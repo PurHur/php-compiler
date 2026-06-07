@@ -1,0 +1,182 @@
+diff --git vendor/ircmaxell/php-cfg/lib/PHPCfg/Parser.php vendor/ircmaxell/php-cfg/lib/PHPCfg/Parser.php
+--- vendor/ircmaxell/php-cfg/lib/PHPCfg/Parser.php
++++ vendor/ircmaxell/php-cfg/lib/PHPCfg/Parser.php
+@@ -55,6 +55,12 @@ class Parser
+ 
+     protected $anonId = 0;
+ 
++    /** Source text for the current parse() call (#6549). */
++    protected $sourceCode = '';
++
++    /** @var array<string, int> occurrence cursor for token matching per parse() (#6549) */
++    private array $newExprMatchCursor = [];
++
+     public function __construct(AstParser $astParser, AstTraverser $astTraverser = null)
+     {
+         $this->astParser = $astParser;
+@@ -76,6 +82,9 @@ class Parser
+      */
+     public function parse($code, $fileName)
+     {
++        $this->sourceCode = $code;
++        $this->newExprMatchCursor = [];
++
+         return $this->parseAst($this->astParser->parse($code), $fileName);
+     }
+ 
+@@ -1564,10 +1573,155 @@ class Parser
+             $class = $this->readVariable($this->parseExprNode($expr->class));
+         }
+ 
++        $attrs = $this->mapAttributes($expr);
++        $attrs['newHasCtorParens'] = $this->newExpressionHasCtorParens($expr);
++
+         return new Op\Expr\New_(
+             $class,
+             $this->parseExprList($expr->args, self::MODE_READ),
+-            $this->mapAttributes($expr)
++            $attrs
+         );
+     }
++
++    /**
++     * True when `new Class()` used explicit constructor parentheses (php-src new_dereferenceable).
++     * Bare `new Class` (new_non_dereferenceable) must not appear in class initializer contexts (#6549).
++     */
++    private function newExpressionHasCtorParens(Expr\New_ $expr): bool
++    {
++        if ([] !== $expr->args) {
++            return true;
++        }
++        if ($expr->class instanceof Stmt\Class_) {
++            return true;
++        }
++        $start = $expr->getStartFilePos();
++        $end = $expr->getEndFilePos();
++        if ($start >= 0 && $end >= $start && '' !== $this->sourceCode) {
++            $snippet = substr($this->sourceCode, $start, $end - $start + 1);
++
++            return (bool) preg_match('/\)\s*$/', $snippet);
++        }
++
++        return $this->newExpressionHasCtorParensFromTokens($expr);
++    }
++
++    private function newExpressionHasCtorParensFromTokens(Expr\New_ $expr): bool
++    {
++        if ('' === $this->sourceCode || !function_exists('token_get_all')) {
++            return true;
++        }
++        if (!($expr->class instanceof Node\Name)) {
++            return true;
++        }
++        $tokens = token_get_all($this->sourceCode);
++        if (!is_array($tokens)) {
++            return true;
++        }
++        $classParts = $expr->class->getParts();
++        $line = $expr->getStartLine();
++        $matchKey = $line . ':' . $expr->class->toString();
++        $wantOccurrence = $this->newExprMatchCursor[$matchKey] ?? 0;
++        $this->newExprMatchCursor[$matchKey] = $wantOccurrence + 1;
++        $n = count($tokens);
++        $seen = 0;
++        for ($i = 0; $i < $n; ++$i) {
++            $t = $tokens[$i];
++            if (!is_array($t) || T_NEW !== $t[0]) {
++                continue;
++            }
++            if ($line > 0 && $t[2] !== $line) {
++                continue;
++            }
++            $j = $this->skipInsignificantTokens($tokens, $i + 1, $n);
++            if (!$this->tokensMatchClassName($tokens, $j, $n, $classParts)) {
++                continue;
++            }
++            if ($seen < $wantOccurrence) {
++                ++$seen;
++                continue;
++            }
++            $j = $this->advancePastClassNameTokens($tokens, $j, $n, $classParts);
++            $j = $this->skipInsignificantTokens($tokens, $j, $n);
++            if ($j < $n && !is_array($tokens[$j]) && '(' === $tokens[$j]) {
++                return true;
++            }
++
++            return false;
++        }
++
++        return true;
++    }
++
++    private function skipInsignificantTokens(array $tokens, int $i, int $n): int
++    {
++        while ($i < $n) {
++            $t = $tokens[$i];
++            if (is_array($t) && in_array($t[0], [T_WHITESPACE, T_COMMENT, T_DOC_COMMENT], true)) {
++                ++$i;
++                continue;
++            }
++            break;
++        }
++
++        return $i;
++    }
++
++    /**
++     * @param list<string> $classParts
++     */
++    private function tokensMatchClassName(array $tokens, int $i, int $n, array $classParts): bool
++    {
++        if ([] === $classParts) {
++            return false;
++        }
++        if ($i < $n && !is_array($tokens[$i]) && '\\' === $tokens[$i]) {
++            ++$i;
++        }
++        foreach ($classParts as $part) {
++            $i = $this->skipInsignificantTokens($tokens, $i, $n);
++            if ($i >= $n || !is_array($tokens[$i]) || T_STRING !== $tokens[$i][0]) {
++                return false;
++            }
++            if (strcasecmp($tokens[$i][1], $part) !== 0) {
++                return false;
++            }
++            ++$i;
++            $i = $this->skipInsignificantTokens($tokens, $i, $n);
++            if ($i < $n && !is_array($tokens[$i]) && '\\' === $tokens[$i]) {
++                ++$i;
++            } else {
++                break;
++            }
++        }
++
++        return true;
++    }
++
++    /**
++     * @param list<string> $classParts
++     */
++    private function advancePastClassNameTokens(array $tokens, int $i, int $n, array $classParts): int
++    {
++        if ($i < $n && !is_array($tokens[$i]) && '\\' === $tokens[$i]) {
++            ++$i;
++        }
++        foreach ($classParts as $partIndex => $part) {
++            $i = $this->skipInsignificantTokens($tokens, $i, $n);
++            if ($i < $n && is_array($tokens[$i]) && T_STRING === $tokens[$i][0]) {
++                ++$i;
++            }
++            if ($partIndex < count($classParts) - 1) {
++                $i = $this->skipInsignificantTokens($tokens, $i, $n);
++                if ($i < $n && !is_array($tokens[$i]) && '\\' === $tokens[$i]) {
++                    ++$i;
++                }
++            }
++        }
++
++        return $i;
++    }
+
+     protected function parseExpr_PostDec(Expr\PostDec $expr)
+

@@ -7,7 +7,7 @@ namespace PHPCompiler\ext\standard;
 /**
  * Native hash() / hash_hmac() digests for VM bootstrap (issue #4790).
  *
- * Port of lib/AOT/runtime/hash_crypto.c — sha256, sha1, md5 without host ext/hash.
+ * Native sha256/sha1/md5 digests for VM bootstrap (mirrors StringHashCryptoJit logic, issue #4790).
  */
 final class VmHashNative
 {

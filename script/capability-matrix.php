@@ -26,6 +26,8 @@ function collectCapabilities(string $root): array
     $modules = [
         'types' => new PHPCompiler\ext\types\Module(),
         'bcmath' => new PHPCompiler\ext\bcmath\Module(),
+        'ctype' => new PHPCompiler\ext\ctype\Module(),
+        'tokenizer' => new PHPCompiler\ext\tokenizer\Module(),
         'filter' => new PHPCompiler\ext\filter\Module(),
         'session' => new PHPCompiler\ext\session\Module(),
         'standard' => new PHPCompiler\ext\standard\Module(),
@@ -71,6 +73,15 @@ function analyzeInternal(PHPCompiler\Func\Internal $fn): array
     if ('gethostbynamel' === $fn->getName() && preg_match('/native getaddrinfo/i', $source)) {
         $notes[] = 'native getaddrinfo (VM FFI + AOT) (#4928)';
     }
+    if ('gethostbyname' === $fn->getName() && preg_match('/JitGethostbyname/i', $source)) {
+        $notes[] = 'forward DNS IPv4 (VM FFI + AOT delegate) (#7419)';
+    }
+    if ('gethostbyaddr' === $fn->getName() && preg_match('/GethostbyaddrRuntime/i', $source)) {
+        $notes[] = 'reverse DNS IPv4 (VM FFI + AOT) (#5854)';
+    }
+    if (in_array($fn->getName(), ['strcspn', 'strspn'], true) && preg_match('/GH-12592/i', $source)) {
+        $notes[] = 'empty $characters: PHP 8.4 full byte length (GH-12592, #7088)';
+    }
     if ('array_map' === $fn->getName() && str_contains($source, 'VmClosureCall::isClosure')) {
         $notes[] = 'callbacks: null/string builtins JIT/AOT; VM closure callbacks (#3086, #1154)';
     } elseif ('array_map' === $fn->getName() && preg_match('/callables are deferred/i', $source)) {
@@ -107,7 +118,9 @@ function analyzeInternal(PHPCompiler\Func\Internal $fn): array
     if ('array_walk' === $fn->getName() && str_contains($source, 'VmClosureCall::isClosure')) {
         $notes[] = 'callbacks: string builtins JIT/AOT; VM closure + optional userdata (#3627)';
     }
-    if ('array_reduce' === $fn->getName() && preg_match('/callables are deferred/i', $source)) {
+    if ('array_reduce' === $fn->getName() && str_contains($source, 'VmClosureCall::isClosure')) {
+        $notes[] = 'callbacks: string user functions + VM closures; php-src-strict invalid callback TypeError (#6679)';
+    } elseif ('array_reduce' === $fn->getName() && preg_match('/callables are deferred/i', $source)) {
         $notes[] = 'callbacks: string user functions VM-only; closures deferred (#1213, #142)';
     }
     if ('preg_replace_callback' === $fn->getName() && preg_match('/closures deferred/i', $source)) {

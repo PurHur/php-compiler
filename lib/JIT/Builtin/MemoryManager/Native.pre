@@ -15,11 +15,7 @@ class Native extends MemoryManager {
 
     public function register(): void {
         parent::register();
-        declare {
-            function malloc(size_t): int8*;
-            function realloc(int8*, size_t): int8*;
-            function free(int8*): void;            
-        }
+        // malloc/free/realloc are registered by LibcExtern before builtin register().
     } 
 
     public function implement(): void {

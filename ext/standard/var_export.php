@@ -7,6 +7,7 @@ namespace PHPCompiler\ext\standard;
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\BasicBlockHelper;
+use PHPCompiler\JIT\Builtin\StringVarExportJit;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\ValueEchoHelper;
@@ -38,7 +39,7 @@ final class var_export extends Internal
             }
             $return = $retArg->toBool();
         }
-        $exported = self::exportVm($v);
+        $exported = self::exportVm($v, $frame);
         if ($return) {
             if (null === $frame->returnVar) {
                 return;
@@ -63,6 +64,7 @@ final class var_export extends Internal
 
             return $outPtr;
         }
+        StringVarExportJit::ensureLinked($context);
         $valuePtr = JitValueBox::valuePtrFromVariable($context, $args[0]);
         $str = $context->builder->call(
             $context->lookupFunction('__compiler_var_export'),
@@ -108,12 +110,12 @@ final class var_export extends Internal
         return $result;
     }
 
-    private static function exportVm(Variable $v): string
+    private static function exportVm(Variable $v, Frame $frame): string
     {
-        return self::exportVmNested($v, 0);
+        return self::exportVmNested($v, 0, $frame);
     }
 
-    private static function exportVmNested(Variable $v, int $level): string
+    private static function exportVmNested(Variable $v, int $level, Frame $frame): string
     {
         if (Variable::TYPE_BOOLEAN === $v->type) {
             return $v->toBool() ? 'true' : 'false';
@@ -130,7 +132,14 @@ final class var_export extends Internal
             return (string) $v->toInt();
         }
         if (Variable::TYPE_FLOAT === $v->type) {
-            $s = (string) $v->toFloat();
+            $f = $v->toFloat();
+            if (is_nan($f)) {
+                return $f < 0 ? '-NAN' : 'NAN';
+            }
+            if (is_infinite($f)) {
+                return $f < 0 ? '-INF' : 'INF';
+            }
+            $s = (string) $f;
             if (false === strpos($s, '.')) {
                 return $s.'.0';
             }
@@ -141,7 +150,7 @@ final class var_export extends Internal
             return "'".str_replace(["\\", "'"], ["\\\\", "\\'"], $v->toString())."'";
         }
         if (Variable::TYPE_ARRAY === $v->type) {
-            return self::exportVmArray($v->toArray(), $level);
+            return self::exportVmArray($v->toArray(), $level, $frame);
         }
         if (Variable::TYPE_ENUM_CASE === $v->type) {
             $case = $v->toEnumCase();
@@ -149,7 +158,7 @@ final class var_export extends Internal
             return self::exportVmEnumCaseLiteral($case->enumClass->name, $case->caseName);
         }
         if (Variable::TYPE_OBJECT === $v->type) {
-            return self::exportVmObject($v, $level);
+            return self::exportVmObject($v, $level, $frame);
         }
 
         throw new \LogicException('var_export() does not support this value type in this compiler build');
@@ -163,15 +172,15 @@ final class var_export extends Internal
         return '\\'.ltrim($enumClassName, '\\').'::'.$caseName;
     }
 
-    private static function exportVmObject(Variable $v, int $level): string
+    private static function exportVmObject(Variable $v, int $level, Frame $frame): string
     {
         $object = $v->resolveIndirect()->toObject();
         if (EnumCaseSupport::isEnumCase($object)) {
             return self::exportVmEnumCaseLiteral($object->class->name, $object->enumCaseName ?? '');
         }
         $className = $object->class->name;
-        $props = VmReflection::getObjectVars($v);
-        $exported = self::exportVmArray($props->toArray(), $level);
+        $props = VmReflection::getObjectVars($v, $frame);
+        $exported = self::exportVmArray($props->toArray(), $level, $frame);
         if ('stdClass' === $className) {
             return '(object) '.$exported;
         }
@@ -179,7 +188,7 @@ final class var_export extends Internal
         return $className.'::__set_state('.$exported.')';
     }
 
-    private static function exportVmArray(HashTable $ht, int $level): string
+    private static function exportVmArray(HashTable $ht, int $level, Frame $frame): string
     {
         $indent = str_repeat('  ', $level);
         $inner = str_repeat('  ', $level + 1);
@@ -188,7 +197,7 @@ final class var_export extends Internal
             $k = Variable::TYPE_INTEGER === $key->type
                 ? (string) $key->toInt()
                 : "'".str_replace(["\\", "'"], ["\\\\", "\\'"], $key->toString())."'";
-            $lines[] = $inner.$k.' => '.self::exportVmNested($value->resolveIndirect(), $level + 1).",\n";
+            $lines[] = $inner.$k.' => '.self::exportVmNested($value->resolveIndirect(), $level + 1, $frame).",\n";
         }
         $lines[] = $indent.")";
 

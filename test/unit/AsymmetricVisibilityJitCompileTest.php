@@ -33,7 +33,7 @@ final class AsymmetricVisibilityJitCompileTest extends TestCase
         $this->assertModuleVerifies(<<<'PHP'
 <?php
 class Demo {
-    public private(set) string $name = 'x';
+    private(set) string $name = 'x';
 }
 $d = new Demo();
 echo $d->name, "\n";
@@ -47,7 +47,7 @@ PHP);
         $this->assertModuleVerifies(<<<'PHP'
 <?php
 class Demo {
-    public private(set) string $name = 'x';
+    private(set) string $name = 'x';
     public function mutate(): void { $this->name = 'y'; }
 }
 $d = new Demo();

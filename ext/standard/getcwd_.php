@@ -6,7 +6,9 @@ namespace PHPCompiler\ext\standard;
 
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
+use PHPCompiler\JIT\Builtin\TypeErrorRaise;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Value;
 
@@ -20,8 +22,9 @@ final class getcwd_ extends Internal
 
     public function execute(Frame $frame): void
     {
-        if (0 !== \count($frame->calledArgs)) {
-            throw new \LogicException('getcwd() takes no arguments in this compiler build');
+        $argc = \count($frame->calledArgs);
+        if ($argc > 0) {
+            throw new \ArgumentCountError('getcwd() expects exactly 0 arguments, '.$argc.' given');
         }
         if (null === $frame->returnVar) {
             return;
@@ -36,8 +39,16 @@ final class getcwd_ extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        if (0 !== \count($args)) {
-            throw new \LogicException('getcwd() takes no arguments in this compiler build');
+        $argc = \count($args);
+        if ($argc > 0) {
+            TypeErrorRaise::ensureLinked($context);
+            TypeErrorRaise::emitArgumentCountError(
+                $context,
+                'getcwd() expects exactly 0 arguments, '.$argc.' given'
+            );
+            $slot = JitValueBox::alloc($context);
+
+            return JitValueBox::pointer($context, $slot);
         }
 
         $resolved = JitGetcwd::invoke($context);

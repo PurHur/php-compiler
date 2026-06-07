@@ -76,6 +76,15 @@ final class ClosureSupport
             if (null !== $state) {
                 return $callable->toObject();
             }
+
+            throw new \Error(
+                'Object of type '.self::valueTypeName($callable).' is not callable'
+            );
+        }
+        if (Variable::TYPE_ENUM_CASE === $callable->type) {
+            throw new \Error(
+                'Object of type '.self::valueTypeName($callable).' is not callable'
+            );
         }
         if (Variable::TYPE_STRING === $callable->type) {
             $name = $callable->toString();
@@ -102,7 +111,7 @@ final class ClosureSupport
         string $context = 'Closure::bindTo()',
         ?Frame $frame = null
     ): ?ObjectEntry {
-        $newThis = $newThis->resolveIndirect();
+        $newThis = self::normalizeNewThis($newThis);
         if (Variable::TYPE_NULL !== $newThis->type && Variable::TYPE_OBJECT !== $newThis->type) {
             $thisArg = 'Closure::bind()' === $context ? '#2 ($newThis)' : '#1 ($newThis)';
             throw new \TypeError(
@@ -123,6 +132,13 @@ final class ClosureSupport
             $bound->boundThis = $newThis;
         }
         $scopeClass = self::resolveScopeClass($newScope, $newThis, $context);
+        if (null !== $scopeClass && self::isExplicitStringScope($newScope)) {
+            if (!self::scopeClassExists($ctx, $scopeClass)) {
+                self::warnScopeClassNotFound($ctx, $frame, $scopeClass);
+
+                return null;
+            }
+        }
         if (null !== $scopeClass && self::isInternalScopeClass($ctx, $scopeClass)) {
             self::warnCannotBindInternalScope($ctx, $frame, $scopeClass);
 
@@ -133,17 +149,50 @@ final class ClosureSupport
         return self::wrapState($ctx, $bound);
     }
 
-    private static function isInternalScopeClass(Context $ctx, string $scopeClass): bool
+    private static function isExplicitStringScope(?Variable $newScope): bool
+    {
+        if (null === $newScope) {
+            return false;
+        }
+        $newScope = $newScope->resolveIndirect();
+        if (Variable::TYPE_STRING !== $newScope->type) {
+            return false;
+        }
+
+        return 'static' !== strtolower($newScope->toString());
+    }
+
+    private static function scopeClassExists(Context $ctx, string $scopeClass): bool
     {
         $lc = strtolower($scopeClass);
         if (!isset($ctx->classes[$lc])) {
             $ctx->autoloadClass($scopeClass);
         }
-        if (!isset($ctx->classes[$lc])) {
+
+        return isset($ctx->classes[$lc]);
+    }
+
+    private static function isInternalScopeClass(Context $ctx, string $scopeClass): bool
+    {
+        if (!self::scopeClassExists($ctx, $scopeClass)) {
             return false;
         }
 
-        return $ctx->classes[$lc]->isInternal;
+        return $ctx->classes[strtolower($scopeClass)]->isInternal;
+    }
+
+    private static function warnScopeClassNotFound(
+        Context $ctx,
+        ?Frame $frame,
+        string $scopeClass
+    ): void {
+        $ctx->errors->triggerError(
+            sprintf('Class "%s" not found', $scopeClass),
+            ErrorReporter::E_WARNING,
+            null,
+            $ctx,
+            $frame
+        );
     }
 
     private static function warnCannotBindInternalScope(
@@ -175,9 +224,10 @@ final class ClosureSupport
         ClosureState $state,
         Variable $newThis,
         array $invokeArgs,
-        string $context = 'Closure::call()'
+        string $context = 'Closure::call()',
+        ?Frame $frame = null
     ): Variable {
-        $newThis = $newThis->resolveIndirect();
+        $newThis = self::normalizeNewThis($newThis);
         if (Variable::TYPE_OBJECT !== $newThis->type) {
             throw new \TypeError(
                 "{$context}: Argument #1 (\$newThis) must be of type object, "
@@ -192,10 +242,20 @@ final class ClosureSupport
         if ($state->isStaticClosure()) {
             throw new \Error('Cannot bind static closure to object');
         }
+        $scopeClass = $newThis->toObject()->class->name;
+        if (self::isInternalScopeClass($ctx, $scopeClass)) {
+            self::warnCannotBindInternalScope($ctx, $frame, $scopeClass);
+
+            $null = new Variable();
+            $null->null();
+
+            return $null;
+        }
         $invokeState = $state->cloneForBind();
         $boundThis = new Variable();
         $boundThis->copyFrom($newThis);
         $invokeState->boundThis = $boundThis;
+        $invokeState->boundScopeClass = $scopeClass;
 
         $copies = [];
         foreach ($invokeArgs as $arg) {
@@ -231,8 +291,18 @@ final class ClosureSupport
                 "Closure::fromCallable(): Class '{$className}' not found"
             );
         }
+        $class = $ctx->classes[$lcClass];
         $methodLc = strtolower($methodName);
+        if ($class->isEnum && 'cases' === $methodLc) {
+            EnumSupport::ensureBuiltinCasesMethod($class);
+
+            return ClosureState::fromWrappedFunc($class->methods['cases']);
+        }
+        if ($class->isEnum && null !== $class->backedType && ('from' === $methodLc || 'tryfrom' === $methodLc)) {
+            return ClosureState::fromWrappedFunc(new EnumFromHandler($class, 'tryfrom' === $methodLc));
+        }
         [$class, $methodLc] = self::resolveStaticMethod($ctx, $lcClass, $methodLc);
+        self::assertStaticMethodForCallable($class, $methodLc);
         $vis = $class->methodVisibility[$methodLc] ?? \PHPCfg\Func::FLAG_PUBLIC;
         $callerClassLc = self::callerClassLc($frame);
         $callerDisplay = self::classDisplayName($ctx, $callerClassLc);
@@ -266,6 +336,14 @@ final class ClosureSupport
         $methodName = $table->findVariable($idx1, false)->resolveIndirect()->toString();
         if (Variable::TYPE_OBJECT === $receiver->type) {
             return self::fromInstanceMethodCallable($ctx, $frame, $receiver, $methodName);
+        }
+        if (Variable::TYPE_ENUM_CASE === $receiver->type) {
+            return self::fromInstanceMethodCallable(
+                $ctx,
+                $frame,
+                EnumCaseSupport::receiverForInstanceMethod($receiver),
+                $methodName
+            );
         }
         if (Variable::TYPE_STRING === $receiver->type) {
             return self::fromStaticStringCallable(
@@ -354,6 +432,17 @@ final class ClosureSupport
         );
     }
 
+    /** Enum cases are objects in Zend; materialize before bindTo/bind/call (#7201). */
+    private static function normalizeNewThis(Variable $newThis): Variable
+    {
+        $newThis = $newThis->resolveIndirect();
+        if (EnumCaseSupport::isEnumCaseVariable($newThis)) {
+            return EnumCaseSupport::receiverForInstanceMethod($newThis);
+        }
+
+        return $newThis;
+    }
+
     private static function valueTypeName(Variable $value): string
     {
         return EnumCaseSupport::typeNameForVariable($value);
@@ -401,6 +490,41 @@ final class ClosureSupport
     /**
      * @return array{0: ClassEntry, 1: string}
      */
+    /**
+     * First-class `Class::instanceMethod(...)` must Error at creation (zend_compile.c, #7465).
+     */
+    private static function assertStaticMethodForCallable(ClassEntry $declaringClass, string $methodLc): void
+    {
+        if ($declaringClass->isEnum && 'cases' === $methodLc) {
+            return;
+        }
+        if ($declaringClass->usesLazyGhostTrait && 'createlazyghost' === $methodLc) {
+            return;
+        }
+        $vis = $declaringClass->methodVisibility[$methodLc] ?? 0;
+        if (($vis & \PHPCfg\Func::FLAG_STATIC) !== 0) {
+            return;
+        }
+        $func = $declaringClass->methods[$methodLc] ?? null;
+        if ($func instanceof Func\PHP && null !== $func->block->func
+            && (($func->block->func->flags ?? 0) & \PHPCfg\Func::FLAG_STATIC) !== 0) {
+            return;
+        }
+        $declaringName = $declaringClass->name;
+        $declaredName = $declaringClass->methodNames[$methodLc] ?? $methodLc;
+        if ($func instanceof Func\PHP && null !== $func->block->func && null !== $func->block->func->class) {
+            $declaringName = $func->block->func->class->value;
+            if (isset($declaringClass->methodNames[$methodLc])) {
+                $declaredName = $declaringClass->methodNames[$methodLc];
+            } elseif (isset($func->block->func->name)) {
+                $declaredName = $func->block->func->name;
+            }
+        }
+        throw new \Error(
+            'Non-static method '.$declaringName.'::'.$declaredName.'() cannot be called statically'
+        );
+    }
+
     private static function resolveStaticMethod(Context $ctx, string $lcClass, string $methodLc): array
     {
         $visited = [];

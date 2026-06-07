@@ -36,6 +36,10 @@ final class get_called_class_ extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        throw new \LogicException('get_called_class() is not supported in JIT in this compiler build; use bin/vm.php');
+        if (\count($args) > 0) {
+            throw new \LogicException('get_called_class() takes no arguments in this compiler build');
+        }
+
+        return JitGetCalledClass::invoke($context);
     }
 }

@@ -31,7 +31,7 @@ final class VmFs
     }
 
     public static function fileSize(string $path) {
-        $stat = @stat($path);
+        $stat = VmStatCache::stat($path);
         if (false === $stat) {
             return false;
         }
@@ -40,7 +40,7 @@ final class VmFs
     }
 
     public static function fileMtime(string $path) {
-        $stat = @stat($path);
+        $stat = VmStatCache::stat($path);
         if (false === $stat) {
             return false;
         }
@@ -49,7 +49,7 @@ final class VmFs
     }
 
     public static function fileAtime(string $path) {
-        $stat = @stat($path);
+        $stat = VmStatCache::stat($path);
         if (false === $stat) {
             return false;
         }
@@ -58,7 +58,7 @@ final class VmFs
     }
 
     public static function fileCtime(string $path) {
-        $stat = @stat($path);
+        $stat = VmStatCache::stat($path);
         if (false === $stat) {
             return false;
         }
@@ -67,7 +67,7 @@ final class VmFs
     }
 
     public static function fileInode(string $path) {
-        $stat = @stat($path);
+        $stat = VmStatCache::stat($path);
         if (false === $stat) {
             return false;
         }
@@ -77,7 +77,7 @@ final class VmFs
 
     /** linkinfo() — st_dev from lstat(2) on the link itself (php-src ext/standard/link.c, #6083). */
     public static function linkinfo(string $path) {
-        $stat = @lstat($path);
+        $stat = VmStatCache::lstat($path);
         if (false === $stat) {
             return false;
         }
@@ -86,7 +86,7 @@ final class VmFs
     }
 
     public static function fileOwner(string $path) {
-        $stat = @stat($path);
+        $stat = VmStatCache::stat($path);
         if (false === $stat) {
             return false;
         }
@@ -95,7 +95,7 @@ final class VmFs
     }
 
     public static function fileGroup(string $path) {
-        $stat = @stat($path);
+        $stat = VmStatCache::stat($path);
         if (false === $stat) {
             return false;
         }
@@ -104,7 +104,7 @@ final class VmFs
     }
 
     public static function filePerms(string $path) {
-        $stat = @stat($path);
+        $stat = VmStatCache::stat($path);
         if (false === $stat) {
             return false;
         }
@@ -113,7 +113,7 @@ final class VmFs
     }
 
     public static function fileType(string $path) {
-        $stat = @lstat($path);
+        $stat = VmStatCache::lstat($path);
         if (false === $stat) {
             return false;
         }
@@ -127,7 +127,7 @@ final class VmFs
    * @return HashTable|false
    */
     public static function statInfo(string $path, bool $lstat = false) {
-        $raw = $lstat ? @lstat($path) : @stat($path);
+        $raw = $lstat ? VmStatCache::lstat($path) : VmStatCache::stat($path);
         if (false === $raw) {
             return false;
         }
@@ -184,7 +184,12 @@ final class VmFs
 
     public static function unlink(string $path): bool
     {
-        return VmFsUnlink::unlink($path);
+        $ok = VmFsUnlink::unlink($path);
+        if ($ok) {
+            VmStatCache::invalidatePath($path);
+        }
+
+        return $ok;
     }
 
     public static function mkdir(string $path, int $mode = 0777, bool $recursive = false): bool
@@ -199,7 +204,12 @@ final class VmFs
 
     public static function chmod(string $path, int $permissions): bool
     {
-        return @chmod($path, $permissions);
+        $ok = @chmod($path, $permissions);
+        if ($ok) {
+            VmStatCache::invalidatePath($path);
+        }
+
+        return $ok;
     }
 
     public static function resolveUserUid(Variable $user): ?int
@@ -290,7 +300,13 @@ final class VmFs
 
     public static function rename(string $from, string $to): bool
     {
-        return @rename($from, $to);
+        $ok = @rename($from, $to);
+        if ($ok) {
+            VmStatCache::invalidatePath($from);
+            VmStatCache::invalidatePath($to);
+        }
+
+        return $ok;
     }
 
     public static function hardLink(string $target, string $link): bool
@@ -300,7 +316,12 @@ final class VmFs
 
     public static function symlink(string $target, string $link): bool
     {
-        return @symlink($target, $link);
+        $ok = @symlink($target, $link);
+        if ($ok) {
+            VmStatCache::invalidatePath($link);
+        }
+
+        return $ok;
     }
 
     /** Prefix for multipart upload temps (lib/Web/Superglobals.php, AOT sg_set_file_entry). */
@@ -356,7 +377,12 @@ final class VmFs
 
     public static function copy(string $from, string $to): bool
     {
-        return @copy($from, $to);
+        $ok = @copy($from, $to);
+        if ($ok) {
+            VmStatCache::invalidatePath($to);
+        }
+
+        return $ok;
     }
 
     public static function touch(string $path, ?int $mtime = null, ?int $atime = null): bool
@@ -369,7 +395,7 @@ final class VmFs
             $ok = @touch($path, $mtime, $atime);
         }
         if ($ok) {
-            \clearstatcache(true, $path);
+            VmStatCache::invalidatePath($path);
         }
 
         return $ok;
@@ -446,8 +472,18 @@ final class VmFs
         if (false === $fp) {
             return false;
         }
+
+        return self::adoptStreamResource($fp);
+    }
+
+    /** @return int|false */
+    public static function adoptStreamResource($resource)
+    {
+        if (!\is_resource($resource)) {
+            return false;
+        }
         $id = ++self::$nextHandleId;
-        self::$handles[$id] = $fp;
+        self::$handles[$id] = $resource;
 
         return $id;
     }
@@ -570,6 +606,30 @@ final class VmFs
         }
 
         return @\fflush($fp);
+    }
+
+    /** fsync() — flush buffers and sync to disk (php-src ext/standard/file.c, #6062). */
+    public static function fsync(int $handle): bool
+    {
+        $fp = self::lookup($handle);
+        if (null === $fp || !VmStreamSync::isSupportedResource($fp)) {
+            return false;
+        }
+        @\fflush($fp);
+
+        return @\fsync($fp);
+    }
+
+    /** fdatasync() — sync file data without metadata (php-src ext/standard/file.c, #6813). */
+    public static function fdatasync(int $handle): bool
+    {
+        $fp = self::lookup($handle);
+        if (null === $fp || !VmStreamSync::isSupportedResource($fp)) {
+            return false;
+        }
+        @\fflush($fp);
+
+        return @\fdatasync($fp);
     }
 
     /**
@@ -933,6 +993,16 @@ final class VmFs
         return 'stream';
     }
 
+    /**
+     * get_resource_type() for VM stream-tagged handles, including after fclose (#5179).
+     *
+     * php-src: ext/standard/file.c — closed resources return "Unknown"
+     */
+    public static function resourceTypeForStreamTag(int $handle): string
+    {
+        return isset(self::$handles[$handle]) ? 'stream' : 'Unknown';
+    }
+
     public static function isValidHandle(int $handle): bool
     {
         return isset(self::$handles[$handle]);
@@ -958,6 +1028,12 @@ final class VmFs
         }
 
         return $ht;
+    }
+
+    /** @return resource|null */
+    public static function lookupResource(int $handle): mixed
+    {
+        return self::lookup($handle);
     }
 
     private static function lookup(int $handle): mixed

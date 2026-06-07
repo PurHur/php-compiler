@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Insert parseExpr_Match into vendor php-cfg Parser (issue #143, #3398)."""
+"""Insert or refresh parseExpr_Match in vendor php-cfg Parser (#143, #3398, #5448)."""
 from __future__ import annotations
 
 from pathlib import Path
@@ -11,6 +11,16 @@ OVERLAY = ROOT / "patches/overlays/php-cfg/match-parser-methods.php"
 INSERT = OVERLAY.read_text() if OVERLAY.is_file() else ""
 
 NEEDLE = "    protected function parseExpr_UnaryMinus(Expr\\UnaryMinus $expr)\n"
+OVERLAY_COMMENT = "    /**\n     * Lower match to === compare"
+MATCH_FN = "    protected function parseExpr_Match(Expr\\Match_ $expr)\n"
+
+
+def match_block_start(text: str) -> int | None:
+    if OVERLAY_COMMENT in text:
+        return text.index(OVERLAY_COMMENT)
+    if MATCH_FN in text:
+        return text.index(MATCH_FN)
+    return None
 
 
 def main() -> int:
@@ -21,8 +31,17 @@ def main() -> int:
         print(f"missing overlay {OVERLAY}", flush=True)
         return 1
     text = PARSER.read_text()
-    if "function parseExpr_Match" in text:
-        start = text.index("    /**\n     * Lower match to === compare")
+    if "lowerUnhandledMatchError" in text and "function parseExpr_Match" in text:
+        if "phpc_match_unhandled_operand_is_object" in text:
+            print(f"skip {PARSER} (match overlay current)")
+            return 0
+        print(f"refresh {PARSER} (match overlay stale — enum UnhandledMatchError probe)")
+
+    start = match_block_start(text)
+    if start is not None:
+        if NEEDLE not in text[start:]:
+            print("parseExpr_UnaryMinus needle missing after parseExpr_Match", flush=True)
+            return 1
         end = text.index(NEEDLE, start)
         text = text[:start] + INSERT + text[end:]
     elif NEEDLE not in text:
@@ -30,6 +49,7 @@ def main() -> int:
         return 1
     else:
         text = text.replace(NEEDLE, INSERT + NEEDLE, 1)
+
     PARSER.write_text(text)
     print("patched", PARSER)
     return 0

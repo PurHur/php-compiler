@@ -26,6 +26,10 @@ final class DebugBacktraceBuiltinTest extends BaseTest
             __DIR__.'/../compliance/cases/stdlib/debug_backtrace_ignore_args.phpt',
             'debug_backtrace_ignore_args.phpt'
         );
+        yield 'get_debug_backtrace_alias.phpt' => self::parsePHPT(
+            __DIR__.'/../compliance/cases/stdlib/get_debug_backtrace_alias.phpt',
+            'get_debug_backtrace_alias.phpt'
+        );
     }
 
     public function testVmDebugBacktraceInline(): void

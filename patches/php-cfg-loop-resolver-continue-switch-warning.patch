@@ -1,7 +1,6 @@
-diff --git vendor/ircmaxell/php-cfg/lib/PHPCfg/AstVisitor/LoopResolver.php vendor/ircmaxell/php-cfg/lib/PHPCfg/AstVisitor/LoopResolver.php
---- vendor/ircmaxell/php-cfg/lib/PHPCfg/AstVisitor/LoopResolver.php
-+++ vendor/ircmaxell/php-cfg/lib/PHPCfg/AstVisitor/LoopResolver.php
-@@ -12,6 +12,11 @@ declare(strict_types=1);
+--- vendor/ircmaxell/php-cfg/lib/PHPCfg/AstVisitor/LoopResolver.php	2026-06-07 11:31:35.768982190 +0000
++++ vendor/ircmaxell/php-cfg/lib/PHPCfg/AstVisitor/LoopResolver.php	2026-06-07 11:31:35.782185532 +0000
+@@ -12,7 +12,12 @@
  namespace PHPCfg\AstVisitor;
  
  use PhpParser\Node;
@@ -14,7 +13,7 @@ diff --git vendor/ircmaxell/php-cfg/lib/PHPCfg/AstVisitor/LoopResolver.php vendo
  use PhpParser\Node\Stmt\Goto_;
  use PhpParser\Node\Stmt\Label;
  use PhpParser\NodeVisitorAbstract;
-@@ -21,8 +26,12 @@ class LoopResolver extends NodeVisitorAbstract
+@@ -21,8 +26,13 @@
  {
      protected static $labelCounter = 0;
  
@@ -28,9 +27,12 @@ diff --git vendor/ircmaxell/php-cfg/lib/PHPCfg/AstVisitor/LoopResolver.php vendo
      protected $breakStack = [];
  
      public function enterNode(Node $node)
-@@ -31,17 +40,27 @@ class LoopResolver extends NodeVisitorAbstract
+@@ -30,12 +40,11 @@
+         switch ($node->getType()) {
              case 'Stmt_Break':
                  return $this->resolveStack($node, $this->breakStack);
+-            case 'Stmt_Continue':
+-                return $this->resolveStack($node, $this->continueStack);
              case 'Stmt_Switch':
                  $lbl = $this->makeLabel();
                  $this->breakStack[] = $lbl;
@@ -39,7 +41,7 @@ diff --git vendor/ircmaxell/php-cfg/lib/PHPCfg/AstVisitor/LoopResolver.php vendo
  
                  break;
              case 'Stmt_Do':
-             case 'Stmt_While':
+@@ -43,6 +52,7 @@
              case 'Stmt_For':
              case 'Stmt_Foreach':
                  $this->continueStack[] = $this->makeLabel();
@@ -47,7 +49,7 @@ diff --git vendor/ircmaxell/php-cfg/lib/PHPCfg/AstVisitor/LoopResolver.php vendo
                  $this->breakStack[] = $this->makeLabel();
  
                  break;
-@@ -52,6 +71,14 @@ class LoopResolver extends NodeVisitorAbstract
+@@ -52,15 +62,24 @@
      public function leaveNode(Node $node)
      {
          switch ($node->getType()) {
@@ -72,15 +74,7 @@ diff --git vendor/ircmaxell/php-cfg/lib/PHPCfg/AstVisitor/LoopResolver.php vendo
  
                  return [$node, new Label(array_pop($this->breakStack))];
          }
-     }
- 
-+    /**
-+     * @param list<string> $stack
-+     */
-     protected function resolveStack(Node $node, array $stack)
-     {
-         if (! $node->num) {
-@@ -68,7 +91,7 @@ class LoopResolver extends NodeVisitorAbstract
+@@ -80,7 +99,7 @@
          }
          if ($node->num instanceof LNumber) {
              $num = $node->num->value;
@@ -89,10 +83,11 @@ diff --git vendor/ircmaxell/php-cfg/lib/PHPCfg/AstVisitor/LoopResolver.php vendo
                  throw new \LogicException('Too high of a count for '.$node->getType());
              }
              $loc = array_slice($stack, -$num, 1);
-@@ -79,6 +102,42 @@ class LoopResolver extends NodeVisitorAbstract
+@@ -91,6 +110,38 @@
          throw new \LogicException('Unimplemented Node Value Type');
      }
  
++
 +    protected function isContinueTargetingSwitch(Node $node): bool
 +    {
 +        $level = 1;

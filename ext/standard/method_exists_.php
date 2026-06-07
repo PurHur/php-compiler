@@ -26,7 +26,7 @@ final class method_exists_ extends Internal
         }
         $ctx = VmReflection::requireContext($frame);
         $class = VmReflection::resolveClassFromArg($ctx, $frame->calledArgs[0]);
-        $method = VmReflection::stringArg($frame->calledArgs[1], 'method_exists() method name');
+        $method = VmReflection::stringArg($frame->calledArgs[1], 'method_exists() method name', 1);
         $exists = VmReflection::methodExistsOnClass($class, $method);
         if (null !== $frame->returnVar) {
             $frame->returnVar->bool($exists);

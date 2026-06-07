@@ -1,10 +1,10 @@
 --TEST--
-Language: #[\Override] on trait-composed method compiles (issue #5550)
+Language: #[\Override] on trait-composed method — valid (#6786)
 --FILE--
 <?php
-trait T { public function f(): void {} }
-class C { use T; #[\Override] public function f(): void {} }
-echo "ok\n";
+trait T { public function f(): string { return 't'; } }
+class C { use T; #[\Override] public function f(): string { return 'c'; } }
+echo (new C())->f() . "\n";
 ?>
 --EXPECT--
-ok
+c

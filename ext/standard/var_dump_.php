@@ -43,7 +43,7 @@ final class var_dump_ extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        throw new \LogicException('var_dump() is not implemented for JIT in this compiler build');
+        return JitVarDump::invoke($context, ...$args);
     }
 
     private static function dumpVariable(VM $vm, Variable $var, int $level, bool $showRefMarker = false): void

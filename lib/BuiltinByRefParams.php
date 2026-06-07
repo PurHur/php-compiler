@@ -37,10 +37,14 @@ final class BuiltinByRefParams
                 return [1];
             case 'parse_str':
                 return [1];
+            case 'stream_socket_client':
+                return [1, 2];
             case 'settype':
                 return [0];
             case 'similar_text':
                 return [2];
+            case 'headers_sent':
+                return [0, 1];
         }
 
         return [];

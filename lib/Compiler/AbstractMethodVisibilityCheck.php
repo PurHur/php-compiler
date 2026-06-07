@@ -10,7 +10,8 @@ use PHPCfg\Operand;
 use PHPCfg\Script;
 
 /**
- * Compile-time check: abstract methods cannot be private (#3548).
+ * Compile-time check: abstract methods cannot be private on classes/interfaces (#3548).
+ * Traits may declare abstract private methods since PHP 8.0 (#6895).
  *
  * php-src: Zend/zend_compile.c — zend_compile_method abstract + visibility checks
  */
@@ -20,9 +21,14 @@ final class AbstractMethodVisibilityCheck
     {
         $check = new self();
         foreach ($script->main->cfg->children as $child) {
-            if ($child instanceof Op\Stmt\ClassLike) {
-                $check->validateClassLike($child);
+            if (!$child instanceof Op\Stmt\ClassLike) {
+                continue;
             }
+            // php-src: abstract private methods are allowed on traits (PHP 8.0+), not on classes (#6895).
+            if ($child instanceof Op\Stmt\Trait_) {
+                continue;
+            }
+            $check->validateClassLike($child);
         }
     }
 

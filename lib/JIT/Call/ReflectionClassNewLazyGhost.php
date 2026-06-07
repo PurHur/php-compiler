@@ -31,7 +31,7 @@ final class ReflectionClassNewLazyGhost implements Call
         }
         $initIndex = LazyObjectHelper::registerInitProxy($context, $initProxy);
 
-        $classIdVal = ReflectionClassNewLazyProxy::loadClassIdFromReflection($context, $args[0]);
+        $classIdVal = ReflectionClassNewLazyProxy::loadClassIdFromLazyFactoryArg($context, $args[0]);
         $obj = $context->type->object->allocateForRuntimeClassId($classIdVal);
         $context->type->object->resetInstancePropertySlots($obj, $classIdVal);
         LazyObjectHelper::registerLazyObject($context, $obj, $initIndex, true);

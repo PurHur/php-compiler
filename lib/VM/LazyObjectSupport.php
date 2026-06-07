@@ -4,8 +4,10 @@ declare(strict_types=1);
 
 namespace PHPCompiler\VM;
 
+use PHPCompiler\VM\EnumCaseSupport;
+
 /**
- * PHP 8.4 lazy proxy and ghost initialization (#3317, #4026, #5318).
+ * PHP 8.4 lazy proxy and ghost initialization (#3317, #4026, #5318, #6708).
  *
  * VM stores lazy state on {@see ObjectEntry}; JIT/AOT use matching {@code __object__} header fields.
  *
@@ -16,6 +18,69 @@ final class LazyObjectSupport
     public static function classUsesLazyGhostTrait(ClassEntry $class): bool
     {
         return $class->usesLazyGhostTrait;
+    }
+
+    /**
+     * createLazyGhost()/createLazyProxy()/ReflectionClass lazy factories (#6708).
+     */
+    public static function resolveClassForLazyFactory(
+        Context $ctx,
+        string $className,
+        string $functionName,
+        bool $proxy = false
+    ): ClassEntry {
+        $entry = $ctx->classes[strtolower($className)] ?? null;
+        if (null === $entry) {
+            throw new \ValueError(
+                $functionName.'(): Argument #1 ($class) must be a valid class name, '
+                .var_export($className, true).' given'
+            );
+        }
+        if ($entry->isInterface || $entry->isTrait || $entry->isEnum) {
+            $kind = $proxy ? 'proxy' : 'ghost';
+
+            throw new \LogicException('Cannot create lazy '.$kind.' of '.$className);
+        }
+
+        return $entry;
+    }
+
+    public static function extractRequiredCallable(
+        Variable $arg,
+        string $functionName,
+        int $argNum,
+        string $paramName
+    ): ClosureState {
+        $arg = $arg->resolveIndirect();
+        if (Variable::TYPE_OBJECT !== $arg->type) {
+            throw new \TypeError(
+                $functionName.'(): Argument #'.$argNum.' ($'.$paramName.') must be of type callable, '
+                .EnumCaseSupport::typeNameForVariable($arg).' given'
+            );
+        }
+        $initObject = $arg->toObject();
+        if (null === $initObject->closureState) {
+            throw new \TypeError(
+                $functionName.'(): Argument #'.$argNum.' ($'.$paramName.') must be of type callable, '
+                .$initObject->class->name.' given'
+            );
+        }
+
+        return $initObject->closureState;
+    }
+
+    public static function extractOptionalCallable(
+        Variable $arg,
+        string $functionName,
+        int $argNum,
+        string $paramName
+    ): ?ClosureState {
+        $arg = $arg->resolveIndirect();
+        if ($arg->isUndefined() || Variable::TYPE_NULL === $arg->type) {
+            return null;
+        }
+
+        return self::extractRequiredCallable($arg, $functionName, $argNum, $paramName);
     }
 
     public static function createProxy(ClassEntry $class, ClosureState $initializer): ObjectEntry
@@ -30,7 +95,7 @@ final class LazyObjectSupport
         return $object;
     }
 
-    public static function createGhost(ClassEntry $class, ClosureState $initializer): ObjectEntry
+    public static function createGhost(ClassEntry $class, ?ClosureState $initializer): ObjectEntry
     {
         $object = new ObjectEntry($class);
         foreach ($object->getRawProperties() as $var) {
@@ -48,7 +113,12 @@ final class LazyObjectSupport
 
     public static function ensureInitialized(\PHPCompiler\VM $vm, ObjectEntry $object): void
     {
-        if (!$object->lazyPending || null === $object->lazyInitializer) {
+        if (!$object->lazyPending) {
+            return;
+        }
+        if (null === $object->lazyInitializer) {
+            self::markAsInitialized($object);
+
             return;
         }
 
@@ -60,7 +130,14 @@ final class LazyObjectSupport
             self::applyPropertyDefaults($object);
             $ghostArg = new Variable(Variable::TYPE_OBJECT);
             $ghostArg->object($object);
-            $result = $vm->invokeClosure($initializer, $ghostArg);
+            $ctx = $vm->context;
+            $prev = $ctx->lazyGhostInitializing;
+            $ctx->lazyGhostInitializing = $object;
+            try {
+                $result = $vm->invokeClosure($initializer, $ghostArg);
+            } finally {
+                $ctx->lazyGhostInitializing = $prev;
+            }
             $result = $result->resolveIndirect();
             if (!$result->isUndefined() && Variable::TYPE_NULL !== $result->type) {
                 throw new \LogicException('Lazy object initializer must return NULL or no value');
@@ -211,6 +288,21 @@ final class LazyObjectSupport
             if (null !== $property->default && !$property->hasRuntimeDefaultInit()) {
                 $var->copyFrom($property->default);
             }
+        }
+    }
+
+    /** Set declared properties on an uninitialized lazy ghost without running the initializer (#6531). */
+    public static function applyInstanceProperties(ObjectEntry $object, HashTable $properties): void
+    {
+        foreach ($properties->iterateKeyed(true) as [$key, $value]) {
+            if (Variable::TYPE_STRING !== $key->type) {
+                continue;
+            }
+            $name = $key->toString();
+            if (!$object->hasProperty($name)) {
+                continue;
+            }
+            $object->getProperty($name)->copyFrom($value);
         }
     }
 }

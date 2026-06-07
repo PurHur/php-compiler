@@ -130,10 +130,8 @@ final class AutoloadDiscovery
     private static function parseScript(Runtime $runtime, string $file): Script
     {
         $code = (string) file_get_contents($file);
-        $script = $runtime->parser->parse($code, $file);
-        $runtime->preprocessor->traverse($script);
 
-        return $script;
+        return $runtime->parse($code, $file);
     }
 }
 

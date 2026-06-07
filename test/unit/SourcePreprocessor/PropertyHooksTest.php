@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace PHPCompiler\Test\Unit\SourcePreprocessor;
 
+use PHPCompiler\Runtime;
 use PHPCompiler\SourcePreprocessor\PropertyHooks;
 use PHPUnit\Framework\TestCase;
 
@@ -89,10 +90,73 @@ interface HasTitle {
     }
 }
 PHP;
-        [$out] = (new PropertyHooks())->process($src);
+        [$out, $registry] = (new PropertyHooks())->process($src);
         self::assertStringNotContainsString('$title {', $out);
         self::assertStringContainsString('public string $title;', $out);
         self::assertStringNotContainsString('__phpc_property_get_title', $out);
+        self::assertTrue($registry['hastitle']['title']['virtual'] ?? false);
+    }
+
+    public function testStripsAbstractGetSetHooksOnInterface(): void
+    {
+        $src = <<<'PHP'
+<?php
+interface I {
+    public int $p {
+        get;
+        set;
+    }
+}
+PHP;
+        [$out, $registry] = (new PropertyHooks())->process($src);
+        self::assertStringNotContainsString('$p {', $out);
+        self::assertStringContainsString('public int $p;', $out);
+        self::assertStringNotContainsString('set;', $out);
+        self::assertTrue($registry['i']['p']['virtual'] ?? false);
+        self::assertTrue($registry['i']['p']['requiresGet'] ?? false);
+        self::assertTrue($registry['i']['p']['requiresSet'] ?? false);
+    }
+
+    public function testIgnoresInterfaceKeywordInComments(): void
+    {
+        $src = <<<'PHP'
+<?php
+/** interface property hooks in comments must not confuse the scanner */
+interface I {
+    public int $x {
+        get;
+        set;
+    }
+}
+PHP;
+        [$out, $registry] = (new PropertyHooks())->process($src);
+        self::assertTrue($registry['i']['x']['requiresGet'] ?? false);
+        self::assertTrue($registry['i']['x']['requiresSet'] ?? false);
+        self::assertArrayNotHasKey('property', $registry);
+    }
+
+    public function testStripsAbstractGetHookOnAbstractClass(): void
+    {
+        $src = <<<'PHP'
+<?php
+abstract class A {
+    abstract public string $label {
+        get;
+    }
+}
+final class C extends A {
+    public string $label {
+        get => 'child';
+    }
+}
+PHP;
+        [$out, $registry] = (new PropertyHooks())->process($src);
+        self::assertStringNotContainsString('$label {', $out);
+        self::assertStringContainsString('public string $label;', $out);
+        self::assertStringNotContainsString('abstract public string $label', $out);
+        self::assertStringContainsString('function __phpc_property_get_label', $out);
+        self::assertTrue($registry['a']['label']['abstract'] ?? false);
+        self::assertSame('__phpc_property_get_label', $registry['c']['label']['get'] ?? null);
     }
 
     public function testLowersTraitPropertyHooks(): void
@@ -113,22 +177,280 @@ PHP;
         self::assertSame('__phpc_property_get_x', $registry['t']['x']['get'] ?? null);
     }
 
-    public function testLowersStaticPropertyHooksAsStaticMethods(): void
+    public function testTraitAbstractPropertyHooksRegisterRequirements(): void
+    {
+        $src = <<<'PHP'
+<?php
+trait T {
+    public string $x { get; set; }
+}
+PHP;
+        [$out, $registry] = (new PropertyHooks())->process($src);
+        self::assertStringContainsString('public string $x;', $out);
+        self::assertStringNotContainsString('__phpc_property_get_x', $out);
+        self::assertTrue($registry['t']['x']['requiresGet'] ?? false);
+        self::assertTrue($registry['t']['x']['requiresSet'] ?? false);
+        self::assertTrue($registry['t']['x']['abstract'] ?? false);
+    }
+
+    public function testLowersSetArrowAssignmentToSeparateBackingField(): void
+    {
+        $src = <<<'PHP'
+<?php
+class H {
+    public int $x {
+        get => $this->v;
+        set => $this->v = $value;
+    }
+    private int $v = 1;
+}
+PHP;
+        [$out, $registry] = (new PropertyHooks())->process($src);
+        self::assertStringContainsString('$this->v = $value;', $out);
+        self::assertStringNotContainsString('$this->x =', $out);
+        self::assertTrue($registry['h']['x']['virtual'] ?? false);
+    }
+
+    public function testLowersSetArrowTransformToSeparateBackingField(): void
+    {
+        $src = <<<'PHP'
+<?php
+class Box {
+    private int $stored = 0;
+    public int $value {
+        get => $this->stored;
+        set => $this->stored = $value * 10;
+    }
+}
+PHP;
+        [$out, $registry] = (new PropertyHooks())->process($src);
+        self::assertStringContainsString('$this->stored = $value * 10;', $out);
+        self::assertStringNotContainsString('$this->value =', $out);
+        self::assertTrue($registry['box']['value']['virtual'] ?? false);
+    }
+
+    public function testLowersStaticPropertyHooks(): void
     {
         $src = <<<'PHP'
 <?php
 class Box {
     public static string $label {
-        get => 'static:' . self::$label;
+        get => self::$v;
         set => strtoupper($value);
+    }
+    private static ?string $v = null;
+}
+PHP;
+        [$out, $registry] = (new PropertyHooks())->process($src, 'static_hooks.php');
+        self::assertStringContainsString('public static string $label;', $out);
+        self::assertStringContainsString('public static function __phpc_property_get_label()', $out);
+        self::assertStringContainsString('public static function __phpc_property_set_label($value)', $out);
+        self::assertTrue($registry['box']['label']['static'] ?? false);
+    }
+
+    public function testLowersSetBlockHookWithNestedBackingField(): void
+    {
+        $src = <<<'PHP'
+<?php
+class C {
+    public int $x {
+        set { $this->v = $value; }
+        private int $v = 0;
     }
 }
 PHP;
         [$out, $registry] = (new PropertyHooks())->process($src);
-        self::assertStringContainsString('public static string $label;', $out);
-        self::assertStringContainsString('public static function __phpc_property_get_label', $out);
-        self::assertStringContainsString('public static function __phpc_property_set_label', $out);
-        self::assertStringContainsString("self::\$label = (strtoupper(\$value));", $out);
-        self::assertTrue($registry['box']['label']['static'] ?? false);
+        self::assertStringContainsString('public int $x;', $out);
+        self::assertStringContainsString('private int $v = 0;', $out);
+        self::assertStringContainsString('function __phpc_property_set_x', $out);
+        self::assertStringContainsString('$this->v = $value;', $out);
+        self::assertSame('__phpc_property_set_x', $registry['c']['x']['set'] ?? null);
+        self::assertSame('v', $registry['c']['x']['setBacking'] ?? null);
+    }
+
+    public function testLowersUnsetHook(): void
+    {
+        $src = <<<'PHP'
+<?php
+class Box {
+    public string $label {
+        get => $this->label ?? 'default';
+        set => $this->label = $value;
+        unset => $this->label = 'cleared';
+    }
+}
+PHP;
+        [$out, $registry] = (new PropertyHooks())->process($src);
+        self::assertStringContainsString('function __phpc_property_unset_label', $out);
+        self::assertStringContainsString("\$this->label = 'cleared';", $out);
+        self::assertSame('__phpc_property_unset_label', $registry['box']['label']['unset'] ?? null);
+    }
+
+    /** @covers issue #6650 — block hook syntax must preprocess before curly-brace rejector */
+    public function testBlockGetHookSurvivesRuntimePreprocess(): void
+    {
+        $src = <<<'PHP'
+<?php
+class C {
+    public int $x {
+        get {
+            return 42;
+        }
+    }
+}
+PHP;
+        $runtime = new Runtime();
+        [$out] = $runtime->preprocessSourceForParse($src, 'block_hook.php');
+        self::assertStringNotContainsString('$x {', $out);
+        self::assertStringContainsString('function __phpc_property_get_x', $out);
+    }
+
+    /** @covers issue #6898 — asymmetric set visibility on property hooks */
+    public function testLowersAsymmetricSetArrowHook(): void
+    {
+        $src = <<<'PHP'
+<?php
+class C {
+    public string $x {
+        get => 'g';
+        set (protected) => $value;
+    }
+}
+PHP;
+        [$out, $registry] = (new PropertyHooks())->process($src);
+        self::assertStringNotContainsString('$x {', $out);
+        self::assertStringContainsString('/*phpc-asymmetric-set:protected*/ public string $x;', $out);
+        self::assertStringContainsString('function __phpc_property_get_x', $out);
+        self::assertStringContainsString('function __phpc_property_set_x', $out);
+        self::assertStringContainsString('$this->x = ($value);', $out);
+        self::assertSame('__phpc_property_set_x', $registry['c']['x']['set'] ?? null);
+    }
+
+    public function testLowersAsymmetricSetBlockHook(): void
+    {
+        $src = <<<'PHP'
+<?php
+class C {
+    public string $x {
+        get => 'g';
+        set (private) {
+            $this->x = $value;
+        }
+    }
+}
+PHP;
+        [$out] = (new PropertyHooks())->process($src);
+        self::assertStringContainsString('/*phpc-asymmetric-set:private*/ public string $x;', $out);
+        self::assertStringContainsString('function __phpc_property_set_x($value)', $out);
+    }
+
+    /** @covers issue #7148 — brace hook `private set;` modifier before set keyword */
+    public function testLowersBraceHookPrivateSetModifierOnConcreteClass(): void
+    {
+        $src = <<<'PHP'
+<?php
+class User {
+    public string $email { get; private set; }
+}
+PHP;
+        [$out, $registry] = (new PropertyHooks())->process($src);
+        self::assertStringNotContainsString('$email {', $out);
+        self::assertStringContainsString('/*phpc-asymmetric-set:private*/ public string $email;', $out);
+        self::assertArrayNotHasKey('requiresGet', $registry['user']['email'] ?? []);
+        self::assertArrayNotHasKey('requiresSet', $registry['user']['email'] ?? []);
+    }
+
+    public function testLowersBraceHookPrivateSetArrowHook(): void
+    {
+        $src = <<<'PHP'
+<?php
+class C {
+    public string $x {
+        get => 'g';
+        private set => $this->x = $value;
+    }
+}
+PHP;
+        [$out] = (new PropertyHooks())->process($src);
+        self::assertStringContainsString('/*phpc-asymmetric-set:private*/ public string $x;', $out);
+        self::assertStringContainsString('function __phpc_property_set_x', $out);
+    }
+
+    public function testSkipsClassDeclarationsInsideStringLiterals(): void
+    {
+        $src = <<<'PHP'
+<?php
+$code = "abstract class BaseE { abstract public string \$x { get; } } class ChildE extends BaseE {}";
+eval($code);
+PHP;
+        [$out, $registry] = (new PropertyHooks())->process($src);
+        self::assertStringContainsString('$x { get; }', $out);
+        self::assertSame([], $registry);
+    }
+
+    /** @covers issue #7313 — promoted constructor parameters with property hooks */
+    public function testLowersPromotedConstructorParamPropertyHooks(): void
+    {
+        $src = <<<'PHP'
+<?php
+class C {
+    public function __construct(
+        public string $name {
+            get => strtoupper($this->name);
+            set => $this->name = strtolower($value);
+        },
+    ) {}
+}
+PHP;
+        [$out, $registry] = (new PropertyHooks())->process($src);
+        self::assertStringNotContainsString('$name {', $out);
+        self::assertStringContainsString('public string $name,', $out);
+        self::assertStringNotContainsString('$name;', $out);
+        self::assertStringContainsString('function __phpc_property_get_name', $out);
+        self::assertStringContainsString('function __phpc_property_set_name', $out);
+        self::assertSame('__phpc_property_get_name', $registry['c']['name']['get'] ?? null);
+        self::assertSame('__phpc_property_set_name', $registry['c']['name']['set'] ?? null);
+    }
+
+    /** @covers issue #7313 — promoted hooked param end-to-end via Runtime preprocess */
+    public function testPromotedConstructorParamPropertyHooksSurviveRuntimePreprocess(): void
+    {
+        $src = <<<'PHP'
+<?php
+class C {
+    public function __construct(
+        public string $name {
+            get => strtoupper($this->name);
+            set => $this->name = strtolower($value);
+        },
+    ) {}
+}
+$c = new C('AbC');
+echo $c->name;
+PHP;
+        $runtime = new Runtime();
+        $block = $runtime->parseAndCompile($src, 'promoted_property_hook.php');
+        ob_start();
+        $runtime->run($block);
+        self::assertSame('ABC', ob_get_clean());
+    }
+
+    /** @covers issue #7031 — same-name backing field must merge with hooked property decl */
+    public function testMergesSameNameBackingFieldDeclaration(): void
+    {
+        $src = <<<'PHP'
+<?php
+class Evaled {
+    public string $name {
+        get => strtoupper($this->name ?? "");
+        set => $this->name = strtolower($value);
+    }
+    private string $name = "x";
+}
+PHP;
+        [$out, $registry] = (new PropertyHooks())->process($src);
+        self::assertStringContainsString('public string $name = "x";', $out);
+        self::assertStringNotContainsString('private string $name', $out);
+        self::assertSame('__phpc_property_set_name', $registry['evaled']['name']['set'] ?? null);
     }
 }

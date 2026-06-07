@@ -133,7 +133,8 @@ final class CastSupport
             }
             $copy = new Variable();
             $copy->copyFrom($value);
-            $ht->add($name, $copy);
+            // Zend convert_to_array: dynamic property names are always string keys (#7427).
+            $ht->add((string) $name, $copy);
         }
     }
 }

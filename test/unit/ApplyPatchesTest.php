@@ -47,6 +47,11 @@ final class ApplyPatchesTest extends TestCase
             $body,
             'php-types-union-type must lower Op\\Type\\Union_ in resolveOpType (M2 spine compile)'
         );
+        self::assertStringContainsString(
+            'instanceof Op\\Type\\Intersection',
+            $body,
+            'php-types-intersection-type must lower Op\\Type\\Intersection in resolveOpType (#4956)'
+        );
     }
 
     public function testPhpTypesUnionTypeReconstructorOverlayReappliesAfterPartialVendor(): void
@@ -89,6 +94,63 @@ PHP;
         }
     }
 
+    public function testPhpTypesUnionTypeTypeOverlayReappliesAfterPartialVendorDrift(): void
+    {
+        $typePhp = self::$root.'/vendor/ircmaxell/php-types/lib/PHPTypes/Type.php';
+        if (!is_readable($typePhp)) {
+            self::markTestSkipped('vendor/ircmaxell/php-types not installed');
+        }
+
+        $original = (string) file_get_contents($typePhp);
+        self::assertStringContainsString(
+            'instanceof CfgType\\Union_',
+            $original,
+            'fixture must include CfgType\\Union_ handler in Type.php'
+        );
+        self::assertStringContainsString(
+            'instanceof CfgType\\Intersection',
+            $original,
+            'fixture must include CfgType\\Intersection handler in Type.php'
+        );
+
+        $unionBlock = <<<'PHP'
+        if ($decl instanceof CfgType\Union_) {
+            $subs = [];
+            foreach ($decl->types as $sub) {
+                $subs[] = self::fromTypeDecl($sub);
+            }
+
+            return new self(self::TYPE_UNION, $subs);
+        }
+PHP;
+        self::assertStringContainsString($unionBlock, $original);
+
+        $stripped = str_replace($unionBlock, '', $original);
+        file_put_contents($typePhp, $stripped);
+
+        try {
+            $output = [];
+            $exitCode = 0;
+            exec('bash '.escapeshellarg(self::$root.'/script/apply-patches.sh').' 2>&1', $output, $exitCode);
+            $joined = implode("\n", $output);
+            self::assertSame(0, $exitCode, "apply-patches failed after stripping Type.php Union_:\n".$joined);
+
+            $restored = (string) file_get_contents($typePhp);
+            self::assertStringContainsString(
+                'instanceof CfgType\\Union_',
+                $restored,
+                'overlay must re-insert Union_ when Intersection handler remains (#7327)'
+            );
+            self::assertStringContainsString(
+                'instanceof CfgType\\Intersection',
+                $restored,
+                'Intersection handler must remain after Union_ repair (#7327)'
+            );
+        } finally {
+            file_put_contents($typePhp, $original);
+        }
+    }
+
     public function testPhpCfgThrowExprParserOverlayApplied(): void
     {
         $parser = self::$root.'/vendor/ircmaxell/php-cfg/lib/PHPCfg/Parser.php';
@@ -102,6 +164,51 @@ PHP;
             $body,
             'php-cfg-throw-expr overlay must register throw expressions (#3802, #4232)'
         );
+    }
+
+    public function testPhpTypesThrowExprOverlayApplied(): void
+    {
+        $recon = self::$root.'/vendor/ircmaxell/php-types/lib/PHPTypes/TypeReconstructor.php';
+        if (!is_readable($recon)) {
+            self::markTestSkipped('vendor/ircmaxell/php-types not installed');
+        }
+
+        $body = (string) file_get_contents($recon);
+        self::assertStringContainsString(
+            "case 'Expr_Throw':",
+            $body,
+            'php-types-throw-expr overlay must type-reconstruct throw expressions (#3802, #5151)'
+        );
+    }
+
+    public function testPhpTypesThrowExprOverlayReappliesAfterPartialVendor(): void
+    {
+        $recon = self::$root.'/vendor/ircmaxell/php-types/lib/PHPTypes/TypeReconstructor.php';
+        if (!is_readable($recon)) {
+            self::markTestSkipped('vendor/ircmaxell/php-types not installed');
+        }
+
+        $original = (string) file_get_contents($recon);
+        $stripped = str_replace("            case 'Expr_Throw':\n", '', $original);
+        self::assertNotSame($original, $stripped, 'fixture must include Expr_Throw case arm');
+        file_put_contents($recon, $stripped);
+
+        try {
+            $output = [];
+            $exitCode = 0;
+            exec('bash '.escapeshellarg(self::$root.'/script/apply-patches.sh').' 2>&1', $output, $exitCode);
+            $joined = implode("\n", $output);
+            self::assertSame(0, $exitCode, "apply-patches failed after stripping Expr_Throw:\n".$joined);
+
+            $restored = (string) file_get_contents($recon);
+            self::assertStringContainsString(
+                "case 'Expr_Throw':",
+                $restored,
+                'overlay must re-insert Expr_Throw on harness tar-copy vendor (#5151)'
+            );
+        } finally {
+            file_put_contents($recon, $original);
+        }
     }
 
     public function testPhpCfgThrowExprParserOverlayReappliesAfterPartialVendor(): void
@@ -277,6 +384,158 @@ PHP;
         );
     }
 
+    public function testApplyPatchesInvokesListSpreadOverlayBeforeOptionalPatchFailures(): void
+    {
+        $script = (string) file_get_contents(self::$root.'/script/apply-patches.sh');
+        self::assertMatchesRegularExpression(
+            '/apply_php_cfg_list_spread_overlay[\s\S]*php-cfg-loop-resolver-continue-switch-warning/s',
+            $script,
+            'list spread overlay must run before optional patch failures (#6069)'
+        );
+    }
+
+    public function testVerifyCriticalLanguagePatchesIncludesListSpreadRhs(): void
+    {
+        $script = (string) file_get_contents(self::$root.'/script/apply-patches.sh');
+        self::assertStringContainsString(
+            'php-cfg-list-spread-Assign',
+            $script,
+            'verify_critical_language_patches must require listSpreadRhs on Assign (#6069)'
+        );
+        self::assertStringContainsString(
+            'php-cfg-list-spread-Parser',
+            $script,
+            'verify_critical_language_patches must require list spread Parser lowering (#6069)'
+        );
+    }
+
+    public function testApplyPatchesDoesNotSwallowIncdecOverlayFailures(): void
+    {
+        $script = (string) file_get_contents(self::$root.'/script/apply-patches.sh');
+        self::assertStringNotContainsString(
+            'apply_php_types_incdec_type_overlay || true',
+            $script,
+            'incdec TypeReconstructor overlay must fail CI when PostInc arms are missing (#6326)'
+        );
+        self::assertStringNotContainsString(
+            'apply_php_cfg_incdec_expr_overlay || true',
+            $script,
+            'incdec Parser overlay must fail CI when PostInc lowering is missing (#6326)'
+        );
+    }
+
+    public function testIncdecTypeOverlayFailureExitsNonZero(): void
+    {
+        $recon = self::$root.'/vendor/ircmaxell/php-types/lib/PHPTypes/TypeReconstructor.php';
+        if (!is_readable($recon)) {
+            self::markTestSkipped('vendor/ircmaxell/php-types not installed');
+        }
+
+        $original = (string) file_get_contents($recon);
+        $broken = preg_replace(
+            "/\\s*case 'Expr_PostInc':.*?return false;\\n/s",
+            '',
+            $original
+        );
+        self::assertIsString($broken);
+        self::assertNotSame($original, $broken, 'fixture must include inc/dec switch arms');
+        $broken = str_replace(
+            "throw new \\LogicException('Unknown variable op found: '.\$op->getType());",
+            "throw new \\LogicException('incdec overlay test sentinel');",
+            $broken
+        );
+        self::assertNotSame($original, $broken, 'fixture must include resolveVariableOp throw anchor');
+        file_put_contents($recon, $broken);
+
+        try {
+            $output = [];
+            $exitCode = 0;
+            exec('bash '.escapeshellarg(self::$root.'/script/apply-patches.sh').' 2>&1', $output, $exitCode);
+            $joined = implode("\n", $output);
+            self::assertNotSame(0, $exitCode, "apply-patches must fail when incdec overlay cannot insert arms:\n".$joined);
+            self::assertMatchesRegularExpression(
+                '/php-types-incdec-type.*(overlay failed|marker not found|arms missing)/i',
+                $joined,
+                'failure must name php-types-incdec-type overlay (#6326)'
+            );
+            self::assertStringNotContainsString(
+                'Applied php-types-incdec-type.patch (overlay): '.self::$root.'/vendor/ircmaxell/php-types/lib/PHPTypes/TypeReconstructor.php',
+                $joined,
+                'must not claim Applied when overlay did not insert PostInc arms (#6326)'
+            );
+        } finally {
+            file_put_contents($recon, $original);
+            $output = [];
+            $exitCode = 0;
+            exec('bash '.escapeshellarg(self::$root.'/script/apply-patches.sh').' 2>&1', $output, $exitCode);
+            self::assertSame(0, $exitCode, 'apply-patches must restore vendor after incdec overlay test');
+        }
+    }
+
+    public function testVerifyCriticalLanguagePatchesIncludesFirstClassCallableOverlay(): void
+    {
+        $script = (string) file_get_contents(self::$root.'/script/apply-patches.sh');
+        self::assertStringContainsString(
+            'php-types-first-class-callable',
+            $script,
+            'verify_critical_language_patches must require FCC overlay (#6932)'
+        );
+        self::assertStringContainsString(
+            'php-types-first-class-callable-Type-array-typo',
+            $script,
+            'verify_critical_language_patches must reject Type::array() FCC typo (#6932)'
+        );
+        self::assertStringContainsString(
+            'apply_php_types_fcc_overlay_final_repair',
+            $script,
+            'apply-patches must run final FCC typo repair after php-types overlays (#6932)'
+        );
+    }
+
+    public function testIncdecTypeOverlayDoesNotReintroduceFccTypeArrayTypo(): void
+    {
+        $recon = self::$root.'/vendor/ircmaxell/php-types/lib/PHPTypes/TypeReconstructor.php';
+        if (!is_readable($recon)) {
+            self::markTestSkipped('vendor/ircmaxell/php-types not installed');
+        }
+
+        $original = (string) file_get_contents($recon);
+        $broken = preg_replace(
+            '/return \[new Type\(Type::TYPE_ARRAY\)\];/',
+            'return [Type::array()];',
+            $original,
+            1
+        );
+        self::assertIsString($broken);
+        self::assertNotSame($original, $broken, 'fixture must include FCC TYPE_ARRAY return');
+        file_put_contents($recon, $broken);
+
+        try {
+            $output = [];
+            $exitCode = 0;
+            exec('bash '.escapeshellarg(self::$root.'/script/apply-patches.sh').' 2>&1', $output, $exitCode);
+            $joined = implode("\n", $output);
+            self::assertSame(0, $exitCode, "apply-patches must succeed and repair FCC typo:\n".$joined);
+            $restored = (string) file_get_contents($recon);
+            self::assertStringNotContainsString(
+                'return [Type::array()];',
+                $restored,
+                'final FCC repair must replace Type::array() typo (#6932)'
+            );
+            self::assertStringContainsString(
+                'new Type(Type::TYPE_ARRAY)',
+                $restored,
+                'FCC path must use TYPE_ARRAY constructor (#6932)'
+            );
+        } finally {
+            file_put_contents($recon, $original);
+            $output = [];
+            $exitCode = 0;
+            exec('bash '.escapeshellarg(self::$root.'/script/apply-patches.sh').' 2>&1', $output, $exitCode);
+            self::assertSame(0, $exitCode, 'apply-patches must restore vendor after FCC repair test');
+        }
+    }
+
     public function testPhpCfgInOperatorOverlayApplied(): void
     {
         $op = self::$root.'/vendor/ircmaxell/php-cfg/lib/PHPCfg/Op/Expr/In_.php';
@@ -348,5 +607,122 @@ PHP;
             substr_count($paramBody, 'promotionSetVisibility'),
             'Param must declare promotionSetVisibility exactly once (#1492 partial vendor)'
         );
+        self::assertStringContainsString('promotionGetVisibility', $paramBody, '#5059 Param promotionGetVisibility');
+    }
+
+    public function testPhpCfgAsymmetricVisibilityOverlayAddsPromotionGetVisibilityForUntypedSet(): void
+    {
+        $param = self::$root.'/vendor/ircmaxell/php-cfg/lib/PHPCfg/Op/Expr/Param.php';
+        if (!is_readable($param)) {
+            self::markTestSkipped('vendor/ircmaxell/php-cfg not installed');
+        }
+
+        $original = (string) file_get_contents($param);
+        $simulated = preg_replace(
+            '/\n    \/\*\* Constructor promotion: asymmetric get visibility \(#5059\)\. \*\/\n    public int \$promotionGetVisibility = 0;\n/',
+            "\n",
+            $original,
+            1
+        );
+        self::assertNotSame($original, $simulated, 'fixture must drop promotionGetVisibility');
+        $simulated = (string) preg_replace(
+            '/public int \$promotionSetVisibility/',
+            'public $promotionSetVisibility',
+            $simulated,
+            1
+        );
+        file_put_contents($param, $simulated);
+
+        try {
+            $output = [];
+            $exitCode = 0;
+            exec('bash '.escapeshellarg(self::$root.'/script/apply-patches.sh').' 2>&1', $output, $exitCode);
+            $joined = implode("\n", $output);
+            self::assertStringContainsString('Param getVisibility overlay #5059', $joined, $joined);
+            self::assertStringContainsString(
+                'promotionGetVisibility',
+                (string) file_get_contents($param),
+                'overlay must add promotionGetVisibility for untyped promotionSetVisibility (#7468)'
+            );
+        } finally {
+            file_put_contents($param, $original);
+        }
+    }
+
+    public function testPhpCfgMatchOverlayIncludesUnhandledMatchLowering(): void
+    {
+        $parser = self::$root.'/vendor/ircmaxell/php-cfg/lib/PHPCfg/Parser.php';
+        if (!is_readable($parser)) {
+            self::markTestSkipped('vendor/ircmaxell/php-cfg not installed');
+        }
+
+        $body = (string) file_get_contents($parser);
+        self::assertStringContainsString(
+            'function parseExpr_Match',
+            $body,
+            'php-cfg-match overlay must register match lowering (#143)'
+        );
+        self::assertStringContainsString(
+            'phpc_match_unhandled_operand_is_object',
+            $body,
+            'php-cfg-match overlay must probe object/enum operands for UnhandledMatchError (#5448, #7199)'
+        );
+        self::assertStringContainsString(
+            'lowerUnhandledMatchError',
+            $body,
+            'php-cfg-match overlay must lower UnhandledMatchError for enum/scalar subjects (#5448)'
+        );
+    }
+
+    public function testVerifyCriticalLanguagePatchesIncludesEnumBodyOverlays(): void
+    {
+        $script = (string) file_get_contents(self::$root.'/script/apply-patches.sh');
+        self::assertStringContainsString(
+            'php-cfg-enum-trait-use',
+            $script,
+            'verify_critical_language_patches must require TraitUse in parseStmt_Enum (#6625)'
+        );
+        self::assertStringContainsString(
+            'php-cfg-enum-class-const-Parser',
+            $script,
+            'verify_critical_language_patches must require ClassConst in parseStmt_Enum (#6625)'
+        );
+        self::assertStringContainsString(
+            'php-cfg-enum-case-isEnumCase',
+            $script,
+            'verify_critical_language_patches must require isEnumCase on parseEnumCase (#6625)'
+        );
+        self::assertStringContainsString(
+            'php-cfg-enum-trait-use.patch)',
+            $script,
+            'patch_already_applied must probe php-cfg-enum-trait-use.patch (#6625)'
+        );
+    }
+
+    public function testApplyPatchesLeavesEnumBodyOverlaysOnVendorParser(): void
+    {
+        $parser = self::$root.'/vendor/ircmaxell/php-cfg/lib/PHPCfg/Parser.php';
+        $const = self::$root.'/vendor/ircmaxell/php-cfg/lib/PHPCfg/Op/Terminal/Const_.php';
+        if (!is_readable($parser) || !is_readable($const)) {
+            self::markTestSkipped('vendor/ircmaxell/php-cfg not installed');
+        }
+
+        $output = [];
+        $exitCode = 0;
+        exec('bash '.escapeshellarg(self::$root.'/script/apply-patches.sh').' 2>&1', $output, $exitCode);
+        $joined = implode("\n", $output);
+        self::assertSame(0, $exitCode, "apply-patches must succeed before enum marker check:\n".$joined);
+
+        $parserBody = (string) file_get_contents($parser);
+        $enumLoop = preg_match(
+            '/function parseStmt_Enum.*?Stmt\\\\TraitUse.*?Stmt\\\\ClassConst/s',
+            $parserBody
+        );
+        self::assertSame(1, $enumLoop, 'parseStmt_Enum must lower TraitUse and ClassConst (#6622, #6623)');
+        self::assertStringContainsString('isEnumCase = true', $parserBody, 'parseEnumCase must set isEnumCase (#5054)');
+
+        $constBody = (string) file_get_contents($const);
+        self::assertStringContainsString('public bool $isEnumCase = false', $constBody);
+        self::assertStringContainsString('public bool $enumCaseHasExplicitValue = false', $constBody);
     }
 }

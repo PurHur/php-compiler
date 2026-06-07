@@ -138,6 +138,102 @@ final class VmDate
         return VmHrtime::hrtime($asNumber);
     }
 
+    /**
+     * idate() part value — php-src ext/date/php_date.c php_idate() (issue #6830).
+     *
+     * @return int|false false when format char is unrecognized
+     */
+    public static function idateValue(string $formatChar, int $timestamp): int|false
+    {
+        if (1 !== \strlen($formatChar)) {
+            return false;
+        }
+        $tm = self::localtime($timestamp);
+        if (null === $tm) {
+            return false;
+        }
+
+        $sec = (int) $tm->tm_sec;
+        $min = (int) $tm->tm_min;
+        $hour = (int) $tm->tm_hour;
+        $mday = (int) $tm->tm_mday;
+        $mon = (int) $tm->tm_mon + 1;
+        $year = (int) $tm->tm_year + 1900;
+        $wday = (int) $tm->tm_wday;
+        $yday = (int) $tm->tm_yday;
+        $isdst = (int) $tm->tm_isdst;
+
+        return match ($formatChar) {
+            'B' => self::swatchBeat($hour, $min, $sec, $wday),
+            'd', 'j' => $mday,
+            'h', 'g' => self::hour12($hour),
+            'H' => $hour,
+            'i' => $min,
+            'I' => $isdst > 0 ? 1 : 0,
+            'L' => self::isLeapYear($year) ? 1 : 0,
+            'm', 'n' => $mon,
+            'N' => 0 === $wday ? 7 : $wday,
+            's' => $sec,
+            't' => self::daysInMonth($year, $mon),
+            'U' => $timestamp,
+            'w' => $wday,
+            'W' => self::isoWeek($year, $mon, $mday),
+            'y' => $year % 100,
+            'Y' => $year,
+            'z' => $yday,
+            'o' => self::isoYear($year, $mon, $mday),
+            default => false,
+        };
+    }
+
+    /**
+     * localtime() breakdown — php-src ext/standard/datetime.c PHP_FUNCTION(localtime) (#6812).
+     */
+    public static function localtimeBreakdown(?int $timestamp = null, bool $associative = false): HashTable
+    {
+        $ts = $timestamp ?? self::time();
+        $tm = self::localtime($ts);
+        $ht = new HashTable();
+        if (null === $tm) {
+            return $ht;
+        }
+
+        $values = [
+            (int) $tm->tm_sec,
+            (int) $tm->tm_min,
+            (int) $tm->tm_hour,
+            (int) $tm->tm_mday,
+            (int) $tm->tm_mon,
+            (int) $tm->tm_year,
+            (int) $tm->tm_wday,
+            (int) $tm->tm_yday,
+            (int) $tm->tm_isdst,
+        ];
+        $keys = [
+            'tm_sec',
+            'tm_min',
+            'tm_hour',
+            'tm_mday',
+            'tm_mon',
+            'tm_year',
+            'tm_wday',
+            'tm_yday',
+            'tm_isdst',
+        ];
+
+        if ($associative) {
+            foreach ($keys as $i => $key) {
+                self::hashSetLong($ht, $key, $values[$i]);
+            }
+        } else {
+            foreach ($values as $i => $value) {
+                $ht->addIndex($i, self::intVariable($value));
+            }
+        }
+
+        return $ht;
+    }
+
     public static function getdate(?int $timestamp = null): HashTable
     {
         $ts = $timestamp ?? self::time();
@@ -255,6 +351,83 @@ final class VmDate
         }
 
         return $out;
+    }
+
+    private static function hour12(int $hour): int
+    {
+        $h = $hour % 12;
+
+        return 0 === $h ? 12 : $h;
+    }
+
+    private static function isLeapYear(int $year): bool
+    {
+        return (0 === $year % 4 && 0 !== $year % 100) || 0 === $year % 400;
+    }
+
+    private static function daysInMonth(int $year, int $month): int
+    {
+        static $days = [31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
+        if ($month < 1 || $month > 12) {
+            return 0;
+        }
+        if (2 === $month && self::isLeapYear($year)) {
+            return 29;
+        }
+
+        return $days[$month - 1];
+    }
+
+    private static function swatchBeat(int $hour, int $minute, int $second, int $wday): int
+    {
+        $seconds = ($hour * 3600) + ($minute * 60) + $second;
+        $daysFromMonday = ($wday + 6) % 7;
+        $total = $seconds + ($daysFromMonday * 86400);
+
+        return (int) \floor($total / 86.4);
+    }
+
+    /** ISO-8601 week number (php-src timelib_isoweek_from_date subset). */
+    private static function isoWeek(int $year, int $month, int $day): int
+    {
+        return self::isoWeekAndYear($year, $month, $day)[0];
+    }
+
+    /** ISO-8601 year (php-src timelib_isoweek_from_date subset). */
+    private static function isoYear(int $year, int $month, int $day): int
+    {
+        return self::isoWeekAndYear($year, $month, $day)[1];
+    }
+
+    /**
+     * @return array{0: int, 1: int} week number, ISO year
+     */
+    private static function isoWeekAndYear(int $year, int $month, int $day): array
+    {
+        $a = (int) \floor((14 - $month) / 12);
+        $y = $year + 4800 - $a;
+        $m = $month + 12 * $a - 3;
+        $jd = $day
+            + (int) \floor((153 * $m + 2) / 5)
+            + 365 * $y
+            + (int) \floor($y / 4)
+            - (int) \floor($y / 100)
+            + (int) \floor($y / 400)
+            - 32045;
+        $d4 = $jd + 31739 - ($jd % 7);
+        $d1 = $d4 % 146097;
+        $week = (int) \floor($d1 / 7) - (int) \floor($d1 / 36524) + (int) \floor($d1 / 1461);
+        $d3 = $d1 % 36524;
+        $week += (int) \floor($d3 / 1461) - (int) \floor($d3 / 365) + (int) \floor($d3 / 7);
+        $d5 = $d3 % 365;
+        $week += (int) \floor($d5 / 7);
+        $isoYear = (int) \floor($d4 / 146097) * 100
+            + (int) \floor($d1 / 36524)
+            + (int) \floor($d3 / 1461)
+            + (int) \floor($d5 / 365)
+            + (int) \floor($d5 / 7);
+
+        return [$week, $isoYear];
     }
 
     private static function padInt(int $value, int $width): string

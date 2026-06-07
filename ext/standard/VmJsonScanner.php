@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace PHPCompiler\ext\standard;
 
 /**
- * JSON syntax scanner for VM json_validate() — mirrors lib/AOT/runtime/phpc_json_decode.c.
+ * JSON syntax scanner for VM json_validate() — mirrors StringJsonDecodeJit / former phpc_json_decode.c.
  *
  * php-src ref: ext/json/json_scanner.c (lexer-only validation subset).
  */
@@ -153,7 +153,7 @@ final class VmJsonScanner
         return true;
     }
 
-    private function parseValue(bool $inArray): bool
+    private function parseValue(): bool
     {
         if ($this->depth > $this->maxDepth) {
             VmJson::setLastError(1);
@@ -169,9 +169,6 @@ final class VmJsonScanner
             return $this->parseString();
         }
         if ('{' === $c) {
-            if ($inArray) {
-                return false;
-            }
             $this->depth++;
             if (!$this->parseObject()) {
                 $this->depth--;
@@ -183,9 +180,6 @@ final class VmJsonScanner
             return true;
         }
         if ('[' === $c) {
-            if ($inArray) {
-                return false;
-            }
             $this->depth++;
             if (!$this->parseArray()) {
                 $this->depth--;
@@ -232,7 +226,7 @@ final class VmJsonScanner
             if (!$this->expect(':')) {
                 return false;
             }
-            if (!$this->parseValue(false)) {
+            if (!$this->parseValue()) {
                 return false;
             }
             $this->skipWs();
@@ -261,7 +255,7 @@ final class VmJsonScanner
             return true;
         }
         for (;;) {
-            if (!$this->parseValue(true)) {
+            if (!$this->parseValue()) {
                 return false;
             }
             $this->skipWs();

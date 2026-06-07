@@ -28,11 +28,7 @@ final class headers_sent extends Internal
         if ($argc > 2) {
             throw new \LogicException('headers_sent() accepts at most two arguments');
         }
-        if (null === $frame->returnVar) {
-            return;
-        }
         $sent = SapiOutput::headersSent();
-        $frame->returnVar->bool($sent);
         if ($argc >= 1) {
             if ($sent) {
                 $frame->calledArgs[0]->resolveIndirect()->string(SapiOutput::sentFile() ?? '');
@@ -43,6 +39,10 @@ final class headers_sent extends Internal
         if (2 === $argc) {
             $frame->calledArgs[1]->resolveIndirect()->int($sent ? SapiOutput::sentLine() : 0);
         }
+        if (null === $frame->returnVar) {
+            return;
+        }
+        $frame->returnVar->bool($sent);
     }
 
     public function call(Context $context, JITVariable ...$args): Value

@@ -8,5 +8,14 @@ class C {
 $c = new C();
 $cl = Closure::bind(function (): string { return $this->m(); }, $c, C::class);
 echo $cl->call($c), "\n";
+
+// Instance dispatch + private access without bindTo (#6411 regression).
+$fn = function (): string { return $this->m(); };
+try {
+    echo $fn->call($c), "\n";
+} catch (Throwable $e) {
+    echo get_class($e), ': ', $e->getMessage(), "\n";
+}
 --EXPECT--
+ok
 ok

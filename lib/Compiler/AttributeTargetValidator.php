@@ -1,0 +1,160 @@
+<?php
+
+declare(strict_types=1);
+
+namespace PHPCompiler\Compiler;
+
+use PHPCompiler\CompilerVersion;
+use PHPCompiler\VM\AttributeSupport;
+
+/**
+ * User attribute compile-time target validation (Zend zend_attributes.c, issue #5124).
+ *
+ * Promoted constructor parameters validate against TARGET_PROPERTY after the class body
+ * is parsed (delayed remap). Builtin internal attributes keep dedicated guards in
+ * {@see AttributeNames}.
+ */
+final class AttributeTargetValidator
+{
+    /** @var array<int, string> */
+    private const TARGET_LABELS = [
+        AttributeSupport::TARGET_CLASS => 'class',
+        AttributeSupport::TARGET_FUNCTION => 'function',
+        AttributeSupport::TARGET_METHOD => 'method',
+        AttributeSupport::TARGET_PROPERTY => 'property',
+        AttributeSupport::TARGET_CLASS_CONSTANT => 'class constant',
+        AttributeSupport::TARGET_PARAMETER => 'parameter',
+        AttributeSupport::TARGET_CONSTANT => 'constant',
+    ];
+
+    /**
+     * @param list<AttributeEntry> $entries
+     */
+    public static function assertPromotedParameterTargets(
+        array $entries,
+        AttributeClassRegistry $registry
+    ): void {
+        if (!CompilerVersion::supportsDelayedTargetValidationAttribute()) {
+            return;
+        }
+
+        self::assertEntriesForTarget(
+            $entries,
+            AttributeSupport::TARGET_PROPERTY,
+            'property',
+            $registry,
+            false
+        );
+    }
+
+    /**
+     * @param list<AttributeEntry> $entries
+     */
+    public static function assertEntriesForTarget(
+        array $entries,
+        int $targetFlag,
+        string $targetLabel,
+        AttributeClassRegistry $registry,
+        bool $delayInternalValidation
+    ): void {
+        if ([] === $entries) {
+            return;
+        }
+
+        $delayInternal = $delayInternalValidation
+            && CompilerVersion::supportsDelayedTargetValidationAttribute()
+            && self::hasDelayedTargetValidation($entries);
+
+        foreach ($entries as $entry) {
+            if (!$entry instanceof AttributeEntry) {
+                continue;
+            }
+            if (self::isBuiltinInternalAttribute($entry->name)) {
+                if ($delayInternal) {
+                    continue;
+                }
+
+                continue;
+            }
+            if (self::isAttributeMetaClass($entry->name)) {
+                continue;
+            }
+
+            $allowed = $registry->getFlags($entry->name);
+            if (null === $allowed) {
+                continue;
+            }
+
+            if (!$registry->allowsTarget($entry->name, $targetFlag)) {
+                throw new \CompileError(
+                    'Attribute "'.self::messageName($entry->name).'" cannot target '.$targetLabel
+                    .' (allowed targets: '.self::formatAllowedTargets($allowed).')'
+                );
+            }
+        }
+    }
+
+    /**
+     * @param list<AttributeEntry> $entries
+     */
+    private static function hasDelayedTargetValidation(array $entries): bool
+    {
+        foreach ($entries as $entry) {
+            if (!$entry instanceof AttributeEntry) {
+                continue;
+            }
+            $base = strtolower(ltrim($entry->name, '\\'));
+            if ('delayedtargetvalidation' === $base || str_ends_with($base, '\\delayedtargetvalidation')) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private static function isBuiltinInternalAttribute(string $name): bool
+    {
+        $base = strtolower(ltrim($name, '\\'));
+        $pos = strrpos($base, '\\');
+        $short = false !== $pos ? substr($base, $pos + 1) : $base;
+
+        return \in_array($short, [
+            'override',
+            'allowdynamicproperties',
+            'compiletime',
+            'sensitiveparameter',
+            'nodiscard',
+            'deprecated',
+            'returntypewillchange',
+            'delayedtargetvalidation',
+        ], true);
+    }
+
+    private static function isAttributeMetaClass(string $name): bool
+    {
+        $base = ltrim($name, '\\');
+        $lc = strtolower($base);
+
+        return 'attribute' === $lc || str_ends_with($lc, '\\attribute');
+    }
+
+    private static function formatAllowedTargets(int $flags): string
+    {
+        $names = [];
+        foreach (self::TARGET_LABELS as $flag => $label) {
+            if (0 !== ($flags & $flag)) {
+                $names[] = $label;
+            }
+        }
+
+        return [] !== $names ? implode(', ', $names) : 'none';
+    }
+
+    private static function messageName(string $name): string
+    {
+        $name = ltrim($name, '\\');
+        $pos = strrpos($name, '\\');
+
+        return false !== $pos ? substr($name, $pos + 1) : $name;
+    }
+}

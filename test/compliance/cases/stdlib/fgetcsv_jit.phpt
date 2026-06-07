@@ -1,5 +1,5 @@
 --TEST--
-JIT: fgetcsv() via __compiler_fgetcsv (issue #1192)
+JIT: fgetcsv() via StringFgetcsvJit (issue #1192, #6750)
 --FILE--
 <?php
 $path = 'test/compliance/cases/stdlib/fgetcsv_fixture.csv';

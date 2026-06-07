@@ -242,6 +242,8 @@ function opcode_type_name(int $type): string
             return 'TYPE_FROM_CALLABLE';
         case 126:
             return 'TYPE_EMPTY_OBJECT_PROPERTY';
+        case 127:
+            return 'TYPE_CAST_VOID';
         default:
             return 'unknown opcode';
     }

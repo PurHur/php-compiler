@@ -7,7 +7,6 @@ namespace PHPCompiler\ext\standard;
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Context;
-use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
@@ -25,18 +24,12 @@ final class chown_ extends Internal
         if (2 !== \count($frame->calledArgs)) {
             throw new \LogicException('chown() requires exactly two arguments in this compiler build');
         }
-        $pathVar = $frame->calledArgs[0]->resolveIndirect();
-        $userVar = $frame->calledArgs[1]->resolveIndirect();
+        $path = VmFilestatArg::coerceFilenameArg($frame->calledArgs[0], 'chown');
+        $userVar = VmFilestatArg::requireIntOrStringArg($frame->calledArgs[1], 'chown', 1, 'user');
         if (null === $frame->returnVar) {
             return;
         }
-        if (Variable::TYPE_STRING !== $pathVar->type) {
-            throw new \LogicException('chown() filename must be a string in this compiler build');
-        }
-        if (!\in_array($userVar->type, [Variable::TYPE_INTEGER, Variable::TYPE_STRING], true)) {
-            throw new \LogicException('chown() user must be int or string in this compiler build');
-        }
-        $frame->returnVar->bool(VmFs::chown($pathVar->toString(), $userVar));
+        $frame->returnVar->bool(VmFs::chown($path, $userVar));
     }
 
     public function call(Context $context, JITVariable ...$args): Value
@@ -44,8 +37,8 @@ final class chown_ extends Internal
         if (2 !== \count($args)) {
             throw new \LogicException('chown() requires exactly two arguments in this compiler build');
         }
-        $path = $this->jitString($context, $args[0], 'chown() argument #1');
-        $userPtr = JitValueBox::valuePtrFromVariable($context, $args[1]);
+        $path = JitFilestatArg::lowerFilename($context, $args[0], 'chown');
+        $userPtr = JitFilestatArg::valuePtrAfterIntOrStringGuard($context, $args[1], 'chown', 1, 'user');
 
         return JitChown::invoke($context, $path, $userPtr, false);
     }

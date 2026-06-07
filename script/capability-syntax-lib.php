@@ -37,7 +37,7 @@ function syntaxRowDefinitions(): array
             'issue' => 1233,
             'aot' => true,
             'notes' => [
-                'php-cfg inline Stmt\\Class_ in parseExpr_New; Zend @anonymous\\0path:line$id name (#4510)',
+                'php-cfg inline Stmt\\Class_ in parseExpr_New; Zend @anonymous\\0path:line$id name (#4510, #6281 get_class/static::class)',
                 'AOT: user AnonymousClass@* methods lowered when PHP_COMPILER_SELFHOST_AOT=1 (#3098)',
             ],
             'probe' => '$o = new class { public function f(): int { return 42; } }; echo $o->f();',
@@ -52,7 +52,7 @@ function syntaxRowDefinitions(): array
                 'Backed enum case objects with `->name` / `->value`; `echo $case` throws Error (#4891); double-quoted `"$case"` throws Error (#4785)',
                 '`Foo::Bar` singleton fetch; `enum_exists` registry; `implements` interface list + instance methods + `instanceof` (#3373)',
                 'static methods (#2299); `Enum::cases()` JIT (#3308, #4068); AOT fixture enum_backed.phpt (#3076)',
-                '`BackedEnum::from()` / `tryFrom()` VM lookup with Zend-parity ValueError (#3114); JIT deferred',
+                '`BackedEnum::from()` / `tryFrom()` VM + JIT lookup with Zend-parity ValueError (#3114, #4053)',
             ],
             'probe' => 'interface L { public function n(): string; } enum S: string implements L { case A = "a"; public function n(): string { return $this->name; } } echo S::A->n();',
         ],
@@ -101,6 +101,18 @@ function syntaxRowDefinitions(): array
                 'VM invokePhpFunction; JIT invokeCloneMagicIfPresent after cloneObject',
             ],
             'probe' => 'class C { public int $x = 1; public function __clone() { $this->x = 2; } } $a = new C(); $b = clone $a; echo $b->x;',
+        ],
+        [
+            'id' => 'clone_with',
+            'construct' => 'PHP 8.3+ `clone $obj with { prop: $value }`',
+            'opcodes' => ['TYPE_CLONE', 'TYPE_METHODCALL_INIT'],
+            'issue' => 4513,
+            'jit' => true,
+            'notes' => [
+                'Ast\\CloneWithDesugar before php-parser (#4513); lowers to IIFE clone + property writes',
+                'Zend/zend_language_parser.y clone_expr with clause; zend_clones.c property overrides',
+            ],
+            'probe' => 'class C { public int $x = 1; public string $y = "a"; } $c = new C(); $d = clone $c with { x: 2, y: "b" }; echo $d->x, $d->y;',
         ],
         [
             'id' => 'magic_methods',
@@ -262,7 +274,7 @@ function syntaxRowDefinitions(): array
             'aot' => true,
             'notes' => [
                 'VM FiberState + builtin Fiber class (#3130); php-src Zend/zend_fibers.c',
-                'JIT/AOT resume lowering (#4019); AOT native execute green; script-scope MCJIT gate in Block::containsFiberSuspendOpcodesInScriptScope (#4097); bin/jit.php VM-fallback until jit-runtime-probe green',
+                'JIT/AOT resume lowering (#4019); MCJIT execute green for nested callbacks (#6437); script-scope suspend still VM-fallback via Block::containsFiberSuspendOpcodesInScriptScope (#4097)',
             ],
             'probe' => '$f = new Fiber(function (): void { Fiber::suspend(1); }); echo $f->start();',
         ],
@@ -296,6 +308,16 @@ function syntaxRowDefinitions(): array
                 'Typed trait constants enabled on 8.3+ target (#5993); rejected on 8.2 (Zend parse error parity, #5212)',
             ],
             'probe' => 'class C { public const array X = [1, 2]; } echo C::X[0];',
+        ],
+        [
+            'id' => 'global_typed_constant',
+            'construct' => 'PHP 8.3+ file/namespace typed constants (`const string X = \'a\';`)',
+            'opcodes' => ['TYPE_DECLARE_GLOBAL_CONST', 'TYPE_CONST_FETCH', 'TYPE_ARRAY_DIM_FETCH'],
+            'issue' => 7081,
+            'notes' => [
+                'GlobalTypedConstRewriter + PHPCfg marker for nikic/php-parser 4.x; compile-time type check reuses class-const path',
+            ],
+            'probe' => 'const string X = "a"; echo X;',
         ],
         [
             'id' => 'typed_interface_const',
@@ -562,11 +584,14 @@ function syntaxRowDefinitions(): array
         ],
         [
             'id' => 'pipe_operator',
-            'construct' => 'PHP 8.4+ pipe operator (`|>`)',
+            'construct' => 'PHP 8.5 pipe operator (`|>`)',
             'opcodes' => ['TYPE_FUNCCALL_INIT', 'TYPE_FUNCCALL_EXEC_RETURN'],
-            'issue' => 3243,
+            'issue' => 7219,
             'notes' => [
                 'Ast\\PipeOperatorDesugar before php-parser (#3243); lowers $lhs |> f(...) to f($lhs, ...)',
+                'Bare callable names: $lhs |> strlen → strlen($lhs) (#7219)',
+                'PHP 8.5 errata: arrow-fn RHS must be parenthesized — $lhs |> (fn($p) => expr) (#7219, php-src #19533)',
+                'Chained pipes and parenthesized-callable LHS (#6705, #7219)',
                 'Zend/zend_compile.c pipe expression; requires first-class callable (#1363)',
             ],
             'probe' => 'echo "hi" |> strtoupper(...);',
@@ -726,6 +751,7 @@ function syntaxRowDefinitions(): array
             'construct' => 'throw expressions (PHP 8.0) — `throw` in expression context',
             'opcodes' => ['TYPE_THROW', 'TYPE_NEW', 'TYPE_JUMPIF'],
             'issue' => 3802,
+            'jit' => true,
             'aot' => true,
             'notes' => [
                 'php-cfg Op\\Expr\\Throw_ overlay (#3802); php-types Expr_Throw type reconstructor patch',
@@ -773,8 +799,9 @@ function syntaxRowDefinitions(): array
             'aot' => true,
             'notes' => [
                 'SourcePreprocessor lowers hooks to __phpc_property_* methods (#3145)',
+                'Promoted constructor parameters with hook blocks preprocess to promoted param + __phpc_property_* methods (#7313)',
                 'VM dispatches set/get on property access; JIT PropertyHookDispatch (#3723)',
-                'Static property hooks (PHP 8.4): VM dispatch via TYPE_STATIC_PROPERTY_FETCH (#4751); JIT/AOT defer to VM',
+                'Static property hooks rejected at compile time (#6619, php-src 8.4 zend_compile.c)',
                 'AOT: user-class hook methods lower under PHP_COMPILER_SELFHOST_AOT; set-hook smoke in property_hook_set.phpt',
                 'JIT: raw backing access in hook bodies via jitPropertyHookRawProperty (set + get methods, #4025, #4205)',
             ],
@@ -782,7 +809,7 @@ function syntaxRowDefinitions(): array
         ],
         [
             'id' => 'asymmetric_visibility',
-            'construct' => 'PHP 8.4 asymmetric property visibility (public private(set), etc.)',
+            'construct' => 'PHP 8.4 asymmetric property visibility (private(set), protected(set), etc.)',
             'opcodes' => ['TYPE_DECLARE_PROPERTY', 'TYPE_PROPERTY_FETCH', 'TYPE_ASSIGN'],
             'issue' => 3165,
             'jit' => true,
@@ -790,7 +817,7 @@ function syntaxRowDefinitions(): array
                 'Ast\\AsymmetricVisibilityRewriter normalizes private(set) for php-parser 4.x; VM/JIT enforce set visibility with catchable Error (#3165, #4020)',
                 'php-src: Zend/zend_compile.c ZEND_ACC_*_SET; AsymmetricVisibilityGuard + AsymmetricVisibilityJitCompileTest (#4020)',
             ],
-            'probe' => 'class D { public private(set) string $n = "x"; } $d = new D(); echo $d->n; $d->n = "y";',
+            'probe' => 'class D { private(set) string $n = "x"; } $d = new D(); echo $d->n; $d->n = "y";',
         ],
         [
             'id' => 'class_destruct',
@@ -991,6 +1018,7 @@ function collectSyntaxPhptCoverage(string $root, array $definitions): array
         'instance_methods' => '/function\s+\w+\s*\(/',
         'construct_method' => '/function\s+__construct\s*\(/',
         'clone_magic' => '/function\s+__clone\s*\(/',
+        'clone_with' => '/\bclone\b[^;{]*\bwith\s*\{/',
         'magic_methods' => '/function\s+__get\s*\(|function\s+__call\s*\(|function\s+__toString\s*\(/',
         'private_methods' => '/\bprivate\s+function\b/',
         'method_return_types' => '/function\s+\w+\([^)]*\)\s*:\s*(?:string|void|int)/',

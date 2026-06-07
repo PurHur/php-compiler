@@ -15,7 +15,10 @@ use PHPLLVM\Builder;
 use PHPLLVM\Value;
 
 /**
- * JIT lowering for intval/floatval on enum case objects (#5623).
+ * JIT lowering for enum-case scalar coercion (#5623, #5714, #7120).
+ *
+ * Zend php-src (8.2+): explicit (int)/(float) casts and intval/floatval on enum cases
+ * emit E_WARNING and yield legacy object cast 1 / 1.0, not backing scalars.
  */
 final class JitScalarEnumCoerce
 {

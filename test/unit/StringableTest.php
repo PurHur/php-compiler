@@ -61,4 +61,26 @@ PHP;
         $runtime->run($runtime->parseAndCompile($code, 'stringable_cast.php'));
         $this->assertSame('cast-ok', ob_get_clean());
     }
+
+    public function testImplicitStringableInstanceofAndParam(): void
+    {
+        $runtime = new Runtime();
+        $code = <<<'PHP'
+<?php
+class C {
+    public function __toString(): string {
+        return 'ok';
+    }
+}
+function needsStringable(Stringable $s): void {
+    echo $s, "\n";
+}
+var_export(new C() instanceof Stringable);
+echo "\n";
+needsStringable(new C());
+PHP;
+        ob_start();
+        $runtime->run($runtime->parseAndCompile($code, 'stringable_implicit.php'));
+        $this->assertSame("true\nok\n", ob_get_clean());
+    }
 }

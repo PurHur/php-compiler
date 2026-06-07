@@ -594,6 +594,7 @@ class Context {
     private function defineBuiltins(int $loadType): void {
         // Stale sg_* from a prior JITContext in the same PHP process breaks SessionDestroy::implement (#4415).
         SuperglobalInit::$globals = [];
+        LibcExtern::register($this);
         foreach ($this->builtins as $builtin) {
             // this is a separate loop, since implementation may
             // depend on global variables set during init()
@@ -637,13 +638,13 @@ class Context {
 
         Builtin\ReflectionNative::registerDeclarations($this);
         Builtin\AttributeRegistry::registerDeclarations($this);
-        Builtin\MethodRegistry::registerDeclarations($this);
         if (Builtin::LOAD_TYPE_STANDALONE === $this->loadType) {
-            Builtin\TypeErrorRaise::ensureStandaloneBodies($this);
-            Builtin\ErrorRaise::ensureStandaloneBodies($this);
-            Builtin\ReadonlyRaise::ensureStandaloneBodies($this);
-            Builtin\JitThrow::ensureStandaloneBodies($this);
+            ExceptionBridge::ensureStandaloneBodies($this);
+            ErrorBridge::ensureStandaloneBodies($this);
+            Builtin\AssertFail::ensureStandaloneBodies($this);
             Builtin\JitReturnPending::ensureStandaloneBodies($this);
+            Builtin\CliArgvRuntime::ensureStandaloneBodies($this);
+            Builtin\Sscanf::ensureStandaloneBodies($this);
         }
 
         $this->functionProxies['is_null'] = new Builtin\IsNullFn();
@@ -721,21 +722,9 @@ class Context {
                 $main->getParam(0),
                 $main->getParam(1)
             );
-            $this->builder->call(
-                $this->lookupFunction('__phpc_progress_note'),
-                $this->builder->pointerCast(
-                    $this->constantFromString('c:main_before_init'),
-                    $this->getTypeFromString('int8*')
-                )
-            );
+            Progress::emitNativeNote($this, 'c:main_before_init');
             $this->builder->call($this->initFunc);
-            $this->builder->call(
-                $this->lookupFunction('__phpc_progress_note'),
-                $this->builder->pointerCast(
-                    $this->constantFromString('c:main_after_init'),
-                    $this->getTypeFromString('int8*')
-                )
-            );
+            Progress::emitNativeNote($this, 'c:main_after_init');
             if (Builtin::LOAD_TYPE_STANDALONE === $this->loadType) {
                 Builtin\HttpResponseCode::emitResetForStandaloneMain($this);
                 Builtin\SessionId::emitResetForStandaloneMain($this);
@@ -746,29 +735,15 @@ class Context {
                 $this->builder->call($this->lookupFunction('phpc_jit_clear_throw_pending'));
                 Builtin\JitReturnPending::registerDeclarations($this);
                 $this->builder->call($this->lookupFunction('phpc_jit_clear_return_pending'));
-                Builtin\ReadonlyRaise::emitClearForStandaloneMain($this);
-                Builtin\TypeErrorRaise::emitClearForStandaloneMain($this);
-                Builtin\ErrorRaise::emitClearForStandaloneMain($this);
+                ErrorBridge::emitClearForStandaloneMain($this);
+                ExceptionBridge::emitClearForStandaloneMain($this);
             }
-            $this->builder->call(
-                $this->lookupFunction('__phpc_progress_note'),
-                $this->builder->pointerCast(
-                    $this->constantFromString('c:main_before_php'),
-                    $this->getTypeFromString('int8*')
-                )
-            );
+            Progress::emitNativeNote($this, 'c:main_before_php');
             $this->builder->call($this->main);
-            $this->builder->call(
-                $this->lookupFunction('__phpc_progress_note'),
-                $this->builder->pointerCast(
-                    $this->constantFromString('c:main_after_php'),
-                    $this->getTypeFromString('int8*')
-                )
-            );
+            Progress::emitNativeNote($this, 'c:main_after_php');
             if (Builtin::LOAD_TYPE_STANDALONE === $this->loadType) {
-                Builtin\ReadonlyRaise::emitAbortIfPendingForStandaloneMain($this);
-                Builtin\TypeErrorRaise::emitAbortIfPendingForStandaloneMain($this);
-                Builtin\ErrorRaise::emitAbortIfPendingForStandaloneMain($this);
+                ErrorBridge::emitAbortIfPendingForStandaloneMain($this);
+                ExceptionBridge::emitAbortIfPendingForStandaloneMain($this);
                 Builtin\PendingHeaders::emitFlushForStandalone($this);
                 Builtin\ObOutput::emitEndAllForStandalone($this);
             }
@@ -838,10 +813,8 @@ class Context {
                 $engine,
                 $this->loadType
             );
-            Builtin\ReadonlyRaise::bindJitEngine($engine);
-            Builtin\TypeErrorRaise::bindJitEngine($engine);
-            Builtin\ErrorRaise::bindJitEngine($engine);
-            Builtin\JitThrow::bindJitEngine($engine);
+            ExceptionBridge::bindJitEngine($engine);
+            ErrorBridge::bindJitEngine($engine);
             foreach ($this->exports as $export) {
                 $export[2]->handler = $this->result->getHandler($export[0], $export[1]);
             }
@@ -861,10 +834,8 @@ class Context {
             $engine,
             $this->loadType
         );
-        Builtin\ReadonlyRaise::bindJitEngine($engine);
-        Builtin\TypeErrorRaise::bindJitEngine($engine);
-        Builtin\ErrorRaise::bindJitEngine($engine);
-        Builtin\JitThrow::bindJitEngine($engine);
+        ExceptionBridge::bindJitEngine($engine);
+        ErrorBridge::bindJitEngine($engine);
         foreach ($this->exports as $export) {
             $export[2]->handler = $this->result->getHandler($export[0], $export[1]);
         }
@@ -1178,6 +1149,28 @@ class Context {
             $this->stringConstant[$string] = $global;
         }
         return $this->stringConstant[$string];
+    }
+
+    /** NUL-terminated C string pointer for a module string global. */
+    public function pointerFromStringConstant(string $string): PHPLLVM\Value
+    {
+        return $this->bytePtr($this->constantFromString($string));
+    }
+
+    /** C-style int success flag (non-zero => true) for branch/select lowering. */
+    public function i32Success(PHPLLVM\Value $value): PHPLLVM\Value
+    {
+        return $this->builder->icmp(
+            PHPLLVM\Builder::INT_NE,
+            $value,
+            $this->getTypeFromString('int32')->constInt(0, false)
+        );
+    }
+
+    /** Bitcast any pointer to i8* for libc helpers declared with int8* parameters. */
+    public function bytePtr(PHPLLVM\Value $value): PHPLLVM\Value
+    {
+        return $this->builder->pointerCast($value, $this->getTypeFromString('int8*'));
     }
 
     private array $boolValues = [];

@@ -10,6 +10,7 @@ use PHPCompiler\JIT\HashTableHelper;
 use PHPCompiler\JIT\JitStringArg;
 use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\Variable as JITVariable;
+use PHPCompiler\VM\Variable as VmVariable;
 use PHPLLVM\Builder;
 use PHPLLVM\Value;
 
@@ -30,35 +31,73 @@ final class JitClassParents
         }
 
         if (JITVariable::TYPE_VALUE === $whatArg->type) {
-            $valuePtr = JitValueBox::valuePtrFromVariable($context, $whatArg);
-            $obj = $context->builder->call(
-                $context->lookupFunction('__value__readObject'),
-                $valuePtr
-            );
-            $objType = $context->getTypeFromString('__object__*');
-            $isObject = $context->builder->icmp(
-                Builder::INT_NE,
-                $obj,
-                $objType->constNull()
-            );
-            if (!$isObject) {
-                throw new \LogicException(
-                    'class_parents() argument must be an object or class name string in this compiler build'
-                );
-            }
-            $objVar = new JITVariable(
-                $context,
-                JITVariable::TYPE_OBJECT,
-                JITVariable::KIND_VALUE,
-                $obj
-            );
-
-            return self::invokeForObject($context, $objVar, $autoload);
+            return self::invokeForBoxedValue($context, $whatArg, $autoload);
         }
 
         throw new \LogicException(
             'class_parents() class name must be a string literal in this compiler build'
         );
+    }
+
+    private static function invokeForBoxedValue(
+        Context $context,
+        JITVariable $whatArg,
+        bool $autoload
+    ): Value {
+        $valuePtr = JitValueBox::valuePtrFromVariable($context, $whatArg);
+        $typeField = $context->structFieldMap['__value__']['type'];
+        $typeByte = $context->builder->load(
+            $context->builder->structGep($valuePtr, $typeField)
+        );
+        $i8 = $context->getTypeFromString('int8');
+        $isEnumCase = $context->builder->icmp(
+            Builder::INT_EQ,
+            $typeByte,
+            $i8->constInt(VmVariable::TYPE_ENUM_CASE, false)
+        );
+        $tag = 'cp_box_'.(string) ++self::$seq;
+        $enumCaseBlock = BasicBlockHelper::append($context, $tag.'_enum');
+        $objectBlock = BasicBlockHelper::append($context, $tag.'_obj');
+        $doneBlock = BasicBlockHelper::append($context, $tag.'_done');
+        $context->builder->branchIf($isEnumCase, $enumCaseBlock, $objectBlock);
+
+        $context->builder->positionAtEnd($enumCaseBlock);
+        $emptyPtr = self::returnEmptyArray($context);
+        $context->builder->branch($doneBlock);
+
+        $context->builder->positionAtEnd($objectBlock);
+        $obj = $context->builder->call(
+            $context->lookupFunction('__value__readObject'),
+            $valuePtr
+        );
+        $objType = $context->getTypeFromString('__object__*');
+        $isObject = $context->builder->icmp(
+            Builder::INT_NE,
+            $obj,
+            $objType->constNull()
+        );
+        if (!$isObject) {
+            throw new \LogicException(
+                'class_parents() argument must be an object or class name string in this compiler build'
+            );
+        }
+        $objVar = new JITVariable(
+            $context,
+            JITVariable::TYPE_OBJECT,
+            JITVariable::KIND_VALUE,
+            $obj
+        );
+        $objectResult = self::invokeForObject($context, $objVar, $autoload);
+        $objectEndBlock = $context->builder->getInsertBlock();
+        $context->builder->branch($doneBlock);
+
+        $context->builder->positionAtEnd($doneBlock);
+        $valuePtrTy = $context->getTypeFromString('__value__*');
+        $result = $context->builder->phi($valuePtrTy);
+        $result->addIncoming($emptyPtr, $enumCaseBlock);
+        $result->addIncoming($objectResult, $objectEndBlock);
+
+        return $result;
     }
 
     private static function invokeForObject(

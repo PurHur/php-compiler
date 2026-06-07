@@ -7,9 +7,8 @@ namespace PHPCompiler\ext\standard;
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Context;
-use PHPCompiler\JIT\JitStringArg;
+use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\Variable as JITVariable;
-use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
 
 /** stat() — file metadata array via host stat(2) (issue #1197). */
@@ -25,14 +24,11 @@ final class stat_ extends Internal
         if (1 !== \count($frame->calledArgs)) {
             throw new \LogicException('stat() requires exactly one argument in this compiler build');
         }
-        $v = $frame->calledArgs[0]->resolveIndirect();
+        $path = VmString::coerceStringBuiltinArg($frame->calledArgs[0], 'stat', 0, 'filename');
         if (null === $frame->returnVar) {
             return;
         }
-        if (Variable::TYPE_STRING !== $v->type) {
-            throw new \LogicException('stat() requires a string path in this compiler build');
-        }
-        $info = VmFs::statInfo($v->toString(), false);
+        $info = VmFs::statInfo($path, false);
         if (false === $info) {
             $frame->returnVar->bool(false);
         } else {
@@ -45,7 +41,7 @@ final class stat_ extends Internal
         if (1 !== \count($args)) {
             throw new \LogicException('stat() requires exactly one argument in this compiler build');
         }
-        $path = JitStringArg::lower($context, $args[0], 'stat() path');
+        $path = JitStringBuiltinArg::lower($context, $args[0], 'stat', 0, 'filename');
 
         return JitStatArray::invoke($context, $path, false);
     }

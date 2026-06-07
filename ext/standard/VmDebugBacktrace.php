@@ -35,7 +35,8 @@ final class VmDebugBacktrace
             foreach ($frame->vmContext->runStackFrames() as $stackFrame) {
                 $walk[] = $stackFrame;
             }
-        } elseif ([] === $walk) {
+        }
+        if ([] === $walk) {
             $walk = self::parentChainFrames($frame);
         }
         foreach ($walk as $f) {

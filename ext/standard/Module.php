@@ -19,9 +19,16 @@ use PHPCompiler\VM;
 
 class Module extends ModuleAbstract
 {
+    public function getAdditionalExtensionNames(): array
+    {
+        return ['json', 'date'];
+    }
+
     public function init(Runtime $runtime): void
     {
         parent::init($runtime);
+        BuiltinAttributes::register($runtime->vmContext);
+        BuiltinEnums::register($runtime->vmContext);
         foreach ([
             'LOCK_SH' => 1,
             'LOCK_EX' => 2,
@@ -30,6 +37,9 @@ class Module extends ModuleAbstract
             'DEBUG_BACKTRACE_PROVIDE_OBJECT' => VmDebugBacktrace::PROVIDE_OBJECT,
             'DEBUG_BACKTRACE_IGNORE_ARGS' => VmDebugBacktrace::IGNORE_ARGS,
             'DEBUG_BACKTRACE_IGNORE_STATIC_ARGS' => VmDebugBacktrace::IGNORE_STATIC_ARGS,
+            'CONNECTION_NORMAL' => VmConnection::NORMAL,
+            'CONNECTION_ABORTED' => VmConnection::ABORTED,
+            'CONNECTION_TIMEOUT' => VmConnection::TIMEOUT,
         ] + VmStreamSupports::constants() + VmImage::constants() as $name => $value) {
             $var = new VM\Variable();
             $var->int($value);
@@ -92,6 +102,8 @@ class Module extends ModuleAbstract
             new gc_disable(),
             new gc_enabled(),
             new halt_compiler_(),
+            new exit_(),
+            new die_(),
             new strval(),
             new int_min(),
             new int_max(),
@@ -159,6 +171,7 @@ class Module extends ModuleAbstract
             new str_starts_with(),
             new str_ends_with(),
             new strncmp(),
+            new memcmp(),
             new substr_compare(),
             new array_count(),
             new array_count('sizeof'),
@@ -176,6 +189,7 @@ class Module extends ModuleAbstract
             new array_first(),
             new array_last(),
             new array_is_list(),
+            new array_is_assoc(),
             new in_array(),
             new array_push(),
             new array_pop(),
@@ -213,6 +227,7 @@ class Module extends ModuleAbstract
             new implode(),
             new implode('join'),
             new image_type_to_extension(),
+            new image_type_to_mime_type(),
             new str_replace(),
             new str_ireplace(),
             new strtr(),
@@ -306,8 +321,10 @@ class Module extends ModuleAbstract
             new strip_tags(),
             new header_(),
             new headers_sent(),
+            new connection_status(),
             new header_register_callback(),
             new register_shutdown_function(),
+            new readonly_(),
             new setcookie(),
             new setrawcookie(),
             new header_remove(),
@@ -398,6 +415,7 @@ class Module extends ModuleAbstract
             new touch_(),
             new filetype(),
             new stream_context_create(),
+            new stream_socket_client(),
             new stream_set_chunk_size_(),
             new stream_set_timeout_(),
             new stream_set_write_buffer_(),
@@ -418,6 +436,8 @@ class Module extends ModuleAbstract
             new rewind_(),
             new feof_(),
             new fflush_(),
+            new fsync_(),
+            new fdatasync_(),
             new ftruncate_(),
             new fpassthru(),
             new fwrite(),
@@ -439,6 +459,8 @@ class Module extends ModuleAbstract
             new getcwd_(),
             new gethostname(),
             new gethostbynamel(),
+            new gethostbyname(),
+            new gethostbyaddr(),
             new getprotobyname(),
             new getprotobynumber(),
             new getservbyname(),
@@ -446,11 +468,13 @@ class Module extends ModuleAbstract
             new chdir_(),
             new putenv_(),
             new ini_set_(),
+            new ini_set_('ini_alter'),
             new ini_get_(),
             new error_reporting(),
             new define_(),
             new defined_(),
             new constant_(),
+            new class_constants_(),
             new get_defined_constants_(),
             new get_defined_vars_(),
             new get_declared_interfaces_(),
@@ -459,20 +483,27 @@ class Module extends ModuleAbstract
             new get_declared_functions_(),
             new get_defined_functions_(),
             new debug_backtrace(),
+            new get_debug_backtrace(),
             new class_exists_(),
             new class_alias(),
+            new create_lazy_ghost(),
+            new create_lazy_proxy(),
             new enum_exists_(),
+            new unitenum_exists_(),
             new get_declared_enums_(),
             new interface_exists_(),
             new trait_exists_(),
             new class_uses_(),
+            new class_uses_recursive(),
             new class_implements_(),
             new class_parents_(),
             new function_exists(),
             new func_get_args(),
             new func_num_args(),
             new method_exists_(),
+            new class_meth_exists_(),
             new property_exists_(),
+            new attribute_exists_(),
             new get_object_vars_(),
             new get_mangled_object_vars_(),
             new get_object_id(),
@@ -495,6 +526,9 @@ class Module extends ModuleAbstract
             new eval_(),
             new phpc_deploy_path(),
             new compiler_is_superglobal_name(),
+            new phpc_match_unhandled_operand_is_object(),
+            new phpc_clone_with_begin(),
+            new phpc_clone_with_end(),
             new extract_(),
             new compact_(),
             new scandir(),
@@ -512,6 +546,7 @@ class Module extends ModuleAbstract
             new fnmatch(),
             new time(),
             new getmypid(),
+            new zend_thread_id(),
             new getmygrgid(),
             new getmyinode(),
             new getlastmod(),
@@ -532,6 +567,8 @@ class Module extends ModuleAbstract
             new date(),
             new gmdate(),
             new getdate(),
+            new localtime(),
+            new idate(),
             new sleep(),
             new spl_autoload_register(),
             new time_nanosleep(),
@@ -775,6 +812,40 @@ class Module extends ModuleAbstract
             $ft = $context->context->functionType($i32, false, $i8p, $i32);
             $fn = $context->module->addFunction('chmod', $ft);
             $context->registerFunction('chmod', $fn);
+        }
+        try {
+            $context->lookupFunction('umask');
+        } catch (\Throwable $e) {
+            $i32 = $context->getTypeFromString('int32');
+            $ft = $context->context->functionType($i32, false, $i32);
+            $fn = $context->module->addFunction('umask', $ft);
+            $context->registerFunction('umask', $fn);
+        }
+        try {
+            $context->lookupFunction('nice');
+        } catch (\Throwable $e) {
+            $i32 = $context->getTypeFromString('int32');
+            $ft = $context->context->functionType($i32, false, $i32);
+            $fn = $context->module->addFunction('nice', $ft);
+            $context->registerFunction('nice', $fn);
+        }
+        try {
+            $context->lookupFunction('__errno_location');
+        } catch (\Throwable $e) {
+            $i32 = $context->getTypeFromString('int32');
+            $i32Ptr = $i32->pointerType(0);
+            $ft = $context->context->functionType($i32Ptr, false);
+            $fn = $context->module->addFunction('__errno_location', $ft);
+            $context->registerFunction('__errno_location', $fn);
+        }
+        try {
+            $context->lookupFunction('fnmatch');
+        } catch (\Throwable $e) {
+            $i8p = $context->getTypeFromString('int8*');
+            $i32 = $context->getTypeFromString('int32');
+            $ft = $context->context->functionType($i32, false, $i8p, $i8p, $i32);
+            $fn = $context->module->addFunction('fnmatch', $ft);
+            $context->registerFunction('fnmatch', $fn);
         }
         try {
             $context->lookupFunction('rename');

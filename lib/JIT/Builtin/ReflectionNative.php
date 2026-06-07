@@ -6,7 +6,7 @@ namespace PHPCompiler\JIT\Builtin;
 
 use PHPCompiler\JIT\Context;
 
-/** Declare native reflection/attribute registry symbols for JIT/AOT (#1936). */
+/** Declare LLVM attribute lookup symbols lowered from PHP tables (#1936, #6922). */
 final class ReflectionNative
 {
     public static function registerDeclarations(Context $context): void
@@ -16,12 +16,11 @@ final class ReflectionNative
 
         foreach (
             [
-                ['phpc_attr_class_count', $sizeT, [$i8p]],
-                ['phpc_attr_class_name_at', $i8p, [$i8p, $sizeT]],
-                ['phpc_attr_method_count', $sizeT, [$i8p, $i8p]],
-                ['phpc_attr_method_name_at', $i8p, [$i8p, $i8p, $sizeT]],
-                ['phpc_attr_class_args_hashtable', $context->getTypeFromString('__hashtable__*'), [$i8p, $sizeT]],
-                ['phpc_attr_class_string_arg', $i8p, [$i8p, $sizeT, $sizeT]],
+                ['__compiler_attr_class_count', $sizeT, [$i8p]],
+                ['__compiler_attr_class_name_at', $i8p, [$i8p, $sizeT]],
+                ['__compiler_attr_method_count', $sizeT, [$i8p, $i8p]],
+                ['__compiler_attr_method_name_at', $i8p, [$i8p, $i8p, $sizeT]],
+                ['__compiler_attr_class_args_hashtable', $context->getTypeFromString('__hashtable__*'), [$i8p, $sizeT]],
             ] as [$name, $ret, $params]
         ) {
             $existing = $context->module->getNamedFunction($name);

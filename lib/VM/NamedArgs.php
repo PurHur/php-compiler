@@ -93,22 +93,32 @@ final class NamedArgs
             $idx = array_search($name, $lowerNames, true);
             if (false === $idx) {
                 if (null !== $variadicParamIndex) {
-                    $variadicNamed[(string) $entry[1]] = $value;
+                    $key = (string) $entry[1];
+                    if (isset($variadicNamed[$key])) {
+                        throw new \Error("Named parameter \${$key} overwrites previous argument");
+                    }
+                    $variadicNamed[$key] = $value;
                     continue;
                 }
                 throw new \Error("Unknown named parameter \${$entry[1]}");
             }
+            if (null !== $variadicParamIndex && $idx === $variadicParamIndex) {
+                $key = (string) $entry[1];
+                if (isset($variadicNamed[$key])) {
+                    throw new \Error("Named parameter \${$key} overwrites previous argument");
+                }
+                $variadicNamed[$key] = $value;
+                continue;
+            }
             if (isset($filled[$idx])) {
-                throw new \LogicException(
-                    sprintf('Argument #%d ($%s) must be passed only once', $idx + 1, $paramNames[$idx])
-                );
+                throw new \Error("Named parameter \${$entry[1]} overwrites previous argument");
             }
             $filled[$idx] = true;
             $result[$idx] = $value;
         }
 
         if (null !== $variadicParamIndex && ([] !== $variadicNamed || [] !== $variadicPositional)) {
-            self::assignVariadicArray($result, $variadicParamIndex, $variadicPositional, $variadicNamed);
+            self::assignVariadicArray($result, $variadicParamIndex, $paramCount, $variadicPositional, $variadicNamed);
         }
 
         ksort($result);
@@ -124,6 +134,7 @@ final class NamedArgs
     private static function assignVariadicArray(
         array &$result,
         int $variadicParamIndex,
+        int $paramCount,
         array $variadicPositional,
         array $variadicNamed
     ): void {
@@ -148,7 +159,7 @@ final class NamedArgs
             $packed->add($key, $copy);
         }
         foreach ($result as $idx => $existing) {
-            if ($idx > $variadicParamIndex) {
+            if ($idx > $variadicParamIndex && $idx >= $paramCount) {
                 $copy = new Variable();
                 $copy->copyFrom($existing);
                 $packed->addIndex($numIdx++, $copy);

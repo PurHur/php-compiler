@@ -124,6 +124,20 @@ class Type extends Builtin {
         );
         $fnVarExport = $this->context->module->addFunction('__compiler_var_export', $fntypeVarExport);
         $this->context->registerFunction('__compiler_var_export', $fnVarExport);
+        $fntypePrintR = $this->context->context->functionType(
+            $this->context->getTypeFromString('__string__*'),
+            false,
+            $this->context->getTypeFromString('__value__*')
+        );
+        $fnPrintR = $this->context->module->addFunction('__compiler_print_r', $fntypePrintR);
+        $this->context->registerFunction('__compiler_print_r', $fnPrintR);
+        $fntypeVarDump = $this->context->context->functionType(
+            $this->context->getTypeFromString('void'),
+            false,
+            $this->context->getTypeFromString('__value__*')
+        );
+        $fnVarDump = $this->context->module->addFunction('__compiler_var_dump', $fntypeVarDump);
+        $this->context->registerFunction('__compiler_var_dump', $fnVarDump);
         $fntypeIniSet = $this->context->context->functionType(
             $this->context->getTypeFromString('void'),
             false,
@@ -174,26 +188,6 @@ class Type extends Builtin {
         );
         $fnUtf8Strlen = $this->context->module->addFunction('__compiler_utf8_strlen', $fntypeUtf8Strlen);
         $this->context->registerFunction('__compiler_utf8_strlen', $fnUtf8Strlen);
-        HttpResponseCode::implement($this->context);
-        SessionStorageGlobals::ensureGlobals($this->context);
-        SessionId::implement($this->context);
-        SessionName::implement($this->context);
-        ObOutput::registerExternals($this->context);
-        PowIntRuntime::ensureLinked($this->context);
-        GethostbynamelRuntime::ensureLinked($this->context);
-        TimeSleepRuntime::ensureLinked($this->context);
-        StringHrtime::ensureLinked($this->context);
-        StringMicrotime::ensureLinked($this->context);
-        StringGettimeofday::ensureLinked($this->context);
-        StringGetrusage::ensureLinked($this->context);
-        StringInfo::ensureLinked($this->context);
-        LastErrorRuntime::ensureLinked($this->context);
-        FunctionExistsRuntime::ensureLinked($this->context);
-        WeakRefRegistryRuntime::ensureLinked($this->context);
-        MemoryRuntime::ensureLinked($this->context);
-        IniRuntime::ensureLinked($this->context);
-        ErrorHandlerOutput::registerExternals($this->context);
-        CallArgv::implement($this->context);
         $i8p = $this->context->getTypeFromString('int8*');
         $i32 = $this->context->getTypeFromString('int32');
         $sizeT = $this->context->getTypeFromString('size_t');
@@ -207,65 +201,15 @@ class Type extends Builtin {
                 '__compiler_env_register_putenv' => [$voidTy, false, $i8p],
             ] as $libcName => [$ret, $vararg, $param]
         ) {
-            $ft = $this->context->context->functionType($ret, $vararg, $param);
-            $fn = $this->context->module->addFunction($libcName, $ft);
-            $this->context->registerFunction($libcName, $fn);
+            $this->ensureExternalFunction($libcName, $this->context->context->functionType($ret, $vararg, $param));
         }
-        $i64 = $this->context->getTypeFromString('int64');
-        $i8pp = $this->context->getTypeFromString('int8**');
-        $voidTy = $this->context->getTypeFromString('void');
-        $fnStoreArgv = $this->context->module->addFunction(
-            '__phpc_cli_store_argv',
-            $this->context->context->functionType($voidTy, false, $i32, $i8pp)
-        );
-        $this->context->registerFunction('__phpc_cli_store_argv', $fnStoreArgv);
-        $fnCliArgc = $this->context->module->addFunction(
-            '__phpc_cli_argc',
-            $this->context->context->functionType($i64, false)
-        );
-        $this->context->registerFunction('__phpc_cli_argc', $fnCliArgc);
-        $fnCliArgvCstr = $this->context->module->addFunction(
-            '__phpc_cli_argv_cstr',
-            $this->context->context->functionType($i8p, false, $i32)
-        );
-        $this->context->registerFunction('__phpc_cli_argv_cstr', $fnCliArgvCstr);
-        $fnCliStrEq = $this->context->module->addFunction(
-            '__phpc_cli_str_eq',
-            $this->context->context->functionType($i32, false, $i8p, $i8p)
-        );
-        $this->context->registerFunction('__phpc_cli_str_eq', $fnCliStrEq);
-        $fnProgressNote = $this->context->module->addFunction(
-            '__phpc_progress_note',
-            $this->context->context->functionType($voidTy, false, $i8p)
-        );
-        $this->context->registerFunction('__phpc_progress_note', $fnProgressNote);
-        $valuePtr = $this->context->getTypeFromString('__value__*');
-        $fnRefreshArgv = $this->context->module->addFunction(
-            '__phpc_cli_refresh_argv_global',
-            $this->context->context->functionType($voidTy, false, $valuePtr)
-        );
-        $this->context->registerFunction('__phpc_cli_refresh_argv_global', $fnRefreshArgv);
-        $ftOpen = $this->context->context->functionType($i32, false, $i8p, $i32);
-        $fnOpen = $this->context->module->addFunction('open', $ftOpen);
-        $this->context->registerFunction('open', $fnOpen);
-        $ftFopen = $this->context->context->functionType($i8p, false, $i8p, $i8p);
-        $fnFopen = $this->context->module->addFunction('fopen', $ftFopen);
-        $this->context->registerFunction('fopen', $fnFopen);
-        $ftFwrite = $this->context->context->functionType($sizeT, false, $i8p, $sizeT, $sizeT, $i8p);
-        $fnFwrite = $this->context->module->addFunction('fwrite', $ftFwrite);
-        $this->context->registerFunction('fwrite', $fnFwrite);
-        $ftFclose = $this->context->context->functionType($i32, false, $i8p);
-        $fnFclose = $this->context->module->addFunction('fclose', $ftFclose);
-        $this->context->registerFunction('fclose', $fnFclose);
-        $ftRead = $this->context->context->functionType($i64, false, $i32, $i8p, $sizeT);
-        $fnRead = $this->context->module->addFunction('read', $ftRead);
-        $this->context->registerFunction('read', $fnRead);
-        $ftWrite = $this->context->context->functionType($i64, false, $i32, $i8p, $sizeT);
-        $fnWrite = $this->context->module->addFunction('write', $ftWrite);
-        $this->context->registerFunction('write', $fnWrite);
-        $ftClose = $this->context->context->functionType($i32, false, $i32);
-        $fnClose = $this->context->module->addFunction('close', $ftClose);
-        $this->context->registerFunction('close', $fnClose);
+        $this->ensureExternalFunction('open', $this->context->context->functionType($i32, false, $i8p, $i32, $i32));
+        $this->ensureExternalFunction('fopen', $this->context->context->functionType($i8p, false, $i8p, $i8p));
+        $this->ensureExternalFunction('fwrite', $this->context->context->functionType($sizeT, false, $i8p, $sizeT, $sizeT, $i8p));
+        $this->ensureExternalFunction('fclose', $this->context->context->functionType($i32, false, $i8p));
+        $this->ensureExternalFunction('read', $this->context->context->functionType($i64, false, $i32, $i8p, $sizeT));
+        $this->ensureExternalFunction('write', $this->context->context->functionType($i64, false, $i32, $i8p, $sizeT));
+        $this->ensureExternalFunction('close', $this->context->context->functionType($i32, false, $i32));
         $fntypeReadfile = $this->context->context->functionType(
             $i64,
             false,
@@ -358,6 +302,12 @@ class Type extends Builtin {
         $fntypeFflush = $this->context->context->functionType($i32, false, $i64);
         $fnFflush = $this->context->module->addFunction('__compiler_fflush', $fntypeFflush);
         $this->context->registerFunction('__compiler_fflush', $fnFflush);
+        $fntypeFsync = $this->context->context->functionType($i32, false, $i64);
+        $fnFsync = $this->context->module->addFunction('__compiler_fsync', $fntypeFsync);
+        $this->context->registerFunction('__compiler_fsync', $fnFsync);
+        $fntypeFdatasync = $this->context->context->functionType($i32, false, $i64);
+        $fnFdatasync = $this->context->module->addFunction('__compiler_fdatasync', $fntypeFdatasync);
+        $this->context->registerFunction('__compiler_fdatasync', $fnFdatasync);
         $fntypeStreamSetChunkSize = $this->context->context->functionType($i64, false, $i64, $i64);
         $fnStreamSetChunkSize = $this->context->module->addFunction('__compiler_stream_set_chunk_size', $fntypeStreamSetChunkSize);
         $this->context->registerFunction('__compiler_stream_set_chunk_size', $fnStreamSetChunkSize);
@@ -418,15 +368,6 @@ class Type extends Builtin {
         );
         $fnMkdir = $this->context->module->addFunction('__compiler_mkdir', $fntypeMkdir);
         $this->context->registerFunction('__compiler_mkdir', $fnMkdir);
-        $fntypeUmaskGet = $this->context->context->functionType($i64, false);
-        $fnUmaskGet = $this->context->module->addFunction('__compiler_umask_get', $fntypeUmaskGet);
-        $this->context->registerFunction('__compiler_umask_get', $fnUmaskGet);
-        $fntypeUmask = $this->context->context->functionType($i64, false, $i64);
-        $fnUmask = $this->context->module->addFunction('__compiler_umask', $fntypeUmask);
-        $this->context->registerFunction('__compiler_umask', $fnUmask);
-        $fntypeProcNice = $this->context->context->functionType($i64, false, $i64);
-        $fnProcNice = $this->context->module->addFunction('__compiler_proc_nice', $fntypeProcNice);
-        $this->context->registerFunction('__compiler_proc_nice', $fnProcNice);
         $fntypeCopy = $this->context->context->functionType(
             $i32,
             false,
@@ -712,6 +653,14 @@ class Type extends Builtin {
         );
         $fnFormatDt = $this->context->module->addFunction('__compiler_format_datetime', $fntypeFormatDt);
         $this->context->registerFunction('__compiler_format_datetime', $fnFormatDt);
+        $fntypeIdate = $this->context->context->functionType(
+            $i64,
+            false,
+            $this->context->getTypeFromString('__string__*'),
+            $i64
+        );
+        $fnIdate = $this->context->module->addFunction('__compiler_idate', $fntypeIdate);
+        $this->context->registerFunction('__compiler_idate', $fnIdate);
         $fntypeUndefKeyStr = $this->context->context->functionType(
             $void,
             false,
@@ -748,11 +697,14 @@ class Type extends Builtin {
             'time' => [$i64, false, [$i8p]],
             'gettimeofday' => [$i32, false, [$i8p, $i8p]],
             'getpid' => [$i32, false, []],
+            'getppid' => [$i32, false, []],
+            'strerror' => [$i8p, false, [$i32]],
             'getgid' => [$i32, false, []],
             'localtime' => [$i8p, false, [$i64p]],
             'gmtime' => [$i8p, false, [$i64p]],
             'sleep' => [$i32, false, [$i32]],
             'usleep' => [$i32, false, [$i32]],
+            'getloadavg' => [$i32, false, [$double->pointerType(0), $i32]],
         ];
         foreach ($libcFns as $libcName => $spec) {
             [$ret, $vararg, $params] = $spec;
@@ -789,11 +741,6 @@ class Type extends Builtin {
             $this->context->context->functionType($htPtr, false)
         );
         $this->context->registerFunction('__phpc_pending_header_list', $fnPendingList);
-        $fnFnmatch = $this->context->module->addFunction(
-            '__phpc_fnmatch',
-            $this->context->context->functionType($i32, false, $strPtr, $strPtr, $i32)
-        );
-        $this->context->registerFunction('__phpc_fnmatch', $fnFnmatch);
         $fnGlobVec = $this->context->module->addFunction(
             '__phpc_glob_vec',
             $this->context->context->functionType($i32, false, $strPtr, $i32, $i8pppPtr)
@@ -814,16 +761,6 @@ class Type extends Builtin {
             $this->context->context->functionType($void, false, $i8ppPtr, $i32)
         );
         $this->context->registerFunction('__phpc_strvec_free', $fnStrvecFree);
-        $fnGlob = $this->context->module->addFunction(
-            '__phpc_glob',
-            $this->context->context->functionType($htPtr, false, $strPtr, $i32)
-        );
-        $this->context->registerFunction('__phpc_glob', $fnGlob);
-        $fnScandir = $this->context->module->addFunction(
-            '__phpc_scandir',
-            $this->context->context->functionType($htPtr, false, $strPtr, $i32)
-        );
-        $this->context->registerFunction('__phpc_scandir', $fnScandir);
         $fnStat = $this->context->module->addFunction(
             '__phpc_stat',
             $this->context->context->functionType($htPtr, false, $strPtr, $i32)
@@ -834,11 +771,6 @@ class Type extends Builtin {
             $this->context->context->functionType($strPtr, false, $i64)
         );
         $this->context->registerFunction('__phpc_stream_path', $fnStreamPath);
-        $fnFstat = $this->context->module->addFunction(
-            '__phpc_fstat',
-            $this->context->context->functionType($htPtr, false, $i64)
-        );
-        $this->context->registerFunction('__phpc_fstat', $fnFstat);
         $fnFgetcsv = $this->context->module->addFunction(
             '__compiler_fgetcsv',
             $this->context->context->functionType($htPtr, false, $i64, $i64, $strPtr, $strPtr, $strPtr)
@@ -851,6 +783,7 @@ class Type extends Builtin {
         $this->context->registerFunction('__compiler_str_getcsv', $fnStrGetcsv);
         $valuePtr = $this->context->getTypeFromString('__value__*');
         $i64 = $this->context->getTypeFromString('int64');
+        $i1 = $this->context->getTypeFromString('int1');
         $fnParseUrl = $this->context->module->addFunction(
             '__phpc_parse_url_component',
             $this->context->context->functionType($void, false, $strPtr, $i64, $valuePtr)
@@ -866,6 +799,11 @@ class Type extends Builtin {
             $this->context->context->functionType($void, false, $i64, $valuePtr)
         );
         $this->context->registerFunction('__compiler_getdate', $fnGetdate);
+        $fnLocaltime = $this->context->module->addFunction(
+            '__compiler_localtime',
+            $this->context->context->functionType($void, false, $i64, $i1, $valuePtr)
+        );
+        $this->context->registerFunction('__compiler_localtime', $fnLocaltime);
         $fnGetrusage = $this->context->module->addFunction(
             '__compiler_getrusage',
             $this->context->context->functionType($void, false, $i64, $valuePtr)
@@ -910,10 +848,6 @@ class Type extends Builtin {
         );
         $this->context->registerFunction('__phpc_session_destroy_apply', $fnSessionDestroy);
         SessionStart::registerRuntimeDeclaration($this->context);
-        SessionStart::implement($this->context);
-        SessionWriteClose::implement($this->context);
-        SessionRegenerateId::implement($this->context);
-        SessionDestroy::implement($this->context);
         $fntypeJsonEncode = $this->context->context->functionType(
             $this->context->getTypeFromString('__string__*'),
             false,
@@ -1023,5 +957,59 @@ class Type extends Builtin {
         // $this->nativearray->register();
     }
 
+    public function initialize(): void {
+        Sscanf::ensureLinked($this->context);
+        HttpResponseCode::implement($this->context);
+        ObOutput::registerExternals($this->context);
+        ObOutputRuntime::ensureLinked($this->context);
+        PendingHeadersRuntime::ensureLinked($this->context);
+        PowIntRuntime::ensureLinked($this->context);
+        GethostbynamelRuntime::ensureLinked($this->context);
+        GethostbyaddrRuntime::ensureLinked($this->context);
+        TimeSleepRuntime::ensureLinked($this->context);
+        ProcessRuntime::ensureLinked($this->context);
+        StringHrtime::ensureLinked($this->context);
+        StringMicrotime::ensureLinked($this->context);
+        StringGettimeofday::ensureLinked($this->context);
+        StringGetrusage::ensureLinked($this->context);
+        StringInfo::ensureLinked($this->context);
+        StringDir::ensureLinked($this->context);
+        StringFsGlob::ensureLinked($this->context);
+        StringFsDir::ensureLinked($this->context);
+        StreamSync::ensureLinked($this->context);
+        LastErrorRuntime::ensureLinked($this->context);
+        CliArgvRuntime::ensureLinked($this->context);
+        FunctionExistsRuntime::ensureLinked($this->context);
+        WeakRefRegistryRuntime::ensureLinked($this->context);
+        MemoryRuntime::ensureLinked($this->context);
+        IniRuntime::ensureLinked($this->context);
+        StringEnvLocal::ensureLinked($this->context);
+        ErrorHandlerOutput::registerExternals($this->context);
+        CallArgv::implement($this->context);
+        ProgressNoteRuntime::ensureLinked($this->context);
+        AssertFail::ensureLinked($this->context);
+        SessionLifecycleRuntime::ensureLinked($this->context);
+        SessionStart::implement($this->context);
+        SessionWriteClose::implement($this->context);
+        SessionRegenerateId::implement($this->context);
+        SessionDestroy::implement($this->context);
+        SessionStorageGlobals::ensureGlobals($this->context);
+        SessionStorageRuntime::ensureLinked($this->context);
+        SessionId::implement($this->context);
+        SessionName::implement($this->context);
+    }
+
+    private function ensureExternalFunction(string $name, $fnType): void
+    {
+        if (null !== $this->context->module->getNamedFunction($name)) {
+            return;
+        }
+        try {
+            $this->context->lookupFunction($name);
+        } catch (\Throwable) {
+            $fn = $this->context->module->addFunction($name, $fnType);
+            $this->context->registerFunction($name, $fn);
+        }
+    }
 
 }

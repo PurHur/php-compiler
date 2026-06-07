@@ -3,7 +3,7 @@ PHP 8.4 asymmetric visibility: private(get) read guard (#5059, zend_object_handl
 --FILE--
 <?php
 class Box {
-    public private(get) string $secret = 'hidden';
+    private(get) string $secret = 'hidden';
 }
 
 $b = new Box();

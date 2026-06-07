@@ -23,18 +23,18 @@ final class ReflectionPropertyConstruct extends VmClassMethod
         }
         $ctx = VmReflection::requireContext($frame);
         $entry = VmReflection::resolveClassFromArg($ctx, $frame->calledArgs[1]);
-        $property = VmReflection::stringArg($frame->calledArgs[2], 'ReflectionProperty::__construct() name');
+        $property = VmReflection::stringArg($frame->calledArgs[2], 'ReflectionProperty::__construct() name', 2);
         $instanceName = VmReflection::findInstancePropertyName($entry, $property, $ctx);
         $staticKey = VmReflection::findStaticPropertyKey($entry, $property, $ctx);
         if (null === $instanceName && null === $staticKey) {
-            throw new \LogicException("Property {$property} does not exist on {$entry->name}");
+            ReflectionSupport::throwReflectionException(
+                ReflectionSupport::propertyNotFoundMessage($entry->name, $property)
+            );
         }
         $receiver = ReflectionSupport::requireReflectionProperty($frame, $frame->calledArgs[0]);
         $receiver->getProperty(ReflectionSupport::PROP_CLASS_NAME)->string($entry->name);
         $receiver->getProperty(ReflectionSupport::PROP_PROPERTY_NAME)->string($property);
         $receiver->constructed = true;
-        if (null !== $frame->returnVar) {
-            $frame->returnVar->null();
-        }
+        // Do not touch returnVar: it may alias the `new ReflectionProperty()` result slot (#6983).
     }
 }

@@ -8,9 +8,9 @@ use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Builtin\StringSimilarText;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\Variable as JITVariable;
-use PHPCompiler\VM\Variable;
 use PHPLLVM\Builder;
 use PHPLLVM\Value;
 
@@ -30,13 +30,8 @@ final class similar_text extends Internal
         if ($argc < 2 || $argc > 3) {
             throw new \LogicException('similar_text() accepts two or three arguments in this compiler build');
         }
-        $a = $frame->calledArgs[0]->resolveIndirect();
-        $b = $frame->calledArgs[1]->resolveIndirect();
-        if (Variable::TYPE_STRING !== $a->type || Variable::TYPE_STRING !== $b->type) {
-            throw new \LogicException('similar_text() requires two strings in this compiler build');
-        }
-        $s1 = $a->toString();
-        $s2 = $b->toString();
+        $s1 = VmString::coerceStringBuiltinArg($frame->calledArgs[0], 'similar_text', 0, 'string1');
+        $s2 = VmString::coerceStringBuiltinArg($frame->calledArgs[1], 'similar_text', 1, 'string2');
         if (3 === $argc) {
             $percent = 0.0;
             $sim = VmString::similar_text($s1, $s2, $percent);
@@ -60,8 +55,8 @@ final class similar_text extends Internal
             throw new \LogicException('similar_text() accepts two or three arguments in this compiler build');
         }
         StringSimilarText::ensureLinked($context);
-        $str0 = $this->jitString($context, $args[0], 'similar_text() argument #1');
-        $str1 = $this->jitString($context, $args[1], 'similar_text() argument #2');
+        $str0 = JitStringBuiltinArg::lower($context, $args[0], 'similar_text', 0, 'string1');
+        $str1 = JitStringBuiltinArg::lower($context, $args[1], 'similar_text', 1, 'string2');
         $p0 = $this->stringDataPtr($context, $str0);
         $p1 = $this->stringDataPtr($context, $str1);
         $fn = $context->lookupFunction('phpc_similar_text');

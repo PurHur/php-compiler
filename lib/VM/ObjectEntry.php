@@ -64,6 +64,16 @@ class ObjectEntry {
     /** PHP 8.1 fiber callback state (issue #3130). */
     public ?FiberState $fiberState = null;
 
+    /** True after readonly($object) marks this instance immutable (#6485). */
+    public bool $dynamicReadonly = false;
+
+    /**
+     * Readonly property names allowed one write during clone-with (#7250, IS_PROP_REINITABLE).
+     *
+     * @var array<string, true>
+     */
+    public array $reinitableProperties = [];
+
     public function __construct(ClassEntry $class) {
         $this->class = $class;
         $this->id = ++self::$counter;
@@ -155,15 +165,13 @@ class ObjectEntry {
             if ($property->name !== $name) {
                 continue;
             }
-            if ($property->prototype->isUndefined()) {
-                $slot->reset();
-                $slot->type = Variable::TYPE_UNDEFINED;
-                $slot->objectPropertyOwner = $this;
-                $slot->objectPropertyName = $name;
+            // Declared property unset → uninitialized slot (typed with/without default, #4863).
+            $slot->reset();
+            $slot->type = Variable::TYPE_UNDEFINED;
+            $slot->objectPropertyOwner = $this;
+            $slot->objectPropertyName = $name;
 
-                return;
-            }
-            break;
+            return;
         }
         $slot->null();
     }

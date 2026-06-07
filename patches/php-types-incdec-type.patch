@@ -4,6 +4,7 @@
                  }
  
                  return [Type::string()];
++
 +            case 'Expr_PostInc':
 +            case 'Expr_PostDec':
 +            case 'Expr_PreInc':

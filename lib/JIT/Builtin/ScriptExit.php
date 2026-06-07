@@ -6,15 +6,30 @@ namespace PHPCompiler\JIT\Builtin;
 
 use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Builtin;
+use PHPCompiler\JIT\Builtin\ErrorRaise;
+use PHPCompiler\JIT\Builtin\TypeErrorRaise;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\JitOperandTypeLabel;
 use PHPCompiler\JIT\Variable;
+use PHPCompiler\VM\Variable as VmVariable;
 use PHPLLVM\Builder;
 use PHPLLVM\Value;
 
 /** LLVM lowering for exit/die (issue #269). */
 final class ScriptExit
 {
+    public static function emitWithMessage(Context $context, Variable $statusArg, Variable $messageArg): void
+    {
+        self::emitMessage($context, $messageArg);
+        self::emitStatusOnly($context, $statusArg);
+    }
+
     public static function emit(Context $context, Variable $arg): void
+    {
+        self::emitStatusOnly($context, $arg);
+    }
+
+    private static function emitStatusOnly(Context $context, Variable $arg): void
     {
         switch ($arg->type) {
             case Variable::TYPE_NULL:
@@ -42,9 +57,145 @@ final class ScriptExit
             case Variable::TYPE_VALUE:
                 self::emitBoxed($context, $context->helper->loadValue($arg));
                 break;
+            case Variable::TYPE_OBJECT:
+                self::emitObjectStatus($context, $context->helper->loadValue($arg), $arg);
+                break;
             default:
                 throw new \LogicException('exit() only supports string or integer status in this compiler build');
         }
+    }
+
+    private static function emitMessage(Context $context, Variable $arg): void
+    {
+        switch ($arg->type) {
+            case Variable::TYPE_NULL:
+                return;
+            case Variable::TYPE_STRING:
+                self::echoString($context, $context->helper->loadValue($arg));
+                return;
+            case Variable::TYPE_NATIVE_LONG:
+                $context->builder->call(
+                    $context->lookupFunction('__phpc_ob_echo_ll'),
+                    $context->helper->loadValue($arg)
+                );
+                return;
+            case Variable::TYPE_NATIVE_DOUBLE:
+                $context->builder->call(
+                    $context->lookupFunction('__phpc_ob_echo_double'),
+                    $context->helper->loadValue($arg)
+                );
+                return;
+            case Variable::TYPE_NATIVE_BOOL:
+                self::emitNativeBool($context, $context->helper->loadValue($arg));
+                return;
+            case Variable::TYPE_VALUE:
+                self::emitBoxedMessage($context, $context->helper->loadValue($arg));
+                return;
+            default:
+                throw new \LogicException('exit() message must be string-coercible in this compiler build');
+        }
+    }
+
+    private static function emitBoxedMessage(Context $context, Value $boxedPtr): void
+    {
+        $map = $context->structFieldMap['__value__'];
+        $typeByte = $context->builder->load(
+            $context->builder->structGep($boxedPtr, $map['type'])
+        );
+        $i8 = $context->getTypeFromString('int8');
+
+        $nullBlock = BasicBlockHelper::append($context, 'exit_msg_boxed_null');
+        $stringBlock = BasicBlockHelper::append($context, 'exit_msg_boxed_string');
+        $longBlock = BasicBlockHelper::append($context, 'exit_msg_boxed_long');
+        $boolBlock = BasicBlockHelper::append($context, 'exit_msg_boxed_bool');
+        $doubleBlock = BasicBlockHelper::append($context, 'exit_msg_boxed_double');
+        $doneBlock = BasicBlockHelper::append($context, 'exit_msg_boxed_done');
+
+        $isNull = $context->builder->icmp(
+            Builder::INT_EQ,
+            $typeByte,
+            $i8->constInt(Variable::TYPE_NULL, false)
+        );
+        $afterNull = BasicBlockHelper::append($context, 'exit_msg_boxed_after_null');
+        $context->builder->branchIf($isNull, $nullBlock, $afterNull);
+
+        $context->builder->positionAtEnd($nullBlock);
+        $context->builder->branch($doneBlock);
+
+        $context->builder->positionAtEnd($afterNull);
+        $isString = $context->builder->icmp(
+            Builder::INT_EQ,
+            $typeByte,
+            $i8->constInt(Variable::TYPE_STRING, false)
+        );
+        $afterStringProbe = BasicBlockHelper::append($context, 'exit_msg_boxed_after_string');
+        $context->builder->branchIf($isString, $stringBlock, $afterStringProbe);
+
+        $context->builder->positionAtEnd($stringBlock);
+        $strPtr = $context->builder->call(
+            $context->lookupFunction('__value__readString'),
+            $boxedPtr
+        );
+        self::echoString($context, $strPtr);
+        $context->builder->branch($doneBlock);
+
+        $context->builder->positionAtEnd($afterStringProbe);
+        $isLong = $context->builder->icmp(
+            Builder::INT_EQ,
+            $typeByte,
+            $i8->constInt(Variable::TYPE_NATIVE_LONG, false)
+        );
+        $afterLong = BasicBlockHelper::append($context, 'exit_msg_boxed_after_long');
+        $context->builder->branchIf($isLong, $longBlock, $afterLong);
+
+        $context->builder->positionAtEnd($longBlock);
+        $longVal = $context->builder->call(
+            $context->lookupFunction('__value__readLong'),
+            $boxedPtr
+        );
+        $context->builder->call(
+            $context->lookupFunction('__phpc_ob_echo_ll'),
+            $longVal
+        );
+        $context->builder->branch($doneBlock);
+
+        $context->builder->positionAtEnd($afterLong);
+        $isBool = $context->builder->icmp(
+            Builder::INT_EQ,
+            $typeByte,
+            $i8->constInt(Variable::TYPE_NATIVE_BOOL, false)
+        );
+        $afterBool = BasicBlockHelper::append($context, 'exit_msg_boxed_after_bool');
+        $context->builder->branchIf($isBool, $boolBlock, $afterBool);
+
+        $context->builder->positionAtEnd($boolBlock);
+        $boolVal = $context->builder->call(
+            $context->lookupFunction('__value__readLong'),
+            $boxedPtr
+        );
+        self::emitNativeBool($context, $boolVal);
+        $context->builder->branch($doneBlock);
+
+        $context->builder->positionAtEnd($afterBool);
+        $isDouble = $context->builder->icmp(
+            Builder::INT_EQ,
+            $typeByte,
+            $i8->constInt(Variable::TYPE_NATIVE_DOUBLE, false)
+        );
+        $context->builder->branchIf($isDouble, $doubleBlock, $doneBlock);
+
+        $context->builder->positionAtEnd($doubleBlock);
+        $doubleVal = $context->builder->call(
+            $context->lookupFunction('__value__readDouble'),
+            $boxedPtr
+        );
+        $context->builder->call(
+            $context->lookupFunction('__phpc_ob_echo_double'),
+            $doubleVal
+        );
+        $context->builder->branch($doneBlock);
+
+        $context->builder->positionAtEnd($doneBlock);
     }
 
     private static function emitBoxed(Context $context, Value $boxedPtr): void
@@ -131,7 +282,8 @@ final class ScriptExit
             $typeByte,
             $i8->constInt(Variable::TYPE_NATIVE_DOUBLE, false)
         );
-        $context->builder->branchIf($isDouble, $doubleBlock, $badBlock);
+        $afterDouble = BasicBlockHelper::append($context, 'exit_boxed_after_double');
+        $context->builder->branchIf($isDouble, $doubleBlock, $afterDouble);
 
         $context->builder->positionAtEnd($doubleBlock);
         $doubleVal = $context->builder->call(
@@ -143,6 +295,36 @@ final class ScriptExit
             $doubleVal
         );
         self::callLibcExit($context, $i64->constInt(0, false));
+
+        $context->builder->positionAtEnd($afterDouble);
+        $isEnumCase = $context->builder->icmp(
+            Builder::INT_EQ,
+            $typeByte,
+            $i8->constInt(VmVariable::TYPE_ENUM_CASE, false)
+        );
+        $enumCaseBlock = BasicBlockHelper::append($context, 'exit_boxed_enum_case');
+        $afterEnumCase = BasicBlockHelper::append($context, 'exit_boxed_after_enum_case');
+        $context->builder->branchIf($isEnumCase, $enumCaseBlock, $afterEnumCase);
+
+        $context->builder->positionAtEnd($enumCaseBlock);
+        self::emitBoxedEnumCaseError($context, $boxedPtr);
+        $context->builder->call($context->lookupFunction('abort'));
+
+        $context->builder->positionAtEnd($afterEnumCase);
+        $isObject = $context->builder->icmp(
+            Builder::INT_EQ,
+            $typeByte,
+            $i8->constInt(Variable::TYPE_OBJECT, false)
+        );
+        $objectBlock = BasicBlockHelper::append($context, 'exit_boxed_object');
+        $context->builder->branchIf($isObject, $objectBlock, $badBlock);
+
+        $context->builder->positionAtEnd($objectBlock);
+        $objPtr = $context->builder->call(
+            $context->lookupFunction('__value__readObject'),
+            $boxedPtr
+        );
+        self::emitObjectStatus($context, $objPtr);
 
         $context->builder->positionAtEnd($badBlock);
         $context->builder->call(
@@ -200,5 +382,65 @@ final class ScriptExit
         $i32 = $context->getTypeFromString('int32');
         $trunc = $context->builder->trunc($status, $i32);
         $context->builder->call($context->lookupFunction('exit'), $trunc);
+    }
+
+    private static function emitObjectStatus(Context $context, Value $objPtr, ?Variable $arg = null): void
+    {
+        $enumClass = null !== $arg
+            ? JitOperandTypeLabel::compileTimeEnumClassName($context, $arg)
+            : null;
+        if (null !== $enumClass) {
+            self::emitEnumStringConversionError($context, $enumClass);
+            $context->builder->call($context->lookupFunction('abort'));
+
+            return;
+        }
+        $context->type->object->emitExitStatusObjectGuard($context, $objPtr);
+    }
+
+    private static function emitBoxedEnumCaseError(Context $context, Value $boxedPtr): void
+    {
+        $enumMap = $context->structFieldMap['__enum_case__'] ?? null;
+        if (null === $enumMap || !isset($enumMap['class_id'])) {
+            self::emitEnumStringConversionError($context, 'object');
+
+            return;
+        }
+        $classIdVal = $context->builder->load(
+            $context->builder->structGep($boxedPtr, $enumMap['class_id'])
+        );
+        if (method_exists($classIdVal, 'isConstant') && $classIdVal->isConstant()) {
+            $classId = (int) $classIdVal->getConstantValue();
+            self::emitEnumStringConversionError(
+                $context,
+                $context->type->object->classNameForId($classId)
+            );
+
+            return;
+        }
+        self::emitEnumStringConversionError($context, 'object');
+    }
+
+    private static function emitEnumStringConversionError(Context $context, string $className): void
+    {
+        ErrorRaise::ensureLinked($context);
+        ErrorRaise::emitRaise(
+            $context,
+            'Object of class '.$className.' could not be converted to string'
+        );
+    }
+
+    public static function emitStatusTypeErrorAndAbort(Context $context, string $given): void
+    {
+        TypeErrorRaise::registerDeclarations($context);
+        TypeErrorRaise::ensureLinked($context);
+        TypeErrorRaise::emitRaise(
+            $context,
+            \sprintf(
+                'exit(): Argument #1 ($status) must be of type string|int, %s given',
+                $given
+            )
+        );
+        $context->builder->call($context->lookupFunction('abort'));
     }
 }

@@ -1,14 +1,17 @@
 --TEST--
-Static property hooks get/set dispatch (issue #4751, Zend/zend_property_hooks.c)
+Language: static property hooks compile and run (#6931, zend_property_hooks.c)
 --FILE--
 <?php
-class Box {
-    public static string $label {
-        get => 'static:' . self::$label;
-        set => strtoupper($value);
+declare(strict_types=1);
+
+class C {
+    public static string $x {
+        get => self::$v;
+        set => self::$v = $value;
     }
+    private static ?string $v = null;
 }
-Box::$label = 'hi';
-echo Box::$label, "\n";
+C::$x = 'b';
+echo C::$x, "\n";
 --EXPECT--
-static:HI
+b

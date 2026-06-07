@@ -7,10 +7,23 @@ namespace PHPCompiler\Test\Unit;
 use PHPCompiler\Runtime;
 use PHPUnit\Framework\TestCase;
 
-/** @covers issue #3506 */
+/** @covers issue #6633 #7414 */
 final class NeverParamTypeTest extends TestCase
 {
-    public function testNeverParamRejectedAtCompileTime(): void
+    public function testStandaloneNeverParamCompiles(): void
+    {
+        $runtime = new Runtime();
+        $code = <<<'PHP'
+<?php
+function acceptsNever(never $value): void {}
+echo "ok\n";
+PHP;
+        ob_start();
+        $runtime->run($runtime->parseAndCompile($code, 'never_param.php'));
+        $this->assertSame("ok\n", ob_get_clean());
+    }
+
+    public function testNeverParamCallSiteTypeError(): void
     {
         $runtime = new Runtime();
         $code = <<<'PHP'
@@ -20,28 +33,44 @@ function f(never $x) {
 }
 f(1);
 PHP;
-        $this->expectException(\CompileError::class);
-        $this->expectExceptionMessage('never cannot be used as a parameter type');
-        $runtime->parseAndCompile($code, 'never_param.php');
+        $this->expectException(\TypeError::class);
+        $this->expectExceptionMessage('must be of type never');
+        $runtime->run($runtime->parseAndCompile($code, 'never_param_call.php'));
     }
 
-    public function testNeverReturnTypeStillCompiles(): void
+    public function testNeverInUnionParamCompilesAndAcceptsInt(): void
     {
         $runtime = new Runtime();
         $code = <<<'PHP'
 <?php
-function stop(): never {
-    exit('gone');
+function f(int|never $x): int {
+    return $x;
 }
-stop();
+echo f(42);
 PHP;
         ob_start();
-        try {
-            $runtime->run($runtime->parseAndCompile($code, 'never_return_guard.php'));
-            $this->fail('Expected ScriptExit');
-        } catch (\PHPCompiler\VM\ScriptExit $e) {
-            $this->assertSame(0, $e->status);
-        }
-        $this->assertSame('gone', ob_get_clean());
+        $runtime->run($runtime->parseAndCompile($code, 'never_union_param.php'));
+        $this->assertSame('42', ob_get_clean());
     }
+
+    public function testNeverInUnionParamRejectsString(): void
+    {
+        $runtime = new Runtime();
+        $code = <<<'PHP'
+<?php
+function f(int|never $x): void {}
+try {
+    f('bad');
+} catch (Throwable $e) {
+    echo get_class($e), ': ', $e->getMessage(), "\n";
+}
+PHP;
+        ob_start();
+        $runtime->run($runtime->parseAndCompile($code, 'never_union_param_bad.php'));
+        $this->assertSame(
+            "TypeError: Argument must be of type int|never, string given\n",
+            ob_get_clean()
+        );
+    }
+
 }

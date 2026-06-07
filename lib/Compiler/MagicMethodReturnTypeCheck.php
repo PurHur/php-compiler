@@ -43,6 +43,14 @@ final class MagicMethodReturnTypeCheck
                         );
                     }
                     break;
+                case '__destruct':
+                    if ($this->hasExplicitReturnType($returnType)) {
+                        $this->fatal(
+                            $member,
+                            "Method {$classDisplay}::__destruct() cannot declare a return type"
+                        );
+                    }
+                    break;
                 case '__sleep':
                     if ($this->hasExplicitReturnType($returnType) && !$this->isExactArrayType($returnType)) {
                         $this->fatal(
@@ -52,7 +60,7 @@ final class MagicMethodReturnTypeCheck
                     }
                     break;
                 case '__wakeup':
-                    if ($this->hasExplicitReturnType($returnType) && !$this->isVoidType($returnType)) {
+                    if ($this->hasExplicitReturnType($returnType) && !$this->isVoidOrNeverType($returnType)) {
                         $this->fatal(
                             $member,
                             "{$classDisplay}::__wakeup(): Return type must be void when declared"
@@ -68,7 +76,7 @@ final class MagicMethodReturnTypeCheck
                     }
                     break;
                 case '__unserialize':
-                    if ($this->hasExplicitReturnType($returnType) && !$this->isVoidType($returnType)) {
+                    if ($this->hasExplicitReturnType($returnType) && !$this->isVoidOrNeverType($returnType)) {
                         $this->fatal(
                             $member,
                             "{$classDisplay}::__unserialize(): Return type must be void when declared"
@@ -76,7 +84,7 @@ final class MagicMethodReturnTypeCheck
                     }
                     break;
                 case '__clone':
-                    if ($this->hasExplicitReturnType($returnType) && !$this->isVoidType($returnType)) {
+                    if ($this->hasExplicitReturnType($returnType) && !$this->isVoidOrNeverType($returnType)) {
                         $this->fatal(
                             $member,
                             "{$classDisplay}::__clone(): Return type must be void when declared"
@@ -119,6 +127,13 @@ final class MagicMethodReturnTypeCheck
         $sig = TypeSig::fromCfgType($type);
 
         return null !== $sig && $sig->void;
+    }
+
+    private function isVoidOrNeverType(Op\Type $type): bool
+    {
+        $sig = TypeSig::fromCfgType($type);
+
+        return null !== $sig && ($sig->void || $sig->never);
     }
 
     private function isArrayOrNullableArrayType(Op\Type $type): bool

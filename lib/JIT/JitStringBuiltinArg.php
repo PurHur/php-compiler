@@ -11,6 +11,9 @@ use PHPLLVM\Value;
 
 /**
  * Lower string builtin operands with Z_PARAM_STR parity (#5780, ext/standard/string.c).
+ *
+ * Runtime strictness hook (#7361): future php-compiler-strict skips need static proof
+ * before omitting enum-case / object rejection blocks here; default stays php-src-strict.
  */
 final class JitStringBuiltinArg
 {
@@ -19,10 +22,11 @@ final class JitStringBuiltinArg
         Variable $arg,
         string $function,
         int $argIndex,
-        string $paramName
+        string $paramName,
+        string $expectedType = 'string'
     ): Value {
         if (Variable::TYPE_HASHTABLE === $arg->type) {
-            self::emitTypeErrorAndAbort($context, $function, $argIndex, $paramName, 'array');
+            self::emitTypeErrorAndAbort($context, $function, $argIndex, $paramName, 'array', $expectedType);
 
             return self::unreachableStringPtr($context);
         }
@@ -32,13 +36,14 @@ final class JitStringBuiltinArg
                 $function,
                 $argIndex,
                 $paramName,
-                self::compileTimeGivenLabel($context, $arg)
+                self::compileTimeGivenLabel($context, $arg),
+                $expectedType
             );
 
             return self::unreachableStringPtr($context);
         }
         if (Variable::TYPE_VALUE === $arg->type) {
-            return self::lowerBoxed($context, $arg, $function, $argIndex, $paramName);
+            return self::lowerBoxed($context, $arg, $function, $argIndex, $paramName, $expectedType);
         }
 
         return JitStringArg::lower($context, $arg, "{$function}() argument #" . ($argIndex + 1));
@@ -49,7 +54,8 @@ final class JitStringBuiltinArg
         Variable $arg,
         string $function,
         int $argIndex,
-        string $paramName
+        string $paramName,
+        string $expectedType = 'string'
     ): Value {
         TypeErrorRaise::registerDeclarations($context);
         TypeErrorRaise::ensureLinked($context);
@@ -75,7 +81,7 @@ final class JitStringBuiltinArg
         $context->builder->branchIf($isArray, $arrayBlock, $okBlock);
 
         $context->builder->positionAtEnd($arrayBlock);
-        self::emitTypeErrorAndAbort($context, $function, $argIndex, $paramName, 'array');
+        self::emitTypeErrorAndAbort($context, $function, $argIndex, $paramName, 'array', $expectedType);
 
         $context->builder->positionAtEnd($okBlock);
         $isObjOrEnum = $context->builder->or($isObject, $isEnumCase);
@@ -87,7 +93,8 @@ final class JitStringBuiltinArg
             $function,
             $argIndex,
             $paramName,
-            self::compileTimeGivenLabel($context, $arg)
+            self::compileTimeGivenLabel($context, $arg),
+            $expectedType
         );
 
         $context->builder->positionAtEnd($coerceBlock);
@@ -101,7 +108,7 @@ final class JitStringBuiltinArg
             $strictErrBlock = BasicBlockHelper::append($context, 'str_builtin_strict_err');
             $context->builder->branchIf($isString, $strictOkBlock, $strictErrBlock);
             $context->builder->positionAtEnd($strictErrBlock);
-            self::emitTypeErrorAndAbort($context, $function, $argIndex, $paramName, 'mixed');
+            self::emitTypeErrorAndAbort($context, $function, $argIndex, $paramName, 'mixed', $expectedType);
             $context->builder->positionAtEnd($strictOkBlock);
         }
 
@@ -139,13 +146,15 @@ final class JitStringBuiltinArg
         string $function,
         int $argIndex,
         string $paramName,
-        string $given
+        string $given,
+        string $expectedType = 'string'
     ): string {
         return sprintf(
-            '%s(): Argument #%d ($%s) must be of type string, %s given',
+            '%s(): Argument #%d ($%s) must be of type %s, %s given',
             $function,
             $argIndex + 1,
             $paramName,
+            $expectedType,
             $given
         );
     }
@@ -155,11 +164,15 @@ final class JitStringBuiltinArg
         string $function,
         int $argIndex,
         string $paramName,
-        string $given
+        string $given,
+        string $expectedType = 'string'
     ): void {
         TypeErrorRaise::registerDeclarations($context);
         TypeErrorRaise::ensureLinked($context);
-        TypeErrorRaise::emitRaise($context, self::typeErrorMessage($function, $argIndex, $paramName, $given));
+        TypeErrorRaise::emitRaise(
+            $context,
+            self::typeErrorMessage($function, $argIndex, $paramName, $given, $expectedType)
+        );
         $context->builder->call($context->lookupFunction('abort'));
     }
 

@@ -48,6 +48,8 @@ class ClassEntry {
     public array $methods = [];
     /** @var array<string, int> method name (lowercase) => PHPCfg visibility flags */
     public array $methodVisibility = [];
+    /** @var array<string, string> method name (lowercase) => declaring class lc (#7352) */
+    public array $methodDeclaringClassLc = [];
     /** @var array<string, string> method name (lowercase) => declared casing (#3118) */
     public array $methodNames = [];
     /** @var array<string, Variable> constant name (lowercase) => value */
@@ -66,12 +68,22 @@ class ClassEntry {
     public bool $backedEnumTableBuilt = false;
     /** @var array<string, Variable> static property name (lowercase) => shared storage */
     public array $staticProperties = [];
+    /** @var array<string, int> static property name (lowercase) => PHPCfg visibility flags (#6785) */
+    public array $staticPropertyVisibility = [];
+    /** @var array<string, int> static property name (lowercase) => asymmetric set visibility (#6769) */
+    public array $staticPropertySetVisibility = [];
+    /** @var array<string, int> static property name (lowercase) => asymmetric get visibility (#6769) */
+    public array $staticPropertyGetVisibility = [];
+    /** @var array<string, string> static property name (lowercase) => declaring class lc (#6785) */
+    public array $staticPropertyDeclaringClassLc = [];
     /** @var array<string, array{get?: string, set?: string}> static prop (lowercase) => hook method lc (#4751) */
     public array $staticPropertyHooks = [];
     /** @var array<string, true> static props imported from a trait (per-class storage, #4670) */
     public array $traitStaticPropertyNames = [];
     /** Readonly class: instance properties cannot change after construction (issue #1360). */
     public bool $readonly = false;
+    /** Static class: cannot be instantiated; static members only (#6929, PHP 8.4). */
+    public bool $isStatic = false;
     /** Sealed class/interface: only listed types may extend/implement (#3322). */
     public bool $sealed = false;
     /** @var list<string> lowercase permitted child FQCNs; empty when sealed = none allowed */
@@ -106,8 +118,14 @@ class ClassEntry {
     public array $methodDeprecated = [];
     /** @var array<string, \PHPCompiler\Compiler\DeprecatedMetadata> constant (lowercase) => deprecation (#3569). */
     public array $constDeprecated = [];
+    /** @var array<string, \PHPCompiler\Compiler\DeprecatedMetadata> property (lowercase) => deprecation (#7369). */
+    public array $propDeprecated = [];
+    /** Class-level #[\Deprecated] metadata (#6803). */
+    public ?\PHPCompiler\Compiler\DeprecatedMetadata $classDeprecated = null;
     /** @var array<string, \PHPCfg\Op\Type> constant (lowercase) => declared type for reflection (#5954). */
     public array $constDeclaredTypes = [];
+    /** @var array<string, true>|null sibling const names declared but not yet evaluated (#7382). */
+    public ?array $forwardDeclaredConstNames = null;
 
     public function __construct(string $name) {
         $this->name = $name;

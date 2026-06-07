@@ -6,7 +6,9 @@ namespace PHPCompiler\Compiler;
 
 use PhpParser\Node;
 use PhpParser\Node\Expr;
+use PhpParser\Node\Expr\BinaryOp;
 use PhpParser\Node\Scalar;
+use PHPCompiler\VM\AttributeSupport;
 
 /**
  * Evaluate attribute constructor arguments that must be compile-time constants (#3206, #3340).
@@ -58,10 +60,89 @@ final class AttributeConstantEvaluator
         if ($expr instanceof Expr\New_) {
             return self::evalNew($expr);
         }
+        if ($expr instanceof Expr\ClassConstFetch) {
+            return self::evalClassConstFetch($expr);
+        }
+        if ($expr instanceof BinaryOp\BitwiseOr) {
+            return self::evalIntBinary($expr, '|');
+        }
+        if ($expr instanceof BinaryOp\BitwiseAnd) {
+            return self::evalIntBinary($expr, '&');
+        }
+        if ($expr instanceof BinaryOp\BitwiseXor) {
+            return self::evalIntBinary($expr, '^');
+        }
 
         throw new \LogicException(
             'Attribute constructor arguments must be compile-time constant expressions in this compiler build'
         );
+    }
+
+    private static function evalClassConstFetch(Expr\ClassConstFetch $expr): int
+    {
+        if (!$expr->class instanceof Node\Name) {
+            throw new \LogicException(
+                'Attribute constructor arguments must be compile-time constant expressions in this compiler build'
+            );
+        }
+        if (!$expr->name instanceof Node\Identifier) {
+            throw new \LogicException(
+                'Attribute constructor arguments must be compile-time constant expressions in this compiler build'
+            );
+        }
+
+        $className = ltrim($expr->class->toString(), '\\');
+        if ('attribute' !== strtolower($className)) {
+            throw new \LogicException(
+                'Attribute constructor arguments must be compile-time constant expressions in this compiler build'
+            );
+        }
+
+        $constName = strtolower($expr->name->toString());
+        $value = self::attributeBuiltinConstValue($constName);
+        if (null === $value) {
+            throw new \LogicException(
+                'Attribute constructor arguments must be compile-time constant expressions in this compiler build'
+            );
+        }
+
+        return $value;
+    }
+
+    private static function attributeBuiltinConstValue(string $lcConst): ?int
+    {
+        return match ($lcConst) {
+            'target_class' => AttributeSupport::TARGET_CLASS,
+            'target_function' => AttributeSupport::TARGET_FUNCTION,
+            'target_method' => AttributeSupport::TARGET_METHOD,
+            'target_property' => AttributeSupport::TARGET_PROPERTY,
+            'target_class_constant' => AttributeSupport::TARGET_CLASS_CONSTANT,
+            'target_parameter' => AttributeSupport::TARGET_PARAMETER,
+            'target_constant' => AttributeSupport::TARGET_CONSTANT,
+            'target_all' => AttributeSupport::TARGET_ALL,
+            'is_repeatable' => AttributeSupport::IS_REPEATABLE,
+            default => null,
+        };
+    }
+
+    private static function evalIntBinary(BinaryOp $expr, string $op): int
+    {
+        $left = self::evalExpr($expr->left);
+        $right = self::evalExpr($expr->right);
+        if (!\is_int($left) || !\is_int($right)) {
+            throw new \LogicException(
+                'Attribute constructor arguments must be compile-time constant expressions in this compiler build'
+            );
+        }
+
+        return match ($op) {
+            '|' => $left | $right,
+            '&' => $left & $right,
+            '^' => $left ^ $right,
+            default => throw new \LogicException(
+                'Attribute constructor arguments must be compile-time constant expressions in this compiler build'
+            ),
+        };
     }
 
     private static function evalNew(Expr\New_ $expr): CompileTimeNew

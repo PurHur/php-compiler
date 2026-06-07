@@ -41,4 +41,41 @@ PHP;
         $rt->run($block);
         $this->assertSame('1', ob_get_clean());
     }
+
+    public function testVmClassUsesRecursiveNestedTraits(): void
+    {
+        $code = <<<'PHP'
+<?php
+trait A {}
+trait B { use A; }
+class C { use B; }
+$direct = class_uses(C::class);
+$recursive = class_uses_recursive(C::class);
+echo isset($direct['B']) && !isset($direct['A']) ? '1' : '0';
+echo isset($recursive['A']) ? '1' : '0';
+echo isset($recursive['B']) ? '1' : '0';
+PHP;
+        $rt = new Runtime();
+        $block = $rt->parseAndCompile($code, 'class_uses_recursive.php');
+        ob_start();
+        $rt->run($block);
+        $this->assertSame('111', ob_get_clean());
+    }
+
+    public function testVmClassUsesEnumCaseEmptyArray(): void
+    {
+        $code = <<<'PHP'
+<?php
+enum E: string { case A = 'a'; case B = 'b'; }
+$u1 = class_uses(E::A);
+$u2 = class_uses(E::B);
+echo is_array($u1) && 0 === count($u1) ? '1' : '0';
+echo is_array($u2) && 0 === count($u2) ? '1' : '0';
+PHP;
+        $rt = new Runtime();
+        $block = $rt->parseAndCompile($code, 'class_uses_enum_case.php');
+        ob_start();
+        $rt->run($block);
+        $this->assertSame('11', ob_get_clean());
+    }
 }

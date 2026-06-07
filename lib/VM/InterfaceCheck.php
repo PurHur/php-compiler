@@ -16,14 +16,15 @@ final class InterfaceCheck
         Variable $value,
         array $interfaceLcs,
         Context $context,
-        string $kind = 'Argument'
+        string $kind = 'Argument',
+        ?string $expectedDisplay = null
     ): void {
         if ([] === $interfaceLcs) {
             return;
         }
+        $expected = $expectedDisplay ?? self::formatIntersectionType($interfaceLcs);
         $target = $value->resolveIndirect();
         if (Variable::TYPE_OBJECT !== $target->type) {
-            $expected = self::formatIntersectionType($interfaceLcs);
             $given = self::valueTypeName($target);
 
             throw new \TypeError("{$kind} must be of type {$expected}, {$given} given");
@@ -31,7 +32,6 @@ final class InterfaceCheck
         $entry = $target->toObject()->class;
         foreach ($interfaceLcs as $ifaceLc) {
             if (!self::entryImplements($entry, $ifaceLc, $context)) {
-                $expected = self::formatIntersectionType($interfaceLcs);
                 $given = $entry->name;
 
                 throw new \TypeError(
@@ -67,6 +67,11 @@ final class InterfaceCheck
                 break;
             }
             $current = $context->classes[$current->parentLc];
+        }
+
+        if (StringableSupport::isStringableInterfaceLc($ifaceLc)
+            && StringableSupport::entryHasImplicitStringable($entry, $context)) {
+            return true;
         }
 
         return false;
@@ -105,6 +110,11 @@ final class InterfaceCheck
                 break;
             }
             $current = $context->classes[$current->parentLc];
+        }
+
+        if (StringableSupport::isStringableInterfaceLc($classLc)
+            && StringableSupport::entryHasImplicitStringable($entry, $context)) {
+            return true;
         }
 
         return false;

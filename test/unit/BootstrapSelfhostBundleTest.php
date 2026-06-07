@@ -183,6 +183,7 @@ final class BootstrapSelfhostBundleTest extends TestCase
         'ext/standard/JitStat.php',
         'ext/standard/JitStatArray.php',
         'ext/standard/JitSysGetTempDir.php',
+        'ext/standard/JitSysGetloadavg.php',
         'ext/standard/JitTouch.php',
         'ext/standard/JitUnlink.php',
         'ext/standard/JitWebParams.php',
@@ -391,7 +392,7 @@ final class BootstrapSelfhostBundleTest extends TestCase
         $this->assertFileExists($entry);
         $contents = (string) file_get_contents($entry);
         $count = substr_count($contents, 'require_once __DIR__');
-        $this->assertSame(1253, $count, 'M2 spine 1253/1259 require_once units (#2868 cli_driver literal)');
+        $this->assertSame(1298, $count, 'M2 spine 1298/1681 require_once units (#2868 cli_driver literal)');
         foreach (self::LIB_SPINE_SMOKE_NEW_UNITS as $unit) {
             $this->assertStringContainsString(
                 "require_once __DIR__.'/../../../{$unit}';",

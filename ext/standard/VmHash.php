@@ -8,11 +8,14 @@ use PHPCompiler\VM\HashTable;
 use PHPCompiler\VM\Variable;
 
 /**
- * VM hash() / hash_hmac() — native digests via VmHashNative (issue #4790, lib/AOT/runtime/hash_crypto.c).
+ * VM hash() / hash_hmac() — native digests via VmHashNative (issue #4790; JIT via StringHashCryptoJit).
  */
 final class VmHash
 {
-    /** HMAC-capable algorithms supported by VmHashNative / hash_crypto.c (issue #6229). */
+    /** Digest algorithms supported by VmHashNative / StringHashCryptoJit (issue #6229, #6937). */
+    private const HASH_ALGOS = ['md5', 'sha1', 'sha256'];
+
+    /** HMAC-capable algorithms supported by VmHashNative / StringHashCryptoJit (issue #6229). */
     private const HMAC_ALGOS = ['md5', 'sha1', 'sha256'];
     public static function hash(string $algo, string $data, bool $raw = false): string|false
     {
@@ -38,6 +41,19 @@ final class VmHash
         bool $raw = false
     ): string {
         return \hash_pbkdf2($algo, $password, $salt, $iterations, $length, $raw);
+    }
+
+    /** hash_algos() — digest names supported by VmHashNative (ext/hash/hash.c, issue #6937). */
+    public static function algos(): HashTable
+    {
+        $ht = new HashTable();
+        foreach (self::HASH_ALGOS as $algo) {
+            $var = new Variable();
+            $var->string($algo);
+            $ht->append($var);
+        }
+
+        return $ht;
     }
 
     /** hash_hmac_algos() — HMAC-capable digest names (ext/hash/hash.c, issue #6229). */

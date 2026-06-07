@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace PHPCompiler\Compiler;
 
+use PHPCompiler\VM\TraitCompositionConflictMessage;
 use PHPCfg\Op;
 use PHPCfg\Operand;
 use PHPCfg\Script;
@@ -69,11 +70,14 @@ final class TraitCollisionCheck
                     continue;
                 }
                 $traits = [];
+                $seenInUse = [];
                 foreach ($member->traits as $traitOperand) {
                     $traitLc = $this->operandLcName($traitOperand);
-                    if (null !== $traitLc) {
-                        $traits[] = $traitLc;
+                    if (null === $traitLc || isset($seenInUse[$traitLc])) {
+                        continue;
                     }
+                    $seenInUse[$traitLc] = true;
+                    $traits[] = $traitLc;
                 }
                 if ([] !== $traits) {
                     $traitUses[] = $traits;
@@ -199,11 +203,17 @@ final class TraitCollisionCheck
         $traitSources = [];
         /** @var array<string, string> property lc => trait display */
         $traitPropertySources = [];
+        /** @var array<string, true> trait lc => already applied (php-src dedupes duplicate use entries) */
+        $appliedTraits = [];
         foreach ($class['traitUses'] as $useGroup) {
             foreach ($useGroup as $traitLc) {
+                if (isset($appliedTraits[$traitLc])) {
+                    continue;
+                }
                 if (!isset($this->traits[$traitLc])) {
                     continue;
                 }
+                $appliedTraits[$traitLc] = true;
                 $trait = $this->traits[$traitLc];
                 foreach ($trait['methods'] as $methodLc => $_) {
                     if (isset($excluded[$methodLc])) {
@@ -225,9 +235,12 @@ final class TraitCollisionCheck
                         );
                     }
                     if (isset($traitPropertySources[$propLc])) {
-                        throw new \CompileError(
-                            "Trait property {$trait['display']}::\${$propLc} conflicts with a property declared in another trait"
-                        );
+                        throw new \CompileError(TraitCompositionConflictMessage::incompatibleProperty(
+                            $traitPropertySources[$propLc],
+                            $trait['display'],
+                            $propLc,
+                            $class['display']
+                        ));
                     }
                     $traitPropertySources[$propLc] = $trait['display'];
                 }

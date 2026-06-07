@@ -36,9 +36,14 @@ final class preg_replace extends Internal
         if (null === $frame->returnVar) {
             return;
         }
-        $pattern = VmReflection::stringArg($frame->calledArgs[0], 'preg_replace() pattern');
-        $replacement = VmReflection::stringArg($frame->calledArgs[1], 'preg_replace() replacement');
-        $subjectVar = $frame->calledArgs[2]->resolveIndirect();
+        $pattern = VmReflection::stringArg($frame->calledArgs[0], 'preg_replace() pattern', 0);
+        $replacement = VmReflection::stringArg($frame->calledArgs[1], 'preg_replace() replacement', 1);
+        $subjectVar = VmPreg::requireStringOrArraySubject(
+            $frame->calledArgs[2],
+            'preg_replace',
+            2,
+            'subject'
+        );
         $limit = -1;
         if (4 === $argc) {
             $limitVar = $frame->calledArgs[3]->resolveIndirect();
@@ -66,10 +71,6 @@ final class preg_replace extends Internal
                 $host[$hostKey] = $value->toString();
             }
             $result = VmPreg::pregReplace($pattern, $replacement, $host, $limit);
-        } else {
-            throw new \LogicException(
-                'preg_replace() subject must be a string or array in this compiler build'
-            );
         }
 
         if (false === $result) {
@@ -113,6 +114,7 @@ final class preg_replace extends Internal
 
         $pattern = JitStringArg::lower($context, $args[0], 'preg_replace() pattern');
         $replacement = JitStringArg::lower($context, $args[1], 'preg_replace() replacement');
+        JitPregSubject::requireStringOrArray($context, $args[2], 'preg_replace', 2, 'subject');
         if (JITVariable::TYPE_STRING === $args[2]->type) {
             return JitPregReplace::invokeString(
                 $context,

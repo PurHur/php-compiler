@@ -12,9 +12,17 @@ use PHPCompiler\GenericArrayTypeSpec;
  */
 final class TypeCheck
 {
+    public static function assertNeverParameter(Variable $argument): void
+    {
+        throw new \TypeError(
+            'Argument must be of type never, '.self::valueTypeLabel($argument).' given'
+        );
+    }
+
     public static function variadicSlotNeedsElementChecks(Block $block, int $slot): bool
     {
-        return isset($block->paramIterableSlots[$slot])
+        return isset($block->paramNeverSlots[$slot])
+            || isset($block->paramIterableSlots[$slot])
             || isset($block->paramVariadicElementTypeConstraints[$slot])
             || isset($block->paramVariadicElementGenericArrayTypeSpecs[$slot])
             || isset($block->paramVariadicElementIntersectionConstraints[$slot])
@@ -36,14 +44,31 @@ final class TypeCheck
         ?array $intersection,
         ?array $dnfArms,
         Context $context,
-        bool $iterableElement = false
+        bool $iterableElement = false,
+        bool $neverElement = false,
+        ?string $intersectionDisplay = null
     ): void {
         foreach ($elements as $element) {
             $probe = new Variable();
             $probe->copyFrom($element);
             $resolved = $probe->resolveIndirect();
+            if ($neverElement) {
+                self::assertNeverParameter($probe);
+
+                continue;
+            }
             if ($iterableElement) {
                 IterableCheck::assertParameter($probe, $context);
+
+                continue;
+            }
+            if (null !== $dnfArms) {
+                DnfCheck::assertMatches($probe, $dnfArms, $context);
+
+                continue;
+            }
+            if (null !== $intersection) {
+                self::assertParamIntersection($probe, $intersection, $context, $intersectionDisplay);
 
                 continue;
             }
@@ -51,12 +76,6 @@ final class TypeCheck
                 $resolved->typeConstraint = $typeConstraint;
             }
             self::coerceParameter($probe, $strict, $arraySpec);
-            if (null !== $intersection) {
-                self::assertParamIntersection($probe, $intersection, $context);
-            }
-            if (null !== $dnfArms) {
-                DnfCheck::assertMatches($probe, $dnfArms, $context);
-            }
         }
     }
 
@@ -74,9 +93,10 @@ final class TypeCheck
     public static function assertParamIntersection(
         Variable $dest,
         array $interfaceLcs,
-        Context $context
+        Context $context,
+        ?string $expectedDisplay = null
     ): void {
-        InterfaceCheck::assertObjectImplementsAll($dest, $interfaceLcs, $context, 'Argument');
+        InterfaceCheck::assertObjectImplementsAll($dest, $interfaceLcs, $context, 'Argument', $expectedDisplay);
     }
 
     public static function coercePropertyWrite(Variable $dest, bool $strict): void
@@ -95,6 +115,44 @@ final class TypeCheck
         if (null !== $resolved->genericArrayTypeSpec) {
             self::assertGenericArrayShape($resolved, $resolved->genericArrayTypeSpec, 'Property');
         }
+    }
+
+    /**
+     * Property get hook return must match declared property type (zend_property_hooks.c, #7301).
+     */
+    public static function assertPropertyHookGetReturn(
+        Variable $value,
+        Variable $prototype,
+        bool $strict,
+        Context $context
+    ): void {
+        $meta = $prototype->resolveIndirect();
+        if (null !== $meta->dnfArms) {
+            DnfCheck::assertMatches($value, $meta->dnfArms, $context, 'Return value');
+
+            return;
+        }
+        if (Variable::TYPE_NULL === $value->resolveIndirect()->type
+            && TypedPropertyCheck::propertyAllowsNull($prototype)) {
+            return;
+        }
+        $probe = new Variable();
+        $probe->copyFrom($value);
+        self::bindPropertyTypeMetadata($probe, $meta);
+        self::coercePropertyWrite($probe, $strict);
+        $value->copyFrom($probe);
+    }
+
+    private static function bindPropertyTypeMetadata(Variable $dest, Variable $typeMeta): void
+    {
+        $resolved = $dest->resolveIndirect();
+        $resolved->typeConstraint = $typeMeta->typeConstraint;
+        $resolved->classConstraint = $typeMeta->classConstraint;
+        $resolved->literalBoolType = $typeMeta->literalBoolType;
+        $resolved->unionTypeConstraints = $typeMeta->unionTypeConstraints;
+        $resolved->declaredTypeLabel = $typeMeta->declaredTypeLabel;
+        $resolved->genericArrayTypeSpec = $typeMeta->genericArrayTypeSpec;
+        $resolved->dnfArms = $typeMeta->dnfArms;
     }
 
     public static function coerceReturn(
@@ -140,6 +198,78 @@ final class TypeCheck
         throw new \TypeError("Cannot assign {$given} to class constant of type {$expected}");
     }
 
+    /**
+     * PHP 8.3+ typed compile-unit constants (#7081).
+     */
+    public static function assertGlobalConstantTypedValue(
+        Variable $value,
+        Variable $typeMeta,
+        ?string $constName = null
+    ): void {
+        try {
+            self::assertClassConstantTypedValue($value, $typeMeta, $constName);
+        } catch (\TypeError $e) {
+            throw new \TypeError(str_replace('class constant', 'constant', $e->getMessage()), $e->getCode(), $e);
+        }
+    }
+
+    /**
+     * PHP 8.3+ union typed class constants (zend_compile_const_decl, #6886).
+     */
+    public static function assertClassConstantTypedValue(
+        Variable $value,
+        Variable $typeMeta,
+        ?string $constName = null
+    ): void {
+        if (null !== $typeMeta->unionTypeConstraints) {
+            self::assertClassConstantUnionValue(
+                $value,
+                $typeMeta->unionTypeConstraints,
+                $constName,
+                $typeMeta->declaredTypeLabel
+            );
+
+            return;
+        }
+        if (null !== $typeMeta->typeConstraint) {
+            self::assertClassConstantValue($value, $typeMeta->typeConstraint, $constName);
+        }
+    }
+
+    /**
+     * @param list<int> $constraints
+     */
+    public static function assertClassConstantUnionValue(
+        Variable $value,
+        array $constraints,
+        ?string $constName = null,
+        ?string $typeLabel = null
+    ): void {
+        if ([] === $constraints) {
+            return;
+        }
+        $target = $value->resolveIndirect();
+        foreach ($constraints as $constraint) {
+            $trial = new Variable();
+            $trial->copyFrom($target);
+            try {
+                self::assertClassConstantValue($trial, $constraint, null);
+                $value->copyFrom($trial);
+
+                return;
+            } catch (\TypeError $e) {
+                continue;
+            }
+        }
+        $expected = $typeLabel ?? 'mixed';
+        $given = self::typeName($target->type);
+        if (null !== $constName && '' !== $constName) {
+            throw new \TypeError("Cannot assign {$given} to class constant {$constName} of type {$expected}");
+        }
+
+        throw new \TypeError("Cannot assign {$given} to class constant of type {$expected}");
+    }
+
     public static function assertVoidReturn(?Variable $value): void
     {
         if (null !== $value) {
@@ -147,8 +277,12 @@ final class TypeCheck
         }
     }
 
-    public static function assertNeverReturn(): void
+    public static function assertNeverReturn(?string $functionName = null): void
     {
+        if (null !== $functionName && '' !== $functionName) {
+            throw new \TypeError("{$functionName}(): never-returning function must not implicitly return");
+        }
+
         throw new \TypeError('A never-returning function must not return');
     }
 
@@ -305,21 +439,32 @@ final class TypeCheck
         ], true);
     }
 
+    /** Zend zend_execute.c FETCH_DIM_W on scalars (#6325, #4713). */
+    public const SCALAR_USED_AS_ARRAY_MESSAGE = 'Cannot use a scalar value as an array';
+
     /**
-     * Zend write/append [] on scalars — TypeError "Cannot use [] on …" (zend_operators.c, #4713).
+     * True when []= / dim-write targets a scalar container (null/bool/int/float).
+     */
+    public static function isScalarUsedAsArray(Variable $value): bool
+    {
+        $resolved = $value->resolveIndirect();
+
+        return \in_array($resolved->type, [
+            Variable::TYPE_NULL,
+            Variable::TYPE_BOOLEAN,
+            Variable::TYPE_INTEGER,
+            Variable::TYPE_FLOAT,
+        ], true);
+    }
+
+    /**
+     * Zend write/append [] on scalars — Error "Cannot use a scalar value as an array" (zend_execute.c, #6325).
+     *
+     * @deprecated Use isScalarUsedAsArray() + SCALAR_USED_AS_ARRAY_MESSAGE; kept for const-expr paths.
      */
     public static function cannotUseBracketOn(Variable $value): ?string
     {
-        $resolved = $value->resolveIndirect();
-        switch ($resolved->type) {
-            case Variable::TYPE_NULL:
-            case Variable::TYPE_BOOLEAN:
-            case Variable::TYPE_INTEGER:
-            case Variable::TYPE_FLOAT:
-                return 'Cannot use [] on ' . self::typeNameForConstraint($resolved->type);
-            default:
-                return null;
-        }
+        return self::isScalarUsedAsArray($value) ? self::SCALAR_USED_AS_ARRAY_MESSAGE : null;
     }
 
     private static function isExactType(Variable $value, int $constraint): bool
@@ -548,12 +693,28 @@ final class TypeCheck
                 $expectedType
             ));
         }
+        $classLc = $target->staticPropertyClassLc;
+        if (null !== $classLc && '' !== $propName) {
+            $classLabel = $classLc;
+            $vm = \PHPCompiler\VM::running();
+            if (null !== $vm && isset($vm->context->classes[$classLc])) {
+                $classLabel = $vm->context->classes[$classLc]->name;
+            }
+
+            return new \TypeError(sprintf(
+                'Cannot assign %s to property %s::$%s of type %s',
+                self::valueTypeLabel($value),
+                $classLabel,
+                $propName,
+                $expectedType
+            ));
+        }
 
         return new \TypeError(self::strictMessage(
             $target->typeConstraint ?? Variable::TYPE_INTEGER,
             $value,
             'Property',
-            $expected
+            $expectedType
         ));
     }
 

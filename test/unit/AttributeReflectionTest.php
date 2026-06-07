@@ -50,6 +50,27 @@ PHP;
         $this->assertSame("1\nDeprecated", ob_get_clean());
     }
 
+    /** @covers issue #6369 */
+    public function testDeprecatedBuiltinAttributeClassExists(): void
+    {
+        $runtime = new Runtime();
+        $code = <<<'PHP'
+<?php
+#[\Deprecated(message: "legacy", since: "8.4")]
+class Legacy {}
+echo class_exists('Deprecated') ? 'yes' : 'no';
+echo "\n";
+$attr = (new ReflectionClass(Legacy::class))->getAttributes()[0];
+echo $attr->getName(), "\n";
+$inst = $attr->newInstance();
+echo $inst->message, "\n";
+echo $inst->since, "\n";
+PHP;
+        ob_start();
+        $runtime->run($runtime->parseAndCompile($code, 'deprecated_builtin_class.php'));
+        $this->assertSame("yes\nDeprecated\nlegacy\n8.4\n", ob_get_clean());
+    }
+
     public function testAttributeNamesExtractedAtCompileTime(): void
     {
         $runtime = new Runtime();

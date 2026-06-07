@@ -2,12 +2,12 @@
 Web: http_response_code() get and set
 --FILE--
 <?php
-echo http_response_code(), "\n";
-echo http_response_code(404), "\n";
+echo http_response_code() ? 'true' : 'false', "\n";
+echo http_response_code(404) ? 'true' : 'false', "\n";
 echo http_response_code(), "\n";
 echo http_response_code(999) ? 'true' : 'false', "\n";
 --EXPECT--
-200
-200
+false
+true
 404
 false

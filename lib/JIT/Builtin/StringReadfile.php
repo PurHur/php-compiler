@@ -64,7 +64,8 @@ final class StringReadfile
         $fd = $context->builder->call(
             $context->lookupFunction('open'),
             $pathCStr,
-            $oRdonly
+            $oRdonly,
+            $i32->constInt(0, false)
         );
         if (Builtin::LOAD_TYPE_STANDALONE === $context->loadType) {
             $context->builder->call($context->lookupFunction('__mm__free'), $pathBuf);

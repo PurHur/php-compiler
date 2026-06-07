@@ -43,7 +43,7 @@ final class BuiltinParamNames
             case 'header_register_callback':
                 return ['callback'];
             case 'headers_sent':
-                return ['file', 'line'];
+                return ['filename', 'line'];
             case 'modf':
                 return ['num', 'num2'];
             case 'frexp':
@@ -68,6 +68,11 @@ final class BuiltinParamNames
                 return ['num1', 'num2'];
             case 'hex2bin':
                 return ['data', 'strict'];
+            case 'resetaslazyghost':
+                return ['object', 'initializer', 'options'];
+            case 'exit':
+            case 'die':
+                return ['status', 'message'];
         }
 
         return null;

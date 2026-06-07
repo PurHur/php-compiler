@@ -211,7 +211,7 @@ final class ErrorReporter
     }
 
     /**
-     * Zend E_WARNING for property read on non-object (zend_execute.c, #5276).
+     * Zend E_WARNING for property read on non-object except null (zend_execute.c, #5276, #7431).
      */
     public function propertyReadOnNonObject(
         string $propertyName,
@@ -387,8 +387,20 @@ final class ErrorReporter
                 $line = $frame->callSiteLine;
             }
         }
+        if (null !== $file && $this->isVirtualScriptFilename($file)) {
+            $file = null;
+            $line = 0;
+        }
 
         return [$file, $line];
+    }
+
+    private function isVirtualScriptFilename(string $file): bool
+    {
+        return '' === $file
+            || '-' === $file
+            || 'Standard input code' === $file
+            || 'Command line code' === $file;
     }
 
     private function activeHandlerCopy(): ?Variable

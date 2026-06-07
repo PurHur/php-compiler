@@ -1,5 +1,5 @@
 --TEST--
-Language: unset() on typed property — read throws Error (#4240)
+Language: unset() on typed property with default — read throws Error (#4240, #4863)
 --FILE--
 <?php
 declare(strict_types=1);

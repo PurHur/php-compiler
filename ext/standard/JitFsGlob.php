@@ -11,7 +11,7 @@ use PHPCompiler\JIT\JitValueBox;
 use PHPLLVM\Builder;
 use PHPLLVM\Value;
 
-/** LLVM lowering for glob() and scandir(); paths from libc, list built in JIT (issue #1153). */
+/** LLVM lowering for glob() and scandir(); libc via StringFsGlobVecJit (issue #5459/#7405). */
 final class JitFsGlob
 {
     private static int $seq = 0;

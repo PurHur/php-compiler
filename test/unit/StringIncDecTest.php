@@ -41,6 +41,11 @@ final class StringIncDecTest extends TestCase
         $this->assertSame(9, $this->runIncDec(OpCode::TYPE_MINUS, '10')->toInt());
     }
 
+    public function testDecrementEmptyStringCoercesToIntMinusOne(): void
+    {
+        $this->assertSame(-1, $this->runIncDec(OpCode::TYPE_MINUS, '')->toInt());
+    }
+
     public function testIncrementStringOperatorMatchesBuiltinCases(): void
     {
         $this->assertSame('b0', VmString::incrementStringOperator('a9'));

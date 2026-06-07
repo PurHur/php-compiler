@@ -4,17 +4,19 @@ declare(strict_types=1);
 
 namespace PHPCompiler\ext\standard;
 
+use PHPCompiler\JIT\Builtin\PackJitRuntime;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitStringArg;
 use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Value;
 
-/** LLVM JIT/AOT helper for pack() via __compiler_pack. */
+/** LLVM JIT/AOT helper for pack() via __compiler_pack (issue #5231). */
 final class JitPack
 {
     public static function pack(Context $context, JITVariable ...$args): Value
     {
+        PackJitRuntime::ensureLinked($context);
         $argc = \count($args);
         if ($argc < 1) {
             throw new \LogicException('pack() requires at least one argument');

@@ -69,27 +69,24 @@ final class VmMemory
         return $rss;
     }
 
+    /**
+     * RSS via /proc/self/statm only (issue #7287, #4862).
+     *
+     * JIT/AOT use the same source in MemoryRuntime::__phpc_memory_read_rss_bytes.
+     */
     private static function readRssBytes(): int
     {
-        if ('Linux' === \PHP_OS_FAMILY && is_readable('/proc/self/statm')) {
-            $statm = @file_get_contents('/proc/self/statm');
-            if (false !== $statm && '' !== $statm) {
-                $parts = preg_split('/\s+/', trim($statm));
-                $rssPages = (int) ($parts[1] ?? 0);
-
-                return $rssPages * self::pageSize();
-            }
+        if ('Linux' !== \PHP_OS_FAMILY || !is_readable('/proc/self/statm')) {
+            return 0;
         }
-
-        if (\function_exists('getrusage')) {
-            $ru = getrusage();
-            if (\is_array($ru) && isset($ru['ru_maxrss'])) {
-                // Linux: kilobytes; BSD often bytes — treat as KiB (php-src ZEND_SYS_VMEM).
-                return (int) $ru['ru_maxrss'] * 1024;
-            }
+        $statm = @file_get_contents('/proc/self/statm');
+        if (false === $statm || '' === $statm) {
+            return 0;
         }
+        $parts = preg_split('/\s+/', trim($statm));
+        $rssPages = (int) ($parts[1] ?? 0);
 
-        return 0;
+        return $rssPages * self::pageSize();
     }
 
     private static function pageSize(): int

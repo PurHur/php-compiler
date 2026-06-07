@@ -4,8 +4,10 @@ declare(strict_types=1);
 
 namespace PHPCompiler\Ast;
 
+use PhpParser\Error as ParserError;
+
 /**
- * Desugar PHP 8.4+ pipe operator (|>) before nikic/php-parser (#3243).
+ * Desugar PHP 8.4+ pipe operator (|>) before nikic/php-parser (#3243, #7219).
  *
  * Lowering matches Zend: $lhs |> $callable(...) becomes $callable($lhs, ...).
  * php-src: Zend/zend_compile.c pipe expression handling.
@@ -14,6 +16,9 @@ final class PipeOperatorDesugar
 {
     /** Pipe binds tighter than comparison (php.net operator precedence). */
     private const PREC_LHS_STOP = 18;
+
+    /** PHP 8.5 errata: arrow functions on pipe RHS must be parenthesized (php-src #19533). */
+    private const ARROW_FN_PAREN_MESSAGE = 'Arrow functions on the right-hand side of the pipe operator must be parenthesized';
 
     public static function desugar(string $code): string
     {
@@ -30,7 +35,7 @@ final class PipeOperatorDesugar
 
             $pipeSpan = self::pipeSpan($tokens, $pipeIdx);
             $lhs = self::extractLhs($code, $tokens, $pipeIdx);
-            $rhs = self::extractRhsCall($code, $tokens, $pipeSpan['endIdx']);
+            $rhs = self::extractRhs($code, $tokens, $pipeSpan['endIdx']);
             if (null === $lhs || null === $rhs) {
                 break;
             }
@@ -194,12 +199,18 @@ final class PipeOperatorDesugar
                         --$pos;
                     }
                 }
+                $openIdx = $pos;
                 --$pos;
                 self::skipBackwardIgnorable($tokens, $pos);
                 if ($pos >= 0 && self::isCallCalleeToken($tokens[$pos])) {
                     return $pos;
                 }
-                continue;
+                // Parenthesized callee: (expr)(args) — e.g. (fn($x) => $x + 1)(3) (#7219).
+                if ($pos >= 0 && \is_string($tokens[$pos]) && ')' === $tokens[$pos]) {
+                    return self::scanAtomStart($tokens, $pos);
+                }
+
+                return $openIdx;
             }
 
             if (\is_string($token) && ']' === $token) {
@@ -221,7 +232,7 @@ final class PipeOperatorDesugar
 
             if (\is_array($token) && \in_array($token[0], [
                 \T_VARIABLE, \T_STRING, \T_CONSTANT_ENCAPSED_STRING, \T_LNUMBER, \T_DNUMBER,
-                \T_ARRAY, \T_NEW, \T_CLONE, \T_ECHO, \T_PRINT,
+                \T_ARRAY, \T_NEW, \T_CLONE,
             ], true)) {
                 return $pos;
             }
@@ -241,7 +252,7 @@ final class PipeOperatorDesugar
      *
      * @return array{start: int, end: int, endIdx: int, text: string}|null
      */
-    private static function extractRhsCall(string $code, array $tokens, int $afterPipeIdx): ?array
+    private static function extractRhs(string $code, array $tokens, int $afterPipeIdx): ?array
     {
         $startIdx = $afterPipeIdx + 1;
         while ($startIdx < count($tokens) && self::isIgnorable($tokens[$startIdx])) {
@@ -251,7 +262,18 @@ final class PipeOperatorDesugar
             return null;
         }
 
+        if (isset($tokens[$startIdx]) && \is_array($tokens[$startIdx]) && \T_FN === $tokens[$startIdx][0]) {
+            $line = $tokens[$startIdx][2] ?? 1;
+            throw new ParserError(self::ARROW_FN_PAREN_MESSAGE, [
+                'startLine' => $line,
+                'endLine' => $line,
+            ]);
+        }
+
         $endIdx = self::scanCallLikeForward($tokens, $startIdx);
+        if (null === $endIdx) {
+            $endIdx = self::scanBareCallableForward($tokens, $startIdx);
+        }
         if (null === $endIdx) {
             return null;
         }
@@ -372,7 +394,191 @@ final class PipeOperatorDesugar
             }
         }
 
-        return 0 === $depth ? $end : null;
+        if (0 !== $depth) {
+            return null;
+        }
+
+        // Parenthesized callee immediately invoked: (fn($x) => ...)( ) (#7244).
+        $invokeStart = $end + 1;
+        while ($invokeStart < \count($tokens) && self::isIgnorable($tokens[$invokeStart])) {
+            ++$invokeStart;
+        }
+        if ($invokeStart < \count($tokens) && \is_string($tokens[$invokeStart]) && '(' === $tokens[$invokeStart]) {
+            $invokeDepth = 0;
+            for ($j = $invokeStart; $j < \count($tokens); ++$j) {
+                $it = $tokens[$j];
+                if (\is_string($it) && '(' === $it) {
+                    ++$invokeDepth;
+                } elseif (\is_string($it) && ')' === $it) {
+                    --$invokeDepth;
+                    if (0 === $invokeDepth) {
+                        $end = $j;
+                        break;
+                    }
+                } elseif (\is_array($it) && \T_CURLY_OPEN === $it[0]) {
+                    ++$invokeDepth;
+                }
+            }
+        }
+
+        return $end;
+    }
+
+    /**
+     * Bare callable reference without argument list: $lhs |> strlen → strlen($lhs).
+     *
+     * @param array<int, array{0: int, 1: string, 2: int}|string> $tokens
+     */
+    private static function scanBareCallableForward(array $tokens, int $startIdx): ?int
+    {
+        $pos = $startIdx;
+        $sawCallable = false;
+
+        while ($pos < \count($tokens)) {
+            if (self::isIgnorable($tokens[$pos])) {
+                ++$pos;
+                continue;
+            }
+
+            $token = $tokens[$pos];
+            if (\is_array($token) && \in_array($token[0], [
+                \T_STRING, \T_VARIABLE, \T_NS_SEPARATOR, \T_NAME_QUALIFIED, \T_NAME_FULLY_QUALIFIED,
+                \T_NAME_RELATIVE, \T_OBJECT_OPERATOR, \T_NULLSAFE_OBJECT_OPERATOR,
+                \T_PAAMAYIM_NEKUDOTAYIM,
+            ], true)) {
+                $sawCallable = true;
+                ++$pos;
+                continue;
+            }
+
+            if (\is_string($token) && '(' === $token) {
+                return null;
+            }
+
+            break;
+        }
+
+        if (!$sawCallable) {
+            return null;
+        }
+
+        $end = $pos - 1;
+        while ($end >= $startIdx && self::isIgnorable($tokens[$end])) {
+            --$end;
+        }
+
+        return $end >= $startIdx ? $end : null;
+    }
+
+    /**
+     * @param array<int, array{0: int, 1: string, 2: int}|string> $tokens
+     */
+    private static function scanArrowFunctionForward(array $tokens, int $startIdx): ?int
+    {
+        if (!isset($tokens[$startIdx]) || !\is_array($tokens[$startIdx]) || \T_FN !== $tokens[$startIdx][0]) {
+            return null;
+        }
+
+        $pos = $startIdx + 1;
+        while ($pos < \count($tokens) && self::isIgnorable($tokens[$pos])) {
+            ++$pos;
+        }
+        if ($pos >= \count($tokens) || !\is_string($tokens[$pos]) || '(' !== $tokens[$pos]) {
+            return null;
+        }
+
+        $depth = 0;
+        for ($i = $pos; $i < \count($tokens); ++$i) {
+            $t = $tokens[$i];
+            if (\is_string($t) && '(' === $t) {
+                ++$depth;
+            } elseif (\is_string($t) && ')' === $t) {
+                --$depth;
+                if (0 === $depth) {
+                    $pos = $i + 1;
+                    break;
+                }
+            } elseif (\is_array($t) && \T_CURLY_OPEN === $t[0]) {
+                ++$depth;
+            }
+        }
+        if (0 !== $depth) {
+            return null;
+        }
+
+        while ($pos < \count($tokens) && self::isIgnorable($tokens[$pos])) {
+            ++$pos;
+        }
+        if ($pos >= \count($tokens) || !\is_array($tokens[$pos]) || \T_DOUBLE_ARROW !== $tokens[$pos][0]) {
+            return null;
+        }
+
+        ++$pos;
+        while ($pos < \count($tokens) && self::isIgnorable($tokens[$pos])) {
+            ++$pos;
+        }
+        if ($pos >= \count($tokens)) {
+            return null;
+        }
+
+        return self::scanExpressionForward($tokens, $pos);
+    }
+
+    /**
+     * Scan a single expression (arrow-fn body, pipe RHS tail, etc.).
+     *
+     * @param array<int, array{0: int, 1: string, 2: int}|string> $tokens
+     */
+    private static function scanExpressionForward(array $tokens, int $startIdx): int
+    {
+        $pos = $startIdx;
+        $paren = 0;
+        $bracket = 0;
+
+        while ($pos < \count($tokens)) {
+            if (self::isIgnorable($tokens[$pos])) {
+                ++$pos;
+                continue;
+            }
+
+            if (0 === $paren && 0 === $bracket) {
+                $t = $tokens[$pos];
+                if (\is_string($t) && \in_array($t, [';', ','], true)) {
+                    break;
+                }
+                if (\is_string($t) && ')' === $t) {
+                    break;
+                }
+            }
+
+            $t = $tokens[$pos];
+            if (\is_string($t)) {
+                if ('(' === $t) {
+                    ++$paren;
+                } elseif (')' === $t) {
+                    --$paren;
+                } elseif ('[' === $t) {
+                    ++$bracket;
+                } elseif (']' === $t) {
+                    --$bracket;
+                }
+            } elseif (\is_array($t) && \T_FN === $t[0]) {
+                $end = self::scanArrowFunctionForward($tokens, $pos);
+                if (null !== $end) {
+                    $pos = $end + 1;
+                    continue;
+                }
+            }
+
+            ++$pos;
+        }
+
+        $end = $pos - 1;
+        while ($end >= $startIdx && self::isIgnorable($tokens[$end])) {
+            --$end;
+        }
+
+        return max($startIdx, $end);
     }
 
     /**
@@ -479,19 +685,31 @@ final class PipeOperatorDesugar
 
     private static function rewritePipe(string $lhs, string $rhs, bool $bindAsClosure): string
     {
+        $trimmed = ltrim($rhs);
+        if (preg_match('/^\(\s*fn\s*\(/s', $trimmed)) {
+            $callable = rtrim($rhs);
+            // (fn(...))() — drop empty invoke; pipe LHS becomes the sole argument (#7244).
+            if (preg_match('/\(\s*\)$/', $callable)) {
+                $callable = preg_replace('/\(\s*\)$/', '', $callable);
+            }
+
+            return $callable.'('.$lhs.')';
+        }
+
         $open = strpos($rhs, '(');
         if (false === $open) {
-            return $lhs;
+            return $rhs.'('.$lhs.')';
         }
 
         $prefix = substr($rhs, 0, $open + 1);
         $suffix = substr($rhs, $open + 1);
         $inner = ltrim($suffix);
+        $callee = substr($rhs, 0, $open);
 
         // First-class callable: func(...) → func($lhs) or bound Closure for assignment (#4943).
         if (preg_match('/^\\.\\.\\.(\\s*\\))/s', $inner, $m)) {
             if ($bindAsClosure) {
-                return '(fn(...$__pipe_a) => '.$rhs.'('.$lhs.', ...$__pipe_a))';
+                return '(fn() => '.$callee.'('.$lhs.'))';
             }
 
             return $prefix.$lhs.$m[1];

@@ -7,6 +7,7 @@ namespace PHPCompiler\ext\standard;
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
@@ -29,11 +30,8 @@ final class levenshtein extends Internal
         if ($argc < 2 || $argc > 5) {
             throw new \LogicException('levenshtein() accepts two to five arguments in this compiler build');
         }
-        $a = $frame->calledArgs[0]->resolveIndirect();
-        $b = $frame->calledArgs[1]->resolveIndirect();
-        if (Variable::TYPE_STRING !== $a->type || Variable::TYPE_STRING !== $b->type) {
-            throw new \LogicException('levenshtein() requires two strings in this compiler build');
-        }
+        $a = VmString::coerceStringBuiltinArg($frame->calledArgs[0], 'levenshtein', 0, 'string1');
+        $b = VmString::coerceStringBuiltinArg($frame->calledArgs[1], 'levenshtein', 1, 'string2');
         $ins = 1;
         $rep = 1;
         $del = 1;
@@ -61,7 +59,7 @@ final class levenshtein extends Internal
         if (null === $frame->returnVar) {
             return;
         }
-        $frame->returnVar->int(VmString::levenshtein($a->toString(), $b->toString(), $ins, $rep, $del));
+        $frame->returnVar->int(VmString::levenshtein($a, $b, $ins, $rep, $del));
     }
 
     public Context $context;
@@ -98,8 +96,8 @@ final class levenshtein extends Internal
 
         return JitLevenshtein::invoke(
             $context,
-            $this->jitString($context, $args[0], 'levenshtein() argument #1'),
-            $this->jitString($context, $args[1], 'levenshtein() argument #2'),
+            JitStringBuiltinArg::lower($context, $args[0], 'levenshtein', 0, 'string1'),
+            JitStringBuiltinArg::lower($context, $args[1], 'levenshtein', 1, 'string2'),
             $ins,
             $rep,
             $del

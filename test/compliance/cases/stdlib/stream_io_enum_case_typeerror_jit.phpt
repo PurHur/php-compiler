@@ -29,7 +29,7 @@ try {
     echo "fseek: ", $e->getMessage(), "\n";
 }
 --EXPECT--
-feof: feof(): Argument #1 ($stream) must be of type resource, object given
-fflush: fflush(): Argument #1 ($stream) must be of type resource, object given
-flock: flock(): Argument #1 ($stream) must be of type resource, object given
-fseek: fseek(): Argument #1 ($stream) must be of type resource, object given
+feof: feof(): Argument #1 ($stream) must be of type resource, E given
+fflush: fflush(): Argument #1 ($stream) must be of type resource, E given
+flock: flock(): Argument #1 ($stream) must be of type resource, E given
+fseek: fseek(): Argument #1 ($stream) must be of type resource, E given

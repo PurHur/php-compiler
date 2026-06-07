@@ -1,5 +1,5 @@
 --TEST--
-bool increment/decrement runtime: bool promoted to int (issue #4727)
+bool increment/decrement runtime: bool inc/dec is no-op (issue #7058)
 --FILE--
 <?php
 declare(strict_types=1);
@@ -12,29 +12,33 @@ $cases = [
 
 foreach ($cases as [$label, $fn]) {
     $v = $fn();
-    echo "$label=$v type=" . gettype($v) . "\n";
+    echo "$label=" . get_debug_type($v) . " " . var_export($v, true) . "\n";
 }
 
 $t = true;
 $ret = $t++;
-echo "post_ret=" . ($ret ? 'true' : 'false') . ' type=' . gettype($ret) . " after=$t\n";
+echo "post_ret=" . get_debug_type($ret) . " " . var_export($ret, true)
+    . " after=" . get_debug_type($t) . " " . var_export($t, true) . "\n";
 
 $t = true;
 $ret = $t--;
-echo "post_dec_ret=" . ($ret ? 'true' : 'false') . ' type=' . gettype($ret) . " after=$t\n";
+echo "post_dec_ret=" . get_debug_type($ret) . " " . var_export($ret, true)
+    . " after=" . get_debug_type($t) . " " . var_export($t, true) . "\n";
 
 $f = false;
 $ret = ++$f;
-echo "false_pre_ret=$ret after=$f\n";
+echo "false_pre_ret=" . get_debug_type($ret) . " " . var_export($ret, true)
+    . " after=" . get_debug_type($f) . " " . var_export($f, true) . "\n";
 
 $f = false;
 $ret = --$f;
-echo "false_pre_dec=$ret after=$f\n";
+echo "false_pre_dec=" . get_debug_type($ret) . " " . var_export($ret, true)
+    . " after=" . get_debug_type($f) . " " . var_export($f, true) . "\n";
 --EXPECT--
-pre=1 type=integer
-post=1 type=integer
-false_pre=1 type=integer
-post_ret=true type=boolean after=1
-post_dec_ret=true type=boolean after=0
-false_pre_ret=1 after=1
-false_pre_dec=-1 after=-1
+pre=bool true
+post=bool true
+false_pre=bool false
+post_ret=bool true after=bool true
+post_dec_ret=bool true after=bool true
+false_pre_ret=bool false after=bool false
+false_pre_dec=bool false after=bool false

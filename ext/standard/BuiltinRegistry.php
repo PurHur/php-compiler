@@ -5,7 +5,10 @@ declare(strict_types=1);
 namespace PHPCompiler\ext\standard;
 
 /**
- * Authoritative sorted builtin function name list (issue #5390, #1216).
+ * Authoritative sorted builtin function name list (issues #5390, #1216, #6400).
+ *
+ * SSOT for function_exists() LLVM lowering (FunctionExistsRuntime) and AOT/JIT
+ * symbol resolution — replaces lib/AOT/runtime/builtin_function_names.inc.
  *
  * php-src: ext/standard/basic_functions.c — function_exists() registry
  */

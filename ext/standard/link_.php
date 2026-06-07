@@ -26,10 +26,10 @@ final class link_ extends Internal
         }
         $target = VmString::coerceStringBuiltinArg($frame->calledArgs[0], 'link', 0, 'target');
         $linkPath = VmString::coerceStringBuiltinArg($frame->calledArgs[1], 'link', 1, 'link');
-        if (null === $frame->returnVar) {
-            return;
+        $ok = VmFs::hardLink($target, $linkPath);
+        if (null !== $frame->returnVar) {
+            $frame->returnVar->bool($ok);
         }
-        $frame->returnVar->bool(VmFs::hardLink($target, $linkPath));
     }
 
     public function call(Context $context, JITVariable ...$args): Value

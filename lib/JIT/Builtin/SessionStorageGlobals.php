@@ -13,7 +13,7 @@ use PHPLLVM\Value;
  * LLVM globals for JIT/AOT session_id() / session_name() buffers (issues #1183–#1184, #5694, #5750).
  *
  * VM source of truth: {@see VmSession}. MCJIT defines these globals in LLVM; standalone AOT
- * links storage from {@see lib/AOT/runtime/phpc_session_lifecycle.c} (merged #5750).
+ * links storage from {@see lib/JIT/Builtin/SessionStorageGlobals} LLVM globals (merged #5750).
  * php-src: ext/session/session.c (PS(id), PS(session_name))
  */
 final class SessionStorageGlobals
@@ -98,10 +98,6 @@ final class SessionStorageGlobals
      */
     public static function implementEnsureDefaults(Context $context): void
     {
-        if (Builtin::LOAD_TYPE_STANDALONE === $context->loadType) {
-            return;
-        }
-
         $probe = $context->module->getNamedFunction('__phpc_session_ensure_defaults');
         if (null !== $probe && $probe->countBasicBlocks() > 0) {
             $context->registerFunction('__phpc_session_ensure_defaults', $probe);
@@ -161,10 +157,8 @@ final class SessionStorageGlobals
 
     public static function emitCallEnsureDefaults(Context $context): void
     {
-        if (Builtin::LOAD_TYPE_STANDALONE === $context->loadType) {
-            return;
-        }
         self::ensureGlobals($context);
+        self::implementEnsureDefaults($context);
         $context->builder->call($context->lookupFunction('__phpc_session_ensure_defaults'));
     }
 }

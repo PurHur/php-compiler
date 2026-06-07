@@ -12,8 +12,26 @@ source "$_CI_SCRIPT_DIR/php-env.sh"
 # shellcheck source=ci-resource-limits.sh
 source "$_CI_SCRIPT_DIR/ci-resource-limits.sh"
 
+ci_guard_runtime_strictness() {
+  local strict="${PHP_COMPILER_RUNTIME_STRICT:-}"
+  if [[ -z "$strict" ]]; then
+    unset PHP_COMPILER_RUNTIME_STRICT
+    return 0
+  fi
+  strict="${strict,,}"
+  if [[ "$strict" == "php-compiler" ]]; then
+    echo "ci: PHP_COMPILER_RUNTIME_STRICT=php-compiler is forbidden in CI; compliance must stay php-src-strict (#7361)" >&2
+    exit 1
+  fi
+  if [[ "$strict" != "php-src" ]]; then
+    echo "ci: PHP_COMPILER_RUNTIME_STRICT must be php-src or unset (got: ${PHP_COMPILER_RUNTIME_STRICT})" >&2
+    exit 1
+  fi
+}
+
 ci_prepare_test_runtime() {
   ci_guard_parallel_ci
+  ci_guard_runtime_strictness
   ci_apply_resource_limits
   ci_apply_default_memory_env
   ci_export_llvm_env

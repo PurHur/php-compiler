@@ -41,6 +41,8 @@ function run(string $filename, string $code, array $options): void
         $block = $runtime->parseAndCompile($code, $filename);
     } catch (\CompileError $e) {
         exit(255);
+    } catch (\LogicException $e) {
+        exit(255);
     }
     if (! isset($options['-l'])) {
         try {

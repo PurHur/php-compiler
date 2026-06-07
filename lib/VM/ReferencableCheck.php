@@ -42,13 +42,22 @@ final class ReferencableCheck
         if ([] === $calleeBlock->paramByRef) {
             return;
         }
+        $thisArgOffset = 0;
+        if (
+            null !== $calleeBlock->func
+            && null !== $calleeBlock->func->class
+            && !(($calleeBlock->func->flags ?? 0) & \PHPCfg\Func::FLAG_STATIC)
+        ) {
+            $thisArgOffset = 1;
+        }
         foreach ($calleeBlock->paramByRef as $paramIdx => $_) {
             $idx = (int) $paramIdx;
-            if (!array_key_exists($idx, $calledArgs)) {
+            $argIndex = $idx + $thisArgOffset;
+            if (!array_key_exists($argIndex, $calledArgs)) {
                 continue;
             }
             $paramName = $calleeBlock->paramNames[$idx] ?? 'param'.$idx;
-            self::assertArgument($fn, $idx, $paramName, $calledArgs[$idx], $caller);
+            self::assertArgument($fn, $idx, $paramName, $calledArgs[$argIndex], $caller);
         }
     }
 
@@ -113,6 +122,7 @@ final class ReferencableCheck
         if (
             Variable::TYPE_STRING_OFFSET === $resolved->type
             || Variable::TYPE_ARRAYACCESS_OFFSET === $resolved->type
+            || Variable::TYPE_PROPERTY_HOOK_REF === $resolved->type
         ) {
             return true;
         }

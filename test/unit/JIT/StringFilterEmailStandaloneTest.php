@@ -9,12 +9,23 @@ use PHPCompiler\Runtime;
 use PHPUnit\Framework\TestCase;
 
 /**
- * Issue #6082: AOT standalone must define __compiler_filter_validate_email (PHP LLVM, not C).
+ * Issues #5199 / #6082: filter_validate.c deleted; FILTER_VALIDATE_EMAIL via PHP LLVM.
  *
  * @group aot-lint
  */
 final class StringFilterEmailStandaloneTest extends TestCase
 {
+    public function testRuntimeShrinkRemovesFilterValidateC(): void
+    {
+        $this->assertFileDoesNotExist(__DIR__.'/../../../lib/AOT/runtime/filter_validate.c');
+        $linker = (string) file_get_contents(__DIR__.'/../../../lib/AOT/Linker.php');
+        $this->assertStringNotContainsString('filter_validate.c', $linker);
+        $jitFilter = (string) file_get_contents(__DIR__.'/../../../ext/standard/JitFilter.php');
+        $this->assertStringContainsString('StringFilterEmail', $jitFilter);
+        $emailJit = (string) file_get_contents(__DIR__.'/../../../lib/JIT/Builtin/StringFilterEmail.php');
+        $this->assertStringContainsString('__compiler_filter_validate_email', $emailJit);
+    }
+
     public function testEnsureLinkedDefinesFilterValidateEmailForStandalone(): void
     {
         $runtime = new Runtime(Runtime::MODE_AOT);

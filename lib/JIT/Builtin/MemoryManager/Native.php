@@ -18,57 +18,7 @@ class Native extends MemoryManager {
 
     public function register(): void {
         parent::register();
-        $fntype___cfcd208495d565ef66e7dff9f98764da = $this->context->context->functionType(
-                $this->context->getTypeFromString('int8*'),
-                false , 
-                $this->context->getTypeFromString('size_t')
-                
-            );
-            $fn___cfcd208495d565ef66e7dff9f98764da = $this->context->module->addFunction('malloc', $fntype___cfcd208495d565ef66e7dff9f98764da);
-            
-            
-            
-            $this->context->registerFunction('malloc', $fn___cfcd208495d565ef66e7dff9f98764da);
-        
-
-        
-
-        
-    $fntype___cfcd208495d565ef66e7dff9f98764da = $this->context->context->functionType(
-                $this->context->getTypeFromString('int8*'),
-                false , 
-                $this->context->getTypeFromString('int8*')
-                , $this->context->getTypeFromString('size_t')
-                
-            );
-            $fn___cfcd208495d565ef66e7dff9f98764da = $this->context->module->addFunction('realloc', $fntype___cfcd208495d565ef66e7dff9f98764da);
-            
-            
-            
-            
-            $this->context->registerFunction('realloc', $fn___cfcd208495d565ef66e7dff9f98764da);
-        
-
-        
-
-        
-    $fntype___cfcd208495d565ef66e7dff9f98764da = $this->context->context->functionType(
-                $this->context->getTypeFromString('void'),
-                false , 
-                $this->context->getTypeFromString('int8*')
-                
-            );
-            $fn___cfcd208495d565ef66e7dff9f98764da = $this->context->module->addFunction('free', $fntype___cfcd208495d565ef66e7dff9f98764da);
-            
-            
-            
-            $this->context->registerFunction('free', $fn___cfcd208495d565ef66e7dff9f98764da);
-        
-
-        
-
-        
-    
+        // malloc/free/realloc are registered by LibcExtern before builtin register().
     } 
 
     public function implement(): void {

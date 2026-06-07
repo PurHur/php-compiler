@@ -18,6 +18,31 @@ final class VmArray
 
     public const COUNT_RECURSIVE = 1;
 
+    /**
+     * array_intersect/diff* reject enum case keys/values before string hash (#5927, php-src array.c).
+     */
+    public static function rejectEnumCaseSetOpOperands(HashTable ...$tables): void
+    {
+        foreach ($tables as $table) {
+            foreach ($table->iterateKeyed(true) as [$key, $value]) {
+                $value = $value->resolveIndirect();
+                if (EnumCaseSupport::isEnumCaseVariable($value)) {
+                    $enumClass = EnumCaseSupport::enumClassForCaseVariable($value);
+                    throw new \Error(
+                        'Object of class '.($enumClass->name ?? 'enum').' could not be converted to string'
+                    );
+                }
+                $key = $key->resolveIndirect();
+                if (EnumCaseSupport::isEnumCaseVariable($key)) {
+                    $enumClass = EnumCaseSupport::enumClassForCaseVariable($key);
+                    throw new \Error(
+                        'Object of class '.($enumClass->name ?? 'enum').' could not be converted to string'
+                    );
+                }
+            }
+        }
+    }
+
     public static function isList(HashTable $ht): bool
     {
         $n = $ht->getNumElements();
@@ -37,6 +62,16 @@ final class VmArray
         }
 
         return $expected === $n;
+    }
+
+    /** array_is_assoc() — non-empty and not a list (issue #7016, ext/standard/array.c). */
+    public static function isAssoc(HashTable $ht): bool
+    {
+        if (0 === $ht->getNumElements()) {
+            return false;
+        }
+
+        return !self::isList($ht);
     }
 
     /**
@@ -177,34 +212,31 @@ final class VmArray
     }
 
     /**
-     * array_first() — first element value (php-src array.c, #3491).
+     * array_first() — first element value (php-src array.c, #3491, #7293).
      *
-     * @throws \ValueError when {@param $ht} is empty
+     * Returns null when the hash table has no elements (empty or all-unset).
      */
-    public static function valueFirst(HashTable $ht): Variable
+    public static function valueFirst(HashTable $ht): ?Variable
     {
         $ht->iterReset();
         if (!$ht->iterValid()) {
-            throw new \ValueError('array_first(): Argument #1 ($array) must not be empty');
+            return null;
         }
 
         return $ht->iterCurrentValue();
     }
 
     /**
-     * array_last() — last element value (php-src array.c, #3491).
+     * array_last() — last element value (php-src array.c, #3491, #7293).
      *
-     * @throws \ValueError when {@param $ht} is empty
+     * Returns null when the hash table has no elements (empty or all-unset).
      */
-    public static function valueLast(HashTable $ht): Variable
+    public static function valueLast(HashTable $ht): ?Variable
     {
         $ht->iterReset();
         $last = null;
         while ($ht->iterValid()) {
             $last = $ht->iterCurrentValue();
-        }
-        if (null === $last) {
-            throw new \ValueError('array_last(): Argument #1 ($array) must not be empty');
         }
 
         return $last;

@@ -11,6 +11,36 @@ use PHPUnit\Framework\TestCase;
 /** @covers issue #3569 */
 final class DeprecatedAttributeTest extends TestCase
 {
+    public function testFormatClassMessage(): void
+    {
+        $meta = new DeprecatedMetadata('Legacy API', '8.4');
+        $this->assertSame(
+            'Class Legacy is deprecated since 8.4, Legacy API',
+            $meta->formatClass('Legacy')
+        );
+
+        $meta = new DeprecatedMetadata(null, null);
+        $this->assertSame('Class Old is deprecated', $meta->formatClass('Old'));
+    }
+
+    public function testFormatEnumMessages(): void
+    {
+        $meta = new DeprecatedMetadata('Legacy enum', '8.4');
+        $this->assertSame(
+            'Enum Legacy is deprecated since 8.4, Legacy enum',
+            $meta->formatEnum('Legacy')
+        );
+
+        $meta = new DeprecatedMetadata('use E::Test instead', null);
+        $this->assertSame(
+            'Enum case E::Test2 is deprecated, use E::Test instead',
+            $meta->formatEnumCase('E', 'Test2')
+        );
+
+        $meta = new DeprecatedMetadata(null, null);
+        $this->assertSame('Enum case E::Test is deprecated', $meta->formatEnumCase('E', 'Test'));
+    }
+
     public function testFormatFunctionMessage(): void
     {
         $meta = new DeprecatedMetadata('old', null);

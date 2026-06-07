@@ -1,0 +1,51 @@
+<?php
+
+declare(strict_types=1);
+
+namespace PHPCompiler\ext\standard;
+
+use PHPCompiler\Frame;
+use PHPCompiler\Func\Internal;
+use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\Variable as JITVariable;
+use PHPLLVM\Value;
+
+/**
+ * image_type_to_mime_type() — IMAGETYPE_* to MIME string (ext/standard/image.c, #6063).
+ *
+ * @see https://github.com/php/php-src/blob/master/ext/standard/image.c PHP_FUNCTION(image_type_to_mime_type)
+ */
+final class image_type_to_mime_type extends Internal
+{
+    public function __construct()
+    {
+        parent::__construct('image_type_to_mime_type');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $argc = \count($frame->calledArgs);
+        if (1 !== $argc) {
+            throw new \LogicException('image_type_to_mime_type() accepts exactly one argument in this compiler build');
+        }
+        if (null === $frame->returnVar) {
+            return;
+        }
+        $imageType = VmMath::parseIntBuiltinArg(
+            $frame->calledArgs[0]->resolveIndirect(),
+            'image_type_to_mime_type',
+            1,
+            'image_type'
+        );
+        $frame->returnVar->string(VmImage::imageTypeToMimeType($imageType));
+    }
+
+    public function call(Context $context, JITVariable ...$args): Value
+    {
+        if (1 !== \count($args)) {
+            throw new \LogicException('image_type_to_mime_type() accepts exactly one argument in this compiler build');
+        }
+
+        return JitImageTypeToMimeType::invoke($context, $args[0]);
+    }
+}

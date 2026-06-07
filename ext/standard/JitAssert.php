@@ -5,12 +5,18 @@ declare(strict_types=1);
 namespace PHPCompiler\ext\standard;
 
 use PHPCompiler\JIT\BasicBlockHelper;
+use PHPCompiler\JIT\Builtin\AssertFail;
+use PHPCompiler\JIT\Builtin\TypeErrorRaise;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\JitOperandTypeLabel;
 use PHPCompiler\JIT\JitStringArg;
+use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\Variable as JITVariable;
+use PHPCompiler\VM\Variable as VmVariable;
+use PHPLLVM\Builder;
 use PHPLLVM\Value;
 
-/** LLVM lowering for assert() via __compiler_assert_fail (issue #3157). */
+/** LLVM lowering for assert() via AssertFail runtime (issues #3157, #6550). */
 final class JitAssert
 {
     /** @return Value int64 1 on pass, 0 on fail (php-cfg infers assert() as int) */
@@ -41,7 +47,11 @@ final class JitAssert
     /** @param list<JITVariable> $args */
     private static function emitFail(Context $context, array $args, int $argc): void
     {
+        AssertFail::ensureLinked($context);
         if (2 === $argc) {
+            if (self::rejectDescriptionEnumCase($context, $args[1])) {
+                return;
+            }
             $literal = JitStringArg::compileTimeLiteral($args[1]);
             if (null !== $literal) {
                 self::emitFailCstr($context, $literal);
@@ -62,6 +72,59 @@ final class JitAssert
             );
         }
         self::emitFailCstr($context, 'assert(): assert(false) failed');
+    }
+
+    /** @return bool true when compile-time enum rejection was emitted (caller must stop) */
+    private static function rejectDescriptionEnumCase(Context $context, JITVariable $arg): bool
+    {
+        $enumLabel = JitOperandTypeLabel::compileTimeEnumClassName($context, $arg);
+        if (null !== $enumLabel) {
+            self::emitDescriptionTypeError($context, $enumLabel);
+
+            return true;
+        }
+        if (JITVariable::TYPE_VALUE === $arg->type) {
+            self::emitRuntimeDescriptionEnumCaseGuard($context, $arg);
+        }
+
+        return false;
+    }
+
+    private static function emitRuntimeDescriptionEnumCaseGuard(Context $context, JITVariable $arg): void
+    {
+        TypeErrorRaise::registerDeclarations($context);
+        TypeErrorRaise::ensureLinked($context);
+        $valuePtr = JitValueBox::valuePtrFromVariable($context, $arg);
+        $map = $context->structFieldMap['__value__'];
+        $typeByte = $context->builder->load(
+            $context->builder->structGep($valuePtr, $map['type'])
+        );
+        $i8 = $context->getTypeFromString('int8');
+        $typeKind = $context->builder->and($typeByte, $i8->constInt(0x7f, false));
+        $enumCaseTy = $i8->constInt(VmVariable::TYPE_ENUM_CASE, false);
+
+        $okBlock = BasicBlockHelper::append($context, 'assert_desc_ok');
+        $rejectBlock = BasicBlockHelper::append($context, 'assert_desc_enum');
+        $isEnumCase = $context->builder->icmp(Builder::INT_EQ, $typeKind, $enumCaseTy);
+        $context->builder->branchIf($isEnumCase, $rejectBlock, $okBlock);
+
+        $context->builder->positionAtEnd($rejectBlock);
+        self::emitDescriptionTypeError($context, JitOperandTypeLabel::givenLabel($context, $arg));
+        $context->builder->positionAtEnd($okBlock);
+    }
+
+    private static function emitDescriptionTypeError(Context $context, string $given): void
+    {
+        TypeErrorRaise::registerDeclarations($context);
+        TypeErrorRaise::ensureLinked($context);
+        TypeErrorRaise::emitRaise(
+            $context,
+            sprintf(
+                'assert(): Argument #2 ($description) must be of type string|Throwable, %s given',
+                $given
+            )
+        );
+        $context->builder->call($context->lookupFunction('abort'));
     }
 
     private static function emitFailCstr(Context $context, string $message): void

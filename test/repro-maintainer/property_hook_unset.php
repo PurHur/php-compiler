@@ -1,14 +1,12 @@
 <?php
-class C {
-    public string $p {
-        get { return $this->p; }
-        set (string $value) { $this->p = $value; }
+class Box {
+    public string $label {
+        get => $this->label ?? 'default';
+        set => $this->label = $value;
+        unset => $this->label = 'cleared';
     }
 }
-$c = new C();
-$c->p = 'a';
-unset($c->p);
-var_export(isset($c->p));
-echo "\n";
-$c->p = 'b';
-echo $c->p, "\n";
+$b = new Box;
+$b->label = 'hi';
+unset($b->label);
+echo $b->label, "\n";

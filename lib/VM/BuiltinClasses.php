@@ -16,8 +16,12 @@ use PHPCompiler\VM\Builtin\ExceptionGetFile;
 use PHPCompiler\VM\Builtin\ExceptionGetLine;
 use PHPCompiler\VM\Builtin\ExceptionGetMessage;
 use PHPCompiler\VM\Builtin\ExceptionGetPrevious;
+use PHPCompiler\VM\Builtin\ExceptionGetTrace;
+use PHPCompiler\VM\Builtin\ExceptionGetTraceAsString;
+use PHPCompiler\VM\Builtin\ExceptionToString;
 use PHPCompiler\VM\Builtin\FiberConstruct;
 use PHPCompiler\VM\Builtin\FiberGetCurrent;
+use PHPCompiler\VM\Builtin\FiberGetReturn;
 use PHPCompiler\VM\Builtin\FiberIsRunning;
 use PHPCompiler\VM\Builtin\FiberIsStarted;
 use PHPCompiler\VM\Builtin\FiberIsSuspended;
@@ -28,6 +32,7 @@ use PHPCompiler\VM\Builtin\FiberSuspend;
 use PHPCompiler\VM\Builtin\FiberThrow;
 use PHPCompiler\VM\Builtin\ReflectionAttributeGetArguments;
 use PHPCompiler\VM\Builtin\ReflectionAttributeGetName;
+use PHPCompiler\VM\Builtin\ReflectionAttributeIsRepeated;
 use PHPCompiler\VM\Builtin\ReflectionAttributeNewInstance;
 use PHPCompiler\VM\Builtin\ReflectionClassConstantGetType;
 use PHPCompiler\VM\Builtin\ReflectionClassConstruct;
@@ -38,7 +43,9 @@ use PHPCompiler\VM\Builtin\ReflectionClassGetMethods;
 use PHPCompiler\VM\Builtin\ReflectionClassGetProperty;
 use PHPCompiler\VM\Builtin\ReflectionClassGetProperties;
 use PHPCompiler\VM\Builtin\ReflectionClassGetReflectionConstant;
+use PHPCompiler\VM\Builtin\ReflectionClassIsDeprecated;
 use PHPCompiler\VM\Builtin\ReflectionClassIsInternal;
+use PHPCompiler\VM\Builtin\ReflectionClassIsStatic;
 use PHPCompiler\VM\Builtin\ReflectionClassIsUninitializedLazyObject;
 use PHPCompiler\VM\Builtin\ReflectionClassMarkLazyObjectAsInitialized;
 use PHPCompiler\VM\Builtin\ReflectionClassNewLazyGhost;
@@ -67,6 +74,7 @@ use PHPCompiler\VM\Builtin\ReflectionMethodConstruct;
 use PHPCompiler\VM\Builtin\ReflectionMethodGetAttributes;
 use PHPCompiler\VM\Builtin\ReflectionMethodGetName;
 use PHPCompiler\VM\Builtin\ReflectionMethodGetParameters;
+use PHPCompiler\VM\Builtin\ReflectionMethodIsDeprecated;
 use PHPCompiler\VM\Builtin\ReflectionNamedTypeGetName;
 use PHPCompiler\VM\Builtin\ReflectionNamedTypeIsBuiltin;
 use PHPCompiler\VM\Builtin\ReflectionParameterGetAttributes;
@@ -75,9 +83,11 @@ use PHPCompiler\VM\Builtin\ReflectionPropertyConstruct;
 use PHPCompiler\VM\Builtin\ReflectionPropertyGetAttributes;
 use PHPCompiler\VM\Builtin\ReflectionPropertyGetName;
 use PHPCompiler\VM\Builtin\ReflectionPropertyGetValue;
+use PHPCompiler\VM\Builtin\ReflectionPropertyIsAbstract;
 use PHPCompiler\VM\Builtin\ReflectionPropertyIsPrivate;
 use PHPCompiler\VM\Builtin\ReflectionPropertyIsProtected;
 use PHPCompiler\VM\Builtin\ReflectionPropertyIsPublic;
+use PHPCompiler\VM\Builtin\ReflectionPropertyIsReadOnly;
 use PHPCompiler\VM\Builtin\ReflectionTypeAllowsNull;
 use PHPCompiler\VM\Builtin\ReflectionTypeToString;
 use PHPCompiler\VM\Builtin\WeakMapConstruct;
@@ -89,6 +99,7 @@ use PHPCompiler\VM\Builtin\WeakMapOffsetUnset;
 use PHPCompiler\VM\Builtin\WeakReferenceConstruct;
 use PHPCompiler\VM\Builtin\WeakReferenceCreate;
 use PHPCompiler\VM\Builtin\WeakReferenceGet;
+use PHPCompiler\ext\standard\ThrowableManifest;
 use PHPCompiler\VM\ExceptionSupport;
 use PHPCompiler\VM\FiberSupport;
 
@@ -105,6 +116,7 @@ final class BuiltinClasses
         AttributeSupport::register($ctx);
         self::registerStdClass($ctx);
         self::registerCountable($ctx);
+        self::registerArrayAccess($ctx);
         self::registerTraversableInterfaces($ctx);
         SensitiveParamSupport::register($ctx);
         self::registerWeakReference($ctx);
@@ -147,6 +159,14 @@ final class BuiltinClasses
         $ctx->classes['countable'] = $entry;
     }
 
+    /** Zend zend_interfaces.c — ArrayAccess for $obj[$key] dispatch (#3331, #5433). */
+    private static function registerArrayAccess(Context $ctx): void
+    {
+        $entry = new ClassEntry('ArrayAccess');
+        $entry->isInterface = true;
+        $ctx->classes['arrayaccess'] = $entry;
+    }
+
     private static function registerStdClass(Context $ctx): void
     {
         $entry = new ClassEntry('stdClass');
@@ -164,8 +184,9 @@ final class BuiltinClasses
             $nullProto
         );
         $pub = CfgFunc::FLAG_PUBLIC;
+        $pubStatic = $pub | CfgFunc::FLAG_STATIC;
         $entry->methods['create'] = new WeakReferenceCreate();
-        $entry->methodVisibility['create'] = $pub;
+        $entry->methodVisibility['create'] = $pubStatic;
         $entry->methods['get'] = new WeakReferenceGet();
         $entry->methodVisibility['get'] = $pub;
         $entry->constructor = new WeakReferenceConstruct();
@@ -177,6 +198,7 @@ final class BuiltinClasses
     private static function registerWeakMap(Context $ctx): void
     {
         $entry = new ClassEntry('WeakMap');
+        $entry->interfaces = ['arrayaccess', 'countable'];
         $arrayProto = new Variable(Variable::TYPE_ARRAY);
         $entry->properties[] = new ClassProperty(
             WeakRefSupport::MAP_PROPERTY,
@@ -218,10 +240,13 @@ final class BuiltinClasses
         $attr = new ClassEntry('ReflectionAttribute');
         $attr->properties[] = new ClassProperty(ReflectionSupport::PROP_ATTR_NAME, null, $strProto);
         $attr->properties[] = new ClassProperty(ReflectionSupport::PROP_ATTR_ARGS, null, $arrayProto);
+        $attr->properties[] = new ClassProperty(ReflectionSupport::PROP_ATTR_IS_REPEATED, null, $boolProto);
         $attr->methods['getname'] = new ReflectionAttributeGetName();
         $attr->methodVisibility['getname'] = $pub;
         $attr->methods['getarguments'] = new ReflectionAttributeGetArguments();
         $attr->methodVisibility['getarguments'] = $pub;
+        $attr->methods['isrepeated'] = new ReflectionAttributeIsRepeated();
+        $attr->methodVisibility['isrepeated'] = $pub;
         $attr->methods['newinstance'] = new ReflectionAttributeNewInstance();
         $attr->methodVisibility['newinstance'] = $pub;
         $ctx->classes[ReflectionSupport::REFLECTION_ATTRIBUTE] = $attr;
@@ -251,6 +276,8 @@ final class BuiltinClasses
         $rm->methodVisibility['getparameters'] = $pub;
         $rm->methods['getname'] = new ReflectionMethodGetName();
         $rm->methodVisibility['getname'] = $pub;
+        $rm->methods['isdeprecated'] = new ReflectionMethodIsDeprecated();
+        $rm->methodVisibility['isdeprecated'] = $pub;
         $ctx->classes[ReflectionSupport::REFLECTION_METHOD] = $rm;
 
         $rc = new ClassEntry('ReflectionClass');
@@ -270,10 +297,11 @@ final class BuiltinClasses
         $rc->methodVisibility['getmethods'] = $pub;
         $rc->methods['getreflectionconstant'] = new ReflectionClassGetReflectionConstant();
         $rc->methodVisibility['getreflectionconstant'] = $pub;
+        $pubStatic = $pub | CfgFunc::FLAG_STATIC;
         $rc->methods['newlazyproxy'] = new ReflectionClassNewLazyProxy();
-        $rc->methodVisibility['newlazyproxy'] = $pub;
+        $rc->methodVisibility['newlazyproxy'] = $pubStatic;
         $rc->methods['newlazyghost'] = new ReflectionClassNewLazyGhost();
-        $rc->methodVisibility['newlazyghost'] = $pub;
+        $rc->methodVisibility['newlazyghost'] = $pubStatic;
         $rc->methods['getlazyinitializer'] = new ReflectionClassGetLazyInitializer();
         $rc->methodVisibility['getlazyinitializer'] = $pub;
         $rc->methods['isuninitializedlazyobject'] = new ReflectionClassIsUninitializedLazyObject();
@@ -281,11 +309,15 @@ final class BuiltinClasses
         $rc->methods['marklazyobjectasinitialized'] = new ReflectionClassMarkLazyObjectAsInitialized();
         $rc->methodVisibility['marklazyobjectasinitialized'] = $pub;
         $rc->methods['resetaslazyghost'] = new ReflectionClassResetAsLazyGhost();
-        $rc->methodVisibility['resetaslazyghost'] = $pub;
+        $rc->methodVisibility['resetaslazyghost'] = $pubStatic;
         $rc->methods['resetaslazyobject'] = new ReflectionClassResetAsLazyObject();
         $rc->methodVisibility['resetaslazyobject'] = $pub;
         $rc->methods['isinternal'] = new ReflectionClassIsInternal();
         $rc->methodVisibility['isinternal'] = $pub;
+        $rc->methods['isstatic'] = new ReflectionClassIsStatic();
+        $rc->methodVisibility['isstatic'] = $pub;
+        $rc->methods['isdeprecated'] = new ReflectionClassIsDeprecated();
+        $rc->methodVisibility['isdeprecated'] = $pub;
 
         $rp = new ClassEntry('ReflectionProperty');
         $rp->properties[] = new ClassProperty(ReflectionSupport::PROP_CLASS_NAME, null, $strProto);
@@ -304,6 +336,8 @@ final class BuiltinClasses
                 'ispublic' => new ReflectionPropertyIsPublic(),
                 'isprivate' => new ReflectionPropertyIsPrivate(),
                 'isprotected' => new ReflectionPropertyIsProtected(),
+                'isabstract' => new ReflectionPropertyIsAbstract(),
+                'isreadonly' => new ReflectionPropertyIsReadOnly(),
             ] as $name => $method
         ) {
             $rp->methods[$name] = $method;
@@ -493,123 +527,16 @@ final class BuiltinClasses
     {
         $throwable = new ClassEntry('Throwable');
         $throwable->isInterface = true;
-        $ctx->classes[ExceptionSupport::CLASS_THROWABLE] = $throwable;
+        $ctx->classes[ThrowableManifest::LC_THROWABLE] = $throwable;
 
-        self::registerThrowableClass($ctx, 'Exception', ExceptionSupport::CLASS_EXCEPTION);
-        self::registerThrowableClass(
-            $ctx,
-            'LogicException',
-            ExceptionSupport::CLASS_LOGIC_EXCEPTION,
-            ExceptionSupport::CLASS_EXCEPTION
-        );
-        // ext/spl/spl_exceptions.c — SPL Exception hierarchy (#5237).
-        self::registerThrowableClass(
-            $ctx,
-            'BadFunctionCallException',
-            ExceptionSupport::CLASS_BAD_FUNCTION_CALL_EXCEPTION,
-            ExceptionSupport::CLASS_LOGIC_EXCEPTION
-        );
-        self::registerThrowableClass(
-            $ctx,
-            'BadMethodCallException',
-            ExceptionSupport::CLASS_BAD_METHOD_CALL_EXCEPTION,
-            ExceptionSupport::CLASS_BAD_FUNCTION_CALL_EXCEPTION
-        );
-        self::registerThrowableClass(
-            $ctx,
-            'DomainException',
-            ExceptionSupport::CLASS_DOMAIN_EXCEPTION,
-            ExceptionSupport::CLASS_LOGIC_EXCEPTION
-        );
-        self::registerThrowableClass(
-            $ctx,
-            'InvalidArgumentException',
-            ExceptionSupport::CLASS_INVALID_ARGUMENT_EXCEPTION,
-            ExceptionSupport::CLASS_LOGIC_EXCEPTION
-        );
-        self::registerThrowableClass(
-            $ctx,
-            'LengthException',
-            ExceptionSupport::CLASS_LENGTH_EXCEPTION,
-            ExceptionSupport::CLASS_LOGIC_EXCEPTION
-        );
-        self::registerThrowableClass(
-            $ctx,
-            'OutOfRangeException',
-            ExceptionSupport::CLASS_OUT_OF_RANGE_EXCEPTION,
-            ExceptionSupport::CLASS_LOGIC_EXCEPTION
-        );
-        self::registerThrowableClass(
-            $ctx,
-            'RuntimeException',
-            ExceptionSupport::CLASS_RUNTIME_EXCEPTION,
-            ExceptionSupport::CLASS_EXCEPTION
-        );
-        self::registerThrowableClass(
-            $ctx,
-            'OutOfBoundsException',
-            ExceptionSupport::CLASS_OUT_OF_BOUNDS_EXCEPTION,
-            ExceptionSupport::CLASS_RUNTIME_EXCEPTION
-        );
-        self::registerThrowableClass(
-            $ctx,
-            'OverflowException',
-            ExceptionSupport::CLASS_OVERFLOW_EXCEPTION,
-            ExceptionSupport::CLASS_RUNTIME_EXCEPTION
-        );
-        self::registerThrowableClass(
-            $ctx,
-            'RangeException',
-            ExceptionSupport::CLASS_RANGE_EXCEPTION,
-            ExceptionSupport::CLASS_RUNTIME_EXCEPTION
-        );
-        self::registerThrowableClass(
-            $ctx,
-            'UnderflowException',
-            ExceptionSupport::CLASS_UNDERFLOW_EXCEPTION,
-            ExceptionSupport::CLASS_RUNTIME_EXCEPTION
-        );
-        self::registerThrowableClass(
-            $ctx,
-            'UnexpectedValueException',
-            ExceptionSupport::CLASS_UNEXPECTED_VALUE_EXCEPTION,
-            ExceptionSupport::CLASS_RUNTIME_EXCEPTION
-        );
-        self::registerThrowableClass($ctx, 'Error', ExceptionSupport::CLASS_ERROR);
-        self::registerThrowableClass($ctx, 'TypeError', ExceptionSupport::CLASS_TYPE_ERROR, ExceptionSupport::CLASS_ERROR);
-        self::registerThrowableClass($ctx, 'ValueError', ExceptionSupport::CLASS_VALUE_ERROR, ExceptionSupport::CLASS_ERROR);
-        self::registerThrowableClass($ctx, 'FiberError', ExceptionSupport::CLASS_FIBER_ERROR, ExceptionSupport::CLASS_ERROR);
-        self::registerThrowableClass(
-            $ctx,
-            'ArgumentCountError',
-            ExceptionSupport::CLASS_ARGUMENT_COUNT_ERROR,
-            ExceptionSupport::CLASS_TYPE_ERROR
-        );
-        self::registerThrowableClass($ctx, 'ParseError', ExceptionSupport::CLASS_PARSE_ERROR, ExceptionSupport::CLASS_ERROR);
-        self::registerThrowableClass(
-            $ctx,
-            'UnhandledMatchError',
-            ExceptionSupport::CLASS_UNHANDLED_MATCH_ERROR,
-            ExceptionSupport::CLASS_ERROR
-        );
-        self::registerThrowableClass(
-            $ctx,
-            'ArithmeticError',
-            ExceptionSupport::CLASS_ARITHMETIC_ERROR,
-            ExceptionSupport::CLASS_ERROR
-        );
-        self::registerThrowableClass(
-            $ctx,
-            'DivisionByZeroError',
-            ExceptionSupport::CLASS_DIVISION_BY_ZERO_ERROR,
-            ExceptionSupport::CLASS_ARITHMETIC_ERROR
-        );
-        self::registerThrowableClass(
-            $ctx,
-            'AssertionError',
-            ExceptionSupport::CLASS_ASSERTION_ERROR,
-            ExceptionSupport::CLASS_ERROR
-        );
+        foreach (ThrowableManifest::registrationOrder() as $className) {
+            self::registerThrowableClass(
+                $ctx,
+                $className,
+                ThrowableManifest::lcKey($className),
+                ThrowableManifest::parentLc($className)
+            );
+        }
     }
 
     private static function registerThrowableClass(
@@ -626,14 +553,18 @@ final class BuiltinClasses
         if (null !== $parentLc) {
             $entry->parentLc = $parentLc;
         } else {
-            $entry->interfaces = [ExceptionSupport::CLASS_THROWABLE];
+            $entry->interfaces = [ThrowableManifest::LC_THROWABLE];
         }
         $nullProto = new Variable(Variable::TYPE_NULL);
+        $arrayProto = new Variable(Variable::TYPE_ARRAY);
+        $emptyTrace = new Variable();
+        $emptyTrace->newArray();
         $entry->properties[] = new ClassProperty(ExceptionSupport::PROP_MESSAGE, null, $strProto);
         $entry->properties[] = new ClassProperty(ExceptionSupport::PROP_CODE, null, $intProto);
         $entry->properties[] = new ClassProperty(ExceptionSupport::PROP_FILE, null, $strProto);
         $entry->properties[] = new ClassProperty(ExceptionSupport::PROP_LINE, null, $intProto);
         $entry->properties[] = new ClassProperty(ExceptionSupport::PROP_PREVIOUS, null, $nullProto);
+        $entry->properties[] = new ClassProperty(ExceptionSupport::PROP_TRACE, $emptyTrace, $arrayProto);
         $entry->constructor = new ExceptionConstruct();
         $entry->methods['__construct'] = $entry->constructor;
         $entry->methodVisibility['__construct'] = $pub;
@@ -644,6 +575,9 @@ final class BuiltinClasses
                 'getfile' => new ExceptionGetFile(),
                 'getline' => new ExceptionGetLine(),
                 'getprevious' => new ExceptionGetPrevious(),
+                'gettrace' => new ExceptionGetTrace(),
+                'gettraceasstring' => new ExceptionGetTraceAsString(),
+                '__tostring' => new ExceptionToString(),
             ] as $methodName => $method
         ) {
             $entry->methods[$methodName] = $method;
@@ -680,6 +614,7 @@ final class BuiltinClasses
                 'issuspended' => new FiberIsSuspended(),
                 'isrunning' => new FiberIsRunning(),
                 'isterminated' => new FiberIsTerminated(),
+                'getreturn' => new FiberGetReturn(),
             ] as $name => $method
         ) {
             $entry->methods[$name] = $method;

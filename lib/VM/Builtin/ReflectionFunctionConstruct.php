@@ -30,7 +30,7 @@ final class ReflectionFunctionConstruct extends VmClassMethod
             $receiver->reflectionClosureState = $state;
             $receiver->getProperty(ReflectionSupport::PROP_FUNC_NAME)->string($state->func->name);
         } else {
-            $name = VmReflection::stringArg($target, 'ReflectionFunction::__construct() name');
+            $name = VmReflection::stringArg($target, 'ReflectionFunction::__construct() name', 1);
             ReflectionSupport::resolveUserFunction($ctx, $name);
             $receiver->reflectionClosureState = null;
             $receiver->getProperty(ReflectionSupport::PROP_FUNC_NAME)->string($name);

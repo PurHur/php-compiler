@@ -73,8 +73,33 @@ final class ObjectLifetime
     public static function releaseDirectObject(Variable $var): void
     {
         $var = $var->resolveIndirect();
-        if (Variable::TYPE_OBJECT === $var->type && isset($var->object)) {
+        if (Variable::TYPE_OBJECT !== $var->type) {
+            return;
+        }
+        try {
             self::releaseRef($var->toObject());
+        } catch (\LogicException) {
+        }
+    }
+
+    /**
+     * unset($var) on an owned binding: run __destruct before storage is cleared (#4096, #6456).
+     *
+     * @see https://github.com/php/php-src/blob/master/Zend/zend_objects.c zend_objects_destroy_object
+     */
+    public static function invokeUnsetDestructor(VM $vm, Variable $var): void
+    {
+        $var = $var->resolveIndirect();
+        if (Variable::TYPE_OBJECT !== $var->type) {
+            return;
+        }
+        try {
+            $object = $var->toObject();
+        } catch (\LogicException) {
+            return;
+        }
+        if (!$object->destructorInvoked) {
+            $vm->invokeUserDestructor($object);
         }
     }
 }

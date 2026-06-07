@@ -26,7 +26,8 @@ final class UnsetHelper
     public static function compileOffset(
         Context $context,
         Block $block,
-        OpCode $op
+        OpCode $op,
+        ?\PHPCompiler\JIT $jit = null
     ): void {
         $containerOp = $block->getOperand($op->arg2);
         $dimOp = $block->getOperand($op->arg3);
@@ -36,7 +37,7 @@ final class UnsetHelper
             if (ArrayAccessHelper::tryCompileOffsetUnset($context, $container, $dim, $containerOp)) {
                 return;
             }
-            self::compilePropertyUnset($context, $block, $containerOp, $dimOp);
+            self::compilePropertyUnset($context, $block, $containerOp, $dimOp, $jit);
 
             return;
         }
@@ -51,7 +52,7 @@ final class UnsetHelper
             return;
         }
         if (Variable::TYPE_VALUE === $container->type) {
-            self::compileValueBoxOffsetUnset($context, $block, $containerOp, $dimOp, $container, $dim);
+            self::compileValueBoxOffsetUnset($context, $block, $containerOp, $dimOp, $container, $dim, $jit);
 
             return;
         }
@@ -83,7 +84,8 @@ final class UnsetHelper
         Operand $containerOp,
         Operand $dimOp,
         Variable $container,
-        Variable $dim
+        Variable $dim,
+        ?\PHPCompiler\JIT $jit = null
     ): void {
         $valuePtr = JitValueBox::valuePtrFromVariable($context, $container);
         $map = $context->structFieldMap['__value__'];
@@ -134,7 +136,7 @@ final class UnsetHelper
         if (ArrayAccessHelper::tryCompileOffsetUnset($context, $objVar, $dim, $containerOp)) {
             $context->builder->returnVoid();
         } else {
-            self::compilePropertyUnset($context, $block, $containerOp, $dimOp);
+            self::compilePropertyUnset($context, $block, $containerOp, $dimOp, $jit);
             $context->builder->returnVoid();
         }
 
@@ -164,7 +166,8 @@ final class UnsetHelper
         Context $context,
         Block $block,
         Operand $containerOp,
-        Operand $dimOp
+        Operand $dimOp,
+        ?\PHPCompiler\JIT $jit = null
     ): void {
         $declaringClass = Type::TYPE_OBJECT === $containerOp->type->type
             ? $containerOp->type->userType
@@ -186,8 +189,22 @@ final class UnsetHelper
         );
         $null->isNullConstant = true;
         if ($dimOp instanceof Literal) {
+            if (PropertyHookDispatch::emitVirtualHookUnsetGuard(
+                $context,
+                $declaringClass,
+                $dimOp->value,
+                $jit
+            )) {
+                return;
+            }
             $prop = $context->type->object->propertyFetch($receiver, $declaringClass, $dimOp->value);
             if (null !== $prop->objectPropertySlot && null !== $prop->objectPropertyType) {
+                DynamicObjectReadonlyGuard::emitBeforePropertyStore(
+                    $context,
+                    $prop,
+                    $context->jitEnclosingBlock,
+                    'unset'
+                );
                 ReadonlyClassGuard::emitBeforePropertyStore(
                     $context,
                     $prop,
@@ -211,6 +228,12 @@ final class UnsetHelper
         $nameVar = $context->getVariableFromOp($dimOp);
         $prop = $context->type->object->propertyFetchDynamic($receiver, $declaringClass, $nameVar);
         if (null !== $prop->objectPropertySlot && null !== $prop->objectPropertyType) {
+            DynamicObjectReadonlyGuard::emitBeforePropertyStore(
+                $context,
+                $prop,
+                $context->jitEnclosingBlock,
+                'unset'
+            );
             ReadonlyClassGuard::emitBeforePropertyStore(
                 $context,
                 $prop,

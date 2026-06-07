@@ -12,12 +12,12 @@ use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
 
 /**
- * strspn() — length of initial segment matching a character mask (LLVM via StringStrspnJit).
+ * strspn() — length of initial segment matching a character mask (LLVM via JitStrspn).
+ *
+ * PHP 8.4 (GH-12592): empty $characters returns 0; strcspn() returns full byte length instead.
  */
 final class strspn extends Internal
 {
-    use SpnJitExtended;
-
     public function execute(Frame $frame): void
     {
         $argc = \count($frame->calledArgs);
@@ -50,16 +50,13 @@ final class strspn extends Internal
         );
     }
 
-    public Context $context;
-
     public function call(Context $context, JITVariable ...$args): Value
     {
-        $this->context = $context;
         $argc = \count($args);
         if ($argc < 2 || $argc > 4) {
             throw new \LogicException('strspn() requires two to four arguments in this compiler build');
         }
 
-        return $this->callSpnExtended($context, $args, true, 'strspn');
+        return JitStrspn::extended($context, $args, true, 'strspn');
     }
 }

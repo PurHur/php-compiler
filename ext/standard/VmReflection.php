@@ -15,6 +15,7 @@ use PHPCompiler\VM\EnumCaseSupport;
 use PHPCompiler\VM\EnumSupport;
 use PHPCompiler\VM\InterfaceCheck;
 use PHPCompiler\VM\ReflectionSupport;
+use PHPCompiler\VM\StringableSupport;
 use PHPCompiler\VM\TypedPropertyCheck;
 use PHPCompiler\VM\Variable;
 
@@ -32,14 +33,23 @@ final class VmReflection
         return $frame->vmContext;
     }
 
-    public static function stringArg(Variable $var, string $label): string
+    /**
+     * Coerce a string parameter for VM builtins / internal methods (php-src Z_PARAM_STR, #7163).
+     *
+     * @param int $calledArgsIndex index in Frame::calledArgs for Zend-shaped Argument #N
+     */
+    public static function stringArg(Variable $var, string $label, int $calledArgsIndex = 0): string
     {
-        $var = $var->resolveIndirect();
-        if (Variable::TYPE_STRING !== $var->type) {
-            throw new \LogicException("{$label} must be a string in this compiler build");
+        if (!preg_match('/^(.+?)\(\)\s+(.+)$/', $label, $m)) {
+            return VmString::coerceStringBuiltinArg($var, $label, $calledArgsIndex, 'string');
         }
+        $function = $m[1];
+        $paramName = $m[2];
+        $argIndex = str_contains($function, '::')
+            ? max(0, $calledArgsIndex - 1)
+            : $calledArgsIndex;
 
-        return $var->toString();
+        return VmString::coerceStringBuiltinArg($var, $function, $argIndex, $paramName);
     }
 
     public static function resolveClassEntry(Context $ctx, string $className): ?ClassEntry
@@ -59,6 +69,18 @@ final class VmReflection
     public static function enumExists(Context $ctx, string $enumName): bool
     {
         return isset($ctx->enums[strtolower($enumName)]);
+    }
+
+    /**
+     * unitenum_exists() — true only for pure (non-backed) user enums (#6884).
+     *
+     * php-src: ext/standard/basic_functions.c — PHP_FUNCTION(unitenum_exists)
+     */
+    public static function unitEnumExists(Context $ctx, string $enumName): bool
+    {
+        $entry = self::resolveClassEntry($ctx, $enumName);
+
+        return null !== $entry && $entry->isEnum && null === $entry->backedType;
     }
 
     /**
@@ -117,7 +139,7 @@ final class VmReflection
     {
         $result = new \PHPCompiler\VM\HashTable();
         foreach ($ctx->classes as $lc => $entry) {
-            if ($entry->isInterface || $entry->isTrait || $entry->isEnum || isset($ctx->classAliases[$lc])) {
+            if ($entry->isInterface || $entry->isTrait || isset($ctx->classAliases[$lc])) {
                 continue;
             }
             $value = new Variable();
@@ -237,6 +259,26 @@ final class VmReflection
         return isset($class->methods[$methodLc]);
     }
 
+    /**
+     * class_meth_exists() — method on a class name string (#7068).
+     *
+     * php-src: Zend/zend_builtin_functions.c — class_meth_exists (string $class only)
+     */
+    public static function classMethExists(Context $ctx, string $className, string $method): bool
+    {
+        $entry = self::resolveClassEntry($ctx, $className);
+        if (null === $entry) {
+            return false;
+        }
+        if (self::methodExistsOnClass($entry, $method)) {
+            return true;
+        }
+        $classLc = strtolower(ltrim($className, '\\'));
+        $methodLc = strtolower($method);
+
+        return 'closure' === $classLc && '__invoke' === $methodLc;
+    }
+
     public static function propertyExistsOnClass(ClassEntry $class, string $property): bool
     {
         $lc = strtolower($property);
@@ -342,7 +384,9 @@ final class VmReflection
     {
         $lc = strtolower(ltrim($functionName, '\\'));
         if (!isset($ctx->functions[$lc])) {
-            throw new \LogicException("Function {$functionName} does not exist");
+            ReflectionSupport::throwReflectionException(
+                ReflectionSupport::functionNotFoundMessage($functionName)
+            );
         }
 
         return $ctx->functions[$lc];
@@ -385,8 +429,16 @@ final class VmReflection
     public static function resolveClassForClassUses(Context $ctx, Variable $arg, bool $autoload): ?ClassEntry
     {
         $arg = $arg->resolveIndirect();
+        if (Variable::TYPE_ENUM_CASE === $arg->type) {
+            return EnumSupport::resolveRuntimeEnumClass($ctx, $arg->toEnumCase()->enumClass);
+        }
         if (Variable::TYPE_OBJECT === $arg->type) {
-            return $arg->toObject()->class;
+            $object = $arg->toObject();
+            if (EnumCaseSupport::isEnumCase($object)) {
+                return EnumSupport::resolveRuntimeEnumClass($ctx, $object->class);
+            }
+
+            return $object->class;
         }
         if (Variable::TYPE_STRING !== $arg->type) {
             return null;
@@ -437,19 +489,47 @@ final class VmReflection
 
         $result = [];
         if ($entry->isInterface) {
-            self::addInterfaceAndParents($entry, $ctx, $result);
+            // php-src: interface operands list parent interfaces only, not self (#7400).
+            foreach ($entry->interfaces as $parentLc) {
+                if (!isset($ctx->classes[$parentLc])) {
+                    continue;
+                }
+                self::addInterfaceAndParents($ctx->classes[$parentLc], $ctx, $result);
+            }
 
             return $result;
         }
 
         foreach ($entry->interfaces as $ifaceLc) {
+            $builtin = self::builtinEnumInterfaceDisplayName($ifaceLc);
+            if (null !== $builtin) {
+                $result[$builtin] = $builtin;
+                continue;
+            }
             if (!isset($ctx->classes[$ifaceLc])) {
                 continue;
             }
             self::addInterfaceAndParents($ctx->classes[$ifaceLc], $ctx, $result);
         }
 
+        if (StringableSupport::entryHasImplicitStringable($entry, $ctx)) {
+            $name = StringableSupport::INTERFACE_NAME;
+            $result[$name] = $name;
+        }
+
         return $result;
+    }
+
+    /**
+     * Zend implicit enum interfaces — not registered as user ClassEntry (#5651, #5422).
+     */
+    public static function builtinEnumInterfaceDisplayName(string $ifaceLc): ?string
+    {
+        return match (strtolower(ltrim($ifaceLc, '\\'))) {
+            'unitenum' => 'UnitEnum',
+            'backedenum' => 'BackedEnum',
+            default => null,
+        };
     }
 
     /** @param array<string, string> $result */
@@ -497,6 +577,49 @@ final class VmReflection
     }
 
     /**
+     * trait name => trait name — direct + nested trait uses (#6469).
+     *
+     * php-src: ext/standard/class.c — PHP_FUNCTION(class_uses_recursive)
+     *
+     * @return array<string, string>
+     */
+    public static function traitUsesRecursiveMap(Context $ctx, ClassEntry $class): array
+    {
+        $result = [];
+        self::collectTraitUsesRecursive($ctx, $class, $result);
+
+        return $result;
+    }
+
+    /**
+     * @param array<string, string> $result
+     */
+    private static function collectTraitUsesRecursive(Context $ctx, ClassEntry $entry, array &$result): void
+    {
+        foreach (self::traitUsesMap($entry) as $traitName) {
+            $result[$traitName] = $traitName;
+            $traitLc = strtolower(ltrim($traitName, '\\'));
+            if (isset($ctx->classes[$traitLc])) {
+                self::collectTraitUsesRecursive($ctx, $ctx->classes[$traitLc], $result);
+            }
+        }
+    }
+
+    public static function classUsesRecursiveArray(ClassEntry $class, Context $ctx): Variable
+    {
+        $result = new Variable();
+        $result->newArray();
+        $ht = $result->toArray();
+        foreach (self::traitUsesRecursiveMap($ctx, $class) as $traitName) {
+            $value = new Variable();
+            $value->string($traitName);
+            $ht->add($traitName, $value);
+        }
+
+        return $result;
+    }
+
+    /**
      * Parent class FQCN for get_parent_class() / class_parents() (issue #3483).
      *
      * php-src: ext/standard/class.c — PHP_FUNCTION(get_parent_class)
@@ -528,6 +651,15 @@ final class VmReflection
         }
 
         return $parents;
+    }
+
+    /** Empty VM array for class_parents() enum-case / no-parent operands (#6336). */
+    public static function emptyArray(): Variable
+    {
+        $result = new Variable();
+        $result->newArray();
+
+        return $result;
     }
 
     /**
@@ -562,15 +694,74 @@ final class VmReflection
                 continue;
             }
             $copy = new Variable();
+            // php-src add_class_vars: skip ZEND_ACC_VIRTUAL (no class-level get-hook invocation).
+            if ($prop->propertyHookVirtual) {
+                continue;
+            }
             if (null !== $prop->default && !$prop->hasRuntimeDefaultInit()) {
                 $copy->copyFrom($prop->default);
             } else {
-                $copy->copyFrom($prop->getVariable());
+                $src = $prop->getVariable();
+                if ($src->isUndefined()) {
+                    $copy->null();
+                } else {
+                    $copy->copyFrom($src);
+                }
             }
             $ht->add($prop->name, $copy);
         }
+        self::addPublicStaticClassVars($entry, $ht);
+        if ($entry->isEnum) {
+            /** @var array<string, true> $seen */
+            $seen = [];
+            foreach ($ht->iterate(false) as $key => $_value) {
+                $seen[(string) $key] = true;
+            }
+            foreach (['name', 'value'] as $enumProp) {
+                if (isset($seen[$enumProp])) {
+                    continue;
+                }
+                $copy = new Variable();
+                $copy->null();
+                $ht->add($enumProp, $copy);
+            }
+        }
 
         return $result;
+    }
+
+    /**
+     * Public static properties declared on $entry (php-src add_class_vars, #7397).
+     *
+     * @param \PHPCompiler\VM\HashTable $ht
+     */
+    private static function addPublicStaticClassVars(ClassEntry $entry, $ht): void
+    {
+        /** @var array<string, true> $seen */
+        $seen = [];
+        foreach ($ht->iterate(false) as $key => $_value) {
+            $seen[(string) $key] = true;
+        }
+        foreach ($entry->staticProperties as $propLc => $storage) {
+            // php-src add_class_vars: public static props on $entry include trait-composed
+            // and parent-inherited members already merged into staticProperties (#7420).
+            if (!MethodVisibility::isPublic($entry->staticPropertyVisibility[$propLc] ?? \PHPCfg\Func::FLAG_PUBLIC)) {
+                continue;
+            }
+            $displayName = $storage->objectPropertyName ?? $propLc;
+            if (isset($seen[$displayName])) {
+                continue;
+            }
+            $copy = new Variable();
+            $resolved = $storage->resolveIndirect();
+            if ($resolved->isUndefined()) {
+                $copy->null();
+            } else {
+                $copy->copyFrom($resolved);
+            }
+            $ht->add($displayName, $copy);
+            $seen[$displayName] = true;
+        }
     }
 
     public static function resolveClassFromArg(Context $ctx, Variable $arg): ClassEntry
@@ -579,7 +770,9 @@ final class VmReflection
         if (Variable::TYPE_STRING === $arg->type) {
             $entry = self::resolveClassEntry($ctx, $arg->toString());
             if (null === $entry) {
-                throw new \LogicException('Unknown class name in this compiler build');
+                ReflectionSupport::throwReflectionException(
+                    ReflectionSupport::classNotFoundMessage($arg->toString())
+                );
             }
 
             return $entry;
@@ -685,9 +878,11 @@ final class VmReflection
     }
 
     /**
-     * get_object_vars() — copy of accessible instance property values (issue #1370).
+     * get_object_vars() — accessible instance properties; get hooks invoked (#5203, #6453).
+     *
+     * php-src: zend_get_properties_for(..., ZEND_PROP_PURPOSE_GET_OBJECT_VARS)
      */
-    public static function getObjectVars(Variable $object): Variable
+    public static function getObjectVars(Variable $object, Frame $frame): Variable
     {
         $object = $object->resolveIndirect();
         if (Variable::TYPE_OBJECT !== $object->type) {
@@ -696,17 +891,12 @@ final class VmReflection
                 VmStreamArg::debugTypeName($object)
             ));
         }
+        $ctx = self::requireContext($frame);
         $result = new Variable();
         $result->newArray();
         $ht = $result->toArray();
-        foreach ($object->toObject()->getProperties(0) as $name => $prop) {
-            $value = $prop->resolveIndirect();
-            if (TypedPropertyCheck::omitFromPropertyEnumeration($value)) {
-                continue;
-            }
-            $copy = new Variable();
-            $copy->copyFrom($value);
-            $ht->add($name, $copy);
+        foreach ($ctx->runtime->vm()->collectObjectVarsForBuiltin($object->toObject(), $frame) as $name => $value) {
+            $ht->add($name, $value);
         }
 
         return $result;
@@ -933,6 +1123,10 @@ final class VmReflection
                 if (!self::matchesReflectionVisibilityFilter($vis, $filter)) {
                     continue;
                 }
+                // php-src add_reflection_method_sub: parent-private methods hidden on child (#7191).
+                if (($vis & \PHPCfg\Func::FLAG_PRIVATE) !== 0 && $class !== $entry) {
+                    continue;
+                }
                 $byLc[$methodLc] = [
                     'methodLc' => $methodLc,
                     'display' => $class->methodNames[$methodLc] ?? $methodLc,
@@ -1042,6 +1236,24 @@ final class VmReflection
     }
 
     /**
+     * attribute_exists() — whether a class declares the given attribute (#6468).
+     *
+     * php-src: ext/reflection/php_reflection.c — PHP_FUNCTION(attribute_exists)
+     */
+    public static function attributeExists(Context $ctx, string $className, string $attributeName): bool
+    {
+        $entry = self::resolveClassEntry($ctx, $className);
+        if (null === $entry) {
+            return false;
+        }
+        if ([] !== ReflectionSupport::filterEntriesByName($entry->attributeEntries, $attributeName)) {
+            return true;
+        }
+
+        return [] !== ReflectionSupport::filterByName($entry->attributeNames, $attributeName);
+    }
+
+    /**
      * ReflectionEnum::getCases() result array (#4121).
      */
     public static function reflectionEnumCasesArray(Context $ctx, ClassEntry $enumEntry): Variable
@@ -1054,6 +1266,59 @@ final class VmReflection
             $slot = new Variable(Variable::TYPE_OBJECT);
             $slot->object($obj);
             $ht->append($slot);
+        }
+
+        return $result;
+    }
+
+    /**
+     * class_constants() — resolve class/interface/enum and reject traits (#7309).
+     *
+     * php-src: ext/standard/basic_functions.c — PHP_FUNCTION(class_constants)
+     */
+    public static function fetchClassEntryForClassConstants(Context $ctx, string $className): ClassEntry
+    {
+        $classLc = strtolower(ltrim($className, '\\'));
+        if (!isset($ctx->classes[$classLc])) {
+            $ctx->autoloadClass($className);
+        }
+        if (!isset($ctx->classes[$classLc])) {
+            throw new \Error('Class "'.$className.'" not found');
+        }
+        $entry = $ctx->classes[$classLc];
+        if ($entry->isTrait) {
+            throw new \Error("Cannot fetch constants from trait {$entry->name}");
+        }
+
+        return $entry;
+    }
+
+    /**
+     * class_constants() result map — constant name => value (#7309).
+     *
+     * php-src: Zend/zend_constants.c — class constant table iteration
+     */
+    public static function classConstantsArray(Context $ctx, ClassEntry $entry): Variable
+    {
+        $result = new Variable();
+        $result->newArray();
+        $ht = $result->toArray();
+        if ($entry->isEnum && null !== $entry->backedType) {
+            EnumSupport::ensureBackedEnumValuesUnique($entry);
+        }
+        foreach ($entry->constants as $constLc => $_stored) {
+            $displayName = $entry->constNames[$constLc]
+                ?? $entry->enumCaseCanonicalNames[$constLc]
+                ?? $constLc;
+            $value = new Variable();
+            if (EnumCaseSupport::tryMaterializeEnumCaseConstantFetch($entry, $constLc, $value)) {
+                $ht->add($displayName, $value);
+
+                continue;
+            }
+            $copy = new Variable();
+            $copy->copyFrom($entry->constants[$constLc]);
+            $ht->add($displayName, $copy);
         }
 
         return $result;

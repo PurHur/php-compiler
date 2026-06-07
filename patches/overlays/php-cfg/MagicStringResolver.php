@@ -38,6 +38,9 @@ class MagicStringResolver extends NodeVisitorAbstract
     /** @var list<string> */
     protected $traitStack = [];
 
+    /** True while visiting StaticCall::class — preserve `parent` for runtime dispatch (#6735). */
+    protected bool $inStaticCallClassName = false;
+
     /** @var string */
     protected $compilationUnitFile = '';
 
@@ -46,6 +49,12 @@ class MagicStringResolver extends NodeVisitorAbstract
 
     public function beginCompilationUnit(string $fileName): void
     {
+        if ('' !== $fileName && is_file($fileName)) {
+            $real = realpath($fileName);
+            if (false !== $real) {
+                $fileName = $real;
+            }
+        }
         $this->compilationUnitFile = $fileName;
         $this->anonymousClassCounter = 0;
     }
@@ -61,7 +70,7 @@ class MagicStringResolver extends NodeVisitorAbstract
             $this->namespaceStack[] = $name;
         }
         if ($node instanceof Node\Stmt\ClassLike) {
-            if (null === $node->namespacedName) {
+            if (null === $node->name) {
                 $node->namespacedName = new Node\Name\FullyQualified(
                     $this->anonymousClassName($node),
                     $node->getAttributes()
@@ -87,6 +96,8 @@ class MagicStringResolver extends NodeVisitorAbstract
             if (null !== $prop) {
                 $this->propertyStack[] = $prop;
             }
+        } elseif ($node instanceof Node\Expr\StaticCall) {
+            $this->inStaticCallClassName = true;
         } elseif ($node instanceof Node\Expr\ConstFetch) {
             if ('__property__' === strtolower($node->name->toString())) {
                 $name = $this->propertyStack !== [] ? end($this->propertyStack) : '';
@@ -102,6 +113,9 @@ class MagicStringResolver extends NodeVisitorAbstract
 
                     break;
                 case 'parent':
+                    if ($this->inStaticCallClassName) {
+                        break;
+                    }
                     if (! empty($this->parentStack) && '' !== end($this->parentStack)) {
                         return new Node\Name\FullyQualified(end($this->parentStack), $node->getAttributes());
                     }
@@ -162,6 +176,8 @@ class MagicStringResolver extends NodeVisitorAbstract
             if (null !== $this->propertyNameFromHookMethod($node->name->name)) {
                 array_pop($this->propertyStack);
             }
+        } elseif ($node instanceof Node\Expr\StaticCall) {
+            $this->inStaticCallClassName = false;
         }
     }
 

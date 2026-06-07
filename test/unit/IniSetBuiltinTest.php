@@ -30,6 +30,20 @@ PHP;
         $this->assertSame(self::EXPECT, $this->runBin('bin/vm.php', self::CODE));
     }
 
+    public function testVmIniAlterAlias(): void
+    {
+        $code = <<<'PHP'
+if (!function_exists('ini_alter')) {
+    echo "missing\n";
+    exit(1);
+}
+$old = ini_alter('error_reporting', '0');
+echo is_string($old) ? "alter-ok\n" : "alter-fail\n";
+echo ini_alter('unknown_ini_key', 'x') === false ? "unknown-false\n" : "unknown-bad\n";
+PHP;
+        $this->assertSame("alter-ok\nunknown-false\n", $this->runBin('bin/vm.php', $code));
+    }
+
     /** @group llvm */
     public function testAotNativeBinaryIniSetSubset(): void
     {

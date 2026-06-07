@@ -7,7 +7,10 @@ namespace PHPCompiler\VM;
 use PHPCompiler\Compiler\AttributeEntry;
 use PHPCompiler\Compiler\CompileTimeNew;
 use PHPCompiler\Frame;
+use PHPCompiler\Func;
 use PHPCompiler\VM as VmEngine;
+use PHPCompiler\VM\Builtin\AttributeConstruct;
+use PHPCompiler\VM\Builtin\DeprecatedConstruct;
 use PHPCompiler\VM\Variable;
 
 /**
@@ -56,6 +59,9 @@ final class ReflectionSupport
     /** Serialized attribute ctor args on ReflectionAttribute instances (#3206). */
     public const PROP_ATTR_ARGS = 'args';
 
+    /** Whether this attribute name is duplicated on the target (#6912). */
+    public const PROP_ATTR_IS_REPEATED = 'isRepeated';
+
     public const PROP_ENUM_CASE_NAME = 'case';
 
     public const PROP_FUNC_NAME = 'funcName';
@@ -75,6 +81,38 @@ final class ReflectionSupport
     public const PROP_TYPE_ALLOWS_NULL = 'allowsNullFlag';
 
     public const PROP_TYPE_MEMBERS = 'typeMembers';
+
+    /** php-src: ext/reflection/php_reflection.c — class/member lookup failures (#7344). */
+    public static function classNotFoundMessage(string $className): string
+    {
+        return sprintf('Class "%s" does not exist', $className);
+    }
+
+    public static function methodNotFoundMessage(string $className, string $method): string
+    {
+        return sprintf('Method %s::%s() does not exist', $className, $method);
+    }
+
+    public static function propertyNotFoundMessage(string $className, string $property): string
+    {
+        return sprintf('Property %s::$%s does not exist', $className, $property);
+    }
+
+    public static function constantNotFoundMessage(string $className, string $constant): string
+    {
+        return sprintf('Constant %s::%s does not exist', $className, $constant);
+    }
+
+    public static function functionNotFoundMessage(string $functionName): string
+    {
+        return sprintf('Function %s() does not exist', $functionName);
+    }
+
+    /** @return never */
+    public static function throwReflectionException(string $message): void
+    {
+        throw new \ReflectionException($message);
+    }
 
     /**
      * @param list<string> $names
@@ -113,6 +151,7 @@ final class ReflectionSupport
             $obj->constructed = true;
             $obj->getProperty(self::PROP_ATTR_NAME)->string($entry->name);
             $obj->getProperty(self::PROP_ATTR_ARGS)->copyFrom(self::argsToVariable($entry->args, $ctx));
+            $obj->getProperty(self::PROP_ATTR_IS_REPEATED)->bool($entry->isRepeated);
             $slot = new Variable(Variable::TYPE_OBJECT);
             $slot->object($obj);
             $ht->append($slot);
@@ -239,11 +278,56 @@ final class ReflectionSupport
         $thisVar = new Variable();
         $thisVar->object($object);
         $invokeArgs = self::constructorInvokeVariables($classEntry->constructor, $spec->args, $ctx);
-        $vm->invokePhpFunction($classEntry->constructor, $thisVar, ...$invokeArgs);
+        self::invokeAttributeConstructor($vm, $ctx, $classEntry->constructor, $thisVar, $invokeArgs);
         self::applyConstructorPropertyArgs($object, $classEntry->constructor, $spec->args, $ctx);
         $object->constructed = true;
 
         return $result;
+    }
+
+    /**
+     * @param list<Variable> $invokeArgs
+     */
+    public static function invokeAttributeConstructor(
+        VmEngine $vm,
+        Context $ctx,
+        Func $ctor,
+        Variable $thisVar,
+        array $invokeArgs,
+    ): void {
+        if ($ctor instanceof Func\PHP) {
+            $vm->invokePhpFunction($ctor, $thisVar, ...$invokeArgs);
+
+            return;
+        }
+        if ($ctor instanceof Func\Internal) {
+            $frame = $ctor->getFrame($ctx);
+            $frame->vmContext = $ctx;
+            $frame->calledArgs = array_merge([$thisVar], $invokeArgs);
+            $ctor->execute($frame);
+
+            return;
+        }
+        throw new \LogicException('Unsupported attribute constructor in this compiler build');
+    }
+
+    /**
+     * @return list<string>
+     */
+    public static function constructorParamNames(Func $ctor): array
+    {
+        if ($ctor instanceof Func\PHP) {
+            return $ctor->block->paramNames;
+        }
+        if ($ctor instanceof Func\Internal) {
+            return match ($ctor::class) {
+                DeprecatedConstruct::class => ['message', 'since'],
+                AttributeConstruct::class => ['flags'],
+                default => [],
+            };
+        }
+
+        return [];
     }
 
     /**
@@ -254,7 +338,7 @@ final class ReflectionSupport
      * @return list<Variable>
      */
     public static function constructorInvokeVariables(
-        \PHPCompiler\Func\PHP $ctor,
+        Func $ctor,
         array $argSpecs,
         ?Context $ctx = null,
     ): array {
@@ -269,7 +353,7 @@ final class ReflectionSupport
         }
         $vars = [];
         $pi = 0;
-        foreach ($ctor->block->paramNames as $paramName) {
+        foreach (self::constructorParamNames($ctor) as $paramName) {
             if (isset($named[$paramName])) {
                 $vars[] = self::attributeValueToVariable($named[$paramName], $ctx);
             } elseif (array_key_exists($pi, $positional)) {
@@ -293,10 +377,13 @@ final class ReflectionSupport
      */
     public static function applyConstructorPropertyArgs(
         ObjectEntry $object,
-        \PHPCompiler\Func\PHP $ctor,
+        Func $ctor,
         array $argSpecs,
         ?Context $ctx = null,
     ): void {
+        if ($ctor instanceof Func\Internal) {
+            return;
+        }
         $positional = [];
         $named = [];
         foreach ($argSpecs as $spec) {
@@ -307,7 +394,7 @@ final class ReflectionSupport
             }
         }
         $pi = 0;
-        foreach ($ctor->block->paramNames as $paramName) {
+        foreach (self::constructorParamNames($ctor) as $paramName) {
             if (isset($named[$paramName])) {
                 $value = $named[$paramName];
             } elseif (array_key_exists($pi, $positional)) {
@@ -465,6 +552,48 @@ final class ReflectionSupport
         }
 
         return $nameVar->toString();
+    }
+
+    /**
+     * ReflectionClass::newLazyGhost/Proxy — class name string or ReflectionClass receiver (#6399).
+     */
+    public static function classNameFromLazyFactoryArg(Variable $arg, string $method = 'newLazyGhost'): string
+    {
+        $arg = $arg->resolveIndirect();
+        if (Variable::TYPE_STRING === $arg->type) {
+            return $arg->toString();
+        }
+        if (Variable::TYPE_OBJECT === $arg->type) {
+            $obj = $arg->toObject();
+            if (strtolower($obj->class->name) !== self::REFLECTION_CLASS) {
+                throw new \TypeError(
+                    'ReflectionClass::'.$method.'(): Argument #1 ($class) must be of type string, '
+                    .$obj->class->name.' given'
+                );
+            }
+
+            return self::classNameFromReflection($obj);
+        }
+
+        throw new \TypeError(
+            'ReflectionClass::'.$method.'(): Argument #1 ($class) must be of type string, '
+            .self::valueTypeLabel($arg).' given'
+        );
+    }
+
+    private static function valueTypeLabel(Variable $var): string
+    {
+        return match ($var->type) {
+            Variable::TYPE_NULL => 'null',
+            Variable::TYPE_BOOL => 'bool',
+            Variable::TYPE_LONG => 'int',
+            Variable::TYPE_DOUBLE => 'float',
+            Variable::TYPE_STRING => 'string',
+            Variable::TYPE_ARRAY => 'array',
+            Variable::TYPE_OBJECT => 'object',
+            Variable::TYPE_RESOURCE => 'resource',
+            default => 'unknown',
+        };
     }
 
     public static function enumCaseNameFromReflection(ObjectEntry $reflection): string
@@ -677,7 +806,7 @@ final class ReflectionSupport
         $lc = strtolower($functionName);
         $func = $ctx->functions[$lc] ?? null;
         if (!$func instanceof \PHPCompiler\Func\PHP) {
-            throw new \LogicException("Function {$functionName}() does not exist");
+            self::throwReflectionException(self::functionNotFoundMessage($functionName));
         }
 
         return $func;

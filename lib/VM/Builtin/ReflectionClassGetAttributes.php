@@ -6,8 +6,8 @@ namespace PHPCompiler\VM\Builtin;
 
 use PHPCompiler\ext\standard\VmReflection;
 use PHPCompiler\Frame;
+use PHPCompiler\VM\AttributeRegistry;
 use PHPCompiler\VM\ReflectionSupport;
-use PHPCompiler\VM\Variable;
 
 /** ReflectionClass::getAttributes() — VM read path (#1936). */
 final class ReflectionClassGetAttributes extends VmClassMethod
@@ -28,17 +28,10 @@ final class ReflectionClassGetAttributes extends VmClassMethod
         }
         $filter = null;
         if (isset($frame->calledArgs[1])) {
-            $filter = VmReflection::stringArg($frame->calledArgs[1], 'ReflectionClass::getAttributes() name');
-        }
-        $names = ReflectionSupport::filterByName($entry->attributeNames, $filter);
-        $entries = ReflectionSupport::filterEntriesByName($entry->attributeEntries, $filter);
-        if ([] !== $entries) {
-            $out = ReflectionSupport::attributesArrayFromEntries($frame, $entries);
-        } else {
-            $out = ReflectionSupport::attributesArray($frame, $names);
+            $filter = VmReflection::stringArg($frame->calledArgs[1], 'ReflectionClass::getAttributes() name', 1);
         }
         if (null !== $frame->returnVar) {
-            $frame->returnVar->copyFrom($out);
+            $frame->returnVar->copyFrom(AttributeRegistry::classAttributes($frame, $entry, $filter));
         }
     }
 }

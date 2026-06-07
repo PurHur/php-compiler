@@ -28,7 +28,7 @@ final class ReflectionPropertyGetAttributes implements Call
         $sizeT = $context->getTypeFromString('size_t');
         $i8p = $context->getTypeFromString('int8*');
         $count = $context->builder->call(
-            $context->lookupFunction('phpc_attr_method_count'),
+            $context->lookupFunction('__compiler_attr_method_count'),
             $classSafe,
             $propSafe
         );
@@ -54,7 +54,7 @@ final class ReflectionPropertyGetAttributes implements Call
 
         $context->builder->positionAtEnd($body);
         $namePtr = $context->builder->call(
-            $context->lookupFunction('phpc_attr_method_name_at'),
+            $context->lookupFunction('__compiler_attr_method_name_at'),
             $classSafe,
             $propSafe,
             $i

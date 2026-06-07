@@ -10,6 +10,7 @@ declare(strict_types=1);
 
 namespace PHPCompiler\ext\standard;
 
+use PHPCompiler\Frame;
 use PHPCompiler\VM\OutputBuffer;
 use PHPCompiler\VM\Variable;
 
@@ -31,14 +32,14 @@ final class VmVprintf
         return $values;
     }
 
-    public static function formatString(string $format, Variable $argsVar): string
+    public static function formatString(string $format, Variable $argsVar, ?Frame $frame = null): string
     {
-        return VmSprintf::format($format, self::argsFromArray($argsVar));
+        return VmSprintf::format($format, self::argsFromArray($argsVar), $frame);
     }
 
-    public static function vprintf(string $format, Variable $argsVar): int
+    public static function vprintf(string $format, Variable $argsVar, ?Frame $frame = null): int
     {
-        $formatted = self::formatString($format, $argsVar);
+        $formatted = self::formatString($format, $argsVar, $frame);
         OutputBuffer::append($formatted);
         $written = VmString::byteLength($formatted);
         if ($written <= 0) {
@@ -48,9 +49,9 @@ final class VmVprintf
         return $written;
     }
 
-    public static function vfprintf(int $handle, string $format, Variable $argsVar): int
+    public static function vfprintf(int $handle, string $format, Variable $argsVar, ?Frame $frame = null): int
     {
-        $formatted = self::formatString($format, $argsVar);
+        $formatted = self::formatString($format, $argsVar, $frame);
         $written = VmFs::fwrite($handle, $formatted, null);
         if (false === $written) {
             throw new \LogicException('vfprintf() failed to write to stream in this compiler build');

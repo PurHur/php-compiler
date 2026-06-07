@@ -7,6 +7,9 @@ namespace PHPCompiler\ext\standard;
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\JitStringArg;
+use PHPCompiler\JIT\JitStringBuiltinArg;
+use PHPCompiler\JIT\ReflectionBuiltinHelper;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Value;
 
@@ -24,7 +27,7 @@ final class enum_exists_ extends Internal
             throw new \LogicException('enum_exists() requires one or two arguments in this compiler build');
         }
         $ctx = VmReflection::requireContext($frame);
-        $name = VmReflection::stringArg($frame->calledArgs[0], 'enum_exists() enum name');
+        $name = VmString::coerceStringBuiltinArg($frame->calledArgs[0], 'enum_exists', 0, 'enum');
         $exists = VmReflection::enumExists($ctx, $name);
         if (null !== $frame->returnVar) {
             $frame->returnVar->bool($exists);
@@ -36,10 +39,14 @@ final class enum_exists_ extends Internal
         if (\count($args) < 1 || \count($args) > 2) {
             throw new \LogicException('enum_exists() requires one or two arguments in this compiler build');
         }
-        if (JITVariable::TYPE_STRING !== $args[0]->type && JITVariable::TYPE_VALUE !== $args[0]->type) {
-            throw new \LogicException('enum_exists() enum name must be a string in this compiler build');
+        $literal = JitStringArg::compileTimeLiteral($args[0]);
+        if (null !== $literal) {
+            return ReflectionBuiltinHelper::enumExistsLiteral($context, $literal);
         }
 
-        return JitEnumExists::invoke($context, $args[0]);
+        return JitEnumExists::invoke(
+            $context,
+            JitStringBuiltinArg::lower($context, $args[0], 'enum_exists', 0, 'enum')
+        );
     }
 }

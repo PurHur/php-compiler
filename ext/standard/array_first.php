@@ -27,7 +27,13 @@ final class array_first extends Internal
             return;
         }
         $ht = VmArray::requireArray($frame->calledArgs[0]->resolveIndirect(), 'array_first');
-        $frame->returnVar->copyFrom(VmArray::valueFirst($ht));
+        $value = VmArray::valueFirst($ht);
+        if (null === $value) {
+            $frame->returnVar->null();
+
+            return;
+        }
+        $frame->returnVar->copyFrom($value);
     }
 
     public function call(Context $context, JITVariable ...$args): Value

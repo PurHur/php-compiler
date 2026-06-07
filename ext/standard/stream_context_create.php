@@ -35,41 +35,10 @@ final class stream_context_create extends Internal
             return;
         }
 
-        $options = [];
-        if ($argc >= 1) {
-            $optVar = $frame->calledArgs[0]->resolveIndirect();
-            if (Variable::TYPE_ARRAY !== $optVar->type) {
-                throw new \LogicException(
-                    'stream_context_create() argument #1 must be an array in this compiler build'
-                );
-            }
-            $exported = VmHttpBuildQuery::export($optVar);
-            if (!\is_array($exported)) {
-                throw new \LogicException(
-                    'stream_context_create() argument #1 must be an array in this compiler build'
-                );
-            }
-            $options = $exported;
-        }
+        $optionsVar = $argc >= 1 ? $frame->calledArgs[0] : null;
+        $paramsVar = 2 === $argc ? $frame->calledArgs[1] : null;
 
-        $params = null;
-        if (2 === $argc) {
-            $paramsVar = $frame->calledArgs[1]->resolveIndirect();
-            if (Variable::TYPE_ARRAY !== $paramsVar->type) {
-                throw new \LogicException(
-                    'stream_context_create() argument #2 must be an array in this compiler build'
-                );
-            }
-            $exportedParams = VmHttpBuildQuery::export($paramsVar);
-            if (!\is_array($exportedParams)) {
-                throw new \LogicException(
-                    'stream_context_create() argument #2 must be an array in this compiler build'
-                );
-            }
-            $params = $exportedParams;
-        }
-
-        $frame->returnVar->array(VmStreamContext::create($options, $params));
+        $frame->returnVar->array(VmStreamContext::createFromVmOptions($optionsVar, $paramsVar));
     }
 
     public function call(Context $context, JITVariable ...$args): Value

@@ -64,7 +64,7 @@ final class header_ extends Internal
             ResponseContext::setStatus($responseCode);
         } else {
             \header($line, $replace);
-            if (0 === strncasecmp($line, 'Location:', 9) && 200 === ResponseContext::getStatus()) {
+            if (0 === strncasecmp($line, 'Location:', 9) && ResponseContext::isHttpResponseCodeUnset()) {
                 ResponseContext::setStatus(302);
             }
         }

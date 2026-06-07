@@ -26,10 +26,15 @@ final class Variable {
     const TYPE_INDIRECT = 7;
     /** Writable single-byte view of a parent string (Zend-style $str[$i]). */
     const TYPE_STRING_OFFSET = 8;
+
+    /** @see Zend/zend_operators.c increment_function() / decrement_function() on TYPE_STRING offsets */
+    public const STRING_OFFSET_INCDEC_ERROR = 'Cannot increment/decrement string offsets';
     /** Zend enum case object for E::Case fetches (#3420, #3554). */
     const TYPE_ENUM_CASE = 9;
     /** Writable ArrayAccess dimension ($obj[$key] assignment, #3331). */
     const TYPE_ARRAYACCESS_OFFSET = 10;
+    /** Writable hooked property reference cell (#6426). */
+    const TYPE_PROPERTY_HOOK_REF = 11;
 
 
     const NUMERIC = self::TYPE_INTEGER | self::TYPE_FLOAT;
@@ -54,6 +59,7 @@ final class Variable {
     private ?\PHPCompiler\Frame $stringOffsetFrame = null;
     private ?string $stringOffsetFile = null;
     private ArrayAccessDimension $arrayAccessDimension;
+    private PropertyHookRef $propertyHookRef;
 
 
     public int $next = -1;
@@ -98,6 +104,12 @@ final class Variable {
     public ?ObjectEntry $magicGetOverloadedTarget = null;
 
     public ?string $magicGetOverloadedName = null;
+
+    /** Hooked property dim modify: flush set hook after assign through this container (#6775). */
+    public bool $propertyHookDimWriteBackPending = false;
+
+    /** Dim lvalue → hooked property container pending set-hook writeback (#6775). */
+    public ?Variable $hookedPropertyDimWriteBackContainer = null;
 
     public function __construct(int $type = self::TYPE_NULL) {
         $this->type = $type;
@@ -226,6 +238,11 @@ final class Variable {
 
     public function streamHandle(int $value): void
     {
+        if ($this->type === self::TYPE_INDIRECT) {
+            $this->indirect->streamHandle($value);
+
+            return;
+        }
         $this->int($value);
         $this->streamResource = true;
         $this->dirResource = false;
@@ -233,6 +250,11 @@ final class Variable {
 
     public function dirHandle(int $value): void
     {
+        if ($this->type === self::TYPE_INDIRECT) {
+            $this->indirect->dirHandle($value);
+
+            return;
+        }
         $this->int($value);
         $this->dirResource = true;
         $this->streamResource = false;
@@ -323,6 +345,8 @@ final class Variable {
                 break;
             case self::TYPE_ARRAYACCESS_OFFSET:
                 return $this->arrayAccessDimension->read()->toInt($vm);
+            case self::TYPE_PROPERTY_HOOK_REF:
+                return $this->propertyHookRef->read()->toInt($vm);
         }
         throw new \LogicException("Cannot convert type {$this->type} to int");
     }
@@ -366,6 +390,8 @@ final class Variable {
                     return $enumFloat;
                 }
                 break;
+            case self::TYPE_PROPERTY_HOOK_REF:
+                return $this->propertyHookRef->read()->toFloat($vm);
         }
         throw new \LogicException("Cannot convert type {$this->type} to float");
     }
@@ -532,6 +558,8 @@ final class Variable {
                 return $this->objectToScalarString($vm, 'bool')->toBool($vm);
             case self::TYPE_ENUM_CASE:
                 return true;
+            case self::TYPE_PROPERTY_HOOK_REF:
+                return $this->propertyHookRef->read()->toBool($vm);
         }
         throw new \LogicException("Cannot convert type {$this->type} to bool");
     }
@@ -540,6 +568,28 @@ final class Variable {
         $this->reset();
         $this->type = self::TYPE_STRING;
         $this->string = $value;
+    }
+
+    /** Read string scalar when assigned; null for typed prototypes / unset slots (#6357). */
+    public function optionalScalarString(): ?string
+    {
+        $var = $this->resolveIndirect();
+        if (self::TYPE_STRING !== $var->type || !isset($var->string)) {
+            return null;
+        }
+
+        return $var->string;
+    }
+
+    /** Read int scalar when assigned; null for typed prototypes / unset slots (#6357). */
+    public function optionalScalarInt(): ?int
+    {
+        $var = $this->resolveIndirect();
+        if (self::TYPE_INTEGER !== $var->type || !isset($var->integer)) {
+            return null;
+        }
+
+        return $var->integer;
     }
 
     public function toString(?\PHPCompiler\VM $vm = null, ?\PHPCompiler\Frame $frame = null): string {
@@ -562,6 +612,8 @@ final class Variable {
                 return $var->readStringOffset();
             case self::TYPE_ARRAYACCESS_OFFSET:
                 return $var->arrayAccessDimension->read()->toString();
+            case self::TYPE_PROPERTY_HOOK_REF:
+                return $var->propertyHookRef->read()->toString($vm, $frame);
             case self::TYPE_NULL:
             case self::TYPE_UNDEFINED:
                 return '';
@@ -692,6 +744,7 @@ final class Variable {
         unset($this->stringOffsetFrame);
         unset($this->stringOffsetFile);
         unset($this->arrayAccessDimension);
+        unset($this->propertyHookRef);
     }
 
     public function arrayAccessDimension(ArrayAccessDimension $dimension): void
@@ -723,6 +776,36 @@ final class Variable {
         }
 
         return $this->arrayAccessDimension->declaringClassName();
+    }
+
+    public function propertyHookRef(PropertyHookRef $ref): void
+    {
+        $this->reset();
+        $this->type = self::TYPE_PROPERTY_HOOK_REF;
+        $this->propertyHookRef = $ref;
+    }
+
+    public function isPropertyHookRef(): bool
+    {
+        return self::TYPE_PROPERTY_HOOK_REF === $this->type;
+    }
+
+    public function readPropertyHookRefValue(): Variable
+    {
+        if (self::TYPE_PROPERTY_HOOK_REF !== $this->type) {
+            throw new \LogicException('Not a property hook reference');
+        }
+
+        return $this->propertyHookRef->read()->resolveIndirect();
+    }
+
+    public function propertyHookRefWriteLvalue(): Variable
+    {
+        if (self::TYPE_PROPERTY_HOOK_REF !== $this->type) {
+            throw new \LogicException('Not a property hook reference');
+        }
+
+        return $this->propertyHookRef->writeLvalue();
     }
 
     /**
@@ -875,6 +958,25 @@ final class Variable {
         $this->copyFrom($var);
     }
 
+    /**
+     * Per-class clone of trait static property storage without reading uninitialized typed slots (#6624).
+     */
+    public function copyUninitializedStaticPropertySlot(self $source): void
+    {
+        $source = $source->resolveIndirect();
+        $this->reset();
+        $this->type = self::TYPE_UNDEFINED;
+        $this->typeConstraint = $source->typeConstraint;
+        $this->classConstraint = $source->classConstraint;
+        $this->unionTypeConstraints = $source->unionTypeConstraints;
+        $this->declaredTypeLabel = $source->declaredTypeLabel;
+        $this->literalBoolType = $source->literalBoolType;
+        $this->genericArrayTypeSpec = $source->genericArrayTypeSpec;
+        $this->dnfArms = $source->dnfArms;
+        $this->objectPropertyName = $source->objectPropertyName;
+        $this->staticPropertyClassLc = $source->staticPropertyClassLc;
+    }
+
     public function copyFrom(self $var): void {
         if ($this->type === self::TYPE_INDIRECT) {
             // always assign to the indirection
@@ -896,6 +998,11 @@ final class Variable {
 
             return;
         }
+        if ($this->type === self::TYPE_PROPERTY_HOOK_REF) {
+            $this->propertyHookRef->write($var);
+
+            return;
+        }
         switch ($var->type) {
             case self::TYPE_NULL:
                 $this->null();
@@ -905,6 +1012,9 @@ final class Variable {
                 break;
             case self::TYPE_STRING_OFFSET:
                 $this->string($var->toString());
+                break;
+            case self::TYPE_PROPERTY_HOOK_REF:
+                $this->copyFrom($var->propertyHookRef->read());
                 break;
             case self::TYPE_INTEGER:
                 $this->int($var->integer);
@@ -937,6 +1047,9 @@ final class Variable {
                 if (self::TYPE_ARRAY === $this->type && isset($this->array) && $this->array === $var->array) {
                     break;
                 }
+                $owner = $this->objectPropertyOwner;
+                $propName = $this->objectPropertyName;
+                $staticClass = $this->staticPropertyClassLc;
                 $this->releaseArrayRef();
                 $this->resetScalars();
                 $var->array->addRef();
@@ -944,6 +1057,9 @@ final class Variable {
                 $this->streamResource = false;
                 $this->dirResource = false;
                 $this->array = $var->array;
+                $this->objectPropertyOwner = $owner;
+                $this->objectPropertyName = $propName;
+                $this->staticPropertyClassLc = $staticClass;
                 break;
             case self::TYPE_ENUM_CASE:
                 $this->enumCase(new EnumCaseEntry(
@@ -968,8 +1084,16 @@ final class Variable {
 
             return;
         }
-        while (self::TYPE_INDIRECT === $var->type) {
-            $var = $var->indirect;
+        // Share live reference cells when duplicating array buckets (Zend zend_array_dup, #6426/#6727).
+        if (self::TYPE_INDIRECT === $var->type) {
+            $this->indirect($var->indirect);
+
+            return;
+        }
+        if (self::TYPE_PROPERTY_HOOK_REF === $var->type) {
+            $this->propertyHookRef($var->propertyHookRef);
+
+            return;
         }
         TypedPropertyCheck::assertReadable($var);
         if (self::TYPE_ARRAY === $var->type) {
@@ -1235,12 +1359,12 @@ restart:
      * Int↔string loose == prefers exact integer numeric strings; other numeric strings (e.g. '0e5')
      * fall back to {@see looseNumericFromString} (#4035, Zend zend_operators.c).
      *
-     * Non-numeric strings still compare as 0 (#3644).
+     * Non-numeric strings do not coerce to 0 (PHP 8.2+, #5178).
      */
     private static function looseIntegerFromString(string $s): ?int
     {
         if (!is_numeric($s)) {
-            return 0;
+            return null;
         }
         if (((string) (int) $s) === $s) {
             return (int) $s;
@@ -1713,13 +1837,10 @@ restart:
 
     private static function compareEnumCaseOperands(Variable $left, Variable $right): int
     {
-        $left = $left->resolveIndirect();
-        $right = $right->resolveIndirect();
-        if (self::TYPE_OBJECT === $left->type && self::TYPE_OBJECT === $right->type) {
-            return EnumCaseSupport::compareSpaceship($left->object, $right->object);
-        }
-        if (self::TYPE_ENUM_CASE === $left->type && self::TYPE_ENUM_CASE === $right->type) {
-            return EnumCaseSupport::compareEnumCaseEntrySpaceship($left->toEnumCase(), $right->toEnumCase());
+        $leftEntry = EnumCaseSupport::enumCaseEntryForVariable($left);
+        $rightEntry = EnumCaseSupport::enumCaseEntryForVariable($right);
+        if (null !== $leftEntry && null !== $rightEntry) {
+            return EnumCaseSupport::compareEnumCaseEntrySpaceship($leftEntry, $rightEntry);
         }
 
         return 1;
@@ -1939,6 +2060,9 @@ restart:
 
             return;
         }
+        if (self::TYPE_STRING_OFFSET === $this->type) {
+            throw new \Error(self::STRING_OFFSET_INCDEC_ERROR);
+        }
         $left = $left->resolveIndirect();
         $right = $right->resolveIndirect();
         if (self::TYPE_BOOLEAN === $left->type) {
@@ -1974,6 +2098,11 @@ restart:
                 return;
             }
             $this->string(VmString::incrementStringOperator($str));
+
+            return;
+        }
+        if ('' === $str) {
+            $this->int(-1);
 
             return;
         }
@@ -2074,15 +2203,18 @@ restart:
         }
         switch ($this->type) {
             case self::TYPE_BOOLEAN:
-                // Zend future inc/dec: bool promoted to int (issue #4727, zend_operators.c).
-                $this->int(1);
-
+                // PHP 8.2+ zend_operators.c: bool inc/dec is a no-op (issue #7058, re-#4727).
                 return;
+            case self::TYPE_UNDEFINED:
             case self::TYPE_NULL:
+                // Zend increment_function(): IS_NULL → int 0 then ++ (issue #7435).
                 $this->int(1);
 
                 return;
             case self::TYPE_INTEGER:
+                if ($this->isVmResource()) {
+                    throw new \TypeError('Cannot increment resource');
+                }
                 ++$this->integer;
 
                 return;
@@ -2090,6 +2222,8 @@ restart:
                 $this->float += 1;
 
                 return;
+            case self::TYPE_STRING_OFFSET:
+                throw new \Error(self::STRING_OFFSET_INCDEC_ERROR);
             case self::TYPE_STRING:
                 $this->applyStringIncDec(OpCode::TYPE_PLUS, $this->string);
 
@@ -2100,6 +2234,11 @@ restart:
                 if (self::isEnumCaseOperand($this)) {
                     throw new \TypeError(
                         'Cannot increment '.self::operandEnumClassName($this)
+                    );
+                }
+                if (self::TYPE_OBJECT === $this->type) {
+                    throw new \TypeError(
+                        'Cannot increment '.$this->object->class->name
                     );
                 }
                 $one = new self();
@@ -2123,12 +2262,16 @@ restart:
         }
         switch ($this->type) {
             case self::TYPE_BOOLEAN:
-                $this->int(($this->bool ? 1 : 0) - 1);
-
+                // PHP 8.2+ zend_operators.c: bool inc/dec is a no-op (issue #7058, re-#4727).
                 return;
+            case self::TYPE_UNDEFINED:
             case self::TYPE_NULL:
+                // Zend decrement_function(): IS_NULL is a no-op on PHP 8.x (issue #7435).
                 return;
             case self::TYPE_INTEGER:
+                if ($this->isVmResource()) {
+                    throw new \TypeError('Cannot decrement resource');
+                }
                 --$this->integer;
 
                 return;
@@ -2136,6 +2279,8 @@ restart:
                 $this->float -= 1;
 
                 return;
+            case self::TYPE_STRING_OFFSET:
+                throw new \Error(self::STRING_OFFSET_INCDEC_ERROR);
             case self::TYPE_STRING:
                 $this->applyStringIncDec(OpCode::TYPE_MINUS, $this->string);
 
@@ -2146,6 +2291,11 @@ restart:
                 if (self::isEnumCaseOperand($this)) {
                     throw new \TypeError(
                         'Cannot decrement '.self::operandEnumClassName($this)
+                    );
+                }
+                if (self::TYPE_OBJECT === $this->type) {
+                    throw new \TypeError(
+                        'Cannot decrement '.$this->object->class->name
                     );
                 }
                 $one = new self();
@@ -2312,7 +2462,7 @@ restart:
         }
         $byte = self::byteFromAssignValue($value);
         if ($index > $len) {
-            $str .= str_repeat(' ', $index - $len);
+            $str .= str_repeat("\0", $index - $len);
         }
         if ($index >= $len) {
             if ($index === strlen($str)) {

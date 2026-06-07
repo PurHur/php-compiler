@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace PHPCompiler\ext\standard;
 
+use PHPCompiler\VM\EnumCaseSupport;
 use PHPCompiler\VM\Variable;
 
 /** Shared stream argument helpers (issue #3755, #6044). */
@@ -17,6 +18,15 @@ final class VmStreamArg
      */
     public static function requireStreamHandle(Variable $v, string $functionName, int $argNum = 1): int
     {
+        $v = $v->resolveIndirect();
+        if (EnumCaseSupport::isEnumCaseVariable($v)) {
+            throw new \TypeError(\sprintf(
+                '%s(): Argument #%d ($stream) must be of type resource, %s given',
+                $functionName,
+                $argNum,
+                EnumCaseSupport::typeNameForVariable($v)
+            ));
+        }
         if (Variable::TYPE_INTEGER !== $v->type) {
             throw new \TypeError(\sprintf(
                 '%s(): Argument #%d ($stream) must be of type resource, %s given',
@@ -40,8 +50,9 @@ final class VmStreamArg
 
     public static function debugTypeName(Variable $v): string
     {
-        if (Variable::TYPE_OBJECT === $v->type || Variable::TYPE_ENUM_CASE === $v->type) {
-            return 'object';
+        $v = $v->resolveIndirect();
+        if (EnumCaseSupport::isEnumCaseVariable($v)) {
+            return EnumCaseSupport::typeNameForVariable($v);
         }
 
         switch ($v->type) {
@@ -61,6 +72,24 @@ final class VmStreamArg
                 return 'object';
             default:
                 return 'mixed';
+        }
+    }
+
+    public static function rejectEnumCaseOperand(
+        Variable $v,
+        string $functionName,
+        int $argNum = 1,
+        string $paramName = 'resource'
+    ): void {
+        $v = $v->resolveIndirect();
+        if (EnumCaseSupport::isEnumCaseVariable($v)) {
+            throw new \TypeError(\sprintf(
+                '%s(): Argument #%d ($%s) must be of type resource, %s given',
+                $functionName,
+                $argNum,
+                $paramName,
+                EnumCaseSupport::typeNameForVariable($v)
+            ));
         }
     }
 }

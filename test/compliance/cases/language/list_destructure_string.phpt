@@ -1,12 +1,19 @@
 --TEST--
-list() destructuring from string leaves targets unset (Zend VM parity, #4308)
+list() destructuring from string — TypeError (#7461, supersedes #4308 silent null)
 --FILE--
 <?php
-[$a] = 'ab';
-echo $a === null ? 'null' : $a;
-echo "\n";
-[$b, $c] = 'xy';
-echo 'b=', var_export($b, true), ' c=', var_export($c, true), "\n";
+try {
+    [$a] = 'ab';
+    echo "no-exception\n";
+} catch (TypeError $e) {
+    echo 'TypeError: ', $e->getMessage(), "\n";
+}
+try {
+    [$b, $c] = 'xy';
+    echo "no-exception\n";
+} catch (TypeError $e) {
+    echo 'TypeError: ', $e->getMessage(), "\n";
+}
 --EXPECT--
-null
-b=NULL c=NULL
+TypeError: Cannot use string as array
+TypeError: Cannot use string as array

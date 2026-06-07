@@ -47,6 +47,53 @@ final class VmMath
     }
 
     /**
+     * Z_PARAM_BOOL-style coercion for bool-only builtins (php-src basic_functions.c; #6149 microtime/hrtime).
+     *
+     * @throws \TypeError when the operand cannot be converted like Zend PHP 8.x
+     */
+    public static function parseBoolBuiltinArg(
+        Variable $var,
+        string $function,
+        int $argIndex,
+        string $paramName
+    ): bool {
+        $var = $var->resolveIndirect();
+        self::rejectEnumCaseBoolBuiltinArg($var, $function, $argIndex, $paramName);
+        switch ($var->type) {
+            case Variable::TYPE_BOOLEAN:
+                return $var->toBool();
+            case Variable::TYPE_INTEGER:
+                return 0 !== $var->toInt();
+            case Variable::TYPE_FLOAT:
+                return 0.0 !== $var->toFloat();
+            case Variable::TYPE_NULL:
+                return false;
+            case Variable::TYPE_STRING:
+                return self::coerceBoolStringLiteral($var->toString(), $function, $argIndex, $paramName);
+            case Variable::TYPE_ARRAY:
+                throw new \TypeError(self::boolBuiltinTypeError($function, $argIndex, $paramName, 'array'));
+            case Variable::TYPE_OBJECT:
+                throw new \TypeError(
+                    self::boolBuiltinTypeError(
+                        $function,
+                        $argIndex,
+                        $paramName,
+                        $var->toObject()->class->name
+                    )
+                );
+            default:
+                throw new \TypeError(
+                    self::boolBuiltinTypeError(
+                        $function,
+                        $argIndex,
+                        $paramName,
+                        self::vmTypeName($var->type)
+                    )
+                );
+        }
+    }
+
+    /**
      * Z_PARAM_LONG-style coercion for int-only builtins (php-src math.c; #4982 intdiv, #5360 float truncation).
      *
      * @throws \TypeError when the operand cannot be converted like Zend PHP 8.x
@@ -145,13 +192,45 @@ final class VmMath
     ): float {
         $var = $var->resolveIndirect();
         self::rejectEnumCaseDoubleBuiltinArg($var, $function, $argIndex, $paramName);
-        if (Variable::TYPE_INTEGER === $var->type) {
-            return (float) $var->toInt();
+        if (Variable::TYPE_ARRAY === $var->type) {
+            throw new \TypeError(self::doubleBuiltinTypeError($function, $argIndex, $paramName, 'array'));
         }
-        if (Variable::TYPE_FLOAT === $var->type) {
-            return $var->toFloat();
+        if (Variable::TYPE_OBJECT === $var->type) {
+            throw new \TypeError(
+                self::doubleBuiltinTypeError(
+                    $function,
+                    $argIndex,
+                    $paramName,
+                    $var->toObject()->class->name
+                )
+            );
         }
-        throw new \LogicException($function.'() only supports integers and floats in this compiler build');
+        switch ($var->type) {
+            case Variable::TYPE_INTEGER:
+                return (float) $var->toInt();
+            case Variable::TYPE_FLOAT:
+                return $var->toFloat();
+            case Variable::TYPE_BOOLEAN:
+                return $var->toBool() ? 1.0 : 0.0;
+            case Variable::TYPE_NULL:
+                return 0.0;
+            case Variable::TYPE_STRING:
+                $s = $var->toString();
+                if ('' === $s || !is_numeric($s)) {
+                    throw new \TypeError(self::doubleBuiltinTypeError($function, $argIndex, $paramName, 'string'));
+                }
+
+                return (float) $s;
+            default:
+                throw new \TypeError(
+                    self::doubleBuiltinTypeError(
+                        $function,
+                        $argIndex,
+                        $paramName,
+                        self::vmTypeName($var->type)
+                    )
+                );
+        }
     }
 
     /**
@@ -166,6 +245,20 @@ final class VmMath
         string $paramName
     ): void {
         self::rejectEnumCaseBuiltinArg($var, $function, $argIndex, $paramName, 'int');
+    }
+
+    /**
+     * Z_PARAM_BOOL rejects enum cases (php-src basic_functions.c microtime/hrtime; #6149).
+     *
+     * @throws \TypeError
+     */
+    private static function rejectEnumCaseBoolBuiltinArg(
+        Variable $var,
+        string $function,
+        int $argIndex,
+        string $paramName
+    ): void {
+        self::rejectEnumCaseBuiltinArg($var, $function, $argIndex, $paramName, 'bool');
     }
 
     /**
@@ -197,11 +290,45 @@ final class VmMath
         }
         $enumClass = EnumCaseSupport::enumClassForCaseVariable($var);
         $given = null !== $enumClass ? $enumClass->name : 'object';
-        $message = 'int' === $expectedType
-            ? self::intBuiltinTypeError($function, $argIndex, $paramName, $given)
-            : self::doubleBuiltinTypeError($function, $argIndex, $paramName, $given);
+        $message = match ($expectedType) {
+            'int' => self::intBuiltinTypeError($function, $argIndex, $paramName, $given),
+            'float' => self::doubleBuiltinTypeError($function, $argIndex, $paramName, $given),
+            default => self::boolBuiltinTypeError($function, $argIndex, $paramName, $given),
+        };
 
         throw new \TypeError($message);
+    }
+
+    private static function coerceBoolStringLiteral(
+        string $literal,
+        string $function,
+        int $argIndex,
+        string $paramName
+    ): bool {
+        $lower = strtolower($literal);
+        if (\in_array($lower, ['1', 'true', 'on', 'yes'], true)) {
+            return true;
+        }
+        if (\in_array($lower, ['0', 'false', 'off', 'no', ''], true)) {
+            return false;
+        }
+
+        throw new \TypeError(self::boolBuiltinTypeError($function, $argIndex, $paramName, 'string'));
+    }
+
+    private static function boolBuiltinTypeError(
+        string $function,
+        int $argIndex,
+        string $paramName,
+        string $given
+    ): string {
+        return sprintf(
+            '%s(): Argument #%d ($%s) must be of type bool, %s given',
+            $function,
+            $argIndex,
+            $paramName,
+            $given
+        );
     }
 
     private static function intBuiltinTypeError(

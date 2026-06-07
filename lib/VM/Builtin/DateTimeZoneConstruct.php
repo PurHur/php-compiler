@@ -21,11 +21,8 @@ final class DateTimeZoneConstruct extends VmClassMethod
         if (\count($frame->calledArgs) < 2) {
             throw new \LogicException('DateTimeZone::__construct() expects exactly 1 argument');
         }
-        $timezone = VmReflection::stringArg($frame->calledArgs[1], 'DateTimeZone::__construct() timezone');
+        $timezone = VmReflection::stringArg($frame->calledArgs[1], 'DateTimeZone::__construct() timezone', 1);
         $receiver = DateTimeSupport::requireDateTimeZone($frame->calledArgs[0], 'DateTimeZone::__construct()');
         DateTimeSupport::initDateTimeZone($receiver, $timezone);
-        if (null !== $frame->returnVar) {
-            $frame->returnVar->null();
-        }
     }
 }

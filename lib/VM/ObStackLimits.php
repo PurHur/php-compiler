@@ -7,7 +7,7 @@ namespace PHPCompiler\VM;
 /**
  * Output-buffer stack limits shared by VM and JIT/AOT (issue #5582, php-src ext/standard/head.c).
  *
- * AOT still mirrors these in {@see lib/AOT/runtime/phpc_ob.c} until #5314 deletes that TU.
+ * JIT/AOT mirror these in {@see \PHPCompiler\JIT\Builtin\ObOutputRuntime} (#5314).
  */
 final class ObStackLimits
 {

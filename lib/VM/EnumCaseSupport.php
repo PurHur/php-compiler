@@ -123,6 +123,33 @@ final class EnumCaseSupport
         return false;
     }
 
+    /**
+     * Zend zend_enum_get_property_ptr_ptr — name/value are readonly pseudo-properties (#7155).
+     */
+    public static function isReadonlyPseudoProperty(ClassEntry $enum, string $property): bool
+    {
+        return self::propertyExistsOnCase($enum, $property);
+    }
+
+    /**
+     * @return string|null Error message when $property is a readonly enum pseudo-property
+     */
+    public static function readonlyPseudoPropertyViolationMessage(
+        ClassEntry $enum,
+        string $property,
+        bool $isUnset
+    ): ?string {
+        if (!self::isReadonlyPseudoProperty($enum, $property)) {
+            return null;
+        }
+        $propLc = strtolower($property);
+        if ($isUnset) {
+            return "Cannot unset readonly property {$enum->name}::\${$propLc}";
+        }
+
+        return "Cannot modify readonly property {$enum->name}::\${$propLc}";
+    }
+
     public static function getProperty(
         ObjectEntry $object,
         string $name,
@@ -268,15 +295,14 @@ final class EnumCaseSupport
     }
 
     /**
-     * Zend zend_hash illegal offset — enum cases cannot be array keys (#5594, zend_hash.c).
+     * Zend zend_hash illegal offset — objects, enum cases, and arrays cannot be keys (#5594, #6500, zend_hash.c).
      */
     public static function rejectIllegalArrayOffset(Variable $index, string $message = 'Illegal offset type'): void
     {
         $index = $index->resolveIndirect();
-        if (Variable::TYPE_ENUM_CASE === $index->type) {
-            throw new \TypeError($message);
-        }
-        if (Variable::TYPE_OBJECT === $index->type && self::isEnumCase($index->toObject())) {
+        if (Variable::TYPE_ENUM_CASE === $index->type
+            || Variable::TYPE_OBJECT === $index->type
+            || Variable::TYPE_ARRAY === $index->type) {
             throw new \TypeError($message);
         }
     }
@@ -435,15 +461,32 @@ final class EnumCaseSupport
 
     public static function enumCaseNameForVariable(Variable $value): string
     {
+        $entry = self::enumCaseEntryForVariable($value);
+
+        return null !== $entry ? $entry->caseName : '';
+    }
+
+    /**
+     * Normalize TYPE_ENUM_CASE and enum-case TYPE_OBJECT operands for compare (#7006).
+     */
+    public static function enumCaseEntryForVariable(Variable $value): ?EnumCaseEntry
+    {
         $value = $value->resolveIndirect();
         if (Variable::TYPE_ENUM_CASE === $value->type) {
-            return $value->toEnumCase()->caseName;
+            return $value->toEnumCase();
         }
         if (Variable::TYPE_OBJECT === $value->type && self::isEnumCase($value->toObject())) {
-            return $value->toObject()->enumCaseName ?? '';
+            $object = $value->toObject();
+            $backing = new Variable(Variable::TYPE_NULL);
+            $backing->null();
+            if (null !== $object->class->backedType && null !== $object->enumCaseValue) {
+                $backing->copyFrom($object->enumCaseValue);
+            }
+
+            return new EnumCaseEntry($object->class, $object->enumCaseName ?? '', $backing);
         }
 
-        return '';
+        return null;
     }
 
     private static function enumCaseEntryToVariable(EnumCaseEntry $entry): Variable
@@ -524,8 +567,21 @@ final class EnumCaseSupport
      */
     public static function materializeConstantValue(Context $context, Variable $src): Variable
     {
+        if ($src->is(Variable::TYPE_INDIRECT) || $src->is(Variable::TYPE_PROPERTY_HOOK_REF)) {
+            $out = new Variable();
+            $out->copyFrom($src);
+
+            return $out;
+        }
         $src = $src->resolveIndirect();
         if ($src->is(Variable::TYPE_ARRAY)) {
+            if (self::arrayContainsRuntimeRefs($src)) {
+                $out = new Variable();
+                $out->copyFrom($src);
+
+                return $out;
+            }
+
             return ClassConstMaterializer::detachConstantValue(
                 self::materializeConstantArrayDeep($context, $src)
             );
@@ -568,6 +624,27 @@ final class EnumCaseSupport
         }
 
         return ClassConstMaterializer::detachConstantValue($src);
+    }
+
+    /** True when array storage carries live reference cells (must not immortalize for globals, #6426). */
+    public static function arrayContainsRuntimeRefs(Variable $arrayVar): bool
+    {
+        $arrayVar = $arrayVar->resolveIndirect();
+        if (!$arrayVar->is(Variable::TYPE_ARRAY)) {
+            return false;
+        }
+
+        foreach ($arrayVar->toArray()->iterate(true) as $element) {
+            $resolved = $element->resolveIndirect();
+            if (
+                $element->is(Variable::TYPE_INDIRECT)
+                || $resolved->is(Variable::TYPE_PROPERTY_HOOK_REF)
+            ) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     /**

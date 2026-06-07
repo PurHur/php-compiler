@@ -51,7 +51,13 @@ final class ReflectionAttributeNewInstance extends VmClassMethod
                 $argSpecs,
                 $ctx
             );
-            $vm->invokePhpFunction($classEntry->constructor, $thisVar, ...$invokeArgs);
+            ReflectionSupport::invokeAttributeConstructor(
+                $vm,
+                $ctx,
+                $classEntry->constructor,
+                $thisVar,
+                $invokeArgs
+            );
             ReflectionSupport::applyConstructorPropertyArgs($object, $classEntry->constructor, $argSpecs, $ctx);
             $object->constructed = true;
         } else {

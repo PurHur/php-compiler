@@ -31,6 +31,29 @@ PHP;
         );
     }
 
+    public function testExitBackedEnumCaseUnderStrictTypesThrowsErrorNotTypeError(): void
+    {
+        $runtime = new Runtime();
+        $code = <<<'PHP'
+<?php
+declare(strict_types=1);
+enum E: int { case A = 1; }
+try {
+    exit(E::A);
+} catch (Error $e) {
+    echo $e->getMessage();
+} catch (TypeError $e) {
+    echo 'TypeError:', $e->getMessage();
+}
+PHP;
+        ob_start();
+        $runtime->run($runtime->parseAndCompile($code, 'exit_enum_strict.php'));
+        $this->assertSame(
+            'Object of class E could not be converted to string',
+            ob_get_clean()
+        );
+    }
+
     public function testDieBackedEnumCaseThrowsErrorNotBackingCoercion(): void
     {
         $runtime = new Runtime();

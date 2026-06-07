@@ -1,0 +1,17 @@
+--TEST--
+stdlib fsync() on writable regular-file stream (#6062, ext/standard/streamsfuncs.c)
+--FILE--
+<?php
+$path = tempnam(sys_get_temp_dir(), 'phpc_fsync_');
+if (!is_string($path)) {
+    echo "fail\n";
+    return;
+}
+$fp = fopen($path, 'w');
+echo fwrite($fp, 'x') === 1 ? 'w' : 'n', "\n";
+echo fsync($fp) ? '1' : '0', "\n";
+fclose($fp);
+@unlink($path);
+--EXPECT--
+w
+1

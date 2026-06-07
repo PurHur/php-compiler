@@ -33,7 +33,7 @@ final class ReflectionParameterGetAttributes extends VmClassMethod
         $all = null !== $paramMeta ? $paramMeta->attributes : [];
         $filter = null;
         if (isset($frame->calledArgs[1])) {
-            $filter = VmReflection::stringArg($frame->calledArgs[1], 'ReflectionParameter::getAttributes() name');
+            $filter = VmReflection::stringArg($frame->calledArgs[1], 'ReflectionParameter::getAttributes() name', 1);
         }
         $entries = ReflectionSupport::filterEntriesByName($all, $filter);
         if (null !== $frame->returnVar) {

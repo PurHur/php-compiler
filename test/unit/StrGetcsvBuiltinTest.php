@@ -68,4 +68,19 @@ final class StrGetcsvBuiltinTest extends TestCase
         $this->expectExceptionMessage('str_getcsv(): Argument #1 ($string) must be of type string, E given');
         $fn->execute($frame);
     }
+
+    public function testNullOperandTypeError(): void
+    {
+        $runtime = new Runtime();
+        $fn = new str_getcsv();
+        $arg = new VMVariable();
+        $arg->null();
+
+        $frame = $fn->getFrame($runtime->vmContext);
+        $frame->calledArgs = [$arg];
+        $frame->returnVar = new VMVariable();
+        $this->expectException(\TypeError::class);
+        $this->expectExceptionMessage('str_getcsv(): Argument #1 ($string) must be of type string, null given');
+        $fn->execute($frame);
+    }
 }

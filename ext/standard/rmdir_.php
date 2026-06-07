@@ -26,13 +26,13 @@ final class rmdir_ extends Internal
             throw new \LogicException('rmdir() requires exactly one argument in this compiler build');
         }
         $v = $frame->calledArgs[0]->resolveIndirect();
-        if (null === $frame->returnVar) {
-            return;
-        }
         if (Variable::TYPE_STRING !== $v->type) {
             throw new \LogicException('rmdir() requires a string path in this compiler build');
         }
-        $frame->returnVar->bool(VmFs::rmdir($v->toString()));
+        $ok = VmFs::rmdir($v->toString());
+        if (null !== $frame->returnVar) {
+            $frame->returnVar->bool($ok);
+        }
     }
 
     public function call(Context $context, JITVariable ...$args): Value

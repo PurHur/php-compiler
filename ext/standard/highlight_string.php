@@ -24,10 +24,12 @@ final class highlight_string extends Internal
         if ($argc < 1 || $argc > 2) {
             throw new \LogicException('highlight_string() expects 1 or 2 arguments in this compiler build');
         }
-        $codeVar = $frame->calledArgs[0]->resolveIndirect();
-        if (Variable::TYPE_STRING !== $codeVar->type) {
-            throw new \LogicException('highlight_string() expects string for argument 1 in this compiler build');
-        }
+        $code = VmString::coerceStringBuiltinArg(
+            $frame->calledArgs[0],
+            $this->getName(),
+            0,
+            'string'
+        );
         $return = false;
         if ($argc >= 2) {
             $retVar = $frame->calledArgs[1]->resolveIndirect();
@@ -36,7 +38,7 @@ final class highlight_string extends Internal
             }
             $return = $retVar->toBool();
         }
-        $result = VmHighlight::highlightString($codeVar->toString(), $return);
+        $result = VmHighlight::highlightString($code, $return);
         if (null === $frame->returnVar) {
             return;
         }

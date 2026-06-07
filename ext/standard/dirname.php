@@ -7,9 +7,8 @@ namespace PHPCompiler\ext\standard;
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Context;
-use PHPCompiler\JIT\JitStringArg;
+use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\Variable as JITVariable;
-use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
 
 /** dirname() for path strings (subset of PHP; JIT/AOT via JitPath). */
@@ -21,18 +20,15 @@ final class dirname extends Internal
         if ($argc < 1 || $argc > 2) {
             throw new \LogicException('dirname() expects 1 or 2 arguments');
         }
-        $v = $frame->calledArgs[0]->resolveIndirect();
+        $path = VmString::coerceStringBuiltinArg($frame->calledArgs[0], 'dirname', 0, 'path');
         if (null === $frame->returnVar) {
             return;
-        }
-        if (Variable::TYPE_STRING !== $v->type) {
-            throw new \LogicException('dirname() only supports strings in this compiler build');
         }
         $levels = 1;
         if (2 === $argc) {
             $levels = $frame->calledArgs[1]->resolveIndirect()->toInt();
         }
-        $frame->returnVar->string(VmString::dirname($v->toString(), $levels));
+        $frame->returnVar->string(VmString::dirname($path, $levels));
     }
 
     public function call(Context $context, JITVariable ...$args): Value
@@ -41,7 +37,7 @@ final class dirname extends Internal
         if ($argc < 1 || $argc > 2) {
             throw new \LogicException('dirname() expects 1 or 2 arguments');
         }
-        $path = JitStringArg::lower($context, $args[0], 'dirname() path');
+        $path = JitStringBuiltinArg::lower($context, $args[0], 'dirname', 0, 'path');
         if (1 === $argc) {
             return JitPath::dirname($context, $path);
         }

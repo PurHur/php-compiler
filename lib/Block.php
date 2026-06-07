@@ -77,6 +77,9 @@ class Block {
     /** Parameter scope slots declared `iterable` (array|Traversable union, #4829). */
     public array $paramIterableSlots = [];
 
+    /** Parameter scope slots declared standalone `never` (#6633). */
+    public array $paramNeverSlots = [];
+
     /** @var array<int, 'true'|'false'> standalone bool literal parameter types (#4784) */
     public array $paramLiteralBoolTypes = [];
 
@@ -92,8 +95,14 @@ class Block {
     /** @var array<int, list<string>> */
     public array $paramIntersectionConstraints = [];
 
+    /** @var array<int, string> declared intersection type labels for TypeError messages */
+    public array $paramIntersectionDisplayLabels = [];
+
     /** @var array<int, list<string>> typed variadic element intersection constraints (#4185) */
     public array $paramVariadicElementIntersectionConstraints = [];
+
+    /** @var array<int, string> typed variadic element intersection type labels (#6819) */
+    public array $paramVariadicElementIntersectionDisplayLabels = [];
 
     /** @var array<int, Op\Type> declared parameter types for reflection (#3355). */
     public array $paramDeclaredTypes = [];
@@ -122,7 +131,7 @@ class Block {
     /** Declared `: void` return — non-null returns are rejected. */
     public bool $returnTypeVoid = false;
 
-    /** Declared `: never` return — any return is rejected (issue #1358). */
+    /** Declared `: never` return — implicit fall-off raises at runtime (#1358, #4206). */
     public bool $returnTypeNever = false;
 
     /** Declared `: static` return — late-bound object type (issue #3412). */
@@ -148,6 +157,12 @@ class Block {
 
     /** Parameter scope slots with non-nullable type and `= null` default (Zend 8.2 implicit nullable, #4449). */
     public array $paramImplicitNullable = [];
+
+    /** Parameter indices with runtime `new` default init fragments (#6652). */
+    public array $paramRuntimeDefaultInitBlocks = [];
+
+    /** Result slot in {@see self::$paramRuntimeDefaultInitBlocks} per parameter index (#6652). */
+    public array $paramRuntimeDefaultResultSlots = [];
 
     /** Function body contains `yield` (issue #167). */
     public bool $isGenerator = false;
@@ -218,6 +233,16 @@ class Block {
         return null !== $this->func
             && null === $this->func->class
             && '{main}' === $this->func->name;
+    }
+
+    /**
+     * User function/method/closure body — unbound locals must not inherit {main} globals (#5454).
+     */
+    public function blocksScriptGlobalInheritance(): bool
+    {
+        return null !== $this->func
+            && !$this->isMainScript()
+            && !$this->inheritUndefinedLocals;
     }
 
     public function getOperand(int $offset): Operand {
@@ -334,6 +359,9 @@ class Block {
             return false;
         }
         if ($this->isLocallyWritten($operand)) {
+            return false;
+        }
+        if ($this->blocksScriptGlobalInheritance()) {
             return false;
         }
 
@@ -483,14 +511,20 @@ class Block {
             $this->paramClassConstraints = $parent->paramClassConstraints;
             $this->paramDeclaredTypeLabels = $parent->paramDeclaredTypeLabels;
             $this->paramIterableSlots = $parent->paramIterableSlots;
+            $this->paramNeverSlots = $parent->paramNeverSlots;
             $this->paramLiteralBoolTypes = $parent->paramLiteralBoolTypes;
             $this->returnLiteralBoolType = $parent->returnLiteralBoolType;
             $this->paramIntersectionConstraints = $parent->paramIntersectionConstraints;
+            $this->paramIntersectionDisplayLabels = $parent->paramIntersectionDisplayLabels;
+            $this->paramVariadicElementIntersectionConstraints = $parent->paramVariadicElementIntersectionConstraints;
+            $this->paramVariadicElementIntersectionDisplayLabels = $parent->paramVariadicElementIntersectionDisplayLabels;
             $this->paramDnfConstraints = $parent->paramDnfConstraints;
             $this->paramNames = $parent->paramNames;
             $this->paramByRef = $parent->paramByRef;
             $this->paramSensitive = $parent->paramSensitive;
             $this->paramImplicitNullable = $parent->paramImplicitNullable;
+            $this->paramRuntimeDefaultInitBlocks = $parent->paramRuntimeDefaultInitBlocks;
+            $this->paramRuntimeDefaultResultSlots = $parent->paramRuntimeDefaultResultSlots;
             $this->noDiscard = $parent->noDiscard;
             $this->noDiscardMessage = $parent->noDiscardMessage;
         }
@@ -559,6 +593,23 @@ class Block {
         }
 
         return false;
+    }
+
+    /**
+     * True when an assign RHS/result temp may be nulled after TYPE_ASSIGN (#4096, #6758).
+     * Chained assignment keeps the inner result temp alive until the outer assign reads it.
+     */
+    public function assignTempSlotIsDead(int $slot): bool
+    {
+        if (isset($this->constants[$slot]) || $this->isNamedVariableSlot($slot)) {
+            return false;
+        }
+        $operand = $this->getOperand($slot);
+        if (null === $operand) {
+            return true;
+        }
+
+        return [] === $operand->usages;
     }
 
     /** Yields [variable name, scope slot] pairs. */
@@ -670,7 +721,15 @@ class Block {
 
     public static function findVariableInParentFramesByName(string $name, Frame $frame): ?Variable
     {
+        $blockScriptGlobals = null !== $frame->block && $frame->block->blocksScriptGlobalInheritance();
         for ($f = $frame; null !== $f; $f = $f->parent) {
+            if (
+                $blockScriptGlobals
+                && null !== $f->block
+                && $f->block->isMainScript()
+            ) {
+                break;
+            }
             if ('this' === $name) {
                 $boundThis = self::resolveBoundClosureThis($f);
                 if (null !== $boundThis) {
@@ -743,28 +802,29 @@ class Block {
                 $scope[$pos] = $this->constants[$pos];
             } elseif (isset($this->closureCaptureSlots[$pos])) {
                 $scope[$pos] = self::initialVariableForOperand($op, $context, $pos, $this);
+            } elseif ($this->isArgRecvParameterSlot($pos)) {
+                // Params are not in $args (compileOperand isRead=false); still need type metadata (#7057).
+                $scope[$pos] = self::initialVariableForOperand($op, $context, $pos, $this);
             } elseif ($this->args->contains($op)) {
                 // Callee parameters are filled by TYPE_ARG_RECV; do not inherit caller locals (#3803).
-                if ($this->isArgRecvParameterSlot($pos)) {
-                    $scope[$pos] = self::initialVariableForOperand($op, $context, $pos, $this);
-                    continue;
-                }
                 if (is_null($frame)) {
                     $scope[$pos] = self::initialEntryVariable($op, $context, $pos, $this);
                     continue;
                 }
                 $found = false;
                 // Resolve reads from the jump parent block, not the merge block's scope (#3787).
-                $parent = $frame->block->findSlot($op, $frame);
-                if (!is_null($parent)) {
-                    $scope[$pos] = $parent;
-                    $found = true;
-                }
-                if (!$found) {
-                    $inherited = self::findVariableInParentFrames($op, $frame);
-                    if (null !== $inherited) {
-                        $scope[$pos] = $inherited;
-                        continue;
+                if (!$this->blocksScriptGlobalInheritance()) {
+                    $parent = $frame->block->findSlot($op, $frame);
+                    if (!is_null($parent)) {
+                        $scope[$pos] = $parent;
+                        $found = true;
+                    }
+                    if (!$found) {
+                        $inherited = self::findVariableInParentFrames($op, $frame);
+                        if (null !== $inherited) {
+                            $scope[$pos] = $inherited;
+                            continue;
+                        }
                     }
                 }
                 if (!$found) {
@@ -791,10 +851,14 @@ class Block {
                         $scope[$pos] = new Variable(Variable::TYPE_UNDEFINED);
                         continue;
                     }
+                    if ($this->blocksScriptGlobalInheritance()) {
+                        $scope[$pos] = new Variable(Variable::TYPE_UNDEFINED);
+                        continue;
+                    }
                     throw new \LogicException("Could not resolve argument");
                 }
             } else {
-                if (null !== $frame) {
+                if (null !== $frame && !$this->blocksScriptGlobalInheritance()) {
                     $inherited = self::findVariableInParentFrames($op, $frame);
                     if (null !== $inherited) {
                         $scope[$pos] = $inherited;
@@ -823,6 +887,8 @@ class Block {
                     } elseif (null === $frame || self::usesMainScriptGlobalSlot($op, $this)) {
                         // {main} locals live in the global table on every CFG block (#3601, #3787).
                         $scope[$pos] = self::initialEntryVariable($op, $context, $pos, $this);
+                    } elseif ($this->blocksScriptGlobalInheritance() && null !== $frame) {
+                        $scope[$pos] = new Variable(Variable::TYPE_UNDEFINED);
                     } else {
                         $scope[$pos] = self::initialVariableForOperand($op, $context, $pos, $this);
                     }
@@ -1006,6 +1072,26 @@ class Block {
         }
 
         return false;
+    }
+
+    /**
+     * Standalone `true`/`false`/`null` parameter types — exact match even without caller strict_types
+     * (Zend zend_check_type / zend_verify_arg_type, issue #7057).
+     */
+    public function paramRequiresExactLiteralMatch(int $slot): bool
+    {
+        if (isset($this->paramLiteralBoolTypes[$slot])) {
+            return true;
+        }
+        if (!isset($this->paramTypeConstraints[$slot])) {
+            return false;
+        }
+        if (Variable::TYPE_NULL !== $this->paramTypeConstraints[$slot]) {
+            return false;
+        }
+
+        return !isset($this->paramDnfConstraints[$slot])
+            && !isset($this->paramIntersectionConstraints[$slot]);
     }
 
     public static function resolveVariableName(Operand $op): ?string
@@ -1922,6 +2008,37 @@ class Block {
     }
 
     /**
+     * Any DECLARE_TRAIT in the compilation unit — MCJIT link/execute segfaults (#3609, #6284).
+     */
+    public static function containsDeclareTraitOpcodesInScriptScope(?self $root): bool
+    {
+        if (null === $root) {
+            return false;
+        }
+        $seen = new \SplObjectStorage();
+        $stack = [$root];
+        while ([] !== $stack) {
+            $block = array_pop($stack);
+            if (!$block instanceof self || $seen->contains($block)) {
+                continue;
+            }
+            $seen->attach($block);
+            foreach ($block->opCodes as $op) {
+                if (OpCode::TYPE_DECLARE_TRAIT === $op->type) {
+                    return true;
+                }
+                foreach ([$op->block1, $op->block2, $op->block3] as $sub) {
+                    if ($sub instanceof self) {
+                        $stack[] = $sub;
+                    }
+                }
+            }
+        }
+
+        return false;
+    }
+
+    /**
      * Trait `__construct` merged into a using class — MCJIT execute segfaults (#4671).
      */
     public static function containsTraitConstructorOpcodes(?self $root): bool
@@ -2100,18 +2217,48 @@ class Block {
     {
         return self::containsGeneratorOpcodesInScriptScope($root)
             || self::containsFinallyOpcodesInScriptScope($root)
-            || self::containsExceptionHandlingOpcodesInScriptScope($root)
             || self::containsMatchExpressionOpcodesInScriptScope($root)
             || self::containsTypedNonVoidReturnOpcodes($root)
             || self::containsReadonlyPropertyOpcodes($root)
             || self::containsReadonlyClassOpcodes($root)
             || self::containsUserClassDeclaredInstancePropertyOpcodes($root)
             || self::containsDynamicPropertyDeprecationOpcodes($root)
-            || self::containsFiberSuspendOpcodes($root)
+            || self::containsFiberSuspendOpcodesInScriptScope($root)
+            || self::containsDeclareTraitOpcodesInScriptScope($root)
             || self::containsTraitConstructorOpcodes($root)
             || self::containsReflectionAttributeNewInstanceOpcodes($root)
             || self::containsInterfaceAbstractStaticMcjitDeferral($root)
-            || self::containsNonStaticStaticCallOpcodes($root);
+            || self::containsNonStaticStaticCallOpcodes($root)
+            || self::containsParamRuntimeNewDefaultOpcodes($root);
+    }
+
+    /** Constructor/function parameters with `new` default expressions (#6652). */
+    public static function containsParamRuntimeNewDefaultOpcodes(?self $root): bool
+    {
+        if (null === $root) {
+            return false;
+        }
+        $seen = new \SplObjectStorage();
+        $stack = [$root];
+        while ([] !== $stack) {
+            $block = array_pop($stack);
+            if (!$block instanceof self || $seen->contains($block)) {
+                continue;
+            }
+            $seen->attach($block);
+            if ([] !== $block->paramRuntimeDefaultInitBlocks) {
+                return true;
+            }
+            foreach ($block->opCodes as $op) {
+                foreach ([$op->block1, $op->block2, $op->block3] as $sub) {
+                    if ($sub instanceof self) {
+                        $stack[] = $sub;
+                    }
+                }
+            }
+        }
+
+        return false;
     }
 
     /**

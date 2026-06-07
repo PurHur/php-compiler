@@ -125,6 +125,7 @@ final class MemoryRuntime
         $fd = $context->builder->call(
             $context->lookupFunction('open'),
             $path,
+            $i32->constInt(0, false),
             $i32->constInt(0, false)
         );
         $openFail = $context->builder->icmp(Builder::INT_SLT, $fd, $zeroI32);
@@ -202,11 +203,6 @@ final class MemoryRuntime
         $i8pp = $context->getTypeFromString('int8**');
         $sizeT = $context->getTypeFromString('size_t');
 
-        self::ensureExternal(
-            $context,
-            'open',
-            $context->context->functionType($i32, false, $i8p, $i32)
-        );
         self::ensureExternal(
             $context,
             'read',

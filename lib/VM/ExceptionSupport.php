@@ -4,8 +4,9 @@ declare(strict_types=1);
 
 namespace PHPCompiler\VM;
 
+use PHPCompiler\ext\standard\ThrowableManifest;
+use PHPCompiler\ext\standard\VmString;
 use PHPCompiler\Frame;
-use PHPCompiler\ext\standard\VmReflection;
 
 /**
  * Shared helpers for Throwable / Exception / Error VM builtins (#195, #3371).
@@ -14,31 +15,35 @@ use PHPCompiler\ext\standard\VmReflection;
  */
 final class ExceptionSupport
 {
-    public const CLASS_THROWABLE = 'throwable';
-    public const CLASS_EXCEPTION = 'exception';
-    public const CLASS_LOGIC_EXCEPTION = 'logicexception';
-    public const CLASS_BAD_FUNCTION_CALL_EXCEPTION = 'badfunctioncallexception';
-    public const CLASS_BAD_METHOD_CALL_EXCEPTION = 'badmethodcallexception';
-    public const CLASS_DOMAIN_EXCEPTION = 'domainexception';
-    public const CLASS_INVALID_ARGUMENT_EXCEPTION = 'invalidargumentexception';
-    public const CLASS_LENGTH_EXCEPTION = 'lengthexception';
-    public const CLASS_OUT_OF_RANGE_EXCEPTION = 'outofrangeexception';
-    public const CLASS_RUNTIME_EXCEPTION = 'runtimeexception';
-    public const CLASS_OUT_OF_BOUNDS_EXCEPTION = 'outofboundsexception';
-    public const CLASS_OVERFLOW_EXCEPTION = 'overflowexception';
-    public const CLASS_RANGE_EXCEPTION = 'rangeexception';
-    public const CLASS_UNDERFLOW_EXCEPTION = 'underflowexception';
-    public const CLASS_UNEXPECTED_VALUE_EXCEPTION = 'unexpectedvalueexception';
-    public const CLASS_ERROR = 'error';
-    public const CLASS_TYPE_ERROR = 'typeerror';
-    public const CLASS_VALUE_ERROR = 'valueerror';
-    public const CLASS_ARGUMENT_COUNT_ERROR = 'argumentcounterror';
-    public const CLASS_PARSE_ERROR = 'parseerror';
-    public const CLASS_UNHANDLED_MATCH_ERROR = 'unhandledmatcherror';
-    public const CLASS_ARITHMETIC_ERROR = 'arithmeticerror';
-    public const CLASS_DIVISION_BY_ZERO_ERROR = 'divisionbyzeroerror';
-    public const CLASS_ASSERTION_ERROR = 'assertionerror';
-    public const CLASS_FIBER_ERROR = 'fibererror';
+    public const CLASS_THROWABLE = ThrowableManifest::LC_THROWABLE;
+    public const CLASS_EXCEPTION = ThrowableManifest::LC_EXCEPTION;
+    public const CLASS_LOGIC_EXCEPTION = ThrowableManifest::LC_LOGIC_EXCEPTION;
+    public const CLASS_BAD_FUNCTION_CALL_EXCEPTION = ThrowableManifest::LC_BAD_FUNCTION_CALL_EXCEPTION;
+    public const CLASS_BAD_METHOD_CALL_EXCEPTION = ThrowableManifest::LC_BAD_METHOD_CALL_EXCEPTION;
+    public const CLASS_DOMAIN_EXCEPTION = ThrowableManifest::LC_DOMAIN_EXCEPTION;
+    public const CLASS_INVALID_ARGUMENT_EXCEPTION = ThrowableManifest::LC_INVALID_ARGUMENT_EXCEPTION;
+    public const CLASS_LENGTH_EXCEPTION = ThrowableManifest::LC_LENGTH_EXCEPTION;
+    public const CLASS_OUT_OF_RANGE_EXCEPTION = ThrowableManifest::LC_OUT_OF_RANGE_EXCEPTION;
+    public const CLASS_RUNTIME_EXCEPTION = ThrowableManifest::LC_RUNTIME_EXCEPTION;
+    public const CLASS_OUT_OF_BOUNDS_EXCEPTION = ThrowableManifest::LC_OUT_OF_BOUNDS_EXCEPTION;
+    public const CLASS_OVERFLOW_EXCEPTION = ThrowableManifest::LC_OVERFLOW_EXCEPTION;
+    public const CLASS_RANGE_EXCEPTION = ThrowableManifest::LC_RANGE_EXCEPTION;
+    public const CLASS_UNDERFLOW_EXCEPTION = ThrowableManifest::LC_UNDERFLOW_EXCEPTION;
+    public const CLASS_UNEXPECTED_VALUE_EXCEPTION = ThrowableManifest::LC_UNEXPECTED_VALUE_EXCEPTION;
+    public const CLASS_ERROR_EXCEPTION = ThrowableManifest::LC_ERROR_EXCEPTION;
+    public const CLASS_REFLECTION_EXCEPTION = ThrowableManifest::LC_REFLECTION_EXCEPTION;
+    public const CLASS_CLOSED_GENERATOR_EXCEPTION = ThrowableManifest::LC_CLOSED_GENERATOR_EXCEPTION;
+    public const CLASS_ERROR = ThrowableManifest::LC_ERROR;
+    public const CLASS_TYPE_ERROR = ThrowableManifest::LC_TYPE_ERROR;
+    public const CLASS_VALUE_ERROR = ThrowableManifest::LC_VALUE_ERROR;
+    public const CLASS_ARGUMENT_COUNT_ERROR = ThrowableManifest::LC_ARGUMENT_COUNT_ERROR;
+    public const CLASS_PARSE_ERROR = ThrowableManifest::LC_PARSE_ERROR;
+    public const CLASS_COMPILE_ERROR = ThrowableManifest::LC_COMPILE_ERROR;
+    public const CLASS_UNHANDLED_MATCH_ERROR = ThrowableManifest::LC_UNHANDLED_MATCH_ERROR;
+    public const CLASS_ARITHMETIC_ERROR = ThrowableManifest::LC_ARITHMETIC_ERROR;
+    public const CLASS_DIVISION_BY_ZERO_ERROR = ThrowableManifest::LC_DIVISION_BY_ZERO_ERROR;
+    public const CLASS_ASSERTION_ERROR = ThrowableManifest::LC_ASSERTION_ERROR;
+    public const CLASS_FIBER_ERROR = ThrowableManifest::LC_FIBER_ERROR;
 
     public const PROP_MESSAGE = 'message';
     public const PROP_CODE = 'code';
@@ -46,6 +51,8 @@ final class ExceptionSupport
     public const PROP_LINE = 'line';
     /** Zend zend_exceptions.c — chained Throwable (#5104, #5486). */
     public const PROP_PREVIOUS = 'previous';
+    /** Zend zend_exceptions.c — captured stack on throw (#3351, #7159). */
+    public const PROP_TRACE = 'trace';
 
     /** Zend zend_exceptions.c — throw non-Throwable raises Error (#5223, #5727). */
     public const THROW_NON_THROWABLE_MESSAGE = 'Cannot throw objects that do not implement Throwable';
@@ -97,37 +104,16 @@ final class ExceptionSupport
 
     public static function isBuiltinExceptionSubclass(string $lc): bool
     {
-        return in_array($lc, [
-            self::CLASS_EXCEPTION,
-            self::CLASS_LOGIC_EXCEPTION,
-            self::CLASS_BAD_FUNCTION_CALL_EXCEPTION,
-            self::CLASS_BAD_METHOD_CALL_EXCEPTION,
-            self::CLASS_DOMAIN_EXCEPTION,
-            self::CLASS_INVALID_ARGUMENT_EXCEPTION,
-            self::CLASS_LENGTH_EXCEPTION,
-            self::CLASS_OUT_OF_RANGE_EXCEPTION,
-            self::CLASS_RUNTIME_EXCEPTION,
-            self::CLASS_OUT_OF_BOUNDS_EXCEPTION,
-            self::CLASS_OVERFLOW_EXCEPTION,
-            self::CLASS_RANGE_EXCEPTION,
-            self::CLASS_UNDERFLOW_EXCEPTION,
-            self::CLASS_UNEXPECTED_VALUE_EXCEPTION,
-        ], true);
+        return ThrowableManifest::isDescendantOf($lc, self::CLASS_EXCEPTION);
     }
 
     public static function isBuiltinErrorSubclass(string $lc): bool
     {
-        return in_array($lc, [
-            self::CLASS_TYPE_ERROR,
-            self::CLASS_VALUE_ERROR,
-            self::CLASS_ARGUMENT_COUNT_ERROR,
-            self::CLASS_PARSE_ERROR,
-            self::CLASS_UNHANDLED_MATCH_ERROR,
-            self::CLASS_ARITHMETIC_ERROR,
-            self::CLASS_DIVISION_BY_ZERO_ERROR,
-            self::CLASS_ASSERTION_ERROR,
-            self::CLASS_FIBER_ERROR,
-        ], true);
+        if (self::CLASS_ERROR === $lc) {
+            return false;
+        }
+
+        return ThrowableManifest::isDescendantOf($lc, self::CLASS_ERROR);
     }
 
     public static function initFromConstruct(ObjectEntry $receiver, Frame $frame, int $messageArgIndex = 1): void
@@ -136,7 +122,13 @@ final class ExceptionSupport
         if (array_key_exists($messageArgIndex, $frame->calledArgs)) {
             $msgVar = $frame->calledArgs[$messageArgIndex]->resolveIndirect();
             if (Variable::TYPE_NULL !== $msgVar->type) {
-                $message = VmReflection::stringArg($frame->calledArgs[$messageArgIndex], 'Exception::__construct() message');
+                $className = $receiver->class->name;
+                $message = VmString::coerceStringBuiltinArg(
+                    $frame->calledArgs[$messageArgIndex],
+                    "{$className}::__construct",
+                    0,
+                    'message'
+                );
             }
         }
         $code = 0;
@@ -198,6 +190,139 @@ final class ExceptionSupport
         return 0;
     }
 
+    /**
+     * User call-site for uncaught builtin fatals (#6334).
+     *
+     * @return array{0: string, 1: int}
+     */
+    public static function userFatalSite(Frame $frame): array
+    {
+        $file = self::throwSiteFile($frame);
+        $line = $frame->callSiteLine;
+        if ($line <= 0) {
+            for ($f = $frame->parent; null !== $f; $f = $f->parent) {
+                if ($f->callSiteLine > 0) {
+                    $line = $f->callSiteLine;
+                    break;
+                }
+            }
+        }
+
+        return [$file, $line];
+    }
+
+    public static function stampThrowableSite(ObjectEntry $receiver, string $file, int $line): void
+    {
+        if ('' !== $file) {
+            $receiver->getProperty(self::PROP_FILE)->string($file);
+        }
+        if ($line > 0) {
+            $receiver->getProperty(self::PROP_LINE)->int($line);
+        }
+    }
+
+    public static function applyNativeLocation(\Throwable $native, string $file, int $line): void
+    {
+        if ('' === $file && $line <= 0) {
+            return;
+        }
+        try {
+            $ref = new \ReflectionObject($native);
+            if ('' !== $file && $ref->hasProperty('file')) {
+                $ref->getProperty('file')->setValue($native, $file);
+            }
+            if ($line > 0 && $ref->hasProperty('line')) {
+                $ref->getProperty('line')->setValue($native, $line);
+            }
+        } catch (\ReflectionException) {
+        }
+    }
+
+    /**
+     * Zend SAPI uncaught fatal — user site only, no VM re-dispatch frames (#6334, #7343).
+     *
+     * @return never
+     */
+    public static function emitNativeUncaughtFatal(\Throwable $native): void
+    {
+        self::writeNativeUncaughtFatalBlock($native, true);
+        throw new ScriptExit(255);
+    }
+
+    /**
+     * Zend zend_exceptions.c — finally throw over pending try uncaught fatal (#5867, #7342).
+     *
+     * @return never
+     */
+    public static function emitNativeUncaughtFatalWithNext(\Throwable $primary, \Throwable $next): void
+    {
+        self::writeNativeUncaughtFatalBlock($primary, false);
+        $message = $next->getMessage();
+        $file = $next->getFile();
+        $line = $next->getLine();
+        $nextFatal = "Next Exception: {$message}";
+        if ('' !== $file) {
+            $nextFatal .= " in {$file}";
+            if ($line > 0) {
+                $nextFatal .= ":{$line}";
+            }
+        }
+        fwrite(STDERR, "\n{$nextFatal}\n");
+        fwrite(STDERR, "Stack trace:\n");
+        fwrite(STDERR, "#0 {main}\n");
+        if ('' !== $file && $line > 0) {
+            fwrite(STDERR, "  thrown in {$file} on line {$line}\n");
+        }
+        throw new ScriptExit(255);
+    }
+
+    private static function writeNativeUncaughtFatalBlock(\Throwable $native, bool $includeThrownIn): void
+    {
+        $class = $native::class;
+        $message = $native->getMessage();
+        $file = $native->getFile();
+        $line = $native->getLine();
+        $fatal = "PHP Fatal error:  Uncaught {$class}: {$message}";
+        if ('' !== $file) {
+            $fatal .= " in {$file}";
+            if ($line > 0) {
+                $fatal .= ":{$line}";
+            }
+        }
+        fwrite(STDERR, $fatal."\n");
+        fwrite(STDERR, "Stack trace:\n");
+        fwrite(STDERR, "#0 {main}\n");
+        if ($includeThrownIn && '' !== $file && $line > 0) {
+            fwrite(STDERR, "  thrown in {$file} on line {$line}\n");
+        }
+    }
+
+    /** Safe read for Throwable slots that may stay at typed prototype without a value (#6357). */
+    public static function readThrowableMessage(ObjectEntry $entry): string
+    {
+        $message = self::readOptionalStringProperty($entry, self::PROP_MESSAGE);
+
+        return null !== $message && '' !== $message ? $message : 'Exception';
+    }
+
+    private static function readOptionalStringProperty(ObjectEntry $entry, string $prop): ?string
+    {
+        try {
+            return $entry->getProperty($prop)->optionalScalarString();
+        } catch (\Throwable) {
+            return null;
+        }
+    }
+
+    private static function readOptionalIntProperty(ObjectEntry $entry, string $prop): ?int
+    {
+        try {
+            return $entry->getProperty($prop)->optionalScalarInt();
+        } catch (\Throwable) {
+            return null;
+        }
+    }
+
     /** Stamp throw-statement line on a Throwable before dispatch (#195). */
     public static function stampThrowLine(Variable $thrown, int $line): void
     {
@@ -234,6 +359,9 @@ final class ExceptionSupport
         if (Variable::TYPE_OBJECT !== $previous->type) {
             throw new \LogicException('Exception previous must be an object');
         }
+        if ($receiver === $previous->toObject()) {
+            return;
+        }
         if (!self::objectImplementsThrowable($previous->toObject())) {
             throw new \LogicException('Exception previous must implement Throwable');
         }
@@ -247,8 +375,15 @@ final class ExceptionSupport
     /** Chain pending try exception onto a throw from finally (zend_exceptions.c, #5486). */
     public static function chainPendingExceptionOnFinallyThrow(Variable $thrown, Variable $pending): void
     {
+        if ($thrown === $pending) {
+            return;
+        }
         $thrown = $thrown->resolveIndirect();
-        if (Variable::TYPE_OBJECT !== $thrown->type) {
+        $pending = $pending->resolveIndirect();
+        if (Variable::TYPE_OBJECT !== $thrown->type || Variable::TYPE_OBJECT !== $pending->type) {
+            return;
+        }
+        if ($thrown->toObject() === $pending->toObject()) {
             return;
         }
         self::setExceptionPrevious($thrown->toObject(), $pending);
@@ -260,50 +395,48 @@ final class ExceptionSupport
     public static function nativeUncaughtThrowable(ObjectEntry $entry, string $message): \Throwable
     {
         $lc = strtolower($entry->class->name);
-        $native = match ($lc) {
-            self::CLASS_VALUE_ERROR => new \ValueError($message),
-            self::CLASS_TYPE_ERROR => new \TypeError($message),
-            self::CLASS_DIVISION_BY_ZERO_ERROR => new \DivisionByZeroError($message),
-            self::CLASS_ARGUMENT_COUNT_ERROR => new \ArgumentCountError($message),
-            self::CLASS_PARSE_ERROR => new \ParseError($message),
-            self::CLASS_UNHANDLED_MATCH_ERROR => new \UnhandledMatchError($message),
-            self::CLASS_ASSERTION_ERROR => new \AssertionError($message),
+        $nativeClass = ThrowableManifest::nativeClassForLc($lc);
+        if (null !== $nativeClass) {
+            $native = new $nativeClass($message);
+        } elseif (self::CLASS_FIBER_ERROR === $lc) {
             // FiberError is reserved for internal use in Zend; cannot be instantiated from userland PHP.
             // Map uncaught VM FiberError to a native Error for the test runner / CLI.
-            self::CLASS_FIBER_ERROR => new \Error('FiberError: '.$message),
-            self::CLASS_ERROR => new \Error($message),
-            self::CLASS_LOGIC_EXCEPTION => new \LogicException($message),
-            self::CLASS_BAD_FUNCTION_CALL_EXCEPTION => new \BadFunctionCallException($message),
-            self::CLASS_BAD_METHOD_CALL_EXCEPTION => new \BadMethodCallException($message),
-            self::CLASS_DOMAIN_EXCEPTION => new \DomainException($message),
-            self::CLASS_INVALID_ARGUMENT_EXCEPTION => new \InvalidArgumentException($message),
-            self::CLASS_LENGTH_EXCEPTION => new \LengthException($message),
-            self::CLASS_OUT_OF_RANGE_EXCEPTION => new \OutOfRangeException($message),
-            self::CLASS_RUNTIME_EXCEPTION => new \RuntimeException($message),
-            self::CLASS_OUT_OF_BOUNDS_EXCEPTION => new \OutOfBoundsException($message),
-            self::CLASS_OVERFLOW_EXCEPTION => new \OverflowException($message),
-            self::CLASS_RANGE_EXCEPTION => new \RangeException($message),
-            self::CLASS_UNDERFLOW_EXCEPTION => new \UnderflowException($message),
-            self::CLASS_UNEXPECTED_VALUE_EXCEPTION => new \UnexpectedValueException($message),
-            self::CLASS_EXCEPTION => new \Exception($message),
-            default => new \Exception($message),
-        };
+            $native = new \Error('FiberError: '.$message);
+        } elseif (ThrowableManifest::isDescendantOf($lc, self::CLASS_ERROR)) {
+            $native = new \Error($message);
+        } else {
+            $native = new \Exception($message);
+        }
+        $file = self::readOptionalStringProperty($entry, self::PROP_FILE);
+        $line = self::readOptionalIntProperty($entry, self::PROP_LINE);
+        if (null !== $file || (null !== $line && $line > 0)) {
+            self::applyNativeLocation($native, $file ?? '', $line ?? 0);
+        }
         $prevVar = $entry->getProperty(self::PROP_PREVIOUS)->resolveIndirect();
         if (Variable::TYPE_OBJECT !== $prevVar->type) {
             return $native;
         }
         $prevEntry = $prevVar->toObject();
-        try {
-            $prevMessage = $prevEntry->getProperty(self::PROP_MESSAGE)->toString();
-        } catch (\LogicException) {
-            $prevMessage = 'Exception';
+        if ($prevEntry === $entry) {
+            return $native;
         }
+        $prevMessage = self::readThrowableMessage($prevEntry);
         $prevNative = self::nativeUncaughtThrowable($prevEntry, $prevMessage);
         if ($native instanceof \Exception && $prevNative instanceof \Throwable) {
-            return new \Exception($message, $native->getCode(), $prevNative);
+            $chained = new \Exception($message, $native->getCode(), $prevNative);
+            if (null !== $file || (null !== $line && $line > 0)) {
+                self::applyNativeLocation($chained, $file ?? '', $line ?? 0);
+            }
+
+            return $chained;
         }
         if ($native instanceof \Error && $prevNative instanceof \Throwable) {
-            return new \Error($message, $native->getCode(), $prevNative);
+            $chained = new \Error($message, $native->getCode(), $prevNative);
+            if (null !== $file || (null !== $line && $line > 0)) {
+                self::applyNativeLocation($chained, $file ?? '', $line ?? 0);
+            }
+
+            return $chained;
         }
 
         return $native;

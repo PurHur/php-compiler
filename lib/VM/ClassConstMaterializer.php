@@ -98,7 +98,13 @@ final class ClassConstMaterializer
                 $stored->string($src->toString());
                 break;
             case Variable::TYPE_INTEGER:
-                $stored->int($src->toInt());
+                if ($src->isStreamResource()) {
+                    $stored->streamHandle($src->toInt());
+                } elseif ($src->isDirResource()) {
+                    $stored->dirHandle($src->toInt());
+                } else {
+                    $stored->int($src->toInt());
+                }
                 break;
             case Variable::TYPE_FLOAT:
                 $stored->float($src->toFloat());
@@ -116,6 +122,9 @@ final class ClassConstMaterializer
                 break;
             case Variable::TYPE_ARRAY:
                 $stored->array($src->toArray());
+                break;
+            case Variable::TYPE_PROPERTY_HOOK_REF:
+                $stored->copyFrom($src);
                 break;
             default:
                 throw new \LogicException(

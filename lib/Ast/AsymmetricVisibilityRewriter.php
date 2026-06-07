@@ -15,6 +15,9 @@ final class AsymmetricVisibilityRewriter
     private const MARKER_PREFIX_SET = 'phpc-asymmetric-set:';
     private const MARKER_PREFIX_GET = 'phpc-asymmetric-get:';
 
+    /** php-src: Zend/zend_compile.c — zend_add_member_modifier() duplicate PPP / PPP_SET (#6774). */
+    public const MULTIPLE_MODIFIERS_MESSAGE = 'Multiple access type modifiers are not allowed';
+
     /**
      * @internal Marker embedded in source for PHPCfg to recover set visibility.
      */
@@ -41,19 +44,122 @@ final class AsymmetricVisibilityRewriter
             return $source;
         }
 
-        return (string) preg_replace_callback(
+        self::rejectExplicitPublicBeforeSetModifier($source);
+        self::rejectExplicitPublicAfterSetModifier($source);
+        self::rejectAsymmetricSetOnStaticProperty($source);
+
+        $source = (string) preg_replace_callback(
             '/(?P<prefix>(?:\/\*(?:[^*]|\*(?!\/))*\*\/\s*)*)(?P<attrs>(?:#\[[^\]]*\]\s*)*)'
-            .'(?P<read>(?:(?:public|protected|private)\s+)?)'
-            .'(?P<set>public|protected|private)\s*\(\s*set\s*\)\s*/i',
+            .'(?P<readBefore>(?:(?:public|protected|private)\s+)?)'
+            .'(?P<static>(?:static\s+)?)'
+            .'\(\s*(?P<set>public|protected|private)\s*\(\s*set\s*\)\s*\)\s*/i',
             static function (array $m): string {
                 $set = strtolower($m['set']);
-                $read = trim($m['read']);
-                $readPrefix = '' !== $read ? $read.' ' : 'public ';
+                $readBefore = trim($m['readBefore']);
+                if ('' !== $readBefore) {
+                    $readPrefix = $readBefore.' ';
+                } else {
+                    $readPrefix = 'public ';
+                }
+
+                return $m['prefix'].$m['attrs'].'/*'.self::MARKER_PREFIX_SET.$set.'*/ '.$readPrefix.$m['static'];
+            },
+            $source
+        );
+
+        return (string) preg_replace_callback(
+            '/(?P<prefix>(?:\/\*(?:[^*]|\*(?!\/))*\*\/\s*)*)(?P<attrs>(?:#\[[^\]]*\]\s*)*)'
+            .'(?P<readBefore>(?:(?:public|protected|private)\s+)?)'
+            .'(?P<set>public|protected|private)\s*\(\s*set\s*\)\s*'
+            .'(?P<readAfter>(?:(?:public|protected|private)\s+)?)/i',
+            static function (array $m): string {
+                $set = strtolower($m['set']);
+                $readBefore = trim($m['readBefore']);
+                $readAfter = trim($m['readAfter']);
+                if ('' !== $readAfter) {
+                    $readPrefix = $readAfter.' ';
+                } elseif ('' !== $readBefore) {
+                    $readPrefix = $readBefore.' ';
+                } else {
+                    $readPrefix = 'public ';
+                }
 
                 return $m['prefix'].$m['attrs'].'/*'.self::MARKER_PREFIX_SET.$set.'*/ '.$readPrefix;
             },
             $source
         );
+    }
+
+    /**
+     * Duplicate read/set visibility on the same axis is a compile fatal (#6774, #6861).
+     *
+     * php-src: Zend/zend_compile.c — zend_add_member_modifier(); `public public(set)` duplicates
+     * the same modifier.
+     */
+    private static function rejectExplicitPublicBeforeSetModifier(string $source): void
+    {
+        if (preg_match(
+            '/(?<![a-zA-Z0-9_])(public|protected|private)\s+\1\s*\(\s*set\s*\)/i',
+            $source
+        )) {
+            throw new \CompileError(self::MULTIPLE_MODIFIERS_MESSAGE);
+        }
+    }
+
+    /** Explicit read `public` after `public(set)` duplicates implicit public read (#6589, #6774). */
+    private static function rejectExplicitPublicAfterSetModifier(string $source): void
+    {
+        if (preg_match(
+            '/(?<![a-zA-Z0-9_])public\s*\(\s*set\s*\)\s*public\b/i',
+            $source
+        )) {
+            throw new \CompileError(self::MULTIPLE_MODIFIERS_MESSAGE);
+        }
+        if (preg_match(
+            '/(?<![a-zA-Z0-9_])public\s+\(\s*public\s*\(\s*set\s*\)\s*\)/i',
+            $source
+        )) {
+            throw new \CompileError(self::MULTIPLE_MODIFIERS_MESSAGE);
+        }
+    }
+
+    /**
+     * Static properties do not support asymmetric visibility with an explicit read modifier (#7013).
+     *
+     * php-src: Zend/zend_compile.c — zend_add_member_modifier(); `public private(set) static` is fatal
+     * (`Multiple access type modifiers are not allowed`). `private(set) static` alone remains valid (#6769).
+     */
+    private static function rejectAsymmetricSetOnStaticProperty(string $source): void
+    {
+        if (!preg_match('/\bstatic\b/i', $source) || !preg_match('/\(\s*set\s*\)/i', $source)) {
+            return;
+        }
+
+        $modifier = '(?:public|protected|private)';
+        $setModifier = $modifier.'\s*\(\s*set\s*\)';
+        $parenthesizedSet = '\(\s*'.$modifier.'\s*\(\s*set\s*\)\s*\)';
+        $staticWord = '\bstatic\b';
+        $patterns = [
+            // read + set(set) … static (any spacing)
+            '/(?<![a-zA-Z0-9_])'.$modifier.'\s+(?:'.$staticWord.'\s+)?'.$setModifier.'[^;{]*'.$staticWord.'/i',
+            '/(?<![a-zA-Z0-9_])'.$modifier.'\s+'.$setModifier.'\s+'.$staticWord.'/i',
+            // read + static + set(set)
+            '/(?<![a-zA-Z0-9_])'.$modifier.'\s+'.$staticWord.'\s+'.$setModifier.'/i',
+            // read + static + (set(set))
+            '/(?<![a-zA-Z0-9_])'.$modifier.'\s+'.$staticWord.'\s+'.$parenthesizedSet.'/i',
+            // read + (set(set)) … static
+            '/(?<![a-zA-Z0-9_])'.$modifier.'\s+'.$parenthesizedSet.'[^;{]*'.$staticWord.'/i',
+            // static + read + set(set)
+            '/'.$staticWord.'\s+(?<![a-zA-Z0-9_])'.$modifier.'\s+'.$setModifier.'/i',
+            // static + read + (set(set))
+            '/'.$staticWord.'\s+(?<![a-zA-Z0-9_])'.$modifier.'\s+'.$parenthesizedSet.'/i',
+        ];
+
+        foreach ($patterns as $pattern) {
+            if (preg_match($pattern, $source)) {
+                throw new \CompileError(self::MULTIPLE_MODIFIERS_MESSAGE);
+            }
+        }
     }
 
     private static function rewriteGetModifiers(string $source): string
@@ -67,19 +173,50 @@ final class AsymmetricVisibilityRewriter
             return $source;
         }
 
+        self::rejectExplicitPublicBeforeGetModifier($source);
+        self::rejectExplicitPublicAfterGetModifier($source);
+
         return (string) preg_replace_callback(
             '/(?P<prefix>(?:\/\*(?:[^*]|\*(?!\/))*\*\/\s*)*)(?P<attrs>(?:#\[[^\]]*\]\s*)*)'
-            .'(?P<write>(?:(?:public|protected|private)\s+)?)'
-            .'(?P<get>public|protected|private)\s*\(\s*get\s*\)\s*/i',
+            .'(?P<writeBefore>(?:(?:public|protected|private)\s+)?)'
+            .'(?P<get>public|protected|private)\s*\(\s*get\s*\)\s*'
+            .'(?P<writeAfter>(?:(?:public|protected|private)\s+)?)/i',
             static function (array $m): string {
                 $get = strtolower($m['get']);
-                $write = trim($m['write']);
-                $writePrefix = '' !== $write ? $write.' ' : 'public ';
+                $writeBefore = trim($m['writeBefore']);
+                $writeAfter = trim($m['writeAfter']);
+                if ('' !== $writeAfter) {
+                    $writePrefix = $writeAfter.' ';
+                } elseif ('' !== $writeBefore) {
+                    $writePrefix = $writeBefore.' ';
+                } else {
+                    $writePrefix = 'public ';
+                }
 
                 return $m['prefix'].$m['attrs'].'/*'.self::MARKER_PREFIX_GET.$get.'*/ '.$writePrefix;
             },
             $source
         );
+    }
+
+    private static function rejectExplicitPublicBeforeGetModifier(string $source): void
+    {
+        if (preg_match(
+            '/(?<![a-zA-Z0-9_])(public|protected|private)\s+\1\s*\(\s*get\s*\)/i',
+            $source
+        )) {
+            throw new \CompileError(self::MULTIPLE_MODIFIERS_MESSAGE);
+        }
+    }
+
+    private static function rejectExplicitPublicAfterGetModifier(string $source): void
+    {
+        if (preg_match(
+            '/(?:public|protected|private)\s*\(\s*get\s*\)\s*public\b/i',
+            $source
+        )) {
+            throw new \CompileError(self::MULTIPLE_MODIFIERS_MESSAGE);
+        }
     }
 
     public static function visibilityFromMarker(string $text): int

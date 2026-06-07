@@ -27,6 +27,7 @@ function php_compiler_jit_prepare_embed_code(string $filename, string $code): st
  */
 function run(string $filename, string $code, array $options): void
 {
+    $userSource = $code;
     $code = php_compiler_jit_prepare_embed_code($filename, $code);
     $runtime = new Runtime();
     $queryString = $options['-q'] ?? null;
@@ -60,9 +61,16 @@ function run(string $filename, string $code, array $options): void
         $runtime->setDebug($debugFile);
     }
     $block = $runtime->parseAndCompile($code, $filename);
+    if (null !== $block) {
+        $runtime->compiler->reconcileHaltCompilerOffsetFromSource($userSource);
+        if (null !== $runtime->compiler->getHaltCompilerOffset()) {
+            $block->haltCompilerOffset = $runtime->compiler->getHaltCompilerOffset();
+        }
+    }
     if (null !== $block && Block::requiresVmLowering($block)) {
         // Generators, readonly, fibers, typed returns in script scope, etc. still VM-fallback (#2114).
-        // Try/catch/finally in functions uses MCJIT via TryCatchHelper (#4246).
+        // Script-scope try/catch/throw uses MCJIT via TryCatchHelper (#4246, #4137).
+        // finally in script scope still VM-fallback until #2114 phase B.
     } else {
         $runtime->jit($block, $code, $filename);
     }

@@ -62,4 +62,39 @@ PHP;
         $runtime->run($block);
         $this->assertSame("1\n", ob_get_clean());
     }
+
+    public function testDuplicateTraitInUseListDedupesSilently(): void
+    {
+        $runtime = new Runtime();
+        $code = <<<'PHP'
+<?php
+trait T { public function foo(): int { return 1; } }
+class C { use T, T; }
+echo (new C())->foo(), "\n";
+PHP;
+        $block = $runtime->parseAndCompile($code, 'duplicate_use.php');
+        $this->assertNotNull($block);
+        ob_start();
+        $runtime->run($block);
+        $this->assertSame("1\n", ob_get_clean());
+    }
+
+    public function testDuplicateTraitInSeparateUseStatementsDedupesSilently(): void
+    {
+        $runtime = new Runtime();
+        $code = <<<'PHP'
+<?php
+trait T { public function foo(): int { return 1; } }
+class C {
+    use T;
+    use T;
+}
+echo (new C())->foo(), "\n";
+PHP;
+        $block = $runtime->parseAndCompile($code, 'duplicate_use_separate.php');
+        $this->assertNotNull($block);
+        ob_start();
+        $runtime->run($block);
+        $this->assertSame("1\n", ob_get_clean());
+    }
 }

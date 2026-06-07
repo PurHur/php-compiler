@@ -7,6 +7,7 @@ namespace PHPCompiler\ext\standard;
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
@@ -19,14 +20,16 @@ final class rawurlencode extends Internal
         if (1 !== \count($frame->calledArgs)) {
             throw new \LogicException('rawurlencode() requires exactly one argument');
         }
-        $v = $frame->calledArgs[0]->resolveIndirect();
+        $subject = VmString::coerceStringBuiltinArg(
+            $frame->calledArgs[0],
+            'rawurlencode',
+            0,
+            'string'
+        );
         if (null === $frame->returnVar) {
             return;
         }
-        if (Variable::TYPE_STRING !== $v->type) {
-            throw new \LogicException('rawurlencode() only supports strings in this compiler build');
-        }
-        $frame->returnVar->string(VmString::rawurlencode($v->toString()));
+        $frame->returnVar->string(VmString::rawurlencode($subject));
     }
 
     public function call(Context $context, JITVariable ...$args): Value
@@ -35,7 +38,9 @@ final class rawurlencode extends Internal
             throw new \LogicException('rawurlencode() requires exactly one argument');
         }
 
-        return JitUrlencode::rawurlencode($context, $this->jitString($context, $args[0], 'rawurlencode() argument #1'));
+        $str = JitStringBuiltinArg::lower($context, $args[0], 'rawurlencode', 0, 'string');
+
+        return JitUrlencode::rawurlencode($context, $str);
     }
 
 }

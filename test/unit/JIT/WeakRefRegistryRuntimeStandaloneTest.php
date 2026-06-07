@@ -30,11 +30,21 @@ final class WeakRefRegistryRuntimeStandaloneTest extends TestCase
                 'phpc_weakref_clear_object',
                 'phpc_weakref_clear_object_typed',
                 'phpc_weakref_format_object_key',
+                'phpc_gc_notify_object_freed',
             ] as $name
         ) {
             $fn = $ctx->lookupFunction($name);
             $this->assertNotNull($fn);
             $this->assertGreaterThan(0, $fn->countBasicBlocks());
         }
+    }
+
+    public function testPhpcGcNoLongerReferencesWeakrefClearSymbols(): void
+    {
+        $gc = file_get_contents(__DIR__.'/../../../lib/AOT/runtime/phpc_gc.c');
+        $this->assertIsString($gc);
+        $this->assertStringNotContainsString('phpc_weakref_clear_object', $gc);
+        $this->assertStringContainsString('phpc_gc_notify_object_freed', $gc);
+        $this->assertFileDoesNotExist(__DIR__.'/../../../lib/AOT/runtime/phpc_weakref.c');
     }
 }

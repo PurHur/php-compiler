@@ -17,21 +17,13 @@ use PHPLLVM\Value;
  */
 final class show_source extends Internal
 {
-    private highlight_file $delegate;
-
-    public function __construct()
-    {
-        parent::__construct('show_source');
-        $this->delegate = new highlight_file();
-    }
-
     public function execute(Frame $frame): void
     {
-        $this->delegate->execute($frame);
+        highlight_file::run($frame, $this->getName());
     }
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        return $this->delegate->call($context, ...$args);
+        throw new \LogicException('show_source() is VM only in this compiler build');
     }
 }

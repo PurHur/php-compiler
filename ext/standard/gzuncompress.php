@@ -7,6 +7,8 @@ namespace PHPCompiler\ext\standard;
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\JitLongArg;
+use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
@@ -25,13 +27,7 @@ final class gzuncompress extends Internal
         if ($argc < 1 || $argc > 2) {
             throw new \LogicException('gzuncompress() expects one or two arguments in this compiler build');
         }
-        if (null === $frame->returnVar) {
-            return;
-        }
-        $data = $frame->calledArgs[0]->resolveIndirect();
-        if (Variable::TYPE_STRING !== $data->type) {
-            throw new \LogicException('gzuncompress() data must be a string in this compiler build');
-        }
+        $data = VmString::coerceStringBuiltinArg($frame->calledArgs[0], 'gzuncompress', 0, 'data');
         $maxLength = 0;
         if (2 === $argc) {
             $maxVar = $frame->calledArgs[1]->resolveIndirect();
@@ -40,7 +36,10 @@ final class gzuncompress extends Internal
             }
             $maxLength = $maxVar->toInt();
         }
-        $result = VmZlib::gzuncompress($data->toString(), $maxLength);
+        if (null === $frame->returnVar) {
+            return;
+        }
+        $result = VmZlib::gzuncompress($data, $maxLength);
         if (false === $result) {
             VmZlib::triggerWarning($frame, 'gzuncompress(): data error');
 
@@ -53,6 +52,19 @@ final class gzuncompress extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        throw new \LogicException('gzuncompress() is not implemented for JIT in this compiler build (issue #3194)');
+        $argc = \count($args);
+        if ($argc < 1 || $argc > 2) {
+            throw new \LogicException('gzuncompress() expects one or two arguments in this compiler build');
+        }
+        $maxLength = $context->getTypeFromString('int64')->constInt(0, false);
+        if (2 === $argc) {
+            $maxLength = JitLongArg::lower($context, $args[1], 'gzuncompress() max_length');
+        }
+
+        return JitZlib::uncompress(
+            $context,
+            JitStringBuiltinArg::lower($context, $args[0], 'gzuncompress', 0, 'data'),
+            $maxLength
+        );
     }
 }

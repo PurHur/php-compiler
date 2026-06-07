@@ -8,6 +8,7 @@ declare(strict_types=1);
 
 namespace PHPCompiler\ext\standard;
 
+use PHPCompiler\RuntimeStrictness;
 use PHPCompiler\VM;
 use PHPCompiler\VM\EnumCaseSupport;
 use PHPCompiler\VM\Variable;
@@ -46,7 +47,7 @@ final class VmString
         if (Variable::TYPE_ARRAY === $var->type) {
             throw new \TypeError(self::stringBuiltinTypeError($function, $argIndex, $paramName, 'array'));
         }
-        if (EnumCaseSupport::isEnumCaseVariable($var)) {
+        if (RuntimeStrictness::enforceStringBuiltinParityGuards() && EnumCaseSupport::isEnumCaseVariable($var)) {
             throw new \TypeError(
                 self::stringBuiltinTypeError(
                     $function,
@@ -83,6 +84,47 @@ final class VmString
         return self::coerceStringBuiltinArg($var, $function, 0, 'directory');
     }
 
+    /**
+     * Coerce a ?string builtin operand (php-src Z_PARAM_STR with null; #6536 session_name).
+     *
+     * @throws \TypeError when the operand cannot be converted like Zend PHP 8.x
+     */
+    public static function coerceNullableStringBuiltinArg(
+        Variable $var,
+        string $function,
+        int $argIndex = 0,
+        string $paramName = 'string'
+    ): ?string {
+        $var = $var->resolveIndirect();
+        if (Variable::TYPE_NULL === $var->type) {
+            return null;
+        }
+        if (Variable::TYPE_ARRAY === $var->type) {
+            throw new \TypeError(self::nullableStringBuiltinTypeError($function, $argIndex, $paramName, 'array'));
+        }
+        if (EnumCaseSupport::isEnumCaseVariable($var)) {
+            throw new \TypeError(
+                self::nullableStringBuiltinTypeError(
+                    $function,
+                    $argIndex,
+                    $paramName,
+                    EnumCaseSupport::typeNameForVariable($var)
+                )
+            );
+        }
+        if (Variable::TYPE_OBJECT === $var->type) {
+            $vm = VM::running();
+            $object = $var->toObject();
+            if (null === $vm || !$vm->hasInstanceMethod($object->class, '__tostring')) {
+                throw new \TypeError(
+                    self::nullableStringBuiltinTypeError($function, $argIndex, $paramName, $object->class->name)
+                );
+            }
+        }
+
+        return self::coerceOperand($var);
+    }
+
     private static function stringBuiltinTypeError(
         string $function,
         int $argIndex,
@@ -91,6 +133,21 @@ final class VmString
     ): string {
         return sprintf(
             '%s(): Argument #%d ($%s) must be of type string, %s given',
+            $function,
+            $argIndex + 1,
+            $paramName,
+            $given
+        );
+    }
+
+    private static function nullableStringBuiltinTypeError(
+        string $function,
+        int $argIndex,
+        string $paramName,
+        string $given
+    ): string {
+        return sprintf(
+            '%s(): Argument #%d ($%s) must be of type ?string, %s given',
             $function,
             $argIndex + 1,
             $paramName,
@@ -544,6 +601,34 @@ final class VmString
         return 0;
     }
 
+    /**
+     * memcmp() — zend_binary_strcmp (php-src ext/standard/string.c, #7118).
+     */
+    public static function memcmp(string $a, string $b, int $length): int
+    {
+        if ($length <= 0) {
+            return 0;
+        }
+        $lenA = self::byteLength($a);
+        $lenB = self::byteLength($b);
+        $compare = $length;
+        if ($compare > $lenA) {
+            $compare = $lenA;
+        }
+        if ($compare > $lenB) {
+            $compare = $lenB;
+        }
+        for ($i = 0; $i < $compare; ++$i) {
+            $ordA = self::byteOrd($a[$i]);
+            $ordB = self::byteOrd($b[$i]);
+            if ($ordA !== $ordB) {
+                return $ordA - $ordB;
+            }
+        }
+
+        return $lenA <=> $lenB;
+    }
+
     public static function strcasecmp(string $a, string $b): int
     {
         $lenA = self::byteLength($a);
@@ -871,6 +956,9 @@ final class VmString
         return [$start, $length];
     }
 
+    /**
+     * PHP 8.4 (GH-12592): empty $mask returns 0; strcspn() returns full segment byte length.
+     */
     public static function strspn(string $str, string $mask, int $offset = 0, ?int $length = null): int
     {
         $slen = self::byteLength($str);
@@ -890,6 +978,9 @@ final class VmString
         return $count;
     }
 
+    /**
+     * PHP 8.4 (GH-12592): empty $mask returns full segment byte length (not NUL-terminated walk).
+     */
     public static function strcspn(string $str, string $mask, int $offset = 0, ?int $length = null): int
     {
         $slen = self::byteLength($str);

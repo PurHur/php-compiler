@@ -91,6 +91,81 @@ PHP;
         $this->assertSame('5', ob_get_clean());
     }
 
+    /** Issue #6851: enum case value as first-class callable must compile then Error at runtime. */
+    public function testVmEnumCaseValueFirstClassCallableThrowsError(): void
+    {
+        $code = <<<'PHP'
+<?php
+enum E: int {
+    case A = 1;
+}
+try {
+    (E::A)(...);
+} catch (Error $e) {
+    echo get_class($e), ': ', $e->getMessage(), "\n";
+}
+PHP;
+        $rt = new Runtime();
+        $block = $rt->parseAndCompile($code, 'test.php');
+        ob_start();
+        $rt->run($block);
+        $this->assertSame("Error: Object of type E is not callable\n", ob_get_clean());
+    }
+
+    /** Issue #6845: enum case instance method first-class callable (E::A->f(...)). */
+    public function testVmEnumCaseMethodFirstClassCallable(): void
+    {
+        $code = <<<'PHP'
+<?php
+enum E {
+    case A;
+    public function f(): string { return 'a'; }
+}
+$c = E::A->f(...);
+echo $c();
+PHP;
+        $rt = new Runtime();
+        $block = $rt->parseAndCompile($code, 'test.php');
+        ob_start();
+        $rt->run($block);
+        $this->assertSame('a', ob_get_clean());
+    }
+
+    /** Issue #7025: backed enum E::from(...)/tryFrom(...) first-class static callable. */
+    public function testVmBackedEnumFromFirstClassCallable(): void
+    {
+        $code = <<<'PHP'
+<?php
+enum E: int {
+    case A = 1;
+}
+$from = E::from(...);
+echo $from(1)->name;
+PHP;
+        $rt = new Runtime();
+        $block = $rt->parseAndCompile($code, 'test.php');
+        ob_start();
+        $rt->run($block);
+        $this->assertSame('A', ob_get_clean());
+    }
+
+    public function testVmBackedEnumTryFromFirstClassCallableReturnsNull(): void
+    {
+        $code = <<<'PHP'
+<?php
+enum E: int {
+    case A = 1;
+}
+$tryFrom = E::tryFrom(...);
+var_export($tryFrom(99));
+PHP;
+        $rt = new Runtime();
+        $block = $rt->parseAndCompile($code, 'test.php');
+        ob_start();
+        $rt->run($block);
+        $this->assertSame('NULL', ob_get_clean());
+    }
+
     /** Issue #4957: TypeReconstructor must not call missing Type::array(). */
     public function testVmInstanceMethodFirstClassCallableOnNewExpression(): void
     {

@@ -15,8 +15,10 @@ use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\HashTableHelper;
+use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\Variable as JITVariable;
+use PHPCompiler\VM\EnumCaseSupport;
 use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
 
@@ -46,7 +48,8 @@ final class implode extends Internal
                 'array'
             );
         } else {
-            $glue = $frame->calledArgs[0]->resolveIndirect()->toString();
+            self::rejectEnumSeparator($frame->calledArgs[0], $this->getName());
+            $glue = VmString::coerceOperand($frame->calledArgs[0]);
             $ht = VmArray::requireArrayParam(
                 $frame->calledArgs[1],
                 $this->getName(),
@@ -81,7 +84,14 @@ final class implode extends Internal
             );
             $haystack = $this->loadHaystack($context, $args[0], false);
         } else {
-            $glue = $this->jitString($context, $args[0], $this->getName().'() glue');
+            $glue = JitStringBuiltinArg::lower(
+                $context,
+                $args[0],
+                $this->getName(),
+                0,
+                'separator',
+                'array|string'
+            );
             $haystack = $this->loadHaystack($context, $args[1], true);
         }
 
@@ -112,5 +122,21 @@ final class implode extends Internal
         }
 
         return $context->getTypeFromString('__hashtable__*')->constNull();
+    }
+
+    /**
+     * php-src Z_PARAM_STR on implode() separator — enum cases must TypeError (#7114, ext/standard/string.c).
+     */
+    private static function rejectEnumSeparator(Variable $var, string $function): void
+    {
+        $var = $var->resolveIndirect();
+        if (!EnumCaseSupport::isEnumCaseVariable($var)) {
+            return;
+        }
+        throw new \TypeError(sprintf(
+            '%s(): Argument #1 ($separator) must be of type array|string, %s given',
+            $function,
+            EnumCaseSupport::typeNameForVariable($var)
+        ));
     }
 }

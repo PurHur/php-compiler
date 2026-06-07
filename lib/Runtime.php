@@ -25,16 +25,30 @@ use PHPCompiler\VM\Context as VMContext;
 use PHPCompiler\VM\ObjectRegistry;
 use PHPCompiler\JIT\Context as JITContext;
 use PHPCompiler\Ast\AsymmetricVisibilityRewriter;
+use PHPCompiler\Ast\GlobalTypedConstRewriter;
 use PHPCompiler\Ast\GroupUseStripper;
 use PHPCompiler\Ast\SealedClassAnnotator;
 use PHPCompiler\Ast\SealedClassPreprocessor;
+use PHPCompiler\Ast\StaticClassAnnotator;
+use PHPCompiler\Ast\StaticClassPreprocessor;
 use PHPCompiler\Ast\InOperatorDesugar;
+use PHPCompiler\Ast\ExitFunctionDesugar;
+use PHPCompiler\Ast\HexFloatLiteralDesugar;
+use PHPCompiler\Ast\NewDereferenceableDesugar;
+use PHPCompiler\Ast\CloneWithDesugar;
 use PHPCompiler\Ast\PipeOperatorDesugar;
+use PHPCompiler\Ast\VoidCastDesugar;
+use PHPCompiler\Ast\ReadonlyFunctionDesugar;
+use PHPCompiler\Ast\ReadonlyFunctionAnnotator;
 use PHPCompiler\Visitor\InOperatorResolver;
+use PHPCompiler\Visitor\ExitFunctionResolver;
+use PHPCompiler\Visitor\VoidCastResolver;
 use PHPCompiler\Web\Superglobals;
 use PHPCompiler\Lint\LintCompiler;
+use PHPCompiler\Compiler\CompileFatal;
 use PHPCompiler\VM\OutputBuffer;
 use PHPCompiler\VM\ShutdownQueue;
+use PHPCompiler\VM\ClassEntry;
 
 class Runtime {
     const MODE_NORMAL   = 0b0001;
@@ -56,6 +70,8 @@ class Runtime {
     public array $modules = [];
     public int $mode;
     private SealedClassAnnotator $sealedClassAnnotator;
+    private StaticClassAnnotator $staticClassAnnotator;
+    private ReadonlyFunctionAnnotator $readonlyFunctionAnnotator;
     public ?string $debugFile = null;
 
     public TypeReconstructor $typeReconstructor;
@@ -86,6 +102,7 @@ class Runtime {
 
     public function __construct(int $mode = self::MODE_NORMAL) {
         ObjectRegistry::reset();
+        ext\standard\ModuleRegistry::reset();
         self::clearLastParseFailure();
         $this->mode = $mode;
         $this->initParsePipeline();
@@ -101,11 +118,16 @@ class Runtime {
             new NodeVisitor\NameResolver
         );
         $astTraverser->addVisitor(new Ast\EnumCaseImportRewriter());
+        $astTraverser->addVisitor(new Ast\EnumCaseMatchSwitchRewriter());
         $astTraverser->addVisitor(new GroupUseStripper());
         $this->abstractEnumMarker = new Ast\AbstractEnumMarker();
         $astTraverser->addVisitor($this->abstractEnumMarker);
         $this->sealedClassAnnotator = new SealedClassAnnotator();
         $astTraverser->addVisitor($this->sealedClassAnnotator);
+        $this->staticClassAnnotator = new StaticClassAnnotator();
+        $astTraverser->addVisitor($this->staticClassAnnotator);
+        $this->readonlyFunctionAnnotator = new ReadonlyFunctionAnnotator();
+        $astTraverser->addVisitor($this->readonlyFunctionAnnotator);
         $astTraverser->addVisitor(new Ast\EnumPropertyCompileCheck());
         $this->parser = new Parser(
             (new ParserFactory)->create(ParserFactory::ONLY_PHP7),
@@ -114,6 +136,8 @@ class Runtime {
 
         $this->preprocessor = new Traverser;
         $this->preprocessor->addVisitor(new InOperatorResolver);
+        $this->preprocessor->addVisitor(new ExitFunctionResolver);
+        $this->preprocessor->addVisitor(new VoidCastResolver);
         $this->preprocessor->addVisitor(new Visitor\Simplifier);
         $this->preprocessor->addVisitor(new Visitor\DeadBlockEliminator);
         $this->postprocessor = new Traverser;
@@ -181,10 +205,22 @@ class Runtime {
         $this->load(new ext\spl\Module);
         $this->load(new ext\intl\Module);
         $this->load(new ext\zip\Module);
+        $this->load(new ext\xml\Module);
+        $this->load(new ext\gd\Module);
         $this->load(new ext\mbstring\Module);
         $this->load(new ext\filter\Module);
+        $this->load(new ext\calendar\Module);
         $this->load(new ext\session\Module);
         $this->load(new ext\bcmath\Module);
+        $this->load(new ext\openssl\Module);
+        $this->load(new ext\curl\Module);
+        $this->load(new ext\hash\Module);
+        $this->load(new ext\posix\Module);
+        $this->load(new ext\ctype\Module);
+        $this->load(new ext\tokenizer\Module);
+        $this->load(new ext\random\Module);
+        $this->load(new ext\igbinary\Module);
+        $this->load(new ext\msgpack\Module);
         $this->load(new ext\standard\Module);
     }
 
@@ -292,6 +328,7 @@ class Runtime {
     public function load(Module $module): void {
         $this->modules[] = $module;
         $module->init($this);
+        ext\standard\ModuleRegistry::registerModule($module);
         foreach ($module->getFunctions() as $function) {
             $this->vmContext->declareFunction($function);
         }
@@ -299,11 +336,23 @@ class Runtime {
 
     public function preprocessSourceForParse(string $code, string $filename = 'unknown'): array
     {
-        CurlyBraceOffsetRejector::reject($code, $filename);
         $sealedPreprocessor = new SealedClassPreprocessor();
         [$code, $permitsByLine] = $sealedPreprocessor->preprocess($code);
         $this->sealedClassAnnotator->setPermitsByLine($permitsByLine);
-        [$code, $this->vmContext->propertyHookRegistry] = (new SourcePreprocessor\PropertyHooks())->process($code);
+        $staticPreprocessor = new StaticClassPreprocessor();
+        [$code, $staticLines] = $staticPreprocessor->preprocess($code);
+        $this->staticClassAnnotator->setStaticLines($staticLines);
+        [$code, $newRegistry] = (new SourcePreprocessor\PropertyHooks())->process($code, $filename);
+        if (\PHPCompiler\ext\standard\VmEval::EVAL_FILENAME === $filename) {
+            $this->vmContext->propertyHookRegistry = self::mergePropertyHookRegistry(
+                $this->vmContext->propertyHookRegistry,
+                $newRegistry
+            );
+        } else {
+            $this->vmContext->propertyHookRegistry = $newRegistry;
+        }
+        CurlyBraceOffsetRejector::reject($code, $filename);
+        ReadonlyMethodModifierRejector::reject($code, $filename);
         $code = EnumCaseListRewriter::rewrite($code);
         $code = SwitchCommaCaseRewriter::rewrite($code);
         $code = GenericArrayTypeSourceRewriter::rewrite($code);
@@ -314,21 +363,71 @@ class Runtime {
     }
 
     /**
+     * eval() compile units append hook metadata; file units replace (#7030, #7031).
+     *
+     * @param array<string, array<string, array<string, mixed>>> $existing
+     * @param array<string, array<string, array<string, mixed>>> $incoming
+     *
+     * @return array<string, array<string, array<string, mixed>>>
+     */
+    public static function mergePropertyHookRegistry(array $existing, array $incoming): array
+    {
+        foreach ($incoming as $classLc => $props) {
+            if (!isset($existing[$classLc])) {
+                $existing[$classLc] = $props;
+
+                continue;
+            }
+            foreach ($props as $prop => $meta) {
+                $existing[$classLc][$prop] = array_merge($existing[$classLc][$prop] ?? [], $meta);
+            }
+        }
+
+        return $existing;
+    }
+
+    /**
+     * Full preprocess + parser desugar chain shared by VM, JIT, AOT, lint, and include discovery.
+     *
+     * Order is SSOT: sealed/static preprocessors, {@see SourcePreprocessor\PropertyHooks} (before
+     * {@see CurlyBraceOffsetRejector}), enum/switch/generic rewriters, bare-throw rewrite, then
+     * parser desugar passes (#6650, #6654).
+     *
+     * @return array{0: string, 1: array<int, true>}
+     */
+    public function prepareSourceForParser(string $code, string $filename = 'unknown'): array
+    {
+        [$code, $bareRethrowLines] = $this->preprocessSourceForParse($code, $filename);
+        $code = $this->rewriteSourceBeforeParser($code);
+
+        return [$code, $bareRethrowLines];
+    }
+
+    /**
      * Source rewrites applied immediately before php-parser / PHPCfg (issue #3243, #4456).
      *
      * Must run on any path that calls Parser::parse() directly (AOT include discovery, etc.).
      */
     public function rewriteSourceBeforeParser(string $code): string
     {
+        $code = GlobalTypedConstRewriter::rewrite($code);
         $code = AsymmetricVisibilityRewriter::rewrite($code);
+        $code = HexFloatLiteralDesugar::desugar($code);
+        $code = NewDereferenceableDesugar::desugar($code);
         $code = InOperatorDesugar::desugar($code);
-        return PipeOperatorDesugar::desugar($code);
+        $code = ExitFunctionDesugar::desugar($code);
+        $code = CloneWithDesugar::desugar($code);
+        $code = VoidCastDesugar::desugar($code);
+        $code = PipeOperatorDesugar::desugar($code);
+        [$code, $readonlyFunctionLines] = ReadonlyFunctionDesugar::desugar($code);
+        $this->readonlyFunctionAnnotator->setReadonlyLines($readonlyFunctionLines);
+
+        return $code;
     }
 
     public function parse(string $code, string $filename): Script {
-        [$code, $bareRethrowLines] = $this->preprocessSourceForParse($code, $filename);
+        [$code, $bareRethrowLines] = $this->prepareSourceForParser($code, $filename);
         $this->compiler->setBareRethrowLines($bareRethrowLines);
-        $code = $this->rewriteSourceBeforeParser($code);
         $fileStrictTypes = $this->detectFileStrictTypes($code);
         try {
             $script = $this->parser->parse($code, $filename);
@@ -421,8 +520,13 @@ class Runtime {
     {
         $detail = $this->compiler->getCompileAbortDetail();
         $primary = null !== $detail && '' !== $detail ? $detail : $e->getMessage();
-        $this->recordLastParseFailure(sprintf('%s: %s', $sourcePath, $primary));
-        $line = sprintf("parseAndCompile failure: target=%s: %s\n", $sourcePath, $primary);
+        if ($e instanceof CompileFatal) {
+            $line = $e->zendStderrLine();
+            $this->recordLastParseFailure(sprintf('%s: %s', $e->sourceFile, $primary));
+        } else {
+            $this->recordLastParseFailure(sprintf('%s: %s', $sourcePath, $primary));
+            $line = sprintf("parseAndCompile failure: target=%s: %s\n", $sourcePath, $primary);
+        }
         $context = null;
         if (null !== $sourceCode && $e instanceof \PhpParser\Error) {
             $context = $this->formatPhpParserErrorContext($sourceCode, $e);
@@ -481,6 +585,8 @@ class Runtime {
     }
 
     public function compile(Script $script): ?Block {
+        $this->compiler->setPropertyHookRegistry($this->vmContext->propertyHookRegistry);
+        $this->compiler->setKnownClassReadonly(self::knownClassReadonlyForCompileCheck($this->vmContext->classes));
         /** @var mixed $block */
         $block = $this->compiler->compile($script);
         if (!$block instanceof Block) {
@@ -653,7 +759,13 @@ class Runtime {
 
             return $block;
         } catch (\Throwable $e) {
-            $this->emitParseCompileFailureStderr($filename, $e, $code);
+            if (\PHPCompiler\ext\standard\VmEval::EVAL_FILENAME === $filename) {
+                $detail = $this->compiler->getCompileAbortDetail();
+                $primary = null !== $detail && '' !== $detail ? $detail : $e->getMessage();
+                $this->recordLastParseFailure(sprintf('%s: %s', $filename, $primary));
+            } else {
+                $this->emitParseCompileFailureStderr($filename, $e, $code);
+            }
             throw $e;
         }
     }
@@ -778,6 +890,36 @@ class Runtime {
             OutputBuffer::endAllAtShutdown();
             Superglobals::setActiveContext(null);
         }
+    }
+
+    /**
+     * @param array<string, ClassEntry> $classes
+     *
+     * @return array<string, array{display: string, readonly: bool, extends: ?string}>
+     */
+    private static function knownClassReadonlyForCompileCheck(array $classes): array
+    {
+        $known = [];
+        foreach ($classes as $lc => $entry) {
+            if (!$entry instanceof ClassEntry) {
+                continue;
+            }
+            if ($entry->isInterface || $entry->isTrait || $entry->isEnum) {
+                continue;
+            }
+            $display = $entry->name;
+            if (str_contains($display, '\\')) {
+                $parts = explode('\\', ltrim($display, '\\'));
+                $display = end($parts) ?: $display;
+            }
+            $known[$lc] = [
+                'display' => $display,
+                'readonly' => $entry->readonly,
+                'extends' => $entry->parentLc,
+            ];
+        }
+
+        return $known;
     }
 
 }

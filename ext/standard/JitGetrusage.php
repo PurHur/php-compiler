@@ -34,16 +34,6 @@ final class JitGetrusage
 
     private static function jitWhoArg(Context $context, JITVariable $arg): Value
     {
-        if (JITVariable::TYPE_NATIVE_LONG === $arg->type) {
-            return $context->helper->loadValue($arg);
-        }
-        if (JITVariable::TYPE_VALUE === $arg->type) {
-            return $context->builder->call(
-                $context->lookupFunction('__value__readLong'),
-                $arg->value
-            );
-        }
-
-        throw new \LogicException('getrusage() who must be an integer in this compiler build');
+        return JitGetrusageArg::lowerMode($context, $arg);
     }
 }

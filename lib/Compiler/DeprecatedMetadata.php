@@ -64,6 +64,26 @@ final class DeprecatedMetadata
         return 'Constant '.$class.'::'.$constant.' is deprecated'.$this->suffix();
     }
 
+    public function formatClass(string $name): string
+    {
+        return 'Class '.$name.' is deprecated'.$this->suffix();
+    }
+
+    public function formatEnum(string $name): string
+    {
+        return 'Enum '.$name.' is deprecated'.$this->suffix();
+    }
+
+    public function formatEnumCase(string $class, string $case): string
+    {
+        return 'Enum case '.$class.'::'.$case.' is deprecated'.$this->suffix();
+    }
+
+    public function formatProperty(string $class, string $property): string
+    {
+        return 'Property '.$class.'::$'.$property.' is deprecated'.$this->suffix();
+    }
+
     private function suffix(): string
     {
         if (null !== $this->since && null !== $this->message) {
@@ -116,6 +136,12 @@ final class DeprecatedMetadata
     {
         if ($node instanceof Node\Scalar\String_) {
             return $node->value;
+        }
+        if ($node instanceof Node\Scalar\LNumber) {
+            return (string) $node->value;
+        }
+        if ($node instanceof Node\Scalar\DNumber) {
+            return (string) $node->value;
         }
 
         return null;

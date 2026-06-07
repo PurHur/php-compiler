@@ -219,6 +219,25 @@ class Value extends Type {
         
 
         
+    $fntype___cfcd208495d565ef66e7dff9f98764da = $this->context->context->functionType(
+                $this->context->getTypeFromString('void'),
+                false , 
+                $this->context->getTypeFromString('__value__*')
+                , $this->context->getTypeFromString('int32')
+                
+            );
+            $fn___cfcd208495d565ef66e7dff9f98764da = $this->context->module->addFunction('__value__writeBool', $fntype___cfcd208495d565ef66e7dff9f98764da);
+            $fn___cfcd208495d565ef66e7dff9f98764da->addAttributeAtIndex(\PHPLLVM\Attribute::INDEX_FUNCTION, $this->context->attributes['alwaysinline']);
+            
+            
+            
+            
+            $this->context->registerFunction('__value__writeBool', $fn___cfcd208495d565ef66e7dff9f98764da);
+        
+
+        
+
+        
     
     }
 
@@ -232,6 +251,7 @@ class Value extends Type {
         $this->implementValueWriteString();
         $this->implementValueWriteNull();
         $this->implementValueDelref();
+        \PHPCompiler\JIT\Builtin\ValueBoxWriteBoolJit::implement($this->context);
     }
 
     public function initialize(): void {

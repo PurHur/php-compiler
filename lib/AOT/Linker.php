@@ -11,47 +11,28 @@ use PHPCompiler\JIT\AotDebugSymbols;
  */
 final class Linker
 {
-    /** @var list<string> */
+    /**
+     * Bundled C runtime objects for AOT link.
+     *
+     * phpc_progress.c is a frozen thin ABI only (#7146, #7360): async-signal-safe SIGSEGV handler
+     * that write(2)s phpc_last_progress globals filled by ProgressNoteRuntime.php.
+     * Do not add progress formatting or buffer writes in C — use lib/JIT/Builtin/ProgressNoteRuntime.php.
+     * Opt out via PHP_COMPILER_PROGRESS_ABI=0 (see runtimeCSources()).
+     *
+     * @var list<string>
+     */
     private const RUNTIME_C_SOURCES = [
         __DIR__.'/runtime/superglobals_refresh.c',
-        __DIR__.'/runtime/phpc_env_local.c',
-        __DIR__.'/runtime/phpc_pending_headers.c',
-        __DIR__.'/runtime/hash_crypto.c',
-        __DIR__.'/runtime/phpc_version_compare.c',
-        __DIR__.'/runtime/phpc_spaceship.c',
-        __DIR__.'/runtime/phpc_str_getcsv.c',
-        __DIR__.'/runtime/password_crypto.c',
-        __DIR__.'/runtime/phpc_fs_dir.c',
-        __DIR__.'/runtime/phpc_dir.c',
-        __DIR__.'/runtime/phpc_upload_temp.c',
-        __DIR__.'/runtime/phpc_value_box.c',
-        __DIR__.'/runtime/phpc_session_lifecycle.c',
-        __DIR__.'/runtime/phpc_session_storage.c',
-        __DIR__.'/runtime/phpc_ob.c',
-        __DIR__.'/runtime/phpc_parse_url.c',
-        __DIR__.'/runtime/phpc_parse_str.c',
-        __DIR__.'/runtime/phpc_json_decode.c',
-        __DIR__.'/runtime/phpc_unserialize.c',
+        __DIR__.'/../JIT/Builtin/hash_crypto_jit_runtime.c',
         __DIR__.'/runtime/phpc_stream.c',
-        __DIR__.'/runtime/phpc_process.c',
-        __DIR__.'/runtime/preg_match.c',
-        __DIR__.'/runtime/phpc_pack.c',
-        __DIR__.'/runtime/phpc_var_export.c',
-        __DIR__.'/runtime/phpc_error_handler.c',
-        __DIR__.'/runtime/phpc_class_methods.c',
-        __DIR__.'/runtime/phpc_cli_argv.c',
+        __DIR__.'/runtime/phpc_progress.c',
         __DIR__.'/runtime/phpc_gc.c',
     ];
 
-    private const RUNTIME_LINK_LIBS = '-lpcre2-8 -lcrypt';
+    private const RUNTIME_LINK_LIBS = '-lpcre2-8 -lcrypt -lz';
 
     /** Runtime units that need host libc headers (glob/scandir; llvm sysroot lacks linux/limits.h). */
     private const RUNTIME_HOST_LIBC_BASENAMES = [
-        'phpc_fs_dir.c',
-        'phpc_dir.c',
-        'phpc_upload_temp.c',
-        'preg_match.c',
-        'password_crypto.c',
     ];
 
     private static function which(string $binary): ?string
@@ -178,7 +159,7 @@ final class Linker
             }
         }
         $index = 0;
-        foreach (self::RUNTIME_C_SOURCES as $source) {
+        foreach (self::runtimeCSources() as $source) {
             if (!is_file($source)) {
                 continue;
             }
@@ -199,6 +180,31 @@ final class Linker
         }
 
         return $objects;
+    }
+
+    /**
+     * @return list<string>
+     */
+    private static function runtimeCSources(): array
+    {
+        if (self::progressAbiEnabled()) {
+            return self::RUNTIME_C_SOURCES;
+        }
+
+        return array_values(array_filter(
+            self::RUNTIME_C_SOURCES,
+            static fn (string $source): bool => !str_ends_with($source, 'phpc_progress.c')
+        ));
+    }
+
+    private static function progressAbiEnabled(): bool
+    {
+        $flag = getenv('PHP_COMPILER_PROGRESS_ABI');
+        if (false === $flag || '' === $flag) {
+            return true;
+        }
+
+        return '0' !== $flag && 'false' !== strtolower($flag);
     }
 
     /**
@@ -251,10 +257,6 @@ final class Linker
         } else {
             $flags = self::runtimeCIncludeFlags();
         }
-        if ('preg_match.c' === $basename) {
-            $flags .= ' -DPCRE2_CODE_UNIT_WIDTH=8';
-        }
-
         return $flags;
     }
 

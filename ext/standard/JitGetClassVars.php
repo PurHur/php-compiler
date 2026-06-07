@@ -34,14 +34,9 @@ final class JitGetClassVars
         $lc = strtolower(ltrim($className, '\\'));
         $vm = $context->runtime->vmContext;
         if (null !== $vm && isset($vm->classes[$lc])) {
-            $entry = $vm->classes[$lc];
-            if ($entry->isInterface || $entry->isTrait || $entry->isEnum) {
-                return self::returnFalse($context);
-            }
-
             return self::wrapHashTable(
                 $context,
-                self::emitFromVmClass($context, $entry)
+                self::emitFromVmClass($context, $vm->classes[$lc])
             );
         }
 
@@ -103,8 +98,33 @@ final class JitGetClassVars
             }
             $currentId = $object->lookup($parentName);
         }
+        foreach ($object->publicStaticPropertyDefaultEntries($classId) as $propName => $entry) {
+            if (isset($seen[$propName])) {
+                continue;
+            }
+            $keyStr = $context->builder->load($context->constantStringFromString($propName));
+            self::storeStaticPropertyDefault($context, $ht, $keyStr, $entry);
+            $seen[$propName] = true;
+        }
 
         return $ht;
+    }
+
+    /**
+     * @param array{type: int, value: int|float|bool|string|null} $entry
+     */
+    private static function storeStaticPropertyDefault(
+        Context $context,
+        Value $ht,
+        Value $keyStr,
+        array $entry
+    ): void {
+        $compileEntry = [
+            'propertyType' => $entry['type'],
+            'type' => $entry['type'],
+            'value' => $entry['value'],
+        ];
+        self::storeCompileTimeDefault($context, $ht, $keyStr, $compileEntry);
     }
 
     /**

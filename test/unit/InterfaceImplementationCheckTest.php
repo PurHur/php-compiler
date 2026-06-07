@@ -135,4 +135,172 @@ PHP;
         $runtime->run($block);
         $this->assertSame("ok\n", ob_get_clean());
     }
+
+    public function testPlainInterfacePropertyFailsAtCompileTime(): void
+    {
+        $runtime = new Runtime();
+        $code = <<<'PHP'
+<?php
+interface I {
+    public string $name;
+}
+class C implements I {
+    public string $name = 'x';
+}
+PHP;
+        $this->expectException(\CompileError::class);
+        $this->expectExceptionMessage('Interfaces may not include properties');
+        $runtime->parseAndCompile($code, 'plain_iface_property.php');
+    }
+
+    public function testInterfaceAsymmetricVisibilityPropertyCompiles(): void
+    {
+        $runtime = new Runtime();
+        $code = <<<'PHP'
+<?php
+interface I {
+    private(set) string $slug;
+}
+class C implements I {
+    public string $slug = 'b';
+}
+$c = new C();
+echo $c->slug, "\n";
+try {
+    $c->slug = 'x';
+    echo "set ok\n";
+} catch (Error $e) {
+    echo $e->getMessage(), "\n";
+}
+PHP;
+        $block = $runtime->parseAndCompile($code, 'iface_asymmetric_ok.php');
+        $this->assertNotNull($block);
+        ob_start();
+        $runtime->run($block);
+        $this->assertSame(
+            "b\nCannot modify private(set) property C::\$slug from global scope\n",
+            ob_get_clean()
+        );
+    }
+
+    public function testMissingInterfacePropertyHookFailsAtCompileTime(): void
+    {
+        $runtime = new Runtime();
+        $code = <<<'PHP'
+<?php
+interface I {
+    public int $x { get; set; }
+}
+class Bad implements I {
+    public int $y = 1;
+}
+PHP;
+        $this->expectException(\CompileError::class);
+        $this->expectExceptionMessage('Class Bad must implement 1 interface property');
+        $this->expectExceptionMessage('I::$x');
+        $this->expectExceptionMessage('{ get; set; }');
+        $runtime->parseAndCompile($code, 'missing_iface_property.php');
+    }
+
+    public function testImplementedInterfacePropertyHookCompiles(): void
+    {
+        $runtime = new Runtime();
+        $code = <<<'PHP'
+<?php
+interface I {
+    public int $x { get; set; }
+}
+class Good implements I {
+    public int $x = 1;
+}
+echo (new Good())->x, "\n";
+PHP;
+        $block = $runtime->parseAndCompile($code, 'iface_property_ok.php');
+        $this->assertNotNull($block);
+        ob_start();
+        $runtime->run($block);
+        $this->assertSame("1\n", ob_get_clean());
+    }
+
+    public function testConcreteClassAbstractPropertyHookFailsAtCompileTime(): void
+    {
+        $runtime = new Runtime();
+        $code = <<<'PHP'
+<?php
+class C {
+    public string $p {
+        get;
+    }
+}
+PHP;
+        $this->expectException(\CompileError::class);
+        $this->expectExceptionMessage('Class C contains 1 abstract method');
+        $this->expectExceptionMessage('C::$p::get');
+        $runtime->parseAndCompile($code, 'concrete_abstract_hook.php');
+    }
+
+    public function testMissingParentAbstractPropertyHooksFailsAtCompileTime(): void
+    {
+        $runtime = new Runtime();
+        $code = <<<'PHP'
+<?php
+abstract class A {
+    public string $p {
+        get;
+        set;
+    }
+}
+class B extends A {}
+PHP;
+        $this->expectException(\CompileError::class);
+        $this->expectExceptionMessage('Class B contains 2 abstract methods');
+        $this->expectExceptionMessage('A::$p::get');
+        $this->expectExceptionMessage('A::$p::set');
+        $runtime->parseAndCompile($code, 'missing_parent_hooks.php');
+    }
+
+    public function testEvalAbstractPropertyHookFailsAtCompileTime(): void
+    {
+        $runtime = new Runtime();
+        $outer = <<<'PHP'
+<?php
+$ok = eval('abstract class BaseE { abstract public string $x { get; } } class ChildE extends BaseE {}');
+echo ($ok === false ? 'eval-false' : 'eval-not-false'), "\n";
+echo class_exists('ChildE', false) ? "child-exists\n" : "child-missing\n";
+PHP;
+        $block = $runtime->parseAndCompile($outer, 'eval_abstract_property_hook.php');
+        ob_start();
+        $runtime->run($block);
+        $out = ob_get_clean();
+        $this->assertSame("eval-false\nchild-missing\n", $out);
+        $this->assertFalse(isset($runtime->vm()->context->classes['childe']));
+    }
+
+    public function testAbstractClassGetSetHooksSubclassCompiles(): void
+    {
+        $runtime = new Runtime();
+        $code = <<<'PHP'
+<?php
+abstract class A {
+    public string $p {
+        get;
+        set;
+    }
+}
+class B extends A {
+    public string $p {
+        get => $this->p;
+        set => $this->p = $value;
+    }
+}
+$b = new B();
+$b->p = 'hi';
+echo $b->p, "\n";
+PHP;
+        $block = $runtime->parseAndCompile($code, 'abstract_hooks_ok.php');
+        $this->assertNotNull($block);
+        ob_start();
+        $runtime->run($block);
+        $this->assertSame("hi\n", ob_get_clean());
+    }
 }

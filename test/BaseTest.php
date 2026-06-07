@@ -224,7 +224,19 @@ abstract class BaseTest extends TestCase {
             $this->fail("VM exited with code {$exitCode} for {$name}: {$detail}");
         }
         if (isset($sections['EXPECT']) || isset($sections['EXPECTF']) || isset($sections['EXPECTREGEX'])) {
-            $this->assertExpect($result, $sections);
+            $stderrTrim = trim($stderr);
+            $stdoutTrim = trim($result);
+            if (isset($sections['EXPECT_EXIT']) && '' !== $stdoutTrim && str_contains($stderrTrim, 'PHP Fatal error:')) {
+                // PHPT --EXPECT-- is stdout; uncaught fatals after partial output land on stderr (#7468).
+                $merged = $stdoutTrim;
+            } elseif ('' === $stderrTrim) {
+                $merged = $stdoutTrim;
+            } elseif ('' === $stdoutTrim) {
+                $merged = $stderrTrim;
+            } else {
+                $merged = $stderrTrim . "\n" . $stdoutTrim;
+            }
+            $this->assertExpect($merged, $sections);
         }
     }
 

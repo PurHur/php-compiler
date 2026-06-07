@@ -7,7 +7,7 @@ namespace PHPCompiler\ext\standard;
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Context;
-use PHPCompiler\JIT\JitStringArg;
+use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
@@ -28,12 +28,14 @@ final class html_entity_decode extends Internal
         if ($argc < 1 || $argc > 2) {
             throw new \LogicException('html_entity_decode() requires one or two arguments in this compiler build');
         }
-        $v = $frame->calledArgs[0]->resolveIndirect();
+        $string = VmString::coerceStringBuiltinArg(
+            $frame->calledArgs[0],
+            'html_entity_decode',
+            0,
+            'string'
+        );
         if (null === $frame->returnVar) {
             return;
-        }
-        if (Variable::TYPE_STRING !== $v->type) {
-            throw new \LogicException('html_entity_decode() only supports strings in this compiler build');
         }
         $flags = ENT_COMPAT;
         if ($argc >= 2) {
@@ -43,7 +45,7 @@ final class html_entity_decode extends Internal
             }
             $flags = $flagsVar->toInt();
         }
-        $frame->returnVar->string(VmString::html_entity_decode($v->toString(), $flags));
+        $frame->returnVar->string(VmString::html_entity_decode($string, $flags));
     }
 
     public Context $context;
@@ -81,7 +83,7 @@ final class html_entity_decode extends Internal
             );
         }
 
-        $str = JitStringArg::lower($context, $args[0], 'html_entity_decode() argument #1');
+        $str = JitStringBuiltinArg::lower($context, $args[0], 'html_entity_decode', 0, 'string');
         $i64 = $context->getTypeFromString('int64');
         $flagsVal = $i64->constInt($flags, false);
         if ($argc >= 2 && null === ($args[1]->compileTimeLong ?? null)) {

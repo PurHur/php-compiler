@@ -243,7 +243,7 @@ final class InheritanceVariance
                 }
             }
         }
-        if ($parent->isAbstract && count($child->params) > count($parent->params)) {
+        if (count($child->params) > count($parent->params)) {
             for ($i = count($parent->params); $i < count($child->params); ++$i) {
                 if (!($child->paramHasDefault[$i] ?? false)) {
                     return self::formatDeclarationError($childClass, $methodLc, $child, $parentClass, $parent);
@@ -371,7 +371,7 @@ final class InheritanceVariance
             return false;
         }
         if ($parent->isVoid()) {
-            return $child->isVoid();
+            return $child->isVoid() || $child->isNever();
         }
         if ($parent->isNever()) {
             return $child->isNever();
@@ -382,8 +382,15 @@ final class InheritanceVariance
         if ($parent->nullable && !$child->nullable && !$child->isVoid() && !$child->isNever()) {
             return false;
         }
+        if ($parent->static && !$child->static) {
+            return false;
+        }
         if ($parent->builtinScalar !== null || $child->builtinScalar !== null) {
-            return $parent->signatureKey($parentOwnerLc) === $child->signatureKey($childOwnerLc);
+            if ($parent->signatureKey($parentOwnerLc) === $child->signatureKey($childOwnerLc)) {
+                return true;
+            }
+
+            return self::isBuiltinReturnCovariant($parent, $child, $childOwnerLc, $classImplementsInterface);
         }
         $parentClass = $parent->resolveClassName($parentOwnerLc);
         $childClass = $child->resolveClassName($childOwnerLc);
@@ -393,11 +400,48 @@ final class InheritanceVariance
         if ($parentClass === $childClass) {
             return true;
         }
+        if ($parent->self && $child->static) {
+            if ($isClassSubtypeOf($childClass, $parentClass)) {
+                return true;
+            }
+
+            return $classImplementsInterface($childClass, $parentClass);
+        }
         if ($isClassSubtypeOf($childClass, $parentClass)) {
             return true;
         }
 
         return $classImplementsInterface($childClass, $parentClass);
+    }
+
+    /**
+     * Return-type covariance for built-in parent types (Zend zend_inheritance.c, issue #6710).
+     *
+     * @param callable(string, string): bool $classImplementsInterface
+     */
+    private static function isBuiltinReturnCovariant(
+        TypeSig $parent,
+        ?TypeSig $child,
+        string $childOwnerLc,
+        callable $classImplementsInterface
+    ): bool {
+        if (null === $child || null === $parent->builtinScalar) {
+            return false;
+        }
+        if ('object' === $parent->builtinScalar) {
+            return null !== $child->resolveClassName($childOwnerLc) || $child->self || $child->static;
+        }
+        if ('iterable' === $parent->builtinScalar) {
+            if ('array' === $child->builtinScalar) {
+                return true;
+            }
+            $childClass = $child->resolveClassName($childOwnerLc);
+            if (null !== $childClass) {
+                return $classImplementsInterface($childClass, 'traversable');
+            }
+        }
+
+        return false;
     }
 
     private function isParameterCompatible(
@@ -561,6 +605,11 @@ final class MethodSig
 
     public bool $isAbstract;
 
+    public bool $isFinal;
+
+    /** @see Func::FLAG_PUBLIC|FLAG_PROTECTED|FLAG_PRIVATE */
+    public int $visibilityFlags;
+
     /**
      * @param list<?TypeSig>   $params
      * @param list<string>     $paramNames
@@ -572,7 +621,9 @@ final class MethodSig
         array $paramNames,
         array $paramHasDefault,
         ?TypeSig $returnType,
-        bool $isAbstract = false
+        bool $isAbstract = false,
+        int $visibilityFlags = Func::FLAG_PUBLIC,
+        bool $isFinal = false
     ) {
         $this->ownerLc = $ownerLc;
         $this->params = $params;
@@ -580,6 +631,8 @@ final class MethodSig
         $this->paramHasDefault = $paramHasDefault;
         $this->returnType = $returnType;
         $this->isAbstract = $isAbstract;
+        $this->isFinal = $isFinal;
+        $this->visibilityFlags = $visibilityFlags;
     }
 
     public static function fromFunc(Func $func, string $ownerLc): self
@@ -593,6 +646,12 @@ final class MethodSig
             $hasDefault[] = null !== $param->defaultVar;
         }
         $isAbstract = 0 !== ($func->flags & Func::FLAG_ABSTRACT);
+        $visibility = $func->flags & (Func::FLAG_PUBLIC | Func::FLAG_PROTECTED | Func::FLAG_PRIVATE);
+        if (0 === $visibility) {
+            $visibility = Func::FLAG_PUBLIC;
+        }
+
+        $isFinal = 0 !== ($func->flags & Func::FLAG_FINAL);
 
         return new self(
             $ownerLc,
@@ -600,8 +659,20 @@ final class MethodSig
             $names,
             $hasDefault,
             TypeSig::fromCfgType($func->returnType),
-            $isAbstract
+            $isAbstract,
+            $visibility,
+            $isFinal
         );
+    }
+
+    /** Private parent methods are not visible to subclasses for #[\Override] (Zend find_override_method). */
+    public function isVisibleForOverrideFrom(string $childClassLc): bool
+    {
+        if (0 !== ($this->visibilityFlags & Func::FLAG_PRIVATE)) {
+            return $this->ownerLc === $childClassLc;
+        }
+
+        return true;
     }
 
     private static function paramNameFromOperand(Operand $name): string
@@ -715,6 +786,17 @@ final class TypeSig
         if ($type instanceof Op\Type\Reference) {
             $decl = $type->declaration;
             if ($decl instanceof Operand\Literal && is_string($decl->value)) {
+                $name = strtolower(ltrim($decl->value, '\\'));
+                if ('self' === $name) {
+                    $sig->self = true;
+
+                    return $sig;
+                }
+                if ('static' === $name) {
+                    $sig->static = true;
+
+                    return $sig;
+                }
                 $sig->classDisplay = ltrim($decl->value, '\\');
                 $sig->classLc = strtolower($sig->classDisplay);
 

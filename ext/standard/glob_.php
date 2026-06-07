@@ -6,13 +6,14 @@ namespace PHPCompiler\ext\standard;
 
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
+use PHPCompiler\JIT\Builtin\StringFsGlob;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitLongArg;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
 
-/** glob() — path pattern matching (VM via libc glob; JIT via __phpc_glob_vec, #4859). */
+/** glob() — path pattern matching (VM via VmFsGlob; JIT via StringFsGlobVecJit, #4859/#7405). */
 final class glob_ extends Internal
 {
     public function __construct()
@@ -70,6 +71,7 @@ final class glob_ extends Internal
         }
 
         $pattern = $this->jitString($context, $args[0], 'glob() argument #1');
+        StringFsGlob::ensureLinked($context);
 
         return JitFsGlob::glob($context, $pattern, $flags);
     }

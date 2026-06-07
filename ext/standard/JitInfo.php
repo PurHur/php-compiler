@@ -9,6 +9,7 @@ use PHPCompiler\JIT\Builtin\StringInfo;
 use PHPCompiler\JIT\Builtin\StringVersionCompare;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitStringArg;
+use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Builder;
@@ -99,8 +100,8 @@ final class JitInfo
         StringVersionCompare::ensureLinked($context);
         $raw = $context->builder->call(
             $context->lookupFunction('__compiler_version_compare'),
-            JitStringArg::lower($context, $ver1, 'version_compare() ver1'),
-            JitStringArg::lower($context, $ver2, 'version_compare() ver2')
+            JitStringBuiltinArg::lower($context, $ver1, 'version_compare', 0, 'version1'),
+            JitStringBuiltinArg::lower($context, $ver2, 'version_compare', 1, 'version2')
         );
         if (null === $operator) {
             $slot = JitValueBox::alloc($context);

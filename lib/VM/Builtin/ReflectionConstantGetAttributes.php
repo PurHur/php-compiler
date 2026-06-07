@@ -6,6 +6,7 @@ namespace PHPCompiler\VM\Builtin;
 
 use PHPCompiler\ext\standard\VmReflection;
 use PHPCompiler\Frame;
+use PHPCompiler\VM\AttributeRegistry;
 use PHPCompiler\VM\ReflectionSupport;
 
 /** ReflectionConstant::getAttributes() — VM read path (#4136). */
@@ -26,22 +27,14 @@ final class ReflectionConstantGetAttributes extends VmClassMethod
         if (null === $entry) {
             throw new \LogicException('ReflectionConstant refers to unknown class in this compiler build');
         }
-        $constLc = strtolower($constant);
-        $all = $entry->constAttributeNames[$constLc] ?? [];
-        $allEntries = $entry->constAttributeEntries[$constLc] ?? [];
         $filter = null;
         if (isset($frame->calledArgs[1])) {
-            $filter = VmReflection::stringArg($frame->calledArgs[1], 'ReflectionConstant::getAttributes() name');
-        }
-        $entries = ReflectionSupport::filterEntriesByName($allEntries, $filter);
-        if ([] !== $entries) {
-            $out = ReflectionSupport::attributesArrayFromEntries($frame, $entries);
-        } else {
-            $names = ReflectionSupport::filterByName($all, $filter);
-            $out = ReflectionSupport::attributesArray($frame, $names);
+            $filter = VmReflection::stringArg($frame->calledArgs[1], 'ReflectionConstant::getAttributes() name', 1);
         }
         if (null !== $frame->returnVar) {
-            $frame->returnVar->copyFrom($out);
+            $frame->returnVar->copyFrom(
+                AttributeRegistry::constantAttributes($frame, $entry, strtolower($constant), $filter)
+            );
         }
     }
 }

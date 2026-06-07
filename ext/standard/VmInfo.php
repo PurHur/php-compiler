@@ -8,12 +8,9 @@ use PHPCompiler\CompilerVersion;
 use PHPCompiler\VM\HashTable;
 use PHPCompiler\VM\Variable;
 
-/** VM helpers for phpversion/php_uname/php_sapi_name/version_compare/extension introspection (#3174, #3204). */
+/** VM helpers for phpversion/php_uname/php_sapi_name/version_compare/extension introspection (#3174, #3204, #7190). */
 final class VmInfo
 {
-    /** @var list<string> */
-    public const LOADED_EXTENSIONS = ['standard', 'types'];
-
     public static function phpversion(?string $extension = null): string|false
     {
         if (null === $extension) {
@@ -40,14 +37,7 @@ final class VmInfo
 
     public static function extension_loaded(string $extension): bool
     {
-        $needle = strtolower($extension);
-        foreach (self::LOADED_EXTENSIONS as $name) {
-            if ($name === $needle) {
-                return true;
-            }
-        }
-
-        return false;
+        return ModuleRegistry::extensionLoaded($extension);
     }
 
     public static function get_loaded_extensions(bool $zendExtensions = false): HashTable
@@ -56,7 +46,7 @@ final class VmInfo
         if ($zendExtensions) {
             return $ht;
         }
-        foreach (self::LOADED_EXTENSIONS as $name) {
+        foreach (ModuleRegistry::getLoadedExtensions() as $name) {
             $var = new Variable();
             $var->string($name);
             $ht->append($var);

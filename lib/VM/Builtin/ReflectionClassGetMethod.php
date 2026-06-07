@@ -30,10 +30,12 @@ final class ReflectionClassGetMethod extends VmClassMethod
         if (null === $entry) {
             throw new \LogicException('ReflectionClass refers to unknown class in this compiler build');
         }
-        $method = VmReflection::stringArg($frame->calledArgs[1], 'ReflectionClass::getMethod() name');
+        $method = VmReflection::stringArg($frame->calledArgs[1], 'ReflectionClass::getMethod() name', 1);
         $methodLc = strtolower($method);
         if (!isset($entry->methods[$methodLc])) {
-            throw new \LogicException("Method {$method} does not exist on {$className}");
+            ReflectionSupport::throwReflectionException(
+                ReflectionSupport::methodNotFoundMessage($className, $method)
+            );
         }
         $rmClass = $ctx->classes[ReflectionSupport::REFLECTION_METHOD] ?? null;
         if (null === $rmClass) {

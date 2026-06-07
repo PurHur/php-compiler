@@ -51,6 +51,33 @@ final class MethodVisibility
     }
 
     /**
+     * Object clone: Zend uses "Call to private Class::__clone()" wording (#7352).
+     *
+     * @throws \LogicException when the call is not allowed
+     */
+    public static function assertCloneCallable(
+        int $visibilityFlags,
+        ?string $callerClassLc,
+        string $declaringClassLc,
+        string $declaringClassDisplay,
+        bool $parentScopeAllows = false,
+        ?callable $isSameOrSubclassOf = null,
+        ?string $callerClassDisplay = null
+    ): void {
+        self::assertCallableInternal(
+            $visibilityFlags,
+            $callerClassLc,
+            $declaringClassLc,
+            $declaringClassDisplay,
+            '__clone',
+            $parentScopeAllows,
+            $isSameOrSubclassOf,
+            $callerClassDisplay,
+            true
+        );
+    }
+
+    /**
      * Object construction: Zend uses "Call to private Class::__construct()" wording (#5382).
      *
      * @throws \LogicException when the call is not allowed
@@ -163,7 +190,8 @@ final class MethodVisibility
             return false;
         }
         if (($visibilityFlags & CfgFunc::FLAG_PRIVATE) !== 0) {
-            return $methodDeclaringClassLc === $resolvedParentLc;
+            // php-src: private parent:: requires calling scope === declaring class (#6799).
+            return $callerClassLc === $methodDeclaringClassLc;
         }
         if (($visibilityFlags & CfgFunc::FLAG_PROTECTED) !== 0) {
             return $isSameOrSubclassOf($callerClassLc, $methodDeclaringClassLc);

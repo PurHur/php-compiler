@@ -7,8 +7,8 @@ namespace PHPCompiler\ext\standard;
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\Variable as JITVariable;
-use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
 
 /**
@@ -28,14 +28,11 @@ final class soundex extends Internal
         if (1 !== \count($frame->calledArgs)) {
             throw new \LogicException('soundex() requires exactly one argument in this compiler build');
         }
-        $arg = $frame->calledArgs[0]->resolveIndirect();
+        $string = VmString::coerceStringBuiltinArg($frame->calledArgs[0], 'soundex', 0, 'string');
         if (null === $frame->returnVar) {
             return;
         }
-        if (Variable::TYPE_STRING !== $arg->type) {
-            throw new \LogicException('soundex() only supports strings in this compiler build');
-        }
-        $frame->returnVar->string(VmString::soundex($arg->toString()));
+        $frame->returnVar->string(VmString::soundex($string));
     }
 
     public Context $context;
@@ -49,7 +46,7 @@ final class soundex extends Internal
 
         return JitSoundex::invoke(
             $context,
-            $this->jitString($context, $args[0], 'soundex() argument #1')
+            JitStringBuiltinArg::lower($context, $args[0], 'soundex', 0, 'string')
         );
     }
 }

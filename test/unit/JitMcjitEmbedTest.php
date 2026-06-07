@@ -21,6 +21,20 @@ PHP;
         $this->assertStringNotContainsString("class Foo {}\n", $out);
     }
 
+    public function testPadsConstOnlyUserClassBodyForMcjit(): void
+    {
+        $in = <<<'PHP'
+<?php
+class C {
+    public const X = 1;
+}
+echo C::X;
+PHP;
+        $out = JitMcjitEmbed::prepareClassless($in);
+        $this->assertStringContainsString('__phpcMcjitClassPad', $out);
+        $this->assertStringContainsString('public const X = 1', $out);
+    }
+
     public function testLeavesNonEmptyClassUnchanged(): void
     {
         $in = <<<'PHP'
@@ -35,5 +49,17 @@ PHP;
         $in = '<?php echo 1;';
         $out = JitMcjitEmbed::prepareClassless($in);
         $this->assertStringContainsString('__phpc_mcjit_embed_bootstrap', $out);
+    }
+
+    public function testInjectsBootstrapForEnumOnlyScript(): void
+    {
+        $in = <<<'PHP'
+<?php
+enum U { case A; case B; }
+echo count(U::cases());
+PHP;
+        $out = JitMcjitEmbed::prepareClassless($in);
+        $this->assertStringContainsString('__phpc_mcjit_embed_bootstrap', $out);
+        $this->assertStringContainsString('enum U', $out);
     }
 }

@@ -11,6 +11,7 @@ use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitBoolArg;
 use PHPCompiler\JIT\JitLongArg;
 use PHPCompiler\JIT\JitStringArg;
+use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\Variable;
 use PHPCompiler\Web\ResponseContext;
@@ -58,18 +59,12 @@ final class setrawcookie extends Internal
         if ($argc < 1 || $argc > 7) {
             throw new \LogicException('setrawcookie() accepts one to seven arguments');
         }
-        if (JITVariable::TYPE_STRING !== $args[0]->type) {
-            throw new \LogicException('setrawcookie() name must be a string in this compiler build');
-        }
         $i32 = $context->getTypeFromString('int32');
         $i64 = $context->getTypeFromString('int64');
-        $namePtr = $this->jitString($context, $args[0], 'setrawcookie() name');
+        $namePtr = JitStringBuiltinArg::lower($context, $args[0], 'setrawcookie', 0, 'name');
         $valuePtr = $context->builder->load($context->constantStringFromString(''));
         if ($argc >= 2) {
-            if (JITVariable::TYPE_STRING !== $args[1]->type) {
-                throw new \LogicException('setrawcookie() value must be a string in this compiler build');
-            }
-            $valuePtr = $this->jitString($context, $args[1], 'setrawcookie() value');
+            $valuePtr = JitStringBuiltinArg::lower($context, $args[1], 'setrawcookie', 1, 'value');
         }
         $expiresI64 = $i64->constInt(0, false);
         if ($argc >= 3) {
@@ -81,17 +76,11 @@ final class setrawcookie extends Internal
         }
         $pathPtr = $context->builder->load($context->constantStringFromString(''));
         if ($argc >= 4) {
-            if (JITVariable::TYPE_STRING !== $args[3]->type) {
-                throw new \LogicException('setrawcookie() path must be a string in this compiler build');
-            }
-            $pathPtr = $this->jitString($context, $args[3], 'setrawcookie() path');
+            $pathPtr = JitStringBuiltinArg::lower($context, $args[3], 'setrawcookie', 3, 'path');
         }
         $domainPtr = $context->builder->load($context->constantStringFromString(''));
         if ($argc >= 5) {
-            if (JITVariable::TYPE_STRING !== $args[4]->type) {
-                throw new \LogicException('setrawcookie() domain must be a string in this compiler build');
-            }
-            $domainPtr = $this->jitString($context, $args[4], 'setrawcookie() domain');
+            $domainPtr = JitStringBuiltinArg::lower($context, $args[4], 'setrawcookie', 4, 'domain');
         }
         $secureI32 = $i32->constInt(0, false);
         if ($argc >= 6) {
@@ -212,41 +201,22 @@ final class setrawcookie extends Internal
         if ($argc < 1 || $argc > 7) {
             throw new \LogicException('setrawcookie() accepts one to seven arguments');
         }
-        $name = $args[0]->resolveIndirect();
-        if (Variable::TYPE_STRING !== $name->type) {
-            throw new \LogicException('setrawcookie() name must be a string in this compiler build');
-        }
+        $name = VmString::coerceStringBuiltinArg($args[0], 'setrawcookie', 0, 'name');
         $value = '';
         if ($argc >= 2) {
-            $v = $args[1]->resolveIndirect();
-            if (Variable::TYPE_STRING !== $v->type) {
-                throw new \LogicException('setrawcookie() value must be a string in this compiler build');
-            }
-            $value = $v->toString();
+            $value = VmString::coerceStringBuiltinArg($args[1], 'setrawcookie', 1, 'value');
         }
         $expires = 0;
         if ($argc >= 3) {
-            $e = $args[2]->resolveIndirect();
-            if (Variable::TYPE_INTEGER !== $e->type) {
-                throw new \LogicException('setrawcookie() expires must be an integer in this compiler build');
-            }
-            $expires = $e->toInt();
+            $expires = VmMath::parseIntBuiltinArg($args[2], 'setrawcookie', 2, 'expires');
         }
         $path = '';
         if ($argc >= 4) {
-            $p = $args[3]->resolveIndirect();
-            if (Variable::TYPE_STRING !== $p->type) {
-                throw new \LogicException('setrawcookie() path must be a string in this compiler build');
-            }
-            $path = $p->toString();
+            $path = VmString::coerceStringBuiltinArg($args[3], 'setrawcookie', 3, 'path');
         }
         $domain = '';
         if ($argc >= 5) {
-            $d = $args[4]->resolveIndirect();
-            if (Variable::TYPE_STRING !== $d->type) {
-                throw new \LogicException('setrawcookie() domain must be a string in this compiler build');
-            }
-            $domain = $d->toString();
+            $domain = VmString::coerceStringBuiltinArg($args[4], 'setrawcookie', 4, 'domain');
         }
         $secure = false;
         if ($argc >= 6) {
@@ -266,7 +236,7 @@ final class setrawcookie extends Internal
         }
 
         return [
-            'name' => $name->toString(),
+            'name' => $name,
             'value' => $value,
             'expires' => $expires,
             'path' => $path,

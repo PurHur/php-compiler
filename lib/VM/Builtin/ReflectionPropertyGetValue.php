@@ -41,7 +41,9 @@ final class ReflectionPropertyGetValue extends VmClassMethod
         }
         $instanceName = VmReflection::findInstancePropertyName($entry, $property, $ctx);
         if (null === $instanceName) {
-            throw new \LogicException("Property {$property} does not exist on {$className}");
+            ReflectionSupport::throwReflectionException(
+                ReflectionSupport::propertyNotFoundMessage($className, $property)
+            );
         }
         $object = $frame->calledArgs[1]->resolveIndirect();
         if (Variable::TYPE_OBJECT !== $object->type) {

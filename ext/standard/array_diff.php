@@ -31,15 +31,17 @@ final class array_diff extends Internal
         if ($argc < 1) {
             throw new \ArgumentCountError('array_diff() expects at least 1 argument, 0 given');
         }
-        if (null === $frame->returnVar) {
-            return;
-        }
         $first = $frame->calledArgs[0]->resolveIndirect();
         if (Variable::TYPE_ARRAY !== $first->type) {
             throw new \LogicException('array_diff() first argument must be an array in this compiler build');
         }
+        $firstHt = $first->toArray();
+        $operandTables = [$firstHt];
         if (1 === $argc) {
-            $frame->returnVar->array($first->toArray()->replaceCopy());
+            VmArray::rejectEnumCaseSetOpOperands($firstHt);
+            if (null !== $frame->returnVar) {
+                $frame->returnVar->array($firstHt->replaceCopy());
+            }
 
             return;
         }
@@ -50,9 +52,14 @@ final class array_diff extends Internal
                 throw new \LogicException('array_diff() arguments must be arrays in this compiler build');
             }
             $others[] = $arg->toArray();
+            $operandTables[] = $others[\count($others) - 1];
+        }
+        VmArray::rejectEnumCaseSetOpOperands(...$operandTables);
+        if (null === $frame->returnVar) {
+            return;
         }
         $out = new HashTable();
-        foreach ($first->toArray()->iterateKeyed(true) as [$key, $value]) {
+        foreach ($firstHt->iterateKeyed(true) as [$key, $value]) {
             if (self::valueInArrays($value, $others)) {
                 continue;
             }

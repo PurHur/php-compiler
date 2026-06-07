@@ -26,5 +26,15 @@ final class BootstrapPhpTypesMagicScriptConstPatchTest extends TestCase
             $content,
             'Run script/apply-patches.sh (php-types-first-class-callable.patch) before CI'
         );
+        $this->assertStringContainsString(
+            'new Type(Type::TYPE_ARRAY)',
+            $content,
+            'FCC overlay must use TYPE_ARRAY constructor, not Type::array() (#4957, #6932)'
+        );
+        $this->assertStringNotContainsString(
+            'return [Type::array()];',
+            $content,
+            'TypeReconstructor must not call missing Type::array() on FCC path (#6932)'
+        );
     }
 }

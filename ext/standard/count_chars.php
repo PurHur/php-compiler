@@ -8,6 +8,7 @@ use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitStringArg;
+use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\HashTable;
 use PHPCompiler\VM\Variable;
@@ -31,22 +32,25 @@ final class count_chars extends Internal
         if ($argc < 1 || $argc > 2) {
             throw new \LogicException('count_chars() accepts one or two arguments in this compiler build');
         }
-        $str = $frame->calledArgs[0]->resolveIndirect();
-        if (Variable::TYPE_STRING !== $str->type) {
-            throw new \LogicException('count_chars() argument #1 must be a string in this compiler build');
-        }
+        $string = VmString::coerceStringBuiltinArg(
+            $frame->calledArgs[0],
+            'count_chars',
+            0,
+            'string'
+        );
         $mode = 0;
         if (2 === $argc) {
-            $modeVar = $frame->calledArgs[1]->resolveIndirect();
-            if (Variable::TYPE_INTEGER !== $modeVar->type) {
-                throw new \LogicException('count_chars() argument #2 must be an integer in this compiler build');
-            }
-            $mode = $modeVar->toInt();
+            $mode = VmMath::parseIntBuiltinArg(
+                $frame->calledArgs[1]->resolveIndirect(),
+                'count_chars',
+                2,
+                'mode'
+            );
         }
         if (null === $frame->returnVar) {
             return;
         }
-        $result = VmString::count_chars($str->toString(), $mode);
+        $result = VmString::count_chars($string, $mode);
         if (\is_string($result)) {
             $frame->returnVar->string($result);
 
@@ -92,7 +96,7 @@ final class count_chars extends Internal
             return JitCountChars::materializeHistogram($context, $result);
         }
 
-        $str = $this->jitString($context, $args[0], 'count_chars() argument #1');
+        $str = JitStringBuiltinArg::lower($context, $args[0], 'count_chars', 0, 'string');
 
         return JitCountChars::invoke($context, $str, $mode);
     }

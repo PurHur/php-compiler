@@ -10,6 +10,7 @@
 namespace PHPCompiler;
 
 class OpCode {
+    /** arg2 = echo-statement startLine when known (#5134). */
     const TYPE_ECHO = 1;
     const TYPE_ASSIGN = 2;
     const TYPE_CONCAT = 3;
@@ -42,11 +43,15 @@ class OpCode {
     const TYPE_UNARY_PLUS = 27;
     const TYPE_BITWISE_NOT = 28;
     const TYPE_BOOLEAN_NOT = 29;
+    /** arg3 = print-expression startLine when known (#5134). */
     const TYPE_PRINT = 30;
     const TYPE_CLONE = 31;
     const TYPE_EMPTY = 32;
     const TYPE_EVAL = 33;
+    /** arg3 = exit/die expression startLine when known (#6358). */
     const TYPE_EXIT = 34;
+    /** TYPE_EXIT: optional message operand slot for exit($status, $message) (#6718). */
+    public ?int $exitMessageSlot = null;
     const TYPE_SMALLER_OR_EQUAL = 35;
     const TYPE_GREATER_OR_EQUAL = 36;
     const TYPE_CAST_ARRAY = 37;
@@ -84,6 +89,7 @@ class OpCode {
     const TYPE_ITER_VALUE = 67;
     const TYPE_SHIFT_LEFT = 68;
     const TYPE_SHIFT_RIGHT = 69;
+    /** arg2 = method declaration startLine when known (#6914). */
     const TYPE_DECLARE_METHOD = 84;
     const TYPE_METHODCALL_INIT = 85;
     const TYPE_DECLARE_CLASS_CONST = 86;
@@ -104,6 +110,8 @@ class OpCode {
     const TYPE_CATCH = 93;
     const TYPE_FINALLY = 94;
     const TYPE_DECLARE_GLOBAL_CONST = 95;
+    /** {@see TYPE_DECLARE_GLOBAL_CONST} source line for duplicate-const E_WARNING (#6938). */
+    public int $globalConstStartLine = 0;
     /** Runtime __DIR__ / __FILE__ / __LINE__ (issues #707, #715). arg2 = line when LINE; arg3 = SCRIPT_MAGIC_* kind. */
     const TYPE_SCRIPT_MAGIC = 96;
 
@@ -123,6 +131,8 @@ class OpCode {
     public const INCLUDE_KIND_REQUIRE_ONCE = 4;
 
     const TYPE_ASSIGN_REF = 97;
+    /** {@see TYPE_ASSIGN_REF} arg3: foreach `as &$obj->hookedProp` iteration assign (#6435). */
+    const ASSIGN_REF_FOREACH_PROPERTY_HOOK = 2;
     const TYPE_DECLARE_GLOBAL = 98;
     const TYPE_DECLARE_STATIC_PROPERTY = 99;
     /** Dynamic variable fetch: `$$name` where arg2 holds the name variable (#1226). */
@@ -197,8 +207,10 @@ class OpCode {
      * arg1 = destination slot; arg2 = callable value slot (string or array).
      */
     const TYPE_FROM_CALLABLE = 125;
-    /** empty($obj->prop): read typed slots; __isset semantics otherwise (#4912, zend_object_handlers.c). */
+    /** empty($obj->prop): uninitialized typed slots empty without read; __isset semantics otherwise (#6787, zend_object_handlers.c). */
     const TYPE_EMPTY_OBJECT_PROPERTY = 126;
+    /** `(void)` cast — evaluate operand, result is null (#7346). */
+    const TYPE_CAST_VOID = 127;
 
     /** `['k' => $v, ...$tail] = $arr` string keys already assigned; empty = numeric spread only (#4889). */
     public array $listSpreadExcludedKeys = [];
@@ -251,6 +263,8 @@ class OpCode {
     public bool $isIncDec = false;
     /** isset()/empty() on PropertyFetch, not ArrayDimFetch (issue #5117, zend_hash.c). */
     public bool $issetOnProperty = false;
+    /** ??= on hooked properties: null-check backing storage, not get-hook value (#6472). */
+    public bool $issetForCoalesceAssign = false;
     /** TYPE_PROPERTY_FETCH in a ?-> fetch arm must read typed slots (#5361, zend_object_handlers.c). */
     public bool $nullsafeFetchPropertyRead = false;
     /**
@@ -272,6 +286,8 @@ class OpCode {
     public int $classConstVisibilityFlags = 0;
     /** TYPE_DECLARE_CLASS_CONST: `case` in enum body vs user `const` (#5054, zend_enum.c). */
     public bool $isEnumCaseDeclare = false;
+    /** TYPE_STATICCALL_INIT: source was `parent::` (php-cfg may lower class operand to fqcn). */
+    public bool $staticCallParentScope = false;
 
     /** TYPE_INCLUDE: include/require + once/non-once semantics (issue #4426). */
     public int $includeKind = self::INCLUDE_KIND_INCLUDE_ONCE;
@@ -283,11 +299,70 @@ class OpCode {
         $this->arg3 = $arg3;
     }
 
-    /** True when this opcode assigns through {@see $destSlot} as lvalue (#5370). */
+    /** True when this opcode assigns through {@see $destSlot} as lvalue (#5370, #6426). */
     public static function destSlotUsedAsAssignLvalue(self $op, int $destSlot): bool
     {
         return (self::TYPE_ASSIGN === $op->type && $op->arg2 === $destSlot)
-            || (self::TYPE_ASSIGN_REF === $op->type && $op->arg1 === $destSlot);
+            || (self::TYPE_ASSIGN_REF === $op->type && ($op->arg1 === $destSlot || $op->arg2 === $destSlot))
+            || (self::TYPE_POST_INC === $op->type && $op->arg3 === $destSlot)
+            || (self::TYPE_PRE_INC === $op->type && $op->arg3 === $destSlot)
+            || (self::TYPE_POST_DEC === $op->type && $op->arg3 === $destSlot)
+            || (self::TYPE_PRE_DEC === $op->type && $op->arg3 === $destSlot)
+            || self::destSlotUsedAsInPlaceCompoundAssign($op, $destSlot);
+    }
+
+    /** True when this opcode uses {@see $destSlot} as the container for dim write ([]/key assign, #6775). */
+    public static function destSlotUsedAsDimWriteContainer(self $op, int $destSlot): bool
+    {
+        return self::TYPE_ARRAY_DIM_FETCH_WRITE === $op->type && $op->arg2 === $destSlot;
+    }
+
+    /** True when this opcode reads {@see $destSlot} as lhs in fetch-op-assign compound lowering (#6438). */
+    public static function destSlotUsedAsCompoundAssignRead(self $op, int $destSlot): bool
+    {
+        if ($op->arg2 !== $destSlot || $op->arg1 === $destSlot) {
+            return false;
+        }
+
+        return match ($op->type) {
+            self::TYPE_CONCAT,
+            self::TYPE_PLUS,
+            self::TYPE_MINUS,
+            self::TYPE_MUL,
+            self::TYPE_DIV,
+            self::TYPE_MODULO,
+            self::TYPE_POW,
+            self::TYPE_BITWISE_AND,
+            self::TYPE_BITWISE_OR,
+            self::TYPE_BITWISE_XOR,
+            self::TYPE_SHIFT_LEFT,
+            self::TYPE_SHIFT_RIGHT => true,
+            default => false,
+        };
+    }
+
+    /** True when this opcode mutates {@see $destSlot} in-place (arg1 === arg2) (#6438). */
+    public static function destSlotUsedAsInPlaceCompoundAssign(self $op, int $destSlot): bool
+    {
+        if ($op->arg1 !== $destSlot || $op->arg2 !== $destSlot) {
+            return false;
+        }
+
+        return match ($op->type) {
+            self::TYPE_CONCAT,
+            self::TYPE_PLUS,
+            self::TYPE_MINUS,
+            self::TYPE_MUL,
+            self::TYPE_DIV,
+            self::TYPE_MODULO,
+            self::TYPE_POW,
+            self::TYPE_BITWISE_AND,
+            self::TYPE_BITWISE_OR,
+            self::TYPE_BITWISE_XOR,
+            self::TYPE_SHIFT_LEFT,
+            self::TYPE_SHIFT_RIGHT => true,
+            default => false,
+        };
     }
 
 }

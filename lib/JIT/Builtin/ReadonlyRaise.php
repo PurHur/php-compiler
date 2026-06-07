@@ -34,6 +34,22 @@ final class ReadonlyRaise
         self::implementBodies($context);
     }
 
+    public static function emitRaise(Context $context, string $message): void
+    {
+        self::registerDeclarations($context);
+        self::ensureLinked($context);
+        $msgLen = $context->constantFromInteger(strlen($message), 'size_t');
+        $msgCStr = $context->builder->pointerCast(
+            $context->constantFromString($message),
+            $context->getTypeFromString('int8*')
+        );
+        $context->builder->call(
+            $context->lookupFunction('__compiler_jit_raise_logic_exception'),
+            $msgCStr,
+            $msgLen
+        );
+    }
+
     private static function implementBodies(Context $context): void
     {
         $fn = $context->module->getNamedFunction('__compiler_jit_raise_logic_exception');

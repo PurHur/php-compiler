@@ -27,13 +27,28 @@ final class ClassCompileRegistry
     /** @var array<string, true> registered trait lc names (#4973) */
     private array $traits = [];
 
+    /** @var array<string, true> registered interface lc names (#7042) */
+    private array $registeredInterfaces = [];
+
+    /** @var array<string, CfgBlock> trait lc name => body stmts (#6761) */
+    private array $traitStmts = [];
+
     public function registerClass(string $name, ?string $parentLc, array $interfaceLcs, CfgBlock $stmts): void
     {
         $lc = self::lc($name);
         $this->displayNames[$lc] = ltrim($name, '\\');
         $this->parents[$lc] = $parentLc;
         $this->interfaces[$lc] = $interfaceLcs;
-        $this->methods[$lc] = self::methodSigsFromStmts($stmts, $lc);
+        $ownMethods = self::methodSigsFromStmts($stmts, $lc);
+        $traitMethods = TraitComposedMethodResolver::resolve($stmts, $this);
+        $merged = [];
+        foreach ($traitMethods as $methodLc => $entry) {
+            $merged[$methodLc] = $entry['sig'];
+        }
+        foreach ($ownMethods as $methodLc => $sig) {
+            $merged[$methodLc] = $sig;
+        }
+        $this->methods[$lc] = $merged;
     }
 
     public function registerInterface(string $name, array $extendsLcs, CfgBlock $stmts): void
@@ -42,6 +57,7 @@ final class ClassCompileRegistry
         $this->displayNames[$lc] = ltrim($name, '\\');
         $this->parents[$lc] = null;
         $this->interfaces[$lc] = $extendsLcs;
+        $this->registeredInterfaces[$lc] = true;
         $this->methods[$lc] = self::methodSigsFromStmts($stmts, $lc);
     }
 
@@ -52,7 +68,22 @@ final class ClassCompileRegistry
         $this->parents[$lc] = null;
         $this->interfaces[$lc] = [];
         $this->traits[$lc] = true;
+        $this->traitStmts[$lc] = $stmts;
         $this->methods[$lc] = self::methodSigsFromStmts($stmts, $lc);
+    }
+
+    public function getTraitStmts(string $lcName): ?CfgBlock
+    {
+        $lc = self::lc($lcName);
+
+        return $this->traitStmts[$lc] ?? null;
+    }
+
+    public function traitDisplayName(string $lcName): string
+    {
+        $lc = self::lc($lcName);
+
+        return $this->displayNames[$lc] ?? $lc;
     }
 
     public function isTrait(string $lcName): bool
@@ -60,23 +91,23 @@ final class ClassCompileRegistry
         return isset($this->traits[self::lc($lcName)]);
     }
 
-    /**
-     * @param list<string> $traitLcs traits composed into the class (#5550)
-     */
-    public function hasOverridableMethod(?string $parentLc, array $interfaceLcs, array $traitLcs, string $methodLc): bool
+    public function isInterface(string $lcName): bool
     {
-        if (null !== $parentLc && '' !== $parentLc && $this->hasMethodInClassChain($parentLc, $methodLc)) {
+        return isset($this->registeredInterfaces[self::lc($lcName)]);
+    }
+
+    public function hasOverridableMethod(
+        ?string $parentLc,
+        array $interfaceLcs,
+        string $methodLc,
+        string $childClassLc
+    ): bool {
+        if (null !== $parentLc && '' !== $parentLc && $this->hasMethodInClassChain($parentLc, $methodLc, $childClassLc)) {
             return true;
         }
 
         foreach ($interfaceLcs as $ifaceLc) {
             if ($this->hasMethodInInterfaceChain($ifaceLc, $methodLc)) {
-                return true;
-            }
-        }
-
-        foreach ($traitLcs as $traitLc) {
-            if (isset($this->methods[$traitLc][$methodLc])) {
                 return true;
             }
         }
@@ -87,13 +118,14 @@ final class ClassCompileRegistry
     /**
      * @return array{sig: MethodSig, ownerLc: string, ownerDisplay: string}|null
      */
-    /**
-     * @param list<string> $traitLcs traits composed into the class (#5550)
-     */
-    public function findOverriddenMethod(?string $parentLc, array $interfaceLcs, array $traitLcs, string $methodLc): ?array
-    {
+    public function findOverriddenMethod(
+        ?string $parentLc,
+        array $interfaceLcs,
+        string $methodLc,
+        string $childClassLc
+    ): ?array {
         if (null !== $parentLc && '' !== $parentLc) {
-            $found = $this->findMethodInClassChain($parentLc, $methodLc);
+            $found = $this->findMethodInClassChain($parentLc, $methodLc, $childClassLc);
             if (null !== $found) {
                 return $found;
             }
@@ -103,16 +135,6 @@ final class ClassCompileRegistry
             $found = $this->findMethodInInterfaceChain($ifaceLc, $methodLc);
             if (null !== $found) {
                 return $found;
-            }
-        }
-
-        foreach ($traitLcs as $traitLc) {
-            if (isset($this->methods[$traitLc][$methodLc])) {
-                return [
-                    'sig' => $this->methods[$traitLc][$methodLc],
-                    'ownerLc' => $traitLc,
-                    'ownerDisplay' => $this->displayNames[$traitLc] ?? $traitLc,
-                ];
             }
         }
 
@@ -171,25 +193,42 @@ final class ClassCompileRegistry
         return false;
     }
 
-    private function hasMethodInClassChain(string $classLc, string $methodLc): bool
+    private function hasMethodInClassChain(string $classLc, string $methodLc, string $childClassLc): bool
     {
-        return null !== $this->findMethodInClassChain($classLc, $methodLc);
+        return null !== $this->findMethodInClassChain($classLc, $methodLc, $childClassLc);
     }
 
     /**
      * @return array{sig: MethodSig, ownerLc: string, ownerDisplay: string}|null
      */
-    private function findMethodInClassChain(string $classLc, string $methodLc): ?array
+    private function findMethodInClassChain(string $classLc, string $methodLc, string $childClassLc): ?array
     {
         $visited = [];
         while ('' !== $classLc && !isset($visited[$classLc])) {
             $visited[$classLc] = true;
             if (isset($this->methods[$classLc][$methodLc])) {
+                $sig = $this->methods[$classLc][$methodLc];
+                if (!$sig->isVisibleForOverrideFrom($childClassLc)) {
+                    $parent = $this->parents[$classLc] ?? null;
+                    if (null === $parent || '' === $parent) {
+                        break;
+                    }
+                    $classLc = $parent;
+
+                    continue;
+                }
+
                 return [
-                    'sig' => $this->methods[$classLc][$methodLc],
+                    'sig' => $sig,
                     'ownerLc' => $classLc,
                     'ownerDisplay' => $this->displayNames[$classLc] ?? $classLc,
                 ];
+            }
+            foreach ($this->interfaces[$classLc] ?? [] as $ifaceLc) {
+                $found = $this->findMethodInInterfaceChain($ifaceLc, $methodLc);
+                if (null !== $found) {
+                    return $found;
+                }
             }
             $parent = $this->parents[$classLc] ?? null;
             if (null === $parent || '' === $parent) {

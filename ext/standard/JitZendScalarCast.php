@@ -15,7 +15,8 @@ use PHPLLVM\Value;
 /**
  * JIT lowering for Zend scalar (int)/(float) casts (#5714, #5791, zend_operators.c).
  *
- * Distinct from intval/floatval (#5623): enum cases warn and yield legacy 1 / 1.0, not backing.
+ * Zend php-src: (int)/(float) on enum cases warn and yield legacy 1 / 1.0 (#5714, #7120).
+ * intval/floatval JIT must use the same legacy paths (not backing extract).
  */
 final class JitZendScalarCast
 {

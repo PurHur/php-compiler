@@ -45,3 +45,34 @@ Verification:
 ```bash
 ./script/docker-exec.sh -- bash -lc 'source script/php-env.sh && ./script/ci-local.sh --filter logic_exception_enum'
 ```
+
+## Runtime strictness modes ([#7361](https://github.com/PurHur/php-compiler/issues/7361))
+
+Two complementary strictness layers (not `declare(strict_types=1)` on user functions):
+
+| Mode | Env | When | Behavior |
+|------|-----|------|----------|
+| **php-src-strict** (default) | unset or `PHP_COMPILER_RUNTIME_STRICT=php-src` | VM/JIT/AOT compliance + app code | Full Zend guards (`VmString::coerceStringBuiltinArg`, enum-case checks, JIT `JitStringBuiltinArg`) |
+| **php-compiler-strict** (opt-in) | `PHP_COMPILER_RUNTIME_STRICT=php-compiler` | Self-host/AOT with static proof in PR | May skip specific guard branches; **never** default in CI |
+
+Policy helper: `lib/RuntimeStrictness.php`. CI wrappers (`ci-local.sh`, `ci-fast.sh`) **fail** if `PHP_COMPILER_RUNTIME_STRICT=php-compiler`.
+
+Self-host-only guard skipping lands in follow-up issues with proof obligations (see [#5780](https://github.com/PurHur/php-compiler/issues/5780) enum-case parity).
+
+Verification:
+
+```bash
+./script/docker-exec.sh -- bash -lc 'vendor/bin/phpunit --filter RuntimeStrictness'
+```
+
+## Source preprocess pipeline ([#6654](https://github.com/PurHur/php-compiler/issues/6654))
+
+All parse entrypoints (VM `Runtime::parse()`, AOT include discovery, lint) must run the same preprocess chain before php-parser / PHPCfg. **`Runtime::prepareSourceForParser()`** is the SSOT helper; it runs sealed/static preprocessors, **`PropertyHooks`** (lowering block/arrow hook syntax), **`CurlyBraceOffsetRejector`**, enum/switch/generic rewriters, bare-throw rewrite, then parser desugar passes (`GlobalTypedConstRewriter`, `PipeOperatorDesugar`, etc.).
+
+Property-hook block syntax (`public $x { get { … } }`) must be lowered **before** the curly-brace rejector (#6650); otherwise AOT include discovery that calls `Parser::parse()` directly would fatal on `{` in hook bodies.
+
+Verification:
+
+```bash
+./script/docker-exec.sh -- bash -lc 'vendor/bin/phpunit --filter RuntimePreprocessTest'
+```

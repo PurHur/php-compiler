@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace PHPCompiler\JIT\Builtin;
 
 use PHPCompiler\CompilerVersion;
+use PHPCompiler\ext\standard\ModuleRegistry;
 use PHPCompiler\JIT\Context;
 use PHPLLVM\Builder;
 use PHPLLVM\Value;
@@ -36,9 +37,6 @@ final class StringInfo
     private const UTSNAME_FIELD_LEN = 65;
 
     private const UNAME_RESULT_BUF = 512;
-
-    /** @var list<string> */
-    private const LOADED_EXTENSIONS = ['standard', 'types'];
 
     /** @var list<string> */
     private const RUNTIME_FUNCTIONS = [
@@ -262,7 +260,7 @@ final class StringInfo
 
         $context->builder->positionAtEnd($matchBb);
         $result = $i32->constInt(0, false);
-        foreach (self::LOADED_EXTENSIONS as $literal) {
+        foreach (ModuleRegistry::getLoadedExtensions() as $literal) {
             $matches = self::stringEqualsIgnoreCase($context, $fn, $name, $literal);
             $result = $context->builder->select(
                 $matches,
@@ -296,7 +294,7 @@ final class StringInfo
 
         $context->builder->positionAtEnd($fillBb);
         $i64 = $context->getTypeFromString('int64');
-        foreach (self::LOADED_EXTENSIONS as $index => $literal) {
+        foreach (ModuleRegistry::getLoadedExtensions() as $index => $literal) {
             $context->builder->call(
                 $context->lookupFunction('__hashtable__setStringAt'),
                 $ht,

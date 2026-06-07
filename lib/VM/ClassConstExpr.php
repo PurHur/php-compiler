@@ -36,7 +36,8 @@ final class ClassConstExpr
             OpCode::TYPE_CONCAT,
             OpCode::TYPE_CONST_FETCH,
             OpCode::TYPE_CLASS_CONST_FETCH,
-            OpCode::TYPE_ARRAY_DIM_FETCH => true,
+            OpCode::TYPE_ARRAY_DIM_FETCH,
+            OpCode::TYPE_PROPERTY_FETCH => true,
             default => false,
         };
     }
@@ -87,6 +88,9 @@ final class ClassConstExpr
                 break;
             case OpCode::TYPE_ARRAY_DIM_FETCH:
                 self::executeArrayDimFetch($context, $frame, $block, $op);
+                break;
+            case OpCode::TYPE_PROPERTY_FETCH:
+                self::executePropertyFetch($context, $frame, $op);
                 break;
             default:
                 throw new \LogicException(
@@ -183,11 +187,43 @@ final class ClassConstExpr
             return;
         }
         if (!isset($entry->constants[$constName])) {
+            if (
+                null !== $entry->forwardDeclaredConstNames
+                && isset($entry->forwardDeclaredConstNames[$constName])
+            ) {
+                throw new ClassConstForwardReferenceException($entry->name, $constName);
+            }
+            $display = $entry->constNames[$constName] ?? $constName;
             throw new \LogicException(
-                "Undefined class constant {$entry->name}::{$constName}"
+                "Undefined class constant {$entry->name}::{$display}"
             );
         }
+        if (EnumCaseSupport::tryMaterializeEnumCaseConstantFetch($entry, $constName, $frame->scope[$op->arg1])) {
+            return;
+        }
         $frame->scope[$op->arg1]->copyFrom($entry->constants[$constName]);
+    }
+
+    private static function executePropertyFetch(Context $context, Frame $frame, OpCode $op): void
+    {
+        $obj = $frame->scope[$op->arg2]->resolveIndirect();
+        $propName = $frame->scope[$op->arg3]->toString();
+        if (Variable::TYPE_ENUM_CASE === $obj->type) {
+            $prop = $obj->toEnumCase()->fetchProperty($propName, $context, $frame);
+            $frame->scope[$op->arg1]->copyFrom($prop);
+
+            return;
+        }
+        if (Variable::TYPE_OBJECT === $obj->type && EnumCaseSupport::isEnumCase($obj->toObject())) {
+            $prop = EnumCaseSupport::getProperty($obj->toObject(), $propName, $context, $frame);
+            $frame->scope[$op->arg1]->copyFrom($prop);
+
+            return;
+        }
+
+        throw new \LogicException(
+            'Property fetch in class constant expression requires enum case receiver'
+        );
     }
 
     private static function executeArrayDimFetch(
@@ -201,9 +237,8 @@ final class ClassConstExpr
         }
         $container = self::resolveValue($frame, $block, $op->arg2);
         if (Variable::TYPE_ARRAY !== $container->type) {
-            $msg = TypeCheck::cannotUseBracketOn($container);
-            if (null !== $msg) {
-                throw new \TypeError($msg);
+            if (TypeCheck::isScalarUsedAsArray($container)) {
+                throw new \Error(TypeCheck::SCALAR_USED_AS_ARRAY_MESSAGE);
             }
             throw new \LogicException('[] is only supported for arrays in class constant expressions');
         }

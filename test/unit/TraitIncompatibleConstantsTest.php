@@ -26,4 +26,20 @@ PHP;
         );
         $runtime->run($runtime->parseAndCompile($code, 'trait_incompatible_constants.php'));
     }
+
+    public function testClassOverridesTraitConstantWithIncompatibleValue(): void
+    {
+        $runtime = new Runtime();
+        $code = <<<'PHP'
+<?php
+trait T { public const X = 1; }
+class C { use T; public const X = 2; }
+PHP;
+        $this->expectException(\LogicException::class);
+        $this->expectExceptionMessage(
+            'C and T define the same constant (X) in the composition of C. '
+            .'However, the definition differs and is considered incompatible. Class was composed'
+        );
+        $runtime->run($runtime->parseAndCompile($code, 'trait_const_class_override.php'));
+    }
 }

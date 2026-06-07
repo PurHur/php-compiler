@@ -175,6 +175,41 @@ try {
         );
     }
 
+    /** Issue #6334: uncaught builtin TypeError must fatal at user call site. */
+    public function testUncaughtBuiltinTypeErrorFatalAtUserSite(): void
+    {
+        $bin = realpath(__DIR__ . '/../../bin/vm.php');
+        $this->assertNotFalse($bin);
+        $tmp = tempnam(sys_get_temp_dir(), 'phpc_uncaught_te_');
+        $this->assertNotFalse($tmp);
+        $script = $tmp . '.php';
+        rename($tmp, $script);
+        file_put_contents($script, '<?php
+class C {}
+$o = new C();
+array_key_exists(\'k\', $o);
+');
+        $php = getenv('PHP_COMPILER_PHP') ?: PHP_BINARY;
+        $descriptor = [
+            0 => ['pipe', 'r'],
+            1 => ['pipe', 'w'],
+            2 => ['pipe', 'w'],
+        ];
+        $proc = proc_open([$php, $bin, $script], $descriptor, $pipes, dirname(__DIR__, 2));
+        $this->assertIsResource($proc);
+        fclose($pipes[0]);
+        fclose($pipes[1]);
+        $stderr = stream_get_contents($pipes[2]);
+        fclose($pipes[2]);
+        $exit = proc_close($proc);
+        @unlink($script);
+        $this->assertNotSame(0, $exit);
+        $this->assertIsString($stderr);
+        $this->assertStringContainsString('Uncaught TypeError:', $stderr);
+        $this->assertStringContainsString(basename($script) . ' on line 4', $stderr);
+        $this->assertStringNotContainsString('ExceptionSupport.php', $stderr);
+    }
+
     private function assertVmCliOutput(string $code, string $expected): void
     {
         [$stdout, $exit] = $this->runVmCli($code);

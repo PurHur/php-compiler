@@ -158,6 +158,41 @@ try {
         $this->assertStringContainsString('Next Exception: finally', $stderr);
     }
 
+    /** Issue #6457: reused throw variable must still chain inner on finally uncaught fatal. */
+    public function testFinallyThrowOperandAliasChainsOnUncaughtFatal(): void
+    {
+        $bin = realpath(__DIR__ . '/../../bin/vm.php');
+        $this->assertNotFalse($bin);
+        $code = '<?php
+$e = new Exception("inner");
+try {
+    throw $e;
+} finally {
+    $e = new Exception("finally");
+    throw $e;
+}
+';
+        $php = getenv('PHP_COMPILER_PHP') ?: PHP_BINARY;
+        $descriptor = [
+            0 => ['pipe', 'r'],
+            1 => ['pipe', 'w'],
+            2 => ['pipe', 'w'],
+        ];
+        $proc = proc_open([$php, $bin], $descriptor, $pipes, dirname(__DIR__, 2));
+        $this->assertIsResource($proc);
+        fwrite($pipes[0], $code);
+        fclose($pipes[0]);
+        fclose($pipes[1]);
+        $stderr = stream_get_contents($pipes[2]);
+        fclose($pipes[2]);
+        $exit = proc_close($proc);
+        $this->assertNotSame(0, $exit);
+        $this->assertIsString($stderr);
+        $this->assertStringContainsString('Uncaught Exception: inner', $stderr);
+        $this->assertStringContainsString('Next Exception: finally', $stderr);
+        $this->assertStringNotContainsString('memory size', $stderr);
+    }
+
     /** Issue #5486: finally throw must chain pending try exception (zend_exceptions.c). */
     public function testFinallyThrowChainsPendingException(): void
     {

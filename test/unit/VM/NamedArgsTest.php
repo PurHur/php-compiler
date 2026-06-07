@@ -36,9 +36,9 @@ function f(int $a, int $b): int {
 }
 f(a: 1, a: 2);
 PHP;
-        $this->expectException(\LogicException::class);
-        $this->expectExceptionMessage('must be passed only once');
-        $runtime->run($runtime->parseAndCompile($code, 'named_args_duplicate.php'));
+        $this->expectException(\CompileError::class);
+        $this->expectExceptionMessage('Named parameter $a overwrites previous argument');
+        $runtime->parseAndCompile($code, 'named_args_duplicate.php');
     }
 
     public function testResolverReordersNamedArguments(): void
@@ -109,5 +109,68 @@ PHP;
         $this->assertSame(1, $resolved[0]->toInt());
         $packed = $resolved[1]->toArray();
         $this->assertSame(2, $packed->find('b')?->toInt());
+    }
+
+    public function testVariadicNamedMatchingVariadicParamName(): void
+    {
+        $a = new Variable(Variable::TYPE_INTEGER);
+        $a->int(1);
+        $b = new Variable(Variable::TYPE_INTEGER);
+        $b->int(2);
+        $resolved = NamedArgs::resolve(
+            [['n', 'a', $a], ['n', 'b', $b]],
+            ['a'],
+            0
+        );
+        $this->assertCount(1, $resolved);
+        $packed = $resolved[0]->toArray();
+        $this->assertSame(1, $packed->find('a')?->toInt());
+        $this->assertSame(2, $packed->find('b')?->toInt());
+        $this->assertNull($packed->findIndex(0));
+    }
+
+    public function testVariadicNamedMatchingParamNameDuplicateRejects(): void
+    {
+        $a = new Variable(Variable::TYPE_INTEGER);
+        $a->int(1);
+        $b = new Variable(Variable::TYPE_INTEGER);
+        $b->int(2);
+        $this->expectException(\Error::class);
+        $this->expectExceptionMessage('Named parameter $a overwrites previous argument');
+        NamedArgs::resolve(
+            [['n', 'a', $a], ['n', 'a', $b]],
+            ['a'],
+            0
+        );
+    }
+
+    public function testNamedTrailingParamAfterVariadic(): void
+    {
+        $b = new Variable(Variable::TYPE_INTEGER);
+        $b->int(2);
+        $resolved = NamedArgs::resolve(
+            [['n', 'b', $b]],
+            ['rest', 'b'],
+            0
+        );
+        $this->assertCount(1, $resolved);
+        $this->assertSame(2, $resolved[1]->toInt());
+    }
+
+    public function testNamedTrailingParamAfterVariadicWithOverflow(): void
+    {
+        $extra = new Variable(Variable::TYPE_INTEGER);
+        $extra->int(9);
+        $b = new Variable(Variable::TYPE_INTEGER);
+        $b->int(2);
+        $resolved = NamedArgs::resolve(
+            [['n', 'extra', $extra], ['n', 'b', $b]],
+            ['rest', 'b'],
+            0
+        );
+        $this->assertCount(2, $resolved);
+        $this->assertSame(2, $resolved[1]->toInt());
+        $packed = $resolved[0]->toArray();
+        $this->assertSame(9, $packed->find('extra')?->toInt());
     }
 }

@@ -15,7 +15,7 @@ use PHPCompiler\Block;
 use PHPCompiler\PseudoClassScope;
 use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Builtin\ErrorRaise;
-use PHPCompiler\JIT\Builtin\ReadonlyRaise;
+use PHPCompiler\JIT\ReadonlyBridge;
 use PHPCompiler\JIT\Builtin\Type\Object_;
 use PHPCompiler\JIT\Builtin\TypeErrorRaise;
 use PHPCompiler\JIT\ReflectionBuiltinHelper;
@@ -85,7 +85,8 @@ final class ClassConstFetchHelper
         Block $block,
         Variable $classVar,
         Operand $classOp,
-        string $constName
+        string $constName,
+        ?\PHPCompiler\JIT $jit = null
     ): Variable {
         $classIdVal = self::emitResolveClassId($objectType, $block, $classVar, $classOp);
         $key = strtolower($constName);
@@ -127,6 +128,9 @@ final class ClassConstFetchHelper
                 );
                 $context->builder->branch($merge);
             } else {
+                if (null !== $jit) {
+                    ClassConstVisibilityJitGuard::emitBeforeFetch($objectType, $jit, $block, $id, $constName);
+                }
                 self::writeConstEntry($context, $resultSlot, $entryData);
                 $context->builder->branch($merge);
             }
@@ -174,12 +178,17 @@ final class ClassConstFetchHelper
         Object_ $objectType,
         int $classId,
         Variable $nameVar,
-        Operand $classOp
+        Operand $classOp,
+        ?Block $block = null,
+        ?\PHPCompiler\JIT $jit = null
     ): Variable {
         $literal = JitStringArg::compileTimeLiteral($nameVar);
         if (null !== $literal) {
             if ('class' === strtolower($literal)) {
                 return self::classPseudoConst($objectType, $classId);
+            }
+            if (null !== $block && null !== $jit) {
+                ClassConstVisibilityJitGuard::emitBeforeFetch($objectType, $jit, $block, $classId, $literal);
             }
 
             return $objectType->classConstFetch($classId, $literal);
@@ -252,7 +261,7 @@ final class ClassConstFetchHelper
     ): Variable {
         $context = $objectType->jitContext();
         self::ensureStrCaseCmp($context);
-        ReadonlyRaise::ensureLinked($context);
+        ReadonlyBridge::ensureLinked($context);
 
         $nativeName = JitStringArg::lower($context, $nameVar, 'class constant name');
         $resultSlot = JitValueBox::alloc($context);

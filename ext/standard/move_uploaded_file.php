@@ -11,7 +11,7 @@ use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
 
-/** move_uploaded_file() — VM via VmFs; JIT/AOT via __compiler_move_uploaded_file (issue #2005). */
+/** move_uploaded_file() — VM via VmFs; JIT/AOT via UploadTempJit (issue #5346). */
 final class move_uploaded_file extends Internal
 {
     public function __construct()

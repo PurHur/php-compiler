@@ -26,16 +26,19 @@ final class array_diff_assoc extends Internal
         if ($argc < 1) {
             throw new \ArgumentCountError('array_diff_assoc() expects at least 1 argument, 0 given');
         }
-        if (null === $frame->returnVar) {
-            return;
-        }
         $first = $frame->calledArgs[0]->resolveIndirect();
         if (Variable::TYPE_ARRAY !== $first->type) {
             throw new \LogicException('array_diff_assoc() first argument must be an array in this compiler build');
         }
+        self::guardSetOpOperands($frame->calledArgs, 'array_diff_assoc');
         if (1 === $argc) {
-            $frame->returnVar->array($first->toArray()->replaceCopy());
+            if (null !== $frame->returnVar) {
+                $frame->returnVar->array($first->toArray()->replaceCopy());
+            }
 
+            return;
+        }
+        if (null === $frame->returnVar) {
             return;
         }
         $others = self::collectOtherHashTables($frame->calledArgs, 'array_diff_assoc');

@@ -48,6 +48,9 @@ class JIT {
 
     private array $queue = [];
 
+    /** @var \SplObjectStorage<OpCode, true> DECLARE_GLOBAL_CONST opcodes that registered (#4941). */
+    private \SplObjectStorage $registeredGlobalConstDeclareOpcodes;
+
     private ?Block $m3EmitTuMainBlock = null;
     private ?Block $m3CompileDriverMainBlock = null;
     private bool $m3EmitTuRuntimeSpineLowered = false;
@@ -60,11 +63,13 @@ class JIT {
 
     public function __construct(Context $context) {
         $this->context = $context;
+        $this->registeredGlobalConstDeclareOpcodes = new \SplObjectStorage();
     }
 
     public function compile(Block $block): PHPLLVM\Value {
         JIT\Progress::noteFunction('jit_compile_begin');
         $this->context->resetScriptLocalBindings();
+        $this->registeredGlobalConstDeclareOpcodes = new \SplObjectStorage();
         if ($this->shouldUseM3EmitTuNativeBridge() && $this->isM3EmitTuScriptMain($block)) {
             // Inventory emit-helper reuses thin TU spine (#3070); argv-only inventory keeps compile_driver {main}.
             $inventoryEmitHelper = $this->shouldUseM3InventoryEmitDriver()
@@ -5013,10 +5018,14 @@ class JIT {
                         $this->assignOperand($destOp, $value, $forceAssign);
                     }
                     $srcOp = $block->getOperand($op->arg3);
-                    if ($op->arg2 !== $op->arg3) {
+                    if ($op->arg2 !== $op->arg3 && $block->assignTempSlotIsDead((int) $op->arg3)) {
                         $this->jitClearAssignTempOperand($srcOp);
                     }
-                    if ($op->arg1 !== $op->arg2 && $op->arg1 !== $op->arg3) {
+                    if (
+                        $op->arg1 !== $op->arg2
+                        && $op->arg1 !== $op->arg3
+                        && $block->assignTempSlotIsDead((int) $op->arg1)
+                    ) {
                         $this->jitClearAssignTempOperand($destOp);
                     }
                     $this->maybeBindNamedVariable($aliasOp);
@@ -5037,8 +5046,14 @@ class JIT {
                     }
                     break;  
                 case OpCode::TYPE_ASSIGN_REF:
-                    if (null !== $op->arg3 && 0 !== (int) $op->arg3) {
+                    if (null !== $op->arg3 && 1 === (int) $op->arg3) {
                         throw new \LogicException('Cannot assign reference to non referenceable value');
+                    }
+                    if (
+                        null !== $op->arg3
+                        && OpCode::ASSIGN_REF_FOREACH_PROPERTY_HOOK === (int) $op->arg3
+                    ) {
+                        break;
                     }
                     $destOp = $block->getOperand($op->arg1);
                     $srcOp = $block->getOperand($op->arg2);
@@ -5199,11 +5214,11 @@ class JIT {
                     if (null === $op->arg3) {
                         $bracketLabel = Variable::cannotUseBracketLabel($value->type);
                         if (null !== $bracketLabel) {
-                            JIT\Builtin\TypeErrorRaise::registerDeclarations($this->context);
-                            JIT\Builtin\TypeErrorRaise::ensureLinked($this->context);
-                            JIT\Builtin\TypeErrorRaise::emitRaise(
+                            JIT\Builtin\ErrorRaise::registerDeclarations($this->context);
+                            JIT\Builtin\ErrorRaise::ensureLinked($this->context);
+                            JIT\Builtin\ErrorRaise::emitRaise(
                                 $this->context,
-                                'Cannot use [] on ' . $bracketLabel
+                                \PHPCompiler\VM\TypeCheck::SCALAR_USED_AS_ARRAY_MESSAGE
                             );
                             break;
                         }
@@ -5294,11 +5309,11 @@ class JIT {
                             );
                             break;
                         }
-                        JIT\Builtin\TypeErrorRaise::registerDeclarations($this->context);
-                        JIT\Builtin\TypeErrorRaise::ensureLinked($this->context);
-                        JIT\Builtin\TypeErrorRaise::emitRaise(
+                        JIT\Builtin\ErrorRaise::registerDeclarations($this->context);
+                        JIT\Builtin\ErrorRaise::ensureLinked($this->context);
+                        JIT\Builtin\ErrorRaise::emitRaise(
                             $this->context,
-                            'Cannot use [] on ' . $bracketLabel
+                            \PHPCompiler\VM\TypeCheck::SCALAR_USED_AS_ARRAY_MESSAGE
                         );
                         break;
                     }
@@ -5410,7 +5425,8 @@ class JIT {
                             $this->context,
                             $array,
                             $branchBlock,
-                            $mergeBody
+                            $mergeBody,
+                            $block->getOperand($op->arg2)
                         );
                         break;
                     }
@@ -5439,7 +5455,7 @@ class JIT {
                             $op->listSpreadExcludedKeys
                         );
                     } else {
-                        if (!JIT\ListUnpackHelper::isDefinitelyNonArrayAtCompileTime($spreadSrc)) {
+                        if (!JIT\ListUnpackHelper::isDefinitelyNonArrayAtCompileTime($this->context, $spreadSrc)) {
                             JIT\ListUnpackHelper::emitIsListBranchOrFail($this->context, $spreadSrc);
                         }
                         $spreadTailHt = JIT\ArrayBuiltinHelper::buildSliceArray(
@@ -5479,10 +5495,13 @@ class JIT {
                     break;
                 case OpCode::TYPE_EMPTY:
                     $from = $this->context->getVariableFromOp($block->getOperand($op->arg2));
-                    $truthy = (new ext\standard\boolval())->call($this->context, $from);
+                    $emptyResult = JIT\EmptyObjectPropertyHelper::compileEmptyFromValue(
+                        $this->context,
+                        $from
+                    );
                     $this->assignOperandValue(
                         $block->getOperand($op->arg1),
-                        $this->context->builder->not($truthy)
+                        $emptyResult
                     );
                     break;
                 case OpCode::TYPE_EMPTY_OBJECT_PROPERTY:
@@ -5767,6 +5786,13 @@ class JIT {
                                 $this->assignOperand($block->getOperand($op->arg1), $opcodeConst);
                                 break;
                             }
+                            JIT\ClassConstVisibilityJitGuard::emitBeforeFetch(
+                                $this->context->type->object,
+                                $this,
+                                $block,
+                                $classId,
+                                $nameOp->value
+                            );
                             $value = $this->context->type->object->classConstFetch($classId, $nameOp->value);
                             $resultOp = $block->getOperand($op->arg1);
                             if ($this->context->type->object->isEnumClassId($classId)
@@ -5777,7 +5803,13 @@ class JIT {
                             break;
                         }
                         $nameVar = $this->context->getVariableFromOp($nameOp);
-                        $value = $this->context->type->object->classConstFetchDynamic($classId, $nameVar, $classOp);
+                        $value = $this->context->type->object->classConstFetchDynamic(
+                            $classId,
+                            $nameVar,
+                            $classOp,
+                            $block,
+                            $this
+                        );
                         $this->assignOperand($block->getOperand($op->arg1), $value);
                         break;
                     }
@@ -5796,7 +5828,8 @@ class JIT {
                             $block,
                             $classVar,
                             $classOp,
-                            $nameOp->value
+                            $nameOp->value,
+                            $this
                         );
                         $this->assignOperand($block->getOperand($op->arg1), $value);
                         break;
@@ -5852,15 +5885,15 @@ class JIT {
                                 break;
                             }
                         }
+                        JIT\StaticPropertyVisibilityJitGuard::emitBeforeFetch(
+                            $this->context->type->object,
+                            $this,
+                            $block,
+                            $classId,
+                            $nameOp->value
+                        );
                         $fetched = $this->context->type->object->staticPropertyFetch($classId, $nameOp->value);
-                        if (
-                            $forWrite
-                            && JIT\PropertyHookDispatch::staticPropertyHasSetHook(
-                                $this->context,
-                                $className,
-                                $nameOp->value
-                            )
-                        ) {
+                        if ($forWrite) {
                             $fetched->staticPropertyHookClassLc = strtolower(ltrim($className, '\\'));
                             $fetched->objectPropertyName = $nameOp->value;
                         }
@@ -5935,7 +5968,7 @@ class JIT {
                             $this->context->setVariableOp($targetOp, $this->jitNullVariable());
                         }
                     } else {
-                        JIT\UnsetHelper::compileOffset($this->context, $block, $op);
+                        JIT\UnsetHelper::compileOffset($this->context, $block, $op, $this);
                     }
                     break;
                 case OpCode::TYPE_CAST_BOOL:
@@ -5958,6 +5991,9 @@ class JIT {
                         $block->getOperand($op->arg1),
                         JIT\JitNativeString::coerce($this->context, $value)
                     );
+                    break;
+                case OpCode::TYPE_CAST_VOID:
+                    $this->assignOperand($block->getOperand($op->arg1), $this->jitNullVariable());
                     break;
                 case OpCode::TYPE_ECHO:
                 case OpCode::TYPE_PRINT:
@@ -6109,6 +6145,11 @@ class JIT {
                         break;
                     }
                     $exitArg = $this->context->getVariableFromOp($block->getOperand($op->arg2));
+                    if (null !== $op->exitMessageSlot) {
+                        $messageArg = $this->context->getVariableFromOp($block->getOperand($op->exitMessageSlot));
+                        JIT\Builtin\ScriptExit::emitWithMessage($this->context, $exitArg, $messageArg);
+                        break;
+                    }
                     JIT\Builtin\ScriptExit::emit($this->context, $exitArg);
                     break;
                 case OpCode::TYPE_POW:
@@ -6444,6 +6485,15 @@ class JIT {
                         return $origBasicBlock;
                     }
                     if (0 === $this->context->inlineIncludeDepth) {
+                        if ($block->returnTypeNever) {
+                            $neverFunc = null !== $block->func ? $block->func->name : null;
+                            JIT\Builtin\TypeErrorRaise::emitRaise(
+                                $this->context,
+                                null !== $neverFunc && '' !== $neverFunc
+                                    ? "{$neverFunc}(): never-returning function must not implicitly return"
+                                    : 'A never-returning function must not return'
+                            );
+                        }
                         if (
                             !$this->isVoidLlvmFunction($func)
                             && null !== $block->func
@@ -6686,7 +6736,7 @@ class JIT {
                     $this->context->scope->argOperands = [];
                     break;
                 case OpCode::TYPE_STATICCALL_INIT:
-                    $this->initJitStaticCall($block, $op->arg1, $op->arg2);
+                    $this->initJitStaticCall($block, $op->arg1, $op->arg2, $op->staticCallParentScope);
                     break;
                 case OpCode::TYPE_ARG_SEND:
                     if ($this->context->inlineIncludeDepth > 0) {
@@ -6695,7 +6745,7 @@ class JIT {
                     $sendValue = $this->context->getVariableFromOp($block->getOperand($op->arg1));
                     if (null !== $op->arg3) {
                         $this->context->scope->args[] = ['unpack' => $sendValue];
-                        $this->context->scope->argOperands[] = null;
+                        $this->context->scope->argOperands[] = $block->getOperand($op->arg1);
                     } elseif (null !== $op->arg2 && isset($block->constants[$op->arg2])) {
                         $this->context->scope->args[] = [
                             'named' => $block->constants[$op->arg2]->toString(),
@@ -6895,26 +6945,37 @@ class JIT {
                         $this->context->runtime->vmContext,
                         $constValue
                     );
-                    if (!$this->context->runtime->vmContext->defineConstant(
+                    if ($this->context->runtime->vmContext->defineConstant(
                         $nameOp->value,
                         $constValue
                     )) {
-                        // Spine may require bin/vm.php after tokenizer-compat shims (#2134).
-                        if ($this->shouldUseSelfHostJitStubs()) {
-                            break;
+                        $this->registeredGlobalConstDeclareOpcodes->attach($op);
+                        if (VM\Variable::TYPE_ARRAY === $constValue->type) {
+                            $this->context->constantArrayFromVmHashTable(
+                                $nameOp->value,
+                                $constValue->toArray()
+                            );
                         }
-                        // Re-compile passes (jitCompileBlock + runQueue) may revisit DECLARE_GLOBAL_CONST (#4941).
-                        if (null !== $this->context->runtime->vmContext->constantFetch($nameOp->value)) {
-                            break;
-                        }
-                        throw new \LogicException("Cannot redefine constant {$nameOp->value}");
+                        break;
                     }
-                    if (VM\Variable::TYPE_ARRAY === $constValue->type) {
-                        $this->context->constantArrayFromVmHashTable(
-                            $nameOp->value,
-                            $constValue->toArray()
-                        );
+                    // Spine may require bin/vm.php after tokenizer-compat shims (#2134).
+                    if ($this->shouldUseSelfHostJitStubs()) {
+                        break;
                     }
+                    // Re-compile passes (jitCompileBlock + runQueue) may revisit DECLARE_GLOBAL_CONST (#4941).
+                    if ($this->registeredGlobalConstDeclareOpcodes->contains($op)) {
+                        break;
+                    }
+                    $scriptPath = $block->scriptPath();
+                    $line = (int) ($op->globalConstStartLine ?? 0);
+                    $this->context->runtime->vmContext->errors->triggerError(
+                        "Constant {$nameOp->value} already defined",
+                        VM\ErrorReporter::E_WARNING,
+                        null !== $scriptPath && '' !== $scriptPath ? $scriptPath : null,
+                        $this->context->runtime->vmContext,
+                        null,
+                        $line > 0 ? $line : 0
+                    );
                     break;
                 case OpCode::TYPE_DECLARE_INTERFACE:
                     $nameOp = $block->getOperand($op->arg1);
@@ -7011,13 +7072,6 @@ class JIT {
                         $parentOp = $block->getOperand($op->arg2);
                         assert($parentOp instanceof Operand\Literal);
                         $this->context->type->object->setClassParentName($nameOp->value, $parentOp->value);
-                        if (JIT\Builtin::LOAD_TYPE_STANDALONE === $this->context->loadType) {
-                            JIT\Builtin\MethodRegistry::emitSetParent(
-                                $this->context,
-                                strtolower(ltrim($nameOp->value, '\\')),
-                                strtolower(ltrim($parentOp->value, '\\'))
-                            );
-                        }
                     }
                     if ([] !== $op->attributeNames || [] !== $op->attributeEntries) {
                         $attrNames = [];
@@ -7162,12 +7216,41 @@ class JIT {
                     if (null !== $nonObjectLabel && null !== $propName) {
                         $forWrite = $this->varFetchDestUsedAsAssignLvalue($block, $i, (int) $op->arg1);
                         if ($forWrite) {
-                            JIT\Builtin\ErrorRaise::emitRaise(
-                                $this->context,
-                                sprintf('Attempt to assign property "%s" on %s', $propName, $nonObjectLabel)
-                            );
-                            $this->context->builder->returnVoid();
-                            $this->context->builder->clearInsertionPosition();
+                            if (
+                                'null' === $nonObjectLabel
+                                && $this->varFetchDestUsedAsIncDec($block, $i, (int) $op->arg1)
+                            ) {
+                                $message = sprintf(
+                                    'Attempt to increment/decrement property "%s" on null',
+                                    $propName
+                                );
+                            } else {
+                                $message = sprintf(
+                                    'Attempt to assign property "%s" on %s',
+                                    $propName,
+                                    $nonObjectLabel
+                                );
+                            }
+                            if ([] !== $this->context->tryCatch->handlerStack) {
+                                JIT\NonObjectPropertyFetchHelper::lowerNullPropertyDest($this->context, $result);
+                                JIT\TryCatchHelper::emitCatchableErrorMessage($this->context, $this, $message);
+                            } else {
+                                JIT\Builtin\ErrorRaise::emitRaise($this->context, $message);
+                                $this->context->builder->returnVoid();
+                                $this->context->builder->clearInsertionPosition();
+                            }
+                            break;
+                        }
+                        if ('null' === $nonObjectLabel) {
+                            $message = sprintf('Attempt to read property "%s" on null', $propName);
+                            if ([] !== $this->context->tryCatch->handlerStack) {
+                                JIT\NonObjectPropertyFetchHelper::lowerNullPropertyDest($this->context, $result);
+                                JIT\TryCatchHelper::emitCatchableErrorMessage($this->context, $this, $message);
+                            } else {
+                                JIT\Builtin\ErrorRaise::emitRaise($this->context, $message);
+                                $this->context->builder->returnVoid();
+                                $this->context->builder->clearInsertionPosition();
+                            }
                             break;
                         }
                         JIT\NonObjectPropertyFetchHelper::lowerNonObjectPropertyRead(
@@ -7286,6 +7369,14 @@ class JIT {
                         );
                         if (null !== $hookFetched) {
                             $this->assignOperandValue($result, $hookFetched);
+                            break;
+                        }
+                        if (JIT\PropertyHookDispatch::emitWriteOnlyVirtualReadGuard(
+                            $this->context,
+                            $this,
+                            $declaringClass,
+                            $name->value
+                        )) {
                             break;
                         }
                         JIT\LazyObjectHelper::emitEnsureInitialized(
@@ -8134,7 +8225,14 @@ class JIT {
                         $name->value,
                         $declaredJitType,
                         $default,
-                        $prototype
+                        $prototype,
+                        false,
+                        \PHPCompiler\MethodVisibility::mask($op->propertyVisibility)
+                    );
+                    $this->context->type->object->defineStaticPropertySetVisibility(
+                        $classId,
+                        $name->value,
+                        (int) ($op->propertySetVisibility ?? 0)
                     );
                     break;
                 case OpCode::TYPE_DECLARE_PROPERTY:
@@ -8263,6 +8361,7 @@ class JIT {
                 case OpCode::TYPE_BOOLEAN_NOT:
                 case OpCode::TYPE_CONCAT:
                 case OpCode::TYPE_ARRAY_DIM_FETCH:
+                case OpCode::TYPE_PROPERTY_FETCH:
                     // Scalar class const expressions — evaluated in jitClassConstDefineValue (#5394).
                     break;
                 case OpCode::TYPE_DECLARE_METHOD:
@@ -8294,6 +8393,9 @@ class JIT {
                         if (($storedFlags & \PHPCfg\Func::FLAG_STATIC) !== 0) {
                             $visFlags |= \PHPCfg\Func::FLAG_STATIC;
                         }
+                        if (($storedFlags & \PHPCfg\Func::FLAG_FINAL) !== 0) {
+                            $visFlags |= \PHPCfg\Func::FLAG_FINAL;
+                        }
                     }
                     $methodBlock = $op->block1;
                     if (null !== $methodBlock && null !== $methodBlock->func
@@ -8306,16 +8408,6 @@ class JIT {
                         $visFlags,
                         $name->value
                     );
-                    if ('' !== ($this->context->scope->className ?? '')
-                        && JIT\Builtin::LOAD_TYPE_STANDALONE === $this->context->loadType) {
-                        JIT\Builtin\MethodRegistry::emitRegisterMethod(
-                            $this->context,
-                            strtolower(ltrim($this->context->scope->className, '\\')),
-                            $methodLc,
-                            $name->value,
-                            $visFlags
-                        );
-                    }
                     if (($this->isBundledSuperglobalsClass($classId) || $this->shouldSkipExternalClassBodyLowering($classId))
                         && 'issuperglobalname' !== $methodLc
                     ) {
@@ -8370,14 +8462,19 @@ class JIT {
                             );
                             break;
                         }
-                        $this->context->type->object->defineClassConst(
-                            $classId,
-                            $name->value,
-                            $constValue
-                        );
-                        break;
-                    }
-                    if ($this->context->type->object->isEnumClassId($classId) && $op->isEnumCaseDeclare) {
+                    $this->context->type->object->defineClassConst(
+                        $classId,
+                        $name->value,
+                        $constValue
+                    );
+                    $this->context->type->object->defineClassConstVisibility(
+                        $classId,
+                        $name->value,
+                        $op->classConstVisibilityFlags
+                    );
+                    break;
+                }
+                if ($this->context->type->object->isEnumClassId($classId) && $op->isEnumCaseDeclare) {
                         $this->context->type->object->defineEnumCaseConst(
                             $classId,
                             $name->value,
@@ -8385,12 +8482,17 @@ class JIT {
                         );
                         break;
                     }
-                    $this->context->type->object->defineClassConst(
-                        $classId,
-                        $name->value,
-                        $constValue
-                    );
-                    if ([] !== $op->attributeNames) {
+                $this->context->type->object->defineClassConst(
+                    $classId,
+                    $name->value,
+                    $constValue
+                );
+                $this->context->type->object->defineClassConstVisibility(
+                    $classId,
+                    $name->value,
+                    $op->classConstVisibilityFlags
+                );
+                if ([] !== $op->attributeNames) {
                         $classLc = '' !== $this->context->scope->className
                             ? strtolower(ltrim($this->context->scope->className, '\\'))
                             : strtolower(ltrim($this->context->type->object->classNameForId($this->context->scope->classId), '\\'));
@@ -8503,6 +8605,20 @@ class JIT {
         if ([] === $traitNames) {
             return;
         }
+        $dedupedTraitNames = [];
+        $seenTraitLc = [];
+        foreach ($traitNames as $traitName) {
+            $traitLc = strtolower(ltrim($traitName, '\\'));
+            if (isset($seenTraitLc[$traitLc])) {
+                continue;
+            }
+            $seenTraitLc[$traitLc] = true;
+            $dedupedTraitNames[] = $traitName;
+        }
+        $traitNames = $dedupedTraitNames;
+        if ([] === $traitNames) {
+            return;
+        }
         $classLc = '' !== ($this->context->scope->className ?? '')
             ? strtolower(ltrim($this->context->scope->className, '\\'))
             : strtolower(ltrim($this->context->type->object->classNameForId($classId), '\\'));
@@ -8605,7 +8721,13 @@ class JIT {
                 if (isset($excludedByPrecedence["{$traitLc}\0{$methodLc}"])) {
                     continue;
                 }
+                if (isset($excluded[$methodLc])) {
+                    continue;
+                }
                 if (isset($merged[$methodLc])) {
+                    if ($merged[$methodLc]['traitLc'] === $traitLc) {
+                        continue;
+                    }
                     $prev = $merged[$methodLc]['traitName'];
                     throw new \CompileError(
                         "Trait method {$data['traitName']}::{$methodLc} has not been applied as {$className}::{$methodLc}, "
@@ -8668,13 +8790,24 @@ class JIT {
                 }
                 $data = $perTraitMethods[$traitLcFilter][$methodLc];
             } else {
-                if (!isset($merged[$methodLc])) {
-                    throw new \LogicException(
-                        'An alias was defined for ' . $traitPrefix . (string) ($adaptation['method'] ?? '')
-                        . ' but this method does not exist'
-                    );
+                if (isset($merged[$methodLc])) {
+                    $data = $merged[$methodLc];
+                } else {
+                    $source = null;
+                    foreach ($perTraitMethods as $methods) {
+                        if (isset($methods[$methodLc])) {
+                            $source = $methods[$methodLc];
+                            break;
+                        }
+                    }
+                    if (null === $source) {
+                        throw new \LogicException(
+                            'An alias was defined for ' . $traitPrefix . (string) ($adaptation['method'] ?? '')
+                            . ' but this method does not exist'
+                        );
+                    }
+                    $data = $source;
                 }
-                $data = $merged[$methodLc];
             }
 
             if (null !== $newModifier) {
@@ -8682,6 +8815,7 @@ class JIT {
             }
             $data['sourceMethodLc'] = $methodLc;
             $data['methodLc'] = $newNameLc;
+            unset($merged[$methodLc]);
             $merged[$newNameLc] = $data;
         }
 
@@ -8694,6 +8828,9 @@ class JIT {
             }
             if (isset($traitMethodSources[$methodLc])) {
                 $prevTrait = $traitMethodSources[$methodLc];
+                if ($prevTrait === $data['traitName']) {
+                    continue;
+                }
                 throw new \CompileError(
                     "Trait method {$data['traitName']}::{$methodLc} has not been applied as {$className}::{$methodLc}, "
                     ."because of collision with {$prevTrait}::{$methodLc}"
@@ -8714,6 +8851,11 @@ class JIT {
             $sourceMethodLc = $data['sourceMethodLc'] ?? $data['methodLc'];
             $methodBlock = $object->traitMethodBlock($traitId, $sourceMethodLc);
             if (null !== $methodBlock) {
+                $methodBlock = TraitMethodFunctionStatic::bindBlock(
+                    $methodBlock,
+                    $className,
+                    $data['traitName']
+                );
                 if ($this->context->scope->blockStorage->contains($methodBlock)) {
                     $this->context->scope->blockStorage->detach($methodBlock);
                 }
@@ -8859,6 +9001,11 @@ class JIT {
             if (null === $result->objectPropertyType) {
                 throw new \LogicException('objectPropertySlot requires objectPropertyType');
             }
+            JIT\DynamicObjectReadonlyGuard::emitBeforePropertyStore(
+                $this->context,
+                $result,
+                $this->context->jitEnclosingBlock
+            );
             JIT\ReadonlyClassGuard::emitBeforePropertyStore(
                 $this->context,
                 $result,
@@ -8904,6 +9051,14 @@ class JIT {
         if (null !== $result->staticPropertyGlobal) {
             if (null === $result->staticPropertyType) {
                 throw new \LogicException('staticPropertyGlobal requires staticPropertyType');
+            }
+            if (JIT\AsymmetricVisibilityGuard::emitBeforeStaticPropertyStore(
+                $this->context,
+                $this,
+                $result,
+                $this->context->jitEnclosingBlock
+            )) {
+                return;
             }
             if (JIT\PropertyHookDispatch::emitStaticSetHookIfNeeded(
                 $this->context,
@@ -9920,6 +10075,15 @@ class JIT {
         $writeOp = $this->operandAt($block, $op->arg3, 'inc/dec write');
         $resultOp = $this->operandAt($block, $op->arg1, 'inc/dec result');
         $read = $this->context->getVariableFromOpInScopes($readOp);
+        $write = $this->context->getVariableFromOpInScopes($writeOp);
+        if (
+            JIT\StringOffsetHelper::isWritableCharOffsetLvalue($write, $this->context)
+            || JIT\StringOffsetHelper::isWritableCharOffsetLvalue($read, $this->context)
+        ) {
+            JIT\StringOffsetHelper::emitIncDecError($this->context);
+
+            return;
+        }
         $literal = JIT\JitStringArg::compileTimeLiteral($read);
         if (null !== $literal) {
             $vm = new VM\Variable();
@@ -9940,40 +10104,56 @@ class JIT {
 
             return;
         }
+        if (null !== $read->staticPropertyGlobal) {
+            $write = $this->context->getVariableFromOpInScopes($writeOp);
+            $this->compileStaticPropertyIncDecOp($read, $write, $resultOp, $increment, $prefix);
+
+            return;
+        }
+
         if (null !== $read->objectPropertySlot) {
             $this->compileObjectPropertyIncDecOp($read, $resultOp, $increment, $prefix);
 
             return;
         }
 
-        if (Variable::TYPE_NATIVE_BOOL === $read->type) {
-            if (!$prefix) {
-                $this->assignOperand($resultOp, $read, true);
-            }
+        if (Variable::TYPE_NULL === $read->type || ($read->isNullConstant ?? false)) {
             if ($increment) {
-                $newVar = new Variable(
-                    $this->context,
-                    Variable::TYPE_NATIVE_LONG,
-                    Variable::KIND_VALUE,
-                    $this->context->constantFromInteger(1)
-                );
-            } else {
-                $boolVal = $this->context->helper->loadValue($read);
-                $i64 = $this->context->getTypeFromString('int64');
-                $one = $i64->constInt(1, false);
-                $zero = $i64->constInt(0, false);
-                $asLong = $this->context->builder->select($boolVal, $one, $zero);
-                $newLong = $this->context->builder->sub($asLong, $one);
+                $newLong = $this->context->constantFromInteger(1);
                 $newVar = new Variable(
                     $this->context,
                     Variable::TYPE_NATIVE_LONG,
                     Variable::KIND_VALUE,
                     $newLong
                 );
+                if (!$prefix) {
+                    $this->assignOperand($resultOp, $read, true);
+                }
+                $this->assignOperand($writeOp, $newVar, true);
+                if ($prefix) {
+                    $this->assignOperand($resultOp, $newVar, true);
+                }
+            } else {
+                if (!$prefix) {
+                    $this->assignOperand($resultOp, $read, true);
+                }
+                $this->assignOperand($writeOp, $read, true);
+                if ($prefix) {
+                    $this->assignOperand($resultOp, $read, true);
+                }
             }
-            $this->assignOperand($writeOp, $newVar, true);
+
+            return;
+        }
+
+        if (Variable::TYPE_NATIVE_BOOL === $read->type) {
+            // PHP 8.2+ zend_operators.c: bool inc/dec is a no-op (issue #7058, re-#4727).
+            if (!$prefix) {
+                $this->assignOperand($resultOp, $read, true);
+            }
+            $this->assignOperand($writeOp, $read, true);
             if ($prefix) {
-                $this->assignOperand($resultOp, $newVar, true);
+                $this->assignOperand($resultOp, $read, true);
             }
 
             return;
@@ -9987,11 +10167,9 @@ class JIT {
             Variable::TYPE_VALUE === $read->type
             && (Variable::KIND_VARIABLE === $read->kind || $read->functionStaticGlobal)
         ) {
+            $this->guardIncDecResourceOperand($read, $increment);
             $readPtr = JIT\JitValueBox::valuePtrFromVariable($this->context, $read);
-            $cur = $this->context->builder->call(
-                $this->context->lookupFunction('__value__readLong'),
-                $readPtr
-            );
+            $cur = $this->readIncDecValueBoxLong($read, $readPtr, $increment);
             $one = $cur->typeOf()->constInt(1, false);
             $newLong = $increment
                 ? $this->context->builder->add($cur, $one)
@@ -10017,6 +10195,7 @@ class JIT {
         }
 
         if (Variable::TYPE_NATIVE_LONG === $read->type && Variable::KIND_VARIABLE === $read->kind) {
+            $this->guardIncDecResourceOperand($read, $increment);
             $cur = $this->context->helper->loadValue($read);
             $one = $cur->typeOf()->constInt(1, false);
             $newLong = $increment
@@ -10050,6 +10229,84 @@ class JIT {
         }
     }
 
+    /** Coerce null value-box operands to 0 before ++; decrement uses raw readLong (#7435). */
+    private function readIncDecValueBoxLong(
+        JIT\Variable $read,
+        PHPLLVM\Value $readPtr,
+        bool $increment
+    ): PHPLLVM\Value {
+        if (!$increment) {
+            return $this->context->builder->call(
+                $this->context->lookupFunction('__value__readLong'),
+                $readPtr
+            );
+        }
+        if (JIT\Variable::TYPE_NULL === $read->type || ($read->isNullConstant ?? false)) {
+            return $readPtr->typeOf()->constInt(0, false);
+        }
+        if (!JIT\JitValueBox::isValueOperand($read)) {
+            return $this->context->builder->call(
+                $this->context->lookupFunction('__value__readLong'),
+                $readPtr
+            );
+        }
+        $isNull = JIT\JitValueCompare::valueBoxIsNull($this->context, $read);
+        $zero = $readPtr->typeOf()->constInt(0, false);
+        $readLong = $this->context->builder->call(
+            $this->context->lookupFunction('__value__readLong'),
+            $readPtr
+        );
+        $okBlock = JIT\BasicBlockHelper::append($this->context, 'incdec_null_coerce_ok');
+        $nullBlock = JIT\BasicBlockHelper::append($this->context, 'incdec_null_coerce_null');
+        $mergeBlock = JIT\BasicBlockHelper::append($this->context, 'incdec_null_coerce_merge');
+        $this->context->builder->branchIf($isNull, $nullBlock, $okBlock);
+        $this->context->builder->positionAtEnd($nullBlock);
+        $this->context->builder->branch($mergeBlock);
+        $this->context->builder->positionAtEnd($okBlock);
+        $this->context->builder->branch($mergeBlock);
+        $this->context->builder->positionAtEnd($mergeBlock);
+        $phi = $this->context->builder->phi($readLong->typeOf(), 'incdec_null_coerced');
+        $phi->addIncoming($zero, $nullBlock);
+        $phi->addIncoming($readLong, $okBlock);
+
+        return $phi;
+    }
+
+    /** Reject ++/-- on stream/dir handles (issue #6396, zend_operators.c). */
+    private function guardIncDecResourceOperand(JIT\Variable $read, bool $increment): void
+    {
+        $longVal = null;
+        if (JIT\Variable::TYPE_NATIVE_LONG === $read->type) {
+            $longVal = $this->context->helper->loadValue($read);
+        } elseif (
+            JIT\Variable::TYPE_VALUE === $read->type
+            && (JIT\Variable::KIND_VARIABLE === $read->kind || $read->functionStaticGlobal)
+        ) {
+            $readPtr = JIT\JitValueBox::valuePtrFromVariable($this->context, $read);
+            $longVal = $this->context->builder->call(
+                $this->context->lookupFunction('__value__readLong'),
+                $readPtr
+            );
+        }
+        if (null === $longVal) {
+            return;
+        }
+        JIT\Builtin\StringDir::ensureLinked($this->context);
+        $isRes = JIT\JitValueCompare::nativeLongIsResource($this->context, $longVal);
+        $okBlock = JIT\BasicBlockHelper::append($this->context, 'incdec_res_ok');
+        $errBlock = JIT\BasicBlockHelper::append($this->context, 'incdec_res_err');
+        $this->context->builder->branchIf($isRes, $errBlock, $okBlock);
+        $this->context->builder->positionAtEnd($errBlock);
+        JIT\Builtin\TypeErrorRaise::registerDeclarations($this->context);
+        JIT\Builtin\TypeErrorRaise::ensureLinked($this->context);
+        JIT\Builtin\TypeErrorRaise::emitRaise(
+            $this->context,
+            $increment ? 'Cannot increment resource' : 'Cannot decrement resource'
+        );
+        $this->context->builder->call($this->context->lookupFunction('abort'));
+        $this->context->builder->positionAtEnd($okBlock);
+    }
+
     /** .= on object properties: concat into new string, guard readonly, store via slot (#3149). */
     private function compileObjectPropertyConcatOp(Variable $dest, Variable $left, Variable $right): void
     {
@@ -10057,6 +10314,11 @@ class JIT {
             throw new \LogicException('objectPropertySlot requires objectPropertyType');
         }
         $newVal = $this->compileConcatIntoNewString($left, $right);
+        JIT\DynamicObjectReadonlyGuard::emitBeforePropertyStore(
+            $this->context,
+            $dest,
+            $this->context->jitEnclosingBlock
+        );
         JIT\ReadonlyClassGuard::emitBeforePropertyStore(
             $this->context,
             $dest,
@@ -10127,7 +10389,78 @@ class JIT {
         );
     }
 
-    /** ++/-- on object properties: guard readonly and store via property slot (#3149). */
+    /** ++/-- on static hooked properties: get hook read, set hook write (#6319). */
+    private function compileStaticPropertyIncDecOp(
+        Variable $read,
+        Variable $write,
+        \PHPCfg\Operand $resultOp,
+        bool $increment,
+        bool $prefix
+    ): void {
+        if (null === $read->staticPropertyType) {
+            throw new \LogicException('staticPropertyGlobal requires staticPropertyType');
+        }
+        $className = $read->staticPropertyHookClassLc ?? '';
+        $propName = $read->objectPropertyName ?? '';
+        $current = null;
+        if ('' !== $className && '' !== $propName) {
+            $hookVal = JIT\PropertyHookDispatch::tryEmitStaticPropertyGet(
+                $this->context,
+                $className,
+                $propName,
+                $this->context->jitEnclosingBlock
+            );
+            if (null !== $hookVal) {
+                $current = new Variable(
+                    $this->context,
+                    Variable::TYPE_VALUE,
+                    Variable::KIND_VALUE,
+                    $hookVal
+                );
+            }
+        }
+        if (null === $current) {
+            $current = $read;
+        }
+        if (!$prefix) {
+            $this->assignOperand($resultOp, $current, true);
+        }
+        $arithOp = new OpCode($increment ? OpCode::TYPE_PLUS : OpCode::TYPE_MINUS);
+        $oneVar = new Variable(
+            $this->context,
+            Variable::TYPE_NATIVE_LONG,
+            Variable::KIND_VALUE,
+            $this->context->constantFromInteger(1)
+        );
+        $newVal = $this->context->helper->binaryOp($arithOp, $current, $oneVar);
+        if (
+            !JIT\AsymmetricVisibilityGuard::emitBeforeStaticPropertyStore(
+                $this->context,
+                $this,
+                $read,
+                $this->context->jitEnclosingBlock
+            )
+            && !JIT\PropertyHookDispatch::emitStaticSetHookIfNeeded(
+                $this->context,
+                $write,
+                $newVal,
+                $this->context->jitEnclosingBlock,
+                $this
+            )
+        ) {
+            $this->context->type->object->staticPropertyStore(
+                $read->staticPropertyGlobal,
+                $newVal,
+                $read->staticPropertyType,
+                $read->staticPropertyInitGlobal
+            );
+        }
+        if ($prefix) {
+            $this->assignOperand($resultOp, $newVal, true);
+        }
+    }
+
+    /** ++/-- on object properties: get/set hook dispatch or guard readonly (#6309, #3149). */
     private function compileObjectPropertyIncDecOp(
         Variable $read,
         \PHPCfg\Operand $resultOp,
@@ -10137,8 +10470,41 @@ class JIT {
         if (null === $read->objectPropertySlot || null === $read->objectPropertyType) {
             throw new \LogicException('objectPropertySlot requires objectPropertyType');
         }
+        $current = null;
+        if (
+            null !== $read->objectPropertyReceiver
+            && null !== $read->objectPropertyClassName
+            && null !== $read->objectPropertyName
+            && '' !== $read->objectPropertyName
+        ) {
+            $hookVal = JIT\PropertyHookDispatch::tryEmitPropertyGet(
+                $this->context,
+                $read->objectPropertyReceiver,
+                $read->objectPropertyClassName,
+                $read->objectPropertyName,
+                $this->context->jitEnclosingBlock
+            );
+            if (null !== $hookVal) {
+                $current = new Variable(
+                    $this->context,
+                    Variable::TYPE_VALUE,
+                    Variable::KIND_VALUE,
+                    $hookVal
+                );
+            } elseif (JIT\PropertyHookDispatch::emitWriteOnlyVirtualReadGuard(
+                $this->context,
+                $this,
+                $read->objectPropertyClassName,
+                $read->objectPropertyName
+            )) {
+                return;
+            }
+        }
+        if (null === $current) {
+            $current = $read;
+        }
         if (!$prefix) {
-            $this->assignOperand($resultOp, $read, true);
+            $this->assignOperand($resultOp, $current, true);
         }
         $arithOp = new OpCode($increment ? OpCode::TYPE_PLUS : OpCode::TYPE_MINUS);
         $oneVar = new Variable(
@@ -10147,7 +10513,25 @@ class JIT {
             Variable::KIND_VALUE,
             $this->context->constantFromInteger(1)
         );
-        $newVal = $this->context->helper->binaryOp($arithOp, $read, $oneVar);
+        $newVal = $this->context->helper->binaryOp($arithOp, $current, $oneVar);
+        if (JIT\PropertyHookDispatch::emitSetHookIfNeeded(
+            $this->context,
+            $read,
+            $newVal,
+            $this->context->jitEnclosingBlock,
+            $this
+        )) {
+            if ($prefix) {
+                $this->assignOperand($resultOp, $newVal, true);
+            }
+
+            return;
+        }
+        JIT\DynamicObjectReadonlyGuard::emitBeforePropertyStore(
+            $this->context,
+            $read,
+            $this->context->jitEnclosingBlock
+        );
         JIT\ReadonlyClassGuard::emitBeforePropertyStore(
             $this->context,
             $read,
@@ -10474,6 +10858,19 @@ class JIT {
                 return;
             }
         }
+        if ('propertyisinitialized' === strtolower($methodName)) {
+            $receiverVar = $this->context->getVariableFromOp($receiverOp);
+            if (Type::TYPE_OBJECT === $receiverOp->type?->type) {
+                JIT\LazyObjectHelper::emitEnsureInitialized(
+                    $this->context,
+                    $this->context->helper->loadValue($receiverVar)
+                );
+            }
+            $this->context->scope->toCall = new VM\PropertyIsInitializedHandler();
+            $this->context->scope->args = [$receiverVar];
+
+            return;
+        }
         $receiverVar = $this->context->getVariableFromOp($receiverOp);
         if (JIT\GeneratorHelper::isGeneratorVariable($receiverVar)) {
             $methodLc = strtolower($methodName);
@@ -10732,7 +11129,7 @@ class JIT {
         }
     }
 
-    private function initJitStaticCall(Block $block, int $classOpIdx, int $nameOpIdx): void
+    private function initJitStaticCall(Block $block, int $classOpIdx, int $nameOpIdx, bool $parentScope = false): void
     {
         $classOp = $block->getOperand($classOpIdx);
         $nameOp = $block->getOperand($nameOpIdx);
@@ -10750,17 +11147,27 @@ class JIT {
             return;
         }
         $declaringClassId = $this->context->type->object->lookup($className);
-        $this->assertJitStaticMethodCallable($declaringClassLc, $methodLc, $className, $nameOp->value);
-        $visFlags = $this->context->type->object->methodVisibility($declaringClassId, $methodLc);
         $callerClassLc = null;
         if (null !== $block->func && null !== $block->func->class) {
             $callerClassLc = strtolower($block->func->class->value);
         } elseif ($this->context->scope->className !== '') {
             $callerClassLc = $this->context->scope->className;
         }
+        $callerInstanceMethod = $this->instanceMethodUsesThis($block);
+        $directParentLc = null !== $callerClassLc
+            ? $this->context->type->object->parentClassLc($callerClassLc)
+            : null;
+        // Compiler staticCallParentScope + php-cfg lowered parent class (#1858, #6735).
+        $parentScopeInstanceCall = ($parentScope && $callerInstanceMethod)
+            || ($callerInstanceMethod
+                && null !== $directParentLc
+                && $directParentLc === $declaringClassLc);
+        if (!$parentScopeInstanceCall) {
+            $this->assertJitStaticMethodCallable($declaringClassLc, $methodLc, $className, $nameOp->value);
+        }
+        $visFlags = $this->context->type->object->methodVisibility($declaringClassId, $methodLc);
         $parentScopeAllows = false;
         if (null !== $callerClassLc) {
-            $directParentLc = $this->context->type->object->parentClassLc($callerClassLc);
             if (null !== $directParentLc && $directParentLc === $declaringClassLc) {
                 $parentScopeAllows = MethodVisibility::parentScopeAllows(
                     $visFlags,
@@ -10781,7 +11188,8 @@ class JIT {
         );
         $proxyName = $this->resolveJitStaticMethodProxyName($declaringClassLc, $methodLc);
         if (!$this->context->functionIsRegistered($proxyName)) {
-            if ($this->context->type->object->isEnumClassLc($declaringClassLc) && 'cases' === $methodLc) {
+            if ($this->context->type->object->isEnumClassLc($declaringClassLc)
+                && \in_array($methodLc, ['cases', 'from', 'tryfrom'], true)) {
                 $this->context->type->object->finishEnumClass($declaringClassId);
             }
         }
@@ -10919,13 +11327,24 @@ class JIT {
             }
         }
 
-        foreach ($argEntries as $entry) {
-            if (\is_array($entry) && isset($entry['unpack'])) {
-                return [
-                    $this->finalizeJitCallArgs($argEntries),
-                    $argOperands,
-                ];
+        if ($this->jitCallArgsHaveUnpack($argEntries)) {
+            [$paramNames, $variadicIndex] = $this->jitCalleeParamMetadata($toCall);
+            $namedUnpack = JIT\CallUnpackHelper::tryResolveCompileTimeNamedUnpack(
+                $this->context->jitEnclosingBlock,
+                $argEntries,
+                $argOperands,
+                $paramNames,
+                $variadicIndex,
+                $this
+            );
+            if (null !== $namedUnpack) {
+                return $namedUnpack;
             }
+
+            return [
+                $this->finalizeJitCallArgs($argEntries),
+                $argOperands,
+            ];
         }
 
         if ($this->jitCallArgsHaveNamed($argEntries)) {
@@ -10953,6 +11372,26 @@ class JIT {
         }
 
         return false;
+    }
+
+    /**
+     * @param list<Variable|array{unpack: Variable}|array{named: string, value: Variable}> $argEntries
+     */
+    private function jitCallArgsHaveUnpack(array $argEntries): bool
+    {
+        foreach ($argEntries as $entry) {
+            if (\is_array($entry) && isset($entry['unpack'])) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /** @internal CallUnpackHelper compile-time named unpack (#5031). */
+    public function jitVariableFromVmConstantForCallUnpack(VM\Variable $vm): Variable
+    {
+        return $this->jitVariableFromVmConstant($vm);
     }
 
     /**
@@ -11086,10 +11525,22 @@ class JIT {
             $paramIdx = (int) $op->arg2;
             $isVariadic = null !== $block->variadicParamIndex && $paramIdx === $block->variadicParamIndex;
             if ($isVariadic) {
+                if (
+                    isset($block->paramVariadicElementIntersectionConstraints[$slot])
+                    || isset($block->paramVariadicElementDnfConstraints[$slot])
+                ) {
+                    continue;
+                }
                 if (!isset($block->paramVariadicElementTypeConstraints[$slot])) {
                     continue;
                 }
                 $constraints[$paramIdx + $offset] = $block->paramVariadicElementTypeConstraints[$slot];
+                continue;
+            }
+            if (
+                isset($block->paramIntersectionConstraints[$slot])
+                || isset($block->paramDnfConstraints[$slot])
+            ) {
                 continue;
             }
             if (!isset($block->paramTypeConstraints[$slot])) {
@@ -11385,13 +11836,10 @@ class JIT {
             $value = $block->constants[$op->arg2];
         }
         if (null !== $op->arg3 && isset($block->constants[$op->arg3])) {
-            $constraint = $block->constants[$op->arg3]->typeConstraint;
-            if (null !== $constraint) {
-                $check = new VM\Variable();
-                $check->copyFrom($value);
-                VM\TypeCheck::assertClassConstantValue($check, $constraint, $constNameLc);
-                $value = $check;
-            }
+            $check = new VM\Variable();
+            $check->copyFrom($value);
+            VM\TypeCheck::assertClassConstantTypedValue($check, $block->constants[$op->arg3], $constNameLc);
+            $value = $check;
         }
 
         return $value;
@@ -11720,6 +12168,21 @@ class JIT {
         }
 
         return false;
+    }
+
+    private function varFetchDestUsedAsIncDec(Block $block, int $opIndex, int $destSlot): bool
+    {
+        $next = $block->opCodes[$opIndex + 1] ?? null;
+        if (null === $next) {
+            return false;
+        }
+
+        return \in_array($next->type, [
+            OpCode::TYPE_PRE_INC,
+            OpCode::TYPE_POST_INC,
+            OpCode::TYPE_PRE_DEC,
+            OpCode::TYPE_POST_DEC,
+        ], true) && $next->arg3 === $destSlot;
     }
 
     /**

@@ -80,6 +80,23 @@ final class JitBoolArg
             $context->builder->positionAtEnd($ok);
         }
 
+        $enumBlock = BasicBlockHelper::append($context, 'jit_bool_vbox_enum');
+        $afterEnum = BasicBlockHelper::append($context, 'jit_bool_vbox_after_enum');
+        $isEnumCase = $context->builder->icmp(
+            Builder::INT_EQ,
+            $typeByte,
+            $i8->constInt(VmVariable::TYPE_ENUM_CASE, false)
+        );
+        $context->builder->branchIf($isEnumCase, $enumBlock, $afterEnum);
+
+        $context->builder->positionAtEnd($enumBlock);
+        self::emitTypeErrorAndAbort(
+            $context,
+            $contextLabel,
+            self::compileTimeEnumGivenLabel($context, $arg)
+        );
+        $context->builder->positionAtEnd($afterEnum);
+
         $boolBlock = BasicBlockHelper::append($context, 'jit_bool_vbox_bool');
         $longBlock = BasicBlockHelper::append($context, 'jit_bool_vbox_long');
         $mergeBlock = BasicBlockHelper::append($context, 'jit_bool_vbox_merge');
@@ -157,5 +174,36 @@ final class JitBoolArg
         }
 
         return "{$contextLabel} must be of type bool, {$given} given";
+    }
+
+    private static function compileTimeEnumGivenLabel(Context $context, Variable $arg): string
+    {
+        if (Variable::KIND_VALUE !== $arg->kind) {
+            return 'object';
+        }
+        $objMap = $context->structFieldMap['__object__'] ?? null;
+        if (null !== $objMap && isset($objMap['class_id'])) {
+            $classIdVal = $context->builder->load(
+                $context->builder->structGep($arg->value, $objMap['class_id'])
+            );
+            if (method_exists($classIdVal, 'isConstant') && $classIdVal->isConstant()) {
+                $classId = (int) $classIdVal->getConstantValue();
+
+                return $context->type->object->classNameForId($classId);
+            }
+        }
+        $enumMap = $context->structFieldMap['__enum_case__'] ?? null;
+        if (null !== $enumMap && isset($enumMap['class_id'])) {
+            $classIdVal = $context->builder->load(
+                $context->builder->structGep($arg->value, $enumMap['class_id'])
+            );
+            if (method_exists($classIdVal, 'isConstant') && $classIdVal->isConstant()) {
+                $classId = (int) $classIdVal->getConstantValue();
+
+                return $context->type->object->classNameForId($classId);
+            }
+        }
+
+        return 'object';
     }
 }

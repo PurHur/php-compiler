@@ -22,5 +22,5 @@ class InClass {
 }
 (new InClass())->dup();
 --EXPECT--
-Trying to clone an uncloneable object of class C
+Call to private C::__clone() from global scope
 in-class ok

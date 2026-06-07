@@ -138,6 +138,7 @@ final class CurlyBraceOffsetRejector
             T_CATCH,
             T_FUNCTION,
             T_FN,
+            T_USE,
         ];
 
         if (\in_array($beforeOpen[0], $blockOpeners, true)) {
@@ -146,6 +147,14 @@ final class CurlyBraceOffsetRejector
 
         if (T_NEW === $beforeOpen[0]) {
             return true;
+        }
+
+        // `new class(...)` anonymous class ctor args — `{` opens class body, not offset access (#6881).
+        if (T_CLASS === $beforeOpen[0]) {
+            $beforeClass = self::previousSignificantToken($tokens, $openParenIndex - 2);
+            if (\is_array($beforeClass) && T_NEW === $beforeClass[0]) {
+                return true;
+            }
         }
 
         if (T_STRING === $beforeOpen[0]) {

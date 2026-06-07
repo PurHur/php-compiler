@@ -280,6 +280,7 @@ class String_ extends Type {
         \PHPCompiler\JIT\Builtin\StringHtmlspecialcharsDecode::implement($this->context);
         \PHPCompiler\JIT\Builtin\StringPregQuote::implement($this->context);
         \PHPCompiler\JIT\Builtin\StringQuotemeta::implement($this->context);
+        \PHPCompiler\JIT\Builtin\CtypeJit::implement($this->context);
         \PHPCompiler\JIT\Builtin\StringAddslashes::implement($this->context);
         \PHPCompiler\JIT\Builtin\StringStripslashes::implement($this->context);
         \PHPCompiler\JIT\Builtin\StringUrlencode::implement($this->context);
@@ -288,7 +289,9 @@ class String_ extends Type {
         \PHPCompiler\JIT\Builtin\StringUcwords::implement($this->context);
         \PHPCompiler\JIT\Builtin\StringRandomBytes::implement($this->context);
         \PHPCompiler\JIT\Builtin\StringJsonEncode::implement($this->context);
+        \PHPCompiler\JIT\Builtin\StringJsonDecode::implement($this->context);
         \PHPCompiler\JIT\Builtin\StringSerialize::implement($this->context);
+        \PHPCompiler\JIT\Builtin\StringUnserialize::implement($this->context);
         \PHPCompiler\JIT\Builtin\StringHttpBuildQuery::implement($this->context);
         \PHPCompiler\JIT\Builtin\StringParseStr::implement($this->context);
         \PHPCompiler\JIT\Builtin\StringGetenv::implement($this->context);
@@ -301,6 +304,9 @@ class String_ extends Type {
         \PHPCompiler\JIT\Builtin\StringFilePutContents::implement($this->context);
         \PHPCompiler\JIT\Builtin\StringDateTime::implement($this->context);
         \PHPCompiler\JIT\Builtin\StringGetdate::implement($this->context);
+        \PHPCompiler\JIT\Builtin\StringLocaltime::implement($this->context);
+        \PHPCompiler\JIT\Builtin\StringIdate::implement($this->context);
+        \PHPCompiler\JIT\Builtin\ParseUrl::implement($this->context);
         \PHPCompiler\JIT\Builtin\StringMicrotime::implement($this->context);
         \PHPCompiler\JIT\Builtin\StringGettimeofday::implement($this->context);
     }

@@ -37,6 +37,22 @@ class Printer {
             $return .= ', ' . $this->renderArg($op->arg2, $block);
             $return .= ', ' . $this->renderArg($op->arg3, $block);
             $return .= ')';
+            if (OpCode::TYPE_DECLARE_PROPERTY === $op->type) {
+                $vis = MethodVisibility::mask($op->propertyVisibility);
+                $read = match (true) {
+                    ($vis & \PHPCfg\Func::FLAG_PRIVATE) !== 0 => 'private',
+                    ($vis & \PHPCfg\Func::FLAG_PROTECTED) !== 0 => 'protected',
+                    default => 'public',
+                };
+                $return .= ' /* '.$read;
+                if (0 !== $op->propertySetVisibility) {
+                    $return .= ' '.Ast\AsymmetricVisibilityRewriter::setModifierLabel($op->propertySetVisibility);
+                }
+                if (0 !== $op->propertyGetVisibility) {
+                    $return .= ' '.Ast\AsymmetricVisibilityRewriter::getModifierLabel($op->propertyGetVisibility);
+                }
+                $return .= ' */';
+            }
             if (!is_null($op->block1)) {
                 $append .= $this->printBlock($op->block1);
                 $return .= "\n    goto block_" . $this->seen[$op->block1];

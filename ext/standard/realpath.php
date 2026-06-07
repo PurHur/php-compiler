@@ -7,8 +7,8 @@ namespace PHPCompiler\ext\standard;
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\Variable as JITVariable;
-use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
 
 /** realpath() — canonical path when the target exists (VM: VmString; JIT: libc via JitRealpath). */
@@ -19,14 +19,11 @@ final class realpath extends Internal
         if (1 !== \count($frame->calledArgs)) {
             throw new \LogicException('realpath() requires exactly one argument');
         }
-        $v = $frame->calledArgs[0]->resolveIndirect();
+        $path = VmString::coerceStringBuiltinArg($frame->calledArgs[0], 'realpath', 0, 'path');
         if (null === $frame->returnVar) {
             return;
         }
-        if (Variable::TYPE_STRING !== $v->type) {
-            throw new \LogicException('realpath() only supports strings in this compiler build');
-        }
-        $resolved = VmString::realpath($v->toString());
+        $resolved = VmString::realpath($path);
         if (false === $resolved) {
             $frame->returnVar->bool(false);
         } else {
@@ -42,6 +39,8 @@ final class realpath extends Internal
             throw new \LogicException('realpath() requires exactly one argument');
         }
 
-        return JitRealpath::resolve($context, $this->jitString($context, $args[0], 'realpath() argument #1'));
+        $path = JitStringBuiltinArg::lower($context, $args[0], 'realpath', 0, 'path');
+
+        return JitRealpath::resolve($context, $path);
     }
 }

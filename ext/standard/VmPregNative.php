@@ -7,7 +7,7 @@ namespace PHPCompiler\ext\standard;
 /**
  * Native preg_* for VM bootstrap (issue #4874).
  *
- * Uses libpcre2-8 via FFI — no host \\preg_* calls. Mirrors lib/AOT/runtime/preg_match.c.
+ * Uses libpcre2-8 via FFI — no host \\preg_* calls. Mirrors {@see StringPregMatchJit} semantics.
  */
 final class VmPregNative
 {

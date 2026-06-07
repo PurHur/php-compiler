@@ -46,6 +46,10 @@ class JITTest extends BaseTest {
             if (str_contains($name, 'sealed_class')) {
                 continue;
             }
+            // eval() readonly inheritance compile fatal: VM + known-class compile check (#7170); MCJIT inline eval deferral pending.
+            if (str_contains($name, 'eval_readonly_inheritance') || str_contains($name, 'eval_nonreadonly_extends_readonly')) {
+                continue;
+            }
             // preserve_keys=true: VM + JIT/AOT via ArrayBuiltinHelper (#3524).
             // array_merge_recursive(): VM + JIT via ArrayBuiltinHelper overlay (#3297, #6177).
             if (str_contains(strtolower($case[0]), 'array_merge_recursive')) {
@@ -65,18 +69,6 @@ class JITTest extends BaseTest {
             }
             // readline() MCJIT false return boxing unstable (#3776); VM + AOT lint green.
             if (str_contains($name, 'readline_exists')) {
-                continue;
-            }
-            // Fiber::suspend() MCJIT execute segfault (#4019, #4097); VM + AOT green; bin/jit.php VM-fallback.
-            if (str_contains($name, 'fiber_jit')) {
-                continue;
-            }
-            // substr_count() offset/length: VM + AOT via inline LLVM (#4105, #5188); MCJIT execute pending.
-            if (str_contains($name, 'substr_count')) {
-                continue;
-            }
-            // vsprintf()/sscanf() VM + AOT (#3190); MCJIT execute segfaults (argv hashtable pack, same as vfprintf).
-            if (str_contains($name, 'vsprintf_basic') || str_contains($name, 'sscanf_int')) {
                 continue;
             }
             // CLI $argc/$argv globals: VM + standalone AOT (#4139); MCJIT execute segfaults (CliArgvGlobalInit refresh).
@@ -123,6 +115,10 @@ class JITTest extends BaseTest {
             if (str_contains($name, 'exception_handler')) {
                 continue;
             }
+            // headers_sent($file, $line) by-ref origin: VM path only (#5134); JIT zero-arg #4110.
+            if (str_contains($name, 'headers_sent_byref')) {
+                continue;
+            }
             // WeakReference get() return used in locals — MCJIT execute (#3667).
             if (str_contains($name, 'weak_reference_gc_jit')) {
                 continue;
@@ -139,12 +135,20 @@ class JITTest extends BaseTest {
             if (str_contains($name, 'get_debug_type_enum')) {
                 continue;
             }
+            // var_export() on enum case arrays: VM (#5583); MCJIT enum literal layout deferred.
+            if (str_contains($name, 'array_spread_enum_cases')) {
+                continue;
+            }
             // count() on Countable objects is VM-only until JIT object dispatch (#3364).
             if (str_contains($name, 'countable')) {
                 continue;
             }
             // __halt_compiler() is compile-time only (#3479).
             if (str_contains($name, 'halt_compiler')) {
+                continue;
+            }
+            // never/void covariance on class methods: compile-time only (#6733); MCJIT segfault on :void/:never class methods (#98).
+            if (str_contains($name, 'never_void_covariance')) {
                 continue;
             }
             // class_alias() on interfaces/traits: VM + AOT -l (#5329); MCJIT LLVM verify until interface_exists stable.
@@ -236,7 +240,8 @@ class JITTest extends BaseTest {
                 continue;
             }
             // ReflectionClass::getProperties/getMethods are VM-only (#3815).
-            if (str_contains($name, 'reflection_class_members')) {
+            if (str_contains($name, 'reflection_class_members')
+                || str_contains($name, 'reflection_class_getmethods_private')) {
                 continue;
             }
             // ReflectionProperty/Constant::getAttributes() MCJIT: VM read path (#4136, #2467).
@@ -249,10 +254,6 @@ class JITTest extends BaseTest {
             }
             // variadic + named args: VM parity (#4808); MCJIT NamedArgs variadic pack (#3777 follow-up).
             if (str_contains($name, 'named_args_variadic')) {
-                continue;
-            }
-            // #[\AllowDynamicProperties] is VM-only until JIT class flag (#3467).
-            if (str_contains($name, 'allow_dynamic_properties')) {
                 continue;
             }
             // E_DEPRECATED on stderr: DynamicPropertyDeprecatedJITTest (#5470, #4570).
@@ -303,6 +304,10 @@ class JITTest extends BaseTest {
             if (str_contains($name, 'exit_array_status')) {
                 continue;
             }
+            // exit()/die() enum case Error + uncaught reporting — VM TYPE_EXIT (#6358).
+            if (str_contains($name, 'exit_enum_case_error') || str_contains($name, 'uncaught_no_secondary_fatal')) {
+                continue;
+            }
             // define() case_insensitive + constant() MCJIT execute segfaults (#3711); VM + AOT PHPT green.
             if (str_contains($name, 'define_case_insensitive')) {
                 continue;
@@ -315,8 +320,8 @@ class JITTest extends BaseTest {
             if (str_contains($name, 'stringable')) {
                 continue;
             }
-            // Enum::cases() is VM-only until JIT enum case lowering (#3308).
-            if (str_contains($name, 'enum_cases')) {
+            // Array literal spread on enum arrays: VM green (#5569); MCJIT enum declare unstable (#3518).
+            if (str_contains($name, 'array_literal_spread_enum')) {
                 continue;
             }
             // Global function __METHOD__/__FUNCTION__ — parse-time literals; MCJIT segfault (#3595).
@@ -395,15 +400,12 @@ class JITTest extends BaseTest {
                 continue;
             }
             if ((str_contains($name, 'enum_') || str_contains($name, 'abstract_enum'))
-                && !str_contains($name, 'enum_case_name_value')) {
+                && !str_contains($name, 'enum_case_name_value')
+                && !str_contains($name, 'enum_cases_static')) {
                 continue;
             }
             // Generator foreach MCJIT resume (#3074); VM in GeneratorVMTest, compile in GeneratorJITTest/GeneratorJitCompileTest.
             if (str_contains($name, 'generator_')) {
-                continue;
-            }
-            // Named call-time unpack (...$assoc) is VM-only until JIT resolveOutgoingCall expansion (#4669).
-            if (str_contains($name, 'call_unpack_named_keys')) {
                 continue;
             }
             // Negative string offsets: VM (#3751); MCJIT StringOffsetHelper still segfaults (#198).
@@ -422,6 +424,10 @@ class JITTest extends BaseTest {
             if (str_contains($name, 'property_default_new')) {
                 continue;
             }
+            // Static typed property write TypeError message: VM parity (#7368); MCJIT static store execute unstable (#4908).
+            if (str_contains($name, 'static_typed_property_typeerror')) {
+                continue;
+            }
             // Variable variables MCJIT execute segfaults; VM + compile probe in JitVariableVariablesTest (#3801, #1226).
             if (str_contains($name, 'variable_variables')) {
                 continue;
@@ -430,12 +436,24 @@ class JITTest extends BaseTest {
             if (str_contains($name, 'class_parents_get_class_vars')) {
                 continue;
             }
+            // get_class_methods() MCJIT execute segfaults; PHP lowering: GetClassMethodsRuntimeShrinkTest (#6339).
+            if (str_contains($name, 'get_class_methods')) {
+                continue;
+            }
             // class_parents() $autoload flag: VM + AOT (#5026); MCJIT execute segfaults (#3159).
             if (str_contains($name, 'class_parents_autoload')) {
                 continue;
             }
             // class_parents() on interface: VM (#5249); MCJIT execute unstable (#3159).
             if (str_contains($name, 'class_parents_interface')) {
+                continue;
+            }
+            // class_uses_recursive() nested trait use: VM (#6469); MCJIT/AOT segfault on trait-in-trait (#6439).
+            if (str_contains($name, 'class_uses_recursive')) {
+                continue;
+            }
+            // #[\Override] on trait method at use site: VM compile + run (#6761); MCJIT trait override segfault.
+            if (str_contains($name, 'override_trait_body_attribute')) {
                 continue;
             }
             // __callStatic is VM-only until JIT static magic dispatch (#3273).
@@ -448,10 +466,6 @@ class JITTest extends BaseTest {
             }
             // Uncaught asymmetric_visibility fatal: MCJIT execute unstable (#4029, #98); *_jit.phpt uses try/catch (#4020).
             if (str_contains($name, 'asymmetric_visibility') && !str_contains($name, 'jit')) {
-                continue;
-            }
-            // BackedEnum::from/tryFrom VM-only until JIT lowering (#3114, #3076).
-            if (str_contains($name, 'enum_from') || str_contains($name, 'enum_try_from')) {
                 continue;
             }
             // highlight_string/highlight_file/show_source VM-only (#3164, #3447).
@@ -468,10 +482,6 @@ class JITTest extends BaseTest {
             if (str_contains($name, 'fstat_stream')) {
                 continue;
             }
-            // print_r()/var_dump() VM-only until debug export LLVM lowering (#3133).
-            if (str_contains($name, 'print_r') || str_contains($name, 'var_dump')) {
-                continue;
-            }
             // parse_str() one-arg in function scope: VM + AOT; MCJIT try/catch pending dispatch (#4034).
             if (str_contains($name, 'parse_str_function_scope')
                 || str_contains($name, 'parse_str_local_scope')) {
@@ -485,6 +495,22 @@ class JITTest extends BaseTest {
             if (str_contains($name, 'trait_typed_const')) {
                 continue;
             }
+            // Trait method static locals: VM green (#6660); MCJIT execute segfault (trait + function-static).
+            if (str_contains($name, 'trait_method_static_local')) {
+                continue;
+            }
+            // Trait abstract private: compile-time guard only (#6895); MCJIT execute exit -1 until trait abstract lowering stable.
+            if (str_contains($name, 'trait_abstract_private')) {
+                continue;
+            }
+            // final private method E_WARNING at class declare: VM green (#6914); MCJIT class-body warning deferred.
+            if (str_contains($name, 'final_private_method_warning')) {
+                continue;
+            }
+            // Instance method by-ref + function-static: VM green (#6739); MCJIT execute segfault.
+            if (str_contains($name, 'byref_method_static_local')) {
+                continue;
+            }
             // list() from null/false/int: VM + LLVM verify (#4325); MCJIT execute segfault until list unpack branch stable.
             if (str_contains($name, 'list_destructure_null')) {
                 continue;
@@ -495,6 +521,20 @@ class JITTest extends BaseTest {
             }
             // Pipe operator (|>): LLVM verify green in PipeOperatorJitCompileTest (#4783); MCJIT execute in PipeOperatorJitExecuteTest (#98).
             if (str_contains($name, 'pipe_first_class')) {
+                continue;
+            }
+            // Exception/Error::__construct parent forwarding: VM dispatch (#6735); builtin ctor MCJIT segfault.
+            if (str_contains($name, 'exception_subclass_parent_construct')) {
+                continue;
+            }
+            // posix access/mknod/set* VM-only until LLVM libc wrappers (#7376).
+            if (str_contains($name, 'posix_access')
+                || str_contains($name, 'posix_setegid')
+                || str_contains($name, 'posix_mknod')) {
+                continue;
+            }
+            // null property read try/catch: VM green (#7431); MCJIT catchable Error dispatch segfault (#98).
+            if ($name === 'language/null_property_read_error') {
                 continue;
             }
             yield $name => $case;

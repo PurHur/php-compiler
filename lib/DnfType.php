@@ -50,8 +50,9 @@ final class DnfType
             if (null === $name || '' === $name) {
                 return [];
             }
+            $display = ltrim($name, '\\');
 
-            return [['kind' => 'literal', 'name' => strtolower(ltrim($name, '\\'))]];
+            return [['kind' => 'literal', 'name' => strtolower($display), 'display' => $display]];
         }
         if ($type instanceof CfgType\Intersection) {
             $ifaces = $intersectionNames($type);
@@ -63,6 +64,9 @@ final class DnfType
                 : implode('&', $ifaces);
 
             return [['kind' => 'intersection', 'interfaces' => $ifaces, 'display' => $display]];
+        }
+        if ($type instanceof CfgType\Never_) {
+            return [['kind' => 'literal', 'name' => 'never']];
         }
         if ($type instanceof CfgType\Literal) {
             return [['kind' => 'literal', 'name' => strtolower($type->name)]];
@@ -91,6 +95,23 @@ final class DnfType
     }
 
     /**
+     * True when arms need DNF metadata (intersection members). Simple scalar unions
+     * (`int|string`, `?int`) use unionTypeConstraints instead (#6701).
+     *
+     * @param list<DnfArm> $arms
+     */
+    public static function requiresDnfLowering(array $arms): bool
+    {
+        foreach ($arms as $arm) {
+            if (($arm['kind'] ?? '') === 'intersection') {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /**
      * @param list<DnfArm> $arms
      */
     public static function formatUnionType(array $arms): string
@@ -100,7 +121,7 @@ final class DnfType
             $part = match ($arm['kind']) {
                 'null' => 'null',
                 'intersection' => $arm['display'] ?? implode('&', $arm['interfaces']),
-                'literal' => $arm['name'],
+                'literal' => $arm['display'] ?? $arm['name'],
             };
             if (\count($arms) > 1 && 'intersection' === $arm['kind']) {
                 $part = '(' . $part . ')';

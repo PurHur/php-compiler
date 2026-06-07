@@ -7,6 +7,7 @@ namespace PHPCompiler\ext\standard;
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\HashTable;
 use PHPCompiler\VM\Variable;
@@ -31,10 +32,7 @@ final class str_word_count extends Internal
         if ($argc < 1 || $argc > 3) {
             throw new \LogicException('str_word_count() accepts one to three arguments in this compiler build');
         }
-        $str = $frame->calledArgs[0]->resolveIndirect();
-        if (Variable::TYPE_STRING !== $str->type) {
-            throw new \LogicException('str_word_count() argument #1 must be a string in this compiler build');
-        }
+        $string = VmString::coerceStringBuiltinArg($frame->calledArgs[0], 'str_word_count', 0, 'string');
         $format = 0;
         if ($argc >= 2) {
             $formatArg = $frame->calledArgs[1]->resolveIndirect();
@@ -45,16 +43,12 @@ final class str_word_count extends Internal
         }
         $chars = '';
         if (3 === $argc) {
-            $charsArg = $frame->calledArgs[2]->resolveIndirect();
-            if (Variable::TYPE_STRING !== $charsArg->type) {
-                throw new \LogicException('str_word_count() argument #3 must be a string in this compiler build');
-            }
-            $chars = $charsArg->toString();
+            $chars = VmString::coerceStringBuiltinArg($frame->calledArgs[2], 'str_word_count', 2, 'chars');
         }
         if (null === $frame->returnVar) {
             return;
         }
-        $result = VmString::str_word_count($str->toString(), $format, $chars);
+        $result = VmString::str_word_count($string, $format, $chars);
         if (\is_int($result)) {
             $frame->returnVar->int($result);
 
@@ -110,7 +104,7 @@ final class str_word_count extends Internal
 
         $str = null !== $literal
             ? $context->builder->load($context->constantStringFromString($literal))
-            : $this->jitString($context, $args[0], 'str_word_count() argument #1');
+            : JitStringBuiltinArg::lower($context, $args[0], 'str_word_count', 0, 'string');
 
         $formatVal = 1 === $argc
             ? $context->getTypeFromString('int64')->constInt(0, false)
@@ -122,7 +116,7 @@ final class str_word_count extends Internal
         if (3 === $argc) {
             $charsVal = null !== $charsCt
                 ? $context->builder->load($context->constantStringFromString($charsCt))
-                : $this->jitString($context, $args[2], 'str_word_count() argument #3');
+                : JitStringBuiltinArg::lower($context, $args[2], 'str_word_count', 2, 'chars');
         }
 
         if (1 === $argc) {

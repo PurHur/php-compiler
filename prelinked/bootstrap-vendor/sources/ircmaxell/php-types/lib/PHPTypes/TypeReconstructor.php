@@ -248,6 +248,8 @@ class TypeReconstructor
             case 'Expr_Exit':
             case 'Iterator_Reset':
                 return [Type::null()];
+            case 'Expr_Throw':
+                return [Type::never()];
             case 'Iterator_Valid':
                 return [Type::bool()];
             case 'Iterator_Value':
@@ -821,6 +823,13 @@ class TypeReconstructor
             }
 
             return (new Type(Type::TYPE_UNION, $subs))->simplify();
+        } elseif ($type instanceof Op\Type\Intersection) {
+            $subs = [];
+            foreach ($type->types as $sub) {
+                $subs[] = $this->resolveOpType($sub);
+            }
+
+            return new Type(Type::TYPE_INTERSECTION, $subs);
         }
 
         throw new \LogicException('Unknown Op\\Type provided: '.get_class($type));

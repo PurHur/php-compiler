@@ -71,7 +71,7 @@ final class HashTable {
             return $out;
         }
         $maxIntKey = 0;
-        foreach ($this->iterateKeyed(true) as [$key, $value]) {
+        foreach ($this->iterateKeyed(false) as [$key, $value]) {
             if (Variable::TYPE_INTEGER === $key->type) {
                 $intKey = $key->toInt();
                 if ($intKey > $maxIntKey) {
@@ -82,17 +82,64 @@ final class HashTable {
         if ($maxIntKey > 0) {
             $out->ensureHashSlotCapacity($maxIntKey);
         }
-        foreach ($this->iterateKeyed(true) as [$key, $value]) {
-            $copy = new Variable();
-            $copy->duplicateFrom($value);
+        foreach ($this->iterateKeyed(false) as [$key, $value]) {
             if (Variable::TYPE_INTEGER === $key->type) {
-                $out->addIndex($key->toInt(), $copy);
+                $out->insertDuplicatedIndex($key->toInt(), $value);
             } else {
-                $out->add($key->toString(), $copy);
+                $out->insertDuplicatedKey($key->toString(), $value);
             }
         }
 
         return $out;
+    }
+
+    /**
+     * Insert a bucket during zend_array_dup without copyFrom() unwrapping IS_INDIRECT cells (#6727).
+     */
+    private function insertDuplicatedIndex(int $index, Variable $data): void
+    {
+        $this->assertConsistent();
+        $this->refcount->assertSeparated();
+        if ($this->flags & self::FLAG_UNINITIALIZED) {
+            $this->initMixed();
+        }
+        $this->resizeIfFull();
+        $id = $this->numUsed++;
+        $this->numElements++;
+        $bucket = $this->buckets->read($id);
+        $bucket->key = null;
+        $bucket->hash = $index;
+        $bucket->value->next = $this->indexes->read($index);
+        $this->indexes->write($index, $id);
+        $bucket->value->duplicateFrom($data);
+        if ($index >= $this->nextFreeElement) {
+            $this->nextFreeElement = $index + 1;
+        }
+    }
+
+    private function insertDuplicatedKey(string $key, Variable $data): void
+    {
+        $intKey = self::tryIntFromNumericString($key);
+        if (null !== $intKey) {
+            $this->insertDuplicatedIndex($intKey, $data);
+
+            return;
+        }
+        $this->assertConsistent();
+        $this->refcount->assertSeparated();
+        if ($this->flags & self::FLAG_UNINITIALIZED) {
+            $this->initMixed();
+        }
+        $this->resizeIfFull();
+        $hash = $this->hash($key);
+        $id = $this->numUsed++;
+        $this->numElements++;
+        $bucket = $this->buckets->read($id);
+        $bucket->key = $key;
+        $bucket->hash = $hash;
+        $bucket->value->next = $this->indexes->read($hash);
+        $this->indexes->write($hash, $id);
+        $bucket->value->duplicateFrom($data);
     }
 
     public function iterate(bool $resolveIndirect = false): \Traversable {
@@ -904,23 +951,27 @@ final class HashTable {
         $out->array(new self());
         $ht = $out->toArray();
         if (Variable::TYPE_ARRAY === $existing->type) {
-            foreach ($existing->toArray()->iterateKeyed(true) as [, $element]) {
+            foreach ($existing->toArray()->iterateKeyed(true) as [$key, $element]) {
                 $elementCopy = new Variable();
                 $elementCopy->copyFrom($element);
-                $ht->append($elementCopy);
+                if (Variable::TYPE_INTEGER === $key->type) {
+                    $ht->addIndex($key->toInt(), $elementCopy);
+                } else {
+                    $ht->add($key->toString(), $elementCopy);
+                }
             }
+            $elementCopy = new Variable();
+            $elementCopy->copyFrom($overlay);
+            $ht->append($elementCopy);
+        } elseif (Variable::TYPE_ARRAY === $overlay->type) {
+            $elementCopy = new Variable();
+            $elementCopy->copyFrom($existing);
+            $ht->append($elementCopy);
+            self::mergeRecursiveOverlay($ht, $overlay->toArray());
         } else {
             $elementCopy = new Variable();
             $elementCopy->copyFrom($existing);
             $ht->append($elementCopy);
-        }
-        if (Variable::TYPE_ARRAY === $overlay->type) {
-            foreach ($overlay->toArray()->iterateKeyed(true) as [, $element]) {
-                $elementCopy = new Variable();
-                $elementCopy->copyFrom($element);
-                $ht->append($elementCopy);
-            }
-        } else {
             $elementCopy = new Variable();
             $elementCopy->copyFrom($overlay);
             $ht->append($elementCopy);

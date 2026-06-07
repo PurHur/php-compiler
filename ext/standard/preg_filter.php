@@ -36,9 +36,14 @@ final class preg_filter extends Internal
         if (null === $frame->returnVar) {
             return;
         }
-        $pattern = VmReflection::stringArg($frame->calledArgs[0], 'preg_filter() pattern');
-        $replacement = VmReflection::stringArg($frame->calledArgs[1], 'preg_filter() replacement');
-        $subjectVar = $frame->calledArgs[2]->resolveIndirect();
+        $pattern = VmReflection::stringArg($frame->calledArgs[0], 'preg_filter() pattern', 0);
+        $replacement = VmReflection::stringArg($frame->calledArgs[1], 'preg_filter() replacement', 1);
+        $subjectVar = VmPreg::requireStringOrArraySubject(
+            $frame->calledArgs[2],
+            'preg_filter',
+            2,
+            'subject'
+        );
         $limit = -1;
         $flags = 0;
         if ($argc >= 4) {
@@ -76,10 +81,6 @@ final class preg_filter extends Internal
                 $host[$hostKey] = $value->toString();
             }
             $result = VmPreg::pregFilter($pattern, $replacement, $host, $limit, $flags);
-        } else {
-            throw new \LogicException(
-                'preg_filter() subject must be a string or array in this compiler build'
-            );
         }
 
         if (false === $result) {
@@ -130,6 +131,8 @@ final class preg_filter extends Internal
                 'preg_filter() flags are not supported in JIT/AOT in this compiler build'
             );
         }
+
+        JitPregSubject::requireStringOrArray($context, $args[2], 'preg_filter', 2, 'subject');
 
         return JitPregFilter::invoke(
             $context,

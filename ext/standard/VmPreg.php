@@ -4,13 +4,15 @@ declare(strict_types=1);
 
 namespace PHPCompiler\ext\standard;
 
+use PHPCompiler\RuntimeStrictness;
+use PHPCompiler\VM\EnumCaseSupport;
 use PHPCompiler\VM\HashTable;
 use PHPCompiler\VM\Variable;
 
 /**
  * VM preg_match() — native PCRE via VmPregNative (issue #4874).
  *
- * JIT/AOT use native {@see lib/AOT/runtime/preg_match.c} instead.
+ * JIT/AOT use {@see StringPregMatchJit} (libpcre2 via LLVM externals, issue #5289).
  */
 final class VmPreg
 {
@@ -72,6 +74,72 @@ final class VmPreg
 
     private const PREG_MATCH_ALLOWED_FLAGS = StdlibConstants::PREG_OFFSET_CAPTURE
         | StdlibConstants::PREG_UNMATCHED_AS_NULL;
+
+    /**
+     * Z_PARAM_ARRAY_STR on preg_* $subject (#7154, ext/pcre/php_pcre.c).
+     *
+     * @throws \TypeError
+     */
+    public static function requireStringOrArraySubject(
+        Variable $var,
+        string $function,
+        int $argIndex = 2,
+        string $paramName = 'subject'
+    ): Variable {
+        $var = $var->resolveIndirect();
+        if (RuntimeStrictness::enforceStringBuiltinParityGuards() && EnumCaseSupport::isEnumCaseVariable($var)) {
+            throw new \TypeError(
+                self::stringOrArraySubjectTypeError(
+                    $function,
+                    $argIndex,
+                    $paramName,
+                    EnumCaseSupport::typeNameForVariable($var)
+                )
+            );
+        }
+        if (Variable::TYPE_STRING === $var->type || Variable::TYPE_ARRAY === $var->type) {
+            return $var;
+        }
+
+        throw new \TypeError(
+            self::stringOrArraySubjectTypeError($function, $argIndex, $paramName, self::subjectTypeLabel($var))
+        );
+    }
+
+    private static function stringOrArraySubjectTypeError(
+        string $function,
+        int $argIndex,
+        string $paramName,
+        string $given
+    ): string {
+        return \sprintf(
+            '%s(): Argument #%d ($%s) must be of type array|string, %s given',
+            $function,
+            $argIndex + 1,
+            $paramName,
+            $given
+        );
+    }
+
+    private static function subjectTypeLabel(Variable $var): string
+    {
+        $var = $var->resolveIndirect();
+        if (EnumCaseSupport::isEnumCaseVariable($var)) {
+            return EnumCaseSupport::typeNameForVariable($var);
+        }
+
+        return match ($var->type) {
+            Variable::TYPE_INTEGER => 'int',
+            Variable::TYPE_FLOAT => 'float',
+            Variable::TYPE_BOOLEAN => 'bool',
+            Variable::TYPE_STRING => 'string',
+            Variable::TYPE_NULL => 'null',
+            Variable::TYPE_ARRAY => 'array',
+            Variable::TYPE_OBJECT => $var->toObject()->class->name,
+            Variable::TYPE_RESOURCE => 'resource',
+            default => 'mixed',
+        };
+    }
 
     public static function pregMatch(
         string $pattern,

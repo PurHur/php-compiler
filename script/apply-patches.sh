@@ -255,7 +255,9 @@ patch_already_applied() {
       grep -q 'public \\$expr;' "$ROOT/vendor/ircmaxell/php-cfg/lib/PHPCfg/Op/Expr/Assertion.php" 2>/dev/null
       ;;
     php-cfg-match.patch)
-      grep -q 'function parseExpr_Match' "$ROOT/vendor/ircmaxell/php-cfg/lib/PHPCfg/Parser.php" 2>/dev/null
+      grep -q 'function parseExpr_Match' "$ROOT/vendor/ircmaxell/php-cfg/lib/PHPCfg/Parser.php" 2>/dev/null \
+        && grep -q 'lowerUnhandledMatchError' "$ROOT/vendor/ircmaxell/php-cfg/lib/PHPCfg/Parser.php" 2>/dev/null \
+        && grep -q 'phpc_match_unhandled_operand_is_object' "$ROOT/vendor/ircmaxell/php-cfg/lib/PHPCfg/Parser.php" 2>/dev/null
       ;;
     php-cfg-incdec-expr.patch)
       grep -q 'new Op\\Expr\\PostInc' "$ROOT/vendor/ircmaxell/php-cfg/lib/PHPCfg/Parser.php" 2>/dev/null \
@@ -289,6 +291,9 @@ patch_already_applied() {
     php-cfg-anonymous-class.patch)
       grep -q 'parseStmt_Class($expr->class)' "$ROOT/vendor/ircmaxell/php-cfg/lib/PHPCfg/Parser.php" 2>/dev/null
       ;;
+    php-cfg-new-ctor-parens.patch)
+      grep -q 'newHasCtorParens' "$ROOT/vendor/ircmaxell/php-cfg/lib/PHPCfg/Parser.php" 2>/dev/null
+      ;;
     php-cfg-enum.patch)
       grep -q 'parseStmt_Enum' "$ROOT/vendor/ircmaxell/php-cfg/lib/PHPCfg/Parser.php" 2>/dev/null \
         && php_cfg_enum_implements_parser_applied
@@ -304,6 +309,10 @@ patch_already_applied() {
       grep -q 'public bool \\$isEnumCase = false' "$ROOT/vendor/ircmaxell/php-cfg/lib/PHPCfg/Op/Terminal/Const_.php" 2>/dev/null \
         && grep -q 'Stmt\\ClassConst' "$ROOT/vendor/ircmaxell/php-cfg/lib/PHPCfg/Parser.php" 2>/dev/null \
         && grep -A30 'function parseStmt_Enum' "$ROOT/vendor/ircmaxell/php-cfg/lib/PHPCfg/Parser.php" 2>/dev/null | grep -q 'ClassConst'
+      ;;
+    php-cfg-enum-trait-use.patch)
+      grep -q 'function parseStmt_Enum' "$ROOT/vendor/ircmaxell/php-cfg/lib/PHPCfg/Parser.php" 2>/dev/null \
+        && grep -A35 'function parseStmt_Enum' "$ROOT/vendor/ircmaxell/php-cfg/lib/PHPCfg/Parser.php" 2>/dev/null | grep -q 'Stmt\\TraitUse'
       ;;
     php-cfg-enum-abstract.patch)
       php_cfg_enum_flags_parser_applied
@@ -331,6 +340,16 @@ patch_already_applied() {
       ;;
     php-cfg-ctor-promotion-readonly.patch)
       grep -q 'promotionReadonly' "$ROOT/vendor/ircmaxell/php-cfg/lib/PHPCfg/Op/Expr/Param.php" 2>/dev/null
+      ;;
+    php-cfg-readonly-function.patch)
+      grep -q 'FLAG_READONLY' "$ROOT/vendor/ircmaxell/php-cfg/lib/PHPCfg/Func.php" 2>/dev/null \
+        && grep -A25 'function parseExpr_Closure' "$ROOT/vendor/ircmaxell/php-cfg/lib/PHPCfg/Parser.php" 2>/dev/null \
+          | grep -q "compilerReadonlyFunction" \
+        && { ! grep -q 'function parseExpr_ArrowFunction' "$ROOT/vendor/ircmaxell/php-cfg/lib/PHPCfg/Parser.php" 2>/dev/null \
+          || grep -A25 'function parseExpr_ArrowFunction' "$ROOT/vendor/ircmaxell/php-cfg/lib/PHPCfg/Parser.php" 2>/dev/null \
+            | grep -q "compilerReadonlyFunction"; } \
+        && grep -A12 'function parseStmt_Function' "$ROOT/vendor/ircmaxell/php-cfg/lib/PHPCfg/Parser.php" 2>/dev/null \
+          | grep -q "compilerReadonlyFunction"
       ;;
     php-cfg-property-readonly.patch)
       grep -qE 'propertyFlags = \$node->flags|\$cfgProp->readonly =|\$prop->readonly =|\$property->readonly =|->readonly = 0 !== \\(\\$node->flags & .*MODIFIER_READONLY\\)' \
@@ -406,8 +425,13 @@ apply_php_cfg_match_overlay() {
     echo "Skip php-cfg-match.patch (overlay missing)" >&2
     return 1
   fi
+  # Always run — patch-php-cfg-match.py refreshes stale is_object probes (#7263, #7199).
   if python3 "$ROOT/script/patch-php-cfg-match.py"; then
-    echo "Applied php-cfg-match.patch (overlay)"
+    if patch_already_applied "$PATCH_DIR/php-cfg-match.patch"; then
+      echo "Refreshed php-cfg-match.patch (overlay)"
+    else
+      echo "Applied php-cfg-match.patch (overlay)"
+    fi
     return 0
   fi
   return 1
@@ -519,6 +543,7 @@ PY
     fi
     if ! grep -q 'promotionGetVisibility' "$param" 2>/dev/null; then
       python3 - "$param" <<'PY'
+import re
 import sys
 from pathlib import Path
 
@@ -526,12 +551,24 @@ path = Path(sys.argv[1])
 text = path.read_text()
 if 'promotionGetVisibility' in text:
     raise SystemExit(0)
-needle = "    public int $promotionSetVisibility = 0;\n"
-insert = needle + "\n    /** Constructor promotion: asymmetric get visibility (#5059). */\n    public int $promotionGetVisibility = 0;\n"
-if needle not in text:
-    sys.stderr.write("php-cfg-asymmetric-visibility: Param.php promotionSetVisibility anchor missing\n")
-    raise SystemExit(1)
-path.write_text(text.replace(needle, insert, 1))
+get_vis_block = (
+    "\n    /** Constructor promotion: asymmetric get visibility (#5059). */\n"
+    "    public int $promotionGetVisibility = 0;\n"
+)
+for needle in (
+    "    public int $promotionSetVisibility = 0;\n",
+    "    public $promotionSetVisibility = 0;\n",
+):
+    if needle in text:
+        path.write_text(text.replace(needle, needle + get_vis_block, 1))
+        raise SystemExit(0)
+match = re.search(r"\n    public(?: int)? \$promotionSetVisibility = 0;\n", text)
+if match is not None:
+    needle = match.group(0)
+    path.write_text(text.replace(needle, needle + get_vis_block, 1))
+    raise SystemExit(0)
+sys.stderr.write("php-cfg-asymmetric-visibility: Param.php promotionSetVisibility anchor missing\n")
+raise SystemExit(1)
 PY
       echo "Applied php-cfg-asymmetric-visibility.patch (Param getVisibility overlay #5059)"
     fi
@@ -600,7 +637,10 @@ if needle in text:
     insert = (
         "    public $declaredType;\n\n"
         + "    /** Constructor promotion: asymmetric set visibility (#3165). */\n"
-        + "    public int $promotionSetVisibility = 0;\n\n"
+        + "    public int $promotionSetVisibility = 0;\n"
+        + "\n"
+        + "    /** Constructor promotion: asymmetric get visibility (#5059). */\n"
+        + "    public int $promotionGetVisibility = 0;\n\n"
         + "    // A helper\n    public $function;"
     )
     path.write_text(text.replace(needle, insert, 1))
@@ -641,22 +681,59 @@ if anchor not in text:
 insert = method_path.read_text().rstrip("\n") + "\n\n"
 text = text.replace(anchor, insert + anchor, 1)
 
-param_needle = "            $p->promotionReadonly = 0 !== ($param->flags & Stmt\\Class_::MODIFIER_READONLY);\n"
-param_insert = param_needle + "            $p->promotionSetVisibility = $this->extractAsymmetricSetVisibilityFromAttributes($p->getAttributes());\n"
-if param_needle in text and 'promotionSetVisibility = $this->extractAsymmetricSetVisibilityFromAttributes' not in text:
-    text = text.replace(param_needle, param_insert, 1)
+param_needles = [
+    "            $p->promotionReadonly = (bool) ($param->flags & Stmt\\Class_::MODIFIER_READONLY);\n",
+    "            $p->promotionReadonly = 0 !== ($param->flags & Stmt\\Class_::MODIFIER_READONLY);\n",
+]
+param_insert_suffix = "            $p->promotionSetVisibility = $this->extractAsymmetricSetVisibilityFromAttributes($p->getAttributes());\n"
+for param_needle in param_needles:
+    if param_needle in text and 'promotionSetVisibility = $this->extractAsymmetricSetVisibilityFromAttributes' not in text:
+        text = text.replace(param_needle, param_needle + param_insert_suffix, 1)
+        break
 
-prop_needle = "            $property->readonly = 0 !== ($node->flags & Node\\Stmt\\Class_::MODIFIER_READONLY);\n"
-prop_insert = prop_needle + "            $property->setVisibility = $this->extractAsymmetricSetVisibilityFromAttributes($property->getAttributes());\n"
-if prop_needle in text and 'property->setVisibility = $this->extractAsymmetricSetVisibilityFromAttributes' not in text:
-    text = text.replace(prop_needle, prop_insert, 1)
+prop_needles = [
+    "            $prop->propertyFlags = $node->flags;\n",
+    "            $cfgProp->readonly = 0 !== ($node->flags & Node\\Stmt\\Class_::MODIFIER_READONLY);\n",
+    "            $prop->readonly = 0 !== ($node->flags & Node\\Stmt\\Class_::MODIFIER_READONLY);\n",
+    "            $property->readonly = 0 !== ($node->flags & Node\\Stmt\\Class_::MODIFIER_READONLY);\n",
+]
+prop_insert_suffix = "            $prop->setVisibility = $this->extractAsymmetricSetVisibilityFromAttributes($prop->getAttributes());\n"
+for prop_needle in prop_needles:
+    if prop_needle in text and 'setVisibility = $this->extractAsymmetricSetVisibilityFromAttributes' not in text:
+        if '$prop->propertyFlags' in prop_needle:
+            text = text.replace(prop_needle, prop_needle + prop_insert_suffix, 1)
+        elif '$cfgProp->readonly' in prop_needle:
+            text = text.replace(
+                prop_needle,
+                prop_needle + "            $cfgProp->setVisibility = $this->extractAsymmetricSetVisibilityFromAttributes($cfgProp->getAttributes());\n",
+                1,
+            )
+        elif '$prop->readonly' in prop_needle:
+            text = text.replace(
+                prop_needle,
+                prop_needle + "            $prop->setVisibility = $this->extractAsymmetricSetVisibilityFromAttributes($prop->getAttributes());\n",
+                1,
+            )
+        else:
+            text = text.replace(
+                prop_needle,
+                prop_needle + "            $property->setVisibility = $this->extractAsymmetricSetVisibilityFromAttributes($property->getAttributes());\n",
+                1,
+            )
+        break
 
-if 'promotionSetVisibility = $this->extractAsymmetricSetVisibilityFromAttributes' not in text and 'property->setVisibility = $this->extractAsymmetricSetVisibilityFromAttributes' not in text:
+if 'extractAsymmetricSetVisibilityFromAttributes($p->getAttributes())' not in text \
+    and 'extractAsymmetricSetVisibilityFromAttributes($prop->getAttributes())' not in text \
+    and 'extractAsymmetricSetVisibilityFromAttributes($cfgProp->getAttributes())' not in text \
+    and 'extractAsymmetricSetVisibilityFromAttributes($property->getAttributes())' not in text:
     sys.stderr.write("php-cfg-asymmetric-set-visibility: Parser promotion/readonly anchors missing (apply after ctor-promotion)\n")
     raise SystemExit(1)
 
 parser_path.write_text(text)
 PY
+  if [[ $? -ne 0 ]]; then
+    return 1
+  fi
   echo "Applied php-cfg asymmetric set-visibility Parser overlay (#4690)"
 }
 
@@ -688,22 +765,43 @@ if anchor not in text:
 insert = method_path.read_text().rstrip("\n") + "\n\n"
 text = text.replace(anchor, insert + anchor, 1)
 
-param_needle = "            $p->promotionSetVisibility = $this->extractAsymmetricSetVisibilityFromAttributes($p->getAttributes());\n"
-param_insert = param_needle + "            $p->promotionGetVisibility = $this->extractAsymmetricGetVisibilityFromAttributes($p->getAttributes());\n"
-if param_needle in text and 'promotionGetVisibility = $this->extractAsymmetricGetVisibilityFromAttributes' not in text:
-    text = text.replace(param_needle, param_insert, 1)
+param_needles = [
+    "            $p->promotionSetVisibility = $this->extractAsymmetricSetVisibilityFromAttributes($p->getAttributes());\n",
+]
+param_insert_suffix = "            $p->promotionGetVisibility = $this->extractAsymmetricGetVisibilityFromAttributes($p->getAttributes());\n"
+for param_needle in param_needles:
+    if param_needle in text and 'promotionGetVisibility = $this->extractAsymmetricGetVisibilityFromAttributes' not in text:
+        text = text.replace(param_needle, param_needle + param_insert_suffix, 1)
+        break
 
-prop_needle = "            $property->setVisibility = $this->extractAsymmetricSetVisibilityFromAttributes($property->getAttributes());\n"
-prop_insert = prop_needle + "            $property->getVisibility = $this->extractAsymmetricGetVisibilityFromAttributes($property->getAttributes());\n"
-if prop_needle in text and 'property->getVisibility = $this->extractAsymmetricGetVisibilityFromAttributes' not in text:
-    text = text.replace(prop_needle, prop_insert, 1)
+prop_needles = [
+    "            $prop->setVisibility = $this->extractAsymmetricSetVisibilityFromAttributes($prop->getAttributes());\n",
+    "            $cfgProp->setVisibility = $this->extractAsymmetricSetVisibilityFromAttributes($cfgProp->getAttributes());\n",
+    "            $property->setVisibility = $this->extractAsymmetricSetVisibilityFromAttributes($property->getAttributes());\n",
+]
+for prop_needle in prop_needles:
+    if prop_needle in text and 'getVisibility = $this->extractAsymmetricGetVisibilityFromAttributes' not in text:
+        var = 'prop'
+        if '$cfgProp->' in prop_needle:
+            var = 'cfgProp'
+        elif '$property->' in prop_needle:
+            var = 'property'
+        get_line = f"            ${var}->getVisibility = $this->extractAsymmetricGetVisibilityFromAttributes(${var}->getAttributes());\n"
+        text = text.replace(prop_needle, prop_needle + get_line, 1)
+        break
 
-if 'promotionGetVisibility = $this->extractAsymmetricGetVisibilityFromAttributes' not in text and 'property->getVisibility = $this->extractAsymmetricGetVisibilityFromAttributes' not in text:
+if 'extractAsymmetricGetVisibilityFromAttributes($p->getAttributes())' not in text \
+    and 'extractAsymmetricGetVisibilityFromAttributes($prop->getAttributes())' not in text \
+    and 'extractAsymmetricGetVisibilityFromAttributes($cfgProp->getAttributes())' not in text \
+    and 'extractAsymmetricGetVisibilityFromAttributes($property->getAttributes())' not in text:
     sys.stderr.write("php-cfg-asymmetric-get-visibility: Parser setVisibility anchors missing (apply after set overlay)\n")
     raise SystemExit(1)
 
 parser_path.write_text(text)
 PY
+  if [[ $? -ne 0 ]]; then
+    return 1
+  fi
   echo "Applied php-cfg asymmetric get-visibility Parser overlay (#5059)"
 }
 
@@ -723,7 +821,7 @@ apply_php_cfg_incdec_expr_overlay() {
     mkdir -p "$(dirname "$ROOT/vendor/ircmaxell/php-cfg/lib/PHPCfg/Op/Expr/${class}.php")"
     cp "$overlay/Op/Expr/${class}.php" "$ROOT/vendor/ircmaxell/php-cfg/lib/PHPCfg/Op/Expr/${class}.php"
   done
-  python3 - "$parser" "$overlay/incdec-parser-methods.php" <<'PY'
+  if ! python3 - "$parser" "$overlay/incdec-parser-methods.php" <<'PY'
 import sys
 from pathlib import Path
 
@@ -786,6 +884,11 @@ if old not in text:
 
 parser_path.write_text(text.replace(old, new_methods.rstrip('\n'), 1))
 PY
+  then
+    echo "ERROR: php-cfg-incdec-expr overlay failed (#6326, #6321)" >&2
+    record_patch_failure "php-cfg-incdec-expr.patch" "PostInc Parser.php anchor missing"
+    return 1
+  fi
   echo "Applied php-cfg-incdec-expr.patch (overlay)"
 }
 
@@ -909,6 +1012,8 @@ if "isEnumCase" not in const_text:
     )
     for old in (
         "    public int $flags = 0;\n\n    public function __construct",
+        "    public bool $enumCaseHasExplicitValue = false;\n\n    public function __construct",
+        "    public bool $isEnumCase = false;\n\n    public function __construct",
         "    public ?Type $declaredType = null;\n\n    public function __construct",
         "    public $valueBlock;\n\n    public function __construct",
     ):
@@ -966,9 +1071,9 @@ elif "enumCaseHasExplicitValue" not in text.split("function parseEnumCase", 1)[-
     if case_is_only in text:
         text = text.replace(case_is_only, case_is_explicit, 1)
 
-if "enumCaseHasExplicitValue" not in const_text and "isEnumCase" in const_path.read_text():
-    const_text = const_path.read_text()
-    const_text = const_text.replace(
+const_fresh = const_path.read_text()
+if "enumCaseHasExplicitValue" not in const_fresh and "isEnumCase" in const_fresh:
+    const_text = const_fresh.replace(
         "    public bool $isEnumCase = false;\n\n",
         "    public bool $isEnumCase = false;\n\n"
         "    /** True when enum case declares `= value`; false for unit enum implicit case (#5397). */\n"
@@ -1001,6 +1106,8 @@ apply_php_cfg_enum_overlay() {
     && grep -A25 'function parseStmt_Enum' "$parser" | grep -q 'Stmt\\ClassMethod'; then
     echo "Skip php-cfg-enum.patch (already applied)"
     php_cfg_sync_enum_flags_parser "$parser" "$op" || true
+    apply_php_cfg_enum_trait_use_parser_fix "$parser"
+    apply_php_cfg_enum_class_const_parser_fix "$parser"
     return 0
   fi
   if ! grep -q 'function parseStmt_Enum' "$parser" 2>/dev/null; then
@@ -1379,13 +1486,64 @@ PY
   echo "Applied php-cfg-attribute-groups.patch (overlay)"
 }
 
-apply_php_types_intersection_type_overlay() {
-  local target="$ROOT/vendor/ircmaxell/php-types/lib/PHPTypes/Type.php"
-  if grep -q 'instanceof CfgType\\Intersection' "$target" 2>/dev/null; then
-    echo "Skip php-types-intersection-type.patch (already applied)"
+apply_php_types_intersection_type_reconstructor_overlay_to_target() {
+  local target="$1"
+  if [[ ! -f "$target" ]]; then
+    echo "Skip php-types-intersection-type.patch (target missing): ${target}"
     return 0
   fi
-  python3 - "$target" <<'PY'
+  if grep -q 'instanceof Op\\Type\\Intersection' "$target" 2>/dev/null && php -l "$target" >/dev/null 2>&1; then
+    return 0
+  fi
+  if ! python3 - "$target" <<'PY'
+import sys
+from pathlib import Path
+
+path = Path(sys.argv[1])
+text = path.read_text()
+intersection_branch = """        } elseif ($type instanceof Op\\Type\\Intersection) {
+            $subs = [];
+            foreach ($type->types as $sub) {
+                $subs[] = $this->resolveOpType($sub);
+            }
+
+            return new Type(Type::TYPE_INTERSECTION, $subs);
+"""
+throw_anchor = """        throw new \\LogicException('Unknown Op\\\\Type provided: '.get_class($type));"""
+union_close = (
+    "            return (new Type(Type::TYPE_UNION, $subs))->simplify();\n"
+    "        }\n\n"
+    + throw_anchor
+)
+if "instanceof Op\\Type\\Intersection" in text:
+    raise SystemExit(0)
+if union_close in text:
+    text = text.replace(union_close, union_close.replace("\n\n" + throw_anchor, "\n" + intersection_branch + "\n" + throw_anchor, 1), 1)
+elif throw_anchor in text:
+    text = text.replace(throw_anchor, intersection_branch + "\n" + throw_anchor, 1)
+else:
+    sys.stderr.write("php-types-intersection-type: TypeReconstructor anchor not found\n")
+    raise SystemExit(1)
+path.write_text(text)
+PY
+  then
+    echo "ERROR: php-types-intersection-type overlay failed for ${target} (#6820)" >&2
+    return 1
+  fi
+  echo "Applied php-types-intersection-type.patch (TypeReconstructor overlay): ${target}"
+}
+
+apply_php_types_intersection_type_type_overlay_to_target() {
+  local target="$1"
+  if [[ ! -f "$target" ]]; then
+    echo "Skip php-types-intersection-type.patch (target missing): ${target}"
+    return 0
+  fi
+  if grep -q 'instanceof CfgType\\Union_' "$target" 2>/dev/null \
+    && grep -q 'instanceof CfgType\\Intersection' "$target" 2>/dev/null; then
+    return 0
+  fi
+  if ! python3 - "$target" <<'PY'
 import sys
 from pathlib import Path
 
@@ -1397,7 +1555,7 @@ if anchor not in text:
     sys.stderr.write("php-types-intersection-type: throw anchor not found\n")
     raise SystemExit(1)
 
-insert = """        if ($decl instanceof CfgType\\Union_) {
+union_block = """        if ($decl instanceof CfgType\\Union_) {
             $subs = [];
             foreach ($decl->types as $sub) {
                 $subs[] = self::fromTypeDecl($sub);
@@ -1405,7 +1563,8 @@ insert = """        if ($decl instanceof CfgType\\Union_) {
 
             return new self(self::TYPE_UNION, $subs);
         }
-        if ($decl instanceof CfgType\\Intersection) {
+"""
+intersection_block = """        if ($decl instanceof CfgType\\Intersection) {
             $subs = [];
             foreach ($decl->types as $sub) {
                 $subs[] = self::fromTypeDecl($sub);
@@ -1415,19 +1574,66 @@ insert = """        if ($decl instanceof CfgType\\Union_) {
         }
 
 """
+insert = ""
+if "instanceof CfgType\\Union_" not in text:
+    insert += union_block
+if "instanceof CfgType\\Intersection" not in text:
+    insert += intersection_block
+if not insert:
+    raise SystemExit(0)
 path.write_text(text.replace(anchor, insert + anchor, 1))
 PY
-  echo "Applied php-types-intersection-type.patch (overlay)"
+  then
+    echo "ERROR: php-types-intersection-type Type.php overlay failed for ${target} (#6820)" >&2
+    return 1
+  fi
+  echo "Applied php-types-intersection-type.patch (Type.php overlay): ${target}"
 }
 
-repair_php_types_union_type_reconstructor_if_needed() {
-  local target="$ROOT/vendor/ircmaxell/php-types/lib/PHPTypes/TypeReconstructor.php"
-  local ssot="${ROOT}/prelinked/bootstrap-vendor/sources/ircmaxell/php-types/lib/PHPTypes/TypeReconstructor.php"
+apply_php_types_intersection_type_overlay() {
+  local rc=0
+  local vendor_type="$ROOT/vendor/ircmaxell/php-types/lib/PHPTypes/Type.php"
+  local prelinked_type="$ROOT/prelinked/bootstrap-vendor/sources/ircmaxell/php-types/lib/PHPTypes/Type.php"
+  local vendor_recon="$ROOT/vendor/ircmaxell/php-types/lib/PHPTypes/TypeReconstructor.php"
+  local prelinked_recon="$ROOT/prelinked/bootstrap-vendor/sources/ircmaxell/php-types/lib/PHPTypes/TypeReconstructor.php"
+  local applied=0
+
+  if [[ -f "$vendor_type" ]] && ! grep -q 'instanceof CfgType\\Intersection' "$vendor_type" 2>/dev/null; then
+    apply_php_types_intersection_type_type_overlay_to_target "$vendor_type" || rc=1
+    applied=1
+  fi
+  if [[ -f "$prelinked_type" ]] && ! grep -q 'instanceof CfgType\\Intersection' "$prelinked_type" 2>/dev/null; then
+    apply_php_types_intersection_type_type_overlay_to_target "$prelinked_type" || rc=1
+    applied=1
+  fi
+  if ! apply_php_types_intersection_type_reconstructor_overlay_to_target "$vendor_recon"; then
+    rc=1
+  elif [[ -f "$vendor_recon" ]] \
+    && ! grep -q 'instanceof Op\\Type\\Intersection' "$vendor_recon" 2>/dev/null; then
+    applied=1
+  fi
+  if ! apply_php_types_intersection_type_reconstructor_overlay_to_target "$prelinked_recon"; then
+    rc=1
+  elif [[ -f "$prelinked_recon" ]] \
+    && ! grep -q 'instanceof Op\\Type\\Intersection' "$prelinked_recon" 2>/dev/null; then
+    applied=1
+  fi
+  if [[ "$applied" -eq 0 ]]; then
+    echo "Skip php-types-intersection-type.patch (already applied)"
+  else
+    echo "Applied php-types-intersection-type.patch (overlay)"
+  fi
+  return "$rc"
+}
+
+repair_php_types_union_type_reconstructor_at() {
+  local target="$1"
+  local ssot="$2"
   [[ -f "$target" ]] || return 0
   if php -l "$target" >/dev/null 2>&1; then
     return 0
   fi
-  echo "apply-patches: repairing malformed php-types-union-type in TypeReconstructor.php (#4229)" >&2
+  echo "apply-patches: repairing malformed php-types-union-type in ${target} (#4229)" >&2
   if [[ ! -f "$ssot" ]]; then
     echo "apply-patches: missing SSOT ${ssot} for TypeReconstructor repair" >&2
     return 1
@@ -1451,13 +1657,27 @@ path.write_text(text[:start] + ssot_text[ssot_start:ssot_end] + text[end:])
 PY
 }
 
-apply_php_types_union_type_reconstructor_overlay() {
-  local target="$ROOT/vendor/ircmaxell/php-types/lib/PHPTypes/TypeReconstructor.php"
-  repair_php_types_union_type_reconstructor_if_needed
-  if grep -q 'instanceof Op\\Type\\Union_' "$target" 2>/dev/null && php -l "$target" >/dev/null 2>&1; then
+repair_php_types_union_type_reconstructor_if_needed() {
+  local vendor_recon="$ROOT/vendor/ircmaxell/php-types/lib/PHPTypes/TypeReconstructor.php"
+  local prelinked_recon="$ROOT/prelinked/bootstrap-vendor/sources/ircmaxell/php-types/lib/PHPTypes/TypeReconstructor.php"
+  repair_php_types_union_type_reconstructor_at "$vendor_recon" "$prelinked_recon" || return 1
+  if [[ -f "$prelinked_recon" ]] && ! php -l "$prelinked_recon" >/dev/null 2>&1; then
+    repair_php_types_union_type_reconstructor_at "$prelinked_recon" "$vendor_recon" || return 1
+  fi
+}
+
+apply_php_types_union_type_reconstructor_overlay_to_target() {
+  local target="$1"
+  if [[ ! -f "$target" ]]; then
+    echo "Skip php-types-union-type.patch (target missing): ${target}"
     return 0
   fi
-  python3 - "$target" <<'PY'
+  if grep -q 'instanceof Op\\Type\\Union_' "$target" 2>/dev/null \
+    && grep -q 'instanceof Op\\Type\\Intersection' "$target" 2>/dev/null \
+    && php -l "$target" >/dev/null 2>&1; then
+    return 0
+  fi
+  if ! python3 - "$target" <<'PY'
 import sys
 from pathlib import Path
 
@@ -1470,12 +1690,10 @@ union_body = """            $subs = [];
 
             return (new Type(Type::TYPE_UNION, $subs))->simplify();
 """
-union_branch = (
+union_before_intersection = (
     "        } elseif ($type instanceof Op\\Type\\Union_) {\n"
     + union_body
-    + "        }\n"
 )
-union_before_intersection = union_branch
 if "instanceof Op\\Type\\Union_" in text:
     raise SystemExit(0)
 
@@ -1490,13 +1708,22 @@ literal_throw_anchor = """        } elseif ($type instanceof Op\\Type\\Literal) 
         }
 
         throw new \\LogicException('Unknown Op\\\\Type provided: '.get_class($type));"""
+intersection_branch = """        } elseif ($type instanceof Op\\Type\\Intersection) {
+            $subs = [];
+            foreach ($type->types as $sub) {
+                $subs[] = $this->resolveOpType($sub);
+            }
+
+            return new Type(Type::TYPE_INTERSECTION, $subs);
+"""
 never_union_tail = (
     """        } elseif ($type instanceof Op\\Type\\Never_) {
             return Type::never();
         } elseif ($type instanceof Op\\Type\\Union_) {
 """
     + union_body
-    + """        }
+    + intersection_branch
+    + """
 
         throw new \\LogicException('Unknown Op\\\\Type provided: '.get_class($type));"""
 )
@@ -1508,7 +1735,8 @@ literal_union_tail = (
         } elseif ($type instanceof Op\\Type\\Union_) {
 """
     + union_body
-    + """        }
+    + intersection_branch
+    + """
 
         throw new \\LogicException('Unknown Op\\\\Type provided: '.get_class($type));"""
 )
@@ -1527,37 +1755,55 @@ else:
     raise SystemExit(1)
 path.write_text(text)
 PY
-  echo "Applied php-types-union-type.patch (TypeReconstructor overlay)"
+  then
+    echo "ERROR: php-types-union-type overlay failed for ${target} (#6820)" >&2
+    return 1
+  fi
+  echo "Applied php-types-union-type.patch (TypeReconstructor overlay): ${target}"
 }
 
 apply_php_types_union_type_overlay() {
-  local type_php="$ROOT/vendor/ircmaxell/php-types/lib/PHPTypes/Type.php"
-  local recon="$ROOT/vendor/ircmaxell/php-types/lib/PHPTypes/TypeReconstructor.php"
-  local need_type=1
-  local need_recon=1
+  local rc=0
+  local vendor_type="$ROOT/vendor/ircmaxell/php-types/lib/PHPTypes/Type.php"
+  local prelinked_type="$ROOT/prelinked/bootstrap-vendor/sources/ircmaxell/php-types/lib/PHPTypes/Type.php"
+  local vendor_recon="$ROOT/vendor/ircmaxell/php-types/lib/PHPTypes/TypeReconstructor.php"
+  local prelinked_recon="$ROOT/prelinked/bootstrap-vendor/sources/ircmaxell/php-types/lib/PHPTypes/TypeReconstructor.php"
+  local applied=0
 
-  repair_php_types_union_type_reconstructor_if_needed
+  repair_php_types_union_type_reconstructor_if_needed || rc=1
 
-  if grep -q 'instanceof CfgType\\Union_' "$type_php" 2>/dev/null; then
-    need_type=0
+  if [[ -f "$vendor_type" ]] && ! grep -q 'instanceof CfgType\\Union_' "$vendor_type" 2>/dev/null; then
+    apply_php_types_intersection_type_type_overlay_to_target "$vendor_type" || rc=1
+    applied=1
   fi
-  if grep -q 'instanceof Op\\Type\\Union_' "$recon" 2>/dev/null && php -l "$recon" >/dev/null 2>&1; then
-    need_recon=0
+  if [[ -f "$prelinked_type" ]] && ! grep -q 'instanceof CfgType\\Union_' "$prelinked_type" 2>/dev/null; then
+    apply_php_types_intersection_type_type_overlay_to_target "$prelinked_type" || rc=1
+    applied=1
   fi
-
-  if [[ "$need_type" -eq 0 && "$need_recon" -eq 0 ]]; then
+  if [[ -f "$vendor_recon" ]] \
+    && { ! grep -q 'instanceof Op\\Type\\Union_' "$vendor_recon" 2>/dev/null \
+      || ! php -l "$vendor_recon" >/dev/null 2>&1; }; then
+    apply_php_types_union_type_reconstructor_overlay_to_target "$vendor_recon" || rc=1
+    applied=1
+  fi
+  if [[ -f "$prelinked_recon" ]] \
+    && { ! grep -q 'instanceof Op\\Type\\Union_' "$prelinked_recon" 2>/dev/null \
+      || ! php -l "$prelinked_recon" >/dev/null 2>&1; }; then
+    apply_php_types_union_type_reconstructor_overlay_to_target "$prelinked_recon" || rc=1
+    applied=1
+  fi
+  if ! apply_php_types_intersection_type_reconstructor_overlay_to_target "$vendor_recon"; then
+    rc=1
+  fi
+  if ! apply_php_types_intersection_type_reconstructor_overlay_to_target "$prelinked_recon"; then
+    rc=1
+  fi
+  if [[ "$applied" -eq 0 ]]; then
     echo "Skip php-types-union-type.patch (already applied)"
-    return 0
+  else
+    echo "Applied php-types-union-type.patch (overlay)"
   fi
-
-  if [[ "$need_type" -eq 1 ]]; then
-    # Union fromTypeDecl is inserted by php-types-intersection-type overlay.
-    apply_php_types_intersection_type_overlay
-  fi
-
-  if [[ "$need_recon" -eq 1 ]]; then
-    apply_php_types_union_type_reconstructor_overlay
-  fi
+  return "$rc"
 }
 
 apply_php_types_closure_unbound_this_overlay() {
@@ -1603,12 +1849,25 @@ PY
   echo "Applied php-types-closure-unbound-this.patch (overlay)"
 }
 
-apply_php_types_first_class_callable_overlay() {
-  local target="$ROOT/vendor/ircmaxell/php-types/lib/PHPTypes/TypeReconstructor.php"
+repair_php_types_fcc_type_array_typo_in_target() {
+  local target="$1"
+  if [[ ! -f "$target" ]]; then
+    return 0
+  fi
   if grep -q 'return \[Type::array()\];' "$target" 2>/dev/null; then
     sed -i 's/return \[Type::array()\];/return [new Type(Type::TYPE_ARRAY)];/' "$target"
-    echo "Repaired php-types-first-class-callable Type::array() typo (#4957)"
+    echo "Repaired php-types-first-class-callable Type::array() typo in ${target} (#4957, #6932)"
   fi
+}
+
+apply_php_types_fcc_overlay_final_repair() {
+  repair_php_types_fcc_type_array_typo_in_target "$ROOT/vendor/ircmaxell/php-types/lib/PHPTypes/TypeReconstructor.php"
+  repair_php_types_fcc_type_array_typo_in_target "$ROOT/prelinked/bootstrap-vendor/sources/ircmaxell/php-types/lib/PHPTypes/TypeReconstructor.php"
+}
+
+apply_php_types_first_class_callable_overlay() {
+  local target="$ROOT/vendor/ircmaxell/php-types/lib/PHPTypes/TypeReconstructor.php"
+  repair_php_types_fcc_type_array_typo_in_target "$target"
   if grep -q 'FirstClassCallable::KIND_METHOD' "$target" 2>/dev/null; then
     echo "Skip php-types-first-class-callable.patch (already applied)"
     return 0
@@ -1739,20 +1998,76 @@ PY
   echo "Applied php-types-magic-script-const.patch (overlay)"
 }
 
-apply_php_types_incdec_type_overlay() {
-  apply_php_types_incdec_type_overlay_to_target() {
-    local target="$1"
-    if grep -q "case 'Expr_PostInc':" "$target" 2>/dev/null; then
-      echo "Skip php-types-incdec-type.patch (already applied): ${target}"
-      return 0
-    fi
-    python3 - "$target" <<'PY'
+apply_php_cfg_class_const_flags_overlay() {
+  local const_file="$ROOT/vendor/ircmaxell/php-cfg/lib/PHPCfg/Op/Terminal/Const_.php"
+  local parser="$ROOT/vendor/ircmaxell/php-cfg/lib/PHPCfg/Parser.php"
+  if patch_already_applied "$PATCH_DIR/php-cfg-class-const-flags.patch"; then
+    echo "Skip php-cfg-class-const-flags.patch (already applied)"
+    return 0
+  fi
+  python3 - "$const_file" "$parser" <<'PY'
+import sys
+from pathlib import Path
+
+const_path = Path(sys.argv[1])
+parser_path = Path(sys.argv[2])
+const_text = const_path.read_text()
+if 'public int $flags = 0' not in const_text:
+    for old in (
+        "    public ?Type $declaredType = null;\n\n    public function __construct",
+        "    public $valueBlock;\n\n    public function __construct",
+    ):
+        if old in const_text:
+            const_text = const_text.replace(
+                old,
+                old.replace(
+                    "\n\n    public function __construct",
+                    "\n\n    /** PhpParser Stmt\\ClassConst flags (MODIFIER_FINAL, visibility, etc.). */\n"
+                    "    public int $flags = 0;\n\n    public function __construct",
+                    1,
+                ),
+                1,
+            )
+            const_path.write_text(const_text)
+            break
+    else:
+        sys.stderr.write("php-cfg-class-const-flags: Const_.php anchor not found\n")
+        raise SystemExit(1)
+
+text = parser_path.read_text()
+if '$constOp->flags = $node->flags' not in text:
+    old = "$constOp->declaredType = null !== $node->type ? $this->parseTypeNode($node->type) : null;\n            $this->block->children[] = $constOp;"
+    new = old.replace(
+        "\n            $this->block->children[] = $constOp;",
+        "\n            $constOp->flags = $node->flags;\n            $this->block->children[] = $constOp;",
+        1,
+    )
+    if old not in text:
+        sys.stderr.write("php-cfg-class-const-flags: Parser parseStmt_ClassConst anchor not found\n")
+        raise SystemExit(1)
+    parser_path.write_text(text.replace(old, new, 1))
+PY
+  echo "Applied php-cfg-class-const-flags.patch (overlay)"
+}
+
+apply_php_types_incdec_type_overlay_to_target() {
+  local target="$1"
+  if [[ ! -f "$target" ]]; then
+    echo "Skip php-types-incdec-type.patch (target missing): ${target}"
+    return 0
+  fi
+  if grep -q "case 'Expr_PostInc':" "$target" 2>/dev/null; then
+    echo "Skip php-types-incdec-type.patch (already applied): ${target}"
+    return 0
+  fi
+  if ! python3 - "$target" <<'PY'
 import sys
 from pathlib import Path
 
 path = Path(sys.argv[1])
 text = path.read_text()
-incdec_case = """            case 'Expr_PostInc':
+incdec_case = """
+            case 'Expr_PostInc':
             case 'Expr_PostDec':
             case 'Expr_PreInc':
             case 'Expr_PreDec':
@@ -1762,20 +2077,183 @@ incdec_case = """            case 'Expr_PostInc':
 
                 return false;
 """
-marker = """
+throw_tail = "        throw new \\LogicException('Unknown variable op found: '.$op->getType());"
+anchors = [
+    (
+        """            case 'Expr_FirstClassCallable':
+                if (\\PHPCfg\\Op\\Expr\\FirstClassCallable::KIND_METHOD === $op->kind) {
+                    return [new Type(Type::TYPE_ARRAY)];
+                }
+
+                return [Type::string()];
+            case 'Expr_MagicScriptConst':
+                if (\\PHPCfg\\Op\\Expr\\MagicScriptConst::KIND_LINE === $op->kind) {
+                    return [Type::int()];
+                }
+
+                return [Type::string()];
+
         }
 
-        throw new \\LogicException('Unknown variable op found: '.$op->getType());"""
-if marker not in text:
-    sys.stderr.write("php-types-incdec-type: TypeReconstructor switch marker not found\\n")
-    raise SystemExit(1)
-path.write_text(text.replace(marker, incdec_case + marker, 1))
-PY
-    echo "Applied php-types-incdec-type.patch (overlay): ${target}"
-  }
+""" + throw_tail,
+        """            case 'Expr_FirstClassCallable':
+                if (\\PHPCfg\\Op\\Expr\\FirstClassCallable::KIND_METHOD === $op->kind) {
+                    return [new Type(Type::TYPE_ARRAY)];
+                }
 
-  apply_php_types_incdec_type_overlay_to_target "$ROOT/vendor/ircmaxell/php-types/lib/PHPTypes/TypeReconstructor.php"
-  apply_php_types_incdec_type_overlay_to_target "$ROOT/prelinked/bootstrap-vendor/sources/ircmaxell/php-types/lib/PHPTypes/TypeReconstructor.php"
+                return [Type::string()];
+            case 'Expr_MagicScriptConst':
+                if (\\PHPCfg\\Op\\Expr\\MagicScriptConst::KIND_LINE === $op->kind) {
+                    return [Type::int()];
+                }
+
+                return [Type::string()];
+""" + incdec_case + """        }
+
+""" + throw_tail,
+    ),
+    (
+        """            case 'Expr_FirstClassCallable':
+                if (\\PHPCfg\\Op\\Expr\\FirstClassCallable::KIND_METHOD === $op->kind) {
+                    return [new Type(Type::TYPE_ARRAY)];
+                }
+
+                return [Type::string()];
+            case 'Expr_MagicScriptConst':
+                if (\\PHPCfg\\Op\\Expr\\MagicScriptConst::KIND_LINE === $op->kind) {
+                    return [Type::int()];
+                }
+
+                return [Type::string()];
+        }
+
+""" + throw_tail,
+        """            case 'Expr_FirstClassCallable':
+                if (\\PHPCfg\\Op\\Expr\\FirstClassCallable::KIND_METHOD === $op->kind) {
+                    return [new Type(Type::TYPE_ARRAY)];
+                }
+
+                return [Type::string()];
+            case 'Expr_MagicScriptConst':
+                if (\\PHPCfg\\Op\\Expr\\MagicScriptConst::KIND_LINE === $op->kind) {
+                    return [Type::int()];
+                }
+
+                return [Type::string()];
+""" + incdec_case + """        }
+
+""" + throw_tail,
+    ),
+    (
+        """            case 'Expr_MagicScriptConst':
+                if (\\PHPCfg\\Op\\Expr\\MagicScriptConst::KIND_LINE === $op->kind
+                    || \\PHPCfg\\Op\\Expr\\MagicScriptConst::KIND_HALT_OFFSET === $op->kind) {
+                    return [Type::int()];
+                }
+
+                return [Type::string()];
+        }
+
+""" + throw_tail,
+        """            case 'Expr_MagicScriptConst':
+                if (\\PHPCfg\\Op\\Expr\\MagicScriptConst::KIND_LINE === $op->kind
+                    || \\PHPCfg\\Op\\Expr\\MagicScriptConst::KIND_HALT_OFFSET === $op->kind) {
+                    return [Type::int()];
+                }
+
+                return [Type::string()];
+""" + incdec_case + """        }
+
+""" + throw_tail,
+    ),
+    (
+        """            case 'Expr_MagicScriptConst':
+                if (\\PHPCfg\\Op\\Expr\\MagicScriptConst::KIND_LINE === $op->kind) {
+                    return [Type::int()];
+                }
+
+                return [Type::string()];
+        }
+
+""" + throw_tail,
+        """            case 'Expr_MagicScriptConst':
+                if (\\PHPCfg\\Op\\Expr\\MagicScriptConst::KIND_LINE === $op->kind) {
+                    return [Type::int()];
+                }
+
+                return [Type::string()];
+""" + incdec_case + """        }
+
+""" + throw_tail,
+    ),
+    (
+        """            case 'Expr_MagicScriptConst':
+                if (\\PHPCfg\\Op\\Expr\\MagicScriptConst::KIND_LINE === $op->kind) {
+                    return [Type::int()];
+                }
+
+                return [Type::string()];
+
+        }
+
+""" + throw_tail,
+        """            case 'Expr_MagicScriptConst':
+                if (\\PHPCfg\\Op\\Expr\\MagicScriptConst::KIND_LINE === $op->kind) {
+                    return [Type::int()];
+                }
+
+                return [Type::string()];
+""" + incdec_case + """        }
+
+""" + throw_tail,
+    ),
+    (
+        """            case 'Expr_FirstClassCallable':
+                if (\\PHPCfg\\Op\\Expr\\FirstClassCallable::KIND_METHOD === $op->kind) {
+                    return [new Type(Type::TYPE_ARRAY)];
+                }
+
+                return [Type::string()];
+        }
+
+""" + throw_tail,
+        """            case 'Expr_FirstClassCallable':
+                if (\\PHPCfg\\Op\\Expr\\FirstClassCallable::KIND_METHOD === $op->kind) {
+                    return [new Type(Type::TYPE_ARRAY)];
+                }
+
+                return [Type::string()];
+""" + incdec_case + """        }
+
+""" + throw_tail,
+    ),
+]
+for old, new in anchors:
+    if old in text:
+        path.write_text(text.replace(old, new, 1))
+        raise SystemExit(0)
+sys.stderr.write("php-types-incdec-type: TypeReconstructor switch marker not found\\n")
+raise SystemExit(1)
+PY
+  then
+    echo "ERROR: php-types-incdec-type overlay failed for ${target} (#6326, #6321)" >&2
+    return 1
+  fi
+  echo "Applied php-types-incdec-type.patch (overlay): ${target}"
+}
+
+apply_php_types_incdec_type_overlay() {
+  local rc=0
+  if ! apply_php_types_incdec_type_overlay_to_target "$ROOT/vendor/ircmaxell/php-types/lib/PHPTypes/TypeReconstructor.php"; then
+    rc=1
+  fi
+  if ! apply_php_types_incdec_type_overlay_to_target "$ROOT/prelinked/bootstrap-vendor/sources/ircmaxell/php-types/lib/PHPTypes/TypeReconstructor.php"; then
+    rc=1
+  fi
+  if [[ "$rc" -ne 0 ]]; then
+    record_patch_failure "php-types-incdec-type.patch" "PostInc TypeReconstructor arms missing — fix overlay anchors (#6321)"
+  fi
+  return "$rc"
 }
 
 apply_php_types_yield_from_overlay() {
@@ -1803,31 +2281,213 @@ PY
   echo "Applied php-types-yield-from.patch (overlay)"
 }
 
-apply_php_types_throw_expr_overlay() {
-  local target="$ROOT/vendor/ircmaxell/php-types/lib/PHPTypes/TypeReconstructor.php"
-  if grep -q "case 'Expr_Throw':" "$target" 2>/dev/null; then
-    echo "Skip php-types-throw-expr.patch (already applied)"
+apply_php_types_throw_expr_overlay_to_target() {
+  local target="$1"
+  if [[ ! -f "$target" ]]; then
+    echo "Skip php-types-throw-expr.patch (target missing): ${target}"
     return 0
   fi
-  python3 - "$target" <<'PY'
+  if grep -q "case 'Expr_Throw':" "$target" 2>/dev/null; then
+    if grep -A1 "case 'Expr_Throw':" "$target" 2>/dev/null | grep -q 'Type::never()'; then
+      echo "Skip php-types-throw-expr.patch (already applied): ${target}"
+      return 0
+    fi
+    # Upgrade legacy fall-through (Expr_Exit + Expr_Throw → null) to never (#6746).
+    if ! python3 - "$target" <<'PY'
 import sys
 from pathlib import Path
 
 path = Path(sys.argv[1])
 text = path.read_text()
 old = """            case 'Expr_Exit':
-            case 'Iterator_Reset':
-                return [Type::null()];"""
-new = """            case 'Expr_Exit':
             case 'Expr_Throw':
             case 'Iterator_Reset':
                 return [Type::null()];"""
+new = """            case 'Expr_Exit':
+            case 'Iterator_Reset':
+                return [Type::null()];
+            case 'Expr_Throw':
+                return [Type::never()];"""
 if old not in text:
-    sys.stderr.write("php-types-throw-expr: TypeReconstructor Expr_Exit anchor not found\n")
     raise SystemExit(1)
 path.write_text(text.replace(old, new, 1))
 PY
-  echo "Applied php-types-throw-expr.patch (overlay)"
+    then
+      echo "Skip php-types-throw-expr.patch (already applied): ${target}"
+      return 0
+    fi
+    echo "Applied php-types-throw-expr.patch (never upgrade): ${target}"
+    return 0
+  fi
+  if ! python3 - "$target" <<'PY'
+import re
+import sys
+from pathlib import Path
+
+path = Path(sys.argv[1])
+text = path.read_text()
+anchors = [
+    (
+        """            case 'Expr_Exit':
+            case 'Iterator_Reset':
+                return [Type::null()];""",
+        """            case 'Expr_Exit':
+            case 'Iterator_Reset':
+                return [Type::null()];
+            case 'Expr_Throw':
+                return [Type::never()];""",
+    ),
+    (
+        """            case 'Expr_Exit':
+            case 'Expr_Throw':
+            case 'Iterator_Reset':
+                return [Type::null()];""",
+        """            case 'Expr_Exit':
+            case 'Iterator_Reset':
+                return [Type::null()];
+            case 'Expr_Throw':
+                return [Type::never()];""",
+    ),
+    (
+        """            case 'Expr_Exit':
+                return [Type::null()];
+            case 'Iterator_Reset':""",
+        """            case 'Expr_Exit':
+                return [Type::null()];
+            case 'Expr_Throw':
+                return [Type::never()];
+            case 'Iterator_Reset':""",
+    ),
+]
+for old, new in anchors:
+    if old in text:
+        path.write_text(text.replace(old, new, 1))
+        raise SystemExit(0)
+
+sys.stderr.write("php-types-throw-expr: TypeReconstructor Expr_Exit anchor not found\n")
+raise SystemExit(1)
+PY
+  then
+    echo "ERROR: php-types-throw-expr overlay failed for ${target} (#5151)" >&2
+    return 1
+  fi
+  echo "Applied php-types-throw-expr.patch (overlay): ${target}"
+}
+
+apply_php_types_throw_expr_overlay() {
+  local rc=0
+  if ! apply_php_types_throw_expr_overlay_to_target "$ROOT/vendor/ircmaxell/php-types/lib/PHPTypes/TypeReconstructor.php"; then
+    rc=1
+  fi
+  if ! apply_php_types_throw_expr_overlay_to_target "$ROOT/prelinked/bootstrap-vendor/sources/ircmaxell/php-types/lib/PHPTypes/TypeReconstructor.php"; then
+    rc=1
+  fi
+  if [[ "$rc" -ne 0 ]]; then
+    record_patch_failure "php-types-throw-expr.patch" "Expr_Throw TypeReconstructor arm missing — fix overlay anchors (#5151)"
+  fi
+  return "$rc"
+}
+
+apply_php_types_never_method_overlay_to_target() {
+  local target="$1"
+  if [[ ! -f "$target" ]]; then
+    echo "Skip php-types-never-type.patch (target missing): ${target}"
+    return 0
+  fi
+  if grep -q 'function never(): self' "$target" 2>/dev/null \
+    && grep -q 'instanceof CfgType\\Never_' "$target" 2>/dev/null \
+    && grep -q "case 'never':" "$target" 2>/dev/null; then
+    echo "Skip php-types-never-type.patch (already applied): ${target}"
+    return 0
+  fi
+  if ! python3 - "$target" <<'PY'
+import sys
+from pathlib import Path
+
+path = Path(sys.argv[1])
+text = path.read_text()
+changed = False
+
+if 'function never(): self' not in text:
+    anchor = """    public static function null(): self
+    {
+        return self::makeCachedType(self::TYPE_NULL);
+    }
+
+    public static function object(): self"""
+    insert = """    public static function null(): self
+    {
+        return self::makeCachedType(self::TYPE_NULL);
+    }
+
+    public static function never(): self
+    {
+        return self::makeCachedType(self::TYPE_NULL);
+    }
+
+    public static function object(): self"""
+    if anchor not in text:
+        raise SystemExit(1)
+    text = text.replace(anchor, insert, 1)
+    changed = True
+
+if 'instanceof CfgType\\Never_' not in text:
+    anchor = """        if ($decl instanceof CfgType\\Literal) {
+            return self::fromDecl($decl->name);
+        }
+        if ($decl instanceof CfgType\\Mixed_) {"""
+    insert = """        if ($decl instanceof CfgType\\Literal) {
+            return self::fromDecl($decl->name);
+        }
+        if ($decl instanceof CfgType\\Never_) {
+            return self::never();
+        }
+        if ($decl instanceof CfgType\\Mixed_) {"""
+    if anchor not in text:
+        raise SystemExit(2)
+    text = text.replace(anchor, insert, 1)
+    changed = True
+
+if "case 'never':" not in text:
+    anchor = """            case 'null':
+            case 'void':
+                return new self(self::TYPE_NULL);
+            case 'numeric':"""
+    insert = """            case 'null':
+            case 'void':
+                return new self(self::TYPE_NULL);
+            case 'never':
+                return self::never();
+            case 'numeric':"""
+    if anchor not in text:
+        raise SystemExit(3)
+    text = text.replace(anchor, insert, 1)
+    changed = True
+
+if not changed:
+    raise SystemExit(4)
+
+path.write_text(text)
+PY
+  then
+    echo "ERROR: php-types-never-type overlay failed for ${target} (#4137/#7329)" >&2
+    return 1
+  fi
+  echo "Applied php-types-never-type.patch (never overlay): ${target}"
+}
+
+apply_php_types_never_method_overlay() {
+  local rc=0
+  if ! apply_php_types_never_method_overlay_to_target "$ROOT/vendor/ircmaxell/php-types/lib/PHPTypes/Type.php"; then
+    rc=1
+  fi
+  if ! apply_php_types_never_method_overlay_to_target "$ROOT/prelinked/bootstrap-vendor/sources/ircmaxell/php-types/lib/PHPTypes/Type.php"; then
+    rc=1
+  fi
+  if [[ "$rc" -ne 0 ]]; then
+    record_patch_failure "php-types-never-type.patch" "Type::never() missing — fix overlay anchors (#4137)"
+  fi
+  return "$rc"
 }
 
 apply_php_types_hex2bin_strict_overlay() {
@@ -2257,6 +2917,30 @@ apply_php_cfg_in_operator_overlay() {
   echo "Applied php-cfg-in-operator overlay (In_.php)"
 }
 
+apply_php_cfg_exit_two_arg_overlay() {
+  local op="$ROOT/vendor/ircmaxell/php-cfg/lib/PHPCfg/Op/Expr/Exit_.php"
+  local overlay="$PATCH_DIR/overlays/php-cfg/Op/Expr/Exit_.php"
+  if [[ ! -f "$overlay" ]]; then
+    echo "Skip php-cfg-exit-two-arg overlay (missing $overlay)" >&2
+    return 1
+  fi
+  mkdir -p "$(dirname "$op")"
+  cp "$overlay" "$op"
+  echo "Applied php-cfg-exit-two-arg overlay (Exit_.php)"
+}
+
+apply_php_cfg_void_cast_overlay() {
+  local op="$ROOT/vendor/ircmaxell/php-cfg/lib/PHPCfg/Op/Expr/Cast/Void_.php"
+  local overlay="$PATCH_DIR/overlays/php-cfg/Op/Expr/Cast/Void_.php"
+  if [[ ! -f "$overlay" ]]; then
+    echo "Skip php-cfg-void-cast overlay (missing $overlay)" >&2
+    return 1
+  fi
+  mkdir -p "$(dirname "$op")"
+  cp "$overlay" "$op"
+  echo "Applied php-cfg-void-cast overlay (Void_.php)"
+}
+
 apply_php_cfg_typed_class_const_overlay() {
   local const_op="$ROOT/vendor/ircmaxell/php-cfg/lib/PHPCfg/Op/Terminal/Const_.php"
   local parser="$ROOT/vendor/ircmaxell/php-cfg/lib/PHPCfg/Parser.php"
@@ -2290,12 +2974,62 @@ new = """            $constOp = new Op\\Terminal\\Const_(
                 $this->mapAttributes($node)
             );
             $constOp->declaredType = null !== $node->type ? $this->parseTypeNode($node->type) : null;
+            $constOp->flags = $node->flags;
             $this->block->children[] = $constOp;"""
 if old not in text:
     raise SystemExit('php-cfg typed class const: parseStmt_ClassConst anchor missing')
 parser_path.write_text(text.replace(old, new, 1))
 PY
   echo "Applied php-cfg-typed-class-const overlay (#6012)"
+}
+
+apply_php_cfg_global_typed_const_overlay() {
+  local parser="$ROOT/vendor/ircmaxell/php-cfg/lib/PHPCfg/Parser.php"
+  local overlay="$PATCH_DIR/overlays/php-cfg/global-typed-const-parser-methods.php"
+  if [[ ! -f "$parser" || ! -f "$overlay" ]]; then
+    return 0
+  fi
+  if grep -q 'function extractGlobalTypedConstDeclaredTypeFromAttributes' "$parser" 2>/dev/null; then
+    return 0
+  fi
+  python3 - "$parser" "$overlay" <<'PY'
+import sys
+from pathlib import Path
+
+parser_path = Path(sys.argv[1])
+method_path = Path(sys.argv[2])
+text = parser_path.read_text()
+if 'function extractGlobalTypedConstDeclaredTypeFromAttributes' in text:
+    raise SystemExit(0)
+
+anchor = """    protected function parseExpr_Yield(Expr\\Yield_ $expr)
+    {"""
+if anchor not in text:
+    sys.stderr.write("php-cfg-global-typed-const: parseExpr_Yield anchor not found in Parser.php\n")
+    raise SystemExit(1)
+
+insert = method_path.read_text().rstrip("\n") + "\n\n"
+text = text.replace(anchor, insert + anchor, 1)
+
+old = """            $this->block->children[] = new Op\\Terminal\\Const_(
+                $this->parseExprNode($const->namespacedName),
+                $value, $valueBlock,
+                $this->mapAttributes($node)
+            );"""
+new = """            $constOp = new Op\\Terminal\\Const_(
+                $this->parseExprNode($const->namespacedName),
+                $value, $valueBlock,
+                $this->mapAttributes($node)
+            );
+            $constOp->declaredType = $this->extractGlobalTypedConstDeclaredTypeFromAttributes($node->getAttributes());
+            $this->block->children[] = $constOp;"""
+if old not in text:
+    sys.stderr.write("php-cfg-global-typed-const: parseStmt_Const anchor missing\n")
+    raise SystemExit(1)
+text = text.replace(old, new, 1)
+parser_path.write_text(text)
+PY
+  echo "Applied php-cfg-global-typed-const overlay (#7081)"
 }
 
 apply_php_cfg_list_spread_overlay() {
@@ -2659,6 +3393,94 @@ PY
 }
 
 # Per-property MODIFIER_READONLY: Property.propertyFlags + Parser assignment (#3149, #4230).
+apply_php_cfg_readonly_function_overlay() {
+  local func="$ROOT/vendor/ircmaxell/php-cfg/lib/PHPCfg/Func.php"
+  local parser="$ROOT/vendor/ircmaxell/php-cfg/lib/PHPCfg/Parser.php"
+  if [[ ! -f "$func" || ! -f "$parser" ]]; then
+    echo "Skip php-cfg-readonly-function.patch (vendor php-cfg missing)" >&2
+    return 1
+  fi
+  if patch_already_applied "$PATCH_DIR/php-cfg-readonly-function.patch"; then
+    echo "Skip php-cfg-readonly-function.patch (already applied)"
+    return 0
+  fi
+  python3 - "$func" "$parser" <<'PY'
+import sys
+from pathlib import Path
+
+func_path = Path(sys.argv[1])
+parser_path = Path(sys.argv[2])
+
+func_text = func_path.read_text()
+if "const FLAG_READONLY = 0x100;" not in func_text:
+    needle = "    const FLAG_CLOSURE = 0x80;\n"
+    insert = needle + "\n    const FLAG_READONLY = 0x100;\n"
+    if needle not in func_text:
+        sys.stderr.write("php-cfg-readonly-function: Func.php FLAG_CLOSURE anchor missing\n")
+        raise SystemExit(1)
+    func_text = func_text.replace(needle, insert, 1)
+    func_path.write_text(func_text)
+
+parser_text = parser_path.read_text()
+
+stmt_old = """        $this->script->functions[] = $func = new Func(
+            $node->namespacedName->toString(),
+            $node->byRef ? Func::FLAG_RETURNS_REF : 0,"""
+stmt_new = """        $this->script->functions[] = $func = new Func(
+            $node->namespacedName->toString(),
+            ($node->byRef ? Func::FLAG_RETURNS_REF : 0)
+                | ($node->getAttribute('compilerReadonlyFunction', false) ? Func::FLAG_READONLY : 0),"""
+if stmt_new not in parser_text:
+    if stmt_old not in parser_text:
+        sys.stderr.write("php-cfg-readonly-function: parseStmt_Function anchor missing\n")
+        raise SystemExit(1)
+    parser_text = parser_text.replace(stmt_old, stmt_new, 1)
+
+readonly_block = """        if ($expr->getAttribute('compilerReadonlyFunction', false)) {
+            $flags |= Func::FLAG_READONLY;
+        }
+"""
+
+def inject_closure_readonly(text: str, method: str) -> str:
+    marker = f"protected function {method}"
+    start = text.find(marker)
+    if start == -1:
+        return text
+    rest = text[start:]
+    next_fn = rest.find("\n    protected function ", len(marker))
+    method_body = rest if next_fn == -1 else rest[:next_fn]
+    if "compilerReadonlyFunction" in method_body:
+        return text
+    anchor = "        $flags |= $expr->static ? Func::FLAG_STATIC : 0;\n"
+    if anchor not in method_body:
+        sys.stderr.write(f"php-cfg-readonly-function: {method} static flags anchor missing\n")
+        raise SystemExit(1)
+    new_method_body = method_body.replace(anchor, anchor + "\n" + readonly_block, 1)
+    return text[:start] + new_method_body + text[start + len(method_body):]
+
+parser_text = inject_closure_readonly(parser_text, "parseExpr_Closure")
+if "function parseExpr_ArrowFunction" in parser_text:
+    parser_text = inject_closure_readonly(parser_text, "parseExpr_ArrowFunction")
+
+if "const FLAG_READONLY = 0x100;" not in func_path.read_text():
+    sys.stderr.write("php-cfg-readonly-function: Func.php FLAG_READONLY missing after overlay\n")
+    raise SystemExit(1)
+closure_slice = parser_text.split("parseExpr_Closure", 1)[1].split("protected function", 1)[0]
+if "compilerReadonlyFunction" not in closure_slice:
+    sys.stderr.write("php-cfg-readonly-function: parseExpr_Closure readonly wiring missing\n")
+    raise SystemExit(1)
+if "function parseExpr_ArrowFunction" in parser_text:
+    arrow_slice = parser_text.split("parseExpr_ArrowFunction", 1)[1].split("protected function", 1)[0]
+    if "compilerReadonlyFunction" not in arrow_slice:
+        sys.stderr.write("php-cfg-readonly-function: parseExpr_ArrowFunction readonly wiring missing\n")
+        raise SystemExit(1)
+
+parser_path.write_text(parser_text)
+PY
+  echo "Applied php-cfg-readonly-function.patch (overlay)"
+  return 0
+}
+
 apply_php_cfg_property_readonly_overlay() {
   local prop="$ROOT/vendor/ircmaxell/php-cfg/lib/PHPCfg/Op/Stmt/Property.php"
   local parser="$ROOT/vendor/ircmaxell/php-cfg/lib/PHPCfg/Parser.php"
@@ -3032,6 +3854,10 @@ apply_patch() {
     apply_php_cfg_enum_class_const_overlay
     return $?
   fi
+  if [[ "$(basename "$patch")" == "php-cfg-enum-trait-use.patch" ]]; then
+    apply_php_cfg_enum_trait_use_parser_fix
+    return $?
+  fi
   if [[ "$(basename "$patch")" == "php-cfg-intersection-type.patch" ]]; then
     apply_php_cfg_intersection_type_overlay
     return $?
@@ -3078,6 +3904,7 @@ apply_patch() {
   fi
   if [[ "$(basename "$patch")" == "php-types-throw-expr.patch" ]]; then
     apply_php_types_throw_expr_overlay
+    apply_php_types_never_method_overlay
     return $?
   fi
   if [[ "$(basename "$patch")" == "php-types-anonymous-class-type.patch" ]]; then
@@ -3120,6 +3947,10 @@ apply_patch() {
     apply_php_cfg_typed_class_const_overlay
     return $?
   fi
+  if [[ "$(basename "$patch")" == "php-cfg-class-const-flags.patch" ]]; then
+    apply_php_cfg_class_const_flags_overlay
+    return $?
+  fi
   if [[ "$(basename "$patch")" == "php-cfg-match.patch" ]]; then
     apply_php_cfg_match_overlay
     return $?
@@ -3138,6 +3969,10 @@ apply_patch() {
   fi
   if [[ "$(basename "$patch")" == "php-cfg-throw-expr.patch" ]]; then
     apply_php_cfg_throw_expr_overlay
+    return $?
+  fi
+  if [[ "$(basename "$patch")" == "php-cfg-readonly-function.patch" ]]; then
+    apply_php_cfg_readonly_function_overlay
     return $?
   fi
   if [[ "$(basename "$patch")" == "php-cfg-property-readonly.patch" ]]; then
@@ -3209,6 +4044,10 @@ apply_patch() {
       record_patch_failure "${patch_name}" "required for AOT (declare(strict_types))"
       return 1
       ;;
+    php-cfg-new-ctor-parens.patch)
+      echo "Skip ${patch_name} (optional — stale hunk #6549; does not block throw-expr #6746)"
+      return 0
+      ;;
     *)
       if patch_marker_present "$patch"; then
         echo "Skip ${patch_name} (already applied)"
@@ -3242,10 +4081,21 @@ if [[ -d "$ROOT/vendor/ircmaxell/php-cfg" ]]; then
   apply_php_cfg_magic_constants_overlay || true
   # PHP 8.3 `in` operator CFG node must survive optional patch failures (#4682, #4850).
   apply_php_cfg_in_operator_overlay || true
+  apply_php_cfg_exit_two_arg_overlay || true
+  apply_php_cfg_void_cast_overlay || true
   # PHP 8.3 typed class/trait constants must survive optional patch failures (#6012).
   apply_php_cfg_typed_class_const_overlay || true
-  # ++/-- must survive optional patch failures (#4926, self-host loops #1492).
-  apply_php_cfg_incdec_expr_overlay || true
+  # listSpreadRhs on Assign must exist before optional patch failures abort the script (#6069, #4835).
+  apply_php_cfg_list_spread_overlay
+  # ++/-- overlays are hard-required — missing PostInc arms break compile (#6326, #6321).
+  apply_php_cfg_incdec_expr_overlay
+  apply_php_types_incdec_type_overlay
+  # Readonly closure FLAG_READONLY must exist before any closure compile (#7464, #7428).
+  apply_php_cfg_readonly_function_overlay || true
+  # Throw expressions must survive optional patch failures (#6746, #5151).
+  apply_php_cfg_throw_expr_overlay
+  apply_php_types_throw_expr_overlay
+  apply_php_types_never_method_overlay
   apply_patch "$PATCH_DIR/php-cfg-dollars-brace.patch"
   apply_patch "$PATCH_DIR/php-cfg-mixed-reserved.patch"
   apply_patch "$PATCH_DIR/php-cfg-nullsafe.patch"
@@ -3270,6 +4120,8 @@ if [[ -d "$ROOT/vendor/ircmaxell/php-cfg" ]]; then
   apply_php_cfg_enum_early_chain
   apply_patch "$PATCH_DIR/php-cfg-typed-class-const.patch"
   apply_patch "$PATCH_DIR/php-cfg-class-const-flags.patch"
+  # typed-class-const overlay copies Const_.php without enum markers; restore (#6622).
+  apply_php_cfg_enum_class_const_overlay || true
   apply_patch "$PATCH_DIR/php-cfg-asymmetric-visibility.patch"
   apply_patch "$PATCH_DIR/php-cfg-assertion-expr-property.patch"
   apply_php_cfg_yield_from_overlay
@@ -3285,6 +4137,7 @@ if [[ -d "$ROOT/vendor/ircmaxell/php-cfg" ]]; then
   apply_patch "$PATCH_DIR/php-cfg-first-class-callable.patch"
   apply_patch "$PATCH_DIR/php-cfg-arrow-function.patch"
   apply_patch "$PATCH_DIR/php-cfg-anonymous-class.patch"
+  apply_patch "$PATCH_DIR/php-cfg-new-ctor-parens.patch"
   apply_php_cfg_anonymous_class_name_overlay || true
   apply_patch "$PATCH_DIR/php-cfg-enum.patch"
   apply_patch "$PATCH_DIR/php-cfg-enum-implements.patch"
@@ -3299,9 +4152,11 @@ if [[ -d "$ROOT/vendor/ircmaxell/php-cfg" ]]; then
   apply_patch "$PATCH_DIR/php-cfg-union-type.patch"
   apply_patch "$PATCH_DIR/php-cfg-ctor-promotion.patch"
   apply_patch "$PATCH_DIR/php-cfg-ctor-promotion-readonly.patch"
+  apply_patch "$PATCH_DIR/php-cfg-readonly-function.patch"
   apply_patch "$PATCH_DIR/php-cfg-property-readonly.patch"
-  apply_php_cfg_asymmetric_set_visibility_parser_overlay || true
-  apply_php_cfg_asymmetric_get_visibility_parser_overlay || true
+  apply_php_cfg_asymmetric_set_visibility_parser_overlay
+  apply_php_cfg_asymmetric_get_visibility_parser_overlay
+  apply_php_cfg_global_typed_const_overlay
   apply_patch "$PATCH_DIR/php-cfg-attribute-groups.patch"
   apply_patch "$PATCH_DIR/php-cfg-trait-use.patch"
   apply_patch "$PATCH_DIR/php-cfg-throw-expr.patch"
@@ -3309,7 +4164,7 @@ if [[ -d "$ROOT/vendor/ircmaxell/php-cfg" ]]; then
 fi
 
 if [[ -d "$ROOT/vendor/ircmaxell/php-types" ]]; then
-  apply_php_types_incdec_type_overlay || true
+  apply_php_types_incdec_type_overlay
   apply_patch "$PATCH_DIR/php-types-binaryop-pow.patch"
   apply_patch "$PATCH_DIR/php-types-binaryop-coalesce.patch"
   apply_patch "$PATCH_DIR/php-types-cast-object.patch"
@@ -3364,6 +4219,7 @@ if [[ -d "$ROOT/vendor/ircmaxell/php-types" ]]; then
   apply_patch "$PATCH_DIR/php-types-intersection-type.patch"
   apply_patch "$PATCH_DIR/php-types-union-type.patch"
   apply_patch "$PATCH_DIR/php-types-throw-expr.patch"
+  apply_php_types_fcc_overlay_final_repair
 fi
 
 if [[ -d "$ROOT/vendor/pre/plugin" ]]; then
@@ -3399,10 +4255,36 @@ verify_critical_language_patches() {
     && ! grep -q 'enumCaseHasExplicitValue' "$const_file" 2>/dev/null; then
     missing+=("php-cfg-enum-case-explicit-value-Const_")
   fi
+  if [[ -f "$const_file" ]] \
+    && grep -q 'function parseStmt_Enum' "$parser" 2>/dev/null \
+    && ! grep -q 'public bool \$isEnumCase = false' "$const_file" 2>/dev/null; then
+    missing+=("php-cfg-enum-class-const-Const_")
+  fi
+  if grep -q 'function parseStmt_Enum' "$parser" 2>/dev/null; then
+    if ! grep -A35 'function parseStmt_Enum' "$parser" 2>/dev/null | grep -q 'Stmt\\TraitUse'; then
+      missing+=("php-cfg-enum-trait-use")
+    fi
+    if ! grep -A35 'function parseStmt_Enum' "$parser" 2>/dev/null | grep -q 'Stmt\\ClassConst'; then
+      missing+=("php-cfg-enum-class-const-Parser")
+    fi
+    if ! grep -A20 'function parseEnumCase' "$parser" 2>/dev/null | grep -q 'isEnumCase = true'; then
+      missing+=("php-cfg-enum-case-isEnumCase")
+    fi
+  fi
+  local vendor_type="$ROOT/vendor/ircmaxell/php-types/lib/PHPTypes/Type.php"
   if ! grep -q 'instanceof Op\\Type\\Union_' "$recon" 2>/dev/null; then
     missing+=("php-types-union-type")
   elif ! php -l "$recon" >/dev/null 2>&1; then
     missing+=("php-types-union-type-syntax")
+  fi
+  if [[ -f "$vendor_type" ]] && ! grep -q 'instanceof CfgType\\Union_' "$vendor_type" 2>/dev/null; then
+    missing+=("php-types-union-type-Type")
+  fi
+  if ! grep -q 'instanceof Op\\Type\\Intersection' "$recon" 2>/dev/null; then
+    missing+=("php-types-intersection-type")
+  fi
+  if [[ -f "$vendor_type" ]] && ! grep -q 'instanceof CfgType\\Intersection' "$vendor_type" 2>/dev/null; then
+    missing+=("php-types-intersection-type-Type")
   fi
   if ! grep -qE 'public \$readonly|propertyFlags' "$prop" 2>/dev/null; then
     missing+=("php-cfg-property-readonly-Property")
@@ -3410,8 +4292,40 @@ verify_critical_language_patches() {
   if ! grep -qE 'propertyFlags = \$node->flags|\$cfgProp->readonly =|\$prop->readonly =|\$property->readonly =|->readonly = 0 !== \\(\\$node->flags & .*MODIFIER_READONLY\\)' "$parser" 2>/dev/null; then
     missing+=("php-cfg-property-readonly-Parser")
   fi
+  local func_file="$ROOT/vendor/ircmaxell/php-cfg/lib/PHPCfg/Func.php"
+  if [[ -f "$func_file" ]] && ! grep -q 'FLAG_READONLY' "$func_file" 2>/dev/null; then
+    missing+=("php-cfg-readonly-function-Func")
+  fi
+  if grep -q 'function parseExpr_Closure' "$parser" 2>/dev/null \
+    && ! grep -A25 'function parseExpr_Closure' "$parser" 2>/dev/null \
+      | grep -q "compilerReadonlyFunction"; then
+    missing+=("php-cfg-readonly-function-Parser")
+  fi
+  if grep -q 'function parseExpr_ArrowFunction' "$parser" 2>/dev/null \
+    && ! grep -A25 'function parseExpr_ArrowFunction' "$parser" 2>/dev/null \
+      | grep -q "compilerReadonlyFunction"; then
+    missing+=("php-cfg-readonly-function-ArrowParser")
+  fi
+  if ! grep -q 'function extractAsymmetricSetVisibilityFromAttributes' "$parser" 2>/dev/null; then
+    missing+=("php-cfg-asymmetric-set-visibility-Parser")
+  fi
+  if ! grep -q 'function extractAsymmetricGetVisibilityFromAttributes' "$parser" 2>/dev/null; then
+    missing+=("php-cfg-asymmetric-get-visibility-Parser")
+  fi
   if [[ ! -f "$ROOT/vendor/ircmaxell/php-cfg/lib/PHPCfg/Op/Expr/In_.php" ]]; then
     missing+=("php-cfg-in-operator-In_")
+  fi
+  if [[ -f "$ROOT/vendor/ircmaxell/php-cfg/lib/PHPCfg/Op/Expr/Exit_.php" ]] \
+    && ! grep -q 'public \$message' "$ROOT/vendor/ircmaxell/php-cfg/lib/PHPCfg/Op/Expr/Exit_.php" 2>/dev/null; then
+    missing+=("php-cfg-exit-two-arg-Exit_")
+  fi
+  local assign_expr="$ROOT/vendor/ircmaxell/php-cfg/lib/PHPCfg/Op/Expr/Assign.php"
+  if [[ -f "$assign_expr" ]] && ! grep -q 'listSpreadRhs' "$assign_expr" 2>/dev/null; then
+    missing+=("php-cfg-list-spread-Assign")
+  fi
+  if grep -q 'function parseListAssignment' "$parser" 2>/dev/null \
+    && ! grep -q 'listSpreadExcludedKeys = \$excludedKeys' "$parser" 2>/dev/null; then
+    missing+=("php-cfg-list-spread-Parser")
   fi
   if [[ -f "$const_file" ]] \
     && ! grep -q 'public ?Type \$declaredType' "$const_file" 2>/dev/null; then
@@ -3428,8 +4342,54 @@ verify_critical_language_patches() {
   if ! grep -q "case 'Expr_PostInc':" "$recon" 2>/dev/null; then
     missing+=("php-types-incdec-type")
   fi
+  if ! grep -q 'FirstClassCallable::KIND_METHOD' "$recon" 2>/dev/null; then
+    missing+=("php-types-first-class-callable")
+  elif grep -q 'return \[Type::array()\];' "$recon" 2>/dev/null; then
+    missing+=("php-types-first-class-callable-Type-array-typo")
+  elif ! grep -q 'new Type(Type::TYPE_ARRAY)' "$recon" 2>/dev/null; then
+    missing+=("php-types-first-class-callable-TYPE_ARRAY")
+  fi
+  if ! grep -q "case 'Expr_Throw':" "$recon" 2>/dev/null; then
+    missing+=("php-types-throw-expr")
+  fi
+  local type_php="$ROOT/vendor/ircmaxell/php-types/lib/PHPTypes/Type.php"
+  if grep -q "case 'Expr_Throw':" "$recon" 2>/dev/null \
+    && { ! grep -q 'function never(): self' "$type_php" 2>/dev/null \
+      || ! grep -q 'instanceof CfgType\\Never_' "$type_php" 2>/dev/null \
+      || ! grep -q "case 'never':" "$type_php" 2>/dev/null; }; then
+    missing+=("php-types-never-type")
+  fi
+  local prelinked_recon="$ROOT/prelinked/bootstrap-vendor/sources/ircmaxell/php-types/lib/PHPTypes/TypeReconstructor.php"
+  if [[ -f "$prelinked_recon" ]] && ! grep -q "case 'Expr_PostInc':" "$prelinked_recon" 2>/dev/null; then
+    missing+=("php-types-incdec-type-prelinked")
+  fi
+  if [[ -f "$prelinked_recon" ]] && ! grep -q 'FirstClassCallable::KIND_METHOD' "$prelinked_recon" 2>/dev/null; then
+    missing+=("php-types-first-class-callable-prelinked")
+  elif [[ -f "$prelinked_recon" ]] && grep -q 'return \[Type::array()\];' "$prelinked_recon" 2>/dev/null; then
+    missing+=("php-types-first-class-callable-prelinked-Type-array-typo")
+  fi
+  if [[ -f "$prelinked_recon" ]] && ! grep -q "case 'Expr_Throw':" "$prelinked_recon" 2>/dev/null; then
+    missing+=("php-types-throw-expr-prelinked")
+  fi
+  if [[ -f "$prelinked_recon" ]] && ! grep -q 'instanceof Op\\Type\\Union_' "$prelinked_recon" 2>/dev/null; then
+    missing+=("php-types-union-type-prelinked")
+  elif [[ -f "$prelinked_recon" ]] && ! php -l "$prelinked_recon" >/dev/null 2>&1; then
+    missing+=("php-types-union-type-prelinked-syntax")
+  fi
+  if [[ -f "$prelinked_recon" ]] && ! grep -q 'instanceof Op\\Type\\Intersection' "$prelinked_recon" 2>/dev/null; then
+    missing+=("php-types-intersection-type-prelinked")
+  fi
+  local prelinked_type="$ROOT/prelinked/bootstrap-vendor/sources/ircmaxell/php-types/lib/PHPTypes/Type.php"
+  if [[ -f "$prelinked_type" ]] && ! grep -q 'instanceof CfgType\\Union_' "$prelinked_type" 2>/dev/null; then
+    missing+=("php-types-union-type-Type-prelinked")
+  fi
+  if [[ -f "$prelinked_type" ]] && ! grep -q 'instanceof CfgType\\Intersection' "$prelinked_type" 2>/dev/null; then
+    missing+=("php-types-intersection-type-Type-prelinked")
+  fi
   if ((${#missing[@]} > 0)); then
     echo "apply-patches: critical language patch markers missing: ${missing[*]}" >&2
+    echo "apply-patches: hint: php-types-incdec-type overlay anchor drift — see #6321" >&2
+    echo "apply-patches: hint: php-types-first-class-callable overlay — run composer install && ./script/apply-patches.sh (#6932)" >&2
     exit 1
   fi
 }

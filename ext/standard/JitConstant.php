@@ -15,7 +15,10 @@ final class JitConstant
 {
     public static function invoke(Context $context, JITVariable $nameArg): Value
     {
-        if (JITVariable::TYPE_STRING !== $nameArg->type || null === $nameArg->compileTimeString) {
+        if (JITVariable::TYPE_STRING !== $nameArg->type) {
+            throw new \LogicException('constant() name type check should run in constant_::call');
+        }
+        if (null === $nameArg->compileTimeString) {
             throw new \LogicException(
                 'constant() constant name must be a string literal in this compiler build'
             );

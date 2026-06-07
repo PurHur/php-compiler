@@ -30,7 +30,7 @@ final class preg_grep extends Internal
         if ($argc < 2 || $argc > 3) {
             throw new \LogicException('preg_grep() requires two or three arguments in this compiler build');
         }
-        $pattern = VmReflection::stringArg($frame->calledArgs[0], 'preg_grep() pattern');
+        $pattern = VmReflection::stringArg($frame->calledArgs[0], 'preg_grep() pattern', 0);
         $array = $frame->calledArgs[1]->resolveIndirect();
         if (Variable::TYPE_ARRAY !== $array->type) {
             throw new \LogicException('preg_grep() second argument must be an array in this compiler build');

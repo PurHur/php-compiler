@@ -34,15 +34,11 @@ class JIT extends Func implements Handler {
     public function execute(Frame $frame): void {
         // TODO: handle argument passing
         assert(empty($frame->calledArgs));
-        \PHPCompiler\JIT\Builtin\ReadonlyRaise::clearPendingAtRunEntry();
-        \PHPCompiler\JIT\Builtin\TypeErrorRaise::clearPendingAtRunEntry();
-        \PHPCompiler\JIT\Builtin\ErrorRaise::clearPendingAtRunEntry();
-        \PHPCompiler\JIT\Builtin\JitThrow::clearPendingAtRunEntry();
+        \PHPCompiler\JIT\ErrorBridge::clearPendingAtRunEntry();
+        \PHPCompiler\JIT\ExceptionBridge::clearPendingAtRunEntry();
         ($this->callback)();
-        \PHPCompiler\JIT\Builtin\ReadonlyRaise::throwPendingIfAny();
-        \PHPCompiler\JIT\Builtin\TypeErrorRaise::throwPendingIfAny();
-        \PHPCompiler\JIT\Builtin\ErrorRaise::throwPendingIfAny();
-        \PHPCompiler\JIT\Builtin\JitThrow::throwPendingIfAny();
+        \PHPCompiler\JIT\ErrorBridge::throwPendingIfAny();
+        \PHPCompiler\JIT\ExceptionBridge::throwPendingIfAny();
     }
 
 }

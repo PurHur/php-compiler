@@ -81,6 +81,10 @@ final class CycleCollector
                 return;
             case Variable::TYPE_ARRAYACCESS_OFFSET:
                 return;
+            case Variable::TYPE_PROPERTY_HOOK_REF:
+                $visitVar($var->propertyHookRefWriteLvalue());
+
+                return;
             case Variable::TYPE_OBJECT:
                 $object = $var->toObject();
                 if (isset($marked[$object->id])) {
