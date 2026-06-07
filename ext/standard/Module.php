@@ -423,6 +423,7 @@ class Module extends ModuleAbstract
             new stream_supports(),
             new stream_supports_lock(),
             new stream_is_local(),
+            new stream_isatty(),
             new fopen(),
             new fread(),
             new stream_get_contents(),
