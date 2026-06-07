@@ -1364,6 +1364,13 @@ class Context {
 
             return;
         }
+        if (null !== $name && $block->isMainScript()) {
+            $global = $this->ensureScriptGlobal($name);
+            $this->scope->variables[$op] = $global;
+            $this->bindVariableByName($name, $global);
+
+            return;
+        }
         $this->scope->variables[$op] = Variable::fromOp($this, $func, $basicBlock, $block, $op);
         $this->scope->variables[$op]->initialize();
     }

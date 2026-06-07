@@ -416,6 +416,7 @@ class Context {
         if (!isset($this->globalVars[$name])) {
             $this->globalVars[$name] = new Variable(Variable::TYPE_NULL);
         }
+        $this->ensureGlobalsTable();
         $this->syncGlobalEntryInGlobalsTable($name, $this->globalVars[$name]);
 
         return $this->globalVars[$name];
@@ -564,6 +565,23 @@ class Context {
         }
 
         return $slot;
+    }
+
+    /**
+     * isset($GLOBALS['name']) — symbol table probe (php-src zend_hash_global_lookup).
+     */
+    public function globalsTableOffsetIsSet(Variable $index): bool
+    {
+        if (Variable::TYPE_STRING !== $index->type) {
+            return $this->ensureGlobalsTable()->toArray()->offsetIsSet($index);
+        }
+        $name = $index->toString();
+        if (!isset($this->globalVars[$name])) {
+            return false;
+        }
+        $global = $this->globalVars[$name]->resolveIndirect();
+
+        return !$global->isUndefined() && Variable::TYPE_NULL !== $global->type;
     }
 
     private function syncGlobalEntryInGlobalsTable(string $name, Variable $global): void

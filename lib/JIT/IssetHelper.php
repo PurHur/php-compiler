@@ -349,6 +349,9 @@ final class IssetHelper
         }
         $superglobalName = self::superglobalName($container, $containerOp);
         if (null !== $superglobalName) {
+            if ('GLOBALS' === $superglobalName) {
+                return GlobalsTableInit::offsetIsSet($context, $dim);
+            }
             $key = $dim->compileTimeString ?? self::literalStringKey($dimOp);
             if (
                 null !== $key

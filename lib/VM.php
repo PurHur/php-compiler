@@ -4734,6 +4734,10 @@ restart:
                     if (null !== $op->arg3) {
                         $container = $frame->scope[$op->arg2]->resolveIndirect();
                         if (Variable::TYPE_ARRAY === $container->type) {
+                            if ($this->context->isGlobalsTable($container)) {
+                                $dst->bool($this->context->globalsTableOffsetIsSet($frame->scope[$op->arg3]));
+                                break;
+                            }
                             if ($op->issetOnProperty) {
                                 $dst->bool(false);
                                 break;
