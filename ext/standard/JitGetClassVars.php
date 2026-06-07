@@ -34,14 +34,9 @@ final class JitGetClassVars
         $lc = strtolower(ltrim($className, '\\'));
         $vm = $context->runtime->vmContext;
         if (null !== $vm && isset($vm->classes[$lc])) {
-            $entry = $vm->classes[$lc];
-            if ($entry->isInterface || $entry->isTrait || $entry->isEnum) {
-                return self::returnFalse($context);
-            }
-
             return self::wrapHashTable(
                 $context,
-                self::emitFromVmClass($context, $entry)
+                self::emitFromVmClass($context, $vm->classes[$lc])
             );
         }
 

@@ -708,8 +708,60 @@ final class VmReflection
             }
             $ht->add($prop->name, $copy);
         }
+        self::addPublicStaticClassVars($entry, $ht);
+        if ($entry->isEnum) {
+            /** @var array<string, true> $seen */
+            $seen = [];
+            foreach ($ht->iterate(false) as $key => $_value) {
+                $seen[(string) $key] = true;
+            }
+            foreach (['name', 'value'] as $enumProp) {
+                if (isset($seen[$enumProp])) {
+                    continue;
+                }
+                $copy = new Variable();
+                $copy->null();
+                $ht->add($enumProp, $copy);
+            }
+        }
 
         return $result;
+    }
+
+    /**
+     * Public static properties declared on $entry (php-src add_class_vars, #7397).
+     *
+     * @param \PHPCompiler\VM\HashTable $ht
+     */
+    private static function addPublicStaticClassVars(ClassEntry $entry, $ht): void
+    {
+        $entryLc = strtolower($entry->name);
+        /** @var array<string, true> $seen */
+        $seen = [];
+        foreach ($ht->iterate(false) as $key => $_value) {
+            $seen[(string) $key] = true;
+        }
+        foreach ($entry->staticProperties as $propLc => $storage) {
+            if (($entry->staticPropertyDeclaringClassLc[$propLc] ?? $entryLc) !== $entryLc) {
+                continue;
+            }
+            if (!MethodVisibility::isPublic($entry->staticPropertyVisibility[$propLc] ?? \PHPCfg\Func::FLAG_PUBLIC)) {
+                continue;
+            }
+            $displayName = $storage->objectPropertyName ?? $propLc;
+            if (isset($seen[$displayName])) {
+                continue;
+            }
+            $copy = new Variable();
+            $resolved = $storage->resolveIndirect();
+            if ($resolved->isUndefined()) {
+                $copy->null();
+            } else {
+                $copy->copyFrom($resolved);
+            }
+            $ht->add($displayName, $copy);
+            $seen[$displayName] = true;
+        }
     }
 
     public static function resolveClassFromArg(Context $ctx, Variable $arg): ClassEntry
