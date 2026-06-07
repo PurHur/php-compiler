@@ -18,7 +18,7 @@ final class JitMemory
     public static function getUsage(Context $context, ?JITVariable $realUsage = null): Value
     {
         $real = self::resolveRealUsage($context, $realUsage);
-        $usage = MemoryRuntime::readRssBytes($context);
+        $usage = self::readUsage($context, $real);
         self::updatePeak($context, $real, $usage);
 
         return self::boxLong($context, $usage);
@@ -27,7 +27,7 @@ final class JitMemory
     public static function getPeakUsage(Context $context, ?JITVariable $realUsage = null): Value
     {
         $real = self::resolveRealUsage($context, $realUsage);
-        $usage = MemoryRuntime::readRssBytes($context);
+        $usage = self::readUsage($context, $real);
         self::updatePeak($context, $real, $usage);
         $peak = self::loadPeak($context, $real);
 
@@ -37,9 +37,10 @@ final class JitMemory
     public static function resetPeakUsage(Context $context): Value
     {
         MemoryRuntime::ensureLinked($context);
-        $usage = MemoryRuntime::readRssBytes($context);
-        $context->builder->store($usage, MemoryRuntime::peakGlobal($context, false));
-        $context->builder->store($usage, MemoryRuntime::peakGlobal($context, true));
+        $currentEmalloc = MemoryRuntime::readEmallocBytes($context);
+        $currentRss = MemoryRuntime::readRssBytes($context);
+        $context->builder->store($currentEmalloc, MemoryRuntime::peakGlobal($context, false));
+        $context->builder->store($currentRss, MemoryRuntime::peakGlobal($context, true));
 
         return $context->getTypeFromString('int32')->constInt(0, false);
     }
@@ -51,6 +52,14 @@ final class JitMemory
         }
 
         return JitBoolArg::lower($context, $realUsage, 'memory_get_*() real_usage');
+    }
+
+    private static function readUsage(Context $context, Value $realUsage): Value
+    {
+        $rss = MemoryRuntime::readRssBytes($context);
+        $emalloc = MemoryRuntime::readEmallocBytes($context);
+
+        return $context->builder->select($realUsage, $rss, $emalloc);
     }
 
     private static function updatePeak(Context $context, Value $realUsage, Value $usage): void

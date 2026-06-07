@@ -188,12 +188,14 @@ final class Variable {
     }
 
     public function array(HashTable $ht): void {
+        $this->releaseTrackedMemory();
         $this->releaseArrayRef();
         $this->resetScalars();
         $this->type = self::TYPE_ARRAY;
         $this->streamResource = false;
         $this->dirResource = false;
         $this->array = $ht;
+        MemoryAccounting::noteBytes(MemoryAccounting::estimateArrayBytesForTable($ht));
     }
 
     /**
@@ -568,6 +570,7 @@ final class Variable {
         $this->reset();
         $this->type = self::TYPE_STRING;
         $this->string = $value;
+        MemoryAccounting::noteBytes(strlen($value));
     }
 
     /** Read string scalar when assigned; null for typed prototypes / unset slots (#6357). */
@@ -710,6 +713,7 @@ final class Variable {
     }
 
     public function reset(): void {
+        $this->releaseTrackedMemory();
         if (self::TYPE_OBJECT === $this->type && isset($this->object)) {
             ObjectLifetime::releaseRef($this->object);
         }
@@ -718,6 +722,24 @@ final class Variable {
         $this->type = self::TYPE_NULL;
         $this->streamResource = false;
         $this->dirResource = false;
+    }
+
+    /** Drop emalloc-tracked bytes before replacing or clearing this slot (#7310). */
+    public function releaseTrackedMemory(): void
+    {
+        if (self::TYPE_INDIRECT === $this->type) {
+            $this->indirect->releaseTrackedMemory();
+
+            return;
+        }
+        if (self::TYPE_STRING === $this->type && isset($this->string)) {
+            MemoryAccounting::noteBytes(-strlen($this->string));
+
+            return;
+        }
+        if (self::TYPE_ARRAY === $this->type && isset($this->array)) {
+            MemoryAccounting::noteBytes(-MemoryAccounting::estimateArrayBytesForTable($this->array));
+        }
     }
 
     private function releaseArrayRef(): void
@@ -1068,8 +1090,17 @@ final class Variable {
                     clone $var->enumCase->backingValue,
                 ));
                 break;
+            case self::TYPE_UNDEFINED:
+                $owner = $this->objectPropertyOwner;
+                $propName = $this->objectPropertyName;
+                $staticClass = $this->staticPropertyClassLc;
+                $this->reset();
+                $this->type = self::TYPE_UNDEFINED;
+                $this->objectPropertyOwner = $owner;
+                $this->objectPropertyName = $propName;
+                $this->staticPropertyClassLc = $staticClass;
+                break;
             default:
-                var_dump($var);
                 throw new \LogicException("Unsupported type copy: {$var->type}");
         }
     }

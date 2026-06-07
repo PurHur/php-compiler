@@ -20,13 +20,22 @@ final class MemoryRuntime
 
     public const GLOBAL_PEAK_REAL = '__phpc_memory_peak_real';
 
+    public const GLOBAL_CURRENT_EMALLOC = '__phpc_memory_current_emalloc';
+
     public const READ_RSS = '__phpc_memory_read_rss_bytes';
+
+    public const READ_EMALLOC = '__phpc_memory_read_emalloc_bytes';
+
+    public const NOTE_ALLOC = '__phpc_memory_note_alloc';
 
     /** @var Value|null */
     public static $peakEmallocGlobal = null;
 
     /** @var Value|null */
     public static $peakRealGlobal = null;
+
+    /** @var Value|null */
+    public static $currentEmallocGlobal = null;
 
     public static function ensureLinked(Context $context): void
     {
@@ -51,12 +60,26 @@ final class MemoryRuntime
         return $context->builder->call($context->lookupFunction(self::READ_RSS));
     }
 
+    public static function readEmallocBytes(Context $context): Value
+    {
+        self::ensureLinked($context);
+
+        return $context->builder->call($context->lookupFunction(self::READ_EMALLOC));
+    }
+
+    public static function noteAlloc(Context $context, Value $delta): void
+    {
+        self::ensureLinked($context);
+        $context->builder->call($context->lookupFunction(self::NOTE_ALLOC), $delta);
+    }
+
     private static function implement(Context $context): void
     {
         $probe = $context->module->getNamedFunction(self::READ_RSS);
         if (null !== $probe && $probe->countBasicBlocks() > 0) {
             self::$peakEmallocGlobal = $context->module->getNamedGlobal(self::GLOBAL_PEAK_EMALLOC);
             self::$peakRealGlobal = $context->module->getNamedGlobal(self::GLOBAL_PEAK_REAL);
+            self::$currentEmallocGlobal = $context->module->getNamedGlobal(self::GLOBAL_CURRENT_EMALLOC);
 
             return;
         }
@@ -76,9 +99,17 @@ final class MemoryRuntime
         } else {
             self::$peakRealGlobal = $context->module->getNamedGlobal(self::GLOBAL_PEAK_REAL);
         }
+        if (null === $context->module->getNamedGlobal(self::GLOBAL_CURRENT_EMALLOC)) {
+            self::$currentEmallocGlobal = $context->module->addGlobal($i64, self::GLOBAL_CURRENT_EMALLOC);
+            self::$currentEmallocGlobal->setInitializer($i64->constInt(0, false));
+        } else {
+            self::$currentEmallocGlobal = $context->module->getNamedGlobal(self::GLOBAL_CURRENT_EMALLOC);
+        }
 
         self::ensureLibcForStatm($context);
         self::emitReadRssBytes($context);
+        self::emitReadEmallocBytes($context);
+        self::emitNoteAlloc($context);
         self::restoreInsertBlock($context, $restoreBlock);
     }
 
@@ -171,6 +202,50 @@ final class MemoryRuntime
         $context->builder->positionAtEnd($failBlock);
         $context->builder->returnValue($i64->constInt(0, false));
 
+        $context->builder->clearInsertionPosition();
+    }
+
+    private static function emitReadEmallocBytes(Context $context): void
+    {
+        $i64 = $context->getTypeFromString('int64');
+        $fn = $context->module->addFunction(
+            self::READ_EMALLOC,
+            $context->context->functionType($i64, false)
+        );
+        $context->registerFunction(self::READ_EMALLOC, $fn);
+        $entry = $fn->appendBasicBlock('mem_emalloc_entry');
+        $context->builder->positionAtEnd($entry);
+        $current = $context->builder->load(
+            $context->module->getNamedGlobal(self::GLOBAL_CURRENT_EMALLOC)
+        );
+        $context->builder->returnValue($current);
+        $context->builder->clearInsertionPosition();
+    }
+
+    private static function emitNoteAlloc(Context $context): void
+    {
+        $i64 = $context->getTypeFromString('int64');
+        $fn = $context->module->addFunction(
+            self::NOTE_ALLOC,
+            $context->context->functionType($context->getTypeFromString('void'), false, $i64)
+        );
+        $context->registerFunction(self::NOTE_ALLOC, $fn);
+        $entry = $fn->appendBasicBlock('mem_note_entry');
+        $context->builder->positionAtEnd($entry);
+        $delta = $fn->getParam(0);
+        $currentGlobal = $context->module->getNamedGlobal(self::GLOBAL_CURRENT_EMALLOC);
+        $peakGlobal = $context->module->getNamedGlobal(self::GLOBAL_PEAK_EMALLOC);
+        $oldCurrent = $context->builder->load($currentGlobal);
+        $newCurrent = $context->builder->add($oldCurrent, $delta);
+        $zero = $i64->constInt(0, false);
+        $isNegative = $context->builder->icmp(Builder::INT_SLT, $newCurrent, $zero);
+        $clamped = $context->builder->select($isNegative, $zero, $newCurrent);
+        $context->builder->store($clamped, $currentGlobal);
+        $oldPeak = $context->builder->load($peakGlobal);
+        $isGreater = $context->builder->icmp(Builder::INT_SGT, $clamped, $oldPeak);
+        $newPeak = $context->builder->select($isGreater, $clamped, $oldPeak);
+        $context->builder->store($newPeak, $peakGlobal);
+        $context->builder->returnVoid();
         $context->builder->clearInsertionPosition();
     }
 

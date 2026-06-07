@@ -12109,10 +12109,45 @@ class JIT {
             $this->context->builder->branch($doneBlock);
             $this->context->builder->positionAtEnd($doneBlock);
         }
+        $this->jitNoteMemoryReleaseForUnset($valueBoxPtr);
         $this->context->builder->call(
             $this->context->lookupFunction('__value__writeNull'),
             $valueBoxPtr
         );
+    }
+
+    /** Zend emalloc parity: drop tracked bytes when unset frees a string (#7310). */
+    private function jitNoteMemoryReleaseForUnset(\PHPLLVM\Value $valueBoxPtr): void
+    {
+        JIT\Builtin\MemoryRuntime::ensureLinked($this->context);
+        $map = $this->context->structFieldMap['__value__'];
+        $stringMap = $this->context->structFieldMap['__string__'];
+        $i8 = $this->context->getTypeFromString('int8');
+        $i64 = $this->context->getTypeFromString('int64');
+        $zero = $i64->constInt(0, false);
+        $typeByte = $this->context->builder->load(
+            $this->context->builder->structGep($valueBoxPtr, $map['type'])
+        );
+        $isString = $this->context->builder->icmp(
+            \PHPLLVM\Builder::INT_EQ,
+            $typeByte,
+            $i8->constInt(Variable::TYPE_STRING, false)
+        );
+        $doneBlock = JIT\BasicBlockHelper::append($this->context, 'unset_mem_done');
+        $stringBlock = JIT\BasicBlockHelper::append($this->context, 'unset_mem_string');
+        $this->context->builder->branchIf($isString, $stringBlock, $doneBlock);
+        $this->context->builder->positionAtEnd($stringBlock);
+        $strPtr = $this->context->builder->call(
+            $this->context->lookupFunction('__value__readString'),
+            $valueBoxPtr
+        );
+        $len = $this->context->builder->load(
+            $this->context->builder->structGep($strPtr, $stringMap['length'])
+        );
+        $negLen = $this->context->builder->sub($zero, $len);
+        JIT\Builtin\MemoryRuntime::noteAlloc($this->context, $negLen);
+        $this->context->builder->branch($doneBlock);
+        $this->context->builder->positionAtEnd($doneBlock);
     }
 
     /** Drop assign RHS / result temps so block-end dead-operand free cannot re-delref (#4096). */
