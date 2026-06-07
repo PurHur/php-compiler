@@ -1067,12 +1067,7 @@ final class VmFs
     }
 
     public static function getcwd() {
-        $cwd = @\getcwd();
-        if (false === $cwd) {
-            return false;
-        }
-
-        return $cwd;
+        return VmGetcwdNative::resolve();
     }
 
     public static function chdir(string $path): bool
