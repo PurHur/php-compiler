@@ -137,6 +137,8 @@ final class StringFsGlobVecJit
         $name = '__phpc_scandir_desc_cmp';
         $probe = $context->module->getNamedFunction($name);
         if (null !== $probe && $probe->countBasicBlocks() > 0) {
+            $context->registerFunction($name, $probe);
+
             return;
         }
 
@@ -162,6 +164,7 @@ final class StringFsGlobVecJit
         $cmpB = $context->builder->call($context->lookupFunction('strcmp'), $nameB, $nameA);
         $context->builder->returnValue($cmpB);
         $context->builder->clearInsertionPosition();
+        $context->registerFunction($name, $fn);
     }
 
     private static function ensureExternal(Context $context, string $name, $ft): void

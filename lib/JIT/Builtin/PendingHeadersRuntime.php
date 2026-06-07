@@ -739,29 +739,42 @@ final class PendingHeadersRuntime
         return $context->builder->load($outSlot);
     }
 
+    private static function linesArrayType(Context $context)
+    {
+        return $context->getTypeFromString('__string__*')->arrayType(self::MAX_HEADERS);
+    }
+
+    private static function linesBasePtr(Context $context): Value
+    {
+        $global = $context->module->getNamedGlobal(self::G_LINES);
+        if (null === $global) {
+            throw new \LogicException('PendingHeadersRuntime global missing: '.self::G_LINES);
+        }
+        $arrTy = self::linesArrayType($context);
+
+        return $context->builder->pointerCast($global, $arrTy->pointerType(0));
+    }
+
     private static function loadLineAt(Context $context, Value $idx): Value
     {
-        $strPtr = $context->getTypeFromString('__string__*');
         $i64 = $context->getTypeFromString('int64');
-        $base = $context->builder->pointerCast(
-            self::globalPtr($context, self::G_LINES, $strPtr->pointerType(0)->arrayType(self::MAX_HEADERS)),
-            $strPtr->pointerType(0)->pointerType(0)
+        $slot = $context->builder->inBoundsGEP(
+            self::linesBasePtr($context),
+            $i64->constInt(0, false),
+            $context->builder->sext($idx, $i64)
         );
 
-        return $context->builder->load(
-            $context->builder->inBoundsGEP($base, $i64->constInt(0, false), $context->builder->sext($idx, $i64))
-        );
+        return $context->builder->load($slot);
     }
 
     private static function storeLineAt(Context $context, Value $idx, Value $line): void
     {
-        $strPtr = $context->getTypeFromString('__string__*');
         $i64 = $context->getTypeFromString('int64');
-        $base = $context->builder->pointerCast(
-            self::globalPtr($context, self::G_LINES, $strPtr->pointerType(0)->arrayType(self::MAX_HEADERS)),
-            $strPtr->pointerType(0)->pointerType(0)
+        $slot = $context->builder->inBoundsGEP(
+            self::linesBasePtr($context),
+            $i64->constInt(0, false),
+            $context->builder->sext($idx, $i64)
         );
-        $slot = $context->builder->inBoundsGEP($base, $i64->constInt(0, false), $context->builder->sext($idx, $i64));
         $context->builder->store($line, $slot);
     }
 
@@ -826,7 +839,7 @@ final class PendingHeadersRuntime
             }
         }
         if (null === $context->module->getNamedGlobal(self::G_LINES)) {
-            $arrTy = $strPtr->pointerType(0)->arrayType(self::MAX_HEADERS);
+            $arrTy = $strPtr->arrayType(self::MAX_HEADERS);
             $g = $context->module->addGlobal($arrTy, self::G_LINES);
             $g->setInitializer($arrTy->constNull());
         }

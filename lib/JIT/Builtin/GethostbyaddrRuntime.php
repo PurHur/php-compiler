@@ -102,7 +102,7 @@ final class GethostbyaddrRuntime
             $srcVoid,
             $context->builder->zExt($len32, $sizeT)
         );
-        $context->builder->store($i8->constInt(0, false), $context->builder->gep($ipbuf, [$len32]));
+        $context->builder->store($i8->constInt(0, false), $context->builder->gep($ipbuf, $len32));
 
         $inAddr = $context->builder->alloca($i8, self::IN_ADDR_SIZE, 'ghba_inaddr');
         $inAddrVoid = $context->builder->pointerCast($inAddr, $voidPtr);

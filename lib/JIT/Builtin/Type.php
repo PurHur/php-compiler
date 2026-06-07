@@ -98,7 +98,6 @@ class Type extends Builtin {
         );
         $fnSscanfArray = $this->context->module->addFunction('__compiler_sscanf_array', $fntypeSscanfArray);
         $this->context->registerFunction('__compiler_sscanf_array', $fnSscanfArray);
-        Sscanf::ensureLinked($this->context);
         $fntypePack = $this->context->context->functionType(
             $this->context->getTypeFromString('__string__*'),
             false,
@@ -189,37 +188,6 @@ class Type extends Builtin {
         );
         $fnUtf8Strlen = $this->context->module->addFunction('__compiler_utf8_strlen', $fntypeUtf8Strlen);
         $this->context->registerFunction('__compiler_utf8_strlen', $fnUtf8Strlen);
-        HttpResponseCode::implement($this->context);
-        SessionStorageGlobals::ensureGlobals($this->context);
-        SessionStorageRuntime::ensureLinked($this->context);
-        SessionId::implement($this->context);
-        SessionName::implement($this->context);
-        ObOutput::registerExternals($this->context);
-        ObOutputRuntime::ensureLinked($this->context);
-        PendingHeadersRuntime::ensureLinked($this->context);
-        PowIntRuntime::ensureLinked($this->context);
-        GethostbynamelRuntime::ensureLinked($this->context);
-        GethostbyaddrRuntime::ensureLinked($this->context);
-        TimeSleepRuntime::ensureLinked($this->context);
-        ProcessRuntime::ensureLinked($this->context);
-        StringHrtime::ensureLinked($this->context);
-        StringMicrotime::ensureLinked($this->context);
-        StringGettimeofday::ensureLinked($this->context);
-        StringGetrusage::ensureLinked($this->context);
-        StringInfo::ensureLinked($this->context);
-        StringDir::ensureLinked($this->context);
-        StringFsGlob::ensureLinked($this->context);
-        StringFsDir::ensureLinked($this->context);
-        StreamSync::ensureLinked($this->context);
-        LastErrorRuntime::ensureLinked($this->context);
-        CliArgvRuntime::ensureLinked($this->context);
-        FunctionExistsRuntime::ensureLinked($this->context);
-        WeakRefRegistryRuntime::ensureLinked($this->context);
-        MemoryRuntime::ensureLinked($this->context);
-        IniRuntime::ensureLinked($this->context);
-        StringEnvLocal::ensureLinked($this->context);
-        ErrorHandlerOutput::registerExternals($this->context);
-        CallArgv::implement($this->context);
         $i8p = $this->context->getTypeFromString('int8*');
         $i32 = $this->context->getTypeFromString('int32');
         $sizeT = $this->context->getTypeFromString('size_t');
@@ -237,7 +205,7 @@ class Type extends Builtin {
             $fn = $this->context->module->addFunction($libcName, $ft);
             $this->context->registerFunction($libcName, $fn);
         }
-        ProgressNoteRuntime::ensureLinked($this->context);
+        $ftOpen = $this->context->context->functionType($i32, false, $i8p, $i32);
         $fnOpen = $this->context->module->addFunction('open', $ftOpen);
         $this->context->registerFunction('open', $fnOpen);
         $ftFopen = $this->context->context->functionType($i8p, false, $i8p, $i8p);
@@ -249,7 +217,6 @@ class Type extends Builtin {
         $ftFclose = $this->context->context->functionType($i32, false, $i8p);
         $fnFclose = $this->context->module->addFunction('fclose', $ftFclose);
         $this->context->registerFunction('fclose', $fnFclose);
-        ProgressNoteRuntime::ensureLinked($this->context);
         $ftRead = $this->context->context->functionType($i64, false, $i32, $i8p, $sizeT);
         $fnRead = $this->context->module->addFunction('read', $ftRead);
         $this->context->registerFunction('read', $fnRead);
@@ -740,7 +707,6 @@ class Type extends Builtin {
             $fntypeAssertFailStr
         );
         $this->context->registerFunction('__compiler_assert_fail_string', $fnAssertFailStr);
-        AssertFail::ensureLinked($this->context);
         $i8p = $this->context->getTypeFromString('int8*');
         $i64p = $this->context->getTypeFromString('int64*');
         $libcFns = [
@@ -898,11 +864,6 @@ class Type extends Builtin {
         );
         $this->context->registerFunction('__phpc_session_destroy_apply', $fnSessionDestroy);
         SessionStart::registerRuntimeDeclaration($this->context);
-        SessionLifecycleRuntime::ensureLinked($this->context);
-        SessionStart::implement($this->context);
-        SessionWriteClose::implement($this->context);
-        SessionRegenerateId::implement($this->context);
-        SessionDestroy::implement($this->context);
         $fntypeJsonEncode = $this->context->context->functionType(
             $this->context->getTypeFromString('__string__*'),
             false,
@@ -1010,6 +971,48 @@ class Type extends Builtin {
         $this->context->registerFunction('__compiler_http_build_query', $fnHttpBuildQuery);
         // $this->maskedarray->register();
         // $this->nativearray->register();
+    }
+
+    public function initialize(): void {
+        Sscanf::ensureLinked($this->context);
+        HttpResponseCode::implement($this->context);
+        ObOutput::registerExternals($this->context);
+        ObOutputRuntime::ensureLinked($this->context);
+        PendingHeadersRuntime::ensureLinked($this->context);
+        PowIntRuntime::ensureLinked($this->context);
+        GethostbynamelRuntime::ensureLinked($this->context);
+        GethostbyaddrRuntime::ensureLinked($this->context);
+        TimeSleepRuntime::ensureLinked($this->context);
+        ProcessRuntime::ensureLinked($this->context);
+        StringHrtime::ensureLinked($this->context);
+        StringMicrotime::ensureLinked($this->context);
+        StringGettimeofday::ensureLinked($this->context);
+        StringGetrusage::ensureLinked($this->context);
+        StringInfo::ensureLinked($this->context);
+        StringDir::ensureLinked($this->context);
+        StringFsGlob::ensureLinked($this->context);
+        StringFsDir::ensureLinked($this->context);
+        StreamSync::ensureLinked($this->context);
+        LastErrorRuntime::ensureLinked($this->context);
+        CliArgvRuntime::ensureLinked($this->context);
+        FunctionExistsRuntime::ensureLinked($this->context);
+        WeakRefRegistryRuntime::ensureLinked($this->context);
+        MemoryRuntime::ensureLinked($this->context);
+        IniRuntime::ensureLinked($this->context);
+        StringEnvLocal::ensureLinked($this->context);
+        ErrorHandlerOutput::registerExternals($this->context);
+        CallArgv::implement($this->context);
+        ProgressNoteRuntime::ensureLinked($this->context);
+        AssertFail::ensureLinked($this->context);
+        SessionLifecycleRuntime::ensureLinked($this->context);
+        SessionStart::implement($this->context);
+        SessionWriteClose::implement($this->context);
+        SessionRegenerateId::implement($this->context);
+        SessionDestroy::implement($this->context);
+        SessionStorageGlobals::ensureGlobals($this->context);
+        SessionStorageRuntime::ensureLinked($this->context);
+        SessionId::implement($this->context);
+        SessionName::implement($this->context);
     }
 
 

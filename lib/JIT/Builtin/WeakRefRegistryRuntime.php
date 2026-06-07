@@ -87,6 +87,7 @@ final class WeakRefRegistryRuntime
         $ftClearTyped = $context->context->functionType($voidTy, false, $i8p, $i32);
         $fnClearTyped = $context->module->addFunction('phpc_weakref_clear_object_typed', $ftClearTyped);
         self::implementClearObjectTyped($context, $fnClearTyped, $fnClear);
+        $context->registerFunction('phpc_weakref_clear_object_typed', $fnClearTyped);
 
         self::ensureGcNotifyObjectFreed($context);
         self::registerLinkedRuntime($context);

@@ -111,7 +111,7 @@ final class StreamPathRuntime
         if (null === $global) {
             throw new \LogicException('StreamPathRuntime: '.$globalName.' missing');
         }
-        $slot = $context->builder->gep($global, [$zero, $handle]);
+        $slot = $context->builder->gep($global, $zero, $handle);
 
         return $context->builder->load($context->builder->bitcast($slot, $i8p->pointer));
     }

@@ -1194,8 +1194,8 @@ final class StringJsonDecodeJit
         $closeBb = $fn->appendBasicBlock('arr_close');
         $nextComma = $fn->appendBasicBlock('arr_next');
         $commaOrFail = $fn->appendBasicBlock('arr_comma_or_fail');
-        $context->builder->branchIf($isClose, $closeBb, $bb_comma_or_fail);
-        $context->builder->positionAtEnd($bb_comma_or_fail);
+        $context->builder->branchIf($isClose, $closeBb, $commaOrFail);
+        $context->builder->positionAtEnd($commaOrFail);
         $context->builder->branchIf($isComma, $nextComma, $fail);
         $context->builder->positionAtEnd($closeBb);
         $context->builder->store($context->builder->inBoundsGEP($pos, $i8p->constInt(1, false)), $posPtr);

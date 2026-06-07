@@ -205,7 +205,7 @@ final class CtypeJit
         $context->builder->branchIf($done, $okBlock, $loopBody);
 
         $context->builder->positionAtEnd($loopBody);
-        $ptr = $context->builder->gep($data, [$idxPhi]);
+        $ptr = $context->builder->gep($data, $idxPhi);
         $ch = $context->builder->load($ptr);
         $checkFn = $context->lookupFunction('__phpc_ctype_check_char');
         $matches = $context->builder->icmp(
@@ -461,7 +461,11 @@ final class CtypeJit
      */
     private static function captureInsertBlock(Context $context): array
     {
-        $block = $context->builder->getInsertBlock();
+        try {
+            $block = $context->builder->getInsertBlock();
+        } catch (\TypeError) {
+            $block = null;
+        }
 
         return [$block, null !== $block ? $block->getParent() : null];
     }
