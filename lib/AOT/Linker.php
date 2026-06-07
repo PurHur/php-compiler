@@ -24,7 +24,6 @@ final class Linker
     private const RUNTIME_C_SOURCES = [
         __DIR__.'/runtime/superglobals_refresh.c',
         __DIR__.'/../JIT/Builtin/hash_crypto_jit_runtime.c',
-        __DIR__.'/runtime/password_crypto.c',
         __DIR__.'/runtime/phpc_stream.c',
         __DIR__.'/runtime/phpc_progress.c',
         __DIR__.'/runtime/phpc_gc.c',
@@ -34,7 +33,6 @@ final class Linker
 
     /** Runtime units that need host libc headers (glob/scandir; llvm sysroot lacks linux/limits.h). */
     private const RUNTIME_HOST_LIBC_BASENAMES = [
-        'password_crypto.c',
     ];
 
     private static function which(string $binary): ?string

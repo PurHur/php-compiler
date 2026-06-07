@@ -12,7 +12,7 @@ use PHPCompiler\JIT\JitValueBox;
 use PHPLLVM\Builder;
 use PHPLLVM\Value;
 
-/** LLVM helpers for password_hash() / password_verify() — libcrypt via AOT runtime. */
+/** LLVM helpers for password_hash() / password_verify() — libcrypt via StringPasswordCryptoJit (#6906). */
 final class JitPassword
 {
     private static int $blockSerial = 0;
