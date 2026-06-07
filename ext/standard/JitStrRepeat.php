@@ -9,6 +9,7 @@ declare(strict_types=1);
 namespace PHPCompiler\ext\standard;
 
 use PHPCompiler\JIT\BasicBlockHelper;
+use PHPCompiler\JIT\Builtin\MemoryRuntime;
 use PHPCompiler\JIT\Builtin\TypeErrorRaise;
 use PHPCompiler\JIT\Context;
 use PHPLLVM\Builder;
@@ -68,6 +69,7 @@ final class JitStrRepeat
             $totalLen,
             $context->builder->structGep($dest, $map['length'])
         );
+        MemoryRuntime::noteAlloc($context, $totalLen);
 
         $idxSlot = $context->builder->alloca($i64, 1, 'strrepeat_idx');
         $context->builder->store($zero, $idxSlot);

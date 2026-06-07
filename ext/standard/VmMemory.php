@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace PHPCompiler\ext\standard;
 
+use PHPCompiler\VM\MemoryAccounting;
+
 /**
  * VM memory introspection without host Zend memory_get_* (issue #4862, #3134).
  *
@@ -12,61 +14,42 @@ namespace PHPCompiler\ext\standard;
  */
 final class VmMemory
 {
-    private static int $peakEmalloc = 0;
     private static int $peakReal = 0;
 
     public static function getUsage(bool $realUsage = false): int
     {
-        $usage = self::readHeapUsage($realUsage);
         if ($realUsage) {
+            $usage = self::readRssBytes();
             if ($usage > self::$peakReal) {
                 self::$peakReal = $usage;
             }
-        } elseif ($usage > self::$peakEmalloc) {
-            self::$peakEmalloc = $usage;
+
+            return $usage;
         }
 
-        return $usage;
+        return MemoryAccounting::currentBytes();
     }
 
     public static function getPeakUsage(bool $realUsage = false): int
     {
-        self::getUsage($realUsage);
+        if ($realUsage) {
+            self::getUsage(true);
 
-        return $realUsage ? self::$peakReal : self::$peakEmalloc;
+            return self::$peakReal;
+        }
+
+        return MemoryAccounting::peakBytes();
     }
 
     /** php-src: zend_reset_peak_memory_usage — baseline peak at current usage. */
     public static function resetPeakUsage(bool $realUsage = false): void
     {
-        $usage = self::getUsage($realUsage);
         if ($realUsage) {
-            self::$peakReal = $usage;
-        } else {
-            self::$peakEmalloc = $usage;
+            self::$peakReal = self::readRssBytes();
+
+            return;
         }
-    }
-
-    /**
-     * Current heap bytes (emalloc subset or RSS when $realUsage).
-     */
-    private static function readHeapUsage(bool $realUsage): int
-    {
-        if ($realUsage) {
-            return self::readRssBytes();
-        }
-
-        return self::readEmallocApprox();
-    }
-
-    /**
-     * Zend emalloc usage approximation (RSS via /proc/self/statm like JIT path).
-     */
-    private static function readEmallocApprox(): int
-    {
-        $rss = self::readRssBytes();
-
-        return $rss;
+        MemoryAccounting::resetPeakToCurrent();
     }
 
     /**
