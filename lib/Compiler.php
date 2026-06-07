@@ -1197,6 +1197,17 @@ class Compiler {
                 default:
                     if ($child instanceof Op\Expr\Isset_ && count($child->vars) > 1) {
                         $block = $this->compileIssetMulti($child, $block);
+                    } elseif (
+                        $child instanceof Op\Expr\Isset_
+                        && 1 === count($child->vars)
+                        && [] !== ($nullsafeChain = $this->collectNullsafePropertyFetchChain($child->vars[0], $block))
+                    ) {
+                        $block = $this->compileIssetNullsafePropertyFetchChain($nullsafeChain, $child, $block);
+                    } elseif (
+                        $child instanceof Op\Expr\Empty_
+                        && [] !== ($nullsafeChain = $this->collectNullsafePropertyFetchChainForEmpty($child, $block))
+                    ) {
+                        $block = $this->compileEmptyNullsafePropertyFetchChain($nullsafeChain, $child, $block);
                     } elseif ($child instanceof Op\Expr\BinaryOp\Coalesce) {
                         if ($this->isCoalesceChainInnerStmt($child, $ops, $i)) {
                             break;
@@ -1219,6 +1230,12 @@ class Compiler {
                         if (null !== $resultOverride) {
                             ++$i;
                         }
+                    } elseif (
+                        $child instanceof Op\Expr\NullsafePropertyFetch
+                        && $this->shouldSkipNullsafePropertyFetchForIssetOrEmpty($child, $ops, $i, $block)
+                    ) {
+                        // Lowered by compileIssetNullsafePropertyFetchChain / compileEmptyNullsafePropertyFetchChain (#4980).
+                        break;
                     } elseif ($child instanceof Op\Expr\NullsafePropertyFetch) {
                         if ($this->isNullsafePropertyFetchInWriteContext($ops, $i)) {
                             $this->throwCompileError("Can't use nullsafe operator in write context");
@@ -2382,6 +2399,122 @@ class Compiler {
         }
 
         return $this->findCoalesceArrayDimFetch($target, $block) === $fetch;
+    }
+
+    /**
+     * @return list<Op\Expr\NullsafePropertyFetch>
+     */
+    protected function collectNullsafePropertyFetchChain(?Operand $operand, Block $block): array
+    {
+        $innermost = $this->findNullsafePropertyFetch($operand, $block);
+        if (null === $innermost) {
+            return [];
+        }
+        $chain = [$innermost];
+        $var = $innermost->var;
+        while (true) {
+            $prev = $this->findNullsafePropertyFetchProducing($var, $block);
+            if (null === $prev) {
+                break;
+            }
+            array_unshift($chain, $prev);
+            $var = $prev->var;
+        }
+
+        return $chain;
+    }
+
+    /**
+     * @return list<Op\Expr\NullsafePropertyFetch>
+     */
+    protected function collectNullsafePropertyFetchChainForEmpty(Op\Expr\Empty_ $expr, Block $block): array
+    {
+        $operand = $this->unaryExprOperandForRead($expr, $block);
+        if (null === $operand) {
+            return [];
+        }
+
+        return $this->collectNullsafePropertyFetchChain($operand, $block);
+    }
+
+    /**
+     * @return ?Op\Expr\NullsafePropertyFetch
+     */
+    protected function findNullsafePropertyFetch(?Operand $operand, Block $block): ?Op\Expr\NullsafePropertyFetch
+    {
+        if (null === $operand) {
+            return null;
+        }
+        $candidates = [$operand];
+        $seen = [];
+        while ([] !== $candidates) {
+            $current = array_shift($candidates);
+            if (isset($seen[spl_object_id($current)])) {
+                continue;
+            }
+            $seen[spl_object_id($current)] = true;
+            foreach ($block->orig->children as $child) {
+                if ($child instanceof Op\Expr\NullsafePropertyFetch && $child->result === $current) {
+                    return $child;
+                }
+            }
+            if ($current instanceof Temporary && null !== $current->original) {
+                $candidates[] = $current->original;
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * @return ?Op\Expr\NullsafePropertyFetch
+     */
+    protected function findNullsafePropertyFetchProducing(?Operand $operand, Block $block): ?Op\Expr\NullsafePropertyFetch
+    {
+        if (null === $operand) {
+            return null;
+        }
+        foreach ($block->orig->children as $child) {
+            if ($child instanceof Op\Expr\NullsafePropertyFetch && $child->result === $operand) {
+                return $child;
+            }
+        }
+        if ($operand instanceof Temporary && null !== $operand->original) {
+            return $this->findNullsafePropertyFetchProducing($operand->original, $block);
+        }
+
+        return null;
+    }
+
+    /**
+     * @param Op[] $ops
+     */
+    protected function shouldSkipNullsafePropertyFetchForIssetOrEmpty(
+        Op\Expr\NullsafePropertyFetch $fetch,
+        array $ops,
+        int $index,
+        Block $block
+    ): bool {
+        for ($j = $index + 1, $count = count($ops); $j < $count; ++$j) {
+            $next = $ops[$j];
+            if ($next instanceof Op\Expr\NullsafePropertyFetch) {
+                continue;
+            }
+            if ($next instanceof Op\Expr\Isset_ && 1 === count($next->vars)) {
+                $chain = $this->collectNullsafePropertyFetchChain($next->vars[0], $block);
+
+                return [] !== $chain && in_array($fetch, $chain, true);
+            }
+            if ($next instanceof Op\Expr\Empty_) {
+                $chain = $this->collectNullsafePropertyFetchChainForEmpty($next, $block);
+
+                return [] !== $chain && in_array($fetch, $chain, true);
+            }
+
+            return false;
+        }
+
+        return false;
     }
 
     private function isPropertyWriteAssign(Op\Expr\Assign $assign, Block $block): bool
@@ -6733,6 +6866,176 @@ class Compiler {
         $block->addOpCode($nullsafeOp);
 
         return $endBlock;
+    }
+
+    /**
+     * @param list<Op\Expr\NullsafePropertyFetch> $chain
+     */
+    protected function compileIssetNullsafePropertyFetchChain(
+        array $chain,
+        Op\Expr\Isset_ $isset,
+        Block $block
+    ): Block {
+        $resultSlot = $this->compileOperand($isset->result, $block, false);
+        $endBlock = new Block($block->orig);
+        $endBlock->inheritUndefinedLocals = true;
+        $endBlock->inheritScopeFrom($block);
+        $this->compileIssetNullsafeChainLink($chain, 0, $block, $resultSlot, $endBlock);
+
+        return $endBlock;
+    }
+
+    /**
+     * @param list<Op\Expr\NullsafePropertyFetch> $chain
+     */
+    protected function compileEmptyNullsafePropertyFetchChain(
+        array $chain,
+        Op\Expr\Empty_ $empty,
+        Block $block
+    ): Block {
+        $resultSlot = $this->compileOperand($empty->result, $block, false);
+        $endBlock = new Block($block->orig);
+        $endBlock->inheritUndefinedLocals = true;
+        $endBlock->inheritScopeFrom($block);
+        $this->compileEmptyNullsafeChainLink($chain, 0, $block, $resultSlot, $endBlock);
+
+        return $endBlock;
+    }
+
+    /**
+     * @param list<Op\Expr\NullsafePropertyFetch> $chain
+     */
+    protected function compileIssetNullsafeChainLink(
+        array $chain,
+        int $index,
+        Block $block,
+        int $resultSlot,
+        Block $endBlock
+    ): void {
+        $fetch = $chain[$index];
+        $isLast = $index === count($chain) - 1;
+        $receiverSlot = $this->compileOperand($fetch->var, $block, true);
+
+        $nullBlock = new Block($block->orig);
+        $nullBlock->inheritUndefinedLocals = true;
+        $nullBlock->inheritScopeFrom($block);
+        $falseSlot = $this->compileBoolConstant($nullBlock, false);
+        $nullBlock->addOpCode(new OpCode(
+            OpCode::TYPE_ASSIGN,
+            $resultSlot,
+            $resultSlot,
+            $falseSlot
+        ));
+        $nullJump = new OpCode(OpCode::TYPE_JUMP);
+        $nullJump->block1 = $endBlock;
+        $nullBlock->addOpCode($nullJump);
+
+        $fetchBlock = new Block($block->orig);
+        $fetchBlock->inheritUndefinedLocals = true;
+        $fetchBlock->inheritScopeFrom($block);
+        if ($isLast) {
+            $fetchBlock->addOpCode($this->makeIssetOpCode(
+                $resultSlot,
+                $this->compileOperand($fetch->var, $fetchBlock, true),
+                $this->compileOperand($fetch->name, $fetchBlock, true),
+                true
+            ));
+            $fetchJump = new OpCode(OpCode::TYPE_JUMP);
+            $fetchJump->block1 = $endBlock;
+            $fetchBlock->addOpCode($fetchJump);
+        } else {
+            $intermediateSlot = $this->compileOperand($fetch->result, $fetchBlock, false);
+            $propFetch = new OpCode(
+                OpCode::TYPE_PROPERTY_FETCH,
+                $intermediateSlot,
+                $this->compileOperand($fetch->var, $fetchBlock, true),
+                $this->compileOperand($fetch->name, $fetchBlock, true)
+            );
+            $propFetch->nullsafeFetchPropertyRead = true;
+            $fetchBlock->addOpCode($propFetch);
+            $this->compileIssetNullsafeChainLink($chain, $index + 1, $fetchBlock, $resultSlot, $endBlock);
+        }
+
+        $endBlock->parents[] = $nullBlock;
+        $endBlock->parents[] = $fetchBlock;
+
+        $nullsafeOp = new OpCode(
+            OpCode::TYPE_NULLSAFE,
+            $isLast ? $resultSlot : $this->compileOperand($fetch->result, $block, false),
+            $receiverSlot
+        );
+        $nullsafeOp->block1 = $nullBlock;
+        $nullsafeOp->block2 = $fetchBlock;
+        $nullsafeOp->block3 = $endBlock;
+        $block->addOpCode($nullsafeOp);
+    }
+
+    /**
+     * @param list<Op\Expr\NullsafePropertyFetch> $chain
+     */
+    protected function compileEmptyNullsafeChainLink(
+        array $chain,
+        int $index,
+        Block $block,
+        int $resultSlot,
+        Block $endBlock
+    ): void {
+        $fetch = $chain[$index];
+        $isLast = $index === count($chain) - 1;
+        $receiverSlot = $this->compileOperand($fetch->var, $block, true);
+
+        $nullBlock = new Block($block->orig);
+        $nullBlock->inheritUndefinedLocals = true;
+        $nullBlock->inheritScopeFrom($block);
+        $trueSlot = $this->compileBoolConstant($nullBlock, true);
+        $nullBlock->addOpCode(new OpCode(
+            OpCode::TYPE_ASSIGN,
+            $resultSlot,
+            $resultSlot,
+            $trueSlot
+        ));
+        $nullJump = new OpCode(OpCode::TYPE_JUMP);
+        $nullJump->block1 = $endBlock;
+        $nullBlock->addOpCode($nullJump);
+
+        $fetchBlock = new Block($block->orig);
+        $fetchBlock->inheritUndefinedLocals = true;
+        $fetchBlock->inheritScopeFrom($block);
+        if ($isLast) {
+            $fetchBlock->addOpCode(new OpCode(
+                OpCode::TYPE_EMPTY_OBJECT_PROPERTY,
+                $resultSlot,
+                $this->compileOperand($fetch->var, $fetchBlock, true),
+                $this->compileOperand($fetch->name, $fetchBlock, true),
+            ));
+            $fetchJump = new OpCode(OpCode::TYPE_JUMP);
+            $fetchJump->block1 = $endBlock;
+            $fetchBlock->addOpCode($fetchJump);
+        } else {
+            $intermediateSlot = $this->compileOperand($fetch->result, $fetchBlock, false);
+            $propFetch = new OpCode(
+                OpCode::TYPE_PROPERTY_FETCH,
+                $intermediateSlot,
+                $this->compileOperand($fetch->var, $fetchBlock, true),
+                $this->compileOperand($fetch->name, $fetchBlock, true)
+            );
+            $propFetch->nullsafeFetchPropertyRead = true;
+            $fetchBlock->addOpCode($propFetch);
+            $this->compileEmptyNullsafeChainLink($chain, $index + 1, $fetchBlock, $resultSlot, $endBlock);
+        }
+
+        $endBlock->parents[] = $nullBlock;
+        $endBlock->parents[] = $fetchBlock;
+
+        $nullsafeOp = new OpCode(
+            OpCode::TYPE_NULLSAFE,
+            $isLast ? $resultSlot : $this->compileOperand($fetch->result, $block, false),
+            $receiverSlot
+        );
+        $nullsafeOp->block1 = $nullBlock;
+        $nullsafeOp->block2 = $fetchBlock;
+        $nullsafeOp->block3 = $endBlock;
+        $block->addOpCode($nullsafeOp);
     }
 
     /**
