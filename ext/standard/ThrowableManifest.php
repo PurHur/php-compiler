@@ -47,6 +47,10 @@ final class ThrowableManifest
 
     public const LC_CLOSED_GENERATOR_EXCEPTION = 'closedgeneratorexception';
 
+    public const LC_DATE_EXCEPTION = 'dateexception';
+
+    public const LC_DATE_INVALID_TIME_ZONE_EXCEPTION = 'dateinvalidtimezoneexception';
+
     public const LC_ERROR = 'error';
 
     public const LC_TYPE_ERROR = 'typeerror';
@@ -92,6 +96,8 @@ final class ThrowableManifest
         'ErrorException' => 'Exception',
         'ReflectionException' => 'Exception',
         'ClosedGeneratorException' => 'Exception',
+        'DateException' => 'Exception',
+        'DateInvalidTimeZoneException' => 'DateException',
         'Error' => null,
         'TypeError' => 'Error',
         'ValueError' => 'Error',
@@ -124,6 +130,7 @@ final class ThrowableManifest
         'ErrorException' => \ErrorException::class,
         'ReflectionException' => \ReflectionException::class,
         'ClosedGeneratorException' => \ClosedGeneratorException::class,
+        'DateException' => \DateException::class,
         'Error' => \Error::class,
         'TypeError' => \TypeError::class,
         'ValueError' => \ValueError::class,
