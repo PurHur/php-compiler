@@ -487,7 +487,13 @@ final class VmReflection
 
         $result = [];
         if ($entry->isInterface) {
-            self::addInterfaceAndParents($entry, $ctx, $result);
+            // php-src: interface operands list parent interfaces only, not self (#7400).
+            foreach ($entry->interfaces as $parentLc) {
+                if (!isset($ctx->classes[$parentLc])) {
+                    continue;
+                }
+                self::addInterfaceAndParents($ctx->classes[$parentLc], $ctx, $result);
+            }
 
             return $result;
         }
