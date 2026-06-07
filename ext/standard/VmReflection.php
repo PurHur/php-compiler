@@ -256,7 +256,7 @@ final class VmReflection
             }
         }
 
-        return isset($class->methods[$methodLc]);
+        return isset($class->methods[$methodLc]) || isset($class->abstractMethods[$methodLc]);
     }
 
     /**
@@ -1019,7 +1019,13 @@ final class VmReflection
     public static function classMethodsList(ClassEntry $entry, int $filter = 7): array
     {
         $names = [];
-        foreach ($entry->methods as $methodLc => $_method) {
+        $methodLcs = array_keys($entry->methods);
+        foreach (array_keys($entry->abstractMethods) as $abstractLc) {
+            if (!in_array($abstractLc, $methodLcs, true)) {
+                $methodLcs[] = $abstractLc;
+            }
+        }
+        foreach ($methodLcs as $methodLc) {
             $vis = $entry->methodVisibility[$methodLc] ?? \PHPCfg\Func::FLAG_PUBLIC;
             if (0 !== ($filter & 7) && 0 === ($vis & $filter & 7)) {
                 continue;

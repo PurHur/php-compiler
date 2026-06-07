@@ -116,13 +116,17 @@ final class ReflectionBuiltinHelper
     public static function methodExistsLiteral(Context $context, string $className, string $method): Value
     {
         $object = self::objectBuiltin($context);
-        if (!$object->hasUserDeclaredClass($className)) {
-            $i1 = $context->getTypeFromString('int1');
-
-            return $i1->constInt(0, false);
+        $lc = strtolower(ltrim($className, '\\'));
+        $exists = false;
+        if ($object->hasUserDeclaredClass($className) || $object->isInterfaceClassLc($lc)) {
+            $classId = $object->lookup($className);
+            $exists = $object->hasMethod($classId, $method);
+        } elseif (null !== $context->runtime->vmContext && isset($context->runtime->vmContext->classes[$lc])) {
+            $exists = \PHPCompiler\ext\standard\VmReflection::methodExistsOnClass(
+                $context->runtime->vmContext->classes[$lc],
+                $method
+            );
         }
-        $classId = $object->lookup($className);
-        $exists = $object->hasMethod($classId, $method);
         $i1 = $context->getTypeFromString('int1');
 
         return $i1->constInt($exists ? 1 : 0, false);
