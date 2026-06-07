@@ -498,10 +498,32 @@ final class InterfaceImplementationCheck
             if (!isset($this->classes[$current])) {
                 break;
             }
+            foreach ($this->classes[$current]['properties'] as $propLc => $_) {
+                $this->markImplicitBackingFieldHooks($provided, $current, $propLc);
+            }
             $current = $this->classes[$current]['extends'];
         }
 
         return $provided;
+    }
+
+    /**
+     * @param array<string, array<string, true>> $provided
+     */
+    private function markImplicitBackingFieldHooks(array &$provided, string $classLc, string $propLc): void
+    {
+        $meta = $this->propertyHookRegistry[$classLc][$propLc] ?? null;
+        if (is_array($meta) && !empty($meta['abstract']) && empty($meta['get']) && empty($meta['set'])) {
+            return;
+        }
+        if (is_array($meta) && (!empty($meta['get']) || !empty($meta['set']) || !empty($meta['unset']))) {
+            return;
+        }
+        if (!isset($provided[$propLc])) {
+            $provided[$propLc] = [];
+        }
+        $provided[$propLc]['get'] = true;
+        $provided[$propLc]['set'] = true;
     }
 
     /**

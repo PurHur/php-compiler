@@ -105,6 +105,7 @@ final class AbstractPropertyHookCheck
                 if (null !== $prop->unsetHookMethodLc) {
                     $provided[$propLc]['unset'] = true;
                 }
+                self::markImplicitBackingFieldHooks($provided, $propLc, $lc, $prop, $context);
             }
             $parentLc = $current->parentLc;
             $current = null !== $parentLc && isset($context->classes[$parentLc])
@@ -170,5 +171,30 @@ final class AbstractPropertyHookCheck
     private static function propertyHookKindProvided(array $provided, string $kind): bool
     {
         return isset($provided[$kind]);
+    }
+
+    /**
+     * Plain typed property on a concrete class satisfies interface / inherited { get; } / { set; } (#7311).
+     *
+     * @param array<string, array<string, true>> $provided
+     */
+    private static function markImplicitBackingFieldHooks(
+        array &$provided,
+        string $propLc,
+        string $classLc,
+        ClassProperty $prop,
+        Context $context
+    ): void {
+        if (null !== $prop->getHookMethodLc || null !== $prop->setHookMethodLc || null !== $prop->unsetHookMethodLc) {
+            return;
+        }
+        $meta = $context->propertyHookRegistry[$classLc][$prop->name]
+            ?? $context->propertyHookRegistry[$classLc][$propLc]
+            ?? null;
+        if (is_array($meta) && !empty($meta['abstract']) && empty($meta['get']) && empty($meta['set'])) {
+            return;
+        }
+        $provided[$propLc]['get'] = true;
+        $provided[$propLc]['set'] = true;
     }
 }
