@@ -50,6 +50,8 @@ final class ExceptionSupport
     public const PROP_LINE = 'line';
     /** Zend zend_exceptions.c — chained Throwable (#5104, #5486). */
     public const PROP_PREVIOUS = 'previous';
+    /** Zend zend_exceptions.c — captured stack on throw (#3351, #7159). */
+    public const PROP_TRACE = 'trace';
 
     /** Zend zend_exceptions.c — throw non-Throwable raises Error (#5223, #5727). */
     public const THROW_NON_THROWABLE_MESSAGE = 'Cannot throw objects that do not implement Throwable';

@@ -299,12 +299,49 @@ class VM {
         }
         $this->context->coercingObjectToString = true;
         try {
-            $result = $this->invokeInstanceMethod($object, '__toString')->resolveIndirect();
+            $result = $this->invokeMagicToString($object, $frame)->resolveIndirect();
         } finally {
             $this->context->coercingObjectToString = false;
         }
 
         return $result->toString($this, $frame);
+    }
+
+    /**
+     * Invoke __toString for user Func\PHP or VM builtin VmClassMethod handlers (#7159).
+     */
+    private function invokeMagicToString(ObjectEntry $object, ?Frame $callerFrame = null): Variable
+    {
+        $methodLc = '__tostring';
+        [$declaring] = $this->resolveInstanceMethod($object->class, $methodLc);
+        $func = $declaring->methods[$methodLc];
+        $thisVar = new Variable();
+        $thisVar->object($object);
+        if ($func instanceof Func\Internal) {
+            $caller = $callerFrame ?? $this->coercionCallerFrame();
+            $result = new Variable();
+            $catchFrame = $this->invokeVmClassMethod($func, $caller, $result, $thisVar);
+            if (null !== $catchFrame) {
+                throw new VM\MagicMethodInvocationAborted();
+            }
+
+            return $result;
+        }
+        if ($func instanceof Func\PHP) {
+            return $this->invokePhpFunctionForCoercion($func, $thisVar);
+        }
+
+        throw new \LogicException("{$declaring->name}::__toString() is not invokable in this compiler build");
+    }
+
+    private function coercionCallerFrame(): Frame
+    {
+        $frames = $this->context->runStackFrames();
+        if ([] !== $frames) {
+            return $frames[0];
+        }
+
+        return (new VM\Builtin\ExceptionGetMessage())->getFrame($this->context);
     }
 
     /** Invoke a user instance method from VM internals (e.g. __debugInfo, #3259). */
@@ -864,7 +901,7 @@ class VM {
         }
         $this->context->coercingObjectToString = true;
         try {
-            $result = $this->invokeInstanceMethod($object, '__toString')->resolveIndirect();
+            $result = $this->invokeMagicToString($object)->resolveIndirect();
         } finally {
             $this->context->coercingObjectToString = false;
         }
@@ -897,7 +934,7 @@ class VM {
         }
         $this->context->coercingObjectToString = true;
         try {
-            $result = $this->invokeInstanceMethod($object, '__toString')->resolveIndirect();
+            $result = $this->invokeMagicToString($object, $frame)->resolveIndirect();
         } finally {
             $this->context->coercingObjectToString = false;
         }
@@ -1672,6 +1709,7 @@ class VM {
     private function dispatchEngineThrow(Frame $frame, Variable $thrown): ?Frame
     {
         $thrown = $this->normalizeThrownVariable($thrown);
+        VM\ExceptionTrace::captureOnThrow($this->context, $frame, $thrown);
         // Zend: throw in finally discards a pending return (#5331).
         $inFinally = $this->frameIsInFinallyBody($frame);
         if ($inFinally) {
@@ -5236,9 +5274,6 @@ restart:
                         throw new \LogicException('Cannot use "throw;" outside of a catch block');
                     }
                     $catchFrame = $this->dispatchEngineThrow($frame, $thrown);
-                    if (null !== $catchFrame) {
-                        VM\ExceptionTrace::captureOnThrow($frame, $thrown);
-                    }
                     if (null !== $catchFrame) {
                         $frame = $catchFrame;
                         goto restart;
