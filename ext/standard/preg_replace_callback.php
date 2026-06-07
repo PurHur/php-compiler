@@ -33,9 +33,6 @@ final class preg_replace_callback extends Internal
                 'preg_replace_callback() requires exactly three arguments in this compiler build'
             );
         }
-        if (null === $frame->returnVar) {
-            return;
-        }
         if (null === $frame->vmContext) {
             throw new \LogicException('preg_replace_callback() requires VM context in this compiler build');
         }
@@ -44,7 +41,21 @@ final class preg_replace_callback extends Internal
         if (!PregReplaceCallbackPolicy::isVmSupportedType($callbackVar->type)) {
             throw new \LogicException(PregReplaceCallbackPolicy::vmRejectionMessage());
         }
-        $subject = VmReflection::stringArg($frame->calledArgs[2], 'preg_replace_callback() subject', 2);
+        $subjectVar = VmPreg::requireStringOrArraySubject(
+            $frame->calledArgs[2],
+            'preg_replace_callback',
+            2,
+            'subject'
+        );
+        if (Variable::TYPE_STRING !== $subjectVar->type) {
+            throw new \LogicException(
+                'preg_replace_callback() array subject is not supported in this compiler build'
+            );
+        }
+        if (null === $frame->returnVar) {
+            return;
+        }
+        $subject = $subjectVar->toString();
         $fn = VmUserCall::resolveStringCallback($frame->vmContext, $callbackVar->toString());
         $result = VmPregReplaceCallback::invoke($frame->vmContext, $pattern, $fn, $subject);
         if (false === $result) {
@@ -61,6 +72,8 @@ final class preg_replace_callback extends Internal
                 'preg_replace_callback() requires exactly three arguments in this compiler build'
             );
         }
+
+        JitPregSubject::requireStringOrArray($context, $args[2], 'preg_replace_callback', 2, 'subject');
 
         return JitPregReplaceCallback::invoke(
             $context,
