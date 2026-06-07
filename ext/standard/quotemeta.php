@@ -7,8 +7,8 @@ namespace PHPCompiler\ext\standard;
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\Variable as JITVariable;
-use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
 
 /** quotemeta() — escape regex metacharacters (subset of PHP; native LLVM in JIT/AOT). */
@@ -19,14 +19,11 @@ final class quotemeta extends Internal
         if (1 !== \count($frame->calledArgs)) {
             throw new \LogicException('quotemeta() requires exactly one argument in this compiler build');
         }
-        $subject = $frame->calledArgs[0]->resolveIndirect();
+        $str = VmString::coerceStringBuiltinArg($frame->calledArgs[0], 'quotemeta', 0, 'str');
         if (null === $frame->returnVar) {
             return;
         }
-        if (Variable::TYPE_STRING !== $subject->type) {
-            throw new \LogicException('quotemeta() only supports strings in this compiler build');
-        }
-        $frame->returnVar->string(VmString::quotemeta($subject->toString()));
+        $frame->returnVar->string(VmString::quotemeta($str));
     }
 
     public function call(Context $context, JITVariable ...$args): Value
@@ -35,6 +32,9 @@ final class quotemeta extends Internal
             throw new \LogicException('quotemeta() requires exactly one argument in this compiler build');
         }
 
-        return JitQuotemeta::quote($context, $this->jitString($context, $args[0], 'quotemeta() argument #1'));
+        return JitQuotemeta::quote(
+            $context,
+            JitStringBuiltinArg::lower($context, $args[0], 'quotemeta', 0, 'str')
+        );
     }
 }
