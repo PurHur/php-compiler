@@ -37,8 +37,10 @@ use PHPCompiler\Ast\HexFloatLiteralDesugar;
 use PHPCompiler\Ast\NewDereferenceableDesugar;
 use PHPCompiler\Ast\CloneWithDesugar;
 use PHPCompiler\Ast\PipeOperatorDesugar;
+use PHPCompiler\Ast\VoidCastDesugar;
 use PHPCompiler\Visitor\InOperatorResolver;
 use PHPCompiler\Visitor\ExitFunctionResolver;
+use PHPCompiler\Visitor\VoidCastResolver;
 use PHPCompiler\Web\Superglobals;
 use PHPCompiler\Lint\LintCompiler;
 use PHPCompiler\Compiler\CompileFatal;
@@ -130,6 +132,7 @@ class Runtime {
         $this->preprocessor = new Traverser;
         $this->preprocessor->addVisitor(new InOperatorResolver);
         $this->preprocessor->addVisitor(new ExitFunctionResolver);
+        $this->preprocessor->addVisitor(new VoidCastResolver);
         $this->preprocessor->addVisitor(new Visitor\Simplifier);
         $this->preprocessor->addVisitor(new Visitor\DeadBlockEliminator);
         $this->postprocessor = new Traverser;
@@ -390,6 +393,7 @@ class Runtime {
         $code = InOperatorDesugar::desugar($code);
         $code = ExitFunctionDesugar::desugar($code);
         $code = CloneWithDesugar::desugar($code);
+        $code = VoidCastDesugar::desugar($code);
         return PipeOperatorDesugar::desugar($code);
     }
 

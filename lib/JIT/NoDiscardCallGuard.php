@@ -6,6 +6,7 @@ namespace PHPCompiler\JIT;
 
 use PHPCompiler\Block;
 use PHPCompiler\Compiler\NoDiscardMetadata;
+use PHPCompiler\CompilerVersion;
 use PHPCompiler\JIT\Call;
 use PHPCompiler\VM\ErrorReporter;
 
@@ -26,6 +27,9 @@ final class NoDiscardCallGuard
 
     public static function emitAfterDiscardedReturn(Context $context, ?Call $toCall): void
     {
+        if (!CompilerVersion::supportsNoDiscardAttribute()) {
+            return;
+        }
         if (!$toCall instanceof Call\Native) {
             return;
         }
