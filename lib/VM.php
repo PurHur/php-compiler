@@ -7988,6 +7988,9 @@ restart:
     /** Reject readonly property writes; returns catch frame or throws when uncaught. */
     private function enforceReadonlyPropertyWrite(Variable $lvalue, Frame $frame): ?Frame
     {
+        if ($this->shouldDeferReadonlyForPropertySetHook($lvalue, $frame)) {
+            return null;
+        }
         $target = $lvalue->resolveIndirect();
         $owner = $this->resolvePropertyWriteOwner($lvalue);
         if (null !== $owner && VM\ObjectReadonlySupport::isDynamicReadonly($owner)) {
@@ -8049,6 +8052,32 @@ restart:
         }
 
         return sprintf('Cannot modify readonly property %s::$%s', $declaringClass, $prop);
+    }
+
+    /**
+     * Zend routes external writes through set hooks; readonly backing checks run on raw writes inside the hook (#4518).
+     */
+    private function shouldDeferReadonlyForPropertySetHook(Variable $lvalue, Frame $frame): bool
+    {
+        $propName = $this->resolvePropertyWriteName($lvalue);
+        if (null === $propName || $this->isPropertyHookRawWrite($frame, $propName)) {
+            return false;
+        }
+        $owner = $this->resolvePropertyWriteOwner($lvalue);
+        if (null !== $owner) {
+            $meta = $this->classPropertyMeta($owner, $propName);
+
+            return null !== $meta && null !== $meta->setHookMethodLc;
+        }
+        $target = $lvalue->resolveIndirect();
+        $classLc = $lvalue->staticPropertyClassLc ?? $target->staticPropertyClassLc;
+        $staticPropName = $lvalue->objectPropertyName ?? $target->objectPropertyName;
+        if (!is_string($classLc) || !is_string($staticPropName) || '' === $staticPropName) {
+            return false;
+        }
+        $hooks = $this->resolveStaticPropertyHooks($classLc, strtolower($staticPropName));
+
+        return null !== $hooks && !empty($hooks['set']);
     }
 
     private function propertyWriteScopeLabel(Frame $frame): string

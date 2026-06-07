@@ -4096,6 +4096,8 @@ if [[ -d "$ROOT/vendor/ircmaxell/php-cfg" ]]; then
   apply_php_cfg_throw_expr_overlay
   apply_php_types_throw_expr_overlay
   apply_php_types_never_method_overlay
+  # Required for readonly property VM/JIT guards (#3149, #4518); apply before optional patches may fail.
+  apply_php_cfg_property_readonly_overlay
   apply_patch "$PATCH_DIR/php-cfg-dollars-brace.patch"
   apply_patch "$PATCH_DIR/php-cfg-mixed-reserved.patch"
   apply_patch "$PATCH_DIR/php-cfg-nullsafe.patch"
