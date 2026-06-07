@@ -177,6 +177,22 @@ PHP;
         self::assertSame('__phpc_property_get_x', $registry['t']['x']['get'] ?? null);
     }
 
+    public function testTraitAbstractPropertyHooksRegisterRequirements(): void
+    {
+        $src = <<<'PHP'
+<?php
+trait T {
+    public string $x { get; set; }
+}
+PHP;
+        [$out, $registry] = (new PropertyHooks())->process($src);
+        self::assertStringContainsString('public string $x;', $out);
+        self::assertStringNotContainsString('__phpc_property_get_x', $out);
+        self::assertTrue($registry['t']['x']['requiresGet'] ?? false);
+        self::assertTrue($registry['t']['x']['requiresSet'] ?? false);
+        self::assertTrue($registry['t']['x']['abstract'] ?? false);
+    }
+
     public function testLowersSetArrowAssignmentToSeparateBackingField(): void
     {
         $src = <<<'PHP'

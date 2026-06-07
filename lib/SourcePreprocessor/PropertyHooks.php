@@ -317,7 +317,8 @@ final class PropertyHooks
             if (!$isPromotedCtorParam && !str_ends_with($propDecl, ';')) {
                 $propDecl .= ';';
             }
-            $registerRequiredHooks = $isAbstractHook || $isInterfaceHook;
+            $isTraitDecl = 'trait' === $declKind;
+            $registerRequiredHooks = $isAbstractHook || $isInterfaceHook || $isTraitDecl;
             [$methods, $usesBacking, $trailing, $asymmetricSetVis] = $this->lowerHooks(
                 $hookSource,
                 $prop,
@@ -357,11 +358,12 @@ final class PropertyHooks
             if ('' !== $trailing) {
                 $out .= "\n    ".$trailing;
             }
-            if (([] !== $methods && !$usesBacking) || $isAbstractHook || $isInterfaceHook) {
+            $isTraitAbstractHook = $isTraitDecl && [] === $methods;
+            if (([] !== $methods && !$usesBacking) || $isAbstractHook || $isInterfaceHook || $isTraitAbstractHook) {
                 if (!isset($this->registry[$lcClass][$prop])) {
                     $this->registry[$lcClass][$prop] = [];
                 }
-                if ($isAbstractHook || $isInterfaceHook) {
+                if ($isAbstractHook || $isInterfaceHook || $isTraitAbstractHook) {
                     $this->registry[$lcClass][$prop]['abstract'] = true;
                 }
                 if ([] === $methods || !$usesBacking || $isInterfaceHook) {
