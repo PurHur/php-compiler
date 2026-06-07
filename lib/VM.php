@@ -603,6 +603,18 @@ class VM {
             return $catchFrame;
         }
         $meta = $this->classPropertyMeta($object, $propName);
+        if (null !== $meta && null !== $meta->getHookMethodLc) {
+            $catchFrame = $this->enforcePropertyVisibilityRead($object, $propName, $frame);
+            if (null !== $catchFrame) {
+                return $catchFrame;
+            }
+            $hookValue = $this->fetchPropertyWithHooks($object, $propName, $frame);
+            if (null !== $hookValue) {
+                $dst->bool(!ext\standard\boolval::isTruthy($hookValue));
+
+                return null;
+            }
+        }
         if (null === $meta || !$meta->prototype->isUndefined()) {
             $dst->bool(!$this->objectPropertyIsSet($object, $propName, $frame));
 

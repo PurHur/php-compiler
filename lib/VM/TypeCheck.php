@@ -132,6 +132,10 @@ final class TypeCheck
 
             return;
         }
+        if (Variable::TYPE_NULL === $value->resolveIndirect()->type
+            && TypedPropertyCheck::propertyAllowsNull($prototype)) {
+            return;
+        }
         $probe = new Variable();
         $probe->copyFrom($value);
         self::bindPropertyTypeMetadata($probe, $meta);
