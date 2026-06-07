@@ -15,6 +15,13 @@ interface Module
 {
     public function getName(): string;
 
+    public function getExtensionName(): string;
+
+    /**
+     * @return list<string>
+     */
+    public function getAdditionalExtensionNames(): array;
+
     public function getFunctions(): array;
 
     public function init(Runtime $runtime): void;
