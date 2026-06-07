@@ -4,8 +4,10 @@ declare(strict_types=1);
 
 namespace PHPCompiler\Ast;
 
+use PhpParser\Error as ParserError;
+
 /**
- * Desugar PHP 8.4+ pipe operator (|>) before nikic/php-parser (#3243).
+ * Desugar PHP 8.4+ pipe operator (|>) before nikic/php-parser (#3243, #7219).
  *
  * Lowering matches Zend: $lhs |> $callable(...) becomes $callable($lhs, ...).
  * php-src: Zend/zend_compile.c pipe expression handling.
@@ -14,6 +16,9 @@ final class PipeOperatorDesugar
 {
     /** Pipe binds tighter than comparison (php.net operator precedence). */
     private const PREC_LHS_STOP = 18;
+
+    /** PHP 8.5 errata: arrow functions on pipe RHS must be parenthesized (php-src #19533). */
+    private const ARROW_FN_PAREN_MESSAGE = 'Arrow functions on the right-hand side of the pipe operator must be parenthesized';
 
     public static function desugar(string $code): string
     {
@@ -194,12 +199,18 @@ final class PipeOperatorDesugar
                         --$pos;
                     }
                 }
+                $openIdx = $pos;
                 --$pos;
                 self::skipBackwardIgnorable($tokens, $pos);
                 if ($pos >= 0 && self::isCallCalleeToken($tokens[$pos])) {
                     return $pos;
                 }
-                continue;
+                // Parenthesized callee: (expr)(args) — e.g. (fn($x) => $x + 1)(3) (#7219).
+                if ($pos >= 0 && \is_string($tokens[$pos]) && ')' === $tokens[$pos]) {
+                    return self::scanAtomStart($tokens, $pos);
+                }
+
+                return $openIdx;
             }
 
             if (\is_string($token) && ']' === $token) {
@@ -221,7 +232,7 @@ final class PipeOperatorDesugar
 
             if (\is_array($token) && \in_array($token[0], [
                 \T_VARIABLE, \T_STRING, \T_CONSTANT_ENCAPSED_STRING, \T_LNUMBER, \T_DNUMBER,
-                \T_ARRAY, \T_NEW, \T_CLONE, \T_ECHO, \T_PRINT,
+                \T_ARRAY, \T_NEW, \T_CLONE,
             ], true)) {
                 return $pos;
             }
@@ -251,9 +262,17 @@ final class PipeOperatorDesugar
             return null;
         }
 
+        if (isset($tokens[$startIdx]) && \is_array($tokens[$startIdx]) && \T_FN === $tokens[$startIdx][0]) {
+            $line = $tokens[$startIdx][2] ?? 1;
+            throw new ParserError(self::ARROW_FN_PAREN_MESSAGE, [
+                'startLine' => $line,
+                'endLine' => $line,
+            ]);
+        }
+
         $endIdx = self::scanCallLikeForward($tokens, $startIdx);
-        if (null === $endIdx && isset($tokens[$startIdx]) && \is_array($tokens[$startIdx]) && \T_FN === $tokens[$startIdx][0]) {
-            $endIdx = self::scanArrowFunctionForward($tokens, $startIdx);
+        if (null === $endIdx) {
+            $endIdx = self::scanBareCallableForward($tokens, $startIdx);
         }
         if (null === $endIdx) {
             return null;
@@ -376,6 +395,52 @@ final class PipeOperatorDesugar
         }
 
         return 0 === $depth ? $end : null;
+    }
+
+    /**
+     * Bare callable reference without argument list: $lhs |> strlen → strlen($lhs).
+     *
+     * @param array<int, array{0: int, 1: string, 2: int}|string> $tokens
+     */
+    private static function scanBareCallableForward(array $tokens, int $startIdx): ?int
+    {
+        $pos = $startIdx;
+        $sawCallable = false;
+
+        while ($pos < \count($tokens)) {
+            if (self::isIgnorable($tokens[$pos])) {
+                ++$pos;
+                continue;
+            }
+
+            $token = $tokens[$pos];
+            if (\is_array($token) && \in_array($token[0], [
+                \T_STRING, \T_VARIABLE, \T_NS_SEPARATOR, \T_NAME_QUALIFIED, \T_NAME_FULLY_QUALIFIED,
+                \T_NAME_RELATIVE, \T_OBJECT_OPERATOR, \T_NULLSAFE_OBJECT_OPERATOR,
+                \T_PAAMAYIM_NEKUDOTAYIM,
+            ], true)) {
+                $sawCallable = true;
+                ++$pos;
+                continue;
+            }
+
+            if (\is_string($token) && '(' === $token) {
+                return null;
+            }
+
+            break;
+        }
+
+        if (!$sawCallable) {
+            return null;
+        }
+
+        $end = $pos - 1;
+        while ($end >= $startIdx && self::isIgnorable($tokens[$end])) {
+            --$end;
+        }
+
+        return $end >= $startIdx ? $end : null;
     }
 
     /**
@@ -593,23 +658,25 @@ final class PipeOperatorDesugar
 
     private static function rewritePipe(string $lhs, string $rhs, bool $bindAsClosure): string
     {
-        if (preg_match('/^fn\s*\(/s', ltrim($rhs))) {
-            return '('.$rhs.')('.$lhs.')';
+        $trimmed = ltrim($rhs);
+        if (preg_match('/^\(\s*fn\s*\(/s', $trimmed)) {
+            return $rhs.'('.$lhs.')';
         }
 
         $open = strpos($rhs, '(');
         if (false === $open) {
-            return $lhs;
+            return $rhs.'('.$lhs.')';
         }
 
         $prefix = substr($rhs, 0, $open + 1);
         $suffix = substr($rhs, $open + 1);
         $inner = ltrim($suffix);
+        $callee = substr($rhs, 0, $open);
 
         // First-class callable: func(...) → func($lhs) or bound Closure for assignment (#4943).
         if (preg_match('/^\\.\\.\\.(\\s*\\))/s', $inner, $m)) {
             if ($bindAsClosure) {
-                return '(fn(...$__pipe_a) => '.$rhs.'('.$lhs.', ...$__pipe_a))';
+                return '(fn() => '.$callee.'('.$lhs.'))';
             }
 
             return $prefix.$lhs.$m[1];
