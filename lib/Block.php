@@ -910,6 +910,17 @@ class Block {
             if (null !== $frame->closureCall) {
                 $return->closureCall = $frame->closureCall;
             }
+            if (null !== $frame->generatorState) {
+                $return->generatorState = $frame->generatorState;
+            }
+            // Zend CV "initialized" bitmap survives across CFG block frames (#4489, generator_nested.phpt).
+            for ($f = $frame; null !== $f; $f = $f->parent) {
+                foreach ($f->initializedSlots as $slot => $_) {
+                    if (isset($scope[$slot])) {
+                        $return->initializedSlots[$slot] = true;
+                    }
+                }
+            }
         }
         return $return;
     }
