@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace PHPCompiler\Compiler;
 
+use PHPCompiler\VM\TraitCompositionConflictMessage;
 use PHPCfg\Op;
 use PHPCfg\Operand;
 use PHPCfg\Script;
@@ -234,9 +235,12 @@ final class TraitCollisionCheck
                         );
                     }
                     if (isset($traitPropertySources[$propLc])) {
-                        throw new \CompileError(
-                            "Trait property {$trait['display']}::\${$propLc} conflicts with a property declared in another trait"
-                        );
+                        throw new \CompileError(TraitCompositionConflictMessage::incompatibleProperty(
+                            $traitPropertySources[$propLc],
+                            $trait['display'],
+                            $propLc,
+                            $class['display']
+                        ));
                     }
                     $traitPropertySources[$propLc] = $trait['display'];
                 }

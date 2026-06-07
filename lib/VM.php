@@ -35,6 +35,7 @@ use PHPCompiler\VM\ObjectPropertyIterator;
 use PHPCompiler\VM\ReferencableCheck;
 use PHPCompiler\VM\ScriptExit;
 use PHPCompiler\VM\TypeCheck;
+use PHPCompiler\VM\TraitCompositionConflictMessage;
 use PHPCompiler\VM\TypedPropertyReadSignal;
 use PHPCompiler\VM\WeakRefRegistry;
 use PHPCompiler\VM\Variable;
@@ -9304,9 +9305,15 @@ restart:
                     if ($declaringLc === $traitLc) {
                         continue;
                     }
-                    throw new \LogicException(
-                        "Trait property {$trait->name}::\${$name} conflicts with a property declared in another trait"
-                    );
+                    $prevTrait = $usedTraitNameByLc[$declaringLc]
+                        ?? $this->context->classes[$declaringLc]->name
+                        ?? $declaringLc;
+                    throw new \LogicException(TraitCompositionConflictMessage::incompatibleProperty(
+                        $prevTrait,
+                        $trait->name,
+                        $name,
+                        $entry->name
+                    ));
                 }
                 $entry->staticProperties[$name] = $this->cloneStaticPropertyStorage($storage);
                 $this->linkStaticTypedPropertySlot(
@@ -9588,9 +9595,16 @@ restart:
                     if ($existing->declaringClassLc === $traitLc) {
                         continue 2;
                     }
-                    throw new \LogicException(
-                        "Trait property {$traitName}::\${$property->name} conflicts with a property declared in another trait"
-                    );
+                    $prevTraitLc = $existing->declaringClassLc;
+                    $prevTrait = isset($this->context->classes[$prevTraitLc])
+                        ? $this->context->classes[$prevTraitLc]->name
+                        : $prevTraitLc;
+                    throw new \LogicException(TraitCompositionConflictMessage::incompatibleProperty(
+                        $prevTrait,
+                        $traitName,
+                        $property->name,
+                        $entry->name
+                    ));
                 }
             }
             $entry->properties[] = $this->cloneClassPropertyForEntry($property, $entry);
