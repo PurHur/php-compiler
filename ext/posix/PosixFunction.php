@@ -11,9 +11,9 @@ use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Value;
 
 /**
- * Shared VM/JIT wiring for posix builtins (php-src ext/posix/posix.c; issue #7105).
+ * Base for unimplemented posix builtins (php-src ext/posix/posix.c; #7105, #3339).
  *
- * Phase 0 skeleton: register symbols; libc wrappers in #3339.
+ * v1 handlers (getpid/getppid/strerror/errno) extend Internal directly (#7271).
  */
 abstract class PosixFunction extends Internal
 {

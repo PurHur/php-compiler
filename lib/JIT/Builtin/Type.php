@@ -747,6 +747,8 @@ class Type extends Builtin {
             'time' => [$i64, false, [$i8p]],
             'gettimeofday' => [$i32, false, [$i8p, $i8p]],
             'getpid' => [$i32, false, []],
+            'getppid' => [$i32, false, []],
+            'strerror' => [$i8p, false, [$i32]],
             'getgid' => [$i32, false, []],
             'localtime' => [$i8p, false, [$i64p]],
             'gmtime' => [$i8p, false, [$i64p]],
