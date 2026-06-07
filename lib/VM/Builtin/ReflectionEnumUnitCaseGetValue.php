@@ -28,7 +28,7 @@ final class ReflectionEnumUnitCaseGetValue extends VmClassMethod
             throw new \LogicException('ReflectionEnumUnitCase refers to unknown enum in this compiler build');
         }
         if (null === $entry->backedType) {
-            throw new \LogicException('Cannot get value of a pure enum case');
+            throw new \Error('Cannot get value of a pure enum case');
         }
         $caseLc = strtolower($caseName);
         foreach ($entry->enumCases as $case) {
