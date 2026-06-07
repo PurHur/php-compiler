@@ -288,6 +288,18 @@ final class SuperglobalInit
 
     public static function load(Context $context, string $name): Variable
     {
+        if ('GLOBALS' === $name) {
+            $htPtr = $context->getTypeFromString('__hashtable__*')->constNull();
+            $var = new Variable(
+                $context,
+                Variable::TYPE_HASHTABLE,
+                Variable::KIND_VALUE,
+                $htPtr
+            );
+            $var->superglobalName = 'GLOBALS';
+
+            return $var;
+        }
         if (!isset(self::$globals[$name])) {
             throw new \LogicException("Superglobal not initialized for JIT: {$name}");
         }

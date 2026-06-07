@@ -179,6 +179,9 @@ final class Variable {
     /** Module-global {@see __value__*} slot for function-local static storage (#3778, #2286). */
     public bool $functionStaticGlobal = false;
 
+    /** Top-level script / $GLOBALS symbol slot — skip valueDelref on scope exit (#4423). */
+    public bool $scriptGlobalSlot = false;
+
     private static int $lvalueCounter = 0;
     public int $nextFreeElement = 0;
 
@@ -692,6 +695,9 @@ final class Variable {
         if ($this->includeBinding) {
             return;
         }
+        if ($this->scriptGlobalSlot) {
+            return;
+        }
         if ($this->kind === self::KIND_VALUE) {
             return;
         }
@@ -803,6 +809,9 @@ final class Variable {
                 // Property slots own the hashtable; transient delref would free it (#58).
                 $propertyBacked = null !== $this->objectPropertySlot;
                 $container = HashTableHelper::asDetachedHashtable($this->context, $this);
+                if ('GLOBALS' === $container->superglobalName) {
+                    return GlobalsTableInit::offsetFetch($this->context, $dim, $forWrite);
+                }
                 if (
                     !$forWrite
                     && null !== $container->superglobalName
