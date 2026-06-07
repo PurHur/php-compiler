@@ -1032,6 +1032,10 @@ final class VmReflection
                 if (!self::matchesReflectionVisibilityFilter($vis, $filter)) {
                     continue;
                 }
+                // php-src add_reflection_method_sub: parent-private methods hidden on child (#7191).
+                if (($vis & \PHPCfg\Func::FLAG_PRIVATE) !== 0 && $class !== $entry) {
+                    continue;
+                }
                 $byLc[$methodLc] = [
                     'methodLc' => $methodLc,
                     'display' => $class->methodNames[$methodLc] ?? $methodLc,
