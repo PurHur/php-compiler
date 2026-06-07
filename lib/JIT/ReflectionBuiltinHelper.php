@@ -6,6 +6,7 @@ namespace PHPCompiler\JIT;
 
 use PHPCompiler\JIT\Builtin\Type\Object_;
 use PHPCompiler\JIT\JitValueBox;
+use PHPCompiler\VM\LazyGhostTraitSupport;
 use PHPLLVM\Builder;
 use PHPLLVM\Value;
 
@@ -65,6 +66,11 @@ final class ReflectionBuiltinHelper
     /** trait_exists() — user traits only (Zend; php-src basic_functions.c). */
     public static function traitExistsLiteral(Context $context, string $traitName): Value
     {
+        if (LazyGhostTraitSupport::isLazyGhostTrait($traitName)) {
+            $i1 = $context->getTypeFromString('int1');
+
+            return $i1->constInt(0, false);
+        }
         $lc = strtolower(ltrim($traitName, '\\'));
         $exists = self::objectBuiltin($context)->isTraitClass($lc);
         if (!$exists && null !== $context->runtime->vmContext) {

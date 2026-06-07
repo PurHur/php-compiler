@@ -8,6 +8,7 @@ use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitStringArg;
 use PHPCompiler\JIT\ReflectionBuiltinHelper;
 use PHPCompiler\JIT\Variable as JITVariable;
+use PHPCompiler\VM\LazyGhostTraitSupport;
 use PHPLLVM\Builder;
 use PHPLLVM\Value;
 
@@ -31,7 +32,7 @@ final class JitTraitExists
         $candidates = array_keys($context->type->object->traitClassLowerNames());
         if (null !== $context->runtime->vmContext) {
             foreach ($context->runtime->vmContext->classes as $lc => $entry) {
-                if ($entry->isTrait) {
+                if ($entry->isTrait && !LazyGhostTraitSupport::isLazyGhostTrait($lc)) {
                     $candidates[] = $lc;
                 }
             }
@@ -39,6 +40,9 @@ final class JitTraitExists
         }
 
         foreach ($candidates as $lc) {
+            if (LazyGhostTraitSupport::isLazyGhostTrait($lc)) {
+                continue;
+            }
             $candidate = $context->builder->load($context->constantStringFromString($lc));
             $candidateData = JitClassExists::stringDataPtr($context, $candidate);
             $cmp = $context->builder->call($strcasecmpFn, $nameData, $candidateData);

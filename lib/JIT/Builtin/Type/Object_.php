@@ -28,6 +28,7 @@ use PHPCompiler\JIT\HashTableHelper;
 use PHPCompiler\JIT\JitNativeString;
 use PHPCompiler\JIT\JitStringArg;
 use PHPCompiler\JIT\Builtin\ErrorRaise;
+use PHPCompiler\VM\LazyGhostTraitSupport;
 use PHPCompiler\JIT\Builtin\TypeErrorRaise;
 use PHPCompiler\JIT\JitStringCompare;
 use PHPCompiler\JIT\JitValueBox;
@@ -1910,6 +1911,9 @@ class Object_ extends Type {
     {
         $names = [];
         foreach (array_keys($this->traitClassLcs) as $traitLc) {
+            if (LazyGhostTraitSupport::isLazyGhostTrait($traitLc)) {
+                continue;
+            }
             $resolved = null;
             foreach ($this->classIdToName as $name) {
                 if (strtolower(ltrim($name, '\\')) === $traitLc) {
