@@ -9,10 +9,10 @@ use PHPCfg\Op\Expr\New_;
 use PHPCfg\Script;
 
 /**
- * Reject bare `new Class` (no constructor parentheses) in class initializer contexts (#6549).
+ * Reject bare `new Class` (no constructor parentheses) in class **constant** initializers (#6549).
  *
  * php-src: Zend/zend_compile.c — zend_compile_const_expr(); Zend/zend_ast.c validation.
- * Distinct from property-default `new Class()` with parens (#3391).
+ * Property defaults may use `new` with or without `()` per PHP 8.1+ (#3391, #5362).
  */
 final class NewWithoutParensCompileCheck
 {
@@ -37,8 +37,6 @@ final class NewWithoutParensCompileCheck
         foreach ($class->stmts->children as $stmt) {
             if ($stmt instanceof Op\Terminal\Const_) {
                 $this->walkOps($stmt->valueBlock->children ?? []);
-            } elseif ($stmt instanceof Op\Stmt\Property) {
-                $this->walkOps($stmt->defaultBlock->children ?? []);
             }
         }
     }
@@ -66,6 +64,8 @@ final class NewWithoutParensCompileCheck
             return (bool) $op->getAttribute('newHasCtorParens');
         }
 
-        return [] !== $op->args;
+        // Without php-cfg #6549 patch, empty-arg `new Foo()` is indistinguishable from bare `new Foo`.
+        // Class constants cannot use `new` at all; treat missing attribute as rejection.
+        return false;
     }
 }

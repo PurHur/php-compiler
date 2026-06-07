@@ -3,7 +3,8 @@
 declare(strict_types=1);
 
 /**
- * Issue #6549 — `new` without `()` in class initializers must compile-error.
+ * Issue #6549 — `new` without `()` in class constant initializers must compile-error.
+ * Property defaults may use bare `new` per PHP 8.1+ (#5362).
  *
  * Zend reference: Zend/zend_compile.c, Zend/zend_ast.c
  */
@@ -32,8 +33,20 @@ function assertCompileFails(string $label, string $code): void
     }
 }
 
+function assertCompileSucceeds(string $label, string $code): void
+{
+    $runtime = new Runtime();
+    try {
+        $runtime->parseAndCompile($code, 'parity_new_without_parens.php');
+        echo "PASS: {$label}\n";
+    } catch (\Throwable $e) {
+        fwrite(STDERR, "FAIL: {$label} — unexpected ".get_class($e).": {$e->getMessage()}\n");
+        exit(1);
+    }
+}
+
 assertCompileFails('class const', '<?php class C { const X = new stdClass; }');
-assertCompileFails('static property', '<?php class C { public static $s = new stdClass; }');
-assertCompileFails('instance property', '<?php class C { public $p = new stdClass; }');
+assertCompileSucceeds('static property', '<?php class C { public static $s = new stdClass; }');
+assertCompileSucceeds('instance property', '<?php class C { public $p = new stdClass; }');
 
 echo "ok\n";

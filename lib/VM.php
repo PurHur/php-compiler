@@ -10765,7 +10765,7 @@ restart:
         if (null === $block) {
             return false;
         }
-        for ($i = $frame->pos + 1; $i < $block->nOpCodes; ++$i) {
+        for ($i = $frame->pos; $i < $block->nOpCodes; ++$i) {
             $next = $block->opCodes[$i];
             // Null-constructor stub does not consume the NEW result temp (#6467, #6620).
             if (OpCode::TYPE_FUNCCALL_EXEC_NORETURN === $next->type) {
