@@ -510,7 +510,7 @@ class Compiler {
         if (null === $returnType) {
             return;
         }
-        $this->assertNeverIsStandaloneType($returnType);
+        $this->assertFunctionSignatureNeverType($returnType);
         $block->returnDeclaredType = $returnType;
         if ($returnType instanceof Op\Type\Void_) {
             $block->returnTypeVoid = true;
@@ -3077,30 +3077,64 @@ class Compiler {
     }
 
     /**
-     * Zend zend_handle_never_type — never must not appear in unions/intersections/DNF (#4970).
+     * True when `never` appears inside an intersection (not a top-level union arm only).
      */
-    protected function assertNeverIsStandaloneType(?Op\Type $type): void
+    protected function cfgTypeContainsNeverInIntersection(?Op\Type $type): bool
+    {
+        if (null === $type) {
+            return false;
+        }
+        if ($type instanceof Op\Type\Intersection) {
+            foreach ($type->types as $member) {
+                if ($this->cfgTypeIsStandaloneNever($member)) {
+                    return true;
+                }
+                if ($this->cfgTypeContainsNeverInIntersection($member)) {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+        if ($type instanceof Op\Type\Union_) {
+            foreach ($type->types as $member) {
+                if ($this->cfgTypeContainsNeverInIntersection($member)) {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+        if ($type instanceof Op\Type\Nullable) {
+            return $this->cfgTypeContainsNeverInIntersection($type->subtype);
+        }
+
+        return false;
+    }
+
+    /**
+     * Zend zend_handle_never_type — PHP 8.2+ allows never in parameter/return unions (#7414).
+     */
+    protected function assertFunctionSignatureNeverType(?Op\Type $type): void
+    {
+        if ($this->cfgTypeContainsNeverInIntersection($type)) {
+            $this->throwCompileError('never can only be used as a standalone type');
+        }
+    }
+
+    /**
+     * Zend zend_handle_property_type — never invalid on properties, including unions (#6967, #7052).
+     */
+    protected function assertPropertyDeclaredType(?Op\Type $type, string $propName): void
     {
         if (!$this->cfgTypeContainsNever($type)) {
             return;
         }
         if ($this->cfgTypeIsStandaloneNever($type)) {
-            return;
+            $class = $this->compilingClassDisplayName ?? 'class';
+            $this->throwCompileError(sprintf('Property %s::$%s cannot have type never', $class, $propName));
         }
         $this->throwCompileError('never can only be used as a standalone type');
-    }
-
-    /**
-     * Zend zend_handle_property_type — standalone never is invalid on properties (#7052).
-     */
-    protected function assertPropertyDeclaredType(?Op\Type $type, string $propName): void
-    {
-        $this->assertNeverIsStandaloneType($type);
-        if (!$this->cfgTypeIsStandaloneNever($type)) {
-            return;
-        }
-        $class = $this->compilingClassDisplayName ?? 'class';
-        $this->throwCompileError(sprintf('Property %s::$%s cannot have type never', $class, $propName));
     }
 
     protected function dnfTypeLabelFromCfgType(?Op\Type $declared): string
@@ -3149,7 +3183,7 @@ class Compiler {
     protected function applyParamDeclaredType(Op\Expr\Param $param, Block $block, int $slot, bool $variadicElement = false): void
     {
         $declared = $param->declaredType;
-        $this->assertNeverIsStandaloneType($declared);
+        $this->assertFunctionSignatureNeverType($declared);
         if ($this->cfgTypeIsStandaloneNever($declared)) {
             $block->paramNeverSlots[$slot] = true;
 

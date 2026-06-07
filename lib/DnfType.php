@@ -65,6 +65,9 @@ final class DnfType
 
             return [['kind' => 'intersection', 'interfaces' => $ifaces, 'display' => $display]];
         }
+        if ($type instanceof CfgType\Never_) {
+            return [['kind' => 'literal', 'name' => 'never']];
+        }
         if ($type instanceof CfgType\Literal) {
             return [['kind' => 'literal', 'name' => strtolower($type->name)]];
         }
