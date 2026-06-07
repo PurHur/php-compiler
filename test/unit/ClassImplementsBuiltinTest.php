@@ -77,4 +77,26 @@ PHP;
         $rt->run($block);
         $this->assertSame("0\n1", ob_get_clean());
     }
+
+    public function testVmClassImplementsOnEnumCaseObject(): void
+    {
+        $code = <<<'PHP'
+<?php
+enum E: int { case A = 1; }
+enum U { case B; }
+$byCase = class_implements(E::A);
+$byClass = class_implements(E::class);
+echo isset($byCase['UnitEnum']) ? '1' : '0';
+echo isset($byCase['BackedEnum']) ? '1' : '0';
+echo isset($byClass['UnitEnum']) ? '1' : '0';
+echo isset($byClass['BackedEnum']) ? '1' : '0';
+echo isset(class_implements(U::B)['UnitEnum']) ? '1' : '0';
+echo isset(class_implements(U::class)['UnitEnum']) ? '1' : '0';
+PHP;
+        $rt = new Runtime();
+        $block = $rt->parseAndCompile($code, 'class_implements_enum_case.php');
+        ob_start();
+        $rt->run($block);
+        $this->assertSame('111111', ob_get_clean());
+    }
 }
