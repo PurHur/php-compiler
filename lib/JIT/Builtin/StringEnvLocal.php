@@ -83,12 +83,13 @@ final class StringEnvLocal
         $i32 = $context->getTypeFromString('int32');
         $null = $i8p->constNull();
 
+        $idxSlot = $context->builder->alloca($i32, 1, 'el_lookup_i');
+        $context->builder->store($i32->constInt(0, false), $idxSlot);
+
         $nameNull = $context->builder->icmp(Builder::INT_EQ, $name, $null);
         $loopHead = $fn->appendBasicBlock('el_lookup_head');
         $context->builder->branchIf($nameNull, $missBb, $loopHead);
 
-        $idxSlot = $context->builder->alloca($i32, 1, 'el_lookup_i');
-        $context->builder->store($i32->constInt(0, false), $idxSlot);
         $loopCheck = $fn->appendBasicBlock('el_lookup_check');
         $loopBody = $fn->appendBasicBlock('el_lookup_body');
         $loopNext = $fn->appendBasicBlock('el_lookup_next');
@@ -144,14 +145,14 @@ final class StringEnvLocal
         $null = $i8p->constNull();
         $eqChar = $i32->constInt(ord('='), false);
 
+        $nameSlot = $context->builder->alloca($i8p, 1, 'el_reg_name');
+        $valueSlot = $context->builder->alloca($i8p, 1, 'el_reg_value');
+        $unsetSlot = $context->builder->alloca($i32, 1, 'el_reg_unset');
+
         $badBb = $fn->appendBasicBlock('el_reg_bad');
         $parseBb = $fn->appendBasicBlock('el_reg_parse');
         $settingNull = $context->builder->icmp(Builder::INT_EQ, $setting, $null);
         $context->builder->branchIf($settingNull, $badBb, $parseBb);
-
-        $nameSlot = $context->builder->alloca($i8p, 1, 'el_reg_name');
-        $valueSlot = $context->builder->alloca($i8p, 1, 'el_reg_value');
-        $unsetSlot = $context->builder->alloca($i32, 1, 'el_reg_unset');
 
         $context->builder->positionAtEnd($parseBb);
         $eq = $context->builder->call($context->lookupFunction('strchr'), $setting, $eqChar);
