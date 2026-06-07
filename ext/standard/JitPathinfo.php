@@ -12,6 +12,7 @@ use PHPCompiler\Block;
 use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\HashTableHelper;
+use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\OpCode;
 use PHPCfg\Operand;
@@ -24,10 +25,8 @@ final class JitPathinfo
 
     public static function invoke(Context $context, JITVariable $path, ?JITVariable $flags = null): Value
     {
-        if (JITVariable::TYPE_STRING !== $path->type) {
-            throw new \LogicException('pathinfo() path must be a string in this compiler build');
-        }
-        $pathVal = $context->helper->loadValue($path);
+        $literal = $path->compileTimeString ?? null;
+        $pathVal = JitStringBuiltinArg::lower($context, $path, 'pathinfo', 0, 'path');
         $maskConst = 15;
         if (null !== $flags) {
             $resolved = self::tryResolveFlags($context, $flags);
