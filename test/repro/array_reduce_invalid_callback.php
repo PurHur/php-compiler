@@ -19,4 +19,7 @@ function sum(int $carry, int $item): int
     return $carry + $item;
 }
 echo array_reduce(array(), 'sum', 0), "\n";
-echo array_reduce(array(), fn(int $carry, int $item): int => $carry + $item, 5), "\n";
+$add = function (int $carry, int $item): int {
+    return $carry + $item;
+};
+echo array_reduce(array(), $add, 5), "\n";

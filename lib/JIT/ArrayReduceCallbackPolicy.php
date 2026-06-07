@@ -8,10 +8,10 @@ use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\Variable as VMVariable;
 
 /**
- * Supported vs deferred array_reduce() callback forms (issue #1213).
+ * Supported vs deferred array_reduce() callback forms (issue #1213, #6683).
  *
- * VM lowers compile-time string user-function names. Closures and other callables stay
- * deferred until user-function / callable JIT lands ([#142](https://github.com/PurHur/php-compiler/issues/142)).
+ * VM validation lives in {@see \PHPCompiler\ext\standard\VmReduceCallback}. JIT/AOT still
+ * lower compile-time string user-function names only; closures deferred ([#142](https://github.com/PurHur/php-compiler/issues/142)).
  */
 final class ArrayReduceCallbackPolicy
 {

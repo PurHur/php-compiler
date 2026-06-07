@@ -21,7 +21,10 @@ function sum(int $carry, int $item): int
     return $carry + $item;
 }
 echo array_reduce(array(), 'sum', 0), "\n";
-echo array_reduce(array(), fn(int $carry, int $item): int => $carry + $item, 5), "\n";
+$add = function (int $carry, int $item): int {
+    return $carry + $item;
+};
+echo array_reduce(array(), $add, 5), "\n";
 --EXPECT--
 array_reduce(): Argument #2 ($callback) must be a valid callback, no array or string given
 array_reduce(): Argument #2 ($callback) must be a valid callback, function "not_a_real_function_xyz" not found or invalid function name
