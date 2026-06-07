@@ -1432,58 +1432,7 @@ extern double __value__readDouble(__value__ *);
 extern __string__ *__value__readString(__value__ *);
 extern void __value__writeString(__value__ *out, __string__ *str);
 
-extern const char *__compiler_env_local_lookup(const char *name);
-
-static void phpc_getenv_write_missing(__value__ *out)
-{
-    out->type = PHPC_TYPE_BOOL;
-    out->value[0] = 0;
-}
-
-/**
- * LLVM/AOT runtime: getenv() into __value__ out-parameter (mirrors lib/JIT/Builtin/StringGetenv.php).
- */
-void __compiler_getenv(__string__ *name, char local_only, __value__ *out)
-{
-    size_t name_len;
-    const char *name_bytes;
-    char *name_buf;
-    const char *env;
-
-    if (NULL == name || NULL == out) {
-        return;
-    }
-    name_len = nf_strlen(name);
-    name_bytes = nf_strdata(name);
-    name_buf = (char *) malloc(name_len + 1);
-    if (NULL == name_buf) {
-        phpc_getenv_write_missing(out);
-
-        return;
-    }
-    memcpy(name_buf, name_bytes, name_len);
-    name_buf[name_len] = '\0';
-    if (0 != local_only) {
-        env = __compiler_env_local_lookup(name_buf);
-        free(name_buf);
-        if (NULL == env) {
-            phpc_getenv_write_missing(out);
-
-            return;
-        }
-        __value__writeString(out, __string__init((long long) strlen(env), env));
-
-        return;
-    }
-    env = getenv(name_buf);
-    free(name_buf);
-    if (NULL == env) {
-        phpc_getenv_write_missing(out);
-
-        return;
-    }
-    __value__writeString(out, __string__init((long long) strlen(env), env));
-}
+/* __compiler_getenv: LLVM in lib/JIT/Builtin/StringGetenv.php (#5330). */
 
 #define SPRINTF_MAX_OUT 4096
 
