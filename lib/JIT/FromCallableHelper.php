@@ -44,6 +44,7 @@ final class FromCallableHelper
             [$className, $methodName] = explode('::', $name, 2);
             $declaringClassLc = strtolower($className);
             $methodLc = strtolower($methodName);
+            self::assertStaticMethodFcc($context, $declaringClassLc, $methodLc, $className, $methodName);
             $proxyName = self::resolveStaticProxyName($context, $block, $declaringClassLc, $methodLc, $className, $methodName);
             $proxy = $context->resolveFunctionProxy($proxyName);
 
@@ -97,6 +98,44 @@ final class FromCallableHelper
         $closureVar = self::wrapCallableProxy($context, $closureCall);
 
         return $closureVar;
+    }
+
+    /** Zend zend_compile_first_class_callable: reject instance methods on Class::m(...) (#7465). */
+    private static function assertStaticMethodFcc(
+        Context $context,
+        string $calledClassLc,
+        string $methodLc,
+        string $calledClassName,
+        string $methodDisplay
+    ): void {
+        if ($context->type->object->isEnumClassLc(strtolower(ltrim($calledClassLc, '\\')))
+            && 'cases' === $methodLc) {
+            return;
+        }
+        $visited = [];
+        $current = strtolower(ltrim($calledClassLc, '\\'));
+        while (!isset($visited[$current])) {
+            $visited[$current] = true;
+            if ($context->type->object->hasDeclaredClass($current)) {
+                $classId = $context->type->object->lookup($current);
+                if ($context->type->object->hasMethod($classId, $methodLc)) {
+                    $vis = $context->type->object->methodVisibility($classId, $methodLc);
+                    if (0 === ($vis & \PHPCfg\Func::FLAG_STATIC)) {
+                        $declaringName = $context->type->object->classNameForId($classId);
+                        throw new \Error(
+                            'Non-static method '.$declaringName.'::'.$methodDisplay.'() cannot be called statically'
+                        );
+                    }
+
+                    return;
+                }
+            }
+            $parent = $context->type->object->parentClassLc($current);
+            if (null === $parent) {
+                break;
+            }
+            $current = $parent;
+        }
     }
 
     private static function resolveStaticProxyName(

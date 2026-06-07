@@ -302,6 +302,7 @@ final class ClosureSupport
             return ClosureState::fromWrappedFunc(new EnumFromHandler($class, 'tryfrom' === $methodLc));
         }
         [$class, $methodLc] = self::resolveStaticMethod($ctx, $lcClass, $methodLc);
+        self::assertStaticMethodForCallable($class, $methodLc);
         $vis = $class->methodVisibility[$methodLc] ?? \PHPCfg\Func::FLAG_PUBLIC;
         $callerClassLc = self::callerClassLc($frame);
         $callerDisplay = self::classDisplayName($ctx, $callerClassLc);
@@ -489,6 +490,41 @@ final class ClosureSupport
     /**
      * @return array{0: ClassEntry, 1: string}
      */
+    /**
+     * First-class `Class::instanceMethod(...)` must Error at creation (zend_compile.c, #7465).
+     */
+    private static function assertStaticMethodForCallable(ClassEntry $declaringClass, string $methodLc): void
+    {
+        if ($declaringClass->isEnum && 'cases' === $methodLc) {
+            return;
+        }
+        if ($declaringClass->usesLazyGhostTrait && 'createlazyghost' === $methodLc) {
+            return;
+        }
+        $vis = $declaringClass->methodVisibility[$methodLc] ?? 0;
+        if (($vis & \PHPCfg\Func::FLAG_STATIC) !== 0) {
+            return;
+        }
+        $func = $declaringClass->methods[$methodLc] ?? null;
+        if ($func instanceof Func\PHP && null !== $func->block->func
+            && (($func->block->func->flags ?? 0) & \PHPCfg\Func::FLAG_STATIC) !== 0) {
+            return;
+        }
+        $declaringName = $declaringClass->name;
+        $declaredName = $declaringClass->methodNames[$methodLc] ?? $methodLc;
+        if ($func instanceof Func\PHP && null !== $func->block->func && null !== $func->block->func->class) {
+            $declaringName = $func->block->func->class->value;
+            if (isset($declaringClass->methodNames[$methodLc])) {
+                $declaredName = $declaringClass->methodNames[$methodLc];
+            } elseif (isset($func->block->func->name)) {
+                $declaredName = $func->block->func->name;
+            }
+        }
+        throw new \Error(
+            'Non-static method '.$declaringName.'::'.$declaredName.'() cannot be called statically'
+        );
+    }
+
     private static function resolveStaticMethod(Context $ctx, string $lcClass, string $methodLc): array
     {
         $visited = [];
