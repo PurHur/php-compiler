@@ -25,7 +25,9 @@ final class ReflectionConstantConstruct extends VmClassMethod
         $entry = VmReflection::resolveClassFromArg($ctx, $frame->calledArgs[1]);
         $constant = VmReflection::stringArg($frame->calledArgs[2], 'ReflectionConstant::__construct() name', 2);
         if (null === VmReflection::findClassConstantKey($entry, $constant, $ctx)) {
-            throw new \LogicException("Constant {$constant} does not exist on {$entry->name}");
+            ReflectionSupport::throwReflectionException(
+                ReflectionSupport::constantNotFoundMessage($entry->name, $constant)
+            );
         }
         $receiver = ReflectionSupport::requireReflectionConstant($frame, $frame->calledArgs[0]);
         $receiver->getProperty(ReflectionSupport::PROP_CLASS_NAME)->string($entry->name);

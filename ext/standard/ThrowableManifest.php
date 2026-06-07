@@ -43,6 +43,8 @@ final class ThrowableManifest
 
     public const LC_ERROR_EXCEPTION = 'errorexception';
 
+    public const LC_REFLECTION_EXCEPTION = 'reflectionexception';
+
     public const LC_CLOSED_GENERATOR_EXCEPTION = 'closedgeneratorexception';
 
     public const LC_ERROR = 'error';
@@ -88,6 +90,7 @@ final class ThrowableManifest
         'UnderflowException' => 'RuntimeException',
         'UnexpectedValueException' => 'RuntimeException',
         'ErrorException' => 'Exception',
+        'ReflectionException' => 'Exception',
         'ClosedGeneratorException' => 'Exception',
         'Error' => null,
         'TypeError' => 'Error',
@@ -119,6 +122,7 @@ final class ThrowableManifest
         'UnderflowException' => \UnderflowException::class,
         'UnexpectedValueException' => \UnexpectedValueException::class,
         'ErrorException' => \ErrorException::class,
+        'ReflectionException' => \ReflectionException::class,
         'ClosedGeneratorException' => \ClosedGeneratorException::class,
         'Error' => \Error::class,
         'TypeError' => \TypeError::class,

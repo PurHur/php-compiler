@@ -82,6 +82,38 @@ final class ReflectionSupport
 
     public const PROP_TYPE_MEMBERS = 'typeMembers';
 
+    /** php-src: ext/reflection/php_reflection.c — class/member lookup failures (#7344). */
+    public static function classNotFoundMessage(string $className): string
+    {
+        return sprintf('Class "%s" does not exist', $className);
+    }
+
+    public static function methodNotFoundMessage(string $className, string $method): string
+    {
+        return sprintf('Method %s::%s() does not exist', $className, $method);
+    }
+
+    public static function propertyNotFoundMessage(string $className, string $property): string
+    {
+        return sprintf('Property %s::$%s does not exist', $className, $property);
+    }
+
+    public static function constantNotFoundMessage(string $className, string $constant): string
+    {
+        return sprintf('Constant %s::%s does not exist', $className, $constant);
+    }
+
+    public static function functionNotFoundMessage(string $functionName): string
+    {
+        return sprintf('Function %s() does not exist', $functionName);
+    }
+
+    /** @return never */
+    public static function throwReflectionException(string $message): void
+    {
+        throw new \ReflectionException($message);
+    }
+
     /**
      * @param list<string> $names
      */
@@ -774,7 +806,7 @@ final class ReflectionSupport
         $lc = strtolower($functionName);
         $func = $ctx->functions[$lc] ?? null;
         if (!$func instanceof \PHPCompiler\Func\PHP) {
-            throw new \LogicException("Function {$functionName}() does not exist");
+            self::throwReflectionException(self::functionNotFoundMessage($functionName));
         }
 
         return $func;

@@ -29,7 +29,9 @@ final class ReflectionPropertyIsPublic extends VmClassMethod
         $property = ReflectionSupport::propertyNameFromReflection($receiver);
         $meta = VmReflection::findClassProperty($entry, $property, $ctx);
         if (null === $meta) {
-            throw new \LogicException("Property {$property} does not exist on {$className}");
+            ReflectionSupport::throwReflectionException(
+                ReflectionSupport::propertyNotFoundMessage($className, $property)
+            );
         }
         if (null !== $frame->returnVar) {
             $frame->returnVar->bool(MethodVisibility::isPublic($meta->visibility));

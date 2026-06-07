@@ -29,11 +29,15 @@ final class ReflectionMethodConstruct extends VmClassMethod
         $method = VmReflection::stringArg($frame->calledArgs[2], 'ReflectionMethod::__construct() method', 2);
         $entry = VmReflection::resolveClassEntry($ctx, $className);
         if (null === $entry) {
-            throw new \LogicException('ReflectionMethod refers to unknown class in this compiler build');
+            ReflectionSupport::throwReflectionException(
+                ReflectionSupport::classNotFoundMessage($className)
+            );
         }
         $methodLc = strtolower($method);
         if (!isset($entry->methods[$methodLc])) {
-            throw new \LogicException("Method {$method} does not exist on {$className}");
+            ReflectionSupport::throwReflectionException(
+                ReflectionSupport::methodNotFoundMessage($entry->name, $method)
+            );
         }
         $receiver->getProperty(ReflectionSupport::PROP_CLASS_NAME)->string($entry->name);
         $receiver->getProperty(ReflectionSupport::PROP_METHOD_NAME)->string($method);
