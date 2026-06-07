@@ -68,6 +68,9 @@ class Context {
     /** Set when a property set hook throws (even if caught); suppresses outer assign (#3145). */
     public bool $propertyHookSetAborted = false;
 
+    /** Catch frame for TypeError during nested property-hook invoke; bubble to caller (#7301). */
+    public ?Frame $propertyHookExternalCatchFrame = null;
+
     /** Active object-to-string coercion via __toString (issue #4284). */
     public bool $coercingObjectToString = false;
 
