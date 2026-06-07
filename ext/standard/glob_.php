@@ -13,7 +13,7 @@ use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
 
-/** glob() — path pattern matching (VM via libc glob; JIT via __phpc_glob_vec, #4859). */
+/** glob() — path pattern matching (VM via VmFsGlob; JIT via StringFsGlobVecJit, #4859/#7405). */
 final class glob_ extends Internal
 {
     public function __construct()

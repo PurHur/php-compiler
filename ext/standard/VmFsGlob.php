@@ -8,7 +8,7 @@ namespace PHPCompiler\ext\standard;
  * glob() for VM — libc glob(3) via FFI, host glob(), or PHP fallback (#4859, #7314).
  *
  * php-src: ext/standard/dir.c — PHP_FUNCTION(glob)
- * JIT/AOT: __phpc_glob_vec via StringFsGlobVecJit.php
+ * JIT/AOT: StringFsGlobVecJit.php (LLVM from PHP, no injected C runtime)
  */
 final class VmFsGlob
 {
