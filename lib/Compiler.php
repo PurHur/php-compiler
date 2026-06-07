@@ -4247,6 +4247,42 @@ class Compiler {
 
             return $value;
         }
+        if ($expr instanceof Op\Expr\PropertyFetch) {
+            return $this->tryFoldEnumCasePropertyFetchDefault($expr, $block, $defaultBlockChildren);
+        }
+
+        return null;
+    }
+
+    /**
+     * Fold {@code E::Case->name}/{@code ->value} in parameter/property defaults (#7399, zend_compile.c).
+     *
+     * @param list<Op> $defaultBlockChildren
+     */
+    protected function tryFoldEnumCasePropertyFetchDefault(
+        Op\Expr\PropertyFetch $expr,
+        Block $block,
+        array $defaultBlockChildren
+    ): ?Variable {
+        $propName = $this->staticNameFromOperand($expr->name);
+        if (null === $propName) {
+            return null;
+        }
+        $receiver = $this->tryFoldCompileTimeOperandDefault(
+            $expr->var,
+            $block,
+            $defaultBlockChildren,
+            true
+        );
+        if (null === $receiver) {
+            return null;
+        }
+        if (Variable::TYPE_ENUM_CASE === $receiver->type) {
+            return $receiver->toEnumCase()->fetchProperty($propName);
+        }
+        if (Variable::TYPE_OBJECT === $receiver->type && EnumCaseSupport::isEnumCase($receiver->toObject())) {
+            return EnumCaseSupport::getProperty($receiver->toObject(), $propName);
+        }
 
         return null;
     }
