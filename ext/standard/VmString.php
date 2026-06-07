@@ -1853,6 +1853,58 @@ final class VmString
         return self::byteSlice($padding, 0, $length);
     }
 
+    public static function resolveStrPadTypeArg(Variable $var): int
+    {
+        $var = $var->resolveIndirect();
+        $padFromEnum = self::tryPadTypeInt($var);
+        if (null !== $padFromEnum) {
+            return $padFromEnum;
+        }
+        if (EnumCaseSupport::isEnumCaseVariable($var)) {
+            throw new \TypeError(sprintf(
+                'str_pad(): Argument #4 ($pad_type) must be of type PadType|int, %s given',
+                EnumCaseSupport::typeNameForVariable($var)
+            ));
+        }
+        if (Variable::TYPE_INTEGER !== $var->type) {
+            throw new \LogicException('str_pad() pad type must be an integer in this compiler build');
+        }
+
+        return $var->toInt();
+    }
+
+    public static function padTypeIntFromEnumBacking(int $backing): int
+    {
+        return match ($backing) {
+            0 => 1,
+            1 => 0,
+            2 => 2,
+            default => throw new \ValueError('Invalid PadType enum value '.$backing),
+        };
+    }
+
+    public static function tryPadTypeInt(Variable $var): ?int
+    {
+        if (!EnumCaseSupport::isEnumCaseVariable($var)) {
+            return null;
+        }
+        $enumClass = EnumCaseSupport::enumClassForCaseVariable($var);
+        if (null === $enumClass || !self::isPadTypeEnum($enumClass->name)) {
+            return null;
+        }
+        $entry = EnumCaseSupport::enumCaseEntryForVariable($var);
+        if (null === $entry || null === $entry->backingValue) {
+            throw new \LogicException('PadType case missing backing value');
+        }
+
+        return self::padTypeIntFromEnumBacking($entry->backingValue->resolveIndirect()->toInt());
+    }
+
+    private static function isPadTypeEnum(string $className): bool
+    {
+        return 0 === strcasecmp(ltrim($className, '\\'), 'PadType');
+    }
+
     public static function strPad(string $input, int $padLength, string $padString = ' ', int $padType = 1): string
     {
         $inputLen = self::byteLength($input);

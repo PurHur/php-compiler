@@ -14,6 +14,7 @@ namespace PHPCompiler\ext\standard;
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\Builtin\PadTypeJit;
 use PHPCompiler\JIT\JitLongArg;
 use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\Variable as JITVariable;
@@ -54,11 +55,7 @@ final class str_pad extends Internal
         // Compiler convention: 0 = STR_PAD_LEFT, 1 = STR_PAD_RIGHT (default).
         $padType = 1;
         if (4 === $argc) {
-            $typeArg = $frame->calledArgs[3]->resolveIndirect();
-            if (Variable::TYPE_INTEGER !== $typeArg->type) {
-                throw new \LogicException('str_pad() pad type must be an integer in this compiler build');
-            }
-            $padType = $typeArg->toInt();
+            $padType = VmString::resolveStrPadTypeArg($frame->calledArgs[3]);
         }
         $result = VmString::strPad($input, $padLength->toInt(), $padString, $padType);
         BuiltinExecute::writeReturn(
@@ -87,7 +84,12 @@ final class str_pad extends Internal
             $padString = $context->builder->load($context->constantStringFromString(' '));
         }
         if (4 === $argc) {
-            $padType = JitLongArg::lower($context, $args[3], 'str_pad() pad type');
+            $padTypeLiteral = PadTypeJit::compileTimePadType($context, $args[3]);
+            if (null !== $padTypeLiteral) {
+                $padType = $context->getTypeFromString('int64')->constInt($padTypeLiteral, false);
+            } else {
+                $padType = JitLongArg::lower($context, $args[3], 'str_pad() pad type');
+            }
         } else {
             $padType = $context->getTypeFromString('int64')->constInt(1, false);
         }
