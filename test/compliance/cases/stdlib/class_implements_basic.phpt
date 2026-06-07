@@ -21,4 +21,4 @@ echo isset($byIface['Named']) ? '1' : '0';
 echo class_implements('MissingClass') ? '1' : '0';
 echo "\n";
 --EXPECT--
-11110
+11100

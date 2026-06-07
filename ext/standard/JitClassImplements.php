@@ -160,7 +160,7 @@ final class JitClassImplements
         }
 
         $names = [];
-        $ifaceLcs = $object->allInterfacesForClassLc($classLc);
+        $ifaceLcs = $object->interfacesForClassImplementsLc($classLc);
         foreach ($ifaceLcs as $ifaceLc) {
             $builtin = VmReflection::builtinEnumInterfaceDisplayName($ifaceLc);
             if (null !== $builtin) {

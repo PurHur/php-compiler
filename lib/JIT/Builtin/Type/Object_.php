@@ -1520,6 +1520,28 @@ class Object_ extends Type {
     }
 
     /**
+     * class_implements() — lowercase interface names in the result map (#7400).
+     *
+     * Interface operands list parent interfaces only; classes list all implemented interfaces.
+     *
+     * @return list<string>
+     */
+    public function interfacesForClassImplementsLc(string $classLc): array
+    {
+        $classLc = strtolower(ltrim($classLc, '\\'));
+        if ($this->isInterfaceClassLc($classLc)) {
+            $ifaces = [];
+            foreach ($this->interfaceExtendsLc[$classLc] ?? [] as $parent) {
+                $ifaces = array_merge($ifaces, $this->expandInterfaceLc($parent));
+            }
+
+            return array_values(array_unique($ifaces));
+        }
+
+        return $this->allInterfacesForClassLc($classLc);
+    }
+
+    /**
      * @return list<string>
      */
     private function expandInterfaceLc(string $ifaceLc): array
