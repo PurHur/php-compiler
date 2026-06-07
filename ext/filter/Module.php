@@ -10,7 +10,8 @@ use PHPCompiler\Runtime;
 /**
  * filter extension module entry (php-src ext/filter/filter.c; issue #5839).
  *
- * Validator bodies remain in ext/standard until #5199 migrates them here.
+ * FILTER_VALIDATE_EMAIL LLVM lives in lib/JIT/Builtin/StringFilterEmail.php (#5199);
+ * FILTER_VALIDATE_INT stays in ext/standard/VmFilter.php until relocated here.
  */
 class Module extends ModuleAbstract
 {
