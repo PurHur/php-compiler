@@ -8,6 +8,7 @@ use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitLongArg;
+use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
@@ -26,10 +27,7 @@ final class mkdir_ extends Internal
         if ($argc < 1 || $argc > 3) {
             throw new \LogicException('mkdir() requires one to three arguments in this compiler build');
         }
-        $pathVar = $frame->calledArgs[0]->resolveIndirect();
-        if (Variable::TYPE_STRING !== $pathVar->type) {
-            throw new \LogicException('mkdir() directory must be a string in this compiler build');
-        }
+        $path = VmString::coerceStringBuiltinArg($frame->calledArgs[0], 'mkdir', 0, 'directory');
         $mode = 0777;
         if ($argc >= 2) {
             $modeVar = $frame->calledArgs[1]->resolveIndirect();
@@ -46,7 +44,7 @@ final class mkdir_ extends Internal
             }
             $recursive = $recVar->toBool();
         }
-        $ok = VmFs::mkdir($pathVar->toString(), $mode, $recursive);
+        $ok = VmFs::mkdir($path, $mode, $recursive);
         if (null !== $frame->returnVar) {
             $frame->returnVar->bool($ok);
         }
@@ -58,7 +56,7 @@ final class mkdir_ extends Internal
         if ($argc < 1 || $argc > 3) {
             throw new \LogicException('mkdir() requires one to three arguments in this compiler build');
         }
-        $path = $this->jitString($context, $args[0], 'mkdir() argument #1');
+        $path = JitStringBuiltinArg::lower($context, $args[0], 'mkdir', 0, 'directory');
         $i64 = $context->getTypeFromString('int64');
         $mode = $i64->constInt(0777, false);
         if ($argc >= 2) {

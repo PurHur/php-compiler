@@ -7,7 +7,7 @@ namespace PHPCompiler\ext\standard;
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Context;
-use PHPCompiler\JIT\JitStringArg;
+use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
@@ -20,14 +20,11 @@ final class is_file extends Internal
         if (1 !== \count($frame->calledArgs)) {
             throw new \LogicException('is_file() requires exactly one argument');
         }
-        $v = $frame->calledArgs[0]->resolveIndirect();
+        $path = VmString::coerceStringBuiltinArg($frame->calledArgs[0], 'is_file', 0, 'filename');
         if (null === $frame->returnVar) {
             return;
         }
-        if (Variable::TYPE_STRING !== $v->type) {
-            throw new \LogicException('is_file() requires a string path in this compiler build');
-        }
-        $frame->returnVar->bool(@is_file($v->toString()));
+        $frame->returnVar->bool(@is_file($path));
     }
 
     public function call(Context $context, JITVariable ...$args): Value
@@ -35,7 +32,7 @@ final class is_file extends Internal
         if (1 !== \count($args)) {
             throw new \LogicException('is_file() requires exactly one argument');
         }
-        $path = JitStringArg::lower($context, $args[0], 'is_file() path');
+        $path = JitStringBuiltinArg::lower($context, $args[0], 'is_file', 0, 'filename');
 
         return JitStat::pathIsFile($context, $path);
     }

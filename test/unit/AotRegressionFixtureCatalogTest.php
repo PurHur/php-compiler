@@ -109,6 +109,7 @@ final class AotRegressionFixtureCatalogTest extends TestCase
             'password_needs_rehash_enum_typeerror.php' => ['password_needs_rehash_enum_typeerror.php'],
             'password_hash_enum_case_typeerror.php' => ['password_hash_enum_case_typeerror.php'],
             'stat_is_link_enum_typeerror.php' => ['stat_is_link_enum_typeerror.php'],
+            'fs_path_enum_typeerror.php' => ['fs_path_enum_typeerror.php'],
         ];
     }
 
