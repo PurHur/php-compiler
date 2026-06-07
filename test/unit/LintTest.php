@@ -23,6 +23,17 @@ PHP;
         $this->assertSame(0, $exit['code']);
     }
 
+    public function testLintReadonlyFunctionAccepted(): void
+    {
+        $code = <<<'PHP'
+<?php
+readonly function f(): void {}
+f();
+PHP;
+        $exit = $this->runLint(['-r', $code]);
+        $this->assertSame(0, $exit['code'], $exit['stdout']);
+    }
+
     public function testLintCoalesceAccepted(): void
     {
         $code = '<?php $a = $b ?? 1;';
