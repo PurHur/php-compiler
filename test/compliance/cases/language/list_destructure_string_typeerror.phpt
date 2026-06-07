@@ -1,15 +1,15 @@
 --TEST--
-list() destructuring from string — TypeError (#7461, supersedes #4308 silent null)
+Language: list/array destructuring from string — TypeError (#7461, zend_execute.c)
 --FILE--
 <?php
 try {
-    [$a] = 'ab';
+    list($a, $b) = 'ab';
     echo "no-exception\n";
 } catch (TypeError $e) {
     echo 'TypeError: ', $e->getMessage(), "\n";
 }
 try {
-    [$b, $c] = 'xy';
+    [$x, $y] = 'xy';
     echo "no-exception\n";
 } catch (TypeError $e) {
     echo 'TypeError: ', $e->getMessage(), "\n";

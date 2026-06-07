@@ -1679,7 +1679,7 @@ class Compiler {
     }
 
     /**
-     * Guard list destructuring: skip slot assignments when RHS is not an array (#4325); per-slot warnings for string keys (#4841).
+     * Guard list destructuring: skip slot assignments when RHS is not an array (#4325); string RHS TypeError (#7461).
      *
      * @param Op[] $ops
      *

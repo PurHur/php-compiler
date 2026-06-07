@@ -9,7 +9,7 @@ use PHPUnit\Framework\TestCase;
 require_once __DIR__ . '/../LlvmToolchain.php';
 
 /**
- * JIT lowering for list destructuring from string RHS (#4308).
+ * JIT lowering for list destructuring from string RHS — TypeError (#7461).
  *
  * @group llvm
  * @runInSeparateProcess

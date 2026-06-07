@@ -9,7 +9,7 @@ use PHPUnit\Framework\TestCase;
 require_once __DIR__.'/../LlvmToolchain.php';
 
 /**
- * MCJIT execute for guarded list destructuring from string RHS (#4308, #4531).
+ * MCJIT execute for list destructuring from string RHS — TypeError (#7461, #4531).
  *
  * @group llvm
  */
@@ -30,18 +30,25 @@ final class ListDestructStringJitExecuteTest extends TestCase
         }
     }
 
-    public function testStringRhsLeavesTargetsUnset(): void
+    public function testStringRhsThrowsTypeError(): void
     {
         $this->assertMcjitOutput(<<<'PHP'
 <?php
-[$a] = 'ab';
-echo $a === null ? 'null' : $a;
-echo "\n";
-[$b, $c] = 'xy';
-echo 'b=', var_export($b, true), ' c=', var_export($c, true), "\n";
+try {
+    [$a] = 'ab';
+    echo "no-exception\n";
+} catch (TypeError $e) {
+    echo 'TypeError: ', $e->getMessage(), "\n";
+}
+try {
+    [$b, $c] = 'xy';
+    echo "no-exception\n";
+} catch (TypeError $e) {
+    echo 'TypeError: ', $e->getMessage(), "\n";
+}
 PHP
             ,
-            "null\nb=NULL c=NULL\n");
+            "TypeError: Cannot use string as array\nTypeError: Cannot use string as array\n");
     }
 
     private function assertMcjitOutput(string $code, string $expected): void
