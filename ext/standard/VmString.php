@@ -8,6 +8,7 @@ declare(strict_types=1);
 
 namespace PHPCompiler\ext\standard;
 
+use PHPCompiler\RuntimeStrictness;
 use PHPCompiler\VM;
 use PHPCompiler\VM\EnumCaseSupport;
 use PHPCompiler\VM\Variable;
@@ -46,7 +47,7 @@ final class VmString
         if (Variable::TYPE_ARRAY === $var->type) {
             throw new \TypeError(self::stringBuiltinTypeError($function, $argIndex, $paramName, 'array'));
         }
-        if (EnumCaseSupport::isEnumCaseVariable($var)) {
+        if (RuntimeStrictness::enforceStringBuiltinParityGuards() && EnumCaseSupport::isEnumCaseVariable($var)) {
             throw new \TypeError(
                 self::stringBuiltinTypeError(
                     $function,

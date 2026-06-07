@@ -11,6 +11,9 @@ use PHPLLVM\Value;
 
 /**
  * Lower string builtin operands with Z_PARAM_STR parity (#5780, ext/standard/string.c).
+ *
+ * Runtime strictness hook (#7361): future php-compiler-strict skips need static proof
+ * before omitting enum-case / object rejection blocks here; default stays php-src-strict.
  */
 final class JitStringBuiltinArg
 {
