@@ -49,6 +49,46 @@ final class VmHashNative
         return self::resultString($id, $digest, $raw);
     }
 
+    /**
+     * hash_pbkdf2() — PBKDF2 via HMAC (ext/hash/hash_pbkdf2.c; issue #6186).
+     */
+    public static function hashPbkdf2(
+        string $algo,
+        string $password,
+        string $salt,
+        int $iterations,
+        int $length = 0,
+        bool $raw = false
+    ): string {
+        $id = self::algoId($algo);
+        if (0 === $id || $iterations < 1) {
+            return '';
+        }
+        $hlen = self::digestLen($id);
+        $dklen = 0 === $length ? $hlen : $length;
+        $blocks = (int) (($dklen + $hlen - 1) / $hlen);
+        $derived = '';
+        $written = 0;
+        for ($block = 1; $block <= $blocks; $block++) {
+            $t = self::pbkdf2F($id, $password, $salt, $block, $iterations);
+            $tBin = self::digestBytesToString($t);
+            $copy = \min($hlen, $dklen - $written);
+            $derived .= \substr($tBin, 0, $copy);
+            $written += $copy;
+        }
+
+        if ($raw) {
+            return $derived;
+        }
+
+        $hex = self::hexEncode($derived);
+        if ($length > 0) {
+            return \substr($hex, 0, $length);
+        }
+
+        return $hex;
+    }
+
     /** 0 unknown, 1 sha256, 2 sha1, 3 md5 */
     private static function algoId(string $algo): int
     {
@@ -648,6 +688,32 @@ final class VmHashNative
     }
 
     /* --- HMAC --- */
+
+    /**
+     * PBKDF2 F function — HMAC-based block derivation (RFC 2898; mirrors __phpc_hc_pbkdf2_f).
+     *
+     * @return list<int>
+     */
+    private static function pbkdf2F(
+        int $algo,
+        string $password,
+        string $salt,
+        int $blockIndex,
+        int $iterations
+    ): array {
+        $dlen = self::digestLen($algo);
+        $saltBlock = $salt.\pack('N', $blockIndex);
+        $out = self::hmac($algo, $saltBlock, $password);
+        $u = $out;
+        for ($i = 1; $i < $iterations; $i++) {
+            $u = self::hmac($algo, self::digestBytesToString($u), $password);
+            for ($j = 0; $j < $dlen; $j++) {
+                $out[$j] ^= $u[$j];
+            }
+        }
+
+        return $out;
+    }
 
     /** @return list<int> */
     private static function hmac(int $algo, string $data, string $key): array

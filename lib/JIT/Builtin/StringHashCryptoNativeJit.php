@@ -240,6 +240,7 @@ final class StringHashCryptoNativeJit
 
         $context->builder->positionAtEnd($body);
         $hlen = self::callDigestLen($context, $id);
+        $lengthArg = $length;
         $dklen = $length;
         $useDefault = $context->builder->icmp(Builder::INT_EQ, $dklen, $zeroI64);
         $afterLen = $fn->appendBasicBlock('hc_pbkdf2_after_len');
@@ -335,11 +336,16 @@ final class StringHashCryptoNativeJit
         $context->builder->returnValue($rawResult);
 
         $context->builder->positionAtEnd($hexBb);
-        $hexLen = $context->builder->mul($dklen, $i64->constInt(2, false));
+        $hexFullLen = $context->builder->mul($dklen, $i64->constInt(2, false));
+        $hexOutLen = $context->builder->select(
+            $context->builder->icmp(Builder::INT_SGT, $lengthArg, $zeroI64),
+            $lengthArg,
+            $hexFullLen
+        );
         $hex = $context->builder->call(
             $context->lookupFunction('malloc'),
             $context->builder->truncOrBitCast(
-                $context->builder->add($hexLen, $oneI64),
+                $context->builder->add($hexFullLen, $oneI64),
                 $sizeT
             )
         );
@@ -362,7 +368,7 @@ final class StringHashCryptoNativeJit
         );
         $hexResult = $context->builder->call(
             $context->lookupFunction('__string__init'),
-            $hexLen,
+            $hexOutLen,
             $context->builder->pointerCast($hex, $context->getTypeFromString('char*'))
         );
         $context->builder->call($context->lookupFunction('free'), $hex);
