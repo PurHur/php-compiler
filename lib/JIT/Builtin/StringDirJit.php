@@ -538,12 +538,12 @@ final class StringDirJit
 
         $context->builder->positionAtEnd($loopBody);
         $dirent = $context->builder->load($context->builder->inBoundsGEP($namelist, $context->builder->zExt($j, $sizeT)));
-        $context->builder->call($context->lookupFunction('free'), $context->builder->pointerCast($dirent, $voidPtr));
+        $context->builder->call($context->lookupFunction('free'), $dirent);
         $context->builder->store($context->builder->addNoSignedWrap($j, $i32->constInt(1, false)), $jSlot);
         $context->builder->branch($loopHead);
 
         $context->builder->positionAtEnd($freeArrBlock);
-        $context->builder->call($context->lookupFunction('free'), $context->builder->pointerCast($namelist, $voidPtr));
+        $context->builder->call($context->lookupFunction('free'), $namelist);
         $context->builder->branch($doneBlock);
 
         $context->builder->positionAtEnd($skipBlock);

@@ -257,9 +257,7 @@ final class ParseUrlJit
         $context->builder->branchIf($isNull, $nullRet, $work);
 
         $context->builder->positionAtEnd($nullRet);
-        $emptySlot = $context->builder->alloca($i8, 1);
-        $context->builder->store($i8->constInt(0, false), $emptySlot);
-        $context->builder->returnValue($context->builder->pointerCast($emptySlot, $i8p));
+        $context->builder->returnValue(self::cstrLiteral($context, ''));
 
         $context->builder->positionAtEnd($work);
         $len = $context->builder->call($context->lookupFunction('strlen'), $src);
@@ -267,7 +265,7 @@ final class ParseUrlJit
             $context->lookupFunction('malloc'),
             $context->builder->truncOrBitCast($context->builder->add($len, $one), $sizeT)
         );
-        $outNull = $context->builder->icmp(Builder::INT_EQ, $out, $context->getTypeFromString('void*')->constNull());
+        $outNull = $context->builder->icmp(Builder::INT_EQ, $out, $i8p->constNull());
         $context->builder->branchIf($outNull, $fail, $ok);
 
         $context->builder->positionAtEnd($fail);
@@ -314,7 +312,7 @@ final class ParseUrlJit
         );
         $fail = $fn->appendBasicBlock('sub_fail');
         $ok = $fn->appendBasicBlock('sub_ok');
-        $outNull = $context->builder->icmp(Builder::INT_EQ, $out, $context->getTypeFromString('void*')->constNull());
+        $outNull = $context->builder->icmp(Builder::INT_EQ, $out, $i8p->constNull());
         $context->builder->branchIf($outNull, $fail, $ok);
 
         $context->builder->positionAtEnd($fail);
@@ -1075,10 +1073,7 @@ final class ParseUrlJit
 
     private static function cstrLiteral(Context $context, string $text): Value
     {
-        return $context->builder->pointerCast(
-            $context->constantFromString($text),
-            $context->getTypeFromString('int8*')
-        );
+        return $context->pointerFromStringConstant($text);
     }
 
     private static function captureInsertBlock(Context $context): ?BasicBlock

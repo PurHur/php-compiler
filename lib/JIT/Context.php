@@ -594,6 +594,7 @@ class Context {
     private function defineBuiltins(int $loadType): void {
         // Stale sg_* from a prior JITContext in the same PHP process breaks SessionDestroy::implement (#4415).
         SuperglobalInit::$globals = [];
+        LibcExtern::register($this);
         foreach ($this->builtins as $builtin) {
             // this is a separate loop, since implementation may
             // depend on global variables set during init()
@@ -1148,6 +1149,25 @@ class Context {
             $this->stringConstant[$string] = $global;
         }
         return $this->stringConstant[$string];
+    }
+
+    /** NUL-terminated C string pointer for a module string global. */
+    public function pointerFromStringConstant(string $string): PHPLLVM\Value
+    {
+        $global = $this->constantFromString($string);
+        $zero = $this->getTypeFromString('int32')->constInt(0, false);
+
+        return $this->builder->inBoundsGEP($global, $zero, $zero);
+    }
+
+    /** C-style int success flag (non-zero => true) for branch/select lowering. */
+    public function i32Success(PHPLLVM\Value $value): PHPLLVM\Value
+    {
+        return $this->builder->icmp(
+            PHPLLVM\Builder::INT_NE,
+            $value,
+            $this->getTypeFromString('int32')->constInt(0, false)
+        );
     }
 
     private array $boolValues = [];

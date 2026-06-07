@@ -53,11 +53,11 @@ final class CloneWithReinitRuntime
             }
             $slotGlobal = $context->module->getNamedGlobal('phpc_clone_with_prop_'.$i);
             $lenGlobal = $context->module->getNamedGlobal('phpc_clone_with_prop_len_'.$i);
-            $namePtr = $context->constantFromString($name);
+            $namePtr = $context->pointerFromStringConstant($name);
             $slotPtr = $context->builder->pointerCast($slotGlobal, $i8p);
             $context->intrinsic->memcpy(
                 $slotPtr,
-                $context->builder->pointerCast($namePtr, $i8p),
+                $namePtr,
                 $context->constantFromInteger($len, 'size_t'),
                 false
             );

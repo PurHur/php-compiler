@@ -311,10 +311,7 @@ final class StringJsonDecodeJit
 
     private static function literalCstr(Context $context, string $text): Value
     {
-        return $context->builder->pointerCast(
-            $context->constantFromString($text),
-            $context->getTypeFromString('int8*')
-        );
+        return $context->pointerFromStringConstant($text);
     }
 
     private static function emitCstrToString(Context $context, LlvmFunction $fn): void
@@ -465,7 +462,7 @@ final class StringJsonDecodeJit
             $end,
             $quote
         );
-        $context->builder->branchIf($okQuote, $loopHead, $fail);
+        $context->builder->branchIf($context->i32Success($okQuote), $loopHead, $fail);
 
         $context->builder->positionAtEnd($loopHead);
         $pos = $context->builder->load($posPtr);
@@ -995,7 +992,7 @@ final class StringJsonDecodeJit
         );
         $bb_after_open = $fn->appendBasicBlock('after_open');
 
-        $context->builder->branchIf($okBrace, $bb_after_open, $fail);
+        $context->builder->branchIf($context->i32Success($okBrace), $bb_after_open, $fail);
         $context->builder->positionAtEnd($bb_after_open);
         $context->builder->call($context->lookupFunction('__phpc_json_skip_ws'), $posPtr, $end);
         $empty = $context->builder->call(
@@ -1014,7 +1011,7 @@ final class StringJsonDecodeJit
             $keyBufPtr,
             $keyCap
         );
-        $context->builder->branchIf($okKey, $afterKey, $fail);
+        $context->builder->branchIf($context->i32Success($okKey), $afterKey, $fail);
         $context->builder->positionAtEnd($afterKey);
         $emptyKey = $context->builder->icmp(
             Builder::INT_EQ,
@@ -1033,7 +1030,7 @@ final class StringJsonDecodeJit
         );
         $bb_parse_val = $fn->appendBasicBlock('parse_val');
 
-        $context->builder->branchIf($okColon, $bb_parse_val, $fail);
+        $context->builder->branchIf($context->i32Success($okColon), $bb_parse_val, $fail);
         $context->builder->positionAtEnd($bb_parse_val);
         $okVal = $context->builder->call(
             $context->lookupFunction('__phpc_json_parse_value'),
@@ -1046,7 +1043,7 @@ final class StringJsonDecodeJit
             $zeroI32,
             $zeroSize
         );
-        $context->builder->branchIf($okVal, $comma, $fail);
+        $context->builder->branchIf($context->i32Success($okVal), $comma, $fail);
         $context->builder->positionAtEnd($comma);
         $context->builder->call($context->lookupFunction('__phpc_json_skip_ws'), $posPtr, $end);
         $pos = $context->builder->load($posPtr);
@@ -1123,7 +1120,7 @@ final class StringJsonDecodeJit
         );
         $bb_after_open = $fn->appendBasicBlock('after_open');
 
-        $context->builder->branchIf($okBracket, $bb_after_open, $fail);
+        $context->builder->branchIf($context->i32Success($okBracket), $bb_after_open, $fail);
         $context->builder->positionAtEnd($bb_after_open);
         $context->builder->call($context->lookupFunction('__phpc_json_skip_ws'), $posPtr, $end);
         $empty = $context->builder->call(
@@ -1176,7 +1173,7 @@ final class StringJsonDecodeJit
         );
         $bb_inc_idx = $fn->appendBasicBlock('inc_idx');
 
-        $context->builder->branchIf($okVal, $bb_inc_idx, $fail);
+        $context->builder->branchIf($context->i32Success($okVal), $bb_inc_idx, $fail);
         $context->builder->positionAtEnd($bb_inc_idx);
         $context->builder->store($context->builder->add($idx, $sizeT->constInt(1, false)), $idxSlot);
         $context->builder->branch($comma);
@@ -1320,7 +1317,7 @@ final class StringJsonDecodeJit
         );
         $bb_store_str = $fn->appendBasicBlock('store_str');
 
-        $context->builder->branchIf($okStr, $bb_store_str, $fail);
+        $context->builder->branchIf($context->i32Success($okStr), $bb_store_str, $fail);
         $context->builder->positionAtEnd($bb_store_str);
         $context->builder->call(
             $context->lookupFunction('__phpc_json_store_string'),
@@ -1354,7 +1351,7 @@ final class StringJsonDecodeJit
         $restoreObj = $fn->appendBasicBlock('restore_obj');
         $bb_restore_obj_fail = $fn->appendBasicBlock('restore_obj_fail');
 
-        $context->builder->branchIf($okObj, $restoreObj, $bb_restore_obj_fail);
+        $context->builder->branchIf($context->i32Success($okObj), $restoreObj, $bb_restore_obj_fail);
         $context->builder->positionAtEnd($bb_restore_obj_fail);
         $depth = $context->builder->load($depthPtr);
         $context->builder->store($context->builder->sub($depth, $oneI32), $depthPtr);
@@ -1383,7 +1380,7 @@ final class StringJsonDecodeJit
         );
         $restoreArr = $fn->appendBasicBlock('restore_arr');
         $restoreArrFail = $fn->appendBasicBlock('restore_arr_fail');
-        $context->builder->branchIf($okArr, $restoreArr, $restoreArrFail);
+        $context->builder->branchIf($context->i32Success($okArr), $restoreArr, $restoreArrFail);
         $context->builder->positionAtEnd($restoreArrFail);
         $depth = $context->builder->load($depthPtr);
         $context->builder->store($context->builder->sub($depth, $oneI32), $depthPtr);
@@ -1405,7 +1402,7 @@ final class StringJsonDecodeJit
         );
         $bb_num_store = $fn->appendBasicBlock('num_store');
 
-        $context->builder->branchIf($okNum, $bb_num_store, $fail);
+        $context->builder->branchIf($context->i32Success($okNum), $bb_num_store, $fail);
         $context->builder->positionAtEnd($bb_num_store);
         $hasFrac = $context->builder->call(
             $context->lookupFunction('__phpc_json_has_fraction'),
@@ -1474,7 +1471,7 @@ final class StringJsonDecodeJit
         );
         $bb_store_true = $fn->appendBasicBlock('store_true');
 
-        $context->builder->branchIf($okTrue, $bb_store_true, $fail);
+        $context->builder->branchIf($context->i32Success($okTrue), $bb_store_true, $fail);
         $context->builder->positionAtEnd($bb_store_true);
         $context->builder->call(
             $context->lookupFunction('__phpc_json_store_bool'),
@@ -1497,7 +1494,7 @@ final class StringJsonDecodeJit
         );
         $bb_store_false = $fn->appendBasicBlock('store_false');
 
-        $context->builder->branchIf($okFalse, $bb_store_false, $fail);
+        $context->builder->branchIf($context->i32Success($okFalse), $bb_store_false, $fail);
         $context->builder->positionAtEnd($bb_store_false);
         $context->builder->call(
             $context->lookupFunction('__phpc_json_store_bool'),
@@ -1520,7 +1517,7 @@ final class StringJsonDecodeJit
         );
         $bb_store_null = $fn->appendBasicBlock('store_null');
 
-        $context->builder->branchIf($okNull, $bb_store_null, $fail);
+        $context->builder->branchIf($context->i32Success($okNull), $bb_store_null, $fail);
         $context->builder->positionAtEnd($bb_store_null);
         $emptySlot = $context->builder->alloca($i8, 1);
         $context->builder->store($i8->constInt(0, false), $emptySlot);
@@ -1642,7 +1639,7 @@ final class StringJsonDecodeJit
         );
         $bb_write_ht = $fn->appendBasicBlock('write_ht');
 
-        $context->builder->branchIf($okObj, $bb_write_ht, $fail);
+        $context->builder->branchIf($context->i32Success($okObj), $bb_write_ht, $fail);
         $context->builder->positionAtEnd($bb_write_ht);
         $context->builder->call($context->lookupFunction('__value__writeHashtable'), $out, $ht);
         $context->builder->branch($ok);
@@ -1660,7 +1657,7 @@ final class StringJsonDecodeJit
         );
         $bb_write_ht_arr = $fn->appendBasicBlock('write_ht_arr');
 
-        $context->builder->branchIf($okArr, $bb_write_ht_arr, $fail);
+        $context->builder->branchIf($context->i32Success($okArr), $bb_write_ht_arr, $fail);
         $context->builder->positionAtEnd($bb_write_ht_arr);
         $context->builder->call($context->lookupFunction('__value__writeHashtable'), $out, $ht);
         $context->builder->branch($ok);
@@ -1675,7 +1672,7 @@ final class StringJsonDecodeJit
         );
         $bb_write_str = $fn->appendBasicBlock('write_str');
 
-        $context->builder->branchIf($okStr, $bb_write_str, $fail);
+        $context->builder->branchIf($context->i32Success($okStr), $bb_write_str, $fail);
         $context->builder->positionAtEnd($bb_write_str);
         $strVal = $context->builder->call($context->lookupFunction('__phpc_json_cstr_to_string'), $valBufPtr);
         $context->builder->call($context->lookupFunction('__value__writeString'), $out, $strVal);
@@ -1691,7 +1688,7 @@ final class StringJsonDecodeJit
         );
         $bb_top_num_store = $fn->appendBasicBlock('top_num_store');
 
-        $context->builder->branchIf($okNum, $bb_top_num_store, $fail);
+        $context->builder->branchIf($context->i32Success($okNum), $bb_top_num_store, $fail);
         $context->builder->positionAtEnd($bb_top_num_store);
         $hasFrac = $context->builder->call(
             $context->lookupFunction('__phpc_json_has_fraction'),
@@ -1733,7 +1730,7 @@ final class StringJsonDecodeJit
         );
         $bb_write_true = $fn->appendBasicBlock('write_true');
 
-        $context->builder->branchIf($okTrue, $bb_write_true, $fail);
+        $context->builder->branchIf($context->i32Success($okTrue), $bb_write_true, $fail);
         $context->builder->positionAtEnd($bb_write_true);
         $context->builder->call($context->lookupFunction('__value__writeLong'), $out, $oneI64);
         $context->builder->branch($ok);
@@ -1749,7 +1746,7 @@ final class StringJsonDecodeJit
         );
         $bb_write_false = $fn->appendBasicBlock('write_false');
 
-        $context->builder->branchIf($okFalse, $bb_write_false, $fail);
+        $context->builder->branchIf($context->i32Success($okFalse), $bb_write_false, $fail);
         $context->builder->positionAtEnd($bb_write_false);
         $context->builder->call($context->lookupFunction('__value__writeLong'), $out, $zeroI64);
         $context->builder->branch($ok);
@@ -1765,7 +1762,7 @@ final class StringJsonDecodeJit
         );
         $bb_write_null = $fn->appendBasicBlock('write_null');
 
-        $context->builder->branchIf($okNull, $bb_write_null, $fail);
+        $context->builder->branchIf($context->i32Success($okNull), $bb_write_null, $fail);
         $context->builder->positionAtEnd($bb_write_null);
         $context->builder->call($context->lookupFunction('__value__writeNull'), $out);
         $context->builder->branch($ok);
@@ -1829,7 +1826,7 @@ final class StringJsonDecodeJit
             $i32->constInt(self::MAX_DEPTH, false),
             $out
         );
-        $context->builder->branchIf($ok, $ret, $fail);
+        $context->builder->branchIf($context->i32Success($ok), $ret, $fail);
 
         $context->builder->positionAtEnd($fail);
         $context->builder->store($i32->constInt(self::ERROR_SYNTAX, false), self::$lastErrorGlobal);
@@ -1910,7 +1907,7 @@ final class StringJsonDecodeJit
         );
         $parseFail = $fn->appendBasicBlock('parse_fail');
         $tail = $fn->appendBasicBlock('tail');
-        $context->builder->branchIf($ok, $tail, $parseFail);
+        $context->builder->branchIf($context->i32Success($ok), $tail, $parseFail);
 
         $context->builder->positionAtEnd($parseFail);
         $depthErr = $context->builder->icmp(

@@ -1255,8 +1255,8 @@ final class StringPackJit
                 $context->builder->store($context->builder->fptrunc($dv, $float), $mem);
                 $context->builder->call(
                     $context->lookupFunction('memcpy'),
-                    $context->builder->pointerCast($outPtr, $context->getTypeFromString('void*')),
-                    $context->builder->pointerCast($mem, $context->getTypeFromString('void*')),
+                    $outPtr,
+                    $mem,
                     $context->getTypeFromString('size_t')->constInt(4, false)
                 );
                 $context->builder->branch($afterBb);

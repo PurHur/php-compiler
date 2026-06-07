@@ -203,16 +203,17 @@ final class StringFsGlobVecJit
         $voidPtr = $context->getTypeFromString('void*');
         $statSize = $i64->constInt(144, false);
         $statBase = self::stackArrayBase($context, $statSlot);
+        $statPtr = $context->builder->pointerCast($statBase, $context->getTypeFromString('int8*'));
         $context->builder->call(
             $context->lookupFunction('memset'),
-            $context->builder->pointerCast($statBase, $voidPtr),
+            $statPtr,
             $i32->constInt(0, false),
             $statSize
         );
         $rc = $context->builder->call(
             $context->lookupFunction('stat'),
             $pathCstr,
-            $context->builder->pointerCast($statBase, $voidPtr)
+            $statPtr
         );
         $ok = $context->builder->icmp(Builder::INT_EQ, $rc, $i32->constInt(0, false));
         $modeOff = $i64->constInt(24, false);
@@ -260,12 +261,12 @@ final class StringFsGlobVecJit
 
         $context->builder->positionAtEnd($loopBody);
         $cstr = $context->builder->load($context->builder->inBoundsGEP($items, $context->builder->zExt($i, $sizeT)));
-        $context->builder->call($context->lookupFunction('free'), $context->builder->pointerCast($cstr, $voidPtr));
+        $context->builder->call($context->lookupFunction('free'), $cstr);
         $context->builder->store($context->builder->addNoSignedWrap($i, $i32->constInt(1, false)), $iSlot);
         $context->builder->branch($loopHead);
 
         $context->builder->positionAtEnd($freeArr);
-        $context->builder->call($context->lookupFunction('free'), $context->builder->pointerCast($items, $voidPtr));
+        $context->builder->call($context->lookupFunction('free'), $items);
         $context->builder->branch($done);
 
         $context->builder->positionAtEnd($done);
@@ -424,7 +425,7 @@ final class StringFsGlobVecJit
         $context->builder->branchIf($keptZero, $keptEmptyBlock, $shrinkBlock);
 
         $context->builder->positionAtEnd($keptEmptyBlock);
-        $context->builder->call($context->lookupFunction('free'), $context->builder->pointerCast($items, $voidPtr));
+        $context->builder->call($context->lookupFunction('free'), $items);
         $context->builder->store($i8pp->constNull(), $outItems);
         $context->builder->branch($emptyOk);
 
@@ -582,7 +583,7 @@ final class StringFsGlobVecJit
 
         $context->builder->positionAtEnd($storeBlock);
         $context->builder->store($dup, $context->builder->inBoundsGEP($items, $context->builder->zExt($i, $sizeT)));
-        $context->builder->call($context->lookupFunction('free'), $context->builder->pointerCast($dirent, $voidPtr));
+        $context->builder->call($context->lookupFunction('free'), $dirent);
         $context->builder->store($context->builder->addNoSignedWrap($i, $i32->constInt(1, false)), $iSlot);
         $context->builder->branch($loopHead);
 
@@ -601,7 +602,7 @@ final class StringFsGlobVecJit
         $retEmpty = $fn->appendBasicBlock('scan_ret_empty');
         $context->builder->branchIf($hasList, $freeEmpty, $retEmpty);
         $context->builder->positionAtEnd($freeEmpty);
-        $context->builder->call($context->lookupFunction('free'), $context->builder->pointerCast($namelist, $voidPtr));
+        $context->builder->call($context->lookupFunction('free'), $namelist);
         $context->builder->branch($retEmpty);
         $context->builder->positionAtEnd($retEmpty);
         $context->builder->returnValue($zero32);
@@ -642,12 +643,12 @@ final class StringFsGlobVecJit
 
         $context->builder->positionAtEnd($body);
         $dirent = $context->builder->load($context->builder->inBoundsGEP($namelist, $context->builder->zExt($j, $sizeT)));
-        $context->builder->call($context->lookupFunction('free'), $context->builder->pointerCast($dirent, $voidPtr));
+        $context->builder->call($context->lookupFunction('free'), $dirent);
         $context->builder->store($context->builder->addNoSignedWrap($j, $i32->constInt(1, false)), $jSlot);
         $context->builder->branch($head);
 
         $context->builder->positionAtEnd($freeArr);
-        $context->builder->call($context->lookupFunction('free'), $context->builder->pointerCast($namelist, $voidPtr));
+        $context->builder->call($context->lookupFunction('free'), $namelist);
         $context->builder->branch($done);
 
         $context->builder->positionAtEnd($skip);

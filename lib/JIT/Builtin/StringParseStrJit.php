@@ -910,10 +910,7 @@ final class StringParseStrJit
 
     private static function cstrLiteral(Context $context, string $text): Value
     {
-        return $context->builder->pointerCast(
-            $context->constantFromString($text),
-            $context->getTypeFromString('int8*')
-        );
+        return $context->pointerFromStringConstant($text);
     }
 
     private static function parsedKeyBytePtr(Context $context, Value $pkVoid): Value

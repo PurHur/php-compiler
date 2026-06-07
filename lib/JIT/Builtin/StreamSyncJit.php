@@ -82,16 +82,12 @@ final class StreamSyncJit
         $i32 = $context->getTypeFromString('int32');
         $i64 = $context->getTypeFromString('int64');
         $i8p = $context->getTypeFromString('int8*');
-        $voidPtr = $context->getTypeFromString('void*');
 
         foreach ([
-            ['__phpc_resolve_stream', $voidPtr, [$i64]],
-            ['fflush', $i32, [$voidPtr]],
-            ['fileno', $i32, [$voidPtr]],
+            ['strlen', $i64, [$i8p]],
+            ['__compiler_trigger_error', $i8p, [$i8p, $i64, $i32, $i8p, $i32]],
             ['fsync', $i32, [$i32]],
             ['fdatasync', $i32, [$i32]],
-            ['strlen', $i64, [$i8p]],
-            ['__compiler_trigger_error', $voidPtr, [$i8p, $i64, $i32, $i8p, $i32]],
         ] as [$name, $ret, $params]) {
             self::ensureExternal($context, $name, $context->context->functionType($ret, false, ...$params));
         }
@@ -138,10 +134,10 @@ final class StreamSyncJit
         $context->builder->positionAtEnd($entry);
 
         $i32 = $context->getTypeFromString('int32');
-        $voidPtr = $context->getTypeFromString('void*');
+        $i8p = $context->getTypeFromString('int8*');
         $zero = $i32->constInt(0, false);
         $one = $i32->constInt(1, false);
-        $nullFile = $voidPtr->constNull();
+        $nullFile = $i8p->constNull();
 
         $fp = $context->builder->call($context->lookupFunction('__phpc_resolve_stream'), $handle);
         $fpNull = $context->builder->icmp(Builder::INT_EQ, $fp, $nullFile);

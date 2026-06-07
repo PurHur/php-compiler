@@ -267,9 +267,9 @@ final class StringFsDirJit
     {
         $i8 = $context->getTypeFromString('int8');
         $i32 = $context->getTypeFromString('int32');
-        $voidPtr = $context->getTypeFromString('void*');
+        $i8p = $context->getTypeFromString('int8*');
         $statSlot = BasicBlockHelper::entryAlloca($context, $i8->arrayType(self::STAT_BUF_SIZE));
-        $statBase = $context->builder->pointerCast($statSlot, $voidPtr);
+        $statBase = $context->builder->pointerCast($statSlot, $i8p);
         $rc = $context->builder->call($context->lookupFunction('stat'), $pathCstr, $statBase);
         $ok = $context->builder->icmp(Builder::INT_EQ, $rc, $i32->constInt(0, false));
         $mode = self::statFieldI32ToI64($context, $statBase, self::STAT_MODE_OFFSET);
