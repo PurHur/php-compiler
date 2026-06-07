@@ -394,7 +394,34 @@ final class PipeOperatorDesugar
             }
         }
 
-        return 0 === $depth ? $end : null;
+        if (0 !== $depth) {
+            return null;
+        }
+
+        // Parenthesized callee immediately invoked: (fn($x) => ...)( ) (#7244).
+        $invokeStart = $end + 1;
+        while ($invokeStart < \count($tokens) && self::isIgnorable($tokens[$invokeStart])) {
+            ++$invokeStart;
+        }
+        if ($invokeStart < \count($tokens) && \is_string($tokens[$invokeStart]) && '(' === $tokens[$invokeStart]) {
+            $invokeDepth = 0;
+            for ($j = $invokeStart; $j < \count($tokens); ++$j) {
+                $it = $tokens[$j];
+                if (\is_string($it) && '(' === $it) {
+                    ++$invokeDepth;
+                } elseif (\is_string($it) && ')' === $it) {
+                    --$invokeDepth;
+                    if (0 === $invokeDepth) {
+                        $end = $j;
+                        break;
+                    }
+                } elseif (\is_array($it) && \T_CURLY_OPEN === $it[0]) {
+                    ++$invokeDepth;
+                }
+            }
+        }
+
+        return $end;
     }
 
     /**
@@ -660,7 +687,13 @@ final class PipeOperatorDesugar
     {
         $trimmed = ltrim($rhs);
         if (preg_match('/^\(\s*fn\s*\(/s', $trimmed)) {
-            return $rhs.'('.$lhs.')';
+            $callable = rtrim($rhs);
+            // (fn(...))() — drop empty invoke; pipe LHS becomes the sole argument (#7244).
+            if (preg_match('/\(\s*\)$/', $callable)) {
+                $callable = preg_replace('/\(\s*\)$/', '', $callable);
+            }
+
+            return $callable.'('.$lhs.')';
         }
 
         $open = strpos($rhs, '(');
