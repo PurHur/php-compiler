@@ -7705,9 +7705,13 @@ class Compiler {
     protected function isArrayDimFetchForWrite(Op\Expr\ArrayDimFetch $fetch, Block $block): bool
     {
         foreach ($fetch->result->usages as $usage) {
+            if ($usage instanceof Op\Expr\Assign && $usage->var === $fetch->result) {
+                continue;
+            }
+            // AssignRef RHS needs FETCH_DIM_W for reference acquisition (#7441, zend_execute.c).
             if (
-                ($usage instanceof Op\Expr\Assign || $usage instanceof Op\Expr\AssignRef)
-                && $usage->var === $fetch->result
+                $usage instanceof Op\Expr\AssignRef
+                && ($usage->var === $fetch->result || $usage->expr === $fetch->result)
             ) {
                 continue;
             }
@@ -7741,9 +7745,12 @@ class Compiler {
             }
             $next = $children[$i + 1];
 
+            if ($next instanceof Op\Expr\Assign && $next->var === $fetch->result) {
+                return true;
+            }
             if (
-                ($next instanceof Op\Expr\Assign || $next instanceof Op\Expr\AssignRef)
-                && $next->var === $fetch->result
+                $next instanceof Op\Expr\AssignRef
+                && ($next->var === $fetch->result || $next->expr === $fetch->result)
             ) {
                 return true;
             }
