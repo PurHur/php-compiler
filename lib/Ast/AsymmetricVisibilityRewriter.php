@@ -45,8 +45,9 @@ final class AsymmetricVisibilityRewriter
         }
 
         self::rejectExplicitPublicBeforeSetModifier($source);
+        self::rejectExplicitReadBeforeSetModifier($source);
         self::rejectExplicitPublicAfterSetModifier($source);
-        self::rejectDuplicateReadBeforeParenthesizedSetModifier($source);
+        self::rejectExplicitReadBeforeParenthesizedSetModifier($source);
         self::rejectAsymmetricSetOnStaticProperty($source);
 
         $source = (string) preg_replace_callback(
@@ -95,12 +96,28 @@ final class AsymmetricVisibilityRewriter
      * Duplicate read/set visibility on the same axis is a compile fatal (#6774, #6861).
      *
      * php-src: Zend/zend_compile.c — zend_add_member_modifier(); `public public(set)` duplicates
-     * the same modifier. Explicit read + set pairs such as `public private(set)` are valid (#7308).
+     * the same modifier.
      */
     private static function rejectExplicitPublicBeforeSetModifier(string $source): void
     {
         if (preg_match(
             '/(?<![a-zA-Z0-9_])(public|protected|private)\s+\1\s*\(\s*set\s*\)/i',
+            $source
+        )) {
+            throw new \CompileError(self::MULTIPLE_MODIFIERS_MESSAGE);
+        }
+    }
+
+    /**
+     * Explicit read before X(set) duplicates PPP / PPP_SET (#7388, #6589 regression).
+     *
+     * php-src: Zend/zend_compile.c — zend_add_member_modifier(); `public private(set)` is fatal.
+     * Valid forms use `X(set)` alone or `X(set) READ` after the set modifier.
+     */
+    private static function rejectExplicitReadBeforeSetModifier(string $source): void
+    {
+        if (preg_match(
+            '/(?<![a-zA-Z0-9_])(public|protected|private)\s+(public|protected|private)\s*\(\s*set\s*\)/i',
             $source
         )) {
             throw new \CompileError(self::MULTIPLE_MODIFIERS_MESSAGE);
@@ -118,11 +135,15 @@ final class AsymmetricVisibilityRewriter
         }
     }
 
-    /** php-src: `public (public(set))` duplicates the same access modifier (#6897). */
-    private static function rejectDuplicateReadBeforeParenthesizedSetModifier(string $source): void
+    /**
+     * Explicit read before parenthesized X(set) duplicates PPP / PPP_SET (#6897, #7388).
+     *
+     * php-src: `public (private(set))` is fatal like `public private(set)`.
+     */
+    private static function rejectExplicitReadBeforeParenthesizedSetModifier(string $source): void
     {
         if (preg_match(
-            '/(?<![a-zA-Z0-9_])(public|protected|private)\s+\(\s*\1\s*\(\s*set\s*\)\s*\)/i',
+            '/(?<![a-zA-Z0-9_])(public|protected|private)\s+\(\s*(public|protected|private)\s*\(\s*set\s*\)\s*\)/i',
             $source
         )) {
             throw new \CompileError(self::MULTIPLE_MODIFIERS_MESSAGE);
