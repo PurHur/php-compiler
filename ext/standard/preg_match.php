@@ -7,7 +7,7 @@ namespace PHPCompiler\ext\standard;
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Context;
-use PHPCompiler\JIT\JitStringArg;
+use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
@@ -71,8 +71,8 @@ final class preg_match extends Internal
 
         return JitPregMatch::invoke(
             $context,
-            JitStringArg::lower($context, $args[0], 'preg_match() pattern'),
-            JitStringArg::lower($context, $args[1], 'preg_match() subject')
+            JitStringBuiltinArg::lower($context, $args[0], 'preg_match', 0, 'pattern'),
+            JitStringBuiltinArg::lower($context, $args[1], 'preg_match', 1, 'subject')
         );
     }
 }
