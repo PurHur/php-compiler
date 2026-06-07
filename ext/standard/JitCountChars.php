@@ -7,6 +7,7 @@ namespace PHPCompiler\ext\standard;
 use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\HashTableHelper;
+use PHPCompiler\JIT\JitOperandTypeLabel;
 use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Builder;
@@ -83,6 +84,16 @@ final class JitCountChars
 
     public static function compileTimeMode(Context $context, JITVariable $var): int
     {
+        $enumLabel = JitOperandTypeLabel::compileTimeEnumClassName($context, $var);
+        if (null !== $enumLabel) {
+            throw new \TypeError(self::modeTypeError($enumLabel));
+        }
+        if (($var->type & JITVariable::IS_NATIVE_ARRAY) || JITVariable::TYPE_HASHTABLE === $var->type) {
+            throw new \TypeError(self::modeTypeError('array'));
+        }
+        if (JITVariable::TYPE_OBJECT === $var->type) {
+            throw new \TypeError(self::modeTypeError(self::compileTimeObjectLabel($context, $var)));
+        }
         if (JITVariable::TYPE_NATIVE_LONG !== $var->type
             || JITVariable::KIND_VALUE !== $var->kind) {
             throw new \LogicException(
@@ -97,6 +108,34 @@ final class JitCountChars
         throw new \LogicException(
             'count_chars() argument #2 must be a compile-time integer in this compiler build'
         );
+    }
+
+    private static function modeTypeError(string $given): string
+    {
+        return sprintf(
+            'count_chars(): Argument #2 ($mode) must be of type int, %s given',
+            $given
+        );
+    }
+
+    private static function compileTimeObjectLabel(Context $context, JITVariable $arg): string
+    {
+        if (JITVariable::KIND_VALUE !== $arg->kind) {
+            return 'object';
+        }
+        $objMap = $context->structFieldMap['__object__'] ?? null;
+        if (null === $objMap || !isset($objMap['class_id'])) {
+            return 'object';
+        }
+        $classIdVal = $context->builder->load(
+            $context->builder->structGep($arg->value, $objMap['class_id'])
+        );
+        if (!method_exists($classIdVal, 'isConstant') || !$classIdVal->isConstant()) {
+            return 'object';
+        }
+        $classId = (int) $classIdVal->getConstantValue();
+
+        return $context->type->object->classNameForId($classId);
     }
 
     public static function invoke(Context $context, Value $str, int $mode): Value
