@@ -74,7 +74,7 @@ final class ReflectionSetup
         );
         $voidPtr = $context->getTypeFromString('void*');
         $context->builder->store(
-            $context->builder->pointerCast($heapPtr, $voidPtr),
+            $context->bytePtr($heapPtr),
             $slot
         );
     }

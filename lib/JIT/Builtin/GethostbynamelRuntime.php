@@ -111,8 +111,8 @@ final class GethostbynamelRuntime
         $valPtr = $context->builder->structGep($hostname, $map['value']);
         $src = $context->builder->pointerCast($valPtr, $i8p);
         $len32 = $context->builder->trunc($len, $i32);
-        $hostbufVoid = $context->builder->pointerCast($hostbuf, $voidPtr);
-        $srcVoid = $context->builder->pointerCast($src, $voidPtr);
+        $hostbufVoid = $context->bytePtr($hostbuf);
+        $srcVoid = $context->bytePtr($src);
         $context->builder->call(
             $context->lookupFunction('memcpy'),
             $hostbufVoid,
@@ -125,7 +125,7 @@ final class GethostbynamelRuntime
         $hints = $context->builder->alloca($i8, self::ADDRINFO_SIZE, 'ghbl_hints');
         $context->builder->call(
             $context->lookupFunction('memset'),
-            $context->builder->pointerCast($hints, $voidPtr),
+            $context->bytePtr($hints),
             $i32->constInt(0, false),
             $sizeT->constInt(self::ADDRINFO_SIZE, false)
         );
@@ -137,7 +137,7 @@ final class GethostbynamelRuntime
 
         $resSlot = $context->builder->alloca($voidPtr, 1, 'ghbl_res');
         $context->builder->store($voidPtr->constNull(), $resSlot);
-        $hintsVoid = $context->builder->pointerCast($hints, $voidPtr);
+        $hintsVoid = $context->bytePtr($hints);
         $rc = $context->builder->call(
             $context->lookupFunction('getaddrinfo'),
             $hostbuf,
@@ -207,7 +207,7 @@ final class GethostbynamelRuntime
         $ntop = $context->builder->call(
             $context->lookupFunction('inet_ntop'),
             $i32->constInt(self::AF_INET, false),
-            $context->builder->pointerCast($sinAddr, $voidPtr),
+            $context->bytePtr($sinAddr),
             $ipbuf,
             $sizeT->constInt(self::IPBUF_LEN, false)
         );
@@ -282,8 +282,8 @@ final class GethostbynamelRuntime
         );
         $context->builder->call(
             $context->lookupFunction('memcpy'),
-            $context->builder->pointerCast($dest, $voidPtr),
-            $context->builder->pointerCast($ipbuf, $voidPtr),
+            $context->bytePtr($dest),
+            $context->bytePtr($ipbuf),
             $sizeT->constInt(self::IPBUF_LEN, false)
         );
         $context->builder->store(

@@ -224,8 +224,8 @@ final class StringStrtokJit
         $voidPtr = $context->getTypeFromString('void*');
         $context->builder->call(
             $context->lookupFunction('memcpy'),
-            $context->builder->pointerCast($bufPtr, $voidPtr),
-            $context->builder->pointerCast($data, $voidPtr),
+            $context->bytePtr($bufPtr),
+            $context->bytePtr($data),
             $context->builder->truncOrBitCast($clamped, $sizeT)
         );
         $context->builder->branch($afterCopy);

@@ -1154,10 +1154,7 @@ class Context {
     /** NUL-terminated C string pointer for a module string global. */
     public function pointerFromStringConstant(string $string): PHPLLVM\Value
     {
-        $global = $this->constantFromString($string);
-        $zero = $this->getTypeFromString('int32')->constInt(0, false);
-
-        return $this->builder->inBoundsGEP($global, $zero, $zero);
+        return $this->bytePtr($this->constantFromString($string));
     }
 
     /** C-style int success flag (non-zero => true) for branch/select lowering. */

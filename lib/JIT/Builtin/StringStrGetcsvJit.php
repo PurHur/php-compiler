@@ -228,7 +228,7 @@ final class StringStrGetcsvJit
         $field = $context->builder->load($fieldSlot);
         $grown = $context->builder->call(
             $context->lookupFunction('realloc'),
-            $context->builder->pointerCast($field, $voidPtr),
+            $context->bytePtr($field),
             $newCap
         );
         $context->builder->store($context->builder->pointerCast($grown, $i8p), $fieldSlot);

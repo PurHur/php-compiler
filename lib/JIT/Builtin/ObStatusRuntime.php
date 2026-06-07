@@ -6,6 +6,7 @@ namespace PHPCompiler\JIT\Builtin;
 
 use PHPCompiler\JIT\Builtin;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\VM\ObStackLimits;
 use PHPLLVM\Builder;
 use PHPLLVM\Value;
 
@@ -221,10 +222,11 @@ final class ObStatusRuntime
         }
         $lenPtr = $context->builder->pointerCast(
             $lenGlobal,
-            $i64->pointerType(0)->pointerType(0)
+            $i64->arrayType(ObStackLimits::MAX_DEPTH)->pointerType(0)
         );
         $elem = $context->builder->inBoundsGEP(
             $lenPtr,
+            $i64->constInt(0, false),
             $context->builder->sext($levelIdx, $i64)
         );
 

@@ -94,8 +94,8 @@ final class GethostbyaddrRuntime
         $valPtr = $context->builder->structGep($ipArg, $map['value']);
         $src = $context->builder->pointerCast($valPtr, $i8p);
         $len32 = $context->builder->trunc($len, $i32);
-        $ipbufVoid = $context->builder->pointerCast($ipbuf, $voidPtr);
-        $srcVoid = $context->builder->pointerCast($src, $voidPtr);
+        $ipbufVoid = $context->bytePtr($ipbuf);
+        $srcVoid = $context->bytePtr($src);
         $context->builder->call(
             $context->lookupFunction('memcpy'),
             $ipbufVoid,
@@ -105,7 +105,7 @@ final class GethostbyaddrRuntime
         $context->builder->store($i8->constInt(0, false), $context->builder->gep($ipbuf, $len32));
 
         $inAddr = $context->builder->alloca($i8, self::IN_ADDR_SIZE, 'ghba_inaddr');
-        $inAddrVoid = $context->builder->pointerCast($inAddr, $voidPtr);
+        $inAddrVoid = $context->bytePtr($inAddr);
         $ptonRc = $context->builder->call(
             $context->lookupFunction('inet_pton'),
             $i32->constInt(self::AF_INET, false),

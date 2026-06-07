@@ -182,11 +182,10 @@ final class ObOutputRuntime
         );
         $row = self::storageRowPtr($context, $idx);
         $dest = $context->builder->inBoundsGEP($row, $pos);
-        $voidPtr = $context->getTypeFromString('void*');
         $context->builder->call(
             $context->lookupFunction('memcpy'),
-            $context->builder->pointerCast($dest, $voidPtr),
-            $context->builder->pointerCast($data, $voidPtr),
+            $context->bytePtr($dest),
+            $context->bytePtr($data),
             $useLen
         );
         $newPos = $context->builder->add($pos, $useLen);
@@ -531,14 +530,13 @@ final class ObOutputRuntime
         $i8p = $context->getTypeFromString('int8*');
         $i64 = $context->getTypeFromString('int64');
         $i8 = $context->getTypeFromString('int8');
-        $voidPtr = $context->getTypeFromString('void*');
         $allocLen = $context->builder->add($len, $sizeT->constInt(1, false));
         $copyBuf = $context->builder->call($context->lookupFunction('malloc'), $allocLen);
         $row = self::storageRowPtr($context, $idx);
         $context->builder->call(
             $context->lookupFunction('memcpy'),
             $copyBuf,
-            $context->builder->pointerCast($row, $voidPtr),
+            $context->bytePtr($row),
             $len
         );
         $term = $context->builder->inBoundsGEP($context->builder->pointerCast($copyBuf, $i8p), $len);
@@ -548,7 +546,7 @@ final class ObOutputRuntime
             $context->builder->sext($len, $i64),
             $context->builder->pointerCast($copyBuf, $i8p)
         );
-        $context->builder->call($context->lookupFunction('free'), $context->builder->pointerCast($copyBuf, $i8p));
+        $context->builder->call($context->lookupFunction('free'), $context->bytePtr($copyBuf));
         $context->builder->call($context->lookupFunction('__value__writeString'), $out, $str);
         $context->builder->branch($done);
         $context->builder->positionAtEnd($done);
@@ -708,6 +706,7 @@ final class ObOutputRuntime
 
         return $context->builder->inBoundsGEP(
             self::lenArrayPtr($context),
+            $i64->constInt(0, false),
             $context->builder->sext($idx, $i64)
         );
     }
@@ -716,9 +715,10 @@ final class ObOutputRuntime
     {
         $i64 = $context->getTypeFromString('int64');
 
-        return $context->builder->pointerCast(
-            self::globalPtr($context, ObStorageGlobals::GLOBAL_LEN, $i64->arrayType(ObStackLimits::MAX_DEPTH)),
-            $i64->pointerType(0)->pointerType(0)
+        return self::globalPtr(
+            $context,
+            ObStorageGlobals::GLOBAL_LEN,
+            $i64->arrayType(ObStackLimits::MAX_DEPTH)
         );
     }
 
@@ -772,16 +772,7 @@ final class ObOutputRuntime
         $i8p = $context->getTypeFromString('int8*');
         $charPtr = $context->getTypeFromString('char*');
         $sizeT = $context->getTypeFromString('size_t');
-        $voidPtr = $context->getTypeFromString('void*');
-        $voidTy = $context->getTypeFromString('void');
 
-        self::ensureExternal($context, 'malloc', $context->context->functionType($voidPtr, false, $sizeT));
-        self::ensureExternal($context, 'free', $context->context->functionType($voidTy, false, $i8p));
-        self::ensureExternal(
-            $context,
-            'memcpy',
-            $context->context->functionType($voidPtr, false, $voidPtr, $voidPtr, $sizeT)
-        );
         self::ensureExternal($context, 'strlen', $context->context->functionType($sizeT, false, $i8p));
         self::ensureExternal($context, 'write', $context->context->functionType($i64, false, $i32, $i8p, $i64));
         self::ensureExternal($context, 'fflush', $context->context->functionType($i32, false, $i8p));

@@ -171,7 +171,7 @@ final class StringPackJit
         $bytes = $context->builder->alloca($i8, 8, 'pack_pl_bytes');
         $context->builder->call(
             $context->lookupFunction('memset'),
-            $context->builder->pointerCast($bytes, $voidPtr),
+            $context->bytePtr($bytes),
             $i32->constInt(0, false),
             $sizeT->constInt(8, false)
         );
@@ -179,8 +179,8 @@ final class StringPackJit
         $context->builder->store($zl, $zlAddr);
         $context->builder->call(
             $context->lookupFunction('memcpy'),
-            $context->builder->pointerCast($bytes, $voidPtr),
-            $context->builder->pointerCast($zlAddr, $voidPtr),
+            $context->bytePtr($bytes),
+            $context->bytePtr($zlAddr),
             $context->builder->truncOrBitCast($copySize, $sizeT)
         );
 
@@ -239,8 +239,8 @@ final class StringPackJit
         $context->builder->positionAtEnd($afterSwapBb);
         $context->builder->call(
             $context->lookupFunction('memcpy'),
-            $context->builder->pointerCast($out, $voidPtr),
-            $context->builder->pointerCast($bytes, $voidPtr),
+            $context->bytePtr($out),
+            $context->bytePtr($bytes),
             $context->builder->truncOrBitCast($copySize, $sizeT)
         );
         $context->builder->returnVoid();
@@ -273,8 +273,8 @@ final class StringPackJit
         $context->builder->store($finalBits, $context->builder->pointerCast($mem, $i32p));
         $context->builder->call(
             $context->lookupFunction('memcpy'),
-            $context->builder->pointerCast($out, $voidPtr),
-            $context->builder->pointerCast($mem, $voidPtr),
+            $context->bytePtr($out),
+            $context->bytePtr($mem),
             $sizeT->constInt(4, false)
         );
         $context->builder->returnVoid();
@@ -308,8 +308,8 @@ final class StringPackJit
         $context->builder->store($finalBits, $context->builder->pointerCast($mem, $i64p));
         $context->builder->call(
             $context->lookupFunction('memcpy'),
-            $context->builder->pointerCast($out, $voidPtr),
-            $context->builder->pointerCast($mem, $voidPtr),
+            $context->bytePtr($out),
+            $context->bytePtr($mem),
             $sizeT->constInt(8, false)
         );
         $context->builder->returnVoid();
@@ -911,7 +911,7 @@ final class StringPackJit
         $outAt = $context->builder->gep($output, $pos);
         $context->builder->call(
             $context->lookupFunction('memset'),
-            $context->builder->pointerCast($outAt, $voidPtr),
+            $context->bytePtr($outAt),
             $fill,
             $context->builder->truncOrBitCast($arg64, $sizeT)
         );
@@ -922,8 +922,8 @@ final class StringPackJit
         );
         $context->builder->call(
             $context->lookupFunction('memcpy'),
-            $context->builder->pointerCast($outAt, $voidPtr),
-            $context->builder->pointerCast($sdata, $voidPtr),
+            $context->bytePtr($outAt),
+            $context->bytePtr($sdata),
             $context->builder->truncOrBitCast($copyLen, $sizeT)
         );
         $context->builder->store($context->builder->add($pos, $arg64), $execOutputPos);

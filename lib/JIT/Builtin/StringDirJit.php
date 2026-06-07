@@ -413,7 +413,7 @@ final class StringDirJit
             $pathData,
             $namelistSlot,
             $voidPtr->constNull(),
-            $context->builder->pointerCast($alphasort, $voidPtr)
+            $context->bytePtr($alphasort)
         );
         $scanFailBlock = $fn->appendBasicBlock('scan_fail');
         $scanFail = $context->builder->icmp(Builder::INT_SLT, $n, $zero32);

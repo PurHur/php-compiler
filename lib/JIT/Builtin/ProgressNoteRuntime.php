@@ -183,8 +183,8 @@ final class ProgressNoteRuntime
         $bufPtr = self::bufBasePtr($context);
         $context->builder->call(
             $context->lookupFunction('memcpy'),
-            $context->builder->pointerCast($bufPtr, $voidPtr),
-            $context->builder->pointerCast($msg, $voidPtr),
+            $context->bytePtr($bufPtr),
+            $context->bytePtr($msg),
             $storedLen
         );
         $context->builder->branch($skipCopy);

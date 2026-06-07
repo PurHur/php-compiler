@@ -518,8 +518,8 @@ final class IniRuntime
         $voidPtr = $context->getTypeFromString('void*');
         $context->builder->call(
             $context->lookupFunction('memcpy'),
-            $context->builder->pointerCast($mlPtr, $voidPtr),
-            $context->builder->pointerCast($src, $voidPtr),
+            $context->bytePtr($mlPtr),
+            $context->bytePtr($src),
             $copyLen
         );
         $end = $context->builder->gep($mlPtr, $copyLen);
@@ -575,8 +575,8 @@ final class IniRuntime
         $defLen = $context->builder->call($context->lookupFunction('strlen'), $defPtr);
         $context->builder->call(
             $context->lookupFunction('memcpy'),
-            $context->builder->pointerCast($bufPtr, $voidPtr),
-            $context->builder->pointerCast($defPtr, $voidPtr),
+            $context->bytePtr($bufPtr),
+            $context->bytePtr($defPtr),
             $defLen
         );
         $end = $context->builder->gep($bufPtr, $defLen);
@@ -629,8 +629,8 @@ final class IniRuntime
         $out = $context->builder->pointerCast($raw, $i8p);
         $context->builder->call(
             $context->lookupFunction('memcpy'),
-            $context->builder->pointerCast($out, $voidPtr),
-            $context->builder->pointerCast($src, $voidPtr),
+            $context->bytePtr($out),
+            $context->bytePtr($src),
             $len
         );
         $end = $context->builder->gep($out, $len);

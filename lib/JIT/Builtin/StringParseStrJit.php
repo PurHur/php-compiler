@@ -816,7 +816,7 @@ final class StringParseStrJit
             self::PARSED_KEY_SIZE,
             'pdp_pk'
         );
-        $pkVoid = $context->builder->pointerCast($pk, $voidPtr);
+        $pkVoid = $context->bytePtr($pk);
         $status = $context->builder->call(
             $context->lookupFunction('__phpc_parse_str_parse_key_brackets'),
             $context->builder->load($keySlot),

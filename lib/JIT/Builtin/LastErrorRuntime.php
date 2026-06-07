@@ -237,8 +237,8 @@ final class LastErrorRuntime
         $out = $context->builder->pointerCast($raw, $i8p);
         $context->builder->call(
             $context->lookupFunction('memcpy'),
-            $context->builder->pointerCast($out, $voidPtr),
-            $context->builder->pointerCast($src, $voidPtr),
+            $context->bytePtr($out),
+            $context->bytePtr($src),
             $len
         );
         $end = $context->builder->gep($out, $len);

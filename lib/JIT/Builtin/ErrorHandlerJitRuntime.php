@@ -279,8 +279,8 @@ final class ErrorHandlerJitRuntime
         $copyPtr = $context->builder->pointerCast($copy, $i8p);
         $context->builder->call(
             $context->lookupFunction('memcpy'),
-            $context->builder->pointerCast($copyPtr, $voidPtr),
-            $context->builder->pointerCast($name, $voidPtr),
+            $context->bytePtr($copyPtr),
+            $context->bytePtr($name),
             $nameLen
         );
         $term = $context->builder->gep($copyPtr, $nameLen);

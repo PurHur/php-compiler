@@ -206,7 +206,7 @@ final class StringUnserializeJit
                 ['__hashtable__alloc', $htPtr, []],
                 ['__hashtable__setStringKeyString', $void, [$htPtr, $strPtr, $strPtr]],
                 ['__hashtable__setStringKeyLong', $void, [$htPtr, $strPtr, $i64]],
-                ['__hashtable__setStringKeyBool', $void, [$htPtr, $strPtr, $i32]],
+                ['__hashtable__setStringKeyBool', $void, [$htPtr, $strPtr, $context->getTypeFromString('int1')]],
                 ['__hashtable__setStringKeyHashtable', $void, [$htPtr, $strPtr, $htPtr]],
                 ['__value__writeNull', $void, [$valuePtr]],
                 ['__value__writeLong', $void, [$valuePtr, $i64]],
@@ -255,7 +255,8 @@ final class StringUnserializeJit
         $i8 = $context->getTypeFromString('int8');
         $i32 = $context->getTypeFromString('int32');
         $i8p = $context->getTypeFromString('int8*');
-        $one = $i8p->constInt(1, false);
+        $sizeT = $context->getTypeFromString('size_t');
+        $one = $sizeT->constInt(1, false);
         $zeroI32 = $i32->constInt(0, false);
         $oneI32 = $i32->constInt(1, false);
 
@@ -294,13 +295,14 @@ final class StringUnserializeJit
         $i32 = $context->getTypeFromString('int32');
         $i64 = $context->getTypeFromString('int64');
         $i8p = $context->getTypeFromString('int8*');
+        $sizeT = $context->getTypeFromString('size_t');
         $zeroI32 = $i32->constInt(0, false);
         $oneI32 = $i32->constInt(1, false);
         $zeroI64 = $i64->constInt(0, false);
         $ten = $i64->constInt(10, false);
         $digit0 = $i8->constInt(ord('0'), false);
         $digit9 = $i8->constInt(ord('9'), false);
-        $onePtr = $i8p->constInt(1, false);
+        $onePtr = $sizeT->constInt(1, false);
 
         $posPtr = $fn->getParam(0);
         $end = $fn->getParam(1);
@@ -365,6 +367,7 @@ final class StringUnserializeJit
         $i32 = $context->getTypeFromString('int32');
         $i64 = $context->getTypeFromString('int64');
         $i8p = $context->getTypeFromString('int8*');
+        $sizeT = $context->getTypeFromString('size_t');
         $zeroI32 = $i32->constInt(0, false);
         $oneI32 = $i32->constInt(1, false);
         $zeroI64 = $i64->constInt(0, false);
@@ -373,7 +376,7 @@ final class StringUnserializeJit
         $digit0 = $i8->constInt(ord('0'), false);
         $digit9 = $i8->constInt(ord('9'), false);
         $minus = $i8->constInt(ord('-'), false);
-        $onePtr = $i8p->constInt(1, false);
+        $onePtr = $sizeT->constInt(1, false);
 
         $posPtr = $fn->getParam(0);
         $end = $fn->getParam(1);
@@ -487,8 +490,8 @@ final class StringUnserializeJit
         $context->builder->positionAtEnd($ok);
         $context->builder->call(
             $context->lookupFunction('memcpy'),
-            $context->builder->pointerCast($outBuf, $voidPtr),
-            $context->builder->pointerCast($pos, $voidPtr),
+            $context->bytePtr($outBuf),
+            $context->bytePtr($pos),
             $len
         );
         $nul = $context->builder->inBoundsGEP($outBuf, $len);
@@ -524,6 +527,7 @@ final class StringUnserializeJit
         $key = $fn->getParam(1);
         $kind = $fn->getParam(2);
         $boolVal = $fn->getParam(3);
+        $boolI1 = $context->builder->icmp(Builder::INT_NE, $boolVal, $zeroI32);
         $longVal = $fn->getParam(4);
         $strBuf = $fn->getParam(5);
         $childHt = $fn->getParam(6);
@@ -557,7 +561,7 @@ final class StringUnserializeJit
             $context->lookupFunction('__hashtable__setStringKeyBool'),
             $ht,
             $key,
-            $boolVal
+            $boolI1
         );
         $context->builder->branch($doneBb);
 

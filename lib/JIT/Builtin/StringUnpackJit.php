@@ -226,7 +226,7 @@ final class StringUnpackJit
         $buf = $context->builder->alloca($i8, 8, 'upk_rl_buf');
         $context->builder->call(
             $context->lookupFunction('memset'),
-            $context->builder->pointerCast($buf, $voidPtr),
+            $context->bytePtr($buf),
             $i32->constInt(0, false),
             $sizeT->constInt(8, false)
         );
@@ -237,8 +237,8 @@ final class StringUnpackJit
         );
         $context->builder->call(
             $context->lookupFunction('memcpy'),
-            $context->builder->pointerCast($buf, $voidPtr),
-            $context->builder->pointerCast($bytes, $voidPtr),
+            $context->bytePtr($buf),
+            $context->bytePtr($bytes),
             $context->builder->truncOrBitCast($copySize, $sizeT)
         );
 

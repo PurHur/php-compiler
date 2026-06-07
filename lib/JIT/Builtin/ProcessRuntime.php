@@ -181,7 +181,7 @@ final class ProcessRuntime
         $newCap = $context->builder->mul($needPlusOne, $sizeT->constInt(2, false));
         $grown = $context->builder->call(
             $context->lookupFunction('realloc'),
-            $context->builder->pointerCast($context->builder->load($bufSlot), $voidPtr),
+            $context->bytePtr($context->builder->load($bufSlot)),
             $newCap
         );
         $grownNull = $context->builder->icmp(Builder::INT_EQ, $grown, $voidPtr->constNull());
@@ -192,7 +192,7 @@ final class ProcessRuntime
         $context->builder->positionAtEnd($growFail);
         $context->builder->call(
             $context->lookupFunction('free'),
-            $context->builder->pointerCast($context->builder->load($bufSlot), $voidPtr)
+            $context->bytePtr($context->builder->load($bufSlot))
         );
         $context->builder->returnValue($strPtr->constNull());
 
@@ -206,8 +206,8 @@ final class ProcessRuntime
         $dest = $context->builder->gep($context->builder->load($bufSlot), $curLen);
         $context->builder->call(
             $context->lookupFunction('memcpy'),
-            $context->builder->pointerCast($dest, $voidPtr),
-            $context->builder->pointerCast($chunkPtr, $voidPtr),
+            $context->bytePtr($dest),
+            $context->bytePtr($chunkPtr),
             $chunkLen
         );
         $context->builder->store($context->builder->add($curLen, $chunkLen), $len);
@@ -223,7 +223,7 @@ final class ProcessRuntime
         $context->builder->positionAtEnd($emptyBb);
         $context->builder->call(
             $context->lookupFunction('free'),
-            $context->builder->pointerCast($context->builder->load($bufSlot), $voidPtr)
+            $context->bytePtr($context->builder->load($bufSlot))
         );
         $context->builder->returnValue(
             $context->builder->call(
@@ -241,7 +241,7 @@ final class ProcessRuntime
         );
         $context->builder->call(
             $context->lookupFunction('free'),
-            $context->builder->pointerCast($context->builder->load($bufSlot), $voidPtr)
+            $context->bytePtr($context->builder->load($bufSlot))
         );
         $context->builder->returnValue($result);
 
@@ -495,7 +495,7 @@ final class ProcessRuntime
         );
         $context->builder->call(
             $context->lookupFunction('free'),
-            $context->builder->pointerCast($context->builder->load($outSlot), $voidPtr)
+            $context->bytePtr($context->builder->load($outSlot))
         );
         $context->builder->returnValue($result);
 
@@ -639,7 +639,7 @@ final class ProcessRuntime
         );
         $context->builder->call(
             $context->lookupFunction('free'),
-            $context->builder->pointerCast($context->builder->load($outSlot), $voidPtr)
+            $context->bytePtr($context->builder->load($outSlot))
         );
         $context->builder->returnValue($result);
 
@@ -949,7 +949,7 @@ final class ProcessRuntime
         $newCap = $context->builder->mul($need, $sizeT->constInt(2, false));
         $grown = $context->builder->call(
             $context->lookupFunction('realloc'),
-            $context->builder->pointerCast($context->builder->load($outSlot), $voidPtr),
+            $context->bytePtr($context->builder->load($outSlot)),
             $newCap
         );
         $grownNull = $context->builder->icmp(Builder::INT_EQ, $grown, $voidPtr->constNull());
@@ -960,7 +960,7 @@ final class ProcessRuntime
         $context->builder->positionAtEnd($failBb);
         $context->builder->call(
             $context->lookupFunction('free'),
-            $context->builder->pointerCast($context->builder->load($outSlot), $voidPtr)
+            $context->bytePtr($context->builder->load($outSlot))
         );
         $context->builder->returnValue($context->getTypeFromString('__string__*')->constNull());
 

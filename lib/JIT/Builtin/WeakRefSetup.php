@@ -61,7 +61,7 @@ final class WeakRefSetup
         );
         $voidPtr = $context->getTypeFromString('void*');
         $context->builder->store(
-            $context->builder->pointerCast($heapPtr, $voidPtr),
+            $context->bytePtr($heapPtr),
             $slot
         );
         $i8p = $context->getTypeFromString('int8*');

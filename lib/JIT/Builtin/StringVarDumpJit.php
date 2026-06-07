@@ -238,7 +238,7 @@ final class StringVarDumpJit
 
         $v = $fn->getParam(0);
         $buf = $context->builder->alloca($context->getTypeFromString('int8'), self::BUF_SIZE, 've_buf');
-        $bufVoid = $context->builder->pointerCast($buf, $voidPtr);
+        $bufVoid = $context->bytePtr($buf);
 
         $initCap = $sizeT->constInt(256, false);
         $bufPtr = $context->builder->call($context->lookupFunction('malloc'), $initCap);

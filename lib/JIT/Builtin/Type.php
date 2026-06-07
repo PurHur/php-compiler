@@ -201,31 +201,15 @@ class Type extends Builtin {
                 '__compiler_env_register_putenv' => [$voidTy, false, $i8p],
             ] as $libcName => [$ret, $vararg, $param]
         ) {
-            $ft = $this->context->context->functionType($ret, $vararg, $param);
-            $fn = $this->context->module->addFunction($libcName, $ft);
-            $this->context->registerFunction($libcName, $fn);
+            $this->ensureExternalFunction($libcName, $this->context->context->functionType($ret, $vararg, $param));
         }
-        $ftOpen = $this->context->context->functionType($i32, false, $i8p, $i32);
-        $fnOpen = $this->context->module->addFunction('open', $ftOpen);
-        $this->context->registerFunction('open', $fnOpen);
-        $ftFopen = $this->context->context->functionType($i8p, false, $i8p, $i8p);
-        $fnFopen = $this->context->module->addFunction('fopen', $ftFopen);
-        $this->context->registerFunction('fopen', $fnFopen);
-        $ftFwrite = $this->context->context->functionType($sizeT, false, $i8p, $sizeT, $sizeT, $i8p);
-        $fnFwrite = $this->context->module->addFunction('fwrite', $ftFwrite);
-        $this->context->registerFunction('fwrite', $fnFwrite);
-        $ftFclose = $this->context->context->functionType($i32, false, $i8p);
-        $fnFclose = $this->context->module->addFunction('fclose', $ftFclose);
-        $this->context->registerFunction('fclose', $fnFclose);
-        $ftRead = $this->context->context->functionType($i64, false, $i32, $i8p, $sizeT);
-        $fnRead = $this->context->module->addFunction('read', $ftRead);
-        $this->context->registerFunction('read', $fnRead);
-        $ftWrite = $this->context->context->functionType($i64, false, $i32, $i8p, $sizeT);
-        $fnWrite = $this->context->module->addFunction('write', $ftWrite);
-        $this->context->registerFunction('write', $fnWrite);
-        $ftClose = $this->context->context->functionType($i32, false, $i32);
-        $fnClose = $this->context->module->addFunction('close', $ftClose);
-        $this->context->registerFunction('close', $fnClose);
+        $this->ensureExternalFunction('open', $this->context->context->functionType($i32, false, $i8p, $i32, $i32));
+        $this->ensureExternalFunction('fopen', $this->context->context->functionType($i8p, false, $i8p, $i8p));
+        $this->ensureExternalFunction('fwrite', $this->context->context->functionType($sizeT, false, $i8p, $sizeT, $sizeT, $i8p));
+        $this->ensureExternalFunction('fclose', $this->context->context->functionType($i32, false, $i8p));
+        $this->ensureExternalFunction('read', $this->context->context->functionType($i64, false, $i32, $i8p, $sizeT));
+        $this->ensureExternalFunction('write', $this->context->context->functionType($i64, false, $i32, $i8p, $sizeT));
+        $this->ensureExternalFunction('close', $this->context->context->functionType($i32, false, $i32));
         $fntypeReadfile = $this->context->context->functionType(
             $i64,
             false,
@@ -1015,5 +999,17 @@ class Type extends Builtin {
         SessionName::implement($this->context);
     }
 
+    private function ensureExternalFunction(string $name, $fnType): void
+    {
+        if (null !== $this->context->module->getNamedFunction($name)) {
+            return;
+        }
+        try {
+            $this->context->lookupFunction($name);
+        } catch (\Throwable) {
+            $fn = $this->context->module->addFunction($name, $fnType);
+            $this->context->registerFunction($name, $fn);
+        }
+    }
 
 }

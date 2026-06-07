@@ -280,11 +280,11 @@ final class StringJsonDecodeJit
                 ['__hashtable__alloc', $htPtr, []],
                 ['__hashtable__setStringKeyString', $void, [$htPtr, $strPtr, $strPtr]],
                 ['__hashtable__setStringKeyLong', $void, [$htPtr, $strPtr, $i64]],
-                ['__hashtable__setStringKeyBool', $void, [$htPtr, $strPtr, $i32]],
+                ['__hashtable__setStringKeyBool', $void, [$htPtr, $strPtr, $context->getTypeFromString('int1')]],
                 ['__hashtable__setStringKeyHashtable', $void, [$htPtr, $strPtr, $htPtr]],
                 ['__hashtable__setStringAt', $void, [$htPtr, $sizeT, $strPtr]],
                 ['__hashtable__setLongAt', $void, [$htPtr, $sizeT, $i64]],
-                ['__hashtable__setBoolAt', $void, [$htPtr, $sizeT, $i32]],
+                ['__hashtable__setBoolAt', $void, [$htPtr, $sizeT, $context->getTypeFromString('int1')]],
                 ['__hashtable__setDoubleAt', $void, [$htPtr, $sizeT, $dbl]],
                 ['__hashtable__readStringKeyHashtable', $htPtr, [$htPtr, $strPtr]],
                 ['__value__writeNull', $void, [$valuePtr]],
@@ -337,7 +337,8 @@ final class StringJsonDecodeJit
 
         $i8 = $context->getTypeFromString('int8');
         $i8p = $context->getTypeFromString('int8*');
-        $one = $i8p->constInt(1, false);
+        $sizeT = $context->getTypeFromString('size_t');
+        $one = $sizeT->constInt(1, false);
         $posPtr = $fn->getParam(0);
         $end = $fn->getParam(1);
 
@@ -384,7 +385,8 @@ final class StringJsonDecodeJit
 
         $i8p = $context->getTypeFromString('int8*');
         $i32 = $context->getTypeFromString('int32');
-        $one = $i8p->constInt(1, false);
+        $sizeT = $context->getTypeFromString('size_t');
+        $one = $sizeT->constInt(1, false);
         $zeroI32 = $i32->constInt(0, false);
         $oneI32 = $i32->constInt(1, false);
 
@@ -431,7 +433,7 @@ final class StringJsonDecodeJit
         $sizeT = $context->getTypeFromString('size_t');
         $oneI32 = $i32->constInt(1, false);
         $zeroI32 = $i32->constInt(0, false);
-        $one = $i8p->constInt(1, false);
+        $one = $sizeT->constInt(1, false);
         $oneSize = $sizeT->constInt(1, false);
         $four = $i64->constInt(4, false);
         $quote = $i8->constInt(ord('"'), false);
@@ -605,7 +607,7 @@ final class StringJsonDecodeJit
         $i8p = $context->getTypeFromString('int8*');
         $voidPtr = $context->getTypeFromString('void*');
         $sizeT = $context->getTypeFromString('size_t');
-        $one = $i8p->constInt(1, false);
+        $one = $sizeT->constInt(1, false);
         $oneI32 = $i32->constInt(1, false);
         $zeroI32 = $i32->constInt(0, false);
         $oneSize = $sizeT->constInt(1, false);
@@ -763,8 +765,8 @@ final class StringJsonDecodeJit
         $context->builder->positionAtEnd($memcpyOk);
         $context->builder->call(
             $context->lookupFunction('memcpy'),
-            $context->builder->pointerCast($outBuf, $voidPtr),
-            $context->builder->pointerCast($start, $voidPtr),
+            $context->bytePtr($outBuf),
+            $context->bytePtr($start),
             $len
         );
         $context->builder->store($i8->constInt(0, false), $context->builder->inBoundsGEP($outBuf, $len));
@@ -934,13 +936,14 @@ final class StringJsonDecodeJit
         $useIndex = $fn->getParam(2);
         $index = $fn->getParam(3);
         $value = $fn->getParam(4);
+        $boolI1 = $context->builder->icmp(Builder::INT_NE, $value, $zeroI32);
         $isIndex = $context->builder->icmp(Builder::INT_NE, $useIndex, $zeroI32);
         $idxBb = $fn->appendBasicBlock('idx');
         $keyBb = $fn->appendBasicBlock('key');
         $done = $fn->appendBasicBlock('done');
         $context->builder->branchIf($isIndex, $idxBb, $keyBb);
         $context->builder->positionAtEnd($idxBb);
-        $context->builder->call($context->lookupFunction('__hashtable__setBoolAt'), $ht, $index, $value);
+        $context->builder->call($context->lookupFunction('__hashtable__setBoolAt'), $ht, $index, $boolI1);
         $context->builder->branch($done);
         $context->builder->positionAtEnd($keyBb);
         $keyStr = $context->builder->call($context->lookupFunction('__phpc_json_cstr_to_string'), $key);
@@ -948,7 +951,7 @@ final class StringJsonDecodeJit
             $context->lookupFunction('__hashtable__setStringKeyBool'),
             $ht,
             $keyStr,
-            $value
+            $boolI1
         );
         $context->builder->branch($done);
         $context->builder->positionAtEnd($done);
@@ -1001,7 +1004,7 @@ final class StringJsonDecodeJit
             $end,
             $i8->constInt(ord('}'), false)
         );
-        $context->builder->branchIf($empty, $ok, $loop);
+        $context->builder->branchIf($context->i32Success($empty), $ok, $loop);
 
         $context->builder->positionAtEnd($loop);
         $okKey = $context->builder->call(
@@ -1064,13 +1067,13 @@ final class StringJsonDecodeJit
         $context->builder->branchIf($isComma, $nextComma, $fail);
         $context->builder->positionAtEnd($closeBb);
         $context->builder->store(
-            $context->builder->inBoundsGEP($pos, $i8p->constInt(1, false)),
+            $context->builder->inBoundsGEP($pos, $sizeT->constInt(1, false)),
             $posPtr
         );
         $context->builder->branch($ok);
         $context->builder->positionAtEnd($nextComma);
         $context->builder->store(
-            $context->builder->inBoundsGEP($pos, $i8p->constInt(1, false)),
+            $context->builder->inBoundsGEP($pos, $sizeT->constInt(1, false)),
             $posPtr
         );
         $context->builder->branch($loop);
@@ -1131,7 +1134,7 @@ final class StringJsonDecodeJit
         );
         $emptyBb = $fn->appendBasicBlock('empty_arr');
         $nonEmpty = $fn->appendBasicBlock('non_empty');
-        $context->builder->branchIf($empty, $emptyBb, $nonEmpty);
+        $context->builder->branchIf($context->i32Success($empty), $emptyBb, $nonEmpty);
         $context->builder->positionAtEnd($emptyBb);
         $hasKey = $context->builder->icmp(Builder::INT_NE, $key, $i8p->constNull());
         $ensureBb = $fn->appendBasicBlock('ensure_empty');
@@ -1195,10 +1198,10 @@ final class StringJsonDecodeJit
         $context->builder->positionAtEnd($commaOrFail);
         $context->builder->branchIf($isComma, $nextComma, $fail);
         $context->builder->positionAtEnd($closeBb);
-        $context->builder->store($context->builder->inBoundsGEP($pos, $i8p->constInt(1, false)), $posPtr);
+        $context->builder->store($context->builder->inBoundsGEP($pos, $sizeT->constInt(1, false)), $posPtr);
         $context->builder->branch($ok);
         $context->builder->positionAtEnd($nextComma);
-        $context->builder->store($context->builder->inBoundsGEP($pos, $i8p->constInt(1, false)), $posPtr);
+        $context->builder->store($context->builder->inBoundsGEP($pos, $sizeT->constInt(1, false)), $posPtr);
         $context->builder->branch($loop);
 
         $context->builder->positionAtEnd($ok);

@@ -663,8 +663,8 @@ final class StringVersionCompareJit
         $buf = $context->builder->pointerCast($raw, $i8p);
         $context->builder->call(
             $context->lookupFunction('memcpy'),
-            $context->builder->pointerCast($buf, $voidPtr),
-            $context->builder->pointerCast($orig, $voidPtr),
+            $context->bytePtr($buf),
+            $context->bytePtr($orig),
             $len
         );
         $context->builder->store($i8->constInt(0, false), $context->builder->inBoundsGEP($buf, $len));

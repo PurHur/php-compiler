@@ -315,7 +315,7 @@ final class StringFsGlobVecJit
         $globBase = self::stackArrayBase($context, $globSlot);
         $context->builder->call(
             $context->lookupFunction('memset'),
-            $context->builder->pointerCast($globBase, $voidPtr),
+            $context->bytePtr($globBase),
             $zero32,
             $globSize
         );
@@ -325,7 +325,7 @@ final class StringFsGlobVecJit
             $pat,
             $flags,
             $voidPtr->constNull(),
-            $context->builder->pointerCast($globBase, $voidPtr)
+            $context->bytePtr($globBase)
         );
         $nomatch = $context->builder->icmp(Builder::INT_EQ, $rc, $i32->constInt(self::GLOB_NOMATCH, false));
         $globErr = $context->builder->icmp(Builder::INT_NE, $rc, $zero32);
@@ -346,7 +346,7 @@ final class StringFsGlobVecJit
         $context->builder->branchIf($zeroCount, $zeroFreeBlock, $allocBlock);
 
         $context->builder->positionAtEnd($zeroFreeBlock);
-        $context->builder->call($context->lookupFunction('globfree'), $context->builder->pointerCast($globBase, $voidPtr));
+        $context->builder->call($context->lookupFunction('globfree'), $context->bytePtr($globBase));
         $context->builder->branch($emptyOk);
         $context->builder->positionAtEnd($allocBlock);
         $items = $context->builder->pointerCast(
@@ -359,7 +359,7 @@ final class StringFsGlobVecJit
         $context->builder->branchIf($mallocFail, $freeGlobFail, $fillBlock);
 
         $context->builder->positionAtEnd($freeGlobFail);
-        $context->builder->call($context->lookupFunction('globfree'), $context->builder->pointerCast($globBase, $voidPtr));
+        $context->builder->call($context->lookupFunction('globfree'), $context->bytePtr($globBase));
         $context->builder->branch($failBlock);
 
         $context->builder->positionAtEnd($fillBlock);
@@ -408,7 +408,7 @@ final class StringFsGlobVecJit
         $context->builder->positionAtEnd($dupFailBlock);
         $context->builder->call($context->lookupFunction('__phpc_strvec_free'), $items, $context->builder->truncOrBitCast($kept, $i32));
         $context->builder->store($i8pp->constNull(), $outItems);
-        $context->builder->call($context->lookupFunction('globfree'), $context->builder->pointerCast($globBase, $voidPtr));
+        $context->builder->call($context->lookupFunction('globfree'), $context->bytePtr($globBase));
         $context->builder->branch($failBlock);
 
         $context->builder->positionAtEnd($storeBlock);
@@ -417,7 +417,7 @@ final class StringFsGlobVecJit
         $context->builder->branch($nextBlock);
 
         $context->builder->positionAtEnd($loopDone);
-        $context->builder->call($context->lookupFunction('globfree'), $context->builder->pointerCast($globBase, $voidPtr));
+        $context->builder->call($context->lookupFunction('globfree'), $context->bytePtr($globBase));
         $kept = $context->builder->load($keptSlot);
         $keptZero = $context->builder->icmp(Builder::INT_EQ, $kept, $sizeT->constInt(0, false));
         $keptEmptyBlock = $fn->appendBasicBlock('glob_kept_empty');
@@ -442,7 +442,7 @@ final class StringFsGlobVecJit
         $shrunk = $context->builder->pointerCast(
             $context->builder->call(
                 $context->lookupFunction('realloc'),
-                $context->builder->pointerCast($items, $voidPtr),
+                $context->bytePtr($items),
                 $context->builder->mul($kept, $ptrSize)
             ),
             $i8pp
@@ -509,11 +509,11 @@ final class StringFsGlobVecJit
         $alphaCmp = $context->lookupFunction('alphasort');
         $cmp = $context->builder->select(
             $isDesc,
-            $context->builder->pointerCast($descCmp, $voidPtr),
+            $context->bytePtr($descCmp),
             $context->builder->select(
                 $isNone,
                 $voidPtr->constNull(),
-                $context->builder->pointerCast($alphaCmp, $voidPtr)
+                $context->bytePtr($alphaCmp)
             )
         );
         $context->builder->store($cmp, $cmpSlot);

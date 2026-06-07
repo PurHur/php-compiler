@@ -522,8 +522,8 @@ final class StringPregMatchJit
         $context->builder->positionAtEnd($doCopyBb);
         $context->builder->call(
             $context->lookupFunction('memcpy'),
-            $context->builder->pointerCast($regexPtr, $voidPtr),
-            $context->builder->pointerCast($regexStart, $voidPtr),
+            $context->bytePtr($regexPtr),
+            $context->bytePtr($regexStart),
             $regexLenSizeT
         );
         $context->builder->branch($afterCopyBb);
@@ -1060,7 +1060,7 @@ final class StringPregMatchJit
         $buf = $context->builder->load($bufSlot);
         $grown = $context->builder->call(
             $context->lookupFunction('realloc'),
-            $context->builder->pointerCast($buf, $voidPtr),
+            $context->bytePtr($buf),
             $newCap
         );
         $growFailBb = $fn->appendBasicBlock('pr_grow_fail_'.self::$blockSuffix);
@@ -1097,7 +1097,7 @@ final class StringPregMatchJit
         $context->builder->call(
             $context->lookupFunction('memcpy'),
             $context->builder->pointerCast($context->builder->gep($buf, $bufLen), $voidPtr),
-            $context->builder->pointerCast($src, $voidPtr),
+            $context->bytePtr($src),
             $len
         );
         $context->builder->store($context->builder->add($bufLen, $len), $bufLenSlot);
