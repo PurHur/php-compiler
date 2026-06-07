@@ -6575,9 +6575,11 @@ restart:
         }
         if (Variable::TYPE_OBJECT === $thrown->type) {
             $entry = $thrown->toObject();
-            throw VM\ExceptionSupport::nativeUncaughtThrowable(
-                $entry,
-                VM\ExceptionSupport::readThrowableMessage($entry)
+            VM\ExceptionSupport::emitNativeUncaughtFatal(
+                VM\ExceptionSupport::nativeUncaughtThrowable(
+                    $entry,
+                    VM\ExceptionSupport::readThrowableMessage($entry)
+                )
             );
         }
         throw new \Exception($thrown->toString());

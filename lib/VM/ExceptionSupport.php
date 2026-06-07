@@ -235,6 +235,33 @@ final class ExceptionSupport
         }
     }
 
+    /**
+     * Zend SAPI uncaught fatal — user site only, no VM re-dispatch frames (#6334, #7343).
+     *
+     * @return never
+     */
+    public static function emitNativeUncaughtFatal(\Throwable $native): void
+    {
+        $class = $native::class;
+        $message = $native->getMessage();
+        $file = $native->getFile();
+        $line = $native->getLine();
+        $fatal = "PHP Fatal error:  Uncaught {$class}: {$message}";
+        if ('' !== $file) {
+            $fatal .= " in {$file}";
+            if ($line > 0) {
+                $fatal .= ":{$line}";
+            }
+        }
+        fwrite(STDERR, $fatal."\n");
+        fwrite(STDERR, "Stack trace:\n");
+        fwrite(STDERR, "#0 {main}\n");
+        if ('' !== $file && $line > 0) {
+            fwrite(STDERR, "  thrown in {$file} on line {$line}\n");
+        }
+        throw new ScriptExit(255);
+    }
+
     /** Safe read for Throwable slots that may stay at typed prototype without a value (#6357). */
     public static function readThrowableMessage(ObjectEntry $entry): string
     {
