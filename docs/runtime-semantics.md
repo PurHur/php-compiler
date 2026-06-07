@@ -64,3 +64,15 @@ Verification:
 ```bash
 ./script/docker-exec.sh -- bash -lc 'vendor/bin/phpunit --filter RuntimeStrictness'
 ```
+
+## Source preprocess pipeline ([#6654](https://github.com/PurHur/php-compiler/issues/6654))
+
+All parse entrypoints (VM `Runtime::parse()`, AOT include discovery, lint) must run the same preprocess chain before php-parser / PHPCfg. **`Runtime::prepareSourceForParser()`** is the SSOT helper; it runs sealed/static preprocessors, **`PropertyHooks`** (lowering block/arrow hook syntax), **`CurlyBraceOffsetRejector`**, enum/switch/generic rewriters, bare-throw rewrite, then parser desugar passes (`GlobalTypedConstRewriter`, `PipeOperatorDesugar`, etc.).
+
+Property-hook block syntax (`public $x { get { … } }`) must be lowered **before** the curly-brace rejector (#6650); otherwise AOT include discovery that calls `Parser::parse()` directly would fatal on `{` in hook bodies.
+
+Verification:
+
+```bash
+./script/docker-exec.sh -- bash -lc 'vendor/bin/phpunit --filter RuntimePreprocessTest'
+```

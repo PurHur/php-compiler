@@ -387,6 +387,23 @@ class Runtime {
     }
 
     /**
+     * Full preprocess + parser desugar chain shared by VM, JIT, AOT, lint, and include discovery.
+     *
+     * Order is SSOT: sealed/static preprocessors, {@see SourcePreprocessor\PropertyHooks} (before
+     * {@see CurlyBraceOffsetRejector}), enum/switch/generic rewriters, bare-throw rewrite, then
+     * parser desugar passes (#6650, #6654).
+     *
+     * @return array{0: string, 1: array<int, true>}
+     */
+    public function prepareSourceForParser(string $code, string $filename = 'unknown'): array
+    {
+        [$code, $bareRethrowLines] = $this->preprocessSourceForParse($code, $filename);
+        $code = $this->rewriteSourceBeforeParser($code);
+
+        return [$code, $bareRethrowLines];
+    }
+
+    /**
      * Source rewrites applied immediately before php-parser / PHPCfg (issue #3243, #4456).
      *
      * Must run on any path that calls Parser::parse() directly (AOT include discovery, etc.).
@@ -409,9 +426,8 @@ class Runtime {
     }
 
     public function parse(string $code, string $filename): Script {
-        [$code, $bareRethrowLines] = $this->preprocessSourceForParse($code, $filename);
+        [$code, $bareRethrowLines] = $this->prepareSourceForParser($code, $filename);
         $this->compiler->setBareRethrowLines($bareRethrowLines);
-        $code = $this->rewriteSourceBeforeParser($code);
         $fileStrictTypes = $this->detectFileStrictTypes($code);
         try {
             $script = $this->parser->parse($code, $filename);
