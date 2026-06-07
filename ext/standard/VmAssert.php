@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace PHPCompiler\ext\standard;
 
 use PHPCompiler\Frame;
+use PHPCompiler\VM\EnumCaseSupport;
 use PHPCompiler\VM\ErrorReporter;
 use PHPCompiler\VM\Variable;
 
@@ -37,6 +38,12 @@ final class VmAssert
         $message = 'assert(): assert(false) failed';
         if (null !== $description) {
             $desc = $description->resolveIndirect();
+            if (EnumCaseSupport::isEnumCaseVariable($desc)) {
+                throw new \TypeError(sprintf(
+                    'assert(): Argument #2 ($description) must be of type string|Throwable, %s given',
+                    EnumCaseSupport::typeNameForVariable($desc)
+                ));
+            }
             if (Variable::TYPE_STRING === $desc->type) {
                 $message = 'Assertion failed: '.$desc->toString();
             }
