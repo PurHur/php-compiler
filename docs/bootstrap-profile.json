@@ -1274,6 +1274,8 @@
         "lib/JIT/Builtin/StringJsonEncode.php",
         "lib/JIT/Builtin/StringLocaltime.php",
         "lib/JIT/Builtin/StringMicrotime.php",
+        "lib/JIT/Builtin/StringMultipart.php",
+        "lib/JIT/Builtin/StringMultipartJit.php",
         "lib/JIT/Builtin/StringNaturalCompareJit.php",
         "lib/JIT/Builtin/StringNetworkServices.php",
         "lib/JIT/Builtin/StringNetworkServicesJit.php",
