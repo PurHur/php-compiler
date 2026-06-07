@@ -31,7 +31,9 @@ final class ClosureCall extends VmClassMethod
             $frame->vmContext,
             $state,
             $newThis,
-            $invokeArgs
+            $invokeArgs,
+            'Closure::call()',
+            $frame
         );
         if (null === $frame->returnVar) {
             return;

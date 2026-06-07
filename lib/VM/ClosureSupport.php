@@ -224,7 +224,8 @@ final class ClosureSupport
         ClosureState $state,
         Variable $newThis,
         array $invokeArgs,
-        string $context = 'Closure::call()'
+        string $context = 'Closure::call()',
+        ?Frame $frame = null
     ): Variable {
         $newThis = self::normalizeNewThis($newThis);
         if (Variable::TYPE_OBJECT !== $newThis->type) {
@@ -241,11 +242,20 @@ final class ClosureSupport
         if ($state->isStaticClosure()) {
             throw new \Error('Cannot bind static closure to object');
         }
+        $scopeClass = $newThis->toObject()->class->name;
+        if (self::isInternalScopeClass($ctx, $scopeClass)) {
+            self::warnCannotBindInternalScope($ctx, $frame, $scopeClass);
+
+            $null = new Variable();
+            $null->null();
+
+            return $null;
+        }
         $invokeState = $state->cloneForBind();
         $boundThis = new Variable();
         $boundThis->copyFrom($newThis);
         $invokeState->boundThis = $boundThis;
-        $invokeState->boundScopeClass = $newThis->toObject()->class->name;
+        $invokeState->boundScopeClass = $scopeClass;
 
         $copies = [];
         foreach ($invokeArgs as $arg) {
