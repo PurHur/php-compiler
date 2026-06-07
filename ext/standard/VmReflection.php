@@ -861,6 +861,34 @@ final class VmReflection
     }
 
     /**
+     * is_subclass_of() object operand — enum cases vs UnitEnum/BackedEnum (#5642, zend_is_a).
+     *
+     * Enum case vs its declaring enum is false (not a subclass); builtin enum interfaces match.
+     */
+    public static function isSubclassOfObject(Context $ctx, Variable $object, string $className): bool
+    {
+        $object = $object->resolveIndirect();
+        if (EnumCaseSupport::isEnumCaseVariable($object)) {
+            $entry = EnumCaseSupport::entryForInstanceOfCheck($object);
+            if (null === $entry) {
+                return false;
+            }
+            $entry = EnumCaseSupport::canonicalEnumClassEntryForInstanceOf($entry, $ctx);
+            $parentLc = strtolower(ltrim($className, '\\'));
+            if (strtolower($entry->name) === $parentLc) {
+                return false;
+            }
+
+            return EnumCaseSupport::valueMatchesInstanceOfClassName($object, $className, $ctx) ?? false;
+        }
+        if (Variable::TYPE_OBJECT !== $object->type) {
+            return false;
+        }
+
+        return self::isInstanceOfObject($ctx, $object, $className);
+    }
+
+    /**
      * is_subclass_of() class-string operand — strict subclass (excludes same class).
      */
     public static function isSubclassOf(Context $ctx, string $childName, string $parentName): bool

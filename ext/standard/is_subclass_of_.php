@@ -36,8 +36,8 @@ final class is_subclass_of_ extends Internal
         }
         $subject = $frame->calledArgs[0]->resolveIndirect();
         $matches = false;
-        if (Variable::TYPE_OBJECT === $subject->type) {
-            $matches = VmReflection::isInstanceOfObject($ctx, $subject, $parentName);
+        if (Variable::TYPE_OBJECT === $subject->type || Variable::TYPE_ENUM_CASE === $subject->type) {
+            $matches = VmReflection::isSubclassOfObject($ctx, $subject, $parentName);
         } elseif (Variable::TYPE_STRING === $subject->type) {
             if ($allowString) {
                 $matches = VmReflection::isSubclassOf($ctx, $subject->toString(), $parentName);
