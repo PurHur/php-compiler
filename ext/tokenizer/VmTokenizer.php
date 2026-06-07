@@ -7,9 +7,22 @@ namespace PHPCompiler\ext\tokenizer;
 use PHPCompiler\VM\HashTable;
 use PHPCompiler\VM\Variable;
 
-/** Host tokenizer bridge for VM builtins (php-src ext/tokenizer/tokenizer.c; #6940). */
+/** Native + host tokenizer bridge for VM builtins (php-src ext/tokenizer/tokenizer.c; #6940, #4561). */
 final class VmTokenizer
 {
+    /**
+     * @return list<int|string|array{0: int, 1: string, 2: int}>
+     */
+    public static function tokenize(string $source, int $flags = 0): array
+    {
+        return LanguageScanner::tokenize($source, $flags);
+    }
+
+    public static function tokenizeToHashTable(string $source, int $flags = 0): HashTable
+    {
+        return self::hostTokensToHashTable(self::tokenize($source, $flags));
+    }
+
     /**
      * @param list<int|string|array{0: int, 1: string, 2: int}> $tokens
      */

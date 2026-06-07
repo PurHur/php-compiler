@@ -11,7 +11,7 @@ use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Value;
 
-/** token_get_all() — PHP source tokenizer (ext/tokenizer/tokenizer.c; issue #6940, #3171). */
+/** token_get_all() — PHP source tokenizer (ext/tokenizer/tokenizer.c; issue #6940, #3171, #4561). */
 final class token_get_all extends Internal
 {
     public function __construct()
@@ -35,17 +35,8 @@ final class token_get_all extends Internal
             $flags = $frame->calledArgs[1]->toInt();
         }
 
-        if (\function_exists('token_get_all')) {
-            $tokens = \token_get_all($source, $flags);
-            if (!\is_array($tokens)) {
-                throw new \Error('token_get_all() is not implemented in this compiler build (issue #3171)');
-            }
-            $frame->returnVar->array(VmTokenizer::hostTokensToHashTable($tokens));
-
-            return;
-        }
-
-        throw new \Error('token_get_all() is not implemented in this compiler build (issue #3171)');
+        $tokens = VmTokenizer::tokenize($source, $flags);
+        $frame->returnVar->array(VmTokenizer::hostTokensToHashTable($tokens));
     }
 
     public function call(Context $context, JITVariable ...$args): Value
