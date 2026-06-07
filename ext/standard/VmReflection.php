@@ -735,16 +735,14 @@ final class VmReflection
      */
     private static function addPublicStaticClassVars(ClassEntry $entry, $ht): void
     {
-        $entryLc = strtolower($entry->name);
         /** @var array<string, true> $seen */
         $seen = [];
         foreach ($ht->iterate(false) as $key => $_value) {
             $seen[(string) $key] = true;
         }
         foreach ($entry->staticProperties as $propLc => $storage) {
-            if (($entry->staticPropertyDeclaringClassLc[$propLc] ?? $entryLc) !== $entryLc) {
-                continue;
-            }
+            // php-src add_class_vars: public static props on $entry include trait-composed
+            // and parent-inherited members already merged into staticProperties (#7420).
             if (!MethodVisibility::isPublic($entry->staticPropertyVisibility[$propLc] ?? \PHPCfg\Func::FLAG_PUBLIC)) {
                 continue;
             }
