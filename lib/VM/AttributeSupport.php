@@ -27,6 +27,10 @@ final class AttributeSupport
 
     public const CLASS_NODISCARD = 'nodiscard';
 
+    public const CLASS_DELAYED_TARGET_VALIDATION = 'delayedtargetvalidation';
+
+    public const CLASS_COMPILE_TIME = 'compiletime';
+
     /** Zend ZEND_ATTRIBUTE_TARGET_* flags (zend_attributes.h). */
     public const TARGET_CLASS = 1;
 
