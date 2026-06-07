@@ -1,5 +1,5 @@
 --TEST--
-language: array literal spread accepts Traversable operands (Zend zend_compile.c parity, #4453)
+language: array literal spread Traversable operands JIT execute (#4686, #4453)
 --FILE--
 <?php
 class C implements IteratorAggregate {
@@ -43,4 +43,3 @@ array (
   1 => 2,
   2 => 3,
 )
-
