@@ -69,5 +69,27 @@ final class VmHashNativeTest extends TestCase
             '/\\\\hash_hmac\s*\(/',
             $src
         );
+        $this->assertDoesNotMatchRegularExpression(
+            '/\\\\hash_pbkdf2\s*\(/',
+            $src
+        );
+    }
+
+    public function testHashPbkdf2MatchesZend(): void
+    {
+        $expected = \hash_pbkdf2('sha256', 'password', 'salt', 1000, 32, true);
+        $this->assertSame($expected, VmHashNative::hashPbkdf2('sha256', 'password', 'salt', 1000, 32, true));
+        $this->assertSame(
+            \hash_pbkdf2('sha256', 'password', 'salt', 1000, 32, false),
+            VmHashNative::hashPbkdf2('sha256', 'password', 'salt', 1000, 32, false)
+        );
+        $this->assertSame(
+            \hash_pbkdf2('sha1', 'password', 'salt', 1000, 20, false),
+            VmHashNative::hashPbkdf2('sha1', 'password', 'salt', 1000, 20, false)
+        );
+        $this->assertSame(
+            \hash_pbkdf2('sha256', 'pass', 'salt', 1, 8),
+            VmHashNative::hashPbkdf2('sha256', 'pass', 'salt', 1, 8)
+        );
     }
 }

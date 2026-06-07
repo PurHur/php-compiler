@@ -28,9 +28,7 @@ final class VmHash
     }
 
     /**
-     * hash_pbkdf2() — delegates to host PHP (issue #3773, ext/hash/hash_pbkdf2.c parity).
-     *
-     * @throws \ValueError unknown algorithm (PHP 8+)
+     * hash_pbkdf2() — native PBKDF2 via VmHashNative (issue #6186, ext/hash/hash_pbkdf2.c parity).
      */
     public static function hashPbkdf2(
         string $algo,
@@ -40,7 +38,7 @@ final class VmHash
         int $length = 0,
         bool $raw = false
     ): string {
-        return \hash_pbkdf2($algo, $password, $salt, $iterations, $length, $raw);
+        return VmHashNative::hashPbkdf2($algo, $password, $salt, $iterations, $length, $raw);
     }
 
     /** hash_algos() — digest names supported by VmHashNative (ext/hash/hash.c, issue #6937). */
