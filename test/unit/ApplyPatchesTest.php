@@ -673,4 +673,56 @@ PHP;
             'php-cfg-match overlay must lower UnhandledMatchError for enum/scalar subjects (#5448)'
         );
     }
+
+    public function testVerifyCriticalLanguagePatchesIncludesEnumBodyOverlays(): void
+    {
+        $script = (string) file_get_contents(self::$root.'/script/apply-patches.sh');
+        self::assertStringContainsString(
+            'php-cfg-enum-trait-use',
+            $script,
+            'verify_critical_language_patches must require TraitUse in parseStmt_Enum (#6625)'
+        );
+        self::assertStringContainsString(
+            'php-cfg-enum-class-const-Parser',
+            $script,
+            'verify_critical_language_patches must require ClassConst in parseStmt_Enum (#6625)'
+        );
+        self::assertStringContainsString(
+            'php-cfg-enum-case-isEnumCase',
+            $script,
+            'verify_critical_language_patches must require isEnumCase on parseEnumCase (#6625)'
+        );
+        self::assertStringContainsString(
+            'php-cfg-enum-trait-use.patch)',
+            $script,
+            'patch_already_applied must probe php-cfg-enum-trait-use.patch (#6625)'
+        );
+    }
+
+    public function testApplyPatchesLeavesEnumBodyOverlaysOnVendorParser(): void
+    {
+        $parser = self::$root.'/vendor/ircmaxell/php-cfg/lib/PHPCfg/Parser.php';
+        $const = self::$root.'/vendor/ircmaxell/php-cfg/lib/PHPCfg/Op/Terminal/Const_.php';
+        if (!is_readable($parser) || !is_readable($const)) {
+            self::markTestSkipped('vendor/ircmaxell/php-cfg not installed');
+        }
+
+        $output = [];
+        $exitCode = 0;
+        exec('bash '.escapeshellarg(self::$root.'/script/apply-patches.sh').' 2>&1', $output, $exitCode);
+        $joined = implode("\n", $output);
+        self::assertSame(0, $exitCode, "apply-patches must succeed before enum marker check:\n".$joined);
+
+        $parserBody = (string) file_get_contents($parser);
+        $enumLoop = preg_match(
+            '/function parseStmt_Enum.*?Stmt\\\\TraitUse.*?Stmt\\\\ClassConst/s',
+            $parserBody
+        );
+        self::assertSame(1, $enumLoop, 'parseStmt_Enum must lower TraitUse and ClassConst (#6622, #6623)');
+        self::assertStringContainsString('isEnumCase = true', $parserBody, 'parseEnumCase must set isEnumCase (#5054)');
+
+        $constBody = (string) file_get_contents($const);
+        self::assertStringContainsString('public bool $isEnumCase = false', $constBody);
+        self::assertStringContainsString('public bool $enumCaseHasExplicitValue = false', $constBody);
+    }
 }
