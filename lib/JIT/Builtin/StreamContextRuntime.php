@@ -336,7 +336,6 @@ final class StreamContextRuntime
         $i32 = $context->getTypeFromString('int32');
         $g = $context->module->addGlobal($i32, self::GLOBAL_NEXT_ID);
         $g->setInitializer($i32->constInt(0, false));
-        $g->setLinkage(\PHPLLVM\GlobalValue::LINKAGE_INTERNAL);
     }
 
     private static function literalKeyString(Context $context, string $text): Value
