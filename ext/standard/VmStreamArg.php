@@ -50,8 +50,9 @@ final class VmStreamArg
 
     public static function debugTypeName(Variable $v): string
     {
-        if (Variable::TYPE_OBJECT === $v->type || Variable::TYPE_ENUM_CASE === $v->type) {
-            return 'object';
+        $v = $v->resolveIndirect();
+        if (EnumCaseSupport::isEnumCaseVariable($v)) {
+            return EnumCaseSupport::typeNameForVariable($v);
         }
 
         switch ($v->type) {
@@ -71,6 +72,24 @@ final class VmStreamArg
                 return 'object';
             default:
                 return 'mixed';
+        }
+    }
+
+    public static function rejectEnumCaseOperand(
+        Variable $v,
+        string $functionName,
+        int $argNum = 1,
+        string $paramName = 'resource'
+    ): void {
+        $v = $v->resolveIndirect();
+        if (EnumCaseSupport::isEnumCaseVariable($v)) {
+            throw new \TypeError(\sprintf(
+                '%s(): Argument #%d ($%s) must be of type resource, %s given',
+                $functionName,
+                $argNum,
+                $paramName,
+                EnumCaseSupport::typeNameForVariable($v)
+            ));
         }
     }
 }

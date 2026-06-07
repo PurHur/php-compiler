@@ -7,7 +7,6 @@ namespace PHPCompiler\ext\standard;
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Context;
-use PHPCompiler\JIT\JitLongArg;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Value;
 
@@ -18,6 +17,8 @@ use PHPLLVM\Value;
  */
 final class get_resource_type extends Internal
 {
+    private const TYPE_ERROR = 'get_resource_type(): Argument #1 ($resource) must be of type resource, %s given';
+
     public function execute(Frame $frame): void
     {
         if (1 !== \count($frame->calledArgs)) {
@@ -27,17 +28,18 @@ final class get_resource_type extends Internal
         if (null === $frame->returnVar) {
             return;
         }
+        VmStreamArg::rejectEnumCaseOperand($v, 'get_resource_type');
         if ($v->isStreamResource()) {
             $frame->returnVar->string(VmFs::resourceTypeForStreamTag($v->toInt()));
 
             return;
         }
         if (!is_resource_::isResource($v)) {
-            throw new \LogicException('get_resource_type() expects a stream resource');
+            throw new \TypeError(\sprintf(self::TYPE_ERROR, VmStreamArg::debugTypeName($v)));
         }
         $type = VmFs::getResourceType($v->toInt());
         if (null === $type) {
-            throw new \LogicException('get_resource_type() expects a valid stream resource');
+            throw new \TypeError(\sprintf(self::TYPE_ERROR, VmStreamArg::debugTypeName($v)));
         }
         $frame->returnVar->string($type);
     }
@@ -47,14 +49,7 @@ final class get_resource_type extends Internal
         if (1 !== \count($args)) {
             throw new \LogicException('get_resource_type() requires exactly one argument');
         }
-        $i64 = $context->getTypeFromString('int64');
 
-        return JitGetResourceType::invoke(
-            $context,
-            $context->builder->truncOrBitCast(
-                JitLongArg::lower($context, $args[0], 'get_resource_type() resource'),
-                $i64
-            )
-        );
+        return JitGetResourceType::invoke($context, $args[0]);
     }
 }
