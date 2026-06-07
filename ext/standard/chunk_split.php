@@ -8,8 +8,8 @@ use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\Variable as JITVariable;
-use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
 
 /** chunk_split() — insert a separator every N bytes (subset of PHP). */
@@ -43,11 +43,12 @@ final class chunk_split extends Internal
         }
         $separator = "\r\n";
         if (3 === $argc) {
-            $sepArg = $frame->calledArgs[2]->resolveIndirect();
-            if (Variable::TYPE_STRING !== $sepArg->type) {
-                throw new \LogicException('chunk_split() separator must be a string in this compiler build');
-            }
-            $separator = $sepArg->toString();
+            $separator = VmString::coerceStringBuiltinArg(
+                $frame->calledArgs[2],
+                'chunk_split',
+                2,
+                'separator'
+            );
         }
         $result = VmString::chunkSplit($string, $length, $separator);
         if (null === $frame->returnVar) {
@@ -73,7 +74,7 @@ final class chunk_split extends Internal
             JitChunkSplit::emitRuntimeLengthGuard($context, $chunkLen);
         }
         if ($argc >= 3) {
-            $separator = $this->jitString($context, $args[2], 'chunk_split() argument #3');
+            $separator = JitStringBuiltinArg::lower($context, $args[2], 'chunk_split', 2, 'separator');
         } else {
             $separator = $context->builder->load($context->constantStringFromString("\r\n"));
         }

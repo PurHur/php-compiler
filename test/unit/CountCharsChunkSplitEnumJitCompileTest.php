@@ -65,4 +65,23 @@ PHP;
             $bc
         );
     }
+
+    public function testChunkSplitEnumSeparatorTypeErrorLowering(): void
+    {
+        $code = <<<'PHP'
+<?php
+enum ES: string { case X = '-'; }
+chunk_split('abc', 2, ES::X);
+PHP;
+        $runtime = new Runtime();
+        $block = $runtime->parseAndCompile($code, 'chunk_split_enum_separator_jit_compile.php');
+        $runtime->jitCompileBlock($block);
+
+        $context = $runtime->loadJitContext();
+        $bc = $context->module->printToString();
+        $this->assertStringContainsString(
+            'chunk_split(): Argument #3 ($separator) must be of type string',
+            $bc
+        );
+    }
 }
