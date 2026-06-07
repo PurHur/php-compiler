@@ -14,7 +14,7 @@ use PHPLLVM\Value;
 /**
  * readline() — CLI line input (ext/readline/readline.c parity, issue #3776).
  *
- * VM: delegates to host readline() when ext/readline is loaded; otherwise false.
+ * VM: host readline() when ext/readline is loaded; otherwise native STDIN fgets fallback (#6216).
  * JIT/AOT: returns false (no interactive stdin in compiled binaries).
  */
 final class readline extends Internal
@@ -36,12 +36,8 @@ final class readline extends Internal
         $prompt = null;
         if (1 === $argc) {
             $v = $frame->calledArgs[0]->resolveIndirect();
-            if (Variable::TYPE_NULL === $v->type) {
-                $prompt = null;
-            } elseif (Variable::TYPE_STRING === $v->type) {
-                $prompt = $v->toString();
-            } else {
-                throw new \LogicException('readline() prompt must be string or null in this compiler build');
+            if (Variable::TYPE_NULL !== $v->type) {
+                $prompt = VmString::coerceStringBuiltinArg($frame->calledArgs[0], 'readline', 0, 'prompt');
             }
         }
         $line = VmReadline::read($prompt);
