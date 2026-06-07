@@ -2254,6 +2254,21 @@ restart:
                             break;
                         }
                         if ($container->type !== Variable::TYPE_ARRAY) {
+                            if (
+                                Variable::TYPE_OBJECT === $container->type
+                                && !$this->objectImplementsArrayAccess($container->toObject())
+                            ) {
+                                $className = $container->toObject()->class->name;
+                                $catchFrame = $this->dispatchVmError(
+                                    'Cannot use object of type ' . $className . ' as array',
+                                    $frame
+                                );
+                                if (null !== $catchFrame) {
+                                    $frame = $catchFrame;
+                                    goto restart;
+                                }
+                                break;
+                            }
                             throw new \LogicException('[] is only supported for arrays');
                         }
                         $arg1->indirect($container->toArray()->append(new Variable));
