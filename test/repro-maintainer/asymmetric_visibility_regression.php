@@ -1,4 +1,6 @@
 <?php
+declare(strict_types=1);
+
 class A {
     public private(set) string $x = 'hi';
 }

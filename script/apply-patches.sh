@@ -533,6 +533,7 @@ PY
     fi
     if ! grep -q 'promotionGetVisibility' "$param" 2>/dev/null; then
       python3 - "$param" <<'PY'
+import re
 import sys
 from pathlib import Path
 
@@ -540,12 +541,24 @@ path = Path(sys.argv[1])
 text = path.read_text()
 if 'promotionGetVisibility' in text:
     raise SystemExit(0)
-needle = "    public int $promotionSetVisibility = 0;\n"
-insert = needle + "\n    /** Constructor promotion: asymmetric get visibility (#5059). */\n    public int $promotionGetVisibility = 0;\n"
-if needle not in text:
-    sys.stderr.write("php-cfg-asymmetric-visibility: Param.php promotionSetVisibility anchor missing\n")
-    raise SystemExit(1)
-path.write_text(text.replace(needle, insert, 1))
+get_vis_block = (
+    "\n    /** Constructor promotion: asymmetric get visibility (#5059). */\n"
+    "    public int $promotionGetVisibility = 0;\n"
+)
+for needle in (
+    "    public int $promotionSetVisibility = 0;\n",
+    "    public $promotionSetVisibility = 0;\n",
+):
+    if needle in text:
+        path.write_text(text.replace(needle, needle + get_vis_block, 1))
+        raise SystemExit(0)
+match = re.search(r"\n    public(?: int)? \$promotionSetVisibility = 0;\n", text)
+if match is not None:
+    needle = match.group(0)
+    path.write_text(text.replace(needle, needle + get_vis_block, 1))
+    raise SystemExit(0)
+sys.stderr.write("php-cfg-asymmetric-visibility: Param.php promotionSetVisibility anchor missing\n")
+raise SystemExit(1)
 PY
       echo "Applied php-cfg-asymmetric-visibility.patch (Param getVisibility overlay #5059)"
     fi
@@ -614,7 +627,10 @@ if needle in text:
     insert = (
         "    public $declaredType;\n\n"
         + "    /** Constructor promotion: asymmetric set visibility (#3165). */\n"
-        + "    public int $promotionSetVisibility = 0;\n\n"
+        + "    public int $promotionSetVisibility = 0;\n"
+        + "\n"
+        + "    /** Constructor promotion: asymmetric get visibility (#5059). */\n"
+        + "    public int $promotionGetVisibility = 0;\n\n"
         + "    // A helper\n    public $function;"
     )
     path.write_text(text.replace(needle, insert, 1))
