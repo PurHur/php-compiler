@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace PHPCompiler\ext\mbstring;
 
 use PHPCompiler\ext\standard\VmString;
+use PHPCompiler\JIT\Builtin\StringUtf8Strlen;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Value;
@@ -28,6 +29,7 @@ final class JitMbStrlen
             );
         }
 
+        StringUtf8Strlen::ensureLinked($context);
         $strPtr = $context->helper->loadValue($arg);
 
         return $context->builder->call(
