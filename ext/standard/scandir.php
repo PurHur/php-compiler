@@ -9,6 +9,7 @@ use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Builtin\StringFsGlob;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitLongArg;
+use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\BuiltinExecute;
 use PHPCompiler\VM\Variable;
@@ -23,10 +24,7 @@ final class scandir extends Internal
         if ($argc < 1 || $argc > 2) {
             throw new \LogicException('scandir() requires one or two arguments in this compiler build');
         }
-        $pathVar = $frame->calledArgs[0]->resolveIndirect();
-        if (Variable::TYPE_STRING !== $pathVar->type) {
-            throw new \LogicException('scandir() directory must be a string in this compiler build');
-        }
+        $path = VmString::coerceStringBuiltinArg($frame->calledArgs[0], 'scandir', 0, 'directory');
         $sortingOrder = \SCANDIR_SORT_ASCENDING;
         if (2 === $argc) {
             $orderVar = $frame->calledArgs[1]->resolveIndirect();
@@ -35,7 +33,7 @@ final class scandir extends Internal
             }
             $sortingOrder = $orderVar->toInt();
         }
-        $result = VmDir::scandir($pathVar->toString(), $sortingOrder);
+        $result = VmDir::scandir($path, $sortingOrder);
         BuiltinExecute::writeReturn($frame, static function (Variable $ret) use ($result): void {
             if (false === $result) {
                 $ret->bool(false);
@@ -52,9 +50,6 @@ final class scandir extends Internal
         if ($argc < 1 || $argc > 2) {
             throw new \LogicException('scandir() requires one or two arguments in this compiler build');
         }
-        if (JITVariable::TYPE_STRING !== $args[0]->type) {
-            throw new \LogicException('scandir() directory must be a string in this compiler build');
-        }
         $i32 = $context->getTypeFromString('int32');
         $sort = $i32->constInt(0, false);
         if (2 === $argc) {
@@ -68,7 +63,7 @@ final class scandir extends Internal
             );
         }
 
-        $path = $this->jitString($context, $args[0], 'scandir() argument #1');
+        $path = JitStringBuiltinArg::lower($context, $args[0], 'scandir', 0, 'directory');
         StringFsGlob::ensureLinked($context);
 
         return JitFsGlob::scandir($context, $path, $sort);
