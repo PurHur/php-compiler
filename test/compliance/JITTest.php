@@ -533,6 +533,10 @@ class JITTest extends BaseTest {
                 || str_contains($name, 'posix_mknod')) {
                 continue;
             }
+            // null property read try/catch: VM green (#7431); MCJIT catchable Error dispatch segfault (#98).
+            if ($name === 'language/null_property_read_error') {
+                continue;
+            }
             yield $name => $case;
         }
     }

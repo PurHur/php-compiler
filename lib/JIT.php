@@ -7212,12 +7212,41 @@ class JIT {
                     if (null !== $nonObjectLabel && null !== $propName) {
                         $forWrite = $this->varFetchDestUsedAsAssignLvalue($block, $i, (int) $op->arg1);
                         if ($forWrite) {
-                            JIT\Builtin\ErrorRaise::emitRaise(
-                                $this->context,
-                                sprintf('Attempt to assign property "%s" on %s', $propName, $nonObjectLabel)
-                            );
-                            $this->context->builder->returnVoid();
-                            $this->context->builder->clearInsertionPosition();
+                            if (
+                                'null' === $nonObjectLabel
+                                && $this->varFetchDestUsedAsIncDec($block, $i, (int) $op->arg1)
+                            ) {
+                                $message = sprintf(
+                                    'Attempt to increment/decrement property "%s" on null',
+                                    $propName
+                                );
+                            } else {
+                                $message = sprintf(
+                                    'Attempt to assign property "%s" on %s',
+                                    $propName,
+                                    $nonObjectLabel
+                                );
+                            }
+                            if ([] !== $this->context->tryCatch->handlerStack) {
+                                JIT\NonObjectPropertyFetchHelper::lowerNullPropertyDest($this->context, $result);
+                                JIT\TryCatchHelper::emitCatchableErrorMessage($this->context, $this, $message);
+                            } else {
+                                JIT\Builtin\ErrorRaise::emitRaise($this->context, $message);
+                                $this->context->builder->returnVoid();
+                                $this->context->builder->clearInsertionPosition();
+                            }
+                            break;
+                        }
+                        if ('null' === $nonObjectLabel) {
+                            $message = sprintf('Attempt to read property "%s" on null', $propName);
+                            if ([] !== $this->context->tryCatch->handlerStack) {
+                                JIT\NonObjectPropertyFetchHelper::lowerNullPropertyDest($this->context, $result);
+                                JIT\TryCatchHelper::emitCatchableErrorMessage($this->context, $this, $message);
+                            } else {
+                                JIT\Builtin\ErrorRaise::emitRaise($this->context, $message);
+                                $this->context->builder->returnVoid();
+                                $this->context->builder->clearInsertionPosition();
+                            }
                             break;
                         }
                         JIT\NonObjectPropertyFetchHelper::lowerNonObjectPropertyRead(
@@ -12136,6 +12165,21 @@ class JIT {
         }
 
         return false;
+    }
+
+    private function varFetchDestUsedAsIncDec(Block $block, int $opIndex, int $destSlot): bool
+    {
+        $next = $block->opCodes[$opIndex + 1] ?? null;
+        if (null === $next) {
+            return false;
+        }
+
+        return \in_array($next->type, [
+            OpCode::TYPE_PRE_INC,
+            OpCode::TYPE_POST_INC,
+            OpCode::TYPE_PRE_DEC,
+            OpCode::TYPE_POST_DEC,
+        ], true) && $next->arg3 === $destSlot;
     }
 
     /**
