@@ -207,6 +207,7 @@ class Runtime {
         $this->load(new ext\hash\Module);
         $this->load(new ext\posix\Module);
         $this->load(new ext\ctype\Module);
+        $this->load(new ext\tokenizer\Module);
         $this->load(new ext\random\Module);
         $this->load(new ext\standard\Module);
     }
