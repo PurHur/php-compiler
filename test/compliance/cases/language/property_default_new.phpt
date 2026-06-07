@@ -20,9 +20,15 @@ class WithArgs {
 }
 $w = new WithArgs();
 echo ($w->h instanceof Holder && $w->h->items === []) ? "1\n" : "0\n";
+class WithDateTime {
+    public DateTime $d = new DateTime('2020-01-01');
+}
+$dt = new WithDateTime();
+echo $dt->d->format('Y'), "\n";
 --EXPECT--
 1
 1
 1
 1
 1
+2020
