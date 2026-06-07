@@ -63,4 +63,38 @@ PHP,
         );
         $this->assertNotNull($block);
     }
+
+    /** @covers issue #7381 */
+    public function testParentInParentlessClassMethodFailsAtCompileTime(): void
+    {
+        $runtime = new Runtime();
+        $this->expectException(\CompileError::class);
+        $this->expectExceptionMessage(EnumParentCompileCheck::MESSAGE);
+        $runtime->parseAndCompile(<<<'PHP'
+<?php
+class C {
+    public function f(): void {
+        parent::g();
+    }
+}
+PHP,
+            'parent_no_parent.php'
+        );
+    }
+
+    /** @covers issue #7381 */
+    public function testParentInParentlessClassConstFailsAtCompileTime(): void
+    {
+        $runtime = new Runtime();
+        $this->expectException(\CompileError::class);
+        $this->expectExceptionMessage(EnumParentCompileCheck::MESSAGE);
+        $runtime->parseAndCompile(<<<'PHP'
+<?php
+class C {
+    public const X = parent::Y;
+}
+PHP,
+            'parent_no_parent_const.php'
+        );
+    }
 }

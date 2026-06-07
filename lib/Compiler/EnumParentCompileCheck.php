@@ -10,7 +10,7 @@ use PHPCfg\Operand;
 use PHPCfg\Script;
 
 /**
- * Compile-time check: parent:: inside enum scope has no parent class (#5410).
+ * Compile-time check: parent:: when current class scope has no parent (#5410, #7381).
  *
  * php-src: Zend/zend_compile.c — parent fetch when current scope has no parent
  */
@@ -23,16 +23,25 @@ final class EnumParentCompileCheck
         $check = new self();
         foreach ($script->main->cfg->children as $child) {
             if ($child instanceof Op\Stmt\Enum_) {
-                $check->validateEnum($child);
+                $check->validateScopeWithoutParent($child);
+            } elseif ($child instanceof Op\Stmt\Class_ && null === $child->extends) {
+                $check->validateScopeWithoutParent($child);
+            } elseif ($child instanceof Op\Stmt\Interface_ && [] === $child->extends) {
+                $check->validateScopeWithoutParent($child);
             }
         }
     }
 
-    private function validateEnum(Op\Stmt\Enum_ $enum): void
+    private function validateScopeWithoutParent(Op\Stmt\ClassLike $class): void
     {
-        foreach ($enum->stmts->children as $member) {
+        foreach ($class->stmts->children as $member) {
             if ($member instanceof Op\Stmt\ClassMethod) {
                 $this->validateMethod($member);
+            } elseif ($member instanceof Op\Terminal\Const_) {
+                $valueBlock = $member->valueBlock;
+                if (null !== $valueBlock && [] !== $valueBlock->children) {
+                    $this->walkCfg($valueBlock);
+                }
             }
         }
     }
