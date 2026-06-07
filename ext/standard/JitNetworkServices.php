@@ -7,6 +7,7 @@ namespace PHPCompiler\ext\standard;
 use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Builtin\StringNetworkServices;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\JitStringArg;
 use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\Variable as JITVariable;
@@ -39,7 +40,7 @@ final class JitNetworkServices
         $ptr = JitValueBox::pointer($context, $slot);
         $context->builder->call(
             $context->lookupFunction('__phpc_getprotobyname'),
-            JitStringArg::lower($context, $name, 'getprotobyname() name'),
+            JitStringBuiltinArg::lower($context, $name, 'getprotobyname', 0, 'protocol'),
             $ptr
         );
 
@@ -55,7 +56,7 @@ final class JitNetworkServices
             $context->builder->call(
                 $context->lookupFunction('__compiler_getservbyport'),
                 self::jitIntArg($context, $port, 'getservbyport() port'),
-                JitStringArg::lower($context, $protocol, 'getservbyport() protocol')
+                JitStringBuiltinArg::lower($context, $protocol, 'getservbyport', 1, 'protocol')
             )
         );
     }
@@ -68,8 +69,8 @@ final class JitNetworkServices
         $ptr = JitValueBox::pointer($context, $slot);
         $context->builder->call(
             $context->lookupFunction('__phpc_getservbyname'),
-            JitStringArg::lower($context, $service, 'getservbyname() service'),
-            JitStringArg::lower($context, $protocol, 'getservbyname() protocol'),
+            JitStringBuiltinArg::lower($context, $service, 'getservbyname', 0, 'service'),
+            JitStringBuiltinArg::lower($context, $protocol, 'getservbyname', 1, 'protocol'),
             $ptr
         );
 
