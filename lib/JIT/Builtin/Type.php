@@ -155,6 +155,8 @@ class Type extends Builtin {
         );
         $fnIniGet = $this->context->module->addFunction('__compiler_ini_get', $fntypeIniGet);
         $this->context->registerFunction('__compiler_ini_get', $fnIniGet);
+        $fnIniCfgGet = $this->context->module->addFunction('__compiler_ini_cfg_get', $fntypeIniGet);
+        $this->context->registerFunction('__compiler_ini_cfg_get', $fnIniCfgGet);
         $fntypeErrorReporting = $this->context->context->functionType(
             $this->context->getTypeFromString('void'),
             false,
@@ -706,6 +708,9 @@ class Type extends Builtin {
             'getppid' => [$i32, false, []],
             'strerror' => [$i8p, false, [$i32]],
             'getgid' => [$i32, false, []],
+            'getuid' => [$i32, false, []],
+            'geteuid' => [$i32, false, []],
+            'getpwuid' => [$i8p, false, [$i32]],
             'localtime' => [$i8p, false, [$i64p]],
             'gmtime' => [$i8p, false, [$i64p]],
             'sleep' => [$i32, false, [$i32]],

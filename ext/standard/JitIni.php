@@ -27,4 +27,13 @@ final class JitIni
 
         return $ptr;
     }
+
+    public static function getCfgVar(Context $context, Value $optionStr): Value
+    {
+        $slot = JitValueBox::alloc($context);
+        $ptr = JitValueBox::pointer($context, $slot);
+        $context->builder->call($context->lookupFunction('__compiler_ini_cfg_get'), $optionStr, $ptr);
+
+        return $ptr;
+    }
 }

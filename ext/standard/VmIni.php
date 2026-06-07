@@ -12,6 +12,12 @@ final class VmIni
     /** @var list<string> */
     public const SUPPORTED_KEYS = ['error_reporting', 'display_errors', 'memory_limit'];
 
+    private const CFG_ERROR_REPORTING = '32767';
+
+    private const CFG_DISPLAY_ERRORS = '1';
+
+    private const CFG_MEMORY_LIMIT = '128M';
+
     public static function set(Context $ctx, string $option, string $newValue) {
         $key = strtolower($option);
         if (!in_array($key, self::SUPPORTED_KEYS, true)) {
@@ -49,7 +55,23 @@ final class VmIni
         }
     }
 
-    private static string $memoryLimit = '128M';
+    /** get_cfg_var() — php.ini compile-time values (ext/standard/ini.c, #6119). */
+    public static function getCfgVar(string $option): string|false
+    {
+        $key = strtolower($option);
+        if (!in_array($key, self::SUPPORTED_KEYS, true)) {
+            return false;
+        }
+
+        return match ($key) {
+            'error_reporting' => self::CFG_ERROR_REPORTING,
+            'display_errors' => self::CFG_DISPLAY_ERRORS,
+            'memory_limit' => self::CFG_MEMORY_LIMIT,
+            default => false,
+        };
+    }
+
+    private static string $memoryLimit = self::CFG_MEMORY_LIMIT;
 
     private static function setErrorReporting(Context $ctx, string $newValue) {
         $old = (string) $ctx->errors->getErrorReporting();

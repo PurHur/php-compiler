@@ -44,7 +44,9 @@ final class IniRuntime
     {
         self::$blockSuffix = 0;
         $probe = $context->module->getNamedFunction('__compiler_ini_get');
-        if (null !== $probe && $probe->countBasicBlocks() > 0) {
+        $cfgProbe = $context->module->getNamedFunction('__compiler_ini_cfg_get');
+        if (null !== $probe && $probe->countBasicBlocks() > 0
+            && null !== $cfgProbe && $cfgProbe->countBasicBlocks() > 0) {
             self::registerLinkedRuntime($context);
 
             return;
@@ -74,6 +76,12 @@ final class IniRuntime
             ? $getProbe
             : $context->module->addFunction('__compiler_ini_get', $ftGet);
         self::implementIniGet($context, $fnGet);
+
+        $cfgGetProbe = $context->module->getNamedFunction('__compiler_ini_cfg_get');
+        $fnCfgGet = null !== $cfgGetProbe
+            ? $cfgGetProbe
+            : $context->module->addFunction('__compiler_ini_cfg_get', $ftGet);
+        self::implementIniCfgGet($context, $fnCfgGet);
 
         $setProbe = $context->module->getNamedFunction('__compiler_ini_set');
         $ftSet = $context->context->functionType($voidTy, false, $strPtr, $strPtr, $valPtr);
@@ -159,6 +167,68 @@ final class IniRuntime
 
         $context->builder->positionAtEnd($mlBb);
         self::writeValueStringFromMemoryLimitGlobal($context, $out);
+        self::freeCstr($context, $fn, $optCstr);
+        $context->builder->returnVoid();
+
+        $context->builder->positionAtEnd($failBb);
+        self::writeValueBoolFalse($context, $out);
+        self::freeCstr($context, $fn, $optCstr);
+        $context->builder->returnVoid();
+        $context->builder->clearInsertionPosition();
+    }
+
+    private static function implementIniCfgGet(Context $context, Value $fn): void
+    {
+        $entry = $fn->appendBasicBlock('icg_entry');
+        $failBb = $fn->appendBasicBlock('icg_fail');
+        $erBb = $fn->appendBasicBlock('icg_er');
+        $deBb = $fn->appendBasicBlock('icg_de');
+        $mlBb = $fn->appendBasicBlock('icg_ml');
+        $testEr = $fn->appendBasicBlock('icg_test_er');
+        $testDe = $fn->appendBasicBlock('icg_test_de');
+        $testMl = $fn->appendBasicBlock('icg_test_ml');
+
+        $context->builder->positionAtEnd($entry);
+        $option = $fn->getParam(0);
+        $out = $fn->getParam(1);
+        $optCstr = self::copyStringObjectToCstr($context, $fn, $option);
+        $optOk = $context->builder->icmp(
+            Builder::INT_NE,
+            $optCstr,
+            $context->getTypeFromString('int8*')->constNull()
+        );
+        $context->builder->branchIf($optOk, $testEr, $failBb);
+
+        self::branchIfKey($context, $testEr, $optCstr, 'error_reporting', $erBb, $testDe);
+        self::branchIfKey($context, $testDe, $optCstr, 'display_errors', $deBb, $testMl);
+        self::branchIfKey($context, $testMl, $optCstr, 'memory_limit', $mlBb, $failBb);
+
+        $i8p = $context->getTypeFromString('int8*');
+
+        $context->builder->positionAtEnd($erBb);
+        self::writeValueStringFromCstr(
+            $context,
+            $out,
+            $context->builder->pointerCast($context->constantFromString('32767'), $i8p)
+        );
+        self::freeCstr($context, $fn, $optCstr);
+        $context->builder->returnVoid();
+
+        $context->builder->positionAtEnd($deBb);
+        self::writeValueStringFromCstr(
+            $context,
+            $out,
+            $context->builder->pointerCast($context->constantFromString('1'), $i8p)
+        );
+        self::freeCstr($context, $fn, $optCstr);
+        $context->builder->returnVoid();
+
+        $context->builder->positionAtEnd($mlBb);
+        self::writeValueStringFromCstr(
+            $context,
+            $out,
+            $context->builder->pointerCast($context->constantFromString(self::MEMORY_LIMIT_DEFAULT), $i8p)
+        );
         self::freeCstr($context, $fn, $optCstr);
         $context->builder->returnVoid();
 
@@ -778,6 +848,7 @@ final class IniRuntime
             [
                 '__compiler_phpc_error_level_enabled',
                 '__compiler_ini_get',
+                '__compiler_ini_cfg_get',
                 '__compiler_ini_set',
                 '__compiler_error_reporting',
                 '__compiler_begin_silence',
