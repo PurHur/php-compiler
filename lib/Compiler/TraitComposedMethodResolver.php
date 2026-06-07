@@ -31,7 +31,8 @@ final class TraitComposedMethodResolver
             if (!$child instanceof TraitUse) {
                 continue;
             }
-            foreach (self::flattenTraitUse($child, $registry) as $methodLc => $entry) {
+            $flattened = self::flattenTraitUse($child, $registry);
+            foreach ($flattened['composed'] as $methodLc => $entry) {
                 if (!isset($composed[$methodLc])) {
                     $composed[$methodLc] = $entry;
                 }
@@ -42,7 +43,34 @@ final class TraitComposedMethodResolver
     }
 
     /**
+     * Trait methods renamed via alias (`f as other`) — original names for #[\Override] (#7384).
+     *
      * @return array<string, array{sig: MethodSig, ownerLc: string, ownerDisplay: string}>
+     */
+    public static function resolveAliasedOriginalMethods(CfgBlock $classStmts, ClassCompileRegistry $registry): array
+    {
+        /** @var array<string, array{sig: MethodSig, ownerLc: string, ownerDisplay: string}> */
+        $origins = [];
+        foreach ($classStmts->children as $child) {
+            if (!$child instanceof TraitUse) {
+                continue;
+            }
+            $flattened = self::flattenTraitUse($child, $registry);
+            foreach ($flattened['aliasedOrigins'] as $methodLc => $entry) {
+                if (!isset($origins[$methodLc])) {
+                    $origins[$methodLc] = $entry;
+                }
+            }
+        }
+
+        return $origins;
+    }
+
+    /**
+     * @return array{
+     *     composed: array<string, array{sig: MethodSig, ownerLc: string, ownerDisplay: string}>,
+     *     aliasedOrigins: array<string, array{sig: MethodSig, ownerLc: string, ownerDisplay: string}>
+     * }
      */
     private static function flattenTraitUse(TraitUse $traitUse, ClassCompileRegistry $registry): array
     {
@@ -78,6 +106,8 @@ final class TraitComposedMethodResolver
 
         /** @var array<string, array{sig: MethodSig, ownerLc: string, ownerDisplay: string}> */
         $merged = [];
+        /** @var array<string, array{sig: MethodSig, ownerLc: string, ownerDisplay: string}> */
+        $aliasedOrigins = [];
         foreach ($perTraitMethods as $traitLc => $methods) {
             foreach ($methods as $methodLc => $entry) {
                 if (isset($excludedByPrecedence["{$traitLc}\0{$methodLc}"])) {
@@ -116,9 +146,15 @@ final class TraitComposedMethodResolver
                 : $methodLc;
             unset($merged[$methodLc]);
             $merged[$newName] = $source;
+            if ($newName !== $methodLc) {
+                $aliasedOrigins[$methodLc] = $source;
+            }
         }
 
-        return $merged;
+        return [
+            'composed' => $merged,
+            'aliasedOrigins' => $aliasedOrigins,
+        ];
     }
 
     /**
@@ -161,7 +197,7 @@ final class TraitComposedMethodResolver
                         self::collectTraitMethodsRecursive($nestedLc, $registry, $methods, $visited);
                     }
                 }
-                foreach (self::flattenTraitUse($child, $registry) as $methodLc => $entry) {
+                foreach (self::flattenTraitUse($child, $registry)['composed'] as $methodLc => $entry) {
                     if (!isset($methods[$methodLc])) {
                         $methods[$methodLc] = $entry;
                     }

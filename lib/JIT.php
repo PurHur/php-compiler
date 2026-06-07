@@ -8757,13 +8757,24 @@ class JIT {
                 }
                 $data = $perTraitMethods[$traitLcFilter][$methodLc];
             } else {
-                if (!isset($merged[$methodLc])) {
-                    throw new \LogicException(
-                        'An alias was defined for ' . $traitPrefix . (string) ($adaptation['method'] ?? '')
-                        . ' but this method does not exist'
-                    );
+                if (isset($merged[$methodLc])) {
+                    $data = $merged[$methodLc];
+                } else {
+                    $source = null;
+                    foreach ($perTraitMethods as $methods) {
+                        if (isset($methods[$methodLc])) {
+                            $source = $methods[$methodLc];
+                            break;
+                        }
+                    }
+                    if (null === $source) {
+                        throw new \LogicException(
+                            'An alias was defined for ' . $traitPrefix . (string) ($adaptation['method'] ?? '')
+                            . ' but this method does not exist'
+                        );
+                    }
+                    $data = $source;
                 }
-                $data = $merged[$methodLc];
             }
 
             if (null !== $newModifier) {
@@ -8771,6 +8782,7 @@ class JIT {
             }
             $data['sourceMethodLc'] = $methodLc;
             $data['methodLc'] = $newNameLc;
+            unset($merged[$methodLc]);
             $merged[$newNameLc] = $data;
         }
 
