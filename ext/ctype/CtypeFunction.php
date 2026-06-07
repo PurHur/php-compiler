@@ -11,19 +11,34 @@ use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Value;
 
 /**
- * Shared VM/JIT wiring for ctype builtins (php-src ext/ctype/ctype.c; issue #6837).
- *
- * Phase 0 skeleton: register symbols; full parity in #3381.
+ * Shared VM/JIT wiring for ctype builtins (php-src ext/ctype/ctype.c; #7253).
  */
 abstract class CtypeFunction extends Internal
 {
     public function execute(Frame $frame): void
     {
-        throw new \Error($this->getName().'() is not implemented in this compiler build (issue #3381)');
+        if (1 !== \count($frame->calledArgs)) {
+            throw new \LogicException($this->getName().'() requires exactly one argument in this compiler build');
+        }
+        $spec = VmCtype::specForFunction($this->getName());
+        $result = VmCtype::evaluate(
+            $frame->calledArgs[0],
+            $this->getName(),
+            $spec['kind'],
+            $spec['allow_digits'],
+            $spec['allow_minus']
+        );
+        if (null !== $frame->returnVar) {
+            $frame->returnVar->bool($result);
+        }
     }
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        throw new \Error($this->getName().'() is not implemented for JIT in this compiler build (issue #3381)');
+        if (1 !== \count($args)) {
+            throw new \LogicException($this->getName().'() requires exactly one argument in this compiler build');
+        }
+
+        return JitCtype::invoke($context, $args[0], $this->getName());
     }
 }

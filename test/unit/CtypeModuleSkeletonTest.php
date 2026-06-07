@@ -8,7 +8,7 @@ use PHPCompiler\ext\standard\VmReflection;
 use PHPUnit\Framework\TestCase;
 
 /**
- * ctype extension module skeleton registration (issue #6837).
+ * ctype extension VM semantics (issues #6837, #7253).
  *
  * @group ctype_module_skeleton
  */
@@ -49,14 +49,22 @@ PHP;
         self::assertSame('11111', ob_get_clean());
     }
 
-    public function test_ctype_alnum_stub_throws_error(): void
+    public function test_ctype_alnum_vm_semantics(): void
     {
         $runtime = new Runtime();
-        $fn = new \PHPCompiler\ext\ctype\ctype_alnum();
-        $frame = $fn->getFrame($runtime->vmContext);
-
-        $this->expectException(\Error::class);
-        $this->expectExceptionMessage('ctype_alnum() is not implemented in this compiler build (issue #3381)');
-        $fn->execute($frame);
+        $code = <<<'PHP'
+<?php
+echo (int) ctype_alnum('abc');
+echo (int) ctype_alnum('123');
+echo (int) ctype_alnum('');
+echo (int) ctype_alnum(' ');
+echo (int) ctype_digit(97);
+echo (int) ctype_digit(256);
+echo (int) ctype_space("\t\n");
+PHP;
+        $block = $runtime->parseAndCompile($code, 'ctype_semantics.php');
+        ob_start();
+        $runtime->run($block);
+        self::assertSame('1100011', ob_get_clean());
     }
 }
