@@ -515,14 +515,6 @@ class JITTest extends BaseTest {
             if (str_contains($name, 'byref_method_static_local')) {
                 continue;
             }
-            // list() from null/false/int: VM + LLVM verify (#4325); MCJIT execute segfault until list unpack branch stable.
-            if (str_contains($name, 'list_destructure_null')) {
-                continue;
-            }
-            // list() from string: VM + LLVM verify (#4308); MCJIT execute segfault until list unpack branch stable.
-            if (str_contains($name, 'list_destructure_string')) {
-                continue;
-            }
             // Pipe operator (|>): LLVM verify green in PipeOperatorJitCompileTest (#4783); MCJIT execute in PipeOperatorJitExecuteTest (#98).
             if (str_contains($name, 'pipe_first_class')) {
                 continue;

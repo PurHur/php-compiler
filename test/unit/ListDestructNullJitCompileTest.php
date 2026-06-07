@@ -6,14 +6,14 @@ namespace PHPCompiler;
 
 use PHPUnit\Framework\TestCase;
 
-require_once __DIR__ . '/../LlvmToolchain.php';
+require_once __DIR__.'/../LlvmToolchain.php';
 
 /**
- * JIT lowering for list destructuring from non-array RHS (#4325).
+ * JIT compile-only verify for guarded list destructuring from non-array RHS (#4325, #4531).
+ *
+ * Uses bin/jit.php -l in a child process (issue #98 — no in-process LLVM preload).
  *
  * @group llvm
- * @runInSeparateProcess
- * @preserveGlobalState disabled
  */
 final class ListDestructNullJitCompileTest extends TestCase
 {
@@ -22,15 +22,15 @@ final class ListDestructNullJitCompileTest extends TestCase
     protected function setUp(): void
     {
         $this->repoRoot = dirname(__DIR__, 2);
-        if (!LlvmToolchain::isReady($this->repoRoot)) {
+        if (!LlvmToolchain::hasLibrary($this->repoRoot)) {
             $reason = LlvmToolchain::readyFailureReason() ?? 'LLVM 9 toolchain not available';
-            $this->markTestSkipped($reason . ' — list destruct null JIT compile test needs LLVM (#4325)');
+            $this->markTestSkipped($reason.' — list destruct null JIT compile test needs LLVM (#4325)');
         }
     }
 
     public function testListDestructNullModuleVerify(): void
     {
-        $code = <<<'PHP'
+        $this->assertJitCompileOnly(<<<'PHP'
 <?php
 [$a, $b] = null;
 echo "a=", var_export($a, true), " b=", var_export($b, true), "\n";
@@ -38,15 +38,57 @@ list($x) = false;
 echo "x=", var_export($x, true), "\n";
 [$y] = 0;
 echo "y=", var_export($y, true), "\n";
-PHP;
-        $runtime = new Runtime();
-        $block = $runtime->parseAndCompile($code, 'list_destructure_null.php');
-        $runtime->jitCompileBlock($block);
+PHP
+        );
+    }
 
-        $context = $runtime->loadJitContext();
-        $verify = new \ReflectionMethod($context, 'compileCommon');
-        $verify->setAccessible(true);
-        $verify->invoke($context);
-        self::addToAssertionCount(1);
+    private function assertJitCompileOnly(string $code): void
+    {
+        $dir = $this->repoRoot.'/var';
+        if (!is_dir($dir) && !mkdir($dir, 0775, true) && !is_dir($dir)) {
+            $this->fail('Could not create var/ for JIT compile probe');
+        }
+        $source = $dir.'/list-destruct-null-compile-'.getmypid().'-'.md5($code).'.php';
+        file_put_contents($source, $code);
+
+        $llvmDir = LlvmToolchain::resolveDir($this->repoRoot);
+        $this->assertNotNull($llvmDir);
+
+        $bash = <<<'BASH'
+set -euo pipefail
+ROOT=%s
+SOURCE=%s
+source "$ROOT/script/php-env.sh"
+export PHP_COMPILER_LLVM_PATH=%s
+export LD_LIBRARY_PATH="%s${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
+unset PHP_COMPILER_SKIP_LLVM_PRELOAD
+"$PHP_BIN" "${PHP_OPTS[@]}" "$ROOT/bin/jit.php" -l "$SOURCE"
+BASH;
+
+        $command = sprintf(
+            $bash,
+            escapeshellarg($this->repoRoot),
+            escapeshellarg($source),
+            escapeshellarg($llvmDir),
+            $llvmDir
+        );
+
+        $descriptorSpec = [
+            0 => ['pipe', 'r'],
+            1 => ['pipe', 'w'],
+            2 => ['pipe', 'w'],
+        ];
+        $proc = proc_open(['bash', '-lc', $command], $descriptorSpec, $pipes, $this->repoRoot);
+        $this->assertIsResource($proc);
+        fclose($pipes[0]);
+        $stdout = stream_get_contents($pipes[1]);
+        $stderr = stream_get_contents($pipes[2]);
+        fclose($pipes[1]);
+        fclose($pipes[2]);
+        $exit = proc_close($proc);
+
+        @unlink($source);
+
+        $this->assertSame(0, $exit, trim((string) $stderr."\n".(string) $stdout));
     }
 }

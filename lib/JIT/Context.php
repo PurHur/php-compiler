@@ -678,6 +678,7 @@ class Context {
         $this->functionProxies['reflectionmethod::getattributes'] = new Call\ReflectionMethodGetAttributes();
         $this->functionProxies['reflectionattribute::getname'] = new Call\ReflectionAttributeGetName();
         $this->functionProxies['reflectionattribute::newinstance'] = new Call\ReflectionAttributeNewInstance();
+        $this->functionProxies['exception::getmessage'] = new Call\ExceptionGetMessage();
 
         FiberHelper::registerJitMethods($this);
         GeneratorHelper::registerJitMethods($this);

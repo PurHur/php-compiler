@@ -150,16 +150,11 @@ final class StringDirJit
         $i8p = $context->getTypeFromString('int8*');
         $i8pp = $context->getTypeFromString('int8**');
         $i8ppp = $i8pp->pointerType(0);
-        $voidPtr = $context->getTypeFromString('void*');
-        $sizeT = $context->getTypeFromString('size_t');
-        $voidTy = $context->getTypeFromString('void');
 
+        // scandir/alphasort only — free/calloc/strlen come from LibcExtern (i8*).
         foreach ([
-            ['scandir', $i32, [$i8p, $i8ppp, $voidPtr, $voidPtr]],
+            ['scandir', $i32, [$i8p, $i8ppp, $i8p, $i8p]],
             ['alphasort', $i32, [$i8pp, $i8pp]],
-            ['free', $voidTy, [$voidPtr]],
-            ['calloc', $voidPtr, [$sizeT, $sizeT]],
-            ['strlen', $sizeT, [$i8p]],
         ] as [$name, $ret, $params]) {
             self::ensureExternal($context, $name, $context->context->functionType($ret, false, ...$params));
         }
@@ -412,7 +407,7 @@ final class StringDirJit
             $context->lookupFunction('scandir'),
             $pathData,
             $namelistSlot,
-            $voidPtr->constNull(),
+            $i8p->constNull(),
             $context->bytePtr($alphasort)
         );
         $scanFailBlock = $fn->appendBasicBlock('scan_fail');

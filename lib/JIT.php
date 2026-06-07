@@ -10917,9 +10917,11 @@ class JIT {
             }
         }
 
-        $className = $receiverOp->type?->userType
-            ?? ($this->context->scope->className !== '' ? $this->context->scope->className : 'object');
-        $declaringClassLc = strtolower($className);
+        $userType = $receiverOp->type?->userType;
+        $className = (is_string($userType) && '' !== ltrim($userType, '\\'))
+            ? $userType
+            : ($this->context->scope->className !== '' ? $this->context->scope->className : 'object');
+        $declaringClassLc = strtolower(ltrim($className, '\\'));
         $methodLc = strtolower($methodName);
 
         if ('object' === $declaringClassLc) {
@@ -10944,6 +10946,25 @@ class JIT {
             );
         }
         if (!$this->context->functionIsRegistered($proxyName)) {
+            if ('getmessage' === $methodLc && $this->context->functionIsRegistered('exception::getmessage')) {
+                $this->context->scope->toCall = $this->context->resolveFunctionProxy('exception::getmessage');
+                $this->context->scope->args = [$receiverVar];
+
+                return;
+            }
+            if ('object' === $declaringClassLc || '' === $declaringClassLc) {
+                $runtimeCandidates = $this->buildRuntimeInstanceMethodCandidatesByClassId($methodLc);
+                if ([] !== $runtimeCandidates) {
+                    $this->context->scope->toCall = new JIT\Call\RuntimeIndirectInstanceMethodCall(
+                        $receiverVar,
+                        $methodLc,
+                        $runtimeCandidates
+                    );
+                    $this->context->scope->args = [$receiverVar];
+
+                    return;
+                }
+            }
             if (JIT\MagicMethodDispatch::tryInitMagicCall(
                 $this->context,
                 $declaringClassLc,
@@ -10955,6 +10976,7 @@ class JIT {
             throw new \LogicException("Call to undefined method {$className}::{$methodLc}()");
         }
         $receiverUserType = $receiverOp->type?->userType;
+        $normalizedReceiverUserType = is_string($receiverUserType) ? ltrim($receiverUserType, '\\') : null;
         $staticProxy = $this->context->resolveFunctionProxy($proxyName);
         // :object receivers use RuntimeIndirectInstanceMethodCall; MCJIT segfaults on
         // ReflectionAttribute::newInstance() through that path (#4598).
@@ -10964,8 +10986,9 @@ class JIT {
 
             return;
         }
-        $needsRuntimeDispatch = null === $receiverUserType
-            || 'object' === strtolower(ltrim((string) $receiverUserType, '\\'))
+        $needsRuntimeDispatch = null === $normalizedReceiverUserType
+            || '' === $normalizedReceiverUserType
+            || 'object' === strtolower($normalizedReceiverUserType)
             || $staticProxy instanceof JIT\Call\ExternalMethod;
         if ($needsRuntimeDispatch) {
             $runtimeCandidates = $this->buildRuntimeInstanceMethodCandidatesByClassId($methodLc);
