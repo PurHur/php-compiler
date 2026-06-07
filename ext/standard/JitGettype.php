@@ -7,6 +7,7 @@ namespace PHPCompiler\ext\standard;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\Variable as JITVariable;
+use PHPCompiler\VM\Variable as VmVariable;
 use PHPLLVM\Builder;
 use PHPLLVM\Value;
 
@@ -32,6 +33,7 @@ final class JitGettype
             JITVariable::TYPE_STRING => 'string',
             JITVariable::TYPE_OBJECT => 'object',
             JITVariable::TYPE_HASHTABLE => 'array',
+            VmVariable::TYPE_ENUM_CASE => 'object',
         ] as $jitType => $name) {
             $expected = $i8->constInt($jitType, false);
             $isType = $context->builder->icmp(Builder::INT_EQ, $typeByte, $expected);
