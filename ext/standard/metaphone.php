@@ -7,6 +7,7 @@ namespace PHPCompiler\ext\standard;
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
@@ -29,10 +30,7 @@ final class metaphone extends Internal
         if ($argc < 1 || $argc > 2) {
             throw new \LogicException('metaphone() accepts one or two arguments in this compiler build');
         }
-        $arg = $frame->calledArgs[0]->resolveIndirect();
-        if (Variable::TYPE_STRING !== $arg->type) {
-            throw new \LogicException('metaphone() argument #1 must be a string in this compiler build');
-        }
+        $string = VmString::coerceStringBuiltinArg($frame->calledArgs[0], 'metaphone', 0, 'string');
         $maxPhonemes = 0;
         if ($argc >= 2) {
             $maxVar = $frame->calledArgs[1]->resolveIndirect();
@@ -47,7 +45,7 @@ final class metaphone extends Internal
         if (null === $frame->returnVar) {
             return;
         }
-        $frame->returnVar->string(VmString::metaphone($arg->toString(), $maxPhonemes));
+        $frame->returnVar->string(VmString::metaphone($string, $maxPhonemes));
     }
 
     public Context $context;
@@ -70,7 +68,7 @@ final class metaphone extends Internal
 
         return JitMetaphone::invoke(
             $context,
-            $this->jitString($context, $args[0], 'metaphone() argument #1'),
+            JitStringBuiltinArg::lower($context, $args[0], 'metaphone', 0, 'string'),
             $maxPhonemes
         );
     }
