@@ -98,6 +98,7 @@ class Type extends Builtin {
         );
         $fnSscanfArray = $this->context->module->addFunction('__compiler_sscanf_array', $fntypeSscanfArray);
         $this->context->registerFunction('__compiler_sscanf_array', $fnSscanfArray);
+        Sscanf::ensureLinked($this->context);
         $fntypePack = $this->context->context->functionType(
             $this->context->getTypeFromString('__string__*'),
             false,
