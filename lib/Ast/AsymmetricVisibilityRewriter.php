@@ -136,14 +136,14 @@ final class AsymmetricVisibilityRewriter
     }
 
     /**
-     * Explicit read before parenthesized X(set) duplicates PPP / PPP_SET (#6897, #7388).
+     * Duplicate read/set on parenthesized X(set) is a compile fatal (#6897, #7308).
      *
-     * php-src: `public (private(set))` is fatal like `public private(set)`.
+     * php-src: `public (public(set))` is fatal; `public (private(set))` is valid (RFC asymmetric-visibility-v2).
      */
     private static function rejectExplicitReadBeforeParenthesizedSetModifier(string $source): void
     {
         if (preg_match(
-            '/(?<![a-zA-Z0-9_])(public|protected|private)\s+\(\s*(public|protected|private)\s*\(\s*set\s*\)\s*\)/i',
+            '/(?<![a-zA-Z0-9_])(public|protected|private)\s+\(\s*\1\s*\(\s*set\s*\)\s*\)/i',
             $source
         )) {
             throw new \CompileError(self::MULTIPLE_MODIFIERS_MESSAGE);

@@ -607,6 +607,46 @@ PHP;
             substr_count($paramBody, 'promotionSetVisibility'),
             'Param must declare promotionSetVisibility exactly once (#1492 partial vendor)'
         );
+        self::assertStringContainsString('promotionGetVisibility', $paramBody, '#5059 Param promotionGetVisibility');
+    }
+
+    public function testPhpCfgAsymmetricVisibilityOverlayAddsPromotionGetVisibilityForUntypedSet(): void
+    {
+        $param = self::$root.'/vendor/ircmaxell/php-cfg/lib/PHPCfg/Op/Expr/Param.php';
+        if (!is_readable($param)) {
+            self::markTestSkipped('vendor/ircmaxell/php-cfg not installed');
+        }
+
+        $original = (string) file_get_contents($param);
+        $simulated = preg_replace(
+            '/\n    \/\*\* Constructor promotion: asymmetric get visibility \(#5059\)\. \*\/\n    public int \$promotionGetVisibility = 0;\n/',
+            "\n",
+            $original,
+            1
+        );
+        self::assertNotSame($original, $simulated, 'fixture must drop promotionGetVisibility');
+        $simulated = (string) preg_replace(
+            '/public int \$promotionSetVisibility/',
+            'public $promotionSetVisibility',
+            $simulated,
+            1
+        );
+        file_put_contents($param, $simulated);
+
+        try {
+            $output = [];
+            $exitCode = 0;
+            exec('bash '.escapeshellarg(self::$root.'/script/apply-patches.sh').' 2>&1', $output, $exitCode);
+            $joined = implode("\n", $output);
+            self::assertStringContainsString('Param getVisibility overlay #5059', $joined, $joined);
+            self::assertStringContainsString(
+                'promotionGetVisibility',
+                (string) file_get_contents($param),
+                'overlay must add promotionGetVisibility for untyped promotionSetVisibility (#7468)'
+            );
+        } finally {
+            file_put_contents($param, $original);
+        }
     }
 
     public function testPhpCfgMatchOverlayIncludesUnhandledMatchLowering(): void

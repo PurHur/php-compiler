@@ -226,7 +226,10 @@ abstract class BaseTest extends TestCase {
         if (isset($sections['EXPECT']) || isset($sections['EXPECTF']) || isset($sections['EXPECTREGEX'])) {
             $stderrTrim = trim($stderr);
             $stdoutTrim = trim($result);
-            if ('' === $stderrTrim) {
+            if (isset($sections['EXPECT_EXIT']) && '' !== $stdoutTrim && str_contains($stderrTrim, 'PHP Fatal error:')) {
+                // PHPT --EXPECT-- is stdout; uncaught fatals after partial output land on stderr (#7468).
+                $merged = $stdoutTrim;
+            } elseif ('' === $stderrTrim) {
                 $merged = $stdoutTrim;
             } elseif ('' === $stdoutTrim) {
                 $merged = $stderrTrim;
