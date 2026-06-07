@@ -43,6 +43,6 @@ final class WeakMapOffsetExists extends VmClassMethod
         }
         $keyVar = new Variable(Variable::TYPE_STRING);
         $keyVar->string($key);
-        $frame->returnVar->bool($ht->keyExists($keyVar));
+        $frame->returnVar->bool($ht->offsetIsSet($keyVar));
     }
 }

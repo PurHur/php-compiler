@@ -325,24 +325,109 @@ class VM {
         return VM\InterfaceCheck::entryImplements($object->class, 'arrayaccess', $this->context);
     }
 
-    public function invokeArrayAccessOffsetGet(ObjectEntry $object, Variable $key): Variable
-    {
-        return $this->invokeInstanceMethod($object, 'offsetGet', $key);
+    public function invokeArrayAccessOffsetGet(
+        ObjectEntry $object,
+        Variable $key,
+        Frame $callerFrame,
+        Variable $resultOut
+    ): ?Frame {
+        [$declaring, $methodLc] = $this->resolveInstanceMethod($object->class, 'offsetGet');
+        $func = $declaring->methods[$methodLc];
+        $thisVar = new Variable();
+        $thisVar->object($object);
+        if ($func instanceof Func\Internal) {
+            $handlerOut = new Variable();
+            $catchFrame = $this->invokeVmClassMethod($func, $callerFrame, $handlerOut, $thisVar, $key);
+            if (null !== $catchFrame) {
+                return $catchFrame;
+            }
+            $resultOut->copyFrom($handlerOut);
+
+            return null;
+        }
+
+        $resultOut->copyFrom($this->invokePhpFunction($func, $thisVar, $key));
+
+        return null;
     }
 
-    public function invokeArrayAccessOffsetSet(ObjectEntry $object, Variable $key, Variable $value): void
-    {
-        $this->invokeInstanceMethod($object, 'offsetSet', $key, $value);
+    public function invokeArrayAccessOffsetSet(
+        ObjectEntry $object,
+        Variable $key,
+        Variable $value,
+        Frame $callerFrame
+    ): ?Frame {
+        [$declaring, $methodLc] = $this->resolveInstanceMethod($object->class, 'offsetSet');
+        $func = $declaring->methods[$methodLc];
+        $thisVar = new Variable();
+        $thisVar->object($object);
+        if ($func instanceof Func\Internal) {
+            return $this->invokeVmClassMethod($func, $callerFrame, null, $thisVar, $key, $value);
+        }
+        $this->invokePhpFunction($func, $thisVar, $key, $value);
+
+        return null;
     }
 
-    public function invokeArrayAccessOffsetExists(ObjectEntry $object, Variable $key): bool
-    {
-        return $this->invokeInstanceMethod($object, 'offsetExists', $key)->toBool();
+    public function invokeArrayAccessOffsetExists(
+        ObjectEntry $object,
+        Variable $key,
+        Frame $callerFrame,
+        Variable $resultOut
+    ): ?Frame {
+        [$declaring, $methodLc] = $this->resolveInstanceMethod($object->class, 'offsetExists');
+        $func = $declaring->methods[$methodLc];
+        $thisVar = new Variable();
+        $thisVar->object($object);
+        if ($func instanceof Func\Internal) {
+            $handlerOut = new Variable();
+            $catchFrame = $this->invokeVmClassMethod($func, $callerFrame, $handlerOut, $thisVar, $key);
+            if (null !== $catchFrame) {
+                return $catchFrame;
+            }
+            $resultOut->copyFrom($handlerOut);
+
+            return null;
+        }
+
+        $resultOut->copyFrom($this->invokePhpFunction($func, $thisVar, $key));
+
+        return null;
     }
 
-    public function invokeArrayAccessOffsetUnset(ObjectEntry $object, Variable $key): void
-    {
-        $this->invokeInstanceMethod($object, 'offsetUnset', $key);
+    public function invokeArrayAccessOffsetUnset(
+        ObjectEntry $object,
+        Variable $key,
+        Frame $callerFrame
+    ): ?Frame {
+        [$declaring, $methodLc] = $this->resolveInstanceMethod($object->class, 'offsetUnset');
+        $func = $declaring->methods[$methodLc];
+        $thisVar = new Variable();
+        $thisVar->object($object);
+        if ($func instanceof Func\Internal) {
+            return $this->invokeVmClassMethod($func, $callerFrame, null, $thisVar, $key);
+        }
+        $this->invokePhpFunction($func, $thisVar, $key);
+
+        return null;
+    }
+
+    /**
+     * Invoke a VM builtin class method; return catch frame when user code handles the throw.
+     *
+     * @param Variable ...$args
+     */
+    private function invokeVmClassMethod(
+        Func\Internal $func,
+        Frame $callerFrame,
+        ?Variable $returnVar,
+        Variable ...$args
+    ): ?Frame {
+        $handlerFrame = $func->getFrame($this->context, $callerFrame);
+        $handlerFrame->calledArgs = $args;
+        $handlerFrame->returnVar = $returnVar;
+
+        return $this->executeInternalHandler($handlerFrame, $callerFrame);
     }
 
     /**
@@ -2101,10 +2186,16 @@ restart:
                         $object = $container->toObject();
                         if ($forWrite) {
                             $dim = new Variable();
-                            $dim->arrayAccessDimension(new VM\ArrayAccessDimension($this, $object, $arg3));
+                            $dim->arrayAccessDimension(new VM\ArrayAccessDimension($this, $object, $arg3, $frame));
                             $arg1->indirect($dim);
                         } else {
-                            $arg1->copyFrom($this->invokeArrayAccessOffsetGet($object, $arg3));
+                            $readOut = new Variable();
+                            $catchFrame = $this->invokeArrayAccessOffsetGet($object, $arg3, $frame, $readOut);
+                            if (null !== $catchFrame) {
+                                $frame = $catchFrame;
+                                goto restart;
+                            }
+                            $arg1->copyFrom($readOut);
                         }
                     } else {
                         $scriptFile = '' !== $frame->scriptPath ? $frame->scriptPath : null;
@@ -3220,7 +3311,11 @@ restart:
                     if (Variable::TYPE_OBJECT === $container->type) {
                         $object = $container->toObject();
                         if ($this->objectImplementsArrayAccess($object)) {
-                            $this->invokeArrayAccessOffsetUnset($object, $key);
+                            $catchFrame = $this->invokeArrayAccessOffsetUnset($object, $key, $frame);
+                            if (null !== $catchFrame) {
+                                $frame = $catchFrame;
+                                goto restart;
+                            }
                             break;
                         }
                         [$propName, $catchFrame] = $this->coerceRuntimeOperandToString($key, $frame);
@@ -4406,10 +4501,18 @@ restart:
                         if (Variable::TYPE_OBJECT === $container->type) {
                             $object = $container->toObject();
                             if ($this->objectImplementsArrayAccess($object)) {
-                                $dst->bool($this->invokeArrayAccessOffsetExists(
+                                $existsOut = new Variable();
+                                $catchFrame = $this->invokeArrayAccessOffsetExists(
                                     $object,
-                                    $frame->scope[$op->arg3]
-                                ));
+                                    $frame->scope[$op->arg3],
+                                    $frame,
+                                    $existsOut
+                                );
+                                if (null !== $catchFrame) {
+                                    $frame = $catchFrame;
+                                    goto restart;
+                                }
+                                $dst->bool($existsOut->toBool());
                                 break;
                             }
                             [$propName, $catchFrame] = $this->coerceRuntimeOperandToString($frame->scope[$op->arg3], $frame);

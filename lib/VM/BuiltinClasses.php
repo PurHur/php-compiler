@@ -112,6 +112,7 @@ final class BuiltinClasses
         AttributeSupport::register($ctx);
         self::registerStdClass($ctx);
         self::registerCountable($ctx);
+        self::registerArrayAccess($ctx);
         self::registerTraversableInterfaces($ctx);
         SensitiveParamSupport::register($ctx);
         self::registerWeakReference($ctx);
@@ -154,6 +155,14 @@ final class BuiltinClasses
         $ctx->classes['countable'] = $entry;
     }
 
+    /** Zend zend_interfaces.c — ArrayAccess for $obj[$key] dispatch (#3331, #5433). */
+    private static function registerArrayAccess(Context $ctx): void
+    {
+        $entry = new ClassEntry('ArrayAccess');
+        $entry->isInterface = true;
+        $ctx->classes['arrayaccess'] = $entry;
+    }
+
     private static function registerStdClass(Context $ctx): void
     {
         $entry = new ClassEntry('stdClass');
@@ -185,6 +194,7 @@ final class BuiltinClasses
     private static function registerWeakMap(Context $ctx): void
     {
         $entry = new ClassEntry('WeakMap');
+        $entry->interfaces = ['arrayaccess', 'countable'];
         $arrayProto = new Variable(Variable::TYPE_ARRAY);
         $entry->properties[] = new ClassProperty(
             WeakRefSupport::MAP_PROPERTY,

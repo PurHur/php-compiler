@@ -49,7 +49,7 @@ final class WeakRefSupport
 
     public static function targetObjectId(Variable $key): int
     {
-        return self::requireObject($key, 'WeakMap key')->toObject()->id;
+        return self::requireWeakMapKey($key)->toObject()->id;
     }
 
     public static function requireObject(Variable $var, string $label): Variable
@@ -62,11 +62,20 @@ final class WeakRefSupport
         return $var;
     }
 
+    /** Zend zend_weakrefs.c — WeakMap offset key must be object (#5433). */
+    public static function requireWeakMapKey(Variable $var): Variable
+    {
+        $var = $var->resolveIndirect();
+        if (Variable::TYPE_OBJECT !== $var->type) {
+            throw new \TypeError('WeakMap key must be an object');
+        }
+
+        return $var;
+    }
+
     public static function objectKey(Variable $key): string
     {
-        $key = self::requireObject($key, 'WeakMap key');
-
-        return 'o:'.$key->toObject()->id;
+        return 'o:'.self::requireWeakMapKey($key)->toObject()->id;
     }
 
     public static function targetSlot(ObjectEntry $weakRef): Variable
