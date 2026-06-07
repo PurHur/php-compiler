@@ -151,4 +151,30 @@ PHP;
             PipeOperatorDesugar::desugar('<?php echo 3 |> (fn($x) => $x + 1) |> (fn($x) => $x * 2), "\n";')
         );
     }
+
+    public function testDesugarRewritesParenthesizedArrowFunctionWithEmptyInvoke(): void
+    {
+        $this->assertSame(
+            '<?php echo (fn($x) => $x * 2)(5), PHP_EOL;',
+            PipeOperatorDesugar::desugar('<?php echo 5 |> (fn($x) => $x * 2)(), PHP_EOL;')
+        );
+        $this->assertSame(
+            '<?php echo (fn(int $x): int => $x * 2)(5), PHP_EOL;',
+            PipeOperatorDesugar::desugar('<?php echo 5 |> (fn(int $x): int => $x * 2)(), PHP_EOL;')
+        );
+    }
+
+    public function testVmPipeParenthesizedArrowFunctionWithEmptyInvoke(): void
+    {
+        $code = <<<'PHP'
+<?php
+echo 5 |> (fn($x) => $x * 2)(), PHP_EOL;
+echo 5 |> (fn(int $x): int => $x * 2)(), PHP_EOL;
+PHP;
+        $rt = new Runtime();
+        $block = $rt->parseAndCompile($code, 'test.php');
+        ob_start();
+        $rt->run($block);
+        $this->assertSame("10\n10\n", ob_get_clean());
+    }
 }
