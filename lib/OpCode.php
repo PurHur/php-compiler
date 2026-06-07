@@ -209,6 +209,8 @@ class OpCode {
     const TYPE_FROM_CALLABLE = 125;
     /** empty($obj->prop): uninitialized typed slots empty without read; __isset semantics otherwise (#6787, zend_object_handlers.c). */
     const TYPE_EMPTY_OBJECT_PROPERTY = 126;
+    /** `(void)` cast — evaluate operand, result is null (#7346). */
+    const TYPE_CAST_VOID = 127;
 
     /** `['k' => $v, ...$tail] = $arr` string keys already assigned; empty = numeric spread only (#4889). */
     public array $listSpreadExcludedKeys = [];

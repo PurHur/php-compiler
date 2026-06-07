@@ -2338,6 +2338,9 @@ restart:
                     }
                     $frame->scope[$op->arg1]->null();
                     break;
+                case OpCode::TYPE_CAST_VOID:
+                    $frame->scope[$op->arg1]->null();
+                    break;
                 case OpCode::TYPE_IDENTICAL:
                     $arg1 = $frame->scope[$op->arg1];
                     $arg2 = $frame->scope[$op->arg2];
@@ -10606,6 +10609,9 @@ restart:
 
     private function emitCallNoDiscardNotice(Frame $frame, OpCode $op): void
     {
+        if (!CompilerVersion::supportsNoDiscardAttribute()) {
+            return;
+        }
         if (OpCode::TYPE_FUNCCALL_EXEC_NORETURN !== $op->type) {
             return;
         }

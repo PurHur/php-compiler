@@ -10,3 +10,5 @@ function f(): int {
 }
 
 f();
+(void) f();
+echo "ok\n";

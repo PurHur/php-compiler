@@ -5213,6 +5213,8 @@ class Compiler {
             return OpCode::TYPE_CAST_STRING;
         } elseif ($expr instanceof Op\Expr\Cast\Unset_) {
             return OpCode::TYPE_CAST_UNSET;
+        } elseif ($expr instanceof Op\Expr\Cast\Void_) {
+            return OpCode::TYPE_CAST_VOID;
         }
         $this->throwCompileLogic("Unknown CastOp Type: " . $expr->getType());
     }
@@ -5278,6 +5280,9 @@ class Compiler {
         } elseif ($expr instanceof Op\Expr\Cast) {
             if ($expr instanceof Op\Expr\Cast\Unset_) {
                 $this->throwCompileError('The (unset) cast is no longer supported');
+            }
+            if ($expr instanceof Op\Expr\Cast\Void_ && !CompilerVersion::supportsNoDiscardAttribute()) {
+                $this->throwCompileError('The (void) cast is not supported for this language target');
             }
             $line = $expr->getLine();
             return [new OpCode(
