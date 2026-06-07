@@ -18,6 +18,7 @@ final class StringSerialize
 {
     public static function implement(Context $context): void
     {
+        StringSerializeDoubleJit::implement($context);
         self::implementHashtable($context);
         self::implementValue($context);
     }
@@ -265,6 +266,7 @@ final class StringSerialize
         $nullType = $i8->constInt(Variable::TYPE_NULL, false);
         $longType = $i8->constInt(Variable::TYPE_NATIVE_LONG, false);
         $boolType = $i8->constInt(Variable::TYPE_NATIVE_BOOL, false);
+        $doubleType = $i8->constInt(Variable::TYPE_NATIVE_DOUBLE, false);
         $stringType = $i8->constInt(Variable::TYPE_STRING & 0xff, false);
 
         $bbNull = $fn->appendBasicBlock('ser_v_null');
@@ -272,6 +274,8 @@ final class StringSerialize
         $bbLong = $fn->appendBasicBlock('ser_v_long');
         $bbCheckBool = $fn->appendBasicBlock('ser_v_check_bool');
         $bbBool = $fn->appendBasicBlock('ser_v_bool');
+        $bbCheckDouble = $fn->appendBasicBlock('ser_v_check_double');
+        $bbDouble = $fn->appendBasicBlock('ser_v_double');
         $bbCheckString = $fn->appendBasicBlock('ser_v_check_string');
         $bbString = $fn->appendBasicBlock('ser_v_string');
         $bbDefault = $fn->appendBasicBlock('ser_v_default');
@@ -290,7 +294,11 @@ final class StringSerialize
 
         $context->builder->positionAtEnd($bbCheckBool);
         $isBool = $context->builder->icmp(Builder::INT_EQ, $typeByte, $boolType);
-        $context->builder->branchIf($isBool, $bbBool, $bbCheckString);
+        $context->builder->branchIf($isBool, $bbBool, $bbCheckDouble);
+
+        $context->builder->positionAtEnd($bbCheckDouble);
+        $isDouble = $context->builder->icmp(Builder::INT_EQ, $typeByte, $doubleType);
+        $context->builder->branchIf($isDouble, $bbDouble, $bbCheckString);
 
         $context->builder->positionAtEnd($bbCheckString);
         $isStr = $context->builder->icmp(Builder::INT_EQ, $typeByte, $stringType);
@@ -339,6 +347,26 @@ final class StringSerialize
             self::literalString($context, 'b:0;')
         );
         $context->builder->store($boolStr, $resultSlot);
+        $context->builder->branch($bbDone);
+
+        $context->builder->positionAtEnd($bbDouble);
+        $doubleVal = $context->builder->call(
+            $context->lookupFunction('__value__readDouble'),
+            $valPtr
+        );
+        $precision = $context->builder->load(
+            $context->module->getNamedGlobal('phpc_ini_serialize_precision')
+        );
+        $formatted = $context->builder->call(
+            $context->lookupFunction('__phpc_format_serialize_double'),
+            $doubleVal,
+            $precision
+        );
+        $acc = JitStringConcat::concat($context, self::literalString($context, 'd:'), $formatted);
+        $context->builder->store(
+            JitStringConcat::concat($context, $acc, self::literalString($context, ';')),
+            $resultSlot
+        );
         $context->builder->branch($bbDone);
 
         $context->builder->positionAtEnd($bbString);
