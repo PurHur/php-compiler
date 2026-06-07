@@ -6191,6 +6191,8 @@ restart:
             return $this->dispatchVmCompileError($e, $callerFrame);
         } catch (\ReflectionException $e) {
             return $this->dispatchVmReflectionException($e, $callerFrame);
+        } catch (VM\NativeDateInvalidTimeZoneException $e) {
+            return $this->dispatchVmDateInvalidTimeZoneException($e, $callerFrame);
         } catch (\Error $e) {
             return $this->dispatchVmError($e->getMessage(), $callerFrame);
         } catch (VM\GeneratorUncaughtThrow $e) {
@@ -6387,6 +6389,28 @@ restart:
     {
         [$file, $line] = VM\ExceptionSupport::userFatalSite($frame);
         $thrown = VM\BuiltinExceptionSupport::materializeReflectionException(
+            $this->context,
+            $error->getMessage(),
+            $file,
+            $line
+        );
+        $catchFrame = $this->findCatchFrameForThrow($frame, $thrown);
+        if (null !== $catchFrame) {
+            return $catchFrame;
+        }
+        $this->raiseUncaughtException($thrown);
+
+        return null;
+    }
+
+    /** Bridge native DateInvalidTimeZoneException from date builtins into user catch handlers (#7279). */
+    private function dispatchVmDateInvalidTimeZoneException(
+        VM\NativeDateInvalidTimeZoneException $error,
+        Frame $frame
+    ): ?Frame
+    {
+        [$file, $line] = VM\ExceptionSupport::userFatalSite($frame);
+        $thrown = VM\BuiltinExceptionSupport::materializeDateInvalidTimeZoneException(
             $this->context,
             $error->getMessage(),
             $file,

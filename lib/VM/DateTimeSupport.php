@@ -56,11 +56,19 @@ final class DateTimeSupport
     {
         try {
             $host = new \DateTimeZone($timezone);
-        } catch (\Exception $e) {
-            throw new \LogicException('DateTimeZone::__construct(): Unknown or bad timezone ('.$timezone.')');
+        } catch (\Exception) {
+            self::throwDateInvalidTimeZoneException($timezone);
         }
         self::requireStringProperty($zone, self::TZ_NAME_PROPERTY, 'DateTimeZone')->string($host->getName());
         $zone->constructed = true;
+    }
+
+    /** php-src ext/date/php_datetimezone.c — invalid id throws DateInvalidTimeZoneException (#7279). */
+    public static function throwDateInvalidTimeZoneException(string $timezone): void
+    {
+        throw new NativeDateInvalidTimeZoneException(
+            'DateTimeZone::__construct(): Unknown or bad timezone ('.$timezone.')'
+        );
     }
 
     public static function initDateTime(ObjectEntry $dt, string $time, ?ObjectEntry $timezone = null): void
