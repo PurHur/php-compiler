@@ -12,7 +12,7 @@ use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
 
-/** clearstatcache() — VM via host PHP stat cache; JIT/AOT no-op (libc stat has no cache). */
+/** clearstatcache() — VM via VmStatCache; JIT/AOT no-op (libc stat has no cache). */
 final class clearstatcache_ extends Internal
 {
     public function __construct()
@@ -27,20 +27,20 @@ final class clearstatcache_ extends Internal
             throw new \LogicException('clearstatcache() accepts at most two arguments in this compiler build');
         }
         if (0 === $argc) {
-            \clearstatcache();
+            VmStatCache::clear();
         } elseif (1 === $argc) {
             $clearRealpath = $frame->calledArgs[0]->resolveIndirect();
             if (Variable::TYPE_BOOLEAN !== $clearRealpath->type) {
                 throw new \LogicException('clearstatcache() argument #1 must be a boolean in this compiler build');
             }
-            \clearstatcache($clearRealpath->toBool());
+            VmStatCache::clear($clearRealpath->toBool());
         } else {
             $clearRealpath = $frame->calledArgs[0]->resolveIndirect();
             if (Variable::TYPE_BOOLEAN !== $clearRealpath->type) {
                 throw new \LogicException('clearstatcache() argument #1 must be a boolean in this compiler build');
             }
             $filename = VmString::coerceStringBuiltinArg($frame->calledArgs[1], 'clearstatcache', 1, 'filename');
-            \clearstatcache($clearRealpath->toBool(), $filename);
+            VmStatCache::clear($clearRealpath->toBool(), $filename);
         }
         if (null !== $frame->returnVar) {
             $frame->returnVar->null();
