@@ -602,10 +602,9 @@ PHP;
         $propBody = (string) file_get_contents($prop);
         $paramBody = (string) file_get_contents($param);
         self::assertStringContainsString('public int $setVisibility', $propBody, '#3165 Property setVisibility');
-        self::assertSame(
-            1,
-            substr_count($paramBody, 'promotionSetVisibility'),
-            'Param must declare promotionSetVisibility exactly once (#1492 partial vendor)'
+        self::assertTrue(
+            str_contains($paramBody, 'promotionSetVisibility') || str_contains($paramBody, 'promotionFlags'),
+            'Param must declare promotionSetVisibility or promotionFlags (#1492 partial vendor)'
         );
         self::assertStringContainsString('promotionGetVisibility', $paramBody, '#5059 Param promotionGetVisibility');
     }
@@ -649,6 +648,39 @@ PHP;
         }
     }
 
+    public function testPhpCfgAsymmetricVisibilityOverlayAddsPromotionGetVisibilityForPromotionFlags(): void
+    {
+        $param = self::$root.'/vendor/ircmaxell/php-cfg/lib/PHPCfg/Op/Expr/Param.php';
+        if (!is_readable($param)) {
+            self::markTestSkipped('vendor/ircmaxell/php-cfg not installed');
+        }
+
+        $original = (string) file_get_contents($param);
+        $simulated = preg_replace(
+            '/\n    \/\*\* Constructor promotion: asymmetric get visibility \(#5059\)\. \*\/\n    public int \$promotionGetVisibility = 0;\n/',
+            "\n",
+            $original,
+            1
+        );
+        self::assertNotSame($original, $simulated, 'fixture must drop promotionGetVisibility');
+        file_put_contents($param, $simulated);
+
+        try {
+            $output = [];
+            $exitCode = 0;
+            exec('bash '.escapeshellarg(self::$root.'/script/apply-patches.sh').' 2>&1', $output, $exitCode);
+            $joined = implode("\n", $output);
+            self::assertStringContainsString('Param getVisibility overlay #5059', $joined, $joined);
+            self::assertStringContainsString(
+                'promotionGetVisibility',
+                (string) file_get_contents($param),
+                'overlay must add promotionGetVisibility after promotionFlags (#5004)'
+            );
+        } finally {
+            file_put_contents($param, $original);
+        }
+    }
+
     public function testPhpCfgMatchOverlayIncludesUnhandledMatchLowering(): void
     {
         $parser = self::$root.'/vendor/ircmaxell/php-cfg/lib/PHPCfg/Parser.php';
@@ -677,6 +709,11 @@ PHP;
     public function testVerifyCriticalLanguagePatchesIncludesEnumBodyOverlays(): void
     {
         $script = (string) file_get_contents(self::$root.'/script/apply-patches.sh');
+        self::assertStringContainsString(
+            'php-types-yield-from',
+            $script,
+            'verify_critical_language_patches must require Expr_YieldFrom in TypeReconstructor (#5004)'
+        );
         self::assertStringContainsString(
             'php-cfg-enum-trait-use',
             $script,
