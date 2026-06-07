@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace PHPCompiler\JIT\Builtin;
 
-use PHPCompiler\JIT\Builtin;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\Variable;
 use PHPLLVM\Builder;
@@ -13,17 +12,30 @@ use PHPLLVM\Value;
 /**
  * LLVM implementation of __compiler_getenv — libc getenv into a __value__ out-parameter.
  *
- * Standalone AOT uses the C runtime in lib/AOT/runtime/superglobals_refresh.c (issue #1068, #3710).
+ * VM/JIT/AOT/standalone share this path; superglobals_refresh.c no longer duplicates it (#5330).
  */
 final class StringGetenv
 {
+    public static function ensureLinked(Context $context): void
+    {
+        self::implement($context);
+    }
+
+    public static function ensureStandaloneBodies(Context $context): void
+    {
+        self::implement($context);
+    }
+
     public static function implement(Context $context): void
     {
-        $fn = $context->lookupFunction('__compiler_getenv');
-        // Standalone AOT links a C runtime implementation of __compiler_getenv; only declare it here.
-        if (Builtin::LOAD_TYPE_STANDALONE === $context->loadType) {
+        $probe = $context->module->getNamedFunction('__compiler_getenv');
+        if (null !== $probe && $probe->countBasicBlocks() > 0) {
+            $context->registerFunction('__compiler_getenv', $probe);
+
             return;
         }
+
+        $fn = $context->lookupFunction('__compiler_getenv');
 
         StringEnvLocal::ensureLinked($context);
 
@@ -117,5 +129,7 @@ final class StringGetenv
         $context->builder->positionAtEnd($done);
         $context->builder->returnVoid();
         $context->builder->clearInsertionPosition();
+
+        $context->registerFunction('__compiler_getenv', $fn);
     }
 }
