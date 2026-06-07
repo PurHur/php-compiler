@@ -40,13 +40,29 @@ array_key_exists(\'k\', $o);
     public function testUncaughtDispatchVmErrorFatalAtUserSite(): void
     {
         $stderr = $this->runVmCliFile('<?php
-$w = WeakReference::create(new stdClass);
-', 'weakref_uncaught.php');
+stdClass::undefined();
+', 'dispatch_vm_error_uncaught.php');
         $this->assertStringContainsString('Uncaught Error:', $stderr);
-        $this->assertStringContainsString('Non-static method WeakReference::create()', $stderr);
-        $this->assertStringContainsString('weakref_uncaught.php', $stderr);
+        $this->assertStringContainsString('Call to undefined static method stdclass::undefined()', $stderr);
+        $this->assertStringContainsString('dispatch_vm_error_uncaught.php', $stderr);
         $this->assertStringNotContainsString('ExceptionSupport.php', $stderr);
         $this->assertStringNotContainsString('Variable::$string must not be accessed before initialization', $stderr);
+    }
+
+    public function testUncaughtFinallyThrowPrintsNextExceptionChain(): void
+    {
+        $stderr = $this->runVmCliFile(<<<'PHP'
+<?php
+try {
+    throw new Exception('inner');
+} finally {
+    throw new Exception('finally');
+}
+PHP
+        );
+        $this->assertStringContainsString('Uncaught Exception: inner', $stderr);
+        $this->assertStringContainsString('Next Exception: finally', $stderr);
+        $this->assertStringNotContainsString('ExceptionSupport.php', $stderr);
     }
 
     private function runVmCliFile(string $code, ?string $basename = null): string
