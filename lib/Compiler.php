@@ -3313,9 +3313,6 @@ class Compiler {
                     ) {
                         $this->registerInstancePropertyDeclaration($child->name->value);
                     }
-                    if (!is_null($child->defaultBlock)) {
-                        $this->compileOps($child->defaultBlock->children, $result);
-                    }
                     $propName = '?';
                     if ($child->name instanceof Operand\Literal && is_string($child->name->value)) {
                         $propName = $child->name->value;
