@@ -9,6 +9,7 @@ use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Builtin\ScriptExit;
 use PHPCompiler\JIT\Builtin\TypeErrorRaise;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\JitOperandTypeLabel;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\EnumCaseSupport;
 use PHPCompiler\VM\Variable;
@@ -67,6 +68,13 @@ final class exit_ extends Internal
         if (Variable::TYPE_STRING === $v->type || Variable::TYPE_INTEGER === $v->type) {
             return;
         }
+        // Zend rejects enum cases at object-to-string conversion (Error), not ZPP (#7214).
+        if (Variable::TYPE_ENUM_CASE === $v->type) {
+            return;
+        }
+        if (Variable::TYPE_OBJECT === $v->type && EnumCaseSupport::isEnumCase($v->toObject())) {
+            return;
+        }
 
         throw new \TypeError(\sprintf(
             '%s(): Argument #1 ($status) must be of type string|int, %s given',
@@ -103,6 +111,12 @@ final class exit_ extends Internal
             return;
         }
         if (JITVariable::TYPE_VALUE === $arg->type) {
+            return;
+        }
+        if (null !== JitOperandTypeLabel::compileTimeEnumClassName($context, $arg)) {
+            return;
+        }
+        if (JITVariable::TYPE_OBJECT === $arg->type) {
             return;
         }
 
