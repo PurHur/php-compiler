@@ -1,6 +1,7 @@
 /**
- * JIT/AOT segfault triage — async-signal-safe SIGSEGV handler only (#2978, #6748, #6777).
+ * JIT/AOT segfault triage — async-signal-safe SIGSEGV handler only (#2978, #6748, #6777, #7360).
  * Progress string buffering lives in LLVM globals filled by ProgressNoteRuntime.php.
+ * Do not add progress formatting or buffer writes here — see lib/JIT/Builtin/ProgressNoteRuntime.php.
  */
 #include <stddef.h>
 #include <unistd.h>

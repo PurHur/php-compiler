@@ -13,7 +13,8 @@ use PHPLLVM\Value\Function_ as LlvmFunction;
  * LLVM implementation of __phpc_progress_note (issue #6748, #6777).
  *
  * File writes mirror lib/JIT/Progress.php; SIGSEGV breadcrumb buffer is LLVM globals
- * (phpc_last_progress / phpc_last_progress_len) read by lib/AOT/runtime/phpc_progress.c.
+ * (phpc_last_progress / phpc_last_progress_len) read by lib/AOT/runtime/phpc_progress.c (#7360).
+ * All progress string updates belong here — phpc_progress.c is a frozen thin SIGSEGV ABI only.
  */
 final class ProgressNoteRuntime
 {

@@ -14,7 +14,7 @@ final class Linker
     /**
      * Bundled C runtime objects for AOT link.
      *
-     * phpc_progress.c is a frozen thin ABI only (#7146): async-signal-safe SIGSEGV handler
+     * phpc_progress.c is a frozen thin ABI only (#7146, #7360): async-signal-safe SIGSEGV handler
      * that write(2)s phpc_last_progress globals filled by ProgressNoteRuntime.php.
      * Do not add progress formatting or buffer writes in C — use lib/JIT/Builtin/ProgressNoteRuntime.php.
      * Opt out via PHP_COMPILER_PROGRESS_ABI=0 (see runtimeCSources()).

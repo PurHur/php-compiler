@@ -9,7 +9,7 @@ use PHPCompiler\Runtime;
 use PHPUnit\Framework\TestCase;
 
 /**
- * Issue #6748 / #6777: AOT standalone defines progress notes in LLVM globals + optional C SIGSEGV ABI.
+ * Issue #6748 / #6777 / #7360: AOT standalone defines progress notes in LLVM globals + optional C SIGSEGV ABI.
  *
  * @group aot-lint
  */
@@ -36,7 +36,7 @@ final class ProgressNoteRuntimeStandaloneTest extends TestCase
         $this->assertNotNull($ctx->module->getNamedGlobal('phpc_last_progress_len'));
     }
 
-    /** Issue #7146: C progress TU must stay async-signal-safe handler only — no buffer writers. */
+    /** Issue #7146 / #7360: C progress TU must stay async-signal-safe handler only — no buffer writers. */
     public function testProgressCRuntimeIsFrozenThinAbi(): void
     {
         $source = file_get_contents(__DIR__.'/../../../lib/AOT/runtime/phpc_progress.c');
