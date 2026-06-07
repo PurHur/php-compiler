@@ -500,6 +500,24 @@ final class Variable {
         ));
     }
 
+    /**
+     * @return int|float
+     */
+    private static function numericForArithmeticOp(
+        int $opCode,
+        Variable $operand,
+        Variable $left,
+        Variable $right,
+        ?\PHPCompiler\VM $vm = null,
+        ?\PHPCompiler\Frame $frame = null
+    ) {
+        try {
+            return $operand->toNumericForArithmetic($vm, $frame);
+        } catch (\TypeError) {
+            self::throwUnsupportedOperandTypes($opCode, $left, $right);
+        }
+    }
+
     private static function operandsValidForNumericOp(Variable $left, Variable $right): bool
     {
         if (self::TYPE_ARRAY === $left->type || self::TYPE_ARRAY === $right->type) {
@@ -2028,8 +2046,8 @@ restart:
         if ($this === $left || $this === $right) {
             $this->storeNumericOp(
                 $opCode,
-                $left->toNumericForArithmetic($vm, $frame),
-                $right->toNumericForArithmetic($vm, $frame)
+                self::numericForArithmeticOp($opCode, $left, $left, $right, $vm, $frame),
+                self::numericForArithmeticOp($opCode, $right, $left, $right, $vm, $frame)
             );
 
             return;
@@ -2066,8 +2084,8 @@ restart:
         } else {
             $result = $this->_numericOp(
                 $opCode,
-                $left->toNumericForArithmetic($vm, $frame),
-                $right->toNumericForArithmetic($vm, $frame)
+                self::numericForArithmeticOp($opCode, $left, $left, $right, $vm, $frame),
+                self::numericForArithmeticOp($opCode, $right, $left, $right, $vm, $frame)
             );
             if (is_int($result)) {
                 $this->int($result);
