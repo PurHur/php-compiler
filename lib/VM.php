@@ -3527,6 +3527,15 @@ restart:
                         }
                         break;
                     }
+                    if (Variable::TYPE_ENUM_CASE === $callee->type) {
+                        $receiver = VM\EnumCaseSupport::receiverForInstanceMethod($callee);
+                        $catchFrame = $this->initMethodCall($frame, $receiver, '__invoke');
+                        if (null !== $catchFrame) {
+                            $frame = $catchFrame;
+                            goto restart;
+                        }
+                        break;
+                    }
                     if (Variable::TYPE_ARRAY === $callee->type) {
                         $this->initArrayCallable($frame, $callee);
                         break;
