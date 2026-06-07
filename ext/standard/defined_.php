@@ -27,7 +27,7 @@ final class defined_ extends Internal
         if (null === $frame->vmContext) {
             throw new \LogicException('defined() requires VM context');
         }
-        $name = VmString::coerceStringBuiltinArg($frame->calledArgs[0], 'defined', 0, 'constant');
+        $name = VmString::coerceStringBuiltinArg($frame->calledArgs[0], 'defined', 0, 'constant_name');
         $defined = VmConstants::constantDefined($frame->vmContext, $name);
         if (null !== $frame->returnVar) {
             $frame->returnVar->bool($defined);
@@ -40,7 +40,7 @@ final class defined_ extends Internal
             throw new \LogicException('defined() requires exactly one argument');
         }
         if (JITVariable::TYPE_VALUE === $args[0]->type || JITVariable::TYPE_OBJECT === $args[0]->type) {
-            JitStringBuiltinArg::lower($context, $args[0], 'defined', 0, 'constant');
+            JitStringBuiltinArg::lower($context, $args[0], 'defined', 0, 'constant_name');
         }
         if (JITVariable::TYPE_STRING !== $args[0]->type || null === $args[0]->compileTimeString) {
             throw new \LogicException('defined() constant name must be a string literal in this compiler build');
