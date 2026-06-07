@@ -34,7 +34,7 @@ final class ReflectionMethodConstruct extends VmClassMethod
             );
         }
         $methodLc = strtolower($method);
-        if (!isset($entry->methods[$methodLc])) {
+        if (!isset($entry->methods[$methodLc]) && !isset($entry->abstractMethods[$methodLc])) {
             ReflectionSupport::throwReflectionException(
                 ReflectionSupport::methodNotFoundMessage($entry->name, $method)
             );
