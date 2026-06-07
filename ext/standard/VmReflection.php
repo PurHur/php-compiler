@@ -427,8 +427,16 @@ final class VmReflection
     public static function resolveClassForClassUses(Context $ctx, Variable $arg, bool $autoload): ?ClassEntry
     {
         $arg = $arg->resolveIndirect();
+        if (Variable::TYPE_ENUM_CASE === $arg->type) {
+            return EnumSupport::resolveRuntimeEnumClass($ctx, $arg->toEnumCase()->enumClass);
+        }
         if (Variable::TYPE_OBJECT === $arg->type) {
-            return $arg->toObject()->class;
+            $object = $arg->toObject();
+            if (EnumCaseSupport::isEnumCase($object)) {
+                return EnumSupport::resolveRuntimeEnumClass($ctx, $object->class);
+            }
+
+            return $object->class;
         }
         if (Variable::TYPE_STRING !== $arg->type) {
             return null;
@@ -485,6 +493,11 @@ final class VmReflection
         }
 
         foreach ($entry->interfaces as $ifaceLc) {
+            $builtin = self::builtinEnumInterfaceDisplayName($ifaceLc);
+            if (null !== $builtin) {
+                $result[$builtin] = $builtin;
+                continue;
+            }
             if (!isset($ctx->classes[$ifaceLc])) {
                 continue;
             }
@@ -497,6 +510,18 @@ final class VmReflection
         }
 
         return $result;
+    }
+
+    /**
+     * Zend implicit enum interfaces — not registered as user ClassEntry (#5651, #5422).
+     */
+    public static function builtinEnumInterfaceDisplayName(string $ifaceLc): ?string
+    {
+        return match (strtolower(ltrim($ifaceLc, '\\'))) {
+            'unitenum' => 'UnitEnum',
+            'backedenum' => 'BackedEnum',
+            default => null,
+        };
     }
 
     /** @param array<string, string> $result */
