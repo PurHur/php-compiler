@@ -196,4 +196,20 @@ PHP;
         $this->expectExceptionMessage('Non-readonly class ChildNormal cannot extend readonly class ParentReadonly');
         $runtime->parseAndCompile($code, "eval()'d code");
     }
+
+    /** @covers issue #7299 */
+    public function testAllowDynamicPropertiesOnReadonlyClassFailsAtCompileTime(): void
+    {
+        $runtime = new Runtime();
+        $code = <<<'PHP'
+<?php
+#[\AllowDynamicProperties]
+readonly class R {
+    public function __construct(public int $x) {}
+}
+PHP;
+        $this->expectException(\CompileError::class);
+        $this->expectExceptionMessage('Cannot apply #[AllowDynamicProperties] to readonly class R');
+        $runtime->parseAndCompile($code, 'allow_dynamic_readonly.php');
+    }
 }

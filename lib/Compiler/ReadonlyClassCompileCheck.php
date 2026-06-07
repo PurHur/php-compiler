@@ -59,6 +59,10 @@ final class ReadonlyClassCompileCheck
         $readonly = ClassReadonly::fromClassFlags($class->flags);
         $display = $this->operandDisplayName($class->name, $lc);
         if ($readonly) {
+            AttributeNames::assertAllowDynamicPropertiesNotOnReadonlyClass(
+                AttributeNames::fromOp($class),
+                $display
+            );
             $this->verifyReadonlyClassNoStaticProperties($class, $display);
         }
         $this->verifyNoPropertyDefaults($class, $display, $readonly);
