@@ -8,7 +8,6 @@ use PHPCfg\Func as CfgFunc;
 use PHPCompiler\Compiler\AttributeEntry;
 use PHPCompiler\CompilerVersion;
 use PHPCompiler\VM\Builtin\AttributeConstruct;
-use PHPCompiler\VM\Builtin\NoDiscardConstruct;
 use PHPCompiler\VM\Builtin\OverrideConstruct;
 
 /**
@@ -58,18 +57,12 @@ final class AttributeSupport
         if (CompilerVersion::supportsOverrideAttribute()) {
             self::registerOverride($ctx);
         }
-        if (CompilerVersion::supportsNoDiscardAttribute()) {
-            self::registerNoDiscard($ctx);
-        }
         $ctx->classes[self::CLASS_ATTRIBUTE]->isInternal = true;
         $ctx->classes[self::CLASS_RETURN_TYPE_WILL_CHANGE]->isInternal = true;
         $ctx->classes[self::CLASS_ALLOW_DYNAMIC_PROPERTIES]->isInternal = true;
         $ctx->classes[self::CLASS_SENSITIVE_PARAMETER]->isInternal = true;
         if (CompilerVersion::supportsOverrideAttribute()) {
             $ctx->classes[self::CLASS_OVERRIDE]->isInternal = true;
-        }
-        if (CompilerVersion::supportsNoDiscardAttribute()) {
-            $ctx->classes[self::CLASS_NODISCARD]->isInternal = true;
         }
     }
 
@@ -149,27 +142,6 @@ final class AttributeSupport
             self::CLASS_OVERRIDE,
             self::TARGET_METHOD
         );
-    }
-
-    private static function registerNoDiscard(Context $ctx): void
-    {
-        $strProto = new Variable(Variable::TYPE_STRING);
-        $pub = CfgFunc::FLAG_PUBLIC;
-
-        $entry = new ClassEntry('NoDiscard');
-        $entry->parentLc = self::CLASS_ATTRIBUTE;
-        $entry->properties[] = new ClassProperty('message', null, $strProto, true);
-        $entry->constructor = new NoDiscardConstruct();
-        $entry->methods['__construct'] = $entry->constructor;
-        $entry->methodVisibility['__construct'] = $pub;
-
-        $targets = self::TARGET_FUNCTION | self::TARGET_METHOD;
-        $entry->attributeNames = ['Attribute'];
-        $entry->attributeEntries = [
-            new AttributeEntry('Attribute', [['name' => null, 'value' => $targets]]),
-        ];
-
-        $ctx->classes[self::CLASS_NODISCARD] = $entry;
     }
 
     private static function registerBuiltinAttributeClass(
