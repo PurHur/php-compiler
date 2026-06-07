@@ -459,6 +459,7 @@ class Module extends ModuleAbstract
             new getcwd_(),
             new gethostname(),
             new gethostbynamel(),
+            new gethostbyname(),
             new gethostbyaddr(),
             new getprotobyname(),
             new getprotobynumber(),

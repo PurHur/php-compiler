@@ -73,6 +73,9 @@ function analyzeInternal(PHPCompiler\Func\Internal $fn): array
     if ('gethostbynamel' === $fn->getName() && preg_match('/native getaddrinfo/i', $source)) {
         $notes[] = 'native getaddrinfo (VM FFI + AOT) (#4928)';
     }
+    if ('gethostbyname' === $fn->getName() && preg_match('/JitGethostbyname/i', $source)) {
+        $notes[] = 'forward DNS IPv4 (VM FFI + AOT delegate) (#7419)';
+    }
     if ('gethostbyaddr' === $fn->getName() && preg_match('/GethostbyaddrRuntime/i', $source)) {
         $notes[] = 'reverse DNS IPv4 (VM FFI + AOT) (#5854)';
     }

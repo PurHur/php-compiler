@@ -10,7 +10,7 @@ use PHPCompiler\VM\Variable;
 /**
  * DNS helpers for stdlib builtins (issue #3707, #5854; native getaddrinfo #4928).
  *
- * php-src: ext/standard/dns.c — PHP_FUNCTION(gethostbynamel), PHP_FUNCTION(gethostbyaddr)
+ * php-src: ext/standard/dns.c — PHP_FUNCTION(gethostbynamel), PHP_FUNCTION(gethostbyaddr), PHP_FUNCTION(gethostbyname)
  */
 final class VmDns
 {
@@ -58,6 +58,30 @@ final class VmDns
         }
 
         return $ht;
+    }
+
+    /**
+     * Forward DNS — first IPv4 for hostname (php-src gethostbyname parity, #7419).
+     *
+     * On lookup failure returns the original hostname (not false).
+     */
+    public static function gethostbyname(string $hostname): string
+    {
+        if ('' === $hostname || \strlen($hostname) > 255) {
+            return $hostname;
+        }
+
+        $list = self::gethostbynamel($hostname);
+        if (false === $list) {
+            return $hostname;
+        }
+
+        $first = $list->find('0');
+        if (null === $first || Variable::TYPE_STRING !== $first->type) {
+            return $hostname;
+        }
+
+        return $first->toString();
     }
 
     /**
