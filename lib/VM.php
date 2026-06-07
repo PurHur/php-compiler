@@ -10020,9 +10020,28 @@ restart:
         /** @var list<string> */
         $pendingTraits = [];
         $classBodyOps = $block->opCodes;
+        $classConstSegments = $this->collectClassConstSegments($classBodyOps, $frame);
+        $deferredClassConstSegments = $this->deferredClassConstSegments($classConstSegments);
+        $classConstSkipIndices = $this->classConstSegmentSkipIndices($deferredClassConstSegments);
+        if ([] !== $deferredClassConstSegments) {
+            $entry->forwardDeclaredConstNames = array_fill_keys(
+                array_keys($classConstSegments),
+                true
+            );
+        }
         $classBodyOpCount = \count($classBodyOps);
         for ($classBodyOpIndex = 0; $classBodyOpIndex < $classBodyOpCount; ++$classBodyOpIndex) {
             $op = $classBodyOps[$classBodyOpIndex];
+            if (isset($classConstSkipIndices[$classBodyOpIndex])) {
+                if (OpCode::TYPE_DECLARE_CLASS_CONST === $op->type && [] !== $pendingNewDefaultOps) {
+                    foreach ($pendingNewDefaultOps as $pendingOp) {
+                        $this->executeClassBodyConstInitOpcode($frame, $pendingOp);
+                    }
+                    $pendingNewDefaultOps = [];
+                }
+
+                continue;
+            }
             if ([] !== $pendingNewDefaultOps) {
                 if (OpCode::TYPE_DECLARE_PROPERTY === $op->type || OpCode::TYPE_DECLARE_STATIC_PROPERTY === $op->type) {
                     $this->finalizePendingNewPropertyDefault($frame, $block, $entry, $op, $pendingNewDefaultOps);
@@ -10189,60 +10208,7 @@ restart:
                 case OpCode::TYPE_DECLARE_CLASS_CONST:
                     $this->flushPendingTraitUses($entry, $pendingTraits, $ownMethods);
                     $pendingTraits = [];
-                    $canonical = $frame->scope[$op->arg1]->toString();
-                    $name = strtolower($canonical);
-                    if ($entry->isEnum && $op->isEnumCaseDeclare) {
-                        $backingSource = VM\ClassConstExpr::resolveValue($frame, $block, $op->arg2);
-                        $caseBacking = new Variable(Variable::TYPE_NULL);
-                        $caseBacking->null();
-                        if (null !== $entry->backedType) {
-                            $caseBacking = clone VM\BackedEnum::caseBackingScalar(
-                                $entry->backedType,
-                                $backingSource
-                            );
-                        }
-                        $entry->constants[$name] = EnumCaseSupport::createCase(
-                            $entry,
-                            $canonical,
-                            $caseBacking
-                        );
-                        $entry->enumCaseCanonicalNames[$name] = $canonical;
-                        $entry->enumCases[] = [
-                            'name' => $canonical,
-                            'value' => $caseBacking,
-                        ];
-                        if ([] !== $op->attributeEntries) {
-                            $entry->enumCaseAttributeEntries[$name] = $op->attributeEntries;
-                        }
-                        if (null !== $op->deprecatedMetadata) {
-                            $entry->constDeprecated[$name] = $op->deprecatedMetadata;
-                        }
-                        break;
-                    }
-                    $value = $this->resolveClassConstDefineValue($frame, $block, $op);
-                    if (null !== $op->arg3 && isset($block->constants[$op->arg3])) {
-                        $check = new Variable();
-                        $check->copyFrom($value);
-                        TypeCheck::assertClassConstantTypedValue($check, $block->constants[$op->arg3], $name);
-                        $value->copyFrom($check);
-                    }
-                    $this->rejectIncompatibleTraitClassConstOverride($entry, $name, $canonical, $value);
-                    $entry->constants[$name] = $value;
-                    $entry->constNames[$name] = $canonical;
-                    $entry->constVisibility[$name] = ClassConstVisibility::mask($op->classConstVisibilityFlags);
-                    unset($entry->traitConstSources[$name]);
-                    if ([] !== $op->attributeNames) {
-                        $entry->constAttributeNames[$name] = $op->attributeNames;
-                    }
-                    if ([] !== $op->attributeEntries) {
-                        $entry->constAttributeEntries[$name] = $op->attributeEntries;
-                    }
-                    if (null !== $op->deprecatedMetadata) {
-                        $entry->constDeprecated[$name] = $op->deprecatedMetadata;
-                    }
-                    if (isset($block->classConstDeclaredTypes[$name])) {
-                        $entry->constDeclaredTypes[$name] = $block->classConstDeclaredTypes[$name];
-                    }
+                    $this->applyClassConstDeclaration($entry, $block, $frame, $op);
                     break;
                 default:
                     $this->flushPendingTraitUses($entry, $pendingTraits, $ownMethods);
@@ -10255,6 +10221,15 @@ restart:
         $this->flushPendingTraitUses($entry, $pendingTraits, $ownMethods);
         if ([] !== $pendingNewDefaultOps) {
             throw new \LogicException('Unterminated property default `new` initializer in class body');
+        }
+        if ([] !== $deferredClassConstSegments) {
+            $this->finalizeDeferredClassConstants(
+                $entry,
+                $block,
+                $frame,
+                $classBodyOps,
+                $deferredClassConstSegments
+            );
         }
         foreach ($entry->properties as $prop) {
             $this->linkPropertyHooks($entry, $prop);
@@ -10281,6 +10256,220 @@ restart:
         }
 
         return VM\EnumCaseSupport::materializeConstantValue($this->context, $value);
+    }
+
+    private function applyClassConstDeclaration(
+        ClassEntry $entry,
+        Block $block,
+        Frame $frame,
+        OpCode $op
+    ): void {
+        $canonical = $frame->scope[$op->arg1]->toString();
+        $name = strtolower($canonical);
+        if ($entry->isEnum && $op->isEnumCaseDeclare) {
+            $backingSource = VM\ClassConstExpr::resolveValue($frame, $block, $op->arg2);
+            $caseBacking = new Variable(Variable::TYPE_NULL);
+            $caseBacking->null();
+            if (null !== $entry->backedType) {
+                $caseBacking = clone VM\BackedEnum::caseBackingScalar(
+                    $entry->backedType,
+                    $backingSource
+                );
+            }
+            $entry->constants[$name] = EnumCaseSupport::createCase(
+                $entry,
+                $canonical,
+                $caseBacking
+            );
+            $entry->enumCaseCanonicalNames[$name] = $canonical;
+            $entry->enumCases[] = [
+                'name' => $canonical,
+                'value' => $caseBacking,
+            ];
+            if ([] !== $op->attributeEntries) {
+                $entry->enumCaseAttributeEntries[$name] = $op->attributeEntries;
+            }
+            if (null !== $op->deprecatedMetadata) {
+                $entry->constDeprecated[$name] = $op->deprecatedMetadata;
+            }
+
+            return;
+        }
+        $value = $this->resolveClassConstDefineValue($frame, $block, $op);
+        if (null !== $op->arg3 && isset($block->constants[$op->arg3])) {
+            $check = new Variable();
+            $check->copyFrom($value);
+            TypeCheck::assertClassConstantTypedValue($check, $block->constants[$op->arg3], $name);
+            $value->copyFrom($check);
+        }
+        $this->rejectIncompatibleTraitClassConstOverride($entry, $name, $canonical, $value);
+        $entry->constants[$name] = $value;
+        $entry->constNames[$name] = $canonical;
+        $entry->constVisibility[$name] = ClassConstVisibility::mask($op->classConstVisibilityFlags);
+        unset($entry->traitConstSources[$name]);
+        if ([] !== $op->attributeNames) {
+            $entry->constAttributeNames[$name] = $op->attributeNames;
+        }
+        if ([] !== $op->attributeEntries) {
+            $entry->constAttributeEntries[$name] = $op->attributeEntries;
+        }
+        if (null !== $op->deprecatedMetadata) {
+            $entry->constDeprecated[$name] = $op->deprecatedMetadata;
+        }
+        if (isset($block->classConstDeclaredTypes[$name])) {
+            $entry->constDeclaredTypes[$name] = $block->classConstDeclaredTypes[$name];
+        }
+    }
+
+    /**
+     * @param list<OpCode> $classBodyOps
+     * @return array<string, array{initIndices: list<int>, declareIndex: int}>
+     */
+    private function collectClassConstSegments(array $classBodyOps, Frame $frame): array
+    {
+        $segments = [];
+        /** @var list<int> $pendingInitIndices */
+        $pendingInitIndices = [];
+        foreach ($classBodyOps as $index => $op) {
+            if (OpCode::TYPE_DECLARE_CLASS_CONST === $op->type) {
+                $name = strtolower($frame->scope[$op->arg1]->toString());
+                $segments[$name] = [
+                    'initIndices' => $pendingInitIndices,
+                    'declareIndex' => $index,
+                ];
+                $pendingInitIndices = [];
+
+                continue;
+            }
+            if ($this->isClassConstSegmentInitOpcode($op->type)) {
+                $pendingInitIndices[] = $index;
+            } elseif ([] !== $pendingInitIndices) {
+                $pendingInitIndices = [];
+            }
+        }
+
+        return $segments;
+    }
+
+    /**
+     * @param array<string, array{initIndices: list<int>, declareIndex: int}> $segments
+     * @return array<int, true>
+     */
+    private function classConstSegmentSkipIndices(array $segments): array
+    {
+        $skip = [];
+        foreach ($segments as $segment) {
+            foreach ($segment['initIndices'] as $index) {
+                $skip[$index] = true;
+            }
+            $skip[$segment['declareIndex']] = true;
+        }
+
+        return $skip;
+    }
+
+    private function isClassConstSegmentInitOpcode(int $type): bool
+    {
+        return VM\ClassConstExpr::isSupportedOpcode($type)
+            || $this->isClassBodyConstInitOpcode($type);
+    }
+
+    /**
+     * @param array<string, array{initIndices: list<int>, declareIndex: int}> $segments
+     * @return array<string, array{initIndices: list<int>, declareIndex: int}>
+     */
+    private function deferredClassConstSegments(array $segments): array
+    {
+        $deferred = [];
+        foreach ($segments as $lcName => $segment) {
+            if ([] !== $segment['initIndices']) {
+                $deferred[$lcName] = $segment;
+            }
+        }
+
+        return $deferred;
+    }
+
+    /**
+     * @param list<OpCode> $classBodyOps
+     * @param array<string, array{initIndices: list<int>, declareIndex: int}> $segments
+     */
+    private function finalizeDeferredClassConstants(
+        ClassEntry $entry,
+        Block $block,
+        Frame $frame,
+        array $classBodyOps,
+        array $segments
+    ): void {
+        /** @var list<string> $pending */
+        $pending = array_keys($segments);
+        $maxPasses = \count($pending) + 1;
+        for ($pass = 0; $pass < $maxPasses && [] !== $pending; ++$pass) {
+            /** @var list<string> $stillPending */
+            $stillPending = [];
+            $madeProgress = false;
+            foreach ($pending as $lcName) {
+                if (isset($entry->constants[$lcName])) {
+                    continue;
+                }
+                try {
+                    $this->evaluateDeferredClassConstSegment(
+                        $entry,
+                        $block,
+                        $frame,
+                        $classBodyOps,
+                        $segments[$lcName]
+                    );
+                    $madeProgress = true;
+                } catch (VM\ClassConstForwardReferenceException) {
+                    $stillPending[] = $lcName;
+                }
+            }
+            if (!$madeProgress) {
+                break;
+            }
+            $pending = $stillPending;
+        }
+        if ([] !== $pending) {
+            $first = $pending[0];
+            $declareOp = $classBodyOps[$segments[$first]['declareIndex']];
+            $canonical = $frame->scope[$declareOp->arg1]->toString();
+            throw new \LogicException(
+                "Cannot declare self-referencing constant {$entry->name}::{$canonical}"
+            );
+        }
+        $entry->forwardDeclaredConstNames = null;
+    }
+
+    /**
+     * @param list<OpCode> $classBodyOps
+     * @param array{initIndices: list<int>, declareIndex: int} $segment
+     */
+    private function evaluateDeferredClassConstSegment(
+        ClassEntry $entry,
+        Block $block,
+        Frame $frame,
+        array $classBodyOps,
+        array $segment
+    ): void {
+        foreach ($segment['initIndices'] as $index) {
+            $op = $classBodyOps[$index];
+            if (VM\ClassConstExpr::isSupportedOpcode($op->type)) {
+                VM\ClassConstExpr::execute($this->context, $frame, $op, $entry);
+            } elseif ($this->isClassBodyConstInitOpcode($op->type)) {
+                $this->executeClassBodyConstInitOpcode($frame, $op);
+            } else {
+                throw new \LogicException(
+                    'Unexpected class constant init opcode: '.opcode_type_name($op->type)
+                );
+            }
+        }
+        $this->applyClassConstDeclaration(
+            $entry,
+            $block,
+            $frame,
+            $classBodyOps[$segment['declareIndex']]
+        );
     }
 
     /**

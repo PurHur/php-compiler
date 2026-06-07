@@ -124,6 +124,8 @@ class ClassEntry {
     public ?\PHPCompiler\Compiler\DeprecatedMetadata $classDeprecated = null;
     /** @var array<string, \PHPCfg\Op\Type> constant (lowercase) => declared type for reflection (#5954). */
     public array $constDeclaredTypes = [];
+    /** @var array<string, true>|null sibling const names declared but not yet evaluated (#7382). */
+    public ?array $forwardDeclaredConstNames = null;
 
     public function __construct(string $name) {
         $this->name = $name;
