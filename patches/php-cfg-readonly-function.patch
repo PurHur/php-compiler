@@ -1,5 +1,5 @@
---- vendor/ircmaxell/php-cfg/lib/PHPCfg/Func.php	2026-06-07 08:48:46.151547575 +0000
-+++ vendor/ircmaxell/php-cfg/lib/PHPCfg/Func.php	2026-06-07 08:48:46.165889674 +0000
+--- vendor/ircmaxell/php-cfg/lib/PHPCfg/Func.php
++++ vendor/ircmaxell/php-cfg/lib/PHPCfg/Func.php
 @@ -33,6 +33,8 @@
  
      const FLAG_CLOSURE = 0x80;
@@ -9,9 +9,9 @@
      /** @var string */
      public $name;
  
---- vendor/ircmaxell/php-cfg/lib/PHPCfg/Parser.php	2026-06-07 08:48:46.152508919 +0000
-+++ vendor/ircmaxell/php-cfg/lib/PHPCfg/Parser.php	2026-06-07 08:48:46.166164714 +0000
-@@ -514,7 +514,8 @@
+--- vendor/ircmaxell/php-cfg/lib/PHPCfg/Parser.php
++++ vendor/ircmaxell/php-cfg/lib/PHPCfg/Parser.php
+@@ -513,7 +513,8 @@
      {
          $this->script->functions[] = $func = new Func(
              $node->namespacedName->toString(),
@@ -21,7 +21,17 @@
              $this->parseTypeNode($node->returnType),
              null
          );
-@@ -1236,6 +1237,9 @@
+@@ -1218,6 +1219,9 @@
+         $flags = Func::FLAG_CLOSURE;
+         $flags |= $expr->byRef ? Func::FLAG_RETURNS_REF : 0;
+         $flags |= $expr->static ? Func::FLAG_STATIC : 0;
++        if ($expr->getAttribute('compilerReadonlyFunction', false)) {
++            $flags |= Func::FLAG_READONLY;
++        }
+ 
+         $this->script->functions[] = $func = new Func(
+             '{anonymous}#'.++$this->anonId,
+@@ -1238,6 +1242,9 @@
          $flags = Func::FLAG_CLOSURE;
          $flags |= $expr->byRef ? Func::FLAG_RETURNS_REF : 0;
          $flags |= $expr->static ? Func::FLAG_STATIC : 0;

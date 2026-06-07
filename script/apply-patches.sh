@@ -339,7 +339,13 @@ patch_already_applied() {
       ;;
     php-cfg-readonly-function.patch)
       grep -q 'FLAG_READONLY' "$ROOT/vendor/ircmaxell/php-cfg/lib/PHPCfg/Func.php" 2>/dev/null \
-        && grep -q "compilerReadonlyFunction" "$ROOT/vendor/ircmaxell/php-cfg/lib/PHPCfg/Parser.php" 2>/dev/null
+        && grep -A25 'function parseExpr_Closure' "$ROOT/vendor/ircmaxell/php-cfg/lib/PHPCfg/Parser.php" 2>/dev/null \
+          | grep -q "compilerReadonlyFunction" \
+        && { ! grep -q 'function parseExpr_ArrowFunction' "$ROOT/vendor/ircmaxell/php-cfg/lib/PHPCfg/Parser.php" 2>/dev/null \
+          || grep -A25 'function parseExpr_ArrowFunction' "$ROOT/vendor/ircmaxell/php-cfg/lib/PHPCfg/Parser.php" 2>/dev/null \
+            | grep -q "compilerReadonlyFunction"; } \
+        && grep -A12 'function parseStmt_Function' "$ROOT/vendor/ircmaxell/php-cfg/lib/PHPCfg/Parser.php" 2>/dev/null \
+          | grep -q "compilerReadonlyFunction"
       ;;
     php-cfg-property-readonly.patch)
       grep -qE 'propertyFlags = \$node->flags|\$cfgProp->readonly =|\$prop->readonly =|\$property->readonly =|->readonly = 0 !== \\(\\$node->flags & .*MODIFIER_READONLY\\)' \
@@ -3381,6 +3387,94 @@ PY
 }
 
 # Per-property MODIFIER_READONLY: Property.propertyFlags + Parser assignment (#3149, #4230).
+apply_php_cfg_readonly_function_overlay() {
+  local func="$ROOT/vendor/ircmaxell/php-cfg/lib/PHPCfg/Func.php"
+  local parser="$ROOT/vendor/ircmaxell/php-cfg/lib/PHPCfg/Parser.php"
+  if [[ ! -f "$func" || ! -f "$parser" ]]; then
+    echo "Skip php-cfg-readonly-function.patch (vendor php-cfg missing)" >&2
+    return 1
+  fi
+  if patch_already_applied "$PATCH_DIR/php-cfg-readonly-function.patch"; then
+    echo "Skip php-cfg-readonly-function.patch (already applied)"
+    return 0
+  fi
+  python3 - "$func" "$parser" <<'PY'
+import sys
+from pathlib import Path
+
+func_path = Path(sys.argv[1])
+parser_path = Path(sys.argv[2])
+
+func_text = func_path.read_text()
+if "const FLAG_READONLY = 0x100;" not in func_text:
+    needle = "    const FLAG_CLOSURE = 0x80;\n"
+    insert = needle + "\n    const FLAG_READONLY = 0x100;\n"
+    if needle not in func_text:
+        sys.stderr.write("php-cfg-readonly-function: Func.php FLAG_CLOSURE anchor missing\n")
+        raise SystemExit(1)
+    func_text = func_text.replace(needle, insert, 1)
+    func_path.write_text(func_text)
+
+parser_text = parser_path.read_text()
+
+stmt_old = """        $this->script->functions[] = $func = new Func(
+            $node->namespacedName->toString(),
+            $node->byRef ? Func::FLAG_RETURNS_REF : 0,"""
+stmt_new = """        $this->script->functions[] = $func = new Func(
+            $node->namespacedName->toString(),
+            ($node->byRef ? Func::FLAG_RETURNS_REF : 0)
+                | ($node->getAttribute('compilerReadonlyFunction', false) ? Func::FLAG_READONLY : 0),"""
+if stmt_new not in parser_text:
+    if stmt_old not in parser_text:
+        sys.stderr.write("php-cfg-readonly-function: parseStmt_Function anchor missing\n")
+        raise SystemExit(1)
+    parser_text = parser_text.replace(stmt_old, stmt_new, 1)
+
+readonly_block = """        if ($expr->getAttribute('compilerReadonlyFunction', false)) {
+            $flags |= Func::FLAG_READONLY;
+        }
+"""
+
+def inject_closure_readonly(text: str, method: str) -> str:
+    marker = f"protected function {method}"
+    start = text.find(marker)
+    if start == -1:
+        return text
+    rest = text[start:]
+    next_fn = rest.find("\n    protected function ", len(marker))
+    method_body = rest if next_fn == -1 else rest[:next_fn]
+    if "compilerReadonlyFunction" in method_body:
+        return text
+    anchor = "        $flags |= $expr->static ? Func::FLAG_STATIC : 0;\n"
+    if anchor not in method_body:
+        sys.stderr.write(f"php-cfg-readonly-function: {method} static flags anchor missing\n")
+        raise SystemExit(1)
+    new_method_body = method_body.replace(anchor, anchor + "\n" + readonly_block, 1)
+    return text[:start] + new_method_body + text[start + len(method_body):]
+
+parser_text = inject_closure_readonly(parser_text, "parseExpr_Closure")
+if "function parseExpr_ArrowFunction" in parser_text:
+    parser_text = inject_closure_readonly(parser_text, "parseExpr_ArrowFunction")
+
+if "const FLAG_READONLY = 0x100;" not in func_path.read_text():
+    sys.stderr.write("php-cfg-readonly-function: Func.php FLAG_READONLY missing after overlay\n")
+    raise SystemExit(1)
+closure_slice = parser_text.split("parseExpr_Closure", 1)[1].split("protected function", 1)[0]
+if "compilerReadonlyFunction" not in closure_slice:
+    sys.stderr.write("php-cfg-readonly-function: parseExpr_Closure readonly wiring missing\n")
+    raise SystemExit(1)
+if "function parseExpr_ArrowFunction" in parser_text:
+    arrow_slice = parser_text.split("parseExpr_ArrowFunction", 1)[1].split("protected function", 1)[0]
+    if "compilerReadonlyFunction" not in arrow_slice:
+        sys.stderr.write("php-cfg-readonly-function: parseExpr_ArrowFunction readonly wiring missing\n")
+        raise SystemExit(1)
+
+parser_path.write_text(parser_text)
+PY
+  echo "Applied php-cfg-readonly-function.patch (overlay)"
+  return 0
+}
+
 apply_php_cfg_property_readonly_overlay() {
   local prop="$ROOT/vendor/ircmaxell/php-cfg/lib/PHPCfg/Op/Stmt/Property.php"
   local parser="$ROOT/vendor/ircmaxell/php-cfg/lib/PHPCfg/Parser.php"
@@ -3867,6 +3961,10 @@ apply_patch() {
     apply_php_cfg_throw_expr_overlay
     return $?
   fi
+  if [[ "$(basename "$patch")" == "php-cfg-readonly-function.patch" ]]; then
+    apply_php_cfg_readonly_function_overlay
+    return $?
+  fi
   if [[ "$(basename "$patch")" == "php-cfg-property-readonly.patch" ]]; then
     apply_php_cfg_property_readonly_overlay
     return $?
@@ -3982,6 +4080,8 @@ if [[ -d "$ROOT/vendor/ircmaxell/php-cfg" ]]; then
   # ++/-- overlays are hard-required — missing PostInc arms break compile (#6326, #6321).
   apply_php_cfg_incdec_expr_overlay
   apply_php_types_incdec_type_overlay
+  # Readonly closure FLAG_READONLY must exist before any closure compile (#7464, #7428).
+  apply_php_cfg_readonly_function_overlay || true
   # Throw expressions must survive optional patch failures (#6746, #5151).
   apply_php_cfg_throw_expr_overlay
   apply_php_types_throw_expr_overlay
@@ -4170,6 +4270,20 @@ verify_critical_language_patches() {
   fi
   if ! grep -qE 'propertyFlags = \$node->flags|\$cfgProp->readonly =|\$prop->readonly =|\$property->readonly =|->readonly = 0 !== \\(\\$node->flags & .*MODIFIER_READONLY\\)' "$parser" 2>/dev/null; then
     missing+=("php-cfg-property-readonly-Parser")
+  fi
+  local func_file="$ROOT/vendor/ircmaxell/php-cfg/lib/PHPCfg/Func.php"
+  if [[ -f "$func_file" ]] && ! grep -q 'FLAG_READONLY' "$func_file" 2>/dev/null; then
+    missing+=("php-cfg-readonly-function-Func")
+  fi
+  if grep -q 'function parseExpr_Closure' "$parser" 2>/dev/null \
+    && ! grep -A25 'function parseExpr_Closure' "$parser" 2>/dev/null \
+      | grep -q "compilerReadonlyFunction"; then
+    missing+=("php-cfg-readonly-function-Parser")
+  fi
+  if grep -q 'function parseExpr_ArrowFunction' "$parser" 2>/dev/null \
+    && ! grep -A25 'function parseExpr_ArrowFunction' "$parser" 2>/dev/null \
+      | grep -q "compilerReadonlyFunction"; then
+    missing+=("php-cfg-readonly-function-ArrowParser")
   fi
   if ! grep -q 'function extractAsymmetricSetVisibilityFromAttributes' "$parser" 2>/dev/null; then
     missing+=("php-cfg-asymmetric-set-visibility-Parser")
