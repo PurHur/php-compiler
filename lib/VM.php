@@ -988,27 +988,28 @@ class VM {
             return null;
         }
         try {
-            [$declaringClass, $methodLc] = $this->resolveInstanceMethod($object->class, '__clone');
-            $vis = $declaringClass->methodVisibility[$methodLc] ?? \PHPCfg\Func::FLAG_PUBLIC;
+            [$resolvedClass, $methodLc] = $this->resolveInstanceMethod($object->class, '__clone');
+            $declLc = $resolvedClass->methodDeclaringClassLc[$methodLc] ?? strtolower($resolvedClass->name);
+            $declaringClass = $this->context->classes[$declLc] ?? $resolvedClass;
+            $vis = $declaringClass->methodVisibility[$methodLc]
+                ?? $resolvedClass->methodVisibility[$methodLc]
+                ?? \PHPCfg\Func::FLAG_PUBLIC;
             $callerClassLc = $this->callerClassLc($frame);
             $callerDisplay = null;
             if (null !== $callerClassLc && isset($this->context->classes[$callerClassLc])) {
                 $callerDisplay = $this->context->classes[$callerClassLc]->name;
             }
-            MethodVisibility::assertCallable(
+            MethodVisibility::assertCloneCallable(
                 $vis,
                 $callerClassLc,
                 strtolower($declaringClass->name),
                 $declaringClass->name,
-                '__clone',
                 false,
                 fn (string $classLc, string $ancestorLc): bool => $this->isClassSameOrSubclassOf($classLc, $ancestorLc),
                 $callerDisplay
             );
         } catch (\LogicException $e) {
-            $message = 'Trying to clone an uncloneable object of class '.$object->class->name;
-
-            return $this->dispatchVmError($message, $frame);
+            return $this->dispatchVmError($e->getMessage(), $frame);
         }
 
         return null;
@@ -9484,6 +9485,7 @@ restart:
             );
             $entry->traitMethodSources[$methodLc] = $data['traitName'];
             $entry->methodVisibility[$methodLc] = $data['vis'];
+            $entry->methodDeclaringClassLc[$methodLc] = strtolower(ltrim($data['traitName'], '\\'));
             $entry->methodNames[$methodLc] = $data['methodNames'];
             if (null !== $data['attrs']) {
                 $entry->methodAttributeNames[$methodLc] = $data['attrs'];
@@ -9835,6 +9837,9 @@ restart:
                 }
                 $entry->methods[$name] = $method;
                 $entry->methodVisibility[$name] = $vis;
+                if (isset($parent->methodDeclaringClassLc[$name])) {
+                    $entry->methodDeclaringClassLc[$name] = $parent->methodDeclaringClassLc[$name];
+                }
                 if (isset($parent->methodDeprecated[$name])) {
                     $entry->methodDeprecated[$name] = $parent->methodDeprecated[$name];
                 }
@@ -10125,6 +10130,7 @@ restart:
                         );
                     }
                     $entry->methodVisibility[$name] = $vis;
+                    $entry->methodDeclaringClassLc[$name] = strtolower($entry->name);
                     unset($entry->traitMethodSources[$name]);
                     $entry->methodNames[$name] = $declaredName;
                     if ([] !== $op->attributeNames) {

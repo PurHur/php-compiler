@@ -20,5 +20,5 @@ try {
 }
 $o->dup();
 --EXPECT--
-Trying to clone an uncloneable object of class Child
+Call to protected Base::__clone() from global scope
 subclass ok
