@@ -14,6 +14,7 @@ namespace PHPCompiler\ext\standard;
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
@@ -29,13 +30,11 @@ final class strpos extends Internal
         if ($argc < 2 || $argc > 3) {
             throw new \LogicException('strpos() requires two or three arguments');
         }
-        $haystack = $frame->calledArgs[0]->resolveIndirect();
-        $needle = $frame->calledArgs[1]->resolveIndirect();
+        $haystackStr = VmString::coerceStringBuiltinArg($frame->calledArgs[0], 'strpos', 0, 'haystack');
+        $needleStr = VmString::coerceStringBuiltinArg($frame->calledArgs[1], 'strpos', 1, 'needle');
         if (null === $frame->returnVar) {
             return;
         }
-        $haystackStr = VmString::coerceOperand($haystack);
-        $needleStr = VmString::coerceOperand($needle);
         $offset = 0;
         if (3 === $argc) {
             $offVar = $frame->calledArgs[2]->resolveIndirect();
@@ -65,8 +64,8 @@ final class strpos extends Internal
             throw new \LogicException('strpos() offset must be an integer in this compiler build');
         }
 
-        $hay = $this->jitString($context, $args[0], 'strpos() argument #1');
-        $needle = $this->jitString($context, $args[1], 'strpos() argument #2');
+        $hay = JitStringBuiltinArg::lower($context, $args[0], 'strpos', 0, 'haystack');
+        $needle = JitStringBuiltinArg::lower($context, $args[1], 'strpos', 1, 'needle');
         $offset = 3 === $argc
             ? $context->builder->truncOrBitCast($context->helper->loadValue($args[2]), $context->getTypeFromString('int64'))
             : null;

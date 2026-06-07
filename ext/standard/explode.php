@@ -15,6 +15,7 @@ use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitLongArg;
+use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\HashTable;
 use PHPCompiler\VM\Variable;
@@ -31,8 +32,8 @@ final class explode extends Internal
         if ($argc < 2 || $argc > 3) {
             throw new \LogicException('explode() expects 2 or 3 arguments in this compiler build');
         }
-        $delimiter = $frame->calledArgs[0]->resolveIndirect()->toString();
-        $string = $frame->calledArgs[1]->resolveIndirect()->toString();
+        $delimiter = VmString::coerceStringBuiltinArg($frame->calledArgs[0], 'explode', 0, 'separator');
+        $string = VmString::coerceStringBuiltinArg($frame->calledArgs[1], 'explode', 1, 'string');
         $limit = \PHP_INT_MAX;
         if (3 === $argc) {
             $limitArg = $frame->calledArgs[2]->resolveIndirect();
@@ -65,8 +66,8 @@ final class explode extends Internal
         if ('' === ($args[0]->compileTimeString ?? null)) {
             throw new \LogicException('explode(): Argument #1 ($separator) cannot be empty');
         }
-        $delimiter = $this->jitString($context, $args[0], 'explode() argument #1');
-        $haystack = $this->jitString($context, $args[1], 'explode() argument #2');
+        $delimiter = JitStringBuiltinArg::lower($context, $args[0], 'explode', 0, 'separator');
+        $haystack = JitStringBuiltinArg::lower($context, $args[1], 'explode', 1, 'string');
         if (3 === $argc) {
             $limitLit = self::compileTimeLimit($args[2]);
             $delimLit = $args[0]->compileTimeString ?? null;

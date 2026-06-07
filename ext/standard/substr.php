@@ -14,6 +14,7 @@ namespace PHPCompiler\ext\standard;
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\Variable;
 use PHPLLVM\Builder;
@@ -30,29 +31,29 @@ final class substr extends Internal
         if ($argc < 2 || $argc > 3) {
             throw new \LogicException('substr() requires two or three arguments');
         }
-        $s = $frame->calledArgs[0]->resolveIndirect();
+        $string = VmString::coerceStringBuiltinArg($frame->calledArgs[0], 'substr', 0, 'string');
         $offset = $frame->calledArgs[1]->resolveIndirect();
         if (null === $frame->returnVar) {
             return;
         }
-        if (Variable::TYPE_STRING !== $s->type || Variable::TYPE_INTEGER !== $offset->type) {
-            throw new \LogicException('substr() requires a string and integer offset in this compiler build');
+        if (Variable::TYPE_INTEGER !== $offset->type) {
+            throw new \LogicException('substr() offset must be an integer in this compiler build');
         }
         if (3 === $argc) {
             $length = $frame->calledArgs[2]->resolveIndirect();
             if (Variable::TYPE_NULL === $length->type) {
-                $frame->returnVar->string(VmString::substr($s->toString(), $offset->toInt()));
+                $frame->returnVar->string(VmString::substr($string, $offset->toInt()));
 
                 return;
             }
             if (Variable::TYPE_INTEGER !== $length->type) {
                 throw new \LogicException('substr() length must be an integer in this compiler build');
             }
-            $frame->returnVar->string(VmString::substr($s->toString(), $offset->toInt(), $length->toInt()));
+            $frame->returnVar->string(VmString::substr($string, $offset->toInt(), $length->toInt()));
 
             return;
         }
-        $frame->returnVar->string(VmString::substr($s->toString(), $offset->toInt()));
+        $frame->returnVar->string(VmString::substr($string, $offset->toInt()));
     }
 
     public Context $context;
@@ -64,7 +65,7 @@ final class substr extends Internal
         if ($argc < 2 || $argc > 3) {
             throw new \LogicException('substr() requires two or three arguments');
         }
-        $str = $this->jitString($context, $args[0], 'substr() argument #1');
+        $str = JitStringBuiltinArg::lower($context, $args[0], 'substr', 0, 'string');
         $structName = $str->typeOf()->getElementType()->getName();
         $map = $context->structFieldMap[$structName];
         $len = $context->builder->load(
