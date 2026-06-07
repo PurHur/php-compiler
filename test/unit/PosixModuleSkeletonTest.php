@@ -38,14 +38,13 @@ PHP;
         self::assertSame('111111', ob_get_clean());
     }
 
-    public function test_posix_getpid_stub_throws_error(): void
+    public function test_posix_getpid_returns_positive_int(): void
     {
         $runtime = new Runtime();
         $fn = new \PHPCompiler\ext\posix\posix_getpid();
         $frame = $fn->getFrame($runtime->vmContext);
-
-        $this->expectException(\Error::class);
-        $this->expectExceptionMessage('posix_getpid() is not implemented in this compiler build (issue #3339)');
+        $frame->returnVar = new \PHPCompiler\VM\Variable();
         $fn->execute($frame);
+        $this->assertGreaterThan(0, $frame->returnVar->resolveIndirect()->toInt());
     }
 }

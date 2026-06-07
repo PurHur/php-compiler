@@ -9,7 +9,7 @@ use PHPCompiler\ModuleAbstract;
 /**
  * posix extension module entry (php-src ext/posix/posix.c; issue #7105).
  *
- * Libc-backed handlers tracked in #3339.
+ * v1 libc wrappers: #7271; full port tracked in #3339 / #7177.
  */
 class Module extends ModuleAbstract
 {
