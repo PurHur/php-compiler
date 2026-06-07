@@ -25,6 +25,8 @@ final class IniRuntime
 
     private const G_MEMORY_LIMIT = 'phpc_ini_memory_limit';
 
+    private const G_SERIALIZE_PRECISION = 'phpc_ini_serialize_precision';
+
     private const G_SILENCE_DEPTH = 'phpc_ini_silence_depth';
 
     private const G_SILENCE_SAVED_ER = 'phpc_ini_silence_saved_error_reporting';
@@ -135,9 +137,11 @@ final class IniRuntime
         $erBb = $fn->appendBasicBlock('ig_er');
         $deBb = $fn->appendBasicBlock('ig_de');
         $mlBb = $fn->appendBasicBlock('ig_ml');
+        $spBb = $fn->appendBasicBlock('ig_sp');
         $testEr = $fn->appendBasicBlock('ig_test_er');
         $testDe = $fn->appendBasicBlock('ig_test_de');
         $testMl = $fn->appendBasicBlock('ig_test_ml');
+        $testSp = $fn->appendBasicBlock('ig_test_sp');
 
         $context->builder->positionAtEnd($entry);
         self::ensureMemoryLimitBuffer($context, $fn);
@@ -153,7 +157,8 @@ final class IniRuntime
 
         self::branchIfKey($context, $testEr, $optCstr, 'error_reporting', $erBb, $testDe);
         self::branchIfKey($context, $testDe, $optCstr, 'display_errors', $deBb, $testMl);
-        self::branchIfKey($context, $testMl, $optCstr, 'memory_limit', $mlBb, $failBb);
+        self::branchIfKey($context, $testMl, $optCstr, 'memory_limit', $mlBb, $testSp);
+        self::branchIfKey($context, $testSp, $optCstr, 'serialize_precision', $spBb, $failBb);
 
         $context->builder->positionAtEnd($erBb);
         self::writeValueStringFromErGlobal($context, $out);
@@ -167,6 +172,11 @@ final class IniRuntime
 
         $context->builder->positionAtEnd($mlBb);
         self::writeValueStringFromMemoryLimitGlobal($context, $out);
+        self::freeCstr($context, $fn, $optCstr);
+        $context->builder->returnVoid();
+
+        $context->builder->positionAtEnd($spBb);
+        self::writeValueStringFromSerializePrecisionGlobal($context, $out);
         self::freeCstr($context, $fn, $optCstr);
         $context->builder->returnVoid();
 
@@ -184,9 +194,11 @@ final class IniRuntime
         $erBb = $fn->appendBasicBlock('icg_er');
         $deBb = $fn->appendBasicBlock('icg_de');
         $mlBb = $fn->appendBasicBlock('icg_ml');
+        $spBb = $fn->appendBasicBlock('icg_sp');
         $testEr = $fn->appendBasicBlock('icg_test_er');
         $testDe = $fn->appendBasicBlock('icg_test_de');
         $testMl = $fn->appendBasicBlock('icg_test_ml');
+        $testSp = $fn->appendBasicBlock('icg_test_sp');
 
         $context->builder->positionAtEnd($entry);
         $option = $fn->getParam(0);
@@ -201,7 +213,8 @@ final class IniRuntime
 
         self::branchIfKey($context, $testEr, $optCstr, 'error_reporting', $erBb, $testDe);
         self::branchIfKey($context, $testDe, $optCstr, 'display_errors', $deBb, $testMl);
-        self::branchIfKey($context, $testMl, $optCstr, 'memory_limit', $mlBb, $failBb);
+        self::branchIfKey($context, $testMl, $optCstr, 'memory_limit', $mlBb, $testSp);
+        self::branchIfKey($context, $testSp, $optCstr, 'serialize_precision', $spBb, $failBb);
 
         $i8p = $context->getTypeFromString('int8*');
 
@@ -232,6 +245,15 @@ final class IniRuntime
         self::freeCstr($context, $fn, $optCstr);
         $context->builder->returnVoid();
 
+        $context->builder->positionAtEnd($spBb);
+        self::writeValueStringFromCstr(
+            $context,
+            $out,
+            $context->builder->pointerCast($context->constantFromString('-1'), $i8p)
+        );
+        self::freeCstr($context, $fn, $optCstr);
+        $context->builder->returnVoid();
+
         $context->builder->positionAtEnd($failBb);
         self::writeValueBoolFalse($context, $out);
         self::freeCstr($context, $fn, $optCstr);
@@ -246,11 +268,13 @@ final class IniRuntime
         $erBb = $fn->appendBasicBlock('is_er');
         $deBb = $fn->appendBasicBlock('is_de');
         $mlBb = $fn->appendBasicBlock('is_ml');
+        $spBb = $fn->appendBasicBlock('is_sp');
         $mlRejectBb = $fn->appendBasicBlock('is_ml_reject');
         $mlApplyBb = $fn->appendBasicBlock('is_ml_apply');
         $testEr = $fn->appendBasicBlock('is_test_er');
         $testDe = $fn->appendBasicBlock('is_test_de');
         $testMl = $fn->appendBasicBlock('is_test_ml');
+        $testSp = $fn->appendBasicBlock('is_test_sp');
 
         $context->builder->positionAtEnd($entry);
         self::ensureMemoryLimitBuffer($context, $fn);
@@ -268,7 +292,8 @@ final class IniRuntime
 
         self::branchIfKey($context, $testEr, $optCstr, 'error_reporting', $erBb, $testDe);
         self::branchIfKey($context, $testDe, $optCstr, 'display_errors', $deBb, $testMl);
-        self::branchIfKey($context, $testMl, $optCstr, 'memory_limit', $mlBb, $failBb);
+        self::branchIfKey($context, $testMl, $optCstr, 'memory_limit', $mlBb, $testSp);
+        self::branchIfKey($context, $testSp, $optCstr, 'serialize_precision', $spBb, $failBb);
 
         $i32 = $context->getTypeFromString('int32');
 
@@ -317,6 +342,25 @@ final class IniRuntime
 
         $context->builder->positionAtEnd($mlRejectBb);
         self::writeValueBoolFalse($context, $out);
+        self::freeCstrPair($context, $fn, $optCstr, $valCstr);
+        $context->builder->returnVoid();
+
+        $context->builder->positionAtEnd($spBb);
+        self::writeValueStringFromSerializePrecisionGlobal($context, $out);
+        $endPtrSlot = $context->builder->alloca($i8p, 1, 'ini_sp_strtol_end');
+        $context->builder->store($i8p->constNull(), $endPtrSlot);
+        $context->builder->store(
+            $context->builder->trunc(
+                $context->builder->call(
+                    $context->lookupFunction('strtol'),
+                    $valCstr,
+                    $endPtrSlot,
+                    $i32->constInt(10, false)
+                ),
+                $i32
+            ),
+            self::globalPtr($context, self::G_SERIALIZE_PRECISION, $i32)
+        );
         self::freeCstrPair($context, $fn, $optCstr, $valCstr);
         $context->builder->returnVoid();
 
@@ -548,6 +592,17 @@ final class IniRuntime
         self::writeValueStringFromCstr($context, $out, $buf);
     }
 
+    private static function writeValueStringFromSerializePrecisionGlobal(Context $context, Value $out): void
+    {
+        $i32 = $context->getTypeFromString('int32');
+        $buf = self::snprintfAlloca(
+            $context,
+            '%d',
+            [$context->builder->load(self::globalPtr($context, self::G_SERIALIZE_PRECISION, $i32))]
+        );
+        self::writeValueStringFromCstr($context, $out, $buf);
+    }
+
     private static function writeValueStringFromDisplayErrorsGlobal(Context $context, Value $fn, Value $out): void
     {
         $i32 = $context->getTypeFromString('int32');
@@ -758,6 +813,10 @@ final class IniRuntime
         if (null === $context->module->getNamedGlobal(self::G_MEMORY_LIMIT)) {
             $g = $context->module->addGlobal($i8p, self::G_MEMORY_LIMIT);
             $g->setInitializer($i8p->constNull());
+        }
+        if (null === $context->module->getNamedGlobal(self::G_SERIALIZE_PRECISION)) {
+            $g = $context->module->addGlobal($i32, self::G_SERIALIZE_PRECISION);
+            $g->setInitializer($i32->constInt(-1, true));
         }
         if (null === $context->module->getNamedGlobal(self::G_SILENCE_DEPTH)) {
             $g = $context->module->addGlobal($i32, self::G_SILENCE_DEPTH);
