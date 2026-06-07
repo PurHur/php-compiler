@@ -1427,7 +1427,7 @@ class Compiler {
     }
 
     /**
-     * Assign/AssignRef index for one list slot after optional property-fetch prelude (#6434).
+     * Assign/AssignRef index for one list slot after write-target prelude ops (#6434, #7286).
      *
      * @param Op[] $ops
      */
@@ -1436,18 +1436,29 @@ class Compiler {
         if (!$ops[$index] instanceof Op\Expr\ArrayDimFetch) {
             return null;
         }
-        $cursor = $index + 1;
-        if ($cursor < count($ops) && $this->isListDestructPropertyFetchStmt($ops[$cursor])) {
-            ++$cursor;
-        }
-        if ($cursor >= count($ops)) {
-            return null;
-        }
-        if (!$ops[$cursor] instanceof Op\Expr\Assign && !$ops[$cursor] instanceof Op\Expr\AssignRef) {
-            return null;
+        /** @var Op\Expr\ArrayDimFetch $fetch */
+        $fetch = $ops[$index];
+        for ($cursor = $index + 1, $count = count($ops); $cursor < $count; ++$cursor) {
+            $op = $ops[$cursor];
+            if ($op instanceof Op\Expr\Assign || $op instanceof Op\Expr\AssignRef) {
+                return $op->expr === $fetch->result ? $cursor : null;
+            }
+            if (!$this->isListDestructWriteTargetPreludeOp($op)) {
+                return null;
+            }
         }
 
-        return $cursor;
+        return null;
+    }
+
+    /**
+     * CFG ops between a list RHS dim fetch and its slot Assign when the write target is complex.
+     */
+    private function isListDestructWriteTargetPreludeOp(Op $op): bool
+    {
+        return $op instanceof Op\Expr\New_
+            || $this->isListDestructPropertyFetchStmt($op)
+            || $op instanceof Op\Expr\ArrayDimFetch;
     }
 
     /**
@@ -5290,7 +5301,7 @@ class Compiler {
                 if (!$this->assignIsListSpread($expr)) {
                     $this->rejectThisReassignment($expr->var);
                     $this->rejectNullsafeInWriteContext($expr->var, $block);
-                    $this->rejectNewExprInWriteContext($expr->var, $block, $expr->expr);
+                    $this->rejectNewExprInWriteContext($expr->var, $block, $expr->expr, $expr);
                     $this->rejectGlobalConstInWriteContext($expr->var, $block);
                 }
                 if ($this->assignIsListSpread($expr)) {
@@ -9293,7 +9304,10 @@ class Compiler {
     }
 
     /**
-     * Zend zend_compile.c: list()/[] slots on `new` property/array offsets are not writable (#6691).
+     * Zend zend_compile.c: list()/[] slots on `new` property/array offsets are not writable (#6691, #7286).
+     *
+     * Scan every assign in the destructuring group — php-cfg may emit New/PropertyFetch between
+     * the RHS dim fetch and Assign so dim-fetch walking alone misses slots.
      *
      * @param Op[] $ops
      *
@@ -9301,32 +9315,31 @@ class Compiler {
      */
     private function rejectListDestructNewExprWriteTargets(array $ops, int $start, int $end, Block $block): void
     {
-        for ($i = $start; $i <= $end; ) {
-            if ($this->isListSpreadAssignOp($ops[$i])) {
-                /** @var Op\Expr\Assign $spread */
-                $spread = $ops[$i];
-                if ($this->lvalueContainsNewExpr($spread->var, $block)) {
-                    $this->throwCompileError('Assignments can only happen to writable values');
-                }
-
-                break;
+        for ($i = $start; $i <= $end; ++$i) {
+            $op = $ops[$i];
+            if (!$op instanceof Op\Expr\Assign) {
+                continue;
             }
-            if (
-                !$this->isPlainListDestructDimFetch($ops, $i)
-                && !$this->isKeyedListDestructDimFetch($ops, $i)
-            ) {
-                break;
+            if ($this->lvalueContainsNewExpr($op->var, $block)) {
+                $this->throwListDestructNewExprWriteFatal($op);
             }
-            $assignIndex = $this->listDestructSlotAssignIndex($ops, $i);
-            if (null !== $assignIndex) {
-                /** @var Op\Expr\Assign|Op\Expr\AssignRef $assign */
-                $assign = $ops[$assignIndex];
-                if ($this->lvalueContainsNewExpr($assign->var, $block)) {
-                    $this->throwCompileError('Assignments can only happen to writable values');
-                }
-            }
-            $i = $this->listDestructOpEndIndex($ops, $i) + 1;
         }
+    }
+
+    /**
+     * @return never
+     */
+    private function throwListDestructNewExprWriteFatal(Op\Expr\Assign $assign): void
+    {
+        $sourceFile = $assign->getFile() ?? '';
+        if ('' === $sourceFile) {
+            $sourceFile = 'unknown';
+        }
+        throw new CompileFatal(
+            $sourceFile,
+            max(1, $assign->getLine()),
+            'Assignments can only happen to writable values'
+        );
     }
 
     /**
@@ -9484,12 +9497,19 @@ class Compiler {
     /**
      * @return never
      */
-    protected function rejectNewExprInWriteContext(?Operand $var, ?Block $block = null, ?Operand $assignExpr = null): void
-    {
+    protected function rejectNewExprInWriteContext(
+        ?Operand $var,
+        ?Block $block = null,
+        ?Operand $assignExpr = null,
+        ?Op $assignOp = null,
+    ): void {
         if (!$this->lvalueContainsNewExpr($var, $block)) {
             return;
         }
         if (null !== $assignExpr && null !== $block && null !== $this->findArrayDimFetchForResult($assignExpr, $block)) {
+            if ($assignOp instanceof Op\Expr\Assign) {
+                $this->throwListDestructNewExprWriteFatal($assignOp);
+            }
             $this->throwCompileError('Assignments can only happen to writable values');
         }
         $this->throwCompileError('Cannot use temporary expression in write context');
