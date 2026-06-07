@@ -310,6 +310,10 @@ patch_already_applied() {
         && grep -q 'Stmt\\ClassConst' "$ROOT/vendor/ircmaxell/php-cfg/lib/PHPCfg/Parser.php" 2>/dev/null \
         && grep -A30 'function parseStmt_Enum' "$ROOT/vendor/ircmaxell/php-cfg/lib/PHPCfg/Parser.php" 2>/dev/null | grep -q 'ClassConst'
       ;;
+    php-cfg-enum-trait-use.patch)
+      grep -q 'function parseStmt_Enum' "$ROOT/vendor/ircmaxell/php-cfg/lib/PHPCfg/Parser.php" 2>/dev/null \
+        && grep -A35 'function parseStmt_Enum' "$ROOT/vendor/ircmaxell/php-cfg/lib/PHPCfg/Parser.php" 2>/dev/null | grep -q 'Stmt\\TraitUse'
+      ;;
     php-cfg-enum-abstract.patch)
       php_cfg_enum_flags_parser_applied
       ;;
@@ -1102,6 +1106,8 @@ apply_php_cfg_enum_overlay() {
     && grep -A25 'function parseStmt_Enum' "$parser" | grep -q 'Stmt\\ClassMethod'; then
     echo "Skip php-cfg-enum.patch (already applied)"
     php_cfg_sync_enum_flags_parser "$parser" "$op" || true
+    apply_php_cfg_enum_trait_use_parser_fix "$parser"
+    apply_php_cfg_enum_class_const_parser_fix "$parser"
     return 0
   fi
   if ! grep -q 'function parseStmt_Enum' "$parser" 2>/dev/null; then
@@ -3848,6 +3854,10 @@ apply_patch() {
     apply_php_cfg_enum_class_const_overlay
     return $?
   fi
+  if [[ "$(basename "$patch")" == "php-cfg-enum-trait-use.patch" ]]; then
+    apply_php_cfg_enum_trait_use_parser_fix
+    return $?
+  fi
   if [[ "$(basename "$patch")" == "php-cfg-intersection-type.patch" ]]; then
     apply_php_cfg_intersection_type_overlay
     return $?
@@ -4249,6 +4259,17 @@ verify_critical_language_patches() {
     && grep -q 'function parseStmt_Enum' "$parser" 2>/dev/null \
     && ! grep -q 'public bool \$isEnumCase = false' "$const_file" 2>/dev/null; then
     missing+=("php-cfg-enum-class-const-Const_")
+  fi
+  if grep -q 'function parseStmt_Enum' "$parser" 2>/dev/null; then
+    if ! grep -A35 'function parseStmt_Enum' "$parser" 2>/dev/null | grep -q 'Stmt\\TraitUse'; then
+      missing+=("php-cfg-enum-trait-use")
+    fi
+    if ! grep -A35 'function parseStmt_Enum' "$parser" 2>/dev/null | grep -q 'Stmt\\ClassConst'; then
+      missing+=("php-cfg-enum-class-const-Parser")
+    fi
+    if ! grep -A20 'function parseEnumCase' "$parser" 2>/dev/null | grep -q 'isEnumCase = true'; then
+      missing+=("php-cfg-enum-case-isEnumCase")
+    fi
   fi
   local vendor_type="$ROOT/vendor/ircmaxell/php-types/lib/PHPTypes/Type.php"
   if ! grep -q 'instanceof Op\\Type\\Union_' "$recon" 2>/dev/null; then
