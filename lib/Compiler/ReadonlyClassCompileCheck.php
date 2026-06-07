@@ -10,17 +10,18 @@ use PHPCfg\Script;
 use PHPCompiler\VM\ClassReadonly;
 
 /**
- * Compile-time checks for readonly class inheritance and property defaults (#3551, #3149).
+ * Compile-time checks for readonly class inheritance, property defaults (#3551, #3149),
+ * and readonly property override compatibility (#7359, #7367).
  *
- * php-src: Zend/zend_compile.c — zend_compile_class_decl;
- * Zend/zend_inheritance.c — readonly parent/child checks;
+ * php-src: Zend/zend_compile.c — zend_compile_class_decl, zend_compile_property_info();
+ * Zend/zend_inheritance.c — inheritance_check_properties(), readonly parent/child checks;
  * per-property MODIFIER_READONLY cannot have default initializer;
  * PHP 8.3+ anonymous classes may use per-property `readonly` with defaults (#6724);
  * PHP 8.3+ `new readonly class` sets ZEND_ACC_READONLY on the anonymous class (#6991).
  */
 final class ReadonlyClassCompileCheck
 {
-    /** @var array<string, array{display: string, readonly: bool, extends: ?string}> */
+    /** @var array<string, array{display: string, readonly: bool, extends: ?string, properties: array<string, array{readonly: bool, display: string}>}> */
     private array $classes = [];
 
     /**
@@ -32,6 +33,7 @@ final class ReadonlyClassCompileCheck
         $check = new self($knownClasses);
         $check->collect($script);
         $check->verifyInheritance();
+        $check->verifyPropertyReadonlyOverrides();
     }
 
     /**
@@ -75,7 +77,29 @@ final class ReadonlyClassCompileCheck
             'display' => $display,
             'readonly' => $readonly,
             'extends' => $parentLc,
+            'properties' => $this->collectInstanceProperties($class, $readonly),
         ];
+    }
+
+    /**
+     * @return array<string, array{readonly: bool, display: string}>
+     */
+    private function collectInstanceProperties(Op\Stmt\Class_ $class, bool $classReadonly): array
+    {
+        $properties = [];
+        foreach ($class->stmts->children as $member) {
+            if (!$member instanceof Op\Stmt\Property || $member->static) {
+                continue;
+            }
+            $propDisplay = $this->propertyDisplayName($member->name);
+            $propLc = strtolower($propDisplay);
+            $properties[$propLc] = [
+                'readonly' => $classReadonly || $this->isCfgPropertyReadonly($member),
+                'display' => $propDisplay,
+            ];
+        }
+
+        return $properties;
     }
 
     private function verifyReadonlyClassNoStaticProperties(Op\Stmt\Class_ $class, string $classDisplay): void
@@ -153,6 +177,75 @@ final class ReadonlyClassCompileCheck
                 );
             }
         }
+    }
+
+    private function verifyPropertyReadonlyOverrides(): void
+    {
+        foreach ($this->classes as $classLc => $class) {
+            $parentLc = $class['extends'];
+            if (null === $parentLc) {
+                continue;
+            }
+            foreach ($class['properties'] as $propLc => $childProp) {
+                $parentProp = $this->findInheritedProperty($parentLc, $propLc);
+                if (null === $parentProp) {
+                    continue;
+                }
+                if ($parentProp['readonly'] && !$childProp['readonly']) {
+                    throw new \CompileError(sprintf(
+                        'Cannot redeclare readonly property %s::$%s as non-readonly %s::$%s',
+                        $parentProp['ownerDisplay'],
+                        $parentProp['display'],
+                        $class['display'],
+                        $childProp['display']
+                    ));
+                }
+                if (!$parentProp['readonly'] && $childProp['readonly']) {
+                    throw new \CompileError(sprintf(
+                        'Cannot redeclare non-readonly property %s::$%s as readonly %s::$%s',
+                        $parentProp['ownerDisplay'],
+                        $parentProp['display'],
+                        $class['display'],
+                        $childProp['display']
+                    ));
+                }
+            }
+        }
+    }
+
+    /**
+     * @return array{readonly: bool, display: string, ownerDisplay: string}|null
+     */
+    private function findInheritedProperty(string $startParentLc, string $propLc): ?array
+    {
+        $current = $startParentLc;
+        $visited = [];
+        $guard = 0;
+        while (null !== $current && '' !== $current && !isset($visited[$current])) {
+            if (++$guard > 256) {
+                break;
+            }
+            $visited[$current] = true;
+            $type = $this->classes[$current] ?? null;
+            if (null !== $type && isset($type['properties'][$propLc])) {
+                $prop = $type['properties'][$propLc];
+
+                return [
+                    'readonly' => $prop['readonly'],
+                    'display' => $prop['display'],
+                    'ownerDisplay' => $type['display'],
+                ];
+            }
+            if (null !== $type) {
+                $current = $type['extends'];
+            } elseif (null !== ($known = $this->knownClasses[$current] ?? null)) {
+                $current = $known['extends'];
+            } else {
+                break;
+            }
+        }
+
+        return null;
     }
 
     private function isCfgPropertyReadonly(Op\Stmt\Property $member): bool

@@ -212,4 +212,41 @@ PHP;
         $this->expectExceptionMessage('Cannot apply #[AllowDynamicProperties] to readonly class R');
         $runtime->parseAndCompile($code, 'allow_dynamic_readonly.php');
     }
+
+    /** @covers issue #7367 */
+    public function testReadonlyParentPropertyWidenedToNonReadonlyFailsAtCompileTime(): void
+    {
+        $runtime = new Runtime();
+        $code = <<<'PHP'
+<?php
+class P {
+    public readonly string $x;
+    public function __construct(string $x) { $this->x = $x; }
+}
+class C extends P {
+    public string $x;
+}
+PHP;
+        $this->expectException(\CompileError::class);
+        $this->expectExceptionMessage('Cannot redeclare readonly property P::$x as non-readonly C::$x');
+        $runtime->parseAndCompile($code, 'readonly_widen_nonreadonly.php');
+    }
+
+    /** @covers issue #7359 */
+    public function testNonReadonlyParentPropertyNarrowedToReadonlyFailsAtCompileTime(): void
+    {
+        $runtime = new Runtime();
+        $code = <<<'PHP'
+<?php
+class B {
+    public int $x = 1;
+}
+class C extends B {
+    public readonly int $x;
+}
+PHP;
+        $this->expectException(\CompileError::class);
+        $this->expectExceptionMessage('Cannot redeclare non-readonly property B::$x as readonly C::$x');
+        $runtime->parseAndCompile($code, 'readonly_narrow.php');
+    }
 }
