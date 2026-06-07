@@ -337,6 +337,10 @@ patch_already_applied() {
     php-cfg-ctor-promotion-readonly.patch)
       grep -q 'promotionReadonly' "$ROOT/vendor/ircmaxell/php-cfg/lib/PHPCfg/Op/Expr/Param.php" 2>/dev/null
       ;;
+    php-cfg-readonly-function.patch)
+      grep -q 'FLAG_READONLY' "$ROOT/vendor/ircmaxell/php-cfg/lib/PHPCfg/Func.php" 2>/dev/null \
+        && grep -q "compilerReadonlyFunction" "$ROOT/vendor/ircmaxell/php-cfg/lib/PHPCfg/Parser.php" 2>/dev/null
+      ;;
     php-cfg-property-readonly.patch)
       grep -qE 'propertyFlags = \$node->flags|\$cfgProp->readonly =|\$prop->readonly =|\$property->readonly =|->readonly = 0 !== \\(\\$node->flags & .*MODIFIER_READONLY\\)' \
         "$ROOT/vendor/ircmaxell/php-cfg/lib/PHPCfg/Parser.php" 2>/dev/null
@@ -4022,6 +4026,7 @@ if [[ -d "$ROOT/vendor/ircmaxell/php-cfg" ]]; then
   apply_patch "$PATCH_DIR/php-cfg-union-type.patch"
   apply_patch "$PATCH_DIR/php-cfg-ctor-promotion.patch"
   apply_patch "$PATCH_DIR/php-cfg-ctor-promotion-readonly.patch"
+  apply_patch "$PATCH_DIR/php-cfg-readonly-function.patch"
   apply_patch "$PATCH_DIR/php-cfg-property-readonly.patch"
   apply_php_cfg_asymmetric_set_visibility_parser_overlay
   apply_php_cfg_asymmetric_get_visibility_parser_overlay
