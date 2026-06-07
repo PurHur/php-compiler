@@ -6535,6 +6535,16 @@ class JIT {
 
                         return $returnBlock;
                     }
+                    if ($block->returnTypeVoid) {
+                        JIT\Builtin\TypeErrorRaise::registerDeclarations($this->context);
+                        JIT\Builtin\TypeErrorRaise::ensureLinked($this->context);
+                        JIT\Builtin\TypeErrorRaise::emitRaise(
+                            $this->context,
+                            'A void function must not return a value'
+                        );
+
+                        return $origBasicBlock;
+                    }
                     $returnOperand = $block->getOperand($op->arg1);
                     if ($this->shouldFreeDeadVariablesBeforeBranch()) {
                         // php-cfg may mark inline `new class` temps dead before return (#3098).
