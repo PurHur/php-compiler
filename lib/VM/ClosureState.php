@@ -161,7 +161,8 @@ final class ClosureState
         $entry->methodVisibility['bindto'] = $pubStatic;
         $entry->methodNames['bindto'] = 'bindTo';
         $entry->methods['call'] = new Builtin\ClosureCall();
-        $entry->methodVisibility['call'] = $pubStatic;
+        // Instance-only in Zend (zend_closures.stub.php); static Closure::call() must Error (#7144).
+        $entry->methodVisibility['call'] = \PHPCfg\Func::FLAG_PUBLIC;
         $entry->methodNames['call'] = 'call';
         $ctx->classes['closure'] = $entry;
     }

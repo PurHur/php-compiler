@@ -42,7 +42,8 @@ final class ClosureCall extends VmClassMethod
     }
 
     /**
-     * Static Closure::call($closure, $obj, ...) vs $closure->call($obj, ...) (#4927, #6411).
+     * Instance $closure->call($obj, ...) — calledArgs are [closure, newThis, ...] (#4927, #6411).
+     * Static Closure::call() is rejected by assertMethodCallableStatically (#7144).
      *
      * @return array{0: ClosureState, 1: Variable, 2: list<Variable>}
      */
