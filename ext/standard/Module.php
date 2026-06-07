@@ -524,6 +524,8 @@ class Module extends ModuleAbstract
             new phpc_deploy_path(),
             new compiler_is_superglobal_name(),
             new phpc_match_unhandled_operand_is_object(),
+            new phpc_clone_with_begin(),
+            new phpc_clone_with_end(),
             new extract_(),
             new compact_(),
             new scandir(),
