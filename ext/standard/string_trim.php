@@ -15,6 +15,7 @@ use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Builtin\StringTrimMask;
+use PHPCompiler\JIT\Builtin\StringTrimModeJit;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\Variable as JITVariable;
@@ -43,13 +44,20 @@ final class string_trim extends Internal
         }
         $string = VmString::coerceStringBuiltinArg($frame->calledArgs[0], 'trim', 0, 'string');
         $mask = VmString::TRIM_DEFAULT;
+        $mode = VmString::TRIM_SIDE_BOTH;
         if (2 === $argc) {
-            $mask = VmString::coerceStringBuiltinArg($frame->calledArgs[1], 'trim', 1, 'characters');
+            [$mask, $mode] = VmString::resolveTrimOptionalArg(
+                $frame->calledArgs[1],
+                'trim',
+                1,
+                'characters',
+                VmString::TRIM_SIDE_BOTH
+            );
         }
         if (null === $frame->returnVar) {
             return;
         }
-        $frame->returnVar->string(VmString::trim($string, $mask));
+        $frame->returnVar->string(VmString::trimInt($string, $mask, $mode));
     }
 
     public Context $context;
@@ -62,25 +70,35 @@ final class string_trim extends Internal
             throw new \LogicException('trim() requires one or two arguments');
         }
         $literal = $args[0]->compileTimeString ?? null;
-        $maskLiteral = (2 === $argc) ? ($args[1]->compileTimeString ?? null) : null;
-        if (null !== $literal && (1 === $argc || null !== $maskLiteral)) {
+        $modeLiteral = (2 === $argc) ? StringTrimModeJit::compileTimeModeBitmask($context, $args[1]) : null;
+        $maskLiteral = (2 === $argc && null === $modeLiteral) ? ($args[1]->compileTimeString ?? null) : null;
+        if (null !== $literal && (1 === $argc || null !== $maskLiteral || null !== $modeLiteral)) {
             $mask = null !== $maskLiteral ? $maskLiteral : VmString::TRIM_DEFAULT;
+            $mode = null !== $modeLiteral ? $modeLiteral : VmString::TRIM_SIDE_BOTH;
 
             return $context->builder->call(
                 $context->lookupFunction('__string__separate'),
                 $context->builder->load(
-                    $context->constantStringFromString(VmString::trim($literal, $mask))
+                    $context->constantStringFromString(VmString::trimInt($literal, $mask, $mode))
                 )
             );
         }
+        $mode = VmString::TRIM_SIDE_BOTH;
+        $maskStr = null;
         if (2 === $argc) {
-            StringTrimMask::ensureLinked($context);
+            $modeLiteral = StringTrimModeJit::compileTimeModeBitmask($context, $args[1]);
+            if (null !== $modeLiteral) {
+                $mode = $modeLiteral;
+            } else {
+                StringTrimMask::ensureLinked($context);
+                $maskStr = JitStringBuiltinArg::lower($context, $args[1], 'trim', 1, 'characters');
+            }
         }
         $str = JitStringBuiltinArg::lower($context, $args[0], 'trim', 0, 'string');
         $str = $context->builder->call($context->lookupFunction('__string__separate'), $str);
-        $maskStr = (2 === $argc)
-            ? JitStringBuiltinArg::lower($context, $args[1], 'trim', 1, 'characters')
-            : null;
+        if (null !== $maskStr) {
+            $maskStr = $context->builder->call($context->lookupFunction('__string__separate'), $maskStr);
+        }
         $structName = $str->typeOf()->getElementType()->getName();
         $map = $context->structFieldMap[$structName];
         $len = $context->builder->load(
@@ -95,8 +113,12 @@ final class string_trim extends Internal
         $context->builder->store($zero, $startSlot);
         $context->builder->store($len, $endSlot);
 
-        self::advanceWhileTrimByte($context, $charPtr, $len, $startSlot, true, 'trim', $maskStr);
-        self::advanceWhileTrimByte($context, $charPtr, $len, $endSlot, false, 'trim', $maskStr);
+        if ($mode & VmString::TRIM_SIDE_LEFT) {
+            self::advanceWhileTrimByte($context, $charPtr, $len, $startSlot, true, 'trim', $maskStr);
+        }
+        if ($mode & VmString::TRIM_SIDE_RIGHT) {
+            self::advanceWhileTrimByte($context, $charPtr, $len, $endSlot, false, 'trim', $maskStr);
+        }
 
         $start = $context->builder->load($startSlot);
         $end = $context->builder->load($endSlot);

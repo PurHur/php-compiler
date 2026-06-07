@@ -17,6 +17,15 @@ final class VmString
 {
     public const TRIM_DEFAULT = " \t\n\r\0\x0B";
 
+    /** php-src php_trim_int(): trim left side. */
+    public const TRIM_SIDE_LEFT = 1;
+
+    /** php-src php_trim_int(): trim right side. */
+    public const TRIM_SIDE_RIGHT = 2;
+
+    /** php-src php_trim_int(): trim left and right. */
+    public const TRIM_SIDE_BOTH = 3;
+
     /**
      * Coerce a string builtin operand to string (php-src _convert_to_string parity, #3549, #4284).
      *
@@ -2342,47 +2351,94 @@ final class VmString
         return self::byteSlice($string, $offset, $length);
     }
 
-    public static function trim(string $string, string $characterMask = self::TRIM_DEFAULT): string
-    {
-        $start = 0;
-        $len = self::byteLength($string);
-        while ($start < $len && self::charInMask($string[$start], $characterMask)) {
-            ++$start;
-        }
-        if ($start === $len) {
-            return '';
-        }
-        $end = $len - 1;
-        while ($end >= $start && self::charInMask($string[$end], $characterMask)) {
-            --$end;
+    /**
+     * @return array{0: string, 1: int} character mask and php_trim_int() mode bitmask
+     */
+    public static function resolveTrimOptionalArg(
+        Variable $var,
+        string $function,
+        int $argIndex,
+        string $paramName,
+        int $defaultMode
+    ): array {
+        $modeFromEnum = self::tryStringTrimModeBitmask($var);
+        if (null !== $modeFromEnum) {
+            return [self::TRIM_DEFAULT, $modeFromEnum];
         }
 
-        return self::byteSlice($string, $start, $end - $start + 1);
+        return [self::coerceStringBuiltinArg($var, $function, $argIndex, $paramName), $defaultMode];
     }
 
-    public static function ltrim(string $string, string $characterMask = self::TRIM_DEFAULT): string
+    public static function stringTrimModeBitmaskFromBacking(int $backing): int
+    {
+        return match ($backing) {
+            0 => self::TRIM_SIDE_BOTH,
+            1 => self::TRIM_SIDE_LEFT,
+            2 => self::TRIM_SIDE_RIGHT,
+            default => throw new \ValueError('Invalid StringTrimMode enum value '.$backing),
+        };
+    }
+
+    public static function trimInt(string $string, string $characterMask, int $mode): string
     {
         $start = 0;
         $len = self::byteLength($string);
-        while ($start < $len && self::charInMask($string[$start], $characterMask)) {
-            ++$start;
+        if ($mode & self::TRIM_SIDE_LEFT) {
+            while ($start < $len && self::charInMask($string[$start], $characterMask)) {
+                ++$start;
+            }
+        }
+        if ($mode & self::TRIM_SIDE_RIGHT) {
+            if ($start === $len) {
+                return '';
+            }
+            $end = $len - 1;
+            while ($end >= $start && self::charInMask($string[$end], $characterMask)) {
+                --$end;
+            }
+
+            return self::byteSlice($string, $start, $end - $start + 1);
         }
 
         return self::byteSlice($string, $start);
     }
 
+    public static function trim(string $string, string $characterMask = self::TRIM_DEFAULT): string
+    {
+        return self::trimInt($string, $characterMask, self::TRIM_SIDE_BOTH);
+    }
+
+    public static function ltrim(string $string, string $characterMask = self::TRIM_DEFAULT): string
+    {
+        return self::trimInt($string, $characterMask, self::TRIM_SIDE_LEFT);
+    }
+
     public static function rtrim(string $string, string $characterMask = self::TRIM_DEFAULT): string
     {
-        $len = self::byteLength($string);
-        if (0 === $len) {
-            return '';
+        return self::trimInt($string, $characterMask, self::TRIM_SIDE_RIGHT);
+    }
+
+    public static function tryStringTrimModeBitmask(Variable $var): ?int
+    {
+        $var = $var->resolveIndirect();
+        if (!EnumCaseSupport::isEnumCaseVariable($var)) {
+            return null;
         }
-        $end = $len - 1;
-        while ($end >= 0 && self::charInMask($string[$end], $characterMask)) {
-            --$end;
+        $enumClass = EnumCaseSupport::enumClassForCaseVariable($var);
+        if (null === $enumClass || !self::isStringTrimModeEnum($enumClass->name)) {
+            return null;
+        }
+        $entry = EnumCaseSupport::enumCaseEntryForVariable($var);
+        if (null === $entry || null === $entry->backingValue) {
+            throw new \LogicException('StringTrimMode case missing backing value');
         }
 
-        return self::byteSlice($string, 0, $end + 1);
+        return self::stringTrimModeBitmaskFromBacking($entry->backingValue->resolveIndirect()->toInt());
+    }
+
+    private static function isStringTrimModeEnum(string $className): bool
+    {
+        return 0 === strcasecmp(ltrim($className, '\\'), 'StringTrimMode');
     }
 
     public static function asciiLower(string $string): string
