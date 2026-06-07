@@ -9,7 +9,7 @@ use PHPCompiler\VM\Variable;
 
 /**
  * VM password_hash() / password_verify() / crypt() — delegates to host PHP (issue #172, #3771).
- * password_get_info() / password_needs_rehash() — native PHP (issue #6503, mirrors password_crypto.c).
+ * password_get_info() / password_needs_rehash() — native PHP (issue #6503; JIT via StringPasswordCryptoJit #6906).
  */
 final class VmPassword
 {
