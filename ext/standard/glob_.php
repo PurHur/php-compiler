@@ -9,6 +9,7 @@ use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Builtin\StringFsGlob;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitLongArg;
+use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
@@ -27,10 +28,7 @@ final class glob_ extends Internal
         if ($argc < 1 || $argc > 2) {
             throw new \LogicException('glob() requires one or two arguments in this compiler build');
         }
-        $patternVar = $frame->calledArgs[0]->resolveIndirect();
-        if (Variable::TYPE_STRING !== $patternVar->type) {
-            throw new \LogicException('glob() pattern must be a string in this compiler build');
-        }
+        $pattern = VmString::coerceStringBuiltinArg($frame->calledArgs[0], 'glob', 0, 'pattern');
         $flags = 0;
         if (2 === $argc) {
             $flagsVar = $frame->calledArgs[1]->resolveIndirect();
@@ -43,7 +41,7 @@ final class glob_ extends Internal
             return;
         }
 
-        $result = VmFsGlob::glob($patternVar->toString(), $flags);
+        $result = VmFsGlob::glob($pattern, $flags);
         if (false === $result) {
             $frame->returnVar->bool(false);
 
@@ -58,9 +56,6 @@ final class glob_ extends Internal
         if ($argc < 1 || $argc > 2) {
             throw new \LogicException('glob() requires one or two arguments in this compiler build');
         }
-        if (JITVariable::TYPE_STRING !== $args[0]->type) {
-            throw new \LogicException('glob() pattern must be a string in this compiler build');
-        }
         $i32 = $context->getTypeFromString('int32');
         $flags = $i32->constInt(0, false);
         if (2 === $argc) {
@@ -70,7 +65,7 @@ final class glob_ extends Internal
             );
         }
 
-        $pattern = $this->jitString($context, $args[0], 'glob() argument #1');
+        $pattern = JitStringBuiltinArg::lower($context, $args[0], 'glob', 0, 'pattern');
         StringFsGlob::ensureLinked($context);
 
         return JitFsGlob::glob($context, $pattern, $flags);
