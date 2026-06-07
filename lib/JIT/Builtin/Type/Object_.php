@@ -36,6 +36,7 @@ use PHPCompiler\JIT\PropertyHookDispatch;
 use PHPCompiler\JIT\TypedPropertyUninitGuard;
 use PHPCompiler\JIT\Variable;
 use PHPCompiler\VM\EnumCaseSupport;
+use PHPCompiler\VM\TraitCompositionConflictMessage;
 use PHPCompiler\VM\Variable as VMVariable;
 use PHPLLVM;
 
@@ -139,6 +140,8 @@ class Object_ extends Type {
     private array $staticPropertySetVisibility = [];
     /** @var array<int, array<string, int>> class id => static prop lc => declaring class id (#6785) */
     private array $staticPropertyDeclaringClassId = [];
+    /** @var array<int, array<string, int>> class id => instance prop lc => declaring trait/class id (#7418) */
+    private array $instancePropertyDeclaringClassId = [];
 
     private ?int $splObjectStorageClassId = null;
 
@@ -3365,11 +3368,16 @@ class Object_ extends Type {
         if (!isset($this->staticPropertyGlobals[$traitId])) {
             return;
         }
+        $className = $this->classNameForId($classId);
         foreach ($this->staticPropertyGlobals[$traitId] as $name => $entry) {
             if (isset($this->staticPropertyGlobals[$classId][$name])) {
-                throw new \LogicException(
-                    "Trait property {$traitName}::\${$name} conflicts with a property declared in another trait"
-                );
+                $prevTraitId = $this->staticPropertyDeclaringClassId[$classId][$name] ?? $classId;
+                throw new \LogicException(TraitCompositionConflictMessage::incompatibleProperty(
+                    $this->classNameForId($prevTraitId),
+                    $traitName,
+                    $name,
+                    $className
+                ));
             }
             $this->defineStaticProperty(
                 $classId,
@@ -3394,18 +3402,24 @@ class Object_ extends Type {
 
     public function inheritTraitInstanceProperties(int $classId, int $traitId, string $traitName): void
     {
+        $className = $this->classNameForId($classId);
         foreach ($this->properties[$traitId] ?? [] as $propset) {
             $name = $propset[1];
             $nameLc = strtolower($name);
             foreach ($this->properties[$classId] ?? [] as $existing) {
                 if (strtolower($existing[1]) === $nameLc) {
-                    throw new \LogicException(
-                        "Trait property {$traitName}::\${$name} conflicts with a property declared in another trait"
-                    );
+                    $prevTraitId = $this->instancePropertyDeclaringClassId[$classId][$nameLc] ?? $classId;
+                    throw new \LogicException(TraitCompositionConflictMessage::incompatibleProperty(
+                        $this->classNameForId($prevTraitId),
+                        $traitName,
+                        $name,
+                        $className
+                    ));
                 }
             }
             $type = $propset[2];
             $this->defineProperty($classId, $name, $type);
+            $this->instancePropertyDeclaringClassId[$classId][$nameLc] = $traitId;
             $this->definePropertyVisibility($classId, $name, $this->propertyVisibility($traitId, $name));
             $setVis = $this->propertySetVisibility($traitId, $name);
             if (0 !== $setVis) {
