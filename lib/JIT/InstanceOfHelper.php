@@ -5,7 +5,8 @@ declare(strict_types=1);
 namespace PHPCompiler\JIT;
 
 use PHPCompiler\JIT\Builtin\ErrorRaise;
-use PHPCompiler\Operand;
+use PHPCfg\Operand;
+use PHPCfg\Operand\Literal;
 use PHPLLVM\Builder;
 use PHPLLVM\Value;
 
@@ -18,7 +19,7 @@ final class InstanceOfHelper
 
     public static function emit(Context $context, Variable $expr, Operand $classOp): Variable
     {
-        if ($classOp instanceof Operand\Literal) {
+        if ($classOp instanceof Literal) {
             return $context->type->object->emitInstanceOf($expr, (string) $classOp->value);
         }
 

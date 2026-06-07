@@ -9,6 +9,7 @@ use PHPCompiler\VM\Context;
 use PHPCompiler\VM\EnumCaseEntry;
 use PHPCompiler\VM\EnumCaseSupport;
 use PHPCompiler\VM\InterfaceCheck;
+use PHPCompiler\VM\ObjectEntry;
 use PHPCompiler\VM\Variable;
 
 /**
@@ -57,6 +58,25 @@ final class VmJson
 
     public static function import(mixed $value): Variable
     {
+        return self::importDecoded($value, true, null);
+    }
+
+    /**
+     * Materialize host json_decode() output into VM values (#7188).
+     *
+     * When {@code $assoc} is false, JSON objects become stdClass instances (php-src ext/json).
+     */
+    public static function importDecoded(mixed $value, bool $assoc, ?Context $ctx): Variable
+    {
+        if ($assoc) {
+            return self::importAssoc($value);
+        }
+
+        return self::importObjectMode($value, $ctx);
+    }
+
+    private static function importAssoc(mixed $value): Variable
+    {
         $var = new Variable();
         if (null === $value) {
             $var->null();
@@ -91,7 +111,7 @@ final class VmJson
         $ht = new \PHPCompiler\VM\HashTable();
         $isList = array_is_list($value);
         foreach ($value as $key => $item) {
-            $slot = self::import($item);
+            $slot = self::importAssoc($item);
             if ($isList) {
                 $ht->addIndex((int) $key, $slot);
             } else {
@@ -106,6 +126,74 @@ final class VmJson
         $var->array($ht);
 
         return $var;
+    }
+
+    private static function importObjectMode(mixed $value, ?Context $ctx): Variable
+    {
+        $var = new Variable();
+        if (null === $value) {
+            $var->null();
+
+            return $var;
+        }
+        if (\is_bool($value)) {
+            $var->bool($value);
+
+            return $var;
+        }
+        if (\is_int($value)) {
+            $var->int($value);
+
+            return $var;
+        }
+        if (\is_float($value)) {
+            $var->float($value);
+
+            return $var;
+        }
+        if (\is_string($value)) {
+            $var->string($value);
+
+            return $var;
+        }
+        if (\is_array($value)) {
+            $ht = new \PHPCompiler\VM\HashTable();
+            $isList = array_is_list($value);
+            foreach ($value as $key => $item) {
+                $slot = self::importObjectMode($item, $ctx);
+                if ($isList) {
+                    $ht->addIndex((int) $key, $slot);
+                } else {
+                    if (!\is_string($key) && !\is_int($key)) {
+                        throw new \LogicException(
+                            'json_decode() only supports string keys in this compiler build'
+                        );
+                    }
+                    $ht->add((string) $key, $slot);
+                }
+            }
+            $var->array($ht);
+
+            return $var;
+        }
+        if ($value instanceof \stdClass) {
+            if (null === $ctx || !isset($ctx->classes['stdclass'])) {
+                throw new \LogicException('stdClass is not registered');
+            }
+            $object = new ObjectEntry($ctx->classes['stdclass']);
+            $object->constructed = true;
+            foreach ((array) $value as $key => $item) {
+                $object->allocateProperty((string) $key)
+                    ->copyFrom(self::importObjectMode($item, $ctx));
+            }
+            $var->object($object);
+
+            return $var;
+        }
+
+        throw new \LogicException(
+            'json_decode() result type not supported in this compiler build'
+        );
     }
 
     public static function export(Variable $v, ?Context $ctx = null, ?VM $vm = null): mixed
