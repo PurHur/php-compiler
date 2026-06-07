@@ -22,12 +22,14 @@ final class CalendarModuleTest extends TestCase
 
         self::assertTrue(VmReflection::functionExists($ctx, 'cal_days_in_month'));
         self::assertTrue(VmReflection::functionExists($ctx, 'gregoriantojd'));
+        self::assertTrue(VmReflection::functionExists($ctx, 'easter_date'));
 
         $code = <<<'PHP'
 <?php
 echo (int) defined('CAL_GREGORIAN');
 echo (int) function_exists('cal_days_in_month');
 echo (int) function_exists('gregoriantojd');
+echo (int) function_exists('easter_date');
 echo CAL_GREGORIAN;
 echo CAL_JULIAN;
 echo CAL_NUM_CALS;
@@ -36,7 +38,7 @@ PHP;
         ob_start();
         $runtime->run($block);
         self::assertSame(
-            '1110'.CalendarConstants::CAL_JULIAN.CalendarConstants::CAL_NUM_CALS,
+            '1111014',
             ob_get_clean()
         );
     }

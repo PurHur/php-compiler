@@ -30,6 +30,7 @@ class Module extends ModuleAbstract
         return [
             new cal_days_in_month(),
             new gregoriantojd(),
+            new easter_date(),
         ];
     }
 }
