@@ -428,6 +428,7 @@ class Module extends ModuleAbstract
             new fopen(),
             new fread(),
             new stream_get_contents(),
+            new stream_get_filters(),
             new fgetc(),
             new fgets(),
             new stream_get_line(),
