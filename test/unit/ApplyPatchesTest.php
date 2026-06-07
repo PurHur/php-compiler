@@ -94,6 +94,63 @@ PHP;
         }
     }
 
+    public function testPhpTypesUnionTypeTypeOverlayReappliesAfterPartialVendorDrift(): void
+    {
+        $typePhp = self::$root.'/vendor/ircmaxell/php-types/lib/PHPTypes/Type.php';
+        if (!is_readable($typePhp)) {
+            self::markTestSkipped('vendor/ircmaxell/php-types not installed');
+        }
+
+        $original = (string) file_get_contents($typePhp);
+        self::assertStringContainsString(
+            'instanceof CfgType\\Union_',
+            $original,
+            'fixture must include CfgType\\Union_ handler in Type.php'
+        );
+        self::assertStringContainsString(
+            'instanceof CfgType\\Intersection',
+            $original,
+            'fixture must include CfgType\\Intersection handler in Type.php'
+        );
+
+        $unionBlock = <<<'PHP'
+        if ($decl instanceof CfgType\Union_) {
+            $subs = [];
+            foreach ($decl->types as $sub) {
+                $subs[] = self::fromTypeDecl($sub);
+            }
+
+            return new self(self::TYPE_UNION, $subs);
+        }
+PHP;
+        self::assertStringContainsString($unionBlock, $original);
+
+        $stripped = str_replace($unionBlock, '', $original);
+        file_put_contents($typePhp, $stripped);
+
+        try {
+            $output = [];
+            $exitCode = 0;
+            exec('bash '.escapeshellarg(self::$root.'/script/apply-patches.sh').' 2>&1', $output, $exitCode);
+            $joined = implode("\n", $output);
+            self::assertSame(0, $exitCode, "apply-patches failed after stripping Type.php Union_:\n".$joined);
+
+            $restored = (string) file_get_contents($typePhp);
+            self::assertStringContainsString(
+                'instanceof CfgType\\Union_',
+                $restored,
+                'overlay must re-insert Union_ when Intersection handler remains (#7327)'
+            );
+            self::assertStringContainsString(
+                'instanceof CfgType\\Intersection',
+                $restored,
+                'Intersection handler must remain after Union_ repair (#7327)'
+            );
+        } finally {
+            file_put_contents($typePhp, $original);
+        }
+    }
+
     public function testPhpCfgThrowExprParserOverlayApplied(): void
     {
         $parser = self::$root.'/vendor/ircmaxell/php-cfg/lib/PHPCfg/Parser.php';
