@@ -6,9 +6,9 @@ namespace PHPCompiler\ext\standard;
 
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
+use PHPCompiler\JIT\Builtin\TypeErrorRaise;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\Variable as JITVariable;
-use PHPCompiler\VM\Variable;
 use PHPCompiler\Web\ResponseContext;
 use PHPLLVM\Value;
 
@@ -26,7 +26,9 @@ final class header_remove extends Internal
     {
         $argc = \count($frame->calledArgs);
         if ($argc > 1) {
-            throw new \LogicException('header_remove() accepts at most one argument');
+            throw new \ArgumentCountError(
+                'header_remove() expects at most 1 argument, '.$argc.' given'
+            );
         }
         if (0 === $argc) {
             ResponseContext::removeHeader(null);
@@ -36,11 +38,12 @@ final class header_remove extends Internal
 
             return;
         }
-        $arg = $frame->calledArgs[0]->resolveIndirect();
-        if (Variable::TYPE_STRING !== $arg->type) {
-            throw new \LogicException('header_remove() name must be a string in this compiler build');
-        }
-        $name = $arg->toString();
+        $name = VmString::coerceStringBuiltinArg(
+            $frame->calledArgs[0],
+            'header_remove',
+            0,
+            'name'
+        );
         ResponseContext::removeHeader($name);
         if (\function_exists('header_remove')) {
             \header_remove($name);
@@ -51,7 +54,13 @@ final class header_remove extends Internal
     {
         $argc = \count($args);
         if ($argc > 1) {
-            throw new \LogicException('header_remove() accepts at most one argument');
+            TypeErrorRaise::ensureLinked($context);
+            TypeErrorRaise::emitArgumentCountError(
+                $context,
+                'header_remove() expects at most 1 argument, '.$argc.' given'
+            );
+
+            return $context->getTypeFromString('int32')->constInt(0, false);
         }
         if (0 === $argc) {
             JitPendingHeaders::remove($context);
