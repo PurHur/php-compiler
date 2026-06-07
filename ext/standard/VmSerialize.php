@@ -46,33 +46,11 @@ final class VmSerialize
     }
 
     /**
-     * Serialize exported PHP data using VM serialize_precision (php-src var.c / PG(serialize_precision); #7100).
+     * Serialize exported PHP data using VM serialize_precision (php-src var.c / PG(serialize_precision); #7100, #7103).
      */
     public static function serializeExported(mixed $exported): string
     {
-        $encoded = self::hostSerializeWithVmPrecision($exported);
-        if (false === $encoded) {
-            throw new \LogicException('serialize() failed');
-        }
-
-        return $encoded;
-    }
-
-    /**
-     * Delegate to host serialize() while honoring VmIni precision (VM-on-Zend parity path).
-     */
-    private static function hostSerializeWithVmPrecision(mixed $value): string|false
-    {
-        $precision = VmIni::getSerializePrecision();
-        $previous = \ini_get('serialize_precision');
-        \ini_set('serialize_precision', $precision);
-        try {
-            return \serialize($value);
-        } finally {
-            if (false !== $previous) {
-                \ini_set('serialize_precision', $previous);
-            }
-        }
+        return VmSerializeFormat::encodeExported($exported);
     }
 
     /**
