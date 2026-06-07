@@ -79,7 +79,7 @@
     {
         $entryBlock = $this->block;
         $isObj = new Op\Expr\FuncCall(
-            $this->readVariable(new Literal('is_object')),
+            $this->readVariable(new Literal('phpc_match_unhandled_operand_is_object')),
             [$cond],
             $attrs
         );

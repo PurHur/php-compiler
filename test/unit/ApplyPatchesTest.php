@@ -566,6 +566,11 @@ PHP;
             'php-cfg-match overlay must register match lowering (#143)'
         );
         self::assertStringContainsString(
+            'phpc_match_unhandled_operand_is_object',
+            $body,
+            'php-cfg-match overlay must probe object/enum operands for UnhandledMatchError (#5448, #7199)'
+        );
+        self::assertStringContainsString(
             'lowerUnhandledMatchError',
             $body,
             'php-cfg-match overlay must lower UnhandledMatchError for enum/scalar subjects (#5448)'
