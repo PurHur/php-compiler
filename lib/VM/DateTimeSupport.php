@@ -71,6 +71,12 @@ final class DateTimeSupport
         );
     }
 
+    /** php-src ext/date/php_date.c — malformed time string throws catchable Exception (#7113). */
+    public static function throwDateMalformedStringException(string $message): void
+    {
+        throw new NativeDateMalformedStringException($message);
+    }
+
     public static function initDateTime(ObjectEntry $dt, string $time, ?ObjectEntry $timezone = null): void
     {
         $tzName = null !== $timezone
@@ -79,7 +85,7 @@ final class DateTimeSupport
         try {
             $host = new \DateTime($time, new \DateTimeZone($tzName));
         } catch (\Exception $e) {
-            throw new \LogicException('DateTime::__construct(): Failed to parse time string ('.$time.')');
+            self::throwDateMalformedStringException($e->getMessage());
         }
         self::syncFromHost($dt, $host);
         $dt->constructed = true;
