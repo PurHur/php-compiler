@@ -19,6 +19,7 @@ final class StringJsonDecodeRuntimeStandaloneTest extends TestCase
         $jit = (string) file_get_contents(__DIR__.'/../../../lib/JIT/Builtin/StringJsonDecodeJit.php');
         $this->assertStringContainsString('__compiler_json_decode', $jit);
         $this->assertStringContainsString('__compiler_json_validate', $jit);
+        $this->assertStringContainsString('__phpc_json_parse_post_body', $jit);
         $this->assertStringContainsString('__compiler_json_last_error', $jit);
         $this->assertStringContainsString('__compiler_json_last_error_msg', $jit);
         $linker = (string) file_get_contents(__DIR__.'/../../../lib/AOT/Linker.php');

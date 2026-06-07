@@ -35,6 +35,12 @@ final class StringJsonDecodeJit
     /** @var Value|null */
     private static $lastErrorGlobal = null;
 
+    /** Standalone AOT: JSON POST helper for superglobals_refresh.c (#7389). */
+    public static function ensureStandaloneBodies(Context $context): void
+    {
+        self::implement($context);
+    }
+
     public static function implement(Context $context): void
     {
         $restore = self::captureInsertBlock($context);
@@ -45,9 +51,6 @@ final class StringJsonDecodeJit
         $probe = $context->module->getNamedFunction('__compiler_json_decode');
         if (null !== $probe && $probe->countBasicBlocks() > 0) {
             $context->registerFunction('__compiler_json_decode', $probe);
-            self::restoreInsertBlock($context, $restore);
-
-            return;
         }
 
         foreach (
@@ -67,6 +70,7 @@ final class StringJsonDecodeJit
                 '__phpc_json_parse_array',
                 '__phpc_json_parse_value',
                 '__phpc_json_parse_top',
+                '__phpc_json_parse_post_body',
                 '__compiler_json_decode',
                 '__compiler_json_validate',
                 '__compiler_json_last_error',
@@ -96,6 +100,7 @@ final class StringJsonDecodeJit
         self::implementIfMissing($context, '__phpc_json_parse_array', self::emitParseArray(...));
         self::implementIfMissing($context, '__phpc_json_parse_value', self::emitParseValue(...));
         self::implementIfMissing($context, '__phpc_json_parse_top', self::emitParseTop(...));
+        self::implementIfMissing($context, '__phpc_json_parse_post_body', self::emitParsePostBody(...));
         self::implementIfMissing($context, '__compiler_json_decode', self::emitCompilerJsonDecode(...));
         self::implementIfMissing($context, '__compiler_json_validate', self::emitCompilerJsonValidate(...));
         self::implementIfMissing($context, '__compiler_json_last_error', self::emitCompilerJsonLastError(...));
@@ -203,6 +208,10 @@ final class StringJsonDecodeJit
             '__phpc_json_parse_top' => $context->module->addFunction(
                 $name,
                 $context->context->functionType($i32, false, $i8pp, $i8p, $i32p, $i32, $valuePtr)
+            ),
+            '__phpc_json_parse_post_body' => $context->module->addFunction(
+                $name,
+                $context->context->functionType($void, false, $htPtr, $i8p)
             ),
             '__compiler_json_decode' => $context->module->addFunction(
                 $name,
@@ -1539,6 +1548,73 @@ final class StringJsonDecodeJit
         $context->builder->returnValue($oneI32);
         $context->builder->positionAtEnd($fail);
         $context->builder->returnValue($zeroI32);
+    }
+
+    /** CGI application/json $_POST refresh — superglobals_refresh.c (#7389). */
+    private static function emitParsePostBody(Context $context, LlvmFunction $fn): void
+    {
+        $entry = $fn->appendBasicBlock('entry');
+        $context->builder->positionAtEnd($entry);
+
+        $i8 = $context->getTypeFromString('int8');
+        $i32 = $context->getTypeFromString('int32');
+        $i8p = $context->getTypeFromString('int8*');
+        $sizeT = $context->getTypeFromString('size_t');
+        $maxLen = $sizeT->constInt(self::MAX_LEN, false);
+        $zeroI8 = $i8->constInt(0, false);
+        $maxDepth = $i32->constInt(self::MAX_DEPTH, false);
+
+        $ht = $fn->getParam(0);
+        $body = $fn->getParam(1);
+
+        $ret = $fn->appendBasicBlock('ret');
+        $work = $fn->appendBasicBlock('work');
+        $lenCheck = $fn->appendBasicBlock('len_check');
+        $parse = $fn->appendBasicBlock('parse');
+        $doParse = $fn->appendBasicBlock('do_parse');
+
+        $isNull = $context->builder->icmp(Builder::INT_EQ, $body, $i8p->constNull());
+        $context->builder->branchIf($isNull, $ret, $work);
+
+        $context->builder->positionAtEnd($work);
+        $first = $context->builder->load($body);
+        $empty = $context->builder->icmp(Builder::INT_EQ, $first, $zeroI8);
+        $context->builder->branchIf($empty, $ret, $lenCheck);
+
+        $context->builder->positionAtEnd($lenCheck);
+        $len = $context->builder->call($context->lookupFunction('strlen'), $body);
+        $tooLong = $context->builder->icmp(Builder::INT_UGT, $len, $maxLen);
+        $context->builder->branchIf($tooLong, $ret, $parse);
+
+        $context->builder->positionAtEnd($parse);
+        $posSlot = BasicBlockHelper::entryAlloca($context, $i8p);
+        $depthSlot = BasicBlockHelper::entryAlloca($context, $i32);
+        $end = $context->builder->inBoundsGEP($body, $len);
+        $context->builder->store($body, $posSlot);
+        $context->builder->store($i32->constInt(0, false), $depthSlot);
+        $context->builder->call($context->lookupFunction('__phpc_json_skip_ws'), $posSlot, $end);
+        $pos = $context->builder->load($posSlot);
+        $atEnd = $context->builder->icmp(Builder::INT_UGE, $pos, $end);
+        $notObj = $context->builder->icmp(
+            Builder::INT_NE,
+            $context->builder->load($pos),
+            $i8->constInt(ord('{'), false)
+        );
+        $context->builder->branchIf($context->builder->or($atEnd, $notObj), $ret, $doParse);
+
+        $context->builder->positionAtEnd($doParse);
+        $context->builder->call(
+            $context->lookupFunction('__phpc_json_parse_object'),
+            $posSlot,
+            $end,
+            $depthSlot,
+            $maxDepth,
+            $ht
+        );
+        $context->builder->branch($ret);
+
+        $context->builder->positionAtEnd($ret);
+        $context->builder->returnVoid();
     }
 
     private static function emitParseTop(Context $context, LlvmFunction $fn): void

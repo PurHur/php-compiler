@@ -16,6 +16,12 @@ final class StringJsonDecode
         self::implement($context);
     }
 
+    /** Standalone AOT: JSON POST helper for superglobals_refresh.c (#7389). */
+    public static function ensureStandaloneBodies(Context $context): void
+    {
+        StringJsonDecodeJit::ensureStandaloneBodies($context);
+    }
+
     public static function implement(Context $context): void
     {
         $resume = null;
