@@ -73,10 +73,12 @@ final class VmParseStr
      */
     public static function ensureArrayChild(HashTable $ht, $key): HashTable
     {
-        $existing = \is_int($key) ? $ht->findIndex($key) : $ht->find((string) $key);
-        if (null !== $existing) {
-            $resolved = $existing->resolveIndirect();
+        $bucket = \is_int($key) ? $ht->findIndex($key) : $ht->find((string) $key);
+        if (null !== $bucket) {
+            $resolved = $bucket->resolveIndirect();
             if (Variable::TYPE_ARRAY === $resolved->type) {
+                $resolved->separateArrayForWrite();
+
                 return $resolved->toArray();
             }
         }
@@ -84,15 +86,22 @@ final class VmParseStr
         $nested = new HashTable();
         $var = new Variable(Variable::TYPE_ARRAY);
         $var->array($nested);
-        if (null !== $existing) {
-            $existing->copyFrom($var);
+        if (null !== $bucket) {
+            $bucket->copyFrom($var);
         } elseif (\is_int($key)) {
             $ht->addIndex($key, $var);
         } else {
             $ht->add((string) $key, $var);
         }
 
-        return $nested;
+        $stored = \is_int($key) ? $ht->findIndex($key) : $ht->find((string) $key);
+        if (null === $stored) {
+            return $nested;
+        }
+        $storedResolved = $stored->resolveIndirect();
+        $storedResolved->separateArrayForWrite();
+
+        return $storedResolved->toArray();
     }
 
     /**
