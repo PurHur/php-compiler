@@ -2008,9 +2008,16 @@ class Block {
     }
 
     /**
-     * Any DECLARE_TRAIT in the compilation unit — MCJIT link/execute segfaults (#3609, #6284).
+     * Empty trait bodies (`trait T {}`) — MCJIT LLVM verify fails (#6284); VM fallback until fixed.
+     *
+     * Traits with methods or properties (including promoted `__construct`, #4939) lower via MCJIT.
      */
     public static function containsDeclareTraitOpcodesInScriptScope(?self $root): bool
+    {
+        return self::containsEmptyTraitBodyMcjitDeferral($root);
+    }
+
+    public static function containsEmptyTraitBodyMcjitDeferral(?self $root): bool
     {
         if (null === $root) {
             return false;
@@ -2024,7 +2031,37 @@ class Block {
             }
             $seen->attach($block);
             foreach ($block->opCodes as $op) {
-                if (OpCode::TYPE_DECLARE_TRAIT === $op->type) {
+                if (OpCode::TYPE_DECLARE_TRAIT === $op->type
+                    && $op->block1 instanceof self
+                    && !self::traitBodyHasMembers($op->block1)) {
+                    return true;
+                }
+                foreach ([$op->block1, $op->block2, $op->block3] as $sub) {
+                    if ($sub instanceof self) {
+                        $stack[] = $sub;
+                    }
+                }
+            }
+        }
+
+        return false;
+    }
+
+    private static function traitBodyHasMembers(self $body): bool
+    {
+        $seen = new \SplObjectStorage();
+        $stack = [$body];
+        while ([] !== $stack) {
+            $block = array_pop($stack);
+            if ($seen->contains($block)) {
+                continue;
+            }
+            $seen->attach($block);
+            foreach ($block->opCodes as $op) {
+                if (OpCode::TYPE_DECLARE_METHOD === $op->type
+                    || OpCode::TYPE_DECLARE_PROPERTY === $op->type
+                    || OpCode::TYPE_DECLARE_STATIC_PROPERTY === $op->type
+                    || OpCode::TYPE_DECLARE_CLASS_CONST === $op->type) {
                     return true;
                 }
                 foreach ([$op->block1, $op->block2, $op->block3] as $sub) {
@@ -2039,7 +2076,7 @@ class Block {
     }
 
     /**
-     * Trait `__construct` merged into a using class — MCJIT execute segfaults (#4671).
+     * Trait `__construct` merged into a using class (#4671, #4939). Detection only; no longer VM gate.
      */
     public static function containsTraitConstructorOpcodes(?self $root): bool
     {
@@ -2224,8 +2261,7 @@ class Block {
             || self::containsUserClassDeclaredInstancePropertyOpcodes($root)
             || self::containsDynamicPropertyDeprecationOpcodes($root)
             || self::containsFiberSuspendOpcodesInScriptScope($root)
-            || self::containsDeclareTraitOpcodesInScriptScope($root)
-            || self::containsTraitConstructorOpcodes($root)
+            || self::containsEmptyTraitBodyMcjitDeferral($root)
             || self::containsReflectionAttributeNewInstanceOpcodes($root)
             || self::containsInterfaceAbstractStaticMcjitDeferral($root)
             || self::containsNonStaticStaticCallOpcodes($root)

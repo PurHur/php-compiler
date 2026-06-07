@@ -9,11 +9,9 @@ use PHPUnit\Framework\TestCase;
 require_once __DIR__.'/../LlvmToolchain.php';
 
 /**
- * MCJIT execute for trait-merged __construct (#4939, Zend/zend_traits.c).
+ * MCJIT execute for trait-merged promoted __construct (#4939, Zend/zend_traits.c).
  *
- * Blocked: any script with TYPE_DECLARE_TRAIT segfaults in MCJIT createJITCompiler
- * (repro: `php bin/jit.php -l test/repro/trait_empty.php` → exit 139). VM fallback via
- * Block::containsTraitConstructorOpcodes() remains required until DECLARE_TRAIT MCJIT is stable (#3609).
+ * Uses bin/jit.php subprocess (in-process Runtime::jit() preloads libLLVM and segfaults, #98).
  *
  * @group llvm
  */
@@ -31,11 +29,6 @@ final class TraitConstructorJitExecuteTest extends TestCase
         }
         if (!$this->jitRuntimeProbeGreen()) {
             $this->markTestSkipped('jit-runtime-probe failed — MCJIT execute unavailable (#4939)');
-        }
-        if ($this->declareTraitMcjitLinkSegfaults()) {
-            $this->markTestSkipped(
-                'TYPE_DECLARE_TRAIT MCJIT link segfault — remove containsTraitConstructorOpcodes gate after #3609 (#4939)'
-            );
         }
     }
 
@@ -56,35 +49,79 @@ PHP
             "3\n");
     }
 
+    public function testTraitConstructorNoLongerForcesVmLowering(): void
+    {
+        $runtime = new Runtime();
+        $block = $runtime->parseAndCompile(<<<'PHP'
+<?php
+trait HasX {
+    public function __construct(public int $x) {}
+}
+class C {
+    use HasX;
+}
+$c = new C(3);
+echo $c->x, "\n";
+PHP
+            ,
+            'trait_ctor_promotion.php'
+        );
+        $this->assertNotNull($block);
+        $this->assertTrue(Block::containsTraitConstructorOpcodes($block));
+        $this->assertFalse(Block::containsEmptyTraitBodyMcjitDeferral($block));
+        $this->assertFalse(Block::requiresVmLowering($block));
+    }
+
     private function assertMcjitOutput(string $code, string $expected): void
     {
         $runtime = new Runtime();
         $block = $runtime->parseAndCompile($code, 'trait_ctor_promotion.php');
         $this->assertNotNull($block);
-        $this->assertTrue(Block::containsTraitConstructorOpcodes($block));
-        $this->assertFalse(Block::containsUserClassDeclaredInstancePropertyOpcodes($block));
         $this->assertFalse(Block::requiresVmLowering($block));
-        $runtime->jit($block, $code, 'trait_ctor_promotion.php');
-        ob_start();
-        $runtime->run($block);
-        $this->assertSame($expected, ob_get_clean());
+
+        $jit = realpath($this->repoRoot.'/bin/jit.php');
+        $this->assertNotFalse($jit);
+        $varDir = $this->repoRoot.'/var';
+        if (!is_dir($varDir) && !mkdir($varDir, 0775, true) && !is_dir($varDir)) {
+            $this->fail('Could not create var/ for trait constructor JIT execute script');
+        }
+        $script = $varDir.'/trait_ctor_jit_execute_'.getmypid().'_'.bin2hex(random_bytes(4)).'.php';
+        file_put_contents($script, $code);
+        try {
+            $env = $this->llvmProcessEnv();
+            $out = $this->runScript(
+                array_merge(LlvmToolchain::envPrefix($this->repoRoot), [PHP_BINARY, $jit, $script]),
+                $env
+            );
+            $this->assertSame(0, $out['exit'], 'JIT: '.$out['combined']);
+            $this->assertSame($expected, $out['stdout']);
+        } finally {
+            @unlink($script);
+        }
     }
 
-    private function declareTraitMcjitLinkSegfaults(): bool
+    /** @param list<string> $cmd */
+    private function runScript(array $cmd, array $env): array
     {
-        $probe = $this->repoRoot.'/test/repro/trait_empty_mcjit_probe.php';
-        if (!is_file($probe)) {
-            return true;
-        }
-        $cmd = sprintf(
-            'bash -lc %s',
-            escapeshellarg('source '.escapeshellarg($this->repoRoot.'/script/php-env.sh')
-                .' && '.escapeshellarg(PHP_BINARY).' '.escapeshellarg($this->repoRoot.'/bin/jit.php')
-                .' -l '.escapeshellarg($probe).' >/dev/null 2>&1')
-        );
-        exec($cmd, $out, $code);
+        $descriptorSpec = [
+            0 => ['pipe', 'r'],
+            1 => ['pipe', 'w'],
+            2 => ['pipe', 'w'],
+        ];
+        $proc = proc_open($cmd, $descriptorSpec, $pipes, $this->repoRoot, $env);
+        $this->assertIsResource($proc);
+        fclose($pipes[0]);
+        $stdout = stream_get_contents($pipes[1]);
+        $stderr = stream_get_contents($pipes[2]);
+        fclose($pipes[1]);
+        fclose($pipes[2]);
+        $exit = proc_close($proc);
 
-        return 139 === $code;
+        return [
+            'exit' => $exit,
+            'stdout' => false !== $stdout ? $stdout : '',
+            'combined' => trim((false !== $stdout ? $stdout : '').(false !== $stderr ? $stderr : '')),
+        ];
     }
 
     private function jitRuntimeProbeGreen(): bool
@@ -98,5 +135,19 @@ PHP
         exec($cmd, $out, $code);
 
         return 0 === $code && str_contains(implode("\n", $out), 'jit-runtime-probe OK');
+    }
+
+    /** @return array<string, string> */
+    private function llvmProcessEnv(): array
+    {
+        $env = $_ENV;
+        foreach ($_SERVER as $key => $value) {
+            if (is_string($value)) {
+                $env[$key] = $value;
+            }
+        }
+        LlvmToolchain::applyProcessEnv($env, $this->repoRoot);
+
+        return $env;
     }
 }
