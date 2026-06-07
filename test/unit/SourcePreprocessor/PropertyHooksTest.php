@@ -372,6 +372,53 @@ PHP;
         self::assertSame([], $registry);
     }
 
+    /** @covers issue #7313 — promoted constructor parameters with property hooks */
+    public function testLowersPromotedConstructorParamPropertyHooks(): void
+    {
+        $src = <<<'PHP'
+<?php
+class C {
+    public function __construct(
+        public string $name {
+            get => strtoupper($this->name);
+            set => $this->name = strtolower($value);
+        },
+    ) {}
+}
+PHP;
+        [$out, $registry] = (new PropertyHooks())->process($src);
+        self::assertStringNotContainsString('$name {', $out);
+        self::assertStringContainsString('public string $name,', $out);
+        self::assertStringNotContainsString('$name;', $out);
+        self::assertStringContainsString('function __phpc_property_get_name', $out);
+        self::assertStringContainsString('function __phpc_property_set_name', $out);
+        self::assertSame('__phpc_property_get_name', $registry['c']['name']['get'] ?? null);
+        self::assertSame('__phpc_property_set_name', $registry['c']['name']['set'] ?? null);
+    }
+
+    /** @covers issue #7313 — promoted hooked param end-to-end via Runtime preprocess */
+    public function testPromotedConstructorParamPropertyHooksSurviveRuntimePreprocess(): void
+    {
+        $src = <<<'PHP'
+<?php
+class C {
+    public function __construct(
+        public string $name {
+            get => strtoupper($this->name);
+            set => $this->name = strtolower($value);
+        },
+    ) {}
+}
+$c = new C('AbC');
+echo $c->name;
+PHP;
+        $runtime = new Runtime();
+        $block = $runtime->parseAndCompile($src, 'promoted_property_hook.php');
+        ob_start();
+        $runtime->run($block);
+        self::assertSame('ABC', ob_get_clean());
+    }
+
     /** @covers issue #7031 — same-name backing field must merge with hooked property decl */
     public function testMergesSameNameBackingFieldDeclaration(): void
     {

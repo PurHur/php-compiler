@@ -201,6 +201,42 @@ final class PropertyHooks
     }
 
     /**
+     * True when a hooked `$prop { ... }` sits in a constructor promoted parameter list (#7313).
+     */
+    private function isPromotedConstructorParam(
+        string $body,
+        int $declStart,
+        int $hookClose,
+        string $declPrefix,
+        string $propDeclHead
+    ): bool {
+        if (!preg_match('/\b(public|protected|private)\b/', $declPrefix.$propDeclHead)) {
+            return false;
+        }
+        $prefix = substr($body, 0, $declStart);
+        if (!preg_match('/\bfunction\s+__construct\s*\(/s', $prefix, $m, PREG_OFFSET_CAPTURE)) {
+            return false;
+        }
+        $constructOpen = (int) $m[0][1] + strlen($m[0][0]) - 1;
+        $segment = substr($body, $constructOpen, $hookClose - $constructOpen + 1);
+        $depth = 0;
+        $len = strlen($segment);
+        for ($i = 0; $i < $len; ++$i) {
+            $ch = $segment[$i];
+            if ('(' === $ch) {
+                ++$depth;
+            } elseif (')' === $ch) {
+                --$depth;
+                if (0 === $depth) {
+                    return false;
+                }
+            }
+        }
+
+        return $depth > 0;
+    }
+
+    /**
      * @return array{0: int, 1: int}|null [openBracePos, closeBracePos]
      */
     private function matchingBraceSpan(string $code, int $openPos): ?array
@@ -270,8 +306,15 @@ final class PropertyHooks
                 $propDeclHead = preg_replace('/\babstract\s+/', '', $propDeclHead) ?? $propDeclHead;
             }
             $isStatic = (bool) preg_match('/\bstatic\b/', $declPrefix.$propDeclHead);
+            $isPromotedCtorParam = $this->isPromotedConstructorParam(
+                $body,
+                $declStart,
+                $close,
+                $declPrefix,
+                $propDeclHead
+            );
             $propDecl = preg_replace('/\s+$/', '', $propDeclHead) ?? $propDeclHead;
-            if (!str_ends_with($propDecl, ';')) {
+            if (!$isPromotedCtorParam && !str_ends_with($propDecl, ';')) {
                 $propDecl .= ';';
             }
             $registerRequiredHooks = $isAbstractHook || $isInterfaceHook;
@@ -300,7 +343,7 @@ final class PropertyHooks
                     if ('' !== $initializer) {
                         $mergedDecl .= ' '.$initializer;
                     }
-                    if (!str_ends_with($mergedDecl, ';')) {
+                    if (!$isPromotedCtorParam && !str_ends_with($mergedDecl, ';')) {
                         $mergedDecl .= ';';
                     }
                     $out .= $declPrefix.$mergedDecl;
