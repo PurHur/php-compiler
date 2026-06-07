@@ -39,8 +39,5 @@ final class DateTimeConstruct extends VmClassMethod
             }
         }
         DateTimeSupport::initDateTime($receiver, $time, $timezone);
-        if (null !== $frame->returnVar) {
-            $frame->returnVar->null();
-        }
     }
 }
