@@ -111,7 +111,7 @@ final class ClosureSupport
         string $context = 'Closure::bindTo()',
         ?Frame $frame = null
     ): ?ObjectEntry {
-        $newThis = $newThis->resolveIndirect();
+        $newThis = self::normalizeNewThis($newThis);
         if (Variable::TYPE_NULL !== $newThis->type && Variable::TYPE_OBJECT !== $newThis->type) {
             $thisArg = 'Closure::bind()' === $context ? '#2 ($newThis)' : '#1 ($newThis)';
             throw new \TypeError(
@@ -226,7 +226,7 @@ final class ClosureSupport
         array $invokeArgs,
         string $context = 'Closure::call()'
     ): Variable {
-        $newThis = $newThis->resolveIndirect();
+        $newThis = self::normalizeNewThis($newThis);
         if (Variable::TYPE_OBJECT !== $newThis->type) {
             throw new \TypeError(
                 "{$context}: Argument #1 (\$newThis) must be of type object, "
@@ -419,6 +419,17 @@ final class ClosureSupport
             "{$context}: Argument {$scopeArg} must be of type object|string|null, "
             .self::valueTypeName($newScope).' given'
         );
+    }
+
+    /** Enum cases are objects in Zend; materialize before bindTo/bind/call (#7201). */
+    private static function normalizeNewThis(Variable $newThis): Variable
+    {
+        $newThis = $newThis->resolveIndirect();
+        if (EnumCaseSupport::isEnumCaseVariable($newThis)) {
+            return EnumCaseSupport::receiverForInstanceMethod($newThis);
+        }
+
+        return $newThis;
     }
 
     private static function valueTypeName(Variable $value): string
