@@ -105,8 +105,8 @@ final class array_multisort extends Internal
             foreach ($indices as $idx) {
                 $reordered[] = $values[$idx];
             }
-            $ht->replacePackedValues($reordered);
-            $array->array($ht);
+            $array->separateArrayForWrite();
+            $array->resolveIndirect()->toArray()->replacePackedValues($reordered);
         }
         if (null !== $frame->returnVar) {
             $frame->returnVar->bool(true);
