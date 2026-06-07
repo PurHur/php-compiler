@@ -17,6 +17,14 @@ final class LevenshteinVMTest extends BaseTest
             __DIR__.'/cases/stdlib/levenshtein.phpt',
             'levenshtein.phpt'
         );
+        yield 'levenshtein_coerce.phpt' => self::parsePHPT(
+            __DIR__.'/cases/stdlib/levenshtein_coerce.phpt',
+            'levenshtein_coerce.phpt'
+        );
+        yield 'levenshtein_numeric_cost.phpt' => self::parsePHPT(
+            __DIR__.'/cases/stdlib/levenshtein_numeric_cost.phpt',
+            'levenshtein_numeric_cost.phpt'
+        );
     }
 
     public function setUp(): void
