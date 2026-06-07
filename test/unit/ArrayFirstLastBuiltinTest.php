@@ -40,15 +40,18 @@ final class ArrayFirstLastBuiltinTest extends TestCase
         $this->assertSame(30, $this->runElem($lastFn, $runtime, $list)->toInt());
     }
 
-    public function testEmptyArrayThrowsValueError(): void
+    public function testEmptyArrayReturnsNull(): void
     {
         $runtime = new Runtime();
         $firstFn = new array_first();
+        $lastFn = new array_last();
         $empty = new HashTable();
 
-        $this->expectException(\ValueError::class);
-        $this->expectExceptionMessage('array_first(): Argument #1 ($array) must not be empty');
-        $this->runElem($firstFn, $runtime, $empty);
+        $first = $this->runElem($firstFn, $runtime, $empty);
+        $this->assertSame(VMVariable::TYPE_NULL, $first->type);
+
+        $last = $this->runElem($lastFn, $runtime, $empty);
+        $this->assertSame(VMVariable::TYPE_NULL, $last->type);
     }
 
     public function testNonArrayThrowsTypeError(): void

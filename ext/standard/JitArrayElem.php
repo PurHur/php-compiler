@@ -22,8 +22,6 @@ final class JitArrayElem
 
     private const TYPE_ERROR_N = '%s(): Argument #%d ($%s) must be of type %s, %s given';
 
-    private const EMPTY_VALUE_ERROR = '%s(): Argument #1 ($array) must not be empty';
-
     public static function first(Context $context, JITVariable $array): Value
     {
         self::requireArrayArg($context, $array, 'array_first');
@@ -61,7 +59,11 @@ final class JitArrayElem
         $context->builder->branchIf($isEmpty, $emptyBb, $workBb);
 
         $context->builder->positionAtEnd($emptyBb);
-        self::emitErrorAndAbort($context, \sprintf(self::EMPTY_VALUE_ERROR, $fn));
+        $context->builder->call(
+            $context->lookupFunction('__value__writeNull'),
+            $resultPtr
+        );
+        $context->builder->branch($doneBb);
 
         $context->builder->positionAtEnd($workBb);
         $nextFree = $context->builder->load(
@@ -119,7 +121,11 @@ final class JitArrayElem
         $context->builder->branch($loopHead);
 
         $context->builder->positionAtEnd($loopFail);
-        self::emitErrorAndAbort($context, \sprintf(self::EMPTY_VALUE_ERROR, $fn));
+        $context->builder->call(
+            $context->lookupFunction('__value__writeNull'),
+            $resultPtr
+        );
+        $context->builder->branch($doneBb);
 
         $context->builder->positionAtEnd($stringBb);
         $head = $context->builder->load($context->builder->structGep($ht, $map['strKeys']));
@@ -129,7 +135,11 @@ final class JitArrayElem
             $strFound = BasicBlockHelper::append($context, 'array_elem_first_str_found');
             $context->builder->branchIf($headNull, $strEmpty, $strFound);
             $context->builder->positionAtEnd($strEmpty);
-            self::emitErrorAndAbort($context, \sprintf(self::EMPTY_VALUE_ERROR, $fn));
+            $context->builder->call(
+                $context->lookupFunction('__value__writeNull'),
+                $resultPtr
+            );
+            $context->builder->branch($doneBb);
             $context->builder->positionAtEnd($strFound);
             $valEntry = $context->builder->structGep($head, $nodeMap['value']);
             JitValueBox::copyFromPointer($context, $resultPtr, $valEntry);
@@ -162,7 +172,11 @@ final class JitArrayElem
             $strFound = BasicBlockHelper::append($context, 'array_elem_last_str_found');
             $context->builder->branchIf($lastNull, $strEmpty, $strFound);
             $context->builder->positionAtEnd($strEmpty);
-            self::emitErrorAndAbort($context, \sprintf(self::EMPTY_VALUE_ERROR, $fn));
+            $context->builder->call(
+                $context->lookupFunction('__value__writeNull'),
+                $resultPtr
+            );
+            $context->builder->branch($doneBb);
             $context->builder->positionAtEnd($strFound);
             $valEntry = $context->builder->structGep($lastNode, $nodeMap['value']);
             JitValueBox::copyFromPointer($context, $resultPtr, $valEntry);

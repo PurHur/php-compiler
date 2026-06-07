@@ -212,34 +212,31 @@ final class VmArray
     }
 
     /**
-     * array_first() — first element value (php-src array.c, #3491).
+     * array_first() — first element value (php-src array.c, #3491, #7293).
      *
-     * @throws \ValueError when {@param $ht} is empty
+     * Returns null when the hash table has no elements (empty or all-unset).
      */
-    public static function valueFirst(HashTable $ht): Variable
+    public static function valueFirst(HashTable $ht): ?Variable
     {
         $ht->iterReset();
         if (!$ht->iterValid()) {
-            throw new \ValueError('array_first(): Argument #1 ($array) must not be empty');
+            return null;
         }
 
         return $ht->iterCurrentValue();
     }
 
     /**
-     * array_last() — last element value (php-src array.c, #3491).
+     * array_last() — last element value (php-src array.c, #3491, #7293).
      *
-     * @throws \ValueError when {@param $ht} is empty
+     * Returns null when the hash table has no elements (empty or all-unset).
      */
-    public static function valueLast(HashTable $ht): Variable
+    public static function valueLast(HashTable $ht): ?Variable
     {
         $ht->iterReset();
         $last = null;
         while ($ht->iterValid()) {
             $last = $ht->iterCurrentValue();
-        }
-        if (null === $last) {
-            throw new \ValueError('array_last(): Argument #1 ($array) must not be empty');
         }
 
         return $last;
