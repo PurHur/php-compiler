@@ -17,6 +17,10 @@ final class ArrayKeyLastVMTest extends BaseTest
             __DIR__.'/cases/stdlib/array_key_last.phpt',
             'array_key_last.phpt'
         );
+        yield 'array_key_last_enum.phpt' => self::parsePHPT(
+            __DIR__.'/cases/stdlib/array_key_last_enum.phpt',
+            'array_key_last_enum.phpt'
+        );
     }
 
     public function setUp(): void

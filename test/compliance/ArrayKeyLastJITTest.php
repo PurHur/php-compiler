@@ -20,6 +20,10 @@ final class ArrayKeyLastJITTest extends BaseTest
             __DIR__.'/cases/stdlib/array_key_last_jit.phpt',
             'array_key_last_jit.phpt'
         );
+        yield 'array_key_last_enum_jit.phpt' => self::parsePHPT(
+            __DIR__.'/cases/stdlib/array_key_last_enum_jit.phpt',
+            'array_key_last_enum_jit.phpt'
+        );
     }
 
     public function setUp(): void
