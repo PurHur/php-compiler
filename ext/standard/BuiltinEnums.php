@@ -20,6 +20,7 @@ final class BuiltinEnums
         $before = array_keys($ctx->classes);
         self::registerPropertyHookType($ctx);
         self::registerExitStatus($ctx);
+        self::registerStringTrimMode($ctx);
         foreach (array_diff(array_keys($ctx->classes), $before) as $lc) {
             $ctx->classes[$lc]->isInternal = true;
         }
@@ -73,6 +74,33 @@ final class BuiltinEnums
         EnumSupport::ensureBuiltinEnumInterfaces($entry);
 
         $lc = 'exitstatus';
+        $ctx->classes[$lc] = $entry;
+        $ctx->enums[$lc] = true;
+    }
+
+    /**
+     * PHP 8.4 StringTrimMode: int-backed enum for trim()/ltrim()/rtrim() side parameter (#7283).
+     *
+     * php-src: ext/standard/basic_functions.stub.php — enum StringTrimMode: int
+     */
+    private static function registerStringTrimMode(Context $ctx): void
+    {
+        if (isset($ctx->classes['stringtrimmode'])) {
+            return;
+        }
+
+        $entry = new ClassEntry('StringTrimMode');
+        $entry->isEnum = true;
+        $entry->backedType = 'int';
+
+        self::registerBackedEnumCase($entry, 'Both', 0);
+        self::registerBackedEnumCase($entry, 'Left', 1);
+        self::registerBackedEnumCase($entry, 'Right', 2);
+
+        EnumSupport::ensureBuiltinCasesMethod($entry);
+        EnumSupport::ensureBuiltinEnumInterfaces($entry);
+
+        $lc = 'stringtrimmode';
         $ctx->classes[$lc] = $entry;
         $ctx->enums[$lc] = true;
     }
