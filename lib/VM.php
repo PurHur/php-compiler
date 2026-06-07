@@ -4530,6 +4530,24 @@ restart:
                             $this->emitInstancePropertyAccessDeprecation($propertyObject, $name, $frame);
                         }
                         if ($forWrite) {
+                            $writeProxy = new Variable();
+                            $writeProxy->objectPropertyOwner = $propertyObject;
+                            $writeProxy->objectPropertyName = $name;
+                            $catchFrame = $this->enforceVirtualPropertyHookWrite($writeProxy, $frame);
+                            if (null !== $catchFrame) {
+                                $frame = $catchFrame;
+                                goto restart;
+                            }
+                            $readBeforeAssign = $this->propertyFetchDestUsedAsReadBeforeAssign($frame, $op);
+                            if ($readBeforeAssign) {
+                                $hookValue = $this->fetchPropertyWithHooks($propertyObject, $name, $frame);
+                                if (null !== $hookValue) {
+                                    $result->copyFrom($hookValue);
+                                    $result->objectPropertyOwner = $propertyObject;
+                                    $result->objectPropertyName = $name;
+                                    break;
+                                }
+                            }
                             $result->indirect($this->fetchObjectPropertyWriteLvalue($propertyObject, $name, $frame));
                             break;
                         }
