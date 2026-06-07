@@ -7,7 +7,7 @@ namespace PHPCompiler\JIT;
 use PHPUnit\Framework\TestCase;
 
 /**
- * JIT pending exception/error buffers are LLVM in PHP, not lib/AOT/runtime/*.c (#5364, #5373).
+ * JIT pending exception/error buffers are LLVM in PHP, not lib/AOT/runtime/*.c (#5364, #5373, #5374).
  *
  * @group llvm
  */
@@ -49,6 +49,13 @@ final class ExceptionBridgeTest extends TestCase
                     'clearPendingAtRunEntry',
                     'throwPendingIfAny',
                     'emitError',
+                ],
+                ReadonlyBridge::class => [
+                    'ensureLinked',
+                    'bindJitEngine',
+                    'clearPendingAtRunEntry',
+                    'throwPendingIfAny',
+                    'emitReadonlyViolation',
                 ],
             ] as $class => $methods
         ) {
