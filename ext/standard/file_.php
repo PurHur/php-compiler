@@ -8,7 +8,7 @@ use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitLongArg;
-use PHPCompiler\JIT\JitStringArg;
+use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\HashTable;
 use PHPCompiler\VM\Variable;
@@ -30,10 +30,7 @@ final class file_ extends Internal
         if ($argc < 1 || $argc > 2) {
             throw new \LogicException('file() requires one or two arguments in this compiler build');
         }
-        $pathVar = $frame->calledArgs[0]->resolveIndirect();
-        if (Variable::TYPE_STRING !== $pathVar->type) {
-            throw new \LogicException('file() filename must be a string in this compiler build');
-        }
+        $path = VmString::coerceStringBuiltinArg($frame->calledArgs[0], 'file', 0, 'filename');
         $flags = 0;
         if (2 === $argc) {
             $flagsVar = $frame->calledArgs[1]->resolveIndirect();
@@ -46,7 +43,7 @@ final class file_ extends Internal
             return;
         }
 
-        $lines = VmFs::file($pathVar->toString(), $flags);
+        $lines = VmFs::file($path, $flags);
         if (false === $lines) {
             $frame->returnVar->bool(false);
 
@@ -67,7 +64,7 @@ final class file_ extends Internal
         if ($argc < 1 || $argc > 2) {
             throw new \LogicException('file() requires one or two arguments in this compiler build');
         }
-        $path = JitStringArg::lower($context, $args[0], 'file() filename');
+        $path = JitStringBuiltinArg::lower($context, $args[0], 'file', 0, 'filename');
         $i64 = $context->getTypeFromString('int64');
         $flags = $i64->constInt(0, false);
         if (2 === $argc) {
