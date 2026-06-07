@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace PHPCompiler\VM\Builtin;
 
-use PHPCompiler\ext\standard\VmReflection;
+use PHPCompiler\ext\standard\VmString;
 use PHPCompiler\Frame;
 use PHPCompiler\VM\DateTimeSupport;
 use PHPCompiler\VM\Variable;
@@ -28,7 +28,12 @@ final class DateTimeConstruct extends VmClassMethod
         if ($argc >= 2) {
             $timeVar = $frame->calledArgs[1]->resolveIndirect();
             if (Variable::TYPE_NULL !== $timeVar->type) {
-                $time = VmReflection::stringArg($frame->calledArgs[1], 'DateTime::__construct() time', 1);
+                $time = VmString::coerceStringBuiltinArg(
+                    $frame->calledArgs[1],
+                    'DateTime::__construct',
+                    0,
+                    'datetime'
+                );
             }
         }
         $timezone = null;
