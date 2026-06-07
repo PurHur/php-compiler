@@ -14,7 +14,9 @@ namespace PHPCompiler\ext\standard;
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\Variable as JITVariable;
+use PHPCompiler\VM\BuiltinExecute;
 use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
 
@@ -28,14 +30,16 @@ final class str_rot13 extends Internal
         if (1 !== count($frame->calledArgs)) {
             throw new \LogicException('str_rot13() requires exactly one argument');
         }
-        $v = $frame->calledArgs[0]->resolveIndirect();
-        if (null === $frame->returnVar) {
-            return;
-        }
-        if (Variable::TYPE_STRING !== $v->type) {
-            throw new \LogicException('str_rot13() only supports strings in this compiler build');
-        }
-        $frame->returnVar->string(VmString::strRot13($v->toString()));
+        $subject = VmString::coerceStringBuiltinArg(
+            $frame->calledArgs[0],
+            'str_rot13',
+            0,
+            'str'
+        );
+        BuiltinExecute::writeReturn(
+            $frame,
+            static fn (Variable $ret) => $ret->string(VmString::strRot13($subject))
+        );
     }
 
     public Context $context;
@@ -47,7 +51,7 @@ final class str_rot13 extends Internal
             throw new \LogicException('str_rot13() requires exactly one argument');
         }
 
-        $str = $this->jitString($context, $args[0], 'str_rot13() string');
+        $str = JitStringBuiltinArg::lower($context, $args[0], 'str_rot13', 0, 'str');
         $copy = $context->builder->call($context->lookupFunction('__string__separate'), $str);
         JitStrRot13::transformInPlace($context, $copy);
 
