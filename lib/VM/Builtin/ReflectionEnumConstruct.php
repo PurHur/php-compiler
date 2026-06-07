@@ -30,8 +30,6 @@ final class ReflectionEnumConstruct extends VmClassMethod
         $receiver = ReflectionSupport::requireReflectionEnum($frame, $frame->calledArgs[0]);
         $receiver->getProperty(ReflectionSupport::PROP_CLASS_NAME)->string($target->name);
         $receiver->constructed = true;
-        if (null !== $frame->returnVar) {
-            $frame->returnVar->null();
-        }
+        // Do not touch returnVar: it may alias the `new ReflectionEnum()` result slot (#1885, #4598, #7370).
     }
 }
