@@ -14,7 +14,7 @@ permalink: /development-status.html
 | **What it is** | PHP → CFG → VM / LLVM JIT → AOT native binaries |
 | **North star** | Compiler compiles itself without Zend ([#1492](https://github.com/PurHur/php-compiler/issues/1492)) |
 | **Wave 3** | Language **12/12** · Stdlib **13/13** on master ([#1380](https://github.com/PurHur/php-compiler/issues/1380)) |
-| **Spine SSOT** | `php script/bootstrap-spine-count.php` → **1297** / **1626** |
+| **Spine SSOT** | `php script/bootstrap-spine-count.php` → **1298** / **1681** |
 | **Builtin matrix** | **321** functions ([`docs/capabilities.md`](https://github.com/PurHur/php-compiler/blob/master/docs/capabilities.md)) |
 | **Try it** | [`docs/GETTING-STARTED.md`](https://github.com/PurHur/php-compiler/blob/master/docs/GETTING-STARTED.md) |
 
@@ -52,7 +52,7 @@ permalink: /development-status.html
 - **`phpc` CLI** — `run`, `serve`, `build`, `deploy`, `lint`, `test`, `init`, `doctor`
 - **Examples 000–009** — VM and AOT link/execute for the curated web subset
 - **Self-host M0** — `compiler_minimal bundle OK` ✅ in Docker
-- **Self-host M2** — spine **1297** / **1626** 🚧; native spine **link** ✅ when LLVM + patches wired
+- **Self-host M2** — spine **1298** / **1681** 🚧; native spine **link** ✅ when LLVM + patches wired
 - **Self-host M3** — HelloWorld + inventory emit strict native ✅; production `bin/compile.php` 🚧 ([#3024](https://github.com/PurHur/php-compiler/issues/3024))
 - **Self-host M4** — gen-1 link partial; **gen-2→gen-3 recompile** 🚧 (native driver vs Zend fallback)
 - **Self-host M5 (partial)** — vendor prelink **3/3** ✅; Zend still default for empty `build/`
@@ -77,7 +77,7 @@ Shipped examples under `examples/` are **regression fixtures** for VM/JIT/AOT an
 |-----------|--------|
 | **M0** — Small `lib/` bundle runs | ✅ |
 | **M1** — Compiler-shaped bundle + compile-smoke | ✅ |
-| **M2** — Spine toward full inventory | 🚧 **1297** / **1626** |
+| **M2** — Spine toward full inventory | 🚧 **1298** / **1681** |
 | **M3** — Native compiles PHP (no Zend emit) | 🚧 Smoke + inventory emit ✅ · `bin/compile.php` production emit 🚧 |
 | **M4** — Bootstrap loop (next revision) | 🚧 Gen-2→gen-3 full-spine recompile open |
 | **M5** — Full self-host, no `vendor/` cold boot | 🚧 |
