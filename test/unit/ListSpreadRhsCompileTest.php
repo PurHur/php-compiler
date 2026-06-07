@@ -8,7 +8,7 @@ use PHPCompiler\Runtime;
 use PHPUnit\Framework\TestCase;
 
 /**
- * listSpreadRhs php-cfg patch must be applied before compile (#6069).
+ * listSpreadRhs php-cfg patch and Compiler guard (#6069, #5472).
  */
 final class ListSpreadRhsCompileTest extends TestCase
 {
@@ -17,6 +17,35 @@ final class ListSpreadRhsCompileTest extends TestCase
     public static function setUpBeforeClass(): void
     {
         self::$root = dirname(__DIR__, 2);
+    }
+
+    /**
+     * @return list<string>
+     */
+    private function compileAndCollectListSpreadRhsWarnings(string $code, string $filename): array
+    {
+        $warnings = [];
+        $previous = set_error_handler(
+            static function (int $errno, string $errstr) use (&$warnings): bool {
+                if ($errno === E_WARNING && str_contains($errstr, 'listSpreadRhs')) {
+                    $warnings[] = $errstr;
+                }
+
+                return false;
+            }
+        );
+        try {
+            $runtime = new Runtime();
+            $block = $runtime->parseAndCompile($code, $filename);
+            self::assertNotNull($block);
+        } finally {
+            restore_error_handler();
+            if ($previous !== null) {
+                set_error_handler($previous);
+            }
+        }
+
+        return $warnings;
     }
 
     public function testListSpreadRhsPropertyPresentAfterApplyPatches(): void
@@ -55,26 +84,7 @@ $a = [1, 2];
 list($x, &$y) = $a;
 PHP;
 
-        $warnings = [];
-        $previous = set_error_handler(
-            static function (int $errno, string $errstr) use (&$warnings): bool {
-                if ($errno === E_WARNING && str_contains($errstr, 'listSpreadRhs')) {
-                    $warnings[] = $errstr;
-                }
-
-                return false;
-            }
-        );
-        try {
-            $runtime = new Runtime();
-            $block = $runtime->parseAndCompile($code, 'list_byref.php');
-            self::assertNotNull($block);
-        } finally {
-            restore_error_handler();
-            if ($previous !== null) {
-                set_error_handler($previous);
-            }
-        }
+        $warnings = $this->compileAndCollectListSpreadRhsWarnings($code, 'list_byref.php');
 
         self::assertSame([], $warnings, 'list() compile must not warn on listSpreadRhs (#6069)');
     }
@@ -92,27 +102,45 @@ $a = [1, 2, 3];
 [$head, ...$tail] = $a;
 PHP;
 
-        $warnings = [];
-        $previous = set_error_handler(
-            static function (int $errno, string $errstr) use (&$warnings): bool {
-                if ($errno === E_WARNING && str_contains($errstr, 'listSpreadRhs')) {
-                    $warnings[] = $errstr;
-                }
-
-                return false;
-            }
-        );
-        try {
-            $runtime = new Runtime();
-            $block = $runtime->parseAndCompile($code, 'list_spread.php');
-            self::assertNotNull($block);
-        } finally {
-            restore_error_handler();
-            if ($previous !== null) {
-                set_error_handler($previous);
-            }
-        }
+        $warnings = $this->compileAndCollectListSpreadRhsWarnings($code, 'list_spread.php');
 
         self::assertSame([], $warnings, 'list spread compile must not warn on listSpreadRhs (#6069)');
+    }
+
+    public function testSimpleAssignCompilesWithoutListSpreadRhsWarningsWhenOverlayMissing(): void
+    {
+        $assign = self::$root.'/vendor/ircmaxell/php-cfg/lib/PHPCfg/Op/Expr/Assign.php';
+        if (!is_readable($assign)) {
+            self::markTestSkipped('vendor/ircmaxell/php-cfg not installed');
+        }
+
+        $original = (string) file_get_contents($assign);
+        $stripped = preg_replace(
+            '/^\s*public \$listSpread(?:Rhs|FromIndex|ExcludedKeys).*$/m',
+            '',
+            $original
+        );
+        if ($stripped === $original) {
+            self::markTestSkipped('listSpreadRhs overlay already absent');
+        }
+
+        file_put_contents($assign, $stripped);
+        try {
+            $warnings = $this->compileAndCollectListSpreadRhsWarnings(
+                <<<'PHP'
+<?php
+$a = 1;
+PHP,
+                'simple_assign.php'
+            );
+        } finally {
+            file_put_contents($assign, $original);
+        }
+
+        self::assertSame(
+            [],
+            $warnings,
+            'simple assign must not warn on listSpreadRhs when overlay missing (#5472)'
+        );
     }
 }
