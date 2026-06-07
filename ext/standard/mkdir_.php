@@ -27,9 +27,6 @@ final class mkdir_ extends Internal
             throw new \LogicException('mkdir() requires one to three arguments in this compiler build');
         }
         $pathVar = $frame->calledArgs[0]->resolveIndirect();
-        if (null === $frame->returnVar) {
-            return;
-        }
         if (Variable::TYPE_STRING !== $pathVar->type) {
             throw new \LogicException('mkdir() directory must be a string in this compiler build');
         }
@@ -49,7 +46,10 @@ final class mkdir_ extends Internal
             }
             $recursive = $recVar->toBool();
         }
-        $frame->returnVar->bool(VmFs::mkdir($pathVar->toString(), $mode, $recursive));
+        $ok = VmFs::mkdir($pathVar->toString(), $mode, $recursive);
+        if (null !== $frame->returnVar) {
+            $frame->returnVar->bool($ok);
+        }
     }
 
     public function call(Context $context, JITVariable ...$args): Value

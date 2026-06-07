@@ -28,9 +28,6 @@ final class touch_ extends Internal
             throw new \LogicException('touch() requires one to three arguments in this compiler build');
         }
         $pathVar = $frame->calledArgs[0]->resolveIndirect();
-        if (null === $frame->returnVar) {
-            return;
-        }
         if (Variable::TYPE_STRING !== $pathVar->type) {
             throw new \LogicException('touch() filename must be a string in this compiler build');
         }
@@ -42,7 +39,10 @@ final class touch_ extends Internal
         if (3 === $argc) {
             $atime = self::parseNullableLong($frame->calledArgs[2]->resolveIndirect(), 3, 'atime');
         }
-        $frame->returnVar->bool(VmFs::touch($pathVar->toString(), $mtime, $atime));
+        $ok = VmFs::touch($pathVar->toString(), $mtime, $atime);
+        if (null !== $frame->returnVar) {
+            $frame->returnVar->bool($ok);
+        }
     }
 
     public function call(Context $context, JITVariable ...$args): Value
