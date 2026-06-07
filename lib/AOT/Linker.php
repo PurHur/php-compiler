@@ -25,7 +25,6 @@ final class Linker
         __DIR__.'/runtime/superglobals_refresh.c',
         __DIR__.'/runtime/phpc_stream.c',
         __DIR__.'/runtime/phpc_progress.c',
-        __DIR__.'/runtime/phpc_gc.c',
     ];
 
     private const RUNTIME_LINK_LIBS = '-lpcre2-8 -lcrypt -lz';
