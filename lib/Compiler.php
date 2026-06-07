@@ -9642,6 +9642,25 @@ class Compiler {
         if ($op instanceof Op\Expr\AssignRef && $this->operandsChainEqual($op->var, $operand)) {
             return true;
         }
+        if ($op instanceof Op\Terminal\Unset_) {
+            foreach ($op->exprs as $var) {
+                if ($this->operandsChainEqual($var, $operand)) {
+                    return true;
+                }
+                $target = $var;
+                while ($target instanceof Temporary) {
+                    if ($this->operandsChainEqual($target, $operand)) {
+                        return true;
+                    }
+                    if (null === $target->original) {
+                        break;
+                    }
+                    $target = $target->original;
+                }
+            }
+
+            return false;
+        }
         if ($op instanceof Op\Expr\PostInc
             || $op instanceof Op\Expr\PreInc
             || $op instanceof Op\Expr\PostDec
