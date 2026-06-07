@@ -17,5 +17,5 @@ define('OK', 1);
 var_dump(defined('OK'));
 ?>
 --EXPECT--
-defined(): Argument #1 ($constant) must be of type string, E given
+defined(): Argument #1 ($constant_name) must be of type string, E given
 bool(true)
