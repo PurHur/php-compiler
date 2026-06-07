@@ -1,9 +1,9 @@
 --TEST--
-Language: asymmetric visibility — public+private(set)/public+protected(set) compile fatal (#7099, zend_compile.c)
+Language: asymmetric visibility — set more permissive than read compile fatal (#7308, zend_compile.c)
 --FILE--
 <?php
 class A {
-    public private(set) string $x = 'a';
+    protected public(set) string $x = 'a';
 }
 echo "compiled\n";
 --EXPECT_EXIT--
@@ -11,7 +11,7 @@ echo "compiled\n";
 --FILE--
 <?php
 class B {
-    public protected(set) string $x = 'a';
+    private protected(set) string $x = 'a';
 }
 echo "compiled\n";
 --EXPECT_EXIT--

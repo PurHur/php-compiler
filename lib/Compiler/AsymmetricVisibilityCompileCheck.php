@@ -70,8 +70,8 @@ final class AsymmetricVisibilityCompileCheck
     /**
      * Promoted asymmetric visibility — same rules as declared properties (#6981, RFC asymmetric-visibility-v2).
      *
-     * php-src: Zend/zend_compile.c — zend_compile_property_info() on promoted params; explicit read
-     * plus `(set)` modifier is rejected in AsymmetricVisibilityRewriter before CFG (#7099).
+     * php-src: Zend/zend_compile.c — zend_compile_property_info() on promoted params; set must not
+     * be more permissive than read (RFC asymmetric-visibility-v2, #7308).
      */
     private function verifyPromotedParam(string $classDisplay, string $propertyName, Param $param): void
     {

@@ -21,7 +21,7 @@ class C {
     protected public(set) string $x = 'a';
 }
 PHP,
-            AsymmetricVisibilityCompileCheck::MULTIPLE_MODIFIERS_MESSAGE
+            'must not be weaker than set visibility'
         );
     }
 
@@ -34,7 +34,7 @@ class C {
     private protected(set) string $x = 'a';
 }
 PHP,
-            AsymmetricVisibilityCompileCheck::MULTIPLE_MODIFIERS_MESSAGE
+            'must not be weaker than set visibility'
         );
     }
 
@@ -51,17 +51,30 @@ PHP,
         );
     }
 
-    public function testPublicPrivateSetCompileErrors(): void
+    public function testPublicPrivateSetCompiles(): void
     {
-        $this->expectCompileError(
-            <<<'PHP'
+        $runtime = new Runtime();
+        $block = $runtime->parseAndCompile(<<<'PHP'
 <?php
 class Demo {
     public private(set) string $name = 'a';
 }
-PHP,
-            AsymmetricVisibilityCompileCheck::MULTIPLE_MODIFIERS_MESSAGE
-        );
+PHP, 'asymmetric_explicit_read_set.php');
+        $this->assertNotNull($block);
+    }
+
+    public function testPromotedPublicPrivateSetCompiles(): void
+    {
+        $runtime = new Runtime();
+        $block = $runtime->parseAndCompile(<<<'PHP'
+<?php
+class User {
+    public function __construct(
+        public private(set) string $name,
+    ) {}
+}
+PHP, 'asymmetric_promoted_explicit.php');
+        $this->assertNotNull($block);
     }
 
     public function testValidPrivateSetStillCompiles(): void
@@ -74,21 +87,6 @@ class Demo {
 }
 PHP, 'asymmetric_ok.php');
         $this->assertNotNull($block);
-    }
-
-    public function testPromotedPublicPrivateSetCompileErrors(): void
-    {
-        $this->expectCompileError(
-            <<<'PHP'
-<?php
-class User {
-    public function __construct(
-        public private(set) string $name,
-    ) {}
-}
-PHP,
-            AsymmetricVisibilityCompileCheck::MULTIPLE_MODIFIERS_MESSAGE
-        );
     }
 
     public function testStaticPublicPrivateSetCompileErrors(): void
