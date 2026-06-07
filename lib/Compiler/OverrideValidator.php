@@ -98,9 +98,13 @@ final class OverrideValidator
     ): void {
         $methodLc = strtolower($method->func->name);
         $childClassLc = strtolower(ltrim($childClassName, '\\'));
-        $traitParent = null !== $classStmts
-            ? (TraitComposedMethodResolver::resolve($classStmts, $registry)[$methodLc] ?? null)
-            : null;
+        $traitParent = null;
+        if (null !== $classStmts) {
+            $composed = TraitComposedMethodResolver::resolve($classStmts, $registry);
+            $traitParent = $composed[$methodLc]
+                ?? TraitComposedMethodResolver::resolveAliasedOriginalMethods($classStmts, $registry)[$methodLc]
+                ?? null;
+        }
         if (
             !$registry->hasOverridableMethod($parentLc, $interfaceLcs, $methodLc, $childClassLc)
             && null === $traitParent

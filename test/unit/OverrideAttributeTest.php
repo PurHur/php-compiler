@@ -221,4 +221,22 @@ PHP;
         $runtime->run($runtime->parseAndCompile($code, 'override_protected_parent.php'));
         $this->assertSame("ok\n", ob_get_clean());
     }
+
+    public function testOverrideOnAliasedAwayTraitMethodNameCompiles(): void
+    {
+        $runtime = new Runtime();
+        $code = <<<'PHP'
+<?php
+trait T { public function f(): void { echo "t\n"; } }
+class C {
+    use T { f as protected other; }
+    #[\Override]
+    public function f(): void { echo "c\n"; }
+}
+(new C)->f();
+PHP;
+        ob_start();
+        $runtime->run($runtime->parseAndCompile($code, 'override_trait_alias_original.php'));
+        $this->assertSame("c\n", ob_get_clean());
+    }
 }
