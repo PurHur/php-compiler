@@ -66,6 +66,7 @@ final class EnumVMTest extends BaseTest
                 'enum_static_method.phpt',
                 'unit_enum_basic.phpt',
                 'unit_enum_case_name.phpt',
+                'enum_case_paren_invoke.phpt',
                 'enum_user_method.phpt',
                 'enum_throw_this_from_method.phpt',
                 'enum_backed_user_method.phpt',

@@ -8639,13 +8639,17 @@ class Compiler {
         if ($this->operandHasObjectType($operand)) {
             return true;
         }
-        if ($this->unwrapOperandChain($operand) instanceof Op\Expr\New_) {
+        $root = $this->unwrapOperandChain($operand);
+        if ($root instanceof Op\Expr\ClassConstFetch
+            && $this->classConstFetchIsInvokableEnumCase($root, $block)) {
+            return true;
+        }
+        if ($root instanceof Op\Expr\New_) {
             return true;
         }
         if (null === $block->orig) {
             return false;
         }
-        $root = $this->unwrapOperandChain($operand);
         foreach ($block->orig->children as $child) {
             if (!$child instanceof Op\Expr\Assign) {
                 continue;
@@ -8662,9 +8666,42 @@ class Compiler {
             if ($this->operandHasObjectType($child->expr)) {
                 return true;
             }
+            if ($child->expr instanceof Op\Expr\ClassConstFetch
+                && $this->classConstFetchIsInvokableEnumCase($child->expr, $block)) {
+                return true;
+            }
         }
 
         return false;
+    }
+
+    /**
+     * Parenthesized enum case `(E::A)()` is a callable object, not a string callee (#7386).
+     */
+    private function classConstFetchIsInvokableEnumCase(
+        Op\Expr\ClassConstFetch $fetch,
+        Block $block
+    ): bool {
+        $className = $this->staticNameFromOperand($fetch->class);
+        $constName = $this->staticNameFromOperand($fetch->name);
+        if (null === $className || null === $constName) {
+            return false;
+        }
+        $lcClass = $this->resolveDefaultClassConstScope($className, $block);
+        if (null === $lcClass) {
+            $lcClass = strtolower(ltrim($className, '\\'));
+        }
+        $lcConst = strtolower($constName);
+        if (isset($this->compileTimeEnumCaseConstNames[$lcClass][$lcConst])) {
+            return true;
+        }
+        if (!isset($this->compileTimeClassConsts[$lcClass][$lcConst])) {
+            return false;
+        }
+        $stored = $this->compileTimeClassConsts[$lcClass][$lcConst];
+
+        return Variable::TYPE_ENUM_CASE === $stored->type
+            || (Variable::TYPE_OBJECT === $stored->type && EnumCaseSupport::isEnumCase($stored->toObject()));
     }
 
     protected function operandDerivesFromClosure(Operand $operand): bool
