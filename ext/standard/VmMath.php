@@ -192,13 +192,45 @@ final class VmMath
     ): float {
         $var = $var->resolveIndirect();
         self::rejectEnumCaseDoubleBuiltinArg($var, $function, $argIndex, $paramName);
-        if (Variable::TYPE_INTEGER === $var->type) {
-            return (float) $var->toInt();
+        if (Variable::TYPE_ARRAY === $var->type) {
+            throw new \TypeError(self::doubleBuiltinTypeError($function, $argIndex, $paramName, 'array'));
         }
-        if (Variable::TYPE_FLOAT === $var->type) {
-            return $var->toFloat();
+        if (Variable::TYPE_OBJECT === $var->type) {
+            throw new \TypeError(
+                self::doubleBuiltinTypeError(
+                    $function,
+                    $argIndex,
+                    $paramName,
+                    $var->toObject()->class->name
+                )
+            );
         }
-        throw new \LogicException($function.'() only supports integers and floats in this compiler build');
+        switch ($var->type) {
+            case Variable::TYPE_INTEGER:
+                return (float) $var->toInt();
+            case Variable::TYPE_FLOAT:
+                return $var->toFloat();
+            case Variable::TYPE_BOOLEAN:
+                return $var->toBool() ? 1.0 : 0.0;
+            case Variable::TYPE_NULL:
+                return 0.0;
+            case Variable::TYPE_STRING:
+                $s = $var->toString();
+                if ('' === $s || !is_numeric($s)) {
+                    throw new \TypeError(self::doubleBuiltinTypeError($function, $argIndex, $paramName, 'string'));
+                }
+
+                return (float) $s;
+            default:
+                throw new \TypeError(
+                    self::doubleBuiltinTypeError(
+                        $function,
+                        $argIndex,
+                        $paramName,
+                        self::vmTypeName($var->type)
+                    )
+                );
+        }
     }
 
     /**

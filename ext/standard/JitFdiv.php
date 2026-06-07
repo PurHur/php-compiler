@@ -8,13 +8,14 @@ use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Builtin\TypeErrorRaise;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitLongArg;
+use PHPCompiler\JIT\JitStringArg;
 use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\Variable as VmVariable;
 use PHPLLVM\Builder;
 use PHPLLVM\Value;
 
-/** LLVM lowering for fdiv() operand coercion (php-src math.c; #6185 enum-case TypeError). */
+/** LLVM lowering for fdiv() operand coercion (php-src math.c; #4388, #6185 enum-case TypeError). */
 final class JitFdiv
 {
     private const FUNCTION = 'fdiv';
@@ -43,6 +44,14 @@ final class JitFdiv
         $double,
         string $function = self::FUNCTION
     ): Value {
+        if (JITVariable::TYPE_NULL === $arg->type) {
+            return $double->constReal(0.0);
+        }
+        if (($arg->type & JITVariable::IS_NATIVE_ARRAY) || JITVariable::TYPE_HASHTABLE === $arg->type) {
+            self::emitDoubleTypeErrorAndAbort($context, $argIndex, $paramName, 'array', $function);
+
+            return $double->constReal(0.0);
+        }
         if (JITVariable::TYPE_OBJECT === $arg->type) {
             self::emitDoubleTypeErrorAndAbort(
                 $context,
@@ -54,32 +63,63 @@ final class JitFdiv
 
             return $double->constReal(0.0);
         }
-        switch ($arg->type) {
-            case JITVariable::TYPE_NATIVE_LONG:
-                $v = JitLongArg::lower($context, $arg, $function.'() argument');
-
-                return $context->builder->siToFp($v, $double);
-            case JITVariable::TYPE_NATIVE_DOUBLE:
-                return $context->helper->loadValue($arg);
-            case JITVariable::TYPE_VALUE:
-                if (JitValueBox::isValueOperand($arg)) {
-                    return self::unboxValueToDouble($context, $arg, $double, $argIndex, $paramName, $function);
-                }
-                break;
-            default:
-                if (JitValueBox::isValueOperand($arg)) {
-                    return self::unboxValueToDouble($context, $arg, $double, $argIndex, $paramName, $function);
-                }
+        if (JITVariable::TYPE_NATIVE_DOUBLE === $arg->type) {
+            return $context->helper->loadValue($arg);
         }
-        throw new \LogicException($function.'() only supports integers and floats in this compiler build');
+        if (JITVariable::TYPE_STRING === $arg->type) {
+            return self::lowerStringOperand($context, $arg, $argIndex, $paramName, $double, $function);
+        }
+        if (JITVariable::TYPE_VALUE === $arg->type) {
+            return self::lowerBoxedOperand($context, $arg, $argIndex, $paramName, $double, $function);
+        }
+        if (JITVariable::TYPE_NATIVE_BOOL === $arg->type) {
+            return $context->builder->uiToFp($context->helper->loadValue($arg), $double);
+        }
+        if (JITVariable::TYPE_NATIVE_LONG === $arg->type) {
+            return $context->builder->siToFp(JitLongArg::lower($context, $arg, $function.'() argument'), $double);
+        }
+
+        throw new \LogicException($function.'() only supports numeric operands in this compiler build');
     }
 
-    private static function unboxValueToDouble(
+    private static function lowerStringOperand(
         Context $context,
         JITVariable $arg,
-        $double,
         int $argIndex,
         string $paramName,
+        $double,
+        string $function = self::FUNCTION
+    ): Value {
+        $strPtr = JitStringArg::lower($context, $arg, sprintf('%s() argument #%d', $function, $argIndex));
+
+        return self::lowerStringOperandFromPtr($context, $strPtr, $argIndex, $paramName, $double, $function);
+    }
+
+    private static function lowerStringOperandFromPtr(
+        Context $context,
+        Value $strPtr,
+        int $argIndex,
+        string $paramName,
+        $double,
+        string $function = self::FUNCTION
+    ): Value {
+        $isNumeric = self::stringPtrIsNumeric($context, $strPtr);
+        $okBlock = BasicBlockHelper::append($context, 'fdiv_str_ok');
+        $errBlock = BasicBlockHelper::append($context, 'fdiv_str_err');
+        $context->builder->branchIf($isNumeric, $okBlock, $errBlock);
+        $context->builder->positionAtEnd($errBlock);
+        self::emitDoubleTypeErrorAndAbort($context, $argIndex, $paramName, 'string', $function);
+        $context->builder->positionAtEnd($okBlock);
+
+        return self::stringPtrToDouble($context, $strPtr);
+    }
+
+    private static function lowerBoxedOperand(
+        Context $context,
+        JITVariable $arg,
+        int $argIndex,
+        string $paramName,
+        $double,
         string $function = self::FUNCTION
     ): Value {
         TypeErrorRaise::registerDeclarations($context);
@@ -90,13 +130,43 @@ final class JitFdiv
             $context->builder->structGep($valuePtr, $map['type'])
         );
         $i8 = $context->getTypeFromString('int8');
+        $nullTy = $i8->constInt(VmVariable::TYPE_NULL, false);
+        $arrayTy = $i8->constInt(VmVariable::TYPE_ARRAY, false);
+        $objectTy = $i8->constInt(VmVariable::TYPE_OBJECT, false);
         $enumCaseTy = $i8->constInt(VmVariable::TYPE_ENUM_CASE, false);
-        $isEnumCase = $context->builder->icmp(Builder::INT_EQ, $typeByte, $enumCaseTy);
-        $enumErrBlock = BasicBlockHelper::append($context, 'fdiv_box_enum_err');
-        $afterEnum = BasicBlockHelper::append($context, 'fdiv_box_after_enum');
-        $context->builder->branchIf($isEnumCase, $enumErrBlock, $afterEnum);
+        $doubleTy = $i8->constInt(VmVariable::TYPE_NATIVE_DOUBLE, false);
+        $stringTy = $i8->constInt(VmVariable::TYPE_STRING, false);
 
-        $context->builder->positionAtEnd($enumErrBlock);
+        $nullBlock = BasicBlockHelper::append($context, 'fdiv_box_null');
+        $afterNull = BasicBlockHelper::append($context, 'fdiv_box_after_null');
+        $arrayBlock = BasicBlockHelper::append($context, 'fdiv_box_array');
+        $enumBlock = BasicBlockHelper::append($context, 'fdiv_box_enum');
+        $objectBlock = BasicBlockHelper::append($context, 'fdiv_box_object');
+        $doubleBlock = BasicBlockHelper::append($context, 'fdiv_box_double');
+        $stringBlock = BasicBlockHelper::append($context, 'fdiv_box_string');
+        $coerceBlock = BasicBlockHelper::append($context, 'fdiv_box_coerce');
+        $mergeBlock = BasicBlockHelper::append($context, 'fdiv_box_merge');
+        $zero = $double->constReal(0.0);
+
+        $isNull = $context->builder->icmp(Builder::INT_EQ, $typeByte, $nullTy);
+        $context->builder->branchIf($isNull, $nullBlock, $afterNull);
+
+        $context->builder->positionAtEnd($nullBlock);
+        $context->builder->branch($mergeBlock);
+
+        $context->builder->positionAtEnd($afterNull);
+        $isArray = $context->builder->icmp(Builder::INT_EQ, $typeByte, $arrayTy);
+        $context->builder->branchIf($isArray, $arrayBlock, $enumBlock);
+
+        $context->builder->positionAtEnd($arrayBlock);
+        self::emitDoubleTypeErrorAndAbort($context, $argIndex, $paramName, 'array', $function);
+
+        $context->builder->positionAtEnd($enumBlock);
+        $isEnumCase = $context->builder->icmp(Builder::INT_EQ, $typeByte, $enumCaseTy);
+        $afterEnum = BasicBlockHelper::append($context, 'fdiv_box_after_enum');
+        $context->builder->branchIf($isEnumCase, $objectBlock, $afterEnum);
+
+        $context->builder->positionAtEnd($objectBlock);
         self::emitDoubleTypeErrorAndAbort(
             $context,
             $argIndex,
@@ -106,31 +176,129 @@ final class JitFdiv
         );
 
         $context->builder->positionAtEnd($afterEnum);
-        $isDouble = $context->builder->icmp(
-            Builder::INT_EQ,
-            $typeByte,
-            $i8->constInt(JITVariable::TYPE_NATIVE_DOUBLE, false)
-        );
-        $isLong = $context->builder->icmp(
-            Builder::INT_EQ,
-            $typeByte,
-            $i8->constInt(JITVariable::TYPE_NATIVE_LONG, false)
-        );
-        $readDouble = $context->builder->call(
-            $context->lookupFunction('__value__readDouble'),
-            $valuePtr
-        );
-        $readLong = $context->builder->call(
-            $context->lookupFunction('__value__readLong'),
-            $valuePtr
-        );
-        $fromLong = $context->builder->siToFp($readLong, $double);
+        $isObject = $context->builder->icmp(Builder::INT_EQ, $typeByte, $objectTy);
+        $objectErrBlock = BasicBlockHelper::append($context, 'fdiv_box_object_err');
+        $afterObject = BasicBlockHelper::append($context, 'fdiv_box_after_object');
+        $context->builder->branchIf($isObject, $objectErrBlock, $afterObject);
 
-        return $context->builder->select(
-            $isDouble,
-            $readDouble,
-            $context->builder->select($isLong, $fromLong, $double->constReal(0.0))
+        $context->builder->positionAtEnd($objectErrBlock);
+        self::emitDoubleTypeErrorAndAbort(
+            $context,
+            $argIndex,
+            $paramName,
+            self::compileTimeObjectGivenLabel($context, $arg),
+            $function
         );
+
+        $context->builder->positionAtEnd($afterObject);
+        $isDouble = $context->builder->icmp(Builder::INT_EQ, $typeByte, $doubleTy);
+        $context->builder->branchIf($isDouble, $doubleBlock, $stringBlock);
+
+        $context->builder->positionAtEnd($doubleBlock);
+        $doubleVal = $context->builder->call($context->lookupFunction('__value__readDouble'), $valuePtr);
+        $doubleEnd = $context->builder->getInsertBlock();
+        $context->builder->branch($mergeBlock);
+
+        $context->builder->positionAtEnd($stringBlock);
+        $isString = $context->builder->icmp(Builder::INT_EQ, $typeByte, $stringTy);
+        $stringCoerce = BasicBlockHelper::append($context, 'fdiv_box_string_coerce');
+        $context->builder->branchIf($isString, $stringCoerce, $coerceBlock);
+
+        $context->builder->positionAtEnd($stringCoerce);
+        $strVal = $context->builder->call($context->lookupFunction('__value__readString'), $valuePtr);
+        $strDouble = self::lowerStringOperandFromPtr($context, $strVal, $argIndex, $paramName, $double, $function);
+        $stringEnd = $context->builder->getInsertBlock();
+        $context->builder->branch($mergeBlock);
+
+        $context->builder->positionAtEnd($coerceBlock);
+        $longVal = $context->builder->call($context->lookupFunction('__value__readLong'), $valuePtr);
+        $coerced = $context->builder->siToFp($longVal, $double);
+        $coerceEnd = $context->builder->getInsertBlock();
+        $context->builder->branch($mergeBlock);
+
+        $context->builder->positionAtEnd($mergeBlock);
+        $phi = $context->builder->phi($double, 'fdiv_box_phi');
+        $phi->addIncoming($zero, $nullBlock);
+        $phi->addIncoming($doubleVal, $doubleEnd);
+        $phi->addIncoming($strDouble, $stringEnd);
+        $phi->addIncoming($coerced, $coerceEnd);
+
+        return $phi;
+    }
+
+    private static function stringPtrIsNumeric(Context $context, Value $strPtr): Value
+    {
+        $isIntNumeric = self::stringPtrIsIntegerNumeric($context, $strPtr);
+
+        return $context->builder->or(
+            $isIntNumeric,
+            self::stringPtrIsDoubleNumeric($context, $strPtr)
+        );
+    }
+
+    private static function stringPtrIsIntegerNumeric(Context $context, Value $strPtr): Value
+    {
+        $map = $context->structFieldMap['__string__'];
+        $i64 = $context->getTypeFromString('int64');
+        $i8p = $context->getTypeFromString('int8*');
+        $len = $context->builder->load(
+            $context->builder->structGep($strPtr, $map['length'])
+        );
+        $isEmpty = $context->builder->icmp(Builder::INT_EQ, $len, $i64->constInt(0, false));
+        $charPtr = $context->builder->structGep($strPtr, $map['value']);
+        $endPtrSlot = $context->builder->alloca($i8p, 1, 'fdiv_strtol_end');
+        $context->builder->store($i8p->constNull(), $endPtrSlot);
+        $context->builder->call(
+            $context->lookupFunction('strtol'),
+            $charPtr,
+            $endPtrSlot,
+            $context->getTypeFromString('int32')->constInt(10, false)
+        );
+        $endPtr = $context->builder->load($endPtrSlot);
+        $endOffset = $context->builder->sub(
+            $context->builder->ptrToInt($endPtr, $i64),
+            $context->builder->ptrToInt($charPtr, $i64)
+        );
+        $consumed = $context->builder->icmp(Builder::INT_NE, $endOffset, $i64->constInt(0, false));
+
+        return $context->builder->and(
+            $context->builder->not($isEmpty),
+            $consumed
+        );
+    }
+
+    private static function stringPtrIsDoubleNumeric(Context $context, Value $strPtr): Value
+    {
+        $map = $context->structFieldMap['__string__'];
+        $i64 = $context->getTypeFromString('int64');
+        $i8p = $context->getTypeFromString('int8*');
+        $len = $context->builder->load(
+            $context->builder->structGep($strPtr, $map['length'])
+        );
+        $charPtr = $context->builder->structGep($strPtr, $map['value']);
+        $endPtrSlot = $context->builder->alloca($i8p, 1, 'fdiv_strtod_end');
+        $context->builder->store($i8p->constNull(), $endPtrSlot);
+        $context->builder->call(
+            $context->lookupFunction('strtod'),
+            $charPtr,
+            $endPtrSlot
+        );
+        $endPtr = $context->builder->load($endPtrSlot);
+        $endOffset = $context->builder->sub(
+            $context->builder->ptrToInt($endPtr, $i64),
+            $context->builder->ptrToInt($charPtr, $i64)
+        );
+
+        return $context->builder->icmp(Builder::INT_EQ, $endOffset, $len);
+    }
+
+    private static function stringPtrToDouble(Context $context, Value $strPtr): Value
+    {
+        $map = $context->structFieldMap['__string__'];
+        $charPtr = $context->builder->structGep($strPtr, $map['value']);
+        $endPtr = $context->getTypeFromString('int8**')->constNull();
+
+        return $context->builder->call($context->lookupFunction('strtod'), $charPtr, $endPtr);
     }
 
     private static function compileTimeObjectGivenLabel(Context $context, JITVariable $arg): string
