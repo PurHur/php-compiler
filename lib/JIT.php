@@ -11112,7 +11112,8 @@ class JIT {
         );
         $proxyName = $this->resolveJitStaticMethodProxyName($declaringClassLc, $methodLc);
         if (!$this->context->functionIsRegistered($proxyName)) {
-            if ($this->context->type->object->isEnumClassLc($declaringClassLc) && 'cases' === $methodLc) {
+            if ($this->context->type->object->isEnumClassLc($declaringClassLc)
+                && \in_array($methodLc, ['cases', 'from', 'tryfrom'], true)) {
                 $this->context->type->object->finishEnumClass($declaringClassId);
             }
         }

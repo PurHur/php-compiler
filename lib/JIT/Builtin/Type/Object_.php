@@ -19,6 +19,7 @@ use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\ClassConstFetchHelper;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\EnumCasesHelper;
+use PHPCompiler\JIT\EnumFromHelper;
 use PHPCompiler\JIT\FiberHelper;
 use PHPCompiler\JIT\GeneratorHelper;
 use PHPCompiler\JIT\Builtin\Refcount;
@@ -1604,6 +1605,11 @@ class Object_ extends Type {
         return null !== ($this->enumBackedType[$classId] ?? null);
     }
 
+    public function enumBackedTypeFor(int $classId): ?string
+    {
+        return $this->enumBackedType[$classId] ?? null;
+    }
+
     public function isEnumClassLc(string $classLc): bool
     {
         return isset($this->enums[strtolower(ltrim($classLc, '\\'))]);
@@ -1613,6 +1619,17 @@ class Object_ extends Type {
     public function enumCaseOrderForClass(int $classId): array
     {
         return $this->enumCaseOrder[$classId] ?? [];
+    }
+
+    /** @return int|float|bool|string|null */
+    public function enumCaseBackingScalarForCase(int $classId, string $caseKey): int|float|bool|string|null
+    {
+        $key = strtolower($caseKey);
+        if (!isset($this->classConstants[$classId][$key])) {
+            throw new \LogicException('Unknown enum case backing: '.$caseKey);
+        }
+
+        return $this->classConstants[$classId][$key]['value'];
     }
 
     public function enumCaseCanonicalName(int $classId, string $caseKey): string
@@ -1630,6 +1647,7 @@ class Object_ extends Type {
                 \PHPCfg\Func::FLAG_PUBLIC | \PHPCfg\Func::FLAG_STATIC,
                 'cases'
             );
+            EnumFromHelper::registerFromMethods($this->context, $this, $classId);
         }
     }
 
