@@ -10,7 +10,7 @@ use PHPUnit\Framework\TestCase;
  * AOT: parse_str-style QUERY_STRING with nested keys (C runtime refresh).
  *
  * Compiled script reads a flat key; QUERY_STRING also carries nested params to
- * exercise the bracket parser in lib/AOT/runtime/superglobals_refresh.c.
+ * exercise bracket parsing via StringParseStrJit LLVM (not C in superglobals_refresh.c, #7302).
  *
  * @group llvm
  * @group aot

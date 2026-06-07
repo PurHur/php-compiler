@@ -30,6 +30,12 @@ final class StringParseStrJit
 
     private const APPEND_OFF = 136;
 
+    /** Standalone AOT: bracket/delimited-pair helpers for superglobals_refresh.c (#7302). */
+    public static function ensureStandaloneBodies(Context $context): void
+    {
+        self::implement($context);
+    }
+
     public static function implement(Context $context): void
     {
         $restore = self::captureInsertBlock($context);
@@ -47,6 +53,7 @@ final class StringParseStrJit
         self::implementIfMissing($context, '__phpc_parse_str_cstr_to_string', self::emitCstrToString(...));
         self::implementIfMissing($context, '__phpc_parse_str_set_string_key', self::emitSetStringKey(...));
         self::implementIfMissing($context, '__phpc_parse_str_url_decode_inplace', self::emitUrlDecodeInplace(...));
+        self::implementIfMissing($context, '__phpc_parse_str_trim_ws_inplace', self::emitTrimWsInplace(...));
         self::implementIfMissing($context, '__phpc_parse_str_free_parsed_key', self::emitFreeParsedKey(...));
         self::implementIfMissing($context, '__phpc_parse_str_parse_key_brackets', self::emitParseKeyBrackets(...));
         self::implementIfMissing($context, '__phpc_parse_str_ensure_child', self::emitEnsureChild(...));
@@ -104,6 +111,10 @@ final class StringParseStrJit
                 $name,
                 $context->context->functionType($void, false, $i8p)
             ),
+            '__phpc_parse_str_trim_ws_inplace' => $context->module->addFunction(
+                $name,
+                $context->context->functionType($void, false, $i8p)
+            ),
             '__phpc_parse_str_free_parsed_key' => $context->module->addFunction(
                 $name,
                 $context->context->functionType($void, false, $voidPtr)
@@ -122,7 +133,7 @@ final class StringParseStrJit
             ),
             '__phpc_parse_str_parse_delimited_pairs' => $context->module->addFunction(
                 $name,
-                $context->context->functionType($void, false, $htPtr, $i8p, $i8)
+                $context->context->functionType($void, false, $htPtr, $i8p, $i8, $i32)
             ),
             '__compiler_parse_str' => $context->module->addFunction(
                 $name,
@@ -148,6 +159,11 @@ final class StringParseStrJit
         self::ensureExternal(
             $context,
             'memcpy',
+            $context->context->functionType($voidPtr, false, $voidPtr, $voidPtr, $sizeT)
+        );
+        self::ensureExternal(
+            $context,
+            'memmove',
             $context->context->functionType($voidPtr, false, $voidPtr, $voidPtr, $sizeT)
         );
         self::ensureExternal($context, 'strlen', $context->context->functionType($sizeT, false, $i8p));
@@ -324,6 +340,106 @@ final class StringParseStrJit
         $w = $context->builder->load($wSlot);
         $context->builder->store($zero, $w);
         $context->builder->returnVoid();
+    }
+
+    private static function emitTrimWsInplace(Context $context, LlvmFunction $fn): void
+    {
+        $entry = $fn->appendBasicBlock('entry');
+        $context->builder->positionAtEnd($entry);
+
+        $i8 = $context->getTypeFromString('int8');
+        $i32 = $context->getTypeFromString('int32');
+        $i64 = $context->getTypeFromString('int64');
+        $sizeT = $context->getTypeFromString('size_t');
+        $i8p = $context->getTypeFromString('int8*');
+        $voidPtr = $context->getTypeFromString('void*');
+        $zero = $i8->constInt(0, false);
+        $one = $i64->constInt(1, false);
+        $s = $fn->getParam(0);
+
+        $startSlot = BasicBlockHelper::entryAlloca($context, $i8p);
+        $context->builder->store($s, $startSlot);
+
+        $leadHead = $fn->appendBasicBlock('trim_lead_head');
+        $leadBody = $fn->appendBasicBlock('trim_lead_body');
+        $leadDone = $fn->appendBasicBlock('trim_lead_done');
+        $context->builder->branch($leadHead);
+
+        $context->builder->positionAtEnd($leadHead);
+        $start = $context->builder->load($startSlot);
+        $ch = $context->builder->load($start);
+        $atEnd = $context->builder->icmp(Builder::INT_EQ, $ch, $zero);
+        $isWs = self::isTrimWs($context, $ch);
+        $advance = $context->builder->and($context->builder->not($atEnd), $isWs);
+        $context->builder->branchIf($advance, $leadBody, $leadDone);
+
+        $context->builder->positionAtEnd($leadBody);
+        $start = $context->builder->load($startSlot);
+        $context->builder->store($context->builder->inBoundsGEP($start, $one), $startSlot);
+        $context->builder->branch($leadHead);
+
+        $context->builder->positionAtEnd($leadDone);
+        $start = $context->builder->load($startSlot);
+        $moved = $context->builder->icmp(Builder::INT_NE, $start, $s);
+        $moveBb = $fn->appendBasicBlock('trim_move');
+        $tailBb = $fn->appendBasicBlock('trim_tail');
+        $context->builder->branchIf($moved, $moveBb, $tailBb);
+
+        $context->builder->positionAtEnd($moveBb);
+        $start = $context->builder->load($startSlot);
+        $restLen = $context->builder->call($context->lookupFunction('strlen'), $start);
+        $restLenPlus = $context->builder->add($restLen, $one);
+        $context->builder->call(
+            $context->lookupFunction('memmove'),
+            $context->builder->pointerCast($s, $voidPtr),
+            $context->builder->pointerCast($start, $voidPtr),
+            $context->builder->truncOrBitCast($restLenPlus, $sizeT)
+        );
+        $context->builder->branch($tailBb);
+
+        $context->builder->positionAtEnd($tailBb);
+        $len = $context->builder->call($context->lookupFunction('strlen'), $s);
+        $endSlot = BasicBlockHelper::entryAlloca($context, $i8p);
+        $context->builder->store($context->builder->inBoundsGEP($s, $len), $endSlot);
+
+        $tailHead = $fn->appendBasicBlock('trim_tail_head');
+        $tailBody = $fn->appendBasicBlock('trim_tail_body');
+        $tailDone = $fn->appendBasicBlock('trim_tail_done');
+        $context->builder->branch($tailHead);
+
+        $context->builder->positionAtEnd($tailHead);
+        $end = $context->builder->load($endSlot);
+        $beforeStart = $context->builder->icmp(Builder::INT_SLE, $end, $s);
+        $ch = $context->builder->load($context->builder->inBoundsGEP($end, $i64->constInt(-1, true)));
+        $isWs = self::isTrimWs($context, $ch);
+        $shrink = $context->builder->and($context->builder->not($beforeStart), $isWs);
+        $context->builder->branchIf($shrink, $tailBody, $tailDone);
+
+        $context->builder->positionAtEnd($tailBody);
+        $end = $context->builder->load($endSlot);
+        $context->builder->store($context->builder->inBoundsGEP($end, $i64->constInt(-1, true)), $endSlot);
+        $context->builder->branch($tailHead);
+
+        $context->builder->positionAtEnd($tailDone);
+        $end = $context->builder->load($endSlot);
+        $context->builder->store($zero, $end);
+        $context->builder->returnVoid();
+    }
+
+    private static function isTrimWs(Context $context, Value $ch): Value
+    {
+        $i8 = $context->getTypeFromString('int8');
+
+        return $context->builder->or(
+            $context->builder->icmp(Builder::INT_EQ, $ch, $i8->constInt(32, false)),
+            $context->builder->or(
+                $context->builder->icmp(Builder::INT_EQ, $ch, $i8->constInt(9, false)),
+                $context->builder->or(
+                    $context->builder->icmp(Builder::INT_EQ, $ch, $i8->constInt(13, false)),
+                    $context->builder->icmp(Builder::INT_EQ, $ch, $i8->constInt(10, false))
+                )
+            )
+        );
     }
 
     private static function isHex(Context $context, Value $ch): Value
@@ -699,6 +815,7 @@ final class StringParseStrJit
         $ht = $fn->getParam(0);
         $body = $fn->getParam(1);
         $delimiter = $fn->getParam(2);
+        $decodePairFirst = $fn->getParam(3);
         $i8 = $context->getTypeFromString('int8');
         $i32 = $context->getTypeFromString('int32');
         $i64 = $context->getTypeFromString('int64');
@@ -755,6 +872,19 @@ final class StringParseStrJit
 
         $context->builder->positionAtEnd($loopBody);
         $pair = $context->builder->load($pairSlot);
+        $decodeFirst = $context->builder->icmp(Builder::INT_NE, $decodePairFirst, $i32->constInt(0, false));
+        $cookieBb = $fn->appendBasicBlock('pdp_cookie');
+        $splitStartBb = $fn->appendBasicBlock('pdp_split_start');
+        $context->builder->branchIf($decodeFirst, $cookieBb, $splitStartBb);
+
+        $context->builder->positionAtEnd($cookieBb);
+        $pair = $context->builder->load($pairSlot);
+        $context->builder->call($context->lookupFunction('__phpc_parse_str_trim_ws_inplace'), $pair);
+        $context->builder->call($context->lookupFunction('__phpc_parse_str_url_decode_inplace'), $pair);
+        $context->builder->branch($splitStartBb);
+
+        $context->builder->positionAtEnd($splitStartBb);
+        $pair = $context->builder->load($pairSlot);
         $eq = $context->builder->call($context->lookupFunction('strchr'), $pair, $i32->constInt(61, false));
         $hasEq = $context->builder->icmp(Builder::INT_NE, $eq, $i8p->constNull());
         $keySlot = BasicBlockHelper::entryAlloca($context, $i8p);
@@ -789,8 +919,19 @@ final class StringParseStrJit
         $context->builder->positionAtEnd($decodeBb);
         $rawKey = $context->builder->load($keySlot);
         $rawVal = $context->builder->load($valSlot);
-        $context->builder->call($context->lookupFunction('__phpc_parse_str_url_decode_inplace'), $rawKey);
-        $context->builder->call($context->lookupFunction('__phpc_parse_str_url_decode_inplace'), $rawVal);
+        $skipDecode = $context->builder->icmp(Builder::INT_NE, $decodePairFirst, $i32->constInt(0, false));
+        $afterDecodeBb = $fn->appendBasicBlock('pdp_after_decode');
+        $doDecodeBb = $fn->appendBasicBlock('pdp_do_decode');
+        $context->builder->branchIf($skipDecode, $afterDecodeBb, $doDecodeBb);
+
+        $context->builder->positionAtEnd($doDecodeBb);
+        $context->builder->call($context->lookupFunction('__phpc_parse_str_url_decode_inplace'), $context->builder->load($keySlot));
+        $context->builder->call($context->lookupFunction('__phpc_parse_str_url_decode_inplace'), $context->builder->load($valSlot));
+        $context->builder->branch($afterDecodeBb);
+
+        $context->builder->positionAtEnd($afterDecodeBb);
+        $rawKey = $context->builder->load($keySlot);
+        $rawVal = $context->builder->load($valSlot);
         $bracket = self::cstrLiteral($context, '[');
         $hasBracket = $context->builder->icmp(
             Builder::INT_NE,
@@ -885,11 +1026,13 @@ final class StringParseStrJit
         $data = $context->builder->structGep($encoded, $strMap['value']);
         $body = $context->builder->pointerCast($data, $i8p);
         $amp = $context->getTypeFromString('int8')->constInt(38, false);
+        $zeroI32 = $context->getTypeFromString('int32')->constInt(0, false);
         $context->builder->call(
             $context->lookupFunction('__phpc_parse_str_parse_delimited_pairs'),
             $dest,
             $body,
-            $amp
+            $amp,
+            $zeroI32
         );
         $context->builder->returnVoid();
     }
