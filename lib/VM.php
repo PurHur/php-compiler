@@ -6206,6 +6206,10 @@ restart:
      */
     private function executeInternalHandler(Frame $handlerFrame, Frame $callerFrame): ?Frame
     {
+        // Void builtin calls omit returnVar; handlers must still run validation/throws (#4866).
+        if (null === $handlerFrame->returnVar) {
+            $handlerFrame->returnVar = new Variable();
+        }
         try {
             $handlerFrame->handler->execute($handlerFrame);
 
@@ -6242,11 +6246,9 @@ restart:
             return null;
         } catch (ScriptExit $e) {
             throw $e;
+        } catch (\LogicException $e) {
+            return $this->dispatchVmLogicException($e, $callerFrame);
         } catch (\Exception $e) {
-            if ($e instanceof \LogicException) {
-                throw $e;
-            }
-
             return $this->dispatchVmEngineException($e->getMessage(), $callerFrame);
         } catch (VM\MagicMethodInvocationAborted) {
             $this->clearTryCatchUnwindState();
@@ -6275,6 +6277,25 @@ restart:
     private function dispatchVmEngineException(string $message, Frame $frame): ?Frame
     {
         $thrown = $this->makeEngineError($message, 'Exception');
+        $catchFrame = $this->findCatchFrameForThrow($frame, $thrown);
+        if (null !== $catchFrame) {
+            return $catchFrame;
+        }
+        $this->raiseUncaughtException($thrown);
+
+        return null;
+    }
+
+    /** Bridge native LogicException from stdlib builtins into user catch handlers (#4866). */
+    private function dispatchVmLogicException(\LogicException $error, Frame $frame): ?Frame
+    {
+        [$file, $line] = VM\ExceptionSupport::userFatalSite($frame);
+        $thrown = VM\BuiltinExceptionSupport::materializeLogicException(
+            $this->context,
+            $error->getMessage(),
+            $file,
+            $line
+        );
         $catchFrame = $this->findCatchFrameForThrow($frame, $thrown);
         if (null !== $catchFrame) {
             return $catchFrame;
