@@ -14,7 +14,7 @@ namespace PHPCompiler\ext\standard;
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Context;
-use PHPCompiler\JIT\JitLongArg;
+use PHPCompiler\JIT\JitResourceArg;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
@@ -50,17 +50,8 @@ final class is_resource_ extends Internal
             throw new \LogicException('is_resource() requires exactly one argument');
         }
         \PHPCompiler\JIT\Builtin\StringDir::ensureLinked($context);
-        if (JITVariable::TYPE_NULL === $args[0]->type) {
-            return $context->constantFromBool(false);
-        }
 
-        return JitIsResource::invoke(
-            $context,
-            $context->builder->truncOrBitCast(
-                JitLongArg::lower($context, $args[0], 'is_resource() argument #1'),
-                $context->getTypeFromString('int64')
-            )
-        );
+        return JitResourceArg::lowerIsResource($context, $args[0]);
     }
 
     public static function isResource(Variable $v): bool
