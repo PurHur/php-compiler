@@ -493,6 +493,8 @@ final class BuiltinClasses
 
     private static function registerDateTime(Context $ctx): void
     {
+        DateTimeInterfaceSupport::register($ctx);
+
         $strProto = new Variable(Variable::TYPE_STRING);
         $intProto = new Variable(Variable::TYPE_INTEGER);
         $pub = CfgFunc::FLAG_PUBLIC;
@@ -505,6 +507,7 @@ final class BuiltinClasses
         $ctx->classes[DateTimeSupport::CLASS_DATETIMEZONE] = $tz;
 
         $dt = new ClassEntry('DateTime');
+        $dt->interfaces = [DateTimeSupport::CLASS_DATETIMEINTERFACE];
         $dt->properties[] = new ClassProperty(DateTimeSupport::TS_PROPERTY, null, $intProto);
         $dt->properties[] = new ClassProperty(DateTimeSupport::TZ_PROPERTY, null, $strProto);
         $dt->constructor = new DateTimeConstruct();

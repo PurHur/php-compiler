@@ -17,6 +17,7 @@ final class DateTimeSupport
 
     public const CLASS_DATETIME = 'datetime';
     public const CLASS_DATETIMEZONE = 'datetimezone';
+    public const CLASS_DATETIMEINTERFACE = DateTimeInterfaceSupport::INTERFACE_LC;
 
     public static function requireDateTimeZone(Variable $var, string $label): ObjectEntry
     {
