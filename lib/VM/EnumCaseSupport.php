@@ -257,6 +257,45 @@ final class EnumCaseSupport
     }
 
     /**
+     * Transitive ordering for sort()/asort() on enum case arrays (#5546, php-src array.c php_array_compare_transitive).
+     *
+     * Backed enums: backing scalar spaceship. Unit enums: object handle (spl_object_id order).
+     */
+    public static function compareEnumCasesForSort(Variable $left, Variable $right): int
+    {
+        [$leftClass, $leftName] = self::resolveEnumCaseIdentity($left);
+        [$rightClass, $rightName] = self::resolveEnumCaseIdentity($right);
+        if (null === $leftClass || null === $rightClass) {
+            return 1;
+        }
+        if ($leftClass !== $rightClass) {
+            return strcmp($leftClass->name, $rightClass->name);
+        }
+        if ($leftName === $rightName) {
+            return 0;
+        }
+        if (null !== $leftClass->backedType) {
+            return Variable::spaceshipCompare(
+                self::backingValueForMinMax($left),
+                self::backingValueForMinMax($right)
+            );
+        }
+
+        return self::objectIdForEnumSort($left) <=> self::objectIdForEnumSort($right);
+    }
+
+    private static function objectIdForEnumSort(Variable $value): int
+    {
+        $value = $value->resolveIndirect();
+        if (Variable::TYPE_OBJECT === $value->type && self::isEnumCase($value->toObject())) {
+            return $value->toObject()->id;
+        }
+        [$enumClass, $caseName] = self::resolveEnumCaseIdentity($value);
+
+        return self::enumCaseDeclarationOrdinal($enumClass, $caseName);
+    }
+
+    /**
      * Zend {@see zend_compare()} for enum case objects (#4700).
      *
      * Same enum + same declared case name: equal. Different cases or enums: not equal.

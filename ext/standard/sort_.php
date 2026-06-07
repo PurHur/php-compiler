@@ -16,6 +16,7 @@ use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\ArrayBuiltinHelper;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\Variable as JITVariable;
+use PHPCompiler\VM\EnumCaseSupport;
 use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
 
@@ -87,8 +88,8 @@ final class sort_ extends Internal
                     --$j;
                 }
             }
-        } elseif (Variable::TYPE_OBJECT === $first->type) {
-            self::assertHomogeneousObjectValues($values);
+        } elseif (Variable::TYPE_OBJECT === $first->type || EnumCaseSupport::isEnumCaseVariable($first)) {
+            self::assertHomogeneousEnumOrObjectValues($values);
             if (self::objectSortUsesSpaceship($flags)) {
                 VmInternalCompare::sortVariableValuesBySpaceship($values);
             } else {
@@ -181,10 +182,14 @@ final class sort_ extends Internal
     /**
      * @param list<Variable> $values
      */
-    private static function assertHomogeneousObjectValues(array $values): void
+    private static function assertHomogeneousEnumOrObjectValues(array $values): void
     {
         foreach ($values as $value) {
-            if (Variable::TYPE_OBJECT !== $value->resolveIndirect()->type) {
+            $resolved = $value->resolveIndirect();
+            if (EnumCaseSupport::isEnumCaseVariable($resolved)) {
+                continue;
+            }
+            if (Variable::TYPE_OBJECT !== $resolved->type) {
                 throw new \LogicException(
                     'sort() only supports homogeneous object arrays in this compiler build'
                 );

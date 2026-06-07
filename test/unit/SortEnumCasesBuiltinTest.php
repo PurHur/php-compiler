@@ -1,0 +1,46 @@
+<?php
+
+declare(strict_types=1);
+
+namespace PHPCompiler;
+
+use PHPUnit\Framework\TestCase;
+
+/**
+ * sort() on enum case arrays — transitive compare parity (#5546).
+ */
+final class SortEnumCasesBuiltinTest extends TestCase
+{
+    public function testBackedEnumSortPreservesObjectsAndOrdersByBacking(): void
+    {
+        ob_start();
+        $runtime = new Runtime();
+        $runtime->run($runtime->parseAndCompile(<<<'PHP'
+<?php
+enum EInt: int { case A = 1; case B = 2; case C = 3; }
+$a = [EInt::C, EInt::A, EInt::B];
+sort($a);
+echo implode(',', array_map(fn($v) => $v->name.':'.(int) ($v instanceof EInt), $a));
+PHP, 'sort_backed_enum.php'));
+        $output = ob_get_clean();
+
+        $this->assertSame('A:1,B:1,C:1', $output);
+    }
+
+    public function testUnitEnumSortPreservesObjects(): void
+    {
+        ob_start();
+        $runtime = new Runtime();
+        $runtime->run($runtime->parseAndCompile(<<<'PHP'
+<?php
+enum EUnit { case A; case B; }
+$b = [EUnit::B, EUnit::A];
+sort($b);
+echo implode(',', array_map(fn($v) => $v->name.':'.(int) ($v instanceof EUnit), $b));
+PHP, 'sort_unit_enum.php'));
+        $output = ob_get_clean();
+
+        $this->assertSame('A:1,B:1', $output);
+        $this->assertStringNotContainsString(':0', $output);
+    }
+}
