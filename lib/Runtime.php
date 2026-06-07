@@ -27,6 +27,7 @@ use PHPCompiler\JIT\Context as JITContext;
 use PHPCompiler\Ast\AsymmetricVisibilityRewriter;
 use PHPCompiler\Ast\GlobalTypedConstRewriter;
 use PHPCompiler\Ast\GroupUseStripper;
+use PHPCompiler\Ast\MultiBlockNameResolver;
 use PHPCompiler\Ast\SealedClassAnnotator;
 use PHPCompiler\Ast\SealedClassPreprocessor;
 use PHPCompiler\Ast\StaticClassAnnotator;
@@ -114,9 +115,7 @@ class Runtime {
     /** PhpParser + PHPCfg traversers; LLVM 9 crashes when inlined in __construct (#1402, #1494). */
     private function initParsePipeline(): void {
         $astTraverser = new NodeTraverser;
-        $astTraverser->addVisitor(
-            new NodeVisitor\NameResolver
-        );
+        $astTraverser->addVisitor(new MultiBlockNameResolver());
         $astTraverser->addVisitor(new Ast\EnumCaseImportRewriter());
         $astTraverser->addVisitor(new Ast\EnumCaseMatchSwitchRewriter());
         $astTraverser->addVisitor(new GroupUseStripper());
