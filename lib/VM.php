@@ -326,15 +326,82 @@ class VM {
         return VM\InterfaceCheck::entryImplements($object->class, 'arrayaccess', $this->context);
     }
 
-    /** Array or ArrayAccess RHS for guarded list destructuring (#4325, #7440). */
+    /** Array, ArrayAccess, or Traversable RHS for guarded list destructuring (#4325, #7440, #7452). */
     private function variableIsListDestructUnpackable(Variable $value): bool
     {
+        $value = $value->resolveIndirect();
         if (Variable::TYPE_ARRAY === $value->type) {
             return true;
         }
+        if (Variable::TYPE_OBJECT !== $value->type) {
+            return false;
+        }
+        if ($this->objectImplementsArrayAccess($value->toObject())) {
+            return true;
+        }
 
-        return Variable::TYPE_OBJECT === $value->type
-            && $this->objectImplementsArrayAccess($value->toObject());
+        return VM\IterableCheck::isIterable($value, $this->context);
+    }
+
+    /**
+     * Materialize Iterator / Generator RHS into a packed list array for integer-key dim fetches (#7452).
+     */
+    private function materializeListDestructIterableRhs(Variable $rhsSlot, Frame $frame): ?Frame
+    {
+        $unpack = $rhsSlot->resolveIndirect();
+        if (Variable::TYPE_ARRAY === $unpack->type) {
+            return null;
+        }
+        if (
+            Variable::TYPE_OBJECT === $unpack->type
+            && $this->objectImplementsArrayAccess($unpack->toObject())
+        ) {
+            return null;
+        }
+        if (!VM\IterableCheck::isIterable($unpack, $this->context)) {
+            return null;
+        }
+
+        $ht = new HashTable();
+        if (Variable::TYPE_OBJECT === $unpack->type && $this->variableIsGenerator($unpack)) {
+            $gen = $unpack->toObject()->generatorState;
+            $gen->rewind();
+            $index = 0;
+            while ($this->advanceGeneratorIteration($gen)) {
+                $packedKey = new Variable();
+                $packedKey->int($index++);
+                self::appendHashTableEntry($ht, $packedKey, $gen->currentValue);
+            }
+        } elseif (Variable::TYPE_OBJECT === $unpack->type) {
+            try {
+                $iterable = VM\ForeachIterator::resolveTraversableObject($this, $frame, $unpack);
+            } catch (\TypeError $e) {
+                return $this->dispatchVmTypeError($e, $frame);
+            }
+            if ($this->variableIsGenerator($iterable)) {
+                $gen = $iterable->toObject()->generatorState;
+                $gen->rewind();
+                $index = 0;
+                while ($this->advanceGeneratorIteration($gen)) {
+                    $packedKey = new Variable();
+                    $packedKey->int($index++);
+                    self::appendHashTableEntry($ht, $packedKey, $gen->currentValue);
+                }
+            } else {
+                $this->invokeForeachInstanceMethod($frame, $iterable, 'rewind');
+                $index = 0;
+                while ($this->invokeForeachInstanceMethod($frame, $iterable, 'valid')->toBool()) {
+                    $current = $this->invokeForeachInstanceMethod($frame, $iterable, 'current');
+                    $packedKey = new Variable();
+                    $packedKey->int($index++);
+                    self::appendHashTableEntry($ht, $packedKey, $current);
+                    $this->invokeForeachInstanceMethod($frame, $iterable, 'next');
+                }
+            }
+        }
+        $rhsSlot->array($ht);
+
+        return null;
     }
 
     public function invokeArrayAccessOffsetGet(
@@ -2034,10 +2101,16 @@ restart:
                     $this->markFunctionStaticInitializedForFrame($frame, $storeKey);
                     break;
                 case OpCode::TYPE_LIST_UNPACK_CHECK:
-                    $unpack = $frame->scope[$op->arg2]->resolveIndirect();
+                    $unpackSlot = $frame->scope[$op->arg2];
+                    $unpack = $unpackSlot->resolveIndirect();
                     if (null !== $op->block1) {
                         if (!$this->variableIsListDestructUnpackable($unpack)) {
                             $frame = $this->frameForBranch($frame, $op->block1);
+                            goto restart;
+                        }
+                        $catchFrame = $this->materializeListDestructIterableRhs($unpackSlot, $frame);
+                        if (null !== $catchFrame) {
+                            $frame = $catchFrame;
                             goto restart;
                         }
                         break;
