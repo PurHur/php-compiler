@@ -52,7 +52,7 @@ function syntaxRowDefinitions(): array
                 'Backed enum case objects with `->name` / `->value`; `echo $case` throws Error (#4891); double-quoted `"$case"` throws Error (#4785)',
                 '`Foo::Bar` singleton fetch; `enum_exists` registry; `implements` interface list + instance methods + `instanceof` (#3373)',
                 'static methods (#2299); `Enum::cases()` JIT (#3308, #4068); AOT fixture enum_backed.phpt (#3076)',
-                '`BackedEnum::from()` / `tryFrom()` VM lookup with Zend-parity ValueError (#3114); JIT deferred',
+                '`BackedEnum::from()` / `tryFrom()` VM + JIT lookup with Zend-parity ValueError (#3114, #4053)',
             ],
             'probe' => 'interface L { public function n(): string; } enum S: string implements L { case A = "a"; public function n(): string { return $this->name; } } echo S::A->n();',
         ],
