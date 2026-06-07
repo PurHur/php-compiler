@@ -30,20 +30,20 @@ final class token_name extends Internal
 
         $type = $frame->calledArgs[0]->toInt();
 
+        $name = TokenConstants::nameForId($type);
+        if (null !== $name) {
+            $frame->returnVar->string($name);
+
+            return;
+        }
+
         if (\function_exists('token_name')) {
-            $name = \token_name($type);
-            if (\is_string($name) && '' !== $name) {
-                $frame->returnVar->string($name);
+            $hostName = \token_name($type);
+            if (\is_string($hostName) && '' !== $hostName) {
+                $frame->returnVar->string($hostName);
 
                 return;
             }
-        }
-
-        $fallback = TokenConstants::nameForId($type);
-        if (null !== $fallback) {
-            $frame->returnVar->string($fallback);
-
-            return;
         }
 
         throw new \Error('token_name() is not implemented in this compiler build (issue #3171)');

@@ -5,9 +5,9 @@ declare(strict_types=1);
 namespace PHPCompiler\ext\tokenizer;
 
 /**
- * T_* tokenizer identifiers (php-src ext/tokenizer/tokenizer_data.c; issue #6940).
+ * T_* tokenizer identifiers (php-src ext/tokenizer/tokenizer_data.c; issue #6940, #7254).
  *
- * Full lexer parity tracked in #3171 / #4561.
+ * Native lexer parity tracked in #3171 / #4561.
  */
 final class TokenConstants
 {
@@ -36,6 +36,11 @@ final class TokenConstants
 
     public static function nameForId(int $id): ?string
     {
+        $name = self::fallbackIdToName()[$id] ?? null;
+        if (null !== $name) {
+            return $name;
+        }
+
         foreach (self::registeredConstants() as $name => $value) {
             if ($value === $id) {
                 return $name;
@@ -48,20 +53,12 @@ final class TokenConstants
     /** @return array<string, int> */
     private static function fallbackConstants(): array
     {
-        return [
-            'T_OPEN_TAG' => 389,
-            'T_CLOSE_TAG' => 390,
-            'T_ECHO' => 266,
-            'T_WHITESPACE' => 392,
-            'T_STRING' => 262,
-            'T_VARIABLE' => 266,
-            // T_ECHO and T_VARIABLE share id 266 in php-src; nameForId returns first match.
-            'T_LNUMBER' => 260,
-            'T_DNUMBER' => 261,
-            'T_CONSTANT_ENCAPSED_STRING' => 269,
-            'T_DOUBLE_COLON' => 387,
-            'T_PAAMAYIM_NEKUDOTAYIM' => 387,
-            'TOKEN_PARSE' => 1,
-        ];
+        return TokenConstantsData::nameToId();
+    }
+
+    /** @return array<int, string> */
+    private static function fallbackIdToName(): array
+    {
+        return TokenConstantsData::idToName();
     }
 }
