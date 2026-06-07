@@ -31,7 +31,7 @@ final class VmFs
     }
 
     public static function fileSize(string $path) {
-        $stat = @stat($path);
+        $stat = VmStatCache::stat($path);
         if (false === $stat) {
             return false;
         }
@@ -40,7 +40,7 @@ final class VmFs
     }
 
     public static function fileMtime(string $path) {
-        $stat = @stat($path);
+        $stat = VmStatCache::stat($path);
         if (false === $stat) {
             return false;
         }
@@ -49,7 +49,7 @@ final class VmFs
     }
 
     public static function fileAtime(string $path) {
-        $stat = @stat($path);
+        $stat = VmStatCache::stat($path);
         if (false === $stat) {
             return false;
         }
@@ -58,7 +58,7 @@ final class VmFs
     }
 
     public static function fileCtime(string $path) {
-        $stat = @stat($path);
+        $stat = VmStatCache::stat($path);
         if (false === $stat) {
             return false;
         }
@@ -67,7 +67,7 @@ final class VmFs
     }
 
     public static function fileInode(string $path) {
-        $stat = @stat($path);
+        $stat = VmStatCache::stat($path);
         if (false === $stat) {
             return false;
         }
@@ -77,7 +77,7 @@ final class VmFs
 
     /** linkinfo() — st_dev from lstat(2) on the link itself (php-src ext/standard/link.c, #6083). */
     public static function linkinfo(string $path) {
-        $stat = @lstat($path);
+        $stat = VmStatCache::lstat($path);
         if (false === $stat) {
             return false;
         }
@@ -86,7 +86,7 @@ final class VmFs
     }
 
     public static function fileOwner(string $path) {
-        $stat = @stat($path);
+        $stat = VmStatCache::stat($path);
         if (false === $stat) {
             return false;
         }
@@ -95,7 +95,7 @@ final class VmFs
     }
 
     public static function fileGroup(string $path) {
-        $stat = @stat($path);
+        $stat = VmStatCache::stat($path);
         if (false === $stat) {
             return false;
         }
@@ -104,7 +104,7 @@ final class VmFs
     }
 
     public static function filePerms(string $path) {
-        $stat = @stat($path);
+        $stat = VmStatCache::stat($path);
         if (false === $stat) {
             return false;
         }
@@ -113,7 +113,7 @@ final class VmFs
     }
 
     public static function fileType(string $path) {
-        $stat = @lstat($path);
+        $stat = VmStatCache::lstat($path);
         if (false === $stat) {
             return false;
         }
@@ -127,7 +127,7 @@ final class VmFs
    * @return HashTable|false
    */
     public static function statInfo(string $path, bool $lstat = false) {
-        $raw = $lstat ? @lstat($path) : @stat($path);
+        $raw = $lstat ? VmStatCache::lstat($path) : VmStatCache::stat($path);
         if (false === $raw) {
             return false;
         }
@@ -199,7 +199,12 @@ final class VmFs
 
     public static function chmod(string $path, int $permissions): bool
     {
-        return @chmod($path, $permissions);
+        $ok = @chmod($path, $permissions);
+        if ($ok) {
+            VmStatCache::invalidatePath($path);
+        }
+
+        return $ok;
     }
 
     public static function resolveUserUid(Variable $user): ?int
@@ -369,7 +374,7 @@ final class VmFs
             $ok = @touch($path, $mtime, $atime);
         }
         if ($ok) {
-            \clearstatcache(true, $path);
+            VmStatCache::invalidatePath($path);
         }
 
         return $ok;
