@@ -376,14 +376,14 @@ final class StringParseStrJit
 
         $i64 = $context->getTypeFromString('int64');
         $i8pp = $context->getTypeFromString('int8*')->pointerType(0);
-        $voidPtr = $context->getTypeFromString('void*');
-        $pk = $context->builder->pointerCast($fn->getParam(0), $i8pp);
+        $pkVoid = $fn->getParam(0);
+        $pk = $context->builder->pointerCast($pkVoid, $i8pp);
         $countPtr = $context->builder->pointerCast(
-            $context->builder->gep($fn->getParam(0), $i64->constInt(self::COUNT_OFF, false)),
+            self::parsedKeyFieldPtr($context, $pkVoid, self::COUNT_OFF),
             $i64->pointerType(0)
         );
         $appendPtr = $context->builder->pointerCast(
-            $context->builder->gep($fn->getParam(0), $i64->constInt(self::APPEND_OFF, false)),
+            self::parsedKeyFieldPtr($context, $pkVoid, self::APPEND_OFF),
             $context->getTypeFromString('int32')->pointerType(0)
         );
 
@@ -429,11 +429,11 @@ final class StringParseStrJit
 
         $parts = $context->builder->pointerCast($pk, $i8pp);
         $countPtr = $context->builder->pointerCast(
-            $context->builder->gep($pk, $i64->constInt(self::COUNT_OFF, false)),
+            self::parsedKeyFieldPtr($context, $pk, self::COUNT_OFF),
             $i64->pointerType(0)
         );
         $appendPtr = $context->builder->pointerCast(
-            $context->builder->gep($pk, $i64->constInt(self::APPEND_OFF, false)),
+            self::parsedKeyFieldPtr($context, $pk, self::APPEND_OFF),
             $i32->pointerType(0)
         );
         $pSlot = BasicBlockHelper::entryAlloca($context, $i8p);
@@ -620,11 +620,11 @@ final class StringParseStrJit
 
         $parts = $context->builder->pointerCast($pk, $i8pp);
         $countPtr = $context->builder->pointerCast(
-            $context->builder->gep($pk, $i64->constInt(self::COUNT_OFF, false)),
+            self::parsedKeyFieldPtr($context, $pk, self::COUNT_OFF),
             $i64->pointerType(0)
         );
         $appendPtr = $context->builder->pointerCast(
-            $context->builder->gep($pk, $i64->constInt(self::APPEND_OFF, false)),
+            self::parsedKeyFieldPtr($context, $pk, self::APPEND_OFF),
             $i32->pointerType(0)
         );
         $count = $context->builder->load($countPtr);
@@ -910,20 +910,25 @@ final class StringParseStrJit
 
     private static function cstrLiteral(Context $context, string $text): Value
     {
-        $global = $context->module->addGlobal(
-            $context->getTypeFromString('int8')->arrayType(\strlen($text) + 1),
-            '__phpc_parse_str_lit_'.md5($text)
+        return $context->builder->pointerCast(
+            $context->constantFromString($text),
+            $context->getTypeFromString('int8*')
         );
-        $chars = [];
-        foreach (str_split($text) as $ch) {
-            $chars[] = $context->getTypeFromString('int8')->constInt(\ord($ch), false);
-        }
-        $chars[] = $context->getTypeFromString('int8')->constInt(0, false);
-        $global->setInitializer($context->getTypeFromString('int8')->arrayType(\count($chars))->constArray($chars));
-        $i64 = $context->getTypeFromString('int64');
-        $i32 = $context->getTypeFromString('int32');
+    }
 
-        return $context->builder->inBoundsGEP($global, $i32->constInt(0, false), $i64->constInt(0, false));
+    private static function parsedKeyBytePtr(Context $context, Value $pkVoid): Value
+    {
+        return $context->builder->pointerCast($pkVoid, $context->getTypeFromString('int8*'));
+    }
+
+    private static function parsedKeyFieldPtr(Context $context, Value $pkVoid, int $byteOffset): Value
+    {
+        $i64 = $context->getTypeFromString('int64');
+
+        return $context->builder->inBoundsGEP(
+            self::parsedKeyBytePtr($context, $pkVoid),
+            $i64->constInt($byteOffset, false)
+        );
     }
 
     private static function captureInsertBlock(Context $context): ?BasicBlock

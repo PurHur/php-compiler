@@ -292,7 +292,7 @@ final class CloneWithReinitRuntime
         $done = $fn->appendBasicBlock($prefix.'sel_done');
         $default = $fn->appendBasicBlock($prefix.'sel_default');
         $i32 = $context->getTypeFromString('int32');
-        $switch = $context->builder->switch_($idx, $default, self::MAX_PROPS);
+        $switch = $context->builder->branchSwitch($idx, $default, self::MAX_PROPS);
         $incoming = [];
         for ($i = 0; $i < self::MAX_PROPS; ++$i) {
             $case = $fn->appendBasicBlock($prefix.'sel_'.$i);

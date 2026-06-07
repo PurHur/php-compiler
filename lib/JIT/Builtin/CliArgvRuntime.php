@@ -60,12 +60,14 @@ final class CliArgvRuntime
                 '__phpc_cli_store_argv',
                 $context->context->functionType($voidTy, false, $i32, $i8pp)
             );
+        $context->registerFunction('__phpc_cli_store_argv', $fnStore);
         self::implementStoreArgv($context, $fnStore);
 
         $argcProbe = $context->module->getNamedFunction('__phpc_cli_argc');
         $fnArgc = null !== $argcProbe
             ? $argcProbe
             : $context->module->addFunction('__phpc_cli_argc', $context->context->functionType($i64, false));
+        $context->registerFunction('__phpc_cli_argc', $fnArgc);
         self::implementArgc($context, $fnArgc);
 
         $cstrProbe = $context->module->getNamedFunction('__phpc_cli_argv_cstr');
@@ -75,6 +77,7 @@ final class CliArgvRuntime
                 '__phpc_cli_argv_cstr',
                 $context->context->functionType($i8p, false, $i32)
             );
+        $context->registerFunction('__phpc_cli_argv_cstr', $fnCstr);
         self::implementArgvCstr($context, $fnCstr);
 
         $eqProbe = $context->module->getNamedFunction('__phpc_cli_str_eq');
@@ -84,6 +87,7 @@ final class CliArgvRuntime
                 '__phpc_cli_str_eq',
                 $context->context->functionType($i32, false, $i8p, $i8p)
             );
+        $context->registerFunction('__phpc_cli_str_eq', $fnEq);
         self::implementStrEq($context, $fnEq);
 
         $refreshProbe = $context->module->getNamedFunction('__phpc_cli_refresh_argv_global');
@@ -93,6 +97,7 @@ final class CliArgvRuntime
                 '__phpc_cli_refresh_argv_global',
                 $context->context->functionType($voidTy, false, $valuePtr)
             );
+        $context->registerFunction('__phpc_cli_refresh_argv_global', $fnRefresh);
         self::implementRefreshArgvGlobal($context, $fnRefresh);
 
         self::registerLinkedRuntime($context);

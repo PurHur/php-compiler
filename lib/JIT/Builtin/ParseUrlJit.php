@@ -792,7 +792,7 @@ final class ParseUrlJit
             $blocks[$idx] = $fn->appendBasicBlock('wc_'.$name);
         }
 
-        $switch = $context->builder->switch_($component, $defaultBb, 8);
+        $switch = $context->builder->branchSwitch($component, $defaultBb, 8);
         foreach ($blocks as $idx => $bb) {
             $switch->addCase($i32->constInt($idx, false), $bb);
         }
@@ -1075,20 +1075,10 @@ final class ParseUrlJit
 
     private static function cstrLiteral(Context $context, string $text): Value
     {
-        $global = $context->module->addGlobal(
-            $context->getTypeFromString('int8')->arrayType(\strlen($text) + 1),
-            '__phpc_parse_url_lit_'.md5($text)
+        return $context->builder->pointerCast(
+            $context->constantFromString($text),
+            $context->getTypeFromString('int8*')
         );
-        $chars = [];
-        foreach (str_split($text) as $ch) {
-            $chars[] = $context->getTypeFromString('int8')->constInt(\ord($ch), false);
-        }
-        $chars[] = $context->getTypeFromString('int8')->constInt(0, false);
-        $global->setInitializer($context->getTypeFromString('int8')->arrayType(\count($chars))->constArray($chars));
-        $i64 = $context->getTypeFromString('int64');
-        $i32 = $context->getTypeFromString('int32');
-
-        return $context->builder->inBoundsGEP($global, $i32->constInt(0, false), $i64->constInt(0, false));
     }
 
     private static function captureInsertBlock(Context $context): ?BasicBlock
