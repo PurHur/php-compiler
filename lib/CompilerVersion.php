@@ -54,4 +54,16 @@ final class CompilerVersion
     {
         return version_compare(self::VERSION, '8.4', '>=');
     }
+
+    /** PHP 8.4+ #[\DelayedTargetValidation] builtin attribute class (Zend/zend_attributes.c, issue #7101). */
+    public static function supportsDelayedTargetValidationAttribute(): bool
+    {
+        return version_compare(self::VERSION, '8.4', '>=');
+    }
+
+    /** PHP 8.4+ #[\CompileTime] builtin attribute class (zend_attributes.stub.php, issue #7101). */
+    public static function supportsCompileTimeAttribute(): bool
+    {
+        return version_compare(self::VERSION, '8.4', '>=');
+    }
 }

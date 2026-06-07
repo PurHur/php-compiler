@@ -40,6 +40,12 @@ final class BuiltinAttributes
         if (CompilerVersion::supportsNoDiscardAttribute()) {
             self::registerNoDiscard($ctx);
         }
+        if (CompilerVersion::supportsDelayedTargetValidationAttribute()) {
+            self::registerDelayedTargetValidation($ctx);
+        }
+        if (CompilerVersion::supportsCompileTimeAttribute()) {
+            self::registerCompileTime($ctx);
+        }
         foreach (array_diff(array_keys($ctx->classes), $before) as $lc) {
             $ctx->classes[$lc]->isInternal = true;
         }
@@ -128,6 +134,42 @@ final class BuiltinAttributes
         ];
 
         $ctx->classes[AttributeSupport::CLASS_NODISCARD] = $entry;
+    }
+
+    private static function registerDelayedTargetValidation(Context $ctx): void
+    {
+        self::registerMarkerAttributeClass(
+            $ctx,
+            'DelayedTargetValidation',
+            AttributeSupport::CLASS_DELAYED_TARGET_VALIDATION,
+            AttributeSupport::TARGET_ALL
+        );
+    }
+
+    private static function registerCompileTime(Context $ctx): void
+    {
+        self::registerMarkerAttributeClass(
+            $ctx,
+            'CompileTime',
+            AttributeSupport::CLASS_COMPILE_TIME,
+            AttributeSupport::TARGET_ALL
+        );
+    }
+
+    private static function registerMarkerAttributeClass(
+        Context $ctx,
+        string $name,
+        string $lcKey,
+        int $targets
+    ): void {
+        $entry = new ClassEntry($name);
+        $entry->parentLc = AttributeSupport::CLASS_ATTRIBUTE;
+        $entry->attributeNames = ['Attribute'];
+        $entry->attributeEntries = [
+            new AttributeEntry('Attribute', [['name' => null, 'value' => $targets]]),
+        ];
+
+        $ctx->classes[$lcKey] = $entry;
     }
 
     private static function registerBuiltinAttributeClass(
