@@ -103,6 +103,7 @@ final class AotRegressionFixtureCatalogTest extends TestCase
             'array_union_plus.php' => ['array_union_plus.php'],
             'match_guard.php' => ['match_guard.php'],
             'str_getcsv_enum_typeerror.php' => ['str_getcsv_enum_typeerror.php'],
+            'str_getcsv_null_typeerror.php' => ['str_getcsv_null_typeerror.php'],
             'urldecode_enum_typeerror.php' => ['urldecode_enum_typeerror.php'],
             'urlencode_enum_typeerror.php' => ['urlencode_enum_typeerror.php'],
             'password_needs_rehash_enum_typeerror.php' => ['password_needs_rehash_enum_typeerror.php'],
