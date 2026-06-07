@@ -20,7 +20,7 @@ use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
 
 /**
- * sort() for homogeneous packed string or integer arrays (subset of PHP).
+ * sort() for homogeneous packed string, integer, or object arrays (subset of PHP).
  *
  * VM: full support. JIT/AOT: dynamic hashtable arrays only (not fixed native literals).
  */
@@ -86,6 +86,15 @@ final class sort_ extends Internal
                     $values[$j] = $tmp;
                     --$j;
                 }
+            }
+        } elseif (Variable::TYPE_OBJECT === $first->type) {
+            self::assertHomogeneousObjectValues($values);
+            if (self::objectSortUsesSpaceship($flags)) {
+                VmInternalCompare::sortVariableValuesBySpaceship($values);
+            } else {
+                throw new \LogicException(
+                    'sort() flags are not supported for object arrays in this compiler build'
+                );
             }
         } else {
             throw new \LogicException(
@@ -158,5 +167,28 @@ final class sort_ extends Internal
             return;
         }
         throw new \LogicException('sort() flags are not supported in this compiler build');
+    }
+
+    /** php-src php_array_sort — SORT_REGULAR uses zend_compare on object zvals. */
+    private static function objectSortUsesSpaceship(int $flags): bool
+    {
+        $sortType = $flags & ~StdlibConstants::SORT_FLAG_CASE;
+
+        return StdlibConstants::SORT_REGULAR === $sortType
+            || StdlibConstants::SORT_NUMERIC === $sortType;
+    }
+
+    /**
+     * @param list<Variable> $values
+     */
+    private static function assertHomogeneousObjectValues(array $values): void
+    {
+        foreach ($values as $value) {
+            if (Variable::TYPE_OBJECT !== $value->resolveIndirect()->type) {
+                throw new \LogicException(
+                    'sort() only supports homogeneous object arrays in this compiler build'
+                );
+            }
+        }
     }
 }

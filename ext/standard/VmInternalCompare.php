@@ -71,6 +71,25 @@ final class VmInternalCompare
     }
 
     /**
+     * Sort packed Variable list using {@see Variable::compareSpaceship()} (php-src zend_compare).
+     *
+     * @param list<Variable> $values
+     */
+    public static function sortVariableValuesBySpaceship(array &$values): void
+    {
+        $n = \count($values);
+        for ($i = 1; $i < $n; ++$i) {
+            $j = $i;
+            while ($j > 0 && Variable::compareSpaceship($values[$j - 1], $values[$j]) > 0) {
+                $tmp = $values[$j - 1];
+                $values[$j - 1] = $values[$j];
+                $values[$j] = $tmp;
+                --$j;
+            }
+        }
+    }
+
+    /**
      * Sort packed Variable list in place (no PHP closures — AOT self-host spine safe).
      *
      * @param list<Variable> $values
