@@ -5,11 +5,39 @@ declare(strict_types=1);
 namespace PHPCompiler;
 
 use PHPCompiler\Ast\PipeOperatorDesugar;
+use PhpParser\Error as ParserError;
 use PHPUnit\Framework\TestCase;
 
-/** PHP 8.4+ pipe operator (|>) VM desugar (#3243). */
+/** PHP 8.4+ pipe operator (|>) VM desugar (#3243, #7219). */
 final class PipeOperatorTest extends TestCase
 {
+    public function testVmPipeBareCallableName(): void
+    {
+        $code = <<<'PHP'
+<?php
+echo 1 |> strval, "\n";
+PHP;
+        $rt = new Runtime();
+        $block = $rt->parseAndCompile($code, 'test.php');
+        ob_start();
+        $rt->run($block);
+        $this->assertSame("1\n", ob_get_clean());
+    }
+
+    public function testDesugarRewritesBareCallableName(): void
+    {
+        $this->assertSame(
+            '<?php echo strval(1), "\n";',
+            PipeOperatorDesugar::desugar('<?php echo 1 |> strval, "\n";')
+        );
+    }
+
+    public function testUnparenthesizedArrowFunctionRhsIsParseError(): void
+    {
+        $this->expectException(ParserError::class);
+        $this->expectExceptionMessage('Arrow functions on the right-hand side of the pipe operator must be parenthesized');
+        PipeOperatorDesugar::desugar('<?php echo 1 |> fn($x) => $x;');
+    }
     public function testVmPipeWithFirstClassCallable(): void
     {
         $code = <<<'PHP'
@@ -60,7 +88,7 @@ PHP;
     public function testDesugarBindsPipeFirstClassCallableForAssignment(): void
     {
         $this->assertSame(
-            '<?php $fn = (fn(...$__pipe_a) => strtoupper(...)("hi", ...$__pipe_a));',
+            '<?php $fn = (fn() => strtoupper("hi"));',
             PipeOperatorDesugar::desugar('<?php $fn = "hi" |> strtoupper(...);')
         );
     }
@@ -84,7 +112,7 @@ PHP;
     {
         $code = <<<'PHP'
 <?php
-$x = 5 |> fn($v) => $v * 2;
+$x = 5 |> (fn($v) => $v * 2);
 var_export($x);
 echo "\n";
 PHP;
@@ -99,7 +127,7 @@ PHP;
     {
         $code = <<<'PHP'
 <?php
-echo 3 |> fn($x) => $x + 1 |> fn($x) => $x * 2, "\n";
+echo 3 |> (fn($x) => $x + 1) |> (fn($x) => $x * 2), "\n";
 PHP;
         $rt = new Runtime();
         $block = $rt->parseAndCompile($code, 'test.php');
@@ -112,15 +140,15 @@ PHP;
     {
         $this->assertSame(
             '<?php $x = (fn($v) => $v * 2)(5);',
-            PipeOperatorDesugar::desugar('<?php $x = 5 |> fn($v) => $v * 2;')
+            PipeOperatorDesugar::desugar('<?php $x = 5 |> (fn($v) => $v * 2);')
         );
     }
 
     public function testDesugarRewritesChainedArrowFunctionPipe(): void
     {
         $this->assertSame(
-            '<?php echo (fn($x) => (fn($x) => $x * 2)($x + 1))(3), "\n";',
-            PipeOperatorDesugar::desugar('<?php echo 3 |> fn($x) => $x + 1 |> fn($x) => $x * 2, "\n";')
+            '<?php echo (fn($x) => $x * 2)((fn($x) => $x + 1)(3)), "\n";',
+            PipeOperatorDesugar::desugar('<?php echo 3 |> (fn($x) => $x + 1) |> (fn($x) => $x * 2), "\n";')
         );
     }
 }

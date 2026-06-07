@@ -584,12 +584,14 @@ function syntaxRowDefinitions(): array
         ],
         [
             'id' => 'pipe_operator',
-            'construct' => 'PHP 8.4+ pipe operator (`|>`)',
+            'construct' => 'PHP 8.5 pipe operator (`|>`)',
             'opcodes' => ['TYPE_FUNCCALL_INIT', 'TYPE_FUNCCALL_EXEC_RETURN'],
-            'issue' => 3243,
+            'issue' => 7219,
             'notes' => [
                 'Ast\\PipeOperatorDesugar before php-parser (#3243); lowers $lhs |> f(...) to f($lhs, ...)',
-                'Arrow-function RHS and chained pipes (#6705): $lhs |> fn($p) => expr → (fn($p) => expr)($lhs)',
+                'Bare callable names: $lhs |> strlen → strlen($lhs) (#7219)',
+                'PHP 8.5 errata: arrow-fn RHS must be parenthesized — $lhs |> (fn($p) => expr) (#7219, php-src #19533)',
+                'Chained pipes and parenthesized-callable LHS (#6705, #7219)',
                 'Zend/zend_compile.c pipe expression; requires first-class callable (#1363)',
             ],
             'probe' => 'echo "hi" |> strtoupper(...);',
