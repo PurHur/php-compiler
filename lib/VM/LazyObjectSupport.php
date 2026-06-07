@@ -148,7 +148,9 @@ final class LazyObjectSupport
             return;
         }
 
-        $result = $vm->invokeClosure($initializer);
+        $proxyArg = new Variable(Variable::TYPE_OBJECT);
+        $proxyArg->object($object);
+        $result = $vm->invokeClosure($initializer, $proxyArg);
         $result = $result->resolveIndirect();
         if (Variable::TYPE_OBJECT !== $result->type) {
             throw new \LogicException('Lazy object initializer must return an object');
