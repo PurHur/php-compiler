@@ -5991,6 +5991,9 @@ class JIT {
                         JIT\JitNativeString::coerce($this->context, $value)
                     );
                     break;
+                case OpCode::TYPE_CAST_VOID:
+                    $this->assignOperand($block->getOperand($op->arg1), $this->jitNullVariable());
+                    break;
                 case OpCode::TYPE_ECHO:
                 case OpCode::TYPE_PRINT:
                     if ($this->context->inlineIncludeDepth > 0) {
