@@ -14,7 +14,7 @@ use PHPCompiler\VM\BuiltinExecute;
 use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
 
-/** scandir() — list directory entries (VM via VmDir; JIT via __phpc_scandir_vec). */
+/** scandir() — list directory entries (VM via VmDir; JIT via StringFsGlobVecJit, #7405). */
 final class scandir extends Internal
 {
     public function execute(Frame $frame): void

@@ -11,7 +11,7 @@ use PHPLLVM\Value;
 use PHPLLVM\Value\Function_ as LlvmFunction;
 
 /**
- * LLVM glob/scandir vec collectors (mirrors phpc_fs_dir.c vec helpers, #5459).
+ * LLVM glob/scandir vec collectors (PHP-in-PHP; replaces apply-1153 C injection, #5459/#7405).
  *
  * php-src: ext/standard/dir.c — glob(), scandir()
  */
