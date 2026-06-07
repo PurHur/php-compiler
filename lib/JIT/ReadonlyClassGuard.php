@@ -6,7 +6,6 @@ namespace PHPCompiler\JIT;
 
 use PHPCompiler\Block;
 use PHPCompiler\JIT\Builtin\CloneWithReinitRuntime;
-use PHPCompiler\JIT\Builtin\ErrorRaise;
 use PHPCompiler\JIT\Builtin\Type\Object_;
 use PHPLLVM\Builder;
 
@@ -96,8 +95,7 @@ final class ReadonlyClassGuard
                 $declaringClass,
                 $propName
             );
-            ErrorRaise::ensureLinked($context);
-            ErrorRaise::emitRaise($context, $message);
+            ReadonlyBridge::emitReadonlyViolation($context, $message);
             // Merge with allow path: pending flag + skip store (#3149, #4875). Avoid returnVoid here —
             // it breaks AOT LLVM verify and MCJIT uncaught readonly inc/dec (#4082).
             $context->builder->branch($exitBlock);
@@ -117,6 +115,8 @@ final class ReadonlyClassGuard
     {
         ErrorRaise::ensureLinked($context);
         ErrorRaise::registerDeclarations($context);
+        ReadonlyBridge::ensureLinked($context);
+        ReadonlyBridge::registerDeclarations($context);
 
         $fn = BasicBlockHelper::parentFunction($context);
         $doStore = $fn->appendBasicBlock('readonly_store_do');
@@ -124,15 +124,17 @@ final class ReadonlyClassGuard
         $done = $fn->appendBasicBlock('readonly_store_done');
         $entry = $context->builder->getInsertBlock();
 
-        $hasPending = $context->builder->call(
+        $i32 = $context->getTypeFromString('int32');
+        $zero = $i32->constInt(0, false);
+        $hasErrorPending = $context->builder->call(
             $context->lookupFunction('phpc_jit_error_has_pending')
         );
-        $i32 = $context->getTypeFromString('int32');
-        $isPending = $context->builder->icmp(
-            Builder::INT_NE,
-            $hasPending,
-            $i32->constInt(0, false)
+        $hasReadonlyPending = $context->builder->call(
+            $context->lookupFunction('phpc_jit_has_pending_exception')
         );
+        $errorPending = $context->builder->icmp(Builder::INT_NE, $hasErrorPending, $zero);
+        $readonlyPending = $context->builder->icmp(Builder::INT_NE, $hasReadonlyPending, $zero);
+        $isPending = $context->builder->or($errorPending, $readonlyPending);
         $context->builder->branchIf($isPending, $skipStore, $doStore);
 
         $context->builder->positionAtEnd($doStore);

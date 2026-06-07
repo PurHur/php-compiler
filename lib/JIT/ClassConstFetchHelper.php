@@ -15,7 +15,7 @@ use PHPCompiler\Block;
 use PHPCompiler\PseudoClassScope;
 use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Builtin\ErrorRaise;
-use PHPCompiler\JIT\Builtin\ReadonlyRaise;
+use PHPCompiler\JIT\ReadonlyBridge;
 use PHPCompiler\JIT\Builtin\Type\Object_;
 use PHPCompiler\JIT\Builtin\TypeErrorRaise;
 use PHPCompiler\JIT\ReflectionBuiltinHelper;
@@ -261,7 +261,7 @@ final class ClassConstFetchHelper
     ): Variable {
         $context = $objectType->jitContext();
         self::ensureStrCaseCmp($context);
-        ReadonlyRaise::ensureLinked($context);
+        ReadonlyBridge::ensureLinked($context);
 
         $nativeName = JitStringArg::lower($context, $nameVar, 'class constant name');
         $resultSlot = JitValueBox::alloc($context);
