@@ -7385,6 +7385,9 @@ restart:
             return null;
         }
         $prop = $this->resolvePropertyWriteName($lvalue) ?? 'property';
+        if (VM\CloneWithSupport::consumeReinit($owner, $prop)) {
+            return null;
+        }
         $declaringClass = $this->readonlyPropertyDeclaringClass($owner, $prop);
         if (null === $declaringClass) {
             return null;

@@ -67,6 +67,13 @@ class ObjectEntry {
     /** True after readonly($object) marks this instance immutable (#6485). */
     public bool $dynamicReadonly = false;
 
+    /**
+     * Readonly property names allowed one write during clone-with (#7250, IS_PROP_REINITABLE).
+     *
+     * @var array<string, true>
+     */
+    public array $reinitableProperties = [];
+
     public function __construct(ClassEntry $class) {
         $this->class = $class;
         $this->id = ++self::$counter;

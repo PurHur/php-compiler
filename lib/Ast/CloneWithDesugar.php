@@ -31,8 +31,18 @@ final class CloneWithDesugar
             }
 
             $body = '$__phpc_r = clone $__phpc_o;';
+            $propArgs = [];
+            foreach ($assignments as [$name, $_value]) {
+                $propArgs[] = var_export($name, true);
+            }
+            if ([] !== $propArgs) {
+                $body .= 'phpc_clone_with_begin($__phpc_r, '.implode(', ', $propArgs).');';
+            }
             foreach ($assignments as [$name, $value]) {
                 $body .= '$__phpc_r->'.$name.' = '.$value.';';
+            }
+            if ([] !== $propArgs) {
+                $body .= 'phpc_clone_with_end($__phpc_r);';
             }
             $body .= 'return $__phpc_r;';
 

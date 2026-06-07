@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace PHPCompiler\JIT;
 
 use PHPCompiler\Block;
+use PHPCompiler\JIT\Builtin\CloneWithReinitRuntime;
 use PHPCompiler\JIT\Builtin\ErrorRaise;
 use PHPCompiler\JIT\Builtin\Type\Object_;
 use PHPLLVM\Builder;
@@ -79,8 +80,13 @@ final class ReadonlyClassGuard
                 $constructed,
                 $context->getTypeFromString('int8')->constInt(0, false)
             );
+            $reinitBlock = $fn->appendBasicBlock('readonly_reinit_'.$id);
             $violateBlock = $fn->appendBasicBlock('readonly_violate_'.$id);
-            $context->builder->branchIf($notConstructed, $storeBlock, $violateBlock);
+            $context->builder->branchIf($notConstructed, $storeBlock, $reinitBlock);
+            $context->builder->positionAtEnd($reinitBlock);
+            CloneWithReinitRuntime::ensureLinked($context);
+            $reinitOk = CloneWithReinitRuntime::emitTryConsumePropertyName($context, $obj, $propName);
+            $context->builder->branchIf($reinitOk, $storeBlock, $violateBlock);
             $context->builder->positionAtEnd($violateBlock);
             $declaringClass = $objectType->classNameForId($id);
             $message = sprintf(
