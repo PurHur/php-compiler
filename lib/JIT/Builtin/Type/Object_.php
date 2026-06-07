@@ -27,6 +27,7 @@ use PHPCompiler\JIT\HashTableHelper;
 use PHPCompiler\JIT\JitNativeString;
 use PHPCompiler\JIT\JitStringArg;
 use PHPCompiler\JIT\Builtin\ErrorRaise;
+use PHPCompiler\JIT\Builtin\TypeErrorRaise;
 use PHPCompiler\JIT\JitStringCompare;
 use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\MagicMethodDispatch;
@@ -4511,6 +4512,61 @@ class Object_ extends Type {
             $context->builder->positionAtEnd($nextBlock);
         }
         $context->builder->positionAtEnd($doneBlock);
+    }
+
+    /**
+     * exit()/die() status: enum object → Error; otherwise TypeError (#7214).
+     */
+    public function emitExitStatusObjectGuard(Context $context, PHPLLVM\Value $objPtr): void
+    {
+        $enumEntries = [];
+        foreach ($this->classIdToName as $id => $name) {
+            $lc = strtolower(ltrim($name, '\\'));
+            if (isset($this->enums[$lc])) {
+                $enumEntries[(int) $id] = $name;
+            }
+        }
+        if ([] === $enumEntries) {
+            \PHPCompiler\JIT\Builtin\ScriptExit::emitStatusTypeErrorAndAbort($context, 'object');
+
+            return;
+        }
+
+        \PHPCompiler\JIT\Builtin\ErrorRaise::ensureLinked($context);
+        TypeErrorRaise::registerDeclarations($context);
+        TypeErrorRaise::ensureLinked($context);
+        $map = $context->structFieldMap['__object__'];
+        $classId = $context->builder->load(
+            $context->builder->structGep($objPtr, $map['class_id'])
+        );
+        $i64 = $context->getTypeFromString('int64');
+        $typeErrorBlock = BasicBlockHelper::append($context, 'exit_status_obj_type_error');
+        $ids = array_keys($enumEntries);
+        $lastIdx = count($ids) - 1;
+        foreach ($ids as $idx => $id) {
+            $matchBlock = BasicBlockHelper::append($context, 'exit_status_obj_enum_'.$id);
+            $nextBlock = $idx === $lastIdx
+                ? $typeErrorBlock
+                : BasicBlockHelper::append($context, 'exit_status_obj_next_'.$id);
+            $context->builder->branchIf(
+                $context->builder->icmp(
+                    PHPLLVM\Builder::INT_EQ,
+                    $classId,
+                    $i64->constInt($id, false)
+                ),
+                $matchBlock,
+                $nextBlock
+            );
+            $context->builder->positionAtEnd($matchBlock);
+            \PHPCompiler\JIT\Builtin\ErrorRaise::emitRaise(
+                $context,
+                'Object of class '.$enumEntries[$id].' could not be converted to string'
+            );
+            $context->builder->call($context->lookupFunction('abort'));
+            $context->builder->positionAtEnd($nextBlock);
+        }
+        $context->builder->positionAtEnd($typeErrorBlock);
+        \PHPCompiler\JIT\Builtin\ScriptExit::emitStatusTypeErrorAndAbort($context, 'object');
     }
 
     public function propertyFetch(PHPLLVM\Value $obj, string $class, string $name): Variable
