@@ -425,6 +425,28 @@ int __compiler_stream_is_local(int64_t handle)
     return phpc_stream_is_url_path(path) ? 0 : 1;
 }
 
+int __compiler_stream_isatty(int64_t handle)
+{
+    FILE *fp = __phpc_resolve_stream(handle);
+
+    if (NULL == fp) {
+        return 0;
+    }
+#if defined(_WIN32)
+    return _isatty(_fileno(fp)) ? 1 : 0;
+#else
+    {
+        int fd = fileno(fp);
+
+        if (fd < 0) {
+            return 0;
+        }
+
+        return isatty(fd) ? 1 : 0;
+    }
+#endif
+}
+
 int __compiler_stream_supports(int64_t handle, int64_t feature)
 {
     FILE *fp;

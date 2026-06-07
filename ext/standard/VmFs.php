@@ -687,6 +687,21 @@ final class VmFs
     }
 
     /**
+     * stream_isatty() — php-src ext/standard/streamsfuncs.c (issue #6035).
+     *
+     * Returns true when the stream is connected to a terminal (php_stream_isatty).
+     */
+    public static function streamIsatty(int $handle): bool
+    {
+        $fp = self::lookup($handle);
+        if (null === $fp) {
+            return false;
+        }
+
+        return \stream_isatty($fp);
+    }
+
+    /**
      * stream_is_local() — php-src ext/standard/streamsfuncs.c (issue #6173).
      *
      * Returns true when the stream wrapper is not a URL wrapper (php_stream_is_local).

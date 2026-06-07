@@ -326,6 +326,9 @@ class Type extends Builtin {
         $fntypeStreamIsLocal = $this->context->context->functionType($i32, false, $i64);
         $fnStreamIsLocal = $this->context->module->addFunction('__compiler_stream_is_local', $fntypeStreamIsLocal);
         $this->context->registerFunction('__compiler_stream_is_local', $fnStreamIsLocal);
+        $fntypeStreamIsatty = $this->context->context->functionType($i32, false, $i64);
+        $fnStreamIsatty = $this->context->module->addFunction('__compiler_stream_isatty', $fntypeStreamIsatty);
+        $this->context->registerFunction('__compiler_stream_isatty', $fnStreamIsatty);
         $fntypeFtruncate = $this->context->context->functionType($i32, false, $i64, $i64);
         $fnFtruncate = $this->context->module->addFunction('__compiler_ftruncate', $fntypeFtruncate);
         $this->context->registerFunction('__compiler_ftruncate', $fnFtruncate);
