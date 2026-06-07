@@ -7,9 +7,11 @@ namespace PHPCompiler\ext\standard;
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\InternalStrictArg as JitInternalStrictArg;
+use PHPCompiler\JIT\JitLongArg;
 use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\Variable as JITVariable;
-use PHPCompiler\VM\Variable;
+use PHPCompiler\VM\InternalStrictArg;
 use PHPLLVM\Value;
 
 /**
@@ -30,31 +32,19 @@ final class levenshtein extends Internal
         if ($argc < 2 || $argc > 5) {
             throw new \LogicException('levenshtein() accepts two to five arguments in this compiler build');
         }
-        $a = VmString::coerceStringBuiltinArg($frame->calledArgs[0], 'levenshtein', 0, 'string1');
-        $b = VmString::coerceStringBuiltinArg($frame->calledArgs[1], 'levenshtein', 1, 'string2');
+        $a = self::vmStringArg($frame, 0, 'string1');
+        $b = self::vmStringArg($frame, 1, 'string2');
         $ins = 1;
         $rep = 1;
         $del = 1;
         if ($argc >= 3) {
-            $insVar = $frame->calledArgs[2]->resolveIndirect();
-            if (Variable::TYPE_INTEGER !== $insVar->type) {
-                throw new \LogicException('levenshtein() insertion cost must be an integer in this compiler build');
-            }
-            $ins = $insVar->toInt();
+            $ins = self::vmCostArg($frame, 2, 'insertion_cost');
         }
         if ($argc >= 4) {
-            $repVar = $frame->calledArgs[3]->resolveIndirect();
-            if (Variable::TYPE_INTEGER !== $repVar->type) {
-                throw new \LogicException('levenshtein() replacement cost must be an integer in this compiler build');
-            }
-            $rep = $repVar->toInt();
+            $rep = self::vmCostArg($frame, 3, 'replacement_cost');
         }
         if ($argc >= 5) {
-            $delVar = $frame->calledArgs[4]->resolveIndirect();
-            if (Variable::TYPE_INTEGER !== $delVar->type) {
-                throw new \LogicException('levenshtein() deletion cost must be an integer in this compiler build');
-            }
-            $del = $delVar->toInt();
+            $del = self::vmCostArg($frame, 4, 'deletion_cost');
         }
         if (null === $frame->returnVar) {
             return;
@@ -76,31 +66,78 @@ final class levenshtein extends Internal
         $rep = $i64->constInt(1, false);
         $del = $i64->constInt(1, false);
         if ($argc >= 3) {
-            if (JITVariable::TYPE_NATIVE_LONG !== $args[2]->type) {
-                throw new \LogicException('levenshtein() insertion cost must be an integer in this compiler build');
-            }
-            $ins = $this->jitLong($context, $args[2], 'levenshtein() insertion cost');
+            $ins = self::jitCostArg($context, $args[2], 3, 'insertion_cost');
         }
         if ($argc >= 4) {
-            if (JITVariable::TYPE_NATIVE_LONG !== $args[3]->type) {
-                throw new \LogicException('levenshtein() replacement cost must be an integer in this compiler build');
-            }
-            $rep = $this->jitLong($context, $args[3], 'levenshtein() replacement cost');
+            $rep = self::jitCostArg($context, $args[3], 4, 'replacement_cost');
         }
         if ($argc >= 5) {
-            if (JITVariable::TYPE_NATIVE_LONG !== $args[4]->type) {
-                throw new \LogicException('levenshtein() deletion cost must be an integer in this compiler build');
-            }
-            $del = $this->jitLong($context, $args[4], 'levenshtein() deletion cost');
+            $del = self::jitCostArg($context, $args[4], 5, 'deletion_cost');
         }
 
         return JitLevenshtein::invoke(
             $context,
-            JitStringBuiltinArg::lower($context, $args[0], 'levenshtein', 0, 'string1'),
-            JitStringBuiltinArg::lower($context, $args[1], 'levenshtein', 1, 'string2'),
+            self::jitStringArg($context, $args[0], 1, 'string1'),
+            self::jitStringArg($context, $args[1], 2, 'string2'),
             $ins,
             $rep,
             $del
         );
+    }
+
+    private static function vmStringArg(Frame $frame, int $argIndex, string $paramName): string
+    {
+        if (null !== $frame->parent && $frame->parent->block->strictTypes) {
+            return InternalStrictArg::requireString($frame, $argIndex, 'levenshtein', $paramName)->toString();
+        }
+
+        return VmString::coerceStringBuiltinArg(
+            $frame->calledArgs[$argIndex],
+            'levenshtein',
+            $argIndex,
+            $paramName
+        );
+    }
+
+    private static function vmCostArg(Frame $frame, int $argIndex, string $paramName): int
+    {
+        if (null !== $frame->parent && $frame->parent->block->strictTypes) {
+            return InternalStrictArg::requireInt($frame, $argIndex, 'levenshtein', $paramName)->toInt();
+        }
+
+        return VmMath::parseIntBuiltinArg(
+            $frame->calledArgs[$argIndex]->resolveIndirect(),
+            'levenshtein',
+            $argIndex + 1,
+            $paramName
+        );
+    }
+
+    private static function jitStringArg(
+        Context $context,
+        JITVariable $arg,
+        int $argNumber,
+        string $paramName
+    ): Value {
+        JitInternalStrictArg::requireString($context, $arg, 'levenshtein', $paramName, $argNumber);
+
+        return JitStringBuiltinArg::lower(
+            $context,
+            $arg,
+            'levenshtein',
+            $argNumber - 1,
+            $paramName
+        );
+    }
+
+    private static function jitCostArg(
+        Context $context,
+        JITVariable $arg,
+        int $argNumber,
+        string $paramName
+    ): Value {
+        JitInternalStrictArg::requireInt($context, $arg, 'levenshtein', $paramName, $argNumber);
+
+        return JitLongArg::lower($context, $arg, sprintf('levenshtein() argument #%d', $argNumber));
     }
 }
