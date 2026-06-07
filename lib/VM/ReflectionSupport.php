@@ -938,4 +938,68 @@ final class ReflectionSupport
 
         return null !== $decl && (($decl->flags ?? 0) & \PHPCfg\Func::FLAG_STATIC) !== 0;
     }
+
+    /** php-src ext/reflection/php_reflection.c — ReflectionMethod::hasPrototype (#7262). */
+    public static function methodHasPrototype(Context $ctx, ClassEntry $entry, string $methodLc): bool
+    {
+        return null !== self::methodPrototypeClassEntry($ctx, $entry, $methodLc);
+    }
+
+    /**
+     * Class entry for ReflectionMethod::getPrototype() or null when none (#7262).
+     *
+     * Mirrors zend inheritance: child.prototype = parent.prototype ?: parent.
+     */
+    public static function methodPrototypeClassEntry(Context $ctx, ClassEntry $entry, string $methodLc): ?ClassEntry
+    {
+        $classLc = strtolower($entry->name);
+        $declLc = $entry->methodDeclaringClassLc[$methodLc] ?? $classLc;
+        if ($declLc !== $classLc) {
+            return null;
+        }
+
+        if (null !== $entry->parentLc && isset($ctx->classes[$entry->parentLc])) {
+            $parent = $ctx->classes[$entry->parentLc];
+            if (isset($parent->methods[$methodLc])) {
+                $parentProto = self::methodPrototypeClassEntry($ctx, $parent, $methodLc);
+                if (null !== $parentProto) {
+                    return $parentProto;
+                }
+                $parentDeclLc = $parent->methodDeclaringClassLc[$methodLc] ?? strtolower($parent->name);
+                $parentVis = $parent->methodVisibility[$methodLc] ?? \PHPCfg\Func::FLAG_PUBLIC;
+                if (($parentVis & \PHPCfg\Func::FLAG_PRIVATE) !== 0
+                    && $parentDeclLc === strtolower($parent->name)) {
+                    return null;
+                }
+
+                return $ctx->classes[$parentDeclLc] ?? null;
+            }
+        }
+
+        foreach ($entry->interfaces as $ifaceLc) {
+            if (!isset($ctx->classes[$ifaceLc])) {
+                continue;
+            }
+            $iface = $ctx->classes[$ifaceLc];
+            if (isset($iface->methods[$methodLc]) || isset($iface->abstractMethods[$methodLc])) {
+                return $iface;
+            }
+        }
+
+        return null;
+    }
+
+    public static function newReflectionMethodObject(Context $ctx, ClassEntry $entry, string $methodName): ObjectEntry
+    {
+        $rmClass = $ctx->classes[self::REFLECTION_METHOD] ?? null;
+        if (null === $rmClass) {
+            throw new \LogicException('ReflectionMethod is not registered in this compiler build');
+        }
+        $rm = new ObjectEntry($rmClass);
+        $rm->constructed = true;
+        $rm->getProperty(self::PROP_CLASS_NAME)->string($entry->name);
+        $rm->getProperty(self::PROP_METHOD_NAME)->string($methodName);
+
+        return $rm;
+    }
 }

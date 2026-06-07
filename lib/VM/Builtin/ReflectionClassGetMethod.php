@@ -32,7 +32,7 @@ final class ReflectionClassGetMethod extends VmClassMethod
         }
         $method = VmReflection::stringArg($frame->calledArgs[1], 'ReflectionClass::getMethod() name', 1);
         $methodLc = strtolower($method);
-        if (!isset($entry->methods[$methodLc])) {
+        if (!isset($entry->methods[$methodLc]) && !isset($entry->abstractMethods[$methodLc])) {
             ReflectionSupport::throwReflectionException(
                 ReflectionSupport::methodNotFoundMessage($className, $method)
             );
