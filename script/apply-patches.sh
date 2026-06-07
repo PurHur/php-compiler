@@ -1507,7 +1507,8 @@ apply_php_types_intersection_type_type_overlay_to_target() {
     echo "Skip php-types-intersection-type.patch (target missing): ${target}"
     return 0
   fi
-  if grep -q 'instanceof CfgType\\Intersection' "$target" 2>/dev/null; then
+  if grep -q 'instanceof CfgType\\Union_' "$target" 2>/dev/null \
+    && grep -q 'instanceof CfgType\\Intersection' "$target" 2>/dev/null; then
     return 0
   fi
   if ! python3 - "$target" <<'PY'
@@ -1522,7 +1523,7 @@ if anchor not in text:
     sys.stderr.write("php-types-intersection-type: throw anchor not found\n")
     raise SystemExit(1)
 
-insert = """        if ($decl instanceof CfgType\\Union_) {
+union_block = """        if ($decl instanceof CfgType\\Union_) {
             $subs = [];
             foreach ($decl->types as $sub) {
                 $subs[] = self::fromTypeDecl($sub);
@@ -1530,7 +1531,8 @@ insert = """        if ($decl instanceof CfgType\\Union_) {
 
             return new self(self::TYPE_UNION, $subs);
         }
-        if ($decl instanceof CfgType\\Intersection) {
+"""
+intersection_block = """        if ($decl instanceof CfgType\\Intersection) {
             $subs = [];
             foreach ($decl->types as $sub) {
                 $subs[] = self::fromTypeDecl($sub);
@@ -1540,6 +1542,13 @@ insert = """        if ($decl instanceof CfgType\\Union_) {
         }
 
 """
+insert = ""
+if "instanceof CfgType\\Union_" not in text:
+    insert += union_block
+if "instanceof CfgType\\Intersection" not in text:
+    insert += intersection_block
+if not insert:
+    raise SystemExit(0)
 path.write_text(text.replace(anchor, insert + anchor, 1))
 PY
   then
@@ -4063,13 +4072,20 @@ verify_critical_language_patches() {
     && ! grep -q 'public bool \$isEnumCase = false' "$const_file" 2>/dev/null; then
     missing+=("php-cfg-enum-class-const-Const_")
   fi
+  local vendor_type="$ROOT/vendor/ircmaxell/php-types/lib/PHPTypes/Type.php"
   if ! grep -q 'instanceof Op\\Type\\Union_' "$recon" 2>/dev/null; then
     missing+=("php-types-union-type")
   elif ! php -l "$recon" >/dev/null 2>&1; then
     missing+=("php-types-union-type-syntax")
   fi
+  if [[ -f "$vendor_type" ]] && ! grep -q 'instanceof CfgType\\Union_' "$vendor_type" 2>/dev/null; then
+    missing+=("php-types-union-type-Type")
+  fi
   if ! grep -q 'instanceof Op\\Type\\Intersection' "$recon" 2>/dev/null; then
     missing+=("php-types-intersection-type")
+  fi
+  if [[ -f "$vendor_type" ]] && ! grep -q 'instanceof CfgType\\Intersection' "$vendor_type" 2>/dev/null; then
+    missing+=("php-types-intersection-type-Type")
   fi
   if ! grep -qE 'public \$readonly|propertyFlags' "$prop" 2>/dev/null; then
     missing+=("php-cfg-property-readonly-Property")
