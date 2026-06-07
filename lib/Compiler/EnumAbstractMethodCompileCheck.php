@@ -10,7 +10,7 @@ use PHPCfg\Script;
 use PHPCompiler\VM\ClassAbstract;
 
 /**
- * Compile-time check: enums must implement declared abstract methods (#6618, #6887).
+ * Compile-time check: enums must implement declared abstract methods (#6618, #6887, #7353).
  *
  * php-src: Zend/zend_compile.c — enum abstract method validation;
  * Zend/zend_enum.c — enum method table / abstract enforcement.
@@ -19,16 +19,20 @@ use PHPCompiler\VM\ClassAbstract;
  */
 final class EnumAbstractMethodCompileCheck
 {
-    /** @var array<string, array{abstract: array<string, string>}> */
+    /** @var array<string, array{abstract: array<string, string>, concrete: array<string, true>}> */
     private array $traits = [];
 
     /** @var array<string, array{display: string, abstract: bool, abstractMethods: array<string, string>}> */
     private array $enums = [];
 
+    /** @var array<string, array{display: string, extends: list<string>, methods: array<string, true>}> */
+    private array $interfaces = [];
+
     public static function validate(Script $script): void
     {
         $check = new self();
         $check->collectTraits($script);
+        $check->collectInterfaces($script);
         $check->collectEnums($script);
         foreach ($script->main->cfg->children as $child) {
             if ($child instanceof Op\Stmt\Enum_) {
@@ -49,6 +53,41 @@ final class EnumAbstractMethodCompileCheck
             }
             $this->traits[$lc] = [
                 'abstract' => $this->collectAbstractMethodNames($child->stmts->children),
+                'concrete' => $this->collectConcreteMethodNames($child->stmts->children),
+            ];
+        }
+    }
+
+    private function collectInterfaces(Script $script): void
+    {
+        foreach ($script->main->cfg->children as $child) {
+            if (!$child instanceof Op\Stmt\Interface_) {
+                continue;
+            }
+            $lc = $this->operandLcName($child->name);
+            if (null === $lc) {
+                continue;
+            }
+            $methods = [];
+            foreach ($child->stmts->children as $member) {
+                if ($member instanceof Op\Stmt\ClassMethod) {
+                    $name = $member->func->name;
+                    if (is_string($name)) {
+                        $methods[strtolower($name)] = true;
+                    }
+                }
+            }
+            $extends = [];
+            foreach ($child->extends as $parentOperand) {
+                $parentLc = $this->operandLcName($parentOperand);
+                if (null !== $parentLc) {
+                    $extends[] = $parentLc;
+                }
+            }
+            $this->interfaces[$lc] = [
+                'display' => $this->operandDisplayName($child->name, $lc),
+                'extends' => $extends,
+                'methods' => $methods,
             ];
         }
     }
@@ -95,30 +134,44 @@ final class EnumAbstractMethodCompileCheck
                         $abstract[$methodLc] = $methodName;
                     }
                 }
-            }
-        }
-
-        foreach ($enum->implements as $implementedOperand) {
-            $implementedLc = $this->operandLcName($implementedOperand);
-            if (null === $implementedLc || !isset($this->enums[$implementedLc])) {
-                continue;
-            }
-            $implemented = $this->enums[$implementedLc];
-            if (!$implemented['abstract']) {
-                continue;
-            }
-            foreach ($implemented['abstractMethods'] as $methodLc => $methodName) {
-                if (!isset($abstract[$methodLc])) {
-                    $abstract[$methodLc] = $methodName;
+                foreach ($this->traits[$traitLc]['concrete'] as $methodLc => $_) {
+                    $concrete[$methodLc] = true;
                 }
             }
         }
 
+        $implementedInterfaces = [];
+        foreach ($enum->implements as $implementedOperand) {
+            $implementedLc = $this->operandLcName($implementedOperand);
+            if (null === $implementedLc) {
+                continue;
+            }
+            if (isset($this->enums[$implementedLc])) {
+                $implemented = $this->enums[$implementedLc];
+                if (!$implemented['abstract']) {
+                    continue;
+                }
+                foreach ($implemented['abstractMethods'] as $methodLc => $methodName) {
+                    if (!isset($abstract[$methodLc])) {
+                        $abstract[$methodLc] = $methodName;
+                    }
+                }
+                continue;
+            }
+            if (isset($this->interfaces[$implementedLc])) {
+                $implementedInterfaces[] = $implementedLc;
+            }
+        }
+
+        /** @var list<array{0: string, 1: string}> owner display, method display */
         $missing = [];
         foreach ($abstract as $methodLc => $methodName) {
             if (!isset($concrete[$methodLc])) {
-                $missing[$methodLc] = $methodName;
+                $missing[] = [$enumDisplay, $methodName];
             }
+        }
+        foreach ($this->missingInterfaceMethods($implementedInterfaces, $concrete) as [$ifaceDisplay, $methodDisplay]) {
+            $missing[] = [$ifaceDisplay, $methodDisplay];
         }
         if ([] === $missing) {
             return;
@@ -127,8 +180,8 @@ final class EnumAbstractMethodCompileCheck
         $count = count($missing);
         $suffix = 1 === $count ? '' : 's';
         $list = implode(', ', array_map(
-            static fn (string $name): string => $enumDisplay.'::'.$name,
-            array_values($missing)
+            static fn (array $pair): string => $pair[0].'::'.$pair[1],
+            $missing
         ));
         throw new CompileFatal(
             $enum->getFile(),
@@ -185,6 +238,50 @@ final class EnumAbstractMethodCompileCheck
         }
 
         return $methods;
+    }
+
+    /**
+     * @param list<string> $directInterfaces
+     * @param array<string, true> $provided
+     *
+     * @return list<array{0: string, 1: string}>
+     */
+    private function missingInterfaceMethods(array $directInterfaces, array $provided): array
+    {
+        $required = [];
+        $ifaceVisited = [];
+        $queue = $directInterfaces;
+        while ([] !== $queue) {
+            $ifaceLc = array_shift($queue);
+            if (isset($ifaceVisited[$ifaceLc])) {
+                continue;
+            }
+            $ifaceVisited[$ifaceLc] = true;
+            if (!isset($this->interfaces[$ifaceLc])) {
+                continue;
+            }
+            $iface = $this->interfaces[$ifaceLc];
+            foreach ($iface['methods'] as $methodLc => $_) {
+                $key = $ifaceLc.'::'.$methodLc;
+                if (!isset($required[$key])) {
+                    $required[$key] = [$iface['display'], $methodLc];
+                }
+            }
+            foreach ($iface['extends'] as $parentLc) {
+                $queue[] = $parentLc;
+            }
+        }
+
+        $missing = [];
+        foreach ($required as $pair) {
+            [$ifaceDisplay, $methodLc] = $pair;
+            if (isset($provided[$methodLc])) {
+                continue;
+            }
+            $missing[] = [$ifaceDisplay, $methodLc];
+        }
+
+        return $missing;
     }
 
     private function methodHasBody(Op\Stmt\ClassMethod $method): bool
