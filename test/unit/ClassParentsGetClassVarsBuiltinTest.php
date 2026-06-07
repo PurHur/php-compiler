@@ -82,4 +82,25 @@ PHP;
         $rt->run($block);
         $this->assertSame("2\n2\nhi\n0\nenum-ok", ob_get_clean());
     }
+
+    public function testVmGetClassVarsTraitStaticOnClass(): void
+    {
+        $code = <<<'PHP'
+<?php
+trait T7420 { public static int $a = 1; public static string $b = 'x'; }
+class C7420 { use T7420; public static int $c = 2; }
+class P7420 { public static int $p = 3; }
+class D7420 extends P7420 {}
+$v = get_class_vars(C7420::class);
+echo count($v), "\n", $v['a'], "\n", $v['b'], "\n", $v['c'], "\n";
+echo isset($v['hidden']) ? 'has-hidden' : 'no-hidden', "\n";
+$p = get_class_vars(D7420::class);
+echo count($p), "\n", $p['p'], "\n";
+PHP;
+        $rt = new Runtime();
+        $block = $rt->parseAndCompile($code, 'get_class_vars_trait_static.php');
+        ob_start();
+        $rt->run($block);
+        $this->assertSame("3\n1\nx\n2\nno-hidden\n1\n3\n", ob_get_clean());
+    }
 }

@@ -2373,6 +2373,34 @@ class Object_ extends Type {
     }
 
     /**
+     * Public static property compile-time defaults for get_class_vars() (#7420).
+     *
+     * @return array<string, array{type: int, value: int|float|bool|string|null}>
+     */
+    public function publicStaticPropertyDefaultEntries(int $classId): array
+    {
+        $entries = [];
+        foreach ($this->staticPropertyGlobals[$classId] ?? [] as $name => $entry) {
+            if (!MethodVisibility::isPublic($this->staticPropertyVisibility[$classId][$name] ?? \PHPCfg\Func::FLAG_PUBLIC)) {
+                continue;
+            }
+            if (!empty($entry['typedWithoutDefault']) && null === ($entry['default'] ?? null)) {
+                continue;
+            }
+            $default = $entry['default'] ?? null;
+            if (null === $default) {
+                continue;
+            }
+            $entries[$name] = [
+                'type' => $entry['type'],
+                'value' => $this->compileTimeValueFromVm($default),
+            ];
+        }
+
+        return $entries;
+    }
+
+    /**
      * Compile-time property default metadata for get_class_vars() (#3159).
      *
      * @return array<int, array{propertyType: int, type: int, value: int|float|bool|string|null}>
