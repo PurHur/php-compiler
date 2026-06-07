@@ -9,6 +9,8 @@ use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\Variable as JITVariable;
+use PHPCompiler\VM\BuiltinExecute;
+use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
 
 /** escapeshellarg() — shell-safe quoting (VM; JIT/AOT via __compiler_escapeshellarg). */
@@ -24,11 +26,10 @@ final class escapeshellarg extends Internal
         if (1 !== \count($frame->calledArgs)) {
             throw new \LogicException('escapeshellarg() requires exactly one argument');
         }
-        if (null === $frame->returnVar) {
-            return;
-        }
         $arg = VmString::coerceStringBuiltinArg($frame->calledArgs[0], 'escapeshellarg', 0, 'arg');
-        $frame->returnVar->string(\escapeshellarg($arg));
+        BuiltinExecute::writeReturn($frame, static function (Variable $ret) use ($arg): void {
+            $ret->string(\escapeshellarg($arg));
+        });
     }
 
     public function call(Context $context, JITVariable ...$args): Value
