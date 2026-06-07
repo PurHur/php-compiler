@@ -301,6 +301,7 @@ class String_ extends Type {
         \PHPCompiler\JIT\Builtin\StringDeployPath::implement($this->context);
         \PHPCompiler\JIT\Builtin\StringReadfile::implement($this->context);
         \PHPCompiler\JIT\Builtin\StringFileGetContents::implement($this->context);
+        \PHPCompiler\JIT\Builtin\MimeContentTypeRuntime::implement($this->context);
         \PHPCompiler\JIT\Builtin\StringFilePutContents::implement($this->context);
         \PHPCompiler\JIT\Builtin\StringDateTime::implement($this->context);
         \PHPCompiler\JIT\Builtin\StringGetdate::implement($this->context);
