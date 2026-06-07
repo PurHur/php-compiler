@@ -2205,8 +2205,12 @@ restart:
             case self::TYPE_BOOLEAN:
                 // PHP 8.2+ zend_operators.c: bool inc/dec is a no-op (issue #7058, re-#4727).
                 return;
+            case self::TYPE_UNDEFINED:
             case self::TYPE_NULL:
-                throw new \TypeError('Cannot increment null');
+                // Zend increment_function(): IS_NULL → int 0 then ++ (issue #7435).
+                $this->int(1);
+
+                return;
             case self::TYPE_INTEGER:
                 if ($this->isVmResource()) {
                     throw new \TypeError('Cannot increment resource');
@@ -2260,8 +2264,10 @@ restart:
             case self::TYPE_BOOLEAN:
                 // PHP 8.2+ zend_operators.c: bool inc/dec is a no-op (issue #7058, re-#4727).
                 return;
+            case self::TYPE_UNDEFINED:
             case self::TYPE_NULL:
-                throw new \TypeError('Cannot decrement null');
+                // Zend decrement_function(): IS_NULL is a no-op on PHP 8.x (issue #7435).
+                return;
             case self::TYPE_INTEGER:
                 if ($this->isVmResource()) {
                     throw new \TypeError('Cannot decrement resource');
