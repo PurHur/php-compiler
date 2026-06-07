@@ -42,13 +42,37 @@ final class VmSerialize
             }
         }
 
-        $exported = VmJson::export($value);
-        $encoded = \serialize($exported);
+        return self::serializeExported(VmJson::export($value));
+    }
+
+    /**
+     * Serialize exported PHP data using VM serialize_precision (php-src var.c / PG(serialize_precision); #7100).
+     */
+    public static function serializeExported(mixed $exported): string
+    {
+        $encoded = self::hostSerializeWithVmPrecision($exported);
         if (false === $encoded) {
             throw new \LogicException('serialize() failed');
         }
 
         return $encoded;
+    }
+
+    /**
+     * Delegate to host serialize() while honoring VmIni precision (VM-on-Zend parity path).
+     */
+    private static function hostSerializeWithVmPrecision(mixed $value): string|false
+    {
+        $precision = VmIni::getSerializePrecision();
+        $previous = \ini_get('serialize_precision');
+        \ini_set('serialize_precision', $precision);
+        try {
+            return \serialize($value);
+        } finally {
+            if (false !== $previous) {
+                \ini_set('serialize_precision', $previous);
+            }
+        }
     }
 
     /**
@@ -304,12 +328,7 @@ final class VmSerialize
 
     private static function encodeSerializedScalar(mixed $exported): string
     {
-        $encoded = \serialize($exported);
-        if (false === $encoded) {
-            throw new \LogicException('serialize() failed');
-        }
-
-        return $encoded;
+        return self::serializeExported($exported);
     }
 
     /** @param array<string, mixed> $data */
