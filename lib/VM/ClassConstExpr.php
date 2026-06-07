@@ -187,8 +187,15 @@ final class ClassConstExpr
             return;
         }
         if (!isset($entry->constants[$constName])) {
+            if (
+                null !== $entry->forwardDeclaredConstNames
+                && isset($entry->forwardDeclaredConstNames[$constName])
+            ) {
+                throw new ClassConstForwardReferenceException($entry->name, $constName);
+            }
+            $display = $entry->constNames[$constName] ?? $constName;
             throw new \LogicException(
-                "Undefined class constant {$entry->name}::{$constName}"
+                "Undefined class constant {$entry->name}::{$display}"
             );
         }
         if (EnumCaseSupport::tryMaterializeEnumCaseConstantFetch($entry, $constName, $frame->scope[$op->arg1])) {
