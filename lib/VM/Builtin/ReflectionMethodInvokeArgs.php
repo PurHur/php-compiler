@@ -1,0 +1,43 @@
+<?php
+
+declare(strict_types=1);
+
+namespace PHPCompiler\VM\Builtin;
+
+use PHPCompiler\Frame;
+use PHPCompiler\VM;
+use PHPCompiler\VM\ReflectionSupport;
+use PHPCompiler\VM\Variable;
+
+/** ReflectionMethod::invokeArgs($object, array $args) — VM (#7117, php_reflection.c). */
+final class ReflectionMethodInvokeArgs extends VmClassMethod
+{
+    public function __construct()
+    {
+        parent::__construct('invokeArgs');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $argc = \count($frame->calledArgs);
+        if ($argc < 3) {
+            throw new \ArgumentCountError(
+                'ReflectionMethod::invokeArgs() expects exactly 2 arguments, '.($argc - 1).' given'
+            );
+        }
+        $reflection = ReflectionSupport::requireReflectionMethod($frame, $frame->calledArgs[0]);
+        $objectArg = $frame->calledArgs[1];
+        $invokeArgs = ReflectionSupport::invokeArgsFromArray(
+            $frame->calledArgs[2],
+            'ReflectionMethod::invokeArgs'
+        );
+        $vm = VM::running();
+        if (null === $vm) {
+            throw new \LogicException('ReflectionMethod::invokeArgs() requires active VM');
+        }
+        $result = ReflectionSupport::invokeReflectedMethod($vm, $frame, $reflection, $objectArg, $invokeArgs);
+        if (null !== $frame->returnVar) {
+            $frame->returnVar->copyFrom($result);
+        }
+    }
+}

@@ -74,6 +74,8 @@ use PHPCompiler\VM\Builtin\ReflectionMethodConstruct;
 use PHPCompiler\VM\Builtin\ReflectionMethodGetAttributes;
 use PHPCompiler\VM\Builtin\ReflectionMethodGetName;
 use PHPCompiler\VM\Builtin\ReflectionMethodGetParameters;
+use PHPCompiler\VM\Builtin\ReflectionMethodInvoke;
+use PHPCompiler\VM\Builtin\ReflectionMethodInvokeArgs;
 use PHPCompiler\VM\Builtin\ReflectionMethodIsDeprecated;
 use PHPCompiler\VM\Builtin\ReflectionNamedTypeGetName;
 use PHPCompiler\VM\Builtin\ReflectionNamedTypeIsBuiltin;
@@ -278,6 +280,10 @@ final class BuiltinClasses
         $rm->methodVisibility['getname'] = $pub;
         $rm->methods['isdeprecated'] = new ReflectionMethodIsDeprecated();
         $rm->methodVisibility['isdeprecated'] = $pub;
+        $rm->methods['invoke'] = new ReflectionMethodInvoke();
+        $rm->methodVisibility['invoke'] = $pub;
+        $rm->methods['invokeargs'] = new ReflectionMethodInvokeArgs();
+        $rm->methodVisibility['invokeargs'] = $pub;
         $ctx->classes[ReflectionSupport::REFLECTION_METHOD] = $rm;
 
         $rc = new ClassEntry('ReflectionClass');

@@ -6,6 +6,7 @@ namespace PHPCompiler\VM;
 
 use PHPCompiler\Compiler\AttributeEntry;
 use PHPCompiler\Compiler\CompileTimeNew;
+use PHPCompiler\ext\standard\VmReflection;
 use PHPCompiler\Frame;
 use PHPCompiler\Func;
 use PHPCompiler\VM as VmEngine;
@@ -832,5 +833,109 @@ final class ReflectionSupport
         $flag = $reflection->getProperty(self::PROP_TYPE_ALLOWS_NULL)->resolveIndirect();
 
         return $flag->toBool();
+    }
+
+    /**
+     * @return array{0: ClassEntry, 1: string, 2: Func}
+     */
+    public static function resolveReflectedMethod(Context $ctx, ObjectEntry $reflection): array
+    {
+        $className = self::classNameFromReflection($reflection);
+        $methodName = self::methodNameFromReflection($reflection);
+        $entry = VmReflection::resolveClassEntry($ctx, $className);
+        if (null === $entry) {
+            self::throwReflectionException(self::classNotFoundMessage($className));
+        }
+        $methodLc = strtolower($methodName);
+        $lcClass = strtolower($entry->name);
+        $visited = [];
+        while (!isset($visited[$lcClass])) {
+            $visited[$lcClass] = true;
+            if (!isset($ctx->classes[$lcClass])) {
+                break;
+            }
+            $class = $ctx->classes[$lcClass];
+            if (isset($class->methods[$methodLc])) {
+                return [$class, $methodLc, $class->methods[$methodLc]];
+            }
+            if (null === $class->parentLc) {
+                break;
+            }
+            $lcClass = $class->parentLc;
+        }
+
+        self::throwReflectionException(self::methodNotFoundMessage($entry->name, $methodName));
+    }
+
+    /**
+     * @param list<Variable> $invokeArgs
+     */
+    public static function invokeReflectedMethod(
+        VmEngine $vm,
+        Frame $frame,
+        ObjectEntry $reflection,
+        Variable $objectArg,
+        array $invokeArgs
+    ): Variable {
+        $ctx = VmReflection::requireContext($frame);
+        [$declaring, $methodLc, $func] = self::resolveReflectedMethod($ctx, $reflection);
+        $methodName = $declaring->methodNames[$methodLc] ?? self::methodNameFromReflection($reflection);
+        if (!$func instanceof Func\PHP) {
+            throw new \LogicException("{$declaring->name}::{$methodName}() is not a user method in this compiler build");
+        }
+        if (self::methodIsStatic($func)) {
+            return $vm->invokeStaticWithCalledScope($declaring->name, $methodName, ...$invokeArgs);
+        }
+        $objectArg = $objectArg->resolveIndirect();
+        if (Variable::TYPE_NULL === $objectArg->type) {
+            self::throwReflectionException(
+                'Trying to invoke non static method '.$declaring->name.'::'.$methodName.'() without an object'
+            );
+        }
+        if (Variable::TYPE_OBJECT !== $objectArg->type) {
+            throw new \TypeError(
+                'ReflectionMethod::invoke(): Argument #1 ($object) must be of type ?object, '
+                .self::valueTypeLabel($objectArg).' given'
+            );
+        }
+        if (!VmReflection::isInstanceOfObject($ctx, $objectArg, $declaring->name)) {
+            self::throwReflectionException(
+                'Given object is not an instance of the class this method was declared in'
+            );
+        }
+
+        return $vm->invokeInstanceMethod($objectArg->toObject(), $methodName, ...$invokeArgs);
+    }
+
+    /**
+     * @return list<Variable>
+     */
+    public static function invokeArgsFromArray(Variable $argsVar, string $methodLabel): array
+    {
+        $argsVar = $argsVar->resolveIndirect();
+        if (Variable::TYPE_ARRAY !== $argsVar->type) {
+            throw new \TypeError(
+                $methodLabel.'(): Argument #2 ($args) must be of type array, '
+                .self::valueTypeLabel($argsVar).' given'
+            );
+        }
+        $invokeArgs = [];
+        foreach ($argsVar->toArray()->iterate(true) as $value) {
+            $copy = new Variable();
+            $copy->copyFrom($value);
+            $invokeArgs[] = $copy;
+        }
+
+        return $invokeArgs;
+    }
+
+    private static function methodIsStatic(Func $func): bool
+    {
+        if (!$func instanceof Func\PHP) {
+            return false;
+        }
+        $decl = $func->block->func;
+
+        return null !== $decl && (($decl->flags ?? 0) & \PHPCfg\Func::FLAG_STATIC) !== 0;
     }
 }
