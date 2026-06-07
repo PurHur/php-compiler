@@ -79,6 +79,11 @@ final class DeprecatedMetadata
         return 'Enum case '.$class.'::'.$case.' is deprecated'.$this->suffix();
     }
 
+    public function formatProperty(string $class, string $property): string
+    {
+        return 'Property '.$class.'::$'.$property.' is deprecated'.$this->suffix();
+    }
+
     private function suffix(): string
     {
         if (null !== $this->since && null !== $this->message) {

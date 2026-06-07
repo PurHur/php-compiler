@@ -3403,6 +3403,7 @@ class Compiler {
                     $this->assignAttributeMetadata($declare, $child);
                     AttributeNames::assertOverrideMethodTargetOnly($declare->attributeNames, 'property');
                     AttributeNames::assertCompileTimeConstTargetOnly($declare->attributeNames, 'property');
+                    $declare->deprecatedMetadata = DeprecatedMetadata::fromOp($child);
                     $result->addOpCode($declare);
                     break;
                 case Op\Stmt\ClassMethod::class:
@@ -3870,6 +3871,7 @@ class Compiler {
         $declare->propertyVisibility = MethodVisibility::mask($param->promotionFlags);
         $declare->propertySetVisibility = $this->asymmetricSetVisibilityFromCfgOp($param);
         $declare->propertyGetVisibility = $this->asymmetricGetVisibilityFromCfgOp($param);
+        $declare->deprecatedMetadata = DeprecatedMetadata::fromOp($param);
         $result->addOpCode($declare);
     }
 

@@ -1689,6 +1689,7 @@ restart:
                         $frame = $catchFrame;
                         goto restart;
                     }
+                    $this->emitPropertyWriteDeprecation($arg2, $frame);
                     try {
                         if ($this->dispatchPropertySetHookAssign($arg2, $arg3, $frame)) {
                             $this->deliverPropertySetHookAssignResult($arg1, $arg3);
@@ -1813,6 +1814,7 @@ restart:
                             goto restart;
                         }
                     }
+                    $this->emitPropertyWriteDeprecation($lhs, $frame);
                     $rhsSlot = $frame->scope[$op->arg2];
                     // Reference acquisition follows set visibility (php.net asymmetric visibility, #7070).
                     $catchFrame = $this->enforcePropertyVisibilityWrite($rhsSlot, $frame);
@@ -3157,6 +3159,9 @@ restart:
                         } else {
                             $dest->copyFrom($hookValue);
                         }
+                        if (!$forWrite) {
+                            $this->emitStaticPropertyAccessDeprecation($lcClass, $propNameRaw, $frame);
+                        }
                         break;
                     }
                     if (
@@ -3171,6 +3176,7 @@ restart:
                             $dest->copyFrom($hookValue);
                             $dest->staticPropertyClassLc = $lcClass;
                             $dest->objectPropertyName = $propNameRaw;
+                            $this->emitStaticPropertyAccessDeprecation($lcClass, $propNameRaw, $frame);
                             break;
                         }
                         $dest = $frame->scope[$op->arg1];
@@ -3198,6 +3204,9 @@ restart:
                     $dest->indirect($storage);
                     $dest->staticPropertyClassLc = $lcClass;
                     $dest->objectPropertyName = $propNameRaw;
+                    if (!$forWrite) {
+                        $this->emitStaticPropertyAccessDeprecation($lcClass, $propNameRaw, $frame);
+                    }
                     break;
                 case OpCode::TYPE_STATIC_PROPERTY_UNSET:
                     $classOperand = $frame->scope[$op->arg2]->resolveIndirect();
@@ -4295,6 +4304,9 @@ restart:
                         }
                     }
                     if ($propertyObject->hasProperty($name) && !$magicGetForRead) {
+                        if (!$forWrite) {
+                            $this->emitInstancePropertyAccessDeprecation($propertyObject, $name, $frame);
+                        }
                         if ($forWrite) {
                             $result->indirect($this->fetchObjectPropertyWriteLvalue($propertyObject, $name, $frame));
                             break;
@@ -9549,6 +9561,9 @@ restart:
             if (isset($trait->propertyAttributeEntries[$propLc])) {
                 $entry->propertyAttributeEntries[$propLc] = $trait->propertyAttributeEntries[$propLc];
             }
+            if (isset($trait->propDeprecated[$propLc])) {
+                $entry->propDeprecated[$propLc] = $trait->propDeprecated[$propLc];
+            }
         }
     }
 
@@ -9887,6 +9902,11 @@ restart:
                 }
             }
         }
+        foreach ($parent->propDeprecated as $name => $deprecated) {
+            if (!isset($entry->propDeprecated[$name])) {
+                $entry->propDeprecated[$name] = $deprecated;
+            }
+        }
         if (null === $entry->constructor && null !== $parent->constructor) {
             $entry->constructor = $parent->constructor;
         }
@@ -10075,6 +10095,9 @@ restart:
                     if ([] !== $op->attributeEntries) {
                         $entry->propertyAttributeEntries[$propLc] = $op->attributeEntries;
                     }
+                    if (null !== $op->deprecatedMetadata) {
+                        $entry->propDeprecated[$propLc] = $op->deprecatedMetadata;
+                    }
                     break;
                 case OpCode::TYPE_DECLARE_STATIC_PROPERTY:
                     $this->flushPendingTraitUses($entry, $pendingTraits, $ownMethods);
@@ -10094,6 +10117,9 @@ restart:
                     $entry->staticPropertySetVisibility[$name] = (int) ($op->propertySetVisibility ?? 0);
                     $entry->staticPropertyGetVisibility[$name] = (int) ($op->propertyGetVisibility ?? 0);
                     $entry->staticPropertyDeclaringClassLc[$name] = strtolower($entry->name);
+                    if (null !== $op->deprecatedMetadata) {
+                        $entry->propDeprecated[$name] = $op->deprecatedMetadata;
+                    }
                     break;
                 case OpCode::TYPE_DECLARE_METHOD:
                     $this->flushPendingTraitUses($entry, $pendingTraits, $ownMethods);
@@ -10733,6 +10759,78 @@ restart:
                 ),
                 $frame
             );
+        }
+    }
+
+    private function emitInstancePropertyAccessDeprecation(
+        ObjectEntry $object,
+        string $propName,
+        Frame $frame
+    ): void {
+        $meta = $this->classPropertyMeta($object, $propName);
+        if (null === $meta) {
+            return;
+        }
+        $declLc = '' !== $meta->declaringClassLc
+            ? $meta->declaringClassLc
+            : strtolower($object->class->name);
+        if (!isset($this->context->classes[$declLc])) {
+            return;
+        }
+        $declEntry = $this->context->classes[$declLc];
+        $propLc = strtolower($propName);
+        if (!isset($declEntry->propDeprecated[$propLc])) {
+            return;
+        }
+        $this->emitDeprecatedNotice(
+            $declEntry->propDeprecated[$propLc]->formatProperty($declEntry->name, $propName),
+            $frame
+        );
+    }
+
+    private function emitStaticPropertyAccessDeprecation(
+        string $classLc,
+        string $propNameRaw,
+        Frame $frame
+    ): void {
+        $meta = $this->resolveStaticPropertyVisibilityMeta($classLc, strtolower($propNameRaw));
+        if (null === $meta) {
+            return;
+        }
+        $declLc = $meta['declaringClassLc'];
+        if (!isset($this->context->classes[$declLc])) {
+            return;
+        }
+        $declEntry = $this->context->classes[$declLc];
+        $propLc = strtolower($propNameRaw);
+        if (!isset($declEntry->propDeprecated[$propLc])) {
+            return;
+        }
+        $this->emitDeprecatedNotice(
+            $declEntry->propDeprecated[$propLc]->formatProperty(
+                $meta['declaringClassDisplay'],
+                $propNameRaw
+            ),
+            $frame
+        );
+    }
+
+    private function emitPropertyWriteDeprecation(Variable $lvalue, Frame $frame): void
+    {
+        $target = $lvalue->resolveIndirect();
+        if (null !== $target->objectPropertyOwner && null !== $target->objectPropertyName) {
+            $this->emitInstancePropertyAccessDeprecation(
+                $target->objectPropertyOwner,
+                $target->objectPropertyName,
+                $frame
+            );
+
+            return;
+        }
+        $classLc = $target->staticPropertyClassLc ?? $lvalue->staticPropertyClassLc;
+        $propName = $target->objectPropertyName ?? $lvalue->objectPropertyName;
+        if (is_string($classLc) && is_string($propName) && '' !== $propName) {
+            $this->emitStaticPropertyAccessDeprecation($classLc, $propName, $frame);
         }
     }
 
