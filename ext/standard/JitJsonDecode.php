@@ -90,6 +90,300 @@ final class JitJsonDecode
         return $ptr;
     }
 
+    public static function decodeRuntimeObjectMode(Context $context, JITVariable $json): Value
+    {
+        throw new \LogicException(
+            'json_decode() assoc=false requires a compile-time JSON string in JIT/AOT in this compiler build'
+        );
+    }
+
+    /**
+     * @param int|float|bool|string|array<string|int, mixed>|\stdClass|null $decoded
+     */
+    public static function materializeDecoded(Context $context, mixed $decoded, bool $assoc): Value
+    {
+        if (null === $decoded) {
+            return self::materializeNull($context);
+        }
+        if (\is_bool($decoded) || \is_int($decoded) || \is_float($decoded) || \is_string($decoded)) {
+            return self::materializeScalar($context, $decoded);
+        }
+        if ($assoc) {
+            if (!\is_array($decoded)) {
+                throw new \LogicException('json_decode() assoc=true expects array result');
+            }
+
+            return self::materializeArray($context, $decoded);
+        }
+        if (\is_array($decoded)) {
+            return self::materializeArrayDeepObjectMode($context, $decoded);
+        }
+        if ($decoded instanceof \stdClass) {
+            return self::materializeStdClass($context, $decoded);
+        }
+
+        throw new \LogicException('json_decode() result type not supported for JIT materialization');
+    }
+
+    /**
+     * @param array<string|int, mixed> $data
+     */
+    private static function materializeArrayDeepObjectMode(Context $context, array $data): Value
+    {
+        $ht = self::buildHashtableFromPhpObjectMode($context, $data);
+        $context->refcount->addref($ht);
+
+        $slot = JitValueBox::alloc($context);
+        $ptr = JitValueBox::pointer($context, $slot);
+        $context->builder->call($context->lookupFunction('__value__writeHashtable'), $ptr, $ht);
+
+        return $ptr;
+    }
+
+    /**
+     * @param array<string|int, mixed> $data
+     */
+    private static function buildHashtableFromPhpObjectMode(Context $context, array $data): Value
+    {
+        $ht = HashTableHelper::alloc($context);
+        $isList = array_is_list($data);
+        foreach ($data as $key => $value) {
+            if ($isList) {
+                self::storeIndexValueObjectMode($context, $ht, (int) $key, $value);
+                continue;
+            }
+            $keyStr = $context->builder->load($context->constantStringFromString((string) $key));
+            self::storeStringKeyValueObjectMode($context, $ht, $keyStr, $value);
+        }
+
+        return $ht;
+    }
+
+    private static function storeIndexValueObjectMode(Context $context, Value $ht, int $index, mixed $value): void
+    {
+        if (\is_array($value)) {
+            $child = self::buildHashtableFromPhpObjectMode($context, $value);
+            $context->builder->call(
+                $context->lookupFunction('__hashtable__setHashtableAt'),
+                $ht,
+                $context->getTypeFromString('size_t')->constInt($index, false),
+                $child
+            );
+
+            return;
+        }
+        if ($value instanceof \stdClass) {
+            $obj = self::allocateStdClassFromPhp($context, $value);
+            $context->builder->call(
+                $context->lookupFunction('__hashtable__setObjectAt'),
+                $ht,
+                $context->getTypeFromString('size_t')->constInt($index, false),
+                $obj
+            );
+
+            return;
+        }
+        if (\is_bool($value)) {
+            $context->builder->call(
+                $context->lookupFunction('__hashtable__setBoolAt'),
+                $ht,
+                $context->getTypeFromString('size_t')->constInt($index, false),
+                $context->getTypeFromString('int1')->constInt($value ? 1 : 0, false)
+            );
+
+            return;
+        }
+        if (\is_int($value)) {
+            $context->builder->call(
+                $context->lookupFunction('__hashtable__setLongAt'),
+                $ht,
+                $context->getTypeFromString('size_t')->constInt($index, false),
+                $context->getTypeFromString('int64')->constInt($value, false)
+            );
+
+            return;
+        }
+        if (\is_float($value)) {
+            $context->builder->call(
+                $context->lookupFunction('__hashtable__setDoubleAt'),
+                $ht,
+                $context->getTypeFromString('size_t')->constInt($index, false),
+                $context->getTypeFromString('double')->constReal($value, false)
+            );
+
+            return;
+        }
+        if (null === $value) {
+            $context->builder->call(
+                $context->lookupFunction('__hashtable__setNullAt'),
+                $ht,
+                $context->getTypeFromString('size_t')->constInt($index, false)
+            );
+
+            return;
+        }
+        $context->builder->call(
+            $context->lookupFunction('__hashtable__setStringAt'),
+            $ht,
+            $context->getTypeFromString('size_t')->constInt($index, false),
+            $context->builder->load($context->constantStringFromString((string) $value))
+        );
+    }
+
+    private static function storeStringKeyValueObjectMode(Context $context, Value $ht, Value $keyStr, mixed $value): void
+    {
+        if (\is_array($value)) {
+            $child = self::buildHashtableFromPhpObjectMode($context, $value);
+            $context->builder->call(
+                $context->lookupFunction('__hashtable__setStringKeyHashtable'),
+                $ht,
+                $keyStr,
+                $child
+            );
+
+            return;
+        }
+        if (\is_bool($value)) {
+            $context->builder->call(
+                $context->lookupFunction('__hashtable__setStringKeyBool'),
+                $ht,
+                $keyStr,
+                $context->getTypeFromString('int1')->constInt($value ? 1 : 0, false)
+            );
+
+            return;
+        }
+        if (\is_int($value)) {
+            $context->builder->call(
+                $context->lookupFunction('__hashtable__setStringKeyLong'),
+                $ht,
+                $keyStr,
+                $context->getTypeFromString('int64')->constInt($value, false)
+            );
+
+            return;
+        }
+        if (\is_float($value)) {
+            $context->builder->call(
+                $context->lookupFunction('__hashtable__setStringKeyDouble'),
+                $ht,
+                $keyStr,
+                $context->getTypeFromString('double')->constReal($value, false)
+            );
+
+            return;
+        }
+        $context->builder->call(
+            $context->lookupFunction('__hashtable__setStringKeyString'),
+            $ht,
+            $keyStr,
+            self::scalarToJitString($context, $value)
+        );
+    }
+
+    private static function materializeStdClass(Context $context, \stdClass $obj): Value
+    {
+        $objectPtr = self::allocateStdClassFromPhp($context, $obj);
+        $slot = JitValueBox::alloc($context);
+        $ptr = JitValueBox::pointer($context, $slot);
+        $context->builder->call(
+            $context->lookupFunction('__value__writeObject'),
+            $ptr,
+            $objectPtr
+        );
+
+        return $ptr;
+    }
+
+    private static function allocateStdClassFromPhp(Context $context, \stdClass $obj): Value
+    {
+        $classId = $context->type->object->lookup('stdclass');
+        $objectPtr = $context->type->object->allocate($classId);
+        $context->type->object->markObjectConstructed($objectPtr);
+        foreach ((array) $obj as $prop => $value) {
+            $propName = (string) $prop;
+            $context->type->object->defineProperty($classId, $propName, \PHPCompiler\JIT\Variable::TYPE_VALUE);
+            $context->type->object->storeInstanceProperty(
+                $objectPtr,
+                'stdClass',
+                $propName,
+                self::materializeDecodedPropertyValue($context, $value)
+            );
+        }
+
+        return $objectPtr;
+    }
+
+    private static function materializeDecodedPropertyValue(Context $context, mixed $value): \PHPCompiler\JIT\Variable
+    {
+        if (null === $value) {
+            return new \PHPCompiler\JIT\Variable(
+                $context,
+                \PHPCompiler\JIT\Variable::TYPE_NULL,
+                \PHPCompiler\JIT\Variable::KIND_VALUE,
+                $context->getTypeFromString('void*')->constNull()
+            );
+        }
+        if (\is_bool($value)) {
+            $i1 = $context->getTypeFromString('int1');
+
+            return new \PHPCompiler\JIT\Variable(
+                $context,
+                \PHPCompiler\JIT\Variable::TYPE_NATIVE_BOOL,
+                \PHPCompiler\JIT\Variable::KIND_VALUE,
+                $i1->constInt($value ? 1 : 0, false)
+            );
+        }
+        if (\is_int($value)) {
+            return new \PHPCompiler\JIT\Variable(
+                $context,
+                \PHPCompiler\JIT\Variable::TYPE_NATIVE_LONG,
+                \PHPCompiler\JIT\Variable::KIND_VALUE,
+                $context->getTypeFromString('int64')->constInt($value, false)
+            );
+        }
+        if (\is_float($value)) {
+            return new \PHPCompiler\JIT\Variable(
+                $context,
+                \PHPCompiler\JIT\Variable::TYPE_NATIVE_DOUBLE,
+                \PHPCompiler\JIT\Variable::KIND_VALUE,
+                $context->getTypeFromString('double')->constReal($value, false)
+            );
+        }
+        if (\is_string($value)) {
+            return new \PHPCompiler\JIT\Variable(
+                $context,
+                \PHPCompiler\JIT\Variable::TYPE_STRING,
+                \PHPCompiler\JIT\Variable::KIND_VALUE,
+                $context->builder->load($context->constantStringFromString($value))
+            );
+        }
+        if (\is_array($value)) {
+            $ht = self::buildHashtableFromPhpObjectMode($context, $value);
+            $context->refcount->addref($ht);
+
+            return new \PHPCompiler\JIT\Variable(
+                $context,
+                \PHPCompiler\JIT\Variable::TYPE_HASHTABLE,
+                \PHPCompiler\JIT\Variable::KIND_VALUE,
+                $ht
+            );
+        }
+        if ($value instanceof \stdClass) {
+            $obj = self::allocateStdClassFromPhp($context, $value);
+            $context->refcount->addref($obj);
+
+            return new \PHPCompiler\JIT\Variable(
+                $context,
+                \PHPCompiler\JIT\Variable::TYPE_OBJECT,
+                \PHPCompiler\JIT\Variable::KIND_VALUE,
+                $obj
+            );
+        }
+
+        throw new \LogicException('json_decode() property type not supported for JIT materialization');
+    }
+
     private static function buildHashtableFromPhp(Context $context, array $data): Value
     {
         $ht = HashTableHelper::alloc($context);
