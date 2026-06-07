@@ -192,23 +192,38 @@ final class DnfParamCheck
             'null' => \PHPCompiler\VM\Variable::TYPE_NULL,
             default => null,
         };
-        if (null === $vmTy) {
+        if (null !== $vmTy) {
+            $scalar = self::scalarGivenLabel($arg);
+            if (null !== $scalar) {
+                return new Variable(
+                    $context,
+                    Variable::TYPE_NATIVE_BOOL,
+                    Variable::KIND_VALUE,
+                    $i1->constInt($scalar === $name ? 1 : 0, false)
+                );
+            }
+            if (Variable::TYPE_VALUE === $arg->type) {
+                return self::emitValueBoxTypeEquals($context, $arg, $vmTy);
+            }
+
             return new Variable($context, Variable::TYPE_NATIVE_BOOL, Variable::KIND_VALUE, $i1->constInt(0, false));
         }
-        $scalar = self::scalarGivenLabel($arg);
-        if (null !== $scalar) {
-            return new Variable(
-                $context,
-                Variable::TYPE_NATIVE_BOOL,
-                Variable::KIND_VALUE,
-                $i1->constInt($scalar === $name ? 1 : 0, false)
-            );
+
+        return self::emitClassNameLiteralMatches($context, $arg, $name);
+    }
+
+    private static function emitClassNameLiteralMatches(Context $context, Variable $arg, string $name): Variable
+    {
+        $i1 = $context->getTypeFromString('int1');
+        $objectType = $context->type->object;
+        if (!$objectType instanceof ObjectType) {
+            return new Variable($context, Variable::TYPE_NATIVE_BOOL, Variable::KIND_VALUE, $i1->constInt(0, false));
         }
-        if (Variable::TYPE_VALUE === $arg->type) {
-            return self::emitValueBoxTypeEquals($context, $arg, $vmTy);
+        if (null !== self::scalarGivenLabel($arg)) {
+            return new Variable($context, Variable::TYPE_NATIVE_BOOL, Variable::KIND_VALUE, $i1->constInt(0, false));
         }
 
-        return new Variable($context, Variable::TYPE_NATIVE_BOOL, Variable::KIND_VALUE, $i1->constInt(0, false));
+        return $objectType->emitInstanceOf($arg, $name);
     }
 
     private static function emitLiteralTrueFalseMatches(Context $context, Variable $arg, bool $expectTrue): Variable
@@ -356,7 +371,8 @@ final class DnfParamCheck
             $classLc = strtolower(ltrim($name, '\\'));
             $ifaces = $objectType->allInterfacesForClassLc($classLc);
             $matches = in_array($ifaceLc, $ifaces, true)
-                || ($objectType->isInterfaceClassLc($classLc) && $classLc === $ifaceLc);
+                || ($objectType->isInterfaceClassLc($classLc) && $classLc === $ifaceLc)
+                || ('stringable' === $ifaceLc && $objectType->classHasImplicitStringableLc($classLc));
             if (!$matches) {
                 continue;
             }

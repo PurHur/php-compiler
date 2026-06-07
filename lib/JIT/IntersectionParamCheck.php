@@ -90,7 +90,8 @@ final class IntersectionParamCheck
             $classLc = strtolower(ltrim($name, '\\'));
             $ifaces = $objectType->allInterfacesForClassLc($classLc);
             $matches = in_array($ifaceLc, $ifaces, true)
-                || ($objectType->isInterfaceClassLc($classLc) && $classLc === $ifaceLc);
+                || ($objectType->isInterfaceClassLc($classLc) && $classLc === $ifaceLc)
+                || ('stringable' === $ifaceLc && $objectType->classHasImplicitStringableLc($classLc));
             if (!$matches) {
                 continue;
             }
