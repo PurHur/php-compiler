@@ -19,7 +19,8 @@ final class PosixModuleSkeletonTest extends TestCase
         $runtime = new Runtime();
         $ctx = $runtime->vmContext;
 
-        foreach (['posix_getpid', 'posix_getppid', 'posix_strerror', 'posix_get_last_error', 'posix_errno'] as $fn) {
+        foreach (['posix_getpid', 'posix_getppid', 'posix_strerror', 'posix_get_last_error', 'posix_errno',
+            'posix_access', 'posix_mknod', 'posix_setuid', 'posix_setgid', 'posix_seteuid', 'posix_setegid'] as $fn) {
             self::assertTrue(VmReflection::functionExists($ctx, $fn), $fn);
         }
 
@@ -30,12 +31,18 @@ echo (int) function_exists('posix_getppid');
 echo (int) function_exists('posix_strerror');
 echo (int) function_exists('posix_get_last_error');
 echo (int) function_exists('posix_errno');
+echo (int) function_exists('posix_access');
+echo (int) function_exists('posix_mknod');
+echo (int) function_exists('posix_setuid');
+echo (int) function_exists('posix_setgid');
+echo (int) function_exists('posix_seteuid');
+echo (int) function_exists('posix_setegid');
 echo (int) extension_loaded('posix');
 PHP;
         $block = $runtime->parseAndCompile($code, 'posix_module.php');
         ob_start();
         $runtime->run($block);
-        self::assertSame('111111', ob_get_clean());
+        self::assertSame('111111111111', ob_get_clean());
     }
 
     public function test_posix_getpid_returns_positive_int(): void
