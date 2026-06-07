@@ -8,6 +8,7 @@ use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\SuperglobalInit;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\Variable;
@@ -23,15 +24,20 @@ final class filter_input extends Internal
         if ($argc < 3 || $argc > 4) {
             throw new \LogicException('filter_input() requires three or four arguments in this compiler build');
         }
-        if (null === $frame->returnVar) {
-            return;
-        }
         $type = $frame->calledArgs[0]->resolveIndirect();
-        $key = $frame->calledArgs[1]->resolveIndirect();
+        if (Variable::TYPE_INTEGER !== $type->type) {
+            throw new \LogicException(
+                'filter_input() requires (int type, string key, int filter) in this compiler build'
+            );
+        }
+        $keyStr = VmString::coerceStringBuiltinArg(
+            $frame->calledArgs[1],
+            'filter_input',
+            1,
+            'variable_name'
+        );
         $filter = $frame->calledArgs[2]->resolveIndirect();
-        if (Variable::TYPE_INTEGER !== $type->type
-            || Variable::TYPE_STRING !== $key->type
-            || Variable::TYPE_INTEGER !== $filter->type) {
+        if (Variable::TYPE_INTEGER !== $filter->type) {
             throw new \LogicException(
                 'filter_input() requires (int type, string key, int filter) in this compiler build'
             );
@@ -41,6 +47,9 @@ final class filter_input extends Internal
             if (!$options->isUndefined() && Variable::TYPE_NULL !== $options->type) {
                 throw new \LogicException('filter_input() options are not supported in this compiler build');
             }
+        }
+        if (null === $frame->returnVar) {
+            return;
         }
         $ctx = $frame->vmContext;
         if (null === $ctx) {
@@ -54,14 +63,14 @@ final class filter_input extends Internal
             return;
         }
         $keyVar = new Variable();
-        $keyVar->string($key->toString());
+        $keyVar->string($keyStr);
         $ht = $sg->toArray();
         if (!$ht->offsetIsSet($keyVar)) {
             $frame->returnVar->null();
 
             return;
         }
-        $stored = $ht->find($key->toString());
+        $stored = $ht->find($keyStr);
         if (null === $stored) {
             $frame->returnVar->null();
 
@@ -76,12 +85,12 @@ final class filter_input extends Internal
         if (\count($args) < 3 || \count($args) > 4) {
             throw new \LogicException('filter_input() requires three or four arguments in this compiler build');
         }
-        if (JITVariable::TYPE_STRING !== $args[1]->type) {
-            throw new \LogicException('filter_input() key must be a string in this compiler build');
-        }
         if (\count($args) > 3 && JITVariable::TYPE_NULL !== $args[3]->type) {
             throw new \LogicException('filter_input() options are not supported in this compiler build');
         }
+
+        $keyStr = JitStringBuiltinArg::lower($context, $args[1], 'filter_input', 1, 'variable_name');
+        $keyVar = new JITVariable($context, JITVariable::TYPE_STRING, JITVariable::KIND_VALUE, $keyStr);
 
         $typeVal = JitFilter::loadFilterId($context, $args[0]);
         $i64 = $context->getTypeFromString('int64');
@@ -112,12 +121,12 @@ final class filter_input extends Internal
         $context->builder->branch($doneBlock);
 
         $context->builder->positionAtEnd($getBlock);
-        $getResult = self::filterFromSuperglobal($context, '_GET', $args[1], $args[2]);
+        $getResult = self::filterFromSuperglobal($context, '_GET', $keyVar, $args[2]);
         $getTail = $context->builder->getInsertBlock();
         $context->builder->branch($doneBlock);
 
         $context->builder->positionAtEnd($postBlock);
-        $postResult = self::filterFromSuperglobal($context, '_POST', $args[1], $args[2]);
+        $postResult = self::filterFromSuperglobal($context, '_POST', $keyVar, $args[2]);
         $postTail = $context->builder->getInsertBlock();
         $context->builder->branch($doneBlock);
 
