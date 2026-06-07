@@ -12,8 +12,8 @@ final class VmFsUnlinkTest extends TestCase
 {
     public function testLibcUnlinkRemovesFile(): void
     {
-        if (!\extension_loaded('ffi')) {
-            $this->markTestSkipped('FFI extension required for VmFsUnlink');
+        if (!\extension_loaded('ffi') && !\function_exists('unlink')) {
+            $this->markTestSkipped('FFI or host unlink() required for VmFsUnlink');
         }
         $path = tempnam(sys_get_temp_dir(), 'phpc_vm_unlink_');
         $this->assertNotFalse($path);

@@ -5,9 +5,10 @@ declare(strict_types=1);
 namespace PHPCompiler\ext\standard;
 
 /**
- * glob() for VM — libc glob(3) via FFI, matching __phpc_glob_vec (issue #4859, #1153).
+ * glob() for VM — libc glob(3) via FFI, host glob(), or PHP fallback (#4859, #7314).
  *
  * php-src: ext/standard/dir.c — PHP_FUNCTION(glob)
+ * JIT/AOT: __phpc_glob_vec via StringFsGlobVecJit.php
  */
 final class VmFsGlob
 {
@@ -23,12 +24,57 @@ final class VmFsGlob
         $onlyDir = 0 !== ($flags & StdlibConstants::GLOB_ONLYDIR);
         $libcFlags = $flags & StdlibConstants::GLOB_AVAILABLE_FLAGS & ~StdlibConstants::GLOB_ONLYDIR;
 
-        $libc = self::libcGlob($pattern, $libcFlags, $onlyDir);
-        if (null !== $libc) {
-            return $libc;
+        if (self::ffiEnabled()) {
+            $libc = self::libcGlob($pattern, $libcFlags, $onlyDir);
+            if (null !== $libc) {
+                return $libc;
+            }
+        }
+
+        $host = self::hostGlob($pattern, $flags, $onlyDir, $libcFlags);
+        if (null !== $host) {
+            return $host;
         }
 
         return self::globFallback($pattern, $libcFlags, $onlyDir);
+    }
+
+    private static function ffiEnabled(): bool
+    {
+        $v = getenv('PHP_COMPILER_DISABLE_FFI');
+        if (false !== $v && '' !== $v && '0' !== $v && 'false' !== strtolower($v)) {
+            return false;
+        }
+
+        return true;
+    }
+
+    /**
+     * Host Zend glob() when VM driver runs under php-src (no ext/ffi required).
+     *
+     * @return list<string>|false|null null when host glob unavailable
+     */
+    private static function hostGlob(string $pattern, int $flags, bool $onlyDir, int $libcFlags): array|false|null
+    {
+        if (!\function_exists('glob')) {
+            return null;
+        }
+        $hostFlags = $libcFlags | ($onlyDir ? StdlibConstants::GLOB_ONLYDIR : 0);
+        $matches = @\glob($pattern, $hostFlags);
+        if (false === $matches) {
+            return false;
+        }
+        if (!$onlyDir) {
+            return $matches;
+        }
+        $filtered = [];
+        foreach ($matches as $path) {
+            if (self::pathIsDir($path)) {
+                $filtered[] = $path;
+            }
+        }
+
+        return $filtered;
     }
 
     /**
@@ -36,7 +82,7 @@ final class VmFsGlob
      */
     private static function libcGlob(string $pattern, int $libcFlags, bool $onlyDir): array|false|null
     {
-        if (!\extension_loaded('ffi')) {
+        if (!self::ffiEnabled() || !\extension_loaded('ffi')) {
             return null;
         }
         try {
