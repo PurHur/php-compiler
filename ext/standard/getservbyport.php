@@ -8,7 +8,6 @@ use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\Variable as JITVariable;
-use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
 
 /**
@@ -28,18 +27,22 @@ final class getservbyport extends Internal
         if (2 !== \count($frame->calledArgs)) {
             throw new \LogicException('getservbyport() requires exactly two arguments in this compiler build');
         }
-        $portVar = $frame->calledArgs[0]->resolveIndirect();
-        $protoVar = $frame->calledArgs[1]->resolveIndirect();
         if (null === $frame->returnVar) {
             return;
         }
-        if (Variable::TYPE_INTEGER !== $portVar->type) {
-            throw new \LogicException('getservbyport() port must be an integer in this compiler build');
-        }
-        if (Variable::TYPE_STRING !== $protoVar->type) {
-            throw new \LogicException('getservbyport() protocol must be a string in this compiler build');
-        }
-        $name = VmNetworkServices::getservbyport($portVar->toInt(), $protoVar->toString());
+        $port = VmMath::parseIntBuiltinArg(
+            $frame->calledArgs[0],
+            'getservbyport',
+            1,
+            'port'
+        );
+        $protocol = VmString::coerceStringBuiltinArg(
+            $frame->calledArgs[1],
+            'getservbyport',
+            1,
+            'protocol'
+        );
+        $name = VmNetworkServices::getservbyport($port, $protocol);
         if (false === $name) {
             $frame->returnVar->bool(false);
         } else {

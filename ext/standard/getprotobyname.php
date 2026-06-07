@@ -8,7 +8,6 @@ use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\Variable as JITVariable;
-use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
 
 /**
@@ -31,11 +30,13 @@ final class getprotobyname extends Internal
         if (null === $frame->returnVar) {
             return;
         }
-        $nameVar = $frame->calledArgs[0]->resolveIndirect();
-        if (Variable::TYPE_STRING !== $nameVar->type) {
-            throw new \LogicException('getprotobyname() requires a string name in this compiler build');
-        }
-        $number = VmNetworkServices::getprotobyname($nameVar->toString());
+        $name = VmString::coerceStringBuiltinArg(
+            $frame->calledArgs[0],
+            'getprotobyname',
+            0,
+            'protocol'
+        );
+        $number = VmNetworkServices::getprotobyname($name);
         if (false === $number) {
             $frame->returnVar->bool(false);
 

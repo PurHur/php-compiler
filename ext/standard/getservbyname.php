@@ -8,7 +8,6 @@ use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\Variable as JITVariable;
-use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
 
 /**
@@ -31,12 +30,19 @@ final class getservbyname extends Internal
         if (null === $frame->returnVar) {
             return;
         }
-        $serviceVar = $frame->calledArgs[0]->resolveIndirect();
-        $protocolVar = $frame->calledArgs[1]->resolveIndirect();
-        if (Variable::TYPE_STRING !== $serviceVar->type || Variable::TYPE_STRING !== $protocolVar->type) {
-            throw new \LogicException('getservbyname() requires string service and protocol in this compiler build');
-        }
-        $port = VmNetworkServices::getservbyname($serviceVar->toString(), $protocolVar->toString());
+        $service = VmString::coerceStringBuiltinArg(
+            $frame->calledArgs[0],
+            'getservbyname',
+            0,
+            'service'
+        );
+        $protocol = VmString::coerceStringBuiltinArg(
+            $frame->calledArgs[1],
+            'getservbyname',
+            1,
+            'protocol'
+        );
+        $port = VmNetworkServices::getservbyname($service, $protocol);
         if (false === $port) {
             $frame->returnVar->bool(false);
 

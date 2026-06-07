@@ -8,7 +8,6 @@ use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\Variable as JITVariable;
-use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
 
 /**
@@ -28,14 +27,16 @@ final class getprotobynumber extends Internal
         if (1 !== \count($frame->calledArgs)) {
             throw new \LogicException('getprotobynumber() requires exactly one argument in this compiler build');
         }
-        $v = $frame->calledArgs[0]->resolveIndirect();
         if (null === $frame->returnVar) {
             return;
         }
-        if (Variable::TYPE_INTEGER !== $v->type) {
-            throw new \LogicException('getprotobynumber() requires an integer in this compiler build');
-        }
-        $name = VmNetworkServices::getprotobynumber($v->toInt());
+        $number = VmMath::parseIntBuiltinArg(
+            $frame->calledArgs[0],
+            'getprotobynumber',
+            1,
+            'protocol'
+        );
+        $name = VmNetworkServices::getprotobynumber($number);
         if (false === $name) {
             $frame->returnVar->bool(false);
         } else {
