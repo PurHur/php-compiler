@@ -41,4 +41,22 @@ final class VmStatCacheTest extends TestCase
             @unlink($path);
         }
     }
+
+    public function testNegativeCacheInvalidatesAfterTouch(): void
+    {
+        $path = sys_get_temp_dir().'/phpc_vm_statcache_touch_'.getmypid();
+        @unlink($path);
+        try {
+            VmStatCache::reset();
+            $this->assertFalse(VmStatCache::stat($path));
+            $this->assertFalse(VmStatCache::stat($path));
+            $this->assertTrue(touch($path));
+            VmStatCache::invalidatePath($path);
+            $fresh = VmStatCache::stat($path);
+            $this->assertIsArray($fresh);
+            $this->assertGreaterThan(0, $fresh['atime'] ?? 0);
+        } finally {
+            @unlink($path);
+        }
+    }
 }

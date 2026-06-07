@@ -184,7 +184,12 @@ final class VmFs
 
     public static function unlink(string $path): bool
     {
-        return VmFsUnlink::unlink($path);
+        $ok = VmFsUnlink::unlink($path);
+        if ($ok) {
+            VmStatCache::invalidatePath($path);
+        }
+
+        return $ok;
     }
 
     public static function mkdir(string $path, int $mode = 0777, bool $recursive = false): bool
@@ -295,7 +300,13 @@ final class VmFs
 
     public static function rename(string $from, string $to): bool
     {
-        return @rename($from, $to);
+        $ok = @rename($from, $to);
+        if ($ok) {
+            VmStatCache::invalidatePath($from);
+            VmStatCache::invalidatePath($to);
+        }
+
+        return $ok;
     }
 
     public static function hardLink(string $target, string $link): bool
@@ -305,7 +316,12 @@ final class VmFs
 
     public static function symlink(string $target, string $link): bool
     {
-        return @symlink($target, $link);
+        $ok = @symlink($target, $link);
+        if ($ok) {
+            VmStatCache::invalidatePath($link);
+        }
+
+        return $ok;
     }
 
     /** Prefix for multipart upload temps (lib/Web/Superglobals.php, AOT sg_set_file_entry). */
@@ -361,7 +377,12 @@ final class VmFs
 
     public static function copy(string $from, string $to): bool
     {
-        return @copy($from, $to);
+        $ok = @copy($from, $to);
+        if ($ok) {
+            VmStatCache::invalidatePath($to);
+        }
+
+        return $ok;
     }
 
     public static function touch(string $path, ?int $mtime = null, ?int $atime = null): bool

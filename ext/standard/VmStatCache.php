@@ -25,13 +25,11 @@ final class VmStatCache
      */
     public static function stat(string $path)
     {
-        if (isset(self::$stat[$path])) {
+        if (\array_key_exists($path, self::$stat)) {
             return self::$stat[$path];
         }
         $raw = @stat($path);
-        if (false !== $raw) {
-            self::$stat[$path] = $raw;
-        }
+        self::$stat[$path] = $raw;
 
         return $raw;
     }
@@ -41,13 +39,11 @@ final class VmStatCache
      */
     public static function lstat(string $path)
     {
-        if (isset(self::$lstat[$path])) {
+        if (\array_key_exists($path, self::$lstat)) {
             return self::$lstat[$path];
         }
         $raw = @lstat($path);
-        if (false !== $raw) {
-            self::$lstat[$path] = $raw;
-        }
+        self::$lstat[$path] = $raw;
 
         return $raw;
     }
@@ -60,6 +56,7 @@ final class VmStatCache
             if ($clearRealpath) {
                 self::$realpath = [];
             }
+            self::syncHostClearstatcache($clearRealpath);
 
             return;
         }
@@ -72,11 +69,27 @@ final class VmStatCache
                 unset(self::$stat[$resolved], self::$lstat[$resolved], self::$realpath[$resolved]);
             }
         }
+        self::syncHostClearstatcache($clearRealpath, $filename);
     }
 
     public static function invalidatePath(string $path): void
     {
         self::clear(true, $path);
+    }
+
+    /**
+     * VM builtins call host stat(); keep Zend negative-cache in sync (issue #7436).
+     */
+    private static function syncHostClearstatcache(bool $clearRealpath, ?string $filename = null): void
+    {
+        if (!\function_exists('clearstatcache')) {
+            return;
+        }
+        if (null === $filename) {
+            \clearstatcache($clearRealpath);
+        } else {
+            \clearstatcache($clearRealpath, $filename);
+        }
     }
 
     public static function reset(): void
