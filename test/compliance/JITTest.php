@@ -248,6 +248,10 @@ class JITTest extends BaseTest {
             if (str_contains($name, 'uasort_closure') || str_contains($name, 'uksort_closure')) {
                 continue;
             }
+            // Closure::fromCallable() inaccessible callback TypeError: VM ClosureSupport (#7416).
+            if (str_contains($name, 'closure_from_callable_inaccessible')) {
+                continue;
+            }
             // variadic + named args: VM parity (#4808); MCJIT NamedArgs variadic pack (#3777 follow-up).
             if (str_contains($name, 'named_args_variadic')) {
                 continue;

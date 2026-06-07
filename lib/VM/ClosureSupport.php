@@ -306,13 +306,12 @@ final class ClosureSupport
         $vis = $class->methodVisibility[$methodLc] ?? \PHPCfg\Func::FLAG_PUBLIC;
         $callerClassLc = self::callerClassLc($frame);
         $callerDisplay = self::classDisplayName($ctx, $callerClassLc);
-        MethodVisibility::assertCallable(
+        self::assertMethodAccessibleForFromCallable(
             $vis,
             $callerClassLc,
             strtolower($class->name),
             $class->name,
             $class->methodNames[$methodLc] ?? $methodName,
-            false,
             fn (string $classLc, string $ancestorLc): bool => self::isClassSameOrSubclassOf($ctx, $classLc, $ancestorLc),
             $callerDisplay
         );
@@ -371,13 +370,12 @@ final class ClosureSupport
         $vis = $declaringClass->methodVisibility[$methodLc] ?? \PHPCfg\Func::FLAG_PUBLIC;
         $callerClassLc = self::callerClassLc($frame);
         $callerDisplay = self::classDisplayName($ctx, $callerClassLc);
-        MethodVisibility::assertCallable(
+        self::assertMethodAccessibleForFromCallable(
             $vis,
             $callerClassLc,
             strtolower($declaringClass->name),
             $declaringClass->name,
             $declaringClass->methodNames[$methodLc] ?? $methodName,
-            false,
             fn (string $classLc, string $ancestorLc): bool => self::isClassSameOrSubclassOf($ctx, $classLc, $ancestorLc),
             $callerDisplay
         );
@@ -553,6 +551,39 @@ final class ClosureSupport
         }
 
         return $ctx->classes[$classLc]->name;
+    }
+
+    /**
+     * Zend zend_closure_from_callable() visibility — TypeError, not call-site LogicException (#7416).
+     *
+     * @throws \TypeError when the callback is not accessible from the current scope
+     */
+    private static function assertMethodAccessibleForFromCallable(
+        int $visibilityFlags,
+        ?string $callerClassLc,
+        string $declaringClassLc,
+        string $declaringClassDisplay,
+        string $methodName,
+        ?callable $isSameOrSubclassOf = null,
+        ?string $callerClassDisplay = null
+    ): void {
+        try {
+            MethodVisibility::assertCallable(
+                $visibilityFlags,
+                $callerClassLc,
+                $declaringClassLc,
+                $declaringClassDisplay,
+                $methodName,
+                false,
+                $isSameOrSubclassOf,
+                $callerClassDisplay
+            );
+        } catch (\LogicException) {
+            $kind = ($visibilityFlags & \PHPCfg\Func::FLAG_PRIVATE) !== 0 ? 'private' : 'protected';
+            throw new \TypeError(
+                "Failed to create closure from callable: cannot access {$kind} method {$declaringClassDisplay}::{$methodName}()"
+            );
+        }
     }
 
     private static function isClassSameOrSubclassOf(Context $ctx, string $classLc, string $ancestorLc): bool
