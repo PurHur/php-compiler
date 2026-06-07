@@ -1,0 +1,53 @@
+<?php
+
+declare(strict_types=1);
+
+namespace PHPCompiler\ext\standard;
+
+use PHPCompiler\Frame;
+use PHPCompiler\Func\Internal;
+use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\JitStringBuiltinArg;
+use PHPCompiler\JIT\Variable as JITVariable;
+use PHPLLVM\Value;
+
+/**
+ * mime_content_type() — sniff MIME type from path or stream (php-src ext/standard/file.c; #6196).
+ *
+ * @see https://github.com/php/php-src/blob/master/ext/standard/file.c PHP_FUNCTION(mime_content_type)
+ */
+final class mime_content_type extends Internal
+{
+    public function __construct()
+    {
+        parent::__construct('mime_content_type');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        if (1 !== \count($frame->calledArgs)) {
+            throw new \LogicException('mime_content_type() requires exactly one argument in this compiler build');
+        }
+        if (null === $frame->returnVar) {
+            return;
+        }
+        $result = VmMime::mimeContentType($frame->calledArgs[0]);
+        if (false === $result) {
+            $frame->returnVar->bool(false);
+        } else {
+            $frame->returnVar->string($result);
+        }
+    }
+
+    public function call(Context $context, JITVariable ...$args): Value
+    {
+        if (1 !== \count($args)) {
+            throw new \LogicException('mime_content_type() requires exactly one argument in this compiler build');
+        }
+
+        return JitMimeContentType::invoke(
+            $context,
+            JitStringBuiltinArg::lower($context, $args[0], 'mime_content_type', 1, 'filename_or_stream')
+        );
+    }
+}

@@ -79,6 +79,9 @@ function analyzeInternal(PHPCompiler\Func\Internal $fn): array
     if ('gethostbyaddr' === $fn->getName() && preg_match('/GethostbyaddrRuntime/i', $source)) {
         $notes[] = 'reverse DNS IPv4 (VM FFI + AOT) (#5854)';
     }
+    if ('mime_content_type' === $fn->getName() && preg_match('/MimeContentTypeRuntime/i', $source)) {
+        $notes[] = 'file MIME sniff (VM host fileinfo + AOT byte sniff) (#6196)';
+    }
     if (in_array($fn->getName(), ['strcspn', 'strspn'], true) && preg_match('/GH-12592/i', $source)) {
         $notes[] = 'empty $characters: PHP 8.4 full byte length (GH-12592, #7088)';
     }

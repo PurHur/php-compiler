@@ -229,6 +229,16 @@ class Type extends Builtin {
             $fntypeFileGetContents
         );
         $this->context->registerFunction('__compiler_file_get_contents', $fnFileGetContents);
+        $fntypeMimeContentType = $this->context->context->functionType(
+            $this->context->getTypeFromString('__string__*'),
+            false,
+            $this->context->getTypeFromString('__string__*')
+        );
+        $fnMimeContentType = $this->context->module->addFunction(
+            '__compiler_mime_content_type',
+            $fntypeMimeContentType
+        );
+        $this->context->registerFunction('__compiler_mime_content_type', $fnMimeContentType);
         $fntypeFilePutContents = $this->context->context->functionType(
             $i64,
             false,

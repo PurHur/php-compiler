@@ -367,6 +367,7 @@ class Module extends ModuleAbstract
             new pathinfo(),
             new file_get_contents(),
             new readfile(),
+            new mime_content_type(),
             new file_(),
             new readline(),
             new file_put_contents(),
