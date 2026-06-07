@@ -1211,6 +1211,59 @@ final class VmReflection
         return $result;
     }
 
+    /**
+     * class_constants() — resolve class/interface/enum and reject traits (#7309).
+     *
+     * php-src: ext/standard/basic_functions.c — PHP_FUNCTION(class_constants)
+     */
+    public static function fetchClassEntryForClassConstants(Context $ctx, string $className): ClassEntry
+    {
+        $classLc = strtolower(ltrim($className, '\\'));
+        if (!isset($ctx->classes[$classLc])) {
+            $ctx->autoloadClass($className);
+        }
+        if (!isset($ctx->classes[$classLc])) {
+            throw new \Error('Class "'.$className.'" not found');
+        }
+        $entry = $ctx->classes[$classLc];
+        if ($entry->isTrait) {
+            throw new \Error("Cannot fetch constants from trait {$entry->name}");
+        }
+
+        return $entry;
+    }
+
+    /**
+     * class_constants() result map — constant name => value (#7309).
+     *
+     * php-src: Zend/zend_constants.c — class constant table iteration
+     */
+    public static function classConstantsArray(Context $ctx, ClassEntry $entry): Variable
+    {
+        $result = new Variable();
+        $result->newArray();
+        $ht = $result->toArray();
+        if ($entry->isEnum && null !== $entry->backedType) {
+            EnumSupport::ensureBackedEnumValuesUnique($entry);
+        }
+        foreach ($entry->constants as $constLc => $_stored) {
+            $displayName = $entry->constNames[$constLc]
+                ?? $entry->enumCaseCanonicalNames[$constLc]
+                ?? $constLc;
+            $value = new Variable();
+            if (EnumCaseSupport::tryMaterializeEnumCaseConstantFetch($entry, $constLc, $value)) {
+                $ht->add($displayName, $value);
+
+                continue;
+            }
+            $copy = new Variable();
+            $copy->copyFrom($entry->constants[$constLc]);
+            $ht->add($displayName, $copy);
+        }
+
+        return $result;
+    }
+
     private static function propertyExistsInvalidTypeName(int $type): string
     {
         switch ($type) {

@@ -473,6 +473,7 @@ class Module extends ModuleAbstract
             new define_(),
             new defined_(),
             new constant_(),
+            new class_constants_(),
             new get_defined_constants_(),
             new get_defined_vars_(),
             new get_declared_interfaces_(),
