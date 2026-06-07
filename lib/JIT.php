@@ -10085,13 +10085,30 @@ class JIT {
         }
 
         if (Variable::TYPE_NULL === $read->type || ($read->isNullConstant ?? false)) {
-            JIT\Builtin\TypeErrorRaise::registerDeclarations($this->context);
-            JIT\Builtin\TypeErrorRaise::ensureLinked($this->context);
-            JIT\Builtin\TypeErrorRaise::emitRaise(
-                $this->context,
-                $increment ? 'Cannot increment null' : 'Cannot decrement null'
-            );
-            $this->context->builder->call($this->context->lookupFunction('abort'));
+            if ($increment) {
+                $newLong = $this->context->constantFromInteger(1);
+                $newVar = new Variable(
+                    $this->context,
+                    Variable::TYPE_NATIVE_LONG,
+                    Variable::KIND_VALUE,
+                    $newLong
+                );
+                if (!$prefix) {
+                    $this->assignOperand($resultOp, $read, true);
+                }
+                $this->assignOperand($writeOp, $newVar, true);
+                if ($prefix) {
+                    $this->assignOperand($resultOp, $newVar, true);
+                }
+            } else {
+                if (!$prefix) {
+                    $this->assignOperand($resultOp, $read, true);
+                }
+                $this->assignOperand($writeOp, $read, true);
+                if ($prefix) {
+                    $this->assignOperand($resultOp, $read, true);
+                }
+            }
 
             return;
         }
@@ -10113,18 +10130,13 @@ class JIT {
             $this->assignOperand($resultOp, $read, true);
         }
 
-        $this->guardIncDecNullOperand($read, $increment);
-
         if (
             Variable::TYPE_VALUE === $read->type
             && (Variable::KIND_VARIABLE === $read->kind || $read->functionStaticGlobal)
         ) {
             $this->guardIncDecResourceOperand($read, $increment);
             $readPtr = JIT\JitValueBox::valuePtrFromVariable($this->context, $read);
-            $cur = $this->context->builder->call(
-                $this->context->lookupFunction('__value__readLong'),
-                $readPtr
-            );
+            $cur = $this->readIncDecValueBoxLong($read, $readPtr, $increment);
             $one = $cur->typeOf()->constInt(1, false);
             $newLong = $increment
                 ? $this->context->builder->add($cur, $one)
@@ -10184,28 +10196,48 @@ class JIT {
         }
     }
 
-    /** Reject ++/-- on null (issue #4362, zend_operators.c saner inc/dec path). */
-    private function guardIncDecNullOperand(JIT\Variable $read, bool $increment): void
+    /** Coerce null value-box operands to 0 before ++; decrement uses raw readLong (#7435). */
+    private function readIncDecValueBoxLong(
+        JIT\Variable $read,
+        PHPLLVM\Value $readPtr,
+        bool $increment
+    ): PHPLLVM\Value {
+        if (!$increment) {
+            return $this->context->builder->call(
+                $this->context->lookupFunction('__value__readLong'),
+                $readPtr
+            );
+        }
     {
         if (JIT\Variable::TYPE_NULL === $read->type || ($read->isNullConstant ?? false)) {
-            return;
+            return $readPtr->typeOf()->constInt(0, false);
         }
         if (!JIT\JitValueBox::isValueOperand($read)) {
-            return;
+            return $this->context->builder->call(
+                $this->context->lookupFunction('__value__readLong'),
+                $readPtr
+            );
         }
         $isNull = JIT\JitValueCompare::valueBoxIsNull($this->context, $read);
-        $okBlock = JIT\BasicBlockHelper::append($this->context, 'incdec_null_ok');
-        $errBlock = JIT\BasicBlockHelper::append($this->context, 'incdec_null_err');
-        $this->context->builder->branchIf($isNull, $errBlock, $okBlock);
-        $this->context->builder->positionAtEnd($errBlock);
-        JIT\Builtin\TypeErrorRaise::registerDeclarations($this->context);
-        JIT\Builtin\TypeErrorRaise::ensureLinked($this->context);
-        JIT\Builtin\TypeErrorRaise::emitRaise(
-            $this->context,
-            $increment ? 'Cannot increment null' : 'Cannot decrement null'
+        $zero = $readPtr->typeOf()->constInt(0, false);
+        $readLong = $this->context->builder->call(
+            $this->context->lookupFunction('__value__readLong'),
+            $readPtr
         );
-        $this->context->builder->call($this->context->lookupFunction('abort'));
+        $okBlock = JIT\BasicBlockHelper::append($this->context, 'incdec_null_coerce_ok');
+        $nullBlock = JIT\BasicBlockHelper::append($this->context, 'incdec_null_coerce_null');
+        $mergeBlock = JIT\BasicBlockHelper::append($this->context, 'incdec_null_coerce_merge');
+        $this->context->builder->branchIf($isNull, $nullBlock, $okBlock);
+        $this->context->builder->positionAtEnd($nullBlock);
+        $this->context->builder->branch($mergeBlock);
         $this->context->builder->positionAtEnd($okBlock);
+        $this->context->builder->branch($mergeBlock);
+        $this->context->builder->positionAtEnd($mergeBlock);
+        $phi = $this->context->builder->phi($readLong->typeOf(), 'incdec_null_coerced');
+        $phi->addIncoming($zero, $nullBlock);
+        $phi->addIncoming($readLong, $okBlock);
+
+        return $phi;
     }
 
     /** Reject ++/-- on stream/dir handles (issue #6396, zend_operators.c). */
