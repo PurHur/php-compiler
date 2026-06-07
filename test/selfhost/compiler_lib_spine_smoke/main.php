@@ -346,6 +346,8 @@ require_once __DIR__.'/../../../ext/standard/Module.php';
 require_once __DIR__.'/../../../ext/standard/SetcookieLine.php';
 require_once __DIR__.'/../../../ext/standard/VmCrc32.php';
 require_once __DIR__.'/../../../ext/standard/VmDate.php';
+require_once __DIR__.'/../../../ext/standard/VmHrtimeNative.php';
+require_once __DIR__.'/../../../ext/standard/VmHrtime.php';
 require_once __DIR__.'/../../../ext/standard/VmDebugBacktrace.php';
 require_once __DIR__.'/../../../ext/standard/VmErrorHandler.php';
 require_once __DIR__.'/../../../ext/standard/VmExit.php';
