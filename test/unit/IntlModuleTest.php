@@ -36,4 +36,30 @@ PHP;
         $runtime->run($block);
         self::assertSame('1110', ob_get_clean());
     }
+
+    public function test_intl_skeleton_create_stubs_throw(): void
+    {
+        $runtime = new Runtime();
+        $code = <<<'PHP'
+<?php
+try {
+    Collator::create('en_US');
+} catch (Throwable $e) {
+    echo get_class($e), ': ', $e->getMessage(), "\n";
+}
+try {
+    IntlDateFormatter::create('en_US', 0, 0);
+} catch (Throwable $e) {
+    echo get_class($e), ': ', $e->getMessage(), "\n";
+}
+PHP;
+        $block = $runtime->parseAndCompile($code, 'intl_skeleton.php');
+        ob_start();
+        $runtime->run($block);
+        self::assertSame(
+            "Error: Collator::create() is not implemented in this compiler build (issue #5747)\n"
+            ."Error: IntlDateFormatter::create() is not implemented in this compiler build (issue #5201)\n",
+            ob_get_clean()
+        );
+    }
 }

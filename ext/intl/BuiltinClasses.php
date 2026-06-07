@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace PHPCompiler\ext\intl;
 
+use PHPCfg\Func as CfgFunc;
 use PHPCompiler\VM\ClassEntry;
 use PHPCompiler\VM\Context;
 
@@ -27,12 +28,22 @@ final class BuiltinClasses
 
     private static function registerIntlDateFormatter(Context $ctx): void
     {
-        $ctx->classes['intldateformatter'] = new ClassEntry('IntlDateFormatter');
+        $entry = new ClassEntry('IntlDateFormatter');
+        $pubStatic = CfgFunc::FLAG_PUBLIC | CfgFunc::FLAG_STATIC;
+        $entry->methods['create'] = new IntlDateFormatterCreate();
+        $entry->methodVisibility['create'] = $pubStatic;
+        $entry->methodNames['create'] = 'create';
+        $ctx->classes['intldateformatter'] = $entry;
     }
 
     private static function registerCollator(Context $ctx): void
     {
-        $ctx->classes['collator'] = new ClassEntry('Collator');
+        $entry = new ClassEntry('Collator');
+        $pubStatic = CfgFunc::FLAG_PUBLIC | CfgFunc::FLAG_STATIC;
+        $entry->methods['create'] = new CollatorCreate();
+        $entry->methodVisibility['create'] = $pubStatic;
+        $entry->methodNames['create'] = 'create';
+        $ctx->classes['collator'] = $entry;
     }
 
     private static function registerIntlException(Context $ctx): void
