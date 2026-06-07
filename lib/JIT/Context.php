@@ -645,6 +645,7 @@ class Context {
             Builtin\JitReturnPending::ensureStandaloneBodies($this);
             Builtin\CliArgvRuntime::ensureStandaloneBodies($this);
             Builtin\Sscanf::ensureStandaloneBodies($this);
+            Builtin\StringParseStrJit::ensureStandaloneBodies($this);
         }
 
         $this->functionProxies['is_null'] = new Builtin\IsNullFn();
