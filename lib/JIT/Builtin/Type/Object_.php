@@ -4633,21 +4633,38 @@ class Object_ extends Type {
     }
 
     /**
-     * exit()/die() status: enum object → Error; otherwise TypeError (#7214).
+     * exit()/die() status: ExitStatus enum → backing int; other enums → Error; else TypeError (#7214, #7294).
      */
-    public function emitExitStatusObjectGuard(Context $context, PHPLLVM\Value $objPtr): void
+    public function exitStatusEnumClassId(): ?int
     {
-        $enumEntries = [];
-        foreach ($this->classIdToName as $id => $name) {
-            $lc = strtolower(ltrim($name, '\\'));
-            if (isset($this->enums[$lc])) {
-                $enumEntries[(int) $id] = $name;
-            }
-        }
-        if ([] === $enumEntries) {
+        return $this->classes['exitstatus'] ?? null;
+    }
+
+    public function emitExitStatusFromEnumCaseObject(Context $context, PHPLLVM\Value $objPtr): void
+    {
+        $exitStatusId = $this->exitStatusEnumClassId();
+        if (null === $exitStatusId) {
             \PHPCompiler\JIT\Builtin\ScriptExit::emitStatusTypeErrorAndAbort($context, 'object');
 
             return;
+        }
+        $status = $this->enumCaseBackingLong($context, $objPtr, $exitStatusId);
+        \PHPCompiler\JIT\Builtin\ScriptExit::emitLibcExitWithStatus($context, $status);
+    }
+
+    public function emitExitStatusObjectGuard(Context $context, PHPLLVM\Value $objPtr): void
+    {
+        $exitStatusId = $this->exitStatusEnumClassId();
+        $enumEntries = [];
+        foreach ($this->classIdToName as $id => $name) {
+            $lc = strtolower(ltrim($name, '\\'));
+            if (!isset($this->enums[$lc])) {
+                continue;
+            }
+            if (null !== $exitStatusId && (int) $id === $exitStatusId) {
+                continue;
+            }
+            $enumEntries[(int) $id] = $name;
         }
 
         \PHPCompiler\JIT\Builtin\ErrorRaise::ensureLinked($context);
@@ -4659,6 +4676,34 @@ class Object_ extends Type {
         );
         $i64 = $context->getTypeFromString('int64');
         $typeErrorBlock = BasicBlockHelper::append($context, 'exit_status_obj_type_error');
+
+        if (null !== $exitStatusId) {
+            $exitStatusBlock = BasicBlockHelper::append($context, 'exit_status_obj_exitstatus');
+            $afterExitStatus = [] === $enumEntries
+                ? $typeErrorBlock
+                : BasicBlockHelper::append($context, 'exit_status_obj_after_exitstatus');
+            $context->builder->branchIf(
+                $context->builder->icmp(
+                    PHPLLVM\Builder::INT_EQ,
+                    $classId,
+                    $i64->constInt($exitStatusId, false)
+                ),
+                $exitStatusBlock,
+                $afterExitStatus
+            );
+            $context->builder->positionAtEnd($exitStatusBlock);
+            $this->emitExitStatusFromEnumCaseObject($context, $objPtr);
+
+            if ([] === $enumEntries) {
+                return;
+            }
+            $context->builder->positionAtEnd($afterExitStatus);
+        } elseif ([] === $enumEntries) {
+            \PHPCompiler\JIT\Builtin\ScriptExit::emitStatusTypeErrorAndAbort($context, 'object');
+
+            return;
+        }
+
         $ids = array_keys($enumEntries);
         $lastIdx = count($ids) - 1;
         foreach ($ids as $idx => $id) {
@@ -4685,6 +4730,27 @@ class Object_ extends Type {
         }
         $context->builder->positionAtEnd($typeErrorBlock);
         \PHPCompiler\JIT\Builtin\ScriptExit::emitStatusTypeErrorAndAbort($context, 'object');
+    }
+
+    private function enumCaseBackingLong(Context $context, PHPLLVM\Value $objPtr, int $enumClassId): PHPLLVM\Value
+    {
+        $slot = $this->propertySlotPtr($objPtr, self::ENUM_CASE_SLOT_VALUE);
+        $storage = BasicBlockHelper::entryAlloca($context, $context->getTypeFromString('__value__'));
+        $valueMap = $context->structFieldMap['__value__'];
+        $context->builder->store(
+            $context->getTypeFromString('int8')->constInt(Variable::TYPE_NULL, false),
+            $context->builder->structGep($storage, $valueMap['type'])
+        );
+        $context->builder->call(
+            $context->lookupFunction('__object__load_value_slot'),
+            $slot,
+            $storage
+        );
+
+        return $context->builder->call(
+            $context->lookupFunction('__value__readLong'),
+            $storage
+        );
     }
 
     public function propertyFetch(PHPLLVM\Value $obj, string $class, string $name): Variable

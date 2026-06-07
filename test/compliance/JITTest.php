@@ -392,6 +392,10 @@ class JITTest extends BaseTest {
             if (str_contains($name, 'property_hook')) {
                 continue;
             }
+            // Builtin enums (PropertyHookType, ExitStatus): VM + enum registration; MCJIT execute gated (#7222, #7294).
+            if (str_contains($name, 'exit_status_enum')) {
+                continue;
+            }
             // User enum DECLARE_ENUM segfaults in MCJIT until enum lowering is stable (#3518).
             // enum_spaceship_jit: lowering fixed #4849; compliance JIT when jit-runtime-probe green (#98).
             // enum_case_name_value: ->name/->value JIT dispatch (#4953); compliance when jit-runtime-probe green (#98).

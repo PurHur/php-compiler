@@ -67,13 +67,26 @@ final class VmExit
             return 0;
         }
         if (Variable::TYPE_ENUM_CASE === $v->type) {
+            $case = $v->toEnumCase();
+            if (self::isExitStatusEnum($case->enumClass->name)) {
+                return $case->backingValue->toInt();
+            }
             throw new \Error(
-                'Object of class '.$v->toEnumCase()->enumClass->name.' could not be converted to string'
+                'Object of class '.$case->enumClass->name.' could not be converted to string'
             );
         }
         if (Variable::TYPE_OBJECT === $v->type && EnumCaseSupport::isEnumCase($v->toObject())) {
+            $obj = $v->toObject();
+            if (self::isExitStatusEnum($obj->class->name)) {
+                $backing = $obj->enumCaseValue;
+                if (null === $backing) {
+                    throw new \LogicException('ExitStatus case missing backing value');
+                }
+
+                return $backing->toInt();
+            }
             throw new \Error(
-                'Object of class '.$v->toObject()->class->name.' could not be converted to string'
+                'Object of class '.$obj->class->name.' could not be converted to string'
             );
         }
 
@@ -117,6 +130,11 @@ final class VmExit
             'exit(): Argument #2 ($message) must be of type string, %s given',
             TypeCheck::typeNameForConstraint($v->type)
         ));
+    }
+
+    private static function isExitStatusEnum(string $className): bool
+    {
+        return 0 === strcasecmp(ltrim($className, '\\'), 'ExitStatus');
     }
 
     private static function typeErrorForStatus(Variable $value): \TypeError

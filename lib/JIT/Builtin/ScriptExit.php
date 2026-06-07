@@ -384,12 +384,22 @@ final class ScriptExit
         $context->builder->call($context->lookupFunction('exit'), $trunc);
     }
 
+    public static function emitLibcExitWithStatus(Context $context, Value $status): void
+    {
+        self::callLibcExit($context, $status);
+    }
+
     private static function emitObjectStatus(Context $context, Value $objPtr, ?Variable $arg = null): void
     {
         $enumClass = null !== $arg
             ? JitOperandTypeLabel::compileTimeEnumClassName($context, $arg)
             : null;
         if (null !== $enumClass) {
+            if (0 === strcasecmp(ltrim($enumClass, '\\'), 'ExitStatus')) {
+                $context->type->object->emitExitStatusFromEnumCaseObject($context, $objPtr);
+
+                return;
+            }
             self::emitEnumStringConversionError($context, $enumClass);
             $context->builder->call($context->lookupFunction('abort'));
 
