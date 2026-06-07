@@ -8,7 +8,10 @@ use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Builtin\TypeErrorRaise;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\JitOperandTypeLabel;
+use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\Variable as JITVariable;
+use PHPCompiler\VM\EnumCaseSupport;
 use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
 
@@ -34,7 +37,12 @@ final class constant_ extends Internal
         }
         $nameVar = $frame->calledArgs[0]->resolveIndirect();
         if (Variable::TYPE_STRING !== $nameVar->type) {
-            throw new \TypeError(\sprintf(self::NAME_TYPE_ERROR, self::vmTypeName($nameVar->type)));
+            throw new \TypeError(\sprintf(
+                self::NAME_TYPE_ERROR,
+                EnumCaseSupport::isEnumCaseVariable($nameVar)
+                    ? EnumCaseSupport::typeNameForVariable($nameVar)
+                    : self::vmTypeName($nameVar->type)
+            ));
         }
         if (null === $frame->vmContext) {
             throw new \LogicException('constant() requires VM context');
@@ -57,8 +65,11 @@ final class constant_ extends Internal
             throw new \LogicException('constant() requires exactly one argument');
         }
 
+        if (JITVariable::TYPE_VALUE === $args[0]->type || JITVariable::TYPE_OBJECT === $args[0]->type) {
+            JitStringBuiltinArg::lower($context, $args[0], 'constant', 0, 'name');
+        }
         if (JITVariable::TYPE_STRING !== $args[0]->type) {
-            self::emitJitTypeErrorAndAbort($context, self::jitTypeErrorMessage($args[0]->type));
+            self::emitJitTypeErrorAndAbort($context, self::jitTypeErrorMessage($context, $args[0]));
             $ptrType = $context->getTypeFromString('__value__*');
 
             return $ptrType->constNull();
@@ -75,29 +86,9 @@ final class constant_ extends Internal
         $context->builder->call($context->lookupFunction('abort'));
     }
 
-    private static function jitTypeErrorMessage(int $type): string
+    private static function jitTypeErrorMessage(Context $context, JITVariable $arg): string
     {
-        return \sprintf(self::NAME_TYPE_ERROR, self::jitTypeName($type));
-    }
-
-    private static function jitTypeName(int $type): string
-    {
-        switch ($type) {
-            case JITVariable::TYPE_NATIVE_LONG:
-                return 'int';
-            case JITVariable::TYPE_NATIVE_DOUBLE:
-                return 'float';
-            case JITVariable::TYPE_HASHTABLE:
-                return 'array';
-            case JITVariable::TYPE_OBJECT:
-                return 'object';
-            case JITVariable::TYPE_BOOLEAN:
-                return 'bool';
-            case JITVariable::TYPE_NULL:
-                return 'null';
-            default:
-                return 'mixed';
-        }
+        return \sprintf(self::NAME_TYPE_ERROR, JitOperandTypeLabel::givenLabel($context, $arg));
     }
 
     private static function vmTypeName(int $type): string
