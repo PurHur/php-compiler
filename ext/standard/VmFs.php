@@ -687,6 +687,26 @@ final class VmFs
     }
 
     /**
+     * stream_is_local() — php-src ext/standard/streamsfuncs.c (issue #6173).
+     *
+     * Returns true when the stream wrapper is not a URL wrapper (php_stream_is_local).
+     */
+    public static function streamIsLocal(int $handle): bool
+    {
+        $fp = self::lookup($handle);
+        if (null === $fp) {
+            return false;
+        }
+        $meta = @\stream_get_meta_data($fp);
+        if (!\is_array($meta)) {
+            return false;
+        }
+        $wrapper = \strtolower((string) ($meta['wrapper_type'] ?? ''));
+
+        return !\in_array($wrapper, ['http', 'https', 'ftp', 'ftps'], true);
+    }
+
+    /**
      * stream_supports() — capability probe (php-src php_stream_* option API, issue #5062).
      */
     public static function streamSupports(int $handle, int $feature): bool
