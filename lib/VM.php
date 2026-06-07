@@ -1593,7 +1593,7 @@ restart:
                         goto restart;
                     }
                     if ($this->dispatchPropertySetHookAssign($arg2, $arg3, $frame)) {
-                        $arg1->copyFrom($arg3);
+                        $this->deliverPropertySetHookAssignResult($arg1, $arg3);
                         break;
                     }
                     if ($this->context->propertyHookSetAborted) {
@@ -6949,6 +6949,17 @@ restart:
             ?? strtolower(SourcePreprocessor\PropertyHooks::setHookMethodName($propName));
 
         return isset($owner->class->methods[$setLc]);
+    }
+
+    /**
+     * Assignment expression result after set hook — hook owns backing storage (#7251, zend_property_hooks.c).
+     */
+    private function deliverPropertySetHookAssignResult(Variable $dest, Variable $rhs): void
+    {
+        if ($dest->isIndirect()) {
+            $dest->reset();
+        }
+        $dest->duplicateFrom($rhs);
     }
 
     /**
