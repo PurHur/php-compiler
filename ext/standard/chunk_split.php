@@ -34,11 +34,12 @@ final class chunk_split extends Internal
         );
         $length = 76;
         if ($argc >= 2) {
-            $lenArg = $frame->calledArgs[1]->resolveIndirect();
-            if (Variable::TYPE_INTEGER !== $lenArg->type) {
-                throw new \LogicException('chunk_split() length must be an integer in this compiler build');
-            }
-            $length = $lenArg->toInt();
+            $length = VmMath::parseIntBuiltinArg(
+                $frame->calledArgs[1]->resolveIndirect(),
+                'chunk_split',
+                2,
+                'length'
+            );
         }
         $separator = "\r\n";
         if (3 === $argc) {
@@ -68,10 +69,7 @@ final class chunk_split extends Internal
         $i64 = $context->getTypeFromString('int64');
         $chunkLen = $i64->constInt(76, false);
         if ($argc >= 2) {
-            if (JITVariable::TYPE_NATIVE_LONG !== $args[1]->type) {
-                throw new \LogicException('chunk_split() length must be an integer in this compiler build');
-            }
-            $chunkLen = $context->helper->loadValue($args[1]);
+            $chunkLen = JitChunkSplit::lowerLengthArg($context, $args[1]);
             JitChunkSplit::emitRuntimeLengthGuard($context, $chunkLen);
         }
         if ($argc >= 3) {

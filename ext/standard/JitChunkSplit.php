@@ -8,6 +8,8 @@ use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Builtin\TypeErrorRaise;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\InternalStrictArg as JitInternalStrictArg;
+use PHPCompiler\JIT\JitLongArg;
+use PHPCompiler\JIT\JitOperandTypeLabel;
 use PHPCompiler\JIT\JitStringArg;
 use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\Variable as JITVariable;
@@ -19,6 +21,114 @@ use PHPLLVM\Value;
 final class JitChunkSplit
 {
     private const LENGTH_ERROR = 'chunk_split(): Argument #2 ($length) must be greater than 0';
+
+    /** Lower chunk_split() $length with Z_PARAM_LONG parity (#6032, ext/standard/string.c). */
+    public static function lowerLengthArg(Context $context, JITVariable $arg): Value
+    {
+        $enumLabel = JitOperandTypeLabel::compileTimeEnumClassName($context, $arg);
+        if (null !== $enumLabel) {
+            self::emitLengthTypeErrorAndAbort($context, $enumLabel);
+
+            return $context->getTypeFromString('int64')->constInt(0, false);
+        }
+        if (($arg->type & JITVariable::IS_NATIVE_ARRAY) || JITVariable::TYPE_HASHTABLE === $arg->type) {
+            self::emitLengthTypeErrorAndAbort($context, 'array');
+
+            return $context->getTypeFromString('int64')->constInt(0, false);
+        }
+        if (JITVariable::TYPE_OBJECT === $arg->type) {
+            self::emitLengthTypeErrorAndAbort($context, self::compileTimeObjectLabel($context, $arg));
+
+            return $context->getTypeFromString('int64')->constInt(0, false);
+        }
+        if (JITVariable::TYPE_VALUE === $arg->type) {
+            return self::lowerBoxedLengthArg($context, $arg);
+        }
+
+        return JitLongArg::lower($context, $arg, 'chunk_split() length');
+    }
+
+    private static function lowerBoxedLengthArg(Context $context, JITVariable $arg): Value
+    {
+        TypeErrorRaise::registerDeclarations($context);
+        TypeErrorRaise::ensureLinked($context);
+        $valuePtr = JitValueBox::valuePtrFromVariable($context, $arg);
+        $map = $context->structFieldMap['__value__'];
+        $typeByte = $context->builder->load(
+            $context->builder->structGep($valuePtr, $map['type'])
+        );
+        $i8 = $context->getTypeFromString('int8');
+        $arrayTy = $i8->constInt(VmVariable::TYPE_ARRAY, false);
+        $objectTy = $i8->constInt(VmVariable::TYPE_OBJECT, false);
+        $enumCaseTy = $i8->constInt(VmVariable::TYPE_ENUM_CASE, false);
+
+        $okBlock = BasicBlockHelper::append($context, 'chunksplit_len_ok');
+        $arrayBlock = BasicBlockHelper::append($context, 'chunksplit_len_array');
+        $rejectBlock = BasicBlockHelper::append($context, 'chunksplit_len_reject');
+        $coerceBlock = BasicBlockHelper::append($context, 'chunksplit_len_coerce');
+
+        $isArray = $context->builder->icmp(Builder::INT_EQ, $typeByte, $arrayTy);
+        $context->builder->branchIf($isArray, $arrayBlock, $okBlock);
+
+        $context->builder->positionAtEnd($arrayBlock);
+        self::emitLengthTypeErrorAndAbort($context, 'array');
+
+        $context->builder->positionAtEnd($okBlock);
+        $isObject = $context->builder->icmp(Builder::INT_EQ, $typeByte, $objectTy);
+        $isEnumCase = $context->builder->icmp(Builder::INT_EQ, $typeByte, $enumCaseTy);
+        $isObjOrEnum = $context->builder->or($isObject, $isEnumCase);
+        $context->builder->branchIf($isObjOrEnum, $rejectBlock, $coerceBlock);
+
+        $context->builder->positionAtEnd($rejectBlock);
+        self::emitLengthTypeErrorAndAbort($context, self::compileTimeObjectLabel($context, $arg));
+
+        $context->builder->positionAtEnd($coerceBlock);
+
+        return $context->builder->call(
+            $context->lookupFunction('__value__readLong'),
+            $valuePtr
+        );
+    }
+
+    private static function compileTimeObjectLabel(Context $context, JITVariable $arg): string
+    {
+        $enumLabel = JitOperandTypeLabel::compileTimeEnumClassName($context, $arg);
+        if (null !== $enumLabel) {
+            return $enumLabel;
+        }
+        if (JITVariable::KIND_VALUE !== $arg->kind) {
+            return 'object';
+        }
+        $objMap = $context->structFieldMap['__object__'] ?? null;
+        if (null === $objMap || !isset($objMap['class_id'])) {
+            return 'object';
+        }
+        $classIdVal = $context->builder->load(
+            $context->builder->structGep($arg->value, $objMap['class_id'])
+        );
+        if (!method_exists($classIdVal, 'isConstant') || !$classIdVal->isConstant()) {
+            return 'object';
+        }
+        $classId = (int) $classIdVal->getConstantValue();
+
+        return $context->type->object->classNameForId($classId);
+    }
+
+    private static function lengthTypeError(string $given): string
+    {
+        return sprintf(
+            'chunk_split(): Argument #2 ($length) must be of type int, %s given',
+            $given
+        );
+    }
+
+    private static function emitLengthTypeErrorAndAbort(Context $context, string $given): void
+    {
+        TypeErrorRaise::registerDeclarations($context);
+        TypeErrorRaise::ensureLinked($context);
+        TypeErrorRaise::emitRaise($context, self::lengthTypeError($given));
+        $context->builder->call($context->lookupFunction('abort'));
+    }
 
     /** Lower chunk_split() $string with Z_PARAM_STR parity (#4580, ext/standard/string.c). */
     public static function lowerStringSubject(Context $context, JITVariable $arg): Value
