@@ -22,7 +22,16 @@ final class ReadonlyFunctionCompileCheck
             return false;
         }
 
-        return 0 !== (((int) ($func->flags ?? 0)) & CfgFunc::FLAG_READONLY);
+        return 0 !== (((int) ($func->flags ?? 0)) & self::readonlyFlagMask());
+    }
+
+    private static function readonlyFlagMask(): int
+    {
+        if (!\defined(CfgFunc::class.'::FLAG_READONLY')) {
+            return 0;
+        }
+
+        return CfgFunc::FLAG_READONLY;
     }
 
     public static function assertClosureCaptures(Closure $closure): void
