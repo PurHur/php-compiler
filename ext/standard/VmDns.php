@@ -8,7 +8,10 @@ use PHPCompiler\VM\HashTable;
 use PHPCompiler\VM\Variable;
 
 /**
- * DNS helpers for stdlib builtins (issue #3707, #5854; native getaddrinfo #4928).
+ * DNS helpers for stdlib builtins (issue #3707, #5854, #7315).
+ *
+ * VM resolves via /etc/hosts without host ext/ffi; optional libc getaddrinfo when FFI is loaded.
+ * JIT/AOT: lib/JIT/Builtin/GethostbynamelRuntime.php (__compiler_gethostbynamel).
  *
  * php-src: ext/standard/dns.c — PHP_FUNCTION(gethostbynamel), PHP_FUNCTION(gethostbyaddr), PHP_FUNCTION(gethostbyname)
  */
@@ -39,9 +42,9 @@ final class VmDns
             return false;
         }
 
-        $ips = self::resolveViaGetaddrinfo($hostname);
-        if (null === $ips) {
-            $ips = self::resolveViaEtcHosts($hostname);
+        $ips = self::resolveViaEtcHosts($hostname);
+        if (null === $ips || [] === $ips) {
+            $ips = self::resolveViaGetaddrinfo($hostname);
         }
         if (null === $ips || [] === $ips) {
             return false;
@@ -98,9 +101,9 @@ final class VmDns
             return false;
         }
 
-        $name = self::resolveHostnameViaGetnameinfo($ipAddress);
-        if (null === $name) {
-            $name = self::resolveHostnameViaEtcHosts($ipAddress);
+        $name = self::resolveHostnameViaEtcHosts($ipAddress);
+        if (null === $name || '' === $name) {
+            $name = self::resolveHostnameViaGetnameinfo($ipAddress);
         }
         if (null === $name || '' === $name) {
             $error = self::isValidIpv4Address($ipAddress)
@@ -174,19 +177,17 @@ final class VmDns
 
     private static function inetPtonIpv4(string $ip): bool
     {
-        if (!\extension_loaded('ffi')) {
-            return \preg_match('/^\d{1,3}(\.\d{1,3}){3}$/', $ip) === 1;
+        if (!\preg_match('/^\d{1,3}(\.\d{1,3}){3}$/', $ip)) {
+            return false;
         }
-        try {
-            $ffi = self::ffi();
-        } catch (\Throwable) {
-            return \preg_match('/^\d{1,3}(\.\d{1,3}){3}$/', $ip) === 1;
+        foreach (\explode('.', $ip) as $octet) {
+            $n = (int) $octet;
+            if ($n < 0 || $n > 255 || (string) $n !== $octet) {
+                return false;
+            }
         }
 
-        $addr = $ffi->new('struct in_addr');
-        $rc = (int) $ffi->inet_pton(self::AF_INET, $ip, \FFI::addr($addr));
-
-        return 1 === $rc;
+        return true;
     }
 
     /**
