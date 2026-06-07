@@ -35,7 +35,7 @@ final class get_class_vars_ extends Internal
         }
         $ctx = VmReflection::requireContext($frame);
         $entry = VmReflection::resolveClassEntry($ctx, $className);
-        if (null === $entry || $entry->isInterface || $entry->isTrait || $entry->isEnum) {
+        if (null === $entry) {
             $frame->returnVar->bool(false);
 
             return;

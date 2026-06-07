@@ -61,4 +61,25 @@ PHP;
         $rt->run($block);
         $this->assertSame("1\nBase5026\nBase5026\n", ob_get_clean());
     }
+
+    public function testVmGetClassVarsTraitInterfaceEnum(): void
+    {
+        $code = <<<'PHP'
+<?php
+trait T7397 { public static string $s = 'hi'; public int $y = 2; }
+interface I7397 { public const C = 1; }
+enum E7397: string { case A = 'a'; }
+$t = get_class_vars('T7397');
+echo count($t), "\n", $t['y'], "\n", $t['s'], "\n";
+$i = get_class_vars(I7397::class);
+echo is_array($i) ? count($i) : 'bad', "\n";
+$e = get_class_vars(E7397::class);
+echo array_key_exists('name', $e) && array_key_exists('value', $e) ? 'enum-ok' : 'enum-bad';
+PHP;
+        $rt = new Runtime();
+        $block = $rt->parseAndCompile($code, 'get_class_vars_interface_trait.php');
+        ob_start();
+        $rt->run($block);
+        $this->assertSame("2\n2\nhi\n0\nenum-ok", ob_get_clean());
+    }
 }
