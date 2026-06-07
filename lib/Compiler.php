@@ -5673,7 +5673,8 @@ class Compiler {
                     $this->compileUnaryExprReadOperand($expr, $block)
                 )];
             case Op\Expr\Empty_::class:
-                $emptyOperand = $this->unaryExprOperandForRead($expr, $block);
+                $emptyOperand = $this->recoverEmptyExprOperand($expr, $block)
+                    ?? $this->unaryExprOperandForRead($expr, $block);
                 $propFetch = null !== $emptyOperand
                     ? $this->findCoalescePropertyFetch($emptyOperand, $block)
                     : null;
@@ -7610,6 +7611,26 @@ class Compiler {
      * @return ?Op\Expr\ArrayDimFetch
      */
     /**
+     * php-cfg emits PropertyFetch before Empty_; recover operand when Empty_.expr is cleared (#4701, #6829).
+     */
+    private function recoverEmptyExprOperand(Op\Expr\Empty_ $expr, Block $block): ?Operand
+    {
+        if (null !== $expr->expr) {
+            return $expr->expr;
+        }
+        foreach ($block->orig->children as $child) {
+            if ($child instanceof Op\Expr\PropertyFetch && $this->isPropertyFetchOnlyEmptyVar($child, $expr, $block)) {
+                return $child->result;
+            }
+            if ($child instanceof Op\Expr\ArrayDimFetch && $this->isArrayDimFetchOnlyEmptyVar($child, $expr, $block)) {
+                return $child->result;
+            }
+        }
+
+        return null;
+    }
+
+    /**
      * php-cfg may clear Empty_/BooleanNot->expr after SSA phi replaceWith; recover read operand (#6829).
      */
     private function unaryExprOperandForRead(Op\Expr $expr, Block $block): ?Operand
@@ -7618,7 +7639,7 @@ class Compiler {
             return $expr->expr;
         }
         if ($expr instanceof Op\Expr\Empty_) {
-            return $expr->result;
+            return $this->recoverEmptyExprOperand($expr, $block);
         }
         if ($expr instanceof Op\Expr\BooleanNot) {
             return $this->recoverBooleanNotExprOperand($expr, $block);
