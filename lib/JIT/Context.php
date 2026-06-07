@@ -647,6 +647,7 @@ class Context {
             Builtin\Sscanf::ensureStandaloneBodies($this);
             Builtin\StringParseStrJit::ensureStandaloneBodies($this);
             Builtin\StringGetenv::ensureStandaloneBodies($this);
+            Builtin\GcCollectCyclesRuntime::ensureStandaloneBodies($this);
         }
 
         $this->functionProxies['is_null'] = new Builtin\IsNullFn();
