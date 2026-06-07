@@ -29,6 +29,12 @@ final class fdatasync_ extends Internal
         if (null === $frame->returnVar) {
             return;
         }
+        if (!VmStreamSync::isSupported($handle)) {
+            VmStreamSync::triggerUnsyncableWarning($frame, 'fdatasync');
+            $frame->returnVar->bool(false);
+
+            return;
+        }
         $frame->returnVar->bool(VmFs::fdatasync($handle));
     }
 
