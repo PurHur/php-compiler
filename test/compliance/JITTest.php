@@ -320,10 +320,6 @@ class JITTest extends BaseTest {
             if (str_contains($name, 'global_top_level')) {
                 continue;
             }
-            // $GLOBALS + top-level locals MCJIT execute segfault (#4423); VM green; lowering in GlobalsTableInit.
-            if (str_contains($name, 'globals_alias')) {
-                continue;
-            }
             // Stringable __toString in echo/concat is VM-only until magic method JIT (#146, #3296).
             if (str_contains($name, 'stringable')) {
                 continue;
