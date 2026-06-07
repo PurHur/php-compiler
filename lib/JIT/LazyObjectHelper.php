@@ -136,7 +136,9 @@ final class LazyObjectHelper
             $context->builder->branch($done);
 
             $context->builder->positionAtEnd($proxyBlock);
-            $result = $proxy->call($context);
+            $proxyThis = new Variable($context, Variable::TYPE_OBJECT, Variable::KIND_VALUE, $obj);
+            $proxyThis->addref();
+            $result = $proxy->call($context, $proxyThis);
             $realObj = $context->builder->call(
                 $context->lookupFunction('__value__readObject'),
                 JitValueBox::coerceToValuePtrForStore($context, $result)

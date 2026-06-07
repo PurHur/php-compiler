@@ -24,7 +24,7 @@ class Svc {
         $this->id = $id;
     }
 }
-$proxy = createLazyProxy(Svc::class, static fn () => new Svc('proxy'));
+$proxy = createLazyProxy(Svc::class, static fn (Svc $o): Svc => new Svc('proxy'));
 echo $proxy->id, "\n";
 
 try {
