@@ -152,6 +152,22 @@ final class DnfCheck
                 $expectedType
             ));
         }
+        $classLc = $target->staticPropertyClassLc;
+        if (null !== $classLc && '' !== $propName) {
+            $classLabel = $classLc;
+            $vm = \PHPCompiler\VM::running();
+            if (null !== $vm && isset($vm->context->classes[$classLc])) {
+                $classLabel = $vm->context->classes[$classLc]->name;
+            }
+
+            return new \TypeError(sprintf(
+                'Cannot assign %s to property %s::$%s of type %s',
+                self::givenTypeLabel($value),
+                $classLabel,
+                $propName,
+                $expectedType
+            ));
+        }
 
         return new \TypeError(sprintf(
             'Property must be of type %s, %s given',
