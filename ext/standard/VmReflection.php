@@ -14,6 +14,7 @@ use PHPCompiler\VM\Context;
 use PHPCompiler\VM\EnumCaseSupport;
 use PHPCompiler\VM\EnumSupport;
 use PHPCompiler\VM\InterfaceCheck;
+use PHPCompiler\VM\LazyGhostTraitSupport;
 use PHPCompiler\VM\ReflectionSupport;
 use PHPCompiler\VM\StringableSupport;
 use PHPCompiler\VM\TypedPropertyCheck;
@@ -162,6 +163,9 @@ final class VmReflection
             if (!$entry->isTrait || isset($ctx->classAliases[$lc])) {
                 continue;
             }
+            if (LazyGhostTraitSupport::isLazyGhostTrait($entry->name)) {
+                continue;
+            }
             $value = new Variable();
             $value->string($entry->name);
             $result->append($value);
@@ -233,6 +237,9 @@ final class VmReflection
 
     public static function traitExists(Context $ctx, string $traitName): bool
     {
+        if (LazyGhostTraitSupport::isLazyGhostTrait($traitName)) {
+            return false;
+        }
         $entry = self::resolveClassEntry($ctx, $traitName);
 
         return null !== $entry && $entry->isTrait;

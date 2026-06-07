@@ -705,10 +705,10 @@ function syntaxRowDefinitions(): array
             'opcodes' => ['TYPE_DECLARE_CLASS', 'TYPE_USE_TRAIT'],
             'issue' => 6096,
             'notes' => [
-                'Zend/zend_lazy_objects.c — internal empty trait; trait_exists true; use in class bodies',
-                'ReflectionClass::newLazyGhost on trait-marked classes (#5968)',
+                'Zend/zend_lazy_objects.c — internal trait; not in get_declared_traits/trait_exists (#7009)',
+                'Compiler allows use LazyGhostTrait in class bodies; ReflectionClass::newLazyGhost (#5968)',
             ],
-            'probe' => 'class S { use LazyGhostTrait; public string $id = ""; } echo trait_exists("LazyGhostTrait") ? 1 : 0;',
+            'probe' => 'echo count(get_declared_traits()); echo trait_exists("LazyGhostTrait") ? 1 : 0;',
         ],
         [
             'id' => 'array_argument_unpack',

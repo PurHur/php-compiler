@@ -103,7 +103,7 @@ echo $lazy->id, "\n";
 PHP;
         ob_start();
         $runtime->run($runtime->parseAndCompile($code, 'lazy_ghost_trait.php'));
-        $this->assertSame("true\ncompiled\nuninit\nlazy\n", ob_get_clean());
+        $this->assertSame("false\ncompiled\nuninit\nlazy\n", ob_get_clean());
     }
 
     /** @covers issue #6531 */

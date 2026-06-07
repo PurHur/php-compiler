@@ -25,7 +25,7 @@ $lazy = $ref->newLazyGhost(function (Svc $o) {
 echo $ref->isUninitializedLazyObject($lazy) ? 'uninit' : 'init', "\n";
 echo $lazy->id, "\n";
 --EXPECT--
-true
+false
 compiled
 uninit
 lazy
