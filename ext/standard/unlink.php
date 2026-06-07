@@ -7,7 +7,7 @@ namespace PHPCompiler\ext\standard;
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Context;
-use PHPCompiler\JIT\JitStringArg;
+use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
@@ -20,11 +20,8 @@ final class unlink extends Internal
         if (1 !== \count($frame->calledArgs)) {
             throw new \LogicException('unlink() requires exactly one argument in this compiler build');
         }
-        $v = $frame->calledArgs[0]->resolveIndirect();
-        if (Variable::TYPE_STRING !== $v->type) {
-            throw new \LogicException('unlink() requires a string path in this compiler build');
-        }
-        $ok = VmFs::unlink($v->toString());
+        $path = VmString::coerceStringBuiltinArg($frame->calledArgs[0], 'unlink', 0, 'filename');
+        $ok = VmFs::unlink($path);
         if (null !== $frame->returnVar) {
             $frame->returnVar->bool($ok);
         }
@@ -35,7 +32,7 @@ final class unlink extends Internal
         if (1 !== \count($args)) {
             throw new \LogicException('unlink() requires exactly one argument in this compiler build');
         }
-        $path = JitStringArg::lower($context, $args[0], 'unlink() path');
+        $path = JitStringBuiltinArg::lower($context, $args[0], 'unlink', 0, 'filename');
 
         return JitUnlink::invoke($context, $path);
     }

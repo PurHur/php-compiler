@@ -8,6 +8,7 @@ use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitStringArg;
+use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\Variable;
 use PHPCompiler\ext\standard\JitRequestBody;
@@ -24,14 +25,15 @@ final class file_get_contents extends Internal
         if (1 !== \count($frame->calledArgs)) {
             throw new \LogicException('file_get_contents() requires exactly one argument in this compiler build');
         }
-        $v = $frame->calledArgs[0]->resolveIndirect();
+        $filename = VmString::coerceStringBuiltinArg(
+            $frame->calledArgs[0],
+            'file_get_contents',
+            0,
+            'filename'
+        );
         if (null === $frame->returnVar) {
             return;
         }
-        if (Variable::TYPE_STRING !== $v->type) {
-            throw new \LogicException('file_get_contents() requires a string filename in this compiler build');
-        }
-        $filename = $v->toString();
         if ('php://input' === $filename) {
             $frame->returnVar->string(Superglobals::readRequestBody());
 
@@ -59,7 +61,7 @@ final class file_get_contents extends Internal
 
         return JitFileGetContents::invoke(
             $context,
-            JitStringArg::lower($context, $arg, 'file_get_contents() filename')
+            JitStringBuiltinArg::lower($context, $arg, 'file_get_contents', 0, 'filename')
         );
     }
 }
