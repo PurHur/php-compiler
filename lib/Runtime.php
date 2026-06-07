@@ -336,6 +336,7 @@ class Runtime {
             $this->vmContext->propertyHookRegistry = $newRegistry;
         }
         CurlyBraceOffsetRejector::reject($code, $filename);
+        ReadonlyMethodModifierRejector::reject($code, $filename);
         $code = EnumCaseListRewriter::rewrite($code);
         $code = SwitchCommaCaseRewriter::rewrite($code);
         $code = GenericArrayTypeSourceRewriter::rewrite($code);
