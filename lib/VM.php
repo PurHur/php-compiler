@@ -2105,6 +2105,17 @@ restart:
                     $unpack = $unpackSlot->resolveIndirect();
                     if (null !== $op->block1) {
                         if (!$this->variableIsListDestructUnpackable($unpack)) {
+                            if (Variable::TYPE_STRING === $unpack->type) {
+                                $catchFrame = $this->dispatchVmTypeError(
+                                    new \TypeError(JIT\ListUnpackHelper::LIST_DESTRUCT_STRING_MESSAGE),
+                                    $frame
+                                );
+                                if (null !== $catchFrame) {
+                                    $frame = $catchFrame;
+                                    goto restart;
+                                }
+                                break;
+                            }
                             $frame = $this->frameForBranch($frame, $op->block1);
                             goto restart;
                         }
