@@ -55,6 +55,7 @@ use PHPCompiler\Compiler\FinalClassExtensionCheck;
 use PHPCompiler\Compiler\FinalMethodOverrideCheck;
 use PHPCompiler\Compiler\InterfaceImplementationCheck;
 use PHPCompiler\Compiler\ParameterMetadata;
+use PHPCompiler\Compiler\GeneratorNeverReturnCompileCheck;
 use PHPCompiler\Compiler\GeneratorStaticMethodCompileCheck;
 use PHPCompiler\Compiler\ReadonlyClassCompileCheck;
 use PHPCompiler\Compiler\TraitCollisionCheck;
@@ -437,6 +438,7 @@ class Compiler {
         ReadonlyClassCompileCheck::validate($script, $this->knownClassReadonly);
         AsymmetricVisibilityCompileCheck::validate($script);
         GeneratorStaticMethodCompileCheck::validate($script);
+        GeneratorNeverReturnCompileCheck::validate($script);
 
         if (null !== $this->haltCompilerOffset) {
             $main->haltCompilerOffset = $this->haltCompilerOffset;
