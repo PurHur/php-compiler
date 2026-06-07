@@ -7,9 +7,8 @@ namespace PHPCompiler\ext\standard;
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Context;
-use PHPCompiler\JIT\JitStringArg;
+use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\Variable as JITVariable;
-use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
 
 /** basename() for path strings (subset of PHP; JIT/AOT via JitPath). */
@@ -21,22 +20,15 @@ final class basename extends Internal
         if ($argc < 1 || $argc > 2) {
             throw new \LogicException('basename() expects 1 or 2 arguments');
         }
-        $v = $frame->calledArgs[0]->resolveIndirect();
+        $path = VmString::coerceStringBuiltinArg($frame->calledArgs[0], 'basename', 0, 'path');
         if (null === $frame->returnVar) {
             return;
         }
-        if (Variable::TYPE_STRING !== $v->type) {
-            throw new \LogicException('basename() only supports strings in this compiler build');
-        }
         $suffix = '';
         if (2 === $argc) {
-            $s = $frame->calledArgs[1]->resolveIndirect();
-            if (Variable::TYPE_STRING !== $s->type) {
-                throw new \LogicException('basename() only supports strings in this compiler build');
-            }
-            $suffix = $s->toString();
+            $suffix = VmString::coerceStringBuiltinArg($frame->calledArgs[1], 'basename', 1, 'suffix');
         }
-        $frame->returnVar->string(VmString::basename($v->toString(), $suffix));
+        $frame->returnVar->string(VmString::basename($path, $suffix));
     }
 
     public function call(Context $context, JITVariable ...$args): Value
@@ -45,10 +37,10 @@ final class basename extends Internal
         if ($argc < 1 || $argc > 2) {
             throw new \LogicException('basename() expects 1 or 2 arguments');
         }
-        $path = JitStringArg::lower($context, $args[0], 'basename() path');
+        $path = JitStringBuiltinArg::lower($context, $args[0], 'basename', 0, 'path');
         $base = JitPath::basename($context, $path);
         if (2 === $argc) {
-            $suffix = JitStringArg::lower($context, $args[1], 'basename() suffix');
+            $suffix = JitStringBuiltinArg::lower($context, $args[1], 'basename', 1, 'suffix');
 
             return JitPath::stripSuffixIfPresent($context, $base, $suffix);
         }

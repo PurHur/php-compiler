@@ -21,10 +21,7 @@ final class pathinfo extends Internal
         if ($argc < 1 || $argc > 2) {
             throw new \LogicException('pathinfo() requires one or two arguments in this compiler build');
         }
-        $pathVar = $frame->calledArgs[0]->resolveIndirect();
-        if (Variable::TYPE_STRING !== $pathVar->type) {
-            throw new \LogicException('pathinfo() path must be a string in this compiler build');
-        }
+        $path = VmString::coerceStringBuiltinArg($frame->calledArgs[0], 'pathinfo', 0, 'path');
         $flags = 15;
         if (2 === $argc) {
             $flagVar = $frame->calledArgs[1]->resolveIndirect();
@@ -37,7 +34,7 @@ final class pathinfo extends Internal
             return;
         }
 
-        $result = VmString::pathinfo($pathVar->toString(), $flags);
+        $result = VmString::pathinfo($path, $flags);
         if (\is_array($result)) {
             $ht = new HashTable();
             foreach ($result as $key => $value) {
@@ -58,12 +55,8 @@ final class pathinfo extends Internal
         if ($argc < 1 || $argc > 2) {
             throw new \LogicException('pathinfo() requires one or two arguments in this compiler build');
         }
-        if (JITVariable::TYPE_STRING !== $args[0]->type) {
-            throw new \LogicException('pathinfo() path must be a string in this compiler build');
-        }
         $flags = 2 === $argc ? $args[1] : null;
 
-        $this->jitString($context, $args[0], 'pathinfo() argument #1');
         return JitPathinfo::invoke($context, $args[0], $flags);
     }
 }
