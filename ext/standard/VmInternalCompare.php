@@ -6,6 +6,7 @@ namespace PHPCompiler\ext\standard;
 
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
+use PHPCompiler\VM\EnumCaseSupport;
 use PHPCompiler\VM\Variable;
 
 /**
@@ -80,7 +81,7 @@ final class VmInternalCompare
         $n = \count($values);
         for ($i = 1; $i < $n; ++$i) {
             $j = $i;
-            while ($j > 0 && Variable::compareSpaceship($values[$j - 1], $values[$j]) > 0) {
+            while ($j > 0 && self::compareValuesForSort($values[$j - 1], $values[$j]) > 0) {
                 $tmp = $values[$j - 1];
                 $values[$j - 1] = $values[$j];
                 $values[$j] = $tmp;
@@ -294,5 +295,14 @@ final class VmInternalCompare
         throw new \LogicException(
             'ksort() only supports homogeneous string or integer keys in this compiler build'
         );
+    }
+
+    private static function compareValuesForSort(Variable $left, Variable $right): int
+    {
+        if (EnumCaseSupport::isEnumCaseVariable($left) && EnumCaseSupport::isEnumCaseVariable($right)) {
+            return EnumCaseSupport::compareEnumCasesForSort($left, $right);
+        }
+
+        return Variable::compareSpaceship($left, $right);
     }
 }
