@@ -43,34 +43,14 @@ final class array_reduce extends Internal
         if (null === $frame->vmContext) {
             throw new \LogicException('array_reduce() requires VM context in this compiler build');
         }
-        $callback = $frame->calledArgs[1]->resolveIndirect();
+        $callback = $frame->calledArgs[1];
         $hasInitial = 3 === $argc;
         $initial = $hasInitial ? $frame->calledArgs[2]->resolveIndirect() : null;
-        [$closure, $userFn] = self::resolveVmCallback($frame, $callback);
+        [$closure, $userFn] = VmReduceCallback::resolve($frame, $callback);
         if (null === $frame->returnVar) {
             return;
         }
         self::reduceVm($frame, $array, $hasInitial, $initial, $closure, $userFn, $frame->vmContext);
-    }
-
-    /**
-     * @return array{0: ?ClosureState, 1: ?PHP}
-     */
-    private static function resolveVmCallback(Frame $frame, Variable $callback): array
-    {
-        if (VmClosureCall::isClosure($callback)) {
-            return [VmClosureCall::resolve($callback), null];
-        }
-        if (Variable::TYPE_STRING !== $callback->type) {
-            throw new \TypeError(ArrayReduceCallbackPolicy::invalidCallbackTypeError());
-        }
-        try {
-            return [null, VmUserCall::resolveStringCallback($frame->vmContext, $callback->toString())];
-        } catch (\LogicException) {
-            throw new \TypeError(
-                ArrayReduceCallbackPolicy::invalidStringCallbackTypeError($callback->toString())
-            );
-        }
     }
 
     /**
