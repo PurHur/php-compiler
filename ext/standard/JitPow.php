@@ -8,6 +8,7 @@ use PHPCompiler\JIT\Builtin\PowIntRuntime;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitEnumNumericOperandGuard;
 use PHPCompiler\JIT\JitLongArg;
+use PHPCompiler\JIT\JitPowNumericOperandGuard;
 use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Value;
@@ -33,6 +34,7 @@ final class JitPow
      */
     private static function invokeBoxedIntAware(Context $context, JITVariable ...$args): Value
     {
+        JitPowNumericOperandGuard::guardOperands($context, $args[0], $args[1]);
         JitEnumNumericOperandGuard::guardPow($context, $args[0], $args[1]);
         $slot = JitValueBox::alloc($context);
         $slotPtr = JitValueBox::pointer($context, $slot);
@@ -65,6 +67,7 @@ final class JitPow
 
     private static function writeLibcPowToSlot(Context $context, Value $slotPtr, JITVariable ...$args): Value
     {
+        JitPowNumericOperandGuard::guardOperands($context, $args[0], $args[1]);
         JitEnumNumericOperandGuard::guardPow($context, $args[0], $args[1]);
         $double = $context->getTypeFromString('double');
         $baseD = pow::toJitDouble($context, $args[0], $double);
