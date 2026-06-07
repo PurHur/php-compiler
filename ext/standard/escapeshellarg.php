@@ -23,19 +23,20 @@ final class escapeshellarg extends Internal
 
     public function execute(Frame $frame): void
     {
-        if (1 !== \count($frame->calledArgs)) {
-            throw new \LogicException('escapeshellarg() requires exactly one argument');
+        $argc = \count($frame->calledArgs);
+        if (1 !== $argc) {
+            throw new \ArgumentCountError('escapeshellarg() expects exactly 1 argument, '.$argc.' given');
         }
         $arg = VmString::coerceStringBuiltinArg($frame->calledArgs[0], 'escapeshellarg', 0, 'arg');
         BuiltinExecute::writeReturn($frame, static function (Variable $ret) use ($arg): void {
-            $ret->string(\escapeshellarg($arg));
+            $ret->string(VmEscapeshell::escapeshellarg($arg));
         });
     }
 
     public function call(Context $context, JITVariable ...$args): Value
     {
         if (1 !== \count($args)) {
-            throw new \LogicException('escapeshellarg() requires exactly one argument');
+            throw new \ArgumentCountError('escapeshellarg() expects exactly 1 argument, '.\count($args).' given');
         }
 
         return JitEscapeshellarg::invoke(
