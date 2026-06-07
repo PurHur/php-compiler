@@ -26,14 +26,28 @@ final class JitFdiv
         JITVariable $num2,
         string $function = self::FUNCTION,
         string $param1 = 'num1',
-        string $param2 = 'num2'
+        string $param2 = 'num2',
+        string $expectedType = 'float'
     ): array {
         $double = $context->getTypeFromString('double');
 
         return [
-            self::lowerOperand($context, $num1, 1, $param1, $double, $function),
-            self::lowerOperand($context, $num2, 2, $param2, $double, $function),
+            self::lowerOperand($context, $num1, 1, $param1, $double, $function, $expectedType),
+            self::lowerOperand($context, $num2, 2, $param2, $double, $function, $expectedType),
         ];
+    }
+
+    public static function lowerSingleOperand(
+        Context $context,
+        JITVariable $arg,
+        int $argIndex,
+        string $paramName,
+        string $function,
+        string $expectedType = 'float'
+    ): Value {
+        $double = $context->getTypeFromString('double');
+
+        return self::lowerOperand($context, $arg, $argIndex, $paramName, $double, $function, $expectedType);
     }
 
     private static function lowerOperand(
@@ -42,23 +56,25 @@ final class JitFdiv
         int $argIndex,
         string $paramName,
         $double,
-        string $function = self::FUNCTION
+        string $function = self::FUNCTION,
+        string $expectedType = 'float'
     ): Value {
         if (JITVariable::TYPE_NULL === $arg->type) {
             return $double->constReal(0.0);
         }
         if (($arg->type & JITVariable::IS_NATIVE_ARRAY) || JITVariable::TYPE_HASHTABLE === $arg->type) {
-            self::emitDoubleTypeErrorAndAbort($context, $argIndex, $paramName, 'array', $function);
+            self::emitNumericTypeErrorAndAbort($context, $argIndex, $paramName, 'array', $function, $expectedType);
 
             return $double->constReal(0.0);
         }
         if (JITVariable::TYPE_OBJECT === $arg->type) {
-            self::emitDoubleTypeErrorAndAbort(
+            self::emitNumericTypeErrorAndAbort(
                 $context,
                 $argIndex,
                 $paramName,
                 self::compileTimeObjectGivenLabel($context, $arg),
-                $function
+                $function,
+                $expectedType
             );
 
             return $double->constReal(0.0);
@@ -67,10 +83,10 @@ final class JitFdiv
             return $context->helper->loadValue($arg);
         }
         if (JITVariable::TYPE_STRING === $arg->type) {
-            return self::lowerStringOperand($context, $arg, $argIndex, $paramName, $double, $function);
+            return self::lowerStringOperand($context, $arg, $argIndex, $paramName, $double, $function, $expectedType);
         }
         if (JITVariable::TYPE_VALUE === $arg->type) {
-            return self::lowerBoxedOperand($context, $arg, $argIndex, $paramName, $double, $function);
+            return self::lowerBoxedOperand($context, $arg, $argIndex, $paramName, $double, $function, $expectedType);
         }
         if (JITVariable::TYPE_NATIVE_BOOL === $arg->type) {
             return $context->builder->uiToFp($context->helper->loadValue($arg), $double);
@@ -88,11 +104,12 @@ final class JitFdiv
         int $argIndex,
         string $paramName,
         $double,
-        string $function = self::FUNCTION
+        string $function = self::FUNCTION,
+        string $expectedType = 'float'
     ): Value {
         $strPtr = JitStringArg::lower($context, $arg, sprintf('%s() argument #%d', $function, $argIndex));
 
-        return self::lowerStringOperandFromPtr($context, $strPtr, $argIndex, $paramName, $double, $function);
+        return self::lowerStringOperandFromPtr($context, $strPtr, $argIndex, $paramName, $double, $function, $expectedType);
     }
 
     private static function lowerStringOperandFromPtr(
@@ -101,14 +118,15 @@ final class JitFdiv
         int $argIndex,
         string $paramName,
         $double,
-        string $function = self::FUNCTION
+        string $function = self::FUNCTION,
+        string $expectedType = 'float'
     ): Value {
         $isNumeric = self::stringPtrIsNumeric($context, $strPtr);
         $okBlock = BasicBlockHelper::append($context, 'fdiv_str_ok');
         $errBlock = BasicBlockHelper::append($context, 'fdiv_str_err');
         $context->builder->branchIf($isNumeric, $okBlock, $errBlock);
         $context->builder->positionAtEnd($errBlock);
-        self::emitDoubleTypeErrorAndAbort($context, $argIndex, $paramName, 'string', $function);
+        self::emitNumericTypeErrorAndAbort($context, $argIndex, $paramName, 'string', $function, $expectedType);
         $context->builder->positionAtEnd($okBlock);
 
         return self::stringPtrToDouble($context, $strPtr);
@@ -120,7 +138,8 @@ final class JitFdiv
         int $argIndex,
         string $paramName,
         $double,
-        string $function = self::FUNCTION
+        string $function = self::FUNCTION,
+        string $expectedType = 'float'
     ): Value {
         TypeErrorRaise::registerDeclarations($context);
         TypeErrorRaise::ensureLinked($context);
@@ -159,7 +178,7 @@ final class JitFdiv
         $context->builder->branchIf($isArray, $arrayBlock, $enumBlock);
 
         $context->builder->positionAtEnd($arrayBlock);
-        self::emitDoubleTypeErrorAndAbort($context, $argIndex, $paramName, 'array', $function);
+        self::emitNumericTypeErrorAndAbort($context, $argIndex, $paramName, 'array', $function, $expectedType);
 
         $context->builder->positionAtEnd($enumBlock);
         $isEnumCase = $context->builder->icmp(Builder::INT_EQ, $typeByte, $enumCaseTy);
@@ -167,12 +186,13 @@ final class JitFdiv
         $context->builder->branchIf($isEnumCase, $objectBlock, $afterEnum);
 
         $context->builder->positionAtEnd($objectBlock);
-        self::emitDoubleTypeErrorAndAbort(
+        self::emitNumericTypeErrorAndAbort(
             $context,
             $argIndex,
             $paramName,
             self::compileTimeEnumCaseGivenLabel($context, $arg),
-            $function
+            $function,
+            $expectedType
         );
 
         $context->builder->positionAtEnd($afterEnum);
@@ -182,12 +202,13 @@ final class JitFdiv
         $context->builder->branchIf($isObject, $objectErrBlock, $afterObject);
 
         $context->builder->positionAtEnd($objectErrBlock);
-        self::emitDoubleTypeErrorAndAbort(
+        self::emitNumericTypeErrorAndAbort(
             $context,
             $argIndex,
             $paramName,
             self::compileTimeObjectGivenLabel($context, $arg),
-            $function
+            $function,
+            $expectedType
         );
 
         $context->builder->positionAtEnd($afterObject);
@@ -206,7 +227,7 @@ final class JitFdiv
 
         $context->builder->positionAtEnd($stringCoerce);
         $strVal = $context->builder->call($context->lookupFunction('__value__readString'), $valuePtr);
-        $strDouble = self::lowerStringOperandFromPtr($context, $strVal, $argIndex, $paramName, $double, $function);
+        $strDouble = self::lowerStringOperandFromPtr($context, $strVal, $argIndex, $paramName, $double, $function, $expectedType);
         $stringEnd = $context->builder->getInsertBlock();
         $context->builder->branch($mergeBlock);
 
@@ -326,31 +347,39 @@ final class JitFdiv
         return self::compileTimeObjectGivenLabel($context, $arg);
     }
 
-    private static function doubleTypeError(
+    private static function numericTypeError(
         int $argIndex,
         string $paramName,
         string $given,
-        string $function = self::FUNCTION
+        string $function = self::FUNCTION,
+        string $expectedType = 'float'
     ): string {
+        $expected = 'number' === $expectedType ? 'int|float' : 'float';
+
         return sprintf(
-            '%s(): Argument #%d ($%s) must be of type float, %s given',
+            '%s(): Argument #%d ($%s) must be of type %s, %s given',
             $function,
             $argIndex,
             $paramName,
+            $expected,
             $given
         );
     }
 
-    private static function emitDoubleTypeErrorAndAbort(
+    private static function emitNumericTypeErrorAndAbort(
         Context $context,
         int $argIndex,
         string $paramName,
         string $given,
-        string $function = self::FUNCTION
+        string $function = self::FUNCTION,
+        string $expectedType = 'float'
     ): void {
         TypeErrorRaise::registerDeclarations($context);
         TypeErrorRaise::ensureLinked($context);
-        TypeErrorRaise::emitRaise($context, self::doubleTypeError($argIndex, $paramName, $given, $function));
+        TypeErrorRaise::emitRaise(
+            $context,
+            self::numericTypeError($argIndex, $paramName, $given, $function, $expectedType)
+        );
         $context->builder->call($context->lookupFunction('abort'));
     }
 }

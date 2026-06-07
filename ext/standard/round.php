@@ -29,13 +29,18 @@ final class round extends Internal
         if ($argc < 1 || $argc > 3) {
             throw new \LogicException('round() requires one to three arguments');
         }
-        if (null === $frame->returnVar) {
-            return;
-        }
 
-        $numVar = $frame->calledArgs[0]->resolveIndirect();
-        if (Variable::TYPE_INTEGER !== $numVar->type && Variable::TYPE_FLOAT !== $numVar->type) {
-            throw new \LogicException('round() only supports integers and floats in this compiler build');
+        $num = VmMath::parseNumberBuiltinArg(
+            $frame->calledArgs[0]->resolveIndirect(),
+            'round',
+            1,
+            'num'
+        );
+        $numVar = new Variable();
+        if (\is_int($num)) {
+            $numVar->int($num);
+        } else {
+            $numVar->float($num);
         }
 
         $precision = 0;
@@ -54,6 +59,10 @@ final class round extends Internal
                 throw new \LogicException('round() mode must be an integer in this compiler build');
             }
             $mode = $modeVar->toInt();
+        }
+
+        if (null === $frame->returnVar) {
+            return;
         }
 
         VmRound::apply($frame->returnVar, $numVar, $precision, $mode);

@@ -94,6 +94,61 @@ final class VmMath
     }
 
     /**
+     * Z_PARAM_NUMBER-style coercion for int|float builtins (php-src math.c abs/ceil/floor/round; #5613).
+     *
+     * @throws \TypeError when the operand cannot be converted like Zend PHP 8.x
+     */
+    public static function parseNumberBuiltinArg(
+        Variable $var,
+        string $function,
+        int $argIndex,
+        string $paramName
+    ): int|float {
+        $var = $var->resolveIndirect();
+        self::rejectEnumCaseNumberBuiltinArg($var, $function, $argIndex, $paramName);
+        if (Variable::TYPE_ARRAY === $var->type) {
+            throw new \TypeError(self::numberBuiltinTypeError($function, $argIndex, $paramName, 'array'));
+        }
+        if (Variable::TYPE_OBJECT === $var->type) {
+            throw new \TypeError(
+                self::numberBuiltinTypeError(
+                    $function,
+                    $argIndex,
+                    $paramName,
+                    $var->toObject()->class->name
+                )
+            );
+        }
+        if (Variable::TYPE_INTEGER === $var->type) {
+            return $var->toInt();
+        }
+        if (Variable::TYPE_FLOAT === $var->type) {
+            return $var->toFloat();
+        }
+        if (Variable::TYPE_BOOLEAN === $var->type) {
+            return $var->toBool() ? 1 : 0;
+        }
+        if (Variable::TYPE_NULL === $var->type) {
+            return 0;
+        }
+        if (Variable::TYPE_STRING === $var->type) {
+            $s = $var->toString();
+            if ('' === $s || !is_numeric($s)) {
+                throw new \TypeError(self::numberBuiltinTypeError($function, $argIndex, $paramName, 'string'));
+            }
+            if (!str_contains($s, '.') && !str_contains($s, 'e') && !str_contains($s, 'E')) {
+                return (int) $s;
+            }
+
+            return (float) $s;
+        }
+
+        throw new \TypeError(
+            self::numberBuiltinTypeError($function, $argIndex, $paramName, self::vmTypeName($var->type))
+        );
+    }
+
+    /**
      * Z_PARAM_LONG-style coercion for int-only builtins (php-src math.c; #4982 intdiv, #5360 float truncation).
      *
      * @throws \TypeError when the operand cannot be converted like Zend PHP 8.x
@@ -234,6 +289,20 @@ final class VmMath
     }
 
     /**
+     * Z_PARAM_NUMBER rejects enum cases (php-src ext/standard/math.c; #5613).
+     *
+     * @throws \TypeError
+     */
+    private static function rejectEnumCaseNumberBuiltinArg(
+        Variable $var,
+        string $function,
+        int $argIndex,
+        string $paramName
+    ): void {
+        self::rejectEnumCaseBuiltinArg($var, $function, $argIndex, $paramName, 'number');
+    }
+
+    /**
      * Z_PARAM_LONG rejects enum cases (php-src ext/standard/string.c chr/ord; #5673, #5836).
      *
      * @throws \TypeError
@@ -293,6 +362,7 @@ final class VmMath
         $message = match ($expectedType) {
             'int' => self::intBuiltinTypeError($function, $argIndex, $paramName, $given),
             'float' => self::doubleBuiltinTypeError($function, $argIndex, $paramName, $given),
+            'number' => self::numberBuiltinTypeError($function, $argIndex, $paramName, $given),
             default => self::boolBuiltinTypeError($function, $argIndex, $paramName, $given),
         };
 
@@ -339,6 +409,21 @@ final class VmMath
     ): string {
         return sprintf(
             '%s(): Argument #%d ($%s) must be of type int, %s given',
+            $function,
+            $argIndex,
+            $paramName,
+            $given
+        );
+    }
+
+    private static function numberBuiltinTypeError(
+        string $function,
+        int $argIndex,
+        string $paramName,
+        string $given
+    ): string {
+        return sprintf(
+            '%s(): Argument #%d ($%s) must be of type int|float, %s given',
             $function,
             $argIndex,
             $paramName,

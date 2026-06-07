@@ -14,9 +14,7 @@ namespace PHPCompiler\ext\standard;
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Context;
-use PHPCompiler\JIT\JitLongArg;
 use PHPCompiler\JIT\Variable as JITVariable;
-use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
 
 /**
@@ -29,21 +27,16 @@ final class sqrt extends Internal
         if (1 !== count($frame->calledArgs)) {
             throw new \LogicException('sqrt() requires exactly one argument');
         }
-        $v = $frame->calledArgs[0]->resolveIndirect();
+        $num = VmMath::parseDoubleBuiltinArg(
+            $frame->calledArgs[0]->resolveIndirect(),
+            'sqrt',
+            1,
+            'num'
+        );
         if (null === $frame->returnVar) {
             return;
         }
-        if (Variable::TYPE_INTEGER === $v->type) {
-            $frame->returnVar->float(\sqrt($v->toInt()));
-
-            return;
-        }
-        if (Variable::TYPE_FLOAT === $v->type) {
-            $frame->returnVar->float(\sqrt($v->toFloat()));
-
-            return;
-        }
-        throw new \LogicException('sqrt() only supports integers and floats in this compiler build');
+        $frame->returnVar->float(\sqrt($num));
     }
 
     public Context $context;
@@ -54,18 +47,7 @@ final class sqrt extends Internal
         if (1 !== count($args)) {
             throw new \LogicException('sqrt() requires exactly one argument');
         }
-        $double = $context->getTypeFromString('double');
-        $v = JitLongArg::lower($context, $args[0], 'sqrt() argument #1');
-        switch ($args[0]->type) {
-            case JITVariable::TYPE_NATIVE_LONG:
-                $asFloat = $context->builder->siToFp($v, $double);
-                break;
-            case JITVariable::TYPE_NATIVE_DOUBLE:
-                $asFloat = $v;
-                break;
-            default:
-                throw new \LogicException('sqrt() only supports integers and floats in this compiler build');
-        }
+        $asFloat = JitFdiv::lowerSingleOperand($context, $args[0], 1, 'num', 'sqrt', 'float');
         $fn = $context->lookupFunction('sqrt');
 
         return $context->builder->call($fn, $asFloat);

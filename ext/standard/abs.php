@@ -27,19 +27,21 @@ final class abs extends Internal
         if (1 !== count($frame->calledArgs)) {
             throw new \LogicException('Expecting exactly one argument to abs()');
         }
-        $var = $frame->calledArgs[0]->resolveIndirect();
+        $num = VmMath::parseNumberBuiltinArg(
+            $frame->calledArgs[0]->resolveIndirect(),
+            'abs',
+            1,
+            'num'
+        );
         if (null === $frame->returnVar) {
             return;
         }
-        if (Variable::TYPE_INTEGER === $var->type) {
-            $i = $var->toInt();
-            $frame->returnVar->int($i < 0 ? -$i : $i);
-        } elseif (Variable::TYPE_FLOAT === $var->type) {
-            $f = $var->toFloat();
-            $frame->returnVar->float($f < 0.0 ? -$f : $f);
-        } else {
-            throw new \LogicException('Unsupported type for abs(): '.$var->type);
+        if (\is_int($num)) {
+            $frame->returnVar->int($num < 0 ? -$num : $num);
+
+            return;
         }
+        $frame->returnVar->float($num < 0.0 ? -$num : $num);
     }
 
     public Context $context;
@@ -50,22 +52,27 @@ final class abs extends Internal
         if (1 !== count($args)) {
             throw new \LogicException('Expecting exactly one argument to abs()');
         }
-        $v = $context->helper->loadValue($args[0]);
-        switch ($args[0]->type) {
-            case JITVariable::TYPE_NATIVE_LONG:
-                $v = JitLongArg::lower($context, $args[0], 'abs() argument #1');
-                $zero = $v->typeOf()->constInt(0, false);
-                $isNeg = $context->builder->icmp(Builder::INT_SLT, $v, $zero);
-                $negated = $context->builder->negate($v);
+        if (JITVariable::TYPE_NATIVE_DOUBLE === $args[0]->type) {
+            $v = $context->helper->loadValue($args[0]);
+            $zero = $v->typeOf()->constReal(0.0);
+            $isNeg = $context->builder->fcmp(Builder::REAL_OLT, $v, $zero);
+            $negated = $context->builder->fNegate($v);
 
-                return $context->builder->select($isNeg, $negated, $v);
-            case JITVariable::TYPE_NATIVE_DOUBLE:
-                $zero = $v->typeOf()->constReal(0.0);
-                $isNeg = $context->builder->fcmp(Builder::REAL_OLT, $v, $zero);
-                $negated = $context->builder->fNegate($v);
-
-                return $context->builder->select($isNeg, $negated, $v);
+            return $context->builder->select($isNeg, $negated, $v);
         }
-        throw new \LogicException('Unsupported type for abs(): '.$args[0]->type);
+        if (JITVariable::TYPE_NATIVE_LONG === $args[0]->type) {
+            $v = JitLongArg::lower($context, $args[0], 'abs() argument #1');
+            $zero = $v->typeOf()->constInt(0, false);
+            $isNeg = $context->builder->icmp(Builder::INT_SLT, $v, $zero);
+            $negated = $context->builder->negate($v);
+
+            return $context->builder->select($isNeg, $negated, $v);
+        }
+        $asFloat = JitMathNumberArg::lowerToDouble($context, $args[0], 'abs', 1, 'num');
+        $zero = $asFloat->typeOf()->constReal(0.0);
+        $isNeg = $context->builder->fcmp(Builder::REAL_OLT, $asFloat, $zero);
+        $negated = $context->builder->fNegate($asFloat);
+
+        return $context->builder->select($isNeg, $negated, $asFloat);
     }
 }

@@ -34,16 +34,17 @@ final class JitRound
 
     private static function coerceDouble(Context $context, JITVariable $arg): Value
     {
-        $value = $context->helper->loadValue($arg);
-        $f64 = $context->getTypeFromString('double');
-        switch ($arg->type) {
-            case JITVariable::TYPE_NATIVE_LONG:
-                return $context->builder->sitofp($value, $f64);
-            case JITVariable::TYPE_NATIVE_DOUBLE:
-                return $value;
-            default:
-                throw new \LogicException('round() only supports integers and floats in this compiler build');
+        if (JITVariable::TYPE_NATIVE_DOUBLE === $arg->type) {
+            return $context->helper->loadValue($arg);
         }
+        if (JITVariable::TYPE_NATIVE_LONG === $arg->type) {
+            $value = $context->helper->loadValue($arg);
+            $f64 = $context->getTypeFromString('double');
+
+            return $context->builder->sitofp($value, $f64);
+        }
+
+        return JitMathNumberArg::lowerToDouble($context, $arg, 'round', 1, 'num');
     }
 
     private static function coerceInt64(Context $context, JITVariable $arg, string $label): Value
