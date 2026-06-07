@@ -118,7 +118,7 @@ final class NamedArgs
         }
 
         if (null !== $variadicParamIndex && ([] !== $variadicNamed || [] !== $variadicPositional)) {
-            self::assignVariadicArray($result, $variadicParamIndex, $variadicPositional, $variadicNamed);
+            self::assignVariadicArray($result, $variadicParamIndex, $paramCount, $variadicPositional, $variadicNamed);
         }
 
         ksort($result);
@@ -134,6 +134,7 @@ final class NamedArgs
     private static function assignVariadicArray(
         array &$result,
         int $variadicParamIndex,
+        int $paramCount,
         array $variadicPositional,
         array $variadicNamed
     ): void {
@@ -158,7 +159,7 @@ final class NamedArgs
             $packed->add($key, $copy);
         }
         foreach ($result as $idx => $existing) {
-            if ($idx > $variadicParamIndex) {
+            if ($idx > $variadicParamIndex && $idx >= $paramCount) {
                 $copy = new Variable();
                 $copy->copyFrom($existing);
                 $packed->addIndex($numIdx++, $copy);

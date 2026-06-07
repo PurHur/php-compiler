@@ -3845,15 +3845,36 @@ restart:
                         && $frame->block->variadicParamIndex === (int) $op->arg2;
                     if ($isVariadicSlot) {
                         $variadicSlot = (int) $op->arg1;
+                        $variadicParamIdx = (int) $op->arg2;
+                        $paramCount = count($frame->block->paramNames);
                         $strict = null !== $frame->parent
                             ? $frame->parent->block->strictTypes
                             : $frame->block->strictTypes;
-                        $n = count($frame->calledArgs);
+                        $maxArgIdx = -1;
+                        foreach (array_keys($frame->calledArgs) as $argKey) {
+                            if ($argKey > $maxArgIdx) {
+                                $maxArgIdx = $argKey;
+                            }
+                        }
+                        $hasTrailingFixedAfterVariadic = $variadicParamIdx < $paramCount - 1;
+                        if ($hasTrailingFixedAfterVariadic) {
+                            $trailingCount = $paramCount - $variadicParamIdx - 1;
+                            $numProvided = $maxArgIdx + 1;
+                            $numToTrailing = min(
+                                $trailingCount,
+                                max(0, $numProvided - $variadicParamIdx - 1)
+                            );
+                            $variadicEndIdx = $numProvided - $numToTrailing - 1;
+                        } else {
+                            $variadicEndIdx = $maxArgIdx;
+                        }
                         try {
                             if (TypeCheck::variadicSlotNeedsElementChecks($frame->block, $variadicSlot)) {
                                 $trailing = [];
-                                for ($i = $recvIdx; $i < $n; ++$i) {
-                                    $trailing[] = $frame->calledArgs[$i];
+                                for ($i = $recvIdx; $i <= $variadicEndIdx; ++$i) {
+                                    if (array_key_exists($i, $frame->calledArgs)) {
+                                        $trailing[] = $frame->calledArgs[$i];
+                                    }
                                 }
                                 TypeCheck::verifyVariadicElements(
                                     $trailing,
@@ -3868,9 +3889,15 @@ restart:
                                     $frame->block->paramVariadicElementIntersectionDisplayLabels[$variadicSlot] ?? null
                                 );
                             }
+                            $variadicArgCount = 0;
+                            for ($i = $recvIdx; $i <= $variadicEndIdx; ++$i) {
+                                if (array_key_exists($i, $frame->calledArgs)) {
+                                    ++$variadicArgCount;
+                                }
+                            }
                             if (
-                                1 === $n - $recvIdx
-                                && isset($frame->calledArgs[$recvIdx])
+                                1 === $variadicArgCount
+                                && array_key_exists($recvIdx, $frame->calledArgs)
                             ) {
                                 $sole = $frame->calledArgs[$recvIdx]->resolveIndirect();
                                 if (
@@ -3884,7 +3911,10 @@ restart:
                             }
                             $arg1->newArray();
                             $packed = $arg1->toArray();
-                            for ($i = $recvIdx; $i < $n; ++$i) {
+                            for ($i = $recvIdx; $i <= $variadicEndIdx; ++$i) {
+                                if (!array_key_exists($i, $frame->calledArgs)) {
+                                    continue;
+                                }
                                 $copy = new Variable();
                                 $copy->copyFrom($frame->calledArgs[$i]);
                                 $packed->append($copy);

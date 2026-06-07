@@ -143,4 +143,34 @@ PHP;
             0
         );
     }
+
+    public function testNamedTrailingParamAfterVariadic(): void
+    {
+        $b = new Variable(Variable::TYPE_INTEGER);
+        $b->int(2);
+        $resolved = NamedArgs::resolve(
+            [['n', 'b', $b]],
+            ['rest', 'b'],
+            0
+        );
+        $this->assertCount(1, $resolved);
+        $this->assertSame(2, $resolved[1]->toInt());
+    }
+
+    public function testNamedTrailingParamAfterVariadicWithOverflow(): void
+    {
+        $extra = new Variable(Variable::TYPE_INTEGER);
+        $extra->int(9);
+        $b = new Variable(Variable::TYPE_INTEGER);
+        $b->int(2);
+        $resolved = NamedArgs::resolve(
+            [['n', 'extra', $extra], ['n', 'b', $b]],
+            ['rest', 'b'],
+            0
+        );
+        $this->assertCount(2, $resolved);
+        $this->assertSame(2, $resolved[1]->toInt());
+        $packed = $resolved[0]->toArray();
+        $this->assertSame(9, $packed->find('extra')?->toInt());
+    }
 }
