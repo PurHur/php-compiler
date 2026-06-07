@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace PHPCompiler\JIT;
 
+use PHPCfg\Operand;
 use PHPCompiler\ext\standard\JitArrayIsList;
 use PHPCompiler\JIT\Builtin\TypeErrorRaise;
 
@@ -54,9 +55,10 @@ final class ListUnpackHelper
         Context $context,
         Variable $array,
         \PHPLLVM\BasicBlock $branchBlock,
-        \PHPLLVM\BasicBlock $mergeEntry
+        \PHPLLVM\BasicBlock $mergeEntry,
+        ?Operand $arrayOp = null
     ): bool {
-        if (self::isDefinitelyNonArrayAtCompileTime($array)) {
+        if (self::isDefinitelyNonArrayAtCompileTime($context, $array, $arrayOp)) {
             $context->builder->positionAtEnd($branchBlock);
             $context->builder->branch($mergeEntry);
             $deadBb = BasicBlockHelper::append($context, 'list_unpack_skip_assign');
@@ -64,31 +66,60 @@ final class ListUnpackHelper
 
             return true;
         }
-        $isArray = self::isArrayValue($context, $array);
-        $arrayCheckBb = BasicBlockHelper::append($context, 'list_unpack_array_check');
+        $isUnpackable = self::isListDestructUnpackableValue($context, $array, $arrayOp);
+        $assignBb = BasicBlockHelper::append($context, 'list_unpack_array_check');
         $context->builder->positionAtEnd($branchBlock);
-        $context->builder->branchIf($isArray, $arrayCheckBb, $mergeEntry);
+        $context->builder->branchIf($isUnpackable, $assignBb, $mergeEntry);
         // Numeric list slots warn per-key at dim fetch; spread tail keeps isList in TYPE_LIST_SPREAD_ASSIGN (#4841).
-        $context->builder->positionAtEnd($arrayCheckBb);
+        $context->builder->positionAtEnd($assignBb);
 
         return false;
     }
 
-    public static function isDefinitelyNonArrayAtCompileTime(Variable $array): bool
-    {
+    public static function isDefinitelyNonArrayAtCompileTime(
+        Context $context,
+        Variable $array,
+        ?Operand $arrayOp = null
+    ): bool {
         if (self::isDefinitelyArrayAtCompileTime($array)) {
+            return false;
+        }
+        if (ArrayAccessHelper::containerImplementsArrayAccess($context, $array, $arrayOp)) {
             return false;
         }
         if ($array->isNullConstant) {
             return true;
         }
+        if (Variable::TYPE_OBJECT === $array->type) {
+            return ArrayAccessHelper::isKnownNonArrayAccessObject($context, $array, $arrayOp);
+        }
 
         return Variable::TYPE_STRING === $array->type
-            || Variable::TYPE_OBJECT === $array->type
             || Variable::TYPE_NULL === $array->type
             || Variable::TYPE_NATIVE_BOOL === $array->type
             || Variable::TYPE_NATIVE_LONG === $array->type
             || Variable::TYPE_NATIVE_DOUBLE === $array->type;
+    }
+
+    public static function isListDestructUnpackableValue(
+        Context $context,
+        Variable $var,
+        ?Operand $varOp = null
+    ): \PHPLLVM\Value {
+        $isArray = self::isArrayValue($context, $var);
+        if (ArrayAccessHelper::containerImplementsArrayAccess($context, $var, $varOp)) {
+            $i1 = $context->getTypeFromString('int1');
+
+            return $context->builder->or(
+                $isArray,
+                $i1->constInt(1, false)
+            );
+        }
+        if (ArrayAccessHelper::isKnownNonArrayAccessObject($context, $var, $varOp)) {
+            return $isArray;
+        }
+
+        return $isArray;
     }
 
     public static function isDefinitelyArrayAtCompileTime(Variable $array): bool
@@ -99,7 +130,7 @@ final class ListUnpackHelper
 
     public static function emitIsListBranchOrFail(Context $context, Variable $array): void
     {
-        if (self::isDefinitelyNonArrayAtCompileTime($array)) {
+        if (self::isDefinitelyNonArrayAtCompileTime($context, $array)) {
             return;
         }
         TypeErrorRaise::registerDeclarations($context);

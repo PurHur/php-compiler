@@ -326,6 +326,17 @@ class VM {
         return VM\InterfaceCheck::entryImplements($object->class, 'arrayaccess', $this->context);
     }
 
+    /** Array or ArrayAccess RHS for guarded list destructuring (#4325, #7440). */
+    private function variableIsListDestructUnpackable(Variable $value): bool
+    {
+        if (Variable::TYPE_ARRAY === $value->type) {
+            return true;
+        }
+
+        return Variable::TYPE_OBJECT === $value->type
+            && $this->objectImplementsArrayAccess($value->toObject());
+    }
+
     public function invokeArrayAccessOffsetGet(
         ObjectEntry $object,
         Variable $key,
@@ -2025,7 +2036,7 @@ restart:
                 case OpCode::TYPE_LIST_UNPACK_CHECK:
                     $unpack = $frame->scope[$op->arg2]->resolveIndirect();
                     if (null !== $op->block1) {
-                        if (Variable::TYPE_ARRAY !== $unpack->type) {
+                        if (!$this->variableIsListDestructUnpackable($unpack)) {
                             $frame = $this->frameForBranch($frame, $op->block1);
                             goto restart;
                         }
