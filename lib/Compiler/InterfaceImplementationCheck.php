@@ -129,6 +129,7 @@ final class InterfaceImplementationCheck
         }
         $methods = $this->collectConcreteMethods($class->stmts->children);
         $properties = $this->collectDeclaredProperties($class->stmts->children);
+        $usedTraits = [];
         foreach ($class->stmts->children as $member) {
             if ($member instanceof Op\Stmt\TraitUse) {
                 foreach ($member->traits as $traitOperand) {
@@ -136,6 +137,7 @@ final class InterfaceImplementationCheck
                     if (null === $traitLc || !isset($this->traits[$traitLc])) {
                         continue;
                     }
+                    $usedTraits[] = $traitLc;
                     foreach ($this->traits[$traitLc]['methods'] as $name => $_) {
                         $methods[$name] = true;
                     }
@@ -150,6 +152,7 @@ final class InterfaceImplementationCheck
             'methods' => $methods,
             'abstractMethods' => $this->collectAbstractMethods($class->stmts->children),
             'properties' => $properties,
+            'traits' => $usedTraits,
             'file' => $class->getFile(),
             'line' => max(1, $class->getLine()),
         ];
@@ -524,7 +527,29 @@ final class InterfaceImplementationCheck
             $current = $decl['extends'];
         }
 
+        $this->appendTraitPropertyHookRequirements($classLc, $requirements);
+
         return $requirements;
+    }
+
+    /**
+     * Trait property hooks with semicolon bodies are abstract obligations on the using class (#7316).
+     *
+     * @param list<array{0: string, 1: string, 2: string}> $requirements
+     */
+    private function appendTraitPropertyHookRequirements(string $classLc, array &$requirements): void
+    {
+        if (!isset($this->classes[$classLc]['traits'])) {
+            return;
+        }
+        foreach ($this->classes[$classLc]['traits'] as $traitLc) {
+            $ownerDisplay = $this->traits[$traitLc]['display'] ?? $traitLc;
+            foreach ($this->propertyHookRegistry[$traitLc] ?? [] as $prop => $meta) {
+                foreach ($this->requiredPropertyHookKinds($meta) as $hookKind) {
+                    $requirements[] = [$ownerDisplay, $prop, $hookKind];
+                }
+            }
+        }
     }
 
     /**

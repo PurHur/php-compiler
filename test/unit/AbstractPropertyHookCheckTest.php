@@ -69,4 +69,23 @@ PHP;
         $this->expectExceptionMessage('A::$x::get');
         $runtime->parseAndCompile($code, 'anon.php');
     }
+
+    public function testTraitAbstractPropertyHookMissingOnUsingClassFailsAtCompileTime(): void
+    {
+        $runtime = new Runtime();
+        $code = <<<'PHP'
+<?php
+trait T {
+    public string $x { get; set; }
+}
+class C {
+    use T;
+}
+PHP;
+        $this->expectException(\CompileError::class);
+        $this->expectExceptionMessage('abstract method');
+        $this->expectExceptionMessage('T::$x::get');
+        $this->expectExceptionMessage('T::$x::set');
+        $runtime->parseAndCompile($code, 'trait.php');
+    }
 }
