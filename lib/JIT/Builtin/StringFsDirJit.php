@@ -151,43 +151,15 @@ final class StringFsDirJit
 
     private static function ensureLibc(Context $context): void
     {
-        $i8 = $context->getTypeFromString('int8');
-        $i32 = $context->getTypeFromString('int32');
         $i64 = $context->getTypeFromString('int64');
         $i8p = $context->getTypeFromString('int8*');
-        $i8pp = $context->getTypeFromString('int8**');
-        $voidPtr = $context->getTypeFromString('void*');
-        $sizeT = $context->getTypeFromString('size_t');
         $strPtr = $context->getTypeFromString('__string__*');
         $htPtr = $context->getTypeFromString('__hashtable__*');
         $valuePtr = $context->getTypeFromString('__value__*');
         $voidTy = $context->getTypeFromString('void');
+        $sizeT = $context->getTypeFromString('size_t');
 
         foreach ([
-            ['fopen', $voidPtr, [$i8p, $i8p]],
-            ['fread', $sizeT, [$voidPtr, $sizeT, $sizeT, $voidPtr]],
-            ['fwrite', $sizeT, [$voidPtr, $sizeT, $sizeT, $voidPtr]],
-            ['fclose', $i32, [$voidPtr]],
-            ['ferror', $i32, [$voidPtr]],
-            ['stat', $i32, [$i8p, $voidPtr]],
-            ['lstat', $i32, [$i8p, $voidPtr]],
-            ['chmod', $i32, [$i8p, $i32]],
-            ['open', $i32, [$i8p, $i32, $i32]],
-            ['close', $i32, [$i32]],
-            ['utime', $i32, [$i8p, $voidPtr]],
-            ['time', $i64, [$i8p]],
-            ['mkdir', $i32, [$i8p, $i32]],
-            ['strlen', $sizeT, [$i8p]],
-            ['memcpy', $voidPtr, [$voidPtr, $voidPtr, $sizeT]],
-            ['snprintf', $i32, [$i8p, $sizeT, $i8p, $i8p, $i8p]],
-            ['mkstemp', $i32, [$i8p]],
-            ['getenv', $i8p, [$i8p]],
-            ['realpath', $i8p, [$i8p, $i8p]],
-            ['strtol', $i64, [$i8p, $i8pp, $i32]],
-            ['getgrnam', $i8p, [$i8p]],
-            ['getpwnam', $i8p, [$i8p]],
-            ['fchownat', $i32, [$i32, $i8p, $i32, $i32, $i32]],
-            ['chown', $i32, [$i8p, $i32, $i32]],
             ['__hashtable__alloc', $htPtr, []],
             ['__hashtable__setStringKeyLong', $voidTy, [$htPtr, $strPtr, $i64]],
             ['__hashtable__setLongAt', $voidTy, [$htPtr, $sizeT, $i64]],
@@ -197,6 +169,11 @@ final class StringFsDirJit
         ] as [$name, $ret, $params]) {
             self::ensureExternal($context, $name, $context->context->functionType($ret, false, ...$params));
         }
+    }
+
+    private static function stackBytesPtr(Context $context, Value $slot): Value
+    {
+        return $context->builder->pointerCast($slot, $context->getTypeFromString('int8*'));
     }
 
     private static function ensureExternal(Context $context, string $name, $ft): void
@@ -240,11 +217,7 @@ final class StringFsDirJit
     private static function statFieldI64(Context $context, Value $statBase, int $offset): Value
     {
         $i64 = $context->getTypeFromString('int64');
-        $i8p = $context->getTypeFromString('int8*');
-        $at = $context->builder->gep(
-            $context->builder->pointerCast($statBase, $i8p),
-            $i64->constInt($offset, false)
-        );
+        $at = $context->builder->gep($statBase, $i64->constInt($offset, false));
 
         return $context->builder->load($context->builder->pointerCast($at, $i64->pointerType(0)));
     }
@@ -253,11 +226,7 @@ final class StringFsDirJit
     {
         $i32 = $context->getTypeFromString('int32');
         $i64 = $context->getTypeFromString('int64');
-        $i8p = $context->getTypeFromString('int8*');
-        $at = $context->builder->gep(
-            $context->builder->pointerCast($statBase, $i8p),
-            $i64->constInt($offset, false)
-        );
+        $at = $context->builder->gep($statBase, $i64->constInt($offset, false));
         $v = $context->builder->load($context->builder->pointerCast($at, $i32->pointerType(0)));
 
         return $context->builder->zExt($v, $i64);
@@ -269,7 +238,7 @@ final class StringFsDirJit
         $i32 = $context->getTypeFromString('int32');
         $i8p = $context->getTypeFromString('int8*');
         $statSlot = BasicBlockHelper::entryAlloca($context, $i8->arrayType(self::STAT_BUF_SIZE));
-        $statBase = $context->builder->pointerCast($statSlot, $i8p);
+        $statBase = self::stackBytesPtr($context, $statSlot);
         $rc = $context->builder->call($context->lookupFunction('stat'), $pathCstr, $statBase);
         $ok = $context->builder->icmp(Builder::INT_EQ, $rc, $i32->constInt(0, false));
         $mode = self::statFieldI32ToI64($context, $statBase, self::STAT_MODE_OFFSET);
@@ -299,7 +268,7 @@ final class StringFsDirJit
 
         $i8 = $context->getTypeFromString('int8');
         $i32 = $context->getTypeFromString('int32');
-        $voidPtr = $context->getTypeFromString('void*');
+        $i8p = $context->getTypeFromString('int8*');
         $sizeT = $context->getTypeFromString('size_t');
         $strPtr = $context->getTypeFromString('__string__*');
 
@@ -308,7 +277,7 @@ final class StringFsDirJit
         $zero = $i32->constInt(0, false);
         $one = $i32->constInt(1, false);
         $nullStr = $strPtr->constNull();
-        $nullFile = $voidPtr->constNull();
+        $nullFile = $i8p->constNull();
 
         $badArgs = $context->builder->or(
             $context->builder->icmp(Builder::INT_EQ, $from, $nullStr),
@@ -341,7 +310,7 @@ final class StringFsDirJit
         $okSlot = BasicBlockHelper::entryAlloca($context, $i32);
         $context->builder->store($one, $okSlot);
         $bufSlot = BasicBlockHelper::entryAlloca($context, $i8->arrayType(8192));
-        $buf = $context->builder->pointerCast($bufSlot, $voidPtr);
+        $buf = self::stackBytesPtr($context, $bufSlot);
         $loop = $fn->appendBasicBlock('copy_loop');
         $write = $fn->appendBasicBlock('copy_write');
         $afterRead = $fn->appendBasicBlock('copy_after_read');
@@ -419,7 +388,7 @@ final class StringFsDirJit
 
         $context->builder->positionAtEnd($chmodBlock);
         $stSlot = BasicBlockHelper::entryAlloca($context, $i8->arrayType(self::STAT_BUF_SIZE));
-        $stBase = $context->builder->pointerCast($stSlot, $voidPtr);
+        $stBase = self::stackBytesPtr($context, $stSlot);
         $stRc = $context->builder->call($context->lookupFunction('stat'), $src, $stBase);
         $stOk = $context->builder->icmp(Builder::INT_EQ, $stRc, $zero);
         $chmodTail = $fn->appendBasicBlock('copy_chmod_tail');
@@ -447,7 +416,7 @@ final class StringFsDirJit
         $i8 = $context->getTypeFromString('int8');
         $i32 = $context->getTypeFromString('int32');
         $i64 = $context->getTypeFromString('int64');
-        $voidPtr = $context->getTypeFromString('void*');
+        $i8p = $context->getTypeFromString('int8*');
         $strPtr = $context->getTypeFromString('__string__*');
 
         $path = $fn->getParam(0);
@@ -464,7 +433,7 @@ final class StringFsDirJit
         $context->builder->positionAtEnd($checkPath);
         $p = self::stringData($context, $path);
         $stSlot = BasicBlockHelper::entryAlloca($context, $i8->arrayType(self::STAT_BUF_SIZE));
-        $stBase = $context->builder->pointerCast($stSlot, $voidPtr);
+        $stBase = self::stackBytesPtr($context, $stSlot);
         $stRc = $context->builder->call($context->lookupFunction('stat'), $p, $stBase);
         $needCreate = $context->builder->icmp(Builder::INT_NE, $stRc, $zero);
         $openBlock = $fn->appendBasicBlock('touch_open');
@@ -495,7 +464,7 @@ final class StringFsDirJit
         $context->builder->branchIf($bothNeg, $utimeNow, $custom);
 
         $context->builder->positionAtEnd($utimeNow);
-        $utNowRc = $context->builder->call($context->lookupFunction('utime'), $p, $voidPtr->constNull());
+        $utNowRc = $context->builder->call($context->lookupFunction('utime'), $p, $i8p->constNull());
         $utNowOk = $context->builder->icmp(Builder::INT_EQ, $utNowRc, $zero);
         $context->builder->returnValue($context->builder->select($utNowOk, $one, $zero));
 
@@ -509,7 +478,7 @@ final class StringFsDirJit
         $utRc = $context->builder->call(
             $context->lookupFunction('utime'),
             $p,
-            $context->builder->pointerCast($times, $voidPtr)
+            self::stackBytesPtr($context, $times)
         );
         $utOk = $context->builder->icmp(Builder::INT_EQ, $utRc, $zero);
         $context->builder->returnValue($context->builder->select($utOk, $one, $zero));
@@ -527,7 +496,6 @@ final class StringFsDirJit
         $i32 = $context->getTypeFromString('int32');
         $i64 = $context->getTypeFromString('int64');
         $sizeT = $context->getTypeFromString('size_t');
-        $voidPtr = $context->getTypeFromString('void*');
         $strPtr = $context->getTypeFromString('__string__*');
 
         $path = $fn->getParam(0);
@@ -574,8 +542,8 @@ final class StringFsDirJit
         $copyLen = $context->builder->add($len, $sizeT->constInt(1, false));
         $context->builder->call(
             $context->lookupFunction('memcpy'),
-            $context->builder->pointerCast($buf, $voidPtr),
-            $context->builder->pointerCast($p, $voidPtr),
+            $buf,
+            $p,
             $copyLen
         );
         $lenGt1 = $context->builder->icmp(Builder::INT_UGT, $len, $sizeT->constInt(1, false));
@@ -674,7 +642,6 @@ final class StringFsDirJit
 
         $i8 = $context->getTypeFromString('int8');
         $i32 = $context->getTypeFromString('int32');
-        $voidPtr = $context->getTypeFromString('void*');
         $strPtr = $context->getTypeFromString('__string__*');
         $htPtr = $context->getTypeFromString('__hashtable__*');
 
@@ -691,7 +658,7 @@ final class StringFsDirJit
         $context->builder->positionAtEnd($run);
         $p = self::stringData($context, $path);
         $stSlot = BasicBlockHelper::entryAlloca($context, $i8->arrayType(self::STAT_BUF_SIZE));
-        $stBase = $context->builder->pointerCast($stSlot, $voidPtr);
+        $stBase = self::stackBytesPtr($context, $stSlot);
         $isLstat = $context->builder->icmp(Builder::INT_NE, $useLstat, $zero);
         $doLstat = $fn->appendBasicBlock('stat_do_lstat');
         $doStat = $fn->appendBasicBlock('stat_do_stat');
