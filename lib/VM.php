@@ -9623,8 +9623,9 @@ restart:
 
                 continue;
             }
+            $mergeMeta = $this->propertyHookMetaForInheritedBackingField($entry, $classProp, $meta, $childLc, $prop);
             if (!isset($this->context->propertyHookRegistry[$childLc][$prop])) {
-                $this->context->propertyHookRegistry[$childLc][$prop] = $meta;
+                $this->context->propertyHookRegistry[$childLc][$prop] = $mergeMeta;
             }
             $this->linkPropertyHooks($entry, $classProp);
         }
@@ -9652,11 +9653,60 @@ restart:
             if (null === $classProp) {
                 continue;
             }
+            $mergeMeta = $this->propertyHookMetaForInheritedBackingField($entry, $classProp, $meta, $childLc, $prop);
             if (!isset($this->context->propertyHookRegistry[$childLc][$prop])) {
-                $this->context->propertyHookRegistry[$childLc][$prop] = $meta;
+                $this->context->propertyHookRegistry[$childLc][$prop] = $mergeMeta;
             }
             $this->linkPropertyHooks($entry, $classProp);
         }
+    }
+
+    /**
+     * Implementing / subclass plain typed property satisfies interface or inherited hook stubs (#7311).
+     *
+     * @param array<string, mixed> $meta
+     *
+     * @return array<string, mixed>
+     */
+    private function propertyHookMetaForInheritedBackingField(
+        ClassEntry $entry,
+        VM\ClassProperty $classProp,
+        array $meta,
+        string $childLc,
+        string $prop
+    ): array {
+        if ($this->entryPropertyHasExplicitHookMethods($entry, $classProp->name)) {
+            return $meta;
+        }
+        $childMeta = $this->context->propertyHookRegistry[$childLc][$prop]
+            ?? $this->context->propertyHookRegistry[$childLc][strtolower($prop)]
+            ?? null;
+        if (is_array($childMeta) && !empty($childMeta['abstract']) && empty($childMeta['get']) && empty($childMeta['set'])) {
+            return $meta;
+        }
+
+        return $this->sanitizePropertyHookMetaForBackingField($meta);
+    }
+
+    /**
+     * @param array<string, mixed> $meta
+     *
+     * @return array<string, mixed>
+     */
+    private function sanitizePropertyHookMetaForBackingField(array $meta): array
+    {
+        unset($meta['requiresGet'], $meta['requiresSet'], $meta['requiresUnset'], $meta['abstract'], $meta['virtual']);
+
+        return $meta;
+    }
+
+    private function entryPropertyHasExplicitHookMethods(ClassEntry $entry, string $propName): bool
+    {
+        $getLc = strtolower(SourcePreprocessor\PropertyHooks::getHookMethodName($propName));
+        $setLc = strtolower(SourcePreprocessor\PropertyHooks::setHookMethodName($propName));
+        $unsetLc = strtolower(SourcePreprocessor\PropertyHooks::unsetHookMethodName($propName));
+
+        return isset($entry->methods[$getLc]) || isset($entry->methods[$setLc]) || isset($entry->methods[$unsetLc]);
     }
 
     /**
