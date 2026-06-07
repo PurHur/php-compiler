@@ -3845,6 +3845,7 @@ restart:
                                     && !$sole->toArray()->isPackedList()
                                 ) {
                                     $arg1->copyFrom($sole);
+                                    $this->markScopeSlotInitialized($frame, (int) $op->arg1);
                                     break;
                                 }
                             }
@@ -3862,6 +3863,7 @@ restart:
                                 goto restart;
                             }
                         }
+                        $this->markScopeSlotInitialized($frame, (int) $op->arg1);
                         break;
                     }
                     if (array_key_exists($recvIdx, $frame->calledArgs)) {
