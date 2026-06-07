@@ -5425,7 +5425,8 @@ class JIT {
                             $this->context,
                             $array,
                             $branchBlock,
-                            $mergeBody
+                            $mergeBody,
+                            $block->getOperand($op->arg2)
                         );
                         break;
                     }
@@ -5454,7 +5455,7 @@ class JIT {
                             $op->listSpreadExcludedKeys
                         );
                     } else {
-                        if (!JIT\ListUnpackHelper::isDefinitelyNonArrayAtCompileTime($spreadSrc)) {
+                        if (!JIT\ListUnpackHelper::isDefinitelyNonArrayAtCompileTime($this->context, $spreadSrc)) {
                             JIT\ListUnpackHelper::emitIsListBranchOrFail($this->context, $spreadSrc);
                         }
                         $spreadTailHt = JIT\ArrayBuiltinHelper::buildSliceArray(
