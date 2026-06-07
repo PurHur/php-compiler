@@ -587,24 +587,26 @@ final class VmFs
         return @\fflush($fp);
     }
 
-    /** fsync() — flush buffers and sync to disk (php-src ext/standard/streamsfuncs.c, #6062). */
+    /** fsync() — flush buffers and sync to disk (php-src ext/standard/file.c, #6062). */
     public static function fsync(int $handle): bool
     {
         $fp = self::lookup($handle);
-        if (null === $fp) {
+        if (null === $fp || !VmStreamSync::isSupportedResource($fp)) {
             return false;
         }
+        @\fflush($fp);
 
         return @\fsync($fp);
     }
 
-    /** fdatasync() — sync file data without metadata (php-src ext/standard/streamsfuncs.c, #6813). */
+    /** fdatasync() — sync file data without metadata (php-src ext/standard/file.c, #6813). */
     public static function fdatasync(int $handle): bool
     {
         $fp = self::lookup($handle);
-        if (null === $fp) {
+        if (null === $fp || !VmStreamSync::isSupportedResource($fp)) {
             return false;
         }
+        @\fflush($fp);
 
         return @\fdatasync($fp);
     }
@@ -1005,6 +1007,12 @@ final class VmFs
         }
 
         return $ht;
+    }
+
+    /** @return resource|null */
+    public static function lookupResource(int $handle): mixed
+    {
+        return self::lookup($handle);
     }
 
     private static function lookup(int $handle): mixed
