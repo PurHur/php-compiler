@@ -103,6 +103,23 @@ final class AttributeNames
         );
     }
 
+    /**
+     * Zend compile-time guard (zend_compile.c, issue #7299).
+     * `#[\AllowDynamicProperties]` and `readonly class` are mutually exclusive.
+     *
+     * @param list<string> $names
+     */
+    public static function assertAllowDynamicPropertiesNotOnReadonlyClass(array $names, string $classDisplay): void
+    {
+        if (!self::hasAllowDynamicProperties($names)) {
+            return;
+        }
+
+        throw new \CompileError(
+            'Cannot apply #[AllowDynamicProperties] to readonly class '.$classDisplay
+        );
+    }
+
     /** PHP 8.2 #[\SensitiveParameter] on parameters (issue #3351, Zend zend_attributes.c). */
     public static function isSensitiveParameter(array $names): bool
     {
