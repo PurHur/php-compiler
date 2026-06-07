@@ -24,6 +24,7 @@ use PHPCfg\Operand\Variable as CfgVariable;
 use PHPCfg\Script;
 use PHPTypes\Type;
 use PHPCompiler\VM\AttributeSupport;
+use PHPCompiler\VM\ClassConstExpr;
 use PHPCompiler\VM\ClassEntry;
 use PHPCompiler\VM\EnumCaseSupport;
 use PHPCompiler\VM\EnumSupport;
@@ -4403,35 +4404,121 @@ class Compiler {
         if ($expr instanceof Op\Expr\UnaryMinus || $expr instanceof Op\Expr\UnaryPlus) {
             return $this->tryFoldUnaryLiteralDefault($expr);
         }
-        if ($expr instanceof Op\Expr\BinaryOp\BitwiseOr || $expr instanceof Op\Expr\BinaryOp\BitwiseAnd) {
-            $left = $this->tryFoldCompileTimeOperandDefault(
-                $expr->left,
+        if ($expr instanceof Op\Expr\BitwiseNot || $expr instanceof Op\Expr\BooleanNot) {
+            return $this->tryFoldCompileTimeUnaryExprDefault(
+                $expr,
                 $block,
                 $defaultBlockChildren,
                 $materializeEnumCase
             );
-            $right = $this->tryFoldCompileTimeOperandDefault(
-                $expr->right,
+        }
+        if ($expr instanceof Op\Expr\BinaryOp) {
+            return $this->tryFoldCompileTimeBinaryExprDefault(
+                $expr,
                 $block,
                 $defaultBlockChildren,
                 $materializeEnumCase
             );
-            if (null === $left || null === $right || !$left->is(Variable::TYPE_INTEGER) || !$right->is(Variable::TYPE_INTEGER)) {
-                return null;
-            }
-            $value = new Variable(Variable::TYPE_INTEGER);
-            $combined = $expr instanceof Op\Expr\BinaryOp\BitwiseOr
-                ? ($left->toInt() | $right->toInt())
-                : ($left->toInt() & $right->toInt());
-            $value->int($combined);
-
-            return $value;
         }
         if ($expr instanceof Op\Expr\PropertyFetch) {
             return $this->tryFoldEnumCasePropertyFetchDefault($expr, $block, $defaultBlockChildren);
         }
 
         return null;
+    }
+
+    /**
+     * Fold unary const-expr operators in parameter/property defaults (#5166, zend_const_expr_to_zval).
+     *
+     * @param list<Op> $defaultBlockChildren
+     */
+    protected function tryFoldCompileTimeUnaryExprDefault(
+        Op\Expr $expr,
+        Block $block,
+        array $defaultBlockChildren = [],
+        bool $materializeEnumCase = false
+    ): ?Variable {
+        if (!$expr instanceof Op\Expr\BitwiseNot && !$expr instanceof Op\Expr\BooleanNot) {
+            return null;
+        }
+        $opCode = $this->getOpCodeTypeFromUnaryOp($expr);
+        if (!ClassConstExpr::isSupportedOpcode($opCode)) {
+            return null;
+        }
+        $operand = $this->tryFoldCompileTimeOperandDefault(
+            $expr->expr,
+            $block,
+            $defaultBlockChildren,
+            $materializeEnumCase
+        );
+        if (null === $operand) {
+            return null;
+        }
+        $result = new Variable();
+        try {
+            $result->unaryOp($opCode, $operand);
+        } catch (\Throwable) {
+            return null;
+        }
+
+        return $result;
+    }
+
+    /**
+     * Fold binary const-expr operators in parameter/property defaults (#5166, zend_const_expr_to_zval).
+     *
+     * @param list<Op> $defaultBlockChildren
+     */
+    protected function tryFoldCompileTimeBinaryExprDefault(
+        Op\Expr\BinaryOp $expr,
+        Block $block,
+        array $defaultBlockChildren = [],
+        bool $materializeEnumCase = false
+    ): ?Variable {
+        $opCode = $this->getOpCodeTypeFromBinaryOp($expr);
+        if (!ClassConstExpr::isSupportedOpcode($opCode)) {
+            return null;
+        }
+        $left = $this->tryFoldCompileTimeOperandDefault(
+            $expr->left,
+            $block,
+            $defaultBlockChildren,
+            $materializeEnumCase
+        );
+        $right = $this->tryFoldCompileTimeOperandDefault(
+            $expr->right,
+            $block,
+            $defaultBlockChildren,
+            $materializeEnumCase
+        );
+        if (null === $left || null === $right) {
+            return null;
+        }
+        if (OpCode::TYPE_CONCAT === $opCode) {
+            $result = new Variable(Variable::TYPE_STRING);
+            $result->string($left->toString().$right->toString());
+
+            return $result;
+        }
+        $result = new Variable();
+        try {
+            if (\in_array($opCode, [
+                OpCode::TYPE_PLUS,
+                OpCode::TYPE_MINUS,
+                OpCode::TYPE_MUL,
+                OpCode::TYPE_DIV,
+                OpCode::TYPE_MODULO,
+                OpCode::TYPE_POW,
+            ], true)) {
+                $result->numericOp($opCode, $left, $right);
+            } else {
+                $result->bitwiseOp($opCode, $left, $right);
+            }
+        } catch (\Throwable) {
+            return null;
+        }
+
+        return $result;
     }
 
     /**
