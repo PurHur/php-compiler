@@ -16,6 +16,7 @@ use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\ArrayBuiltinHelper;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\Variable as JITVariable;
+use PHPCompiler\VM\EnumCaseSupport;
 use PHPCompiler\VM\HashTable;
 use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
@@ -75,11 +76,16 @@ final class array_unique extends Internal
     }
 
     /**
-     * Objects without __toString must throw (ext/standard/array.c php_array_unique, #4698).
+     * Objects and enum cases without __toString must throw (ext/standard/array.c php_array_unique, #4698, #5531).
      */
     private static function assertUniqueElement(Frame $frame, Variable $value): void
     {
         $value = $value->resolveIndirect();
+        if (EnumCaseSupport::isEnumCaseVariable($value)) {
+            throw new \Error(
+                'Object of class '.EnumCaseSupport::typeNameForVariable($value).' could not be converted to string'
+            );
+        }
         if (Variable::TYPE_OBJECT !== $value->type) {
             return;
         }
