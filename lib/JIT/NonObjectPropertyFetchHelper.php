@@ -8,7 +8,8 @@ use PHPCfg\Operand;
 use PHPCompiler\VM\ErrorReporter;
 
 /**
- * ZEND_FETCH_PROPERTY_R on non-object receivers — E_WARNING + null (zend_execute.c, #5276).
+ * ZEND_FETCH_PROPERTY_R on non-object receivers — E_WARNING + null for scalars;
+ * null read throws Error since PHP 8.0 (zend_execute.c, #5276, #7431).
  */
 final class NonObjectPropertyFetchHelper
 {
@@ -38,6 +39,11 @@ final class NonObjectPropertyFetchHelper
         string $typeLabel
     ): void {
         self::emitPropertyReadWarning($context, $propertyName, $typeLabel);
+        self::lowerNullPropertyDest($context, $destOp);
+    }
+
+    public static function lowerNullPropertyDest(Context $context, Operand $destOp): void
+    {
         $nullBox = JitValueBox::alloc($context);
         $nullVar = new Variable($context, Variable::TYPE_VALUE, Variable::KIND_VALUE, $nullBox);
         $context->setVariableOp($destOp, $nullVar);

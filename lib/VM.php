@@ -4277,15 +4277,37 @@ restart:
                         $scriptFile = '' !== $frame->scriptPath ? $frame->scriptPath : null;
                         $forWrite = $this->propertyFetchDestUsedAsAssignLvalue($frame, $op);
                         if ($forWrite) {
+                            if (
+                                Variable::TYPE_NULL === $resolved->type
+                                && $this->propertyFetchDestUsedAsIncDec($frame, $op)
+                            ) {
+                                $catchFrame = $this->dispatchVmError(
+                                    sprintf('Attempt to increment/decrement property "%s" on null', $name),
+                                    $frame
+                                );
+                            } else {
+                                $catchFrame = $this->dispatchVmError(
+                                    sprintf('Attempt to assign property "%s" on %s', $name, $typeName),
+                                    $frame
+                                );
+                            }
+                            if (null !== $catchFrame) {
+                                $frame = $catchFrame;
+                                goto restart;
+                            }
+                            break;
+                        }
+                        if (Variable::TYPE_NULL === $resolved->type) {
                             $catchFrame = $this->dispatchVmError(
-                                sprintf('Attempt to assign property "%s" on %s', $name, $typeName),
+                                sprintf('Attempt to read property "%s" on null', $name),
                                 $frame
                             );
                             if (null !== $catchFrame) {
                                 $frame = $catchFrame;
                                 goto restart;
                             }
-                            break;
+
+                            return self::EXCEPTION;
                         }
                         $this->context->errors->propertyReadOnNonObject(
                             $name,
@@ -5807,6 +5829,23 @@ restart:
         }
 
         return OpCode::destSlotUsedAsAssignLvalue($next, (int) $op->arg1);
+    }
+
+    /** True when fetch dest is mutated by a following ++/-- (#7431, zend_execute.c). */
+    private function propertyFetchDestUsedAsIncDec(Frame $frame, OpCode $op): bool
+    {
+        $destSlot = (int) $op->arg1;
+        $next = $frame->block->opCodes[$frame->pos] ?? null;
+        if (null === $next) {
+            return false;
+        }
+
+        return \in_array($next->type, [
+            OpCode::TYPE_PRE_INC,
+            OpCode::TYPE_POST_INC,
+            OpCode::TYPE_PRE_DEC,
+            OpCode::TYPE_POST_DEC,
+        ], true) && $next->arg3 === $destSlot;
     }
 
     /** True when a following opcode assigns through this PROPERTY_FETCH destination slot (#5370). */
