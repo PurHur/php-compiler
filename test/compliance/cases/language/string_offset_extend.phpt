@@ -1,16 +1,14 @@
 --TEST--
-String offset write extends and space-pads like Zend (#5353)
+String offset write extends and NUL-pads like Zend (#5353, #7430)
 --FILE--
 <?php
 $s = 'a';
 $s[1] = 'b';
-var_export($s);
-echo "\n";
+echo bin2hex($s), "\n";
 
 $s = 'ab';
 $s[5] = 'x';
-var_export($s);
-echo "\n";
+echo bin2hex($s), "\n";
 --EXPECT--
-'ab'
-'ab   x'
+6162
+616200000078
