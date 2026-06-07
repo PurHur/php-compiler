@@ -10,22 +10,32 @@ use PHPCompiler\CompilerVersion;
 use PHPCompiler\VM\AttributeSupport;
 use PHPCompiler\VM\Builtin\DeprecatedConstruct;
 use PHPCompiler\VM\Builtin\NoDiscardConstruct;
+use PHPCompiler\VM\Builtin\OverrideConstruct;
 use PHPCompiler\VM\ClassEntry;
 use PHPCompiler\VM\ClassProperty;
 use PHPCompiler\VM\Context;
 use PHPCompiler\VM\Variable;
 
 /**
- * Register ext/standard builtin attribute classes (php-src Zend/zend_attributes.stub.php; #7145, #7147).
+ * Register ext/standard builtin attribute classes (php-src Zend/zend_attributes.stub.php; #7145, #7147, #7238).
  *
- * Attribute / ReturnTypeWillChange / AllowDynamicProperties / Override remain in lib/VM/AttributeSupport
- * until follow-up issues migrate them here.
+ * Base `Attribute` class remains in lib/VM/AttributeSupport.php.
  */
 final class BuiltinAttributes
 {
     public static function register(Context $ctx): void
     {
+        if (!isset($ctx->classes[AttributeSupport::CLASS_ATTRIBUTE])) {
+            return;
+        }
+
         $before = array_keys($ctx->classes);
+        self::registerReturnTypeWillChange($ctx);
+        self::registerAllowDynamicProperties($ctx);
+        self::registerSensitiveParameter($ctx);
+        if (CompilerVersion::supportsOverrideAttribute()) {
+            self::registerOverride($ctx);
+        }
         self::registerDeprecated($ctx);
         if (CompilerVersion::supportsNoDiscardAttribute()) {
             self::registerNoDiscard($ctx);
@@ -35,12 +45,48 @@ final class BuiltinAttributes
         }
     }
 
+    private static function registerReturnTypeWillChange(Context $ctx): void
+    {
+        self::registerBuiltinAttributeClass(
+            $ctx,
+            'ReturnTypeWillChange',
+            AttributeSupport::CLASS_RETURN_TYPE_WILL_CHANGE,
+            AttributeSupport::TARGET_METHOD
+        );
+    }
+
+    private static function registerAllowDynamicProperties(Context $ctx): void
+    {
+        self::registerBuiltinAttributeClass(
+            $ctx,
+            'AllowDynamicProperties',
+            AttributeSupport::CLASS_ALLOW_DYNAMIC_PROPERTIES,
+            AttributeSupport::TARGET_CLASS
+        );
+    }
+
+    private static function registerSensitiveParameter(Context $ctx): void
+    {
+        self::registerBuiltinAttributeClass(
+            $ctx,
+            'SensitiveParameter',
+            AttributeSupport::CLASS_SENSITIVE_PARAMETER,
+            AttributeSupport::TARGET_PARAMETER
+        );
+    }
+
+    private static function registerOverride(Context $ctx): void
+    {
+        self::registerBuiltinAttributeClass(
+            $ctx,
+            'Override',
+            AttributeSupport::CLASS_OVERRIDE,
+            AttributeSupport::TARGET_METHOD
+        );
+    }
+
     private static function registerDeprecated(Context $ctx): void
     {
-        if (!isset($ctx->classes[AttributeSupport::CLASS_ATTRIBUTE])) {
-            return;
-        }
-
         $strProto = new Variable(Variable::TYPE_STRING);
         $pub = CfgFunc::FLAG_PUBLIC;
 
@@ -65,10 +111,6 @@ final class BuiltinAttributes
 
     private static function registerNoDiscard(Context $ctx): void
     {
-        if (!isset($ctx->classes[AttributeSupport::CLASS_ATTRIBUTE])) {
-            return;
-        }
-
         $strProto = new Variable(Variable::TYPE_STRING);
         $pub = CfgFunc::FLAG_PUBLIC;
 
@@ -86,5 +128,27 @@ final class BuiltinAttributes
         ];
 
         $ctx->classes[AttributeSupport::CLASS_NODISCARD] = $entry;
+    }
+
+    private static function registerBuiltinAttributeClass(
+        Context $ctx,
+        string $name,
+        string $lcKey,
+        int $targets
+    ): void {
+        $pub = CfgFunc::FLAG_PUBLIC;
+
+        $entry = new ClassEntry($name);
+        $entry->parentLc = AttributeSupport::CLASS_ATTRIBUTE;
+        $entry->constructor = new OverrideConstruct();
+        $entry->methods['__construct'] = $entry->constructor;
+        $entry->methodVisibility['__construct'] = $pub;
+
+        $entry->attributeNames = ['Attribute'];
+        $entry->attributeEntries = [
+            new AttributeEntry('Attribute', [['name' => null, 'value' => $targets]]),
+        ];
+
+        $ctx->classes[$lcKey] = $entry;
     }
 }
