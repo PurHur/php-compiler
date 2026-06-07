@@ -47,4 +47,20 @@ PHP;
         $runtime->run($runtime->parseAndCompile($code, 'datetime_ts.php'));
         $this->assertSame('1', ob_get_clean());
     }
+
+    public function testDateTimeInterfaceRegistration(): void
+    {
+        $runtime = new Runtime();
+        $code = <<<'PHP'
+<?php
+echo interface_exists('DateTimeInterface') ? '1' : '0', "\n";
+echo (new DateTime('2026-01-01')) instanceof DateTimeInterface ? '1' : '0', "\n";
+echo DateTimeInterface::ATOM, "\n";
+function accepts(DateTimeInterface $dt): string { return $dt->format('Y-m-d'); }
+echo accepts(new DateTime('2026-06-07')), "\n";
+PHP;
+        ob_start();
+        $runtime->run($runtime->parseAndCompile($code, 'datetime_interface.php'));
+        $this->assertSame("1\n1\nY-m-d\\TH:i:sP\n2026-06-07\n", ob_get_clean());
+    }
 }

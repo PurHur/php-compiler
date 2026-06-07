@@ -648,6 +648,10 @@ final class TypeCheck
         if (null === $context) {
             return strtolower($resolved->toObject()->class->name) === $classLc;
         }
+        $targetClass = $context->classes[$classLc] ?? null;
+        if (null !== $targetClass && $targetClass->isInterface) {
+            return InterfaceCheck::entryImplements($resolved->toObject()->class, $classLc, $context);
+        }
 
         return InterfaceCheck::entryIsInstanceOf($resolved->toObject()->class, $classLc, $context);
     }
