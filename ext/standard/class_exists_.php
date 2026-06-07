@@ -7,6 +7,9 @@ namespace PHPCompiler\ext\standard;
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\JitStringArg;
+use PHPCompiler\JIT\JitStringBuiltinArg;
+use PHPCompiler\JIT\ReflectionBuiltinHelper;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Value;
 
@@ -24,7 +27,7 @@ final class class_exists_ extends Internal
             throw new \LogicException('class_exists() requires one or two arguments in this compiler build');
         }
         $ctx = VmReflection::requireContext($frame);
-        $name = VmReflection::stringArg($frame->calledArgs[0], 'class_exists() class name', 0);
+        $name = VmString::coerceStringBuiltinArg($frame->calledArgs[0], 'class_exists', 0, 'class');
         $exists = VmReflection::classExists($ctx, $name);
         if (null !== $frame->returnVar) {
             $frame->returnVar->bool($exists);
@@ -36,10 +39,14 @@ final class class_exists_ extends Internal
         if (\count($args) < 1 || \count($args) > 2) {
             throw new \LogicException('class_exists() requires one or two arguments in this compiler build');
         }
-        if (JITVariable::TYPE_STRING !== $args[0]->type && JITVariable::TYPE_VALUE !== $args[0]->type) {
-            throw new \LogicException('class_exists() class name must be a string in this compiler build');
+        $literal = JitStringArg::compileTimeLiteral($args[0]);
+        if (null !== $literal) {
+            return ReflectionBuiltinHelper::classExistsLiteral($context, $literal);
         }
 
-        return JitClassExists::invoke($context, $args[0]);
+        return JitClassExists::invoke(
+            $context,
+            JitStringBuiltinArg::lower($context, $args[0], 'class_exists', 0, 'class')
+        );
     }
 }
