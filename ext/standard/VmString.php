@@ -2661,7 +2661,7 @@ final class VmString
     }
 
     /**
-     * addcslashes() — prefix backslash before chars in charlist (php-src string.c php_addcslashes).
+     * addcslashes() — C-style selective escaping (php-src string.c php_addcslashes_str).
      */
     public static function addcslashes(string $string, string $charlist): string
     {
@@ -2669,15 +2669,34 @@ final class VmString
         $out = '';
         $len = self::byteLength($string);
         for ($i = 0; $i < $len; ++$i) {
-            $ch = $string[$i];
-            if ($mask[self::byteOrd($ch)]) {
-                $out .= '\\'.$ch;
+            $ord = self::byteOrd($string[$i]);
+            if ($mask[$ord]) {
+                $out .= self::formatAddcslashesEscape($ord);
             } else {
-                $out .= $ch;
+                $out .= $string[$i];
             }
         }
 
         return $out;
+    }
+
+    /** Escaped output for one masked byte (php-src php_addcslashes_str; issue #4736). */
+    private static function formatAddcslashesEscape(int $ord): string
+    {
+        if ($ord < 32 || $ord > 126) {
+            return match ($ord) {
+                10 => '\\n',
+                9 => '\\t',
+                13 => '\\r',
+                7 => '\\a',
+                11 => '\\v',
+                8 => '\\b',
+                12 => '\\f',
+                default => sprintf('\\%03o', $ord),
+            };
+        }
+
+        return '\\'.self::byteChr($ord);
     }
 
     /** @return array<int, bool> escape mask for addcslashes charlist (JIT/AOT lowering). */

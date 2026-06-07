@@ -12,7 +12,7 @@ use PHPLLVM\Builder;
 use PHPLLVM\Value;
 use PHPLLVM\Value\Function_ as LlvmFunction;
 
-/** LLVM JIT helper for addcslashes() — VmString parity (#3356, #5652). */
+/** LLVM JIT helper for addcslashes() — VmString parity (#3356, #5652, #4736). */
 final class JitAddcslashes
 {
     public static function escape(Context $context, JITVariable $subjectArg, JITVariable $charlistArg): Value
@@ -140,7 +140,7 @@ final class JitAddcslashes
         $context->builder->positionAtEnd($body);
         $ch = $context->builder->load($context->builder->gep($srcChars, $i));
         $escape = self::maskHit($context, $maskSlot, $ch);
-        $add = $context->builder->select($escape, $two, $one);
+        $add = $context->builder->select($escape, self::escapedOutputLen($context, $ch), $one);
         $outLen = $context->builder->load($outLenSlot);
         $context->builder->store($context->builder->addNoSignedWrap($outLen, $add), $outLenSlot);
         $context->builder->store($context->builder->addNoSignedWrap($i, $one), $iSlot);
@@ -185,9 +185,8 @@ final class JitAddcslashes
         $context->builder->branchIf($escape, $escapedBlock, $plainBlock);
 
         $context->builder->positionAtEnd($escapedBlock);
-        $context->builder->store($backslash, $destAt);
-        $context->builder->store($ch, $context->builder->gep($destChars, $context->builder->addNoSignedWrap($pos, $one)));
-        $context->builder->store($context->builder->addNoSignedWrap($pos, $two), $posSlot);
+        $newPos = self::writeEscapedByte($context, $fn, $destChars, $pos, $ch, $backslash);
+        $context->builder->store($newPos, $posSlot);
         $context->builder->branch($afterBlock);
 
         $context->builder->positionAtEnd($plainBlock);
@@ -208,5 +207,174 @@ final class JitAddcslashes
         $hit = $context->builder->load($context->builder->gep($maskSlot, $chI64));
 
         return $context->builder->icmp(Builder::INT_NE, $hit, $context->getTypeFromString('int8')->constInt(0, false));
+    }
+
+    /** Output length for one escaped byte (php-src php_addcslashes_str). */
+    private static function escapedOutputLen(Context $context, Value $ch): Value
+    {
+        $i64 = $context->getTypeFromString('int64');
+        $two = $i64->constInt(2, false);
+        $four = $i64->constInt(4, false);
+        $ord = $context->builder->zExt($ch, $i64);
+        $nonPrintable = $context->builder->or(
+            $context->builder->icmp(Builder::INT_SLT, $ord, $i64->constInt(32, false)),
+            $context->builder->icmp(Builder::INT_SGT, $ord, $i64->constInt(126, false))
+        );
+
+        return $context->builder->select(
+            $nonPrintable,
+            self::nonPrintableEscapedLen($context, $ord, $two, $four),
+            $two
+        );
+    }
+
+    private static function nonPrintableEscapedLen(Context $context, Value $ord, Value $two, Value $four): Value
+    {
+        $i64 = $context->getTypeFromString('int64');
+        $named = [10, 9, 13, 7, 11, 8, 12];
+        $chain = $context->builder->icmp(Builder::INT_EQ, $ord, $i64->constInt($named[0], false));
+        for ($idx = 1; $idx < \count($named); ++$idx) {
+            $chain = $context->builder->or(
+                $chain,
+                $context->builder->icmp(Builder::INT_EQ, $ord, $i64->constInt($named[$idx], false))
+            );
+        }
+
+        return $context->builder->select($chain, $two, $four);
+    }
+
+    private static function writeEscapedByte(
+        Context $context,
+        LlvmFunction $fn,
+        Value $destChars,
+        Value $pos,
+        Value $ch,
+        Value $backslash
+    ): Value {
+        $i64 = $context->getTypeFromString('int64');
+        $i8 = $context->getTypeFromString('int8');
+        $one = $i64->constInt(1, false);
+        $two = $i64->constInt(2, false);
+        $ord = $context->builder->zExt($ch, $i64);
+        $nonPrintable = $context->builder->or(
+            $context->builder->icmp(Builder::INT_SLT, $ord, $i64->constInt(32, false)),
+            $context->builder->icmp(Builder::INT_SGT, $ord, $i64->constInt(126, false))
+        );
+
+        $printableBlock = $fn->appendBasicBlock('jit_addcslashes_write_printable');
+        $nonPrintableBlock = $fn->appendBasicBlock('jit_addcslashes_write_nonprintable');
+        $doneBlock = $fn->appendBasicBlock('jit_addcslashes_write_escape_done');
+        $context->builder->branchIf($nonPrintable, $nonPrintableBlock, $printableBlock);
+
+        $context->builder->positionAtEnd($printableBlock);
+        $context->builder->store($backslash, $context->builder->gep($destChars, $pos));
+        $context->builder->store($ch, $context->builder->gep($destChars, $context->builder->addNoSignedWrap($pos, $one)));
+        $printablePos = $context->builder->addNoSignedWrap($pos, $two);
+        $context->builder->branch($doneBlock);
+
+        $context->builder->positionAtEnd($nonPrintableBlock);
+        $nonPrintablePos = self::writeNonPrintableEscapedByte($context, $fn, $destChars, $pos, $backslash, $ord);
+        $context->builder->branch($doneBlock);
+
+        $context->builder->positionAtEnd($doneBlock);
+        $posPhi = $context->builder->phi($i64);
+        $posPhi->addIncoming($printablePos, $printableBlock);
+        $posPhi->addIncoming($nonPrintablePos, $nonPrintableBlock);
+
+        return $posPhi;
+    }
+
+    private static function writeNonPrintableEscapedByte(
+        Context $context,
+        LlvmFunction $fn,
+        Value $destChars,
+        Value $pos,
+        Value $backslash,
+        Value $ord
+    ): Value {
+        $i64 = $context->getTypeFromString('int64');
+        $i8 = $context->getTypeFromString('int8');
+        $one = $i64->constInt(1, false);
+        $two = $i64->constInt(2, false);
+        $named = [
+            10 => 110,
+            9 => 116,
+            13 => 114,
+            7 => 97,
+            11 => 118,
+            8 => 98,
+            12 => 102,
+        ];
+
+        $doneBlock = $fn->appendBasicBlock('jit_addcslashes_write_named_done');
+        $nextChain = $context->builder->getInsertBlock();
+        $incomingBlocks = [];
+        $incomingValues = [];
+        foreach ($named as $byteOrd => $letterOrd) {
+            $context->builder->positionAtEnd($nextChain);
+            $caseBlock = $fn->appendBasicBlock('jit_addcslashes_write_named_'.$byteOrd);
+            $fallBlock = $fn->appendBasicBlock('jit_addcslashes_write_named_fall_'.$byteOrd);
+            $match = $context->builder->icmp(Builder::INT_EQ, $ord, $i64->constInt($byteOrd, false));
+            $context->builder->branchIf($match, $caseBlock, $fallBlock);
+            $context->builder->positionAtEnd($caseBlock);
+            $context->builder->store($backslash, $context->builder->gep($destChars, $pos));
+            $context->builder->store(
+                $i8->constInt($letterOrd, false),
+                $context->builder->gep($destChars, $context->builder->addNoSignedWrap($pos, $one))
+            );
+            $incomingBlocks[] = $caseBlock;
+            $incomingValues[] = $context->builder->addNoSignedWrap($pos, $two);
+            $context->builder->branch($doneBlock);
+            $nextChain = $fallBlock;
+        }
+
+        $context->builder->positionAtEnd($nextChain);
+        $incomingBlocks[] = $nextChain;
+        $incomingValues[] = self::writeOctalEscapedByte($context, $destChars, $pos, $ord, $backslash);
+        $context->builder->branch($doneBlock);
+
+        $context->builder->positionAtEnd($doneBlock);
+        $posPhi = $context->builder->phi($i64);
+        foreach ($incomingBlocks as $idx => $block) {
+            $posPhi->addIncoming($incomingValues[$idx], $block);
+        }
+
+        return $posPhi;
+    }
+
+    private static function writeOctalEscapedByte(
+        Context $context,
+        Value $destChars,
+        Value $pos,
+        Value $ord,
+        Value $backslash
+    ): Value {
+        $i64 = $context->getTypeFromString('int64');
+        $i8 = $context->getTypeFromString('int8');
+        $one = $i64->constInt(1, false);
+        $two = $i64->constInt(2, false);
+        $three = $i64->constInt(3, false);
+        $four = $i64->constInt(4, false);
+        $zeroDigit = $i64->constInt(48, false);
+        $seven = $i64->constInt(7, false);
+
+        $context->builder->store($backslash, $context->builder->gep($destChars, $pos));
+        $d1 = $context->builder->trunc(
+            $context->builder->add($zeroDigit, $context->builder->and($context->builder->lShr($ord, $i64->constInt(6, false)), $seven)),
+            $i8
+        );
+        $d2 = $context->builder->trunc(
+            $context->builder->add($zeroDigit, $context->builder->and($context->builder->lShr($ord, $i64->constInt(3, false)), $seven)),
+            $i8
+        );
+        $d3 = $context->builder->trunc(
+            $context->builder->add($zeroDigit, $context->builder->and($ord, $seven)),
+            $i8
+        );
+        $context->builder->store($d1, $context->builder->gep($destChars, $context->builder->addNoSignedWrap($pos, $one)));
+        $context->builder->store($d2, $context->builder->gep($destChars, $context->builder->addNoSignedWrap($pos, $two)));
+        $context->builder->store($d3, $context->builder->gep($destChars, $context->builder->addNoSignedWrap($pos, $three)));
+
+        return $context->builder->addNoSignedWrap($pos, $four);
     }
 }
