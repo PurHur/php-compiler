@@ -998,6 +998,7 @@ class Type extends Builtin {
         StringFsGlob::ensureLinked($this->context);
         StringFsDir::ensureLinked($this->context);
         StreamSync::ensureLinked($this->context);
+        StreamCaps::ensureLinked($this->context);
         LastErrorRuntime::ensureLinked($this->context);
         CliArgvRuntime::ensureLinked($this->context);
         FunctionExistsRuntime::ensureLinked($this->context);
