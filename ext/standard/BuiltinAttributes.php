@@ -6,17 +6,19 @@ namespace PHPCompiler\ext\standard;
 
 use PHPCfg\Func as CfgFunc;
 use PHPCompiler\Compiler\AttributeEntry;
+use PHPCompiler\CompilerVersion;
 use PHPCompiler\VM\AttributeSupport;
 use PHPCompiler\VM\Builtin\DeprecatedConstruct;
+use PHPCompiler\VM\Builtin\NoDiscardConstruct;
 use PHPCompiler\VM\ClassEntry;
 use PHPCompiler\VM\ClassProperty;
 use PHPCompiler\VM\Context;
 use PHPCompiler\VM\Variable;
 
 /**
- * Register ext/standard builtin attribute classes (php-src Zend/zend_attributes.stub.php; #7145).
+ * Register ext/standard builtin attribute classes (php-src Zend/zend_attributes.stub.php; #7145, #7147).
  *
- * Attribute / ReturnTypeWillChange / AllowDynamicProperties remain in lib/VM/AttributeSupport
+ * Attribute / ReturnTypeWillChange / AllowDynamicProperties / Override remain in lib/VM/AttributeSupport
  * until follow-up issues migrate them here.
  */
 final class BuiltinAttributes
@@ -25,6 +27,9 @@ final class BuiltinAttributes
     {
         $before = array_keys($ctx->classes);
         self::registerDeprecated($ctx);
+        if (CompilerVersion::supportsNoDiscardAttribute()) {
+            self::registerNoDiscard($ctx);
+        }
         foreach (array_diff(array_keys($ctx->classes), $before) as $lc) {
             $ctx->classes[$lc]->isInternal = true;
         }
@@ -56,5 +61,30 @@ final class BuiltinAttributes
         ];
 
         $ctx->classes[AttributeSupport::CLASS_DEPRECATED] = $entry;
+    }
+
+    private static function registerNoDiscard(Context $ctx): void
+    {
+        if (!isset($ctx->classes[AttributeSupport::CLASS_ATTRIBUTE])) {
+            return;
+        }
+
+        $strProto = new Variable(Variable::TYPE_STRING);
+        $pub = CfgFunc::FLAG_PUBLIC;
+
+        $entry = new ClassEntry('NoDiscard');
+        $entry->parentLc = AttributeSupport::CLASS_ATTRIBUTE;
+        $entry->properties[] = new ClassProperty('message', null, $strProto, true);
+        $entry->constructor = new NoDiscardConstruct();
+        $entry->methods['__construct'] = $entry->constructor;
+        $entry->methodVisibility['__construct'] = $pub;
+
+        $targets = AttributeSupport::TARGET_FUNCTION | AttributeSupport::TARGET_METHOD;
+        $entry->attributeNames = ['Attribute'];
+        $entry->attributeEntries = [
+            new AttributeEntry('Attribute', [['name' => null, 'value' => $targets]]),
+        ];
+
+        $ctx->classes[AttributeSupport::CLASS_NODISCARD] = $entry;
     }
 }
