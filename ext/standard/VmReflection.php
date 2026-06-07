@@ -1223,7 +1223,9 @@ final class VmReflection
         }
         $caseLc = strtolower($caseName);
         if (!isset($enumEntry->enumCaseCanonicalNames[$caseLc])) {
-            throw new \LogicException('Enum '.$enumEntry->name.' has no case named '.$caseName);
+            ReflectionSupport::throwReflectionException(
+                ReflectionSupport::enumCaseNotFoundMessage($enumEntry->name, $caseName)
+            );
         }
         $obj = new \PHPCompiler\VM\ObjectEntry($reucClass);
         $obj->constructed = true;

@@ -108,6 +108,11 @@ final class ReflectionSupport
         return sprintf('Function %s() does not exist', $functionName);
     }
 
+    public static function enumCaseNotFoundMessage(string $enumName, string $caseName): string
+    {
+        return $enumName.'::'.$caseName.' is not a case';
+    }
+
     /** @return never */
     public static function throwReflectionException(string $message): void
     {
