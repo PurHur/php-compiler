@@ -125,6 +125,18 @@ final class VmBcmath
         return null !== $scale ? $scale : self::$defaultScale;
     }
 
+    /** Validate arbitrary-precision operand (php-src ext/bcmath/bcmath.c; issue #7220). */
+    public static function assertValidNumber(string $num): void
+    {
+        self::parse($num);
+    }
+
+    /** Decimal places after the radix point for a validated operand (#7220). */
+    public static function decimalScale(string $num): int
+    {
+        return \strlen(self::parse($num)['frac']);
+    }
+
     /**
      * @return array{sign:int,int:string,frac:string}
      */

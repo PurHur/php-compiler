@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace PHPCompiler\ext\bcmath;
 
 use PHPCompiler\ModuleAbstract;
+use PHPCompiler\Runtime;
 
 /**
  * bcmath extension module entry (php-src ext/bcmath/bcmath.c; issue #5924).
@@ -13,6 +14,12 @@ use PHPCompiler\ModuleAbstract;
  */
 class Module extends ModuleAbstract
 {
+    public function init(Runtime $runtime): void
+    {
+        parent::init($runtime);
+        BuiltinClasses::register($runtime->vmContext);
+    }
+
     public function getFunctions(): array
     {
         return [
