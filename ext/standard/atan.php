@@ -14,7 +14,6 @@ namespace PHPCompiler\ext\standard;
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Context;
-use PHPCompiler\JIT\JitLongArg;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Value;
 
@@ -48,25 +47,10 @@ final class atan extends Internal
         if (1 !== count($args)) {
             throw new \LogicException('atan() requires exactly one argument');
         }
-        $double = $context->getTypeFromString('double');
-        $asFloat = self::toJitDouble($context, $args[0], $double);
+        $asFloat = JitFdiv::lowerSingleOperand($context, $args[0], 1, 'num', 'atan', 'float');
         $fn = $context->lookupFunction('atan');
 
         return $context->builder->call($fn, $asFloat);
-    }
-
-    private static function toJitDouble(Context $context, JITVariable $arg, $double): Value
-    {
-        switch ($arg->type) {
-            case JITVariable::TYPE_NATIVE_LONG:
-                $v = JitLongArg::lower($context, $arg, 'atan() argument');
-
-                return $context->builder->siToFp($v, $double);
-            case JITVariable::TYPE_NATIVE_DOUBLE:
-                return $context->helper->loadValue($arg);
-            default:
-                throw new \LogicException('atan() only supports integers and floats in this compiler build');
-        }
     }
 
 }

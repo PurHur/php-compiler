@@ -14,7 +14,6 @@ namespace PHPCompiler\ext\standard;
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Context;
-use PHPCompiler\JIT\JitLongArg;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Value;
 
@@ -54,9 +53,7 @@ final class atan2 extends Internal
         if (2 !== \count($args)) {
             throw new \LogicException('atan2() requires exactly two arguments');
         }
-        $double = $context->getTypeFromString('double');
-        $y = pow::toJitDouble($context, $args[0], $double);
-        $x = pow::toJitDouble($context, $args[1], $double);
+        [$y, $x] = JitFdiv::lowerOperands($context, $args[0], $args[1], 'atan2', 'y', 'x', 'float');
         $fn = $context->lookupFunction('atan2');
 
         return $context->builder->call($fn, $y, $x);

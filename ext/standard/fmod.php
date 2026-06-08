@@ -14,7 +14,6 @@ namespace PHPCompiler\ext\standard;
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Context;
-use PHPCompiler\JIT\JitLongArg;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Value;
 
@@ -54,17 +53,8 @@ final class fmod extends Internal
         if (2 !== count($args)) {
             throw new \LogicException('fmod() requires exactly two arguments');
         }
-        $double = $context->getTypeFromString('double');
-        $left = pow::toJitDouble($context, $args[0], $double);
-        $right = pow::toJitDouble($context, $args[1], $double);
+        [$left, $right] = JitFdiv::lowerOperands($context, $args[0], $args[1], 'fmod', 'num1', 'num2', 'float');
         $fn = $context->lookupFunction('fmod');
-
-        if (JITVariable::TYPE_NATIVE_LONG === $args[0]->type) {
-            JitLongArg::lower($context, $args[0], 'fmod() argument #1');
-        }
-        if (isset($args[1]) && JITVariable::TYPE_NATIVE_LONG === $args[1]->type) {
-            JitLongArg::lower($context, $args[1], 'fmod() argument #2');
-        }
 
         return $context->builder->call($fn, $left, $right);
     }

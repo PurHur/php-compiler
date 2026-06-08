@@ -14,7 +14,6 @@ namespace PHPCompiler\ext\standard;
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Context;
-use PHPCompiler\JIT\JitLongArg;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Value;
 
@@ -48,8 +47,7 @@ final class cos extends Internal
         if (1 !== count($args)) {
             throw new \LogicException('cos() requires exactly one argument');
         }
-        $double = $context->getTypeFromString('double');
-        $asFloat = pow::toJitDouble($context, $args[0], $double);
+        $asFloat = JitFdiv::lowerSingleOperand($context, $args[0], 1, 'num', 'cos', 'float');
         $fn = $context->lookupFunction('cos');
 
         return $context->builder->call($fn, $asFloat);

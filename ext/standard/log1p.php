@@ -33,8 +33,7 @@ final class log1p extends Internal
         if (1 !== \count($args)) {
             throw new \LogicException('log1p() requires exactly one argument');
         }
-        $double = $context->getTypeFromString('double');
-        $asFloat = pow::toJitDouble($context, $args[0], $double);
+        $asFloat = JitFdiv::lowerSingleOperand($context, $args[0], 1, 'num', 'log1p', 'float');
 
         return $context->builder->call($context->lookupFunction('log1p'), $asFloat);
     }
