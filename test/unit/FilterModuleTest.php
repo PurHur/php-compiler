@@ -20,6 +20,7 @@ final class FilterModuleTest extends TestCase
         $ctx = $runtime->vmContext;
 
         self::assertTrue(VmReflection::functionExists($ctx, 'filter_var'));
+        self::assertTrue(VmReflection::functionExists($ctx, 'filter_input'));
         self::assertTrue(VmReflection::functionExists($ctx, 'filter_list'));
         self::assertTrue(VmReflection::functionExists($ctx, 'filter_id'));
 

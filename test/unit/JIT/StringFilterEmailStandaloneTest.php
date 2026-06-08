@@ -20,7 +20,7 @@ final class StringFilterEmailStandaloneTest extends TestCase
         $this->assertFileDoesNotExist(__DIR__.'/../../../lib/AOT/runtime/filter_validate.c');
         $linker = (string) file_get_contents(__DIR__.'/../../../lib/AOT/Linker.php');
         $this->assertStringNotContainsString('filter_validate.c', $linker);
-        $jitFilter = (string) file_get_contents(__DIR__.'/../../../ext/standard/JitFilter.php');
+        $jitFilter = (string) file_get_contents(__DIR__.'/../../../ext/filter/JitFilter.php');
         $this->assertStringContainsString('StringFilterEmail', $jitFilter);
         $emailJit = (string) file_get_contents(__DIR__.'/../../../lib/JIT/Builtin/StringFilterEmail.php');
         $this->assertStringContainsString('__compiler_filter_validate_email', $emailJit);

@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace PHPCompiler;
 
-use PHPCompiler\ext\standard\VmFilter;
+use PHPCompiler\ext\filter\VmFilter;
 use PHPCompiler\VM\Variable;
 use PHPUnit\Framework\TestCase;
 

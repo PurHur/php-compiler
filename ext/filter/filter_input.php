@@ -2,8 +2,10 @@
 
 declare(strict_types=1);
 
-namespace PHPCompiler\ext\standard;
+namespace PHPCompiler\ext\filter;
 
+use PHPCompiler\ext\standard\VmString;
+use PHPCompiler\ext\standard\array_key_exists;
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\BasicBlockHelper;

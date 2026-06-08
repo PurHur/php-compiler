@@ -4,8 +4,6 @@ declare(strict_types=1);
 
 namespace PHPCompiler\ext\filter;
 
-use PHPCompiler\ext\standard\VmFilter;
-
 /**
  * FILTER_* ids and name map (php-src ext/filter/php_filter.h; issue #5839).
  *
