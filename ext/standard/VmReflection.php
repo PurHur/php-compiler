@@ -1019,6 +1019,9 @@ final class VmReflection
         if (Variable::TYPE_OBJECT === $arg->type) {
             return $arg->toObject()->class;
         }
+        if (Variable::TYPE_ENUM_CASE === $arg->type) {
+            return $arg->toEnumCase()->enumClass;
+        }
         if (Variable::TYPE_STRING === $arg->type) {
             $className = $arg->toString();
             $lc = strtolower(ltrim($className, '\\'));
@@ -1037,6 +1040,9 @@ final class VmReflection
      */
     public static function classMethodsList(ClassEntry $entry, int $filter = 7): array
     {
+        if ($entry->isEnum) {
+            EnumSupport::ensureBuiltinCasesMethod($entry);
+        }
         $names = [];
         $methodLcs = array_keys($entry->methods);
         foreach (array_keys($entry->abstractMethods) as $abstractLc) {
@@ -1051,8 +1057,31 @@ final class VmReflection
             }
             $names[] = $entry->methodNames[$methodLc] ?? $methodLc;
         }
+        foreach (self::syntheticEnumMethodNames($entry, $filter) as $methodName) {
+            if (!in_array($methodName, $names, true)) {
+                $names[] = $methodName;
+            }
+        }
 
         return $names;
+    }
+
+    /**
+     * Zend zend_get_class_methods() synthetic enum methods (php-src basic_functions.c, #5614).
+     *
+     * @return list<string>
+     */
+    private static function syntheticEnumMethodNames(ClassEntry $entry, int $filter): array
+    {
+        if (!$entry->isEnum || null === $entry->backedType) {
+            return [];
+        }
+        $vis = \PHPCfg\Func::FLAG_PUBLIC | \PHPCfg\Func::FLAG_STATIC;
+        if (0 !== ($filter & 7) && 0 === ($vis & $filter & 7)) {
+            return [];
+        }
+
+        return ['from', 'tryFrom'];
     }
 
     public static function classMethodsArray(ClassEntry $entry, int $filter = 7): Variable
