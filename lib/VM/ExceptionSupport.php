@@ -35,6 +35,9 @@ final class ExceptionSupport
     public const CLASS_CLOSED_GENERATOR_EXCEPTION = ThrowableManifest::LC_CLOSED_GENERATOR_EXCEPTION;
     public const CLASS_DATE_EXCEPTION = ThrowableManifest::LC_DATE_EXCEPTION;
     public const CLASS_DATE_INVALID_TIME_ZONE_EXCEPTION = ThrowableManifest::LC_DATE_INVALID_TIME_ZONE_EXCEPTION;
+    public const CLASS_DATE_ERROR = ThrowableManifest::LC_DATE_ERROR;
+    public const CLASS_DATE_OBJECT_ERROR = ThrowableManifest::LC_DATE_OBJECT_ERROR;
+    public const CLASS_DATE_RANGE_ERROR = ThrowableManifest::LC_DATE_RANGE_ERROR;
     public const CLASS_ERROR = ThrowableManifest::LC_ERROR;
     public const CLASS_TYPE_ERROR = ThrowableManifest::LC_TYPE_ERROR;
     public const CLASS_VALUE_ERROR = ThrowableManifest::LC_VALUE_ERROR;

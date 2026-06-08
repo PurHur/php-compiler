@@ -20,7 +20,11 @@ final class DateTimeGetTimestamp extends VmClassMethod
         if (\count($frame->calledArgs) < 1) {
             throw new \LogicException('DateTime::getTimestamp() called without $this');
         }
-        $receiver = DateTimeSupport::requireDateTimeLike($frame->calledArgs[0], 'DateTime::getTimestamp()');
+        $receiver = DateTimeSupport::requireDateTimeLike(
+            $frame->calledArgs[0],
+            'DateTime::getTimestamp()',
+            $frame->vmContext
+        );
         if (null === $frame->returnVar) {
             return;
         }

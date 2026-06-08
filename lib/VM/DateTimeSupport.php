@@ -21,6 +21,9 @@ final class DateTimeSupport
     public const CLASS_DATETIMEZONE = 'datetimezone';
     public const CLASS_DATETIMEINTERFACE = DateTimeInterfaceSupport::INTERFACE_LC;
 
+    /** @var array<int, true> DateTime/DateTimeImmutable instances initialized via initDateTime* (#7276). */
+    private static array $dateTimeLikeInitialized = [];
+
     public static function requireDateTimeZone(Variable $var, string $label): ObjectEntry
     {
         $var = $var->resolveIndirect();
@@ -63,8 +66,8 @@ final class DateTimeSupport
         return $obj;
     }
 
-    /** Accept DateTime or DateTimeImmutable (#7082). */
-    public static function requireDateTimeLike(Variable $var, string $label): ObjectEntry
+    /** Accept DateTime or DateTimeImmutable (#7082); subclasses when $ctx is provided (#7276). */
+    public static function requireDateTimeLike(Variable $var, string $label, ?Context $ctx = null): ObjectEntry
     {
         $var = $var->resolveIndirect();
         if (Variable::TYPE_OBJECT !== $var->type) {
@@ -72,11 +75,19 @@ final class DateTimeSupport
         }
         $obj = $var->toObject();
         $lc = strtolower($obj->class->name);
-        if (self::CLASS_DATETIME !== $lc && self::CLASS_DATETIMEIMMUTABLE !== $lc) {
-            throw new \TypeError("{$label} must be of type DateTime or DateTimeImmutable");
+        if (self::CLASS_DATETIME === $lc || self::CLASS_DATETIMEIMMUTABLE === $lc) {
+            return $obj;
         }
-
-        return $obj;
+        if (null !== $ctx) {
+            if (InterfaceCheck::entryIsInstanceOf($obj->class, self::CLASS_DATETIME, $ctx)
+                || InterfaceCheck::entryIsInstanceOf($obj->class, self::CLASS_DATETIMEIMMUTABLE, $ctx)) {
+                return $obj;
+            }
+        } elseif (self::CLASS_DATETIME === $obj->class->parentLc
+            || self::CLASS_DATETIMEIMMUTABLE === $obj->class->parentLc) {
+            return $obj;
+        }
+        throw new \TypeError("{$label} must be of type DateTime or DateTimeImmutable");
     }
 
     public static function isDateTimeImmutable(ObjectEntry $obj): bool
@@ -108,6 +119,38 @@ final class DateTimeSupport
         );
     }
 
+    /** php-src ext/date/php_date.c — epoch overflow on getTimestamp() (#7276). */
+    public static function throwDateRangeError(string $message): void
+    {
+        throw new NativeDateRangeError($message);
+    }
+
+    /** php-src ext/date/php_date.c — uninitialized date object (#7276). */
+    public static function throwDateObjectError(string $message): void
+    {
+        throw new NativeDateObjectError($message);
+    }
+
+    public static function requireInitializedDateTimeLike(ObjectEntry $obj, string $method): void
+    {
+        if (isset(self::$dateTimeLikeInitialized[$obj->id])) {
+            return;
+        }
+        self::throwUninitializedDateTimeLike($obj);
+    }
+
+    private static function markDateTimeLikeInitialized(ObjectEntry $dt): void
+    {
+        self::$dateTimeLikeInitialized[$dt->id] = true;
+    }
+
+    private static function throwUninitializedDateTimeLike(ObjectEntry $obj): void
+    {
+        self::throwDateObjectError(
+            'Object of type '.$obj->class->name.' has not been correctly initialized by calling parent::__construct() in its constructor'
+        );
+    }
+
     /** php-src ext/date/php_date.c — malformed time string throws catchable Exception (#7113). */
     public static function throwDateMalformedStringException(string $message): void
     {
@@ -126,6 +169,7 @@ final class DateTimeSupport
         }
         self::syncFromHost($dt, $host);
         $dt->constructed = true;
+        self::markDateTimeLikeInitialized($dt);
     }
 
     public static function initDateTimeFromFormat(
@@ -145,6 +189,7 @@ final class DateTimeSupport
         }
         self::syncFromHost($dt, $host);
         $dt->constructed = true;
+        self::markDateTimeLikeInitialized($dt);
     }
 
     public static function format(ObjectEntry $dt, string $format): string
@@ -154,6 +199,15 @@ final class DateTimeSupport
 
     public static function getTimestamp(ObjectEntry $dt): int
     {
+        self::requireInitializedDateTimeLike($dt, self::classLabel($dt).'::getTimestamp()');
+        $host = self::toHost($dt);
+        if (4 === \PHP_INT_SIZE) {
+            $epoch = (float) $host->format('U');
+            if ($epoch > \PHP_INT_MAX || $epoch < \PHP_INT_MIN) {
+                self::throwDateRangeError('Epoch doesn\'t fit in a PHP integer');
+            }
+        }
+
         return self::requireIntProperty($dt, self::TS_PROPERTY, self::classLabel($dt))->toInt();
     }
 
@@ -207,6 +261,7 @@ final class DateTimeSupport
         self::requireIntProperty($clone, self::MICROSECOND_PROPERTY, self::classLabel($source))
             ->int(self::requireIntProperty($source, self::MICROSECOND_PROPERTY, self::classLabel($source))->toInt());
         $clone->constructed = true;
+        self::markDateTimeLikeInitialized($clone);
 
         return $clone;
     }
