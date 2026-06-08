@@ -650,6 +650,7 @@ class Context {
             Builtin\StringJsonDecode::ensureStandaloneBodies($this);
             Builtin\StringMultipart::ensureStandaloneBodies($this);
             Builtin\StringGetenv::ensureStandaloneBodies($this);
+            Builtin\StringTriggerError::ensureStandaloneBodies($this);
             Builtin\GcCollectCyclesRuntime::ensureStandaloneBodies($this);
         }
 
