@@ -25,7 +25,7 @@ final class JitPropertyExists
     {
         $propLiteral = JitStringArg::compileTimeLiteral($propertyArg);
         if (JITVariable::TYPE_OBJECT === $objectOrClass->type) {
-            return self::forObject($context, $objectOrClass, $propLiteral);
+            return self::forObject($context, $objectOrClass, $propertyArg, $propLiteral);
         }
         if (JITVariable::TYPE_VALUE === $objectOrClass->type) {
             return self::invokeFromValueBox($context, $objectOrClass, $propertyArg, $propLiteral);
@@ -102,7 +102,7 @@ final class JitPropertyExists
             JITVariable::KIND_VALUE,
             $obj
         );
-        $objResult = self::forObject($context, $objVar, $propLiteral);
+        $objResult = self::forObject($context, $objVar, $propertyArg, $propLiteral);
         $context->builder->branch($mergeBlock);
 
         $context->builder->positionAtEnd($notObject);
@@ -159,25 +159,31 @@ final class JitPropertyExists
         }
     }
 
-    private static function forObject(Context $context, JITVariable $objectArg, ?string $propLiteral): Value
-    {
-        if (null === $propLiteral) {
-            throw new \LogicException('property_exists() on object requires a string literal property name in JIT in this compiler build');
-        }
+    private static function forObject(
+        Context $context,
+        JITVariable $objectArg,
+        JITVariable $propertyArg,
+        ?string $propLiteral
+    ): Value {
         $objMap = $context->structFieldMap['__object__'];
         $obj = $context->helper->loadValue($objectArg);
         $classId = $context->builder->load(
             $context->builder->structGep($obj, $objMap['class_id'])
         );
-        $propLc = strtolower($propLiteral);
-        if ('name' === $propLc || 'value' === $propLc) {
-            $enumExists = self::existsForEnumCasePropertyLiteral($context, $classId, $propLc);
-            $regularExists = self::existsForClassIdLiteralProperty($context, $classId, $propLiteral);
+        if (null !== $propLiteral) {
+            $propLc = strtolower($propLiteral);
+            if ('name' === $propLc || 'value' === $propLc) {
+                $enumExists = self::existsForEnumCasePropertyLiteral($context, $classId, $propLc);
+                $regularExists = self::existsForClassIdLiteralProperty($context, $classId, $propLiteral);
 
-            return $context->builder->or($enumExists, $regularExists);
+                return $context->builder->or($enumExists, $regularExists);
+            }
+
+            return self::existsForClassIdLiteralProperty($context, $classId, $propLiteral);
         }
+        $propStr = JitStringArg::lower($context, $propertyArg, 'property_exists() property name');
 
-        return self::existsForClassIdLiteralProperty($context, $classId, $propLiteral);
+        return self::existsForClassIdRuntimePropertyDynamic($context, $classId, $propStr);
     }
 
     private static function existsForEnumCasePropertyLiteral(
@@ -243,6 +249,52 @@ final class JitPropertyExists
             $classExists = $object->hasProperty($id, $property)
                 ? $i1->constInt(1, false)
                 : $i1->constInt(0, false);
+            $exists = $context->builder->select($isClass, $classExists, $exists);
+        }
+
+        return $exists;
+    }
+
+    private static function existsForClassIdRuntimePropertyDynamic(
+        Context $context,
+        Value $classId,
+        Value $propertyStr
+    ): Value {
+        $i1 = $context->getTypeFromString('int1');
+        $exists = $i1->constInt(0, false);
+        $object = $context->type->object;
+        $propData = self::stringDataPtr($context, $propertyStr);
+        $strcasecmpFn = $context->lookupFunction('strcasecmp');
+        $i32 = $context->getTypeFromString('int32');
+        $nameStr = $context->builder->load($context->constantStringFromString('name'));
+        $enumNameCmp = $context->builder->call(
+            $strcasecmpFn,
+            $propData,
+            self::stringDataPtr($context, $nameStr)
+        );
+        $enumNameMatch = $context->builder->icmp(Builder::INT_EQ, $enumNameCmp, $i32->constInt(0, false));
+        $valueStr = $context->builder->load($context->constantStringFromString('value'));
+        $enumValueCmp = $context->builder->call(
+            $strcasecmpFn,
+            $propData,
+            self::stringDataPtr($context, $valueStr)
+        );
+        $enumValueMatch = $context->builder->icmp(Builder::INT_EQ, $enumValueCmp, $i32->constInt(0, false));
+
+        foreach ($object->allClassNamesById() as $id => $className) {
+            $isClass = $context->builder->icmp(
+                Builder::INT_EQ,
+                $classId,
+                $context->constantFromInteger($id, 'int64')
+            );
+            if ($object->isEnumClassId($id)) {
+                $classExists = $enumNameMatch;
+                if ($object->enumHasBacking($id)) {
+                    $classExists = $context->builder->or($enumNameMatch, $enumValueMatch);
+                }
+            } else {
+                $classExists = self::existsForClassIdRuntimeProperty($context, $id, $propertyStr);
+            }
             $exists = $context->builder->select($isClass, $classExists, $exists);
         }
 

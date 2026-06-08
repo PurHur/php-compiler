@@ -42,7 +42,13 @@ final class property_exists_ extends Internal
         if (2 !== \count($args)) {
             throw new \LogicException('property_exists() requires exactly two arguments');
         }
-        if (JITVariable::TYPE_STRING !== $args[1]->type && JITVariable::TYPE_VALUE !== $args[1]->type) {
+        if (!\in_array($args[1]->type, [
+            JITVariable::TYPE_STRING,
+            JITVariable::TYPE_VALUE,
+            JITVariable::TYPE_NATIVE_LONG,
+            JITVariable::TYPE_NATIVE_DOUBLE,
+            JITVariable::TYPE_NATIVE_BOOL,
+        ], true)) {
             throw new \LogicException('property_exists() property name must be a string in this compiler build');
         }
         if (JITVariable::TYPE_NULL === $args[0]->type || ($args[0]->isNullConstant ?? false)) {
