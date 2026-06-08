@@ -205,6 +205,51 @@ final class VmString
         return $count;
     }
 
+    /** Byte width of one UTF-8 codepoint at $bytePos (invalid sequences count as one byte). */
+    private static function utf8CharByteWidth(string $string, int $bytePos): int
+    {
+        $byteLen = self::byteLength($string);
+        if ($bytePos >= $byteLen) {
+            return 0;
+        }
+        $byte = \ord($string[$bytePos]);
+        if ($byte < 0x80) {
+            return 1;
+        }
+        if (($byte & 0xE0) === 0xC0 && $bytePos + 1 < $byteLen) {
+            return 2;
+        }
+        if (($byte & 0xF0) === 0xE0 && $bytePos + 2 < $byteLen) {
+            return 3;
+        }
+        if (($byte & 0xF8) === 0xF0 && $bytePos + 3 < $byteLen) {
+            return 4;
+        }
+
+        return 1;
+    }
+
+    /**
+     * UTF-8 substring measured in codepoints (php-src ext/mbstring mb_get_substr; #7044).
+     */
+    public static function utf8CharSubstr(string $string, int $charOffset, int $charCount): string
+    {
+        if ($charCount <= 0) {
+            return '';
+        }
+        $byteLen = self::byteLength($string);
+        $bytePos = 0;
+        for ($skipped = 0; $skipped < $charOffset && $bytePos < $byteLen; ++$skipped) {
+            $bytePos += self::utf8CharByteWidth($string, $bytePos);
+        }
+        $start = $bytePos;
+        for ($taken = 0; $taken < $charCount && $bytePos < $byteLen; ++$taken) {
+            $bytePos += self::utf8CharByteWidth($string, $bytePos);
+        }
+
+        return self::byteSlice($string, $start, $bytePos - $start);
+    }
+
     public static function byteSlice(string $string, int $offset, ?int $length = null): string
     {
         $len = self::byteLength($string);
@@ -1957,6 +2002,60 @@ final class VmString
         }
 
         return $input.$padding;
+    }
+
+    /**
+     * str_padded() — UTF-8 codepoint padding (php-src ext/mbstring/mbstring.c mb_str_pad; issue #7044).
+     */
+    public static function strPadded(string $input, int $padLength, string $padString = ' ', int $padType = 1): string
+    {
+        $inputLength = self::utf8CharLength($input);
+        if ($padLength <= 0 || $padLength <= $inputLength) {
+            return $input;
+        }
+        if ('' === $padString) {
+            throw new \ValueError('str_padded(): Argument #3 ($pad_string) must be a non-empty string');
+        }
+        $padCharLength = self::utf8CharLength($padString);
+        if (0 === $padCharLength) {
+            throw new \ValueError('str_padded(): Argument #3 ($pad_string) must be a non-empty string');
+        }
+        if ($padType < 0 || $padType > 2) {
+            throw new \ValueError(
+                'str_padded(): Argument #4 ($pad_type) must be STR_PAD_LEFT, STR_PAD_RIGHT, or STR_PAD_BOTH'
+            );
+        }
+
+        $numPadChars = $padLength - $inputLength;
+        if (1 === $padType) {
+            $leftPad = 0;
+            $rightPad = $numPadChars;
+        } elseif (0 === $padType) {
+            $leftPad = $numPadChars;
+            $rightPad = 0;
+        } else {
+            $leftPad = intdiv($numPadChars, 2);
+            $rightPad = $numPadChars - $leftPad;
+        }
+
+        return self::repeatUtf8PadString($padString, $padCharLength, $leftPad)
+            .$input
+            .self::repeatUtf8PadString($padString, $padCharLength, $rightPad);
+    }
+
+    private static function repeatUtf8PadString(string $padString, int $padCharLength, int $charLength): string
+    {
+        if ($charLength <= 0) {
+            return '';
+        }
+        $fullCopies = intdiv($charLength, $padCharLength);
+        $remainder = $charLength % $padCharLength;
+        $result = \str_repeat($padString, $fullCopies);
+        if ($remainder > 0) {
+            $result .= self::utf8CharSubstr($padString, 0, $remainder);
+        }
+
+        return $result;
     }
 
     public static function htmlspecialchars(
