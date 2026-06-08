@@ -25,6 +25,8 @@ final class BuiltinExceptionSupport
     public const CLASS_EXCEPTION = 'exception';
     public const CLASS_LOGIC_EXCEPTION = 'logicexception';
     public const CLASS_DATE_INVALID_TIME_ZONE_EXCEPTION = 'dateinvalidtimezoneexception';
+    public const CLASS_DATE_MALFORMED_INTERVAL_EXCEPTION = 'datemalformedintervalexception';
+    public const CLASS_DATE_MALFORMED_PERIOD_EXCEPTION = 'datemalformedperiodexception';
     public const CLASS_DATE_ERROR = 'dateerror';
     public const CLASS_DATE_OBJECT_ERROR = 'dateobjecterror';
     public const CLASS_DATE_RANGE_ERROR = 'daterangeerror';
@@ -109,6 +111,38 @@ final class BuiltinExceptionSupport
         return self::materializeThrowable(
             $ctx,
             self::CLASS_DATE_INVALID_TIME_ZONE_EXCEPTION,
+            $message,
+            $file,
+            $line
+        );
+    }
+
+    /** php-src ext/date/php_date.c — malformed DateInterval spec (#7129). */
+    public static function materializeDateMalformedIntervalException(
+        Context $ctx,
+        string $message,
+        string $file = '',
+        int $line = 0
+    ): Variable {
+        return self::materializeThrowable(
+            $ctx,
+            self::CLASS_DATE_MALFORMED_INTERVAL_EXCEPTION,
+            $message,
+            $file,
+            $line
+        );
+    }
+
+    /** php-src ext/date/php_date.c — malformed DatePeriod spec (#7129). */
+    public static function materializeDateMalformedPeriodException(
+        Context $ctx,
+        string $message,
+        string $file = '',
+        int $line = 0
+    ): Variable {
+        return self::materializeThrowable(
+            $ctx,
+            self::CLASS_DATE_MALFORMED_PERIOD_EXCEPTION,
             $message,
             $file,
             $line
