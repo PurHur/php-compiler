@@ -11,6 +11,7 @@ namespace PHPCompiler;
 
 require_once __DIR__.'/OpCodeNames.php';
 
+use PHPCompiler\BuiltinByRefParams;
 use PHPCompiler\Compiler\AttributeNames;
 use PHPCompiler\Compiler\NoDiscardMetadata;
 use PHPCompiler\Func;
@@ -8933,17 +8934,53 @@ restart:
                 $packed->addIndex($i, $copy);
             }
 
-            return array_merge($frame->callArgs, [$nameVar, $argsVar]);
+            $args = array_merge($frame->callArgs, [$nameVar, $argsVar]);
+            $this->separateInternalByRefArgsForWrite($frame->call, $args);
+
+            return $args;
         }
 
         [$paramNames, $variadicIndex] = $this->calleeParamMetadata($frame->call);
 
         $userArgs = $this->resolveUserCallArgs($frame, $paramNames, $variadicIndex);
         if ([] === $frame->callArgs) {
+            $this->separateInternalByRefArgsForWrite($frame->call, $userArgs);
+
             return $userArgs;
         }
 
-        return array_merge($frame->callArgs, $userArgs);
+        $args = array_merge($frame->callArgs, $userArgs);
+        $this->separateInternalByRefArgsForWrite($frame->call, $args);
+
+        return $args;
+    }
+
+    /**
+     * COW-separate array zvals passed by reference to internal builtins (Zend zval separation, #6689).
+     *
+     * @param list<Variable> $calledArgs
+     */
+    private function separateInternalByRefArgsForWrite(Func $call, array $calledArgs): void
+    {
+        if (!$call instanceof Func\Internal) {
+            return;
+        }
+        $name = $call->getName();
+        foreach (BuiltinByRefParams::forFunction($name) as $idx) {
+            if (isset($calledArgs[$idx])) {
+                $calledArgs[$idx]->separateArrayForWrite();
+            }
+        }
+        $variadicFrom = BuiltinByRefParams::variadicByRefFromIndex($name);
+        if (null === $variadicFrom) {
+            return;
+        }
+        $n = \count($calledArgs);
+        for ($i = $variadicFrom; $i < $n; ++$i) {
+            if (isset($calledArgs[$i])) {
+                $calledArgs[$i]->separateArrayForWrite();
+            }
+        }
     }
 
     /**
