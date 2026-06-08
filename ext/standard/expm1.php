@@ -33,8 +33,7 @@ final class expm1 extends Internal
         if (1 !== \count($args)) {
             throw new \LogicException('expm1() requires exactly one argument');
         }
-        $double = $context->getTypeFromString('double');
-        $asFloat = pow::toJitDouble($context, $args[0], $double);
+        $asFloat = JitFdiv::lowerSingleOperand($context, $args[0], 1, 'num', 'expm1', 'float');
 
         return $context->builder->call($context->lookupFunction('expm1'), $asFloat);
     }

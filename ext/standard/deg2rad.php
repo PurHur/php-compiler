@@ -14,7 +14,6 @@ namespace PHPCompiler\ext\standard;
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Context;
-use PHPCompiler\JIT\JitLongArg;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Value;
 
@@ -51,7 +50,7 @@ final class deg2rad extends Internal
             throw new \LogicException('deg2rad() requires exactly one argument');
         }
         $double = $context->getTypeFromString('double');
-        $asFloat = pow::toJitDouble($context, $args[0], $double);
+        $asFloat = JitFdiv::lowerSingleOperand($context, $args[0], 1, 'num', 'deg2rad', 'float');
         $factor = $double->constReal(self::FACTOR);
 
         return $context->builder->fMul($asFloat, $factor);
