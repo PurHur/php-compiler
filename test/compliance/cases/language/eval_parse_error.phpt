@@ -1,8 +1,12 @@
 --TEST--
-language eval() parse error returns false (VM, issue #3358)
+language eval() parse error throws ParseError (VM, issue #4410)
 --FILE--
 <?php
-$bad = eval('syntax error;');
-echo $bad === false ? "false\n" : "not-false\n";
+try {
+    eval('syntax error;');
+    echo "no-exception\n";
+} catch (ParseError $e) {
+    echo "ParseError\n";
+}
 --EXPECT--
-false
+ParseError
