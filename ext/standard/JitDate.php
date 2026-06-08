@@ -57,6 +57,22 @@ final class JitDate
         return self::libcUidToI64($context, 'getgid');
     }
 
+    /** timezone_version_get() — tzdata version baked at JIT link from host bridge (#6832). */
+    public static function timezone_version_get(Context $context): Value
+    {
+        $version = VmDate::timezone_version_get();
+        $slot = JitValueBox::alloc($context);
+        $ptr = JitValueBox::pointer($context, $slot);
+        $owned = $context->builder->load($context->constantStringFromString($version));
+        $context->builder->call(
+            $context->lookupFunction('__value__writeString'),
+            $ptr,
+            $owned
+        );
+
+        return $ptr;
+    }
+
     private static function libcUidToI64(Context $context, string $fn): Value
     {
         $i64 = $context->getTypeFromString('int64');

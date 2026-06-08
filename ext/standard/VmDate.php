@@ -54,6 +54,20 @@ final class VmDate
     }
 
     /**
+     * timezone_version_get() — Olson/tzdata version bundled with PHP (ext/date/php_date.c, #6832).
+     *
+     * Host bridge: delegate to Zend date extension when the compiler runs under PHP.
+     */
+    public static function timezone_version_get(): string
+    {
+        if (\function_exists('timezone_version_get')) {
+            return (string) \timezone_version_get();
+        }
+
+        return '0.system';
+    }
+
+    /**
      * getmyinode() — inode of the executed script (ext/standard/basic_functions.c, #3611).
      *
      * @return int|false

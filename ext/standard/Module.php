@@ -613,6 +613,7 @@ class Module extends ModuleAbstract
             new extension_loaded(),
             new get_loaded_extensions(),
             new date(),
+            new timezone_version_get(),
             new gmdate(),
             new getdate(),
             new gmgetdate(),
