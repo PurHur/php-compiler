@@ -26,6 +26,26 @@ PHP;
         $this->assertSame("B\nB\n0", ob_get_clean());
     }
 
+    public function testVmGetParentClassExtraArgsArgumentCountError(): void
+    {
+        $code = <<<'PHP'
+<?php
+try {
+    get_parent_class('stdClass', true);
+} catch (ArgumentCountError $e) {
+    echo get_class($e), ': ', $e->getMessage();
+}
+PHP;
+        $rt = new Runtime();
+        $block = $rt->parseAndCompile($code, 'get_parent_class_argc.php');
+        ob_start();
+        $rt->run($block);
+        $this->assertSame(
+            'ArgumentCountError: get_parent_class() expects at most 1 argument, 2 given',
+            ob_get_clean()
+        );
+    }
+
     public function testVmGetParentClassEnumCaseReturnsFalse(): void
     {
         $code = <<<'PHP'
