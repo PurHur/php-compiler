@@ -15,8 +15,6 @@ final class VmHash
     /** Digest algorithms supported by VmHashNative / StringHashCryptoJit (issue #6229, #6937). */
     private const HASH_ALGOS = ['md5', 'sha1', 'sha256'];
 
-    /** HMAC-capable algorithms supported by VmHashNative / StringHashCryptoJit (issue #6229). */
-    private const HMAC_ALGOS = ['md5', 'sha1', 'sha256'];
     public static function hash(string $algo, string $data, bool $raw = false): string|false
     {
         return VmHashNative::hash($algo, $data, $raw);
@@ -54,11 +52,11 @@ final class VmHash
         return $ht;
     }
 
-    /** hash_hmac_algos() — HMAC-capable digest names (ext/hash/hash.c, issue #6229). */
+    /** hash_hmac_algos() — HMAC-capable digest names (ext/hash/hash.c, issues #6229, #6365). */
     public static function hmacAlgos(): HashTable
     {
         $ht = new HashTable();
-        foreach (self::HMAC_ALGOS as $algo) {
+        foreach (HashAlgosRegistry::HMAC_ALGOS as $algo) {
             $var = new Variable();
             $var->string($algo);
             $ht->append($var);

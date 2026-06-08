@@ -1,14 +1,16 @@
 --TEST--
-AOT hash_hmac_algos() — sha256 algorithm listed (#6229)
+AOT hash_hmac_algos() — full HMAC algorithm list (#6229, #6365)
 --FILE--
 <?php
 $algos = hash_hmac_algos();
 echo is_array($algos) ? "array\n" : "not_array\n";
 echo array_is_list($algos) ? "list\n" : "assoc\n";
 echo in_array('sha256', $algos, true) ? "has_sha256\n" : "no_sha256\n";
-echo count($algos) === 3 ? "three_algos\n" : "wrong_count\n";
+echo in_array('sha512', $algos, true) ? "has_sha512\n" : "no_sha512\n";
+echo count($algos) === 44 ? "forty_four_algos\n" : "wrong_count\n";
 --EXPECT--
 array
 list
 has_sha256
-three_algos
+has_sha512
+forty_four_algos

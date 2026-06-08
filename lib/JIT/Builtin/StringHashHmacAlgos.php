@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace PHPCompiler\JIT\Builtin;
 
+use PHPCompiler\ext\standard\HashAlgosRegistry;
 use PHPCompiler\JIT\Context;
 use PHPLLVM\Builder;
 use PHPLLVM\Value\Function_ as LlvmFunction;
@@ -16,9 +17,6 @@ use PHPLLVM\Value\Function_ as LlvmFunction;
  */
 final class StringHashHmacAlgos
 {
-    /** @var list<string> */
-    private const HMAC_ALGOS = ['md5', 'sha1', 'sha256'];
-
     public static function ensureLinked(Context $context): void
     {
         self::implement($context);
@@ -63,7 +61,7 @@ final class StringHashHmacAlgos
 
         $context->builder->positionAtEnd($buildBb);
         $setAt = $context->lookupFunction('__hashtable__setStringAt');
-        foreach (self::HMAC_ALGOS as $index => $algo) {
+        foreach (HashAlgosRegistry::HMAC_ALGOS as $index => $algo) {
             $context->builder->call(
                 $setAt,
                 $ht,
