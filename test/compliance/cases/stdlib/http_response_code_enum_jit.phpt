@@ -1,9 +1,9 @@
 --TEST--
-stdlib http_response_code() JIT (get/set; previous code on success)
+stdlib http_response_code() JIT with ResponseCode enum (#7322)
 --FILE--
 <?php
 echo http_response_code() ? 'true' : 'false', "\n";
-echo http_response_code(404) ? 'true' : 'false', "\n";
+echo http_response_code(ResponseCode::NotFound) ? 'true' : 'false', "\n";
 echo http_response_code()->value, "\n";
 --EXPECT--
 false

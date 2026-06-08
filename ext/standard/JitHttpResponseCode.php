@@ -9,6 +9,7 @@ declare(strict_types=1);
 namespace PHPCompiler\ext\standard;
 
 use PHPCompiler\JIT\Builtin\HttpResponseCode as Hrc;
+use PHPCompiler\JIT\Builtin\HttpResponseCodeJit;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\Variable as JITVariable;
@@ -44,6 +45,18 @@ final class JitHttpResponseCode
         }
 
         $arg = $args[0];
+        $compileTimeCode = HttpResponseCodeJit::compileTimeCodeLong($context, $arg);
+        if (null !== $compileTimeCode) {
+            $context->builder->call(
+                $context->lookupFunction('__phpc_http_response_code_apply'),
+                $i8->constInt(Hrc::APPLY_SET_LONG, false),
+                $i64->constInt($compileTimeCode, false),
+                $nullBoxed,
+                $ptr
+            );
+
+            return $ptr;
+        }
         if (JITVariable::TYPE_NATIVE_LONG === $arg->type) {
             $context->builder->call(
                 $context->lookupFunction('__phpc_http_response_code_apply'),
