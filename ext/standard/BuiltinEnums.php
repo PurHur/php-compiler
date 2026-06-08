@@ -22,6 +22,7 @@ final class BuiltinEnums
         self::registerExitStatus($ctx);
         self::registerStringTrimMode($ctx);
         self::registerPadType($ctx);
+        self::registerMemoryUsage($ctx);
         foreach (array_diff(array_keys($ctx->classes), $before) as $lc) {
             $ctx->classes[$lc]->isInternal = true;
         }
@@ -129,6 +130,32 @@ final class BuiltinEnums
         EnumSupport::ensureBuiltinEnumInterfaces($entry);
 
         $lc = 'padtype';
+        $ctx->classes[$lc] = $entry;
+        $ctx->enums[$lc] = true;
+    }
+
+    /**
+     * PHP 8.4 MemoryUsage: int-backed enum for memory_get_usage()/memory_get_peak_usage() (#7247).
+     *
+     * php-src: ext/standard/basic_functions.stub.php — enum MemoryUsage: int
+     */
+    private static function registerMemoryUsage(Context $ctx): void
+    {
+        if (isset($ctx->classes['memoryusage'])) {
+            return;
+        }
+
+        $entry = new ClassEntry('MemoryUsage');
+        $entry->isEnum = true;
+        $entry->backedType = 'int';
+
+        self::registerBackedEnumCase($entry, 'Default', 0);
+        self::registerBackedEnumCase($entry, 'RealUsage', 1);
+
+        EnumSupport::ensureBuiltinCasesMethod($entry);
+        EnumSupport::ensureBuiltinEnumInterfaces($entry);
+
+        $lc = 'memoryusage';
         $ctx->classes[$lc] = $entry;
         $ctx->enums[$lc] = true;
     }

@@ -6,7 +6,7 @@ namespace PHPCompiler\ext\standard;
 
 use PHPCompiler\JIT\Builtin\MemoryRuntime;
 use PHPCompiler\JIT\Context;
-use PHPCompiler\JIT\JitBoolArg;
+use PHPCompiler\JIT\JitMemoryUsageArg;
 use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Builder;
@@ -17,7 +17,7 @@ final class JitMemory
 {
     public static function getUsage(Context $context, ?JITVariable $realUsage = null): Value
     {
-        $real = self::resolveRealUsage($context, $realUsage);
+        $real = self::resolveRealUsage($context, $realUsage, 'memory_get_usage');
         $usage = self::readUsage($context, $real);
         self::updatePeak($context, $real, $usage);
 
@@ -26,7 +26,7 @@ final class JitMemory
 
     public static function getPeakUsage(Context $context, ?JITVariable $realUsage = null): Value
     {
-        $real = self::resolveRealUsage($context, $realUsage);
+        $real = self::resolveRealUsage($context, $realUsage, 'memory_get_peak_usage');
         $usage = self::readUsage($context, $real);
         self::updatePeak($context, $real, $usage);
         $peak = self::loadPeak($context, $real);
@@ -45,13 +45,9 @@ final class JitMemory
         return $context->getTypeFromString('int32')->constInt(0, false);
     }
 
-    private static function resolveRealUsage(Context $context, ?JITVariable $realUsage): Value
+    private static function resolveRealUsage(Context $context, ?JITVariable $realUsage, string $fn): Value
     {
-        if (null === $realUsage) {
-            return $context->constantFromBool(false);
-        }
-
-        return JitBoolArg::lower($context, $realUsage, 'memory_get_*() real_usage');
+        return JitMemoryUsageArg::lower($context, $realUsage, $fn);
     }
 
     private static function readUsage(Context $context, Value $realUsage): Value
