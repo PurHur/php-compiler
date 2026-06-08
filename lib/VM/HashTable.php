@@ -744,6 +744,25 @@ final class HashTable {
     }
 
     /**
+     * Keys whose values match $searchValue (ext/standard/array.c php_array_keys, #4266).
+     */
+    public function keysMatchingCopy(Variable $searchValue, bool $strict): HashTable
+    {
+        $out = new self();
+        $searchValue = $searchValue->resolveIndirect();
+        foreach ($this->iterateKeyed(true) as [$key, $value]) {
+            $stored = $value->resolveIndirect();
+            if ($strict ? $searchValue->identicalTo($stored) : $searchValue->equals($stored)) {
+                $keyCopy = new Variable();
+                $keyCopy->copyFrom($key);
+                $out->append($keyCopy);
+            }
+        }
+
+        return $out;
+    }
+
+    /**
      * Append values from packed list arrays into a copy of this array.
      *
      * @param HashTable ...$others
