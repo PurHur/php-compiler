@@ -6,6 +6,7 @@ namespace PHPCompiler\ext\posix;
 
 use PHPCompiler\VM\EnumCaseSupport;
 use PHPCompiler\ext\standard\VmDate;
+use PHPCompiler\ext\standard\VmGetcwdNative;
 use PHPCompiler\VM\Variable;
 
 /**
@@ -181,6 +182,52 @@ final class VmPosix
         return $var->resolveIndirect()->toInt();
     }
 
+    /**
+     * @return string|false
+     */
+    public static function getcwd(): string|false
+    {
+        if (\function_exists('posix_getcwd')) {
+            $cwd = \posix_getcwd();
+            if (false === $cwd) {
+                self::captureHostPosixErrno();
+
+                return false;
+            }
+
+            return (string) $cwd;
+        }
+
+        $cwd = VmGetcwdNative::resolve();
+        if (false === $cwd) {
+            $ffi = self::ffi();
+            if (null !== $ffi) {
+                self::$lastError = self::readErrno($ffi);
+            }
+
+            return false;
+        }
+
+        return $cwd;
+    }
+
+    public static function ctermid(): string
+    {
+        if (\function_exists('posix_ctermid')) {
+            return (string) \posix_ctermid();
+        }
+        $ffi = self::ffi();
+        if (null === $ffi) {
+            return '';
+        }
+        $ptr = $ffi->ctermid(null);
+        if (null === $ptr) {
+            return '';
+        }
+
+        return \FFI::string($ptr);
+    }
+
     public static function getLastError(): int
     {
         return self::$lastError;
@@ -271,6 +318,7 @@ int setgid(gid_t gid);
 int seteuid(uid_t uid);
 int setegid(gid_t gid);
 int *__errno_location(void);
+char *ctermid(char *s);
 CDEF;
 
         foreach (['libc.so.6', 'libc.so'] as $lib) {

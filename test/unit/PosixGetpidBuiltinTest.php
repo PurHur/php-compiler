@@ -4,8 +4,10 @@ declare(strict_types=1);
 
 namespace PHPCompiler;
 
+use PHPCompiler\ext\posix\posix_ctermid;
 use PHPCompiler\ext\posix\posix_errno;
 use PHPCompiler\ext\posix\posix_get_last_error;
+use PHPCompiler\ext\posix\posix_getcwd;
 use PHPCompiler\ext\posix\posix_getpid;
 use PHPCompiler\ext\posix\posix_getppid;
 use PHPCompiler\ext\posix\posix_strerror;
@@ -67,5 +69,30 @@ final class PosixGetpidBuiltinTest extends TestCase
         $frame->returnVar = new VMVariable();
         $fn->execute($frame);
         $this->assertSame(0, $frame->returnVar->resolveIndirect()->toInt());
+    }
+
+    public function test_posix_getcwd_returns_non_empty_string(): void
+    {
+        $runtime = new Runtime();
+        $fn = new posix_getcwd();
+        $frame = $fn->getFrame($runtime->vmContext);
+        $frame->returnVar = new VMVariable();
+        $fn->execute($frame);
+        $cwd = $frame->returnVar->resolveIndirect()->toString();
+        $this->assertNotSame('', $cwd);
+        $this->assertTrue(\is_dir($cwd));
+    }
+
+    public function test_posix_ctermid_returns_string(): void
+    {
+        $runtime = new Runtime();
+        $fn = new posix_ctermid();
+        $frame = $fn->getFrame($runtime->vmContext);
+        $frame->returnVar = new VMVariable();
+        $fn->execute($frame);
+        $this->assertSame(
+            VMVariable::TYPE_STRING,
+            $frame->returnVar->resolveIndirect()->type
+        );
     }
 }
