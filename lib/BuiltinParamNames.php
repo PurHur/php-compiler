@@ -77,6 +77,14 @@ final class BuiltinParamNames
                 return ['status', 'message'];
             case 'http_build_query':
                 return ['data', 'numeric_prefix', 'arg_separator', 'encoding_type'];
+            case 'json_decode':
+                return ['json', 'associative', 'depth', 'flags'];
+            case 'str_contains':
+                return ['haystack', 'needle'];
+            case 'preg_match':
+                return ['pattern', 'subject', 'matches', 'flags', 'offset'];
+            case 'fopen':
+                return ['filename', 'mode', 'use_include_path', 'context'];
         }
 
         return null;
