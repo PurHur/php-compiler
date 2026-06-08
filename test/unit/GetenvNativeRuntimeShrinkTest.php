@@ -1,0 +1,43 @@
+<?php
+
+declare(strict_types=1);
+
+namespace PHPCompiler;
+
+use PHPUnit\Framework\TestCase;
+
+/** getenv() zero-arg native enumeration — no phpc_env_local.c / host PHP loops (#5079, #5345). */
+final class GetenvNativeRuntimeShrinkTest extends TestCase
+{
+    private string $repoRoot;
+
+    protected function setUp(): void
+    {
+        $this->repoRoot = dirname(__DIR__, 2);
+    }
+
+    public function testEnvLocalCRuntimeRemovedFromLinker(): void
+    {
+        $linker = file_get_contents($this->repoRoot.'/lib/AOT/Linker.php');
+        $this->assertIsString($linker);
+        $this->assertStringNotContainsString('phpc_env_local.c', $linker);
+        $this->assertFileDoesNotExist($this->repoRoot.'/lib/AOT/runtime/phpc_env_local.c');
+    }
+
+    public function testVmEnvUsesNativeEnvironEnumeration(): void
+    {
+        $vmEnv = file_get_contents($this->repoRoot.'/ext/standard/VmEnv.php');
+        $this->assertIsString($vmEnv);
+        $this->assertStringContainsString('VmEnvEnvironNative::enumerate()', $vmEnv);
+        $this->assertMatchesRegularExpression(
+            '/private static function getAllEnvironmentMap\(\): array\s*\{[^}]*VmEnvEnvironNative::enumerate\(\)/s',
+            $vmEnv
+        );
+    }
+
+    public function testBootstrapReproAndCompliancePresent(): void
+    {
+        $this->assertFileExists($this->repoRoot.'/test/repro-maintainer/bootstrap_getenv_all_native.php');
+        $this->assertFileExists($this->repoRoot.'/test/compliance/cases/bootstrap/getenv_all_native.phpt');
+    }
+}
