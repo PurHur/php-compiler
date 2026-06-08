@@ -9,6 +9,7 @@ use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitStringArg;
 use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\Variable as JITVariable;
+use PHPLLVM\BasicBlock;
 use PHPLLVM\Builder;
 use PHPLLVM\Value;
 
@@ -143,6 +144,22 @@ final class JitSettype
         $context->builder->branch($done);
 
         $context->builder->positionAtEnd($afterBool);
+        $objectBb = BasicBlockHelper::append($context, 'settype_'.$tag.'_obj');
+        $afterObj = BasicBlockHelper::append($context, 'settype_'.$tag.'_after_obj');
+        $context->builder->branchIf(
+            $context->builder->icmp(
+                Builder::INT_EQ,
+                $typeByte,
+                $i8->constInt(JITVariable::TYPE_OBJECT, false)
+            ),
+            $objectBb,
+            $afterObj
+        );
+
+        $context->builder->positionAtEnd($objectBb);
+        $objPtr = $context->builder->call($context->lookupFunction('__value__readObject'), $ptr);
+        self::emitTargetFromEnumObject($context, $ptr, $objPtr, $target, $done, $afterObj);
+        $context->builder->positionAtEnd($afterObj);
         $context->builder->branchIf(
             $context->builder->icmp(
                 Builder::INT_EQ,
@@ -476,5 +493,96 @@ final class JitSettype
             $context->getTypeFromString('int64')->constInt(1, false),
             JitValueBox::pointer($context, $slot)
         );
+    }
+
+    /**
+     * Zend settype() on enum case objects (#5643, ext/standard/type.c).
+     */
+    private static function emitTargetFromEnumObject(
+        Context $context,
+        Value $dest,
+        Value $objPtr,
+        string $target,
+        BasicBlock $done,
+        BasicBlock $nonEnumTarget
+    ): void {
+        $afterEnum = BasicBlockHelper::append($context, 'settype_enum_non_'.(string) spl_object_id($context));
+
+        if ('object' === $target) {
+            $matched = JitScalarEnumCoerce::tryEmitObjectEnumCaseLegacyCastToLong(
+                $context,
+                $objPtr,
+                'settype',
+                $afterEnum
+            );
+            if (null !== $matched) {
+                $context->builder->branch($done);
+
+                return;
+            }
+            $context->builder->positionAtEnd($afterEnum);
+            $context->builder->branch($nonEnumTarget);
+
+            return;
+        }
+
+        if ('boolean' === $target) {
+            $matched = JitScalarEnumCoerce::tryEmitObjectEnumCaseLegacyCastToLong(
+                $context,
+                $objPtr,
+                'settype',
+                $afterEnum
+            );
+            if (null !== $matched) {
+                self::writeBoolLong($context, $dest, $context->constantFromBool(true));
+                $context->builder->branch($done);
+
+                return;
+            }
+            $context->builder->positionAtEnd($afterEnum);
+            $context->builder->branch($nonEnumTarget);
+
+            return;
+        }
+
+        if ('integer' === $target) {
+            $matched = JitScalarEnumCoerce::tryEmitObjectEnumCaseLegacyCastToLong(
+                $context,
+                $objPtr,
+                'settype',
+                $afterEnum
+            );
+            if (null !== $matched) {
+                $context->builder->call($context->lookupFunction('__value__writeLong'), $dest, $matched);
+                $context->builder->branch($done);
+
+                return;
+            }
+            $context->builder->positionAtEnd($afterEnum);
+            $context->builder->branch($nonEnumTarget);
+
+            return;
+        }
+
+        if ('double' === $target) {
+            $matched = JitScalarEnumCoerce::tryEmitObjectEnumCaseLegacyCastToDouble(
+                $context,
+                $objPtr,
+                'settype',
+                $afterEnum
+            );
+            if (null !== $matched) {
+                $context->builder->call($context->lookupFunction('__value__writeDouble'), $dest, $matched);
+                $context->builder->branch($done);
+
+                return;
+            }
+            $context->builder->positionAtEnd($afterEnum);
+            $context->builder->branch($nonEnumTarget);
+
+            return;
+        }
+
+        $context->builder->branch($nonEnumTarget);
     }
 }

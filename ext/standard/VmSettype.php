@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace PHPCompiler\ext\standard;
 
+use PHPCompiler\Frame;
 use PHPCompiler\VM\HashTable;
 use PHPCompiler\VM\Variable;
 
@@ -12,7 +13,7 @@ use PHPCompiler\VM\Variable;
  */
 final class VmSettype
 {
-    public static function apply(Variable $slot, string $typeName): void
+    public static function apply(Variable $slot, string $typeName, ?Frame $frame = null): void
     {
         $type = strtolower($typeName);
         $value = $slot->resolveIndirect();
@@ -21,26 +22,35 @@ final class VmSettype
         switch ($type) {
             case 'integer':
             case 'int':
-                self::toInteger($result, $value);
+                self::toInteger($result, $value, $frame);
                 break;
             case 'double':
             case 'float':
-                self::toFloat($result, $value);
+                self::toFloat($result, $value, $frame);
                 break;
             case 'string':
                 self::toString($result, $value);
                 break;
             case 'bool':
             case 'boolean':
-                $result->bool(boolval::isTruthy($value));
+                if (VmScalarType::isEnumCaseVariable($value)) {
+                    $result->bool(true);
+                } else {
+                    $result->bool(boolval::isTruthy($value));
+                }
                 break;
             case 'array':
-                $result->array(self::toArray($value));
+                $enumArray = VmScalarType::enumCaseToSettypeArray($value);
+                $result->array(null !== $enumArray ? $enumArray : self::toArray($value));
                 break;
             case 'null':
                 $result->null();
                 break;
             case 'object':
+                if (VmScalarType::isEnumCaseVariable($value)) {
+                    $result->copyFrom($value);
+                    break;
+                }
                 throw new \LogicException('settype() to object is not supported in this compiler build');
             case 'resource':
                 throw new \ValueError('Cannot convert to resource type');
@@ -51,7 +61,7 @@ final class VmSettype
         $slot->copyFrom($result);
     }
 
-    private static function toInteger(Variable $result, Variable $value): void
+    private static function toInteger(Variable $result, Variable $value, ?Frame $frame): void
     {
         $v = $value->resolveIndirect();
         if (Variable::TYPE_INTEGER === $v->type) {
@@ -84,10 +94,16 @@ final class VmSettype
 
             return;
         }
+        $enumInt = VmScalarType::tryEnumCaseToInt($frame, $v);
+        if (null !== $enumInt) {
+            $result->int($enumInt);
+
+            return;
+        }
         throw new \LogicException('settype() to integer does not support this value type in this compiler build');
     }
 
-    private static function toFloat(Variable $result, Variable $value): void
+    private static function toFloat(Variable $result, Variable $value, ?Frame $frame): void
     {
         $v = $value->resolveIndirect();
         if (Variable::TYPE_FLOAT === $v->type) {
@@ -117,6 +133,12 @@ final class VmSettype
         }
         if (Variable::TYPE_ARRAY === $v->type) {
             $result->float($v->toArray()->getNumElements() > 0 ? 1.0 : 0.0);
+
+            return;
+        }
+        $enumFloat = VmScalarType::tryEnumCaseToFloat($frame, $v);
+        if (null !== $enumFloat) {
+            $result->float($enumFloat);
 
             return;
         }

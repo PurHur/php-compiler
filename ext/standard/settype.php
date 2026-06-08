@@ -40,7 +40,7 @@ final class settype extends Internal
         if (Variable::TYPE_STRING !== $typeVar->type) {
             throw new \TypeError('settype(): Argument #2 ($type) must be of type string');
         }
-        VmSettype::apply($slot, $typeVar->toString());
+        VmSettype::apply($slot, $typeVar->toString(), $frame);
         if (null !== $frame->returnVar) {
             $frame->returnVar->bool(true);
         }
