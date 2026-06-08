@@ -22,7 +22,7 @@ extern __string__ *__string__init(long long size, const char *value);
 
 FILE *phpc_stream_handles[PHPC_MAX_STREAM_HANDLES];
 /** Set when a handle id is allocated; kept after fclose for get_resource_type() (#5179). */
-static char phpc_stream_was_used[PHPC_MAX_STREAM_HANDLES];
+char phpc_stream_was_used[PHPC_MAX_STREAM_HANDLES];
 static int phpc_stream_chunk_size[PHPC_MAX_STREAM_HANDLES];
 static int phpc_stream_write_buffer[PHPC_MAX_STREAM_HANDLES];
 static int phpc_stream_read_buffer[PHPC_MAX_STREAM_HANDLES];
@@ -725,47 +725,4 @@ __string__ *__compiler_stream_get_contents(int64_t handle, int64_t maxlength, in
     return phpc_read_stream_bytes(fp, maxlength);
 }
 
-__string__ *__compiler_get_resource_type(int64_t handle)
-{
-    if (0 != __compiler_is_resource(handle)) {
-        return __string__init(6, "stream");
-    }
-    if (handle >= 3 && handle < PHPC_MAX_STREAM_HANDLES && phpc_stream_was_used[handle]) {
-        return __string__init(7, "Unknown");
-    }
-
-    return NULL;
-}
-
-extern void __hashtable__setLongAt(__hashtable__ *ht, size_t index, long long val);
-
-/*
- * get_resources() — active fopen/tmpfile handles (php-src basic_functions.c, #3646).
- * type_filter NULL: all streams; "stream": same; any other string is invalid (caller validates).
- */
-__hashtable__ *__compiler_get_resources(__string__ *type_filter)
-{
-    __hashtable__ *ht;
-    size_t index = 1;
-    int64_t id;
-
-    if (NULL != type_filter) {
-        size_t len = phpc_string_len(type_filter);
-        const char *data = phpc_string_data(type_filter);
-        if (len != 6 || 0 != memcmp(data, "stream", 6)) {
-            return NULL;
-        }
-    }
-
-    ht = __hashtable__alloc();
-    if (NULL == ht) {
-        return NULL;
-    }
-    for (id = 3; id < PHPC_MAX_STREAM_HANDLES; id++) {
-        if (NULL != phpc_stream_handles[id]) {
-            __hashtable__setLongAt(ht, index++, (long long) id);
-        }
-    }
-
-    return ht;
-}
+/* get_resource_type/get_resources helpers: LLVM StreamResourceJit.php (#6821). */
