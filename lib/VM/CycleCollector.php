@@ -55,6 +55,7 @@ final class CycleCollector
             if (isset($marked[$object->id])) {
                 continue;
             }
+            ObjectLifetime::invokeDestructorBeforeGcRelease($object);
             ObjectRegistry::release($object);
             ++$collected;
         }

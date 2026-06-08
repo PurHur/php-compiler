@@ -87,6 +87,15 @@ final class ObjectLifetime
      *
      * @see https://github.com/php/php-src/blob/master/Zend/zend_objects.c zend_objects_destroy_object
      */
+    /** Invoke __destruct before gc_collect_cycles() frees an unreachable object (#6519, zend_gc.c). */
+    public static function invokeDestructorBeforeGcRelease(ObjectEntry $object): void
+    {
+        $vm = self::$vm;
+        if (null !== $vm && !$object->destructorInvoked) {
+            $vm->invokeUserDestructor($object);
+        }
+    }
+
     public static function invokeUnsetDestructor(VM $vm, Variable $var): void
     {
         $var = $var->resolveIndirect();
