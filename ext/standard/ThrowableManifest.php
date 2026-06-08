@@ -51,6 +51,10 @@ final class ThrowableManifest
 
     public const LC_DATE_INVALID_TIME_ZONE_EXCEPTION = 'dateinvalidtimezoneexception';
 
+    public const LC_DATE_MALFORMED_INTERVAL_EXCEPTION = 'datemalformedintervalexception';
+
+    public const LC_DATE_MALFORMED_PERIOD_EXCEPTION = 'datemalformedperiodexception';
+
     public const LC_DATE_ERROR = 'dateerror';
 
     public const LC_DATE_OBJECT_ERROR = 'dateobjecterror';
@@ -106,6 +110,8 @@ final class ThrowableManifest
         'ClosedGeneratorException' => 'Exception',
         'DateException' => 'Exception',
         'DateInvalidTimeZoneException' => 'DateException',
+        'DateMalformedIntervalException' => 'DateException',
+        'DateMalformedPeriodException' => 'DateException',
         'Error' => null,
         'DateError' => 'Error',
         'DateObjectError' => 'DateError',
