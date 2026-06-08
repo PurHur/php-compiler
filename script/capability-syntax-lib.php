@@ -886,7 +886,7 @@ PROBE,
             'jit' => false,
             'aot' => false,
             'notes' => [
-                'VM builtins: DateTime::__construct/format/getTimestamp/setTimezone; DateTimeZone::__construct',
+                'VM builtins: DateTime::__construct/format/getTimestamp/setTimezone; DateTimeZone::__construct/getName/getOffset/getLocation',
                 'Host PHP date extension for parsing/formatting; UTC and named timezone subset (php-src ext/date/php_datetime.c)',
                 'JIT/AOT method bodies VM-only in phase 1',
             ],
