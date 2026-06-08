@@ -2298,7 +2298,7 @@ final class VmString
     public static function explode(string $delimiter, string $string, int $limit = \PHP_INT_MAX): array
     {
         if ('' === $delimiter) {
-            throw new \LogicException('explode(): Argument #1 ($separator) cannot be empty');
+            throw new \ValueError('explode(): Argument #1 ($separator) cannot be empty');
         }
         if ('' === $string) {
             if ($limit >= 0) {
@@ -3301,7 +3301,11 @@ final class VmString
     public static function strpos(string $haystack, string $needle, int $offset = 0)
     {
         if ('' === $needle) {
-            throw new \LogicException('strpos(): Argument #2 ($needle) cannot be empty');
+            return self::normalizeContainedStringOffset(
+                self::byteLength($haystack),
+                $offset,
+                'strpos'
+            );
         }
         $offset = self::normalizeContainedStringOffset(
             self::byteLength($haystack),
@@ -3319,7 +3323,7 @@ final class VmString
     public static function strstr(string $haystack, string $needle, bool $beforeNeedle = false)
     {
         if ('' === $needle) {
-            throw new \LogicException('strstr(): Argument #2 ($needle) cannot be empty');
+            return $beforeNeedle ? '' : $haystack;
         }
         $pos = self::findSubstring($haystack, $needle, 0);
         if (false === $pos) {
@@ -3338,7 +3342,7 @@ final class VmString
     public static function strrchr(string $haystack, string $needle)
     {
         if ('' === $needle) {
-            throw new \LogicException('strrchr(): Argument #2 ($needle) cannot be empty');
+            return false;
         }
         $pos = self::strrpos($haystack, $needle[0], 0);
         if (false === $pos) {
@@ -3354,7 +3358,7 @@ final class VmString
     public static function stristr(string $haystack, string $needle, bool $beforeNeedle = false)
     {
         if ('' === $needle) {
-            throw new \LogicException('stristr(): Argument #2 ($needle) cannot be empty');
+            return $beforeNeedle ? '' : $haystack;
         }
         $pos = self::findSubstringCaseInsensitive($haystack, $needle, 0);
         if (false === $pos) {
@@ -3472,7 +3476,7 @@ final class VmString
         ?int $length = null
     ): int {
         if ('' === $needle) {
-            throw new \LogicException('substr_count(): Argument #2 ($needle) cannot be empty');
+            throw new \ValueError('substr_count(): Argument #2 ($needle) cannot be empty');
         }
         $hayLen = self::byteLength($haystack);
         $needleLen = self::byteLength($needle);
@@ -3559,7 +3563,11 @@ final class VmString
     public static function stripos(string $haystack, string $needle, int $offset = 0)
     {
         if ('' === $needle) {
-            throw new \LogicException('stripos(): Argument #2 ($needle) cannot be empty');
+            return self::normalizeContainedStringOffset(
+                self::byteLength($haystack),
+                $offset,
+                'stripos'
+            );
         }
         $offset = self::normalizeContainedStringOffset(
             self::byteLength($haystack),
@@ -3576,9 +3584,6 @@ final class VmString
      */
     public static function strrpos(string $haystack, string $needle, int $offset = 0)
     {
-        if ('' === $needle) {
-            throw new \ValueError('strrpos(): Argument #2 ($needle) must not be empty');
-        }
         $hayLen = self::byteLength($haystack);
         $minStart = 0;
         $maxStart = null;
@@ -3592,6 +3597,9 @@ final class VmString
             $maxStart = $suffixEnd;
         } else {
             $minStart = $offset;
+        }
+        if ('' === $needle) {
+            return null !== $maxStart ? $maxStart : $hayLen;
         }
         $pos = self::findRSubstring($haystack, $needle, $minStart, $maxStart);
 

@@ -13,7 +13,10 @@ namespace PHPCompiler\ext\standard;
 
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
+use PHPCompiler\JIT\BasicBlockHelper;
+use PHPCompiler\JIT\Builtin\TypeErrorRaise;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\HashTableHelper;
 use PHPCompiler\JIT\JitLongArg;
 use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\Variable as JITVariable;
@@ -64,7 +67,17 @@ final class explode extends Internal
             throw new \LogicException('explode() expects 2 or 3 arguments in this compiler build');
         }
         if ('' === ($args[0]->compileTimeString ?? null)) {
-            throw new \LogicException('explode(): Argument #1 ($separator) cannot be empty');
+            TypeErrorRaise::registerDeclarations($context);
+            TypeErrorRaise::ensureLinked($context);
+            $err = BasicBlockHelper::append($context, 'explode_empty_sep_err');
+            $after = BasicBlockHelper::append($context, 'explode_empty_sep_after');
+            $context->builder->branch($err);
+            $context->builder->positionAtEnd($err);
+            TypeErrorRaise::emitValueError($context, 'explode(): Argument #1 ($separator) cannot be empty');
+            $context->builder->call($context->lookupFunction('abort'));
+            $context->builder->positionAtEnd($after);
+
+            return HashTableHelper::alloc($context);
         }
         $delimiter = JitStringBuiltinArg::lower($context, $args[0], 'explode', 0, 'separator');
         $haystack = JitStringBuiltinArg::lower($context, $args[1], 'explode', 1, 'string');
