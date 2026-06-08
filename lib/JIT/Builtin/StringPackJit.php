@@ -18,8 +18,6 @@ use PHPLLVM\Value\Function_ as LlvmFunction;
  */
 final class StringPackJit
 {
-    private const PACK_ERR_LEVEL = 256;
-
     private const MAX_SPECS = 256;
 
     private const MAX_OUT = 65536;
@@ -43,6 +41,7 @@ final class StringPackJit
         self::$blockSuffix = 0;
         self::ensureLibc($context);
         self::ensureRuntimeHelpers($context);
+        TypeErrorRaise::ensureLinked($context);
 
         self::implementIfMissing($context, '__compiler_pack_fail', self::emitFail(...));
         self::implementIfMissing($context, '__compiler_pack_put_long', self::emitPutLong(...));
@@ -121,17 +120,14 @@ final class StringPackJit
 
         $msg = $fn->getParam(0);
         $i8p = $context->getTypeFromString('int8*');
-        $i32 = $context->getTypeFromString('int32');
         $i64 = $context->getTypeFromString('int64');
 
         $msgLen = $context->builder->call($context->lookupFunction('strlen'), $msg);
+        $sizeT = $context->getTypeFromString('size_t');
         $context->builder->call(
-            $context->lookupFunction('__compiler_trigger_error'),
+            $context->lookupFunction('__compiler_jit_raise_value_error'),
             $msg,
-            $msgLen,
-            $i32->constInt(self::PACK_ERR_LEVEL, false),
-            $context->builder->pointerCast($context->constantFromString(''), $i8p),
-            $i32->constInt(0, false)
+            $context->builder->intCast($msgLen, $sizeT)
         );
         $result = $context->builder->call(
             $context->lookupFunction('__string__init'),
@@ -526,7 +522,7 @@ final class StringPackJit
             $stringArgOkBb
         );
         $context->builder->positionAtEnd($needArgFailBb);
-        $msg = self::snprintfAlloca($context, 'pack(): Type %c: not enough arguments', [$code]);
+        $msg = self::snprintfAlloca($context, 'Type %c: not enough arguments', [$code]);
         $fail = $context->builder->call($context->lookupFunction('__compiler_pack_fail'), $msg);
         $context->builder->returnValue($fail);
 
@@ -570,7 +566,7 @@ final class StringPackJit
             $numericOkBb
         );
         $context->builder->positionAtEnd($fewArgsFailBb);
-        $msg = self::snprintfAlloca($context, 'pack(): Type %c: too few arguments', [$code]);
+        $msg = self::snprintfAlloca($context, 'Type %c: too few arguments', [$code]);
         $fail = $context->builder->call($context->lookupFunction('__compiler_pack_fail'), $msg);
         $context->builder->returnValue($fail);
         $context->builder->positionAtEnd($numericOkBb);
@@ -578,7 +574,7 @@ final class StringPackJit
         $context->builder->branch($afterValidateBb);
 
         $context->builder->positionAtEnd($parseUnknownBb);
-        $msg = self::snprintfAlloca($context, 'pack(): Type %c: unknown format code', [$code]);
+        $msg = self::snprintfAlloca($context, 'Type %c: unknown format code', [$code]);
         $fail = $context->builder->call($context->lookupFunction('__compiler_pack_fail'), $msg);
         $context->builder->returnValue($fail);
 
@@ -767,7 +763,7 @@ final class StringPackJit
         );
         $context->builder->positionAtEnd($overflowBb);
         $msg = $context->builder->pointerCast(
-            $context->constantFromString('pack(): integer overflow in format string'),
+            $context->constantFromString('integer overflow in format string'),
             $i8p
         );
         $fail = $context->builder->call($context->lookupFunction('__compiler_pack_fail'), $msg);
@@ -1343,7 +1339,7 @@ final class StringPackJit
         $context->builder->branch($execNext);
 
         $context->builder->positionAtEnd($execUnknownBb);
-        $msg = self::snprintfAlloca($context, 'pack(): Type %c: unknown format code', [$code]);
+        $msg = self::snprintfAlloca($context, 'Type %c: unknown format code', [$code]);
         $fail = $context->builder->call($context->lookupFunction('__compiler_pack_fail'), $msg);
         $context->builder->call($context->lookupFunction('free'), $output);
         $context->builder->returnValue($fail);
@@ -1534,7 +1530,7 @@ final class StringPackJit
                 ['__value__readLong', $i64, [$valuePtr]],
                 ['__value__readDouble', $double, [$valuePtr]],
                 ['__value__readString', $strPtr, [$valuePtr]],
-                ['__compiler_trigger_error', $voidTy, [$i8p, $sizeT, $i32, $i8p, $i32]],
+                ['__compiler_jit_raise_value_error', $voidTy, [$i8p, $sizeT]],
             ] as [$name, $ret, $params]
         ) {
             self::ensureExternal($context, $name, $context->context->functionType($ret, false, ...$params));

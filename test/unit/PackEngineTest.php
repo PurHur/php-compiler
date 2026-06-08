@@ -27,4 +27,18 @@ final class PackEngineTest extends TestCase
         $this->assertSame(\pack('x2c', 1), PackEngine::pack('x2c', [1]));
         $this->assertSame(\pack('@4c', 9), PackEngine::pack('@4c', [9]));
     }
+
+    public function testInvalidFormatThrowsValueError(): void
+    {
+        $this->expectException(\ValueError::class);
+        $this->expectExceptionMessage('Type !: unknown format code');
+        PackEngine::pack('!', [1]);
+    }
+
+    public function testTooFewArgumentsThrowsValueError(): void
+    {
+        $this->expectException(\ValueError::class);
+        $this->expectExceptionMessage('Type c: too few arguments');
+        PackEngine::pack('cc', [1]);
+    }
 }

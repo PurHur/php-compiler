@@ -36,15 +36,10 @@ final class PackEngine
         }
 
         $specs = self::parseFormat($format, $args);
-        if (null === $specs) {
-            return '';
-        }
 
         $outputSize = self::computeOutputSize($specs);
         if ($outputSize > self::MAX_OUT) {
-            self::fail('pack(): integer overflow in format string');
-
-            return '';
+            throw new \ValueError('integer overflow in format string');
         }
 
         $output = \str_repeat("\0", $outputSize > 0 ? $outputSize : 0);
@@ -234,9 +229,9 @@ final class PackEngine
     /**
      * @param list<int|float|string|bool|null> $args
      *
-     * @return list<array{code: string, arg: int}>|null
+     * @return list<array{code: string, arg: int}>
      */
-    private static function parseFormat(string $format, array $args): ?array
+    private static function parseFormat(string $format, array $args): array
     {
         $numArgs = \count($args);
         $specs = [];
@@ -276,9 +271,7 @@ final class PackEngine
                 case 'h':
                 case 'H':
                     if ($currentArg >= $numArgs) {
-                        self::fail(\sprintf('pack(): Type %s: not enough arguments', $code));
-
-                        return null;
+                        throw new \ValueError(\sprintf('Type %s: not enough arguments', $code));
                     }
                     if ($arg < 0) {
                         $str = self::argString($args[$currentArg] ?? '');
@@ -316,15 +309,11 @@ final class PackEngine
                     }
                     $currentArg += $arg;
                     if ($currentArg > $numArgs) {
-                        self::fail(\sprintf('pack(): Type %s: too few arguments', $code));
-
-                        return null;
+                        throw new \ValueError(\sprintf('Type %s: too few arguments', $code));
                     }
                     break;
                 default:
-                    self::fail(\sprintf('pack(): Type %s: unknown format code', $code));
-
-                    return null;
+                    throw new \ValueError(\sprintf('Type %s: unknown format code', $code));
             }
 
             $specs[] = ['code' => $code, 'arg' => $arg];
@@ -536,8 +525,4 @@ final class PackEngine
         return 0.0;
     }
 
-    private static function fail(string $message): void
-    {
-        @\trigger_error($message, \E_USER_WARNING);
-    }
 }
