@@ -50,6 +50,34 @@ trait VmArrayAssocSetOps
         return $value->resolveIndirect()->identicalTo($stored->resolveIndirect());
     }
 
+    /**
+     * @param list<HashTable> $others
+     */
+    private static function keyInAnyOther(Variable $key, array $others): bool
+    {
+        foreach ($others as $haystack) {
+            if (null !== self::valueAtKey($haystack, $key)) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /**
+     * @param list<HashTable> $others
+     */
+    private static function keyInAllOthers(Variable $key, array $others): bool
+    {
+        foreach ($others as $haystack) {
+            if (null === self::valueAtKey($haystack, $key)) {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
     private static function valueAtKey(HashTable $table, Variable $key): ?Variable
     {
         $key = $key->resolveIndirect();
