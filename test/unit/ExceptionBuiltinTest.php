@@ -210,6 +210,19 @@ array_key_exists(\'k\', $o);
         $this->assertStringNotContainsString('ExceptionSupport.php', $stderr);
     }
 
+    public function testErrorExceptionConstructAndGetSeverity(): void
+    {
+        $this->assertVmOutput(
+            '<?php
+$e = new ErrorException("m", 0, E_USER_WARNING, __FILE__, 42);
+echo $e->getSeverity(), "\n";
+$e2 = new ErrorException("probe", 0, E_USER_WARNING, __FILE__, 99);
+echo $e2->getMessage(), ":", $e2->getSeverity(), "\n";
+',
+            "512\nprobe:512\n"
+        );
+    }
+
     private function assertVmCliOutput(string $code, string $expected): void
     {
         [$stdout, $exit] = $this->runVmCli($code);

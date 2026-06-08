@@ -55,6 +55,8 @@ final class ExceptionSupport
 
     public const PROP_MESSAGE = 'message';
     public const PROP_CODE = 'code';
+    /** Zend zend_exceptions.c — ErrorException severity (#6732). */
+    public const PROP_SEVERITY = 'severity';
     public const PROP_FILE = 'file';
     public const PROP_LINE = 'line';
     /** Zend zend_exceptions.c — chained Throwable (#5104, #5486). */
@@ -173,6 +175,94 @@ final class ExceptionSupport
             $ret = $frame->returnVar->resolveIndirect();
             // void __construct must not wipe the `new Exception()` temp when returnVar
             // aliases the same slot as $this (FUNCCALL_EXEC_RETURN after TYPE_NEW, #4540).
+            if (
+                Variable::TYPE_OBJECT !== $ret->type
+                || $ret->toObject() !== $receiver
+            ) {
+                $frame->returnVar->null();
+            }
+        }
+    }
+
+    /**
+     * ErrorException::__construct($message, $code, $severity, $filename, $lineno, $previous).
+     *
+     * php-src: Zend/zend_exceptions.stub.php
+     */
+    public static function initErrorExceptionFromConstruct(ObjectEntry $receiver, Frame $frame): void
+    {
+        $className = $receiver->class->name;
+        $message = '';
+        if (array_key_exists(1, $frame->calledArgs)) {
+            $msgVar = $frame->calledArgs[1]->resolveIndirect();
+            if (Variable::TYPE_NULL !== $msgVar->type) {
+                $message = VmString::coerceStringBuiltinArg(
+                    $frame->calledArgs[1],
+                    "{$className}::__construct",
+                    0,
+                    'message'
+                );
+            }
+        }
+        $code = 0;
+        if (array_key_exists(2, $frame->calledArgs)) {
+            $codeVar = $frame->calledArgs[2]->resolveIndirect();
+            if (Variable::TYPE_NULL !== $codeVar->type) {
+                if (Variable::TYPE_INTEGER !== $codeVar->type) {
+                    throw new \LogicException('ErrorException::__construct() code must be an integer');
+                }
+                $code = $codeVar->toInt();
+            }
+        }
+        $severity = \E_ERROR;
+        if (array_key_exists(3, $frame->calledArgs)) {
+            $severityVar = $frame->calledArgs[3]->resolveIndirect();
+            if (Variable::TYPE_NULL !== $severityVar->type) {
+                if (Variable::TYPE_INTEGER !== $severityVar->type) {
+                    throw new \LogicException('ErrorException::__construct() severity must be an integer');
+                }
+                $severity = $severityVar->toInt();
+            }
+        }
+        $receiver->getProperty(self::PROP_MESSAGE)->string($message);
+        $receiver->getProperty(self::PROP_CODE)->int($code);
+        $receiver->getProperty(self::PROP_SEVERITY)->int($severity);
+        $file = self::throwSiteFile($frame);
+        if (array_key_exists(4, $frame->calledArgs)) {
+            $fileVar = $frame->calledArgs[4]->resolveIndirect();
+            if (Variable::TYPE_NULL !== $fileVar->type) {
+                $file = VmString::coerceStringBuiltinArg(
+                    $frame->calledArgs[4],
+                    "{$className}::__construct",
+                    3,
+                    'filename'
+                );
+            }
+        }
+        $receiver->getProperty(self::PROP_FILE)->string($file);
+        $line = 0;
+        if (array_key_exists(5, $frame->calledArgs)) {
+            $lineVar = $frame->calledArgs[5]->resolveIndirect();
+            if (Variable::TYPE_NULL !== $lineVar->type) {
+                if (Variable::TYPE_INTEGER !== $lineVar->type) {
+                    throw new \LogicException('ErrorException::__construct() lineno must be an integer');
+                }
+                $line = $lineVar->toInt();
+            }
+        }
+        if ($line <= 0) {
+            $line = self::throwSiteLine($frame);
+        }
+        $receiver->getProperty(self::PROP_LINE)->int($line);
+        if (array_key_exists(6, $frame->calledArgs)) {
+            $prevArg = $frame->calledArgs[6]->resolveIndirect();
+            if (Variable::TYPE_NULL !== $prevArg->type) {
+                self::setExceptionPrevious($receiver, $frame->calledArgs[6]);
+            }
+        }
+        $receiver->constructed = true;
+        if (null !== $frame->returnVar) {
+            $ret = $frame->returnVar->resolveIndirect();
             if (
                 Variable::TYPE_OBJECT !== $ret->type
                 || $ret->toObject() !== $receiver
@@ -422,7 +512,20 @@ final class ExceptionSupport
         $lc = strtolower($entry->class->name);
         $nativeClass = ThrowableManifest::nativeClassForLc($lc);
         if (null !== $nativeClass) {
-            $native = new $nativeClass($message);
+            if (self::CLASS_ERROR_EXCEPTION === $lc) {
+                $severity = self::readOptionalIntProperty($entry, self::PROP_SEVERITY) ?? \E_ERROR;
+                $file = self::readOptionalStringProperty($entry, self::PROP_FILE);
+                $line = self::readOptionalIntProperty($entry, self::PROP_LINE);
+                $native = new \ErrorException(
+                    $message,
+                    self::readOptionalIntProperty($entry, self::PROP_CODE) ?? 0,
+                    $severity,
+                    $file,
+                    $line ?? 0
+                );
+            } else {
+                $native = new $nativeClass($message);
+            }
         } elseif (self::CLASS_FIBER_ERROR === $lc) {
             // FiberError is reserved for internal use in Zend; cannot be instantiated from userland PHP.
             // Map uncaught VM FiberError to a native Error for the test runner / CLI.
