@@ -155,6 +155,8 @@ final class SelfHostBuiltinPolicy
         'is_uploaded_file' => 'filesystem', 'move_uploaded_file' => 'filesystem', 'touch' => 'filesystem',
         'getenv' => 'filesystem', 'putenv' => 'filesystem', 'sys_get_temp_dir' => 'filesystem', 'tempnam' => 'filesystem', 'tmpfile' => 'filesystem',
         'getcwd' => 'filesystem', 'chdir' => 'filesystem', 'gethostname' => 'filesystem',
+        'get_include_path' => 'filesystem', 'set_include_path' => 'filesystem',
+        'restore_include_path' => 'filesystem', 'stream_resolve_include_path' => 'filesystem',
         'get_current_user' => 'filesystem',
         'gethostbynamel' => 'filesystem',
         'gethostbyname' => 'filesystem',

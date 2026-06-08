@@ -16,7 +16,7 @@ final class VmMetaTags
      */
     public static function getMetaTags(string $filename, bool $useIncludePath = false) {
         if ($useIncludePath) {
-            $resolved = stream_resolve_include_path($filename);
+            $resolved = VmFs::resolveIncludePath($filename);
             if (false !== $resolved) {
                 $filename = $resolved;
             }

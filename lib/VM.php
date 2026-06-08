@@ -5984,18 +5984,16 @@ restart:
             }
         }
 
-        // 3) include_path search (best-effort using host get_include_path when available)
-        if (\function_exists('get_include_path')) {
-            $includePath = (string) @get_include_path();
-            if ('' !== $includePath) {
-                foreach (explode(\PATH_SEPARATOR, $includePath) as $dir) {
-                    if ('' === $dir) {
-                        continue;
-                    }
-                    $cand = VM\ScriptStack::normalize(rtrim($dir, '/').'/'.$file);
-                    if ('' !== $cand && is_file($cand)) {
-                        return $cand;
-                    }
+        // 3) include_path search (VmIncludePath stack; issues #3223, #6051)
+        $includePath = \PHPCompiler\ext\standard\VmIncludePath::get();
+        if ('' !== $includePath) {
+            foreach (explode(\PATH_SEPARATOR, $includePath) as $dir) {
+                if ('' === $dir) {
+                    continue;
+                }
+                $cand = VM\ScriptStack::normalize(rtrim($dir, '/').'/'.$file);
+                if ('' !== $cand && is_file($cand)) {
+                    return $cand;
                 }
             }
         }
