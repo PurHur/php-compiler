@@ -22,6 +22,7 @@ class Module extends ModuleAbstract
             new bcdiv(),
             new bcscale(),
             new bccomp(),
+            new bcpowmod(),
         ];
     }
 }

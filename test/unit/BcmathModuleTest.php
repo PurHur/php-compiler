@@ -26,7 +26,7 @@ final class BcmathModuleTest extends TestCase
         $runtime = new Runtime();
         $ctx = $runtime->vmContext;
 
-        foreach (['bcadd', 'bcsub', 'bcmul', 'bcdiv', 'bcscale', 'bccomp'] as $fn) {
+        foreach (['bcadd', 'bcsub', 'bcmul', 'bcdiv', 'bcscale', 'bccomp', 'bcpowmod'] as $fn) {
             self::assertTrue(VmReflection::functionExists($ctx, $fn), $fn);
         }
 
@@ -38,11 +38,12 @@ echo (int) function_exists('bcmul');
 echo (int) function_exists('bcdiv');
 echo (int) function_exists('bcscale');
 echo (int) function_exists('bccomp');
+echo (int) function_exists('bcpowmod');
 PHP;
         $block = $runtime->parseAndCompile($code, 'bcmath_module.php');
         ob_start();
         $runtime->run($block);
-        self::assertSame('111111', ob_get_clean());
+        self::assertSame('1111111', ob_get_clean());
     }
 
     public function test_bcadd_issue_5969(): void
@@ -72,5 +73,12 @@ PHP;
         self::assertSame('3.33', VmBcmath::div('10', '3', 2));
         self::assertSame(0, VmBcmath::comp('1.0', '1.00', 2));
         self::assertSame(1, VmBcmath::comp('1.01', '1.00', 2));
+    }
+
+    public function test_bcpowmod_issue_6976(): void
+    {
+        self::assertSame('24', VmBcmath::powmod('2', '10', '1000'));
+        self::assertSame('4', VmBcmath::powmod('3', '4', '7'));
+        self::assertSame('1', VmBcmath::powmod('2', '0', '5'));
     }
 }
