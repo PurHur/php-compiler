@@ -68,8 +68,7 @@ final class json_decode extends Internal
         $assoc = self::resolveAssocFlag($context, $args);
         $literal = JitStringArg::compileTimeLiteral($args[0]);
         if (null !== $literal) {
-            $decoded = \json_decode($literal, $assoc);
-            VmJson::syncLastErrorFromHost();
+            $decoded = VmJsonFormat::decode($literal, $assoc);
 
             return JitJsonDecode::materializeDecoded($context, $decoded, $assoc);
         }

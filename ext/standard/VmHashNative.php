@@ -855,7 +855,12 @@ final class VmHashNative
      */
     public static function incrementalCopy(array $ctx): array
     {
-        return \json_decode(\json_encode($ctx, \JSON_THROW_ON_ERROR), true, 512, \JSON_THROW_ON_ERROR);
+        $copy = [];
+        foreach ($ctx as $key => $value) {
+            $copy[$key] = \is_array($value) ? [...$value] : $value;
+        }
+
+        return $copy;
     }
 
     /**

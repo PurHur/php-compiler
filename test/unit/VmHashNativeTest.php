@@ -92,4 +92,28 @@ final class VmHashNativeTest extends TestCase
             VmHashNative::hashPbkdf2('sha256', 'pass', 'salt', 1, 8)
         );
     }
+
+    public function testIncrementalCopyDoesNotUseHostJson(): void
+    {
+        $root = \dirname(__DIR__, 2);
+        $src = (string) file_get_contents($root.'/ext/standard/VmHashNative.php');
+        $this->assertStringNotContainsString('\\json_decode', $src);
+        $this->assertStringNotContainsString('\\json_encode', $src);
+    }
+
+    public function testIncrementalCopyIsolatesHashState(): void
+    {
+        $ctx = VmHashNative::incrementalCreate(1);
+        VmHashNative::incrementalUpdate(1, $ctx, 'mutate-original');
+        $work = VmHashNative::incrementalCopy($ctx);
+        VmHashNative::incrementalUpdate(1, $work, '-copy-only');
+        $this->assertSame(
+            VmHashNative::incrementalFinal(1, $ctx),
+            VmHashNative::hash('sha256', 'mutate-original')
+        );
+        $this->assertSame(
+            VmHashNative::incrementalFinal(1, $work),
+            VmHashNative::hash('sha256', 'mutate-original-copy-only')
+        );
+    }
 }
