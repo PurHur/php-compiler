@@ -17,6 +17,10 @@ final class UniqidVMTest extends BaseTest
             __DIR__.'/cases/stdlib/uniqid.phpt',
             'uniqid.phpt'
         );
+        yield 'uniqid_coerce.phpt' => self::parsePHPT(
+            __DIR__.'/cases/stdlib/uniqid_coerce.phpt',
+            'uniqid_coerce.phpt'
+        );
     }
 
     public function setUp(): void
