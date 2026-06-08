@@ -25,6 +25,8 @@ class ClassProperty {
     public bool $propertyHookVirtual = false;
     /** Individual readonly property (issue #3149, promoted readonly #3432). */
     public bool $readonly = false;
+    /** Constructor promotion (#7383, ext/reflection/php_reflection.c reflection_property_is_promoted). */
+    public bool $fromConstructorPromotion = false;
     /** Per-instance `new` default initializer (issue #3391). */
     public ?Block $defaultInitBlock = null;
     public ?int $defaultInitResultSlot = null;
