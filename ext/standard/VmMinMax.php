@@ -39,6 +39,28 @@ final class VmMinMax
         return self::finishEnumCaseReduce($frame, $values, $pickMin);
     }
 
+    /**
+     * Two-argument scalar path — int/float/numeric-string (php-src php_min_max, #4347).
+     */
+    public static function tryReduceScalarsTwoArg(Frame $frame, bool $pickMin): bool
+    {
+        if (2 !== \count($frame->calledArgs) || null === $frame->returnVar) {
+            return false;
+        }
+
+        $a = $frame->calledArgs[0]->resolveIndirect();
+        $b = $frame->calledArgs[1]->resolveIndirect();
+        if (!self::isNumericScalar($a) || !self::isNumericScalar($b)) {
+            return false;
+        }
+
+        $cmp = self::compareNumericScalars($a, $b);
+        $best = ($pickMin ? $cmp < 0 : $cmp > 0) ? $a : $b;
+        $frame->returnVar->copyFrom($best);
+
+        return true;
+    }
+
     private static function reduce(Frame $frame, string $name, bool $pickMin): void
     {
         $argc = \count($frame->calledArgs);
@@ -61,49 +83,17 @@ final class VmMinMax
             return;
         }
 
-        $bestInt = null;
-        $bestFloat = null;
-        $useFloat = false;
-
-        foreach ($values as $v) {
-            if (Variable::TYPE_INTEGER === $v->type) {
-                if ($useFloat) {
-                    $f = (float) $v->toInt();
-                    if (null === $bestFloat || self::isBetterFloat($f, $bestFloat, $pickMin)) {
-                        $bestFloat = $f;
-                    }
-                    continue;
-                }
-                $i = $v->toInt();
-                if (null === $bestInt || self::isBetterInt($i, $bestInt, $pickMin)) {
-                    $bestInt = $i;
-                }
-                continue;
+        $best = $values[0];
+        self::assertNumericScalar($best, $name);
+        foreach (\array_slice($values, 1) as $candidate) {
+            self::assertNumericScalar($candidate, $name);
+            $cmp = self::compareNumericScalars($candidate, $best);
+            if ($pickMin ? $cmp < 0 : $cmp > 0) {
+                $best = $candidate;
             }
-            if (Variable::TYPE_FLOAT === $v->type) {
-                if (!$useFloat) {
-                    $useFloat = true;
-                    $bestFloat = null === $bestInt
-                        ? $v->toFloat()
-                        : self::pickFloat((float) $bestInt, $v->toFloat(), $pickMin);
-                } else {
-                    $f = $v->toFloat();
-                    if (null === $bestFloat || self::isBetterFloat($f, $bestFloat, $pickMin)) {
-                        $bestFloat = $f;
-                    }
-                }
-                continue;
-            }
-            throw new \LogicException(
-                $name.'() only supports integer and float values in this compiler build'
-            );
         }
 
-        if ($useFloat) {
-            $frame->returnVar->float($bestFloat ?? 0.0);
-        } else {
-            $frame->returnVar->int($bestInt ?? 0);
-        }
+        $frame->returnVar->copyFrom($best);
     }
 
     /**
@@ -175,22 +165,70 @@ final class VmMinMax
         return $values;
     }
 
-    private static function isBetterInt(int $candidate, int $best, bool $pickMin): bool
+    private static function isNumericScalar(Variable $value): bool
     {
-        return $pickMin ? $candidate < $best : $candidate > $best;
+        if (Variable::TYPE_INTEGER === $value->type || Variable::TYPE_FLOAT === $value->type) {
+            return true;
+        }
+        if (Variable::TYPE_STRING !== $value->type) {
+            return false;
+        }
+        $s = $value->toString();
+
+        return '' !== $s && \is_numeric($s);
     }
 
-    private static function isBetterFloat(float $candidate, float $best, bool $pickMin): bool
+    private static function assertNumericScalar(Variable $value, string $name): void
     {
-        return $pickMin ? $candidate < $best : $candidate > $best;
+        if (self::isNumericScalar($value)) {
+            return;
+        }
+
+        throw new \TypeError(
+            $name.'(): Argument #1 ($value) must be of type array, '
+            .self::valueTypeName($value).' given'
+        );
     }
 
-    private static function pickFloat(float $a, float $b, bool $pickMin): float
+    private static function compareNumericScalars(Variable $a, Variable $b): int
     {
-        return $pickMin ? ($a < $b ? $a : $b) : ($a > $b ? $a : $b);
+        $av = self::numericCompareValue($a);
+        $bv = self::numericCompareValue($b);
+        $useFloat = Variable::TYPE_FLOAT === $a->type
+            || Variable::TYPE_FLOAT === $b->type
+            || \is_float($av)
+            || \is_float($bv);
+        if ($useFloat) {
+            $af = \is_float($av) ? $av : (float) $av;
+            $bf = \is_float($bv) ? $bv : (float) $bv;
+
+            return $af <=> $bf;
+        }
+
+        return (int) $av <=> (int) $bv;
     }
 
-    private static function valueTypeName(Variable $value): string
+    private static function numericCompareValue(Variable $value): int|float
+    {
+        if (Variable::TYPE_INTEGER === $value->type) {
+            return $value->toInt();
+        }
+        if (Variable::TYPE_FLOAT === $value->type) {
+            return $value->toFloat();
+        }
+        if (Variable::TYPE_STRING === $value->type) {
+            $s = $value->toString();
+            if ('' === $s || !\is_numeric($s)) {
+                throw new \TypeError('Unsupported operand types: string');
+            }
+
+            return $value->toNumeric();
+        }
+
+        throw new \TypeError('Unsupported operand types: '.self::operandZendTypeName($value));
+    }
+
+    private static function operandZendTypeName(Variable $value): string
     {
         switch ($value->type) {
             case Variable::TYPE_INTEGER:
@@ -212,5 +250,10 @@ final class VmMinMax
             default:
                 return 'mixed';
         }
+    }
+
+    private static function valueTypeName(Variable $value): string
+    {
+        return self::operandZendTypeName($value);
     }
 }
