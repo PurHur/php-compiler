@@ -1697,9 +1697,13 @@ class Block {
                     $nameOp = $block->getOperand($op->arg1);
                     if ($nameOp instanceof Literal) {
                         $classLc = strtolower(ltrim($nameOp->value, '\\'));
+                        $classReadonly = null !== $op->arg3
+                            && isset($block->constants[$op->arg3])
+                            && VM\ClassFlags::isReadonly($block->constants[$op->arg3]->toInt());
                         if (
                             !str_starts_with($classLc, 'phpcfg\\')
                             && !str_starts_with($classLc, 'phpcompiler\\')
+                            && !$classReadonly
                             && self::classBodyDeclaresInstanceProperty($op->block1)
                         ) {
                             return true;
@@ -2267,7 +2271,6 @@ class Block {
             || self::containsFinallyOpcodesInScriptScope($root)
             || self::containsTypedNonVoidReturnOpcodes($root)
             || self::containsReadonlyPropertyOpcodes($root)
-            || self::containsReadonlyClassOpcodes($root)
             || self::containsUserClassDeclaredInstancePropertyOpcodes($root)
             || self::containsDynamicPropertyDeprecationOpcodes($root)
             || self::containsFiberSuspendOpcodesInScriptScope($root)
