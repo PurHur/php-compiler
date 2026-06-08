@@ -189,42 +189,7 @@ __string__ *__compiler_fread(int64_t handle, int64_t length)
     return result;
 }
 
-extern int __compiler_is_dir_resource(int64_t handle);
-
-#define PHPC_DIR_HANDLE_BASE ((int64_t) 0x10000000)
-
-int __compiler_is_resource(int64_t handle)
-{
-    if (handle >= PHPC_DIR_HANDLE_BASE && __compiler_is_dir_resource(handle)) {
-        return 1;
-    }
-    /* fopen() handles start at 3; 1/2 are stdio aliases in __phpc_resolve_stream (#3519). */
-    if (handle <= 2) {
-        return 0;
-    }
-
-    return NULL != __phpc_resolve_stream(handle) ? 1 : 0;
-}
-
-int __compiler_fclose(int64_t handle)
-{
-    FILE *fp;
-
-    if (handle <= 0 || handle >= PHPC_MAX_STREAM_HANDLES) {
-        return 0;
-    }
-    fp = phpc_stream_handles[handle];
-    if (NULL == fp) {
-        return 0;
-    }
-    phpc_stream_handles[handle] = NULL;
-    if (NULL != phpc_stream_paths[handle]) {
-        free(phpc_stream_paths[handle]);
-        phpc_stream_paths[handle] = NULL;
-    }
-
-    return fclose(fp) == 0 ? 1 : 0;
-}
+/* is_resource/fclose/feof/fflush helpers: LLVM StreamLifecycleJit.php (#5343). */
 
 /* Map PHP LOCK_* (ext/standard/flock.c) to host flock(2) flags. */
 static int phpc_map_flock_operation(int operation)
@@ -306,28 +271,6 @@ int64_t __compiler_fpassthru(int64_t handle)
     }
 
     return total;
-}
-
-int __compiler_feof(int64_t handle)
-{
-    FILE *fp = __phpc_resolve_stream(handle);
-
-    if (NULL == fp) {
-        return 1;
-    }
-
-    return feof(fp) ? 1 : 0;
-}
-
-int __compiler_fflush(int64_t handle)
-{
-    FILE *fp = __phpc_resolve_stream(handle);
-
-    if (NULL == fp) {
-        return 0;
-    }
-
-    return fflush(fp) == 0 ? 1 : 0;
 }
 
 int64_t __compiler_stream_set_chunk_size(int64_t handle, int64_t chunk_size)
@@ -726,3 +669,4 @@ __string__ *__compiler_stream_get_contents(int64_t handle, int64_t maxlength, in
 }
 
 /* get_resource_type/get_resources helpers: LLVM StreamResourceJit.php (#6821). */
+/* is_resource/fclose/feof/fflush helpers: LLVM StreamLifecycleJit.php (#5343). */
