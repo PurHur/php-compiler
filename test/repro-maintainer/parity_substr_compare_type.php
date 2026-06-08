@@ -18,6 +18,12 @@ function probe(string $label, callable $fn): void
     }
 }
 
-probe('substr_compare_array_haystack', static fn () => substr_compare([], 'a', 0));
-probe('substr_compare_array_needle', static fn () => substr_compare('abc', [], 0));
-probe('substr_compare_numeric_offset', static fn () => substr_compare('abc', 'ab', '0', 2));
+probe('substr_compare_array_haystack', static function (): void {
+    substr_compare([], 'a', 0);
+});
+probe('substr_compare_array_needle', static function (): void {
+    substr_compare('abc', [], 0);
+});
+probe('substr_compare_numeric_offset', static function (): void {
+    substr_compare('abc', 'ab', '0', 2);
+});
