@@ -146,6 +146,8 @@ final class BuiltinClasses
         self::registerResource($ctx);
         self::registerCountable($ctx);
         self::registerArrayAccess($ctx);
+        self::registerZendEnumInterfaces($ctx);
+        self::registerSerializable($ctx);
         self::registerTraversableInterfaces($ctx);
         SensitiveParamSupport::register($ctx);
         self::registerWeakReference($ctx);
@@ -194,6 +196,27 @@ final class BuiltinClasses
         $entry = new ClassEntry('ArrayAccess');
         $entry->isInterface = true;
         $ctx->classes['arrayaccess'] = $entry;
+    }
+
+    /** Zend zend_interfaces.c — UnitEnum / BackedEnum for enum reflection (#6354). */
+    private static function registerZendEnumInterfaces(Context $ctx): void
+    {
+        $unitEnum = new ClassEntry('UnitEnum');
+        $unitEnum->isInterface = true;
+        $ctx->classes['unitenum'] = $unitEnum;
+
+        $backedEnum = new ClassEntry('BackedEnum');
+        $backedEnum->isInterface = true;
+        $backedEnum->interfaces = ['unitenum'];
+        $ctx->classes['backedenum'] = $backedEnum;
+    }
+
+    /** Zend zend_interfaces.c — legacy Serializable (#3287, #6354). */
+    private static function registerSerializable(Context $ctx): void
+    {
+        $entry = new ClassEntry('Serializable');
+        $entry->isInterface = true;
+        $ctx->classes['serializable'] = $entry;
     }
 
     private static function registerStdClass(Context $ctx): void
