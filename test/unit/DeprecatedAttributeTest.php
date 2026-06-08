@@ -56,12 +56,43 @@ final class DeprecatedAttributeTest extends TestCase
         $this->assertSame('Function f() is deprecated since 1.0', $meta->formatFunction('f'));
     }
 
+    public function testBareDeprecatedDoesNotEmitRuntimeNotice(): void
+    {
+        $meta = new DeprecatedMetadata(null, null);
+        $this->assertFalse($meta->emitsRuntimeNotice());
+
+        $meta = new DeprecatedMetadata('old', null);
+        $this->assertTrue($meta->emitsRuntimeNotice());
+
+        $meta = new DeprecatedMetadata(null, '1.0');
+        $this->assertTrue($meta->emitsRuntimeNotice());
+    }
+
+    public function testBareDeprecatedMethodCallIsSilent(): void
+    {
+        $runtime = new Runtime();
+        $code = <<<'PHP'
+<?php
+class Box {
+    #[\Deprecated]
+    public function ping(): string {
+        return 'pong';
+    }
+}
+echo (new Box())->ping();
+PHP;
+        ob_start();
+        $runtime->run($runtime->parseAndCompile($code, 'bare_deprecated_method.php'));
+        $this->assertSame('pong', ob_get_clean());
+    }
+
     public function testFunctionCallRecordsDeprecation(): void
     {
         $runtime = new Runtime();
         $code = <<<'PHP'
 <?php
 ini_set('error_reporting', '32767');
+ini_set('display_errors', '0');
 #[\Deprecated(message: "old")]
 function f() {}
 f();

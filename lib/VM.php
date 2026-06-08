@@ -11385,7 +11385,7 @@ restart:
             return;
         }
         $meta = $frame->call->deprecated;
-        if (null === $meta) {
+        if (null === $meta || !$meta->emitsRuntimeNotice()) {
             return;
         }
         $name = $frame->call->getName();
@@ -11444,7 +11444,7 @@ restart:
 
     private function emitClassInstantiationDeprecation(ClassEntry $class, Frame $frame): void
     {
-        if (null === $class->classDeprecated) {
+        if (null === $class->classDeprecated || !$class->classDeprecated->emitsRuntimeNotice()) {
             return;
         }
         $this->emitDeprecatedNotice($class->classDeprecated->formatClass($class->name), $frame);
@@ -11457,32 +11457,32 @@ restart:
         Frame $frame
     ): void {
         if ($classEntry->isEnum) {
-            if (null !== $classEntry->classDeprecated) {
+            if (null !== $classEntry->classDeprecated && $classEntry->classDeprecated->emitsRuntimeNotice()) {
                 $this->emitDeprecatedNotice(
                     $classEntry->classDeprecated->formatEnum($classEntry->name),
                     $frame
                 );
             }
             if (isset($classEntry->constDeprecated[$memberLc])) {
-                $this->emitDeprecatedNotice(
-                    $classEntry->constDeprecated[$memberLc]->formatEnumCase(
-                        $classEntry->name,
-                        $memberNameRaw
-                    ),
-                    $frame
-                );
+                $meta = $classEntry->constDeprecated[$memberLc];
+                if ($meta->emitsRuntimeNotice()) {
+                    $this->emitDeprecatedNotice(
+                        $meta->formatEnumCase($classEntry->name, $memberNameRaw),
+                        $frame
+                    );
+                }
             }
 
             return;
         }
         if (isset($classEntry->constDeprecated[$memberLc])) {
-            $this->emitDeprecatedNotice(
-                $classEntry->constDeprecated[$memberLc]->formatConstant(
-                    $classEntry->name,
-                    $memberNameRaw
-                ),
-                $frame
-            );
+            $meta = $classEntry->constDeprecated[$memberLc];
+            if ($meta->emitsRuntimeNotice()) {
+                $this->emitDeprecatedNotice(
+                    $meta->formatConstant($classEntry->name, $memberNameRaw),
+                    $frame
+                );
+            }
         }
     }
 
@@ -11506,8 +11506,12 @@ restart:
         if (!isset($declEntry->propDeprecated[$propLc])) {
             return;
         }
+        $meta = $declEntry->propDeprecated[$propLc];
+        if (!$meta->emitsRuntimeNotice()) {
+            return;
+        }
         $this->emitDeprecatedNotice(
-            $declEntry->propDeprecated[$propLc]->formatProperty($declEntry->name, $propName),
+            $meta->formatProperty($declEntry->name, $propName),
             $frame
         );
     }
@@ -11530,11 +11534,12 @@ restart:
         if (!isset($declEntry->propDeprecated[$propLc])) {
             return;
         }
+        $depMeta = $declEntry->propDeprecated[$propLc];
+        if (!$depMeta->emitsRuntimeNotice()) {
+            return;
+        }
         $this->emitDeprecatedNotice(
-            $declEntry->propDeprecated[$propLc]->formatProperty(
-                $meta['declaringClassDisplay'],
-                $propNameRaw
-            ),
+            $depMeta->formatProperty($meta['declaringClassDisplay'], $propNameRaw),
             $frame
         );
     }

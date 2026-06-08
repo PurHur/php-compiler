@@ -3,6 +3,7 @@ Language: #[\Deprecated] attribute emits E_USER_DEPRECATED (VM, #3569)
 --FILE--
 <?php
 ini_set('error_reporting', '32767');
+ini_set('display_errors', '0');
 
 #[\Deprecated(message: "old")]
 function f() {}
