@@ -15,9 +15,11 @@ use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Builtin\HttpResponseCode;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\JitBoolArg;
 use PHPCompiler\JIT\JitLongArg;
+use PHPCompiler\JIT\JitStringArg;
+use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\Variable as JITVariable;
-use PHPCompiler\VM\Variable;
 use PHPCompiler\Web\ResponseContext;
 use PHPLLVM\Value;
 
@@ -37,27 +39,15 @@ final class header_ extends Internal
         if ($argc < 1 || $argc > 3) {
             throw new \LogicException('header() requires one to three arguments');
         }
-        $v = $frame->calledArgs[0]->resolveIndirect();
-        if (Variable::TYPE_STRING !== $v->type) {
-            throw new \LogicException('header() only supports string header lines in this compiler build');
-        }
+        $line = VmString::coerceStringBuiltinArg($frame->calledArgs[0], 'header', 0, 'header');
         $replace = true;
         $responseCode = 0;
         if ($argc >= 2) {
-            $replaceVar = $frame->calledArgs[1]->resolveIndirect();
-            if (Variable::TYPE_BOOLEAN !== $replaceVar->type) {
-                throw new \LogicException('header() replace argument must be a boolean in this compiler build');
-            }
-            $replace = $replaceVar->toBool();
+            $replace = VmMath::parseBoolBuiltinArg($frame->calledArgs[1], 'header', 2, 'replace');
         }
         if (3 === $argc) {
-            $codeVar = $frame->calledArgs[2]->resolveIndirect();
-            if (Variable::TYPE_INTEGER !== $codeVar->type) {
-                throw new \LogicException('header() response_code must be an integer in this compiler build');
-            }
-            $responseCode = $codeVar->toInt();
+            $responseCode = VmMath::parseIntBuiltinArg($frame->calledArgs[2], 'header', 3, 'response_code');
         }
-        $line = $v->toString();
         ResponseContext::assertSafeHeaderLine($line);
         if (0 !== $responseCode) {
             \header($line, $replace, $responseCode);
@@ -77,30 +67,24 @@ final class header_ extends Internal
         if ($argc < 1 || $argc > 3) {
             throw new \LogicException('header() requires one to three arguments');
         }
-        if (JITVariable::TYPE_STRING !== $args[0]->type) {
-            throw new \LogicException('header() only supports string header lines in this compiler build');
-        }
-        $literal = $args[0]->compileTimeString ?? null;
+        $literal = JitStringArg::compileTimeLiteral($args[0]);
         if (null !== $literal) {
             ResponseContext::assertSafeHeaderLine($literal);
         }
-        $line = $this->jitString($context, $args[0], 'header() line');
-        if ($argc >= 2 && JITVariable::TYPE_NATIVE_BOOL !== $args[1]->type) {
-            throw new \LogicException('header() replace argument must be a boolean in this compiler build');
-        }
+        $line = JitStringBuiltinArg::lower($context, $args[0], 'header', 0, 'header');
         if (3 === $argc) {
-            if (JITVariable::TYPE_NATIVE_LONG !== $args[2]->type) {
-                throw new \LogicException('header() response_code must be an integer in this compiler build');
-            }
-            HttpResponseCode::emitStandaloneStatusLine($context, JitLongArg::lower($context, $args[2], 'header() response_code'));
+            HttpResponseCode::emitStandaloneStatusLine(
+                $context,
+                JitLongArg::lower($context, $args[2], 'header(): Argument #3 ($response_code)')
+            );
         }
         $i32 = $context->getTypeFromString('int32');
         $replaceI32 = $i32->constInt(1, false);
         if ($argc >= 2) {
-            if (JITVariable::TYPE_NATIVE_BOOL !== $args[1]->type) {
-                throw new \LogicException('header() replace argument must be a boolean in this compiler build');
-            }
-            $replaceI32 = $context->builder->zExt($this->jitBool($context, $args[1], 'header() replace'), $i32);
+            $replaceI32 = $context->builder->zExt(
+                JitBoolArg::lower($context, $args[1], 'header(): Argument #2 ($replace)'),
+                $i32
+            );
         }
         JitPendingHeaders::add($context, $line, $replaceI32);
 
