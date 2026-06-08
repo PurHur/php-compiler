@@ -374,11 +374,23 @@ final class VmReflection
      */
     public static function findClassConstantKey(ClassEntry $class, string $constant, Context $ctx): ?string
     {
+        $decl = self::findClassConstantDecl($class, $constant, $ctx);
+
+        return null !== $decl ? $decl['constLc'] : null;
+    }
+
+    /**
+     * Declaring class + storage key for a class constant on $class or an ancestor (#6950).
+     *
+     * @return array{declaring: ClassEntry, constLc: string}|null
+     */
+    public static function findClassConstantDecl(ClassEntry $class, string $constant, Context $ctx): ?array
+    {
         $lc = strtolower($constant);
         $current = $class;
         while (true) {
             if (isset($current->constants[$lc])) {
-                return $lc;
+                return ['declaring' => $current, 'constLc' => $lc];
             }
             if (null === $current->parentLc || !isset($ctx->classes[$current->parentLc])) {
                 return null;
@@ -1334,6 +1346,75 @@ final class VmReflection
         }
 
         return $entry;
+    }
+
+    /**
+     * Class constants visible on $entry (child overrides parent), php-src ReflectionClass::getConstants (#6950).
+     *
+     * @return list<array{name: string, declaring: ClassEntry, constLc: string}>
+     */
+    public static function collectClassConstantsForReflection(ClassEntry $entry, Context $ctx, int $filter): array
+    {
+        $byLc = [];
+        foreach (array_reverse(self::classHierarchyChain($entry, $ctx)) as $class) {
+            foreach ($class->constants as $constLc => $_stored) {
+                $vis = $class->constVisibility[$constLc] ?? \PHPCfg\Func::FLAG_PUBLIC;
+                if (!self::matchesReflectionVisibilityFilter($vis, $filter)) {
+                    continue;
+                }
+                $displayName = $class->constNames[$constLc]
+                    ?? $class->enumCaseCanonicalNames[$constLc]
+                    ?? $constLc;
+                $byLc[$constLc] = [
+                    'name' => $displayName,
+                    'declaring' => $class,
+                    'constLc' => $constLc,
+                ];
+            }
+        }
+
+        return array_values($byLc);
+    }
+
+    /**
+     * ReflectionClass::getConstants() result map — constant name => value (#6950).
+     *
+     * php-src: ext/reflection/php_reflection.c — reflection_class_get_constants
+     */
+    public static function reflectionClassConstantsMap(Context $ctx, ClassEntry $entry, int $filter): Variable
+    {
+        $result = new Variable();
+        $result->newArray();
+        $ht = $result->toArray();
+        foreach (self::collectClassConstantsForReflection($entry, $ctx, $filter) as $spec) {
+            $declaring = $spec['declaring'];
+            $constLc = $spec['constLc'];
+            $value = new Variable();
+            if (EnumCaseSupport::tryMaterializeEnumCaseConstantFetch($declaring, $constLc, $value)) {
+                $ht->add($spec['name'], $value);
+
+                continue;
+            }
+            $copy = new Variable();
+            $copy->copyFrom($declaring->constants[$constLc]);
+            $ht->add($spec['name'], $copy);
+        }
+
+        return $result;
+    }
+
+    /**
+     * Resolve ReflectionClass::getConstants() visibility filter (#6950, filter flags in #4479).
+     *
+     * php-src: null filter returns all constants; IS_* bitmasks narrow the set.
+     */
+    public static function reflectionConstantsFilterArg(Frame $frame, int $argIndex): int
+    {
+        if (\count($frame->calledArgs) <= $argIndex) {
+            return 0;
+        }
+
+        return self::optionalReflectionFilterArg($frame, $argIndex);
     }
 
     /**
