@@ -21,9 +21,21 @@ PHP;
 
     private const EXPECT = "Abc\n2112\nhe112\nsame\nboob\n";
 
+    private const SCALAR_CODE = <<<'PHP'
+echo strtr(123, '1', '9'), "\n";
+echo strtr(true, ['1' => '9']), "\n";
+PHP;
+
+    private const SCALAR_EXPECT = "923\n9\n";
+
     public function testVmMatchesPhpSubset(): void
     {
         $this->assertSame(self::EXPECT, $this->runBin('bin/vm.php'));
+    }
+
+    public function testVmScalarCoercionMatchesZend(): void
+    {
+        $this->assertSame(self::SCALAR_EXPECT, $this->runBin('bin/vm.php', self::SCALAR_CODE));
     }
 
     /**
@@ -79,13 +91,13 @@ PHP;
         return $this->normalize((string) $result);
     }
 
-    private function runBin(string $bin): string
+    private function runBin(string $bin, string $code = self::CODE): string
     {
         $repo = dirname(__DIR__, 2);
         $path = $repo . '/' . $bin;
         $tmp = tempnam(sys_get_temp_dir(), 'phpc_strtr_');
         $this->assertNotFalse($tmp);
-        file_put_contents($tmp, "<?php\n" . self::CODE);
+        file_put_contents($tmp, "<?php\n" . $code);
         $descriptor = [0 => ['pipe', 'r'], 1 => ['pipe', 'w'], 2 => ['pipe', 'w']];
         $env = $_ENV;
         LlvmToolchain::applyProcessEnv($env, $repo);

@@ -8,6 +8,7 @@ use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\ArrayBuiltinHelper;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
@@ -22,39 +23,56 @@ final class strtr extends Internal
         }
         $argc = \count($frame->calledArgs);
         if (2 === $argc) {
-            $string = $frame->calledArgs[0]->resolveIndirect();
+            $string = VmString::coerceStringBuiltinArg(
+                $frame->calledArgs[0],
+                'strtr',
+                0,
+                'string'
+            );
             $pairs = $frame->calledArgs[1]->resolveIndirect();
-            if (Variable::TYPE_STRING !== $string->type) {
-                throw new \LogicException('strtr() argument #1 ($str) must be of type string');
-            }
             if (Variable::TYPE_ARRAY !== $pairs->type) {
-                throw new \LogicException('strtr() argument #2 ($replace_pairs) must be of type array');
+                throw new \TypeError(\sprintf(
+                    'strtr(): Argument #2 ($replace_pairs) must be of type array, %s given',
+                    match ($pairs->type) {
+                        Variable::TYPE_NULL => 'null',
+                        Variable::TYPE_BOOLEAN => 'bool',
+                        Variable::TYPE_INTEGER => 'int',
+                        Variable::TYPE_FLOAT => 'float',
+                        Variable::TYPE_STRING => 'string',
+                        Variable::TYPE_OBJECT => 'object',
+                        default => 'mixed',
+                    }
+                ));
             }
             $replacePairs = [];
             foreach ($pairs->toArray()->iterateKeyed(true) as [$keyVar, $valueVar]) {
-                $replacePairs[$keyVar->resolveIndirect()->toString()] = $valueVar->resolveIndirect()->toString();
+                $replacePairs[VmString::coerceStringBuiltinArg($keyVar, 'strtr', 1, 'replace_pairs')] =
+                    VmString::coerceStringBuiltinArg($valueVar, 'strtr', 1, 'replace_pairs');
             }
-            $frame->returnVar->string(VmString::strtrArray(
-                $string->toString(),
-                $replacePairs
-            ));
+            $frame->returnVar->string(VmString::strtrArray($string, $replacePairs));
 
             return;
         }
         if (3 === $argc) {
-            $string = $frame->calledArgs[0]->resolveIndirect();
-            $from = $frame->calledArgs[1]->resolveIndirect();
-            $to = $frame->calledArgs[2]->resolveIndirect();
-            if (Variable::TYPE_STRING !== $string->type
-                || Variable::TYPE_STRING !== $from->type
-                || Variable::TYPE_STRING !== $to->type) {
-                throw new \LogicException('strtr() requires string arguments in this compiler build');
-            }
-            $frame->returnVar->string(VmString::strtr(
-                $string->toString(),
-                $from->toString(),
-                $to->toString()
-            ));
+            $string = VmString::coerceStringBuiltinArg(
+                $frame->calledArgs[0],
+                'strtr',
+                0,
+                'string'
+            );
+            $from = VmString::coerceStringBuiltinArg(
+                $frame->calledArgs[1],
+                'strtr',
+                1,
+                'from'
+            );
+            $to = VmString::coerceStringBuiltinArg(
+                $frame->calledArgs[2],
+                'strtr',
+                2,
+                'to'
+            );
+            $frame->returnVar->string(VmString::strtr($string, $from, $to));
 
             return;
         }
@@ -66,7 +84,7 @@ final class strtr extends Internal
         if (\count($args) >= 2 && self::isReplacePairsArg($args[1])) {
             return JitStrtr::translateArray(
                 $context,
-                $this->jitString($context, $args[0], 'strtr() argument #1'),
+                JitStringBuiltinArg::lower($context, $args[0], 'strtr', 0, 'string'),
                 $this->loadReplacePairs($context, $args[1]),
                 $args[0],
                 $args[1]
@@ -75,9 +93,9 @@ final class strtr extends Internal
         if (3 === \count($args)) {
             return JitStrtr::translate(
                 $context,
-                $this->jitString($context, $args[0], 'strtr() argument #1'),
-                $this->jitString($context, $args[1], 'strtr() argument #2'),
-                $this->jitString($context, $args[2], 'strtr() argument #3'),
+                JitStringBuiltinArg::lower($context, $args[0], 'strtr', 0, 'string'),
+                JitStringBuiltinArg::lower($context, $args[1], 'strtr', 1, 'from'),
+                JitStringBuiltinArg::lower($context, $args[2], 'strtr', 2, 'to'),
                 $args[0],
                 $args[1],
                 $args[2]
