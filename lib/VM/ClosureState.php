@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace PHPCompiler\VM;
 
+use PHPCompiler\Block;
+use PHPCompiler\Compiler\SourceLocation;
 use PHPCompiler\Func;
 
 /**
@@ -34,6 +36,11 @@ final class ClosureState
 
     /** Class scope name for private/protected access (bindTo / fromCallable). */
     public ?string $boundScopeClass = null;
+
+    /** Definition site for var_dump / Closure::__debugInfo (issue #7069). */
+    public string $definitionFile = '';
+
+    public int $definitionLine = 0;
 
     /**
      * Per-closure static locals (Zend zend_closure static_variables; issue #4872).
@@ -82,20 +89,26 @@ final class ClosureState
 
     public static function fromWrappedFunc(Func $func): self
     {
-        $stub = new Func\PHP('{closure}', new \PHPCompiler\Block(null));
+        $stub = new Func\PHP('{closure}', new Block(null));
         $state = new self($stub);
         $state->wrappedFunc = $func;
+        if ($func instanceof Func\PHP) {
+            $state->applyDefinitionSite(null, $func->block);
+        }
 
         return $state;
     }
 
     public static function fromMethodCallable(Func $func, Variable $receiver, string $methodName): self
     {
-        $stub = new Func\PHP('{closure}', new \PHPCompiler\Block(null));
+        $stub = new Func\PHP('{closure}', new Block(null));
         $state = new self($stub);
         $state->wrappedFunc = $func;
         $state->methodReceiver = $receiver;
         $state->methodName = $methodName;
+        if ($func instanceof Func\PHP) {
+            $state->applyDefinitionSite(null, $func->block);
+        }
 
         return $state;
     }
@@ -123,8 +136,89 @@ final class ClosureState
             $clone->staticVars[$name] = $this->copyVar($var);
         }
         $clone->staticInitialized = $this->staticInitialized;
+        $clone->definitionFile = $this->definitionFile;
+        $clone->definitionLine = $this->definitionLine;
 
         return $clone;
+    }
+
+    public function applyDefinitionSite(?SourceLocation $location, ?Block $body): void
+    {
+        if (null !== $location) {
+            if ('' !== $location->filename) {
+                $this->definitionFile = $location->filename;
+            }
+            if ($location->startLine > 0) {
+                $this->definitionLine = $location->startLine;
+            }
+        }
+        if ('' === $this->definitionFile && null !== $body) {
+            $path = $body->scriptPath();
+            if ('' !== $path) {
+                $this->definitionFile = $path;
+            }
+        }
+        if (0 === $this->definitionLine && null !== $body?->func) {
+            $line = $body->func->getLine();
+            if ($line > 0) {
+                $this->definitionLine = $line;
+            }
+        }
+    }
+
+    /**
+     * @return array<string, Variable>
+     */
+    public function debugInfoEntries(): array
+    {
+        if (!$this->isUserClosure()) {
+            return $this->fakeClosureDebugInfoEntries();
+        }
+
+        $entries = [];
+        $name = new Variable();
+        $name->string($this->debugDisplayName());
+        $entries['name'] = $name;
+        if ('' !== $this->definitionFile) {
+            $file = new Variable();
+            $file->string($this->definitionFile);
+            $entries['file'] = $file;
+        }
+        if ($this->definitionLine > 0) {
+            $line = new Variable();
+            $line->int($this->definitionLine);
+            $entries['line'] = $line;
+        }
+
+        return $entries;
+    }
+
+    private function debugDisplayName(): string
+    {
+        $name = $this->func->getName();
+        if (preg_match('/^\{anonymous\}#\d+$/', $name)) {
+            return '{closure}';
+        }
+
+        return $name;
+    }
+
+    /**
+     * @return array<string, Variable>
+     */
+    private function fakeClosureDebugInfoEntries(): array
+    {
+        $wrapped = $this->wrappedFunc ?? $this->func;
+        $label = $wrapped->getName();
+        if (null !== $this->methodName && '' !== $this->methodName) {
+            $scope = $this->boundScopeClass ?? '';
+            if ('' !== $scope) {
+                $label = $scope.'::'.$this->methodName;
+            }
+        }
+        $function = new Variable();
+        $function->string($label);
+        return ['function' => $function];
     }
 
     public function isUserClosure(): bool
@@ -164,6 +258,9 @@ final class ClosureState
         // Instance-only in Zend (zend_closures.stub.php); static Closure::call() must Error (#7144).
         $entry->methodVisibility['call'] = \PHPCfg\Func::FLAG_PUBLIC;
         $entry->methodNames['call'] = 'call';
+        $entry->methods['__debuginfo'] = new Builtin\ClosureDebugInfo();
+        $entry->methodVisibility['__debuginfo'] = \PHPCfg\Func::FLAG_PUBLIC;
+        $entry->methodNames['__debuginfo'] = '__debugInfo';
         $ctx->classes['closure'] = $entry;
     }
 

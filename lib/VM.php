@@ -345,17 +345,28 @@ class VM {
         return (new VM\Builtin\ExceptionGetMessage())->getFrame($this->context);
     }
 
-    /** Invoke a user instance method from VM internals (e.g. __debugInfo, #3259). */
+    /** Invoke an instance method from VM internals (e.g. __debugInfo, #3259, #7069). */
     public function invokeInstanceMethod(ObjectEntry $object, string $methodName, Variable ...$extraArgs): Variable
     {
         $methodLc = strtolower($methodName);
         [$declaring] = $this->resolveInstanceMethod($object->class, $methodLc);
         $func = $declaring->methods[$methodLc];
-        if (!$func instanceof Func\PHP) {
-            throw new \LogicException("{$declaring->name}::{$methodName}() is not a user method in this compiler build");
-        }
         $thisVar = new Variable();
         $thisVar->object($object);
+        if ($func instanceof Func\Internal) {
+            $caller = $this->coercionCallerFrame();
+            $result = new Variable();
+            $catchFrame = $this->invokeVmClassMethod($func, $caller, $result, $thisVar, ...$extraArgs);
+            if (null !== $catchFrame) {
+                throw new VM\MagicMethodInvocationAborted();
+            }
+
+            return $result;
+        }
+        if (!$func instanceof Func\PHP) {
+            throw new \LogicException("{$declaring->name}::{$methodName}() is not invokable in this compiler build");
+        }
+
         return $this->invokePhpFunction($func, $thisVar, ...$extraArgs);
     }
 
@@ -3608,6 +3619,7 @@ restart:
                     $closureFunc = new Func\PHP($funcName, $op->block1);
                     $captures = $this->bindClosureCaptures($frame, $op->closureCaptures);
                     $state = new ClosureState($closureFunc, $captures);
+                    $state->applyDefinitionSite($op->sourceLocation, $op->block1);
                     if (
                         null !== $frame->block->func
                         && null !== $frame->block->func->class
