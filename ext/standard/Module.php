@@ -575,6 +575,8 @@ class Module extends ModuleAbstract
             new date(),
             new gmdate(),
             new getdate(),
+            new gmgetdate(),
+            new gmmktime(),
             new localtime(),
             new idate(),
             new sleep(),

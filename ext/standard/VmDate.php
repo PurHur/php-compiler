@@ -236,8 +236,71 @@ final class VmDate
 
     public static function getdate(?int $timestamp = null): HashTable
     {
+        return self::dateBreakdown($timestamp, false);
+    }
+
+    /**
+     * gmgetdate() — UTC getdate() breakdown (php-src userland pattern; pairs #6706, #7001).
+     */
+    public static function gmgetdate(?int $timestamp = null): HashTable
+    {
+        return self::dateBreakdown($timestamp, true);
+    }
+
+    /**
+     * gmmktime() — UTC mktime (php-src ext/date/php_date.c PHP_FUNCTION(gmmktime), #7001).
+     */
+    public static function gmmktime(
+        int $hour,
+        ?int $minute = null,
+        ?int $second = null,
+        ?int $month = null,
+        ?int $day = null,
+        ?int $year = null
+    ): int|false {
+        if (null === $minute) {
+            $tm = self::gmtime(self::time());
+            if (null === $tm) {
+                return false;
+            }
+            $minute = (int) $tm->tm_min;
+            $second = (int) $tm->tm_sec;
+            $month = (int) $tm->tm_mon + 1;
+            $day = (int) $tm->tm_mday;
+            $year = (int) $tm->tm_year + 1900;
+        } else {
+            $second ??= 0;
+            $month ??= 0;
+            $day ??= 0;
+            $year ??= 0;
+        }
+
+        $ffi = self::ffi();
+        if (null === $ffi) {
+            return false;
+        }
+
+        $tmStruct = $ffi->new('struct tm');
+        $tmStruct->tm_sec = $second;
+        $tmStruct->tm_min = $minute;
+        $tmStruct->tm_hour = $hour;
+        $tmStruct->tm_mday = $day;
+        $tmStruct->tm_mon = $month - 1;
+        $tmStruct->tm_year = $year - 1900;
+        $tmStruct->tm_isdst = 0;
+
+        $result = (int) $ffi->timegm(\FFI::addr($tmStruct));
+        if (-1 === $result) {
+            return false;
+        }
+
+        return $result;
+    }
+
+    private static function dateBreakdown(?int $timestamp, bool $gmt): HashTable
+    {
         $ts = $timestamp ?? self::time();
-        $tm = self::localtime($ts);
+        $tm = $gmt ? self::gmtime($ts) : self::localtime($ts);
         $ht = new HashTable();
         if (null === $tm) {
             return $ht;
@@ -574,6 +637,7 @@ time_t time(time_t *tloc);
 int gettimeofday(struct timeval *tv, struct timezone *tz);
 struct tm *localtime_r(const time_t *timep, struct tm *result);
 struct tm *gmtime_r(const time_t *timep, struct tm *result);
+time_t timegm(struct tm *tm);
 pid_t getpid(void);
 CDEF;
 
