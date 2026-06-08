@@ -13,7 +13,7 @@ use PHPLLVM\Value\Function_ as LlvmFunction;
  * LLVM stream lifecycle helpers — is_resource/fclose/feof/fflush (#5343).
  *
  * Replaces __compiler_is_resource / __compiler_fclose / __compiler_feof / __compiler_fflush
- * in lib/AOT/runtime/phpc_stream.c. Handle table stays in C until full #5343 migration.
+ * Handle table globals: StreamGlobalsJit.php (#5343 phase 5).
  *
  * php-src: ext/standard/file.c, ext/standard/streamsfuncs.c
  */

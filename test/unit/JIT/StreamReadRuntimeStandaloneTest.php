@@ -37,19 +37,4 @@ final class StreamReadRuntimeStandaloneTest extends TestCase
             $this->assertGreaterThan(0, $fn->countBasicBlocks(), $name);
         }
     }
-
-    public function testPhpcStreamCNoLongerDefinesReadHelpers(): void
-    {
-        $source = (string) file_get_contents(__DIR__.'/../../../lib/AOT/runtime/phpc_stream.c');
-        $this->assertStringNotContainsString('__compiler_flock(int64_t', $source);
-        $this->assertStringNotContainsString('__compiler_fpassthru(int64_t', $source);
-        $this->assertStringNotContainsString('__compiler_ftruncate(int64_t', $source);
-        $this->assertStringNotContainsString('__compiler_ftell(int64_t', $source);
-        $this->assertStringNotContainsString('__compiler_fgetc(int64_t', $source);
-        $this->assertStringNotContainsString('__compiler_fgets(int64_t', $source);
-        $this->assertStringNotContainsString('__compiler_stream_get_line(int64_t', $source);
-        $this->assertStringNotContainsString('__compiler_fseek(int64_t', $source);
-        $this->assertStringNotContainsString('__compiler_stream_get_contents(int64_t', $source);
-        $this->assertStringContainsString('StreamReadJit.php', $source);
-    }
 }

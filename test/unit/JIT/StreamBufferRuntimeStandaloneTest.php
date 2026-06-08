@@ -32,14 +32,4 @@ final class StreamBufferRuntimeStandaloneTest extends TestCase
             $this->assertGreaterThan(0, $fn->countBasicBlocks(), $name);
         }
     }
-
-    public function testPhpcStreamCNoLongerDefinesBufferHelpers(): void
-    {
-        $source = (string) file_get_contents(__DIR__.'/../../../lib/AOT/runtime/phpc_stream.c');
-        $this->assertStringNotContainsString('__compiler_stream_set_chunk_size(int64_t', $source);
-        $this->assertStringNotContainsString('__compiler_stream_set_timeout(int64_t', $source);
-        $this->assertStringNotContainsString('__compiler_stream_set_write_buffer(int64_t', $source);
-        $this->assertStringNotContainsString('__compiler_stream_set_read_buffer(int64_t', $source);
-        $this->assertStringContainsString('StreamBufferJit.php', $source);
-    }
 }

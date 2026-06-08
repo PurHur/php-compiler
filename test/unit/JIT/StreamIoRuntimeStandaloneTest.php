@@ -32,14 +32,4 @@ final class StreamIoRuntimeStandaloneTest extends TestCase
             $this->assertGreaterThan(0, $fn->countBasicBlocks(), $name);
         }
     }
-
-    public function testPhpcStreamCNoLongerDefinesIoHelpers(): void
-    {
-        $source = (string) file_get_contents(__DIR__.'/../../../lib/AOT/runtime/phpc_stream.c');
-        $this->assertStringNotContainsString('__compiler_fwrite(int64_t', $source);
-        $this->assertStringNotContainsString('__compiler_fopen(__string__', $source);
-        $this->assertStringNotContainsString('__compiler_tmpfile(void)', $source);
-        $this->assertStringNotContainsString('__compiler_fread(int64_t', $source);
-        $this->assertStringContainsString('StreamIoJit.php', $source);
-    }
 }

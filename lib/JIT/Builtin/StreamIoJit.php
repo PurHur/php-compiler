@@ -13,7 +13,7 @@ use PHPLLVM\Value\Function_ as LlvmFunction;
  * LLVM stream I/O helpers — fopen/fread/fwrite/tmpfile (#5343 phase 3, #4436).
  *
  * Replaces __compiler_fopen / __compiler_fread / __compiler_fwrite / __compiler_tmpfile
- * in lib/AOT/runtime/phpc_stream.c. Handle table globals stay in C until full deletion.
+ * Handle table globals + __phpc_resolve_stream: StreamGlobalsJit.php (#5343 phase 5).
  *
  * php-src: ext/standard/file.c, ext/standard/streamsfuncs.c
  */

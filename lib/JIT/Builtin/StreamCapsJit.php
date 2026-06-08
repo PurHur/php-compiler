@@ -15,7 +15,7 @@ use PHPLLVM\Value\Function_ as LlvmFunction;
  * LLVM stream capability probes — isatty, is_local, supports (#5343, #6035, #6173, #5062).
  *
  * Replaces __compiler_stream_isatty / __compiler_stream_is_local / __compiler_stream_supports
- * in lib/AOT/runtime/phpc_stream.c. Handle table stays in C until full #5343 migration.
+ * Handle table globals: StreamGlobalsJit.php (#5343 phase 5).
  *
  * php-src: ext/standard/streamsfuncs.c
  */

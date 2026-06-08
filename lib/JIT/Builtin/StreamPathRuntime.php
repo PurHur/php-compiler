@@ -11,7 +11,7 @@ use PHPLLVM\Value;
 /**
  * LLVM __phpc_stream_path for fstat() JIT/AOT lowering (issue #6764).
  *
- * Reads fopen paths from phpc_stream_paths[] in lib/AOT/runtime/phpc_stream.c.
+ * Reads fopen paths from phpc_stream_paths[] LLVM global (StreamGlobalsJit.php).
  * Replaces deleted C __phpc_stream_path / __phpc_fstat. php-src: ext/standard/streams.c
  */
 final class StreamPathRuntime

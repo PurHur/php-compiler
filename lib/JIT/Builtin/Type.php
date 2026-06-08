@@ -1025,6 +1025,7 @@ class Type extends Builtin {
         StringFsDir::ensureLinked($this->context);
         StreamSync::ensureLinked($this->context);
         StreamCaps::ensureLinked($this->context);
+        StreamGlobals::ensureLinked($this->context);
         StreamLifecycle::ensureLinked($this->context);
         StreamIo::ensureLinked($this->context);
         StreamBuffer::ensureLinked($this->context);

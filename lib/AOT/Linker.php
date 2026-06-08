@@ -22,7 +22,6 @@ final class Linker
      * @var list<string>
      */
     private const RUNTIME_C_SOURCES = [
-        __DIR__.'/runtime/phpc_stream.c',
         __DIR__.'/runtime/phpc_progress.c',
     ];
 
