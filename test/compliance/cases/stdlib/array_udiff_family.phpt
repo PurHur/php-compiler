@@ -19,6 +19,8 @@ var_export(array_uintersect_uassoc(['a' => 1, 'b' => 2], ['a' => 1], $cmp, $keyc
 echo "\n";
 var_export(array_diff_uassoc(['a' => 1, 'b' => 2], ['a' => 2], $cmp));
 echo "\n";
+var_export(array_intersect_uassoc(['a' => 1, 'b' => 2], ['a' => 1], $cmp));
+echo "\n";
 var_export(array_diff_ukey(['a' => 1, 'b' => 2], ['A' => 3], 'strcasecmp'));
 echo "\n";
 foreach ([
@@ -29,6 +31,7 @@ foreach ([
     'array_uintersect_assoc',
     'array_uintersect_uassoc',
     'array_diff_uassoc',
+    'array_intersect_uassoc',
     'array_diff_ukey',
 ] as $fn) {
     echo $fn, '=', var_export(function_exists($fn), true), "\n";
@@ -57,6 +60,9 @@ array (
   'b' => 2,
 )
 array (
+  'a' => 1,
+)
+array (
   'b' => 2,
 )
 array_udiff=true
@@ -66,4 +72,5 @@ array_uintersect=true
 array_uintersect_assoc=true
 array_uintersect_uassoc=true
 array_diff_uassoc=true
+array_intersect_uassoc=true
 array_diff_ukey=true

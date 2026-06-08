@@ -17,6 +17,10 @@ final class ArrayUdiffVMTest extends BaseTest
             __DIR__.'/cases/stdlib/array_udiff_family.phpt',
             'array_udiff_family.phpt'
         );
+        yield 'array_intersect_uassoc.phpt' => self::parsePHPT(
+            __DIR__.'/cases/stdlib/array_intersect_uassoc.phpt',
+            'array_intersect_uassoc.phpt'
+        );
     }
 
     public function setUp(): void

@@ -9,4 +9,5 @@ array_uintersect_assoc(['a' => 1, 'b' => 2], ['a' => 1], $keycmp);
 array_udiff_uassoc(['a' => 1], ['a' => 1], $cmp, $keycmp);
 array_uintersect_uassoc(['a' => 1, 'b' => 2], ['a' => 1], $cmp, $keycmp);
 array_diff_uassoc(['a' => 1, 'b' => 2], ['a' => 2], $cmp);
+array_intersect_uassoc(['a' => 1, 'b' => 2], ['a' => 1], $cmp);
 array_diff_ukey(['a' => 1, 'b' => 2], ['A' => 3], 'strcasecmp');
