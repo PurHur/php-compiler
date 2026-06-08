@@ -19,6 +19,7 @@ use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitLongArg;
 use PHPCompiler\JIT\HashTableHelper;
 use PHPCompiler\JIT\Variable as JITVariable;
+use PHPCompiler\VM\EnumCaseSupport;
 use PHPCompiler\VM\HashTable;
 use PHPCompiler\VM\Variable;
 use PHPLLVM\Builder;
@@ -40,11 +41,8 @@ final class range extends Internal
         }
         $startVar = $frame->calledArgs[0]->resolveIndirect();
         $endVar = $frame->calledArgs[1]->resolveIndirect();
-        if (Variable::TYPE_INTEGER !== $startVar->type || Variable::TYPE_INTEGER !== $endVar->type) {
-            throw new \LogicException('range() start and end must be integers in this compiler build');
-        }
-        $start = $startVar->toInt();
-        $end = $endVar->toInt();
+        $start = self::resolveRangeEndpoint($frame, $startVar);
+        $end = self::resolveRangeEndpoint($frame, $endVar);
         $step = 1;
         if (3 === \count($frame->calledArgs)) {
             $stepVar = $frame->calledArgs[2]->resolveIndirect();
@@ -127,5 +125,24 @@ final class range extends Internal
         TypeErrorRaise::emitValueError($context, self::ZERO_STEP_ERROR);
         $context->builder->call($context->lookupFunction('abort'));
         $context->builder->positionAtEnd($ok);
+    }
+
+    /**
+     * Zend range() int endpoints: enum cases warn and coerce to legacy object cast 1.
+     *
+     * @see php-src ext/standard/array.c PHP_FUNCTION(range), zval_get_long()
+     */
+    private static function resolveRangeEndpoint(Frame $frame, Variable $var): int
+    {
+        $var = $var->resolveIndirect();
+        if (Variable::TYPE_INTEGER === $var->type) {
+            return $var->toInt();
+        }
+        $enumInt = EnumCaseSupport::tryCastToInt($var, $frame->vmContext, $frame);
+        if (null !== $enumInt) {
+            return $enumInt;
+        }
+
+        throw new \LogicException('range() start and end must be integers in this compiler build');
     }
 }
