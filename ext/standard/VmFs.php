@@ -589,14 +589,12 @@ final class VmFs
     /** @return int|false */
     public static function tmpfile()
     {
-        $fp = @\tmpfile();
+        $fp = VmTmpfileNative::open();
         if (false === $fp) {
             return false;
         }
-        $id = ++self::$nextHandleId;
-        self::$handles[$id] = $fp;
 
-        return $id;
+        return self::adoptStreamResource($fp);
     }
 
     public static function fread(int $handle, int $length) {
