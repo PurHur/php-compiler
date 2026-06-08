@@ -4,8 +4,11 @@ declare(strict_types=1);
 
 namespace PHPCompiler\ext\standard;
 
+use PHPCompiler\ext\session\SessionConstants;
 use PHPCompiler\ext\session\SessionFileStorage;
+use PHPCompiler\VM\BackedEnum;
 use PHPCompiler\VM\Context;
+use PHPCompiler\VM\EnumCaseSupport;
 use PHPCompiler\VM\HashTable;
 use PHPCompiler\VM\Variable;
 use PHPCompiler\Web\ResponseContext;
@@ -40,6 +43,44 @@ final class VmSession
     public static function isActive(): bool
     {
         return self::$active;
+    }
+
+    public static function sessionStatus(): int
+    {
+        return self::$active
+            ? SessionConstants::PHP_SESSION_ACTIVE
+            : SessionConstants::PHP_SESSION_NONE;
+    }
+
+    public static function assignStatusResult(Variable $dest, ?Context $ctx): void
+    {
+        $enum = self::enumCaseForStatus($ctx, self::sessionStatus());
+        if (null !== $enum) {
+            $dest->copyFrom($enum);
+
+            return;
+        }
+        $dest->int(self::sessionStatus());
+    }
+
+    public static function enumCaseForStatus(?Context $ctx, int $status): ?Variable
+    {
+        if (null === $ctx || !isset($ctx->classes['sessionstatus'])) {
+            return null;
+        }
+        $enum = $ctx->classes['sessionstatus'];
+        $needle = new Variable(Variable::TYPE_INTEGER);
+        $needle->int($status);
+        $match = BackedEnum::tryCaseForValue($enum, $needle);
+        if (null === $match) {
+            return null;
+        }
+        $canonical = BackedEnum::canonicalCaseVariable($enum, $match->caseName);
+        if (null !== $canonical) {
+            return $canonical;
+        }
+
+        return EnumCaseSupport::createCase($enum, $match->caseName, $match->backingValue);
     }
 
     public static function getName(): string

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace PHPCompiler\ext\standard;
 
+use PHPCompiler\ext\session\SessionConstants;
 use PHPCompiler\VM\ClassEntry;
 use PHPCompiler\VM\Context;
 use PHPCompiler\VM\EnumCaseSupport;
@@ -24,6 +25,7 @@ final class BuiltinEnums
         self::registerPadType($ctx);
         self::registerMemoryUsage($ctx);
         self::registerConnectionStatus($ctx);
+        self::registerSessionStatus($ctx);
         self::registerResponseCode($ctx);
         foreach (array_diff(array_keys($ctx->classes), $before) as $lc) {
             $ctx->classes[$lc]->isInternal = true;
@@ -185,6 +187,33 @@ final class BuiltinEnums
         EnumSupport::ensureBuiltinEnumInterfaces($entry);
 
         $lc = 'connectionstatus';
+        $ctx->classes[$lc] = $entry;
+        $ctx->enums[$lc] = true;
+    }
+
+    /**
+     * PHP 8.4 SessionStatus: int-backed enum for session_status() (#7321).
+     *
+     * php-src: ext/session/session.stub.php — enum SessionStatus: int
+     */
+    private static function registerSessionStatus(Context $ctx): void
+    {
+        if (isset($ctx->classes['sessionstatus'])) {
+            return;
+        }
+
+        $entry = new ClassEntry('SessionStatus');
+        $entry->isEnum = true;
+        $entry->backedType = 'int';
+
+        self::registerBackedEnumCase($entry, 'Disabled', SessionConstants::PHP_SESSION_DISABLED);
+        self::registerBackedEnumCase($entry, 'None', SessionConstants::PHP_SESSION_NONE);
+        self::registerBackedEnumCase($entry, 'Active', SessionConstants::PHP_SESSION_ACTIVE);
+
+        EnumSupport::ensureBuiltinCasesMethod($entry);
+        EnumSupport::ensureBuiltinEnumInterfaces($entry);
+
+        $lc = 'sessionstatus';
         $ctx->classes[$lc] = $entry;
         $ctx->enums[$lc] = true;
     }
