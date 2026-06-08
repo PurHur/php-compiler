@@ -305,6 +305,8 @@ class String_ extends Type {
         \PHPCompiler\JIT\Builtin\StringFilePutContents::implement($this->context);
         \PHPCompiler\JIT\Builtin\StringDateTime::implement($this->context);
         \PHPCompiler\JIT\Builtin\StringGetdate::implement($this->context);
+        \PHPCompiler\JIT\Builtin\StringGmgetdate::implement($this->context);
+        \PHPCompiler\JIT\Builtin\StringGmmktime::implement($this->context);
         \PHPCompiler\JIT\Builtin\StringLocaltime::implement($this->context);
         \PHPCompiler\JIT\Builtin\StringIdate::implement($this->context);
         \PHPCompiler\JIT\Builtin\ParseUrl::implement($this->context);
