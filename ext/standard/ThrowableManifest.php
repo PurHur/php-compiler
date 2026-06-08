@@ -59,6 +59,8 @@ final class ThrowableManifest
 
     public const LC_FIBER_ERROR = 'fibererror';
 
+    public const LC_FIBER_STACK_OVERFLOW = 'fiberstackoverflow';
+
     public const LC_ARGUMENT_COUNT_ERROR = 'argumentcounterror';
 
     public const LC_PARSE_ERROR = 'parseerror';
@@ -102,6 +104,7 @@ final class ThrowableManifest
         'TypeError' => 'Error',
         'ValueError' => 'Error',
         'FiberError' => 'Error',
+        'FiberStackOverflow' => 'Error',
         'ArgumentCountError' => 'TypeError',
         'ParseError' => 'Error',
         'CompileError' => 'Error',

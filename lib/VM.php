@@ -4015,6 +4015,11 @@ restart:
                         $frame->callArgEntries = [];
                         break;
                     }
+                    $catchFrame = $this->guardFiberStackBeforeCall($frame);
+                    if (null !== $catchFrame) {
+                        $frame = $catchFrame;
+                        goto restart;
+                    }
                     $this->context->push($frame);
                     $frame = $new;
                     goto restart;
@@ -6269,6 +6274,8 @@ restart:
             return $this->dispatchVmValueError($e, $callerFrame);
         } catch (VM\NativeFiberError $e) {
             return $this->dispatchVmFiberError($e, $callerFrame);
+        } catch (VM\NativeFiberStackOverflow $e) {
+            return $this->dispatchVmFiberStackOverflowFromNative($e, $callerFrame);
         } catch (\ParseError $e) {
             return $this->dispatchVmParseError($e, $callerFrame);
         } catch (\CompileError $e) {
@@ -6590,6 +6597,87 @@ restart:
     private function dispatchVmFiberError(VM\NativeFiberError $error, Frame $frame): ?Frame
     {
         $thrown = VM\BuiltinExceptionSupport::materializeFiberError($this->context, $error->getMessage());
+        $catchFrame = $this->findCatchFrameForThrow($frame, $thrown);
+        if (null !== $catchFrame) {
+            return $catchFrame;
+        }
+        $this->raiseUncaughtException($thrown);
+
+        return null;
+    }
+
+    /**
+     * Guard fiber call depth before entering a callee frame (#7267; php-src zend_call_stack_size_error).
+     */
+    private function guardFiberStackBeforeCall(Frame $frame): ?Frame
+    {
+        if (null === $this->context->currentFiber || !VM\FiberStackLimit::wouldOverflow($this->context)) {
+            return null;
+        }
+
+        return $this->dispatchVmFiberStackOverflow($frame);
+    }
+
+    private function dispatchVmFiberStackOverflow(Frame $frame): ?Frame
+    {
+        $fiber = $this->context->currentFiber;
+        if (null !== $fiber) {
+            [$file, $line] = VM\ExceptionSupport::userFatalSite($frame);
+            $thrown = VM\BuiltinExceptionSupport::materializeFiberStackOverflow(
+                $this->context,
+                VM\FiberStackLimit::stackSizeErrorMessage(),
+                $file,
+                $line
+            );
+            $this->context->pendingException = $thrown;
+            for ($handler = $frame; null !== $handler; $handler = $handler->parent) {
+                if ($handler->fiberState !== $fiber && $this->findFiberState($handler) !== $fiber) {
+                    break;
+                }
+                $catchFrame = $this->dispatchCatchForHandlerFrame($handler);
+                if (null !== $catchFrame) {
+                    $catchFrame->fiberState = $fiber;
+                    $fiber->frame = $catchFrame;
+
+                    return $catchFrame;
+                }
+            }
+            $this->clearTryCatchUnwindState();
+            $fiber->status = FiberState::STATUS_TERMINATED;
+            $fiber->frame = null;
+            $fiber->hasReturnValue = false;
+            $fiber->threw = true;
+
+            throw new VM\NativeFiberStackOverflow(VM\FiberStackLimit::stackSizeErrorMessage());
+        }
+
+        [$file, $line] = VM\ExceptionSupport::userFatalSite($frame);
+        $thrown = VM\BuiltinExceptionSupport::materializeFiberStackOverflow(
+            $this->context,
+            VM\FiberStackLimit::stackSizeErrorMessage(),
+            $file,
+            $line
+        );
+        $catchFrame = $this->findCatchFrameForThrow($frame, $thrown);
+        if (null !== $catchFrame) {
+            return $catchFrame;
+        }
+        $this->raiseUncaughtException($thrown);
+
+        return null;
+    }
+
+    private function dispatchVmFiberStackOverflowFromNative(
+        VM\NativeFiberStackOverflow $error,
+        Frame $frame
+    ): ?Frame {
+        [$file, $line] = VM\ExceptionSupport::userFatalSite($frame);
+        $thrown = VM\BuiltinExceptionSupport::materializeFiberStackOverflow(
+            $this->context,
+            $error->getMessage(),
+            $file,
+            $line
+        );
         $catchFrame = $this->findCatchFrameForThrow($frame, $thrown);
         if (null !== $catchFrame) {
             return $catchFrame;
