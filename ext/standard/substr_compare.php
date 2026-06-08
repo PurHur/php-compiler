@@ -6,12 +6,17 @@ namespace PHPCompiler\ext\standard;
 
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
+use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Builtin\StringSubstrCompare;
+use PHPCompiler\JIT\Builtin\TypeErrorRaise;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\JitOperandTypeLabel;
 use PHPCompiler\JIT\JitStringBuiltinArg;
+use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\EnumCaseSupport;
 use PHPCompiler\VM\Variable;
+use PHPLLVM\Builder;
 use PHPLLVM\Value;
 
 /**
@@ -33,20 +38,12 @@ final class substr_compare extends Internal
         }
         $haystack = VmString::coerceStringBuiltinArg($frame->calledArgs[0], 'substr_compare', 0, 'haystack');
         $needle = VmString::coerceStringBuiltinArg($frame->calledArgs[1], 'substr_compare', 1, 'needle');
-        $offset = $frame->calledArgs[2]->resolveIndirect();
-        if (Variable::TYPE_INTEGER !== $offset->type) {
-            throw new \TypeError('substr_compare(): Argument #3 ($offset) must be of type int, '
-                .EnumCaseSupport::typeNameForVariable($offset).' given');
-        }
+        $offsetInt = self::requireIntArg($frame->calledArgs[2], 'substr_compare', 3, 'offset');
         $length = null;
         if ($argc >= 4) {
             $lengthArg = $frame->calledArgs[3]->resolveIndirect();
-            if (Variable::TYPE_NULL === $lengthArg->type) {
-                $length = null;
-            } elseif (Variable::TYPE_INTEGER !== $lengthArg->type) {
-                throw new \LogicException('substr_compare() argument #4 must be an integer in this compiler build');
-            } else {
-                $length = $lengthArg->toInt();
+            if (Variable::TYPE_NULL !== $lengthArg->type) {
+                $length = self::requireIntArg($frame->calledArgs[3], 'substr_compare', 4, 'length');
             }
         }
         $caseInsensitive = false;
@@ -60,7 +57,7 @@ final class substr_compare extends Internal
         $frame->returnVar->int(VmString::substr_compare(
             $haystack,
             $needle,
-            $offset->toInt(),
+            $offsetInt,
             $length,
             $caseInsensitive
         ));
@@ -76,22 +73,14 @@ final class substr_compare extends Internal
         if ($argc < 3 || $argc > 5) {
             throw new \LogicException('substr_compare() accepts three to five arguments in this compiler build');
         }
-        if (JITVariable::TYPE_NATIVE_LONG !== $args[2]->type) {
-            throw new \LogicException('substr_compare() offset must be an integer in this compiler build');
-        }
         $i64 = $context->getTypeFromString('int64');
         $i32 = $context->getTypeFromString('int32');
         $lengthVal = $i64->constInt(-1, false);
         if ($argc >= 4) {
-            if (JITVariable::TYPE_NATIVE_LONG === $args[3]->type) {
-                $lengthVal = $this->jitLong($context, $args[3], 'substr_compare() length');
-            } elseif (JITVariable::TYPE_VALUE === $args[3]->type) {
-                if (!$args[3]->isNullConstant) {
-                    throw new \LogicException('substr_compare() length must be an integer or literal null in this compiler build');
-                }
+            if (JITVariable::TYPE_VALUE === $args[3]->type && $args[3]->isNullConstant) {
                 $lengthVal = $i64->constInt(-1, false);
             } else {
-                throw new \LogicException('substr_compare() length must be an integer or null in this compiler build');
+                $lengthVal = self::lowerStrictIntArg($context, $args[3], 'substr_compare', 4, 'length');
             }
         }
         $ci = $i32->constInt(0, false);
@@ -106,11 +95,156 @@ final class substr_compare extends Internal
         }
         $p0 = $this->stringDataPtr($context, JitStringBuiltinArg::lower($context, $args[0], 'substr_compare', 0, 'haystack'));
         $p1 = $this->stringDataPtr($context, JitStringBuiltinArg::lower($context, $args[1], 'substr_compare', 1, 'needle'));
-        $offset = $this->jitLong($context, $args[2], 'substr_compare() offset');
+        $offset = self::lowerStrictIntArg($context, $args[2], 'substr_compare', 3, 'offset');
         $fn = $context->lookupFunction('substr_compare');
         $raw = $context->builder->call($fn, $p0, $p1, $offset, $lengthVal, $ci);
         $i64 = $context->getTypeFromString('int64');
 
         return $context->builder->sExt($raw, $i64);
+    }
+
+    /**
+     * @throws \TypeError
+     */
+    private static function requireIntArg(Variable $var, string $function, int $argIndex, string $paramName): int
+    {
+        $var = $var->resolveIndirect();
+        if (Variable::TYPE_INTEGER !== $var->type) {
+            throw new \TypeError(sprintf(
+                '%s(): Argument #%d ($%s) must be of type int, %s given',
+                $function,
+                $argIndex,
+                $paramName,
+                EnumCaseSupport::typeNameForVariable($var)
+            ));
+        }
+
+        return $var->toInt();
+    }
+
+    private static function lowerStrictIntArg(
+        Context $context,
+        JITVariable $arg,
+        string $function,
+        int $argIndex,
+        string $paramName
+    ): Value {
+        if (($arg->type & JITVariable::IS_NATIVE_ARRAY) || JITVariable::TYPE_HASHTABLE === $arg->type) {
+            self::emitIntTypeErrorAndAbort($context, $function, $argIndex, $paramName, 'array');
+
+            return $context->getTypeFromString('int64')->constInt(0, false);
+        }
+        if (JITVariable::TYPE_OBJECT === $arg->type) {
+            self::emitIntTypeErrorAndAbort(
+                $context,
+                $function,
+                $argIndex,
+                $paramName,
+                JitOperandTypeLabel::givenLabel($context, $arg)
+            );
+
+            return $context->getTypeFromString('int64')->constInt(0, false);
+        }
+        if (JITVariable::TYPE_VALUE === $arg->type) {
+            return self::lowerBoxedStrictIntArg($context, $arg, $function, $argIndex, $paramName);
+        }
+        if (JITVariable::TYPE_NATIVE_LONG !== $arg->type) {
+            self::emitIntTypeErrorAndAbort(
+                $context,
+                $function,
+                $argIndex,
+                $paramName,
+                JitOperandTypeLabel::givenLabel($context, $arg)
+            );
+
+            return $context->getTypeFromString('int64')->constInt(0, false);
+        }
+
+        return $context->helper->loadValue($arg);
+    }
+
+    private static function lowerBoxedStrictIntArg(
+        Context $context,
+        JITVariable $arg,
+        string $function,
+        int $argIndex,
+        string $paramName
+    ): Value {
+        TypeErrorRaise::registerDeclarations($context);
+        TypeErrorRaise::ensureLinked($context);
+        $valuePtr = JitValueBox::valuePtrFromVariable($context, $arg);
+        $map = $context->structFieldMap['__value__'];
+        $typeByte = $context->builder->load(
+            $context->builder->structGep($valuePtr, $map['type'])
+        );
+        $i8 = $context->getTypeFromString('int8');
+        $arrayTy = $i8->constInt(Variable::TYPE_ARRAY, false);
+        $objectTy = $i8->constInt(Variable::TYPE_OBJECT, false);
+        $enumCaseTy = $i8->constInt(Variable::TYPE_ENUM_CASE, false);
+        $intTy = $i8->constInt(Variable::TYPE_INTEGER, false);
+
+        $okBlock = BasicBlockHelper::append($context, 'substr_compare_int_ok');
+        $arrayBlock = BasicBlockHelper::append($context, 'substr_compare_int_array');
+        $rejectBlock = BasicBlockHelper::append($context, 'substr_compare_int_reject');
+        $coerceBlock = BasicBlockHelper::append($context, 'substr_compare_int_coerce');
+
+        $isArray = $context->builder->icmp(Builder::INT_EQ, $typeByte, $arrayTy);
+        $context->builder->branchIf($isArray, $arrayBlock, $okBlock);
+
+        $context->builder->positionAtEnd($arrayBlock);
+        self::emitIntTypeErrorAndAbort($context, $function, $argIndex, $paramName, 'array');
+
+        $context->builder->positionAtEnd($okBlock);
+        $isObject = $context->builder->icmp(Builder::INT_EQ, $typeByte, $objectTy);
+        $isEnumCase = $context->builder->icmp(Builder::INT_EQ, $typeByte, $enumCaseTy);
+        $isObjOrEnum = $context->builder->or($isObject, $isEnumCase);
+        $context->builder->branchIf($isObjOrEnum, $rejectBlock, $coerceBlock);
+
+        $context->builder->positionAtEnd($rejectBlock);
+        self::emitIntTypeErrorAndAbort(
+            $context,
+            $function,
+            $argIndex,
+            $paramName,
+            JitOperandTypeLabel::givenLabel($context, $arg)
+        );
+
+        $context->builder->positionAtEnd($coerceBlock);
+        $isInt = $context->builder->icmp(Builder::INT_EQ, $typeByte, $intTy);
+        $intOkBlock = BasicBlockHelper::append($context, 'substr_compare_int_read');
+        $stringErrBlock = BasicBlockHelper::append($context, 'substr_compare_int_string_err');
+        $context->builder->branchIf($isInt, $intOkBlock, $stringErrBlock);
+
+        $context->builder->positionAtEnd($stringErrBlock);
+        self::emitIntTypeErrorAndAbort($context, $function, $argIndex, $paramName, 'string');
+
+        $context->builder->positionAtEnd($intOkBlock);
+
+        return $context->builder->call(
+            $context->lookupFunction('__value__readLong'),
+            $valuePtr
+        );
+    }
+
+    private static function emitIntTypeErrorAndAbort(
+        Context $context,
+        string $function,
+        int $argIndex,
+        string $paramName,
+        string $given
+    ): void {
+        TypeErrorRaise::registerDeclarations($context);
+        TypeErrorRaise::ensureLinked($context);
+        TypeErrorRaise::emitRaise(
+            $context,
+            sprintf(
+                '%s(): Argument #%d ($%s) must be of type int, %s given',
+                $function,
+                $argIndex,
+                $paramName,
+                $given
+            )
+        );
+        $context->builder->call($context->lookupFunction('abort'));
     }
 }
