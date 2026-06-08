@@ -1,0 +1,177 @@
+<?php
+
+declare(strict_types=1);
+
+namespace PHPCompiler\ext\hash;
+
+use PHPCompiler\ext\standard\VmHashNative;
+use PHPCompiler\ext\standard\VmStreamArg;
+use PHPCompiler\ext\standard\VmString;
+use PHPCompiler\VM\Context;
+use PHPCompiler\VM\EnumCaseSupport;
+use PHPCompiler\VM\ObjectEntry;
+use PHPCompiler\VM\Variable;
+
+/**
+ * Incremental hash context lifecycle (php-src ext/hash/hash.c; issue #7174).
+ *
+ * Opaque HashContext objects backed by VmHashNative incremental digests — no C growth.
+ */
+final class VmHashContext
+{
+    public const CLASS_LC = 'hashcontext';
+
+    /** @var array<int, array{algo: int, ctx: array<string, mixed>, finalized: bool}> */
+    private static array $store = [];
+
+    public static function registerClass(Context $ctx): void
+    {
+        if (isset($ctx->classes[self::CLASS_LC])) {
+            return;
+        }
+        $entry = new \PHPCompiler\VM\ClassEntry('HashContext');
+        $entry->isInternal = true;
+        $ctx->classes[self::CLASS_LC] = $entry;
+    }
+
+    public static function init(Context $vmCtx, string $algo): Variable
+    {
+        $algoId = VmHashNative::resolveAlgoId($algo);
+        if (0 === $algoId) {
+            throw new \ValueError('hash_init(): Argument #1 ($algo) must be a valid hashing algorithm');
+        }
+        $class = $vmCtx->classes[self::CLASS_LC] ?? null;
+        if (null === $class) {
+            throw new \LogicException('HashContext is not registered in this compiler build');
+        }
+        $entry = new ObjectEntry($class);
+        $entry->constructed = true;
+        self::$store[$entry->id] = [
+            'algo' => $algoId,
+            'ctx' => VmHashNative::incrementalCreate($algoId),
+            'finalized' => false,
+        ];
+        $var = new Variable(Variable::TYPE_OBJECT);
+        $var->object($entry);
+
+        return $var;
+    }
+
+    public static function update(ObjectEntry $entry, string $data): void
+    {
+        self::requireLiveContext($entry, 'hash_update', 1);
+        VmHashNative::incrementalUpdate(
+            self::$store[$entry->id]['algo'],
+            self::$store[$entry->id]['ctx'],
+            $data
+        );
+    }
+
+    public static function final(ObjectEntry $entry, bool $raw = false): string
+    {
+        $state = self::requireLiveContext($entry, 'hash_final', 1);
+        $result = VmHashNative::incrementalFinal($state['algo'], $state['ctx'], $raw);
+        self::$store[$entry->id]['finalized'] = true;
+
+        return $result;
+    }
+
+    public static function copy(ObjectEntry $entry): Variable
+    {
+        $state = self::requireLiveContext($entry, 'hash_copy', 1);
+        $class = $entry->class;
+        $clone = new ObjectEntry($class);
+        $clone->constructed = true;
+        self::$store[$clone->id] = [
+            'algo' => $state['algo'],
+            'ctx' => VmHashNative::incrementalCopy($state['ctx']),
+            'finalized' => false,
+        ];
+        $var = new Variable(Variable::TYPE_OBJECT);
+        $var->object($clone);
+
+        return $var;
+    }
+
+    /**
+     * @return array{algo: int, ctx: array<string, mixed>, finalized: bool}
+     */
+    private static function requireLiveContext(ObjectEntry $entry, string $function, int $argNum): array
+    {
+        $state = self::$store[$entry->id] ?? null;
+        if (null === $state || self::CLASS_LC !== strtolower($entry->class->name)) {
+            throw new \TypeError(\sprintf(
+                '%s(): Argument #%d ($context) must be of type HashContext, %s given',
+                $function,
+                $argNum,
+                $entry->class->name
+            ));
+        }
+        if ($state['finalized']) {
+            throw new \TypeError(\sprintf(
+                '%s(): Argument #%d ($context) must be a valid, non-finalized HashContext',
+                $function,
+                $argNum
+            ));
+        }
+
+        return $state;
+    }
+
+    public static function requireHashContext(
+        Variable $var,
+        string $function,
+        int $argNum,
+        string $paramName = 'context'
+    ): ObjectEntry {
+        $var = $var->resolveIndirect();
+        if (EnumCaseSupport::isEnumCaseVariable($var)) {
+            throw new \TypeError(\sprintf(
+                '%s(): Argument #%d ($%s) must be of type HashContext, %s given',
+                $function,
+                $argNum,
+                $paramName,
+                EnumCaseSupport::typeNameForVariable($var)
+            ));
+        }
+        if (Variable::TYPE_OBJECT !== $var->type) {
+            throw new \TypeError(\sprintf(
+                '%s(): Argument #%d ($%s) must be of type HashContext, %s given',
+                $function,
+                $argNum,
+                $paramName,
+                VmStreamArg::debugTypeName($var)
+            ));
+        }
+        $object = $var->toObject();
+        if (self::CLASS_LC !== strtolower($object->class->name)) {
+            throw new \TypeError(\sprintf(
+                '%s(): Argument #%d ($%s) must be of type HashContext, %s given',
+                $function,
+                $argNum,
+                $paramName,
+                $object->class->name
+            ));
+        }
+        if (!isset(self::$store[$object->id])) {
+            throw new \TypeError(\sprintf(
+                '%s(): Argument #%d ($%s) must be of type HashContext, %s given',
+                $function,
+                $argNum,
+                $paramName,
+                $object->class->name
+            ));
+        }
+
+        return $object;
+    }
+
+    public static function coerceContextString(
+        Variable $var,
+        string $function,
+        int $argNum,
+        string $paramName
+    ): string {
+        return VmString::coerceStringBuiltinArg($var, $function, $argNum, $paramName);
+    }
+}
