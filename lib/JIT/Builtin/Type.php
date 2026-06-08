@@ -880,13 +880,26 @@ class Type extends Builtin {
         );
         $this->context->registerFunction('__phpc_session_destroy_apply', $fnSessionDestroy);
         SessionStart::registerRuntimeDeclaration($this->context);
-        $fntypeJsonEncode = $this->context->context->functionType(
+        $fntypeJsonEncodeValue = $this->context->context->functionType(
+            $this->context->getTypeFromString('__string__*'),
+            false,
+            $valuePtr
+        );
+        $fnJsonEncodeValue = $this->context->module->addFunction(
+            '__compiler_json_encode_value',
+            $fntypeJsonEncodeValue
+        );
+        $this->context->registerFunction('__compiler_json_encode_value', $fnJsonEncodeValue);
+        $fntypeJsonEncodeArray = $this->context->context->functionType(
             $this->context->getTypeFromString('__string__*'),
             false,
             $this->context->getTypeFromString('__hashtable__*')
         );
-        $fnJsonEncode = $this->context->module->addFunction('__compiler_json_encode_hashtable', $fntypeJsonEncode);
-        $this->context->registerFunction('__compiler_json_encode_hashtable', $fnJsonEncode);
+        $fnJsonEncodeArray = $this->context->module->addFunction(
+            '__compiler_json_encode_array',
+            $fntypeJsonEncodeArray
+        );
+        $this->context->registerFunction('__compiler_json_encode_array', $fnJsonEncodeArray);
         $fnJsonDecode = $this->context->module->addFunction(
             '__compiler_json_decode',
             $this->context->context->functionType($void, false, $strPtr, $valuePtr)

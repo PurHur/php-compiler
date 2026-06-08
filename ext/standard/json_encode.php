@@ -13,7 +13,7 @@ use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
 
 /**
- * json_encode() — assoc arrays with scalar values (VM: VmJsonFormat; JIT/AOT via __compiler_json_encode_hashtable).
+ * json_encode() — native VmJson/VmJsonFormat (VM + JIT/AOT via __compiler_json_encode_value, #6852).
  */
 final class json_encode extends Internal
 {
