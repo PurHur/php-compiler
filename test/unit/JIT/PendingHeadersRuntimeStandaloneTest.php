@@ -9,12 +9,22 @@ use PHPCompiler\Runtime;
 use PHPUnit\Framework\TestCase;
 
 /**
- * Issue #5344: AOT standalone must define pending header helpers without phpc_pending_headers.c.
+ * Issue #5344 / #6340: AOT standalone must define pending header helpers without phpc_pending_headers.c.
  *
  * @group aot-lint
  */
 final class PendingHeadersRuntimeStandaloneTest extends TestCase
 {
+    public function testRuntimeShrinkRemovesPendingHeadersC(): void
+    {
+        $this->assertFileDoesNotExist(__DIR__.'/../../../lib/AOT/runtime/phpc_pending_headers.c');
+        $linker = (string) file_get_contents(__DIR__.'/../../../lib/AOT/Linker.php');
+        $this->assertStringNotContainsString('phpc_pending_headers.c', $linker);
+        $runtime = (string) file_get_contents(__DIR__.'/../../../lib/JIT/Builtin/PendingHeadersRuntime.php');
+        $this->assertStringContainsString('appendSetcookieExpires', $runtime);
+        $this->assertStringContainsString('gmtime', $runtime);
+    }
+
     public function testEnsureLinkedDefinesPendingHeadersForStandalone(): void
     {
         $runtime = new Runtime(Runtime::MODE_AOT);

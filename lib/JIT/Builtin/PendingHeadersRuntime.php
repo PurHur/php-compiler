@@ -450,7 +450,74 @@ final class PendingHeadersRuntime
         Value $posSlot,
         Value $expires
     ): Value {
-        unset($context, $fn, $buf, $expires);
+        $i32 = $context->getTypeFromString('int32');
+        $i64 = $context->getTypeFromString('int64');
+        $i64p = $context->getTypeFromString('int64*');
+        $i8p = $context->getTypeFromString('int8*');
+        $sizeT = $context->getTypeFromString('size_t');
+        $skip = $fn->appendBasicBlock('sc_exp_skip_'.++self::$blockSuffix);
+        $work = $fn->appendBasicBlock('sc_exp_work_'.self::$blockSuffix);
+        $done = $fn->appendBasicBlock('sc_exp_done_'.self::$blockSuffix);
+
+        $gtZero = $context->builder->icmp(
+            Builder::INT_SGT,
+            $expires,
+            $i64->constInt(0, false)
+        );
+        $context->builder->branchIf($gtZero, $work, $skip);
+
+        $context->builder->positionAtEnd($skip);
+        $context->builder->branch($done);
+
+        $context->builder->positionAtEnd($work);
+        $pos = $context->builder->load($posSlot);
+        $dest = $context->builder->inBoundsGEP(
+            $context->builder->pointerCast($buf, $i8p),
+            $context->builder->trunc($pos, $i64)
+        );
+        $context->builder->call(
+            $context->lookupFunction('memcpy'),
+            $dest,
+            self::literalCstr($context, '; expires='),
+            $sizeT->constInt(10, false)
+        );
+        $pos = $context->builder->add($pos, $i64->constInt(10, false));
+
+        $tsSlot = $context->builder->alloca($i64, 1);
+        $context->builder->store($expires, $tsSlot);
+        $tmPtr = $context->builder->call(
+            $context->lookupFunction('gmtime'),
+            $context->builder->pointerCast($tsSlot, $i64p)
+        );
+
+        $dateBuf = $context->builder->alloca($context->getTypeFromString('int8')->arrayType(64), 1);
+        $datePtr = $context->builder->pointerCast($dateBuf, $i8p);
+        $context->builder->call(
+            $context->lookupFunction('strftime'),
+            $datePtr,
+            $sizeT->constInt(64, false),
+            self::literalCstr($context, '%a, %d-%b-%Y %H:%M:%S'),
+            $tmPtr
+        );
+
+        $dest2 = $context->builder->inBoundsGEP(
+            $context->builder->pointerCast($buf, $i8p),
+            $context->builder->trunc($pos, $i64)
+        );
+        $written = $context->builder->call(
+            $context->lookupFunction('snprintf'),
+            $context->builder->pointerCast($dest2, $context->getTypeFromString('char*')),
+            $sizeT->constInt(128, false),
+            self::literalCstr($context, '%s GMT'),
+            $datePtr
+        );
+        $context->builder->store(
+            $context->builder->add($pos, $context->builder->zExt($written, $i64)),
+            $posSlot
+        );
+        $context->builder->branch($done);
+
+        $context->builder->positionAtEnd($done);
 
         return $posSlot;
     }
@@ -855,6 +922,8 @@ final class PendingHeadersRuntime
         $i8p = $context->getTypeFromString('int8*');
         $charPtr = $context->getTypeFromString('char*');
 
+        $i64p = $context->getTypeFromString('int64*');
+
         foreach (
             [
                 ['printf', $i32, true, [$charPtr]],
@@ -862,6 +931,8 @@ final class PendingHeadersRuntime
                 ['strlen', $sizeT, false, [$i8p]],
                 ['memcpy', $voidPtr, false, [$voidPtr, $voidPtr, $sizeT]],
                 ['strncasecmp', $i32, false, [$i8p, $i8p, $sizeT]],
+                ['gmtime', $i8p, false, [$i64p]],
+                ['strftime', $sizeT, false, [$i8p, $sizeT, $charPtr, $i8p]],
             ] as [$name, $ret, $vararg, $params]
         ) {
             self::ensureExternal($context, $name, $context->context->functionType($ret, $vararg, ...$params));
