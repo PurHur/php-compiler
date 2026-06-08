@@ -82,6 +82,44 @@ final class VmBcmath
         return $pa['sign'] * $mag;
     }
 
+    /**
+     * Modular exponentiation (php-src ext/bcmath/libbcmath/src/raisemod.c; issue #6976).
+     */
+    public static function powmod(string $base, string $exponent, string $modulus, ?int $scale = null): string
+    {
+        $scale = self::resolveScale($scale);
+        $baseNum = self::parseInteger($base, 1);
+        $expoNum = self::parseInteger($exponent, 2);
+        $modNum = self::parseInteger($modulus, 3);
+
+        if (self::isZero($modNum)) {
+            throw new \DivisionByZeroError('Modulo by zero');
+        }
+        if ($expoNum['sign'] < 0) {
+            throw new \ValueError('bcpowmod(): Argument #2 ($exponent) must be greater than or equal to 0');
+        }
+
+        $baseStr = self::format($baseNum, 0);
+        $modStr = self::format($modNum, 0);
+        $baseStr = self::modInt($baseStr, $modStr);
+
+        if (self::isZero($expoNum)) {
+            return self::format(['sign' => 1, 'int' => '1', 'frac' => ''], $scale);
+        }
+
+        $expoDigits = self::unscaledDigits($expoNum);
+        $result = '1';
+        while (self::cmpDigitStrings($expoDigits, '0') > 0) {
+            if (1 === ((int) $expoDigits[\strlen($expoDigits) - 1] % 2)) {
+                $result = self::modInt(self::mul($result, $baseStr, 0), $modStr);
+            }
+            $baseStr = self::modInt(self::mul($baseStr, $baseStr, 0), $modStr);
+            $expoDigits = self::divDigitStringByTwo($expoDigits);
+        }
+
+        return self::format(self::parse($result), $scale);
+    }
+
     private static function resolveScale(?int $scale): int
     {
         return null !== $scale ? $scale : self::$defaultScale;
@@ -417,5 +455,47 @@ final class VmBcmath
         }
 
         return \strcmp($a, $b) <=> 0;
+    }
+
+    /**
+     * @return array{sign:int,int:string,frac:string}
+     */
+    private static function parseInteger(string $num, int $argNum): array
+    {
+        $parsed = self::parse($num);
+        if ('' !== $parsed['frac']) {
+            throw new \ValueError(\sprintf(
+                'bcpowmod(): Argument #%d ($%s) cannot have a fractional part',
+                $argNum,
+                1 === $argNum ? 'num' : (2 === $argNum ? 'exponent' : 'modulus')
+            ));
+        }
+
+        return $parsed;
+    }
+
+    private static function modInt(string $left, string $right): string
+    {
+        $quotient = self::div($left, $right, 0);
+        $product = self::mul($quotient, $right, 0);
+
+        return self::sub($left, $product, 0);
+    }
+
+    private static function divDigitStringByTwo(string $digits): string
+    {
+        $digits = self::stripLeadingZeros($digits);
+        if ('0' === $digits) {
+            return '0';
+        }
+        $carry = 0;
+        $out = '';
+        for ($i = 0; $i < \strlen($digits); ++$i) {
+            $current = $carry * 10 + (int) $digits[$i];
+            $out .= (string) intdiv($current, 2);
+            $carry = $current % 2;
+        }
+
+        return self::stripLeadingZeros($out);
     }
 }
