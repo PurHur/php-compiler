@@ -13,12 +13,6 @@ final class StringQuotPrint
 {
     public static function ensureLinked(Context $context): void
     {
-        $resume = $context->builder->getInsertBlock();
         StringQuotPrintJit::implement($context);
-        if (null !== $resume) {
-            $context->builder->positionAtEnd($resume);
-        } else {
-            $context->builder->clearInsertionPosition();
-        }
     }
 }
