@@ -7,7 +7,11 @@ namespace PHPCompiler\VM;
 use PHPCfg\Func as CfgFunc;
 use PHPCompiler\VM\Builtin\DateTimeConstruct;
 use PHPCompiler\VM\Builtin\DateTimeFormat;
+use PHPCompiler\VM\Builtin\DateTimeGetMicrosecond;
 use PHPCompiler\VM\Builtin\DateTimeGetTimestamp;
+use PHPCompiler\VM\Builtin\DateTimeImmutableConstruct;
+use PHPCompiler\VM\Builtin\DateTimeImmutableCreateFromFormat;
+use PHPCompiler\VM\Builtin\DateTimeSetMicrosecond;
 use PHPCompiler\VM\Builtin\DateTimeSetTimezone;
 use PHPCompiler\VM\Builtin\DateTimeZoneConstruct;
 use PHPCompiler\VM\Builtin\ExceptionConstruct;
@@ -520,24 +524,44 @@ final class BuiltinClasses
         $tz->methodVisibility['__construct'] = $pub;
         $ctx->classes[DateTimeSupport::CLASS_DATETIMEZONE] = $tz;
 
+        $pubStatic = $pub | CfgFunc::FLAG_STATIC;
+        $dateTimeMethods = [
+            'format' => new DateTimeFormat(),
+            'gettimestamp' => new DateTimeGetTimestamp(),
+            'getmicrosecond' => new DateTimeGetMicrosecond(),
+            'setmicrosecond' => new DateTimeSetMicrosecond(),
+            'settimezone' => new DateTimeSetTimezone(),
+        ];
+
         $dt = new ClassEntry('DateTime');
         $dt->interfaces = [DateTimeSupport::CLASS_DATETIMEINTERFACE];
         $dt->properties[] = new ClassProperty(DateTimeSupport::TS_PROPERTY, null, $intProto);
         $dt->properties[] = new ClassProperty(DateTimeSupport::TZ_PROPERTY, null, $strProto);
+        $dt->properties[] = new ClassProperty(DateTimeSupport::MICROSECOND_PROPERTY, null, $intProto);
         $dt->constructor = new DateTimeConstruct();
         $dt->methods['__construct'] = $dt->constructor;
         $dt->methodVisibility['__construct'] = $pub;
-        foreach (
-            [
-                'format' => new DateTimeFormat(),
-                'gettimestamp' => new DateTimeGetTimestamp(),
-                'settimezone' => new DateTimeSetTimezone(),
-            ] as $name => $method
-        ) {
+        foreach ($dateTimeMethods as $name => $method) {
             $dt->methods[$name] = $method;
             $dt->methodVisibility[$name] = $pub;
         }
         $ctx->classes[DateTimeSupport::CLASS_DATETIME] = $dt;
+
+        $dti = new ClassEntry('DateTimeImmutable');
+        $dti->interfaces = [DateTimeSupport::CLASS_DATETIMEINTERFACE];
+        $dti->properties[] = new ClassProperty(DateTimeSupport::TS_PROPERTY, null, $intProto);
+        $dti->properties[] = new ClassProperty(DateTimeSupport::TZ_PROPERTY, null, $strProto);
+        $dti->properties[] = new ClassProperty(DateTimeSupport::MICROSECOND_PROPERTY, null, $intProto);
+        $dti->constructor = new DateTimeImmutableConstruct();
+        $dti->methods['__construct'] = $dti->constructor;
+        $dti->methodVisibility['__construct'] = $pub;
+        foreach ($dateTimeMethods as $name => $method) {
+            $dti->methods[$name] = $method;
+            $dti->methodVisibility[$name] = $pub;
+        }
+        $dti->methods['createfromformat'] = new DateTimeImmutableCreateFromFormat();
+        $dti->methodVisibility['createfromformat'] = $pubStatic;
+        $ctx->classes[DateTimeSupport::CLASS_DATETIMEIMMUTABLE] = $dti;
     }
 
     private static function registerExceptions(Context $ctx): void

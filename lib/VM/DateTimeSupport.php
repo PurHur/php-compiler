@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace PHPCompiler\VM;
 
 /**
- * Shared helpers for DateTime / DateTimeZone VM builtins (issue #3072).
+ * Shared helpers for DateTime / DateTimeZone VM builtins (issue #3072, #7082).
  *
  * Uses host PHP date extension for parsing and formatting (php-src: ext/date/php_datetime.c).
  */
@@ -14,8 +14,10 @@ final class DateTimeSupport
     public const TZ_NAME_PROPERTY = '__dt_timezone_name';
     public const TS_PROPERTY = '__dt_timestamp';
     public const TZ_PROPERTY = '__dt_timezone';
+    public const MICROSECOND_PROPERTY = '__dt_microsecond';
 
     public const CLASS_DATETIME = 'datetime';
+    public const CLASS_DATETIMEIMMUTABLE = 'datetimeimmutable';
     public const CLASS_DATETIMEZONE = 'datetimezone';
     public const CLASS_DATETIMEINTERFACE = DateTimeInterfaceSupport::INTERFACE_LC;
 
@@ -45,6 +47,41 @@ final class DateTimeSupport
         }
 
         return $obj;
+    }
+
+    public static function requireDateTimeImmutable(Variable $var, string $label): ObjectEntry
+    {
+        $var = $var->resolveIndirect();
+        if (Variable::TYPE_OBJECT !== $var->type) {
+            throw new \TypeError("{$label} must be of type DateTimeImmutable");
+        }
+        $obj = $var->toObject();
+        if (self::CLASS_DATETIMEIMMUTABLE !== strtolower($obj->class->name)) {
+            throw new \TypeError("{$label} must be of type DateTimeImmutable");
+        }
+
+        return $obj;
+    }
+
+    /** Accept DateTime or DateTimeImmutable (#7082). */
+    public static function requireDateTimeLike(Variable $var, string $label): ObjectEntry
+    {
+        $var = $var->resolveIndirect();
+        if (Variable::TYPE_OBJECT !== $var->type) {
+            throw new \TypeError("{$label} must be of type DateTime or DateTimeImmutable");
+        }
+        $obj = $var->toObject();
+        $lc = strtolower($obj->class->name);
+        if (self::CLASS_DATETIME !== $lc && self::CLASS_DATETIMEIMMUTABLE !== $lc) {
+            throw new \TypeError("{$label} must be of type DateTime or DateTimeImmutable");
+        }
+
+        return $obj;
+    }
+
+    public static function isDateTimeImmutable(ObjectEntry $obj): bool
+    {
+        return self::CLASS_DATETIMEIMMUTABLE === strtolower($obj->class->name);
     }
 
     public static function timezoneName(ObjectEntry $zone): string
@@ -91,6 +128,25 @@ final class DateTimeSupport
         $dt->constructed = true;
     }
 
+    public static function initDateTimeFromFormat(
+        ObjectEntry $dt,
+        string $format,
+        string $time,
+        ?ObjectEntry $timezone = null
+    ): void {
+        $tzName = null !== $timezone
+            ? self::timezoneName($timezone)
+            : \date_default_timezone_get();
+        $host = \DateTimeImmutable::createFromFormat($format, $time, new \DateTimeZone($tzName));
+        if (false === $host) {
+            self::throwDateMalformedStringException(
+                'DateTimeImmutable::createFromFormat(): Failed to parse time string ('.$time.')'
+            );
+        }
+        self::syncFromHost($dt, $host);
+        $dt->constructed = true;
+    }
+
     public static function format(ObjectEntry $dt, string $format): string
     {
         return self::toHost($dt)->format($format);
@@ -98,7 +154,31 @@ final class DateTimeSupport
 
     public static function getTimestamp(ObjectEntry $dt): int
     {
-        return self::requireIntProperty($dt, self::TS_PROPERTY, 'DateTime')->toInt();
+        return self::requireIntProperty($dt, self::TS_PROPERTY, self::classLabel($dt))->toInt();
+    }
+
+    public static function getMicrosecond(ObjectEntry $dt): int
+    {
+        return self::requireIntProperty($dt, self::MICROSECOND_PROPERTY, self::classLabel($dt))->toInt();
+    }
+
+    /** php-src zim_DateTime_setMicrosecond — mutable in-place (#7082). */
+    public static function setMicrosecond(ObjectEntry $dt, int $microsecond): void
+    {
+        self::validateMicrosecond($microsecond);
+        self::requireIntProperty($dt, self::MICROSECOND_PROPERTY, self::classLabel($dt))
+            ->int($microsecond);
+    }
+
+    /** php-src zim_DateTimeImmutable_setMicrosecond — returns new instance (#7082). */
+    public static function withMicrosecond(ObjectEntry $dt, int $microsecond): ObjectEntry
+    {
+        self::validateMicrosecond($microsecond);
+        $clone = self::cloneDateTimeObject($dt);
+        self::requireIntProperty($clone, self::MICROSECOND_PROPERTY, self::classLabel($clone))
+            ->int($microsecond);
+
+        return $clone;
     }
 
     public static function setTimezone(ObjectEntry $dt, ObjectEntry $timezone): void
@@ -108,20 +188,62 @@ final class DateTimeSupport
         self::syncFromHost($dt, $host);
     }
 
-    private static function toHost(ObjectEntry $dt): \DateTime
+    private static function validateMicrosecond(int $microsecond): void
     {
-        $ts = self::requireIntProperty($dt, self::TS_PROPERTY, 'DateTime')->toInt();
-        $tzName = self::requireStringProperty($dt, self::TZ_PROPERTY, 'DateTime')->toString();
-        $host = new \DateTime('@'.$ts);
-        $host->setTimezone(new \DateTimeZone($tzName));
-
-        return $host;
+        if ($microsecond < 0 || $microsecond > 999_999) {
+            throw new \ValueError(
+                'DateTime::setMicrosecond(): Argument #1 ($microsecond) must be between 0 and 999999'
+            );
+        }
     }
 
-    private static function syncFromHost(ObjectEntry $dt, \DateTime $host): void
+    private static function cloneDateTimeObject(ObjectEntry $source): ObjectEntry
     {
-        self::requireIntProperty($dt, self::TS_PROPERTY, 'DateTime')->int($host->getTimestamp());
-        self::requireStringProperty($dt, self::TZ_PROPERTY, 'DateTime')->string($host->getTimezone()->getName());
+        $clone = new ObjectEntry($source->class);
+        self::requireIntProperty($clone, self::TS_PROPERTY, self::classLabel($source))
+            ->int(self::requireIntProperty($source, self::TS_PROPERTY, self::classLabel($source))->toInt());
+        self::requireStringProperty($clone, self::TZ_PROPERTY, self::classLabel($source))
+            ->string(self::requireStringProperty($source, self::TZ_PROPERTY, self::classLabel($source))->toString());
+        self::requireIntProperty($clone, self::MICROSECOND_PROPERTY, self::classLabel($source))
+            ->int(self::requireIntProperty($source, self::MICROSECOND_PROPERTY, self::classLabel($source))->toInt());
+        $clone->constructed = true;
+
+        return $clone;
+    }
+
+    private static function toHost(ObjectEntry $dt): \DateTimeInterface
+    {
+        $ts = self::requireIntProperty($dt, self::TS_PROPERTY, self::classLabel($dt))->toInt();
+        $microsecond = self::requireIntProperty($dt, self::MICROSECOND_PROPERTY, self::classLabel($dt))->toInt();
+        $tzName = self::requireStringProperty($dt, self::TZ_PROPERTY, self::classLabel($dt))->toString();
+        $host = \DateTimeImmutable::createFromFormat(
+            'U.u',
+            \sprintf('%d.%06d', $ts, $microsecond),
+            new \DateTimeZone('UTC')
+        );
+        if (false === $host) {
+            throw new \LogicException('DateTime backing conversion failed in this compiler build');
+        }
+        $mutable = \DateTime::createFromImmutable($host);
+        $mutable->setTimezone(new \DateTimeZone($tzName));
+
+        return $mutable;
+    }
+
+    private static function syncFromHost(ObjectEntry $dt, \DateTimeInterface $host): void
+    {
+        self::requireIntProperty($dt, self::TS_PROPERTY, self::classLabel($dt))->int($host->getTimestamp());
+        self::requireStringProperty($dt, self::TZ_PROPERTY, self::classLabel($dt))
+            ->string($host->getTimezone()->getName());
+        $microsecond = \method_exists($host, 'getMicrosecond')
+            ? (int) $host->getMicrosecond()
+            : (int) $host->format('u');
+        self::requireIntProperty($dt, self::MICROSECOND_PROPERTY, self::classLabel($dt))->int($microsecond);
+    }
+
+    private static function classLabel(ObjectEntry $obj): string
+    {
+        return self::isDateTimeImmutable($obj) ? 'DateTimeImmutable' : 'DateTime';
     }
 
     private static function requireStringProperty(ObjectEntry $obj, string $name, string $classLabel): Variable
