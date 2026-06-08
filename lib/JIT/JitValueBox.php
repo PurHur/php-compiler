@@ -283,6 +283,17 @@ final class JitValueBox
 
                 return;
         }
+        if (ArrayBuiltinHelper::isNativeArray($value->type)) {
+            $ht = ArrayBuiltinHelper::loadHashTable($context, $value);
+            $context->refcount->addref($ht);
+            $context->builder->call(
+                $context->lookupFunction('__value__writeHashtable'),
+                $destPtr,
+                $ht
+            );
+
+            return;
+        }
         throw new \LogicException(
             'assignToPointer: unsupported source type '.Variable::getStringType($value->type)
         );
@@ -604,6 +615,16 @@ final class JitValueBox
                 );
                 break;
             default:
+                if (ArrayBuiltinHelper::isNativeArray($var->type)) {
+                    $ht = ArrayBuiltinHelper::loadHashTable($context, $var);
+                    $context->refcount->addref($ht);
+                    $context->builder->call(
+                        $context->lookupFunction('__value__writeHashtable'),
+                        self::pointer($context, $slot),
+                        $ht
+                    );
+                    break;
+                }
                 throw new \LogicException(
                     'valuePtrFromNativeVariable unsupported type: '.Variable::getStringType($var->type)
                 );
