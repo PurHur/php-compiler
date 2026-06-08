@@ -481,6 +481,14 @@ final class VmMath
         $returnVar->float(\pow(self::toFloat($base), self::toFloat($exp)));
     }
 
+    /**
+     * fpow() — always returns float (php-src ext/standard/math.c zend_fpow; #7045).
+     */
+    public static function fpow(float $num, float $exponent): float
+    {
+        return \pow($num, $exponent);
+    }
+
     /** @return float fractional part; writes integer part to $intPart (php-src modf). */
     public static function modf(float $num, float &$intPart): float
     {

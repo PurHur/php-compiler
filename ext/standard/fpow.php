@@ -51,7 +51,7 @@ final class fpow extends Internal
         if (null === $frame->returnVar) {
             return;
         }
-        $frame->returnVar->float(\function_exists('fpow') ? \fpow($num, $exponent) : \pow($num, $exponent));
+        $frame->returnVar->float(VmMath::fpow($num, $exponent));
     }
 
     public function call(Context $context, JITVariable ...$args): Value
