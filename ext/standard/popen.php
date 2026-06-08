@@ -50,7 +50,7 @@ final class popen extends Internal
 
             return;
         }
-        $frame->returnVar->streamHandle($handle);
+        $frame->returnVar->streamHandle($handle, $frame->vmContext);
     }
 
     public function call(Context $context, JITVariable ...$args): Value

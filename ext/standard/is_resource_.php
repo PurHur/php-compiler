@@ -57,7 +57,9 @@ final class is_resource_ extends Internal
     public static function isResource(Variable $v): bool
     {
         if ($v->isStreamResource()) {
-            return VmFs::isValidHandle($v->toInt());
+            $handle = \PHPCompiler\VM\ResourceSupport::resolveHandle($v);
+
+            return null !== $handle && VmFs::isValidHandle($handle);
         }
         if ($v->isDirResource()) {
             return VmDir::isValidHandle($v->toInt());

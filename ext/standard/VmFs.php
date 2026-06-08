@@ -1092,7 +1092,7 @@ final class VmFs
      *
      * @throws \ValueError when $type is not a supported resource type filter
      */
-    public static function getResourcesTable(?string $type = null): HashTable
+    public static function getResourcesTable(?string $type = null, ?\PHPCompiler\VM\Context $ctx = null): HashTable
     {
         if (null !== $type && 'stream' !== $type) {
             throw new \ValueError('get_resources(): Argument #1 ($type) must be a valid resource type');
@@ -1101,7 +1101,7 @@ final class VmFs
         $index = 1;
         foreach (self::$handles as $id => $fp) {
             $value = new Variable();
-            $value->streamHandle((int) $id);
+            $value->streamHandle((int) $id, $ctx);
             $ht->addIndex($index, $value);
             ++$index;
         }

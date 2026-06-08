@@ -44,16 +44,13 @@ final class gettype extends Internal
         if (null === $frame->returnVar) {
             return;
         }
-        if (Variable::TYPE_OBJECT === $v->type || Variable::TYPE_ENUM_CASE === $v->type) {
-            $frame->returnVar->string('object');
+        if ($v->isVmResource()) {
+            $frame->returnVar->string('resource');
 
             return;
         }
-        if ($v->isStreamResource()
-            || $v->isDirResource()
-            || $v->isBrigadeResource()
-            || $v->isBucketResource()) {
-            $frame->returnVar->string('resource');
+        if (Variable::TYPE_OBJECT === $v->type || Variable::TYPE_ENUM_CASE === $v->type) {
+            $frame->returnVar->string('object');
 
             return;
         }

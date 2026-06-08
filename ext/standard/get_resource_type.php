@@ -30,12 +30,16 @@ final class get_resource_type extends Internal
         }
         VmStreamArg::rejectEnumCaseOperand($v, 'get_resource_type');
         if ($v->isStreamResource()) {
-            $frame->returnVar->string(VmFs::resourceTypeForStreamTag($v->toInt()));
+            $handle = \PHPCompiler\VM\ResourceSupport::resolveHandle($v);
+            if (null !== $handle) {
+                $frame->returnVar->string(VmFs::resourceTypeForStreamTag($handle));
 
-            return;
+                return;
+            }
         }
         if ($v->isBrigadeResource()) {
-            $type = VmStreamBucket::getResourceType($v->toInt(), true);
+            $handle = \PHPCompiler\VM\ResourceSupport::resolveHandle($v);
+            $type = null !== $handle ? VmStreamBucket::getResourceType($handle, true) : null;
             if (null !== $type) {
                 $frame->returnVar->string($type);
 
@@ -43,7 +47,8 @@ final class get_resource_type extends Internal
             }
         }
         if ($v->isBucketResource()) {
-            $type = VmStreamBucket::getResourceType($v->toInt(), false);
+            $handle = \PHPCompiler\VM\ResourceSupport::resolveHandle($v);
+            $type = null !== $handle ? VmStreamBucket::getResourceType($handle, false) : null;
             if (null !== $type) {
                 $frame->returnVar->string($type);
 
@@ -53,7 +58,8 @@ final class get_resource_type extends Internal
         if (!is_resource_::isResource($v)) {
             throw new \TypeError(\sprintf(self::TYPE_ERROR, VmStreamArg::debugTypeName($v)));
         }
-        $type = VmFs::getResourceType($v->toInt());
+        $handle = \PHPCompiler\VM\ResourceSupport::resolveHandle($v);
+        $type = null !== $handle ? VmFs::getResourceType($handle) : null;
         if (null === $type) {
             throw new \TypeError(\sprintf(self::TYPE_ERROR, VmStreamArg::debugTypeName($v)));
         }

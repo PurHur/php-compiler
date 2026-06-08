@@ -248,13 +248,68 @@ final class Variable {
         $this->bucketResource = false;
     }
 
-    public function streamHandle(int $value): void
+    public function streamHandle(int $value, ?Context $ctx = null): void
     {
         if ($this->type === self::TYPE_INDIRECT) {
-            $this->indirect->streamHandle($value);
+            $this->indirect->streamHandle($value, $ctx);
 
             return;
         }
+        if (null !== $ctx) {
+            ResourceSupport::wrap($this, $value, ResourceState::KIND_STREAM, $ctx);
+
+            return;
+        }
+        $this->legacyStreamHandle($value);
+    }
+
+    public function dirHandle(int $value, ?Context $ctx = null): void
+    {
+        if ($this->type === self::TYPE_INDIRECT) {
+            $this->indirect->dirHandle($value, $ctx);
+
+            return;
+        }
+        if (null !== $ctx) {
+            ResourceSupport::wrap($this, $value, ResourceState::KIND_DIR, $ctx);
+
+            return;
+        }
+        $this->legacyDirHandle($value);
+    }
+
+    public function brigadeHandle(int $value, ?Context $ctx = null): void
+    {
+        if ($this->type === self::TYPE_INDIRECT) {
+            $this->indirect->brigadeHandle($value, $ctx);
+
+            return;
+        }
+        if (null !== $ctx) {
+            ResourceSupport::wrap($this, $value, ResourceState::KIND_BRIGADE, $ctx);
+
+            return;
+        }
+        $this->legacyBrigadeHandle($value);
+    }
+
+    public function bucketHandle(int $value, ?Context $ctx = null): void
+    {
+        if ($this->type === self::TYPE_INDIRECT) {
+            $this->indirect->bucketHandle($value, $ctx);
+
+            return;
+        }
+        if (null !== $ctx) {
+            ResourceSupport::wrap($this, $value, ResourceState::KIND_BUCKET, $ctx);
+
+            return;
+        }
+        $this->legacyBucketHandle($value);
+    }
+
+    public function legacyStreamHandle(int $value): void
+    {
         $this->int($value);
         $this->streamResource = true;
         $this->dirResource = false;
@@ -262,13 +317,8 @@ final class Variable {
         $this->bucketResource = false;
     }
 
-    public function dirHandle(int $value): void
+    public function legacyDirHandle(int $value): void
     {
-        if ($this->type === self::TYPE_INDIRECT) {
-            $this->indirect->dirHandle($value);
-
-            return;
-        }
         $this->int($value);
         $this->dirResource = true;
         $this->streamResource = false;
@@ -276,13 +326,8 @@ final class Variable {
         $this->bucketResource = false;
     }
 
-    public function brigadeHandle(int $value): void
+    public function legacyBrigadeHandle(int $value): void
     {
-        if ($this->type === self::TYPE_INDIRECT) {
-            $this->indirect->brigadeHandle($value);
-
-            return;
-        }
         $this->int($value);
         $this->brigadeResource = true;
         $this->streamResource = false;
@@ -290,13 +335,8 @@ final class Variable {
         $this->bucketResource = false;
     }
 
-    public function bucketHandle(int $value): void
+    public function legacyBucketHandle(int $value): void
     {
-        if ($this->type === self::TYPE_INDIRECT) {
-            $this->indirect->bucketHandle($value);
-
-            return;
-        }
         $this->int($value);
         $this->bucketResource = true;
         $this->streamResource = false;
@@ -306,30 +346,27 @@ final class Variable {
 
     public function isStreamResource(): bool
     {
-        return $this->streamResource && self::TYPE_INTEGER === $this->type;
+        return ResourceSupport::isStreamResource($this);
     }
 
     public function isDirResource(): bool
     {
-        return $this->dirResource && self::TYPE_INTEGER === $this->type;
+        return ResourceSupport::isDirResource($this);
     }
 
     public function isBrigadeResource(): bool
     {
-        return $this->brigadeResource && self::TYPE_INTEGER === $this->type;
+        return ResourceSupport::isBrigadeResource($this);
     }
 
     public function isBucketResource(): bool
     {
-        return $this->bucketResource && self::TYPE_INTEGER === $this->type;
+        return ResourceSupport::isBucketResource($this);
     }
 
     public function isVmResource(): bool
     {
-        return $this->isStreamResource()
-            || $this->isDirResource()
-            || $this->isBrigadeResource()
-            || $this->isBucketResource();
+        return ResourceSupport::isVmResource($this);
     }
 
     /**
@@ -339,24 +376,7 @@ final class Variable {
      */
     private static function compareVmResources(Variable $left, Variable $right): ?bool
     {
-        $left = $left->resolveIndirect();
-        $right = $right->resolveIndirect();
-        $leftRes = $left->isVmResource();
-        $rightRes = $right->isVmResource();
-        if (!$leftRes && !$rightRes) {
-            return null;
-        }
-        if ($leftRes !== $rightRes) {
-            return false;
-        }
-        if ($left->streamResource !== $right->streamResource
-            || $left->dirResource !== $right->dirResource
-            || $left->brigadeResource !== $right->brigadeResource
-            || $left->bucketResource !== $right->bucketResource) {
-            return false;
-        }
-
-        return $left->integer === $right->integer;
+        return ResourceSupport::compareResources($left, $right);
     }
 
     public function is(int $type): bool {
@@ -388,6 +408,12 @@ final class Variable {
             case self::TYPE_ARRAY:
                 return $this->toArray()->getNumElements() > 0 ? 1 : 0;
             case self::TYPE_OBJECT:
+                if (ResourceSupport::isResourceObject($this->toObject())) {
+                    $handle = ResourceSupport::resolveHandle($this);
+                    if (null !== $handle) {
+                        return $handle;
+                    }
+                }
                 if (EnumCaseSupport::isEnumCase($this->toObject())) {
                     $enumInt = EnumCaseSupport::tryCastToInt($this, $vm?->context);
                     if (null !== $enumInt) {
@@ -699,6 +725,11 @@ final class Variable {
                 self::emitArrayToStringWarning($vm, $frame);
                 return 'Array';
             case self::TYPE_OBJECT:
+                if (ResourceSupport::isResourceObject($var->object)) {
+                    $handle = ResourceSupport::resolveHandle($var);
+
+                    return 'Resource id #'.(null !== $handle ? $handle : $var->object->id);
+                }
                 if (EnumCaseSupport::isEnumCase($var->object)) {
                     throw new \Error(
                         'Object of class '.$var->object->class->name.' could not be converted to string'
@@ -1230,6 +1261,11 @@ final class Variable {
             return false;
         }
         if (self::TYPE_OBJECT === $self->type) {
+            $resourceCmp = self::compareVmResources($self, $other);
+            if (null !== $resourceCmp) {
+                return $resourceCmp;
+            }
+
             return $self->object === $other->object;
         }
         if (self::TYPE_STRING === $self->type) {
@@ -1258,6 +1294,11 @@ restart:
             case TYPE_PAIR_FLOAT_FLOAT:
                 return $self->float === $other->float;
             case TYPE_PAIR_OBJECT_OBJECT:
+                $resourceCmp = self::compareVmResources($self, $other);
+                if (null !== $resourceCmp) {
+                    return $resourceCmp;
+                }
+
                 return $self->object->looseEquals($other->object);
             case TYPE_PAIR_ENUM_CASE_ENUM_CASE:
                 return $self->enumCase->enumClass === $other->enumCase->enumClass
@@ -2349,6 +2390,9 @@ restart:
                     );
                 }
                 if (self::TYPE_OBJECT === $this->type) {
+                    if (ResourceSupport::isResourceObject($this->object)) {
+                        throw new \TypeError('Cannot increment resource');
+                    }
                     throw new \TypeError(
                         'Cannot increment '.$this->object->class->name
                     );
@@ -2406,6 +2450,9 @@ restart:
                     );
                 }
                 if (self::TYPE_OBJECT === $this->type) {
+                    if (ResourceSupport::isResourceObject($this->object)) {
+                        throw new \TypeError('Cannot decrement resource');
+                    }
                     throw new \TypeError(
                         'Cannot decrement '.$this->object->class->name
                     );

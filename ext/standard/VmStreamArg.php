@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace PHPCompiler\ext\standard;
 
 use PHPCompiler\VM\EnumCaseSupport;
+use PHPCompiler\VM\ResourceSupport;
 use PHPCompiler\VM\Variable;
 
 /** Shared stream argument helpers (issue #3755, #6044). */
@@ -27,17 +28,11 @@ final class VmStreamArg
                 EnumCaseSupport::typeNameForVariable($v)
             ));
         }
-        if (Variable::TYPE_INTEGER !== $v->type) {
-            throw new \TypeError(\sprintf(
-                '%s(): Argument #%d ($stream) must be of type resource, %s given',
-                $functionName,
-                $argNum,
-                self::debugTypeName($v)
-            ));
-        }
-        $handle = $v->toInt();
-        if ($v->isStreamResource() || VmFs::isValidHandle($handle)) {
-            return $handle;
+        if (ResourceSupport::isOpenStreamResource($v)) {
+            $handle = ResourceSupport::resolveHandle($v);
+            if (null !== $handle) {
+                return $handle;
+            }
         }
 
         throw new \TypeError(\sprintf(
@@ -53,6 +48,10 @@ final class VmStreamArg
         $v = $v->resolveIndirect();
         if (EnumCaseSupport::isEnumCaseVariable($v)) {
             return EnumCaseSupport::typeNameForVariable($v);
+        }
+        $resourceDebug = ResourceSupport::debugTypeName($v);
+        if (null !== $resourceDebug) {
+            return $resourceDebug;
         }
 
         switch ($v->type) {

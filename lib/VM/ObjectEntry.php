@@ -64,6 +64,9 @@ class ObjectEntry {
     /** PHP 8.1 fiber callback state (issue #3130). */
     public ?FiberState $fiberState = null;
 
+    /** PHP 8.4 Resource object handle payload (#7073). */
+    public ?ResourceState $resourceState = null;
+
     /** True after readonly($object) marks this instance immutable (#6485). */
     public bool $dynamicReadonly = false;
 

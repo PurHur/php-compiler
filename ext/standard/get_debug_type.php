@@ -50,6 +50,12 @@ final class get_debug_type extends Internal
 
             return;
         }
+        $resourceDebug = \PHPCompiler\VM\ResourceSupport::debugTypeName($v);
+        if (null !== $resourceDebug) {
+            $frame->returnVar->string($resourceDebug);
+
+            return;
+        }
         if (Variable::TYPE_OBJECT === $v->type) {
             $frame->returnVar->string($v->toObject()->class->name);
 
