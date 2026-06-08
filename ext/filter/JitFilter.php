@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace PHPCompiler\ext\standard;
+namespace PHPCompiler\ext\filter;
 
 use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Builtin\StringFilterEmail;
@@ -12,7 +12,7 @@ use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Builder;
 use PHPLLVM\Value;
 
-/** LLVM JIT/AOT helpers for filter_var() / filter_input() (issue #104). */
+/** LLVM JIT/AOT helpers for filter_var() / filter_input() (issues #104, #6028). */
 final class JitFilter
 {
     private static int $blockSerial = 0;

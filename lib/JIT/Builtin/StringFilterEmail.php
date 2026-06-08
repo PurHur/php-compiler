@@ -12,7 +12,7 @@ use PHPLLVM\Value;
  * LLVM implementation of __compiler_filter_validate_email (issue #6082).
  *
  * php-src: ext/filter/logical_filters.c — FILTER_VALIDATE_EMAIL subset.
- * VM semantics: ext/standard/VmFilter::isValidEmailSubset().
+ * VM semantics: ext/filter/VmFilter::isValidEmailSubset().
  */
 final class StringFilterEmail
 {

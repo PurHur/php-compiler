@@ -193,23 +193,23 @@ class Context {
                 return $var;
             case 'filter_validate_int':
                 $var = new Variable(Variable::TYPE_INTEGER);
-                $var->int(\PHPCompiler\ext\standard\VmFilter::FILTER_VALIDATE_INT);
+                $var->int(\PHPCompiler\ext\filter\VmFilter::FILTER_VALIDATE_INT);
                 return $var;
             case 'filter_validate_email':
                 $var = new Variable(Variable::TYPE_INTEGER);
-                $var->int(\PHPCompiler\ext\standard\VmFilter::FILTER_VALIDATE_EMAIL);
+                $var->int(\PHPCompiler\ext\filter\VmFilter::FILTER_VALIDATE_EMAIL);
                 return $var;
             case 'filter_null_on_failure':
                 $var = new Variable(Variable::TYPE_INTEGER);
-                $var->int(\PHPCompiler\ext\standard\VmFilter::FILTER_NULL_ON_FAILURE);
+                $var->int(\PHPCompiler\ext\filter\VmFilter::FILTER_NULL_ON_FAILURE);
                 return $var;
             case 'input_get':
                 $var = new Variable(Variable::TYPE_INTEGER);
-                $var->int(\PHPCompiler\ext\standard\VmFilter::INPUT_GET);
+                $var->int(\PHPCompiler\ext\filter\VmFilter::INPUT_GET);
                 return $var;
             case 'input_post':
                 $var = new Variable(Variable::TYPE_INTEGER);
-                $var->int(\PHPCompiler\ext\standard\VmFilter::INPUT_POST);
+                $var->int(\PHPCompiler\ext\filter\VmFilter::INPUT_POST);
                 return $var;
         }
         $stdlibInt = \PHPCompiler\ext\standard\StdlibConstants::CORE_INT_BY_NAME[strtolower($name)] ?? null;
