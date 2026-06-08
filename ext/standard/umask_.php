@@ -7,9 +7,7 @@ namespace PHPCompiler\ext\standard;
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Context;
-use PHPCompiler\JIT\JitLongArg;
 use PHPCompiler\JIT\Variable as JITVariable;
-use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
 
 /** umask() — process file-creation mask (VM host; JIT/AOT via libc umask(2), #3226). */
@@ -34,11 +32,13 @@ final class umask_ extends Internal
 
             return;
         }
-        $arg = $frame->calledArgs[0]->resolveIndirect();
-        if (Variable::TYPE_INTEGER !== $arg->type) {
-            throw new \LogicException('umask() mask must be an integer in this compiler build');
-        }
-        $frame->returnVar->int((int) \umask($arg->toInt()));
+        $mask = VmMath::parseIntBuiltinArg(
+            $frame->calledArgs[0]->resolveIndirect(),
+            'umask',
+            1,
+            'mask'
+        );
+        $frame->returnVar->int((int) \umask($mask));
     }
 
     public function call(Context $context, JITVariable ...$args): Value
@@ -48,7 +48,7 @@ final class umask_ extends Internal
         }
         $mask = null;
         if (isset($args[0])) {
-            $mask = JitLongArg::lower($context, $args[0], 'umask() mask');
+            $mask = JitSleep::zParamLong($context, $args[0], 'umask', 1, 'mask');
         }
 
         return JitUmask::invoke($context, $mask);
