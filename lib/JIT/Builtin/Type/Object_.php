@@ -152,6 +152,8 @@ class Object_ extends Type {
 
     private bool $traversableInterfacesSeeded = false;
 
+    private bool $zendBuiltinInterfacesSeeded = false;
+
     private bool $lazyGhostTraitSeeded = false;
 
     /** @var array<int, true> class ids that use LazyGhostTrait (#6096) */
@@ -1501,6 +1503,8 @@ class Object_ extends Type {
 
     public function isInterfaceClassLc(string $classLc): bool
     {
+        $this->ensureZendBuiltinInterfaces();
+
         return isset($this->interfaceClassLcs[strtolower(ltrim($classLc, '\\'))]);
     }
 
@@ -1565,6 +1569,19 @@ class Object_ extends Type {
         }
 
         return array_values(array_unique($out));
+    }
+
+    /** Zend zend_interfaces.c — UnitEnum, BackedEnum, Serializable (#6354). */
+    private function ensureZendBuiltinInterfaces(): void
+    {
+        if ($this->zendBuiltinInterfacesSeeded) {
+            return;
+        }
+        $this->zendBuiltinInterfacesSeeded = true;
+        $this->markInterfaceClass('UnitEnum');
+        $this->markInterfaceClass('BackedEnum');
+        $this->setInterfaceExtends('BackedEnum', ['UnitEnum']);
+        $this->markInterfaceClass('Serializable');
     }
 
     /** Zend traversable/iterator/iteratoraggregate hierarchy for instanceof (#4754, #4771). */
