@@ -16,6 +16,7 @@ final class BuiltinExceptionSupport
     public const CLASS_ARGUMENT_COUNT_ERROR = 'argumentcounterror';
     public const CLASS_VALUE_ERROR = 'valueerror';
     public const CLASS_DIVISION_BY_ZERO_ERROR = 'divisionbyzeroerror';
+    public const CLASS_ARITHMETIC_ERROR = 'arithmeticerror';
     public const CLASS_FIBER_ERROR = 'fibererror';
     public const CLASS_COMPILE_ERROR = 'compileerror';
     public const CLASS_REFLECTION_EXCEPTION = 'reflectionexception';
@@ -121,6 +122,9 @@ final class BuiltinExceptionSupport
         if ($error instanceof \DivisionByZeroError) {
             return self::materializeDivisionByZeroError($ctx, $error->getMessage());
         }
+        if ($error instanceof \ArithmeticError) {
+            return self::materializeArithmeticError($ctx, $error->getMessage());
+        }
 
         return self::materializeError($ctx, $error->getMessage(), $file, $line);
     }
@@ -159,5 +163,10 @@ final class BuiltinExceptionSupport
         $var->object($obj);
 
         return $var;
+    }
+
+    public static function materializeArithmeticError(Context $ctx, string $message): Variable
+    {
+        return self::materializeThrowable($ctx, self::CLASS_ARITHMETIC_ERROR, $message);
     }
 }

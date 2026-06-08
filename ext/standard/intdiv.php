@@ -46,6 +46,9 @@ final class intdiv extends Internal
         if (0 === $num2) {
             throw new \DivisionByZeroError('Division by zero');
         }
+        if (\PHP_INT_MIN === $num1 && -1 === $num2) {
+            throw new \ArithmeticError('Division of PHP_INT_MIN by -1 is not an integer');
+        }
         if (null === $frame->returnVar) {
             return;
         }
@@ -62,6 +65,12 @@ final class intdiv extends Internal
         }
         [$left, $right] = JitIntdiv::lowerOperands($context, $args[0], $args[1]);
         JitNumericDivisionGuard::emitZeroLongDivisorGuard($context, $right, 'Division by zero');
+        JitNumericDivisionGuard::emitIntMinNegOneOverflowGuard(
+            $context,
+            $left,
+            $right,
+            'Division of PHP_INT_MIN by -1 is not an integer'
+        );
 
         return $context->builder->signedDiv($left, $right);
     }

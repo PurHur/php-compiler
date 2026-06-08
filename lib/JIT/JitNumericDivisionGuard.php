@@ -37,4 +37,25 @@ final class JitNumericDivisionGuard
         TryCatchHelper::emitCatchableClassError($context, 'DivisionByZeroError', $message);
         $context->builder->positionAtEnd($okBlock);
     }
+
+    /** intdiv(PHP_INT_MIN, -1) — php-src ext/standard/math.c (#4724). */
+    public static function emitIntMinNegOneOverflowGuard(
+        Context $context,
+        Value $dividend,
+        Value $divisor,
+        string $message
+    ): void {
+        $i64 = $context->getTypeFromString('int64');
+        $intMin = $i64->constInt(\PHP_INT_MIN, true);
+        $negOne = $i64->constInt(-1, true);
+        $isIntMin = $context->builder->icmp(Builder::INT_EQ, $dividend, $intMin);
+        $isNegOne = $context->builder->icmp(Builder::INT_EQ, $divisor, $negOne);
+        $overflow = $context->builder->and($isIntMin, $isNegOne);
+        $okBlock = BasicBlockHelper::append($context, 'intdiv_overflow_ok');
+        $errBlock = BasicBlockHelper::append($context, 'intdiv_overflow_err');
+        $context->builder->branchIf($overflow, $errBlock, $okBlock);
+        $context->builder->positionAtEnd($errBlock);
+        TryCatchHelper::emitCatchableClassError($context, 'ArithmeticError', $message);
+        $context->builder->positionAtEnd($okBlock);
+    }
 }

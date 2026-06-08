@@ -2667,6 +2667,13 @@ restart:
                             goto restart;
                         }
                         break;
+                    } catch (\ArithmeticError $e) {
+                        $catchFrame = $this->dispatchVmArithmeticError($e, $frame);
+                        if (null !== $catchFrame) {
+                            $frame = $catchFrame;
+                            goto restart;
+                        }
+                        break;
                     } catch (\Error $e) {
                         $catchFrame = $this->dispatchVmError($e->getMessage(), $frame);
                         if (null !== $catchFrame) {
@@ -5856,6 +5863,8 @@ restart:
             return $this->dispatchVmTypeError($e, $frame);
         } catch (\DivisionByZeroError $e) {
             return $this->dispatchVmDivisionByZeroError($e, $frame);
+        } catch (\ArithmeticError $e) {
+            return $this->dispatchVmArithmeticError($e, $frame);
         } catch (\Error $e) {
             return $this->dispatchVmError($e->getMessage(), $frame);
         }
@@ -6232,6 +6241,8 @@ restart:
             return null;
         } catch (\DivisionByZeroError $e) {
             return $this->dispatchVmDivisionByZeroError($e, $callerFrame);
+        } catch (\ArithmeticError $e) {
+            return $this->dispatchVmArithmeticError($e, $callerFrame);
         } catch (\ArgumentCountError $e) {
             return $this->dispatchVmArgumentCountError($e, $callerFrame);
         } catch (\TypeError $e) {
@@ -6363,6 +6374,21 @@ restart:
     private function dispatchVmDivisionByZeroError(\DivisionByZeroError $error, Frame $frame): ?Frame
     {
         $thrown = VM\BuiltinExceptionSupport::materializeDivisionByZeroError($this->context, $error->getMessage());
+        $catchFrame = $this->findCatchFrameForThrow($frame, $thrown);
+        if (null !== $catchFrame) {
+            return $catchFrame;
+        }
+        $this->raiseUncaughtException($thrown);
+
+        return null;
+    }
+
+    /**
+     * Bridge native ArithmeticError from stdlib builtins into user catch handlers (#4724).
+     */
+    private function dispatchVmArithmeticError(\ArithmeticError $error, Frame $frame): ?Frame
+    {
+        $thrown = VM\BuiltinExceptionSupport::materializeArithmeticError($this->context, $error->getMessage());
         $catchFrame = $this->findCatchFrameForThrow($frame, $thrown);
         if (null !== $catchFrame) {
             return $catchFrame;
