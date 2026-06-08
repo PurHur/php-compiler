@@ -753,4 +753,197 @@ final class VmHashNative
 
         return self::digest($algo, $outerBuf);
     }
+
+    /* --- Incremental HashContext (ext/hash/hash.c; issue #7174) --- */
+
+    /** 0 unknown, 1 sha256, 2 sha1, 3 md5 */
+    public static function resolveAlgoId(string $algo): int
+    {
+        return self::algoId($algo);
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    public static function incrementalCreate(int $algoId): array
+    {
+        if (1 === $algoId) {
+            return [
+                'data' => \str_repeat("\0", 64),
+                'datalen' => 0,
+                'bitlen' => 0,
+                'state' => [
+                    0x6a09e667, 0xbb67ae85, 0x3c6ef372, 0xa54ff53a,
+                    0x510e527f, 0x9b05688c, 0x1f83d9ab, 0x5be0cd19,
+                ],
+            ];
+        }
+        if (2 === $algoId) {
+            return [
+                'state' => [0x67452301, 0xEFCDAB89, 0x98BADCFE, 0x10325476, 0xC3D2E1F0],
+                'count' => [0, 0],
+                'buffer' => \str_repeat("\0", 64),
+            ];
+        }
+        if (3 === $algoId) {
+            return [
+                'count' => [0, 0],
+                'state' => [0x67452301, 0xefcdab89, 0x98badcfe, 0x10325476],
+                'buffer' => \str_repeat("\0", 64),
+            ];
+        }
+
+        throw new \LogicException('Unsupported incremental hash algorithm id: '.$algoId);
+    }
+
+    /**
+     * @param array<string, mixed> $ctx
+     */
+    public static function incrementalUpdate(int $algoId, array &$ctx, string $data): void
+    {
+        if (1 === $algoId) {
+            self::sha256Update($ctx, $data);
+
+            return;
+        }
+        if (2 === $algoId) {
+            self::sha1Update($ctx, $data);
+
+            return;
+        }
+        if (3 === $algoId) {
+            self::md5Update($ctx, $data);
+
+            return;
+        }
+
+        throw new \LogicException('Unsupported incremental hash algorithm id: '.$algoId);
+    }
+
+    /**
+     * @param array<string, mixed> $ctx
+     *
+     * @return list<int>
+     */
+    public static function incrementalDigest(int $algoId, array $ctx): array
+    {
+        if (1 === $algoId) {
+            return self::sha256Finalize($ctx);
+        }
+        if (2 === $algoId) {
+            return self::sha1Finalize($ctx);
+        }
+        if (3 === $algoId) {
+            return self::md5Finalize($ctx);
+        }
+
+        throw new \LogicException('Unsupported incremental hash algorithm id: '.$algoId);
+    }
+
+    /**
+     * @param array<string, mixed> $ctx
+     */
+    public static function incrementalFinal(int $algoId, array $ctx, bool $raw = false): string
+    {
+        return self::resultString($algoId, self::incrementalDigest($algoId, $ctx), $raw);
+    }
+
+    /**
+     * @param array<string, mixed> $ctx
+     *
+     * @return array<string, mixed>
+     */
+    public static function incrementalCopy(array $ctx): array
+    {
+        return \json_decode(\json_encode($ctx, \JSON_THROW_ON_ERROR), true, 512, \JSON_THROW_ON_ERROR);
+    }
+
+    /**
+     * @param array{data: string, datalen: int, bitlen: int, state: list<int>} $ctx
+     *
+     * @return list<int>
+     */
+    private static function sha256Finalize(array $ctx): array
+    {
+        $work = self::incrementalCopy($ctx);
+        $datalen = $work['datalen'];
+        $work['bitlen'] += $datalen * 8;
+        $padlen = $datalen < 56 ? 56 - $datalen : 120 - $datalen;
+        $pad = "\x80".\str_repeat("\0", 127);
+        self::sha256Update($work, \substr($pad, 0, $padlen));
+        $bits = '';
+        for ($i = 0; $i < 8; $i++) {
+            $bits .= \chr((int) (($work['bitlen'] >> (56 - $i * 8)) & 0xFF));
+        }
+        self::sha256Update($work, $bits);
+        $hash = [];
+        for ($i = 0; $i < 4; ++$i) {
+            $hash[$i] = (self::u32($work['state'][0]) >> (24 - $i * 8)) & 0xFF;
+            $hash[$i + 4] = (self::u32($work['state'][1]) >> (24 - $i * 8)) & 0xFF;
+            $hash[$i + 8] = (self::u32($work['state'][2]) >> (24 - $i * 8)) & 0xFF;
+            $hash[$i + 12] = (self::u32($work['state'][3]) >> (24 - $i * 8)) & 0xFF;
+            $hash[$i + 16] = (self::u32($work['state'][4]) >> (24 - $i * 8)) & 0xFF;
+            $hash[$i + 20] = (self::u32($work['state'][5]) >> (24 - $i * 8)) & 0xFF;
+            $hash[$i + 24] = (self::u32($work['state'][6]) >> (24 - $i * 8)) & 0xFF;
+            $hash[$i + 28] = (self::u32($work['state'][7]) >> (24 - $i * 8)) & 0xFF;
+        }
+
+        return $hash;
+    }
+
+    /**
+     * @param array{count: list<int>, state: list<int>, buffer: string} $ctx
+     *
+     * @return list<int>
+     */
+    private static function md5Finalize(array $ctx): array
+    {
+        $work = self::incrementalCopy($ctx);
+        $bits = \array_fill(0, 8, 0);
+        self::md5Encode($bits, $work['count'], 8);
+        $index = ($work['count'][0] >> 3) & 0x3F;
+        $padLen = $index < 56 ? 56 - $index : 120 - $index;
+        self::md5Update($work, "\x80");
+        if ($padLen > 1) {
+            self::md5Update($work, \str_repeat("\0", $padLen - 1));
+        }
+        $bitsStr = '';
+        foreach ($bits as $byte) {
+            $bitsStr .= \chr($byte);
+        }
+        self::md5Update($work, $bitsStr);
+        $digest = \array_fill(0, 16, 0);
+        self::md5Encode($digest, $work['state'], 16);
+
+        return $digest;
+    }
+
+    /**
+     * @param array{state: list<int>, count: list<int>, buffer: string} $ctx
+     *
+     * @return list<int>
+     */
+    private static function sha1Finalize(array $ctx): array
+    {
+        $work = self::incrementalCopy($ctx);
+        $finalcount = [];
+        for ($i = 0; $i < 8; $i++) {
+            $finalcount[$i] = ($work['count'][$i >= 4 ? 0 : 1] >> ((3 - ($i & 3)) * 8)) & 255;
+        }
+        self::sha1Update($work, "\x80");
+        while (($work['count'][0] & 504) !== 448) {
+            self::sha1Update($work, "\0");
+        }
+        $bitsStr = '';
+        foreach ($finalcount as $byte) {
+            $bitsStr .= \chr($byte);
+        }
+        self::sha1Update($work, $bitsStr);
+        $digest = [];
+        for ($i = 0; $i < 20; $i++) {
+            $digest[$i] = ($work['state'][$i >> 2] >> ((3 - ($i & 3)) * 8)) & 255;
+        }
+
+        return $digest;
+    }
 }

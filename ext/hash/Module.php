@@ -5,14 +5,21 @@ declare(strict_types=1);
 namespace PHPCompiler\ext\hash;
 
 use PHPCompiler\ModuleAbstract;
+use PHPCompiler\Runtime;
 
 /**
- * hash extension module entry (php-src ext/hash/hash.c; issue #6937).
+ * hash extension module entry (php-src ext/hash/hash.c; issue #6937, #7174).
  *
- * Incremental HashContext lifecycle in #3357; one-shot hash() remains in ext/standard.
+ * Incremental HashContext lifecycle via VmHashContext + VmHashNative (PHP-in-PHP).
  */
 class Module extends ModuleAbstract
 {
+    public function init(Runtime $runtime): void
+    {
+        parent::init($runtime);
+        BuiltinClasses::register($runtime->vmContext);
+    }
+
     public function getFunctions(): array
     {
         return [
