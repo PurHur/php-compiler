@@ -46,6 +46,7 @@ final class ExceptionSupport
     public const CLASS_DIVISION_BY_ZERO_ERROR = ThrowableManifest::LC_DIVISION_BY_ZERO_ERROR;
     public const CLASS_ASSERTION_ERROR = ThrowableManifest::LC_ASSERTION_ERROR;
     public const CLASS_FIBER_ERROR = ThrowableManifest::LC_FIBER_ERROR;
+    public const CLASS_FIBER_STACK_OVERFLOW = ThrowableManifest::LC_FIBER_STACK_OVERFLOW;
 
     public const PROP_MESSAGE = 'message';
     public const PROP_CODE = 'code';
@@ -421,6 +422,12 @@ final class ExceptionSupport
             // FiberError is reserved for internal use in Zend; cannot be instantiated from userland PHP.
             // Map uncaught VM FiberError to a native Error for the test runner / CLI.
             $native = new \Error('FiberError: '.$message);
+        } elseif (self::CLASS_FIBER_STACK_OVERFLOW === $lc) {
+            if (\class_exists('FiberStackOverflow', false)) {
+                $native = new \FiberStackOverflow($message);
+            } else {
+                $native = new \Error($message);
+            }
         } elseif (ThrowableManifest::isDescendantOf($lc, self::CLASS_ERROR)) {
             $native = new \Error($message);
         } else {
