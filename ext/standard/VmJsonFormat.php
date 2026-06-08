@@ -66,6 +66,21 @@ final class VmJsonFormat
         if (\is_string($value)) {
             return '"'.self::escapeString($value).'"';
         }
+        if ($value instanceof \stdClass) {
+            $props = get_object_vars($value);
+            if ([] === $props) {
+                return '{}';
+            }
+            $parts = [];
+            foreach ($props as $key => $item) {
+                if (!\is_string($key)) {
+                    throw new \LogicException('json_encode() only supports string keys in this compiler build');
+                }
+                $parts[] = '"'.self::escapeString($key).'":'.self::encodeValue($item);
+            }
+
+            return '{'.implode(',', $parts).'}';
+        }
         if (\is_array($value)) {
             if ([] === $value) {
                 return array_is_list($value) ? '[]' : '{}';

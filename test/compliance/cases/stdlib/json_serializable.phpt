@@ -11,10 +11,10 @@ class Plain {}
 echo json_encode(new Payload()), "\n";
 var_export(json_encode(new Plain()));
 echo "\n";
-echo json_last_error() === 8 ? '8' : 'n', "\n";
+echo json_last_error() === 0 ? '0' : (string) json_last_error(), "\n";
 echo interface_exists(JsonSerializable::class) ? '1' : '0', "\n";
 --EXPECT--
 {"id":1,"label":"ok"}
-false
-8
+'{}'
+0
 1
