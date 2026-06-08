@@ -41,6 +41,6 @@ final class bcscale extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        throw new \LogicException('bcscale() is not implemented for JIT in this compiler build (issue #3365)');
+        return JitBcmath::scale($context, ...$args);
     }
 }
