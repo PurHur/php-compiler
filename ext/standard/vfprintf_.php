@@ -33,14 +33,12 @@ final class vfprintf_ extends Internal
         $handleVar = $frame->calledArgs[0]->resolveIndirect();
         $fmtVar = $frame->calledArgs[1]->resolveIndirect();
         $argsVar = $frame->calledArgs[2]->resolveIndirect();
-        if (Variable::TYPE_INTEGER !== $handleVar->type) {
-            throw new \LogicException('vfprintf() stream must be a resource handle in this compiler build');
-        }
+        $handle = VmStreamArg::requireStreamHandle($handleVar, 'vfprintf', 1);
         if (Variable::TYPE_STRING !== $fmtVar->type) {
             throw new \LogicException('vfprintf() format must be a string in this compiler build');
         }
         $written = VmVprintf::vfprintf(
-            $handleVar->toInt(),
+            $handle,
             $fmtVar->toString(),
             $argsVar,
             $frame
