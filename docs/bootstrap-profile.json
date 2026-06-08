@@ -480,6 +480,8 @@
         "ext/standard/VmInternalCompare.php",
         "ext/standard/VmIteratorWalk.php",
         "ext/standard/VmJson.php",
+        "ext/standard/VmJsonFormat.php",
+        "ext/standard/VmJsonParser.php",
         "ext/standard/VmJsonScanner.php",
         "ext/standard/VmJsonValidate.php",
         "ext/standard/VmMath.php",

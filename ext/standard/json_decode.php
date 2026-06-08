@@ -13,7 +13,7 @@ use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
 
 /**
- * json_decode() — assoc arrays or stdClass object graphs (VM: host json_decode; JIT/AOT: __compiler_json_decode).
+ * json_decode() — assoc arrays or stdClass object graphs (VM: VmJsonFormat; JIT/AOT: __compiler_json_decode).
  *
  * php-src ref: ext/json/php_json.c — object vs array decode (#7188).
  */
@@ -45,8 +45,7 @@ final class json_decode extends Internal
         if ($argc > 2) {
             throw new \LogicException('json_decode() depth/flags not supported in this compiler build');
         }
-        $decoded = \json_decode($jsonVar->toString(), $assoc);
-        VmJson::syncLastErrorFromHost();
+        $decoded = VmJsonFormat::decode($jsonVar->toString(), $assoc);
         if (null === $frame->returnVar) {
             return;
         }

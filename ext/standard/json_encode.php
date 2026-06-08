@@ -13,7 +13,7 @@ use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
 
 /**
- * json_encode() — assoc arrays with scalar values (VM delegates to PHP; JIT/AOT via __compiler_json_encode_hashtable).
+ * json_encode() — assoc arrays with scalar values (VM: VmJsonFormat; JIT/AOT via __compiler_json_encode_hashtable).
  */
 final class json_encode extends Internal
 {
@@ -44,8 +44,7 @@ final class json_encode extends Internal
 
             return;
         }
-        $encoded = \json_encode($value);
-        VmJson::syncLastErrorFromHost();
+        $encoded = VmJsonFormat::encodeExported($value);
         if (false === $encoded) {
             $frame->returnVar->bool(false);
 
