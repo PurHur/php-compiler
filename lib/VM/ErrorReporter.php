@@ -352,6 +352,31 @@ final class ErrorReporter
     }
 
     /**
+     * Zend FE_RESET_R foreach invalid operand: user handler runs even when error_reporting(0) (#4879).
+     */
+    public function triggerErrorWithHandlerFirst(
+        string $message,
+        int $level,
+        ?string $file = null,
+        ?Context $context = null,
+        ?Frame $frame = null,
+        int $line = 0
+    ): void {
+        [$file, $line] = $this->resolveDisplayLocation($frame, $file, $line);
+        $this->recordLastError($level, $message, $file, $line);
+        if ($this->dispatchUserHandler($context, $frame, $level, $message, $file, $line)) {
+            return;
+        }
+        if (0 === ($this->errorReporting & $level)) {
+            return;
+        }
+        $formatted = $this->formatCliError($level, $message, $file, $line);
+        if ($this->displayErrors) {
+            fwrite(STDERR, $formatted);
+        }
+    }
+
+    /**
      * Zend CLI stderr line (main/main.c php_error_cb).
      */
     private function formatCliError(int $level, string $message, ?string $file, int $line): string

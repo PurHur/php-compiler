@@ -1327,6 +1327,19 @@ class Compiler {
                         break;
                     } elseif ($this->isUnreachableAfterNeverCall($child, $ops, $i)) {
                         break;
+                    } elseif ($this->isForeachLoopVarAssignRefFusion($ops, $i)) {
+                        /** @var Op\Iterator\Value $iter */
+                        $iter = $ops[$i];
+                        /** @var Op\Expr\AssignRef $assign */
+                        $assign = $ops[$i + 1];
+                        $block->addOpCode(new OpCode(
+                            OpCode::TYPE_ITER_VALUE,
+                            $this->compileOperand($assign->var, $block, false),
+                            $this->compileOperand($iter->var, $block, true),
+                            1
+                        ));
+                        ++$i;
+                        break;
                     } elseif (
                         $child instanceof Op\Expr\ArrayDimFetch
                         && $i + 1 < $opCount
@@ -1399,6 +1412,32 @@ class Compiler {
         }
 
         return false;
+    }
+
+    /**
+     * foreach ($iterable as &$loopVar) — fuse Iterator\\Value + AssignRef into one ITER_VALUE (#4431).
+     *
+     * @param Op[] $ops
+     */
+    private function isForeachLoopVarAssignRefFusion(array $ops, int $index): bool
+    {
+        if (!isset($ops[$index + 1])) {
+            return false;
+        }
+        if (!$ops[$index] instanceof Op\Iterator\Value) {
+            return false;
+        }
+        if (!$ops[$index + 1] instanceof Op\Expr\AssignRef) {
+            return false;
+        }
+        /** @var Op\Iterator\Value $iter */
+        $iter = $ops[$index];
+        /** @var Op\Expr\AssignRef $assign */
+        $assign = $ops[$index + 1];
+
+        return $iter->byRef
+            && $iter->result === $assign->expr
+            && !$this->operandIsPropertyWriteTarget($assign->var);
     }
 
     /**
