@@ -5997,6 +5997,27 @@ class JIT {
                 case OpCode::TYPE_CAST_VOID:
                     $this->assignOperand($block->getOperand($op->arg1), $this->jitNullVariable());
                     break;
+                case OpCode::TYPE_CAST_ARRAY:
+                    $value = $this->context->getVariableFromOp($block->getOperand($op->arg2));
+                    $this->assignOperand(
+                        $block->getOperand($op->arg1),
+                        JIT\CastHelper::emitArrayCast($this->context, $value)
+                    );
+                    break;
+                case OpCode::TYPE_CAST_OBJECT:
+                    $value = $this->context->getVariableFromOp($block->getOperand($op->arg2));
+                    $this->assignOperand(
+                        $block->getOperand($op->arg1),
+                        JIT\CastHelper::emitObjectCast($this->context, $value, $block, $op)
+                    );
+                    break;
+                case OpCode::TYPE_CAST_UNSET:
+                    $value = $this->context->getVariableFromOp($block->getOperand($op->arg2));
+                    $this->assignOperand(
+                        $block->getOperand($op->arg1),
+                        JIT\CastHelper::emitUnsetCast($this->context, $value)
+                    );
+                    break;
                 case OpCode::TYPE_ECHO:
                 case OpCode::TYPE_PRINT:
                     if ($this->context->inlineIncludeDepth > 0) {

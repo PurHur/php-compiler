@@ -614,8 +614,16 @@ class Object_ extends Type {
         }
 
         $propCount = \count($this->properties[$classId] ?? []);
+        $savedInsert = null;
+        try {
+            $savedInsert = $this->context->builder->getInsertBlock();
+        } catch (\Throwable) {
+        }
         \PHPCompiler\JIT\Builtin\GcCollectCyclesNative::registerDeclarations($this->context);
         \PHPCompiler\JIT\Builtin\GcCollectCyclesRuntime::ensureLinked($this->context);
+        if (null !== $savedInsert) {
+            $this->context->builder->positionAtEnd($savedInsert);
+        }
         $this->context->builder->call(
             $this->context->lookupFunction('phpc_gc_register'),
             $this->context->builder->pointerCast($obj, $this->context->getTypeFromString('int8*')),

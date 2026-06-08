@@ -7109,6 +7109,16 @@ final class ArrayBuiltinHelper
         self::copyReindexableInto($context, $dest, $src);
     }
 
+    /** Deep copy hashtable (packed + string keys) for (array) cast (#4887, VM CastSupport::toArray). */
+    public static function duplicateHashtable(Context $context, Value $src): Value
+    {
+        $dest = HashTableHelper::alloc($context);
+        self::copyReindexableInto($context, $dest, $src);
+        self::mergeStringKeysInto($context, $dest, $src);
+
+        return $dest;
+    }
+
     /**
      * Append values from a packed list or numeric-string-key list (#3607).
      */

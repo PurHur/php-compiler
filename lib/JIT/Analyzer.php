@@ -72,6 +72,14 @@ class Analyzer
                 || $usage instanceof Op\Iterator\Next
                 || $usage instanceof Op\Terminal\Echo_
                 || $usage instanceof Op\Expr\Array_
+                || $usage instanceof Op\Expr\Cast\Array_
+                || $usage instanceof Op\Expr\Cast\Object_
+                || $usage instanceof Op\Expr\Cast\Unset_
+                || $usage instanceof Op\Expr\Cast\Bool_
+                || $usage instanceof Op\Expr\Cast\Int_
+                || $usage instanceof Op\Expr\Cast\Double
+                || $usage instanceof Op\Expr\Cast\String_
+                || $usage instanceof Op\Expr\Cast\Void_
                 || $usage instanceof Op\Expr\Yield_
                 || $usage instanceof Op\Expr\YieldFrom
                 || $usage instanceof Op\Terminal\StaticVar) {
@@ -140,6 +148,14 @@ class Analyzer
                 || $usage instanceof Op\Iterator\Next
                 || $usage instanceof Op\Terminal\Return_
                 || $usage instanceof Op\Terminal\Echo_
+                || $usage instanceof Op\Expr\Cast\Array_
+                || $usage instanceof Op\Expr\Cast\Object_
+                || $usage instanceof Op\Expr\Cast\Unset_
+                || $usage instanceof Op\Expr\Cast\Bool_
+                || $usage instanceof Op\Expr\Cast\Int_
+                || $usage instanceof Op\Expr\Cast\Double
+                || $usage instanceof Op\Expr\Cast\String_
+                || $usage instanceof Op\Expr\Cast\Void_
                 || $usage instanceof Op\Expr\Yield_
                 || $usage instanceof Op\Expr\YieldFrom
                 || $usage instanceof Op\Terminal\StaticVar
@@ -189,6 +205,15 @@ class Analyzer
                     return null;
                 }
                 $size = max($size, $newSize);
+            } elseif ($op instanceof Op\Expr\Cast\Array_
+                || $op instanceof Op\Expr\Cast\Object_
+                || $op instanceof Op\Expr\Cast\Unset_
+                || $op instanceof Op\Expr\Cast\Bool_
+                || $op instanceof Op\Expr\Cast\Int_
+                || $op instanceof Op\Expr\Cast\Double
+                || $op instanceof Op\Expr\Cast\String_
+                || $op instanceof Op\Expr\Cast\Void_) {
+                return null;
             } elseif ($op instanceof Op\Expr\BinaryOp
                 || $op instanceof Op\Expr\ArrayDimFetch
                 || $op instanceof Op\Expr\New_
