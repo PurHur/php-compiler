@@ -30,14 +30,11 @@ final class parse_str extends Internal
         if ($argc < 1 || $argc > 2) {
             throw new \LogicException('parse_str() requires one or two arguments in this compiler build');
         }
-        $encoded = $frame->calledArgs[0]->resolveIndirect();
-        if (Variable::TYPE_STRING !== $encoded->type) {
-            throw new \LogicException('parse_str() argument #1 must be a string in this compiler build');
-        }
+        $encodedStr = VmString::coerceStringBuiltinArg($frame->calledArgs[0], 'parse_str', 0, 'string');
         if (1 === $argc) {
             $caller = VmScope::requireCaller($frame);
             VmScope::requireMainScriptForParseStrOneArg($caller);
-            $params = ParseStrEngine::parse($encoded->toString());
+            $params = ParseStrEngine::parse($encodedStr);
             VmParseStr::importIntoCaller($caller, $params);
 
             return;
@@ -56,7 +53,7 @@ final class parse_str extends Internal
             ));
         }
 
-        $params = ParseStrEngine::parse($encoded->toString());
+        $params = ParseStrEngine::parse($encodedStr);
         $parsed = new \PHPCompiler\VM\HashTable();
         VmParseStr::mergeInto($parsed, $params);
         $replacement = new Variable(Variable::TYPE_ARRAY);
