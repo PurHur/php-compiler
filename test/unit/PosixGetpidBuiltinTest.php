@@ -34,7 +34,7 @@ final class PosixGetpidBuiltinTest extends TestCase
         $frame = $fn->getFrame($runtime->vmContext);
         $frame->returnVar = new VMVariable();
         $fn->execute($frame);
-        $this->assertGreaterThan(0, $frame->returnVar->resolveIndirect()->toInt());
+        $this->assertSame((int) \posix_getppid(), $frame->returnVar->resolveIndirect()->toInt());
     }
 
     public function test_posix_strerror_zero_is_non_empty(): void
