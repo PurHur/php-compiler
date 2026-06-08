@@ -32,6 +32,22 @@ final class VmHttpBuildQueryTest extends TestCase
             't=1&f=0',
             VmHttpBuildQuery::build(['t' => true, 'f' => false])
         );
+        $this->assertSame(
+            '123a=1&456b=2',
+            VmHttpBuildQuery::build(['123a' => 1, '456b' => 2], 'n')
+        );
+        $this->assertSame(
+            'my_1=foo&my_2=bar',
+            VmHttpBuildQuery::build([1 => 'foo', 2 => 'bar'], 'my_')
+        );
+        $this->assertSame(
+            'nested%5B0%5D=a&nested%5B1%5D=b',
+            VmHttpBuildQuery::build(['nested' => [0 => 'a', 1 => 'b']], 'p_')
+        );
+        $this->assertSame(
+            'n0=foo&bar=baz',
+            VmHttpBuildQuery::build([0 => 'foo', 'bar' => 'baz'], 'n')
+        );
     }
 
     public function testVmBuiltinDoesNotCallHostHttpBuildQuery(): void

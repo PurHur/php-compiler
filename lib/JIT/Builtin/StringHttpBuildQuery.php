@@ -193,15 +193,27 @@ final class StringHttpBuildQuery
 
     private static function buildFullKey(Context $context, Value $prefix, Value $key): Value
     {
+        $i64 = $context->getTypeFromString('int64');
+        $i8 = $context->getTypeFromString('int8');
         $len = $context->builder->call($context->lookupFunction('__string__strlen'), $prefix);
-        $isEmpty = $context->builder->icmp(Builder::INT_EQ, $len, $context->getTypeFromString('int64')->constInt(0, false));
-        $open = self::literalString($context, '[');
+        $zero = $i64->constInt(0, false);
+        $isEmpty = $context->builder->icmp(Builder::INT_EQ, $len, $zero);
+        $lastIdx = $context->builder->subNoSignedWrap($len, $i64->constInt(1, false));
+        $strMap = $context->structFieldMap['__string__'];
+        $prefixData = $context->builder->structGep($prefix, $strMap['value']);
+        $lastCharPtr = $context->builder->gep($prefixData, $lastIdx);
+        $lastChar = $context->builder->load($lastCharPtr);
+        $openBracket = $i8->constInt(ord('['), false);
+        $isBracketPrefix = $context->builder->icmp(Builder::INT_EQ, $lastChar, $openBracket);
         $close = self::literalString($context, ']');
-        $withBracket = JitStringConcat::concat($context, $prefix, $open);
-        $withBracket = JitStringConcat::concat($context, $withBracket, $key);
+        $withBracket = JitStringConcat::concat($context, $prefix, $key);
         $withBracket = JitStringConcat::concat($context, $withBracket, $close);
 
-        return $context->builder->select($isEmpty, $key, $withBracket);
+        return $context->builder->select(
+            $isEmpty,
+            $key,
+            $context->builder->select($isBracketPrefix, $withBracket, $key)
+        );
     }
 
     private static function urlencodeWithFn(Context $context, Value $useRawSlot, Value $str): Value
@@ -259,10 +271,11 @@ final class StringHttpBuildQuery
 
         $context->builder->positionAtEnd($bbNested);
         $childHt = $context->builder->call($context->lookupFunction('__value__readHashtable'), $valPtr);
+        $childPrefix = JitStringConcat::concat($context, $fullKey, self::literalString($context, '['));
         $nested = $context->builder->call(
             $context->lookupFunction('__compiler_http_build_query'),
             $childHt,
-            $fullKey,
+            $childPrefix,
             $argSeparator,
             $encodingType
         );
