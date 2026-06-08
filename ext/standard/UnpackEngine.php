@@ -136,13 +136,8 @@ final class UnpackEngine
         $flen = \strlen($format);
         $i = 0;
 
+        // php-src ext/standard/pack.c PHP_FUNCTION(unpack): names run until '/' only.
         while ($i < $flen && \count($specs) < self::MAX_SPECS) {
-            if ('/' === $format[$i]) {
-                ++$i;
-            }
-            if ($i >= $flen) {
-                break;
-            }
             $code = $format[$i++];
             $arg = 1;
 
@@ -160,14 +155,15 @@ final class UnpackEngine
                 }
             }
 
-            $name = '';
-            while ($i < $flen && '/' !== $format[$i] && !self::isCode($format[$i])) {
-                if (\strlen($name) + 1 >= self::MAX_NAME) {
-                    self::fail('unpack(): Argument #1 ($format) contains name longer than 64 characters');
+            $nameStart = $i;
+            while ($i < $flen && '/' !== $format[$i]) {
+                ++$i;
+            }
+            $name = \substr($format, $nameStart, $i - $nameStart);
+            if (\strlen($name) >= self::MAX_NAME) {
+                self::fail('unpack(): Argument #1 ($format) contains name longer than 64 characters');
 
-                    return null;
-                }
-                $name .= $format[$i++];
+                return null;
             }
 
             if (!self::isSupportedCode($code)) {
@@ -182,6 +178,10 @@ final class UnpackEngine
                 'name' => $name,
                 'has_name' => '' !== $name,
             ];
+
+            if ($i < $flen && '/' === $format[$i]) {
+                ++$i;
+            }
         }
 
         return $specs;
@@ -199,11 +199,6 @@ final class UnpackEngine
             'X', '@' => 0,
             default => null,
         };
-    }
-
-    private static function isCode(string $c): bool
-    {
-        return 1 === \strlen($c) && self::isSupportedCode($c);
     }
 
     private static function isSupportedCode(string $code): bool
