@@ -5,6 +5,10 @@ declare(strict_types=1);
 namespace PHPCompiler\VM;
 
 use PHPCompiler\Frame;
+use PHPCompiler\VM\Builtin\SensitiveParameterValueConstruct;
+use PHPCompiler\VM\ClassProperty;
+use PHPCompiler\VM\Builtin\SensitiveParameterValueDebugInfo;
+use PHPCompiler\VM\Builtin\SensitiveParameterValueGetValue;
 use PHPCfg\Func;
 
 /**
@@ -14,12 +18,75 @@ final class SensitiveParamSupport
 {
     public const CLASS_NAME = 'SensitiveParameterValue';
 
+    public const PROP_VALUE = 'value';
+
     public const TRACE_ARG_LABEL = '[Sensitive Parameter]';
 
     public static function register(Context $ctx): void
     {
+        $mixedProto = new Variable();
+        $pub = \PHPCfg\Func::FLAG_PUBLIC;
+
         $entry = new ClassEntry(self::CLASS_NAME);
+        $entry->properties[] = new ClassProperty(self::PROP_VALUE, null, $mixedProto);
+        $entry->constructor = new SensitiveParameterValueConstruct();
+        $entry->methods['__construct'] = $entry->constructor;
+        $entry->methodVisibility['__construct'] = $pub;
+        $entry->methods['getvalue'] = new SensitiveParameterValueGetValue();
+        $entry->methodVisibility['getvalue'] = $pub;
+        $entry->methods['__debuginfo'] = new SensitiveParameterValueDebugInfo();
+        $entry->methodVisibility['__debuginfo'] = $pub;
         $ctx->classes[strtolower(self::CLASS_NAME)] = $entry;
+    }
+
+    public static function requireMarkerObject(Frame $frame, Variable $receiver): ObjectEntry
+    {
+        $receiver = $receiver->resolveIndirect();
+        if (Variable::TYPE_OBJECT !== $receiver->type) {
+            throw new \LogicException('SensitiveParameterValue method called without object');
+        }
+        $obj = $receiver->toObject();
+        if (strtolower($obj->class->name) !== strtolower(self::CLASS_NAME)) {
+            throw new \LogicException('Expected SensitiveParameterValue instance');
+        }
+
+        return $obj;
+    }
+
+    public static function wrapValue(Variable $value): Variable
+    {
+        $value = $value->resolveIndirect();
+        $obj = new ObjectEntry(self::markerClassEntry());
+        $obj->constructed = true;
+        $obj->getProperty(self::PROP_VALUE)->copyFrom($value);
+        $out = new Variable(Variable::TYPE_OBJECT);
+        $out->object($obj);
+
+        return $out;
+    }
+
+    /** Unwrap SensitiveParameterValue for reflection/introspection (#5127). */
+    public static function unwrapForReflection(Variable $value): Variable
+    {
+        $value = $value->resolveIndirect();
+        if (!self::isMarker($value)) {
+            $out = new Variable();
+            $out->copyFrom($value);
+
+            return $out;
+        }
+        $obj = $value->toObject();
+        $stored = $obj->getProperty(self::PROP_VALUE)->resolveIndirect();
+        if (Variable::TYPE_NULL === $stored->type) {
+            $out = new Variable();
+            $out->copyFrom($value);
+
+            return $out;
+        }
+        $out = new Variable();
+        $out->copyFrom($stored);
+
+        return $out;
     }
 
     public static function createMarker(): Variable
