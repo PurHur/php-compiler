@@ -13,30 +13,14 @@ final class NetworkServicesBuiltinTest extends TestCase
 echo function_exists('getprotobyname') ? 'proto_yes' : 'proto_no', "\n";
 echo function_exists('getservbyname') ? 'serv_yes' : 'serv_no', "\n";
 $tcp = getprotobyname('tcp');
-if (!is_array($tcp) || ($tcp['name'] ?? '') !== 'tcp') {
-    echo "proto_fail\n";
-    exit(0);
-}
-echo 'proto=' . (isset($tcp['number']) ? 'num' : 'no_num') . "\n";
+echo $tcp === 6 ? "proto=6\n" : "proto_fail\n";
 $http = getservbyname('http', 'tcp');
-if (!is_array($http) || ($http['name'] ?? '') !== 'http') {
-    echo "serv_fail\n";
-    exit(0);
-}
-echo 'port=' . ($http['port'] ?? -1) . "\n";
+echo $http === 80 ? "port=80\n" : "serv_fail\n";
 $bad = @getprotobyname('not_a_real_protocol_xyz');
 echo $bad === false ? "unknown_false\n" : "unknown_bad\n";
 PHP;
 
-    private const EXPECT = "proto_yes\nserv_yes\nproto=num\nport=80\nunknown_false\n";
-
-    protected function setUp(): void
-    {
-        parent::setUp();
-        if (!is_readable('/etc/protocols') || !is_readable('/etc/services')) {
-            $this->markTestSkipped('/etc/protocols or /etc/services unavailable');
-        }
-    }
+    private const EXPECT = "proto_yes\nserv_yes\nproto=6\nport=80\nunknown_false\n";
 
     public function testVmMatchesPhpSubset(): void
     {
