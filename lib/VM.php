@@ -5237,6 +5237,7 @@ restart:
                             $frame->scope[$op->arg1]->indirect(
                                 $this->objectForeachIterator($op->arg2)->currentValue(true)
                             );
+                            $this->markScopeSlotInitialized($frame, (int) $op->arg1);
                         } else {
                             $frame->scope[$op->arg1]->assignForeachByValue(
                                 $this->objectForeachIterator($op->arg2)->currentValue(false)
@@ -5252,6 +5253,7 @@ restart:
                         $frame->scope[$op->arg1]->indirect(
                             $container->toArray()->iterCurrentValue(true)
                         );
+                        $this->markScopeSlotInitialized($frame, (int) $op->arg1);
                     } else {
                         $frame->scope[$op->arg1]->assignForeachByValue(
                             $container->toArray()->iterCurrentValue(false)
@@ -8688,7 +8690,7 @@ restart:
     private function warnForeachNonTraversable(Variable $container, Frame $frame): void
     {
         $resolved = $container->resolveIndirect();
-        $this->context->errors->triggerError(
+        $this->context->errors->triggerErrorWithHandlerFirst(
             'foreach() argument must be of type array|object, '
             .TypeCheck::typeNameForConstraint($resolved->type).' given',
             ErrorReporter::E_WARNING,
