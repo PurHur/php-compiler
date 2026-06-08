@@ -12,7 +12,7 @@ use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
 
 /**
- * highlight_string() — syntax-highlighted PHP as HTML (VM delegates to host Zend).
+ * highlight_string() — syntax-highlighted PHP as HTML (VM: HighlightEngine, #4824).
  *
  * @see https://github.com/php/php-src/blob/master/ext/standard/url.c PHP_FUNCTION(highlight_string)
  */

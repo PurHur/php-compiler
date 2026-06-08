@@ -954,6 +954,7 @@ require_once __DIR__.'/../../../ext/standard/VmDns.php';
 require_once __DIR__.'/../../../ext/standard/VmExceptionHandler.php';
 require_once __DIR__.'/../../../ext/standard/VmForwardStaticCall.php';
 require_once __DIR__.'/../../../ext/standard/VmHashFile.php';
+require_once __DIR__.'/../../../ext/standard/HighlightEngine.php';
 require_once __DIR__.'/../../../ext/standard/VmHighlight.php';
 require_once __DIR__.'/../../../ext/standard/VmIteratorWalk.php';
 require_once __DIR__.'/../../../ext/standard/VmMemory.php';

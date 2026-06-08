@@ -468,6 +468,7 @@
         "ext/standard/VmHash.php",
         "ext/standard/VmHashFile.php",
         "ext/standard/VmHashNative.php",
+        "ext/standard/HighlightEngine.php",
         "ext/standard/VmHighlight.php",
         "ext/standard/VmHost.php",
         "ext/standard/VmHrtime.php",
