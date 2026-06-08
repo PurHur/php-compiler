@@ -23,6 +23,7 @@ final class StringInfoRuntimeStandaloneTest extends TestCase
         $info = (string) file_get_contents(__DIR__.'/../../../lib/JIT/Builtin/StringInfo.php');
         $this->assertStringContainsString('__compiler_phpversion', $info);
         $this->assertStringContainsString('replaces lib/AOT/runtime/phpc_info.c', $info);
+        $this->assertStringContainsString('ModuleRegistry::getLoadedExtensions', $info);
     }
 
     public function testEnsureLinkedDefinesInfoForStandalone(): void

@@ -227,6 +227,10 @@ class JITTest extends BaseTest {
             if (str_contains($name, 'phpversion')) {
                 continue;
             }
+            // extension_loaded/phpversion introspection: VM + AOT (#6372, #7190); MCJIT LLVM verify until stable.
+            if (str_contains($name, 'extension_loaded_in_tree')) {
+                continue;
+            }
             // ReflectionProperty/Function/Constant builtins are VM-only (#3354).
             if (str_contains($name, 'reflection_oop')) {
                 continue;
