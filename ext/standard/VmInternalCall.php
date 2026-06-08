@@ -32,6 +32,7 @@ final class VmInternalCall
         'trim' => string_trim::class,
         'ltrim' => string_ltrim::class,
         'rtrim' => string_rtrim::class,
+        'chop' => string_rtrim::class,
         'strlen' => \PHPCompiler\ext\types\strlen::class,
     ];
 
@@ -45,6 +46,10 @@ final class VmInternalCall
         }
 
         $class = self::STRING_CALLBACKS[$lc];
+
+        if ('chop' === $lc) {
+            return new string_rtrim('chop');
+        }
 
         return new $class();
     }

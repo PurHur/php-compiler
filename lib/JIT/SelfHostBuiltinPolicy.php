@@ -220,7 +220,7 @@ final class SelfHostBuiltinPolicy
         'header' => 'string', 'http_response_code' => 'string',
         'headers_sent' => 'string', 'header_register_callback' => 'string',
         'register_shutdown_function' => 'string',
-        'substr' => 'string', 'trim' => 'string', 'ltrim' => 'string', 'rtrim' => 'string',
+        'substr' => 'string', 'trim' => 'string', 'ltrim' => 'string', 'rtrim' => 'string', 'chop' => 'string',
         'urlencode' => 'string', 'rawurlencode' => 'string', 'http_build_query' => 'string',
         'parse_str' => 'string',
     ];
