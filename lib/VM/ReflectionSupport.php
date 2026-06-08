@@ -39,6 +39,8 @@ final class ReflectionSupport
 
     public const REFLECTION_PARAMETER = 'reflectionparameter';
 
+    public const REFLECTION_TYPE = 'reflectiontype';
+
     public const REFLECTION_NAMED_TYPE = 'reflectionnamedtype';
 
     public const REFLECTION_UNION_TYPE = 'reflectionuniontype';

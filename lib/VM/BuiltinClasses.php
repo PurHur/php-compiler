@@ -444,6 +444,14 @@ final class BuiltinClasses
         $reuc->methodVisibility['getvalue'] = $pub;
         $ctx->classes[ReflectionSupport::REFLECTION_ENUM_UNIT_CASE] = $reuc;
 
+        $reflectionType = new ClassEntry('ReflectionType');
+        $reflectionType->isAbstract = true;
+        $reflectionType->methods['allowsnull'] = new ReflectionTypeAllowsNull();
+        $reflectionType->methodVisibility['allowsnull'] = $pub;
+        $reflectionType->methods['__tostring'] = new ReflectionTypeToString();
+        $reflectionType->methodVisibility['__tostring'] = $pub;
+        $ctx->classes[ReflectionSupport::REFLECTION_TYPE] = $reflectionType;
+
         self::registerReflectionTypeClass(
             $ctx,
             'ReflectionNamedType',
@@ -493,16 +501,13 @@ final class BuiltinClasses
         array $extraMethods
     ): void {
         $entry = new ClassEntry($name);
+        $entry->parentLc = ReflectionSupport::REFLECTION_TYPE;
         $entry->properties[] = new ClassProperty(ReflectionSupport::PROP_TYPE_STRING, null, $strProto);
         $entry->properties[] = new ClassProperty(ReflectionSupport::PROP_TYPE_ALLOWS_NULL, null, $boolProto);
         $entry->properties[] = new ClassProperty(ReflectionSupport::PROP_TYPE_NAME, null, $strProto);
         $entry->properties[] = new ClassProperty(ReflectionSupport::PROP_TYPE_BUILTIN, null, $boolProto);
         $entry->properties[] = new ClassProperty(ReflectionSupport::PROP_TYPE_MEMBERS, null, $arrayProto);
-        $shared = [
-            'allowsnull' => new ReflectionTypeAllowsNull(),
-            '__tostring' => new ReflectionTypeToString(),
-        ];
-        foreach (array_merge($shared, $extraMethods) as $methodName => $method) {
+        foreach ($extraMethods as $methodName => $method) {
             $entry->methods[$methodName] = $method;
             $entry->methodVisibility[$methodName] = $pub;
         }
