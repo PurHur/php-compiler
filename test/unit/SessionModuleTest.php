@@ -31,6 +31,7 @@ final class SessionModuleTest extends TestCase
                 'session_start',
                 'session_id',
                 'session_name',
+                'session_status',
                 'session_destroy',
                 'session_write_close',
                 'session_regenerate_id',
@@ -44,6 +45,7 @@ final class SessionModuleTest extends TestCase
 echo (int) function_exists('session_start');
 echo (int) function_exists('session_id');
 echo (int) function_exists('session_name');
+echo (int) function_exists('session_status');
 echo (int) function_exists('session_destroy');
 echo (int) function_exists('session_write_close');
 echo (int) function_exists('session_regenerate_id');
@@ -56,6 +58,6 @@ PHP;
         $block = $runtime->parseAndCompile($code, 'session_module.php');
         ob_start();
         $runtime->run($block);
-        self::assertSame("1111111\n2\nPHPSESSID\n", ob_get_clean());
+        self::assertSame("11111111\n2\nPHPSESSID\n", ob_get_clean());
     }
 }
