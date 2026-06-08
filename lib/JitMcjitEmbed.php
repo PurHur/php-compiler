@@ -10,6 +10,7 @@ namespace PHPCompiler;
  * Empty user class bodies (zero declared properties) leave MCJIT modules that segfault on
  * execute until a property slot exists (#4954); pad at JIT prepare time only (bin/jit.php).
  * Const-only / method-only bodies without properties hit the same MCJIT gap (#6964).
+ * Constructor-promoted-only user classes need the same pad as trait-merged classes (#5091).
  */
 final class JitMcjitEmbed
 {
@@ -26,7 +27,11 @@ final class JitMcjitEmbed
             return self::prependMcjitBootstrap($code);
         }
 
-        $code = self::padPropertylessUserClassesForMcjit($code);
+        $needsReadonlyPromotedBootstrap = false;
+        $code = self::padPropertylessUserClassesForMcjit($code, $needsReadonlyPromotedBootstrap);
+        if ($needsReadonlyPromotedBootstrap && !str_contains($code, '__phpc_mcjit_embed_bootstrap')) {
+            $code = self::prependMcjitBootstrap($code);
+        }
         // Enum-only scripts still need a padded user class for MCJIT module init (#4964, #6487).
         if (preg_match('/\benum\b/i', $code) && !str_contains($code, '__phpc_mcjit_embed_bootstrap')) {
             return self::prependMcjitBootstrap($code);
@@ -45,11 +50,11 @@ final class JitMcjitEmbed
         ) ?? $code;
     }
 
-    private static function padPropertylessUserClassesForMcjit(string $code): string
+    private static function padPropertylessUserClassesForMcjit(string $code, bool &$needsReadonlyPromotedBootstrap): string
     {
         $replaced = preg_replace_callback(
-            '/\b((?:abstract\s+|final\s+)?class\s+(?:[\w\\\\]+)\b[^<{]*)\{([^{}]*)\}/',
-            static function (array $match): string {
+            '/\b((?:(?:abstract\s+|final\s+|readonly\s+)*)class\s+(?:[\w\\\\]+)\b[^{]*)\{((?:[^{}]|\{[^{}]*\})*)\}/',
+            static function (array $match) use (&$needsReadonlyPromotedBootstrap): string {
                 if (preg_match('/\binterface\s+/i', $match[1])) {
                     return $match[0];
                 }
@@ -57,7 +62,13 @@ final class JitMcjitEmbed
                 if (str_contains($body, '__phpcMcjitClassPad')) {
                     return $match[0];
                 }
-                if (self::classBodyHasDeclaredProperty($body)) {
+                if (self::classBodyHasNonPromotedDeclaredProperty($body)) {
+                    return $match[0];
+                }
+                $isReadonlyClass = (bool) preg_match('/\breadonly\b/i', $match[1]);
+                if ($isReadonlyClass && self::classBodyHasPromotedConstructorProperty($body)) {
+                    $needsReadonlyPromotedBootstrap = true;
+
                     return $match[0];
                 }
                 $trimmed = trim($body);
@@ -73,12 +84,22 @@ final class JitMcjitEmbed
         return null !== $replaced ? $replaced : $code;
     }
 
-    private static function classBodyHasDeclaredProperty(string $body): bool
+    private static function classBodyHasNonPromotedDeclaredProperty(string $body): bool
     {
-        if (preg_match('/\b(?:public|protected|private|var|readonly)\s+(?:[\w\\\\|?]+\s+)*\$/', $body)) {
-            return true;
-        }
+        $stripped = preg_replace(
+            '/function\s+__construct\s*\([^)]*\)/',
+            'function __construct()',
+            $body
+        ) ?? $body;
 
+        return (bool) preg_match(
+            '/\b(?:public|protected|private|var|readonly)\s+(?:[\w\\\\|?]+\s+)*\$/',
+            $stripped
+        );
+    }
+
+    private static function classBodyHasPromotedConstructorProperty(string $body): bool
+    {
         return (bool) preg_match(
             '/function\s+__construct\s*\([^)]*(?:public|protected|private|readonly)\s+[^)]*\$/',
             $body

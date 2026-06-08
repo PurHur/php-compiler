@@ -1697,13 +1697,9 @@ class Block {
                     $nameOp = $block->getOperand($op->arg1);
                     if ($nameOp instanceof Literal) {
                         $classLc = strtolower(ltrim($nameOp->value, '\\'));
-                        $classReadonly = null !== $op->arg3
-                            && isset($block->constants[$op->arg3])
-                            && VM\ClassFlags::isReadonly($block->constants[$op->arg3]->toInt());
                         if (
                             !str_starts_with($classLc, 'phpcfg\\')
                             && !str_starts_with($classLc, 'phpcompiler\\')
-                            && !$classReadonly
                             && self::classBodyDeclaresInstanceProperty($op->block1)
                         ) {
                             return true;
@@ -1732,7 +1728,10 @@ class Block {
             }
             $seen->attach($block);
             foreach ($block->opCodes as $op) {
-                if (OpCode::TYPE_DECLARE_PROPERTY === $op->type) {
+                if (
+                    OpCode::TYPE_DECLARE_PROPERTY === $op->type
+                    && !$op->propertyFromConstructorPromotion
+                ) {
                     return true;
                 }
                 foreach ([$op->block1, $op->block2, $op->block3] as $sub) {

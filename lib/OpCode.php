@@ -249,6 +249,8 @@ class OpCode {
 
     /** TYPE_DECLARE_PROPERTY: property is readonly (#3149, #3432). */
     public bool $propertyReadonly = false;
+    /** TYPE_DECLARE_PROPERTY: constructor promotion (#4758, #5091). */
+    public bool $propertyFromConstructorPromotion = false;
     /** TYPE_DECLARE_PROPERTY: PHPCfg visibility flags (#145). */
     public int $propertyVisibility = 0;
 
