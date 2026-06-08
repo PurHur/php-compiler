@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace PHPCompiler\Web;
 
-use PHPCompiler\ext\standard\VmFs;
 use PHPCompiler\ext\standard\VmParseStr;
 use PHPCompiler\VM\HashTable;
 
@@ -163,7 +162,7 @@ final class MultipartParser
             'type',
             null !== $partType && '' !== $partType ? $partType : 'application/octet-stream'
         );
-        $tmp = tempnam(sys_get_temp_dir(), VmFs::UPLOAD_TEMP_PREFIX);
+        $tmp = UploadTemp::createTempFile();
         if (false === $tmp) {
             VmParseStr::setScalarEntry($entry, 'error', 1);
 
