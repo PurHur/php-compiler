@@ -163,6 +163,7 @@ class Module extends ModuleAbstract
             new string_trim(),
             new string_ltrim(),
             new string_rtrim(),
+            new string_rtrim('chop'),
             new substr(),
             new substr_replace(),
             new strrev(),

@@ -25,24 +25,25 @@ use PHPLLVM\Value;
  */
 final class string_rtrim extends Internal
 {
-    public function __construct()
+    public function __construct(string $name = 'rtrim')
     {
-        parent::__construct('rtrim');
+        parent::__construct($name);
     }
 
     public function execute(Frame $frame): void
     {
+        $fn = $this->getName();
         $argc = \count($frame->calledArgs);
         if ($argc < 1 || $argc > 2) {
-            throw new \LogicException('rtrim() requires one or two arguments');
+            throw new \LogicException($fn.'() requires one or two arguments');
         }
-        $string = VmString::coerceStringBuiltinArg($frame->calledArgs[0], 'rtrim', 0, 'string');
+        $string = VmString::coerceStringBuiltinArg($frame->calledArgs[0], $fn, 0, 'string');
         $mask = VmString::TRIM_DEFAULT;
         $mode = VmString::TRIM_SIDE_RIGHT;
         if (2 === $argc) {
             [$mask, $mode] = VmString::resolveTrimOptionalArg(
                 $frame->calledArgs[1],
-                'rtrim',
+                $fn,
                 1,
                 'characters',
                 VmString::TRIM_SIDE_RIGHT
@@ -59,9 +60,10 @@ final class string_rtrim extends Internal
     public function call(Context $context, JITVariable ...$args): Value
     {
         $this->context = $context;
+        $fn = $this->getName();
         $argc = \count($args);
         if ($argc < 1 || $argc > 2) {
-            throw new \LogicException('rtrim() requires one or two arguments');
+            throw new \LogicException($fn.'() requires one or two arguments');
         }
         $literal = $args[0]->compileTimeString ?? null;
         $modeLiteral = (2 === $argc) ? StringTrimModeJit::compileTimeModeBitmask($context, $args[1]) : null;
@@ -85,11 +87,11 @@ final class string_rtrim extends Internal
                 $mode = $modeLiteral;
             } else {
                 StringTrimMask::ensureLinked($context);
-                $maskStr = JitStringBuiltinArg::lower($context, $args[1], 'rtrim', 1, 'characters');
+                $maskStr = JitStringBuiltinArg::lower($context, $args[1], $fn, 1, 'characters');
                 $maskStr = $context->builder->call($context->lookupFunction('__string__separate'), $maskStr);
             }
         }
-        $str = JitStringBuiltinArg::lower($context, $args[0], 'rtrim', 0, 'string');
+        $str = JitStringBuiltinArg::lower($context, $args[0], $fn, 0, 'string');
         $structName = $str->typeOf()->getElementType()->getName();
         $map = $context->structFieldMap[$structName];
         $len = $context->builder->load(
@@ -104,16 +106,16 @@ final class string_rtrim extends Internal
         if ($mode & VmString::TRIM_SIDE_LEFT) {
             $startSlot = $context->builder->alloca($i64, 1, 'rtrim_start');
             $context->builder->store($zero, $startSlot);
-            string_trim::advanceWhileTrimByte($context, $charPtr, $len, $startSlot, true, 'rtrim', $maskStr);
+            string_trim::advanceWhileTrimByte($context, $charPtr, $len, $startSlot, true, $fn, $maskStr);
             $start = $context->builder->load($startSlot);
         } else {
             $start = $zero;
         }
         if ($mode & VmString::TRIM_SIDE_RIGHT) {
-            string_trim::advanceWhileTrimByte($context, $charPtr, $len, $endSlot, false, 'rtrim', $maskStr);
+            string_trim::advanceWhileTrimByte($context, $charPtr, $len, $endSlot, false, $fn, $maskStr);
         }
         $end = $context->builder->load($endSlot);
 
-        return string_trim::jitCopySlice($context, $str, $charPtr, $start, $end, 'rtrim');
+        return string_trim::jitCopySlice($context, $str, $charPtr, $start, $end, $fn);
     }
 }
