@@ -318,7 +318,8 @@ patch_already_applied() {
       php_cfg_enum_flags_parser_applied
       ;;
     php-cfg-named-args.patch)
-      grep -q 'callArgName' "$ROOT/vendor/ircmaxell/php-cfg/lib/PHPCfg/Parser.php" 2>/dev/null
+      grep -q 'callArgName' "$ROOT/vendor/ircmaxell/php-cfg/lib/PHPCfg/Operand.php" 2>/dev/null \
+        && grep -q 'callArgName' "$ROOT/vendor/ircmaxell/php-cfg/lib/PHPCfg/Parser.php" 2>/dev/null
       ;;
     php-cfg-spread.patch)
       grep -q 'callArgUnpack' "$ROOT/vendor/ircmaxell/php-cfg/lib/PHPCfg/Parser.php" 2>/dev/null
