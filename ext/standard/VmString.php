@@ -3207,6 +3207,12 @@ final class VmString
         if (1 === \count($pairs)) {
             $from = \array_key_first($pairs);
             $to = $pairs[$from];
+            if (!\is_string($from)) {
+                $from = (string) $from;
+            }
+            if (!\is_string($to)) {
+                $to = (string) $to;
+            }
             if (1 === self::byteLength($from)) {
                 return self::strtr($string, $from, self::byteSlice($to, 0, 1));
             }
