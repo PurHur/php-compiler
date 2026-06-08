@@ -28,4 +28,11 @@ final class StringJsonDecodeRuntimeStandaloneTest extends TestCase
         $this->assertStringContainsString('StringJsonDecodeJit', $runtime);
         $this->assertStringNotContainsString('phpc_json_decode.c', $runtime);
     }
+
+    public function testJsonDecodeJitCompileTimePathDoesNotCallHostJsonDecode(): void
+    {
+        $source = (string) file_get_contents(__DIR__.'/../../../ext/standard/json_decode.php');
+        $this->assertStringNotContainsString('\\json_decode', $source);
+        $this->assertStringContainsString('VmJsonFormat::decode', $source);
+    }
 }
