@@ -34,17 +34,8 @@ final class StringFormatRuntimeStandaloneTest extends TestCase
         }
     }
 
-    public function testSuperglobalsRefreshCDoesNotDefineFormatRuntime(): void
+    public function testSuperglobalsRefreshCFileRemoved(): void
     {
-        $source = (string) file_get_contents(__DIR__.'/../../../lib/AOT/runtime/superglobals_refresh.c');
-        $this->assertStringNotContainsString('void __compiler_sprintf', $source);
-        $this->assertStringNotContainsString('void __compiler_printf', $source);
-        $this->assertStringNotContainsString('void __compiler_number_format', $source);
-        $this->assertStringNotContainsString('__string__ *__compiler_sprintf', $source);
-        $this->assertStringNotContainsString('long long __compiler_printf', $source);
-        $this->assertStringNotContainsString('__string__ *__compiler_number_format', $source);
-        $this->assertStringContainsString('__compiler_sprintf', $source);
-        $this->assertStringContainsString('__compiler_printf', $source);
-        $this->assertStringContainsString('__compiler_number_format', $source);
+        $this->assertFileDoesNotExist(__DIR__.'/../../../lib/AOT/runtime/superglobals_refresh.c');
     }
 }

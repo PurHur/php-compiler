@@ -36,11 +36,8 @@ final class SuperglobalsBracketRuntimeStandaloneTest extends TestCase
         }
     }
 
-    public function testSuperglobalsRefreshCDoesNotDefineBracketParser(): void
+    public function testSuperglobalsRefreshCFileRemoved(): void
     {
-        $source = (string) file_get_contents(__DIR__.'/../../../lib/AOT/runtime/superglobals_refresh.c');
-        $this->assertStringNotContainsString('sg_parse_key_brackets', $source);
-        $this->assertDoesNotMatchRegularExpression('/\bparse_delimited_pairs\b/', $source);
-        $this->assertStringContainsString('__phpc_parse_str_parse_delimited_pairs', $source);
+        $this->assertFileDoesNotExist(__DIR__.'/../../../lib/AOT/runtime/superglobals_refresh.c');
     }
 }

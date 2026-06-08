@@ -36,15 +36,8 @@ final class SuperglobalsMultipartRuntimeStandaloneTest extends TestCase
         }
     }
 
-    public function testSuperglobalsRefreshCDoesNotDefineMultipartParser(): void
+    public function testSuperglobalsRefreshCFileRemoved(): void
     {
-        $source = (string) file_get_contents(__DIR__.'/../../../lib/AOT/runtime/superglobals_refresh.c');
-        $this->assertStringNotContainsString('sg_extract_boundary', $source);
-        $this->assertStringNotContainsString('sg_find_header_value', $source);
-        $this->assertStringNotContainsString('sg_multipart_param', $source);
-        $this->assertStringNotContainsString('sg_set_file_entry', $source);
-        $this->assertStringNotContainsString('sg_normalize_body_newlines', $source);
-        $this->assertDoesNotMatchRegularExpression('/\bparse_multipart_post\b/', $source);
-        $this->assertStringContainsString('__phpc_parse_multipart_post', $source);
+        $this->assertFileDoesNotExist(__DIR__.'/../../../lib/AOT/runtime/superglobals_refresh.c');
     }
 }

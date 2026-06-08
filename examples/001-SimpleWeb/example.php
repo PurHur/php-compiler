@@ -20,7 +20,7 @@ declare(strict_types=1);
  *   REQUEST_METHOD=POST REQUEST_BODY='name=PostDev' ./simpleweb
  *
  * $_REQUEST merges $_GET then $_POST (POST wins on duplicate keys). See lib/Web/Superglobals.php
- * and lib/AOT/runtime/superglobals_refresh.c for runtime refresh per request.
+ * and SuperglobalRefreshRuntime LLVM for runtime refresh per request (#5330).
  */
 $name = $_REQUEST['name'];
 header('Content-Type: text/html; charset=UTF-8');

@@ -35,12 +35,8 @@ final class SuperglobalsJsonPostRuntimeStandaloneTest extends TestCase
         }
     }
 
-    public function testSuperglobalsRefreshCDoesNotDefineJsonParser(): void
+    public function testSuperglobalsRefreshCFileRemoved(): void
     {
-        $source = (string) file_get_contents(__DIR__.'/../../../lib/AOT/runtime/superglobals_refresh.c');
-        $this->assertStringNotContainsString('sg_json_parse_object', $source);
-        $this->assertStringNotContainsString('sg_json_ctx', $source);
-        $this->assertStringNotContainsString('parse_json_post', $source);
-        $this->assertStringContainsString('__phpc_json_parse_post_body', $source);
+        $this->assertFileDoesNotExist(__DIR__.'/../../../lib/AOT/runtime/superglobals_refresh.c');
     }
 }

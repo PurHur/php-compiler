@@ -59,7 +59,7 @@ final class SuperglobalInit
 
     /**
      * MCJIT embed: LLVM body that repopulates sg_* from the VM (issue #642, #2055).
-     * Standalone AOT links {@see __superglobals__refresh} from C runtime instead.
+     * Standalone AOT defines {@see __superglobals__refresh} via SuperglobalRefreshRuntime LLVM (#5330).
      */
     public static function implementRefresh(Context $context): void
     {
