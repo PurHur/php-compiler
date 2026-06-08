@@ -7,6 +7,7 @@ namespace PHPCompiler\VM;
 use PHPCompiler\ext\standard\VmClosureCall;
 use PHPCompiler\Frame;
 use PHPCompiler\VM\FiberState;
+use PHPCompiler\VM\FiberTrace;
 
 /**
  * Fiber helpers (issue #3130; php-src Zend/zend_fibers.c).
@@ -66,6 +67,7 @@ final class FiberSupport
         }
         // `Fiber::suspend()` returns when resumed; stash the return target now and fill it on resume.
         $fiber->pendingSuspendReturnVar = $handlerFrame->returnVar;
+        $fiber->suspendedTrace->copyFrom(FiberTrace::captureAtSuspend($handlerFrame, $fiber));
         $parent = $handlerFrame->parent;
         if (null !== $parent) {
             $parent->fiberSuspend = true;
