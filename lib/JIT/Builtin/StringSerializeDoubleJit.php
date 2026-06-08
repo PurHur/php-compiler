@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace PHPCompiler\JIT\Builtin;
 
 use PHPCompiler\JIT\Context;
+use PHPLLVM\BasicBlock;
 use PHPLLVM\Builder;
 use PHPLLVM\Value;
 
@@ -28,11 +29,7 @@ final class StringSerializeDoubleJit
             return;
         }
 
-        $restore = null;
-        try {
-            $restore = $context->builder->getInsertBlock();
-        } catch (\Throwable) {
-        }
+        $restore = self::captureInsertBlock($context);
         self::ensureLibc($context);
 
         $doubleTy = $context->getTypeFromString('double');
@@ -116,9 +113,24 @@ final class StringSerializeDoubleJit
 
         $context->builder->positionAtEnd($bbMerge);
         $context->builder->returnValue($context->builder->load($resultSlot));
-        $context->builder->clearInsertionPosition();
-        if (null !== $restore) {
-            $context->builder->positionAtEnd($restore);
+        self::restoreInsertBlock($context, $restore);
+    }
+
+    private static function captureInsertBlock(Context $context): ?BasicBlock
+    {
+        try {
+            return $context->builder->getInsertBlock();
+        } catch (\Throwable) {
+            return null;
+        }
+    }
+
+    private static function restoreInsertBlock(Context $context, ?BasicBlock $block): void
+    {
+        if (null !== $block) {
+            $context->builder->positionAtEnd($block);
+        } else {
+            $context->builder->clearInsertionPosition();
         }
     }
 
