@@ -29,6 +29,7 @@ class Module extends ModuleAbstract
         parent::init($runtime);
         BuiltinAttributes::register($runtime->vmContext);
         BuiltinEnums::register($runtime->vmContext);
+        BuiltinClasses::register($runtime->vmContext);
         foreach ([
             'LOCK_SH' => 1,
             'LOCK_EX' => 2,
@@ -430,6 +431,10 @@ class Module extends ModuleAbstract
             new fread(),
             new stream_get_contents(),
             new stream_get_filters(),
+            new stream_bucket_new(),
+            new stream_bucket_make_writeable(),
+            new stream_bucket_append(),
+            new stream_bucket_prepend(),
             new fgetc(),
             new fgets(),
             new stream_get_line(),

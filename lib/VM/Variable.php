@@ -95,6 +95,12 @@ final class Variable {
 
     public bool $dirResource = false;
 
+    /** Stream filter brigade registry handle (#7089). */
+    public bool $brigadeResource = false;
+
+    /** Stream filter bucket registry handle (#7089). */
+    public bool $bucketResource = false;
+
     /** Lvalue proxy for __set dispatch when the property slot does not exist (#146). */
     public ?ObjectEntry $magicSetTarget = null;
 
@@ -194,6 +200,8 @@ final class Variable {
         $this->type = self::TYPE_ARRAY;
         $this->streamResource = false;
         $this->dirResource = false;
+        $this->brigadeResource = false;
+        $this->bucketResource = false;
         $this->array = $ht;
         MemoryAccounting::noteBytes(MemoryAccounting::estimateArrayBytesForTable($ht));
     }
@@ -236,6 +244,8 @@ final class Variable {
         $this->integer = $value;
         $this->streamResource = false;
         $this->dirResource = false;
+        $this->brigadeResource = false;
+        $this->bucketResource = false;
     }
 
     public function streamHandle(int $value): void
@@ -248,6 +258,8 @@ final class Variable {
         $this->int($value);
         $this->streamResource = true;
         $this->dirResource = false;
+        $this->brigadeResource = false;
+        $this->bucketResource = false;
     }
 
     public function dirHandle(int $value): void
@@ -260,6 +272,36 @@ final class Variable {
         $this->int($value);
         $this->dirResource = true;
         $this->streamResource = false;
+        $this->brigadeResource = false;
+        $this->bucketResource = false;
+    }
+
+    public function brigadeHandle(int $value): void
+    {
+        if ($this->type === self::TYPE_INDIRECT) {
+            $this->indirect->brigadeHandle($value);
+
+            return;
+        }
+        $this->int($value);
+        $this->brigadeResource = true;
+        $this->streamResource = false;
+        $this->dirResource = false;
+        $this->bucketResource = false;
+    }
+
+    public function bucketHandle(int $value): void
+    {
+        if ($this->type === self::TYPE_INDIRECT) {
+            $this->indirect->bucketHandle($value);
+
+            return;
+        }
+        $this->int($value);
+        $this->bucketResource = true;
+        $this->streamResource = false;
+        $this->dirResource = false;
+        $this->brigadeResource = false;
     }
 
     public function isStreamResource(): bool
@@ -272,9 +314,22 @@ final class Variable {
         return $this->dirResource && self::TYPE_INTEGER === $this->type;
     }
 
+    public function isBrigadeResource(): bool
+    {
+        return $this->brigadeResource && self::TYPE_INTEGER === $this->type;
+    }
+
+    public function isBucketResource(): bool
+    {
+        return $this->bucketResource && self::TYPE_INTEGER === $this->type;
+    }
+
     public function isVmResource(): bool
     {
-        return $this->isStreamResource() || $this->isDirResource();
+        return $this->isStreamResource()
+            || $this->isDirResource()
+            || $this->isBrigadeResource()
+            || $this->isBucketResource();
     }
 
     /**
@@ -295,7 +350,9 @@ final class Variable {
             return false;
         }
         if ($left->streamResource !== $right->streamResource
-            || $left->dirResource !== $right->dirResource) {
+            || $left->dirResource !== $right->dirResource
+            || $left->brigadeResource !== $right->brigadeResource
+            || $left->bucketResource !== $right->bucketResource) {
             return false;
         }
 
@@ -740,6 +797,8 @@ final class Variable {
         $this->type = self::TYPE_NULL;
         $this->streamResource = false;
         $this->dirResource = false;
+        $this->brigadeResource = false;
+        $this->bucketResource = false;
     }
 
     /** Drop emalloc-tracked bytes before replacing or clearing this slot (#7310). */
@@ -1060,6 +1119,8 @@ final class Variable {
                 $this->int($var->integer);
                 $this->streamResource = $var->streamResource;
                 $this->dirResource = $var->dirResource;
+                $this->brigadeResource = $var->brigadeResource;
+                $this->bucketResource = $var->bucketResource;
                 break;
             case self::TYPE_FLOAT:
                 $this->float($var->float);
@@ -1096,6 +1157,8 @@ final class Variable {
                 $this->type = self::TYPE_ARRAY;
                 $this->streamResource = false;
                 $this->dirResource = false;
+                $this->brigadeResource = false;
+                $this->bucketResource = false;
                 $this->array = $var->array;
                 $this->objectPropertyOwner = $owner;
                 $this->objectPropertyName = $propName;
