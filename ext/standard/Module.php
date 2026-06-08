@@ -470,6 +470,7 @@ class Module extends ModuleAbstract
             new fputcsv(),
             new str_getcsv(),
             new ftell_(),
+            new ftok(),
             new fseek(),
             new rewind_(),
             new feof_(),
