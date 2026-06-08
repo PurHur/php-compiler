@@ -122,6 +122,7 @@ use PHPCompiler\VM\Builtin\WeakMapOffsetExists;
 use PHPCompiler\VM\Builtin\WeakMapOffsetGet;
 use PHPCompiler\VM\Builtin\WeakMapOffsetSet;
 use PHPCompiler\VM\Builtin\WeakMapOffsetUnset;
+use PHPCompiler\VM\Builtin\ResourceConstruct;
 use PHPCompiler\VM\Builtin\WeakReferenceConstruct;
 use PHPCompiler\VM\Builtin\WeakReferenceCreate;
 use PHPCompiler\VM\Builtin\WeakReferenceGet;
@@ -141,6 +142,7 @@ final class BuiltinClasses
         LazyGhostTraitSupport::register($ctx);
         AttributeSupport::register($ctx);
         self::registerStdClass($ctx);
+        self::registerResource($ctx);
         self::registerCountable($ctx);
         self::registerArrayAccess($ctx);
         self::registerTraversableInterfaces($ctx);
@@ -198,6 +200,17 @@ final class BuiltinClasses
         $entry = new ClassEntry('stdClass');
         $entry->allowsDynamicProperties = true;
         $ctx->classes['stdclass'] = $entry;
+    }
+
+    /** PHP 8.4 Resource builtin — stream/dir zval wrapper (#7071, #7073). */
+    private static function registerResource(Context $ctx): void
+    {
+        $entry = new ClassEntry('Resource');
+        $pub = CfgFunc::FLAG_PUBLIC;
+        $entry->constructor = new ResourceConstruct();
+        $entry->methods['__construct'] = $entry->constructor;
+        $entry->methodVisibility['__construct'] = $pub;
+        $ctx->classes['resource'] = $entry;
     }
 
     private static function registerWeakReference(Context $ctx): void

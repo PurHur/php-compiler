@@ -29,7 +29,7 @@ final class opendir extends Internal
 
             return;
         }
-        $frame->returnVar->dirHandle($handle);
+        $frame->returnVar->dirHandle($handle, $frame->vmContext);
     }
 
     public function call(Context $context, JITVariable ...$args): Value

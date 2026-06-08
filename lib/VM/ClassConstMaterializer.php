@@ -99,9 +99,9 @@ final class ClassConstMaterializer
                 break;
             case Variable::TYPE_INTEGER:
                 if ($src->isStreamResource()) {
-                    $stored->streamHandle($src->toInt());
+                    $stored->legacyStreamHandle($src->toInt());
                 } elseif ($src->isDirResource()) {
-                    $stored->dirHandle($src->toInt());
+                    $stored->legacyDirHandle($src->toInt());
                 } else {
                     $stored->int($src->toInt());
                 }

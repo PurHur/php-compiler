@@ -28,7 +28,7 @@ final class get_resources_ extends Internal
         if (\count($frame->calledArgs) > 1) {
             throw new \LogicException('get_resources() takes at most one argument');
         }
-        $table = VmFs::getResourcesTable(self::optionalType($frame));
+        $table = VmFs::getResourcesTable(self::optionalType($frame), $frame->vmContext);
         if (null === $frame->returnVar) {
             return;
         }
