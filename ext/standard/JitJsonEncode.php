@@ -8,26 +8,23 @@ use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Value;
 
+/**
+ * JIT json_encode() lowering via VmJsonFormat LLVM helpers (#6852).
+ */
 final class JitJsonEncode
 {
     public static function encode(Context $context, JITVariable $arg): Value
     {
         if (JITVariable::TYPE_HASHTABLE === $arg->type) {
             return $context->builder->call(
-                $context->lookupFunction('__compiler_json_encode_hashtable'),
+                $context->lookupFunction('__compiler_json_encode_array'),
                 $context->helper->loadValue($arg)
             );
         }
         if (JITVariable::TYPE_VALUE === $arg->type) {
-            $boxed = $context->helper->loadValue($arg);
-            $ht = $context->builder->call(
-                $context->lookupFunction('__value__readHashtable'),
-                $boxed
-            );
-
             return $context->builder->call(
-                $context->lookupFunction('__compiler_json_encode_hashtable'),
-                $ht
+                $context->lookupFunction('__compiler_json_encode_value'),
+                $context->helper->loadValue($arg)
             );
         }
 
