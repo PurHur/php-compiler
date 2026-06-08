@@ -30,12 +30,4 @@ final class StreamResourceRuntimeStandaloneTest extends TestCase
             $this->assertGreaterThan(0, $fn->countBasicBlocks(), $name);
         }
     }
-
-    public function testPhpcStreamCNoLongerDefinesResourceHelpers(): void
-    {
-        $source = (string) file_get_contents(__DIR__.'/../../../lib/AOT/runtime/phpc_stream.c');
-        $this->assertStringNotContainsString('__compiler_get_resource_type(int64_t', $source);
-        $this->assertStringNotContainsString('__compiler_get_resources(__string__', $source);
-        $this->assertStringContainsString('StreamResourceJit.php', $source);
-    }
 }

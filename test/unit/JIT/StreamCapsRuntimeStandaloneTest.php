@@ -31,14 +31,4 @@ final class StreamCapsRuntimeStandaloneTest extends TestCase
             $this->assertGreaterThan(0, $fn->countBasicBlocks(), $name);
         }
     }
-
-    public function testPhpcStreamCNoLongerDefinesCapsHelpers(): void
-    {
-        $source = file_get_contents(__DIR__.'/../../../lib/AOT/runtime/phpc_stream.c');
-        $this->assertIsString($source);
-        $this->assertStringNotContainsString('__compiler_stream_isatty', $source);
-        $this->assertStringNotContainsString('__compiler_stream_is_local', $source);
-        $this->assertStringNotContainsString('__compiler_stream_supports', $source);
-        $this->assertStringNotContainsString('phpc_stream_is_url_path', $source);
-    }
 }

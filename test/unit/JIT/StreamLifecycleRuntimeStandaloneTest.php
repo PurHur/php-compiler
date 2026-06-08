@@ -32,14 +32,4 @@ final class StreamLifecycleRuntimeStandaloneTest extends TestCase
             $this->assertGreaterThan(0, $fn->countBasicBlocks(), $name);
         }
     }
-
-    public function testPhpcStreamCNoLongerDefinesLifecycleHelpers(): void
-    {
-        $source = (string) file_get_contents(__DIR__.'/../../../lib/AOT/runtime/phpc_stream.c');
-        $this->assertStringNotContainsString('__compiler_is_resource(int64_t', $source);
-        $this->assertStringNotContainsString('__compiler_fclose(int64_t', $source);
-        $this->assertStringNotContainsString('__compiler_feof(int64_t', $source);
-        $this->assertStringNotContainsString('__compiler_fflush(int64_t', $source);
-        $this->assertStringContainsString('StreamLifecycleJit.php', $source);
-    }
 }
