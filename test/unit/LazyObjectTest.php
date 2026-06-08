@@ -193,4 +193,36 @@ PHP;
             ob_get_clean()
         );
     }
+
+    /** @covers issue #6776 */
+    public function testLazyProxyReflectionMethods(): void
+    {
+        $runtime = new Runtime();
+        $code = <<<'PHP'
+<?php
+class Svc {
+    public function __construct(public string $id = 'x') {}
+}
+$ref = new ReflectionClass(Svc::class);
+$lazy = $ref->newLazyProxy(static fn () => new Svc('proxy'));
+echo 'methods=';
+echo (int) method_exists($ref, 'getLazyProxyFactory');
+echo (int) method_exists($ref, 'resetAsLazyProxy');
+echo "\n";
+$factory = $ref->getLazyProxyFactory($lazy);
+echo 'pending_factory=', (null === $factory ? 'null' : 'callable'), "\n";
+echo 'before=', $lazy->id, "\n";
+$ref->resetAsLazyProxy($lazy, static fn () => new Svc('rebound'));
+echo 'rebound_before=', $lazy->id, "\n";
+echo 'after_rebound=', $lazy->id, "\n";
+$ref->markLazyObjectAsInitialized($lazy);
+echo 'after_mark_factory=', (null === $ref->getLazyProxyFactory($lazy) ? 'null' : 'callable'), "\n";
+PHP;
+        ob_start();
+        $runtime->run($runtime->parseAndCompile($code, 'lazy_proxy_reflection.php'));
+        $this->assertSame(
+            "methods=11\npending_factory=callable\nbefore=proxy\nrebound_before=rebound\nafter_rebound=rebound\nafter_mark_factory=null\n",
+            ob_get_clean()
+        );
+    }
 }

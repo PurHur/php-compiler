@@ -182,6 +182,19 @@ final class LazyObjectSupport
         return null;
     }
 
+    /** ReflectionClass::getLazyProxyFactory — pending proxy factory only (#6776). */
+    public static function getProxyFactory(ObjectEntry $object): ?ClosureState
+    {
+        if ($object->lazyGhost) {
+            return null;
+        }
+        if (!$object->lazyPending || null === $object->lazyResetInitializer) {
+            return null;
+        }
+
+        return $object->lazyInitializer;
+    }
+
     /** Zend zend_object_is_lazy && !zend_lazy_object_initialized (#6054, #6068). */
     public static function isUninitializedLazyObject(ObjectEntry $object): bool
     {
@@ -267,6 +280,36 @@ final class LazyObjectSupport
         $object->lazyPending = true;
         $object->lazyGhost = true;
         $object->lazyResetInitializer = $initializer;
+    }
+
+    /**
+     * Zend zend_object_make_lazy proxy reset path (#6776).
+     */
+    public static function resetAsLazyProxy(
+        \PHPCompiler\VM $vm,
+        ObjectEntry $object,
+        ClosureState $factory,
+        int $options = 0
+    ): void {
+        if ($object->lazyPending) {
+            throw new \ReflectionException('Object is already lazy');
+        }
+
+        if (0 === ($options & self::SKIP_DESTRUCTOR) && !$object->destructorInvoked) {
+            $vm->invokeUserDestructor($object);
+        }
+
+        foreach ($object->getRawProperties() as $var) {
+            $var->reset();
+            $var->type = Variable::TYPE_UNDEFINED;
+        }
+
+        $object->constructed = false;
+        $object->destructorInvoked = false;
+        $object->lazyInitializer = $factory;
+        $object->lazyPending = true;
+        $object->lazyGhost = false;
+        $object->lazyResetInitializer = $factory;
     }
 
     /**
