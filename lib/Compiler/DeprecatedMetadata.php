@@ -84,6 +84,14 @@ final class DeprecatedMetadata
         return 'Property '.$class.'::$'.$property.' is deprecated'.$this->suffix();
     }
 
+    /**
+     * Bare #[\Deprecated] (no message/since) is reflection metadata only — no E_USER_DEPRECATED (#4392, Zend zend_attributes.c).
+     */
+    public function emitsRuntimeNotice(): bool
+    {
+        return null !== $this->message || null !== $this->since;
+    }
+
     private function suffix(): string
     {
         if (null !== $this->since && null !== $this->message) {
