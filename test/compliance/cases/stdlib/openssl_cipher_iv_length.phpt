@@ -1,0 +1,11 @@
+--TEST--
+stdlib openssl_cipher_iv_length() — AES-256-CBC IV length (#7331, ext/openssl/openssl.c)
+--FILE--
+<?php
+echo function_exists('openssl_cipher_iv_length') ? "exists\n" : "missing\n";
+var_dump(openssl_cipher_iv_length('aes-256-cbc'));
+var_dump(openssl_cipher_iv_length('not-a-real-cipher-method'));
+--EXPECT--
+exists
+int(16)
+bool(false)

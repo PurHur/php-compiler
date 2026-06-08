@@ -19,7 +19,7 @@ final class OpensslModuleTest extends TestCase
         $runtime = new Runtime();
         $ctx = $runtime->vmContext;
 
-        foreach (['openssl_encrypt', 'openssl_decrypt', 'openssl_sign', 'openssl_get_cipher_methods', 'openssl_pkey_new'] as $fn) {
+        foreach (['openssl_encrypt', 'openssl_decrypt', 'openssl_sign', 'openssl_get_cipher_methods', 'openssl_pkey_new', 'openssl_cipher_iv_length'] as $fn) {
             self::assertTrue(VmReflection::functionExists($ctx, $fn), $fn);
         }
 
@@ -30,6 +30,7 @@ echo (int) function_exists('openssl_decrypt');
 echo (int) function_exists('openssl_sign');
 echo (int) function_exists('openssl_get_cipher_methods');
 echo (int) function_exists('openssl_pkey_new');
+echo (int) function_exists('openssl_cipher_iv_length');
 echo (int) defined('OPENSSL_RAW_DATA');
 echo OPENSSL_RAW_DATA;
 echo (int) defined('OPENSSL_ZERO_PADDING');
@@ -38,7 +39,24 @@ PHP;
         $block = $runtime->parseAndCompile($code, 'openssl_module.php');
         ob_start();
         $runtime->run($block);
-        self::assertSame('111111112', ob_get_clean());
+        self::assertSame('1111111112', ob_get_clean());
+    }
+
+    public function test_openssl_cipher_iv_length_aes_256_cbc(): void
+    {
+        $runtime = new Runtime();
+        $fn = new \PHPCompiler\ext\openssl\openssl_cipher_iv_length();
+        $frame = $fn->getFrame($runtime->vmContext);
+        $frame->calledArgs[] = (static function () use ($runtime) {
+            $v = new \PHPCompiler\VM\Variable();
+            $v->string('aes-256-cbc');
+
+            return $v;
+        })();
+        $frame->returnVar = new \PHPCompiler\VM\Variable();
+        $fn->execute($frame);
+        self::assertSame(\PHPCompiler\VM\Variable::TYPE_INTEGER, $frame->returnVar->type);
+        self::assertSame(16, $frame->returnVar->toInt());
     }
 
     public function test_openssl_encrypt_stub_throws_logic_exception(): void
