@@ -66,4 +66,10 @@ final class CompilerVersion
     {
         return version_compare(self::VERSION, '8.4', '>=');
     }
+
+    /** PHP 8.4+ fpow() IEEE float power (ext/standard/math.c; issue #7045). */
+    public static function supportsFpow(): bool
+    {
+        return version_compare(self::VERSION, '8.4', '>=');
+    }
 }
