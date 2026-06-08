@@ -6239,6 +6239,20 @@ restart:
         if (null === $handlerFrame->returnVar) {
             $handlerFrame->returnVar = new Variable();
         }
+        if ($handlerFrame->handler instanceof Func\Internal) {
+            foreach (BuiltinByRefParams::forFunction($handlerFrame->handler->getName()) as $idx) {
+                if (!isset($handlerFrame->calledArgs[$idx])) {
+                    continue;
+                }
+                $catchFrame = $this->enforceReadonlyPropertyWrite(
+                    $handlerFrame->calledArgs[$idx],
+                    $callerFrame
+                );
+                if (null !== $catchFrame) {
+                    return $catchFrame;
+                }
+            }
+        }
         try {
             $handlerFrame->handler->execute($handlerFrame);
 
