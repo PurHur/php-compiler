@@ -960,7 +960,6 @@ require_once __DIR__.'/../../../ext/standard/VmIteratorWalk.php';
 require_once __DIR__.'/../../../ext/standard/VmMemory.php';
 require_once __DIR__.'/../../../ext/standard/VmMetaTags.php';
 require_once __DIR__.'/../../../ext/standard/VmMinMax.php';
-require_once __DIR__.'/../../../ext/standard/VmNetwork.php';
 require_once __DIR__.'/../../../ext/standard/VmNetworkServices.php';
 require_once __DIR__.'/../../../ext/standard/VmOb.php';
 require_once __DIR__.'/../../../ext/standard/VmReadline.php';

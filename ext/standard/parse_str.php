@@ -15,7 +15,7 @@ use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
 
 /**
- * parse_str() — query string parser (VM via PHP; JIT/AOT via StringParseStrJit / __compiler_parse_str).
+ * parse_str() — query string parser (VM: ParseStrEngine; JIT/AOT: StringParseStrJit / __compiler_parse_str).
  */
 final class parse_str extends Internal
 {
@@ -37,8 +37,7 @@ final class parse_str extends Internal
         if (1 === $argc) {
             $caller = VmScope::requireCaller($frame);
             VmScope::requireMainScriptForParseStrOneArg($caller);
-            $params = [];
-            \parse_str($encoded->toString(), $params);
+            $params = ParseStrEngine::parse($encoded->toString());
             VmParseStr::importIntoCaller($caller, $params);
 
             return;
@@ -57,8 +56,7 @@ final class parse_str extends Internal
             ));
         }
 
-        $params = [];
-        \parse_str($encoded->toString(), $params);
+        $params = ParseStrEngine::parse($encoded->toString());
         $parsed = new \PHPCompiler\VM\HashTable();
         VmParseStr::mergeInto($parsed, $params);
         $replacement = new Variable(Variable::TYPE_ARRAY);
