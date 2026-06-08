@@ -260,6 +260,7 @@ class Module extends ModuleAbstract
             new array_intersect(),
             new array_intersect_assoc(),
             new iterator_to_array(),
+            new generator_to_array(),
             new iterator_count(),
             new iterator_apply(),
             new array_replace(),
