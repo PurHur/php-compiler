@@ -5,8 +5,10 @@ declare(strict_types=1);
 namespace PHPCompiler\ext\standard;
 
 use PHPCompiler\Func\PHP as PhpFunc;
+use PHPCompiler\VM\BackedEnum;
 use PHPCompiler\VM\ClassEntry;
 use PHPCompiler\VM\Context;
+use PHPCompiler\VM\EnumCaseSupport;
 use PHPCompiler\VM\ObjectEntry;
 use PHPCompiler\VM\Variable;
 
@@ -21,6 +23,10 @@ final class VmSerialize
     public static function serializeValue(Context $ctx, Variable $value): string
     {
         $value = $value->resolveIndirect();
+        $enumRef = self::enumCaseRefFromVariable($value);
+        if (null !== $enumRef) {
+            return self::encodeEnumCaseLiteral($enumRef->className, $enumRef->caseName);
+        }
         if (Variable::TYPE_OBJECT === $value->type) {
             $entry = $value->toObject();
             if (self::hasInstanceMethod($entry->class, '__serialize')) {
@@ -42,7 +48,16 @@ final class VmSerialize
             }
         }
 
-        return self::serializeExported(VmJson::export($value));
+        return self::serializeExported(self::exportForSerialize($ctx, $value));
+    }
+
+    /** Zend enum wire format: E:len:"EnumName:CaseName"; (php-src ext/standard/var.c). */
+    public static function encodeEnumCaseLiteral(string $className, string $caseName): string
+    {
+        $payload = $className.':'.$caseName;
+        $len = \strlen($payload);
+
+        return 'E:'.$len.':"'.$payload.'";';
     }
 
     /**
@@ -77,6 +92,20 @@ final class VmSerialize
             }
 
             return self::instantiateLegacySerializable($ctx, $class, $data);
+        }
+
+        if (str_starts_with($payload, 'E:')) {
+            $parsed = self::parseEnumCasePayload($payload);
+            if (null === $parsed) {
+                return false;
+            }
+            [$className, $caseName] = $parsed;
+            $resolved = self::resolveEnumCaseVariable($ctx, $className, $caseName);
+            if (null === $resolved) {
+                return false;
+            }
+
+            return $resolved;
         }
 
         if (str_starts_with($payload, 'O:')) {
@@ -272,6 +301,127 @@ final class VmSerialize
         return $recv;
     }
 
+    /**
+     * @return array{0: string, 1: string}|null
+     */
+    public static function parseEnumCasePayload(string $payload): ?array
+    {
+        if (!\preg_match('/^E:(\d+):"((?:[^"\\\\]|\\\\.)*)";$/', $payload, $m)) {
+            return null;
+        }
+        $declaredLen = (int) $m[1];
+        $inner = $m[2];
+        if (\strlen($inner) !== $declaredLen) {
+            return null;
+        }
+        $unescaped = self::unescapeSerializedEnumPayload($inner);
+        $colonPos = strrpos($unescaped, ':');
+        if (false === $colonPos || 0 === $colonPos) {
+            return null;
+        }
+        $className = \substr($unescaped, 0, $colonPos);
+        $caseName = \substr($unescaped, $colonPos + 1);
+        if ('' === $className || '' === $caseName) {
+            return null;
+        }
+
+        return [$className, $caseName];
+    }
+
+    public static function resolveEnumCaseVariable(
+        Context $ctx,
+        string $className,
+        string $caseName
+    ): ?Variable {
+        $lc = strtolower($className);
+        if (!isset($ctx->classes[$lc])) {
+            $ctx->autoloadClass($className);
+        }
+        if (!isset($ctx->classes[$lc])) {
+            return null;
+        }
+        $enum = $ctx->classes[$lc];
+        if (!$enum->isEnum) {
+            return null;
+        }
+        $canonical = BackedEnum::canonicalCaseVariable($enum, $caseName);
+        if (null === $canonical) {
+            return null;
+        }
+        $resolved = $canonical->resolveIndirect();
+        if (Variable::TYPE_ENUM_CASE === $resolved->type
+            || (Variable::TYPE_OBJECT === $resolved->type && EnumCaseSupport::isEnumCase($resolved->toObject()))) {
+            $var = new Variable();
+            $var->copyFrom($resolved);
+
+            return $var;
+        }
+
+        return null;
+    }
+
+    private static function exportForSerialize(Context $ctx, Variable $value): mixed
+    {
+        $value = $value->resolveIndirect();
+        $enumRef = self::enumCaseRefFromVariable($value);
+        if (null !== $enumRef) {
+            return $enumRef;
+        }
+        if (Variable::TYPE_ARRAY === $value->type) {
+            $out = [];
+            foreach ($value->toArray()->iterateKeyed(true) as [$key, $elem]) {
+                $k = $key->resolveIndirect();
+                if (Variable::TYPE_STRING === $k->type) {
+                    $out[$k->toString()] = self::exportForSerialize($ctx, $elem);
+                } elseif (Variable::TYPE_INTEGER === $k->type) {
+                    $out[$k->toInt()] = self::exportForSerialize($ctx, $elem);
+                } else {
+                    throw new \LogicException(
+                        'serialize() only supports string or integer keys in this compiler build'
+                    );
+                }
+            }
+
+            return $out;
+        }
+
+        return VmJson::export($value, $ctx, $ctx->runtime->vm);
+    }
+
+    /** Unescape php-src serialize string escapes in enum E: payloads (var_unserializer.c). */
+    private static function unescapeSerializedEnumPayload(string $payload): string
+    {
+        return \preg_replace_callback(
+            '/\\\\([\\\\"nrt])/',
+            static function (array $m): string {
+                return match ($m[1]) {
+                    'n' => "\n",
+                    'r' => "\r",
+                    't' => "\t",
+                    default => $m[1],
+                };
+            },
+            $payload
+        ) ?? $payload;
+    }
+
+    private static function enumCaseRefFromVariable(Variable $value): ?VmSerializeEnumCaseRef
+    {
+        $value = $value->resolveIndirect();
+        if (Variable::TYPE_ENUM_CASE === $value->type) {
+            $case = $value->toEnumCase();
+
+            return new VmSerializeEnumCaseRef($case->enumClass->name, $case->caseName);
+        }
+        if (Variable::TYPE_OBJECT === $value->type && EnumCaseSupport::isEnumCase($value->toObject())) {
+            $object = $value->toObject();
+
+            return new VmSerializeEnumCaseRef($object->class->name, $object->enumCaseName ?? '');
+        }
+
+        return null;
+    }
+
     private static function encodeSleepObject(Context $ctx, ObjectEntry $entry): string
     {
         $names = self::invokeSleep($ctx, $entry);
@@ -280,18 +430,18 @@ final class VmSerialize
             $props[$name] = $entry->getProperty($name)->resolveIndirect();
         }
 
-        return self::encodeObjectPropertyBag($entry->class->name, $props);
+        return self::encodeObjectPropertyBag($ctx, $entry->class->name, $props);
     }
 
     /**
      * @param array<string, Variable> $props
      */
-    private static function encodeObjectPropertyBag(string $className, array $props): string
+    private static function encodeObjectPropertyBag(Context $ctx, string $className, array $props): string
     {
         $body = '';
         foreach ($props as $name => $value) {
             $body .= self::encodeSerializedScalar($name);
-            $body .= self::encodeSerializedValue($value);
+            $body .= self::encodeSerializedValue($ctx, $value);
         }
         $count = \count($props);
         $classLen = \strlen($className);
@@ -299,9 +449,9 @@ final class VmSerialize
         return 'O:'.$classLen.':"'.$className.'":'.$count.':{'.$body.'}';
     }
 
-    private static function encodeSerializedValue(Variable $value): string
+    private static function encodeSerializedValue(Context $ctx, Variable $value): string
     {
-        return self::encodeSerializedScalar(VmJson::export($value->resolveIndirect()));
+        return self::encodeSerializedScalar(self::exportForSerialize($ctx, $value));
     }
 
     private static function encodeSerializedScalar(mixed $exported): string
@@ -393,5 +543,15 @@ final class VmSerialize
     private static function hasInstanceMethod(ClassEntry $class, string $methodName): bool
     {
         return isset($class->methods[strtolower($methodName)]);
+    }
+}
+
+/** Marker for enum case values in VmSerialize::exportForSerialize() (#6131). */
+final class VmSerializeEnumCaseRef
+{
+    public function __construct(
+        public readonly string $className,
+        public readonly string $caseName,
+    ) {
     }
 }
