@@ -8,6 +8,7 @@ use PHPCompiler\ext\standard\VmString;
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\Variable;
 use PHPCompiler\VM\Variable as VMVariable;
 use PHPLLVM\Value;
@@ -30,21 +31,23 @@ final class mb_strlen extends Internal
         if ($argc < 1 || $argc > 2) {
             throw new \LogicException('mb_strlen() requires one or two arguments');
         }
-        $strVar = $frame->calledArgs[0]->resolveIndirect();
-        if (VMVariable::TYPE_STRING !== $strVar->type) {
-            throw new \LogicException('mb_strlen() only supports strings in this compiler build');
-        }
+        $str = VmString::coerceStringBuiltinArg(
+            $frame->calledArgs[0],
+            'mb_strlen',
+            0,
+            'string'
+        );
         if (null === $frame->returnVar) {
             return;
         }
-        $str = $strVar->toString();
         $encoding = 'UTF-8';
         if (2 === $argc) {
-            $encVar = $frame->calledArgs[1]->resolveIndirect();
-            if (VMVariable::TYPE_STRING !== $encVar->type) {
-                throw new \LogicException('mb_strlen() encoding must be a string in this compiler build');
-            }
-            $encoding = $encVar->toString();
+            $encoding = VmString::coerceStringBuiltinArg(
+                $frame->calledArgs[1],
+                'mb_strlen',
+                1,
+                'encoding'
+            );
         }
         $frame->returnVar->int(self::lengthForEncoding($str, $encoding));
     }
@@ -55,29 +58,35 @@ final class mb_strlen extends Internal
         if ($argc < 1 || $argc > 2) {
             throw new \LogicException('mb_strlen() requires one or two arguments');
         }
+        if (1 === $argc && Variable::TYPE_STRING === $args[0]->type && null !== ($args[0]->compileTimeString ?? null)) {
+            return $context->constantFromInteger(
+                VmString::utf8CharLength($args[0]->compileTimeString),
+                'int64'
+            );
+        }
+
+        $str = JitStringBuiltinArg::lower($context, $args[0], 'mb_strlen', 0, 'string');
+
         if (1 === $argc) {
-            return JitMbStrlen::utf8Length($context, $args[0]);
+            return JitMbStrlen::utf8LengthFromPtr($context, $str);
         }
         if (Variable::TYPE_STRING !== $args[1]->type) {
             throw new \LogicException('mb_strlen() encoding must be a string in this compiler build');
         }
         $encoding = $args[1]->compileTimeString ?? null;
         if ('UTF-8' === $encoding) {
-            return JitMbStrlen::utf8Length($context, $args[0]);
+            return JitMbStrlen::utf8LengthFromPtr($context, $str);
         }
         if (null !== $encoding && 'ASCII' !== $encoding && '8BIT' !== $encoding) {
             throw new \LogicException(
                 'mb_strlen() JIT only supports UTF-8, ASCII, or 8BIT encoding literals in this compiler build'
             );
         }
-        if (Variable::TYPE_STRING !== $args[0]->type) {
-            throw new \LogicException('mb_strlen() only supports strings in this compiler build');
-        }
-        $argValue = $context->helper->loadValue($args[0]);
-        $offset = $context->structFieldIndex($argValue, 'length');
+
+        $offset = $context->structFieldIndex($str, 'length');
 
         return $context->builder->load(
-            $context->builder->structGep($argValue, $offset)
+            $context->builder->structGep($str, $offset)
         );
     }
 
