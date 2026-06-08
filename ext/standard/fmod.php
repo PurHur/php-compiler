@@ -16,7 +16,6 @@ use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitLongArg;
 use PHPCompiler\JIT\Variable as JITVariable;
-use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
 
 /**
@@ -29,12 +28,22 @@ final class fmod extends Internal
         if (2 !== count($frame->calledArgs)) {
             throw new \LogicException('fmod() requires exactly two arguments');
         }
-        $a = $frame->calledArgs[0]->resolveIndirect();
-        $b = $frame->calledArgs[1]->resolveIndirect();
+        $num1 = VmMath::parseDoubleBuiltinArg(
+            $frame->calledArgs[0]->resolveIndirect(),
+            'fmod',
+            1,
+            'num1'
+        );
+        $num2 = VmMath::parseDoubleBuiltinArg(
+            $frame->calledArgs[1]->resolveIndirect(),
+            'fmod',
+            2,
+            'num2'
+        );
         if (null === $frame->returnVar) {
             return;
         }
-        $frame->returnVar->float(\fmod(self::toFloat($a), self::toFloat($b)));
+        $frame->returnVar->float(\fmod($num1, $num2));
     }
 
     public Context $context;
@@ -60,14 +69,4 @@ final class fmod extends Internal
         return $context->builder->call($fn, $left, $right);
     }
 
-    private static function toFloat(Variable $v): float
-    {
-        if (Variable::TYPE_INTEGER === $v->type) {
-            return (float) $v->toInt();
-        }
-        if (Variable::TYPE_FLOAT === $v->type) {
-            return $v->toFloat();
-        }
-        throw new \LogicException('fmod() only supports integers and floats in this compiler build');
-    }
 }

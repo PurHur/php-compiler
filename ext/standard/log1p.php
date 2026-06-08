@@ -22,7 +22,7 @@ final class log1p extends Internal
         if (null === $frame->returnVar) {
             return;
         }
-        $frame->returnVar->float(\log1p(VmMath::toFloat($v)));
+        $frame->returnVar->float(\log1p(VmMath::parseDoubleBuiltinArg($v, 'log1p', 1, 'num')));
     }
 
     public Context $context;

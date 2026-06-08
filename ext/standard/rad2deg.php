@@ -16,7 +16,6 @@ use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitLongArg;
 use PHPCompiler\JIT\Variable as JITVariable;
-use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
 
 /**
@@ -31,11 +30,16 @@ final class rad2deg extends Internal
         if (1 !== count($frame->calledArgs)) {
             throw new \LogicException('rad2deg() requires exactly one argument');
         }
-        $v = $frame->calledArgs[0]->resolveIndirect();
+        $num = VmMath::parseDoubleBuiltinArg(
+            $frame->calledArgs[0]->resolveIndirect(),
+            'rad2deg',
+            1,
+            'num'
+        );
         if (null === $frame->returnVar) {
             return;
         }
-        $frame->returnVar->float(self::FACTOR * self::toFloat($v));
+        $frame->returnVar->float(self::FACTOR * $num);
     }
 
     public Context $context;
@@ -53,14 +57,4 @@ final class rad2deg extends Internal
         return $context->builder->fMul($asFloat, $factor);
     }
 
-    private static function toFloat(Variable $v): float
-    {
-        if (Variable::TYPE_INTEGER === $v->type) {
-            return (float) $v->toInt();
-        }
-        if (Variable::TYPE_FLOAT === $v->type) {
-            return $v->toFloat();
-        }
-        throw new \LogicException('rad2deg() only supports integers and floats in this compiler build');
-    }
 }

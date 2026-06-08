@@ -20,7 +20,7 @@ final class frexp extends Internal
         if (2 !== \count($frame->calledArgs)) {
             throw new \LogicException('frexp() requires exactly two arguments');
         }
-        $num = VmMath::toFloat($frame->calledArgs[0]->resolveIndirect());
+        $num = VmMath::parseDoubleBuiltinArg($frame->calledArgs[0]->resolveIndirect(), 'frexp', 1, 'num');
         $exp = 0;
         $frac = VmMath::frexp($num, $exp);
         $frame->calledArgs[1]->resolveIndirect()->int($exp);

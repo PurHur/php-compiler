@@ -467,8 +467,10 @@ final class VmMath
     public static function applyPow(Variable $returnVar, Variable $base, Variable $exp): void
     {
         $returnVar->reset();
-        if (Variable::TYPE_INTEGER === $base->type && Variable::TYPE_INTEGER === $exp->type) {
-            $result = $base->toInt() ** $exp->toInt();
+        $baseNum = self::parseNumberBuiltinArg($base, 'pow', 1, 'num');
+        $expNum = self::parseNumberBuiltinArg($exp, 'pow', 2, 'exponent');
+        if (\is_int($baseNum) && \is_int($expNum)) {
+            $result = $baseNum ** $expNum;
             if (\is_int($result)) {
                 $returnVar->int($result);
 
@@ -478,7 +480,7 @@ final class VmMath
 
             return;
         }
-        $returnVar->float(\pow(self::toFloat($base), self::toFloat($exp)));
+        $returnVar->float(\pow((float) $baseNum, (float) $expNum));
     }
 
     /**

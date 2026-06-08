@@ -23,7 +23,7 @@ final class log10 extends Internal
         if (null === $frame->returnVar) {
             return;
         }
-        $frame->returnVar->float(\log10(VmMath::toFloat($v)));
+        $frame->returnVar->float(\log10(VmMath::parseDoubleBuiltinArg($v, 'log10', 1, 'num')));
     }
 
     public Context $context;
