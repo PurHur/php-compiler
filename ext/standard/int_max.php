@@ -33,14 +33,14 @@ final class int_max extends Internal
     public function execute(Frame $frame): void
     {
         if (2 === \count($frame->calledArgs)) {
-            $a = $frame->calledArgs[0]->resolveIndirect();
-            $b = $frame->calledArgs[1]->resolveIndirect();
             if (null === $frame->returnVar) {
                 return;
             }
             if (VmMinMax::tryReduceEnumCasesTwoArg($frame, false)) {
                 return;
             }
+            $a = $frame->calledArgs[0]->resolveIndirect();
+            $b = $frame->calledArgs[1]->resolveIndirect();
             if (Variable::TYPE_INTEGER === $a->type && Variable::TYPE_INTEGER === $b->type) {
                 $ai = $a->toInt();
                 $bi = $b->toInt();
@@ -49,11 +49,9 @@ final class int_max extends Internal
                 return;
             }
             if (self::isNumeric($a) && self::isNumeric($b)) {
-                $af = self::toFloat($a);
-                $bf = self::toFloat($b);
-                $frame->returnVar->float($af > $bf ? $af : $bf);
-
-                return;
+                if (VmMinMax::tryReduceScalarsTwoArg($frame, false)) {
+                    return;
+                }
             }
         }
 
@@ -65,43 +63,42 @@ final class int_max extends Internal
     public function call(Context $context, JITVariable ...$args): Value
     {
         $this->context = $context;
-        if (2 !== \count($args)) {
-            throw new \LogicException('This max() JIT path requires exactly two arguments');
-        }
-        if (JITVariable::TYPE_NATIVE_LONG === $args[0]->type && JITVariable::TYPE_NATIVE_LONG === $args[1]->type) {
-            $l = JitLongArg::lower($context, $args[0], 'max() argument #1');
-            $r = JitLongArg::lower($context, $args[1], 'max() argument #2');
-            $cmp = $context->builder->icmp(Builder::INT_SGT, $l, $r);
+        if (2 === \count($args)) {
+            if (JITVariable::TYPE_NATIVE_LONG === $args[0]->type && JITVariable::TYPE_NATIVE_LONG === $args[1]->type) {
+                $l = JitLongArg::lower($context, $args[0], 'max() argument #1');
+                $r = JitLongArg::lower($context, $args[1], 'max() argument #2');
+                $cmp = $context->builder->icmp(Builder::INT_SGT, $l, $r);
 
-            return $context->builder->select($cmp, $l, $r);
-        }
-        if (self::isJitNumeric($args[0]) && self::isJitNumeric($args[1])) {
-            $double = $context->getTypeFromString('double');
-            $l = pow::toJitDouble($context, $args[0], $double);
-            $r = pow::toJitDouble($context, $args[1], $double);
-            $cmp = $context->builder->fcmp(Builder::REAL_OGT, $l, $r);
+                return $context->builder->select($cmp, $l, $r);
+            }
+            if (self::isJitNativeNumeric($args[0]) && self::isJitNativeNumeric($args[1])) {
+                $double = $context->getTypeFromString('double');
+                $l = pow::toJitDouble($context, $args[0], $double);
+                $r = pow::toJitDouble($context, $args[1], $double);
+                $cmp = $context->builder->fcmp(Builder::REAL_OGT, $l, $r);
 
-            return $context->builder->select($cmp, $l, $r);
+                return $context->builder->select($cmp, $l, $r);
+            }
         }
-        throw new \LogicException('max() only supports two integers or floats in this compiler build');
+
+        return JitMinMax::invoke($context, false, ...$args);
     }
 
     private static function isNumeric(Variable $v): bool
     {
-        return Variable::TYPE_INTEGER === $v->type || Variable::TYPE_FLOAT === $v->type;
+        if (Variable::TYPE_INTEGER === $v->type || Variable::TYPE_FLOAT === $v->type) {
+            return true;
+        }
+        if (Variable::TYPE_STRING !== $v->type) {
+            return false;
+        }
+        $s = $v->toString();
+
+        return '' !== $s && \is_numeric($s);
     }
 
-    private static function isJitNumeric(JITVariable $v): bool
+    private static function isJitNativeNumeric(JITVariable $v): bool
     {
         return JITVariable::TYPE_NATIVE_LONG === $v->type || JITVariable::TYPE_NATIVE_DOUBLE === $v->type;
-    }
-
-    private static function toFloat(Variable $v): float
-    {
-        if (Variable::TYPE_INTEGER === $v->type) {
-            return (float) $v->toInt();
-        }
-
-        return $v->toFloat();
     }
 }
