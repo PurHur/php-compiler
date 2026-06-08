@@ -28,9 +28,7 @@ final class str_starts_with extends Internal
 {
     public function execute(Frame $frame): void
     {
-        if (2 !== count($frame->calledArgs)) {
-            throw new \LogicException('str_starts_with() requires exactly two arguments');
-        }
+        $this->requireExactArgCount($frame, 'str_starts_with', 2);
         $haystackStr = VmString::coerceStringBuiltinArg(
             $frame->calledArgs[0],
             'str_starts_with',
@@ -54,8 +52,8 @@ final class str_starts_with extends Internal
     public function call(Context $context, JITVariable ...$args): Value
     {
         $this->context = $context;
-        if (2 !== count($args)) {
-            throw new \LogicException('str_starts_with() requires exactly two arguments');
+        if (!$this->requireExactJitArgCount($context, $args, 'str_starts_with', 2)) {
+            return $context->getTypeFromString('int1')->constInt(0, false);
         }
         $hay = JitStringBuiltinArg::lower($context, $args[0], 'str_starts_with', 0, 'haystack');
         $needle = JitStringBuiltinArg::lower($context, $args[1], 'str_starts_with', 1, 'needle');

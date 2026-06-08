@@ -25,9 +25,7 @@ final class ord extends Internal
 {
     public function execute(Frame $frame): void
     {
-        if (1 !== count($frame->calledArgs)) {
-            throw new \LogicException('ord() requires exactly one argument');
-        }
+        $this->requireExactArgCount($frame, 'ord', 1);
         $s = VmString::coerceStringBuiltinArg(
             $frame->calledArgs[0],
             'ord',
@@ -45,8 +43,8 @@ final class ord extends Internal
     public function call(Context $context, JITVariable ...$args): Value
     {
         $this->context = $context;
-        if (1 !== count($args)) {
-            throw new \LogicException('ord() requires exactly one argument');
+        if (!$this->requireExactJitArgCount($context, $args, 'ord', 1)) {
+            return $context->getTypeFromString('int64')->constInt(0, false);
         }
 
         $strPtr = JitOrd::lowerCharacter($context, $args[0]);

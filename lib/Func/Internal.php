@@ -9,6 +9,7 @@ use PHPCompiler\Func;
 use PHPCompiler\Handler;
 use PHPCompiler\JIT\Call;
 use PHPCompiler\JIT\Context as JITContext;
+use PHPCompiler\JIT\ExceptionBridge;
 use PHPCompiler\JIT\JitBoolArg;
 use PHPCompiler\JIT\JitLongArg;
 use PHPCompiler\JIT\JitStringArg;
@@ -76,5 +77,50 @@ abstract class Internal extends Func implements Handler, Call
         $off = $context->structFieldIndex($strPtr, 'value');
 
         return $context->builder->structGep($strPtr, $off);
+    }
+
+    /**
+     * Arity guard for VM builtin execute() — Zend ArgumentCountError (#4145).
+     */
+    protected function requireExactArgCount(Frame $frame, string $function, int $expected): void
+    {
+        $argc = \count($frame->calledArgs);
+        if ($argc !== $expected) {
+            throw new \ArgumentCountError(self::exactArgCountMessage($function, $expected, $argc));
+        }
+    }
+
+    /**
+     * Arity guard for JIT/AOT builtin lowering (#4145).
+     *
+     * Emits a pending ArgumentCountError in LLVM IR (AOT-safe) instead of throwing
+     * during compile-time lowering. Returns false when argc is wrong.
+     *
+     * @param JITVariable[] $args
+     */
+    protected function requireExactJitArgCount(JITContext $context, array $args, string $function, int $expected): bool
+    {
+        $argc = \count($args);
+        if ($argc !== $expected) {
+            ExceptionBridge::emitArgumentCountError(
+                $context,
+                self::exactArgCountMessage($function, $expected, $argc)
+            );
+
+            return false;
+        }
+
+        return true;
+    }
+
+    private static function exactArgCountMessage(string $function, int $expected, int $given): string
+    {
+        return \sprintf(
+            '%s() expects exactly %d argument%s, %d given',
+            $function,
+            $expected,
+            1 === $expected ? '' : 's',
+            $given
+        );
     }
 }
