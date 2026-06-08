@@ -21,9 +21,8 @@ final class VmEval
     /**
      * eval() Internal builtin — caller scope is the parent frame of the handler.
      *
-     * @return Variable|false
      */
-    public static function evalString(Frame $frame): Variable|false
+    public static function evalString(Frame $frame): Variable
     {
         if (\count($frame->calledArgs) < 1) {
             throw new \LogicException('eval() requires at least one argument');
@@ -43,14 +42,12 @@ final class VmEval
 
     /**
      * Shared compile+execute path for TYPE_EVAL and the eval() builtin.
-     *
-     * @return Variable|false
      */
     public static function evalCodeInFrame(
         VM $vm,
         Frame $scopeFrame,
         string $code
-    ): Variable|false {
+    ): Variable {
         $ctx = $vm->context;
         $runtime = $ctx->runtime;
 
@@ -63,21 +60,44 @@ final class VmEval
         } catch (\CompileError $e) {
             throw $e;
         } catch (\Throwable $e) {
-            self::recordParseError($ctx, $e->getMessage(), self::lineFromThrowable($e));
-
-            return false;
+            self::failEvalParse($ctx, $e->getMessage(), self::lineFromThrowable($e));
         }
 
         if (null === $block) {
             $detail = $runtime->formatParseAndCompileNullDetail(null)
                 ?? Runtime::getLastParseFailure()
                 ?? 'Parse error';
-            self::recordParseError($ctx, $detail, 1);
-
-            return false;
+            self::failEvalParse($ctx, $detail, 1);
         }
 
         return $vm->executeEvalBlock($block, $scopeFrame);
+    }
+
+    /**
+     * Zend eval() parse failures throw ParseError (php-src zif_eval / zend_eval_string, #4410).
+     *
+     * @return never
+     */
+    private static function failEvalParse(Context $ctx, string $detail, int $evalLine): void
+    {
+        self::recordParseError($ctx, $detail, $evalLine);
+        throw new \ParseError(self::normalizeParseMessage($detail), $evalLine);
+    }
+
+    private static function normalizeParseMessage(string $detail): string
+    {
+        $message = trim($detail);
+        if (str_starts_with(strtolower($message), 'parse error:')) {
+            $message = trim(substr($message, strlen('Parse error:')));
+        }
+        if (str_starts_with(strtolower($message), 'syntax error,')) {
+            return $message;
+        }
+        if (str_starts_with($message, 'Syntax error,')) {
+            return 'syntax error,'.substr($message, strlen('Syntax error,'));
+        }
+
+        return $message;
     }
 
     private static function recordParseError(Context $ctx, string $message, int $line): void

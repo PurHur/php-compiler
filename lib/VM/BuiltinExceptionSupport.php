@@ -19,6 +19,7 @@ final class BuiltinExceptionSupport
     public const CLASS_ARITHMETIC_ERROR = 'arithmeticerror';
     public const CLASS_FIBER_ERROR = 'fibererror';
     public const CLASS_COMPILE_ERROR = 'compileerror';
+    public const CLASS_PARSE_ERROR = 'parseerror';
     public const CLASS_REFLECTION_EXCEPTION = 'reflectionexception';
     public const CLASS_EXCEPTION = 'exception';
     public const CLASS_LOGIC_EXCEPTION = 'logicexception';
@@ -66,6 +67,15 @@ final class BuiltinExceptionSupport
         int $line = 0
     ): Variable {
         return self::materializeThrowable($ctx, self::CLASS_COMPILE_ERROR, $message, $file, $line);
+    }
+
+    public static function materializeParseError(
+        Context $ctx,
+        string $message,
+        string $file = '',
+        int $line = 0
+    ): Variable {
+        return self::materializeThrowable($ctx, self::CLASS_PARSE_ERROR, $message, $file, $line);
     }
 
     public static function materializeReflectionException(

@@ -26,11 +26,6 @@ final class eval_ extends Internal
         if (null === $frame->returnVar) {
             return;
         }
-        if (false === $result) {
-            $frame->returnVar->bool(false);
-
-            return;
-        }
         $frame->returnVar->copyFrom($result);
     }
 

@@ -2845,14 +2845,20 @@ restart:
                     if (Variable::TYPE_STRING !== $codeVar->type) {
                         return $this->raise('eval() expects a string argument', $frame);
                     }
-                    $evalResult = VmEval::evalCodeInFrame(
-                        $this,
-                        $frame,
-                        $codeVar->toString()
-                    );
-                    if (false === $evalResult) {
-                        $dest->bool(false);
-                        break;
+                    try {
+                        $evalResult = VmEval::evalCodeInFrame(
+                            $this,
+                            $frame,
+                            $codeVar->toString()
+                        );
+                    } catch (\ParseError $e) {
+                        $catchFrame = $this->dispatchVmParseError($e, $frame);
+                        if (null !== $catchFrame) {
+                            $frame = $catchFrame;
+                            goto restart;
+                        }
+
+                        return null;
                     }
                     $dest->copyFrom($evalResult);
                     break;
@@ -6251,6 +6257,8 @@ restart:
             return $this->dispatchVmValueError($e, $callerFrame);
         } catch (VM\NativeFiberError $e) {
             return $this->dispatchVmFiberError($e, $callerFrame);
+        } catch (\ParseError $e) {
+            return $this->dispatchVmParseError($e, $callerFrame);
         } catch (\CompileError $e) {
             return $this->dispatchVmCompileError($e, $callerFrame);
         } catch (\ReflectionException $e) {
@@ -6468,6 +6476,25 @@ restart:
     {
         [$file, $line] = VM\ExceptionSupport::userFatalSite($frame);
         $thrown = VM\BuiltinExceptionSupport::materializeCompileError(
+            $this->context,
+            $error->getMessage(),
+            $file,
+            $line
+        );
+        $catchFrame = $this->findCatchFrameForThrow($frame, $thrown);
+        if (null !== $catchFrame) {
+            return $catchFrame;
+        }
+        $this->raiseUncaughtException($thrown);
+
+        return null;
+    }
+
+    private function dispatchVmParseError(\ParseError $error, Frame $frame): ?Frame
+    {
+        $evalLine = $error->getCode() > 0 ? $error->getCode() : 1;
+        [$file, $line] = VM\ExceptionSupport::evalFatalSite($frame, $evalLine);
+        $thrown = VM\BuiltinExceptionSupport::materializeParseError(
             $this->context,
             $error->getMessage(),
             $file,
