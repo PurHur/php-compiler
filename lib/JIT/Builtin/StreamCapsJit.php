@@ -6,6 +6,7 @@ namespace PHPCompiler\JIT\Builtin;
 
 use PHPCompiler\ext\standard\VmStreamSupports;
 use PHPCompiler\JIT\Context;
+use PHPLLVM\BasicBlock;
 use PHPLLVM\Builder;
 use PHPLLVM\Value;
 use PHPLLVM\Value\Function_ as LlvmFunction;
@@ -138,7 +139,7 @@ final class StreamCapsJit
         }
         $slot = $context->builder->gep($global, $zero, $handle);
 
-        return $context->builder->load($context->builder->bitcast($slot, $i8p->pointer));
+        return $context->builder->load($context->builder->bitcast($slot, $i8p->pointerType(0)));
     }
 
     private static function literalCstr(Context $context, string $text): Value
@@ -168,8 +169,8 @@ final class StreamCapsJit
         Context $context,
         LlvmFunction $fn,
         Value $path,
-        Value $urlBb,
-        Value $notUrlBb
+        BasicBlock $urlBb,
+        BasicBlock $notUrlBb
     ): void {
         $i8p = $context->getTypeFromString('int8*');
         $nullPtr = $i8p->constNull();
@@ -354,8 +355,8 @@ final class StreamCapsJit
         LlvmFunction $fn,
         Value $fp,
         Value $path,
-        Value $failBb,
-        Value $lockBb
+        BasicBlock $failBb,
+        BasicBlock $lockBb
     ): void {
         $context->builder->positionAtEnd($lockBb);
         $i32 = $context->getTypeFromString('int32');
@@ -385,8 +386,8 @@ final class StreamCapsJit
         Context $context,
         LlvmFunction $fn,
         Value $path,
-        Value $failBb,
-        Value $filterBb
+        BasicBlock $failBb,
+        BasicBlock $filterBb
     ): void {
         $context->builder->positionAtEnd($filterBb);
         $i32 = $context->getTypeFromString('int32');
@@ -412,8 +413,8 @@ final class StreamCapsJit
         Context $context,
         LlvmFunction $fn,
         Value $path,
-        Value $failBb,
-        Value $metaBb
+        BasicBlock $failBb,
+        BasicBlock $metaBb
     ): void {
         $context->builder->positionAtEnd($metaBb);
         $i32 = $context->getTypeFromString('int32');

@@ -991,6 +991,7 @@ class Type extends Builtin {
 
     public function initialize(): void {
         Sscanf::ensureLinked($this->context);
+        StringFormat::ensureLinked($this->context);
         StringStripTags::ensureLinked($this->context);
         HttpResponseCode::implement($this->context);
         ObOutput::registerExternals($this->context);

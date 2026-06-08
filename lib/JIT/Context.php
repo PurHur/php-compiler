@@ -651,6 +651,7 @@ class Context {
             Builtin\StringMultipart::ensureStandaloneBodies($this);
             Builtin\StringGetenv::ensureStandaloneBodies($this);
             Builtin\StringTriggerError::ensureStandaloneBodies($this);
+            Builtin\StringFormat::ensureStandaloneBodies($this);
             Builtin\GcCollectCyclesRuntime::ensureStandaloneBodies($this);
         }
 

@@ -113,7 +113,7 @@ final class StreamPathRuntime
         }
         $slot = $context->builder->gep($global, $zero, $handle);
 
-        return $context->builder->load($context->builder->bitcast($slot, $i8p->pointer));
+        return $context->builder->load($context->builder->bitcast($slot, $i8p->pointerType(0)));
     }
 
     private static function ensureExternGlobals(Context $context): void
