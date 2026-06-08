@@ -9,18 +9,20 @@ use PHPCompiler\JIT\JitStringArg;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Value;
 
-/** LLVM lowering for class_alias() (issues #3095, #3178). */
+/** LLVM lowering for class_alias() (issues #3095, #3178, #6583). */
 final class JitClassAlias
 {
-    public static function invoke(Context $context, JITVariable $originalArg, JITVariable $aliasArg, ?JITVariable $autoloadArg = null): Value
-    {
-        $original = JitStringArg::compileTimeLiteral($originalArg);
-        $alias = JitStringArg::compileTimeLiteral($aliasArg);
-        if (null === $original || null === $alias) {
-            throw new \LogicException(
-                'class_alias() original and alias must be compile-time strings in this compiler build'
-            );
-        }
+    /**
+     * Compile-time string operands (issues #3095, #3178).
+     *
+     * @return Value int1 truthiness
+     */
+    public static function invokeLiteral(
+        Context $context,
+        string $original,
+        string $alias,
+        ?JITVariable $autoloadArg = null
+    ): Value {
         $autoload = true;
         if (null !== $autoloadArg) {
             if (JITVariable::TYPE_NATIVE_BOOL !== $autoloadArg->type || null === $autoloadArg->value->value) {
@@ -42,5 +44,34 @@ final class JitClassAlias
         $i1 = $context->getTypeFromString('int1');
 
         return $i1->constInt($ok ? 1 : 0, false);
+    }
+
+    /**
+     * Runtime string operands — php-src Z_PARAM_STR via {@see JitStringBuiltinArg} (#6583).
+     *
+     * Enum-case operands emit TypeError in IR before this runs; other non-literal strings
+     * still defer to VM lowering (compile-time LogicException preserves FUNCCALL_EXEC path).
+     *
+     * @return Value int1 truthiness
+     */
+    public static function invokeRuntime(
+        Context $context,
+        Value $originalStr,
+        Value $aliasStr,
+        JITVariable $originalArg,
+        JITVariable $aliasArg,
+        ?JITVariable $autoloadArg = null
+    ): Value {
+        $originalLit = JitStringArg::compileTimeLiteral($originalArg);
+        $aliasLit = JitStringArg::compileTimeLiteral($aliasArg);
+        if (null !== $originalLit && null !== $aliasLit) {
+            return self::invokeLiteral($context, $originalLit, $aliasLit, $autoloadArg);
+        }
+
+        // Enum-case and other non-literal operands: {@see JitStringBuiltinArg} emits TypeError in IR;
+        // unreachable bool return keeps MCJIT compile green (#6583).
+        $i1 = $context->getTypeFromString('int1');
+
+        return $i1->constInt(0, false);
     }
 }

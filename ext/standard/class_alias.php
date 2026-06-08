@@ -7,6 +7,8 @@ namespace PHPCompiler\ext\standard;
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\JitStringArg;
+use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
@@ -29,8 +31,8 @@ final class class_alias extends Internal
             throw new \LogicException('class_alias() requires two or three arguments in this compiler build');
         }
         $ctx = VmReflection::requireContext($frame);
-        $original = VmReflection::stringArg($frame->calledArgs[0], 'class_alias() original class', 0);
-        $alias = VmReflection::stringArg($frame->calledArgs[1], 'class_alias() alias', 1);
+        $original = VmString::coerceStringBuiltinArg($frame->calledArgs[0], 'class_alias', 0, 'original class');
+        $alias = VmString::coerceStringBuiltinArg($frame->calledArgs[1], 'class_alias', 1, 'alias');
         $autoload = true;
         if (3 === \count($frame->calledArgs)) {
             $autoloadArg = $frame->calledArgs[2]->resolveIndirect();
@@ -51,7 +53,19 @@ final class class_alias extends Internal
             throw new \LogicException('class_alias() requires two or three arguments in this compiler build');
         }
         $autoloadArg = 3 === \count($args) ? $args[2] : null;
+        $originalLit = JitStringArg::compileTimeLiteral($args[0]);
+        $aliasLit = JitStringArg::compileTimeLiteral($args[1]);
+        if (null !== $originalLit && null !== $aliasLit) {
+            return JitClassAlias::invokeLiteral($context, $originalLit, $aliasLit, $autoloadArg);
+        }
 
-        return JitClassAlias::invoke($context, $args[0], $args[1], $autoloadArg);
+        return JitClassAlias::invokeRuntime(
+            $context,
+            JitStringBuiltinArg::lower($context, $args[0], 'class_alias', 0, 'original class'),
+            JitStringBuiltinArg::lower($context, $args[1], 'class_alias', 1, 'alias'),
+            $args[0],
+            $args[1],
+            $autoloadArg
+        );
     }
 }
