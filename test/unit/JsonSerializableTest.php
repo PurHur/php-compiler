@@ -42,7 +42,7 @@ PHP;
         self::assertSame(['id' => 1], $exported);
     }
 
-    public function testNonJsonSerializableObjectSetsUnsupportedTypeError(): void
+    public function testNonJsonSerializableObjectEncodesAsEmptyObject(): void
     {
         $source = <<<'PHP'
 <?php
@@ -61,14 +61,10 @@ PHP;
         $object = new ObjectEntry($class);
         $object->constructed = true;
 
-        try {
-            $var = new Variable();
-            $var->object($object);
-            VmJson::export($var, $ctx, $vm);
-            self::fail('Expected VmJsonExportException');
-        } catch (\PHPCompiler\ext\standard\VmJsonExportException $e) {
-            self::assertSame(VmJson::ERROR_UNSUPPORTED_TYPE, $e->errorCode);
-            self::assertSame(VmJson::ERROR_UNSUPPORTED_TYPE, VmJson::lastError());
-        }
+        $var = new Variable();
+        $var->object($object);
+        $exported = VmJson::export($var, $ctx, $vm);
+        self::assertInstanceOf(\stdClass::class, $exported);
+        self::assertSame([], get_object_vars($exported));
     }
 }

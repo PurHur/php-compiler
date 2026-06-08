@@ -288,6 +288,10 @@ class JITTest extends BaseTest {
             if (str_contains($name, 'json_serializable')) {
                 continue;
             }
+            // json_encode() object public-property export needs VM dispatch (#6879).
+            if (str_contains($name, 'json_encode_stringable')) {
+                continue;
+            }
             // Generator::getReturn() and generator return slot are VM-only until JIT generators (#167, #3350).
             if (str_contains($name, 'generator_get_return')) {
                 continue;

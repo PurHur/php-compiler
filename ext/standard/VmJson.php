@@ -4,12 +4,14 @@ declare(strict_types=1);
 
 namespace PHPCompiler\ext\standard;
 
+use PHPCompiler\MethodVisibility;
 use PHPCompiler\VM;
 use PHPCompiler\VM\Context;
 use PHPCompiler\VM\EnumCaseEntry;
 use PHPCompiler\VM\EnumCaseSupport;
 use PHPCompiler\VM\InterfaceCheck;
 use PHPCompiler\VM\ObjectEntry;
+use PHPCompiler\VM\TypedPropertyCheck;
 use PHPCompiler\VM\Variable;
 
 /**
@@ -250,9 +252,7 @@ final class VmJson
                     ));
                 }
                 if (!InterfaceCheck::entryImplements($object->class, 'jsonserializable', $ctx)) {
-                    self::$lastError = self::ERROR_UNSUPPORTED_TYPE;
-
-                    throw new VmJsonExportException(self::ERROR_UNSUPPORTED_TYPE);
+                    return self::exportObjectPublicProperties($object, $ctx, $vm);
                 }
                 if (!$vm->hasInstanceMethod($object->class, 'jsonserialize')) {
                     throw new \Error(
@@ -267,6 +267,58 @@ final class VmJson
                     'json_encode() value type not supported in this compiler build'
                 );
         }
+    }
+
+    /**
+     * Zend ext/json/php_json.c — public properties only; empty hash encodes as {} (#6879).
+     *
+     * Stringable/__toString() is not consulted; objects with no public props become {}.
+     */
+    private static function exportObjectPublicProperties(ObjectEntry $object, Context $ctx, VM $vm): \stdClass
+    {
+        $out = new \stdClass();
+        /** @var array<string, true> $seenLc */
+        $seenLc = [];
+        foreach (array_reverse(VmReflection::classHierarchyChain($object->class, $ctx)) as $class) {
+            foreach ($class->properties as $meta) {
+                $lc = strtolower($meta->name);
+                if (isset($seenLc[$lc])) {
+                    continue;
+                }
+                $seenLc[$lc] = true;
+                if (!MethodVisibility::isPublic($meta->visibility)) {
+                    continue;
+                }
+                if ($meta->propertyHookVirtual && null === $meta->getHookMethodLc) {
+                    continue;
+                }
+                if (!$object->hasProperty($meta->name)) {
+                    continue;
+                }
+                $value = $object->getProperty($meta->name)->resolveIndirect();
+                if (TypedPropertyCheck::omitFromPropertyEnumeration($value)) {
+                    continue;
+                }
+                $copy = new Variable();
+                $copy->copyFrom($value);
+                $name = $meta->name;
+                $out->$name = self::export($copy, $ctx, $vm);
+            }
+        }
+        foreach ($object->getRawProperties() as $name => $prop) {
+            if (isset($seenLc[strtolower($name)])) {
+                continue;
+            }
+            $value = $prop->resolveIndirect();
+            if (TypedPropertyCheck::omitFromPropertyEnumeration($value)) {
+                continue;
+            }
+            $copy = new Variable();
+            $copy->copyFrom($prop);
+            $out->$name = self::export($copy, $ctx, $vm);
+        }
+
+        return $out;
     }
 
     /**
