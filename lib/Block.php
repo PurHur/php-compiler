@@ -1159,7 +1159,7 @@ class Block {
 
     /**
      * php-cfg match lowering emits one TYPE_IDENTICAL per non-default arm (#143).
-     * MCJIT segfaults on successful arm merge; VM strict === is correct (#4516).
+     * Detection helper; no longer forces {@see requiresVmLowering} (#4623).
      */
     public static function containsMatchExpressionOpcodesInScriptScope(?self $root): bool
     {
@@ -2265,7 +2265,6 @@ class Block {
     {
         return self::containsGeneratorOpcodesInScriptScope($root)
             || self::containsFinallyOpcodesInScriptScope($root)
-            || self::containsMatchExpressionOpcodesInScriptScope($root)
             || self::containsTypedNonVoidReturnOpcodes($root)
             || self::containsReadonlyPropertyOpcodes($root)
             || self::containsReadonlyClassOpcodes($root)
