@@ -5,10 +5,11 @@ declare(strict_types=1);
 namespace PHPCompiler;
 
 use PHPCompiler\ext\standard\gethostname;
+use PHPCompiler\ext\standard\VmHost;
 use PHPCompiler\VM\Variable as VMVariable;
 use PHPUnit\Framework\TestCase;
 
-/** VM builtin for gethostname() (#3465). */
+/** VM builtin for gethostname() (#3465, #5022). */
 final class GethostnameBuiltinTest extends TestCase
 {
     public function testTooManyArgsThrowsArgumentCountError(): void
@@ -25,17 +26,21 @@ final class GethostnameBuiltinTest extends TestCase
 
     public function testReturnsHostName(): void
     {
+        if (!VmHost::available()) {
+            $this->markTestSkipped('libc FFI unavailable on this host');
+        }
+
         $runtime = new Runtime();
         $fn = new gethostname();
         $frame = $fn->getFrame($runtime->vmContext);
         $frame->returnVar = new VMVariable();
         $fn->execute($frame);
         $resolved = $frame->returnVar->resolveIndirect();
-        $host = \gethostname();
-        if (false === $host) {
+        $expected = VmHost::gethostname();
+        if (false === $expected) {
             $this->assertTrue($resolved->toBool() === false);
         } else {
-            $this->assertSame($host, $resolved->toString());
+            $this->assertSame($expected, $resolved->toString());
         }
     }
 }
