@@ -8,8 +8,8 @@ use PHPCompiler\VM\HashTable;
 use PHPCompiler\VM\Variable;
 
 /**
- * VM password_hash() / password_verify() / crypt() — delegates to host PHP (issue #172, #3771).
- * password_get_info() / password_needs_rehash() — native PHP (issue #6503; JIT via StringPasswordCryptoJit #6906).
+ * VM password_hash() / password_verify() / crypt() — libcrypt via VmPasswordNative (#4794, #6906).
+ * password_get_info() / password_needs_rehash() — native PHP (issue #6503).
  */
 final class VmPassword
 {
@@ -28,25 +28,20 @@ final class VmPassword
 
     public const CRYPT_BLOWFISH = 4;
 
-    public static function hash(string $password, int $algo, array $options = []) {
-        if ($algo !== self::PASSWORD_BCRYPT && $algo !== self::PASSWORD_DEFAULT) {
-            return false;
-        }
-
-        return \password_hash($password, \PASSWORD_BCRYPT, $options);
+    public static function hash(string $password, int $algo, array $options = [])
+    {
+        return VmPasswordNative::passwordHash($password, $algo, $options);
     }
 
     public static function verify(string $password, string $hash): bool
     {
-        return \password_verify($password, $hash);
+        return VmPasswordNative::passwordVerify($password, $hash);
     }
 
-    /**
-     * crypt() — delegate to host PHP php_crypt() for Zend parity (issue #3771).
-     */
+    /** crypt() — libcrypt(3) via FFI (issue #3771, #4794). */
     public static function crypt(string $password, string $salt): string
     {
-        return \crypt($password, $salt);
+        return VmPasswordNative::crypt($password, $salt);
     }
 
     /**
@@ -185,14 +180,11 @@ final class VmPassword
         return self::BCRYPT_DEFAULT_COST;
     }
 
-    /** password_algos() — host PHP for Zend parity (ext/standard/password.c, issue #6195). */
+    /** password_algos() — native list (ext/standard/password.c, issue #6195, #4794). */
     public static function algos(): HashTable
     {
         $ht = new HashTable();
-        foreach (\password_algos() as $algo) {
-            if (!\is_string($algo)) {
-                throw new \LogicException('password_algos() returned unexpected value type');
-            }
+        foreach (VmPasswordNative::passwordAlgos() as $algo) {
             $var = new Variable();
             $var->string($algo);
             $ht->append($var);
