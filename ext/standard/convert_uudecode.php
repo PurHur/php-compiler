@@ -7,9 +7,9 @@ namespace PHPCompiler\ext\standard;
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\ErrorReporter;
-use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
 
 /** convert_uudecode() — decode uuencoded string (php-src ext/standard/uuencode.c). */
@@ -30,11 +30,8 @@ final class convert_uudecode extends Internal
         if (null === $frame->returnVar) {
             return;
         }
-        $data = $frame->calledArgs[0]->resolveIndirect();
-        if (Variable::TYPE_STRING !== $data->type) {
-            throw new \LogicException('convert_uudecode() only supports strings in this compiler build');
-        }
-        $result = VmString::convert_uudecode($data->toString());
+        $data = VmString::coerceStringBuiltinArg($frame->calledArgs[0], 'convert_uudecode', 0, 'string');
+        $result = VmString::convert_uudecode($data);
         if (false === $result) {
             if (null !== $frame->vmContext) {
                 $frame->vmContext->errors->triggerError(
@@ -60,7 +57,7 @@ final class convert_uudecode extends Internal
 
         return JitConvertUudecode::decode(
             $context,
-            $this->jitString($context, $args[0], 'convert_uudecode() argument #1')
+            JitStringBuiltinArg::lower($context, $args[0], 'convert_uudecode', 0, 'string')
         );
     }
 }
