@@ -58,7 +58,7 @@ final class fgetcsv extends Internal
 
             return;
         }
-        $frame->returnVar->array(VmFs::stringListToArray($row));
+        $frame->returnVar->array(VmFs::csvRowToArray($row));
     }
 
     public function call(Context $context, JITVariable ...$args): Value

@@ -12,7 +12,7 @@ namespace PHPCompiler\ext\standard;
 final class VmCsv
 {
     /**
-     * @return list<string>
+     * @return list<string|null>
      */
     public static function parseLine(
         string $line,
@@ -20,6 +20,11 @@ final class VmCsv
         string $enclosure = '"',
         string $escape = '\\',
     ): array {
+        // php-src ext/standard/file.c — zero-length line is one NULL field (#4922).
+        if ('' === $line) {
+            return [null];
+        }
+
         $delim = '' === $separator ? ',' : $separator[0];
         $enc = '' === $enclosure ? '"' : $enclosure[0];
         $esc = '' === $escape ? '\\' : $escape[0];

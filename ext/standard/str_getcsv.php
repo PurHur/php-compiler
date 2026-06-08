@@ -49,7 +49,7 @@ final class str_getcsv extends Internal
             return;
         }
         $row = VmCsv::parseLine($input, $separator, $enclosure, $escape);
-        $frame->returnVar->array(VmFs::stringListToArray($row));
+        $frame->returnVar->array(VmFs::csvRowToArray($row));
     }
 
     public function call(Context $context, JITVariable ...$args): Value
