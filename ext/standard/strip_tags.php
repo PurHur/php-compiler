@@ -6,6 +6,7 @@ namespace PHPCompiler\ext\standard;
 
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
+use PHPCompiler\JIT\Builtin\StringStripTags;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\Variable as JITVariable;
@@ -56,6 +57,7 @@ final class strip_tags extends Internal
         } else {
             $allowPtr = JitStringBuiltinArg::lower($context, $allowed, 'strip_tags', 1, 'allowed_tags');
         }
+        StringStripTags::ensureLinked($context);
 
         return $context->builder->call(
             $context->lookupFunction('__compiler_strip_tags'),
