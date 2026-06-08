@@ -15,7 +15,9 @@ use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\ReflectionBuiltinHelper;
+use PHPCompiler\JIT\TypedPropertyUninitGuard;
 use PHPCompiler\JIT\Variable as JITVariable;
+use PHPCompiler\VM\TypedPropertyCheck;
 use PHPCompiler\VM\Variable;
 use PHPLLVM\Builder;
 use PHPLLVM\Value;
@@ -42,6 +44,7 @@ final class get_debug_type extends Internal
             throw new \LogicException('get_debug_type() requires exactly one argument');
         }
         $v = $frame->calledArgs[0]->resolveIndirect();
+        TypedPropertyCheck::assertReadable($v);
         if (null === $frame->returnVar) {
             return;
         }
@@ -74,6 +77,9 @@ final class get_debug_type extends Internal
         $this->context = $context;
         if (1 !== \count($args)) {
             throw new \LogicException('get_debug_type() requires exactly one argument');
+        }
+        if (JITVariable::TYPE_VALUE === $args[0]->type) {
+            TypedPropertyUninitGuard::emitBeforeRead($context, $args[0]);
         }
         if ($args[0]->type & JITVariable::IS_NATIVE_ARRAY
             || JITVariable::TYPE_HASHTABLE === $args[0]->type) {
