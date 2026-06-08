@@ -22,6 +22,10 @@ final class MoveUploadedFileJITTest extends BaseTest
             __DIR__.'/cases/stdlib/move_uploaded_file_jit.phpt',
             'move_uploaded_file_jit.phpt'
         );
+        yield 'move_uploaded_file_enum_operand_jit.phpt' => self::parsePHPT(
+            __DIR__.'/cases/stdlib/move_uploaded_file_enum_operand_jit.phpt',
+            'move_uploaded_file_enum_operand_jit.phpt'
+        );
     }
 
     public function setUp(): void
