@@ -6198,6 +6198,7 @@ class Compiler {
         );
         $op->block1 = $funcBlock;
         $this->assignAttributeMetadata($op, $expr);
+        $this->assignSourceMetadata($op, $expr);
         AttributeNames::assertCompileTimeConstTargetOnly($op->attributeNames, 'function');
         if ($expr instanceof Op\Expr\Closure) {
             Compiler\ReadonlyFunctionCompileCheck::assertClosureCaptures($expr);
