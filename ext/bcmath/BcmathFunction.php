@@ -27,7 +27,15 @@ abstract class BcmathFunction extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        throw new \LogicException($this->getName().'() is not implemented for JIT in this compiler build (issue #3365)');
+        return match ($this->getName()) {
+            'bcadd' => JitBcmath::add($context, ...$args),
+            'bcsub' => JitBcmath::sub($context, ...$args),
+            'bcmul' => JitBcmath::mul($context, ...$args),
+            'bcdiv' => JitBcmath::div($context, ...$args),
+            'bccomp' => JitBcmath::comp($context, ...$args),
+            'bcpowmod' => JitBcmath::powmod($context, ...$args),
+            default => throw new \LogicException('unsupported bcmath builtin: '.$this->getName()),
+        };
     }
 
     abstract protected function compute(Frame $frame): string|int;
