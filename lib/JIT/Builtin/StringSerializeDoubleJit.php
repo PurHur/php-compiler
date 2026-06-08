@@ -28,7 +28,11 @@ final class StringSerializeDoubleJit
             return;
         }
 
-        $restore = $context->builder->getInsertBlock();
+        $restore = null;
+        try {
+            $restore = $context->builder->getInsertBlock();
+        } catch (\Throwable) {
+        }
         self::ensureLibc($context);
 
         $doubleTy = $context->getTypeFromString('double');
