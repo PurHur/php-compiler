@@ -63,6 +63,7 @@ final class implode extends Internal
         }
         $parts = [];
         foreach ($ht->iterate(true) as $value) {
+            self::rejectEnumHaystackElement($value);
             $parts[] = $value->resolveIndirect()->toString();
         }
         $frame->returnVar->string(VmString::implode($glue, $parts));
@@ -122,6 +123,20 @@ final class implode extends Internal
         }
 
         return $context->getTypeFromString('__hashtable__*')->constNull();
+    }
+
+    /**
+     * php-src php_implode: array elements must convert to string (#5581, ext/standard/string.c).
+     */
+    private static function rejectEnumHaystackElement(Variable $value): void
+    {
+        $value = $value->resolveIndirect();
+        if (!EnumCaseSupport::isEnumCaseVariable($value)) {
+            return;
+        }
+        throw new \Error(
+            'Object of class '.EnumCaseSupport::typeNameForVariable($value).' could not be converted to string'
+        );
     }
 
     /**
