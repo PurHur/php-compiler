@@ -4284,6 +4284,7 @@ restart:
                     );
                     $classEntry->attributeEntries = $op->attributeEntries;
                     $classEntry->classDeprecated = $op->deprecatedMetadata;
+                    $classEntry->sourceLocation = $op->sourceLocation;
                     self::defineClass($classEntry, $op->block1, $frame);
                     if (null !== $classEntry->parentLc) {
                         $this->inheritFromParent($classEntry);
@@ -9679,6 +9680,7 @@ restart:
                     'deprecated' => $trait->methodDeprecated[$name] ?? null,
                     'attributeEntries' => $trait->methodAttributeEntries[$name] ?? null,
                     'parameterMetadata' => $trait->methodParameterMetadata[$name] ?? null,
+                    'sourceLocation' => $trait->methodSourceLocations[$name] ?? null,
                 ];
             }
             foreach ($trait->abstractMethods as $name => $_) {
@@ -9955,6 +9957,9 @@ restart:
             }
             if (null !== $data['parameterMetadata']) {
                 $entry->methodParameterMetadata[$methodLc] = $data['parameterMetadata'];
+            }
+            if (null !== $data['sourceLocation']) {
+                $entry->methodSourceLocations[$methodLc] = $data['sourceLocation'];
             }
             if ('__construct' === $methodLc && null === $entry->constructor) {
                 $entry->constructor = $entry->methods[$methodLc];
@@ -10637,6 +10642,9 @@ restart:
                     }
                     if ([] !== $op->parameterMetadata) {
                         $entry->methodParameterMetadata[$name] = $op->parameterMetadata;
+                    }
+                    if (null !== $op->sourceLocation) {
+                        $entry->methodSourceLocations[$name] = $op->sourceLocation;
                     }
                     if (null !== $op->block1) {
                         $method = new Func\PHP($entry->name.'::'.$name, $op->block1);

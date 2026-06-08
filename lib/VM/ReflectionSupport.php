@@ -6,6 +6,7 @@ namespace PHPCompiler\VM;
 
 use PHPCompiler\Compiler\AttributeEntry;
 use PHPCompiler\Compiler\CompileTimeNew;
+use PHPCompiler\Compiler\SourceLocation;
 use PHPCompiler\ext\standard\VmReflection;
 use PHPCompiler\Frame;
 use PHPCompiler\Func;
@@ -1003,5 +1004,55 @@ final class ReflectionSupport
         $rm->getProperty(self::PROP_METHOD_NAME)->string($methodName);
 
         return $rm;
+    }
+
+    public static function methodSourceLocation(ClassEntry $entry, string $methodLc): ?SourceLocation
+    {
+        return $entry->methodSourceLocations[$methodLc] ?? null;
+    }
+
+    public static function returnDocComment(?Variable $returnVar, ?string $docComment): void
+    {
+        if (null === $returnVar) {
+            return;
+        }
+        if (null === $docComment || '' === $docComment) {
+            $returnVar->bool(false);
+
+            return;
+        }
+        $returnVar->string($docComment);
+    }
+
+    public static function returnFileName(?Variable $returnVar, ClassEntry $entry, SourceLocation $location): void
+    {
+        if (null === $returnVar) {
+            return;
+        }
+        if ($entry->isInternal) {
+            $returnVar->bool(false);
+
+            return;
+        }
+        $file = $location->filename;
+        if ('' === $file || 'unknown' === $file) {
+            $returnVar->bool(false);
+
+            return;
+        }
+        $returnVar->string($file);
+    }
+
+    public static function returnExtensionName(?Variable $returnVar, ClassEntry $entry): void
+    {
+        if (null === $returnVar) {
+            return;
+        }
+        if (!$entry->isInternal) {
+            $returnVar->bool(false);
+
+            return;
+        }
+        $returnVar->string('Core');
     }
 }

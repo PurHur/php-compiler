@@ -240,6 +240,10 @@ class JITTest extends BaseTest {
             if (str_contains($name, 'reflection_property_attributes') || str_contains($name, 'reflection_constant_attributes')) {
                 continue;
             }
+            // Reflection docblock/source getters are VM-only (#7358).
+            if (str_contains($name, 'reflection_docblock_source')) {
+                continue;
+            }
             // uasort()/uksort() closure comparators are VM-only (#3582, #3143).
             if (str_contains($name, 'uasort_closure') || str_contains($name, 'uksort_closure')) {
                 continue;
