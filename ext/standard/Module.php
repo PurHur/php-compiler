@@ -279,6 +279,7 @@ class Module extends ModuleAbstract
             new array_diff_ukey(),
             new array_intersect(),
             new array_intersect_assoc(),
+            new array_intersect_uassoc(),
             new array_intersect_key(),
             new array_udiff(),
             new array_udiff_assoc(),

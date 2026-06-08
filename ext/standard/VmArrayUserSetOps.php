@@ -49,6 +49,11 @@ final class VmArrayUserSetOps
         self::runDiffUassoc($frame);
     }
 
+    public static function intersectUassoc(Frame $frame): void
+    {
+        self::runIntersectUassoc($frame);
+    }
+
     public static function diffUkey(Frame $frame): void
     {
         self::runDiffUkey($frame);
@@ -141,6 +146,35 @@ final class VmArrayUserSetOps
         $out = new HashTable();
         foreach ($first->iterateKeyed(true) as [$key, $value]) {
             if (self::exactPairInAnyOther($key, $value, $others, $dataCompare)) {
+                continue;
+            }
+            self::appendToOutput($out, $key, $value);
+        }
+        $frame->returnVar->array($out);
+    }
+
+    private static function runIntersectUassoc(Frame $frame): void
+    {
+        $argc = \count($frame->calledArgs);
+        if ($argc < 3) {
+            throw new \ArgumentCountError(
+                'array_intersect_uassoc() expects at least 3 arguments, '.$argc.' given'
+            );
+        }
+        $dataCompare = self::resolveCompareCallback(
+            $frame,
+            $frame->calledArgs[$argc - 1],
+            'array_intersect_uassoc'
+        );
+        $first = VmArray::requireArrayParam($frame->calledArgs[0], 'array_intersect_uassoc', 1, 'array');
+        $others = self::collectOtherArrays($frame, 'array_intersect_uassoc', 1, $argc - 1);
+        self::guardOperands($first, $others);
+        if (null === $frame->returnVar) {
+            return;
+        }
+        $out = new HashTable();
+        foreach ($first->iterateKeyed(true) as [$key, $value]) {
+            if (!self::exactPairInAllOthers($key, $value, $others, $dataCompare)) {
                 continue;
             }
             self::appendToOutput($out, $key, $value);
@@ -329,6 +363,29 @@ final class VmArrayUserSetOps
         }
 
         return false;
+    }
+
+    /**
+     * @param list<HashTable> $others
+     * @param callable(Variable, Variable): int $dataCompare
+     */
+    private static function exactPairInAllOthers(
+        Variable $key,
+        Variable $value,
+        array $others,
+        callable $dataCompare
+    ): bool {
+        foreach ($others as $haystack) {
+            $otherValue = self::valueAtExactKey($haystack, $key);
+            if (null === $otherValue) {
+                return false;
+            }
+            if (0 !== $dataCompare($value, $otherValue)) {
+                return false;
+            }
+        }
+
+        return [] !== $others;
     }
 
     /**
