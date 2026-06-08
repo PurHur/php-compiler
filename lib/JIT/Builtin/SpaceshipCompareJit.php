@@ -929,11 +929,9 @@ final class SpaceshipCompareJit
 
     private static function stringLen(Context $context, Value $str): Value
     {
-        if ($str->typeOf()->isPointer()) {
-            $strTy = $context->getStringFromType($str->typeOf());
-            if ('__string__*' !== $strTy) {
-                $str = $context->builder->pointerCast($str, $context->getTypeFromString('__string__*'));
-            }
+        $strTy = $context->getStringFromType($str->typeOf());
+        if ('__string__*' !== $strTy) {
+            $str = $context->builder->pointerCast($str, $context->getTypeFromString('__string__*'));
         }
         $map = $context->structFieldMap['__string__'];
 
