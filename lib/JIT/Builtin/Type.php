@@ -1019,6 +1019,7 @@ class Type extends Builtin {
         IniRuntime::ensureLinked($this->context);
         StringEnvLocal::ensureLinked($this->context);
         ErrorHandlerOutput::registerExternals($this->context);
+        StringTriggerError::ensureLinked($this->context);
         CallArgv::implement($this->context);
         ProgressNoteRuntime::ensureLinked($this->context);
         AssertFail::ensureLinked($this->context);
