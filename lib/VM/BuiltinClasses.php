@@ -111,6 +111,7 @@ use PHPCompiler\VM\Builtin\ReflectionPropertyIsAbstract;
 use PHPCompiler\VM\Builtin\ReflectionPropertyIsPrivate;
 use PHPCompiler\VM\Builtin\ReflectionPropertyIsProtected;
 use PHPCompiler\VM\Builtin\ReflectionPropertyIsPublic;
+use PHPCompiler\VM\Builtin\ReflectionPropertyIsLazy;
 use PHPCompiler\VM\Builtin\ReflectionPropertyIsReadOnly;
 use PHPCompiler\VM\Builtin\ReflectionTypeAllowsNull;
 use PHPCompiler\VM\Builtin\ReflectionTypeToString;
@@ -400,6 +401,7 @@ final class BuiltinClasses
                 'isprotected' => new ReflectionPropertyIsProtected(),
                 'isabstract' => new ReflectionPropertyIsAbstract(),
                 'isreadonly' => new ReflectionPropertyIsReadOnly(),
+                'islazy' => new ReflectionPropertyIsLazy(),
             ] as $name => $method
         ) {
             $rp->methods[$name] = $method;
