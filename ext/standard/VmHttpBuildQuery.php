@@ -25,32 +25,146 @@ final class VmHttpBuildQuery
         string $argSeparator = '&',
         int $encodingType = self::ENCODING_RFC1738
     ): string {
+        return self::buildWithKeyPrefix($data, $numericPrefix, $argSeparator, $encodingType, null);
+    }
+
+    /**
+     * @param array<int|string, mixed> $data
+     */
+    private static function buildWithKeyPrefix(
+        array $data,
+        string $numericPrefix,
+        string $argSeparator,
+        int $encodingType,
+        ?string $keyPrefix
+    ): string {
         $useRaw = self::ENCODING_RFC3986 === $encodingType;
         $parts = [];
         foreach ($data as $key => $value) {
-            $keyStr = \is_int($key) ? (string) $key : $key;
-            if (!\is_string($keyStr)) {
-                continue;
+            $encoded = self::encodeEntry(
+                $key,
+                $value,
+                $numericPrefix,
+                $keyPrefix,
+                $useRaw,
+                $argSeparator,
+                $encodingType
+            );
+            if ('' !== $encoded) {
+                $parts[] = $encoded;
             }
-            $fullKey = '' === $numericPrefix ? $keyStr : $numericPrefix.'['.$keyStr.']';
-            if (\is_array($value)) {
-                $nested = self::build($value, $fullKey, $argSeparator, $encodingType);
-                if ('' !== $nested) {
-                    $parts[] = $nested;
-                }
-                continue;
-            }
-            if (null === $value) {
-                continue;
-            }
-            $encodedKey = $useRaw
-                ? VmString::rawurlencode($fullKey)
-                : VmString::urlencode($fullKey);
-            $encodedVal = self::encodeScalarValue($value, $useRaw);
-            $parts[] = $encodedKey.'='.$encodedVal;
         }
 
         return \implode($argSeparator, $parts);
+    }
+
+    /**
+     * @param int|string $key
+     */
+    private static function encodeEntry(
+        int|string $key,
+        mixed $value,
+        string $numericPrefix,
+        ?string $keyPrefix,
+        bool $useRaw,
+        string $argSeparator,
+        int $encodingType
+    ): string {
+        $isIntKey = \is_int($key);
+        $keyStr = $isIntKey ? (string) $key : $key;
+        if (!\is_string($keyStr)) {
+            return '';
+        }
+
+        if (\is_array($value)) {
+            $childPrefix = self::buildChildKeyPrefix(
+                $keyStr,
+                $isIntKey,
+                $numericPrefix,
+                $keyPrefix,
+                $useRaw
+            );
+
+            return self::buildWithKeyPrefix($value, '', $argSeparator, $encodingType, $childPrefix);
+        }
+        if (null === $value) {
+            return '';
+        }
+
+        $fullKey = self::buildScalarKey($keyStr, $isIntKey, $numericPrefix, $keyPrefix, $useRaw);
+        $encodedKey = self::encodeKeyForOutput($fullKey, $isIntKey, $numericPrefix, $keyPrefix, $useRaw);
+        $encodedVal = self::encodeScalarValue($value, $useRaw);
+
+        return $encodedKey.'='.$encodedVal;
+    }
+
+    private static function encodeKeyForOutput(
+        string $fullKey,
+        bool $isIntKey,
+        string $numericPrefix,
+        ?string $keyPrefix,
+        bool $useRaw
+    ): string {
+        if (null !== $keyPrefix) {
+            return $fullKey;
+        }
+        if ($isIntKey) {
+            return $fullKey;
+        }
+
+        return $useRaw ? VmString::rawurlencode($fullKey) : VmString::urlencode($fullKey);
+    }
+
+    private static function buildChildKeyPrefix(
+        string $keyStr,
+        bool $isIntKey,
+        string $numericPrefix,
+        ?string $keyPrefix,
+        bool $useRaw
+    ): string {
+        if (null !== $keyPrefix) {
+            if ($isIntKey) {
+                return $keyPrefix.$keyStr.'%5D%5B';
+            }
+
+            $encoded = $useRaw ? VmString::rawurlencode($keyStr) : VmString::urlencode($keyStr);
+
+            return $keyPrefix.$encoded.'%5D%5B';
+        }
+        if ($isIntKey) {
+            if ('' !== $numericPrefix) {
+                return $numericPrefix.$keyStr.'%5B';
+            }
+
+            return $keyStr.'%5B';
+        }
+
+        $encoded = $useRaw ? VmString::rawurlencode($keyStr) : VmString::urlencode($keyStr);
+
+        return $encoded.'%5B';
+    }
+
+    private static function buildScalarKey(
+        string $keyStr,
+        bool $isIntKey,
+        string $numericPrefix,
+        ?string $keyPrefix,
+        bool $useRaw
+    ): string {
+        if (null !== $keyPrefix) {
+            if ($isIntKey) {
+                return $keyPrefix.$keyStr.'%5D';
+            }
+
+            $encoded = $useRaw ? VmString::rawurlencode($keyStr) : VmString::urlencode($keyStr);
+
+            return $keyPrefix.$encoded.'%5D';
+        }
+        if ($isIntKey && '' !== $numericPrefix) {
+            return $numericPrefix.$keyStr;
+        }
+
+        return $keyStr;
     }
 
     public static function export(Variable $v): mixed

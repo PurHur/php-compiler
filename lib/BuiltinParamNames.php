@@ -73,6 +73,8 @@ final class BuiltinParamNames
             case 'exit':
             case 'die':
                 return ['status', 'message'];
+            case 'http_build_query':
+                return ['data', 'numeric_prefix', 'arg_separator', 'encoding_type'];
         }
 
         return null;
