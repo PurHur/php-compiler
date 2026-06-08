@@ -3822,6 +3822,22 @@ final class VmString
         if (0 === $len) {
             return '.';
         }
+        // php-src zend_dirname(): wrapper URLs like php://memory have no path segment
+        // after "://", so dirname is scheme + ":" (not "php:/").
+        $schemeSep = strpos($path, '://');
+        if (false !== $schemeSep) {
+            $afterScheme = $schemeSep + 3;
+            $hasPathSep = false;
+            for ($i = $afterScheme; $i < $len; ++$i) {
+                if ('/' === $path[$i] || '\\' === $path[$i]) {
+                    $hasPathSep = true;
+                    break;
+                }
+            }
+            if (!$hasPathSep) {
+                return self::byteSlice($path, 0, $schemeSep + 1);
+            }
+        }
         $end = $len;
         while ($end > 0 && ('/' === $path[$end - 1] || '\\' === $path[$end - 1])) {
             --$end;
