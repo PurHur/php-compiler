@@ -7,8 +7,8 @@ namespace PHPCompiler\ext\standard;
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\Variable as JITVariable;
-use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
 
 /** convert_uuencode() — Unix-to-Unix encoding (VmString; JIT via StringConvertUuJit, #6307). */
@@ -27,11 +27,8 @@ final class convert_uuencode extends Internal
         if (null === $frame->returnVar) {
             return;
         }
-        $data = $frame->calledArgs[0]->resolveIndirect();
-        if (Variable::TYPE_STRING !== $data->type) {
-            throw new \LogicException('convert_uuencode() only supports strings in this compiler build');
-        }
-        $frame->returnVar->string(VmString::convert_uuencode($data->toString()));
+        $data = VmString::coerceStringBuiltinArg($frame->calledArgs[0], 'convert_uuencode', 0, 'string');
+        $frame->returnVar->string(VmString::convert_uuencode($data));
     }
 
     public function call(Context $context, JITVariable ...$args): Value
@@ -42,7 +39,7 @@ final class convert_uuencode extends Internal
 
         return JitConvertUuencode::encode(
             $context,
-            $this->jitString($context, $args[0], 'convert_uuencode() argument #1')
+            JitStringBuiltinArg::lower($context, $args[0], 'convert_uuencode', 0, 'string')
         );
     }
 }
