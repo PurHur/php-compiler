@@ -9,7 +9,7 @@ use PHPCompiler\Runtime;
 use PHPUnit\Framework\TestCase;
 
 /**
- * Issue #5684: AOT standalone must define weakref helpers without phpc_weakref.c.
+ * Issues #5684 / #5303: AOT standalone must define weakref helpers without phpc_weakref.c.
  *
  * @group aot-lint
  */
@@ -43,5 +43,9 @@ final class WeakRefRegistryRuntimeStandaloneTest extends TestCase
     {
         $this->assertFileDoesNotExist(__DIR__.'/../../../lib/AOT/runtime/phpc_weakref.c');
         $this->assertFileDoesNotExist(__DIR__.'/../../../lib/AOT/runtime/phpc_gc.c');
+        $linker = (string) file_get_contents(__DIR__.'/../../../lib/AOT/Linker.php');
+        $this->assertStringNotContainsString('phpc_weakref.c', $linker);
+        $runtime = (string) file_get_contents(__DIR__.'/../../../lib/JIT/Builtin/WeakRefRegistryRuntime.php');
+        $this->assertStringContainsString('Replaces lib/AOT/runtime/phpc_weakref.c', $runtime);
     }
 }
