@@ -7,7 +7,7 @@ namespace PHPCompiler\ext\standard;
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Context;
-use PHPCompiler\JIT\JitStringArg;
+use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
@@ -29,12 +29,7 @@ final class preg_split extends Internal
             );
         }
         $pattern = VmReflection::stringArg($frame->calledArgs[0], 'preg_split() pattern', 0);
-        $subjectVar = $frame->calledArgs[1]->resolveIndirect();
-        if (Variable::TYPE_STRING !== $subjectVar->type) {
-            throw new \LogicException(
-                'preg_split() subject must be a string in this compiler build'
-            );
-        }
+        $subject = VmReflection::stringArg($frame->calledArgs[1], 'preg_split() subject', 1);
         $limit = -1;
         $flags = 0;
         if ($argc >= 3) {
@@ -58,7 +53,7 @@ final class preg_split extends Internal
         if (null === $frame->returnVar) {
             return;
         }
-        $parts = VmPreg::pregSplit($pattern, $subjectVar->toString(), $limit, $flags);
+        $parts = VmPreg::pregSplit($pattern, $subject, $limit, $flags);
         if (false === $parts) {
             $frame->returnVar->bool(false);
 
@@ -83,8 +78,8 @@ final class preg_split extends Internal
 
         return JitPregSplit::invoke(
             $context,
-            JitStringArg::lower($context, $args[0], 'preg_split() pattern'),
-            JitStringArg::lower($context, $args[1], 'preg_split() subject')
+            JitStringBuiltinArg::lower($context, $args[0], 'preg_split', 0, 'pattern'),
+            JitStringBuiltinArg::lower($context, $args[1], 'preg_split', 1, 'subject')
         );
     }
 }

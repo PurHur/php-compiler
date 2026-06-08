@@ -8,6 +8,7 @@ use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitStringArg;
+use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
@@ -34,10 +35,12 @@ final class json_validate extends Internal
         if (null === $frame->returnVar) {
             return;
         }
-        $jsonVar = $frame->calledArgs[0]->resolveIndirect();
-        if (Variable::TYPE_STRING !== $jsonVar->type) {
-            throw new \LogicException('json_validate() argument #1 must be a string in this compiler build');
-        }
+        $json = VmString::coerceStringBuiltinArg(
+            $frame->calledArgs[0],
+            'json_validate',
+            0,
+            'json'
+        );
         $depth = 512;
         if ($argc > 1) {
             $depthVar = $frame->calledArgs[1]->resolveIndirect();
@@ -58,7 +61,7 @@ final class json_validate extends Internal
         if ($argc > 3) {
             throw new \LogicException('json_validate() accepts at most three arguments');
         }
-        $frame->returnVar->bool(VmJsonValidate::validate($jsonVar->toString(), $depth));
+        $frame->returnVar->bool(VmJsonValidate::validate($json, $depth));
     }
 
     public function call(Context $context, JITVariable ...$args): Value
@@ -95,7 +98,7 @@ final class json_validate extends Internal
             return $context->getTypeFromString('int1')->constInt($ok ? 1 : 0, false);
         }
 
-        $jsonPtr = JitStringArg::lower($context, $args[0], 'json_validate() argument #1');
+        $jsonPtr = JitStringBuiltinArg::lower($context, $args[0], 'json_validate', 0, 'json');
         $depthConst = $context->getTypeFromString('int64')->constInt($depth, false);
 
         return JitJsonValidate::invokeWithDepth($context, $jsonPtr, $depthConst);
