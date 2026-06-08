@@ -6,11 +6,54 @@ namespace PHPCompiler\ext\standard;
 
 use PHPCompiler\CompilerVersion;
 use PHPCompiler\VM\HashTable;
+use PHPCompiler\VM\OutputBuffer;
 use PHPCompiler\VM\Variable;
 
-/** VM helpers for phpversion/php_uname/php_sapi_name/version_compare/extension introspection (#3174, #3204, #7190). */
+/**
+ * VM helpers for phpversion/php_uname/php_sapi_name/version_compare/extension introspection (#3174, #3204, #7190)
+ * and phpinfo/phpcredits/zend_version runtime reports (#3359, #5304).
+ *
+ * php-src: ext/standard/info.c
+ */
 final class VmInfo
 {
+    /** php-src PHP_INFO_* (ext/standard/info.c). */
+    public const INFO_GENERAL = 1;
+
+    public const INFO_CREDITS = 2;
+
+    public const INFO_CONFIGURATION = 4;
+
+    public const INFO_MODULES = 8;
+
+    public const INFO_ENVIRONMENT = 16;
+
+    public const INFO_VARIABLES = 32;
+
+    public const INFO_LICENSE = 64;
+
+    public const INFO_ALL = -1;
+
+    /** php-src PHP_CREDITS_* (ext/standard/info.c). */
+    public const CREDITS_GROUP = 1;
+
+    public const CREDITS_GENERAL = 2;
+
+    public const CREDITS_SAPI = 4;
+
+    public const CREDITS_MODULES = 8;
+
+    public const CREDITS_DOCS = 16;
+
+    public const CREDITS_FULLPAGE = 32;
+
+    public const CREDITS_QA = 64;
+
+    public const CREDITS_ALL = -1;
+
+    /** Zend engine version label for zend_version() (php-src Zend/zend.c ZEND_VERSION shape). */
+    public const ZEND_VERSION = '4.4.0';
+
     public static function phpversion(?string $extension = null): string|false
     {
         if (null === $extension) {
@@ -53,6 +96,42 @@ final class VmInfo
         }
 
         return $ht;
+    }
+
+    public static function zend_version(): string
+    {
+        return self::ZEND_VERSION;
+    }
+
+    public static function phpinfo(int $flags = self::INFO_ALL): bool
+    {
+        OutputBuffer::append('<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "DTD/xhtml1-transitional.dtd">');
+        OutputBuffer::append('<html><head><meta http-equiv="Content-Type" content="text/html; charset=utf-8" />');
+        OutputBuffer::append('<title>phpinfo()</title><style type="text/css">.h{background-color:#9999cc;font-weight:bold;color:#000000;}');
+        OutputBuffer::append('.v{background-color:#cccccc;color:#000000;}</style></head><body><div class="center">');
+        if (self::infoFlagSelected($flags, self::INFO_GENERAL)) {
+            self::printInfoGeneralSection();
+        }
+        if (self::infoFlagSelected($flags, self::INFO_MODULES)) {
+            self::printInfoModulesSection();
+        }
+        if (self::infoFlagSelected($flags, self::INFO_CONFIGURATION)) {
+            self::printInfoConfigurationSection();
+        }
+        if (self::infoFlagSelected($flags, self::INFO_LICENSE)) {
+            self::printInfoLicenseSection();
+        }
+        if (self::infoFlagSelected($flags, self::INFO_CREDITS)) {
+            self::printCreditsSection(self::CREDITS_GENERAL);
+        }
+        OutputBuffer::append('</div></body></html>');
+
+        return true;
+    }
+
+    public static function phpcredits(int $flags = self::CREDITS_ALL): void
+    {
+        self::printCreditsSection($flags);
     }
 
     public static function version_compare(string $ver1, string $ver2, ?string $operator = null): int|bool
@@ -269,5 +348,77 @@ final class VmInfo
                 'php_uname(): Argument #1 ($mode) must be one of "a", "s", "n", "r", "v", or "m"'
             );
         }
+    }
+
+    private static function infoFlagSelected(int $flags, int $section): bool
+    {
+        if (self::INFO_ALL === $flags) {
+            return true;
+        }
+
+        return 0 !== ($flags & $section);
+    }
+
+    private static function creditsFlagSelected(int $flags, int $section): bool
+    {
+        if (self::CREDITS_ALL === $flags) {
+            return true;
+        }
+
+        return 0 !== ($flags & $section);
+    }
+
+    private static function printInfoGeneralSection(): void
+    {
+        $version = CompilerVersion::VERSION;
+        $sapi = self::php_sapi_name();
+        $system = self::php_uname('s');
+        $host = self::php_uname('n');
+        $release = self::php_uname('r');
+        $versionStr = self::php_uname('v');
+        $machine = self::php_uname('m');
+        OutputBuffer::append('<table><tr class="h"><td colspan="2"><h1>PHP Version '.$version.'</h1></td></tr>');
+        OutputBuffer::append('<tr><td class="e">System </td><td class="v">'.$system.' '.$host.' '.$release.' '.$versionStr.' '.$machine.' </td></tr>');
+        OutputBuffer::append('<tr><td class="e">Build System </td><td class="v">'.$system.' '.$machine.' </td></tr>');
+        OutputBuffer::append('<tr><td class="e">Server API </td><td class="v">'.$sapi.' </td></tr>');
+        OutputBuffer::append('<tr><td class="e">PHP Version </td><td class="v">'.$version.' </td></tr>');
+        OutputBuffer::append('<tr><td class="e">Zend Engine Version </td><td class="v">'.self::ZEND_VERSION.' </td></tr>');
+        OutputBuffer::append('</table><br />');
+    }
+
+    private static function printInfoModulesSection(): void
+    {
+        $extensions = ModuleRegistry::getLoadedExtensions();
+        sort($extensions, SORT_STRING);
+        OutputBuffer::append('<table><tr class="h"><td colspan="2"><h2>PHP Modules</h2></td></tr>');
+        OutputBuffer::append('<tr><td class="e">Module Name </td><td class="v">Enabled </td></tr>');
+        foreach ($extensions as $name) {
+            OutputBuffer::append('<tr><td class="e">'.$name.' </td><td class="v">enabled </td></tr>');
+        }
+        OutputBuffer::append('</table><br />');
+    }
+
+    private static function printInfoConfigurationSection(): void
+    {
+        OutputBuffer::append('<table><tr class="h"><td colspan="2"><h2>Configuration</h2></td></tr>');
+        OutputBuffer::append('<tr><td class="e">Compiler </td><td class="v">PurHur/php-compiler </td></tr>');
+        OutputBuffer::append('</table><br />');
+    }
+
+    private static function printInfoLicenseSection(): void
+    {
+        OutputBuffer::append('<table><tr class="h"><td colspan="2"><h2>PHP License</h2></td></tr>');
+        OutputBuffer::append('<tr><td class="v" colspan="2">This program is free software; you can redistribute it and/or modify it under the terms of the PHP License.</td></tr>');
+        OutputBuffer::append('</table><br />');
+    }
+
+    private static function printCreditsSection(int $flags): void
+    {
+        if (!self::creditsFlagSelected($flags, self::CREDITS_GENERAL)) {
+            return;
+        }
+        OutputBuffer::append('<table><tr class="h"><td colspan="2"><h2>PHP Credits</h2></td></tr>');
+        OutputBuffer::append('<tr><td class="v" colspan="2">PurHur/php-compiler — PHP-in-PHP compiler runtime</td></tr>');
+        OutputBuffer::append('</table><br />');
     }
 }

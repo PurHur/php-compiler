@@ -1,0 +1,45 @@
+<?php
+
+declare(strict_types=1);
+
+namespace PHPCompiler\ext\standard;
+
+use PHPCompiler\Frame;
+use PHPCompiler\Func\Internal;
+use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\Variable as JITVariable;
+use PHPCompiler\VM\Variable;
+use PHPLLVM\Value;
+
+/** phpcredits() — runtime credits report (ext/standard/info.c parity, #3359, #5304). */
+final class phpcredits extends Internal
+{
+    public function __construct()
+    {
+        parent::__construct('phpcredits');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $argc = \count($frame->calledArgs);
+        if ($argc > 1) {
+            throw new \LogicException('phpcredits() accepts at most one argument');
+        }
+        $flags = VmInfo::CREDITS_ALL;
+        if (1 === $argc) {
+            $arg = $frame->calledArgs[0]->resolveIndirect();
+            if (Variable::TYPE_NULL !== $arg->type) {
+                if (Variable::TYPE_INTEGER !== $arg->type && Variable::TYPE_FLOAT !== $arg->type) {
+                    throw new \LogicException('phpcredits() flags must be an integer in this compiler build');
+                }
+                $flags = (int) $arg->toInt();
+            }
+        }
+        VmInfo::phpcredits($flags);
+    }
+
+    public function call(Context $context, JITVariable ...$args): Value
+    {
+        throw new \LogicException('phpcredits() is VM-only in this compiler build (issue #5304)');
+    }
+}
