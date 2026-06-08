@@ -41,6 +41,7 @@ use PHPCompiler\VM\Builtin\ReflectionAttributeGetName;
 use PHPCompiler\VM\Builtin\ReflectionAttributeIsRepeated;
 use PHPCompiler\VM\Builtin\ReflectionAttributeNewInstance;
 use PHPCompiler\VM\Builtin\ReflectionClassConstantGetType;
+use PHPCompiler\VM\Builtin\ReflectionClassConstantIsDeprecated;
 use PHPCompiler\VM\Builtin\ReflectionClassConstruct;
 use PHPCompiler\VM\Builtin\ReflectionClassGetAttributes;
 use PHPCompiler\VM\Builtin\ReflectionClassGetConstant;
@@ -456,6 +457,8 @@ final class BuiltinClasses
         $rconst->methodVisibility['getattributes'] = $pub;
         $rconst->methods['gettype'] = new ReflectionClassConstantGetType();
         $rconst->methodVisibility['gettype'] = $pub;
+        $rconst->methods['isdeprecated'] = new ReflectionClassConstantIsDeprecated();
+        $rconst->methodVisibility['isdeprecated'] = $pub;
         $ctx->classes[ReflectionSupport::REFLECTION_CONSTANT] = $rconst;
 
         $rcc = new ClassEntry('ReflectionClassConstant');
@@ -472,6 +475,8 @@ final class BuiltinClasses
         $rcc->methodVisibility['getattributes'] = $pub;
         $rcc->methods['gettype'] = new ReflectionClassConstantGetType();
         $rcc->methodVisibility['gettype'] = $pub;
+        $rcc->methods['isdeprecated'] = new ReflectionClassConstantIsDeprecated();
+        $rcc->methodVisibility['isdeprecated'] = $pub;
         $ctx->classes[ReflectionSupport::REFLECTION_CLASS_CONSTANT] = $rcc;
 
         $ctx->classes[ReflectionSupport::REFLECTION_CLASS] = $rc;
