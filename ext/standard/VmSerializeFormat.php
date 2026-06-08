@@ -18,6 +18,9 @@ final class VmSerializeFormat
      */
     public static function encodeExported(mixed $exported): string
     {
+        if ($exported instanceof VmSerializeEnumCaseRef) {
+            return VmSerialize::encodeEnumCaseLiteral($exported->className, $exported->caseName);
+        }
         if (null === $exported) {
             return 'N;';
         }
