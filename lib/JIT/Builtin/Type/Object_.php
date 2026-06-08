@@ -2810,6 +2810,19 @@ class Object_ extends Type {
                 ];
             }
         }
+        if ('connectionstatus' === $lcname) {
+            $this->enums[$lcname] = true;
+            $this->setEnumBackedType($id, 'int');
+            foreach ([
+                'Normal' => \PHPCompiler\ext\standard\VmConnection::NORMAL,
+                'Aborted' => \PHPCompiler\ext\standard\VmConnection::ABORTED,
+                'Timeout' => \PHPCompiler\ext\standard\VmConnection::TIMEOUT,
+            ] as $caseName => $value) {
+                $backing = new VMVariable();
+                $backing->int($value);
+                $this->defineEnumCaseConst($id, $caseName, $backing);
+            }
+        }
     }
 
     /**
@@ -4672,6 +4685,11 @@ class Object_ extends Type {
     public function memoryUsageEnumClassId(): ?int
     {
         return $this->classes['memoryusage'] ?? null;
+    }
+
+    public function connectionStatusEnumClassId(): ?int
+    {
+        return $this->classes['connectionstatus'] ?? null;
     }
 
     public function responseCodeEnumClassId(): ?int

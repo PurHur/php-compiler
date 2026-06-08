@@ -31,7 +31,7 @@ final class connection_status extends Internal
         if (null === $frame->returnVar) {
             return;
         }
-        $frame->returnVar->int(VmConnection::connectionStatus());
+        VmConnection::assignStatusResult($frame->returnVar, $frame->vmContext);
     }
 
     public function call(Context $context, JITVariable ...$args): Value

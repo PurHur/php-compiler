@@ -1,5 +1,5 @@
 --TEST--
-stdlib connection_status() JIT/AOT path (issues #6161, #7234)
+stdlib connection_status() JIT with ConnectionStatus enum (#7234)
 --FILE--
 <?php
 $st = connection_status();

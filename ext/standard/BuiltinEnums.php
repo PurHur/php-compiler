@@ -23,6 +23,7 @@ final class BuiltinEnums
         self::registerStringTrimMode($ctx);
         self::registerPadType($ctx);
         self::registerMemoryUsage($ctx);
+        self::registerConnectionStatus($ctx);
         self::registerResponseCode($ctx);
         foreach (array_diff(array_keys($ctx->classes), $before) as $lc) {
             $ctx->classes[$lc]->isInternal = true;
@@ -157,6 +158,33 @@ final class BuiltinEnums
         EnumSupport::ensureBuiltinEnumInterfaces($entry);
 
         $lc = 'memoryusage';
+        $ctx->classes[$lc] = $entry;
+        $ctx->enums[$lc] = true;
+    }
+
+    /**
+     * PHP 8.4 ConnectionStatus: int-backed enum for connection_status() (#7234).
+     *
+     * php-src: ext/standard/basic_functions.stub.php — enum ConnectionStatus: int
+     */
+    private static function registerConnectionStatus(Context $ctx): void
+    {
+        if (isset($ctx->classes['connectionstatus'])) {
+            return;
+        }
+
+        $entry = new ClassEntry('ConnectionStatus');
+        $entry->isEnum = true;
+        $entry->backedType = 'int';
+
+        self::registerBackedEnumCase($entry, 'Normal', VmConnection::NORMAL);
+        self::registerBackedEnumCase($entry, 'Aborted', VmConnection::ABORTED);
+        self::registerBackedEnumCase($entry, 'Timeout', VmConnection::TIMEOUT);
+
+        EnumSupport::ensureBuiltinCasesMethod($entry);
+        EnumSupport::ensureBuiltinEnumInterfaces($entry);
+
+        $lc = 'connectionstatus';
         $ctx->classes[$lc] = $entry;
         $ctx->enums[$lc] = true;
     }
