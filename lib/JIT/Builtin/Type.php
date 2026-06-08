@@ -1026,6 +1026,7 @@ class Type extends Builtin {
         StreamSync::ensureLinked($this->context);
         StreamCaps::ensureLinked($this->context);
         StreamLifecycle::ensureLinked($this->context);
+        StreamIo::ensureLinked($this->context);
         StreamResource::ensureLinked($this->context);
         LastErrorRuntime::ensureLinked($this->context);
         CliArgvRuntime::ensureLinked($this->context);

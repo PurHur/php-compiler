@@ -23,9 +23,9 @@ extern __string__ *__string__init(long long size, const char *value);
 FILE *phpc_stream_handles[PHPC_MAX_STREAM_HANDLES];
 /** Set when a handle id is allocated; kept after fclose for get_resource_type() (#5179). */
 char phpc_stream_was_used[PHPC_MAX_STREAM_HANDLES];
-static int phpc_stream_chunk_size[PHPC_MAX_STREAM_HANDLES];
-static int phpc_stream_write_buffer[PHPC_MAX_STREAM_HANDLES];
-static int phpc_stream_read_buffer[PHPC_MAX_STREAM_HANDLES];
+int phpc_stream_chunk_size[PHPC_MAX_STREAM_HANDLES];
+int phpc_stream_write_buffer[PHPC_MAX_STREAM_HANDLES];
+int phpc_stream_read_buffer[PHPC_MAX_STREAM_HANDLES];
 static char phpc_stream_write_buffer_storage[PHPC_MAX_STREAM_HANDLES][8192];
 char *phpc_stream_paths[PHPC_MAX_STREAM_HANDLES];
 
@@ -71,123 +71,7 @@ FILE *__phpc_resolve_stream(int64_t handle)
     return NULL;
 }
 
-int64_t __compiler_fwrite(int64_t handle, __string__ *data, int64_t length)
-{
-    FILE *fp = __phpc_resolve_stream(handle);
-    if (NULL == fp || NULL == data) {
-        return -1;
-    }
-
-    size_t data_len = phpc_string_len(data);
-    size_t write_len = data_len;
-    if (length >= 0 && (size_t) length < data_len) {
-        write_len = (size_t) length;
-    }
-    if (0 == write_len) {
-        return 0;
-    }
-
-    size_t n = fwrite(phpc_string_data(data), 1, write_len, fp);
-    if (n != write_len) {
-        return -1;
-    }
-
-    return (int64_t) n;
-}
-
-int64_t __compiler_fopen(__string__ *path, __string__ *mode)
-{
-    FILE *fp;
-    int64_t id;
-
-    if (NULL == path || NULL == mode) {
-        return -1;
-    }
-    fp = fopen(phpc_string_data(path), phpc_string_data(mode));
-    if (NULL == fp) {
-        return -1;
-    }
-    for (id = 3; id < PHPC_MAX_STREAM_HANDLES; id++) {
-        if (NULL == phpc_stream_handles[id]) {
-            phpc_stream_handles[id] = fp;
-            phpc_stream_chunk_size[id] = PHPC_STREAM_DEFAULT_CHUNK_SIZE;
-            phpc_stream_write_buffer[id] = PHPC_STREAM_DEFAULT_BUFFER_SIZE;
-            phpc_stream_read_buffer[id] = PHPC_STREAM_DEFAULT_BUFFER_SIZE;
-            phpc_stream_paths[id] = strdup(phpc_string_data(path));
-            if (NULL == phpc_stream_paths[id]) {
-                fclose(fp);
-                phpc_stream_handles[id] = NULL;
-
-                return -1;
-            }
-            phpc_stream_was_used[id] = 1;
-
-            return id;
-        }
-    }
-    fclose(fp);
-
-    return -1;
-}
-
-int64_t __compiler_tmpfile(void)
-{
-    FILE *fp;
-    int64_t id;
-
-    fp = tmpfile();
-    if (NULL == fp) {
-        return -1;
-    }
-    for (id = 3; id < PHPC_MAX_STREAM_HANDLES; id++) {
-        if (NULL == phpc_stream_handles[id]) {
-            phpc_stream_handles[id] = fp;
-            phpc_stream_chunk_size[id] = PHPC_STREAM_DEFAULT_CHUNK_SIZE;
-            phpc_stream_write_buffer[id] = PHPC_STREAM_DEFAULT_BUFFER_SIZE;
-            phpc_stream_read_buffer[id] = PHPC_STREAM_DEFAULT_BUFFER_SIZE;
-            phpc_stream_paths[id] = NULL;
-            phpc_stream_was_used[id] = 1;
-
-            return id;
-        }
-    }
-    fclose(fp);
-
-    return -1;
-}
-
-__string__ *__compiler_fread(int64_t handle, int64_t length)
-{
-    FILE *fp;
-    char *buf;
-    size_t got;
-    __string__ *result;
-
-    if (length < 0) {
-        return NULL;
-    }
-    fp = __phpc_resolve_stream(handle);
-    if (NULL == fp) {
-        return NULL;
-    }
-    if (0 == length) {
-        return __string__init(0, "");
-    }
-    buf = (char *) malloc((size_t) length);
-    if (NULL == buf) {
-        return NULL;
-    }
-    got = fread(buf, 1, (size_t) length, fp);
-    if (0 == got && ferror(fp)) {
-        free(buf);
-
-        return NULL;
-    }
-    result = __string__init((long long) got, buf);
-    free(buf);
-
-    return result;
-}
+/* fopen/fread/fwrite/tmpfile helpers: LLVM StreamIoJit.php (#5343 phase 3, #4436). */
 
 /* is_resource/fclose/feof/fflush helpers: LLVM StreamLifecycleJit.php (#5343). */
 
@@ -669,4 +553,5 @@ __string__ *__compiler_stream_get_contents(int64_t handle, int64_t maxlength, in
 }
 
 /* get_resource_type/get_resources helpers: LLVM StreamResourceJit.php (#6821). */
+/* fopen/fread/fwrite/tmpfile helpers: LLVM StreamIoJit.php (#5343 phase 3). */
 /* is_resource/fclose/feof/fflush helpers: LLVM StreamLifecycleJit.php (#5343). */
