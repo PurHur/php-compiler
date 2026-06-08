@@ -361,6 +361,8 @@ require_once __DIR__.'/../../../ext/standard/VmIni.php';
 require_once __DIR__.'/../../../ext/standard/VmInternalCall.php';
 require_once __DIR__.'/../../../ext/standard/VmInternalCompare.php';
 require_once __DIR__.'/../../../ext/standard/VmJson.php';
+require_once __DIR__.'/../../../ext/standard/VmJsonFormat.php';
+require_once __DIR__.'/../../../ext/standard/VmJsonParser.php';
 require_once __DIR__.'/../../../ext/standard/VmNumberFormat.php';
 require_once __DIR__.'/../../../ext/standard/PackEngine.php';
 require_once __DIR__.'/../../../ext/standard/VmPack.php';

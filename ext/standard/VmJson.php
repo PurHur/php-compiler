@@ -214,12 +214,15 @@ final class VmJson
                 $out = [];
                 foreach ($v->toArray()->iterateKeyed(true) as [$key, $value]) {
                     $k = $key->resolveIndirect();
-                    if (Variable::TYPE_STRING !== $k->type) {
+                    if (Variable::TYPE_STRING === $k->type) {
+                        $out[$k->toString()] = self::export($value, $ctx, $vm);
+                    } elseif (Variable::TYPE_INTEGER === $k->type) {
+                        $out[$k->toInt()] = self::export($value, $ctx, $vm);
+                    } else {
                         throw new \LogicException(
-                            'json_encode() only supports string keys in this compiler build'
+                            'json_encode() only supports string or integer keys in this compiler build'
                         );
                     }
-                    $out[$k->toString()] = self::export($value, $ctx, $vm);
                 }
 
                 return $out;

@@ -220,6 +220,8 @@ final class BootstrapSelfhostBundleTest extends TestCase
         'ext/standard/VmInternalCall.php',
         'ext/standard/VmInternalCompare.php',
         'ext/standard/VmJson.php',
+        'ext/standard/VmJsonFormat.php',
+        'ext/standard/VmJsonParser.php',
         'ext/standard/VmNumberFormat.php',
         'ext/standard/VmPack.php',
         'ext/standard/VmParseStr.php',
