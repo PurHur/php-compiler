@@ -27,18 +27,20 @@ final class StreamLifecycleJit
 
     private const GLOBAL_PATHS = 'phpc_stream_paths';
 
+    private const GLOBAL_IS_POPEN = 'phpc_stream_is_popen';
+
     /** @var list<string> */
     private const RUNTIME_FUNCTIONS = [
         '__compiler_is_resource',
         '__compiler_fclose',
+        '__compiler_pclose',
         '__compiler_feof',
         '__compiler_fflush',
     ];
 
     public static function implement(Context $context): void
     {
-        $probe = $context->module->getNamedFunction('__compiler_is_resource');
-        if (null !== $probe && $probe->countBasicBlocks() > 0) {
+        if (self::allRuntimeFunctionsLinked($context)) {
             self::registerLinkedRuntime($context);
 
             return;
@@ -49,8 +51,21 @@ final class StreamLifecycleJit
 
         self::implementIfMissing($context, '__compiler_is_resource', self::emitIsResource(...));
         self::implementIfMissing($context, '__compiler_fclose', self::emitFclose(...));
+        self::implementIfMissing($context, '__compiler_pclose', self::emitPclose(...));
         self::implementIfMissing($context, '__compiler_feof', self::emitFeof(...));
         self::implementIfMissing($context, '__compiler_fflush', self::emitFflush(...));
+    }
+
+    private static function allRuntimeFunctionsLinked(Context $context): bool
+    {
+        foreach (self::RUNTIME_FUNCTIONS as $name) {
+            $fn = $context->module->getNamedFunction($name);
+            if (null === $fn || 0 === $fn->countBasicBlocks()) {
+                return false;
+            }
+        }
+
+        return true;
     }
 
     /**
@@ -82,7 +97,7 @@ final class StreamLifecycleJit
         $i32 = $context->getTypeFromString('int32');
         $i64 = $context->getTypeFromString('int64');
         $ft = match ($name) {
-            '__compiler_is_resource', '__compiler_fclose', '__compiler_feof', '__compiler_fflush'
+            '__compiler_is_resource', '__compiler_fclose', '__compiler_feof', '__compiler_fflush', '__compiler_pclose'
                 => $context->context->functionType($i32, false, $i64),
             default => throw new \LogicException('StreamLifecycleJit: unknown '.$name),
         };
@@ -103,6 +118,7 @@ final class StreamLifecycleJit
             ['__phpc_resolve_stream', $i8p, [$i64]],
             ['__compiler_is_dir_resource', $i32, [$i64]],
             ['fclose', $i32, [$i8p]],
+            ['pclose', $i32, [$i8p]],
             ['feof', $i32, [$i8p]],
             ['fflush', $i32, [$i8p]],
             ['free', $void, [$i8p]],
@@ -125,11 +141,13 @@ final class StreamLifecycleJit
     {
         $i8p = $context->getTypeFromString('int8*');
         $tableTy = $i8p->arrayType(self::MAX_HANDLES);
-        foreach ([self::GLOBAL_HANDLES, self::GLOBAL_PATHS] as $name) {
+        $i8 = $context->getTypeFromString('int8');
+        $flagTy = $i8->arrayType(self::MAX_HANDLES);
+        foreach ([self::GLOBAL_HANDLES => $tableTy, self::GLOBAL_PATHS => $tableTy, self::GLOBAL_IS_POPEN => $flagTy] as $name => $ty) {
             if (null !== $context->module->getNamedGlobal($name)) {
                 continue;
             }
-            $context->module->addGlobal($tableTy, $name);
+            $context->module->addGlobal($ty, $name);
         }
     }
 
@@ -252,6 +270,58 @@ final class StreamLifecycleJit
 
         $context->builder->positionAtEnd($failBb);
         $context->builder->returnValue($zeroI32);
+    }
+
+    private static function emitPclose(Context $context, LlvmFunction $fn): void
+    {
+        $entry = $fn->appendBasicBlock('pclose_entry');
+        $context->builder->positionAtEnd($entry);
+
+        $handle = $fn->getParam(0);
+        $i64 = $context->getTypeFromString('int64');
+        $i32 = $context->getTypeFromString('int32');
+        $i8 = $context->getTypeFromString('int8');
+        $i8p = $context->getTypeFromString('int8*');
+        $zeroI64 = $i64->constInt(0, false);
+        $max = $i64->constInt(self::MAX_HANDLES, false);
+        $nullPtr = $i8p->constNull();
+        $minusOne = $i32->constInt(-1, true);
+
+        $badHandle = $context->builder->or(
+            $context->builder->icmp(Builder::INT_SLE, $handle, $zeroI64),
+            $context->builder->icmp(Builder::INT_SGE, $handle, $max)
+        );
+        $failBb = $fn->appendBasicBlock('pclose_fail');
+        $loadBb = $fn->appendBasicBlock('pclose_load');
+        $context->builder->branchIf($badHandle, $failBb, $loadBb);
+
+        $context->builder->positionAtEnd($loadBb);
+        $fp = self::loadTableSlot($context, self::GLOBAL_HANDLES, $handle);
+        $noFp = $context->builder->icmp(Builder::INT_EQ, $fp, $nullPtr);
+        $checkPopenBb = $fn->appendBasicBlock('pclose_check');
+        $context->builder->branchIf($noFp, $failBb, $checkPopenBb);
+
+        $context->builder->positionAtEnd($checkPopenBb);
+        $zeroI64Phi = $i64->constInt(0, false);
+        $global = $context->module->getNamedGlobal(self::GLOBAL_IS_POPEN);
+        if (null === $global) {
+            throw new \LogicException('StreamLifecycleJit: '.self::GLOBAL_IS_POPEN.' missing');
+        }
+        $flagSlot = $context->builder->gep($global, $zeroI64Phi, $handle);
+        $isPopen = $context->builder->load($context->builder->bitcast($flagSlot, $i8->pointerType(0)));
+        $notPopen = $context->builder->icmp(Builder::INT_EQ, $isPopen, $i8->constInt(0, false));
+        $workBb = $fn->appendBasicBlock('pclose_work');
+        $context->builder->branchIf($notPopen, $failBb, $workBb);
+
+        $context->builder->positionAtEnd($workBb);
+        self::storeTableSlot($context, self::GLOBAL_HANDLES, $handle, $nullPtr);
+        $flagSlotClear = $context->builder->gep($global, $zeroI64Phi, $handle);
+        $context->builder->store($i8->constInt(0, false), $context->builder->bitcast($flagSlotClear, $i8->pointerType(0)));
+        $status = $context->builder->call($context->lookupFunction('pclose'), $fp);
+        $context->builder->returnValue($status);
+
+        $context->builder->positionAtEnd($failBb);
+        $context->builder->returnValue($minusOne);
     }
 
     private static function emitFeof(Context $context, LlvmFunction $fn): void
