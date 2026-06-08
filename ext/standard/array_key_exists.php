@@ -37,9 +37,7 @@ final class array_key_exists extends Internal
     public function execute(Frame $frame): void
     {
         $fn = $this->getName();
-        if (2 !== \count($frame->calledArgs)) {
-            throw new \LogicException($fn.'() requires exactly two arguments');
-        }
+        $this->requireExactArgCount($frame, $fn, 2);
         $key = $frame->calledArgs[0]->resolveIndirect();
         EnumCaseSupport::rejectIllegalArrayOffset($key);
         $array = VmArray::requireArrayParam(
@@ -68,8 +66,8 @@ final class array_key_exists extends Internal
     public function call(Context $context, JITVariable ...$args): Value
     {
         $fn = $this->getName();
-        if (2 !== \count($args)) {
-            throw new \LogicException($fn.'() requires exactly two arguments');
+        if (!$this->requireExactJitArgCount($context, $args, $fn, 2)) {
+            return $context->getTypeFromString('int1')->constInt(0, false);
         }
         $key = $args[0];
         $array = $args[1];

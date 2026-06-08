@@ -25,9 +25,7 @@ final class chr extends Internal
 {
     public function execute(Frame $frame): void
     {
-        if (1 !== count($frame->calledArgs)) {
-            throw new \LogicException('chr() requires exactly one argument');
-        }
+        $this->requireExactArgCount($frame, 'chr', 1);
         $n = VmMath::parseChrCodepoint(
             $frame->calledArgs[0]->resolveIndirect(),
             'chr',
@@ -46,8 +44,8 @@ final class chr extends Internal
     public function call(Context $context, JITVariable ...$args): Value
     {
         $this->context = $context;
-        if (1 !== count($args)) {
-            throw new \LogicException('chr() requires exactly one argument');
+        if (!$this->requireExactJitArgCount($context, $args, 'chr', 1)) {
+            return $context->getTypeFromString('__string__*')->constNull();
         }
         $v = JitChr::lowerCodepoint($context, $args[0]);
         $const256 = $v->typeOf()->constInt(256, false);

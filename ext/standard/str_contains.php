@@ -28,9 +28,7 @@ final class str_contains extends Internal
 {
     public function execute(Frame $frame): void
     {
-        if (2 !== count($frame->calledArgs)) {
-            throw new \LogicException('str_contains() requires exactly two arguments');
-        }
+        $this->requireExactArgCount($frame, 'str_contains', 2);
         $haystackStr = VmString::coerceStringBuiltinArg(
             $frame->calledArgs[0],
             'str_contains',
@@ -61,8 +59,8 @@ final class str_contains extends Internal
     public function call(Context $context, JITVariable ...$args): Value
     {
         $this->context = $context;
-        if (2 !== count($args)) {
-            throw new \LogicException('str_contains() requires exactly two arguments');
+        if (!$this->requireExactJitArgCount($context, $args, 'str_contains', 2)) {
+            return $context->getTypeFromString('int1')->constInt(0, false);
         }
         $hayPtr = $this->stringDataPtr($context, JitStringBuiltinArg::lower($context, $args[0], 'str_contains', 0, 'haystack'));
         $needlePtr = $this->stringDataPtr($context, JitStringBuiltinArg::lower($context, $args[1], 'str_contains', 1, 'needle'));
