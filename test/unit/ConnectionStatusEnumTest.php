@@ -1,0 +1,27 @@
+<?php
+
+declare(strict_types=1);
+
+namespace PHPCompiler\Test\Unit;
+
+use PHPCompiler\Runtime;
+use PHPUnit\Framework\TestCase;
+
+/** @covers issue #7234 */
+final class ConnectionStatusEnumTest extends TestCase
+{
+    public function testConnectionStatusBuiltinEnumAndHandler(): void
+    {
+        $runtime = new Runtime();
+        $code = <<<'PHP'
+<?php
+var_export(enum_exists('ConnectionStatus', false));
+echo "\n";
+echo connection_status() === ConnectionStatus::Normal ? "match\n" : "bad\n";
+echo connection_status()->value === CONNECTION_NORMAL ? "legacy\n" : "bad\n";
+PHP;
+        ob_start();
+        $runtime->run($runtime->parseAndCompile($code, 'connection_status_enum.php'));
+        $this->assertSame("true\nmatch\nlegacy\n", ob_get_clean());
+    }
+}
