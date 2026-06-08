@@ -159,6 +159,10 @@ final class SelfHostBuiltinPolicy
         'gethostbynamel' => 'filesystem',
         'gethostbyname' => 'filesystem',
         'gethostbyaddr' => 'filesystem',
+        'long2ip' => 'filesystem',
+        'ip2long' => 'filesystem',
+        'inet_ntop' => 'filesystem',
+        'inet_pton' => 'filesystem',
         'stream_context_create' => 'filesystem',
     ];
 
