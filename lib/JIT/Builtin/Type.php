@@ -283,6 +283,12 @@ class Type extends Builtin {
         $fntypeFclose = $this->context->context->functionType($i32, false, $i64);
         $fnFclose = $this->context->module->addFunction('__compiler_fclose', $fntypeFclose);
         $this->context->registerFunction('__compiler_fclose', $fnFclose);
+        $fntypePopen = $this->context->context->functionType($i64, false, $strPtr, $strPtr);
+        $fnPopen = $this->context->module->addFunction('__compiler_popen', $fntypePopen);
+        $this->context->registerFunction('__compiler_popen', $fnPopen);
+        $fntypePclose = $this->context->context->functionType($i32, false, $i64);
+        $fnPclose = $this->context->module->addFunction('__compiler_pclose', $fntypePclose);
+        $this->context->registerFunction('__compiler_pclose', $fnPclose);
         $fntypeOpendir = $this->context->context->functionType($i64, false, $strPtr);
         $fnOpendir = $this->context->module->addFunction('__compiler_opendir', $fntypeOpendir);
         $this->context->registerFunction('__compiler_opendir', $fnOpendir);

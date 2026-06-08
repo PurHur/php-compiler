@@ -13,6 +13,9 @@ final class VmFs
     /** @var array<int, resource> */
     private static array $handles = [];
 
+    /** @var array<int, true> popen() handles — pclose() vs fclose() at libc layer in JIT/AOT */
+    private static array $popenHandles = [];
+
     private static int $nextHandleId = 0;
 
     /**
@@ -474,6 +477,47 @@ final class VmFs
         }
 
         return self::adoptStreamResource($fp);
+    }
+
+    /**
+     * popen() — open pipe to subprocess (php-src ext/standard/exec.c; #6211).
+     *
+     * @return int|false stream handle id
+     */
+    public static function popen(string $command, string $mode)
+    {
+        $fp = @\popen($command, $mode);
+        if (false === $fp) {
+            return false;
+        }
+        $id = self::adoptStreamResource($fp);
+        self::$popenHandles[$id] = true;
+
+        return $id;
+    }
+
+    /**
+     * pclose() — close popen pipe and return exit status (php-src ext/standard/exec.c; #6211).
+     */
+    public static function pclose(int $handle): int
+    {
+        $fp = self::lookup($handle);
+        if (null === $fp) {
+            return -1;
+        }
+        unset(self::$handles[$handle]);
+        unset(self::$popenHandles[$handle]);
+        $result = @\pclose($fp);
+        if (false === $result) {
+            return -1;
+        }
+
+        return (int) $result;
+    }
+
+    public static function isPopenHandle(int $handle): bool
+    {
+        return isset(self::$popenHandles[$handle]);
     }
 
     /** @return int|false */

@@ -31,6 +31,8 @@ final class StreamIoJit
 
     private const GLOBAL_WAS_USED = 'phpc_stream_was_used';
 
+    private const GLOBAL_IS_POPEN = 'phpc_stream_is_popen';
+
     private const GLOBAL_CHUNK_SIZE = 'phpc_stream_chunk_size';
 
     private const GLOBAL_WRITE_BUFFER = 'phpc_stream_write_buffer';
@@ -41,14 +43,14 @@ final class StreamIoJit
     private const RUNTIME_FUNCTIONS = [
         '__compiler_fwrite',
         '__compiler_fopen',
+        '__compiler_popen',
         '__compiler_tmpfile',
         '__compiler_fread',
     ];
 
     public static function implement(Context $context): void
     {
-        $probe = $context->module->getNamedFunction('__compiler_fwrite');
-        if (null !== $probe && $probe->countBasicBlocks() > 0) {
+        if (self::allRuntimeFunctionsLinked($context)) {
             self::registerLinkedRuntime($context);
 
             return;
@@ -59,8 +61,21 @@ final class StreamIoJit
 
         self::implementIfMissing($context, '__compiler_fwrite', self::emitFwrite(...));
         self::implementIfMissing($context, '__compiler_fopen', self::emitFopen(...));
+        self::implementIfMissing($context, '__compiler_popen', self::emitPopen(...));
         self::implementIfMissing($context, '__compiler_tmpfile', self::emitTmpfile(...));
         self::implementIfMissing($context, '__compiler_fread', self::emitFread(...));
+    }
+
+    private static function allRuntimeFunctionsLinked(Context $context): bool
+    {
+        foreach (self::RUNTIME_FUNCTIONS as $name) {
+            $fn = $context->module->getNamedFunction($name);
+            if (null === $fn || 0 === $fn->countBasicBlocks()) {
+                return false;
+            }
+        }
+
+        return true;
     }
 
     /**
@@ -104,6 +119,10 @@ final class StreamIoJit
                 $name,
                 $context->context->functionType($i64, false, $strPtr, $strPtr)
             ),
+            '__compiler_popen' => $context->module->addFunction(
+                $name,
+                $context->context->functionType($i64, false, $strPtr, $strPtr)
+            ),
             '__compiler_tmpfile' => $context->module->addFunction(
                 $name,
                 $context->context->functionType($i64, false)
@@ -134,6 +153,8 @@ final class StreamIoJit
             ['__string__init', $strPtr, [$i64, $i8p]],
             ['fwrite', $sizeT, [$i8p, $sizeT, $sizeT, $i8p]],
             ['fopen', $i8p, [$i8p, $i8p]],
+            ['popen', $i8p, [$i8p, $i8p]],
+            ['pclose', $i32, [$i8p]],
             ['fclose', $i32, [$i8p]],
             ['tmpfile', $i8p, []],
             ['strdup', $i8p, [$i8p]],
@@ -171,6 +192,7 @@ final class StreamIoJit
             self::GLOBAL_WRITE_BUFFER => $i32TableTy,
             self::GLOBAL_READ_BUFFER => $i32TableTy,
             self::GLOBAL_WAS_USED => $wasUsedTy,
+            self::GLOBAL_IS_POPEN => $wasUsedTy,
         ] as $name => $ty) {
             if (null !== $context->module->getNamedGlobal($name)) {
                 continue;
@@ -235,12 +257,22 @@ final class StreamIoJit
 
     private static function storeWasUsed(Context $context, Value $handle): void
     {
+        self::storeI8Flag($context, self::GLOBAL_WAS_USED, $handle);
+    }
+
+    private static function storeIsPopen(Context $context, Value $handle): void
+    {
+        self::storeI8Flag($context, self::GLOBAL_IS_POPEN, $handle);
+    }
+
+    private static function storeI8Flag(Context $context, string $globalName, Value $handle): void
+    {
         $i64 = $context->getTypeFromString('int64');
         $i8 = $context->getTypeFromString('int8');
         $zeroI64 = $i64->constInt(0, false);
-        $global = $context->module->getNamedGlobal(self::GLOBAL_WAS_USED);
+        $global = $context->module->getNamedGlobal($globalName);
         if (null === $global) {
-            throw new \LogicException('StreamIoJit: '.self::GLOBAL_WAS_USED.' missing');
+            throw new \LogicException('StreamIoJit: '.$globalName.' missing');
         }
         $slot = $context->builder->gep($global, $zeroI64, $handle);
         $context->builder->store($i8->constInt(1, false), $context->builder->bitcast($slot, $i8->pointerType(0)));
@@ -320,6 +352,92 @@ final class StreamIoJit
     private static function emitFopen(Context $context, LlvmFunction $fn): void
     {
         self::emitOpenHandle($context, $fn, withPath: true);
+    }
+
+    private static function emitPopen(Context $context, LlvmFunction $fn): void
+    {
+        $prefix = 'popen';
+        $entry = $fn->appendBasicBlock($prefix.'_entry');
+        $context->builder->positionAtEnd($entry);
+
+        $command = $fn->getParam(0);
+        $mode = $fn->getParam(1);
+        $i64 = $context->getTypeFromString('int64');
+        $i32 = $context->getTypeFromString('int32');
+        $i8p = $context->getTypeFromString('int8*');
+        $strPtr = $context->getTypeFromString('__string__*');
+        $minusOne = $i64->constInt(-1, true);
+        $nullStr = $strPtr->constNull();
+        $nullPtr = $i8p->constNull();
+        $defaultChunk = $i32->constInt(self::DEFAULT_CHUNK_SIZE, false);
+        $defaultBuf = $i32->constInt(self::DEFAULT_BUFFER_SIZE, false);
+
+        $failBb = $fn->appendBasicBlock($prefix.'_fail');
+        $openBb = $fn->appendBasicBlock($prefix.'_call');
+
+        $badArgs = $context->builder->or(
+            $context->builder->icmp(Builder::INT_EQ, $command, $nullStr),
+            $context->builder->icmp(Builder::INT_EQ, $mode, $nullStr)
+        );
+        $context->builder->branchIf($badArgs, $failBb, $openBb);
+
+        $context->builder->positionAtEnd($openBb);
+        $fp = $context->builder->call(
+            $context->lookupFunction('popen'),
+            self::stringData($context, $command),
+            self::stringData($context, $mode)
+        );
+
+        $loopInitBb = $fn->appendBasicBlock($prefix.'_loop_init');
+        $fpNull = $context->builder->icmp(Builder::INT_EQ, $fp, $nullPtr);
+        $context->builder->branchIf($fpNull, $failBb, $loopInitBb);
+
+        $loopCheckBb = $fn->appendBasicBlock($prefix.'_loop_check');
+        $loopBodyBb = $fn->appendBasicBlock($prefix.'_loop_body');
+        $loopSkipBb = $fn->appendBasicBlock($prefix.'_loop_skip');
+        $loopIncBb = $fn->appendBasicBlock($prefix.'_loop_inc');
+        $exhaustBb = $fn->appendBasicBlock($prefix.'_exhaust');
+
+        $context->builder->positionAtEnd($loopInitBb);
+        $idPhi = $context->builder->phi($i64, $prefix.'_id');
+        $idPhi->addIncoming($i64->constInt(3, false), $loopInitBb);
+        $context->builder->branch($loopCheckBb);
+
+        $context->builder->positionAtEnd($loopCheckBb);
+        $maxId = $i64->constInt(self::MAX_HANDLES, false);
+        $atEnd = $context->builder->icmp(Builder::INT_SGE, $idPhi, $maxId);
+        $context->builder->branchIf($atEnd, $exhaustBb, $loopBodyBb);
+
+        $context->builder->positionAtEnd($loopBodyBb);
+        $slotFp = self::loadPtrSlot($context, self::GLOBAL_HANDLES, $idPhi);
+        $slotFree = $context->builder->icmp(Builder::INT_EQ, $slotFp, $nullPtr);
+        $allocBb = $fn->appendBasicBlock($prefix.'_alloc');
+        $context->builder->branchIf($slotFree, $allocBb, $loopSkipBb);
+
+        $context->builder->positionAtEnd($allocBb);
+        self::storePtrSlot($context, self::GLOBAL_HANDLES, $idPhi, $fp);
+        self::storeI32Slot($context, self::GLOBAL_CHUNK_SIZE, $idPhi, $defaultChunk);
+        self::storeI32Slot($context, self::GLOBAL_WRITE_BUFFER, $idPhi, $defaultBuf);
+        self::storeI32Slot($context, self::GLOBAL_READ_BUFFER, $idPhi, $defaultBuf);
+        self::storePtrSlot($context, self::GLOBAL_PATHS, $idPhi, $nullPtr);
+        self::storeWasUsed($context, $idPhi);
+        self::storeIsPopen($context, $idPhi);
+        $context->builder->returnValue($idPhi);
+
+        $context->builder->positionAtEnd($loopSkipBb);
+        $context->builder->branch($loopIncBb);
+
+        $context->builder->positionAtEnd($loopIncBb);
+        $nextId = $context->builder->add($idPhi, $i64->constInt(1, false));
+        $idPhi->addIncoming($nextId, $loopIncBb);
+        $context->builder->branch($loopCheckBb);
+
+        $context->builder->positionAtEnd($exhaustBb);
+        $context->builder->call($context->lookupFunction('pclose'), $fp);
+        $context->builder->returnValue($minusOne);
+
+        $context->builder->positionAtEnd($failBb);
+        $context->builder->returnValue($minusOne);
     }
 
     private static function emitTmpfile(Context $context, LlvmFunction $fn): void

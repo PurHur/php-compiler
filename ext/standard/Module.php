@@ -484,6 +484,8 @@ class Module extends ModuleAbstract
             new getenv_(),
             new putenv_(),
             new shell_exec(),
+            new popen(),
+            new pclose(),
             new escapeshellarg(),
             new escapeshellcmd(),
             new phpc_run_command(),
