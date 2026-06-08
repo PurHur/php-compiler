@@ -24,7 +24,10 @@ final class ldexp extends Internal
         if (null === $frame->returnVar) {
             return;
         }
-        $frame->returnVar->float(VmMath::ldexp(VmMath::toFloat($num), VmMath::toInt($exp)));
+        $frame->returnVar->float(VmMath::ldexp(
+            VmMath::parseDoubleBuiltinArg($num, 'ldexp', 1, 'num'),
+            VmMath::parseIntBuiltinArg($exp, 'ldexp', 2, 'exponent')
+        ));
     }
 
     public Context $context;

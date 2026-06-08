@@ -16,7 +16,6 @@ use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitLongArg;
 use PHPCompiler\JIT\Variable as JITVariable;
-use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
 
 /**
@@ -29,11 +28,16 @@ final class tanh extends Internal
         if (1 !== count($frame->calledArgs)) {
             throw new \LogicException('tanh() requires exactly one argument');
         }
-        $v = $frame->calledArgs[0]->resolveIndirect();
+        $num = VmMath::parseDoubleBuiltinArg(
+            $frame->calledArgs[0]->resolveIndirect(),
+            'tanh',
+            1,
+            'num'
+        );
         if (null === $frame->returnVar) {
             return;
         }
-        $frame->returnVar->float(\tanh(self::toFloat($v)));
+        $frame->returnVar->float(\tanh($num));
     }
 
     public Context $context;
@@ -65,14 +69,4 @@ final class tanh extends Internal
         }
     }
 
-    private static function toFloat(Variable $v): float
-    {
-        if (Variable::TYPE_INTEGER === $v->type) {
-            return (float) $v->toInt();
-        }
-        if (Variable::TYPE_FLOAT === $v->type) {
-            return $v->toFloat();
-        }
-        throw new \LogicException('tanh() only supports integers and floats in this compiler build');
-    }
 }

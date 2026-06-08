@@ -22,7 +22,7 @@ final class expm1 extends Internal
         if (null === $frame->returnVar) {
             return;
         }
-        $frame->returnVar->float(\expm1(VmMath::toFloat($v)));
+        $frame->returnVar->float(\expm1(VmMath::parseDoubleBuiltinArg($v, 'expm1', 1, 'num')));
     }
 
     public Context $context;

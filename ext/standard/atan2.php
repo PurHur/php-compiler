@@ -16,7 +16,6 @@ use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitLongArg;
 use PHPCompiler\JIT\Variable as JITVariable;
-use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
 
 /**
@@ -26,15 +25,25 @@ final class atan2 extends Internal
 {
     public function execute(Frame $frame): void
     {
-        if (2 !== \count($frame->calledArgs)) {
+        if (2 !== count($frame->calledArgs)) {
             throw new \LogicException('atan2() requires exactly two arguments');
         }
-        $y = $frame->calledArgs[0]->resolveIndirect();
-        $x = $frame->calledArgs[1]->resolveIndirect();
+        $y = VmMath::parseDoubleBuiltinArg(
+            $frame->calledArgs[0]->resolveIndirect(),
+            'atan2',
+            1,
+            'y'
+        );
+        $x = VmMath::parseDoubleBuiltinArg(
+            $frame->calledArgs[1]->resolveIndirect(),
+            'atan2',
+            2,
+            'x'
+        );
         if (null === $frame->returnVar) {
             return;
         }
-        $frame->returnVar->float(\atan2(self::toFloat($y), self::toFloat($x)));
+        $frame->returnVar->float(\atan2($y, $x));
     }
 
     public Context $context;
@@ -46,35 +55,12 @@ final class atan2 extends Internal
             throw new \LogicException('atan2() requires exactly two arguments');
         }
         $double = $context->getTypeFromString('double');
-        $y = self::toJitDouble($context, $args[0], $double);
-        $x = self::toJitDouble($context, $args[1], $double);
+        $y = pow::toJitDouble($context, $args[0], $double);
+        $x = pow::toJitDouble($context, $args[1], $double);
         $fn = $context->lookupFunction('atan2');
 
         return $context->builder->call($fn, $y, $x);
     }
 
-    private static function toJitDouble(Context $context, JITVariable $arg, $double): Value
-    {
-        switch ($arg->type) {
-            case JITVariable::TYPE_NATIVE_LONG:
-                $v = JitLongArg::lower($context, $arg, 'atan2() argument');
 
-                return $context->builder->siToFp($v, $double);
-            case JITVariable::TYPE_NATIVE_DOUBLE:
-                return $context->helper->loadValue($arg);
-            default:
-                throw new \LogicException('atan2() only supports integers and floats in this compiler build');
-        }
-    }
-
-    private static function toFloat(Variable $v): float
-    {
-        if (Variable::TYPE_INTEGER === $v->type) {
-            return (float) $v->toInt();
-        }
-        if (Variable::TYPE_FLOAT === $v->type) {
-            return $v->toFloat();
-        }
-        throw new \LogicException('atan2() only supports integers and floats in this compiler build');
-    }
 }

@@ -20,7 +20,7 @@ final class modf extends Internal
         if (2 !== \count($frame->calledArgs)) {
             throw new \LogicException('modf() requires exactly two arguments');
         }
-        $num = VmMath::toFloat($frame->calledArgs[0]->resolveIndirect());
+        $num = VmMath::parseDoubleBuiltinArg($frame->calledArgs[0]->resolveIndirect(), 'modf', 1, 'num');
         $intPart = 0.0;
         $frac = VmMath::modf($num, $intPart);
         $frame->calledArgs[1]->resolveIndirect()->float($intPart);
