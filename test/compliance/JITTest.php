@@ -235,6 +235,10 @@ class JITTest extends BaseTest {
             if (str_contains($name, 'extension_loaded_in_tree')) {
                 continue;
             }
+            // BcMath\Number OOP methods are VM-only until JIT class method lowering (#7220, #6100).
+            if (str_contains($name, 'bcmath_number')) {
+                continue;
+            }
             // ReflectionProperty/Function/Constant builtins are VM-only (#3354).
             if (str_contains($name, 'reflection_oop')) {
                 continue;
