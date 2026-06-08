@@ -303,8 +303,8 @@ final class StringMultipartJit
 
         $context->builder->positionAtEnd($useEnv);
         $envVal = $context->builder->phi($i8p, 'env_ct');
-        $context->builder->addIncoming($raw, $entry);
-        $context->builder->addIncoming($raw2, $tryHttp);
+        $envVal->addIncoming($raw, $entry);
+        $envVal->addIncoming($raw2, $tryHttp);
         $context->builder->store($envVal, $contentTypeSlot);
         $context->builder->branch($afterEnv);
 
