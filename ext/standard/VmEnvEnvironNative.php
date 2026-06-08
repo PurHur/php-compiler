@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace PHPCompiler\ext\standard;
 
 /**
- * Process environment enumeration without host PHP \getenv() loops (#5075, #5079).
+ * Process environment enumeration without host PHP \getenv() loops (#5075, #5079, #5345).
  *
  * php-src: ext/standard/basic_functions.c — zif_getenv argc==0 via environ walk.
  */
