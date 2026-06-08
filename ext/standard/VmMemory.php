@@ -4,7 +4,9 @@ declare(strict_types=1);
 
 namespace PHPCompiler\ext\standard;
 
+use PHPCompiler\VM\EnumCaseSupport;
 use PHPCompiler\VM\MemoryAccounting;
+use PHPCompiler\VM\Variable;
 
 /**
  * VM memory introspection without host Zend memory_get_* (issue #4862, #3134).
@@ -15,6 +17,65 @@ use PHPCompiler\VM\MemoryAccounting;
 final class VmMemory
 {
     private static int $peakReal = 0;
+
+    public static function resolveUsageArg(Variable $var, string $fn): bool
+    {
+        $var = $var->resolveIndirect();
+        $fromEnum = self::tryMemoryUsageBool($var);
+        if (null !== $fromEnum) {
+            return $fromEnum;
+        }
+        if (EnumCaseSupport::isEnumCaseVariable($var)) {
+            throw new \TypeError(sprintf(
+                '%s(): Argument #1 ($usage) must be of type MemoryUsage|bool, %s given',
+                $fn,
+                EnumCaseSupport::typeNameForVariable($var)
+            ));
+        }
+        if (Variable::TYPE_BOOLEAN === $var->type) {
+            return $var->toBool();
+        }
+        if (Variable::TYPE_INTEGER === $var->type) {
+            return 0 !== $var->toInt();
+        }
+
+        throw new \TypeError(sprintf(
+            '%s(): Argument #1 ($usage) must be of type MemoryUsage|bool, %s given',
+            $fn,
+            EnumCaseSupport::typeNameForVariable($var)
+        ));
+    }
+
+    public static function tryMemoryUsageBool(Variable $var): ?bool
+    {
+        if (!EnumCaseSupport::isEnumCaseVariable($var)) {
+            return null;
+        }
+        $enumClass = EnumCaseSupport::enumClassForCaseVariable($var);
+        if (null === $enumClass || !self::isMemoryUsageEnum($enumClass->name)) {
+            return null;
+        }
+        $entry = EnumCaseSupport::enumCaseEntryForVariable($var);
+        if (null === $entry || null === $entry->backingValue) {
+            throw new \LogicException('MemoryUsage case missing backing value');
+        }
+
+        return self::memoryUsageBoolFromBacking($entry->backingValue->resolveIndirect()->toInt());
+    }
+
+    public static function memoryUsageBoolFromBacking(int $backing): bool
+    {
+        return match ($backing) {
+            0 => false,
+            1 => true,
+            default => throw new \ValueError('Invalid MemoryUsage enum value '.$backing),
+        };
+    }
+
+    private static function isMemoryUsageEnum(string $className): bool
+    {
+        return 0 === strcasecmp(ltrim($className, '\\'), 'MemoryUsage');
+    }
 
     public static function getUsage(bool $realUsage = false): int
     {

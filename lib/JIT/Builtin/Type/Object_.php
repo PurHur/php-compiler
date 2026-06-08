@@ -4644,6 +4644,11 @@ class Object_ extends Type {
         return $this->classes['exitstatus'] ?? null;
     }
 
+    public function memoryUsageEnumClassId(): ?int
+    {
+        return $this->classes['memoryusage'] ?? null;
+    }
+
     public function emitExitStatusFromEnumCaseObject(Context $context, PHPLLVM\Value $objPtr): void
     {
         $exitStatusId = $this->exitStatusEnumClassId();
