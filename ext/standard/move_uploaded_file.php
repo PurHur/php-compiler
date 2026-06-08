@@ -7,8 +7,8 @@ namespace PHPCompiler\ext\standard;
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\Variable as JITVariable;
-use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
 
 /** move_uploaded_file() — VM via VmFs; JIT/AOT via UploadTempJit (issue #5346). */
@@ -24,15 +24,12 @@ final class move_uploaded_file extends Internal
         if (2 !== \count($frame->calledArgs)) {
             throw new \LogicException('move_uploaded_file() requires exactly two arguments in this compiler build');
         }
-        $fromVar = $frame->calledArgs[0]->resolveIndirect();
-        $toVar = $frame->calledArgs[1]->resolveIndirect();
         if (null === $frame->returnVar) {
             return;
         }
-        if (Variable::TYPE_STRING !== $fromVar->type || Variable::TYPE_STRING !== $toVar->type) {
-            throw new \LogicException('move_uploaded_file() requires string paths in this compiler build');
-        }
-        $frame->returnVar->bool(VmFs::moveUploadedFile($fromVar->toString(), $toVar->toString()));
+        $from = VmString::coerceStringBuiltinArg($frame->calledArgs[0], 'move_uploaded_file', 0, 'from');
+        $to = VmString::coerceStringBuiltinArg($frame->calledArgs[1], 'move_uploaded_file', 1, 'to');
+        $frame->returnVar->bool(VmFs::moveUploadedFile($from, $to));
     }
 
     public function call(Context $context, JITVariable ...$args): Value
@@ -40,8 +37,8 @@ final class move_uploaded_file extends Internal
         if (2 !== \count($args)) {
             throw new \LogicException('move_uploaded_file() requires exactly two arguments in this compiler build');
         }
-        $a = $this->jitString($context, $args[0], 'move_uploaded_file() argument #1');
-        $b = $this->jitString($context, $args[1], 'move_uploaded_file() argument #2');
+        $a = JitStringBuiltinArg::lower($context, $args[0], 'move_uploaded_file', 0, 'from');
+        $b = JitStringBuiltinArg::lower($context, $args[1], 'move_uploaded_file', 1, 'to');
 
         return JitMoveUploadedFile::invoke($context, $a, $b);
     }
