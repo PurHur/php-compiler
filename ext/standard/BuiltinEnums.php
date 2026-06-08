@@ -23,6 +23,7 @@ final class BuiltinEnums
         self::registerStringTrimMode($ctx);
         self::registerPadType($ctx);
         self::registerMemoryUsage($ctx);
+        self::registerResponseCode($ctx);
         foreach (array_diff(array_keys($ctx->classes), $before) as $lc) {
             $ctx->classes[$lc]->isInternal = true;
         }
@@ -156,6 +157,33 @@ final class BuiltinEnums
         EnumSupport::ensureBuiltinEnumInterfaces($entry);
 
         $lc = 'memoryusage';
+        $ctx->classes[$lc] = $entry;
+        $ctx->enums[$lc] = true;
+    }
+
+    /**
+     * PHP 8.4 ResponseCode: int-backed enum for http_response_code() (#7322).
+     *
+     * php-src: ext/standard/basic_functions.stub.php — enum ResponseCode: int
+     */
+    private static function registerResponseCode(Context $ctx): void
+    {
+        if (isset($ctx->classes['responsecode'])) {
+            return;
+        }
+
+        $entry = new ClassEntry('ResponseCode');
+        $entry->isEnum = true;
+        $entry->backedType = 'int';
+
+        foreach (HttpStatusEnumData::cases() as $name => $value) {
+            self::registerBackedEnumCase($entry, $name, $value);
+        }
+
+        EnumSupport::ensureBuiltinCasesMethod($entry);
+        EnumSupport::ensureBuiltinEnumInterfaces($entry);
+
+        $lc = 'responsecode';
         $ctx->classes[$lc] = $entry;
         $ctx->enums[$lc] = true;
     }

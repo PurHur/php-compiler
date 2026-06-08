@@ -13,6 +13,7 @@ namespace PHPCompiler\JIT\Builtin;
 use PHPCompiler\JIT\Builtin;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\Variable;
+use PHPCompiler\VM\Variable as VmVariable;
 use PHPLLVM\Builder;
 
 final class HttpResponseCode
@@ -105,14 +106,28 @@ final class HttpResponseCode
             $typeByte,
             $i8->constInt(Variable::TYPE_NULL, false)
         );
-        $bbMaybeLong = $fn->appendBasicBlock('hr_box_maybe_long');
+        $bbMaybeEnum = $fn->appendBasicBlock('hr_box_maybe_enum');
         $bbBoxGet = $fn->appendBasicBlock('hr_box_get');
         $bbBoxSet = $fn->appendBasicBlock('hr_box_set');
+        $bbBoxEnum = $fn->appendBasicBlock('hr_box_enum');
         $bbBoxBadType = $fn->appendBasicBlock('hr_box_bad_type');
-        $context->builder->branchIf($isNull, $bbBoxGet, $bbMaybeLong);
+        $context->builder->branchIf($isNull, $bbBoxGet, $bbMaybeEnum);
 
         $context->builder->positionAtEnd($bbBoxGet);
         self::emitWriteCurrentAsLong($context, $outPtr);
+        $context->builder->returnVoid();
+
+        $context->builder->positionAtEnd($bbMaybeEnum);
+        $isEnumCase = $context->builder->icmp(
+            Builder::INT_EQ,
+            $typeByte,
+            $i8->constInt(VmVariable::TYPE_ENUM_CASE, false)
+        );
+        $bbMaybeLong = $fn->appendBasicBlock('hr_box_maybe_long');
+        $context->builder->branchIf($isEnumCase, $bbBoxEnum, $bbMaybeLong);
+
+        $context->builder->positionAtEnd($bbBoxEnum);
+        self::emitSetFromResponseCodeEnumCase($context, $boxedPtr, $outPtr);
         $context->builder->returnVoid();
 
         $context->builder->positionAtEnd($bbMaybeLong);
@@ -273,6 +288,48 @@ final class HttpResponseCode
         $context->builder->branch($sMerge);
 
         $context->builder->positionAtEnd($sMerge);
+    }
+
+    private static function emitSetFromResponseCodeEnumCase(
+        Context $context,
+        \PHPLLVM\Value $boxedPtr,
+        \PHPLLVM\Value $outPtr
+    ): void {
+        $responseCodeId = $context->type->object->responseCodeEnumClassId();
+        $fn = $context->builder->getInsertBlock()->getParent();
+        assert($fn instanceof \PHPLLVM\Value\Function_);
+        if (null === $responseCodeId) {
+            self::emitWriteBoolFalse($context, $outPtr);
+
+            return;
+        }
+        $enumMap = $context->structFieldMap['__enum_case__'] ?? null;
+        if (null === $enumMap || !isset($enumMap['class_id'])) {
+            self::emitWriteBoolFalse($context, $outPtr);
+
+            return;
+        }
+        $classId = $context->builder->load(
+            $context->builder->structGep($boxedPtr, $enumMap['class_id'])
+        );
+        $i32 = $context->getTypeFromString('int32');
+        $isResponseCode = $context->builder->icmp(
+            Builder::INT_EQ,
+            $classId,
+            $i32->constInt($responseCodeId, false)
+        );
+        $okBlock = $fn->appendBasicBlock('hr_box_rc_ok');
+        $badBlock = $fn->appendBasicBlock('hr_box_rc_bad');
+        $context->builder->branchIf($isResponseCode, $okBlock, $badBlock);
+        $context->builder->positionAtEnd($badBlock);
+        self::emitWriteBoolFalse($context, $outPtr);
+        $context->builder->returnVoid();
+        $context->builder->positionAtEnd($okBlock);
+        $boxedLong = $context->builder->call(
+            $context->lookupFunction('__value__readLong'),
+            $boxedPtr
+        );
+        self::emitSetFromCode64($context, $boxedLong, $outPtr);
     }
 
     /** Match {@see JIT\JitValueBox::writeBool(..., false)} for outPtr. */
