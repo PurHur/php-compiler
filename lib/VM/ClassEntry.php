@@ -126,6 +126,10 @@ class ClassEntry {
     public array $constDeclaredTypes = [];
     /** @var array<string, true>|null sibling const names declared but not yet evaluated (#7382). */
     public ?array $forwardDeclaredConstNames = null;
+    /** Class docblock + declaration site (#7358). */
+    public ?\PHPCompiler\Compiler\SourceLocation $sourceLocation = null;
+    /** @var array<string, \PHPCompiler\Compiler\SourceLocation> method lc => source metadata (#7358) */
+    public array $methodSourceLocations = [];
 
     public function __construct(string $name) {
         $this->name = $name;

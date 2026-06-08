@@ -291,6 +291,8 @@ class OpCode {
 
     /** TYPE_INCLUDE: include/require + once/non-once semantics (issue #4426). */
     public int $includeKind = self::INCLUDE_KIND_INCLUDE_ONCE;
+    /** Docblock + source file/line for reflection (#7358). */
+    public ?\PHPCompiler\Compiler\SourceLocation $sourceLocation = null;
 
     public function __construct(int $type, ?int $arg1 = null, ?int $arg2 = null, ?int $arg3 = null) {
         $this->type = $type;

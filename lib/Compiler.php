@@ -61,6 +61,7 @@ use PHPCompiler\Compiler\ParameterMetadata;
 use PHPCompiler\Compiler\GeneratorNeverReturnCompileCheck;
 use PHPCompiler\Compiler\GeneratorStaticMethodCompileCheck;
 use PHPCompiler\Compiler\ReadonlyClassCompileCheck;
+use PHPCompiler\Compiler\SourceLocation;
 use PHPCompiler\Compiler\TraitCollisionCheck;
 use PHPCompiler\Compiler\TypedClassConstInheritCheck;
 use PHPCompiler\Compiler\ClassCompileRegistry;
@@ -2868,6 +2869,7 @@ class Compiler {
             $declare->block1 = $methodBlock;
         }
         $this->assignAttributeMetadata($declare, $child);
+        $this->assignSourceMetadata($declare, $child);
         AttributeNames::assertAllowDynamicPropertiesClassTargetOnly($declare->attributeNames, 'method');
         AttributeNames::assertCompileTimeConstTargetOnly($declare->attributeNames, 'method');
         $declare->parameterMetadata = $this->parameterMetadataFromParams($child->func->params);
@@ -2901,6 +2903,11 @@ class Compiler {
         $entries = AttributeMetadata::fromOp($cfgOp);
         $op->attributeEntries = AttributeNames::validateDuplicates($entries, $this->attributeClassRegistry);
         $op->attributeNames = AttributeEntry::namesFromList($op->attributeEntries);
+    }
+
+    protected function assignSourceMetadata(OpCode $op, Op $cfgOp): void
+    {
+        $op->sourceLocation = SourceLocation::fromOp($cfgOp);
     }
 
     /**
@@ -2965,6 +2972,7 @@ class Compiler {
             VM\StringableSupport::assertConcreteClassImplements($class, $className);
         }
         $this->assignAttributeMetadata($return, $class);
+        $this->assignSourceMetadata($return, $class);
         $return->deprecatedMetadata = DeprecatedMetadata::fromOp($class);
         AttributeNames::assertOverrideMethodTargetOnly($return->attributeNames, 'class');
         AttributeNames::assertCompileTimeConstTargetOnly($return->attributeNames, 'class');
@@ -5318,6 +5326,7 @@ class Compiler {
         $return->block1 = $funcBlock;
         $return->deprecatedMetadata = DeprecatedMetadata::fromOp($function);
         $this->assignAttributeMetadata($return, $function);
+        $this->assignSourceMetadata($return, $function);
         AttributeNames::assertCompileTimeConstTargetOnly($return->attributeNames, 'function');
         return $return;
     }

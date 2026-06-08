@@ -51,9 +51,15 @@ use PHPCompiler\VM\Builtin\ReflectionClassGetMethods;
 use PHPCompiler\VM\Builtin\ReflectionClassGetProperty;
 use PHPCompiler\VM\Builtin\ReflectionClassGetProperties;
 use PHPCompiler\VM\Builtin\ReflectionClassGetReflectionConstant;
+use PHPCompiler\VM\Builtin\ReflectionClassGetDocComment;
+use PHPCompiler\VM\Builtin\ReflectionClassGetEndLine;
+use PHPCompiler\VM\Builtin\ReflectionClassGetExtensionName;
+use PHPCompiler\VM\Builtin\ReflectionClassGetFileName;
+use PHPCompiler\VM\Builtin\ReflectionClassGetStartLine;
 use PHPCompiler\VM\Builtin\ReflectionClassIsDeprecated;
 use PHPCompiler\VM\Builtin\ReflectionClassIsInternal;
 use PHPCompiler\VM\Builtin\ReflectionClassIsStatic;
+use PHPCompiler\VM\Builtin\ReflectionClassIsUserDefined;
 use PHPCompiler\VM\Builtin\ReflectionClassIsUninitializedLazyObject;
 use PHPCompiler\VM\Builtin\ReflectionClassMarkLazyObjectAsInitialized;
 use PHPCompiler\VM\Builtin\ReflectionClassNewLazyGhost;
@@ -86,7 +92,13 @@ use PHPCompiler\VM\Builtin\ReflectionMethodGetPrototype;
 use PHPCompiler\VM\Builtin\ReflectionMethodHasPrototype;
 use PHPCompiler\VM\Builtin\ReflectionMethodInvoke;
 use PHPCompiler\VM\Builtin\ReflectionMethodInvokeArgs;
+use PHPCompiler\VM\Builtin\ReflectionMethodGetDocComment;
+use PHPCompiler\VM\Builtin\ReflectionMethodGetEndLine;
+use PHPCompiler\VM\Builtin\ReflectionMethodGetExtensionName;
+use PHPCompiler\VM\Builtin\ReflectionMethodGetFileName;
+use PHPCompiler\VM\Builtin\ReflectionMethodGetStartLine;
 use PHPCompiler\VM\Builtin\ReflectionMethodIsDeprecated;
+use PHPCompiler\VM\Builtin\ReflectionMethodIsUserDefined;
 use PHPCompiler\VM\Builtin\ReflectionNamedTypeGetName;
 use PHPCompiler\VM\Builtin\ReflectionNamedTypeIsBuiltin;
 use PHPCompiler\VM\Builtin\ReflectionParameterGetAttributes;
@@ -298,6 +310,19 @@ final class BuiltinClasses
         $rm->methodVisibility['invoke'] = $pub;
         $rm->methods['invokeargs'] = new ReflectionMethodInvokeArgs();
         $rm->methodVisibility['invokeargs'] = $pub;
+        foreach (
+            [
+                'getdoccomment' => new ReflectionMethodGetDocComment(),
+                'getstartline' => new ReflectionMethodGetStartLine(),
+                'getendline' => new ReflectionMethodGetEndLine(),
+                'getfilename' => new ReflectionMethodGetFileName(),
+                'isuserdefined' => new ReflectionMethodIsUserDefined(),
+                'getextensionname' => new ReflectionMethodGetExtensionName(),
+            ] as $name => $method
+        ) {
+            $rm->methods[$name] = $method;
+            $rm->methodVisibility[$name] = $pub;
+        }
         $ctx->classes[ReflectionSupport::REFLECTION_METHOD] = $rm;
 
         $rc = new ClassEntry('ReflectionClass');
@@ -342,6 +367,19 @@ final class BuiltinClasses
         $rc->methodVisibility['isstatic'] = $pub;
         $rc->methods['isdeprecated'] = new ReflectionClassIsDeprecated();
         $rc->methodVisibility['isdeprecated'] = $pub;
+        foreach (
+            [
+                'getdoccomment' => new ReflectionClassGetDocComment(),
+                'getstartline' => new ReflectionClassGetStartLine(),
+                'getendline' => new ReflectionClassGetEndLine(),
+                'getfilename' => new ReflectionClassGetFileName(),
+                'isuserdefined' => new ReflectionClassIsUserDefined(),
+                'getextensionname' => new ReflectionClassGetExtensionName(),
+            ] as $name => $method
+        ) {
+            $rc->methods[$name] = $method;
+            $rc->methodVisibility[$name] = $pub;
+        }
 
         $rp = new ClassEntry('ReflectionProperty');
         $rp->properties[] = new ClassProperty(ReflectionSupport::PROP_CLASS_NAME, null, $strProto);
