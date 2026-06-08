@@ -34,13 +34,8 @@ final class SuperglobalsStripTagsRuntimeStandaloneTest extends TestCase
         }
     }
 
-    public function testSuperglobalsRefreshCDoesNotDefineStripTagsRuntime(): void
+    public function testSuperglobalsRefreshCFileRemoved(): void
     {
-        $source = (string) file_get_contents(__DIR__.'/../../../lib/AOT/runtime/superglobals_refresh.c');
-        $this->assertStringNotContainsString('st_parse_allowed', $source);
-        $this->assertStringNotContainsString('st_extract_tag_name', $source);
-        $this->assertStringNotContainsString('st_find_substr', $source);
-        $this->assertStringNotContainsString('__string__ *__compiler_strip_tags', $source);
-        $this->assertStringContainsString('__compiler_strip_tags', $source);
+        $this->assertFileDoesNotExist(__DIR__.'/../../../lib/AOT/runtime/superglobals_refresh.c');
     }
 }

@@ -17,8 +17,7 @@ final class StringUtf8StrlenStandaloneTest extends TestCase
 {
     public function testRuntimeShrinkRemovesUtf8StrlenFromSuperglobalsC(): void
     {
-        $superglobals = (string) file_get_contents(__DIR__.'/../../../lib/AOT/runtime/superglobals_refresh.c');
-        $this->assertStringNotContainsString('__compiler_utf8_strlen', $superglobals);
+        $this->assertFileDoesNotExist(__DIR__.'/../../../lib/AOT/runtime/superglobals_refresh.c');
         $this->assertFileExists(__DIR__.'/../../../lib/JIT/Builtin/StringUtf8StrlenJit.php');
     }
 

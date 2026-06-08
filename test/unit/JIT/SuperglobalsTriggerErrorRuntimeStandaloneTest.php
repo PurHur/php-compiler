@@ -35,13 +35,8 @@ final class SuperglobalsTriggerErrorRuntimeStandaloneTest extends TestCase
         }
     }
 
-    public function testSuperglobalsRefreshCDoesNotDefineTriggerErrorRuntime(): void
+    public function testSuperglobalsRefreshCFileRemoved(): void
     {
-        $source = (string) file_get_contents(__DIR__.'/../../../lib/AOT/runtime/superglobals_refresh.c');
-        $this->assertStringNotContainsString('phpc_stderr_print_cli_error', $source);
-        $this->assertStringNotContainsString('__compiler_undefined_array_key_warning_cstr', $source);
-        $this->assertStringNotContainsString('__compiler_undefined_array_key_warning_long', $source);
-        $this->assertStringNotContainsString('void __compiler_trigger_error', $source);
-        $this->assertStringContainsString('__compiler_trigger_error', $source);
+        $this->assertFileDoesNotExist(__DIR__.'/../../../lib/AOT/runtime/superglobals_refresh.c');
     }
 }

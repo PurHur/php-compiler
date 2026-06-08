@@ -653,6 +653,7 @@ class Context {
             Builtin\StringTriggerError::ensureStandaloneBodies($this);
             Builtin\StringFormat::ensureStandaloneBodies($this);
             Builtin\GcCollectCyclesRuntime::ensureStandaloneBodies($this);
+            Builtin\SuperglobalRefreshRuntime::ensureStandaloneBodies($this);
         }
 
         $this->functionProxies['is_null'] = new Builtin\IsNullFn();
