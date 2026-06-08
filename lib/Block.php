@@ -1728,7 +1728,10 @@ class Block {
             }
             $seen->attach($block);
             foreach ($block->opCodes as $op) {
-                if (OpCode::TYPE_DECLARE_PROPERTY === $op->type) {
+                if (
+                    OpCode::TYPE_DECLARE_PROPERTY === $op->type
+                    && !$op->propertyFromConstructorPromotion
+                ) {
                     return true;
                 }
                 foreach ([$op->block1, $op->block2, $op->block3] as $sub) {
@@ -2267,7 +2270,6 @@ class Block {
             || self::containsFinallyOpcodesInScriptScope($root)
             || self::containsTypedNonVoidReturnOpcodes($root)
             || self::containsReadonlyPropertyOpcodes($root)
-            || self::containsReadonlyClassOpcodes($root)
             || self::containsUserClassDeclaredInstancePropertyOpcodes($root)
             || self::containsDynamicPropertyDeprecationOpcodes($root)
             || self::containsFiberSuspendOpcodesInScriptScope($root)

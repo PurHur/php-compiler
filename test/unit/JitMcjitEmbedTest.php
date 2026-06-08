@@ -62,4 +62,31 @@ PHP;
         $this->assertStringContainsString('__phpc_mcjit_embed_bootstrap', $out);
         $this->assertStringContainsString('enum U', $out);
     }
+
+    public function testPadsConstructorPromotedOnlyUserClassForMcjit(): void
+    {
+        $in = <<<'PHP'
+<?php
+class R {
+    public function __construct(public int $x) {}
+}
+$r = new R(1);
+PHP;
+        $out = JitMcjitEmbed::prepareClassless($in);
+        $this->assertStringContainsString('__phpcMcjitClassPad', $out);
+    }
+
+    public function testPrependsBootstrapForReadonlyPromotedOnlyClass(): void
+    {
+        $in = <<<'PHP'
+<?php
+readonly class R {
+    public function __construct(public int $x) {}
+}
+$r = new R(1);
+PHP;
+        $out = JitMcjitEmbed::prepareClassless($in);
+        $this->assertStringContainsString('__phpc_mcjit_embed_bootstrap', $out);
+        $this->assertStringNotContainsString('__phpcMcjitClassPad', $out);
+    }
 }

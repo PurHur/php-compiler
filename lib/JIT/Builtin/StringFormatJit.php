@@ -1329,11 +1329,6 @@ final class StringFormatJit
             $context->builder->trunc($decimals, $i32)
         );
         $scaledIn = $context->builder->call($context->lookupFunction('__phpc_fmt_round_scaled'), $num, $scale);
-        $neg = $context->builder->icmp(Builder::INT_SLT, $scaledIn, $zeroI64);
-        $negBb = $fn->appendBasicBlock('nf_neg');
-        $afterNeg = $fn->appendBasicBlock('nf_after_neg');
-        $context->builder->branchIf($neg, $negBb, $afterNeg);
-
         $bufSlot = $context->builder->alloca($i8->arrayType(128), 1, 'nf_buf');
         $buf = $context->builder->pointerCast($bufSlot, $i8p);
         $intBufSlot = $context->builder->alloca($i8->arrayType(64), 1, 'nf_int_buf');
@@ -1343,6 +1338,11 @@ final class StringFormatJit
         $posSlot = BasicBlockHelper::entryAlloca($context, $sizeT);
         $scaledSlot = BasicBlockHelper::entryAlloca($context, $i64);
         $context->builder->store($sizeT->constInt(0, false), $posSlot);
+
+        $neg = $context->builder->icmp(Builder::INT_SLT, $scaledIn, $zeroI64);
+        $negBb = $fn->appendBasicBlock('nf_neg');
+        $afterNeg = $fn->appendBasicBlock('nf_after_neg');
+        $context->builder->branchIf($neg, $negBb, $afterNeg);
 
         $appendChar = $context->lookupFunction('__phpc_fmt_append_char');
         $appendStr = $context->lookupFunction('__phpc_fmt_append_str');

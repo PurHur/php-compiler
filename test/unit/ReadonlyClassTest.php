@@ -107,7 +107,7 @@ PHP;
         $this->assertSame("caught Error\n", ob_get_clean());
     }
 
-    public function testReadonlyClassDeclRequiresVmLoweringForBinJit(): void
+    public function testReadonlyClassDeclDoesNotRequireVmLoweringForBinJit(): void
     {
         $runtime = new Runtime();
         $block = $runtime->parseAndCompile(
@@ -123,7 +123,7 @@ PHP,
         );
         $this->assertNotNull($block);
         $this->assertTrue(Block::containsReadonlyClassOpcodes($block));
-        $this->assertTrue(Block::requiresVmLowering($block));
+        $this->assertFalse(Block::requiresVmLowering($block));
     }
 
     public function testReadonlyClassFlagFromPhpCfg(): void

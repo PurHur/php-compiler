@@ -4092,6 +4092,7 @@ class Compiler {
             $typeSlot
         );
         $declare->propertyReadonly = $this->isPromotedParamReadonly($param);
+        $declare->propertyFromConstructorPromotion = true;
         $declare->propertyVisibility = MethodVisibility::mask($param->promotionFlags);
         $declare->propertySetVisibility = $this->asymmetricSetVisibilityFromCfgOp($param);
         $declare->propertyGetVisibility = $this->asymmetricGetVisibilityFromCfgOp($param);
