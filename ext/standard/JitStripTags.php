@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace PHPCompiler\ext\standard;
 
+use PHPCompiler\JIT\Builtin\StringStripTags;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitStringArg;
 use PHPCompiler\JIT\Variable as JITVariable;
@@ -36,6 +37,7 @@ final class JitStripTags
 
         $inPtr = JitStringArg::lower($context, $input, 'strip_tags() string');
         $allowPtr = self::jitAllowedArg($context, $allowed);
+        StringStripTags::ensureLinked($context);
 
         return $context->builder->call(
             $context->lookupFunction('__compiler_strip_tags'),
