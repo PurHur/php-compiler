@@ -8,7 +8,6 @@ use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\Variable as JITVariable;
-use PHPCompiler\VM\EnumCaseSupport;
 use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
 
@@ -41,24 +40,12 @@ final class random_bytes extends Internal
     }
 
     /**
-     * Z_PARAM_LONG length — reject enum cases before int-only check (#6160, ext/standard/random.c).
+     * Z_PARAM_LONG length (ext/standard/random.c; #4626 numeric-string, #6160 enum TypeError).
      *
-     * @throws \TypeError when an enum case operand is passed (php-src-strict)
+     * @throws \TypeError when the operand cannot be converted like Zend PHP 8.x
      */
     private static function parseLength(Variable $var): int
     {
-        if (EnumCaseSupport::isEnumCaseVariable($var)) {
-            $enumClass = EnumCaseSupport::enumClassForCaseVariable($var);
-            $given = null !== $enumClass ? $enumClass->name : 'object';
-            throw new \TypeError(sprintf(
-                'random_bytes(): Argument #1 ($length) must be of type int, %s given',
-                $given
-            ));
-        }
-        if (Variable::TYPE_INTEGER !== $var->type) {
-            throw new \LogicException('random_bytes() only supports integers in this compiler build');
-        }
-
-        return $var->toInt();
+        return VmMath::parseIntBuiltinArg($var, 'random_bytes', 1, 'length');
     }
 }
