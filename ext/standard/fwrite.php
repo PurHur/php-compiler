@@ -8,8 +8,8 @@ use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitLongArg;
+use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\Variable as JITVariable;
-use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
 
 /** fwrite() / fputs() — VM via VmFs; JIT/AOT via __compiler_fwrite (issue #1070, #6162). */
@@ -28,23 +28,21 @@ final class fwrite extends Internal
             throw new \LogicException($fn.'() requires two or three arguments in this compiler build');
         }
         $handleVar = $frame->calledArgs[0]->resolveIndirect();
-        $dataVar = $frame->calledArgs[1]->resolveIndirect();
         $handle = VmStreamArg::requireStreamHandle($handleVar, $fn);
         if (null === $frame->returnVar) {
             return;
         }
-        if (Variable::TYPE_STRING !== $dataVar->type) {
-            throw new \LogicException($fn.'() data must be a string in this compiler build');
-        }
+        $data = VmString::coerceStringBuiltinArg($frame->calledArgs[1], $fn, 1, 'data');
         $length = null;
         if (3 === $argc) {
-            $lenVar = $frame->calledArgs[2]->resolveIndirect();
-            if (Variable::TYPE_INTEGER !== $lenVar->type) {
-                throw new \LogicException($fn.'() length must be an integer in this compiler build');
-            }
-            $length = $lenVar->toInt();
+            $length = VmMath::parseIntBuiltinArg(
+                $frame->calledArgs[2]->resolveIndirect(),
+                $fn,
+                3,
+                'length'
+            );
         }
-        $written = VmFs::fwrite($handle, $dataVar->toString(), $length);
+        $written = VmFs::fwrite($handle, $data, $length);
         if (false === $written) {
             $frame->returnVar->bool(false);
 
@@ -65,12 +63,9 @@ final class fwrite extends Internal
             JitLongArg::lower($context, $args[0], $fn.'() handle'),
             $i64
         );
-        $dataStr = $this->jitString($context, $args[1], $fn.'() data');
+        $dataStr = JitStringBuiltinArg::lower($context, $args[1], $fn, 1, 'data');
         if (3 === $argc) {
-            $length = $context->builder->truncOrBitCast(
-                JitLongArg::lower($context, $args[2], $fn.'() length'),
-                $i64
-            );
+            $length = JitIntdiv::lowerIntBuiltinArg($context, $args[2], $fn, 3, 'length');
         } else {
             $length = $i64->constInt(-1, true);
         }

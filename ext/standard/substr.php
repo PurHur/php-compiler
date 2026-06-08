@@ -36,24 +36,20 @@ final class substr extends Internal
         if (null === $frame->returnVar) {
             return;
         }
-        if (Variable::TYPE_INTEGER !== $offset->type) {
-            throw new \LogicException('substr() offset must be an integer in this compiler build');
-        }
+        $offsetInt = VmMath::parseIntBuiltinArg($offset, 'substr', 2, 'offset');
         if (3 === $argc) {
             $length = $frame->calledArgs[2]->resolveIndirect();
             if (Variable::TYPE_NULL === $length->type) {
-                $frame->returnVar->string(VmString::substr($string, $offset->toInt()));
+                $frame->returnVar->string(VmString::substr($string, $offsetInt));
 
                 return;
             }
-            if (Variable::TYPE_INTEGER !== $length->type) {
-                throw new \LogicException('substr() length must be an integer in this compiler build');
-            }
-            $frame->returnVar->string(VmString::substr($string, $offset->toInt(), $length->toInt()));
+            $lengthInt = VmMath::parseIntBuiltinArg($length, 'substr', 3, 'length');
+            $frame->returnVar->string(VmString::substr($string, $offsetInt, $lengthInt));
 
             return;
         }
-        $frame->returnVar->string(VmString::substr($string, $offset->toInt()));
+        $frame->returnVar->string(VmString::substr($string, $offsetInt));
     }
 
     public Context $context;
@@ -73,25 +69,20 @@ final class substr extends Internal
         );
         $charPtr = $context->builder->structGep($str, $map['value']);
         $zero = JitStringIndex::zero($context);
-        $offset = $this->jitLong($context, $args[1], 'substr() argument #2');
+        $offset = JitIntdiv::lowerIntBuiltinArg($context, $args[1], 'substr', 2, 'offset');
         $start = JitStringIndex::clamp($context, $offset, $zero, $len);
 
         $sliceLen = null;
         if (3 === $argc) {
-            if (JITVariable::TYPE_NATIVE_LONG === $args[2]->type) {
-                $lengthArg = $this->jitLong($context, $args[2], 'substr() argument #3');
+            if (JITVariable::TYPE_VALUE === $args[2]->type && $args[2]->isNullConstant) {
+                $sliceLen = $context->builder->sub($len, $start);
+                $sliceLen = JitStringIndex::max($context, $sliceLen, $zero);
+            } else {
+                $lengthArg = JitIntdiv::lowerIntBuiltinArg($context, $args[2], 'substr', 3, 'length');
                 $negLen = $context->builder->icmp(Builder::INT_SLT, $lengthArg, $zero);
                 $remaining = $context->builder->sub($len, $start);
                 $maxLen = $context->builder->select($negLen, $zero, $lengthArg);
                 $sliceLen = JitStringIndex::min($context, $maxLen, $remaining);
-            } elseif (JITVariable::TYPE_VALUE === $args[2]->type) {
-                if (!$args[2]->isNullConstant) {
-                    throw new \LogicException('substr() length must be an integer or literal null in this compiler build');
-                }
-                $sliceLen = $context->builder->sub($len, $start);
-                $sliceLen = JitStringIndex::max($context, $sliceLen, $zero);
-            } else {
-                throw new \LogicException('substr() length must be an integer or null in this compiler build');
             }
         } else {
             $sliceLen = $context->builder->sub($len, $start);
