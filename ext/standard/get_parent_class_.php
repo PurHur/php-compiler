@@ -6,6 +6,7 @@ namespace PHPCompiler\ext\standard;
 
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
+use PHPCompiler\JIT\Builtin\TypeErrorRaise;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\EnumCaseSupport;
@@ -26,7 +27,13 @@ final class get_parent_class_ extends Internal
 
     public function execute(Frame $frame): void
     {
-        if (\count($frame->calledArgs) < 1 || \count($frame->calledArgs) > 2) {
+        $argc = \count($frame->calledArgs);
+        if ($argc > 1) {
+            throw new \ArgumentCountError(
+                'get_parent_class() expects at most 1 argument, '.$argc.' given'
+            );
+        }
+        if ($argc < 1) {
             throw new \LogicException('get_parent_class() requires one or two arguments in this compiler build');
         }
         if (null === $frame->returnVar) {
@@ -69,7 +76,17 @@ final class get_parent_class_ extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        if (\count($args) < 1 || \count($args) > 2) {
+        $argc = \count($args);
+        if ($argc > 1) {
+            TypeErrorRaise::ensureLinked($context);
+            TypeErrorRaise::emitArgumentCountError(
+                $context,
+                'get_parent_class() expects at most 1 argument, '.$argc.' given'
+            );
+
+            return $context->getTypeFromString('int32')->constInt(0, false);
+        }
+        if ($argc < 1) {
             throw new \LogicException('get_parent_class() requires one or two arguments in this compiler build');
         }
         if (JITVariable::TYPE_STRING === $args[0]->type || JITVariable::TYPE_VALUE === $args[0]->type) {
