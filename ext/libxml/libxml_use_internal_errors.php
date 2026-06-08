@@ -1,0 +1,40 @@
+<?php
+
+declare(strict_types=1);
+
+namespace PHPCompiler\ext\libxml;
+
+use PHPCompiler\Frame;
+use PHPCompiler\VM\Variable;
+
+/** libxml_use_internal_errors() — toggle internal error buffer (php-src ext/libxml/libxml.c; #6058). */
+final class libxml_use_internal_errors extends LibxmlFunction
+{
+    public function __construct()
+    {
+        parent::__construct('libxml_use_internal_errors');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        if (null === $frame->returnVar) {
+            return;
+        }
+        $argc = \count($frame->calledArgs);
+        if ($argc > 1) {
+            throw new \ArgumentCountError('libxml_use_internal_errors() expects at most 1 argument, '.$argc.' given');
+        }
+        $useErrors = null;
+        if (1 === $argc) {
+            $arg = $frame->calledArgs[0]->resolveIndirect();
+            if (Variable::TYPE_NULL === $arg->type) {
+                $useErrors = null;
+            } elseif (Variable::TYPE_BOOLEAN === $arg->type) {
+                $useErrors = $arg->toBool();
+            } else {
+                $useErrors = (bool) $arg->toInt();
+            }
+        }
+        $frame->returnVar->bool(VmLibxml::useInternalErrors($useErrors));
+    }
+}

@@ -4,9 +4,30 @@ declare(strict_types=1);
 
 namespace PHPCompiler\ext\xml;
 
-/**
- * xml_parser_create() stub (php-src ext/xml/xml.c; issue #7406, #3494).
- */
-final class xml_parser_create extends XmlFunction
+use PHPCompiler\Frame;
+use PHPCompiler\Func\Internal;
+use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\Variable as JITVariable;
+use PHPLLVM\Value;
+
+/** xml_parser_create() — allocate SAX parser handle (php-src ext/xml/xml.c; #7406, #6058). */
+final class xml_parser_create extends Internal
 {
+    public function __construct()
+    {
+        parent::__construct('xml_parser_create');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        if (null === $frame->returnVar) {
+            return;
+        }
+        $frame->returnVar->int(VmXml::parserCreate());
+    }
+
+    public function call(Context $context, JITVariable ...$args): Value
+    {
+        throw new \LogicException('xml_parser_create() is not JIT-lowered in this compiler build');
+    }
 }
