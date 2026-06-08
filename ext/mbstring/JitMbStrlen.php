@@ -7,6 +7,7 @@ namespace PHPCompiler\ext\mbstring;
 use PHPCompiler\ext\standard\VmString;
 use PHPCompiler\JIT\Builtin\StringUtf8Strlen;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Value;
 
@@ -15,26 +16,27 @@ use PHPLLVM\Value;
  */
 final class JitMbStrlen
 {
-    public static function utf8Length(Context $context, JITVariable $arg): Value
+    public static function utf8LengthFromPtr(Context $context, Value $strPtr): Value
     {
-        if (JITVariable::TYPE_STRING !== $arg->type) {
-            throw new \LogicException('mb_strlen() only supports strings in this compiler build');
-        }
-
-        $literal = $arg->compileTimeString ?? null;
-        if (null !== $literal) {
-            return $context->constantFromInteger(
-                VmString::utf8CharLength($literal),
-                'int64'
-            );
-        }
-
         StringUtf8Strlen::ensureLinked($context);
-        $strPtr = $context->helper->loadValue($arg);
 
         return $context->builder->call(
             $context->lookupFunction('__compiler_utf8_strlen'),
             $strPtr
         );
+    }
+
+    public static function utf8Length(Context $context, JITVariable $arg): Value
+    {
+        if (JITVariable::TYPE_STRING === $arg->type && null !== ($arg->compileTimeString ?? null)) {
+            return $context->constantFromInteger(
+                VmString::utf8CharLength($arg->compileTimeString),
+                'int64'
+            );
+        }
+
+        $str = JitStringBuiltinArg::lower($context, $arg, 'mb_strlen', 0, 'string');
+
+        return self::utf8LengthFromPtr($context, $str);
     }
 }
