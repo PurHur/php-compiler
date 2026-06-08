@@ -68,6 +68,8 @@ final class BuiltinParamNames
                 return ['num1', 'num2'];
             case 'hex2bin':
                 return ['data', 'strict'];
+            case 'base64_decode':
+                return ['string', 'strict'];
             case 'resetaslazyghost':
                 return ['object', 'initializer', 'options'];
             case 'exit':

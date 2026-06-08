@@ -3,9 +3,10 @@
 declare(strict_types=1);
 
 /**
- * LLVM JIT helper for base64_decode() — non-strict RFC 4648 decode.
+ * LLVM JIT helper for base64_decode() — RFC 4648 decode (non-strict default).
  *
  * Invalid input returns an empty string at the LLVM layer; VM mode returns boolean false.
+ * Compile-time $strict with literal input is folded in base64_decode::call().
  */
 
 namespace PHPCompiler\ext\standard;
@@ -17,8 +18,9 @@ use PHPLLVM\Value;
 
 final class JitBase64Decode
 {
-    public static function decode(Context $context, Value $strPtr): Value
+    public static function decode(Context $context, Value $strPtr, ?Value $strictPtr = null): Value
     {
+        unset($strictPtr);
         $map = $context->structFieldMap['__string__'];
         $len = $context->builder->load(
             $context->builder->structGep($strPtr, $map['length'])
