@@ -18,6 +18,8 @@ use PHPCompiler\VM\Builtin\DateTimeZoneGetLocation;
 use PHPCompiler\VM\Builtin\DateTimeZoneGetName;
 use PHPCompiler\VM\Builtin\DateTimeZoneGetOffset;
 use PHPCompiler\VM\Builtin\ExceptionConstruct;
+use PHPCompiler\VM\Builtin\ErrorExceptionConstruct;
+use PHPCompiler\VM\Builtin\ErrorExceptionGetSeverity;
 use PHPCompiler\VM\Builtin\ExceptionGetCode;
 use PHPCompiler\VM\Builtin\ExceptionGetFile;
 use PHPCompiler\VM\Builtin\ExceptionGetLine;
@@ -720,7 +722,12 @@ final class BuiltinClasses
         $entry->properties[] = new ClassProperty(ExceptionSupport::PROP_LINE, null, $intProto);
         $entry->properties[] = new ClassProperty(ExceptionSupport::PROP_PREVIOUS, null, $nullProto);
         $entry->properties[] = new ClassProperty(ExceptionSupport::PROP_TRACE, $emptyTrace, $arrayProto);
-        $entry->constructor = new ExceptionConstruct();
+        if (ThrowableManifest::LC_ERROR_EXCEPTION === $lcKey) {
+            $entry->properties[] = new ClassProperty(ExceptionSupport::PROP_SEVERITY, null, $intProto);
+            $entry->constructor = new ErrorExceptionConstruct();
+        } else {
+            $entry->constructor = new ExceptionConstruct();
+        }
         $entry->methods['__construct'] = $entry->constructor;
         $entry->methodVisibility['__construct'] = $pub;
         foreach (
@@ -737,6 +744,10 @@ final class BuiltinClasses
         ) {
             $entry->methods[$methodName] = $method;
             $entry->methodVisibility[$methodName] = $pub;
+        }
+        if (ThrowableManifest::LC_ERROR_EXCEPTION === $lcKey) {
+            $entry->methods['getseverity'] = new ErrorExceptionGetSeverity();
+            $entry->methodVisibility['getseverity'] = $pub;
         }
         $ctx->classes[$lcKey] = $entry;
     }
