@@ -12,7 +12,7 @@ use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
 
 /**
- * highlight_file() — read file and emit syntax-highlighted HTML (VM host Zend).
+ * highlight_file() — read file and emit syntax-highlighted HTML (VM: HighlightEngine, #4824).
  *
  * @see https://github.com/php/php-src/blob/master/ext/standard/url.c PHP_FUNCTION(highlight_file)
  */

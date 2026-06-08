@@ -4,34 +4,47 @@ declare(strict_types=1);
 
 namespace PHPCompiler\ext\standard;
 
+use PHPCompiler\VM\OutputBuffer;
+
 /**
- * highlight_string() / highlight_file() — delegate to Zend tokenizer HTML (VM host).
+ * highlight_string() / highlight_file() — native tokenizer HTML (#4824).
  *
  * @see https://github.com/php/php-src/blob/master/ext/standard/php_highlight.h
  */
 final class VmHighlight
 {
     /**
-     * @return string|bool HTML when $return is true, otherwise bool success from Zend
+     * @return string|bool HTML when $return is true, otherwise bool success
      */
     public static function highlightString(string $code, bool $return): string|bool
     {
-        return \highlight_string($code, $return);
+        $html = HighlightEngine::render($code);
+        if ($return) {
+            return $html;
+        }
+        OutputBuffer::append($html);
+
+        return true;
     }
 
     /**
-     * @return string|bool HTML when $return is true, otherwise bool success from Zend
+     * @return string|bool HTML when $return is true, otherwise bool success
      */
     public static function highlightFile(string $filename, bool $return): string|bool
     {
-        if (is_readable($filename) && is_file($filename)) {
-            return \highlight_file($filename, $return);
-        }
-        $contents = VmFs::fileGetContents($filename);
-        if (false !== $contents) {
+        if (!is_readable($filename) || !is_file($filename)) {
+            $contents = VmFs::fileGetContents($filename);
+            if (false === $contents) {
+                return false;
+            }
+
             return self::highlightString($contents, $return);
         }
+        $contents = file_get_contents($filename);
+        if (false === $contents) {
+            return false;
+        }
 
-        return \highlight_file($filename, $return);
+        return self::highlightString($contents, $return);
     }
 }
