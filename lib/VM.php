@@ -6286,6 +6286,10 @@ restart:
             return $this->dispatchVmDateInvalidTimeZoneException($e, $callerFrame);
         } catch (VM\NativeDateMalformedStringException $e) {
             return $this->dispatchVmDateMalformedStringException($e, $callerFrame);
+        } catch (VM\NativeDateRangeError $e) {
+            return $this->dispatchVmDateRangeError($e, $callerFrame);
+        } catch (VM\NativeDateObjectError $e) {
+            return $this->dispatchVmDateObjectError($e, $callerFrame);
         } catch (\Error $e) {
             return $this->dispatchVmError($e->getMessage(), $callerFrame);
         } catch (VM\GeneratorUncaughtThrow $e) {
@@ -6577,6 +6581,44 @@ restart:
     {
         [$file, $line] = VM\ExceptionSupport::userFatalSite($frame);
         $thrown = VM\BuiltinExceptionSupport::materializeException(
+            $this->context,
+            $error->getMessage(),
+            $file,
+            $line
+        );
+        $catchFrame = $this->findCatchFrameForThrow($frame, $thrown);
+        if (null !== $catchFrame) {
+            return $catchFrame;
+        }
+        $this->raiseUncaughtException($thrown);
+
+        return null;
+    }
+
+    /** Bridge DateRangeError from date builtins into user catch handlers (#7276). */
+    private function dispatchVmDateRangeError(VM\NativeDateRangeError $error, Frame $frame): ?Frame
+    {
+        [$file, $line] = VM\ExceptionSupport::userFatalSite($frame);
+        $thrown = VM\BuiltinExceptionSupport::materializeDateRangeError(
+            $this->context,
+            $error->getMessage(),
+            $file,
+            $line
+        );
+        $catchFrame = $this->findCatchFrameForThrow($frame, $thrown);
+        if (null !== $catchFrame) {
+            return $catchFrame;
+        }
+        $this->raiseUncaughtException($thrown);
+
+        return null;
+    }
+
+    /** Bridge DateObjectError from date builtins into user catch handlers (#7276). */
+    private function dispatchVmDateObjectError(VM\NativeDateObjectError $error, Frame $frame): ?Frame
+    {
+        [$file, $line] = VM\ExceptionSupport::userFatalSite($frame);
+        $thrown = VM\BuiltinExceptionSupport::materializeDateObjectError(
             $this->context,
             $error->getMessage(),
             $file,

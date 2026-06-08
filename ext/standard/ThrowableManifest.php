@@ -51,6 +51,12 @@ final class ThrowableManifest
 
     public const LC_DATE_INVALID_TIME_ZONE_EXCEPTION = 'dateinvalidtimezoneexception';
 
+    public const LC_DATE_ERROR = 'dateerror';
+
+    public const LC_DATE_OBJECT_ERROR = 'dateobjecterror';
+
+    public const LC_DATE_RANGE_ERROR = 'daterangeerror';
+
     public const LC_ERROR = 'error';
 
     public const LC_TYPE_ERROR = 'typeerror';
@@ -101,6 +107,9 @@ final class ThrowableManifest
         'DateException' => 'Exception',
         'DateInvalidTimeZoneException' => 'DateException',
         'Error' => null,
+        'DateError' => 'Error',
+        'DateObjectError' => 'DateError',
+        'DateRangeError' => 'DateError',
         'TypeError' => 'Error',
         'ValueError' => 'Error',
         'FiberError' => 'Error',

@@ -25,6 +25,9 @@ final class BuiltinExceptionSupport
     public const CLASS_EXCEPTION = 'exception';
     public const CLASS_LOGIC_EXCEPTION = 'logicexception';
     public const CLASS_DATE_INVALID_TIME_ZONE_EXCEPTION = 'dateinvalidtimezoneexception';
+    public const CLASS_DATE_ERROR = 'dateerror';
+    public const CLASS_DATE_OBJECT_ERROR = 'dateobjecterror';
+    public const CLASS_DATE_RANGE_ERROR = 'daterangeerror';
     public const CLASS_THROWABLE = 'throwable';
     public const PROP_MESSAGE = 'message';
 
@@ -110,6 +113,24 @@ final class BuiltinExceptionSupport
             $file,
             $line
         );
+    }
+
+    public static function materializeDateRangeError(
+        Context $ctx,
+        string $message,
+        string $file = '',
+        int $line = 0
+    ): Variable {
+        return self::materializeThrowable($ctx, self::CLASS_DATE_RANGE_ERROR, $message, $file, $line);
+    }
+
+    public static function materializeDateObjectError(
+        Context $ctx,
+        string $message,
+        string $file = '',
+        int $line = 0
+    ): Variable {
+        return self::materializeThrowable($ctx, self::CLASS_DATE_OBJECT_ERROR, $message, $file, $line);
     }
 
     /** php-src ext/date/php_date.c — malformed DateTime string (#7113; DateMalformedStringException in #6048). */
