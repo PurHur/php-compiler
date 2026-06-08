@@ -34,6 +34,22 @@ final class get_resource_type extends Internal
 
             return;
         }
+        if ($v->isBrigadeResource()) {
+            $type = VmStreamBucket::getResourceType($v->toInt(), true);
+            if (null !== $type) {
+                $frame->returnVar->string($type);
+
+                return;
+            }
+        }
+        if ($v->isBucketResource()) {
+            $type = VmStreamBucket::getResourceType($v->toInt(), false);
+            if (null !== $type) {
+                $frame->returnVar->string($type);
+
+                return;
+            }
+        }
         if (!is_resource_::isResource($v)) {
             throw new \TypeError(\sprintf(self::TYPE_ERROR, VmStreamArg::debugTypeName($v)));
         }

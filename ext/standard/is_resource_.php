@@ -62,6 +62,12 @@ final class is_resource_ extends Internal
         if ($v->isDirResource()) {
             return VmDir::isValidHandle($v->toInt());
         }
+        if ($v->isBrigadeResource()) {
+            return VmStreamBucket::isValidBrigade($v->toInt());
+        }
+        if ($v->isBucketResource()) {
+            return VmStreamBucket::isValidBucket($v->toInt());
+        }
 
         return false;
     }
