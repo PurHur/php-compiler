@@ -130,6 +130,7 @@ final class StringStrGetcsvJit
             [
                 ['__hashtable__alloc', $htPtr, []],
                 ['__hashtable__setStringAt', $void, [$htPtr, $sizeT, $strPtr]],
+                ['__hashtable__setNullAt', $void, [$htPtr, $sizeT]],
                 ['__string__init', $strPtr, [$i64, $i8p]],
             ] as [$name, $ret, $params]
         ) {
@@ -323,6 +324,20 @@ final class StringStrGetcsvJit
         $escape = $fn->getParam(4);
 
         $ht = $context->builder->call($context->lookupFunction('__hashtable__alloc'));
+
+        $emptyLineBb = $fn->appendBasicBlock('csv_empty_line');
+        $bodyBb = $fn->appendBasicBlock('csv_body');
+        $context->builder->branchIf(
+            $context->builder->icmp(Builder::INT_EQ, $lineLen, $zero),
+            $emptyLineBb,
+            $bodyBb
+        );
+
+        $context->builder->positionAtEnd($emptyLineBb);
+        $context->builder->call($context->lookupFunction('__hashtable__setNullAt'), $ht, $zero);
+        $context->builder->returnValue($ht);
+
+        $context->builder->positionAtEnd($bodyBb);
 
         $iSlot = BasicBlockHelper::entryAlloca($context, $sizeT);
         $fieldSlot = BasicBlockHelper::entryAlloca($context, $i8pp);

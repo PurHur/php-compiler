@@ -33,6 +33,27 @@ final class VmFs
         return $ht;
     }
 
+    /**
+     * CSV row cells may be null (empty input line); php-src ext/standard/file.c (#4922).
+     *
+     * @param list<string|null> $fields
+     */
+    public static function csvRowToArray(array $fields): HashTable
+    {
+        $ht = new HashTable();
+        foreach ($fields as $field) {
+            $value = new Variable();
+            if (null === $field) {
+                $value->null();
+            } else {
+                $value->string($field);
+            }
+            $ht->append($value);
+        }
+
+        return $ht;
+    }
+
     public static function fileSize(string $path) {
         $stat = VmStatCache::stat($path);
         if (false === $stat) {
