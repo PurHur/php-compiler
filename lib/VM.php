@@ -10210,6 +10210,7 @@ restart:
         $cloned->setHookMethodLc = $property->setHookMethodLc;
         $cloned->unsetHookMethodLc = $property->unsetHookMethodLc;
         $cloned->propertyHookVirtual = $property->propertyHookVirtual;
+        $cloned->fromConstructorPromotion = $property->fromConstructorPromotion;
         $cloned->defaultInitBlock = $property->defaultInitBlock;
         $cloned->defaultInitResultSlot = $property->defaultInitResultSlot;
 
@@ -10716,7 +10717,7 @@ restart:
                     $name = $frame->scope[$op->arg1];
                     $default = is_null($op->arg2) ? null : $frame->scope[$op->arg2];
                     $propLc = strtolower($name->toString());
-                    $entry->properties[] = new VM\ClassProperty(
+                    $prop = new VM\ClassProperty(
                         $name->toString(),
                         $default,
                         $frame->scope[$op->arg3],
@@ -10726,6 +10727,8 @@ restart:
                         (int) ($op->propertySetVisibility ?? 0),
                         (int) ($op->propertyGetVisibility ?? 0)
                     );
+                    $prop->fromConstructorPromotion = $op->propertyFromConstructorPromotion;
+                    $entry->properties[] = $prop;
                     if ([] !== $op->attributeNames) {
                         $entry->propertyAttributeNames[$propLc] = $op->attributeNames;
                     }
