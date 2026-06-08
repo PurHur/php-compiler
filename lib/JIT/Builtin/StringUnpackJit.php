@@ -810,13 +810,9 @@ final class StringUnpackJit
         $context->builder->positionAtEnd($nameHead);
         $i = $context->builder->load($iSlot);
         $c = $context->builder->load($context->builder->gep($format, $i));
-        $isCode = $context->builder->call($context->lookupFunction('__compiler_unpack_is_code'), $c);
         $canName = $context->builder->and(
             $context->builder->icmp(Builder::INT_SLT, $i, $formatLen),
-            $context->builder->and(
-                $context->builder->icmp(Builder::INT_NE, $c, $i8->constInt((int) \ord('/'), false)),
-                $context->builder->icmp(Builder::INT_EQ, $isCode, $zeroI32)
-            )
+            $context->builder->icmp(Builder::INT_NE, $c, $i8->constInt((int) \ord('/'), false))
         );
         $context->builder->branchIf($canName, $nameBody, $nameDone);
 
