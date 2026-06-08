@@ -189,6 +189,34 @@ final class LazyObjectSupport
     }
 
     /**
+     * ReflectionProperty::isLazy — IS_PROP_LAZY probe without triggering init (#6515).
+     *
+     * @see ext/reflection/php_reflection.c ReflectionProperty::isLazy
+     */
+    public static function isPropertyLazy(ObjectEntry $object, string $propertyName): bool
+    {
+        if (!$object->lazyPending && null === $object->lazyResetInitializer) {
+            return false;
+        }
+
+        if (!$object->lazyGhost) {
+            return $object->lazyPending;
+        }
+
+        if ($object->lazyPending) {
+            return true;
+        }
+
+        if (!$object->hasProperty($propertyName)) {
+            return false;
+        }
+
+        $slot = $object->getProperty($propertyName)->resolveIndirect();
+
+        return $slot->isUndefined() || TypedPropertyCheck::isUninitialized($slot);
+    }
+
+    /**
      * Zend zend_lazy_object_mark_as_initialized — skip initializer, apply defaults (#5968).
      */
     public static function markAsInitialized(ObjectEntry $object): ObjectEntry
