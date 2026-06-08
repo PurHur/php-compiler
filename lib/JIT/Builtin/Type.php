@@ -229,6 +229,50 @@ class Type extends Builtin {
             $fntypeFileGetContents
         );
         $this->context->registerFunction('__compiler_file_get_contents', $fnFileGetContents);
+        $fntypeIncludePathGet = $this->context->context->functionType(
+            $this->context->getTypeFromString('void'),
+            false,
+            $this->context->getTypeFromString('__value__*')
+        );
+        $fnIncludePathGet = $this->context->module->addFunction(
+            '__compiler_get_include_path',
+            $fntypeIncludePathGet
+        );
+        $this->context->registerFunction('__compiler_get_include_path', $fnIncludePathGet);
+        $fntypeIncludePathSet = $this->context->context->functionType(
+            $this->context->getTypeFromString('void'),
+            false,
+            $this->context->getTypeFromString('__string__*'),
+            $this->context->getTypeFromString('__value__*')
+        );
+        $fnIncludePathSet = $this->context->module->addFunction(
+            '__compiler_set_include_path',
+            $fntypeIncludePathSet
+        );
+        $this->context->registerFunction('__compiler_set_include_path', $fnIncludePathSet);
+        $fntypeIncludePathRestore = $this->context->context->functionType(
+            $this->context->getTypeFromString('void'),
+            false
+        );
+        $fnIncludePathRestore = $this->context->module->addFunction(
+            '__compiler_restore_include_path',
+            $fntypeIncludePathRestore
+        );
+        $this->context->registerFunction('__compiler_restore_include_path', $fnIncludePathRestore);
+        $fnStreamResolveIncludePath = $this->context->module->addFunction(
+            '__compiler_stream_resolve_include_path',
+            $fntypeFileGetContents
+        );
+        $this->context->registerFunction('__compiler_stream_resolve_include_path', $fnStreamResolveIncludePath);
+        $fntypeIncludePathInit = $this->context->context->functionType(
+            $this->context->getTypeFromString('void'),
+            false
+        );
+        $fnIncludePathInit = $this->context->module->addFunction(
+            '__compiler_include_path_init',
+            $fntypeIncludePathInit
+        );
+        $this->context->registerFunction('__compiler_include_path_init', $fnIncludePathInit);
         $fntypeMimeContentType = $this->context->context->functionType(
             $this->context->getTypeFromString('__string__*'),
             false,
@@ -1044,6 +1088,7 @@ class Type extends Builtin {
         WeakRefRegistryRuntime::ensureLinked($this->context);
         MemoryRuntime::ensureLinked($this->context);
         IniRuntime::ensureLinked($this->context);
+        IncludePathRuntime::ensureLinked($this->context);
         StringEnvLocal::ensureLinked($this->context);
         ErrorHandlerOutput::registerExternals($this->context);
         StringTriggerError::ensureLinked($this->context);

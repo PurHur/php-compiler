@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace PHPCompiler\ext\standard;
 
 use PHPCompiler\VM\HashTable;
+use PHPCompiler\VM\ScriptStack;
 use PHPCompiler\VM\Variable;
 
 /** Host filesystem helpers for stdlib builtins (VM). */
@@ -451,6 +452,38 @@ final class VmFs
         }
 
         return $data;
+    }
+
+    /**
+     * stream_resolve_include_path() — search include_path for filename (ext/standard/streams.c; #6051).
+     *
+     * @return string|false absolute path when found
+     */
+    public static function resolveIncludePath(string $filename): string|false
+    {
+        if ('' === $filename || str_contains($filename, "\0")) {
+            return false;
+        }
+        if ($filename[0] === '/' || (\strlen($filename) > 1 && $filename[1] === ':')) {
+            $normalized = ScriptStack::normalize($filename);
+
+            return '' !== $normalized && \is_file($normalized) ? $normalized : false;
+        }
+        $includePath = VmIncludePath::get();
+        if ('' === $includePath) {
+            return false;
+        }
+        foreach (\explode(\PATH_SEPARATOR, $includePath) as $dir) {
+            if ('' === $dir) {
+                continue;
+            }
+            $candidate = ScriptStack::normalize(\rtrim($dir, '/\\').'/'.$filename);
+            if ('' !== $candidate && \is_file($candidate)) {
+                return $candidate;
+            }
+        }
+
+        return false;
     }
 
     /**
