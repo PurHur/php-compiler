@@ -14,13 +14,11 @@ namespace PHPCompiler\ext\standard;
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Context;
-use PHPCompiler\JIT\JitLongArg;
 use PHPCompiler\JIT\Variable as JITVariable;
-use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
 
 /**
- * decoct() for integer arguments (subset of PHP standard library).
+ * decoct() — integer to octal string (php-src ext/standard/math.c; #4211 float truncation).
  */
 final class decoct extends Internal
 {
@@ -29,14 +27,16 @@ final class decoct extends Internal
         if (1 !== count($frame->calledArgs)) {
             throw new \LogicException('decoct() requires exactly one argument');
         }
-        $v = $frame->calledArgs[0]->resolveIndirect();
         if (null === $frame->returnVar) {
             return;
         }
-        if (Variable::TYPE_INTEGER !== $v->type) {
-            throw new \LogicException('decoct() only supports integers in this compiler build');
-        }
-        $frame->returnVar->string(\decoct($v->toInt()));
+        $num = VmMath::parseIntBuiltinArg(
+            $frame->calledArgs[0]->resolveIndirect(),
+            'decoct',
+            1,
+            'num'
+        );
+        $frame->returnVar->string(\decoct($num));
     }
 
     public Context $context;
@@ -47,11 +47,9 @@ final class decoct extends Internal
         if (1 !== count($args)) {
             throw new \LogicException('decoct() requires exactly one argument');
         }
-        if (JITVariable::TYPE_NATIVE_LONG !== $args[0]->type) {
-            throw new \LogicException('decoct() only supports integers in this compiler build');
-        }
+        $num = JitIntdiv::lowerIntBuiltinArg($context, $args[0], 'decoct', 1, 'num');
 
-        return $this->formatToString($context, $context->helper->loadValue($args[0]), '%o');
+        return $this->formatToString($context, $num, '%o');
     }
 
     private function formatToString(Context $context, Value $value, string $format): Value

@@ -14,13 +14,11 @@ namespace PHPCompiler\ext\standard;
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Context;
-use PHPCompiler\JIT\JitLongArg;
 use PHPCompiler\JIT\Variable as JITVariable;
-use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
 
 /**
- * dechex() for integer arguments (subset of PHP standard library).
+ * dechex() — integer to hexadecimal string (php-src ext/standard/math.c; #4211 float truncation).
  */
 final class dechex extends Internal
 {
@@ -29,14 +27,16 @@ final class dechex extends Internal
         if (1 !== count($frame->calledArgs)) {
             throw new \LogicException('dechex() requires exactly one argument');
         }
-        $v = $frame->calledArgs[0]->resolveIndirect();
         if (null === $frame->returnVar) {
             return;
         }
-        if (Variable::TYPE_INTEGER !== $v->type) {
-            throw new \LogicException('dechex() only supports integers in this compiler build');
-        }
-        $frame->returnVar->string(\dechex($v->toInt()));
+        $num = VmMath::parseIntBuiltinArg(
+            $frame->calledArgs[0]->resolveIndirect(),
+            'dechex',
+            1,
+            'num'
+        );
+        $frame->returnVar->string(\dechex($num));
     }
 
     public Context $context;
@@ -47,11 +47,9 @@ final class dechex extends Internal
         if (1 !== count($args)) {
             throw new \LogicException('dechex() requires exactly one argument');
         }
-        if (JITVariable::TYPE_NATIVE_LONG !== $args[0]->type) {
-            throw new \LogicException('dechex() only supports integers in this compiler build');
-        }
+        $num = JitIntdiv::lowerIntBuiltinArg($context, $args[0], 'dechex', 1, 'num');
 
-        return $this->formatToString($context, $context->helper->loadValue($args[0]), '%x');
+        return $this->formatToString($context, $num, '%x');
     }
 
     private function formatToString(Context $context, Value $value, string $format): Value
