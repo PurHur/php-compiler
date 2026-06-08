@@ -7,6 +7,7 @@ namespace PHPCompiler\JIT;
 use PHPCompiler\JIT\Builtin\Type\Object_ as ObjectBuiltin;
 use PHPCompiler\JIT\Builtin\TypeErrorRaise;
 use PHPLLVM\Builder;
+use PHPLLVM\BasicBlock;
 use PHPLLVM\Value;
 
 /**
@@ -220,7 +221,7 @@ final class BackedEnumFromJit
     private static function normalizeValueBoxToString(
         Context $context,
         Value $valuePtr,
-        Value $typeErrorBlock,
+        BasicBlock $typeErrorBlock,
         string $typeErrorSuffix
     ): Value {
         $map = $context->structFieldMap['__value__'];
@@ -324,7 +325,7 @@ final class BackedEnumFromJit
         Context $context,
         string $className,
         Value $valuePtr,
-        Value $typeErrorBlock
+        BasicBlock $typeErrorBlock
     ): Value {
         $map = $context->structFieldMap['__value__'];
         $typeByte = $context->builder->load(
@@ -411,7 +412,8 @@ final class BackedEnumFromJit
         self::emitDynamicValueError($context, $written);
     }
 
-    private static function emitDynamicValueError(Context $context, Value $written): void
+    /** @param array{0: Value, 1: Value} $written */
+    private static function emitDynamicValueError(Context $context, array $written): void
     {
         $charPtr = $context->getTypeFromString('char*');
         $sizeT = $context->getTypeFromString('size_t');
@@ -497,12 +499,11 @@ final class BackedEnumFromJit
         $longTy = $context->getTypeFromString('int64');
         $i8pp = $context->getTypeFromString('int8**');
         $charPtr = $context->getTypeFromString('char*');
-        $longRet = $context->getTypeFromString('long');
         $int32 = $context->getTypeFromString('int32');
         foreach ([
             ['strcmp', $i32, [$i8p, $i8p]],
             ['snprintf', $i32, [$charPtr, $sizeT, $charPtr]],
-            ['strtol', $longRet, [$i8p, $i8pp, $int32]],
+            ['strtol', $longTy, [$i8p, $i8pp, $int32]],
         ] as [$name, $ret, $params]) {
             if (null === $context->module->getNamedFunction($name)) {
                 $ft = $context->context->functionType($ret, false, ...$params);
