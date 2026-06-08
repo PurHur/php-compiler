@@ -6,7 +6,7 @@ namespace PHPCompiler\ext\standard;
 
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitLongArg;
-use PHPCompiler\JIT\JitStringArg;
+use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Value;
 
@@ -15,7 +15,7 @@ final class JitJsonValidate
 {
     public static function invoke(Context $context, JITVariable $json, JITVariable $depth): Value
     {
-        $jsonPtr = JitStringArg::lower($context, $json, 'json_validate() argument #1');
+        $jsonPtr = JitStringBuiltinArg::lower($context, $json, 'json_validate', 0, 'json');
         $depthVal = JitLongArg::lower($context, $depth, 'json_validate() argument #2');
 
         return self::invokeWithDepth($context, $jsonPtr, $depthVal);

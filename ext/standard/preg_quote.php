@@ -7,9 +7,8 @@ namespace PHPCompiler\ext\standard;
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Context;
-use PHPCompiler\JIT\JitStringArg;
+use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\Variable as JITVariable;
-use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
 
 /** preg_quote() — escape regex metacharacters (subset of PHP; native LLVM in JIT/AOT). */
@@ -21,22 +20,25 @@ final class preg_quote extends Internal
         if ($argc < 1 || $argc > 2) {
             throw new \LogicException('preg_quote() requires one or two arguments in this compiler build');
         }
-        $subject = $frame->calledArgs[0]->resolveIndirect();
         if (null === $frame->returnVar) {
             return;
         }
-        if (Variable::TYPE_STRING !== $subject->type) {
-            throw new \LogicException('preg_quote() subject must be a string in this compiler build');
-        }
+        $subject = VmString::coerceStringBuiltinArg(
+            $frame->calledArgs[0],
+            'preg_quote',
+            0,
+            'str'
+        );
         $delimiter = null;
         if (2 === $argc) {
-            $delimVar = $frame->calledArgs[1]->resolveIndirect();
-            if (Variable::TYPE_STRING !== $delimVar->type) {
-                throw new \LogicException('preg_quote() delimiter must be a string in this compiler build');
-            }
-            $delimiter = $delimVar->toString();
+            $delimiter = VmString::coerceStringBuiltinArg(
+                $frame->calledArgs[1],
+                'preg_quote',
+                1,
+                'delimiter'
+            );
         }
-        $frame->returnVar->string(VmString::pregQuote($subject->toString(), $delimiter));
+        $frame->returnVar->string(VmString::pregQuote($subject, $delimiter));
     }
 
     public function call(Context $context, JITVariable ...$args): Value
@@ -45,7 +47,7 @@ final class preg_quote extends Internal
         if ($argc < 1 || $argc > 2) {
             throw new \LogicException('preg_quote() requires one or two arguments in this compiler build');
         }
-        $subject = JitStringArg::lower($context, $args[0], 'preg_quote() subject');
+        $subject = JitStringBuiltinArg::lower($context, $args[0], 'preg_quote', 0, 'str');
         if (1 === $argc) {
             return JitPregQuote::quote($context, $subject, null);
         }
@@ -53,7 +55,7 @@ final class preg_quote extends Internal
         return JitPregQuote::quote(
             $context,
             $subject,
-            JitStringArg::lower($context, $args[1], 'preg_quote() delimiter')
+            JitStringBuiltinArg::lower($context, $args[1], 'preg_quote', 1, 'delimiter')
         );
     }
 }
