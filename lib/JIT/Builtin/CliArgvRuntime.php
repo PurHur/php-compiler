@@ -11,7 +11,7 @@ use PHPLLVM\Value;
 use PHPLLVM\Value\Function_ as LlvmFunction;
 
 /**
- * LLVM argv storage for standalone AOT / MCJIT CLI binaries (issues #2794, #6341).
+ * LLVM argv storage for standalone AOT / MCJIT CLI binaries (issues #2794, #5407, #6341).
  *
  * Replaces argv logic in lib/AOT/runtime/phpc_cli_argv.c. php-src: basic_functions.c $argc/$argv.
  */
