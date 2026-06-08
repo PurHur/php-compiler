@@ -45,6 +45,8 @@ class Module extends ModuleAbstract
             new posix_getegid(),
             new posix_strerror(),
             new posix_get_last_error(),
+            new posix_getcwd(),
+            new posix_ctermid(),
             new posix_errno(),
             new posix_access(),
             new posix_mknod(),

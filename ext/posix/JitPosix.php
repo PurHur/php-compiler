@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace PHPCompiler\ext\posix;
 
+use PHPCompiler\ext\standard\JitGetcwd;
 use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitLongArg;
@@ -101,6 +102,44 @@ final class JitPosix
         return $i64->constInt(0, false);
     }
 
+    public static function getcwd(Context $context): Value
+    {
+        $resolved = JitGetcwd::invoke($context);
+
+        return JitGetcwd::boxed($context, $resolved);
+    }
+
+    public static function ctermid(Context $context): Value
+    {
+        self::ensureLibcCtermid($context);
+        $i8p = $context->getTypeFromString('int8*');
+        $msgPtr = $context->builder->call(
+            $context->lookupFunction('ctermid'),
+            $i8p->constNull()
+        );
+
+        $slot = JitValueBox::alloc($context);
+        $ptr = JitValueBox::pointer($context, $slot);
+        $i64 = $context->getTypeFromString('int64');
+        $len = $context->builder->call(
+            $context->lookupFunction('strlen'),
+            $msgPtr
+        );
+        $lenI64 = $context->builder->zExt($len, $i64);
+        $resultStr = $context->builder->call(
+            $context->lookupFunction('__string__init'),
+            $lenI64,
+            $msgPtr
+        );
+        $context->builder->call(
+            $context->lookupFunction('__value__writeString'),
+            $ptr,
+            $resultStr
+        );
+
+        return $ptr;
+    }
+
     private static function ensureLibcPid(Context $context): void
     {
         $i32 = $context->getTypeFromString('int32');
@@ -125,6 +164,18 @@ final class JitPosix
             $ft = $context->context->functionType($i8p, false, $i32);
             $fn = $context->module->addFunction('strerror', $ft);
             $context->registerFunction('strerror', $fn);
+        }
+    }
+
+    private static function ensureLibcCtermid(Context $context): void
+    {
+        $i8p = $context->getTypeFromString('int8*');
+        try {
+            $context->lookupFunction('ctermid');
+        } catch (\Throwable $e) {
+            $ft = $context->context->functionType($i8p, false, $i8p);
+            $fn = $context->module->addFunction('ctermid', $ft);
+            $context->registerFunction('ctermid', $fn);
         }
     }
 }
