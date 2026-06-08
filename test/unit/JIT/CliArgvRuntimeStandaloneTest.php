@@ -9,7 +9,7 @@ use PHPCompiler\Runtime;
 use PHPUnit\Framework\TestCase;
 
 /**
- * Issue #6341: AOT standalone must define CLI argv helpers without phpc_cli_argv.c.
+ * Issues #5407, #6341: AOT standalone must define CLI argv helpers without phpc_cli_argv.c.
  *
  * @group aot-lint
  */

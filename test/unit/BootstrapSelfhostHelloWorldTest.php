@@ -697,7 +697,9 @@ final class BootstrapSelfhostHelloWorldTest extends TestCase
         $jit = (string) file_get_contents(self::$root.'/lib/JIT.php');
         $this->assertStringContainsString('shouldUseM5DriverHostCompile', $jit);
         $this->assertStringContainsString('PHP_COMPILER_M5_DRIVER_HOST', $jit);
-        $this->assertStringContainsString('CliArgvGlobalInit', $jit);
+
+        $ctx = (string) file_get_contents(self::$root.'/lib/JIT/Context.php');
+        $this->assertStringContainsString('CliArgvGlobalInit', $ctx);
 
         $argvInit = (string) file_get_contents(self::$root.'/lib/JIT/CliArgvGlobalInit.php');
         $this->assertStringContainsString('jit_global_argv', $argvInit);
