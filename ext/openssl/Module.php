@@ -36,6 +36,7 @@ class Module extends ModuleAbstract
             new openssl_sign(),
             new openssl_get_cipher_methods(),
             new openssl_pkey_new(),
+            new openssl_cipher_iv_length(),
         ];
     }
 }
