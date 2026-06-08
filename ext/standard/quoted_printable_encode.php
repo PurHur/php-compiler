@@ -7,6 +7,7 @@ namespace PHPCompiler\ext\standard;
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Value;
 
@@ -42,7 +43,7 @@ final class quoted_printable_encode extends Internal
         }
         return JitQuotedPrintableEncode::encode(
             $context,
-            JitQuotPrint::lowerStringSubject($context, $args[0], 'quoted_printable_encode'),
+            JitStringBuiltinArg::lower($context, $args[0], 'quoted_printable_encode', 0, 'string'),
             $args[0]
         );
     }

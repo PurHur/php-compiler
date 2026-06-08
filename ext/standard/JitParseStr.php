@@ -6,7 +6,7 @@ namespace PHPCompiler\ext\standard;
 
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\HashTableHelper;
-use PHPCompiler\JIT\JitStringArg;
+use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\ScopeBuiltinHelper;
 use PHPCompiler\JIT\Variable as JITVariable;
 
@@ -16,7 +16,7 @@ final class JitParseStr
     /** One-arg parse_str(): populate compile-time locals from parsed query (issue #3708). */
     public static function parseIntoScope(Context $context, JITVariable $encoded): void
     {
-        $encodedStr = JitStringArg::lower($context, $encoded, 'parse_str() argument #1');
+        $encodedStr = JitStringBuiltinArg::lower($context, $encoded, 'parse_str', 0, 'string');
         $parsedHt = HashTableHelper::alloc($context);
         $context->builder->call(
             $context->lookupFunction('__compiler_parse_str'),
@@ -28,7 +28,7 @@ final class JitParseStr
 
     public static function parse(Context $context, JITVariable $encoded, JITVariable $result): void
     {
-        $encodedStr = JitStringArg::lower($context, $encoded, 'parse_str() argument #1');
+        $encodedStr = JitStringBuiltinArg::lower($context, $encoded, 'parse_str', 0, 'string');
         $parsedHt = HashTableHelper::alloc($context);
         $context->builder->call(
             $context->lookupFunction('__compiler_parse_str'),
