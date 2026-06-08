@@ -17,6 +17,10 @@ final class SubstrCompareVMTest extends BaseTest
             __DIR__.'/cases/stdlib/substr_compare.phpt',
             'substr_compare.phpt'
         );
+        yield 'substr_compare_typeerror.phpt' => self::parsePHPT(
+            __DIR__.'/cases/stdlib/substr_compare_typeerror.phpt',
+            'substr_compare_typeerror.phpt'
+        );
     }
 
     public function setUp(): void
