@@ -28,15 +28,20 @@ final class getenv_ extends Internal
     public function execute(Frame $frame): void
     {
         $argc = \count($frame->calledArgs);
-        if ($argc < 1 || $argc > 2) {
-            throw new \LogicException('getenv() requires one or two arguments');
+        if ($argc > 2) {
+            throw new \LogicException('getenv() accepts at most two arguments');
+        }
+        if (null === $frame->returnVar) {
+            return;
+        }
+        if (0 === $argc) {
+            $frame->returnVar->array(VmEnv::getAllEnvironmentTable());
+
+            return;
         }
         $localOnly = false;
         if (2 === $argc) {
             $localOnly = $frame->calledArgs[1]->resolveIndirect()->toBool();
-        }
-        if (null === $frame->returnVar) {
-            return;
         }
         $name = VmString::coerceStringBuiltinArg($frame->calledArgs[0], 'getenv', 0, 'name');
         $result = VmEnv::getenv($name, $localOnly);
@@ -50,8 +55,13 @@ final class getenv_ extends Internal
     public function call(Context $context, JITVariable ...$args): Value
     {
         $argc = \count($args);
-        if ($argc < 1 || $argc > 2) {
-            throw new \LogicException('getenv() requires one or two arguments');
+        if ($argc > 2) {
+            throw new \LogicException('getenv() accepts at most two arguments');
+        }
+        if (0 === $argc) {
+            throw new \LogicException(
+                'getenv() with no arguments is VM-only in this compiler build; use bin/vm.php (issue #5075 phase 2 JIT)'
+            );
         }
         $i8 = $context->getTypeFromString('int8');
         $localOnlyI8 = $i8->constInt(0, false);

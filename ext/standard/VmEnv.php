@@ -4,6 +4,9 @@ declare(strict_types=1);
 
 namespace PHPCompiler\ext\standard;
 
+use PHPCompiler\VM\HashTable;
+use PHPCompiler\VM\Variable;
+
 /**
  * Process environment helpers — putenv()/getenv() local table (php-src EG(env), issue #3710).
  *
@@ -55,5 +58,35 @@ final class VmEnv
         $result = \getenv($name);
 
         return false === $result ? false : $result;
+    }
+
+    /**
+     * getenv() with no arguments — assoc array of all variables (#5075, php-src zif_getenv argc==0).
+     */
+    public static function getAllEnvironmentTable(): HashTable
+    {
+        $ht = new HashTable();
+        foreach (self::getAllEnvironmentMap() as $name => $value) {
+            $var = new Variable();
+            $var->string($value);
+            $ht->add($name, $var);
+        }
+
+        return $ht;
+    }
+
+    /**
+     * @return array<string, string>
+     */
+    private static function getAllEnvironmentMap(): array
+    {
+        $all = VmEnvEnvironNative::enumerate();
+        foreach (self::$local as $name => $value) {
+            if ('' !== $name) {
+                $all[$name] = $value;
+            }
+        }
+
+        return $all;
     }
 }
