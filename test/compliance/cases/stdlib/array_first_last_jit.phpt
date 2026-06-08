@@ -8,8 +8,16 @@ echo array_last($a), "\n";
 $list = [10, 20, 30];
 echo array_first($list), "\n";
 echo array_last($list), "\n";
+enum E: int { case A = 1; case B = 2; }
+$enumList = [E::A, E::B];
+var_export(array_first($enumList));
+echo "\n";
+var_export(array_last($enumList));
+echo "\n";
 --EXPECT--
 1
 2
 10
 30
+\E::A
+\E::B
