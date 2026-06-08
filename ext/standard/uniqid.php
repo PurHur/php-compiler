@@ -8,6 +8,7 @@ use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitBoolArg;
+use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
@@ -32,18 +33,20 @@ final class uniqid extends Internal
         $prefix = '';
         $moreEntropy = false;
         if ($argc >= 1) {
-            $arg = $frame->calledArgs[0]->resolveIndirect();
-            if (Variable::TYPE_STRING !== $arg->type) {
-                throw new \LogicException('uniqid() prefix must be a string in this compiler build');
-            }
-            $prefix = $arg->toString();
+            $prefix = VmString::coerceStringBuiltinArg(
+                $frame->calledArgs[0],
+                'uniqid',
+                0,
+                'prefix'
+            );
         }
         if (2 === $argc) {
-            $arg = $frame->calledArgs[1]->resolveIndirect();
-            if (Variable::TYPE_BOOLEAN !== $arg->type) {
-                throw new \LogicException('uniqid() more_entropy must be boolean in this compiler build');
-            }
-            $moreEntropy = $arg->toBool();
+            $moreEntropy = VmMath::parseBoolBuiltinArg(
+                $frame->calledArgs[1],
+                'uniqid',
+                2,
+                'more_entropy'
+            );
         }
         $frame->returnVar->string(VmString::uniqid($prefix, $moreEntropy));
     }
@@ -55,11 +58,15 @@ final class uniqid extends Internal
         }
         $prefix = $context->builder->load($context->constantStringFromString(''));
         if (isset($args[0])) {
-            $prefix = $this->jitString($context, $args[0], 'uniqid() prefix');
+            $prefix = JitStringBuiltinArg::lower($context, $args[0], 'uniqid', 0, 'prefix');
         }
         $moreEntropy = $context->constantFromBool(false);
         if (isset($args[1])) {
-            $moreEntropy = JitBoolArg::lower($context, $args[1], 'uniqid() more_entropy');
+            $moreEntropy = JitBoolArg::lower(
+                $context,
+                $args[1],
+                'uniqid(): Argument #2 ($more_entropy)'
+            );
         }
 
         return JitUniqid::uniqid($context, $prefix, $moreEntropy);
