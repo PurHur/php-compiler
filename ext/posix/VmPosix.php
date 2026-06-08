@@ -10,9 +10,9 @@ use PHPCompiler\ext\standard\VmGetcwdNative;
 use PHPCompiler\VM\Variable;
 
 /**
- * VM helpers for posix builtins (php-src ext/posix/posix.c; #7271, #7376).
+ * VM helpers for posix builtins (php-src ext/posix/posix.c; #7271, #7376, #7177).
  *
- * Libc via FFI when available; host POSIX helpers for VM-on-Zend parity.
+ * Libc via FFI when available; no host \\posix_* delegation (M5 bootstrap path).
  */
 final class VmPosix
 {
@@ -32,9 +32,6 @@ final class VmPosix
         if (null !== $ffi) {
             return (int) $ffi->getppid();
         }
-        if (\function_exists('posix_getppid')) {
-            return (int) \posix_getppid();
-        }
 
         throw new \Error('posix_getppid() is not available in this compiler build');
     }
@@ -44,9 +41,6 @@ final class VmPosix
         $ffi = self::ffi();
         if (null !== $ffi) {
             return (int) $ffi->getegid();
-        }
-        if (\function_exists('posix_getegid')) {
-            return (int) \posix_getegid();
         }
 
         throw new \Error('posix_getegid() is not available in this compiler build');
@@ -64,12 +58,6 @@ final class VmPosix
                 }
             }
         }
-        if (\function_exists('posix_strerror')) {
-            $msg = (string) \posix_strerror($errno);
-            if ('' !== $msg) {
-                return $msg;
-            }
-        }
 
         return 'Unknown error '.$errno;
     }
@@ -77,14 +65,6 @@ final class VmPosix
     public static function access(string $path, int $mode): bool
     {
         self::$lastError = 0;
-        if (\function_exists('posix_access')) {
-            $ok = @\posix_access($path, $mode);
-            if (!$ok) {
-                self::captureHostPosixErrno();
-            }
-
-            return $ok;
-        }
         $ffi = self::ffi();
         if (null === $ffi) {
             throw new \Error('posix_access() is not available in this compiler build');
@@ -101,14 +81,6 @@ final class VmPosix
     public static function mknod(string $path, int $mode, int $major = 0, int $minor = 0): bool
     {
         self::$lastError = 0;
-        if (\function_exists('posix_mknod')) {
-            $ok = @\posix_mknod($path, $mode, $major, $minor);
-            if (!$ok) {
-                self::captureHostPosixErrno();
-            }
-
-            return $ok;
-        }
         $ffi = self::ffi();
         if (null === $ffi) {
             throw new \Error('posix_mknod() is not available in this compiler build');
@@ -187,17 +159,7 @@ final class VmPosix
      */
     public static function getcwd(): string|false
     {
-        if (\function_exists('posix_getcwd')) {
-            $cwd = \posix_getcwd();
-            if (false === $cwd) {
-                self::captureHostPosixErrno();
-
-                return false;
-            }
-
-            return (string) $cwd;
-        }
-
+        self::$lastError = 0;
         $cwd = VmGetcwdNative::resolve();
         if (false === $cwd) {
             $ffi = self::ffi();
@@ -213,9 +175,6 @@ final class VmPosix
 
     public static function ctermid(): string
     {
-        if (\function_exists('posix_ctermid')) {
-            return (string) \posix_ctermid();
-        }
         $ffi = self::ffi();
         if (null === $ffi) {
             return '';
@@ -238,21 +197,17 @@ final class VmPosix
         self::$lastError = $errno;
     }
 
+    public static function ffiAvailable(): bool
+    {
+        return null !== self::ffi();
+    }
+
     private static function setId(string $fn, int $id): bool
     {
         self::$lastError = 0;
-        $hostFn = 'posix_'.$fn;
-        if (\function_exists($hostFn)) {
-            $ok = @$hostFn($id);
-            if (!$ok) {
-                self::captureHostPosixErrno();
-            }
-
-            return $ok;
-        }
         $ffi = self::ffi();
         if (null === $ffi) {
-            throw new \Error($hostFn.'() is not available in this compiler build');
+            throw new \Error('posix_'.$fn.'() is not available in this compiler build');
         }
         if (0 !== (int) $ffi->$fn($id)) {
             self::$lastError = self::readErrno($ffi);
@@ -261,16 +216,6 @@ final class VmPosix
         }
 
         return true;
-    }
-
-    private static function captureHostPosixErrno(): void
-    {
-        if (\function_exists('posix_get_last_error')) {
-            self::$lastError = (int) \posix_get_last_error();
-
-            return;
-        }
-        self::$lastError = 1;
     }
 
     private static function readErrno(\FFI $ffi): int

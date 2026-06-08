@@ -11,7 +11,7 @@ use PHPCompiler\VM;
 /**
  * posix extension module entry (php-src ext/posix/posix.c; issue #7105).
  *
- * v1 libc wrappers: #7271; access/mknod/set*: #7376; full port tracked in #3339 / #7177.
+ * v1 libc wrappers: #7271; access/mknod/set*: #7376; host delegation removed #7177.
  */
 class Module extends ModuleAbstract
 {
