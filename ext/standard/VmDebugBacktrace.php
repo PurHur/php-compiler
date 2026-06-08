@@ -43,7 +43,7 @@ final class VmDebugBacktrace
             if ($f->hasHandler()) {
                 continue;
             }
-            $entry = self::frameEntry($f, $includeArgs, $provideObject);
+            $entry = self::frameEntry($f, $includeArgs, $provideObject, false);
             if (null === $entry) {
                 continue;
             }
@@ -52,6 +52,37 @@ final class VmDebugBacktrace
             if ($limit > 0 && $framesAdded >= $limit) {
                 break;
             }
+        }
+
+        return $result;
+    }
+
+    /**
+     * Build a trace from an explicit frame list (issue #6470 fiber suspend stacks).
+     *
+     * @param list<Frame> $frames innermost first
+     */
+    public static function buildFromFrames(
+        array $frames,
+        int $options = 0,
+        bool $includeHandlers = false,
+    ): Variable {
+        $includeArgs = 0 === ($options & self::IGNORE_ARGS);
+        $provideObject = 0 !== ($options & self::PROVIDE_OBJECT);
+
+        $result = new Variable();
+        $result->newArray();
+        $ht = $result->toArray();
+
+        foreach ($frames as $f) {
+            if (!$includeHandlers && $f->hasHandler()) {
+                continue;
+            }
+            $entry = self::frameEntry($f, $includeArgs, $provideObject, $includeHandlers);
+            if (null === $entry) {
+                continue;
+            }
+            $ht->append($entry);
         }
 
         return $result;
@@ -71,8 +102,12 @@ final class VmDebugBacktrace
         return $frames;
     }
 
-    private static function frameEntry(Frame $frame, bool $includeArgs, bool $provideObject): ?Variable
-    {
+    private static function frameEntry(
+        Frame $frame,
+        bool $includeArgs,
+        bool $provideObject,
+        bool $includeHandlerMetadata,
+    ): ?Variable {
         $function = self::frameFunction($frame);
         $file = self::frameFile($frame);
         if ('' === $function && '' === $file) {
@@ -83,17 +118,32 @@ final class VmDebugBacktrace
         $entry->newArray();
         $ht = $entry->toArray();
 
-        $fileVar = new Variable(Variable::TYPE_STRING);
-        $fileVar->string($file);
-        $ht->add('file', $fileVar);
+        if ('' !== $file) {
+            $fileVar = new Variable(Variable::TYPE_STRING);
+            $fileVar->string($file);
+            $ht->add('file', $fileVar);
 
-        $lineVar = new Variable(Variable::TYPE_INTEGER);
-        $lineVar->int(self::frameLine($frame));
-        $ht->add('line', $lineVar);
+            $lineVar = new Variable(Variable::TYPE_INTEGER);
+            $lineVar->int(self::frameLine($frame));
+            $ht->add('line', $lineVar);
+        }
 
         $fnVar = new Variable(Variable::TYPE_STRING);
         $fnVar->string($function);
         $ht->add('function', $fnVar);
+
+        if ($includeHandlerMetadata && $frame->hasHandler()) {
+            $className = self::handlerClassName($frame);
+            if ('' !== $className) {
+                $classVar = new Variable(Variable::TYPE_STRING);
+                $classVar->string($className);
+                $ht->add('class', $classVar);
+
+                $typeVar = new Variable(Variable::TYPE_STRING);
+                $typeVar->string('::');
+                $ht->add('type', $typeVar);
+            }
+        }
 
         if ($provideObject) {
             $object = self::frameObject($frame);
@@ -139,6 +189,9 @@ final class VmDebugBacktrace
         }
         $func = $frame->block->func;
         $name = $func->name;
+        if ('' === $name && null === $func->class) {
+            return '{closure}';
+        }
         if (null !== $func->class) {
             $class = $func->class->value ?? $func->class->name ?? '';
 
@@ -146,6 +199,19 @@ final class VmDebugBacktrace
         }
 
         return $name;
+    }
+
+    private static function handlerClassName(Frame $frame): string
+    {
+        if (!$frame->hasHandler()) {
+            return '';
+        }
+        $handlerClass = $frame->handler::class;
+        if (str_starts_with($handlerClass, 'PHPCompiler\\VM\\Builtin\\Fiber')) {
+            return 'Fiber';
+        }
+
+        return '';
     }
 
     private static function frameFile(Frame $frame): string

@@ -32,6 +32,9 @@ final class FiberState
     /** Value passed to start()/resume() — returned from suspend(). */
     public Variable $resumeArgument;
 
+    /** Stack captured at {@see FiberSupport::suspend()} for getTrace() (#6470). */
+    public Variable $suspendedTrace;
+
     /** Throwable passed to Fiber->throw() — thrown from suspend(). */
     public bool $hasPendingThrow = false;
 
@@ -59,6 +62,8 @@ final class FiberState
         $this->suspendReturn = new Variable();
         $this->resumeArgument = new Variable();
         $this->resumeArgument->null();
+        $this->suspendedTrace = new Variable();
+        $this->suspendedTrace->newArray();
         $this->pendingThrow = new Variable();
         $this->pendingThrow->null();
         $this->returnValue = new Variable();

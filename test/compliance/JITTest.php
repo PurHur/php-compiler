@@ -288,6 +288,10 @@ class JITTest extends BaseTest {
             if (str_contains($name, 'generator_get_return')) {
                 continue;
             }
+            // Fiber::getTrace()/getTraceAsString() — VM FiberState suspend capture (#6470).
+            if (str_contains($name, 'fiber_get_trace')) {
+                continue;
+            }
             // exit/die expression ScriptExit status — VM compliance (#3539).
             if (str_contains($name, 'exit_expression') || str_contains($name, 'die_expression')) {
                 continue;
