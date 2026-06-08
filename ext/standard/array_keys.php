@@ -16,6 +16,7 @@ use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\ArrayBuiltinHelper;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\HashTableHelper;
+use PHPCompiler\JIT\JitBoolArg;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Value;
 
@@ -26,22 +27,45 @@ final class array_keys extends Internal
 {
     public function execute(Frame $frame): void
     {
-        if (1 !== \count($frame->calledArgs)) {
-            throw new \LogicException('array_keys() requires exactly one argument');
+        $argc = \count($frame->calledArgs);
+        if ($argc < 1 || $argc > 3) {
+            throw new \LogicException('array_keys() requires one to three arguments');
         }
         $ht = VmArray::requireArray($frame->calledArgs[0]->resolveIndirect(), 'array_keys');
         if (null === $frame->returnVar) {
             return;
         }
-        $frame->returnVar->array($ht->keysCopy());
+        if (1 === $argc) {
+            $frame->returnVar->array($ht->keysCopy());
+
+            return;
+        }
+        $searchValue = $frame->calledArgs[1]->resolveIndirect();
+        $strict = false;
+        if (3 === $argc) {
+            $strict = $frame->calledArgs[2]->resolveIndirect()->toBool();
+        }
+        $frame->returnVar->array($ht->keysMatchingCopy($searchValue, $strict));
     }
 
     public Context $context;
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        if (1 !== \count($args)) {
-            throw new \LogicException('array_keys() requires exactly one argument');
+        $argc = \count($args);
+        if ($argc < 1 || $argc > 3) {
+            throw new \LogicException('array_keys() requires one to three arguments');
+        }
+        if ($argc > 1) {
+            $strict = $context->constantFromBool(false);
+            if (3 === $argc) {
+                $strict = JitBoolArg::lower($context, $args[2], 'array_keys() strict');
+            }
+            if (JITVariable::TYPE_STRING === $args[1]->type || JITVariable::TYPE_VALUE === $args[1]->type) {
+                $this->jitString($context, $args[1], 'array_keys() search_value');
+            }
+
+            return ArrayBuiltinHelper::buildKeysArrayFiltered($context, $args[0], $args[1], $strict);
         }
 
         if (JITVariable::TYPE_HASHTABLE === $args[0]->type

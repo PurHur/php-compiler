@@ -5126,6 +5126,251 @@ final class ArrayBuiltinHelper
     }
 
     /**
+     * array_keys($array, $search_value, $strict) — matching keys only (#4266).
+     */
+    public static function buildKeysArrayFiltered(
+        Context $context,
+        Variable $array,
+        Variable $searchValue,
+        Value $strict
+    ): Value {
+        if (self::isNativeArray($array->type)) {
+            return self::buildKeysArrayFilteredNative($context, $array, $searchValue, $strict);
+        }
+        if (Variable::TYPE_VALUE === $array->type) {
+            JitArrayElem::requireArrayArg($context, $array, 'array_keys');
+        }
+        $ht = self::loadHashTable($context, $array);
+
+        return self::buildKeysArrayFilteredHashTable($context, $ht, $searchValue, $strict);
+    }
+
+    private static function buildKeysArrayFilteredNative(
+        Context $context,
+        Variable $array,
+        Variable $searchValue,
+        Value $strict
+    ): Value {
+        $elemType = $array->type & ~Variable::IS_NATIVE_ARRAY;
+        $sizeT = $context->getTypeFromString('size_t');
+        $i64 = $context->getTypeFromString('int64');
+        $zero = $sizeT->constInt(0, false);
+        $one = $sizeT->constInt(1, false);
+        $count = $context->constantFromInteger($array->nextFreeElement, 'size_t');
+        $destHt = HashTableHelper::alloc($context);
+        $idxSlot = $context->builder->alloca($sizeT, 1, 'array_keys_filt_native_idx');
+        $destIdxSlot = $context->builder->alloca($sizeT, 1, 'array_keys_filt_native_dest');
+        $context->builder->store($zero, $idxSlot);
+        $context->builder->store($zero, $destIdxSlot);
+        $setLongAt = $context->lookupFunction('__hashtable__setLongAt');
+
+        $head = BasicBlockHelper::append($context, 'array_keys_filt_native_head');
+        $body = BasicBlockHelper::append($context, 'array_keys_filt_native_body');
+        $append = BasicBlockHelper::append($context, 'array_keys_filt_native_append');
+        $next = BasicBlockHelper::append($context, 'array_keys_filt_native_next');
+        $done = BasicBlockHelper::append($context, 'array_keys_filt_native_done');
+        $context->builder->branch($head);
+
+        $context->builder->positionAtEnd($head);
+        $idx = $context->builder->load($idxSlot);
+        $atEnd = $context->builder->icmp(Builder::INT_SGE, $idx, $count);
+        $context->builder->branchIf($atEnd, $done, $body);
+
+        $context->builder->positionAtEnd($body);
+        $slot = $context->builder->inBoundsGep($array->value, $zero, $idx);
+        $elem = $context->builder->load($slot);
+        $cand = new Variable($context, $elemType, Variable::KIND_VALUE, $elem);
+        $match = self::valuesEqual($context, $searchValue, $cand, $strict);
+        $context->builder->branchIf($match, $append, $next);
+
+        $context->builder->positionAtEnd($append);
+        $destIdx = $context->builder->load($destIdxSlot);
+        $context->builder->call(
+            $setLongAt,
+            $destHt,
+            $destIdx,
+            $context->builder->truncOrBitCast($idx, $i64)
+        );
+        $context->builder->store($context->builder->addNoSignedWrap($destIdx, $one), $destIdxSlot);
+        $context->builder->branch($next);
+
+        $context->builder->positionAtEnd($next);
+        $context->builder->store($context->builder->addNoSignedWrap($idx, $one), $idxSlot);
+        $context->builder->branch($head);
+
+        $context->builder->positionAtEnd($done);
+
+        return $destHt;
+    }
+
+    private static function buildKeysArrayFilteredHashTable(
+        Context $context,
+        Value $ht,
+        Variable $searchValue,
+        Value $strict
+    ): Value {
+        $map = $context->structFieldMap['__hashtable__'];
+        $nodeMap = $context->structFieldMap['__strkey_node__'];
+        $sizeT = $context->getTypeFromString('size_t');
+        $i64 = $context->getTypeFromString('int64');
+        $zero = $sizeT->constInt(0, false);
+        $one = $sizeT->constInt(1, false);
+        $nodePtrType = $context->getTypeFromString('__strkey_node__*');
+        $destHt = HashTableHelper::alloc($context);
+        $destIdxSlot = $context->builder->alloca($sizeT, 1, 'array_keys_filt_dest');
+        $context->builder->store($zero, $destIdxSlot);
+        $setLongAt = $context->lookupFunction('__hashtable__setLongAt');
+        $setStringAt = $context->lookupFunction('__hashtable__setStringAt');
+
+        $nextFree = $context->builder->load($context->builder->structGep($ht, $map['nextFreeElement']));
+        $idxSlot = $context->builder->alloca($sizeT, 1, 'array_keys_filt_packed_idx');
+        $context->builder->store($zero, $idxSlot);
+        $packedHead = BasicBlockHelper::append($context, 'array_keys_filt_packed_head');
+        $packedBody = BasicBlockHelper::append($context, 'array_keys_filt_packed_body');
+        $packedAppend = BasicBlockHelper::append($context, 'array_keys_filt_packed_append');
+        $packedNext = BasicBlockHelper::append($context, 'array_keys_filt_packed_next');
+        $packedDone = BasicBlockHelper::append($context, 'array_keys_filt_packed_done');
+        $context->builder->branch($packedHead);
+
+        $context->builder->positionAtEnd($packedHead);
+        $idx = $context->builder->load($idxSlot);
+        $atEnd = $context->builder->icmp(Builder::INT_SGE, $idx, $nextFree);
+        $context->builder->branchIf($atEnd, $packedDone, $packedBody);
+
+        $context->builder->positionAtEnd($packedBody);
+        $isSet = $context->builder->call(
+            $context->lookupFunction('__hashtable__offsetIsSet'),
+            $ht,
+            $idx
+        );
+        $context->builder->branchIf($isSet, $packedAppend, $packedNext);
+
+        $context->builder->positionAtEnd($packedAppend);
+        $entry = self::listEntryAt($context, $ht, $idx);
+        $match = self::entryMatchesNeedle($context, $entry, $searchValue, $strict);
+        $packedMatch = BasicBlockHelper::append($context, 'array_keys_filt_packed_write');
+        $context->builder->branchIf($match, $packedMatch, $packedNext);
+
+        $context->builder->positionAtEnd($packedMatch);
+        $destIdx = $context->builder->load($destIdxSlot);
+        $context->builder->call(
+            $setLongAt,
+            $destHt,
+            $destIdx,
+            $context->builder->truncOrBitCast($idx, $i64)
+        );
+        $context->builder->store($context->builder->addNoSignedWrap($destIdx, $one), $destIdxSlot);
+        $context->builder->branch($packedNext);
+
+        $context->builder->positionAtEnd($packedNext);
+        $context->builder->store($context->builder->addNoSignedWrap($idx, $one), $idxSlot);
+        $context->builder->branch($packedHead);
+
+        $strInit = BasicBlockHelper::append($context, 'array_keys_filt_str_init');
+        $strHead = BasicBlockHelper::append($context, 'array_keys_filt_str_head');
+        $context->builder->positionAtEnd($packedDone);
+        $context->builder->branch($strInit);
+
+        $context->builder->positionAtEnd($strInit);
+        $ptrSize = $sizeT->constInt(8, false);
+        $strCountSlot = $context->builder->alloca($sizeT, 1, 'array_keys_filt_str_count');
+        $nodesSlot = $context->builder->alloca($nodePtrType->pointerType(0), 1, 'array_keys_filt_str_nodes');
+        $walkSlot = $context->builder->alloca($nodePtrType, 1, 'array_keys_filt_str_walk');
+        $head = $context->builder->load($context->builder->structGep($ht, $map['strKeys']));
+        $context->builder->store($zero, $strCountSlot);
+        $context->builder->store($head, $walkSlot);
+        $countHead = BasicBlockHelper::append($context, 'array_keys_filt_str_count_head');
+        $countBody = BasicBlockHelper::append($context, 'array_keys_filt_str_count_body');
+        $countDone = BasicBlockHelper::append($context, 'array_keys_filt_str_count_done');
+        $context->builder->branch($countHead);
+        $context->builder->positionAtEnd($countHead);
+        $walkNode = $context->builder->load($walkSlot);
+        $walkEnd = $context->builder->icmp(Builder::INT_EQ, $walkNode, $nodePtrType->constNull());
+        $context->builder->branchIf($walkEnd, $countDone, $countBody);
+        $context->builder->positionAtEnd($countBody);
+        $strCount = $context->builder->load($strCountSlot);
+        $context->builder->store($context->builder->addNoSignedWrap($strCount, $one), $strCountSlot);
+        $nextWalk = $context->builder->load($context->builder->structGep($walkNode, $nodeMap['next']));
+        $context->builder->store($nextWalk, $walkSlot);
+        $context->builder->branch($countHead);
+        $context->builder->positionAtEnd($countDone);
+        $numStrKeys = $context->builder->load($strCountSlot);
+        $isEmpty = $context->builder->icmp(Builder::INT_EQ, $numStrKeys, $zero);
+        $strEmpty = BasicBlockHelper::append($context, 'array_keys_filt_str_empty');
+        $strWork = BasicBlockHelper::append($context, 'array_keys_filt_str_work');
+        $context->builder->branchIf($isEmpty, $strEmpty, $strWork);
+        $context->builder->positionAtEnd($strEmpty);
+        $strDone = BasicBlockHelper::append($context, 'array_keys_filt_str_done');
+        $context->builder->branch($strDone);
+        $context->builder->positionAtEnd($strWork);
+        $bytes = $context->builder->mulNoSignedWrap($numStrKeys, $ptrSize);
+        $nodesRaw = $context->builder->call($context->lookupFunction('malloc'), $bytes);
+        $nodesArray = $context->builder->pointerCast($nodesRaw, $nodePtrType->pointerType(0));
+        $context->builder->store($nodesArray, $nodesSlot);
+        $context->builder->store($zero, $strCountSlot);
+        $context->builder->store($head, $walkSlot);
+        $fillHead = BasicBlockHelper::append($context, 'array_keys_filt_str_fill_head');
+        $fillBody = BasicBlockHelper::append($context, 'array_keys_filt_str_fill_body');
+        $fillDone = BasicBlockHelper::append($context, 'array_keys_filt_str_fill_done');
+        $context->builder->branch($fillHead);
+        $context->builder->positionAtEnd($fillHead);
+        $walkNode = $context->builder->load($walkSlot);
+        $walkEnd = $context->builder->icmp(Builder::INT_EQ, $walkNode, $nodePtrType->constNull());
+        $context->builder->branchIf($walkEnd, $fillDone, $fillBody);
+        $context->builder->positionAtEnd($fillBody);
+        $strCount = $context->builder->load($strCountSlot);
+        $nodesArray = $context->builder->load($nodesSlot);
+        $context->builder->store($walkNode, $context->builder->inBoundsGEP($nodesArray, $strCount));
+        $nextFill = $context->builder->load($context->builder->structGep($walkNode, $nodeMap['next']));
+        $context->builder->store($context->builder->addNoSignedWrap($strCount, $one), $strCountSlot);
+        $context->builder->store($nextFill, $walkSlot);
+        $context->builder->branch($fillHead);
+        $context->builder->positionAtEnd($fillDone);
+        $strIdxSlot = $context->builder->alloca($sizeT, 1, 'array_keys_filt_str_idx');
+        $context->builder->store($zero, $strIdxSlot);
+        $strBody = BasicBlockHelper::append($context, 'array_keys_filt_str_body');
+        $strAppend = BasicBlockHelper::append($context, 'array_keys_filt_str_append');
+        $strNext = BasicBlockHelper::append($context, 'array_keys_filt_str_next');
+        $context->builder->branch($strHead);
+
+        $context->builder->positionAtEnd($strHead);
+        $nodeIdx = $context->builder->load($strIdxSlot);
+        $atEnd = $context->builder->icmp(Builder::INT_SGE, $nodeIdx, $numStrKeys);
+        $strDrain = BasicBlockHelper::append($context, 'array_keys_filt_str_drain');
+        $context->builder->branchIf($atEnd, $strDrain, $strBody);
+
+        $context->builder->positionAtEnd($strDrain);
+        $nodesArray = $context->builder->load($nodesSlot);
+        $nodesRaw = $context->builder->pointerCast($nodesArray, $context->getTypeFromString('int8*'));
+        $context->builder->call($context->lookupFunction('free'), $nodesRaw);
+        $context->builder->branch($strDone);
+
+        $context->builder->positionAtEnd($strBody);
+        $nodesArray = $context->builder->load($nodesSlot);
+        $node = $context->builder->load($context->builder->inBoundsGEP($nodesArray, $nodeIdx));
+        $valEntry = $context->builder->structGep($node, $nodeMap['value']);
+        $match = self::entryMatchesNeedle($context, $valEntry, $searchValue, $strict);
+        $strMatch = BasicBlockHelper::append($context, 'array_keys_filt_str_write');
+        $context->builder->branchIf($match, $strMatch, $strNext);
+
+        $context->builder->positionAtEnd($strMatch);
+        $keyStr = $context->builder->load($context->builder->structGep($node, $nodeMap['key']));
+        $owned = $context->builder->call($context->lookupFunction('__string__separate'), $keyStr);
+        $destIdx = $context->builder->load($destIdxSlot);
+        $context->builder->call($setStringAt, $destHt, $destIdx, $owned);
+        $context->builder->store($context->builder->addNoSignedWrap($destIdx, $one), $destIdxSlot);
+        $context->builder->branch($strNext);
+
+        $context->builder->positionAtEnd($strNext);
+        $context->builder->store($context->builder->addNoSignedWrap($nodeIdx, $one), $strIdxSlot);
+        $context->builder->branch($strHead);
+
+        $context->builder->positionAtEnd($strDone);
+
+        return $destHt;
+    }
+
+    /**
      * array_merge() with one source — reindex integer keys, preserve string keys (#4620).
      */
     private static function mergeSingleArgumentCopy(Context $context, Variable $array): Value
