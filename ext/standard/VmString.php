@@ -1091,9 +1091,6 @@ final class VmString
 
     private const BASE64_ALPHABET = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/';
 
-    /** @var array|null */
-    private static ?array $base64DecodeTable = null;
-
     /** RFC 4648 base64 encode (standard alphabet, padding). */
     public static function base64_encode(string $data): string
     {
@@ -1126,58 +1123,91 @@ final class VmString
     }
 
     /**
-     * RFC 4648 base64 decode (non-strict: ignore bytes outside the alphabet).
-     *
-     * @return string|false
-     * decoded bytes, or false when padding or input is invalid
+     * php-src ext/standard/base64.c base64_reverse_table: -2 invalid, -1 whitespace, 0..63 digit.
      */
-    public static function base64_decode(string $data) {
+    private static function base64ReverseChar(int $ch): int
+    {
+        static $table = null;
+        if (null === $table) {
+            $table = array_fill(0, 256, -2);
+            foreach ([9, 10, 13, 32] as $ws) {
+                $table[$ws] = -1;
+            }
+            $alphabet = self::BASE64_ALPHABET;
+            for ($i = 0; $i < 64; ++$i) {
+                $table[self::byteOrd($alphabet[$i])] = $i;
+            }
+        }
+
+        return $table[$ch] ?? -2;
+    }
+
+    /**
+     * RFC 4648 base64 decode (php-src php_base64_decode_impl).
+     *
+     * Non-strict: ignore bytes outside the alphabet (whitespace skipped).
+     * Strict: reject invalid characters, bad padding, and truncated groups.
+     *
+     * @return string|false decoded bytes, or false when input is invalid
+     */
+    public static function base64_decode(string $data, bool $strict = false)
+    {
         $len = self::byteLength($data);
         if (0 === $len) {
             return '';
         }
-        if (null === self::$base64DecodeTable) {
-            $decode = array_fill(0, 256, -1);
-            $alphabet = self::BASE64_ALPHABET;
-            for ($i = 0; $i < 64; ++$i) {
-                $decode[self::byteOrd($alphabet[$i])] = $i;
-            }
-            self::$base64DecodeTable = $decode;
-        }
-        $decode = self::$base64DecodeTable;
         $out = '';
-        $val = 0;
-        $bits = 0;
-        $sawPad = false;
-        for ($i = 0; $i < $len; ++$i) {
-            $ch = self::byteOrd($data[$i]);
+        $j = 0;
+        $i = 0;
+        $padding = 0;
+        for ($pos = 0; $pos < $len; ++$pos) {
+            $ch = self::byteOrd($data[$pos]);
             if (61 === $ch) {
-                if ($sawPad) {
+                ++$padding;
+                continue;
+            }
+            $d = self::base64ReverseChar($ch);
+            if (!$strict) {
+                if ($d < 0) {
+                    continue;
+                }
+            } else {
+                if (-1 === $d) {
+                    continue;
+                }
+                if (-2 === $d || $padding > 0) {
                     return false;
                 }
-                $sawPad = true;
-                continue;
             }
-            if ($sawPad) {
-                return false;
+            switch ($i % 4) {
+                case 0:
+                    $out .= \chr($d << 2);
+                    break;
+                case 1:
+                    $out[$j] = \chr((self::byteOrd($out[$j]) | ($d >> 4)) & 0xFF);
+                    ++$j;
+                    $out .= \chr(($d & 0x0f) << 4);
+                    break;
+                case 2:
+                    $out[$j] = \chr((self::byteOrd($out[$j]) | ($d >> 2)) & 0xFF);
+                    ++$j;
+                    $out .= \chr(($d & 0x03) << 6);
+                    break;
+                case 3:
+                    $out[$j] = \chr((self::byteOrd($out[$j]) | $d) & 0xFF);
+                    ++$j;
+                    break;
             }
-            $d = $decode[$ch] ?? -1;
-            if ($d < 0) {
-                continue;
-            }
-            $val = ($val << 6) | $d;
-            $bits += 6;
-            if ($bits >= 8) {
-                $bits -= 8;
-                $out .= \chr(($val >> $bits) & 0xFF);
-                $val &= (1 << $bits) - 1;
-            }
+            ++$i;
         }
-        if ($sawPad && 0 !== $bits) {
+        if ($strict && 1 === $i % 4) {
+            return false;
+        }
+        if ($strict && $padding > 0 && ($padding > 2 || 0 !== ($i + $padding) % 4)) {
             return false;
         }
 
-        return $out;
+        return \substr($out, 0, $j);
     }
 
     private const QPRINT_MAXL = 75;
