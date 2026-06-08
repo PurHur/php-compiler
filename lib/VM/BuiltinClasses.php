@@ -14,6 +14,9 @@ use PHPCompiler\VM\Builtin\DateTimeImmutableCreateFromFormat;
 use PHPCompiler\VM\Builtin\DateTimeSetMicrosecond;
 use PHPCompiler\VM\Builtin\DateTimeSetTimezone;
 use PHPCompiler\VM\Builtin\DateTimeZoneConstruct;
+use PHPCompiler\VM\Builtin\DateTimeZoneGetLocation;
+use PHPCompiler\VM\Builtin\DateTimeZoneGetName;
+use PHPCompiler\VM\Builtin\DateTimeZoneGetOffset;
 use PHPCompiler\VM\Builtin\ExceptionConstruct;
 use PHPCompiler\VM\Builtin\ExceptionGetCode;
 use PHPCompiler\VM\Builtin\ExceptionGetFile;
@@ -627,6 +630,12 @@ final class BuiltinClasses
         $tz->constructor = new DateTimeZoneConstruct();
         $tz->methods['__construct'] = $tz->constructor;
         $tz->methodVisibility['__construct'] = $pub;
+        $tz->methods['getname'] = new DateTimeZoneGetName();
+        $tz->methodVisibility['getname'] = $pub;
+        $tz->methods['getoffset'] = new DateTimeZoneGetOffset();
+        $tz->methodVisibility['getoffset'] = $pub;
+        $tz->methods['getlocation'] = new DateTimeZoneGetLocation();
+        $tz->methodVisibility['getlocation'] = $pub;
         $ctx->classes[DateTimeSupport::CLASS_DATETIMEZONE] = $tz;
 
         $pubStatic = $pub | CfgFunc::FLAG_STATIC;

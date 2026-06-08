@@ -100,6 +100,61 @@ final class DateTimeSupport
         return self::requireStringProperty($zone, self::TZ_NAME_PROPERTY, 'DateTimeZone')->toString();
     }
 
+    /** php-src zim_DateTimeZone_getOffset — DateTimeInterface operand (#7131). */
+    public static function requireDateTimeInterface(Variable $var, string $label, Context $ctx): ObjectEntry
+    {
+        $var = $var->resolveIndirect();
+        if (Variable::TYPE_OBJECT !== $var->type) {
+            throw new \TypeError(
+                "{$label} must be of type DateTimeInterface, "
+                .ReflectionSupport::valueTypeLabelPublic($var).' given'
+            );
+        }
+        $obj = $var->toObject();
+        if (InterfaceCheck::entryIsInstanceOf($obj->class, self::CLASS_DATETIMEINTERFACE, $ctx)) {
+            return $obj;
+        }
+        throw new \TypeError(
+            "{$label} must be of type DateTimeInterface, "
+            .$obj->class->name.' given'
+        );
+    }
+
+    /** php-src zim_DateTimeZone_getOffset (#7131). */
+    public static function timezoneOffset(ObjectEntry $zone, ObjectEntry $datetime): int
+    {
+        self::requireInitializedDateTimeLike($datetime, self::classLabel($datetime));
+        $hostZone = new \DateTimeZone(self::timezoneName($zone));
+
+        return $hostZone->getOffset(self::toHost($datetime));
+    }
+
+    /** php-src zim_DateTimeZone_getLocation (#7131). */
+    public static function timezoneLocationInto(ObjectEntry $zone, Variable $returnVar): void
+    {
+        $location = (new \DateTimeZone(self::timezoneName($zone)))->getLocation();
+        if (false === $location) {
+            $returnVar->bool(false);
+
+            return;
+        }
+        $ht = new HashTable();
+        foreach ($location as $key => $value) {
+            $entry = new Variable();
+            if (\is_string($value)) {
+                $entry->string($value);
+            } elseif (\is_int($value)) {
+                $entry->int($value);
+            } elseif (\is_float($value)) {
+                $entry->float($value);
+            } else {
+                throw new \LogicException('DateTimeZone::getLocation() returned unexpected value type');
+            }
+            $ht->addNew((string) $key, $entry);
+        }
+        $returnVar->array($ht);
+    }
+
     public static function initDateTimeZone(ObjectEntry $zone, string $timezone): void
     {
         try {
