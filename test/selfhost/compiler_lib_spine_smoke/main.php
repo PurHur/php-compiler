@@ -1268,6 +1268,10 @@ require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionFunctionIsAnonymous.php
 require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionNamedTypeGetName.php';
 require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionNamedTypeIsBuiltin.php';
 require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionParameterGetType.php';
+require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionParameterGetValue.php';
+require_once __DIR__.'/../../../lib/VM/Builtin/SensitiveParameterValueConstruct.php';
+require_once __DIR__.'/../../../lib/VM/Builtin/SensitiveParameterValueDebugInfo.php';
+require_once __DIR__.'/../../../lib/VM/Builtin/SensitiveParameterValueGetValue.php';
 require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionPropertyGetAttributes.php';
 require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionPropertyIsPrivate.php';
 require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionPropertyIsProtected.php';

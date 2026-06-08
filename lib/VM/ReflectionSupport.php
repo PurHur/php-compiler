@@ -807,6 +807,55 @@ final class ReflectionSupport
         return $idxVar->toInt();
     }
 
+    public static function paramNameFromReflection(ObjectEntry $reflection): string
+    {
+        $nameVar = $reflection->getProperty(self::PROP_PARAM_NAME)->resolveIndirect();
+        if (Variable::TYPE_STRING !== $nameVar->type) {
+            throw new \LogicException('ReflectionParameter missing parameter name');
+        }
+
+        return $nameVar->toString();
+    }
+
+    public static function valueTypeLabelPublic(Variable $var): string
+    {
+        return self::valueTypeLabel($var);
+    }
+
+    /**
+     * @return list<AttributeEntry>
+     */
+    public static function parameterAttributeEntries(Context $ctx, ObjectEntry $reflection): array
+    {
+        $classNameVar = $reflection->getProperty(self::PROP_CLASS_NAME)->resolveIndirect();
+        if (Variable::TYPE_STRING === $classNameVar->type) {
+            $className = $classNameVar->toString();
+            $method = self::methodNameFromReflection($reflection);
+            $entry = VmReflection::resolveClassEntry($ctx, $className);
+            if (null === $entry) {
+                return [];
+            }
+            $methodLc = strtolower($method);
+            $position = self::paramPositionFromReflection($reflection);
+            $params = $entry->methodParameterMetadata[$methodLc] ?? [];
+            $paramMeta = $params[$position] ?? null;
+
+            return null !== $paramMeta ? $paramMeta->attributes : [];
+        }
+
+        $funcNameVar = $reflection->getProperty(self::PROP_FUNC_NAME)->resolveIndirect();
+        if (Variable::TYPE_STRING !== $funcNameVar->type) {
+            return [];
+        }
+        $func = self::resolveUserFunction($ctx, $funcNameVar->toString());
+        $index = self::paramIndexFromReflection($reflection);
+        if (!isset($func->block->paramSensitive[$index])) {
+            return [];
+        }
+
+        return [new AttributeEntry('SensitiveParameter')];
+    }
+
     /**
      * @return \PHPCompiler\Func\PHP
      */

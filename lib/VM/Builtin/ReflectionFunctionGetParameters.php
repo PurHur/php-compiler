@@ -37,6 +37,8 @@ final class ReflectionFunctionGetParameters extends VmClassMethod
             $param = new ObjectEntry($paramClass);
             $param->constructed = true;
             $param->getProperty(ReflectionSupport::PROP_FUNC_NAME)->string($funcName);
+            $param->getProperty(ReflectionSupport::PROP_CLASS_NAME)->null();
+            $param->getProperty(ReflectionSupport::PROP_METHOD_NAME)->null();
             $param->getProperty(ReflectionSupport::PROP_PARAM_INDEX)->int((int) $index);
             $param->getProperty(ReflectionSupport::PROP_PARAM_NAME)->string($func->block->paramNames[$index]);
             $slot = new Variable(Variable::TYPE_OBJECT);

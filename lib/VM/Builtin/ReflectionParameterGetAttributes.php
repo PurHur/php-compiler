@@ -20,17 +20,7 @@ final class ReflectionParameterGetAttributes extends VmClassMethod
     {
         $receiver = ReflectionSupport::requireReflectionParameter($frame, $frame->calledArgs[0]);
         $ctx = VmReflection::requireContext($frame);
-        $className = ReflectionSupport::classNameFromReflection($receiver);
-        $method = ReflectionSupport::methodNameFromReflection($receiver);
-        $position = ReflectionSupport::paramPositionFromReflection($receiver);
-        $entry = VmReflection::resolveClassEntry($ctx, $className);
-        if (null === $entry) {
-            throw new \LogicException('ReflectionParameter refers to unknown class in this compiler build');
-        }
-        $methodLc = strtolower($method);
-        $params = $entry->methodParameterMetadata[$methodLc] ?? [];
-        $paramMeta = $params[$position] ?? null;
-        $all = null !== $paramMeta ? $paramMeta->attributes : [];
+        $all = ReflectionSupport::parameterAttributeEntries($ctx, $receiver);
         $filter = null;
         if (isset($frame->calledArgs[1])) {
             $filter = VmReflection::stringArg($frame->calledArgs[1], 'ReflectionParameter::getAttributes() name', 1);

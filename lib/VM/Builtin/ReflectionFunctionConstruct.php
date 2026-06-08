@@ -36,8 +36,5 @@ final class ReflectionFunctionConstruct extends VmClassMethod
             $receiver->getProperty(ReflectionSupport::PROP_FUNC_NAME)->string($name);
         }
         $receiver->constructed = true;
-        if (null !== $frame->returnVar) {
-            $frame->returnVar->null();
-        }
     }
 }

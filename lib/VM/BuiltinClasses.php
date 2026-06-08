@@ -104,6 +104,7 @@ use PHPCompiler\VM\Builtin\ReflectionNamedTypeGetName;
 use PHPCompiler\VM\Builtin\ReflectionNamedTypeIsBuiltin;
 use PHPCompiler\VM\Builtin\ReflectionParameterGetAttributes;
 use PHPCompiler\VM\Builtin\ReflectionParameterGetType;
+use PHPCompiler\VM\Builtin\ReflectionParameterGetValue;
 use PHPCompiler\VM\Builtin\ReflectionPropertyConstruct;
 use PHPCompiler\VM\Builtin\ReflectionPropertyGetAttributes;
 use PHPCompiler\VM\Builtin\ReflectionPropertyGetName;
@@ -302,6 +303,8 @@ final class BuiltinClasses
         $rparam->methodVisibility['getattributes'] = $pub;
         $rparam->methods['gettype'] = new ReflectionParameterGetType();
         $rparam->methodVisibility['gettype'] = $pub;
+        $rparam->methods['getvalue'] = new ReflectionParameterGetValue();
+        $rparam->methodVisibility['getvalue'] = $pub;
         $ctx->classes[ReflectionSupport::REFLECTION_PARAMETER] = $rparam;
 
         $rm = new ClassEntry('ReflectionMethod');
