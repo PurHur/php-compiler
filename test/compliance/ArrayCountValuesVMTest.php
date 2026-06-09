@@ -17,6 +17,14 @@ final class ArrayCountValuesVMTest extends BaseTest
             __DIR__.'/cases/stdlib/array_count_values.phpt',
             'array_count_values.phpt'
         );
+        yield 'array_count_values_skip.phpt' => self::parsePHPT(
+            __DIR__.'/cases/stdlib/array_count_values_skip.phpt',
+            'array_count_values_skip.phpt'
+        );
+        yield 'array_count_values_enum.phpt' => self::parsePHPT(
+            __DIR__.'/cases/stdlib/array_count_values_enum.phpt',
+            'array_count_values_enum.phpt'
+        );
     }
 
     public function setUp(): void

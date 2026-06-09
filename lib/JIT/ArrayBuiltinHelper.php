@@ -1931,8 +1931,14 @@ final class ArrayBuiltinHelper
         $context->builder->positionAtEnd($strDone);
         $context->builder->branch($done);
 
+        $skipBlock = BasicBlockHelper::append($context, 'array_count_values_val_skip_'.$id);
+
         $context->builder->positionAtEnd($afterString);
-        $context->builder->branchIf($isLong, $longBlock, $done);
+        $context->builder->branchIf($isLong, $longBlock, $skipBlock);
+
+        $context->builder->positionAtEnd($skipBlock);
+        self::emitCountValuesSkipWarning($context);
+        $context->builder->branch($done);
 
         $context->builder->positionAtEnd($longBlock);
         $keyIdx = $context->builder->truncOrBitCast(
@@ -1976,6 +1982,27 @@ final class ArrayBuiltinHelper
         $context->builder->branch($done);
 
         $context->builder->positionAtEnd($done);
+    }
+
+    private static function emitCountValuesSkipWarning(Context $context): void
+    {
+        $i8p = $context->getTypeFromString('int8*');
+        $i32 = $context->getTypeFromString('int32');
+        $msg = $context->builder->pointerCast(
+            $context->constantFromString(
+                'array_count_values(): Can only count string and integer values, entry skipped'
+            ),
+            $i8p
+        );
+        $msgLen = $context->builder->call($context->lookupFunction('strlen'), $msg);
+        $context->builder->call(
+            $context->lookupFunction('__compiler_trigger_error'),
+            $msg,
+            $msgLen,
+            $i32->constInt(2, false),
+            $context->builder->pointerCast($context->constantFromString(''), $i8p),
+            $i32->constInt(0, false)
+        );
     }
 
     /**

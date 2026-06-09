@@ -57,4 +57,28 @@ final class ArrayCountValuesBuiltinTest extends TestCase
         $this->assertSame(2, $out->findIndex(1)->resolveIndirect()->toInt());
         $this->assertSame(1, $out->findIndex(2)->resolveIndirect()->toInt());
     }
+
+    public function testSkipsInvalidEntriesWithWarning(): void
+    {
+        $ht = new HashTable();
+        $float = new VMVariable();
+        $float->float(1.5);
+        $ht->addIndex(0, $float);
+        $int = new VMVariable();
+        $int->int(2);
+        $ht->addIndex(1, $int);
+        $arr = new VMVariable();
+        $arr->array($ht);
+
+        $runtime = new Runtime();
+        $fn = new array_count_values();
+        $frame = $fn->getFrame($runtime->vmContext);
+        $frame->calledArgs = [$arr];
+        $frame->returnVar = new VMVariable();
+        $fn->execute($frame);
+
+        $out = $frame->returnVar->resolveIndirect()->toArray();
+        $this->assertSame(1, $out->findIndex(2)->resolveIndirect()->toInt());
+        $this->assertNull($out->findIndex(1));
+    }
 }
