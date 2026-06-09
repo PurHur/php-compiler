@@ -36,4 +36,18 @@ final class ParseStrEngineTest extends TestCase
         $native = ParseStrEngine::parse($encoded);
         $this->assertSame($zend, $native);
     }
+
+    public function testParseDelimitedCookieHeaderMatchesFormForSimplePairs(): void
+    {
+        $encoded = 'session=abc; path=%2F';
+        $native = ParseStrEngine::parseDelimited($encoded, ';', true);
+        $this->assertSame(['session' => 'abc', 'path' => '/'], $native);
+    }
+
+    public function testParseDelimitedCookieTrimsWhitespace(): void
+    {
+        $encoded = ' a=1 ; b=2 ';
+        $native = ParseStrEngine::parseDelimited($encoded, ';', true);
+        $this->assertSame(['a' => '1', 'b' => '2'], $native);
+    }
 }

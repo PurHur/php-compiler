@@ -18,6 +18,18 @@ final class ParseStrEngine
      */
     public static function parse(string $encoded, string $delimiter = '&'): array
     {
+        return self::parseDelimited($encoded, $delimiter, false);
+    }
+
+    /**
+     * Delimited key/value parser shared by parse_str(), superglobals, and JIT compile-time lowering (#6308).
+     *
+     * @param bool $cookiePairDecode when true, trim + url-decode each pair before splitting on '=' (Cookie header)
+     *
+     * @return array<string, mixed>
+     */
+    public static function parseDelimited(string $encoded, string $delimiter, bool $cookiePairDecode): array
+    {
         if ('' === $encoded) {
             return [];
         }
@@ -27,13 +39,20 @@ final class ParseStrEngine
             if ('' === $pair) {
                 continue;
             }
+            if ($cookiePairDecode) {
+                $pair = self::trimWs($pair);
+                if ('' === $pair) {
+                    continue;
+                }
+                $pair = self::urlDecode($pair);
+            }
             $eq = strpos($pair, '=');
             if (false === $eq) {
-                $key = self::urlDecode($pair);
+                $key = $cookiePairDecode ? $pair : self::urlDecode($pair);
                 $value = '';
             } else {
-                $key = self::urlDecode(substr($pair, 0, $eq));
-                $value = self::urlDecode(substr($pair, $eq + 1));
+                $key = $cookiePairDecode ? substr($pair, 0, $eq) : self::urlDecode(substr($pair, 0, $eq));
+                $value = $cookiePairDecode ? substr($pair, $eq + 1) : self::urlDecode(substr($pair, $eq + 1));
             }
             if ('' === $key) {
                 continue;
@@ -42,6 +61,11 @@ final class ParseStrEngine
         }
 
         return $result;
+    }
+
+    private static function trimWs(string $value): string
+    {
+        return trim($value, " \t\r\n");
     }
 
     private static function urlDecode(string $value): string
