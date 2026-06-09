@@ -17,26 +17,20 @@ final class VmHttpResponse
 {
     public static function resolveCodeArg(Variable $var, string $fn): int
     {
-        $var = $var->resolveIndirect();
-        $fromEnum = self::tryResponseCodeInt($var);
+        $resolved = $var->resolveIndirect();
+        $fromEnum = self::tryResponseCodeInt($resolved);
         if (null !== $fromEnum) {
             return $fromEnum;
         }
-        if (EnumCaseSupport::isEnumCaseVariable($var)) {
+        if (EnumCaseSupport::isEnumCaseVariable($resolved)) {
             throw new \TypeError(sprintf(
                 '%s(): Argument #1 ($response_code) must be of type int|ResponseCode|null, %s given',
                 $fn,
-                EnumCaseSupport::typeNameForVariable($var)
+                EnumCaseSupport::typeNameForVariable($resolved)
             ));
         }
-        if (Variable::TYPE_INTEGER === $var->type) {
-            return $var->toInt();
-        }
-        if (Variable::TYPE_NULL === $var->type) {
-            throw new \LogicException($fn.'() response_code must be an integer in this compiler build');
-        }
 
-        throw new \LogicException($fn.'() response_code must be an integer in this compiler build');
+        return VmMath::parseIntBuiltinArg($var, $fn, 1, 'response_code');
     }
 
     public static function tryResponseCodeInt(Variable $var): ?int
