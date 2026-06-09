@@ -58,7 +58,7 @@ final class JitMbCheckEncoding
                 'mb_check_encoding() JIT requires compile-time encoding literal in this compiler build'
             );
         }
-        VmMbstring::assertValidEncodingName($encoding, 'mb_check_encoding', 2);
+        VmMbstring::assertCheckEncodingName($encoding);
 
         if ('ASCII' === $encoding || '8BIT' === $encoding) {
             return $context->constantFromBool(true);
