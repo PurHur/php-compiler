@@ -43,6 +43,34 @@ final class VmScope
         return $caller->block->slotIndexForVariableName($name);
     }
 
+    /** Resolve a caller local by compile-time slot or runtime dynamicLocals (#4826). */
+    private static function callerVariable(Frame $caller, string $name): ?Variable
+    {
+        $slot = self::slotForName($caller, $name);
+        if (null !== $slot) {
+            return $caller->scope[$slot] ?? null;
+        }
+        if (null === $caller->block) {
+            return null;
+        }
+
+        return $caller->block->findVariableByRuntimeName($name, $caller);
+    }
+
+    /** Writable caller local — allocates dynamicLocals when extract imports an unknown name (#4826). */
+    private static function ensureCallerVariable(Frame $caller, string $name): Variable
+    {
+        $existing = self::callerVariable($caller, $name);
+        if (null !== $existing) {
+            return $existing;
+        }
+        if (null === $caller->block) {
+            throw new \LogicException('extract() requires an active caller block');
+        }
+
+        return $caller->block->ensureVariableByRuntimeName($name, $caller);
+    }
+
     public static function extract(Frame $frame): int
     {
         if (\count($frame->calledArgs) < 1 || \count($frame->calledArgs) > 2) {
@@ -73,11 +101,7 @@ final class VmScope
                 continue;
             }
             $name = $keyVar->toString();
-            $slot = self::slotForName($caller, $name);
-            if (null === $slot) {
-                continue;
-            }
-            $target = $caller->scope[$slot];
+            $target = self::ensureCallerVariable($caller, $name);
             if (self::EXTR_SKIP === ($flags & self::EXTR_SKIP) && self::callerVarIsSet($target)) {
                 continue;
             }
@@ -94,12 +118,11 @@ final class VmScope
         $result = new HashTable();
         foreach ($frame->calledArgs as $argIndex => $arg) {
             foreach (self::collectCompactNames($frame, (int) $argIndex + 1, $arg->resolveIndirect()) as $name) {
-                $slot = self::slotForName($caller, $name);
-                if (null === $slot) {
+                $value = self::callerVariable($caller, $name);
+                if (null === $value) {
                     self::compactUndefinedVariableWarning($frame, $name);
                     continue;
                 }
-                $value = $caller->scope[$slot];
                 $copy = new Variable();
                 $copy->copyFrom($value);
                 $result->add($name, $copy);
