@@ -23,4 +23,9 @@ final class JitHttpLastResponseHeaders
 
         return $ptr;
     }
+
+    public static function clear(Context $context): void
+    {
+        // JIT/AOT standalone has no HTTP wrapper state yet; clear is a no-op (#7024).
+    }
 }
