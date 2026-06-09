@@ -14,6 +14,7 @@ namespace PHPCompiler\ext\standard;
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
@@ -28,15 +29,17 @@ final class str_repeat extends Internal
         if (2 !== count($frame->calledArgs)) {
             throw new \LogicException('str_repeat() requires exactly two arguments');
         }
-        $input = $frame->calledArgs[0]->resolveIndirect();
+        $input = VmString::coerceStringBuiltinArg(
+            $frame->calledArgs[0],
+            'str_repeat',
+            0,
+            'string'
+        );
         $mult = $frame->calledArgs[1]->resolveIndirect();
-        if (Variable::TYPE_STRING !== $input->type) {
-            throw new \LogicException('str_repeat() input must be a string in this compiler build');
-        }
         if (Variable::TYPE_INTEGER !== $mult->type) {
             throw new \LogicException('str_repeat() multiplier must be an integer in this compiler build');
         }
-        $result = VmString::repeat($input->toString(), $mult->toInt());
+        $result = VmString::repeat($input, $mult->toInt());
         if (null === $frame->returnVar) {
             return;
         }
@@ -59,7 +62,7 @@ final class str_repeat extends Internal
 
         return JitStrRepeat::repeat(
             $context,
-            $this->jitString($context, $args[0], 'str_repeat() argument #1'),
+            JitStringBuiltinArg::lower($context, $args[0], 'str_repeat', 0, 'string'),
             $multiplier
         );
     }
