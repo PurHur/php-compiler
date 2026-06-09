@@ -190,6 +190,8 @@ class Type extends Builtin {
         );
         $fnUtf8Strlen = $this->context->module->addFunction('__compiler_utf8_strlen', $fntypeUtf8Strlen);
         $this->context->registerFunction('__compiler_utf8_strlen', $fnUtf8Strlen);
+        $fnUtf8Valid = $this->context->module->addFunction('__compiler_utf8_valid', $fntypeUtf8Strlen);
+        $this->context->registerFunction('__compiler_utf8_valid', $fnUtf8Valid);
         $i8p = $this->context->getTypeFromString('int8*');
         $i32 = $this->context->getTypeFromString('int32');
         $sizeT = $this->context->getTypeFromString('size_t');
