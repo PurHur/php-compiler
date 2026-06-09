@@ -8,6 +8,7 @@ use PHPCompiler\JIT\Builtin\StringJsonDecode;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\HashTableHelper;
 use PHPCompiler\JIT\JitStringArg;
+use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Value;
@@ -71,7 +72,7 @@ final class JitJsonDecode
     {
         return self::decodeRuntimeString(
             $context,
-            JitStringArg::lower($context, $json, 'json_decode() json')
+            JitStringBuiltinArg::lower($context, $json, 'json_decode', 0, 'json')
         );
     }
 
