@@ -1,0 +1,129 @@
+<?php
+
+declare(strict_types=1);
+
+namespace PHPCompiler\VM\Builtin;
+
+use PHPCompiler\ext\standard\VmReflection;
+use PHPCompiler\Frame;
+use PHPCompiler\VM\ObjectEntry;
+use PHPCompiler\VM\ReflectionSupport;
+use PHPCompiler\VM\Variable;
+
+/** ReflectionParameter::__construct($function, $parameter) — VM (#7072, ext/reflection/php_reflection.c). */
+final class ReflectionParameterConstruct extends VmClassMethod
+{
+    public function __construct()
+    {
+        parent::__construct('__construct');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        if (\count($frame->calledArgs) < 3) {
+            throw new \LogicException('ReflectionParameter::__construct() expects function and parameter');
+        }
+        $receiver = ReflectionSupport::requireReflectionParameter($frame, $frame->calledArgs[0]);
+        $ctx = VmReflection::requireContext($frame);
+        $functionArg = $frame->calledArgs[1]->resolveIndirect();
+        $parameterArg = $frame->calledArgs[2]->resolveIndirect();
+
+        if (Variable::TYPE_ARRAY === $functionArg->type) {
+            $this->initForMethod($ctx, $receiver, $functionArg, $parameterArg);
+
+            return;
+        }
+
+        $functionName = VmReflection::stringArg(
+            $frame->calledArgs[1],
+            'ReflectionParameter::__construct() function',
+            1
+        );
+        $func = ReflectionSupport::resolveUserFunction($ctx, $functionName);
+        $index = $this->resolveParameterIndex($parameterArg, $func->block->paramNames, 'function');
+        if (!isset($func->block->paramNames[$index])) {
+            ReflectionSupport::throwReflectionException(
+                'Parameter '.$index.' does not exist on function '.$functionName.'()'
+            );
+        }
+        $receiver->getProperty(ReflectionSupport::PROP_FUNC_NAME)->string($functionName);
+        $receiver->getProperty(ReflectionSupport::PROP_CLASS_NAME)->null();
+        $receiver->getProperty(ReflectionSupport::PROP_METHOD_NAME)->null();
+        $receiver->getProperty(ReflectionSupport::PROP_PARAM_INDEX)->int($index);
+        $receiver->getProperty(ReflectionSupport::PROP_PARAM_NAME)->string($func->block->paramNames[$index]);
+        $receiver->constructed = true;
+    }
+
+    private function initForMethod(
+        \PHPCompiler\VM\Context $ctx,
+        ObjectEntry $receiver,
+        Variable $functionArg,
+        Variable $parameterArg,
+    ): void {
+        $ht = $functionArg->toArray();
+        if (2 !== $ht->getNumElements()) {
+            throw new \LogicException('ReflectionParameter::__construct() class/method array must have two elements');
+        }
+        $className = $ht->findIndex(0)->resolveIndirect();
+        $methodName = $ht->findIndex(1)->resolveIndirect();
+        if (Variable::TYPE_STRING !== $className->type || Variable::TYPE_STRING !== $methodName->type) {
+            throw new \LogicException('ReflectionParameter::__construct() class and method must be strings');
+        }
+        $class = $className->toString();
+        $method = $methodName->toString();
+        $entry = VmReflection::resolveClassEntry($ctx, $class);
+        if (null === $entry) {
+            ReflectionSupport::throwReflectionException(
+                ReflectionSupport::classNotFoundMessage($class)
+            );
+        }
+        $methodLc = strtolower($method);
+        if (!isset($entry->methods[$methodLc]) && !isset($entry->abstractMethods[$methodLc])) {
+            ReflectionSupport::throwReflectionException(
+                ReflectionSupport::methodNotFoundMessage($entry->name, $method)
+            );
+        }
+        $params = $entry->methodParameterMetadata[$methodLc] ?? [];
+        $position = $this->resolveParameterIndex($parameterArg, array_map(
+            static fn ($meta) => $meta->name,
+            $params
+        ), 'method');
+        if (!isset($params[$position])) {
+            ReflectionSupport::throwReflectionException(
+                'Parameter '.$position.' does not exist on method '.$entry->name.'::'.$method.'()'
+            );
+        }
+        $receiver->getProperty(ReflectionSupport::PROP_CLASS_NAME)->string($entry->name);
+        $receiver->getProperty(ReflectionSupport::PROP_METHOD_NAME)->string($method);
+        $receiver->getProperty(ReflectionSupport::PROP_FUNC_NAME)->null();
+        $receiver->getProperty(ReflectionSupport::PROP_PARAM_POSITION)->int($position);
+        $receiver->getProperty(ReflectionSupport::PROP_PARAM_NAME)->string($params[$position]->name);
+        $receiver->constructed = true;
+    }
+
+    /**
+     * @param list<string> $paramNames
+     */
+    private function resolveParameterIndex(Variable $parameterArg, array $paramNames, string $context): int
+    {
+        if (Variable::TYPE_INTEGER === $parameterArg->type) {
+            return $parameterArg->toInt();
+        }
+        if (Variable::TYPE_STRING === $parameterArg->type) {
+            $name = $parameterArg->toString();
+            $index = array_search($name, $paramNames, true);
+            if (false === $index) {
+                ReflectionSupport::throwReflectionException(
+                    'Parameter '.$name.' does not exist on '.$context
+                );
+            }
+
+            return (int) $index;
+        }
+
+        throw new \TypeError(
+            'ReflectionParameter::__construct(): Argument #2 ($parameter) must be of type string|int, '
+            .ReflectionSupport::valueTypeLabelPublic($parameterArg).' given'
+        );
+    }
+}
