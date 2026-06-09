@@ -7,8 +7,8 @@ namespace PHPCompiler\ext\standard;
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\Variable as JITVariable;
-use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
 
 /** copy() — VM via VmFs; JIT/AOT via __compiler_copy (native fread/fwrite). */
@@ -24,12 +24,9 @@ final class copy_ extends Internal
         if (2 !== \count($frame->calledArgs)) {
             throw new \LogicException('copy() requires exactly two arguments in this compiler build');
         }
-        $fromVar = $frame->calledArgs[0]->resolveIndirect();
-        $toVar = $frame->calledArgs[1]->resolveIndirect();
-        if (Variable::TYPE_STRING !== $fromVar->type || Variable::TYPE_STRING !== $toVar->type) {
-            throw new \LogicException('copy() requires string paths in this compiler build');
-        }
-        $ok = VmFs::copy($fromVar->toString(), $toVar->toString());
+        $from = VmString::coerceStringBuiltinArg($frame->calledArgs[0], 'copy', 0, 'from');
+        $to = VmString::coerceStringBuiltinArg($frame->calledArgs[1], 'copy', 1, 'to');
+        $ok = VmFs::copy($from, $to);
         if (null !== $frame->returnVar) {
             $frame->returnVar->bool($ok);
         }
@@ -40,9 +37,9 @@ final class copy_ extends Internal
         if (2 !== \count($args)) {
             throw new \LogicException('copy() requires exactly two arguments in this compiler build');
         }
-        $a = $this->jitString($context, $args[0], 'copy() argument #1');
-        $b = $this->jitString($context, $args[1], 'copy() argument #2');
+        $from = JitStringBuiltinArg::lower($context, $args[0], 'copy', 0, 'from');
+        $to = JitStringBuiltinArg::lower($context, $args[1], 'copy', 1, 'to');
 
-        return JitCopy::invoke($context, $a, $b);
+        return JitCopy::invoke($context, $from, $to);
     }
 }

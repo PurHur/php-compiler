@@ -11,3 +11,11 @@ foreach (['file_get_contents', 'is_file', 'unlink', 'mkdir'] as $fn) {
         echo $fn, ': ', $e->getMessage(), "\n";
     }
 }
+foreach (['copy', 'rename'] as $fn) {
+    try {
+        $fn(E::A, '/tmp/y');
+        echo "{$fn} uncaught\n";
+    } catch (TypeError $e) {
+        echo $fn, ': ', $e->getMessage(), "\n";
+    }
+}
