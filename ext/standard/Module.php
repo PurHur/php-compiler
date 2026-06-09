@@ -118,6 +118,8 @@ class Module extends ModuleAbstract
             new gc_enable(),
             new gc_disable(),
             new gc_enabled(),
+            new gc_status(),
+            new gc_mem_caches(),
             new halt_compiler_(),
             new exit_(),
             new die_(),
