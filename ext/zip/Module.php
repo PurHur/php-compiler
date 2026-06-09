@@ -10,7 +10,7 @@ use PHPCompiler\Runtime;
 /**
  * zip extension module entry (php-src ext/zip/php_zip.c; issue #5869).
  *
- * ZipArchive behavior tracked in #3337; v1 skeleton enables class_exists() and inventory.
+ * ZipArchive open/extract in ext/zip PHP (issues #3337, #6414); v1 skeleton enables class_exists() and inventory.
  */
 class Module extends ModuleAbstract
 {
