@@ -22,6 +22,11 @@ final class ReflectionFunctionGetReturnType extends VmClassMethod
     {
         $ctx = VmReflection::requireContext($frame);
         $receiver = ReflectionSupport::requireReflectionFunction($frame, $frame->calledArgs[0]);
+        if (null !== $frame->returnVar && ReflectionSupport::isReflectionInternalFunction($receiver)) {
+            $frame->returnVar->null();
+
+            return;
+        }
         $func = ReflectionSupport::resolveFunctionFromReflection($ctx, $receiver);
         if (null !== $frame->returnVar) {
             $declared = $func->block->returnDeclaredType;

@@ -40,6 +40,9 @@ class ObjectEntry {
     /** Closure target for ReflectionFunction instances (#4123). */
     public ?ClosureState $reflectionClosureState = null;
 
+    /** True when ReflectionFunction wraps an ext/* internal builtin (#6678). */
+    public bool $reflectionIsInternalFunction = false;
+
     /** Initializer for lazy proxy objects (#3317). */
     public ?ClosureState $lazyInitializer = null;
 
