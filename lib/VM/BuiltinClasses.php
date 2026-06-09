@@ -98,6 +98,7 @@ use PHPCompiler\VM\Builtin\ReflectionFunctionGetExtensionName;
 use PHPCompiler\VM\Builtin\ReflectionFunctionGetName;
 use PHPCompiler\VM\Builtin\ReflectionFunctionGetParameters;
 use PHPCompiler\VM\Builtin\ReflectionFunctionGetReturnType;
+use PHPCompiler\VM\Builtin\ReflectionFunctionHasReturnType;
 use PHPCompiler\VM\Builtin\ReflectionFunctionIsAnonymous;
 use PHPCompiler\VM\Builtin\ReflectionFunctionIsInternal;
 use PHPCompiler\VM\Builtin\ReflectionFunctionIsUserDefined;
@@ -107,6 +108,7 @@ use PHPCompiler\VM\Builtin\ReflectionMethodGetName;
 use PHPCompiler\VM\Builtin\ReflectionMethodGetParameters;
 use PHPCompiler\VM\Builtin\ReflectionMethodGetPrototype;
 use PHPCompiler\VM\Builtin\ReflectionMethodHasPrototype;
+use PHPCompiler\VM\Builtin\ReflectionMethodHasReturnType;
 use PHPCompiler\VM\Builtin\ReflectionMethodInvoke;
 use PHPCompiler\VM\Builtin\ReflectionMethodInvokeArgs;
 use PHPCompiler\VM\Builtin\ReflectionMethodGetDocComment;
@@ -384,6 +386,8 @@ final class BuiltinClasses
         $rm->methodVisibility['getdeprecatedversion'] = $pub;
         $rm->methods['hasprototype'] = new ReflectionMethodHasPrototype();
         $rm->methodVisibility['hasprototype'] = $pub;
+        $rm->methods['hasreturntype'] = new ReflectionMethodHasReturnType();
+        $rm->methodVisibility['hasreturntype'] = $pub;
         $rm->methods['getprototype'] = new ReflectionMethodGetPrototype();
         $rm->methodVisibility['getprototype'] = $pub;
         $rm->methods['invoke'] = new ReflectionMethodInvoke();
@@ -520,6 +524,7 @@ final class BuiltinClasses
                 'getname' => new ReflectionFunctionGetName(),
                 'getparameters' => new ReflectionFunctionGetParameters(),
                 'getreturntype' => new ReflectionFunctionGetReturnType(),
+                'hasreturntype' => new ReflectionFunctionHasReturnType(),
                 'isanonymous' => new ReflectionFunctionIsAnonymous(),
                 'isinternal' => new ReflectionFunctionIsInternal(),
                 'isuserdefined' => new ReflectionFunctionIsUserDefined(),

@@ -10,6 +10,7 @@ use PHPCompiler\Compiler\SourceLocation;
 use PHPCompiler\ext\standard\VmReflection;
 use PHPCompiler\Frame;
 use PHPCompiler\Func;
+use PHPCfg\Op\Type as CfgType;
 use PHPCompiler\VM as VmEngine;
 use PHPCompiler\VM\Builtin\AttributeConstruct;
 use PHPCompiler\VM\Builtin\DeprecatedConstruct;
@@ -957,6 +958,21 @@ final class ReflectionSupport
         }
 
         return $flags;
+    }
+
+    /**
+     * Whether compile-time metadata includes a user-declared return type (#5141).
+     *
+     * php-src: reflection_function_has_return_type() ignores ZEND_TYPE_IS_TENTATIVE;
+     * php-cfg maps absent return types to {@see CfgType\Mixed_}.
+     */
+    public static function hasDeclaredReturnType(?CfgType $type): bool
+    {
+        if (null === $type) {
+            return false;
+        }
+
+        return !$type instanceof CfgType\Mixed_;
     }
 
     /**
