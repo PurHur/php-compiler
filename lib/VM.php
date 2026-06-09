@@ -9961,6 +9961,9 @@ restart:
                 if (isset($trait->constDeprecated[$name])) {
                     $entry->constDeprecated[$name] = $trait->constDeprecated[$name];
                 }
+                if (isset($trait->constFinal[$name])) {
+                    $entry->constFinal[$name] = true;
+                }
                 if (isset($trait->constDeclaredTypes[$name])) {
                     $entry->constDeclaredTypes[$name] = $trait->constDeclaredTypes[$name];
                 }
@@ -10570,6 +10573,9 @@ restart:
                 if (isset($parent->constDeprecated[$name])) {
                     $entry->constDeprecated[$name] = $parent->constDeprecated[$name];
                 }
+                if (isset($parent->constFinal[$name])) {
+                    $entry->constFinal[$name] = true;
+                }
             }
         }
         foreach ($parent->propDeprecated as $name => $deprecated) {
@@ -10986,6 +10992,9 @@ restart:
         }
         if (null !== $op->deprecatedMetadata) {
             $entry->constDeprecated[$name] = $op->deprecatedMetadata;
+        }
+        if (0 !== ($op->classConstVisibilityFlags & \PHPCfg\Func::FLAG_FINAL)) {
+            $entry->constFinal[$name] = true;
         }
         if (isset($block->classConstDeclaredTypes[$name])) {
             $entry->constDeclaredTypes[$name] = $block->classConstDeclaredTypes[$name];
