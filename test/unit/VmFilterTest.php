@@ -119,4 +119,21 @@ final class VmFilterTest extends TestCase
         $this->assertFalse(VmFilter::isValidEmailSubset('a@b'));
         $this->assertFalse(VmFilter::isValidEmailSubset('a@@b.co'));
     }
+
+    public function testUnknownFilterReturnsFalse(): void
+    {
+        $v = new Variable();
+        $v->string('x');
+        $out = VmFilter::filterVar($v, 99999);
+        $this->assertSame(Variable::TYPE_BOOLEAN, $out->type);
+        $this->assertFalse($out->toBool());
+    }
+
+    public function testUnknownFilterWarningMessage(): void
+    {
+        $this->assertSame(
+            'filter_var(): Unknown filter with ID 99999',
+            VmFilter::unknownFilterWarningMessage(99999)
+        );
+    }
 }

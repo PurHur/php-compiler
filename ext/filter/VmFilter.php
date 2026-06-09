@@ -20,6 +20,17 @@ final class VmFilter
     public const INPUT_POST = 0;
     public const INPUT_GET = 1;
 
+    public static function isSupportedFilter(int $filter): bool
+    {
+        return self::FILTER_VALIDATE_INT === $filter
+            || self::FILTER_VALIDATE_EMAIL === $filter;
+    }
+
+    public static function unknownFilterWarningMessage(int $filter): string
+    {
+        return 'filter_var(): Unknown filter with ID '.$filter;
+    }
+
     public static function filterVar(Variable $value, int $filter, ?Variable $options = null): Variable
     {
         $nullOnFailure = self::hasNullOnFailureFlag($options);
@@ -30,9 +41,7 @@ final class VmFilter
             return self::validateEmail($value, $nullOnFailure);
         }
 
-        throw new \LogicException(
-            'filter_var() filter '.$filter.' is not supported in this compiler build'
-        );
+        return self::failureResult(false);
     }
 
     public static function inputSuperglobalName(int $type): string
