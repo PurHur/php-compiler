@@ -7,9 +7,8 @@ namespace PHPCompiler\ext\standard;
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Context;
-use PHPCompiler\JIT\JitStringArg;
+use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\Variable as JITVariable;
-use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
 
 /** shell_exec() — run command via host shell (VM; JIT/AOT via __compiler_shell_exec). */
@@ -25,14 +24,11 @@ final class shell_exec extends Internal
         if (1 !== \count($frame->calledArgs)) {
             throw new \LogicException('shell_exec() requires exactly one argument');
         }
-        $v = $frame->calledArgs[0]->resolveIndirect();
         if (null === $frame->returnVar) {
             return;
         }
-        if (Variable::TYPE_STRING !== $v->type) {
-            throw new \LogicException('shell_exec() requires a string command in this compiler build');
-        }
-        $result = \shell_exec($v->toString());
+        $command = VmString::coerceStringBuiltinArg($frame->calledArgs[0], 'shell_exec', 0, 'command');
+        $result = \shell_exec($command);
         if (false === $result) {
             $frame->returnVar->bool(false);
         } elseif (null === $result) {
@@ -50,7 +46,7 @@ final class shell_exec extends Internal
 
         return JitShellExec::invoke(
             $context,
-            JitStringArg::lower($context, $args[0], 'shell_exec() command')
+            JitStringBuiltinArg::lower($context, $args[0], 'shell_exec', 0, 'command')
         );
     }
 }
