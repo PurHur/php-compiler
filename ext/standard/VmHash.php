@@ -26,6 +26,19 @@ final class VmHash
     }
 
     /**
+     * hash_hkdf() — RFC 5869 HKDF via VmHashNative (issue #5025, ext/hash/hash_hkdf.c parity).
+     */
+    public static function hashHkdf(
+        string $algo,
+        string $key,
+        int $length = 0,
+        string $info = '',
+        string $salt = ''
+    ): string {
+        return VmHashNative::hashHkdf($algo, $key, $length, $info, $salt);
+    }
+
+    /**
      * hash_pbkdf2() — native PBKDF2 via VmHashNative (issue #6186, ext/hash/hash_pbkdf2.c parity).
      */
     public static function hashPbkdf2(
