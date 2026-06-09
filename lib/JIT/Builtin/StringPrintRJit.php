@@ -238,7 +238,7 @@ final class StringPrintRJit
 
         $v = $fn->getParam(0);
         $buf = $context->builder->alloca($context->getTypeFromString('int8'), self::BUF_SIZE, 'pr_buf');
-        $bufVoid = $context->bytePtr($buf);
+        $bufVoid = $context->builder->pointerCast($buf, $voidPtr);
 
         $initCap = $sizeT->constInt(256, false);
         $bufPtr = $context->builder->call($context->lookupFunction('malloc'), $initCap);
@@ -812,10 +812,14 @@ final class StringPrintRJit
         $closeParen = $fn->appendBasicBlock('pr_close_paren');
         $context->builder->branchIf($zeroLevel, $closeParen, $closeIndent);
         $context->builder->positionAtEnd($closeIndent);
+        $closeCount = $context->builder->mul(
+            $context->builder->add($level, $i32->constInt(1, false)),
+            $i32->constInt(4, false)
+        );
         $context->builder->call(
             $context->lookupFunction('__phpc_pr_buf_append_spaces'),
             $buf,
-            $openCount
+            $closeCount
         );
         $context->builder->branch($closeParen);
         $context->builder->positionAtEnd($closeParen);
