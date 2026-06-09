@@ -75,4 +75,20 @@ PHP;
         $this->expectExceptionMessage('hash_init(): Argument #1 ($algo) must be a valid hashing algorithm');
         $fn->execute($frame);
     }
+
+    public function test_hash_context_debug_info(): void
+    {
+        $runtime = new Runtime();
+        $code = <<<'PHP'
+<?php
+$ctx = hash_init('sha256');
+$info = $ctx->__debugInfo();
+echo (int) is_array($info);
+echo isset($info['algo']) ? $info['algo'] : '';
+PHP;
+        $block = $runtime->parseAndCompile($code, 'hash_context_debug_info.php');
+        ob_start();
+        $runtime->run($block);
+        self::assertSame('1sha256', ob_get_clean());
+    }
 }
