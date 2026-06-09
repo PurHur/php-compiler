@@ -26,7 +26,12 @@ final class extension_loaded extends Internal
         if (null === $frame->returnVar) {
             return;
         }
-        $name = $frame->calledArgs[0]->resolveIndirect()->toString();
+        $name = VmString::coerceStringBuiltinArg(
+            $frame->calledArgs[0],
+            'extension_loaded',
+            0,
+            'extension'
+        );
         $frame->returnVar->bool(VmInfo::extension_loaded($name));
     }
 
