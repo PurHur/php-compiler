@@ -6,7 +6,9 @@ namespace PHPCompiler\ext\standard;
 
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
+use PHPCompiler\JIT\Builtin\TypeErrorRaise;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\ErrorReporter;
 use PHPCompiler\VM\Variable;
@@ -18,6 +20,9 @@ final class define_ extends Internal
     private const MSG_CASE_INSENSITIVE_IGNORED =
         'define(): Argument #3 ($case_insensitive) is ignored since declaration of case-insensitive constants is no longer supported';
 
+    private const MSG_CLASS_CONSTANT =
+        'define(): Argument #1 ($constant_name) cannot be a class constant';
+
     public function __construct()
     {
         parent::__construct('define');
@@ -28,10 +33,8 @@ final class define_ extends Internal
         if (count($frame->calledArgs) < 2) {
             throw new \LogicException('define() requires at least two arguments');
         }
-        $nameVar = $frame->calledArgs[0]->resolveIndirect();
-        if (Variable::TYPE_STRING !== $nameVar->type) {
-            throw new \LogicException('define() constant name must be a string');
-        }
+        $name = VmString::coerceStringBuiltinArg($frame->calledArgs[0], 'define', 0, 'constant_name');
+        self::rejectClassConstantName($name);
         $value = $frame->calledArgs[1]->resolveIndirect();
         if (null === $frame->vmContext) {
             throw new \LogicException('define() requires VM context');
@@ -46,7 +49,7 @@ final class define_ extends Internal
                 $frame
             );
         }
-        $ok = $frame->vmContext->defineConstant($nameVar->toString(), $value);
+        $ok = $frame->vmContext->defineConstant($name, $value);
         if (null !== $frame->returnVar) {
             $frame->returnVar->bool($ok);
         }
@@ -57,13 +60,22 @@ final class define_ extends Internal
         if (\count($args) < 2) {
             throw new \LogicException('define() requires at least two arguments');
         }
-        if (JITVariable::TYPE_STRING === $args[0]->type || JITVariable::TYPE_VALUE === $args[0]->type) {
-            $this->jitString($context, $args[0], 'define() constant name');
+        if (JITVariable::TYPE_VALUE === $args[0]->type || JITVariable::TYPE_OBJECT === $args[0]->type) {
+            JitStringBuiltinArg::lower($context, $args[0], 'define', 0, 'constant_name');
         }
         if (JITVariable::TYPE_STRING !== $args[0]->type || null === $args[0]->compileTimeString) {
             throw new \LogicException('define() constant name must be a string literal in this compiler build');
         }
         $name = $args[0]->compileTimeString;
+        if (str_contains($name, '::')) {
+            TypeErrorRaise::registerDeclarations($context);
+            TypeErrorRaise::ensureLinked($context);
+            TypeErrorRaise::emitValueError($context, self::MSG_CLASS_CONSTANT);
+            $context->builder->call($context->lookupFunction('abort'));
+            $i1 = $context->getTypeFromString('int1');
+
+            return $i1->constInt(0, false);
+        }
         $value = self::compileTimeVmVariable($context, $args[1]);
         if (\count($args) >= 3
             && (JITVariable::TYPE_NATIVE_BOOL !== $args[2]->type || null === $args[2]->value->value)) {
@@ -166,5 +178,15 @@ final class define_ extends Internal
         }
 
         return clone $phpVar;
+    }
+
+    /**
+     * php-src: ext/standard/basic_functions.c — define() rejects Class::CONST names.
+     */
+    private static function rejectClassConstantName(string $name): void
+    {
+        if (str_contains($name, '::')) {
+            throw new \ValueError(self::MSG_CLASS_CONSTANT);
+        }
     }
 }
