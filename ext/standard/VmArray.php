@@ -21,6 +21,14 @@ final class VmArray
     public const COUNT_RECURSIVE = 1;
 
     /**
+     * php-src array.c php_add_var / php_multiply_var skip enum case elements (#5578).
+     */
+    public static function shouldSkipNumericArrayFoldElement(Variable $value): bool
+    {
+        return EnumCaseSupport::isEnumCaseVariable($value);
+    }
+
+    /**
      * array_intersect/diff* reject enum case keys/values before string hash (#5927, php-src array.c).
      */
     public static function rejectEnumCaseSetOpOperands(HashTable ...$tables): void
