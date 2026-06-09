@@ -42,6 +42,9 @@ final class array_product extends Internal
         $useFloat = false;
         foreach ($ht->iterate(true) as $value) {
             $v = $value->resolveIndirect();
+            if (VmArray::shouldSkipNumericArrayFoldElement($v)) {
+                continue;
+            }
             if (Variable::TYPE_INTEGER === $v->type) {
                 if ($useFloat) {
                     $prodFloat *= (float) $v->toInt();

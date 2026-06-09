@@ -41,6 +41,9 @@ final class array_sum extends Internal
         $useFloat = false;
         foreach ($array->toArray()->iterate(true) as $value) {
             $v = $value->resolveIndirect();
+            if (VmArray::shouldSkipNumericArrayFoldElement($v)) {
+                continue;
+            }
             if (Variable::TYPE_INTEGER === $v->type) {
                 if ($useFloat) {
                     $sumFloat += (float) $v->toInt();

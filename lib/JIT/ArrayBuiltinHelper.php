@@ -25,6 +25,7 @@ use PHPCompiler\JIT\Builtin\TypeErrorRaise;
 use PHPCompiler\JIT\Call;
 use PHPCompiler\JIT\Call\ClosureWithCaptures;
 use PHPCompiler\JIT\Call\ExternalMethod;
+use PHPLLVM\BasicBlock;
 use PHPLLVM\Builder;
 use PHPLLVM\Value;
 
@@ -8530,6 +8531,34 @@ final class ArrayBuiltinHelper
         return $context->builder->or($isIntNumeric, $isDoubleNumeric);
     }
 
+    /**
+     * php-src array.c: enum case elements are skipped in array_product numeric fold (#5578).
+     */
+    private static function branchArrayProductStringOrEnumSkipOrInvalid(
+        Context $context,
+        Value $typeByte,
+        BasicBlock $stringBlock,
+        BasicBlock $continueBlock,
+        BasicBlock $invalidBlock
+    ): void {
+        $i8 = $context->getTypeFromString('int8');
+        $afterEnum = BasicBlockHelper::append($context, 'array_product_after_enum');
+        $isEnumCase = $context->builder->icmp(
+            Builder::INT_EQ,
+            $typeByte,
+            $i8->constInt(\PHPCompiler\VM\Variable::TYPE_ENUM_CASE, false)
+        );
+        $context->builder->branchIf($isEnumCase, $continueBlock, $afterEnum);
+
+        $context->builder->positionAtEnd($afterEnum);
+        $isString = $context->builder->icmp(
+            Builder::INT_EQ,
+            $typeByte,
+            $i8->constInt(Variable::TYPE_STRING & 0xff, false)
+        );
+        $context->builder->branchIf($isString, $stringBlock, $invalidBlock);
+    }
+
     private static function arrayProductEmitInvalidElementType(Context $context): void
     {
         TypeErrorRaise::registerDeclarations($context);
@@ -9477,12 +9506,13 @@ final class ArrayBuiltinHelper
         $context->builder->branchIf($isDouble, $doubleBlock, $afterDouble);
 
         $context->builder->positionAtEnd($afterDouble);
-        $isString = $context->builder->icmp(
-            Builder::INT_EQ,
+        self::branchArrayProductStringOrEnumSkipOrInvalid(
+            $context,
             $typeByte,
-            $i8->constInt(Variable::TYPE_STRING & 0xff, false)
+            $stringBlock,
+            $continueBlock,
+            $invalidBlock
         );
-        $context->builder->branchIf($isString, $stringBlock, $invalidBlock);
 
         $context->builder->positionAtEnd($invalidBlock);
         self::arrayProductEmitInvalidElementType($context);
@@ -9630,12 +9660,13 @@ final class ArrayBuiltinHelper
         $context->builder->branchIf($isDouble, $doubleBlock, $afterDouble);
 
         $context->builder->positionAtEnd($afterDouble);
-        $isString = $context->builder->icmp(
-            Builder::INT_EQ,
+        self::branchArrayProductStringOrEnumSkipOrInvalid(
+            $context,
             $typeByte,
-            $i8->constInt(Variable::TYPE_STRING & 0xff, false)
+            $stringBlock,
+            $continueBlock,
+            $invalidBlock
         );
-        $context->builder->branchIf($isString, $stringBlock, $invalidBlock);
 
         $context->builder->positionAtEnd($invalidBlock);
         self::arrayProductEmitInvalidElementType($context);
