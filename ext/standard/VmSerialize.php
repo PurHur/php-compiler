@@ -5,11 +5,13 @@ declare(strict_types=1);
 namespace PHPCompiler\ext\standard;
 
 use PHPCompiler\Func\PHP as PhpFunc;
+use PHPCompiler\MethodVisibility;
 use PHPCompiler\VM\BackedEnum;
 use PHPCompiler\VM\ClassEntry;
 use PHPCompiler\VM\Context;
 use PHPCompiler\VM\EnumCaseSupport;
 use PHPCompiler\VM\ObjectEntry;
+use PHPCompiler\VM\TypedPropertyCheck;
 use PHPCompiler\VM\Variable;
 
 /**
@@ -46,6 +48,8 @@ final class VmSerialize
             if (self::hasInstanceMethod($entry->class, '__sleep')) {
                 return self::encodeSleepObject($ctx, $entry);
             }
+
+            return self::encodePlainObject($ctx, $entry);
         }
 
         return self::serializeExported(self::exportForSerialize($ctx, $value));
@@ -453,6 +457,66 @@ final class VmSerialize
     }
 
     /**
+     * Zend php_var_serialize() plain object branch — public properties + dynamic props (#3621, var.c).
+     * Private/protected mangling deferred to #3497.
+     */
+    private static function encodePlainObject(Context $ctx, ObjectEntry $entry): string
+    {
+        return self::encodeObjectPropertyBag(
+            $ctx,
+            $entry->class->name,
+            self::collectPlainObjectSerializeProperties($ctx, $entry)
+        );
+    }
+
+    /**
+     * @return array<string, Variable>
+     */
+    private static function collectPlainObjectSerializeProperties(Context $ctx, ObjectEntry $entry): array
+    {
+        /** @var array<string, Variable> $props */
+        $props = [];
+        /** @var array<string, true> $seenLc */
+        $seenLc = [];
+        foreach (array_reverse(VmReflection::classHierarchyChain($entry->class, $ctx)) as $class) {
+            foreach ($class->properties as $meta) {
+                $lc = strtolower($meta->name);
+                if (isset($seenLc[$lc])) {
+                    continue;
+                }
+                $seenLc[$lc] = true;
+                if (!MethodVisibility::isPublic($meta->visibility)) {
+                    continue;
+                }
+                if (!$entry->hasProperty($meta->name)) {
+                    continue;
+                }
+                $value = $entry->getProperty($meta->name)->resolveIndirect();
+                if (TypedPropertyCheck::omitFromPropertyEnumeration($value)) {
+                    continue;
+                }
+                $copy = new Variable();
+                $copy->copyFrom($value);
+                $props[$meta->name] = $copy;
+            }
+        }
+        foreach ($entry->getRawProperties() as $name => $prop) {
+            if (isset($seenLc[strtolower($name)])) {
+                continue;
+            }
+            $value = $prop->resolveIndirect();
+            if (TypedPropertyCheck::omitFromPropertyEnumeration($value)) {
+                continue;
+            }
+            $copy = new Variable();
+            $copy->copyFrom($value);
+            $props[$name] = $copy;
+        }
+
+        return $props;
+    }
+
+    /**
      * @param array<string, Variable> $props
      */
     private static function encodeObjectPropertyBag(Context $ctx, string $className, array $props): string
@@ -482,7 +546,10 @@ final class VmSerialize
     private static function restoreObjectProperties(ObjectEntry $entry, array $data): void
     {
         foreach ($data as $name => $raw) {
-            $prop = $entry->getProperty((string) $name);
+            $propName = (string) $name;
+            $prop = $entry->hasProperty($propName)
+                ? $entry->getProperty($propName)
+                : $entry->allocateProperty($propName);
             $prop->copyFrom(VmJson::import($raw));
         }
     }
