@@ -30,6 +30,20 @@ PHP;
         $this->assertSame(self::EXPECT, $this->runBin('bin/vm.php', self::CODE));
     }
 
+    public function testVmIniIntrospectionSubset(): void
+    {
+        $code = <<<'PHP'
+$orig = ini_get('display_errors');
+ini_set('display_errors', '0');
+ini_restore('display_errors');
+echo ini_get('display_errors') === $orig ? "restore_ok\n" : "restore_fail\n";
+$all = ini_get_all();
+echo isset($all['display_errors']) ? "all_ok\n" : "all_fail\n";
+echo get_cfg_var('display_errors') === '1' ? "cfg_ok\n" : "cfg_fail\n";
+PHP;
+        $this->assertSame("restore_ok\nall_ok\ncfg_ok\n", $this->runBin('bin/vm.php', $code));
+    }
+
     public function testVmIniAlterAlias(): void
     {
         $code = <<<'PHP'
