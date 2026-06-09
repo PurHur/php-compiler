@@ -9,6 +9,7 @@ use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\ArrayBuiltinHelper;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\Variable as JITVariable;
+use PHPCompiler\VM\EnumCaseSupport;
 use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
 
@@ -73,6 +74,9 @@ final class arsort_ extends Internal
                         --$j;
                     }
                 }
+            } elseif (Variable::TYPE_OBJECT === $first->type || EnumCaseSupport::isEnumCaseVariable($first)) {
+                VmInternalCompare::assertHomogeneousEnumOrObjectValues($values, 'arsort()');
+                VmInternalCompare::sortVariableValuesBySpaceshipDesc($values);
             } else {
                 throw new \LogicException(
                     'arsort() only supports homogeneous string or integer values in this compiler build'

@@ -9,6 +9,7 @@ use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\ArrayBuiltinHelper;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\Variable as JITVariable;
+use PHPCompiler\VM\EnumCaseSupport;
 use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
 
@@ -71,12 +72,16 @@ final class rsort_ extends Internal
                     --$j;
                 }
             }
+        } elseif (Variable::TYPE_OBJECT === $first->type || EnumCaseSupport::isEnumCaseVariable($first)) {
+            VmInternalCompare::assertHomogeneousEnumOrObjectValues($values, 'rsort()');
+            VmInternalCompare::sortVariableValuesBySpaceshipDesc($values);
         } else {
             throw new \LogicException(
                 'rsort() only supports homogeneous string or integer arrays in this compiler build'
             );
         }
-        $ht->replacePackedValues($values);
+        $array->separateArrayForWrite();
+        $array->resolveIndirect()->toArray()->replacePackedValues($values);
         if (null !== $frame->returnVar) {
             $frame->returnVar->bool(true);
         }

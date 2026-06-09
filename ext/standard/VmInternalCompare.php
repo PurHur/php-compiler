@@ -91,6 +91,25 @@ final class VmInternalCompare
     }
 
     /**
+     * Sort packed Variable list descending via {@see compareValuesForSort()} (rsort/arsort enum arrays, #6150).
+     *
+     * @param list<Variable> $values
+     */
+    public static function sortVariableValuesBySpaceshipDesc(array &$values): void
+    {
+        $n = \count($values);
+        for ($i = 1; $i < $n; ++$i) {
+            $j = $i;
+            while ($j > 0 && self::compareValuesForSort($values[$j - 1], $values[$j]) < 0) {
+                $tmp = $values[$j - 1];
+                $values[$j - 1] = $values[$j];
+                $values[$j] = $tmp;
+                --$j;
+            }
+        }
+    }
+
+    /**
      * Sort packed Variable list in place (no PHP closures — AOT self-host spine safe).
      *
      * @param list<Variable> $values
@@ -158,6 +177,44 @@ final class VmInternalCompare
         for ($i = 1; $i < $n; ++$i) {
             $j = $i;
             while ($j > 0 && self::invoke($compare, $pairs[$j - 1][1], $pairs[$j][1]) < 0) {
+                $tmp = $pairs[$j - 1];
+                $pairs[$j - 1] = $pairs[$j];
+                $pairs[$j] = $tmp;
+                --$j;
+            }
+        }
+    }
+
+    /**
+     * Sort [key, value] pairs ascending by enum/object value spaceship (#5546, #6150).
+     *
+     * @param list<array{0: Variable, 1: Variable}> $pairs
+     */
+    public static function sortKeyedPairsByValueSpaceship(array &$pairs): void
+    {
+        $n = \count($pairs);
+        for ($i = 1; $i < $n; ++$i) {
+            $j = $i;
+            while ($j > 0 && self::compareValuesForSort($pairs[$j - 1][1], $pairs[$j][1]) > 0) {
+                $tmp = $pairs[$j - 1];
+                $pairs[$j - 1] = $pairs[$j];
+                $pairs[$j] = $tmp;
+                --$j;
+            }
+        }
+    }
+
+    /**
+     * Sort [key, value] pairs descending by enum/object value spaceship (#6150).
+     *
+     * @param list<array{0: Variable, 1: Variable}> $pairs
+     */
+    public static function sortKeyedPairsByValueSpaceshipDesc(array &$pairs): void
+    {
+        $n = \count($pairs);
+        for ($i = 1; $i < $n; ++$i) {
+            $j = $i;
+            while ($j > 0 && self::compareValuesForSort($pairs[$j - 1][1], $pairs[$j][1]) < 0) {
                 $tmp = $pairs[$j - 1];
                 $pairs[$j - 1] = $pairs[$j];
                 $pairs[$j] = $tmp;
@@ -304,5 +361,23 @@ final class VmInternalCompare
         }
 
         return Variable::compareSpaceship($left, $right);
+    }
+
+    /**
+     * @param list<Variable> $values
+     */
+    public static function assertHomogeneousEnumOrObjectValues(array $values, string $function): void
+    {
+        foreach ($values as $value) {
+            $resolved = $value->resolveIndirect();
+            if (EnumCaseSupport::isEnumCaseVariable($resolved)) {
+                continue;
+            }
+            if (Variable::TYPE_OBJECT !== $resolved->type) {
+                throw new \LogicException(
+                    $function.' only supports homogeneous object arrays in this compiler build'
+                );
+            }
+        }
     }
 }

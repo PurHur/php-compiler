@@ -13,7 +13,7 @@ final class ArsortVMTest extends BaseTest
 
     public static function providePHPTests(): \Generator
     {
-        foreach (['arsort.phpt', 'arsort_int.phpt'] as $file) {
+        foreach (['arsort.phpt', 'arsort_int.phpt', 'arsort_enum_case.phpt'] as $file) {
             yield $file => self::parsePHPT(
                 __DIR__.'/cases/stdlib/'.$file,
                 $file
