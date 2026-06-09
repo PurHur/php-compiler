@@ -13,7 +13,8 @@ use PHPCompiler\VM\Variable;
  * VM resolves via /etc/hosts without host ext/ffi; optional libc getaddrinfo when FFI is loaded.
  * JIT/AOT: lib/JIT/Builtin/GethostbynamelRuntime.php (__compiler_gethostbynamel).
  *
- * php-src: ext/standard/dns.c — PHP_FUNCTION(gethostbynamel), PHP_FUNCTION(gethostbyaddr), PHP_FUNCTION(gethostbyname)
+ * php-src: ext/standard/dns.c — PHP_FUNCTION(gethostbynamel), PHP_FUNCTION(gethostbyaddr),
+ * PHP_FUNCTION(gethostbyname), PHP_FUNCTION(checkdnsrr), PHP_FUNCTION(dns_check_record)
  */
 final class VmDns
 {
@@ -32,6 +33,56 @@ final class VmDns
     private const NI_MAXHOST = 1025;
 
     private static ?\FFI $ffi = null;
+
+    private static ?\FFI $dnsFfi = null;
+
+    /** DNS query class IN (arpa/nameser.h). */
+    private const DNS_CLASS_IN = 1;
+
+    /** @var array<string, int> php-src php_dns_record_types (ext/standard/dns.c) */
+    private const DNS_RECORD_TYPES = [
+        'A' => 1,
+        'NS' => 2,
+        'CNAME' => 5,
+        'SOA' => 6,
+        'PTR' => 12,
+        'HINFO' => 13,
+        'MX' => 15,
+        'TXT' => 16,
+        'AAAA' => 28,
+        'SRV' => 33,
+        'NAPTR' => 35,
+        'A6' => 38,
+        'ANY' => 255,
+    ];
+
+    /**
+     * checkdnsrr() / dns_check_record() — whether DNS records of $type exist (#5983).
+     *
+     * php-src: ext/standard/dns.c — php_dns_check_record()
+     */
+    public static function checkdnsrr(string $hostname, string $type = 'MX'): bool
+    {
+        if ('' === $hostname || \strlen($hostname) > 255) {
+            return false;
+        }
+        $type = \strtoupper($type);
+        $qtype = self::DNS_RECORD_TYPES[$type] ?? null;
+        if (null === $qtype) {
+            return false;
+        }
+
+        if (self::ffiEnabled()) {
+            $ffiResult = self::checkdnsrrViaResQuery($hostname, $qtype);
+            if (null !== $ffiResult) {
+                return $ffiResult;
+            }
+        }
+
+        $host = self::hostCheckdnsrr($hostname, $type);
+
+        return false !== $host && $host;
+    }
 
     /**
      * @return HashTable|false
@@ -276,6 +327,71 @@ final class VmDns
         $ffi->freeaddrinfo($resHead);
 
         return $stored;
+    }
+
+    /**
+     * @return bool|null null when FFI path unavailable
+     */
+    private static function checkdnsrrViaResQuery(string $hostname, int $qtype): ?bool
+    {
+        if (!\extension_loaded('ffi')) {
+            return null;
+        }
+        try {
+            $ffi = self::dnsFfi();
+        } catch (\Throwable) {
+            return null;
+        }
+        $ffi->res_init();
+        $buf = $ffi->new('unsigned char[1024]');
+        $rc = (int) $ffi->res_query($hostname, self::DNS_CLASS_IN, $qtype, $buf, 1024);
+
+        return $rc > 0;
+    }
+
+    /**
+     * Host Zend checkdnsrr() when VM driver runs under php-src (no ext/ffi required).
+     */
+    private static function hostCheckdnsrr(string $hostname, string $type): ?bool
+    {
+        if (!\function_exists('checkdnsrr')) {
+            return null;
+        }
+
+        return \checkdnsrr($hostname, $type);
+    }
+
+    private static function ffiEnabled(): bool
+    {
+        $v = \getenv('PHP_COMPILER_DISABLE_FFI');
+        if (false !== $v && '' !== $v && '0' !== $v && 'false' !== \strtolower($v)) {
+            return false;
+        }
+
+        return true;
+    }
+
+    private static function dnsFfi(): \FFI
+    {
+        if (null !== self::$dnsFfi) {
+            return self::$dnsFfi;
+        }
+
+        $cdef = <<<'CDEF'
+int res_init(void);
+int res_query(const char *dname, int class, int type, unsigned char *answer, int anslen);
+CDEF;
+
+        foreach (['libresolv.so', 'libc.so.6', 'libc.so'] as $lib) {
+            try {
+                self::$dnsFfi = \FFI::cdef($cdef, $lib);
+
+                return self::$dnsFfi;
+            } catch (\Throwable) {
+            }
+        }
+
+        throw new \RuntimeException('libc res_query FFI unavailable');
     }
 
     private static function ffi(): \FFI

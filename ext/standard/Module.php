@@ -509,6 +509,8 @@ class Module extends ModuleAbstract
             new gethostbynamel(),
             new gethostbyname(),
             new gethostbyaddr(),
+            new checkdnsrr(),
+            new checkdnsrr('dns_check_record'),
             new long2ip(),
             new ip2long(),
             new inet_ntop(),
