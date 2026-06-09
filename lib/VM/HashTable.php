@@ -829,6 +829,44 @@ final class HashTable {
     }
 
     /**
+     * array_replace_key(): copy this array, then replace values only for keys that already exist.
+     *
+     * php-src: ext/standard/array.c — PHP_FUNCTION(array_replace_key) (PHP 8.4+; issue #5650).
+     */
+    public function replaceKeyCopy(HashTable $replacements): HashTable
+    {
+        $out = new self();
+        foreach ($this->iterateKeyed(true) as [$key, $value]) {
+            $copy = new Variable();
+            $copy->copyFrom($value);
+            if (Variable::TYPE_INTEGER === $key->type) {
+                $out->addIndex($key->toInt(), $copy);
+            } else {
+                $out->add($key->toString(), $copy);
+            }
+        }
+        foreach ($replacements->iterateKeyed(true) as [$key, $value]) {
+            $copy = new Variable();
+            $copy->copyFrom($value);
+            if (Variable::TYPE_INTEGER === $key->type) {
+                $idx = $key->toInt();
+                $existing = $out->findIndex($idx);
+                if (null !== $existing) {
+                    $existing->copyFrom($copy);
+                }
+            } else {
+                $k = $key->toString();
+                $existing = $out->find($k);
+                if (null !== $existing) {
+                    $existing->copyFrom($copy);
+                }
+            }
+        }
+
+        return $out;
+    }
+
+    /**
      * array_replace_recursive(): copy this array, then overlay keys from each replacement array.
      * When both the destination and replacement values for a key are arrays, merge recursively.
      *

@@ -298,6 +298,7 @@ class Module extends ModuleAbstract
             new iterator_apply(),
             new array_replace(),
             new array_replace_recursive(),
+            new array_replace_key(),
             new array_fill(),
             new array_fill_keys(),
             new array_pad(),
