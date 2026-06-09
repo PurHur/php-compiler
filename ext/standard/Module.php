@@ -322,6 +322,7 @@ class Module extends ModuleAbstract
             new hash_hmac(),
             new hash_hmac_algos(),
             new hash_pbkdf2(),
+            new hash_hkdf(),
             new hash_equals(),
             new md5(),
             new md5_file(),

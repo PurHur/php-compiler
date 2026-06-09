@@ -34,6 +34,7 @@ final class StringHashCryptoNativeJit
         '__compiler_hash',
         '__compiler_hash_hmac',
         '__compiler_hash_pbkdf2',
+        '__compiler_hash_hkdf',
     ];
 
     public static function implement(Context $context): void
@@ -62,6 +63,7 @@ final class StringHashCryptoNativeJit
         self::implementIfMissing($context, '__compiler_hash', self::emitCompilerHash(...));
         self::implementIfMissing($context, '__compiler_hash_hmac', self::emitCompilerHashHmac(...));
         self::implementIfMissing($context, '__compiler_hash_pbkdf2', self::emitCompilerHashPbkdf2(...));
+        self::implementIfMissing($context, '__compiler_hash_hkdf', self::emitCompilerHashHkdf(...));
 
         self::registerLinkedRuntime($context);
         $context->builder->clearInsertionPosition();
@@ -109,6 +111,10 @@ final class StringHashCryptoNativeJit
             '__compiler_hash_pbkdf2' => $context->module->addFunction(
                 $name,
                 $context->context->functionType($strPtr, false, $strPtr, $strPtr, $strPtr, $i64, $i64, $i32)
+            ),
+            '__compiler_hash_hkdf' => $context->module->addFunction(
+                $name,
+                $context->context->functionType($strPtr, false, $strPtr, $strPtr, $i64, $strPtr, $strPtr)
             ),
             default => throw new \LogicException('Unknown hash crypto JIT function: '.$name),
         };
@@ -374,6 +380,202 @@ final class StringHashCryptoNativeJit
         $context->builder->call($context->lookupFunction('free'), $hex);
         $context->builder->call($context->lookupFunction('free'), $derived);
         $context->builder->returnValue($hexResult);
+    }
+
+    private static function emitCompilerHashHkdf(Context $context, LlvmFunction $fn): void
+    {
+        $entry = $fn->appendBasicBlock('hc_hkdf_entry');
+        $context->builder->positionAtEnd($entry);
+
+        $algo = $fn->getParam(0);
+        $key = $fn->getParam(1);
+        $length = $fn->getParam(2);
+        $info = $fn->getParam(3);
+        $salt = $fn->getParam(4);
+        $strPtr = $context->getTypeFromString('__string__*');
+        $i32 = $context->getTypeFromString('int32');
+        $i64 = $context->getTypeFromString('int64');
+        $i8 = $context->getTypeFromString('int8');
+        $i8p = $context->getTypeFromString('int8*');
+        $sizeT = $context->getTypeFromString('size_t');
+        $charPtr = $context->getTypeFromString('char*');
+        $nullStr = $strPtr->constNull();
+        $zeroI64 = $i64->constInt(0, false);
+        $oneI32 = $i32->constInt(1, false);
+        $oneI64 = $i64->constInt(1, false);
+
+        $id = self::algoId($context, $algo);
+        $bad = $fn->appendBasicBlock('hc_hkdf_bad');
+        $body = $fn->appendBasicBlock('hc_hkdf_body');
+        $lengthBad = $context->builder->icmp(Builder::INT_SLT, $length, $zeroI64);
+        $idBad = $context->builder->icmp(Builder::INT_EQ, $id, $i32->constInt(0, false));
+        $context->builder->branchIf($context->builder->or($idBad, $lengthBad), $bad, $body);
+
+        $context->builder->positionAtEnd($bad);
+        $context->builder->returnValue($nullStr);
+
+        $context->builder->positionAtEnd($body);
+        $hlen = self::callDigestLen($context, $id);
+        $hlenI64 = $context->builder->sext($hlen, $i64);
+        $useDefault = $context->builder->icmp(Builder::INT_EQ, $length, $zeroI64);
+        $afterLen = $fn->appendBasicBlock('hc_hkdf_after_len');
+        $context->builder->branch($afterLen);
+        $context->builder->positionAtEnd($afterLen);
+        $dklen = $context->builder->select($useDefault, $hlenI64, $length);
+
+        $keyData = self::stringData($context, $key);
+        $keyLen = self::stringLen($context, $key);
+        $saltLen = self::stringLen($context, $salt);
+        $saltData = self::stringData($context, $salt);
+        $saltEmpty = $context->builder->icmp(Builder::INT_EQ, $saltLen, $zeroI64);
+        $zeroSalt = $context->builder->alloca($i8, self::SHA256_DIGEST_SIZE, 'hc_hkdf_zero_salt');
+        $context->builder->call(
+            $context->lookupFunction('memset'),
+            $context->builder->pointerCast($zeroSalt, $charPtr),
+            $i32->constInt(0, false),
+            $context->builder->truncOrBitCast($hlenI64, $sizeT)
+        );
+        $extractKey = $context->builder->select($saltEmpty, $zeroSalt, $saltData);
+        $extractKeyLen = $context->builder->select($saltEmpty, $hlenI64, $saltLen);
+
+        $prk = $context->builder->alloca($i8, self::SHA256_DIGEST_SIZE, 'hc_hkdf_prk');
+        self::callHmac(
+            $context,
+            $id,
+            $keyData,
+            $keyLen,
+            $extractKey,
+            $extractKeyLen,
+            $prk
+        );
+
+        $blocks = $context->builder->add(
+            $context->builder->sub($dklen, $oneI64),
+            $context->builder->sub($hlenI64, $oneI64)
+        );
+        $blocks = $context->builder->lshr($blocks, $i64->constInt(32, false));
+        $blocks = $context->builder->add($blocks, $oneI64);
+
+        $derived = $context->builder->call(
+            $context->lookupFunction('malloc'),
+            $context->builder->truncOrBitCast($dklen, $sizeT)
+        );
+        $mallocFail = $fn->appendBasicBlock('hc_hkdf_malloc_fail');
+        $loopHead = $fn->appendBasicBlock('hc_hkdf_loop_head');
+        $context->builder->branchIf(
+            $context->builder->icmp(Builder::INT_EQ, $derived, $i8p->constNull()),
+            $mallocFail,
+            $loopHead
+        );
+
+        $context->builder->positionAtEnd($mallocFail);
+        $context->builder->returnValue($nullStr);
+
+        $blockSlot = BasicBlockHelper::entryAlloca($context, $i32);
+        $writtenSlot = BasicBlockHelper::entryAlloca($context, $i64);
+        $tLenSlot = BasicBlockHelper::entryAlloca($context, $i64);
+        $tBuf = $context->builder->alloca($i8, self::SHA256_DIGEST_SIZE, 'hc_hkdf_t');
+        $context->builder->store($oneI32, $blockSlot);
+        $context->builder->store($zeroI64, $writtenSlot);
+        $context->builder->store($zeroI64, $tLenSlot);
+
+        $infoData = self::stringData($context, $info);
+        $infoLen = self::stringLen($context, $info);
+
+        $context->builder->positionAtEnd($loopHead);
+        $block = $context->builder->load($blockSlot);
+        $doneLoop = $context->builder->icmp(Builder::INT_SGT, $block, $context->builder->truncOrBitCast($blocks, $i32));
+        $loopBody = $fn->appendBasicBlock('hc_hkdf_loop_body');
+        $loopDone = $fn->appendBasicBlock('hc_hkdf_loop_done');
+        $context->builder->branchIf($doneLoop, $loopDone, $loopBody);
+
+        $context->builder->positionAtEnd($loopBody);
+        $tLen = $context->builder->load($tLenSlot);
+        $inputLen = $context->builder->add($context->builder->add($tLen, $infoLen), $oneI64);
+        $input = $context->builder->call(
+            $context->lookupFunction('malloc'),
+            $context->builder->truncOrBitCast($inputLen, $sizeT)
+        );
+        $inputFail = $fn->appendBasicBlock('hc_hkdf_input_fail');
+        $inputOk = $fn->appendBasicBlock('hc_hkdf_input_ok');
+        $context->builder->branchIf(
+            $context->builder->icmp(Builder::INT_EQ, $input, $i8p->constNull()),
+            $inputFail,
+            $inputOk
+        );
+        $context->builder->positionAtEnd($inputFail);
+        $context->builder->call($context->lookupFunction('free'), $derived);
+        $context->builder->returnValue($nullStr);
+
+        $context->builder->positionAtEnd($inputOk);
+        $hasT = $context->builder->icmp(Builder::INT_SGT, $tLen, $zeroI64);
+        $afterT = $fn->appendBasicBlock('hc_hkdf_after_t');
+        $copyT = $fn->appendBasicBlock('hc_hkdf_copy_t');
+        $context->builder->branchIf($hasT, $copyT, $afterT);
+        $context->builder->positionAtEnd($copyT);
+        $context->builder->call(
+            $context->lookupFunction('memcpy'),
+            $input,
+            $tBuf,
+            $context->builder->truncOrBitCast($tLen, $sizeT)
+        );
+        $context->builder->branch($afterT);
+        $context->builder->positionAtEnd($afterT);
+        $context->builder->call(
+            $context->lookupFunction('memcpy'),
+            $context->builder->inBoundsGep($input, $tLen),
+            $infoData,
+            $context->builder->truncOrBitCast($infoLen, $sizeT)
+        );
+        $context->builder->store(
+            $context->builder->truncOrBitCast($block, $i8),
+            $context->builder->inBoundsGep($input, $context->builder->add($tLen, $infoLen))
+        );
+        self::callHmac(
+            $context,
+            $id,
+            $input,
+            $inputLen,
+            $prk,
+            $hlenI64,
+            $tBuf
+        );
+        $context->builder->call($context->lookupFunction('free'), $input);
+        $context->builder->store($hlenI64, $tLenSlot);
+
+        $written = $context->builder->load($writtenSlot);
+        $copy = $hlenI64;
+        $wouldOverflow = $context->builder->icmp(
+            Builder::INT_SGT,
+            $context->builder->add($written, $copy),
+            $dklen
+        );
+        $afterCopy = $fn->appendBasicBlock('hc_hkdf_after_copy');
+        $context->builder->branch($afterCopy);
+        $context->builder->positionAtEnd($afterCopy);
+        $copy = $context->builder->select(
+            $wouldOverflow,
+            $context->builder->sub($dklen, $written),
+            $copy
+        );
+        $context->builder->call(
+            $context->lookupFunction('memcpy'),
+            $context->builder->inBoundsGep($derived, $written),
+            $tBuf,
+            $context->builder->truncOrBitCast($copy, $sizeT)
+        );
+        $context->builder->store($context->builder->add($written, $copy), $writtenSlot);
+        $context->builder->store($context->builder->add($block, $oneI32), $blockSlot);
+        $context->builder->branch($loopHead);
+
+        $context->builder->positionAtEnd($loopDone);
+        $rawResult = $context->builder->call(
+            $context->lookupFunction('__string__init'),
+            $dklen,
+            $context->builder->pointerCast($derived, $charPtr)
+        );
+        $context->builder->call($context->lookupFunction('free'), $derived);
+        $context->builder->returnValue($rawResult);
     }
 
     private static function algoId(Context $context, Value $algo): Value

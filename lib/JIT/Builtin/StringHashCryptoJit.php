@@ -19,6 +19,7 @@ final class StringHashCryptoJit
         '__compiler_hash',
         '__compiler_hash_hmac',
         '__compiler_hash_pbkdf2',
+        '__compiler_hash_hkdf',
         '__compiler_hash_equals',
         '__compiler_hash_hmac_algos',
     ];

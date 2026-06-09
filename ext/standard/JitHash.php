@@ -66,6 +66,26 @@ final class JitHash
         ));
     }
 
+    public static function hashHkdf(
+        Context $context,
+        Value $algo,
+        Value $key,
+        Value $length,
+        Value $info,
+        Value $salt
+    ): Value {
+        StringHashCrypto::ensureLinked($context);
+
+        return self::digestToValue($context, $context->builder->call(
+            $context->lookupFunction('__compiler_hash_hkdf'),
+            $algo,
+            $key,
+            $length,
+            $info,
+            $salt
+        ));
+    }
+
     public static function equals(Context $context, Value $known, Value $user): Value
     {
         StringHashCrypto::ensureLinked($context);

@@ -539,6 +539,17 @@ class Type extends Builtin {
         );
         $fnHashPbkdf2 = $this->context->module->addFunction('__compiler_hash_pbkdf2', $fntypeHashPbkdf2);
         $this->context->registerFunction('__compiler_hash_pbkdf2', $fnHashPbkdf2);
+        $fntypeHashHkdf = $this->context->context->functionType(
+            $strPtr,
+            false,
+            $strPtr,
+            $strPtr,
+            $i64,
+            $strPtr,
+            $strPtr
+        );
+        $fnHashHkdf = $this->context->module->addFunction('__compiler_hash_hkdf', $fntypeHashHkdf);
+        $this->context->registerFunction('__compiler_hash_hkdf', $fnHashHkdf);
         $fntypeHashEquals = $this->context->context->functionType($i32, false, $strPtr, $strPtr);
         $fnHashEquals = $this->context->module->addFunction('__compiler_hash_equals', $fntypeHashEquals);
         $this->context->registerFunction('__compiler_hash_equals', $fnHashEquals);

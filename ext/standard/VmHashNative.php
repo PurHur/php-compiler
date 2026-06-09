@@ -50,6 +50,52 @@ final class VmHashNative
     }
 
     /**
+     * hash_hkdf() — RFC 5869 HKDF via HMAC (ext/hash/hash_hkdf.c; issue #5025).
+     */
+    public static function hashHkdf(
+        string $algo,
+        string $key,
+        int $length = 0,
+        string $info = '',
+        string $salt = ''
+    ): string {
+        $id = self::algoId($algo);
+        if (0 === $id) {
+            return '';
+        }
+        if ($length < 0) {
+            return '';
+        }
+        $hlen = self::digestLen($id);
+        $okmLen = 0 === $length ? $hlen : $length;
+        $prk = self::hkdfExtract($id, $key, $salt, $hlen);
+
+        return self::hkdfExpand($id, $prk, $info, $okmLen, $hlen);
+    }
+
+    private static function hkdfExtract(int $algo, string $key, string $salt, int $hlen): string
+    {
+        if ('' === $salt) {
+            $salt = \str_repeat("\0", $hlen);
+        }
+
+        return self::digestBytesToString(self::hmac($algo, $key, $salt));
+    }
+
+    private static function hkdfExpand(int $algo, string $prk, string $info, int $length, int $hlen): string
+    {
+        $blocks = (int) (($length + $hlen - 1) / $hlen);
+        $okm = '';
+        $t = '';
+        for ($i = 1; $i <= $blocks; $i++) {
+            $t = self::digestBytesToString(self::hmac($algo, $t.$info.\chr($i), $prk));
+            $okm .= $t;
+        }
+
+        return \substr($okm, 0, $length);
+    }
+
+    /**
      * hash_pbkdf2() — PBKDF2 via HMAC (ext/hash/hash_pbkdf2.c; issue #6186).
      */
     public static function hashPbkdf2(

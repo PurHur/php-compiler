@@ -73,6 +73,26 @@ final class VmHashNativeTest extends TestCase
             '/\\\\hash_pbkdf2\s*\(/',
             $src
         );
+        $this->assertDoesNotMatchRegularExpression(
+            '/\\\\hash_hkdf\s*\(/',
+            $src
+        );
+    }
+
+    public function testHashHkdfMatchesZend(): void
+    {
+        $this->assertSame(
+            \hash_hkdf('sha256', 'key', 16, 'info', 'salt'),
+            VmHashNative::hashHkdf('sha256', 'key', 16, 'info', 'salt')
+        );
+        $this->assertSame(
+            \hash_hkdf('sha256', 'key', 32),
+            VmHashNative::hashHkdf('sha256', 'key', 32)
+        );
+        $this->assertSame(
+            \hash_hkdf('sha256', 'key', 0),
+            VmHashNative::hashHkdf('sha256', 'key', 0)
+        );
     }
 
     public function testHashPbkdf2MatchesZend(): void
