@@ -127,10 +127,15 @@ class VM {
             [] !== $args
             && null !== $func->block->func
             && null !== $func->block->func->class
+            && !(($func->block->func->flags ?? 0) & \PHPCfg\Func::FLAG_STATIC)
         ) {
             $thisIdx = $func->block->slotIndexForVariableName('this');
             if (null !== $thisIdx) {
-                $child->scope[$thisIdx] = $args[0];
+                if (!isset($child->scope[$thisIdx])) {
+                    $child->scope[$thisIdx] = new Variable();
+                }
+                // copyInto scope slot; assigning calledArgs[0] directly breaks $this writes (#4772).
+                $child->scope[$thisIdx]->copyFrom($args[0]);
             }
         }
         $out = new Variable();
