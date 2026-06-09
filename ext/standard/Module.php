@@ -519,6 +519,7 @@ class Module extends ModuleAbstract
             new ini_set_(),
             new ini_set_('ini_alter'),
             new ini_get_(),
+            new ini_parse_quantity(),
             new error_reporting(),
             new define_(),
             new defined_(),
