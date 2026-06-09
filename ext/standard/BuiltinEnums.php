@@ -27,6 +27,7 @@ final class BuiltinEnums
         self::registerConnectionStatus($ctx);
         self::registerSessionStatus($ctx);
         self::registerResponseCode($ctx);
+        self::registerSorting($ctx);
         foreach (array_diff(array_keys($ctx->classes), $before) as $lc) {
             $ctx->classes[$lc]->isInternal = true;
         }
@@ -241,6 +242,32 @@ final class BuiltinEnums
         EnumSupport::ensureBuiltinEnumInterfaces($entry);
 
         $lc = 'responsecode';
+        $ctx->classes[$lc] = $entry;
+        $ctx->enums[$lc] = true;
+    }
+
+    /**
+     * PHP 8.4 Sorting: int-backed enum for array_multisort() order (#7229).
+     *
+     * php-src: ext/standard/basic_functions.stub.php — enum Sorting: int
+     */
+    private static function registerSorting(Context $ctx): void
+    {
+        if (isset($ctx->classes['sorting'])) {
+            return;
+        }
+
+        $entry = new ClassEntry('Sorting');
+        $entry->isEnum = true;
+        $entry->backedType = 'int';
+
+        self::registerBackedEnumCase($entry, 'Ascending', StdlibConstants::SORT_ASC);
+        self::registerBackedEnumCase($entry, 'Descending', StdlibConstants::SORT_DESC);
+
+        EnumSupport::ensureBuiltinCasesMethod($entry);
+        EnumSupport::ensureBuiltinEnumInterfaces($entry);
+
+        $lc = 'sorting';
         $ctx->classes[$lc] = $entry;
         $ctx->enums[$lc] = true;
     }
