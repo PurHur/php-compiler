@@ -153,6 +153,40 @@ final class VmMath
      *
      * @throws \TypeError when the operand cannot be converted like Zend PHP 8.x
      */
+    /**
+     * Z_PARAM_LONG_OR_NULL-style coercion (php-src basic_functions.c error_reporting; #5917).
+     *
+     * @throws \TypeError when the operand cannot be converted like Zend PHP 8.x
+     */
+    public static function parseNullableIntBuiltinArg(
+        Variable $var,
+        string $function,
+        int $argIndex,
+        string $paramName
+    ): ?int {
+        $var = $var->resolveIndirect();
+        if (Variable::TYPE_NULL === $var->type) {
+            return null;
+        }
+        self::rejectEnumCaseNullableIntBuiltinArg($var, $function, $argIndex, $paramName);
+        if (Variable::TYPE_ARRAY === $var->type) {
+            throw new \TypeError(self::nullableIntBuiltinTypeError($function, $argIndex, $paramName, 'array'));
+        }
+        if (Variable::TYPE_OBJECT === $var->type) {
+            throw new \TypeError(self::nullableIntBuiltinTypeError($function, $argIndex, $paramName, 'object'));
+        }
+        if (Variable::TYPE_FLOAT === $var->type) {
+            $f = $var->toFloat();
+            if (!\is_finite($f)) {
+                throw new \TypeError(self::nullableIntBuiltinTypeError($function, $argIndex, $paramName, 'float'));
+            }
+
+            return self::floatToZendLong($f);
+        }
+
+        return self::parseNullableLongBuiltinArgCore($var, $function, $argIndex, $paramName);
+    }
+
     public static function parseIntBuiltinArg(
         Variable $var,
         string $function,
@@ -205,6 +239,31 @@ final class VmMath
         }
 
         return self::parseLongBuiltinArgCore($var, $function, $argIndex, $paramName);
+    }
+
+    private static function parseNullableLongBuiltinArgCore(
+        Variable $var,
+        string $function,
+        int $argIndex,
+        string $paramName
+    ): int {
+        switch ($var->type) {
+            case Variable::TYPE_INTEGER:
+                return $var->toInt();
+            case Variable::TYPE_BOOLEAN:
+                return $var->toBool() ? 1 : 0;
+            case Variable::TYPE_STRING:
+                $s = $var->toString();
+                if ('' === $s || !is_numeric($s)) {
+                    throw new \TypeError(self::nullableIntBuiltinTypeError($function, $argIndex, $paramName, 'string'));
+                }
+
+                return (int) $s;
+            default:
+                throw new \TypeError(
+                    self::nullableIntBuiltinTypeError($function, $argIndex, $paramName, self::vmTypeName($var->type))
+                );
+        }
     }
 
     private static function parseLongBuiltinArgCore(
@@ -317,6 +376,26 @@ final class VmMath
     }
 
     /**
+     * Z_PARAM_LONG_OR_NULL rejects enum cases (php-src basic_functions.c error_reporting; #5917).
+     *
+     * @throws \TypeError
+     */
+    private static function rejectEnumCaseNullableIntBuiltinArg(
+        Variable $var,
+        string $function,
+        int $argIndex,
+        string $paramName
+    ): void {
+        if (!EnumCaseSupport::isEnumCaseVariable($var)) {
+            return;
+        }
+        $enumClass = EnumCaseSupport::enumClassForCaseVariable($var);
+        $given = null !== $enumClass ? $enumClass->name : 'object';
+
+        throw new \TypeError(self::nullableIntBuiltinTypeError($function, $argIndex, $paramName, $given));
+    }
+
+    /**
      * Z_PARAM_BOOL rejects enum cases (php-src basic_functions.c microtime/hrtime; #6149).
      *
      * @throws \TypeError
@@ -409,6 +488,21 @@ final class VmMath
     ): string {
         return sprintf(
             '%s(): Argument #%d ($%s) must be of type int, %s given',
+            $function,
+            $argIndex,
+            $paramName,
+            $given
+        );
+    }
+
+    private static function nullableIntBuiltinTypeError(
+        string $function,
+        int $argIndex,
+        string $paramName,
+        string $given
+    ): string {
+        return sprintf(
+            '%s(): Argument #%d ($%s) must be of type ?int, %s given',
             $function,
             $argIndex,
             $paramName,

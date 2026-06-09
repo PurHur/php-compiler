@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace PHPCompiler\ext\standard;
 
 use PHPCompiler\JIT\Context;
-use PHPCompiler\JIT\JitLongArg;
 use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Value;
@@ -21,7 +20,13 @@ final class JitErrorReporting
         $newLevel = $i64->constInt(0, false);
         if (null !== $levelArg && JITVariable::TYPE_NULL !== $levelArg->type) {
             $hasLevel = $i32->constInt(1, false);
-            $newLevel = JitLongArg::lower($context, $levelArg, 'error_reporting() level');
+            $newLevel = JitIntdiv::lowerNullableIntBuiltinArg(
+                $context,
+                $levelArg,
+                'error_reporting',
+                1,
+                'error_level'
+            );
         }
         $slot = JitValueBox::alloc($context);
         $ptr = JitValueBox::pointer($context, $slot);
