@@ -19,6 +19,7 @@ final class VmIni
         'display_errors',
         'memory_limit',
         'serialize_precision',
+        'unserialize_callback_func',
         ...VmAssertState::SUPPORTED_INI_KEYS,
     ];
 
@@ -48,6 +49,8 @@ final class VmIni
                 return self::setMemoryLimit($newValue);
             case 'serialize_precision':
                 return self::setSerializePrecision($newValue);
+            case 'unserialize_callback_func':
+                return self::setUnserializeCallbackFunc($newValue);
             default:
                 return false;
         }
@@ -72,6 +75,8 @@ final class VmIni
                 return self::$memoryLimit;
             case 'serialize_precision':
                 return (string) self::$serializePrecision;
+            case 'unserialize_callback_func':
+                return self::$unserializeCallbackFunc;
             default:
                 return false;
         }
@@ -90,6 +95,7 @@ final class VmIni
             'display_errors' => self::CFG_DISPLAY_ERRORS,
             'memory_limit' => self::CFG_MEMORY_LIMIT,
             'serialize_precision' => self::CFG_SERIALIZE_PRECISION,
+            'unserialize_callback_func' => '',
             default => false,
         };
     }
@@ -103,6 +109,8 @@ final class VmIni
     private static string $memoryLimit = self::CFG_MEMORY_LIMIT;
 
     private static int $serializePrecision = -1;
+
+    private static string $unserializeCallbackFunc = '';
 
     private static function setErrorReporting(Context $ctx, string $newValue) {
         $old = (string) $ctx->errors->getErrorReporting();
@@ -133,6 +141,18 @@ final class VmIni
         self::$serializePrecision = self::parseSerializePrecision($newValue);
 
         return $old;
+    }
+
+    private static function setUnserializeCallbackFunc(string $newValue) {
+        $old = self::$unserializeCallbackFunc;
+        self::$unserializeCallbackFunc = $newValue;
+
+        return $old;
+    }
+
+    public static function getUnserializeCallbackFunc(): string
+    {
+        return self::$unserializeCallbackFunc;
     }
 
     public static function parseSerializePrecision(string $value): int
@@ -188,6 +208,9 @@ final class VmIni
                 break;
             case 'serialize_precision':
                 self::$serializePrecision = self::parseSerializePrecision(self::CFG_SERIALIZE_PRECISION);
+                break;
+            case 'unserialize_callback_func':
+                self::$unserializeCallbackFunc = '';
                 break;
         }
     }

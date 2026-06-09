@@ -4,12 +4,15 @@ declare(strict_types=1);
 
 namespace PHPCompiler\ext\standard;
 
+use PHPCompiler\Frame;
+use PHPCompiler\Func\Internal as FuncInternal;
 use PHPCompiler\Func\PHP as PhpFunc;
 use PHPCompiler\MethodVisibility;
 use PHPCompiler\VM\BackedEnum;
 use PHPCompiler\VM\ClassEntry;
 use PHPCompiler\VM\Context;
 use PHPCompiler\VM\EnumCaseSupport;
+use PHPCompiler\VM\ErrorReporter;
 use PHPCompiler\VM\ObjectEntry;
 use PHPCompiler\VM\TypedPropertyCheck;
 use PHPCompiler\VM\Variable;
@@ -83,14 +86,10 @@ final class VmSerialize
                 return false;
             }
             [$className, $data] = $parsed;
-            $lc = strtolower($className);
-            if (!isset($ctx->classes[$lc])) {
-                $ctx->autoloadClass($className);
-            }
-            if (!isset($ctx->classes[$lc])) {
+            $class = self::resolveClassEntryForUnserialize($ctx, $className);
+            if (null === $class) {
                 return false;
             }
-            $class = $ctx->classes[$lc];
             if (!self::implementsLegacySerializable($class)) {
                 return false;
             }
@@ -121,14 +120,14 @@ final class VmSerialize
             if (!self::isClassAllowedForUnserialize($className, $options)) {
                 return false;
             }
-            $lc = strtolower($className);
-            if (!isset($ctx->classes[$lc])) {
-                $ctx->autoloadClass($className);
+            $class = self::resolveClassEntryForUnserialize($ctx, $className);
+            if (null === $class) {
+                if (!\is_array($data)) {
+                    return false;
+                }
+
+                return self::instantiateIncompleteObject($ctx, $className, $data);
             }
-            if (!isset($ctx->classes[$lc])) {
-                return false;
-            }
-            $class = $ctx->classes[$lc];
             if (self::hasInstanceMethod($class, '__unserialize')) {
                 if (!\is_array($data)) {
                     return false;
@@ -552,6 +551,92 @@ final class VmSerialize
                 : $entry->allocateProperty($propName);
             $prop->copyFrom(VmJson::import($raw));
         }
+    }
+
+    /**
+     * Resolve class for O:/C: unserialize after autoload + unserialize_callback_func (var_unserializer.c, #6564).
+     */
+    private static function resolveClassEntryForUnserialize(Context $ctx, string $className): ?ClassEntry
+    {
+        $lc = strtolower($className);
+        if (isset($ctx->classes[$lc])) {
+            return $ctx->classes[$lc];
+        }
+        $ctx->autoloadClass($className);
+        if (isset($ctx->classes[$lc])) {
+            return $ctx->classes[$lc];
+        }
+        $callback = VmIni::getUnserializeCallbackFunc();
+        if ('' === $callback) {
+            return null;
+        }
+        $classNameVar = new Variable();
+        $classNameVar->string($className);
+        $result = self::invokeNamedFunction($ctx, $callback, $classNameVar);
+        if (!$result->resolveIndirect()->toBool()) {
+            $ctx->errors->triggerError(
+                "unserialize(): Function {$callback}() hasn't defined the class it was called for",
+                ErrorReporter::E_WARNING
+            );
+        }
+        if (isset($ctx->classes[$lc])) {
+            return $ctx->classes[$lc];
+        }
+
+        return null;
+    }
+
+    /**
+     * Zend __PHP_Incomplete_Class placeholder when class definition is missing (var_unserializer.c, #6564).
+     *
+     * @param array<string, mixed> $data
+     */
+    public static function instantiateIncompleteObject(
+        Context $ctx,
+        string $missingClassName,
+        array $data
+    ): Variable {
+        $icClass = $ctx->classes['__php_incomplete_class'] ?? null;
+        if (null === $icClass) {
+            throw new \LogicException('__PHP_Incomplete_Class is not registered in this compiler build');
+        }
+        $entry = new ObjectEntry($icClass);
+        $nameProp = $entry->allocateProperty('__PHP_Incomplete_Class_Name');
+        $nameProp->string($missingClassName);
+        self::restoreObjectProperties($entry, $data);
+        $recv = new Variable();
+        $recv->object($entry);
+
+        return $recv;
+    }
+
+    private static function invokeNamedFunction(Context $ctx, string $name, Variable ...$args): Variable
+    {
+        if (str_contains($name, '::')) {
+            throw new \LogicException(
+                'Static method unserialize callbacks are not supported in this compiler build'
+            );
+        }
+        $lc = strtolower($name);
+        if (!isset($ctx->functions[$lc])) {
+            throw new \LogicException("Function {$name}() is not defined");
+        }
+        $fn = $ctx->functions[$lc];
+        if ($fn instanceof FuncInternal) {
+            $frame = new Frame($fn, null, null);
+            $frame->vmContext = $ctx;
+            $frame->calledArgs = $args;
+            $out = new Variable();
+            $frame->returnVar = $out;
+            $fn->execute($frame);
+
+            return $out;
+        }
+        if ($fn instanceof PhpFunc) {
+            return $ctx->runtime->vm->invokePhpFunction($fn, ...$args);
+        }
+
+        throw new \LogicException("Function {$name}() is not callable");
     }
 
     private static function invokeSerialize(Context $ctx, ObjectEntry $entry): Variable
