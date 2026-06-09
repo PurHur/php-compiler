@@ -405,6 +405,10 @@ final class VmArray
             );
         } elseif (Variable::TYPE_INTEGER === $first->type) {
             VmInternalCompare::sortKeyedPairsByValueInt($pairs);
+        } elseif (Variable::TYPE_OBJECT === $first->type || EnumCaseSupport::isEnumCaseVariable($first)) {
+            $values = array_map(static fn (array $pair): Variable => $pair[1], $pairs);
+            VmInternalCompare::assertHomogeneousEnumOrObjectValues($values, 'asort()');
+            VmInternalCompare::sortKeyedPairsByValueSpaceship($pairs);
         } else {
             throw new \LogicException(
                 'asort() only supports homogeneous string or integer values in this compiler build'
@@ -543,6 +547,10 @@ final class VmArray
             );
         } elseif (Variable::TYPE_INTEGER === $first->type) {
             VmInternalCompare::sortKeyedPairsByValueIntDesc($pairs);
+        } elseif (Variable::TYPE_OBJECT === $first->type || EnumCaseSupport::isEnumCaseVariable($first)) {
+            $values = array_map(static fn (array $pair): Variable => $pair[1], $pairs);
+            VmInternalCompare::assertHomogeneousEnumOrObjectValues($values, 'arsort()');
+            VmInternalCompare::sortKeyedPairsByValueSpaceshipDesc($pairs);
         } else {
             throw new \LogicException(
                 'arsort() only supports homogeneous string or integer values in this compiler build'

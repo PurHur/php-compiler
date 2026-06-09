@@ -89,7 +89,7 @@ final class sort_ extends Internal
                 }
             }
         } elseif (Variable::TYPE_OBJECT === $first->type || EnumCaseSupport::isEnumCaseVariable($first)) {
-            self::assertHomogeneousEnumOrObjectValues($values);
+            VmInternalCompare::assertHomogeneousEnumOrObjectValues($values, 'sort()');
             if (self::objectSortUsesSpaceship($flags)) {
                 VmInternalCompare::sortVariableValuesBySpaceship($values);
             } else {
@@ -179,21 +179,4 @@ final class sort_ extends Internal
             || StdlibConstants::SORT_NUMERIC === $sortType;
     }
 
-    /**
-     * @param list<Variable> $values
-     */
-    private static function assertHomogeneousEnumOrObjectValues(array $values): void
-    {
-        foreach ($values as $value) {
-            $resolved = $value->resolveIndirect();
-            if (EnumCaseSupport::isEnumCaseVariable($resolved)) {
-                continue;
-            }
-            if (Variable::TYPE_OBJECT !== $resolved->type) {
-                throw new \LogicException(
-                    'sort() only supports homogeneous object arrays in this compiler build'
-                );
-            }
-        }
-    }
 }

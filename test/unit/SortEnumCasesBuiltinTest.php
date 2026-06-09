@@ -43,4 +43,40 @@ PHP, 'sort_unit_enum.php'));
         $this->assertSame('A:1,B:1', $output);
         $this->assertStringNotContainsString(':0', $output);
     }
+
+    public function testRsortPreservesBackedEnumCasesDescending(): void
+    {
+        ob_start();
+        $runtime = new Runtime();
+        $runtime->run($runtime->parseAndCompile(<<<'PHP'
+<?php
+enum EInt: int { case A = 1; case B = 2; case C = 3; }
+$a = [EInt::C, EInt::A, EInt::B];
+rsort($a);
+echo $a[0]->name, ',', $a[1]->name, ',', $a[2]->name;
+PHP, 'rsort_backed_enum.php'));
+        $output = ob_get_clean();
+
+        $this->assertSame('C,B,A', $output);
+    }
+
+    public function testArsortPreservesBackedEnumCasesDescending(): void
+    {
+        ob_start();
+        $runtime = new Runtime();
+        $runtime->run($runtime->parseAndCompile(<<<'PHP'
+<?php
+enum EInt: int { case A = 1; case B = 2; }
+$a = ['x' => EInt::A, 'y' => EInt::B];
+arsort($a);
+$names = [];
+foreach ($a as $v) {
+    $names[] = $v->name;
+}
+echo implode(',', $names);
+PHP, 'arsort_backed_enum.php'));
+        $output = ob_get_clean();
+
+        $this->assertSame('B,A', $output);
+    }
 }
