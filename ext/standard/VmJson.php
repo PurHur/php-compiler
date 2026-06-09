@@ -229,7 +229,7 @@ final class VmJson
 
                 return $out;
             case Variable::TYPE_ENUM_CASE:
-                return self::exportEnumCase($v->toEnumCase());
+                return self::exportEnumCase($v->toEnumCase(), $ctx, $vm);
             case Variable::TYPE_OBJECT:
                 if (null === $ctx || null === $vm) {
                     throw new \LogicException(
@@ -245,11 +245,15 @@ final class VmJson
                         $backing->string('');
                     }
 
-                    return self::exportEnumCase(new EnumCaseEntry(
-                        $object->class,
-                        $object->enumCaseName ?? '',
-                        $backing
-                    ));
+                    return self::exportEnumCase(
+                        new EnumCaseEntry(
+                            $object->class,
+                            $object->enumCaseName ?? '',
+                            $backing
+                        ),
+                        $ctx,
+                        $vm
+                    );
                 }
                 if (!InterfaceCheck::entryImplements($object->class, 'jsonserializable', $ctx)) {
                     return self::exportObjectPublicProperties($object, $ctx, $vm);
@@ -322,10 +326,25 @@ final class VmJson
     }
 
     /**
-     * Zend ext/json/php_json.c — backed enum cases encode as backing scalar; unit cases as "".
+     * Zend ext/json/php_json.c — JsonSerializable hook before default enum scalar encoding (#6880).
      */
-    private static function exportEnumCase(EnumCaseEntry $case): mixed
+    private static function exportEnumCase(EnumCaseEntry $case, ?Context $ctx, ?VM $vm): mixed
     {
+        if (null !== $ctx && null !== $vm
+            && InterfaceCheck::entryImplements($case->enumClass, 'jsonserializable', $ctx)) {
+            $caseVar = new Variable(Variable::TYPE_ENUM_CASE);
+            $caseVar->enumCase($case);
+            $object = EnumCaseSupport::receiverForInstanceMethod($caseVar)->toObject();
+            if (!$vm->hasInstanceMethod($object->class, 'jsonserialize')) {
+                throw new \Error(
+                    'Call to undefined method '.$object->class->name.'::jsonSerialize()'
+                );
+            }
+            $serialized = $vm->invokeInstanceMethod($object, 'jsonSerialize')->resolveIndirect();
+
+            return self::export($serialized, $ctx, $vm);
+        }
+
         if (null === $case->enumClass->backedType) {
             return '';
         }
