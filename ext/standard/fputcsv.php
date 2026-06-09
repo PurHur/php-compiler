@@ -6,6 +6,8 @@ namespace PHPCompiler\ext\standard;
 
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
+use PHPCompiler\JIT\BasicBlockHelper;
+use PHPCompiler\JIT\Builtin\TypeErrorRaise;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\HashTableHelper;
 use PHPCompiler\JIT\JitLongArg;
@@ -49,6 +51,7 @@ final class fputcsv extends Internal
         if ($argc >= 5) {
             $escape = VmReflection::stringArg($frame->calledArgs[4], 'fputcsv() escape', 4);
         }
+        VmCsvArg::validateFputcsvOptions($separator, $enclosure, $escape);
         $fields = [];
         foreach ($fieldsVar->toArray()->iterate(true) as $value) {
             $value = $value->resolveIndirect();
@@ -95,6 +98,11 @@ final class fputcsv extends Internal
         if ($argc < 2 || $argc > 5) {
             throw new \LogicException('fputcsv() requires two to five arguments in this compiler build');
         }
+        $compileTimeFailure = $this->emitCompileTimeCsvValidationFailure($context, $argc, ...$args);
+        if (null !== $compileTimeFailure) {
+            return $compileTimeFailure;
+        }
+        JitCsvArg::validateFputcsvCall($context, $argc, ...$args);
         $i64 = $context->getTypeFromString('int64');
         $strPtr = $context->getTypeFromString('__string__*');
         $handle = $context->builder->truncOrBitCast(
@@ -134,5 +142,43 @@ final class fputcsv extends Internal
         }
 
         throw new \LogicException('fputcsv() fields must be an array in this compiler build');
+    }
+
+    private function emitCompileTimeCsvValidationFailure(Context $context, int $argc, JITVariable ...$args): ?Value
+    {
+        $checks = [
+            [3, 'separator', false, 2],
+            [4, 'enclosure', false, 3],
+            [5, 'escape', true, 4],
+        ];
+        foreach ($checks as [$argNum, $paramName, $allowEmpty, $argIndex]) {
+            if ($argc < $argNum) {
+                continue;
+            }
+            $literal = $args[$argIndex]->compileTimeString ?? null;
+            if (null === $literal) {
+                continue;
+            }
+            $invalid = $allowEmpty ? \strlen($literal) > 1 : 1 !== \strlen($literal);
+            if (!$invalid) {
+                continue;
+            }
+            $message = $allowEmpty
+                ? \sprintf('fputcsv(): Argument #%d ($%s) must be empty or a single character', $argNum, $paramName)
+                : \sprintf('fputcsv(): Argument #%d ($%s) must be a single character', $argNum, $paramName);
+            TypeErrorRaise::registerDeclarations($context);
+            TypeErrorRaise::ensureLinked($context);
+            $errBlock = BasicBlockHelper::append($context, 'fputcsv_csv_lit_err_'.$argNum);
+            $afterBlock = BasicBlockHelper::append($context, 'fputcsv_csv_lit_after_'.$argNum);
+            $context->builder->branch($errBlock);
+            $context->builder->positionAtEnd($errBlock);
+            TypeErrorRaise::emitValueError($context, $message);
+            $context->builder->call($context->lookupFunction('abort'));
+            $context->builder->positionAtEnd($afterBlock);
+
+            return $context->getTypeFromString('int64')->constInt(0, false);
+        }
+
+        return null;
     }
 }
