@@ -75,7 +75,8 @@ final class JitPregFilter
             $context->lookupFunction('__compiler_preg_replace'),
             $pattern,
             $replacement,
-            $subjectStr
+            $subjectStr,
+            $context->getTypeFromString('int64')->constInt(-1, false)
         );
         $replaceFailed = $context->builder->icmp(Builder::INT_EQ, $replaced, $strPtrTy->constNull());
         $context->builder->branchIf($replaceFailed, $failBlock, $okBlock);
@@ -220,7 +221,8 @@ final class JitPregFilter
             $context->lookupFunction('__compiler_preg_replace'),
             $pattern,
             $replacement,
-            $subject
+            $subject,
+            $context->getTypeFromString('int64')->constInt(-1, false)
         );
         $replaceFailed = $context->builder->icmp(Builder::INT_EQ, $replaced, $strPtrTy->constNull());
         $storeBlock = BasicBlockHelper::append($context, 'preg_filter_append_store_'.$id);

@@ -288,10 +288,6 @@ class JITTest extends BaseTest {
             if (str_contains($name, 'preg_last_error_msg')) {
                 continue;
             }
-            // preg_replace() $limit: VM + AOT lint (#3605); MCJIT until __compiler_preg_replace gains limit.
-            if (str_contains($name, 'preg_replace_limit')) {
-                continue;
-            }
             // preg_replace() array $subject: VM + AOT lint (#4055); MCJIT segfaults (preg_filter array path, #98).
             if (str_contains($name, 'preg_replace_array_subject')) {
                 continue;

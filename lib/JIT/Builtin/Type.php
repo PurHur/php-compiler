@@ -708,7 +708,8 @@ class Type extends Builtin {
             false,
             $strPtr,
             $strPtr,
-            $strPtr
+            $strPtr,
+            $i64
         );
         $fnPregReplace = $this->context->module->addFunction('__compiler_preg_replace', $fntypePregReplace);
         $this->context->registerFunction('__compiler_preg_replace', $fnPregReplace);
