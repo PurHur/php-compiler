@@ -230,7 +230,10 @@ final class StringVersionCompareJit
         $retZero = $fn->appendBasicBlock('sf_ret0');
         $retPos = $fn->appendBasicBlock('sf_retp');
         $retNeg = $fn->appendBasicBlock('sf_retn');
-        $context->builder->branchIf($eq, $retZero, $gt);
+        $retMid = $fn->appendBasicBlock('sf_retm');
+        $context->builder->branchIf($eq, $retZero, $retMid);
+        $context->builder->positionAtEnd($retMid);
+        $context->builder->branchIf($gt, $retPos, $retNeg);
         $context->builder->positionAtEnd($retPos);
         $context->builder->returnValue($i32->constInt(1, true));
         $context->builder->positionAtEnd($retNeg);

@@ -7,6 +7,7 @@ namespace PHPCompiler\ext\standard;
 use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Builtin\StringInfo;
 use PHPCompiler\JIT\Builtin\StringVersionCompare;
+use PHPCompiler\JIT\Builtin\TypeErrorRaise;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitStringArg;
 use PHPCompiler\JIT\JitStringBuiltinArg;
@@ -97,6 +98,13 @@ final class JitInfo
         JITVariable $ver2,
         ?JITVariable $operator = null
     ): Value {
+        if (null !== $operator) {
+            $opLit = $operator->compileTimeString ?? null;
+            if (null !== $opLit && !VmInfo::isValidVersionCompareOperator($opLit)) {
+                return self::emitVersionCompareOperatorValueError($context);
+            }
+        }
+
         StringVersionCompare::ensureLinked($context);
         $raw = $context->builder->call(
             $context->lookupFunction('__compiler_version_compare'),
@@ -112,6 +120,18 @@ final class JitInfo
         }
 
         return self::versionCompareWithOperator($context, $raw, $operator);
+    }
+
+    private static function emitVersionCompareOperatorValueError(Context $context): Value
+    {
+        TypeErrorRaise::registerDeclarations($context);
+        TypeErrorRaise::ensureLinked($context);
+        TypeErrorRaise::emitValueError($context, VmInfo::VERSION_COMPARE_OPERATOR_ERROR);
+        $slot = JitValueBox::alloc($context);
+        $ptr = JitValueBox::pointer($context, $slot);
+        $context->builder->call($context->lookupFunction('abort'));
+
+        return $ptr;
     }
 
     public static function extension_loaded(Context $context, JITVariable $extension): Value
@@ -181,6 +201,7 @@ final class JitInfo
 
         $false = $i64->constInt(0, false);
         $result = $false;
+        $matched = $context->constantFromBool(false);
         foreach ([
             ['<', $context->builder->zExt($isLt, $i64)],
             ['lt', $context->builder->zExt($isLt, $i64)],
@@ -198,8 +219,19 @@ final class JitInfo
             ['ne', $context->builder->zExt($notEq, $i64)],
         ] as [$literal, $longVal]) {
             $matches = self::jitStringEqualsLiteral($context, $operator, $literal);
+            $matched = $context->builder->or($matched, $matches);
             $result = $context->builder->select($matches, $longVal, $result);
         }
+
+        $validOk = BasicBlockHelper::append($context, 'version_compare_op_ok');
+        $validErr = BasicBlockHelper::append($context, 'version_compare_op_err');
+        $context->builder->branchIf($matched, $validOk, $validErr);
+        $context->builder->positionAtEnd($validErr);
+        TypeErrorRaise::registerDeclarations($context);
+        TypeErrorRaise::ensureLinked($context);
+        TypeErrorRaise::emitValueError($context, VmInfo::VERSION_COMPARE_OPERATOR_ERROR);
+        $context->builder->call($context->lookupFunction('abort'));
+        $context->builder->positionAtEnd($validOk);
         JitValueBox::writeLong($context, $slot, $result);
 
         return $ptr;
