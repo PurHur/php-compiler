@@ -506,10 +506,6 @@ class JITTest extends BaseTest {
                 || str_contains($name, 'show_source')) {
                 continue;
             }
-            // get_meta_tags() VM-only until HTML meta LLVM lowering (#3703).
-            if (str_contains($name, 'get_meta_tags')) {
-                continue;
-            }
             // fstat() on fopen handles: VM + AOT (#3482); MCJIT fopen execute unstable (jit-runtime-probe #98).
             if (str_contains($name, 'fstat_stream')) {
                 continue;

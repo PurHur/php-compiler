@@ -283,6 +283,17 @@ class Type extends Builtin {
             $fntypeMimeContentType
         );
         $this->context->registerFunction('__compiler_mime_content_type', $fnMimeContentType);
+        $fntypeGetMetaTags = $this->context->context->functionType(
+            $this->context->getTypeFromString('__hashtable__*'),
+            false,
+            $this->context->getTypeFromString('__string__*'),
+            $this->context->getTypeFromString('int1')
+        );
+        $fnGetMetaTags = $this->context->module->addFunction(
+            '__compiler_get_meta_tags',
+            $fntypeGetMetaTags
+        );
+        $this->context->registerFunction('__compiler_get_meta_tags', $fnGetMetaTags);
         $fntypeFilePutContents = $this->context->context->functionType(
             $i64,
             false,

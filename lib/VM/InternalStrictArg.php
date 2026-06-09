@@ -24,6 +24,19 @@ final class InternalStrictArg
         return $arg;
     }
 
+    public static function requireBool(Frame $frame, int $argIndex, string $function, string $paramName): Variable
+    {
+        $arg = $frame->calledArgs[$argIndex]->resolveIndirect();
+        if (!self::callerStrict($frame)) {
+            return $arg;
+        }
+        if (Variable::TYPE_BOOLEAN !== $arg->type) {
+            throw new \TypeError(self::message($function, $argIndex, $paramName, 'bool', $arg));
+        }
+
+        return $arg;
+    }
+
     public static function requireString(Frame $frame, int $argIndex, string $function, string $paramName): Variable
     {
         $arg = $frame->calledArgs[$argIndex]->resolveIndirect();

@@ -87,6 +87,38 @@ final class InternalStrictArg
         $context->builder->positionAtEnd($okBlock);
     }
 
+    public static function requireBool(
+        Context $context,
+        Variable $arg,
+        string $function,
+        string $paramName,
+        int $argNumber
+    ): void {
+        if (!$context->callerStrictTypes) {
+            return;
+        }
+        if (Variable::TYPE_NATIVE_BOOL === $arg->type) {
+            return;
+        }
+        if (Variable::TYPE_VALUE === $arg->type) {
+            self::enforceExactValueBox(
+                $context,
+                $arg,
+                VmVariable::TYPE_BOOLEAN,
+                $function,
+                $paramName,
+                $argNumber,
+                'bool'
+            );
+
+            return;
+        }
+        self::raiseTypeErrorAndAbort(
+            $context,
+            self::message($context, $function, $argNumber, $paramName, 'bool', $arg)
+        );
+    }
+
     public static function requireString(
         Context $context,
         Variable $arg,

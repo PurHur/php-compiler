@@ -92,6 +92,9 @@ function analyzeInternal(PHPCompiler\Func\Internal $fn): array
     if ('mime_content_type' === $fn->getName() && preg_match('/MimeContentTypeRuntime/i', $source)) {
         $notes[] = 'file MIME sniff (VM host fileinfo + AOT byte sniff) (#6196)';
     }
+    if ('get_meta_tags' === $fn->getName() && preg_match('/JitGetMetaTags|MetaTagsRuntime/i', $source)) {
+        $notes[] = 'HTML meta name/content (VM + JIT/AOT MetaTagsRuntime) (#3703, #4608)';
+    }
     if (in_array($fn->getName(), ['strcspn', 'strspn'], true) && preg_match('/GH-12592/i', $source)) {
         $notes[] = 'empty $characters: PHP 8.4 full byte length (GH-12592, #7088)';
     }
