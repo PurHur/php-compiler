@@ -20,6 +20,7 @@ final class CtypeModuleSkeletonTest extends TestCase
         $ctx = $runtime->vmContext;
 
         foreach ([
+            'ctype_blank',
             'ctype_alnum',
             'ctype_alpha',
             'ctype_cntrl',
@@ -66,5 +67,21 @@ PHP;
         ob_start();
         $runtime->run($block);
         self::assertSame('1100011', ob_get_clean());
+    }
+
+    public function test_ctype_blank_vm_semantics(): void
+    {
+        $runtime = new Runtime();
+        $code = <<<'PHP'
+<?php
+echo (int) ctype_blank(" \t");
+echo (int) ctype_blank("\n");
+echo (int) ctype_blank(9);
+echo (int) ctype_blank(10);
+PHP;
+        $block = $runtime->parseAndCompile($code, 'ctype_blank.php');
+        ob_start();
+        $runtime->run($block);
+        self::assertSame('1010', ob_get_clean());
     }
 }

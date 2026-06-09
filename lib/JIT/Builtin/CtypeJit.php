@@ -125,7 +125,7 @@ final class CtypeJit
 
         $defaultBlock = $fn->appendBasicBlock('kind_default');
         $cursor = $entry;
-        for ($i = 0; $i <= VmCtype::KIND_XDIGIT; ++$i) {
+        for ($i = 0; $i <= VmCtype::KIND_BLANK; ++$i) {
             $caseBlock = $fn->appendBasicBlock('kind_'.$i);
             $afterBlock = $fn->appendBasicBlock('after_kind_'.$i);
             $context->builder->positionAtEnd($cursor);
@@ -166,6 +166,7 @@ final class CtypeJit
             VmCtype::KIND_SPACE => self::emitIsSpace($context, $c),
             VmCtype::KIND_UPPER => self::emitIsUpper($context, $c),
             VmCtype::KIND_XDIGIT => self::emitIsXdigit($context, $c),
+            VmCtype::KIND_BLANK => self::emitIsBlank($context, $c),
             default => $context->getTypeFromString('int1')->constInt(0, false),
         };
     }
@@ -446,6 +447,15 @@ final class CtypeJit
                 $context->builder->or($isVt, $context->builder->or($isFf, $context->builder->or($isCr, $isSp)))
             )
         );
+    }
+
+    private static function emitIsBlank(Context $context, Value $c): Value
+    {
+        $i8 = $context->getTypeFromString('int8');
+        $isTab = $context->builder->icmp(Builder::INT_EQ, $c, $i8->constInt(9, false));
+        $isSp = $context->builder->icmp(Builder::INT_EQ, $c, $i8->constInt(32, false));
+
+        return $context->builder->or($isTab, $isSp);
     }
 
     private static function emitIsPrint(Context $context, Value $c): Value
