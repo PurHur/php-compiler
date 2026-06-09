@@ -13,7 +13,14 @@ use PHPCompiler\Frame;
  */
 final class CycleCollector
 {
+    /** Zend GC root-buffer threshold (zend_gc.c default). */
+    public const ROOT_THRESHOLD = 10001;
+
     private static bool $enabled = true;
+
+    private static int $runs = 0;
+
+    private static int $totalCollected = 0;
 
     public static function isEnabled(): bool
     {
@@ -30,11 +37,33 @@ final class CycleCollector
         self::$enabled = false;
     }
 
+    /**
+     * @return array{runs: int, collected: int, threshold: int, roots: int}
+     *
+     * @see https://github.com/php/php-src/blob/master/ext/standard/php_gc.c PHP_FUNCTION(gc_status)
+     */
+    public static function status(Context $ctx): array
+    {
+        return [
+            'runs' => self::$runs,
+            'collected' => self::$totalCollected,
+            'threshold' => self::ROOT_THRESHOLD,
+            'roots' => self::countBufferedRoots($ctx),
+        ];
+    }
+
+    /** Release VM allocator caches — no Zend MM layer yet (php_gc.c gc_mem_caches subset). */
+    public static function memCaches(): void
+    {
+        MemoryAccounting::resetPeakToCurrent();
+    }
+
     public static function collect(Context $ctx): int
     {
         if (!self::$enabled) {
             return 0;
         }
+        ++self::$runs;
         /** @var array<int, true> $marked */
         $marked = [];
         $visitVar = static function (Variable $var) use (&$marked, &$visitVar): void {
@@ -60,7 +89,37 @@ final class CycleCollector
             ++$collected;
         }
 
+        self::$totalCollected += $collected;
+
         return $collected;
+    }
+
+    /** Objects not reachable from VM roots — Zend GC root-buffer analogue. */
+    private static function countBufferedRoots(Context $ctx): int
+    {
+        /** @var array<int, true> $marked */
+        $marked = [];
+        $visitVar = static function (Variable $var) use (&$marked, &$visitVar): void {
+            self::markVariable($var, $marked, $visitVar);
+        };
+
+        $ctx->visitGcRoots($visitVar);
+
+        foreach (WeakRefRegistry::weakTargetIds() as $targetId) {
+            unset($marked[$targetId]);
+        }
+        foreach (WeakRefRegistry::weakMapKeyTargetIds() as $targetId) {
+            unset($marked[$targetId]);
+        }
+
+        $roots = 0;
+        foreach (ObjectRegistry::snapshot() as $object) {
+            if (!isset($marked[$object->id])) {
+                ++$roots;
+            }
+        }
+
+        return $roots;
     }
 
     /**
