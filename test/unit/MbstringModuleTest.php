@@ -20,16 +20,19 @@ final class MbstringModuleTest extends TestCase
         $ctx = $runtime->vmContext;
 
         self::assertTrue(VmReflection::functionExists($ctx, 'mb_strlen'));
+        self::assertTrue(VmReflection::functionExists($ctx, 'mb_convert_case'));
 
         $code = <<<'PHP'
 <?php
 echo (int) function_exists('mb_strlen');
 echo mb_strlen('é', 'UTF-8');
 echo mb_strlen('hello', 'UTF-8');
+echo (int) function_exists('mb_convert_case');
+echo mb_convert_case('hello', MB_CASE_UPPER, 'UTF-8');
 PHP;
         $block = $runtime->parseAndCompile($code, 'mbstring_module.php');
         ob_start();
         $runtime->run($block);
-        self::assertSame('115', ob_get_clean());
+        self::assertSame('1151HELLO', ob_get_clean());
     }
 }

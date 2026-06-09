@@ -30,6 +30,7 @@ function collectCapabilities(string $root): array
         'tokenizer' => new PHPCompiler\ext\tokenizer\Module(),
         'filter' => new PHPCompiler\ext\filter\Module(),
         'session' => new PHPCompiler\ext\session\Module(),
+        'mbstring' => new PHPCompiler\ext\mbstring\Module(),
         'standard' => new PHPCompiler\ext\standard\Module(),
         'openssl' => new PHPCompiler\ext\openssl\Module(),
     ];
