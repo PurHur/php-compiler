@@ -4758,7 +4758,7 @@ class Compiler {
             return;
         }
         $constName = $constNameArg->value;
-        if (!is_string($constName) || '' === $constName) {
+        if (!is_string($constName) || '' === $constName || str_contains($constName, '::')) {
             return;
         }
         $vm = $this->tryFoldDefineValueOperand($valueArg, $block);
@@ -9624,9 +9624,10 @@ class Compiler {
             return null;
         }
         $constName = $block->constants[$constNameSlot]->toString();
-        if ('' !== $constName) {
-            $this->storeCompileTimeGlobalConst($constName, $block->constants[$valueSlot]);
+        if ('' === $constName || str_contains($constName, '::')) {
+            return null;
         }
+        $this->storeCompileTimeGlobalConst($constName, $block->constants[$valueSlot]);
         $ops = [new OpCode(
             OpCode::TYPE_DECLARE_GLOBAL_CONST,
             $constNameSlot,
