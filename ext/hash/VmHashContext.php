@@ -31,7 +31,19 @@ final class VmHashContext
         }
         $entry = new \PHPCompiler\VM\ClassEntry('HashContext');
         $entry->isInternal = true;
+        $entry->methods['__debuginfo'] = new HashContextDebugInfo();
+        $entry->methodNames['__debuginfo'] = '__debugInfo';
         $ctx->classes[self::CLASS_LC] = $entry;
+    }
+
+    public static function debugInfoAlgoName(ObjectEntry $entry): string
+    {
+        $state = self::$store[$entry->id] ?? null;
+        if (null === $state || self::CLASS_LC !== strtolower($entry->class->name)) {
+            throw new \LogicException('HashContext::__debugInfo() expects a HashContext receiver');
+        }
+
+        return VmHashNative::resolveAlgoName($state['algo']);
     }
 
     public static function init(Context $vmCtx, string $algo): Variable

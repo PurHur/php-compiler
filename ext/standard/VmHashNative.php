@@ -808,6 +808,22 @@ final class VmHashNative
         return self::algoId($algo);
     }
 
+    /** Canonical registered algorithm name for HashContext::__debugInfo() (php-src ops->algo). */
+    public static function resolveAlgoName(int $algoId): string
+    {
+        if (1 === $algoId) {
+            return 'sha256';
+        }
+        if (2 === $algoId) {
+            return 'sha1';
+        }
+        if (3 === $algoId) {
+            return 'md5';
+        }
+
+        throw new \LogicException('Unsupported incremental hash algorithm id: '.$algoId);
+    }
+
     /**
      * @return array<string, mixed>
      */
