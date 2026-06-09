@@ -37,16 +37,7 @@ final class token_name extends Internal
             return;
         }
 
-        if (\function_exists('token_name')) {
-            $hostName = \token_name($type);
-            if (\is_string($hostName) && '' !== $hostName) {
-                $frame->returnVar->string($hostName);
-
-                return;
-            }
-        }
-
-        throw new \Error('token_name() is not implemented in this compiler build (issue #3171)');
+        throw new \Error('token_name(): Unknown token ID '.$type.' in this compiler build');
     }
 
     public function call(Context $context, JITVariable ...$args): Value
