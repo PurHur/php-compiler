@@ -67,6 +67,25 @@ final class VmBcmath
         return self::format($quotient, $scale);
     }
 
+    /**
+     * Quotient + remainder pair (php-src ext/bcmath/bcmath.c PHP_FUNCTION(bcdivmod), #6966).
+     *
+     * @return array{0: string, 1: string}
+     */
+    public static function divmod(string $left, string $right, ?int $scale = null): array
+    {
+        $scale = self::resolveScale($scale);
+        $b = self::parse($right);
+        if (self::isZero($b)) {
+            throw new \DivisionByZeroError('Division by zero');
+        }
+        $quotient = self::div($left, $right, 0);
+        $product = self::mul($quotient, $right, $scale);
+        $remainder = self::sub($left, $product, $scale);
+
+        return [$quotient, $remainder];
+    }
+
     public static function comp(string $left, string $right, ?int $scale = null): int
     {
         $scale = self::resolveScale($scale);
