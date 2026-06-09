@@ -7,6 +7,7 @@ namespace PHPCompiler\ext\standard;
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\JitLongArg;
 use PHPCompiler\JIT\JitStringArg;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\HashTable;
@@ -15,7 +16,7 @@ use PHPLLVM\Value;
 
 /**
  * preg_replace() — VM via VmPreg; JIT/AOT via __compiler_preg_replace (issue #1176).
- * Optional $limit (4th arg): VM (#3605); JIT/AOT deferred until native runtime supports it.
+ * Optional $limit (4th arg): VM (#3605); JIT/AOT via __compiler_preg_replace (#4765).
  * Array $subject: VM + JIT (#4055, ext/pcre/php_pcre.c php_pcre_replace).
  */
 final class preg_replace extends Internal
@@ -106,11 +107,9 @@ final class preg_replace extends Internal
                 'preg_replace() expects 3 to 4 arguments in this compiler build'
             );
         }
-        if ($argc >= 4) {
-            throw new \LogicException(
-                'preg_replace() limit is not supported in JIT/AOT in this compiler build (issue #3605)'
-            );
-        }
+        $limit = 4 === $argc
+            ? self::lowerLimit($context, $args[3])
+            : $context->getTypeFromString('int64')->constInt(-1, false);
 
         $pattern = JitStringArg::lower($context, $args[0], 'preg_replace() pattern');
         $replacement = JitStringArg::lower($context, $args[1], 'preg_replace() replacement');
@@ -120,10 +119,34 @@ final class preg_replace extends Internal
                 $context,
                 $pattern,
                 $replacement,
-                JitStringArg::lower($context, $args[2], 'preg_replace() subject')
+                JitStringArg::lower($context, $args[2], 'preg_replace() subject'),
+                $limit
             );
         }
 
-        return JitPregReplace::invokeArray($context, $pattern, $replacement, $args[2]);
+        return JitPregReplace::invokeArray($context, $pattern, $replacement, $args[2], $limit);
+    }
+
+    private static function lowerLimit(Context $context, JITVariable $arg): Value
+    {
+        $lit = self::compileTimeLimit($arg);
+        if (null !== $lit) {
+            return $context->constantFromInteger($lit, 'int64');
+        }
+
+        return JitLongArg::lower($context, $arg, 'preg_replace() argument #4 ($limit)');
+    }
+
+    private static function compileTimeLimit(JITVariable $arg): ?int
+    {
+        if (JITVariable::TYPE_NATIVE_LONG !== $arg->type
+            || JITVariable::KIND_VALUE !== $arg->kind) {
+            return null;
+        }
+        if (null !== ($arg->compileTimeLong ?? null)) {
+            return (int) $arg->compileTimeLong;
+        }
+
+        return null;
     }
 }

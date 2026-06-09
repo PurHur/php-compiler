@@ -23,39 +23,49 @@ final class JitPregReplace
         Context $context,
         Value $pattern,
         Value $replacement,
-        Value $subject
+        Value $subject,
+        ?Value $limit = null
     ): Value {
         StringPregMatch::ensureLinked($context);
 
-        return self::replaceString($context, $pattern, $replacement, $subject);
+        return self::replaceString($context, $pattern, $replacement, $subject, $limit ?? self::unlimitedLimit($context));
     }
 
     public static function invokeArray(
         Context $context,
         Value $pattern,
         Value $replacement,
-        Variable $subject
+        Variable $subject,
+        ?Value $limit = null
     ): Value {
         StringPregMatch::ensureLinked($context);
+        $limitVal = $limit ?? self::unlimitedLimit($context);
 
         $ht = ArrayBuiltinHelper::loadHashTable($context, $subject);
-        $resultHt = self::buildReplaceHashTable($context, $ht, $pattern, $replacement);
+        $resultHt = self::buildReplaceHashTable($context, $ht, $pattern, $replacement, $limitVal);
 
         return self::wrapHashTableResult($context, $resultHt);
+    }
+
+    private static function unlimitedLimit(Context $context): Value
+    {
+        return $context->getTypeFromString('int64')->constInt(-1, false);
     }
 
     private static function replaceString(
         Context $context,
         Value $pattern,
         Value $replacement,
-        Value $subjectStr
+        Value $subjectStr,
+        Value $limit
     ): Value {
         $strPtrTy = $context->getTypeFromString('__string__*');
         $raw = $context->builder->call(
             $context->lookupFunction('__compiler_preg_replace'),
             $pattern,
             $replacement,
-            $subjectStr
+            $subjectStr,
+            $limit
         );
         $isError = $context->builder->icmp(Builder::INT_EQ, $raw, $strPtrTy->constNull());
 
@@ -114,7 +124,8 @@ final class JitPregReplace
         Context $context,
         Value $src,
         Value $pattern,
-        Value $replacement
+        Value $replacement,
+        Value $limit
     ): Value {
         $id = (string) (++self::$blockSerial);
         $map = $context->structFieldMap['__hashtable__'];
@@ -186,7 +197,8 @@ final class JitPregReplace
             $context->lookupFunction('__compiler_preg_replace'),
             $pattern,
             $replacement,
-            $subject
+            $subject,
+            $limit
         );
         $replaceFailed = $context->builder->icmp(Builder::INT_EQ, $replaced, $strPtrTy->constNull());
         $storeBlock = BasicBlockHelper::append($context, 'preg_replace_store_'.$id);

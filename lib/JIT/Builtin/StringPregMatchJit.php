@@ -194,7 +194,7 @@ final class StringPregMatchJit
             ),
             '__phpc_preg_replace_internal' => $context->module->addFunction(
                 $name,
-                $context->context->functionType($strPtr, false, $strPtr, $strPtr, $strPtr)
+                $context->context->functionType($strPtr, false, $strPtr, $strPtr, $strPtr, $i64)
             ),
             '__compiler_preg_last_error' => $context->module->addFunction(
                 $name,
@@ -210,7 +210,7 @@ final class StringPregMatchJit
             ),
             '__compiler_preg_replace' => $context->module->addFunction(
                 $name,
-                $context->context->functionType($strPtr, false, $strPtr, $strPtr, $strPtr)
+                $context->context->functionType($strPtr, false, $strPtr, $strPtr, $strPtr, $i64)
             ),
             '__compiler_preg_replace_callback' => $context->module->addFunction(
                 $name,
@@ -824,6 +824,7 @@ final class StringPregMatchJit
         $pattern = $fn->getParam(0);
         $replacement = $fn->getParam(1);
         $subject = $fn->getParam(2);
+        $limit = $fn->getParam(3);
         $i32 = $context->getTypeFromString('int32');
         $i64 = $context->getTypeFromString('int64');
         $i8p = $context->getTypeFromString('int8*');
@@ -878,10 +879,20 @@ final class StringPregMatchJit
         $bufLenSlot = BasicBlockHelper::entryAlloca($context, $sizeT);
         $bufCapSlot = BasicBlockHelper::entryAlloca($context, $sizeT);
         $offsetSlot = BasicBlockHelper::entryAlloca($context, $sizeT);
+        $replacementsSlot = BasicBlockHelper::entryAlloca($context, $i64);
+        $maxReplacementsSlot = BasicBlockHelper::entryAlloca($context, $i64);
         $context->builder->store($i8p->constNull(), $bufSlot);
         $context->builder->store($sizeT->constInt(0, false), $bufLenSlot);
         $context->builder->store($sizeT->constInt(0, false), $bufCapSlot);
         $context->builder->store($sizeT->constInt(0, false), $offsetSlot);
+        $context->builder->store($i64->constInt(0, false), $replacementsSlot);
+        $limitNegative = $context->builder->icmp(Builder::INT_SLT, $limit, $i64->constInt(0, false));
+        $maxReplacements = $context->builder->select(
+            $limitNegative,
+            $i64->constInt(\PHP_INT_MAX, false),
+            $limit
+        );
+        $context->builder->store($maxReplacements, $maxReplacementsSlot);
 
         $loopHead = $fn->appendBasicBlock('pr_loop_head');
         $loopBody = $fn->appendBasicBlock('pr_loop_body');
@@ -913,7 +924,14 @@ final class StringPregMatchJit
         $context->builder->branchIf($isNomatch, $tailBb, $checkErrBb);
 
         $context->builder->positionAtEnd($checkErrBb);
-        $context->builder->branchIf($isError, $matchErrBb, $replaceBb);
+        $limitCheckBb = $fn->appendBasicBlock('pr_limit_check');
+        $context->builder->branchIf($isError, $matchErrBb, $limitCheckBb);
+
+        $context->builder->positionAtEnd($limitCheckBb);
+        $replacements = $context->builder->load($replacementsSlot);
+        $maxReplacements = $context->builder->load($maxReplacementsSlot);
+        $underLimit = $context->builder->icmp(Builder::INT_SLT, $replacements, $maxReplacements);
+        $context->builder->branchIf($underLimit, $replaceBb, $tailBb);
 
         $context->builder->positionAtEnd($tailBb);
         $tailLen = $context->builder->sub($subjLen, $offset);
@@ -990,6 +1008,11 @@ final class StringPregMatchJit
             $end
         );
         $context->builder->store($nextOffset, $offsetSlot);
+        $doneReplacements = $context->builder->load($replacementsSlot);
+        $context->builder->store(
+            $context->builder->addNoSignedWrap($doneReplacements, $i64->constInt(1, false)),
+            $replacementsSlot
+        );
         $context->builder->branch($loopHead);
 
         $context->builder->positionAtEnd($loopDone);
@@ -1332,7 +1355,8 @@ final class StringPregMatchJit
                 $context->lookupFunction('__phpc_preg_replace_internal'),
                 $fn->getParam(0),
                 $fn->getParam(1),
-                $fn->getParam(2)
+                $fn->getParam(2),
+                $fn->getParam(3)
             )
         );
     }
