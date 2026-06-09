@@ -139,8 +139,14 @@ final class VmSerialize
 
                 return self::instantiateWithWakeup($ctx, $class, $data);
             }
+            if (!\is_array($data)) {
+                return false;
+            }
+            if ($class->isInterface || $class->isTrait || $class->isEnum || $class->isAbstract) {
+                return false;
+            }
 
-            return false;
+            return self::instantiatePlainObject($class, $data);
         }
 
         return @\unserialize($payload);
@@ -256,6 +262,19 @@ final class VmSerialize
         $recv->object($entry);
         $dataVar = VmJson::import($data);
         $ctx->runtime->vm->invokePhpFunction($method, $recv, $dataVar);
+
+        return $recv;
+    }
+
+    /**
+     * Zend var_unserializer.c — plain O: object with property bag (no __unserialize/__wakeup; #5140).
+     */
+    public static function instantiatePlainObject(ClassEntry $class, array $data): Variable
+    {
+        $entry = new ObjectEntry($class);
+        self::restoreObjectProperties($entry, $data);
+        $recv = new Variable();
+        $recv->object($entry);
 
         return $recv;
     }
