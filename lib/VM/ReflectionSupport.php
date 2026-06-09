@@ -703,11 +703,37 @@ final class ReflectionSupport
         return null !== $state && $state->isUserClosure();
     }
 
+    public static function isReflectionInternalFunction(ObjectEntry $reflection): bool
+    {
+        return $reflection->reflectionIsInternalFunction;
+    }
+
+    /**
+     * Resolve a named function for ReflectionFunction::__construct (user or internal).
+     *
+     * php-src: ext/reflection/php_reflection.c — zend_lookup_internal_function()
+     */
+    public static function resolveFunctionForReflection(Context $ctx, string $functionName): Func
+    {
+        $lc = strtolower($functionName);
+        $func = $ctx->functions[$lc] ?? null;
+        if (null === $func) {
+            self::throwReflectionException(self::functionNotFoundMessage($functionName));
+        }
+
+        return $func;
+    }
+
     /**
      * @return \PHPCompiler\Func\PHP
      */
     public static function resolveFunctionFromReflection(Context $ctx, ObjectEntry $reflection): \PHPCompiler\Func\PHP
     {
+        if ($reflection->reflectionIsInternalFunction) {
+            self::throwReflectionException(
+                self::functionNotFoundMessage(self::functionNameFromReflection($reflection))
+            );
+        }
         $closure = $reflection->reflectionClosureState;
         if (null !== $closure) {
             return $closure->func;

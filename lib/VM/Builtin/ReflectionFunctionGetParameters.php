@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace PHPCompiler\VM\Builtin;
 
+use PHPCompiler\BuiltinParamNames;
 use PHPCompiler\ext\standard\VmReflection;
 use PHPCompiler\Frame;
 use PHPCompiler\VM\ObjectEntry;
@@ -22,25 +23,28 @@ final class ReflectionFunctionGetParameters extends VmClassMethod
     {
         $ctx = VmReflection::requireContext($frame);
         $receiver = ReflectionSupport::requireReflectionFunction($frame, $frame->calledArgs[0]);
-        $func = ReflectionSupport::resolveFunctionFromReflection($ctx, $receiver);
+        $funcName = ReflectionSupport::functionNameFromReflection($receiver);
+        if (ReflectionSupport::isReflectionInternalFunction($receiver)) {
+            $paramNames = BuiltinParamNames::forFunction($funcName) ?? [];
+        } else {
+            $func = ReflectionSupport::resolveFunctionFromReflection($ctx, $receiver);
+            $paramNames = $func->block->paramNames;
+        }
         $paramClass = $ctx->classes[ReflectionSupport::REFLECTION_PARAMETER] ?? null;
         if (null === $paramClass) {
             throw new \LogicException('ReflectionParameter is not registered in this compiler build');
         }
-        $funcName = ReflectionSupport::functionNameFromReflection($receiver);
         $result = new Variable();
         $result->newArray();
         $ht = $result->toArray();
-        $indices = array_keys($func->block->paramNames);
-        sort($indices, SORT_NUMERIC);
-        foreach ($indices as $index) {
+        foreach (array_keys($paramNames) as $index) {
             $param = new ObjectEntry($paramClass);
             $param->constructed = true;
             $param->getProperty(ReflectionSupport::PROP_FUNC_NAME)->string($funcName);
             $param->getProperty(ReflectionSupport::PROP_CLASS_NAME)->null();
             $param->getProperty(ReflectionSupport::PROP_METHOD_NAME)->null();
             $param->getProperty(ReflectionSupport::PROP_PARAM_INDEX)->int((int) $index);
-            $param->getProperty(ReflectionSupport::PROP_PARAM_NAME)->string($func->block->paramNames[$index]);
+            $param->getProperty(ReflectionSupport::PROP_PARAM_NAME)->string($paramNames[$index]);
             $slot = new Variable(Variable::TYPE_OBJECT);
             $slot->object($param);
             $ht->append($slot);

@@ -250,6 +250,43 @@ final class VmReflection
         return isset($ctx->functions[strtolower($functionName)]);
     }
 
+    /**
+     * Owning extension module for a registered builtin (php-src internal function bucket, #6678).
+     */
+    public static function extensionNameForFunction(Context $ctx, string $functionName): string
+    {
+        $lc = strtolower($functionName);
+        $registered = $ctx->functions[$lc] ?? null;
+        if (null !== $registered) {
+            foreach ($ctx->runtime->modules as $module) {
+                foreach ($module->getFunctions() as $func) {
+                    if ($func === $registered) {
+                        return self::reflectionExtensionName($module->getExtensionName());
+                    }
+                }
+            }
+        }
+        $extension = 'standard';
+        foreach ($ctx->runtime->modules as $module) {
+            foreach ($module->getFunctions() as $func) {
+                if (strtolower($func->getName()) === $lc) {
+                    $extension = $module->getExtensionName();
+                }
+            }
+        }
+
+        return self::reflectionExtensionName($extension);
+    }
+
+    /** php-src maps Zend core builtins to extension name Core (#6678). */
+    private static function reflectionExtensionName(string $moduleExtension): string
+    {
+        return match ($moduleExtension) {
+            'types' => 'Core',
+            default => $moduleExtension,
+        };
+    }
+
     public static function methodExistsOnClass(ClassEntry $class, string $method): bool
     {
         $methodLc = strtolower($method);

@@ -89,10 +89,13 @@ use PHPCompiler\VM\Builtin\ReflectionEnumUnitCaseGetAttributes;
 use PHPCompiler\VM\Builtin\ReflectionEnumUnitCaseGetName;
 use PHPCompiler\VM\Builtin\ReflectionEnumUnitCaseGetValue;
 use PHPCompiler\VM\Builtin\ReflectionFunctionConstruct;
+use PHPCompiler\VM\Builtin\ReflectionFunctionGetExtensionName;
 use PHPCompiler\VM\Builtin\ReflectionFunctionGetName;
 use PHPCompiler\VM\Builtin\ReflectionFunctionGetParameters;
 use PHPCompiler\VM\Builtin\ReflectionFunctionGetReturnType;
 use PHPCompiler\VM\Builtin\ReflectionFunctionIsAnonymous;
+use PHPCompiler\VM\Builtin\ReflectionFunctionIsInternal;
+use PHPCompiler\VM\Builtin\ReflectionFunctionIsUserDefined;
 use PHPCompiler\VM\Builtin\ReflectionMethodConstruct;
 use PHPCompiler\VM\Builtin\ReflectionMethodGetAttributes;
 use PHPCompiler\VM\Builtin\ReflectionMethodGetName;
@@ -494,6 +497,9 @@ final class BuiltinClasses
                 'getparameters' => new ReflectionFunctionGetParameters(),
                 'getreturntype' => new ReflectionFunctionGetReturnType(),
                 'isanonymous' => new ReflectionFunctionIsAnonymous(),
+                'isinternal' => new ReflectionFunctionIsInternal(),
+                'isuserdefined' => new ReflectionFunctionIsUserDefined(),
+                'getextensionname' => new ReflectionFunctionGetExtensionName(),
             ] as $name => $method
         ) {
             $rf->methods[$name] = $method;
