@@ -16,7 +16,6 @@ use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\ArrayBuiltinHelper;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitBoolArg;
-use PHPCompiler\JIT\JitLongArg;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
@@ -40,24 +39,19 @@ final class array_slice extends Internal
         if (Variable::TYPE_ARRAY !== $array->type) {
             throw new \LogicException('array_slice() first argument must be an array in this compiler build');
         }
-        if (Variable::TYPE_INTEGER !== $offset->type) {
-            throw new \LogicException('array_slice() offset must be an integer in this compiler build');
-        }
+        $offsetInt = VmMath::parseIntBuiltinArg($offset, 'array_slice', 2, 'offset');
         $length = null;
         if ($argc >= 3) {
             $lengthArg = $frame->calledArgs[2]->resolveIndirect();
             if (Variable::TYPE_NULL !== $lengthArg->type) {
-                if (Variable::TYPE_INTEGER !== $lengthArg->type) {
-                    throw new \LogicException('array_slice() length must be an integer in this compiler build');
-                }
-                $length = $lengthArg->toInt();
+                $length = VmMath::parseIntBuiltinArg($lengthArg, 'array_slice', 3, 'length');
             }
         }
         $preserveKeys = false;
         if (4 === $argc) {
             $preserveKeys = $frame->calledArgs[3]->resolveIndirect()->toBool();
         }
-        $frame->returnVar->array($array->toArray()->sliceCopy($offset->toInt(), $length, $preserveKeys));
+        $frame->returnVar->array($array->toArray()->sliceCopy($offsetInt, $length, $preserveKeys));
     }
 
     public function call(Context $context, JITVariable ...$args): Value
@@ -66,24 +60,19 @@ final class array_slice extends Internal
         if ($argc < 2 || $argc > 4) {
             throw new \LogicException('array_slice() requires two to four arguments in this compiler build');
         }
-        if (JITVariable::TYPE_NATIVE_LONG !== $args[1]->type) {
-            throw new \LogicException('array_slice() offset must be an integer in this compiler build');
-        }
         $hasExplicitLength = false;
         if ($argc >= 3) {
             if (JITVariable::TYPE_NULL === $args[2]->type || $args[2]->isNullConstant) {
                 $hasExplicitLength = false;
-            } elseif (JITVariable::TYPE_NATIVE_LONG !== $args[2]->type) {
-                throw new \LogicException('array_slice() length must be an integer in this compiler build');
             } else {
                 $hasExplicitLength = true;
             }
         }
 
-        $offset = JitLongArg::lower($context, $args[1], 'array_slice() offset');
+        $offset = JitIntdiv::lowerIntBuiltinArg($context, $args[1], 'array_slice', 2, 'offset');
         $hasLength = $context->getTypeFromString('int1')->constInt($hasExplicitLength ? 1 : 0, false);
         $length = $hasExplicitLength
-            ? JitLongArg::lower($context, $args[2], 'array_slice() length')
+            ? JitIntdiv::lowerIntBuiltinArg($context, $args[2], 'array_slice', 3, 'length')
             : $context->getTypeFromString('int64')->constInt(0, false);
         $preserveKeys = 4 === $argc
             ? JitBoolArg::lower($context, $args[3], 'array_slice() preserve_keys')
