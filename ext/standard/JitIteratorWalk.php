@@ -13,6 +13,8 @@ use PHPCompiler\JIT\GeneratorHelper;
 use PHPCompiler\JIT\HashTableHelper;
 use PHPCompiler\JIT\IteratorHelper;
 use PHPCompiler\JIT\IteratorProtocolHelper;
+use PHPCompiler\JIT\JitIterableArg;
+use PHPCompiler\JIT\JitOperandTypeLabel;
 use PHPCompiler\JIT\Variable;
 use PHPLLVM\Value;
 
@@ -23,6 +25,9 @@ final class JitIteratorWalk
 {
     public static function count(Context $context, Variable $iterable): Value
     {
+        if (!JitIterableArg::guardIterableOperand($context, $iterable, 'iterator_count')) {
+            return $context->getTypeFromString('int64')->constInt(0, false);
+        }
         GeneratorHelper::ensureTypes($context);
         $gen = self::resolveGenerator($iterable);
         if (null !== $gen) {
@@ -40,13 +45,22 @@ final class JitIteratorWalk
             }
         }
 
-        throw new \LogicException(
-            'iterator_count() argument must be an array or Traversable in this compiler build'
+        JitIterableArg::emitIterableTypeErrorAndAbort(
+            $context,
+            'iterator_count',
+            0,
+            'iterator',
+            JitOperandTypeLabel::givenLabel($context, $iterable)
         );
+
+        return $context->getTypeFromString('int64')->constInt(0, false);
     }
 
     public static function apply(Context $context, Variable $iterable, Variable $callback, Variable $params): Value
     {
+        if (!JitIterableArg::guardIterableOperand($context, $iterable, 'iterator_apply')) {
+            return $context->getTypeFromString('int64')->constInt(0, false);
+        }
         if (!ArrayMapCallbackPolicy::isClosureJitLowerable($callback)) {
             throw new \LogicException(
                 'iterator_apply() requires a compile-time closure callback in this compiler build'
@@ -73,9 +87,15 @@ final class JitIteratorWalk
             }
         }
 
-        throw new \LogicException(
-            'iterator_apply() argument must be an array or Traversable in this compiler build'
+        JitIterableArg::emitIterableTypeErrorAndAbort(
+            $context,
+            'iterator_apply',
+            0,
+            'iterator',
+            JitOperandTypeLabel::givenLabel($context, $iterable)
         );
+
+        return $context->getTypeFromString('int64')->constInt(0, false);
     }
 
     private static function resolveGenerator(Variable $iterable): ?Variable

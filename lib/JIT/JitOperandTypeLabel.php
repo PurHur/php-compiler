@@ -77,6 +77,17 @@ final class JitOperandTypeLabel
             return null;
         }
         $type = (int) $typeByte->getConstantValue();
+        if (VmVariable::TYPE_OBJECT === $type) {
+            $valuePtr = JitValueBox::valuePtrFromVariable($context, $arg);
+            $obj = $context->builder->call(
+                $context->lookupFunction('__value__readObject'),
+                $valuePtr
+            );
+            $objVar = new Variable($context, Variable::TYPE_OBJECT, Variable::KIND_VALUE, $obj);
+
+            return self::compileTimeObjectEnumClassName($context, $objVar)
+                ?? self::compileTimeObjectClassName($context, $objVar);
+        }
         if (VmVariable::TYPE_ENUM_CASE !== $type) {
             return null;
         }
@@ -91,6 +102,20 @@ final class JitOperandTypeLabel
             return null;
         }
         $classId = (int) $classIdVal->getConstantValue();
+        $jitObject = $context->type->object;
+        if (!$jitObject instanceof JitObjectType) {
+            return null;
+        }
+
+        return $jitObject->classNameForId($classId);
+    }
+
+    private static function compileTimeObjectClassName(Context $context, Variable $arg): ?string
+    {
+        $classId = self::constantObjectClassId($context, $arg);
+        if (null === $classId) {
+            return null;
+        }
         $jitObject = $context->type->object;
         if (!$jitObject instanceof JitObjectType) {
             return null;
