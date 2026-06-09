@@ -79,7 +79,11 @@ final class filter_input extends Internal
             return;
         }
         $value = $stored->resolveIndirect();
-        filter_var::writeReturn($frame, VmFilter::filterVar($value, $filter->toInt(), null));
+        $filterId = $filter->toInt();
+        if (!VmFilter::isSupportedFilter($filterId)) {
+            filter_var::triggerUnknownFilterWarning($frame, $filterId);
+        }
+        filter_var::writeReturn($frame, VmFilter::filterVar($value, $filterId, null));
     }
 
     public function call(Context $context, JITVariable ...$args): Value

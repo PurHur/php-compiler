@@ -9,6 +9,7 @@ use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\Variable as JITVariable;
+use PHPCompiler\VM\ErrorReporter;
 use PHPCompiler\VM\Variable;
 use PHPLLVM\Builder;
 use PHPLLVM\Value;
@@ -39,7 +40,25 @@ final class filter_var extends Internal
                 throw new \LogicException('filter_var() options must be an integer flag bitmask');
             }
         }
-        self::writeReturn($frame, VmFilter::filterVar($value, $filter->toInt(), $options));
+        $filterId = $filter->toInt();
+        if (!VmFilter::isSupportedFilter($filterId)) {
+            self::triggerUnknownFilterWarning($frame, $filterId);
+        }
+        self::writeReturn($frame, VmFilter::filterVar($value, $filterId, $options));
+    }
+
+    public static function triggerUnknownFilterWarning(Frame $frame, int $filterId): void
+    {
+        if (null === $frame->vmContext) {
+            return;
+        }
+        $frame->vmContext->errors->triggerError(
+            VmFilter::unknownFilterWarningMessage($filterId),
+            ErrorReporter::E_WARNING,
+            '' !== $frame->scriptPath ? $frame->scriptPath : null,
+            $frame->vmContext,
+            $frame
+        );
     }
 
     public function call(Context $context, JITVariable ...$args): Value
