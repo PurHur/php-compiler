@@ -1258,6 +1258,7 @@ require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionEnumConstruct.php';
 require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionEnumGetCase.php';
 require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionEnumGetCases.php';
 require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionEnumGetName.php';
+require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionEnumHasCase.php';
 require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionEnumIsBacked.php';
 require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionEnumUnitCaseConstruct.php';
 require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionEnumUnitCaseGetAttributes.php';

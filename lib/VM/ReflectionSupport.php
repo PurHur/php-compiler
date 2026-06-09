@@ -114,7 +114,7 @@ final class ReflectionSupport
 
     public static function enumCaseNotFoundMessage(string $enumName, string $caseName): string
     {
-        return $enumName.'::'.$caseName.' is not a case';
+        return 'Case '.$enumName.'::'.$caseName.' does not exist';
     }
 
     /** @return never */
