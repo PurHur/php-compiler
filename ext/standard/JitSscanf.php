@@ -7,7 +7,7 @@ namespace PHPCompiler\ext\standard;
 use PHPCompiler\JIT\Builtin\Sscanf;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\HashTableHelper;
-use PHPCompiler\JIT\JitStringArg;
+use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\Variable as VMVariable;
@@ -33,8 +33,8 @@ final class JitSscanf
             return self::parseCompileTime($context, $strLit, $fmtLit, \array_slice($args, 2));
         }
 
-        $str = JitStringArg::lower($context, $args[0], 'sscanf() string');
-        $fmt = JitStringArg::lower($context, $args[1], 'sscanf() format');
+        $str = JitStringBuiltinArg::lower($context, $args[0], 'sscanf', 0, 'string');
+        $fmt = JitStringBuiltinArg::lower($context, $args[1], 'sscanf', 1, 'format');
         $outCount = $argc - 2;
         $i64 = $context->getTypeFromString('int64');
         if (0 === $outCount) {
