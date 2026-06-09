@@ -109,6 +109,9 @@ final class SelfHostBuiltinPolicy
         'session_write_close' => 'session',
         'session_destroy' => 'session',
         'session_regenerate_id' => 'session',
+        'session_abort' => 'session',
+        'session_reset' => 'session',
+        'session_create_id' => 'session',
     ];
 
     /** @var array<string, string> */
