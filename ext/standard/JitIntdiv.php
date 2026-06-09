@@ -8,6 +8,7 @@ use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Builtin\TypeErrorRaise;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitLongArg;
+use PHPCompiler\JIT\JitOperandTypeLabel;
 use PHPCompiler\JIT\JitStringArg;
 use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\Variable as JITVariable;
@@ -36,7 +37,18 @@ final class JitIntdiv
         int $argIndex,
         string $paramName
     ): Value {
-        return self::lowerIntOperand($context, $arg, $argIndex, $paramName, $function);
+        return self::lowerIntOperand($context, $arg, $argIndex, $paramName, $function, false);
+    }
+
+    /** Z_PARAM_LONG_OR_NULL lowering with ?int TypeError messages (#5917 error_reporting). */
+    public static function lowerNullableIntBuiltinArg(
+        Context $context,
+        JITVariable $arg,
+        string $function,
+        int $argIndex,
+        string $paramName
+    ): Value {
+        return self::lowerIntOperand($context, $arg, $argIndex, $paramName, $function, true);
     }
 
     private static function lowerIntOperand(
@@ -44,29 +56,38 @@ final class JitIntdiv
         JITVariable $arg,
         int $argIndex,
         string $paramName,
-        string $function
+        string $function,
+        bool $nullable = false
     ): Value {
         if (JITVariable::TYPE_NULL === $arg->type) {
             return $context->getTypeFromString('int64')->constInt(0, false);
         }
+        if ($nullable) {
+            $enumLabel = JitOperandTypeLabel::compileTimeEnumClassName($context, $arg);
+            if (null !== $enumLabel) {
+                self::emitIntTypeErrorAndAbort($context, $function, $argIndex, $paramName, $enumLabel, true);
+
+                return $context->getTypeFromString('int64')->constInt(0, false);
+            }
+        }
         if (($arg->type & JITVariable::IS_NATIVE_ARRAY) || JITVariable::TYPE_HASHTABLE === $arg->type) {
-            self::emitIntTypeErrorAndAbort($context, $function, $argIndex, $paramName, 'array');
+            self::emitIntTypeErrorAndAbort($context, $function, $argIndex, $paramName, 'array', $nullable);
 
             return $context->getTypeFromString('int64')->constInt(0, false);
         }
         if (JITVariable::TYPE_OBJECT === $arg->type) {
-            self::emitIntTypeErrorAndAbort($context, $function, $argIndex, $paramName, 'object');
+            self::emitIntTypeErrorAndAbort($context, $function, $argIndex, $paramName, 'object', $nullable);
 
             return $context->getTypeFromString('int64')->constInt(0, false);
         }
         if (JITVariable::TYPE_NATIVE_DOUBLE === $arg->type) {
-            return self::lowerNativeDoubleOperand($context, $arg, $argIndex, $paramName, $function);
+            return self::lowerNativeDoubleOperand($context, $arg, $argIndex, $paramName, $function, $nullable);
         }
         if (JITVariable::TYPE_STRING === $arg->type) {
-            return self::lowerStringOperand($context, $arg, $argIndex, $paramName, $function);
+            return self::lowerStringOperand($context, $arg, $argIndex, $paramName, $function, $nullable);
         }
         if (JITVariable::TYPE_VALUE === $arg->type) {
-            return self::lowerBoxedOperand($context, $arg, $argIndex, $paramName, $function);
+            return self::lowerBoxedOperand($context, $arg, $argIndex, $paramName, $function, $nullable);
         }
 
         return JitLongArg::lower($context, $arg, sprintf('%s() argument #%d', $function, $argIndex));
@@ -77,7 +98,8 @@ final class JitIntdiv
         JITVariable $arg,
         int $argIndex,
         string $paramName,
-        string $function
+        string $function,
+        bool $nullable = false
     ): Value {
         $strPtr = JitStringArg::lower($context, $arg, sprintf('%s() argument #%d', $function, $argIndex));
         $isNumeric = self::stringPtrIsNumeric($context, $strPtr);
@@ -85,7 +107,7 @@ final class JitIntdiv
         $errBlock = BasicBlockHelper::append($context, 'intdiv_str_err');
         $context->builder->branchIf($isNumeric, $okBlock, $errBlock);
         $context->builder->positionAtEnd($errBlock);
-        self::emitIntTypeErrorAndAbort($context, $function, $argIndex, $paramName, 'string');
+        self::emitIntTypeErrorAndAbort($context, $function, $argIndex, $paramName, 'string', $nullable);
         $context->builder->positionAtEnd($okBlock);
 
         return self::stringPtrToLong($context, $strPtr);
@@ -96,7 +118,8 @@ final class JitIntdiv
         JITVariable $arg,
         int $argIndex,
         string $paramName,
-        string $function
+        string $function,
+        bool $nullable = false
     ): Value {
         TypeErrorRaise::registerDeclarations($context);
         TypeErrorRaise::ensureLinked($context);
@@ -112,8 +135,11 @@ final class JitIntdiv
         $doubleTy = $i8->constInt(VmVariable::TYPE_NATIVE_DOUBLE, false);
         $stringTy = $i8->constInt(VmVariable::TYPE_STRING, false);
 
+        $enumCaseTy = $i8->constInt(VmVariable::TYPE_ENUM_CASE, false);
         $nullBlock = BasicBlockHelper::append($context, 'intdiv_box_null');
         $afterNull = BasicBlockHelper::append($context, 'intdiv_box_after_null');
+        $enumBlock = BasicBlockHelper::append($context, 'intdiv_box_enum');
+        $afterEnum = BasicBlockHelper::append($context, 'intdiv_box_after_enum');
         $arrayBlock = BasicBlockHelper::append($context, 'intdiv_box_array');
         $objectBlock = BasicBlockHelper::append($context, 'intdiv_box_object');
         $doubleBlock = BasicBlockHelper::append($context, 'intdiv_box_double');
@@ -130,11 +156,27 @@ final class JitIntdiv
         $context->builder->branch($mergeBlock);
 
         $context->builder->positionAtEnd($afterNull);
+        if ($nullable) {
+            $isEnumCase = $context->builder->icmp(Builder::INT_EQ, $typeByte, $enumCaseTy);
+            $context->builder->branchIf($isEnumCase, $enumBlock, $afterEnum);
+
+            $context->builder->positionAtEnd($enumBlock);
+            self::emitIntTypeErrorAndAbort(
+                $context,
+                $function,
+                $argIndex,
+                $paramName,
+                JitOperandTypeLabel::compileTimeEnumClassName($context, $arg) ?? 'object',
+                true
+            );
+
+            $context->builder->positionAtEnd($afterEnum);
+        }
         $isArray = $context->builder->icmp(Builder::INT_EQ, $typeByte, $arrayTy);
         $context->builder->branchIf($isArray, $arrayBlock, $objectBlock);
 
         $context->builder->positionAtEnd($arrayBlock);
-        self::emitIntTypeErrorAndAbort($context, $function, $argIndex, $paramName, 'array');
+        self::emitIntTypeErrorAndAbort($context, $function, $argIndex, $paramName, 'array', $nullable);
 
         $context->builder->positionAtEnd($objectBlock);
         $isObject = $context->builder->icmp(Builder::INT_EQ, $typeByte, $objectTy);
@@ -143,7 +185,7 @@ final class JitIntdiv
         $context->builder->branchIf($isObject, $errBlock, $afterObject);
 
         $context->builder->positionAtEnd($errBlock);
-        self::emitIntTypeErrorAndAbort($context, $function, $argIndex, $paramName, 'object');
+        self::emitIntTypeErrorAndAbort($context, $function, $argIndex, $paramName, 'object', $nullable);
 
         $context->builder->positionAtEnd($afterObject);
         $isDouble = $context->builder->icmp(Builder::INT_EQ, $typeByte, $doubleTy);
@@ -151,7 +193,7 @@ final class JitIntdiv
 
         $context->builder->positionAtEnd($doubleBlock);
         $doubleVal = $context->builder->call($context->lookupFunction('__value__readDouble'), $valuePtr);
-        $truncated = self::lowerFiniteDoubleToLong($context, $doubleVal, $function, $argIndex, $paramName);
+        $truncated = self::lowerFiniteDoubleToLong($context, $doubleVal, $function, $argIndex, $paramName, $nullable);
         $doubleEnd = $context->builder->getInsertBlock();
         $context->builder->branch($mergeBlock);
 
@@ -162,7 +204,7 @@ final class JitIntdiv
 
         $context->builder->positionAtEnd($stringCoerce);
         $strVal = $context->builder->call($context->lookupFunction('__value__readString'), $valuePtr);
-        $strLong = self::lowerStringOperandFromPtr($context, $strVal, $function, $argIndex, $paramName);
+        $strLong = self::lowerStringOperandFromPtr($context, $strVal, $function, $argIndex, $paramName, $nullable);
         $stringEnd = $context->builder->getInsertBlock();
         $context->builder->branch($mergeBlock);
 
@@ -186,11 +228,12 @@ final class JitIntdiv
         JITVariable $arg,
         int $argIndex,
         string $paramName,
-        string $function
+        string $function,
+        bool $nullable = false
     ): Value {
         $doubleVal = $context->helper->loadValue($arg);
 
-        return self::lowerFiniteDoubleToLong($context, $doubleVal, $function, $argIndex, $paramName);
+        return self::lowerFiniteDoubleToLong($context, $doubleVal, $function, $argIndex, $paramName, $nullable);
     }
 
     private static function lowerFiniteDoubleToLong(
@@ -198,7 +241,8 @@ final class JitIntdiv
         Value $doubleVal,
         string $function,
         int $argIndex,
-        string $paramName
+        string $paramName,
+        bool $nullable = false
     ): Value {
         $i32 = $context->getTypeFromString('int32');
         $finite = $context->builder->call($context->lookupFunction('isfinite'), $doubleVal);
@@ -211,7 +255,7 @@ final class JitIntdiv
         $errBlock = BasicBlockHelper::append($context, 'intdiv_dbl_err');
         $context->builder->branchIf($isFinite, $okBlock, $errBlock);
         $context->builder->positionAtEnd($errBlock);
-        self::emitIntTypeErrorAndAbort($context, $function, $argIndex, $paramName, 'float');
+        self::emitIntTypeErrorAndAbort($context, $function, $argIndex, $paramName, 'float', $nullable);
         $context->builder->positionAtEnd($okBlock);
 
         return $context->builder->fptosi($doubleVal, $context->getTypeFromString('int64'));
@@ -222,14 +266,15 @@ final class JitIntdiv
         Value $strPtr,
         string $function,
         int $argIndex,
-        string $paramName
+        string $paramName,
+        bool $nullable = false
     ): Value {
         $isNumeric = self::stringPtrIsNumeric($context, $strPtr);
         $okBlock = BasicBlockHelper::append($context, 'intdiv_box_str_ok');
         $errBlock = BasicBlockHelper::append($context, 'intdiv_box_str_err');
         $context->builder->branchIf($isNumeric, $okBlock, $errBlock);
         $context->builder->positionAtEnd($errBlock);
-        self::emitIntTypeErrorAndAbort($context, $function, $argIndex, $paramName, 'string');
+        self::emitIntTypeErrorAndAbort($context, $function, $argIndex, $paramName, 'string', $nullable);
         $context->builder->positionAtEnd($okBlock);
 
         return self::stringPtrToLong($context, $strPtr);
@@ -286,13 +331,17 @@ final class JitIntdiv
         string $function,
         int $argIndex,
         string $paramName,
-        string $given
+        string $given,
+        bool $nullable = false
     ): string {
+        $expected = $nullable ? '?int' : 'int';
+
         return sprintf(
-            '%s(): Argument #%d ($%s) must be of type int, %s given',
+            '%s(): Argument #%d ($%s) must be of type %s, %s given',
             $function,
             $argIndex,
             $paramName,
+            $expected,
             $given
         );
     }
@@ -302,11 +351,15 @@ final class JitIntdiv
         string $function,
         int $argIndex,
         string $paramName,
-        string $given
+        string $given,
+        bool $nullable = false
     ): void {
         TypeErrorRaise::registerDeclarations($context);
         TypeErrorRaise::ensureLinked($context);
-        TypeErrorRaise::emitRaise($context, self::intTypeError($function, $argIndex, $paramName, $given));
+        TypeErrorRaise::emitRaise(
+            $context,
+            self::intTypeError($function, $argIndex, $paramName, $given, $nullable)
+        );
         $context->builder->call($context->lookupFunction('abort'));
     }
 }

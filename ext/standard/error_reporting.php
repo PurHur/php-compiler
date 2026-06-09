@@ -9,7 +9,6 @@ use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\Variable as JITVariable;
-use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
 
 /** error_reporting() — get/set active error level (ext/standard/basic_functions.c; issue #3220). */
@@ -31,9 +30,14 @@ final class error_reporting extends Internal
         }
         $old = VmIni::errorReporting($frame->vmContext);
         if (1 === $argc) {
-            $levelVar = $frame->calledArgs[0]->resolveIndirect();
-            if (Variable::TYPE_NULL !== $levelVar->type) {
-                VmIni::errorReporting($frame->vmContext, $levelVar->toInt());
+            $level = VmMath::parseNullableIntBuiltinArg(
+                $frame->calledArgs[0]->resolveIndirect(),
+                'error_reporting',
+                1,
+                'error_level'
+            );
+            if (null !== $level) {
+                VmIni::errorReporting($frame->vmContext, $level);
             }
         }
         $frame->returnVar->int($old);
