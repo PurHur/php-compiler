@@ -17,6 +17,14 @@ final class SoundexVMTest extends BaseTest
             __DIR__.'/cases/stdlib/soundex.phpt',
             'soundex.phpt'
         );
+        yield 'soundex_coerce.phpt' => self::parsePHPT(
+            __DIR__.'/cases/stdlib/soundex_coerce.phpt',
+            'soundex_coerce.phpt'
+        );
+        yield 'soundex_strict_coerce.phpt' => self::parsePHPT(
+            __DIR__.'/cases/stdlib/soundex_strict_coerce.phpt',
+            'soundex_strict_coerce.phpt'
+        );
     }
 
     public function setUp(): void
