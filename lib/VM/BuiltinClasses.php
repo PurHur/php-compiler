@@ -45,6 +45,8 @@ use PHPCompiler\VM\Builtin\ReflectionAttributeGetArguments;
 use PHPCompiler\VM\Builtin\ReflectionAttributeGetName;
 use PHPCompiler\VM\Builtin\ReflectionAttributeIsRepeated;
 use PHPCompiler\VM\Builtin\ReflectionAttributeNewInstance;
+use PHPCompiler\VM\Builtin\ReflectionClassConstantGetDeprecatedMessage;
+use PHPCompiler\VM\Builtin\ReflectionClassConstantGetDeprecatedVersion;
 use PHPCompiler\VM\Builtin\ReflectionClassConstantGetType;
 use PHPCompiler\VM\Builtin\ReflectionClassConstantIsDeprecated;
 use PHPCompiler\VM\Builtin\ReflectionClassConstantIsFinal;
@@ -63,6 +65,8 @@ use PHPCompiler\VM\Builtin\ReflectionClassGetDocComment;
 use PHPCompiler\VM\Builtin\ReflectionClassGetEndLine;
 use PHPCompiler\VM\Builtin\ReflectionClassGetExtensionName;
 use PHPCompiler\VM\Builtin\ReflectionClassGetFileName;
+use PHPCompiler\VM\Builtin\ReflectionClassGetDeprecatedMessage;
+use PHPCompiler\VM\Builtin\ReflectionClassGetDeprecatedVersion;
 use PHPCompiler\VM\Builtin\ReflectionClassGetStartLine;
 use PHPCompiler\VM\Builtin\ReflectionClassIsDeprecated;
 use PHPCompiler\VM\Builtin\ReflectionClassIsInternal;
@@ -110,6 +114,8 @@ use PHPCompiler\VM\Builtin\ReflectionMethodGetEndLine;
 use PHPCompiler\VM\Builtin\ReflectionMethodGetExtensionName;
 use PHPCompiler\VM\Builtin\ReflectionMethodGetFileName;
 use PHPCompiler\VM\Builtin\ReflectionMethodGetModifiers;
+use PHPCompiler\VM\Builtin\ReflectionMethodGetDeprecatedMessage;
+use PHPCompiler\VM\Builtin\ReflectionMethodGetDeprecatedVersion;
 use PHPCompiler\VM\Builtin\ReflectionMethodGetStartLine;
 use PHPCompiler\VM\Builtin\ReflectionMethodIsDeprecated;
 use PHPCompiler\VM\Builtin\ReflectionMethodIsFinal;
@@ -372,6 +378,10 @@ final class BuiltinClasses
         $rm->methodVisibility['getname'] = $pub;
         $rm->methods['isdeprecated'] = new ReflectionMethodIsDeprecated();
         $rm->methodVisibility['isdeprecated'] = $pub;
+        $rm->methods['getdeprecatedmessage'] = new ReflectionMethodGetDeprecatedMessage();
+        $rm->methodVisibility['getdeprecatedmessage'] = $pub;
+        $rm->methods['getdeprecatedversion'] = new ReflectionMethodGetDeprecatedVersion();
+        $rm->methodVisibility['getdeprecatedversion'] = $pub;
         $rm->methods['hasprototype'] = new ReflectionMethodHasPrototype();
         $rm->methodVisibility['hasprototype'] = $pub;
         $rm->methods['getprototype'] = new ReflectionMethodGetPrototype();
@@ -453,6 +463,10 @@ final class BuiltinClasses
         $rc->methodVisibility['isstatic'] = $pub;
         $rc->methods['isdeprecated'] = new ReflectionClassIsDeprecated();
         $rc->methodVisibility['isdeprecated'] = $pub;
+        $rc->methods['getdeprecatedmessage'] = new ReflectionClassGetDeprecatedMessage();
+        $rc->methodVisibility['getdeprecatedmessage'] = $pub;
+        $rc->methods['getdeprecatedversion'] = new ReflectionClassGetDeprecatedVersion();
+        $rc->methodVisibility['getdeprecatedversion'] = $pub;
         foreach (
             [
                 'getdoccomment' => new ReflectionClassGetDocComment(),
@@ -533,6 +547,10 @@ final class BuiltinClasses
         $rconst->methodVisibility['gettype'] = $pub;
         $rconst->methods['isdeprecated'] = new ReflectionClassConstantIsDeprecated();
         $rconst->methodVisibility['isdeprecated'] = $pub;
+        $rconst->methods['getdeprecatedmessage'] = new ReflectionClassConstantGetDeprecatedMessage();
+        $rconst->methodVisibility['getdeprecatedmessage'] = $pub;
+        $rconst->methods['getdeprecatedversion'] = new ReflectionClassConstantGetDeprecatedVersion();
+        $rconst->methodVisibility['getdeprecatedversion'] = $pub;
         $rconst->methods['isfinal'] = new ReflectionClassConstantIsFinal();
         $rconst->methodVisibility['isfinal'] = $pub;
         $ctx->classes[ReflectionSupport::REFLECTION_CONSTANT] = $rconst;
@@ -553,6 +571,10 @@ final class BuiltinClasses
         $rcc->methodVisibility['gettype'] = $pub;
         $rcc->methods['isdeprecated'] = new ReflectionClassConstantIsDeprecated();
         $rcc->methodVisibility['isdeprecated'] = $pub;
+        $rcc->methods['getdeprecatedmessage'] = new ReflectionClassConstantGetDeprecatedMessage();
+        $rcc->methodVisibility['getdeprecatedmessage'] = $pub;
+        $rcc->methods['getdeprecatedversion'] = new ReflectionClassConstantGetDeprecatedVersion();
+        $rcc->methodVisibility['getdeprecatedversion'] = $pub;
         $rcc->methods['isfinal'] = new ReflectionClassConstantIsFinal();
         $rcc->methodVisibility['isfinal'] = $pub;
         $ctx->classes[ReflectionSupport::REFLECTION_CLASS_CONSTANT] = $rcc;
