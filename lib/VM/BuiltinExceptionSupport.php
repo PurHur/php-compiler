@@ -17,6 +17,7 @@ final class BuiltinExceptionSupport
     public const CLASS_VALUE_ERROR = 'valueerror';
     public const CLASS_DIVISION_BY_ZERO_ERROR = 'divisionbyzeroerror';
     public const CLASS_ARITHMETIC_ERROR = 'arithmeticerror';
+    public const CLASS_ASSERTION_ERROR = 'assertionerror';
     public const CLASS_FIBER_ERROR = 'fibererror';
     public const CLASS_FIBER_STACK_OVERFLOW = 'fiberstackoverflow';
     public const CLASS_COMPILE_ERROR = 'compileerror';
@@ -50,6 +51,15 @@ final class BuiltinExceptionSupport
     public static function materializeValueError(Context $ctx, string $message): Variable
     {
         return self::materializeThrowable($ctx, self::CLASS_VALUE_ERROR, $message);
+    }
+
+    public static function materializeAssertionError(
+        Context $ctx,
+        string $message,
+        string $file = '',
+        int $line = 0
+    ): Variable {
+        return self::materializeThrowable($ctx, self::CLASS_ASSERTION_ERROR, $message, $file, $line);
     }
 
     public static function materializeError(
@@ -199,6 +209,9 @@ final class BuiltinExceptionSupport
         }
         if ($error instanceof \ArithmeticError) {
             return self::materializeArithmeticError($ctx, $error->getMessage());
+        }
+        if ($error instanceof \AssertionError) {
+            return self::materializeAssertionError($ctx, $error->getMessage(), $file, $line);
         }
 
         return self::materializeError($ctx, $error->getMessage(), $file, $line);

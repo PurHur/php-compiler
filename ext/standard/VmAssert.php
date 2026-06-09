@@ -10,10 +10,7 @@ use PHPCompiler\VM\ErrorReporter;
 use PHPCompiler\VM\Variable;
 
 /**
- * assert() VM semantics (ext/standard/assert.c; issue #3157).
- *
- * Supported ini subset: assertions always evaluated; failed assertions emit
- * E_USER_WARNING (assert.exception=0). AssertionError throw deferred (#195).
+ * assert() VM semantics (ext/standard/assert.c; issues #3157, #3316).
  */
 final class VmAssert
 {
@@ -22,6 +19,9 @@ final class VmAssert
         Variable $assertion,
         ?Variable $description = null
     ): bool {
+        if (!VmAssertState::isEnabled()) {
+            return true;
+        }
         if (boolval::isTruthy($assertion)) {
             return true;
         }
@@ -35,25 +35,44 @@ final class VmAssert
         if (null === $frame->vmContext) {
             throw new \LogicException('assert() requires VM context');
         }
-        $message = 'assert(): assert(false) failed';
-        if (null !== $description) {
-            $desc = $description->resolveIndirect();
-            if (EnumCaseSupport::isEnumCaseVariable($desc)) {
-                throw new \TypeError(sprintf(
-                    'assert(): Argument #2 ($description) must be of type string|Throwable, %s given',
-                    EnumCaseSupport::typeNameForVariable($desc)
-                ));
-            }
-            if (Variable::TYPE_STRING === $desc->type) {
-                $message = 'Assertion failed: '.$desc->toString();
-            }
+        [$exceptionMessage, $warningMessage] = self::buildMessages($description);
+        if (VmAssertState::shouldThrowOnFailure()) {
+            throw new \AssertionError($exceptionMessage);
         }
         $frame->vmContext->errors->triggerError(
-            $message,
+            $warningMessage,
             ErrorReporter::E_USER_WARNING,
             '' !== $frame->scriptPath ? $frame->scriptPath : null,
             $frame->vmContext,
             $frame
         );
+        if (VmAssertState::shouldBailOnFailure()) {
+            exit(1);
+        }
+    }
+
+    /**
+     * @return array{0: string, 1: string} exception message, warning message
+     */
+    private static function buildMessages(?Variable $description): array
+    {
+        $default = 'assert(): assert(false) failed';
+        if (null === $description) {
+            return [$default, $default];
+        }
+        $desc = $description->resolveIndirect();
+        if (EnumCaseSupport::isEnumCaseVariable($desc)) {
+            throw new \TypeError(sprintf(
+                'assert(): Argument #2 ($description) must be of type string|Throwable, %s given',
+                EnumCaseSupport::typeNameForVariable($desc)
+            ));
+        }
+        if (Variable::TYPE_STRING === $desc->type) {
+            $text = $desc->toString();
+
+            return [$text, 'Assertion failed: '.$text];
+        }
+
+        return [$default, $default];
     }
 }

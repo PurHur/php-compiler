@@ -576,6 +576,7 @@ class Module extends ModuleAbstract
             new is_a_(),
             new is_subclass_of_(),
             new assert_(),
+            new assert_options(),
             new trigger_error_(),
             new compiler_language_warning_(),
             new set_error_handler_(),

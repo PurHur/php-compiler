@@ -123,6 +123,13 @@ final class StdlibConstants
 
     public const PASSWORD_DEFAULT = VmPassword::PASSWORD_DEFAULT;
 
+    /** assert_options() selectors (ext/standard/assert.c). */
+    public const ASSERT_ACTIVE = 1;
+    public const ASSERT_CALLBACK = 2;
+    public const ASSERT_BAIL = 3;
+    public const ASSERT_WARNING = 4;
+    public const ASSERT_EXCEPTION = 5;
+
     /** glob() flags (ext/standard/dir.c / glob.h; values match php-src on Linux). */
     public const GLOB_ERR = 1;
     public const GLOB_MARK = 2;
@@ -212,6 +219,11 @@ final class StdlibConstants
         'glob_available_flags' => self::GLOB_AVAILABLE_FLAGS,
         'password_bcrypt' => self::PASSWORD_BCRYPT,
         'password_default' => self::PASSWORD_DEFAULT,
+        'assert_active' => self::ASSERT_ACTIVE,
+        'assert_callback' => self::ASSERT_CALLBACK,
+        'assert_bail' => self::ASSERT_BAIL,
+        'assert_warning' => self::ASSERT_WARNING,
+        'assert_exception' => self::ASSERT_EXCEPTION,
     ];
 
     /** Lowercase name => float value for VM\Context::constantFetch(). */
@@ -303,6 +315,11 @@ final class StdlibConstants
         'glob_available_flags',
         'password_bcrypt',
         'password_default',
+        'assert_active',
+        'assert_callback',
+        'assert_bail',
+        'assert_warning',
+        'assert_exception',
         'm_e',
         'm_log2e',
         'm_log10e',

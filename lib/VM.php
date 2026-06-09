@@ -6277,6 +6277,8 @@ restart:
             return $this->dispatchVmTypeError($e, $callerFrame);
         } catch (\ValueError $e) {
             return $this->dispatchVmValueError($e, $callerFrame);
+        } catch (\AssertionError $e) {
+            return $this->dispatchVmAssertionError($e, $callerFrame);
         } catch (VM\NativeFiberError $e) {
             return $this->dispatchVmFiberError($e, $callerFrame);
         } catch (VM\NativeFiberStackOverflow $e) {
@@ -6440,6 +6442,25 @@ restart:
     private function dispatchVmValueError(\ValueError $error, Frame $frame): ?Frame
     {
         $thrown = VM\BuiltinExceptionSupport::materializeValueError($this->context, $error->getMessage());
+        $catchFrame = $this->findCatchFrameForThrow($frame, $thrown);
+        if (null !== $catchFrame) {
+            return $catchFrame;
+        }
+        $this->raiseUncaughtException($thrown);
+
+        return null;
+    }
+
+    /** Bridge native AssertionError from assert() into user catch handlers (#3316). */
+    private function dispatchVmAssertionError(\AssertionError $error, Frame $frame): ?Frame
+    {
+        [$file, $line] = VM\ExceptionSupport::userFatalSite($frame);
+        $thrown = VM\BuiltinExceptionSupport::materializeAssertionError(
+            $this->context,
+            $error->getMessage(),
+            $file,
+            $line
+        );
         $catchFrame = $this->findCatchFrameForThrow($frame, $thrown);
         if (null !== $catchFrame) {
             return $catchFrame;

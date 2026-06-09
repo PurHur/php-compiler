@@ -6,6 +6,7 @@ namespace PHPCompiler\ext\standard;
 
 use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Builtin\AssertFail;
+use PHPCompiler\JIT\Builtin\AssertIniRuntime;
 use PHPCompiler\JIT\Builtin\TypeErrorRaise;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitOperandTypeLabel;
@@ -27,21 +28,43 @@ final class JitAssert
             throw new \LogicException('assert() requires one or two arguments');
         }
 
+        AssertIniRuntime::ensureGlobals($context);
+
         $boolval = new boolval();
         $truthy = $boolval->call($context, $args[0]);
+        $i64 = $context->getTypeFromString('int64');
 
+        $inactiveBlock = BasicBlockHelper::append($context, 'assert_inactive');
+        $checkFailBlock = BasicBlockHelper::append($context, 'assert_check_fail');
+        $passBlock = BasicBlockHelper::append($context, 'assert_pass');
         $failBlock = BasicBlockHelper::append($context, 'assert_fail');
         $doneBlock = BasicBlockHelper::append($context, 'assert_done');
-        $context->builder->branchIf($truthy, $doneBlock, $failBlock);
+
+        $enabled = AssertIniRuntime::loadAssertionsEnabled($context);
+        $context->builder->branchIf($enabled, $checkFailBlock, $inactiveBlock);
+
+        $context->builder->positionAtEnd($inactiveBlock);
+        $context->builder->branch($doneBlock);
+
+        $context->builder->positionAtEnd($checkFailBlock);
+        $context->builder->branchIf($truthy, $passBlock, $failBlock);
+
+        $context->builder->positionAtEnd($passBlock);
+        $context->builder->branch($doneBlock);
 
         $context->builder->positionAtEnd($failBlock);
         self::emitFail($context, $args, $argc);
         $context->builder->branch($doneBlock);
 
         $context->builder->positionAtEnd($doneBlock);
-        $i64 = $context->getTypeFromString('int64');
+        $result = $context->builder->phi($i64);
+        $one = $i64->constInt(1, false);
+        $zero = $i64->constInt(0, false);
+        $result->addIncoming($one, $inactiveBlock);
+        $result->addIncoming($one, $passBlock);
+        $result->addIncoming($zero, $failBlock);
 
-        return $context->builder->zExt($truthy, $i64);
+        return $result;
     }
 
     /** @param list<JITVariable> $args */

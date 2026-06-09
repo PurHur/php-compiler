@@ -9,6 +9,7 @@ try {
 } catch (TypeError $e) {
     echo $e->getMessage(), "\n";
 }
+ini_set('assert.exception', '0');
 @assert(false, 'still works');
 echo assert(true) ? "1\n" : "0\n";
 --EXPECT--
