@@ -888,9 +888,11 @@ final class ReflectionSupport
     }
 
     /**
-     * @return array{0: ClassEntry, 1: string, 2: Func}
+     * Declaring class + lowercase method name for a ReflectionMethod receiver (#7116).
+     *
+     * @return array{0: ClassEntry, 1: string}
      */
-    public static function resolveReflectedMethod(Context $ctx, ObjectEntry $reflection): array
+    public static function resolveReflectedMethodDeclaring(Context $ctx, ObjectEntry $reflection): array
     {
         $className = self::classNameFromReflection($reflection);
         $methodName = self::methodNameFromReflection($reflection);
@@ -907,8 +909,8 @@ final class ReflectionSupport
                 break;
             }
             $class = $ctx->classes[$lcClass];
-            if (isset($class->methods[$methodLc])) {
-                return [$class, $methodLc, $class->methods[$methodLc]];
+            if (isset($class->methods[$methodLc]) || isset($class->abstractMethods[$methodLc])) {
+                return [$class, $methodLc];
             }
             if (null === $class->parentLc) {
                 break;
@@ -917,6 +919,33 @@ final class ReflectionSupport
         }
 
         self::throwReflectionException(self::methodNotFoundMessage($entry->name, $methodName));
+    }
+
+    /** PHPCfg method flags for a reflected method (#7116). */
+    public static function reflectedMethodCfgFlags(Context $ctx, ObjectEntry $reflection): int
+    {
+        [$declaring, $methodLc] = self::resolveReflectedMethodDeclaring($ctx, $reflection);
+        $flags = $declaring->methodVisibility[$methodLc] ?? \PHPCfg\Func::FLAG_PUBLIC;
+        if (isset($declaring->abstractMethods[$methodLc])) {
+            $flags |= \PHPCfg\Func::FLAG_ABSTRACT;
+        }
+
+        return $flags;
+    }
+
+    /**
+     * @return array{0: ClassEntry, 1: string, 2: Func}
+     */
+    public static function resolveReflectedMethod(Context $ctx, ObjectEntry $reflection): array
+    {
+        [$class, $methodLc] = self::resolveReflectedMethodDeclaring($ctx, $reflection);
+        if (!isset($class->methods[$methodLc])) {
+            $className = self::classNameFromReflection($reflection);
+            $methodName = self::methodNameFromReflection($reflection);
+            self::throwReflectionException(self::methodNotFoundMessage($className, $methodName));
+        }
+
+        return [$class, $methodLc, $class->methods[$methodLc]];
     }
 
     /**

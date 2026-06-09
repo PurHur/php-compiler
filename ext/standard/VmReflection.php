@@ -1126,12 +1126,25 @@ final class VmReflection
         return $current->block->func->class->value;
     }
 
-    /** php-src ReflectionProperty::IS_* visibility bitmask (not PHPCfg flags). */
+    /** php-src ZEND_ACC_* filter bitmask for getProperties()/getMethods() (not getModifiers()). */
     public const REFLECTION_IS_PUBLIC = 256;
 
     public const REFLECTION_IS_PROTECTED = 512;
 
     public const REFLECTION_IS_PRIVATE = 1024;
+
+    /** php-src ReflectionMethod::IS_* values returned by getModifiers() (#7116). */
+    public const REFLECTION_METHOD_IS_STATIC = 16;
+
+    public const REFLECTION_METHOD_IS_PUBLIC = 1;
+
+    public const REFLECTION_METHOD_IS_PROTECTED = 2;
+
+    public const REFLECTION_METHOD_IS_PRIVATE = 4;
+
+    public const REFLECTION_METHOD_IS_FINAL = 32;
+
+    public const REFLECTION_METHOD_IS_ABSTRACT = 64;
 
     /**
      * Class hierarchy from $entry to root parent (child-first).
@@ -1169,6 +1182,29 @@ final class VmReflection
         }
 
         return self::REFLECTION_IS_PUBLIC;
+    }
+
+    /** php-src zend_get_function_modifiers() for ReflectionMethod::getModifiers() (#7116). */
+    public static function cfgMethodFlagsToReflectionModifiers(int $cfgFlags): int
+    {
+        if (($cfgFlags & \PHPCfg\Func::FLAG_PRIVATE) !== 0) {
+            $modifiers = self::REFLECTION_METHOD_IS_PRIVATE;
+        } elseif (($cfgFlags & \PHPCfg\Func::FLAG_PROTECTED) !== 0) {
+            $modifiers = self::REFLECTION_METHOD_IS_PROTECTED;
+        } else {
+            $modifiers = self::REFLECTION_METHOD_IS_PUBLIC;
+        }
+        if (($cfgFlags & \PHPCfg\Func::FLAG_STATIC) !== 0) {
+            $modifiers |= self::REFLECTION_METHOD_IS_STATIC;
+        }
+        if (($cfgFlags & \PHPCfg\Func::FLAG_FINAL) !== 0) {
+            $modifiers |= self::REFLECTION_METHOD_IS_FINAL;
+        }
+        if (($cfgFlags & \PHPCfg\Func::FLAG_ABSTRACT) !== 0) {
+            $modifiers |= self::REFLECTION_METHOD_IS_ABSTRACT;
+        }
+
+        return $modifiers;
     }
 
     /**
