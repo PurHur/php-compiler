@@ -33,6 +33,9 @@ class Module extends ModuleAbstract
             new mb_strlen(),
             new mb_convert_case(),
             new mb_convert_encoding(),
+            new mb_stripos(),
+            new mb_strrpos(),
+            new mb_strrichr(),
         ];
     }
 }
