@@ -260,8 +260,8 @@ class JITTest extends BaseTest {
             if (str_contains($name, 'reflection_docblock_source')) {
                 continue;
             }
-            // uasort()/uksort() closure comparators are VM-only (#3582, #3143).
-            if (str_contains($name, 'uasort_closure') || str_contains($name, 'uksort_closure')) {
+            // uasort() closure comparators are VM-only (#3582).
+            if (str_contains($name, 'uasort_closure')) {
                 continue;
             }
             // Closure::fromCallable() inaccessible callback TypeError: VM ClosureSupport (#7416).

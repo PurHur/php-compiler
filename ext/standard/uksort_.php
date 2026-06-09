@@ -18,7 +18,7 @@ use PHPLLVM\Value;
  * uksort() — sort by keys preserving values (ext/standard/array.c php_array_uksort; issue #3143).
  *
  * VM: strcmp and strcasecmp string callbacks; closure comparators (#3086).
- * JIT/AOT: compile-time strcmp on string-key hashtables (ksort lowering); VM closure comparator (#3086).
+ * JIT/AOT: compile-time strcmp or closure comparator on string-key hashtables (#3597).
  */
 final class uksort_ extends Internal
 {
@@ -93,7 +93,11 @@ final class uksort_ extends Internal
         if (!UsortCallbackPolicy::isJitLowerable($args[1])) {
             throw new \LogicException(UsortCallbackPolicy::jitRejectionMessage());
         }
-        ArrayBuiltinHelper::ksortByKey($context, $args[0]);
+        if (UsortCallbackPolicy::isClosureJitLowerable($args[1])) {
+            ArrayBuiltinHelper::sortStringKeysWithClosure($context, $args[0], $args[1]);
+        } else {
+            ArrayBuiltinHelper::ksortByKey($context, $args[0]);
+        }
 
         return $context->getTypeFromString('int1')->constInt(1, false);
     }

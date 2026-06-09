@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace PHPCompiler;
 
+use PHPCompiler\JIT\Call\Native;
 use PHPCompiler\JIT\UsortCallbackPolicy;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPUnit\Framework\TestCase;
@@ -27,6 +28,15 @@ final class UsortCallbackPolicyTest extends TestCase
             false,
             null
         ));
+    }
+
+    public function testJitAllowsClosureCallbacks(): void
+    {
+        $callback = (new \ReflectionClass(JITVariable::class))->newInstanceWithoutConstructor();
+        $callback->closureCall = $this->createMock(Native::class);
+
+        $this->assertTrue(UsortCallbackPolicy::isClosureJitLowerable($callback));
+        $this->assertTrue(UsortCallbackPolicy::isJitLowerable($callback));
     }
 
     public function testVmAllowsStrcmpAndStrcasecmpNames(): void

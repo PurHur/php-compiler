@@ -16,8 +16,8 @@ use PHPLLVM\Value;
 /**
  * usort() with string builtin comparators (subset of PHP).
  *
- * VM: strcmp and strcasecmp on packed list arrays. JIT/AOT: strcmp only (packed sort).
- * Closures and other callables are deferred — see UsortCallbackPolicy (#1210).
+ * VM: strcmp and strcasecmp on packed list arrays; closure comparators (#3086).
+ * JIT/AOT: strcmp and closure/arrow comparators (packed sort; issue #3597).
  */
 final class usort_ extends Internal
 {
@@ -86,7 +86,11 @@ final class usort_ extends Internal
         if (!UsortCallbackPolicy::isJitLowerable($args[1])) {
             throw new \LogicException(UsortCallbackPolicy::jitRejectionMessage());
         }
-        ArrayBuiltinHelper::sortPacked($context, $args[0]);
+        if (UsortCallbackPolicy::isClosureJitLowerable($args[1])) {
+            ArrayBuiltinHelper::sortPackedWithClosure($context, $args[0], $args[1]);
+        } else {
+            ArrayBuiltinHelper::sortPacked($context, $args[0]);
+        }
 
         return $context->getTypeFromString('int1')->constInt(1, false);
     }
