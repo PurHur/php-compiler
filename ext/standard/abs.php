@@ -37,7 +37,18 @@ final class abs extends Internal
             return;
         }
         if (\is_int($num)) {
-            $frame->returnVar->int($num < 0 ? -$num : $num);
+            if ($num < 0) {
+                $abs = -$num;
+                if (\is_float($abs)) {
+                    $frame->returnVar->float($abs);
+
+                    return;
+                }
+                $frame->returnVar->int($abs);
+
+                return;
+            }
+            $frame->returnVar->int($num);
 
             return;
         }
@@ -61,6 +72,12 @@ final class abs extends Internal
             return $context->builder->select($isNeg, $negated, $v);
         }
         if (JITVariable::TYPE_NATIVE_LONG === $args[0]->type) {
+            if (JITVariable::KIND_VALUE === $args[0]->kind) {
+                $const = (int) $context->llvm->lib->LLVMConstIntGetSExtValue($args[0]->value->value);
+                if (\PHP_INT_MIN === $const) {
+                    return $context->getTypeFromString('double')->constReal(-(float) $const);
+                }
+            }
             $v = JitLongArg::lower($context, $args[0], 'abs() argument #1');
             $zero = $v->typeOf()->constInt(0, false);
             $isNeg = $context->builder->icmp(Builder::INT_SLT, $v, $zero);
