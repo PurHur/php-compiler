@@ -367,6 +367,8 @@ class Module extends ModuleAbstract
             new header_list(),
             new headers_list(),
             new getallheaders_(),
+            new http_get_last_response_headers(),
+            new get_last_response_headers(),
             new ob_start(),
             new ob_get_clean(),
             new ob_get_contents(),

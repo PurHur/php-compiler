@@ -447,6 +447,14 @@ final class VmFs
             return false;
         }
         $data = @file_get_contents($path);
+        if (VmHttpLastResponseHeaders::isHttpUrl($path)) {
+            /** @var list<string> $http_response_header */
+            VmHttpLastResponseHeaders::store(
+                isset($http_response_header) && \is_array($http_response_header)
+                    ? $http_response_header
+                    : null
+            );
+        }
         if (false === $data) {
             return false;
         }
