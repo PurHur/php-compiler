@@ -61,6 +61,12 @@ final class HashTable {
         return $this->refcount->needsSeparate();
     }
 
+    /** Zend GC refcount for debug_zval_dump() (#6576). */
+    public function getGcRefcount(): int
+    {
+        return $this->refcount->refcount;
+    }
+
     /**
      * Deep copy for copy-on-write separation (Zend zend_array_dup).
      */

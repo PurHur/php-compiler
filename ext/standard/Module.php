@@ -111,6 +111,7 @@ class Module extends ModuleAbstract
             new settype(),
             new var_export(),
             new var_dump_(),
+            new debug_zval_dump(),
             new print_r(),
             new gettype(),
             new get_debug_type(),
