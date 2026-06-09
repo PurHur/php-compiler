@@ -47,6 +47,7 @@ final class StreamGlobalsJit
         $wasUsedTy = $i8->arrayType(self::MAX_HANDLES);
         $storageTy = $i8->arrayType(8192)->arrayType(self::MAX_HANDLES);
 
+        $isPopenTy = $i8->arrayType(self::MAX_HANDLES);
         foreach ([
             self::GLOBAL_HANDLES => $ptrTableTy,
             self::GLOBAL_PATHS => $ptrTableTy,
@@ -55,11 +56,13 @@ final class StreamGlobalsJit
             self::GLOBAL_READ_BUFFER => $i32TableTy,
             self::GLOBAL_WAS_USED => $wasUsedTy,
             self::GLOBAL_WRITE_BUFFER_STORAGE => $storageTy,
+            'phpc_stream_is_popen' => $isPopenTy,
         ] as $name => $ty) {
-            if (null !== $context->module->getNamedGlobal($name)) {
-                continue;
+            $global = $context->module->getNamedGlobal($name);
+            if (null === $global) {
+                $global = $context->module->addGlobal($ty, $name);
             }
-            $context->module->addGlobal($ty, $name);
+            $global->setInitializer($ty->constNull());
         }
     }
 

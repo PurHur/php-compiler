@@ -77,7 +77,7 @@ final class StringTriggerErrorJit
             return;
         }
 
-        $fn = self::declareFunction($context, $name);
+        $fn = null !== $probe ? $probe : self::declareFunction($context, $name);
         $emit($context, $fn);
         $context->registerFunction($name, $fn);
         $context->builder->clearInsertionPosition();

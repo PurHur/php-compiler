@@ -747,8 +747,10 @@ final class SessionStorageRuntime
     {
         $htPtr = $context->getTypeFromString('__hashtable__*');
         foreach ([self::G_SG_SESSION, self::G_SG_COOKIE] as $name) {
-            if (null === $context->module->getNamedGlobal($name)) {
-                $context->module->addGlobal($htPtr, $name);
+            $existing = $context->module->getNamedGlobal($name);
+            if (null === $existing) {
+                $g = $context->module->addGlobal($htPtr, $name);
+                $g->setInitializer($htPtr->constNull());
             }
         }
     }

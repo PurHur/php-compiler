@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace PHPCompiler\JIT\Builtin;
 
 use PHPCompiler\ext\standard\VmSession;
-use PHPCompiler\JIT\Builtin;
 use PHPCompiler\JIT\Context;
 use PHPLLVM\Value;
 
@@ -51,46 +50,28 @@ final class SessionStorageGlobals
         $nameBufType = $i8->arrayType(VmSession::MAX_NAME_LEN + 1);
         $defaultNameLen = \strlen(VmSession::DEFAULT_NAME);
 
-        if (null === $context->module->getNamedGlobal(self::GLOBAL_ID_BUF)) {
-            self::$idBufGlobal = $context->module->addGlobal($idBufType, self::GLOBAL_ID_BUF);
-        } else {
-            self::$idBufGlobal = $context->module->getNamedGlobal(self::GLOBAL_ID_BUF);
-        }
+        self::$idBufGlobal = self::ensureGlobal($context, $idBufType, self::GLOBAL_ID_BUF, $idBufType->constNull());
+        self::$idLenGlobal = self::ensureGlobal($context, $i64, self::GLOBAL_ID_LEN, $i64->constInt(0, false));
+        self::$nameBufGlobal = self::ensureGlobal($context, $nameBufType, self::GLOBAL_NAME_BUF, $nameBufType->constNull());
+        self::$nameLenGlobal = self::ensureGlobal(
+            $context,
+            $i64,
+            self::GLOBAL_NAME_LEN,
+            $i64->constInt($defaultNameLen, false)
+        );
+        self::$activeGlobal = self::ensureGlobal($context, $i8, self::GLOBAL_ACTIVE, $i8->constInt(0, false));
+    }
 
-        $standalone = Builtin::LOAD_TYPE_STANDALONE === $context->loadType;
-
-        if (null === $context->module->getNamedGlobal(self::GLOBAL_ID_LEN)) {
-            self::$idLenGlobal = $context->module->addGlobal($i64, self::GLOBAL_ID_LEN);
-            if (!$standalone) {
-                self::$idLenGlobal->setInitializer($i64->constInt(0, false));
-            }
-        } else {
-            self::$idLenGlobal = $context->module->getNamedGlobal(self::GLOBAL_ID_LEN);
+    /** @param mixed $initializer */
+    private static function ensureGlobal(Context $context, $llvmType, string $name, $initializer): Value
+    {
+        $global = $context->module->getNamedGlobal($name);
+        if (null === $global) {
+            $global = $context->module->addGlobal($llvmType, $name);
         }
+        $global->setInitializer($initializer);
 
-        if (null === $context->module->getNamedGlobal(self::GLOBAL_NAME_BUF)) {
-            self::$nameBufGlobal = $context->module->addGlobal($nameBufType, self::GLOBAL_NAME_BUF);
-        } else {
-            self::$nameBufGlobal = $context->module->getNamedGlobal(self::GLOBAL_NAME_BUF);
-        }
-
-        if (null === $context->module->getNamedGlobal(self::GLOBAL_NAME_LEN)) {
-            self::$nameLenGlobal = $context->module->addGlobal($i64, self::GLOBAL_NAME_LEN);
-            if (!$standalone) {
-                self::$nameLenGlobal->setInitializer($i64->constInt($defaultNameLen, false));
-            }
-        } else {
-            self::$nameLenGlobal = $context->module->getNamedGlobal(self::GLOBAL_NAME_LEN);
-        }
-
-        if (null === $context->module->getNamedGlobal(self::GLOBAL_ACTIVE)) {
-            self::$activeGlobal = $context->module->addGlobal($i8, self::GLOBAL_ACTIVE);
-            if (!$standalone) {
-                self::$activeGlobal->setInitializer($i8->constInt(0, false));
-            }
-        } else {
-            self::$activeGlobal = $context->module->getNamedGlobal(self::GLOBAL_ACTIVE);
-        }
+        return $global;
     }
 
     /**

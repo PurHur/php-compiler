@@ -301,7 +301,8 @@ final class GcCollectCyclesRuntime
         $context->builder->positionAtEnd($invoke);
         $markFn = $context->lookupFunction('phpc_destruct_mark_invoked');
         $context->builder->call($markFn, $obj);
-        $context->builder->call($context->lookupFunction('__object__invoke_destructor'), $obj);
+        $objTyped = $context->builder->pointerCast($obj, $objPtr);
+        $context->builder->call($context->lookupFunction('__object__invoke_destructor'), $objTyped);
         $context->builder->branch($done);
 
         $context->builder->positionAtEnd($done);
@@ -1212,7 +1213,7 @@ final class GcCollectCyclesRuntime
                 ['memset', $context->context->functionType($i8p, false, $i8p, $i32, $sizeT)],
                 ['__mm__free', $context->context->functionType($voidTy, false, $i8p)],
                 ['__value__readObject', $context->context->functionType($objPtr, false, $valuePtr)],
-                ['__object__invoke_destructor', $context->context->functionType($voidTy, false, $i8p)],
+                ['__object__invoke_destructor', $context->context->functionType($voidTy, false, $objPtr)],
             ] as [$name, $ft]
         ) {
             self::ensureExternal($context, $name, $ft);

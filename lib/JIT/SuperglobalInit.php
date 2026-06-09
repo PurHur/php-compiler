@@ -158,7 +158,10 @@ final class SuperglobalInit
         $htPtr = $context->getTypeFromString('__hashtable__*');
         foreach (Superglobals::NAMES as $name) {
             $globalName = 'sg_'.substr($name, 1);
-            $global = $context->module->addGlobal($htPtr, $globalName);
+            $existing = $context->module->getNamedGlobal($globalName);
+            $global = null !== $existing
+                ? $existing
+                : $context->module->addGlobal($htPtr, $globalName);
             $global->setInitializer($htPtr->constNull());
 
             $ht = $context->builder->call($context->lookupFunction('__hashtable__alloc'));

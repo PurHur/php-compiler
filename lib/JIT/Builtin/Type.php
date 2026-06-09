@@ -817,8 +817,7 @@ class Type extends Builtin {
         foreach ($libcFns as $libcName => $spec) {
             [$ret, $vararg, $params] = $spec;
             $ft = $this->context->context->functionType($ret, $vararg, ...$params);
-            $fn = $this->context->module->addFunction($libcName, $ft);
-            $this->context->registerFunction($libcName, $fn);
+            $this->ensureExternalFunction($libcName, $ft);
         }
         $void = $this->context->getTypeFromString('void');
         $strPtr = $this->context->getTypeFromString('__string__*');

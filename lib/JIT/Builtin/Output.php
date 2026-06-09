@@ -23,24 +23,6 @@ class Output extends Builtin {
                 $this->context->getTypeFromString('int32'),
                 true ,  
                 $this->context->getTypeFromString('char*')
-                 
-            );
-            $fn___cfcd208495d565ef66e7dff9f98764da = $this->context->module->addFunction('printf', $fntype___cfcd208495d565ef66e7dff9f98764da);
-            
-            $fn___cfcd208495d565ef66e7dff9f98764da->addAttributeAtIndex(0 + 1, $this->context->attributes['readonly'], 0);
-                    $fn___cfcd208495d565ef66e7dff9f98764da->addAttributeAtIndex(0 + 1, $this->context->attributes['nocapture'], 0);
-                
-             
-            $this->context->registerFunction('printf', $fn___cfcd208495d565ef66e7dff9f98764da);
-        
-
-        
-    
-
-        $fntype___cfcd208495d565ef66e7dff9f98764da = $this->context->context->functionType(
-                $this->context->getTypeFromString('int32'),
-                true ,  
-                $this->context->getTypeFromString('char*')
                 , $this->context->getTypeFromString('char*')
                  
             );
@@ -57,27 +39,6 @@ class Output extends Builtin {
         
     
 
-        $fntype___cfcd208495d565ef66e7dff9f98764da = $this->context->context->functionType(
-                $this->context->getTypeFromString('int32'),
-                true ,  
-                $this->context->getTypeFromString('char*')
-                , $this->context->getTypeFromString('size_t')
-                , $this->context->getTypeFromString('char*')
-                 
-            );
-            $fn___cfcd208495d565ef66e7dff9f98764da = $this->context->module->addFunction('snprintf', $fntype___cfcd208495d565ef66e7dff9f98764da);
-            
-            
-            
-            $fn___cfcd208495d565ef66e7dff9f98764da->addAttributeAtIndex(2 + 1, $this->context->attributes['readonly'], 0);
-                    $fn___cfcd208495d565ef66e7dff9f98764da->addAttributeAtIndex(2 + 1, $this->context->attributes['nocapture'], 0);
-                
-             
-            $this->context->registerFunction('snprintf', $fn___cfcd208495d565ef66e7dff9f98764da);
-        
-
-        
-    
     }
 
 }

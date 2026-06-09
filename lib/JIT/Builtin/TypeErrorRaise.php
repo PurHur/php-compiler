@@ -95,7 +95,8 @@ final class TypeErrorRaise
             $flag->setInitializer($i8->constInt(0, false));
         }
         if (null === $context->module->getNamedGlobal('phpc_jit_type_error_pending_msg')) {
-            $context->module->addGlobal($msgTy, 'phpc_jit_type_error_pending_msg');
+            $msg = $context->module->addGlobal($msgTy, 'phpc_jit_type_error_pending_msg');
+            $msg->setInitializer($msgTy->constNull());
         }
         $i32 = $context->getTypeFromString('int32');
         if (null === $context->module->getNamedGlobal('phpc_jit_type_error_pending_kind')) {

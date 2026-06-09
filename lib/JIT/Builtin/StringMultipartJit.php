@@ -163,7 +163,6 @@ final class StringMultipartJit
                 ['strchr', $i8p, [$i8p, $i32]],
                 ['strstr', $i8p, [$i8p, $i8p]],
                 ['strncasecmp', $i32, [$i8p, $i8p, $sizeT]],
-                ['snprintf', $i32, [$i8p, $sizeT, $i8p]],
                 ['getenv', $i8p, [$i8p]],
                 ['mkstemp', $i32, [$i8p]],
                 ['fdopen', $i8p, [$i32, $i8p]],

@@ -393,6 +393,7 @@ final class SessionLifecycleRuntime
         $global = $context->module->getNamedGlobal(self::G_SG_SESSION);
         if (null === $global) {
             $global = $context->module->addGlobal($htPtr, self::G_SG_SESSION);
+            $global->setInitializer($htPtr->constNull());
         }
 
         return $context->builder->pointerCast($global, $htPtr->pointerType(0));

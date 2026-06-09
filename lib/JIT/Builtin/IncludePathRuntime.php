@@ -68,10 +68,12 @@ final class IncludePathRuntime
         $depth->setInitializer($i32->constInt(1, false));
 
         $pathTy = $i8->arrayType(self::MAX_PATH);
-        $context->module->addGlobal($pathTy, 'phpc_include_path_current');
+        $current = $context->module->addGlobal($pathTy, 'phpc_include_path_current');
+        $current->setInitializer($pathTy->constNull());
 
         $stackTy = $i8->arrayType(self::MAX_PATH * self::MAX_STACK);
-        $context->module->addGlobal($stackTy, 'phpc_include_path_stack');
+        $stack = $context->module->addGlobal($stackTy, 'phpc_include_path_stack');
+        $stack->setInitializer($stackTy->constNull());
 
         self::implementInitDefaultPath($context);
     }

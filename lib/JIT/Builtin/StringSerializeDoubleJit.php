@@ -138,37 +138,28 @@ final class StringSerializeDoubleJit
     {
         $charPtr = $context->getTypeFromString('char*');
         $charPtrPtr = $charPtr->pointerType(0);
-        $sizeT = $context->getTypeFromString('size_t');
-        $i32 = $context->getTypeFromString('int32');
         $doubleTy = $context->getTypeFromString('double');
 
-        foreach (
-            [
-                ['snprintf', $i32, [$charPtr, $sizeT, $charPtr, $i32, $doubleTy]],
-                ['strtod', $doubleTy, [$charPtr, $charPtrPtr]],
-            ] as [$name, $ret, $params]
-        ) {
-            if (null === $context->module->getNamedFunction($name)) {
-                $context->module->addFunction(
-                    $name,
-                    $context->context->functionType($context->getTypeFromString($ret), false, ...$params)
-                );
-            }
+        if (null === $context->module->getNamedFunction('strtod')) {
+            $context->module->addFunction(
+                'strtod',
+                $context->context->functionType($doubleTy, false, $charPtr, $charPtrPtr)
+            );
         }
     }
 
     private static function snprintfDouble(Context $context, Value $val, Value $precision, string $fmt): Value
     {
-        $charPtr = $context->getTypeFromString('char*');
+        $i8p = $context->getTypeFromString('int8*');
         $sizeT = $context->getTypeFromString('size_t');
         $i64 = $context->getTypeFromString('int64');
         $bufSize = $sizeT->constInt(self::BUF_SIZE, false);
         $buf = $context->builder->call($context->lookupFunction('__mm__malloc'), $bufSize);
-        $bufChar = $context->builder->pointerCast($buf, $charPtr);
-        $fmtCstr = $context->builder->pointerCast($context->constantFromString($fmt), $charPtr);
+        $bufPtr = $context->builder->pointerCast($buf, $i8p);
+        $fmtCstr = $context->builder->pointerCast($context->constantFromString($fmt), $i8p);
         $written = $context->builder->call(
             $context->lookupFunction('snprintf'),
-            $bufChar,
+            $bufPtr,
             $bufSize,
             $fmtCstr,
             $precision,
@@ -178,7 +169,7 @@ final class StringSerializeDoubleJit
         $str = $context->builder->call(
             $context->lookupFunction('__string__init'),
             $len,
-            $bufChar
+            $bufPtr
         );
         $context->builder->call($context->lookupFunction('__mm__free'), $buf);
 

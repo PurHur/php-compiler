@@ -284,14 +284,17 @@ class Object_ extends Type {
 
     private function implementInvokeDestructor(): void
     {
-        if (null !== $this->context->module->getNamedFunction('__object__invoke_destructor')) {
-            return;
-        }
         $objPtr = $this->context->getTypeFromString('__object__*');
         $void = $this->context->getTypeFromString('void');
         $fnType = $this->context->context->functionType($void, false, $objPtr);
-        $fn = $this->context->module->addFunction('__object__invoke_destructor', $fnType);
-        $this->context->registerFunction('__object__invoke_destructor', $fn);
+        $fn = $this->context->module->getNamedFunction('__object__invoke_destructor');
+        if (null !== $fn && $fn->countBasicBlocks() > 0) {
+            return;
+        }
+        if (null === $fn) {
+            $fn = $this->context->module->addFunction('__object__invoke_destructor', $fnType);
+            $this->context->registerFunction('__object__invoke_destructor', $fn);
+        }
         $entry = $fn->appendBasicBlock('entry');
         $this->context->builder->positionAtEnd($entry);
         $obj = $fn->getParam(0);

@@ -1764,7 +1764,6 @@ final class SuperglobalRefreshRuntime
                 ['strchr', $i8p, false, [$i8p, $i32]],
                 ['strrchr', $i8p, false, [$i8p, $i32]],
                 ['atoi', $i32, false, [$i8p]],
-                ['snprintf', $i32, true, [$charPtr, $sizeT, $charPtr]],
                 ['strncpy', $charPtr, false, [$charPtr, $charPtr, $sizeT]],
                 ['memcpy', $voidPtr, false, [$voidPtr, $voidPtr, $sizeT]],
                 ['malloc', $voidPtr, false, [$sizeT]],
