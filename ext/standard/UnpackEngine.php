@@ -30,7 +30,7 @@ final class UnpackEngine
     }
 
     /**
-     * @return array<int|string, int|string>|false
+     * @return array<int|string, int|float|string>|false
      */
     public static function unpack(string $format, string $data, int $offset = 0): array|false
     {
@@ -196,6 +196,8 @@ final class UnpackEngine
             'i', 'I' => $arg * \PHP_INT_SIZE,
             'l', 'L', 'N', 'V' => $arg * 4,
             'q', 'Q', 'J', 'P' => $arg * 8,
+            'f', 'g', 'G' => $arg * 4,
+            'd', 'e', 'E' => $arg * 8,
             'X', '@' => 0,
             default => null,
         };
@@ -205,15 +207,16 @@ final class UnpackEngine
     {
         return \in_array($code, [
             'a', 'A', 'Z', 'h', 'H', 'c', 'C', 's', 'S', 'i', 'I', 'l', 'L',
-            'n', 'N', 'v', 'V', 'q', 'Q', 'J', 'P', 'x', 'X', '@',
+            'n', 'N', 'v', 'V', 'q', 'Q', 'J', 'P', 'f', 'g', 'G', 'd', 'e', 'E',
+            'x', 'X', '@',
         ], true);
     }
 
     /**
-     * @param array<int|string, int|string> $result
+     * @param array<int|string, int|float|string> $result
      * @param array{code: string, arg: int, name: string, has_name: bool} $spec
      */
-    private static function store(array &$result, array $spec, int &$autoIdx, int|string $val): void
+    private static function store(array &$result, array $spec, int &$autoIdx, int|float|string $val): void
     {
         if ($spec['has_name']) {
             $result[$spec['name']] = $val;
@@ -230,6 +233,8 @@ final class UnpackEngine
             'i', 'I' => \PHP_INT_SIZE,
             'l', 'L', 'N', 'V' => 4,
             'q', 'Q', 'J', 'P' => 8,
+            'f', 'g', 'G' => 4,
+            'd', 'e', 'E' => 8,
             default => null,
         };
     }
@@ -291,7 +296,7 @@ final class UnpackEngine
     }
 
     /**
-     * @param array<int|string, int|string> $result
+     * @param array<int|string, int|float|string> $result
      * @param array{code: string, arg: int, name: string, has_name: bool} $spec
      */
     private static function unpackOne(
@@ -307,6 +312,13 @@ final class UnpackEngine
             self::fail('unpack(): format not supported in this compiler build');
 
             return false;
+        }
+
+        if (self::isIeeeCode($code)) {
+            self::store($result, $spec, $autoIdx, self::readIeee($data, $pos, $code));
+            $pos += $unit;
+
+            return true;
         }
 
         [$le, $signed] = self::endianSigned($code);
@@ -387,6 +399,18 @@ final class UnpackEngine
                     }
                 }
                 break;
+            case 'f':
+            case 'g':
+            case 'G':
+            case 'd':
+            case 'e':
+            case 'E':
+                for ($r = 0; $r < $arg; ++$r) {
+                    if (!self::unpackOne($result, $spec, $autoIdx, $code, $data, $pos)) {
+                        return false;
+                    }
+                }
+                break;
             default:
                 self::fail('unpack(): format not supported in this compiler build');
 
@@ -394,6 +418,38 @@ final class UnpackEngine
         }
 
         return true;
+    }
+
+    private static function isIeeeCode(string $code): bool
+    {
+        return \in_array($code, ['f', 'g', 'G', 'd', 'e', 'E'], true);
+    }
+
+    /** @return bool|null machine-endian when null */
+    private static function ieeeLittleEndian(string $code): ?bool
+    {
+        return match ($code) {
+            'f', 'd' => null,
+            'g', 'e' => true,
+            'G', 'E' => false,
+            default => null,
+        };
+    }
+
+    private static function readIeee(string $data, int $pos, string $code): float
+    {
+        $size = \in_array($code, ['f', 'g', 'G'], true) ? 4 : 8;
+        $slice = \substr($data, $pos, $size);
+        $le = self::ieeeLittleEndian($code);
+        $machineLe = self::machineLe();
+        if (null === $le) {
+            return 4 === $size ? \unpack('f', $slice)[1] : \unpack('d', $slice)[1];
+        }
+        if ($le !== $machineLe) {
+            $slice = \strrev($slice);
+        }
+
+        return 4 === $size ? \unpack('f', $slice)[1] : \unpack('d', $slice)[1];
     }
 
     /** @return array{0: bool, 1: bool} little-endian, signed */

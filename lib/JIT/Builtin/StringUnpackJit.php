@@ -46,9 +46,11 @@ final class StringUnpackJit
 
         self::implementIfMissing($context, '__compiler_unpack_fail', self::emitFail(...));
         self::implementIfMissing($context, '__compiler_unpack_read_long', self::emitReadLong(...));
+        self::implementIfMissing($context, '__compiler_unpack_read_ieee', self::emitReadIeee(...));
         self::implementIfMissing($context, '__compiler_unpack_need_bytes', self::emitNeedBytes(...));
         self::implementIfMissing($context, '__compiler_unpack_is_code', self::emitIsCode(...));
         self::implementIfMissing($context, '__compiler_unpack_store_long', self::emitStoreLong(...));
+        self::implementIfMissing($context, '__compiler_unpack_store_double', self::emitStoreDouble(...));
         self::implementIfMissing($context, '__compiler_unpack_store_string', self::emitStoreString(...));
         self::implementIfMissing($context, '__compiler_unpack_hex', self::emitHex(...));
         self::implementIfMissing($context, '__compiler_unpack_parse_format', self::emitParseFormat(...));
@@ -105,6 +107,14 @@ final class StringUnpackJit
                 $name,
                 $context->context->functionType($i64, false, $i8p, $i64, $i32, $i32)
             ),
+            '__compiler_unpack_read_ieee' => $context->module->addFunction(
+                $name,
+                $context->context->functionType(
+                    $context->getTypeFromString('double'),
+                    false,
+                    [$i8p, $i32, $i32]
+                )
+            ),
             '__compiler_unpack_need_bytes' => $context->module->addFunction(
                 $name,
                 $context->context->functionType($i64, false, $i8, $i32)
@@ -116,6 +126,14 @@ final class StringUnpackJit
             '__compiler_unpack_store_long' => $context->module->addFunction(
                 $name,
                 $context->context->functionType($void, false, $htPtr, $i32, $i8p, $i32p, $i64)
+            ),
+            '__compiler_unpack_store_double' => $context->module->addFunction(
+                $name,
+                $context->context->functionType(
+                    $void,
+                    false,
+                    [$htPtr, $i32, $i8p, $i32p, $context->getTypeFromString('double')]
+                )
             ),
             '__compiler_unpack_store_string' => $context->module->addFunction(
                 $name,
@@ -432,6 +450,12 @@ final class StringUnpackJit
                 'Q' => $context->builder->mul($arg64, $eight),
                 'J' => $context->builder->mul($arg64, $eight),
                 'P' => $context->builder->mul($arg64, $eight),
+                'f' => $context->builder->mul($arg64, $four),
+                'g' => $context->builder->mul($arg64, $four),
+                'G' => $context->builder->mul($arg64, $four),
+                'd' => $context->builder->mul($arg64, $eight),
+                'e' => $context->builder->mul($arg64, $eight),
+                'E' => $context->builder->mul($arg64, $eight),
             ] as $ch => $val
         ) {
             $eq = $context->builder->icmp(Builder::INT_EQ, $code, $i8->constInt((int) \ord($ch), false));
@@ -439,6 +463,97 @@ final class StringUnpackJit
         }
 
         $context->builder->returnValue($result);
+    }
+
+    private static function emitReadIeee(Context $context, LlvmFunction $fn): void
+    {
+        $entry = $fn->appendBasicBlock('upk_ri_entry');
+        $context->builder->positionAtEnd($entry);
+
+        $bytes = $fn->getParam(0);
+        $size = $fn->getParam(1);
+        $littleEndian = $fn->getParam(2);
+
+        $i8 = $context->getTypeFromString('int8');
+        $i32 = $context->getTypeFromString('int32');
+        $i64 = $context->getTypeFromString('int64');
+        $i8p = $context->getTypeFromString('int8*');
+        $i32p = $context->getTypeFromString('int32*');
+        $i64p = $context->getTypeFromString('int64*');
+        $flt = $context->getTypeFromString('float');
+        $dbl = $context->getTypeFromString('double');
+        $fltPtr = $context->getTypeFromString('float*');
+        $dblPtr = $context->getTypeFromString('double*');
+        $sizeT = $context->getTypeFromString('size_t');
+        $four = $i32->constInt(4, false);
+        $eightI32 = $i32->constInt(8, false);
+        $machineLe = $i32->constInt(self::machineLe() ? 1 : 0, false);
+        $machineLeTag = $i32->constInt(2, false);
+
+        $buf = $context->builder->alloca($i8, 8, 'upk_ri_buf');
+        $context->builder->call(
+            $context->lookupFunction('memset'),
+            $context->bytePtr($buf),
+            $i32->constInt(0, false),
+            $sizeT->constInt(8, false)
+        );
+        $copySize = $context->builder->select(
+            $context->builder->icmp(Builder::INT_EQ, $size, $four),
+            $four,
+            $eightI32
+        );
+        $context->builder->call(
+            $context->lookupFunction('memcpy'),
+            $context->bytePtr($buf),
+            $context->bytePtr($bytes),
+            $context->builder->zext($copySize, $sizeT)
+        );
+
+        $effectiveLe = $context->builder->select(
+            $context->builder->icmp(Builder::INT_EQ, $littleEndian, $machineLeTag),
+            $machineLe,
+            $littleEndian
+        );
+        $leDiffers = $context->builder->icmp(Builder::INT_NE, $effectiveLe, $machineLe);
+        $swapBb = $fn->appendBasicBlock('upk_ri_swap');
+        $afterSwapBb = $fn->appendBasicBlock('upk_ri_after_swap');
+        $context->builder->branchIf($leDiffers, $swapBb, $afterSwapBb);
+
+        $context->builder->positionAtEnd($swapBb);
+        $is4 = $context->builder->icmp(Builder::INT_EQ, $size, $four);
+        $swap4Bb = $fn->appendBasicBlock('upk_ri_swap4');
+        $swap8Bb = $fn->appendBasicBlock('upk_ri_swap8');
+        $context->builder->branchIf($is4, $swap4Bb, $swap8Bb);
+
+        $context->builder->positionAtEnd($swap4Bb);
+        $u32p = $context->builder->pointerCast($buf, $i32p);
+        $context->builder->store(self::bswap32($context, $context->builder->load($u32p)), $u32p);
+        $context->builder->branch($afterSwapBb);
+
+        $context->builder->positionAtEnd($swap8Bb);
+        $u64p = $context->builder->pointerCast($buf, $i64p);
+        $u64 = $context->builder->load($u64p);
+        $hi = $context->builder->trunc($context->builder->lShr($u64, $i32->constInt(32, false)), $i32);
+        $lo = $context->builder->trunc($u64, $i32);
+        $swapped = $context->builder->or(
+            $context->builder->shl($context->builder->zExt(self::bswap32($context, $lo), $i64), $i32->constInt(32, false)),
+            $context->builder->zExt(self::bswap32($context, $hi), $i64)
+        );
+        $context->builder->store($swapped, $u64p);
+        $context->builder->branch($afterSwapBb);
+
+        $context->builder->positionAtEnd($afterSwapBb);
+        $is4Load = $context->builder->icmp(Builder::INT_EQ, $size, $four);
+        $load4Bb = $fn->appendBasicBlock('upk_ri_load4');
+        $load8Bb = $fn->appendBasicBlock('upk_ri_load8');
+        $context->builder->branchIf($is4Load, $load4Bb, $load8Bb);
+
+        $context->builder->positionAtEnd($load4Bb);
+        $fval = $context->builder->load($context->builder->pointerCast($buf, $fltPtr));
+        $context->builder->returnValue($context->builder->fpExt($fval, $dbl));
+
+        $context->builder->positionAtEnd($load8Bb);
+        $context->builder->returnValue($context->builder->load($context->builder->pointerCast($buf, $dblPtr)));
     }
 
     private static function emitIsCode(Context $context, LlvmFunction $fn): void
@@ -556,6 +671,59 @@ final class StringUnpackJit
         $idx = $context->builder->load($autoIdx);
         $context->builder->call(
             $context->lookupFunction('__hashtable__setStringAt'),
+            $ht,
+            $context->builder->zext($idx, $sizeT),
+            $val
+        );
+        $context->builder->store($context->builder->add($idx, $i32->constInt(1, false)), $autoIdx);
+        $context->builder->branch($doneBb);
+
+        $context->builder->positionAtEnd($doneBb);
+        $context->builder->returnVoid();
+    }
+
+    private static function emitStoreDouble(Context $context, LlvmFunction $fn): void
+    {
+        $entry = $fn->appendBasicBlock('upk_sd_entry');
+        $context->builder->positionAtEnd($entry);
+
+        $ht = $fn->getParam(0);
+        $hasName = $fn->getParam(1);
+        $name = $fn->getParam(2);
+        $autoIdx = $fn->getParam(3);
+        $val = $fn->getParam(4);
+        $i32 = $context->getTypeFromString('int32');
+        $i64 = $context->getTypeFromString('int64');
+        $sizeT = $context->getTypeFromString('size_t');
+
+        $namedBb = $fn->appendBasicBlock('upk_sd_named');
+        $indexedBb = $fn->appendBasicBlock('upk_sd_indexed');
+        $context->builder->branchIf(
+            $context->builder->icmp(Builder::INT_NE, $hasName, $i32->constInt(0, false)),
+            $namedBb,
+            $indexedBb
+        );
+
+        $context->builder->positionAtEnd($namedBb);
+        $nameLen = $context->builder->call($context->lookupFunction('strlen'), $name);
+        $key = $context->builder->call(
+            $context->lookupFunction('__string__init'),
+            $context->builder->sext($nameLen, $i64),
+            $name
+        );
+        $context->builder->call(
+            $context->lookupFunction('__hashtable__setStringKeyDouble'),
+            $ht,
+            $key,
+            $val
+        );
+        $doneBb = $fn->appendBasicBlock('upk_sd_done');
+        $context->builder->branch($doneBb);
+
+        $context->builder->positionAtEnd($indexedBb);
+        $idx = $context->builder->load($autoIdx);
+        $context->builder->call(
+            $context->lookupFunction('__hashtable__setDoubleAt'),
             $ht,
             $context->builder->zext($idx, $sizeT),
             $val
@@ -1452,7 +1620,8 @@ final class StringUnpackJit
             )
         );
         $quadBb = $fn->appendBasicBlock('upk_ex_quad');
-        $context->builder->branchIf($isQuad, $quadBb, $unsupportedBb);
+        $checkFloatBb = $fn->appendBasicBlock('upk_ex_check_float');
+        $context->builder->branchIf($isQuad, $quadBb, $checkFloatBb);
 
         $context->builder->positionAtEnd($quadBb);
         $signed = $context->builder->or(
@@ -1490,6 +1659,123 @@ final class StringUnpackJit
                     $val
                 );
                 $context->builder->store($context->builder->add($pos, $eightI64), $posSlot);
+            },
+            $afterDataBb
+        );
+
+        $context->builder->positionAtEnd($checkFloatBb);
+        $isFloat4 = $context->builder->or(
+            $context->builder->icmp(Builder::INT_EQ, $code, $i8->constInt((int) \ord('f'), false)),
+            $context->builder->or(
+                $context->builder->icmp(Builder::INT_EQ, $code, $i8->constInt((int) \ord('g'), false)),
+                $context->builder->icmp(Builder::INT_EQ, $code, $i8->constInt((int) \ord('G'), false))
+            )
+        );
+        $floatBb = $fn->appendBasicBlock('upk_ex_float');
+        $checkDoubleBb = $fn->appendBasicBlock('upk_ex_check_double');
+        $context->builder->branchIf($isFloat4, $floatBb, $checkDoubleBb);
+
+        $context->builder->positionAtEnd($floatBb);
+        $isG = $context->builder->icmp(Builder::INT_EQ, $code, $i8->constInt((int) \ord('g'), false));
+        $isGUpper = $context->builder->icmp(Builder::INT_EQ, $code, $i8->constInt((int) \ord('G'), false));
+        $leFloat = $context->builder->select(
+            $isG,
+            $oneI32,
+            $context->builder->select($isGUpper, $zeroI32, $i32->constInt(2, false))
+        );
+        self::emitIeeeRepLoop(
+            $context,
+            $fn,
+            $arg,
+            $posSlot,
+            $fourI64,
+            $i32->constInt(4, false),
+            $leFloat,
+            $input,
+            $ht,
+            $hasName,
+            $name,
+            $autoIdx,
+            $afterDataBb
+        );
+
+        $context->builder->positionAtEnd($checkDoubleBb);
+        $isDouble8 = $context->builder->or(
+            $context->builder->icmp(Builder::INT_EQ, $code, $i8->constInt((int) \ord('d'), false)),
+            $context->builder->or(
+                $context->builder->icmp(Builder::INT_EQ, $code, $i8->constInt((int) \ord('e'), false)),
+                $context->builder->icmp(Builder::INT_EQ, $code, $i8->constInt((int) \ord('E'), false))
+            )
+        );
+        $doubleBb = $fn->appendBasicBlock('upk_ex_double');
+        $context->builder->branchIf($isDouble8, $doubleBb, $unsupportedBb);
+
+        $context->builder->positionAtEnd($doubleBb);
+        $isE = $context->builder->icmp(Builder::INT_EQ, $code, $i8->constInt((int) \ord('e'), false));
+        $isEUpper = $context->builder->icmp(Builder::INT_EQ, $code, $i8->constInt((int) \ord('E'), false));
+        $leDouble = $context->builder->select(
+            $isE,
+            $oneI32,
+            $context->builder->select($isEUpper, $zeroI32, $i32->constInt(2, false))
+        );
+        self::emitIeeeRepLoop(
+            $context,
+            $fn,
+            $arg,
+            $posSlot,
+            $eightI64,
+            $i32->constInt(8, false),
+            $leDouble,
+            $input,
+            $ht,
+            $hasName,
+            $name,
+            $autoIdx,
+            $afterDataBb
+        );
+    }
+
+    /**
+     * @param callable(): void $body
+     */
+    private static function emitIeeeRepLoop(
+        Context $context,
+        LlvmFunction $fn,
+        Value $arg,
+        Value $posSlot,
+        Value $stepI64,
+        Value $sizeI32,
+        Value $leI32,
+        Value $input,
+        Value $ht,
+        Value $hasName,
+        Value $name,
+        Value $autoIdx,
+        BasicBlock $afterDataBb
+    ): void {
+        self::emitRepLoop(
+            $context,
+            $fn,
+            $arg,
+            $posSlot,
+            $stepI64,
+            function () use ($context, $input, $posSlot, $sizeI32, $leI32, $ht, $hasName, $name, $autoIdx, $stepI64): void {
+                $pos = $context->builder->load($posSlot);
+                $val = $context->builder->call(
+                    $context->lookupFunction('__compiler_unpack_read_ieee'),
+                    $context->builder->gep($input, $pos),
+                    $sizeI32,
+                    $leI32
+                );
+                $context->builder->call(
+                    $context->lookupFunction('__compiler_unpack_store_double'),
+                    $ht,
+                    $hasName,
+                    $name,
+                    $autoIdx,
+                    $val
+                );
+                $context->builder->store($context->builder->add($pos, $stepI64), $posSlot);
             },
             $afterDataBb
         );
