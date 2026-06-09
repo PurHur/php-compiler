@@ -21,14 +21,11 @@ final class file_put_contents extends Internal
         if ($argc < 2 || $argc > 3) {
             throw new \LogicException('file_put_contents() requires two or three arguments in this compiler build');
         }
-        $pathVar = $frame->calledArgs[0]->resolveIndirect();
         $dataVar = $frame->calledArgs[1]->resolveIndirect();
         if (null === $frame->returnVar) {
             return;
         }
-        if (Variable::TYPE_STRING !== $pathVar->type) {
-            throw new \LogicException('file_put_contents() filename must be a string in this compiler build');
-        }
+        $path = VmFilestatArg::coerceFilenameArg($frame->calledArgs[0], 'file_put_contents');
         $flags = 0;
         if (3 === $argc) {
             $flagsVar = $frame->calledArgs[2]->resolveIndirect();
@@ -38,7 +35,7 @@ final class file_put_contents extends Internal
             $flags = $flagsVar->toInt();
         }
         $data = self::coerceData($dataVar);
-        $written = VmFs::filePutContents($pathVar->toString(), $data, $flags);
+        $written = VmFs::filePutContents($path, $data, $flags);
         if (false === $written) {
             $frame->returnVar->bool(false);
 
@@ -72,7 +69,7 @@ final class file_put_contents extends Internal
 
         return JitFilePutContents::invoke(
             $context,
-            $context->helper->loadValue($args[0]),
+            JitFilestatArg::lowerFilename($context, $args[0], 'file_put_contents'),
             $context->helper->loadValue($args[1]),
             $flags
         );
