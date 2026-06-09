@@ -1205,53 +1205,67 @@ final class SuperglobalRefreshRuntime
     private static function emitIsHttpsRequest(Context $context, LlvmFunction $fn): void
     {
         $entry = $fn->appendBasicBlock('sg_https_entry');
+        $checkHttpsBb = $fn->appendBasicBlock('sg_https_check_val');
+        $cmpZeroBb = $fn->appendBasicBlock('sg_https_cmp_zero');
+        $cmpOffBb = $fn->appendBasicBlock('sg_https_cmp_off');
+        $checkProtoBb = $fn->appendBasicBlock('sg_https_proto');
+        $protoCmpBb = $fn->appendBasicBlock('sg_https_proto_cmp');
+        $yesBb = $fn->appendBasicBlock('sg_https_yes');
+        $noBb = $fn->appendBasicBlock('sg_https_no');
+        $doneBb = $fn->appendBasicBlock('sg_https_done');
+
         $context->builder->positionAtEnd($entry);
         $i8 = $context->getTypeFromString('int8');
         $i32 = $context->getTypeFromString('int32');
         $i8p = $context->getTypeFromString('int8*');
+        $one = $i32->constInt(1, false);
+        $zero = $i32->constInt(0, false);
+
         $https = $context->builder->call($context->lookupFunction('getenv'), self::literalCstr($context, 'HTTPS'));
-        $checkProtoBb = $fn->appendBasicBlock('sg_https_proto');
-        $yesBb = $fn->appendBasicBlock('sg_https_yes');
-        $noBb = $fn->appendBasicBlock('sg_https_no');
-        $doneBb = $fn->appendBasicBlock('sg_https_done');
         $httpsNull = $context->builder->icmp(Builder::INT_EQ, $https, $i8p->constNull());
+        $context->builder->branchIf($httpsNull, $checkProtoBb, $checkHttpsBb);
+
+        $context->builder->positionAtEnd($checkHttpsBb);
         $httpsEmpty = $context->builder->icmp(Builder::INT_EQ, $context->builder->load($https), $i8->constInt(0, false));
+        $context->builder->branchIf($httpsEmpty, $checkProtoBb, $cmpZeroBb);
+
+        $context->builder->positionAtEnd($cmpZeroBb);
         $isZero = $context->builder->icmp(
             Builder::INT_EQ,
             $context->builder->call($context->lookupFunction('strcmp'), $https, self::literalCstr($context, '0')),
-            $i32->constInt(0, false)
+            $zero
         );
+        $context->builder->branchIf($isZero, $checkProtoBb, $cmpOffBb);
+
+        $context->builder->positionAtEnd($cmpOffBb);
         $isOff = $context->builder->icmp(
             Builder::INT_EQ,
             $context->builder->call($context->lookupFunction('strcasecmp'), $https, self::literalCstr($context, 'off')),
-            $i32->constInt(0, false)
+            $zero
         );
-        $httpsOn = $context->builder->and(
-            $context->builder->not($httpsNull),
-            $context->builder->and(
-                $context->builder->not($httpsEmpty),
-                $context->builder->and($context->builder->not($isZero), $context->builder->not($isOff))
-            )
-        );
-        $context->builder->branchIf($httpsOn, $yesBb, $checkProtoBb);
+        $context->builder->branchIf($isOff, $checkProtoBb, $yesBb);
+
         $context->builder->positionAtEnd($checkProtoBb);
         $proto = $context->builder->call($context->lookupFunction('getenv'), self::literalCstr($context, 'HTTP_X_FORWARDED_PROTO'));
         $protoNull = $context->builder->icmp(Builder::INT_EQ, $proto, $i8p->constNull());
+        $context->builder->branchIf($protoNull, $noBb, $protoCmpBb);
+
+        $context->builder->positionAtEnd($protoCmpBb);
         $protoHttps = $context->builder->icmp(
             Builder::INT_EQ,
             $context->builder->call($context->lookupFunction('strcasecmp'), $proto, self::literalCstr($context, 'https')),
-            $i32->constInt(0, false)
+            $zero
         );
-        $protoOn = $context->builder->and($context->builder->not($protoNull), $protoHttps);
-        $context->builder->branchIf($protoOn, $yesBb, $noBb);
+        $context->builder->branchIf($protoHttps, $yesBb, $noBb);
+
         $context->builder->positionAtEnd($yesBb);
         $context->builder->branch($doneBb);
         $context->builder->positionAtEnd($noBb);
         $context->builder->branch($doneBb);
         $context->builder->positionAtEnd($doneBb);
         $result = $context->builder->phi($i32);
-        $result->addIncoming($i32->constInt(1, false), $yesBb);
-        $result->addIncoming($i32->constInt(0, false), $noBb);
+        $result->addIncoming($one, $yesBb);
+        $result->addIncoming($zero, $noBb);
         $context->builder->returnValue($result);
     }
 
