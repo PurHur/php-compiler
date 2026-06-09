@@ -5,7 +5,9 @@ declare(strict_types=1);
 namespace PHPCompiler\ext\standard;
 
 use PHPCompiler\Frame;
+use PHPCompiler\JIT\ErrorHandlerCallbackPolicy;
 use PHPCompiler\VM\Context;
+use PHPCompiler\VM\EnumCaseSupport;
 use PHPCompiler\VM\ErrorReporter;
 use PHPCompiler\VM\Variable;
 
@@ -57,6 +59,9 @@ final class VmErrorHandler
             $out->null();
 
             return $out;
+        }
+        if (EnumCaseSupport::isEnumCaseVariable($callback)) {
+            throw new \TypeError(ErrorHandlerCallbackPolicy::invalidCallbackTypeError());
         }
         if (VmClosureCall::isClosure($resolved)) {
             $out = new Variable();

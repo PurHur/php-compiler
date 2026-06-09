@@ -8,6 +8,7 @@ use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\ErrorHandlerCallbackPolicy;
+use PHPCompiler\JIT\JitOperandTypeLabel;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Value;
 
@@ -42,6 +43,9 @@ final class set_error_handler_ extends Internal
         $argc = \count($args);
         if ($argc < 1 || $argc > 2) {
             throw new \LogicException('set_error_handler() requires one or two arguments');
+        }
+        if (null !== JitOperandTypeLabel::compileTimeEnumClassName($context, $args[0])) {
+            throw new \TypeError(ErrorHandlerCallbackPolicy::invalidCallbackTypeError());
         }
         if (!ErrorHandlerCallbackPolicy::isJitLowerable($args[0])) {
             throw new \LogicException(ErrorHandlerCallbackPolicy::jitRejectionMessage());
