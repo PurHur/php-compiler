@@ -119,7 +119,7 @@ final class JitInfo
         StringInfo::ensureLinked($context);
         $loaded = $context->builder->call(
             $context->lookupFunction('__compiler_extension_loaded'),
-            JitStringArg::lower($context, $extension, 'extension_loaded() extension_name')
+            JitStringBuiltinArg::lower($context, $extension, 'extension_loaded', 0, 'extension')
         );
         $slot = JitValueBox::alloc($context);
         $ptr = JitValueBox::pointer($context, $slot);
