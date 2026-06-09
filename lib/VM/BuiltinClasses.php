@@ -83,6 +83,7 @@ use PHPCompiler\VM\Builtin\ReflectionEnumConstruct;
 use PHPCompiler\VM\Builtin\ReflectionEnumGetCase;
 use PHPCompiler\VM\Builtin\ReflectionEnumGetCases;
 use PHPCompiler\VM\Builtin\ReflectionEnumGetName;
+use PHPCompiler\VM\Builtin\ReflectionEnumHasCase;
 use PHPCompiler\VM\Builtin\ReflectionEnumIsBacked;
 use PHPCompiler\VM\Builtin\ReflectionEnumUnitCaseConstruct;
 use PHPCompiler\VM\Builtin\ReflectionEnumUnitCaseGetAttributes;
@@ -562,6 +563,8 @@ final class BuiltinClasses
         $renum->methodVisibility['getcases'] = $pub;
         $renum->methods['getcase'] = new ReflectionEnumGetCase();
         $renum->methodVisibility['getcase'] = $pub;
+        $renum->methods['hascase'] = new ReflectionEnumHasCase();
+        $renum->methodVisibility['hascase'] = $pub;
         $ctx->classes[ReflectionSupport::REFLECTION_ENUM] = $renum;
 
         $reuc = new ClassEntry('ReflectionEnumUnitCase');

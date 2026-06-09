@@ -24,4 +24,4 @@ try {
 --EXPECT--
 1
 A
-getCase E::X is not a case
+getCase Case E::X does not exist
