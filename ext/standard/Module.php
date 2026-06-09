@@ -461,6 +461,7 @@ class Module extends ModuleAbstract
             new fopen(),
             new fread(),
             new stream_get_contents(),
+            new stream_copy_to_stream(),
             new stream_get_filters(),
             new stream_bucket_new(),
             new stream_bucket_make_writeable(),

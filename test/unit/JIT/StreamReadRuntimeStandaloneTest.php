@@ -31,6 +31,7 @@ final class StreamReadRuntimeStandaloneTest extends TestCase
             '__compiler_stream_get_line',
             '__compiler_fseek',
             '__compiler_stream_get_contents',
+            '__compiler_stream_copy_to_stream',
         ] as $name) {
             $fn = $ctx->lookupFunction($name);
             $this->assertNotNull($fn, $name);

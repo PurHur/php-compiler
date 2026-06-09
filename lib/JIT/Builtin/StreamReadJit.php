@@ -47,6 +47,7 @@ final class StreamReadJit
         '__compiler_stream_get_line',
         '__compiler_fseek',
         '__compiler_stream_get_contents',
+        '__compiler_stream_copy_to_stream',
         '__phpc_read_stream_bytes',
     ];
 
@@ -71,6 +72,7 @@ final class StreamReadJit
         self::implementIfMissing($context, '__compiler_stream_get_line', self::emitStreamGetLine(...));
         self::implementIfMissing($context, '__compiler_fseek', self::emitFseek(...));
         self::implementIfMissing($context, '__compiler_stream_get_contents', self::emitStreamGetContents(...));
+        self::implementIfMissing($context, '__compiler_stream_copy_to_stream', self::emitStreamCopyToStream(...));
     }
 
     /**
@@ -113,6 +115,7 @@ final class StreamReadJit
             '__compiler_stream_get_line' => $context->context->functionType($strPtr, false, $i64, $i64, $strPtr),
             '__compiler_fseek' => $context->context->functionType($i64, false, $i64, $i64, $i64),
             '__compiler_stream_get_contents' => $context->context->functionType($strPtr, false, $i64, $i64, $i64),
+            '__compiler_stream_copy_to_stream' => $context->context->functionType($i64, false, $i64, $i64, $i64, $i64),
             '__phpc_read_stream_bytes' => $context->context->functionType($strPtr, false, $i8p, $i64),
             default => throw new \LogicException('StreamReadJit: unknown '.$name),
         };
@@ -943,6 +946,107 @@ final class StreamReadJit
 
         $context->builder->positionAtEnd($failBb);
         $context->builder->returnValue($nullStr);
+    }
+
+    private static function emitStreamCopyToStream(Context $context, LlvmFunction $fn): void
+    {
+        $entry = $fn->appendBasicBlock('scts_entry');
+        $context->builder->positionAtEnd($entry);
+
+        $sourceHandle = $fn->getParam(0);
+        $destHandle = $fn->getParam(1);
+        $maxlength = $fn->getParam(2);
+        $offset = $fn->getParam(3);
+        $i8 = $context->getTypeFromString('int8');
+        $i8p = $context->getTypeFromString('int8*');
+        $i64 = $context->getTypeFromString('int64');
+        $i32 = $context->getTypeFromString('int32');
+        $sizeT = $context->getTypeFromString('size_t');
+        $minusOne = $i64->constInt(-1, true);
+        $zero64 = $i64->constInt(0, false);
+        $zero32 = $i32->constInt(0, false);
+        $oneSize = $sizeT->constInt(1, false);
+        $bufCap = $sizeT->constInt(8192, false);
+
+        $failBb = $fn->appendBasicBlock('scts_fail');
+        $resolveBb = $fn->appendBasicBlock('scts_resolve');
+        $srcFp = $context->builder->call($context->lookupFunction('__phpc_resolve_stream'), $sourceHandle);
+        $srcNull = $context->builder->icmp(Builder::INT_EQ, $srcFp, $i8p->constNull());
+        $context->builder->branchIf($srcNull, $failBb, $resolveBb);
+
+        $context->builder->positionAtEnd($resolveBb);
+        $dstFp = $context->builder->call($context->lookupFunction('__phpc_resolve_stream'), $destHandle);
+        $dstNull = $context->builder->icmp(Builder::INT_EQ, $dstFp, $i8p->constNull());
+        $seekBb = $fn->appendBasicBlock('scts_seek');
+        $context->builder->branchIf($dstNull, $failBb, $seekBb);
+
+        $context->builder->positionAtEnd($seekBb);
+        $hasOffset = $context->builder->icmp(Builder::INT_SGT, $offset, $zero64);
+        $seekDoBb = $fn->appendBasicBlock('scts_seek_do');
+        $afterSeekBb = $fn->appendBasicBlock('scts_after_seek');
+        $context->builder->branchIf($hasOffset, $seekDoBb, $afterSeekBb);
+
+        $context->builder->positionAtEnd($seekDoBb);
+        $seekRc = $context->builder->call($context->lookupFunction('fseek'), $srcFp, $offset, $zero32);
+        $seekBad = $context->builder->icmp(Builder::INT_NE, $seekRc, $zero32);
+        $context->builder->branchIf($seekBad, $failBb, $afterSeekBb);
+
+        $context->builder->positionAtEnd($afterSeekBb);
+        $empty = $context->builder->icmp(Builder::INT_EQ, $maxlength, $zero64);
+        $emptyBb = $fn->appendBasicBlock('scts_empty');
+        $loopInitBb = $fn->appendBasicBlock('scts_loop_init');
+        $context->builder->branchIf($empty, $emptyBb, $loopInitBb);
+
+        $context->builder->positionAtEnd($emptyBb);
+        $context->builder->returnValue($zero64);
+
+        $context->builder->positionAtEnd($loopInitBb);
+        $buf = $context->builder->alloca($i8, 8192, 'scts_buf');
+        $loopBb = $fn->appendBasicBlock('scts_loop');
+        $context->builder->branch($loopBb);
+        $context->builder->positionAtEnd($loopBb);
+        $totalPhi = $context->builder->phi($i64, 'scts_total');
+        $totalPhi->addIncoming($zero64, $loopInitBb);
+
+        $hasLimit = $context->builder->icmp(Builder::INT_SGT, $maxlength, $zero64);
+        $remaining = $context->builder->sub($maxlength, $totalPhi);
+        $doneLimit = $context->builder->icmp(Builder::INT_SLE, $remaining, $zero64);
+        $doneBb = $fn->appendBasicBlock('scts_done');
+        $readBb = $fn->appendBasicBlock('scts_read');
+        $limitDone = $context->builder->and($hasLimit, $doneLimit);
+        $context->builder->branchIf($limitDone, $doneBb, $readBb);
+
+        $context->builder->positionAtEnd($readBb);
+        $remainingSize = $context->builder->trunc($remaining, $sizeT);
+        $smallRemaining = $context->builder->icmp(Builder::INT_SLT, $remainingSize, $bufCap);
+        $limitedRead = $context->builder->select($smallRemaining, $remainingSize, $bufCap);
+        $toRead = $context->builder->select($hasLimit, $limitedRead, $bufCap);
+        $got = $context->builder->call($context->lookupFunction('fread'), $buf, $oneSize, $toRead, $srcFp);
+        $gotZero = $context->builder->icmp(Builder::INT_EQ, $got, $sizeT->constInt(0, false));
+        $zeroCheckBb = $fn->appendBasicBlock('scts_zero_check');
+        $writeBb = $fn->appendBasicBlock('scts_write');
+        $context->builder->branchIf($gotZero, $zeroCheckBb, $writeBb);
+
+        $context->builder->positionAtEnd($zeroCheckBb);
+        $hasErr = $context->builder->icmp(Builder::INT_NE, $context->builder->call($context->lookupFunction('ferror'), $srcFp), $zero32);
+        $context->builder->branchIf($hasErr, $failBb, $doneBb);
+
+        $context->builder->positionAtEnd($writeBb);
+        $wrote = $context->builder->call($context->lookupFunction('fwrite'), $buf, $oneSize, $got, $dstFp);
+        $writeBad = $context->builder->icmp(Builder::INT_NE, $wrote, $got);
+        $loopNextBb = $fn->appendBasicBlock('scts_next');
+        $context->builder->branchIf($writeBad, $failBb, $loopNextBb);
+
+        $context->builder->positionAtEnd($loopNextBb);
+        $nextTotal = $context->builder->add($totalPhi, $context->builder->sext($wrote, $i64));
+        $totalPhi->addIncoming($nextTotal, $loopNextBb);
+        $context->builder->branch($loopBb);
+
+        $context->builder->positionAtEnd($doneBb);
+        $context->builder->returnValue($totalPhi);
+
+        $context->builder->positionAtEnd($failBb);
+        $context->builder->returnValue($minusOne);
     }
 
     private static function registerLinkedRuntime(Context $context): void

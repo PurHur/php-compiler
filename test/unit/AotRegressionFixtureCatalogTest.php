@@ -117,6 +117,7 @@ final class AotRegressionFixtureCatalogTest extends TestCase
             'trig_math_enum_case_typeerror.php' => ['trig_math_enum_case_typeerror.php'],
             'chop_pos_aliases.php' => ['chop_pos_aliases.php'],
             'strcoll_strxfrm.php' => ['strcoll_strxfrm.php'],
+            'stream_copy_to_stream.php' => ['stream_copy_to_stream.php'],
         ];
     }
 
