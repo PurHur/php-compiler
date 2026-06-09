@@ -451,6 +451,7 @@ class Module extends ModuleAbstract
             new stream_set_timeout_(),
             new stream_set_write_buffer_(),
             new stream_set_read_buffer_(),
+            new set_file_buffer(),
             new stream_supports(),
             new stream_supports_lock(),
             new stream_is_local(),
