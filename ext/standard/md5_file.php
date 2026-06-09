@@ -8,9 +8,7 @@ use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitBoolArg;
-use PHPCompiler\JIT\JitStringArg;
 use PHPCompiler\JIT\Variable as JITVariable;
-use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
 
 /** md5_file() — hash file contents (issue #3590, ext/standard/md5.c parity). */
@@ -30,10 +28,7 @@ final class md5_file extends Internal
         if (null === $frame->returnVar) {
             return;
         }
-        $path = $frame->calledArgs[0]->resolveIndirect();
-        if (Variable::TYPE_STRING !== $path->type) {
-            throw new \LogicException('md5_file() requires a string path in this compiler build');
-        }
+        $path = VmFilestatArg::coerceFilenameArg($frame->calledArgs[0], 'md5_file');
         $raw = false;
         if (2 === $argc) {
             $rawArg = $frame->calledArgs[1]->resolveIndirect();
@@ -42,7 +37,7 @@ final class md5_file extends Internal
             }
             $raw = $rawArg->toBool();
         }
-        $result = VmHashFile::hashFile('md5', $path->toString(), $raw);
+        $result = VmHashFile::hashFile('md5', $path, $raw);
         if (false === $result) {
             $frame->returnVar->bool(false);
 
@@ -60,7 +55,7 @@ final class md5_file extends Internal
         if (isset($args[1])) {
             $raw = JitBoolArg::lower($context, $args[1], 'md5_file() raw_output');
         }
-        $path = JitStringArg::lower($context, $args[0], 'md5_file() filename');
+        $path = JitFilestatArg::lowerFilename($context, $args[0], 'md5_file');
 
         return JitHashFile::md5($context, $path, $raw);
     }

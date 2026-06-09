@@ -27,10 +27,7 @@ final class touch_ extends Internal
         if ($argc < 1 || $argc > 3) {
             throw new \LogicException('touch() requires one to three arguments in this compiler build');
         }
-        $pathVar = $frame->calledArgs[0]->resolveIndirect();
-        if (Variable::TYPE_STRING !== $pathVar->type) {
-            throw new \LogicException('touch() filename must be a string in this compiler build');
-        }
+        $path = VmFilestatArg::coerceFilenameArg($frame->calledArgs[0], self::FUNCTION);
         $mtime = null;
         if ($argc >= 2) {
             $mtime = self::parseNullableLong($frame->calledArgs[1]->resolveIndirect(), 2, 'mtime');
@@ -39,7 +36,7 @@ final class touch_ extends Internal
         if (3 === $argc) {
             $atime = self::parseNullableLong($frame->calledArgs[2]->resolveIndirect(), 3, 'atime');
         }
-        $ok = VmFs::touch($pathVar->toString(), $mtime, $atime);
+        $ok = VmFs::touch($path, $mtime, $atime);
         if (null !== $frame->returnVar) {
             $frame->returnVar->bool($ok);
         }
@@ -51,7 +48,7 @@ final class touch_ extends Internal
         if ($argc < 1 || $argc > 3) {
             throw new \LogicException('touch() requires one to three arguments in this compiler build');
         }
-        $path = $this->jitString($context, $args[0], 'touch() argument #1');
+        $path = JitFilestatArg::lowerFilename($context, $args[0], self::FUNCTION);
         $i64 = $context->getTypeFromString('int64');
         $sentinel = $i64->constInt(-1, true);
         $mtime = $sentinel;

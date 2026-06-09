@@ -7,9 +7,8 @@ namespace PHPCompiler\ext\standard;
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Context;
-use PHPCompiler\JIT\JitStringArg;
+use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\Variable as JITVariable;
-use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
 
 /** fopen() — VM via VmFs; JIT/AOT via __compiler_fopen (issue #1117). */
@@ -20,15 +19,12 @@ final class fopen extends Internal
         if (2 !== \count($frame->calledArgs)) {
             throw new \LogicException('fopen() requires exactly two arguments in this compiler build');
         }
-        $pathVar = $frame->calledArgs[0]->resolveIndirect();
-        $modeVar = $frame->calledArgs[1]->resolveIndirect();
         if (null === $frame->returnVar) {
             return;
         }
-        if (Variable::TYPE_STRING !== $pathVar->type || Variable::TYPE_STRING !== $modeVar->type) {
-            throw new \LogicException('fopen() path and mode must be strings in this compiler build');
-        }
-        $handle = VmFs::fopen($pathVar->toString(), $modeVar->toString());
+        $path = VmFilestatArg::coerceFilenameArg($frame->calledArgs[0], 'fopen');
+        $mode = VmString::coerceStringBuiltinArg($frame->calledArgs[1], 'fopen', 1, 'mode');
+        $handle = VmFs::fopen($path, $mode);
         if (false === $handle) {
             $frame->returnVar->bool(false);
 
@@ -45,8 +41,8 @@ final class fopen extends Internal
 
         return JitFopen::invoke(
             $context,
-            JitStringArg::lower($context, $args[0], 'fopen() path'),
-            JitStringArg::lower($context, $args[1], 'fopen() mode')
+            JitFilestatArg::lowerFilename($context, $args[0], 'fopen'),
+            JitStringBuiltinArg::lower($context, $args[1], 'fopen', 1, 'mode')
         );
     }
 }
