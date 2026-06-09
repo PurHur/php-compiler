@@ -45,20 +45,22 @@ final class round extends Internal
 
         $precision = 0;
         if ($argc >= 2) {
-            $precisionVar = $frame->calledArgs[1]->resolveIndirect();
-            if (Variable::TYPE_INTEGER !== $precisionVar->type) {
-                throw new \LogicException('round() precision must be an integer in this compiler build');
-            }
-            $precision = $precisionVar->toInt();
+            $precision = VmMath::parseIntBuiltinArg(
+                $frame->calledArgs[1]->resolveIndirect(),
+                'round',
+                2,
+                'precision'
+            );
         }
 
         $mode = StdlibConstants::PHP_ROUND_HALF_UP;
         if (3 === $argc) {
-            $modeVar = $frame->calledArgs[2]->resolveIndirect();
-            if (Variable::TYPE_INTEGER !== $modeVar->type) {
-                throw new \LogicException('round() mode must be an integer in this compiler build');
-            }
-            $mode = $modeVar->toInt();
+            $mode = VmMath::parseIntBuiltinArg(
+                $frame->calledArgs[2]->resolveIndirect(),
+                'round',
+                3,
+                'mode'
+            );
         }
 
         if (null === $frame->returnVar) {

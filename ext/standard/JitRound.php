@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace PHPCompiler\ext\standard;
 
 use PHPCompiler\JIT\Context;
-use PHPCompiler\JIT\JitLongArg;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Value;
 
@@ -23,10 +22,10 @@ final class JitRound
 
         $number = self::coerceDouble($context, $args[0]);
         $precision = $argc >= 2
-            ? self::coerceInt64($context, $args[1], 'round() precision')
+            ? JitIntdiv::lowerIntBuiltinArg($context, $args[1], 'round', 2, 'precision')
             : $context->getTypeFromString('int64')->constInt(0, false);
         $mode = 3 === $argc
-            ? self::coerceInt64($context, $args[2], 'round() mode')
+            ? JitIntdiv::lowerIntBuiltinArg($context, $args[2], 'round', 3, 'mode')
             : $context->getTypeFromString('int64')->constInt(StdlibConstants::PHP_ROUND_HALF_UP, false);
 
         return JitRoundLowering::lower($context, $number, $precision, $mode);
@@ -45,10 +44,5 @@ final class JitRound
         }
 
         return JitMathNumberArg::lowerToDouble($context, $arg, 'round', 1, 'num');
-    }
-
-    private static function coerceInt64(Context $context, JITVariable $arg, string $label): Value
-    {
-        return JitLongArg::lower($context, $arg, $label);
     }
 }
