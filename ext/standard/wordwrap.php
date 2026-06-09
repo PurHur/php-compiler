@@ -7,6 +7,7 @@ namespace PHPCompiler\ext\standard;
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
@@ -25,13 +26,15 @@ final class wordwrap extends Internal
         if ($argc < 1 || $argc > 4) {
             throw new \LogicException('wordwrap() requires one to four arguments in this compiler build');
         }
-        $text = $frame->calledArgs[0]->resolveIndirect();
         if (null === $frame->returnVar) {
             return;
         }
-        if (Variable::TYPE_STRING !== $text->type) {
-            throw new \LogicException('wordwrap() first argument must be a string in this compiler build');
-        }
+        $text = VmString::coerceStringBuiltinArg(
+            $frame->calledArgs[0],
+            'wordwrap',
+            0,
+            'string'
+        );
         $width = 75;
         if ($argc >= 2) {
             $w = $frame->calledArgs[1]->resolveIndirect();
@@ -42,11 +45,12 @@ final class wordwrap extends Internal
         }
         $break = "\n";
         if ($argc >= 3) {
-            $b = $frame->calledArgs[2]->resolveIndirect();
-            if (Variable::TYPE_STRING !== $b->type) {
-                throw new \LogicException('wordwrap() break must be a string in this compiler build');
-            }
-            $break = $b->toString();
+            $break = VmString::coerceStringBuiltinArg(
+                $frame->calledArgs[2],
+                'wordwrap',
+                2,
+                'break'
+            );
         }
         $cut = false;
         if (4 === $argc) {
@@ -57,7 +61,7 @@ final class wordwrap extends Internal
             $cut = $c->toBool();
         }
         $frame->returnVar->string(
-            VmString::wordwrap($text->toString(), $width, $break, $cut)
+            VmString::wordwrap($text, $width, $break, $cut)
         );
     }
 
@@ -67,7 +71,7 @@ final class wordwrap extends Internal
         if ($argc < 1 || $argc > 4) {
             throw new \LogicException('wordwrap() requires one to four arguments in this compiler build');
         }
-        $input = $this->jitString($context, $args[0], 'wordwrap() argument #1');
+        $input = JitStringBuiltinArg::lower($context, $args[0], 'wordwrap', 0, 'string');
         $i64 = $context->getTypeFromString('int64');
         $width = $i64->constInt(75, false);
         if ($argc >= 2) {
@@ -77,7 +81,7 @@ final class wordwrap extends Internal
             $width = $context->helper->loadValue($args[1]);
         }
         if ($argc >= 3) {
-            $break = $this->jitString($context, $args[2], 'wordwrap() argument #3');
+            $break = JitStringBuiltinArg::lower($context, $args[2], 'wordwrap', 2, 'break');
         } else {
             $break = $context->builder->load($context->constantStringFromString("\n"));
         }

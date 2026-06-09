@@ -7,7 +7,10 @@ namespace PHPCompiler\ext\standard;
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\Variable as JITVariable;
+use PHPCompiler\RuntimeStrictness;
+use PHPCompiler\VM\EnumCaseSupport;
 use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
 
@@ -24,22 +27,13 @@ final class str_ireplace extends Internal
         if (3 !== \count($frame->calledArgs)) {
             throw new \LogicException('str_ireplace() requires exactly three arguments in this compiler build');
         }
-        $search = $frame->calledArgs[0]->resolveIndirect();
-        $replace = $frame->calledArgs[1]->resolveIndirect();
-        $subject = $frame->calledArgs[2]->resolveIndirect();
         if (null === $frame->returnVar) {
             return;
         }
-        if (Variable::TYPE_STRING !== $search->type
-            || Variable::TYPE_STRING !== $replace->type
-            || Variable::TYPE_STRING !== $subject->type) {
-            throw new \LogicException('str_ireplace() requires string arguments in this compiler build');
-        }
-        $frame->returnVar->string(VmString::strIreplace(
-            $search->toString(),
-            $replace->toString(),
-            $subject->toString()
-        ));
+        $search = self::coerceStringReplaceArg($frame->calledArgs[0], 'str_ireplace', 0, 'search');
+        $replace = self::coerceStringReplaceArg($frame->calledArgs[1], 'str_ireplace', 1, 'replace');
+        $subject = self::coerceStringReplaceArg($frame->calledArgs[2], 'str_ireplace', 2, 'subject');
+        $frame->returnVar->string(VmString::strIreplace($search, $replace, $subject));
     }
 
     public function call(Context $context, JITVariable ...$args): Value
@@ -50,9 +44,35 @@ final class str_ireplace extends Internal
 
         return JitStrIreplace::replace(
             $context,
-            $this->jitString($context, $args[0], 'str_ireplace() search'),
-            $this->jitString($context, $args[1], 'str_ireplace() replace'),
-            $this->jitString($context, $args[2], 'str_ireplace() subject')
+            JitStringBuiltinArg::lower($context, $args[0], 'str_ireplace', 0, 'search', 'array|string'),
+            JitStringBuiltinArg::lower($context, $args[1], 'str_ireplace', 1, 'replace', 'array|string'),
+            JitStringBuiltinArg::lower($context, $args[2], 'str_ireplace', 2, 'subject', 'array|string')
         );
+    }
+
+    /**
+     * php-src Z_PARAM_STR_OR_ARR on str_ireplace() string path — enum cases TypeError (#5889).
+     */
+    private static function coerceStringReplaceArg(
+        Variable $var,
+        string $function,
+        int $argIndex,
+        string $paramName
+    ): string {
+        $var = $var->resolveIndirect();
+        if (RuntimeStrictness::enforceStringBuiltinParityGuards() && EnumCaseSupport::isEnumCaseVariable($var)) {
+            throw new \TypeError(\sprintf(
+                '%s(): Argument #%d ($%s) must be of type array|string, %s given',
+                $function,
+                $argIndex + 1,
+                $paramName,
+                EnumCaseSupport::typeNameForVariable($var)
+            ));
+        }
+        if (Variable::TYPE_STRING !== $var->type) {
+            throw new \LogicException("{$function}() requires string arguments in this compiler build");
+        }
+
+        return $var->toString();
     }
 }
