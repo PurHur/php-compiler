@@ -34,9 +34,7 @@ final class StringPregMatchJit
 
     private const PHPC_PREG_BAD_UTF8_OFFSET_ERROR = 5;
 
-    private const PHPC_PREG_BAD_REGEX = 6;
-
-    private const PHPC_PREG_JIT_STACKLIMIT_ERROR = 7;
+    private const PHPC_PREG_JIT_STACKLIMIT_ERROR = 6;
 
     private const PCRE2_CASELESS = 0x00000008;
 
@@ -369,7 +367,7 @@ final class StringPregMatchJit
 
         $code = $fn->getParam(0);
         $i32 = $context->getTypeFromString('int32');
-        $result = $i32->constInt(self::PHPC_PREG_BAD_REGEX, false);
+        $result = $i32->constInt(self::PHPC_PREG_INTERNAL_ERROR, false);
 
         $isZero = $context->builder->icmp(Builder::INT_EQ, $code, $i32->constInt(0, false));
         $zeroBb = $fn->appendBasicBlock('pe_zero');
@@ -396,7 +394,7 @@ final class StringPregMatchJit
         $context->builder->branch($doneBb);
 
         $context->builder->positionAtEnd($switchBb);
-        $mapped = $i32->constInt(self::PHPC_PREG_BAD_REGEX, false);
+        $mapped = $i32->constInt(self::PHPC_PREG_INTERNAL_ERROR, false);
         foreach (
             [
                 self::PCRE2_ERROR_BADUTFOFFSET => self::PHPC_PREG_BAD_UTF8_OFFSET_ERROR,
@@ -670,7 +668,7 @@ final class StringPregMatchJit
         );
 
         $context->builder->positionAtEnd($parseFailBb);
-        $context->builder->store($i32->constInt(self::PHPC_PREG_BAD_REGEX, false), $pregErrorOut);
+        $context->builder->store($i32->constInt(self::PHPC_PREG_INTERNAL_ERROR, false), $pregErrorOut);
         $context->builder->returnValue($nullCode);
 
         $context->builder->positionAtEnd($compileBb);

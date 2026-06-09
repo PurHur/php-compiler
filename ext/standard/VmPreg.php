@@ -40,7 +40,7 @@ final class VmPreg
             5 => 'The offset did not correspond to the beginning of a valid UTF-8 code point',
             2 => 'Backtrack limit exhausted',
             3 => 'Recursion limit exhausted',
-            7 => 'JIT stack limit exhausted',
+            6 => 'JIT stack limit exhausted',
             default => 'Unknown error',
         };
     }
