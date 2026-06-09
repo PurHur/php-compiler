@@ -2289,14 +2289,14 @@ final class VmString
     }
 
     /**
-     * strip_tags() subset: removes HTML/PHP tags; optional allow-list like "<b><p>".
+     * strip_tags() subset: removes HTML/PHP tags; optional allow-list like "<b><p>" or ['b','p'].
      * HTML comments and PHP tags remove their inner content; other tags keep inner text.
+     *
+     * @param string|list<string>|null $allowedTags
      */
-    public static function stripTags(string $string, ?string $allowedTags = null): string
+    public static function stripTags(string $string, string|array|null $allowedTags = null): string
     {
-        $allowed = null === $allowedTags || '' === $allowedTags
-            ? []
-            : self::parseAllowedTags($allowedTags);
+        $allowed = self::normalizeStripTagsAllowed($allowedTags);
         $out = '';
         $len = self::byteLength($string);
         $i = 0;
@@ -2336,6 +2336,56 @@ final class VmString
         }
 
         return $out;
+    }
+
+    /**
+     * @param string|list<string>|null $allowedTags
+     *
+     * @return list<string>
+     */
+    public static function normalizeStripTagsAllowed(string|array|null $allowedTags): array
+    {
+        if (null === $allowedTags) {
+            return [];
+        }
+        if (\is_array($allowedTags)) {
+            return self::normalizeAllowedTagNames($allowedTags);
+        }
+
+        return '' === $allowedTags ? [] : self::parseAllowedTags($allowedTags);
+    }
+
+    /**
+     * Build {@code <a><b>} markup from plain tag names (php-src array allowed_tags branch).
+     *
+     * @param list<string> $tagNames
+     */
+    public static function formatAllowedTagsMarkup(array $tagNames): string
+    {
+        $parts = [];
+        foreach (self::normalizeAllowedTagNames($tagNames) as $name) {
+            $parts[] = '<'.$name.'>';
+        }
+
+        return implode('', $parts);
+    }
+
+    /**
+     * @param list<string> $names
+     *
+     * @return list<string>
+     */
+    private static function normalizeAllowedTagNames(array $names): array
+    {
+        $tags = [];
+        foreach ($names as $name) {
+            $name = strtolower($name);
+            if ('' !== $name) {
+                $tags[] = $name;
+            }
+        }
+
+        return $tags;
     }
 
     /**
