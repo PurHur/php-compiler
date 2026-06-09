@@ -9,7 +9,6 @@ use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitStringArg;
 use PHPCompiler\JIT\Variable as JITVariable;
-use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
 
 /** tempnam() — VM via VmFs; JIT/AOT via libc tempnam(3) (issue #1201). */
@@ -28,12 +27,9 @@ final class tempnam extends Internal
         if (null === $frame->returnVar) {
             return;
         }
-        $dir = $frame->calledArgs[0]->resolveIndirect();
-        $prefix = $frame->calledArgs[1]->resolveIndirect();
-        if (Variable::TYPE_STRING !== $dir->type || Variable::TYPE_STRING !== $prefix->type) {
-            throw new \LogicException('tempnam() requires string directory and prefix in this compiler build');
-        }
-        $path = VmFs::tempnam($dir->toString(), $prefix->toString());
+        $dir = VmString::coerceStringBuiltinArg($frame->calledArgs[0], 'tempnam', 0, 'directory');
+        $prefix = VmString::coerceStringBuiltinArg($frame->calledArgs[1], 'tempnam', 1, 'prefix');
+        $path = VmFs::tempnam($dir, $prefix);
         if (false === $path) {
             $frame->returnVar->bool(false);
         } else {
