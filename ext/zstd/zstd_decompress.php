@@ -1,0 +1,44 @@
+<?php
+
+declare(strict_types=1);
+
+namespace PHPCompiler\ext\zstd;
+
+use PHPCompiler\ext\standard\VmString;
+use PHPCompiler\Frame;
+use PHPCompiler\Func\Internal;
+use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\Variable as JITVariable;
+use PHPLLVM\Value;
+
+/** zstd_decompress() — libzstd via FFI (php-src ext/zstd/zstd.c; #6382, #6387). */
+final class zstd_decompress extends Internal
+{
+    public function __construct()
+    {
+        parent::__construct('zstd_decompress');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        if (1 !== \count($frame->calledArgs)) {
+            throw new \LogicException('zstd_decompress() expects exactly one argument in this compiler build');
+        }
+        $data = VmString::coerceStringBuiltinArg($frame->calledArgs[0], 'zstd_decompress', 0, 'data');
+        if (null === $frame->returnVar) {
+            return;
+        }
+        $result = VmZstdNative::decompress($data);
+        if (false === $result) {
+            $frame->returnVar->bool(false);
+
+            return;
+        }
+        $frame->returnVar->string($result);
+    }
+
+    public function call(Context $context, JITVariable ...$args): Value
+    {
+        throw new \Error('zstd_decompress() is not implemented for JIT in this compiler build (issue #6387)');
+    }
+}
