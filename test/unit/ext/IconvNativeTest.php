@@ -1,0 +1,53 @@
+<?php
+
+declare(strict_types=1);
+
+namespace PHPCompiler\Test\Unit\Ext;
+
+use PHPCompiler\ext\iconv\CharsetEngine;
+use PHPCompiler\ext\iconv\VmIconv;
+use PHPUnit\Framework\TestCase;
+
+/** Native iconv charset engine (#6251). */
+final class IconvNativeTest extends TestCase
+{
+    public function testLatin1ToUtf8MatchesZendShape(): void
+    {
+        $bytes = "\xE9";
+        $this->assertSame(
+            \function_exists('iconv') ? \iconv('ISO-8859-1', 'UTF-8', $bytes) : "\xC3\xA9",
+            CharsetEngine::convert('ISO-8859-1', 'UTF-8', $bytes)
+        );
+        $this->assertSame(
+            CharsetEngine::convert('ISO-8859-1', 'UTF-8', $bytes),
+            VmIconv::iconv('ISO-8859-1', 'UTF-8', $bytes)
+        );
+    }
+
+    public function testEncodingAliasesNormalize(): void
+    {
+        $bytes = 'A';
+        $this->assertSame('A', CharsetEngine::convert('latin1', 'UTF-8', $bytes));
+        $this->assertSame('A', CharsetEngine::convert('ISO8859-1', 'UTF-8', $bytes));
+        $this->assertSame('A', CharsetEngine::convert('UTF8', 'UTF-8', $bytes));
+    }
+
+    public function testUtf8RoundTripLatin1(): void
+    {
+        $utf8 = "\xC3\xA9";
+        $latin1 = CharsetEngine::convert('UTF-8', 'ISO-8859-1', $utf8);
+        $this->assertSame("\xE9", $latin1);
+        $this->assertSame($utf8, CharsetEngine::convert('ISO-8859-1', 'UTF-8', (string) $latin1));
+    }
+
+    public function testUnknownEncodingThrowsValueError(): void
+    {
+        $this->expectException(\ValueError::class);
+        VmIconv::iconv('KOI8-R', 'UTF-8', 'x');
+    }
+
+    public function testIgnoreSuffixStripsInvalidAsciiBytes(): void
+    {
+        $this->assertSame('A', CharsetEngine::convert('ASCII//IGNORE', 'UTF-8', "A\xFF"));
+    }
+}
