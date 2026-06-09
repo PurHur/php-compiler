@@ -6,6 +6,7 @@ namespace PHPCompiler\ext\standard;
 
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
+use PHPCompiler\JIT\ArrayBuiltinHelper;
 use PHPCompiler\JIT\Builtin\StringStripTags;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitStringBuiltinArg;
@@ -28,14 +29,7 @@ final class strip_tags extends Internal
         $subject = VmString::coerceStringBuiltinArg($frame->calledArgs[0], 'strip_tags', 0, 'string');
         $allowed = null;
         if (2 === $argc) {
-            $allowVar = $frame->calledArgs[1]->resolveIndirect();
-            if (Variable::TYPE_NULL === $allowVar->type) {
-                $allowed = null;
-            } elseif (Variable::TYPE_STRING === $allowVar->type) {
-                $allowed = $allowVar->toString();
-            } else {
-                throw new \LogicException('strip_tags() allowed_tags must be a string or null in this compiler build');
-            }
+            $allowed = self::resolveAllowedTagsVm($frame->calledArgs[1]);
         }
         BuiltinExecute::writeReturn(
             $frame,
@@ -51,9 +45,25 @@ final class strip_tags extends Internal
         }
         $allowed = 2 === $argc ? $args[1] : null;
 
+        $subjectArg = $args[0];
+        $subjectLiteral = $subjectArg->compileTimeString ?? null;
+        if (null !== $subjectLiteral && (null === $allowed || self::isAllowedTagsArrayArg($allowed))) {
+            $allowedValue = self::resolveAllowedTagsJit($allowed);
+            if (null !== $allowedValue || null === $allowed) {
+                return $context->builder->load(
+                    $context->constantStringFromString(VmString::stripTags($subjectLiteral, $allowedValue))
+                );
+            }
+        }
+
         $subject = JitStringBuiltinArg::lower($context, $args[0], 'strip_tags', 0, 'string');
         if (null === $allowed) {
             $allowPtr = $context->builder->load($context->constantStringFromString(''));
+        } elseif (self::isAllowedTagsArrayArg($allowed)) {
+            $allowPtr = JitStripTags::allowedMarkupFromHashTable(
+                $context,
+                ArrayBuiltinHelper::loadHashTable($context, $allowed)
+            );
         } else {
             $allowPtr = JitStringBuiltinArg::lower($context, $allowed, 'strip_tags', 1, 'allowed_tags');
         }
@@ -63,6 +73,104 @@ final class strip_tags extends Internal
             $context->lookupFunction('__compiler_strip_tags'),
             $subject,
             $allowPtr
+        );
+    }
+
+    /**
+     * @return string|list<string>|null
+     */
+    private static function resolveAllowedTagsVm(Variable $allowVar): string|array|null
+    {
+        $allowVar = $allowVar->resolveIndirect();
+        if (Variable::TYPE_NULL === $allowVar->type) {
+            return null;
+        }
+        if (Variable::TYPE_STRING === $allowVar->type) {
+            return $allowVar->toString();
+        }
+        if (Variable::TYPE_ARRAY === $allowVar->type) {
+            $tagNames = [];
+            foreach ($allowVar->toArray()->iterateKeyed(true) as [, $valueVar]) {
+                $tagNames[] = VmString::coerceStringBuiltinArg($valueVar, 'strip_tags', 1, 'allowed_tags');
+            }
+
+            return $tagNames;
+        }
+
+        throw new \TypeError(self::allowedTagsTypeError($allowVar->type));
+    }
+
+    /**
+     * @return string|list<string>|null
+     */
+    private static function resolveAllowedTagsJit(?JITVariable $allowed): string|array|null
+    {
+        if (null === $allowed) {
+            return null;
+        }
+        if (JITVariable::TYPE_STRING === $allowed->type) {
+            return $allowed->compileTimeString;
+        }
+        if (!self::isAllowedTagsArrayArg($allowed)) {
+            return null;
+        }
+        $tagNames = self::compileTimeAllowedTagNames($allowed);
+        if (null === $tagNames) {
+            return null;
+        }
+
+        return $tagNames;
+    }
+
+    private static function isAllowedTagsArrayArg(JITVariable $arg): bool
+    {
+        if (JITVariable::TYPE_HASHTABLE === $arg->type) {
+            return true;
+        }
+        if (0 !== ($arg->type & JITVariable::IS_NATIVE_ARRAY)) {
+            return true;
+        }
+
+        return JITVariable::TYPE_VALUE === $arg->type;
+    }
+
+    /**
+     * @return list<string>|null
+     */
+    private static function compileTimeAllowedTagNames(JITVariable $arg): ?array
+    {
+        if (0 === ($arg->type & JITVariable::IS_NATIVE_ARRAY)) {
+            return null;
+        }
+        $compileTime = $arg->compileTimeArray ?? null;
+        if (!\is_array($compileTime)) {
+            return null;
+        }
+        $names = [];
+        foreach ($compileTime as $value) {
+            if (!\is_string($value) && !\is_int($value) && !\is_float($value) && !\is_bool($value)) {
+                return null;
+            }
+            $names[] = (string) $value;
+        }
+
+        return $names;
+    }
+
+    private static function allowedTagsTypeError(int $type): string
+    {
+        $given = match ($type) {
+            Variable::TYPE_BOOLEAN => 'bool',
+            Variable::TYPE_INTEGER => 'int',
+            Variable::TYPE_FLOAT => 'float',
+            Variable::TYPE_OBJECT => 'object',
+            Variable::TYPE_RESOURCE => 'resource',
+            default => 'mixed',
+        };
+
+        return \sprintf(
+            'strip_tags(): Argument #2 ($allowed_tags) must be of type array|string|null, %s given',
+            $given
         );
     }
 }
