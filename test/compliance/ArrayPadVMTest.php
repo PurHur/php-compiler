@@ -17,6 +17,10 @@ final class ArrayPadVMTest extends BaseTest
             __DIR__.'/cases/stdlib/array_pad.phpt',
             'array_pad.phpt'
         );
+        yield 'array_pad_chunk_enum.phpt' => self::parsePHPT(
+            __DIR__.'/cases/stdlib/array_pad_chunk_enum.phpt',
+            'array_pad_chunk_enum.phpt'
+        );
     }
 
     public function setUp(): void
