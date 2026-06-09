@@ -7,7 +7,10 @@ namespace PHPCompiler\ext\standard;
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\JitOperandTypeLabel;
+use PHPCompiler\JIT\ShutdownCallbackPolicy;
 use PHPCompiler\JIT\Variable as JITVariable;
+use PHPCompiler\VM\EnumCaseSupport;
 use PHPCompiler\VM\ShutdownQueue;
 use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
@@ -29,6 +32,9 @@ final class register_shutdown_function extends Internal
             throw new \LogicException('register_shutdown_function() requires at least one argument');
         }
         $callable = $frame->calledArgs[0];
+        if (EnumCaseSupport::isEnumCaseVariable($callable)) {
+            throw new \TypeError(ShutdownCallbackPolicy::invalidCallbackTypeError());
+        }
         $extra = [];
         for ($i = 1; $i < $argc; ++$i) {
             $copy = new Variable();
@@ -40,6 +46,10 @@ final class register_shutdown_function extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
+        if ([] !== $args && null !== JitOperandTypeLabel::compileTimeEnumClassName($context, $args[0])) {
+            throw new \TypeError(ShutdownCallbackPolicy::invalidCallbackTypeError());
+        }
+
         return JitRegisterShutdown::invoke($context, ...$args);
     }
 }
