@@ -19,12 +19,16 @@ final class VmIteratorWalk
         return VM\IterableCheck::isIterable($value, $ctx);
     }
 
-    public static function assertTraversable(Variable $value, Context $ctx, string $funcName): Variable
-    {
+    public static function assertTraversable(
+        Variable $value,
+        Context $ctx,
+        string $funcName,
+        string $paramName = 'iterator'
+    ): Variable {
         $value = $value->resolveIndirect();
         if (!self::isIterable($value, $ctx)) {
             throw new \TypeError(
-                "{$funcName}(): Argument #1 must be of type ".VM\IterableCheck::TYPE_LABEL.', '
+                "{$funcName}(): Argument #1 (\${$paramName}) must be of type ".VM\IterableCheck::TYPE_LABEL.', '
                 .VM\IterableCheck::valueTypeName($value).' given'
             );
         }
