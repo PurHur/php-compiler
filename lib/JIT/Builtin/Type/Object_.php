@@ -2412,7 +2412,11 @@ class Object_ extends Type {
     public function publicStaticPropertyDefaultEntries(int $classId): array
     {
         $entries = [];
-        foreach ($this->staticPropertyGlobals[$classId] ?? [] as $name => $entry) {
+        foreach ($this->orderedPublicStaticPropertyNames($classId) as $name) {
+            $entry = $this->staticPropertyGlobals[$classId][$name] ?? null;
+            if (null === $entry) {
+                continue;
+            }
             if (!MethodVisibility::isPublic($this->staticPropertyVisibility[$classId][$name] ?? \PHPCfg\Func::FLAG_PUBLIC)) {
                 continue;
             }
@@ -2430,6 +2434,31 @@ class Object_ extends Type {
         }
 
         return $entries;
+    }
+
+    /**
+     * php-src add_class_vars: class-declared statics before trait/parent (#7417).
+     *
+     * @return list<string>
+     */
+    private function orderedPublicStaticPropertyNames(int $classId): array
+    {
+        $globals = $this->staticPropertyGlobals[$classId] ?? [];
+        if ([] === $globals) {
+            return [];
+        }
+        $composed = [];
+        $own = [];
+        foreach (array_keys($globals) as $name) {
+            $declId = $this->staticPropertyDeclaringClassId[$classId][$name] ?? $classId;
+            if ($declId !== $classId) {
+                $composed[] = $name;
+            } else {
+                $own[] = $name;
+            }
+        }
+
+        return array_merge($own, $composed);
     }
 
     /**

@@ -21,9 +21,9 @@ var_export(get_class_vars(D7420::class));
 echo "\n";
 --EXPECT--
 array (
+  'c' => 2,
   'a' => 1,
   'b' => 'x',
-  'c' => 2,
 )
 ---
 array (
