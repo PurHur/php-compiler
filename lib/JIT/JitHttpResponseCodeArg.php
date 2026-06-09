@@ -23,11 +23,15 @@ final class JitHttpResponseCodeArg
             return $context->getTypeFromString('int64')->constInt($compileTime, false);
         }
 
-        if (Variable::TYPE_NATIVE_LONG === $arg->type) {
-            return $context->helper->loadValue($arg);
-        }
         if (Variable::TYPE_VALUE === $arg->type) {
             return self::lowerBoxed($context, $arg, $fn);
+        }
+        if (
+            Variable::TYPE_NATIVE_LONG === $arg->type
+            || Variable::TYPE_STRING === $arg->type
+            || Variable::TYPE_NATIVE_BOOL === $arg->type
+        ) {
+            return JitLongArg::lower($context, $arg, 'http_response_code(): Argument #1 ($response_code)');
         }
 
         throw new \LogicException($fn.' must be an integer in this compiler build');
@@ -57,15 +61,42 @@ final class JitHttpResponseCodeArg
         $context->builder->branch($afterEnum);
         $context->builder->positionAtEnd($afterEnum);
 
+        $stringTy = $i8->constInt(VmVariable::TYPE_STRING, false);
+        $boolTy = $i8->constInt(VmVariable::TYPE_BOOLEAN, false);
+        $longTy = $i8->constInt(VmVariable::TYPE_INTEGER, false);
+        $arrayTy = $i8->constInt(VmVariable::TYPE_ARRAY, false);
+
+        $stringBlock = BasicBlockHelper::append($context, 'jit_hrc_string');
+        $scalarBlock = BasicBlockHelper::append($context, 'jit_hrc_scalar');
+        $context->builder->branchIf(
+            $context->builder->icmp(Builder::INT_EQ, $typeByte, $stringTy),
+            $stringBlock,
+            $scalarBlock
+        );
+
+        $context->builder->positionAtEnd($stringBlock);
+        $strPtr = $context->builder->call($context->lookupFunction('__value__readString'), $valuePtr);
+        $stringLong = JitLongArg::lowerStringValue($context, $strPtr);
+        $stringEnd = $context->builder->getInsertBlock();
+        $context->builder->branch($mergeBlock = BasicBlockHelper::append($context, 'jit_hrc_merge'));
+
+        $context->builder->positionAtEnd($scalarBlock);
+        $isArray = $context->builder->icmp(Builder::INT_EQ, $typeByte, $arrayTy);
+        $arrayBlock = BasicBlockHelper::append($context, 'jit_hrc_array');
+        $afterArray = BasicBlockHelper::append($context, 'jit_hrc_after_array');
+        $context->builder->branchIf($isArray, $arrayBlock, $afterArray);
+
+        $context->builder->positionAtEnd($arrayBlock);
+        self::emitTypeErrorAndAbort($context, $fn, 'array');
+
+        $context->builder->positionAtEnd($afterArray);
+        $isLongOrBool = $context->builder->or(
+            $context->builder->icmp(Builder::INT_EQ, $typeByte, $longTy),
+            $context->builder->icmp(Builder::INT_EQ, $typeByte, $boolTy)
+        );
         $longBlock = BasicBlockHelper::append($context, 'jit_hrc_long');
         $badBlock = BasicBlockHelper::append($context, 'jit_hrc_bad');
-        $mergeBlock = BasicBlockHelper::append($context, 'jit_hrc_merge');
-        $isLong = $context->builder->icmp(
-            Builder::INT_EQ,
-            $typeByte,
-            $i8->constInt(VmVariable::TYPE_INTEGER, false)
-        );
-        $context->builder->branchIf($isLong, $longBlock, $badBlock);
+        $context->builder->branchIf($isLongOrBool, $longBlock, $badBlock);
 
         $context->builder->positionAtEnd($longBlock);
         $longVal = $context->builder->call($context->lookupFunction('__value__readLong'), $valuePtr);
@@ -79,6 +110,7 @@ final class JitHttpResponseCodeArg
         $i64 = $context->getTypeFromString('int64');
         $phi = $context->builder->phi($i64);
         $phi->addIncoming($enumLong, $enumEnd);
+        $phi->addIncoming($stringLong, $stringEnd);
         $phi->addIncoming($longVal, $longEnd);
 
         return $phi;
