@@ -8,6 +8,9 @@ use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\ArrayBuiltinHelper;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\HashTableHelper;
+use PHPCompiler\JIT\JitArrayColumnArg;
+use PHPCompiler\JIT\JitOperandTypeLabel;
 use PHPCompiler\JIT\JitStringArg;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\HashTable;
@@ -34,10 +37,10 @@ final class array_column extends Internal
         if (Variable::TYPE_ARRAY !== $array->type) {
             throw new \LogicException('array_column() first argument must be an array in this compiler build');
         }
-        $columnField = $this->resolveFieldSpec($column, 'column key');
+        $columnField = VmArrayColumnArg::requireStrIntArg($column, 'array_column', 1, 'column_key');
         $indexField = null;
         if (null !== $indexKeySpec && Variable::TYPE_NULL !== $indexKeySpec->type) {
-            $indexField = $this->resolveFieldSpec($indexKeySpec, 'index_key');
+            $indexField = VmArrayColumnArg::requireStrIntArg($indexKeySpec, 'array_column', 2, 'index_key');
         }
 
         $out = new HashTable();
@@ -78,7 +81,26 @@ final class array_column extends Internal
         if ($argc < 2 || $argc > 3) {
             throw new \LogicException('array_column() requires two or three arguments in this compiler build');
         }
+        if (!JitArrayColumnArg::guardStrIntNullOperand($context, $args[1], 'array_column', 1, 'column_key')) {
+            return HashTableHelper::alloc($context);
+        }
         if (null === JitStringArg::compileTimeLiteral($args[1])) {
+            if (JITVariable::TYPE_OBJECT === $args[1]->type) {
+                JitArrayColumnArg::emitStrIntNullTypeErrorAndAbort(
+                    $context,
+                    'array_column',
+                    1,
+                    'column_key',
+                    JitOperandTypeLabel::givenLabel($context, $args[1])
+                );
+
+                return HashTableHelper::alloc($context);
+            }
+            if (JITVariable::TYPE_VALUE === $args[1]->type) {
+                JitArrayColumnArg::emitRuntimeColumnKeyReject($context, $args[1], 'array_column', 1, 'column_key');
+
+                return HashTableHelper::alloc($context);
+            }
             throw new \LogicException(
                 'array_column() column key must be a compile-time string in this compiler build'
             );
@@ -87,10 +109,29 @@ final class array_column extends Internal
         if (2 === $argc) {
             return ArrayBuiltinHelper::buildColumnArray($context, $args[0], $columnKey);
         }
-        if (Variable::TYPE_NULL === $args[2]->type || $args[2]->isNullConstant) {
+        if (JITVariable::TYPE_NULL === $args[2]->type || $args[2]->isNullConstant) {
             return ArrayBuiltinHelper::buildColumnArray($context, $args[0], $columnKey);
         }
+        if (!JitArrayColumnArg::guardStrIntNullOperand($context, $args[2], 'array_column', 2, 'index_key')) {
+            return HashTableHelper::alloc($context);
+        }
         if (null === JitStringArg::compileTimeLiteral($args[2])) {
+            if (JITVariable::TYPE_OBJECT === $args[2]->type) {
+                JitArrayColumnArg::emitStrIntNullTypeErrorAndAbort(
+                    $context,
+                    'array_column',
+                    2,
+                    'index_key',
+                    JitOperandTypeLabel::givenLabel($context, $args[2])
+                );
+
+                return HashTableHelper::alloc($context);
+            }
+            if (JITVariable::TYPE_VALUE === $args[2]->type) {
+                JitArrayColumnArg::emitRuntimeColumnKeyReject($context, $args[2], 'array_column', 2, 'index_key');
+
+                return HashTableHelper::alloc($context);
+            }
             throw new \LogicException(
                 'array_column() index_key must be a compile-time string in this compiler build'
             );
@@ -98,18 +139,6 @@ final class array_column extends Internal
         $indexKey = $this->jitString($context, $args[2], 'array_column() index_key');
 
         return ArrayBuiltinHelper::buildColumnArrayWithIndex($context, $args[0], $columnKey, $indexKey);
-    }
-
-    /** @return string|int */
-    private function resolveFieldSpec(Variable $spec, string $label): string|int
-    {
-        if (Variable::TYPE_STRING === $spec->type) {
-            return $spec->toString();
-        }
-        if (Variable::TYPE_INTEGER === $spec->type) {
-            return $spec->toInt();
-        }
-        throw new \LogicException("array_column() {$label} must be a string or integer in this compiler build");
     }
 
     private function rowHasField(HashTable $row, string|int $field): bool
