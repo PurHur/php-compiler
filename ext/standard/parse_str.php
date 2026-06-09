@@ -10,12 +10,13 @@ use PHPCompiler\Block;
 use PHPCompiler\JIT\Builtin\StringParseStr;
 use PHPCompiler\JIT\Builtin\TypeErrorRaise;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\JitStringArg;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
 
 /**
- * parse_str() — query string parser (VM: ParseStrEngine; JIT/AOT: StringParseStrJit / __compiler_parse_str).
+ * parse_str() — query string parser (VM: ParseStrEngine; JIT compile-time: JitParseStrMaterializer; runtime: StringParseStrJit).
  */
 final class parse_str extends Internal
 {
@@ -67,7 +68,6 @@ final class parse_str extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        StringParseStr::ensureLinked($context);
         if (\count($args) < 1 || \count($args) > 2) {
             throw new \LogicException('parse_str() requires one or two arguments in this compiler build');
         }
@@ -83,11 +83,17 @@ final class parse_str extends Internal
 
                 return $context->getTypeFromString('int32')->constInt(0, false);
             }
+            if (null === JitStringArg::compileTimeLiteral($args[0])) {
+                StringParseStr::ensureLinked($context);
+            }
             JitParseStr::parseIntoScope($context, $args[0]);
 
             return $context->getTypeFromString('int32')->constInt(0, false);
         }
 
+        if (null === JitStringArg::compileTimeLiteral($args[0])) {
+            StringParseStr::ensureLinked($context);
+        }
         JitParseStr::parse($context, $args[0], $args[1]);
 
         return $context->getTypeFromString('int64')->constInt(1, false);
