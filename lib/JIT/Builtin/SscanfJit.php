@@ -449,10 +449,12 @@ final class SscanfJit
             false
         );
         $context->builder->store($i8->constInt(0, false), $context->builder->inBoundsGEP($tmpPtr, $sliceLen));
+        $endPtrSlot = BasicBlockHelper::entryAlloca($context, $context->getTypeFromString('int8*'));
+        $context->builder->store($context->getTypeFromString('int8*')->constNull(), $endPtrSlot);
         $val = $context->builder->call(
             $context->lookupFunction('strtod'),
             $tmpPtr,
-            $context->getTypeFromString('int8*')->constNull()
+            $endPtrSlot
         );
         $context->builder->store($val, $outPtr);
         $context->builder->store($end, $posPtr);

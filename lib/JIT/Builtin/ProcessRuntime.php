@@ -152,6 +152,8 @@ final class ProcessRuntime
         $failBb = $fn->appendBasicBlock('prs_malloc_fail');
         $loopHead = $fn->appendBasicBlock('prs_loop_head');
         $context->builder->branchIf($initialNull, $failBb, $loopHead);
+
+        $context->builder->positionAtEnd($loopHead);
         $context->builder->store($context->builder->pointerCast($initial, $i8p), $bufSlot);
 
         $context->builder->positionAtEnd($loopHead);
@@ -259,12 +261,14 @@ final class ProcessRuntime
         $nodePtrTy = $context->getTypeFromString('__strkey_node__*');
         $nullEnv = $context->builder->icmp(Builder::INT_EQ, $env, $htPtr->constNull());
         $nullBb = $fn->appendBasicBlock('pae_null');
+        $initBb = $fn->appendBasicBlock('pae_init');
         $loopHead = $fn->appendBasicBlock('pae_loop_head');
-        $context->builder->branchIf($nullEnv, $nullBb, $loopHead);
+        $context->builder->branchIf($nullEnv, $nullBb, $initBb);
 
         $context->builder->positionAtEnd($nullBb);
         $context->builder->returnVoid();
 
+        $context->builder->positionAtEnd($initBb);
         $htMap = $context->structFieldMap['__hashtable__'];
         $nodeMap = $context->structFieldMap['__strkey_node__'];
         $valueMap = $context->structFieldMap['__value__'];
@@ -437,6 +441,8 @@ final class ProcessRuntime
         $failBb = $fn->appendBasicBlock('esa_fail');
         $initBb = $fn->appendBasicBlock('esa_init');
         $context->builder->branchIf($outNull, $failBb, $initBb);
+
+        $context->builder->positionAtEnd($initBb);
         $outPtr = $context->builder->pointerCast($out, $i8p);
         $context->builder->store($outPtr, $outSlot);
         $context->builder->store($sizeT->constInt(0, false), $outLenSlot);
@@ -550,6 +556,8 @@ final class ProcessRuntime
         $failBb = $fn->appendBasicBlock('esc_fail');
         $initBb = $fn->appendBasicBlock('esc_init');
         $context->builder->branchIf($outNull, $failBb, $initBb);
+
+        $context->builder->positionAtEnd($initBb);
         $context->builder->store($context->builder->pointerCast($out, $i8p), $outSlot);
         $context->builder->store($sizeT->constInt(0, false), $outLenSlot);
         $context->builder->store($outCap, $outCapSlot);

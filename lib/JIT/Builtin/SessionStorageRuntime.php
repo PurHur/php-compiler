@@ -306,6 +306,7 @@ final class SessionStorageRuntime
         $context->builder->positionAtEnd($entry);
 
         $i64 = $context->getTypeFromString('int64');
+        $i32 = $context->getTypeFromString('int32');
         $strPtr = $context->getTypeFromString('__string__*');
         $idLen = $context->builder->load(SessionStorageGlobals::$idLenGlobal);
         $hasId = $context->builder->icmp(Builder::INT_SGT, $idLen, $i64->constInt(0, false));
@@ -332,8 +333,8 @@ final class SessionStorageRuntime
             $i64->constInt(0, false),
             $pathStr,
             $strPtr->constNull(),
-            $i64->constInt(0, false),
-            $i64->constInt(0, false)
+            $i32->constInt(0, false),
+            $i32->constInt(0, false)
         );
         $context->builder->branch($bbDone);
 
@@ -416,17 +417,18 @@ final class SessionStorageRuntime
         $context->builder->branch($bbNext);
 
         $context->builder->positionAtEnd($bbBool);
-        $boolByte = $context->builder->load(
-            $context->builder->inBoundsGEP(
-                $context->builder->structGep($valField, $valMap['value']),
-                $i64->constInt(0, false)
-            )
+        $i8 = $context->getTypeFromString('int8');
+        $boolPtr = $context->builder->inBoundsGEP(
+            $context->builder->structGep($valField, $valMap['value']),
+            $i64->constInt(0, false),
+            $i64->constInt(0, false)
         );
+        $boolByte = $context->builder->load($boolPtr);
         $context->builder->call(
             $context->lookupFunction('__hashtable__setStringKeyBool'),
             $dest,
             $key,
-            $context->builder->zExt($boolByte, $i32)
+            $context->builder->icmp(Builder::INT_NE, $boolByte, $i8->constInt(0, false))
         );
         $context->builder->branch($bbNext);
 
@@ -784,7 +786,7 @@ final class SessionStorageRuntime
                 ['__hashtable__alloc', $htPtr, []],
                 ['__hashtable__setStringKeyString', $void, [$htPtr, $strPtr, $strPtr]],
                 ['__hashtable__setStringKeyLong', $void, [$htPtr, $strPtr, $i64]],
-                ['__hashtable__setStringKeyBool', $void, [$htPtr, $strPtr, $i32]],
+                ['__hashtable__setStringKeyBool', $void, [$htPtr, $strPtr, $context->getTypeFromString('int1')]],
                 ['__hashtable__readStringKeyValue', $valuePtr, [$htPtr, $strPtr]],
                 ['__string__init', $strPtr, [$i64, $i8p]],
             ] as [$name, $ret, $params]

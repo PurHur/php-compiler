@@ -1028,7 +1028,7 @@ final class SuperglobalRefreshRuntime
         $isVerb = $context->builder->or($isPut, $context->builder->or($isPatch, $isDelete));
         $verbBb = $fn->appendBasicBlock('sg_should_post_verb');
         $postBb = $fn->appendBasicBlock('sg_should_post_post');
-        $context->builder->branchIf($isVerb, $verbBb, $postBb);
+        $context->builder->branchIf($context->i32Success($isVerb), $verbBb, $postBb);
         $context->builder->positionAtEnd($verbBb);
         $isForm = $context->builder->icmp(
             Builder::INT_EQ,
@@ -1044,7 +1044,7 @@ final class SuperglobalRefreshRuntime
         $isPost = $context->builder->call($context->lookupFunction('__phpc_sg_method_is'), $method, self::literalCstr($context, 'POST'));
         $notPostBb = $fn->appendBasicBlock('sg_should_post_not_post');
         $postWorkBb = $fn->appendBasicBlock('sg_should_post_post_work');
-        $context->builder->branchIf($isPost, $postWorkBb, $notPostBb);
+        $context->builder->branchIf($context->i32Success($isPost), $postWorkBb, $notPostBb);
         $context->builder->positionAtEnd($notPostBb);
         $context->builder->returnValue($i32->constInt(0, false));
         $context->builder->positionAtEnd($postWorkBb);

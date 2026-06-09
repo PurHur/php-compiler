@@ -482,8 +482,12 @@ final class StringUnserializeJit
         $need = $context->builder->add($len, $oneSize);
         $tooBig = $context->builder->icmp(Builder::INT_UGT, $need, $cap);
         $pos = $context->builder->load($posPtr);
-        $remain = $context->builder->sub($end, $pos);
-        $notEnough = $context->builder->icmp(Builder::INT_ULT, $remain, $len);
+        $i64 = $context->getTypeFromString('int64');
+        $remain = $context->builder->sub(
+            $context->builder->ptrToInt($end, $i64),
+            $context->builder->ptrToInt($pos, $i64)
+        );
+        $notEnough = $context->builder->icmp(Builder::INT_ULT, $remain, $context->builder->zExt($len, $i64));
         $bad = $context->builder->or($tooBig, $notEnough);
         $context->builder->branchIf($bad, $fail, $ok);
 
@@ -704,14 +708,14 @@ final class StringUnserializeJit
 
         $ok1 = $context->builder->call($context->lookupFunction('__phpc_unser_expect'), $posPtr, $end, $sCh);
         $ok1b = $context->builder->call($context->lookupFunction('__phpc_unser_expect'), $posPtr, $end, $colon);
-        $step1 = $context->builder->and($ok1, $ok1b);
-        $context->builder->branchIf($context->i32Success($step1), $digitsBb, $fail);
+        $step1 = $context->builder->and($context->i32Success($ok1), $context->i32Success($ok1b));
+        $context->builder->branchIf($step1, $digitsBb, $fail);
 
         $context->builder->positionAtEnd($digitsBb);
         $ok2 = $context->builder->call($context->lookupFunction('__phpc_unser_parse_digits'), $posPtr, $end, $lenSlot);
         $ok2b = $context->builder->call($context->lookupFunction('__phpc_unser_expect'), $posPtr, $end, $colon);
-        $step2 = $context->builder->and($ok2, $ok2b);
-        $context->builder->branchIf($context->i32Success($step2), $quoteBb, $fail);
+        $step2 = $context->builder->and($context->i32Success($ok2), $context->i32Success($ok2b));
+        $context->builder->branchIf($step2, $quoteBb, $fail);
 
         $context->builder->positionAtEnd($quoteBb);
         $ok3 = $context->builder->call($context->lookupFunction('__phpc_unser_expect'), $posPtr, $end, $quote);
@@ -732,8 +736,8 @@ final class StringUnserializeJit
         $context->builder->positionAtEnd($closeBb);
         $ok5 = $context->builder->call($context->lookupFunction('__phpc_unser_expect'), $posPtr, $end, $quote);
         $ok5b = $context->builder->call($context->lookupFunction('__phpc_unser_expect'), $posPtr, $end, $semi);
-        $step5 = $context->builder->and($ok5, $ok5b);
-        $context->builder->branchIf($context->i32Success($step5), $ok, $fail);
+        $step5 = $context->builder->and($context->i32Success($ok5), $context->i32Success($ok5b));
+        $context->builder->branchIf($step5, $ok, $fail);
 
         $context->builder->positionAtEnd($ok);
         $context->builder->store($i32->constInt(self::KIND_STRING, false), $kindOut);
@@ -799,14 +803,14 @@ final class StringUnserializeJit
 
         $ok1 = $context->builder->call($context->lookupFunction('__phpc_unser_expect'), $posPtr, $end, $aCh);
         $ok1b = $context->builder->call($context->lookupFunction('__phpc_unser_expect'), $posPtr, $end, $colon);
-        $step1 = $context->builder->and($ok1, $ok1b);
-        $context->builder->branchIf($context->i32Success($step1), $countBb, $fail);
+        $step1 = $context->builder->and($context->i32Success($ok1), $context->i32Success($ok1b));
+        $context->builder->branchIf($step1, $countBb, $fail);
 
         $context->builder->positionAtEnd($countBb);
         $ok2 = $context->builder->call($context->lookupFunction('__phpc_unser_parse_digits'), $posPtr, $end, $countSlot);
         $ok2b = $context->builder->call($context->lookupFunction('__phpc_unser_expect'), $posPtr, $end, $colon);
-        $step2 = $context->builder->and($ok2, $ok2b);
-        $context->builder->branchIf($context->i32Success($step2), $openBb, $fail);
+        $step2 = $context->builder->and($context->i32Success($ok2), $context->i32Success($ok2b));
+        $context->builder->branchIf($step2, $openBb, $fail);
 
         $context->builder->positionAtEnd($openBb);
         $ok3 = $context->builder->call($context->lookupFunction('__phpc_unser_expect'), $posPtr, $end, $brace);
@@ -955,8 +959,8 @@ final class StringUnserializeJit
         $context->builder->positionAtEnd($nBb);
         $okN = $context->builder->call($context->lookupFunction('__phpc_unser_expect'), $posPtr, $end, $nCh);
         $okN2 = $context->builder->call($context->lookupFunction('__phpc_unser_expect'), $posPtr, $end, $semi);
-        $okNull = $context->builder->and($okN, $okN2);
-        $context->builder->branchIf($context->i32Success($okNull), $nullOk, $fail);
+        $okNull = $context->builder->and($context->i32Success($okN), $context->i32Success($okN2));
+        $context->builder->branchIf($okNull, $nullOk, $fail);
         $context->builder->positionAtEnd($nullOk);
         $context->builder->store($i32->constInt(self::KIND_NULL, false), $kindOut);
         $context->builder->returnValue($oneI32);
@@ -1184,7 +1188,10 @@ final class StringUnserializeJit
             $context->builder->load($htSlot),
             $htPtr->constNull()
         );
-        $good = $context->builder->and($parsed, $context->builder->and($isArray, $hasHt));
+        $good = $context->builder->and(
+            $context->i32Success($parsed),
+            $context->builder->and($isArray, $hasHt)
+        );
         $context->builder->branchIf($good, $ok, $fail);
 
         $context->builder->positionAtEnd($ok);

@@ -656,12 +656,14 @@ final class ParseUrlJit
         $context->builder->branchIf($context->builder->icmp(Builder::INT_NE, $portSep, $i8p->constNull()), $hasPortBb, $noPortBb);
         $context->builder->positionAtEnd($hasPortBb);
         $context->builder->store($i8->constInt(0, false), $portSep);
+        $portEndSlot = BasicBlockHelper::entryAlloca($context, $i8p);
+        $context->builder->store($i8p->constNull(), $portEndSlot);
         $context->builder->store(
             $context->builder->trunc(
                 $context->builder->call(
                     $context->lookupFunction('strtol'),
                     $context->builder->inBoundsGEP($portSep, $one),
-                    $i8p->constNull(),
+                    $portEndSlot,
                     $i32->constInt(10, false)
                 ),
                 $i32

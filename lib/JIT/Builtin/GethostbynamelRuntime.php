@@ -137,12 +137,12 @@ final class GethostbynamelRuntime
 
         $resSlot = $context->builder->alloca($voidPtr, 1, 'ghbl_res');
         $context->builder->store($voidPtr->constNull(), $resSlot);
-        $hintsVoid = $context->bytePtr($hints);
+        $hintsPtr = $context->builder->pointerCast($hints, $i8p);
         $rc = $context->builder->call(
             $context->lookupFunction('getaddrinfo'),
             $hostbuf,
             $i8p->constNull(),
-            $hintsVoid,
+            $hintsPtr,
             $resSlot
         );
         $gaFailBb = $fn->appendBasicBlock('ghbl_ga_fail');
@@ -378,7 +378,7 @@ final class GethostbynamelRuntime
         self::ensureExternal(
             $context,
             'getaddrinfo',
-            $context->context->functionType($i32, false, $i8p, $i8p, $voidPtr, $addrinfoResPtr)
+            $context->context->functionType($i32, false, $i8p, $i8p, $i8p, $addrinfoResPtr)
         );
         self::ensureExternal(
             $context,
@@ -388,7 +388,7 @@ final class GethostbynamelRuntime
         self::ensureExternal(
             $context,
             'inet_ntop',
-            $context->context->functionType($i8p, false, $i32, $voidPtr, $i8p, $sizeT)
+            $context->context->functionType($i8p, false, $i32, $i8p, $i8p, $sizeT)
         );
         self::ensureExternal(
             $context,

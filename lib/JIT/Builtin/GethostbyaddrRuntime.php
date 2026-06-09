@@ -105,12 +105,12 @@ final class GethostbyaddrRuntime
         $context->builder->store($i8->constInt(0, false), $context->builder->gep($ipbuf, $len32));
 
         $inAddr = $context->builder->alloca($i8, self::IN_ADDR_SIZE, 'ghba_inaddr');
-        $inAddrVoid = $context->bytePtr($inAddr);
+        $inAddrPtr = $context->builder->pointerCast($inAddr, $i8p);
         $ptonRc = $context->builder->call(
             $context->lookupFunction('inet_pton'),
             $i32->constInt(self::AF_INET, false),
             $ipbuf,
-            $inAddrVoid
+            $inAddrPtr
         );
         $ptonOk = $context->builder->icmp(Builder::INT_EQ, $ptonRc, $oneI32);
         $ptonFailBb = $fn->appendBasicBlock('ghba_pton_fail');
@@ -124,12 +124,11 @@ final class GethostbyaddrRuntime
         $context->builder->positionAtEnd($ptonOkBb);
         $he = $context->builder->call(
             $context->lookupFunction('gethostbyaddr'),
-            $inAddrVoid,
+            $inAddrPtr,
             $i32->constInt(self::IN_ADDR_SIZE, false),
             $i32->constInt(self::AF_INET, false)
         );
-        $heVoidPtr = $context->getTypeFromString('void*');
-        $heIsNull = $context->builder->icmp(Builder::INT_EQ, $he, $heVoidPtr->constNull());
+        $heIsNull = $context->builder->icmp(Builder::INT_EQ, $he, $i8p->constNull());
         $lookupFailBb = $fn->appendBasicBlock('ghba_lookup_fail');
         $lookupOkBb = $fn->appendBasicBlock('ghba_lookup_ok');
         $context->builder->branchIf($heIsNull, $lookupFailBb, $lookupOkBb);
@@ -184,12 +183,12 @@ final class GethostbyaddrRuntime
         self::ensureExternal(
             $context,
             'inet_pton',
-            $context->context->functionType($i32, false, $i32, $i8p, $voidPtr)
+            $context->context->functionType($i32, false, $i32, $i8p, $i8p)
         );
         self::ensureExternal(
             $context,
             'gethostbyaddr',
-            $context->context->functionType($hostentPtr, false, $voidPtr, $i32, $i32)
+            $context->context->functionType($i8p, false, $i8p, $i32, $i32)
         );
         self::ensureExternal(
             $context,

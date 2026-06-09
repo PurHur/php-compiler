@@ -519,7 +519,10 @@ final class StringJsonDecodeJit
         $context->builder->positionAtEnd($escRead);
         $context->builder->positionAtEnd($bb_u_check);
         $pos = $context->builder->load($posPtr);
-        $remain = $context->builder->sub($end, $pos);
+        $remain = $context->builder->sub(
+            $context->builder->ptrToInt($end, $i64),
+            $context->builder->ptrToInt($pos, $i64)
+        );
         $context->builder->branchIf(
             $context->builder->icmp(Builder::INT_ULT, $remain, $four),
             $fail,
@@ -791,6 +794,7 @@ final class StringJsonDecodeJit
         $context->builder->positionAtEnd($entry);
 
         $i32 = $context->getTypeFromString('int32');
+        $i64 = $context->getTypeFromString('int64');
         $i8p = $context->getTypeFromString('int8*');
         $sizeT = $context->getTypeFromString('size_t');
         $oneI32 = $i32->constInt(1, false);
@@ -807,8 +811,11 @@ final class StringJsonDecodeJit
         $ok = $fn->appendBasicBlock('ok');
         $len = $context->builder->call($context->lookupFunction('strlen'), $lit);
         $pos = $context->builder->load($posPtr);
-        $remain = $context->builder->sub($end, $pos);
-        $notEnough = $context->builder->icmp(Builder::INT_ULT, $remain, $len);
+        $remain = $context->builder->sub(
+            $context->builder->ptrToInt($end, $i64),
+            $context->builder->ptrToInt($pos, $i64)
+        );
+        $notEnough = $context->builder->icmp(Builder::INT_ULT, $remain, $context->builder->zExt($len, $i64));
         $bb_cmp = $fn->appendBasicBlock('cmp');
 
         $context->builder->branchIf($notEnough, $fail, $bb_cmp);

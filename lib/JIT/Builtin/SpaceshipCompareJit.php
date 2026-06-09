@@ -175,8 +175,8 @@ final class SpaceshipCompareJit
         $right = $fn->getParam(1);
         $i64 = $context->getTypeFromString('int64');
         $zero64 = $i64->constInt(0, false);
-        $voidPtr = $context->getTypeFromString('void*');
-        $nullPtr = $voidPtr->constNull();
+        $valuePtr = $context->getTypeFromString('__value__*');
+        $nullPtr = $valuePtr->constNull();
 
         $leftNull = $context->builder->icmp(Builder::INT_EQ, $left, $nullPtr);
         $rightNull = $context->builder->icmp(Builder::INT_EQ, $right, $nullPtr);

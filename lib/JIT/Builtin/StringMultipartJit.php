@@ -857,9 +857,9 @@ final class StringMultipartJit
             $context->builder->add($len, $oneSize)
         );
         $copyNull = $context->builder->icmp(Builder::INT_EQ, $copy, $voidPtr->constNull());
-        $context->builder->branchIf($copyNull, $fail, $fn->appendBasicBlock('loop_init'));
-
         $loopInit = $fn->appendBasicBlock('loop_init');
+        $context->builder->branchIf($copyNull, $fail, $loopInit);
+
         $context->builder->positionAtEnd($loopInit);
         $iSlot = BasicBlockHelper::entryAlloca($context, $sizeT);
         $wSlot = BasicBlockHelper::entryAlloca($context, $sizeT);

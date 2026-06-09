@@ -305,7 +305,7 @@ final class StringVersionCompareJit
         $ch = $context->builder->load($context->builder->inBoundsGEP($version, $i));
         $lp = $context->builder->load($lpSlot);
         $q = $context->builder->load($qSlot);
-        $lq = $context->builder->load($context->builder->inBoundsGEP($q, $context->builder->sub($q, $buf)));
+        $lq = $context->builder->load($context->builder->inBoundsGEP($q, self::ptrDiffFromBase($context, $q, $buf)));
 
         $emitCh = $fn->appendBasicBlock('canon_emit');
         $skipEmit = $fn->appendBasicBlock('canon_skip');
@@ -381,13 +381,14 @@ final class StringVersionCompareJit
 
         $context->builder->positionAtEnd($loopDone);
         $q = $context->builder->load($qSlot);
-        $last = $context->builder->load($context->builder->inBoundsGEP($q, $context->builder->sub($q, $buf)));
+        $qOff = self::ptrDiffFromBase($context, $q, $buf);
+        $last = $context->builder->load($context->builder->inBoundsGEP($q, $qOff));
         $trailDot = $context->builder->icmp(Builder::INT_EQ, $last, $dot);
         $trimBb = $fn->appendBasicBlock('canon_trim');
         $finishBb = $fn->appendBasicBlock('canon_finish');
         $context->builder->branchIf($trailDot, $trimBb, $finishBb);
         $context->builder->positionAtEnd($trimBb);
-        $context->builder->store($i8->constInt(0, false), $context->builder->inBoundsGEP($q, $context->builder->sub($q, $buf)));
+        $context->builder->store($i8->constInt(0, false), $context->builder->inBoundsGEP($q, $qOff));
         $context->builder->branch($finishBb);
         $context->builder->positionAtEnd($finishBb);
         $context->builder->store($i8->constInt(0, false), $q);
@@ -776,6 +777,16 @@ final class StringVersionCompareJit
         } catch (\Throwable) {
             return null;
         }
+    }
+
+    private static function ptrDiffFromBase(Context $context, Value $ptr, Value $base): Value
+    {
+        $i64 = $context->getTypeFromString('int64');
+
+        return $context->builder->sub(
+            $context->builder->ptrToInt($ptr, $i64),
+            $context->builder->ptrToInt($base, $i64)
+        );
     }
 
     private static function restoreInsertBlock(Context $context, ?BasicBlock $block): void

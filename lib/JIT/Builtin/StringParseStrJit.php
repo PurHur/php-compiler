@@ -117,11 +117,11 @@ final class StringParseStrJit
             ),
             '__phpc_parse_str_free_parsed_key' => $context->module->addFunction(
                 $name,
-                $context->context->functionType($void, false, $voidPtr)
+                $context->context->functionType($void, false, $i8p)
             ),
             '__phpc_parse_str_parse_key_brackets' => $context->module->addFunction(
                 $name,
-                $context->context->functionType($i32, false, $i8p, $voidPtr)
+                $context->context->functionType($i32, false, $i8p, $i8p)
             ),
             '__phpc_parse_str_ensure_child' => $context->module->addFunction(
                 $name,
@@ -129,7 +129,7 @@ final class StringParseStrJit
             ),
             '__phpc_parse_str_set_nested_value' => $context->module->addFunction(
                 $name,
-                $context->context->functionType($void, false, $htPtr, $voidPtr, $i8p)
+                $context->context->functionType($void, false, $htPtr, $i8p, $i8p)
             ),
             '__phpc_parse_str_parse_delimited_pairs' => $context->module->addFunction(
                 $name,
@@ -848,7 +848,7 @@ final class StringParseStrJit
         $delimSlot = $context->builder->alloca($i8, 2, 'pdp_delim');
         $context->builder->store($delimiter, $delimSlot);
         $context->builder->store($i8->constInt(0, false), $context->builder->inBoundsGEP($delimSlot, $one));
-        $saveSlot = BasicBlockHelper::entryAlloca($context, $context->getTypeFromString('int8**'));
+        $saveSlot = BasicBlockHelper::entryAlloca($context, $i8p);
 
         $pair = $context->builder->call(
             $context->lookupFunction('strtok_r'),
