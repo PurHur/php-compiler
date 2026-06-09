@@ -488,9 +488,25 @@ final class ParseUrlJit
         $context->builder->store($rest, $restSlot);
 
         $schemeBb = $fn->appendBasicBlock('pp_scheme_try');
+        $schemeRelEntry = $fn->appendBasicBlock('pp_scheme_rel_entry');
+        $doAuth = $fn->appendBasicBlock('pp_do_auth');
         $lenGe2 = $context->builder->icmp(Builder::INT_UGE, $len, $sizeT->constInt(2, false));
         $alpha = self::isAlpha($context, $context->builder->load($rest));
-        $context->builder->branchIf($context->builder->and($lenGe2, $alpha), $schemeBb, $tailBb);
+        $context->builder->branchIf($context->builder->and($lenGe2, $alpha), $schemeBb, $schemeRelEntry);
+
+        $context->builder->positionAtEnd($schemeRelEntry);
+        $curRest = $context->builder->load($restSlot);
+        $isSchemeRel = $context->builder->icmp(
+            Builder::INT_EQ,
+            $context->builder->call(
+                $context->lookupFunction('strncmp'),
+                $curRest,
+                self::cstrLiteral($context, '//'),
+                $sizeT->constInt(2, false)
+            ),
+            $i32->constInt(0, false)
+        );
+        $context->builder->branchIf($isSchemeRel, $doAuth, $tailBb);
 
         $context->builder->positionAtEnd($schemeBb);
         $iSlot = BasicBlockHelper::entryAlloca($context, $i64);
@@ -535,7 +551,18 @@ final class ParseUrlJit
             $noScheme
         );
         $context->builder->positionAtEnd($noScheme);
-        $context->builder->branch($tailBb);
+        $curRest = $context->builder->load($restSlot);
+        $isSchemeRel = $context->builder->icmp(
+            Builder::INT_EQ,
+            $context->builder->call(
+                $context->lookupFunction('strncmp'),
+                $curRest,
+                self::cstrLiteral($context, '//'),
+                $sizeT->constInt(2, false)
+            ),
+            $i32->constInt(0, false)
+        );
+        $context->builder->branchIf($isSchemeRel, $doAuth, $tailBb);
 
         $context->builder->positionAtEnd($hasScheme);
         $context->builder->store($i8->constInt(0, false), $colonPtr);
@@ -560,7 +587,6 @@ final class ParseUrlJit
             ),
             $i32->constInt(0, false)
         );
-        $doAuth = $fn->appendBasicBlock('pp_do_auth');
         $noAuth = $fn->appendBasicBlock('pp_no_auth');
         $context->builder->branchIf($isAuth, $doAuth, $noAuth);
         $context->builder->positionAtEnd($noAuth);
