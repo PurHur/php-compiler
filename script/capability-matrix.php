@@ -103,12 +103,16 @@ function analyzeInternal(PHPCompiler\Func\Internal $fn): array
     } elseif ('array_map' === $fn->getName() && preg_match('/callables are deferred/i', $source)) {
         $notes[] = 'callbacks: null/string builtins; closures deferred (#1154)';
     }
-    if ('usort' === $fn->getName() && str_contains($source, 'VmClosureCall::isClosure')) {
+    if ('usort' === $fn->getName() && str_contains($source, 'sortPackedWithClosure')) {
+        $notes[] = 'callbacks: strcmp + closure JIT/AOT; strcasecmp VM (#3086, #3597)';
+    } elseif ('usort' === $fn->getName() && str_contains($source, 'VmClosureCall::isClosure')) {
         $notes[] = 'callbacks: strcmp JIT; strcasecmp VM; VM closure comparator (#3086, #1210)';
     } elseif ('usort' === $fn->getName() && preg_match('/callables are deferred/i', $source)) {
         $notes[] = 'callbacks: strcmp JIT; strcasecmp VM; closures deferred (#1210)';
     }
-    if ('uksort' === $fn->getName() && str_contains($source, 'VmClosureCall::isClosure')) {
+    if ('uksort' === $fn->getName() && str_contains($source, 'sortStringKeysWithClosure')) {
+        $notes[] = 'callbacks: strcmp + closure JIT/AOT; strcasecmp VM (#3086, #3597)';
+    } elseif ('uksort' === $fn->getName() && str_contains($source, 'VmClosureCall::isClosure')) {
         $notes[] = 'callbacks: strcmp JIT (ksort lowering); strcasecmp VM; VM closure comparator (#3086, #3143)';
     } elseif ('uksort' === $fn->getName() && preg_match('/callables are deferred/i', $source)) {
         $notes[] = 'callbacks: strcmp JIT; strcasecmp VM; closures deferred (#3143)';

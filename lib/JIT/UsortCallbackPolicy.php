@@ -8,20 +8,20 @@ use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\Variable as VMVariable;
 
 /**
- * Supported vs deferred usort() callback forms (issue #1210).
+ * Supported vs deferred usort() / uksort() callback forms (issue #1210, #3597).
  *
- * JIT/AOT lowers compile-time string builtins strcmp only (same packed sort as sort()).
- * strcasecmp is VM-only until a case-insensitive hashtable sort lands. Closures and other
- * callables stay deferred ([#142](https://github.com/PurHur/php-compiler/issues/142)).
+ * JIT/AOT lowers compile-time strcmp and closure/arrow comparators (int return).
+ * strcasecmp is VM-only until a case-insensitive hashtable sort lands. Array callables
+ * and invokable objects stay deferred ([#142](https://github.com/PurHur/php-compiler/issues/142)).
  */
 final class UsortCallbackPolicy
 {
     public const DEFERRED_SUMMARY =
-        'usort callbacks: compile-time strcmp for JIT/AOT; strcasecmp VM-only; closures deferred';
+        'usort callbacks: compile-time strcmp + closure/arrow for JIT/AOT; strcasecmp VM-only';
 
-    public const DEFERRED_KINDS = 'closures, array callables, and invokable objects';
+    public const DEFERRED_KINDS = 'array callables and invokable objects';
 
-    public const JIT_SUBSET = 'compile-time strcmp';
+    public const JIT_SUBSET = 'compile-time strcmp or closure/arrow comparator';
 
     /** @var array<string, true> */
     private const VM_STRING_CALLBACKS = [
@@ -29,8 +29,17 @@ final class UsortCallbackPolicy
         'strcasecmp' => true,
     ];
 
+    public static function isClosureJitLowerable(JITVariable $callback): bool
+    {
+        return null !== $callback->closureCall;
+    }
+
     public static function isJitLowerable(JITVariable $callback): bool
     {
+        if (self::isClosureJitLowerable($callback)) {
+            return true;
+        }
+
         return self::isJitLowerableScalar(
             $callback->type,
             $callback->isNullConstant,
