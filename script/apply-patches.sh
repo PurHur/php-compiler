@@ -360,7 +360,8 @@ patch_already_applied() {
       grep -q "attrGroups'\] = \$expr->attrGroups" "$ROOT/vendor/ircmaxell/php-cfg/lib/PHPCfg/Parser.php" 2>/dev/null
       ;;
     php-cfg-trait-use.patch)
-      [[ -f "$ROOT/vendor/ircmaxell/php-cfg/lib/PHPCfg/Op/Stmt/TraitUse.php" ]]
+      [[ -f "$ROOT/vendor/ircmaxell/php-cfg/lib/PHPCfg/Op/Stmt/TraitUse.php" ]] \
+        && ! grep -A8 'function parseStmt_TraitUse' "$ROOT/vendor/ircmaxell/php-cfg/lib/PHPCfg/Parser.php" 2>/dev/null | grep -q '// TODO'
       ;;
     php-cfg-throw-expr.patch)
       grep -q 'return new Op\\Expr\\Throw_' "$ROOT/vendor/ircmaxell/php-cfg/lib/PHPCfg/Parser.php" 2>/dev/null \
@@ -499,6 +500,43 @@ if anchor not in text:
 parser_path.write_text(text.replace(anchor, insert + anchor, 1))
 PY
   echo "Applied php-cfg processAssertions overlay"
+}
+
+apply_php_cfg_trait_use_overlay() {
+  local parser="$ROOT/vendor/ircmaxell/php-cfg/lib/PHPCfg/Parser.php"
+  local op="$ROOT/vendor/ircmaxell/php-cfg/lib/PHPCfg/Op/Stmt/TraitUse.php"
+  local overlay="$PATCH_DIR/overlays/php-cfg"
+  if [[ ! -f "$parser" || ! -f "$overlay/trait-use-parser-method.php" || ! -f "$overlay/Op/Stmt/TraitUse.php" ]]; then
+    echo "Skip php-cfg trait-use overlay (files missing)" >&2
+    return 0
+  fi
+  if grep -q 'function parseStmt_TraitUse' "$parser" 2>/dev/null \
+    && ! grep -A8 'function parseStmt_TraitUse' "$parser" 2>/dev/null | grep -q '// TODO'; then
+    echo "Skip php-cfg trait-use overlay (already applied)"
+    return 0
+  fi
+  mkdir -p "$(dirname "$op")"
+  cp "$overlay/Op/Stmt/TraitUse.php" "$op"
+  python3 - "$parser" "$overlay/trait-use-parser-method.php" <<'PY'
+import sys
+from pathlib import Path
+
+parser_path = Path(sys.argv[1])
+method_path = Path(sys.argv[2])
+text = parser_path.read_text()
+if 'function parseStmt_TraitUse' in text and '// TODO' not in text.split('function parseStmt_TraitUse', 1)[1].split('function ', 1)[0]:
+    raise SystemExit(0)
+old = """    protected function parseStmt_TraitUse(Stmt\\TraitUse $node)
+    {
+        // TODO
+    }"""
+new = method_path.read_text().rstrip("\n") + "\n"
+if old not in text:
+    sys.stderr.write("php-cfg-trait-use: parseStmt_TraitUse TODO stub not found in Parser.php\n")
+    raise SystemExit(1)
+parser_path.write_text(text.replace(old, new, 1))
+PY
+  echo "Applied php-cfg trait-use overlay (#7417)"
 }
 
 apply_php_cfg_yield_from_overlay() {
@@ -4195,6 +4233,7 @@ if [[ -d "$ROOT/vendor/ircmaxell/php-cfg" ]]; then
   apply_php_cfg_global_typed_const_overlay
   apply_patch "$PATCH_DIR/php-cfg-attribute-groups.patch"
   apply_patch "$PATCH_DIR/php-cfg-trait-use.patch"
+  apply_php_cfg_trait_use_overlay
   apply_patch "$PATCH_DIR/php-cfg-throw-expr.patch"
   apply_patch "$PATCH_DIR/php-cfg-is-resource-no-assertion.patch"
 fi
@@ -4295,6 +4334,15 @@ verify_critical_language_patches() {
     && grep -q 'function parseStmt_Enum' "$parser" 2>/dev/null \
     && ! grep -q 'public bool \$isEnumCase = false' "$const_file" 2>/dev/null; then
     missing+=("php-cfg-enum-class-const-Const_")
+  fi
+  if grep -q 'function parseStmt_TraitUse' "$parser" 2>/dev/null; then
+    if grep -A8 'function parseStmt_TraitUse' "$parser" 2>/dev/null | grep -q '// TODO'; then
+      missing+=("php-cfg-trait-use")
+    elif ! [[ -f "$ROOT/vendor/ircmaxell/php-cfg/lib/PHPCfg/Op/Stmt/TraitUse.php" ]]; then
+      missing+=("php-cfg-trait-use-Op")
+    fi
+  else
+    missing+=("php-cfg-trait-use")
   fi
   if grep -q 'function parseStmt_Enum' "$parser" 2>/dev/null; then
     if ! grep -A35 'function parseStmt_Enum' "$parser" 2>/dev/null | grep -q 'Stmt\\TraitUse'; then

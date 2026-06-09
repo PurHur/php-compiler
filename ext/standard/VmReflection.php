@@ -798,7 +798,8 @@ final class VmReflection
         foreach ($ht->iterate(false) as $key => $_value) {
             $seen[(string) $key] = true;
         }
-        foreach ($entry->staticProperties as $propLc => $storage) {
+        foreach (self::orderedPublicStaticPropertyKeys($entry) as $propLc) {
+            $storage = $entry->staticProperties[$propLc];
             // php-src add_class_vars: public static props on $entry include trait-composed
             // and parent-inherited members already merged into staticProperties (#7420).
             if (!MethodVisibility::isPublic($entry->staticPropertyVisibility[$propLc] ?? \PHPCfg\Func::FLAG_PUBLIC)) {
@@ -818,6 +819,31 @@ final class VmReflection
             $ht->add($displayName, $copy);
             $seen[$displayName] = true;
         }
+    }
+
+    /**
+     * php-src add_class_vars: class-declared statics before trait-composed (#7417).
+     *
+     * @return list<string> lowercase property keys
+     */
+    private static function orderedPublicStaticPropertyKeys(ClassEntry $entry): array
+    {
+        $ordered = [];
+        $added = [];
+        foreach (array_keys($entry->staticProperties) as $propLc) {
+            if (isset($entry->traitStaticPropertyNames[$propLc])) {
+                continue;
+            }
+            $ordered[] = $propLc;
+            $added[$propLc] = true;
+        }
+        foreach (array_keys($entry->traitStaticPropertyNames) as $propLc) {
+            if (!isset($added[$propLc]) && isset($entry->staticProperties[$propLc])) {
+                $ordered[] = $propLc;
+            }
+        }
+
+        return $ordered;
     }
 
     public static function resolveClassFromArg(Context $ctx, Variable $arg): ClassEntry
