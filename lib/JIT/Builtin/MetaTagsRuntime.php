@@ -28,8 +28,7 @@ final class MetaTagsRuntime
 
     public static function implement(Context $context): void
     {
-        $probe = $context->module->getNamedFunction('__compiler_get_meta_tags');
-        if (null !== $probe && $probe->countBasicBlocks() > 0) {
+        if (self::isFullyImplemented($context)) {
             self::registerLinkedRuntime($context);
 
             return;
@@ -45,40 +44,67 @@ final class MetaTagsRuntime
         $i1 = $context->getTypeFromString('int1');
         $i8p = $context->getTypeFromString('int8*');
 
+        $probe = $context->module->getNamedFunction('__compiler_get_meta_tags');
         $ftGet = $context->context->functionType($htPtr, false, $strPtr, $i1);
         $fnGet = null !== $probe
             ? $probe
             : $context->module->addFunction('__compiler_get_meta_tags', $ftGet);
-        self::implementGetMetaTags($context, $fnGet);
+        $context->registerFunction('__compiler_get_meta_tags', $fnGet);
 
         $ftParse = $context->context->functionType($htPtr, false, $strPtr);
         $fnParse = $context->module->getNamedFunction('__compiler_parse_meta_tags_html');
-        if (null === $fnParse || 0 === $fnParse->countBasicBlocks()) {
-            $fnParse = null === $fnParse
-                ? $context->module->addFunction('__compiler_parse_meta_tags_html', $ftParse)
-                : $fnParse;
-            self::implementParseMetaTagsHtml($context, $fnParse);
+        if (null === $fnParse) {
+            $fnParse = $context->module->addFunction('__compiler_parse_meta_tags_html', $ftParse);
         }
+        $context->registerFunction('__compiler_parse_meta_tags_html', $fnParse);
 
         $ftExtract = $context->context->functionType($strPtr, false, $strPtr, $i8p);
         $fnExtract = $context->module->getNamedFunction('__compiler_meta_extract_attr');
-        if (null === $fnExtract || 0 === $fnExtract->countBasicBlocks()) {
-            $fnExtract = null === $fnExtract
-                ? $context->module->addFunction('__compiler_meta_extract_attr', $ftExtract)
-                : $fnExtract;
-            self::implementExtractAttribute($context, $fnExtract);
+        if (null === $fnExtract) {
+            $fnExtract = $context->module->addFunction('__compiler_meta_extract_attr', $ftExtract);
         }
+        $context->registerFunction('__compiler_meta_extract_attr', $fnExtract);
 
         $ftNorm = $context->context->functionType($strPtr, false, $strPtr);
         $fnNorm = $context->module->getNamedFunction('__compiler_meta_normalize_name');
-        if (null === $fnNorm || 0 === $fnNorm->countBasicBlocks()) {
-            $fnNorm = null === $fnNorm
-                ? $context->module->addFunction('__compiler_meta_normalize_name', $ftNorm)
-                : $fnNorm;
+        if (null === $fnNorm) {
+            $fnNorm = $context->module->addFunction('__compiler_meta_normalize_name', $ftNorm);
+        }
+        $context->registerFunction('__compiler_meta_normalize_name', $fnNorm);
+
+        if (0 === $fnExtract->countBasicBlocks()) {
+            self::implementExtractAttribute($context, $fnExtract);
+        }
+        if (0 === $fnNorm->countBasicBlocks()) {
             self::implementNormalizeMetaName($context, $fnNorm);
+        }
+        if (0 === $fnParse->countBasicBlocks()) {
+            self::implementParseMetaTagsHtml($context, $fnParse);
+        }
+        if (0 === $fnGet->countBasicBlocks()) {
+            self::implementGetMetaTags($context, $fnGet);
         }
 
         self::registerLinkedRuntime($context);
+    }
+
+    private static function isFullyImplemented(Context $context): bool
+    {
+        foreach (
+            [
+                '__compiler_get_meta_tags',
+                '__compiler_parse_meta_tags_html',
+                '__compiler_meta_extract_attr',
+                '__compiler_meta_normalize_name',
+            ] as $name
+        ) {
+            $fn = $context->module->getNamedFunction($name);
+            if (null === $fn || 0 === $fn->countBasicBlocks()) {
+                return false;
+            }
+        }
+
+        return true;
     }
 
     private static function implementGetMetaTags(Context $context, LlvmFunction $fn): void
