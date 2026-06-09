@@ -14,6 +14,7 @@ use PHPCompiler\JIT\ValueEchoHelper;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\EnumCaseSupport;
 use PHPCompiler\VM\HashTable;
+use PHPCompiler\VM\ResourceSupport;
 use PHPCompiler\VM\TypedPropertyCheck;
 use PHPCompiler\VM\Variable;
 use PHPLLVM\Builder;
@@ -117,6 +118,11 @@ final class var_export extends Internal
 
     private static function exportVmNested(Variable $v, int $level, Frame $frame): string
     {
+        $v = $v->resolveIndirect();
+        // php-src var.c: closed/invalid resources export as NULL (#5148, #4920).
+        if (ResourceSupport::isVmResource($v) && !is_resource_::isResource($v)) {
+            return 'NULL';
+        }
         if (Variable::TYPE_BOOLEAN === $v->type) {
             return $v->toBool() ? 'true' : 'false';
         }
