@@ -5,7 +5,9 @@ declare(strict_types=1);
 namespace PHPCompiler\ext\standard;
 
 use PHPCompiler\Func\PHP as PhpFunc;
+use PHPCompiler\JIT\SplAutoloadCallbackPolicy;
 use PHPCompiler\VM\Context;
+use PHPCompiler\VM\EnumCaseSupport;
 use PHPCompiler\VM\ObjectEntry;
 use PHPCompiler\VM\Variable;
 
@@ -54,6 +56,9 @@ final class VmSplAutoload
 
     private static function bindCallback(Context $ctx, Variable $callback): SplAutoloadRunner
     {
+        if (EnumCaseSupport::isEnumCaseVariable($callback)) {
+            throw new \TypeError(SplAutoloadCallbackPolicy::invalidCallbackTypeError());
+        }
         $callback = $callback->resolveIndirect();
         if (Variable::TYPE_STRING === $callback->type) {
             $name = $callback->toString();
