@@ -8,6 +8,7 @@ use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitStringArg;
+use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
@@ -30,10 +31,12 @@ final class json_decode extends Internal
         if ($argc < 1) {
             throw new \LogicException('json_decode() requires at least one argument');
         }
-        $jsonVar = $frame->calledArgs[0]->resolveIndirect();
-        if (Variable::TYPE_STRING !== $jsonVar->type) {
-            throw new \LogicException('json_decode() first argument must be a string in this compiler build');
-        }
+        $json = VmString::coerceStringBuiltinArg(
+            $frame->calledArgs[0],
+            'json_decode',
+            0,
+            'json'
+        );
         $assoc = false;
         if ($argc > 1) {
             $assocVar = $frame->calledArgs[1]->resolveIndirect();
@@ -45,7 +48,7 @@ final class json_decode extends Internal
         if ($argc > 2) {
             throw new \LogicException('json_decode() depth/flags not supported in this compiler build');
         }
-        $decoded = VmJsonFormat::decode($jsonVar->toString(), $assoc);
+        $decoded = VmJsonFormat::decode($json, $assoc);
         if (null === $frame->returnVar) {
             return;
         }
@@ -76,6 +79,9 @@ final class json_decode extends Internal
         if ($assoc) {
             return JitJsonDecode::decodeRuntime($context, $args[0]);
         }
+
+        // assoc=false runtime path is unsupported; still reject enum operands first (#5907).
+        JitStringBuiltinArg::lower($context, $args[0], 'json_decode', 0, 'json');
 
         return JitJsonDecode::decodeRuntimeObjectMode($context, $args[0]);
     }
