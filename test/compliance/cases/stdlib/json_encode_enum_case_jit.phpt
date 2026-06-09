@@ -1,5 +1,6 @@
 --TEST--
-stdlib json_encode() on enum cases matches Zend (issues #6130, #6598)
+stdlib json_encode() JIT — enum cases match Zend (#6130, ext/json/php_json.c)
+--JIT--
 --FILE--
 <?php
 enum UE { case A; }
