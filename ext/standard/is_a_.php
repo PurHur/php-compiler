@@ -22,9 +22,6 @@ final class is_a_ extends Internal
     private const SUBJECT_TYPE_ERROR =
         'is_a(): Argument #1 ($object_or_class) must be of type object|string, %s given';
 
-    private const SUBJECT_TYPE_ERROR_STRING =
-        'is_a(): Argument #1 ($object_or_class) must be of type object|string, string given';
-
     public function __construct()
     {
         parent::__construct('is_a');
@@ -81,8 +78,10 @@ final class is_a_ extends Internal
         );
         if (JITVariable::TYPE_STRING === $args[0]->type) {
             $this->jitString($context, $args[0], 'is_a() subject');
+            $i1 = $context->getTypeFromString('int1');
+            $falseVal = $i1->constInt(0, false);
             if ($allowStringKnownFalse) {
-                self::emitJitTypeErrorAndAbort($context, self::SUBJECT_TYPE_ERROR_STRING);
+                return $falseVal;
             }
             $subjectName = ReflectionBuiltinHelper::requireCompileTimeClassName(
                 $context,
@@ -94,12 +93,11 @@ final class is_a_ extends Internal
                 $subjectName,
                 $className
             );
-            $i1 = $context->getTypeFromString('int1');
 
             return $context->builder->select(
                 $allowString,
                 $match,
-                $i1->constInt(0, false)
+                $falseVal
             );
         }
 
@@ -113,7 +111,8 @@ final class is_a_ extends Internal
         if (Variable::TYPE_OBJECT === $subject->type || Variable::TYPE_ENUM_CASE === $subject->type) {
             return;
         }
-        if ($allowString && Variable::TYPE_STRING === $subject->type) {
+        // object|string — disallowed string subjects return false in execute(), not TypeError (#4853).
+        if (Variable::TYPE_STRING === $subject->type) {
             return;
         }
         throw new \TypeError(\sprintf(self::SUBJECT_TYPE_ERROR, self::vmTypeName($subject->type)));

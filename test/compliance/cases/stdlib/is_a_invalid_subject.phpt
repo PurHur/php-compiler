@@ -15,16 +15,10 @@ try {
     echo $e->getMessage(), "\n";
 }
 class Widget {}
-try {
-    var_dump(is_a('Widget', 'Widget'));
-} catch (Throwable $e) {
-    echo $e::class, "\n";
-    echo $e->getMessage(), "\n";
-}
+var_dump(is_a('Widget', 'Widget'));
 --EXPECT--
 TypeError
 is_a(): Argument #1 ($object_or_class) must be of type object|string, int given
 TypeError
 is_a(): Argument #1 ($object_or_class) must be of type object|string, int given
-TypeError
-is_a(): Argument #1 ($object_or_class) must be of type object|string, string given
+bool(false)
