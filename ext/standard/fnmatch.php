@@ -13,7 +13,7 @@ use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
 
-/** fnmatch() — POSIX glob pattern match (VM via host; JIT/AOT via libc fnmatch, issue #3189). */
+/** fnmatch() — POSIX glob pattern match (VM via VmFnmatch FFI; JIT/AOT via JitFnmatch, #3189/#7756). */
 final class fnmatch extends Internal
 {
     public function __construct()
