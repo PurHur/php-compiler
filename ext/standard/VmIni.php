@@ -19,6 +19,7 @@ final class VmIni
         'display_errors',
         'memory_limit',
         'serialize_precision',
+        ...VmAssertState::SUPPORTED_INI_KEYS,
     ];
 
     private const CFG_ERROR_REPORTING = '32767';
@@ -31,6 +32,9 @@ final class VmIni
 
     public static function set(Context $ctx, string $option, string $newValue) {
         $key = strtolower($option);
+        if (in_array($key, VmAssertState::SUPPORTED_INI_KEYS, true)) {
+            return VmAssertState::iniSet($option, $newValue);
+        }
         if (!in_array($key, self::SUPPORTED_KEYS, true)) {
             return false;
         }
@@ -52,6 +56,9 @@ final class VmIni
     /** @return string|false */
     public static function get(Context $ctx, string $option) {
         $key = strtolower($option);
+        if (in_array($key, VmAssertState::SUPPORTED_INI_KEYS, true)) {
+            return VmAssertState::iniGet($option);
+        }
         if (!in_array($key, self::SUPPORTED_KEYS, true)) {
             return false;
         }

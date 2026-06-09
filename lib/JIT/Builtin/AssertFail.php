@@ -24,6 +24,8 @@ final class AssertFail
 
     public static function ensureLinked(Context $context): void
     {
+        AssertIniRuntime::ensureGlobals($context);
+        AssertionErrorRaise::registerDeclarations($context);
         if (Builtin::LOAD_TYPE_STANDALONE !== $context->loadType) {
             self::implementBodies($context);
         }
@@ -63,7 +65,7 @@ final class AssertFail
 
         $defaultBb = $fn->appendBasicBlock('assert_fail_default');
         $customBb = $fn->appendBasicBlock('assert_fail_custom');
-        $doneBb = $fn->appendBasicBlock('assert_fail_done');
+        $msgReadyBb = $fn->appendBasicBlock('assert_fail_msg_ready');
         $context->builder->branchIf($useDefault, $defaultBb, $customBb);
 
         $defaultMsgPtr = $context->builder->pointerCast(
@@ -71,17 +73,43 @@ final class AssertFail
             $i8p
         );
         $defaultLen = $sizeT->constInt(\strlen(self::DEFAULT_MSG), false);
+
+        $context->builder->positionAtEnd($defaultBb);
+        $context->builder->branch($msgReadyBb);
+
+        $context->builder->positionAtEnd($customBb);
+        $context->builder->branch($msgReadyBb);
+
+        $context->builder->positionAtEnd($msgReadyBb);
+        $finalMsg = $context->builder->phi($i8p);
+        $finalLen = $context->builder->phi($sizeT);
+        $finalMsg->addIncoming($defaultMsgPtr, $defaultBb);
+        $finalMsg->addIncoming($message, $customBb);
+        $finalLen->addIncoming($defaultLen, $defaultBb);
+        $finalLen->addIncoming($len, $customBb);
+
+        $exceptionBb = $fn->appendBasicBlock('assert_fail_exception');
+        $warningBb = $fn->appendBasicBlock('assert_fail_warning');
+        $doneBb = $fn->appendBasicBlock('assert_fail_done');
+        $exceptionOn = AssertIniRuntime::loadExceptionMode($context);
+        $context->builder->branchIf($exceptionOn, $exceptionBb, $warningBb);
+
+        $context->builder->positionAtEnd($exceptionBb);
+        AssertionErrorRaise::ensureLinked($context);
+        $context->builder->call(
+            $context->lookupFunction('__compiler_jit_raise_assertion_error'),
+            $finalMsg,
+            $finalLen
+        );
+        $context->builder->branch($doneBb);
+
         $emptyFile = $context->builder->pointerCast($context->constantFromString(''), $i8p);
         $level = $i32->constInt(ErrorReporter::E_USER_WARNING, false);
         $zeroLine = $i32->constInt(0, false);
         $trigger = $context->lookupFunction('__compiler_trigger_error');
 
-        $context->builder->positionAtEnd($defaultBb);
-        $context->builder->call($trigger, $defaultMsgPtr, $defaultLen, $level, $emptyFile, $zeroLine);
-        $context->builder->branch($doneBb);
-
-        $context->builder->positionAtEnd($customBb);
-        $context->builder->call($trigger, $message, $len, $level, $emptyFile, $zeroLine);
+        $context->builder->positionAtEnd($warningBb);
+        $context->builder->call($trigger, $finalMsg, $finalLen, $level, $emptyFile, $zeroLine);
         $context->builder->branch($doneBb);
 
         $context->builder->positionAtEnd($doneBb);
@@ -146,11 +174,32 @@ final class AssertFail
         $context->builder->branch($afterCopyBb);
 
         $context->builder->positionAtEnd($afterCopyBb);
+        $exceptionBb = $fn->appendBasicBlock('assert_fail_str_exception');
+        $warningBb = $fn->appendBasicBlock('assert_fail_str_warning');
+        $afterFailBb = $fn->appendBasicBlock('assert_fail_str_after_fail');
+        $exceptionOn = AssertIniRuntime::loadExceptionMode($context);
+        $context->builder->branchIf($exceptionOn, $exceptionBb, $warningBb);
+
+        $context->builder->positionAtEnd($exceptionBb);
+        AssertionErrorRaise::ensureLinked($context);
+        $descLen = $context->builder->sub($totalLen, $sizeT->constInt($prefixLen, false));
+        $descPtr = $context->builder->inBoundsGEP($bufPtr, $sizeT->constInt($prefixLen, false));
+        $context->builder->call(
+            $context->lookupFunction('__compiler_jit_raise_assertion_error'),
+            $descPtr,
+            $descLen
+        );
+        $context->builder->branch($afterFailBb);
+
+        $context->builder->positionAtEnd($warningBb);
         $context->builder->call(
             $context->lookupFunction('__compiler_assert_fail'),
             $bufPtr,
             $totalLen
         );
+        $context->builder->branch($afterFailBb);
+
+        $context->builder->positionAtEnd($afterFailBb);
         $context->builder->returnVoid();
         $context->builder->clearInsertionPosition();
     }

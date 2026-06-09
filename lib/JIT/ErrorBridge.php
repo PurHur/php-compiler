@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace PHPCompiler\JIT;
 
+use PHPCompiler\JIT\Builtin\AssertionErrorRaise;
 use PHPCompiler\JIT\Builtin\ErrorRaise;
 
 /**
@@ -16,36 +17,42 @@ final class ErrorBridge
 {
     public static function ensureLinked(Context $context): void
     {
+        AssertionErrorRaise::ensureLinked($context);
         ErrorRaise::ensureLinked($context);
         ReadonlyBridge::ensureLinked($context);
     }
 
     public static function registerDeclarations(Context $context): void
     {
+        AssertionErrorRaise::registerDeclarations($context);
         ErrorRaise::registerDeclarations($context);
         ReadonlyBridge::registerDeclarations($context);
     }
 
     public static function ensureStandaloneBodies(Context $context): void
     {
+        AssertionErrorRaise::ensureStandaloneBodies($context);
         ErrorRaise::ensureStandaloneBodies($context);
         ReadonlyBridge::ensureStandaloneBodies($context);
     }
 
     public static function bindJitEngine(\PHPLLVM\ExecutionEngine $engine): void
     {
+        AssertionErrorRaise::bindJitEngine($engine);
         ErrorRaise::bindJitEngine($engine);
         ReadonlyBridge::bindJitEngine($engine);
     }
 
     public static function clearPendingAtRunEntry(): void
     {
+        AssertionErrorRaise::clearPendingAtRunEntry();
         ErrorRaise::clearPendingAtRunEntry();
         ReadonlyBridge::clearPendingAtRunEntry();
     }
 
     public static function throwPendingIfAny(): void
     {
+        AssertionErrorRaise::throwPendingIfAny();
         ErrorRaise::throwPendingIfAny();
         ReadonlyBridge::throwPendingIfAny();
     }
