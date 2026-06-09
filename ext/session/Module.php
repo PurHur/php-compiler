@@ -42,6 +42,9 @@ class Module extends ModuleAbstract
             new session_abort(),
             new session_reset(),
             new session_create_id(),
+            new session_encode(),
+            new session_decode(),
+            new session_unset(),
         ];
     }
 }

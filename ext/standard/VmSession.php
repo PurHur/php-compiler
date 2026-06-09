@@ -224,6 +224,44 @@ final class VmSession
     }
 
     /**
+     * session_encode() — php handler wire format (php-src php_session_encode).
+     *
+     * @return string|false
+     */
+    public static function encode(Context $ctx) {
+        if (!self::$active) {
+            return false;
+        }
+        $sessionVar = $ctx->getSuperglobal('_SESSION');
+        if (null === $sessionVar || Variable::TYPE_ARRAY !== $sessionVar->type) {
+            return VmSessionSerializer::encodePhp($ctx, new HashTable());
+        }
+
+        return VmSessionSerializer::encodePhp($ctx, $sessionVar->toArray());
+    }
+
+    /** session_decode() — hydrate $_SESSION from php handler blob (php-src php_session_decode). */
+    public static function decode(Context $ctx, string $payload): bool
+    {
+        if (!self::$active) {
+            return false;
+        }
+
+        return VmSessionSerializer::decodePhp($ctx, $payload);
+    }
+
+    /** session_unset() — clear registered session variables (php-src php_session_unset). */
+    public static function unsetVariables(Context $ctx): bool
+    {
+        if (!self::$active) {
+            return false;
+        }
+        $ctx->ensureSuperglobal('_SESSION')->array(new HashTable());
+
+        return true;
+    }
+
+    /**
      * session_create_id() — collision-resistant id string (php-src php_session_create_id).
      *
      * @return string|false
