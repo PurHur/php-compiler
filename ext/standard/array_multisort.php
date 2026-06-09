@@ -9,6 +9,7 @@ use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\ArrayBuiltinHelper;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\Variable as JITVariable;
+use PHPCompiler\VM\EnumCaseSupport;
 use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
 
@@ -44,8 +45,9 @@ final class array_multisort extends Internal
                 $arrays[] = $arg;
                 continue;
             }
-            if (Variable::TYPE_INTEGER === $arg->type) {
-                $order = $arg->toInt();
+            if (Variable::TYPE_INTEGER === $arg->type
+                || EnumCaseSupport::isEnumCaseVariable($arg)) {
+                $order = VmArraySort::resolveMultisortOrderArg($arg);
                 if (self::SORT_DESC === $order) {
                     $descending = true;
                 } elseif (self::SORT_ASC !== $order) {
