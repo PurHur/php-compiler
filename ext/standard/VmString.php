@@ -2831,7 +2831,7 @@ final class VmString
             throw new \ValueError('str_decrement(): Argument #1 ($string) must be composed only of alphanumeric ASCII characters');
         }
         if ('0' === $string[0]) {
-            throw new \ValueError('str_decrement(): Argument #1 ($string) "'.$string.'" is out of decrement range');
+            throw new \Error('str_decrement(): Argument #1 ($string) "'.$string.'" is out of decrement range');
         }
 
         $decremented = $string;
@@ -2856,7 +2856,7 @@ final class VmString
 
         if ($carry || ('0' === $decremented[0] && $len > 1)) {
             if (1 === $len) {
-                throw new \ValueError('str_decrement(): Argument #1 ($string) "'.$string.'" is out of decrement range');
+                throw new \Error('str_decrement(): Argument #1 ($string) "'.$string.'" is out of decrement range');
             }
 
             return substr($decremented, 1);

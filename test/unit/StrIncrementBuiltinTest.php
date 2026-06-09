@@ -72,19 +72,19 @@ final class StrIncrementBuiltinTest extends TestCase
 
     public function testDecrementZeroPrefixThrows(): void
     {
-        $this->expectException(\ValueError::class);
+        $this->expectException(\Error::class);
         $this->runDecrement('0');
     }
 
     public function testDecrementUnderflowThrows(): void
     {
-        $this->expectException(\ValueError::class);
+        $this->expectException(\Error::class);
         $this->runDecrement('A');
     }
 
     public function testDecrementSingleLowercaseUnderflowThrows(): void
     {
-        $this->expectException(\ValueError::class);
+        $this->expectException(\Error::class);
         $this->expectExceptionMessage('str_decrement(): Argument #1 ($string) "a" is out of decrement range');
         $this->runDecrement('a');
     }
