@@ -290,17 +290,17 @@ final class IncludePathRuntime
         $nullStr = $strPtrTy->constNull();
         $zeroI32 = $i32->constInt(0, false);
 
+        $pathBuf = $context->builder->alloca($i8, $i64->constInt(self::MAX_PATH, false), 'resolve_path');
+        $pathCStr = $context->builder->pointerCast($pathBuf, $i8p);
+        $realBuf = $context->builder->alloca($i8, $i64->constInt(self::MAX_PATH, false), 'resolve_real');
+        $realCStr = $context->builder->pointerCast($realBuf, $i8p);
+
         $nameLen = $context->builder->load($context->builder->structGep($filename, $strMap['length']));
         $nameBytes = $context->builder->structGep($filename, $strMap['value']);
         $empty = $context->builder->icmp(Builder::INT_EQ, $nameLen, $i64->constInt(0, false));
         $failBlock = BasicBlockHelper::append($context, 'resolve_fail');
         $absBlock = BasicBlockHelper::append($context, 'resolve_abs');
         $context->builder->branchIf($empty, $failBlock, $absBlock);
-
-        $pathBuf = $context->builder->alloca($i8, $i64->constInt(self::MAX_PATH, false), 'resolve_path');
-        $pathCStr = $context->builder->pointerCast($pathBuf, $i8p);
-        $realBuf = $context->builder->alloca($i8, $i64->constInt(self::MAX_PATH, false), 'resolve_real');
-        $realCStr = $context->builder->pointerCast($realBuf, $i8p);
 
         $context->builder->positionAtEnd($absBlock);
         $first = $context->builder->load($nameBytes);

@@ -900,7 +900,7 @@ final class SscanfJit
         $sizeT = $context->getTypeFromString('size_t');
 
         $input = $context->builder->pointerCast(
-            $context->builder->load($context->builder->structGep($str, $map['value'])),
+            $context->builder->structGep($str, $map['value']),
             $i8p
         );
         $inLen = $context->builder->trunc(
@@ -908,7 +908,7 @@ final class SscanfJit
             $sizeT
         );
         $format = $context->builder->pointerCast(
-            $context->builder->load($context->builder->structGep($fmt, $map['value'])),
+            $context->builder->structGep($fmt, $map['value']),
             $i8p
         );
         $fmtLen = $context->builder->trunc(

@@ -144,8 +144,10 @@ final class AssertFail
 
         $map = $context->structFieldMap['__string__'];
         $descLen = $context->builder->load($context->builder->structGep($description, $map['length']));
-        $valuePtr = $context->builder->load($context->builder->structGep($description, $map['value']));
-        $descPtr = $context->builder->pointerCast($valuePtr, $i8p);
+        $descPtr = $context->builder->pointerCast(
+            $context->builder->structGep($description, $map['value']),
+            $i8p
+        );
 
         $maxDesc = $context->constantFromInteger(4096 - $prefixLen - 2, 'size_t');
         $descLenCast = $context->builder->trunc($descLen, $sizeT);

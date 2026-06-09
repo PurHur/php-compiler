@@ -117,7 +117,7 @@ final class SuperglobalRefreshRuntime
         $context->builder->positionAtEnd($postBodyMergeBb);
         $postBody = $context->builder->phi($i8p);
         $postBody->addIncoming($postBodyOwned, $postBodyPhiBb);
-        $postBody->addIncoming($emptyBody, $postBodyMergeBb);
+        $postBody->addIncoming($emptyBody, $entry);
 
         $method = $context->builder->call(
             $context->lookupFunction('__phpc_sg_request_method_for'),
@@ -205,7 +205,7 @@ final class SuperglobalRefreshRuntime
 
         $context->builder->positionAtEnd($uriMergeBb);
         $requestUri = $context->builder->phi($i8p);
-        $requestUri->addIncoming($requestUriBufPtr, $buildUriBb);
+        $requestUri->addIncoming($requestUriBufPtr, $afterQsBb);
         $requestUri->addIncoming($requestUriEnv, $haveUriBb);
 
         $defaultScriptBb = $fn->appendBasicBlock('sg_refresh_default_script');
@@ -679,9 +679,10 @@ final class SuperglobalRefreshRuntime
         $context->builder->call($context->lookupFunction('fclose'), $fp);
         $context->builder->branch($doneBb);
         $context->builder->positionAtEnd($growOkBb);
-        $grown = $context->builder->pointerCast(
-            $context->builder->call($context->lookupFunction('realloc'), $context->builder->pointerCast($buf, $voidPtr), $newCap),
-            $i8p
+        $grown = $context->builder->call(
+            $context->lookupFunction('realloc'),
+            $context->bytePtr($buf),
+            $newCap
         );
         $reallocFailBb = $fn->appendBasicBlock('sg_read_body_realloc_fail');
         $reallocOkBb = $fn->appendBasicBlock('sg_read_body_realloc_ok');
@@ -819,6 +820,9 @@ final class SuperglobalRefreshRuntime
         $raw = $fn->getParam(0);
         $out = $fn->getParam(1);
         $outLen = $fn->getParam(2);
+        $idxSlot = BasicBlockHelper::entryAlloca($context, $sizeT);
+        $endSlot = BasicBlockHelper::entryAlloca($context, $sizeT);
+        $iSlot = BasicBlockHelper::entryAlloca($context, $sizeT);
         $nullBb = $fn->appendBasicBlock('sg_norm_ct_null');
         $workBb = $fn->appendBasicBlock('sg_norm_ct_work');
         $doneBb = $fn->appendBasicBlock('sg_norm_ct_done');
@@ -835,7 +839,6 @@ final class SuperglobalRefreshRuntime
             $context->builder->sub($outLen, $sizeT->constInt(1, false))
         );
         $context->builder->store($i8->constInt(0, false), $context->builder->inBoundsGEP($out, $context->builder->sub($outLen, $sizeT->constInt(1, false))));
-        $idxSlot = BasicBlockHelper::entryAlloca($context, $sizeT);
         $context->builder->store($sizeT->constInt(0, false), $idxSlot);
         $lowerHead = $fn->appendBasicBlock('sg_norm_ct_lower_head');
         $lowerBody = $fn->appendBasicBlock('sg_norm_ct_lower_body');
@@ -868,8 +871,6 @@ final class SuperglobalRefreshRuntime
         $context->builder->branch($lowerHead);
         $context->builder->positionAtEnd($semiBb);
         $end = $context->builder->call($context->lookupFunction('strlen'), $out);
-        $endSlot = BasicBlockHelper::entryAlloca($context, $sizeT);
-        $iSlot = BasicBlockHelper::entryAlloca($context, $sizeT);
         $context->builder->store($end, $endSlot);
         $context->builder->store($sizeT->constInt(0, false), $iSlot);
         $semiHead = $fn->appendBasicBlock('sg_norm_ct_semi_head');
@@ -923,7 +924,7 @@ final class SuperglobalRefreshRuntime
         $i8p = $context->getTypeFromString('int8*');
         $buf = $fn->getParam(0);
         $bufLen = $fn->getParam(1);
-        $ct = $context->builder->call(
+        $ctPrimary = $context->builder->call(
             $context->lookupFunction('getenv'),
             self::literalCstr($context, 'CONTENT_TYPE')
         );
@@ -931,21 +932,24 @@ final class SuperglobalRefreshRuntime
         $haveBb = $fn->appendBasicBlock('sg_resolve_ct_have');
         $nullBb = $fn->appendBasicBlock('sg_resolve_ct_null');
         $doneBb = $fn->appendBasicBlock('sg_resolve_ct_done');
-        $ctNull = $context->builder->icmp(Builder::INT_EQ, $ct, $i8p->constNull());
-        $ctEmpty = $context->builder->icmp(Builder::INT_EQ, $context->builder->load($ct), $i8->constInt(0, false));
+        $ctNull = $context->builder->icmp(Builder::INT_EQ, $ctPrimary, $i8p->constNull());
+        $ctEmpty = $context->builder->icmp(Builder::INT_EQ, $context->builder->load($ctPrimary), $i8->constInt(0, false));
         $tryHttp = $context->builder->or($ctNull, $ctEmpty);
         $context->builder->branchIf($tryHttp, $tryHttpBb, $haveBb);
         $context->builder->positionAtEnd($tryHttpBb);
-        $ct = $context->builder->call(
+        $ctHttp = $context->builder->call(
             $context->lookupFunction('getenv'),
             self::literalCstr($context, 'HTTP_CONTENT_TYPE')
         );
-        $ctNull2 = $context->builder->icmp(Builder::INT_EQ, $ct, $i8p->constNull());
+        $ctNull2 = $context->builder->icmp(Builder::INT_EQ, $ctHttp, $i8p->constNull());
         $context->builder->branchIf($ctNull2, $nullBb, $haveBb);
         $context->builder->positionAtEnd($nullBb);
         $context->builder->store($i8->constInt(0, false), $buf);
         $context->builder->branch($doneBb);
         $context->builder->positionAtEnd($haveBb);
+        $ct = $context->builder->phi($i8p);
+        $ct->addIncoming($ctPrimary, $entry);
+        $ct->addIncoming($ctHttp, $tryHttpBb);
         $context->builder->call(
             $context->lookupFunction('__phpc_sg_normalize_content_type'),
             $ct,

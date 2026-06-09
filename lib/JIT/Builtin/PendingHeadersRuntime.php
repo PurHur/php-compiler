@@ -110,10 +110,11 @@ final class PendingHeadersRuntime
         $context->builder->positionAtEnd($entry);
 
         $i32 = $context->getTypeFromString('int32');
+        $i64 = $context->getTypeFromString('int64');
         $name = $fn->getParam(0);
         $isNull = $context->builder->icmp(Builder::INT_EQ, $name, $strPtr->constNull());
         $nameLen = self::stringLen($context, $name);
-        $zeroLen = $context->builder->icmp(Builder::INT_EQ, $nameLen, $i32->constInt(0, false));
+        $zeroLen = $context->builder->icmp(Builder::INT_EQ, $nameLen, $i64->constInt(0, false));
         $clearAll = $context->builder->or($isNull, $zeroLen);
         $context->builder->branchIf($clearAll, $emptyName, $loopInit);
 
@@ -537,9 +538,10 @@ final class PendingHeadersRuntime
         $skip = $fn->appendBasicBlock('sc_part_skip_'.++self::$blockSuffix);
         $work = $fn->appendBasicBlock('sc_part_work_'.self::$blockSuffix);
         $done = $fn->appendBasicBlock('sc_part_done_'.self::$blockSuffix);
+        $i64 = $context->getTypeFromString('int64');
         $isNull = $context->builder->icmp(Builder::INT_EQ, $part, $strPtr->constNull());
         $partLen = self::stringLen($context, $part);
-        $empty = $context->builder->icmp(Builder::INT_EQ, $partLen, $i32->constInt(0, false));
+        $empty = $context->builder->icmp(Builder::INT_EQ, $partLen, $i64->constInt(0, false));
         $skipPart = $context->builder->or($isNull, $empty);
         $context->builder->branchIf($skipPart, $skip, $work);
         $context->builder->positionAtEnd($skip);
@@ -637,10 +639,11 @@ final class PendingHeadersRuntime
             return;
         }
         $i32 = $context->getTypeFromString('int32');
+        $i64 = $context->getTypeFromString('int64');
         $status = $context->builder->load(HttpResponseCode::$global);
         $isUnset = $context->builder->icmp(Builder::INT_EQ, $status, $i32->constInt(0, false));
         $len = self::stringLen($context, $line);
-        $longEnough = $context->builder->icmp(Builder::INT_SGE, $len, $i32->constInt(9, false));
+        $longEnough = $context->builder->icmp(Builder::INT_SGE, $len, $i64->constInt(9, false));
         $data = self::stringData($context, $line);
         $prefix = self::literalCstr($context, 'Location:');
         $cmp = $context->builder->call(
@@ -666,9 +669,9 @@ final class PendingHeadersRuntime
         $i8 = $context->getTypeFromString('int8');
         $len = self::stringLen($context, $line);
         $data = self::stringData($context, $line);
-        $idxSlot = $context->builder->alloca($i32, 1);
+        $idxSlot = $context->builder->alloca($i64, 1);
         $foundSlot = $context->builder->alloca($i32, 1);
-        $context->builder->store($i32->constInt(0, false), $idxSlot);
+        $context->builder->store($i64->constInt(0, false), $idxSlot);
         $context->builder->store($i32->constInt(0, false), $foundSlot);
         $loopHead = $fn->appendBasicBlock('ph_crlf_head_'.++self::$blockSuffix);
         $loopBody = $fn->appendBasicBlock('ph_crlf_body_'.self::$blockSuffix);
@@ -680,7 +683,7 @@ final class PendingHeadersRuntime
         $context->builder->branchIf($more, $loopBody, $done);
         $context->builder->positionAtEnd($loopBody);
         $ch = $context->builder->load(
-            $context->builder->inBoundsGEP($data, $context->builder->sext($idx, $i64))
+            $context->builder->inBoundsGEP($data, $idx)
         );
         $isCr = $context->builder->icmp(Builder::INT_EQ, $ch, $i8->constInt(13, false));
         $isLf = $context->builder->icmp(Builder::INT_EQ, $ch, $i8->constInt(10, false));
@@ -693,13 +696,17 @@ final class PendingHeadersRuntime
         $context->builder->branch($done);
         $context->builder->positionAtEnd($noHit);
         $context->builder->store(
-            $context->builder->add($idx, $i32->constInt(1, false)),
+            $context->builder->add($idx, $i64->constInt(1, false)),
             $idxSlot
         );
         $context->builder->branch($loopHead);
         $context->builder->positionAtEnd($done);
 
-        return $context->builder->load($foundSlot);
+        return $context->builder->icmp(
+            Builder::INT_NE,
+            $context->builder->load($foundSlot),
+            $i32->constInt(0, false)
+        );
     }
 
     private static function headerNameMatches(Context $context, Value $name, Value $line): Value
@@ -739,11 +746,11 @@ final class PendingHeadersRuntime
         $i64 = $context->getTypeFromString('int64');
         $strPtr = $context->getTypeFromString('__string__*');
         $data = self::stringData($context, $line);
-        $idxSlot = $context->builder->alloca($i32, 1);
-        $endSlot = $context->builder->alloca($i32, 1);
+        $idxSlot = $context->builder->alloca($i64, 1);
+        $endSlot = $context->builder->alloca($i64, 1);
         $outSlot = $context->builder->alloca($strPtr, 1);
         $context->builder->store($strPtr->constNull(), $outSlot);
-        $context->builder->store($i32->constInt(0, false), $idxSlot);
+        $context->builder->store($i64->constInt(0, false), $idxSlot);
         $fn = $context->builder->getInsertBlock()->getParent();
         assert($fn instanceof LlvmFunction);
         $loopHead = $fn->appendBasicBlock('ph_name_head_'.++self::$blockSuffix);
@@ -758,7 +765,7 @@ final class PendingHeadersRuntime
         $context->builder->branchIf($more, $loopBody, $fail);
         $context->builder->positionAtEnd($loopBody);
         $ch = $context->builder->load(
-            $context->builder->inBoundsGEP($data, $context->builder->sext($idx, $i64))
+            $context->builder->inBoundsGEP($data, $idx)
         );
         $isColon = $context->builder->icmp(
             Builder::INT_EQ,
@@ -773,7 +780,7 @@ final class PendingHeadersRuntime
         $context->builder->branch($done);
         $context->builder->positionAtEnd($cont);
         $context->builder->store(
-            $context->builder->add($idx, $i32->constInt(1, false)),
+            $context->builder->add($idx, $i64->constInt(1, false)),
             $idxSlot
         );
         $context->builder->branch($loopHead);
@@ -781,7 +788,7 @@ final class PendingHeadersRuntime
         $context->builder->branch($done);
         $context->builder->positionAtEnd($done);
         $endIdx = $context->builder->load($endSlot);
-        $hasName = $context->builder->icmp(Builder::INT_SGT, $endIdx, $i32->constInt(0, false));
+        $hasName = $context->builder->icmp(Builder::INT_SGT, $endIdx, $i64->constInt(0, false));
         $build = $fn->appendBasicBlock('ph_name_build_'.self::$blockSuffix);
         $merge = $fn->appendBasicBlock('ph_name_merge_'.self::$blockSuffix);
         $context->builder->branchIf($hasName, $build, $merge);

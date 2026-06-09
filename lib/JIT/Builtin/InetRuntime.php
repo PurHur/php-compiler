@@ -82,7 +82,7 @@ final class InetRuntime
         $context->builder->branchIf($nullIp, $invalidBb, $copyBb);
 
         $context->builder->positionAtEnd($invalidBb);
-        $context->builder->call($context->lookupFunction('__value__writeBool'), $out, $i1->constInt(0, false));
+        $context->builder->call($context->lookupFunction('__value__writeBool'), $out, $i32->constInt(0, false));
         $context->builder->returnVoid();
         $context->builder->clearInsertionPosition();
 
@@ -98,7 +98,7 @@ final class InetRuntime
         $context->builder->branchIf($lenOk, $lenOkBb, $lenFailBb);
 
         $context->builder->positionAtEnd($lenFailBb);
-        $context->builder->call($context->lookupFunction('__value__writeBool'), $out, $i1->constInt(0, false));
+        $context->builder->call($context->lookupFunction('__value__writeBool'), $out, $i32->constInt(0, false));
         $context->builder->returnVoid();
         $context->builder->clearInsertionPosition();
 
@@ -127,7 +127,7 @@ final class InetRuntime
         $context->builder->branchIf($atonOk, $atonOkBb, $atonFailBb);
 
         $context->builder->positionAtEnd($atonFailBb);
-        $context->builder->call($context->lookupFunction('__value__writeBool'), $out, $i1->constInt(0, false));
+        $context->builder->call($context->lookupFunction('__value__writeBool'), $out, $i32->constInt(0, false));
         $context->builder->returnVoid();
         $context->builder->clearInsertionPosition();
 
@@ -175,7 +175,7 @@ final class InetRuntime
         $context->builder->branchIf($invalid, $invalidBb, $okBb);
 
         $context->builder->positionAtEnd($invalidBb);
-        $context->builder->call($context->lookupFunction('__value__writeBool'), $out, $i1->constInt(0, false));
+        $context->builder->call($context->lookupFunction('__value__writeBool'), $out, $i32->constInt(0, false));
         $context->builder->returnVoid();
         $context->builder->clearInsertionPosition();
 
@@ -361,15 +361,13 @@ final class InetRuntime
         $context->builder->returnValue($strPtr->constNull());
         $context->builder->clearInsertionPosition();
 
-        $valPtr = $context->builder->structGep($inArg, $map['value']);
-        $src = $context->builder->pointerCast($valPtr, $i8p);
-
         $context->builder->positionAtEnd($v4Bb);
+        $src4 = $context->builder->pointerCast($context->builder->structGep($inArg, $map['value']), $i8p);
         $outbuf4 = $context->builder->alloca($i8, self::INET_ADDRSTRLEN, 'ntop_buf4');
         $ntop4 = $context->builder->call(
             $context->lookupFunction('inet_ntop'),
             $i32->constInt(self::AF_INET, false),
-            $src,
+            $src4,
             $context->bytePtr($outbuf4),
             $sizeT->constInt(self::INET_ADDRSTRLEN, false)
         );
@@ -393,11 +391,12 @@ final class InetRuntime
         $context->builder->clearInsertionPosition();
 
         $context->builder->positionAtEnd($v6Bb);
+        $src6 = $context->builder->pointerCast($context->builder->structGep($inArg, $map['value']), $i8p);
         $outbuf6 = $context->builder->alloca($i8, self::INET6_ADDRSTRLEN, 'ntop_buf6');
         $ntop6 = $context->builder->call(
             $context->lookupFunction('inet_ntop'),
             $i32->constInt(self::AF_INET6, false),
-            $src,
+            $src6,
             $context->bytePtr($outbuf6),
             $sizeT->constInt(self::INET6_ADDRSTRLEN, false)
         );
@@ -431,7 +430,7 @@ final class InetRuntime
         self::ensureExternal(
             $context,
             'inet_aton',
-            $context->context->functionType($i32, false, $i8p, $voidPtr)
+            $context->context->functionType($i32, false, $i8p, $i8p)
         );
         self::ensureExternal(
             $context,

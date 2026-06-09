@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace PHPCompiler\JIT\Builtin;
 
+use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Context;
 use PHPLLVM\Builder;
 use PHPLLVM\Value;
@@ -153,9 +154,9 @@ final class StreamReadJit
             ['malloc', $i8p, [$sizeT]],
             ['free', $void, [$i8p]],
             ['strlen', $sizeT, [$i8p]],
-            ['memcmp', $i32, [$voidPtr, $voidPtr, $sizeT]],
-            ['memcpy', $voidPtr, [$voidPtr, $voidPtr, $sizeT]],
-            ['realloc', $voidPtr, [$voidPtr, $sizeT]],
+            ['memcmp', $i32, [$i8p, $i8p, $sizeT]],
+            ['memcpy', $i8p, [$i8p, $i8p, $sizeT]],
+            ['realloc', $i8p, [$i8p, $sizeT]],
             ['fseek', $i32, [$i8p, $i64, $i32]],
             ['__string__init', $strPtr, [$i64, $i8p]],
             ['__string__strlen', $i64, [$strPtr]],
@@ -179,7 +180,7 @@ final class StreamReadJit
         $map = $context->structFieldMap['__string__'];
 
         return $context->builder->pointerCast(
-            $context->builder->load($context->builder->structGep($str, $map['value'])),
+            $context->builder->structGep($str, $map['value']),
             $context->getTypeFromString('int8*')
         );
     }
@@ -645,22 +646,20 @@ final class StreamReadJit
         );
         $grown = $context->builder->call(
             $context->lookupFunction('realloc'),
-            $context->builder->pointerCast($context->builder->load($bufSlot), $context->getTypeFromString('void*')),
+            $context->bytePtr($context->builder->load($bufSlot)),
             $newCap
         );
-        $growNull = $context->builder->icmp(Builder::INT_EQ, $grown, $context->getTypeFromString('void*')->constNull());
-        $context->builder->branchIf($growNull, $failBb, $appendNowBb);
+        $growNull = $context->builder->icmp(Builder::INT_EQ, $grown, $i8p->constNull());
+        $growOkBb = $fn->appendBasicBlock('sgl_grow_ok');
+        $context->builder->branchIf($growNull, $failBb, $growOkBb);
+
+        $context->builder->positionAtEnd($growOkBb);
+        $context->builder->store($grown, $bufSlot);
+        $context->builder->store($newCap, $capSlot);
+        $context->builder->branch($appendNowBb);
 
         $context->builder->positionAtEnd($appendNowBb);
-        $newBuf = $context->builder->phi($i8p, 'sgl_buf_phi');
-        $newBuf->addIncoming($context->builder->load($bufSlot), $appendBb);
-        $newBuf->addIncoming($context->builder->pointerCast($grown, $i8p), $growBb);
-        $newCapPhi = $context->builder->phi($sizeT, 'sgl_cap_phi');
-        $newCapPhi->addIncoming($capBefore, $appendBb);
-        $newCapPhi->addIncoming($newCap, $growBb);
-        $context->builder->store($newBuf, $bufSlot);
-        $context->builder->store($newCapPhi, $capSlot);
-
+        $newBuf = $context->builder->load($bufSlot);
         $lenWrite = $context->builder->load($lenSlot);
         $context->builder->store($context->builder->trunc($c, $i8), $context->builder->gep($newBuf, $lenWrite));
         $lenAfter = $context->builder->add($lenWrite, $sizeT->constInt(1, false));
@@ -680,8 +679,8 @@ final class StreamReadJit
         $start = $context->builder->sub($lenAfter, $context->builder->truncOrBitCast($endingLen, $sizeT));
         $cmp = $context->builder->call(
             $context->lookupFunction('memcmp'),
-            $context->builder->pointerCast($context->builder->gep($newBuf, $start), $context->getTypeFromString('void*')),
-            $context->builder->pointerCast($endingData, $context->getTypeFromString('void*')),
+            $context->bytePtr($context->builder->gep($newBuf, $start)),
+            $context->bytePtr($endingData),
             $context->builder->truncOrBitCast($endingLen, $sizeT)
         );
         $hasEnding = $context->builder->icmp(Builder::INT_EQ, $cmp, $i32->constInt(0, false));
@@ -762,6 +761,7 @@ final class StreamReadJit
         $bufSlot = $context->builder->alloca($i8p, 1, 'read_bytes_buf');
         $lenSlot = $context->builder->alloca($sizeT, 1, 'read_bytes_len');
         $capSlot = $context->builder->alloca($sizeT, 1, 'read_bytes_cap');
+        $newCapSlot = BasicBlockHelper::entryAlloca($context, $sizeT);
         $context->builder->store($i8p->constNull(), $bufSlot);
         $context->builder->store($sizeT->constInt(0, false), $lenSlot);
         $context->builder->store($sizeT->constInt(0, false), $capSlot);
@@ -824,7 +824,6 @@ final class StreamReadJit
         $context->builder->branchIf($needsGrow, $growBb, $copyBb);
 
         $context->builder->positionAtEnd($growBb);
-        $newCapSlot = $context->builder->alloca($sizeT, 1, 'read_bytes_new_cap');
         $startCap = $context->builder->select(
             $context->builder->icmp(Builder::INT_ULT, $capBefore, $sizeT->constInt(4096, false)),
             $sizeT->constInt(4096, false),
@@ -847,25 +846,24 @@ final class StreamReadJit
         $context->builder->positionAtEnd($growDoneBb);
         $grown = $context->builder->call(
             $context->lookupFunction('realloc'),
-            $context->builder->pointerCast($context->builder->load($bufSlot), $context->getTypeFromString('void*')),
+            $context->bytePtr($context->builder->load($bufSlot)),
             $context->builder->load($newCapSlot)
         );
-        $growNull = $context->builder->icmp(Builder::INT_EQ, $grown, $context->getTypeFromString('void*')->constNull());
-        $context->builder->branchIf($growNull, $errBb, $copyBb);
+        $growNull = $context->builder->icmp(Builder::INT_EQ, $grown, $i8p->constNull());
+        $growOkBb = $fn->appendBasicBlock('read_bytes_grow_ok');
+        $context->builder->branchIf($growNull, $errBb, $growOkBb);
+
+        $context->builder->positionAtEnd($growOkBb);
+        $context->builder->store($grown, $bufSlot);
+        $context->builder->store($context->builder->load($newCapSlot), $capSlot);
+        $context->builder->branch($copyBb);
 
         $context->builder->positionAtEnd($copyBb);
-        $bufPhi = $context->builder->phi($i8p, 'read_bytes_buf_phi');
-        $bufPhi->addIncoming($context->builder->load($bufSlot), $growCheckBb);
-        $bufPhi->addIncoming($context->builder->pointerCast($grown, $i8p), $growDoneBb);
-        $capPhi = $context->builder->phi($sizeT, 'read_bytes_cap_phi');
-        $capPhi->addIncoming($capBefore, $growCheckBb);
-        $capPhi->addIncoming($context->builder->load($newCapSlot), $growDoneBb);
-        $context->builder->store($bufPhi, $bufSlot);
-        $context->builder->store($capPhi, $capSlot);
+        $bufNow = $context->builder->load($bufSlot);
         $context->builder->call(
             $context->lookupFunction('memcpy'),
-            $context->builder->pointerCast($context->builder->gep($bufPhi, $lenBefore), $context->getTypeFromString('void*')),
-            $context->builder->pointerCast($chunk, $context->getTypeFromString('void*')),
+            $context->bytePtr($context->builder->gep($bufNow, $lenBefore)),
+            $context->bytePtr($chunk),
             $got
         );
         $context->builder->store($context->builder->add($lenBefore, $got), $lenSlot);

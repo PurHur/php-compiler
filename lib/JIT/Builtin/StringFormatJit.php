@@ -252,7 +252,7 @@ final class StringFormatJit
         $map = $context->structFieldMap['__string__'];
 
         return $context->builder->pointerCast(
-            $context->builder->load($context->builder->structGep($str, $map['value'])),
+            $context->builder->structGep($str, $map['value']),
             $context->getTypeFromString('int8*')
         );
     }

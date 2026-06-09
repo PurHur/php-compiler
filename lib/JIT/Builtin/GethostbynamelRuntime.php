@@ -393,7 +393,7 @@ final class GethostbynamelRuntime
         self::ensureExternal(
             $context,
             'memset',
-            $context->context->functionType($voidPtr, false, $voidPtr, $i32, $sizeT)
+            $context->context->functionType($i8p, false, $i8p, $i32, $sizeT)
         );
         self::ensureExternal(
             $context,

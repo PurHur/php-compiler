@@ -204,13 +204,13 @@ final class StreamResourceJit
         $doneBb = $fn->appendBasicBlock('grs_done');
 
         $context->builder->positionAtEnd($loopInitBb);
+        $context->builder->branch($loopCheckBb);
+
+        $context->builder->positionAtEnd($loopCheckBb);
         $idPhi = $context->builder->phi($i64, 'grs_id');
         $indexPhi = $context->builder->phi($sizeT, 'grs_index');
         $idPhi->addIncoming($i64->constInt(3, false), $loopInitBb);
         $indexPhi->addIncoming($sizeT->constInt(1, false), $loopInitBb);
-        $context->builder->branch($loopCheckBb);
-
-        $context->builder->positionAtEnd($loopCheckBb);
         $maxId = $i64->constInt(self::MAX_HANDLES, false);
         $atEnd = $context->builder->icmp(Builder::INT_SGE, $idPhi, $maxId);
         $context->builder->branchIf($atEnd, $doneBb, $loopBodyBb);

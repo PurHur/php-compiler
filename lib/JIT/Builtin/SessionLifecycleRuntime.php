@@ -99,7 +99,11 @@ final class SessionLifecycleRuntime
         $byteIdx = $context->builder->lshr($i, $oneI64);
         $bytePtr = $context->builder->inBoundsGEP($rawBytes, $byteIdx);
         $byte = $context->builder->load($bytePtr);
-        $isLow = $context->builder->and($i, $oneI64);
+        $isLow = $context->builder->icmp(
+            Builder::INT_NE,
+            $context->builder->and($i, $oneI64),
+            $zeroI64
+        );
         $highNibble = $context->builder->lshr($byte, $i8->constInt(4, false));
         $lowNibble = $context->builder->and($byte, $i8->constInt(0x0f, false));
         $nibble = $context->builder->select($isLow, $lowNibble, $highNibble);
@@ -132,6 +136,7 @@ final class SessionLifecycleRuntime
         $context->builder->positionAtEnd($entry);
 
         $i8 = $context->getTypeFromString('int8');
+        $i32 = $context->getTypeFromString('int32');
         $i64 = $context->getTypeFromString('int64');
         $zeroI8 = $i8->constInt(0, false);
         $oneI8 = $i8->constInt(1, false);
@@ -152,7 +157,7 @@ final class SessionLifecycleRuntime
         $context->builder->positionAtEnd($bbStart);
         self::emitEnsureDefaultSessionName($context);
         $cookieOk = $context->builder->call($context->lookupFunction('phpc_session_apply_incoming_cookie'));
-        $cookieFailed = $context->builder->icmp(Builder::INT_EQ, $cookieOk, $i8->constInt(0, false));
+        $cookieFailed = $context->builder->icmp(Builder::INT_EQ, $cookieOk, $i32->constInt(0, false));
         $bbNewId = BasicBlockHelper::append($context, 'ssr_new_id');
         $bbAfterCookie = BasicBlockHelper::append($context, 'ssr_after_cookie');
         $context->builder->branchIf($cookieFailed, $bbNewId, $bbAfterCookie);

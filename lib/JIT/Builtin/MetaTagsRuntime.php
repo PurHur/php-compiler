@@ -112,7 +112,7 @@ final class MetaTagsRuntime
         $entry = $fn->appendBasicBlock('meta_tags_entry');
         $context->builder->positionAtEnd($entry);
 
-        $path = $fn->getParam(0);
+        $pathParam = $fn->getParam(0);
         $useIncludePath = $fn->getParam(1);
         $strPtr = $context->getTypeFromString('__string__*');
         $nullStr = $strPtr->constNull();
@@ -124,19 +124,22 @@ final class MetaTagsRuntime
         $context->builder->positionAtEnd($resolveBlock);
         $resolved = $context->builder->call(
             $context->lookupFunction('__compiler_stream_resolve_include_path'),
-            $path
+            $pathParam
         );
         $hasResolved = $context->builder->icmp(Builder::INT_NE, $resolved, $nullStr);
         $useResolved = $fn->appendBasicBlock('meta_tags_use_resolved');
         $context->builder->branchIf($hasResolved, $useResolved, $readBlock);
         $context->builder->positionAtEnd($useResolved);
-        $path = $resolved;
         $context->builder->branch($readBlock);
 
         $context->builder->positionAtEnd($readBlock);
+        $pathPhi = $context->builder->phi($strPtr, 'meta_tags_path');
+        $pathPhi->addIncoming($pathParam, $entry);
+        $pathPhi->addIncoming($pathParam, $resolveBlock);
+        $pathPhi->addIncoming($resolved, $useResolved);
         $html = $context->builder->call(
             $context->lookupFunction('__compiler_file_get_contents'),
-            $path
+            $pathPhi
         );
         $missing = $context->builder->icmp(Builder::INT_EQ, $html, $nullStr);
         $failBlock = $fn->appendBasicBlock('meta_tags_missing');

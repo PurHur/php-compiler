@@ -190,11 +190,14 @@ final class StringSerializeDoubleJit
         $charPtr = $context->getTypeFromString('char*');
         $charPtrPtr = $charPtr->pointerType(0);
         $strMap = $context->structFieldMap['__string__'];
-        $data = $context->builder->load($context->builder->structGep($strPtr, $strMap['value']));
+        $data = $context->builder->pointerCast(
+            $context->builder->structGep($strPtr, $strMap['value']),
+            $charPtr
+        );
 
         return $context->builder->call(
             $context->lookupFunction('strtod'),
-            $context->builder->pointerCast($data, $charPtr),
+            $data,
             $charPtrPtr->constNull()
         );
     }

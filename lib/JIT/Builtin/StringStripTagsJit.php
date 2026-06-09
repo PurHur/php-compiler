@@ -894,10 +894,10 @@ final class StringStripTagsJit
         $newCap = $context->builder->add($context->builder->mul($outCapCur, $sizeT->constInt(2, false)), $tagLen);
         $grown = $context->builder->call(
             $context->lookupFunction('realloc'),
-            $context->builder->pointerCast($context->builder->load($outSlot), $voidPtr),
+            $context->bytePtr($context->builder->load($outSlot)),
             $newCap
         );
-        $growFail = $context->builder->icmp(Builder::INT_EQ, $grown, $voidPtr->constNull());
+        $growFail = $context->builder->icmp(Builder::INT_EQ, $grown, $nullI8);
         $growFailBb = $fn->appendBasicBlock('grow_fail');
         $growOkBb = $fn->appendBasicBlock('grow_ok');
         $context->builder->branchIf($growFail, $growFailBb, $growOkBb);
@@ -912,7 +912,7 @@ final class StringStripTagsJit
         $context->builder->returnValue($empty2);
 
         $context->builder->positionAtEnd($growOkBb);
-        $context->builder->store($context->builder->pointerCast($grown, $i8p), $outSlot);
+        $context->builder->store($grown, $outSlot);
         $context->builder->store($newCap, $outCapSlot);
         $context->builder->branch($copyNow);
 

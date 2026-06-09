@@ -283,7 +283,7 @@ final class StreamIoJit
         $map = $context->structFieldMap['__string__'];
 
         return $context->builder->pointerCast(
-            $context->builder->load($context->builder->structGep($str, $map['value'])),
+            $context->builder->structGep($str, $map['value']),
             $context->getTypeFromString('int8*')
         );
     }
@@ -399,11 +399,11 @@ final class StreamIoJit
         $exhaustBb = $fn->appendBasicBlock($prefix.'_exhaust');
 
         $context->builder->positionAtEnd($loopInitBb);
-        $idPhi = $context->builder->phi($i64, $prefix.'_id');
-        $idPhi->addIncoming($i64->constInt(3, false), $loopInitBb);
         $context->builder->branch($loopCheckBb);
 
         $context->builder->positionAtEnd($loopCheckBb);
+        $idPhi = $context->builder->phi($i64, $prefix.'_id');
+        $idPhi->addIncoming($i64->constInt(3, false), $loopInitBb);
         $maxId = $i64->constInt(self::MAX_HANDLES, false);
         $atEnd = $context->builder->icmp(Builder::INT_SGE, $idPhi, $maxId);
         $context->builder->branchIf($atEnd, $exhaustBb, $loopBodyBb);
@@ -497,11 +497,11 @@ final class StreamIoJit
         $exhaustBb = $fn->appendBasicBlock($prefix.'_exhaust');
 
         $context->builder->positionAtEnd($loopInitBb);
-        $idPhi = $context->builder->phi($i64, $prefix.'_id');
-        $idPhi->addIncoming($i64->constInt(3, false), $loopInitBb);
         $context->builder->branch($loopCheckBb);
 
         $context->builder->positionAtEnd($loopCheckBb);
+        $idPhi = $context->builder->phi($i64, $prefix.'_id');
+        $idPhi->addIncoming($i64->constInt(3, false), $loopInitBb);
         $maxId = $i64->constInt(self::MAX_HANDLES, false);
         $atEnd = $context->builder->icmp(Builder::INT_SGE, $idPhi, $maxId);
         $context->builder->branchIf($atEnd, $exhaustBb, $loopBodyBb);

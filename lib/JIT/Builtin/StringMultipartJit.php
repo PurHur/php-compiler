@@ -267,6 +267,11 @@ final class StringMultipartJit
         $out = $fn->getParam(1);
         $outLen = $fn->getParam(2);
 
+        $contentTypeSlot = BasicBlockHelper::entryAlloca($context, $i8p);
+        $pSlot = BasicBlockHelper::entryAlloca($context, $i8p);
+        $startSlot = BasicBlockHelper::entryAlloca($context, $i8p);
+        $lenSlot = BasicBlockHelper::entryAlloca($context, $sizeT);
+
         $context->builder->store($zeroI8, $out);
 
         $fail = $fn->appendBasicBlock('fail');
@@ -279,7 +284,6 @@ final class StringMultipartJit
         $copyOk = $fn->appendBasicBlock('copy_ok');
         $done = $fn->appendBasicBlock('done');
 
-        $contentTypeSlot = BasicBlockHelper::entryAlloca($context, $i8p);
         $context->builder->store($contentTypeIn, $contentTypeSlot);
 
         $raw = $context->builder->call(
@@ -324,7 +328,6 @@ final class StringMultipartJit
 
         $context->builder->positionAtEnd($findBoundary);
         $p = $context->builder->inBoundsGEP($p, $sizeT->constInt(9, false));
-        $pSlot = BasicBlockHelper::entryAlloca($context, $i8p);
         $context->builder->store($p, $pSlot);
         $context->builder->branch($skipWs);
 
@@ -341,8 +344,6 @@ final class StringMultipartJit
         $context->builder->store($context->builder->inBoundsGEP($p, $oneSize), $pSlot);
         $context->builder->branch($skipWs);
 
-        $startSlot = BasicBlockHelper::entryAlloca($context, $i8p);
-        $lenSlot = BasicBlockHelper::entryAlloca($context, $sizeT);
         $quotedBody = $fn->appendBasicBlock('quoted_body');
 
         $context->builder->positionAtEnd($quoted);
@@ -461,6 +462,9 @@ final class StringMultipartJit
         $nameLen = $context->builder->call($context->lookupFunction('strlen'), $name);
 
         $lineSlot = BasicBlockHelper::entryAlloca($context, $i8p);
+        $endSlot = BasicBlockHelper::entryAlloca($context, $i8p);
+        $trimSlot = BasicBlockHelper::entryAlloca($context, $sizeT);
+        $valSlot = BasicBlockHelper::entryAlloca($context, $i8p);
         $context->builder->store($headers, $lineSlot);
 
         $loopHead = $fn->appendBasicBlock('loop_head');
@@ -475,21 +479,32 @@ final class StringMultipartJit
 
         $context->builder->positionAtEnd($loopBody);
         $line = $context->builder->load($lineSlot);
-        $end = $context->builder->call(
+        $endFromStrstr = $context->builder->call(
             $context->lookupFunction('strstr'),
             $line,
             self::literalCstr($context, "\r\n")
         );
-        $endNull = $context->builder->icmp(Builder::INT_EQ, $end, $nullPtr);
+        $endNull = $context->builder->icmp(Builder::INT_EQ, $endFromStrstr, $nullPtr);
         $useStrlen = $fn->appendBasicBlock('use_strlen');
+        $storeStrstrEnd = $fn->appendBasicBlock('store_strstr_end');
         $haveEnd = $fn->appendBasicBlock('have_end');
-        $context->builder->branchIf($endNull, $useStrlen, $haveEnd);
+        $context->builder->branchIf($endNull, $useStrlen, $storeStrstrEnd);
+
+        $context->builder->positionAtEnd($storeStrstrEnd);
+        $context->builder->store($endFromStrstr, $endSlot);
+        $context->builder->branch($haveEnd);
 
         $context->builder->positionAtEnd($useStrlen);
-        $end = $context->builder->inBoundsGEP($line, $context->builder->call($context->lookupFunction('strlen'), $line));
+        $line = $context->builder->load($lineSlot);
+        $context->builder->store(
+            $context->builder->inBoundsGEP($line, $context->builder->call($context->lookupFunction('strlen'), $line)),
+            $endSlot
+        );
         $context->builder->branch($haveEnd);
 
         $context->builder->positionAtEnd($haveEnd);
+        $end = $context->builder->load($endSlot);
+        $line = $context->builder->load($lineSlot);
         $colon = $context->builder->call(
             $context->lookupFunction('strchr'),
             $line,
@@ -507,7 +522,6 @@ final class StringMultipartJit
             $context->builder->ptrToInt($colon, $i64),
             $context->builder->ptrToInt($line, $i64)
         );
-        $trimSlot = BasicBlockHelper::entryAlloca($context, $sizeT);
         $context->builder->store($lineNameLen, $trimSlot);
         $trimHead = $fn->appendBasicBlock('trim_head');
         $trimBody = $fn->appendBasicBlock('trim_body');
@@ -518,6 +532,7 @@ final class StringMultipartJit
         $canTrim = $context->builder->icmp(Builder::INT_UGT, $curLen, $sizeT->constInt(0, false));
         $context->builder->branchIf($canTrim, $trimBody, $afterTrim);
         $context->builder->positionAtEnd($trimBody);
+        $line = $context->builder->load($lineSlot);
         $idx = $context->builder->sub($curLen, $oneSize);
         $ch = $context->builder->load($context->builder->inBoundsGEP($line, $idx));
         $isWs = $context->builder->or(
@@ -531,6 +546,7 @@ final class StringMultipartJit
         $context->builder->branch($trimHead);
 
         $context->builder->positionAtEnd($afterTrim);
+        $line = $context->builder->load($lineSlot);
         $lineNameLen = $context->builder->load($trimSlot);
         $lenMatch = $context->builder->icmp(Builder::INT_EQ, $lineNameLen, $nameLen);
         $cmp = $context->builder->call(
@@ -550,7 +566,6 @@ final class StringMultipartJit
         $value = $context->builder->inBoundsGEP($colon, $oneSize);
         $skipVal = $fn->appendBasicBlock('skip_val');
         $valDone = $fn->appendBasicBlock('val_done');
-        $valSlot = BasicBlockHelper::entryAlloca($context, $i8p);
         $context->builder->store($value, $valSlot);
         $context->builder->branch($skipVal);
         $context->builder->positionAtEnd($skipVal);
@@ -569,6 +584,7 @@ final class StringMultipartJit
         $context->builder->returnValue($context->builder->load($valSlot));
 
         $context->builder->positionAtEnd($nextLine);
+        $end = $context->builder->load($endSlot);
         $endNull2 = $context->builder->icmp(Builder::INT_EQ, $end, $nullPtr);
         $endZero = $context->builder->icmp(Builder::INT_EQ, $context->builder->load($end), $i8->constInt(0, false));
         $breakLoop = $context->builder->or($endNull2, $endZero);
@@ -604,6 +620,7 @@ final class StringMultipartJit
         $outLen = $fn->getParam(3);
 
         $needleSlot = BasicBlockHelper::entryAlloca($context, $i8->arrayType(self::NEEDLE_CAP));
+        $pSlot = BasicBlockHelper::entryAlloca($context, $i8p);
         $needle = $context->builder->pointerCast($needleSlot, $i8p);
         $context->builder->call(
             $context->lookupFunction('snprintf'),
@@ -623,7 +640,6 @@ final class StringMultipartJit
         $needleLen = $context->builder->call($context->lookupFunction('strlen'), $needle);
         $p = $context->builder->inBoundsGEP($p, $needleLen);
         $start = $p;
-        $pSlot = BasicBlockHelper::entryAlloca($context, $i8p);
         $context->builder->store($p, $pSlot);
         $loopHead = $fn->appendBasicBlock('loop_head');
         $loopBody = $fn->appendBasicBlock('loop_body');
@@ -856,7 +872,7 @@ final class StringMultipartJit
             $context->lookupFunction('malloc'),
             $context->builder->add($len, $oneSize)
         );
-        $copyNull = $context->builder->icmp(Builder::INT_EQ, $copy, $voidPtr->constNull());
+        $copyNull = $context->builder->icmp(Builder::INT_EQ, $copy, $nullPtr);
         $loopInit = $fn->appendBasicBlock('loop_init');
         $context->builder->branchIf($copyNull, $fail, $loopInit);
 
@@ -943,6 +959,24 @@ final class StringMultipartJit
         $contentType = $fn->getParam(2);
         $bodyIn = $fn->getParam(3);
 
+        $bodyLenSlot = BasicBlockHelper::entryAlloca($context, $sizeT);
+        $boundarySlot = BasicBlockHelper::entryAlloca($context, $i8->arrayType(self::BOUNDARY_CAP));
+        $boundary = $context->builder->pointerCast($boundarySlot, $i8p);
+        $delimSlot = BasicBlockHelper::entryAlloca($context, $i8->arrayType(self::DELIM_CAP));
+        $delim = $context->builder->pointerCast($delimSlot, $i8p);
+        $cursorSlot = BasicBlockHelper::entryAlloca($context, $i8p);
+        $fieldSlot = BasicBlockHelper::entryAlloca($context, $i8->arrayType(self::FIELD_CAP));
+        $field = $context->builder->pointerCast($fieldSlot, $i8p);
+        $contentLenSlot = BasicBlockHelper::entryAlloca($context, $sizeT);
+        $filenameSlot = BasicBlockHelper::entryAlloca($context, $i8->arrayType(self::FIELD_CAP));
+        $filename = $context->builder->pointerCast($filenameSlot, $i8p);
+        $pairSlot = BasicBlockHelper::entryAlloca($context, $i8->arrayType(self::PAIR_CAP));
+        $pairBuf = $context->builder->pointerCast($pairSlot, $i8p);
+        $partStartSlot = BasicBlockHelper::entryAlloca($context, $i8p);
+        $partEndSlot = BasicBlockHelper::entryAlloca($context, $i8p);
+        $headersEndSlot = BasicBlockHelper::entryAlloca($context, $i8p);
+        $dispositionSlot = BasicBlockHelper::entryAlloca($context, $i8p);
+
         $ret = $fn->appendBasicBlock('ret');
         $work = $fn->appendBasicBlock('work');
 
@@ -951,7 +985,6 @@ final class StringMultipartJit
         $context->builder->branchIf($context->builder->or($bodyNull, $bodyEmpty), $ret, $work);
 
         $context->builder->positionAtEnd($work);
-        $bodyLenSlot = BasicBlockHelper::entryAlloca($context, $sizeT);
         $normalized = $context->builder->call(
             $context->lookupFunction('__phpc_multipart_normalize_body_newlines'),
             $bodyIn,
@@ -971,11 +1004,6 @@ final class StringMultipartJit
         $context->builder->positionAtEnd($freeRet);
         $context->builder->call($context->lookupFunction('free'), $normalized);
         $context->builder->branch($ret);
-
-        $boundarySlot = BasicBlockHelper::entryAlloca($context, $i8->arrayType(self::BOUNDARY_CAP));
-        $boundary = $context->builder->pointerCast($boundarySlot, $i8p);
-        $delimSlot = BasicBlockHelper::entryAlloca($context, $i8->arrayType(self::DELIM_CAP));
-        $delim = $context->builder->pointerCast($delimSlot, $i8p);
 
         $context->builder->positionAtEnd($parse);
         $okBoundary = $context->builder->call(
@@ -1003,7 +1031,6 @@ final class StringMultipartJit
         $delimLen = $context->builder->call($context->lookupFunction('strlen'), $delim);
         $body = $normalized;
         $end = $context->builder->inBoundsGEP($body, $bodyLen);
-        $cursorSlot = BasicBlockHelper::entryAlloca($context, $i8p);
         $context->builder->store($body, $cursorSlot);
 
         $partLoop = $fn->appendBasicBlock('part_loop');
@@ -1034,6 +1061,7 @@ final class StringMultipartJit
 
         $context->builder->positionAtEnd($havePart);
         $partStart = $context->builder->inBoundsGEP($partStart, $delimLen);
+        $context->builder->store($partStart, $partStartSlot);
         $isCrLf = $context->builder->and(
             $context->builder->icmp(Builder::INT_ULT, $partStart, $end),
             $context->builder->and(
@@ -1049,10 +1077,12 @@ final class StringMultipartJit
         $checkLf = $fn->appendBasicBlock('check_lf');
         $context->builder->branchIf($isCrLf, $skipCrLf, $checkLf);
         $context->builder->positionAtEnd($skipCrLf);
-        $partStart = $context->builder->inBoundsGEP($partStart, $twoSize);
+        $partStart = $context->builder->inBoundsGEP($context->builder->load($partStartSlot), $twoSize);
+        $context->builder->store($partStart, $partStartSlot);
         $afterSkip = $fn->appendBasicBlock('after_skip');
         $context->builder->branch($afterSkip);
         $context->builder->positionAtEnd($checkLf);
+        $partStart = $context->builder->load($partStartSlot);
         $isLf = $context->builder->and(
             $context->builder->icmp(Builder::INT_ULT, $partStart, $end),
             $context->builder->icmp(Builder::INT_EQ, $context->builder->load($partStart), $i8->constInt(ord("\n"), false))
@@ -1060,11 +1090,17 @@ final class StringMultipartJit
         $skipLf = $fn->appendBasicBlock('skip_lf_only');
         $context->builder->branchIf($isLf, $skipLf, $afterSkip);
         $context->builder->positionAtEnd($skipLf);
-        $partStart = $context->builder->inBoundsGEP($partStart, $oneSize);
+        $partStart = $context->builder->inBoundsGEP($context->builder->load($partStartSlot), $oneSize);
+        $context->builder->store($partStart, $partStartSlot);
         $context->builder->branch($afterSkip);
 
         $context->builder->positionAtEnd($afterSkip);
-        $canClose = $context->builder->icmp(Builder::INT_ULE, $context->builder->add($partStart, $twoSize), $end);
+        $partStart = $context->builder->load($partStartSlot);
+        $canClose = $context->builder->icmp(
+            Builder::INT_ULE,
+            $context->builder->inBoundsGEP($partStart, $twoSize),
+            $end
+        );
         $isClose = $context->builder->and(
             $canClose,
             $context->builder->and(
@@ -1079,14 +1115,17 @@ final class StringMultipartJit
         $context->builder->branchIf($isClose, $partDone, $findPartEnd);
 
         $context->builder->positionAtEnd($findPartEnd);
+        $partStart = $context->builder->load($partStartSlot);
         $partEnd = $context->builder->call($context->lookupFunction('strstr'), $partStart, $delim);
         $partEndNull = $context->builder->icmp(Builder::INT_EQ, $partEnd, $nullPtr);
         $partEnd = $context->builder->select($partEndNull, $end, $partEnd);
+        $context->builder->store($partEnd, $partEndSlot);
         $headersEnd = $context->builder->call(
             $context->lookupFunction('strstr'),
             $partStart,
             self::literalCstr($context, "\n\n")
         );
+        $context->builder->store($headersEnd, $headersEndSlot);
         $headersBad = $context->builder->or(
             $context->builder->icmp(Builder::INT_EQ, $headersEnd, $nullPtr),
             $context->builder->icmp(Builder::INT_UGE, $headersEnd, $partEnd)
@@ -1094,18 +1133,20 @@ final class StringMultipartJit
         $context->builder->branchIf($headersBad, $skipPart, $processPart);
 
         $context->builder->positionAtEnd($processPart);
-        $headersEnd = $context->builder->inBoundsGEP($headersEnd, $twoSize);
+        $partStart = $context->builder->load($partStartSlot);
+        $headersEnd = $context->builder->inBoundsGEP($context->builder->load($headersEndSlot), $twoSize);
+        $context->builder->store($headersEnd, $headersEndSlot);
         $disposition = $context->builder->call(
             $context->lookupFunction('__phpc_multipart_find_header_value'),
             $partStart,
             self::literalCstr($context, 'Content-Disposition')
         );
+        $context->builder->store($disposition, $dispositionSlot);
         $dispNull = $context->builder->icmp(Builder::INT_EQ, $disposition, $nullPtr);
         $context->builder->branchIf($dispNull, $skipPart, $haveDisp);
 
         $context->builder->positionAtEnd($haveDisp);
-        $fieldSlot = BasicBlockHelper::entryAlloca($context, $i8->arrayType(self::FIELD_CAP));
-        $field = $context->builder->pointerCast($fieldSlot, $i8p);
+        $disposition = $context->builder->load($dispositionSlot);
         $okName = $context->builder->call(
             $context->lookupFunction('__phpc_multipart_param'),
             $disposition,
@@ -1121,11 +1162,12 @@ final class StringMultipartJit
         $context->builder->branchIf($nameBad, $skipPart, $haveField);
 
         $context->builder->positionAtEnd($haveField);
+        $partEnd = $context->builder->load($partEndSlot);
+        $headersEnd = $context->builder->load($headersEndSlot);
         $contentLen = $context->builder->sub(
             $context->builder->ptrToInt($partEnd, $i64),
             $context->builder->ptrToInt($headersEnd, $i64)
         );
-        $contentLenSlot = BasicBlockHelper::entryAlloca($context, $sizeT);
         $context->builder->store($contentLen, $contentLenSlot);
 
         $trimHead = $fn->appendBasicBlock('trim_head');
@@ -1138,6 +1180,7 @@ final class StringMultipartJit
         $context->builder->branchIf($canTrim, $trimBody, $afterTrim);
         $context->builder->positionAtEnd($trimBody);
         $cl = $context->builder->load($contentLenSlot);
+        $headersEnd = $context->builder->load($headersEndSlot);
         $last = $context->builder->load($context->builder->inBoundsGEP($headersEnd, $context->builder->sub($cl, $oneSize)));
         $isTrail = $context->builder->or(
             $context->builder->icmp(Builder::INT_EQ, $last, $i8->constInt(ord("\r"), false)),
@@ -1149,10 +1192,9 @@ final class StringMultipartJit
         $context->builder->store($context->builder->sub($cl, $oneSize), $contentLenSlot);
         $context->builder->branch($trimHead);
 
-        $filenameSlot = BasicBlockHelper::entryAlloca($context, $i8->arrayType(self::FIELD_CAP));
-        $filename = $context->builder->pointerCast($filenameSlot, $i8p);
         $context->builder->positionAtEnd($afterTrim);
         $contentLen = $context->builder->load($contentLenSlot);
+        $disposition = $context->builder->load($dispositionSlot);
         $hasFile = $context->builder->call(
             $context->lookupFunction('__phpc_multipart_param'),
             $disposition,
@@ -1164,6 +1206,9 @@ final class StringMultipartJit
         $context->builder->branchIf($isFile, $filePart, $fieldPart);
 
         $context->builder->positionAtEnd($filePart);
+        $partStart = $context->builder->load($partStartSlot);
+        $headersEnd = $context->builder->load($headersEndSlot);
+        $contentLen = $context->builder->load($contentLenSlot);
         $partType = $context->builder->call(
             $context->lookupFunction('__phpc_multipart_find_header_value'),
             $partStart,
@@ -1181,6 +1226,7 @@ final class StringMultipartJit
         $context->builder->branch($skipPart);
 
         $context->builder->positionAtEnd($fieldPart);
+        $contentLen = $context->builder->load($contentLenSlot);
         $fieldLen = $context->builder->call($context->lookupFunction('strlen'), $field);
         $pairTooLong = $context->builder->icmp(
             Builder::INT_UGE,
@@ -1190,23 +1236,24 @@ final class StringMultipartJit
         $context->builder->branchIf($pairTooLong, $skipPart, $buildPair);
 
         $context->builder->positionAtEnd($buildPair);
+        $contentLen = $context->builder->load($contentLenSlot);
         $copy = $context->builder->call(
             $context->lookupFunction('malloc'),
             $context->builder->add($contentLen, $oneSize)
         );
-        $copyNull = $context->builder->icmp(Builder::INT_EQ, $copy, $voidPtr->constNull());
+        $copyNull = $context->builder->icmp(Builder::INT_EQ, $copy, $nullPtr);
         $context->builder->branchIf($copyNull, $skipPart, $haveCopy);
 
         $context->builder->positionAtEnd($haveCopy);
+        $headersEnd = $context->builder->load($headersEndSlot);
+        $contentLen = $context->builder->load($contentLenSlot);
         $context->builder->call(
             $context->lookupFunction('memcpy'),
-            $copy,
-            $headersEnd,
+            $context->bytePtr($copy),
+            $context->bytePtr($headersEnd),
             $contentLen
         );
         $context->builder->store($zeroI8, $context->builder->inBoundsGEP($copy, $contentLen));
-        $pairSlot = BasicBlockHelper::entryAlloca($context, $i8->arrayType(self::PAIR_CAP));
-        $pairBuf = $context->builder->pointerCast($pairSlot, $i8p);
         $context->builder->call(
             $context->lookupFunction('snprintf'),
             $pairBuf,
@@ -1226,7 +1273,7 @@ final class StringMultipartJit
         $context->builder->branch($skipPart);
 
         $context->builder->positionAtEnd($skipPart);
-        $context->builder->store($partEnd, $cursorSlot);
+        $context->builder->store($context->builder->load($partEndSlot), $cursorSlot);
         $context->builder->branch($partLoop);
 
         $context->builder->positionAtEnd($partDone);

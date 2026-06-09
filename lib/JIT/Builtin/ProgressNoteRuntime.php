@@ -170,10 +170,9 @@ final class ProgressNoteRuntime
         $context->builder->branch($copy);
 
         $context->builder->positionAtEnd($copy);
-        $storedLen = $context->builder->phi($sizeT, [
-            [$maxLen, $clamp],
-            [$len, $okLen],
-        ]);
+        $storedLen = $context->builder->phi($sizeT);
+        $storedLen->addIncoming($maxLen, $clamp);
+        $storedLen->addIncoming($len, $okLen);
         $context->builder->store($storedLen, self::$lenGlobal);
 
         $hasLen = $context->builder->icmp(Builder::INT_UGT, $storedLen, $zeroSize);

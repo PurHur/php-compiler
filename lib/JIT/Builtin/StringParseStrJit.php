@@ -391,8 +391,8 @@ final class StringParseStrJit
         $restLenPlus = $context->builder->add($restLen, $one);
         $context->builder->call(
             $context->lookupFunction('memmove'),
-            $context->builder->pointerCast($s, $voidPtr),
-            $context->builder->pointerCast($start, $voidPtr),
+            $context->bytePtr($s),
+            $context->bytePtr($start),
             $context->builder->truncOrBitCast($restLenPlus, $sizeT)
         );
         $context->builder->branch($tailBb);

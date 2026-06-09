@@ -179,7 +179,12 @@ final class StringStrGetcsvJit
         $context->builder->branchIf($empty, $doneBb, $useBb);
 
         $context->builder->positionAtEnd($useBb);
-        $first = $context->builder->load($context->builder->structGep($str, $map['value']));
+        $first = $context->builder->load(
+            $context->builder->pointerCast(
+                $context->builder->structGep($str, $map['value']),
+                $context->getTypeFromString('int8*')
+            )
+        );
         $context->builder->branch($doneBb);
 
         $context->builder->positionAtEnd($doneBb);

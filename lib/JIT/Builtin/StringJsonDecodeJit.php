@@ -768,10 +768,15 @@ final class StringJsonDecodeJit
         $context->builder->branch($expHead);
 
         $context->builder->positionAtEnd($copy);
+        $i64 = $context->getTypeFromString('int64');
         $start = $context->builder->load($startSlot);
         $cur = $context->builder->load($posPtr);
-        $len = $context->builder->sub($cur, $start);
-        $need = $context->builder->add($len, $oneSize);
+        $len = $context->builder->sub(
+            $context->builder->ptrToInt($cur, $i64),
+            $context->builder->ptrToInt($start, $i64)
+        );
+        $lenSize = $context->builder->truncOrBitCast($len, $sizeT);
+        $need = $context->builder->add($lenSize, $oneSize);
         $tooBig = $context->builder->icmp(Builder::INT_UGT, $need, $outLen);
         $context->builder->branchIf($tooBig, $fail, $memcpyOk);
         $context->builder->positionAtEnd($memcpyOk);
@@ -779,9 +784,9 @@ final class StringJsonDecodeJit
             $context->lookupFunction('memcpy'),
             $context->bytePtr($outBuf),
             $context->bytePtr($start),
-            $len
+            $lenSize
         );
-        $context->builder->store($i8->constInt(0, false), $context->builder->inBoundsGEP($outBuf, $len));
+        $context->builder->store($i8->constInt(0, false), $context->builder->inBoundsGEP($outBuf, $lenSize));
         $context->builder->returnValue($oneI32);
 
         $context->builder->positionAtEnd($fail);
@@ -1972,7 +1977,7 @@ final class StringJsonDecodeJit
         $context->builder->positionAtEnd($parse);
         $context->builder->call(
             $context->lookupFunction('memset'),
-            $context->builder->pointerCast($outStorage, $context->getTypeFromString('void*')),
+            $context->bytePtr($outStorage),
             $i32->constInt(0, false),
             $context->getTypeFromString('size_t')->constInt(128, false)
         );

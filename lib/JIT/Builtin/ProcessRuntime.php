@@ -148,7 +148,7 @@ final class ProcessRuntime
         $context->builder->store($sizeT->constInt(0, false), $len);
 
         $initial = $context->builder->call($context->lookupFunction('malloc'), $chunkSizeT);
-        $initialNull = $context->builder->icmp(Builder::INT_EQ, $initial, $voidPtr->constNull());
+        $initialNull = $context->builder->icmp(Builder::INT_EQ, $initial, $i8p->constNull());
         $failBb = $fn->appendBasicBlock('prs_malloc_fail');
         $loopHead = $fn->appendBasicBlock('prs_loop_head');
         $context->builder->branchIf($initialNull, $failBb, $loopHead);
@@ -186,7 +186,7 @@ final class ProcessRuntime
             $context->bytePtr($context->builder->load($bufSlot)),
             $newCap
         );
-        $grownNull = $context->builder->icmp(Builder::INT_EQ, $grown, $voidPtr->constNull());
+        $grownNull = $context->builder->icmp(Builder::INT_EQ, $grown, $i8p->constNull());
         $growFail = $fn->appendBasicBlock('prs_grow_fail');
         $growOk = $fn->appendBasicBlock('prs_grow_ok');
         $context->builder->branchIf($grownNull, $growFail, $growOk);
@@ -437,7 +437,7 @@ final class ProcessRuntime
         $outCapSlot = $context->builder->alloca($sizeT, 1, 'esa_out_cap');
         $iSlot = $context->builder->alloca($sizeT, 1, 'esa_i');
         $out = $context->builder->call($context->lookupFunction('malloc'), $outCap);
-        $outNull = $context->builder->icmp(Builder::INT_EQ, $out, $voidPtr->constNull());
+        $outNull = $context->builder->icmp(Builder::INT_EQ, $out, $i8p->constNull());
         $failBb = $fn->appendBasicBlock('esa_fail');
         $initBb = $fn->appendBasicBlock('esa_init');
         $context->builder->branchIf($outNull, $failBb, $initBb);
@@ -552,7 +552,7 @@ final class ProcessRuntime
         $xSlot = $context->builder->alloca($sizeT, 1, 'esc_x');
         $pSlot = $context->builder->alloca($i8p, 1, 'esc_p');
         $out = $context->builder->call($context->lookupFunction('malloc'), $outCap);
-        $outNull = $context->builder->icmp(Builder::INT_EQ, $out, $voidPtr->constNull());
+        $outNull = $context->builder->icmp(Builder::INT_EQ, $out, $i8p->constNull());
         $failBb = $fn->appendBasicBlock('esc_fail');
         $initBb = $fn->appendBasicBlock('esc_init');
         $context->builder->branchIf($outNull, $failBb, $initBb);
@@ -960,7 +960,7 @@ final class ProcessRuntime
             $context->bytePtr($context->builder->load($outSlot)),
             $newCap
         );
-        $grownNull = $context->builder->icmp(Builder::INT_EQ, $grown, $voidPtr->constNull());
+        $grownNull = $context->builder->icmp(Builder::INT_EQ, $grown, $i8p->constNull());
         $failBb = $fn->appendBasicBlock('por_fail_'.self::$blockSuffix);
         $okBb = $fn->appendBasicBlock('por_ok_'.self::$blockSuffix);
         $context->builder->branchIf($grownNull, $failBb, $okBb);

@@ -435,12 +435,11 @@ final class UploadTempJit
         $context->builder->positionAtEnd($entry);
 
         $i32 = $context->getTypeFromString('int32');
-        $i8p = $context->getTypeFromString('int8*');
+        $strPtr = $context->getTypeFromString('__string__*');
         $pathObj = $fn->getParam(0);
         $zero = $i32->constInt(0, false);
-        $nullPtr = $i8p->constNull();
 
-        $isNull = $context->builder->icmp(Builder::INT_EQ, $pathObj, $nullPtr);
+        $isNull = $context->builder->icmp(Builder::INT_EQ, $pathObj, $strPtr->constNull());
         $failBb = $fn->appendBasicBlock('is_uploaded_fail');
         $checkBb = $fn->appendBasicBlock('is_uploaded_check');
         $context->builder->branchIf($isNull, $failBb, $checkBb);
@@ -466,15 +465,16 @@ final class UploadTempJit
         $i8p = $context->getTypeFromString('int8*');
         $fromObj = $fn->getParam(0);
         $toObj = $fn->getParam(1);
+        $strPtr = $context->getTypeFromString('__string__*');
         $zero = $i32->constInt(0, false);
         $one = $i32->constInt(1, false);
-        $nullPtr = $i8p->constNull();
+        $nullStr = $strPtr->constNull();
 
         $failBb = $fn->appendBasicBlock('move_uploaded_fail');
         $checkNull = $fn->appendBasicBlock('move_uploaded_check_null');
         $eitherNull = $context->builder->or(
-            $context->builder->icmp(Builder::INT_EQ, $fromObj, $nullPtr),
-            $context->builder->icmp(Builder::INT_EQ, $toObj, $nullPtr)
+            $context->builder->icmp(Builder::INT_EQ, $fromObj, $nullStr),
+            $context->builder->icmp(Builder::INT_EQ, $toObj, $nullStr)
         );
         $context->builder->branchIf($eitherNull, $failBb, $checkNull);
 

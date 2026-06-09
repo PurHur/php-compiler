@@ -402,13 +402,14 @@ final class GcCollectCyclesRuntime
 
         $context->builder->positionAtEnd($work);
         $result = $context->builder->call($context->lookupFunction('phpc_gc_collect_cycles_impl'));
+        $resultI64 = $context->builder->sextOrBitCast($result, $i64);
         $context->builder->branch($done);
 
         $context->builder->positionAtEnd($done);
         $zero = $i64->constInt(0, false);
         $retPhi = $context->builder->phi($i64);
         $retPhi->addIncoming($zero, $early);
-        $retPhi->addIncoming($context->builder->sextOrBitCast($result, $i64), $work);
+        $retPhi->addIncoming($resultI64, $work);
         $context->builder->returnValue($retPhi);
         $context->builder->clearInsertionPosition();
         $context->registerFunction('__compiler_gc_collect_cycles', $fn);
@@ -783,7 +784,7 @@ final class GcCollectCyclesRuntime
         $context->builder->branchIf($matches, $clearBb, $sNext);
 
         $context->builder->positionAtEnd($clearBb);
-        $context->builder->store($voidpp->constNull(), $slotPtr);
+        $context->builder->store($context->getTypeFromString('void*')->constNull(), $slotPtr);
         $context->builder->branch($sNext);
 
         $context->builder->positionAtEnd($sNext);
@@ -915,6 +916,7 @@ final class GcCollectCyclesRuntime
         $sweepBody = $fn->appendBasicBlock('collect_sweep_body');
         $freeBb = $fn->appendBasicBlock('collect_sweep_free');
         $sweepNext = $fn->appendBasicBlock('collect_sweep_next');
+        $sweepExit = $fn->appendBasicBlock('collect_sweep_exit');
         $context->builder->branch($inLoop);
 
         $context->builder->positionAtEnd($inLoop);
@@ -1023,8 +1025,12 @@ final class GcCollectCyclesRuntime
         $context->builder->branchIf(
             $context->builder->icmp(Builder::INT_SLT, $si, $countSweep),
             $sweepBody,
-            $done
+            $sweepExit
         );
+
+        $context->builder->positionAtEnd($sweepExit);
+        $finalCollected = $context->builder->load($collectedSlot);
+        $context->builder->branch($done);
 
         $context->builder->positionAtEnd($sweepBody);
         $siExt = $context->builder->zext($si, $sizeT);
@@ -1045,10 +1051,9 @@ final class GcCollectCyclesRuntime
 
         $context->builder->positionAtEnd($done);
         $zero = $i32->constInt(0, false);
-        $collected = $context->builder->load($collectedSlot);
         $retPhi = $context->builder->phi($i32);
         $retPhi->addIncoming($zero, $early);
-        $retPhi->addIncoming($collected, $sweepLoop);
+        $retPhi->addIncoming($finalCollected, $sweepExit);
         $context->builder->returnValue($retPhi);
         $context->builder->clearInsertionPosition();
     }
