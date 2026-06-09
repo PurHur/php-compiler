@@ -130,6 +130,8 @@ class Module extends ModuleAbstract
             new unpack(),
             new chr(),
             new strcmp(),
+            new strcoll(),
+            new strxfrm(),
             new levenshtein(),
             new similar_text(),
             new soundex(),
@@ -650,6 +652,15 @@ class Module extends ModuleAbstract
             $ft = $context->context->functionType($i32, false, $i8p, $i8p);
             $fn = $context->module->addFunction('strcmp', $ft);
             $context->registerFunction('strcmp', $fn);
+        }
+        try {
+            $context->lookupFunction('strcoll');
+        } catch (\Throwable $e) {
+            $i8p = $context->getTypeFromString('int8*');
+            $i32 = $context->getTypeFromString('int32');
+            $ft = $context->context->functionType($i32, false, $i8p, $i8p);
+            $fn = $context->module->addFunction('strcoll', $ft);
+            $context->registerFunction('strcoll', $fn);
         }
         try {
             $context->lookupFunction('memcmp');
