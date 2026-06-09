@@ -15,6 +15,8 @@ use PHPLLVM\Value;
 
 final class JitStrReplace
 {
+    private static int $blockSerial = 0;
+
     public static function replace(
         Context $context,
         Value $search,
@@ -22,6 +24,7 @@ final class JitStrReplace
         Value $subject,
         bool $caseInsensitive = false
     ): Value {
+        $id = (string) (++self::$blockSerial);
         $map = $context->structFieldMap['__string__'];
         $searchLen = $context->builder->load(
             $context->builder->structGep($search, $map['length'])
@@ -46,10 +49,10 @@ final class JitStrReplace
         $context->builder->store($emptyResult, $resultSlot);
         $context->builder->store($zero, $offsetSlot);
 
-        $loopHead = BasicBlockHelper::append($context, 'str_'.$tag.'_head');
-        $loopBody = BasicBlockHelper::append($context, 'str_'.$tag.'_body');
-        $tailBlock = BasicBlockHelper::append($context, 'str_'.$tag.'_tail');
-        $doneBlock = BasicBlockHelper::append($context, 'str_'.$tag.'_done');
+        $loopHead = BasicBlockHelper::append($context, 'str_'.$tag.'_head_'.$id);
+        $loopBody = BasicBlockHelper::append($context, 'str_'.$tag.'_body_'.$id);
+        $tailBlock = BasicBlockHelper::append($context, 'str_'.$tag.'_tail_'.$id);
+        $doneBlock = BasicBlockHelper::append($context, 'str_'.$tag.'_done_'.$id);
         $context->builder->branch($loopHead);
 
         $context->builder->positionAtEnd($loopHead);
@@ -67,7 +70,7 @@ final class JitStrReplace
         );
         $null = $context->getTypeFromString('int8*')->constNull();
         $notFound = $context->builder->icmp(Builder::INT_EQ, $found, $null);
-        $matchBlock = BasicBlockHelper::append($context, 'str_'.$tag.'_match');
+        $matchBlock = BasicBlockHelper::append($context, 'str_'.$tag.'_match_'.$id);
         $context->builder->branchIf($notFound, $tailBlock, $matchBlock);
 
         $context->builder->positionAtEnd($matchBlock);
