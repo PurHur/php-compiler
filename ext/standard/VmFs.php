@@ -498,6 +498,13 @@ final class VmFs
      * @return list<string>|false
      */
     public static function file(string $path, int $flags = 0) {
+        if (0 !== ($flags & StdlibConstants::FILE_USE_INCLUDE_PATH)) {
+            $resolved = self::resolveIncludePath($path);
+            if (false !== $resolved) {
+                $path = $resolved;
+            }
+            $flags &= ~StdlibConstants::FILE_USE_INCLUDE_PATH;
+        }
         $lines = @\file($path, $flags);
         if (false === $lines) {
             return false;

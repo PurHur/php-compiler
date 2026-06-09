@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace PHPCompiler\ext\standard;
 
 use PHPCompiler\JIT\BasicBlockHelper;
+use PHPCompiler\JIT\Builtin\IncludePathRuntime;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\HashTableHelper;
 use PHPCompiler\JIT\JitValueBox;
@@ -18,16 +19,50 @@ use PHPLLVM\Value;
  */
 final class JitFile
 {
+    private const FILE_USE_INCLUDE_PATH = 1;
     private const FILE_IGNORE_NEW_LINES = 2;
     private const FILE_SKIP_EMPTY_LINES = 4;
 
     public static function invoke(Context $context, Value $pathStr, Value $flagsI64): Value
     {
+        IncludePathRuntime::ensureLinked($context);
         $slot = JitValueBox::alloc($context);
         $ptr = JitValueBox::pointer($context, $slot);
         $i1 = $context->getTypeFromString('int1');
+        $i64 = $context->getTypeFromString('int64');
+        $zero = $i64->constInt(0, false);
+        $strPtrTy = $context->getTypeFromString('__string__*');
+        $nullStr = $strPtrTy->constNull();
 
-        $exists = JitStat::pathExists($context, $pathStr);
+        $entryBlock = $context->builder->getInsertBlock();
+        $useIncludePath = $context->builder->icmp(
+            Builder::INT_NE,
+            $context->builder->and($flagsI64, $i64->constInt(self::FILE_USE_INCLUDE_PATH, false)),
+            $zero
+        );
+        $resolveBlock = BasicBlockHelper::append($context, 'file_resolve_inc');
+        $readPathBlock = BasicBlockHelper::append($context, 'file_read_path');
+        $context->builder->branchIf($useIncludePath, $resolveBlock, $readPathBlock);
+
+        $context->builder->positionAtEnd($resolveBlock);
+        $resolved = $context->builder->call(
+            $context->lookupFunction('__compiler_stream_resolve_include_path'),
+            $pathStr
+        );
+        $hasResolved = $context->builder->icmp(Builder::INT_NE, $resolved, $nullStr);
+        $useResolvedBlock = BasicBlockHelper::append($context, 'file_use_resolved');
+        $context->builder->branchIf($hasResolved, $useResolvedBlock, $readPathBlock);
+
+        $context->builder->positionAtEnd($useResolvedBlock);
+        $context->builder->branch($readPathBlock);
+
+        $context->builder->positionAtEnd($readPathBlock);
+        $pathPhi = $context->builder->phi($strPtrTy, 'file_path');
+        $pathPhi->addIncoming($pathStr, $entryBlock);
+        $pathPhi->addIncoming($pathStr, $resolveBlock);
+        $pathPhi->addIncoming($resolved, $useResolvedBlock);
+
+        $exists = JitStat::pathExists($context, $pathPhi);
         $missing = $context->builder->icmp(Builder::INT_EQ, $exists, $i1->constInt(0, false));
 
         $failBlock = BasicBlockHelper::append($context, 'file_fail');
@@ -38,10 +73,9 @@ final class JitFile
         $context->builder->positionAtEnd($readBlock);
         $contents = $context->builder->call(
             $context->lookupFunction('__compiler_file_get_contents'),
-            $pathStr
+            $pathPhi
         );
-        $strPtrTy = $context->getTypeFromString('__string__*');
-        $readFailed = $context->builder->icmp(Builder::INT_EQ, $contents, $strPtrTy->constNull());
+        $readFailed = $context->builder->icmp(Builder::INT_EQ, $contents, $nullStr);
         $okBlock = BasicBlockHelper::append($context, 'file_ok');
         $context->builder->branchIf($readFailed, $failBlock, $okBlock);
 
