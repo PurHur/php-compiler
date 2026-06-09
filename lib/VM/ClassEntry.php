@@ -118,6 +118,8 @@ class ClassEntry {
     public array $methodDeprecated = [];
     /** @var array<string, \PHPCompiler\Compiler\DeprecatedMetadata> constant (lowercase) => deprecation (#3569). */
     public array $constDeprecated = [];
+    /** @var array<string, true> constant (lowercase) => final flag (#6516). */
+    public array $constFinal = [];
     /** @var array<string, \PHPCompiler\Compiler\DeprecatedMetadata> property (lowercase) => deprecation (#7369). */
     public array $propDeprecated = [];
     /** Class-level #[\Deprecated] metadata (#6803). */
