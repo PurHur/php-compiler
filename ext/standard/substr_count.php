@@ -7,6 +7,7 @@ namespace PHPCompiler\ext\standard;
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\VM\Variable;
@@ -23,14 +24,11 @@ final class substr_count extends Internal
         if ($argc < 2 || $argc > 4) {
             throw new \LogicException('substr_count() requires two to four arguments in this compiler build');
         }
-        $haystack = $frame->calledArgs[0]->resolveIndirect();
-        $needle = $frame->calledArgs[1]->resolveIndirect();
         if (null === $frame->returnVar) {
             return;
         }
-        if (Variable::TYPE_STRING !== $haystack->type || Variable::TYPE_STRING !== $needle->type) {
-            throw new \LogicException('substr_count() only supports strings in this compiler build');
-        }
+        $haystack = VmString::coerceStringBuiltinArg($frame->calledArgs[0], 'substr_count', 0, 'haystack');
+        $needle = VmString::coerceStringBuiltinArg($frame->calledArgs[1], 'substr_count', 1, 'needle');
         $offset = 0;
         if ($argc >= 3) {
             $offset = VmMath::parseIntBuiltinArg(
@@ -53,7 +51,7 @@ final class substr_count extends Internal
             }
         }
         $frame->returnVar->int(
-            VmString::substr_count($haystack->toString(), $needle->toString(), $offset, $length)
+            VmString::substr_count($haystack, $needle, $offset, $length)
         );
     }
 
@@ -67,8 +65,8 @@ final class substr_count extends Internal
             throw new \LogicException('substr_count() requires two to four arguments in this compiler build');
         }
 
-        $hay = $this->jitString($context, $args[0], 'substr_count() argument #1');
-        $needle = $this->jitString($context, $args[1], 'substr_count() argument #2');
+        $hay = JitStringBuiltinArg::lower($context, $args[0], 'substr_count', 0, 'haystack');
+        $needle = JitStringBuiltinArg::lower($context, $args[1], 'substr_count', 1, 'needle');
         $offset = $argc >= 3
             ? $this->jitLong($context, $args[2], 'substr_count() argument #3 ($offset)')
             : null;

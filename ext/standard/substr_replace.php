@@ -7,6 +7,8 @@ namespace PHPCompiler\ext\standard;
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\JitPregSubject;
+use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
@@ -20,32 +22,31 @@ final class substr_replace extends Internal
         if ($argc < 3 || $argc > 4) {
             throw new \LogicException('substr_replace() requires three or four arguments in this compiler build');
         }
-        $string = $frame->calledArgs[0]->resolveIndirect();
-        $replace = $frame->calledArgs[1]->resolveIndirect();
-        $offset = $frame->calledArgs[2]->resolveIndirect();
         if (null === $frame->returnVar) {
             return;
         }
-        if (Variable::TYPE_STRING !== $string->type
-            || Variable::TYPE_STRING !== $replace->type
-            || Variable::TYPE_INTEGER !== $offset->type) {
-            throw new \LogicException('substr_replace() requires two strings and an integer offset in this compiler build');
+        $stringVar = VmPreg::requireStringOrArraySubject(
+            $frame->calledArgs[0],
+            'substr_replace',
+            0,
+            'string'
+        );
+        if (Variable::TYPE_STRING !== $stringVar->type) {
+            throw new \LogicException('substr_replace() array string operand is not supported in this compiler build');
         }
+        $replace = VmString::coerceStringBuiltinArg($frame->calledArgs[1], 'substr_replace', 1, 'replace');
+        $offsetInt = VmMath::parseIntBuiltinArg($frame->calledArgs[2], 'substr_replace', 3, 'offset');
         $length = null;
         if (4 === $argc) {
             $lengthArg = $frame->calledArgs[3]->resolveIndirect();
-            if (Variable::TYPE_NULL === $lengthArg->type) {
-                $length = null;
-            } elseif (Variable::TYPE_INTEGER !== $lengthArg->type) {
-                throw new \LogicException('substr_replace() length must be an integer in this compiler build');
-            } else {
-                $length = $lengthArg->toInt();
+            if (Variable::TYPE_NULL !== $lengthArg->type) {
+                $length = VmMath::parseIntBuiltinArg($frame->calledArgs[3], 'substr_replace', 4, 'length');
             }
         }
         $frame->returnVar->string(VmString::substr_replace(
-            $string->toString(),
-            $replace->toString(),
-            $offset->toInt(),
+            $stringVar->toString(),
+            $replace,
+            $offsetInt,
             $length
         ));
     }
@@ -78,10 +79,15 @@ final class substr_replace extends Internal
             }
         }
 
+        JitPregSubject::requireStringOrArray($context, $args[0], 'substr_replace', 0, 'string');
+        if (JITVariable::TYPE_STRING !== $args[0]->type) {
+            throw new \LogicException('substr_replace() array string operand is not supported in this compiler build');
+        }
+
         return JitSubstrReplace::replace(
             $context,
-            $this->jitString($context, $args[0], 'substr_replace() argument #1'),
-            $this->jitString($context, $args[1], 'substr_replace() argument #2'),
+            JitStringBuiltinArg::lower($context, $args[0], 'substr_replace', 0, 'string'),
+            JitStringBuiltinArg::lower($context, $args[1], 'substr_replace', 1, 'replace'),
             $this->jitLong($context, $args[2], 'substr_replace() offset'),
             $lengthVal,
             $hasLength
