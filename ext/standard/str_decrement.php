@@ -7,8 +7,8 @@ namespace PHPCompiler\ext\standard;
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\Variable as JITVariable;
-use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
 
 /**
@@ -26,11 +26,8 @@ final class str_decrement extends Internal
         if (1 !== \count($frame->calledArgs)) {
             throw new \LogicException('str_decrement() requires exactly one argument in this compiler build');
         }
-        $arg = $frame->calledArgs[0]->resolveIndirect();
-        if (Variable::TYPE_STRING !== $arg->type) {
-            throw new \LogicException('str_decrement() only supports strings in this compiler build');
-        }
-        $result = VmString::strDecrement($arg->toString());
+        $input = VmString::coerceStringBuiltinArg($frame->calledArgs[0], 'str_decrement', 0, 'string');
+        $result = VmString::strDecrement($input);
         if (null === $frame->returnVar) {
             return;
         }
@@ -46,10 +43,8 @@ final class str_decrement extends Internal
             throw new \LogicException('str_decrement() requires exactly one argument in this compiler build');
         }
 
-        return JitStrIncdec::decrement(
-            $context,
-            $this->jitString($context, $args[0], 'str_decrement() argument #1'),
-            $args[0]
-        );
+        $input = JitStringBuiltinArg::lower($context, $args[0], 'str_decrement', 0, 'string');
+
+        return JitStrIncdec::decrement($context, $input, $args[0]);
     }
 }
