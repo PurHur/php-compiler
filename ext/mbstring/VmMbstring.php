@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace PHPCompiler\ext\mbstring;
 
+use PHPCompiler\ext\iconv\CharsetEngine;
 use PHPCompiler\ext\standard\VmString;
 use PHPCompiler\VM\EnumCaseSupport;
 use PHPCompiler\VM\Variable;
@@ -321,6 +322,211 @@ final class VmMbstring
                 'mbstring search requires mbstring for encoding '.$encoding.' in this compiler build'
             );
         }
+    }
+
+    /**
+     * @return array<int, mixed>|string|int|null
+     */
+    public static function coerceCheckEncodingValueArg(
+        Variable $var,
+        string $function,
+        int $argIndex = 0
+    ): array|string|int|null {
+        $var = $var->resolveIndirect();
+        if (Variable::TYPE_NULL === $var->type) {
+            return null;
+        }
+        if (EnumCaseSupport::isEnumCaseVariable($var)) {
+            throw new \TypeError(sprintf(
+                '%s(): Argument #%d ($value) must be of type array|string|null, %s given',
+                $function,
+                $argIndex + 1,
+                EnumCaseSupport::typeNameForVariable($var)
+            ));
+        }
+        if (Variable::TYPE_STRING === $var->type) {
+            return $var->toString();
+        }
+        if (Variable::TYPE_INTEGER === $var->type) {
+            return $var->toInt();
+        }
+        if (Variable::TYPE_ARRAY === $var->type) {
+            $out = [];
+            foreach ($var->toArray()->iterateKeyed(true) as [, $elem]) {
+                $elem = $elem->resolveIndirect();
+                if (Variable::TYPE_OBJECT === $elem->type) {
+                    throw new \LogicException(
+                        $function.'(): array value contains object; use checkEncodingForVariable()'
+                    );
+                }
+                $out[] = self::checkEncodingScalarToPhp($elem);
+            }
+
+            return $out;
+        }
+        if (Variable::TYPE_OBJECT === $var->type) {
+            throw new \TypeError(sprintf(
+                '%s(): Argument #%d ($value) must be of type array|string|null, %s given',
+                $function,
+                $argIndex + 1,
+                $var->toObject()->class->name
+            ));
+        }
+
+        throw new \TypeError(sprintf(
+            '%s(): Argument #%d ($value) must be of type array|string|null, %s given',
+            $function,
+            $argIndex + 1,
+            self::typeLabel($var)
+        ));
+    }
+
+    public static function checkEncodingForVariable(?Variable $valueVar, ?string $encoding = null): bool
+    {
+        if (null === $valueVar) {
+            return self::checkEncoding(null, $encoding);
+        }
+        $var = $valueVar->resolveIndirect();
+        if (Variable::TYPE_ARRAY === $var->type) {
+            foreach ($var->toArray()->iterateKeyed(true) as [, $elem]) {
+                if (Variable::TYPE_OBJECT === $elem->resolveIndirect()->type) {
+                    return false;
+                }
+            }
+        }
+
+        return self::checkEncoding(
+            self::coerceCheckEncodingValueArg($valueVar, 'mb_check_encoding', 0),
+            $encoding
+        );
+    }
+
+    /**
+     * @param array<int, mixed>|string|int|null $value
+     */
+    public static function checkEncoding(array|string|int|null $value = null, ?string $encoding = null): bool
+    {
+        if (\function_exists('mb_check_encoding')) {
+            if (null === $value && null === $encoding) {
+                return \mb_check_encoding();
+            }
+            if (null === $encoding) {
+                return \mb_check_encoding($value);
+            }
+
+            return \mb_check_encoding($value, $encoding);
+        }
+
+        $encoding = null === $encoding ? 'UTF-8' : $encoding;
+        self::assertCheckEncodingName($encoding);
+
+        if (null === $value) {
+            return true;
+        }
+        if (\is_int($value)) {
+            $value = (string) $value;
+        }
+        if (\is_string($value)) {
+            return self::isValidInEncoding($value, $encoding);
+        }
+
+        foreach ($value as $item) {
+            if (\is_object($item)) {
+                return false;
+            }
+            if (\is_int($item)) {
+                $item = (string) $item;
+            }
+            if (!\is_string($item) || !self::isValidInEncoding($item, $encoding)) {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    private static function assertCheckEncodingName(string $encoding): void
+    {
+        if (null === CharsetEngine::parseEncodingSpec($encoding)) {
+            throw new \ValueError(sprintf(
+                'mb_check_encoding(): Argument #2 ($encoding) must be a valid encoding, "%s" given',
+                $encoding
+            ));
+        }
+    }
+
+    private static function isValidInEncoding(string $value, string $encoding): bool
+    {
+        $canonical = CharsetEngine::canonicalize($encoding) ?? $encoding;
+        if ('UTF-8' === $canonical) {
+            return self::isValidUtf8($value);
+        }
+        if ('ASCII' === $canonical || '8BIT' === $canonical) {
+            return true;
+        }
+        if (\function_exists('mb_check_encoding')) {
+            return \mb_check_encoding($value, $encoding);
+        }
+
+        throw new \LogicException(
+            'mb_check_encoding() requires mbstring for encoding '.$encoding.' in this compiler build'
+        );
+    }
+
+    private static function isValidUtf8(string $value): bool
+    {
+        $len = \strlen($value);
+        for ($i = 0; $i < $len; ) {
+            $byte = \ord($value[$i]);
+            if ($byte < 0x80) {
+                ++$i;
+                continue;
+            }
+            if (($byte & 0xE0) === 0xC0) {
+                $need = 1;
+                $min = 0x80;
+            } elseif (($byte & 0xF0) === 0xE0) {
+                $need = 2;
+                $min = 0x800;
+            } elseif (($byte & 0xF8) === 0xF0) {
+                $need = 3;
+                $min = 0x10000;
+            } else {
+                return false;
+            }
+            if ($i + $need >= $len) {
+                return false;
+            }
+            $cp = $byte & (0xFF >> (2 + $need));
+            for ($j = 1; $j <= $need; ++$j) {
+                $next = \ord($value[$i + $j]);
+                if (($next & 0xC0) !== 0x80) {
+                    return false;
+                }
+                $cp = ($cp << 6) | ($next & 0x3F);
+            }
+            if ($cp < $min || ($cp >= 0xD800 && $cp <= 0xDFFF)) {
+                return false;
+            }
+            $i += $need + 1;
+        }
+
+        return true;
+    }
+
+    /**
+     * @return string|int|float|bool|null
+     */
+    private static function checkEncodingScalarToPhp(Variable $var): string|int|float|bool|null
+    {
+        return match ($var->type) {
+            Variable::TYPE_NULL => null,
+            Variable::TYPE_BOOLEAN => $var->toBool(),
+            Variable::TYPE_INTEGER => $var->toInt(),
+            Variable::TYPE_FLOAT => $var->toFloat(),
+            Variable::TYPE_STRING => $var->toString(),
+            default => null,
+        };
     }
 
     private static function typeLabel(Variable $var): string

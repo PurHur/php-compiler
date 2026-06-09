@@ -20,6 +20,7 @@ final class MbstringModuleTest extends TestCase
         $ctx = $runtime->vmContext;
 
         self::assertTrue(VmReflection::functionExists($ctx, 'mb_strlen'));
+        self::assertTrue(VmReflection::functionExists($ctx, 'mb_check_encoding'));
         self::assertTrue(VmReflection::functionExists($ctx, 'mb_convert_case'));
 
         $code = <<<'PHP'
