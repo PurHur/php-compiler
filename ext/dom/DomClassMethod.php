@@ -1,0 +1,59 @@
+<?php
+
+declare(strict_types=1);
+
+namespace PHPCompiler\ext\dom;
+
+use PHPCompiler\Frame;
+use PHPCompiler\VM\Builtin\VmClassMethod;
+use PHPCompiler\VM\ObjectEntry;
+use PHPCompiler\VM\Variable;
+
+/** Shared VM wiring for ext/dom class methods (issue #6140). */
+abstract class DomClassMethod extends VmClassMethod
+{
+    protected function receiver(Frame $frame, string $classLc, string $label): ObjectEntry
+    {
+        if (\count($frame->calledArgs) < 1) {
+            throw new \LogicException($label.' called without $this');
+        }
+
+        return VmDom::requireReceiver($frame->calledArgs[0], $classLc, $label);
+    }
+
+    protected function stringArg(Variable $var, string $label, int $index): string
+    {
+        $var = $var->resolveIndirect();
+        if (Variable::TYPE_STRING !== $var->type && Variable::TYPE_NULL !== $var->type) {
+            throw new \TypeError(sprintf(
+                '%s expects argument #%d to be of type string, %s given',
+                $label,
+                $index + 1,
+                VmDom::typeLabel($var)
+            ));
+        }
+        if (Variable::TYPE_NULL === $var->type) {
+            return '';
+        }
+
+        return $var->toString();
+    }
+
+    protected function nullableStringArg(Variable $var, string $label, int $index): ?string
+    {
+        $var = $var->resolveIndirect();
+        if (Variable::TYPE_NULL === $var->type) {
+            return null;
+        }
+        if (Variable::TYPE_STRING !== $var->type) {
+            throw new \TypeError(sprintf(
+                '%s expects argument #%d to be of type ?string, %s given',
+                $label,
+                $index + 1,
+                VmDom::typeLabel($var)
+            ));
+        }
+
+        return $var->toString();
+    }
+}
