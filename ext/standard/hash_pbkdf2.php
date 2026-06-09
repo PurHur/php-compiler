@@ -9,7 +9,7 @@ use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitBoolArg;
 use PHPCompiler\JIT\JitLongArg;
-use PHPCompiler\JIT\JitStringArg;
+use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
@@ -27,19 +27,12 @@ final class hash_pbkdf2 extends Internal
         if ($argc < 4 || $argc > 6) {
             throw new \LogicException('hash_pbkdf2() requires four to six arguments in this compiler build');
         }
-        $algo = $frame->calledArgs[0]->resolveIndirect();
-        $password = $frame->calledArgs[1]->resolveIndirect();
-        $salt = $frame->calledArgs[2]->resolveIndirect();
+        $algo = VmString::coerceStringBuiltinArg($frame->calledArgs[0], 'hash_pbkdf2', 0, 'algo');
+        $password = VmString::coerceStringBuiltinArg($frame->calledArgs[1], 'hash_pbkdf2', 1, 'password');
+        $salt = VmString::coerceStringBuiltinArg($frame->calledArgs[2], 'hash_pbkdf2', 2, 'salt');
         $iterations = $frame->calledArgs[3]->resolveIndirect();
-        if (
-            Variable::TYPE_STRING !== $algo->type
-            || Variable::TYPE_STRING !== $password->type
-            || Variable::TYPE_STRING !== $salt->type
-            || Variable::TYPE_INTEGER !== $iterations->type
-        ) {
-            throw new \LogicException(
-                'hash_pbkdf2() requires string algorithm, password, salt, and integer iterations in this compiler build'
-            );
+        if (Variable::TYPE_INTEGER !== $iterations->type) {
+            throw new \LogicException('hash_pbkdf2() iterations must be an integer in this compiler build');
         }
         $length = 0;
         if ($argc >= 5) {
@@ -57,7 +50,7 @@ final class hash_pbkdf2 extends Internal
             }
             $raw = $rawArg->toBool();
         }
-        $algoName = strtolower($algo->toString());
+        $algoName = strtolower($algo);
         if (!\in_array($algoName, ['sha256', 'sha1', 'md5'], true)) {
             throw new \ValueError(
                 'hash_pbkdf2(): Argument #1 ($algo) must be a valid cryptographic hashing algorithm'
@@ -67,9 +60,9 @@ final class hash_pbkdf2 extends Internal
             return;
         }
         $frame->returnVar->string(VmHash::hashPbkdf2(
-            $algo->toString(),
-            $password->toString(),
-            $salt->toString(),
+            $algo,
+            $password,
+            $salt,
             $iterations->toInt(),
             $length,
             $raw
@@ -92,9 +85,9 @@ final class hash_pbkdf2 extends Internal
 
         return JitHash::hashPbkdf2(
             $context,
-            JitStringArg::lower($context, $args[0], 'hash_pbkdf2() algorithm'),
-            JitStringArg::lower($context, $args[1], 'hash_pbkdf2() password'),
-            JitStringArg::lower($context, $args[2], 'hash_pbkdf2() salt'),
+            JitStringBuiltinArg::lower($context, $args[0], 'hash_pbkdf2', 0, 'algo'),
+            JitStringBuiltinArg::lower($context, $args[1], 'hash_pbkdf2', 1, 'password'),
+            JitStringBuiltinArg::lower($context, $args[2], 'hash_pbkdf2', 2, 'salt'),
             JitLongArg::lower($context, $args[3], 'hash_pbkdf2() iterations'),
             $length,
             $raw
