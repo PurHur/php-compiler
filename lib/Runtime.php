@@ -205,6 +205,7 @@ class Runtime {
         $this->load(new ext\intl\Module);
         $this->load(new ext\zip\Module);
         $this->load(new ext\libxml\Module);
+        $this->load(new ext\dom\Module);
         $this->load(new ext\xml\Module);
         $this->load(new ext\gd\Module);
         $this->load(new ext\mbstring\Module);

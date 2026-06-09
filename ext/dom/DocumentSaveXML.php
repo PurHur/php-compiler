@@ -1,0 +1,24 @@
+<?php
+
+declare(strict_types=1);
+
+namespace PHPCompiler\ext\dom;
+
+use PHPCompiler\Frame;
+
+/** DOMDocument::saveXML() — VM (#6140). */
+final class DocumentSaveXML extends DomClassMethod
+{
+    public function __construct()
+    {
+        parent::__construct('saveXML');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $receiver = $this->receiver($frame, VmDom::CLASS_DOCUMENT, 'DOMDocument::saveXML()');
+        if (null !== $frame->returnVar) {
+            $frame->returnVar->string(VmDom::saveXML($receiver));
+        }
+    }
+}
