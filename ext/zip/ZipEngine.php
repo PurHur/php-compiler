@@ -1,0 +1,228 @@
+<?php
+
+declare(strict_types=1);
+
+namespace PHPCompiler\ext\zip;
+
+/**
+ * Pure-PHP ZIP store/unstore engine (php-src ext/zip/php_zip.c subset; issue #6414).
+ *
+ * Supports method 0 (stored) archives for open/addFile/extractTo without libzip or host ZipArchive.
+ */
+final class ZipEngine
+{
+    private const SIG_LOCAL = 0x04034b50;
+
+    private const SIG_CENTRAL = 0x02014b50;
+
+    private const SIG_EOCD = 0x06054b50;
+
+    /**
+     * @return array{ok: true, entries: list<array{name: string, data: string, crc: int, size: int}>}|array{ok: false, code: int}
+     */
+    public static function readArchive(string $path): array
+    {
+        if (!is_file($path)) {
+            return ['ok' => false, 'code' => ZipArchiveConstants::ER_NOENT];
+        }
+        $data = @file_get_contents($path);
+        if (false === $data) {
+            return ['ok' => false, 'code' => ZipArchiveConstants::ER_READ];
+        }
+        if ('' === $data) {
+            return ['ok' => true, 'entries' => []];
+        }
+
+        $eocd = self::findEocd($data);
+        if (null === $eocd) {
+            return ['ok' => false, 'code' => ZipArchiveConstants::ER_NOZIP];
+        }
+
+        $entries = [];
+        $offset = $eocd['cdOffset'];
+        $count = $eocd['cdCount'];
+        for ($i = 0; $i < $count; ++$i) {
+            if ($offset + 46 > strlen($data)) {
+                return ['ok' => false, 'code' => ZipArchiveConstants::ER_INCONS];
+            }
+            $header = unpack('Vsig/vversion/vversionNeeded/vflags/vmethod/vmtime/vmdate/Vcrc/VcompSize/Vsize/vnameLen/vextraLen/vcommentLen/vdiskStart/vintAttr/VextAttr/VlocalOffset', substr($data, $offset, 46));
+            if (!is_array($header) || self::SIG_CENTRAL !== ($header['sig'] ?? 0)) {
+                return ['ok' => false, 'code' => ZipArchiveConstants::ER_INCONS];
+            }
+            $nameLen = (int) $header['nameLen'];
+            $extraLen = (int) $header['extraLen'];
+            $commentLen = (int) $header['commentLen'];
+            $name = substr($data, $offset + 46, $nameLen);
+            $method = (int) $header['method'];
+            if (0 !== $method) {
+                return ['ok' => false, 'code' => ZipArchiveConstants::ER_COMPNOTSUPP];
+            }
+            $localOffset = (int) $header['localOffset'];
+            $fileData = self::readLocalEntry($data, $localOffset, $name);
+            if (null === $fileData) {
+                return ['ok' => false, 'code' => ZipArchiveConstants::ER_INCONS];
+            }
+            $entries[] = [
+                'name' => $name,
+                'data' => $fileData,
+                'crc' => (int) $header['crc'],
+                'size' => (int) $header['size'],
+            ];
+            $offset += 46 + $nameLen + $extraLen + $commentLen;
+        }
+
+        return ['ok' => true, 'entries' => $entries];
+    }
+
+    /**
+     * @param list<array{name: string, data: string, crc: int, size: int}> $entries
+     */
+    public static function writeArchive(string $path, array $entries): bool
+    {
+        $binary = self::buildArchive($entries);
+
+        return false !== @file_put_contents($path, $binary);
+    }
+
+    /**
+     * @param list<array{name: string, data: string, crc: int, size: int}> $entries
+     */
+    public static function buildArchive(array $entries): string
+    {
+        $local = '';
+        $central = '';
+        $offset = 0;
+        foreach ($entries as $entry) {
+            $name = $entry['name'];
+            $data = $entry['data'];
+            $size = strlen($data);
+            $crc = self::crc32Unsigned($data);
+            $time = self::dosTime(time());
+            $localHeader = pack(
+                'VvvvvvVVVvv',
+                self::SIG_LOCAL,
+                20,
+                0,
+                0,
+                $time['time'],
+                $time['date'],
+                $crc,
+                $size,
+                $size,
+                strlen($name),
+                0
+            );
+            $chunk = $localHeader . $name . $data;
+            $local .= $chunk;
+
+            $centralHeader = pack(
+                'VvvvvvvVVVvvvvvVV',
+                self::SIG_CENTRAL,
+                20,
+                20,
+                0,
+                0,
+                $time['time'],
+                $time['date'],
+                $crc,
+                $size,
+                $size,
+                strlen($name),
+                0,
+                0,
+                0,
+                0,
+                0,
+                $offset
+            );
+            $central .= $centralHeader . $name;
+            $offset += strlen($chunk);
+        }
+
+        $cdSize = strlen($central);
+        $eocd = pack(
+            'VvvvvVVv',
+            self::SIG_EOCD,
+            0,
+            0,
+            count($entries),
+            count($entries),
+            $cdSize,
+            strlen($local),
+            0
+        );
+
+        return $local . $central . $eocd;
+    }
+
+    /**
+     * @return array{cdCount: int, cdOffset: int}|null
+     */
+    private static function findEocd(string $data): ?array
+    {
+        $len = strlen($data);
+        $maxComment = 65535;
+        $start = max(0, $len - 22 - $maxComment);
+        for ($pos = $len - 22; $pos >= $start; --$pos) {
+            $sig = unpack('V', substr($data, $pos, 4));
+            if (is_array($sig) && self::SIG_EOCD === ($sig[1] ?? 0)) {
+                $fields = unpack('vdisk/vdiskStart/vcdCount/vtotal/VcdSize/VcdOffset/vcommentLen', substr($data, $pos + 4, 18));
+                if (!is_array($fields)) {
+                    return null;
+                }
+
+                return [
+                    'cdCount' => (int) $fields['cdCount'],
+                    'cdOffset' => (int) $fields['cdOffset'],
+                ];
+            }
+        }
+
+        return null;
+    }
+
+    private static function readLocalEntry(string $data, int $offset, string $expectedName): ?string
+    {
+        if ($offset + 30 > strlen($data)) {
+            return null;
+        }
+        $header = unpack('Vsig/vversion/vflags/vmethod/vmtime/vmdate/Vcrc/VcompSize/Vsize/vnameLen/vextraLen', substr($data, $offset, 30));
+        if (!is_array($header) || self::SIG_LOCAL !== ($header['sig'] ?? 0)) {
+            return null;
+        }
+        $nameLen = (int) $header['nameLen'];
+        $extraLen = (int) $header['extraLen'];
+        $name = substr($data, $offset + 30, $nameLen);
+        if ($name !== $expectedName) {
+            return null;
+        }
+        $size = (int) $header['size'];
+        $dataOffset = $offset + 30 + $nameLen + $extraLen;
+        if ($dataOffset + $size > strlen($data)) {
+            return null;
+        }
+
+        return substr($data, $dataOffset, $size);
+    }
+
+    /** @return array{time: int, date: int} */
+    private static function dosTime(int $timestamp): array
+    {
+        $dt = getdate($timestamp);
+
+        return [
+            'time' => (($dt['hours'] << 11) | ($dt['minutes'] << 5) | ((int) ($dt['seconds'] / 2))),
+            'date' => ((($dt['year'] - 1980) << 9) | ($dt['mon'] << 5) | $dt['mday']),
+        ];
+    }
+
+    private static function crc32Unsigned(string $data): int
+    {
+        $crc = crc32($data);
+        if ($crc < 0) {
+            $crc += 0x100000000;
+        }
+
+        return (int) $crc;
+    }
+}
