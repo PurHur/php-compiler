@@ -8,8 +8,10 @@ use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitLongArg;
+use PHPCompiler\JIT\JitOperandTypeLabel;
 use PHPCompiler\JIT\SplAutoloadCallbackPolicy;
 use PHPCompiler\JIT\Variable as JITVariable;
+use PHPCompiler\VM\EnumCaseSupport;
 use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
 
@@ -36,7 +38,11 @@ final class spl_autoload_register extends Internal
         $ctx = VmReflection::requireContext($frame);
         $callback = null;
         if ($argc >= 1) {
-            $callback = $frame->calledArgs[0]->resolveIndirect();
+            $callbackArg = $frame->calledArgs[0];
+            if (EnumCaseSupport::isEnumCaseVariable($callbackArg)) {
+                throw new \TypeError(SplAutoloadCallbackPolicy::invalidCallbackTypeError());
+            }
+            $callback = $callbackArg->resolveIndirect();
             if (Variable::TYPE_NULL === $callback->type) {
                 $callback = null;
             } elseif (!SplAutoloadCallbackPolicy::isVmSupportedType($callback->type)) {
@@ -84,6 +90,9 @@ final class spl_autoload_register extends Internal
             throw new \LogicException(
                 'spl_autoload_register() without a callback is not supported in this compiler build'
             );
+        }
+        if (null !== JitOperandTypeLabel::compileTimeEnumClassName($context, $args[0])) {
+            throw new \TypeError(SplAutoloadCallbackPolicy::invalidCallbackTypeError());
         }
         if (!SplAutoloadCallbackPolicy::isJitLowerable($args[0])) {
             throw new \LogicException(SplAutoloadCallbackPolicy::jitRejectionMessage());

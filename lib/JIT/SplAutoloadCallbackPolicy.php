@@ -47,4 +47,12 @@ final class SplAutoloadCallbackPolicy
         return 'spl_autoload_register() callback must be a compile-time string function name in this compiler build; '
             .self::DEFERRED_KINDS.' are deferred (#1776)';
     }
+
+    /**
+     * Zend spl_autoload_register() invalid callback TypeError (#6244, ext/spl/php_spl.c).
+     */
+    public static function invalidCallbackTypeError(): string
+    {
+        return 'spl_autoload_register(): Argument #1 ($callback) must be a valid callback or null, no array or string given';
+    }
 }

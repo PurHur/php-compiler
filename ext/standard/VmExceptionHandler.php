@@ -4,7 +4,9 @@ declare(strict_types=1);
 
 namespace PHPCompiler\ext\standard;
 
+use PHPCompiler\JIT\ExceptionHandlerCallbackPolicy;
 use PHPCompiler\VM\Context;
+use PHPCompiler\VM\EnumCaseSupport;
 use PHPCompiler\VM\Variable;
 
 /**
@@ -77,6 +79,9 @@ final class VmExceptionHandler
 
     private static function assertSupportedCallback(Variable $callback): void
     {
+        if (EnumCaseSupport::isEnumCaseVariable($callback)) {
+            throw new \TypeError(ExceptionHandlerCallbackPolicy::invalidCallbackTypeError());
+        }
         if (VmClosureCall::isClosure($callback)) {
             return;
         }
