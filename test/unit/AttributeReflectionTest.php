@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace PHPCompiler\Test\Unit;
 
 use PHPCompiler\Runtime;
+use PHPCompiler\VM\ScriptExit;
 use PHPUnit\Framework\Attributes\Group;
 use PHPUnit\Framework\TestCase;
 
@@ -169,9 +170,13 @@ class B {}
 $attr = (new ReflectionClass(B::class))->getAttributes()[0];
 $attr->newInstance();
 PHP;
-        $this->expectException(\Error::class);
-        $this->expectExceptionMessage('Attribute class "NonExistentAttribute" not found');
-        $runtime->run($runtime->parseAndCompile($code, 'attr_missing.php'));
+        try {
+            $runtime->run($runtime->parseAndCompile($code, 'attr_missing.php'));
+            $this->fail('Expected uncaught Error for missing attribute class');
+        } catch (ScriptExit $e) {
+            // Zend SAPI fatal — VM maps uncaught Error to ScriptExit (#3206).
+            $this->assertSame(255, $e->status);
+        }
     }
 
     /** @covers issue #3467, #3253 */
