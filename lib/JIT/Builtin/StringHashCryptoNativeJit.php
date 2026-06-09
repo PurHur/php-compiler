@@ -1634,6 +1634,168 @@ final class StringHashCryptoNativeJit
         $context->builder->clearInsertionPosition();
     }
 
+    private static function emitDigestLen(Context $context): void
+    {
+        $probe = $context->module->getNamedFunction('__phpc_hc_digest_len');
+        if (null !== $probe && $probe->countBasicBlocks() > 0) {
+            return;
+        }
+        $i32 = $context->getTypeFromString('int32');
+        $i64 = $context->getTypeFromString('int64');
+        $fn = null !== $probe ? $probe : $context->module->addFunction(
+            '__phpc_hc_digest_len',
+            $context->context->functionType($i64, false, $i32)
+        );
+        $entry = $fn->appendBasicBlock('hc_digest_len_entry');
+        $context->builder->positionAtEnd($entry);
+        $algo = $fn->getParam(0);
+        $is256 = $context->builder->icmp(Builder::INT_EQ, $algo, $i32->constInt(self::ALGO_SHA256, false));
+        $is1 = $context->builder->icmp(Builder::INT_EQ, $algo, $i32->constInt(self::ALGO_SHA1, false));
+        $len = $context->builder->select(
+            $is256,
+            $i64->constInt(self::SHA256_DIGEST_SIZE, false),
+            $context->builder->select(
+                $is1,
+                $i64->constInt(self::SHA1_DIGEST_SIZE, false),
+                $i64->constInt(self::MD5_DIGEST_SIZE, false)
+            )
+        );
+        $context->builder->returnValue($len);
+        $context->builder->clearInsertionPosition();
+    }
+
+    private static function emitHexEncode(Context $context): void
+    {
+        $probe = $context->module->getNamedFunction('__phpc_hc_hex_encode');
+        if (null !== $probe && $probe->countBasicBlocks() > 0) {
+            return;
+        }
+        $i32 = $context->getTypeFromString('int32');
+        $i64 = $context->getTypeFromString('int64');
+        $i8 = $context->getTypeFromString('int8');
+        $i8p = $context->getTypeFromString('int8*');
+        $sizeT = $context->getTypeFromString('size_t');
+        $voidTy = $context->getTypeFromString('void');
+        $fn = null !== $probe ? $probe : $context->module->addFunction(
+            '__phpc_hc_hex_encode',
+            $context->context->functionType($voidTy, false, $i8p, $sizeT, $i8p)
+        );
+        $entry = $fn->appendBasicBlock('hc_hex_entry');
+        $context->builder->positionAtEnd($entry);
+        $bin = $fn->getParam(0);
+        $binLen = $fn->getParam(1);
+        $out = $fn->getParam(2);
+        $iSlot = BasicBlockHelper::entryAlloca($context, $sizeT);
+        $context->builder->store($sizeT->constInt(0, false), $iSlot);
+        $loopHead = $fn->appendBasicBlock('hc_hex_head');
+        $loopBody = $fn->appendBasicBlock('hc_hex_body');
+        $loopDone = $fn->appendBasicBlock('hc_hex_done');
+        $context->builder->branch($loopHead);
+
+        $context->builder->positionAtEnd($loopHead);
+        $i = $context->builder->load($iSlot);
+        $done = $context->builder->icmp(Builder::INT_UGE, $i, $binLen);
+        $context->builder->branchIf($done, $loopDone, $loopBody);
+
+        $context->builder->positionAtEnd($loopBody);
+        $b = $context->builder->zExt(
+            $context->builder->load($context->builder->gep($bin, $context->builder->truncOrBitCast($i, $i64))),
+            $i32
+        );
+        $hi = $context->builder->and($context->builder->lShr($b, $i32->constInt(4, false)), $i32->constInt(0xF, false));
+        $lo = $context->builder->and($b, $i32->constInt(0xF, false));
+        $outIdx = $context->builder->mul($context->builder->truncOrBitCast($i, $i64), $i64->constInt(2, false));
+        foreach ([$hi, $lo] as $j => $nibble) {
+            $isDigit = $context->builder->icmp(Builder::INT_SLT, $nibble, $i32->constInt(10, false));
+            $ch = $context->builder->select(
+                $isDigit,
+                $context->builder->add($nibble, $i32->constInt((int) \ord('0'), false)),
+                $context->builder->add($nibble, $i32->constInt((int) \ord('a') - 10, false))
+            );
+            $context->builder->store(
+                $context->builder->trunc($ch, $i8),
+                $context->builder->gep($out, $context->builder->add($outIdx, $i64->constInt($j, false)))
+            );
+        }
+        $context->builder->store($context->builder->add($i, $sizeT->constInt(1, false)), $iSlot);
+        $context->builder->branch($loopHead);
+
+        $context->builder->positionAtEnd($loopDone);
+        $nullPos = $context->builder->mul($context->builder->truncOrBitCast($binLen, $i64), $i64->constInt(2, false));
+        $context->builder->store($i8->constInt(0, false), $context->builder->gep($out, $nullPos));
+        $context->builder->returnVoid();
+        $context->builder->clearInsertionPosition();
+    }
+
+    private static function emitResultString(Context $context): void
+    {
+        $probe = $context->module->getNamedFunction('__phpc_hc_result_string');
+        if (null !== $probe && $probe->countBasicBlocks() > 0) {
+            return;
+        }
+        $strPtr = $context->getTypeFromString('__string__*');
+        $i32 = $context->getTypeFromString('int32');
+        $i64 = $context->getTypeFromString('int64');
+        $i8p = $context->getTypeFromString('int8*');
+        $charPtr = $context->getTypeFromString('char*');
+        $sizeT = $context->getTypeFromString('size_t');
+        $fn = null !== $probe ? $probe : $context->module->addFunction(
+            '__phpc_hc_result_string',
+            $context->context->functionType($strPtr, false, $i32, $i8p, $i32)
+        );
+        $entry = $fn->appendBasicBlock('hc_result_entry');
+        $context->builder->positionAtEnd($entry);
+        $algo = $fn->getParam(0);
+        $digest = $fn->getParam(1);
+        $raw = $fn->getParam(2);
+        $dlen = self::callDigestLen($context, $algo);
+        $rawNonZero = $context->builder->icmp(Builder::INT_NE, $raw, $i32->constInt(0, false));
+        $rawBb = $fn->appendBasicBlock('hc_result_raw');
+        $hexBb = $fn->appendBasicBlock('hc_result_hex');
+        $context->builder->branchIf($rawNonZero, $rawBb, $hexBb);
+
+        $context->builder->positionAtEnd($rawBb);
+        $context->builder->returnValue($context->builder->call(
+            $context->lookupFunction('__string__init'),
+            $dlen,
+            $context->builder->pointerCast($digest, $charPtr)
+        ));
+
+        $context->builder->positionAtEnd($hexBb);
+        $hexLen = $context->builder->mul($dlen, $i64->constInt(2, false));
+        $hex = $context->builder->call(
+            $context->lookupFunction('malloc'),
+            $context->builder->truncOrBitCast(
+                $context->builder->add($hexLen, $i64->constInt(1, false)),
+                $sizeT
+            )
+        );
+        $hexFail = $fn->appendBasicBlock('hc_result_hex_fail');
+        $hexOk = $fn->appendBasicBlock('hc_result_hex_ok');
+        $context->builder->branchIf(
+            $context->builder->icmp(Builder::INT_EQ, $hex, $i8p->constNull()),
+            $hexFail,
+            $hexOk
+        );
+        $context->builder->positionAtEnd($hexFail);
+        $context->builder->returnValue($strPtr->constNull());
+        $context->builder->positionAtEnd($hexOk);
+        self::callHexEncode(
+            $context,
+            $digest,
+            $context->builder->truncOrBitCast($dlen, $sizeT),
+            $hex
+        );
+        $hexResult = $context->builder->call(
+            $context->lookupFunction('__string__init'),
+            $hexLen,
+            $context->builder->pointerCast($hex, $charPtr)
+        );
+        $context->builder->call($context->lookupFunction('free'), $hex);
+        $context->builder->returnValue($hexResult);
+        $context->builder->clearInsertionPosition();
+    }
+
     /** @param list<int> $bytes */
     private static function matchFixedCi(Context $context, LlvmFunction $fn, Value $data, Value $len, array $bytes, int $tlen, int $id): Value
     {

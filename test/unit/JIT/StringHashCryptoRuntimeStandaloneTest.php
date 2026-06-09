@@ -4,10 +4,12 @@ declare(strict_types=1);
 
 namespace PHPCompiler\JIT;
 
+use PHPCompiler\JIT\Builtin\StringHashCrypto;
+use PHPCompiler\Runtime;
 use PHPUnit\Framework\TestCase;
 
 /**
- * Issue #7437: hash crypto LLVM helpers must lower without hash_crypto_jit_runtime.c.
+ * Issues #7189 / #7437: hash crypto LLVM helpers lower without hash_crypto_jit_runtime.c.
  *
  * @group aot-lint
  */
@@ -36,5 +38,25 @@ final class StringHashCryptoRuntimeStandaloneTest extends TestCase
         $runtime = (string) file_get_contents(__DIR__.'/../../../lib/JIT/Builtin/StringHashCrypto.php');
         $this->assertStringContainsString('StringHashCryptoJit', $runtime);
         $this->assertStringNotContainsString('hash_crypto.c', $runtime);
+    }
+
+    public function testEnsureLinkedDefinesHashCryptoForStandalone(): void
+    {
+        $runtime = new Runtime(Runtime::MODE_AOT);
+        $ctx = new Context($runtime, Builtin::LOAD_TYPE_STANDALONE);
+        StringHashCrypto::ensureLinked($ctx);
+
+        foreach ([
+            '__compiler_hash',
+            '__compiler_hash_hmac',
+            '__compiler_hash_pbkdf2',
+            '__compiler_hash_equals',
+            '__compiler_hash_hmac_algos',
+            '__phpc_hc_sha256_transform',
+        ] as $name) {
+            $fn = $ctx->lookupFunction($name);
+            $this->assertNotNull($fn, $name);
+            $this->assertGreaterThan(0, $fn->countBasicBlocks(), $name);
+        }
     }
 }

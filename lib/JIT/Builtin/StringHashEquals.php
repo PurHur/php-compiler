@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace PHPCompiler\JIT\Builtin;
 
+use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Context;
 use PHPLLVM\Builder;
 use PHPLLVM\Value;
@@ -55,25 +56,28 @@ final class StringHashEquals
         $zeroI64 = $i64->constInt(0, false);
         $oneI64 = $i64->constInt(1, false);
 
+        $iSlot = BasicBlockHelper::entryAlloca($context, $i64);
+        $accSlot = BasicBlockHelper::entryAlloca($context, $i32);
+        $knownData = self::stringData($context, $known);
+        $userData = self::stringData($context, $user);
+
         $strlen = $context->lookupFunction('__string__strlen');
         $knownLen = $context->builder->call($strlen, $known);
         $userLen = $context->builder->call($strlen, $user);
         $lenMismatch = $context->builder->icmp(Builder::INT_NE, $knownLen, $userLen);
 
         $failBb = $fn->appendBasicBlock('hash_equals_fail');
+        $loopInit = $fn->appendBasicBlock('hash_equals_loop_init');
         $loopHead = $fn->appendBasicBlock('hash_equals_loop_head');
-        $context->builder->branchIf($lenMismatch, $failBb, $loopHead);
+        $context->builder->branchIf($lenMismatch, $failBb, $loopInit);
 
         $context->builder->positionAtEnd($failBb);
         $context->builder->returnValue($zeroI32);
-        $context->builder->clearInsertionPosition();
 
-        $knownData = self::stringData($context, $known);
-        $userData = self::stringData($context, $user);
-        $iSlot = $context->builder->alloca($i64, 1, 'hash_equals_i');
-        $accSlot = $context->builder->alloca($i32, 1, 'hash_equals_acc');
+        $context->builder->positionAtEnd($loopInit);
         $context->builder->store($zeroI64, $iSlot);
         $context->builder->store($zeroI32, $accSlot);
+        $context->builder->branch($loopHead);
 
         $context->builder->positionAtEnd($loopHead);
         $i = $context->builder->load($iSlot);
@@ -98,10 +102,14 @@ final class StringHashEquals
         $finalAcc = $context->builder->load($accSlot);
         $isZero = $context->builder->icmp(Builder::INT_EQ, $finalAcc, $zeroI32);
         $okBb = $fn->appendBasicBlock('hash_equals_ok');
-        $context->builder->branchIf($isZero, $okBb, $failBb);
+        $accFailBb = $fn->appendBasicBlock('hash_equals_acc_fail');
+        $context->builder->branchIf($isZero, $okBb, $accFailBb);
 
         $context->builder->positionAtEnd($okBb);
         $context->builder->returnValue($oneI32);
+
+        $context->builder->positionAtEnd($accFailBb);
+        $context->builder->returnValue($zeroI32);
         $context->builder->clearInsertionPosition();
     }
 
