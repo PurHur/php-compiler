@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace PHPCompiler\VM;
 
 use PHPCompiler\Compiler\AttributeEntry;
+use PHPCompiler\Compiler\AttributeNames;
 use PHPCompiler\Compiler\CompileTimeNew;
 use PHPCompiler\Compiler\SourceLocation;
 use PHPCompiler\ext\standard\VmReflection;
@@ -881,6 +882,17 @@ final class ReflectionSupport
         }
 
         return [new AttributeEntry('SensitiveParameter')];
+    }
+
+    public static function parameterIsSensitive(Context $ctx, ObjectEntry $reflection): bool
+    {
+        foreach (self::parameterAttributeEntries($ctx, $reflection) as $entry) {
+            if (AttributeNames::isSensitiveParameter([$entry->name])) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     /**
