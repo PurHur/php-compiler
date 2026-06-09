@@ -27,11 +27,7 @@ final class unpack extends Internal
         $data = VmString::coerceStringBuiltinArg($frame->calledArgs[1], 'unpack', 1, 'string');
         $offset = 0;
         if (3 === $argc) {
-            $offsetVar = $frame->calledArgs[2]->resolveIndirect();
-            if (Variable::TYPE_INTEGER !== $offsetVar->type) {
-                throw new \LogicException('unpack() offset must be an integer in this compiler build');
-            }
-            $offset = $offsetVar->toInt();
+            $offset = VmMath::parseIntBuiltinArg($frame->calledArgs[2], 'unpack', 3, 'offset');
         }
         $result = VmPack::unpack($fmt, $data, $offset);
         BuiltinExecute::writeReturn($frame, static function (Variable $ret) use ($frame, $result): void {
