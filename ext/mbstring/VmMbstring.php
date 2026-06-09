@@ -445,7 +445,7 @@ final class VmMbstring
         return true;
     }
 
-    private static function assertCheckEncodingName(string $encoding): void
+    public static function assertCheckEncodingName(string $encoding): void
     {
         if (null === CharsetEngine::parseEncodingSpec($encoding)) {
             throw new \ValueError(sprintf(

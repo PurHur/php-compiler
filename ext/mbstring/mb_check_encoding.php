@@ -12,8 +12,6 @@ use PHPLLVM\Value;
 
 /**
  * mb_check_encoding() — multibyte validity probe (php-src ext/mbstring/mbstring.c; #4571).
- *
- * VM only — delegates to host mbstring when available; UTF-8/ASCII fallback otherwise.
  */
 final class mb_check_encoding extends Internal
 {
@@ -57,6 +55,16 @@ final class mb_check_encoding extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        throw new \LogicException('mb_check_encoding() is not implemented for JIT/AOT in this compiler build');
+        $argc = \count($args);
+        if ($argc > 2) {
+            throw new \LogicException('mb_check_encoding() expects at most two arguments');
+        }
+
+        $folded = JitMbCheckEncoding::tryCompileTimeFold($context, $args);
+        if (null !== $folded) {
+            return $folded;
+        }
+
+        return JitMbCheckEncoding::lowerRuntime($context, $args);
     }
 }
