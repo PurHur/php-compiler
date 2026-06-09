@@ -25,6 +25,10 @@ final class LevenshteinVMTest extends BaseTest
             __DIR__.'/cases/stdlib/levenshtein_numeric_cost.phpt',
             'levenshtein_numeric_cost.phpt'
         );
+        yield 'levenshtein_negative_cost.phpt' => self::parsePHPT(
+            __DIR__.'/cases/stdlib/levenshtein_negative_cost.phpt',
+            'levenshtein_negative_cost.phpt'
+        );
     }
 
     public function setUp(): void

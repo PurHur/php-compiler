@@ -28,6 +28,10 @@ final class LevenshteinJITTest extends BaseTest
             __DIR__.'/cases/stdlib/levenshtein_coerce_jit.phpt',
             'levenshtein_coerce_jit.phpt'
         );
+        yield 'levenshtein_negative_cost_jit.phpt' => self::parsePHPT(
+            __DIR__.'/cases/stdlib/levenshtein_negative_cost_jit.phpt',
+            'levenshtein_negative_cost_jit.phpt'
+        );
     }
 
     public function setUp(): void

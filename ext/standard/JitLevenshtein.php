@@ -34,10 +34,6 @@ final class JitLevenshtein
         $one = $i64->constInt(1, false);
         $eight = $i64->constInt(8, false);
 
-        $ins = self::clampCost($context, $ins, $one);
-        $rep = self::clampCost($context, $rep, $one);
-        $del = self::clampCost($context, $del, $one);
-
         $len1 = $context->builder->load($context->builder->structGep($s1, $map['length']));
         $len2 = $context->builder->load($context->builder->structGep($s2, $map['length']));
         $data1 = $context->builder->structGep($s1, $map['value']);
@@ -181,13 +177,6 @@ final class JitLevenshtein
         $context->builder->positionAtEnd($doneBb);
 
         return $context->builder->load($resultSlot);
-    }
-
-    private static function clampCost(Context $context, Value $cost, Value $one): Value
-    {
-        $ltOne = $context->builder->icmp(Builder::INT_SLT, $cost, $one);
-
-        return $context->builder->select($ltOne, $one, $cost);
     }
 
     private static function min3(Context $context, Value $a, Value $b, Value $c): Value
