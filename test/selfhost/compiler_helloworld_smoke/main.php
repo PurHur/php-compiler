@@ -47,6 +47,7 @@ require_once __DIR__.'/../../../lib/Func/Internal.php';
 require_once __DIR__.'/../../../lib/Func/JIT.php';
 require_once __DIR__.'/../../../lib/JIT/Variable.php';
 require_once __DIR__.'/../../../lib/JIT/IssetHelper.php';
+require_once __DIR__.'/../../../ext/standard/SuperglobalNames.php';
 require_once __DIR__.'/../../../lib/Web/Superglobals.php';
 require_once __DIR__.'/../../../lib/JIT/Scope.php';
 require_once __DIR__.'/../../../lib/JIT/Analyzer.php';

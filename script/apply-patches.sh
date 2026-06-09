@@ -471,6 +471,36 @@ PY
   echo "Applied php-cfg-arrow-function.patch (overlay)"
 }
 
+apply_php_cfg_process_assertions_overlay() {
+  local parser="$ROOT/vendor/ircmaxell/php-cfg/lib/PHPCfg/Parser.php"
+  local overlay="$PATCH_DIR/overlays/php-cfg/assertion-parser-methods.php"
+  if grep -q 'function processAssertions' "$parser" 2>/dev/null; then
+    echo "Skip php-cfg processAssertions overlay (already applied)"
+    return 0
+  fi
+  if [[ ! -f "$parser" || ! -f "$overlay" ]]; then
+    echo "Skip php-cfg processAssertions overlay (files missing)" >&2
+    return 1
+  fi
+  python3 - "$parser" "$overlay" <<'PY'
+import sys
+from pathlib import Path
+
+parser_path = Path(sys.argv[1])
+method_path = Path(sys.argv[2])
+text = parser_path.read_text()
+if 'function processAssertions' in text:
+    raise SystemExit(0)
+anchor = "    protected function readAssertion(Assertion $assert)"
+insert = method_path.read_text().rstrip("\n") + "\n\n"
+if anchor not in text:
+    sys.stderr.write("php-cfg-process-assertions: readAssertion anchor not found in Parser.php\n")
+    raise SystemExit(1)
+parser_path.write_text(text.replace(anchor, insert + anchor, 1))
+PY
+  echo "Applied php-cfg processAssertions overlay"
+}
+
 apply_php_cfg_yield_from_overlay() {
   local parser="$ROOT/vendor/ircmaxell/php-cfg/lib/PHPCfg/Parser.php"
   local op="$ROOT/vendor/ircmaxell/php-cfg/lib/PHPCfg/Op/Expr/YieldFrom.php"
@@ -4111,6 +4141,7 @@ if [[ -d "$ROOT/vendor/ircmaxell/php-cfg" ]]; then
   apply_patch "$PATCH_DIR/php-cfg-strict-types.patch"
   apply_patch "$PATCH_DIR/php-cfg-trycatch.patch"
   apply_patch "$PATCH_DIR/php-cfg-goto-scope.patch"
+  apply_php_cfg_process_assertions_overlay || true
   apply_patch "$PATCH_DIR/php-cfg-phi-resolver-null.patch"
   apply_patch "$PATCH_DIR/php-cfg-magic-constants.patch"
   apply_patch "$PATCH_DIR/php-cfg-magic-script-const.patch"

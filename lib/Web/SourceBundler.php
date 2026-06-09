@@ -11,6 +11,12 @@ final class SourceBundler
 {
     private const BUNDLE_FILE_MARKER_PREFIX = 'PHPC_BUNDLE_FILE:';
 
+    /** @var array<string, array<string, true>> */
+    private static array $bundledUseImports = [];
+
+    /** @var array<string, array<string, true>> */
+    private static array $bundledDeclaredTypes = [];
+
     /**
      * @param list<string> $includePaths absolute paths, compiled before entry
      *
@@ -25,6 +31,10 @@ final class SourceBundler
 
         $requireTargets = self::requireAssignmentTargets($entryRaw, $includePaths);
 
+        self::$bundledUseImports = [];
+        self::$bundledDeclaredTypes = [];
+        self::prescanBundledDeclaredTypes($includePaths, $projectRoot);
+        self::prescanBundledDeclaredTypes([$entryPath], $projectRoot);
         $parts = ['declare(strict_types=1);'];
         foreach ($includePaths as $path) {
             $raw = file_get_contents($path);
@@ -46,6 +56,7 @@ final class SourceBundler
             if (isset($requireTargets[$base])) {
                 $body = self::rewriteReturnOnlyInclude($body, $requireTargets[$base]);
             }
+            $body = self::wrapInBracedNamespace($body);
             $parts[] = $body;
         }
 
@@ -53,8 +64,10 @@ final class SourceBundler
             $entryRaw = self::stripResolvedRequires($entryRaw, $includePaths);
         }
         $parts[] = self::bundleFileMarker($entryPath);
-        $parts[] = self::rewriteDeployPathIncludes(
-            self::stripStrictTypesDeclare(self::stripOpenTag($entryRaw))
+        $parts[] = self::wrapInBracedNamespace(
+            self::rewriteDeployPathIncludes(
+                self::stripStrictTypesDeclare(self::stripOpenTag($entryRaw))
+            )
         );
 
         return ['<?php'."\n".implode("\n", $parts), $entryPath];
@@ -160,10 +173,21 @@ final class SourceBundler
     private static function stripOpenTag(string $code): string
     {
         $code = ltrim($code);
-        if (str_starts_with($code, '<?php')) {
-            $code = substr($code, 5);
-        } elseif (str_starts_with($code, '<?')) {
-            $code = substr($code, 2);
+        while ('' !== $code) {
+            if (preg_match('/^<\?php/', $code)) {
+                $code = substr($code, 5);
+                break;
+            }
+            if (preg_match('/^<\?/', $code)) {
+                $code = substr($code, 2);
+                break;
+            }
+            if (preg_match('/^#.*(?:\R|\z)/', $code, $m)) {
+                $code = substr($code, strlen($m[0]));
+
+                continue;
+            }
+            break;
         }
 
         return ltrim($code, " \t\n\r\0\x0B");
@@ -182,6 +206,347 @@ final class SourceBundler
         }
 
         return $code;
+    }
+
+    /**
+     * @param list<string> $paths
+     */
+    private static function prescanBundledDeclaredTypes(array $paths, ?string $projectRoot): void
+    {
+        foreach ($paths as $path) {
+            $raw = file_get_contents($path);
+            if (false === $raw) {
+                continue;
+            }
+            $body = self::stripStrictTypesDeclare(self::stripOpenTag($raw));
+            if (self::isComposerAutoloadInclude($path)) {
+                continue;
+            }
+            $namespaceName = self::extractSemicolonNamespaceName($body) ?? '';
+            self::registerBundledDeclaredTypes($namespaceName, $body);
+        }
+    }
+
+    private static function registerBundledDeclaredTypes(string $namespaceName, string $body): void
+    {
+        if (!isset(self::$bundledDeclaredTypes[$namespaceName])) {
+            self::$bundledDeclaredTypes[$namespaceName] = [];
+        }
+        if (!preg_match_all(
+            '/\b(?:class|interface|trait|enum)\s+([A-Za-z_\x7f-\xff][A-Za-z0-9_\x7f-\xff]*)\b/',
+            $body,
+            $matches
+        )) {
+            return;
+        }
+        foreach ($matches[1] as $name) {
+            self::$bundledDeclaredTypes[$namespaceName][self::normalizeUseImportLocalKey($name)] = true;
+        }
+    }
+
+    /**
+     * Isolate bundled compilation units so repeated `use` imports in the same namespace parse (#1416).
+     */
+    private static function wrapInBracedNamespace(string $code): string
+    {
+        $trimmed = ltrim($code);
+        if ('' === $trimmed) {
+            return $code;
+        }
+        if (preg_match('/^namespace\s+[^{;]+\s*\{/s', substr($trimmed, 0, 4096))) {
+            return $code;
+        }
+
+        $namespaceName = self::extractSemicolonNamespaceName($trimmed);
+        if (null === $namespaceName) {
+            $body = self::dedupeBundledUseStatements('', $trimmed);
+
+            return "namespace {\n".rtrim($body)."\n}\n";
+        }
+
+        $namespaceEnd = self::semicolonNamespaceBodyOffset($trimmed);
+        if (null === $namespaceEnd) {
+            $body = self::dedupeBundledUseStatements('', $trimmed);
+
+            return "namespace {\n".rtrim($body)."\n}\n";
+        }
+
+        $namespaceStart = strpos($trimmed, 'namespace');
+        if (false === $namespaceStart) {
+            $body = self::dedupeBundledUseStatements('', $trimmed);
+
+            return "namespace {\n".rtrim($body)."\n}\n";
+        }
+        $prefix = substr($trimmed, 0, $namespaceStart);
+        $body = substr($trimmed, $namespaceEnd);
+        $body = self::dedupeBundledUseStatements($namespaceName, $body);
+
+        return $prefix.'namespace '.$namespaceName." {\n".rtrim($body)."\n}\n";
+    }
+
+    private static function extractSemicolonNamespaceName(string $code): ?string
+    {
+        $tokens = token_get_all('<?php '.$code);
+        $index = 0;
+        if (isset($tokens[0]) && is_array($tokens[0]) && T_OPEN_TAG === $tokens[0][0]) {
+            $index = 1;
+        }
+
+        for ($i = $index, $n = count($tokens); $i < $n; ++$i) {
+            $token = $tokens[$i];
+            if (!is_array($token) || T_NAMESPACE !== $token[0]) {
+                continue;
+            }
+            $nameParts = [];
+            for (++$i; $i < $n; ++$i) {
+                $part = $tokens[$i];
+                if (is_string($part)) {
+                    if (';' === $part || '{' === $part) {
+                        $name = implode('', $nameParts);
+
+                        return '' === $name ? null : $name;
+                    }
+
+                    continue;
+                }
+                if (T_WHITESPACE === $part[0]) {
+                    continue;
+                }
+                if (T_STRING === $part[0] || T_NAME_QUALIFIED === $part[0] || T_NAME_FULLY_QUALIFIED === $part[0]) {
+                    $nameParts[] = $part[1];
+                }
+            }
+            break;
+        }
+
+        return null;
+    }
+
+    private static function semicolonNamespaceBodyOffset(string $trimmed): ?int
+    {
+        $tokens = token_get_all('<?php '.$trimmed);
+        $index = 0;
+        if (isset($tokens[0]) && is_array($tokens[0]) && T_OPEN_TAG === $tokens[0][0]) {
+            $index = 1;
+        }
+
+        for ($i = $index, $n = count($tokens); $i < $n; ++$i) {
+            $token = $tokens[$i];
+            if (!is_array($token) || T_NAMESPACE !== $token[0]) {
+                continue;
+            }
+            for (++$i; $i < $n; ++$i) {
+                $part = $tokens[$i];
+                if (is_string($part)) {
+                    if (';' === $part) {
+                        return self::tokenOffsetBefore($tokens, $index, $i) + 1;
+                    }
+                    if ('{' === $part) {
+                        return null;
+                    }
+                }
+            }
+            break;
+        }
+
+        return null;
+    }
+
+    private static function dedupeBundledUseStatements(string $namespaceName, string $body): string
+    {
+        if (!isset(self::$bundledUseImports[$namespaceName])) {
+            self::$bundledUseImports[$namespaceName] = ['stmt' => [], 'local' => []];
+        }
+        $seen =& self::$bundledUseImports[$namespaceName]['stmt'];
+        $seenLocal =& self::$bundledUseImports[$namespaceName]['local'];
+        $lines = preg_split('/\r\n|\n|\r/', $body) ?: [];
+        $kept = [];
+        /** @var list<array{local: string, alias: string}> */
+        $rewrites = [];
+        foreach ($lines as $line) {
+            if (preg_match('/^\s*use\s+([^;]+);\s*$/', $line, $m)) {
+                $stmt = trim($m[1]);
+                $canonical = self::canonicalUseStmt($stmt);
+                if (isset($seen[$canonical])) {
+                    continue;
+                }
+                $local = self::useImportLocalName($stmt);
+                $localKey = self::normalizeUseImportLocalKey($local);
+                $declaredTypeConflict = isset(self::$bundledDeclaredTypes[$namespaceName][$localKey]);
+                if (isset($seenLocal[$localKey])) {
+                    if (self::canonicalUseStmt($seenLocal[$localKey]) === $canonical) {
+                        continue;
+                    }
+                    $alias = self::uniqueBundledImportAlias($stmt, $namespaceName);
+                    $aliasedStmt = self::appendUseAlias($stmt, $alias);
+                    $aliasedCanonical = self::canonicalUseStmt($aliasedStmt);
+                    if (isset($seen[$aliasedCanonical])) {
+                        continue;
+                    }
+                    $seen[$aliasedCanonical] = true;
+                    $seenLocal[self::normalizeUseImportLocalKey($alias)] = $aliasedStmt;
+                    $rewrites[] = ['local' => $local, 'alias' => $alias];
+                    $kept[] = 'use '.$aliasedStmt.';';
+
+                    continue;
+                }
+                if ($declaredTypeConflict) {
+                    $alias = self::uniqueBundledImportAlias($stmt, $namespaceName);
+                    $aliasedStmt = self::appendUseAlias($stmt, $alias);
+                    $aliasedCanonical = self::canonicalUseStmt($aliasedStmt);
+                    if (isset($seen[$aliasedCanonical])) {
+                        continue;
+                    }
+                    $seen[$aliasedCanonical] = true;
+                    $seenLocal[self::normalizeUseImportLocalKey($alias)] = $aliasedStmt;
+                    $rewrites[] = ['local' => $local, 'alias' => $alias];
+                    $kept[] = 'use '.$aliasedStmt.';';
+
+                    continue;
+                }
+                $seen[$canonical] = true;
+                $seenLocal[$localKey] = $stmt;
+            }
+            $kept[] = $line;
+        }
+
+        $result = implode("\n", $kept);
+        foreach ($rewrites as $rewrite) {
+            $result = self::rewriteBundledLocalImportReferences(
+                $result,
+                $rewrite['local'],
+                $rewrite['alias']
+            );
+        }
+
+        return $result;
+    }
+
+    private static function normalizeUseImportLocalKey(string $local): string
+    {
+        return strtolower($local);
+    }
+
+    private static function canonicalUseStmt(string $stmt): string
+    {
+        if (preg_match('/^(.+)\s+as\s+(\w+)\s*$/', $stmt, $m)) {
+            return trim($m[1]).' as '.strtolower($m[2]);
+        }
+
+        return $stmt;
+    }
+
+    private static function useImportLocalName(string $stmt): string
+    {
+        if (preg_match('/\bas\s+(\w+)\s*$/', $stmt, $m)) {
+            return $m[1];
+        }
+        $parts = explode('\\', $stmt);
+
+        return end($parts);
+    }
+
+    private static function bundledImportConflictAlias(string $stmt): string
+    {
+        if (preg_match('/\bas\s+(\w+)\s*$/', $stmt, $m)) {
+            return $m[1].'Bundled';
+        }
+        $parts = explode('\\', $stmt);
+        $name = array_pop($parts) ?: $stmt;
+        if ([] !== $parts) {
+            $parent = array_pop($parts) ?: $parts[0];
+
+            return ucfirst(strtolower($parent)).$name;
+        }
+
+        return $name.'Bundled';
+    }
+
+    private static function uniqueBundledImportAlias(string $stmt, string $namespaceName): string
+    {
+        if (!isset(self::$bundledUseImports[$namespaceName])) {
+            return self::bundledImportConflictAlias($stmt);
+        }
+        $seenLocal = self::$bundledUseImports[$namespaceName]['local'];
+        $alias = self::bundledImportConflictAlias($stmt);
+        $suffix = 2;
+        while (isset($seenLocal[self::normalizeUseImportLocalKey($alias)])) {
+            $alias = self::bundledImportConflictAlias($stmt).$suffix;
+            ++$suffix;
+        }
+
+        return $alias;
+    }
+
+    private static function appendUseAlias(string $stmt, string $alias): string
+    {
+        if (preg_match('/\bas\s+\w+\s*$/', $stmt)) {
+            return preg_replace('/\bas\s+\w+\s*$/', 'as '.$alias, $stmt) ?? $stmt;
+        }
+
+        return $stmt.' as '.$alias;
+    }
+
+    private static function rewriteBundledLocalImportReferences(
+        string $code,
+        string $localName,
+        string $aliasName
+    ): string {
+        if ($localName === $aliasName) {
+            return $code;
+        }
+
+        $tokens = token_get_all('<?php '.$code);
+        $out = '';
+        $skipOpenTag = true;
+        $n = count($tokens);
+        for ($i = 0; $i < $n; ++$i) {
+            $token = $tokens[$i];
+            if ($skipOpenTag) {
+                if (is_array($token) && T_OPEN_TAG === $token[0]) {
+                    continue;
+                }
+                $skipOpenTag = false;
+            }
+            if (is_array($token) && T_STRING === $token[0] && $token[1] === $localName) {
+                $prev = self::previousMeaningfulToken($tokens, $i);
+                if (null !== $prev && ('\\' === $prev || (is_array($prev) && T_NS_SEPARATOR === $prev[0]))) {
+                    $out .= $token[1];
+                    continue;
+                }
+                $out .= $aliasName;
+                continue;
+            }
+            $out .= is_array($token) ? $token[1] : $token;
+        }
+
+        return $out;
+    }
+
+    /** @return array{0: int, 1: string}|string|null */
+    private static function previousMeaningfulToken(array $tokens, int $index): array|string|null
+    {
+        for ($i = $index - 1; $i >= 0; --$i) {
+            $token = $tokens[$i];
+            if (is_array($token) && T_WHITESPACE === $token[0]) {
+                continue;
+            }
+
+            return $token;
+        }
+
+        return null;
+    }
+
+    private static function tokenOffsetBefore(array $tokens, int $startIndex, int $targetIndex): int
+    {
+        $offset = 0;
+        for ($i = $startIndex; $i < $targetIndex; ++$i) {
+            $token = $tokens[$i];
+            $offset += is_array($token) ? strlen($token[1]) : strlen($token);
+        }
+
+        return $offset;
     }
 
     /**

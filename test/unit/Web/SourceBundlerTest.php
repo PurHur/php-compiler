@@ -128,6 +128,170 @@ final class SourceBundlerTest extends TestCase
         }
     }
 
+    public function testBundleWrapsRepeatedUseImportsInBracedNamespaces(): void
+    {
+        $dir = sys_get_temp_dir().'/phpc_bundle_'.bin2hex(random_bytes(6));
+        $this->assertTrue(mkdir($dir));
+        try {
+            file_put_contents(
+                $dir.'/block.php',
+                "<?php\nnamespace PHPCompiler;\n\nuse PHPCompiler\\VM\\Context;\n\nclass Block {}\n"
+            );
+            file_put_contents(
+                $dir.'/frame.php',
+                "<?php\n# generated\nnamespace PHPCompiler;\n\nuse PHPCompiler\\VM\\Context;\n\nclass Frame {}\n"
+            );
+            file_put_contents(
+                $dir.'/native.php',
+                "<?php\n# generated\nnamespace PHPCompiler\\JIT\\Call;\n\nuse PHPCompiler\\JIT\\Context;\n\nclass Native {}\n"
+            );
+            file_put_contents(
+                $dir.'/index.php',
+                "<?php\nrequire __DIR__ . '/block.php';\nrequire __DIR__ . '/frame.php';\nrequire __DIR__ . '/native.php';\necho 'ok';\n"
+            );
+
+            [$bundled] = SourceBundler::bundleForAot(
+                $dir.'/index.php',
+                [
+                    realpath($dir.'/block.php') ?: $dir.'/block.php',
+                    realpath($dir.'/frame.php') ?: $dir.'/frame.php',
+                    realpath($dir.'/native.php') ?: $dir.'/native.php',
+                ]
+            );
+
+            $this->assertStringContainsString('namespace PHPCompiler {', $bundled);
+            $this->assertStringContainsString('namespace PHPCompiler\\JIT\\Call {', $bundled);
+            $this->assertStringNotContainsString("namespace PHPCompiler;\n\nuse", $bundled);
+            $this->assertStringContainsString('namespace {', $bundled);
+        } finally {
+            foreach (['block.php', 'frame.php', 'native.php', 'index.php'] as $file) {
+                @unlink($dir.'/'.$file);
+            }
+            @rmdir($dir);
+        }
+    }
+
+    public function testBundleRenamesConflictingUseImportLocalNames(): void
+    {
+        $dir = sys_get_temp_dir().'/phpc_bundle_'.bin2hex(random_bytes(6));
+        $this->assertTrue(mkdir($dir));
+        try {
+            file_put_contents(
+                $dir.'/types.php',
+                "<?php\nnamespace PHPCompiler\\JIT;\n\nuse PHPTypes\\Type;\n\nclass TypesUser {}\n"
+            );
+            file_put_contents(
+                $dir.'/llvm.php',
+                "<?php\nnamespace PHPCompiler\\JIT;\n\nuse PHPLLVM\\Type;\n\nclass LlvmUser {\n"
+                ."    public static function entry(Type \$type): void {}\n}\n"
+            );
+            file_put_contents(
+                $dir.'/index.php',
+                "<?php\nrequire __DIR__ . '/types.php';\nrequire __DIR__ . '/llvm.php';\n"
+            );
+
+            [$bundled] = SourceBundler::bundleForAot(
+                $dir.'/index.php',
+                [
+                    realpath($dir.'/types.php') ?: $dir.'/types.php',
+                    realpath($dir.'/llvm.php') ?: $dir.'/llvm.php',
+                ]
+            );
+
+            $this->assertStringContainsString('use PHPTypes\\Type;', $bundled);
+            $this->assertStringContainsString('use PHPLLVM\\Type as PhpllvmType;', $bundled);
+            $this->assertStringContainsString('entry(PhpllvmType $type)', $bundled);
+            $this->assertStringNotContainsString('use PHPLLVM\\Type;', $bundled);
+        } finally {
+            foreach (['types.php', 'llvm.php', 'index.php'] as $file) {
+                @unlink($dir.'/'.$file);
+            }
+            @rmdir($dir);
+        }
+    }
+
+    public function testBundleSkipsDuplicateUseImportAliasCasing(): void
+    {
+        $dir = sys_get_temp_dir().'/phpc_bundle_'.bin2hex(random_bytes(6));
+        $this->assertTrue(mkdir($dir));
+        try {
+            file_put_contents(
+                $dir.'/first.php',
+                "<?php\nnamespace PHPCompiler\\JIT;\n\nuse PHPCompiler\\VM\\Variable as VMVariable;\n\nclass First {}\n"
+            );
+            file_put_contents(
+                $dir.'/second.php',
+                "<?php\nnamespace PHPCompiler\\JIT;\n\nuse PHPCompiler\\VM\\Variable as VmVariable;\n\nclass Second {}\n"
+            );
+            file_put_contents(
+                $dir.'/index.php',
+                "<?php\nrequire __DIR__ . '/first.php';\nrequire __DIR__ . '/second.php';\n"
+            );
+
+            [$bundled] = SourceBundler::bundleForAot(
+                $dir.'/index.php',
+                [
+                    realpath($dir.'/first.php') ?: $dir.'/first.php',
+                    realpath($dir.'/second.php') ?: $dir.'/second.php',
+                ]
+            );
+
+            $this->assertSame(1, substr_count($bundled, 'use PHPCompiler\\VM\\Variable as'));
+        } finally {
+            foreach (['first.php', 'second.php', 'index.php'] as $file) {
+                @unlink($dir.'/'.$file);
+            }
+            @rmdir($dir);
+        }
+    }
+
+    public function testBundleAliasesUseImportThatShadowsDeclaredType(): void
+    {
+        $dir = sys_get_temp_dir().'/phpc_bundle_'.bin2hex(random_bytes(6));
+        $this->assertTrue(mkdir($dir));
+        try {
+            file_put_contents(
+                $dir.'/variable.php',
+                "<?php\nnamespace PHPCompiler\\JIT;\n\nclass Variable {}\n"
+            );
+            file_put_contents(
+                $dir.'/operand.php',
+                "<?php\nnamespace PHPCompiler\\JIT;\n\nuse PHPCompiler\\VM\\Variable;\n\nclass Operand {\n"
+                ."    public static function check(): bool {\n"
+                ."        return Variable::TYPE_STRING === Variable::TYPE_STRING;\n"
+                ."    }\n}\n"
+            );
+            file_put_contents(
+                $dir.'/call.php',
+                "<?php\nnamespace PHPCompiler\\JIT;\n\ninterface Call {\n"
+                ."    public function call(Variable ...\$args): void;\n}\n"
+            );
+            file_put_contents(
+                $dir.'/index.php',
+                "<?php\nrequire __DIR__ . '/variable.php';\nrequire __DIR__ . '/operand.php';\nrequire __DIR__ . '/call.php';\n"
+            );
+
+            [$bundled] = SourceBundler::bundleForAot(
+                $dir.'/index.php',
+                [
+                    realpath($dir.'/variable.php') ?: $dir.'/variable.php',
+                    realpath($dir.'/operand.php') ?: $dir.'/operand.php',
+                    realpath($dir.'/call.php') ?: $dir.'/call.php',
+                ]
+            );
+
+            $this->assertStringContainsString('use PHPCompiler\\VM\\Variable as VmVariable;', $bundled);
+            $this->assertStringContainsString('Variable::TYPE_STRING', $bundled);
+            $this->assertStringContainsString('VmVariable::TYPE_STRING', $bundled);
+            $this->assertStringContainsString('function call(Variable ...$args)', $bundled);
+        } finally {
+            foreach (['variable.php', 'operand.php', 'call.php', 'index.php'] as $file) {
+                @unlink($dir.'/'.$file);
+            }
+            @rmdir($dir);
+        }
+    }
+
     public function testBundleMiniWebAppUsesLiteralDirForMethodIncludes(): void
     {
         $entry = realpath(dirname(__DIR__, 3).'/examples/003-MiniWebApp/public/index.php');
