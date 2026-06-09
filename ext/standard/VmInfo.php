@@ -144,7 +144,18 @@ final class VmInfo
         return self::applyVersionCompareOperator($compare, $operator);
     }
 
-    public static function applyVersionCompareOperator(int $compare, string $operator): bool
+    public const VERSION_COMPARE_OPERATOR_ERROR =
+        'version_compare(): Argument #3 ($operator) must be a valid comparison operator';
+
+    public static function isValidVersionCompareOperator(string $operator): bool
+    {
+        return null !== self::evaluateVersionCompareOperator(0, $operator);
+    }
+
+    /**
+     * @return bool|null null when $operator is not a valid comparison operator (php-src versioning.c)
+     */
+    public static function evaluateVersionCompareOperator(int $compare, string $operator): ?bool
     {
         $len = \strlen($operator);
         if (
@@ -186,9 +197,17 @@ final class VmInfo
             return 0 !== $compare;
         }
 
-        throw new \LogicException(
-            'version_compare(): Argument #3 ($operator) must be a valid comparison operator'
-        );
+        return null;
+    }
+
+    public static function applyVersionCompareOperator(int $compare, string $operator): bool
+    {
+        $result = self::evaluateVersionCompareOperator($compare, $operator);
+        if (null === $result) {
+            throw new \ValueError(self::VERSION_COMPARE_OPERATOR_ERROR);
+        }
+
+        return $result;
     }
 
     private static function phpVersionCompare(string $origVer1, string $origVer2): int
