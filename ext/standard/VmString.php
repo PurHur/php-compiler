@@ -1686,35 +1686,9 @@ final class VmString
         if (preg_match('#^([a-z][a-z0-9+.-]*):#i', $rest, $m)) {
             $scheme = strtolower($m[1]);
             $rest = substr($rest, strlen($m[0]));
-            if (str_starts_with($rest, '//')) {
-                $rest = substr($rest, 2);
-                $slash = strpos($rest, '/');
-                $q = strpos($rest, '?');
-                $hash = strpos($rest, '#');
-                $end = self::minPositive([$slash, $q, $hash]);
-                $authority = false === $end ? $rest : substr($rest, 0, $end);
-                $rest = false === $end ? '' : substr($rest, $end);
-                if (str_contains($authority, '@')) {
-                    $atPos = strrpos($authority, '@');
-                    $userinfo = substr($authority, 0, $atPos);
-                    $authority = substr($authority, $atPos + 1);
-                    if ('' !== $userinfo) {
-                        $colonPos = strpos($userinfo, ':');
-                        if (false !== $colonPos) {
-                            $user = substr($userinfo, 0, $colonPos);
-                            $pass = substr($userinfo, $colonPos + 1);
-                        } else {
-                            $user = $userinfo;
-                        }
-                    }
-                }
-                if (str_contains($authority, ':')) {
-                    [$host, $portStr] = explode(':', $authority, 2);
-                    $port = (int) $portStr;
-                } else {
-                    $host = $authority;
-                }
-            }
+            self::parseUrlAuthority($rest, $host, $port, $user, $pass);
+        } elseif (str_starts_with($rest, '//')) {
+            self::parseUrlAuthority($rest, $host, $port, $user, $pass);
         }
 
         if (str_contains($rest, '#')) {
@@ -1767,6 +1741,48 @@ final class VmString
                 return self::parseUrlComponentOrFalse($fragment);
             default:
                 throw new \LogicException('parse_url() component not supported in this compiler build');
+        }
+    }
+
+    /**
+     * Parse //authority from $rest when present (scheme-relative or post-scheme URLs).
+     */
+    private static function parseUrlAuthority(
+        string &$rest,
+        ?string &$host,
+        ?int &$port,
+        ?string &$user,
+        ?string &$pass
+    ): void {
+        if (!str_starts_with($rest, '//')) {
+            return;
+        }
+        $rest = substr($rest, 2);
+        $slash = strpos($rest, '/');
+        $q = strpos($rest, '?');
+        $hash = strpos($rest, '#');
+        $end = self::minPositive([$slash, $q, $hash]);
+        $authority = false === $end ? $rest : substr($rest, 0, $end);
+        $rest = false === $end ? '' : substr($rest, $end);
+        if (str_contains($authority, '@')) {
+            $atPos = strrpos($authority, '@');
+            $userinfo = substr($authority, 0, $atPos);
+            $authority = substr($authority, $atPos + 1);
+            if ('' !== $userinfo) {
+                $colonPos = strpos($userinfo, ':');
+                if (false !== $colonPos) {
+                    $user = substr($userinfo, 0, $colonPos);
+                    $pass = substr($userinfo, $colonPos + 1);
+                } else {
+                    $user = $userinfo;
+                }
+            }
+        }
+        if (str_contains($authority, ':')) {
+            [$host, $portStr] = explode(':', $authority, 2);
+            $port = (int) $portStr;
+        } else {
+            $host = $authority;
         }
     }
 
