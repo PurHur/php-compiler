@@ -163,6 +163,7 @@ final class BuiltinClasses
         LazyGhostTraitSupport::register($ctx);
         AttributeSupport::register($ctx);
         self::registerStdClass($ctx);
+        self::registerIncompleteClass($ctx);
         self::registerResource($ctx);
         self::registerCountable($ctx);
         self::registerArrayAccess($ctx);
@@ -244,6 +245,14 @@ final class BuiltinClasses
         $entry = new ClassEntry('stdClass');
         $entry->allowsDynamicProperties = true;
         $ctx->classes['stdclass'] = $entry;
+    }
+
+    /** Zend var_unserializer.c — placeholder for missing class definitions (#6564). */
+    private static function registerIncompleteClass(Context $ctx): void
+    {
+        $entry = new ClassEntry('__PHP_Incomplete_Class');
+        $entry->allowsDynamicProperties = true;
+        $ctx->classes['__php_incomplete_class'] = $entry;
     }
 
     /** PHP 8.4 Resource builtin — stream/dir zval wrapper (#7071, #7073). */
