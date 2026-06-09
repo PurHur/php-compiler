@@ -9,6 +9,7 @@ use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitLongArg;
 use PHPCompiler\JIT\Variable as JITVariable;
+use PHPCompiler\VM\EnumCaseSupport;
 use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
 
@@ -35,18 +36,15 @@ final class stream_get_contents extends Internal
         $maxlength = -1;
         $offset = -1;
         if ($argc >= 2) {
-            $maxVar = $frame->calledArgs[1]->resolveIndirect();
-            if (Variable::TYPE_INTEGER !== $maxVar->type) {
-                throw new \LogicException('stream_get_contents() maxlength must be an integer in this compiler build');
-            }
-            $maxlength = $maxVar->toInt();
+            $maxlength = self::parseLengthArg($frame->calledArgs[1]->resolveIndirect());
         }
         if (3 === $argc) {
-            $offVar = $frame->calledArgs[2]->resolveIndirect();
-            if (Variable::TYPE_INTEGER !== $offVar->type) {
-                throw new \LogicException('stream_get_contents() offset must be an integer in this compiler build');
-            }
-            $offset = $offVar->toInt();
+            $offset = VmMath::parseIntBuiltinArg(
+                $frame->calledArgs[2]->resolveIndirect(),
+                'stream_get_contents',
+                3,
+                'offset'
+            );
         }
         $data = VmFs::streamGetContents($handleVar->toInt(), $maxlength, $offset);
         if (false === $data) {
@@ -69,22 +67,82 @@ final class stream_get_contents extends Internal
             $i64
         );
         if ($argc >= 2) {
-            $maxlength = $context->builder->truncOrBitCast(
-                JitLongArg::lower($context, $args[1], 'stream_get_contents() maxlength'),
-                $i64
-            );
+            $maxlength = JitStreamGetContents::lowerLengthArg($context, $args[1]);
         } else {
             $maxlength = $i64->constInt(-1, true);
         }
         if (3 === $argc) {
-            $offset = $context->builder->truncOrBitCast(
-                JitLongArg::lower($context, $args[2], 'stream_get_contents() offset'),
-                $i64
-            );
+            $offset = JitStreamGetContents::lowerOffsetArg($context, $args[2]);
         } else {
             $offset = $i64->constInt(-1, true);
         }
 
         return JitStreamGetContents::invoke($context, $handle, $maxlength, $offset);
+    }
+
+    /**
+     * php-src: Z_PARAM_LONG_OR_NULL (ext/standard/streamsfuncs.c — stream_get_contents).
+     *
+     * @throws \TypeError
+     */
+    private static function parseLengthArg(Variable $var): int
+    {
+        $var = $var->resolveIndirect();
+        if (EnumCaseSupport::isEnumCaseVariable($var)) {
+            throw new \TypeError(self::nullableLengthTypeError(
+                EnumCaseSupport::typeNameForVariable($var)
+            ));
+        }
+        if (Variable::TYPE_NULL === $var->type) {
+            return -1;
+        }
+        if (Variable::TYPE_ARRAY === $var->type) {
+            throw new \TypeError(self::nullableLengthTypeError('array'));
+        }
+        if (Variable::TYPE_OBJECT === $var->type) {
+            throw new \TypeError(self::nullableLengthTypeError('object'));
+        }
+        switch ($var->type) {
+            case Variable::TYPE_INTEGER:
+                return $var->toInt();
+            case Variable::TYPE_BOOLEAN:
+                return $var->toBool() ? 1 : 0;
+            case Variable::TYPE_FLOAT:
+                return (int) $var->toFloat();
+            case Variable::TYPE_STRING:
+                $s = $var->toString();
+                if ('' === $s || !is_numeric($s)) {
+                    throw new \TypeError(self::nullableLengthTypeError('string'));
+                }
+
+                return (int) $s;
+            default:
+                throw new \TypeError(
+                    self::nullableLengthTypeError(self::vmTypeName($var->type))
+                );
+        }
+    }
+
+    private static function nullableLengthTypeError(string $given): string
+    {
+        return sprintf(
+            'stream_get_contents(): Argument #2 ($length) must be of type ?int, %s given',
+            $given
+        );
+    }
+
+    private static function vmTypeName(int $type): string
+    {
+        return match ($type) {
+            Variable::TYPE_INTEGER => 'int',
+            Variable::TYPE_FLOAT => 'float',
+            Variable::TYPE_BOOLEAN => 'bool',
+            Variable::TYPE_STRING => 'string',
+            Variable::TYPE_NULL => 'null',
+            Variable::TYPE_ARRAY => 'array',
+            Variable::TYPE_OBJECT => 'object',
+            Variable::TYPE_RESOURCE => 'resource',
+            default => 'mixed',
+        };
     }
 }
