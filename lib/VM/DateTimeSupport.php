@@ -4,10 +4,12 @@ declare(strict_types=1);
 
 namespace PHPCompiler\VM;
 
+use PHPCompiler\ext\standard\VmDateTimeNative;
+
 /**
  * Shared helpers for DateTime / DateTimeZone VM builtins (issue #3072, #7082).
  *
- * Uses host PHP date extension for parsing and formatting (php-src: ext/date/php_datetime.c).
+ * Native parsing/formatting via {@see VmDateTimeNative} — no host \\DateTime (issue #6164).
  */
 final class DateTimeSupport
 {
@@ -124,15 +126,15 @@ final class DateTimeSupport
     public static function timezoneOffset(ObjectEntry $zone, ObjectEntry $datetime): int
     {
         self::requireInitializedDateTimeLike($datetime, self::classLabel($datetime));
-        $hostZone = new \DateTimeZone(self::timezoneName($zone));
+        $timestamp = self::requireIntProperty($datetime, self::TS_PROPERTY, self::classLabel($datetime))->toInt();
 
-        return $hostZone->getOffset(self::toHost($datetime));
+        return VmDateTimeNative::timezoneOffsetSeconds(self::timezoneName($zone), $timestamp);
     }
 
     /** php-src zim_DateTimeZone_getLocation (#7131). */
     public static function timezoneLocationInto(ObjectEntry $zone, Variable $returnVar): void
     {
-        $location = (new \DateTimeZone(self::timezoneName($zone)))->getLocation();
+        $location = VmDateTimeNative::timezoneLocation(self::timezoneName($zone));
         if (false === $location) {
             $returnVar->bool(false);
 
@@ -158,11 +160,11 @@ final class DateTimeSupport
     public static function initDateTimeZone(ObjectEntry $zone, string $timezone): void
     {
         try {
-            $host = new \DateTimeZone($timezone);
-        } catch (\Exception) {
+            $name = VmDateTimeNative::validateTimezoneId($timezone);
+        } catch (NativeDateInvalidTimeZoneException) {
             self::throwDateInvalidTimeZoneException($timezone);
         }
-        self::requireStringProperty($zone, self::TZ_NAME_PROPERTY, 'DateTimeZone')->string($host->getName());
+        self::requireStringProperty($zone, self::TZ_NAME_PROPERTY, 'DateTimeZone')->string($name);
         $zone->constructed = true;
     }
 
@@ -218,11 +220,14 @@ final class DateTimeSupport
             ? self::timezoneName($timezone)
             : \date_default_timezone_get();
         try {
-            $host = new \DateTime($time, new \DateTimeZone($tzName));
-        } catch (\Exception $e) {
+            VmDateTimeNative::validateTimezoneId($tzName);
+            $parsed = VmDateTimeNative::parseDateTime($time, $tzName);
+        } catch (NativeDateInvalidTimeZoneException) {
+            self::throwDateInvalidTimeZoneException($tzName);
+        } catch (NativeDateMalformedStringException $e) {
             self::throwDateMalformedStringException($e->getMessage());
         }
-        self::syncFromHost($dt, $host);
+        self::applyParsedState($dt, $parsed, $tzName);
         $dt->constructed = true;
         self::markDateTimeLikeInitialized($dt);
     }
@@ -236,34 +241,43 @@ final class DateTimeSupport
         $tzName = null !== $timezone
             ? self::timezoneName($timezone)
             : \date_default_timezone_get();
-        $host = \DateTimeImmutable::createFromFormat($format, $time, new \DateTimeZone($tzName));
-        if (false === $host) {
+        try {
+            VmDateTimeNative::validateTimezoneId($tzName);
+        } catch (NativeDateInvalidTimeZoneException) {
+            self::throwDateInvalidTimeZoneException($tzName);
+        }
+        $parsed = VmDateTimeNative::parseFromFormat($format, $time, $tzName);
+        if (false === $parsed) {
             self::throwDateMalformedStringException(
                 'DateTimeImmutable::createFromFormat(): Failed to parse time string ('.$time.')'
             );
         }
-        self::syncFromHost($dt, $host);
+        self::applyParsedState($dt, $parsed, $tzName);
         $dt->constructed = true;
         self::markDateTimeLikeInitialized($dt);
     }
 
     public static function format(ObjectEntry $dt, string $format): string
     {
-        return self::toHost($dt)->format($format);
+        self::requireInitializedDateTimeLike($dt, self::classLabel($dt).'::format()');
+        $timestamp = self::requireIntProperty($dt, self::TS_PROPERTY, self::classLabel($dt))->toInt();
+        $microsecond = self::requireIntProperty($dt, self::MICROSECOND_PROPERTY, self::classLabel($dt))->toInt();
+        $tzName = self::requireStringProperty($dt, self::TZ_PROPERTY, self::classLabel($dt))->toString();
+
+        return VmDateTimeNative::format($timestamp, $microsecond, $tzName, $format);
     }
 
     public static function getTimestamp(ObjectEntry $dt): int
     {
         self::requireInitializedDateTimeLike($dt, self::classLabel($dt).'::getTimestamp()');
-        $host = self::toHost($dt);
+        $epoch = self::requireIntProperty($dt, self::TS_PROPERTY, self::classLabel($dt))->toInt();
         if (4 === \PHP_INT_SIZE) {
-            $epoch = (float) $host->format('U');
             if ($epoch > \PHP_INT_MAX || $epoch < \PHP_INT_MIN) {
                 self::throwDateRangeError('Epoch doesn\'t fit in a PHP integer');
             }
         }
 
-        return self::requireIntProperty($dt, self::TS_PROPERTY, self::classLabel($dt))->toInt();
+        return $epoch;
     }
 
     public static function getMicrosecond(ObjectEntry $dt): int
@@ -292,9 +306,14 @@ final class DateTimeSupport
 
     public static function setTimezone(ObjectEntry $dt, ObjectEntry $timezone): void
     {
-        $host = self::toHost($dt);
-        $host->setTimezone(new \DateTimeZone(self::timezoneName($timezone)));
-        self::syncFromHost($dt, $host);
+        self::requireInitializedDateTimeLike($dt, self::classLabel($dt).'::setTimezone()');
+        $tzName = self::timezoneName($timezone);
+        try {
+            VmDateTimeNative::validateTimezoneId($tzName);
+        } catch (NativeDateInvalidTimeZoneException) {
+            self::throwDateInvalidTimeZoneException($tzName);
+        }
+        self::requireStringProperty($dt, self::TZ_PROPERTY, self::classLabel($dt))->string($tzName);
     }
 
     private static function validateMicrosecond(int $microsecond): void
@@ -321,34 +340,15 @@ final class DateTimeSupport
         return $clone;
     }
 
-    private static function toHost(ObjectEntry $dt): \DateTimeInterface
+    /**
+     * @param array{timestamp: int, microsecond: int} $parsed
+     */
+    private static function applyParsedState(ObjectEntry $dt, array $parsed, string $tzName): void
     {
-        $ts = self::requireIntProperty($dt, self::TS_PROPERTY, self::classLabel($dt))->toInt();
-        $microsecond = self::requireIntProperty($dt, self::MICROSECOND_PROPERTY, self::classLabel($dt))->toInt();
-        $tzName = self::requireStringProperty($dt, self::TZ_PROPERTY, self::classLabel($dt))->toString();
-        $host = \DateTimeImmutable::createFromFormat(
-            'U.u',
-            \sprintf('%d.%06d', $ts, $microsecond),
-            new \DateTimeZone('UTC')
-        );
-        if (false === $host) {
-            throw new \LogicException('DateTime backing conversion failed in this compiler build');
-        }
-        $mutable = \DateTime::createFromImmutable($host);
-        $mutable->setTimezone(new \DateTimeZone($tzName));
-
-        return $mutable;
-    }
-
-    private static function syncFromHost(ObjectEntry $dt, \DateTimeInterface $host): void
-    {
-        self::requireIntProperty($dt, self::TS_PROPERTY, self::classLabel($dt))->int($host->getTimestamp());
-        self::requireStringProperty($dt, self::TZ_PROPERTY, self::classLabel($dt))
-            ->string($host->getTimezone()->getName());
-        $microsecond = \method_exists($host, 'getMicrosecond')
-            ? (int) $host->getMicrosecond()
-            : (int) $host->format('u');
-        self::requireIntProperty($dt, self::MICROSECOND_PROPERTY, self::classLabel($dt))->int($microsecond);
+        self::requireIntProperty($dt, self::TS_PROPERTY, self::classLabel($dt))->int($parsed['timestamp']);
+        self::requireStringProperty($dt, self::TZ_PROPERTY, self::classLabel($dt))->string($tzName);
+        self::requireIntProperty($dt, self::MICROSECOND_PROPERTY, self::classLabel($dt))
+            ->int($parsed['microsecond']);
     }
 
     private static function classLabel(ObjectEntry $obj): string
