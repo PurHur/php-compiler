@@ -6,7 +6,9 @@ namespace PHPCompiler\ext\standard;
 
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
+use PHPCompiler\JIT\Builtin\TypeErrorRaise;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Value;
 
@@ -24,8 +26,9 @@ final class get_declared_classes_ extends Internal
 
     public function execute(Frame $frame): void
     {
-        if (\count($frame->calledArgs) > 0) {
-            throw new \LogicException('get_declared_classes() takes no arguments');
+        $argc = \count($frame->calledArgs);
+        if ($argc > 0) {
+            throw new \ArgumentCountError('get_declared_classes() expects exactly 0 arguments, '.$argc.' given');
         }
         if (null === $frame->returnVar) {
             return;
@@ -37,8 +40,16 @@ final class get_declared_classes_ extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        if (\count($args) > 0) {
-            throw new \LogicException('get_declared_classes() takes no arguments');
+        $argc = \count($args);
+        if ($argc > 0) {
+            TypeErrorRaise::ensureLinked($context);
+            TypeErrorRaise::emitArgumentCountError(
+                $context,
+                'get_declared_classes() expects exactly 0 arguments, '.$argc.' given'
+            );
+            $slot = JitValueBox::alloc($context);
+
+            return JitValueBox::pointer($context, $slot);
         }
 
         return JitGetDeclaredClasses::invoke($context);
