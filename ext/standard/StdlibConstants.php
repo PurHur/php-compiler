@@ -109,6 +109,15 @@ final class StdlibConstants
     public const PREG_OFFSET_CAPTURE = 256;
     public const PREG_UNMATCHED_AS_NULL = 512;
 
+    /** preg_last_error() codes (ext/pcre/php_pcre.h). */
+    public const PREG_NO_ERROR = 0;
+    public const PREG_INTERNAL_ERROR = 1;
+    public const PREG_BACKTRACK_LIMIT_ERROR = 2;
+    public const PREG_RECURSION_LIMIT_ERROR = 3;
+    public const PREG_BAD_UTF8_ERROR = 4;
+    public const PREG_BAD_UTF8_OFFSET_ERROR = 5;
+    public const PREG_JIT_STACKLIMIT_ERROR = 6;
+
     /** password_hash() algorithms (ext/standard/password.c). */
     public const PASSWORD_BCRYPT = VmPassword::PASSWORD_BCRYPT;
 
@@ -186,6 +195,13 @@ final class StdlibConstants
         'preg_set_order' => self::PREG_SET_ORDER,
         'preg_offset_capture' => self::PREG_OFFSET_CAPTURE,
         'preg_unmatched_as_null' => self::PREG_UNMATCHED_AS_NULL,
+        'preg_no_error' => self::PREG_NO_ERROR,
+        'preg_internal_error' => self::PREG_INTERNAL_ERROR,
+        'preg_backtrack_limit_error' => self::PREG_BACKTRACK_LIMIT_ERROR,
+        'preg_recursion_limit_error' => self::PREG_RECURSION_LIMIT_ERROR,
+        'preg_bad_utf8_error' => self::PREG_BAD_UTF8_ERROR,
+        'preg_bad_utf8_offset_error' => self::PREG_BAD_UTF8_OFFSET_ERROR,
+        'preg_jit_stacklimit_error' => self::PREG_JIT_STACKLIMIT_ERROR,
         'glob_err' => self::GLOB_ERR,
         'glob_mark' => self::GLOB_MARK,
         'glob_nosort' => self::GLOB_NOSORT,

@@ -428,14 +428,14 @@ final class VmPregNative
     {
         self::ensureFfi();
         if (null === self::$ffi) {
-            self::$lastError = 6;
+            self::$lastError = 1;
 
             return null;
         }
 
         $parsed = self::parsePhpPattern($pattern);
         if (null === $parsed) {
-            self::$lastError = 6;
+            self::$lastError = 1;
 
             return null;
         }
@@ -559,8 +559,8 @@ final class VmPregNative
             -48 => 5,
             -8 => 2,
             -9 => 3,
-            -45 => 7,
-            default => 6,
+            -45 => 6,
+            default => 1,
         };
     }
 
