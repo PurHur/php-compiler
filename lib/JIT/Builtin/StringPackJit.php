@@ -635,7 +635,7 @@ final class StringPackJit
 
         $context->builder->positionAtEnd($sizeIsHBb);
         $half = $context->builder->unsignedDiv($arg64, $i64->constInt(2, false));
-        $odd = $context->builder->unsignedRem($arg64, $i64->constInt(2, false));
+        $odd = $context->builder->unsigendRem($arg64, $i64->constInt(2, false));
         $context->builder->store($context->builder->add($half, $odd), $incSlot);
         $context->builder->branch($fn->appendBasicBlock('pack_size_after_set_inc'));
         $sizeAfterSetInc = $context->builder->getInsertBlock();

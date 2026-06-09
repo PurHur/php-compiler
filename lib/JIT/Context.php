@@ -1109,6 +1109,10 @@ class Context {
             case 'char':
             case 'int8':
                 return $this->context->int8Type();
+            case 'int16':
+            case 'short':
+            case 'unsigned short':
+                return $this->context->int16Type();
             case 'int32':
             case 'int':
             case 'unsigned int':
@@ -1122,6 +1126,8 @@ class Context {
             case 'int1':
             case 'bool':
                 return $this->context->int1Type();
+            case 'float':
+                return $this->context->floatType();
             case 'double':
                 return $this->context->doubleType();
 

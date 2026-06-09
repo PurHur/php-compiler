@@ -207,11 +207,9 @@ final class StringUnpackJit
         $isSigned = $fn->getParam(3);
 
         $i8 = $context->getTypeFromString('int8');
-        $i16 = $context->getTypeFromString('int16');
         $i32 = $context->getTypeFromString('int32');
         $i64 = $context->getTypeFromString('int64');
         $i8p = $context->getTypeFromString('int8*');
-        $i16p = $context->getTypeFromString('int16*');
         $i32p = $context->getTypeFromString('int32*');
         $i64p = $context->getTypeFromString('int64*');
         $voidPtr = $context->getTypeFromString('void*');
@@ -289,14 +287,14 @@ final class StringUnpackJit
         $context->builder->branchIf($is2, $swap2Bb, $skipSwapBb);
 
         $context->builder->positionAtEnd($swap2Bb);
-        $u16p = $context->builder->pointerCast($buf, $i16p);
-        $v16 = $context->builder->load($u16p);
+        $u32p = $context->builder->pointerCast($buf, $i32p);
+        $v32 = $context->builder->and($context->builder->load($u32p), $i32->constInt(0xFFFF, false));
         $context->builder->store(
             $context->builder->or(
-                $context->builder->lShr($v16, $i16->constInt(8, false)),
-                $context->builder->shl($v16, $i16->constInt(8, false))
+                $context->builder->shl($context->builder->and($v32, $i32->constInt(0xFF, false)), $i32->constInt(8, false)),
+                $context->builder->lShr($v32, $i32->constInt(8, false))
             ),
-            $u16p
+            $u32p
         );
         $context->builder->branch($afterSwapBb);
 
@@ -331,9 +329,15 @@ final class StringUnpackJit
         $context->builder->branchIf($is2s, $s2Bb, $sCheck4Bb);
 
         $context->builder->positionAtEnd($s2Bb);
-        $context->builder->returnValue(
-            $context->builder->sext($context->builder->load($context->builder->pointerCast($buf, $i16p)), $i64)
+        $v32 = $context->builder->and(
+            $context->builder->load($context->builder->pointerCast($buf, $i32p)),
+            $i32->constInt(0xFFFF, false)
         );
+        $signed32 = $context->builder->ashr(
+            $context->builder->shl($v32, $i32->constInt(16, false)),
+            $i32->constInt(16, false)
+        );
+        $context->builder->returnValue($context->builder->sext($signed32, $i64));
 
         $context->builder->positionAtEnd($sCheck4Bb);
         $s4Bb = $fn->appendBasicBlock('upk_rl_s4');
@@ -399,7 +403,7 @@ final class StringUnpackJit
 
         $hexNeed = $context->builder->add(
             $context->builder->unsignedDiv($arg64, $two),
-            $context->builder->zext($context->builder->trunc($context->builder->unsignedRem($arg64, $two), $i32), $i64)
+            $context->builder->zext($context->builder->trunc($context->builder->unsigendRem($arg64, $two), $i32), $i64)
         );
         $result = $negOne;
         foreach (
@@ -673,6 +677,8 @@ final class StringUnpackJit
         $maxName = $i64->constInt(self::MAX_NAME, false);
 
         $iSlot = BasicBlockHelper::entryAlloca($context, $i64);
+        $argSlot = BasicBlockHelper::entryAlloca($context, $i32);
+        $nlenSlot = BasicBlockHelper::entryAlloca($context, $i64);
         $context->builder->store($zeroI64, $iSlot);
         $context->builder->store($zeroI32, $specCount);
 
@@ -718,7 +724,6 @@ final class StringUnpackJit
         $context->builder->positionAtEnd($haveCodeBb);
         $code = $context->builder->load($context->builder->gep($format, $i));
         $context->builder->store($context->builder->add($i, $oneI64), $iSlot);
-        $argSlot = BasicBlockHelper::entryAlloca($context, $i32);
         $context->builder->store($oneI32, $argSlot);
 
         $i = $context->builder->load($iSlot);
@@ -798,7 +803,6 @@ final class StringUnpackJit
         $context->builder->positionAtEnd($nameBb);
         $count = $context->builder->load($specCount);
         $nameBase = $context->builder->gep($names, $context->builder->mul($context->builder->sext($count, $i64), $maxName));
-        $nlenSlot = BasicBlockHelper::entryAlloca($context, $i64);
         $context->builder->store($zeroI64, $nlenSlot);
         $context->builder->store($i8->constInt(0, false), $nameBase);
 

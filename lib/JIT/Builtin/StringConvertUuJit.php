@@ -117,7 +117,7 @@ final class StringConvertUuJit
         $s = $context->builder->load($sSlot);
         $ee = $srcLen;
         $len = $context->builder->sub($ee, $s);
-        $rem = $context->builder->unsignedRem($len, $three);
+        $rem = $context->builder->unsigendRem($len, $three);
         $floorBb = $fn->appendBasicBlock('uu_enc_floor');
         $afterFloor = $fn->appendBasicBlock('uu_enc_after_floor');
         $context->builder->branchIf(
