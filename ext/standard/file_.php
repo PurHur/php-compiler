@@ -8,7 +8,6 @@ use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitLongArg;
-use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\HashTable;
 use PHPCompiler\VM\Variable;
@@ -33,11 +32,7 @@ final class file_ extends Internal
         $path = VmString::coerceStringBuiltinArg($frame->calledArgs[0], 'file', 0, 'filename');
         $flags = 0;
         if (2 === $argc) {
-            $flagsVar = $frame->calledArgs[1]->resolveIndirect();
-            if (Variable::TYPE_INTEGER !== $flagsVar->type) {
-                throw new \LogicException('file() flags must be an integer in this compiler build');
-            }
-            $flags = $flagsVar->toInt();
+            $flags = VmMath::parseIntBuiltinArg($frame->calledArgs[1], 'file', 1, 'flags');
         }
         if (null === $frame->returnVar) {
             return;
@@ -64,7 +59,7 @@ final class file_ extends Internal
         if ($argc < 1 || $argc > 2) {
             throw new \LogicException('file() requires one or two arguments in this compiler build');
         }
-        $path = JitStringBuiltinArg::lower($context, $args[0], 'file', 0, 'filename');
+        $path = JitPathArg::lowerFilename($context, $args[0], 'file');
         $i64 = $context->getTypeFromString('int64');
         $flags = $i64->constInt(0, false);
         if (2 === $argc) {
