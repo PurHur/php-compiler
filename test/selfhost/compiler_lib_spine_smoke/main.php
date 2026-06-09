@@ -376,6 +376,7 @@ require_once __DIR__.'/../../../ext/standard/VmReflection.php';
 require_once __DIR__.'/../../../ext/standard/VmScope.php';
 require_once __DIR__.'/../../../ext/standard/VmSerialize.php';
 require_once __DIR__.'/../../../ext/standard/VmSession.php';
+require_once __DIR__.'/../../../ext/standard/VmSleepNative.php';
 require_once __DIR__.'/../../../ext/standard/VmSleep.php';
 require_once __DIR__.'/../../../ext/standard/VmSplAutoload.php';
 require_once __DIR__.'/../../../ext/standard/VmSprintf.php';

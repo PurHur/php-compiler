@@ -4,26 +4,31 @@ declare(strict_types=1);
 
 namespace PHPCompiler\ext\standard;
 
-/** VM sleep/usleep via host PHP (parity with PHP 8.2). */
+/**
+ * VM sleep/usleep/time_nanosleep/time_sleep_until (#4860).
+ *
+ * JIT/AOT: {@see JitSleep} + {@see \PHPCompiler\JIT\Builtin\TimeSleepRuntime}.
+ */
 final class VmSleep
 {
-    public static function sleep(int $seconds) {
-        return \sleep($seconds);
+    public static function sleep(int $seconds): int|false
+    {
+        return VmSleepNative::sleep($seconds);
     }
 
     public static function usleep(int $microseconds): void
     {
-        \usleep($microseconds);
+        VmSleepNative::usleep($microseconds);
     }
 
     /** @return true|array{seconds: int, nanoseconds: int}|false */
     public static function timeNanosleep(int $seconds, int $nanoseconds): mixed
     {
-        return \time_nanosleep($seconds, $nanoseconds);
+        return VmSleepNative::timeNanosleep($seconds, $nanoseconds);
     }
 
     public static function timeSleepUntil(float $timestamp): bool
     {
-        return \time_sleep_until($timestamp);
+        return VmSleepNative::timeSleepUntil($timestamp);
     }
 }
