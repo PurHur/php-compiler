@@ -1,0 +1,11 @@
+<?php
+var_dump(function_exists('php_ini_loaded_file'));
+var_dump(function_exists('php_ini_scanned_files'));
+var_dump(php_ini_loaded_file());
+var_dump(php_ini_scanned_files());
+putenv('PHP_COMPILER_INI_LOADED_FILE=/etc/custom/php.ini');
+putenv('PHP_COMPILER_INI_SCANNED_FILES=/etc/custom/conf.d/a.ini,
+/etc/custom/conf.d/b.ini,
+');
+var_dump(php_ini_loaded_file());
+var_dump(php_ini_scanned_files());

@@ -601,6 +601,8 @@ class Module extends ModuleAbstract
             new getmygid(),
             new get_current_user(),
             new get_cfg_var(),
+            new php_ini_loaded_file(),
+            new php_ini_scanned_files(),
             new zend_thread_id(),
             new getmygrgid(),
             new getmyinode(),
