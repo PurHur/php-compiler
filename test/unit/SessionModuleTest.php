@@ -38,6 +38,9 @@ final class SessionModuleTest extends TestCase
                 'session_abort',
                 'session_reset',
                 'session_create_id',
+                'session_encode',
+                'session_decode',
+                'session_unset',
             ] as $fn
         ) {
             self::assertTrue(VmReflection::functionExists($ctx, $fn), $fn);
@@ -55,6 +58,9 @@ echo (int) function_exists('session_regenerate_id');
 echo (int) function_exists('session_abort');
 echo (int) function_exists('session_reset');
 echo (int) function_exists('session_create_id');
+echo (int) function_exists('session_encode');
+echo (int) function_exists('session_decode');
+echo (int) function_exists('session_unset');
 echo PHP_SESSION_NONE, "\n";
 echo PHP_SESSION_ACTIVE, "\n";
 session_start();
@@ -64,6 +70,6 @@ PHP;
         $block = $runtime->parseAndCompile($code, 'session_module.php');
         ob_start();
         $runtime->run($block);
-        self::assertSame("11111111111\n2\nPHPSESSID\n", ob_get_clean());
+        self::assertSame("11111111111111\n2\nPHPSESSID\n", ob_get_clean());
     }
 }
