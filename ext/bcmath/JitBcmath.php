@@ -10,6 +10,8 @@ use PHPCompiler\JIT\JitStringArg;
 use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\Variable as JITVariable;
+use PHPCompiler\VM\HashTable;
+use PHPCompiler\VM\Variable as VmVariable;
 use PHPLLVM\Value;
 
 /** LLVM lowering helper for bcmath builtins via __compiler_bc* runtime bodies (#6100). */
@@ -74,6 +76,38 @@ final class JitBcmath
     public static function div(Context $context, JITVariable ...$args): Value
     {
         return self::stringBinaryOp($context, 'bcdiv', 'div', $args, 'num1', 'num2');
+    }
+
+    public static function divmod(Context $context, JITVariable ...$args): Value
+    {
+        if (\count($args) < 2 || \count($args) > 3) {
+            throw new \LogicException('bcdivmod() requires two or three arguments in this compiler build');
+        }
+
+        $leftLit = self::compileTimeString($args[0]);
+        $rightLit = self::compileTimeString($args[1]);
+        $scaleLit = isset($args[2]) ? self::compileTimeLong($args[2]) : null;
+        $canFold = null !== $leftLit && null !== $rightLit && (!isset($args[2]) || null !== $scaleLit);
+        if ($canFold && self::$compileTimeScaleKnown) {
+            $scale = null !== $scaleLit ? $scaleLit : self::$compileTimeScale;
+            [$quotient, $remainder] = VmBcmath::divmod($leftLit, $rightLit, $scale);
+            $ht = new HashTable();
+            $qVar = new VmVariable();
+            $qVar->string($quotient);
+            $rVar = new VmVariable();
+            $rVar->string($remainder);
+            $ht->append($qVar);
+            $ht->append($rVar);
+            $cacheKey = 'bcdivmod:'.$leftLit.':'.$rightLit.':'.$scale;
+            $global = $context->constantArrayFromVmHashTable($cacheKey, $ht);
+            $slot = JitValueBox::alloc($context);
+            $ptr = JitValueBox::pointer($context, $slot);
+            JitValueBox::copyFromPointer($context, $slot, $context->builder->load($global));
+
+            return $ptr;
+        }
+
+        throw new \LogicException('bcdivmod() not implemented for JIT with non-constant operands in this compiler build');
     }
 
     public static function comp(Context $context, JITVariable ...$args): Value

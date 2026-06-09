@@ -27,6 +27,7 @@ class Module extends ModuleAbstract
             new bcsub(),
             new bcmul(),
             new bcdiv(),
+            new bcdivmod(),
             new bcscale(),
             new bccomp(),
             new bcpowmod(),
