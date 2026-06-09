@@ -197,6 +197,57 @@ final class VmSession
         return true;
     }
 
+    /**
+     * session_abort() — discard in-memory changes and end session (php-src php_session_abort).
+     */
+    public static function abort(): bool
+    {
+        if (!self::$active) {
+            return false;
+        }
+        self::$active = false;
+
+        return true;
+    }
+
+    /**
+     * session_reset() — reload $_SESSION from storage without ending session (php-src php_session_reset).
+     */
+    public static function reloadFromStorage(Context $ctx): bool
+    {
+        if (!self::$active) {
+            return false;
+        }
+        self::loadSession($ctx);
+
+        return true;
+    }
+
+    /**
+     * session_create_id() — collision-resistant id string (php-src php_session_create_id).
+     *
+     * @return string|false
+     */
+    public static function createId(?string $prefix = null) {
+        if (null !== $prefix && '' !== $prefix) {
+            if (\strlen($prefix) > self::MAX_ID_LEN) {
+                throw new \ValueError(
+                    'session_create_id(): Argument #1 ($prefix) cannot be longer than '
+                    .self::MAX_ID_LEN.' characters'
+                );
+            }
+            if ($prefix !== SessionFileStorage::sanitizeId($prefix)) {
+                return false;
+            }
+        }
+        $generated = self::generateId();
+        if (null === $prefix || '' === $prefix) {
+            return $generated;
+        }
+
+        return $prefix.$generated;
+    }
+
     private static function readCookieId(Context $ctx): string
     {
         $cookieVar = $ctx->getSuperglobal('_COOKIE');
