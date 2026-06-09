@@ -1113,6 +1113,57 @@ final class VmFs
     }
 
     /**
+     * stream_copy_to_stream() — copy bytes between open streams (ext/standard/streams.c, #3272).
+     *
+     * @return int|false Bytes copied, or false on I/O failure
+     */
+    public static function streamCopyToStream(int $source, int $dest, int $maxlength = -1, int $offset = 0)
+    {
+        $srcFp = self::lookup($source);
+        $dstFp = self::lookup($dest);
+        if (null === $srcFp || null === $dstFp) {
+            return false;
+        }
+        if ($offset > 0 && 0 !== @\fseek($srcFp, $offset, \SEEK_SET)) {
+            return false;
+        }
+        if (0 === $maxlength) {
+            return 0;
+        }
+        $total = 0;
+        $chunkSize = 8192;
+        while (!\feof($srcFp)) {
+            if ($maxlength > 0) {
+                $remaining = $maxlength - $total;
+                if ($remaining <= 0) {
+                    break;
+                }
+                $toRead = min($chunkSize, $remaining);
+            } else {
+                $toRead = $chunkSize;
+            }
+            $chunk = @\fread($srcFp, $toRead);
+            if (false === $chunk) {
+                return false;
+            }
+            if ('' === $chunk) {
+                break;
+            }
+            $readLen = \strlen($chunk);
+            $written = @\fwrite($dstFp, $chunk);
+            if (false === $written) {
+                return false;
+            }
+            $total += $written;
+            if ($written < $readLen) {
+                break;
+            }
+        }
+
+        return $total;
+    }
+
+    /**
      * get_resource_type() for fopen() stream handles (#3142).
      */
     public static function getResourceType(int $handle): ?string
