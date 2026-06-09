@@ -4,8 +4,10 @@ declare(strict_types=1);
 
 namespace PHPCompiler\ext\standard;
 
+use PHPCompiler\Frame;
 use PHPCompiler\VM\Context;
 use PHPCompiler\VM\EnumCaseSupport;
+use PHPCompiler\VM\ErrorReporter;
 use PHPCompiler\VM\HashTable;
 use PHPCompiler\VM\InterfaceCheck;
 use PHPCompiler\VM\Variable;
@@ -685,14 +687,21 @@ final class VmArray
         return $count;
     }
 
+    private const COUNT_VALUES_SKIP_WARNING =
+        'array_count_values(): Can only count string and integer values, entry skipped';
+
     /**
-     * array_count_values() — count occurrences of string or integer values (#2356).
+     * array_count_values() — count occurrences of string or integer values (#2356, #4267).
      */
-    public static function countValues(HashTable $ht): HashTable
+    public static function countValues(HashTable $ht, ?Frame $frame = null): HashTable
     {
         $out = new HashTable();
         foreach ($ht->iterateKeyed(true) as [, $value]) {
             $v = $value->resolveIndirect();
+            if (!self::isCountValuesScalar($v)) {
+                self::countValuesSkipWarning($frame);
+                continue;
+            }
             if (Variable::TYPE_STRING === $v->type) {
                 $key = $v->toString();
                 $existing = $out->find($key);
@@ -719,12 +728,32 @@ final class VmArray
                 }
                 continue;
             }
-            throw new \LogicException(
-                'array_count_values() only supports string and integer values in this compiler build'
-            );
         }
 
         return $out;
+    }
+
+    private static function isCountValuesScalar(Variable $var): bool
+    {
+        if (EnumCaseSupport::isEnumCaseVariable($var)) {
+            return false;
+        }
+
+        return Variable::TYPE_STRING === $var->type || Variable::TYPE_INTEGER === $var->type;
+    }
+
+    private static function countValuesSkipWarning(?Frame $frame): void
+    {
+        if (null === $frame?->vmContext) {
+            return;
+        }
+        $frame->vmContext->errors->triggerError(
+            self::COUNT_VALUES_SKIP_WARNING,
+            ErrorReporter::E_WARNING,
+            '' !== $frame->scriptPath ? $frame->scriptPath : null,
+            $frame->vmContext,
+            $frame
+        );
     }
 
     /** array_change_key_case() — copy with ASCII string keys lowercased or uppercased. */

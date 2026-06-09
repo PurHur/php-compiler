@@ -36,7 +36,7 @@ final class array_count_values extends Internal
         if (Variable::TYPE_ARRAY !== $array->type) {
             throw new \LogicException('array_count_values() argument must be an array in this compiler build');
         }
-        $frame->returnVar->array(VmArray::countValues($array->toArray()));
+        $frame->returnVar->array(VmArray::countValues($array->toArray(), $frame));
     }
 
     public function call(Context $context, JITVariable ...$args): Value

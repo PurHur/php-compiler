@@ -21,6 +21,10 @@ final class ArrayCountValuesJITTest extends BaseTest
             __DIR__.'/cases/stdlib/array_count_values_jit.phpt',
             'array_count_values_jit.phpt'
         );
+        yield 'array_count_values_skip_jit.phpt' => self::parsePHPT(
+            __DIR__.'/cases/stdlib/array_count_values_skip_jit.phpt',
+            'array_count_values_skip_jit.phpt'
+        );
     }
 
     public function setUp(): void
