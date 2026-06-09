@@ -104,8 +104,14 @@ use PHPCompiler\VM\Builtin\ReflectionMethodGetDocComment;
 use PHPCompiler\VM\Builtin\ReflectionMethodGetEndLine;
 use PHPCompiler\VM\Builtin\ReflectionMethodGetExtensionName;
 use PHPCompiler\VM\Builtin\ReflectionMethodGetFileName;
+use PHPCompiler\VM\Builtin\ReflectionMethodGetModifiers;
 use PHPCompiler\VM\Builtin\ReflectionMethodGetStartLine;
 use PHPCompiler\VM\Builtin\ReflectionMethodIsDeprecated;
+use PHPCompiler\VM\Builtin\ReflectionMethodIsFinal;
+use PHPCompiler\VM\Builtin\ReflectionMethodIsPrivate;
+use PHPCompiler\VM\Builtin\ReflectionMethodIsProtected;
+use PHPCompiler\VM\Builtin\ReflectionMethodIsPublic;
+use PHPCompiler\VM\Builtin\ReflectionMethodIsStatic;
 use PHPCompiler\VM\Builtin\ReflectionMethodIsUserDefined;
 use PHPCompiler\VM\Builtin\ReflectionNamedTypeGetName;
 use PHPCompiler\VM\Builtin\ReflectionNamedTypeIsBuiltin;
@@ -360,6 +366,18 @@ final class BuiltinClasses
         $rm->methodVisibility['invoke'] = $pub;
         $rm->methods['invokeargs'] = new ReflectionMethodInvokeArgs();
         $rm->methodVisibility['invokeargs'] = $pub;
+        $rm->methods['isstatic'] = new ReflectionMethodIsStatic();
+        $rm->methodVisibility['isstatic'] = $pub;
+        $rm->methods['ispublic'] = new ReflectionMethodIsPublic();
+        $rm->methodVisibility['ispublic'] = $pub;
+        $rm->methods['isprotected'] = new ReflectionMethodIsProtected();
+        $rm->methodVisibility['isprotected'] = $pub;
+        $rm->methods['isprivate'] = new ReflectionMethodIsPrivate();
+        $rm->methodVisibility['isprivate'] = $pub;
+        $rm->methods['isfinal'] = new ReflectionMethodIsFinal();
+        $rm->methodVisibility['isfinal'] = $pub;
+        $rm->methods['getmodifiers'] = new ReflectionMethodGetModifiers();
+        $rm->methodVisibility['getmodifiers'] = $pub;
         foreach (
             [
                 'getdoccomment' => new ReflectionMethodGetDocComment(),
