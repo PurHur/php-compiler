@@ -39,4 +39,9 @@ final class VmHttpLastResponseHeaders
     {
         return self::$headers;
     }
+
+    public static function clear(): void
+    {
+        self::$headers = null;
+    }
 }
