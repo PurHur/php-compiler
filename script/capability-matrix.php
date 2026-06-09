@@ -81,6 +81,10 @@ function analyzeInternal(PHPCompiler\Func\Internal $fn): array
     if ('gethostbyaddr' === $fn->getName() && preg_match('/GethostbyaddrRuntime/i', $source)) {
         $notes[] = 'reverse DNS IPv4 (VM FFI + AOT) (#5854)';
     }
+    if (in_array($fn->getName(), ['checkdnsrr', 'dns_check_record'], true)
+        && preg_match('/VmDns::checkdnsrr/i', $source)) {
+        $notes[] = 'DNS record probe via libc res_query FFI (#5983); JIT/AOT deferred';
+    }
     if (in_array($fn->getName(), ['long2ip', 'ip2long', 'inet_ntop', 'inet_pton'], true)
         && preg_match('/JitInet|InetRuntime/i', $source)) {
         $notes[] = 'IPv4/IPv6 conversion (VM host + AOT libc) (#3225)';
