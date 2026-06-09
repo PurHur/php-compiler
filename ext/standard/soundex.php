@@ -7,8 +7,10 @@ namespace PHPCompiler\ext\standard;
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\InternalStrictArg as JitInternalStrictArg;
 use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\Variable as JITVariable;
+use PHPCompiler\VM\InternalStrictArg;
 use PHPLLVM\Value;
 
 /**
@@ -28,7 +30,7 @@ final class soundex extends Internal
         if (1 !== \count($frame->calledArgs)) {
             throw new \LogicException('soundex() requires exactly one argument in this compiler build');
         }
-        $string = VmString::coerceStringBuiltinArg($frame->calledArgs[0], 'soundex', 0, 'string');
+        $string = self::vmStringArg($frame, 0, 'string');
         if (null === $frame->returnVar) {
             return;
         }
@@ -46,7 +48,38 @@ final class soundex extends Internal
 
         return JitSoundex::invoke(
             $context,
-            JitStringBuiltinArg::lower($context, $args[0], 'soundex', 0, 'string')
+            self::jitStringArg($context, $args[0], 1, 'string')
+        );
+    }
+
+    private static function vmStringArg(Frame $frame, int $argIndex, string $paramName): string
+    {
+        if (null !== $frame->parent && $frame->parent->block->strictTypes) {
+            return InternalStrictArg::requireString($frame, $argIndex, 'soundex', $paramName)->toString();
+        }
+
+        return VmString::coerceStringBuiltinArg(
+            $frame->calledArgs[$argIndex],
+            'soundex',
+            $argIndex,
+            $paramName
+        );
+    }
+
+    private static function jitStringArg(
+        Context $context,
+        JITVariable $arg,
+        int $argNumber,
+        string $paramName
+    ): Value {
+        JitInternalStrictArg::requireString($context, $arg, 'soundex', $paramName, $argNumber);
+
+        return JitStringBuiltinArg::lower(
+            $context,
+            $arg,
+            'soundex',
+            $argNumber - 1,
+            $paramName
         );
     }
 }

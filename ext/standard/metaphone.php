@@ -7,8 +7,10 @@ namespace PHPCompiler\ext\standard;
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\InternalStrictArg as JitInternalStrictArg;
 use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\Variable as JITVariable;
+use PHPCompiler\VM\InternalStrictArg;
 use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
 
@@ -30,7 +32,7 @@ final class metaphone extends Internal
         if ($argc < 1 || $argc > 2) {
             throw new \LogicException('metaphone() accepts one or two arguments in this compiler build');
         }
-        $string = VmString::coerceStringBuiltinArg($frame->calledArgs[0], 'metaphone', 0, 'string');
+        $string = self::vmStringArg($frame, 0, 'string');
         $maxPhonemes = 0;
         if ($argc >= 2) {
             $maxVar = $frame->calledArgs[1]->resolveIndirect();
@@ -68,8 +70,39 @@ final class metaphone extends Internal
 
         return JitMetaphone::invoke(
             $context,
-            JitStringBuiltinArg::lower($context, $args[0], 'metaphone', 0, 'string'),
+            self::jitStringArg($context, $args[0], 1, 'string'),
             $maxPhonemes
+        );
+    }
+
+    private static function vmStringArg(Frame $frame, int $argIndex, string $paramName): string
+    {
+        if (null !== $frame->parent && $frame->parent->block->strictTypes) {
+            return InternalStrictArg::requireString($frame, $argIndex, 'metaphone', $paramName)->toString();
+        }
+
+        return VmString::coerceStringBuiltinArg(
+            $frame->calledArgs[$argIndex],
+            'metaphone',
+            $argIndex,
+            $paramName
+        );
+    }
+
+    private static function jitStringArg(
+        Context $context,
+        JITVariable $arg,
+        int $argNumber,
+        string $paramName
+    ): Value {
+        JitInternalStrictArg::requireString($context, $arg, 'metaphone', $paramName, $argNumber);
+
+        return JitStringBuiltinArg::lower(
+            $context,
+            $arg,
+            'metaphone',
+            $argNumber - 1,
+            $paramName
         );
     }
 }

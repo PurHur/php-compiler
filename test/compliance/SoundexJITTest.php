@@ -17,6 +17,14 @@ final class SoundexJITTest extends BaseTest
             __DIR__.'/cases/stdlib/soundex_jit.phpt',
             'soundex_jit.phpt'
         );
+        yield 'soundex_coerce_jit.phpt' => self::parsePHPT(
+            __DIR__.'/cases/stdlib/soundex_coerce_jit.phpt',
+            'soundex_coerce_jit.phpt'
+        );
+        yield 'soundex_strict_coerce_jit.phpt' => self::parsePHPT(
+            __DIR__.'/cases/stdlib/soundex_strict_coerce_jit.phpt',
+            'soundex_strict_coerce_jit.phpt'
+        );
     }
 
     public function setUp(): void
