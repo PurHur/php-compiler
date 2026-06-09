@@ -296,8 +296,9 @@ class JITTest extends BaseTest {
             if (str_contains($name, 'json_validate')) {
                 continue;
             }
-            // JsonSerializable json_encode() needs VM method dispatch (#3370).
-            if (str_contains($name, 'json_serializable')) {
+            // JsonSerializable json_encode() needs VM method dispatch (#3370, #6880).
+            if (str_contains($name, 'json_serializable')
+                || str_contains($name, 'json_encode_enum_jsonserializable')) {
                 continue;
             }
             // json_encode() object public-property export needs VM dispatch (#6879).
