@@ -43,4 +43,35 @@ final class VmRoundBuiltinTest extends TestCase
             $frame->returnVar->resolveIndirect()->toFloat()
         );
     }
+
+    /** @dataProvider precisionCoercionProvider */
+    public function testPrecisionCoercion(float $num, mixed $precision, float $expected): void
+    {
+        $runtime = new Runtime();
+        $fn = new round();
+        $frame = $fn->getFrame($runtime->vmContext);
+        $numVar = new VMVariable();
+        $numVar->float($num);
+        $precVar = new VMVariable();
+        if (\is_float($precision)) {
+            $precVar->float($precision);
+        } else {
+            $precVar->string((string) $precision);
+        }
+        $frame->calledArgs = [$numVar, $precVar];
+        $frame->returnVar = new VMVariable();
+        $fn->execute($frame);
+
+        $this->assertSame($expected, $frame->returnVar->resolveIndirect()->toFloat());
+    }
+
+    /** @return list<array{float, float|string, float}> */
+    public static function precisionCoercionProvider(): array
+    {
+        return [
+            [1.5, 0.9, 2.0],
+            [1.5, '1', 1.5],
+            [1.5, 1.9, 1.5],
+        ];
+    }
 }
