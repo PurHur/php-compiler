@@ -5,10 +5,14 @@ declare(strict_types=1);
 namespace PHPCompiler\ext\standard;
 
 use PHPCompiler\VM\Context;
+use PHPCompiler\VM\HashTable;
+use PHPCompiler\VM\Variable;
 
 /** Minimal ini_set() subset (issue #1374): error_reporting, display_errors, memory_limit, serialize_precision. */
 final class VmIni
 {
+    /** php-src INI_ALL — user/perdir/system readable. */
+    private const INI_ACCESS_ALL = 7;
     /** @var list<string> */
     public const SUPPORTED_KEYS = [
         'error_reporting',
@@ -153,5 +157,84 @@ final class VmIni
         $trimmed = strtolower(trim($value));
 
         return !('' === $trimmed || '0' === $trimmed || 'off' === $trimmed || 'false' === $trimmed);
+    }
+
+    /**
+     * ini_restore() — reset local value to php.ini global default (ext/standard/ini.c, #3205).
+     */
+    public static function restore(Context $ctx, string $option): void
+    {
+        $key = strtolower($option);
+        if (!in_array($key, self::SUPPORTED_KEYS, true)) {
+            return;
+        }
+
+        switch ($key) {
+            case 'error_reporting':
+                $ctx->errors->setErrorReporting(self::parseErrorReporting(self::CFG_ERROR_REPORTING));
+                break;
+            case 'display_errors':
+                $ctx->errors->setDisplayErrors(self::parseBoolIni(self::CFG_DISPLAY_ERRORS));
+                break;
+            case 'memory_limit':
+                self::$memoryLimit = self::CFG_MEMORY_LIMIT;
+                break;
+            case 'serialize_precision':
+                self::$serializePrecision = self::parseSerializePrecision(self::CFG_SERIALIZE_PRECISION);
+                break;
+        }
+    }
+
+    /**
+     * ini_get_all() — introspection for supported directives (ext/standard/ini.c, #3205).
+     *
+     * @return HashTable|false
+     */
+    public static function getAll(Context $ctx, ?string $extension, bool $details)
+    {
+        if (null !== $extension && 'core' !== strtolower($extension)) {
+            return false;
+        }
+
+        $result = new HashTable();
+        foreach (self::SUPPORTED_KEYS as $key) {
+            $local = self::get($ctx, $key);
+            if (false === $local) {
+                continue;
+            }
+            if ($details) {
+                $entry = new HashTable();
+                $global = self::getCfgVar($key);
+                if (false === $global) {
+                    $global = $local;
+                }
+                $entry->add('global_value', self::stringVar($global));
+                $entry->add('local_value', self::stringVar($local));
+                $entry->add('access', self::intVar(self::INI_ACCESS_ALL));
+                $slot = new Variable();
+                $slot->array($entry);
+                $result->add($key, $slot);
+            } else {
+                $result->add($key, self::stringVar($local));
+            }
+        }
+
+        return $result;
+    }
+
+    private static function stringVar(string $value): Variable
+    {
+        $var = new Variable();
+        $var->string($value);
+
+        return $var;
+    }
+
+    private static function intVar(int $value): Variable
+    {
+        $var = new Variable();
+        $var->int($value);
+
+        return $var;
     }
 }
