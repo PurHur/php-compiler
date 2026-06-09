@@ -6,7 +6,7 @@ namespace PHPCompiler\ext\standard;
 
 use PHPCompiler\JIT\Builtin\PackJitRuntime;
 use PHPCompiler\JIT\Context;
-use PHPCompiler\JIT\JitStringArg;
+use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Value;
@@ -21,7 +21,7 @@ final class JitPack
         if ($argc < 1) {
             throw new \LogicException('pack() requires at least one argument');
         }
-        $fmt = JitStringArg::lower($context, $args[0], 'pack() format');
+        $fmt = JitStringBuiltinArg::lower($context, $args[0], 'pack', 0, 'format');
         $numArgs = $argc - 1;
         if (0 === $numArgs) {
             $nullArgv = $context->builder->pointerCast(

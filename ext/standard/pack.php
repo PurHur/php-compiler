@@ -8,7 +8,6 @@ use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\Variable as JITVariable;
-use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
 
 /** pack() — binary string from format and values (VM via PackEngine; JIT/AOT via __compiler_pack, #5231). */
@@ -23,15 +22,12 @@ final class pack extends Internal
         if (null === $frame->returnVar) {
             return;
         }
-        $fmtVar = $frame->calledArgs[0]->resolveIndirect();
-        if (Variable::TYPE_STRING !== $fmtVar->type) {
-            throw new \LogicException('pack() format must be a string in this compiler build');
-        }
+        $fmt = VmString::coerceStringBuiltinArg($frame->calledArgs[0], 'pack', 0, 'format');
         $values = [];
         for ($i = 1; $i < $argc; ++$i) {
             $values[] = VmJson::export($frame->calledArgs[$i]->resolveIndirect());
         }
-        $frame->returnVar->string(VmPack::pack($fmtVar->toString(), $values));
+        $frame->returnVar->string(VmPack::pack($fmt, $values));
     }
 
     public function call(Context $context, JITVariable ...$args): Value
