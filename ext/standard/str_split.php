@@ -30,10 +30,12 @@ final class str_split extends Internal
         if ($argc < 1 || $argc > 2) {
             throw new \LogicException('str_split() requires one or two arguments');
         }
-        $string = $frame->calledArgs[0]->resolveIndirect();
-        if (Variable::TYPE_STRING !== $string->type) {
-            throw new \LogicException('str_split() argument must be a string in this compiler build');
-        }
+        $string = VmString::coerceStringBuiltinArg(
+            $frame->calledArgs[0],
+            'str_split',
+            0,
+            'string'
+        );
         $length = 1;
         if (2 === $argc) {
             $lenArg = $frame->calledArgs[1]->resolveIndirect();
