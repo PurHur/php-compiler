@@ -26,6 +26,10 @@ final class ErrorHandlerJITTest extends BaseTest
             __DIR__.'/cases/stdlib/restore_error_handler_jit.phpt',
             'restore_error_handler_jit.phpt'
         );
+        yield 'set_error_handler_enum_typeerror_jit.phpt' => self::parsePHPT(
+            __DIR__.'/cases/stdlib/set_error_handler_enum_typeerror_jit.phpt',
+            'set_error_handler_enum_typeerror_jit.phpt'
+        );
     }
 
     public function setUp(): void

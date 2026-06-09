@@ -50,4 +50,12 @@ final class ErrorHandlerCallbackPolicy
         return 'set_error_handler() callback must be a compile-time string function name in this compiler build; '
             .self::DEFERRED_KINDS.' are deferred (#1379)';
     }
+
+    /**
+     * Zend set_error_handler() invalid callback TypeError (#6234, ext/standard/basic_functions.c).
+     */
+    public static function invalidCallbackTypeError(): string
+    {
+        return 'set_error_handler(): Argument #1 ($callback) must be a valid callback or null, no array or string given';
+    }
 }
