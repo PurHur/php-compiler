@@ -785,11 +785,6 @@ final class VmString
     ): int {
         $len1 = self::byteLength($string1);
         $len2 = self::byteLength($string2);
-        if ($insertionCost < 1 || $replacementCost < 1 || $deletionCost < 1) {
-            throw new \ValueError(
-                'levenshtein(): insertion, replacement, and deletion costs must be larger than zero'
-            );
-        }
         if (0 === $len1) {
             return $len2 * $insertionCost;
         }

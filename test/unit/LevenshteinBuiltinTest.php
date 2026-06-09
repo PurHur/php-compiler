@@ -38,6 +38,17 @@ final class LevenshteinBuiltinTest extends TestCase
         $this->assertSame(300, $this->runLevenshtein($a, $b));
     }
 
+    public function testNegativeInsertionCostMatchesZend(): void
+    {
+        $this->assertSame(0, $this->runLevenshtein('a', 'b', -1, 1, 1));
+    }
+
+    public function testZeroInsertionCostMatchesZend(): void
+    {
+        $this->assertSame(1, $this->runLevenshtein('a', 'b', 0, 1, 1));
+        $this->assertSame(1, $this->runLevenshtein('abc', 'ab', 0, 1, 1));
+    }
+
     private function runLevenshtein(
         string $a,
         string $b,
