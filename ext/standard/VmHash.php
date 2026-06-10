@@ -15,9 +15,26 @@ final class VmHash
     /** Digest algorithms supported by VmHashNative / StringHashCryptoJit (issue #6229, #6937). */
     private const HASH_ALGOS = ['md5', 'sha1', 'sha256'];
 
-    public static function hash(string $algo, string $data, bool $raw = false): string|false
+    public const HASH_UNKNOWN_ALGO_MSG = 'hash(): Argument #1 ($algo) must be a valid hashing algorithm';
+
+    public static function hash(string $algo, string $data, bool $raw = false): string
     {
+        self::ensureDigestAlgo($algo);
+
         return VmHashNative::hash($algo, $data, $raw);
+    }
+
+    /** @throws \ValueError ext/hash/hash.c unknown algo (issue #4186). */
+    public static function ensureDigestAlgo(string $algo): void
+    {
+        $lower = strtolower($algo);
+        foreach (self::HASH_ALGOS as $known) {
+            if ($lower === $known) {
+                return;
+            }
+        }
+
+        throw new \ValueError(self::HASH_UNKNOWN_ALGO_MSG);
     }
 
     public static function hashHmac(string $algo, string $data, string $key, bool $raw = false): string|false
