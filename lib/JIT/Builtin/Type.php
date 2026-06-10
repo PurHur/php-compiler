@@ -411,6 +411,13 @@ class Type extends Builtin {
         $fntypeStreamIsatty = $this->context->context->functionType($i32, false, $i64);
         $fnStreamIsatty = $this->context->module->addFunction('__compiler_stream_isatty', $fntypeStreamIsatty);
         $this->context->registerFunction('__compiler_stream_isatty', $fnStreamIsatty);
+        $htPtr = $this->context->getTypeFromString('__hashtable__*');
+        $fntypeStreamGetMetaData = $this->context->context->functionType($htPtr, false, $i64);
+        $fnStreamGetMetaData = $this->context->module->addFunction('__compiler_stream_get_meta_data', $fntypeStreamGetMetaData);
+        $this->context->registerFunction('__compiler_stream_get_meta_data', $fnStreamGetMetaData);
+        $fntypeStreamSetBlocking = $this->context->context->functionType($i32, false, $i64, $i64);
+        $fnStreamSetBlocking = $this->context->module->addFunction('__compiler_stream_set_blocking', $fntypeStreamSetBlocking);
+        $this->context->registerFunction('__compiler_stream_set_blocking', $fnStreamSetBlocking);
         $fntypeFtruncate = $this->context->context->functionType($i32, false, $i64, $i64);
         $fnFtruncate = $this->context->module->addFunction('__compiler_ftruncate', $fntypeFtruncate);
         $this->context->registerFunction('__compiler_ftruncate', $fnFtruncate);
@@ -1134,6 +1141,7 @@ class Type extends Builtin {
         StreamLifecycle::ensureLinked($this->context);
         StreamIo::ensureLinked($this->context);
         StreamBuffer::ensureLinked($this->context);
+        StreamMeta::ensureLinked($this->context);
         StreamRead::ensureLinked($this->context);
         StreamResource::ensureLinked($this->context);
         LastErrorRuntime::ensureLinked($this->context);

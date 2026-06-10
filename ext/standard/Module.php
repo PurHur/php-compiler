@@ -468,6 +468,8 @@ class Module extends ModuleAbstract
             new stream_supports_lock(),
             new stream_is_local(),
             new stream_isatty(),
+            new stream_get_meta_data(),
+            new stream_set_blocking(),
             new fopen(),
             new fread(),
             new stream_get_contents(),
