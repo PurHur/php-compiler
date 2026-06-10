@@ -990,11 +990,11 @@ class VM {
     }
 
     /**
-     * Properties for var_dump / print_r when __debugInfo is defined (Zend parity, #3259).
+     * Properties for var_dump / print_r when __debugInfo is defined (Zend parity, #3259, #6604).
      *
      * @return array<string, Variable>
      */
-    public function getObjectDebugProperties(ObjectEntry $object): array
+    public function getObjectDebugProperties(ObjectEntry $object, ?Frame $frame = null): array
     {
         if ($this->hasInstanceMethod($object->class, '__debuginfo')) {
             $result = $this->invokeInstanceMethod($object, '__debugInfo')->resolveIndirect();
@@ -1018,8 +1018,87 @@ class VM {
 
             return $props;
         }
+        if (null !== $frame) {
+            return $this->collectDebugPropertiesForBuiltin($object, $frame);
+        }
 
         return $object->class->getProperties($object->getRawProperties(), ClassEntry::PROP_PURPOSE_DEBUG);
+    }
+
+    /**
+     * var_dump()/print_r() property list — mangled keys, get hooks invoked (#6604).
+     *
+     * php-src: zend_get_properties_for(..., ZEND_PROP_PURPOSE_DEBUG) + zend_read_property_ex
+     *
+     * @return array<string, Variable>
+     */
+    private function collectDebugPropertiesForBuiltin(ObjectEntry $object, Frame $frame): array
+    {
+        $ctx = $this->context;
+        $scopeFrame = $frame;
+        while (null !== $scopeFrame && null !== $scopeFrame->handler) {
+            $scopeFrame = $scopeFrame->parent;
+        }
+        if (null === $scopeFrame) {
+            $scopeFrame = $frame;
+        }
+        /** @var array<string, Variable> $result */
+        $result = [];
+        /** @var array<string, true> $seenLc */
+        $seenLc = [];
+        foreach (array_reverse(\PHPCompiler\ext\standard\VmReflection::classHierarchyChain($object->class, $ctx)) as $class) {
+            foreach ($class->properties as $meta) {
+                $lc = strtolower($meta->name);
+                if (isset($seenLc[$lc])) {
+                    continue;
+                }
+                $seenLc[$lc] = true;
+                if ($meta->propertyHookVirtual && null === $meta->getHookMethodLc) {
+                    continue;
+                }
+                if (null !== $meta->getHookMethodLc) {
+                    $hookValue = $this->fetchPropertyWithHooks($object, $meta->name, $scopeFrame);
+                    if (null === $hookValue) {
+                        continue;
+                    }
+                    $value = $hookValue->resolveIndirect();
+                    if (VM\TypedPropertyCheck::omitFromPropertyEnumeration($value)) {
+                        continue;
+                    }
+                    $key = \PHPCompiler\ext\standard\VmReflection::manglePropertyKey($meta, $ctx);
+                    $copy = new Variable();
+                    $copy->copyFrom($value);
+                    $result[$key] = $copy;
+
+                    continue;
+                }
+                if (!$object->hasProperty($meta->name)) {
+                    continue;
+                }
+                $value = $object->getProperty($meta->name)->resolveIndirect();
+                if (VM\TypedPropertyCheck::omitFromPropertyEnumeration($value)) {
+                    continue;
+                }
+                $key = \PHPCompiler\ext\standard\VmReflection::manglePropertyKey($meta, $ctx);
+                $copy = new Variable();
+                $copy->copyFrom($value);
+                $result[$key] = $copy;
+            }
+        }
+        foreach ($object->getRawProperties() as $name => $prop) {
+            if (isset($seenLc[strtolower($name)])) {
+                continue;
+            }
+            $value = $prop->resolveIndirect();
+            if (VM\TypedPropertyCheck::omitFromPropertyEnumeration($value)) {
+                continue;
+            }
+            $copy = new Variable();
+            $copy->copyFrom($value);
+            $result[$name] = $copy;
+        }
+
+        return $result;
     }
 
     /**
