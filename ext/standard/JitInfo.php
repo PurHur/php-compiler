@@ -47,6 +47,18 @@ final class JitInfo
         return $ptr;
     }
 
+    public static function zend_version(Context $context): Value
+    {
+        StringInfo::ensureLinked($context);
+        $raw = $context->builder->call($context->lookupFunction('__compiler_zend_version'));
+        $slot = JitValueBox::alloc($context);
+        $ptr = JitValueBox::pointer($context, $slot);
+        $owned = $context->builder->call($context->lookupFunction('__string__separate'), $raw);
+        $context->builder->call($context->lookupFunction('__value__writeString'), $ptr, $owned);
+
+        return $ptr;
+    }
+
     public static function php_uname(Context $context, ?Value $mode): Value
     {
         StringInfo::ensureLinked($context);

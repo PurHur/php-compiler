@@ -6,6 +6,7 @@ namespace PHPCompiler\JIT\Builtin;
 
 use PHPCompiler\CompilerVersion;
 use PHPCompiler\ext\standard\ModuleRegistry;
+use PHPCompiler\ext\standard\VmInfo;
 use PHPCompiler\JIT\Context;
 use PHPLLVM\Builder;
 use PHPLLVM\Value;
@@ -42,6 +43,7 @@ final class StringInfo
     private const RUNTIME_FUNCTIONS = [
         '__compiler_phpversion',
         '__compiler_php_sapi_name',
+        '__compiler_zend_version',
         '__compiler_php_uname',
         '__compiler_extension_loaded',
         '__compiler_get_loaded_extensions',
@@ -89,6 +91,13 @@ final class StringInfo
             $context->context->functionType($strPtr, false)
         );
         self::implementPhpSapiName($context, $fnSapi);
+
+        $fnZendVersion = self::declareIfMissing(
+            $context,
+            '__compiler_zend_version',
+            $context->context->functionType($strPtr, false)
+        );
+        self::implementZendVersion($context, $fnZendVersion);
 
         $fnUname = self::declareIfMissing(
             $context,
@@ -149,6 +158,14 @@ final class StringInfo
         $entry = $fn->appendBasicBlock('psn_entry');
         $context->builder->positionAtEnd($entry);
         $context->builder->returnValue(self::literalString($context, CompilerVersion::SAPI));
+        $context->builder->clearInsertionPosition();
+    }
+
+    private static function implementZendVersion(Context $context, LlvmFunction $fn): void
+    {
+        $entry = $fn->appendBasicBlock('zv_entry');
+        $context->builder->positionAtEnd($entry);
+        $context->builder->returnValue(self::literalString($context, VmInfo::ZEND_VERSION));
         $context->builder->clearInsertionPosition();
     }
 
