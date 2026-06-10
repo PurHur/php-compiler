@@ -11,7 +11,7 @@ use PHPCompiler\VM;
 /**
  * posix extension module entry (php-src ext/posix/posix.c; issue #7105).
  *
- * v1 libc wrappers: #7271; access/mknod/set*: #7376; host delegation removed #7177.
+ * v1 libc wrappers: #7271; access/mknod/set*: #7376; host delegation removed #7177; times/rlimit: #7173.
  */
 class Module extends ModuleAbstract
 {
@@ -23,6 +23,17 @@ class Module extends ModuleAbstract
             'POSIX_R_OK' => PosixConstants::POSIX_R_OK,
             'POSIX_W_OK' => PosixConstants::POSIX_W_OK,
             'POSIX_X_OK' => PosixConstants::POSIX_X_OK,
+            'POSIX_RLIMIT_CPU' => PosixConstants::RLIMIT_CPU,
+            'POSIX_RLIMIT_FSIZE' => PosixConstants::RLIMIT_FSIZE,
+            'POSIX_RLIMIT_DATA' => PosixConstants::RLIMIT_DATA,
+            'POSIX_RLIMIT_STACK' => PosixConstants::RLIMIT_STACK,
+            'POSIX_RLIMIT_CORE' => PosixConstants::RLIMIT_CORE,
+            'POSIX_RLIMIT_RSS' => PosixConstants::RLIMIT_RSS,
+            'POSIX_RLIMIT_NPROC' => PosixConstants::RLIMIT_NPROC,
+            'POSIX_RLIMIT_NOFILE' => PosixConstants::RLIMIT_NOFILE,
+            'POSIX_RLIMIT_MEMLOCK' => PosixConstants::RLIMIT_MEMLOCK,
+            'POSIX_RLIMIT_AS' => PosixConstants::RLIMIT_AS,
+            'POSIX_RLIMIT_INFINITY' => PosixConstants::RLIMIT_INFINITY,
             'S_IFIFO' => PosixConstants::S_IFIFO,
             'S_IFCHR' => PosixConstants::S_IFCHR,
             'S_IFDIR' => PosixConstants::S_IFDIR,
@@ -54,6 +65,10 @@ class Module extends ModuleAbstract
             new posix_setgid(),
             new posix_seteuid(),
             new posix_setegid(),
+            new posix_times(),
+            new posix_getrlimit(),
+            new posix_setrlimit(),
+            new posix_setsid(),
         ];
     }
 }

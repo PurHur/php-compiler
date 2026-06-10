@@ -202,6 +202,98 @@ final class VmPosix
         return null !== self::ffi();
     }
 
+    /**
+     * posix_times() — process times (php-src ext/posix/posix.c; #7173).
+     *
+     * @return array{ticks: int, utime: int, stime: int, cutime: int, cstime: int}
+     */
+    public static function times(): array
+    {
+        $ffi = self::ffi();
+        if (null === $ffi) {
+            throw new \Error('posix_times() is not available in this compiler build');
+        }
+
+        $tms = $ffi->new('struct tms');
+        $ticks = (int) $ffi->times(\FFI::addr($tms));
+        if (-1 === $ticks) {
+            self::$lastError = self::readErrno($ffi);
+
+            throw new \Error('posix_times() failed');
+        }
+
+        return [
+            'ticks' => $ticks,
+            'utime' => (int) $tms->tms_utime,
+            'stime' => (int) $tms->tms_stime,
+            'cutime' => (int) $tms->tms_cutime,
+            'cstime' => (int) $tms->tms_cstime,
+        ];
+    }
+
+    /**
+     * posix_getrlimit() — resource limits map (php-src ext/posix/posix.c; #7173).
+     *
+     * @return array<string, int|string>
+     */
+    public static function getrlimit(): array
+    {
+        $ffi = self::ffi();
+        if (null === $ffi) {
+            throw new \Error('posix_getrlimit() is not available in this compiler build');
+        }
+
+        $out = [];
+        foreach (self::rlimitResources() as $resource => $name) {
+            $rlim = $ffi->new('struct rlimit');
+            if (0 !== (int) $ffi->getrlimit($resource, \FFI::addr($rlim))) {
+                self::$lastError = self::readErrno($ffi);
+
+                throw new \Error('posix_getrlimit() failed');
+            }
+            $out['soft '.$name] = self::formatRlimitValue((int) $rlim->rlim_cur);
+            $out['hard '.$name] = self::formatRlimitValue((int) $rlim->rlim_max);
+        }
+
+        return $out;
+    }
+
+    public static function setrlimit(int $resource, int $softLimit, int $hardLimit): bool
+    {
+        self::$lastError = 0;
+        $ffi = self::ffi();
+        if (null === $ffi) {
+            throw new \Error('posix_setrlimit() is not available in this compiler build');
+        }
+
+        $rlim = $ffi->new('struct rlimit');
+        $rlim->rlim_cur = self::parseRlimitInput($softLimit);
+        $rlim->rlim_max = self::parseRlimitInput($hardLimit);
+        if (0 !== (int) $ffi->setrlimit($resource, \FFI::addr($rlim))) {
+            self::$lastError = self::readErrno($ffi);
+
+            return false;
+        }
+
+        return true;
+    }
+
+    public static function setsid(): int
+    {
+        self::$lastError = 0;
+        $ffi = self::ffi();
+        if (null === $ffi) {
+            throw new \Error('posix_setsid() is not available in this compiler build');
+        }
+
+        $sid = (int) $ffi->setsid();
+        if ($sid < 0) {
+            self::$lastError = self::readErrno($ffi);
+        }
+
+        return $sid;
+    }
+
     private static function setId(string $fn, int $id): bool
     {
         self::$lastError = 0;
@@ -238,6 +330,46 @@ final class VmPosix
             | (($minor & 0xffffff00) << 12);
     }
 
+    /**
+     * @return array<int, string>
+     */
+    private static function rlimitResources(): array
+    {
+        return [
+            PosixConstants::RLIMIT_CORE => 'core',
+            PosixConstants::RLIMIT_DATA => 'data',
+            PosixConstants::RLIMIT_STACK => 'stack',
+            PosixConstants::RLIMIT_AS => 'totalmem',
+            PosixConstants::RLIMIT_RSS => 'rss',
+            PosixConstants::RLIMIT_NPROC => 'maxproc',
+            PosixConstants::RLIMIT_MEMLOCK => 'memlock',
+            PosixConstants::RLIMIT_CPU => 'cpu',
+            PosixConstants::RLIMIT_FSIZE => 'filesize',
+            PosixConstants::RLIMIT_NOFILE => 'openfiles',
+        ];
+    }
+
+    /**
+     * @return int|string php-src prints "unlimited" for RLIM_INFINITY
+     */
+    private static function formatRlimitValue(int $raw): int|string
+    {
+        if ($raw < 0 || $raw > \PHP_INT_MAX) {
+            return 'unlimited';
+        }
+
+        return $raw;
+    }
+
+    private static function parseRlimitInput(int $value): int
+    {
+        if (PosixConstants::RLIMIT_INFINITY === $value) {
+            return -1;
+        }
+
+        return $value;
+    }
+
     private static function ffi(): ?\FFI
     {
         if (null !== self::$ffi) {
@@ -264,6 +396,22 @@ int seteuid(uid_t uid);
 int setegid(gid_t gid);
 int *__errno_location(void);
 char *ctermid(char *s);
+typedef long clock_t;
+struct tms {
+    clock_t tms_utime;
+    clock_t tms_stime;
+    clock_t tms_cutime;
+    clock_t tms_cstime;
+};
+clock_t times(struct tms *buf);
+typedef unsigned long rlim_t;
+struct rlimit {
+    rlim_t rlim_cur;
+    rlim_t rlim_max;
+};
+int getrlimit(int resource, struct rlimit *rlim);
+int setrlimit(int resource, const struct rlimit *rlim);
+pid_t setsid(void);
 CDEF;
 
         foreach (['libc.so.6', 'libc.so'] as $lib) {
