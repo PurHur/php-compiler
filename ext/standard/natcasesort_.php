@@ -60,6 +60,9 @@ final class natcasesort_ extends Internal
                         $a = $values[$j - 1]->resolveIndirect();
                         $b = $values[$j]->resolveIndirect();
                         if (Variable::TYPE_INTEGER !== $a->type || Variable::TYPE_INTEGER !== $b->type) {
+                            VmArray::rejectEnumCaseNaturalSortValue(
+                                Variable::TYPE_INTEGER !== $a->type ? $a : $b
+                            );
                             throw new \LogicException(
                                 'natcasesort() only supports homogeneous string or integer values in this compiler build'
                             );
@@ -74,6 +77,7 @@ final class natcasesort_ extends Internal
                     }
                 }
             } else {
+                VmArray::rejectEnumCaseNaturalSortValue($first);
                 throw new \LogicException(
                     'natcasesort() only supports homogeneous string or integer values in this compiler build'
                 );

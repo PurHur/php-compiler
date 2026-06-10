@@ -53,6 +53,19 @@ final class VmArray
         }
     }
 
+    /**
+     * natsort/natcasesort natural compare requires string operands — Zend rejects enum cases (#5607).
+     */
+    public static function rejectEnumCaseNaturalSortValue(Variable $value): void
+    {
+        $value = $value->resolveIndirect();
+        if (EnumCaseSupport::isEnumCaseVariable($value)) {
+            throw new \Error(
+                'Object of class '.EnumCaseSupport::typeNameForVariable($value).' could not be converted to string'
+            );
+        }
+    }
+
     public static function isList(HashTable $ht): bool
     {
         $n = $ht->getNumElements();
@@ -466,6 +479,7 @@ final class VmArray
         } elseif (Variable::TYPE_INTEGER === $first->type) {
             VmInternalCompare::sortKeyedPairsByValueInt($pairs);
         } else {
+            self::rejectEnumCaseNaturalSortValue($first);
             throw new \LogicException(
                 'natsort() only supports homogeneous string or integer values in this compiler build'
             );
@@ -512,6 +526,7 @@ final class VmArray
         } elseif (Variable::TYPE_INTEGER === $first->type) {
             VmInternalCompare::sortKeyedPairsByValueInt($pairs);
         } else {
+            self::rejectEnumCaseNaturalSortValue($first);
             throw new \LogicException(
                 'natcasesort() only supports homogeneous string or integer values in this compiler build'
             );
