@@ -17,6 +17,8 @@ final class VmGetrusageNativeTest extends TestCase
         $this->assertStringContainsString('VmGetrusageNative::available()', $source);
         $this->assertStringContainsString('VmGetrusageNative::getrusage', $source);
         $this->assertStringNotContainsString('host libc via Zend PHP', $source);
+        $this->assertStringNotContainsString("function_exists('getrusage')", $source);
+        $this->assertDoesNotMatchRegularExpression('/\\\\getrusage\\s*\\(/', $source);
     }
 
     public function testNativeDefinesLibcGetrusageFfi(): void

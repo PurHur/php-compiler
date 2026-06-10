@@ -19,6 +19,13 @@ final class VmProcessIdentityNativeTest extends TestCase
         $this->assertStringContainsString('VmProcessIdentityNative::getgid()', $source);
         $this->assertStringContainsString('VmProcessIdentityNative::geteuid()', $source);
         $this->assertStringContainsString('VmProcessIdentityNative::getpwuidName', $source);
+        $this->assertStringNotContainsString("function_exists('posix_", $source);
+        $this->assertStringNotContainsString("function_exists('getuid')", $source);
+        $this->assertStringNotContainsString("function_exists('getgid')", $source);
+        $this->assertStringNotContainsString("function_exists('geteuid')", $source);
+        $this->assertStringNotContainsString("function_exists('getpwuid')", $source);
+        $this->assertDoesNotMatchRegularExpression('/\\\\posix_[a-z_]+\\(/', $source);
+        $this->assertDoesNotMatchRegularExpression('/\\\\getpwuid\\s*\\(/', $source);
     }
 
     public function testVmDateGetmygrgidUsesProcessIdentity(): void
