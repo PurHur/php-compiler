@@ -4,15 +4,18 @@ declare(strict_types=1);
 
 namespace PHPCompiler\ext\standard;
 
+use PHPCompiler\Frame;
+use PHPCompiler\VM\Variable;
+
 /** VM pack()/unpack() — pack via PackEngine; unpack via UnpackEngine (issues #5231, #5442). */
 final class VmPack
 {
     /**
-     * @param list<mixed> $args values after format string
+     * @param list<mixed|Variable> $args values after format string
      */
-    public static function pack(string $format, array $args): string
+    public static function pack(string $format, array $args, ?Frame $frame = null): string
     {
-        return PackEngine::pack($format, $args);
+        return PackEngine::pack($format, $args, $frame);
     }
 
     /**

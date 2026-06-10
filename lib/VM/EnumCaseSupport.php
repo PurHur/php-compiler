@@ -798,6 +798,68 @@ final class EnumCaseSupport
     }
 
     /**
+     * pack() numeric operand — E_WARNING + backing scalar (#5713, #6213, ext/standard/pack.c).
+     *
+     * @return int|null backing int when $value is an enum case, or null otherwise
+     */
+    public static function packCoerceToLong(Variable $value, ?Context $context = null, ?Frame $frame = null): ?int
+    {
+        $entry = self::enumCaseEntryForVariable($value);
+        if (null === $entry) {
+            return null;
+        }
+        self::emitScalarCastWarning($context, $frame, $entry->enumClass->name, 'int');
+        if (null === $entry->enumClass->backedType) {
+            return 1;
+        }
+        $backing = $entry->backingValue->resolveIndirect();
+
+        return match ($backing->type) {
+            Variable::TYPE_INTEGER => $backing->toInt(),
+            Variable::TYPE_FLOAT => (int) $backing->toFloat(),
+            Variable::TYPE_STRING => (int) $backing->toString(),
+            default => 0,
+        };
+    }
+
+    /**
+     * pack() float operand — E_WARNING + backing scalar (#5713, ext/standard/pack.c).
+     *
+     * @return float|null backing float when $value is an enum case, or null otherwise
+     */
+    public static function packCoerceToDouble(Variable $value, ?Context $context = null, ?Frame $frame = null): ?float
+    {
+        $entry = self::enumCaseEntryForVariable($value);
+        if (null === $entry) {
+            return null;
+        }
+        self::emitScalarCastWarning($context, $frame, $entry->enumClass->name, 'float');
+        if (null === $entry->enumClass->backedType) {
+            return 1.0;
+        }
+        $backing = $entry->backingValue->resolveIndirect();
+
+        return match ($backing->type) {
+            Variable::TYPE_FLOAT => $backing->toFloat(),
+            Variable::TYPE_INTEGER => (float) $backing->toInt(),
+            Variable::TYPE_STRING => (float) $backing->toString(),
+            default => 0.0,
+        };
+    }
+
+    /**
+     * pack() string operand — enum cases Error like Zend object-to-string (#5713, ext/standard/pack.c).
+     */
+    public static function packRejectStringOperand(Variable $value): void
+    {
+        $entry = self::enumCaseEntryForVariable($value);
+        if (null === $entry) {
+            return;
+        }
+        throw new \Error("Object of class {$entry->enumClass->name} could not be converted to string");
+    }
+
+    /**
      * Zend scalar (int) cast on enum case operands — E_WARNING + legacy object cast 1 (#5714, zend_operators.c).
      *
      * @return int|null 1 when $value is an enum case, or null otherwise
