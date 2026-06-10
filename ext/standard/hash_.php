@@ -40,11 +40,6 @@ final class hash_ extends Internal
         }
         $result = VmHash::hash($algo, $data, $raw);
         BuiltinExecute::writeReturn($frame, static function (Variable $ret) use ($result): void {
-            if (false === $result) {
-                $ret->bool(false);
-
-                return;
-            }
             $ret->string($result);
         });
     }

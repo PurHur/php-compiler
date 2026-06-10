@@ -6,6 +6,7 @@ namespace PHPCompiler\JIT\Builtin;
 
 use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\Builtin\TypeErrorRaise;
 use PHPLLVM\Builder;
 use PHPLLVM\Value;
 use PHPLLVM\Value\Function_ as LlvmFunction;
@@ -158,7 +159,9 @@ final class StringHashCryptoNativeJit
         );
 
         $context->builder->positionAtEnd($bad);
-        $context->builder->returnValue($nullStr);
+        TypeErrorRaise::ensureLinked($context);
+        TypeErrorRaise::emitValueError($context, \PHPCompiler\ext\standard\VmHash::HASH_UNKNOWN_ALGO_MSG);
+        $context->builder->unreachable();
 
         $context->builder->positionAtEnd($body);
         $digest = $context->builder->alloca($i8, self::SHA256_DIGEST_SIZE, 'hc_hash_digest');
