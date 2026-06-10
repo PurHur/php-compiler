@@ -8,6 +8,7 @@ use PHPCompiler\Compiler\AttributeEntry;
 use PHPCompiler\Compiler\AttributeNames;
 use PHPCompiler\Compiler\CompileTimeNew;
 use PHPCompiler\Compiler\SourceLocation;
+use PHPCompiler\ext\standard\VmClosureCall;
 use PHPCompiler\ext\standard\VmReflection;
 use PHPCompiler\Frame;
 use PHPCompiler\Func;
@@ -1186,5 +1187,218 @@ final class ReflectionSupport
             return;
         }
         $returnVar->string('Core');
+    }
+
+    public static function newReflectionFunctionObject(Context $ctx): ObjectEntry
+    {
+        $rfClass = $ctx->classes[self::REFLECTION_FUNCTION] ?? null;
+        if (null === $rfClass) {
+            throw new \LogicException('ReflectionFunction is not registered in this compiler build');
+        }
+        $rf = new ObjectEntry($rfClass);
+        $rf->constructed = true;
+
+        return $rf;
+    }
+
+    /**
+     * ReflectionFunction::createFromCallable() — php-src ext/reflection/php_reflection.c (#7039).
+     */
+    public static function reflectionFunctionFromCallable(Context $ctx, Frame $frame, Variable $callable): ObjectEntry
+    {
+        $callable = $callable->resolveIndirect();
+        if (VmClosureCall::isClosure($callable)) {
+            return self::populateReflectionFunctionFromClosureState(
+                $ctx,
+                VmClosureCall::resolve($callable)
+            );
+        }
+        if (!\in_array($callable->type, [Variable::TYPE_OBJECT, Variable::TYPE_STRING, Variable::TYPE_ARRAY], true)) {
+            self::throwReflectionException(
+                'ReflectionFunction::createFromCallable(): Argument #1 ($function) must be a valid callback'
+            );
+        }
+        try {
+            if (Variable::TYPE_STRING === $callable->type && !str_contains($callable->toString(), '::')) {
+                $name = $callable->toString();
+                $func = self::resolveFunctionForReflection($ctx, $name);
+                $rf = self::newReflectionFunctionObject($ctx);
+                $rf->reflectionIsInternalFunction = $func instanceof Func\Internal;
+                $rf->getProperty(self::PROP_FUNC_NAME)->string($name);
+
+                return $rf;
+            }
+            $closureObj = ClosureSupport::fromCallable($ctx, $frame, $callable);
+            $state = ClosureSupport::requireClosureState(
+                $closureObj,
+                'ReflectionFunction::createFromCallable()'
+            );
+
+            return self::populateReflectionFunctionFromClosureState($ctx, $state);
+        } catch (\LogicException|\Error) {
+            self::throwReflectionException(
+                'ReflectionFunction::createFromCallable(): Argument #1 ($function) must be a valid callback'
+            );
+        }
+    }
+
+    /**
+     * @param list<Variable> $invokeArgs
+     */
+    public static function invokeReflectionFunction(
+        VmEngine $vm,
+        Frame $frame,
+        ObjectEntry $reflection,
+        array $invokeArgs
+    ): Variable {
+        $ctx = VmReflection::requireContext($frame);
+        $closure = $reflection->reflectionClosureState;
+        if (null !== $closure) {
+            return $vm->invokeClosure($closure, ...$invokeArgs);
+        }
+        $name = self::functionNameFromReflection($reflection);
+        $func = $ctx->functions[strtolower($name)] ?? null;
+        if (null === $func) {
+            self::throwReflectionException(self::functionNotFoundMessage($name));
+        }
+        if ($func instanceof Func\Internal) {
+            $child = $func->getFrame($ctx, $frame);
+            $child->vmContext = $ctx;
+            $child->calledArgs = $invokeArgs;
+            $out = new Variable();
+            $child->returnVar = $out;
+            $func->execute($child);
+
+            return $out->resolveIndirect();
+        }
+        if (!$func instanceof Func\PHP) {
+            throw new \LogicException('ReflectionFunction::invoke() target is not invokable in this compiler build');
+        }
+
+        return $vm->invokePhpFunction($func, ...$invokeArgs);
+    }
+
+    /**
+     * ReflectionMethod::createFromClosure() — php-src ext/reflection/php_reflection.c (#7039).
+     */
+    public static function reflectionMethodFromClosure(
+        Context $ctx,
+        Variable $closureArg,
+        ?Variable $scopeArg,
+        ?Variable $nameArg
+    ): ObjectEntry {
+        $closureArg = $closureArg->resolveIndirect();
+        if (Variable::TYPE_OBJECT !== $closureArg->type
+            || 'closure' !== strtolower($closureArg->toObject()->class->name)) {
+            throw new \TypeError(
+                'ReflectionMethod::createFromClosure(): Argument #1 ($closure) must be of type Closure, '
+                .self::valueTypeLabel($closureArg).' given'
+            );
+        }
+        $state = ClosureSupport::requireClosureState(
+            $closureArg->toObject(),
+            'ReflectionMethod::createFromClosure()'
+        );
+        if ($state->isUserClosure()) {
+            self::throwReflectionException('Given closure was not created from a method');
+        }
+        [$className, $methodName] = self::methodScopeAndNameFromClosureState($ctx, $state);
+        if (null !== $scopeArg) {
+            $scopeArg = $scopeArg->resolveIndirect();
+            if (Variable::TYPE_NULL !== $scopeArg->type) {
+                $className = VmReflection::stringArg($scopeArg, 'ReflectionMethod::createFromClosure() scope', 2);
+            }
+        }
+        if (null !== $nameArg) {
+            $nameArg = $nameArg->resolveIndirect();
+            if (Variable::TYPE_NULL !== $nameArg->type) {
+                $methodName = VmReflection::stringArg($nameArg, 'ReflectionMethod::createFromClosure() name', 3);
+            }
+        }
+        if (null === $className || null === $methodName || '' === $className || '' === $methodName) {
+            self::throwReflectionException('Given closure was not created from a method');
+        }
+        $entry = VmReflection::resolveClassEntry($ctx, $className);
+        if (null === $entry) {
+            self::throwReflectionException(self::classNotFoundMessage($className));
+        }
+        $methodLc = strtolower($methodName);
+        if (!isset($entry->methods[$methodLc]) && !isset($entry->abstractMethods[$methodLc])) {
+            self::throwReflectionException(self::methodNotFoundMessage($entry->name, $methodName));
+        }
+
+        return self::newReflectionMethodObject($ctx, $entry, $methodName);
+    }
+
+    private static function populateReflectionFunctionFromClosureState(Context $ctx, ClosureState $state): ObjectEntry
+    {
+        $rf = self::newReflectionFunctionObject($ctx);
+        $rf->reflectionClosureState = $state;
+        $rf->getProperty(self::PROP_FUNC_NAME)->string(self::displayNameForClosureState($state));
+
+        return $rf;
+    }
+
+    private static function displayNameForClosureState(ClosureState $state): string
+    {
+        if (null !== $state->methodName && '' !== $state->methodName) {
+            $scope = $state->boundScopeClass ?? '';
+            if ('' === $scope && null !== $state->methodReceiver) {
+                $recv = $state->methodReceiver->resolveIndirect();
+                if (Variable::TYPE_OBJECT === $recv->type) {
+                    $scope = $recv->toObject()->class->name;
+                }
+            }
+            if ('' !== $scope) {
+                return $scope.'::'.$state->methodName;
+            }
+
+            return $state->methodName;
+        }
+
+        return $state->func->getName();
+    }
+
+    /**
+     * @return array{0: ?string, 1: ?string}
+     */
+    private static function methodScopeAndNameFromClosureState(Context $ctx, ClosureState $state): array
+    {
+        if (null !== $state->methodName && '' !== $state->methodName) {
+            $className = $state->boundScopeClass;
+            if (null === $className || '' === $className) {
+                if (null !== $state->methodReceiver) {
+                    $recv = $state->methodReceiver->resolveIndirect();
+                    if (Variable::TYPE_OBJECT === $recv->type) {
+                        $className = $recv->toObject()->class->name;
+                    }
+                }
+            }
+
+            return [$className, $state->methodName];
+        }
+        $wrapped = $state->wrappedFunc;
+        if ($wrapped instanceof Func\PHP) {
+            $cfgFunc = $wrapped->block->func ?? null;
+            if (null !== $cfgFunc && null !== $cfgFunc->class) {
+                $className = $cfgFunc->class->value;
+                $methodLc = strtolower($wrapped->getName());
+                if (str_contains($methodLc, '::')) {
+                    $methodLc = strtolower(substr($methodLc, strrpos($methodLc, '::') + 2));
+                }
+                $entry = VmReflection::resolveClassEntry($ctx, $className);
+                if (null !== $entry && (isset($entry->methods[$methodLc]) || isset($entry->abstractMethods[$methodLc]))) {
+                    return [$entry->name, $entry->methodNames[$methodLc] ?? $methodLc];
+                }
+                $shortName = $wrapped->getName();
+                if (str_contains($shortName, '::')) {
+                    $shortName = substr($shortName, strrpos($shortName, '::') + 2);
+                }
+
+                return [$className, $shortName];
+            }
+        }
+
+        return [null, null];
     }
 }

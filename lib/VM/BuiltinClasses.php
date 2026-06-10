@@ -97,15 +97,18 @@ use PHPCompiler\VM\Builtin\ReflectionEnumUnitCaseGetAttributes;
 use PHPCompiler\VM\Builtin\ReflectionEnumUnitCaseGetName;
 use PHPCompiler\VM\Builtin\ReflectionEnumUnitCaseGetValue;
 use PHPCompiler\VM\Builtin\ReflectionFunctionConstruct;
+use PHPCompiler\VM\Builtin\ReflectionFunctionCreateFromCallable;
 use PHPCompiler\VM\Builtin\ReflectionFunctionGetExtensionName;
 use PHPCompiler\VM\Builtin\ReflectionFunctionGetName;
 use PHPCompiler\VM\Builtin\ReflectionFunctionGetParameters;
 use PHPCompiler\VM\Builtin\ReflectionFunctionGetReturnType;
 use PHPCompiler\VM\Builtin\ReflectionFunctionHasReturnType;
+use PHPCompiler\VM\Builtin\ReflectionFunctionInvoke;
 use PHPCompiler\VM\Builtin\ReflectionFunctionIsAnonymous;
 use PHPCompiler\VM\Builtin\ReflectionFunctionIsInternal;
 use PHPCompiler\VM\Builtin\ReflectionFunctionIsUserDefined;
 use PHPCompiler\VM\Builtin\ReflectionMethodConstruct;
+use PHPCompiler\VM\Builtin\ReflectionMethodCreateFromClosure;
 use PHPCompiler\VM\Builtin\ReflectionMethodGetAttributes;
 use PHPCompiler\VM\Builtin\ReflectionMethodGetClosure;
 use PHPCompiler\VM\Builtin\ReflectionMethodGetName;
@@ -344,6 +347,7 @@ final class BuiltinClasses
         $boolProto = new Variable(Variable::TYPE_BOOLEAN);
         $arrayProto = new Variable(Variable::TYPE_ARRAY);
         $pub = CfgFunc::FLAG_PUBLIC;
+        $pubStatic = $pub | CfgFunc::FLAG_STATIC;
 
         $attr = new ClassEntry('ReflectionAttribute');
         $attr->properties[] = new ClassProperty(ReflectionSupport::PROP_ATTR_NAME, null, $strProto);
@@ -409,6 +413,8 @@ final class BuiltinClasses
         $rm->methodVisibility['invokeargs'] = $pub;
         $rm->methods['getclosure'] = new ReflectionMethodGetClosure();
         $rm->methodVisibility['getclosure'] = $pub;
+        $rm->methods['createfromclosure'] = new ReflectionMethodCreateFromClosure();
+        $rm->methodVisibility['createfromclosure'] = $pubStatic;
         $rm->methods['isstatic'] = new ReflectionMethodIsStatic();
         $rm->methodVisibility['isstatic'] = $pub;
         $rm->methods['ispublic'] = new ReflectionMethodIsPublic();
@@ -551,11 +557,14 @@ final class BuiltinClasses
                 'isinternal' => new ReflectionFunctionIsInternal(),
                 'isuserdefined' => new ReflectionFunctionIsUserDefined(),
                 'getextensionname' => new ReflectionFunctionGetExtensionName(),
+                'invoke' => new ReflectionFunctionInvoke(),
             ] as $name => $method
         ) {
             $rf->methods[$name] = $method;
             $rf->methodVisibility[$name] = $pub;
         }
+        $rf->methods['createfromcallable'] = new ReflectionFunctionCreateFromCallable();
+        $rf->methodVisibility['createfromcallable'] = $pubStatic;
         $ctx->classes[ReflectionSupport::REFLECTION_FUNCTION] = $rf;
 
         $rconst = new ClassEntry('ReflectionConstant');
