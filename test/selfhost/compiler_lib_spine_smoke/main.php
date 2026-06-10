@@ -971,6 +971,7 @@ require_once __DIR__.'/../../../ext/standard/VmReadline.php';
 require_once __DIR__.'/../../../ext/standard/VmRound.php';
 require_once __DIR__.'/../../../ext/standard/VmSscanf.php';
 require_once __DIR__.'/../../../ext/standard/VmStreamArg.php';
+require_once __DIR__.'/../../../ext/standard/VmSysGetloadavgNative.php';
 require_once __DIR__.'/../../../ext/standard/VmSys.php';
 require_once __DIR__.'/../../../ext/standard/VmVprintf.php';
 require_once __DIR__.'/../../../ext/standard/VmZlibNative.php';
