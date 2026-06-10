@@ -21,6 +21,8 @@ class VarStream {
 }
 var_export(function_exists('stream_wrapper_register'));
 echo "\n";
+var_export(function_exists('stream_register_wrapper'));
+echo "\n";
 var_export(function_exists('stream_wrapper_unregister'));
 echo "\n";
 var_export(function_exists('stream_wrapper_restore'));
@@ -40,6 +42,7 @@ echo "\n";
 var_export(in_array('var', stream_get_wrappers(), true));
 echo "\n";
 --EXPECT--
+true
 true
 true
 true

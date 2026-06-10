@@ -478,6 +478,7 @@ class Module extends ModuleAbstract
             new stream_get_filters(),
             new stream_get_wrappers(),
             new stream_wrapper_register(),
+            new stream_register_wrapper(),
             new stream_wrapper_unregister(),
             new stream_wrapper_restore(),
             new stream_bucket_new(),
