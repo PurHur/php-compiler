@@ -36,7 +36,7 @@ final class VmMime
         $path = VmString::coerceStringBuiltinArg(
             $operand,
             'mime_content_type',
-            1,
+            0,
             'filename_or_stream'
         );
 

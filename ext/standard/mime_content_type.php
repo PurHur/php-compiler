@@ -47,7 +47,7 @@ final class mime_content_type extends Internal
 
         return JitMimeContentType::invoke(
             $context,
-            JitStringBuiltinArg::lower($context, $args[0], 'mime_content_type', 1, 'filename_or_stream')
+            JitStringBuiltinArg::lower($context, $args[0], 'mime_content_type', 0, 'filename_or_stream')
         );
     }
 }
