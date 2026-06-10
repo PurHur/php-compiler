@@ -29,12 +29,7 @@ final class date extends Internal
         }
         $timestamp = null;
         if (2 === $argc) {
-            $tsVar = $frame->calledArgs[1]->resolveIndirect();
-            if (Variable::TYPE_INTEGER === $tsVar->type) {
-                $timestamp = $tsVar->toInt();
-            } elseif (Variable::TYPE_NULL !== $tsVar->type) {
-                throw new \LogicException('date() timestamp must be an integer or null in this compiler build');
-            }
+            $timestamp = VmDate::coerceNullableTimestampArg($frame->calledArgs[1], 'date', 2, 'timestamp');
         }
         $frame->returnVar->string(VmDate::date($formatVar->toString(), $timestamp));
     }

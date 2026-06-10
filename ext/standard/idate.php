@@ -46,11 +46,9 @@ final class idate extends Internal
         }
         $timestamp = VmDate::time();
         if (2 === $argc) {
-            $tsVar = $frame->calledArgs[1]->resolveIndirect();
-            if (Variable::TYPE_INTEGER === $tsVar->type) {
-                $timestamp = $tsVar->toInt();
-            } elseif (Variable::TYPE_NULL !== $tsVar->type) {
-                throw new \LogicException('idate() timestamp must be an integer or null in this compiler build');
+            $coerced = VmDate::coerceNullableTimestampArg($frame->calledArgs[1], 'idate', 2, 'timestamp');
+            if (null !== $coerced) {
+                $timestamp = $coerced;
             }
         }
         $value = VmDate::idateValue($format, $timestamp);

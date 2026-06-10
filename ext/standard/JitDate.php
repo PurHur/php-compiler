@@ -220,7 +220,14 @@ final class JitDate
         $format = self::jitStringArg($context, $args[0]);
         $i64 = $context->getTypeFromString('int64');
         $timestamp = $argc >= 2
-            ? self::jitTimestampArg($context, $args[1])
+            ? JitDateTimestampArg::lowerNullable(
+                $context,
+                $args[1],
+                $gmt ? 'gmdate' : 'date',
+                2,
+                'timestamp',
+                self::time($context)
+            )
             : self::time($context);
         $gmtI8 = $context->getTypeFromString('int8')->constInt($gmt ? 1 : 0, false);
 
@@ -230,22 +237,6 @@ final class JitDate
             $timestamp,
             $gmtI8
         );
-    }
-
-    private static function jitTimestampArg(Context $context, JITVariable $arg): Value
-    {
-        $i64 = $context->getTypeFromString('int64');
-        if (JITVariable::TYPE_NATIVE_LONG === $arg->type) {
-            return $context->helper->loadValue($arg);
-        }
-        if (JITVariable::TYPE_VALUE === $arg->type) {
-            return $context->builder->call(
-                $context->lookupFunction('__value__readLong'),
-                $arg->value
-            );
-        }
-
-        throw new \LogicException('date() timestamp must be an integer or null in this compiler build');
     }
 
     private static function jitStringArg(Context $context, JITVariable $arg): Value
