@@ -587,6 +587,7 @@ class Module extends ModuleAbstract
             new assert_(),
             new assert_options(),
             new trigger_error_(),
+            new user_error(),
             new compiler_language_warning_(),
             new set_error_handler_(),
             new restore_error_handler_(),

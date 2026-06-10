@@ -1970,7 +1970,10 @@ final class HashTableHelper
                     $context->lookupFunction('__hashtable__setStringKeyBool'),
                     $ht,
                     $keyPtr,
-                    $context->helper->loadValue($element)
+                    $context->builder->truncOrBitCast(
+                        $context->helper->loadValue($element),
+                        $context->getTypeFromString('int1')
+                    )
                 );
                 break;
             case Variable::TYPE_NATIVE_DOUBLE:

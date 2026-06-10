@@ -349,7 +349,7 @@ final class AttributeRegistryLowering
                 $context->lookupFunction('__hashtable__setStringKeyBool'),
                 $entryHt,
                 $valueKey,
-                $context->getTypeFromString('int32')->constInt($value ? 1 : 0, false)
+                $context->getTypeFromString('int1')->constInt($value ? 1 : 0, false)
             );
 
             return;
