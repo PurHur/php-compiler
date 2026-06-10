@@ -3,7 +3,7 @@
 declare(strict_types=1);
 
 /**
- * VM process helpers — libc FFI when available; host Zend fallback for dev (#5388).
+ * VM process helpers — libc FFI when available (#5388, #7862).
  */
 
 namespace PHPCompiler\ext\standard;
@@ -42,13 +42,9 @@ final class VmProcess
         return $ht;
     }
 
-    /** proc_nice() — host libc via Zend when available (php-src basic_functions.c; #5181). */
+    /** proc_nice() — libc nice(3) via FFI (php-src basic_functions.c; #5181, #7862). */
     public static function proc_nice(int $priority): bool
     {
-        if (!\function_exists('proc_nice')) {
-            return false;
-        }
-
-        return \proc_nice($priority);
+        return VmProcNiceNative::proc_nice($priority);
     }
 }
