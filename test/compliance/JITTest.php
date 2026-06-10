@@ -489,12 +489,6 @@ class JITTest extends BaseTest {
             if (str_contains($name, 'asymmetric_visibility') && !str_contains($name, 'jit')) {
                 continue;
             }
-            // highlight_string/highlight_file/show_source VM-only (#3164, #3447).
-            if (str_contains($name, 'highlight_string')
-                || str_contains($name, 'highlight_file')
-                || str_contains($name, 'show_source')) {
-                continue;
-            }
             // fstat() on fopen handles: VM + AOT (#3482); MCJIT fopen execute unstable (jit-runtime-probe #98).
             if (str_contains($name, 'fstat_stream')) {
                 continue;

@@ -52,6 +52,6 @@ final class highlight_string extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        throw new \LogicException('highlight_string() is VM only in this compiler build');
+        return JitHighlight::highlightString($context, ...$args);
     }
 }

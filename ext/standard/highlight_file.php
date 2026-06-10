@@ -62,6 +62,6 @@ final class highlight_file extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        throw new \LogicException('highlight_file() is VM only in this compiler build');
+        return JitHighlight::highlightFile($context, $this->getName(), ...$args);
     }
 }
