@@ -677,6 +677,15 @@ class Module extends ModuleAbstract
             $context->registerFunction('strcoll', $fn);
         }
         try {
+            $context->lookupFunction('strxfrm');
+        } catch (\Throwable $e) {
+            $i8p = $context->getTypeFromString('int8*');
+            $sizeT = $context->getTypeFromString('size_t');
+            $ft = $context->context->functionType($sizeT, false, $i8p, $i8p, $sizeT);
+            $fn = $context->module->addFunction('strxfrm', $ft);
+            $context->registerFunction('strxfrm', $fn);
+        }
+        try {
             $context->lookupFunction('memcmp');
         } catch (\Throwable $e) {
             $i8p = $context->getTypeFromString('int8*');

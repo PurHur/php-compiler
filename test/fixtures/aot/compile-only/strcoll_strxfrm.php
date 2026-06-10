@@ -1,4 +1,4 @@
 <?php
-// Compile-only (#4376): strcoll() JIT lowering; strxfrm() VM-only registration for AOT parse.
+// Compile-only (#4376): strcoll() and strxfrm() JIT/AOT lowering via libc.
 echo strcoll('a', 'b'), "\n";
 echo strxfrm('hello'), "\n";
