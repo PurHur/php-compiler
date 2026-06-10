@@ -6,6 +6,7 @@ namespace PHPCompiler\VM;
 
 use PHPCfg\Func as CfgFunc;
 use PHPCompiler\VM\Builtin\DateTimeConstruct;
+use PHPCompiler\VM\Builtin\DateTimeCreateFromImmutable;
 use PHPCompiler\VM\Builtin\DateTimeFormat;
 use PHPCompiler\VM\Builtin\DateTimeGetMicrosecond;
 use PHPCompiler\VM\Builtin\DateTimeGetTimestamp;
@@ -736,6 +737,8 @@ final class BuiltinClasses
             $dt->methods[$name] = $method;
             $dt->methodVisibility[$name] = $pub;
         }
+        $dt->methods['createfromimmutable'] = new DateTimeCreateFromImmutable();
+        $dt->methodVisibility['createfromimmutable'] = $pubStatic;
         $ctx->classes[DateTimeSupport::CLASS_DATETIME] = $dt;
 
         $dti = new ClassEntry('DateTimeImmutable');

@@ -54,18 +54,43 @@ final class DateTimeSupport
         return $obj;
     }
 
-    public static function requireDateTimeImmutable(Variable $var, string $label): ObjectEntry
-    {
+    public static function requireDateTimeImmutable(
+        Variable $var,
+        string $label,
+        ?int $argNum = null,
+        ?string $argName = null
+    ): ObjectEntry {
         $var = $var->resolveIndirect();
         if (Variable::TYPE_OBJECT !== $var->type) {
-            throw new \TypeError("{$label} must be of type DateTimeImmutable");
+            throw self::dateTimeImmutableTypeError($label, $argNum, $argName, $var);
         }
         $obj = $var->toObject();
         if (self::CLASS_DATETIMEIMMUTABLE !== strtolower($obj->class->name)) {
-            throw new \TypeError("{$label} must be of type DateTimeImmutable");
+            throw self::dateTimeImmutableTypeError($label, $argNum, $argName, $var, $obj->class->name);
         }
 
         return $obj;
+    }
+
+    private static function dateTimeImmutableTypeError(
+        string $label,
+        ?int $argNum,
+        ?string $argName,
+        Variable $var,
+        ?string $objectClass = null
+    ): \TypeError {
+        $given = null !== $objectClass
+            ? $objectClass
+            : ReflectionSupport::valueTypeLabelPublic($var);
+        if (null !== $argNum) {
+            $param = null !== $argName ? " (\${$argName})" : '';
+
+            return new \TypeError(
+                "{$label}: Argument #{$argNum}{$param} must be of type DateTimeImmutable, {$given} given"
+            );
+        }
+
+        return new \TypeError("{$label} must be of type DateTimeImmutable, {$given} given");
     }
 
     /** Accept DateTime or DateTimeImmutable (#7082); subclasses when $ctx is provided (#7276). */
@@ -325,19 +350,48 @@ final class DateTimeSupport
         }
     }
 
+    /** php-src zim_DateTime_createFromImmutable — clone immutable snapshot to mutable (#6518). */
+    public static function createDateTimeFromImmutable(Variable $immutableArg, Context $ctx): ObjectEntry
+    {
+        $immutable = self::requireDateTimeImmutable(
+            $immutableArg,
+            'DateTime::createFromImmutable()',
+            1,
+            'object'
+        );
+        self::requireInitializedDateTimeLike($immutable, 'DateTimeImmutable');
+        $class = $ctx->classes[self::CLASS_DATETIME] ?? null;
+        if (null === $class) {
+            throw new \LogicException('DateTime is not registered in this compiler build');
+        }
+        $mutable = new ObjectEntry($class);
+        self::copyDateTimeState($immutable, $mutable);
+        $mutable->constructed = true;
+        self::markDateTimeLikeInitialized($mutable);
+
+        return $mutable;
+    }
+
     private static function cloneDateTimeObject(ObjectEntry $source): ObjectEntry
     {
         $clone = new ObjectEntry($source->class);
-        self::requireIntProperty($clone, self::TS_PROPERTY, self::classLabel($source))
-            ->int(self::requireIntProperty($source, self::TS_PROPERTY, self::classLabel($source))->toInt());
-        self::requireStringProperty($clone, self::TZ_PROPERTY, self::classLabel($source))
-            ->string(self::requireStringProperty($source, self::TZ_PROPERTY, self::classLabel($source))->toString());
-        self::requireIntProperty($clone, self::MICROSECOND_PROPERTY, self::classLabel($source))
-            ->int(self::requireIntProperty($source, self::MICROSECOND_PROPERTY, self::classLabel($source))->toInt());
+        self::copyDateTimeState($source, $clone);
         $clone->constructed = true;
         self::markDateTimeLikeInitialized($clone);
 
         return $clone;
+    }
+
+    private static function copyDateTimeState(ObjectEntry $source, ObjectEntry $target): void
+    {
+        $sourceLabel = self::classLabel($source);
+        $targetLabel = self::classLabel($target);
+        self::requireIntProperty($target, self::TS_PROPERTY, $targetLabel)
+            ->int(self::requireIntProperty($source, self::TS_PROPERTY, $sourceLabel)->toInt());
+        self::requireStringProperty($target, self::TZ_PROPERTY, $targetLabel)
+            ->string(self::requireStringProperty($source, self::TZ_PROPERTY, $sourceLabel)->toString());
+        self::requireIntProperty($target, self::MICROSECOND_PROPERTY, $targetLabel)
+            ->int(self::requireIntProperty($source, self::MICROSECOND_PROPERTY, $sourceLabel)->toInt());
     }
 
     /**
