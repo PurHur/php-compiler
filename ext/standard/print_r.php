@@ -36,11 +36,7 @@ final class print_r extends Internal
         }
         $return = false;
         if (2 === $argc) {
-            $retArg = $frame->calledArgs[1]->resolveIndirect();
-            if (Variable::TYPE_BOOLEAN !== $retArg->type) {
-                throw new \LogicException('print_r() return argument must be boolean in this compiler build');
-            }
-            $return = $retArg->toBool();
+            $return = $frame->calledArgs[1]->resolveIndirect()->toBool();
         }
         $out = self::formatVariable($vm, $frame->calledArgs[0]->resolveIndirect(), 0);
         if ($return) {
