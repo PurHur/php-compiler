@@ -93,17 +93,10 @@ final class mb_strlen extends Internal
     private static function lengthForEncoding(string $str, string $encoding): int
     {
         if ('UTF-8' === $encoding) {
-            if (\function_exists('mb_strlen')) {
-                return (int) \mb_strlen($str, 'UTF-8');
-            }
-
             return VmString::utf8CharLength($str);
         }
         if ('ASCII' === $encoding || '8BIT' === $encoding) {
             return VmString::byteLength($str);
-        }
-        if (\function_exists('mb_strlen')) {
-            return (int) \mb_strlen($str, $encoding);
         }
 
         throw new \LogicException(
