@@ -23,4 +23,22 @@ final class PosixConstants
     public const S_IFREG = 0100000;
     public const S_IFLNK = 0120000;
     public const S_IFSOCK = 0140000;
+
+    /** php-src ext/posix/posix.c — RLIMIT_* resource ids (Linux). */
+    public const RLIMIT_CPU = 0;
+    public const RLIMIT_FSIZE = 1;
+    public const RLIMIT_DATA = 2;
+    public const RLIMIT_STACK = 3;
+    public const RLIMIT_CORE = 4;
+    public const RLIMIT_RSS = 5;
+    public const RLIMIT_NPROC = 6;
+    public const RLIMIT_NOFILE = 7;
+    public const RLIMIT_MEMLOCK = 8;
+    public const RLIMIT_AS = 9;
+
+    /** User-facing unlimited sentinel for posix_setrlimit() (php-src POSIX_RLIMIT_INFINITY). */
+    public const RLIMIT_INFINITY = -1;
+
+    /** sysconf(_SC_CLK_TCK) fallback when unavailable. */
+    public const CLK_TCK_FALLBACK = 100;
 }
