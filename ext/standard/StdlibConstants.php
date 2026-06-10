@@ -62,6 +62,11 @@ final class StdlibConstants
     public const CASE_LOWER = 0;
     public const CASE_UPPER = 1;
 
+    /** parse_ini_*() scanner modes (ext/standard/ini.c). */
+    public const INI_SCANNER_NORMAL = 0;
+    public const INI_SCANNER_RAW = 1;
+    public const INI_SCANNER_TYPED = 2;
+
     /** file() flags (ext/standard/file.c; PHP bitmask constants). */
     public const FILE_USE_INCLUDE_PATH = 1;
     public const FILE_IGNORE_NEW_LINES = 2;
@@ -163,6 +168,9 @@ final class StdlibConstants
         'php_round_half_odd' => self::PHP_ROUND_HALF_ODD,
         'case_lower' => self::CASE_LOWER,
         'case_upper' => self::CASE_UPPER,
+        'ini_scanner_normal' => self::INI_SCANNER_NORMAL,
+        'ini_scanner_raw' => self::INI_SCANNER_RAW,
+        'ini_scanner_typed' => self::INI_SCANNER_TYPED,
         'file_ignore_new_lines' => self::FILE_IGNORE_NEW_LINES,
         'file_skip_empty_lines' => self::FILE_SKIP_EMPTY_LINES,
         'file_use_include_path' => self::FILE_USE_INCLUDE_PATH,
@@ -270,6 +278,9 @@ final class StdlibConstants
         'php_round_half_odd',
         'case_lower',
         'case_upper',
+        'ini_scanner_normal',
+        'ini_scanner_raw',
+        'ini_scanner_typed',
         'file_ignore_new_lines',
         'file_skip_empty_lines',
         'file_use_include_path',
