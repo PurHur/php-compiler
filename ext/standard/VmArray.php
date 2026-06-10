@@ -601,7 +601,9 @@ final class VmArray
     }
 
     /**
-     * shuffle() — Fisher–Yates on packed list values (CSPRNG via {@see VmString::randomBytes()}).
+     * shuffle() — Fisher–Yates on values (CSPRNG via {@see VmString::randomBytes()}).
+     *
+     * Packed lists shuffle in place; associative arrays reindex to 0..n-1 (php-src array.c).
      */
     public static function shufflePacked(HashTable $ht): void
     {
@@ -609,44 +611,25 @@ final class VmArray
         if ($n < 2) {
             return;
         }
-        if (!self::isList($ht)) {
-            throw new \LogicException(
-                'shuffle() only supports packed list arrays in this compiler build'
-            );
-        }
         $values = [];
         foreach ($ht->iterate(true) as $value) {
             $copy = new Variable();
             $copy->copyFrom($value);
             $values[] = $copy;
         }
-        for ($i = $n - 1; $i > 0; --$i) {
-            $rand = VmString::randomBytes(8);
-            $pick = 0;
-            for ($b = 0; $b < 8; ++$b) {
-                $pick = ($pick << 8) | \ord($rand[$b]);
-            }
-            $j = $pick % ($i + 1);
-            if ($j < 0) {
-                $j += $i + 1;
-            }
-            $tmp = $values[$i];
-            $values[$i] = $values[$j];
-            $values[$j] = $tmp;
+        self::fisherYatesShuffleVariables($values);
+        if (self::isList($ht)) {
+            $ht->replacePackedValues($values);
+        } else {
+            $ht->assignPackedList($values);
         }
-        $ht->replacePackedValues($values);
     }
 
     /**
-     * array_rand() — pick {@param $num} unique packed list keys (CSPRNG; issue #2321).
+     * array_rand() — pick {@param $num} unique keys (CSPRNG; issue #2321, #4460).
      */
     public static function arrayRandPacked(HashTable $ht, int $num): Variable
     {
-        if (!self::isList($ht)) {
-            throw new \LogicException(
-                'array_rand() only supports packed list arrays in this compiler build'
-            );
-        }
         $n = $ht->getNumElements();
         if (0 === $n) {
             throw new \ValueError('array_rand(): Argument #1 ($array) cannot be empty');
@@ -656,41 +639,66 @@ final class VmArray
                 'array_rand(): Argument #2 ($num) must be between 1 and the number of elements in argument #1 ($array)'
             );
         }
-        $indices = [];
-        for ($i = 0; $i < $n; ++$i) {
-            $indices[] = $i;
+        $keys = [];
+        foreach ($ht->iterateKeyed() as $pair) {
+            $keyCopy = new Variable();
+            $keyCopy->copyFrom($pair[0]);
+            $keys[] = $keyCopy;
         }
         for ($i = 0; $i < $num; ++$i) {
-            $rand = VmString::randomBytes(8);
-            $pick = 0;
-            for ($b = 0; $b < 8; ++$b) {
-                $pick = ($pick << 8) | \ord($rand[$b]);
-            }
-            $upper = $n - $i;
-            $j = $i + ($pick % $upper);
-            if ($j < 0) {
-                $j = $i;
-            }
-            $tmp = $indices[$i];
-            $indices[$i] = $indices[$j];
-            $indices[$j] = $tmp;
+            $j = $i + (self::randomIndexBelow($n - $i));
+            $tmp = $keys[$i];
+            $keys[$i] = $keys[$j];
+            $keys[$j] = $tmp;
         }
-        $picked = \array_slice($indices, 0, $num);
+        $picked = \array_slice($keys, 0, $num);
         $result = new Variable();
         if (1 === $num) {
-            $result->int($picked[0]);
+            $result->copyFrom($picked[0]);
 
             return $result;
         }
         $arr = new HashTable();
         foreach ($picked as $pos => $key) {
             $v = new Variable();
-            $v->int($key);
+            $v->copyFrom($key);
             $arr->addIndex($pos, $v);
         }
         $result->array($arr);
 
         return $result;
+    }
+
+    /**
+     * @param list<Variable> $values
+     */
+    private static function fisherYatesShuffleVariables(array &$values): void
+    {
+        $n = \count($values);
+        for ($i = $n - 1; $i > 0; --$i) {
+            $j = self::randomIndexBelow($i + 1);
+            $tmp = $values[$i];
+            $values[$i] = $values[$j];
+            $values[$j] = $tmp;
+        }
+    }
+
+    private static function randomIndexBelow(int $upper): int
+    {
+        if ($upper <= 1) {
+            return 0;
+        }
+        $rand = VmString::randomBytes(8);
+        $pick = 0;
+        for ($b = 0; $b < 8; ++$b) {
+            $pick = ($pick << 8) | \ord($rand[$b]);
+        }
+        $j = $pick % $upper;
+        if ($j < 0) {
+            $j += $upper;
+        }
+
+        return $j;
     }
 
     /**
