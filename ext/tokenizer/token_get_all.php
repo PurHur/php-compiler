@@ -41,6 +41,6 @@ final class token_get_all extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        throw new \Error('token_get_all() is not implemented for JIT in this compiler build (issue #3171)');
+        return JitTokenGetAll::lower($context, ...$args);
     }
 }
