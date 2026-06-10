@@ -81,6 +81,12 @@ final class var_dump_ extends Internal
 
             return;
         }
+        $resourceDump = VmVarFormat::tryFormatVarDump($var);
+        if (null !== $resourceDump) {
+            echo $resourceDump;
+
+            return;
+        }
         if (Variable::TYPE_ARRAY === $var->type) {
             self::dumpArray($vm, $var->toArray(), $level);
 
