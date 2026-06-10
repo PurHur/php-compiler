@@ -47,6 +47,8 @@ final class ThrowableManifest
 
     public const LC_CLOSED_GENERATOR_EXCEPTION = 'closedgeneratorexception';
 
+    public const LC_REQUEST_PARSE_BODY_EXCEPTION = 'requestparsebodyexception';
+
     public const LC_DATE_EXCEPTION = 'dateexception';
 
     public const LC_DATE_INVALID_TIME_ZONE_EXCEPTION = 'dateinvalidtimezoneexception';
@@ -108,6 +110,7 @@ final class ThrowableManifest
         'ErrorException' => 'Exception',
         'ReflectionException' => 'Exception',
         'ClosedGeneratorException' => 'Exception',
+        'RequestParseBodyException' => 'Exception',
         'DateException' => 'Exception',
         'DateInvalidTimeZoneException' => 'DateException',
         'DateMalformedIntervalException' => 'DateException',
