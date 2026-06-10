@@ -39,7 +39,7 @@ final class file_get_contents extends Internal
 
             return;
         }
-        $data = VmFs::fileGetContents($filename);
+        $data = VmFs::fileGetContents($filename, $frame->vmContext);
         if (false === $data) {
             $frame->returnVar->bool(false);
 
