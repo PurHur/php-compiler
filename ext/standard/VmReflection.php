@@ -407,6 +407,39 @@ final class VmReflection
     }
 
     /**
+     * Read/write/get visibility flags for an instance or static property (#6977).
+     *
+     * @return array{visibility: int, setVisibility: int, getVisibility: int}|null
+     */
+    public static function propertyVisibilityMeta(ClassEntry $class, string $property, Context $ctx): ?array
+    {
+        $meta = self::findClassProperty($class, $property, $ctx);
+        if (null !== $meta) {
+            return [
+                'visibility' => $meta->visibility,
+                'setVisibility' => $meta->setVisibility,
+                'getVisibility' => $meta->getVisibility,
+            ];
+        }
+
+        $lc = strtolower($property);
+        $current = $class;
+        while (true) {
+            if (isset($current->staticProperties[$lc])) {
+                return [
+                    'visibility' => $current->staticPropertyVisibility[$lc] ?? \PHPCfg\Func::FLAG_PUBLIC,
+                    'setVisibility' => $current->staticPropertySetVisibility[$lc] ?? 0,
+                    'getVisibility' => $current->staticPropertyGetVisibility[$lc] ?? 0,
+                ];
+            }
+            if (null === $current->parentLc || !isset($ctx->classes[$current->parentLc])) {
+                return null;
+            }
+            $current = $ctx->classes[$current->parentLc];
+        }
+    }
+
+    /**
      * Class constant value storage key on $class or an ancestor, or null.
      */
     public static function findClassConstantKey(ClassEntry $class, string $constant, Context $ctx): ?string
