@@ -19,7 +19,7 @@ final class HashModuleTest extends TestCase
         $runtime = new Runtime();
         $ctx = $runtime->vmContext;
 
-        foreach (['hash_init', 'hash_update', 'hash_final', 'hash_copy', 'hash_algos'] as $fn) {
+        foreach (['hash_init', 'hash_update', 'hash_update_stream', 'hash_final', 'hash_copy', 'hash_algos'] as $fn) {
             self::assertTrue(VmReflection::functionExists($ctx, $fn), $fn);
         }
 
@@ -27,6 +27,7 @@ final class HashModuleTest extends TestCase
 <?php
 echo (int) function_exists('hash_init');
 echo (int) function_exists('hash_update');
+echo (int) function_exists('hash_update_stream');
 echo (int) function_exists('hash_final');
 echo (int) function_exists('hash_copy');
 echo (int) function_exists('hash_algos');
@@ -38,7 +39,7 @@ PHP;
         $block = $runtime->parseAndCompile($code, 'hash_module.php');
         ob_start();
         $runtime->run($block);
-        self::assertSame('111111md5,sha1,sha256', ob_get_clean());
+        self::assertSame('1111111md5,sha1,sha256', ob_get_clean());
     }
 
     public function test_hash_context_incremental_vm(): void
@@ -74,6 +75,28 @@ PHP;
         $this->expectException(\ValueError::class);
         $this->expectExceptionMessage('hash_init(): Argument #1 ($algo) must be a valid hashing algorithm');
         $fn->execute($frame);
+    }
+
+    public function test_hash_update_stream_memory_round_trip(): void
+    {
+        $runtime = new Runtime();
+        $code = <<<'PHP'
+<?php
+$h = fopen('php://memory', 'r+');
+fwrite($h, 'hello world');
+rewind($h);
+$ctx = hash_init('sha256');
+$n = hash_update_stream($ctx, $h);
+echo $n, "\n";
+echo hash_final($ctx), "\n";
+PHP;
+        $block = $runtime->parseAndCompile($code, 'hash_update_stream.php');
+        ob_start();
+        $runtime->run($block);
+        self::assertSame(
+            "11\nb94d27b9934d3e08a52e52d7da7dabfac484efe37a5380ee9088f7ace2efcde9\n",
+            ob_get_clean()
+        );
     }
 
     public function test_hash_context_debug_info(): void

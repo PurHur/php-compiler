@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace PHPCompiler\ext\hash;
 
+use PHPCompiler\ext\standard\VmFs;
 use PHPCompiler\ext\standard\VmHashNative;
 use PHPCompiler\ext\standard\VmStreamArg;
 use PHPCompiler\ext\standard\VmString;
@@ -77,6 +78,56 @@ final class VmHashContext
             self::$store[$entry->id]['ctx'],
             $data
         );
+    }
+
+    /**
+     * hash_update_stream() — read $handle in chunks into incremental digest (#6681).
+     *
+     * php-src: ext/hash/hash.c — PHP_FUNCTION(hash_update_stream)
+     *
+     * @return int|false bytes read, or false on stream read failure
+     */
+    public static function updateFromStream(ObjectEntry $entry, int $handle, int $length = -1)
+    {
+        self::requireLiveContext($entry, 'hash_update_stream', 1);
+        if (!VmFs::isValidHandle($handle)) {
+            throw new \TypeError('hash_update_stream(): supplied resource is not a valid stream resource');
+        }
+        if (0 === $length) {
+            return 0;
+        }
+
+        $total = 0;
+        $chunkSize = 8192;
+        while ($length < 0 || $total < $length) {
+            $toRead = $chunkSize;
+            if ($length >= 0) {
+                $remaining = $length - $total;
+                if ($remaining <= 0) {
+                    break;
+                }
+                if ($toRead > $remaining) {
+                    $toRead = $remaining;
+                }
+            }
+
+            $data = VmFs::fread($handle, $toRead);
+            if (false === $data) {
+                if (VmFs::feof($handle)) {
+                    break;
+                }
+
+                return false;
+            }
+            if ('' === $data) {
+                break;
+            }
+
+            self::update($entry, $data);
+            $total += \strlen($data);
+        }
+
+        return $total;
     }
 
     public static function final(ObjectEntry $entry, bool $raw = false): string
