@@ -48,6 +48,14 @@ final class VmHttpBuildQueryTest extends TestCase
             'n0=foo&bar=baz',
             VmHttpBuildQuery::build([0 => 'foo', 'bar' => 'baz'], 'n')
         );
+        $this->assertSame(
+            'a=b%20c',
+            VmHttpBuildQuery::build(['a' => 'b c'], '', '&', VmHttpBuildQuery::ENCODING_RFC3986)
+        );
+        $this->assertSame(
+            'a=b+c',
+            VmHttpBuildQuery::build(['a' => 'b c'], '', '&', VmHttpBuildQuery::ENCODING_RFC1738)
+        );
     }
 
     public function testVmBuiltinDoesNotCallHostHttpBuildQuery(): void
