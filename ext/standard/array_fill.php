@@ -14,12 +14,10 @@ namespace PHPCompiler\ext\standard;
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Context;
-use PHPCompiler\JIT\JitLongArg;
 use PHPCompiler\JIT\HashTableHelper;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\HashTable;
 use PHPCompiler\VM\Variable;
-use PHPLLVM\Builder;
 use PHPLLVM\Value;
 
 /**
@@ -38,15 +36,12 @@ final class array_fill extends Internal
         if (null === $frame->returnVar) {
             return;
         }
-        if (Variable::TYPE_INTEGER !== $start->type || Variable::TYPE_INTEGER !== $count->type) {
-            throw new \LogicException('array_fill() start index and count must be integers in this compiler build');
-        }
-        $num = $count->toInt();
+        $startIndex = VmMath::parseIntBuiltinArg($start, 'array_fill', 1, 'start_index');
+        $num = VmMath::parseIntBuiltinArg($count, 'array_fill', 2, 'count');
         if ($num < 0) {
-            throw new \LogicException('array_fill() count must be non-negative');
+            throw new \ValueError('array_fill(): Argument #2 ($count) must be greater than or equal to 0');
         }
         $ht = new HashTable();
-        $startIndex = $start->toInt();
         for ($i = 0; $i < $num; ++$i) {
             $stored = new Variable();
             $stored->copyFrom($value);
@@ -63,12 +58,9 @@ final class array_fill extends Internal
         if (3 !== \count($args)) {
             throw new \LogicException('array_fill() requires exactly three arguments');
         }
-        if (JITVariable::TYPE_NATIVE_LONG !== $args[0]->type
-            || JITVariable::TYPE_NATIVE_LONG !== $args[1]->type) {
-            throw new \LogicException('array_fill() start index and count must be integers in this compiler build');
-        }
-        $startIndex = JitLongArg::lower($context, $args[0], 'array_fill() start index');
-        $count = JitLongArg::lower($context, $args[1], 'array_fill() count');
+        $startIndex = JitIntdiv::lowerIntBuiltinArg($context, $args[0], 'array_fill', 1, 'start_index');
+        $count = JitIntdiv::lowerIntBuiltinArg($context, $args[1], 'array_fill', 2, 'count');
+        JitArrayFill::emitRuntimeCountGuard($context, $count);
         $sizeT = $context->getTypeFromString('size_t');
         $countSized = $context->builder->truncOrBitCast($count, $sizeT);
         $startSized = $context->builder->truncOrBitCast($startIndex, $sizeT);
