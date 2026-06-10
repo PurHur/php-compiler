@@ -541,6 +541,8 @@ class Module extends ModuleAbstract
             new ini_get_all(),
             new ini_restore(),
             new ini_parse_quantity(),
+            new parse_ini_string(),
+            new parse_ini_file(),
             new error_reporting(),
             new define_(),
             new defined_(),
