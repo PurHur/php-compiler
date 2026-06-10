@@ -28,6 +28,7 @@ final class BuiltinEnums
         self::registerSessionStatus($ctx);
         self::registerResponseCode($ctx);
         self::registerSorting($ctx);
+        self::registerSortDirection($ctx);
         self::registerParseUrl($ctx);
         foreach (array_diff(array_keys($ctx->classes), $before) as $lc) {
             $ctx->classes[$lc]->isInternal = true;
@@ -274,6 +275,31 @@ final class BuiltinEnums
     }
 
     /**
+     * PHP 8.4 SortDirection: pure enum for sort-family builtins (#7261).
+     *
+     * php-src: ext/standard/basic_functions.stub.php — enum SortDirection
+     */
+    private static function registerSortDirection(Context $ctx): void
+    {
+        if (isset($ctx->classes['sortdirection'])) {
+            return;
+        }
+
+        $entry = new ClassEntry('SortDirection');
+        $entry->isEnum = true;
+
+        self::registerPureEnumCase($entry, 'Ascending');
+        self::registerPureEnumCase($entry, 'Descending');
+
+        EnumSupport::ensureBuiltinCasesMethod($entry);
+        EnumSupport::ensureBuiltinEnumInterfaces($entry);
+
+        $lc = 'sortdirection';
+        $ctx->classes[$lc] = $entry;
+        $ctx->enums[$lc] = true;
+    }
+
+    /**
      * PHP 8.4 ParseUrl: int-backed enum for parse_url() component (#7260).
      *
      * php-src: ext/standard/basic_functions.stub.php — enum ParseUrl: int
@@ -303,6 +329,20 @@ final class BuiltinEnums
         $lc = 'parseurl';
         $ctx->classes[$lc] = $entry;
         $ctx->enums[$lc] = true;
+    }
+
+    private static function registerPureEnumCase(ClassEntry $enum, string $name): void
+    {
+        $lc = strtolower($name);
+        $null = new Variable();
+        $null->null();
+        $case = EnumCaseSupport::createCase($enum, $name, $null);
+        $enum->constants[$lc] = $case;
+        $enum->enumCaseCanonicalNames[$lc] = $name;
+        $enum->enumCases[] = [
+            'name' => $name,
+            'value' => $null,
+        ];
     }
 
     private static function registerBackedEnumCase(ClassEntry $enum, string $name, int $value): void
