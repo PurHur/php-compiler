@@ -89,10 +89,6 @@ final class VmMbstring
 
     public static function convertCase(string $source, int $mode, string $encoding = 'UTF-8'): string
     {
-        if (\function_exists('mb_convert_case')) {
-            return \mb_convert_case($source, $mode, $encoding);
-        }
-
         if ('UTF-8' !== $encoding && 'ASCII' !== $encoding && '8BIT' !== $encoding) {
             throw new \LogicException(
                 'mb_convert_case() requires mbstring for encoding '.$encoding.' in this compiler build'
@@ -173,10 +169,6 @@ final class VmMbstring
      */
     public static function stripos(string $haystack, string $needle, int $offset = 0, string $encoding = 'UTF-8')
     {
-        if (\function_exists('mb_stripos')) {
-            return \mb_stripos($haystack, $needle, $offset, $encoding);
-        }
-
         return self::utf8Strpos($haystack, $needle, $offset, true, $encoding, 'mb_stripos');
     }
 
@@ -185,10 +177,6 @@ final class VmMbstring
      */
     public static function strrpos(string $haystack, string $needle, int $offset = 0, string $encoding = 'UTF-8')
     {
-        if (\function_exists('mb_strrpos')) {
-            return \mb_strrpos($haystack, $needle, $offset, $encoding);
-        }
-
         return self::utf8Strrpos($haystack, $needle, $offset, false, $encoding, 'mb_strrpos');
     }
 
@@ -197,10 +185,6 @@ final class VmMbstring
      */
     public static function strrichr(string $haystack, string $needle, bool $part = false, string $encoding = 'UTF-8')
     {
-        if (\function_exists('mb_strrichr')) {
-            return \mb_strrichr($haystack, $needle, $part, $encoding);
-        }
-
         self::assertSearchEncoding($encoding);
         $lowerHay = self::convertCase($haystack, MbstringConstants::MB_CASE_LOWER, $encoding);
         $lowerNeedle = self::convertCase($needle, MbstringConstants::MB_CASE_LOWER, $encoding);
@@ -406,17 +390,6 @@ final class VmMbstring
      */
     public static function checkEncoding(array|string|int|null $value = null, ?string $encoding = null): bool
     {
-        if (\function_exists('mb_check_encoding')) {
-            if (null === $value && null === $encoding) {
-                return \mb_check_encoding();
-            }
-            if (null === $encoding) {
-                return \mb_check_encoding($value);
-            }
-
-            return \mb_check_encoding($value, $encoding);
-        }
-
         $encoding = null === $encoding ? 'UTF-8' : $encoding;
         self::assertCheckEncodingName($encoding);
 
@@ -463,9 +436,6 @@ final class VmMbstring
         }
         if ('ASCII' === $canonical || '8BIT' === $canonical) {
             return true;
-        }
-        if (\function_exists('mb_check_encoding')) {
-            return \mb_check_encoding($value, $encoding);
         }
 
         throw new \LogicException(
