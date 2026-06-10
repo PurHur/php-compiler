@@ -7,7 +7,7 @@ namespace PHPCompiler\ext\standard;
 use PHPCompiler\VM\HashTable;
 use PHPCompiler\VM\Variable;
 
-/** Host sys_* helpers for stdlib builtins (issue #3464). */
+/** VM sys_* helpers for stdlib builtins (issue #3464, #4607). */
 final class VmSys
 {
     /**
@@ -15,15 +15,7 @@ final class VmSys
      */
     public static function getLoadavg()
     {
-        if (!\function_exists('sys_getloadavg')) {
-            return false;
-        }
-        $avg = @\sys_getloadavg();
-        if (false === $avg || !\is_array($avg) || 3 !== \count($avg)) {
-            return false;
-        }
-
-        return [(float) $avg[0], (float) $avg[1], (float) $avg[2]];
+        return VmSysGetloadavgNative::getLoadavg();
     }
 
     /**
