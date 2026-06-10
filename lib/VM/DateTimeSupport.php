@@ -366,6 +366,39 @@ final class DateTimeSupport
         self::requireStringProperty($dt, self::TZ_PROPERTY, self::classLabel($dt))->string($tzName);
     }
 
+    /** php-src zim_DateTime_modify — mutable in-place (#6132). */
+    public static function modify(ObjectEntry $dt, string $modifier): void
+    {
+        $label = self::classLabel($dt);
+        self::requireInitializedDateTimeLike($dt, "{$label}::modify()");
+        $tzName = self::requireStringProperty($dt, self::TZ_PROPERTY, $label)->toString();
+        $timestamp = self::requireIntProperty($dt, self::TS_PROPERTY, $label)->toInt();
+        try {
+            $updated = VmDateTimeNative::modifyRelative($timestamp, $modifier, $tzName);
+        } catch (NativeDateMalformedStringException $e) {
+            self::throwDateMalformedStringException($e->getMessage());
+        }
+        self::requireIntProperty($dt, self::TS_PROPERTY, $label)->int($updated);
+    }
+
+    /** php-src zim_DateTimeImmutable_modify — returns new instance (#6132). */
+    public static function withModify(ObjectEntry $dt, string $modifier): ObjectEntry
+    {
+        $label = self::classLabel($dt);
+        self::requireInitializedDateTimeLike($dt, "{$label}::modify()");
+        $tzName = self::requireStringProperty($dt, self::TZ_PROPERTY, $label)->toString();
+        $timestamp = self::requireIntProperty($dt, self::TS_PROPERTY, $label)->toInt();
+        try {
+            $updated = VmDateTimeNative::modifyRelative($timestamp, $modifier, $tzName);
+        } catch (NativeDateMalformedStringException $e) {
+            self::throwDateMalformedStringException($e->getMessage());
+        }
+        $clone = self::cloneDateTimeObject($dt);
+        self::requireIntProperty($clone, self::TS_PROPERTY, $label)->int($updated);
+
+        return $clone;
+    }
+
     private static function validateMicrosecond(int $microsecond): void
     {
         if ($microsecond < 0 || $microsecond > 999_999) {

@@ -1230,6 +1230,7 @@ require_once __DIR__.'/../../../lib/VM/Builtin/ClosureFromCallable.php';
 require_once __DIR__.'/../../../lib/VM/Builtin/DateTimeConstruct.php';
 require_once __DIR__.'/../../../lib/VM/Builtin/DateTimeFormat.php';
 require_once __DIR__.'/../../../lib/VM/Builtin/DateTimeGetTimestamp.php';
+require_once __DIR__.'/../../../lib/VM/Builtin/DateTimeModify.php';
 require_once __DIR__.'/../../../lib/VM/Builtin/DateTimeSetTimezone.php';
 require_once __DIR__.'/../../../lib/VM/Builtin/DateTimeZoneConstruct.php';
 require_once __DIR__.'/../../../lib/VM/Builtin/EnumCases.php';
