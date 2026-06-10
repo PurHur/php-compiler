@@ -11,7 +11,7 @@ use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Value;
 
-/** password_verify() — VM via host PHP; JIT/AOT via libcrypt (issue #172). */
+/** password_verify() — VM/JIT/AOT via VmPasswordNative libcrypt (issues #172, #4794, #6906). */
 final class password_verify extends Internal
 {
     public function __construct()
