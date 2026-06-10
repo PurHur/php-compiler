@@ -14,11 +14,8 @@ var_export(array_merge_recursive([1 => 'a']));
 echo "\n";
 var_export(array_replace_recursive([1 => 'a']));
 echo "\n";
-try {
-    array_merge();
-} catch (\ArgumentCountError $e) {
-    echo $e->getMessage(), "\n";
-}
+var_export(array_merge());
+echo "\n";
 --EXPECT--
 array (
   0 => 'a',
@@ -40,4 +37,5 @@ array (
 array (
   1 => 'a',
 )
-array_merge() expects at least 1 argument, 0 given
+array (
+)

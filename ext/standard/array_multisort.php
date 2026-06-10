@@ -32,6 +32,9 @@ final class array_multisort extends Internal
     public function execute(Frame $frame): void
     {
         $argc = \count($frame->calledArgs);
+        if ($argc < 1) {
+            throw new \ArgumentCountError('array_multisort() expects at least 1 argument, 0 given');
+        }
         if ($argc < 2) {
             throw new \LogicException(
                 'array_multisort() requires at least two arguments in this compiler build'
@@ -118,6 +121,9 @@ final class array_multisort extends Internal
     public function call(Context $context, JITVariable ...$args): Value
     {
         $argc = \count($args);
+        if ($argc < 1) {
+            throw new \ArgumentCountError('array_multisort() expects at least 1 argument, 0 given');
+        }
         if ($argc < 2) {
             throw new \LogicException(
                 'array_multisort() requires at least two arguments in this compiler build'
