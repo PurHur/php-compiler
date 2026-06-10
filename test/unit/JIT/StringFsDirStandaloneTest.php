@@ -30,6 +30,7 @@ final class StringFsDirStandaloneTest extends TestCase
             '__compiler_tempnam',
             '__compiler_chgrp',
             '__compiler_chown',
+            '__compiler_ftok',
         ] as $name) {
             $fn = $ctx->lookupFunction($name);
             $this->assertNotNull($fn, $name);

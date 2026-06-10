@@ -58,6 +58,7 @@ final class StringFsDirJit
         '__compiler_tempnam',
         '__compiler_chgrp',
         '__compiler_chown',
+        '__compiler_ftok',
     ];
 
     public static function implement(Context $context): void
@@ -79,6 +80,7 @@ final class StringFsDirJit
         self::implementIfMissing($context, '__compiler_tempnam', self::emitTempnam(...));
         self::implementIfMissing($context, '__compiler_chgrp', self::emitChgrp(...));
         self::implementIfMissing($context, '__compiler_chown', self::emitChown(...));
+        self::implementIfMissing($context, '__compiler_ftok', self::emitFtok(...));
     }
 
     /**
@@ -142,6 +144,10 @@ final class StringFsDirJit
                 $name,
                 $context->context->functionType($i32, false, $strPtr, $valuePtr, $i32)
             ),
+            '__compiler_ftok' => $context->module->addFunction(
+                $name,
+                $context->context->functionType($i64, false, $strPtr, $i32)
+            ),
             default => throw new \LogicException('Unknown fs dir JIT function: '.$name),
         };
         $context->registerFunction($name, $fn);
@@ -159,6 +165,8 @@ final class StringFsDirJit
         $voidTy = $context->getTypeFromString('void');
         $sizeT = $context->getTypeFromString('size_t');
 
+        $i32 = $context->getTypeFromString('int32');
+
         foreach ([
             ['__hashtable__alloc', $htPtr, []],
             ['__hashtable__setStringKeyLong', $voidTy, [$htPtr, $strPtr, $i64]],
@@ -166,6 +174,7 @@ final class StringFsDirJit
             ['__string__init', $strPtr, [$i64, $i8p]],
             ['__value__readLong', $i64, [$valuePtr]],
             ['__value__readString', $strPtr, [$valuePtr]],
+            ['ftok', $i32, [$i8p, $i32]],
         ] as [$name, $ret, $params]) {
             self::ensureExternal($context, $name, $context->context->functionType($ret, false, ...$params));
         }
@@ -896,6 +905,34 @@ final class StringFsDirJit
         $context->builder->positionAtEnd($done);
 
         return $context->builder->load($idSlot);
+    }
+
+    private static function emitFtok(Context $context, LlvmFunction $fn): void
+    {
+        $entry = $fn->appendBasicBlock('entry');
+        $context->builder->positionAtEnd($entry);
+
+        $i32 = $context->getTypeFromString('int32');
+        $i64 = $context->getTypeFromString('int64');
+        $strPtr = $context->getTypeFromString('__string__*');
+
+        $pathObj = $fn->getParam(0);
+        $projId = $fn->getParam(1);
+        $nullStr = $strPtr->constNull();
+        $minusOneI32 = $i32->constInt(-1, true);
+
+        $isNull = $context->builder->icmp(Builder::INT_EQ, $pathObj, $nullStr);
+        $fail = $fn->appendBasicBlock('ftok_fail');
+        $body = $fn->appendBasicBlock('ftok_body');
+        $context->builder->branchIf($isNull, $fail, $body);
+
+        $context->builder->positionAtEnd($body);
+        $path = self::stringData($context, $pathObj);
+        $key = $context->builder->call($context->lookupFunction('ftok'), $path, $projId);
+        $context->builder->returnValue($context->builder->sext($key, $i64));
+
+        $context->builder->positionAtEnd($fail);
+        $context->builder->returnValue($context->builder->sext($minusOneI32, $i64));
     }
 
     private static function emitChgrp(Context $context, LlvmFunction $fn): void

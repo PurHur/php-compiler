@@ -45,7 +45,12 @@ final class ftok extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        throw new \LogicException('ftok() is VM-only in this compiler build (issue #6296)');
+        $argc = \count($args);
+        if (2 !== $argc) {
+            throw new \ArgumentCountError('ftok() expects exactly 2 arguments, '.$argc.' given');
+        }
+
+        return JitFtok::invoke($context, $args[0], $args[1]);
     }
 
     private function triggerWarning(Frame $frame, string $message): void
