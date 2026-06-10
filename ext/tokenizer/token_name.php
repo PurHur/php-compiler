@@ -42,6 +42,9 @@ final class token_name extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        throw new \Error('token_name() is not implemented for JIT in this compiler build (issue #3171)');
+        if (!$this->requireExactJitArgCount($context, $args, 'token_name', 1)) {
+            return $context->getTypeFromString('__string__*')->constNull();
+        }
+        return JitTokenName::lower($context, $args[0]);
     }
 }
