@@ -325,7 +325,7 @@ final class VmFs
 
     public static function rename(string $from, string $to): bool
     {
-        $ok = @rename($from, $to);
+        $ok = VmFsPathNative::rename($from, $to);
         if ($ok) {
             VmStatCache::invalidatePath($from);
             VmStatCache::invalidatePath($to);
@@ -336,7 +336,7 @@ final class VmFs
 
     public static function hardLink(string $target, string $link): bool
     {
-        return @link($target, $link);
+        return VmFsPathNative::link($target, $link);
     }
 
     public static function symlink(string $target, string $link): bool
@@ -397,12 +397,12 @@ final class VmFs
             return false;
         }
 
-        return @rename($from, $to);
+        return VmFsPathNative::rename($from, $to);
     }
 
     public static function copy(string $from, string $to): bool
     {
-        $ok = @copy($from, $to);
+        $ok = VmFsPathNative::copy($from, $to);
         if ($ok) {
             VmStatCache::invalidatePath($to);
         }
