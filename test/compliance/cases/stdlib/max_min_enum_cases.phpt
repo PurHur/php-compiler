@@ -11,9 +11,15 @@ echo ($m === E::B) ? '1' : '0', "\n";
 echo ($n === E::A) ? '1' : '0', "\n";
 $t = max([E::B, E::A]);
 echo $t->name, "\n";
+$u = max([E::A, E::B]);
+echo $u->name, "\n";
+$v = max(E::A, E::B, E::A);
+echo $v->name, "\n";
 --EXPECT--
 B 2
 A 1
 1
 1
 B
+A
+A
