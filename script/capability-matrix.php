@@ -87,8 +87,8 @@ function analyzeInternal(PHPCompiler\Func\Internal $fn): array
         $notes[] = 'DNS record probe via libc res_query FFI (#5983); JIT/AOT deferred';
     }
     if (in_array($fn->getName(), ['long2ip', 'ip2long', 'inet_ntop', 'inet_pton'], true)
-        && preg_match('/JitInet|InetRuntime/i', $source)) {
-        $notes[] = 'IPv4/IPv6 conversion (VM host + AOT libc) (#3225)';
+        && preg_match('/JitInet|InetRuntime|VmInetNative/i', $source)) {
+        $notes[] = 'IPv4/IPv6 conversion (VM libc FFI + JIT/AOT libc) (#3225)';
     }
     if ('mime_content_type' === $fn->getName() && preg_match('/MimeContentTypeRuntime/i', $source)) {
         $notes[] = 'file MIME sniff (VM host fileinfo + AOT byte sniff) (#6196)';
