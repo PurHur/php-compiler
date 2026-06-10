@@ -354,6 +354,7 @@ class Module extends ModuleAbstract
             new highlight_string(),
             new highlight_file(),
             new show_source(),
+            new php_strip_whitespace(),
             new htmlentities(),
             new html_entity_decode(),
             new get_html_translation_table(),
