@@ -9185,7 +9185,8 @@ class Compiler {
             }
         }
 
-        if ($this->operandHasObjectType($operand)) {
+        if ($this->operandHasObjectType($operand)
+            && !$this->variableAssignIsNullableClosureBinding($operand, $block)) {
             return true;
         }
         $root = $this->unwrapOperandChain($operand);
@@ -9206,6 +9207,9 @@ class Compiler {
             if (!$this->operandsReferToSameVariable($child->var, $root)) {
                 continue;
             }
+            if ($this->assignExprIsNullableClosureBinding($child->expr)) {
+                continue;
+            }
             if ($this->operandDerivesFromNew($child->expr, $block)) {
                 return true;
             }
@@ -9217,6 +9221,59 @@ class Compiler {
             }
             if ($child->expr instanceof Op\Expr\ClassConstFetch
                 && $this->classConstFetchIsInvokableEnumCase($child->expr, $block)) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private function variableAssignIsNullableClosureBinding(Operand $operand, Block $block): bool
+    {
+        if ($this->variableAssignIsNullableClosureBindingInOrig($operand, $block)) {
+            return true;
+        }
+        $root = $this->unwrapOperandChain($operand);
+        if (!$root instanceof CfgVariable) {
+            return false;
+        }
+        $slot = null;
+        foreach ($block->eachCfgVarRootSlot() as [$varRoot, $varSlot]) {
+            if ($varRoot === $root) {
+                $slot = $varSlot;
+                break;
+            }
+        }
+        if (null === $slot) {
+            return false;
+        }
+        foreach ($block->opCodes as $op) {
+            if (OpCode::TYPE_ASSIGN !== $op->type || $op->arg2 !== $slot) {
+                continue;
+            }
+            $rhs = $block->getOperand((int) $op->arg3);
+            if ($this->assignExprIsNullableClosureBinding($rhs)) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private function variableAssignIsNullableClosureBindingInOrig(Operand $operand, Block $block): bool
+    {
+        if (null === $block->orig) {
+            return false;
+        }
+        $root = $this->unwrapOperandChain($operand);
+        foreach ($block->orig->children as $child) {
+            if (!$child instanceof Op\Expr\Assign) {
+                continue;
+            }
+            if (!$this->operandsReferToSameVariable($child->var, $root)) {
+                continue;
+            }
+            if ($this->assignExprIsNullableClosureBinding($child->expr)) {
                 return true;
             }
         }
@@ -9258,6 +9315,34 @@ class Compiler {
         $root = $this->unwrapOperandChain($operand);
 
         return $root instanceof Op\Expr\Closure || $root instanceof Op\Expr\ArrowFunction;
+    }
+
+    /**
+     * bind/bindTo may return null at runtime (internal scope, missing class); do not
+     * compile $v() as $v->__invoke() from assign-chain inference (#5170, zend_closures.c).
+     */
+    private function assignExprIsNullableClosureBinding(?Operand $operand): bool
+    {
+        if (null === $operand) {
+            return false;
+        }
+        $root = $this->unwrapOperandChain($operand);
+        if ($root instanceof Op\Expr\MethodCall) {
+            $method = $this->staticNameFromOperand($root->name);
+
+            return null !== $method && in_array(strtolower($method), ['bind', 'bindto'], true);
+        }
+        if ($root instanceof Op\Expr\StaticCall) {
+            $class = $this->staticNameFromOperand($root->class);
+            $method = $this->staticNameFromOperand($root->name);
+
+            return null !== $class
+                && null !== $method
+                && 'closure' === strtolower(ltrim($class, '\\'))
+                && 'bind' === strtolower($method);
+        }
+
+        return false;
     }
 
     protected function operandsReferToSameVariable(Operand $a, Operand $b): bool

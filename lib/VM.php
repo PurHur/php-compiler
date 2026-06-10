@@ -3784,6 +3784,18 @@ restart:
                     break;
                 case OpCode::TYPE_FUNCCALL_INIT:
                     $callee = $frame->scope[$op->arg1]->resolveIndirect();
+                    if (Variable::TYPE_NULL === $callee->type) {
+                        $catchFrame = $this->dispatchVmError(
+                            'Value of type null is not callable',
+                            $frame
+                        );
+                        if (null !== $catchFrame) {
+                            $frame = $catchFrame;
+                            goto restart;
+                        }
+
+                        return self::EXCEPTION;
+                    }
                     if (Variable::TYPE_OBJECT === $callee->type) {
                         $closureState = $callee->toObject()->closureState;
                         if (null !== $closureState) {
@@ -3847,12 +3859,25 @@ restart:
                         goto restart;
                     }
                     $receiver = $frame->scope[$op->arg1]->resolveIndirect();
+                    $methodName = $frame->scope[$op->arg2]->toString();
                     if (Variable::TYPE_OBJECT !== $receiver->type
                         && Variable::TYPE_ENUM_CASE !== $receiver->type) {
+                        if (Variable::TYPE_NULL === $receiver->type
+                            && '__invoke' === strtolower($methodName)) {
+                            $catchFrame = $this->dispatchVmError(
+                                'Value of type null is not callable',
+                                $frame
+                            );
+                            if (null !== $catchFrame) {
+                                $frame = $catchFrame;
+                                goto restart;
+                            }
+
+                            return self::EXCEPTION;
+                        }
                         throw new \LogicException('Method call on non-object');
                     }
                     $receiver = VM\EnumCaseSupport::receiverForInstanceMethod($receiver);
-                    $methodName = $frame->scope[$op->arg2]->toString();
                     $catchFrame = $this->initMethodCall($frame, $receiver, $methodName);
                     if (null !== $catchFrame) {
                         $frame = $catchFrame;
