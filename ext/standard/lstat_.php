@@ -11,7 +11,7 @@ use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Value;
 
-/** lstat() — symlink-aware metadata array via host lstat(2) (issue #1198). */
+/** lstat() — symlink-aware metadata via VmStatCache / libc lstat(2) (issue #1198, #7844). */
 final class lstat_ extends Internal
 {
     public function __construct()
