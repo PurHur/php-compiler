@@ -8,7 +8,6 @@ use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\Variable as JITVariable;
-use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
 
 /**
@@ -28,19 +27,11 @@ final class strspn extends Internal
         $mask = VmString::coerceStringBuiltinArg($frame->calledArgs[1], 'strspn', 1, 'characters');
         $offset = 0;
         if ($argc >= 3) {
-            $offVar = $frame->calledArgs[2]->resolveIndirect();
-            if (Variable::TYPE_INTEGER !== $offVar->type) {
-                throw new \LogicException('strspn() offset must be an integer in this compiler build');
-            }
-            $offset = $offVar->toInt();
+            $offset = VmMath::parseIntBuiltinArg($frame->calledArgs[2], 'strspn', 3, 'offset');
         }
         $length = null;
         if (4 === $argc) {
-            $lenVar = $frame->calledArgs[3]->resolveIndirect();
-            if (Variable::TYPE_INTEGER !== $lenVar->type) {
-                throw new \LogicException('strspn() length must be an integer in this compiler build');
-            }
-            $length = $lenVar->toInt();
+            $length = VmMath::parseIntBuiltinArg($frame->calledArgs[3], 'strspn', 4, 'length');
         }
         if (null === $frame->returnVar) {
             return;
