@@ -8,6 +8,7 @@ declare(strict_types=1);
 
 namespace PHPCompiler\ext\standard;
 
+use PHPCompiler\VM\EnumCaseSupport;
 use PHPCompiler\VM\Variable;
 
 final class VmNumberFormat
@@ -19,6 +20,13 @@ final class VmNumberFormat
      */
     public static function coerceFloat(Variable $value): float
     {
+        $value = $value->resolveIndirect();
+        if (EnumCaseSupport::isEnumCaseVariable($value)) {
+            $enumClass = EnumCaseSupport::enumClassForCaseVariable($value);
+            $given = null !== $enumClass ? $enumClass->name : 'object';
+
+            throw new \TypeError(self::numTypeError($given));
+        }
         switch ($value->type) {
             case Variable::TYPE_INTEGER:
                 return (float) $value->toInt();
@@ -27,13 +35,23 @@ final class VmNumberFormat
             case Variable::TYPE_STRING:
                 $s = $value->toString();
                 if (!\is_numeric($s)) {
-                    throw new \TypeError('number_format(): Argument #1 ($num) must be of type float, string given');
+                    throw new \TypeError(self::numTypeError('string'));
                 }
 
                 return (float) $s;
+            case Variable::TYPE_OBJECT:
+                throw new \TypeError(self::numTypeError($value->toObject()->class->name));
             default:
-                throw new \TypeError('number_format(): Argument #1 ($num) must be of type float');
+                throw new \TypeError(self::numTypeError(VmParseStr::zendTypeLabel($value)));
         }
+    }
+
+    private static function numTypeError(string $given): string
+    {
+        return \sprintf(
+            'number_format(): Argument #1 ($num) must be of type float, %s given',
+            $given
+        );
     }
 
     public static function format(
