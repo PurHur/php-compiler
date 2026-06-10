@@ -10,6 +10,7 @@ $peakAfterGrow = memory_get_peak_usage();
 unset($buf);
 memory_reset_peak_usage();
 $peakAfterReset = memory_get_peak_usage();
+$usage = memory_get_usage();
 echo ($peakAfterGrow >= $peakBefore) ? "grew\n" : "no_grow\n";
 echo ($peakAfterReset <= $peakAfterGrow) ? "reset_lower\n" : "reset_high\n";
-echo ($peakAfterReset >= memory_get_usage()) ? "baseline_ok\n" : "baseline_bad\n";
+echo ($peakAfterReset >= $usage) ? "baseline_ok\n" : "baseline_bad\n";
