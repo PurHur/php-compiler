@@ -13,6 +13,7 @@ use PHPCompiler\VM\Builtin\DateTimeGetTimestamp;
 use PHPCompiler\VM\Builtin\DateTimeImmutableConstruct;
 use PHPCompiler\VM\Builtin\DateTimeImmutableCreateFromFormat;
 use PHPCompiler\VM\Builtin\DateTimeImmutableCreateFromMutable;
+use PHPCompiler\VM\Builtin\DateTimeModify;
 use PHPCompiler\VM\Builtin\DateTimeSetMicrosecond;
 use PHPCompiler\VM\Builtin\DateTimeSetTimezone;
 use PHPCompiler\VM\Builtin\DateTimeZoneConstruct;
@@ -722,6 +723,7 @@ final class BuiltinClasses
             'format' => new DateTimeFormat(),
             'gettimestamp' => new DateTimeGetTimestamp(),
             'getmicrosecond' => new DateTimeGetMicrosecond(),
+            'modify' => new DateTimeModify(),
             'setmicrosecond' => new DateTimeSetMicrosecond(),
             'settimezone' => new DateTimeSetTimezone(),
         ];

@@ -48,6 +48,20 @@ PHP;
         $this->assertSame('1', ob_get_clean());
     }
 
+    public function testDateTimeModifyRelativeDay(): void
+    {
+        $runtime = new Runtime();
+        $code = <<<'PHP'
+<?php
+$dt = new DateTime('2020-01-01', new DateTimeZone('UTC'));
+$dt->modify('+1 day');
+echo $dt->format('Y-m-d');
+PHP;
+        ob_start();
+        $runtime->run($runtime->parseAndCompile($code, 'datetime_modify.php'));
+        $this->assertSame('2020-01-02', ob_get_clean());
+    }
+
     public function testDateTimeInterfaceRegistration(): void
     {
         $runtime = new Runtime();

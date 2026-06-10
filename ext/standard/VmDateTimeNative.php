@@ -94,6 +94,58 @@ final class VmDateTimeNative
         return false;
     }
 
+    /**
+     * php-src date_modify() / timelib_strtotime relative branch — common signed units only (#6132).
+     */
+    public static function modifyRelative(int $timestamp, string $modifier, string $tzName): int
+    {
+        $modifier = trim($modifier);
+        if ('' === $modifier) {
+            self::throwModifyMalformed($modifier);
+        }
+
+        return self::withTimezone($tzName, static function () use ($timestamp, $modifier, $tzName): int {
+            $tm = self::localtime($timestamp);
+            if (null === $tm) {
+                self::throwModifyMalformed($modifier);
+            }
+            $year = (int) $tm->tm_year + 1900;
+            $month = (int) $tm->tm_mon + 1;
+            $day = (int) $tm->tm_mday;
+            $hour = (int) $tm->tm_hour;
+            $minute = (int) $tm->tm_min;
+            $second = (int) $tm->tm_sec;
+            $delta = self::parseSignedRelativeDelta($modifier);
+            switch ($delta['unit']) {
+                case 'second':
+                    $second += $delta['amount'];
+                    break;
+                case 'minute':
+                    $minute += $delta['amount'];
+                    break;
+                case 'hour':
+                    $hour += $delta['amount'];
+                    break;
+                case 'day':
+                    $day += $delta['amount'];
+                    break;
+                case 'week':
+                    $day += 7 * $delta['amount'];
+                    break;
+                case 'month':
+                    $month += $delta['amount'];
+                    break;
+                case 'year':
+                    $year += $delta['amount'];
+                    break;
+                default:
+                    self::throwModifyMalformed($modifier);
+            }
+
+            return self::mktimeInTimezone($year, $month, $day, $hour, $minute, $second, $tzName);
+        });
+    }
+
     public static function format(int $timestamp, int $microsecond, string $tzName, string $format): string
     {
         return self::withTimezone($tzName, static function () use ($timestamp, $microsecond, $format, $tzName): string {
@@ -389,6 +441,36 @@ final class VmDateTimeNative
         throw new \PHPCompiler\VM\NativeDateMalformedStringException(
             'Failed to parse time string ('.$time.') at position 0 ('.$time[0].'): The timezone could not be found in the database'
         );
+    }
+
+    private static function throwModifyMalformed(string $modifier): never
+    {
+        $pos = '' !== $modifier ? $modifier[0] : '';
+        throw new \PHPCompiler\VM\NativeDateMalformedStringException(
+            'Failed to parse time string ('.$modifier.') at position 0 ('.$pos.'): Unexpected character'
+        );
+    }
+
+    /**
+     * @return array{amount: int, unit: string}
+     */
+    private static function parseSignedRelativeDelta(string $modifier): array
+    {
+        if (!preg_match(
+            '/^([+-])\s*(\d+)\s+(second|seconds|minute|minutes|hour|hours|day|days|week|weeks|month|months|year|years)$/i',
+            $modifier,
+            $matches
+        )) {
+            self::throwModifyMalformed($modifier);
+        }
+        $sign = '-' === $matches[1] ? -1 : 1;
+        $amount = $sign * (int) $matches[2];
+        $unit = strtolower($matches[3]);
+        if (str_ends_with($unit, 's')) {
+            $unit = substr($unit, 0, -1);
+        }
+
+        return ['amount' => $amount, 'unit' => $unit];
     }
 
     private static function ffi(): ?\FFI
