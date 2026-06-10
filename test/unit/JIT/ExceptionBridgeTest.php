@@ -42,6 +42,7 @@ final class ExceptionBridgeTest extends TestCase
                     'clearPendingAtRunEntry',
                     'throwPendingIfAny',
                     'emitTypeError',
+                    'emitTypeErrorAndAbort',
                 ],
                 ErrorBridge::class => [
                     'ensureLinked',

@@ -7,25 +7,25 @@ foreach ([[], new stdClass()] as $bad) {
         strspn($bad, 'a');
         echo "strspn haystack no throw\n";
     } catch (Throwable $e) {
-        echo 'strspn haystack: ', $e::class, ': ', $e->getMessage(), "\n";
+        echo 'strspn haystack: ', get_class($e), ': ', $e->getMessage(), "\n";
     }
     try {
         strspn('a', $bad);
         echo "strspn mask no throw\n";
     } catch (Throwable $e) {
-        echo 'strspn mask: ', $e::class, ': ', $e->getMessage(), "\n";
+        echo 'strspn mask: ', get_class($e), ': ', $e->getMessage(), "\n";
     }
     try {
         strcspn($bad, 'a');
         echo "strcspn haystack no throw\n";
     } catch (Throwable $e) {
-        echo 'strcspn haystack: ', $e::class, ': ', $e->getMessage(), "\n";
+        echo 'strcspn haystack: ', get_class($e), ': ', $e->getMessage(), "\n";
     }
     try {
         strcspn('a', $bad);
         echo "strcspn mask no throw\n";
     } catch (Throwable $e) {
-        echo 'strcspn mask: ', $e::class, ': ', $e->getMessage(), "\n";
+        echo 'strcspn mask: ', get_class($e), ': ', $e->getMessage(), "\n";
     }
 }
 echo strspn('abc', 'a'), "\n";
