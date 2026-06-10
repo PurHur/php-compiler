@@ -8,7 +8,6 @@ use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\Variable as JITVariable;
-use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
 
 /** gmgetdate() — UTC associative date/time breakdown (VM VmDate; JIT StringGmgetdate, #7001). */
@@ -30,12 +29,7 @@ final class gmgetdate extends Internal
         }
         $timestamp = null;
         if (1 === $argc) {
-            $tsVar = $frame->calledArgs[0]->resolveIndirect();
-            if (Variable::TYPE_INTEGER === $tsVar->type) {
-                $timestamp = $tsVar->toInt();
-            } elseif (Variable::TYPE_NULL !== $tsVar->type) {
-                throw new \TypeError(self::timestampTypeError($tsVar->type));
-            }
+            $timestamp = VmDate::coerceNullableTimestampArg($frame->calledArgs[0], 'gmgetdate', 1, 'timestamp');
         }
         $frame->returnVar->array(VmDate::gmgetdate($timestamp));
     }
@@ -49,26 +43,4 @@ final class gmgetdate extends Internal
         return JitGmgetdate::invoke($context, $args[0] ?? null);
     }
 
-    private static function timestampTypeError(int $type): string
-    {
-        return \sprintf(
-            'gmgetdate(): Argument #1 ($timestamp) must be of type ?int, %s given',
-            self::vmTypeName($type)
-        );
-    }
-
-    private static function vmTypeName(int $type): string
-    {
-        return match ($type) {
-            Variable::TYPE_INTEGER => 'int',
-            Variable::TYPE_FLOAT => 'float',
-            Variable::TYPE_BOOLEAN => 'bool',
-            Variable::TYPE_STRING => 'string',
-            Variable::TYPE_NULL => 'null',
-            Variable::TYPE_ARRAY => 'array',
-            Variable::TYPE_OBJECT => 'object',
-            Variable::TYPE_ENUM_CASE => 'object',
-            default => 'mixed',
-        };
-    }
 }

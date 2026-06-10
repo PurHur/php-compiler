@@ -11,6 +11,7 @@ declare(strict_types=1);
 namespace PHPCompiler\ext\standard;
 
 use PHPCompiler\Frame;
+use PHPCompiler\VM\EnumCaseSupport;
 use PHPCompiler\VM\HashTable;
 use PHPCompiler\VM\Variable;
 
@@ -131,6 +132,71 @@ final class VmDate
     public static function gmdate(string $format, ?int $timestamp = null): string
     {
         return self::formatDateTime($format, $timestamp ?? self::time(), true);
+    }
+
+    /**
+     * Coerce optional ?int timestamp for date()/gmdate()/getdate() family (php-src Z_PARAM_LONG_OR_NULL, #5842).
+     *
+     * @throws \TypeError when operand is not int|null (enum cases name the enum class, not backing int)
+     */
+    public static function coerceNullableTimestampArg(
+        Variable $var,
+        string $function,
+        int $argIndex,
+        string $paramName = 'timestamp'
+    ): ?int {
+        $var = $var->resolveIndirect();
+        if (Variable::TYPE_NULL === $var->type) {
+            return null;
+        }
+        if (Variable::TYPE_INTEGER === $var->type) {
+            return $var->toInt();
+        }
+        if (EnumCaseSupport::isEnumCaseVariable($var)) {
+            throw new \TypeError(self::nullableTimestampTypeError(
+                $function,
+                $argIndex,
+                $paramName,
+                EnumCaseSupport::typeNameForVariable($var)
+            ));
+        }
+
+        throw new \TypeError(self::nullableTimestampTypeError(
+            $function,
+            $argIndex,
+            $paramName,
+            self::timestampVmTypeName($var->type)
+        ));
+    }
+
+    public static function nullableTimestampTypeError(
+        string $function,
+        int $argIndex,
+        string $paramName,
+        string $given
+    ): string {
+        return \sprintf(
+            '%s(): Argument #%d ($%s) must be of type ?int, %s given',
+            $function,
+            $argIndex,
+            $paramName,
+            $given
+        );
+    }
+
+    private static function timestampVmTypeName(int $type): string
+    {
+        return match ($type) {
+            Variable::TYPE_INTEGER => 'int',
+            Variable::TYPE_FLOAT => 'float',
+            Variable::TYPE_BOOLEAN => 'bool',
+            Variable::TYPE_STRING => 'string',
+            Variable::TYPE_NULL => 'null',
+            Variable::TYPE_ARRAY => 'array',
+            Variable::TYPE_OBJECT => 'object',
+            Variable::TYPE_RESOURCE => 'resource',
+            default => 'mixed',
+        };
     }
 
     /** @return string|float */

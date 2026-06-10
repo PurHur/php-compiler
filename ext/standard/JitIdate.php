@@ -22,7 +22,14 @@ final class JitIdate
         $formatPtr = self::jitStringArg($context, $format);
         $ts = null === $timestamp
             ? JitDate::time($context)
-            : self::jitTimestampArg($context, $timestamp);
+            : JitDateTimestampArg::lowerNullable(
+                $context,
+                $timestamp,
+                'idate',
+                2,
+                'timestamp',
+                JitDate::time($context)
+            );
 
         $raw = $context->builder->call(
             $context->lookupFunction('__compiler_idate'),
@@ -56,21 +63,6 @@ final class JitIdate
         $context->builder->positionAtEnd($mergeBb);
 
         return $ptr;
-    }
-
-    private static function jitTimestampArg(Context $context, JITVariable $arg): Value
-    {
-        if (JITVariable::TYPE_NATIVE_LONG === $arg->type) {
-            return $context->helper->loadValue($arg);
-        }
-        if (JITVariable::TYPE_VALUE === $arg->type) {
-            return $context->builder->call(
-                $context->lookupFunction('__value__readLong'),
-                $arg->value
-            );
-        }
-
-        throw new \LogicException('idate() timestamp must be an integer or null in this compiler build');
     }
 
     private static function jitStringArg(Context $context, JITVariable $arg): Value

@@ -29,12 +29,7 @@ final class gmdate extends Internal
         }
         $timestamp = null;
         if (2 === $argc) {
-            $tsVar = $frame->calledArgs[1]->resolveIndirect();
-            if (Variable::TYPE_INTEGER === $tsVar->type) {
-                $timestamp = $tsVar->toInt();
-            } elseif (Variable::TYPE_NULL !== $tsVar->type) {
-                throw new \LogicException('gmdate() timestamp must be an integer or null in this compiler build');
-            }
+            $timestamp = VmDate::coerceNullableTimestampArg($frame->calledArgs[1], 'gmdate', 2, 'timestamp');
         }
         $frame->returnVar->string(VmDate::gmdate($formatVar->toString(), $timestamp));
     }
