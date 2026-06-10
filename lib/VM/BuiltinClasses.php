@@ -12,6 +12,7 @@ use PHPCompiler\VM\Builtin\DateTimeGetMicrosecond;
 use PHPCompiler\VM\Builtin\DateTimeGetTimestamp;
 use PHPCompiler\VM\Builtin\DateTimeImmutableConstruct;
 use PHPCompiler\VM\Builtin\DateTimeImmutableCreateFromFormat;
+use PHPCompiler\VM\Builtin\DateTimeImmutableCreateFromMutable;
 use PHPCompiler\VM\Builtin\DateTimeSetMicrosecond;
 use PHPCompiler\VM\Builtin\DateTimeSetTimezone;
 use PHPCompiler\VM\Builtin\DateTimeZoneConstruct;
@@ -755,6 +756,8 @@ final class BuiltinClasses
         }
         $dti->methods['createfromformat'] = new DateTimeImmutableCreateFromFormat();
         $dti->methodVisibility['createfromformat'] = $pubStatic;
+        $dti->methods['createfrommutable'] = new DateTimeImmutableCreateFromMutable();
+        $dti->methodVisibility['createfrommutable'] = $pubStatic;
         $ctx->classes[DateTimeSupport::CLASS_DATETIMEIMMUTABLE] = $dti;
     }
 
