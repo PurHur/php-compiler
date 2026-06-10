@@ -24,7 +24,7 @@ final class fopen extends Internal
         }
         $path = VmFilestatArg::coerceFilenameArg($frame->calledArgs[0], 'fopen');
         $mode = VmString::coerceStringBuiltinArg($frame->calledArgs[1], 'fopen', 1, 'mode');
-        $handle = VmFs::fopen($path, $mode);
+        $handle = VmFs::fopen($path, $mode, $frame->vmContext);
         if (false === $handle) {
             $frame->returnVar->bool(false);
 

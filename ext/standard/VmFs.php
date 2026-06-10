@@ -434,9 +434,25 @@ final class VmFs
         };
     }
 
-    public static function fileGetContents(string $path) {
+    public static function fileGetContents(string $path, ?\PHPCompiler\VM\Context $ctx = null) {
         if ('php://input' === $path) {
             return false;
+        }
+        if (VmStreamWrapperRegistry::isCustomProtocol($path)) {
+            if (null === $ctx) {
+                return false;
+            }
+            $handle = VmUserStream::open($ctx->runtime->vm, $ctx, $path, 'r');
+            if (false === $handle) {
+                return false;
+            }
+            $data = VmUserStream::readAll($handle);
+            VmUserStream::close($handle);
+            if (false === $data) {
+                return false;
+            }
+
+            return $data;
         }
         $data = @file_get_contents($path);
         if (VmHttpLastResponseHeaders::isHttpUrl($path)) {
@@ -531,7 +547,14 @@ final class VmFs
         return $written;
     }
 
-    public static function fopen(string $path, string $mode) {
+    public static function fopen(string $path, string $mode, ?\PHPCompiler\VM\Context $ctx = null) {
+        if (VmStreamWrapperRegistry::isCustomProtocol($path)) {
+            if (null === $ctx) {
+                return false;
+            }
+
+            return VmUserStream::open($ctx->runtime->vm, $ctx, $path, $mode);
+        }
         $fp = @fopen($path, $mode);
         if (false === $fp) {
             return false;
@@ -606,6 +629,9 @@ final class VmFs
     }
 
     public static function fread(int $handle, int $length) {
+        if (VmUserStream::isValidHandle($handle)) {
+            return VmUserStream::read($handle, $length);
+        }
         $fp = self::lookup($handle);
         if (null === $fp) {
             return false;
@@ -673,6 +699,9 @@ final class VmFs
 
     public static function fclose(int $handle): bool
     {
+        if (VmUserStream::isValidHandle($handle)) {
+            return VmUserStream::close($handle);
+        }
         $fp = self::lookup($handle);
         if (null === $fp) {
             return false;
@@ -694,6 +723,9 @@ final class VmFs
 
     public static function feof(int $handle): bool
     {
+        if (VmUserStream::isValidHandle($handle)) {
+            return VmUserStream::feof($handle);
+        }
         $fp = self::lookup($handle);
         if (null === $fp) {
             return true;
@@ -1213,12 +1245,19 @@ final class VmFs
      */
     public static function resourceTypeForStreamTag(int $handle): string
     {
-        return isset(self::$handles[$handle]) ? 'stream' : 'Unknown';
+        if (isset(self::$handles[$handle])) {
+            return 'stream';
+        }
+        if (VmUserStream::isValidHandle($handle)) {
+            return VmUserStream::protocolForHandle($handle);
+        }
+
+        return 'Unknown';
     }
 
     public static function isValidHandle(int $handle): bool
     {
-        return isset(self::$handles[$handle]);
+        return isset(self::$handles[$handle]) || VmUserStream::isValidHandle($handle);
     }
 
     /**
@@ -1239,6 +1278,12 @@ final class VmFs
             $ht->addIndex($index, $value);
             ++$index;
         }
+        foreach (VmUserStream::openHandleIds() as $id) {
+            $value = new Variable();
+            $value->streamHandle($id, $ctx);
+            $ht->addIndex($index, $value);
+            ++$index;
+        }
 
         return $ht;
     }
@@ -1256,6 +1301,10 @@ final class VmFs
 
     public static function handleUri(int $handle): string
     {
+        if (VmUserStream::isValidHandle($handle)) {
+            return VmUserStream::uriForHandle($handle);
+        }
+
         return self::$handlePaths[$handle] ?? '';
     }
 
