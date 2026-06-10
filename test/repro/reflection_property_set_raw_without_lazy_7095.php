@@ -1,0 +1,23 @@
+<?php
+
+class Entity7095 {
+    public string $label = 'default';
+}
+
+$initializerRan = false;
+$o = createLazyGhost(Entity7095::class, static function (Entity7095 $e) use (&$initializerRan): void {
+    $initializerRan = true;
+    $e->label = 'initialized';
+});
+
+$rp = new ReflectionProperty(Entity7095::class, 'label');
+var_export(method_exists($rp, 'setRawValueWithoutLazyInitialization'));
+echo "\n";
+
+$rp->setRawValueWithoutLazyInitialization($o, 'raw');
+var_export($o->label);
+echo "\n";
+var_export($initializerRan);
+echo "\n";
+var_export($rp->isLazy($o));
+echo "\n";

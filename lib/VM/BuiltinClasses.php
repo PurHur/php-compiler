@@ -149,6 +149,7 @@ use PHPCompiler\VM\Builtin\ReflectionPropertyIsInitialized;
 use PHPCompiler\VM\Builtin\ReflectionPropertyIsLazy;
 use PHPCompiler\VM\Builtin\ReflectionPropertyIsPromoted;
 use PHPCompiler\VM\Builtin\ReflectionPropertyIsReadOnly;
+use PHPCompiler\VM\Builtin\ReflectionPropertySetRawValueWithoutLazyInitialization;
 use PHPCompiler\VM\Builtin\ReflectionTypeAllowsNull;
 use PHPCompiler\VM\Builtin\ReflectionTypeToString;
 use PHPCompiler\VM\Builtin\WeakMapConstruct;
@@ -520,6 +521,7 @@ final class BuiltinClasses
                 'ispromoted' => new ReflectionPropertyIsPromoted(),
                 'islazy' => new ReflectionPropertyIsLazy(),
                 'isinitialized' => new ReflectionPropertyIsInitialized(),
+                'setrawvaluewithoutlazyinitialization' => new ReflectionPropertySetRawValueWithoutLazyInitialization(),
             ] as $name => $method
         ) {
             $rp->methods[$name] = $method;
