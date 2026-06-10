@@ -167,13 +167,10 @@ final class JitStringBuiltinArg
         string $given,
         string $expectedType = 'string'
     ): void {
-        TypeErrorRaise::registerDeclarations($context);
-        TypeErrorRaise::ensureLinked($context);
-        TypeErrorRaise::emitRaise(
+        ExceptionBridge::emitTypeErrorAndAbort(
             $context,
             self::typeErrorMessage($function, $argIndex, $paramName, $given, $expectedType)
         );
-        $context->builder->call($context->lookupFunction('abort'));
     }
 
     private static function unreachableStringPtr(Context $context): Value

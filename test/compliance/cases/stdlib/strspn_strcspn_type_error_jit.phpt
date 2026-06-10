@@ -6,25 +6,25 @@ try {
     $unused = strspn([], 'a');
     echo "uncaught strspn haystack\n";
 } catch (Throwable $e) {
-    echo $e::class, ': ', $e->getMessage(), "\n";
+    echo get_class($e), ': ', $e->getMessage(), "\n";
 }
 try {
     $unused = strspn('a', []);
     echo "uncaught strspn mask\n";
 } catch (Throwable $e) {
-    echo $e::class, ': ', $e->getMessage(), "\n";
+    echo get_class($e), ': ', $e->getMessage(), "\n";
 }
 try {
     $unused = strcspn([], 'a');
     echo "uncaught strcspn haystack\n";
 } catch (Throwable $e) {
-    echo $e::class, ': ', $e->getMessage(), "\n";
+    echo get_class($e), ': ', $e->getMessage(), "\n";
 }
 try {
     $unused = strcspn('a', new stdClass());
     echo "uncaught strcspn mask\n";
 } catch (Throwable $e) {
-    echo $e::class, ': ', $e->getMessage(), "\n";
+    echo get_class($e), ': ', $e->getMessage(), "\n";
 }
 echo strspn('abc', 'a'), "\n";
 --EXPECT--

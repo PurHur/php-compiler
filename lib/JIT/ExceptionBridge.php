@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace PHPCompiler\JIT;
 
+use PHPCompiler\JIT\Builtin;
 use PHPCompiler\JIT\Builtin\JitThrow;
 use PHPCompiler\JIT\Builtin\TypeErrorRaise;
 
@@ -66,6 +67,29 @@ final class ExceptionBridge
         TypeErrorRaise::registerDeclarations($context);
         TypeErrorRaise::ensureLinked($context);
         TypeErrorRaise::emitRaise($context, $message);
+    }
+
+    /**
+     * Builtin operand TypeError — catchable in active try/catch, fatal when uncaught (#4564).
+     */
+    public static function emitTypeErrorAndAbort(Context $context, string $message): void
+    {
+        TypeErrorRaise::registerDeclarations($context);
+        TypeErrorRaise::ensureLinked($context);
+
+        if (null !== TryCatchHelper::resolveThrowHandler($context)) {
+            TryCatchHelper::emitCatchableClassError($context, 'TypeError', $message);
+
+            return;
+        }
+
+        TypeErrorRaise::emitRaise($context, $message);
+        if (Builtin::LOAD_TYPE_STANDALONE === $context->loadType) {
+            $context->builder->call($context->lookupFunction('phpc_jit_abort_if_pending_type_error'));
+        } else {
+            $context->builder->call($context->lookupFunction('abort'));
+            $context->llvm->lib->LLVMBuildUnreachable($context->builder->builder);
+        }
     }
 
     public static function emitArgumentCountError(Context $context, string $message): void

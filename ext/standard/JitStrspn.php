@@ -79,14 +79,15 @@ final class JitStrspn
         self::implementTwoArg($context, 'strcspn', false);
     }
 
+    public static function ensureStandaloneBodies(Context $context): void
+    {
+        self::implementMaskScan($context);
+        self::implementTwoArg($context, 'strspn', true);
+        self::implementTwoArg($context, 'strcspn', false);
+    }
+
     private static function implementMaskScan(Context $context): void
     {
-        if (Builtin::LOAD_TYPE_STANDALONE === $context->loadType) {
-            self::declareMaskScanIfMissing($context);
-
-            return;
-        }
-
         $probe = $context->module->getNamedFunction(self::MASK_SCAN);
         if (null !== $probe && $probe->countBasicBlocks() > 0) {
             $context->registerFunction(self::MASK_SCAN, $probe);
@@ -102,12 +103,6 @@ final class JitStrspn
 
     private static function implementTwoArg(Context $context, string $name, bool $isStrspn): void
     {
-        if (Builtin::LOAD_TYPE_STANDALONE === $context->loadType) {
-            self::declareTwoArgIfMissing($context, $name);
-
-            return;
-        }
-
         self::implementMaskScan($context);
         $probe = $context->module->getNamedFunction($name);
         if (null !== $probe && $probe->countBasicBlocks() > 0) {
