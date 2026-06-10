@@ -3,7 +3,7 @@
 declare(strict_types=1);
 
 /**
- * VM process helpers (host libc via Zend PHP for parity).
+ * VM process helpers — libc FFI when available; host Zend fallback for dev (#5388).
  */
 
 namespace PHPCompiler\ext\standard;
@@ -18,7 +18,12 @@ final class VmProcess
      */
     public static function getrusage(int $who = 0)
     {
-        $raw = @\getrusage($who);
+        $raw = false;
+        if (VmGetrusageNative::available()) {
+            $raw = VmGetrusageNative::getrusage($who);
+        } elseif (\function_exists('getrusage')) {
+            $raw = @\getrusage($who);
+        }
         if (false === $raw) {
             return false;
         }

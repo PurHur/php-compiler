@@ -97,7 +97,11 @@ final class StringGetrusage
         $context->builder->positionAtEnd($bodyBb);
         $ru = $context->builder->alloca($i8, self::RUSAGE_SIZE, 'gr_ru');
         $ruPtr = $context->builder->pointerCast($ru, $i8p);
-        $whoI32 = $context->builder->truncOrBitCast($who, $i32);
+        $oneI64 = $i64->constInt(1, false);
+        $negOneI64 = $i64->constInt(-1, false);
+        $isChildren = $context->builder->icmp(Builder::INT_EQ, $who, $oneI64);
+        $libcWho = $context->builder->select($isChildren, $negOneI64, $who);
+        $whoI32 = $context->builder->truncOrBitCast($libcWho, $i32);
         $status = $context->builder->call(
             $context->lookupFunction('getrusage'),
             $whoI32,
