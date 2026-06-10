@@ -5,20 +5,16 @@ declare(strict_types=1);
 namespace PHPCompiler\ext\intl;
 
 /**
- * Grapheme cluster string helpers (php-src ext/intl/grapheme/grapheme_string.c; #7128).
+ * Grapheme cluster string helpers (php-src ext/intl/grapheme/grapheme_string.c; #7128, #7888).
+ *
+ * PHP UTF-8 grapheme split via `\X` — no host ext-intl delegation (pairs {@see JitGrapheme}).
  */
 final class VmGrapheme
 {
     public static function strContains(string $haystack, string $needle): bool
     {
-        if (\function_exists('grapheme_str_contains')) {
-            return \grapheme_str_contains($haystack, $needle);
-        }
         if ('' === $needle) {
             return true;
-        }
-        if (\function_exists('grapheme_strpos')) {
-            return false !== \grapheme_strpos($haystack, $needle);
         }
 
         return self::strContainsUtf8($haystack, $needle);
