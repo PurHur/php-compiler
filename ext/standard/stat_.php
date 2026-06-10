@@ -11,7 +11,7 @@ use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Value;
 
-/** stat() — file metadata array via host stat(2) (issue #1197). */
+/** stat() — file metadata array via VmStatCache / libc stat(2) (issue #1197, #7844). */
 final class stat_ extends Internal
 {
     public function __construct()

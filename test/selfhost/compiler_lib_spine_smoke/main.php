@@ -352,6 +352,7 @@ require_once __DIR__.'/../../../ext/standard/VmDebugBacktrace.php';
 require_once __DIR__.'/../../../ext/standard/VmErrorHandler.php';
 require_once __DIR__.'/../../../ext/standard/VmExit.php';
 require_once __DIR__.'/../../../ext/filter/VmFilter.php';
+require_once __DIR__.'/../../../ext/standard/VmStatNative.php';
 require_once __DIR__.'/../../../ext/standard/VmStatCache.php';
 require_once __DIR__.'/../../../ext/standard/VmFs.php';
 require_once __DIR__.'/../../../ext/standard/VmFsGlob.php';
