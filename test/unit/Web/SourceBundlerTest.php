@@ -171,6 +171,42 @@ final class SourceBundlerTest extends TestCase
         }
     }
 
+    public function testBundleStripsRequiresFromIncludedBodies(): void
+    {
+        $dir = sys_get_temp_dir().'/phpc_bundle_'.bin2hex(random_bytes(6));
+        $this->assertTrue(mkdir($dir));
+        try {
+            file_put_contents(
+                $dir.'/dep.php',
+                "<?php\nnamespace PHPCompiler;\n\nclass Dep {}\n"
+            );
+            file_put_contents(
+                $dir.'/lib.php',
+                "<?php\nnamespace PHPCompiler;\n\nrequire_once __DIR__ . '/dep.php';\n\nclass Lib {}\n"
+            );
+            file_put_contents(
+                $dir.'/index.php',
+                "<?php\nrequire __DIR__ . '/lib.php';\n"
+            );
+
+            [$bundled] = SourceBundler::bundleForAot(
+                $dir.'/index.php',
+                [
+                    realpath($dir.'/dep.php') ?: $dir.'/dep.php',
+                    realpath($dir.'/lib.php') ?: $dir.'/lib.php',
+                ]
+            );
+
+            $this->assertStringNotContainsString("require_once __DIR__ . '/dep.php'", $bundled);
+            $this->assertStringContainsString('class Lib', $bundled);
+        } finally {
+            foreach (['dep.php', 'lib.php', 'index.php'] as $file) {
+                @unlink($dir.'/'.$file);
+            }
+            @rmdir($dir);
+        }
+    }
+
     public function testBundleRenamesConflictingUseImportLocalNames(): void
     {
         $dir = sys_get_temp_dir().'/phpc_bundle_'.bin2hex(random_bytes(6));

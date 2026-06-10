@@ -56,6 +56,7 @@ final class SourceBundler
             if (isset($requireTargets[$base])) {
                 $body = self::rewriteReturnOnlyInclude($body, $requireTargets[$base]);
             }
+            $body = self::stripResolvedRequires($body, $includePaths);
             $body = self::wrapInBracedNamespace($body);
             $parts[] = $body;
         }

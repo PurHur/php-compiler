@@ -20,6 +20,12 @@ final class MultiBlockNameContext extends NameContext
     /** @var array<string, array{aliases: array<int, array<string, Name>>, origAliases: array<int, array<string, Name>>}> */
     private array $savedAliasesByNamespace = [];
 
+    public function beginCompilationUnit(): void
+    {
+        $this->savedAliasesByNamespace = [];
+        parent::startNamespace(null);
+    }
+
     public function startNamespace(?Name $namespace = null): void
     {
         if (null !== $this->namespace || $this->hasAnyAlias()) {

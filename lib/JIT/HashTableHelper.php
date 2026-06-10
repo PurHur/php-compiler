@@ -350,10 +350,17 @@ final class HashTableHelper
                 $context->builder->call($setStringKey, $ht, $key, $str);
             } elseif (\PHPCompiler\VM\Variable::TYPE_INTEGER === $resolved->type) {
                 $context->builder->call(
-                    $setLong,
+                    $context->lookupFunction('__hashtable__setStringKeyLong'),
                     $ht,
                     $key,
                     $context->getTypeFromString('int64')->constInt($resolved->toInt(), false)
+                );
+            } elseif (\PHPCompiler\VM\Variable::TYPE_BOOLEAN === $resolved->type) {
+                $context->builder->call(
+                    $context->lookupFunction('__hashtable__setStringKeyBool'),
+                    $ht,
+                    $key,
+                    $context->getTypeFromString('bool')->constInt($resolved->toBool() ? 1 : 0, false)
                 );
             } elseif (\PHPCompiler\VM\Variable::TYPE_ARRAY === $resolved->type) {
                 self::setAtKeyCoercingNumericString(

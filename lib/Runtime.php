@@ -432,6 +432,7 @@ class Runtime {
         [$code, $bareRethrowLines] = $this->prepareSourceForParser($code, $filename);
         $this->compiler->setBareRethrowLines($bareRethrowLines);
         $fileStrictTypes = $this->detectFileStrictTypes($code);
+        $this->resetParserNameResolverState();
         try {
             $script = $this->parser->parse($code, $filename);
         } finally {
@@ -450,6 +451,31 @@ class Runtime {
             $script->main->strictTypes = true;
         }
         return $script;
+    }
+
+    /** php-parser NameResolver aliases persist across traversals on one PHPCfg Parser (#1416). */
+    private function resetParserNameResolverState(): void
+    {
+        static $traverser = null;
+        if (null === $traverser) {
+            $parserRef = new \ReflectionProperty(\PHPCfg\Parser::class, 'astTraverser');
+            $parserRef->setAccessible(true);
+            $traverser = $parserRef->getValue($this->parser);
+        }
+        $visitorsRef = new \ReflectionProperty($traverser, 'visitors');
+        $visitorsRef->setAccessible(true);
+        foreach ($visitorsRef->getValue($traverser) as $visitor) {
+            if ($visitor instanceof \PHPCompiler\Ast\MultiBlockNameResolver) {
+                $context = $visitor->getNameContext();
+                if ($context instanceof \PHPCompiler\Ast\MultiBlockNameContext) {
+                    $context->beginCompilationUnit();
+                    continue;
+                }
+            }
+            if ($visitor instanceof \PhpParser\NodeVisitor\NameResolver) {
+                $visitor->getNameContext()->startNamespace();
+            }
+        }
     }
 
     private function detectFileStrictTypes(string $code): bool
