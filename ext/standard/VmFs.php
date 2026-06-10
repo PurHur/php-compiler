@@ -833,6 +833,63 @@ final class VmFs
     }
 
     /**
+     * stream_get_meta_data() — php-src ext/standard/streams.c (issue #6007).
+     *
+     * @return HashTable|false
+     */
+    public static function streamGetMetaData(int $handle)
+    {
+        $fp = self::lookup($handle);
+        if (null === $fp) {
+            return false;
+        }
+        $meta = @\stream_get_meta_data($fp);
+        if (!\is_array($meta)) {
+            return false;
+        }
+
+        return self::streamMetaArrayToHashTable($meta);
+    }
+
+    /**
+     * stream_set_blocking() — php-src ext/standard/streams.c (issue #6007).
+     */
+    public static function streamSetBlocking(int $handle, bool $mode): bool
+    {
+        $fp = self::lookup($handle);
+        if (null === $fp) {
+            return false;
+        }
+
+        return @\stream_set_blocking($fp, $mode);
+    }
+
+    /**
+     * @param array<string, mixed> $meta
+     */
+    private static function streamMetaArrayToHashTable(array $meta): HashTable
+    {
+        $ht = new HashTable();
+        foreach ($meta as $key => $value) {
+            $var = new Variable();
+            if (\is_bool($value)) {
+                $var->bool($value);
+            } else            if (\is_int($value)) {
+                $var->int($value);
+            } elseif (\is_float($value)) {
+                $var->float($value);
+            } elseif (\is_string($value)) {
+                $var->string($value);
+            } else {
+                $var->null();
+            }
+            $ht->add((string) $key, $var);
+        }
+
+        return $ht;
+    }
+
+    /**
      * stream_supports() — capability probe (php-src php_stream_* option API, issue #5062).
      */
     public static function streamSupports(int $handle, int $feature): bool

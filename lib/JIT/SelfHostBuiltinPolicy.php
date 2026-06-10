@@ -156,6 +156,8 @@ final class SelfHostBuiltinPolicy
         'get_resource_type' => 'filesystem',
         'get_resource_id' => 'filesystem',
         'stream_get_contents' => 'filesystem',
+        'stream_get_meta_data' => 'filesystem',
+        'stream_set_blocking' => 'filesystem',
         'feof' => 'filesystem', 'fflush' => 'filesystem', 'fsync' => 'filesystem', 'fdatasync' => 'filesystem', 'ftruncate' => 'filesystem', 'rewind' => 'filesystem', 'fpassthru' => 'filesystem',
         'pathinfo' => 'filesystem', 'readfile' => 'filesystem', 'readlink' => 'filesystem', 'link' => 'filesystem', 'symlink' => 'filesystem', 'rename' => 'filesystem',
         'is_uploaded_file' => 'filesystem', 'move_uploaded_file' => 'filesystem', 'touch' => 'filesystem',
