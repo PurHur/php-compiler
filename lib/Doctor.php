@@ -439,11 +439,11 @@ final class Doctor
             ? 'opt-in when gate=1 — examples-serve-jit-smoke (#2274)'
             : 'opt-in default 0 — SERVE_JIT_SMOKE_GATE=1 make examples-serve-jit-smoke (#2274, #1900 ci-local)';
         fwrite(STDOUT, '  Serve --jit e2e  SERVE_JIT_SMOKE_GATE='.($serveJitOn ? '1' : '0')." (default {$serveJitDefault}) — {$serveJitDetail}\n");
-        $jitProjectDefault = $defaultsWeb['MINIWEBAPP_JIT_PROJECT_GATE'] ?? '0';
+        $jitProjectDefault = $defaultsWeb['MINIWEBAPP_JIT_PROJECT_GATE'] ?? '1';
         $jitProjectOn = self::gateEnabled('MINIWEBAPP_JIT_PROJECT_GATE', $jitProjectDefault);
         $jitProjectDetail = $jitProjectOn
-            ? 'default on when gate=1 — ci-local MiniWebAppJitProjectTest (#587, #2183)'
-            : 'opt-in default 0 — MINIWEBAPP_JIT_PROJECT_GATE=1 for project JIT (#587)';
+            ? 'ci-fast/ci-local MiniWebAppJitProjectTest when LLVM ready (#587, #730)'
+            : 'opt-out — MINIWEBAPP_JIT_PROJECT_GATE=0 skips project JIT (#730)';
         fwrite(STDOUT, '  003 project JIT  MINIWEBAPP_JIT_PROJECT_GATE='.($jitProjectOn ? '1' : '0')." (default {$jitProjectDefault}) — {$jitProjectDetail}\n");
         $vmOopDefault = $defaultsWeb['MINIWEBAPP_VM_OOP_GATE'] ?? '0';
         $vmOopOn = self::gateEnabled('MINIWEBAPP_VM_OOP_GATE', $vmOopDefault);

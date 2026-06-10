@@ -136,7 +136,7 @@ ROADMAP Phase 1/4: [#78](https://github.com/PurHur/php-compiler/issues/78), acce
 | Private methods + `__construct` | yes | partial | yes | [#145](https://github.com/PurHur/php-compiler/issues/145) | #145 visibility + ctor; Router private render paths |
 | Method return types (`: string` / `: void`) | yes | yes | yes | [#55](https://github.com/PurHur/php-compiler/issues/55) | #55 native scalar/array returns; nullable via __value__*; MCJIT execute #2055 |
 
-_OOP rows are curated from ROADMAP issue state; methods [#58](https://github.com/PurHur/php-compiler/issues/58); visibility/ctor [#145](https://github.com/PurHur/php-compiler/issues/145); return types [#55](https://github.com/PurHur/php-compiler/issues/55). Opt-in gates: `MINIWEBAPP_VM_OOP_GATE` (#2189), `MINIWEBAPP_JIT_PROJECT_GATE` (#587); drift guard `CAPABILITIES_OOP_SYNC_GATE` (#2190)._
+_OOP rows are curated from ROADMAP issue state; methods [#58](https://github.com/PurHur/php-compiler/issues/58); visibility/ctor [#145](https://github.com/PurHur/php-compiler/issues/145); return types [#55](https://github.com/PurHur/php-compiler/issues/55). Gates: `MINIWEBAPP_VM_OOP_GATE` opt-in (#2189); `MINIWEBAPP_JIT_PROJECT_GATE` default-on in ci-fast (#730, #587); drift guard `CAPABILITIES_OOP_SYNC_GATE` (#2190)._
 ## Sessions reference (`examples/005-SessionsWeb`)
 
 File-backed `$_SESSION` flash across HTTP requests for the sessions north-star example.

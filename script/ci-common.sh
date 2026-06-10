@@ -1482,9 +1482,9 @@ ci_run_miniwebapp_serve_aot() {
   ci_run_phpunit --group miniwebapp-aot-serve "$@"
 }
 
-# 003-MiniWebApp bin/jit.php project entry (issues #587, #475); opt-in MINIWEBAPP_JIT_PROJECT_GATE=1.
+# 003-MiniWebApp bin/jit.php project entry (issues #587, #475, #730); default-on MINIWEBAPP_JIT_PROJECT_GATE=1 in ci-fast.
 ci_run_miniwebapp_jit_project() {
-  if [[ "${MINIWEBAPP_JIT_PROJECT_GATE:-0}" != "1" ]]; then
+  if [[ "${MINIWEBAPP_JIT_PROJECT_GATE:-1}" != "1" ]]; then
     return 0
   fi
   if ! ci_llvm_ready; then

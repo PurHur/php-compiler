@@ -2713,6 +2713,39 @@ final class CiScriptsTest extends TestCase
         $this->assertStringContainsString('PhpcLintProjectTest', $body);
     }
 
+    public function testCiDefaultsEnvDefinesMiniWebAppJitProjectGateOn(): void
+    {
+        $defaults = (string) file_get_contents(dirname(__DIR__, 2).'/script/ci-defaults.env');
+        $this->assertStringContainsString(
+            'MINIWEBAPP_JIT_PROJECT_GATE="${MINIWEBAPP_JIT_PROJECT_GATE:-1}"',
+            $defaults
+        );
+        $this->assertStringContainsString('#730', $defaults);
+    }
+
+    public function testCiFastRunsMiniWebAppJitProjectGateByDefault(): void
+    {
+        $fast = (string) file_get_contents(dirname(__DIR__, 2).'/script/ci-fast.sh');
+        $this->assertStringContainsString('ci_run_miniwebapp_jit_project', $fast);
+        $this->assertStringContainsString('#730', $fast);
+    }
+
+    public function testCiCommonMiniWebAppJitProjectGateDefaultOn(): void
+    {
+        $common = (string) file_get_contents(dirname(__DIR__, 2).'/script/ci-common.sh');
+        $this->assertStringContainsString('ci_run_miniwebapp_jit_project', $common);
+        $this->assertStringContainsString('MINIWEBAPP_JIT_PROJECT_GATE:-1', $common);
+        $this->assertStringContainsString('#730', $common);
+    }
+
+    public function testLocalCiMatrixDocumentsMiniWebAppJitProjectGateDefaultOn(): void
+    {
+        $doc = (string) file_get_contents(dirname(__DIR__, 2).'/docs/local-ci-matrix.md');
+        $this->assertStringContainsString('MINIWEBAPP_JIT_PROJECT_GATE', $doc);
+        $this->assertMatchesRegularExpression('/\| `MINIWEBAPP_JIT_PROJECT_GATE` \| `1` \|/', $doc);
+        $this->assertStringContainsString('#730', $doc);
+    }
+
     public function testCiCommonDefinesMiniWebAppVmOopGateOptIn(): void
     {
         $common = (string) file_get_contents(dirname(__DIR__, 2).'/script/ci-common.sh');
