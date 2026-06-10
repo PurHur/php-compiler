@@ -14,6 +14,9 @@ final class VmFs
     /** @var array<int, resource> */
     private static array $handles = [];
 
+    /** @var array<int, string> stream URI/path at open time (StreamMetaJit phpc_stream_paths parity; #7908) */
+    private static array $handlePaths = [];
+
     /** @var array<int, true> popen() handles — pclose() vs fclose() at libc layer in JIT/AOT */
     private static array $popenHandles = [];
 
@@ -545,7 +548,7 @@ final class VmFs
             return false;
         }
 
-        return self::adoptStreamResource($fp);
+        return self::adoptStreamResource($fp, $path);
     }
 
     /**
@@ -559,7 +562,7 @@ final class VmFs
         if (false === $fp) {
             return false;
         }
-        $id = self::adoptStreamResource($fp);
+        $id = self::adoptStreamResource($fp, 'popen://'.$command);
         self::$popenHandles[$id] = true;
 
         return $id;
@@ -574,7 +577,7 @@ final class VmFs
         if (null === $fp) {
             return -1;
         }
-        unset(self::$handles[$handle]);
+        unset(self::$handles[$handle], self::$handlePaths[$handle]);
         unset(self::$popenHandles[$handle]);
         $result = @\pclose($fp);
         if (false === $result) {
@@ -590,13 +593,14 @@ final class VmFs
     }
 
     /** @return int|false */
-    public static function adoptStreamResource($resource)
+    public static function adoptStreamResource($resource, string $uri = '')
     {
         if (!\is_resource($resource)) {
             return false;
         }
         $id = ++self::$nextHandleId;
         self::$handles[$id] = $resource;
+        self::$handlePaths[$id] = $uri;
 
         return $id;
     }
@@ -609,7 +613,7 @@ final class VmFs
             return false;
         }
 
-        return self::adoptStreamResource($fp);
+        return self::adoptStreamResource($fp, 'php://temp');
     }
 
     public static function fread(int $handle, int $length) {
@@ -684,7 +688,7 @@ final class VmFs
         if (null === $fp) {
             return false;
         }
-        unset(self::$handles[$handle]);
+        unset(self::$handles[$handle], self::$handlePaths[$handle]);
 
         return @fclose($fp);
     }
@@ -823,13 +827,8 @@ final class VmFs
         if (null === $fp) {
             return false;
         }
-        $meta = @\stream_get_meta_data($fp);
-        if (!\is_array($meta)) {
-            return false;
-        }
-        $wrapper = \strtolower((string) ($meta['wrapper_type'] ?? ''));
 
-        return !\in_array($wrapper, ['http', 'https', 'ftp', 'ftps'], true);
+        return VmStreamMeta::isLocalUri(self::handleUri($handle));
     }
 
     /**
@@ -843,10 +842,7 @@ final class VmFs
         if (null === $fp) {
             return false;
         }
-        $meta = @\stream_get_meta_data($fp);
-        if (!\is_array($meta)) {
-            return false;
-        }
+        $meta = VmStreamMeta::buildMetaArray(self::handleUri($handle), $fp);
 
         return self::streamMetaArrayToHashTable($meta);
     }
@@ -861,7 +857,7 @@ final class VmFs
             return false;
         }
 
-        return @\stream_set_blocking($fp, $mode);
+        return VmStreamMeta::setBlocking($fp, $mode);
     }
 
     /**
@@ -902,48 +898,27 @@ final class VmFs
             case VmStreamSupports::STREAM_LOCK:
                 return \stream_supports_lock($fp);
             case VmStreamSupports::STREAM_FILTER:
-                return self::streamSupportsFilter($fp);
+                return self::streamSupportsFilter($handle);
             case VmStreamSupports::STREAM_META_TOUCH:
             case VmStreamSupports::STREAM_META_OWNER_NAME:
             case VmStreamSupports::STREAM_META_OWNER:
             case VmStreamSupports::STREAM_META_GROUP_NAME:
             case VmStreamSupports::STREAM_META_GROUP:
             case VmStreamSupports::STREAM_META_ACCESS:
-                return self::streamSupportsMetadata($fp);
+                return self::streamSupportsMetadata($handle);
             default:
                 return false;
         }
     }
 
-    /**
-     * @param resource $fp
-     */
-    private static function streamSupportsFilter($fp): bool
+    private static function streamSupportsFilter(int $handle): bool
     {
-        $meta = @\stream_get_meta_data($fp);
-        if (!\is_array($meta)) {
-            return false;
-        }
-        $uri = (string) ($meta['uri'] ?? '');
-        if ('php://input' === $uri || 'php://output' === $uri || 'php://stdin' === $uri) {
-            return false;
-        }
-
-        return true;
+        return VmStreamMeta::supportsFilter(self::handleUri($handle));
     }
 
-    /**
-     * @param resource $fp
-     */
-    private static function streamSupportsMetadata($fp): bool
+    private static function streamSupportsMetadata(int $handle): bool
     {
-        $meta = @\stream_get_meta_data($fp);
-        if (!\is_array($meta)) {
-            return false;
-        }
-        $wrapper = \strtolower((string) ($meta['wrapper_type'] ?? ''));
-
-        return \in_array($wrapper, ['file', 'plainfile'], true);
+        return VmStreamMeta::supportsMetadata(self::handleUri($handle));
     }
 
     /**
@@ -958,14 +933,9 @@ final class VmFs
         if (@\stream_set_timeout($fp, $seconds, $microseconds)) {
             return true;
         }
-        $meta = @\stream_get_meta_data($fp);
-        if (!\is_array($meta)) {
-            return false;
-        }
-        $streamType = (string) ($meta['stream_type'] ?? '');
 
         // php-src: read timeout applies to socket transports; memory/file are no-op success (#3754).
-        return !\in_array($streamType, ['tcp', 'udp', 'udg', 'unix', 'ssl', 'tls'], true);
+        return !VmStreamMeta::isSocketTransport(self::handleUri($handle));
     }
 
     public static function ftruncate(int $handle, int $size): bool
@@ -1293,6 +1263,11 @@ final class VmFs
     private static function lookup(int $handle): mixed
     {
         return self::$handles[$handle] ?? null;
+    }
+
+    public static function handleUri(int $handle): string
+    {
+        return self::$handlePaths[$handle] ?? '';
     }
 
     public static function tempDir(): string
