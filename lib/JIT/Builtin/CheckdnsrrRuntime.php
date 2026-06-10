@@ -6,6 +6,7 @@ namespace PHPCompiler\JIT\Builtin;
 
 use PHPCompiler\JIT\Context;
 use PHPLLVM\Builder;
+use PHPLLVM\LLVMAbstract\BasicBlock;
 use PHPLLVM\Value;
 
 /**
@@ -155,12 +156,12 @@ final class CheckdnsrrRuntime
         $context->builder->branch($upperInitBb);
         $context->builder->clearInsertionPosition();
 
-        $upperIdxSlot = $context->builder->alloca($i32, 1, 'cdrr_upper_i');
-        $context->builder->store($zeroI32, $upperIdxSlot);
         $upperHeadBb = $fn->appendBasicBlock('cdrr_upper_head');
         $upperBodyBb = $fn->appendBasicBlock('cdrr_upper_body');
         $upperDoneBb = $fn->appendBasicBlock('cdrr_upper_done');
         $context->builder->positionAtEnd($upperInitBb);
+        $upperIdxSlot = $context->builder->alloca($i32, 1, 'cdrr_upper_i');
+        $context->builder->store($zeroI32, $upperIdxSlot);
         $context->builder->branch($upperHeadBb);
         $context->builder->clearInsertionPosition();
 
@@ -212,8 +213,8 @@ final class CheckdnsrrRuntime
         Context $context,
         Value $fn,
         Value $typebuf,
-        Value $failBb,
-        Value $queryBb,
+        BasicBlock $failBb,
+        BasicBlock $queryBb,
         Value $qtypeSlot
     ): void {
         $i32 = $context->getTypeFromString('int32');

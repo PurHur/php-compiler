@@ -55,6 +55,7 @@ require_once __DIR__.'/../../../lib/JIT/Scope.php';
 require_once __DIR__.'/../../../lib/JIT/Analyzer.php';
 require_once __DIR__.'/../../../lib/JIT/BasicBlockHelper.php';
 require_once __DIR__.'/../../../lib/JIT/JitValueBox.php';
+require_once __DIR__.'/../../../lib/JIT/ArrayMapCallbackPolicy.php';
 require_once __DIR__.'/../../../lib/JIT/SelfHostBuiltinPolicy.php';
 require_once __DIR__.'/../../../lib/JIT/CoalesceHelper.php';
 require_once __DIR__.'/../../../lib/JIT/IncludeHelper.php';

@@ -1298,19 +1298,16 @@ class JIT {
         $saved = $this->context->builder;
         $this->context->builder = $this->context->context->builderCreate();
         $this->context->builder->positionAtEnd($bb);
-        $boxed = \PHPCompiler\ext\standard\JitSuperglobalName::invoke(
-            $this->context,
+        \PHPCompiler\JIT\Builtin\StringSuperglobalName::ensureLinked($this->context);
+        $raw = $this->context->builder->call(
+            $this->context->lookupFunction('__compiler_is_superglobal_name'),
             $func->getParam(0)
-        );
-        $long = $this->context->builder->call(
-            $this->context->lookupFunction('__value__readLong'),
-            $boxed
         );
         $this->context->builder->returnValue(
             $this->context->builder->icmp(
                 \PHPLLVM\Builder::INT_NE,
-                $long,
-                $long->typeOf()->constInt(0, false)
+                $raw,
+                $raw->typeOf()->constInt(0, false)
             )
         );
         $this->context->builder->clearInsertionPosition();

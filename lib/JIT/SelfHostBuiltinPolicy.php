@@ -60,19 +60,6 @@ final class SelfHostBuiltinPolicy
         'pi' => 'numeric',
     ];
 
-    private const REQUIRED_FOR_BUNDLE = self::CATEGORY_FILESYSTEM
-        + self::CATEGORY_STRING
-        + self::CATEGORY_ARRAY
-        + self::CATEGORY_HASH
-        + self::CATEGORY_PREG
-        + self::CATEGORY_FILTER
-        + self::CATEGORY_JSON
-        + self::CATEGORY_NUMERIC
-        + self::CATEGORY_GC
-        + self::CATEGORY_PASSWORD
-        + self::CATEGORY_PROCESS
-        + self::CATEGORY_SESSION;
-
     /** @var array<string, string>|null */
     private static ?array $vmOnlyDeferredCache = null;
 
@@ -297,6 +284,19 @@ final class SelfHostBuiltinPolicy
         'serialize' => 'json',
         'unserialize' => 'json',
     ];
+
+    private const REQUIRED_FOR_BUNDLE = self::CATEGORY_FILESYSTEM
+        + self::CATEGORY_STRING
+        + self::CATEGORY_ARRAY
+        + self::CATEGORY_HASH
+        + self::CATEGORY_PREG
+        + self::CATEGORY_FILTER
+        + self::CATEGORY_JSON
+        + self::CATEGORY_NUMERIC
+        + self::CATEGORY_GC
+        + self::CATEGORY_PASSWORD
+        + self::CATEGORY_PROCESS
+        + self::CATEGORY_SESSION;
 
     /** @var list<string> Former auto-stub batch — now in REQUIRED_FOR_BUNDLE categories (#1056). */
     public const AUTO_STUB_BATCH = [];

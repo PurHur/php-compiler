@@ -19,7 +19,7 @@ final class Highlight
 
     public static function ensureStandaloneBodies(Context $context): void
     {
-        self::ensureJitHelperCompiled($context);
+        // Helper LLVM is compiled on first highlight_* lowering (#3164, #3447).
     }
 
     public static function helperFunction(Context $context): \PHPLLVM\Value\Function_
@@ -42,18 +42,15 @@ final class Highlight
         }
 
         $runtime = $context->runtime;
-        $path = dirname(__DIR__, 2).'/ext/standard/HighlightJitHelper.php';
+        $path = dirname(__DIR__, 3).'/ext/standard/HighlightJitHelper.php';
         $block = $runtime->parseAndCompile((string) file_get_contents($path), 'HighlightJitHelper.php');
-        $jit = new JIT($context);
-        foreach ($block->functions as $func) {
-            if (strtolower($func->getName()) !== $lc) {
-                continue;
-            }
-            $jit->compileFunc($func);
-
-            return;
+        if (null === $block) {
+            throw new \LogicException('HighlightJitHelper.php parseAndCompile failed (#3164)');
         }
-
-        throw new \LogicException('HighlightJitHelper::renderString was not compiled for JIT (#3164)');
+        $jit = new JIT($context);
+        $jit->compile($block);
+        if (!isset($context->functions[$lc])) {
+            throw new \LogicException('HighlightJitHelper::renderString was not compiled for JIT (#3164)');
+        }
     }
 }

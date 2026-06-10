@@ -19,7 +19,7 @@ final class TokenGetAll
 
     public static function ensureStandaloneBodies(Context $context): void
     {
-        self::ensureJitHelperCompiled($context);
+        // Helper LLVM is compiled on first token_get_all() lowering (#3171).
     }
 
     public static function helperFunction(Context $context): \PHPLLVM\Value\Function_
@@ -42,18 +42,15 @@ final class TokenGetAll
         }
 
         $runtime = $context->runtime;
-        $path = dirname(__DIR__, 2).'/ext/tokenizer/TokenGetAllJitHelper.php';
+        $path = dirname(__DIR__, 3).'/ext/tokenizer/TokenGetAllJitHelper.php';
         $block = $runtime->parseAndCompile((string) file_get_contents($path), 'TokenGetAllJitHelper.php');
-        $jit = new JIT($context);
-        foreach ($block->functions as $func) {
-            if (strtolower($func->getName()) !== $lc) {
-                continue;
-            }
-            $jit->compileFunc($func);
-
-            return;
+        if (null === $block) {
+            throw new \LogicException('TokenGetAllJitHelper.php parseAndCompile failed (#3171)');
         }
-
-        throw new \LogicException('TokenGetAllJitHelper::tokenizeToHashTable was not compiled for JIT (#3171)');
+        $jit = new JIT($context);
+        $jit->compile($block);
+        if (!isset($context->functions[$lc])) {
+            throw new \LogicException('TokenGetAllJitHelper::tokenizeToHashTable was not compiled for JIT (#3171)');
+        }
     }
 }
