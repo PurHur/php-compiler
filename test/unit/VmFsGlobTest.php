@@ -22,6 +22,16 @@ final class VmFsGlobTest extends TestCase
         $this->assertStringContainsString('VmFsGlob::glob', $source);
     }
 
+    /** Issue #7906: VmFsGlob must not delegate to host \\glob(). */
+    public function testVmFsGlobDoesNotReferenceHostGlob(): void
+    {
+        $source = (string) file_get_contents(self::$root.'/ext/standard/VmFsGlob.php');
+        $this->assertStringContainsString('globFallback', $source);
+        $this->assertStringContainsString('libcGlob', $source);
+        $this->assertStringNotContainsString("function_exists('glob')", $source);
+        $this->assertStringNotContainsString('hostGlob', $source);
+    }
+
     public function testScandirBuiltinDoesNotCallHostScandir(): void
     {
         $source = (string) file_get_contents(self::$root.'/ext/standard/scandir.php');

@@ -5,10 +5,12 @@ declare(strict_types=1);
 namespace PHPCompiler\ext\standard;
 
 /**
- * glob() for VM — libc glob(3) via FFI, host glob(), or PHP fallback (#4859, #7314).
+ * glob() for VM — libc glob(3) via FFI or pure-PHP fallback (#4859, #7314, #7906).
  *
  * php-src: ext/standard/dir.c — PHP_FUNCTION(glob)
  * JIT/AOT: StringFsGlobVecJit.php (LLVM from PHP, no injected C runtime)
+ *
+ * Libc FFI or pure-PHP fallback only — no host glob builtin (bootstrap/M5, #7906).
  */
 final class VmFsGlob
 {
@@ -31,11 +33,6 @@ final class VmFsGlob
             }
         }
 
-        $host = self::hostGlob($pattern, $flags, $onlyDir, $libcFlags);
-        if (null !== $host) {
-            return $host;
-        }
-
         return self::globFallback($pattern, $libcFlags, $onlyDir);
     }
 
@@ -47,34 +44,6 @@ final class VmFsGlob
         }
 
         return true;
-    }
-
-    /**
-     * Host Zend glob() when VM driver runs under php-src (no ext/ffi required).
-     *
-     * @return list<string>|false|null null when host glob unavailable
-     */
-    private static function hostGlob(string $pattern, int $flags, bool $onlyDir, int $libcFlags): array|false|null
-    {
-        if (!\function_exists('glob')) {
-            return null;
-        }
-        $hostFlags = $libcFlags | ($onlyDir ? StdlibConstants::GLOB_ONLYDIR : 0);
-        $matches = @\glob($pattern, $hostFlags);
-        if (false === $matches) {
-            return false;
-        }
-        if (!$onlyDir) {
-            return $matches;
-        }
-        $filtered = [];
-        foreach ($matches as $path) {
-            if (self::pathIsDir($path)) {
-                $filtered[] = $path;
-            }
-        }
-
-        return $filtered;
     }
 
     /**
@@ -154,7 +123,7 @@ CDEF;
     }
 
     /**
-     * Pure-PHP fallback when FFI is absent (no host \glob()).
+     * Pure-PHP fallback when libc FFI is absent.
      *
      * @return list<string>|false
      */
