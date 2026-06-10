@@ -17,7 +17,7 @@ use PHPLLVM\Value;
 /**
  * grapheme_str_contains() — grapheme-cluster substring test (php-src ext/intl/grapheme; #7128).
  *
- * VM only — JIT/AOT lowering not implemented in this compiler build.
+ * VM: {@see VmGrapheme}; JIT/AOT: {@see JitGrapheme}.
  */
 final class grapheme_str_contains extends Internal
 {
@@ -55,11 +55,13 @@ final class grapheme_str_contains extends Internal
         if (!$this->requireExactJitArgCount($context, $args, 'grapheme_str_contains', 2)) {
             return $context->getTypeFromString('int1')->constInt(0, false);
         }
-        JitStringBuiltinArg::lower($context, $args[0], 'grapheme_str_contains', 0, 'haystack');
-        JitStringBuiltinArg::lower($context, $args[1], 'grapheme_str_contains', 1, 'needle');
+        $folded = JitGrapheme::tryContainsFold($context, $args);
+        if (null !== $folded) {
+            return $folded;
+        }
+        $hay = JitStringBuiltinArg::lower($context, $args[0], 'grapheme_str_contains', 0, 'haystack');
+        $needle = JitStringBuiltinArg::lower($context, $args[1], 'grapheme_str_contains', 1, 'needle');
 
-        throw new \LogicException(
-            'grapheme_str_contains() is not lowered for JIT/AOT in this compiler build'
-        );
+        return JitGrapheme::contains($context, $hay, $needle);
     }
 }
