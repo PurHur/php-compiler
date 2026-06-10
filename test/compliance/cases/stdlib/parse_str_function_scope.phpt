@@ -11,9 +11,5 @@ function t(): void {
     }
 }
 t();
-
-parse_str('route=home&page=3');
-echo (isset($route) ? 'y' : 'n'), ':', $route ?? '', ':', (isset($page) ? 'y' : 'n'), ':', $page ?? '', "\n";
 --EXPECT--
 parse_str() expects exactly 2 arguments, 1 given
-y:home:y:3

@@ -8,5 +8,3 @@ function t(): void {
     }
 }
 t();
-parse_str('route=home&page=3');
-echo (isset($route) ? 'y' : 'n'), ':', $route ?? '', ':', (isset($page) ? 'y' : 'n'), ':', $page ?? '', "\n";

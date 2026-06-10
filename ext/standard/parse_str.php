@@ -6,7 +6,6 @@ namespace PHPCompiler\ext\standard;
 
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
-use PHPCompiler\Block;
 use PHPCompiler\JIT\Builtin\StringParseStr;
 use PHPCompiler\JIT\Builtin\TypeErrorRaise;
 use PHPCompiler\JIT\Context;
@@ -14,6 +13,7 @@ use PHPCompiler\JIT\JitStringArg;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
+use ArgumentCountError;
 
 /**
  * parse_str() — query string parser (VM: ParseStrEngine; JIT compile-time: JitParseStrMaterializer; runtime: StringParseStrJit).
@@ -28,18 +28,13 @@ final class parse_str extends Internal
     public function execute(Frame $frame): void
     {
         $argc = \count($frame->calledArgs);
-        if ($argc < 1 || $argc > 2) {
-            throw new \LogicException('parse_str() requires one or two arguments in this compiler build');
+        if (2 !== $argc) {
+            throw new ArgumentCountError(\sprintf(
+                'parse_str() expects exactly 2 arguments, %d given',
+                $argc
+            ));
         }
         $encodedStr = VmString::coerceStringBuiltinArg($frame->calledArgs[0], 'parse_str', 0, 'string');
-        if (1 === $argc) {
-            $caller = VmScope::requireCaller($frame);
-            VmScope::requireMainScriptForParseStrOneArg($caller);
-            $params = ParseStrEngine::parse($encodedStr);
-            VmParseStr::importIntoCaller($caller, $params);
-
-            return;
-        }
 
         $resultArg = $frame->calledArgs[1];
         $resolved = $resultArg->resolveIndirect();
@@ -68,25 +63,13 @@ final class parse_str extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        if (\count($args) < 1 || \count($args) > 2) {
-            throw new \LogicException('parse_str() requires one or two arguments in this compiler build');
-        }
-        if (1 === \count($args)) {
-            $block = $context->jitCurrentBlock ?? $context->jitEnclosingBlock;
-            if ($block instanceof Block && !$block->isMainScript()) {
-                TypeErrorRaise::registerDeclarations($context);
-                TypeErrorRaise::ensureLinked($context);
-                TypeErrorRaise::emitArgumentCountError(
-                    $context,
-                    'parse_str() expects exactly 2 arguments, 1 given'
-                );
-
-                return $context->getTypeFromString('int32')->constInt(0, false);
-            }
-            if (null === JitStringArg::compileTimeLiteral($args[0])) {
-                StringParseStr::ensureLinked($context);
-            }
-            JitParseStr::parseIntoScope($context, $args[0]);
+        if (2 !== \count($args)) {
+            TypeErrorRaise::registerDeclarations($context);
+            TypeErrorRaise::ensureLinked($context);
+            TypeErrorRaise::emitArgumentCountError(
+                $context,
+                \sprintf('parse_str() expects exactly 2 arguments, %d given', \count($args))
+            );
 
             return $context->getTypeFromString('int32')->constInt(0, false);
         }

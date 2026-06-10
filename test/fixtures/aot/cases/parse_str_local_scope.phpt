@@ -1,8 +1,9 @@
 --TEST--
-AOT: parse_str() without $result binds {main} locals (issue #3708, #4034)
+AOT: parse_str() two-arg populates result array (#4050)
 --FILE--
 <?php
-parse_str('id=42&name=Ada');
-echo $id, ':', $name, "\n";
+$params = [];
+parse_str('id=42&name=Ada', $params);
+echo $params['id'], ':', $params['name'], "\n";
 --EXPECT--
 42:Ada
