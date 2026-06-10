@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace PHPCompiler\ext\standard;
 
 /**
- * Process identity builtins (issue #6119).
+ * Process identity builtins (issue #6119, native libc #7891).
  *
  * php-src: ext/standard/basic_functions.c — getmyuid, getmygid, get_current_user.
  */
@@ -13,6 +13,12 @@ final class VmProcessIdentity
 {
     public static function getmyuid(): int
     {
+        if (VmProcessIdentityNative::available()) {
+            $uid = VmProcessIdentityNative::getuid();
+            if (null !== $uid) {
+                return $uid;
+            }
+        }
         if (\function_exists('posix_getuid')) {
             return (int) \posix_getuid();
         }
@@ -25,6 +31,12 @@ final class VmProcessIdentity
 
     public static function getmygid(): int
     {
+        if (VmProcessIdentityNative::available()) {
+            $gid = VmProcessIdentityNative::getgid();
+            if (null !== $gid) {
+                return $gid;
+            }
+        }
         if (\function_exists('posix_getgid')) {
             return (int) \posix_getgid();
         }
@@ -37,6 +49,15 @@ final class VmProcessIdentity
 
     public static function getCurrentUser(): string
     {
+        if (VmProcessIdentityNative::available()) {
+            $euid = VmProcessIdentityNative::geteuid();
+            if (null !== $euid) {
+                $name = VmProcessIdentityNative::getpwuidName($euid);
+                if (null !== $name) {
+                    return $name;
+                }
+            }
+        }
         $euid = null;
         if (\function_exists('posix_geteuid')) {
             $euid = (int) \posix_geteuid();

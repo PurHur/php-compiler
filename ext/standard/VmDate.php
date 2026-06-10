@@ -41,17 +41,10 @@ final class VmDate
         return (int) \getmypid();
     }
 
-    /** getmygrgid() — real group id (ext/standard/basic_functions.c, #3611). */
+    /** getmygrgid() — real group id (ext/standard/basic_functions.c, #3611, native #7891). */
     public static function getmygrgid(): int
     {
-        if (\function_exists('posix_getgid')) {
-            return (int) \posix_getgid();
-        }
-        if (\function_exists('getgid')) {
-            return (int) \getgid();
-        }
-
-        throw new \LogicException('getmygrgid() requires POSIX support in this compiler build');
+        return VmProcessIdentity::getmygid();
     }
 
     /**
