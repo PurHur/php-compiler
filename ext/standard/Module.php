@@ -57,6 +57,8 @@ class Module extends ModuleAbstract
             'CREDITS_FULLPAGE' => VmInfo::CREDITS_FULLPAGE,
             'CREDITS_QA' => VmInfo::CREDITS_QA,
             'CREDITS_ALL' => VmInfo::CREDITS_ALL,
+            'PHP_QUERY_RFC1738' => VmHttpBuildQuery::ENCODING_RFC1738,
+            'PHP_QUERY_RFC3986' => VmHttpBuildQuery::ENCODING_RFC3986,
         ] + VmStreamSupports::constants() + VmImage::constants() as $name => $value) {
             $var = new VM\Variable();
             $var->int($value);

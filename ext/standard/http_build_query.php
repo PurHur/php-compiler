@@ -24,14 +24,13 @@ final class http_build_query extends Internal
 
     public function execute(Frame $frame): void
     {
-        $argc = \count($frame->calledArgs);
-        if ($argc < 1) {
+        if (!\array_key_exists(0, $frame->calledArgs)) {
             throw new \LogicException('http_build_query() requires at least one argument');
         }
         if (null === $frame->returnVar) {
             return;
         }
-        if ($argc > 4) {
+        if (\count($frame->calledArgs) > 4) {
             throw new \LogicException('http_build_query() accepts at most four arguments in this compiler build');
         }
 
@@ -40,32 +39,9 @@ final class http_build_query extends Internal
             throw new \LogicException('http_build_query() argument #1 must be an array in this compiler build');
         }
 
-        $prefix = '';
-        if ($argc >= 2) {
-            $prefixVar = $frame->calledArgs[1]->resolveIndirect();
-            if (Variable::TYPE_STRING !== $prefixVar->type) {
-                throw new \LogicException('http_build_query() argument #2 must be a string in this compiler build');
-            }
-            $prefix = $prefixVar->toString();
-        }
-
-        $separator = '&';
-        if ($argc >= 3) {
-            $sepVar = $frame->calledArgs[2]->resolveIndirect();
-            if (Variable::TYPE_STRING !== $sepVar->type) {
-                throw new \LogicException('http_build_query() argument #3 must be a string in this compiler build');
-            }
-            $separator = $sepVar->toString();
-        }
-
-        $encoding = VmHttpBuildQuery::ENCODING_RFC1738;
-        if ($argc >= 4) {
-            $encVar = $frame->calledArgs[3]->resolveIndirect();
-            if (Variable::TYPE_INTEGER !== $encVar->type) {
-                throw new \LogicException('http_build_query() argument #4 must be an integer in this compiler build');
-            }
-            $encoding = $encVar->toInt();
-        }
+        $prefix = self::resolveOptionalStringArg($frame->calledArgs, 1, 'numeric_prefix', '');
+        $separator = self::resolveOptionalSeparatorArg($frame->calledArgs);
+        $encoding = self::resolveOptionalEncodingArg($frame->calledArgs);
 
         $exported = VmHttpBuildQuery::export($data);
         if (!\is_array($exported)) {
@@ -74,6 +50,66 @@ final class http_build_query extends Internal
         $frame->returnVar->string(
             VmHttpBuildQuery::build($exported, $prefix, $separator, $encoding)
         );
+    }
+
+    /**
+     * @param array<int, \PHPCompiler\VM\Variable> $args
+     */
+    private static function resolveOptionalStringArg(array $args, int $index, string $paramName, string $default): string
+    {
+        if (!\array_key_exists($index, $args)) {
+            return $default;
+        }
+        $var = $args[$index]->resolveIndirect();
+        if (Variable::TYPE_NULL === $var->type) {
+            return $default;
+        }
+        if (Variable::TYPE_STRING !== $var->type) {
+            throw new \LogicException(
+                'http_build_query() argument #'.($index + 1).' ($'.$paramName.') must be a string in this compiler build'
+            );
+        }
+
+        return $var->toString();
+    }
+
+    /**
+     * @param array<int, \PHPCompiler\VM\Variable> $args
+     */
+    private static function resolveOptionalSeparatorArg(array $args): string
+    {
+        if (!\array_key_exists(2, $args)) {
+            return '&';
+        }
+        $var = $args[2]->resolveIndirect();
+        if (Variable::TYPE_NULL === $var->type) {
+            return '&';
+        }
+        if (Variable::TYPE_STRING !== $var->type) {
+            throw new \LogicException(
+                'http_build_query() argument #3 ($arg_separator) must be a string in this compiler build'
+            );
+        }
+
+        return $var->toString();
+    }
+
+    /**
+     * @param array<int, \PHPCompiler\VM\Variable> $args
+     */
+    private static function resolveOptionalEncodingArg(array $args): int
+    {
+        if (!\array_key_exists(3, $args)) {
+            return VmHttpBuildQuery::ENCODING_RFC1738;
+        }
+        $var = $args[3]->resolveIndirect();
+        if (Variable::TYPE_INTEGER !== $var->type) {
+            throw new \LogicException(
+                'http_build_query() argument #4 ($encoding_type) must be an integer in this compiler build'
+            );
+        }
+
+        return $var->toInt();
     }
 
     public function call(Context $context, JITVariable ...$args): Value
@@ -98,8 +134,12 @@ final class http_build_query extends Internal
         if (!isset($args[$index])) {
             return $context->builder->load($context->constantStringFromString($default));
         }
+        $arg = $args[$index];
+        if (JITVariable::TYPE_NULL === $arg->type) {
+            return $context->builder->load($context->constantStringFromString($default));
+        }
 
-        return $this->jitString($context, $args[$index], 'http_build_query() argument #'.($index + 1));
+        return $this->jitString($context, $arg, 'http_build_query() argument #'.($index + 1));
     }
 
     private function optionalEncodingArg(Context $context, array $args, int $index): Value
