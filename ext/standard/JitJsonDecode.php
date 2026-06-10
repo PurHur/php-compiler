@@ -109,6 +109,9 @@ final class JitJsonDecode
         if (\is_bool($decoded) || \is_int($decoded) || \is_float($decoded) || \is_string($decoded)) {
             return self::materializeScalar($context, $decoded);
         }
+        if (!$assoc) {
+            self::predefineStdClassTree($context, $decoded);
+        }
         if ($assoc) {
             if (!\is_array($decoded)) {
                 throw new \LogicException('json_decode() assoc=true expects array result');
@@ -301,9 +304,9 @@ final class JitJsonDecode
         $classId = $context->type->object->lookup('stdclass');
         $objectPtr = $context->type->object->allocate($classId);
         $context->type->object->markObjectConstructed($objectPtr);
+        $context->type->object->initializePropertySlotsNull($objectPtr, $classId);
         foreach ((array) $obj as $prop => $value) {
             $propName = (string) $prop;
-            $context->type->object->defineProperty($classId, $propName, \PHPCompiler\JIT\Variable::TYPE_VALUE);
             $context->type->object->storeInstanceProperty(
                 $objectPtr,
                 'stdClass',
@@ -313,6 +316,58 @@ final class JitJsonDecode
         }
 
         return $objectPtr;
+    }
+
+    /**
+     * Register every dynamic property on stdClass before any allocate() (#7188).
+     *
+     * defineProperty() during nested materialization used to grow the shared stdclass
+     * layout after parent objects were malloc'd with too few slots → AOT segfault.
+     */
+    private static function predefineStdClassTree(Context $context, mixed $value): void
+    {
+        if ($value instanceof \stdClass) {
+            $classId = $context->type->object->lookup('stdclass');
+            /** @var list<string> $compositeProps nested object/array keys first (#7188 slot layout) */
+            $compositeProps = [];
+            /** @var list<string> $scalarProps */
+            $scalarProps = [];
+            foreach ((array) $value as $prop => $item) {
+                $propName = (string) $prop;
+                if ($item instanceof \stdClass || \is_array($item)) {
+                    $compositeProps[] = $propName;
+                    continue;
+                }
+                $scalarProps[] = $propName;
+            }
+            foreach ($compositeProps as $propName) {
+                if (!$context->type->object->hasProperty($classId, $propName)) {
+                    $context->type->object->defineProperty(
+                        $classId,
+                        $propName,
+                        \PHPCompiler\JIT\Variable::TYPE_VALUE
+                    );
+                }
+                self::predefineStdClassTree($context, $value->{$propName});
+            }
+            foreach ($scalarProps as $propName) {
+                if (!$context->type->object->hasProperty($classId, $propName)) {
+                    $context->type->object->defineProperty(
+                        $classId,
+                        $propName,
+                        \PHPCompiler\JIT\Variable::TYPE_VALUE
+                    );
+                }
+            }
+
+            return;
+        }
+        if (!\is_array($value)) {
+            return;
+        }
+        foreach ($value as $item) {
+            self::predefineStdClassTree($context, $item);
+        }
     }
 
     private static function materializeDecodedPropertyValue(Context $context, mixed $value): \PHPCompiler\JIT\Variable

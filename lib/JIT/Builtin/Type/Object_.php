@@ -5125,6 +5125,15 @@ class Object_ extends Type {
         return $this->context->builder->icmp(PHPLLVM\Builder::INT_NE, $loaded, $nullPtr);
     }
 
+    /** Null-init every declared slot on a freshly allocated object (#7188 json_decode stdClass). */
+    public function initializePropertySlotsNull(PHPLLVM\Value $obj, int $classId): void
+    {
+        $null = $this->context->getTypeFromString('void*')->constNull();
+        foreach ($this->properties[$classId] as $propset) {
+            $this->context->builder->store($null, $this->propertySlotPtr($obj, $propset[3]));
+        }
+    }
+
     public function storeInstanceProperty(
         PHPLLVM\Value $obj,
         string $class,

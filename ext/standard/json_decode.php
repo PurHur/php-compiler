@@ -98,7 +98,7 @@ final class json_decode extends Internal
         if (JITVariable::TYPE_NATIVE_BOOL === $assocArg->type && JITVariable::KIND_VALUE === $assocArg->kind) {
             return 0 !== (int) $context->llvm->lib->LLVMConstIntGetZExtValue($assocArg->value->value);
         }
-        if (JITVariable::TYPE_BOOLEAN === $assocArg->type && JITVariable::KIND_VALUE === $assocArg->kind) {
+        if (JITVariable::TYPE_NATIVE_LONG === $assocArg->type && JITVariable::KIND_VALUE === $assocArg->kind) {
             return 0 !== (int) $context->llvm->lib->LLVMConstIntGetZExtValue($assocArg->value->value);
         }
 
