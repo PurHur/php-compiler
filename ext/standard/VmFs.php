@@ -1253,34 +1253,60 @@ final class VmFs
     }
 
     /**
-     * disk_free_space() / diskfreespace() — bytes available on filesystem (php-src filestat.c).
+     * disk_free_space() / diskfreespace() — bytes available on filesystem (php-src filestat.c, #3758).
      *
      * @return float|false
      */
     public static function diskFreeSpace(?string $path)
     {
         $path = $path ?? '.';
-        $result = @\disk_free_space($path);
-        if (false === $result) {
-            return false;
+        if (self::ffiEnabledForDisk()) {
+            $native = VmFsDiskNative::diskFreeSpace($path);
+            if (false !== $native) {
+                return $native;
+            }
+        }
+        if (\function_exists('disk_free_space')) {
+            $result = @\disk_free_space($path);
+            if (false !== $result) {
+                return (float) $result;
+            }
         }
 
-        return (float) $result;
+        return false;
     }
 
     /**
-     * disk_total_space() / disktotalspace() — total bytes on filesystem (php-src filestat.c).
+     * disk_total_space() / disktotalspace() — total bytes on filesystem (php-src filestat.c, #3758).
      *
      * @return float|false
      */
     public static function diskTotalSpace(?string $path)
     {
         $path = $path ?? '.';
-        $result = @\disk_total_space($path);
-        if (false === $result) {
+        if (self::ffiEnabledForDisk()) {
+            $native = VmFsDiskNative::diskTotalSpace($path);
+            if (false !== $native) {
+                return $native;
+            }
+        }
+        if (\function_exists('disk_total_space')) {
+            $result = @\disk_total_space($path);
+            if (false !== $result) {
+                return (float) $result;
+            }
+        }
+
+        return false;
+    }
+
+    private static function ffiEnabledForDisk(): bool
+    {
+        $v = getenv('PHP_COMPILER_DISABLE_FFI');
+        if (false !== $v && '' !== $v && '0' !== $v && 'false' !== strtolower($v)) {
             return false;
         }
 
-        return (float) $result;
+        return true;
     }
 }
