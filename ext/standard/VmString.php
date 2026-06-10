@@ -3256,11 +3256,12 @@ final class VmString
         return $out;
     }
 
-    public static function strReplace(string $search, string $replace, string $subject): string
+    public static function strReplace(string $search, string $replace, string $subject, ?int &$count = null): string
     {
         if ('' === $search) {
             throw new \LogicException('str_replace(): Argument #1 ($search) cannot be empty');
         }
+        $replacementCount = 0;
         $searchLen = self::byteLength($search);
         $out = '';
         $offset = 0;
@@ -3273,17 +3274,22 @@ final class VmString
             }
             $out .= self::byteSlice($subject, $offset, $pos - $offset).$replace;
             $offset = $pos + $searchLen;
+            ++$replacementCount;
+        }
+        if (null !== $count) {
+            $count = $replacementCount;
         }
 
         return $out;
     }
 
     /** Case-insensitive str_replace() for two strings (ASCII fold; subset of PHP). */
-    public static function strIreplace(string $search, string $replace, string $subject): string
+    public static function strIreplace(string $search, string $replace, string $subject, ?int &$count = null): string
     {
         if ('' === $search) {
             throw new \LogicException('str_ireplace(): Argument #1 ($search) cannot be empty');
         }
+        $replacementCount = 0;
         $searchLen = self::byteLength($search);
         $out = '';
         $offset = 0;
@@ -3296,6 +3302,10 @@ final class VmString
             }
             $out .= self::byteSlice($subject, $offset, $pos - $offset).$replace;
             $offset = $pos + $searchLen;
+            ++$replacementCount;
+        }
+        if (null !== $count) {
+            $count = $replacementCount;
         }
 
         return $out;

@@ -13,8 +13,10 @@ namespace PHPCompiler\ext\standard;
 
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
+use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitStringArg;
+use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\RuntimeStrictness;
 use PHPCompiler\VM\EnumCaseSupport;
@@ -30,12 +32,11 @@ final class str_replace extends Internal
 {
     public function execute(Frame $frame): void
     {
-        if (3 !== \count($frame->calledArgs)) {
-            throw new \LogicException('str_replace() requires exactly three arguments in this compiler build');
+        $argc = \count($frame->calledArgs);
+        if ($argc < 3 || $argc > 4) {
+            throw new \LogicException('str_replace() requires 3 or 4 arguments in this compiler build');
         }
-        if (null === $frame->returnVar) {
-            return;
-        }
+        $hasCount = $argc >= 4;
         $search = self::coerceStringReplaceArg($frame->calledArgs[0], 'str_replace', 0, 'search');
         $replace = self::coerceStringReplaceArg($frame->calledArgs[1], 'str_replace', 1, 'replace');
         $subjectVar = VmPreg::requireStringOrArraySubject(
@@ -46,19 +47,34 @@ final class str_replace extends Internal
         );
 
         if (Variable::TYPE_STRING === $subjectVar->type) {
-            $frame->returnVar->string(VmString::strReplace($search, $replace, $subjectVar->toString()));
+            $count = 0;
+            $result = VmString::strReplace(
+                $search,
+                $replace,
+                $subjectVar->toString(),
+                $count
+            );
+            if ($hasCount) {
+                $frame->calledArgs[3]->resolveIndirect()->int($count);
+            }
+            if (null !== $frame->returnVar) {
+                $frame->returnVar->string($result);
+            }
 
             return;
         }
 
         $ht = new HashTable();
+        $totalCount = 0;
         foreach ($subjectVar->toArray()->iterateKeyed(true) as [$key, $value]) {
             if (Variable::TYPE_STRING !== $value->type) {
                 throw new \LogicException(
                     'str_replace() array subject values must be strings in this compiler build'
                 );
             }
-            $replaced = VmString::strReplace($search, $replace, $value->toString());
+            $elemCount = 0;
+            $replaced = VmString::strReplace($search, $replace, $value->toString(), $elemCount);
+            $totalCount += $elemCount;
             $keyVar = new Variable();
             if (Variable::TYPE_INTEGER === $key->type) {
                 $keyVar->int($key->toInt());
@@ -69,7 +85,12 @@ final class str_replace extends Internal
             $outVal->string($replaced);
             array_map::appendKeyedCopy($ht, $keyVar, $outVal);
         }
-        $frame->returnVar->array($ht);
+        if ($hasCount) {
+            $frame->calledArgs[3]->resolveIndirect()->int($totalCount);
+        }
+        if (null !== $frame->returnVar) {
+            $frame->returnVar->array($ht);
+        }
     }
 
     public Context $context;
@@ -77,23 +98,48 @@ final class str_replace extends Internal
     public function call(Context $context, JITVariable ...$args): Value
     {
         $this->context = $context;
-        if (3 !== \count($args)) {
-            throw new \LogicException('str_replace() requires exactly three arguments in this compiler build');
+        $argc = \count($args);
+        if ($argc < 3 || $argc > 4) {
+            throw new \LogicException('str_replace() requires 3 or 4 arguments in this compiler build');
         }
 
         $search = JitStringArg::lower($context, $args[0], 'str_replace() search');
         $replace = JitStringArg::lower($context, $args[1], 'str_replace() replace');
         JitPregSubject::requireStringOrArray($context, $args[2], 'str_replace', 2, 'subject');
+        $countSlot = self::jitCountSlot($context, 4 === $argc);
         if (JITVariable::TYPE_STRING === $args[2]->type) {
-            return JitStrReplace::replace(
+            $result = JitStrReplace::replace(
                 $context,
                 $search,
                 $replace,
-                JitStringArg::lower($context, $args[2], 'str_replace() subject')
+                JitStringArg::lower($context, $args[2], 'str_replace() subject'),
+                false,
+                $countSlot
+            );
+        } else {
+            $result = JitStrReplaceArray::invoke($context, $search, $replace, $args[2], false, $countSlot);
+        }
+        if (4 === $argc) {
+            JitValueBox::writeLong(
+                $context,
+                JitValueBox::valuePtrFromVariable($context, $args[3]),
+                $context->builder->load($countSlot)
             );
         }
 
-        return JitStrReplaceArray::invoke($context, $search, $replace, $args[2], false);
+        return $result;
+    }
+
+    private static function jitCountSlot(Context $context, bool $track): ?Value
+    {
+        if (!$track) {
+            return null;
+        }
+        $i64 = $context->getTypeFromString('int64');
+        $slot = BasicBlockHelper::entryAlloca($context, $i64);
+        $context->builder->store($i64->constInt(0, false), $slot);
+
+        return $slot;
     }
 
     /**

@@ -22,7 +22,8 @@ final class JitStrReplace
         Value $search,
         Value $replace,
         Value $subject,
-        bool $caseInsensitive = false
+        bool $caseInsensitive = false,
+        ?Value $countSlot = null
     ): Value {
         $id = (string) (++self::$blockSerial);
         $map = $context->structFieldMap['__string__'];
@@ -83,6 +84,13 @@ final class JitStrReplace
         $withPrefix = JitStringConcat::concat($context, $acc, $prefix);
         $withReplace = JitStringConcat::concat($context, $withPrefix, $replace);
         $context->builder->store($withReplace, $resultSlot);
+        if (null !== $countSlot) {
+            $one = $i64->constInt(1, false);
+            $context->builder->store(
+                $context->builder->addNoSignedWrap($context->builder->load($countSlot), $one),
+                $countSlot
+            );
+        }
         $newOffset = $context->builder->add($pos, $searchLen);
         $context->builder->store($newOffset, $offsetSlot);
         $context->builder->branch($loopHead);
