@@ -6348,6 +6348,7 @@ class JIT {
                         $coalesceVar = $this->context->getVariableFromOp($coalesceResult);
                         $coalesceVar->compileTimeString = null;
                         $coalesceVar->compileTimeConstantName = null;
+                        $coalesceVar->compileTimeEnumCase = null;
                     }
                     $leftEntry = $this->context->scope->blockStorage[$op->block1];
                     $rightEntry = $this->context->scope->blockStorage[$op->block2];
@@ -6399,6 +6400,7 @@ class JIT {
                         $nullsafeVar = $this->context->getVariableFromOp($nullsafeResult);
                         $nullsafeVar->compileTimeString = null;
                         $nullsafeVar->compileTimeConstantName = null;
+                        $nullsafeVar->compileTimeEnumCase = null;
                     }
                     $nullEntry = $this->context->scope->blockStorage[$op->block1];
                     $fetchEntry = $this->context->scope->blockStorage[$op->block2];
@@ -6896,6 +6898,35 @@ class JIT {
                             JIT\JitNativeString::coerce($this->context, $callArgs[1])
                         );
                         break;
+                    }
+                    if (
+                        $this->context->scope->toCall instanceof CoreFunc\Internal
+                        && 'parse_url' === strtolower($this->context->scope->toCall->getName())
+                        && 2 === count($callArgs)
+                        && isset($callOperands[1])
+                    ) {
+                        $component = \PHPCompiler\ext\standard\JitParseUrl::tryResolveComponent(
+                            $this->context,
+                            $callArgs[1],
+                            $this->context->jitEnclosingBlock,
+                            $callOperands[1]
+                        );
+                        if (null !== $component) {
+                            $prevStrict = $this->context->callerStrictTypes;
+                            $this->context->callerStrictTypes = $block->strictTypes;
+                            $result = \PHPCompiler\ext\standard\JitParseUrl::parseUrl(
+                                $this->context,
+                                $callArgs[0],
+                                Variable::fromConstantInt($this->context, $component)
+                            );
+                            $this->context->callerStrictTypes = $prevStrict;
+                            $this->assignCallResultOperand(
+                                $block->getOperand($op->arg1),
+                                $result,
+                                $this->calleeReturnsByRef($this->context->scope->toCall)
+                            );
+                            break;
+                        }
                     }
                     if (
                         $this->context->scope->toCall instanceof CoreFunc\Internal
@@ -8944,6 +8975,7 @@ class JIT {
                 // it's a kind!
                 $var = $this->context->makeVariableFromValueOp($this->context->helper->loadValue($value), $resultOp);
                 $var->compileTimeConstantName = $value->compileTimeConstantName;
+                $var->compileTimeEnumCase = $value->compileTimeEnumCase;
 
                 return;
             }
@@ -9191,6 +9223,9 @@ class JIT {
                         $result->addref();
                     }
                     $this->copyValueBoxJitFlags($result, $value, $force);
+                    $result->compileTimeConstantName = $value->compileTimeConstantName;
+                    $result->compileTimeEnumCase = $value->compileTimeEnumCase;
+                    $this->syncCompileTimeString($result, $value, $force);
 
                     return;
                 }
@@ -9206,6 +9241,7 @@ class JIT {
             }
             $this->copyValueBoxJitFlags($result, $value, $force);
             $result->compileTimeConstantName = $value->compileTimeConstantName;
+            $result->compileTimeEnumCase = $value->compileTimeEnumCase;
             $this->syncCompileTimeString($result, $value, $force);
             if ($value->isJitGenerator) {
                 $resolved = JIT\OperandName::resolve($resultOp);
@@ -9279,6 +9315,7 @@ class JIT {
                     
                 );
                     $result->compileTimeConstantName = $value->compileTimeConstantName;
+                    $result->compileTimeEnumCase = $value->compileTimeEnumCase;
     
                     return;
                 case Variable::TYPE_NATIVE_DOUBLE:
@@ -9436,6 +9473,7 @@ class JIT {
             );
             $this->copyValueBoxJitFlags($result, $value, $force);
             $result->compileTimeConstantName = $value->compileTimeConstantName;
+            $result->compileTimeEnumCase = $value->compileTimeEnumCase;
             $this->syncCompileTimeString($result, $value, $force);
 
             return;

@@ -96,6 +96,9 @@ final class Variable {
     /** User/global constant name when this variable holds a compile-time const fetch. */
     public ?string $compileTimeConstantName = null;
 
+    /** Builtin/user enum case when this variable is a compile-time enum singleton (#7260). */
+    public ?array $compileTimeEnumCase = null;
+
     /** Set when this variable is the PHP {@code null} constant (const-fetch). */
     public bool $isNullConstant = false;
 

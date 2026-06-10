@@ -85,6 +85,8 @@ final class BuiltinParamNames
                 return ['pattern', 'subject', 'matches', 'flags', 'offset'];
             case 'fopen':
                 return ['filename', 'mode', 'use_include_path', 'context'];
+            case 'parse_url':
+                return ['url', 'component'];
         }
 
         return null;
