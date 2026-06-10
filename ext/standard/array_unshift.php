@@ -26,14 +26,22 @@ final class array_unshift extends Internal
 {
     public function execute(Frame $frame): void
     {
-        if (\count($frame->calledArgs) < 2) {
-            throw new \LogicException('array_unshift() requires at least two arguments');
+        if (\count($frame->calledArgs) < 1) {
+            throw new \LogicException('array_unshift() requires at least one argument');
         }
         $array = $frame->calledArgs[0]->resolveIndirect();
         if (Variable::TYPE_ARRAY !== $array->type) {
             throw new \LogicException('array_unshift() first argument must be an array in this compiler build');
         }
         $ht = $array->toArray();
+        if (\count($frame->calledArgs) < 2) {
+            if (null === $frame->returnVar) {
+                return;
+            }
+            $frame->returnVar->int($ht->getNumElements());
+
+            return;
+        }
         $values = [];
         for ($i = 1, $n = \count($frame->calledArgs); $i < $n; ++$i) {
             $copy = new Variable();
@@ -51,8 +59,8 @@ final class array_unshift extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        if (\count($args) < 2) {
-            throw new \LogicException('array_unshift() requires at least two arguments');
+        if (\count($args) < 1) {
+            throw new \LogicException('array_unshift() requires at least one argument');
         }
         $array = $args[0];
         $values = \array_slice($args, 1);

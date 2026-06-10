@@ -27,10 +27,12 @@ final class array_merge extends Internal
     public function execute(Frame $frame): void
     {
         $argc = \count($frame->calledArgs);
-        if ($argc < 1) {
-            throw new \ArgumentCountError('array_merge() expects at least 1 argument, 0 given');
-        }
         if (null === $frame->returnVar) {
+            return;
+        }
+        if ($argc < 1) {
+            $frame->returnVar->newArray();
+
             return;
         }
         $first = $frame->calledArgs[0]->resolveIndirect();
@@ -58,7 +60,7 @@ final class array_merge extends Internal
     public function call(Context $context, JITVariable ...$args): Value
     {
         if (\count($args) < 1) {
-            throw new \ArgumentCountError('array_merge() expects at least 1 argument, 0 given');
+            return ArrayBuiltinHelper::emptyArray($context);
         }
 
         foreach ($args as $i => $arg) {

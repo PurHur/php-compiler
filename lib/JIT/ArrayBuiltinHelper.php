@@ -5498,10 +5498,15 @@ final class ArrayBuiltinHelper
         return $dest;
     }
 
+    public static function emptyArray(Context $context): Value
+    {
+        return HashTableHelper::alloc($context);
+    }
+
     public static function merge(Context $context, Variable ...$arrays): Value
     {
         if (\count($arrays) < 1) {
-            throw new \ArgumentCountError('array_merge() expects at least 1 argument, 0 given');
+            return self::emptyArray($context);
         }
         if (1 === \count($arrays)) {
             return self::mergeSingleArgumentCopy($context, $arrays[0]);
