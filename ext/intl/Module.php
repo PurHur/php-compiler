@@ -21,6 +21,7 @@ class Module extends ModuleAbstract
     public function getFunctions(): array
     {
         return [
+            new grapheme_str_contains(),
             new intl_get_error_code(),
         ];
     }

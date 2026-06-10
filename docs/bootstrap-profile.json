@@ -99,6 +99,8 @@
         "ext/intl/IntlClassMethod.php",
         "ext/intl/IntlDateFormatterCreate.php",
         "ext/intl/Module.php",
+        "ext/intl/VmGrapheme.php",
+        "ext/intl/grapheme_str_contains.php",
         "ext/intl/intl_get_error_code.php",
         "ext/libxml/BuiltinClasses.php",
         "ext/libxml/LibxmlConstants.php",
