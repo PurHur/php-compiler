@@ -18,12 +18,9 @@ final class VmProcess
      */
     public static function getrusage(int $who = 0)
     {
-        $raw = false;
-        if (VmGetrusageNative::available()) {
-            $raw = VmGetrusageNative::getrusage($who);
-        } elseif (\function_exists('getrusage')) {
-            $raw = @\getrusage($who);
-        }
+        $raw = VmGetrusageNative::available()
+            ? VmGetrusageNative::getrusage($who)
+            : false;
         if (false === $raw) {
             return false;
         }
