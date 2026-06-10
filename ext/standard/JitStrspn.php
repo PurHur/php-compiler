@@ -30,12 +30,6 @@ final class JitStrspn
     public static function extended(Context $context, array $args, bool $isStrspn, string $name): Value
     {
         $argc = \count($args);
-        if ($argc >= 3 && JITVariable::TYPE_NATIVE_LONG !== $args[2]->type) {
-            throw new \LogicException("{$name}() offset must be an integer in this compiler build");
-        }
-        if (4 === $argc && JITVariable::TYPE_NATIVE_LONG !== $args[3]->type) {
-            throw new \LogicException("{$name}() length must be an integer in this compiler build");
-        }
 
         self::implementMaskScan($context);
         $map = $context->structFieldMap['__string__'];

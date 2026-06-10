@@ -14,9 +14,9 @@ namespace PHPCompiler\ext\standard;
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\JitLongArg;
 use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\Variable as JITVariable;
-use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
 
 /**
@@ -31,14 +31,11 @@ final class strncasecmp extends Internal
         }
         $a = VmString::coerceStringBuiltinArg($frame->calledArgs[0], 'strncasecmp', 0, 'string1');
         $b = VmString::coerceStringBuiltinArg($frame->calledArgs[1], 'strncasecmp', 1, 'string2');
-        $len = $frame->calledArgs[2]->resolveIndirect();
         if (null === $frame->returnVar) {
             return;
         }
-        if (Variable::TYPE_INTEGER !== $len->type) {
-            throw new \LogicException('strncasecmp() requires two strings and an integer length in this compiler build');
-        }
-        $frame->returnVar->int(VmString::strncasecmp($a, $b, $len->toInt()));
+        $len = VmMath::parseIntBuiltinArg($frame->calledArgs[2], 'strncasecmp', 3, 'length');
+        $frame->returnVar->int(VmString::strncasecmp($a, $b, $len));
     }
 
     public Context $context;
@@ -49,14 +46,11 @@ final class strncasecmp extends Internal
         if (3 !== count($args)) {
             throw new \LogicException('strncasecmp() requires exactly three arguments');
         }
-        if (JITVariable::TYPE_NATIVE_LONG !== $args[2]->type) {
-            throw new \LogicException('strncasecmp() length must be an integer in this compiler build');
-        }
         $p0 = $this->stringDataPtr($context, JitStringBuiltinArg::lower($context, $args[0], 'strncasecmp', 0, 'string1'));
         $p1 = $this->stringDataPtr($context, JitStringBuiltinArg::lower($context, $args[1], 'strncasecmp', 1, 'string2'));
         $length = $context->builder->zExt(
             $context->builder->trunc(
-                $context->helper->loadValue($args[2]),
+                JitLongArg::lower($context, $args[2], 'strncasecmp() length'),
                 $context->getTypeFromString('int32')
             ),
             $context->getTypeFromString('size_t')
