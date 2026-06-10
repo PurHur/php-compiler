@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace PHPCompiler\ext\standard;
 
+use PHPCompiler\ext\posix\VmPosix;
 use PHPCompiler\VM\HashTable;
 use PHPCompiler\VM\ScriptStack;
 use PHPCompiler\VM\Variable;
@@ -250,14 +251,8 @@ final class VmFs
             if ('' !== $name && ctype_digit($name)) {
                 return (int) $name;
             }
-            if (\function_exists('posix_getpwnam')) {
-                $pw = @posix_getpwnam($name);
-                if (\is_array($pw) && isset($pw['uid'])) {
-                    return (int) $pw['uid'];
-                }
-            }
 
-            return null;
+            return VmPosix::uidForName($name);
         }
 
         return null;
@@ -273,14 +268,8 @@ final class VmFs
             if ('' !== $name && ctype_digit($name)) {
                 return (int) $name;
             }
-            if (\function_exists('posix_getgrnam')) {
-                $gr = @posix_getgrnam($name);
-                if (\is_array($gr) && isset($gr['gid'])) {
-                    return (int) $gr['gid'];
-                }
-            }
 
-            return null;
+            return VmPosix::gidForName($name);
         }
 
         return null;
