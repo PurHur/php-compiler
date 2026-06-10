@@ -203,10 +203,6 @@ class JITTest extends BaseTest {
             if (str_contains($name, 'getrusage')) {
                 continue;
             }
-            // getenv() zero-arg assoc array: VM (#5075); JIT lowering deferred (issue #5075 phase 2).
-            if (str_contains($name, 'getenv_all')) {
-                continue;
-            }
             // memory_get_usage() MCJIT: VM + AOT (#3134); umbrella JITTest skips until stable.
             if (str_contains($name, 'memory_get_usage')) {
                 continue;

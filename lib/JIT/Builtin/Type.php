@@ -40,6 +40,13 @@ class Type extends Builtin {
         );
         $fnGetenv = $this->context->module->addFunction('__compiler_getenv', $fntypeGetenv);
         $this->context->registerFunction('__compiler_getenv', $fnGetenv);
+        $fntypeGetenvAll = $this->context->context->functionType(
+            $this->context->getTypeFromString('void'),
+            false,
+            $this->context->getTypeFromString('__value__*')
+        );
+        $fnGetenvAll = $this->context->module->addFunction('__compiler_getenv_all', $fntypeGetenvAll);
+        $this->context->registerFunction('__compiler_getenv_all', $fnGetenvAll);
         $fntypeDeployPath = $this->context->context->functionType(
             $this->context->getTypeFromString('__string__*'),
             false,
@@ -1112,6 +1119,7 @@ class Type extends Builtin {
         StringMicrotime::ensureLinked($this->context);
         StringGettimeofday::ensureLinked($this->context);
         StringGetrusage::ensureLinked($this->context);
+        StringGetenvAll::ensureLinked($this->context);
         StringInfo::ensureLinked($this->context);
         StringDir::ensureLinked($this->context);
         StringFsGlob::ensureLinked($this->context);
