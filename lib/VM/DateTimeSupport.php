@@ -40,18 +40,43 @@ final class DateTimeSupport
         return $obj;
     }
 
-    public static function requireDateTime(Variable $var, string $label): ObjectEntry
-    {
+    public static function requireDateTime(
+        Variable $var,
+        string $label,
+        ?int $argNum = null,
+        ?string $argName = null
+    ): ObjectEntry {
         $var = $var->resolveIndirect();
         if (Variable::TYPE_OBJECT !== $var->type) {
-            throw new \TypeError("{$label} must be of type DateTime");
+            throw self::dateTimeTypeError($label, $argNum, $argName, $var);
         }
         $obj = $var->toObject();
         if (self::CLASS_DATETIME !== strtolower($obj->class->name)) {
-            throw new \TypeError("{$label} must be of type DateTime");
+            throw self::dateTimeTypeError($label, $argNum, $argName, $var, $obj->class->name);
         }
 
         return $obj;
+    }
+
+    private static function dateTimeTypeError(
+        string $label,
+        ?int $argNum,
+        ?string $argName,
+        Variable $var,
+        ?string $objectClass = null
+    ): \TypeError {
+        $given = null !== $objectClass
+            ? $objectClass
+            : ReflectionSupport::valueTypeLabelPublic($var);
+        if (null !== $argNum) {
+            $param = null !== $argName ? " (\${$argName})" : '';
+
+            return new \TypeError(
+                "{$label}: Argument #{$argNum}{$param} must be of type DateTime, {$given} given"
+            );
+        }
+
+        return new \TypeError("{$label} must be of type DateTime, {$given} given");
     }
 
     public static function requireDateTimeImmutable(
@@ -370,6 +395,28 @@ final class DateTimeSupport
         self::markDateTimeLikeInitialized($mutable);
 
         return $mutable;
+    }
+
+    /** php-src zim_DateTimeImmutable_createFromMutable — clone mutable snapshot to immutable (#6197). */
+    public static function createDateTimeImmutableFromMutable(Variable $mutableArg, Context $ctx): ObjectEntry
+    {
+        $mutable = self::requireDateTime(
+            $mutableArg,
+            'DateTimeImmutable::createFromMutable()',
+            1,
+            'object'
+        );
+        self::requireInitializedDateTimeLike($mutable, 'DateTime');
+        $class = $ctx->classes[self::CLASS_DATETIMEIMMUTABLE] ?? null;
+        if (null === $class) {
+            throw new \LogicException('DateTimeImmutable is not registered in this compiler build');
+        }
+        $immutable = new ObjectEntry($class);
+        self::copyDateTimeState($mutable, $immutable);
+        $immutable->constructed = true;
+        self::markDateTimeLikeInitialized($immutable);
+
+        return $immutable;
     }
 
     private static function cloneDateTimeObject(ObjectEntry $source): ObjectEntry
