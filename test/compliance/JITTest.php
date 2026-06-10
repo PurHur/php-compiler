@@ -252,6 +252,10 @@ class JITTest extends BaseTest {
             if (str_contains($name, 'reflection_property_attributes') || str_contains($name, 'reflection_constant_attributes')) {
                 continue;
             }
+            // ReflectionProperty asymmetric probes: VM builtins + asymmetric syntax (#6977).
+            if (str_contains($name, 'reflection_property_asymmetric')) {
+                continue;
+            }
             // Reflection docblock/source getters are VM-only (#7358).
             if (str_contains($name, 'reflection_docblock_source')) {
                 continue;
