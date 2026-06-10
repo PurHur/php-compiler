@@ -1,10 +1,10 @@
 --TEST--
-stdlib mime_content_type() — backed enum case TypeError (#6196, php-src-strict)
+stdlib mime_content_type() JIT — backed enum case TypeError (#6196, php-src-strict)
 --SKIPIF--
 <?php
-enum _PhpcMimeSkip: string { case P = 'x'; }
+enum _PhpcMimeSkipJit: string { case P = 'x'; }
 try {
-    mime_content_type(_PhpcMimeSkip::P);
+    mime_content_type(_PhpcMimeSkipJit::P);
 } catch (TypeError $e) {
     if (!str_contains($e->getMessage(), '$filename_or_stream')) {
         die('skip Zend PHPT runner — enum TypeError message differs; use VMTest (#6196)');
