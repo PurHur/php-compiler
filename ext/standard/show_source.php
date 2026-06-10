@@ -24,6 +24,6 @@ final class show_source extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        throw new \LogicException('show_source() is VM only in this compiler build');
+        return JitHighlight::highlightFile($context, $this->getName(), ...$args);
     }
 }
