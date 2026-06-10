@@ -23,6 +23,7 @@ Matches [`script/miniwebapp-gates.sh`](../script/miniwebapp-gates.sh) output ord
 | 1 | Lint green | `MINIWEBAPP_LINT_GATE=1` (default) | ✅ | `make web-smoke` fails on lint regression | [#539](https://github.com/PurHur/php-compiler/issues/539), [#621](https://github.com/PurHur/php-compiler/issues/621) |
 | 1z | Lint zero unsupported | `MINIWEBAPP_LINT_ZERO_GATE=1` (default) | ✅ | `ci-fast.sh` → `script/check-miniwebapp-lint-zero.php` | [#2078](https://github.com/PurHur/php-compiler/issues/2078) |
 | 1b | VM CLI route matrix | `MINIWEBAPP_VM_CLI_GATE=1` (default) | ✅ | `ci-fast.sh` → `MiniWebApp*VmCli` | [#597](https://github.com/PurHur/php-compiler/issues/597) |
+| 1b2 | Project JIT execute | `MINIWEBAPP_JIT_PROJECT_GATE=1` (default) | ✅ when LLVM + MCJIT ready | `ci-fast.sh`, `ci-local.sh` → `MiniWebAppJitProjectTest` | [#587](https://github.com/PurHur/php-compiler/issues/587), [#730](https://github.com/PurHur/php-compiler/issues/730) |
 | 1c | VM OOP serve e2e | `MINIWEBAPP_VM_OOP_GATE=1` | opt-in (default `0`) | `ci-fast.sh` → `script/check-miniwebapp-vm-oop.sh` | [#2189](https://github.com/PurHur/php-compiler/issues/2189), [#2059](https://github.com/PurHur/php-compiler/issues/2059) |
 | 2 | PHPUnit serve | `MINIWEBAPP_SERVE_GATE=1` (default) | ✅ | `ci-local.sh`, `ci-fast.sh` → `ServeTest` `@group miniwebapp` | [#641](https://github.com/PurHur/php-compiler/issues/641), [#470](https://github.com/PurHur/php-compiler/issues/470) |
 | 3 | Examples web-smoke | wired in `examples-web-smoke.sh` | ✅ | `make examples-web-smoke` includes 003 curls | [#461](https://github.com/PurHur/php-compiler/issues/461) |
@@ -40,6 +41,7 @@ Defaults for `MINIWEBAPP_SERVE_GATE`, `MINIWEBAPP_WEB_SMOKE_GATE`, `MINIWEBAPP_W
 ```bash
 php script/check-miniwebapp-lint-zero.php
 MINIWEBAPP_LINT_ZERO_GATE=0 ./script/ci-fast.sh   # opt-out during lint iteration (#2078)
+MINIWEBAPP_JIT_PROJECT_GATE=0 ./script/ci-fast.sh # opt-out project JIT during VM-only iteration (#730)
 MINIWEBAPP_VM_OOP_GATE=1 ./script/ci-fast.sh      # opt-in VM serve OOP e2e (#2189)
 ./script/check-miniwebapp-vm-oop.sh               # lint zero + PATH_INFO curls (#2059)
 ```

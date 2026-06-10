@@ -132,6 +132,7 @@ Progressive stages from `script/miniwebapp-gates.sh` / `make miniwebapp-gates` (
 |-------|--------|--------|
 | 1 | `phpc lint --all` | ✅ green |
 | 1b | `MINIWEBAPP_VM_CLI_GATE=1` in ci-fast | ✅ default on |
+| 1b2 | `MINIWEBAPP_JIT_PROJECT_GATE=1` in ci-fast | ✅ default on ([#730](https://github.com/PurHur/php-compiler/issues/730), [#587](https://github.com/PurHur/php-compiler/issues/587)) |
 | 2 | `ServeTest` `@group miniwebapp` | ✅ default on |
 | 3 | `examples-web-smoke.sh` 003 curls | ✅ wired |
 | 3b | `MINIWEBAPP_WEB_SMOKE_GATE=1` shell smoke | ✅ default on |
@@ -162,6 +163,7 @@ MINIWEBAPP_AOT_BISECT_GATE=1 make miniwebapp-gates
 make miniwebapp-gates
 ../../script/examples-web-smoke.sh
 MINIWEBAPP_VM_CLI_GATE=1 ../../script/ci-fast.sh --filter 'MiniWebApp.*VmCli'
+MINIWEBAPP_JIT_PROJECT_GATE=0 ../../script/ci-fast.sh --filter MiniWebAppJitProjectTest   # opt-out project JIT (#730)
 ../../script/ci-local.sh --filter ServeTest
 MINIWEBAPP_SERVE_GATE=0 ../../script/ci-local.sh   # skip miniwebapp ServeTest while iterating
 MINIWEBAPP_WEB_SMOKE_GATE=0 ../../script/ci-local.sh   # skip 003 shell PATH_INFO curls (#664)

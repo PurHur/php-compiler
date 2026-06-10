@@ -32,7 +32,7 @@ final class MiniWebAppJitProjectTest extends TestCase
         }
         if ('0' === getenv('MINIWEBAPP_JIT_PROJECT_GATE')) {
             $this->markTestSkipped(
-                'MINIWEBAPP_JIT_PROJECT_GATE=0 — set to 1 to run MiniWebApp JIT project tests (#587)'
+                'MINIWEBAPP_JIT_PROJECT_GATE=0 — default-on in ci-fast (#730); unset or set 1 to run'
             );
         }
         if (!LlvmToolchain::isReady($this->repoRoot)) {
@@ -110,10 +110,13 @@ final class MiniWebAppJitProjectTest extends TestCase
     private function runIndex(array $cgiEnv): string
     {
         $env = $this->baseEnv();
+        LlvmToolchain::applyProcessEnv($env, $this->repoRoot);
+        foreach (MiniWebAppCgiEnv::aotFrontController($this->repoRoot) as $key => $value) {
+            $env[$key] = $value;
+        }
         foreach ($cgiEnv as $key => $value) {
             $env[$key] = $value;
         }
-        LlvmToolchain::applyProcessEnv($env, $this->repoRoot);
 
         $cmd = array_merge(
             LlvmToolchain::envPrefix($this->repoRoot),

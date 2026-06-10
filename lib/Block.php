@@ -880,7 +880,9 @@ class Block {
                     $scope[$pos] = $frame->scope[$pos];
                 } else {
                     $name = self::resolveVariableName($op);
-                    if (null !== $name && $this->declaresGlobalName($name)) {
+                    if (null !== $name && Superglobals::isSuperglobalName($name)) {
+                        $scope[$pos] = self::initialVariableForOperand($op, $context, $pos, $this);
+                    } elseif (null !== $name && $this->declaresGlobalName($name)) {
                         $local = new Variable(Variable::TYPE_NULL);
                         $local->indirect($context->ensureGlobal($name));
                         $scope[$pos] = $local;
