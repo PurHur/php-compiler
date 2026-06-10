@@ -25,9 +25,9 @@ final class pack extends Internal
         $fmt = VmString::coerceStringBuiltinArg($frame->calledArgs[0], 'pack', 0, 'format');
         $values = [];
         for ($i = 1; $i < $argc; ++$i) {
-            $values[] = VmJson::export($frame->calledArgs[$i]->resolveIndirect());
+            $values[] = $frame->calledArgs[$i]->resolveIndirect();
         }
-        $frame->returnVar->string(VmPack::pack($fmt, $values));
+        $frame->returnVar->string(VmPack::pack($fmt, $values, $frame));
     }
 
     public function call(Context $context, JITVariable ...$args): Value
