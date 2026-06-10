@@ -13,9 +13,9 @@ use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
 
 /**
- * shuffle() — randomize packed list order in place (subset of PHP; issue #2310).
+ * shuffle() — randomize array values in place (issue #2310, #4460).
  *
- * VM: packed lists without holes; Fisher–Yates via CSPRNG.
+ * VM: Fisher–Yates via CSPRNG; associative arrays reindex to 0..n-1.
  * JIT/AOT: {@see ArrayBuiltinHelper::shufflePacked()}.
  */
 final class shuffle_ extends Internal

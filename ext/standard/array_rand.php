@@ -12,9 +12,9 @@ use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
 
 /**
- * array_rand() — random key(s) from a packed list (subset of PHP; issue #2321).
+ * array_rand() — random key(s) from an array (issue #2321, #4460).
  *
- * VM: packed lists without holes; CSPRNG via {@see VmString::randomBytes()}.
+ * VM: returns actual keys (string or int); CSPRNG via {@see VmString::randomBytes()}.
  * JIT/AOT: {@see JitArrayRand} (packed lists; num>1 returns array of keys).
  */
 final class array_rand extends Internal
