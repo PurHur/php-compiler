@@ -319,11 +319,11 @@ miniwebapp_aot_require_pass() {
 }
 
 sessions_serve_aot_require_pass() {
-  [[ "${SESSIONS_WEB_SERVE_AOT_SMOKE_GATE:-0}" == "1" ]]
+  [[ "${SESSIONS_WEB_SERVE_AOT_SMOKE_GATE:-1}" == "1" ]]
 }
 
 file_upload_serve_aot_require_pass() {
-  [[ "${FILE_UPLOAD_WEB_SERVE_AOT_SMOKE_GATE:-0}" == "1" ]]
+  [[ "${FILE_UPLOAD_WEB_SERVE_AOT_SMOKE_GATE:-1}" == "1" ]]
 }
 
 throws_web_serve_aot_require_pass() {
@@ -590,7 +590,7 @@ run_file_upload_web_smoke() {
     echo "examples-web-smoke: 006-FileUploadWeb: skip (missing docroot)"
     return 0
   fi
-  if [[ "$AOT" -eq 1 && "${FILE_UPLOAD_WEB_SERVE_AOT_SMOKE_GATE:-0}" != "1" ]]; then
+  if [[ "$AOT" -eq 1 && "${FILE_UPLOAD_WEB_SERVE_AOT_SMOKE_GATE:-1}" != "1" ]]; then
     echo "examples-web-smoke: 006-FileUploadWeb: skip --aot (FILE_UPLOAD_WEB_SERVE_AOT_SMOKE_GATE=0; #2333)"
     return 0
   fi
@@ -655,7 +655,7 @@ run_sessions_web_smoke() {
     echo "examples-web-smoke: 005-SessionsWeb: skip (missing docroot)"
     return 0
   fi
-  if [[ "$AOT" -eq 1 && "${SESSIONS_WEB_SERVE_AOT_SMOKE_GATE:-0}" != "1" ]]; then
+  if [[ "$AOT" -eq 1 && "${SESSIONS_WEB_SERVE_AOT_SMOKE_GATE:-1}" != "1" ]]; then
     echo "examples-web-smoke: 005-SessionsWeb: skip --aot (SESSIONS_WEB_SERVE_AOT_SMOKE_GATE=0; #2333)"
     return 0
   fi

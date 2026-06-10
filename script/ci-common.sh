@@ -1211,9 +1211,9 @@ ci_run_miniwebapp_web_smoke() {
   "$_CI_SCRIPT_DIR/examples-web-smoke.sh" --miniwebapp-only
 }
 
-# 005-SessionsWeb phpc serve --aot session flash (issue #2333); opt-in SESSIONS_WEB_SERVE_AOT_SMOKE_GATE=1.
+# 005-SessionsWeb phpc serve --aot session flash (issue #2333); default-on SESSIONS_WEB_SERVE_AOT_SMOKE_GATE (#2371).
 ci_run_sessions_web_serve_aot_smoke() {
-  if [[ "${SESSIONS_WEB_SERVE_AOT_SMOKE_GATE:-0}" != "1" ]]; then
+  if [[ "${SESSIONS_WEB_SERVE_AOT_SMOKE_GATE:-1}" != "1" ]]; then
     return 0
   fi
   if [[ -n "${PHP_COMPILER_SKIP_SERVE_TESTS:-}" ]]; then
@@ -1232,9 +1232,9 @@ ci_run_sessions_web_serve_aot_smoke() {
   "$_CI_SCRIPT_DIR/examples-web-smoke.sh" --sessions-only --aot
 }
 
-# 006-FileUploadWeb phpc serve --aot multipart POST (issue #2333); opt-in FILE_UPLOAD_WEB_SERVE_AOT_SMOKE_GATE=1.
+# 006-FileUploadWeb phpc serve --aot multipart POST (issue #2333); default-on FILE_UPLOAD_WEB_SERVE_AOT_SMOKE_GATE (#2371).
 ci_run_file_upload_web_serve_aot_smoke() {
-  if [[ "${FILE_UPLOAD_WEB_SERVE_AOT_SMOKE_GATE:-0}" != "1" ]]; then
+  if [[ "${FILE_UPLOAD_WEB_SERVE_AOT_SMOKE_GATE:-1}" != "1" ]]; then
     return 0
   fi
   if [[ -n "${PHP_COMPILER_SKIP_SERVE_TESTS:-}" ]]; then
