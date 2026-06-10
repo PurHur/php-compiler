@@ -582,6 +582,9 @@ class Type extends Builtin {
         $fntypePhpSapi = $this->context->context->functionType($strPtr, false);
         $fnPhpSapi = $this->context->module->addFunction('__compiler_php_sapi_name', $fntypePhpSapi);
         $this->context->registerFunction('__compiler_php_sapi_name', $fnPhpSapi);
+        $fntypeZendVersion = $this->context->context->functionType($strPtr, false);
+        $fnZendVersion = $this->context->module->addFunction('__compiler_zend_version', $fntypeZendVersion);
+        $this->context->registerFunction('__compiler_zend_version', $fnZendVersion);
         $fntypePhpUname = $this->context->context->functionType($strPtr, false, $strPtr);
         $fnPhpUname = $this->context->module->addFunction('__compiler_php_uname', $fntypePhpUname);
         $this->context->registerFunction('__compiler_php_uname', $fnPhpUname);
