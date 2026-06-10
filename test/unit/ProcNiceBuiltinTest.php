@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace PHPCompiler;
 
 use PHPCompiler\ext\standard\proc_nice;
+use PHPCompiler\ext\standard\VmProcNiceNative;
 use PHPCompiler\VM\HashTable;
 use PHPCompiler\VM\Variable as VMVariable;
 use PHPUnit\Framework\TestCase;
@@ -14,10 +15,8 @@ final class ProcNiceBuiltinTest extends TestCase
 {
     public function testProcNiceReturnsBool(): void
     {
-        if (!\function_exists('proc_nice')) {
-            $this->markTestSkipped('proc_nice() not available on host');
-
-            return;
+        if (!VmProcNiceNative::available()) {
+            $this->markTestSkipped('libc FFI nice unavailable');
         }
 
         $runtime = new Runtime();
