@@ -6313,8 +6313,6 @@ restart:
             throw $e;
         } catch (\LogicException $e) {
             return $this->dispatchVmLogicException($e, $callerFrame);
-        } catch (\Exception $e) {
-            return $this->dispatchVmEngineException($e->getMessage(), $callerFrame);
         } catch (VM\MagicMethodInvocationAborted) {
             $this->clearTryCatchUnwindState();
             $callerFrame->call = null;
@@ -6324,6 +6322,8 @@ restart:
             ++$callerFrame->pos;
 
             return null;
+        } catch (\Exception $e) {
+            return $this->dispatchVmEngineException($e->getMessage(), $callerFrame);
         }
     }
 
