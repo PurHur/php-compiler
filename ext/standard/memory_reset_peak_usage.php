@@ -27,7 +27,6 @@ final class memory_reset_peak_usage extends Internal
     {
         self::assertNoExtraArgs($frame);
         VmMemory::resetPeakUsage(false);
-        VmMemory::resetPeakUsage(true);
     }
 
     public function call(Context $context, JITVariable ...$args): Value

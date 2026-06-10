@@ -13,7 +13,9 @@ use PHPCompiler\Web\ResponseContext;
 use PHPLLVM\Value;
 
 /**
- * header_remove() — remove pending response headers (issue #311).
+ * header_remove() — remove pending response headers (issue #311, #5344).
+ *
+ * VM uses ResponseContext only — no host \\header_remove() delegation (bootstrap/M5).
  */
 final class header_remove extends Internal
 {
@@ -32,9 +34,6 @@ final class header_remove extends Internal
         }
         if (0 === $argc) {
             ResponseContext::removeHeader(null);
-            if (\function_exists('header_remove')) {
-                \header_remove();
-            }
 
             return;
         }
@@ -45,9 +44,6 @@ final class header_remove extends Internal
             'name'
         );
         ResponseContext::removeHeader($name);
-        if (\function_exists('header_remove')) {
-            \header_remove($name);
-        }
     }
 
     public function call(Context $context, JITVariable ...$args): Value
