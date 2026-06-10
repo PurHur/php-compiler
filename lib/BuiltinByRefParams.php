@@ -43,6 +43,9 @@ final class BuiltinByRefParams
                 return [0];
             case 'similar_text':
                 return [2];
+            case 'str_replace':
+            case 'str_ireplace':
+                return [3];
             case 'headers_sent':
                 return [0, 1];
         }

@@ -22,11 +22,12 @@ final class JitStrReplaceArray
         Value $search,
         Value $replace,
         Variable $subject,
-        bool $caseInsensitive = false
+        bool $caseInsensitive = false,
+        ?Value $countSlot = null
     ): Value {
         $ht = ArrayBuiltinHelper::loadHashTable($context, $subject);
 
-        return self::buildReplaceHashTable($context, $ht, $search, $replace, $caseInsensitive);
+        return self::buildReplaceHashTable($context, $ht, $search, $replace, $caseInsensitive, $countSlot);
     }
 
     private static function buildReplaceHashTable(
@@ -34,7 +35,8 @@ final class JitStrReplaceArray
         Value $src,
         Value $search,
         Value $replace,
-        bool $caseInsensitive
+        bool $caseInsensitive,
+        ?Value $countSlot = null
     ): Value {
         $id = (string) (++self::$blockSerial);
         $map = $context->structFieldMap['__hashtable__'];
@@ -101,7 +103,30 @@ final class JitStrReplaceArray
             $context->lookupFunction('__value__readString'),
             $entry
         );
-        $replaced = JitStrReplace::replace($context, $search, $replace, $subject, $caseInsensitive);
+        $itemCountSlot = null;
+        if (null !== $countSlot) {
+            $i64 = $context->getTypeFromString('int64');
+            $itemCountSlot = $context->builder->alloca($i64, 1, 'str_replace_arr_cnt_'.$id);
+            $context->builder->store($i64->constInt(0, false), $itemCountSlot);
+        }
+        $replaced = JitStrReplace::replace(
+            $context,
+            $search,
+            $replace,
+            $subject,
+            $caseInsensitive,
+            $itemCountSlot
+        );
+        if (null !== $countSlot && null !== $itemCountSlot) {
+            $i64 = $context->getTypeFromString('int64');
+            $context->builder->store(
+                $context->builder->addNoSignedWrap(
+                    $context->builder->load($countSlot),
+                    $context->builder->load($itemCountSlot)
+                ),
+                $countSlot
+            );
+        }
         $context->builder->store($replaced, $itemResultSlot);
         $afterItemBlock = BasicBlockHelper::append($context, 'str_replace_arr_after_'.$id);
         $context->builder->branch($afterItemBlock);

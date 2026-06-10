@@ -10,8 +10,13 @@ use PHPLLVM\Value;
 /** LLVM JIT/AOT helper for str_ireplace() — delegates to {@see JitStrReplace}. */
 final class JitStrIreplace
 {
-    public static function replace(Context $context, Value $search, Value $replace, Value $subject): Value
-    {
-        return JitStrReplace::replace($context, $search, $replace, $subject, true);
+    public static function replace(
+        Context $context,
+        Value $search,
+        Value $replace,
+        Value $subject,
+        ?Value $countSlot = null
+    ): Value {
+        return JitStrReplace::replace($context, $search, $replace, $subject, true, $countSlot);
     }
 }
