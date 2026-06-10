@@ -8,9 +8,9 @@ use PHPCompiler\VM\EnumCaseSupport;
 use PHPCompiler\VM\Variable;
 
 /**
- * MIME type sniffing for mime_content_type() (php-src ext/standard/file.c; #6196).
+ * MIME type sniffing for mime_content_type() (php-src ext/standard/file.c; #6196, #7865).
  *
- * VM delegates to host mime_content_type() when available (fileinfo); falls back to byte sniff.
+ * VM and JIT/AOT share byte sniff via detectFromBytes() — no host fileinfo delegation.
  * JIT/AOT: lib/JIT/Builtin/MimeContentTypeRuntime.php.
  */
 final class VmMime
@@ -48,13 +48,6 @@ final class VmMime
      */
     public static function mimeContentTypeFromPath(string $path)
     {
-        if (\function_exists('mime_content_type')) {
-            $result = @\mime_content_type($path);
-            if (false !== $result) {
-                return $result;
-            }
-        }
-
         $data = VmFs::fileGetContents($path);
         if (false === $data) {
             return false;
@@ -74,12 +67,6 @@ final class VmMime
         $fp = VmFs::lookupResource($handle);
         if (null === $fp) {
             return false;
-        }
-        if (\function_exists('mime_content_type')) {
-            $result = @\mime_content_type($fp);
-            if (false !== $result) {
-                return $result;
-            }
         }
 
         $pos = @\ftell($fp);
