@@ -34,15 +34,26 @@ final class JitMemory
         return self::boxLong($context, $peak);
     }
 
-    public static function resetPeakUsage(Context $context): Value
+    public static function resetPeakUsage(Context $context, ?JITVariable $realUsage = null): Value
     {
         MemoryRuntime::ensureLinked($context);
+        $real = self::resolveRealUsage($context, $realUsage, 'memory_reset_peak_usage');
         $currentEmalloc = MemoryRuntime::readEmallocBytes($context);
         $currentRss = MemoryRuntime::readRssBytes($context);
-        $context->builder->store($currentEmalloc, MemoryRuntime::peakGlobal($context, false));
-        $context->builder->store($currentRss, MemoryRuntime::peakGlobal($context, true));
+        $peakEmalloc = MemoryRuntime::peakGlobal($context, false);
+        $peakReal = MemoryRuntime::peakGlobal($context, true);
+        $oldEmalloc = $context->builder->load($peakEmalloc);
+        $oldReal = $context->builder->load($peakReal);
+        $context->builder->store(
+            $context->builder->select($real, $oldEmalloc, $currentEmalloc),
+            $peakEmalloc
+        );
+        $context->builder->store(
+            $context->builder->select($real, $currentRss, $oldReal),
+            $peakReal
+        );
 
-        return $context->getTypeFromString('int32')->constInt(0, false);
+        return $context->constantFromBool(true);
     }
 
     private static function resolveRealUsage(Context $context, ?JITVariable $realUsage, string $fn): Value

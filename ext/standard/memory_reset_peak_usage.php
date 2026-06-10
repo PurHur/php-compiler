@@ -25,28 +25,38 @@ final class memory_reset_peak_usage extends Internal
 
     public function execute(Frame $frame): void
     {
-        self::assertNoExtraArgs($frame);
-        VmMemory::resetPeakUsage(false);
+        if (null === $frame->returnVar) {
+            VmMemory::resetPeakUsage(self::resolveRealUsage($frame));
+
+            return;
+        }
+        VmMemory::resetPeakUsage(self::resolveRealUsage($frame));
+        $frame->returnVar->bool(true);
     }
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        if (\count($args) > 0) {
+        if (\count($args) > 1) {
             throw new \ArgumentCountError(
-                'memory_reset_peak_usage() takes no arguments, '.\count($args).' given'
+                'memory_reset_peak_usage() takes at most 1 argument, '.\count($args).' given'
             );
         }
 
-        return JitMemory::resetPeakUsage($context);
+        return JitMemory::resetPeakUsage($context, $args[0] ?? null);
     }
 
-    private static function assertNoExtraArgs(Frame $frame): void
+    private static function resolveRealUsage(Frame $frame): bool
     {
         $argc = \count($frame->calledArgs);
-        if ($argc > 0) {
+        if ($argc > 1) {
             throw new \ArgumentCountError(
-                'memory_reset_peak_usage() takes no arguments, '.$argc.' given'
+                'memory_reset_peak_usage() takes at most 1 argument, '.$argc.' given'
             );
         }
+        if (0 === $argc) {
+            return false;
+        }
+
+        return VmMemory::resolveUsageArg($frame->calledArgs[0], 'memory_reset_peak_usage');
     }
 }
