@@ -6,17 +6,18 @@ namespace PHPCompiler\ext\standard;
 
 use PHPCompiler\MethodVisibility;
 use PHPCompiler\JIT\BasicBlockHelper;
+use PHPCompiler\JIT\Builtin\Type\Object_ as ObjectBuiltin;
 use PHPCompiler\JIT\Builtin\TypeErrorRaise;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\HashTableHelper;
-use PHPCompiler\JIT\Builtin\Type\Object_ as ObjectBuiltin;
+use PHPCompiler\JIT\JitOperandTypeLabel;
 use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\Variable;
 use PHPLLVM\Builder;
 use PHPLLVM\Value;
 
-/** LLVM lowering for get_object_vars() (issue #1370). */
+/** LLVM lowering for get_object_vars() (issue #1370, #4809 enum cases). */
 final class JitGetObjectVars
 {
     private const TYPE_ERROR = '%s(): Argument #1 ($object) must be of type object, %s given';
@@ -24,7 +25,122 @@ final class JitGetObjectVars
     public static function invoke(Context $context, JITVariable $objectArg, bool $mangledKeys = false): Value
     {
         $function = $mangledKeys ? 'get_mangled_object_vars' : 'get_object_vars';
-        $obj = self::resolveObject($context, $objectArg, $function);
+        $compileTimeEnum = $objectArg->compileTimeEnumCase ?? null;
+        if (\is_array($compileTimeEnum) && isset($compileTimeEnum['classId'], $compileTimeEnum['caseKey'])) {
+            $object = $context->type->object;
+            if (!$object instanceof ObjectBuiltin) {
+                throw new \LogicException('get_object_vars() requires object type metadata in this compiler build');
+            }
+            $caseObj = $object->jitEnumCaseFromBacking((int) $compileTimeEnum['classId'], (string) $compileTimeEnum['caseKey']);
+            $objPtr = JITVariable::KIND_VALUE === $caseObj->kind
+                ? $caseObj->value
+                : $context->builder->load($caseObj->value);
+            $ht = HashTableHelper::alloc($context);
+            self::appendEnumCaseObjectVars($context, $object, $objPtr, (int) $compileTimeEnum['classId'], $ht);
+
+            return self::boxedHashtable($context, $ht);
+        }
+
+        if (JITVariable::TYPE_VALUE === $objectArg->type) {
+            $valuePtr = JitValueBox::valuePtrFromVariable($context, $objectArg);
+            $typeField = $context->structFieldMap['__value__']['type'];
+            $typeByte = $context->builder->load(
+                $context->builder->structGep($valuePtr, $typeField)
+            );
+            $i8 = $context->getTypeFromString('int8');
+            $isEnumCase = $context->builder->icmp(
+                Builder::INT_EQ,
+                $typeByte,
+                $i8->constInt(Variable::TYPE_ENUM_CASE, false)
+            );
+            $enumBlock = BasicBlockHelper::append($context, 'get_object_vars_enum_box');
+            $plainBlock = BasicBlockHelper::append($context, 'get_object_vars_plain_box');
+            $context->builder->branchIf($isEnumCase, $enumBlock, $plainBlock);
+            $context->builder->positionAtEnd($enumBlock);
+            $enumResult = self::invokeFromEnumCaseValueBox($context, $valuePtr, $function);
+            $enumEnd = $context->builder->getInsertBlock();
+            $doneBlock = BasicBlockHelper::append($context, 'get_object_vars_box_done');
+            $context->builder->branch($doneBlock);
+            $context->builder->positionAtEnd($plainBlock);
+            $plainResult = self::invokeFromResolvedObject(
+                $context,
+                self::resolveBoxedObject($context, $objectArg, $function),
+                $mangledKeys
+            );
+            $plainEnd = $context->builder->getInsertBlock();
+            $context->builder->branch($doneBlock);
+            $context->builder->positionAtEnd($doneBlock);
+            $valuePtrTy = $context->getTypeFromString('__value__*');
+            $phi = $context->builder->phi($valuePtrTy, 'get_object_vars_box_phi');
+            $phi->addIncoming($enumResult, $enumEnd);
+            $phi->addIncoming($plainResult, $plainEnd);
+
+            return $phi;
+        }
+
+        return self::invokeFromResolvedObject(
+            $context,
+            self::resolveObject($context, $objectArg, $function),
+            $mangledKeys
+        );
+    }
+
+    private static function invokeFromResolvedObject(Context $context, Value $obj, bool $mangledKeys): Value
+    {
+        $object = $context->type->object;
+        if ($object instanceof ObjectBuiltin && [] !== $object->registeredEnumClassIds()) {
+            return self::invokeWithEnumRuntimeDispatch($context, $object, $obj, $mangledKeys);
+        }
+
+        return self::invokeForPlainObject($context, $obj, $mangledKeys);
+    }
+
+    private static function invokeWithEnumRuntimeDispatch(
+        Context $context,
+        ObjectBuiltin $object,
+        Value $obj,
+        bool $mangledKeys
+    ): Value {
+        $objMap = $context->structFieldMap['__object__'];
+        $classId = $context->builder->load(
+            $context->builder->structGep($obj, $objMap['class_id'])
+        );
+        $enumIds = $object->registeredEnumClassIds();
+        $fn = BasicBlockHelper::parentFunction($context);
+        $entry = $context->builder->getInsertBlock();
+        $doneBlock = $fn->appendBasicBlock('gov_enum_or_plain_done');
+        $plainBlock = $fn->appendBasicBlock('gov_enum_or_plain_plain');
+        $resultSlot = BasicBlockHelper::entryAlloca($context, $context->getTypeFromString('__value__*'));
+        $i64 = $context->getTypeFromString('int64');
+        $checkBlock = $entry;
+        $lastIdx = \count($enumIds) - 1;
+        foreach ($enumIds as $idx => $enumId) {
+            $context->builder->positionAtEnd($checkBlock);
+            $match = $context->builder->icmp(
+                Builder::INT_EQ,
+                $classId,
+                $i64->constInt($enumId, false)
+            );
+            $caseBlock = $fn->appendBasicBlock('gov_enum_or_plain_match_'.$enumId);
+            $nextBlock = $idx === $lastIdx ? $plainBlock : $fn->appendBasicBlock('gov_enum_or_plain_try_'.($idx + 1));
+            $context->builder->branchIf($match, $caseBlock, $nextBlock);
+            $context->builder->positionAtEnd($caseBlock);
+            $ht = HashTableHelper::alloc($context);
+            self::appendEnumCaseObjectVars($context, $object, $obj, $enumId, $ht);
+            $context->builder->store(self::boxedHashtable($context, $ht), $resultSlot);
+            $context->builder->branch($doneBlock);
+            $checkBlock = $nextBlock;
+        }
+        $context->builder->positionAtEnd($plainBlock);
+        $context->builder->store(self::invokeForPlainObject($context, $obj, $mangledKeys), $resultSlot);
+        $context->builder->branch($doneBlock);
+        $context->builder->positionAtEnd($doneBlock);
+
+        return $context->builder->load($resultSlot);
+    }
+
+    private static function invokeForPlainObject(Context $context, Value $obj, bool $mangledKeys): Value
+    {
         $objMap = $context->structFieldMap['__object__'];
         $classId = $context->builder->load(
             $context->builder->structGep($obj, $objMap['class_id'])
@@ -47,6 +163,11 @@ final class JitGetObjectVars
             $context->builder->positionAtEnd($nextClass);
         }
 
+        return self::boxedHashtable($context, $ht);
+    }
+
+    private static function boxedHashtable(Context $context, Value $ht): Value
+    {
         $slot = JitValueBox::alloc($context);
         $ptr = JitValueBox::pointer($context, $slot);
         $context->builder->call(
@@ -56,6 +177,120 @@ final class JitGetObjectVars
         );
 
         return $ptr;
+    }
+
+    private static function invokeFromEnumCaseValueBox(Context $context, Value $enumCasePtr, string $function): Value
+    {
+        $object = $context->type->object;
+        if (!$object instanceof ObjectBuiltin) {
+            self::emitTypeErrorAndAbort($context, self::formatTypeError($function, 'object'));
+
+            return self::boxedHashtable($context, HashTableHelper::alloc($context));
+        }
+        $enumMap = $context->structFieldMap['__enum_case__'] ?? null;
+        if (null === $enumMap || !isset($enumMap['class_id'])) {
+            self::emitTypeErrorAndAbort($context, self::formatTypeError($function, 'object'));
+
+            return self::boxedHashtable($context, HashTableHelper::alloc($context));
+        }
+        $classIdVal = $context->builder->load(
+            $context->builder->structGep($enumCasePtr, $enumMap['class_id'])
+        );
+        if (method_exists($classIdVal, 'isConstant') && $classIdVal->isConstant()) {
+            $classId = (int) $classIdVal->getConstantValue();
+            $caseKey = self::matchEnumCaseKeyFromStruct($context, $object, $classId, $enumCasePtr, $enumMap);
+            if (null !== $caseKey) {
+                $caseObj = $object->jitEnumCaseFromBacking($classId, $caseKey);
+                $objPtr = JITVariable::KIND_VALUE === $caseObj->kind
+                    ? $caseObj->value
+                    : $context->builder->load($caseObj->value);
+                $ht = HashTableHelper::alloc($context);
+                self::appendEnumCaseObjectVars($context, $object, $objPtr, $classId, $ht);
+
+                return self::boxedHashtable($context, $ht);
+            }
+        }
+        $given = JitOperandTypeLabel::compileTimeEnumClassName($context, new JITVariable(
+            $context,
+            JITVariable::TYPE_VALUE,
+            JITVariable::KIND_VALUE,
+            $enumCasePtr
+        )) ?? 'object';
+        self::emitTypeErrorAndAbort($context, self::formatTypeError($function, $given));
+
+        return self::boxedHashtable($context, HashTableHelper::alloc($context));
+    }
+
+    /**
+     * @param array<string, int> $enumMap
+     */
+    private static function matchEnumCaseKeyFromStruct(
+        Context $context,
+        ObjectBuiltin $object,
+        int $classId,
+        Value $enumCasePtr,
+        array $enumMap
+    ): ?string {
+        if (!$object->enumHasBacking($classId) || !isset($enumMap['backing'])) {
+            $caseKeys = $object->enumCaseOrderForClass($classId);
+
+            return $caseKeys[0] ?? null;
+        }
+        $backingField = $context->builder->structGep($enumCasePtr, $enumMap['backing']);
+        $backingPtr = $context->builder->pointerCast(
+            $backingField,
+            $context->getTypeFromString('__value__*')
+        );
+        $backedType = $object->enumBackedTypeFor($classId);
+        foreach ($object->enumCaseOrderForClass($classId) as $caseKey) {
+            $expected = $object->enumCaseBackingScalarForCase($classId, $caseKey);
+            if ('int' === $backedType && \is_int($expected)) {
+                $actual = $context->builder->call($context->lookupFunction('__value__readLong'), $backingPtr);
+                if (method_exists($actual, 'isConstant') && $actual->isConstant()
+                    && (int) $actual->getConstantValue() === $expected) {
+                    return $caseKey;
+                }
+            }
+            if ('string' === $backedType && \is_string($expected)) {
+                $actual = $context->builder->call($context->lookupFunction('__value__readString'), $backingPtr);
+                if (method_exists($actual, 'isConstant') && $actual->isConstant()) {
+                    $expectedPtr = $context->builder->load($context->constantStringFromString($expected));
+                    $cmp = $context->builder->call(
+                        $context->lookupFunction('strcmp'),
+                        self::stringDataPtr($context, $actual),
+                        self::stringDataPtr($context, $expectedPtr)
+                    );
+                    if ($cmp->isConstant() && 0 === (int) $cmp->getConstantValue()) {
+                        return $caseKey;
+                    }
+                }
+            }
+        }
+
+        return null;
+    }
+
+    private static function stringDataPtr(Context $context, Value $strPtr): Value
+    {
+        return $context->builder->structGep($strPtr, $context->structFieldIndex($strPtr, 'value'));
+    }
+
+    private static function appendEnumCaseObjectVars(
+        Context $context,
+        ObjectBuiltin $object,
+        Value $objPtr,
+        int $enumClassId,
+        Value $ht
+    ): void {
+        $nameFetched = $object->fetchEnumCaseBuiltinProperty($objPtr, $enumClassId, 'name');
+        $nameKey = $context->builder->load($context->constantStringFromString('name'));
+        HashTableHelper::setAtStringKey($context, $ht, $nameKey, $nameFetched);
+        if (!$object->enumHasBacking($enumClassId)) {
+            return;
+        }
+        $valueFetched = $object->fetchEnumCaseBuiltinProperty($objPtr, $enumClassId, 'value');
+        $valueKey = $context->builder->load($context->constantStringFromString('value'));
+        HashTableHelper::setAtStringKey($context, $ht, $valueKey, $valueFetched);
     }
 
     private static function resolveObject(Context $context, JITVariable $objectArg, string $function): Value
@@ -90,7 +325,8 @@ final class JitGetObjectVars
         $context->builder->branchIf($isObject, $okBlock, $errBlock);
 
         $context->builder->positionAtEnd($errBlock);
-        self::emitTypeErrorAndAbort($context, self::formatTypeError($function, 'mixed'));
+        $given = JitOperandTypeLabel::givenLabel($context, $objectArg);
+        self::emitTypeErrorAndAbort($context, self::formatTypeError($function, $given));
 
         $context->builder->positionAtEnd($okBlock);
         $obj = $context->builder->call(
@@ -227,9 +463,6 @@ final class JitGetObjectVars
         HashTableHelper::setAtStringKey($context, $ht, $keyStr, $fetched);
     }
 
-    /**
-     * Zend property hash key for ZEND_PROP_PURPOSE_DEBUG (php-src zend_mangle_property_name).
-     */
     private static function manglePropertyKey(string $propName, int $visibility, string $declaringClassName): string
     {
         if (MethodVisibility::isPublic($visibility)) {

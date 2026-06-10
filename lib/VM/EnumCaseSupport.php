@@ -472,6 +472,43 @@ final class EnumCaseSupport
         return Variable::TYPE_OBJECT === $value->type && self::isEnumCase($value->toObject());
     }
 
+    /**
+     * Zend get_object_vars() on enum case objects — name/value pseudo-properties (#4809, ext/standard/var.c).
+     *
+     * @return array<string, Variable>
+     */
+    public static function objectVarsForCaseVariable(Variable $value): array
+    {
+        $value = $value->resolveIndirect();
+        $result = [];
+        if (Variable::TYPE_ENUM_CASE === $value->type) {
+            $entry = $value->toEnumCase();
+            $nameVar = new Variable(Variable::TYPE_STRING);
+            $nameVar->string($entry->caseName);
+            $result['name'] = $nameVar;
+            if (null !== $entry->enumClass->backedType) {
+                $valueVar = new Variable();
+                $valueVar->copyFrom($entry->backingValue);
+                $result['value'] = $valueVar;
+            }
+
+            return $result;
+        }
+        if (Variable::TYPE_OBJECT === $value->type && self::isEnumCase($value->toObject())) {
+            $object = $value->toObject();
+            $nameVar = new Variable(Variable::TYPE_STRING);
+            $nameVar->string($object->enumCaseName ?? '');
+            $result['name'] = $nameVar;
+            if (null !== $object->class->backedType && null !== $object->enumCaseValue) {
+                $valueVar = new Variable();
+                $valueVar->copyFrom($object->enumCaseValue);
+                $result['value'] = $valueVar;
+            }
+        }
+
+        return $result;
+    }
+
     public static function enumClassForCaseVariable(Variable $value): ?ClassEntry
     {
         $value = $value->resolveIndirect();

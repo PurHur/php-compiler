@@ -995,10 +995,20 @@ final class VmReflection
     public static function getObjectVars(Variable $object, Frame $frame): Variable
     {
         $object = $object->resolveIndirect();
+        if (EnumCaseSupport::isEnumCaseVariable($object)) {
+            $result = new Variable();
+            $result->newArray();
+            $ht = $result->toArray();
+            foreach (EnumCaseSupport::objectVarsForCaseVariable($object) as $name => $value) {
+                $ht->add($name, $value);
+            }
+
+            return $result;
+        }
         if (Variable::TYPE_OBJECT !== $object->type) {
             throw new \TypeError(\sprintf(
                 'get_object_vars(): Argument #1 ($object) must be of type object, %s given',
-                VmStreamArg::debugTypeName($object)
+                EnumCaseSupport::typeNameForVariable($object)
             ));
         }
         $ctx = self::requireContext($frame);

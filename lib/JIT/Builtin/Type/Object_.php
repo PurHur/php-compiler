@@ -4638,6 +4638,12 @@ class Object_ extends Type {
         throw new \LogicException('Property slot not found: '.$class.'::$'.$name);
     }
 
+    /** get_object_vars() on enum case singletons (#4809). */
+    public function fetchEnumCaseBuiltinProperty(PHPLLVM\Value $obj, int $classId, string $nameLc): Variable
+    {
+        return $this->enumCasePropertyFetch($obj, $classId, $nameLc);
+    }
+
     private function enumCasePropertyFetch(PHPLLVM\Value $obj, int $classId, string $nameLc): Variable
     {
         if ('value' === $nameLc && null === ($this->enumBackedType[$classId] ?? null)) {
@@ -4880,7 +4886,7 @@ class Object_ extends Type {
     /**
      * @return list<int>
      */
-    private function registeredEnumClassIds(): array
+    public function registeredEnumClassIds(): array
     {
         $ids = [];
         foreach ($this->classIdToName as $id => $name) {
@@ -4893,8 +4899,6 @@ class Object_ extends Type {
     }
 
     /**
-     * Enum case `->name` / `->value` when static declaring class is unknown (e.g. locals from E::Case, #4953).
-     *
      * @param list<int> $enumIds
      */
     private function propertyFetchEnumCaseRuntimeDispatch(
