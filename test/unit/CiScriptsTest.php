@@ -82,11 +82,11 @@ final class CiScriptsTest extends TestCase
 
         $defaults = (string) file_get_contents(dirname(__DIR__, 2).'/script/ci-defaults.env');
         $this->assertStringContainsString(
-            'SESSIONS_WEB_SERVE_AOT_SMOKE_GATE="${SESSIONS_WEB_SERVE_AOT_SMOKE_GATE:-0}"',
+            'SESSIONS_WEB_SERVE_AOT_SMOKE_GATE="${SESSIONS_WEB_SERVE_AOT_SMOKE_GATE:-1}"',
             $defaults
         );
         $this->assertStringContainsString(
-            'FILE_UPLOAD_WEB_SERVE_AOT_SMOKE_GATE="${FILE_UPLOAD_WEB_SERVE_AOT_SMOKE_GATE:-0}"',
+            'FILE_UPLOAD_WEB_SERVE_AOT_SMOKE_GATE="${FILE_UPLOAD_WEB_SERVE_AOT_SMOKE_GATE:-1}"',
             $defaults
         );
         $this->assertStringContainsString(
@@ -2634,6 +2634,58 @@ final class CiScriptsTest extends TestCase
             $doc
         );
         $this->assertStringContainsString('#2390', $doc);
+    }
+
+    public function testCiDefaultsEnvDefinesSessionsWebServeAotGateOn(): void
+    {
+        $defaults = (string) file_get_contents(dirname(__DIR__, 2).'/script/ci-defaults.env');
+        $this->assertStringContainsString(
+            'SESSIONS_WEB_SERVE_AOT_SMOKE_GATE="${SESSIONS_WEB_SERVE_AOT_SMOKE_GATE:-1}"',
+            $defaults
+        );
+        $this->assertStringContainsString('#2371', $defaults);
+    }
+
+    public function testCiDefaultsEnvDefinesFileUploadWebServeAotGateOn(): void
+    {
+        $defaults = (string) file_get_contents(dirname(__DIR__, 2).'/script/ci-defaults.env');
+        $this->assertStringContainsString(
+            'FILE_UPLOAD_WEB_SERVE_AOT_SMOKE_GATE="${FILE_UPLOAD_WEB_SERVE_AOT_SMOKE_GATE:-1}"',
+            $defaults
+        );
+        $this->assertStringContainsString('#2371', $defaults);
+    }
+
+    public function testCiCommonSessionsWebServeAotGateDefaultOn(): void
+    {
+        $common = (string) file_get_contents(dirname(__DIR__, 2).'/script/ci-common.sh');
+        $this->assertStringContainsString('SESSIONS_WEB_SERVE_AOT_SMOKE_GATE:-1', $common);
+    }
+
+    public function testCiCommonFileUploadWebServeAotGateDefaultOn(): void
+    {
+        $common = (string) file_get_contents(dirname(__DIR__, 2).'/script/ci-common.sh');
+        $this->assertStringContainsString('FILE_UPLOAD_WEB_SERVE_AOT_SMOKE_GATE:-1', $common);
+    }
+
+    public function testLocalCiMatrixDocumentsSessionsWebServeAotGateDefaultOn(): void
+    {
+        $doc = (string) file_get_contents(dirname(__DIR__, 2).'/docs/local-ci-matrix.md');
+        $this->assertMatchesRegularExpression(
+            '/\| `SESSIONS_WEB_SERVE_AOT_SMOKE_GATE` \| `1` \|/',
+            $doc
+        );
+        $this->assertStringContainsString('#2371', $doc);
+    }
+
+    public function testLocalCiMatrixDocumentsFileUploadWebServeAotGateDefaultOn(): void
+    {
+        $doc = (string) file_get_contents(dirname(__DIR__, 2).'/docs/local-ci-matrix.md');
+        $this->assertMatchesRegularExpression(
+            '/\| `FILE_UPLOAD_WEB_SERVE_AOT_SMOKE_GATE` \| `1` \|/',
+            $doc
+        );
+        $this->assertStringContainsString('#2371', $doc);
     }
 
     public function testCiCommonThrowsWebServeJitGateDefaultOn(): void
