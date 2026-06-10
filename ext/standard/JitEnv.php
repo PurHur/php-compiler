@@ -8,6 +8,7 @@ declare(strict_types=1);
 
 namespace PHPCompiler\ext\standard;
 
+use PHPCompiler\JIT\Builtin\StringGetenvAll;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitValueBox;
 use PHPLLVM\Builder;
@@ -28,6 +29,20 @@ final class JitEnv
 
             return $fn;
         }
+    }
+
+    /** Zero-arg getenv() — assoc array of all variables (#5075 phase 2). */
+    public static function getenvAll(Context $context): Value
+    {
+        StringGetenvAll::ensureLinked($context);
+        $slot = JitValueBox::alloc($context);
+        $ptr = JitValueBox::pointer($context, $slot);
+        $context->builder->call(
+            $context->lookupFunction('__compiler_getenv_all'),
+            $ptr
+        );
+
+        return $ptr;
     }
 
     /**

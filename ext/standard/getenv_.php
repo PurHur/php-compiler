@@ -14,7 +14,7 @@ use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
 
 /**
- * getenv() — read process environment (VM; JIT/AOT via __compiler_getenv, issue #3710).
+ * getenv() — read process environment (VM; JIT/AOT via __compiler_getenv / __compiler_getenv_all, #3710, #5075).
  *
  * php-src: ext/standard/basic_functions.c — zif_getenv
  */
@@ -59,9 +59,7 @@ final class getenv_ extends Internal
             throw new \LogicException('getenv() accepts at most two arguments');
         }
         if (0 === $argc) {
-            throw new \LogicException(
-                'getenv() with no arguments is VM-only in this compiler build; use bin/vm.php (issue #5075 phase 2 JIT)'
-            );
+            return JitEnv::getenvAll($context);
         }
         $i8 = $context->getTypeFromString('int8');
         $localOnlyI8 = $i8->constInt(0, false);
