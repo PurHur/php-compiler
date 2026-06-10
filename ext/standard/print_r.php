@@ -82,6 +82,10 @@ final class print_r extends Internal
         if (Variable::TYPE_NULL === $var->type) {
             return '';
         }
+        $resourceOut = VmVarFormat::tryFormatPrintR($var);
+        if (null !== $resourceOut) {
+            return $resourceOut;
+        }
         if (Variable::TYPE_ARRAY === $var->type) {
             return self::formatArray($vm, $var->toArray(), $level);
         }
