@@ -83,19 +83,31 @@ final class array_count extends Internal
 
             return $context->getTypeFromString('int64')->constInt(0, false);
         }
+        $recursive = false;
         if (2 === $argc) {
             $modeLit = JitLongArg::compileTimeLiteral($args[1]);
             if (null === $modeLit) {
                 throw new \LogicException('count() mode must be a compile-time integer in this compiler build');
             }
             if (VmArray::COUNT_RECURSIVE === $modeLit) {
-                throw new \LogicException('count() COUNT_RECURSIVE is not supported in JIT in this compiler build');
-            }
-            if (VmArray::COUNT_NORMAL !== $modeLit) {
+                $recursive = true;
+            } elseif (VmArray::COUNT_NORMAL !== $modeLit) {
                 throw new \LogicException(
                     'count(): Parameter must be an integer or use the COUNT_RECURSIVE flag'
                 );
             }
+        }
+        if ($recursive) {
+            if ($args[0]->type & JITVariable::IS_NATIVE_ARRAY
+                || JITVariable::TYPE_HASHTABLE === $args[0]->type
+                || JITVariable::TYPE_VALUE === $args[0]->type
+                || JitValueBox::isValueOperand($args[0])
+            ) {
+                return ArrayBuiltinHelper::countRecursive($context, $args[0]);
+            }
+            $this->emitCountTypeError($context, $args[0]);
+
+            return $context->getTypeFromString('int64')->constInt(0, false);
         }
         if ($args[0]->type & JITVariable::IS_NATIVE_ARRAY) {
             return $context->constantFromInteger($args[0]->nextFreeElement, 'int64');

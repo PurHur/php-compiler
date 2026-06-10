@@ -276,10 +276,6 @@ class JITTest extends BaseTest {
             if (str_contains($name, 'dynamic_property_deprecation')) {
                 continue;
             }
-            // count() COUNT_RECURSIVE is VM-only until recursive LLVM count (#3511).
-            if (str_contains($name, 'count_recursive')) {
-                continue;
-            }
             // User __destruct() MCJIT execute: compile verified in UserDestructJitCompileTest (#4096); harness MCJIT SIGSEGV (#98).
             if (str_contains($name, 'class_destruct') || str_contains($name, 'destruct_user') || str_contains($name, 'destruct_jit')) {
                 continue;
