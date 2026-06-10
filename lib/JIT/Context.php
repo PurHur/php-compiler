@@ -656,6 +656,7 @@ class Context {
             Builtin\GcCollectCyclesRuntime::ensureStandaloneBodies($this);
             Builtin\SuperglobalRefreshRuntime::ensureStandaloneBodies($this);
             \PHPCompiler\ext\standard\JitStrspn::ensureStandaloneBodies($this);
+            Builtin\TokenGetAll::ensureStandaloneBodies($this);
         }
 
         $this->functionProxies['is_null'] = new Builtin\IsNullFn();
