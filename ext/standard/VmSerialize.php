@@ -14,6 +14,7 @@ use PHPCompiler\VM\Context;
 use PHPCompiler\VM\EnumCaseSupport;
 use PHPCompiler\VM\ErrorReporter;
 use PHPCompiler\VM\ObjectEntry;
+use PHPCompiler\VM\ResourceSupport;
 use PHPCompiler\VM\TypedPropertyCheck;
 use PHPCompiler\VM\Variable;
 
@@ -28,6 +29,10 @@ final class VmSerialize
     public static function serializeValue(Context $ctx, Variable $value): string
     {
         $value = $value->resolveIndirect();
+        $resourceWire = self::serializeResourceWire($value);
+        if (null !== $resourceWire) {
+            return $resourceWire;
+        }
         $enumRef = self::enumCaseRefFromVariable($value);
         if (null !== $enumRef) {
             return self::encodeEnumCaseLiteral($enumRef->className, $enumRef->caseName);
@@ -380,6 +385,19 @@ final class VmSerialize
         }
 
         return null;
+    }
+
+    /**
+     * php-src ext/standard/var.c — resource zvals serialize as integer wire (i:N;).
+     * PHP 8.4 Resource objects use id 0; closed handles must not leak stale ids (#5326).
+     */
+    private static function serializeResourceWire(Variable $value): ?string
+    {
+        if (!ResourceSupport::isVmResource($value)) {
+            return null;
+        }
+
+        return 'i:0;';
     }
 
     private static function exportForSerialize(Context $ctx, Variable $value): mixed
