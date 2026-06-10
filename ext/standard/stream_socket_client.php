@@ -112,7 +112,7 @@ final class stream_socket_client extends Internal
             return;
         }
 
-        $handle = VmFs::adoptStreamResource($result);
+        $handle = VmFs::adoptStreamResource($result, $remote);
         if (false === $handle) {
             $frame->returnVar->bool(false);
 
