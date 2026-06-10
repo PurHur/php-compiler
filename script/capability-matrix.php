@@ -83,8 +83,8 @@ function analyzeInternal(PHPCompiler\Func\Internal $fn): array
         $notes[] = 'reverse DNS IPv4 (VM FFI + AOT) (#5854)';
     }
     if (in_array($fn->getName(), ['checkdnsrr', 'dns_check_record'], true)
-        && preg_match('/VmDns::checkdnsrr/i', $source)) {
-        $notes[] = 'DNS record probe via libc res_query FFI (#5983); JIT/AOT deferred';
+        && preg_match('/CheckdnsrrRuntime|JitCheckdnsrr/i', $source)) {
+        $notes[] = 'DNS record probe via libc res_query (VM FFI + JIT/AOT) (#5983)';
     }
     if (in_array($fn->getName(), ['long2ip', 'ip2long', 'inet_ntop', 'inet_pton'], true)
         && preg_match('/JitInet|InetRuntime|VmInetNative/i', $source)) {

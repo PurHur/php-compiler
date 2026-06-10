@@ -11,7 +11,8 @@ use PHPCompiler\VM\Variable;
  * DNS helpers for stdlib builtins (issue #3707, #5854, #7315).
  *
  * VM resolves via /etc/hosts without host ext/ffi; optional libc getaddrinfo when FFI is loaded.
- * JIT/AOT: lib/JIT/Builtin/GethostbynamelRuntime.php (__compiler_gethostbynamel).
+ * JIT/AOT: lib/JIT/Builtin/GethostbynamelRuntime.php (__compiler_gethostbynamel),
+ * CheckdnsrrRuntime.php (__compiler_checkdnsrr).
  *
  * php-src: ext/standard/dns.c — PHP_FUNCTION(gethostbynamel), PHP_FUNCTION(gethostbyaddr),
  * PHP_FUNCTION(gethostbyname), PHP_FUNCTION(checkdnsrr), PHP_FUNCTION(dns_check_record)
