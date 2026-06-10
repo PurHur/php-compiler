@@ -15,6 +15,7 @@ use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\Variable as JITVariable;
+use PHPCompiler\VM\EnumCaseSupport;
 use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
 
@@ -35,6 +36,11 @@ final class get_object_id extends Internal
         }
         $v = $frame->calledArgs[0]->resolveIndirect();
         if (null === $frame->returnVar) {
+            return;
+        }
+        if (EnumCaseSupport::isEnumCaseVariable($v)) {
+            $frame->returnVar->int(EnumCaseSupport::objectIdForVariable($v));
+
             return;
         }
         if (Variable::TYPE_OBJECT !== $v->type) {
@@ -68,6 +74,8 @@ final class get_object_id extends Internal
             case Variable::TYPE_ARRAY:
                 return 'array';
             case Variable::TYPE_OBJECT:
+                return 'object';
+            case Variable::TYPE_ENUM_CASE:
                 return 'object';
             default:
                 return 'mixed';

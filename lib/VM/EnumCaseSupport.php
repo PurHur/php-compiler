@@ -284,6 +284,18 @@ final class EnumCaseSupport
         return self::objectIdForEnumSort($left) <=> self::objectIdForEnumSort($right);
     }
 
+    /**
+     * Stable object handle for get_object_id() on enum case operands (#5837, ext/standard/basic_functions.c).
+     */
+    public static function objectIdForVariable(Variable $value): int
+    {
+        if (!self::isEnumCaseVariable($value)) {
+            throw new \LogicException('objectIdForVariable requires enum case variable');
+        }
+
+        return self::receiverForInstanceMethod($value)->toObject()->id;
+    }
+
     private static function objectIdForEnumSort(Variable $value): int
     {
         $value = $value->resolveIndirect();
