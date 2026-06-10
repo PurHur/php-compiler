@@ -1,8 +1,3 @@
 <?php
-$fn = static fn () => number_format(1234.5, 2, '.', 0);
-try {
-    $fn();
-    echo "uncaught\n";
-} catch (TypeError $e) {
-    echo $e->getMessage(), "\n";
-}
+// Issue #7443 — number_format() Z_PARAM_STR coerces int separators (ext/standard/number_format.c).
+echo number_format(1234.5, 2, '.', 0), "\n";
