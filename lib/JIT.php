@@ -9330,7 +9330,10 @@ class JIT {
                             $this->context->lookupFunction('__hashtable__setStringKeyBool'),
                             $result->writableHt,
                             $result->writableStringKey,
-                            $this->context->helper->loadValue($value)
+                            $this->context->builder->truncOrBitCast(
+                                $this->context->helper->loadValue($value),
+                                $this->context->getTypeFromString('int1')
+                            )
                         );
 
                         return;

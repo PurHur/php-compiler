@@ -100,12 +100,14 @@ final class StreamMetaJit
         $handle = $fn->getParam(0);
         $i64 = $context->getTypeFromString('int64');
         $i32 = $context->getTypeFromString('int32');
+        $i1 = $context->getTypeFromString('int1');
         $i8p = $context->getTypeFromString('int8*');
         $htPtr = $context->getTypeFromString('__hashtable__*');
         $strPtr = $context->getTypeFromString('__string__*');
         $zero64 = $i64->constInt(0, false);
         $zero32 = $i32->constInt(0, false);
-        $one32 = $i32->constInt(1, false);
+        $zeroI1 = $i1->constInt(0, false);
+        $oneI1 = $i1->constInt(1, false);
         $nullHt = $htPtr->constNull();
         $nullPtr = $i8p->constNull();
         $max = $i64->constInt(self::MAX_HANDLES, false);
@@ -136,16 +138,16 @@ final class StreamMetaJit
         $setLong = $context->lookupFunction('__hashtable__setStringKeyLong');
         $setString = $context->lookupFunction('__hashtable__setStringKeyString');
 
-        $context->builder->call($setBool, $ht, self::literalString($context, 'timed_out'), $zero32);
+        $context->builder->call($setBool, $ht, self::literalString($context, 'timed_out'), $zeroI1);
         $context->builder->call($setLong, $ht, self::literalString($context, 'unread_bytes'), $zero64);
-        $context->builder->call($setBool, $ht, self::literalString($context, 'blocked'), $one32);
-        $context->builder->call($setBool, $ht, self::literalString($context, 'seekable'), $one32);
+        $context->builder->call($setBool, $ht, self::literalString($context, 'blocked'), $oneI1);
+        $context->builder->call($setBool, $ht, self::literalString($context, 'seekable'), $oneI1);
 
         $eof = $context->builder->call($context->lookupFunction('feof'), $fp);
         $eofBool = $context->builder->select(
             $context->builder->icmp(Builder::INT_NE, $eof, $zero32),
-            $one32,
-            $zero32
+            $oneI1,
+            $zeroI1
         );
         $context->builder->call($setBool, $ht, self::literalString($context, 'eof'), $eofBool);
 
@@ -349,7 +351,7 @@ final class StreamMetaJit
         $htPtr = $context->getTypeFromString('__hashtable__*');
         $strPtr = $context->getTypeFromString('__string__*');
         $i64 = $context->getTypeFromString('int64');
-        $i32 = $context->getTypeFromString('int32');
+        $i1 = $context->getTypeFromString('int1');
         $charPtr = $context->getTypeFromString('char*');
         $voidTy = $context->getTypeFromString('void');
 
@@ -357,7 +359,7 @@ final class StreamMetaJit
             ['__hashtable__alloc', $htPtr, []],
             ['__hashtable__setStringKeyLong', $voidTy, [$htPtr, $strPtr, $i64]],
             ['__hashtable__setStringKeyString', $voidTy, [$htPtr, $strPtr, $strPtr]],
-            ['__hashtable__setStringKeyBool', $voidTy, [$htPtr, $strPtr, $i32]],
+            ['__hashtable__setStringKeyBool', $voidTy, [$htPtr, $strPtr, $i1]],
             ['__string__init', $strPtr, [$i64, $charPtr]],
         ] as [$name, $ret, $params]) {
             self::ensureExternal(
