@@ -38,7 +38,7 @@ final class print_r extends Internal
         if (2 === $argc) {
             $return = $frame->calledArgs[1]->resolveIndirect()->toBool();
         }
-        $out = self::formatVariable($vm, $frame->calledArgs[0]->resolveIndirect(), 0);
+        $out = self::formatVariable($vm, $frame->calledArgs[0]->resolveIndirect(), 0, $frame);
         if ($return) {
             if (null === $frame->returnVar) {
                 return;
@@ -60,7 +60,7 @@ final class print_r extends Internal
         return JitPrintR::invoke($context, ...$args);
     }
 
-    private static function formatVariable(VM $vm, Variable $var, int $level): string
+    private static function formatVariable(VM $vm, Variable $var, int $level, ?Frame $frame = null): string
     {
         TypedPropertyCheck::assertReadable($var);
         if (Variable::TYPE_INTEGER === $var->type) {
@@ -83,10 +83,10 @@ final class print_r extends Internal
             return $resourceOut;
         }
         if (Variable::TYPE_ARRAY === $var->type) {
-            return self::formatArray($vm, $var->toArray(), $level);
+            return self::formatArray($vm, $var->toArray(), $level, $frame);
         }
         if (Variable::TYPE_OBJECT === $var->type) {
-            return self::formatObject($vm, $var->toObject(), $level);
+            return self::formatObject($vm, $var->toObject(), $level, $frame);
         }
 
         return '';
@@ -102,13 +102,13 @@ final class print_r extends Internal
         return $s.'.0';
     }
 
-    private static function formatArray(VM $vm, VM\HashTable $table, int $level): string
+    private static function formatArray(VM $vm, VM\HashTable $table, int $level, ?Frame $frame = null): string
     {
         $openSpaces = 0 === $level ? '' : str_repeat(' ', 4 * ($level + 1));
         $keySpaces = str_repeat(' ', 4 * (0 === $level ? 1 : $level + 2));
         $lines = ["Array\n", "{$openSpaces}(\n"];
         foreach ($table->iterateKeyed(true) as [$key, $value]) {
-            $formatted = self::formatVariable($vm, $value->resolveIndirect(), $level + 1);
+            $formatted = self::formatVariable($vm, $value->resolveIndirect(), $level + 1, $frame);
             $lines[] = "{$keySpaces}".self::formatKey($key).' => '.$formatted."\n";
         }
         $lines[] = "{$openSpaces})\n";
@@ -116,11 +116,11 @@ final class print_r extends Internal
         return implode('', $lines);
     }
 
-    private static function formatObject(VM $vm, VM\ObjectEntry $object, int $level): string
+    private static function formatObject(VM $vm, VM\ObjectEntry $object, int $level, ?Frame $frame = null): string
     {
         $openSpaces = 0 === $level ? '' : str_repeat(' ', 4 * ($level + 1));
         $keySpaces = str_repeat(' ', 4 * (0 === $level ? 1 : $level + 2));
-        $props = $object->getProperties(ClassEntry::PROP_PURPOSE_DEBUG, $vm);
+        $props = $object->getProperties(ClassEntry::PROP_PURPOSE_DEBUG, $vm, $frame);
         $lines = ["{$object->class->name} Object\n", "{$openSpaces}(\n"];
         foreach ($props as $name => $value) {
             $formatted = self::formatVariable($vm, $value->resolveIndirect(), $level + 1);

@@ -37,7 +37,7 @@ final class debug_zval_dump extends Internal
             throw new \LogicException('debug_zval_dump() requires an active VM');
         }
         foreach ($frame->calledArgs as $arg) {
-            self::dumpVariable($vm, $arg->resolveIndirect(), 0);
+            self::dumpVariable($vm, $arg->resolveIndirect(), 0, false, $frame);
         }
     }
 
@@ -46,7 +46,7 @@ final class debug_zval_dump extends Internal
         throw new \LogicException('debug_zval_dump() is VM-only in this compiler build (issue #6576)');
     }
 
-    private static function dumpVariable(VM $vm, Variable $var, int $level, bool $showRefMarker = false): void
+    private static function dumpVariable(VM $vm, Variable $var, int $level, bool $showRefMarker = false, ?Frame $frame = null): void
     {
         TypedPropertyCheck::assertReadable($var);
         if ($level > 0) {
@@ -82,12 +82,12 @@ final class debug_zval_dump extends Internal
             return;
         }
         if (Variable::TYPE_ARRAY === $var->type) {
-            self::dumpArray($vm, $var->toArray(), $level);
+            self::dumpArray($vm, $var->toArray(), $level, $frame);
 
             return;
         }
         if (Variable::TYPE_OBJECT === $var->type) {
-            self::dumpObject($vm, $var->toObject(), $level);
+            self::dumpObject($vm, $var->toObject(), $level, $frame);
 
             return;
         }
@@ -101,7 +101,7 @@ final class debug_zval_dump extends Internal
         echo "unknown()\n";
     }
 
-    private static function dumpArray(VM $vm, VM\HashTable $table, int $level): void
+    private static function dumpArray(VM $vm, VM\HashTable $table, int $level, ?Frame $frame = null): void
     {
         $count = 0;
         foreach ($table->iterateKeyed(false) as $_) {
@@ -111,7 +111,7 @@ final class debug_zval_dump extends Internal
         foreach ($table->iterateKeyed(false) as [$key, $value]) {
             echo str_repeat(' ', $level + 1);
             echo self::formatKey($key), "\n";
-            self::dumpVariable($vm, $value, $level + 2, true);
+            self::dumpVariable($vm, $value, $level + 2, true, $frame);
         }
         if ($level > 0) {
             echo str_repeat(' ', $level);
@@ -119,20 +119,20 @@ final class debug_zval_dump extends Internal
         echo "}\n";
     }
 
-    private static function dumpObject(VM $vm, VM\ObjectEntry $object, int $level): void
+    private static function dumpObject(VM $vm, VM\ObjectEntry $object, int $level, ?Frame $frame = null): void
     {
         if (EnumCaseSupport::isEnumCase($object)) {
             echo 'enum('.$object->class->name.'::'.($object->enumCaseName ?? '').")\n";
 
             return;
         }
-        $props = $object->getProperties(ClassEntry::PROP_PURPOSE_DEBUG, $vm);
+        $props = $object->getProperties(ClassEntry::PROP_PURPOSE_DEBUG, $vm, $frame);
         $count = \count($props);
         echo 'object(', $object->class->name, ')#', $object->id, ' (', $count, ') refcount(', $object->refCount, "){\n";
         foreach ($props as $name => $value) {
             echo str_repeat(' ', $level + 1);
             echo '["', $name, "\"]=>\n";
-            self::dumpVariable($vm, $value, $level + 2, true);
+            self::dumpVariable($vm, $value, $level + 2, true, $frame);
         }
         if ($level > 0) {
             echo str_repeat(' ', $level);

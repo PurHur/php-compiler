@@ -37,7 +37,7 @@ final class var_dump_ extends Internal
             throw new \LogicException('var_dump() requires an active VM');
         }
         foreach ($frame->calledArgs as $arg) {
-            self::dumpVariable($vm, $arg->resolveIndirect(), 1);
+            self::dumpVariable($vm, $arg->resolveIndirect(), 1, false, $frame);
         }
     }
 
@@ -46,7 +46,7 @@ final class var_dump_ extends Internal
         return JitVarDump::invoke($context, ...$args);
     }
 
-    private static function dumpVariable(VM $vm, Variable $var, int $level, bool $showRefMarker = false): void
+    private static function dumpVariable(VM $vm, Variable $var, int $level, bool $showRefMarker = false, ?Frame $frame = null): void
     {
         TypedPropertyCheck::assertReadable($var);
         if ($level > 1) {
@@ -88,12 +88,12 @@ final class var_dump_ extends Internal
             return;
         }
         if (Variable::TYPE_ARRAY === $var->type) {
-            self::dumpArray($vm, $var->toArray(), $level);
+            self::dumpArray($vm, $var->toArray(), $level, $frame);
 
             return;
         }
         if (Variable::TYPE_OBJECT === $var->type) {
-            self::dumpObject($vm, $var->toObject(), $level);
+            self::dumpObject($vm, $var->toObject(), $level, $frame);
 
             return;
         }
@@ -107,7 +107,7 @@ final class var_dump_ extends Internal
         echo "unknown()\n";
     }
 
-    private static function dumpArray(VM $vm, VM\HashTable $table, int $level): void
+    private static function dumpArray(VM $vm, VM\HashTable $table, int $level, ?Frame $frame = null): void
     {
         $count = 0;
         foreach ($table->iterateKeyed(false) as $_) {
@@ -117,7 +117,7 @@ final class var_dump_ extends Internal
         foreach ($table->iterateKeyed(false) as [$key, $value]) {
             echo str_repeat(' ', $level);
             echo self::formatKey($key), "\n";
-            self::dumpVariable($vm, $value, $level + 1, true);
+            self::dumpVariable($vm, $value, $level + 1, true, $frame);
         }
         if ($level > 1) {
             echo str_repeat(' ', $level - 1);
@@ -125,20 +125,20 @@ final class var_dump_ extends Internal
         echo "}\n";
     }
 
-    private static function dumpObject(VM $vm, VM\ObjectEntry $object, int $level): void
+    private static function dumpObject(VM $vm, VM\ObjectEntry $object, int $level, ?Frame $frame = null): void
     {
         if (EnumCaseSupport::isEnumCase($object)) {
             echo 'enum('.$object->class->name.'::'.($object->enumCaseName ?? '').")\n";
 
             return;
         }
-        $props = $object->getProperties(ClassEntry::PROP_PURPOSE_DEBUG, $vm);
+        $props = $object->getProperties(ClassEntry::PROP_PURPOSE_DEBUG, $vm, $frame);
         $count = \count($props);
         echo 'object(', $object->class->name, ')#', $object->id, ' (', $count, ") {\n";
         foreach ($props as $name => $value) {
             echo str_repeat(' ', $level);
             echo '["', $name, "\"]=>\n";
-            self::dumpVariable($vm, $value, $level + 1, true);
+            self::dumpVariable($vm, $value, $level + 1, true, $frame);
         }
         if ($level > 1) {
             echo str_repeat(' ', $level - 1);
