@@ -413,11 +413,12 @@ final class EnumCaseSupport
     }
 
     /**
-     * Ordering for min()/max() on enum case operands (php-src ext/standard/array.c php_min_max).
+     * zend_compare() for variadic min()/max() on enum case operands (#5707, php-src array.c).
      *
-     * Backed enums: compare backing scalars. Unit enums: declaration order in enumCases.
+     * Different cases of the same enum are ZEND_UNCOMPARABLE: spaceship maps that to 1, never -1.
+     * Backing scalars are not consulted — max keeps the last arg that compares greater; min keeps the first.
      *
-     * @return int spaceship (-1, 0, 1)
+     * @return int 0 when same case, 1 when different cases (never -1)
      */
     public static function compareEnumCasesForMinMax(Variable $left, Variable $right): int
     {
@@ -426,15 +427,11 @@ final class EnumCaseSupport
         if (null === $leftClass || null === $rightClass || $leftClass !== $rightClass) {
             throw new \LogicException('compareEnumCasesForMinMax requires same-enum case operands');
         }
-        if (null !== $leftClass->backedType) {
-            $leftBacking = self::backingValueForMinMax($left);
-            $rightBacking = self::backingValueForMinMax($right);
-
-            return Variable::spaceshipCompare($leftBacking, $rightBacking);
+        if ($leftName === $rightName) {
+            return 0;
         }
 
-        return self::enumCaseDeclarationOrdinal($leftClass, $leftName)
-            <=> self::enumCaseDeclarationOrdinal($rightClass, $rightName);
+        return 1;
     }
 
     /**

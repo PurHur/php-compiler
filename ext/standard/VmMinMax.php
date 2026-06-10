@@ -36,7 +36,7 @@ final class VmMinMax
             $frame->calledArgs[1]->resolveIndirect(),
         ];
 
-        return self::finishEnumCaseReduce($frame, $values, $pickMin);
+        return self::finishEnumCaseReduce($frame, $values, $pickMin, false);
     }
 
     /**
@@ -79,7 +79,7 @@ final class VmMinMax
             return;
         }
 
-        if (self::finishEnumCaseReduce($frame, $values, $pickMin)) {
+        if (self::finishEnumCaseReduce($frame, $values, $pickMin, 1 === $argc)) {
             return;
         }
 
@@ -99,8 +99,12 @@ final class VmMinMax
     /**
      * @param list<Variable> $values
      */
-    private static function finishEnumCaseReduce(Frame $frame, array $values, bool $pickMin): bool
-    {
+    private static function finishEnumCaseReduce(
+        Frame $frame,
+        array $values,
+        bool $pickMin,
+        bool $arrayForm
+    ): bool {
         $context = $frame->vmContext;
         if (null === $context) {
             return false;
@@ -122,6 +126,14 @@ final class VmMinMax
             }
             $enumClass = $class;
             $normalized[] = $case;
+        }
+
+        if ($arrayForm) {
+            // zend_hash_minmax + php_data_compare: max keeps first, min keeps last (#5707).
+            $best = $normalized[$pickMin ? \count($normalized) - 1 : 0];
+            $frame->returnVar->copyFrom($best);
+
+            return true;
         }
 
         $best = $normalized[0];
