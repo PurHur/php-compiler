@@ -107,6 +107,7 @@ use PHPCompiler\VM\Builtin\ReflectionFunctionIsInternal;
 use PHPCompiler\VM\Builtin\ReflectionFunctionIsUserDefined;
 use PHPCompiler\VM\Builtin\ReflectionMethodConstruct;
 use PHPCompiler\VM\Builtin\ReflectionMethodGetAttributes;
+use PHPCompiler\VM\Builtin\ReflectionMethodGetClosure;
 use PHPCompiler\VM\Builtin\ReflectionMethodGetName;
 use PHPCompiler\VM\Builtin\ReflectionMethodGetParameters;
 use PHPCompiler\VM\Builtin\ReflectionMethodGetPrototype;
@@ -404,6 +405,8 @@ final class BuiltinClasses
         $rm->methodVisibility['invoke'] = $pub;
         $rm->methods['invokeargs'] = new ReflectionMethodInvokeArgs();
         $rm->methodVisibility['invokeargs'] = $pub;
+        $rm->methods['getclosure'] = new ReflectionMethodGetClosure();
+        $rm->methodVisibility['getclosure'] = $pub;
         $rm->methods['isstatic'] = new ReflectionMethodIsStatic();
         $rm->methodVisibility['isstatic'] = $pub;
         $rm->methods['ispublic'] = new ReflectionMethodIsPublic();
