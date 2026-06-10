@@ -62,13 +62,11 @@ final class JitIntdiv
         if (JITVariable::TYPE_NULL === $arg->type) {
             return $context->getTypeFromString('int64')->constInt(0, false);
         }
-        if ($nullable) {
-            $enumLabel = JitOperandTypeLabel::compileTimeEnumClassName($context, $arg);
-            if (null !== $enumLabel) {
-                self::emitIntTypeErrorAndAbort($context, $function, $argIndex, $paramName, $enumLabel, true);
+        $enumLabel = JitOperandTypeLabel::compileTimeEnumClassName($context, $arg);
+        if (null !== $enumLabel) {
+            self::emitIntTypeErrorAndAbort($context, $function, $argIndex, $paramName, $enumLabel, $nullable);
 
-                return $context->getTypeFromString('int64')->constInt(0, false);
-            }
+            return $context->getTypeFromString('int64')->constInt(0, false);
         }
         if (($arg->type & JITVariable::IS_NATIVE_ARRAY) || JITVariable::TYPE_HASHTABLE === $arg->type) {
             self::emitIntTypeErrorAndAbort($context, $function, $argIndex, $paramName, 'array', $nullable);
@@ -156,22 +154,20 @@ final class JitIntdiv
         $context->builder->branch($mergeBlock);
 
         $context->builder->positionAtEnd($afterNull);
-        if ($nullable) {
-            $isEnumCase = $context->builder->icmp(Builder::INT_EQ, $typeByte, $enumCaseTy);
-            $context->builder->branchIf($isEnumCase, $enumBlock, $afterEnum);
+        $isEnumCase = $context->builder->icmp(Builder::INT_EQ, $typeByte, $enumCaseTy);
+        $context->builder->branchIf($isEnumCase, $enumBlock, $afterEnum);
 
-            $context->builder->positionAtEnd($enumBlock);
-            self::emitIntTypeErrorAndAbort(
-                $context,
-                $function,
-                $argIndex,
-                $paramName,
-                JitOperandTypeLabel::compileTimeEnumClassName($context, $arg) ?? 'object',
-                true
-            );
+        $context->builder->positionAtEnd($enumBlock);
+        self::emitIntTypeErrorAndAbort(
+            $context,
+            $function,
+            $argIndex,
+            $paramName,
+            JitOperandTypeLabel::compileTimeEnumClassName($context, $arg) ?? 'object',
+            $nullable
+        );
 
-            $context->builder->positionAtEnd($afterEnum);
-        }
+        $context->builder->positionAtEnd($afterEnum);
         $isArray = $context->builder->icmp(Builder::INT_EQ, $typeByte, $arrayTy);
         $context->builder->branchIf($isArray, $arrayBlock, $objectBlock);
 

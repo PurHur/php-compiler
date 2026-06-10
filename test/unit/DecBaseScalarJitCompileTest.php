@@ -50,7 +50,27 @@ final class DecBaseScalarJitCompileTest extends TestCase
     {
         return [
             'dechex_float_operand' => ['test/fixtures/aot/compile-only/dechex_float_operand.php'],
+            'dechex_enum_operand' => ['test/fixtures/aot/compile-only/dechex_enum_operand.php'],
             'hexdec_scalar_coerce' => ['test/fixtures/aot/compile-only/hexdec_scalar_coerce.php'],
         ];
+    }
+
+    public function testDechexEnumCaseTypeErrorLowering(): void
+    {
+        $code = <<<'PHP'
+<?php
+enum E: int { case A = 10; }
+dechex(E::A);
+PHP;
+        $runtime = new Runtime();
+        $block = $runtime->parseAndCompile($code, 'dechex_enum_jit_compile.php');
+        $runtime->jitCompileBlock($block);
+
+        $context = $runtime->loadJitContext();
+        $bc = $context->module->printToString();
+        $this->assertStringContainsString(
+            'dechex(): Argument #1 ($num) must be of type int',
+            $bc
+        );
     }
 }
