@@ -4,11 +4,16 @@ declare(strict_types=1);
 
 namespace PHPCompiler\ext\standard;
 
+use PHPCompiler\Block;
+use PHPCompiler\JIT\Builtin\ParseUrlComponentJit;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\HashTableHelper;
 use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\Variable as JITVariable;
+use PHPCompiler\OpCode;
+use PHPCfg\Operand;
+use PHPCfg\Operand\Literal;
 use PHPLLVM\Value;
 
 /**
@@ -16,6 +21,33 @@ use PHPLLVM\Value;
  */
 final class JitParseUrl
 {
+    public static function tryResolveComponent(
+        Context $context,
+        JITVariable $arg,
+        ?Block $block = null,
+        ?Operand $operand = null
+    ): ?int {
+        $fromJit = ParseUrlComponentJit::compileTimeComponentInt($context, $arg);
+        if (null !== $fromJit) {
+            return $fromJit;
+        }
+        if (null !== $block && null !== $operand) {
+            return self::tryResolveComponentFromBlock($context, $block, $operand);
+        }
+
+        return null;
+    }
+
+    public static function tryResolveComponentFromBlock(Context $context, Block $block, Operand $componentOp): ?int
+    {
+        $slot = self::operandSlot($block, $componentOp);
+        if (null === $slot) {
+            return null;
+        }
+
+        return self::slotParseUrlComponent($context, $block, $slot, []);
+    }
+
     public static function parseUrl(Context $context, JITVariable $url, ?JITVariable $component = null): Value
     {
         if (null === $component) {
@@ -100,6 +132,10 @@ final class JitParseUrl
 
     private static function compileTimeLong(Context $context, JITVariable $var): int
     {
+        $fromEnum = self::tryResolveComponent($context, $var);
+        if (null !== $fromEnum) {
+            return $fromEnum;
+        }
         if (JITVariable::TYPE_NATIVE_LONG !== $var->type) {
             throw new \LogicException('parse_url() component must be an integer in this compiler build');
         }
@@ -132,5 +168,81 @@ final class JitParseUrl
         }
 
         return $ptr;
+    }
+
+    /**
+     * @param array<int, true> $visited
+     */
+    private static function slotParseUrlComponent(Context $context, Block $block, int $slot, array $visited): ?int
+    {
+        if (isset($visited[$slot])) {
+            return null;
+        }
+        $visited[$slot] = true;
+
+        if (isset($block->constants[$slot])) {
+            $const = $block->constants[$slot];
+            if (\PHPCompiler\VM\Variable::TYPE_INTEGER === $const->type) {
+                return VmParseUrl::componentFromBacking($const->toInt());
+            }
+            $fromEnum = VmParseUrl::tryParseUrlComponentInt($const);
+            if (null !== $fromEnum) {
+                return $fromEnum;
+            }
+        }
+
+        foreach ($block->opCodes as $op) {
+            if ($op->arg1 !== $slot) {
+                continue;
+            }
+            if (OpCode::TYPE_CLASS_CONST_FETCH === $op->type) {
+                return self::componentFromClassConstFetch($context, $block, $op);
+            }
+        }
+
+        return null;
+    }
+
+    private static function componentFromClassConstFetch(Context $context, Block $block, OpCode $op): ?int
+    {
+        $classOp = $block->getOperand($op->arg2);
+        $nameOp = $block->getOperand($op->arg3);
+        if (!$classOp instanceof Literal || !$nameOp instanceof Literal) {
+            return null;
+        }
+        if (0 !== strcasecmp(ltrim((string) $classOp->value, '\\'), 'ParseUrl')) {
+            return null;
+        }
+        $jitObject = $context->type->object;
+        if (!$jitObject instanceof \PHPCompiler\JIT\Builtin\Type\Object_) {
+            return null;
+        }
+        $classId = $jitObject->lookup('ParseUrl');
+        $backing = $jitObject->enumCaseBackingScalarForCase($classId, (string) $nameOp->value);
+        if (!\is_int($backing)) {
+            return null;
+        }
+
+        return VmParseUrl::componentFromBacking($backing);
+    }
+
+    private static function operandSlot(Block $block, Operand $op): ?int
+    {
+        foreach ($block->opCodes as $opcode) {
+            foreach ([$opcode->arg1, $opcode->arg2, $opcode->arg3] as $slot) {
+                if (null === $slot) {
+                    continue;
+                }
+                try {
+                    if ($block->getOperand($slot) === $op) {
+                        return $slot;
+                    }
+                } catch (\Throwable) {
+                    continue;
+                }
+            }
+        }
+
+        return null;
     }
 }

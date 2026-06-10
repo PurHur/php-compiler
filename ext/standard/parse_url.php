@@ -24,11 +24,7 @@ final class parse_url extends Internal
         $url = VmString::coerceStringBuiltinArg($frame->calledArgs[0], 'parse_url', 0, 'url');
         $component = -1;
         if (2 === $argc) {
-            $compVar = $frame->calledArgs[1]->resolveIndirect();
-            if (Variable::TYPE_INTEGER !== $compVar->type) {
-                throw new \LogicException('parse_url() component must be an integer in this compiler build');
-            }
-            $component = $compVar->toInt();
+            $component = VmParseUrl::resolveComponentArg($frame->calledArgs[1]);
         }
         if (null === $frame->returnVar) {
             return;
@@ -70,11 +66,6 @@ final class parse_url extends Internal
             throw new \LogicException('parse_url() requires one or two arguments in this compiler build');
         }
         $component = 2 === $argc ? $args[1] : null;
-        if (null !== $component
-            && JITVariable::TYPE_NATIVE_LONG !== $component->type
-            && JITVariable::TYPE_VALUE !== $component->type) {
-            throw new \LogicException('parse_url() component must be an integer in this compiler build');
-        }
 
         return JitParseUrl::parseUrl($context, $args[0], $component);
     }

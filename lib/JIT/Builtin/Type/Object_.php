@@ -1727,10 +1727,13 @@ class Object_ extends Type {
 
         $globalName = $this->ensureEnumCaseSingletonGlobal($classId, $caseKey);
 
-        return $this->jitClassConstObjectFromGlobal([
+        $var = $this->jitClassConstObjectFromGlobal([
             'type' => Variable::TYPE_OBJECT,
             'global' => $globalName,
         ]);
+        $var->compileTimeEnumCase = ['classId' => $classId, 'caseKey' => $caseKey];
+
+        return $var;
     }
 
     public function allocEnumCaseSingletonIr(int $classId, string $caseName, Variable $backingJit): Variable
@@ -2849,6 +2852,24 @@ class Object_ extends Type {
                 'Normal' => \PHPCompiler\ext\standard\VmConnection::NORMAL,
                 'Aborted' => \PHPCompiler\ext\standard\VmConnection::ABORTED,
                 'Timeout' => \PHPCompiler\ext\standard\VmConnection::TIMEOUT,
+            ] as $caseName => $value) {
+                $backing = new VMVariable();
+                $backing->int($value);
+                $this->defineEnumCaseConst($id, $caseName, $backing);
+            }
+        }
+        if ('parseurl' === $lcname) {
+            $this->enums[$lcname] = true;
+            $this->setEnumBackedType($id, 'int');
+            foreach ([
+                'Scheme' => \PHPCompiler\ext\standard\VmParseUrl::PHP_URL_SCHEME,
+                'Host' => \PHPCompiler\ext\standard\VmParseUrl::PHP_URL_HOST,
+                'Port' => \PHPCompiler\ext\standard\VmParseUrl::PHP_URL_PORT,
+                'User' => \PHPCompiler\ext\standard\VmParseUrl::PHP_URL_USER,
+                'Pass' => \PHPCompiler\ext\standard\VmParseUrl::PHP_URL_PASS,
+                'Path' => \PHPCompiler\ext\standard\VmParseUrl::PHP_URL_PATH,
+                'Query' => \PHPCompiler\ext\standard\VmParseUrl::PHP_URL_QUERY,
+                'Fragment' => \PHPCompiler\ext\standard\VmParseUrl::PHP_URL_FRAGMENT,
             ] as $caseName => $value) {
                 $backing = new VMVariable();
                 $backing->int($value);

@@ -28,6 +28,7 @@ final class BuiltinEnums
         self::registerSessionStatus($ctx);
         self::registerResponseCode($ctx);
         self::registerSorting($ctx);
+        self::registerParseUrl($ctx);
         foreach (array_diff(array_keys($ctx->classes), $before) as $lc) {
             $ctx->classes[$lc]->isInternal = true;
         }
@@ -268,6 +269,38 @@ final class BuiltinEnums
         EnumSupport::ensureBuiltinEnumInterfaces($entry);
 
         $lc = 'sorting';
+        $ctx->classes[$lc] = $entry;
+        $ctx->enums[$lc] = true;
+    }
+
+    /**
+     * PHP 8.4 ParseUrl: int-backed enum for parse_url() component (#7260).
+     *
+     * php-src: ext/standard/basic_functions.stub.php — enum ParseUrl: int
+     */
+    private static function registerParseUrl(Context $ctx): void
+    {
+        if (isset($ctx->classes['parseurl'])) {
+            return;
+        }
+
+        $entry = new ClassEntry('ParseUrl');
+        $entry->isEnum = true;
+        $entry->backedType = 'int';
+
+        self::registerBackedEnumCase($entry, 'Scheme', VmParseUrl::PHP_URL_SCHEME);
+        self::registerBackedEnumCase($entry, 'Host', VmParseUrl::PHP_URL_HOST);
+        self::registerBackedEnumCase($entry, 'Port', VmParseUrl::PHP_URL_PORT);
+        self::registerBackedEnumCase($entry, 'User', VmParseUrl::PHP_URL_USER);
+        self::registerBackedEnumCase($entry, 'Pass', VmParseUrl::PHP_URL_PASS);
+        self::registerBackedEnumCase($entry, 'Path', VmParseUrl::PHP_URL_PATH);
+        self::registerBackedEnumCase($entry, 'Query', VmParseUrl::PHP_URL_QUERY);
+        self::registerBackedEnumCase($entry, 'Fragment', VmParseUrl::PHP_URL_FRAGMENT);
+
+        EnumSupport::ensureBuiltinCasesMethod($entry);
+        EnumSupport::ensureBuiltinEnumInterfaces($entry);
+
+        $lc = 'parseurl';
         $ctx->classes[$lc] = $entry;
         $ctx->enums[$lc] = true;
     }
