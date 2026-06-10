@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace PHPCompiler\VM;
 
 use PHPCompiler\VM\EnumCaseSupport;
+use PHPCompiler\VM\TypeCheck;
 
 /**
  * PHP 8.4 lazy proxy and ghost initialization (#3317, #4026, #5318, #6708).
@@ -91,6 +92,7 @@ final class LazyObjectSupport
         $object->lazyPending = true;
         $object->lazyGhost = false;
         $object->lazyResetInitializer = $initializer;
+        self::clearLazyRawInitializedProperties($object);
 
         return $object;
     }
@@ -107,6 +109,7 @@ final class LazyObjectSupport
         $object->lazyPending = true;
         $object->lazyGhost = true;
         $object->lazyResetInitializer = $initializer;
+        self::clearLazyRawInitializedProperties($object);
 
         return $object;
     }
@@ -144,6 +147,7 @@ final class LazyObjectSupport
             }
             $object->constructed = true;
             $object->lazyPending = false;
+            self::clearLazyRawInitializedProperties($object);
 
             return;
         }
@@ -171,6 +175,7 @@ final class LazyObjectSupport
         }
         $object->constructed = true;
         $object->lazyPending = false;
+        self::clearLazyRawInitializedProperties($object);
     }
 
     public static function getInitializer(ObjectEntry $object): ?ClosureState
@@ -208,6 +213,9 @@ final class LazyObjectSupport
      */
     public static function isPropertyLazy(ObjectEntry $object, string $propertyName): bool
     {
+        if (isset($object->lazyRawInitializedProperties[$propertyName])) {
+            return false;
+        }
         if (!$object->lazyPending && null === $object->lazyResetInitializer) {
             return false;
         }
@@ -242,6 +250,7 @@ final class LazyObjectSupport
         $object->lazyInitializer = null;
         $object->lazyPending = false;
         $object->constructed = true;
+        self::clearLazyRawInitializedProperties($object);
 
         return $object;
     }
@@ -280,6 +289,7 @@ final class LazyObjectSupport
         $object->lazyPending = true;
         $object->lazyGhost = true;
         $object->lazyResetInitializer = $initializer;
+        self::clearLazyRawInitializedProperties($object);
     }
 
     /**
@@ -310,6 +320,7 @@ final class LazyObjectSupport
         $object->lazyPending = true;
         $object->lazyGhost = false;
         $object->lazyResetInitializer = $factory;
+        self::clearLazyRawInitializedProperties($object);
     }
 
     /**
@@ -339,6 +350,7 @@ final class LazyObjectSupport
         $object->destructorInvoked = false;
         $object->lazyInitializer = $initializer;
         $object->lazyPending = true;
+        self::clearLazyRawInitializedProperties($object);
     }
 
     private static function archiveResetInitializer(ObjectEntry $object, ?ClosureState $initializer): void
@@ -362,6 +374,64 @@ final class LazyObjectSupport
                 $var->copyFrom($property->default);
             }
         }
+    }
+
+    /**
+     * ReflectionProperty::setRawValueWithoutLazyInitialization — backing write without init (#7095).
+     *
+     * @see ext/reflection/php_reflection.c reflection_property_set_raw_value_without_lazy_initialization
+     */
+    public static function setRawValueWithoutLazyInitialization(
+        ObjectEntry $object,
+        ClassProperty $meta,
+        Variable $value,
+        bool $strictTypes
+    ): void {
+        if (!$object->lazyPending || !$object->lazyGhost) {
+            throw new \Error('Cannot set raw value on a non-lazy object');
+        }
+        if ($meta->propertyHookVirtual) {
+            throw new \Error('Cannot set raw value on virtual property');
+        }
+        if (!$object->hasProperty($meta->name)) {
+            throw new \LogicException('Undefined property in this compiler build');
+        }
+        $slot = $object->getProperty($meta->name);
+        $write = self::coerceRawPropertyWrite($value, $meta, $strictTypes);
+        $slot->copyFrom($write);
+        $object->lazyRawInitializedProperties[$meta->name] = true;
+    }
+
+    private static function coerceRawPropertyWrite(
+        Variable $value,
+        ClassProperty $meta,
+        bool $strictTypes
+    ): Variable {
+        $probe = new Variable();
+        $probe->copyFrom($value);
+        $target = $probe->resolveIndirect();
+        $typeMeta = $meta->prototype->resolveIndirect();
+        $target->typeConstraint = $typeMeta->typeConstraint;
+        $target->classConstraint = $typeMeta->classConstraint;
+        $target->literalBoolType = $typeMeta->literalBoolType;
+        $target->unionTypeConstraints = $typeMeta->unionTypeConstraints;
+        $target->declaredTypeLabel = $typeMeta->declaredTypeLabel;
+        $target->genericArrayTypeSpec = $typeMeta->genericArrayTypeSpec;
+        $target->dnfArms = $typeMeta->dnfArms;
+        TypeCheck::coercePropertyWrite($probe, $strictTypes);
+
+        return $probe;
+    }
+
+    public static function skipLazyInitForPropertyRead(ObjectEntry $object, string $propertyName): bool
+    {
+        return $object->lazyPending
+            && isset($object->lazyRawInitializedProperties[$propertyName]);
+    }
+
+    private static function clearLazyRawInitializedProperties(ObjectEntry $object): void
+    {
+        $object->lazyRawInitializedProperties = [];
     }
 
     /** Set declared properties on an uninitialized lazy ghost without running the initializer (#6531). */

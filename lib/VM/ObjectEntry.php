@@ -55,6 +55,13 @@ class ObjectEntry {
     /** Archived initializer for ReflectionClass::resetAsLazyObject() (#6125). */
     public ?ClosureState $lazyResetInitializer = null;
 
+    /**
+     * Instance properties written via ReflectionProperty::setRawValueWithoutLazyInitialization() (#7095).
+     *
+     * @var array<string, true>
+     */
+    public array $lazyRawInitializedProperties = [];
+
     /** True for backed/unit enum case singleton objects (#3518). */
     public bool $isEnumCase = false;
 
@@ -122,6 +129,7 @@ class ObjectEntry {
         $this->lazyPending = false;
         $this->lazyGhost = false;
         $this->lazyResetInitializer = null;
+        $this->lazyRawInitializedProperties = [];
         $this->fiberState = null;
     }
 
@@ -285,6 +293,7 @@ class ObjectEntry {
         $clone->lazyPending = $this->lazyPending;
         $clone->lazyGhost = $this->lazyGhost;
         $clone->lazyResetInitializer = $this->lazyResetInitializer;
+        $clone->lazyRawInitializedProperties = $this->lazyRawInitializedProperties;
 
         return $clone;
     }

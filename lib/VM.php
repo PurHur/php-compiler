@@ -4517,7 +4517,9 @@ restart:
                         break;
                     }
                     $propertyObject = $var->toObject();
-                    VM\LazyObjectSupport::ensureInitialized($this, $propertyObject);
+                    if (!VM\LazyObjectSupport::skipLazyInitForPropertyRead($propertyObject, $name)) {
+                        VM\LazyObjectSupport::ensureInitialized($this, $propertyObject);
+                    }
                     if (EnumCaseSupport::isEnumCase($propertyObject)) {
                         $forWrite = $this->propertyFetchDestUsedAsAssignLvalue($frame, $op);
                         $readonlyMsg = EnumCaseSupport::readonlyPseudoPropertyViolationMessage(
