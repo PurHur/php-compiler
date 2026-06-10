@@ -1202,6 +1202,22 @@ final class ReflectionSupport
     }
 
     /**
+     * ReflectionFunction::createFromFunction() — php-src ext/reflection/php_reflection.c (#6994).
+     */
+    public static function reflectionFunctionFromFunctionName(Context $ctx, string $functionName): ObjectEntry
+    {
+        if (str_contains($functionName, '::')) {
+            self::throwReflectionException(self::functionNotFoundMessage($functionName));
+        }
+        $func = self::resolveFunctionForReflection($ctx, $functionName);
+        $rf = self::newReflectionFunctionObject($ctx);
+        $rf->reflectionIsInternalFunction = $func instanceof Func\Internal;
+        $rf->getProperty(self::PROP_FUNC_NAME)->string($functionName);
+
+        return $rf;
+    }
+
+    /**
      * ReflectionFunction::createFromCallable() — php-src ext/reflection/php_reflection.c (#7039).
      */
     public static function reflectionFunctionFromCallable(Context $ctx, Frame $frame, Variable $callable): ObjectEntry
@@ -1220,13 +1236,7 @@ final class ReflectionSupport
         }
         try {
             if (Variable::TYPE_STRING === $callable->type && !str_contains($callable->toString(), '::')) {
-                $name = $callable->toString();
-                $func = self::resolveFunctionForReflection($ctx, $name);
-                $rf = self::newReflectionFunctionObject($ctx);
-                $rf->reflectionIsInternalFunction = $func instanceof Func\Internal;
-                $rf->getProperty(self::PROP_FUNC_NAME)->string($name);
-
-                return $rf;
+                return self::reflectionFunctionFromFunctionName($ctx, $callable->toString());
             }
             $closureObj = ClosureSupport::fromCallable($ctx, $frame, $callable);
             $state = ClosureSupport::requireClosureState(

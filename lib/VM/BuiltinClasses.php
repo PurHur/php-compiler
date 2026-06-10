@@ -98,6 +98,7 @@ use PHPCompiler\VM\Builtin\ReflectionEnumUnitCaseGetName;
 use PHPCompiler\VM\Builtin\ReflectionEnumUnitCaseGetValue;
 use PHPCompiler\VM\Builtin\ReflectionFunctionConstruct;
 use PHPCompiler\VM\Builtin\ReflectionFunctionCreateFromCallable;
+use PHPCompiler\VM\Builtin\ReflectionFunctionCreateFromFunction;
 use PHPCompiler\VM\Builtin\ReflectionFunctionGetExtensionName;
 use PHPCompiler\VM\Builtin\ReflectionFunctionGetName;
 use PHPCompiler\VM\Builtin\ReflectionFunctionGetParameters;
@@ -565,6 +566,8 @@ final class BuiltinClasses
         }
         $rf->methods['createfromcallable'] = new ReflectionFunctionCreateFromCallable();
         $rf->methodVisibility['createfromcallable'] = $pubStatic;
+        $rf->methods['createfromfunction'] = new ReflectionFunctionCreateFromFunction();
+        $rf->methodVisibility['createfromfunction'] = $pubStatic;
         $ctx->classes[ReflectionSupport::REFLECTION_FUNCTION] = $rf;
 
         $rconst = new ClassEntry('ReflectionConstant');
