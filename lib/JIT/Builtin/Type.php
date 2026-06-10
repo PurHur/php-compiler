@@ -1072,6 +1072,11 @@ class Type extends Builtin {
         $fntypeTempnam = $this->context->context->functionType($strPtr, false, $strPtr, $strPtr);
         $fnTempnam = $this->context->module->addFunction('__compiler_tempnam', $fntypeTempnam);
         $this->context->registerFunction('__compiler_tempnam', $fnTempnam);
+        $i64 = $this->context->getTypeFromString('int64');
+        $i32 = $this->context->getTypeFromString('int32');
+        $fntypeFtok = $this->context->context->functionType($i64, false, $strPtr, $i32);
+        $fnFtok = $this->context->module->addFunction('__compiler_ftok', $fntypeFtok);
+        $this->context->registerFunction('__compiler_ftok', $fnFtok);
         $fntypeHttpBuildQuery = $this->context->context->functionType(
             $strPtr,
             false,
