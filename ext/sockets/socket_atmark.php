@@ -8,12 +8,14 @@ use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\Variable as JITVariable;
+use PHPCompiler\VM\BuiltinExecute;
+use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
 
 /**
  * socket_atmark() — TCP urgent-data mark probe (php-src ext/sockets/sockets.c; #6544).
  *
- * VM delegates to host {@see \socket_atmark()} on the wrapped {@see \Socket}.
+ * VM uses libc sockatmark(3) via {@see VmSockets} FFI; host fallback only when FFI unavailable (#7998).
  *
  * @see https://github.com/php/php-src/blob/master/ext/sockets/sockets.c PHP_FUNCTION(socket_atmark)
  */
@@ -32,12 +34,13 @@ final class socket_atmark extends Internal
                 'socket_atmark() expects exactly 1 argument, '.$argc.' given'
             );
         }
-        if (null === $frame->returnVar) {
-            return;
-        }
 
         $hostSocket = VmSocketArg::requireHostSocket($frame->calledArgs[0], 'socket_atmark', 1);
-        $frame->returnVar->bool(VmSockets::atmark($hostSocket));
+        $atmark = VmSockets::atmark($hostSocket);
+        BuiltinExecute::writeReturn(
+            $frame,
+            static fn (Variable $ret) => $ret->bool($atmark)
+        );
     }
 
     public function call(Context $context, JITVariable ...$args): Value
