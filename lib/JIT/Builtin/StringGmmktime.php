@@ -226,7 +226,7 @@ final class StringGmmktime
             ['gmtime', $i8p, [$i64p]],
             ['timegm', $i64, [$i8p]],
             ['__value__writeLong', $voidTy, [$valuePtr, $i64]],
-            ['__value__writeBool', $voidTy, [$valuePtr, $i8]],
+            ['__value__writeBool', $voidTy, [$valuePtr, $i32]],
         ] as [$name, $ret, $params]) {
             self::ensureExternal(
                 $context,
