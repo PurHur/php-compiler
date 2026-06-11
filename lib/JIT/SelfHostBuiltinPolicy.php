@@ -44,6 +44,7 @@ final class SelfHostBuiltinPolicy
         'getdate' => 'numeric',
         'gmgetdate' => 'numeric',
         'gmmktime' => 'numeric',
+        'mktime' => 'numeric',
         'localtime' => 'numeric',
         'idate' => 'numeric',
         'uniqid' => 'numeric',

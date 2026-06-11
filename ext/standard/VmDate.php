@@ -492,6 +492,56 @@ final class VmDate
     }
 
     /**
+     * mktime() — local-time timestamp from parts (php-src ext/date/php_date.c PHP_FUNCTION(mktime), #3292).
+     */
+    public static function mktime(
+        int $hour,
+        ?int $minute = null,
+        ?int $second = null,
+        ?int $month = null,
+        ?int $day = null,
+        ?int $year = null
+    ): int|false {
+        if (null === $minute) {
+            $tm = self::localtime(self::time());
+            if (null === $tm) {
+                return false;
+            }
+            $minute = (int) $tm->tm_min;
+            $second = (int) $tm->tm_sec;
+            $month = (int) $tm->tm_mon + 1;
+            $day = (int) $tm->tm_mday;
+            $year = (int) $tm->tm_year + 1900;
+        } else {
+            $second ??= 0;
+            $month ??= 0;
+            $day ??= 0;
+            $year ??= 0;
+        }
+
+        $ffi = self::ffi();
+        if (null === $ffi) {
+            return false;
+        }
+
+        $tmStruct = $ffi->new('struct tm');
+        $tmStruct->tm_sec = $second;
+        $tmStruct->tm_min = $minute;
+        $tmStruct->tm_hour = $hour;
+        $tmStruct->tm_mday = $day;
+        $tmStruct->tm_mon = $month - 1;
+        $tmStruct->tm_year = $year - 1900;
+        $tmStruct->tm_isdst = -1;
+
+        $result = (int) $ffi->mktime(\FFI::addr($tmStruct));
+        if (-1 === $result) {
+            return false;
+        }
+
+        return $result;
+    }
+
+    /**
      * gmmktime() — UTC mktime (php-src ext/date/php_date.c PHP_FUNCTION(gmmktime), #7001).
      */
     public static function gmmktime(
@@ -889,6 +939,7 @@ int gettimeofday(struct timeval *tv, struct timezone *tz);
 struct tm *localtime_r(const time_t *timep, struct tm *result);
 struct tm *gmtime_r(const time_t *timep, struct tm *result);
 time_t timegm(struct tm *tm);
+time_t mktime(struct tm *tm);
 pid_t getpid(void);
 CDEF;
 

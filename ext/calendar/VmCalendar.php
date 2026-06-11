@@ -475,45 +475,11 @@ final class VmCalendar
 
     private static function localMidnightTimestamp(int $year, int $month, int $day): int
     {
-        if (\function_exists('mktime')) {
-            $ts = \mktime(0, 0, 0, $month, $day, $year);
-            if (false !== $ts) {
-                return (int) $ts;
-            }
-        }
-
-        $ffi = self::ffi();
-        if (null !== $ffi) {
-            return (int) $ffi->mktime(0, 0, 0, $month, $day, $year);
+        $ts = VmDate::mktime(0, 0, 0, $month, $day, $year);
+        if (false !== $ts) {
+            return $ts;
         }
 
         throw new \LogicException('easter_date() requires mktime support in this compiler build');
-    }
-
-    private static function ffi(): ?\FFI
-    {
-        static $ffi = null;
-        static $probed = false;
-        if ($probed) {
-            return $ffi;
-        }
-        $probed = true;
-        if (!\extension_loaded('ffi')) {
-            return null;
-        }
-        $cdef = <<<'CDEF'
-typedef long time_t;
-time_t mktime(int hour, int min, int sec, int mon, int day, int year);
-CDEF;
-        foreach (['libc.so.6', 'libc.so'] as $lib) {
-            try {
-                $ffi = \FFI::cdef($cdef, $lib);
-
-                return $ffi;
-            } catch (\Throwable) {
-            }
-        }
-
-        return null;
     }
 }

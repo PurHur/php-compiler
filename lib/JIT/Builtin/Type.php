@@ -850,6 +850,7 @@ class Type extends Builtin {
             'localtime' => [$i8p, false, [$i64p]],
             'gmtime' => [$i8p, false, [$i64p]],
             'timegm' => [$i64, false, [$i8p]],
+            'mktime' => [$i64, false, [$i8p]],
             'sleep' => [$i32, false, [$i32]],
             'usleep' => [$i32, false, [$i32]],
             'getloadavg' => [$i32, false, [$double->pointerType(0), $i32]],
@@ -962,6 +963,11 @@ class Type extends Builtin {
             $this->context->context->functionType($void, false, $i64, $i64, $i64, $i64, $i64, $i64, $i1, $valuePtr)
         );
         $this->context->registerFunction('__compiler_gmmktime', $fnGmmktime);
+        $fnMktime = $this->context->module->addFunction(
+            '__compiler_mktime',
+            $this->context->context->functionType($void, false, $i64, $i64, $i64, $i64, $i64, $i64, $i1, $valuePtr)
+        );
+        $this->context->registerFunction('__compiler_mktime', $fnMktime);
         $fnGetrusage = $this->context->module->addFunction(
             '__compiler_getrusage',
             $this->context->context->functionType($void, false, $i64, $valuePtr)

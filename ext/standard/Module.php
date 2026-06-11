@@ -712,6 +712,7 @@ class Module extends ModuleAbstract
             new getdate(),
             new gmgetdate(),
             new gmmktime(),
+            new mktime(),
             new localtime(),
             new idate(),
             new date_sun_info(),
