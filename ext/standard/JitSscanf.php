@@ -29,7 +29,7 @@ final class JitSscanf
 
         $strLit = $args[0]->compileTimeString ?? null;
         $fmtLit = $args[1]->compileTimeString ?? null;
-        if (null !== $strLit && null !== $fmtLit) {
+        if (null !== $strLit && null !== $fmtLit && self::canFoldCompileTime($fmtLit, $argc - 2)) {
             return self::parseCompileTime($context, $strLit, $fmtLit, \array_slice($args, 2));
         }
 
@@ -83,6 +83,21 @@ final class JitSscanf
         $context->builder->call($context->lookupFunction('__mm__free'), $raw);
 
         return $context->builder->intCast($count, $i64);
+    }
+
+    /** Compile-time fold only when arity is valid — mismatches use runtime LLVM (#4064). */
+    private static function canFoldCompileTime(string $format, int $outCount): bool
+    {
+        if (0 === $outCount) {
+            return true;
+        }
+        try {
+            VmSscanf::validateOutVarArity($format, $outCount);
+
+            return true;
+        } catch (\ValueError) {
+            return false;
+        }
     }
 
     /**
