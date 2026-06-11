@@ -9,12 +9,13 @@ namespace PHPCompiler\ext\standard;
  */
 final class VmJsonValidate
 {
-    public static function validate(string $json, int $depth): bool
+    public static function validate(string $json, int $depth, int $flags = 0): bool
     {
         if ($depth < 1) {
             throw new \ValueError('json_validate(): Argument #2 ($depth) must be greater than 0');
         }
-        $result = VmJsonScanner::validate($json, $depth);
+        VmJsonFlags::assertValidateFlags($flags);
+        $result = VmJsonScanner::validate($json, $depth, $flags);
         if (VmJsonScanner::RESULT_DEPTH === $result) {
             throw new \ValueError('json_validate(): Argument #1 ($json) depth exceeds the maximum allowed depth of '.$depth);
         }

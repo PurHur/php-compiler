@@ -23,21 +23,23 @@ final class VmJsonScanner
     private int $pos = 0;
     private int $depth = 0;
     private int $maxDepth;
+    private int $flags;
 
-    private function __construct(string $json, int $maxDepth)
+    private function __construct(string $json, int $maxDepth, int $flags = 0)
     {
         $this->json = $json;
         $this->len = \strlen($json);
         $this->maxDepth = $maxDepth;
+        $this->flags = $flags;
     }
 
-    public static function validate(string $json, int $maxDepth): int
+    public static function validate(string $json, int $maxDepth, int $flags = 0): int
     {
         $len = \strlen($json);
         if (0 === $len || $len > self::MAX_LEN) {
             return self::RESULT_SYNTAX;
         }
-        $scanner = new self($json, $maxDepth);
+        $scanner = new self($json, $maxDepth, $flags);
         VmJson::setLastError(0);
         if (!$scanner->parseTop()) {
             if (1 === VmJson::lastError()) {
@@ -81,9 +83,17 @@ final class VmJsonScanner
         if (!$this->expect('"')) {
             return false;
         }
+        $start = $this->pos;
         while ($this->pos < $this->len) {
             $c = $this->json[$this->pos++];
             if ('"' === $c) {
+                if (!VmJsonFlags::ignoreInvalidUtf8($this->flags)) {
+                    $content = \substr($this->json, $start, $this->pos - 1 - $start);
+                    if (!VmJsonUtf8::isValidJsonStringContent($content)) {
+                        return false;
+                    }
+                }
+
                 return true;
             }
             if ('\\' === $c && $this->pos < $this->len) {
@@ -93,6 +103,10 @@ final class VmJsonScanner
                 }
                 if ('u' === $esc) {
                     if ($this->pos + 4 > $this->len) {
+                        return false;
+                    }
+                    $hex = \substr($this->json, $this->pos, 4);
+                    if (4 !== \strspn($hex, '0123456789abcdefABCDEF')) {
                         return false;
                     }
                     $this->pos += 4;
