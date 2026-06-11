@@ -64,6 +64,7 @@ class Module extends ModuleAbstract
             new posix_errno(),
             new posix_access(),
             new posix_mknod(),
+            new posix_mkfifo(),
             new posix_setuid(),
             new posix_setgid(),
             new posix_seteuid(),
