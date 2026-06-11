@@ -44,21 +44,14 @@ final class VmFsDiskNativeTest extends TestCase
         }
     }
 
-    public function testVmFsDiskSpaceWithoutFfiViaHostFallback(): void
+    public function testVmFsDiskSpaceWithoutFfiReturnsFalse(): void
     {
-        if (!\function_exists('disk_free_space') || !\function_exists('disk_total_space')) {
-            $this->markTestSkipped('host disk_* unavailable');
-        }
         $path = sys_get_temp_dir();
         $prev = getenv('PHP_COMPILER_DISABLE_FFI');
         putenv('PHP_COMPILER_DISABLE_FFI=1');
         try {
-            $free = VmFs::diskFreeSpace($path);
-            $total = VmFs::diskTotalSpace($path);
-            $this->assertIsFloat($free);
-            $this->assertIsFloat($total);
-            $this->assertGreaterThan(0.0, $free);
-            $this->assertGreaterThan(0.0, $total);
+            $this->assertFalse(VmFs::diskFreeSpace($path));
+            $this->assertFalse(VmFs::diskTotalSpace($path));
         } finally {
             if (false === $prev) {
                 putenv('PHP_COMPILER_DISABLE_FFI');

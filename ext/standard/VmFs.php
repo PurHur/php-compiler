@@ -1393,12 +1393,6 @@ final class VmFs
                 return $native;
             }
         }
-        if (\function_exists('disk_free_space')) {
-            $result = @\disk_free_space($path);
-            if (false !== $result) {
-                return (float) $result;
-            }
-        }
 
         return false;
     }
@@ -1415,12 +1409,6 @@ final class VmFs
             $native = VmFsDiskNative::diskTotalSpace($path);
             if (false !== $native) {
                 return $native;
-            }
-        }
-        if (\function_exists('disk_total_space')) {
-            $result = @\disk_total_space($path);
-            if (false !== $result) {
-                return (float) $result;
             }
         }
 

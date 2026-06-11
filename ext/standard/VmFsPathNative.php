@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace PHPCompiler\ext\standard;
 
 /**
- * rename(2)/link(2)/copy via libc FFI for VM without host PHP builtins (#5213, #7314 pattern).
+ * rename(2)/link(2)/copy via libc FFI only — no host PHP builtin delegation (#5213, #7971).
  *
  * php-src: ext/standard/filestat.c — php_rename, php_link; copy uses streams
  * JIT/AOT: JitRename / JitCopy / __compiler_copy (unchanged).
@@ -31,9 +31,6 @@ final class VmFsPathNative
                 return 0 === (int) $ffi->rename($from, $to);
             }
         }
-        if (\function_exists('rename')) {
-            return @\rename($from, $to);
-        }
 
         return false;
     }
@@ -49,9 +46,6 @@ final class VmFsPathNative
                 return 0 === (int) $ffi->link($target, $link);
             }
         }
-        if (\function_exists('link')) {
-            return @\link($target, $link);
-        }
 
         return false;
     }
@@ -66,9 +60,6 @@ final class VmFsPathNative
             if (null !== $ffi) {
                 return self::copyViaFfi($ffi, $from, $to);
             }
-        }
-        if (\function_exists('copy')) {
-            return @\copy($from, $to);
         }
 
         return false;
