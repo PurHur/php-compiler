@@ -144,6 +144,46 @@ final class StdlibConstants
 
     public const STREAM_FILTER_WRITE = 2;
 
+    /** syslog priorities (syslog.h; ext/standard/basic_functions.c). */
+    public const LOG_EMERG = 0;
+    public const LOG_ALERT = 1;
+    public const LOG_CRIT = 2;
+    public const LOG_ERR = 3;
+    public const LOG_WARNING = 4;
+    public const LOG_NOTICE = 5;
+    public const LOG_INFO = 6;
+    public const LOG_DEBUG = 7;
+
+    /** openlog() option flags (syslog.h). */
+    public const LOG_PID = 1;
+    public const LOG_CONS = 2;
+    public const LOG_ODELAY = 4;
+    public const LOG_NDELAY = 8;
+    public const LOG_NOWAIT = 16;
+    public const LOG_PERROR = 32;
+
+    /** openlog() facility codes (syslog.h; Linux values). */
+    public const LOG_KERN = 0;
+    public const LOG_USER = 8;
+    public const LOG_MAIL = 16;
+    public const LOG_DAEMON = 24;
+    public const LOG_AUTH = 32;
+    public const LOG_SYSLOG = 40;
+    public const LOG_LPR = 48;
+    public const LOG_NEWS = 56;
+    public const LOG_UUCP = 64;
+    public const LOG_CRON = 72;
+    public const LOG_AUTHPRIV = 80;
+    public const LOG_FTP = 88;
+    public const LOG_LOCAL0 = 128;
+    public const LOG_LOCAL1 = 136;
+    public const LOG_LOCAL2 = 144;
+    public const LOG_LOCAL3 = 152;
+    public const LOG_LOCAL4 = 160;
+    public const LOG_LOCAL5 = 168;
+    public const LOG_LOCAL6 = 176;
+    public const LOG_LOCAL7 = 184;
+
     /** glob() flags (ext/standard/dir.c / glob.h; values match php-src on Linux). */
     public const GLOB_ERR = 1;
     public const GLOB_MARK = 2;
@@ -231,6 +271,40 @@ final class StdlibConstants
         'preg_bad_utf8_error' => self::PREG_BAD_UTF8_ERROR,
         'preg_bad_utf8_offset_error' => self::PREG_BAD_UTF8_OFFSET_ERROR,
         'preg_jit_stacklimit_error' => self::PREG_JIT_STACKLIMIT_ERROR,
+        'log_emerg' => self::LOG_EMERG,
+        'log_alert' => self::LOG_ALERT,
+        'log_crit' => self::LOG_CRIT,
+        'log_err' => self::LOG_ERR,
+        'log_warning' => self::LOG_WARNING,
+        'log_notice' => self::LOG_NOTICE,
+        'log_info' => self::LOG_INFO,
+        'log_debug' => self::LOG_DEBUG,
+        'log_pid' => self::LOG_PID,
+        'log_cons' => self::LOG_CONS,
+        'log_odelay' => self::LOG_ODELAY,
+        'log_ndelay' => self::LOG_NDELAY,
+        'log_nowait' => self::LOG_NOWAIT,
+        'log_perror' => self::LOG_PERROR,
+        'log_kern' => self::LOG_KERN,
+        'log_user' => self::LOG_USER,
+        'log_mail' => self::LOG_MAIL,
+        'log_daemon' => self::LOG_DAEMON,
+        'log_auth' => self::LOG_AUTH,
+        'log_syslog' => self::LOG_SYSLOG,
+        'log_lpr' => self::LOG_LPR,
+        'log_news' => self::LOG_NEWS,
+        'log_uucp' => self::LOG_UUCP,
+        'log_cron' => self::LOG_CRON,
+        'log_authpriv' => self::LOG_AUTHPRIV,
+        'log_ftp' => self::LOG_FTP,
+        'log_local0' => self::LOG_LOCAL0,
+        'log_local1' => self::LOG_LOCAL1,
+        'log_local2' => self::LOG_LOCAL2,
+        'log_local3' => self::LOG_LOCAL3,
+        'log_local4' => self::LOG_LOCAL4,
+        'log_local5' => self::LOG_LOCAL5,
+        'log_local6' => self::LOG_LOCAL6,
+        'log_local7' => self::LOG_LOCAL7,
         'glob_err' => self::GLOB_ERR,
         'glob_mark' => self::GLOB_MARK,
         'glob_nosort' => self::GLOB_NOSORT,
@@ -333,6 +407,40 @@ final class StdlibConstants
         'preg_split_delim_capture',
         'preg_split_offset_capture',
         'preg_grep_invert',
+        'log_emerg',
+        'log_alert',
+        'log_crit',
+        'log_err',
+        'log_warning',
+        'log_notice',
+        'log_info',
+        'log_debug',
+        'log_pid',
+        'log_cons',
+        'log_odelay',
+        'log_ndelay',
+        'log_nowait',
+        'log_perror',
+        'log_kern',
+        'log_user',
+        'log_mail',
+        'log_daemon',
+        'log_auth',
+        'log_syslog',
+        'log_lpr',
+        'log_news',
+        'log_uucp',
+        'log_cron',
+        'log_authpriv',
+        'log_ftp',
+        'log_local0',
+        'log_local1',
+        'log_local2',
+        'log_local3',
+        'log_local4',
+        'log_local5',
+        'log_local6',
+        'log_local7',
         'glob_err',
         'glob_mark',
         'glob_nosort',

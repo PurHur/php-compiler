@@ -1,0 +1,41 @@
+<?php
+
+declare(strict_types=1);
+
+namespace PHPCompiler\ext\standard;
+
+use PHPCompiler\Frame;
+use PHPCompiler\Func\Internal;
+use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\Variable as JITVariable;
+use PHPLLVM\Value;
+
+/** openlog() — open connection to system logger (ext/standard/syslog.c; #3676). */
+final class openlog extends Internal
+{
+    public function __construct()
+    {
+        parent::__construct('openlog');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $argc = \count($frame->calledArgs);
+        if (3 !== $argc) {
+            throw new \ArgumentCountError('openlog() expects exactly 3 arguments, '.$argc.' given');
+        }
+        if (null === $frame->returnVar) {
+            return;
+        }
+
+        $ident = VmString::coerceStringBuiltinArg($frame->calledArgs[0], 'openlog', 0, 'ident');
+        $option = VmMath::parseIntBuiltinArg($frame->calledArgs[1], 'openlog', 1, 'option');
+        $facility = VmMath::parseIntBuiltinArg($frame->calledArgs[2], 'openlog', 2, 'facility');
+        $frame->returnVar->bool(VmSyslog::openlog($ident, $option, $facility));
+    }
+
+    public function call(Context $context, JITVariable ...$args): Value
+    {
+        throw new \LogicException('openlog() is not implemented for JIT in this compiler build (issue #3676)');
+    }
+}
