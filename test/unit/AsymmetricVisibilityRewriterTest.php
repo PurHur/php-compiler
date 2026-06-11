@@ -230,4 +230,12 @@ PHP;
         $this->expectExceptionMessage(AsymmetricVisibilityRewriter::MULTIPLE_MODIFIERS_MESSAGE);
         AsymmetricVisibilityRewriter::rewrite($source);
     }
+
+    public function testRewriterSourceFileDoesNotFalsePositiveOnDocblockExamples(): void
+    {
+        $source = file_get_contents(__DIR__.'/../../lib/Ast/AsymmetricVisibilityRewriter.php');
+        self::assertNotFalse($source);
+        $rewritten = AsymmetricVisibilityRewriter::rewrite($source);
+        self::assertSame($source, $rewritten);
+    }
 }
