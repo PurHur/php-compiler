@@ -10,6 +10,7 @@ use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Builtin\StringVarExportJit;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitValueBox;
+use PHPCompiler\JIT\TypedPropertyUninitGuard;
 use PHPCompiler\JIT\ValueEchoHelper;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\EnumCaseSupport;
@@ -32,6 +33,7 @@ final class var_export extends Internal
             throw new \LogicException('var_export() requires one or two arguments in this compiler build');
         }
         $v = $frame->calledArgs[0]->resolveIndirect();
+        TypedPropertyCheck::assertReadable($v);
         $return = false;
         if (2 === $argc) {
             $retArg = $frame->calledArgs[1]->resolveIndirect();
@@ -56,6 +58,9 @@ final class var_export extends Internal
         $argc = count($args);
         if ($argc < 1 || $argc > 2) {
             throw new \LogicException('var_export() requires one or two arguments in this compiler build (JIT/AOT)');
+        }
+        if (JITVariable::TYPE_VALUE === $args[0]->type) {
+            TypedPropertyUninitGuard::emitBeforeRead($context, $args[0]);
         }
         if (JITVariable::TYPE_NATIVE_BOOL === $args[0]->type) {
             self::echoBoolJit($context, self::boolValForBranch($context, $args[0]));
