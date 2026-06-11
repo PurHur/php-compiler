@@ -1134,6 +1134,46 @@ final class ReflectionSupport
         return null;
     }
 
+    /**
+     * Resolve a class + method pair for ReflectionMethod construction (#3340, #7038).
+     *
+     * @return array{0: ClassEntry, 1: string}
+     */
+    public static function reflectionMethodFromClassAndMethod(
+        Context $ctx,
+        string $className,
+        string $methodName
+    ): array {
+        $entry = VmReflection::resolveClassEntry($ctx, $className);
+        if (null === $entry) {
+            self::throwReflectionException(self::classNotFoundMessage($className));
+        }
+        $methodLc = strtolower($methodName);
+        if (!isset($entry->methods[$methodLc]) && !isset($entry->abstractMethods[$methodLc])) {
+            self::throwReflectionException(self::methodNotFoundMessage($entry->name, $methodName));
+        }
+
+        return [$entry, $methodName];
+    }
+
+    /**
+     * ReflectionMethod::createFromMethodName() — php-src ext/reflection/php_reflection.c (#7038).
+     */
+    public static function reflectionMethodFromMethodName(Context $ctx, string $classMethod): ObjectEntry
+    {
+        $sep = strpos($classMethod, '::');
+        if (false === $sep) {
+            self::throwReflectionException(
+                'ReflectionMethod::createFromMethodName(): Argument #1 ($method) must be a valid method name'
+            );
+        }
+        $className = substr($classMethod, 0, $sep);
+        $methodName = substr($classMethod, $sep + 2);
+        [$entry, $methodName] = self::reflectionMethodFromClassAndMethod($ctx, $className, $methodName);
+
+        return self::newReflectionMethodObject($ctx, $entry, $methodName);
+    }
+
     public static function newReflectionMethodObject(Context $ctx, ClassEntry $entry, string $methodName): ObjectEntry
     {
         $rmClass = $ctx->classes[self::REFLECTION_METHOD] ?? null;
@@ -1337,14 +1377,7 @@ final class ReflectionSupport
         if (null === $className || null === $methodName || '' === $className || '' === $methodName) {
             self::throwReflectionException('Given closure was not created from a method');
         }
-        $entry = VmReflection::resolveClassEntry($ctx, $className);
-        if (null === $entry) {
-            self::throwReflectionException(self::classNotFoundMessage($className));
-        }
-        $methodLc = strtolower($methodName);
-        if (!isset($entry->methods[$methodLc]) && !isset($entry->abstractMethods[$methodLc])) {
-            self::throwReflectionException(self::methodNotFoundMessage($entry->name, $methodName));
-        }
+        [$entry, $methodName] = self::reflectionMethodFromClassAndMethod($ctx, $className, $methodName);
 
         return self::newReflectionMethodObject($ctx, $entry, $methodName);
     }

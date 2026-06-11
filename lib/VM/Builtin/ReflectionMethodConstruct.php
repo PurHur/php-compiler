@@ -27,18 +27,7 @@ final class ReflectionMethodConstruct extends VmClassMethod
         $ctx = VmReflection::requireContext($frame);
         $className = VmReflection::stringArg($frame->calledArgs[1], 'ReflectionMethod::__construct() class', 1);
         $method = VmReflection::stringArg($frame->calledArgs[2], 'ReflectionMethod::__construct() method', 2);
-        $entry = VmReflection::resolveClassEntry($ctx, $className);
-        if (null === $entry) {
-            ReflectionSupport::throwReflectionException(
-                ReflectionSupport::classNotFoundMessage($className)
-            );
-        }
-        $methodLc = strtolower($method);
-        if (!isset($entry->methods[$methodLc]) && !isset($entry->abstractMethods[$methodLc])) {
-            ReflectionSupport::throwReflectionException(
-                ReflectionSupport::methodNotFoundMessage($entry->name, $method)
-            );
-        }
+        [$entry, $method] = ReflectionSupport::reflectionMethodFromClassAndMethod($ctx, $className, $method);
         $receiver->getProperty(ReflectionSupport::PROP_CLASS_NAME)->string($entry->name);
         $receiver->getProperty(ReflectionSupport::PROP_METHOD_NAME)->string($method);
     }
