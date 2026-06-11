@@ -153,7 +153,7 @@ final class JitFdiv
         $arrayTy = $i8->constInt(VmVariable::TYPE_ARRAY, false);
         $objectTy = $i8->constInt(VmVariable::TYPE_OBJECT, false);
         $enumCaseTy = $i8->constInt(VmVariable::TYPE_ENUM_CASE, false);
-        $doubleTy = $i8->constInt(VmVariable::TYPE_NATIVE_DOUBLE, false);
+        $doubleTy = $i8->constInt(VmVariable::TYPE_FLOAT, false);
         $stringTy = $i8->constInt(VmVariable::TYPE_STRING, false);
 
         $nullBlock = BasicBlockHelper::append($context, 'fdiv_box_null');

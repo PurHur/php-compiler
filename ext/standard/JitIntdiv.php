@@ -130,7 +130,7 @@ final class JitIntdiv
         $nullTy = $i8->constInt(VmVariable::TYPE_NULL, false);
         $arrayTy = $i8->constInt(VmVariable::TYPE_ARRAY, false);
         $objectTy = $i8->constInt(VmVariable::TYPE_OBJECT, false);
-        $doubleTy = $i8->constInt(VmVariable::TYPE_NATIVE_DOUBLE, false);
+        $doubleTy = $i8->constInt(VmVariable::TYPE_FLOAT, false);
         $stringTy = $i8->constInt(VmVariable::TYPE_STRING, false);
 
         $enumCaseTy = $i8->constInt(VmVariable::TYPE_ENUM_CASE, false);
