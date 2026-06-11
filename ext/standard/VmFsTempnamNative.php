@@ -1,0 +1,76 @@
+<?php
+
+declare(strict_types=1);
+
+namespace PHPCompiler\ext\standard;
+
+/**
+ * libc mkstemp(3) for tempnam() without host PHP delegation (#4401).
+ */
+final class VmFsTempnamNative
+{
+    private const PATH_MAX = 4096;
+
+    private static ?\FFI $ffi = null;
+
+    public static function mkstemp(string $dir, string $prefix): string|false
+    {
+        if (str_contains($dir, "\0") || str_contains($prefix, "\0")) {
+            return false;
+        }
+        $ffi = self::ffi();
+        if (null === $ffi) {
+            return false;
+        }
+        $sep = ('/' === $dir[\strlen($dir) - 1] || '\\' === $dir[\strlen($dir) - 1]) ? '' : '/';
+        $template = $dir.$sep.$prefix.'XXXXXX';
+        if (\strlen($template) >= self::PATH_MAX) {
+            return false;
+        }
+        try {
+            $buf = $ffi->new('char['.\strlen($template).']', false);
+            for ($i = 0, $n = \strlen($template); $i < $n; ++$i) {
+                $buf[$i] = $template[$i];
+            }
+            $fd = (int) $ffi->mkstemp(\FFI::addr($buf[0]));
+            if ($fd < 0) {
+                return false;
+            }
+            $ffi->close($fd);
+
+            return \FFI::string(\FFI::addr($buf[0]));
+        } catch (\Throwable) {
+            return false;
+        }
+    }
+
+    private static function ffi(): ?\FFI
+    {
+        if (null !== self::$ffi) {
+            return self::$ffi;
+        }
+        if (!\extension_loaded('ffi')) {
+            return null;
+        }
+        $v = getenv('PHP_COMPILER_DISABLE_FFI');
+        if (false !== $v && '' !== $v && '0' !== $v && 'false' !== strtolower($v)) {
+            return null;
+        }
+
+        $cdef = <<<'CDEF'
+int mkstemp(char *template);
+int close(int fd);
+CDEF;
+
+        foreach (['libc.so.6', 'libc.so'] as $lib) {
+            try {
+                self::$ffi = \FFI::cdef($cdef, $lib);
+
+                return self::$ffi;
+            } catch (\Throwable) {
+            }
+        }
+
+        return null;
+    }
+}

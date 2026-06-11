@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace PHPCompiler\JIT\Builtin;
 
+use PHPCompiler\ext\standard\VmFsTempnam;
 use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Context;
 use PHPLLVM\Builder;
@@ -787,13 +788,31 @@ final class StringFsDirJit
 
     private static function emitTempnam(Context $context, LlvmFunction $fn): void
     {
-        $entry = $fn->appendBasicBlock('entry');
-        $context->builder->positionAtEnd($entry);
+        TypeErrorRaise::ensureLinked($context);
+        StringTriggerError::ensureLinked($context);
 
         $i8 = $context->getTypeFromString('int8');
         $i32 = $context->getTypeFromString('int32');
+        $i64 = $context->getTypeFromString('int64');
         $sizeT = $context->getTypeFromString('size_t');
+        $i8p = $context->getTypeFromString('int8*');
         $strPtr = $context->getTypeFromString('__string__*');
+        $strMap = $context->structFieldMap['__string__'];
+
+        foreach ([
+            ['memchr', $i8p, [$i8p, $i32, $sizeT]],
+            ['strrchr', $i8p, [$i8p, $i32]],
+            ['strlen', $i64, [$i8p]],
+            ['memcpy', $i8p, [$i8p, $i8p, $sizeT]],
+            ['snprintf', $i32, [$i8p, $sizeT, $i8p]],
+            ['mkstemp', $i32, [$i8p]],
+            ['close', $i32, [$i32]],
+        ] as [$name, $ret, $params]) {
+            self::ensureExternal($context, $name, $context->context->functionType($ret, false, ...$params));
+        }
+
+        $entry = $fn->appendBasicBlock('entry');
+        $context->builder->positionAtEnd($entry);
 
         $dirObj = $fn->getParam(0);
         $pfxObj = $fn->getParam(1);
@@ -809,39 +828,222 @@ final class StringFsDirJit
         $context->builder->positionAtEnd($body);
         $dir = self::stringData($context, $dirObj);
         $pfx = self::stringData($context, $pfxObj);
+        $dirLen = $context->builder->load($context->builder->structGep($dirObj, $strMap['length']));
+        $pfxLen = $context->builder->load($context->builder->structGep($pfxObj, $strMap['length']));
+
+        self::emitTempnamRejectNullByte(
+            $context,
+            $fn,
+            $dir,
+            $dirLen,
+            'tempnam(): Argument #1 ($directory) must not contain any null bytes'
+        );
+        self::emitTempnamRejectNullByte(
+            $context,
+            $fn,
+            $pfx,
+            $pfxLen,
+            'tempnam(): Argument #2 ($prefix) must not contain any null bytes'
+        );
+
         $dirEmpty = $context->builder->icmp(Builder::INT_EQ, $context->builder->load($dir), $i8->constInt(0, false));
         $pfxEmpty = $context->builder->icmp(Builder::INT_EQ, $context->builder->load($pfx), $i8->constInt(0, false));
         $empty = $context->builder->or($dirEmpty, $pfxEmpty);
-        $formatBlock = $fn->appendBasicBlock('tempnam_format');
-        $context->builder->branchIf($empty, $fail, $formatBlock);
+        $normBlock = $fn->appendBasicBlock('tempnam_norm');
+        $context->builder->branchIf($empty, $fail, $normBlock);
 
-        $context->builder->positionAtEnd($formatBlock);
+        $context->builder->positionAtEnd($normBlock);
+        $pfxBufSlot = BasicBlockHelper::entryAlloca($context, $i8->arrayType(64));
+        $pfxBuf = $context->builder->pointerCast($pfxBufSlot, $i8p);
+        $startSlot = BasicBlockHelper::entryAlloca($context, $i8p);
+        $lastSepSlot = BasicBlockHelper::entryAlloca($context, $i8p);
+        $context->builder->store($i8p->constNull(), $lastSepSlot);
+
+        $slash = $context->builder->call($context->lookupFunction('strrchr'), $pfx, $i32->constInt(ord('/'), false));
+        $bslash = $context->builder->call($context->lookupFunction('strrchr'), $pfx, $i32->constInt(ord('\\'), false));
+        $slashNull = $context->builder->icmp(Builder::INT_EQ, $slash, $i8p->constNull());
+        $bslashNull = $context->builder->icmp(Builder::INT_EQ, $bslash, $i8p->constNull());
+
+        $afterSlash = $fn->appendBasicBlock('tempnam_after_slash');
+        $slashSet = $fn->appendBasicBlock('tempnam_slash_set');
+        $context->builder->branchIf($slashNull, $afterSlash, $slashSet);
+        $context->builder->positionAtEnd($slashSet);
+        $context->builder->store($slash, $lastSepSlot);
+        $context->builder->branch($afterSlash);
+        $context->builder->positionAtEnd($afterSlash);
+
+        $afterBslash = $fn->appendBasicBlock('tempnam_after_bslash');
+        $bslashCheck = $fn->appendBasicBlock('tempnam_bslash_check');
+        $bslashSet = $fn->appendBasicBlock('tempnam_bslash_set');
+        $context->builder->branchIf($bslashNull, $afterBslash, $bslashCheck);
+        $context->builder->positionAtEnd($bslashCheck);
+        $lastSep = $context->builder->load($lastSepSlot);
+        $lastSepNull = $context->builder->icmp(Builder::INT_EQ, $lastSep, $i8p->constNull());
+        $bslashGt = $context->builder->icmp(Builder::INT_UGT, $bslash, $lastSep);
+        $context->builder->branchIf(
+            $context->builder->or($lastSepNull, $bslashGt),
+            $bslashSet,
+            $afterBslash
+        );
+        $context->builder->positionAtEnd($bslashSet);
+        $context->builder->store($bslash, $lastSepSlot);
+        $context->builder->branch($afterBslash);
+        $context->builder->positionAtEnd($afterBslash);
+
+        $copyBlock = $fn->appendBasicBlock('tempnam_copy_prefix');
+        $usePfxStart = $fn->appendBasicBlock('tempnam_use_pfx_start');
+        $useLastStart = $fn->appendBasicBlock('tempnam_use_last_start');
+        $lastSep = $context->builder->load($lastSepSlot);
+        $lastSepNull = $context->builder->icmp(Builder::INT_EQ, $lastSep, $i8p->constNull());
+        $context->builder->branchIf($lastSepNull, $usePfxStart, $useLastStart);
+        $context->builder->positionAtEnd($usePfxStart);
+        $context->builder->store($pfx, $startSlot);
+        $context->builder->branch($copyBlock);
+        $context->builder->positionAtEnd($useLastStart);
+        $context->builder->store($context->builder->gep($lastSep, $i64->constInt(1, false)), $startSlot);
+        $context->builder->branch($copyBlock);
+
+        $context->builder->positionAtEnd($copyBlock);
+        $start = $context->builder->load($startSlot);
+        $baseLen = $context->builder->call($context->lookupFunction('strlen'), $start);
+        $maxCopy = $sizeT->constInt(63, false);
+        $copyLen = $context->builder->select(
+            $context->builder->icmp(Builder::INT_ULT, $baseLen, $maxCopy),
+            $context->builder->intCast($baseLen, $sizeT),
+            $maxCopy
+        );
+        $context->builder->call($context->lookupFunction('memcpy'), $pfxBuf, $start, $copyLen);
+        $context->builder->store(
+            $i8->constInt(0, false),
+            $context->builder->gep($pfxBuf, $context->builder->intCast($copyLen, $i64))
+        );
+
+        $tryPrimary = $fn->appendBasicBlock('tempnam_try_primary');
+        $context->builder->branch($tryPrimary);
+        $context->builder->positionAtEnd($tryPrimary);
         $tplSlot = BasicBlockHelper::entryAlloca($context, $i8->arrayType(self::PATH_MAX));
-        $tpl = $context->builder->pointerCast($tplSlot, $context->getTypeFromString('int8*'));
+        $tpl = $context->builder->pointerCast($tplSlot, $i8p);
+        $primaryOk = self::emitTempnamMkstempAttempt($context, $fn, $dir, $pfxBuf, $tpl, 'tempnam_primary');
+        $retPrimary = $fn->appendBasicBlock('tempnam_ret_primary');
+        $fallback = $fn->appendBasicBlock('tempnam_fallback');
+        $context->builder->branchIf($primaryOk, $retPrimary, $fallback);
+
+        $context->builder->positionAtEnd($retPrimary);
+        $context->builder->returnValue(self::cstrToString($context, $tpl));
+
+        $context->builder->positionAtEnd($fallback);
+        self::emitTempnamNotice($context);
+        $fallbackDir = $context->builder->call($context->lookupFunction('__compiler_sys_get_temp_dir'));
+        $fallbackNull = $context->builder->icmp(Builder::INT_EQ, $fallbackDir, $nullStr);
+        $tryFallback = $fn->appendBasicBlock('tempnam_try_fallback');
+        $context->builder->branchIf($fallbackNull, $fail, $tryFallback);
+        $context->builder->positionAtEnd($tryFallback);
+        $fallbackData = self::stringData($context, $fallbackDir);
+        $fallbackOk = self::emitTempnamMkstempAttempt($context, $fn, $fallbackData, $pfxBuf, $tpl, 'tempnam_fb');
+        $retFallback = $fn->appendBasicBlock('tempnam_ret_fallback');
+        $context->builder->branchIf($fallbackOk, $retFallback, $fail);
+        $context->builder->positionAtEnd($retFallback);
+        $context->builder->returnValue(self::cstrToString($context, $tpl));
+
+        $context->builder->positionAtEnd($fail);
+        $context->builder->returnValue($nullStr);
+    }
+
+    private static function emitTempnamRejectNullByte(
+        Context $context,
+        LlvmFunction $fn,
+        Value $data,
+        Value $len,
+        string $message
+    ): void {
+        $i8p = $context->getTypeFromString('int8*');
+        $i32 = $context->getTypeFromString('int32');
+        $sizeT = $context->getTypeFromString('size_t');
+        $found = $context->builder->call(
+            $context->lookupFunction('memchr'),
+            $data,
+            $i32->constInt(0, false),
+            $context->builder->intCast($len, $sizeT)
+        );
+        $hasNull = $context->builder->icmp(Builder::INT_NE, $found, $i8p->constNull());
+        static $rejectSeq = 0;
+        $tag = 'tempnam_nul_'.(string) (++$rejectSeq);
+        $ok = $fn->appendBasicBlock($tag.'_ok');
+        $bad = $fn->appendBasicBlock($tag.'_bad');
+        $context->builder->branchIf($hasNull, $bad, $ok);
+        $context->builder->positionAtEnd($bad);
+        TypeErrorRaise::emitValueError($context, $message);
+        $context->builder->call($context->lookupFunction('abort'));
+        $context->builder->positionAtEnd($ok);
+    }
+
+    private static function emitTempnamNotice(Context $context): void
+    {
+        $i8p = $context->getTypeFromString('int8*');
+        $i32 = $context->getTypeFromString('int32');
+        $i64 = $context->getTypeFromString('int64');
+        $message = VmFsTempnam::NOTICE_MESSAGE;
+        $msgPtr = $context->builder->pointerCast($context->constantFromString($message), $i8p);
+        $msgLen = $context->builder->call($context->lookupFunction('strlen'), $msgPtr);
+        $emptyFile = $context->builder->pointerCast($context->constantFromString(''), $i8p);
+        $context->builder->call(
+            $context->lookupFunction('__compiler_trigger_error'),
+            $msgPtr,
+            $msgLen,
+            $i32->constInt(8, false),
+            $emptyFile,
+            $i32->constInt(0, false)
+        );
+    }
+
+    private static function emitTempnamMkstempAttempt(
+        Context $context,
+        LlvmFunction $fn,
+        Value $dir,
+        Value $pfxBuf,
+        Value $tpl,
+        string $tag
+    ): Value {
+        $i32 = $context->getTypeFromString('int32');
+        $sizeT = $context->getTypeFromString('size_t');
+        $format = $fn->appendBasicBlock($tag.'_format');
+        $mkstempBb = $fn->appendBasicBlock($tag.'_mkstemp');
+        $closeBb = $fn->appendBasicBlock($tag.'_close');
+        $failBb = $fn->appendBasicBlock($tag.'_fail');
+        $doneBb = $fn->appendBasicBlock($tag.'_done');
+
+        $context->builder->branch($format);
+        $context->builder->positionAtEnd($format);
         $n = $context->builder->call(
             $context->lookupFunction('snprintf'),
             $tpl,
             $sizeT->constInt(self::PATH_MAX, false),
             self::literalCstr($context, '%s/%sXXXXXX'),
             $dir,
-            $pfx
+            $pfxBuf
         );
         $tooLong = $context->builder->icmp(Builder::INT_SGE, $n, $i32->constInt(self::PATH_MAX, false));
-        $mkstemp = $fn->appendBasicBlock('tempnam_mkstemp');
-        $context->builder->branchIf($tooLong, $fail, $mkstemp);
+        $context->builder->branchIf($tooLong, $failBb, $mkstempBb);
 
-        $context->builder->positionAtEnd($mkstemp);
+        $context->builder->positionAtEnd($mkstempBb);
         $fd = $context->builder->call($context->lookupFunction('mkstemp'), $tpl);
         $fdBad = $context->builder->icmp(Builder::INT_SLT, $fd, $i32->constInt(0, true));
-        $close = $fn->appendBasicBlock('tempnam_close');
-        $context->builder->branchIf($fdBad, $fail, $close);
+        $context->builder->branchIf($fdBad, $failBb, $closeBb);
 
-        $context->builder->positionAtEnd($close);
+        $context->builder->positionAtEnd($closeBb);
         $context->builder->call($context->lookupFunction('close'), $fd);
-        $context->builder->returnValue(self::cstrToString($context, $tpl));
+        $context->builder->branch($doneBb);
 
-        $context->builder->positionAtEnd($fail);
-        $context->builder->returnValue($nullStr);
+        $context->builder->positionAtEnd($failBb);
+        $context->builder->branch($doneBb);
+
+        $context->builder->positionAtEnd($doneBb);
+        $i1 = $context->getTypeFromString('int1');
+        $okPhi = $context->builder->phi($i1, $tag.'_ok');
+        $okPhi->addIncoming($i1->constInt(0, false), $failBb);
+        $okPhi->addIncoming($i1->constInt(1, false), $closeBb);
+
+        return $okPhi;
     }
 
     private static function resolveIdFromValue(Context $context, Value $value, bool $group): Value

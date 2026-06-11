@@ -10,7 +10,7 @@ use PHPCompiler\JIT\JitValueBox;
 use PHPLLVM\Builder;
 use PHPLLVM\Value;
 
-/** LLVM lowering for tempnam() via __compiler_tempnam (issue #1201). */
+/** LLVM lowering for tempnam() via __compiler_tempnam (issue #1201, #4401). */
 final class JitTempnam
 {
     /** @return Value */
