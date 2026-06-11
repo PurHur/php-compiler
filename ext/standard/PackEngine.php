@@ -16,6 +16,9 @@ use PHPCompiler\VM\Variable;
  */
 final class PackEngine
 {
+    /** php-src ext/standard/pack.c: 'i'/'I' use sizeof(int), 4 on all supported PHP platforms. */
+    public const PACK_INT_SIZE = 4;
+
     private const MAX_SPECS = 256;
     private const MAX_OUT = 65536;
 
@@ -108,9 +111,9 @@ final class PackEngine
                         $output = self::writeAt(
                             $output,
                             $outputPos,
-                            self::putLong(self::argLong($args[$currentArg++], $frame), \PHP_INT_SIZE, self::machineLe())
+                            self::putLong(self::argLong($args[$currentArg++], $frame), self::PACK_INT_SIZE, self::machineLe())
                         );
-                        $outputPos += \PHP_INT_SIZE;
+                        $outputPos += self::PACK_INT_SIZE;
                     }
                     break;
                 case 'l':
@@ -341,7 +344,7 @@ final class PackEngine
                 'h', 'H' => (int) (($arg / 2) + ($arg % 2)),
                 'a', 'A', 'Z', 'c', 'C', 'x' => $arg,
                 's', 'S', 'n', 'v' => $arg * 2,
-                'i', 'I' => $arg * \PHP_INT_SIZE,
+                'i', 'I' => $arg * self::PACK_INT_SIZE,
                 'l', 'L', 'N', 'V' => $arg * 4,
                 'q', 'Q', 'J', 'P' => $arg * 8,
                 'f', 'g', 'G' => $arg * 4,

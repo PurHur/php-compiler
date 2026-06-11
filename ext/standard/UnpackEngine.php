@@ -193,7 +193,7 @@ final class UnpackEngine
             'h', 'H' => (int) (($arg / 2) + ($arg % 2)),
             'a', 'A', 'Z', 'c', 'C', 'x' => $arg,
             's', 'S', 'n', 'v' => $arg * 2,
-            'i', 'I' => $arg * \PHP_INT_SIZE,
+            'i', 'I' => $arg * PackEngine::PACK_INT_SIZE,
             'l', 'L', 'N', 'V' => $arg * 4,
             'q', 'Q', 'J', 'P' => $arg * 8,
             'f', 'g', 'G' => $arg * 4,
@@ -230,7 +230,7 @@ final class UnpackEngine
         return match ($code) {
             'c', 'C' => 1,
             's', 'S', 'n', 'v' => 2,
-            'i', 'I' => \PHP_INT_SIZE,
+            'i', 'I' => PackEngine::PACK_INT_SIZE,
             'l', 'L', 'N', 'V' => 4,
             'q', 'Q', 'J', 'P' => 8,
             'f', 'g', 'G' => 4,
