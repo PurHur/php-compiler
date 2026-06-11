@@ -150,8 +150,9 @@ patch_already_applied() {
       grep -q 'function xor(' "$ROOT/vendor/ircmaxell/php-llvm/lib/LLVMAbstract/Builder.php" 2>/dev/null
       ;;
     php-llvm-no-closures-array-map.patch)
-      grep -q '\$paramTypes = \[\];' "$ROOT/vendor/ircmaxell/php-llvm/lib/LLVMAbstract/Context.php" 2>/dev/null \
-        && grep -q '\$elementTypes = \[\];' "$ROOT/vendor/ircmaxell/php-llvm/lib/LLVMAbstract/Type/Struct.php" 2>/dev/null
+      grep -q 'foreach (\$parameters as \$type)' "$ROOT/vendor/ircmaxell/php-llvm/lib/LLVMAbstract/Context.php" 2>/dev/null \
+        && grep -q 'foreach (\$elements as \$type)' "$ROOT/vendor/ircmaxell/php-llvm/lib/LLVMAbstract/Type/Struct.php" 2>/dev/null \
+        && ! grep -q 'array_map(' "$ROOT/vendor/ircmaxell/php-llvm/lib/LLVMAbstract/Context.php" 2>/dev/null
       ;;
     php-llvm-pass-registry-interface.patch)
       grep -q "class PassRegistry implements CorePassRegistry" "$ROOT/vendor/ircmaxell/php-llvm/lib/LLVMAbstract/PassRegistry.php" 2>/dev/null
@@ -437,6 +438,58 @@ apply_php_cfg_match_overlay() {
     return 0
   fi
   return 1
+}
+
+apply_php_cfg_property_type_overlay() {
+  local target="$ROOT/vendor/ircmaxell/php-cfg/lib/PHPCfg/Op/Stmt/Property.php"
+  if patch_already_applied "$PATCH_DIR/php-cfg-property-type.patch"; then
+    echo "Skip php-cfg-property-type.patch (already applied)"
+    return 0
+  fi
+  python3 - "$target" <<'PY'
+import sys
+from pathlib import Path
+
+path = Path(sys.argv[1])
+text = path.read_text()
+if "public $type;" not in text:
+    text = text.replace(
+        "    public $visibility;\n\n    public $static;",
+        "    public $visibility;\n\n    /** Inferred type from php-types TypeReconstructor (bootstrap native AOT needs declared field). */\n    public $type;\n\n    public $static;",
+        1,
+    )
+text = text.replace("int $visiblity,", "int $visibility,", 1)
+text = text.replace("$this->visiblity = $visiblity;", "$this->visibility = $visibility;", 1)
+if "public $type;" not in text or "int $visibility," not in text:
+    sys.stderr.write("php-cfg-property-type: Property.php overlay anchors not found\n")
+    raise SystemExit(1)
+path.write_text(text)
+PY
+  echo "Applied php-cfg-property-type.patch (overlay)"
+}
+
+apply_php_cfg_assignop_coalesce_overlay() {
+  local target="$ROOT/vendor/ircmaxell/php-cfg/lib/PHPCfg/Parser.php"
+  if patch_already_applied "$PATCH_DIR/php-cfg-assignop-coalesce.patch"; then
+    echo "Skip php-cfg-assignop-coalesce.patch (already applied)"
+    return 0
+  fi
+  python3 - "$target" <<'PY'
+import sys
+from pathlib import Path
+
+path = Path(sys.argv[1])
+text = path.read_text()
+needle = "                'Expr_AssignOp_Pow' => Op\\Expr\\BinaryOp\\Pow::class,\n"
+insert = needle + "                'Expr_AssignOp_Coalesce' => Op\\Expr\\BinaryOp\\Coalesce::class,\n"
+if "'Expr_AssignOp_Coalesce'" in text:
+    raise SystemExit(0)
+if needle not in text:
+    sys.stderr.write("php-cfg-assignop-coalesce: Parser.php AssignOp_Pow anchor not found\n")
+    raise SystemExit(1)
+path.write_text(text.replace(needle, insert, 1))
+PY
+  echo "Applied php-cfg-assignop-coalesce.patch (overlay)"
 }
 
 apply_php_cfg_arrow_function_overlay() {
@@ -2151,6 +2204,22 @@ incdec_case = """
 throw_tail = "        throw new \\LogicException('Unknown variable op found: '.$op->getType());"
 anchors = [
     (
+        """            case 'Expr_Yield':
+            case 'Expr_Include':
+                // TODO: we may be able to determine these...
+                return false;
+        }
+
+""" + throw_tail,
+        """            case 'Expr_Yield':
+            case 'Expr_Include':
+                // TODO: we may be able to determine these...
+                return false;
+""" + incdec_case + """        }
+
+""" + throw_tail,
+    ),
+    (
         """            case 'Expr_FirstClassCallable':
                 if (\\PHPCfg\\Op\\Expr\\FirstClassCallable::KIND_METHOD === $op->kind) {
                     return [new Type(Type::TYPE_ARRAY)];
@@ -3717,28 +3786,13 @@ from pathlib import Path
 context_path = Path(sys.argv[1])
 struct_path = Path(sys.argv[2])
 
-context = context_path.read_text()
-old_function_type = """    public function functionType(CoreType $returnType, bool $isVarArgs, CoreType ... $parameters): CoreFunctionType {
-        $paramWrapper = $this->llvm->lib->makeArray(
-            LLVMTypeRef_ptr::class,
-            array_map(
+ARRAY_MAP_IN_MAKE_ARRAY = """            array_map(
                 function(Type $type) {
                     return $type->type;
-                }, 
-                $parameters
-            )
-        );
-        return $this->llvm->factory->type(
-            $this, 
-            $this->llvm->lib->LLVMFunctionType(
-                $returnType->type,
-                $paramWrapper,
-                count($parameters),
-                // LLVM is stupid, and even though the type is declared LLVMBool, it's not, and is a normal "1/0" bool instead of the weird reversed...
-                $isVarArgs ? 1 : 0
-            )
-        );
-    }"""
+                },
+                {iterable}
+            )"""
+
 new_function_type = """    public function functionType(CoreType $returnType, bool $isVarArgs, CoreType ... $parameters): CoreFunctionType {
         $paramWrapper = null;
         if (count($parameters) > 0) {
@@ -3763,26 +3817,6 @@ new_function_type = """    public function functionType(CoreType $returnType, bo
         );
     }"""
 
-old_struct_type = """    public function structType(bool $packed, CoreType ... $elements): CoreType {
-        $elementWrapper = $this->llvm->lib->makeArray(
-            LLVMTypeRef_ptr::class,
-            array_map(
-                function(Type $type) {
-                    return $type->type;
-                }, 
-                $elements
-            )
-        );
-        return $this->llvm->factory->type(
-            $this,
-            $this->llvm->lib->LLVMStructTypeInContext(
-                $this->context,
-                $elementWrapper,
-                count($elements),
-                $this->llvm->toBool($packed)
-            )
-        );
-    }"""
 new_struct_type = """    public function structType(bool $packed, CoreType ... $elements): CoreType {
         $elementWrapper = null;
         if (count($elements) > 0) {
@@ -3806,31 +3840,6 @@ new_struct_type = """    public function structType(bool $packed, CoreType ... $
         );
     }"""
 
-if old_function_type not in context or old_struct_type not in context:
-    sys.stderr.write("php-llvm-no-closures-array-map: expected Context.php anchors not found\n")
-    sys.exit(1)
-context = context.replace(old_function_type, new_function_type, 1)
-context = context.replace(old_struct_type, new_struct_type, 1)
-context_path.write_text(context)
-
-struct = struct_path.read_text()
-old_set_body = """    public function setBody(bool $packed, CoreType ... $elements): void {
-        $elementWrapper = $this->llvm->lib->makeArray(
-            LLVMTypeRef_ptr::class,
-            array_map(
-                function(Type $type) {
-                    return $type->type;
-                }, 
-                $elements
-            )
-        );
-        $this->llvm->lib->LLVMStructSetBody(
-            $this->type,
-            $elementWrapper,
-            count($elements),
-            $this->llvm->toBool($packed)
-        );
-    }"""
 new_set_body = """    public function setBody(bool $packed, CoreType ... $elements): void {
         $elementTypes = [];
         foreach ($elements as $type) {
@@ -3847,10 +3856,180 @@ new_set_body = """    public function setBody(bool $packed, CoreType ... $elemen
             $this->llvm->toBool($packed)
         );
     }"""
-if old_set_body not in struct:
-    sys.stderr.write("php-llvm-no-closures-array-map: expected Struct.php anchor not found\n")
+
+
+def replace_once(text: str, old: str, new: str, label: str) -> str:
+    if old not in text:
+        return text
+    return text.replace(old, new, 1)
+
+
+def replace_array_map_in_make_array(text: str, iterable: str, types_var: str) -> str:
+    old = ARRAY_MAP_IN_MAKE_ARRAY.format(iterable=iterable)
+    if old not in text:
+        old = old.replace(",\n                ", ", \n                ")
+    if old not in text:
+        return text
+    new = f"""            ${types_var} = [];
+            foreach ({iterable} as $type) {{
+                ${types_var}[] = $type->type;
+            }}"""
+    return text.replace(old, new, 1)
+
+
+def replace_function_type(context: str) -> str:
+    if "foreach ($parameters as $type)" in context:
+        return context
+    anchors = [
+        """    public function functionType(CoreType $returnType, bool $isVarArgs, CoreType ... $parameters): CoreFunctionType {
+        $paramWrapper = $this->llvm->lib->makeArray(
+            LLVMTypeRef_ptr::class,
+            array_map(
+                function(Type $type) {
+                    return $type->type;
+                }, 
+                $parameters
+            )
+        );
+        return $this->llvm->factory->type(
+            $this, 
+            $this->llvm->lib->LLVMFunctionType(
+                $returnType->type,
+                $paramWrapper,
+                count($parameters),
+                // LLVM is stupid, and even though the type is declared LLVMBool, it's not, and is a normal "1/0" bool instead of the weird reversed...
+                $isVarArgs ? 1 : 0
+            )
+        );
+    }""",
+        """    public function functionType(CoreType $returnType, bool $isVarArgs, CoreType ... $parameters): CoreFunctionType {
+        $paramWrapper = null;
+        if (count($parameters) > 0) {
+            $paramWrapper = $this->llvm->lib->makeArray(
+                LLVMTypeRef_ptr::class,
+                array_map(
+                    function(Type $type) {
+                        return $type->type;
+                    },
+                    $parameters
+                )
+            );
+        }
+        return $this->llvm->factory->type(
+            $this, 
+            $this->llvm->lib->LLVMFunctionType(
+                $returnType->type,
+                $paramWrapper,
+                count($parameters),
+                // LLVM is stupid, and even though the type is declared LLVMBool, it's not, and is a normal "1/0" bool instead of the weird reversed...
+                $isVarArgs ? 1 : 0
+            )
+        );
+    }""",
+    ]
+    for old in anchors:
+        if old in context:
+            return replace_once(context, old, new_function_type, "functionType")
+    updated = replace_array_map_in_make_array(context, "$parameters", "paramTypes")
+    if updated != context:
+        return updated
+    sys.stderr.write("php-llvm-no-closures-array-map: expected Context.php functionType anchor not found\n")
     sys.exit(1)
-struct_path.write_text(struct.replace(old_set_body, new_set_body, 1))
+
+
+def replace_struct_type(context: str) -> str:
+    if "foreach ($elements as $type)" in context and "public function structType" in context:
+        before = context.split("public function structType", 1)[1]
+        if "array_map(" not in before.split("public function", 1)[0]:
+            return context
+    anchors = [
+        """    public function structType(bool $packed, CoreType ... $elements): CoreType {
+        $elementWrapper = $this->llvm->lib->makeArray(
+            LLVMTypeRef_ptr::class,
+            array_map(
+                function(Type $type) {
+                    return $type->type;
+                }, 
+                $elements
+            )
+        );
+        return $this->llvm->factory->type(
+            $this,
+            $this->llvm->lib->LLVMStructTypeInContext(
+                $this->context,
+                $elementWrapper,
+                count($elements),
+                $this->llvm->toBool($packed)
+            )
+        );
+    }""",
+        """    public function structType(bool $packed, CoreType ... $elements): CoreType {
+        $elementWrapper = null;
+        if (count($elements) > 0) {
+            $elementWrapper = $this->llvm->lib->makeArray(
+                LLVMTypeRef_ptr::class,
+                array_map(
+                    function(Type $type) {
+                        return $type->type;
+                    },
+                    $elements
+                )
+            );
+        }
+        return $this->llvm->factory->type(
+            $this,
+            $this->llvm->lib->LLVMStructTypeInContext(
+                $this->context,
+                $elementWrapper,
+                count($elements),
+                $this->llvm->toBool($packed)
+            )
+        );
+    }""",
+    ]
+    for old in anchors:
+        if old in context:
+            return replace_once(context, old, new_struct_type, "structType")
+    updated = replace_array_map_in_make_array(context, "$elements", "elementTypes")
+    if updated != context:
+        return updated
+    sys.stderr.write("php-llvm-no-closures-array-map: expected Context.php structType anchor not found\n")
+    sys.exit(1)
+
+
+context = context_path.read_text()
+context = replace_function_type(context)
+context = replace_struct_type(context)
+context_path.write_text(context)
+
+struct = struct_path.read_text()
+if "foreach ($elements as $type)" not in struct:
+    old_set_body = """    public function setBody(bool $packed, CoreType ... $elements): void {
+        $elementWrapper = $this->llvm->lib->makeArray(
+            LLVMTypeRef_ptr::class,
+            array_map(
+                function(Type $type) {
+                    return $type->type;
+                }, 
+                $elements
+            )
+        );
+        $this->llvm->lib->LLVMStructSetBody(
+            $this->type,
+            $elementWrapper,
+            count($elements),
+            $this->llvm->toBool($packed)
+        );
+    }"""
+    if old_set_body not in struct:
+        updated = replace_array_map_in_make_array(struct, "$elements", "elementTypes")
+        if updated == struct:
+            sys.stderr.write("php-llvm-no-closures-array-map: expected Struct.php anchor not found\n")
+            sys.exit(1)
+        struct = updated
+    else:
+        struct = struct.replace(old_set_body, new_set_body, 1)
+struct_path.write_text(struct)
 PY
   echo "Applied php-llvm-no-closures-array-map.patch (overlay)"
 }
@@ -4026,6 +4205,14 @@ apply_patch() {
     apply_php_cfg_match_overlay
     return $?
   fi
+  if [[ "$(basename "$patch")" == "php-cfg-property-type.patch" ]]; then
+    apply_php_cfg_property_type_overlay
+    return $?
+  fi
+  if [[ "$(basename "$patch")" == "php-cfg-assignop-coalesce.patch" ]]; then
+    apply_php_cfg_assignop_coalesce_overlay
+    return $?
+  fi
   if [[ "$(basename "$patch")" == "php-cfg-arrow-function.patch" ]]; then
     apply_php_cfg_arrow_function_overlay
     return $?
@@ -4161,6 +4348,11 @@ if [[ -d "$ROOT/vendor/ircmaxell/php-cfg" ]]; then
   # ++/-- overlays are hard-required — missing PostInc arms break compile (#6326, #6321).
   apply_php_cfg_incdec_expr_overlay
   apply_php_types_incdec_type_overlay
+  # Spine uses match + ??= + union types — apply before optional patches that can abort under set -e.
+  apply_php_cfg_match_overlay
+  apply_php_cfg_assignop_coalesce_overlay
+  apply_php_cfg_union_type_overlay
+  apply_php_types_union_type_overlay || true
   # Readonly closure FLAG_READONLY must exist before any closure compile (#7464, #7428).
   apply_php_cfg_readonly_function_overlay || true
   # Throw expressions must survive optional patch failures (#6746, #5151).
@@ -4206,7 +4398,7 @@ if [[ -d "$ROOT/vendor/ircmaxell/php-cfg" ]]; then
   apply_php_cfg_compiler_halt_offset_overlay
   apply_patch "$PATCH_DIR/php-cfg-assignop-coalesce.patch"
   apply_patch "$PATCH_DIR/php-cfg-list-destruct-byref.patch"
-  apply_patch "$PATCH_DIR/php-cfg-empty-list-assignment.patch"
+  apply_patch "$PATCH_DIR/php-cfg-empty-list-assignment.patch" || true
   apply_patch "$PATCH_DIR/php-cfg-list-spread.patch"
   apply_patch "$PATCH_DIR/php-cfg-first-class-callable.patch"
   apply_patch "$PATCH_DIR/php-cfg-arrow-function.patch"

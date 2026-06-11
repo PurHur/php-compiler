@@ -655,6 +655,7 @@ class Context {
             Builtin\StringFormat::ensureStandaloneBodies($this);
             Builtin\GcCollectCyclesRuntime::ensureStandaloneBodies($this);
             Builtin\SuperglobalRefreshRuntime::ensureStandaloneBodies($this);
+            Builtin\SuperglobalNameRuntime::ensureLinked($this);
             \PHPCompiler\ext\standard\JitStrspn::ensureStandaloneBodies($this);
             Builtin\TokenGetAll::ensureStandaloneBodies($this);
             Builtin\Highlight::ensureStandaloneBodies($this);
