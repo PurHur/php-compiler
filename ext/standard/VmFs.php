@@ -21,6 +21,9 @@ final class VmFs
     /** @var array<int, true> popen() handles — pclose() vs fclose() at libc layer in JIT/AOT */
     private static array $popenHandles = [];
 
+    /** @var array<int, int> host stream identity => outstanding VM handle ids (#3384 pfsockopen persistent) */
+    private static array $hostResourceRefcounts = [];
+
     private static int $nextHandleId = 0;
 
     /**
@@ -591,6 +594,7 @@ final class VmFs
         }
         unset(self::$handles[$handle], self::$handlePaths[$handle]);
         unset(self::$popenHandles[$handle]);
+        self::releaseHostResourceRef($fp);
         $result = @\pclose($fp);
         if (false === $result) {
             return -1;
@@ -613,6 +617,7 @@ final class VmFs
         $id = ++self::$nextHandleId;
         self::$handles[$id] = $resource;
         self::$handlePaths[$id] = $uri;
+        self::retainHostResourceRef($resource);
 
         return $id;
     }
@@ -707,8 +712,50 @@ final class VmFs
             return false;
         }
         unset(self::$handles[$handle], self::$handlePaths[$handle]);
+        if (!self::releaseHostResourceRef($fp)) {
+            return true;
+        }
 
         return @fclose($fp);
+    }
+
+    /**
+     * @param resource|object $resource
+     */
+    private static function hostResourceKey($resource): int
+    {
+        if (\is_object($resource)) {
+            return \spl_object_id($resource);
+        }
+
+        return (int) $resource;
+    }
+
+    /**
+     * @param resource|object $resource
+     */
+    private static function retainHostResourceRef($resource): void
+    {
+        $key = self::hostResourceKey($resource);
+        self::$hostResourceRefcounts[$key] = (self::$hostResourceRefcounts[$key] ?? 0) + 1;
+    }
+
+    /**
+     * @param resource|object $resource
+     */
+    private static function releaseHostResourceRef($resource): bool
+    {
+        $key = self::hostResourceKey($resource);
+        if (!isset(self::$hostResourceRefcounts[$key])) {
+            return true;
+        }
+        --self::$hostResourceRefcounts[$key];
+        if (self::$hostResourceRefcounts[$key] > 0) {
+            return false;
+        }
+        unset(self::$hostResourceRefcounts[$key]);
+
+        return true;
     }
 
     public static function flock(int $handle, int $operation): bool
