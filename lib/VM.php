@@ -17,6 +17,8 @@ use PHPCompiler\Compiler\NoDiscardMetadata;
 use PHPCompiler\Func;
 use PHPCompiler\ext\standard\VmEval;
 use PHPCompiler\ext\standard\VmForwardStaticCall;
+use PHPCompiler\ext\standard\VmIteratorWalk;
+use PHPCompiler\VM\ForeachIterator;
 use PHPCompiler\VM\Context;
 use PHPCompiler\VM\CastSupport;
 use PHPCompiler\VM\ClassEntry;
@@ -1712,10 +1714,16 @@ class VM {
     }
 
     /**
-     * Materialize a Traversable (array or Generator) into a new array (ext/spl iterator_to_array parity, #3100).
+     * Materialize a Traversable (array, Generator, or Iterator) into a new array (ext/spl iterator_to_array parity, #3100, #4244).
      */
-    public function iteratorToArray(Variable $iterator, bool $preserveKeys = false): HashTable
+    public function iteratorToArray(Variable $iterator, bool $preserveKeys = false, ?Frame $frame = null): HashTable
     {
+        $iterator = VmIteratorWalk::assertTraversable(
+            $iterator,
+            $this->context,
+            'iterator_to_array',
+            'iterator'
+        );
         $iterator = $iterator->resolveIndirect();
         $out = new HashTable();
         if (Variable::TYPE_ARRAY === $iterator->type) {
@@ -1748,10 +1756,61 @@ class VM {
 
             return $out;
         }
+        if (Variable::TYPE_OBJECT === $iterator->type) {
+            if (null === $frame) {
+                throw new \LogicException('iterator_to_array() on Traversable object requires VM frame');
+            }
 
-        throw new \LogicException(
-            'iterator_to_array() argument must be an array or Generator in this compiler build'
+            return $this->iteratorObjectToArray($frame, $iterator, $preserveKeys);
+        }
+
+        throw new \TypeError(
+            'iterator_to_array(): Argument #1 ($iterator) must be of type '.IterableCheck::TYPE_LABEL
         );
+    }
+
+    private function iteratorObjectToArray(Frame $frame, Variable $iterable, bool $preserveKeys): HashTable
+    {
+        $out = new HashTable();
+        $object = ForeachIterator::resolveTraversableObject($this, $frame, $iterable);
+        $this->invokeForeachInstanceMethod($frame, $object, 'rewind');
+        $index = 0;
+        while ($this->invokeForeachInstanceMethod($frame, $object, 'valid')->toBool()) {
+            $value = $this->invokeForeachInstanceMethod($frame, $object, 'current')->resolveIndirect();
+            if ($preserveKeys) {
+                $key = $this->invokeForeachInstanceMethod($frame, $object, 'key')->resolveIndirect();
+                self::appendHashTableEntry($out, $key, $value);
+            } else {
+                $packedKey = new Variable();
+                $packedKey->int($index++);
+                self::appendHashTableEntry($out, $packedKey, $value);
+            }
+            $before = $value;
+            $this->invokeForeachInstanceMethod($frame, $object, 'next');
+            $after = $this->invokeForeachInstanceMethod($frame, $object, 'current')->resolveIndirect();
+            if (self::iteratorStepStalled($before, $after) && $index > 0) {
+                break;
+            }
+        }
+
+        return $out;
+    }
+
+    private static function iteratorStepStalled(Variable $before, Variable $after): bool
+    {
+        $before = $before->resolveIndirect();
+        $after = $after->resolveIndirect();
+        if ($before->type !== $after->type) {
+            return false;
+        }
+        if (Variable::TYPE_INTEGER === $before->type) {
+            return $before->toInt() === $after->toInt();
+        }
+        if (Variable::TYPE_STRING === $before->type) {
+            return $before->toString() === $after->toString();
+        }
+
+        return false;
     }
 
     private static function appendHashTableEntry(HashTable $out, Variable $key, Variable $value): void
