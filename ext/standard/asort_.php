@@ -14,7 +14,7 @@ use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
 
 /**
- * asort() — sort by value ascending, preserve keys (subset of PHP; issue #2290).
+ * asort() — sort by value ascending, preserve keys (subset of PHP; issue #2290, #4118).
  *
  * VM: homogeneous string or integer values; packed lists sort values in place.
  * JIT/AOT: packed list via __hashtable__sortPacked; string-key via __hashtable__sortStringKeyValues.
@@ -28,11 +28,16 @@ final class asort_ extends Internal
 
     public function execute(Frame $frame): void
     {
-        if (1 !== \count($frame->calledArgs)) {
-            throw new \LogicException('asort() requires exactly one argument');
+        $argc = \count($frame->calledArgs);
+        if ($argc < 1 || $argc > 2) {
+            throw new \LogicException('asort() requires one or two arguments');
         }
         $array = $frame->calledArgs[0]->resolveIndirect();
         $ht = VmArray::requireArray($frame->calledArgs[0], 'asort');
+        $flags = StdlibConstants::SORT_REGULAR;
+        if (2 === $argc) {
+            $flags = VmInternalCompare::resolveFrameSortFlags($frame, 'asort');
+        }
         if ($ht->getNumElements() < 2) {
             if (null !== $frame->returnVar) {
                 $frame->returnVar->bool(true);
@@ -47,44 +52,10 @@ final class asort_ extends Internal
                 $copy->copyFrom($value);
                 $values[] = $copy;
             }
-            $first = $values[0]->resolveIndirect();
-            if (Variable::TYPE_STRING === $first->type) {
-                VmInternalCompare::sortVariableValues(
-                    $values,
-                    VmInternalCompare::resolveStringCallback('strcmp')
-                );
-            } elseif (Variable::TYPE_INTEGER === $first->type) {
-                $n = \count($values);
-                for ($i = 1; $i < $n; ++$i) {
-                    $j = $i;
-                    while ($j > 0) {
-                        $a = $values[$j - 1]->resolveIndirect();
-                        $b = $values[$j]->resolveIndirect();
-                        if (Variable::TYPE_INTEGER !== $a->type || Variable::TYPE_INTEGER !== $b->type) {
-                            throw new \LogicException(
-                                'asort() only supports homogeneous string or integer values in this compiler build'
-                            );
-                        }
-                        if ($a->toInt() <= $b->toInt()) {
-                            break;
-                        }
-                        $tmp = $values[$j - 1];
-                        $values[$j - 1] = $values[$j];
-                        $values[$j] = $tmp;
-                        --$j;
-                    }
-                }
-            } elseif (Variable::TYPE_OBJECT === $first->type || EnumCaseSupport::isEnumCaseVariable($first)) {
-                VmInternalCompare::assertHomogeneousEnumOrObjectValues($values, 'asort()');
-                VmInternalCompare::sortVariableValuesBySpaceship($values);
-            } else {
-                throw new \LogicException(
-                    'asort() only supports homogeneous string or integer values in this compiler build'
-                );
-            }
+            self::sortPackedValues($values, $flags, 'asort()');
             $ht->replacePackedValues($values);
         } else {
-            $array->array(VmArray::asortCopy($ht));
+            $array->array(VmArray::asortCopy($ht, $flags));
         }
         if (null !== $frame->returnVar) {
             $frame->returnVar->bool(true);
@@ -93,12 +64,104 @@ final class asort_ extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        if (1 !== \count($args)) {
-            throw new \LogicException('asort() requires exactly one argument');
+        $argc = \count($args);
+        if ($argc < 1 || $argc > 2) {
+            throw new \LogicException('asort() requires one or two arguments');
         }
         JitArrayKey::requireArrayArg($context, $args[0], 'asort');
-        ArrayBuiltinHelper::asortByValue($context, $args[0]);
+        if (1 === $argc) {
+            ArrayBuiltinHelper::asortByValue($context, $args[0]);
+        } else {
+            self::jitSortByValueWithFlags($context, $args[0], self::resolveJitSortFlags($context, $args[1]));
+        }
 
         return $context->getTypeFromString('int1')->constInt(1, false);
+    }
+
+    /**
+     * @param list<Variable> $values
+     */
+    private static function sortPackedValues(array &$values, int $flags, string $function): void
+    {
+        $first = $values[0]->resolveIndirect();
+        $sortType = $flags & ~StdlibConstants::SORT_FLAG_CASE;
+        if (Variable::TYPE_STRING === $first->type) {
+            VmInternalCompare::sortVariableValues(
+                $values,
+                VmInternalCompare::valueCompareForSortFlags($flags)
+            );
+        } elseif (Variable::TYPE_INTEGER === $first->type) {
+            if (
+                StdlibConstants::SORT_STRING === $sortType
+                || StdlibConstants::SORT_LOCALE_STRING === $sortType
+                || StdlibConstants::SORT_NATURAL === $sortType
+            ) {
+                VmInternalCompare::sortVariableValues(
+                    $values,
+                    VmInternalCompare::valueCompareForSortFlags($flags)
+                );
+            } else {
+                $n = \count($values);
+                for ($i = 1; $i < $n; ++$i) {
+                    $j = $i;
+                    while ($j > 0) {
+                        $cmp = VmInternalCompare::compareValuesForSortFlags(
+                            $values[$j - 1],
+                            $values[$j],
+                            $flags
+                        );
+                        if ($cmp <= 0) {
+                            break;
+                        }
+                        $tmp = $values[$j - 1];
+                        $values[$j - 1] = $values[$j];
+                        $values[$j] = $tmp;
+                        --$j;
+                    }
+                }
+            }
+        } elseif (Variable::TYPE_OBJECT === $first->type || EnumCaseSupport::isEnumCaseVariable($first)) {
+            VmInternalCompare::assertHomogeneousEnumOrObjectValues($values, $function);
+            VmInternalCompare::sortVariableValuesBySpaceship($values);
+        } else {
+            throw new \LogicException(
+                $function.' only supports homogeneous string or integer values in this compiler build'
+            );
+        }
+    }
+
+    private static function resolveJitSortFlags(Context $context, JITVariable $flagsArg): int
+    {
+        if (null !== $flagsArg->compileTimeConstantName) {
+            $phpVar = $context->runtime->vmContext->constantFetch($flagsArg->compileTimeConstantName);
+            if (null !== $phpVar && Variable::TYPE_INTEGER === $phpVar->type) {
+                return $phpVar->toInt();
+            }
+        }
+        if (JITVariable::TYPE_NATIVE_LONG === $flagsArg->type) {
+            throw new \LogicException(
+                'asort() flags must be a predefined constant in JIT/AOT in this compiler build'
+            );
+        }
+        throw new \LogicException('asort() flags must be an integer in this compiler build');
+    }
+
+    private static function jitSortByValueWithFlags(Context $context, JITVariable $array, int $flags): void
+    {
+        $sortType = $flags & ~StdlibConstants::SORT_FLAG_CASE;
+        if (
+            StdlibConstants::SORT_REGULAR === $sortType
+            || StdlibConstants::SORT_NUMERIC === $sortType
+            || StdlibConstants::SORT_STRING === $sortType
+            || StdlibConstants::SORT_LOCALE_STRING === $sortType
+        ) {
+            ArrayBuiltinHelper::asortByValue($context, $array);
+
+            return;
+        }
+        if (StdlibConstants::SORT_NATURAL === $sortType) {
+            throw new \LogicException('asort() flags are not supported in JIT/AOT in this compiler build');
+        }
+        ArrayBuiltinHelper::asortByValue($context, $array);
     }
 }

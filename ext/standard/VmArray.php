@@ -369,7 +369,7 @@ final class VmArray
     }
 
     /** ksort() — return array sorted by key; packed lists are unchanged. */
-    public static function ksortCopy(HashTable $ht): HashTable
+    public static function ksortCopy(HashTable $ht, int $flags = StdlibConstants::SORT_REGULAR): HashTable
     {
         if ($ht->getNumElements() < 2 || self::isList($ht)) {
             return $ht;
@@ -382,7 +382,7 @@ final class VmArray
             $valCopy->copyFrom($value);
             $pairs[] = [$keyCopy, $valCopy];
         }
-        VmInternalCompare::sortKeyedPairsByKey($pairs);
+        VmInternalCompare::sortKeyedPairsByKey($pairs, $flags);
         $sorted = new HashTable();
         foreach ($pairs as [$key, $value]) {
             $resolvedKey = $key->resolveIndirect();
@@ -403,7 +403,7 @@ final class VmArray
     }
 
     /** krsort() — return array sorted by key descending; packed lists are unchanged. */
-    public static function krsortCopy(HashTable $ht): HashTable
+    public static function krsortCopy(HashTable $ht, int $flags = StdlibConstants::SORT_REGULAR): HashTable
     {
         if ($ht->getNumElements() < 2 || self::isList($ht)) {
             return $ht;
@@ -416,7 +416,7 @@ final class VmArray
             $valCopy->copyFrom($value);
             $pairs[] = [$keyCopy, $valCopy];
         }
-        VmInternalCompare::sortKeyedPairsByKeyDesc($pairs);
+        VmInternalCompare::sortKeyedPairsByKeyDesc($pairs, $flags);
         $sorted = new HashTable();
         foreach ($pairs as [$key, $value]) {
             $resolvedKey = $key->resolveIndirect();
@@ -437,7 +437,7 @@ final class VmArray
     }
 
     /** asort() — return array sorted by value ascending; packed lists are unchanged (handled in-place). */
-    public static function asortCopy(HashTable $ht): HashTable
+    public static function asortCopy(HashTable $ht, int $flags = StdlibConstants::SORT_REGULAR): HashTable
     {
         if ($ht->getNumElements() < 2 || self::isList($ht)) {
             return $ht;
@@ -451,13 +451,27 @@ final class VmArray
             $pairs[] = [$keyCopy, $valCopy];
         }
         $first = $pairs[0][1]->resolveIndirect();
+        $sortType = $flags & ~StdlibConstants::SORT_FLAG_CASE;
         if (Variable::TYPE_STRING === $first->type) {
             VmInternalCompare::sortKeyedPairsByValue(
                 $pairs,
-                VmInternalCompare::resolveStringCallback('strcmp')
+                VmInternalCompare::valueCompareForSortFlags($flags)
             );
         } elseif (Variable::TYPE_INTEGER === $first->type) {
-            VmInternalCompare::sortKeyedPairsByValueInt($pairs);
+            if (
+                StdlibConstants::SORT_STRING === $sortType
+                || StdlibConstants::SORT_LOCALE_STRING === $sortType
+                || StdlibConstants::SORT_NATURAL === $sortType
+            ) {
+                VmInternalCompare::sortKeyedPairsByValue(
+                    $pairs,
+                    VmInternalCompare::valueCompareForSortFlags($flags)
+                );
+            } elseif (StdlibConstants::SORT_NUMERIC === $sortType) {
+                VmInternalCompare::sortKeyedPairsByValueInt($pairs);
+            } else {
+                VmInternalCompare::sortKeyedPairsByValueInt($pairs);
+            }
         } elseif (Variable::TYPE_OBJECT === $first->type || EnumCaseSupport::isEnumCaseVariable($first)) {
             $values = array_map(static fn (array $pair): Variable => $pair[1], $pairs);
             VmInternalCompare::assertHomogeneousEnumOrObjectValues($values, 'asort()');
@@ -581,7 +595,7 @@ final class VmArray
     }
 
     /** arsort() — return array sorted by value descending; packed lists are unchanged (handled in-place). */
-    public static function arsortCopy(HashTable $ht): HashTable
+    public static function arsortCopy(HashTable $ht, int $flags = StdlibConstants::SORT_REGULAR): HashTable
     {
         if ($ht->getNumElements() < 2 || self::isList($ht)) {
             return $ht;
@@ -595,13 +609,25 @@ final class VmArray
             $pairs[] = [$keyCopy, $valCopy];
         }
         $first = $pairs[0][1]->resolveIndirect();
+        $sortType = $flags & ~StdlibConstants::SORT_FLAG_CASE;
         if (Variable::TYPE_STRING === $first->type) {
             VmInternalCompare::sortKeyedPairsByValueDesc(
                 $pairs,
-                VmInternalCompare::resolveStringCallback('strcmp')
+                VmInternalCompare::valueCompareForSortFlags($flags)
             );
         } elseif (Variable::TYPE_INTEGER === $first->type) {
-            VmInternalCompare::sortKeyedPairsByValueIntDesc($pairs);
+            if (
+                StdlibConstants::SORT_STRING === $sortType
+                || StdlibConstants::SORT_LOCALE_STRING === $sortType
+                || StdlibConstants::SORT_NATURAL === $sortType
+            ) {
+                VmInternalCompare::sortKeyedPairsByValueDesc(
+                    $pairs,
+                    VmInternalCompare::valueCompareForSortFlags($flags)
+                );
+            } else {
+                VmInternalCompare::sortKeyedPairsByValueIntDesc($pairs);
+            }
         } elseif (Variable::TYPE_OBJECT === $first->type || EnumCaseSupport::isEnumCaseVariable($first)) {
             $values = array_map(static fn (array $pair): Variable => $pair[1], $pairs);
             VmInternalCompare::assertHomogeneousEnumOrObjectValues($values, 'arsort()');

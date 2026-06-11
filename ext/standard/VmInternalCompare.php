@@ -39,6 +39,12 @@ final class VmInternalCompare
     /** Resolve strcmp-family comparator from sort() flags (php-src php_array_sort). */
     public static function stringCompareForSortFlags(int $flags): Internal
     {
+        return self::valueCompareForSortFlags($flags);
+    }
+
+    /** Resolve strcmp-family comparator for asort/arsort value operands (php-src php_array_sort). */
+    public static function valueCompareForSortFlags(int $flags): Internal
+    {
         $caseFlag = $flags & StdlibConstants::SORT_FLAG_CASE;
         $sortType = $flags & ~StdlibConstants::SORT_FLAG_CASE;
 
@@ -54,10 +60,112 @@ final class VmInternalCompare
             StdlibConstants::SORT_LOCALE_STRING => self::resolveStringCallback(
                 0 !== $caseFlag ? 'strcasecmp' : 'strcmp'
             ),
-            default => throw new \LogicException(
-                'sort() flags are not supported in this compiler build'
+            default => self::resolveStringCallback(
+                0 !== $caseFlag ? 'strcasecmp' : 'strcmp'
             ),
         };
+    }
+
+    /**
+     * Parse optional sort_flags argument on ksort/asort family (php-src basic_functions.c).
+     *
+     * @throws \LogicException when flags are not an integer
+     */
+    public static function resolveFrameSortFlags(Frame $frame, string $function, int $argIndex = 1): int
+    {
+        $flagsArg = $frame->calledArgs[$argIndex]->resolveIndirect();
+        if (Variable::TYPE_INTEGER !== $flagsArg->type) {
+            throw new \LogicException($function.'() flags must be an integer in this compiler build');
+        }
+
+        return $flagsArg->toInt();
+    }
+
+    /** Compare array keys for ksort/krsort with php-src sort_type dispatch. */
+    public static function compareKeysForSort(Variable $a, Variable $b, int $flags): int
+    {
+        $caseFlag = $flags & StdlibConstants::SORT_FLAG_CASE;
+        $sortType = $flags & ~StdlibConstants::SORT_FLAG_CASE;
+
+        if (StdlibConstants::SORT_NUMERIC === $sortType) {
+            return self::compareNumericOperandsForSort($a, $b);
+        }
+        if (StdlibConstants::SORT_NATURAL === $sortType) {
+            return self::invoke(
+                self::resolveStringCallback(0 !== $caseFlag ? 'strnatcasecmp' : 'strnatcmp'),
+                $a,
+                $b
+            );
+        }
+        if (
+            StdlibConstants::SORT_STRING === $sortType
+            || StdlibConstants::SORT_LOCALE_STRING === $sortType
+        ) {
+            return self::invoke(
+                self::resolveStringCallback(0 !== $caseFlag ? 'strcasecmp' : 'strcmp'),
+                $a,
+                $b
+            );
+        }
+
+        return self::compareKeys($a, $b);
+    }
+
+    /** Compare array values for asort/arsort packed lists with SORT_NUMERIC (php-src). */
+    public static function compareValuesForSortFlags(Variable $a, Variable $b, int $flags): int
+    {
+        $sortType = $flags & ~StdlibConstants::SORT_FLAG_CASE;
+        if (StdlibConstants::SORT_NUMERIC === $sortType) {
+            return self::compareNumericOperandsForSort($a, $b);
+        }
+        if (
+            StdlibConstants::SORT_STRING === $sortType
+            || StdlibConstants::SORT_LOCALE_STRING === $sortType
+            || StdlibConstants::SORT_NATURAL === $sortType
+        ) {
+            return self::invoke(self::valueCompareForSortFlags($flags), $a, $b);
+        }
+
+        return self::compareValuesForSort($a, $b);
+    }
+
+    /** php-src zend_compare numeric sort — non-numeric strings compare as 0. */
+    private static function compareNumericOperandsForSort(Variable $a, Variable $b): int
+    {
+        $av = self::numericSortScalar($a);
+        $bv = self::numericSortScalar($b);
+        if (\is_float($av) || \is_float($bv)) {
+            return (float) $av <=> (float) $bv;
+        }
+
+        return (int) $av <=> (int) $bv;
+    }
+
+    private static function numericSortScalar(Variable $value): int|float
+    {
+        $value = $value->resolveIndirect();
+        if (Variable::TYPE_INTEGER === $value->type) {
+            return $value->toInt();
+        }
+        if (Variable::TYPE_DOUBLE === $value->type) {
+            return $value->toFloat();
+        }
+        if (Variable::TYPE_STRING === $value->type) {
+            $s = $value->toString();
+            if ('' === $s || !\is_numeric($s)) {
+                return 0;
+            }
+
+            return str_contains($s, '.') ? (float) $s : (int) $s;
+        }
+        if (Variable::TYPE_NULL === $value->type || Variable::TYPE_FALSE === $value->type) {
+            return 0;
+        }
+        if (Variable::TYPE_TRUE === $value->type) {
+            return 1;
+        }
+
+        return 0;
     }
 
     public static function invoke(Internal $fn, Variable $a, Variable $b): int
@@ -305,12 +413,12 @@ final class VmInternalCompare
      *
      * @param list<array{0: Variable, 1: Variable}> $pairs
      */
-    public static function sortKeyedPairsByKey(array &$pairs): void
+    public static function sortKeyedPairsByKey(array &$pairs, int $flags = StdlibConstants::SORT_REGULAR): void
     {
         $n = \count($pairs);
         for ($i = 1; $i < $n; ++$i) {
             $j = $i;
-            while ($j > 0 && self::compareKeys($pairs[$j - 1][0], $pairs[$j][0]) > 0) {
+            while ($j > 0 && self::compareKeysForSort($pairs[$j - 1][0], $pairs[$j][0], $flags) > 0) {
                 $tmp = $pairs[$j - 1];
                 $pairs[$j - 1] = $pairs[$j];
                 $pairs[$j] = $tmp;
@@ -324,12 +432,12 @@ final class VmInternalCompare
      *
      * @param list<array{0: Variable, 1: Variable}> $pairs
      */
-    public static function sortKeyedPairsByKeyDesc(array &$pairs): void
+    public static function sortKeyedPairsByKeyDesc(array &$pairs, int $flags = StdlibConstants::SORT_REGULAR): void
     {
         $n = \count($pairs);
         for ($i = 1; $i < $n; ++$i) {
             $j = $i;
-            while ($j > 0 && self::compareKeys($pairs[$j - 1][0], $pairs[$j][0]) < 0) {
+            while ($j > 0 && self::compareKeysForSort($pairs[$j - 1][0], $pairs[$j][0], $flags) < 0) {
                 $tmp = $pairs[$j - 1];
                 $pairs[$j - 1] = $pairs[$j];
                 $pairs[$j] = $tmp;
