@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace PHPCompiler\ext\standard;
 
 /**
- * fnmatch() for VM — libc fnmatch(3) via FFI (#7756, pairs #6721 JitFnmatch).
+ * fnmatch() for VM — libc fnmatch(3) FFI, then {@see VmFnmatchPure} (#8016, #7756).
  *
  * php-src: ext/standard/fnmatch.c — PHP_FUNCTION(fnmatch)
  */
@@ -20,7 +20,7 @@ final class VmFnmatch
 
     public static function available(): bool
     {
-        return null !== self::ffi();
+        return null !== self::ffi() || VmFnmatchPure::available();
     }
 
     public static function match(string $pattern, string $string, int $flags = 0): bool
@@ -32,12 +32,7 @@ final class VmFnmatch
             }
         }
 
-        $host = self::hostMatch($pattern, $string, $flags);
-        if (null !== $host) {
-            return $host;
-        }
-
-        throw new \LogicException('fnmatch() requires libc fnmatch(3) FFI or host fnmatch() in this compiler build');
+        return VmFnmatchPure::match($pattern, $string, $flags);
     }
 
     private static function ffiEnabled(): bool
@@ -67,20 +62,6 @@ final class VmFnmatch
         $rc = (int) $ffi->fnmatch($pattern, $string, $sysFlags);
 
         return 0 === $rc;
-    }
-
-    /**
-     * Host Zend fnmatch() when VM driver runs under php-src (no ext/ffi required).
-     *
-     * @return bool|null null when host fnmatch unavailable
-     */
-    private static function hostMatch(string $pattern, string $string, int $flags): ?bool
-    {
-        if (!\function_exists('fnmatch')) {
-            return null;
-        }
-
-        return \fnmatch($pattern, $string, $flags);
     }
 
     private static function phpFlagsToSystem(int $phpFlags): int
