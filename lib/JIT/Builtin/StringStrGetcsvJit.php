@@ -406,8 +406,10 @@ final class StringStrGetcsvJit
         $context->builder->positionAtEnd($iqEsc);
         $i = $context->builder->load($iSlot);
         $nextI = $context->builder->add($i, $one);
+        $appendEsc = $context->lookupFunction('__phpc_csv_append_byte');
+        $context->builder->call($appendEsc, $fieldSlot, $fieldLenSlot, $fieldCapSlot, $escape);
         $context->builder->call(
-            $context->lookupFunction('__phpc_csv_append_byte'),
+            $appendEsc,
             $fieldSlot,
             $fieldLenSlot,
             $fieldCapSlot,
