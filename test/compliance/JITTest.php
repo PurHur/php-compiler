@@ -131,10 +131,6 @@ class JITTest extends BaseTest {
             if (str_contains($name, 'isset_scalar_jit')) {
                 continue;
             }
-            // get_debug_type() on enum cases: VM enum class names; MCJIT deferred (#3454).
-            if (str_contains($name, 'get_debug_type_enum')) {
-                continue;
-            }
             // var_export() on enum case arrays: VM (#5583); MCJIT enum literal layout deferred.
             if (str_contains($name, 'array_spread_enum_cases')) {
                 continue;
@@ -430,7 +426,8 @@ class JITTest extends BaseTest {
             }
             if ((str_contains($name, 'enum_') || str_contains($name, 'abstract_enum'))
                 && !str_contains($name, 'enum_case_name_value')
-                && !str_contains($name, 'enum_cases_static')) {
+                && !str_contains($name, 'enum_cases_static')
+                && !str_contains($name, 'get_debug_type_enum')) {
                 continue;
             }
             // Generator foreach MCJIT resume (#3074); VM in GeneratorVMTest, compile in GeneratorJITTest/GeneratorJitCompileTest.

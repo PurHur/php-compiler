@@ -13,7 +13,9 @@ namespace PHPCompiler\ext\standard;
 
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
+use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\JitOperandTypeLabel;
 use PHPCompiler\JIT\ReflectionBuiltinHelper;
 use PHPCompiler\JIT\TypedPropertyUninitGuard;
 use PHPCompiler\JIT\Variable as JITVariable;
@@ -103,6 +105,11 @@ final class get_debug_type extends Internal
             case JITVariable::TYPE_NULL:
                 return $context->builder->load($context->constantStringFromString('null'));
             case JITVariable::TYPE_VALUE:
+                $enumLabel = JitOperandTypeLabel::compileTimeEnumClassName($context, $args[0]);
+                if (null !== $enumLabel) {
+                    return $context->builder->load($context->constantStringFromString($enumLabel));
+                }
+
                 return self::jitGetDebugTypeBoxed($context, $args[0]);
             default:
                 throw new \LogicException('get_debug_type() does not support this value type in this compiler build');
@@ -112,12 +119,31 @@ final class get_debug_type extends Internal
     private static function jitGetDebugTypeBoxed(Context $context, JITVariable $arg): Value
     {
         $loaded = $context->helper->loadValue($arg);
-        $typeField = $context->structFieldMap['__value__']['type'];
+        $valMap = $context->structFieldMap['__value__'];
         $typeByte = $context->builder->load(
-            $context->builder->structGep($loaded, $typeField)
+            $context->builder->structGep($loaded, $valMap['type'])
         );
         $i8 = $context->getTypeFromString('int8');
-        $strPtr = $context->getTypeFromString('__string__*');
+        $enumCaseTy = $i8->constInt(Variable::TYPE_ENUM_CASE, false);
+        $isEnumCase = $context->builder->icmp(Builder::INT_EQ, $typeByte, $enumCaseTy);
+        $enumBb = BasicBlockHelper::append($context, 'get_debug_type_enum_case');
+        $scalarBb = BasicBlockHelper::append($context, 'get_debug_type_scalar');
+        $doneBb = BasicBlockHelper::append($context, 'get_debug_type_boxed_done');
+        $context->builder->branchIf($isEnumCase, $enumBb, $scalarBb);
+
+        $context->builder->positionAtEnd($enumBb);
+        $enumMap = $context->structFieldMap['__enum_case__'] ?? null;
+        if (null !== $enumMap && isset($enumMap['class_id'])) {
+            $classId = $context->builder->load(
+                $context->builder->structGep($loaded, $enumMap['class_id'])
+            );
+            $enumName = ReflectionBuiltinHelper::classNameStringFromClassId($context, $classId);
+        } else {
+            $enumName = $context->builder->load($context->constantStringFromString('unknown'));
+        }
+        $context->builder->branch($doneBb);
+
+        $context->builder->positionAtEnd($scalarBb);
         $result = $context->builder->load($context->constantStringFromString('unknown'));
         foreach ([
             JITVariable::TYPE_NULL => 'null',
@@ -132,7 +158,14 @@ final class get_debug_type extends Internal
             $candidate = $context->builder->load($context->constantStringFromString($name));
             $result = $context->builder->select($isType, $candidate, $result);
         }
+        $context->builder->branch($doneBb);
 
-        return $result;
+        $context->builder->positionAtEnd($doneBb);
+        $strPtr = $context->getTypeFromString('__string__*');
+        $phi = $context->builder->phi($strPtr);
+        $phi->addIncoming($enumName, $enumBb);
+        $phi->addIncoming($result, $scalarBb);
+
+        return $phi;
     }
 }
