@@ -2248,6 +2248,7 @@ class JIT {
             'initvmcontext',
             'loadcoremodules',
             'parse',
+            'preparesourceforparser',
             'compile',
             'compileemitsmoke',
             'parseandcompile',
@@ -3180,7 +3181,7 @@ class JIT {
         if (!isset($this->context->functions[$emitSmokeLc])) {
             $this->compileM3EmitTuRuntimeMethodFromModules('parseandcompileemitsmoke');
         }
-        foreach (['compileemitsmoke', 'noteparsecompilenullforscript', 'peeklastparsefailure'] as $methodLc) {
+        foreach (['preparesourceforparser', 'compileemitsmoke', 'noteparsecompilenullforscript', 'peeklastparsefailure'] as $methodLc) {
             $runtimeLc = strtolower('PHPCompiler\\Runtime::'.$methodLc);
             if (!isset($this->context->functions[$runtimeLc])) {
                 $this->compileM3EmitTuRuntimeMethodFromModules($methodLc);
@@ -4163,7 +4164,7 @@ class JIT {
         if ($this->shouldUseM3InventoryEmitDriver() && !$this->shouldUseEmitHelperLinkStubs()) {
             // Never scan O(modules×funcs) on inventory argv links (#2967). parse/compileEmitSmoke from
             // Runtime.php; ctor/init* use native M3 via compileBlock / ensureM3EmitTuRuntimeInitSpineSymbols.
-            if (in_array($methodLc, ['parse', 'compileemitsmoke', 'peeklastparsefailure', 'noteparsecompilenullforscript'], true)) {
+            if (in_array($methodLc, ['parse', 'preparesourceforparser', 'compileemitsmoke', 'peeklastparsefailure', 'noteparsecompilenullforscript'], true)) {
                 unset(
                     $this->context->functions[$lc],
                     $this->context->functionReturnType[$lc],
