@@ -23,6 +23,7 @@ class Module extends ModuleAbstract
         return [
             new grapheme_str_contains(),
             new grapheme_levenshtein(),
+            new grapheme_str_split(),
             new intl_get_error_code(),
         ];
     }
