@@ -52,6 +52,68 @@ final class VmGrapheme
     }
 
     /**
+     * grapheme_levenshtein() — grapheme-cluster edit distance (php-src ext/intl/grapheme; #6998).
+     */
+    public static function levenshtein(string $string1, string $string2): int
+    {
+        $graphemes1 = self::splitGraphemes($string1);
+        if (null === $graphemes1) {
+            return -1;
+        }
+        $graphemes2 = self::splitGraphemes($string2);
+        if (null === $graphemes2) {
+            return -1;
+        }
+
+        return self::levenshteinGraphemeArrays($graphemes1, $graphemes2);
+    }
+
+    /**
+     * @param list<string> $graphemes1
+     * @param list<string> $graphemes2
+     */
+    private static function levenshteinGraphemeArrays(array $graphemes1, array $graphemes2): int
+    {
+        $len1 = \count($graphemes1);
+        $len2 = \count($graphemes2);
+        if (0 === $len1) {
+            return $len2;
+        }
+        if (0 === $len2) {
+            return $len1;
+        }
+
+        $prev = [];
+        for ($j = 0; $j <= $len2; ++$j) {
+            $prev[$j] = $j;
+        }
+        for ($i = 1; $i <= $len1; ++$i) {
+            $cur = [];
+            $cur[0] = $i;
+            for ($j = 1; $j <= $len2; ++$j) {
+                $subst = self::graphemesEqual($graphemes1[$i - 1], $graphemes2[$j - 1]) ? 0 : 1;
+                $cur[$j] = min(
+                    $cur[$j - 1] + 1,
+                    $prev[$j] + 1,
+                    $prev[$j - 1] + $subst
+                );
+            }
+            $prev = $cur;
+        }
+
+        return $prev[$len2];
+    }
+
+    private static function graphemesEqual(string $left, string $right): bool
+    {
+        if ($left === $right) {
+            return true;
+        }
+
+        return UnicodeCanonical::graphemeCanonicalKey($left) === UnicodeCanonical::graphemeCanonicalKey($right);
+    }
+
+    /**
      * @return list<string>|null
      */
     private static function splitGraphemes(string $string): ?array
