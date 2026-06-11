@@ -29,9 +29,15 @@ final class SscanfJit
         $probe = $context->module->getNamedFunction('__compiler_sscanf');
         if (null !== $probe && $probe->countBasicBlocks() > 0) {
             $context->registerFunction('__compiler_sscanf', $probe);
-            $probeArray = $context->module->getNamedFunction('__compiler_sscanf_array');
-            if (null !== $probeArray) {
-                $context->registerFunction('__compiler_sscanf_array', $probeArray);
+            foreach ([
+                '__compiler_sscanf_ex',
+                '__compiler_sscanf_array',
+                '__compiler_vfscanf',
+            ] as $linkedName) {
+                $linked = $context->module->getNamedFunction($linkedName);
+                if (null !== $linked) {
+                    $context->registerFunction($linkedName, $linked);
+                }
             }
             self::restoreInsertBlock($context, $restore);
 
@@ -43,7 +49,9 @@ final class SscanfJit
         self::implementIfMissing($context, '__phpc_sscanf_scan_string', self::emitScanString(...));
         self::implementIfMissing($context, '__phpc_sscanf_scan_float', self::emitScanFloat(...));
         self::implementIfMissing($context, '__compiler_sscanf', self::emitCompilerSscanf(...));
+        self::implementIfMissing($context, '__compiler_sscanf_ex', self::emitCompilerSscanfEx(...));
         self::implementIfMissing($context, '__compiler_sscanf_array', self::emitCompilerSscanfArray(...));
+        self::implementIfMissing($context, '__compiler_vfscanf', self::emitCompilerVfscanf(...));
 
         self::restoreInsertBlock($context, $restore);
     }
@@ -109,6 +117,14 @@ final class SscanfJit
             '__compiler_sscanf' => $context->module->addFunction(
                 $name,
                 $context->context->functionType($i64, false, $strPtr, $strPtr, $i64, $valuePtrPtr)
+            ),
+            '__compiler_sscanf_ex' => $context->module->addFunction(
+                $name,
+                $context->context->functionType($i64, false, $strPtr, $strPtr, $i64, $valuePtrPtr, $sizeTp)
+            ),
+            '__compiler_vfscanf' => $context->module->addFunction(
+                $name,
+                $context->context->functionType($i64, false, $i64, $strPtr, $i64, $valuePtrPtr)
             ),
             '__compiler_sscanf_array' => $context->module->addFunction(
                 $name,
@@ -466,6 +482,16 @@ final class SscanfJit
 
     private static function emitCompilerSscanf(Context $context, LlvmFunction $fn): void
     {
+        self::emitCompilerSscanfImpl($context, $fn, false);
+    }
+
+    private static function emitCompilerSscanfEx(Context $context, LlvmFunction $fn): void
+    {
+        self::emitCompilerSscanfImpl($context, $fn, true);
+    }
+
+    private static function emitCompilerSscanfImpl(Context $context, LlvmFunction $fn, bool $trackConsumed): void
+    {
         $entry = $fn->appendBasicBlock('entry');
         $context->builder->positionAtEnd($entry);
 
@@ -485,6 +511,7 @@ final class SscanfJit
         $fmt = $fn->getParam(1);
         $outCount = $fn->getParam(2);
         $outPtrs = $fn->getParam(3);
+        $consumedOut = $trackConsumed ? $fn->getParam(4) : null;
 
         $nullRet = $fn->appendBasicBlock('sscanf_null');
         $work = $fn->appendBasicBlock('sscanf_work');
@@ -495,6 +522,9 @@ final class SscanfJit
         $context->builder->branchIf($nullStr, $nullRet, $work);
 
         $context->builder->positionAtEnd($nullRet);
+        if ($trackConsumed && null !== $consumedOut) {
+            $context->builder->store($sizeT->constInt(0, false), $consumedOut);
+        }
         $context->builder->returnValue($zero64);
 
         $context->builder->positionAtEnd($work);
@@ -683,10 +713,69 @@ final class SscanfJit
         $context->builder->branch($literalFail);
 
         $context->builder->positionAtEnd($literalFail);
+        if ($trackConsumed && null !== $consumedOut) {
+            $context->builder->store($context->builder->load($inPosSlot), $consumedOut);
+        }
         $context->builder->returnValue($context->builder->load($assignedSlot));
 
         $context->builder->positionAtEnd($loopDone);
+        if ($trackConsumed && null !== $consumedOut) {
+            $context->builder->store($context->builder->load($inPosSlot), $consumedOut);
+        }
         $context->builder->returnValue($context->builder->load($assignedSlot));
+    }
+
+    private static function emitCompilerVfscanf(Context $context, LlvmFunction $fn): void
+    {
+        $entry = $fn->appendBasicBlock('entry');
+        $context->builder->positionAtEnd($entry);
+
+        $i64 = $context->getTypeFromString('int64');
+        $sizeT = $context->getTypeFromString('size_t');
+        $strPtr = $context->getTypeFromString('__string__*');
+        $minusOne = $i64->constInt(-1, false);
+        $zero64 = $i64->constInt(0, false);
+        $seekSet = $i64->constInt(\SEEK_SET, false);
+
+        $handle = $fn->getParam(0);
+        $fmt = $fn->getParam(1);
+        $outCount = $fn->getParam(2);
+        $outPtrs = $fn->getParam(3);
+        $consumedSlot = BasicBlockHelper::entryAlloca($context, $sizeT);
+
+        $fail = $fn->appendBasicBlock('vfscanf_fail');
+        $work = $fn->appendBasicBlock('vfscanf_work');
+        $start = $context->builder->call($context->lookupFunction('__compiler_ftell'), $handle);
+        $startOk = $context->builder->icmp(Builder::INT_NE, $start, $minusOne);
+        $context->builder->branchIf($startOk, $work, $fail);
+
+        $context->builder->positionAtEnd($work);
+        $content = $context->builder->call(
+            $context->lookupFunction('__compiler_stream_get_contents'),
+            $handle,
+            $minusOne,
+            $minusOne
+        );
+        $contentOk = $context->builder->icmp(Builder::INT_NE, $content, $strPtr->constNull());
+        $scan = $fn->appendBasicBlock('vfscanf_scan');
+        $context->builder->branchIf($contentOk, $scan, $fail);
+
+        $context->builder->positionAtEnd($scan);
+        $assigned = $context->builder->call(
+            $context->lookupFunction('__compiler_sscanf_ex'),
+            $content,
+            $fmt,
+            $outCount,
+            $outPtrs,
+            $consumedSlot
+        );
+        $consumed = $context->builder->load($consumedSlot);
+        $newPos = $context->builder->add($start, $context->builder->intCast($consumed, $i64));
+        $context->builder->call($context->lookupFunction('__compiler_fseek'), $handle, $newPos, $seekSet);
+        $context->builder->returnValue($assigned);
+
+        $context->builder->positionAtEnd($fail);
+        $context->builder->returnValue($zero64);
     }
 
     private static function emitCompilerSscanfArray(Context $context, LlvmFunction $fn): void

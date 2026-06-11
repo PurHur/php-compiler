@@ -117,7 +117,7 @@ final class JitSscanf
         return $i64->constInt($assigned, false);
     }
 
-    private static function writeVmVarToOut(Context $context, JITVariable $dest, VMVariable $src): void
+    public static function writeVmVarToOut(Context $context, JITVariable $dest, VMVariable $src): void
     {
         $destPtr = JitValueBox::valuePtrFromVariable($context, $dest);
         $i64 = $context->getTypeFromString('int64');

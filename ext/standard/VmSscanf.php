@@ -18,6 +18,16 @@ final class VmSscanf
      */
     public static function parse(string $input, string $format, array $outVars): int
     {
+        return self::parseWithConsumed($input, $format, $outVars)[0];
+    }
+
+    /**
+     * @param list<Variable> $outVars
+     *
+     * @return array{0: int, 1: int} assigned count and input bytes consumed
+     */
+    public static function parseWithConsumed(string $input, string $format, array $outVars): array
+    {
         $outIdx = 0;
         $assigned = 0;
         $inPos = 0;
@@ -28,30 +38,30 @@ final class VmSscanf
             $ch = $format[$fpos];
             if ('%' !== $ch) {
                 if ($inPos >= $inLen || $input[$inPos] !== $ch) {
-                    return $assigned;
+                    return [$assigned, $inPos];
                 }
                 ++$inPos;
                 continue;
             }
             if ($fpos + 1 >= $fmtLen) {
-                return $assigned;
+                return [$assigned, $inPos];
             }
             $spec = $format[++$fpos];
             if ('%' === $spec) {
                 if ($inPos >= $inLen || $input[$inPos] !== '%') {
-                    return $assigned;
+                    return [$assigned, $inPos];
                 }
                 ++$inPos;
                 continue;
             }
             if ($outIdx >= \count($outVars)) {
-                return $assigned;
+                return [$assigned, $inPos];
             }
             switch ($spec) {
                 case 'd':
                     [$val, $consumed] = self::scanInt($input, $inPos, $inLen);
                     if (null === $val) {
-                        return $assigned;
+                        return [$assigned, $inPos];
                     }
                     self::assignInt($outVars[$outIdx], $val);
                     $inPos += $consumed;
@@ -61,7 +71,7 @@ final class VmSscanf
                 case 's':
                     [$str, $consumed] = self::scanString($input, $inPos, $inLen);
                     if (null === $str) {
-                        return $assigned;
+                        return [$assigned, $inPos];
                     }
                     self::assignString($outVars[$outIdx], $str);
                     $inPos += $consumed;
@@ -71,7 +81,7 @@ final class VmSscanf
                 case 'f':
                     [$flt, $consumed] = self::scanFloat($input, $inPos, $inLen);
                     if (null === $flt) {
-                        return $assigned;
+                        return [$assigned, $inPos];
                     }
                     self::assignFloat($outVars[$outIdx], $flt);
                     $inPos += $consumed;
@@ -85,7 +95,7 @@ final class VmSscanf
             }
         }
 
-        return $assigned;
+        return [$assigned, $inPos];
     }
 
     /** Two-arg sscanf(): return parsed values as a list array (php-src ext/standard/sscanf.c, #4201). */
