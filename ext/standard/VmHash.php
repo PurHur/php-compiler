@@ -12,8 +12,11 @@ use PHPCompiler\VM\Variable;
  */
 final class VmHash
 {
-    /** Digest algorithms supported by VmHashNative / StringHashCryptoJit (issue #6229, #6937). */
-    private const HASH_ALGOS = ['md5', 'sha1', 'sha256'];
+    /** Digest algorithms supported by VmHashNative / StringHashCryptoJit (issue #6229, #6937, #4644). */
+    private const HASH_ALGOS = [
+        'md5', 'sha1', 'sha256',
+        'crc32', 'crc32b', 'adler32', 'fnv132', 'fnv1a32',
+    ];
 
     public const HASH_UNKNOWN_ALGO_MSG = 'hash(): Argument #1 ($algo) must be a valid hashing algorithm';
 

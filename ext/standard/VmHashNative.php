@@ -135,7 +135,7 @@ final class VmHashNative
         return $hex;
     }
 
-    /** 0 unknown, 1 sha256, 2 sha1, 3 md5 */
+    /** 0 unknown, 1 sha256, 2 sha1, 3 md5, 4 crc32b, 5 crc32, 6 adler32, 7 fnv132, 8 fnv1a32 */
     private static function algoId(string $algo): int
     {
         if (self::eqCi($algo, 'sha256')) {
@@ -146,6 +146,21 @@ final class VmHashNative
         }
         if (self::eqCi($algo, 'md5')) {
             return 3;
+        }
+        if (self::eqCi($algo, 'crc32b')) {
+            return 4;
+        }
+        if (self::eqCi($algo, 'crc32')) {
+            return 5;
+        }
+        if (self::eqCi($algo, 'adler32')) {
+            return 6;
+        }
+        if (self::eqCi($algo, 'fnv132')) {
+            return 7;
+        }
+        if (self::eqCi($algo, 'fnv1a32')) {
+            return 8;
         }
 
         return 0;
@@ -177,6 +192,18 @@ final class VmHashNative
     private static function u32(int $x): int
     {
         return $x & 0xFFFFFFFF;
+    }
+
+    private static function swapEndian32(int $v): int
+    {
+        $v = self::u32($v);
+
+        return self::u32(
+            (($v & 0xFF) << 24)
+            | (($v & 0xFF00) << 8)
+            | (($v >> 8) & 0xFF00)
+            | (($v >> 24) & 0xFF)
+        );
     }
 
     private static function u32Not(int $x): int
@@ -213,6 +240,9 @@ final class VmHashNative
 
     private static function digestLen(int $algo): int
     {
+        if ($algo >= 4 && $algo <= 8) {
+            return 4;
+        }
         if (1 === $algo) {
             return self::SHA256_DIGEST_SIZE;
         }
@@ -254,6 +284,24 @@ final class VmHashNative
         }
         if (2 === $algo) {
             return self::sha1($data);
+        }
+        if (3 === $algo) {
+            return self::md5($data);
+        }
+        if (4 === $algo) {
+            return VmHashNonCrypto::digestBytes(VmHashNonCrypto::crc32b($data));
+        }
+        if (5 === $algo) {
+            return VmHashNonCrypto::digestBytes(self::swapEndian32(VmHashNonCrypto::crc32($data)));
+        }
+        if (6 === $algo) {
+            return VmHashNonCrypto::digestBytes(VmHashNonCrypto::adler32($data));
+        }
+        if (7 === $algo) {
+            return VmHashNonCrypto::digestBytes(VmHashNonCrypto::fnv132($data));
+        }
+        if (8 === $algo) {
+            return VmHashNonCrypto::digestBytes(VmHashNonCrypto::fnv1a32($data));
         }
 
         return self::md5($data);
