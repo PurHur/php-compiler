@@ -33,6 +33,12 @@ final class VmDateTimeNative
         self::throwInvalidTimezone($timezone);
     }
 
+    /** php-src ext/date/php_date.c — date_default_timezone_set() validation without throwing. */
+    public static function timezoneIdIsValid(string $timezone): bool
+    {
+        return null !== self::zoneinfoPath(trim($timezone)) && '' !== trim($timezone);
+    }
+
     /**
      * @return array{timestamp: int, microsecond: int}
      */
