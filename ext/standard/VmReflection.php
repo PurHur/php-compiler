@@ -999,8 +999,13 @@ final class VmReflection
         if (Variable::TYPE_OBJECT !== $object->type) {
             return false;
         }
+        $entry = $object->toObject()->class;
+        $parentLc = strtolower(ltrim($className, '\\'));
+        if (strtolower($entry->name) === $parentLc) {
+            return false;
+        }
 
-        return self::isInstanceOfObject($ctx, $object, $className);
+        return self::isInstanceOf($ctx, $entry, $className);
     }
 
     /**

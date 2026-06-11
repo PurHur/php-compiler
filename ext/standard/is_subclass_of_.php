@@ -67,7 +67,7 @@ final class is_subclass_of_ extends Internal
         );
         if (JITVariable::TYPE_OBJECT === $args[0]->type) {
             return $context->helper->loadValue(
-                ReflectionBuiltinHelper::emitInstanceOf($context, $args[0], $parentName)
+                ReflectionBuiltinHelper::emitSubclassOf($context, $args[0], $parentName)
             );
         }
         $childName = ReflectionBuiltinHelper::requireCompileTimeClassName(

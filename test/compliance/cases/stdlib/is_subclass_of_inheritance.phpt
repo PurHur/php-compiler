@@ -16,4 +16,4 @@ echo is_subclass_of('B', 'B') ? '1' : '0';
 echo is_subclass_of('C', 'B', false) ? '1' : '0';
 echo "\n";
 --EXPECT--
-111100
+101100

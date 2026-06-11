@@ -4395,6 +4395,76 @@ class Object_ extends Type {
         );
     }
 
+    /**
+     * is_subclass_of() object operand — strict subclass, excludes same class (#4358).
+     */
+    public function emitSubclassOf(Variable $expr, string $className): Variable
+    {
+        $falseVal = $this->context->getTypeFromString('int1')->constInt(0, false);
+        $objMap = $this->context->structFieldMap['__object__'];
+
+        if (Variable::TYPE_OBJECT === $expr->type) {
+            $obj = $this->context->helper->loadValue($expr);
+            $classId = $this->context->builder->load(
+                $this->context->builder->structGep($obj, $objMap['class_id'])
+            );
+            $match = $this->emitClassIdSubclassOf($classId, $className);
+
+            return new Variable(
+                $this->context,
+                Variable::TYPE_NATIVE_BOOL,
+                Variable::KIND_VALUE,
+                $match
+            );
+        }
+
+        if (Variable::TYPE_VALUE === $expr->type) {
+            $valuePtr = JitValueBox::valuePtrFromVariable($this->context, $expr);
+            $obj = $this->context->builder->call(
+                $this->context->lookupFunction('__value__readObject'),
+                $valuePtr
+            );
+            $objType = $this->context->getTypeFromString('__object__*');
+            $isObject = $this->context->builder->icmp(
+                PHPLLVM\Builder::INT_NE,
+                $obj,
+                $objType->constNull()
+            );
+            $classId = $this->context->builder->load(
+                $this->context->builder->structGep($obj, $objMap['class_id'])
+            );
+            $matches = $this->emitClassIdSubclassOf($classId, $className);
+            $match = $this->context->builder->and($isObject, $matches);
+
+            return new Variable(
+                $this->context,
+                Variable::TYPE_NATIVE_BOOL,
+                Variable::KIND_VALUE,
+                $match
+            );
+        }
+
+        return new Variable(
+            $this->context,
+            Variable::TYPE_NATIVE_BOOL,
+            Variable::KIND_VALUE,
+            $falseVal
+        );
+    }
+
+    private function emitClassIdSubclassOf(PHPLLVM\Value $classId, string $className): PHPLLVM\Value
+    {
+        $isInstance = $this->emitClassIdInstanceOf($classId, $className);
+        $parentId = $this->lookup($className);
+        $isSameClass = $this->context->builder->icmp(
+            PHPLLVM\Builder::INT_EQ,
+            $classId,
+            $this->context->constantFromInteger($parentId, 'int64')
+        );
+
+        return $this->context->builder->and($isInstance, $this->context->builder->not($isSameClass));
+    }
+
     private function emitClassIdInstanceOf(PHPLLVM\Value $classId, string $className): PHPLLVM\Value
     {
         $matchingIds = $this->classIdsInstanceOf($className);
