@@ -706,6 +706,15 @@ final class ReflectionSupport
         return null !== $state && $state->isUserClosure();
     }
 
+    /**
+     * php-src: zim_ReflectionClass_isAnonymous() — ce->ce_flags & ZEND_ACC_ANON_CLASS;
+     * anonymous compile names contain @anonymous (MagicStringResolver / zend_compile.c).
+     */
+    public static function isReflectionClassAnonymous(ObjectEntry $reflection): bool
+    {
+        return str_contains(self::classNameFromReflection($reflection), '@anonymous');
+    }
+
     public static function isReflectionInternalFunction(ObjectEntry $reflection): bool
     {
         return $reflection->reflectionIsInternalFunction;
