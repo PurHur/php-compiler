@@ -34,8 +34,12 @@ final class date_default_timezone_get extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        throw new \LogicException(
-            'date_default_timezone_get() is not implemented for JIT in this compiler build (issue #3292)'
-        );
+        if (0 !== \count($args)) {
+            throw new \ArgumentCountError(
+                'date_default_timezone_get() expects exactly 0 arguments, '.\count($args).' given'
+            );
+        }
+
+        return JitDate::defaultTimezoneGet($context);
     }
 }

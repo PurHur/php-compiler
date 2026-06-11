@@ -6,8 +6,10 @@ namespace PHPCompiler\ext\standard;
 
 use PHPCompiler\Block;
 use PHPCompiler\JIT\BasicBlockHelper;
+use PHPCompiler\JIT\Builtin\DefaultTimezoneRuntime;
 use PHPCompiler\JIT\Builtin\StringHrtime;
 use PHPCompiler\JIT\Builtin\StringMicrotime;
+use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\ScriptMagic;
@@ -55,6 +57,44 @@ final class JitDate
     public static function getmygid(Context $context): Value
     {
         return self::libcUidToI64($context, 'getgid');
+    }
+
+    /** date_default_timezone_get() — process default timezone id (#3292 phase 2). */
+    public static function defaultTimezoneGet(Context $context): Value
+    {
+        DefaultTimezoneRuntime::ensureLinked($context);
+
+        $slot = JitValueBox::alloc($context);
+        $ptr = JitValueBox::pointer($context, $slot);
+        $context->builder->call(
+            $context->lookupFunction('__compiler_default_timezone_get'),
+            $ptr
+        );
+
+        return $ptr;
+    }
+
+    /** date_default_timezone_set() — validate and store default timezone (#3292 phase 2). */
+    public static function defaultTimezoneSet(Context $context, JITVariable $timezoneId): Value
+    {
+        DefaultTimezoneRuntime::ensureLinked($context);
+
+        $tz = JitStringBuiltinArg::lower(
+            $context,
+            $timezoneId,
+            'date_default_timezone_set',
+            0,
+            'timezoneId'
+        );
+        $slot = JitValueBox::alloc($context);
+        $ptr = JitValueBox::pointer($context, $slot);
+        $context->builder->call(
+            $context->lookupFunction('__compiler_default_timezone_set'),
+            $tz,
+            $ptr
+        );
+
+        return $ptr;
     }
 
     /** timezone_version_get() — tzdata version baked at JIT link from VmDate (#6832, #8032). */

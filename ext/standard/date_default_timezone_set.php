@@ -50,8 +50,12 @@ final class date_default_timezone_set extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        throw new \LogicException(
-            'date_default_timezone_set() is not implemented for JIT in this compiler build (issue #3292)'
-        );
+        if (1 !== \count($args)) {
+            throw new \ArgumentCountError(
+                'date_default_timezone_set() expects exactly 1 argument, '.\count($args).' given'
+            );
+        }
+
+        return JitDate::defaultTimezoneSet($context, $args[0]);
     }
 }
