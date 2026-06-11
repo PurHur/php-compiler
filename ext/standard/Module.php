@@ -288,6 +288,7 @@ class Module extends ModuleAbstract
             new array_diff_key(),
             new array_diff_uassoc(),
             new array_diff_ukey(),
+            new array_intersect_ukey(),
             new array_intersect(),
             new array_intersect_assoc(),
             new array_intersect_uassoc(),

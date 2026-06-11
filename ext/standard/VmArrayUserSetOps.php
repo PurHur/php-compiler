@@ -59,6 +59,11 @@ final class VmArrayUserSetOps
         self::runDiffUkey($frame);
     }
 
+    public static function intersectUkey(Frame $frame): void
+    {
+        self::runIntersectUkey($frame);
+    }
+
     private static function runValueOp(Frame $frame, string $fn, bool $intersect): void
     {
         $argc = \count($frame->calledArgs);
@@ -200,6 +205,35 @@ final class VmArrayUserSetOps
         $out = new HashTable();
         foreach ($first->iterateKeyed(true) as [$key, $value]) {
             if (self::keyInAnyOther($key, $others, $keyCompare)) {
+                continue;
+            }
+            self::appendToOutput($out, $key, $value);
+        }
+        $frame->returnVar->array($out);
+    }
+
+    private static function runIntersectUkey(Frame $frame): void
+    {
+        $argc = \count($frame->calledArgs);
+        if ($argc < 3) {
+            throw new \ArgumentCountError(
+                'array_intersect_ukey() expects at least 3 arguments, '.$argc.' given'
+            );
+        }
+        $keyCompare = self::resolveCompareCallback(
+            $frame,
+            $frame->calledArgs[$argc - 1],
+            'array_intersect_ukey'
+        );
+        $first = VmArray::requireArrayParam($frame->calledArgs[0], 'array_intersect_ukey', 1, 'array');
+        $others = self::collectOtherArrays($frame, 'array_intersect_ukey', 1, $argc - 1);
+        self::guardOperands($first, $others);
+        if (null === $frame->returnVar) {
+            return;
+        }
+        $out = new HashTable();
+        foreach ($first->iterateKeyed(true) as [$key, $value]) {
+            if (!self::keyInAllOthers($key, $others, $keyCompare)) {
                 continue;
             }
             self::appendToOutput($out, $key, $value);
@@ -403,6 +437,21 @@ final class VmArrayUserSetOps
         }
 
         return false;
+    }
+
+    /**
+     * @param list<HashTable> $others
+     * @param callable(Variable, Variable): int $keyCompare
+     */
+    private static function keyInAllOthers(Variable $key, array $others, callable $keyCompare): bool
+    {
+        foreach ($others as $haystack) {
+            if (!self::keyInAnyOther($key, [$haystack], $keyCompare)) {
+                return false;
+            }
+        }
+
+        return [] !== $others;
     }
 
     private static function valueAtExactKey(HashTable $table, Variable $key): ?Variable
