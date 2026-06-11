@@ -31,7 +31,12 @@ final class in_array extends Internal
             throw new \LogicException('in_array() requires two or three arguments');
         }
         $needle = $frame->calledArgs[0]->resolveIndirect();
-        $haystack = $frame->calledArgs[1]->resolveIndirect();
+        $haystack = VmArray::requireArrayParam(
+            $frame->calledArgs[1],
+            'in_array',
+            2,
+            'haystack'
+        );
         $strict = false;
         if (3 === \count($frame->calledArgs)) {
             $strict = $frame->calledArgs[2]->resolveIndirect()->toBool();
@@ -39,10 +44,7 @@ final class in_array extends Internal
         if (null === $frame->returnVar) {
             return;
         }
-        if (Variable::TYPE_ARRAY !== $haystack->type) {
-            throw new \LogicException('in_array() second argument must be an array in this compiler build');
-        }
-        foreach ($haystack->toArray()->iterate(true) as $value) {
+        foreach ($haystack->iterate(true) as $value) {
             $stored = $value->resolveIndirect();
             if ($strict ? $needle->identicalTo($stored) : self::looseEquals($needle, $stored)) {
                 $frame->returnVar->bool(true);
@@ -91,6 +93,7 @@ final class in_array extends Internal
         if (JITVariable::TYPE_STRING === $args[0]->type || JITVariable::TYPE_VALUE === $args[0]->type) {
             $this->jitString($context, $args[0], 'in_array() needle');
         }
+        JitArrayElem::requireArrayParam($context, $args[1], 'in_array', 2, 'haystack');
 
         return ArrayBuiltinHelper::inArray($context, $args[0], $args[1], $strict);
     }

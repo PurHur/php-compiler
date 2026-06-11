@@ -32,7 +32,12 @@ final class array_search extends Internal
             throw new \LogicException('array_search() requires two or three arguments');
         }
         $needle = $frame->calledArgs[0]->resolveIndirect();
-        $haystack = $frame->calledArgs[1]->resolveIndirect();
+        $haystack = VmArray::requireArrayParam(
+            $frame->calledArgs[1],
+            'array_search',
+            2,
+            'haystack'
+        );
         $strict = false;
         if (3 === $argc) {
             $strict = $frame->calledArgs[2]->resolveIndirect()->toBool();
@@ -40,10 +45,7 @@ final class array_search extends Internal
         if (null === $frame->returnVar) {
             return;
         }
-        if (Variable::TYPE_ARRAY !== $haystack->type) {
-            throw new \LogicException('array_search() second argument must be an array in this compiler build');
-        }
-        foreach ($haystack->toArray()->iterateKeyed(true) as [$key, $value]) {
+        foreach ($haystack->iterateKeyed(true) as [$key, $value]) {
             if ($strict ? $needle->identicalTo($value) : in_array::looseEquals($needle, $value)) {
                 $frame->returnVar->copyFrom($key);
 
@@ -68,6 +70,7 @@ final class array_search extends Internal
         if (JITVariable::TYPE_STRING === $args[0]->type || JITVariable::TYPE_VALUE === $args[0]->type) {
             $this->jitString($context, $args[0], 'array_search() needle');
         }
+        JitArrayElem::requireArrayParam($context, $args[1], 'array_search', 2, 'haystack');
 
         return ArrayBuiltinHelper::arraySearch($context, $args[0], $args[1], $strict);
     }
