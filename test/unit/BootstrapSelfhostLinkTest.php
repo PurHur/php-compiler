@@ -32,6 +32,8 @@ final class BootstrapSelfhostLinkTest extends TestCase
         $install = (string) file_get_contents(self::$root.'/script/bootstrap-gen0-install-prelinked-driver.sh');
         $this->assertStringContainsString('prelinked/bootstrap-gen0/bin-compile-aot', $install);
         $this->assertStringContainsString('bootstrap_gen0_copy_prelinked_inventory_driver', $install);
+        $this->assertStringContainsString('bootstrap_gen0_installed_driver_matches_prelinked', $install);
+        $this->assertStringContainsString('stale build/bin-compile-aot', $install);
         $this->assertStringContainsString('#2930', $install);
         $this->assertStringContainsString('compiler_minimal_aot_blob', $install);
         $this->assertStringContainsString('bootstrap_ensure_m3_compiler_lib_sidecar', $install);
