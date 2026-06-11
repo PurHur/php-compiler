@@ -8,9 +8,20 @@ use PHPCompiler\VM\EnumCaseSupport;
 use PHPCompiler\VM\ResourceSupport;
 use PHPCompiler\VM\Variable;
 
-/** Shared stream argument helpers (issue #3755, #6044). */
+/** Shared stream argument helpers (issue #3755, #6044, #5135). */
 final class VmStreamArg
 {
+    /**
+     * php-src ext/standard/streams.c — invalid/closed stream resource on stream ops.
+     */
+    public static function invalidStreamTypeError(string $functionName): \TypeError
+    {
+        return new \TypeError(\sprintf(
+            '%s(): supplied resource is not a valid stream resource',
+            $functionName
+        ));
+    }
+
     /**
      * Resolve a VM/JIT stream handle for builtins that expect php-src "resource" streams.
      *
@@ -27,6 +38,9 @@ final class VmStreamArg
                 $argNum,
                 EnumCaseSupport::typeNameForVariable($v)
             ));
+        }
+        if (ResourceSupport::isStreamResource($v) && !ResourceSupport::isOpenStreamResource($v)) {
+            throw self::invalidStreamTypeError($functionName);
         }
         if (ResourceSupport::isOpenStreamResource($v)) {
             $handle = ResourceSupport::resolveHandle($v);
