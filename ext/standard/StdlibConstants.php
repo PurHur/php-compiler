@@ -87,6 +87,10 @@ final class StdlibConstants
     public const SORT_NATURAL = 6;
     public const SORT_FLAG_CASE = 8;
 
+    /** array_filter() mode flags (ext/standard/array.c). */
+    public const ARRAY_FILTER_USE_BOTH = 1;
+    public const ARRAY_FILTER_USE_KEY = 2;
+
     /** extract() flags (ext/standard/php_array.h). */
     public const EXTR_OVERWRITE = 0;
     public const EXTR_SKIP = 1;
@@ -248,6 +252,8 @@ final class StdlibConstants
         'sort_locale_string' => self::SORT_LOCALE_STRING,
         'sort_natural' => self::SORT_NATURAL,
         'sort_flag_case' => self::SORT_FLAG_CASE,
+        'array_filter_use_both' => self::ARRAY_FILTER_USE_BOTH,
+        'array_filter_use_key' => self::ARRAY_FILTER_USE_KEY,
         'extr_overwrite' => self::EXTR_OVERWRITE,
         'extr_skip' => self::EXTR_SKIP,
         'extr_prefix_same' => self::EXTR_PREFIX_SAME,
@@ -395,6 +401,8 @@ final class StdlibConstants
         'sort_locale_string',
         'sort_natural',
         'sort_flag_case',
+        'array_filter_use_both',
+        'array_filter_use_key',
         'extr_overwrite',
         'extr_skip',
         'extr_prefix_same',
