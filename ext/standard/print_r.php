@@ -88,8 +88,40 @@ final class print_r extends Internal
         if (Variable::TYPE_OBJECT === $var->type) {
             return self::formatObject($vm, $var->toObject(), $level, $frame);
         }
+        if (Variable::TYPE_ENUM_CASE === $var->type) {
+            return self::formatEnumCase($vm, $var->toEnumCase(), $level, $frame);
+        }
 
         return '';
+    }
+
+    /** Zend zend_print_zval_r enum branch (ext/standard/var.c, #5608). */
+    private static function formatEnumCase(
+        VM $vm,
+        VM\EnumCaseEntry $case,
+        int $level,
+        ?Frame $frame = null
+    ): string {
+        $openSpaces = 0 === $level ? '' : str_repeat(' ', 4 * ($level + 1));
+        $keySpaces = str_repeat(' ', 4 * (0 === $level ? 1 : $level + 2));
+        $header = $case->enumClass->name.' Enum';
+        if (null !== $case->enumClass->backedType) {
+            $header .= ':'.$case->enumClass->backedType;
+        }
+        $lines = ["{$header}\n", "{$openSpaces}(\n"];
+        $lines[] = $keySpaces.'[name] => '.$case->caseName."\n";
+        if (null !== $case->enumClass->backedType) {
+            $valueFormatted = self::formatVariable(
+                $vm,
+                $case->backingValue->resolveIndirect(),
+                $level + 1,
+                $frame
+            );
+            $lines[] = $keySpaces.'[value] => '.$valueFormatted."\n";
+        }
+        $lines[] = "{$openSpaces})\n";
+
+        return implode('', $lines);
     }
 
     private static function formatFloat(float $value): string
