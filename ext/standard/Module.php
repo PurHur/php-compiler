@@ -59,6 +59,9 @@ class Module extends ModuleAbstract
             'CREDITS_ALL' => VmInfo::CREDITS_ALL,
             'PHP_QUERY_RFC1738' => VmHttpBuildQuery::ENCODING_RFC1738,
             'PHP_QUERY_RFC3986' => VmHttpBuildQuery::ENCODING_RFC3986,
+            'SUNFUNCS_RET_STRING' => VmDate::SUNFUNCS_RET_STRING,
+            'SUNFUNCS_RET_DOUBLE' => VmDate::SUNFUNCS_RET_DOUBLE,
+            'SUNFUNCS_RET_TIMESTAMP' => VmDate::SUNFUNCS_RET_TIMESTAMP,
         ] + VmStreamSupports::constants() + VmImage::constants() as $name => $value) {
             $var = new VM\Variable();
             $var->int($value);
@@ -670,6 +673,8 @@ class Module extends ModuleAbstract
             new localtime(),
             new idate(),
             new date_sun_info(),
+            new date_sunrise(),
+            new date_sunset(),
             new sleep(),
             new spl_autoload_register(),
             new time_nanosleep(),
