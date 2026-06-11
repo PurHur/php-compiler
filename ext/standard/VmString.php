@@ -233,7 +233,7 @@ final class VmString
     }
 
     /** Byte width of one UTF-8 codepoint at $bytePos (invalid sequences count as one byte). */
-    private static function utf8CharByteWidth(string $string, int $bytePos): int
+    public static function utf8CharByteWidth(string $string, int $bytePos): int
     {
         $byteLen = self::byteLength($string);
         if ($bytePos >= $byteLen) {
