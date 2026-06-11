@@ -35,13 +35,26 @@ final class register_shutdown_function extends Internal
         if (EnumCaseSupport::isEnumCaseVariable($callable)) {
             throw new \TypeError(ShutdownCallbackPolicy::invalidCallbackTypeError());
         }
+        $resolved = $callable->resolveIndirect();
         $extra = [];
         for ($i = 1; $i < $argc; ++$i) {
             $copy = new Variable();
             $copy->copyFrom($frame->calledArgs[$i]->resolveIndirect());
             $extra[] = $copy;
         }
-        ShutdownQueue::register($callable, ...$extra);
+        if (VmClosureCall::isClosure($resolved)) {
+            ShutdownQueue::registerClosure(VmClosureCall::resolve($resolved), ...$extra);
+
+            return;
+        }
+        if (Variable::TYPE_STRING === $resolved->type) {
+            $callableCopy = new Variable();
+            $callableCopy->string($resolved->toString());
+            ShutdownQueue::register($callableCopy, ...$extra);
+
+            return;
+        }
+        throw new \TypeError(ShutdownCallbackPolicy::invalidCallbackTypeError());
     }
 
     public function call(Context $context, JITVariable ...$args): Value
