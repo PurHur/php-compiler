@@ -56,16 +56,12 @@ final class VmDate
     }
 
     /**
-     * timezone_version_get() — Olson/tzdata version bundled with PHP (ext/date/php_date.c, #6832).
+     * timezone_version_get() — Olson/tzdata version sentinel (ext/date/php_date.c, #6832, #8032).
      *
-     * Host bridge: delegate to Zend date extension when the compiler runs under PHP.
+     * PHP-owned: return php-src `0.system` when no bundled timelib DB is linked (self-host/AOT).
      */
     public static function timezone_version_get(): string
     {
-        if (\function_exists('timezone_version_get')) {
-            return (string) \timezone_version_get();
-        }
-
         return '0.system';
     }
 
