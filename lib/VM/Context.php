@@ -218,6 +218,22 @@ class Context {
                 $var = new Variable(Variable::TYPE_INTEGER);
                 $var->int(\PHPCompiler\ext\filter\VmFilter::INPUT_POST);
                 return $var;
+            case 'input_cookie':
+                $var = new Variable(Variable::TYPE_INTEGER);
+                $var->int(\PHPCompiler\ext\filter\VmFilter::INPUT_COOKIE);
+                return $var;
+            case 'input_env':
+                $var = new Variable(Variable::TYPE_INTEGER);
+                $var->int(\PHPCompiler\ext\filter\VmFilter::INPUT_ENV);
+                return $var;
+            case 'input_server':
+                $var = new Variable(Variable::TYPE_INTEGER);
+                $var->int(\PHPCompiler\ext\filter\VmFilter::INPUT_SERVER);
+                return $var;
+            case 'input_session':
+                $var = new Variable(Variable::TYPE_INTEGER);
+                $var->int(\PHPCompiler\ext\filter\VmFilter::INPUT_SESSION);
+                return $var;
         }
         $stdlibInt = \PHPCompiler\ext\standard\StdlibConstants::CORE_INT_BY_NAME[strtolower($name)] ?? null;
         if (null !== $stdlibInt) {
