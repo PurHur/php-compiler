@@ -847,18 +847,20 @@ final class VmArray
         $out = new HashTable();
         foreach ($ht->iterateKeyed(true) as [$key, $value]) {
             $resolvedKey = $key->resolveIndirect();
+            if (EnumCaseSupport::isEnumCaseVariable($resolvedKey)) {
+                throw new \TypeError('Illegal offset type');
+            }
+            if (Variable::TYPE_INTEGER !== $resolvedKey->type && Variable::TYPE_STRING !== $resolvedKey->type) {
+                throw new \TypeError('Illegal offset type');
+            }
             $copy = new Variable();
             $copy->copyFrom($value);
             if (Variable::TYPE_STRING === $resolvedKey->type) {
                 $raw = $resolvedKey->toString();
                 $newKey = 1 === $case ? VmString::asciiUpper($raw) : VmString::asciiLower($raw);
                 $out->add($newKey, $copy);
-            } elseif (Variable::TYPE_INTEGER === $resolvedKey->type) {
-                $out->addIndex($resolvedKey->toInt(), $copy);
             } else {
-                throw new \LogicException(
-                    'array_change_key_case() only supports string or integer keys in this compiler build'
-                );
+                $out->addIndex($resolvedKey->toInt(), $copy);
             }
         }
 
