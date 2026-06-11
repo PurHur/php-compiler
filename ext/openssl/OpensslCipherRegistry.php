@@ -1,0 +1,183 @@
+<?php
+
+declare(strict_types=1);
+
+namespace PHPCompiler\ext\openssl;
+
+/**
+ * OpenSSL cipher IV lengths without host ext/openssl delegation (#6228, #7331).
+ *
+ * php-src: ext/openssl/openssl.c — EVP_CIPHER_iv_length() table (OpenSSL 3.x Linux).
+ */
+final class OpensslCipherRegistry
+{
+    /** @var array<string, int> */
+    private const CIPHER_IV_LENGTHS = [
+        'aes-128-cbc' => 16,
+        'aes-128-cbc-hmac-sha1' => 16,
+        'aes-128-cbc-hmac-sha256' => 16,
+        'aes-128-ccm' => 12,
+        'aes-128-cfb' => 16,
+        'aes-128-cfb1' => 16,
+        'aes-128-cfb8' => 16,
+        'aes-128-ctr' => 16,
+        'aes-128-ecb' => 0,
+        'aes-128-gcm' => 12,
+        'aes-128-ocb' => 12,
+        'aes-128-ofb' => 16,
+        'aes-128-wrap' => 8,
+        'aes-128-wrap-pad' => 4,
+        'aes-128-xts' => 16,
+        'aes-192-cbc' => 16,
+        'aes-192-ccm' => 12,
+        'aes-192-cfb' => 16,
+        'aes-192-cfb1' => 16,
+        'aes-192-cfb8' => 16,
+        'aes-192-ctr' => 16,
+        'aes-192-ecb' => 0,
+        'aes-192-gcm' => 12,
+        'aes-192-ocb' => 12,
+        'aes-192-ofb' => 16,
+        'aes-192-wrap' => 8,
+        'aes-192-wrap-pad' => 4,
+        'aes-256-cbc' => 16,
+        'aes-256-cbc-hmac-sha1' => 16,
+        'aes-256-cbc-hmac-sha256' => 16,
+        'aes-256-ccm' => 12,
+        'aes-256-cfb' => 16,
+        'aes-256-cfb1' => 16,
+        'aes-256-cfb8' => 16,
+        'aes-256-ctr' => 16,
+        'aes-256-ecb' => 0,
+        'aes-256-gcm' => 12,
+        'aes-256-ocb' => 12,
+        'aes-256-ofb' => 16,
+        'aes-256-wrap' => 8,
+        'aes-256-wrap-pad' => 4,
+        'aes-256-xts' => 16,
+        'aria-128-cbc' => 16,
+        'aria-128-ccm' => 12,
+        'aria-128-cfb' => 16,
+        'aria-128-cfb1' => 16,
+        'aria-128-cfb8' => 16,
+        'aria-128-ctr' => 16,
+        'aria-128-ecb' => 0,
+        'aria-128-gcm' => 12,
+        'aria-128-ofb' => 16,
+        'aria-192-cbc' => 16,
+        'aria-192-ccm' => 12,
+        'aria-192-cfb' => 16,
+        'aria-192-cfb1' => 16,
+        'aria-192-cfb8' => 16,
+        'aria-192-ctr' => 16,
+        'aria-192-ecb' => 0,
+        'aria-192-gcm' => 12,
+        'aria-192-ofb' => 16,
+        'aria-256-cbc' => 16,
+        'aria-256-ccm' => 12,
+        'aria-256-cfb' => 16,
+        'aria-256-cfb1' => 16,
+        'aria-256-cfb8' => 16,
+        'aria-256-ctr' => 16,
+        'aria-256-ecb' => 0,
+        'aria-256-gcm' => 12,
+        'aria-256-ofb' => 16,
+        'camellia-128-cbc' => 16,
+        'camellia-128-cfb' => 16,
+        'camellia-128-cfb1' => 16,
+        'camellia-128-cfb8' => 16,
+        'camellia-128-ctr' => 16,
+        'camellia-128-ecb' => 0,
+        'camellia-128-ofb' => 16,
+        'camellia-192-cbc' => 16,
+        'camellia-192-cfb' => 16,
+        'camellia-192-cfb1' => 16,
+        'camellia-192-cfb8' => 16,
+        'camellia-192-ctr' => 16,
+        'camellia-192-ecb' => 0,
+        'camellia-192-ofb' => 16,
+        'camellia-256-cbc' => 16,
+        'camellia-256-cfb' => 16,
+        'camellia-256-cfb1' => 16,
+        'camellia-256-cfb8' => 16,
+        'camellia-256-ctr' => 16,
+        'camellia-256-ecb' => 0,
+        'camellia-256-ofb' => 16,
+        'chacha20' => 16,
+        'chacha20-poly1305' => 12,
+        'des-ede-cbc' => 8,
+        'des-ede-cfb' => 8,
+        'des-ede-ecb' => 0,
+        'des-ede-ofb' => 8,
+        'des-ede3-cbc' => 8,
+        'des-ede3-cfb' => 8,
+        'des-ede3-cfb1' => 8,
+        'des-ede3-cfb8' => 8,
+        'des-ede3-ecb' => 0,
+        'des-ede3-ofb' => 8,
+        'des3-wrap' => 0,
+        'sm4-cbc' => 16,
+        'sm4-cfb' => 16,
+        'sm4-ctr' => 16,
+        'sm4-ecb' => 0,
+        'sm4-ofb' => 16,
+    ];
+
+    /** Digest names listed by openssl_get_md_methods() (OpenSSL 3.x Linux). */
+    private const MD_METHODS = [
+        'blake2b512',
+        'blake2s256',
+        'md4',
+        'md5',
+        'md5-sha1',
+        'ripemd160',
+        'sha1',
+        'sha224',
+        'sha256',
+        'sha3-224',
+        'sha3-256',
+        'sha3-384',
+        'sha3-512',
+        'sha384',
+        'sha512',
+        'sha512-224',
+        'sha512-256',
+        'shake128',
+        'shake256',
+        'sm3',
+        'whirlpool',
+    ];
+
+    /** Digests openssl_digest() can compute via VmHashNative today. */
+    private const DIGEST_IMPLEMENTED = ['md5', 'sha1', 'sha256'];
+
+    public static function cipherIvLength(string $cipherAlgo): int|false
+    {
+        $key = strtolower($cipherAlgo);
+
+        return self::CIPHER_IV_LENGTHS[$key] ?? false;
+    }
+
+    /** @return list<string> */
+    public static function cipherMethods(bool $aliases = false): array
+    {
+        unset($aliases);
+        $methods = array_keys(self::CIPHER_IV_LENGTHS);
+        sort($methods);
+
+        return $methods;
+    }
+
+    /** @return list<string> */
+    public static function mdMethods(bool $aliases = false): array
+    {
+        unset($aliases);
+
+        return self::MD_METHODS;
+    }
+
+    public static function digestImplemented(string $method): bool
+    {
+        return in_array(strtolower($method), self::DIGEST_IMPLEMENTED, true);
+    }
+}
