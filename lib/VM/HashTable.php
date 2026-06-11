@@ -1117,9 +1117,38 @@ final class HashTable {
     }
 
     /**
-     * Copy values in reverse order into a new packed list array.
+     * Copy values in reverse order (ext/standard/array.c php_array_reverse).
+     *
+     * @param bool $preserveKeys when true, int keys are kept; string keys are always preserved
      */
-    public function reverseCopy(): HashTable
+    public function reverseCopy(bool $preserveKeys = false): HashTable
+    {
+        if (!$preserveKeys && $this->isPackedList()) {
+            return $this->reversePackedCopy();
+        }
+
+        $pairs = iterator_to_array($this->iterateKeyed(true), false);
+        $out = new self();
+        for ($i = \count($pairs) - 1; $i >= 0; --$i) {
+            [$key, $value] = $this->duplicateKeyedPair($pairs[$i]);
+            $copy = new Variable();
+            $copy->copyFrom($value);
+            if (Variable::TYPE_STRING === $key->type) {
+                $out->add($key->toString(), $copy);
+            } elseif ($preserveKeys) {
+                $out->addIndex($key->toInt(), $copy);
+            } else {
+                $out->append($copy);
+            }
+        }
+
+        return $out;
+    }
+
+    /**
+     * Reverse a packed list and re-index from zero (array_reverse $preserve_keys=false fast path).
+     */
+    private function reversePackedCopy(): HashTable
     {
         if (!$this->isWithoutHoles()) {
             throw new \LogicException('reverseCopy() only supports packed list arrays without holes');
