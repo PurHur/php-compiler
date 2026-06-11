@@ -6,6 +6,7 @@ namespace PHPCompiler\ext\mbstring;
 
 use PHPCompiler\ext\iconv\CharsetEngine;
 use PHPCompiler\ext\standard\VmString;
+use PHPCompiler\Frame;
 use PHPCompiler\VM\EnumCaseSupport;
 use PHPCompiler\VM\Variable;
 
@@ -14,6 +15,18 @@ use PHPCompiler\VM\Variable;
  */
 final class VmMbstring
 {
+    public const MB_LTRIM = 1;
+    public const MB_RTRIM = 2;
+    public const MB_BOTH_TRIM = 3;
+
+    /** @var list<int> php-src ext/mbstring/mbstring.c mb_trim_default_chars */
+    private const DEFAULT_TRIM_CODEPOINTS = [
+        0x20, 0x0C, 0x0A, 0x0D, 0x09, 0x0B, 0x00, 0xA0, 0x1680,
+        0x2000, 0x2001, 0x2002, 0x2003, 0x2004, 0x2005, 0x2006, 0x2007,
+        0x2008, 0x2009, 0x200A, 0x2028, 0x2029, 0x202F, 0x205F, 0x3000,
+        0x85, 0x180E,
+    ];
+
     public static function coerceModeArg(Variable $var, string $function, int $argIndex = 1): int
     {
         $var = $var->resolveIndirect();
@@ -511,5 +524,211 @@ final class VmMbstring
             Variable::TYPE_OBJECT => $var->toObject()->class->name,
             default => 'mixed',
         };
+    }
+
+    public static function runTrimBuiltin(Frame $frame, string $function, int $mode): void
+    {
+        $argc = \count($frame->calledArgs);
+        if ($argc < 1 || $argc > 3) {
+            throw new \ArgumentCountError(sprintf(
+                '%s() expects at least 1 argument, %d given',
+                $function,
+                $argc
+            ));
+        }
+        $source = VmString::coerceStringBuiltinArg(
+            $frame->calledArgs[0],
+            $function,
+            0,
+            'string'
+        );
+        if (null === $frame->returnVar) {
+            return;
+        }
+        $what = null;
+        if ($argc >= 2) {
+            $whatVar = $frame->calledArgs[1]->resolveIndirect();
+            if (Variable::TYPE_NULL !== $whatVar->type) {
+                $what = VmString::coerceStringBuiltinArg(
+                    $frame->calledArgs[1],
+                    $function,
+                    1,
+                    'characters'
+                );
+            }
+        }
+        $encoding = $argc >= 3
+            ? self::coerceEncodingArg($frame->calledArgs[2], $function, 2)
+            : 'UTF-8';
+        $frame->returnVar->string(self::trimString($source, $what, $encoding, $mode));
+    }
+
+    public static function trimString(string $source, ?string $what, string $encoding, int $mode): string
+    {
+        self::assertTrimEncoding($encoding);
+        if (null === $what) {
+            $trimSet = self::defaultTrimSet();
+        } elseif ('' === $what) {
+            return $source;
+        } else {
+            $trimSet = self::trimSetFromWhat($what, $encoding);
+        }
+        if ('UTF-8' === $encoding) {
+            return self::trimUtf8($source, $trimSet, $mode);
+        }
+
+        return self::trimSingleByte($source, $trimSet, $mode);
+    }
+
+    /**
+     * @return array<int, true>
+     */
+    private static function defaultTrimSet(): array
+    {
+        $set = [];
+        foreach (self::DEFAULT_TRIM_CODEPOINTS as $cp) {
+            $set[$cp] = true;
+        }
+
+        return $set;
+    }
+
+    /**
+     * @return array<int, true>
+     */
+    private static function trimSetFromWhat(string $what, string $encoding): array
+    {
+        $set = [];
+        foreach (self::codepointsInString($what, $encoding) as $cp) {
+            $set[$cp] = true;
+        }
+
+        return $set;
+    }
+
+    /**
+     * @return list<int>
+     */
+    private static function codepointsInString(string $string, string $encoding): array
+    {
+        if ('UTF-8' === $encoding) {
+            $out = [];
+            $charLen = VmString::utf8CharLength($string);
+            for ($i = 0; $i < $charLen; ++$i) {
+                $out[] = self::decodeUtf8Char(VmString::utf8CharSubstr($string, $i, 1));
+            }
+
+            return $out;
+        }
+        $out = [];
+        $byteLen = \strlen($string);
+        for ($i = 0; $i < $byteLen; ++$i) {
+            $out[] = \ord($string[$i]);
+        }
+
+        return $out;
+    }
+
+    /**
+     * @param array<int, true> $trimSet
+     */
+    private static function trimUtf8(string $source, array $trimSet, int $mode): string
+    {
+        $charLen = VmString::utf8CharLength($source);
+        if (0 === $charLen) {
+            return '';
+        }
+        $left = 0;
+        $right = 0;
+        $currentMode = $mode;
+        for ($i = 0; $i < $charLen; ++$i) {
+            $cp = self::decodeUtf8Char(VmString::utf8CharSubstr($source, $i, 1));
+            if (isset($trimSet[$cp])) {
+                if ($currentMode & self::MB_LTRIM) {
+                    ++$left;
+                }
+                if ($currentMode & self::MB_RTRIM) {
+                    ++$right;
+                }
+            } else {
+                $currentMode &= ~self::MB_LTRIM;
+                if ($currentMode & self::MB_RTRIM) {
+                    $right = 0;
+                }
+            }
+        }
+        if (0 === $left && 0 === $right) {
+            return $source;
+        }
+
+        return VmString::utf8CharSubstr($source, $left, $charLen - $left - $right);
+    }
+
+    /**
+     * @param array<int, true> $trimSet
+     */
+    private static function trimSingleByte(string $source, array $trimSet, int $mode): string
+    {
+        $byteLen = \strlen($source);
+        if (0 === $byteLen) {
+            return '';
+        }
+        $left = 0;
+        $right = 0;
+        $currentMode = $mode;
+        for ($i = 0; $i < $byteLen; ++$i) {
+            $cp = \ord($source[$i]);
+            if (isset($trimSet[$cp])) {
+                if ($currentMode & self::MB_LTRIM) {
+                    ++$left;
+                }
+                if ($currentMode & self::MB_RTRIM) {
+                    ++$right;
+                }
+            } else {
+                $currentMode &= ~self::MB_LTRIM;
+                if ($currentMode & self::MB_RTRIM) {
+                    $right = 0;
+                }
+            }
+        }
+        if (0 === $left && 0 === $right) {
+            return $source;
+        }
+
+        return \substr($source, $left, $byteLen - $left - $right);
+    }
+
+    private static function decodeUtf8Char(string $char): int
+    {
+        $len = \strlen($char);
+        if (0 === $len) {
+            return 0;
+        }
+        $b0 = \ord($char[0]);
+        if ($b0 < 0x80) {
+            return $b0;
+        }
+        if ($len >= 2 && ($b0 & 0xE0) === 0xC0) {
+            return (($b0 & 0x1F) << 6) | (\ord($char[1]) & 0x3F);
+        }
+        if ($len >= 3 && ($b0 & 0xF0) === 0xE0) {
+            return (($b0 & 0x0F) << 12) | ((\ord($char[1]) & 0x3F) << 6) | (\ord($char[2]) & 0x3F);
+        }
+        if ($len >= 4 && ($b0 & 0xF8) === 0xF0) {
+            return (($b0 & 0x07) << 18) | ((\ord($char[1]) & 0x3F) << 12)
+                | ((\ord($char[2]) & 0x3F) << 6) | (\ord($char[3]) & 0x3F);
+        }
+
+        return $b0;
+    }
+
+    private static function assertTrimEncoding(string $encoding): void
+    {
+        if ('UTF-8' !== $encoding && 'ASCII' !== $encoding && '8BIT' !== $encoding) {
+            throw new \LogicException(
+                'mb_trim() requires mbstring for encoding '.$encoding.' in this compiler build'
+            );
+        }
     }
 }
