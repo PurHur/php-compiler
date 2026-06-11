@@ -37,6 +37,6 @@ final class checkdate extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        throw new \LogicException('checkdate() is not implemented for JIT in this compiler build (issue #3292)');
+        return JitCheckdate::invoke($context, ...$args);
     }
 }
