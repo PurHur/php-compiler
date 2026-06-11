@@ -9,7 +9,6 @@ use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitLongArg;
 use PHPCompiler\JIT\Variable as JITVariable;
-use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
 
 /** stream_set_chunk_size() — VM via VmFs; JIT/AOT via __compiler_stream_set_chunk_size (issue #3754). */
@@ -25,15 +24,21 @@ final class stream_set_chunk_size_ extends Internal
         if (2 !== \count($frame->calledArgs)) {
             throw new \LogicException('stream_set_chunk_size() requires exactly two arguments in this compiler build');
         }
-        $handleVar = $frame->calledArgs[0]->resolveIndirect();
-        $sizeVar = $frame->calledArgs[1]->resolveIndirect();
+        $handle = VmStreamArg::requireStreamHandle(
+            $frame->calledArgs[0]->resolveIndirect(),
+            'stream_set_chunk_size',
+            1
+        );
+        $chunkSize = VmMath::parseIntBuiltinArg(
+            $frame->calledArgs[1]->resolveIndirect(),
+            'stream_set_chunk_size',
+            2,
+            'chunk_size'
+        );
+        $previous = VmFs::streamSetChunkSize($handle, $chunkSize);
         if (null === $frame->returnVar) {
             return;
         }
-        if (Variable::TYPE_INTEGER !== $handleVar->type || Variable::TYPE_INTEGER !== $sizeVar->type) {
-            throw new \LogicException('stream_set_chunk_size() handle and chunk_size must be integers in this compiler build');
-        }
-        $previous = VmFs::streamSetChunkSize($handleVar->toInt(), $sizeVar->toInt());
         if (false === $previous) {
             $frame->returnVar->bool(false);
 
