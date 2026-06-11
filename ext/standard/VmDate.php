@@ -71,8 +71,6 @@ final class VmDate
 
     /**
      * date_sun_info() — sunrise/sunset and twilight timestamps (ext/date/php_date.c, #6831).
-     *
-     * Host bridge: delegate to Zend date extension when the compiler runs under PHP.
      */
     public static function dateSunInfo(int $time, float $latitude, float $longitude): HashTable
     {
@@ -89,12 +87,6 @@ final class VmDate
         }
         if (!\is_finite($longitude)) {
             throw new \ValueError('date_sun_info(): Argument #3 ($longitude) must be finite');
-        }
-        if (\function_exists('date_sun_info')) {
-            /** @var array<string, int|bool> $raw */
-            $raw = \date_sun_info($time, $latitude, $longitude);
-
-            return $raw;
         }
 
         return VmDateSunNative::sunInfo($time, $latitude, $longitude);
@@ -165,30 +157,6 @@ final class VmDate
         ?float $gmtOffset,
         int $argc
     ): mixed {
-        if (\function_exists($function)) {
-            $args = [$timestamp];
-            if ($argc >= 2) {
-                $args[] = $returnFormat;
-            }
-            if ($argc >= 3) {
-                $args[] = $latitude;
-            }
-            if ($argc >= 4) {
-                $args[] = $longitude;
-            }
-            if ($argc >= 5) {
-                $args[] = $zenith ?? 90.0;
-            }
-            if ($argc >= 6) {
-                $args[] = $gmtOffset ?? 0.0;
-            }
-
-            /** @var callable(int, int=, ?float=, ?float=, float=, float=): string|int|float|false $callable */
-            $callable = '\\'.$function;
-
-            return $callable(...$args);
-        }
-
         return VmDateSunNative::sunriseSunset(
             'date_sunset' === $function,
             $timestamp,
