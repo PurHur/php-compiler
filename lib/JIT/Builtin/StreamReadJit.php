@@ -49,6 +49,7 @@ final class StreamReadJit
         '__compiler_fseek',
         '__compiler_stream_get_contents',
         '__compiler_stream_copy_to_stream',
+        '__compiler_stream_copy_to_string',
         '__phpc_read_stream_bytes',
     ];
 
@@ -74,6 +75,7 @@ final class StreamReadJit
         self::implementIfMissing($context, '__compiler_fseek', self::emitFseek(...));
         self::implementIfMissing($context, '__compiler_stream_get_contents', self::emitStreamGetContents(...));
         self::implementIfMissing($context, '__compiler_stream_copy_to_stream', self::emitStreamCopyToStream(...));
+        self::implementIfMissing($context, '__compiler_stream_copy_to_string', self::emitStreamCopyToString(...));
     }
 
     /**
@@ -117,6 +119,7 @@ final class StreamReadJit
             '__compiler_fseek' => $context->context->functionType($i64, false, $i64, $i64, $i64),
             '__compiler_stream_get_contents' => $context->context->functionType($strPtr, false, $i64, $i64, $i64),
             '__compiler_stream_copy_to_stream' => $context->context->functionType($i64, false, $i64, $i64, $i64, $i64),
+            '__compiler_stream_copy_to_string' => $context->context->functionType($strPtr, false, $i64, $i64, $i64),
             '__phpc_read_stream_bytes' => $context->context->functionType($strPtr, false, $i8p, $i64),
             default => throw new \LogicException('StreamReadJit: unknown '.$name),
         };
@@ -1045,6 +1048,58 @@ final class StreamReadJit
 
         $context->builder->positionAtEnd($failBb);
         $context->builder->returnValue($minusOne);
+    }
+
+    private static function emitStreamCopyToString(Context $context, LlvmFunction $fn): void
+    {
+        $entry = $fn->appendBasicBlock('sctstr_entry');
+        $context->builder->positionAtEnd($entry);
+
+        $handle = $fn->getParam(0);
+        $maxlength = $fn->getParam(1);
+        $offset = $fn->getParam(2);
+        $i32 = $context->getTypeFromString('int32');
+        $i64 = $context->getTypeFromString('int64');
+        $i8p = $context->getTypeFromString('int8*');
+        $strPtr = $context->getTypeFromString('__string__*');
+        $nullStr = $strPtr->constNull();
+        $zero64 = $i64->constInt(0, false);
+
+        $badOffset = $context->builder->icmp(Builder::INT_SLT, $offset, $zero64);
+        $failBb = $fn->appendBasicBlock('sctstr_fail');
+        $resolveBb = $fn->appendBasicBlock('sctstr_resolve');
+        $context->builder->branchIf($badOffset, $failBb, $resolveBb);
+
+        $context->builder->positionAtEnd($resolveBb);
+        $fp = $context->builder->call($context->lookupFunction('__phpc_resolve_stream'), $handle);
+        $fpNull = $context->builder->icmp(Builder::INT_EQ, $fp, $i8p->constNull());
+        $seekBb = $fn->appendBasicBlock('sctstr_seek');
+        $context->builder->branchIf($fpNull, $failBb, $seekBb);
+
+        $context->builder->positionAtEnd($seekBb);
+        $seekRc = $context->builder->call($context->lookupFunction('fseek'), $fp, $offset, $i32->constInt(0, false));
+        $seekBad = $context->builder->icmp(Builder::INT_NE, $seekRc, $i32->constInt(0, false));
+        $afterSeekBb = $fn->appendBasicBlock('sctstr_after_seek');
+        $context->builder->branchIf($seekBad, $failBb, $afterSeekBb);
+
+        $context->builder->positionAtEnd($afterSeekBb);
+        $empty = $context->builder->icmp(Builder::INT_EQ, $maxlength, $zero64);
+        $emptyBb = $fn->appendBasicBlock('sctstr_empty');
+        $readBb = $fn->appendBasicBlock('sctstr_read');
+        $context->builder->branchIf($empty, $emptyBb, $readBb);
+
+        $context->builder->positionAtEnd($emptyBb);
+        $context->builder->returnValue(
+            $context->builder->call($context->lookupFunction('__string__init'), $zero64, $context->pointerFromStringConstant(''))
+        );
+
+        $context->builder->positionAtEnd($readBb);
+        $context->builder->returnValue(
+            $context->builder->call($context->lookupFunction('__phpc_read_stream_bytes'), $fp, $maxlength)
+        );
+
+        $context->builder->positionAtEnd($failBb);
+        $context->builder->returnValue($nullStr);
     }
 
     private static function registerLinkedRuntime(Context $context): void
