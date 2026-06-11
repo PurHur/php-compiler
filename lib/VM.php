@@ -10259,6 +10259,7 @@ restart:
             $data['methodNames'] = (string) $newName;
             unset($merged[$methodLc]);
             $merged[$newNameLc] = $data;
+            $entry->traitAliases[(string) $newName] = $data['traitName'] . '::' . (string) $adaptation['method'];
         }
 
         foreach ($merged as $methodLc => $data) {

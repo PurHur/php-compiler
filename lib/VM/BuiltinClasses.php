@@ -57,6 +57,7 @@ use PHPCompiler\VM\Builtin\ReflectionClassConstruct;
 use PHPCompiler\VM\Builtin\ReflectionClassGetAttributes;
 use PHPCompiler\VM\Builtin\ReflectionClassGetConstant;
 use PHPCompiler\VM\Builtin\ReflectionClassGetConstants;
+use PHPCompiler\VM\Builtin\ReflectionClassGetTraitAliases;
 use PHPCompiler\VM\Builtin\ReflectionClassGetLazyInitializer;
 use PHPCompiler\VM\Builtin\ReflectionClassGetLazyProxyFactory;
 use PHPCompiler\VM\Builtin\ReflectionClassGetMethod;
@@ -467,6 +468,8 @@ final class BuiltinClasses
         $rc->methodVisibility['getreflectionconstant'] = $pub;
         $rc->methods['getconstants'] = new ReflectionClassGetConstants();
         $rc->methodVisibility['getconstants'] = $pub;
+        $rc->methods['gettraitaliases'] = new ReflectionClassGetTraitAliases();
+        $rc->methodVisibility['gettraitaliases'] = $pub;
         $rc->methods['getconstant'] = new ReflectionClassGetConstant();
         $rc->methodVisibility['getconstant'] = $pub;
         $pubStatic = $pub | CfgFunc::FLAG_STATIC;
