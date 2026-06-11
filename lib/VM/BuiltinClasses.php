@@ -115,6 +115,7 @@ use PHPCompiler\VM\Builtin\ReflectionFunctionIsInternal;
 use PHPCompiler\VM\Builtin\ReflectionFunctionIsUserDefined;
 use PHPCompiler\VM\Builtin\ReflectionMethodConstruct;
 use PHPCompiler\VM\Builtin\ReflectionMethodCreateFromClosure;
+use PHPCompiler\VM\Builtin\ReflectionMethodCreateFromMethodName;
 use PHPCompiler\VM\Builtin\ReflectionMethodGetAttributes;
 use PHPCompiler\VM\Builtin\ReflectionMethodGetClosure;
 use PHPCompiler\VM\Builtin\ReflectionMethodGetName;
@@ -421,6 +422,8 @@ final class BuiltinClasses
         $rm->methodVisibility['getclosure'] = $pub;
         $rm->methods['createfromclosure'] = new ReflectionMethodCreateFromClosure();
         $rm->methodVisibility['createfromclosure'] = $pubStatic;
+        $rm->methods['createfrommethodname'] = new ReflectionMethodCreateFromMethodName();
+        $rm->methodVisibility['createfrommethodname'] = $pubStatic;
         $rm->methods['isstatic'] = new ReflectionMethodIsStatic();
         $rm->methodVisibility['isstatic'] = $pub;
         $rm->methods['ispublic'] = new ReflectionMethodIsPublic();
