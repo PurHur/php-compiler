@@ -21,9 +21,6 @@ final class bcscale extends Internal
 
     public function execute(Frame $frame): void
     {
-        if (null === $frame->returnVar) {
-            return;
-        }
         $argc = \count($frame->calledArgs);
         if ($argc > 1) {
             throw new \LogicException('bcscale() accepts zero or one argument in this compiler build');
@@ -36,7 +33,11 @@ final class bcscale extends Internal
             }
             $scale = $var->toInt();
         }
-        $frame->returnVar->int(VmBcmath::scale($scale));
+        $result = VmBcmath::scale($scale);
+        if (null === $frame->returnVar) {
+            return;
+        }
+        $frame->returnVar->int($result);
     }
 
     public function call(Context $context, JITVariable ...$args): Value

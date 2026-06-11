@@ -26,8 +26,32 @@ try {
 } catch (TypeError $e) {
     echo "md5: ", $e->getMessage(), "\n";
 }
+
+try {
+    strtr('abc', 1);
+    echo "strtr_after\n";
+} catch (TypeError $e) {
+    echo "strtr: ", $e->getMessage(), "\n";
+}
+
+try {
+    array_merge('not-array');
+    echo "array_merge_after\n";
+} catch (LogicException $e) {
+    echo "array_merge: ", $e->getMessage(), "\n";
+}
+
+try {
+    memory_get_usage(true, false);
+    echo "memory_get_usage_after\n";
+} catch (ArgumentCountError $e) {
+    echo "memory_get_usage: ", $e->getMessage(), "\n";
+}
 ?>
 --EXPECT--
 strip_tags: strip_tags(): Argument #1 ($string) must be of type string, array given
 fputcsv: Object of class stdClass could not be converted to string
 md5: md5(): Argument #1 ($string) must be of type string, array given
+strtr: strtr(): Argument #2 ($replace_pairs) must be of type array, int given
+array_merge: array_merge() arguments must be arrays in this compiler build
+memory_get_usage: memory_get_usage() expects at most 1 argument, 2 given

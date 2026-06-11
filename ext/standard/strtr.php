@@ -10,6 +10,7 @@ use PHPCompiler\JIT\ArrayBuiltinHelper;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\Variable as JITVariable;
+use PHPCompiler\VM\BuiltinExecute;
 use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
 
@@ -18,9 +19,6 @@ final class strtr extends Internal
 {
     public function execute(Frame $frame): void
     {
-        if (null === $frame->returnVar) {
-            return;
-        }
         $argc = \count($frame->calledArgs);
         if (2 === $argc) {
             $string = VmString::coerceStringBuiltinArg(
@@ -49,7 +47,8 @@ final class strtr extends Internal
                 $replacePairs[VmString::coerceStringBuiltinArg($keyVar, 'strtr', 1, 'replace_pairs')] =
                     VmString::coerceStringBuiltinArg($valueVar, 'strtr', 1, 'replace_pairs');
             }
-            $frame->returnVar->string(VmString::strtrArray($string, $replacePairs));
+            $result = VmString::strtrArray($string, $replacePairs);
+            BuiltinExecute::writeReturn($frame, static fn (Variable $ret) => $ret->string($result));
 
             return;
         }
@@ -72,7 +71,8 @@ final class strtr extends Internal
                 2,
                 'to'
             );
-            $frame->returnVar->string(VmString::strtr($string, $from, $to));
+            $result = VmString::strtr($string, $from, $to);
+            BuiltinExecute::writeReturn($frame, static fn (Variable $ret) => $ret->string($result));
 
             return;
         }

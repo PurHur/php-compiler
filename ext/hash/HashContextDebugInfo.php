@@ -21,9 +21,6 @@ final class HashContextDebugInfo extends VmClassMethod
 
     public function execute(Frame $frame): void
     {
-        if (null === $frame->returnVar) {
-            return;
-        }
         if (\count($frame->calledArgs) < 1) {
             throw new \LogicException('HashContext::__debugInfo() expects a HashContext receiver');
         }
@@ -33,6 +30,9 @@ final class HashContextDebugInfo extends VmClassMethod
         }
         $object = $receiver->toObject();
         $algoName = VmHashContext::debugInfoAlgoName($object);
+        if (null === $frame->returnVar) {
+            return;
+        }
         $ht = new HashTable();
         $algoVar = new Variable();
         $algoVar->string($algoName);

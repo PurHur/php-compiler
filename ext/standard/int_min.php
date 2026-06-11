@@ -33,9 +33,6 @@ final class int_min extends Internal
     public function execute(Frame $frame): void
     {
         if (2 === \count($frame->calledArgs)) {
-            if (null === $frame->returnVar) {
-                return;
-            }
             if (VmMinMax::tryReduceEnumCasesTwoArg($frame, true)) {
                 return;
             }
@@ -44,7 +41,9 @@ final class int_min extends Internal
             if (Variable::TYPE_INTEGER === $a->type && Variable::TYPE_INTEGER === $b->type) {
                 $ai = $a->toInt();
                 $bi = $b->toInt();
-                $frame->returnVar->int($ai < $bi ? $ai : $bi);
+                if (null !== $frame->returnVar) {
+                    $frame->returnVar->int($ai < $bi ? $ai : $bi);
+                }
 
                 return;
             }

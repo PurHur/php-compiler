@@ -26,3 +26,24 @@ try {
 } catch (Throwable $t) {
     echo 'md5: ', get_class($t), ': ', $t->getMessage(), "\n";
 }
+
+try {
+    strtr('abc', 1);
+    echo "strtr_after\n";
+} catch (Throwable $t) {
+    echo 'strtr: ', get_class($t), ': ', $t->getMessage(), "\n";
+}
+
+try {
+    array_merge('not-array');
+    echo "array_merge_after\n";
+} catch (Throwable $t) {
+    echo 'array_merge: ', get_class($t), ': ', $t->getMessage(), "\n";
+}
+
+try {
+    memory_get_usage(true, false);
+    echo "memory_get_usage_after\n";
+} catch (Throwable $t) {
+    echo 'memory_get_usage: ', get_class($t), ': ', $t->getMessage(), "\n";
+}
