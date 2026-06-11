@@ -13,7 +13,7 @@ use PHPLLVM\Value;
 /**
  * dns_get_mx() — MX record lookup with by-ref host/weight arrays (#4125).
  *
- * VM: VmDns::dnsGetMx() via libc res_query FFI. JIT/AOT: VM-only v1.
+ * VM: VmDns::dnsGetMx() via res_query FFI + UDP DNS fallback. JIT/AOT: JitDnsGetMxMaterializer.
  *
  * @see https://github.com/php/php-src/blob/master/ext/standard/dns.c PHP_FUNCTION(dns_get_mx)
  */
@@ -26,8 +26,12 @@ final class dns_get_mx extends Internal
 
     public function execute(Frame $frame): void
     {
-        if (3 !== \count($frame->calledArgs)) {
-            throw new \LogicException('dns_get_mx() requires exactly three arguments in this compiler build');
+        $argc = \count($frame->calledArgs);
+        if ($argc < 2 || $argc > 3) {
+            throw new \ArgumentCountError(\sprintf(
+                'dns_get_mx() expects between 2 and 3 arguments, %d given',
+                $argc
+            ));
         }
         if (null === $frame->returnVar) {
             return;
@@ -35,18 +39,29 @@ final class dns_get_mx extends Internal
 
         $hostname = VmString::coerceStringBuiltinArg($frame->calledArgs[0], 'dns_get_mx', 0, 'hostname');
         VmDnsMx::validateArrayByRefArg($frame->calledArgs[1], 'dns_get_mx', 1, 'mxhosts');
-        VmDnsMx::validateArrayByRefArg($frame->calledArgs[2], 'dns_get_mx', 2, 'weight');
+        $weightsArg = null;
+        if ($argc >= 3) {
+            VmDnsMx::validateArrayByRefArg($frame->calledArgs[2], 'dns_get_mx', 2, 'weight');
+            $weightsArg = $frame->calledArgs[2];
+        }
 
         $ok = VmDnsMx::applyMxByRef(
             VmDns::dnsGetMx($hostname),
             $frame->calledArgs[1],
-            $frame->calledArgs[2]
+            $weightsArg
         );
         $frame->returnVar->bool($ok);
     }
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        throw new \LogicException('dns_get_mx() is not implemented for JIT in this compiler build (issue #4125)');
+        $argc = \count($args);
+        if ($argc < 2 || $argc > 3) {
+            throw new \LogicException('dns_get_mx() expects between 2 and 3 arguments in this compiler build');
+        }
+
+        $weightsArg = $argc >= 3 ? $args[2] : null;
+
+        return JitDnsGetMx::invoke($context, $args[0], $args[1], $weightsArg);
     }
 }

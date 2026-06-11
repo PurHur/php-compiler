@@ -365,22 +365,131 @@ final class VmDns
      */
     private static function queryMxViaResQuery(string $hostname): ?string
     {
-        if (!\extension_loaded('ffi')) {
-            return null;
+        if (self::ffiEnabled() && \extension_loaded('ffi')) {
+            try {
+                $ffi = self::dnsFfi();
+                $buf = $ffi->new('unsigned char[4096]');
+                $qtype = self::DNS_RECORD_TYPES['MX'];
+                $rc = (int) $ffi->res_query($hostname, self::DNS_CLASS_IN, $qtype, $buf, 4096);
+                if ($rc > 0) {
+                    return \FFI::string($buf, $rc);
+                }
+            } catch (\Throwable) {
+            }
         }
-        try {
-            $ffi = self::dnsFfi();
-        } catch (\Throwable) {
-            return null;
-        }
-        $buf = $ffi->new('unsigned char[4096]');
-        $qtype = self::DNS_RECORD_TYPES['MX'];
-        $rc = (int) $ffi->res_query($hostname, self::DNS_CLASS_IN, $qtype, $buf, 4096);
-        if ($rc <= 0) {
+
+        return self::queryMxViaUdp($hostname);
+    }
+
+    /**
+     * Pure-PHP UDP MX query when libc res_query FFI is unavailable (#4125, #7934).
+     */
+    private static function queryMxViaUdp(string $hostname): ?string
+    {
+        $nameservers = self::readResolvConfNameservers();
+        if ([] === $nameservers) {
             return null;
         }
 
-        return \FFI::string($buf, $rc);
+        $query = self::buildDnsQueryPacket($hostname, self::DNS_RECORD_TYPES['MX']);
+        foreach ($nameservers as $nameserver) {
+            $response = self::udpDnsExchange($nameserver, $query);
+            if (null !== $response && '' !== $response) {
+                return $response;
+            }
+        }
+
+        return null;
+    }
+
+    private static function buildDnsQueryPacket(string $hostname, int $qtype): string
+    {
+        $id = \random_int(0, 0xFFFF);
+        $header = \pack('nnnnnn', $id, 0x0100, 1, 0, 0, 0);
+        $question = self::encodeDnsName($hostname).\pack('nn', $qtype, self::DNS_CLASS_IN);
+
+        return $header.$question;
+    }
+
+    private static function encodeDnsName(string $hostname): string
+    {
+        $hostname = \rtrim($hostname, '.');
+        $encoded = '';
+        foreach (\explode('.', $hostname) as $label) {
+            $len = \strlen($label);
+            if ($len > 63) {
+                $label = \substr($label, 0, 63);
+                $len = 63;
+            }
+            $encoded .= \chr($len).$label;
+        }
+
+        return $encoded."\0";
+    }
+
+    /**
+     * @return list<string>
+     */
+    private static function readResolvConfNameservers(): array
+    {
+        $path = '/etc/resolv.conf';
+        if (!\is_readable($path)) {
+            return [];
+        }
+        $lines = @\file($path, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES);
+        if (false === $lines) {
+            return [];
+        }
+
+        $servers = [];
+        foreach ($lines as $line) {
+            $line = \trim($line);
+            if ('' === $line || '#' === $line[0]) {
+                continue;
+            }
+            if (!\str_starts_with($line, 'nameserver')) {
+                continue;
+            }
+            $parts = \preg_split('/\s+/', $line, -1, PREG_SPLIT_NO_EMPTY);
+            if (null === $parts || \count($parts) < 2) {
+                continue;
+            }
+            $ip = $parts[1];
+            if ('' !== $ip && !\in_array($ip, $servers, true)) {
+                $servers[] = $ip;
+            }
+        }
+
+        return $servers;
+    }
+
+    private static function udpDnsExchange(string $nameserver, string $query): ?string
+    {
+        $errno = 0;
+        $errstr = '';
+        $socket = @\stream_socket_client(
+            'udp://'.$nameserver.':53',
+            $errno,
+            $errstr,
+            2,
+            STREAM_CLIENT_CONNECT
+        );
+        if (false === $socket) {
+            return null;
+        }
+
+        \stream_set_timeout($socket, 2);
+        $written = @\fwrite($socket, $query);
+        if (false === $written || $written !== \strlen($query)) {
+            \fclose($socket);
+
+            return null;
+        }
+
+        $response = @\stream_get_contents($socket);
+        \fclose($socket);
+
+        return false === $response ? null : $response;
     }
 
     /**
