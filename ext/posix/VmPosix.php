@@ -169,6 +169,23 @@ final class VmPosix
         return true;
     }
 
+    public static function mkfifo(string $path, int $mode): bool
+    {
+        self::$lastError = 0;
+        $ffi = self::ffi();
+        if (null === $ffi) {
+            throw new \Error('posix_mkfifo() is not available in this compiler build');
+        }
+        $fifoMode = $mode | PosixConstants::S_IFIFO;
+        if (0 !== (int) $ffi->mkfifo($path, $fifoMode)) {
+            self::$lastError = self::readErrno($ffi);
+
+            return false;
+        }
+
+        return true;
+    }
+
     public static function setuid(int $uid): bool
     {
         return self::setId('setuid', $uid);
@@ -509,6 +526,7 @@ int uname(struct utsname *buf);
 char *strerror(int errnum);
 int access(const char *pathname, int mode);
 int mknod(const char *pathname, mode_t mode, dev_t dev);
+int mkfifo(const char *pathname, mode_t mode);
 int setuid(uid_t uid);
 int setgid(gid_t gid);
 int seteuid(uid_t uid);
