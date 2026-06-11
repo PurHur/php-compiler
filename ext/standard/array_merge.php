@@ -33,25 +33,22 @@ final class array_merge extends Internal
 
             return;
         }
-        $first = $frame->calledArgs[0]->resolveIndirect();
-        if (Variable::TYPE_ARRAY !== $first->type) {
-            throw new \LogicException('array_merge() arguments must be arrays in this compiler build');
-        }
+        $first = VmArray::requireArrayArgNum($frame->calledArgs[0]->resolveIndirect(), 'array_merge', 1);
         if (1 === $argc) {
-            $merged = VmArray::merge($first->toArray());
+            $merged = VmArray::merge($first);
             BuiltinExecute::writeReturn($frame, static fn (Variable $ret) => $ret->array($merged));
 
             return;
         }
         $others = [];
         for ($i = 1, $n = $argc; $i < $n; ++$i) {
-            $arg = $frame->calledArgs[$i]->resolveIndirect();
-            if (Variable::TYPE_ARRAY !== $arg->type) {
-                throw new \LogicException('array_merge() arguments must be arrays in this compiler build');
-            }
-            $others[] = $arg->toArray();
+            $others[] = VmArray::requireArrayArgNum(
+                $frame->calledArgs[$i]->resolveIndirect(),
+                'array_merge',
+                $i + 1
+            );
         }
-        $merged = VmArray::merge($first->toArray(), ...$others);
+        $merged = VmArray::merge($first, ...$others);
         BuiltinExecute::writeReturn($frame, static fn (Variable $ret) => $ret->array($merged));
     }
 

@@ -301,6 +301,28 @@ final class VmArray
     }
 
     /**
+     * Variadic array builtins whose Zend messages omit ($param) — e.g. array_merge().
+     *
+     * @throws \TypeError when {@param $value} is not an array
+     */
+    public static function requireArrayArgNum(Variable $value, string $fn, int $argNum): HashTable
+    {
+        $v = $value->resolveIndirect();
+        if (Variable::TYPE_ARRAY !== $v->type) {
+            throw new \TypeError(
+                \sprintf(
+                    '%s(): Argument #%d must be of type array, %s given',
+                    $fn,
+                    $argNum,
+                    self::valueTypeLabel($v)
+                )
+            );
+        }
+
+        return $v->toArray();
+    }
+
+    /**
      * array_pad() — pad packed list {@param $array} to abs({@param $length}) with {@param $value}.
      */
     public static function pad(HashTable $array, int $length, Variable $value): HashTable
