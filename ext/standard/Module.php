@@ -660,6 +660,7 @@ class Module extends ModuleAbstract
             new hrtime(),
             new phpversion(),
             new php_sapi_name(),
+            new getopt(),
             new php_uname(),
             new phpinfo(),
             new phpcredits(),

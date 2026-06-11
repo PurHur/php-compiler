@@ -48,6 +48,8 @@ final class BuiltinByRefParams
                 return [3];
             case 'headers_sent':
                 return [0, 1];
+            case 'getopt':
+                return [2];
         }
 
         return [];

@@ -77,6 +77,13 @@ class Context {
     /** Ghost object currently running its lazy initializer (#6531, Zend/zend_lazy_objects.c). */
     public ?ObjectEntry $lazyGhostInitializing = null;
 
+    /**
+     * SAPI argv snapshot for getopt() (php-src SG(request_info).argv; issue #3251).
+     *
+     * @var list<string>
+     */
+    public array $cliRequestArgv = [];
+
     /** User catch ran during coercion; caller must not use a coerced result (#4284). */
     public bool $magicMethodThrowHandled = false;
 
