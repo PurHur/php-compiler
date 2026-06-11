@@ -326,6 +326,14 @@ final class VmArray
             }
             if (Variable::TYPE_INTEGER === $keyValue->type) {
                 $dest->addIndex($keyValue->toInt(), $stored);
+            } elseif (Variable::TYPE_FLOAT === $keyValue->type) {
+                $floatKey = $keyValue->toFloat();
+                $intKey = (int) $floatKey;
+                if ($floatKey === (float) $intKey) {
+                    $dest->addIndex($intKey, $stored);
+                } else {
+                    $dest->add($keyValue->toString(), $stored);
+                }
             } elseif (Variable::TYPE_STRING === $keyValue->type) {
                 $dest->add($keyValue->toString(), $stored);
             } else {

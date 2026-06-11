@@ -6969,8 +6969,9 @@ final class ArrayBuiltinHelper
         self::storeValueEntryAtStringKey($context, $dest, $keyStr, $valEntry);
         $context->builder->branch($done);
 
+        $afterLong = BasicBlockHelper::append($context, 'array_combine_after_long');
         $context->builder->positionAtEnd($afterString);
-        $context->builder->branchIf($isLong, $longBlock, $done);
+        $context->builder->branchIf($isLong, $longBlock, $afterLong);
 
         $context->builder->positionAtEnd($longBlock);
         $intKey = $context->builder->truncOrBitCast(
@@ -6980,7 +6981,58 @@ final class ArrayBuiltinHelper
         self::storeValueEntryAtIndex($context, $dest, $intKey, $valEntry);
         $context->builder->branch($done);
 
+        $doubleBlock = BasicBlockHelper::append($context, 'array_combine_key_double');
+        $doubleWholeBlock = BasicBlockHelper::append($context, 'array_combine_key_double_whole');
+        $doubleStringBlock = BasicBlockHelper::append($context, 'array_combine_key_double_str');
+        $context->builder->positionAtEnd($afterLong);
+        $isDouble = $context->builder->icmp(
+            Builder::INT_EQ,
+            $typeByte,
+            $i8->constInt(Variable::TYPE_NATIVE_DOUBLE, false)
+        );
+        $context->builder->branchIf($isDouble, $doubleBlock, $done);
+
+        $context->builder->positionAtEnd($doubleBlock);
+        $doubleVal = $context->builder->call(
+            $context->lookupFunction('__value__readDouble'),
+            $keyEntry
+        );
+        $longFromDouble = $context->builder->fptosi($doubleVal, $sizeT);
+        $doubleFromLong = $context->builder->sitofp(
+            $longFromDouble,
+            $context->getTypeFromString('double')
+        );
+        $isWholeDouble = $context->builder->fcmp(Builder::REAL_OEQ, $doubleVal, $doubleFromLong);
+        $context->builder->branchIf($isWholeDouble, $doubleWholeBlock, $doubleStringBlock);
+
+        $context->builder->positionAtEnd($doubleWholeBlock);
+        self::storeValueEntryAtIndex($context, $dest, $longFromDouble, $valEntry);
+        $context->builder->branch($done);
+
+        $context->builder->positionAtEnd($doubleStringBlock);
+        $keyStrFromDouble = self::formatDoubleStringKey($context, $doubleVal);
+        self::storeValueEntryAtStringKey($context, $dest, $keyStrFromDouble, $valEntry);
+        $context->builder->branch($done);
+
         $context->builder->positionAtEnd($done);
+    }
+
+    /** php-src convert_to_key: fractional doubles become string keys (ext/standard/array.c). */
+    private static function formatDoubleStringKey(Context $context, Value $doubleVal): Value
+    {
+        $sizeT = $context->getTypeFromString('size_t');
+        $charPtr = $context->getTypeFromString('char*');
+        $i64 = $context->getTypeFromString('int64');
+        $bufSize = $sizeT->constInt(64, false);
+        $buf = $context->builder->call($context->lookupFunction('__mm__malloc'), $bufSize);
+        $bufChar = $context->builder->pointerCast($buf, $charPtr);
+        $fmt = $context->builder->pointerCast($context->constantFromString('%G'), $charPtr);
+        $written = $context->builder->call($context->lookupFunction('snprintf'), $bufChar, $bufSize, $fmt, $doubleVal);
+        $len = $context->builder->zExt($written, $i64);
+        $str = $context->builder->call($context->lookupFunction('__string__init'), $len, $bufChar);
+        $context->builder->call($context->lookupFunction('__mm__free'), $buf);
+
+        return $str;
     }
 
     private static function storeValueEntryAtIndex(

@@ -52,6 +52,38 @@ final class ArrayFillKeysBuiltinTest extends TestCase
         $this->assertSame([0 => 'x', 1 => 'x'], $list);
     }
 
+    public function testFillKeysFloatKeyStringifiesLikeZend(): void
+    {
+        $runtime = new Runtime();
+        $fn = new array_fill_keys();
+
+        $keys = new HashTable();
+        $f = new VMVariable();
+        $f->float(1.5);
+        $keys->addIndex(0, $f);
+        $fill = new VMVariable();
+        $fill->string('v');
+        $out = $this->runFill($fn, $runtime, $keys, $fill);
+        $assoc = [];
+        foreach ($out->iterateKeyed(true) as [$key, $val]) {
+            $assoc[VMVariable::TYPE_STRING === $key->type ? $key->toString() : $key->toInt()] = $val->toString();
+        }
+        $this->assertSame(['1.5' => 'v'], $assoc);
+
+        $keys2 = new HashTable();
+        $whole = new VMVariable();
+        $whole->float(2.0);
+        $keys2->addIndex(0, $whole);
+        $fill2 = new VMVariable();
+        $fill2->string('w');
+        $out2 = $this->runFill($fn, $runtime, $keys2, $fill2);
+        $list = [];
+        foreach ($out2->iterateKeyed(true) as [$key, $val]) {
+            $list[$key->toInt()] = $val->toString();
+        }
+        $this->assertSame([2 => 'w'], $list);
+    }
+
     public function testFillKeysEnumCaseThrowsError(): void
     {
         $runtime = new Runtime();
