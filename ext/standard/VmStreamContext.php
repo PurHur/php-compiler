@@ -218,7 +218,9 @@ final class VmStreamContext
     }
 
     /**
-     * Replace params on an existing stream context (issue #6122, php-src stream_context_set_params).
+     * Replace params on an existing stream context (issue #6122, #8058).
+     *
+     * VM HashTable only — no host Zend params sync (bootstrap/M5).
      */
     public static function setParams(Variable $context, Variable $params): bool
     {
@@ -235,11 +237,6 @@ final class VmStreamContext
         }
 
         self::replaceParamsHashTable($context, $exported);
-
-        $resource = self::toHostResource($context);
-        if (\is_resource($resource) && \function_exists('stream_context_set_params')) {
-            \stream_context_set_params($resource, $exported);
-        }
 
         return true;
     }
