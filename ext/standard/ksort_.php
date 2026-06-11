@@ -13,7 +13,7 @@ use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
 
 /**
- * ksort() — sort by key preserving values (subset of PHP; issue #2271).
+ * ksort() — sort by key preserving values (subset of PHP; issue #2271, #4118).
  *
  * VM: homogeneous string or integer keys; packed lists are no-op.
  * JIT/AOT: packed list no-op; string-key hashtable via __hashtable__sortStringKeys.
@@ -27,12 +27,17 @@ final class ksort_ extends Internal
 
     public function execute(Frame $frame): void
     {
-        if (1 !== \count($frame->calledArgs)) {
-            throw new \LogicException('ksort() requires exactly one argument');
+        $argc = \count($frame->calledArgs);
+        if ($argc < 1 || $argc > 2) {
+            throw new \LogicException('ksort() requires one or two arguments');
         }
         $array = $frame->calledArgs[0]->resolveIndirect();
         $ht = VmArray::requireArray($frame->calledArgs[0], 'ksort');
-        $array->array(VmArray::ksortCopy($ht));
+        $flags = StdlibConstants::SORT_REGULAR;
+        if (2 === $argc) {
+            $flags = VmInternalCompare::resolveFrameSortFlags($frame, 'ksort');
+        }
+        $array->array(VmArray::ksortCopy($ht, $flags));
         if (null !== $frame->returnVar) {
             $frame->returnVar->bool(true);
         }
@@ -40,12 +45,51 @@ final class ksort_ extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        if (1 !== \count($args)) {
-            throw new \LogicException('ksort() requires exactly one argument');
+        $argc = \count($args);
+        if ($argc < 1 || $argc > 2) {
+            throw new \LogicException('ksort() requires one or two arguments');
         }
         JitArrayKey::requireArrayArg($context, $args[0], 'ksort');
-        ArrayBuiltinHelper::ksortByKey($context, $args[0]);
+        if (1 === $argc) {
+            ArrayBuiltinHelper::ksortByKey($context, $args[0]);
+        } else {
+            self::jitSortByKeyWithFlags($context, $args[0], self::resolveJitSortFlags($context, $args[1]));
+        }
 
         return $context->getTypeFromString('int1')->constInt(1, false);
+    }
+
+    private static function resolveJitSortFlags(Context $context, JITVariable $flagsArg): int
+    {
+        if (null !== $flagsArg->compileTimeConstantName) {
+            $phpVar = $context->runtime->vmContext->constantFetch($flagsArg->compileTimeConstantName);
+            if (null !== $phpVar && Variable::TYPE_INTEGER === $phpVar->type) {
+                return $phpVar->toInt();
+            }
+        }
+        if (JITVariable::TYPE_NATIVE_LONG === $flagsArg->type) {
+            throw new \LogicException(
+                'ksort() flags must be a predefined constant in JIT/AOT in this compiler build'
+            );
+        }
+        throw new \LogicException('ksort() flags must be an integer in this compiler build');
+    }
+
+    private static function jitSortByKeyWithFlags(Context $context, JITVariable $array, int $flags): void
+    {
+        $sortType = $flags & ~StdlibConstants::SORT_FLAG_CASE;
+        if (
+            StdlibConstants::SORT_REGULAR === $sortType
+            || StdlibConstants::SORT_STRING === $sortType
+            || StdlibConstants::SORT_LOCALE_STRING === $sortType
+        ) {
+            ArrayBuiltinHelper::ksortByKey($context, $array);
+
+            return;
+        }
+        if (StdlibConstants::SORT_NUMERIC === $sortType || StdlibConstants::SORT_NATURAL === $sortType) {
+            throw new \LogicException('ksort() flags are not supported in JIT/AOT in this compiler build');
+        }
+        ArrayBuiltinHelper::ksortByKey($context, $array);
     }
 }
