@@ -11,13 +11,13 @@ use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Value;
 
 /**
- * openssl_get_cipher_methods() — registered cipher names (#6228, ext/openssl/openssl.c).
+ * openssl_get_md_methods() — registered digest names (#6228, ext/openssl/openssl.c).
  */
-final class openssl_get_cipher_methods extends Internal
+final class openssl_get_md_methods extends Internal
 {
     public function __construct()
     {
-        parent::__construct('openssl_get_cipher_methods');
+        parent::__construct('openssl_get_md_methods');
     }
 
     public function execute(Frame $frame): void
@@ -25,14 +25,14 @@ final class openssl_get_cipher_methods extends Internal
         $argc = \count($frame->calledArgs);
         if ($argc > 1) {
             throw new \ArgumentCountError(
-                'openssl_get_cipher_methods() expects at most 1 argument, '.$argc.' given'
+                'openssl_get_md_methods() expects at most 1 argument, '.$argc.' given'
             );
         }
         $aliases = false;
         if (1 === $argc) {
             $aliases = VmOpenssl::coerceBoolArg(
                 $frame->calledArgs[0],
-                'openssl_get_cipher_methods',
+                'openssl_get_md_methods',
                 0,
                 'aliases'
             );
@@ -40,13 +40,13 @@ final class openssl_get_cipher_methods extends Internal
         if (null === $frame->returnVar) {
             return;
         }
-        $frame->returnVar->array(VmOpenssl::cipherMethods($aliases));
+        $frame->returnVar->array(VmOpenssl::mdMethods($aliases));
     }
 
     public function call(Context $context, JITVariable ...$args): Value
     {
         throw new \LogicException(
-            'openssl_get_cipher_methods() is not implemented for JIT in this compiler build (issue #6228)'
+            'openssl_get_md_methods() is not implemented for JIT in this compiler build (issue #6228)'
         );
     }
 }
