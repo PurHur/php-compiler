@@ -385,6 +385,7 @@ class Module extends ModuleAbstract
             new password_algos(),
             new crypt(),
             new random_bytes(),
+            new openssl_random_pseudo_bytes(),
             new random_int(),
             new uniqid(),
             new str_pad(),
