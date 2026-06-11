@@ -11,3 +11,4 @@ array_uintersect_uassoc(['a' => 1, 'b' => 2], ['a' => 1], $cmp, $keycmp);
 array_diff_uassoc(['a' => 1, 'b' => 2], ['a' => 2], $cmp);
 array_intersect_uassoc(['a' => 1, 'b' => 2], ['a' => 1], $cmp);
 array_diff_ukey(['a' => 1, 'b' => 2], ['A' => 3], 'strcasecmp');
+array_intersect_ukey(['a' => 1, 'b' => 2], ['A' => 3], 'strcasecmp');
