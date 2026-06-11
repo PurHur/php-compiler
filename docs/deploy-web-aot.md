@@ -1,6 +1,6 @@
 # Deploy web apps with AOT (quickstart)
 
-Short path from **`phpc build --project`** → **`phpc deploy`** → **`PHPC_DEPLOY_ROOT`** → nginx/CGI in front of a native binary. For the full production guide (TLS, hardening, FastCGI pools), see [#445](https://github.com/PurHur/php-compiler/issues/445). Deploy CLI landed in [#609](https://github.com/PurHur/php-compiler/issues/609) (supersedes [#180](https://github.com/PurHur/php-compiler/issues/180)).
+Short path from **`phpc build --project`** → **`phpc deploy`** → **`PHPC_DEPLOY_ROOT`** → nginx/CGI in front of a native binary. For the full production guide (TLS, hardening, operations, FastCGI roadmap), see [deploy-production.md](deploy-production.md) ([#445](https://github.com/PurHur/php-compiler/issues/445)). Deploy CLI landed in [#609](https://github.com/PurHur/php-compiler/issues/609) (supersedes [#180](https://github.com/PurHur/php-compiler/issues/180)).
 
 ## Prerequisites
 
@@ -328,7 +328,7 @@ Threat model notes for compiled binaries:
 
 | Issue | Topic |
 |-------|--------|
-| [#445](https://github.com/PurHur/php-compiler/issues/445) | Full production deployment guide |
+| [deploy-production.md](deploy-production.md) ([#445](https://github.com/PurHur/php-compiler/issues/445)) | Full production deployment guide |
 | [#697](https://github.com/PurHur/php-compiler/issues/697) | MiniWebApp contact POST validation |
 | [#77](https://github.com/PurHur/php-compiler/issues/77) | CGI body limits and header sanitization |
 | [#50](https://github.com/PurHur/php-compiler/issues/50) | Web runtime / serve |

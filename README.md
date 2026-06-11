@@ -156,7 +156,7 @@ Presenter walkthrough: [`docs/GETTING-STARTED.md`](docs/GETTING-STARTED.md) · p
 ./phpc serve examples/001-SimpleWeb
 ```
 
-Manifest format: [`docs/phpc-json.md`](docs/phpc-json.md) · AOT deploy guide: [`docs/deploy-web-aot.md`](docs/deploy-web-aot.md).
+Manifest format: [`docs/phpc-json.md`](docs/phpc-json.md) · AOT deploy quickstart: [`docs/deploy-web-aot.md`](docs/deploy-web-aot.md) · Production guide: [`docs/deploy-production.md`](docs/deploy-production.md).
 
 ---
 
@@ -214,7 +214,7 @@ Full matrices (auto-generated): [`docs/capabilities.md`](docs/capabilities.md) (
 - CGI-style superglobals (`$_GET`, `$_POST`, `$_SERVER`, `$_FILES`, `$_COOKIE`, `$_SESSION`)
 - `phpc serve` dev server and `phpc serve --aot` for prebuilt binaries
 - Sessions, multipart uploads, JSON APIs — examples **005–007**
-- `phpc build`, `phpc deploy`, `phpc.json` project manifests
+- `phpc build`, `phpc deploy`, `phpc.json` project manifests — see [deploy-production.md](docs/deploy-production.md)
 - Reference **003-MiniWebApp**: router, templates, forms, native AOT execute on supported routes
 
 **Standard library (May 2026 wave)**

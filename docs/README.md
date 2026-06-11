@@ -52,7 +52,8 @@ Generated maps and large tables — **repo only**; exclude from `docs/pages/` co
 
 | Doc | Content |
 |-----|---------|
-| [deploy-web-aot.md](deploy-web-aot.md) | `phpc build` → `phpc deploy` → CGI |
+| [deploy-web-aot.md](deploy-web-aot.md) | Quickstart: `phpc build` → `phpc deploy` → CGI |
+| [deploy-production.md](deploy-production.md) | Production guide: nginx, TLS, security, operations ([#445](https://github.com/PurHur/php-compiler/issues/445)) |
 | [phpc-json.md](phpc-json.md) | Project manifest |
 | [miniwebapp-gates.md](miniwebapp-gates.md) | Gate ladder for `003-MiniWebApp` |
 | [miniwebapp-aot-unskip-matrix.md](miniwebapp-aot-unskip-matrix.md) | AOT execute bisect matrix |
