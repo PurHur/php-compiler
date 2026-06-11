@@ -27,6 +27,10 @@ final class GcCollectCyclesRuntime
 
     private const G_COUNT = 'phpc_gc_count';
 
+    private const G_RUNS = 'phpc_gc_runs';
+
+    private const G_TOTAL_COLLECTED = 'phpc_gc_total_collected';
+
     private const G_ENABLED = 'phpc_gc_enabled';
 
     private const G_ALLOW_DELREF = 'phpc_destruct_allow_delref';
@@ -402,7 +406,20 @@ final class GcCollectCyclesRuntime
         $context->builder->branch($done);
 
         $context->builder->positionAtEnd($work);
+        $runsPtr = self::globalPtr($context, self::G_RUNS, $i32);
+        $context->builder->store(
+            $context->builder->add(
+                $context->builder->load($runsPtr),
+                $i32->constInt(1, false)
+            ),
+            $runsPtr
+        );
         $result = $context->builder->call($context->lookupFunction('phpc_gc_collect_cycles_impl'));
+        $totalPtr = self::globalPtr($context, self::G_TOTAL_COLLECTED, $i32);
+        $context->builder->store(
+            $context->builder->add($context->builder->load($totalPtr), $result),
+            $totalPtr
+        );
         $resultI64 = $context->builder->sextOrBitCast($result, $i64);
         $context->builder->branch($done);
 
@@ -1162,6 +1179,14 @@ final class GcCollectCyclesRuntime
 
         if (null === $context->module->getNamedGlobal(self::G_COUNT)) {
             $g = $context->module->addGlobal($i32, self::G_COUNT);
+            $g->setInitializer($i32->constInt(0, false));
+        }
+        if (null === $context->module->getNamedGlobal(self::G_RUNS)) {
+            $g = $context->module->addGlobal($i32, self::G_RUNS);
+            $g->setInitializer($i32->constInt(0, false));
+        }
+        if (null === $context->module->getNamedGlobal(self::G_TOTAL_COLLECTED)) {
+            $g = $context->module->addGlobal($i32, self::G_TOTAL_COLLECTED);
             $g->setInitializer($i32->constInt(0, false));
         }
         if (null === $context->module->getNamedGlobal(self::G_ENABLED)) {

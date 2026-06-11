@@ -28,6 +28,8 @@ final class MemoryRuntime
 
     public const NOTE_ALLOC = '__phpc_memory_note_alloc';
 
+    public const GC_MEM_CACHES = '__phpc_gc_mem_caches';
+
     /** @var Value|null */
     public static $peakEmallocGlobal = null;
 
@@ -73,6 +75,14 @@ final class MemoryRuntime
         $context->builder->call($context->lookupFunction(self::NOTE_ALLOC), $delta);
     }
 
+    public static function gcMemCaches(Context $context): Value
+    {
+        self::ensureLinked($context);
+        self::ensureGcMemCaches($context);
+
+        return $context->builder->call($context->lookupFunction(self::GC_MEM_CACHES));
+    }
+
     private static function implement(Context $context): void
     {
         $probe = $context->module->getNamedFunction(self::READ_RSS);
@@ -80,6 +90,7 @@ final class MemoryRuntime
             self::$peakEmallocGlobal = $context->module->getNamedGlobal(self::GLOBAL_PEAK_EMALLOC);
             self::$peakRealGlobal = $context->module->getNamedGlobal(self::GLOBAL_PEAK_REAL);
             self::$currentEmallocGlobal = $context->module->getNamedGlobal(self::GLOBAL_CURRENT_EMALLOC);
+            self::ensureGcMemCaches($context);
 
             return;
         }
@@ -110,6 +121,47 @@ final class MemoryRuntime
         self::emitReadRssBytes($context);
         self::emitReadEmallocBytes($context);
         self::emitNoteAlloc($context);
+        self::ensureGcMemCaches($context);
+        self::restoreInsertBlock($context, $restoreBlock);
+    }
+
+    private static function ensureGcMemCaches(Context $context): void
+    {
+        $probe = $context->module->getNamedFunction(self::GC_MEM_CACHES);
+        if (null !== $probe && $probe->countBasicBlocks() > 0) {
+            $context->registerFunction(self::GC_MEM_CACHES, $probe);
+
+            return;
+        }
+
+        $restoreBlock = self::captureInsertBlock($context);
+        $i64 = $context->getTypeFromString('int64');
+        $fn = null !== $probe
+            ? $probe
+            : $context->module->addFunction(
+                self::GC_MEM_CACHES,
+                $context->context->functionType($i64, false)
+            );
+
+        $entry = $fn->appendBasicBlock('gc_mem_caches_entry');
+        $context->builder->positionAtEnd($entry);
+
+        $peakGlobal = $context->module->getNamedGlobal(self::GLOBAL_PEAK_EMALLOC);
+        $currentGlobal = $context->module->getNamedGlobal(self::GLOBAL_CURRENT_EMALLOC);
+        if (null === $peakGlobal || null === $currentGlobal) {
+            throw new \LogicException('MemoryRuntime peak/current globals missing for gc_mem_caches');
+        }
+
+        $peak = $context->builder->load($peakGlobal);
+        $current = $context->builder->load($currentGlobal);
+        $zero = $i64->constInt(0, false);
+        $freed = $context->builder->sub($peak, $current);
+        $positive = $context->builder->icmp(Builder::INT_SGT, $freed, $zero);
+        $ret = $context->builder->select($positive, $freed, $zero);
+        $context->builder->store($current, $peakGlobal);
+        $context->builder->returnValue($ret);
+        $context->builder->clearInsertionPosition();
+        $context->registerFunction(self::GC_MEM_CACHES, $fn);
         self::restoreInsertBlock($context, $restoreBlock);
     }
 

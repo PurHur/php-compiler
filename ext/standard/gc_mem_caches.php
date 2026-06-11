@@ -27,11 +27,14 @@ final class gc_mem_caches extends Internal
         if (\count($frame->calledArgs) > 0) {
             throw new \ArgumentCountError('gc_mem_caches() expects exactly 0 arguments, '.\count($frame->calledArgs).' given');
         }
-        VmGcStatus::memCaches();
+        if (null === $frame->returnVar) {
+            return;
+        }
+        $frame->returnVar->int(VmGcStatus::memCaches());
     }
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        throw new \LogicException('gc_mem_caches() is VM-only in this compiler build (issue #3280 phase 1)');
+        return JitGcMemCaches::invoke($context, \count($args));
     }
 }

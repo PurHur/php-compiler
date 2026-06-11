@@ -38,6 +38,6 @@ final class gc_status extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        throw new \LogicException('gc_status() is VM-only in this compiler build (issue #3280 phase 1)');
+        return JitGcStatus::invokeWithArgs($context, \count($args));
     }
 }

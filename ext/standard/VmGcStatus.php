@@ -26,8 +26,8 @@ final class VmGcStatus
         return $ht;
     }
 
-    public static function memCaches(): void
+    public static function memCaches(): int
     {
-        CycleCollector::memCaches();
+        return CycleCollector::memCaches();
     }
 }
