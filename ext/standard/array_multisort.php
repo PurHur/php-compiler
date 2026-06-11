@@ -35,11 +35,6 @@ final class array_multisort extends Internal
         if ($argc < 1) {
             throw new \ArgumentCountError('array_multisort() expects at least 1 argument, 0 given');
         }
-        if ($argc < 2) {
-            throw new \LogicException(
-                'array_multisort() requires at least two arguments in this compiler build'
-            );
-        }
         $arrays = [];
         $descending = false;
         for ($i = 0; $i < $argc; ++$i) {
@@ -64,10 +59,15 @@ final class array_multisort extends Internal
                 'array_multisort() arguments must be arrays or SORT_* order flags in this compiler build'
             );
         }
-        if (\count($arrays) < 2) {
+        if (\count($arrays) < 1) {
             throw new \LogicException(
-                'array_multisort() requires at least two array arguments in this compiler build'
+                'array_multisort() requires at least one array argument in this compiler build'
             );
+        }
+        if (1 === \count($arrays)) {
+            self::executeSingleArray($frame, $arrays[0], $descending);
+
+            return;
         }
         $length = null;
         $primaryValues = [];
@@ -124,24 +124,12 @@ final class array_multisort extends Internal
         if ($argc < 1) {
             throw new \ArgumentCountError('array_multisort() expects at least 1 argument, 0 given');
         }
-        if ($argc < 2) {
-            throw new \LogicException(
-                'array_multisort() requires at least two arguments in this compiler build'
-            );
-        }
         $arrays = [];
         $descending = false;
         for ($i = 0; $i < $argc; ++$i) {
             $arg = $args[$i];
-            if (JITVariable::TYPE_HASHTABLE === ($arg->type & ~JITVariable::IS_NATIVE_ARRAY)
-                || ArrayBuiltinHelper::isNativeArray($arg->type)) {
-                $arrays[] = $arg;
-                continue;
-            }
-            if (JITVariable::TYPE_NATIVE_LONG === $arg->type
-                && ($arg->isConstant ?? false)
-                && JITVariable::KIND_VALUE === $arg->kind) {
-                $order = (int) $context->llvm->lib->LLVMConstIntGetZExtValue($arg->value->value);
+            $order = self::tryResolveJitMultisortOrder($context, $arg);
+            if (null !== $order) {
                 if (self::SORT_DESC === $order) {
                     $descending = true;
                 } elseif (self::SORT_ASC !== $order) {
@@ -151,18 +139,64 @@ final class array_multisort extends Internal
                 }
                 continue;
             }
+            if (self::isJitArrayArg($arg)) {
+                $arrays[] = $arg;
+                continue;
+            }
             throw new \LogicException(
                 'array_multisort() arguments must be arrays or SORT_* order flags in this compiler build'
             );
         }
-        if (\count($arrays) < 2) {
+        if (\count($arrays) < 1) {
             throw new \LogicException(
-                'array_multisort() requires at least two array arguments in this compiler build'
+                'array_multisort() requires at least one array argument in this compiler build'
             );
+        }
+        if (1 === \count($arrays)) {
+            if ($descending) {
+                ArrayBuiltinHelper::sortPackedReverse($context, $arrays[0]);
+            } else {
+                ArrayBuiltinHelper::sortPacked($context, $arrays[0]);
+            }
+
+            return $context->getTypeFromString('int1')->constInt(1, false);
         }
         ArrayBuiltinHelper::multisortPacked($context, $arrays, $descending);
 
         return $context->getTypeFromString('int1')->constInt(1, false);
+    }
+
+    /**
+     * php-src php_array_multisort: one array sorts that array in place (ext/standard/array.c, #4945).
+     */
+    private static function executeSingleArray(Frame $frame, Variable $array, bool $descending): void
+    {
+        $ht = $array->toArray();
+        $length = $ht->getNumElements();
+        if ($length < 2) {
+            if (null !== $frame->returnVar) {
+                $frame->returnVar->bool(true);
+            }
+
+            return;
+        }
+        $values = [];
+        foreach ($ht->iterate(true) as $value) {
+            $copy = new Variable();
+            $copy->copyFrom($value);
+            $values[] = $copy;
+        }
+        $indices = range(0, $length - 1);
+        self::sortIndicesByPrimary($indices, $values, $descending);
+        $reordered = [];
+        foreach ($indices as $idx) {
+            $reordered[] = $values[$idx];
+        }
+        $array->separateArrayForWrite();
+        $array->resolveIndirect()->toArray()->replacePackedValues($reordered);
+        if (null !== $frame->returnVar) {
+            $frame->returnVar->bool(true);
+        }
     }
 
     /**
@@ -221,5 +255,38 @@ final class array_multisort extends Internal
         }
 
         return $a->toInt() <=> $b->toInt();
+    }
+
+    private static function isJitArrayArg(JITVariable $arg): bool
+    {
+        if (JITVariable::TYPE_HASHTABLE === ($arg->type & ~JITVariable::IS_NATIVE_ARRAY)
+            || ArrayBuiltinHelper::isNativeArray($arg->type)) {
+            return true;
+        }
+
+        return JITVariable::TYPE_VALUE === $arg->type;
+    }
+
+    private static function tryResolveJitMultisortOrder(Context $context, JITVariable $arg): ?int
+    {
+        if (null !== $arg->compileTimeConstantName) {
+            $lookup = strtolower($arg->compileTimeConstantName);
+            if (isset(StdlibConstants::CORE_INT_BY_NAME[$lookup])) {
+                return StdlibConstants::CORE_INT_BY_NAME[$lookup];
+            }
+            $phpVar = $context->runtime->vmContext->constantFetch($arg->compileTimeConstantName);
+            if (null !== $phpVar && Variable::TYPE_INTEGER === $phpVar->type) {
+                return $phpVar->toInt();
+            }
+        }
+        if (JITVariable::TYPE_NATIVE_LONG === $arg->type
+            && JITVariable::KIND_VALUE === $arg->kind) {
+            $lib = $context->llvm->lib;
+            if (null !== $lib->LLVMIsAConstantInt($arg->value->value)) {
+                return (int) $lib->LLVMConstIntGetZExtValue($arg->value->value);
+            }
+        }
+
+        return null;
     }
 }
