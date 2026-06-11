@@ -8,6 +8,8 @@ use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\Variable as JITVariable;
+use PHPCompiler\VM\BuiltinExecute;
+use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
 
 /**
@@ -27,11 +29,11 @@ final class stream_context_set_options extends Internal
                 'stream_context_set_options() requires exactly two arguments in this compiler build'
             );
         }
-        if (null === $frame->returnVar) {
-            return;
-        }
         $ok = VmStreamContext::setOptions($frame->calledArgs[0], $frame->calledArgs[1]);
-        $frame->returnVar->bool($ok);
+        BuiltinExecute::writeReturn(
+            $frame,
+            static fn (Variable $ret) => $ret->bool($ok)
+        );
     }
 
     public function call(Context $context, JITVariable ...$args): Value

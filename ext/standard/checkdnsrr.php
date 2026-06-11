@@ -11,6 +11,7 @@ use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\Variable as JITVariable;
+use PHPCompiler\VM\BuiltinExecute;
 use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
 
@@ -35,9 +36,6 @@ final class checkdnsrr extends Internal
         if ($argc < 1 || $argc > 2) {
             throw new \LogicException($fn.'() requires one or two arguments in this compiler build');
         }
-        if (null === $frame->returnVar) {
-            return;
-        }
         $hostname = VmString::coerceStringBuiltinArg($frame->calledArgs[0], $fn, 0, 'hostname');
         $type = 'MX';
         if ($argc >= 2) {
@@ -47,7 +45,10 @@ final class checkdnsrr extends Internal
             }
             $type = VmString::coerceStringBuiltinArg($frame->calledArgs[1], $fn, 1, 'type');
         }
-        $frame->returnVar->bool(VmDns::checkdnsrr($hostname, $type));
+        BuiltinExecute::writeReturn(
+            $frame,
+            static fn (Variable $ret) => $ret->bool(VmDns::checkdnsrr($hostname, $type))
+        );
     }
 
     public function call(Context $context, JITVariable ...$args): Value
