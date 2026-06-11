@@ -30,4 +30,22 @@ final class VmStreamFilterChainTest extends TestCase
         $names = VmStreamFilters::allFilterNames();
         $this->assertContains('custom.test', $names);
     }
+
+    public function testRemoveDetachesWriteFilter(): void
+    {
+        $handle = VmFs::fopen('php://memory', 'w+');
+        $this->assertNotFalse($handle);
+        $filterId = VmStreamFilterChain::append(
+            $handle,
+            'string.toupper',
+            VmStreamFilterChain::WRITE
+        );
+        $this->assertNotFalse($filterId);
+        VmFs::fwrite($handle, 'hi');
+        $this->assertTrue(VmStreamFilterChain::remove($filterId));
+        $this->assertFalse(VmStreamFilterChain::isValidFilter($filterId));
+        VmFs::fwrite($handle, '!');
+        $this->assertSame('HI!', VmFs::streamGetContents($handle, -1, 0));
+        VmFs::fclose($handle);
+    }
 }
