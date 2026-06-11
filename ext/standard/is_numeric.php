@@ -13,15 +13,20 @@ namespace PHPCompiler\ext\standard;
 
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
+use PHPCompiler\JIT\Builtin\StreamLifecycleJit;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\JitLongArg;
 use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\Variable as JITVariable;
+use PHPCompiler\VM\ResourceSupport;
 use PHPCompiler\VM\Variable;
 use PHPLLVM\Builder;
 use PHPLLVM\Value;
 
 /**
- * is_numeric() for integers, floats, and numeric strings (subset of PHP).
+ * is_numeric() — Zend ext/standard/basic_functions.c parity (#5244).
+ *
+ * Returns false for arrays, objects, and resources without throwing.
  */
 final class is_numeric extends Internal
 {
@@ -47,6 +52,15 @@ final class is_numeric extends Internal
         }
         switch ($args[0]->type) {
             case JITVariable::TYPE_NATIVE_LONG:
+                StreamLifecycleJit::implement($context);
+
+                return $this->longIsNumeric(
+                    $context,
+                    $context->builder->truncOrBitCast(
+                        JitLongArg::lower($context, $args[0], 'is_numeric() argument #1'),
+                        $context->getTypeFromString('int64')
+                    )
+                );
             case JITVariable::TYPE_NATIVE_DOUBLE:
                 return $context->constantFromBool(true);
             case JITVariable::TYPE_NATIVE_BOOL:
@@ -66,8 +80,14 @@ final class is_numeric extends Internal
 
     public static function isNumeric(Variable $v): bool
     {
+        $v = $v->resolveIndirect();
         switch ($v->type) {
             case Variable::TYPE_INTEGER:
+                if (ResourceSupport::isVmResource($v)) {
+                    return false;
+                }
+
+                return true;
             case Variable::TYPE_FLOAT:
                 return true;
             case Variable::TYPE_STRING:
@@ -81,10 +101,7 @@ final class is_numeric extends Internal
             case Variable::TYPE_ARRAY:
                 return false;
             default:
-                if ($v->isStreamResource() || $v->isDirResource()) {
-                    return false;
-                }
-                throw new \LogicException('is_numeric() does not support this value type in this compiler build');
+                return false;
         }
     }
 
@@ -123,21 +140,40 @@ final class is_numeric extends Internal
         return $context->builder->select($isEmpty, $context->constantFromBool(false), $numeric);
     }
 
-    private function valueIsNumeric(Context $context, JITVariable $arg): Value {
+    private function longIsNumeric(Context $context, Value $handleLong): Value
+    {
+        $falseVal = $context->constantFromBool(false);
+        $trueVal = $context->constantFromBool(true);
+        $isRes = JitIsResource::invoke($context, $handleLong);
+
+        return $context->builder->select($isRes, $falseVal, $trueVal);
+    }
+
+    private function valueIsNumeric(Context $context, JITVariable $arg): Value
+    {
+        StreamLifecycleJit::implement($context);
         $valuePtr = JitValueBox::valuePtrFromVariable($context, $arg);
         $map = $context->structFieldMap['__value__'];
         $typeByte = $context->builder->load($context->builder->structGep($valuePtr, $map['type']));
         $i8 = $context->getTypeFromString('int8');
-        $falseVal = $context->constantFromBool(false); $trueVal = $context->constantFromBool(true);
+        $falseVal = $context->constantFromBool(false);
+        $trueVal = $context->constantFromBool(true);
         $isLong = $context->builder->icmp(Builder::INT_EQ, $typeByte, $i8->constInt(JITVariable::TYPE_NATIVE_LONG, false));
         $isDouble = $context->builder->icmp(Builder::INT_EQ, $typeByte, $i8->constInt(JITVariable::TYPE_NATIVE_DOUBLE, false));
         $isString = $context->builder->icmp(Builder::INT_EQ, $typeByte, $i8->constInt(JITVariable::TYPE_STRING, false));
         $isEnumCase = $context->builder->icmp(Builder::INT_EQ, $typeByte, $i8->constInt(Variable::TYPE_ENUM_CASE, false));
         $isObject = $context->builder->icmp(Builder::INT_EQ, $typeByte, $i8->constInt(JITVariable::TYPE_OBJECT, false));
+        $isHashtable = $context->builder->icmp(Builder::INT_EQ, $typeByte, $i8->constInt(JITVariable::TYPE_HASHTABLE, false));
+        $longVal = $context->builder->call($context->lookupFunction('__value__readLong'), $valuePtr);
+        $longNumeric = $this->longIsNumeric($context, $longVal);
         $stringVal = $context->builder->call($context->lookupFunction('__value__readString'), $valuePtr);
         $stringNumeric = $this->stringIsNumeric($context, $stringVal);
-        $numeric = $context->builder->select($isLong, $trueVal, $context->builder->select($isDouble, $trueVal, $context->builder->select($isString, $stringNumeric, $falseVal)));
-        $nonNumeric = $context->builder->or($isEnumCase, $isObject);
+        $numeric = $context->builder->select(
+            $isLong,
+            $longNumeric,
+            $context->builder->select($isDouble, $trueVal, $context->builder->select($isString, $stringNumeric, $falseVal))
+        );
+        $nonNumeric = $context->builder->or($isEnumCase, $context->builder->or($isObject, $isHashtable));
 
         return $context->builder->select($nonNumeric, $falseVal, $numeric);
     }
