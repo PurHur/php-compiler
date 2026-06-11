@@ -8,15 +8,15 @@ use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\Variable as VMVariable;
 
 /**
- * Supported vs deferred preg_replace_callback() callback forms (issue #1177).
+ * Supported vs deferred preg_replace_callback() callback forms (issue #1177, #4442).
  *
- * VM lowers compile-time string user-function names. Closures and other callables stay
- * deferred until user-function / callable JIT lands ([#142](https://github.com/PurHur/php-compiler/issues/142)).
+ * VM accepts any callable. JIT/AOT still lowers compile-time string user-function names only
+ * ([#142](https://github.com/PurHur/php-compiler/issues/142)).
  */
 final class PregReplaceCallbackPolicy
 {
     public const DEFERRED_SUMMARY =
-        'preg_replace_callback callbacks: compile-time string user-function names VM-only; closures deferred';
+        'preg_replace_callback callbacks: compile-time string user-function names for JIT/AOT; closures VM-only';
 
     public const DEFERRED_KINDS = 'closures, array callables, and invokable objects';
 
@@ -38,7 +38,11 @@ final class PregReplaceCallbackPolicy
 
     public static function isVmSupportedType(int $type): bool
     {
-        return VMVariable::TYPE_STRING === $type;
+        return \in_array($type, [
+            VMVariable::TYPE_STRING,
+            VMVariable::TYPE_ARRAY,
+            VMVariable::TYPE_OBJECT,
+        ], true);
     }
 
     public static function jitRejectionMessage(): string
@@ -49,7 +53,6 @@ final class PregReplaceCallbackPolicy
 
     public static function vmRejectionMessage(): string
     {
-        return 'preg_replace_callback() callback must be a string user-function name in this compiler build; '
-            .self::DEFERRED_KINDS.' are deferred';
+        return 'preg_replace_callback(): Argument #2 ($callback) must be a valid callback';
     }
 }

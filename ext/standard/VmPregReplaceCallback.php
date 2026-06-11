@@ -4,36 +4,52 @@ declare(strict_types=1);
 
 namespace PHPCompiler\ext\standard;
 
-use PHPCompiler\Func;
 use PHPCompiler\VM\Context;
 use PHPCompiler\VM\Variable;
 
 /**
- * VM preg_replace_callback() — host PCRE for matching, VM user-function callbacks (issue #1177).
+ * VM preg_replace_callback() — host PCRE for matching, VM callable callbacks (#1177, #4442).
  */
 final class VmPregReplaceCallback
 {
+    /**
+     * @return string|false
+     */
     public static function invoke(
         Context $vmContext,
         string $pattern,
-        Func\PHP $callback,
-        string $subject
+        Variable $callback,
+        string $subject,
+        int $limit = -1,
+        ?int &$count = null
     ) {
         if (strlen($pattern) > VmPreg::MAX_PATTERN_BYTES) {
             return false;
+        }
+        if (!VmCallableInvoke::isInvokable($callback)) {
+            throw new \TypeError(
+                'preg_replace_callback(): Argument #2 ($callback) must be a valid callback'
+            );
         }
 
         $result = '';
         $offset = 0;
         $len = \strlen($subject);
+        $replacements = 0;
 
         while ($offset < $len) {
+            if ($limit >= 0 && $replacements >= $limit) {
+                $result .= \substr($subject, $offset);
+
+                break;
+            }
+
             $matches = [];
-            $count = \preg_match($pattern, $subject, $matches, \PREG_OFFSET_CAPTURE, $offset);
-            if (false === $count) {
+            $matchCount = \preg_match($pattern, $subject, $matches, \PREG_OFFSET_CAPTURE, $offset);
+            if (false === $matchCount) {
                 return false;
             }
-            if (0 === $count) {
+            if (0 === $matchCount) {
                 $result .= \substr($subject, $offset);
 
                 break;
@@ -46,20 +62,21 @@ final class VmPregReplaceCallback
             $result .= \substr($subject, $offset, $matchStart - $offset);
 
             $vmMatches = VmJson::import(VmPreg::stripMatchOffsets($matches));
-            $replacement = VmUserCall::invokeOne($vmContext, $callback, $vmMatches);
+            $replacement = VmCallableInvoke::invokeOne($vmContext, $callback, $vmMatches);
             $replacement = $replacement->resolveIndirect();
-            if (Variable::TYPE_STRING !== $replacement->type) {
-                throw new \LogicException(
-                    'preg_replace_callback() callback must return a string in this compiler build'
-                );
-            }
-            $result .= $replacement->toString();
+            $result .= $vmContext->runtime->vm->coerceVariableToString($replacement);
+
+            ++$replacements;
 
             $next = $matchStart + $matchLen;
             if ($next <= $offset) {
                 return false;
             }
             $offset = $next;
+        }
+
+        if (null !== $count) {
+            $count = $replacements;
         }
 
         return $result;

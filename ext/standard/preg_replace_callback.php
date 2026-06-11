@@ -8,15 +8,13 @@ use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitStringArg;
-use PHPCompiler\JIT\PregReplaceCallbackPolicy;
 use PHPCompiler\JIT\Variable as JITVariable;
+use PHPCompiler\VM\HashTable;
 use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
 
 /**
- * preg_replace_callback() — VM with string user-function callbacks (issue #1177).
- *
- * JIT/AOT: compile-time string user-function names in this compile unit (#1177).
+ * preg_replace_callback() — VM with any callable; JIT/AOT string user-function names (#1177, #4442).
  */
 final class preg_replace_callback extends Internal
 {
@@ -28,52 +26,126 @@ final class preg_replace_callback extends Internal
     public function execute(Frame $frame): void
     {
         $argc = \count($frame->calledArgs);
-        if (3 !== $argc) {
+        if ($argc < 3 || $argc > 6) {
             throw new \LogicException(
-                'preg_replace_callback() requires exactly three arguments in this compiler build'
+                'preg_replace_callback() expects 3 to 6 arguments in this compiler build'
             );
         }
         if (null === $frame->vmContext) {
             throw new \LogicException('preg_replace_callback() requires VM context in this compiler build');
         }
+        if (null === $frame->returnVar) {
+            return;
+        }
+
         $pattern = VmReflection::stringArg($frame->calledArgs[0], 'preg_replace_callback() pattern', 0);
         $callbackVar = $frame->calledArgs[1]->resolveIndirect();
-        if (!PregReplaceCallbackPolicy::isVmSupportedType($callbackVar->type)) {
-            throw new \LogicException(PregReplaceCallbackPolicy::vmRejectionMessage());
-        }
         $subjectVar = VmPreg::requireStringOrArraySubject(
             $frame->calledArgs[2],
             'preg_replace_callback',
             2,
             'subject'
         );
-        if (Variable::TYPE_STRING !== $subjectVar->type) {
-            throw new \LogicException(
-                'preg_replace_callback() array subject is not supported in this compiler build'
-            );
+        $limit = -1;
+        if ($argc >= 4) {
+            $limitVar = $frame->calledArgs[3]->resolveIndirect();
+            if (Variable::TYPE_INTEGER !== $limitVar->type) {
+                throw new \TypeError(
+                    'preg_replace_callback(): Argument #4 ($limit) must be of type int, '
+                    .self::typeLabel($limitVar).' given'
+                );
+            }
+            $limit = $limitVar->toInt();
         }
-        if (null === $frame->returnVar) {
+        $hasCount = $argc >= 5;
+        if ($argc >= 6) {
+            $flagsVar = $frame->calledArgs[5]->resolveIndirect();
+            if (Variable::TYPE_INTEGER !== $flagsVar->type) {
+                throw new \TypeError(
+                    'preg_replace_callback(): Argument #6 ($flags) must be of type int, '
+                    .self::typeLabel($flagsVar).' given'
+                );
+            }
+            $flags = $flagsVar->toInt();
+            if (0 !== $flags) {
+                throw new \LogicException(
+                    'preg_replace_callback() flags must be 0 in this compiler build'
+                );
+            }
+        }
+
+        if (Variable::TYPE_STRING === $subjectVar->type) {
+            $count = 0;
+            $result = VmPregReplaceCallback::invoke(
+                $frame->vmContext,
+                $pattern,
+                $callbackVar,
+                $subjectVar->toString(),
+                $limit,
+                $count
+            );
+            if ($hasCount) {
+                $frame->calledArgs[4]->resolveIndirect()->int($count);
+            }
+            self::assignReturn($frame, $result);
+
             return;
         }
-        $subject = $subjectVar->toString();
-        $fn = VmUserCall::resolveStringCallback($frame->vmContext, $callbackVar->toString());
-        $result = VmPregReplaceCallback::invoke($frame->vmContext, $pattern, $fn, $subject);
-        if (false === $result) {
-            $frame->returnVar->bool(false);
-        } else {
-            $frame->returnVar->string($result);
+
+        $totalCount = 0;
+        $ht = new HashTable();
+        foreach ($subjectVar->toArray()->iterateKeyed(true) as [$key, $value]) {
+            if (Variable::TYPE_STRING !== $value->type) {
+                throw new \TypeError(
+                    'preg_replace_callback(): Argument #3 ($subject) must be of type array|string, '
+                    .self::typeLabel($value).' given'
+                );
+            }
+            $elemCount = 0;
+            $result = VmPregReplaceCallback::invoke(
+                $frame->vmContext,
+                $pattern,
+                $callbackVar,
+                $value->toString(),
+                $limit,
+                $elemCount
+            );
+            $totalCount += $elemCount;
+            if (false === $result) {
+                $frame->returnVar->bool(false);
+
+                return;
+            }
+            $keyVar = new Variable();
+            if (Variable::TYPE_INTEGER === $key->type) {
+                $keyVar->int($key->toInt());
+            } else {
+                $keyVar->string($key->toString());
+            }
+            $outVal = new Variable();
+            $outVal->string($result);
+            array_map::appendKeyedCopy($ht, $keyVar, $outVal);
         }
+        if ($hasCount) {
+            $frame->calledArgs[4]->resolveIndirect()->int($totalCount);
+        }
+        $frame->returnVar->array($ht);
     }
 
     public function call(Context $context, JITVariable ...$args): Value
     {
         if (3 !== \count($args)) {
             throw new \LogicException(
-                'preg_replace_callback() requires exactly three arguments in this compiler build'
+                'preg_replace_callback() JIT/AOT lowering requires exactly three arguments in this compiler build'
             );
         }
 
         JitPregSubject::requireStringOrArray($context, $args[2], 'preg_replace_callback', 2, 'subject');
+        if (JITVariable::TYPE_STRING !== $args[2]->type) {
+            throw new \LogicException(
+                'preg_replace_callback() array subject is not supported for JIT/AOT in this compiler build'
+            );
+        }
 
         return JitPregReplaceCallback::invoke(
             $context,
@@ -81,5 +153,35 @@ final class preg_replace_callback extends Internal
             $args[1],
             JitStringArg::lower($context, $args[2], 'preg_replace_callback() subject')
         );
+    }
+
+    /**
+     * @param string|false $result
+     */
+    private static function assignReturn(Frame $frame, string|false $result): void
+    {
+        if (false === $result) {
+            $frame->returnVar->bool(false);
+
+            return;
+        }
+        $frame->returnVar->string($result);
+    }
+
+    private static function typeLabel(Variable $var): string
+    {
+        $var = $var->resolveIndirect();
+
+        return match ($var->type) {
+            Variable::TYPE_INTEGER => 'int',
+            Variable::TYPE_FLOAT => 'float',
+            Variable::TYPE_BOOLEAN => 'bool',
+            Variable::TYPE_STRING => 'string',
+            Variable::TYPE_NULL => 'null',
+            Variable::TYPE_ARRAY => 'array',
+            Variable::TYPE_OBJECT => $var->toObject()->class->name,
+            Variable::TYPE_RESOURCE => 'resource',
+            default => 'mixed',
+        };
     }
 }
