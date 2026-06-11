@@ -17,6 +17,27 @@ bootstrap_gen0_prelinked_driver_ready() {
   [[ -f "${seed}" && -s "${seed}" ]]
 }
 
+bootstrap_gen0_prelinked_minimal_sidecar_path() {
+  echo "${ROOT}/prelinked/bootstrap-gen0/compiler_minimal_aot_blob"
+}
+
+# True when build artifacts byte-match committed prelinked seeds (#1492 stale driver-smoke overwrite).
+bootstrap_gen0_installed_driver_matches_prelinked() {
+  local out=$1
+  local seed
+  seed="$(bootstrap_gen0_prelinked_driver_path)"
+  [[ -x "${out}" && -f "${seed}" && -s "${seed}" ]] || return 1
+  cmp -s "${out}" "${seed}"
+}
+
+bootstrap_gen0_installed_minimal_sidecar_matches_prelinked() {
+  local blob=$1
+  local seed
+  seed="$(bootstrap_gen0_prelinked_minimal_sidecar_path)"
+  [[ -f "${blob}" && -f "${seed}" && -s "${seed}" ]] || return 1
+  cmp -s "${blob}" "${seed}"
+}
+
 # Seed link-time sidecars so Zend inventory emit skips bin/compile.php host-compile (#2930).
 bootstrap_gen0_seed_prelinked_m3_sidecars() {
   local root="${ROOT:-}"
@@ -161,8 +182,13 @@ bootstrap_gen0_install_prelinked_driver() {
   local out="${root}/build/bin-compile-aot"
   local blob="${root}/build/.m3_bin_compile_aot_blob"
   local minimal_blob="${root}/build/.m3_compiler_minimal_aot_blob"
-  if [[ -x "${out}" && -f "${minimal_blob}" ]]; then
+  if [[ -x "${out}" && -f "${minimal_blob}" ]] \
+    && bootstrap_gen0_installed_driver_matches_prelinked "${out}" \
+    && bootstrap_gen0_installed_minimal_sidecar_matches_prelinked "${minimal_blob}"; then
     return 0
+  fi
+  if [[ -x "${out}" && -f "${minimal_blob}" ]]; then
+    echo "bootstrap-gen0-install: stale build/bin-compile-aot (driver-smoke overwrite); reinstalling from prelinked/bootstrap-gen0 (#1492)" >&2
   fi
 
   local seed
@@ -172,7 +198,8 @@ bootstrap_gen0_install_prelinked_driver() {
     return 1
   fi
 
-  local minimal_seed="${root}/prelinked/bootstrap-gen0/compiler_minimal_aot_blob"
+  local minimal_seed
+  minimal_seed="$(bootstrap_gen0_prelinked_minimal_sidecar_path)"
   if [[ ! -f "${minimal_seed}" || ! -s "${minimal_seed}" ]]; then
     echo "bootstrap-gen0-install: missing ${minimal_seed} (M0 sidecar for argv driver — #3053)" >&2
     return 1
