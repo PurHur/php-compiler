@@ -14,10 +14,20 @@ final class ObjectPropertyForeachHelper
 {
     public static function canLower(Context $context, Variable $container, ?string $containerUserType): bool
     {
+        if ($container->type & Variable::IS_NATIVE_ARRAY) {
+            return false;
+        }
+        if (Variable::TYPE_HASHTABLE === $container->type) {
+            return false;
+        }
         if (
             Variable::TYPE_OBJECT !== $container->type
             && Variable::TYPE_VALUE !== $container->type
         ) {
+            return false;
+        }
+        // Ambiguous boxed containers without a declared object class use hashtable foreach (#1492).
+        if (Variable::TYPE_VALUE === $container->type && (null === $containerUserType || '' === $containerUserType)) {
             return false;
         }
         if (null !== $containerUserType && '' !== $containerUserType) {
@@ -234,10 +244,12 @@ final class ObjectPropertyForeachHelper
             $context->builder->branch($done);
             $checkBlock = $nextCheck;
         }
+        if (null === $fetched) {
+            throw new \LogicException('foreach object property fetch requires at least one instance property');
+        }
         $context->builder->positionAtEnd($checkBlock);
         $context->builder->call($context->lookupFunction('abort'));
         $context->builder->positionAtEnd($done);
-        assert($fetched instanceof Variable);
 
         return $fetched;
     }

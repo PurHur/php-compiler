@@ -39,7 +39,7 @@ final class GlobalsTableInit
             return $context->getTypeFromString('int1')->constInt(0, false);
         }
         $global = $context->jitGlobalVariables[$name];
-        $ptr = JitValueBox::pointer($context, $global);
+        $ptr = JitValueBox::valuePtrFromVariable($context, $global);
         $typeByte = $context->builder->load(
             $context->builder->structGep(
                 $ptr,

@@ -9482,6 +9482,21 @@ class JIT {
             $result->addref();
 
             return;
+        } elseif ($result->type === Variable::TYPE_NATIVE_LONG && Variable::TYPE_NATIVE_BOOL === $value->type) {
+            $result->free();
+            $boolVal = $this->context->helper->loadValue($value);
+            $long = $this->context->builder->zExt($boolVal, $this->context->getTypeFromString('int64'));
+            $this->context->builder->store($long, $result->value);
+            $result->addref();
+
+            return;
+        } elseif ($result->type === Variable::TYPE_NATIVE_LONG && Variable::TYPE_STRING === $value->type) {
+            $result->free();
+            $long = JIT\JitLongArg::lowerStringValue($this->context, $this->context->helper->loadValue($value));
+            $this->context->builder->store($long, $result->value);
+            $result->addref();
+
+            return;
         } elseif ($result->type === Variable::TYPE_NATIVE_DOUBLE && Variable::TYPE_NATIVE_LONG === $value->type) {
             $result->free();
             $long = $this->context->helper->loadValue($value);
