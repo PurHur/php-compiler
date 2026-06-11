@@ -618,12 +618,53 @@ final class ArrayBuiltinHelper
     }
 
     /**
-     * Reverse a packed list array into a new packed array (array_reverse subset; matches VM reverseCopy).
+     * Reverse an array (array_reverse; ext/standard/array.c php_array_reverse).
+     *
+     * @param Value|null $preserveKeys i1 when the second argument is present; null for default false
      */
-    public static function buildReverseArray(Context $context, Variable $array): Value
+    public static function buildReverseArray(
+        Context $context,
+        Variable $array,
+        ?Value $preserveKeys = null
+    ): Value {
+        if (null === $preserveKeys) {
+            if (self::isNativeArray($array->type)) {
+                return self::buildReverseFromNativeArray($context, $array);
+            }
+
+            return self::buildReverseFromHashTable($context, self::loadHashTable($context, $array));
+        }
+
+        $reindexBlock = BasicBlockHelper::append($context, 'array_reverse_reindex');
+        $preserveBlock = BasicBlockHelper::append($context, 'array_reverse_preserve');
+        $doneBlock = BasicBlockHelper::append($context, 'array_reverse_branch_done');
+        $context->builder->branchIf($preserveKeys, $preserveBlock, $reindexBlock);
+
+        $context->builder->positionAtEnd($reindexBlock);
+        $reindexResult = self::buildReverseArray($context, $array, null);
+        $reindexEnd = $context->builder->getInsertBlock();
+        $context->builder->branch($doneBlock);
+
+        $context->builder->positionAtEnd($preserveBlock);
+        $preserveResult = self::buildReversePreserveKeysArray($context, $array);
+        $preserveEnd = $context->builder->getInsertBlock();
+        $context->builder->branch($doneBlock);
+
+        $context->builder->positionAtEnd($doneBlock);
+        $phi = $context->builder->phi($reindexResult->typeOf());
+        $phi->addIncoming($reindexResult, $reindexEnd);
+        $phi->addIncoming($preserveResult, $preserveEnd);
+
+        return $phi;
+    }
+
+    /**
+     * array_reverse(..., preserve_keys=true) for compile-time native packed lists (#4335).
+     */
+    private static function buildReversePreserveKeysArray(Context $context, Variable $array): Value
     {
         if (self::isNativeArray($array->type)) {
-            return self::buildReverseFromNativeArray($context, $array);
+            return self::buildReversePreserveKeysFromNativeArray($context, $array);
         }
 
         return self::buildReverseFromHashTable($context, self::loadHashTable($context, $array));
@@ -4326,6 +4367,71 @@ final class ArrayBuiltinHelper
             $context->builder->addNoSignedWrap($destIdx, $one),
             $destIdxSlot
         );
+        $context->builder->branch($advance);
+
+        $context->builder->positionAtEnd($advance);
+        $context->builder->store(
+            $context->builder->addNoSignedWrap($idx, $one),
+            $idxSlot
+        );
+        $context->builder->branch($head);
+
+        $context->builder->positionAtEnd($doneBlock);
+        $phi = $context->builder->phi($emptyHt->typeOf());
+        $phi->addIncoming($emptyHt, $emptyBlock);
+        $phi->addIncoming($dest, $head);
+
+        return $phi;
+    }
+
+    /**
+     * preserve_keys=true on packed native arrays: copy each index to itself (Zend packed fast path).
+     */
+    private static function buildReversePreserveKeysFromNativeArray(Context $context, Variable $array): Value
+    {
+        $elemType = $array->type & ~Variable::IS_NATIVE_ARRAY;
+        $sizeT = $context->getTypeFromString('size_t');
+        $zero = $sizeT->constInt(0, false);
+        $one = $sizeT->constInt(1, false);
+        $count = $context->constantFromInteger($array->nextFreeElement, 'size_t');
+        $isEmpty = $context->builder->icmp(Builder::INT_EQ, $count, $zero);
+        $emptyBlock = BasicBlockHelper::append($context, 'array_reverse_pk_native_empty');
+        $workBlock = BasicBlockHelper::append($context, 'array_reverse_pk_native_work');
+        $doneBlock = BasicBlockHelper::append($context, 'array_reverse_pk_native_done');
+        $context->builder->branchIf($isEmpty, $emptyBlock, $workBlock);
+
+        $context->builder->positionAtEnd($emptyBlock);
+        $emptyHt = HashTableHelper::alloc($context);
+        $context->builder->branch($doneBlock);
+
+        $context->builder->positionAtEnd($workBlock);
+        $dest = HashTableHelper::alloc($context);
+        $idxSlot = $context->builder->alloca($sizeT, 1, 'array_reverse_pk_native_idx');
+        $context->builder->store($zero, $idxSlot);
+
+        $head = BasicBlockHelper::append($context, 'array_reverse_pk_native_head');
+        $body = BasicBlockHelper::append($context, 'array_reverse_pk_native_body');
+        $advance = BasicBlockHelper::append($context, 'array_reverse_pk_native_advance');
+        $context->builder->branch($head);
+
+        $context->builder->positionAtEnd($head);
+        $idx = $context->builder->load($idxSlot);
+        $atEnd = $context->builder->icmp(Builder::INT_SGE, $idx, $count);
+        $context->builder->branchIf($atEnd, $doneBlock, $body);
+
+        $context->builder->positionAtEnd($body);
+        $slot = $context->builder->inBoundsGep($array->value, $zero, $idx);
+        if (Variable::TYPE_STRING === $elemType) {
+            $elem = new Variable($context, $elemType, Variable::KIND_VARIABLE, $slot);
+        } else {
+            $elem = new Variable(
+                $context,
+                $elemType,
+                Variable::KIND_VALUE,
+                $context->builder->load($slot)
+            );
+        }
+        HashTableHelper::setAtIndex($context, $dest, $idx, $elem);
         $context->builder->branch($advance);
 
         $context->builder->positionAtEnd($advance);

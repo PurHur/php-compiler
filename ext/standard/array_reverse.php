@@ -15,19 +15,21 @@ use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\ArrayBuiltinHelper;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\JitBoolArg;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
 
 /**
- * array_reverse() for packed list arrays (subset of PHP; LLVM via ArrayBuiltinHelper).
+ * array_reverse() — packed lists and associative arrays (ext/standard/array.c; #4335).
  */
 final class array_reverse extends Internal
 {
     public function execute(Frame $frame): void
     {
-        if (1 !== \count($frame->calledArgs)) {
-            throw new \LogicException('array_reverse() requires exactly one argument');
+        $argc = \count($frame->calledArgs);
+        if ($argc < 1 || $argc > 2) {
+            throw new \LogicException('array_reverse() requires one or two arguments in this compiler build');
         }
         $array = $frame->calledArgs[0]->resolveIndirect();
         if (null === $frame->returnVar) {
@@ -36,15 +38,20 @@ final class array_reverse extends Internal
         if (Variable::TYPE_ARRAY !== $array->type) {
             throw new \LogicException('array_reverse() argument must be an array in this compiler build');
         }
-        $frame->returnVar->array($array->toArray()->reverseCopy());
+        $preserveKeys = false;
+        if (2 === $argc) {
+            $preserveKeys = $frame->calledArgs[1]->resolveIndirect()->toBool();
+        }
+        $frame->returnVar->array($array->toArray()->reverseCopy($preserveKeys));
     }
 
     public Context $context;
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        if (1 !== \count($args)) {
-            throw new \LogicException('array_reverse() requires exactly one argument');
+        $argc = \count($args);
+        if ($argc < 1 || $argc > 2) {
+            throw new \LogicException('array_reverse() requires one or two arguments in this compiler build');
         }
 
         foreach ($args as $i => $arg) {
@@ -52,6 +59,10 @@ final class array_reverse extends Internal
                 $this->jitString($context, $arg, 'array_reverse() argument #'.((int) $i + 1));
             }
         }
-        return ArrayBuiltinHelper::buildReverseArray($context, $args[0]);
+        $preserveKeys = 2 === $argc
+            ? JitBoolArg::lower($context, $args[1], 'array_reverse() preserve_keys')
+            : null;
+
+        return ArrayBuiltinHelper::buildReverseArray($context, $args[0], $preserveKeys);
     }
 }
