@@ -28,19 +28,66 @@ final class AsymmetricVisibilityRewriter
 
     public static function rewrite(string $source): string
     {
-        $source = self::rewriteSetModifiers($source);
+        [$masked, $map] = self::maskLiteralsAndComments($source);
+        if (!self::hasAsymmetricVisibilitySyntax($masked)) {
+            return $source;
+        }
 
-        return self::rewriteGetModifiers($source);
+        $masked = self::rewriteSetModifiers($masked);
+        $masked = self::rewriteGetModifiers($masked);
+
+        return self::unmaskLiteralsAndComments($masked, $map);
+    }
+
+    private static function hasAsymmetricVisibilitySyntax(string $source): bool
+    {
+        return false !== stripos($source, '(set)')
+            || false !== stripos($source, '(get)');
+    }
+
+    /**
+     * @return array{0: string, 1: array<string, string>}
+     */
+    private static function maskLiteralsAndComments(string $source): array
+    {
+        $tokens = token_get_all($source);
+        $masked = '';
+        $map = [];
+        $index = 0;
+        foreach ($tokens as $token) {
+            if (is_string($token)) {
+                $masked .= $token;
+                continue;
+            }
+            [$id, $text] = $token;
+            if (T_COMMENT === $id || T_DOC_COMMENT === $id || T_CONSTANT_ENCAPSED_STRING === $id) {
+                $placeholder = "\0PHPC_ASYM_MASK_{$index}\0";
+                $map[$placeholder] = $text;
+                $masked .= $placeholder;
+                ++$index;
+                continue;
+            }
+            $masked .= $text;
+        }
+
+        return [$masked, $map];
+    }
+
+    /**
+     * @param array<string, string> $map
+     */
+    private static function unmaskLiteralsAndComments(string $masked, array $map): string
+    {
+        if ([] === $map) {
+            return $masked;
+        }
+
+        return strtr($masked, $map);
     }
 
     private static function rewriteSetModifiers(string $source): string
     {
-        if (
-            false === stripos($source, '(set)')
-            && false === stripos($source, 'public(set)')
-            && false === stripos($source, 'protected(set)')
-            && false === stripos($source, 'private(set)')
-        ) {
+        if (!self::hasAsymmetricVisibilitySyntax($source)) {
             return $source;
         }
 
@@ -98,29 +145,33 @@ final class AsymmetricVisibilityRewriter
      */
     private static function rejectExplicitPublicBeforeSetModifier(string $source): void
     {
-        if (preg_match(
-            '/(?<![a-zA-Z0-9_])(public|protected|private)\s+\1\s*\(\s*set\s*\)/i',
-            $source
-        )) {
-            throw new \CompileError(self::MULTIPLE_MODIFIERS_MESSAGE);
-        }
+        self::eachPropertyDeclarationLine($source, static function (string $line): void {
+            if (preg_match(
+                '/(?<![a-zA-Z0-9_])(public|protected|private)\s+\1\s*\(\s*set\s*\)/i',
+                $line
+            )) {
+                throw new \CompileError(self::MULTIPLE_MODIFIERS_MESSAGE);
+            }
+        });
     }
 
     /** Explicit read `public` after `public(set)` duplicates implicit public read (#6589, #6774). */
     private static function rejectExplicitPublicAfterSetModifier(string $source): void
     {
-        if (preg_match(
-            '/(?<![a-zA-Z0-9_])public\s*\(\s*set\s*\)\s*public\b/i',
-            $source
-        )) {
-            throw new \CompileError(self::MULTIPLE_MODIFIERS_MESSAGE);
-        }
-        if (preg_match(
-            '/(?<![a-zA-Z0-9_])public\s+\(\s*public\s*\(\s*set\s*\)\s*\)/i',
-            $source
-        )) {
-            throw new \CompileError(self::MULTIPLE_MODIFIERS_MESSAGE);
-        }
+        self::eachPropertyDeclarationLine($source, static function (string $line): void {
+            if (preg_match(
+                '/(?<![a-zA-Z0-9_])public\s*\(\s*set\s*\)\s*public\b/i',
+                $line
+            )) {
+                throw new \CompileError(self::MULTIPLE_MODIFIERS_MESSAGE);
+            }
+            if (preg_match(
+                '/(?<![a-zA-Z0-9_])public\s+\(\s*public\s*\(\s*set\s*\)\s*\)/i',
+                $line
+            )) {
+                throw new \CompileError(self::MULTIPLE_MODIFIERS_MESSAGE);
+            }
+        });
     }
 
     /**
@@ -140,36 +191,54 @@ final class AsymmetricVisibilityRewriter
         $parenthesizedSet = '\(\s*'.$modifier.'\s*\(\s*set\s*\)\s*\)';
         $staticWord = '\bstatic\b';
         $patterns = [
-            // read + set(set) … static (any spacing)
-            '/(?<![a-zA-Z0-9_])'.$modifier.'\s+(?:'.$staticWord.'\s+)?'.$setModifier.'[^;{]*'.$staticWord.'/i',
+            '/(?<![a-zA-Z0-9_])'.$modifier.'\s+(?:'.$staticWord.'\s+)?'.$setModifier.'.*'.$staticWord.'/i',
             '/(?<![a-zA-Z0-9_])'.$modifier.'\s+'.$setModifier.'\s+'.$staticWord.'/i',
-            // read + static + set(set)
             '/(?<![a-zA-Z0-9_])'.$modifier.'\s+'.$staticWord.'\s+'.$setModifier.'/i',
-            // read + static + (set(set))
             '/(?<![a-zA-Z0-9_])'.$modifier.'\s+'.$staticWord.'\s+'.$parenthesizedSet.'/i',
-            // read + (set(set)) … static
-            '/(?<![a-zA-Z0-9_])'.$modifier.'\s+'.$parenthesizedSet.'[^;{]*'.$staticWord.'/i',
-            // static + read + set(set)
+            '/(?<![a-zA-Z0-9_])'.$modifier.'\s+'.$parenthesizedSet.'.*'.$staticWord.'/i',
             '/'.$staticWord.'\s+(?<![a-zA-Z0-9_])'.$modifier.'\s+'.$setModifier.'/i',
-            // static + read + (set(set))
             '/'.$staticWord.'\s+(?<![a-zA-Z0-9_])'.$modifier.'\s+'.$parenthesizedSet.'/i',
         ];
 
-        foreach ($patterns as $pattern) {
-            if (preg_match($pattern, $source)) {
-                throw new \CompileError(self::MULTIPLE_MODIFIERS_MESSAGE);
+        self::eachPropertyDeclarationLine($source, static function (string $line) use ($patterns): void {
+            if (!preg_match('/\bstatic\b/i', $line) || !preg_match('/\(\s*set\s*\)/i', $line)) {
+                return;
             }
+            foreach ($patterns as $pattern) {
+                if (preg_match($pattern, $line)) {
+                    throw new \CompileError(self::MULTIPLE_MODIFIERS_MESSAGE);
+                }
+            }
+        });
+    }
+
+    /**
+     * Run compile-time checks on single source lines only — concatenated self-host bundles and
+     * docblocks must not match property-modifier patterns across lines (#1492 spine compile).
+     */
+    private static function eachPropertyDeclarationLine(string $source, callable $fn, string $needle = '(set)'): void
+    {
+        foreach (explode("\n", $source) as $line) {
+            if (false === stripos($line, $needle)) {
+                continue;
+            }
+            $trimmed = ltrim($line);
+            if ('' === $trimmed) {
+                continue;
+            }
+            if (str_starts_with($trimmed, '//') || str_starts_with($trimmed, '*') || str_starts_with($trimmed, '/*')) {
+                continue;
+            }
+            if (preg_match('/^\s*[\x27\x22]/', $line)) {
+                continue;
+            }
+            $fn($line);
         }
     }
 
     private static function rewriteGetModifiers(string $source): string
     {
-        if (
-            false === stripos($source, '(get)')
-            && false === stripos($source, 'public(get)')
-            && false === stripos($source, 'protected(get)')
-            && false === stripos($source, 'private(get)')
-        ) {
+        if (false === stripos($source, '(get)')) {
             return $source;
         }
 
@@ -201,22 +270,26 @@ final class AsymmetricVisibilityRewriter
 
     private static function rejectExplicitPublicBeforeGetModifier(string $source): void
     {
-        if (preg_match(
-            '/(?<![a-zA-Z0-9_])(public|protected|private)\s+\1\s*\(\s*get\s*\)/i',
-            $source
-        )) {
-            throw new \CompileError(self::MULTIPLE_MODIFIERS_MESSAGE);
-        }
+        self::eachPropertyDeclarationLine($source, static function (string $line): void {
+            if (preg_match(
+                '/(?<![a-zA-Z0-9_])(public|protected|private)\s+\1\s*\(\s*get\s*\)/i',
+                $line
+            )) {
+                throw new \CompileError(self::MULTIPLE_MODIFIERS_MESSAGE);
+            }
+        }, '(get)');
     }
 
     private static function rejectExplicitPublicAfterGetModifier(string $source): void
     {
-        if (preg_match(
-            '/(?:public|protected|private)\s*\(\s*get\s*\)\s*public\b/i',
-            $source
-        )) {
-            throw new \CompileError(self::MULTIPLE_MODIFIERS_MESSAGE);
-        }
+        self::eachPropertyDeclarationLine($source, static function (string $line): void {
+            if (preg_match(
+                '/(?:public|protected|private)\s*\(\s*get\s*\)\s*public\b/i',
+                $line
+            )) {
+                throw new \CompileError(self::MULTIPLE_MODIFIERS_MESSAGE);
+            }
+        }, '(get)');
     }
 
     public static function visibilityFromMarker(string $text): int
