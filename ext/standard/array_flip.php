@@ -17,17 +17,16 @@ use PHPCompiler\JIT\ArrayBuiltinHelper;
 use PHPCompiler\JIT\Builtin\TypeErrorRaise;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\Variable as JITVariable;
-use PHPCompiler\VM\HashTable;
 use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
 
 /**
  * array_flip() for arrays with int or string keys and values (subset of PHP; JIT via ArrayBuiltinHelper).
+ *
+ * VM: {@see VmArray::flip()}; JIT/AOT: {@see ArrayBuiltinHelper::buildFlipArray()}.
  */
 final class array_flip extends Internal
 {
-    private const ILLEGAL_OFFSET_TYPE = 'Illegal offset type';
-
     public function execute(Frame $frame): void
     {
         if (1 !== \count($frame->calledArgs)) {
@@ -40,25 +39,7 @@ final class array_flip extends Internal
         if (Variable::TYPE_ARRAY !== $array->type) {
             throw new \LogicException('array_flip() argument must be an array in this compiler build');
         }
-        $out = new HashTable();
-        foreach ($array->toArray()->iterateKeyed(true) as [$key, $value]) {
-            $keyVar = $key->resolveIndirect();
-            if (Variable::TYPE_INTEGER !== $keyVar->type && Variable::TYPE_STRING !== $keyVar->type) {
-                throw new \TypeError(self::ILLEGAL_OFFSET_TYPE);
-            }
-            $val = $value->resolveIndirect();
-            if (Variable::TYPE_INTEGER !== $val->type && Variable::TYPE_STRING !== $val->type) {
-                throw new \LogicException('array_flip() values must be integers or strings in this compiler build');
-            }
-            $stored = new Variable();
-            $stored->copyFrom($key);
-            if (Variable::TYPE_INTEGER === $val->type) {
-                $out->updateIndex($val->toInt(), $stored);
-            } else {
-                $out->update($val->toString(), $stored);
-            }
-        }
-        $frame->returnVar->array($out);
+        $frame->returnVar->array(VmArray::flip($array->toArray(), $frame));
     }
 
     public Context $context;

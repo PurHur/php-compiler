@@ -2019,6 +2019,27 @@ final class ArrayBuiltinHelper
         );
     }
 
+    private static function emitFlipSkipWarning(Context $context): void
+    {
+        $i8p = $context->getTypeFromString('int8*');
+        $i32 = $context->getTypeFromString('int32');
+        $msg = $context->builder->pointerCast(
+            $context->constantFromString(
+                'array_flip(): Can only flip string and integer values, entry skipped'
+            ),
+            $i8p
+        );
+        $msgLen = $context->builder->call($context->lookupFunction('strlen'), $msg);
+        $context->builder->call(
+            $context->lookupFunction('__compiler_trigger_error'),
+            $msg,
+            $msgLen,
+            $i32->constInt(2, false),
+            $context->builder->pointerCast($context->constantFromString(''), $i8p),
+            $i32->constInt(0, false)
+        );
+    }
+
     /**
      * Copy a sub-range of a packed list array (array_slice subset; matches VM HashTable::sliceCopy).
      *
@@ -6660,6 +6681,9 @@ final class ArrayBuiltinHelper
         Value $valEntry,
         Value $index
     ): void {
+        static $serial = 0;
+        $id = (string) (++$serial);
+
         $valueMap = $context->structFieldMap['__value__'];
         $valType = $context->builder->load(
             $context->builder->structGep($valEntry, $valueMap['type'])
@@ -6669,9 +6693,9 @@ final class ArrayBuiltinHelper
         $sizeT = $context->getTypeFromString('size_t');
         $keyLong = $context->builder->zExt($index, $i64);
 
-        $stringBlock = BasicBlockHelper::append($context, 'array_flip_packed_val_string');
-        $longBlock = BasicBlockHelper::append($context, 'array_flip_packed_val_long');
-        $done = BasicBlockHelper::append($context, 'array_flip_packed_val_done');
+        $stringBlock = BasicBlockHelper::append($context, 'array_flip_packed_val_string_'.$id);
+        $longBlock = BasicBlockHelper::append($context, 'array_flip_packed_val_long_'.$id);
+        $done = BasicBlockHelper::append($context, 'array_flip_packed_val_done_'.$id);
 
         $isString = $context->builder->icmp(
             Builder::INT_EQ,
@@ -6684,7 +6708,7 @@ final class ArrayBuiltinHelper
             $i8->constInt(Variable::TYPE_NATIVE_LONG, false)
         );
 
-        $afterString = BasicBlockHelper::append($context, 'array_flip_packed_after_string');
+        $afterString = BasicBlockHelper::append($context, 'array_flip_packed_after_string_'.$id);
         $context->builder->branchIf($isString, $stringBlock, $afterString);
 
         $context->builder->positionAtEnd($stringBlock);
@@ -6704,8 +6728,14 @@ final class ArrayBuiltinHelper
         );
         $context->builder->branch($done);
 
+        $skipBlock = BasicBlockHelper::append($context, 'array_flip_packed_val_skip_'.$id);
+
         $context->builder->positionAtEnd($afterString);
-        $context->builder->branchIf($isLong, $longBlock, $done);
+        $context->builder->branchIf($isLong, $longBlock, $skipBlock);
+
+        $context->builder->positionAtEnd($skipBlock);
+        self::emitFlipSkipWarning($context);
+        $context->builder->branch($done);
 
         $context->builder->positionAtEnd($longBlock);
         $newKeyIdx = $context->builder->truncOrBitCast(
@@ -6732,6 +6762,9 @@ final class ArrayBuiltinHelper
         Value $valEntry,
         Value $keyEntry
     ): void {
+        static $serial = 0;
+        $id = (string) (++$serial);
+
         $valueMap = $context->structFieldMap['__value__'];
         $valType = $context->builder->load(
             $context->builder->structGep($valEntry, $valueMap['type'])
@@ -6739,9 +6772,9 @@ final class ArrayBuiltinHelper
         $i8 = $context->getTypeFromString('int8');
         $sizeT = $context->getTypeFromString('size_t');
 
-        $stringKeyBlock = BasicBlockHelper::append($context, 'array_flip_newkey_string');
-        $longKeyBlock = BasicBlockHelper::append($context, 'array_flip_newkey_long');
-        $done = BasicBlockHelper::append($context, 'array_flip_newkey_done');
+        $stringKeyBlock = BasicBlockHelper::append($context, 'array_flip_newkey_string_'.$id);
+        $longKeyBlock = BasicBlockHelper::append($context, 'array_flip_newkey_long_'.$id);
+        $done = BasicBlockHelper::append($context, 'array_flip_newkey_done_'.$id);
 
         $isStringKey = $context->builder->icmp(
             Builder::INT_EQ,
@@ -6754,7 +6787,7 @@ final class ArrayBuiltinHelper
             $i8->constInt(Variable::TYPE_NATIVE_LONG, false)
         );
 
-        $afterString = BasicBlockHelper::append($context, 'array_flip_after_string_key');
+        $afterString = BasicBlockHelper::append($context, 'array_flip_after_string_key_'.$id);
         $context->builder->branchIf($isStringKey, $stringKeyBlock, $afterString);
 
         $context->builder->positionAtEnd($stringKeyBlock);
@@ -6769,8 +6802,14 @@ final class ArrayBuiltinHelper
         self::flipStoreValueAtStringKey($context, $dest, $ownedKey, $keyEntry);
         $context->builder->branch($done);
 
+        $skipBlock = BasicBlockHelper::append($context, 'array_flip_newkey_skip_'.$id);
+
         $context->builder->positionAtEnd($afterString);
-        $context->builder->branchIf($isLongKey, $longKeyBlock, $done);
+        $context->builder->branchIf($isLongKey, $longKeyBlock, $skipBlock);
+
+        $context->builder->positionAtEnd($skipBlock);
+        self::emitFlipSkipWarning($context);
+        $context->builder->branch($done);
 
         $context->builder->positionAtEnd($longKeyBlock);
         $newKeyIdx = $context->builder->truncOrBitCast(
