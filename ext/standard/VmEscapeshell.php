@@ -112,21 +112,6 @@ final class VmEscapeshell
             return 0;
         }
 
-        $byte = \ord($str[$x]);
-        if ($byte < 0x80) {
-            return 1;
-        }
-
-        if (\function_exists('mb_strlen')) {
-            $char = \substr($str, $x, 1);
-            $len = @\mb_strlen($char, 'UTF-8');
-            if (\is_int($len) && $len > 0) {
-                $byteLen = \strlen(@\mb_substr($str, $x, 1, 'UTF-8') ?? $char);
-
-                return $byteLen > 0 ? $byteLen : 1;
-            }
-        }
-
-        return 1;
+        return VmString::utf8CharByteWidth($str, $x);
     }
 }

@@ -6,6 +6,7 @@ declare(strict_types=1);
 echo escapeshellarg("it's a test"), "\n";
 echo escapeshellarg(''), "\n";
 echo escapeshellarg('plain'), "\n";
+echo escapeshellarg("日本語"), "\n";
 try {
     escapeshellarg([]);
 } catch (Throwable $e) {
@@ -16,4 +17,5 @@ try {
 'it'\''s a test'
 ''
 'plain'
+'日本語'
 TypeError
