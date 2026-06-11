@@ -80,6 +80,33 @@ final class VmString
     }
 
     /**
+     * Coerce a path builtin operand (php-src Z_PARAM_PATH; rejects embedded NUL, #4401).
+     *
+     * @throws \ValueError when the path contains a null byte
+     * @throws \TypeError when the operand cannot be converted like Zend PHP 8.x
+     */
+    public static function coercePathBuiltinArg(
+        Variable $var,
+        string $function,
+        int $argIndex = 0,
+        string $paramName = 'path'
+    ): string {
+        $str = self::coerceStringBuiltinArg($var, $function, $argIndex, $paramName);
+        if (str_contains($str, "\0")) {
+            throw new \ValueError(
+                sprintf(
+                    '%s(): Argument #%d ($%s) must not contain any null bytes',
+                    $function,
+                    $argIndex + 1,
+                    $paramName
+                )
+            );
+        }
+
+        return $str;
+    }
+
+    /**
      * Coerce disk_*_space() directory operand; null means default path (php-src filestat.c, #4915).
      *
      * @throws \TypeError when the operand cannot be converted like Zend PHP 8.x

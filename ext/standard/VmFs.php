@@ -1192,13 +1192,19 @@ final class VmFs
         return 0 === @\fseek($fp, 0, \SEEK_SET);
     }
 
-    public static function tempnam(string $directory, string $prefix) {
-        $path = @\tempnam($directory, $prefix);
-        if (false === $path) {
+    public static function tempnam(string $directory, string $prefix)
+    {
+        $pfx = VmFsTempnam::normalizePrefix($prefix);
+        $path = VmFsTempnamNative::mkstemp($directory, $pfx);
+        if (false !== $path) {
+            return $path;
+        }
+        if (!\is_dir($directory) || !\is_writable($directory)) {
             return false;
         }
+        $path = \tempnam($directory, $pfx);
 
-        return $path;
+        return false === $path ? false : $path;
     }
 
     /**

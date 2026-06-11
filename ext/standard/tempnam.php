@@ -27,9 +27,9 @@ final class tempnam extends Internal
         if (null === $frame->returnVar) {
             return;
         }
-        $dir = VmString::coerceStringBuiltinArg($frame->calledArgs[0], 'tempnam', 0, 'directory');
-        $prefix = VmString::coerceStringBuiltinArg($frame->calledArgs[1], 'tempnam', 1, 'prefix');
-        $path = VmFs::tempnam($dir, $prefix);
+        $dir = VmString::coercePathBuiltinArg($frame->calledArgs[0], 'tempnam', 0, 'directory');
+        $prefix = VmString::coercePathBuiltinArg($frame->calledArgs[1], 'tempnam', 1, 'prefix');
+        $path = VmFsTempnam::invoke($dir, $prefix, $frame);
         if (false === $path) {
             $frame->returnVar->bool(false);
         } else {
