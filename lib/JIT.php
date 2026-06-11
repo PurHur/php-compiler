@@ -6927,6 +6927,36 @@ class JIT {
                     }
                     if (
                         $this->context->scope->toCall instanceof CoreFunc\Internal
+                        && 'round' === strtolower($this->context->scope->toCall->getName())
+                        && 3 === count($callArgs)
+                        && isset($callOperands[2])
+                    ) {
+                        $mode = \PHPCompiler\ext\standard\JitRoundModeResolve::tryResolveMode(
+                            $this->context,
+                            $callArgs[2],
+                            $block,
+                            $callOperands[2]
+                        );
+                        if (null !== $mode) {
+                            $prevStrict = $this->context->callerStrictTypes;
+                            $this->context->callerStrictTypes = $block->strictTypes;
+                            $result = \PHPCompiler\ext\standard\JitRound::roundWithModeInt(
+                                $this->context,
+                                $callArgs[0],
+                                $callArgs[1],
+                                $mode
+                            );
+                            $this->context->callerStrictTypes = $prevStrict;
+                            $this->assignCallResultOperand(
+                                $block->getOperand($op->arg1),
+                                $result,
+                                $this->calleeReturnsByRef($this->context->scope->toCall)
+                            );
+                            break;
+                        }
+                    }
+                    if (
+                        $this->context->scope->toCall instanceof CoreFunc\Internal
                         && 'pathinfo' === strtolower($this->context->scope->toCall->getName())
                         && 2 === count($callArgs)
                         && isset($callOperands[1])
@@ -9406,6 +9436,8 @@ class JIT {
                         $objVal
                     );
                     $result->closureCall = $value->closureCall;
+                    $result->compileTimeConstantName = $value->compileTimeConstantName;
+                    $result->compileTimeEnumCase = $value->compileTimeEnumCase;
 
                     return;
                 case Variable::TYPE_VALUE:
@@ -9891,6 +9923,8 @@ class JIT {
         }
         $dest->valueBoxHashtable = $src->valueBoxHashtable;
         $dest->isNullConstant = $src->isNullConstant;
+        $dest->compileTimeConstantName = $src->compileTimeConstantName;
+        $dest->compileTimeEnumCase = $src->compileTimeEnumCase;
         $this->syncCompileTimeString($dest, $src, $force);
     }
 

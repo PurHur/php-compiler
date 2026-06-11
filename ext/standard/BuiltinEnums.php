@@ -29,6 +29,7 @@ final class BuiltinEnums
         self::registerResponseCode($ctx);
         self::registerSorting($ctx);
         self::registerSortDirection($ctx);
+        self::registerRoundingMode($ctx);
         self::registerParseUrl($ctx);
         foreach (array_diff(array_keys($ctx->classes), $before) as $lc) {
             $ctx->classes[$lc]->isInternal = true;
@@ -295,6 +296,41 @@ final class BuiltinEnums
         EnumSupport::ensureBuiltinEnumInterfaces($entry);
 
         $lc = 'sortdirection';
+        $ctx->classes[$lc] = $entry;
+        $ctx->enums[$lc] = true;
+    }
+
+    /**
+     * PHP 8.4 RoundingMode: pure enum for round() mode (#5934).
+     *
+     * php-src: ext/standard/basic_functions.stub.php — enum RoundingMode
+     */
+    private static function registerRoundingMode(Context $ctx): void
+    {
+        if (isset($ctx->classes['roundingmode'])) {
+            return;
+        }
+
+        $entry = new ClassEntry('RoundingMode');
+        $entry->isEnum = true;
+
+        foreach ([
+            'HalfAwayFromZero',
+            'HalfTowardsZero',
+            'HalfEven',
+            'HalfOdd',
+            'TowardsZero',
+            'AwayFromZero',
+            'NegativeInfinity',
+            'PositiveInfinity',
+        ] as $caseName) {
+            self::registerPureEnumCase($entry, $caseName);
+        }
+
+        EnumSupport::ensureBuiltinCasesMethod($entry);
+        EnumSupport::ensureBuiltinEnumInterfaces($entry);
+
+        $lc = 'roundingmode';
         $ctx->classes[$lc] = $entry;
         $ctx->enums[$lc] = true;
     }

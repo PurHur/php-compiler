@@ -2858,6 +2858,23 @@ class Object_ extends Type {
                 $this->defineEnumCaseConst($id, $caseName, $backing);
             }
         }
+        if ('roundingmode' === $lcname) {
+            $this->enums[$lcname] = true;
+            foreach ([
+                'HalfAwayFromZero',
+                'HalfTowardsZero',
+                'HalfEven',
+                'HalfOdd',
+                'TowardsZero',
+                'AwayFromZero',
+                'NegativeInfinity',
+                'PositiveInfinity',
+            ] as $caseName) {
+                $backing = new VMVariable();
+                $backing->null();
+                $this->defineEnumCaseConst($id, $caseName, $backing);
+            }
+        }
         if ('parseurl' === $lcname) {
             $this->enums[$lcname] = true;
             $this->setEnumBackedType($id, 'int');
@@ -4744,6 +4761,11 @@ class Object_ extends Type {
     public function memoryUsageEnumClassId(): ?int
     {
         return $this->classes['memoryusage'] ?? null;
+    }
+
+    public function roundingModeEnumClassId(): ?int
+    {
+        return $this->classes['roundingmode'] ?? null;
     }
 
     public function connectionStatusEnumClassId(): ?int

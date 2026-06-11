@@ -29,12 +29,7 @@ final class VmRound
 
     public static function validateMode(int $mode): void
     {
-        if (
-            StdlibConstants::PHP_ROUND_HALF_UP !== $mode
-            && StdlibConstants::PHP_ROUND_HALF_DOWN !== $mode
-            && StdlibConstants::PHP_ROUND_HALF_EVEN !== $mode
-            && StdlibConstants::PHP_ROUND_HALF_ODD !== $mode
-        ) {
+        if ($mode < StdlibConstants::PHP_ROUND_HALF_UP || $mode > StdlibConstants::PHP_ROUND_AWAY_FROM_ZERO) {
             throw new \ValueError('round(): Argument #3 ($mode) must be a valid rounding mode');
         }
     }
@@ -104,6 +99,7 @@ final class VmRound
     ): float {
         $valueAbs = \abs($value);
         $edgeCase = self::getBasicEdgeCase($integral, $exponent, $places);
+        $zeroEdgeCase = self::getZeroEdgeCase($integral, $exponent, $places);
 
         switch ($mode) {
             case StdlibConstants::PHP_ROUND_HALF_UP:
@@ -146,6 +142,30 @@ final class VmRound
 
                 return $integral;
 
+            case StdlibConstants::PHP_ROUND_CEILING:
+                if ($value > 0.0 && $valueAbs > $zeroEdgeCase) {
+                    return $integral + 1.0;
+                }
+
+                return $integral;
+
+            case StdlibConstants::PHP_ROUND_FLOOR:
+                if ($value < 0.0 && $valueAbs > $zeroEdgeCase) {
+                    return $integral - 1.0;
+                }
+
+                return $integral;
+
+            case StdlibConstants::PHP_ROUND_TOWARD_ZERO:
+                return $integral;
+
+            case StdlibConstants::PHP_ROUND_AWAY_FROM_ZERO:
+                if ($valueAbs > $zeroEdgeCase) {
+                    return $integral + self::copySign(1.0, $integral);
+                }
+
+                return $integral;
+
             default:
                 throw new \ValueError('round(): Argument #3 ($mode) must be a valid rounding mode');
         }
@@ -158,6 +178,15 @@ final class VmRound
         }
 
         return \abs(($integral + self::copySign(0.5, $integral)) * $exponent);
+    }
+
+    private static function getZeroEdgeCase(float $integral, float $exponent, int $places): float
+    {
+        if ($places > 0) {
+            return \abs($integral / $exponent);
+        }
+
+        return \abs($integral * $exponent);
     }
 
     private static function copySign(float $magnitude, float $signSource): float
