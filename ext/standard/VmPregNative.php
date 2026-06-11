@@ -207,6 +207,7 @@ final class VmPregNative
             $maxParts = $limit < 0 ? \PHP_INT_MAX : $limit;
             $offsetCapture = 0 !== ($flags & StdlibConstants::PREG_SPLIT_OFFSET_CAPTURE);
             $noEmpty = 0 !== ($flags & StdlibConstants::PREG_SPLIT_NO_EMPTY);
+            $delimCapture = 0 !== ($flags & StdlibConstants::PREG_SPLIT_DELIM_CAPTURE);
 
             while ($offset <= \strlen($subject) && $count < $maxParts) {
                 $rc = (int) self::$ffi->pcre2_match_8(
@@ -237,6 +238,25 @@ final class VmPregNative
                 if (!$noEmpty || '' !== $chunk) {
                     $parts[] = $offsetCapture ? [$chunk, $offset] : $chunk;
                     ++$count;
+                }
+                if ($delimCapture) {
+                    $ovectorCount = (int) self::$ffi->pcre2_get_ovector_count_8($matchData);
+                    $startGi = $ovectorCount > 1 ? 1 : 0;
+                    if ($startGi >= $ovectorCount) {
+                        $startGi = $ovectorCount;
+                    }
+                    for ($gi = $startGi; $gi < $ovectorCount; ++$gi) {
+                        $gStart = (int) $ovector[$gi * 2];
+                        $gEnd = (int) $ovector[$gi * 2 + 1];
+                        if ($gStart < 0 || $gEnd < 0) {
+                            continue;
+                        }
+                        $delim = \substr($subject, $gStart, $gEnd - $gStart);
+                        if (!$noEmpty || '' !== $delim) {
+                            $parts[] = $offsetCapture ? [$delim, $gStart] : $delim;
+                            ++$count;
+                        }
+                    }
                 }
                 $offset = $matchEnd;
                 if ($count >= $maxParts - 1) {

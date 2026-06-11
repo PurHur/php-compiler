@@ -863,7 +863,8 @@ class Type extends Builtin {
         $strPtr = $this->context->getTypeFromString('__string__*');
         $i32 = $this->context->getTypeFromString('int32');
         $htPtr = $this->context->getTypeFromString('__hashtable__*');
-        $fntypePregSplit = $this->context->context->functionType($htPtr, false, $strPtr, $strPtr);
+        $i64 = $this->context->getTypeFromString('int64');
+        $fntypePregSplit = $this->context->context->functionType($htPtr, false, $strPtr, $strPtr, $i64, $i64);
         $fnPregSplit = $this->context->module->addFunction('__compiler_preg_split', $fntypePregSplit);
         $this->context->registerFunction('__compiler_preg_split', $fnPregSplit);
         $i8ppPtr = $this->context->getTypeFromString('int8**');

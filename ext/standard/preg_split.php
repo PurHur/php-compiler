@@ -7,6 +7,7 @@ namespace PHPCompiler\ext\standard;
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\JitLongArg;
 use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\Variable;
@@ -70,16 +71,21 @@ final class preg_split extends Internal
                 'preg_split() expects 2 to 4 arguments in this compiler build'
             );
         }
+        $limit = $context->getTypeFromString('int64')->constInt(-1, true);
+        $flags = $context->getTypeFromString('int64')->constInt(0, false);
         if ($argc >= 3) {
-            throw new \LogicException(
-                'preg_split() limit and flags are not supported in JIT/AOT in this compiler build (issue #3639)'
-            );
+            $limit = JitLongArg::lower($context, $args[2], 'preg_split() limit');
+        }
+        if (4 === $argc) {
+            $flags = JitLongArg::lower($context, $args[3], 'preg_split() flags');
         }
 
         return JitPregSplit::invoke(
             $context,
             JitStringBuiltinArg::lower($context, $args[0], 'preg_split', 0, 'pattern'),
-            JitStringBuiltinArg::lower($context, $args[1], 'preg_split', 1, 'subject')
+            JitStringBuiltinArg::lower($context, $args[1], 'preg_split', 1, 'subject'),
+            $limit,
+            $flags
         );
     }
 }

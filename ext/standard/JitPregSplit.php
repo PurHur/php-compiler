@@ -18,15 +18,22 @@ final class JitPregSplit
 
     /** @return Value
      * (string list array, or boolean false on PCRE error) */
-    public static function invoke(Context $context, Value $pattern, Value $subject): Value
-    {
+    public static function invoke(
+        Context $context,
+        Value $pattern,
+        Value $subject,
+        Value $limit,
+        Value $flags
+    ): Value {
         StringPregMatch::ensureLinked($context);
 
         $htPtrTy = $context->getTypeFromString('__hashtable__*');
         $raw = $context->builder->call(
             $context->lookupFunction('__compiler_preg_split'),
             $pattern,
-            $subject
+            $subject,
+            $limit,
+            $flags
         );
         $isError = $context->builder->icmp(Builder::INT_EQ, $raw, $htPtrTy->constNull());
 
