@@ -721,6 +721,60 @@ final class VmArray
     private const COUNT_VALUES_SKIP_WARNING =
         'array_count_values(): Can only count string and integer values, entry skipped';
 
+    private const FLIP_SKIP_WARNING =
+        'array_flip(): Can only flip string and integer values, entry skipped';
+
+    /**
+     * array_flip() — swap keys and values for int/string pairs (#4295, ext/standard/array.c).
+     */
+    public static function flip(HashTable $ht, ?Frame $frame = null): HashTable
+    {
+        $out = new HashTable();
+        foreach ($ht->iterateKeyed(true) as [$key, $value]) {
+            $keyVar = $key->resolveIndirect();
+            if (Variable::TYPE_INTEGER !== $keyVar->type && Variable::TYPE_STRING !== $keyVar->type) {
+                throw new \TypeError('Illegal offset type');
+            }
+            $val = $value->resolveIndirect();
+            if (!self::isFlipScalar($val)) {
+                self::flipSkipWarning($frame);
+                continue;
+            }
+            $stored = new Variable();
+            $stored->copyFrom($key);
+            if (Variable::TYPE_INTEGER === $val->type) {
+                $out->updateIndex($val->toInt(), $stored);
+            } else {
+                $out->update($val->toString(), $stored);
+            }
+        }
+
+        return $out;
+    }
+
+    private static function isFlipScalar(Variable $var): bool
+    {
+        if (EnumCaseSupport::isEnumCaseVariable($var)) {
+            return false;
+        }
+
+        return Variable::TYPE_STRING === $var->type || Variable::TYPE_INTEGER === $var->type;
+    }
+
+    private static function flipSkipWarning(?Frame $frame): void
+    {
+        if (null === $frame?->vmContext) {
+            return;
+        }
+        $frame->vmContext->errors->triggerError(
+            self::FLIP_SKIP_WARNING,
+            ErrorReporter::E_WARNING,
+            '' !== $frame->scriptPath ? $frame->scriptPath : null,
+            $frame->vmContext,
+            $frame
+        );
+    }
+
     /**
      * array_count_values() — count occurrences of string or integer values (#2356, #4267).
      */
