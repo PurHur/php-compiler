@@ -144,6 +144,7 @@ final class SelfHostBuiltinPolicy
         'get_resource_type' => 'filesystem',
         'get_resource_id' => 'filesystem',
         'stream_get_contents' => 'filesystem',
+        'stream_copy_to_string' => 'filesystem',
         'stream_get_meta_data' => 'filesystem',
         'stream_set_blocking' => 'filesystem',
         'feof' => 'filesystem', 'fflush' => 'filesystem', 'fsync' => 'filesystem', 'fdatasync' => 'filesystem', 'ftruncate' => 'filesystem', 'rewind' => 'filesystem', 'fpassthru' => 'filesystem',
