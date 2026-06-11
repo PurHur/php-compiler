@@ -105,6 +105,27 @@ class Type extends Builtin {
         );
         $fnSscanfArray = $this->context->module->addFunction('__compiler_sscanf_array', $fntypeSscanfArray);
         $this->context->registerFunction('__compiler_sscanf_array', $fnSscanfArray);
+        $fntypeSscanfEx = $this->context->context->functionType(
+            $this->context->getTypeFromString('int64'),
+            false,
+            $this->context->getTypeFromString('__string__*'),
+            $this->context->getTypeFromString('__string__*'),
+            $this->context->getTypeFromString('int64'),
+            $this->context->getTypeFromString('__value__**'),
+            $this->context->getTypeFromString('size_t*')
+        );
+        $fnSscanfEx = $this->context->module->addFunction('__compiler_sscanf_ex', $fntypeSscanfEx);
+        $this->context->registerFunction('__compiler_sscanf_ex', $fnSscanfEx);
+        $fntypeVfscanf = $this->context->context->functionType(
+            $this->context->getTypeFromString('int64'),
+            false,
+            $this->context->getTypeFromString('int64'),
+            $this->context->getTypeFromString('__string__*'),
+            $this->context->getTypeFromString('int64'),
+            $this->context->getTypeFromString('__value__**')
+        );
+        $fnVfscanf = $this->context->module->addFunction('__compiler_vfscanf', $fntypeVfscanf);
+        $this->context->registerFunction('__compiler_vfscanf', $fnVfscanf);
         $fntypePack = $this->context->context->functionType(
             $this->context->getTypeFromString('__string__*'),
             false,

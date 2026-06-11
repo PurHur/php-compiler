@@ -242,6 +242,7 @@ class Module extends ModuleAbstract
             new vfprintf_(),
             new vsprintf(),
             new sscanf(),
+            new vfscanf(),
             new array_values(),
             new array_keys(),
             new array_merge(),

@@ -56,7 +56,7 @@ final class BuiltinByRefParams
     /** First argument index passed by reference for variadic tail (issue #3190). */
     public static function variadicByRefFromIndex(string $name): ?int
     {
-        if ('sscanf' === strtolower($name)) {
+        if (\in_array(strtolower($name), ['sscanf', 'vfscanf'], true)) {
             return 2;
         }
 
