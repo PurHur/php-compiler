@@ -86,6 +86,7 @@ final class BootstrapSelfhostDriverSmokeTest extends TestCase
         $this->assertStringContainsString('shouldUseM4BinCompileArgvMainNative', $jit);
         $emit = (string) file_get_contents(self::$root.'/lib/JIT/BootstrapCompileSmokeM3Emit.php');
         $this->assertStringContainsString("'compileemitsmoke', 'compile'", $emit);
+        $this->assertStringContainsString('Parse once, then try each compile spine in order', $emit);
         $this->assertStringContainsString("strtolower('PHPCompiler\\\\Runtime::parse')", $emit);
         $this->assertStringNotContainsString('unset($runtimeThis, $code, $filename)', $emit);
     }

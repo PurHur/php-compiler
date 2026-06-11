@@ -1,13 +1,13 @@
 {
     "version": 1,
-    "generated_at": "2026-05-29T09:32:00+00:00",
+    "generated_at": "2026-06-11T21:48:00+00:00",
     "driver": "prelinked/bootstrap-gen0/bin-compile-aot",
     "compiler_minimal_sidecar": "prelinked/bootstrap-gen0/compiler_minimal_aot_blob",
     "role": "gen-0 native argv compile driver + M0 link-time sidecar (no Zend)",
-    "sha256_driver": "d60376fc4360a225b0ffa3c5e4b9a3c01cad087f4ec8e9a4c8e0c90a39b0d56e",
+    "sha256_driver": "328cb1acfac7ca595d48498362a4764356d11bbf37b5420e420317422de7c04b",
     "sha256_compiler_minimal_sidecar": "0e1b201f6e493f5838e5aa61112b6000063005e2bb5ab3755a872583f5714dbc",
-    "size_bytes_driver": 432064,
+    "size_bytes_driver": 812136,
     "size_bytes_compiler_minimal_sidecar": 185800,
-    "build_target": "make bootstrap-selfhost-driver-smoke (php-compiler:22.04-dev, LLVM 9)",
+    "build_target": "inventory argv emit (php-compiler:22.04-dev, LLVM 9)",
     "issue": "#3053"
 }
