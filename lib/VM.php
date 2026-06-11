@@ -84,6 +84,7 @@ class VM {
 
             $frame = $block->getFrame($this->context);
             $this->seedScriptPath($frame);
+            $this->context->executionLimits->begin();
             $this->context->push($frame);
 
             $result = $this->runFrames();
@@ -1927,6 +1928,7 @@ restart:
 
         while ($frame->pos < $frame->block->nOpCodes) {
             $this->executingFrame = $frame;
+            $this->context->executionLimits->check($this->context, $frame);
             $op = $frame->block->opCodes[$frame->pos++];
             try {
                 switch ($op->type) {

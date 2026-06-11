@@ -120,6 +120,9 @@ class Context {
 
     public ScriptStack $scriptStack;
 
+    /** Max execution time + ignore_user_abort (ext/standard VmExecutionLimits; #3242). */
+    public \PHPCompiler\ext\standard\VmExecutionLimits $executionLimits;
+
     /** @var array<int, Variable> foreach iterator container cache (issue #167, #1885). */
     public array $foreachIterators = [];
 
@@ -154,6 +157,7 @@ class Context {
         $this->errors = new ErrorReporter();
         $this->exceptionHandlers = new ExceptionHandlerStack();
         $this->scriptStack = new ScriptStack();
+        $this->executionLimits = new \PHPCompiler\ext\standard\VmExecutionLimits();
         BuiltinClasses::register($this);
     }
 
