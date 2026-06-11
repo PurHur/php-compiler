@@ -128,4 +128,99 @@ final class VmStreamContext
 
         return self::$resources[$id] ?? null;
     }
+
+    /**
+     * php-src ext/standard/streams.c — stream_context_set_options/get_options context arg.
+     */
+    public static function requireRepresentation(
+        Variable $var,
+        string $functionName,
+        int $argNum = 1
+    ): Variable {
+        $resolved = $var->resolveIndirect();
+        if (!self::isRepresentation($resolved)) {
+            throw new \TypeError(\sprintf(
+                '%s(): Argument #%d ($context) must be of type resource, %s given',
+                $functionName,
+                $argNum,
+                VmStreamArg::debugTypeName($resolved)
+            ));
+        }
+
+        return $resolved;
+    }
+
+    public static function requireOptionsArray(
+        Variable $var,
+        string $functionName,
+        int $argNum = 2
+    ): Variable {
+        $resolved = $var->resolveIndirect();
+        if (Variable::TYPE_ARRAY !== $resolved->type) {
+            throw new \TypeError(\sprintf(
+                '%s(): Argument #%d ($options) must be of type array, %s given',
+                $functionName,
+                $argNum,
+                VmStreamArg::debugTypeName($resolved)
+            ));
+        }
+
+        return $resolved;
+    }
+
+    /**
+     * Merge options into an existing stream context (issue #6517).
+     */
+    public static function setOptions(Variable $context, Variable $options): bool
+    {
+        $context->separateArrayForWrite();
+        $context = self::requireRepresentation($context, 'stream_context_set_options');
+        $options = self::requireOptionsArray($options, 'stream_context_set_options');
+
+        $exported = VmHttpBuildQuery::export($options);
+        if (!\is_array($exported)) {
+            throw new \TypeError(
+                'stream_context_set_options(): Argument #2 ($options) must be of type array, '
+                .VmStreamArg::debugTypeName($options).' given'
+            );
+        }
+
+        $host = self::toHostResource($context);
+        if (null !== $host) {
+            if (\function_exists('stream_context_set_options')) {
+                \stream_context_set_options($host, $exported);
+            } else {
+                \stream_context_set_option($host, $exported);
+            }
+        }
+
+        VmParseStr::mergeInto($context->toArray(), $exported);
+
+        return true;
+    }
+
+    /**
+     * Return stream wrapper options without the internal marker key (issue #6517).
+     */
+    public static function getOptionsHashTable(Variable $context): HashTable
+    {
+        $context = self::requireRepresentation($context, 'stream_context_get_options');
+        $source = $context->toArray();
+        $out = new HashTable();
+        foreach ($source->iterateKeyed(true) as [$key, $value]) {
+            $k = $key->resolveIndirect();
+            if (Variable::TYPE_STRING === $k->type && self::MARKER_KEY === $k->toString()) {
+                continue;
+            }
+            $copyVal = new Variable();
+            $copyVal->copyFrom($value);
+            if (Variable::TYPE_STRING === $k->type) {
+                $out->add($k->toString(), $copyVal);
+            } elseif (Variable::TYPE_INTEGER === $k->type) {
+                $out->addIndex($k->toInt(), $copyVal);
+            }
+        }
+
+        return $out;
+    }
 }

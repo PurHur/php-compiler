@@ -162,6 +162,8 @@ final class SelfHostBuiltinPolicy
         'inet_ntop' => 'filesystem',
         'inet_pton' => 'filesystem',
         'stream_context_create' => 'filesystem',
+        'stream_context_get_options' => 'filesystem',
+        'stream_context_set_options' => 'filesystem',
     ];
 
     /** @var array<string, string> php-src ext/standard/php_gc.c (#3209, #3160). */

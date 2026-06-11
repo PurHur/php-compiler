@@ -58,6 +58,13 @@ final class StreamContextRuntime
             : $context->module->addFunction('__phpc_stream_context_create', $ftCreate);
         self::implementCreate($context, $fnCreate, $fnMerge);
 
+        $getOptsProbe = $context->module->getNamedFunction('__phpc_stream_context_get_options');
+        $ftGetOpts = $context->context->functionType($htPtr, false, $htPtr);
+        $fnGetOpts = null !== $getOptsProbe
+            ? $getOptsProbe
+            : $context->module->addFunction('__phpc_stream_context_get_options', $ftGetOpts);
+        self::implementGetOptions($context, $fnGetOpts, $fnMerge);
+
         self::registerLinkedRuntime($context);
     }
 
@@ -104,6 +111,35 @@ final class StreamContextRuntime
             $context->builder->sext($id, $i64)
         );
 
+        $context->builder->returnValue($out);
+        $context->builder->clearInsertionPosition();
+    }
+
+    private static function implementGetOptions(Context $context, Value $fn, Value $fnMerge): void
+    {
+        $entry = $fn->appendBasicBlock('scgo_entry');
+        $nullBb = $fn->appendBasicBlock('scgo_null');
+        $doneBb = $fn->appendBasicBlock('scgo_done');
+
+        $context->builder->positionAtEnd($entry);
+
+        $src = $fn->getParam(0);
+        $htPtr = $context->getTypeFromString('__hashtable__*');
+        $nullHt = $htPtr->constNull();
+        $isNull = $context->builder->icmp(Builder::INT_EQ, $src, $nullHt);
+        $context->builder->branchIf($isNull, $nullBb, $doneBb);
+
+        $context->builder->positionAtEnd($nullBb);
+        $context->builder->returnValue($nullHt);
+
+        $context->builder->positionAtEnd($doneBb);
+        $out = $context->builder->call($context->lookupFunction('__hashtable__alloc'));
+        $context->builder->call($fnMerge, $out, $src);
+        $context->builder->call(
+            $context->lookupFunction('__hashtable__unsetStringKey'),
+            $out,
+            self::literalKeyString($context, self::MARKER_KEY)
+        );
         $context->builder->returnValue($out);
         $context->builder->clearInsertionPosition();
     }
@@ -378,6 +414,7 @@ final class StreamContextRuntime
                 ['__value__readLong', $i64, [$valuePtrTy]],
                 ['__value__readDouble', $doubleTy, [$valuePtrTy]],
                 ['__value__readString', $strPtr, [$valuePtrTy]],
+                ['__hashtable__unsetStringKey', $voidTy, [$htPtr, $strPtr]],
             ] as [$name, $ret, $params]
         ) {
             self::ensureExternal(
@@ -400,7 +437,13 @@ final class StreamContextRuntime
 
     private static function registerLinkedRuntime(Context $context): void
     {
-        foreach (['__phpc_stream_context_create', '__phpc_stream_context_merge_options'] as $name) {
+        foreach (
+            [
+                '__phpc_stream_context_create',
+                '__phpc_stream_context_merge_options',
+                '__phpc_stream_context_get_options',
+            ] as $name
+        ) {
             $fn = $context->module->getNamedFunction($name);
             if (null === $fn) {
                 throw new \LogicException($name.' missing after StreamContextRuntime LLVM implement');
