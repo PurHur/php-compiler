@@ -21,8 +21,13 @@ final class CalendarModuleTest extends TestCase
         $ctx = $runtime->vmContext;
 
         self::assertTrue(VmReflection::functionExists($ctx, 'cal_days_in_month'));
+        self::assertTrue(VmReflection::functionExists($ctx, 'cal_info'));
+        self::assertTrue(VmReflection::functionExists($ctx, 'cal_from_jd'));
         self::assertTrue(VmReflection::functionExists($ctx, 'gregoriantojd'));
         self::assertTrue(VmReflection::functionExists($ctx, 'easter_date'));
+        self::assertTrue(VmReflection::functionExists($ctx, 'easter_days'));
+        self::assertTrue(VmReflection::functionExists($ctx, 'jdmonthname'));
+        self::assertTrue(VmReflection::functionExists($ctx, 'jddayofweek'));
 
         $code = <<<'PHP'
 <?php

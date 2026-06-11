@@ -35,6 +35,17 @@ final class CalendarArgs
         return self::requireInt($frame, $fn, $position, $name);
     }
 
+    public static function assertValidCalendarId(int $calendar, string $fn, int $position = 1): void
+    {
+        if ($calendar < 0 || $calendar >= CalendarConstants::CAL_NUM_CALS) {
+            throw new \ValueError(\sprintf(
+                '%s(): Argument #%d ($calendar) must be a valid calendar ID',
+                $fn,
+                $position
+            ));
+        }
+    }
+
     private static function vmTypeName(int $type): string
     {
         return match ($type) {

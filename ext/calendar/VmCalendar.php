@@ -123,6 +123,126 @@ final class VmCalendar
         return self::localMidnightTimestamp($year, $month, $day);
     }
 
+    public static function dayOfWeek(int $sdn): int
+    {
+        return (int) (($sdn % 7 + 8) % 7);
+    }
+
+    public static function calInfo(int $cal): HashTable
+    {
+        $meta = CalendarTables::calendarMeta($cal);
+        $ht = new HashTable();
+        self::hashSetString($ht, 'calname', $meta['name']);
+        self::hashSetString($ht, 'calsymbol', $meta['symbol']);
+        self::hashSetLong($ht, 'maxdaysinmonth', $meta['maxDaysInMonth']);
+        self::hashSetArray($ht, 'months', self::indexedStringArray(
+            $meta['monthLong'],
+            1,
+            $meta['numMonths']
+        ));
+        self::hashSetArray($ht, 'abbrevmonths', self::indexedStringArray(
+            $meta['monthShort'],
+            1,
+            $meta['numMonths']
+        ));
+
+        return $ht;
+    }
+
+    /** @return HashTable<int, HashTable> */
+    public static function calInfoAll(): HashTable
+    {
+        $all = new HashTable();
+        for ($i = 0; $i < CalendarConstants::CAL_NUM_CALS; ++$i) {
+            $var = new Variable(Variable::TYPE_ARRAY);
+            $var->array(self::calInfo($i));
+            $all->add((string) $i, $var);
+        }
+
+        return $all;
+    }
+
+    public static function calFromJd(int $jd, int $cal): HashTable
+    {
+        [$year, $month, $day] = match ($cal) {
+            CalendarConstants::CAL_GREGORIAN => self::sdnToGregorian($jd),
+            CalendarConstants::CAL_JULIAN => self::sdnToJulian($jd),
+            default => throw new \LogicException(
+                'Calendar ID '.$cal.' is not implemented in this compiler build (issue #3742)'
+            ),
+        };
+
+        $ht = new HashTable();
+        self::hashSetString($ht, 'date', $month.'/'.$day.'/'.$year);
+        self::hashSetLong($ht, 'month', $month);
+        self::hashSetLong($ht, 'day', $day);
+        self::hashSetLong($ht, 'year', $year);
+
+        if (CalendarConstants::CAL_JEWISH !== $cal || $year > 0) {
+            $dow = self::dayOfWeek($jd);
+            self::hashSetLong($ht, 'dow', $dow);
+            self::hashSetString($ht, 'abbrevdayname', CalendarTables::DAY_SHORT[$dow]);
+            self::hashSetString($ht, 'dayname', CalendarTables::DAY_LONG[$dow]);
+        } else {
+            self::hashSetNull($ht, 'dow');
+            self::hashSetString($ht, 'abbrevdayname', '');
+            self::hashSetString($ht, 'dayname', '');
+        }
+
+        $meta = CalendarTables::calendarMeta($cal);
+        if (CalendarConstants::CAL_JEWISH === $cal) {
+            $abbrev = $year > 0 ? $meta['monthShort'][$month] : '';
+            $long = $year > 0 ? $meta['monthLong'][$month] : '';
+        } else {
+            $abbrev = $meta['monthShort'][$month];
+            $long = $meta['monthLong'][$month];
+        }
+        self::hashSetString($ht, 'abbrevmonth', $abbrev);
+        self::hashSetString($ht, 'monthname', $long);
+
+        return $ht;
+    }
+
+    public static function jdMonthName(int $jd, int $mode): string
+    {
+        return match ($mode) {
+            CalendarConstants::CAL_MONTH_GREGORIAN_LONG => self::monthNameFromSdn(
+                self::sdnToGregorian($jd),
+                CalendarTables::GREGOR_MONTH_LONG
+            ),
+            CalendarConstants::CAL_MONTH_JULIAN_SHORT => self::monthNameFromSdn(
+                self::sdnToJulian($jd),
+                CalendarTables::GREGOR_MONTH_SHORT
+            ),
+            CalendarConstants::CAL_MONTH_JULIAN_LONG => self::monthNameFromSdn(
+                self::sdnToJulian($jd),
+                CalendarTables::GREGOR_MONTH_LONG
+            ),
+            CalendarConstants::CAL_MONTH_JEWISH,
+            CalendarConstants::CAL_MONTH_FRENCH => throw new \LogicException(
+                'jdmonthname() mode '.$mode.' requires Jewish/French conversion (issue #3742)'
+            ),
+            default => self::monthNameFromSdn(
+                self::sdnToGregorian($jd),
+                CalendarTables::GREGOR_MONTH_SHORT
+            ),
+        };
+    }
+
+    /**
+     * @return int|string
+     */
+    public static function jdDayOfWeek(int $jd, int $mode)
+    {
+        $day = self::dayOfWeek($jd);
+
+        return match ($mode) {
+            CalendarConstants::CAL_DOW_LONG => CalendarTables::DAY_LONG[$day],
+            CalendarConstants::CAL_DOW_SHORT => CalendarTables::DAY_SHORT[$day],
+            default => $day,
+        };
+    }
+
     public static function easterDays(int $year, int $method = CalendarConstants::CAL_EASTER_DEFAULT): int
     {
         $golden = ($year % 19) + 1;
@@ -228,6 +348,54 @@ final class VmCalendar
         }
 
         return [$year, $month, $day];
+    }
+
+    /** @param list<string> $names */
+    private static function monthNameFromSdn(array $parts, array $names): string
+    {
+        [, $month] = $parts;
+
+        return $names[$month] ?? '';
+    }
+
+    /** @param list<string> $values */
+    private static function indexedStringArray(array $values, int $start, int $count): HashTable
+    {
+        $ht = new HashTable();
+        for ($i = 0; $i < $count; ++$i) {
+            $idx = $start + $i;
+            self::hashSetString($ht, (string) $idx, $values[$idx]);
+        }
+
+        return $ht;
+    }
+
+    private static function hashSetString(HashTable $ht, string $key, string $value): void
+    {
+        $var = new Variable();
+        $var->string($value);
+        $ht->add($key, $var);
+    }
+
+    private static function hashSetLong(HashTable $ht, string $key, int $value): void
+    {
+        $var = new Variable(Variable::TYPE_INTEGER);
+        $var->int($value);
+        $ht->add($key, $var);
+    }
+
+    private static function hashSetNull(HashTable $ht, string $key): void
+    {
+        $var = new Variable(Variable::TYPE_NULL);
+        $var->null();
+        $ht->add($key, $var);
+    }
+
+    private static function hashSetArray(HashTable $ht, string $key, HashTable $value): void
+    {
+        $var = new Variable(Variable::TYPE_ARRAY);
+        $var->array($value);
+        $ht->add($key, $var);
     }
 
     private static function hashGetInt(HashTable $ht, string $key): int
