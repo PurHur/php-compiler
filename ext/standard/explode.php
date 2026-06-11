@@ -88,11 +88,6 @@ final class explode extends Internal
             if (null !== $limitLit && null !== $delimLit && null !== $hayLit) {
                 return JitExplode::buildPackedStrings($context, $delimLit, $hayLit, $limitLit);
             }
-            if (null !== $limitLit && $limitLit < 0) {
-                throw new \LogicException(
-                    'explode() negative limit requires compile-time arguments in JIT/AOT in this compiler build'
-                );
-            }
             $limit = null !== $limitLit
                 ? $context->constantFromInteger($limitLit, 'int64')
                 : JitLongArg::lower($context, $args[2], 'explode() argument #3 ($limit)');
