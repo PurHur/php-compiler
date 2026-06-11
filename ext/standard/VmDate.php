@@ -17,6 +17,11 @@ use PHPCompiler\VM\Variable;
 
 final class VmDate
 {
+    /** date_sunrise()/date_sunset() return format (ext/date/php_date.c, PHP 8.4 values, #6137). */
+    public const SUNFUNCS_RET_TIMESTAMP = 0;
+    public const SUNFUNCS_RET_STRING = 1;
+    public const SUNFUNCS_RET_DOUBLE = 2;
+
     private const FORMAT_OUT_BYTES = 256;
 
     private static ?\FFI $ffi = null;
@@ -90,6 +95,124 @@ final class VmDate
         $raw = \date_sun_info($time, $latitude, $longitude);
 
         return $raw;
+    }
+
+    /**
+     * date_sunrise() — procedural sunrise helper (ext/date/php_date.c, #6137).
+     *
+     * @return string|int|float|false
+     */
+    public static function dateSunrise(
+        int $timestamp,
+        int $returnFormat = self::SUNFUNCS_RET_STRING,
+        ?float $latitude = null,
+        ?float $longitude = null,
+        ?float $zenith = null,
+        ?float $gmtOffset = null,
+        int $argc = 1
+    ): mixed {
+        return self::dateSunFuncNative(
+            'date_sunrise',
+            $timestamp,
+            $returnFormat,
+            $latitude,
+            $longitude,
+            $zenith,
+            $gmtOffset,
+            $argc
+        );
+    }
+
+    /**
+     * date_sunset() — procedural sunset helper (ext/date/php_date.c, #6137).
+     *
+     * @return string|int|float|false
+     */
+    public static function dateSunset(
+        int $timestamp,
+        int $returnFormat = self::SUNFUNCS_RET_STRING,
+        ?float $latitude = null,
+        ?float $longitude = null,
+        ?float $zenith = null,
+        ?float $gmtOffset = null,
+        int $argc = 1
+    ): mixed {
+        return self::dateSunFuncNative(
+            'date_sunset',
+            $timestamp,
+            $returnFormat,
+            $latitude,
+            $longitude,
+            $zenith,
+            $gmtOffset,
+            $argc
+        );
+    }
+
+    /**
+     * @return string|int|float|false
+     */
+    private static function dateSunFuncNative(
+        string $function,
+        int $timestamp,
+        int $returnFormat,
+        ?float $latitude,
+        ?float $longitude,
+        ?float $zenith,
+        ?float $gmtOffset,
+        int $argc
+    ): mixed {
+        if (!\function_exists($function)) {
+            throw new \LogicException($function.'() requires host PHP date extension');
+        }
+
+        $args = [$timestamp];
+        if ($argc >= 2) {
+            $args[] = $returnFormat;
+        }
+        if ($argc >= 3) {
+            $args[] = $latitude;
+        }
+        if ($argc >= 4) {
+            $args[] = $longitude;
+        }
+        if ($argc >= 5) {
+            $args[] = $zenith ?? 90.0;
+        }
+        if ($argc >= 6) {
+            $args[] = $gmtOffset ?? 0.0;
+        }
+
+        /** @var callable(int, int=, ?float=, ?float=, float=, float=): string|int|float|false $callable */
+        $callable = '\\'.$function;
+
+        return $callable(...$args);
+    }
+
+    /**
+     * @param string|int|float|false $result
+     */
+    public static function writeSunFuncReturn(Frame $frame, mixed $result): void
+    {
+        if (null === $frame->returnVar) {
+            return;
+        }
+        if (false === $result) {
+            $frame->returnVar->bool(false);
+
+            return;
+        }
+        if (\is_int($result)) {
+            $frame->returnVar->int($result);
+
+            return;
+        }
+        if (\is_float($result)) {
+            $frame->returnVar->float($result);
+
+            return;
+        }
+        $frame->returnVar->string((string) $result);
     }
 
     /**
