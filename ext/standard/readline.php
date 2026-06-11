@@ -14,7 +14,7 @@ use PHPLLVM\Value;
 /**
  * readline() — CLI line input (ext/readline/readline.c parity, issue #3776).
  *
- * VM: host readline() when ext/readline is loaded; otherwise native STDIN fgets fallback (#6216).
+ * VM: native STDIN fgets + in-memory history via VmReadline (#6216, #8028).
  * JIT/AOT: returns false (no interactive stdin in compiled binaries).
  */
 final class readline extends Internal

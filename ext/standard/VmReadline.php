@@ -8,10 +8,9 @@ use PHPCompiler\VM\HashTable;
 use PHPCompiler\VM\Variable;
 
 /**
- * readline() — interactive CLI line input (ext/readline/readline.c, #3776, #6216).
+ * readline() — interactive CLI line input (ext/readline/readline.c, #3776, #6216, #8028).
  *
- * Uses host ext/readline when loaded; otherwise reads one line from STDIN via fgets.
- * History/info helpers: host delegation when available, in-memory fallback (#7059).
+ * PHP-owned implementation: STDIN fgets fallback + in-memory history. No host ext/readline delegation.
  */
 final class VmReadline
 {
@@ -26,20 +25,11 @@ final class VmReadline
 
     public static function read(?string $prompt): string|false
     {
-        if (\function_exists('readline')) {
-            $line = null === $prompt ? \readline() : \readline($prompt);
-
-            return false === $line ? false : $line;
-        }
-
         return self::readStdinFallback($prompt);
     }
 
     public static function addHistory(string $line): bool
     {
-        if (\function_exists('readline_add_history')) {
-            return \readline_add_history($line);
-        }
         self::$history[] = $line;
 
         return true;
@@ -47,9 +37,6 @@ final class VmReadline
 
     public static function clearHistory(): bool
     {
-        if (\function_exists('readline_clear_history')) {
-            return \readline_clear_history();
-        }
         self::$history = [];
 
         return true;
@@ -57,18 +44,11 @@ final class VmReadline
 
     public static function listHistory(): HashTable
     {
-        if (\function_exists('readline_list_history')) {
-            return self::packedStringListToHashTable(\readline_list_history());
-        }
-
         return self::packedStringListToHashTable(self::$history);
     }
 
     public static function writeHistory(?string $filename = null): bool
     {
-        if (\function_exists('readline_write_history')) {
-            return \readline_write_history($filename);
-        }
         if (null === $filename) {
             return false;
         }
@@ -79,9 +59,6 @@ final class VmReadline
 
     public static function readHistory(?string $filename = null): bool
     {
-        if (\function_exists('readline_read_history')) {
-            return \readline_read_history($filename);
-        }
         if (null === $filename || !\is_readable($filename)) {
             return false;
         }
@@ -102,66 +79,34 @@ final class VmReadline
      */
     public static function info(?string $varname = null, mixed $newvalue = null, bool $hasNewvalue = false): HashTable|string|int|bool
     {
-        if (\function_exists('readline_info')) {
-            if (null === $varname) {
-                return self::normalizeInfoResult(\readline_info());
-            }
-            if (!$hasNewvalue) {
-                return self::normalizeInfoResult(\readline_info($varname));
-            }
-
-            return self::normalizeInfoResult(\readline_info($varname, $newvalue));
-        }
-
         return self::infoFallback($varname, $newvalue, $hasNewvalue);
     }
 
     public static function completionFunction(mixed $callback): bool
     {
-        if (\function_exists('readline_completion_function') && \is_string($callback)) {
-            return \readline_completion_function($callback);
-        }
-
         return false;
     }
 
     public static function callbackHandlerInstall(string $prompt, mixed $callback): bool
     {
-        if (\function_exists('readline_callback_handler_install') && \is_string($callback)) {
-            return \readline_callback_handler_install($prompt, $callback);
-        }
-
         return false;
     }
 
     public static function callbackReadChar(): void
     {
-        if (\function_exists('readline_callback_read_char')) {
-            \readline_callback_read_char();
-        }
     }
 
     public static function callbackHandlerRemove(): bool
     {
-        if (\function_exists('readline_callback_handler_remove')) {
-            return \readline_callback_handler_remove();
-        }
-
         return false;
     }
 
     public static function onNewLine(): void
     {
-        if (\function_exists('readline_on_new_line')) {
-            \readline_on_new_line();
-        }
     }
 
     public static function redisplay(): void
     {
-        if (\function_exists('readline_redisplay')) {
-            \readline_redisplay();
-        }
     }
 
     /**
@@ -210,21 +155,6 @@ final class VmReadline
         }
 
         return '';
-    }
-
-    private static function normalizeInfoResult(mixed $result): HashTable|string|int|bool
-    {
-        if (\is_array($result)) {
-            return self::assocArrayToHashTable($result);
-        }
-        if (\is_bool($result)) {
-            return $result;
-        }
-        if (\is_int($result)) {
-            return $result;
-        }
-
-        return (string) $result;
     }
 
     /**
