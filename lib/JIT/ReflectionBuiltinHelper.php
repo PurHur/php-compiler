@@ -196,6 +196,11 @@ final class ReflectionBuiltinHelper
         return self::objectBuiltin($context)->emitInstanceOf($value, $className);
     }
 
+    public static function emitSubclassOf(Context $context, Variable $value, string $className): Variable
+    {
+        return self::objectBuiltin($context)->emitSubclassOf($value, $className);
+    }
+
     public static function classIsInstanceOfLiteral(Context $context, string $childName, string $parentName): Value
     {
         $match = self::objectBuiltin($context)->classIsInstanceOf($childName, $parentName);
