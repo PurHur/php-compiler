@@ -96,6 +96,9 @@ class Module extends ModuleAbstract
             'LOG_LOCAL5' => StdlibConstants::LOG_LOCAL5,
             'LOG_LOCAL6' => StdlibConstants::LOG_LOCAL6,
             'LOG_LOCAL7' => StdlibConstants::LOG_LOCAL7,
+            'ZLIB_ENCODING_RAW' => -15,
+            'ZLIB_ENCODING_DEFLATE' => 15,
+            'ZLIB_ENCODING_GZIP' => 31,
         ] + VmStreamSupports::constants() + VmImage::constants() as $name => $value) {
             $var = new VM\Variable();
             $var->int($value);
@@ -695,6 +698,8 @@ class Module extends ModuleAbstract
             new gzencode(),
             new gzinflate(),
             new gzuncompress(),
+            new zlib_encode(),
+            new zlib_decode(),
             new fnmatch(),
             new time(),
             new getmypid(),
