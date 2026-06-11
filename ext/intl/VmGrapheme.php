@@ -52,6 +52,37 @@ final class VmGrapheme
     }
 
     /**
+     * grapheme_str_split() — split into grapheme clusters (php-src ext/intl/grapheme; #5958).
+     *
+     * @return list<string>|false
+     */
+    public static function strSplit(string $string, int $length = 1): array|false
+    {
+        if ($length < 1 || $length > 1073741823) {
+            throw new \ValueError(
+                'grapheme_str_split(): Argument #2 ($length) must be greater than 0 and less than or equal to 1073741823.'
+            );
+        }
+        if ('' === $string) {
+            return [];
+        }
+        $graphemes = self::splitGraphemes($string);
+        if (null === $graphemes) {
+            return false;
+        }
+        if (1 === $length) {
+            return $graphemes;
+        }
+        $chunks = \array_chunk($graphemes, $length);
+        $result = [];
+        foreach ($chunks as $chunk) {
+            $result[] = \implode('', $chunk);
+        }
+
+        return $result;
+    }
+
+    /**
      * grapheme_levenshtein() — grapheme-cluster edit distance (php-src ext/intl/grapheme; #6998).
      */
     public static function levenshtein(string $string1, string $string2): int

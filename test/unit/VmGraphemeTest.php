@@ -16,9 +16,11 @@ final class VmGraphemeTest extends TestCase
         $this->assertStringNotContainsString('function_exists(\'grapheme_str_contains\')', $source);
         $this->assertStringNotContainsString('function_exists(\'grapheme_strpos\')', $source);
         $this->assertStringNotContainsString('function_exists(\'grapheme_levenshtein\')', $source);
+        $this->assertStringNotContainsString('function_exists(\'grapheme_str_split\')', $source);
         $this->assertStringNotContainsString('\\grapheme_str_contains(', $source);
         $this->assertStringNotContainsString('\\grapheme_strpos(', $source);
         $this->assertStringNotContainsString('\\grapheme_levenshtein(', $source);
+        $this->assertStringNotContainsString('\\grapheme_str_split(', $source);
         $this->assertStringContainsString('strContainsUtf8', $source);
     }
 
@@ -37,5 +39,15 @@ final class VmGraphemeTest extends TestCase
         $this->assertSame(0, VmGrapheme::levenshtein($nfc, $nfd));
         $this->assertSame(3, VmGrapheme::levenshtein('kitten', 'sitting'));
         $this->assertSame(0, VmGrapheme::levenshtein('', ''));
+    }
+
+    public function testStrSplitGraphemeClusters(): void
+    {
+        $one = VmGrapheme::strSplit("e\xCC\x81");
+        $this->assertIsArray($one);
+        $this->assertCount(1, $one);
+        $this->assertSame(['a', 'b', 'c'], VmGrapheme::strSplit('abc'));
+        $this->assertSame(['ab', 'cd', 'ef'], VmGrapheme::strSplit('abcdef', 2));
+        $this->assertSame([], VmGrapheme::strSplit(''));
     }
 }
