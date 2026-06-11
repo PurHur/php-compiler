@@ -37,6 +37,11 @@ final class ScriptStack
         return $this->stack[count($this->stack) - 1];
     }
 
+    public function depth(): int
+    {
+        return \count($this->stack);
+    }
+
     /** Main entry script path (first pushed; ext/standard getmyinode parity). */
     public function root(): string
     {
