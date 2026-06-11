@@ -55,12 +55,11 @@ final class round extends Internal
 
         $mode = StdlibConstants::PHP_ROUND_HALF_UP;
         if (3 === $argc) {
-            $mode = VmMath::parseIntBuiltinArg(
+            $mode = VmRoundMode::resolveRoundModeArg(
                 $frame->calledArgs[2]->resolveIndirect(),
-                'round',
-                3,
-                'mode'
+                'round'
             );
+            VmRound::validateMode($mode);
         }
 
         if (null === $frame->returnVar) {

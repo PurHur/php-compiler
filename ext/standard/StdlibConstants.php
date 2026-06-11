@@ -52,11 +52,15 @@ final class StdlibConstants
     public const ENT_XHTML = 17;
     public const ENT_HTML5 = 48;
 
-    /** round() mode flags (ext/standard/math.c). */
+    /** round() mode flags (ext/standard/php_math_round_mode.h). */
     public const PHP_ROUND_HALF_UP = 1;
     public const PHP_ROUND_HALF_DOWN = 2;
     public const PHP_ROUND_HALF_EVEN = 3;
     public const PHP_ROUND_HALF_ODD = 4;
+    public const PHP_ROUND_CEILING = 5;
+    public const PHP_ROUND_FLOOR = 6;
+    public const PHP_ROUND_TOWARD_ZERO = 7;
+    public const PHP_ROUND_AWAY_FROM_ZERO = 8;
 
     /** array_change_key_case() mode flags (ext/standard/array.c). */
     public const CASE_LOWER = 0;

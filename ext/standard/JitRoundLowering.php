@@ -32,10 +32,10 @@ final class JitRoundLowering
         $one = $f64->constReal(1.0);
         $limit16 = $f64->constReal(1e16);
 
-        $finite = $context->builder->call($context->lookupFunction('isfinite'), $value);
+        $finite = self::isFinite($context, $value);
         $isZero = $context->builder->fcmp(Builder::REAL_OEQ, $value, $zero);
         $early = $context->builder->or(
-            $context->builder->icmp(Builder::INT_EQ, $finite, $i32->constInt(0, false)),
+            $context->builder->not($finite),
             $isZero
         );
         $earlyBlock = BasicBlockHelper::append($context, 'round_early');
@@ -51,12 +51,6 @@ final class JitRoundLowering
         $absPlaces = self::absI32($context, $places);
         $exponent = self::intPow10($context, $absPlaces);
 
-        $geZero = $context->builder->fcmp(Builder::REAL_OGE, $value, $zero);
-        $posBlock = BasicBlockHelper::append($context, 'round_pos');
-        $negBlock = BasicBlockHelper::append($context, 'round_neg');
-        $afterSign = BasicBlockHelper::append($context, 'round_after_sign');
-        $context->builder->branchIf($geZero, $posBlock, $negBlock);
-
         $placesPos = $context->builder->icmp(Builder::INT_SGT, $places, $i32->constInt(0, false));
         $scaledPos = $context->builder->select(
             $placesPos,
@@ -68,6 +62,12 @@ final class JitRoundLowering
             $context->builder->fdiv($value, $exponent),
             $context->builder->fmul($value, $exponent)
         );
+
+        $geZero = $context->builder->fcmp(Builder::REAL_OGE, $value, $zero);
+        $posBlock = BasicBlockHelper::append($context, 'round_pos');
+        $negBlock = BasicBlockHelper::append($context, 'round_neg');
+        $afterSign = BasicBlockHelper::append($context, 'round_after_sign');
+        $context->builder->branchIf($geZero, $posBlock, $negBlock);
 
         $context->builder->positionAtEnd($posBlock);
         $tmpPos = $context->builder->call($context->lookupFunction('floor'), $scaledPos);
@@ -159,11 +159,12 @@ final class JitRoundLowering
     private static function ensureModeValid(Context $context, Value $mode): void
     {
         $i64 = $context->getTypeFromString('int64');
-        $up = $context->builder->icmp(Builder::INT_EQ, $mode, $i64->constInt(StdlibConstants::PHP_ROUND_HALF_UP, false));
-        $down = $context->builder->icmp(Builder::INT_EQ, $mode, $i64->constInt(StdlibConstants::PHP_ROUND_HALF_DOWN, false));
-        $even = $context->builder->icmp(Builder::INT_EQ, $mode, $i64->constInt(StdlibConstants::PHP_ROUND_HALF_EVEN, false));
-        $odd = $context->builder->icmp(Builder::INT_EQ, $mode, $i64->constInt(StdlibConstants::PHP_ROUND_HALF_ODD, false));
-        $valid = $context->builder->or($context->builder->or($up, $down), $context->builder->or($even, $odd));
+        $min = $i64->constInt(StdlibConstants::PHP_ROUND_HALF_UP, false);
+        $max = $i64->constInt(StdlibConstants::PHP_ROUND_AWAY_FROM_ZERO, false);
+        $valid = $context->builder->and(
+            $context->builder->icmp(Builder::INT_SGE, $mode, $min),
+            $context->builder->icmp(Builder::INT_SLE, $mode, $max)
+        );
         $okBlock = BasicBlockHelper::append($context, 'round_mode_ok');
         $errBlock = BasicBlockHelper::append($context, 'round_mode_err');
         $context->builder->branchIf($valid, $okBlock, $errBlock);
@@ -239,7 +240,7 @@ final class JitRoundLowering
     private static function copySign(Context $context, Value $magnitude, Value $signSource): Value
     {
         $f64 = $context->getTypeFromString('double');
-        $neg = $context->builder->fneg($magnitude);
+        $neg = $context->builder->fsub($f64->constReal(0.0), $magnitude);
         $nonNeg = $context->builder->fcmp(Builder::REAL_OGE, $signSource, $f64->constReal(0.0));
 
         return $context->builder->select($nonNeg, $magnitude, $neg);
@@ -276,22 +277,65 @@ final class JitRoundLowering
         $f64 = $context->getTypeFromString('double');
         $i64 = $context->getTypeFromString('int64');
         $one = $f64->constReal(1.0);
+        $zero = $f64->constReal(0.0);
         $valueAbs = $context->builder->call($context->lookupFunction('fabs'), $value);
         $edgeCase = self::getBasicEdgeCase($context, $integral, $exponent, $places);
         $bump = self::copySign($context, $one, $integral);
+        $zeroEdgeCase = self::getZeroEdgeCase($context, $integral, $exponent, $places);
+        $valueGtZero = $context->builder->fcmp(Builder::REAL_OGT, $value, $zero);
+        $valueLtZero = $context->builder->fcmp(Builder::REAL_OLT, $value, $zero);
+        $valueAbsGtZeroEdge = $context->builder->fcmp(Builder::REAL_OGT, $valueAbs, $zeroEdgeCase);
 
         $upBlock = BasicBlockHelper::append($context, 'round_mode_up');
         $downBlock = BasicBlockHelper::append($context, 'round_mode_down');
         $evenBlock = BasicBlockHelper::append($context, 'round_mode_even');
         $oddBlock = BasicBlockHelper::append($context, 'round_mode_odd');
+        $ceilingBlock = BasicBlockHelper::append($context, 'round_mode_ceiling');
+        $floorBlock = BasicBlockHelper::append($context, 'round_mode_floor');
+        $towardBlock = BasicBlockHelper::append($context, 'round_mode_toward');
+        $awayBlock = BasicBlockHelper::append($context, 'round_mode_away');
         $merge = BasicBlockHelper::append($context, 'round_mode_merge');
+
+        $dispatch = BasicBlockHelper::append($context, 'round_mode_dispatch');
+        $context->builder->branch($dispatch);
+        $context->builder->positionAtEnd($dispatch);
 
         $isUp = $context->builder->icmp(Builder::INT_EQ, $mode, $i64->constInt(StdlibConstants::PHP_ROUND_HALF_UP, false));
         $isDown = $context->builder->icmp(Builder::INT_EQ, $mode, $i64->constInt(StdlibConstants::PHP_ROUND_HALF_DOWN, false));
         $isEven = $context->builder->icmp(Builder::INT_EQ, $mode, $i64->constInt(StdlibConstants::PHP_ROUND_HALF_EVEN, false));
+        $isOdd = $context->builder->icmp(Builder::INT_EQ, $mode, $i64->constInt(StdlibConstants::PHP_ROUND_HALF_ODD, false));
+        $isCeiling = $context->builder->icmp(Builder::INT_EQ, $mode, $i64->constInt(StdlibConstants::PHP_ROUND_CEILING, false));
+        $isFloor = $context->builder->icmp(Builder::INT_EQ, $mode, $i64->constInt(StdlibConstants::PHP_ROUND_FLOOR, false));
+        $isToward = $context->builder->icmp(Builder::INT_EQ, $mode, $i64->constInt(StdlibConstants::PHP_ROUND_TOWARD_ZERO, false));
+        $isAway = $context->builder->icmp(Builder::INT_EQ, $mode, $i64->constInt(StdlibConstants::PHP_ROUND_AWAY_FROM_ZERO, false));
 
-        $dispatchDown = BasicBlockHelper::append($context, 'round_dispatch_down');
-        $context->builder->branchIf($isUp, $upBlock, $dispatchDown);
+        $d1 = BasicBlockHelper::append($context, 'round_dispatch_1');
+        $context->builder->branchIf($isUp, $upBlock, $d1);
+        $context->builder->positionAtEnd($d1);
+        $d2 = BasicBlockHelper::append($context, 'round_dispatch_2');
+        $context->builder->branchIf($isDown, $downBlock, $d2);
+        $context->builder->positionAtEnd($d2);
+        $d3 = BasicBlockHelper::append($context, 'round_dispatch_3');
+        $context->builder->branchIf($isEven, $evenBlock, $d3);
+        $context->builder->positionAtEnd($d3);
+        $d4 = BasicBlockHelper::append($context, 'round_dispatch_4');
+        $context->builder->branchIf($isOdd, $oddBlock, $d4);
+        $context->builder->positionAtEnd($d4);
+        $d5 = BasicBlockHelper::append($context, 'round_dispatch_5');
+        $context->builder->branchIf($isCeiling, $ceilingBlock, $d5);
+        $context->builder->positionAtEnd($d5);
+        $d6 = BasicBlockHelper::append($context, 'round_dispatch_6');
+        $context->builder->branchIf($isFloor, $floorBlock, $d6);
+        $context->builder->positionAtEnd($d6);
+        $d7 = BasicBlockHelper::append($context, 'round_dispatch_7');
+        $context->builder->branchIf($isToward, $towardBlock, $d7);
+        $context->builder->positionAtEnd($d7);
+        $defaultBlock = BasicBlockHelper::append($context, 'round_mode_default');
+        $context->builder->branchIf($isAway, $awayBlock, $defaultBlock);
+        $context->builder->positionAtEnd($defaultBlock);
+        $defaultResult = $integral;
+        $defaultEnd = $context->builder->getInsertBlock();
+        $context->builder->branch($merge);
 
         $context->builder->positionAtEnd($upBlock);
         $upGe = $context->builder->fcmp(Builder::REAL_OGE, $valueAbs, $edgeCase);
@@ -299,18 +343,11 @@ final class JitRoundLowering
         $upEnd = $context->builder->getInsertBlock();
         $context->builder->branch($merge);
 
-        $context->builder->positionAtEnd($dispatchDown);
-        $dispatchEven = BasicBlockHelper::append($context, 'round_dispatch_even');
-        $context->builder->branchIf($isDown, $downBlock, $dispatchEven);
-
         $context->builder->positionAtEnd($downBlock);
         $downGt = $context->builder->fcmp(Builder::REAL_OGT, $valueAbs, $edgeCase);
         $downResult = $context->builder->select($downGt, $context->builder->fadd($integral, $bump), $integral);
         $downEnd = $context->builder->getInsertBlock();
         $context->builder->branch($merge);
-
-        $context->builder->positionAtEnd($dispatchEven);
-        $context->builder->branchIf($isEven, $evenBlock, $oddBlock);
 
         $context->builder->positionAtEnd($evenBlock);
         $evenResult = self::roundHalfEvenOdd($context, $integral, $valueAbs, $edgeCase, $bump, false);
@@ -322,14 +359,71 @@ final class JitRoundLowering
         $oddEnd = $context->builder->getInsertBlock();
         $context->builder->branch($merge);
 
+        $context->builder->positionAtEnd($ceilingBlock);
+        $ceilBump = $context->builder->and($valueGtZero, $valueAbsGtZeroEdge);
+        $ceilingResult = $context->builder->select(
+            $ceilBump,
+            $context->builder->fadd($integral, $one),
+            $integral
+        );
+        $ceilingEnd = $context->builder->getInsertBlock();
+        $context->builder->branch($merge);
+
+        $context->builder->positionAtEnd($floorBlock);
+        $floorBump = $context->builder->and($valueLtZero, $valueAbsGtZeroEdge);
+        $floorResult = $context->builder->select(
+            $floorBump,
+            $context->builder->fsub($integral, $one),
+            $integral
+        );
+        $floorEnd = $context->builder->getInsertBlock();
+        $context->builder->branch($merge);
+
+        $context->builder->positionAtEnd($towardBlock);
+        $towardResult = $integral;
+        $towardEnd = $context->builder->getInsertBlock();
+        $context->builder->branch($merge);
+
+        $context->builder->positionAtEnd($awayBlock);
+        $awayResult = $context->builder->select(
+            $valueAbsGtZeroEdge,
+            $context->builder->fadd($integral, $bump),
+            $integral
+        );
+        $awayEnd = $context->builder->getInsertBlock();
+        $context->builder->branch($merge);
+
         $context->builder->positionAtEnd($merge);
         $phi = $context->builder->phi($f64, 'round_helper_out');
         $phi->addIncoming($upResult, $upEnd);
         $phi->addIncoming($downResult, $downEnd);
         $phi->addIncoming($evenResult, $evenEnd);
         $phi->addIncoming($oddResult, $oddEnd);
+        $phi->addIncoming($ceilingResult, $ceilingEnd);
+        $phi->addIncoming($floorResult, $floorEnd);
+        $phi->addIncoming($towardResult, $towardEnd);
+        $phi->addIncoming($awayResult, $awayEnd);
+        $phi->addIncoming($defaultResult, $defaultEnd);
 
         return $phi;
+    }
+
+    private static function getZeroEdgeCase(
+        Context $context,
+        Value $integral,
+        Value $exponent,
+        Value $places
+    ): Value {
+        $f64 = $context->getTypeFromString('double');
+        $i32 = $context->getTypeFromString('int32');
+        $placesPos = $context->builder->icmp(Builder::INT_SGT, $places, $i32->constInt(0, false));
+        $scaled = $context->builder->select(
+            $placesPos,
+            $context->builder->fdiv($integral, $exponent),
+            $context->builder->fmul($integral, $exponent)
+        );
+
+        return $context->builder->call($context->lookupFunction('fabs'), $scaled);
     }
 
     private static function roundHalfEvenOdd(
@@ -382,18 +476,28 @@ final class JitRoundLowering
             $tmpValue,
             $negPlaces
         );
+        $endPtr = $context->builder->alloca($i8p, 1, 'round_strtod_end');
+        $context->builder->store($i8p->constNull(), $endPtr);
         $converted = $context->builder->call(
             $context->lookupFunction('strtod'),
             $context->builder->pointerCast($buf, $charPtr),
-            $i8p->constNull()
+            $endPtr
         );
-        $finite = $context->builder->call($context->lookupFunction('isfinite'), $converted);
-        $nan = $context->builder->call($context->lookupFunction('isnan'), $converted);
-        $bad = $context->builder->or(
-            $context->builder->icmp(Builder::INT_EQ, $finite, $i32->constInt(0, false)),
-            $context->builder->icmp(Builder::INT_NE, $nan, $i32->constInt(0, false))
-        );
+        $bad = $context->builder->not(self::isFinite($context, $converted));
 
         return $context->builder->select($bad, $fallback, $converted);
+    }
+
+    /** glibc exports isnan/isinf but not isfinite (header macro); compose for AOT link. */
+    private static function isFinite(Context $context, Value $value): Value
+    {
+        $i32 = $context->getTypeFromString('int32');
+        $zero = $i32->constInt(0, false);
+        $nan = $context->builder->call($context->lookupFunction('isnan'), $value);
+        $inf = $context->builder->call($context->lookupFunction('isinf'), $value);
+        $notNan = $context->builder->icmp(Builder::INT_EQ, $nan, $zero);
+        $notInf = $context->builder->icmp(Builder::INT_EQ, $inf, $zero);
+
+        return $context->builder->and($notNan, $notInf);
     }
 }
