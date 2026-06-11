@@ -6,18 +6,22 @@ namespace PHPCompiler\Test\Unit;
 
 use PHPCompiler\ext\standard\VmInet;
 use PHPCompiler\ext\standard\VmInetNative;
+use PHPCompiler\ext\standard\VmInetPure;
 use PHPUnit\Framework\TestCase;
 
-/** VmInetNative libc path without host \\ip2long() delegation (#3225 VM phase). */
+/** VmInet libc + pure-PHP path without host \\ip2long() delegation (#3225, #7929). */
 final class VmInetNativeTest extends TestCase
 {
-    public function testVmInetPrefersNativeOverHostDelegation(): void
+    public function testVmInetDoesNotReferenceHostDelegation(): void
     {
         $source = (string) file_get_contents(__DIR__.'/../../ext/standard/VmInet.php');
         $this->assertStringContainsString('VmInetNative::available()', $source);
-        $this->assertStringContainsString('VmInetNative::ip2long', $source);
-        $this->assertStringContainsString('VmInetNative::long2ip', $source);
-        $this->assertStringNotContainsString('delegates to Zend host', $source);
+        $this->assertStringContainsString('VmInetPure::long2ip', $source);
+        $this->assertStringNotContainsString('host Zend fallback', $source);
+        $this->assertDoesNotMatchRegularExpression('/\\\\long2ip\\s*\\(/', $source);
+        $this->assertDoesNotMatchRegularExpression('/\\\\ip2long\\s*\\(/', $source);
+        $this->assertDoesNotMatchRegularExpression('/\\\\inet_ntop\\s*\\(/', $source);
+        $this->assertDoesNotMatchRegularExpression('/\\\\inet_pton\\s*\\(/', $source);
     }
 
     public function testNativeDefinesLibcInetFfi(): void
@@ -26,9 +30,27 @@ final class VmInetNativeTest extends TestCase
         $this->assertStringContainsString('int inet_aton(const char *cp', $source);
         $this->assertStringContainsString('int inet_pton(int af', $source);
         $this->assertStringContainsString('const char *inet_ntop', $source);
-        $this->assertStringContainsString('$ffi->inet_aton', $source);
+        $this->assertStringContainsString('VmInetPure::', $source);
         $this->assertDoesNotMatchRegularExpression('/\\\\long2ip\\s*\\(/', $source);
         $this->assertDoesNotMatchRegularExpression('/\\\\inet_pton\\s*\\(/', $source);
+    }
+
+    public function testPureInetConversions(): void
+    {
+        $this->assertSame('127.0.0.1', VmInetPure::long2ip(2130706433));
+        $this->assertSame(2130706433, VmInetPure::ip2long('127.0.0.1'));
+        $this->assertFalse(VmInetPure::long2ip(-1));
+        $this->assertFalse(VmInetPure::ip2long('not-an-ip'));
+
+        $v6 = VmInetPure::inet_pton('::1');
+        $this->assertIsString($v6);
+        $this->assertSame(16, \strlen((string) $v6));
+        $this->assertSame('::1', VmInetPure::inet_ntop((string) $v6));
+
+        $v4 = VmInetPure::inet_pton('127.0.0.1');
+        $this->assertIsString($v4);
+        $this->assertSame(4, \strlen((string) $v4));
+        $this->assertSame('127.0.0.1', VmInetPure::inet_ntop((string) $v4));
     }
 
     public function testNativeInetConversionsOnLinux(): void
@@ -44,41 +66,25 @@ final class VmInetNativeTest extends TestCase
 
         $v6 = VmInetNative::inet_pton('::1');
         $this->assertIsString($v6);
-        $this->assertSame(16, strlen((string) $v6));
+        $this->assertSame(16, \strlen((string) $v6));
         $this->assertSame('::1', VmInetNative::inet_ntop((string) $v6));
 
         $v4 = VmInetNative::inet_pton('127.0.0.1');
         $this->assertIsString($v4);
-        $this->assertSame(4, strlen((string) $v4));
+        $this->assertSame(4, \strlen((string) $v4));
         $this->assertSame('127.0.0.1', VmInetNative::inet_ntop((string) $v4));
     }
 
-    public function testVmInetMatchesHostWhenFfiEnabled(): void
+    public function testVmInetUsesPureFallbackWhenFfiDisabled(): void
     {
-        if (!VmInetNative::available()) {
-            $this->markTestSkipped('FFI inet unavailable');
-        }
-        if (!\function_exists('ip2long') || !\function_exists('long2ip')) {
-            $this->markTestSkipped('host inet builtins unavailable');
-        }
-
-        $this->assertSame(\long2ip(2130706433), VmInet::long2ip(2130706433));
-        $this->assertSame(\ip2long('127.0.0.1'), VmInet::ip2long('127.0.0.1'));
-        $bin6 = VmInet::inet_pton('::1');
-        $this->assertSame(\inet_ntop((string) $bin6), VmInet::inet_ntop((string) $bin6));
-    }
-
-    public function testVmInetFallsBackWhenFfiDisabled(): void
-    {
-        if (!\function_exists('ip2long') || !\function_exists('long2ip')) {
-            $this->markTestSkipped('host inet builtins unavailable');
-        }
-
         $prev = getenv('PHP_COMPILER_DISABLE_FFI');
         putenv('PHP_COMPILER_DISABLE_FFI=1');
         try {
-            $this->assertSame(\long2ip(2130706433), VmInet::long2ip(2130706433));
-            $this->assertSame(\ip2long('127.0.0.1'), VmInet::ip2long('127.0.0.1'));
+            $this->assertSame('127.0.0.1', VmInet::long2ip(2130706433));
+            $this->assertSame(2130706433, VmInet::ip2long('127.0.0.1'));
+            $bin6 = VmInet::inet_pton('::1');
+            $this->assertIsString($bin6);
+            $this->assertSame('::1', VmInet::inet_ntop((string) $bin6));
         } finally {
             if (false === $prev) {
                 putenv('PHP_COMPILER_DISABLE_FFI');

@@ -26,7 +26,7 @@ final class VmInetNative
 
     public static function available(): bool
     {
-        return null !== self::ffi();
+        return self::ffiEnabled() && null !== self::ffi();
     }
 
     public static function long2ip(int $proper_address): string|false
@@ -36,7 +36,7 @@ final class VmInetNative
         }
         $ffi = self::ffi();
         if (null === $ffi) {
-            return false;
+            return VmInetPure::long2ip($proper_address);
         }
 
         try {
@@ -46,7 +46,7 @@ final class VmInetNative
 
             return \FFI::string($ptr);
         } catch (\Throwable) {
-            return false;
+            return VmInetPure::long2ip($proper_address);
         }
     }
 
@@ -54,7 +54,7 @@ final class VmInetNative
     {
         $ffi = self::ffi();
         if (null === $ffi) {
-            return false;
+            return VmInetPure::ip2long($ip);
         }
 
         try {
@@ -65,7 +65,7 @@ final class VmInetNative
 
             return (int) $ffi->ntohl($in->s_addr);
         } catch (\Throwable) {
-            return false;
+            return VmInetPure::ip2long($ip);
         }
     }
 
@@ -80,7 +80,7 @@ final class VmInetNative
         }
         $ffi = self::ffi();
         if (null === $ffi) {
-            return false;
+            return VmInetPure::inet_ntop($in_addr);
         }
 
         try {
@@ -99,7 +99,7 @@ final class VmInetNative
 
             return self::coerceNtopResult($ptr);
         } catch (\Throwable) {
-            return false;
+            return VmInetPure::inet_ntop($in_addr);
         }
     }
 
@@ -107,7 +107,7 @@ final class VmInetNative
     {
         $ffi = self::ffi();
         if (null === $ffi) {
-            return false;
+            return VmInetPure::inet_pton($address);
         }
 
         try {
@@ -120,9 +120,9 @@ final class VmInetNative
                 return \FFI::string($buf16, 16);
             }
 
-            return false;
+            return VmInetPure::inet_pton($address);
         } catch (\Throwable) {
-            return false;
+            return VmInetPure::inet_pton($address);
         }
     }
 
@@ -144,13 +144,16 @@ final class VmInetNative
 
     private static function ffi(): ?\FFI
     {
+        if (!self::ffiEnabled()) {
+            return null;
+        }
         if (self::$ffiUnavailable) {
             return null;
         }
         if (null !== self::$ffi) {
             return self::$ffi;
         }
-        if (!self::ffiEnabled() || !\extension_loaded('ffi')) {
+        if (!\extension_loaded('ffi')) {
             self::$ffiUnavailable = true;
 
             return null;
