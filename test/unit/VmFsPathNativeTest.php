@@ -31,8 +31,8 @@ final class VmFsPathNativeTest extends TestCase
 
     public function testRenameCopyLinkRoundTrip(): void
     {
-        if (!\extension_loaded('ffi') && (!\function_exists('rename') || !\function_exists('copy') || !\function_exists('link'))) {
-            $this->markTestSkipped('FFI or host rename/copy/link required');
+        if (!\extension_loaded('ffi')) {
+            $this->markTestSkipped('ext/ffi required for VmFsPathNative libc path');
         }
 
         $dir = sys_get_temp_dir();

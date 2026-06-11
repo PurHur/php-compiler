@@ -7,14 +7,11 @@ namespace PHPCompiler\Test\Unit;
 use PHPCompiler\ext\standard\VmFsUnlink;
 use PHPUnit\Framework\TestCase;
 
-/** VM unlink() without ext/ffi (#7314). */
+/** VM unlink() libc FFI without host unlink() delegation (#7314, #7971). */
 final class VmFsUnlinkBootstrapTest extends TestCase
 {
-    public function testUnlinkWithoutFfiViaHostLibc(): void
+    public function testUnlinkWithoutFfiReturnsFalse(): void
     {
-        if (!\function_exists('unlink')) {
-            $this->markTestSkipped('host unlink() unavailable');
-        }
         $path = tempnam(sys_get_temp_dir(), 'phpc_vm_unlink_boot_');
         $this->assertNotFalse($path);
         $this->assertFileExists($path);
@@ -22,15 +19,15 @@ final class VmFsUnlinkBootstrapTest extends TestCase
         $prev = getenv('PHP_COMPILER_DISABLE_FFI');
         putenv('PHP_COMPILER_DISABLE_FFI=1');
         try {
-            $this->assertTrue(VmFsUnlink::unlink($path));
-            $this->assertFileDoesNotExist($path);
             $this->assertFalse(VmFsUnlink::unlink($path));
+            $this->assertFileExists($path);
         } finally {
             if (false === $prev) {
                 putenv('PHP_COMPILER_DISABLE_FFI');
             } else {
                 putenv('PHP_COMPILER_DISABLE_FFI='.$prev);
             }
+            @unlink($path);
         }
     }
 }

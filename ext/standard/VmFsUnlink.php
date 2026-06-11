@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace PHPCompiler\ext\standard;
 
 /**
- * unlink(2) for VM — libc FFI when allowed; host unlink() otherwise (#5063, #7314).
+ * unlink(2) for VM — libc FFI only; no host unlink() delegation (#5063, #7314, #7971).
  *
  * php-src: ext/standard/filestat.c — php_unlink
  * JIT/AOT: ext/standard/JitUnlink.php calls libc unlink(2) directly.
@@ -24,9 +24,6 @@ final class VmFsUnlink
             if (null !== $ffi) {
                 return 0 === (int) $ffi->unlink($path);
             }
-        }
-        if (\function_exists('unlink')) {
-            return @\unlink($path);
         }
 
         return false;
