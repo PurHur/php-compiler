@@ -2079,6 +2079,36 @@ anchors = [
             case 'Expr_Include':
                 // TODO: we may be able to determine these...
                 return false;
+
+            case 'Expr_PostInc':""",
+        """            case 'Expr_Yield':
+            case 'Expr_YieldFrom':
+            case 'Expr_Include':
+                // TODO: we may be able to determine these...
+                return false;
+""" + msc_case + """
+            case 'Expr_PostInc':""",
+    ),
+    (
+        """            case 'Expr_Yield':
+            case 'Expr_Include':
+                // TODO: we may be able to determine these...
+                return false;
+
+            case 'Expr_PostInc':""",
+        """            case 'Expr_Yield':
+            case 'Expr_Include':
+                // TODO: we may be able to determine these...
+                return false;
+""" + msc_case + """
+            case 'Expr_PostInc':""",
+    ),
+    (
+        """            case 'Expr_Yield':
+            case 'Expr_YieldFrom':
+            case 'Expr_Include':
+                // TODO: we may be able to determine these...
+                return false;
         }
 
         throw new \\LogicException('Unknown variable op found: '.$op->getType());""",
@@ -3264,6 +3294,266 @@ PY
   echo "Applied php-cfg-list-spread.patch (overlay)"
 }
 
+apply_php_cfg_empty_list_assignment_overlay() {
+  local parser="$ROOT/vendor/ircmaxell/php-cfg/lib/PHPCfg/Parser.php"
+  if patch_already_applied "$PATCH_DIR/php-cfg-empty-list-assignment.patch"; then
+    echo "Skip php-cfg-empty-list-assignment.patch (already applied)"
+    return 0
+  fi
+  python3 - "$parser" <<'PY'
+import sys
+from pathlib import Path
+
+parser_path = Path(sys.argv[1])
+text = parser_path.read_text()
+if 'isEmptyListExpr' in text:
+    raise SystemExit(0)
+old = """    /**
+     * @param Expr\\List_|Expr\\Array_ $expr
+     */
+    protected function parseListAssignment($expr, Operand $rhs)
+    {
+        $attributes = $this->mapAttributes($expr);
+        $logicalIndex = 0;"""
+new = """    /**
+     * @param Expr\\List_|Expr\\Array_ $expr
+     */
+    protected function isEmptyListExpr($expr): bool
+    {
+        foreach ($expr->items as $item) {
+            if (null !== $item) {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    /**
+     * @param Expr\\List_|Expr\\Array_ $expr
+     */
+    protected function parseListAssignment($expr, Operand $rhs)
+    {
+        if ($this->isEmptyListExpr($expr)) {
+            throw new \\CompileError('Cannot use empty list');
+        }
+
+        $attributes = $this->mapAttributes($expr);
+        $logicalIndex = 0;"""
+if old not in text:
+    sys.stderr.write("php-cfg-empty-list-assignment: Parser.php anchor not found\n")
+    raise SystemExit(1)
+parser_path.write_text(text.replace(old, new, 1))
+PY
+  echo "Applied php-cfg-empty-list-assignment.patch (overlay)"
+}
+
+apply_php_cfg_spread_overlay() {
+  local operand="$ROOT/vendor/ircmaxell/php-cfg/lib/PHPCfg/Operand.php"
+  local array_op="$ROOT/vendor/ircmaxell/php-cfg/lib/PHPCfg/Op/Expr/Array_.php"
+  local parser="$ROOT/vendor/ircmaxell/php-cfg/lib/PHPCfg/Parser.php"
+  if patch_already_applied "$PATCH_DIR/php-cfg-spread.patch"; then
+    echo "Skip php-cfg-spread.patch (already applied)"
+    return 0
+  fi
+  python3 - "$operand" "$array_op" "$parser" <<'PY'
+import sys
+from pathlib import Path
+
+operand_path = Path(sys.argv[1])
+array_path = Path(sys.argv[2])
+parser_path = Path(sys.argv[3])
+
+operand = operand_path.read_text()
+if 'callArgUnpack' not in operand:
+    needle = "    public $callArgName = null;\n\n    public function getType()"
+    insert = (
+        "    public $callArgName = null;\n\n"
+        "    /** Spread/unpack at call site (...$expr) (issue #141). */\n"
+        "    public $callArgUnpack = false;\n\n"
+        "    public function getType()"
+    )
+    if needle not in operand:
+        sys.stderr.write("php-cfg-spread: Operand.php anchor not found\n")
+        raise SystemExit(1)
+    operand_path.write_text(operand.replace(needle, insert, 1))
+
+array_text = array_path.read_text()
+if 'public $unpack' not in array_text:
+    old_ctor = "    public function __construct(array $keys, array $values, array $byRef, array $attributes = [])\n    {\n        parent::__construct($attributes);\n        $this->keys = $this->addReadRefs(...$keys);\n        $this->values = $this->addReadRefs(...$values);\n        $this->byRef = $byRef;\n    }"
+    new_ctor = (
+        "    /** @var list<bool> parallel to values; true when element is ...$expr (issue #141). */\n"
+        "    public $unpack;\n\n"
+        "    public function __construct(array $keys, array $values, array $byRef, array $unpack = [], array $attributes = [])\n"
+        "    {\n        parent::__construct($attributes);\n        $this->keys = $this->addReadRefs(...$keys);\n        $this->values = $this->addReadRefs(...$values);\n        $this->byRef = $byRef;\n        $this->unpack = $unpack;\n    }"
+    )
+    if old_ctor not in array_text:
+        sys.stderr.write("php-cfg-spread: Array_.php constructor anchor not found\n")
+        raise SystemExit(1)
+    array_path.write_text(array_text.replace(old_ctor, new_ctor, 1))
+
+parser = parser_path.read_text()
+if 'function parseCallArgs' not in parser:
+    old_arg = """        if (null !== $expr->name) {
+            $op->callArgName = $expr->name->toString();
+        }
+
+        return $op;
+    }
+
+    protected function parseExpr_Array(Expr\\Array_ $expr)"""
+    new_arg = """        if (null !== $expr->name) {
+            $op->callArgName = $expr->name->toString();
+        }
+        $op->callArgUnpack = $expr->unpack;
+
+        return $op;
+    }
+
+    /**
+     * @param list<Node\\Arg> $args
+     *
+     * @return Operand[]
+     */
+    protected function parseCallArgs(array $args): array
+    {
+        return array_map([$this, 'parseArg'], $args);
+    }
+
+    protected function parseExpr_Array(Expr\\Array_ $expr)"""
+    if old_arg not in parser:
+        sys.stderr.write("php-cfg-spread: Parser.php parseArg anchor not found\n")
+        raise SystemExit(1)
+    parser = parser.replace(old_arg, new_arg, 1)
+
+if '$unpack[] = $item->unpack' not in parser:
+    old_array = """        $keys = [];
+        $values = [];
+        $byRef = [];
+        if ($expr->items) {
+            foreach ($expr->items as $item) {
+                if ($item->key) {
+                    $keys[] = $this->readVariable($this->parseExprNode($item->key));
+                } else {
+                    $keys[] = new Operand\\NullOperand();
+                }
+                $values[] = $this->readVariable($this->parseExprNode($item->value));
+                $byRef[] = $item->byRef;
+            }
+        }
+
+        return new Op\\Expr\\Array_($keys, $values, $byRef, $this->mapAttributes($expr));"""
+    new_array = """        $keys = [];
+        $values = [];
+        $byRef = [];
+        $unpack = [];
+        if ($expr->items) {
+            foreach ($expr->items as $item) {
+                if ($item->key) {
+                    $keys[] = $this->readVariable($this->parseExprNode($item->key));
+                } else {
+                    $keys[] = new Operand\\NullOperand();
+                }
+                $values[] = $this->readVariable($this->parseExprNode($item->value));
+                $byRef[] = $item->byRef;
+                $unpack[] = $item->unpack;
+            }
+        }
+
+        return new Op\\Expr\\Array_($keys, $values, $byRef, $unpack, $this->mapAttributes($expr));"""
+    if old_array not in parser:
+        sys.stderr.write("php-cfg-spread: Parser.php parseExpr_Array anchor not found\n")
+        raise SystemExit(1)
+    parser = parser.replace(old_array, new_array, 1)
+
+parser = parser.replace(
+    '$this->parseExprList($expr->args, self::MODE_READ)',
+    '$this->parseCallArgs($expr->args)',
+)
+if 'parseCallArgs($expr->args)' not in parser:
+    sys.stderr.write("php-cfg-spread: Parser.php call-site anchor not found\n")
+    raise SystemExit(1)
+parser_path.write_text(parser)
+PY
+  echo "Applied php-cfg-spread.patch (overlay)"
+}
+
+apply_php_cfg_simplifier_call_unpack_overlay() {
+  local simplifier="$ROOT/vendor/ircmaxell/php-cfg/lib/PHPCfg/Visitor/Simplifier.php"
+  if grep -q 'preserveCallSiteOperandMetadata' "$simplifier" 2>/dev/null; then
+    echo "Skip php-cfg-simplifier-call-unpack.patch (already applied)"
+    return 0
+  fi
+  python3 - "$simplifier" <<'PY'
+import sys
+from pathlib import Path
+
+path = Path(sys.argv[1])
+text = path.read_text()
+old = """                    if ($value === $from) {
+                        $new[$key] = $to;
+                        if ($op->isWriteVariable($name)) {
+                            $to->addWriteOp($op);
+                        } else {
+                            $to->addUsage($op);
+                        }
+                    } else {
+                        $new[$key] = $value;
+                    }
+                }
+                $op->{$name} = $new;
+            } elseif ($op->{$name} === $from) {
+                $op->{$name} = $to;
+                if ($op->isWriteVariable($name)) {
+                    $to->addWriteOp($op);
+                } else {
+                    $to->addUsage($op);
+                }
+            }
+        }
+    }
+}"""
+new = """                    if ($value === $from) {
+                        $new[$key] = $to;
+                        $this->preserveCallSiteOperandMetadata($from, $to);
+                        if ($op->isWriteVariable($name)) {
+                            $to->addWriteOp($op);
+                        } else {
+                            $to->addUsage($op);
+                        }
+                    } else {
+                        $new[$key] = $value;
+                    }
+                }
+                $op->{$name} = $new;
+            } elseif ($op->{$name} === $from) {
+                $op->{$name} = $to;
+                $this->preserveCallSiteOperandMetadata($from, $to);
+                if ($op->isWriteVariable($name)) {
+                    $to->addWriteOp($op);
+                } else {
+                    $to->addUsage($op);
+                }
+            }
+        }
+    }
+
+    /** Keep named-call metadata when SSA simplifier replaces operands (#4321, #6838). */
+    private function preserveCallSiteOperandMetadata(Operand $from, Operand $to): void
+    {
+        if (property_exists($from, 'callArgName') && null !== $from->callArgName) {
+            $to->callArgName = $from->callArgName;
+        }
+    }
+}"""
+if old not in text:
+    sys.stderr.write("php-cfg-simplifier-call-unpack: Simplifier.php anchor not found\n")
+    raise SystemExit(1)
+path.write_text(text.replace(old, new, 1))
+PY
+  echo "Applied php-cfg-simplifier-call-unpack.patch (overlay)"
+}
+
 apply_php_cfg_magic_script_const_overlay() {
   local op="$ROOT/vendor/ircmaxell/php-cfg/lib/PHPCfg/Op/Expr/MagicScriptConst.php"
   local parser="$ROOT/vendor/ircmaxell/php-cfg/lib/PHPCfg/Parser.php"
@@ -4191,6 +4481,18 @@ apply_patch() {
   fi
   if [[ "$(basename "$patch")" == "php-cfg-list-spread.patch" ]]; then
     apply_php_cfg_list_spread_overlay
+    return $?
+  fi
+  if [[ "$(basename "$patch")" == "php-cfg-empty-list-assignment.patch" ]]; then
+    apply_php_cfg_empty_list_assignment_overlay
+    return $?
+  fi
+  if [[ "$(basename "$patch")" == "php-cfg-spread.patch" ]]; then
+    apply_php_cfg_spread_overlay
+    return $?
+  fi
+  if [[ "$(basename "$patch")" == "php-cfg-simplifier-call-unpack.patch" ]]; then
+    apply_php_cfg_simplifier_call_unpack_overlay
     return $?
   fi
   if [[ "$(basename "$patch")" == "php-cfg-typed-class-const.patch" ]]; then
