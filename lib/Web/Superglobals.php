@@ -147,6 +147,7 @@ final class Superglobals
     public static function populateCliArgv(Context $context, array $argv): void
     {
         // Always define both globals (Zend: they exist even when empty).
+        $context->cliRequestArgv = array_values(array_map('strval', $argv));
         $argc = count($argv);
 
         $argvHt = new HashTable();

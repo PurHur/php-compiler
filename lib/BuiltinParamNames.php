@@ -89,6 +89,8 @@ final class BuiltinParamNames
                 return ['filename', 'mode', 'use_include_path', 'context'];
             case 'parse_url':
                 return ['url', 'component'];
+            case 'getopt':
+                return ['short_options', 'long_options', 'rest_index'];
         }
 
         return null;
