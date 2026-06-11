@@ -12,7 +12,7 @@ use PHPCompiler\ext\standard\VmClosureCall;
  */
 final class ShutdownQueue
 {
-    /** @var list<array{callable: Variable, args: list<Variable>}> */
+    /** @var list<array{kind: 'closure', closure: ClosureState, args: list<Variable>}|array{kind: 'callable', callable: Variable, args: list<Variable>}> */
     private static array $queue = [];
 
     private static bool $running = false;
@@ -25,7 +25,12 @@ final class ShutdownQueue
 
     public static function register(Variable $callable, Variable ...$args): void
     {
-        self::$queue[] = ['callable' => $callable, 'args' => $args];
+        self::$queue[] = ['kind' => 'callable', 'callable' => $callable, 'args' => $args];
+    }
+
+    public static function registerClosure(ClosureState $closure, Variable ...$args): void
+    {
+        self::$queue[] = ['kind' => 'closure', 'closure' => $closure, 'args' => $args];
     }
 
     public static function run(Context $context): void
@@ -37,6 +42,10 @@ final class ShutdownQueue
         $pending = self::$queue;
         self::$queue = [];
         foreach ($pending as $entry) {
+            if ('closure' === $entry['kind']) {
+                VmClosureCall::invoke($context, $entry['closure'], ...$entry['args']);
+                continue;
+            }
             self::invoke($context, $entry['callable'], ...$entry['args']);
         }
         self::$running = false;
