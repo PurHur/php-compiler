@@ -6,6 +6,8 @@ namespace PHPCompiler\ext\standard;
 
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
+use PHPCompiler\JIT\BasicBlockHelper;
+use PHPCompiler\JIT\Builtin\TypeErrorRaise;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\ScriptMagic;
@@ -13,6 +15,7 @@ use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\OpCode;
 use PHPCompiler\VM\ErrorReporter;
 use PHPCompiler\VM\Variable;
+use PHPLLVM\Builder;
 use PHPLLVM\Value;
 
 /** trigger_error() — user-level error/warning/notice (issue #1221). */
@@ -75,10 +78,9 @@ final class trigger_error_ extends Internal
             throw new \LogicException('trigger_error() requires one or two arguments');
         }
         $msgStr = JitStringBuiltinArg::lower($context, $args[0], 'trigger_error', 0, 'message');
-        $level = ErrorReporter::E_USER_NOTICE;
-        if (2 === $argc) {
-            $level = self::jitResolveErrorLevel($context, $args[1]);
-        }
+        $levelVal = 2 === $argc
+            ? $this->jitLowerUserErrorLevel($context, $args[1])
+            : $context->getTypeFromString('int32')->constInt(ErrorReporter::E_USER_NOTICE, false);
         $i8p = $context->getTypeFromString('int8*');
         $sizeT = $context->getTypeFromString('size_t');
         $i32 = $context->getTypeFromString('int32');
@@ -100,7 +102,7 @@ final class trigger_error_ extends Internal
             $context->lookupFunction('__compiler_trigger_error'),
             $msgPtr,
             $msgLen,
-            $i32->constInt($level, false),
+            $levelVal,
             $filePtr,
             $i32->constInt($context->callSiteLine, false)
         );
@@ -109,11 +111,36 @@ final class trigger_error_ extends Internal
         return $i1->constInt(1, false);
     }
 
-    private static function jitResolveErrorLevel(Context $context, JITVariable $arg): int
+    private function jitLowerUserErrorLevel(Context $context, JITVariable $arg): Value
     {
+        $compileTime = self::tryCompileTimeErrorLevel($context, $arg);
+        if (null !== $compileTime) {
+            if (!ErrorReporter::isUserErrorLevel($compileTime)) {
+                throw new \ValueError(
+                    'trigger_error(): Argument #2 ($error_level) must be one of E_USER_ERROR, E_USER_WARNING, E_USER_NOTICE, or E_USER_DEPRECATED'
+                );
+            }
+
+            return $context->getTypeFromString('int32')->constInt($compileTime, false);
+        }
+
+        $levelI32 = $context->builder->trunc(
+            $this->jitLong($context, $arg, 'trigger_error() error type'),
+            $context->getTypeFromString('int32')
+        );
+        self::jitGuardUserErrorLevel($context, $levelI32);
+
+        return $levelI32;
+    }
+
+    private static function tryCompileTimeErrorLevel(Context $context, JITVariable $arg): ?int
+    {
+        if (null !== ($arg->compileTimeLong ?? null)) {
+            return (int) $arg->compileTimeLong;
+        }
         if (JITVariable::TYPE_NATIVE_LONG === $arg->type) {
             $lib = $context->llvm->lib;
-            if (null !== $lib->LLVMIsAConstantInt($arg->value->value)) {
+            if (null !== $arg->value && null !== $lib->LLVMIsAConstantInt($arg->value->value)) {
                 return (int) $lib->LLVMConstIntGetSExtValue($arg->value->value);
             }
         }
@@ -124,6 +151,34 @@ final class trigger_error_ extends Internal
             }
         }
 
-        throw new \LogicException('trigger_error() error type must be a compile-time integer in this compiler build');
+        return null;
+    }
+
+    private static function jitGuardUserErrorLevel(Context $context, Value $levelI32): void
+    {
+        $i32 = $context->getTypeFromString('int32');
+        $isValid = $context->builder->or(
+            $context->builder->icmp(Builder::INT_EQ, $levelI32, $i32->constInt(ErrorReporter::E_USER_ERROR, false)),
+            $context->builder->or(
+                $context->builder->icmp(Builder::INT_EQ, $levelI32, $i32->constInt(ErrorReporter::E_USER_WARNING, false)),
+                $context->builder->or(
+                    $context->builder->icmp(Builder::INT_EQ, $levelI32, $i32->constInt(ErrorReporter::E_USER_NOTICE, false)),
+                    $context->builder->icmp(Builder::INT_EQ, $levelI32, $i32->constInt(ErrorReporter::E_USER_DEPRECATED, false))
+                )
+            )
+        );
+        $ok = BasicBlockHelper::append($context, 'trigger_error_level_ok');
+        $bad = BasicBlockHelper::append($context, 'trigger_error_level_bad');
+        $context->builder->branchIf($isValid, $ok, $bad);
+        $context->builder->positionAtEnd($bad);
+        TypeErrorRaise::registerDeclarations($context);
+        TypeErrorRaise::ensureLinked($context);
+        TypeErrorRaise::emitValueError(
+            $context,
+            'trigger_error(): Argument #2 ($error_level) must be one of E_USER_ERROR, E_USER_WARNING, E_USER_NOTICE, or E_USER_DEPRECATED'
+        );
+        $context->builder->call($context->lookupFunction('abort'));
+        $context->llvm->lib->LLVMBuildUnreachable($context->builder->builder);
+        $context->builder->positionAtEnd($ok);
     }
 }
