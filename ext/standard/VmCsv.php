@@ -43,8 +43,9 @@ final class VmCsv
                     break;
                 }
                 if ($c === $esc && $i + 1 < $len) {
-                    $field .= $line[++$i];
-                    ++$i;
+                    // php-src ext/standard/file.c — state 1 copies escape + next byte inside enclosure.
+                    $field .= $esc.$line[$i + 1];
+                    $i += 2;
                     continue;
                 }
                 if ($c === $enc) {
