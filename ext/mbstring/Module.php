@@ -40,6 +40,8 @@ class Module extends ModuleAbstract
             new mb_trim(),
             new mb_ltrim(),
             new mb_rtrim(),
+            new mb_encode_numericentity(),
+            new mb_decode_numericentity(),
         ];
     }
 }

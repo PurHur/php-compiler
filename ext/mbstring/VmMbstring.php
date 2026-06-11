@@ -731,4 +731,341 @@ final class VmMbstring
             );
         }
     }
+
+    /**
+     * @return list<int>
+     */
+    public static function coerceConvMapArg(Variable $var, string $function): array
+    {
+        $var = $var->resolveIndirect();
+        if (EnumCaseSupport::isEnumCaseVariable($var)) {
+            throw new \TypeError(sprintf(
+                '%s(): Argument #2 ($map) must be of type array, %s given',
+                $function,
+                EnumCaseSupport::typeNameForVariable($var)
+            ));
+        }
+        if (Variable::TYPE_ARRAY !== $var->type) {
+            throw new \TypeError(sprintf(
+                '%s(): Argument #2 ($map) must be of type array, %s given',
+                $function,
+                self::typeLabel($var)
+            ));
+        }
+
+        $elems = [];
+        foreach ($var->toArray()->iterateKeyed(true) as [, $elem]) {
+            $elem = $elem->resolveIndirect();
+            if (Variable::TYPE_INTEGER !== $elem->type) {
+                throw new \ValueError(sprintf(
+                    '%s(): Argument #2 ($map) must only be composed of values of type int',
+                    $function
+                ));
+            }
+            $elems[] = $elem->toInt();
+        }
+        if (0 !== (\count($elems) % 4)) {
+            throw new \ValueError(sprintf(
+                '%s(): Argument #2 ($map) must have a multiple of 4 elements',
+                $function
+            ));
+        }
+
+        return $elems;
+    }
+
+    public static function resolveNumericEntityEncoding(
+        ?string $encoding,
+        string $function,
+        int $argIndex = 2
+    ): string {
+        $encoding = null === $encoding ? 'UTF-8' : $encoding;
+        if (null === CharsetEngine::parseEncodingSpec($encoding)) {
+            throw new \ValueError(sprintf(
+                '%s(): Argument #%d ($encoding) must be a valid encoding, "%s" given',
+                $function,
+                $argIndex + 1,
+                $encoding
+            ));
+        }
+
+        return $encoding;
+    }
+
+    /**
+     * @param list<int> $convmap
+     */
+    public static function encodeNumericEntity(
+        string $str,
+        array $convmap,
+        string $encoding = 'UTF-8',
+        bool $isHex = false
+    ): string {
+        self::assertNumericEntityEncoding($encoding);
+        if ('UTF-8' === $encoding) {
+            return self::encodeNumericEntityUtf8($str, $convmap, $isHex);
+        }
+
+        return self::encodeNumericEntitySingleByte($str, $convmap, $isHex);
+    }
+
+    /**
+     * @param list<int> $convmap
+     */
+    public static function decodeNumericEntity(string $str, array $convmap, string $encoding = 'UTF-8'): string
+    {
+        self::assertNumericEntityEncoding($encoding);
+        if ('UTF-8' === $encoding) {
+            return self::decodeNumericEntityUtf8($str, $convmap);
+        }
+
+        return self::decodeNumericEntitySingleByte($str, $convmap);
+    }
+
+    /**
+     * @param list<int> $convmap
+     */
+    private static function numericEntityConvert(int $wchar, array $convmap, int &$entityNum): bool
+    {
+        $count = \count($convmap);
+        for ($i = 0; $i < $count; $i += 4) {
+            $loCode = $convmap[$i];
+            $hiCode = $convmap[$i + 1];
+            $offset = $convmap[$i + 2];
+            $mask = $convmap[$i + 3];
+            if ($wchar >= $loCode && $wchar <= $hiCode) {
+                $entityNum = ($wchar + $offset) & $mask;
+
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /**
+     * @param list<int> $convmap
+     */
+    private static function numericEntityDeconvert(int $number, array $convmap, int &$codepoint): bool
+    {
+        $count = \count($convmap);
+        for ($i = 0; $i < $count; $i += 4) {
+            $loCode = $convmap[$i];
+            $hiCode = $convmap[$i + 1];
+            $offset = $convmap[$i + 2];
+            $codepoint = $number - $offset;
+            if ($codepoint >= $loCode && $codepoint <= $hiCode) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /**
+     * @param list<int> $convmap
+     */
+    private static function encodeNumericEntityUtf8(string $str, array $convmap, bool $isHex): string
+    {
+        $out = '';
+        foreach (self::codepointsInString($str, 'UTF-8') as $wchar) {
+            $entityNum = 0;
+            if (self::numericEntityConvert($wchar, $convmap, $entityNum)) {
+                $out .= '&#';
+                if ($isHex) {
+                    $out .= 'x';
+                }
+                if (0 === $entityNum) {
+                    $out .= '0';
+                } elseif ($isHex) {
+                    $out .= strtoupper(dechex($entityNum));
+                } else {
+                    $out .= (string) $entityNum;
+                }
+                $out .= ';';
+            } else {
+                $out .= self::encodeUtf8Codepoint($wchar);
+            }
+        }
+
+        return $out;
+    }
+
+    /**
+     * @param list<int> $convmap
+     */
+    private static function encodeNumericEntitySingleByte(string $str, array $convmap, bool $isHex): string
+    {
+        $out = '';
+        $byteLen = \strlen($str);
+        for ($i = 0; $i < $byteLen; ++$i) {
+            $wchar = \ord($str[$i]);
+            $entityNum = 0;
+            if (self::numericEntityConvert($wchar, $convmap, $entityNum)) {
+                $out .= '&#';
+                if ($isHex) {
+                    $out .= 'x';
+                }
+                if (0 === $entityNum) {
+                    $out .= '0';
+                } elseif ($isHex) {
+                    $out .= strtoupper(dechex($entityNum));
+                } else {
+                    $out .= (string) $entityNum;
+                }
+                $out .= ';';
+            } else {
+                $out .= $str[$i];
+            }
+        }
+
+        return $out;
+    }
+
+    /**
+     * @param list<int> $convmap
+     */
+    private static function decodeNumericEntityUtf8(string $str, array $convmap): string
+    {
+        $len = \strlen($str);
+        $out = '';
+        $i = 0;
+        while ($i < $len) {
+            if ('&' !== $str[$i]) {
+                $out .= $str[$i];
+                ++$i;
+                continue;
+            }
+            $replacement = '';
+            $end = $i;
+            $consumed = self::tryDecodeNumericEntityAt($str, $i, $convmap, $replacement, $end);
+            if ($consumed) {
+                $out .= $replacement;
+                $i = $end;
+                continue;
+            }
+            $out .= $str[$i];
+            ++$i;
+        }
+
+        return $out;
+    }
+
+    /**
+     * @param list<int> $convmap
+     */
+    private static function decodeNumericEntitySingleByte(string $str, array $convmap): string
+    {
+        $decoded = self::decodeNumericEntityUtf8($str, $convmap);
+        $out = '';
+        foreach (self::codepointsInString($decoded, 'UTF-8') as $cp) {
+            if ($cp > 0xFF) {
+                $out .= '?';
+            } else {
+                $out .= \chr($cp);
+            }
+        }
+
+        return $out;
+    }
+
+    /**
+     * @param list<int> $convmap
+     */
+    private static function tryDecodeNumericEntityAt(
+        string $str,
+        int $pos,
+        array $convmap,
+        ?string &$replacement,
+        int &$end
+    ): bool {
+        $len = \strlen($str);
+        if ($pos + 2 >= $len || '#' !== $str[$pos + 1]) {
+            return false;
+        }
+
+        if ('x' === $str[$pos + 2] || 'X' === $str[$pos + 2]) {
+            $digitStart = $pos + 3;
+            $digitEnd = $digitStart;
+            while ($digitEnd < $len && ctype_xdigit($str[$digitEnd])) {
+                ++$digitEnd;
+            }
+            $entityLen = $digitEnd - $pos;
+            $digitLen = $digitEnd - $digitStart;
+            if ($digitLen < 1 || $digitLen > 8 || $entityLen < 4 || $entityLen > 11) {
+                return false;
+            }
+            $value = (int) \hexdec(substr($str, $digitStart, $digitLen));
+            $codepoint = 0;
+            if (!self::numericEntityDeconvert($value, $convmap, $codepoint)) {
+                return false;
+            }
+            $replacement = self::encodeUtf8Codepoint($codepoint);
+            $end = $digitEnd;
+            if ($end < $len && ';' === $str[$end]) {
+                ++$end;
+            }
+
+            return true;
+        }
+
+        $digitStart = $pos + 2;
+        $digitEnd = $digitStart;
+        while ($digitEnd < $len && $str[$digitEnd] >= '0' && $str[$digitEnd] <= '9') {
+            ++$digitEnd;
+        }
+        $entityLen = $digitEnd - $pos;
+        $digitLen = $digitEnd - $digitStart;
+        if ($digitLen < 1 || $digitLen > 10 || $entityLen < 3 || $entityLen > 12) {
+            return false;
+        }
+        $value = 0;
+        for ($k = $digitStart; $k < $digitEnd; ++$k) {
+            if ($value > 0x19999999) {
+                return false;
+            }
+            $value = ($value * 10) + (\ord($str[$k]) - 48);
+        }
+        $codepoint = 0;
+        if (!self::numericEntityDeconvert($value, $convmap, $codepoint)) {
+            return false;
+        }
+        $replacement = self::encodeUtf8Codepoint($codepoint);
+        $end = $digitEnd;
+        if ($end < $len && ';' === $str[$end]) {
+            ++$end;
+        }
+
+        return true;
+    }
+
+    public static function encodeUtf8Codepoint(int $cp): string
+    {
+        if ($cp < 0x80) {
+            return \chr($cp);
+        }
+        if ($cp < 0x800) {
+            return \chr(0xC0 | ($cp >> 6)).\chr(0x80 | ($cp & 0x3F));
+        }
+        if ($cp < 0x10000) {
+            return \chr(0xE0 | ($cp >> 12))
+                .\chr(0x80 | (($cp >> 6) & 0x3F))
+                .\chr(0x80 | ($cp & 0x3F));
+        }
+
+        return \chr(0xF0 | ($cp >> 18))
+            .\chr(0x80 | (($cp >> 12) & 0x3F))
+            .\chr(0x80 | (($cp >> 6) & 0x3F))
+            .\chr(0x80 | ($cp & 0x3F));
+    }
+
+    private static function assertNumericEntityEncoding(string $encoding): void
+    {
+        if ('UTF-8' !== $encoding && 'ASCII' !== $encoding && '8BIT' !== $encoding) {
+            throw new \LogicException(
+                'mb_encode_numericentity()/mb_decode_numericentity() require mbstring for encoding '
+                .$encoding.' in this compiler build'
+            );
+        }
+    }
 }
