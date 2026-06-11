@@ -37,6 +37,8 @@ class ClassEntry {
     public array $abstractMethods = [];
     /** @var array<string, string> trait FQCN => FQCN from direct `use Trait;` (#3119) */
     public array $usedTraits = [];
+    /** @var array<string, string> trait alias method name => Trait::method (#6661) */
+    public array $traitAliases = [];
     /** @var list<string> */
     public array $interfaces = [];
     /** User method or VM builtin handler (issues #1360, #1366). */

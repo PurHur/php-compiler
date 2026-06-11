@@ -556,6 +556,33 @@ final class VmReflection
     }
 
     /**
+     * trait alias => Trait::method (Zend ReflectionClass::getTraitAliases).
+     *
+     * @return array<string, string>
+     */
+    public static function traitAliasesMap(ClassEntry $class): array
+    {
+        return $class->traitAliases;
+    }
+
+    /**
+     * ReflectionClass::getTraitAliases() result array (#6661).
+     */
+    public static function reflectionClassTraitAliasesMap(ClassEntry $entry): Variable
+    {
+        $result = new Variable();
+        $result->newArray();
+        $ht = $result->toArray();
+        foreach ($entry->traitAliases as $alias => $source) {
+            $value = new Variable();
+            $value->string((string) $source);
+            $ht->add((string) $alias, $value);
+        }
+
+        return $result;
+    }
+
+    /**
      * class_implements() operand — string or object; optional autoload (#3099).
      *
      * php-src: ext/standard/basic_functions.c — PHP_FUNCTION(class_implements)
