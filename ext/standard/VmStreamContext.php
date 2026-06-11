@@ -185,15 +185,6 @@ final class VmStreamContext
             );
         }
 
-        $host = self::toHostResource($context);
-        if (null !== $host) {
-            if (\function_exists('stream_context_set_options')) {
-                \stream_context_set_options($host, $exported);
-            } else {
-                \stream_context_set_option($host, $exported);
-            }
-        }
-
         VmParseStr::mergeInto($context->toArray(), $exported);
 
         return true;
