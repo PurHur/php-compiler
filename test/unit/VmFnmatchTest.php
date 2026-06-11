@@ -5,17 +5,19 @@ declare(strict_types=1);
 namespace PHPCompiler;
 
 use PHPCompiler\ext\standard\VmFnmatch;
+use PHPCompiler\ext\standard\VmFnmatchPure;
 use PHPUnit\Framework\TestCase;
 
-/** Issue #7756: VM fnmatch() must not require host \\fnmatch() when libc FFI is available. */
+/** Issue #7756 / #8016: VM fnmatch() must not delegate to host \\fnmatch(). */
 final class VmFnmatchTest extends TestCase
 {
-    public function testVmFnmatchDoesNotRequireHostFnmatch(): void
+    public function testVmFnmatchDoesNotDelegateToHostFnmatch(): void
     {
         $source = (string) file_get_contents(__DIR__.'/../../ext/standard/VmFnmatch.php');
-        $this->assertStringNotContainsString("throw new \\LogicException('fnmatch() requires host fnmatch()", $source);
+        $this->assertStringNotContainsString('\\fnmatch(', $source);
+        $this->assertStringNotContainsString('hostMatch', $source);
+        $this->assertStringContainsString('VmFnmatchPure::match', $source);
         $this->assertStringContainsString('libcMatch', $source);
-        $this->assertStringContainsString('fnmatch(3)', $source);
     }
 
     public function testFnmatchBuiltinUsesVmFnmatch(): void
@@ -25,9 +27,38 @@ final class VmFnmatchTest extends TestCase
         $this->assertStringNotContainsString('\\fnmatch(', $source);
     }
 
+    public function testPureMatcherMatchesComplianceCases(): void
+    {
+        $this->assertTrue(VmFnmatchPure::match('*.txt', 'readme.txt'));
+        $this->assertFalse(VmFnmatchPure::match('*.txt', 'readme.php'));
+        $this->assertTrue(VmFnmatchPure::match('file?.txt', 'file1.txt'));
+        $this->assertFalse(VmFnmatchPure::match('file?.txt', 'file12.txt'));
+        $this->assertTrue(VmFnmatchPure::match('foo*', 'foo/bar'));
+        $this->assertFalse(VmFnmatchPure::match('foo*', 'foo/bar', VmFnmatch::FNM_PATHNAME));
+        $this->assertTrue(VmFnmatchPure::match('FILE?.TXT', 'file1.txt', VmFnmatch::FNM_CASEFOLD));
+    }
+
+    public function testPureMatcherFlagParity(): void
+    {
+        $this->assertFalse(VmFnmatchPure::match('*.TXT', 'a.txt'));
+        $this->assertTrue(VmFnmatchPure::match('*.TXT', 'a.txt', VmFnmatch::FNM_CASEFOLD));
+        $this->assertFalse(VmFnmatchPure::match('*', '.hidden', VmFnmatch::FNM_PERIOD));
+        $this->assertTrue(VmFnmatchPure::match('.*', '.hidden', VmFnmatch::FNM_PERIOD));
+        $this->assertFalse(VmFnmatchPure::match('*', 'a/b', VmFnmatch::FNM_PATHNAME));
+        $this->assertTrue(VmFnmatchPure::match('*/b', 'a/b', VmFnmatch::FNM_PATHNAME));
+        $this->assertTrue(VmFnmatchPure::match('a\\*b', 'a*b'));
+        $this->assertFalse(VmFnmatchPure::match('a\\*b', 'a*b', VmFnmatch::FNM_NOESCAPE));
+    }
+
+    public function testVmFnmatchAvailableWithoutLibcFfi(): void
+    {
+        $this->assertTrue(VmFnmatchPure::available());
+        $this->assertTrue(VmFnmatch::available());
+    }
+
     public function testMatchBasicPatternsWhenLibcAvailable(): void
     {
-        if (!VmFnmatch::available()) {
+        if (!\extension_loaded('ffi')) {
             $this->markTestSkipped('libc fnmatch FFI unavailable on this host');
         }
 
