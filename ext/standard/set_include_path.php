@@ -9,6 +9,7 @@ use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\Variable as JITVariable;
+use PHPCompiler\VM\BuiltinExecute;
 use PHPLLVM\Value;
 
 /** set_include_path() — replace include_path (ext/standard/basic_functions.c; #3223). */
@@ -26,9 +27,6 @@ final class set_include_path extends Internal
                 'set_include_path() expects exactly 1 argument, '.\count($frame->calledArgs).' given'
             );
         }
-        if (null === $frame->returnVar) {
-            return;
-        }
         $newPath = VmString::coerceStringBuiltinArg(
             $frame->calledArgs[0],
             'set_include_path',
@@ -36,7 +34,7 @@ final class set_include_path extends Internal
             'new_include_path'
         );
         $old = VmIncludePath::push($newPath);
-        $frame->returnVar->string($old);
+        BuiltinExecute::writeReturn($frame, static fn ($ret) => $ret->string($old));
     }
 
     public function call(Context $context, JITVariable ...$args): Value
