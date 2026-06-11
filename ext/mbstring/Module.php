@@ -37,6 +37,9 @@ class Module extends ModuleAbstract
             new mb_stripos(),
             new mb_strrpos(),
             new mb_strrichr(),
+            new mb_trim(),
+            new mb_ltrim(),
+            new mb_rtrim(),
         ];
     }
 }
