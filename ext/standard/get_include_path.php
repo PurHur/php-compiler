@@ -8,6 +8,7 @@ use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\Variable as JITVariable;
+use PHPCompiler\VM\BuiltinExecute;
 use PHPLLVM\Value;
 
 /** get_include_path() — active include_path (ext/standard/basic_functions.c; #3223). */
@@ -25,10 +26,10 @@ final class get_include_path extends Internal
                 'get_include_path() expects exactly 0 arguments, '.\count($frame->calledArgs).' given'
             );
         }
-        if (null === $frame->returnVar) {
-            return;
-        }
-        $frame->returnVar->string(VmIncludePath::get());
+        BuiltinExecute::writeReturn(
+            $frame,
+            static fn ($ret) => $ret->string(VmIncludePath::get())
+        );
     }
 
     public function call(Context $context, JITVariable ...$args): Value
