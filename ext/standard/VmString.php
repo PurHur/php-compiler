@@ -2238,6 +2238,10 @@ final class VmString
             } elseif ($quoteBoth && self::entityAt($string, $i, $len, '&#39;', 5)) {
                 $out .= "'";
                 $i += 5;
+            } elseif (0 !== ($flags & ENT_HTML5) && ENT_QUOTES === ($flags & ENT_QUOTES)
+                && self::entityAt($string, $i, $len, '&apos;', 6)) {
+                $out .= "'";
+                $i += 6;
             } else {
                 $out .= '&';
                 ++$i;
@@ -2247,12 +2251,93 @@ final class VmString
         return $out;
     }
 
-    /** html_entity_decode() — same subset as htmlspecialchars_decode(); default ENT_COMPAT (#2472). */
+    /** html_entity_decode() — ENT_HTML5 named entities (php-src html.c); default ENT_COMPAT (#2472). */
     public static function html_entity_decode(
         string $string,
         int $flags = ENT_COMPAT
     ): string {
-        return self::htmlspecialchars_decode($string, $flags);
+        if (0 === ($flags & ENT_HTML5)) {
+            return self::htmlspecialchars_decode($string, $flags);
+        }
+
+        return self::htmlEntityDecodeHtml5($string, $flags);
+    }
+
+    /**
+     * html_entity_decode() with ENT_HTML5 — full HTML5 named-entity table (ext/standard/html_tables.h).
+     */
+    private static function htmlEntityDecodeHtml5(string $string, int $flags): string
+    {
+        $decodeDouble = 0 !== ($flags & 2);
+        $decodeSingle = 0 !== ($flags & 1);
+        $out = '';
+        $len = self::byteLength($string);
+        $i = 0;
+        while ($i < $len) {
+            if ('&' !== $string[$i]) {
+                $out .= $string[$i];
+                ++$i;
+                continue;
+            }
+            if (self::entityAt($string, $i, $len, '&amp;', 5)) {
+                $out .= '&';
+                $i += 5;
+                continue;
+            }
+            if (self::entityAt($string, $i, $len, '&lt;', 4)) {
+                $out .= '<';
+                $i += 4;
+                continue;
+            }
+            if (self::entityAt($string, $i, $len, '&gt;', 4)) {
+                $out .= '>';
+                $i += 4;
+                continue;
+            }
+            if ($decodeDouble && self::entityAt($string, $i, $len, '&quot;', 6)) {
+                $out .= '"';
+                $i += 6;
+                continue;
+            }
+            if ($decodeSingle && self::entityAt($string, $i, $len, '&#039;', 6)) {
+                $out .= "'";
+                $i += 6;
+                continue;
+            }
+            if ($decodeSingle && self::entityAt($string, $i, $len, '&#39;', 5)) {
+                $out .= "'";
+                $i += 5;
+                continue;
+            }
+
+            $semi = strpos($string, ';', $i + 1);
+            if (false !== $semi && $semi > $i + 1 && $semi - $i - 1 <= 32) {
+                $name = substr($string, $i + 1, $semi - $i - 1);
+                if (ctype_alnum($name[0])) {
+                    $decoded = Html5NamedEntities::lookup($name);
+                    if (null !== $decoded) {
+                        if ("'" === $decoded && !$decodeSingle) {
+                            $out .= substr($string, $i, $semi - $i);
+                            $i = $semi;
+                            continue;
+                        }
+                        if ('"' === $decoded && !$decodeDouble) {
+                            $out .= substr($string, $i, $semi - $i);
+                            $i = $semi;
+                            continue;
+                        }
+                        $out .= $decoded;
+                        $i = $semi + 1;
+                        continue;
+                    }
+                }
+            }
+
+            $out .= '&';
+            ++$i;
+        }
+
+        return $out;
     }
 
     private static function entityAt(string $string, int $pos, int $len, string $entity, int $entityLen): bool

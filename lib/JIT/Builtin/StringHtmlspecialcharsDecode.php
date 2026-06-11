@@ -22,6 +22,7 @@ final class StringHtmlspecialcharsDecode
         $string = $fn->getParam(0);
         $flags = $fn->getParam(1);
         $quoteBoth = self::quoteBothFlag($context, $flags);
+        $html5Apos = self::html5AposAllowed($context, $flags);
 
         $map = $context->structFieldMap['__string__'];
         $i64 = $context->getTypeFromString('int64');
@@ -38,7 +39,7 @@ final class StringHtmlspecialcharsDecode
         $iSlot = $context->builder->alloca($i64, 1);
         $context->builder->store($zero, $iSlot);
 
-        self::countLoop($context, $fn, $srcChars, $len, $iSlot, $outLenSlot, $quoteBoth, $i64, $i8, $zero, $one);
+        self::countLoop($context, $fn, $srcChars, $len, $iSlot, $outLenSlot, $quoteBoth, $html5Apos, $i64, $i8, $zero, $one);
 
         $outLen = $context->builder->load($outLenSlot);
         $dest = $context->builder->call($context->lookupFunction('__string__alloc'), $outLen);
@@ -49,7 +50,7 @@ final class StringHtmlspecialcharsDecode
         $context->builder->store($zero, $posSlot);
         $context->builder->store($zero, $iSlot);
 
-        self::writeLoop($context, $fn, $srcChars, $len, $destChars, $iSlot, $posSlot, $quoteBoth, $i64, $i8, $zero, $one);
+        self::writeLoop($context, $fn, $srcChars, $len, $destChars, $iSlot, $posSlot, $quoteBoth, $html5Apos, $i64, $i8, $zero, $one);
 
         $context->builder->returnValue($dest);
         $context->builder->clearInsertionPosition();
@@ -75,6 +76,7 @@ final class StringHtmlspecialcharsDecode
         Value $iSlot,
         Value $outLenSlot,
         Value $quoteBoth,
+        Value $html5Apos,
         $i64,
         $i8,
         Value $zero,
@@ -94,7 +96,7 @@ final class StringHtmlspecialcharsDecode
         );
 
         $context->builder->positionAtEnd($body);
-        $step = self::consumeStep($context, $fn, $srcChars, $len, $i, $quoteBoth, $i64, $i8, $one);
+        $step = self::consumeStep($context, $fn, $srcChars, $len, $i, $quoteBoth, $html5Apos, $i64, $i8, $one);
         $outLen = $context->builder->load($outLenSlot);
         $context->builder->store($context->builder->addNoSignedWrap($outLen, $one), $outLenSlot);
         $context->builder->store($context->builder->addNoSignedWrap($i, $step), $iSlot);
@@ -112,6 +114,7 @@ final class StringHtmlspecialcharsDecode
         Value $iSlot,
         Value $posSlot,
         Value $quoteBoth,
+        Value $html5Apos,
         $i64,
         $i8,
         Value $zero,
@@ -133,9 +136,9 @@ final class StringHtmlspecialcharsDecode
         $context->builder->positionAtEnd($body);
         $i = $context->builder->load($iSlot);
         $pos = $context->builder->load($posSlot);
-        $outByte = self::outputByte($context, $fn, $srcChars, $len, $i, $quoteBoth, $i64, $i8);
+        $outByte = self::outputByte($context, $fn, $srcChars, $len, $i, $quoteBoth, $html5Apos, $i64, $i8);
         $context->builder->store($outByte, $context->builder->gep($destChars, $pos));
-        $step = self::consumeStep($context, $fn, $srcChars, $len, $i, $quoteBoth, $i64, $i8, $one);
+        $step = self::consumeStep($context, $fn, $srcChars, $len, $i, $quoteBoth, $html5Apos, $i64, $i8, $one);
         $context->builder->store($context->builder->addNoSignedWrap($pos, $one), $posSlot);
         $context->builder->store($context->builder->addNoSignedWrap($i, $step), $iSlot);
         $context->builder->branch($head);
@@ -150,13 +153,14 @@ final class StringHtmlspecialcharsDecode
         Value $len,
         Value $i,
         Value $quoteBoth,
+        Value $html5Apos,
         $i64,
         $i8,
         Value $one
     ): Value {
         $ch = $context->builder->load($context->builder->gep($srcChars, $i));
         $isAmp = $context->builder->icmp(Builder::INT_EQ, $ch, $i8->constInt(38, false));
-        $entityStep = self::entityStep($context, $fn, $srcChars, $len, $i, $quoteBoth, $i64, $i8);
+        $entityStep = self::entityStep($context, $fn, $srcChars, $len, $i, $quoteBoth, $html5Apos, $i64, $i8);
 
         return $context->builder->select($isAmp, $entityStep, $one);
     }
@@ -168,12 +172,13 @@ final class StringHtmlspecialcharsDecode
         Value $len,
         Value $i,
         Value $quoteBoth,
+        Value $html5Apos,
         $i64,
         $i8
     ): Value {
         $ch = $context->builder->load($context->builder->gep($srcChars, $i));
         $isAmp = $context->builder->icmp(Builder::INT_EQ, $ch, $i8->constInt(38, false));
-        $decoded = self::entityByte($context, $fn, $srcChars, $len, $i, $quoteBoth, $i64, $i8);
+        $decoded = self::entityByte($context, $fn, $srcChars, $len, $i, $quoteBoth, $html5Apos, $i64, $i8);
 
         return $context->builder->select($isAmp, $decoded, $ch);
     }
@@ -185,6 +190,7 @@ final class StringHtmlspecialcharsDecode
         Value $len,
         Value $i,
         Value $quoteBoth,
+        Value $html5Apos,
         $i64,
         $i8
     ): Value {
@@ -196,6 +202,7 @@ final class StringHtmlspecialcharsDecode
         $step = self::stepIfEntity($context, $fn, $srcChars, $len, $i, 'quot;', 6, $step, $i64, $i8, $quoteBoth);
         $step = self::stepIfEntity($context, $fn, $srcChars, $len, $i, '#039;', 6, $step, $i64, $i8, $quoteBoth);
         $step = self::stepIfEntity($context, $fn, $srcChars, $len, $i, '#39;', 5, $step, $i64, $i8, $quoteBoth);
+        $step = self::stepIfEntity($context, $fn, $srcChars, $len, $i, 'apos;', 6, $step, $i64, $i8, $html5Apos);
 
         return $step;
     }
@@ -207,6 +214,7 @@ final class StringHtmlspecialcharsDecode
         Value $len,
         Value $i,
         Value $quoteBoth,
+        Value $html5Apos,
         $i64,
         $i8
     ): Value {
@@ -218,8 +226,26 @@ final class StringHtmlspecialcharsDecode
         $out = self::byteIfEntity($context, $fn, $srcChars, $len, $i, 'quot;', 6, 34, $out, $i64, $i8, $quoteBoth);
         $out = self::byteIfEntity($context, $fn, $srcChars, $len, $i, '#039;', 6, 39, $out, $i64, $i8, $quoteBoth);
         $out = self::byteIfEntity($context, $fn, $srcChars, $len, $i, '#39;', 5, 39, $out, $i64, $i8, $quoteBoth);
+        $out = self::byteIfEntity($context, $fn, $srcChars, $len, $i, 'apos;', 6, 39, $out, $i64, $i8, $html5Apos);
 
         return $out;
+    }
+
+    private static function html5AposAllowed(Context $context, Value $flags): Value
+    {
+        $i64 = $context->getTypeFromString('int64');
+        $hasHtml5 = $context->builder->icmp(
+            Builder::INT_NE,
+            $context->builder->and($flags, $i64->constInt(48, false)),
+            $i64->constInt(0, false)
+        );
+        $fullQuotes = $context->builder->icmp(
+            Builder::INT_EQ,
+            $context->builder->and($flags, $i64->constInt(3, false)),
+            $i64->constInt(3, false)
+        );
+
+        return $context->builder->and($hasHtml5, $fullQuotes);
     }
 
     private static function stepIfEntity(
