@@ -5,7 +5,9 @@ declare(strict_types=1);
 namespace PHPCompiler\JIT\Builtin;
 
 use PHPCompiler\JIT\BasicBlockHelper;
+use PHPCompiler\JIT\Builtin;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\TryCatchHelper;
 use PHPLLVM\BasicBlock;
 use PHPLLVM\Builder;
 use PHPLLVM\Value;
@@ -48,6 +50,7 @@ final class SscanfJit
         self::implementIfMissing($context, '__phpc_sscanf_scan_int', self::emitScanInt(...));
         self::implementIfMissing($context, '__phpc_sscanf_scan_string', self::emitScanString(...));
         self::implementIfMissing($context, '__phpc_sscanf_scan_float', self::emitScanFloat(...));
+        self::implementIfMissing($context, '__phpc_sscanf_count_specs', self::emitCountConversionSpecs(...));
         self::implementIfMissing($context, '__compiler_sscanf', self::emitCompilerSscanf(...));
         self::implementIfMissing($context, '__compiler_sscanf_ex', self::emitCompilerSscanfEx(...));
         self::implementIfMissing($context, '__compiler_sscanf_array', self::emitCompilerSscanfArray(...));
@@ -113,6 +116,10 @@ final class SscanfJit
             '__phpc_sscanf_scan_float' => $context->module->addFunction(
                 $name,
                 $context->context->functionType($i32, false, $i8p, $sizeT, $sizeTp, $dblp)
+            ),
+            '__phpc_sscanf_count_specs' => $context->module->addFunction(
+                $name,
+                $context->context->functionType($i64, false, $i8p, $sizeT)
             ),
             '__compiler_sscanf' => $context->module->addFunction(
                 $name,
@@ -529,6 +536,7 @@ final class SscanfJit
 
         $context->builder->positionAtEnd($work);
         [$input, $inLen, $format, $fmtLen] = self::loadStringPair($context, $str, $fmt);
+        self::emitValidateOutVarArity($context, $fn, $format, $fmtLen, $outCount);
 
         $inPosSlot = BasicBlockHelper::entryAlloca($context, $sizeT);
         $assignedSlot = BasicBlockHelper::entryAlloca($context, $i64);
@@ -977,6 +985,132 @@ final class SscanfJit
 
         $context->builder->positionAtEnd($loopDone);
         $context->builder->returnValue($ht);
+    }
+
+    private static function emitCountConversionSpecs(Context $context, LlvmFunction $fn): void
+    {
+        $entry = $fn->appendBasicBlock('entry');
+        $context->builder->positionAtEnd($entry);
+
+        $format = $fn->getParam(0);
+        $fmtLen = $fn->getParam(1);
+        $i8 = $context->getTypeFromString('int8');
+        $i64 = $context->getTypeFromString('int64');
+        $sizeT = $context->getTypeFromString('size_t');
+        $oneSize = $sizeT->constInt(1, false);
+        $zero64 = $i64->constInt(0, false);
+        $one64 = $i64->constInt(1, false);
+
+        $countSlot = BasicBlockHelper::entryAlloca($context, $i64);
+        $fposSlot = BasicBlockHelper::entryAlloca($context, $sizeT);
+        $context->builder->store($zero64, $countSlot);
+        $context->builder->store($sizeT->constInt(0, false), $fposSlot);
+
+        $loopHead = $fn->appendBasicBlock('count_loop');
+        $loopDone = $fn->appendBasicBlock('count_done');
+        $context->builder->branch($loopHead);
+
+        $context->builder->positionAtEnd($loopHead);
+        $fpos = $context->builder->load($fposSlot);
+        $atEnd = $context->builder->icmp(Builder::INT_UGE, $fpos, $fmtLen);
+        $loopBody = $fn->appendBasicBlock('count_body');
+        $context->builder->branchIf($atEnd, $loopDone, $loopBody);
+
+        $context->builder->positionAtEnd($loopBody);
+        $ch = $context->builder->load($context->builder->inBoundsGEP($format, $fpos));
+        $notPct = $fn->appendBasicBlock('count_not_pct');
+        $pct = $fn->appendBasicBlock('count_pct');
+        $context->builder->branchIf(
+            $context->builder->icmp(Builder::INT_EQ, $ch, $i8->constInt(37, false)),
+            $pct,
+            $notPct
+        );
+
+        $context->builder->positionAtEnd($notPct);
+        $context->builder->store($context->builder->add($fpos, $oneSize), $fposSlot);
+        $context->builder->branch($loopHead);
+
+        $context->builder->positionAtEnd($pct);
+        $nextSpec = $context->builder->add($fpos, $oneSize);
+        $hasSpec = $context->builder->icmp(Builder::INT_SLT, $nextSpec, $fmtLen);
+        $specBody = $fn->appendBasicBlock('count_spec');
+        $specEnd = $fn->appendBasicBlock('count_spec_end');
+        $context->builder->branchIf($hasSpec, $specBody, $specEnd);
+
+        $context->builder->positionAtEnd($specBody);
+        $spec = $context->builder->load($context->builder->inBoundsGEP($format, $nextSpec));
+        $isLitPct = $context->builder->icmp(Builder::INT_EQ, $spec, $i8->constInt(37, false));
+        $incCount = $fn->appendBasicBlock('count_inc');
+        $afterSpec = $fn->appendBasicBlock('count_after_spec');
+        $context->builder->branchIf($isLitPct, $afterSpec, $incCount);
+
+        $context->builder->positionAtEnd($incCount);
+        $context->builder->store(
+            $context->builder->add($context->builder->load($countSlot), $one64),
+            $countSlot
+        );
+        $context->builder->branch($afterSpec);
+
+        $context->builder->positionAtEnd($afterSpec);
+        $context->builder->store($context->builder->add($nextSpec, $oneSize), $fposSlot);
+        $context->builder->branch($loopHead);
+
+        $context->builder->positionAtEnd($specEnd);
+        $context->builder->branch($loopHead);
+
+        $context->builder->positionAtEnd($loopDone);
+        $context->builder->returnValue($context->builder->load($countSlot));
+    }
+
+    private static function emitValidateOutVarArity(
+        Context $context,
+        LlvmFunction $fn,
+        Value $format,
+        Value $fmtLen,
+        Value $outCount
+    ): void {
+        TypeErrorRaise::ensureLinked($context);
+        $i64 = $context->getTypeFromString('int64');
+
+        $specCount = $context->builder->call(
+            $context->lookupFunction('__phpc_sscanf_count_specs'),
+            $format,
+            $fmtLen
+        );
+        $matches = $context->builder->icmp(Builder::INT_EQ, $specCount, $outCount);
+        $arityOk = $fn->appendBasicBlock('sscanf_arity_ok');
+        $arityFail = $fn->appendBasicBlock('sscanf_arity_fail');
+        $context->builder->branchIf($matches, $arityOk, $arityFail);
+
+        $context->builder->positionAtEnd($arityFail);
+        $tooFew = $context->builder->icmp(Builder::INT_SLT, $outCount, $specCount);
+        $msgFew = $fn->appendBasicBlock('sscanf_arity_msg_few');
+        $msgExtra = $fn->appendBasicBlock('sscanf_arity_msg_extra');
+        $context->builder->branchIf($tooFew, $msgFew, $msgExtra);
+
+        $context->builder->positionAtEnd($msgFew);
+        self::emitArityValueError($context, 'Different numbers of variable names and field specifiers');
+
+        $context->builder->positionAtEnd($msgExtra);
+        self::emitArityValueError($context, 'Variable is not assigned by any conversion specifiers');
+
+        $context->builder->positionAtEnd($arityOk);
+    }
+
+    private static function emitArityValueError(Context $context, string $message): void
+    {
+        if (null !== TryCatchHelper::resolveThrowHandler($context)) {
+            TryCatchHelper::emitCatchableClassError($context, 'ValueError', $message);
+
+            return;
+        }
+
+        TypeErrorRaise::emitValueError($context, $message);
+        if (Builtin::LOAD_TYPE_STANDALONE === $context->loadType) {
+            $context->builder->call($context->lookupFunction('phpc_jit_abort_if_pending_type_error'));
+        } else {
+            $context->builder->call($context->lookupFunction('abort'));
+        }
     }
 
     /**

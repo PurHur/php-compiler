@@ -13,6 +13,10 @@ use PHPCompiler\VM\Variable;
 
 final class VmSscanf
 {
+    private const ARITY_MISMATCH_MSG = 'Different numbers of variable names and field specifiers';
+
+    private const EXTRA_VAR_MSG = 'Variable is not assigned by any conversion specifiers';
+
     /**
      * @param list<Variable> $outVars
      */
@@ -28,6 +32,10 @@ final class VmSscanf
      */
     public static function parseWithConsumed(string $input, string $format, array $outVars): array
     {
+        if ([] !== $outVars) {
+            self::validateOutVarArity($format, \count($outVars));
+        }
+
         $outIdx = 0;
         $assigned = 0;
         $inPos = 0;
@@ -120,7 +128,23 @@ final class VmSscanf
         return $ht;
     }
 
-    private static function countConversionSpecs(string $format): int
+    /**
+     * PHP 8+ sscanf(): out-variable count must match conversion specifiers (php-src sscanf.c, #4064).
+     */
+    public static function validateOutVarArity(string $format, int $outVarCount): void
+    {
+        $specCount = self::countConversionSpecs($format);
+        if ($specCount === $outVarCount) {
+            return;
+        }
+        if ($outVarCount < $specCount) {
+            throw new \ValueError(self::ARITY_MISMATCH_MSG);
+        }
+
+        throw new \ValueError(self::EXTRA_VAR_MSG);
+    }
+
+    public static function countConversionSpecs(string $format): int
     {
         $count = 0;
         $len = VmString::byteLength($format);
