@@ -87,8 +87,9 @@ function analyzeInternal(PHPCompiler\Func\Internal $fn): array
         && preg_match('/CheckdnsrrRuntime|JitCheckdnsrr/i', $source)) {
         $notes[] = 'DNS record probe via libc res_query (VM FFI + JIT/AOT) (#5983)';
     }
-    if ('dns_get_mx' === $fn->getName() && preg_match('/JitDnsGetMx|dnsGetMxViaUdp/i', $source)) {
-        $notes[] = 'MX lookup via UDP DNS + compile-time JIT materializer (VM + JIT/AOT literals) (#4125)';
+    if (in_array($fn->getName(), ['dns_get_mx', 'getmxrr'], true)
+        && preg_match('/JitDnsGetMx|dnsGetMxViaUdp/i', $source)) {
+        $notes[] = 'MX lookup via UDP DNS + compile-time JIT materializer (VM + JIT/AOT literals) (#4125, #3662)';
     }
     if (in_array($fn->getName(), ['long2ip', 'ip2long', 'inet_ntop', 'inet_pton'], true)
         && preg_match('/JitInet|InetRuntime|VmInetNative/i', $source)) {
