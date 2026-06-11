@@ -139,6 +139,11 @@ final class StdlibConstants
     public const ASSERT_WARNING = 4;
     public const ASSERT_EXCEPTION = 5;
 
+    /** stream_filter_append/prepend $read_write (ext/standard/streams.c, #3283). */
+    public const STREAM_FILTER_READ = 1;
+
+    public const STREAM_FILTER_WRITE = 2;
+
     /** glob() flags (ext/standard/dir.c / glob.h; values match php-src on Linux). */
     public const GLOB_ERR = 1;
     public const GLOB_MARK = 2;
@@ -188,6 +193,8 @@ final class StdlibConstants
         'fnm_pathname' => VmFnmatch::FNM_PATHNAME,
         'fnm_period' => VmFnmatch::FNM_PERIOD,
         'fnm_casefold' => VmFnmatch::FNM_CASEFOLD,
+        'stream_filter_read' => self::STREAM_FILTER_READ,
+        'stream_filter_write' => self::STREAM_FILTER_WRITE,
         'sunfuncs_ret_string' => VmDate::SUNFUNCS_RET_STRING,
         'sunfuncs_ret_double' => VmDate::SUNFUNCS_RET_DOUBLE,
         'sunfuncs_ret_timestamp' => VmDate::SUNFUNCS_RET_TIMESTAMP,

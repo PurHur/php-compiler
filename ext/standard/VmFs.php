@@ -645,7 +645,12 @@ final class VmFs
             return false;
         }
 
-        return @fread($fp, $length);
+        $data = @fread($fp, $length);
+        if (false === $data) {
+            return false;
+        }
+
+        return VmStreamFilterChain::applyReadFilters($handle, $data);
     }
 
     public static function fpassthru(int $handle) {
@@ -690,6 +695,10 @@ final class VmFs
         if (null === $fp) {
             return false;
         }
+        $data = VmStreamFilterChain::applyWriteFilters($handle, $data);
+        if (null !== $length && $length < \strlen($data)) {
+            $data = substr($data, 0, $length);
+        }
         if (null === $length) {
             $written = @fwrite($fp, $data);
         } else {
@@ -711,6 +720,7 @@ final class VmFs
         if (null === $fp) {
             return false;
         }
+        VmStreamFilterChain::clearStream($handle);
         unset(self::$handles[$handle], self::$handlePaths[$handle]);
         if (!self::releaseHostResourceRef($fp)) {
             return true;
@@ -1219,7 +1229,7 @@ final class VmFs
             return false;
         }
 
-        return $data;
+        return VmStreamFilterChain::applyReadFilters($handle, $data);
     }
 
     /**

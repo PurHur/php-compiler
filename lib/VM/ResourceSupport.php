@@ -7,6 +7,7 @@ namespace PHPCompiler\VM;
 use PHPCompiler\ext\standard\VmDir;
 use PHPCompiler\ext\standard\VmFs;
 use PHPCompiler\ext\standard\VmStreamBucket;
+use PHPCompiler\ext\standard\VmStreamFilterChain;
 
 /**
  * PHP 8.4 Resource builtin — VM stream/dir zval wrappers (#7073, pairs #7071).
@@ -100,12 +101,26 @@ final class ResourceSupport
         return $var->bucketResource && Variable::TYPE_INTEGER === $var->type;
     }
 
+    public static function isStreamFilterResource(Variable $var): bool
+    {
+        $state = self::stateFromVariable($var);
+        if (null !== $state) {
+            return ResourceState::KIND_STREAM_FILTER === $state->kind
+                && VmStreamFilterChain::isValidFilter($state->handle);
+        }
+
+        $var = $var->resolveIndirect();
+
+        return $var->streamFilterResource && Variable::TYPE_INTEGER === $var->type;
+    }
+
     public static function isVmResource(Variable $var): bool
     {
         return self::isStreamResource($var)
             || self::isDirResource($var)
             || self::isBrigadeResource($var)
-            || self::isBucketResource($var);
+            || self::isBucketResource($var)
+            || self::isStreamFilterResource($var);
     }
 
     public static function resolveHandle(Variable $var): ?int
@@ -147,6 +162,12 @@ final class ResourceSupport
 
             return null !== $type ? 'resource ('.$type.')' : 'Resource';
         }
+        if (self::isStreamFilterResource($var)) {
+            $handle = self::resolveHandle($var);
+            $type = null !== $handle ? VmStreamFilterChain::getResourceType($handle) : null;
+
+            return null !== $type ? 'resource ('.$type.')' : 'Resource';
+        }
 
         return null;
     }
@@ -179,6 +200,9 @@ final class ResourceSupport
                 break;
             case ResourceState::KIND_BUCKET:
                 $var->legacyBucketHandle($handle);
+                break;
+            case ResourceState::KIND_STREAM_FILTER:
+                $var->legacyStreamFilterHandle($handle);
                 break;
             default:
                 throw new \LogicException('Unknown VM resource kind: '.$kind);
@@ -220,6 +244,7 @@ final class ResourceSupport
             && $left->dirResource === $right->dirResource
             && $left->brigadeResource === $right->brigadeResource
             && $left->bucketResource === $right->bucketResource
+            && $left->streamFilterResource === $right->streamFilterResource
             && $left->integer === $right->integer;
     }
 
@@ -228,6 +253,7 @@ final class ResourceSupport
         return self::isStreamResource($left) === self::isStreamResource($right)
             && self::isDirResource($left) === self::isDirResource($right)
             && self::isBrigadeResource($left) === self::isBrigadeResource($right)
-            && self::isBucketResource($left) === self::isBucketResource($right);
+            && self::isBucketResource($left) === self::isBucketResource($right)
+            && self::isStreamFilterResource($left) === self::isStreamFilterResource($right);
     }
 }

@@ -101,6 +101,9 @@ final class Variable {
     /** Stream filter bucket registry handle (#7089). */
     public bool $bucketResource = false;
 
+    /** stream_filter_append/prepend() filter resource (#3283). */
+    public bool $streamFilterResource = false;
+
     /** Lvalue proxy for __set dispatch when the property slot does not exist (#146). */
     public ?ObjectEntry $magicSetTarget = null;
 
@@ -202,6 +205,7 @@ final class Variable {
         $this->dirResource = false;
         $this->brigadeResource = false;
         $this->bucketResource = false;
+        $this->streamFilterResource = false;
         $this->array = $ht;
         MemoryAccounting::noteBytes(MemoryAccounting::estimateArrayBytesForTable($ht));
     }
@@ -246,6 +250,7 @@ final class Variable {
         $this->dirResource = false;
         $this->brigadeResource = false;
         $this->bucketResource = false;
+        $this->streamFilterResource = false;
     }
 
     public function streamHandle(int $value, ?Context $ctx = null): void
@@ -308,6 +313,21 @@ final class Variable {
         $this->legacyBucketHandle($value);
     }
 
+    public function streamFilterHandle(int $value, ?Context $ctx = null): void
+    {
+        if ($this->type === self::TYPE_INDIRECT) {
+            $this->indirect->streamFilterHandle($value, $ctx);
+
+            return;
+        }
+        if (null !== $ctx) {
+            ResourceSupport::wrap($this, $value, ResourceState::KIND_STREAM_FILTER, $ctx);
+
+            return;
+        }
+        $this->legacyStreamFilterHandle($value);
+    }
+
     public function legacyStreamHandle(int $value): void
     {
         $this->int($value);
@@ -315,6 +335,7 @@ final class Variable {
         $this->dirResource = false;
         $this->brigadeResource = false;
         $this->bucketResource = false;
+        $this->streamFilterResource = false;
     }
 
     public function legacyDirHandle(int $value): void
@@ -324,6 +345,7 @@ final class Variable {
         $this->streamResource = false;
         $this->brigadeResource = false;
         $this->bucketResource = false;
+        $this->streamFilterResource = false;
     }
 
     public function legacyBrigadeHandle(int $value): void
@@ -333,6 +355,7 @@ final class Variable {
         $this->streamResource = false;
         $this->dirResource = false;
         $this->bucketResource = false;
+        $this->streamFilterResource = false;
     }
 
     public function legacyBucketHandle(int $value): void
@@ -342,6 +365,17 @@ final class Variable {
         $this->streamResource = false;
         $this->dirResource = false;
         $this->brigadeResource = false;
+        $this->streamFilterResource = false;
+    }
+
+    public function legacyStreamFilterHandle(int $value): void
+    {
+        $this->int($value);
+        $this->streamFilterResource = true;
+        $this->streamResource = false;
+        $this->dirResource = false;
+        $this->brigadeResource = false;
+        $this->bucketResource = false;
     }
 
     public function isStreamResource(): bool
@@ -362,6 +396,11 @@ final class Variable {
     public function isBucketResource(): bool
     {
         return ResourceSupport::isBucketResource($this);
+    }
+
+    public function isStreamFilterResource(): bool
+    {
+        return ResourceSupport::isStreamFilterResource($this);
     }
 
     public function isVmResource(): bool
@@ -830,6 +869,7 @@ final class Variable {
         $this->dirResource = false;
         $this->brigadeResource = false;
         $this->bucketResource = false;
+        $this->streamFilterResource = false;
     }
 
     /** Drop emalloc-tracked bytes before replacing or clearing this slot (#7310). */
@@ -1190,6 +1230,7 @@ final class Variable {
                 $this->dirResource = false;
                 $this->brigadeResource = false;
                 $this->bucketResource = false;
+                $this->streamFilterResource = false;
                 $this->array = $var->array;
                 $this->objectPropertyOwner = $owner;
                 $this->objectPropertyName = $propName;
