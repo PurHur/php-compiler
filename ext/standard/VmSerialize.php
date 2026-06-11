@@ -91,6 +91,9 @@ final class VmSerialize
                 return false;
             }
             [$className, $data] = $parsed;
+            if (!self::isClassAllowedForUnserialize($className, $options)) {
+                return self::instantiateIncompleteObject($ctx, $className, []);
+            }
             $class = self::resolveClassEntryForUnserialize($ctx, $className);
             if (null === $class) {
                 return false;
@@ -123,7 +126,11 @@ final class VmSerialize
             }
             [$className, $data] = $parsed;
             if (!self::isClassAllowedForUnserialize($className, $options)) {
-                return false;
+                if (!\is_array($data)) {
+                    return false;
+                }
+
+                return self::instantiateIncompleteObject($ctx, $className, $data);
             }
             $class = self::resolveClassEntryForUnserialize($ctx, $className);
             if (null === $class) {

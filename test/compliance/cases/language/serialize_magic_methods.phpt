@@ -22,11 +22,11 @@ $q = unserialize($s);
 echo $q->x, "\n";
 
 $denied = unserialize($s, ['allowed_classes' => false]);
-echo $denied === false ? "denied\n" : "allowed\n";
+echo $denied instanceof __PHP_Incomplete_Class ? "incomplete\n" : "allowed\n";
 
 $listed = unserialize($s, ['allowed_classes' => ['Point']]);
 echo $listed->x, "\n";
 --EXPECT--
 2
-denied
+incomplete
 2
