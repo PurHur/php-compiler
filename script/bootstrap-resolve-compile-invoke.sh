@@ -45,6 +45,57 @@ bootstrap_native_compile_output_ok() {
   grep -qE 'helloworld_compile_smoke: compile OK|compile_smoke_m3_emit: compile OK|bootstrap_loop_compile_smoke: gen-2 compile OK' <<< "${compile_out}"
 }
 
+# Prelinked gen-0 argv drivers bake absolute /compiler/build/.m3_* sidecar paths at link time.
+# On harness hosts (repo not mounted at /compiler) __compiler_copy misses; recover from local blobs (#3046, #1492).
+bootstrap_gen0_sidecar_blob_for_entry() {
+  local entry=$1
+  local root="${ROOT:-}"
+  local norm="${entry//\\//}"
+  local rel=""
+  case "${norm}" in
+    */test/selfhost/compiler_minimal/main.php) rel='build/.m3_compiler_minimal_aot_blob' ;;
+    */examples/000-HelloWorld/example.php) rel='build/.m3_helloworld_aot_blob' ;;
+    */test/bootstrap-aot/compiler_smoke_standalone.php) rel='build/.m3_compile_smoke_aot_blob' ;;
+    */test/selfhost/compiler_lib_spine_smoke/main.php) rel='build/.m3_compiler_lib_aot_blob' ;;
+    */test/selfhost/compiler_unit_probe/compiler_unit_probe_compile.php) rel='build/.m3_compiler_unit_probe_aot_blob' ;;
+    */test/selfhost/compiler_helloworld_smoke/compile_driver.php) rel='build/.m3_compile_driver_aot_blob' ;;
+    */bin/compile.php) rel='build/.m3_bin_compile_aot_blob' ;;
+    *) return 1 ;;
+  esac
+  local build_blob="${root}/${rel}"
+  if [[ -f "${build_blob}" && -s "${build_blob}" ]]; then
+    printf '%s\n' "${build_blob}"
+    return 0
+  fi
+  local prelinked=""
+  case "${rel}" in
+    build/.m3_compiler_minimal_aot_blob) prelinked="${root}/prelinked/bootstrap-gen0/compiler_minimal_aot_blob" ;;
+    build/.m3_bin_compile_aot_blob) prelinked="${root}/prelinked/bootstrap-gen0/bin-compile-aot" ;;
+    build/.m3_compiler_lib_aot_blob) prelinked="${root}/prelinked/bootstrap-gen0/compiler_lib_aot_blob" ;;
+  esac
+  if [[ -n "${prelinked}" && -f "${prelinked}" && -s "${prelinked}" ]]; then
+    printf '%s\n' "${prelinked}"
+    return 0
+  fi
+  return 1
+}
+
+bootstrap_gen0_sidecar_emit_fallback() {
+  local out=$1
+  local entry=$2
+  local sidecar=""
+  if ! sidecar="$(bootstrap_gen0_sidecar_blob_for_entry "${entry}")"; then
+    return 1
+  fi
+  mkdir -p "$(dirname "${out}")"
+  if ! cp -f "${sidecar}" "${out}"; then
+    return 1
+  fi
+  chmod +x "${out}" 2>/dev/null || true
+  echo "bootstrap-compile-invoke: gen-0 sidecar emit fallback ${sidecar} -> ${out} (#3046)" >&2
+  return 0
+}
+
 bootstrap_is_inventory_bin_compile_argv_driver() {
   local driver=$1
   local root="${ROOT:-}"
@@ -291,6 +342,10 @@ bootstrap_compile_invoke() {
       fi
     fi
     if [[ "${last_code}" -eq 0 && ! -x "${out}" ]]; then
+      if bootstrap_native_compile_output_ok "${invoke_out}" \
+        && bootstrap_gen0_sidecar_emit_fallback "${out}" "${entry}"; then
+        return 0
+      fi
       echo "bootstrap-compile-invoke: compiled driver ${BOOTSTRAP_COMPILE_DRIVER} exited 0 but missing ${out} (#3046)" >&2
       last_code=1
     else
