@@ -19,15 +19,15 @@ final class pack extends Internal
         if ($argc < 1) {
             throw new \LogicException('pack() requires at least one argument');
         }
-        if (null === $frame->returnVar) {
-            return;
-        }
         $fmt = VmString::coerceStringBuiltinArg($frame->calledArgs[0], 'pack', 0, 'format');
         $values = [];
         for ($i = 1; $i < $argc; ++$i) {
             $values[] = $frame->calledArgs[$i]->resolveIndirect();
         }
-        $frame->returnVar->string(VmPack::pack($fmt, $values, $frame));
+        $packed = VmPack::pack($fmt, $values, $frame);
+        if (null !== $frame->returnVar) {
+            $frame->returnVar->string($packed);
+        }
     }
 
     public function call(Context $context, JITVariable ...$args): Value

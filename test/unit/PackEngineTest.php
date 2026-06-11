@@ -15,6 +15,8 @@ final class PackEngineTest extends TestCase
         $this->assertSame(\pack('n', 0x1234), PackEngine::pack('n', [0x1234]));
         $this->assertSame(\pack('a3', 'hi'), PackEngine::pack('a3', ['hi']));
         $this->assertSame(\pack('H4', 'dead'), PackEngine::pack('H4', ['dead']));
+        $this->assertSame(\pack('i', 1), PackEngine::pack('i', [1]));
+        $this->assertSame(\strlen(\pack('i', 1)), \strlen(PackEngine::pack('i', [1])));
     }
 
     public function testEmptyFormat(): void

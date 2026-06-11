@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace PHPCompiler\JIT\Builtin;
 
+use PHPCompiler\ext\standard\PackEngine;
 use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Context;
 use PHPLLVM\BasicBlock;
@@ -337,7 +338,7 @@ final class StringPackJit
         $oneI32 = $i32->constInt(1, false);
         $zeroI64 = $i64->constInt(0, false);
         $oneI64 = $i64->constInt(1, false);
-        $intSizeI64 = $i64->constInt(\PHP_INT_SIZE, false);
+        $intSizeI64 = $i64->constInt(PackEngine::PACK_INT_SIZE, false);
         $floatSizeI64 = $i64->constInt(4, false);
         $doubleSizeI64 = $i64->constInt(8, false);
 

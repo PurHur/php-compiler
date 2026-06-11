@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace PHPCompiler\JIT\Builtin;
 
+use PHPCompiler\ext\standard\PackEngine;
 use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Context;
 use PHPLLVM\BasicBlock;
@@ -416,7 +417,7 @@ final class StringUnpackJit
         $two = $i64->constInt(2, false);
         $four = $i64->constInt(4, false);
         $eight = $i64->constInt(8, false);
-        $intSize = $i64->constInt(\PHP_INT_SIZE, false);
+        $intSize = $i64->constInt(PackEngine::PACK_INT_SIZE, false);
         $arg64 = $context->builder->sext($arg, $i64);
 
         $hexNeed = $context->builder->add(
@@ -1085,7 +1086,7 @@ final class StringUnpackJit
         $twoI64 = $i64->constInt(2, false);
         $fourI64 = $i64->constInt(4, false);
         $eightI64 = $i64->constInt(8, false);
-        $intSizeI64 = $i64->constInt(\PHP_INT_SIZE, false);
+        $intSizeI64 = $i64->constInt(PackEngine::PACK_INT_SIZE, false);
         $maxName = $i64->constInt(self::MAX_NAME, false);
         $machineLe = $i32->constInt(self::machineLe() ? 1 : 0, false);
         $zeroI64 = $i64->constInt(0, false);
