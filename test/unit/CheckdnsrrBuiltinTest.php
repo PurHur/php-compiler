@@ -20,19 +20,19 @@ final class CheckdnsrrBuiltinTest extends TestCase
         $this->assertSame('dns_check_record', $alias->getName());
     }
 
-    public function testExampleComMxWhenResolverAvailable(): void
+    public function testLocalhostARecordWhenEtcHostsAvailable(): void
     {
-        if (!VmDns::checkdnsrr('example.com', 'MX') && (!\function_exists('checkdnsrr') || !\checkdnsrr('example.com', 'MX'))) {
-            $this->markTestSkipped('DNS resolver unavailable for example.com MX');
+        if (!VmDns::checkdnsrr('localhost', 'A')) {
+            $this->markTestSkipped('localhost A record unavailable via /etc/hosts');
         }
 
         $runtime = new Runtime();
         $fn = new checkdnsrr();
         $frame = $fn->getFrame($runtime->vmContext);
         $hostVar = new VMVariable();
-        $hostVar->string('example.com');
+        $hostVar->string('localhost');
         $typeVar = new VMVariable();
-        $typeVar->string('MX');
+        $typeVar->string('A');
         $frame->calledArgs = [$hostVar, $typeVar];
         $frame->returnVar = new VMVariable();
         $fn->execute($frame);
@@ -43,17 +43,17 @@ final class CheckdnsrrBuiltinTest extends TestCase
 
     public function testDnsCheckRecordAliasMatchesCheckdnsrr(): void
     {
-        if (!VmDns::checkdnsrr('example.com', 'MX') && (!\function_exists('checkdnsrr') || !\checkdnsrr('example.com', 'MX'))) {
-            $this->markTestSkipped('DNS resolver unavailable for example.com MX');
+        if (!VmDns::checkdnsrr('localhost', 'A')) {
+            $this->markTestSkipped('localhost A record unavailable via /etc/hosts');
         }
 
         $runtime = new Runtime();
         $check = new checkdnsrr();
         $alias = new checkdnsrr('dns_check_record');
         $hostVar = new VMVariable();
-        $hostVar->string('example.com');
+        $hostVar->string('localhost');
         $typeVar = new VMVariable();
-        $typeVar->string('MX');
+        $typeVar->string('A');
         $retCheck = new VMVariable();
         $retAlias = new VMVariable();
 

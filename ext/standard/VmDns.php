@@ -10,7 +10,7 @@ use PHPCompiler\VM\Variable;
 /**
  * DNS helpers for stdlib builtins (issue #3707, #5854, #7315).
  *
- * VM resolves via /etc/hosts without host ext/ffi; optional libc getaddrinfo when FFI is loaded.
+ * VM resolves via /etc/hosts without host Zend DNS builtins; optional libc getaddrinfo/res_query when FFI is loaded.
  * JIT/AOT: lib/JIT/Builtin/GethostbynamelRuntime.php (__compiler_gethostbynamel),
  * CheckdnsrrRuntime.php (__compiler_checkdnsrr).
  *
@@ -80,9 +80,7 @@ final class VmDns
             }
         }
 
-        $host = self::hostCheckdnsrr($hostname, $type);
-
-        return false !== $host && $host;
+        return self::checkdnsrrPurePhp($hostname, $qtype);
     }
 
     /**
@@ -351,15 +349,27 @@ final class VmDns
     }
 
     /**
-     * Host Zend checkdnsrr() when VM driver runs under php-src (no ext/ffi required).
+     * Pure-PHP fallback when libc res_query is unavailable (#7934, #7315 phase 2).
+     *
+     * A records: probe /etc/hosts then optional getaddrinfo FFI. Other qtypes need res_query.
      */
-    private static function hostCheckdnsrr(string $hostname, string $type): ?bool
+    private static function checkdnsrrPurePhp(string $hostname, int $qtype): bool
     {
-        if (!\function_exists('checkdnsrr')) {
-            return null;
+        if (1 === $qtype) {
+            $ips = self::resolveViaEtcHosts($hostname);
+            if (null !== $ips && [] !== $ips) {
+                return true;
+            }
+            if (self::ffiEnabled()) {
+                $ips = self::resolveViaGetaddrinfo($hostname);
+
+                return null !== $ips && [] !== $ips;
+            }
+
+            return false;
         }
 
-        return \checkdnsrr($hostname, $type);
+        return false;
     }
 
     private static function ffiEnabled(): bool
