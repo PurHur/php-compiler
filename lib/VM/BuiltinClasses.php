@@ -161,6 +161,7 @@ use PHPCompiler\VM\Builtin\ReflectionPropertyIsLazy;
 use PHPCompiler\VM\Builtin\ReflectionPropertyIsPromoted;
 use PHPCompiler\VM\Builtin\ReflectionPropertyIsReadOnly;
 use PHPCompiler\VM\Builtin\ReflectionPropertySetRawValueWithoutLazyInitialization;
+use PHPCompiler\VM\Builtin\ReflectionPropertySkipLazyInitialization;
 use PHPCompiler\VM\Builtin\ReflectionTypeAllowsNull;
 use PHPCompiler\VM\Builtin\ReflectionTypeToString;
 use PHPCompiler\VM\Builtin\WeakMapConstruct;
@@ -548,6 +549,7 @@ final class BuiltinClasses
                 'islazy' => new ReflectionPropertyIsLazy(),
                 'isinitialized' => new ReflectionPropertyIsInitialized(),
                 'setrawvaluewithoutlazyinitialization' => new ReflectionPropertySetRawValueWithoutLazyInitialization(),
+                'skiplazyinitialization' => new ReflectionPropertySkipLazyInitialization(),
                 'isprivateset' => ReflectionPropertyAsymmetricProbe::isPrivateSet(),
                 'isprotectedset' => ReflectionPropertyAsymmetricProbe::isProtectedSet(),
                 'ispublicset' => ReflectionPropertyAsymmetricProbe::isPublicSet(),

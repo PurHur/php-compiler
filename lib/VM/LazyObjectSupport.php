@@ -429,6 +429,46 @@ final class LazyObjectSupport
             && isset($object->lazyRawInitializedProperties[$propertyName]);
     }
 
+    /**
+     * ReflectionProperty::skipLazyInitialization — default value without running initializer (#7094).
+     *
+     * @see ext/reflection/php_reflection.c reflection_property_skip_lazy_initialization
+     */
+    public static function skipLazyInitialization(ObjectEntry $object, ClassProperty $meta): void
+    {
+        if (!self::isPropertyLazy($object, $meta->name)) {
+            return;
+        }
+        if (!$object->hasProperty($meta->name)) {
+            throw new \LogicException('Undefined property in this compiler build');
+        }
+        $slot = $object->getProperty($meta->name);
+        if (null !== $meta->default && !$meta->hasRuntimeDefaultInit()) {
+            $slot->copyFrom($meta->default);
+        }
+        $object->lazyRawInitializedProperties[$meta->name] = true;
+        if ($object->lazyPending && self::allLazyPropertiesResolved($object)) {
+            self::markAsInitialized($object);
+        }
+    }
+
+    private static function allLazyPropertiesResolved(ObjectEntry $object): bool
+    {
+        foreach ($object->class->properties as $property) {
+            if ($property->propertyHookVirtual) {
+                continue;
+            }
+            if (!isset($object->getRawProperties()[$property->name])) {
+                continue;
+            }
+            if (self::isPropertyLazy($object, $property->name)) {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
     private static function clearLazyRawInitializedProperties(ObjectEntry $object): void
     {
         $object->lazyRawInitializedProperties = [];
