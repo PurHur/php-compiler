@@ -95,10 +95,13 @@ final class VmJsonFormat
             }
             $parts = [];
             foreach ($value as $key => $item) {
-                if (!\is_string($key)) {
-                    throw new \LogicException('json_encode() only supports string keys in this compiler build');
+                if (!\is_string($key) && !\is_int($key)) {
+                    throw new \LogicException(
+                        'json_encode() only supports string or integer keys in this compiler build'
+                    );
                 }
-                $parts[] = '"'.self::escapeString($key).'":'.self::encodeValue($item);
+                $keyStr = \is_int($key) ? (string) $key : $key;
+                $parts[] = '"'.self::escapeString($keyStr).'":'.self::encodeValue($item);
             }
 
             return '{'.implode(',', $parts).'}';
