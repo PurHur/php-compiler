@@ -257,6 +257,11 @@ final class ReflectionBuiltinHelper
         return $context->builder->select($isObject, $nameWhenObject, $falseStr);
     }
 
+    public static function classNameStringFromClassId(Context $context, Value $classId): Value
+    {
+        return self::classNameFromId($context, $classId);
+    }
+
     private static function classNameFromId(Context $context, Value $classId): Value
     {
         $names = self::objectBuiltin($context)->allClassNamesById();
