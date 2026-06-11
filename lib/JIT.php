@@ -653,6 +653,9 @@ class JIT {
         if (str_ends_with($lower, '\\runtime::parse')) {
             return true;
         }
+        if (str_ends_with($lower, '\\runtime::preparesourceforparser')) {
+            return true;
+        }
         if (str_ends_with($lower, '\\runtime::compileemitsmoke')) {
             return true;
         }
@@ -3138,6 +3141,7 @@ class JIT {
         foreach ([
             '__construct',
             'parse',
+            'preparesourceforparser',
             'compile',
             'compileemitsmoke',
             'parseandcompileemitsmoke',

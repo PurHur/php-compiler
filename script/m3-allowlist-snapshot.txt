@@ -19,6 +19,7 @@ allow:\runtime::parse
 allow:\runtime::parseandcompile
 allow:\runtime::parseandcompileemitsmoke
 allow:\runtime::peeklastparsefailure
+allow:\runtime::preparesourceforparser
 allow:\runtime::standalone
 allow:slotforoperand
 allow:slotindexforvariablename
