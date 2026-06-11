@@ -10,6 +10,7 @@ use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\JitFilterInputTypeArg;
 use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\SuperglobalInit;
 use PHPCompiler\JIT\Variable as JITVariable;
@@ -26,12 +27,7 @@ final class filter_input extends Internal
         if ($argc < 3 || $argc > 4) {
             throw new \LogicException('filter_input() requires three or four arguments in this compiler build');
         }
-        $type = $frame->calledArgs[0]->resolveIndirect();
-        if (Variable::TYPE_INTEGER !== $type->type) {
-            throw new \LogicException(
-                'filter_input() requires (int type, string key, int filter) in this compiler build'
-            );
-        }
+        $typeInt = VmFilter::resolveInputType($frame->calledArgs[0], 'filter_input');
         $keyStr = VmString::coerceStringBuiltinArg(
             $frame->calledArgs[1],
             'filter_input',
@@ -57,7 +53,7 @@ final class filter_input extends Internal
         if (null === $ctx) {
             throw new \LogicException('filter_input() requires VM context in this compiler build');
         }
-        $sgName = VmFilter::inputSuperglobalName($type->toInt());
+        $sgName = VmFilter::inputSuperglobalName($typeInt);
         $sg = $ctx->getSuperglobal($sgName);
         if (null === $sg || Variable::TYPE_ARRAY !== $sg->type) {
             $frame->returnVar->null();
@@ -98,7 +94,7 @@ final class filter_input extends Internal
         $keyStr = JitStringBuiltinArg::lower($context, $args[1], 'filter_input', 1, 'variable_name');
         $keyVar = new JITVariable($context, JITVariable::TYPE_STRING, JITVariable::KIND_VALUE, $keyStr);
 
-        $typeVal = JitFilter::loadFilterId($context, $args[0]);
+        $typeVal = JitFilterInputTypeArg::lower($context, $args[0]);
         $i64 = $context->getTypeFromString('int64');
         $isGet = $context->builder->icmp(
             Builder::INT_EQ,
@@ -110,17 +106,73 @@ final class filter_input extends Internal
             $typeVal,
             $i64->constInt(VmFilter::INPUT_POST, false)
         );
+        $isCookie = $context->builder->icmp(
+            Builder::INT_EQ,
+            $typeVal,
+            $i64->constInt(VmFilter::INPUT_COOKIE, false)
+        );
+        $isEnv = $context->builder->icmp(
+            Builder::INT_EQ,
+            $typeVal,
+            $i64->constInt(VmFilter::INPUT_ENV, false)
+        );
+        $isServer = $context->builder->icmp(
+            Builder::INT_EQ,
+            $typeVal,
+            $i64->constInt(VmFilter::INPUT_SERVER, false)
+        );
+        $isSession = $context->builder->icmp(
+            Builder::INT_EQ,
+            $typeVal,
+            $i64->constInt(VmFilter::INPUT_SESSION, false)
+        );
 
         $id = 'fi'.spl_object_id($context);
         $pickPostBlock = BasicBlockHelper::append($context, 'filter_input_pick_post_'.$id);
         $getBlock = BasicBlockHelper::append($context, 'filter_input_get_'.$id);
         $postBlock = BasicBlockHelper::append($context, 'filter_input_post_'.$id);
+        $cookieBlock = BasicBlockHelper::append($context, 'filter_input_cookie_'.$id);
+        $envBlock = BasicBlockHelper::append($context, 'filter_input_env_'.$id);
+        $serverBlock = BasicBlockHelper::append($context, 'filter_input_server_'.$id);
+        $sessionBlock = BasicBlockHelper::append($context, 'filter_input_session_'.$id);
         $badTypeBlock = BasicBlockHelper::append($context, 'filter_input_bad_type_'.$id);
         $doneBlock = BasicBlockHelper::append($context, 'filter_input_type_done_'.$id);
 
         $context->builder->branchIf($isGet, $getBlock, $pickPostBlock);
         $context->builder->positionAtEnd($pickPostBlock);
-        $context->builder->branchIf($isPost, $postBlock, $badTypeBlock);
+        $context->builder->branchIf($isPost, $postBlock, $cookieBlock);
+
+        $context->builder->positionAtEnd($cookieBlock);
+        $context->builder->branchIf($isCookie, $cookieBlock.'_body', $envBlock);
+        $cookieBody = BasicBlockHelper::append($context, $cookieBlock.'_body');
+        $context->builder->positionAtEnd($cookieBody);
+        $cookieResult = self::filterFromSuperglobal($context, '_COOKIE', $keyVar, $args[2]);
+        $cookieTail = $context->builder->getInsertBlock();
+        $context->builder->branch($doneBlock);
+
+        $context->builder->positionAtEnd($envBlock);
+        $context->builder->branchIf($isEnv, $envBlock.'_body', $serverBlock);
+        $envBody = BasicBlockHelper::append($context, $envBlock.'_body');
+        $context->builder->positionAtEnd($envBody);
+        $envResult = self::filterFromSuperglobal($context, '_ENV', $keyVar, $args[2]);
+        $envTail = $context->builder->getInsertBlock();
+        $context->builder->branch($doneBlock);
+
+        $context->builder->positionAtEnd($serverBlock);
+        $context->builder->branchIf($isServer, $serverBlock.'_body', $sessionBlock);
+        $serverBody = BasicBlockHelper::append($context, $serverBlock.'_body');
+        $context->builder->positionAtEnd($serverBody);
+        $serverResult = self::filterFromSuperglobal($context, '_SERVER', $keyVar, $args[2]);
+        $serverTail = $context->builder->getInsertBlock();
+        $context->builder->branch($doneBlock);
+
+        $context->builder->positionAtEnd($sessionBlock);
+        $context->builder->branchIf($isSession, $sessionBlock.'_body', $badTypeBlock);
+        $sessionBody = BasicBlockHelper::append($context, $sessionBlock.'_body');
+        $context->builder->positionAtEnd($sessionBody);
+        $sessionResult = self::filterFromSuperglobal($context, '_SESSION', $keyVar, $args[2]);
+        $sessionTail = $context->builder->getInsertBlock();
+        $context->builder->branch($doneBlock);
 
         $context->builder->positionAtEnd($badTypeBlock);
         $badResult = JitFilter::boxedNull($context);
@@ -141,6 +193,10 @@ final class filter_input extends Internal
         $phi->addIncoming($badResult, $badTypeBlock);
         $phi->addIncoming($getResult, $getTail);
         $phi->addIncoming($postResult, $postTail);
+        $phi->addIncoming($cookieResult, $cookieTail);
+        $phi->addIncoming($envResult, $envTail);
+        $phi->addIncoming($serverResult, $serverTail);
+        $phi->addIncoming($sessionResult, $sessionTail);
 
         return $phi;
     }

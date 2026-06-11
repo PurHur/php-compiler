@@ -4878,6 +4878,11 @@ class Object_ extends Type {
         return $this->classes['memoryusage'] ?? null;
     }
 
+    public function phpInputFilterEnumClassId(): ?int
+    {
+        return $this->classes['phpinputfilter'] ?? null;
+    }
+
     public function roundingModeEnumClassId(): ?int
     {
         return $this->classes['roundingmode'] ?? null;

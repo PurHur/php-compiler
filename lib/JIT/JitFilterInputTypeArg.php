@@ -1,0 +1,155 @@
+<?php
+
+declare(strict_types=1);
+
+namespace PHPCompiler\JIT;
+
+use PHPCompiler\JIT\Builtin\FilterInputTypeJit;
+use PHPCompiler\JIT\Builtin\TypeErrorRaise;
+use PHPCompiler\VM\Variable as VmVariable;
+use PHPLLVM\Builder;
+use PHPLLVM\Value;
+
+/**
+ * Lower filter_input() $type parameter (int legacy + PhpInputFilter enum, #7284).
+ */
+final class JitFilterInputTypeArg
+{
+    public static function lower(Context $context, JITVariable $arg): Value
+    {
+        $compileTime = FilterInputTypeJit::compileTimeInputType($context, $arg);
+        if (null !== $compileTime) {
+            return $context->getTypeFromString('int64')->constInt($compileTime, false);
+        }
+
+        if (Variable::TYPE_NATIVE_LONG === $arg->type) {
+            return $context->helper->loadValue($arg);
+        }
+        if (Variable::TYPE_VALUE === $arg->type) {
+            return self::lowerBoxed($context, $arg);
+        }
+
+        self::emitTypeErrorAndAbort($context, 'mixed');
+
+        return $context->getTypeFromString('int64')->constInt(0, false);
+    }
+
+    private static function lowerBoxed(Context $context, Variable $arg): Value
+    {
+        $valuePtr = JitValueBox::valuePtrFromVariable($context, $arg);
+        $map = $context->structFieldMap['__value__'];
+        $typeByte = $context->builder->load(
+            $context->builder->structGep($valuePtr, $map['type'])
+        );
+        $i8 = $context->getTypeFromString('int8');
+
+        $enumBlock = BasicBlockHelper::append($context, 'jit_filter_input_type_enum');
+        $afterEnum = BasicBlockHelper::append($context, 'jit_filter_input_type_after_enum');
+        $isEnumCase = $context->builder->icmp(
+            Builder::INT_EQ,
+            $typeByte,
+            $i8->constInt(VmVariable::TYPE_ENUM_CASE, false)
+        );
+        $context->builder->branchIf($isEnumCase, $enumBlock, $afterEnum);
+
+        $context->builder->positionAtEnd($enumBlock);
+        $enumReal = self::lowerPhpInputFilterEnumCase($context, $valuePtr);
+        $enumEnd = $context->builder->getInsertBlock();
+        $context->builder->branch($afterEnum);
+        $context->builder->positionAtEnd($afterEnum);
+
+        $longBlock = BasicBlockHelper::append($context, 'jit_filter_input_type_long');
+        $badBlock = BasicBlockHelper::append($context, 'jit_filter_input_type_bad');
+        $mergeBlock = BasicBlockHelper::append($context, 'jit_filter_input_type_merge');
+
+        $isLong = $context->builder->icmp(
+            Builder::INT_EQ,
+            $typeByte,
+            $i8->constInt(VmVariable::TYPE_INTEGER, false)
+        );
+        $context->builder->branchIf($isLong, $longBlock, $badBlock);
+
+        $context->builder->positionAtEnd($longBlock);
+        $longVal = $context->builder->call($context->lookupFunction('__value__readLong'), $valuePtr);
+        $longEnd = $context->builder->getInsertBlock();
+        $context->builder->branch($mergeBlock);
+
+        $context->builder->positionAtEnd($badBlock);
+        self::emitTypeErrorAndAbort($context, self::compileTimeEnumGivenLabel($context, $arg));
+        $context->builder->positionAtEnd($mergeBlock);
+
+        $phi = $context->builder->phi($longVal->typeOf());
+        $phi->addIncoming($enumReal, $enumEnd);
+        $phi->addIncoming($longVal, $longEnd);
+
+        return $phi;
+    }
+
+    private static function lowerPhpInputFilterEnumCase(Context $context, Value $valuePtr): Value
+    {
+        $classId = self::readEnumClassId($context, $valuePtr);
+        $phpInputFilterId = $context->type->object->phpInputFilterEnumClassId();
+        if (null === $phpInputFilterId) {
+            self::emitTypeErrorAndAbort($context, 'object');
+
+            return $context->getTypeFromString('int64')->constInt(0, false);
+        }
+        $i32 = $context->getTypeFromString('int32');
+        $isPhpInputFilter = $context->builder->icmp(
+            Builder::INT_EQ,
+            $classId,
+            $i32->constInt($phpInputFilterId, false)
+        );
+        $okBlock = BasicBlockHelper::append($context, 'jit_filter_input_type_enum_ok');
+        $badBlock = BasicBlockHelper::append($context, 'jit_filter_input_type_enum_bad');
+        $context->builder->branchIf($isPhpInputFilter, $okBlock, $badBlock);
+        $context->builder->positionAtEnd($badBlock);
+        self::emitTypeErrorAndAbort($context, 'object');
+        $context->builder->positionAtEnd($okBlock);
+
+        return $context->builder->call($context->lookupFunction('__value__readLong'), $valuePtr);
+    }
+
+    private static function readEnumClassId(Context $context, Value $valuePtr): Value
+    {
+        $enumMap = $context->structFieldMap['__enum_case__'] ?? null;
+        if (null !== $enumMap && isset($enumMap['class_id'])) {
+            return $context->builder->load(
+                $context->builder->structGep($valuePtr, $enumMap['class_id'])
+            );
+        }
+
+        return $context->getTypeFromString('int32')->constInt(0, false);
+    }
+
+    private static function emitTypeErrorAndAbort(Context $context, string $given): void
+    {
+        TypeErrorRaise::registerDeclarations($context);
+        TypeErrorRaise::ensureLinked($context);
+        TypeErrorRaise::emitRaise(
+            $context,
+            sprintf('filter_input(): Argument #1 ($type) must be of type PhpInputFilter|int, %s given', $given)
+        );
+        $context->builder->call($context->lookupFunction('abort'));
+    }
+
+    private static function compileTimeEnumGivenLabel(Context $context, Variable $arg): string
+    {
+        if (Variable::KIND_VALUE !== $arg->kind) {
+            return 'object';
+        }
+        $enumMap = $context->structFieldMap['__enum_case__'] ?? null;
+        if (null !== $enumMap && isset($enumMap['class_id'])) {
+            $classIdVal = $context->builder->load(
+                $context->builder->structGep($arg->value, $enumMap['class_id'])
+            );
+            if (method_exists($classIdVal, 'isConstant') && $classIdVal->isConstant()) {
+                $classId = (int) $classIdVal->getConstantValue();
+
+                return $context->type->object->classNameForId($classId);
+            }
+        }
+
+        return 'object';
+    }
+}
