@@ -55,6 +55,15 @@ final class get_resource_type extends Internal
                 return;
             }
         }
+        if ($v->isStreamFilterResource()) {
+            $handle = \PHPCompiler\VM\ResourceSupport::resolveHandle($v);
+            $type = null !== $handle ? VmStreamFilterChain::getResourceType($handle) : null;
+            if (null !== $type) {
+                $frame->returnVar->string($type);
+
+                return;
+            }
+        }
         if (!is_resource_::isResource($v)) {
             throw new \TypeError(\sprintf(self::TYPE_ERROR, VmStreamArg::debugTypeName($v)));
         }

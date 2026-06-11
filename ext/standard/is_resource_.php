@@ -70,6 +70,9 @@ final class is_resource_ extends Internal
         if ($v->isBucketResource()) {
             return VmStreamBucket::isValidBucket($v->toInt());
         }
+        if ($v->isStreamFilterResource()) {
+            return VmStreamFilterChain::isValidFilter($v->toInt());
+        }
 
         return false;
     }

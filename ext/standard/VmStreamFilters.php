@@ -29,12 +29,30 @@ final class VmStreamFilters
     /** @var list<string> */
     private static array $registered = [];
 
-    public static function register(string $filterName): void
+    /** @var array<string, string> filter name => class name (#3283 stream_filter_register) */
+    private static array $registeredClasses = [];
+
+    public static function register(string $filterName, string $className): bool
     {
         $filterName = strtolower($filterName);
-        if (!\in_array($filterName, self::$registered, true)) {
-            self::$registered[] = $filterName;
+        if ('' === $filterName) {
+            return false;
         }
+        if (\in_array($filterName, self::$registered, true)) {
+            return false;
+        }
+        self::$registered[] = $filterName;
+        self::$registeredClasses[$filterName] = $className;
+
+        return true;
+    }
+
+    /**
+     * @return list<string>
+     */
+    public static function registeredFilterNames(): array
+    {
+        return self::$registered;
     }
 
     public static function getFilters(): HashTable
