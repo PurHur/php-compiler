@@ -283,6 +283,25 @@ final class DateTimeSupport
         self::markDateTimeLikeInitialized($dt);
     }
 
+    /** php-src zim_DateTime_createFromTimestamp / zim_DateTimeImmutable_createFromTimestamp (#5973). */
+    public static function initDateTimeFromTimestamp(ObjectEntry $dt, int $timestamp): void
+    {
+        $tzName = VmDate::defaultTimezoneGet();
+        try {
+            VmDateTimeNative::validateTimezoneId($tzName);
+        } catch (NativeDateInvalidTimeZoneException) {
+            self::throwDateInvalidTimeZoneException($tzName);
+        }
+        if (4 === \PHP_INT_SIZE) {
+            if ($timestamp > \PHP_INT_MAX || $timestamp < \PHP_INT_MIN) {
+                self::throwDateRangeError('Epoch doesn\'t fit in a PHP integer');
+            }
+        }
+        self::applyParsedState($dt, ['timestamp' => $timestamp, 'microsecond' => 0], $tzName);
+        $dt->constructed = true;
+        self::markDateTimeLikeInitialized($dt);
+    }
+
     public static function initDateTimeFromFormat(
         ObjectEntry $dt,
         string $format,
