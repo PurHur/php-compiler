@@ -33,6 +33,23 @@ final class JitGrapheme
         return $context->constantFromBool(VmGrapheme::strContains($hay, $needle));
     }
 
+    /**
+     * @param JITVariable[] $args
+     */
+    public static function tryLevenshteinFold(Context $context, array $args): ?Value
+    {
+        $string1 = self::compileTimeString($args, 0);
+        $string2 = self::compileTimeString($args, 1);
+        if (null === $string1 || null === $string2) {
+            return null;
+        }
+
+        return $context->constantFromInteger(
+            VmGrapheme::levenshtein($string1, $string2),
+            'int64'
+        );
+    }
+
     public static function contains(Context $context, Value $haystack, Value $needle): Value
     {
         $map = $context->structFieldMap['__string__'];
