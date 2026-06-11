@@ -7,7 +7,9 @@ namespace PHPCompiler\ext\standard;
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\Variable as JITVariable;
+use PHPCompiler\VM\BuiltinExecute;
 use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
 
@@ -24,14 +26,16 @@ final class utf8_decode extends Internal
         if (1 !== \count($frame->calledArgs)) {
             throw new \LogicException('utf8_decode() requires exactly one argument in this compiler build');
         }
-        if (null === $frame->returnVar) {
-            return;
-        }
-        $data = $frame->calledArgs[0]->resolveIndirect();
-        if (Variable::TYPE_STRING !== $data->type) {
-            throw new \LogicException('utf8_decode() only supports strings in this compiler build');
-        }
-        $frame->returnVar->string(VmString::utf8_decode($data->toString()));
+        $data = VmString::coerceStringBuiltinArg(
+            $frame->calledArgs[0],
+            'utf8_decode',
+            0,
+            'string'
+        );
+        BuiltinExecute::writeReturn(
+            $frame,
+            static fn (Variable $ret) => $ret->string(VmString::utf8_decode($data))
+        );
     }
 
     public function call(Context $context, JITVariable ...$args): Value
@@ -42,7 +46,7 @@ final class utf8_decode extends Internal
 
         return JitUtf8Latin1::decode(
             $context,
-            $this->jitString($context, $args[0], 'utf8_decode() argument #1')
+            JitStringBuiltinArg::lower($context, $args[0], 'utf8_decode', 0, 'string')
         );
     }
 }
