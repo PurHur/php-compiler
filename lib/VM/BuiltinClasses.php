@@ -66,6 +66,7 @@ use PHPCompiler\VM\Builtin\ReflectionClassGetProperty;
 use PHPCompiler\VM\Builtin\ReflectionClassGetProperties;
 use PHPCompiler\VM\Builtin\ReflectionClassGetReadOnlyProperties;
 use PHPCompiler\VM\Builtin\ReflectionClassGetReflectionConstant;
+use PHPCompiler\VM\Builtin\ReflectionClassGetReflectionConstants;
 use PHPCompiler\VM\Builtin\ReflectionClassGetDocComment;
 use PHPCompiler\VM\Builtin\ReflectionClassGetEndLine;
 use PHPCompiler\VM\Builtin\ReflectionClassGetExtensionName;
@@ -466,6 +467,8 @@ final class BuiltinClasses
         $rc->methodVisibility['getmethods'] = $pub;
         $rc->methods['getreflectionconstant'] = new ReflectionClassGetReflectionConstant();
         $rc->methodVisibility['getreflectionconstant'] = $pub;
+        $rc->methods['getreflectionconstants'] = new ReflectionClassGetReflectionConstants();
+        $rc->methodVisibility['getreflectionconstants'] = $pub;
         $rc->methods['getconstants'] = new ReflectionClassGetConstants();
         $rc->methodVisibility['getconstants'] = $pub;
         $rc->methods['gettraitaliases'] = new ReflectionClassGetTraitAliases();
