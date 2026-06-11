@@ -15,7 +15,8 @@ use PHPCompiler\VM\Variable;
  * CheckdnsrrRuntime.php (__compiler_checkdnsrr).
  *
  * php-src: ext/standard/dns.c — PHP_FUNCTION(gethostbynamel), PHP_FUNCTION(gethostbyaddr),
- * PHP_FUNCTION(gethostbyname), PHP_FUNCTION(checkdnsrr), PHP_FUNCTION(dns_check_record)
+ * PHP_FUNCTION(gethostbyname), PHP_FUNCTION(checkdnsrr), PHP_FUNCTION(dns_check_record),
+ * PHP_FUNCTION(dns_get_mx)
  */
 final class VmDns
 {
@@ -26,6 +27,18 @@ final class VmDns
     public const ERR_NOT_FOUND = 2;
 
     private const MAX_ADDRS = 64;
+
+    private const MAX_MX = 64;
+
+    private const HFIXEDSZ = 12;
+
+    private const QFIXEDSZ = 4;
+
+    private const INT16SZ = 2;
+
+    private const INT32SZ = 4;
+
+    private const DNS_UDP_TIMEOUT_SEC = 2;
 
     private const AF_INET = 2;
 
@@ -142,6 +155,46 @@ final class VmDns
      *
      * @return string|false hostname on success
      */
+    /**
+     * dns_get_mx() — MX hostnames and preference weights (#4125).
+     *
+     * php-src: ext/standard/dns.c — PHP_FUNCTION(dns_get_mx), php_dns_mx()
+     *
+     * @return array{ok: bool, hosts: HashTable, weights: HashTable}
+     */
+    public static function dnsGetMx(string $hostname): array
+    {
+        $hosts = new HashTable();
+        $weights = new HashTable();
+        if ('' === $hostname || \strlen($hostname) > 255) {
+            return ['ok' => false, 'hosts' => $hosts, 'weights' => $weights];
+        }
+
+        $records = self::dnsGetMxViaResQuery($hostname);
+        if (null === $records) {
+            $records = self::dnsGetMxViaUdp($hostname);
+        }
+        if (null === $records) {
+            return ['ok' => false, 'hosts' => $hosts, 'weights' => $weights];
+        }
+
+        foreach ($records as $index => [$mxHost, $weight]) {
+            $hostVar = new Variable(Variable::TYPE_STRING);
+            $hostVar->string($mxHost);
+            $hosts->add((string) $index, $hostVar);
+
+            $weightVar = new Variable(Variable::TYPE_INTEGER);
+            $weightVar->int($weight);
+            $weights->add((string) $index, $weightVar);
+        }
+
+        return [
+            'ok' => $hosts->getNumElements() > 0,
+            'hosts' => $hosts,
+            'weights' => $weights,
+        ];
+    }
+
     public static function gethostbyaddr(string $ipAddress, ?int &$error = null)
     {
         $error = self::ERR_NONE;
@@ -331,6 +384,298 @@ final class VmDns
     /**
      * @return bool|null null when FFI path unavailable
      */
+    /**
+     * @return list<array{0: string, 1: int}>|null null when libc res_query unavailable
+     */
+    private static function dnsGetMxViaResQuery(string $hostname): ?array
+    {
+        if (!self::ffiEnabled() || !\extension_loaded('ffi')) {
+            return null;
+        }
+        try {
+            $ffi = self::dnsFfi();
+        } catch (\Throwable) {
+            return null;
+        }
+
+        $ffi->res_init();
+        $buf = $ffi->new('unsigned char[1024]');
+        $answerLen = (int) $ffi->res_query(
+            $hostname,
+            self::DNS_CLASS_IN,
+            self::DNS_RECORD_TYPES['MX'],
+            $buf,
+            1024
+        );
+        if ($answerLen <= 0) {
+            return [];
+        }
+
+        $packet = \FFI::string($buf, $answerLen);
+
+        return self::parseMxRecordsFromPacket($packet, $answerLen);
+    }
+
+    /**
+     * Pure-PHP UDP MX lookup when libc res_query FFI is unavailable (#4125, #7934).
+     *
+     * @return list<array{0: string, 1: int}>|null null when no nameserver
+     */
+    private static function dnsGetMxViaUdp(string $hostname): ?array
+    {
+        $nameservers = self::readResolvConfNameservers();
+        if ([] === $nameservers) {
+            return null;
+        }
+
+        $query = self::buildDnsQueryPacket($hostname, self::DNS_RECORD_TYPES['MX']);
+        foreach ($nameservers as $nameserver) {
+            $response = self::udpDnsExchange($nameserver, $query);
+            if (null === $response || '' === $response) {
+                continue;
+            }
+            $records = self::parseMxRecordsFromPacket($response, \strlen($response));
+            if ([] !== $records) {
+                return $records;
+            }
+        }
+
+        return [];
+    }
+
+    /**
+     * @return list<array{0: string, 1: int}>
+     */
+    private static function parseMxRecordsFromPacket(string $packet, int $len): array
+    {
+        if ($len < self::HFIXEDSZ) {
+            return [];
+        }
+
+        $qdcount = self::readUint16Be($packet, 4);
+        $ancount = self::readUint16Be($packet, 6);
+        $cp = self::HFIXEDSZ;
+        $end = $len;
+
+        for ($q = 0; $q < $qdcount; ++$q) {
+            $skip = self::dnSkipname($packet, $cp, $end);
+            if (false === $skip || $skip + self::QFIXEDSZ > $end) {
+                return [];
+            }
+            $cp = $skip + self::QFIXEDSZ;
+        }
+
+        $records = [];
+        for ($a = 0; $a < $ancount && $cp < $end; ++$a) {
+            $skip = self::dnSkipname($packet, $cp, $end);
+            if (false === $skip) {
+                break;
+            }
+            $cp = $skip;
+            if ($cp + (self::INT16SZ * 3) + self::INT32SZ > $end) {
+                break;
+            }
+
+            $type = self::readUint16Be($packet, $cp);
+            $cp += self::INT16SZ + self::INT16SZ + self::INT32SZ;
+            if ($cp + self::INT16SZ > $end) {
+                break;
+            }
+            $rdlength = self::readUint16Be($packet, $cp);
+            $cp += self::INT16SZ;
+            if ($cp + $rdlength > $end) {
+                break;
+            }
+
+            $rdataStart = $cp;
+            if (self::DNS_RECORD_TYPES['MX'] !== $type) {
+                $cp = $rdataStart + $rdlength;
+                continue;
+            }
+
+            if ($rdlength < self::INT16SZ) {
+                $cp = $rdataStart + $rdlength;
+                continue;
+            }
+
+            $weight = self::readUint16Be($packet, $rdataStart);
+            $exchange = self::dnExpand($packet, $rdataStart + self::INT16SZ, $end);
+            if (false === $exchange) {
+                $cp = $rdataStart + $rdlength;
+                continue;
+            }
+            if ('.' === $exchange) {
+                $exchange = '';
+            }
+
+            $records[] = [$exchange, $weight];
+            $cp = $rdataStart + $rdlength;
+            if (\count($records) >= self::MAX_MX) {
+                break;
+            }
+        }
+
+        return $records;
+    }
+
+    private static function readUint16Be(string $packet, int $offset): int
+    {
+        return (ord($packet[$offset]) << 8) | ord($packet[$offset + 1]);
+    }
+
+    /**
+     * @return int|false
+     */
+    private static function dnSkipname(string $packet, int $offset, int $end)
+    {
+        while ($offset < $end) {
+            $len = ord($packet[$offset]);
+            if (0 === $len) {
+                return $offset + 1;
+            }
+            if (($len & 0xC0) === 0xC0) {
+                return $offset + 2;
+            }
+            if ($len > 63) {
+                return false;
+            }
+            $offset += 1 + $len;
+        }
+
+        return false;
+    }
+
+    /**
+     * @return string|false
+     */
+    private static function dnExpand(string $packet, int $offset, int $end)
+    {
+        $labels = [];
+        $jumps = 0;
+
+        while ($offset < $end) {
+            $len = ord($packet[$offset]);
+            if (0 === $len) {
+                break;
+            }
+            if (($len & 0xC0) === 0xC0) {
+                if ($offset + 1 >= $end) {
+                    return false;
+                }
+                $offset = (($len & 0x3F) << 8) | ord($packet[$offset + 1]);
+                if (++$jumps > 256) {
+                    return false;
+                }
+                continue;
+            }
+            if ($len > 63) {
+                return false;
+            }
+            ++$offset;
+            if ($offset + $len > $end) {
+                return false;
+            }
+            $labels[] = \substr($packet, $offset, $len);
+            $offset += $len;
+        }
+
+        if ([] === $labels) {
+            return '.';
+        }
+
+        return \implode('.', $labels);
+    }
+
+    private static function buildDnsQueryPacket(string $hostname, int $qtype): string
+    {
+        $id = \random_int(0, 0xFFFF);
+        $header = \pack('nnnnnn', $id, 0x0100, 1, 0, 0, 0);
+        $question = self::encodeDnsName($hostname).\pack('nn', $qtype, self::DNS_CLASS_IN);
+
+        return $header.$question;
+    }
+
+    private static function encodeDnsName(string $hostname): string
+    {
+        $hostname = \rtrim($hostname, '.');
+        $encoded = '';
+        foreach (\explode('.', $hostname) as $label) {
+            $len = \strlen($label);
+            if ($len > 63) {
+                $label = \substr($label, 0, 63);
+                $len = 63;
+            }
+            $encoded .= \chr($len).$label;
+        }
+
+        return $encoded."\0";
+    }
+
+    /**
+     * @return list<string>
+     */
+    private static function readResolvConfNameservers(): array
+    {
+        $path = '/etc/resolv.conf';
+        if (!\is_readable($path)) {
+            return [];
+        }
+        $lines = @\file($path, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES);
+        if (false === $lines) {
+            return [];
+        }
+
+        $servers = [];
+        foreach ($lines as $line) {
+            $line = \trim($line);
+            if ('' === $line || '#' === $line[0]) {
+                continue;
+            }
+            if (!\str_starts_with($line, 'nameserver')) {
+                continue;
+            }
+            $parts = \preg_split('/\s+/', $line, -1, PREG_SPLIT_NO_EMPTY);
+            if (null === $parts || \count($parts) < 2) {
+                continue;
+            }
+            $ip = $parts[1];
+            if ('' !== $ip && !\in_array($ip, $servers, true)) {
+                $servers[] = $ip;
+            }
+        }
+
+        return $servers;
+    }
+
+    private static function udpDnsExchange(string $nameserver, string $query): ?string
+    {
+        $errno = 0;
+        $errstr = '';
+        $socket = @\stream_socket_client(
+            'udp://'.$nameserver.':53',
+            $errno,
+            $errstr,
+            self::DNS_UDP_TIMEOUT_SEC,
+            STREAM_CLIENT_CONNECT
+        );
+        if (false === $socket) {
+            return null;
+        }
+
+        \stream_set_timeout($socket, self::DNS_UDP_TIMEOUT_SEC);
+        $written = @\fwrite($socket, $query);
+        if (false === $written || $written !== \strlen($query)) {
+            \fclose($socket);
+
+            return null;
+        }
+
+        $response = @\stream_get_contents($socket);
+        \fclose($socket);
+
+        return false === $response ? null : $response;
+    }
+
     private static function checkdnsrrViaResQuery(string $hostname, int $qtype): ?bool
     {
         if (!\extension_loaded('ffi')) {
