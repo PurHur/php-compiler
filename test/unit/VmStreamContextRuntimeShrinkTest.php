@@ -48,4 +48,29 @@ final class VmStreamContextRuntimeShrinkTest extends TestCase
         $followOut = $table->find('http')->resolveIndirect()->toArray()->find('follow_location');
         $this->assertSame(0, $followOut->resolveIndirect()->toInt());
     }
+
+    public function testStreamContextSetParamsBuiltinUsesBuiltinExecute(): void
+    {
+        $source = (string) file_get_contents(__DIR__.'/../../ext/standard/stream_context_set_params.php');
+        $this->assertStringContainsString('BuiltinExecute::writeReturn', $source);
+        $this->assertStringNotContainsString('if (null === $frame->returnVar)', $source);
+    }
+
+    public function testSetParamsStoresParamsBagInVmHashTable(): void
+    {
+        $ctx = VmStreamContext::create(['http' => ['timeout' => 5]]);
+        $ctxVar = new \PHPCompiler\VM\Variable();
+        $ctxVar->array($ctx);
+        $params = new \PHPCompiler\VM\Variable();
+        $params->newArray();
+        $source = new \PHPCompiler\VM\Variable();
+        $source->string('unit-test');
+        $params->toArray()->add('source', $source);
+
+        $this->assertTrue(VmStreamContext::setParams($ctxVar, $params));
+        $paramsSlot = $ctxVar->resolveIndirect()->toArray()->find(VmStreamContext::PARAMS_MARKER_KEY);
+        $this->assertNotNull($paramsSlot);
+        $sourceOut = $paramsSlot->resolveIndirect()->toArray()->find('source');
+        $this->assertSame('unit-test', $sourceOut->resolveIndirect()->toString());
+    }
 }

@@ -16,6 +16,9 @@ final class VmStreamContext
 {
     public const MARKER_KEY = '__phpc_stream_context';
 
+    /** Params bag (distinct from wrapper options; php-src php_stream_context.params). */
+    public const PARAMS_MARKER_KEY = '__phpc_stream_context_params';
+
     /** @var array<int, resource> */
     private static array $resources = [];
 
@@ -73,6 +76,9 @@ final class VmStreamContext
         $marker = new Variable(Variable::TYPE_INTEGER);
         $marker->int($id);
         $ht->add(self::MARKER_KEY, $marker);
+        if ([] !== $hostParams) {
+            self::attachParamsHashTable($ht, $hostParams);
+        }
 
         return $ht;
     }
@@ -92,6 +98,9 @@ final class VmStreamContext
         $marker = new Variable(Variable::TYPE_INTEGER);
         $marker->int($id);
         $ht->add(self::MARKER_KEY, $marker);
+        if (null !== $params && [] !== $params) {
+            self::attachParamsHashTable($ht, $params);
+        }
 
         return $ht;
     }
@@ -155,12 +164,30 @@ final class VmStreamContext
         string $functionName,
         int $argNum = 2
     ): Variable {
+        return self::requireContextArrayArg($var, $functionName, $argNum, 'options');
+    }
+
+    public static function requireParamsArray(
+        Variable $var,
+        string $functionName,
+        int $argNum = 2
+    ): Variable {
+        return self::requireContextArrayArg($var, $functionName, $argNum, 'params');
+    }
+
+    private static function requireContextArrayArg(
+        Variable $var,
+        string $functionName,
+        int $argNum,
+        string $label
+    ): Variable {
         $resolved = $var->resolveIndirect();
         if (Variable::TYPE_ARRAY !== $resolved->type) {
             throw new \TypeError(\sprintf(
-                '%s(): Argument #%d ($options) must be of type array, %s given',
+                '%s(): Argument #%d ($%s) must be of type array, %s given',
                 $functionName,
                 $argNum,
+                $label,
                 VmStreamArg::debugTypeName($resolved)
             ));
         }
@@ -191,6 +218,33 @@ final class VmStreamContext
     }
 
     /**
+     * Replace params on an existing stream context (issue #6122, php-src stream_context_set_params).
+     */
+    public static function setParams(Variable $context, Variable $params): bool
+    {
+        $context->separateArrayForWrite();
+        $context = self::requireRepresentation($context, 'stream_context_set_params');
+        $params = self::requireParamsArray($params, 'stream_context_set_params');
+
+        $exported = VmHttpBuildQuery::export($params);
+        if (!\is_array($exported)) {
+            throw new \TypeError(
+                'stream_context_set_params(): Argument #2 ($params) must be of type array, '
+                .VmStreamArg::debugTypeName($params).' given'
+            );
+        }
+
+        self::replaceParamsHashTable($context, $exported);
+
+        $resource = self::toHostResource($context);
+        if (\is_resource($resource) && \function_exists('stream_context_set_params')) {
+            \stream_context_set_params($resource, $exported);
+        }
+
+        return true;
+    }
+
+    /**
      * Return stream wrapper options without the internal marker key (issue #6517).
      */
     public static function getOptionsHashTable(Variable $context): HashTable
@@ -203,6 +257,9 @@ final class VmStreamContext
             if (Variable::TYPE_STRING === $k->type && self::MARKER_KEY === $k->toString()) {
                 continue;
             }
+            if (Variable::TYPE_STRING === $k->type && self::PARAMS_MARKER_KEY === $k->toString()) {
+                continue;
+            }
             $copyVal = new Variable();
             $copyVal->copyFrom($value);
             if (Variable::TYPE_STRING === $k->type) {
@@ -213,5 +270,36 @@ final class VmStreamContext
         }
 
         return $out;
+    }
+
+    /**
+     * @param array<string, mixed> $params
+     */
+    private static function attachParamsHashTable(HashTable $context, array $params): void
+    {
+        $paramsHt = new HashTable();
+        VmParseStr::mergeInto($paramsHt, $params);
+        $slot = new Variable();
+        $slot->array($paramsHt);
+        $context->add(self::PARAMS_MARKER_KEY, $slot);
+    }
+
+    /**
+     * @param array<string, mixed> $params
+     */
+    private static function replaceParamsHashTable(Variable $context, array $params): void
+    {
+        $paramsHt = new HashTable();
+        VmParseStr::mergeInto($paramsHt, $params);
+        $slot = new Variable();
+        $slot->array($paramsHt);
+        $contextArray = $context->toArray();
+        $existing = $contextArray->find(self::PARAMS_MARKER_KEY);
+        if (null !== $existing) {
+            $existing->separateArrayForWrite();
+            $existing->copyFrom($slot);
+        } else {
+            $contextArray->add(self::PARAMS_MARKER_KEY, $slot);
+        }
     }
 }
