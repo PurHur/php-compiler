@@ -12,7 +12,7 @@ use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Value;
 
-/** timezone_version_get() — IANA tzdata version string (ext/date/php_date.c, #6832). */
+/** timezone_version_get() — tzdata version sentinel via VmDate (ext/date/php_date.c, #6832, #8032). */
 final class timezone_version_get extends Internal
 {
     public function __construct()

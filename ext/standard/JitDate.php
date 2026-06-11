@@ -57,7 +57,7 @@ final class JitDate
         return self::libcUidToI64($context, 'getgid');
     }
 
-    /** timezone_version_get() — tzdata version baked at JIT link from host bridge (#6832). */
+    /** timezone_version_get() — tzdata version baked at JIT link from VmDate (#6832, #8032). */
     public static function timezone_version_get(Context $context): Value
     {
         $version = VmDate::timezone_version_get();
