@@ -53,9 +53,13 @@ final class CycleCollector
     }
 
     /** Release VM allocator caches — no Zend MM layer yet (php_gc.c gc_mem_caches subset). */
-    public static function memCaches(): void
+    public static function memCaches(): int
     {
+        $peak = MemoryAccounting::peakBytes();
+        $current = MemoryAccounting::currentBytes();
         MemoryAccounting::resetPeakToCurrent();
+
+        return max(0, $peak - $current);
     }
 
     public static function collect(Context $ctx): int
