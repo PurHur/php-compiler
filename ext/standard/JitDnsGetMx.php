@@ -17,11 +17,14 @@ final class JitDnsGetMx
         Context $context,
         JITVariable $hostnameArg,
         JITVariable $hostsArg,
-        ?JITVariable $weightsArg
+        ?JITVariable $weightsArg,
+        string $function = 'dns_get_mx'
     ): Value {
         $literal = JitStringArg::compileTimeLiteral($hostnameArg);
         if (null === $literal) {
-            throw new \LogicException('dns_get_mx() requires compile-time string hostname for JIT/AOT in this build');
+            throw new \LogicException(
+                $function.'() requires compile-time string hostname for JIT/AOT in this build'
+            );
         }
 
         $materialized = JitDnsGetMxMaterializer::materialize($context, $literal);

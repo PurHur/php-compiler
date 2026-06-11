@@ -13,7 +13,7 @@ use PHPLLVM\Value;
 /**
  * getmxrr() — MX record lookup (ext/standard/dns.c parity, #3662).
  *
- * VM: VmDns::dnsGetMx(). JIT/AOT: VM-only v1.
+ * VM: VmDns::dnsGetMx(). JIT/AOT: {@see JitDnsGetMx} (same MX materializer as dns_get_mx()).
  *
  * @see https://github.com/php/php-src/blob/master/ext/standard/dns.c PHP_FUNCTION(getmxrr)
  */
@@ -28,7 +28,10 @@ final class getmxrr extends Internal
     {
         $argc = \count($frame->calledArgs);
         if ($argc < 2 || $argc > 3) {
-            throw new \LogicException('getmxrr() requires two or three arguments in this compiler build');
+            throw new \ArgumentCountError(\sprintf(
+                'getmxrr() expects between 2 and 3 arguments, %d given',
+                $argc
+            ));
         }
         if (null === $frame->returnVar) {
             return;
@@ -52,6 +55,13 @@ final class getmxrr extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        throw new \LogicException('getmxrr() is not implemented for JIT in this compiler build (issue #3662)');
+        $argc = \count($args);
+        if ($argc < 2 || $argc > 3) {
+            throw new \LogicException('getmxrr() expects between 2 and 3 arguments in this compiler build');
+        }
+
+        $weightsArg = $argc >= 3 ? $args[2] : null;
+
+        return JitDnsGetMx::invoke($context, $args[0], $args[1], $weightsArg, 'getmxrr');
     }
 }
