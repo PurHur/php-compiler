@@ -1151,6 +1151,7 @@ class Type extends Builtin {
         GethostbynamelRuntime::ensureLinked($this->context);
         GethostbyaddrRuntime::ensureLinked($this->context);
         CheckdnsrrRuntime::ensureLinked($this->context);
+        CheckdateRuntime::ensureLinked($this->context);
         InetRuntime::ensureLinked($this->context);
         TimeSleepRuntime::ensureLinked($this->context);
         ProcessRuntime::ensureLinked($this->context);
