@@ -7,9 +7,16 @@ namespace PHPCompiler;
 use PHPCompiler\ext\standard\VmStreamContext;
 use PHPUnit\Framework\TestCase;
 
-/** VmStreamContext::setOptions must not sync to host Zend stream resources (#6517 phase 2, #1492). */
+/** VmStreamContext must not sync to host Zend stream resources (#6517/#6122 phase 2, #8058). */
 final class VmStreamContextRuntimeShrinkTest extends TestCase
 {
+    public function testSetParamsDoesNotDelegateToHostStreamContextSetParams(): void
+    {
+        $source = (string) file_get_contents(__DIR__.'/../../ext/standard/VmStreamContext.php');
+        $this->assertStringNotContainsString("function_exists('stream_context_set_params')", $source);
+        $this->assertStringNotContainsString('\\stream_context_set_params(', $source);
+    }
+
     public function testSetOptionsDoesNotDelegateToHostStreamContextSetOptions(): void
     {
         $source = (string) file_get_contents(__DIR__.'/../../ext/standard/VmStreamContext.php');
