@@ -61,6 +61,9 @@ final class BuiltinParamNames
             case 'sscanf':
                 return ['string', 'format'];
             case 'vfscanf':
+            case 'fscanf':
+                return ['stream', 'format'];
+            case 'fprintf':
                 return ['stream', 'format'];
             case 'get_resources':
                 return ['resource_type'];
