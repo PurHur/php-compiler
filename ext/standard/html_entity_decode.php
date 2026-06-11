@@ -58,24 +58,20 @@ final class html_entity_decode extends Internal
             throw new \LogicException('html_entity_decode() requires one or two arguments in this compiler build');
         }
 
-        $literal = null;
-        if (JITVariable::TYPE_VALUE !== $args[0]->type) {
-            $maybeLiteral = $args[0]->compileTimeString ?? null;
-            if (null !== $maybeLiteral && JITVariable::KIND_VALUE === $args[0]->kind) {
-                $literal = $maybeLiteral;
-            }
-        }
+        $literal = $args[0]->compileTimeString ?? null;
         $flags = ENT_COMPAT;
+        $flagsKnown = $argc < 2;
         if ($argc >= 2) {
             if (JITVariable::TYPE_NATIVE_LONG !== $args[1]->type) {
                 throw new \LogicException('html_entity_decode() flags must be an integer in this compiler build');
             }
-            $ct = $args[1]->compileTimeLong ?? null;
+            $ct = self::tryCompileTimeFlags($context, $args[1]);
             if (null !== $ct) {
-                $flags = (int) $ct;
+                $flags = $ct;
+                $flagsKnown = true;
             }
         }
-        if (null !== $literal && 1 === $argc) {
+        if (null !== $literal && $flagsKnown) {
             return $context->builder->load(
                 $context->constantStringFromString(
                     VmString::html_entity_decode($literal, $flags)
@@ -86,10 +82,23 @@ final class html_entity_decode extends Internal
         $str = JitStringBuiltinArg::lower($context, $args[0], 'html_entity_decode', 0, 'string');
         $i64 = $context->getTypeFromString('int64');
         $flagsVal = $i64->constInt($flags, false);
-        if ($argc >= 2 && null === ($args[1]->compileTimeLong ?? null)) {
+        if ($argc >= 2 && !$flagsKnown) {
             $flagsVal = $context->helper->loadValue($args[1]);
         }
 
         return JitHtmlEntityDecode::decode($context, $str, $flagsVal);
+    }
+
+    private static function tryCompileTimeFlags(Context $context, JITVariable $arg): ?int
+    {
+        if (JITVariable::TYPE_NATIVE_LONG !== $arg->type || JITVariable::KIND_VALUE !== $arg->kind) {
+            return null;
+        }
+        $lib = $context->llvm->lib;
+        if (null === $lib->LLVMIsAConstantInt($arg->value->value)) {
+            return null;
+        }
+
+        return (int) $lib->LLVMConstIntGetZExtValue($arg->value->value);
     }
 }
