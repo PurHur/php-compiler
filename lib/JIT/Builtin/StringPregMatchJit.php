@@ -237,17 +237,16 @@ final class StringPregMatchJit
 
     private static function ensureLibc(Context $context): void
     {
-        $voidPtr = $context->getTypeFromString('void*');
         $voidTy = $context->getTypeFromString('void');
         $sizeT = $context->getTypeFromString('size_t');
         $i8p = $context->getTypeFromString('int8*');
 
         foreach (
             [
-                ['malloc', $voidPtr, [$sizeT]],
-                ['realloc', $voidPtr, [$voidPtr, $sizeT]],
+                ['malloc', $i8p, [$sizeT]],
+                ['realloc', $i8p, [$i8p, $sizeT]],
                 ['free', $voidTy, [$i8p]],
-                ['memcpy', $voidTy, [$voidPtr, $voidPtr, $sizeT]],
+                ['memcpy', $i8p, [$i8p, $i8p, $sizeT]],
                 ['strlen', $sizeT, [$i8p]],
             ] as [$name, $ret, $params]
         ) {
@@ -438,10 +437,8 @@ final class StringPregMatchJit
         $one = $sizeT->constInt(1, false);
         $two = $sizeT->constInt(2, false);
         $zeroSize = $sizeT->constInt(0, false);
-        $nullPtr = $i8p->constNull();
-
         $failBb = $fn->appendBasicBlock('pp_fail');
-        $nullPattern = $context->builder->icmp(Builder::INT_EQ, $pattern, $nullPtr);
+        $nullPattern = self::isNullI8Ptr($context, $pattern);
         $shortPattern = $context->builder->icmp(Builder::INT_ULT, $patternLen, $two);
         $preCheckBb = $fn->appendBasicBlock('pp_pre_check');
         $context->builder->branchIf(
@@ -576,7 +573,7 @@ final class StringPregMatchJit
 
         $context->builder->positionAtEnd($modBadBb);
         $context->builder->call($context->lookupFunction('free'), $regexPtr);
-        $context->builder->store($nullPtr, $regexOut);
+        $context->builder->store($i8p->constNull(), $regexOut);
         $context->builder->branch($failBb);
 
         $context->builder->positionAtEnd($modOkBb);
@@ -746,7 +743,7 @@ final class StringPregMatchJit
             $code,
             $voidPtr->constNull()
         );
-        $mdNull = $context->builder->icmp(Builder::INT_EQ, $matchData, $voidPtr->constNull());
+        $mdNull = self::isNullI8Ptr($context, $matchData);
         $matchBb = $fn->appendBasicBlock('pm_match');
         $mdFailBb = $fn->appendBasicBlock('pm_md_fail');
         $context->builder->branchIf($mdNull, $mdFailBb, $matchBb);
@@ -859,7 +856,7 @@ final class StringPregMatchJit
             $code,
             $voidPtr->constNull()
         );
-        $mdNull = $context->builder->icmp(Builder::INT_EQ, $matchData, $voidPtr->constNull());
+        $mdNull = self::isNullI8Ptr($context, $matchData);
         $initLoopBb = $fn->appendBasicBlock('pr_init_loop');
         $mdFailBb = $fn->appendBasicBlock('pr_md_fail');
         $context->builder->branchIf($mdNull, $mdFailBb, $initLoopBb);
@@ -1133,8 +1130,8 @@ final class StringPregMatchJit
         $bufLen = $context->builder->load($bufLenSlot);
         $context->builder->call(
             $context->lookupFunction('memcpy'),
-            $context->builder->pointerCast($context->builder->gep($buf, $bufLen), $voidPtr),
-            $context->builder->pointerCast($context->bytePtr($src), $voidPtr),
+            $context->builder->gep($buf, $bufLen),
+            $context->bytePtr($src),
             $len
         );
         $context->builder->store($context->builder->add($bufLen, $len), $bufLenSlot);
@@ -1250,7 +1247,7 @@ final class StringPregMatchJit
             $code,
             $voidPtr->constNull()
         );
-        $mdNull = $context->builder->icmp(Builder::INT_EQ, $matchData, $voidPtr->constNull());
+        $mdNull = self::isNullI8Ptr($context, $matchData);
         $initLoopBb = $fn->appendBasicBlock('cma_init_loop');
         $mdFailBb = $fn->appendBasicBlock('cma_md_fail');
         $context->builder->branchIf($mdNull, $mdFailBb, $initLoopBb);
@@ -1406,7 +1403,7 @@ final class StringPregMatchJit
             $code,
             $voidPtr->constNull()
         );
-        $mdNull = $context->builder->icmp(Builder::INT_EQ, $matchData, $voidPtr->constNull());
+        $mdNull = self::isNullI8Ptr($context, $matchData);
         $initLoopBb = $fn->appendBasicBlock('crc_init_loop');
         $mdFailBb = $fn->appendBasicBlock('crc_md_fail');
         $context->builder->branchIf($mdNull, $mdFailBb, $initLoopBb);
@@ -1785,7 +1782,7 @@ final class StringPregMatchJit
             $code,
             $voidPtr->constNull()
         );
-        $mdNull = $context->builder->icmp(Builder::INT_EQ, $matchData, $voidPtr->constNull());
+        $mdNull = self::isNullI8Ptr($context, $matchData);
         $initLoopBb = $fn->appendBasicBlock('ps_init_loop');
         $mdFailBb = $fn->appendBasicBlock('ps_md_fail');
         $context->builder->branchIf($mdNull, $mdFailBb, $initLoopBb);
@@ -2165,12 +2162,13 @@ final class StringPregMatchJit
 
     private static function isNullI8Ptr(Context $context, Value $ptr): Value
     {
-        $voidPtr = $context->getTypeFromString('void*');
+        $i8p = $context->getTypeFromString('int8*');
+        $i64 = $context->getTypeFromString('int64');
 
         return $context->builder->icmp(
             Builder::INT_EQ,
-            $context->builder->pointerCast($ptr, $voidPtr),
-            $voidPtr->constNull()
+            $context->builder->ptrToInt($context->builder->pointerCast($ptr, $i8p), $i64),
+            $i64->constInt(0, false)
         );
     }
 
