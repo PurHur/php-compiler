@@ -442,58 +442,86 @@ final class BootstrapCompileSmokeM3Emit
             return $objPtr->constNull();
         }
         $parseFn = $context->functions[$parseLc];
-        // Inventory argv driver lowers parse + compileEmitSmoke on the link spine (#3004).
-        // Call them directly — not Runtime::parseandcompile (same native wrapper → recursion).
+        // Inventory argv driver prefers compileEmitSmoke; gen-0 bootstrap bundles need full compile (#3004, #1492).
+        // Parse once, then try each compile spine in order until one returns non-null.
+        $compileFns = [];
         foreach (['compileemitsmoke', 'compile'] as $compileMethod) {
             $compileLc = strtolower('PHPCompiler\\Runtime::'.$compileMethod);
-            if (!isset($context->functions[$compileLc])) {
-                continue;
+            if (isset($context->functions[$compileLc])) {
+                $compileFns[] = $context->functions[$compileLc];
             }
-            $tag = 'd'.(string) ++self::$seq;
-            $failBb = BasicBlockHelper::append($context, 'csm3_pac_default_fail_'.$tag);
-            $compileBb = BasicBlockHelper::append($context, 'csm3_pac_default_compile_'.$tag);
-            $tailBb = BasicBlockHelper::append($context, 'csm3_pac_default_tail_'.$tag);
-            $script = $context->builder->call($parseFn, $runtimeThis, $code, $filename);
-            $scriptNull = $context->builder->icmp(Builder::INT_EQ, $script, $objPtr->constNull());
-            $context->builder->branchIf($scriptNull, $failBb, $compileBb);
-
-            $context->builder->positionAtEnd($failBb);
-            $context->builder->call(
-                self::runtimeSpine($context, 'noteparsecompilenullforscript', 'void', ['__object__*', '__object__*']),
-                $runtimeThis,
-                $objPtr->constNull()
-            );
-            $context->builder->branch($tailBb);
-
-            $context->builder->positionAtEnd($compileBb);
-            $block = $context->builder->call($context->functions[$compileLc], $runtimeThis, $script);
-            $blockNull = $context->builder->icmp(Builder::INT_EQ, $block, $objPtr->constNull());
-            $recordBb = BasicBlockHelper::append($context, 'csm3_pac_record_'.$tag);
-            $afterRecordBb = BasicBlockHelper::append($context, 'csm3_pac_after_record_'.$tag);
-            $context->builder->branchIf($blockNull, $recordBb, $afterRecordBb);
-            $context->builder->positionAtEnd($recordBb);
-            $context->builder->call(
-                self::runtimeSpine($context, 'noteparsecompilenullforscript', 'void', ['__object__*', '__object__*']),
-                $runtimeThis,
-                $script
-            );
-            $context->builder->branch($afterRecordBb);
-            $context->builder->positionAtEnd($afterRecordBb);
-            $afterPhi = $context->builder->phi($objPtr);
-            $afterPhi->addIncoming($objPtr->constNull(), $recordBb);
-            $afterPhi->addIncoming($block, $compileBb);
-            $context->builder->branch($tailBb);
-
-            $context->builder->positionAtEnd($tailBb);
-            $phi = $context->builder->phi($objPtr);
-            $phi->addIncoming($objPtr->constNull(), $failBb);
-            // compileBb branches via record/afterRecord, not directly to tail (#3023).
-            $phi->addIncoming($block, $afterRecordBb);
-
-            return $phi;
+        }
+        if ([] === $compileFns) {
+            return $objPtr->constNull();
         }
 
-        return $objPtr->constNull();
+        $tag = 'd'.(string) ++self::$seq;
+        $parseFailBb = BasicBlockHelper::append($context, 'csm3_pac_default_parse_fail_'.$tag);
+        $afterParseBb = BasicBlockHelper::append($context, 'csm3_pac_default_after_parse_'.$tag);
+        $doneBb = BasicBlockHelper::append($context, 'csm3_pac_default_done_'.$tag);
+
+        $script = $context->builder->call($parseFn, $runtimeThis, $code, $filename);
+        $scriptNull = $context->builder->icmp(Builder::INT_EQ, $script, $objPtr->constNull());
+        $context->builder->branchIf($scriptNull, $parseFailBb, $afterParseBb);
+
+        $context->builder->positionAtEnd($parseFailBb);
+        $context->builder->call(
+            self::runtimeSpine($context, 'noteparsecompilenullforscript', 'void', ['__object__*', '__object__*']),
+            $runtimeThis,
+            $objPtr->constNull()
+        );
+        $context->builder->branch($doneBb);
+
+        $currentBb = $afterParseBb;
+        /** @var list<array{Value, \PHPLLVM\BasicBlock}> $successIncoming */
+        $successIncoming = [];
+        $allFailedBb = $afterParseBb;
+
+        $compileCount = count($compileFns);
+        foreach ($compileFns as $index => $compileFn) {
+            $tryTag = $tag.'_c'.$index;
+            $tryBb = $currentBb;
+            $nextBb = BasicBlockHelper::append($context, 'csm3_pac_default_next_'.$tryTag);
+            $successBb = BasicBlockHelper::append($context, 'csm3_pac_default_ok_'.$tryTag);
+            $recordBb = BasicBlockHelper::append($context, 'csm3_pac_default_rec_'.$tryTag);
+
+            $context->builder->positionAtEnd($tryBb);
+            $block = $context->builder->call($compileFn, $runtimeThis, $script);
+            $blockNull = $context->builder->icmp(Builder::INT_EQ, $block, $objPtr->constNull());
+            $context->builder->branchIf($blockNull, $recordBb, $successBb);
+
+            $context->builder->positionAtEnd($recordBb);
+            if ($index === $compileCount - 1) {
+                $context->builder->call(
+                    self::runtimeSpine($context, 'noteparsecompilenullforscript', 'void', ['__object__*', '__object__*']),
+                    $runtimeThis,
+                    $script
+                );
+            }
+            $context->builder->branch($nextBb);
+
+            $context->builder->positionAtEnd($successBb);
+            $context->builder->branch($doneBb);
+            $successIncoming[] = [$block, $successBb];
+
+            $currentBb = $nextBb;
+            $allFailedBb = $nextBb;
+        }
+
+        $context->builder->positionAtEnd($allFailedBb);
+        $context->builder->branch($doneBb);
+
+        $context->builder->positionAtEnd($doneBb);
+        $phi = $context->builder->phi($objPtr);
+        $phi->addIncoming($objPtr->constNull(), $parseFailBb);
+        foreach ($successIncoming as [$val, $bb]) {
+            $phi->addIncoming($val, $bb);
+        }
+        if ($allFailedBb !== $afterParseBb) {
+            $phi->addIncoming($objPtr->constNull(), $allFailedBb);
+        }
+
+        return $phi;
     }
 
     /**
