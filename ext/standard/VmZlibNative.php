@@ -126,6 +126,36 @@ final class VmZlibNative
         return self::inflateBytes($ffi, $data, 31, $maxLength);
     }
 
+    /** php_zlib_encode() — deflateInit2 windowBits from encoding (ext/zlib/zlib.c, issue #6288). */
+    public static function zlib_encode(string $data, int $encoding, int $level = -1): string|false
+    {
+        $ffi = self::ffi();
+        if (null === $ffi) {
+            return false;
+        }
+        $windowBits = self::encodingToWindowBits($encoding);
+        if (null === $windowBits) {
+            return false;
+        }
+
+        return self::deflateBytes($ffi, $data, self::normalizeLevel($level), $windowBits);
+    }
+
+    /** php_zlib_decode() — auto-detect then raw retry (ext/zlib/zlib.c, issue #6288). */
+    public static function zlib_decode(string $data, int $maxLength = 0): string|false
+    {
+        $ffi = self::ffi();
+        if (null === $ffi) {
+            return false;
+        }
+        $result = self::inflateBytes($ffi, $data, 47, $maxLength);
+        if (false !== $result) {
+            return $result;
+        }
+
+        return self::inflateBytes($ffi, $data, -15, $maxLength);
+    }
+
     private static function ffi(): ?\FFI
     {
         if (self::$ffiUnavailable) {
@@ -212,7 +242,22 @@ CDEF;
 
     private static function isDeflateEncoding(int $encoding): bool
     {
-        return self::ENCODING_DEFLATE === $encoding || -16 === $encoding;
+        return self::ENCODING_DEFLATE === $encoding || -16 === $encoding || 15 === $encoding;
+    }
+
+    private static function encodingToWindowBits(int $encoding): ?int
+    {
+        if (self::isGzipEncoding($encoding)) {
+            return 31;
+        }
+        if (self::isDeflateEncoding($encoding)) {
+            return 15;
+        }
+        if (self::isRawEncoding($encoding)) {
+            return -15;
+        }
+
+        return null;
     }
 
     private static function compress2(\FFI $ffi, string $data, int $level): string|false

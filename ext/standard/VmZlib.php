@@ -62,4 +62,14 @@ final class VmZlib
     {
         return VmZlibNative::gzdecode($data, $maxLength);
     }
+
+    public static function zlib_encode(string $data, int $encoding, int $level = -1): string|false
+    {
+        return VmZlibNative::zlib_encode($data, $encoding, $level);
+    }
+
+    public static function zlib_decode(string $data, int $maxLength = 0): string|false
+    {
+        return VmZlibNative::zlib_decode($data, $maxLength);
+    }
 }

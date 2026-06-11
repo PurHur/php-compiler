@@ -85,6 +85,29 @@ final class JitZlib
         ));
     }
 
+    public static function zlibEncode(Context $context, Value $data, Value $encoding, Value $level): Value
+    {
+        StringZlib::ensureLinked($context);
+
+        return self::stringOrFalse($context, $context->builder->call(
+            $context->lookupFunction('__compiler_zlib_encode'),
+            $data,
+            $encoding,
+            $level
+        ));
+    }
+
+    public static function zlibDecode(Context $context, Value $data, Value $maxLength): Value
+    {
+        StringZlib::ensureLinked($context);
+
+        return self::stringOrFalse($context, $context->builder->call(
+            $context->lookupFunction('__compiler_zlib_decode'),
+            $data,
+            $maxLength
+        ));
+    }
+
     private static function stringOrFalse(Context $context, Value $result): Value
     {
         $id = (string) (++self::$blockSerial);

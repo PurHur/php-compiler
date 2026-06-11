@@ -25,6 +25,8 @@ final class StringZlibJit
         '__compiler_gzinflate',
         '__compiler_gzencode',
         '__compiler_gzdecode',
+        '__compiler_zlib_encode',
+        '__compiler_zlib_decode',
     ];
 
     private const DEFLATE_BYTES_HELPER = '__phpc_zc_deflate_bytes';
@@ -67,6 +69,8 @@ final class StringZlibJit
         self::implementIfMissing($context, '__compiler_gzinflate', self::emitGzinflate(...));
         self::implementIfMissing($context, '__compiler_gzencode', self::emitGzencode(...));
         self::implementIfMissing($context, '__compiler_gzdecode', self::emitGzdecode(...));
+        self::implementIfMissing($context, '__compiler_zlib_encode', self::emitZlibEncode(...));
+        self::implementIfMissing($context, '__compiler_zlib_decode', self::emitZlibDecode(...));
 
         self::registerLinkedRuntime($context);
     }
@@ -103,13 +107,15 @@ final class StringZlibJit
         $fn = match ($name) {
             '__compiler_gzcompress',
             '__compiler_gzdeflate',
-            '__compiler_gzencode' => $context->module->addFunction(
+            '__compiler_gzencode',
+            '__compiler_zlib_encode' => $context->module->addFunction(
                 $name,
                 $context->context->functionType($strPtr, false, $strPtr, $i64, $i64)
             ),
             '__compiler_gzuncompress',
             '__compiler_gzinflate',
-            '__compiler_gzdecode' => $context->module->addFunction(
+            '__compiler_gzdecode',
+            '__compiler_zlib_decode' => $context->module->addFunction(
                 $name,
                 $context->context->functionType($strPtr, false, $strPtr, $i64)
             ),
@@ -775,6 +781,121 @@ final class StringZlibJit
         );
     }
 
+    private static function emitZlibEncode(Context $context, LlvmFunction $fn): void
+    {
+        $entry = $fn->appendBasicBlock('entry');
+        $context->builder->positionAtEnd($entry);
+
+        $i32 = $context->getTypeFromString('int32');
+        $strPtr = $context->getTypeFromString('__string__*');
+        $data = $fn->getParam(0);
+        $encoding = $fn->getParam(1);
+        $level = $fn->getParam(2);
+        $nullString = $strPtr->constNull();
+
+        $isNull = $context->builder->icmp(Builder::INT_EQ, $data, $nullString);
+        $fail = $fn->appendBasicBlock('zlib_encode_fail');
+        $body = $fn->appendBasicBlock('zlib_encode_body');
+        $context->builder->branchIf($isNull, $fail, $body);
+
+        $context->builder->positionAtEnd($fail);
+        $context->builder->returnValue($nullString);
+
+        $context->builder->positionAtEnd($body);
+        $in = self::stringData($context, $data);
+        $inLen = self::stringLen($context, $data);
+        $lvl = self::normalizeLevel($context, $level);
+        $windowBits = BasicBlockHelper::entryAlloca($context, $i32);
+        $context->builder->store($i32->constInt(-15, true), $windowBits);
+        $isGzip = self::isGzipEncoding($context, $encoding);
+        $isDeflate = self::isDeflateEncoding($context, $encoding);
+        $isRaw = self::isRawEncoding($context, $encoding);
+        $gzipBlock = $fn->appendBasicBlock('zlib_encode_gzip');
+        $checkDeflate = $fn->appendBasicBlock('zlib_encode_check_deflate');
+        $deflateSet = $fn->appendBasicBlock('zlib_encode_set_deflate');
+        $checkRaw = $fn->appendBasicBlock('zlib_encode_check_raw');
+        $rawSet = $fn->appendBasicBlock('zlib_encode_set_raw');
+        $callBlock = $fn->appendBasicBlock('zlib_encode_call');
+        $context->builder->branchIf($isGzip, $gzipBlock, $checkDeflate);
+
+        $context->builder->positionAtEnd($gzipBlock);
+        $context->builder->store($i32->constInt(31, true), $windowBits);
+        $context->builder->branch($callBlock);
+
+        $context->builder->positionAtEnd($checkDeflate);
+        $context->builder->branchIf($isDeflate, $deflateSet, $checkRaw);
+
+        $context->builder->positionAtEnd($deflateSet);
+        $context->builder->store($i32->constInt(15, false), $windowBits);
+        $context->builder->branch($callBlock);
+
+        $context->builder->positionAtEnd($checkRaw);
+        $context->builder->branchIf($isRaw, $rawSet, $callBlock);
+
+        $context->builder->positionAtEnd($rawSet);
+        $context->builder->store($i32->constInt(-15, true), $windowBits);
+        $context->builder->branch($callBlock);
+
+        $context->builder->positionAtEnd($callBlock);
+        $context->builder->returnValue(
+            $context->builder->call(
+                $context->lookupFunction(self::DEFLATE_BYTES_HELPER),
+                $in,
+                $inLen,
+                $lvl,
+                $context->builder->load($windowBits)
+            )
+        );
+    }
+
+    private static function emitZlibDecode(Context $context, LlvmFunction $fn): void
+    {
+        $entry = $fn->appendBasicBlock('entry');
+        $context->builder->positionAtEnd($entry);
+
+        $i32 = $context->getTypeFromString('int32');
+        $strPtr = $context->getTypeFromString('__string__*');
+        $data = $fn->getParam(0);
+        $maxLength = $fn->getParam(1);
+        $nullString = $strPtr->constNull();
+
+        $isNull = $context->builder->icmp(Builder::INT_EQ, $data, $nullString);
+        $fail = $fn->appendBasicBlock('zlib_decode_fail');
+        $body = $fn->appendBasicBlock('zlib_decode_body');
+        $context->builder->branchIf($isNull, $fail, $body);
+
+        $context->builder->positionAtEnd($fail);
+        $context->builder->returnValue($nullString);
+
+        $context->builder->positionAtEnd($body);
+        $in = self::stringData($context, $data);
+        $inLen = self::stringLen($context, $data);
+        $anyResult = $context->builder->call(
+            $context->lookupFunction(self::INFLATE_BYTES_HELPER),
+            $in,
+            $inLen,
+            $i32->constInt(47, false),
+            $maxLength
+        );
+        $anyOk = $context->builder->icmp(Builder::INT_NE, $anyResult, $nullString);
+        $retryBlock = $fn->appendBasicBlock('zlib_decode_retry');
+        $doneOk = $fn->appendBasicBlock('zlib_decode_done_ok');
+        $context->builder->branchIf($anyOk, $doneOk, $retryBlock);
+
+        $context->builder->positionAtEnd($retryBlock);
+        $rawResult = $context->builder->call(
+            $context->lookupFunction(self::INFLATE_BYTES_HELPER),
+            $in,
+            $inLen,
+            $i32->constInt(-15, true),
+            $maxLength
+        );
+        $context->builder->returnValue($rawResult);
+
+        $context->builder->positionAtEnd($doneOk);
+        $context->builder->returnValue($anyResult);
+    }
+
     private static function allocZeroedZStream(Context $context): Value
     {
         $i8 = $context->getTypeFromString('int8');
@@ -877,8 +998,9 @@ final class StringZlibJit
             $i64->constInt(self::PHP_ZLIB_ENCODING_DEFLATE, false)
         );
         $encNeg16 = $context->builder->icmp(Builder::INT_EQ, $encoding, $i64->constInt(-16, true));
+        $enc15 = $context->builder->icmp(Builder::INT_EQ, $encoding, $i64->constInt(15, false));
 
-        return $context->builder->or($encDeflate, $encNeg16);
+        return $context->builder->or($encDeflate, $context->builder->or($encNeg16, $enc15));
     }
 
     private static function registerLinkedRuntime(Context $context): void
