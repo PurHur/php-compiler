@@ -62,6 +62,54 @@ final class VmDate
     }
 
     /**
+     * date_sun_info() — sunrise/sunset and twilight timestamps (ext/date/php_date.c, #6831).
+     *
+     * Host bridge: delegate to Zend date extension when the compiler runs under PHP.
+     */
+    public static function dateSunInfo(int $time, float $latitude, float $longitude): HashTable
+    {
+        return self::arrayToHashTable(self::dateSunInfoNative($time, $latitude, $longitude));
+    }
+
+    /**
+     * @return array<string, int|bool>
+     */
+    public static function dateSunInfoNative(int $time, float $latitude, float $longitude): array
+    {
+        if (!\is_finite($latitude)) {
+            throw new \ValueError('date_sun_info(): Argument #2 ($latitude) must be finite');
+        }
+        if (!\is_finite($longitude)) {
+            throw new \ValueError('date_sun_info(): Argument #3 ($longitude) must be finite');
+        }
+        if (!\function_exists('date_sun_info')) {
+            throw new \LogicException('date_sun_info() requires host PHP date extension');
+        }
+
+        /** @var array<string, int|bool> $raw */
+        $raw = \date_sun_info($time, $latitude, $longitude);
+
+        return $raw;
+    }
+
+    /**
+     * @param array<string, int|bool> $data
+     */
+    public static function arrayToHashTable(array $data): HashTable
+    {
+        $ht = new HashTable();
+        foreach ($data as $key => $value) {
+            if (\is_int($value)) {
+                self::hashSetLong($ht, (string) $key, $value);
+            } elseif (\is_bool($value)) {
+                self::hashSetBool($ht, (string) $key, $value);
+            }
+        }
+
+        return $ht;
+    }
+
+    /**
      * getmyinode() — inode of the executed script (ext/standard/basic_functions.c, #3611).
      *
      * @return int|false
@@ -659,6 +707,13 @@ final class VmDate
     private static function hashSetLong(HashTable $ht, string $key, int $value): void
     {
         $ht->add($key, self::intVariable($value));
+    }
+
+    private static function hashSetBool(HashTable $ht, string $key, bool $value): void
+    {
+        $var = new Variable(Variable::TYPE_BOOLEAN);
+        $var->bool($value);
+        $ht->add($key, $var);
     }
 
     private static function hashSetString(HashTable $ht, string $key, string $value): void

@@ -666,6 +666,7 @@ class Module extends ModuleAbstract
             new gmmktime(),
             new localtime(),
             new idate(),
+            new date_sun_info(),
             new sleep(),
             new spl_autoload_register(),
             new time_nanosleep(),
