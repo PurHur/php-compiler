@@ -1,0 +1,310 @@
+# Production deployment guide
+
+End-to-end path from **`phpc build --project`** → **`phpc deploy`** → nginx/CGI (or future FastCGI) in production. For a shorter first deploy, start with the [AOT deploy quickstart](deploy-web-aot.md) ([#635](https://github.com/PurHur/php-compiler/issues/635)).
+
+All nginx blocks below are **illustrative** — not exercised in CI. Adapt paths, sockets, and TLS to your host; run `nginx -t` before reload.
+
+## Prerequisites
+
+| Requirement | Notes |
+|-------------|-------|
+| Built compiler | `make docker-build-22` → image `php-compiler:22.04-dev` |
+| LLVM 9 | Inside the dev image (default) for `phpc build --project` |
+| Harness hosts | Empty bind-mount: use `./script/docker-exec.sh` or `./script/docker-ci-local.sh` ([local-ci-matrix.md](local-ci-matrix.md)) |
+| Deploy CLI | `phpc deploy` ([#609](https://github.com/PurHur/php-compiler/issues/609)) |
+
+Commands assume repository root and `./phpc` (wrapper around `bin/phpc.php`).
+
+## 1. Build and deploy
+
+### Minimal static app (`002-StaticWeb`)
+
+Smallest dist — no `public/` tree; good for first smoke:
+
+```bash
+./phpc build --project examples/002-StaticWeb
+./phpc deploy examples/002-StaticWeb -o /tmp/static-dist
+export PHPC_DEPLOY_ROOT=/tmp/static-dist
+./bin/app   # from dist, or set QUERY_STRING for CGI-style output
+```
+
+### Full web app (`003-MiniWebApp`)
+
+Native AOT link and execute are green on supported routes ([#752](https://github.com/PurHur/php-compiler/issues/752), [#764](https://github.com/PurHur/php-compiler/issues/764)). Deploy copies `public/`, `assets/`, and `templates/` for nginx + runtime includes.
+
+```bash
+./phpc build --project examples/003-MiniWebApp
+./phpc deploy examples/003-MiniWebApp -o /tmp/miniwebapp-dist
+export PHPC_DEPLOY_ROOT=/tmp/miniwebapp-dist
+```
+
+Verify execute before nginx:
+
+```bash
+DEPLOY_SMOKE_003_EXECUTE=1 ./script/deploy-smoke.sh --example 003
+# or full north-star bundle:
+make north-star1-verify
+```
+
+Route matrix and gate ladder: [examples/003-MiniWebApp/README.md](../examples/003-MiniWebApp/README.md).
+
+### Sessions (`005-SessionsWeb`)
+
+Requires writable `PHP_COMPILER_SESSION_DIR` and cookie propagation across CGI invocations ([#1881](https://github.com/PurHur/php-compiler/issues/1881), [#1893](https://github.com/PurHur/php-compiler/issues/1893)):
+
+```bash
+./phpc build --project examples/005-SessionsWeb
+./phpc deploy examples/005-SessionsWeb -o /tmp/sessions-dist
+export PHPC_DEPLOY_ROOT=/tmp/sessions-dist
+export PHP_COMPILER_SESSION_DIR=/tmp/phpc-sessions
+mkdir -p "$PHP_COMPILER_SESSION_DIR"
+SESSIONS_WEB_DEPLOY_SMOKE_GATE=1 ./script/deploy-smoke.sh --example 005
+```
+
+### File uploads (`006-FileUploadWeb`)
+
+Multipart POST via CGI `REQUEST_BODY_FILE` ([#2028](https://github.com/PurHur/php-compiler/issues/2028)):
+
+```bash
+FILE_UPLOAD_WEB_DEPLOY_SMOKE_GATE=1 ./script/deploy-smoke.sh --example 006
+```
+
+More per-example detail: [deploy-web-aot.md § Build and deploy](deploy-web-aot.md#1-build-and-deploy).
+
+## 2. Dist layout
+
+After `phpc deploy -o <dist>`:
+
+```
+$PHPC_DEPLOY_ROOT/
+  README.deploy          # operator notes (PHPC_DEPLOY_ROOT, CGI env)
+  bin/app                # native executable (from phpc.json "binary")
+  phpc.json              # project manifest
+  public/                # document root (when manifest sets "public")
+  assets/                # static CSS/JS (nginx alias — not bin/app)
+  templates/             # PHP templates — not web-exposed
+```
+
+| Example | Typical dist contents |
+|---------|----------------------|
+| `002-StaticWeb` | `bin/app`, `phpc.json`, `README.deploy` |
+| `003-MiniWebApp` | above + `public/`, `assets/`, `templates/` |
+| `005-SessionsWeb` | `bin/app`, `phpc.json`, `README.deploy` (single-file app) |
+
+Set **`PHPC_DEPLOY_ROOT`** to the absolute dist path before running `bin/app` ([#585](https://github.com/PurHur/php-compiler/issues/585)). `README.deploy` in the dist repeats required CGI variables.
+
+Implementation: [`lib/Web/ProjectDeploy.php`](../lib/Web/ProjectDeploy.php).
+
+## 3. Who serves what
+
+| URL prefix | Served by | Notes |
+|------------|-----------|-------|
+| `/assets/*` | nginx `alias` → dist `assets/` | CSS/JS/images; **not** `bin/app` ([#696](https://github.com/PurHur/php-compiler/issues/696)) |
+| `/public/*` or docroot files | nginx `root` + `try_files` | Static files under `public/` |
+| Dynamic routes | CGI/FastCGI → `bin/app` | PATH_INFO, `?route=`, front controller |
+| `templates/` | **not** web-exposed | App reads via PHP includes |
+
+Local dev uses `phpc serve` / `phpc serve --aot` to serve `/assets/` from the project tree ([#594](https://github.com/PurHur/php-compiler/issues/594)). Production expects nginx (or another static server) for the same URLs.
+
+## 4. nginx — CGI spawn (illustrative)
+
+Replace `/var/www/miniwebapp` with your dist path. Use **either** the `@app` + `try_files` pattern **or** the `location ~ \.php$` block — not both without adjusting precedence.
+
+### `003-MiniWebApp` — static assets + front controller
+
+```nginx
+server {
+    listen 80;
+    server_name miniwebapp.example.test;
+
+    set $phpc_deploy_root /var/www/miniwebapp;
+    root $phpc_deploy_root/public;
+
+    location ^~ /assets/ {
+        alias $phpc_deploy_root/assets/;
+        try_files $uri =404;
+        expires 7d;
+        add_header Cache-Control "public";
+    }
+
+    location / {
+        try_files $uri @app;
+    }
+
+    location @app {
+        include fastcgi_params;
+        fastcgi_param SCRIPT_FILENAME $phpc_deploy_root/bin/app;
+        fastcgi_param PHPC_DEPLOY_ROOT $phpc_deploy_root;
+        fastcgi_param DOCUMENT_ROOT $document_root;
+        fastcgi_pass unix:/run/fcgiwrap.socket;   # or cgi-wrapper (#665)
+    }
+}
+```
+
+PATH_INFO must reach `bin/app` for `/index.php/hello` style URLs ([#489](https://github.com/PurHur/php-compiler/issues/489), [#682](https://github.com/PurHur/php-compiler/issues/682)).
+
+### `002-StaticWeb` — binary as CGI script
+
+```nginx
+server {
+    listen 80;
+    server_name static.example.test;
+    root /var/www/static-dist;
+
+    location / {
+        try_files $uri @app;
+    }
+
+    location @app {
+        include fastcgi_params;
+        fastcgi_param SCRIPT_FILENAME /var/www/static-dist/bin/app;
+        fastcgi_param PHPC_DEPLOY_ROOT /var/www/static-dist;
+        fastcgi_pass unix:/run/fcgiwrap.socket;
+    }
+}
+```
+
+AOT CGI wrapper for nginx spawn: [`bin/cgi-aot.php`](../bin/cgi-aot.php) ([#665](https://github.com/PurHur/php-compiler/issues/665)).
+
+Copy-paste variants and CGI env tables: [deploy-web-aot.md § nginx](deploy-web-aot.md#4-nginx-illustrative).
+
+## 5. FastCGI (planned)
+
+Long-lived FastCGI adapter (`phpc fcgi`, nginx `fastcgi_pass` to a pool) is tracked in [#173](https://github.com/PurHur/php-compiler/issues/173). Until it lands:
+
+- **Production:** use CGI spawn (fcgiwrap or `cgi-wrapper`) as above, or a reverse proxy to `phpc serve --aot` for experiments only.
+- **Local:** `phpc serve` / `phpc serve --aot` on loopback ([#50](https://github.com/PurHur/php-compiler/issues/50)).
+- **Fixture:** [examples/009-FastCGIWeb](../examples/009-FastCGIWeb/) — deploy layout + health probe ([#2331](https://github.com/PurHur/php-compiler/issues/2331)); CI gate `FASTCGI_WEB_DEPLOY_SMOKE_GATE=1`.
+
+When [#173](https://github.com/PurHur/php-compiler/issues/173) lands, extend this section with `fastcgi_pass 127.0.0.1:9000` pool config and link [local-ci-matrix.md](local-ci-matrix.md) `FASTCGI_SMOKE_GATE` ([#1899](https://github.com/PurHur/php-compiler/issues/1899)).
+
+## 6. TLS termination (illustrative)
+
+Terminate TLS at nginx (or a load balancer) and proxy to the CGI/FastCGI backend on loopback:
+
+```nginx
+server {
+    listen 443 ssl http2;
+    server_name miniwebapp.example.test;
+
+    ssl_certificate     /etc/ssl/certs/miniwebapp.crt;
+    ssl_certificate_key /etc/ssl/private/miniwebapp.key;
+
+    # ... same location blocks as §4, with $phpc_deploy_root unchanged ...
+}
+```
+
+Redirect HTTP → HTTPS:
+
+```nginx
+server {
+    listen 80;
+    server_name miniwebapp.example.test;
+    return 301 https://$host$request_uri;
+}
+```
+
+Certificate provisioning (Let's Encrypt, internal CA) is out of scope — use your org's standard TLS workflow.
+
+## 7. Security and hardening
+
+| Topic | Guidance |
+|-------|----------|
+| Request body size | Default cap **8 MiB** in `phpc serve` / CGI ([#77](https://github.com/PurHur/php-compiler/issues/77)); set `PHP_COMPILER_MAX_BODY` (bytes, max 8 MiB) and nginx `client_max_body_size` |
+| Header injection | CR/LF in `header()` values rejected (VM throws; JIT/AOT fail closed) — [#77](https://github.com/PurHur/php-compiler/issues/77) |
+| Debug output | Unset `PHP_COMPILER_DEBUG` in production; enables extra diagnostics when set |
+| Input validation | `003-MiniWebApp` contact form validates name length/non-empty ([#697](https://github.com/PurHur/php-compiler/issues/697)); treat all POST/query data as untrusted |
+| Path traversal | Do not expose `templates/` or project source via nginx; only `public/` and `assets/` |
+| Sessions | Use a dedicated writable `PHP_COMPILER_SESSION_DIR` outside the web root |
+
+Threat-model notes and PHPUnit filters: [deploy-web-aot.md § Header injection](deploy-web-aot.md#header-injection-vm--jit--aot).
+
+## 8. Operations
+
+### Environment variables
+
+| Variable | Purpose |
+|----------|---------|
+| `PHPC_DEPLOY_ROOT` | Absolute path to deploy dist (required for deploy-aware includes) |
+| `PHP_COMPILER_SESSION_DIR` | Writable directory for session files (`005-SessionsWeb`) |
+| `PHP_COMPILER_MAX_BODY` | Max POST body bytes (default 8 MiB) |
+| `PHP_COMPILER_DEBUG` | Set to enable debug diagnostics (off in production) |
+| CGI per-request | `QUERY_STRING`, `REQUEST_METHOD`, `PATH_INFO`, `HTTP_*`, `CONTENT_TYPE`, … ([#49](https://github.com/PurHur/php-compiler/issues/49)) |
+
+### Upgrading the binary
+
+1. Build new binary: `./phpc build --project <app>`.
+2. Deploy to staging dist: `./phpc deploy <app> -o /var/www/app-staging`.
+3. Run smoke: `DEPLOY_SMOKE_003_EXECUTE=1 ./script/deploy-smoke.sh --example 003` (or your app's gate).
+4. Swap dist directory or `bin/app` atomically; reload nginx if needed (usually not for CGI spawn).
+5. Roll back by restoring the previous dist tree.
+
+### Logs
+
+- **CGI spawn:** check nginx error log and fcgiwrap stderr.
+- **Dev server:** `phpc serve` logs to stdout — not for production.
+- **Application:** use your app's logging (e.g. `error_log()` where supported).
+
+### Gate probes
+
+```bash
+./phpc doctor --gates | grep -iE '003|005|006|deploy|miniwebapp|sessions'
+```
+
+Gate defaults and opt-in flags: [local-ci-matrix.md](local-ci-matrix.md), [miniwebapp-gates.md](miniwebapp-gates.md).
+
+## 9. Local verification (no GitHub Actions)
+
+Run these **before** pointing production traffic at a dist:
+
+| Step | Command |
+|------|---------|
+| Deploy smoke (001–003) | `make deploy-smoke` |
+| 003 execute | `DEPLOY_SMOKE_003_EXECUTE=1 ./script/deploy-smoke.sh --example 003` |
+| 005 sessions | `SESSIONS_WEB_DEPLOY_SMOKE_GATE=1 make deploy-smoke` |
+| 006 uploads | `FILE_UPLOAD_WEB_DEPLOY_SMOKE_GATE=1 make deploy-smoke` |
+| North star bundle | `make north-star1-verify` |
+| HTTP harness | `make examples-web-smoke` |
+| Static assets on disk | `test -f /tmp/miniwebapp-dist/assets/style.css` after 003 deploy |
+| CGI one-shot | `PHPC_DEPLOY_ROOT=/tmp/static-dist QUERY_STRING= ./bin/app` |
+
+Docker (harness-safe):
+
+```bash
+./script/docker-exec.sh -- make deploy-smoke
+./script/docker-exec.sh -- bash -lc 'make north-star1-verify'
+```
+
+Full CI gate (optional):
+
+```bash
+make test-harness
+./script/docker-ci-local.sh fast --filter PhpcDeployTest
+```
+
+## 10. Troubleshooting
+
+| Symptom | Check |
+|---------|-------|
+| Empty stdout from `bin/app` | `PHPC_DEPLOY_ROOT` set? Route in execute matrix? [#676](https://github.com/PurHur/php-compiler/issues/676) |
+| CSS 404 in production | nginx `alias` for `/assets/` — binary does not serve static files ([#696](https://github.com/PurHur/php-compiler/issues/696)) |
+| Session not persisting | `PHP_COMPILER_SESSION_DIR` writable; `HTTP_COOKIE` passed on subsequent CGI requests |
+| 413 on POST | Body over limit — lower `PHP_COMPILER_MAX_BODY` or raise nginx `client_max_body_size` consistently |
+| PATH_INFO broken | nginx must pass `PATH_INFO` / `SCRIPT_NAME`; see [#489](https://github.com/PurHur/php-compiler/issues/489) |
+| Missing binary on deploy | Run `phpc build --project` first; or `phpc deploy … --from-build` |
+
+```bash
+./phpc doctor --gates
+grep PHPC_DEPLOY_ROOT /tmp/your-dist/README.deploy
+```
+
+## Related docs and issues
+
+| Resource | Topic |
+|----------|-------|
+| [deploy-web-aot.md](deploy-web-aot.md) | Quickstart: build → deploy → CGI snippets |
+| [phpc-json.md](phpc-json.md) | Project manifest |
+| [examples/README.md](../examples/README.md) | Reference apps and gate table |
+| [#173](https://github.com/PurHur/php-compiler/issues/173) | FastCGI adapter |
+| [#635](https://github.com/PurHur/php-compiler/issues/635) | Quickstart doc (this guide extends it) |
+| [#445](https://github.com/PurHur/php-compiler/issues/445) | This umbrella guide |

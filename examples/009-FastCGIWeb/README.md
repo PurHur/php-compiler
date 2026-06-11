@@ -38,7 +38,7 @@ Long-lived TCP listener (adapter [#173](https://github.com/PurHur/php-compiler/i
 ./phpc fcgi --project examples/009-FastCGIWeb
 ```
 
-Point nginx `fastcgi_pass` at `127.0.0.1:9000` (or your `--listen` address). Deploy bundle notes: [docs/deploy-web-aot.md](../../docs/deploy-web-aot.md) ([#445](https://github.com/PurHur/php-compiler/issues/445)).
+Point nginx `fastcgi_pass` at `127.0.0.1:9000` (or your `--listen` address). Deploy bundle notes: [docs/deploy-production.md](../../docs/deploy-production.md) ([#445](https://github.com/PurHur/php-compiler/issues/445)).
 
 ## AOT + deploy
 
@@ -49,7 +49,7 @@ QUERY_STRING= REQUEST_URI=/example.php SCRIPT_NAME=/example.php ./.phpc/bin/app
 ../../phpc deploy --project . /tmp/fastcgiweb-dist
 ```
 
-Production nginx + `PHPC_DEPLOY_ROOT`: [docs/deploy-web-aot.md](../../docs/deploy-web-aot.md) ([#445](https://github.com/PurHur/php-compiler/issues/445)). Long-lived FastCGI loop: [#173](https://github.com/PurHur/php-compiler/issues/173).
+Production nginx + `PHPC_DEPLOY_ROOT`: [docs/deploy-production.md](../../docs/deploy-production.md) ([#445](https://github.com/PurHur/php-compiler/issues/445)). Long-lived FastCGI loop: [#173](https://github.com/PurHur/php-compiler/issues/173).
 
 ## Status
 

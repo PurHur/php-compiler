@@ -85,7 +85,7 @@ Build, deploy, and set `PHPC_DEPLOY_ROOT` as above. For production nginx in fron
 - **Static assets** (`/assets/style.css`) → nginx `alias` to dist `assets/` — the AOT binary does not serve CSS in v1
 - **`templates/`** — not web-exposed; copied for runtime includes only
 
-Copy-paste nginx snippets, dist tree, and local file smoke: [docs/deploy-web-aot.md § Static assets](../../docs/deploy-web-aot.md#static-assets--front-controller-003-miniwebapp) ([#696](https://github.com/PurHur/php-compiler/issues/696)). Full production guide: [#445](https://github.com/PurHur/php-compiler/issues/445).
+Copy-paste nginx snippets, dist tree, and local file smoke: [docs/deploy-web-aot.md § Static assets](../../docs/deploy-web-aot.md#static-assets--front-controller-003-miniwebapp) ([#696](https://github.com/PurHur/php-compiler/issues/696)). Full production guide: [docs/deploy-production.md](../../docs/deploy-production.md) ([#445](https://github.com/PurHur/php-compiler/issues/445)).
 
 ```console
 ../../phpc build --project .
