@@ -36,6 +36,10 @@ echo array_any([], fn ($v) => true) ? 'y' : 'n', "\n";
 echo array_all([], fn ($v) => true) ? 'y' : 'n', "\n";
 
 echo array_find($a, 'gt2'), "\n";
+
+echo array_all([1, 2, 3], 'is_int') ? 'y' : 'n', "\n";
+echo array_any([1, 2, 3], 'is_string') ? 'y' : 'n', "\n";
+echo array_find([1, 2, 3], 'is_int'), "\n";
 PHP;
 
     private const EXPECT = <<<'TXT'
@@ -50,6 +54,9 @@ null
 n
 y
 3
+y
+n
+1
 TXT;
 
     public function testVmMatchesSubset(): void
