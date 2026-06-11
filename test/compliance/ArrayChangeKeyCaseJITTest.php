@@ -20,6 +20,10 @@ final class ArrayChangeKeyCaseJITTest extends BaseTest
             __DIR__.'/cases/stdlib/array_change_key_case_jit.phpt',
             'array_change_key_case_jit.phpt'
         );
+        yield 'array_change_key_case_enum_key_jit.phpt' => self::parsePHPT(
+            __DIR__.'/cases/stdlib/array_change_key_case_enum_key_jit.phpt',
+            'array_change_key_case_enum_key_jit.phpt'
+        );
     }
 
     public function setUp(): void
