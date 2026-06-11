@@ -66,19 +66,35 @@ final class unserialize extends Internal
         if (\count($args) < 1) {
             throw new \LogicException('unserialize() requires at least one argument');
         }
+        $options = null;
         if (\count($args) > 1) {
-            throw new \LogicException('unserialize() options not supported in this compiler build');
+            $options = JitUnserializeOptions::tryCompileTime(
+                $context,
+                $args[1],
+                $context->jitEnclosingBlock,
+                $context->jitUnserializeOptionsOperand
+            );
+            if (null === $options) {
+                throw new \LogicException('unserialize() runtime options not supported in this compiler build');
+            }
         }
 
-        $compileTime = self::compileTimeUnserialize($context, $args[0]);
+        $compileTime = self::compileTimeUnserialize($context, $args[0], $options);
         if (null !== $compileTime) {
             return $compileTime;
+        }
+
+        if (null !== $options) {
+            return JitUnserialize::decodeRuntimeWithOptions($context, $args[0], $options);
         }
 
         return JitUnserialize::decodeRuntime($context, $args[0]);
     }
 
-    private static function compileTimeUnserialize(Context $context, JITVariable $arg): ?Value
+    /**
+     * @param array<string, mixed>|null $options
+     */
+    private static function compileTimeUnserialize(Context $context, JITVariable $arg, ?array $options = null): ?Value
     {
         if (JITVariable::TYPE_STRING !== $arg->type) {
             return null;
@@ -87,7 +103,7 @@ final class unserialize extends Internal
         if (null === $literal) {
             return null;
         }
-        $decoded = @\unserialize($literal);
+        $decoded = @\unserialize($literal, $options ?? []);
         if (false === $decoded) {
             return $context->helper->loadValue(
                 new JITVariable(
@@ -120,7 +136,7 @@ final class unserialize extends Internal
     /**
      * @return array<string, mixed>
      */
-    private static function extractUnserializeOptions(Variable $optionsVar): array
+    public static function parseUnserializeOptionsArray(Variable $optionsVar): array
     {
         $options = [];
         foreach ($optionsVar->toArray()->iterateKeyed(true) as [$keyVar, $value]) {
@@ -128,28 +144,44 @@ final class unserialize extends Internal
             $key = Variable::TYPE_STRING === $keyVar->type
                 ? $keyVar->toString()
                 : (string) $keyVar->toInt();
-            if ('allowed_classes' !== $key) {
-                throw new \LogicException(
-                    'unserialize() option '.$key.' not supported in this compiler build'
-                );
-            }
             $resolved = $value->resolveIndirect();
-            if (Variable::TYPE_BOOLEAN === $resolved->type) {
-                $options['allowed_classes'] = $resolved->toBool();
-            } elseif (Variable::TYPE_ARRAY === $resolved->type) {
-                $allowed = [];
-                foreach ($resolved->toArray()->iterate(true) as $entry) {
-                    $entry = $entry->resolveIndirect();
-                    if (Variable::TYPE_STRING === $entry->type) {
-                        $allowed[] = $entry->toString();
+            if ('allowed_classes' === $key) {
+                if (Variable::TYPE_BOOLEAN === $resolved->type) {
+                    $options['allowed_classes'] = $resolved->toBool();
+                } elseif (Variable::TYPE_ARRAY === $resolved->type) {
+                    $allowed = [];
+                    foreach ($resolved->toArray()->iterate(true) as $entry) {
+                        $entry = $entry->resolveIndirect();
+                        if (Variable::TYPE_STRING === $entry->type) {
+                            $allowed[] = $entry->toString();
+                        }
                     }
+                    $options['allowed_classes'] = $allowed;
+                } else {
+                    throw new \LogicException('allowed_classes must be of type bool or array');
                 }
-                $options['allowed_classes'] = $allowed;
-            } else {
-                throw new \LogicException('allowed_classes must be of type bool or array');
+                continue;
             }
+            if ('max_depth' === $key) {
+                if (Variable::TYPE_INTEGER !== $resolved->type) {
+                    throw new \LogicException('max_depth must be of type int');
+                }
+                $options['max_depth'] = $resolved->toInt();
+                continue;
+            }
+            throw new \LogicException(
+                'unserialize() option '.$key.' not supported in this compiler build'
+            );
         }
 
         return $options;
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private static function extractUnserializeOptions(Variable $optionsVar): array
+    {
+        return self::parseUnserializeOptionsArray($optionsVar);
     }
 }
