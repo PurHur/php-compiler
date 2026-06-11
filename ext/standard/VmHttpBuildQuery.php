@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace PHPCompiler\ext\standard;
 
+use PHPCompiler\VM\EnumCaseSupport;
 use PHPCompiler\VM\Variable;
 
 /**
@@ -181,6 +182,14 @@ final class VmHttpBuildQuery
                 return $v->toBool();
             case Variable::TYPE_STRING:
                 return $v->toString();
+            case Variable::TYPE_ENUM_CASE:
+                return self::exportEnumCase($v);
+            case Variable::TYPE_OBJECT:
+                if (EnumCaseSupport::isEnumCaseVariable($v)) {
+                    return self::exportEnumCase($v);
+                }
+
+                break;
             case Variable::TYPE_ARRAY:
                 $out = [];
                 foreach ($v->toArray()->iterateKeyed(true) as [$key, $value]) {
@@ -202,6 +211,21 @@ final class VmHttpBuildQuery
                     'http_build_query() value type not supported in this compiler build'
                 );
         }
+    }
+
+    /**
+     * php-src http.c — backed/unit enum cases expand to name[/value] sub-arrays.
+     *
+     * @return array<string, mixed>
+     */
+    private static function exportEnumCase(Variable $v): array
+    {
+        $out = [];
+        foreach (EnumCaseSupport::objectVarsForCaseVariable($v) as $name => $propVar) {
+            $out[$name] = self::export($propVar);
+        }
+
+        return $out;
     }
 
     private static function encodeScalarValue(mixed $value, bool $useRaw): string
