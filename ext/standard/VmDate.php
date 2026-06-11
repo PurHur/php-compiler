@@ -17,6 +17,9 @@ use PHPCompiler\VM\Variable;
 
 final class VmDate
 {
+    /** php-src PG(date.timezone) default when unset (#3292). */
+    private static string $defaultTimezone = 'UTC';
+
     /** date_sunrise()/date_sunset() return format (ext/date/php_date.c, PHP 8.4 values, #6137). */
     public const SUNFUNCS_RET_TIMESTAMP = 0;
     public const SUNFUNCS_RET_STRING = 1;
@@ -489,6 +492,45 @@ final class VmDate
     public static function gmgetdate(?int $timestamp = null): HashTable
     {
         return self::dateBreakdown($timestamp, true);
+    }
+
+    /**
+     * checkdate() — calendar validation (php-src ext/standard/datetime.c PHP_FUNCTION(checkdate), #3292).
+     */
+    public static function checkdate(int $month, int $day, int $year): bool
+    {
+        if ($year < 1 || $year > 32767) {
+            return false;
+        }
+        if ($month < 1 || $month > 12) {
+            return false;
+        }
+        if ($day < 1 || $day > self::daysInMonth($year, $month)) {
+            return false;
+        }
+
+        return true;
+    }
+
+    /** date_default_timezone_get() — active default timezone id (#3292). */
+    public static function defaultTimezoneGet(): string
+    {
+        return self::$defaultTimezone;
+    }
+
+    /**
+     * date_default_timezone_set() — validate and store default timezone (#3292).
+     *
+     * @return bool false when the identifier is unknown (Zend emits E_NOTICE)
+     */
+    public static function tryDefaultTimezoneSet(string $timezone): bool
+    {
+        if (!VmDateTimeNative::timezoneIdIsValid($timezone)) {
+            return false;
+        }
+        self::$defaultTimezone = VmDateTimeNative::validateTimezoneId($timezone);
+
+        return true;
     }
 
     /**

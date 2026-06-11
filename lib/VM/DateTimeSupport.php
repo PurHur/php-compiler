@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace PHPCompiler\VM;
 
+use PHPCompiler\ext\standard\VmDate;
 use PHPCompiler\ext\standard\VmDateTimeNative;
 
 /**
@@ -268,7 +269,7 @@ final class DateTimeSupport
     {
         $tzName = null !== $timezone
             ? self::timezoneName($timezone)
-            : \date_default_timezone_get();
+            : VmDate::defaultTimezoneGet();
         try {
             VmDateTimeNative::validateTimezoneId($tzName);
             $parsed = VmDateTimeNative::parseDateTime($time, $tzName);
@@ -290,7 +291,7 @@ final class DateTimeSupport
     ): void {
         $tzName = null !== $timezone
             ? self::timezoneName($timezone)
-            : \date_default_timezone_get();
+            : VmDate::defaultTimezoneGet();
         try {
             VmDateTimeNative::validateTimezoneId($tzName);
         } catch (NativeDateInvalidTimeZoneException) {
