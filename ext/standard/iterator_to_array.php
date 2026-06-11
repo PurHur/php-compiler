@@ -51,7 +51,7 @@ final class iterator_to_array extends Internal
             }
             $preserveKeys = $flag->toBool();
         }
-        $out = $frame->vmContext->runtime->vm->iteratorToArray($iterator, $preserveKeys);
+        $out = $frame->vmContext->runtime->vm->iteratorToArray($iterator, $preserveKeys, $frame);
         if (null !== $frame->returnVar) {
             $frame->returnVar->array($out);
         }
