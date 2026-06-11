@@ -1,0 +1,39 @@
+<?php
+
+declare(strict_types=1);
+
+namespace PHPCompiler\ext\calendar;
+
+use PHPCompiler\Frame;
+use PHPCompiler\Func\Internal;
+use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\Variable as JITVariable;
+use PHPLLVM\Value;
+
+/** jdtojulian() — Julian day to Julian calendar date string (php-src ext/calendar/calendar.c; #6759). */
+final class jdtojulian extends Internal
+{
+    public function __construct()
+    {
+        parent::__construct('jdtojulian');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        if (1 !== \count($frame->calledArgs)) {
+            throw new \ArgumentCountError(
+                'jdtojulian() expects exactly 1 argument, '.\count($frame->calledArgs).' given'
+            );
+        }
+        if (null === $frame->returnVar) {
+            return;
+        }
+        $julday = CalendarArgs::requireInt($frame, 'jdtojulian', 1, 'julday');
+        $frame->returnVar->string(VmCalendar::jdtojulian($julday));
+    }
+
+    public function call(Context $context, JITVariable ...$args): Value
+    {
+        throw new \LogicException('jdtojulian() is not implemented for JIT in this compiler build (issue #6759)');
+    }
+}

@@ -4,10 +4,14 @@ declare(strict_types=1);
 
 namespace PHPCompiler\ext\calendar;
 
+use PHPCompiler\ext\standard\VmDate;
+use PHPCompiler\VM\HashTable;
+use PHPCompiler\VM\Variable;
+
 /**
  * Pure PHP calendar math ported from php-src ext/calendar (sdncal / easter.c; #7223).
  *
- * php-src: ext/calendar/gregor.c, julian.c, calendar.c, easter.c
+ * php-src: ext/calendar/gregor.c, julian.c, calendar.c, cal_unix.c, easter.c
  */
 final class VmCalendar
 {
@@ -16,6 +20,8 @@ final class VmCalendar
     private const DAYS_PER_5_MONTHS = 153;
     private const DAYS_PER_4_YEARS = 1461;
     private const DAYS_PER_400_YEARS = 146097;
+    private const UNIX_EPOCH_JD = 2440588;
+    private const SECS_PER_DAY = 86400;
 
     public static function calDaysInMonth(int $calendar, int $month, int $year): int
     {
@@ -46,6 +52,61 @@ final class VmCalendar
     public static function gregorianToJd(int $month, int $day, int $year): int
     {
         return self::gregorianToSdn($year, $month, $day);
+    }
+
+    public static function jdtogregorian(int $julday): string
+    {
+        [$year, $month, $day] = self::sdnToGregorian($julday);
+
+        return $month.'/'.$day.'/'.$year;
+    }
+
+    public static function jdtojulian(int $julday): string
+    {
+        [$year, $month, $day] = self::sdnToJulian($julday);
+
+        return $month.'/'.$day.'/'.$year;
+    }
+
+    public static function calToJd(int $calendar, int $month, int $day, int $year): int
+    {
+        return match ($calendar) {
+            CalendarConstants::CAL_GREGORIAN => self::gregorianToSdn($year, $month, $day),
+            CalendarConstants::CAL_JULIAN => self::julianToSdn($year, $month, $day),
+            default => throw new \LogicException(
+                'Calendar ID '.$calendar.' is not implemented in this compiler build (issue #3742)'
+            ),
+        };
+    }
+
+    public static function unixtojd(?int $timestamp = null): int
+    {
+        if (null === $timestamp) {
+            $timestamp = VmDate::time();
+        } elseif ($timestamp < 0) {
+            throw new \ValueError(
+                'unixtojd(): Argument #1 ($timestamp) must be greater than or equal to 0'
+            );
+        }
+        $parts = VmDate::getdate($timestamp);
+
+        return self::gregorianToSdn(
+            self::hashGetInt($parts, 'year'),
+            self::hashGetInt($parts, 'mon'),
+            self::hashGetInt($parts, 'mday')
+        );
+    }
+
+    public static function jdtounix(int $jday): int
+    {
+        $maxJd = self::UNIX_EPOCH_JD + intdiv(\PHP_INT_MAX, self::SECS_PER_DAY);
+        if ($jday < self::UNIX_EPOCH_JD || $jday > $maxJd) {
+            throw new \ValueError(
+                \sprintf('jdtounix(): Argument #1 ($jday) must be between %d and %d', self::UNIX_EPOCH_JD, $maxJd)
+            );
+        }
+
+        return ($jday - self::UNIX_EPOCH_JD) * self::SECS_PER_DAY;
     }
 
     public static function easterDate(int $year): int
@@ -113,6 +174,72 @@ final class VmCalendar
                 'Calendar ID '.$calendar.' is not implemented in this compiler build (issue #3742)'
             ),
         };
+    }
+
+    /** @return array{0: int, 1: int, 2: int} year, month, day */
+    private static function sdnToGregorian(int $sdn): array
+    {
+        if ($sdn <= 0 || $sdn > intdiv(\PHP_INT_MAX - 4 * self::GREGOR_SDN_OFFSET, 4)) {
+            return [0, 0, 0];
+        }
+        $temp = ($sdn + self::GREGOR_SDN_OFFSET) * 4 - 1;
+        $century = intdiv($temp, self::DAYS_PER_400_YEARS);
+        $temp = intdiv($temp % self::DAYS_PER_400_YEARS, 4) * 4 + 3;
+        $year = $century * 100 + intdiv($temp, self::DAYS_PER_4_YEARS);
+        $dayOfYear = intdiv($temp % self::DAYS_PER_4_YEARS, 4) + 1;
+        $temp = $dayOfYear * 5 - 3;
+        $month = intdiv($temp, self::DAYS_PER_5_MONTHS);
+        $day = intdiv($temp % self::DAYS_PER_5_MONTHS, 5) + 1;
+        if ($month < 10) {
+            $month += 3;
+        } else {
+            ++$year;
+            $month -= 9;
+        }
+        $year -= 4800;
+        if ($year <= 0) {
+            --$year;
+        }
+
+        return [$year, $month, $day];
+    }
+
+    /** @return array{0: int, 1: int, 2: int} year, month, day */
+    private static function sdnToJulian(int $sdn): array
+    {
+        if ($sdn <= 0) {
+            return [0, 0, 0];
+        }
+        $temp = $sdn * 4 + (self::JULIAN_SDN_OFFSET * 4 - 1);
+        $year = intdiv($temp, self::DAYS_PER_4_YEARS);
+        $dayOfYear = intdiv($temp % self::DAYS_PER_4_YEARS, 4) + 1;
+        $temp = $dayOfYear * 5 - 3;
+        $month = intdiv($temp, self::DAYS_PER_5_MONTHS);
+        $day = intdiv($temp % self::DAYS_PER_5_MONTHS, 5) + 1;
+        if ($month < 10) {
+            $month += 3;
+        } else {
+            ++$year;
+            $month -= 9;
+        }
+        $year -= 4800;
+        if ($year <= 0) {
+            --$year;
+        }
+
+        return [$year, $month, $day];
+    }
+
+    private static function hashGetInt(HashTable $ht, string $key): int
+    {
+        $keyVar = new Variable();
+        $keyVar->string($key);
+        $val = $ht->findVariable($keyVar, false);
+        if (null === $val) {
+            throw new \LogicException('calendar date breakdown missing key '.$key);
+        }
+
+        return $val->resolveIndirect()->toInt();
     }
 
     private static function gregorianToSdn(int $inputYear, int $inputMonth, int $inputDay): int
