@@ -3,8 +3,7 @@ AOT dns_get_mx() example.com MX probe (#4125)
 --SKIPIF--
 <?php
 require __DIR__ . '/../../../../ext/standard/VmDns.php';
-$probe = PHPCompiler\ext\standard\VmDns::dnsGetMx('example.com');
-if (!$probe['ok']) {
+if (false === PHPCompiler\ext\standard\VmDns::dnsGetMx('example.com')) {
     echo "skip\n";
 }
 ?>

@@ -21,13 +21,10 @@ final class VmDnsGetMxRuntimeShrinkTest extends TestCase
     public function testExampleComMxViaFfiWhenAvailable(): void
     {
         $result = VmDns::dnsGetMx('example.com');
-        if (!$result['ok']) {
-            $this->markTestSkipped('example.com MX unavailable via FFI getmxrr');
+        if (false === $result) {
+            $this->markTestSkipped('example.com MX unavailable');
         }
-        $this->assertGreaterThan(0, $result['hosts']->getNumElements());
-        $this->assertSame(
-            $result['hosts']->getNumElements(),
-            $result['weights']->getNumElements()
-        );
+        $this->assertGreaterThan(0, \count($result['hosts']));
+        $this->assertSame(\count($result['hosts']), \count($result['weights']));
     }
 }

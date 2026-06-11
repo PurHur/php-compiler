@@ -6,7 +6,6 @@ namespace PHPCompiler\ext\standard;
 
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\HashTableHelper;
-use PHPCompiler\VM\HashTable;
 use PHPLLVM\Value;
 
 /** Materialize {@see VmDns::dnsGetMx()} at JIT compile time (#4125). */
@@ -18,23 +17,31 @@ final class JitDnsGetMxMaterializer
     public static function materialize(Context $context, string $hostname): array
     {
         $result = VmDns::dnsGetMx($hostname);
+        if (false === $result) {
+            return [
+                'hosts' => HashTableHelper::alloc($context),
+                'weights' => HashTableHelper::alloc($context),
+                'ok' => false,
+            ];
+        }
 
         return [
-            'hosts' => self::materializeList($context, $result['hosts']),
-            'weights' => self::materializeWeights($context, $result['weights']),
-            'ok' => $result['ok'],
+            'hosts' => self::materializeStringList($context, $result['hosts']),
+            'weights' => self::materializeIntList($context, $result['weights']),
+            'ok' => true,
         ];
     }
 
-    private static function materializeList(Context $context, HashTable $hosts): Value
+    /**
+     * @param list<string> $hosts
+     */
+    private static function materializeStringList(Context $context, array $hosts): Value
     {
         $ht = HashTableHelper::alloc($context);
         $sizeT = $context->getTypeFromString('size_t');
-        $i64 = $context->getTypeFromString('int64');
-        foreach ($hosts->iterateKeyed(true) as [$key, $value]) {
-            $index = $key->resolveIndirect()->toInt();
+        foreach ($hosts as $index => $host) {
             $str = $context->builder->load(
-                $context->constantStringFromString($value->toString())
+                $context->constantStringFromString($host)
             );
             $context->builder->call(
                 $context->lookupFunction('__hashtable__setStringAt'),
@@ -47,19 +54,20 @@ final class JitDnsGetMxMaterializer
         return $ht;
     }
 
-    private static function materializeWeights(Context $context, HashTable $weights): Value
+    /**
+     * @param list<int> $weights
+     */
+    private static function materializeIntList(Context $context, array $weights): Value
     {
         $ht = HashTableHelper::alloc($context);
         $sizeT = $context->getTypeFromString('size_t');
         $i64 = $context->getTypeFromString('int64');
-        foreach ($weights->iterateKeyed(true) as [$key, $value]) {
-            $index = $key->resolveIndirect()->toInt();
-            $long = $i64->constInt($value->toInt(), false);
+        foreach ($weights as $index => $weight) {
             $context->builder->call(
                 $context->lookupFunction('__hashtable__setLongAt'),
                 $ht,
                 $sizeT->constInt($index, false),
-                $long
+                $i64->constInt($weight, false)
             );
         }
 

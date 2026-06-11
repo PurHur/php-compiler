@@ -534,6 +534,7 @@ class Module extends ModuleAbstract
             new checkdnsrr(),
             new checkdnsrr('dns_check_record'),
             new dns_get_mx(),
+            new getmxrr(),
             new long2ip(),
             new ip2long(),
             new inet_ntop(),

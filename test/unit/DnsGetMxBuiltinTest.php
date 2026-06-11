@@ -41,9 +41,8 @@ final class DnsGetMxBuiltinTest extends TestCase
 
     public function testExampleComMxWhenResolverAvailable(): void
     {
-        $probe = VmDns::dnsGetMx('example.com');
-        if (!$probe['ok']) {
-            $this->markTestSkipped('example.com MX records unavailable via getmxrr');
+        if (false === VmDns::dnsGetMx('example.com')) {
+            $this->markTestSkipped('example.com MX records unavailable');
         }
 
         $runtime = new Runtime();
