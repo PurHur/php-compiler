@@ -218,7 +218,7 @@ final class StringPregMatchJit
             ),
             '__compiler_preg_split' => $context->module->addFunction(
                 $name,
-                $context->context->functionType($htPtr, false, $strPtr, $strPtr)
+                $context->context->functionType($htPtr, false, $strPtr, $strPtr, $i64, $i64)
             ),
             default => throw new \LogicException('Unknown preg_match JIT helper: '.$name),
         };
@@ -237,17 +237,16 @@ final class StringPregMatchJit
 
     private static function ensureLibc(Context $context): void
     {
-        $voidPtr = $context->getTypeFromString('void*');
         $voidTy = $context->getTypeFromString('void');
         $sizeT = $context->getTypeFromString('size_t');
         $i8p = $context->getTypeFromString('int8*');
 
         foreach (
             [
-                ['malloc', $voidPtr, [$sizeT]],
-                ['realloc', $voidPtr, [$voidPtr, $sizeT]],
+                ['malloc', $i8p, [$sizeT]],
+                ['realloc', $i8p, [$i8p, $sizeT]],
                 ['free', $voidTy, [$i8p]],
-                ['memcpy', $voidPtr, [$voidPtr, $voidPtr, $sizeT]],
+                ['memcpy', $i8p, [$i8p, $i8p, $sizeT]],
                 ['strlen', $sizeT, [$i8p]],
             ] as [$name, $ret, $params]
         ) {
@@ -295,6 +294,8 @@ final class StringPregMatchJit
                 ['__string__init', $strPtr, [$i64, $i8p]],
                 ['__hashtable__alloc', $htPtr, []],
                 ['__hashtable__setStringAt', $void, [$htPtr, $sizeT, $strPtr]],
+                ['__hashtable__setLongAt', $void, [$htPtr, $sizeT, $i64]],
+                ['__hashtable__setHashtableAt', $void, [$htPtr, $sizeT, $htPtr]],
                 ['__value__writeHashtable', $void, [$valuePtr, $htPtr]],
                 ['__value__readString', $strPtr, [$valuePtr]],
             ] as [$name, $ret, $params]
@@ -436,10 +437,8 @@ final class StringPregMatchJit
         $one = $sizeT->constInt(1, false);
         $two = $sizeT->constInt(2, false);
         $zeroSize = $sizeT->constInt(0, false);
-        $nullPtr = $i8p->constNull();
-
         $failBb = $fn->appendBasicBlock('pp_fail');
-        $nullPattern = $context->builder->icmp(Builder::INT_EQ, $pattern, $nullPtr);
+        $nullPattern = self::isNullI8Ptr($context, $pattern);
         $shortPattern = $context->builder->icmp(Builder::INT_ULT, $patternLen, $two);
         $preCheckBb = $fn->appendBasicBlock('pp_pre_check');
         $context->builder->branchIf(
@@ -574,7 +573,7 @@ final class StringPregMatchJit
 
         $context->builder->positionAtEnd($modBadBb);
         $context->builder->call($context->lookupFunction('free'), $regexPtr);
-        $context->builder->store($nullPtr, $regexOut);
+        $context->builder->store($i8p->constNull(), $regexOut);
         $context->builder->branch($failBb);
 
         $context->builder->positionAtEnd($modOkBb);
@@ -726,7 +725,7 @@ final class StringPregMatchJit
             $pattern,
             $pregErrorSlot
         );
-        $codeNull = $context->builder->icmp(Builder::INT_EQ, $code, $i8p->constNull());
+        $codeNull = self::isNullI8Ptr($context, $code);
         $compileFailBb = $fn->appendBasicBlock('pm_compile_fail');
         $createMdBb = $fn->appendBasicBlock('pm_create_md');
         $context->builder->branchIf($codeNull, $compileFailBb, $createMdBb);
@@ -744,7 +743,7 @@ final class StringPregMatchJit
             $code,
             $voidPtr->constNull()
         );
-        $mdNull = $context->builder->icmp(Builder::INT_EQ, $matchData, $voidPtr->constNull());
+        $mdNull = self::isNullI8Ptr($context, $matchData);
         $matchBb = $fn->appendBasicBlock('pm_match');
         $mdFailBb = $fn->appendBasicBlock('pm_md_fail');
         $context->builder->branchIf($mdNull, $mdFailBb, $matchBb);
@@ -839,7 +838,7 @@ final class StringPregMatchJit
             $pattern,
             $pregErrorSlot
         );
-        $codeNull = $context->builder->icmp(Builder::INT_EQ, $code, $i8p->constNull());
+        $codeNull = self::isNullI8Ptr($context, $code);
         $compileFailBb = $fn->appendBasicBlock('pr_compile_fail');
         $createMdBb = $fn->appendBasicBlock('pr_create_md');
         $context->builder->branchIf($codeNull, $compileFailBb, $createMdBb);
@@ -857,7 +856,7 @@ final class StringPregMatchJit
             $code,
             $voidPtr->constNull()
         );
-        $mdNull = $context->builder->icmp(Builder::INT_EQ, $matchData, $voidPtr->constNull());
+        $mdNull = self::isNullI8Ptr($context, $matchData);
         $initLoopBb = $fn->appendBasicBlock('pr_init_loop');
         $mdFailBb = $fn->appendBasicBlock('pr_md_fail');
         $context->builder->branchIf($mdNull, $mdFailBb, $initLoopBb);
@@ -955,7 +954,7 @@ final class StringPregMatchJit
 
         $context->builder->positionAtEnd($matchErrBb);
         $buf = $context->builder->load($bufSlot);
-        $hasBuf = $context->builder->icmp(Builder::INT_NE, $buf, $i8p->constNull());
+        $hasBuf = $context->builder->not(self::isNullI8Ptr($context, $buf));
         $cleanupBb = $fn->appendBasicBlock('pr_cleanup_err');
         $freeBufBb = $fn->appendBasicBlock('pr_free_buf');
         $context->builder->branchIf($hasBuf, $freeBufBb, $cleanupBb);
@@ -1020,7 +1019,7 @@ final class StringPregMatchJit
         $context->builder->call($context->lookupFunction('pcre2_code_free_8'), $code);
         $buf = $context->builder->load($bufSlot);
         $bufLen = $context->builder->load($bufLenSlot);
-        $bufNull = $context->builder->icmp(Builder::INT_EQ, $buf, $i8p->constNull());
+        $bufNull = self::isNullI8Ptr($context, $buf);
         $allocEmptyBb = $fn->appendBasicBlock('pr_alloc_empty');
         $buildBb = $fn->appendBasicBlock('pr_build');
         $context->builder->branchIf($bufNull, $allocEmptyBb, $buildBb);
@@ -1106,7 +1105,7 @@ final class StringPregMatchJit
             $growOkBb
         );
         $context->builder->positionAtEnd($growFailBb);
-        $hasBuf = $context->builder->icmp(Builder::INT_NE, $buf, $i8p->constNull());
+        $hasBuf = $context->builder->not(self::isNullI8Ptr($context, $buf));
         $freeOldBb = $fn->appendBasicBlock('pr_free_old_'.self::$blockSuffix);
         $growErrBb = $fn->appendBasicBlock('pr_grow_err_'.self::$blockSuffix);
         $context->builder->branchIf($hasBuf, $freeOldBb, $growErrBb);
@@ -1131,8 +1130,8 @@ final class StringPregMatchJit
         $bufLen = $context->builder->load($bufLenSlot);
         $context->builder->call(
             $context->lookupFunction('memcpy'),
-            $context->builder->pointerCast($context->builder->gep($buf, $bufLen), $voidPtr),
-            $context->builder->pointerCast($context->bytePtr($src), $voidPtr),
+            $context->builder->gep($buf, $bufLen),
+            $context->bytePtr($src),
             $len
         );
         $context->builder->store($context->builder->add($bufLen, $len), $bufLenSlot);
@@ -1230,7 +1229,7 @@ final class StringPregMatchJit
             $pattern,
             $pregErrorSlot
         );
-        $codeNull = $context->builder->icmp(Builder::INT_EQ, $code, $i8p->constNull());
+        $codeNull = self::isNullI8Ptr($context, $code);
         $compileFailBb = $fn->appendBasicBlock('cma_compile_fail');
         $createMdBb = $fn->appendBasicBlock('cma_create_md');
         $context->builder->branchIf($codeNull, $compileFailBb, $createMdBb);
@@ -1248,7 +1247,7 @@ final class StringPregMatchJit
             $code,
             $voidPtr->constNull()
         );
-        $mdNull = $context->builder->icmp(Builder::INT_EQ, $matchData, $voidPtr->constNull());
+        $mdNull = self::isNullI8Ptr($context, $matchData);
         $initLoopBb = $fn->appendBasicBlock('cma_init_loop');
         $mdFailBb = $fn->appendBasicBlock('cma_md_fail');
         $context->builder->branchIf($mdNull, $mdFailBb, $initLoopBb);
@@ -1386,7 +1385,7 @@ final class StringPregMatchJit
             $pattern,
             $pregErrorSlot
         );
-        $codeNull = $context->builder->icmp(Builder::INT_EQ, $code, $i8p->constNull());
+        $codeNull = self::isNullI8Ptr($context, $code);
         $compileFailBb = $fn->appendBasicBlock('crc_compile_fail');
         $createMdBb = $fn->appendBasicBlock('crc_create_md');
         $context->builder->branchIf($codeNull, $compileFailBb, $createMdBb);
@@ -1404,7 +1403,7 @@ final class StringPregMatchJit
             $code,
             $voidPtr->constNull()
         );
-        $mdNull = $context->builder->icmp(Builder::INT_EQ, $matchData, $voidPtr->constNull());
+        $mdNull = self::isNullI8Ptr($context, $matchData);
         $initLoopBb = $fn->appendBasicBlock('crc_init_loop');
         $mdFailBb = $fn->appendBasicBlock('crc_md_fail');
         $context->builder->branchIf($mdNull, $mdFailBb, $initLoopBb);
@@ -1475,7 +1474,7 @@ final class StringPregMatchJit
 
         $context->builder->positionAtEnd($matchErrBb);
         $buf = $context->builder->load($bufSlot);
-        $hasBuf = $context->builder->icmp(Builder::INT_NE, $buf, $i8p->constNull());
+        $hasBuf = $context->builder->not(self::isNullI8Ptr($context, $buf));
         $cleanupBb = $fn->appendBasicBlock('crc_cleanup_err');
         $freeBufBb = $fn->appendBasicBlock('crc_free_buf');
         $context->builder->branchIf($hasBuf, $freeBufBb, $cleanupBb);
@@ -1558,7 +1557,7 @@ final class StringPregMatchJit
         $context->builder->branchIf($stalled, $stalledBb, $advanceBb);
         $context->builder->positionAtEnd($stalledBb);
         $buf = $context->builder->load($bufSlot);
-        $hasBuf = $context->builder->icmp(Builder::INT_NE, $buf, $i8p->constNull());
+        $hasBuf = $context->builder->not(self::isNullI8Ptr($context, $buf));
         $stallCleanupBb = $fn->appendBasicBlock('crc_stall_cleanup');
         $stallFreeBb = $fn->appendBasicBlock('crc_stall_free');
         $context->builder->branchIf($hasBuf, $stallFreeBb, $stallCleanupBb);
@@ -1582,7 +1581,7 @@ final class StringPregMatchJit
         $context->builder->call($context->lookupFunction('pcre2_code_free_8'), $code);
         $buf = $context->builder->load($bufSlot);
         $bufLen = $context->builder->load($bufLenSlot);
-        $bufNull = $context->builder->icmp(Builder::INT_EQ, $buf, $i8p->constNull());
+        $bufNull = self::isNullI8Ptr($context, $buf);
         $allocEmptyBb = $fn->appendBasicBlock('crc_alloc_empty');
         $buildBb = $fn->appendBasicBlock('crc_build');
         $context->builder->branchIf($bufNull, $allocEmptyBb, $buildBb);
@@ -1629,6 +1628,85 @@ final class StringPregMatchJit
         $context->builder->returnValue($result);
     }
 
+    private const PREG_SPLIT_NO_EMPTY = 1;
+
+    private const PREG_SPLIT_DELIM_CAPTURE = 2;
+
+    private const PREG_SPLIT_OFFSET_CAPTURE = 4;
+
+    private static function emitSplitMaybeAppend(
+        Context $context,
+        LlvmFunction $fn,
+        Value $partsHt,
+        Value $indexSlot,
+        Value $subject,
+        Value $partStart,
+        Value $partLen,
+        Value $offsetCapture,
+        Value $noEmpty,
+        BasicBlock $continueBb
+    ): void {
+        $sizeT = $context->getTypeFromString('size_t');
+        $i64 = $context->getTypeFromString('int64');
+        $isEmpty = $context->builder->icmp(Builder::INT_EQ, $partLen, $sizeT->constInt(0, false));
+        $skipBb = $fn->appendBasicBlock('ps_append_skip_'.(++self::$blockSuffix));
+        $checkBb = $fn->appendBasicBlock('ps_append_check_'.self::$blockSuffix);
+        $doBb = $fn->appendBasicBlock('ps_append_do_'.self::$blockSuffix);
+        $context->builder->branchIf($noEmpty, $checkBb, $doBb);
+
+        $context->builder->positionAtEnd($checkBb);
+        $context->builder->branchIf($isEmpty, $skipBb, $doBb);
+
+        $context->builder->positionAtEnd($doBb);
+        $pieceStr = self::sliceSubjectToString($context, $fn, $subject, $partStart, $partLen);
+        $partIndex = $context->builder->load($indexSlot);
+        $pairBb = $fn->appendBasicBlock('ps_append_pair_'.self::$blockSuffix);
+        $plainBb = $fn->appendBasicBlock('ps_append_plain_'.self::$blockSuffix);
+        $afterAppendBb = $fn->appendBasicBlock('ps_append_after_'.self::$blockSuffix);
+        $context->builder->branchIf($offsetCapture, $pairBb, $plainBb);
+
+        $context->builder->positionAtEnd($pairBb);
+        $pairHt = $context->builder->call($context->lookupFunction('__hashtable__alloc'));
+        $context->builder->call(
+            $context->lookupFunction('__hashtable__setStringAt'),
+            $pairHt,
+            $sizeT->constInt(0, false),
+            $pieceStr
+        );
+        $context->builder->call(
+            $context->lookupFunction('__hashtable__setLongAt'),
+            $pairHt,
+            $sizeT->constInt(1, false),
+            $context->builder->sext($partStart, $i64)
+        );
+        $context->builder->call(
+            $context->lookupFunction('__hashtable__setHashtableAt'),
+            $partsHt,
+            $partIndex,
+            $pairHt
+        );
+        $context->builder->branch($afterAppendBb);
+
+        $context->builder->positionAtEnd($plainBb);
+        $context->builder->call(
+            $context->lookupFunction('__hashtable__setStringAt'),
+            $partsHt,
+            $partIndex,
+            $pieceStr
+        );
+        $context->builder->branch($afterAppendBb);
+
+        $context->builder->positionAtEnd($afterAppendBb);
+        $context->builder->store(
+            $context->builder->add($partIndex, $sizeT->constInt(1, false)),
+            $indexSlot
+        );
+        $context->builder->branch($continueBb);
+
+        $context->builder->positionAtEnd($skipBb);
+        $context->builder->branch($continueBb);
+    }
+
     private static function emitSplit(Context $context, LlvmFunction $fn): void
     {
         $entry = $fn->appendBasicBlock('ps_entry');
@@ -1636,12 +1714,49 @@ final class StringPregMatchJit
 
         $pattern = $fn->getParam(0);
         $subject = $fn->getParam(1);
+        $limitArg = $fn->getParam(2);
+        $flagsArg = $fn->getParam(3);
         $i32 = $context->getTypeFromString('int32');
+        $i64 = $context->getTypeFromString('int64');
         $i8p = $context->getTypeFromString('int8*');
         $sizeT = $context->getTypeFromString('size_t');
         $voidPtr = $context->getTypeFromString('void*');
         $htPtr = $context->getTypeFromString('__hashtable__*');
+        $i1 = $context->getTypeFromString('int1');
         $nullHt = $htPtr->constNull();
+
+        $noEmpty = $context->builder->icmp(
+            Builder::INT_NE,
+            $context->builder->and($flagsArg, $i64->constInt(self::PREG_SPLIT_NO_EMPTY, false)),
+            $i64->constInt(0, false)
+        );
+        $delimCapture = $context->builder->icmp(
+            Builder::INT_NE,
+            $context->builder->and($flagsArg, $i64->constInt(self::PREG_SPLIT_DELIM_CAPTURE, false)),
+            $i64->constInt(0, false)
+        );
+        $offsetCapture = $context->builder->icmp(
+            Builder::INT_NE,
+            $context->builder->and($flagsArg, $i64->constInt(self::PREG_SPLIT_OFFSET_CAPTURE, false)),
+            $i64->constInt(0, false)
+        );
+        $limitNeg = $context->builder->icmp(Builder::INT_SLT, $limitArg, $i64->constInt(0, true));
+        $limitBb = $fn->appendBasicBlock('ps_limit_unbounded');
+        $limitPosBb = $fn->appendBasicBlock('ps_limit_bounded');
+        $limitDoneBb = $fn->appendBasicBlock('ps_limit_done');
+        $context->builder->branchIf($limitNeg, $limitBb, $limitPosBb);
+        $context->builder->positionAtEnd($limitBb);
+        $context->builder->branch($limitDoneBb);
+        $context->builder->positionAtEnd($limitPosBb);
+        $context->builder->branch($limitDoneBb);
+        $context->builder->positionAtEnd($limitDoneBb);
+        $maxParts = $context->builder->phi($sizeT, 'ps_max_parts');
+        $maxParts->addIncoming($sizeT->constInt(\PHP_INT_MAX, false), $limitBb);
+        $maxParts->addIncoming(
+            $context->builder->truncOrBitCast($limitArg, $sizeT),
+            $limitPosBb
+        );
+        $maxPartsMinusOne = $context->builder->sub($maxParts, $sizeT->constInt(1, false));
 
         $pregErrorSlot = BasicBlockHelper::entryAlloca($context, $i32);
         $code = $context->builder->call(
@@ -1649,7 +1764,7 @@ final class StringPregMatchJit
             $pattern,
             $pregErrorSlot
         );
-        $codeNull = $context->builder->icmp(Builder::INT_EQ, $code, $i8p->constNull());
+        $codeNull = self::isNullI8Ptr($context, $code);
         $compileFailBb = $fn->appendBasicBlock('ps_compile_fail');
         $createMdBb = $fn->appendBasicBlock('ps_create_md');
         $context->builder->branchIf($codeNull, $compileFailBb, $createMdBb);
@@ -1667,7 +1782,7 @@ final class StringPregMatchJit
             $code,
             $voidPtr->constNull()
         );
-        $mdNull = $context->builder->icmp(Builder::INT_EQ, $matchData, $voidPtr->constNull());
+        $mdNull = self::isNullI8Ptr($context, $matchData);
         $initLoopBb = $fn->appendBasicBlock('ps_init_loop');
         $mdFailBb = $fn->appendBasicBlock('ps_md_fail');
         $context->builder->branchIf($mdNull, $mdFailBb, $initLoopBb);
@@ -1696,7 +1811,10 @@ final class StringPregMatchJit
 
         $context->builder->positionAtEnd($loopHead);
         $offset = $context->builder->load($offsetSlot);
-        $continueLoop = $context->builder->icmp(Builder::INT_ULE, $offset, $subjLen);
+        $partIndex = $context->builder->load($indexSlot);
+        $withinOffset = $context->builder->icmp(Builder::INT_ULE, $offset, $subjLen);
+        $withinLimit = $context->builder->icmp(Builder::INT_ULT, $partIndex, $maxParts);
+        $continueLoop = $context->builder->and($withinOffset, $withinLimit);
         $context->builder->branchIf($continueLoop, $loopBody, $loopDone);
 
         $context->builder->positionAtEnd($loopBody);
@@ -1723,15 +1841,18 @@ final class StringPregMatchJit
 
         $context->builder->positionAtEnd($tailBb);
         $tailLen = $context->builder->sub($subjLen, $offset);
-        $tailStr = self::sliceSubjectToString($context, $fn, $subject, $offset, $tailLen);
-        $tailIndex = $context->builder->load($indexSlot);
-        $context->builder->call(
-            $context->lookupFunction('__hashtable__setStringAt'),
+        self::emitSplitMaybeAppend(
+            $context,
+            $fn,
             $partsHt,
-            $tailIndex,
-            $tailStr
+            $indexSlot,
+            $subject,
+            $offset,
+            $tailLen,
+            $offsetCapture,
+            $noEmpty,
+            $loopDone
         );
-        $context->builder->branch($loopDone);
 
         $context->builder->positionAtEnd($matchErrBb);
         $context->builder->call($context->lookupFunction('pcre2_match_data_free_8'), $matchData);
@@ -1748,16 +1869,127 @@ final class StringPregMatchJit
         $matchStart = $context->builder->load($ovector);
         $matchEnd = $context->builder->load($context->builder->inBoundsGEP($ovector, $sizeT->constInt(1, false)));
         $chunkLen = $context->builder->sub($matchStart, $offset);
-        $chunkStr = self::sliceSubjectToString($context, $fn, $subject, $offset, $chunkLen);
-        $partIndex = $context->builder->load($indexSlot);
-        $context->builder->call(
-            $context->lookupFunction('__hashtable__setStringAt'),
+        $afterChunkBb = $fn->appendBasicBlock('ps_after_chunk');
+        self::emitSplitMaybeAppend(
+            $context,
+            $fn,
             $partsHt,
-            $partIndex,
-            $chunkStr
+            $indexSlot,
+            $subject,
+            $offset,
+            $chunkLen,
+            $offsetCapture,
+            $noEmpty,
+            $afterChunkBb
         );
-        $context->builder->store($context->builder->add($partIndex, $sizeT->constInt(1, false)), $indexSlot);
+
+        $context->builder->positionAtEnd($afterChunkBb);
+        $delimSkipBb = $fn->appendBasicBlock('ps_delim_skip');
+        $delimInitBb = $fn->appendBasicBlock('ps_delim_init');
+        $context->builder->branchIf($delimCapture, $delimInitBb, $delimSkipBb);
+
+        $context->builder->positionAtEnd($delimInitBb);
+        $giSlot = BasicBlockHelper::entryAlloca($context, $i32);
+        $giCount = $context->builder->call(
+            $context->lookupFunction('pcre2_get_ovector_count_8'),
+            $matchData
+        );
+        $hasCaptures = $context->builder->icmp(Builder::INT_SGT, $giCount, $i32->constInt(1, false));
+        $giStartOneBb = $fn->appendBasicBlock('ps_delim_start_one');
+        $giStartZeroBb = $fn->appendBasicBlock('ps_delim_start_zero');
+        $giStartDoneBb = $fn->appendBasicBlock('ps_delim_start_done');
+        $context->builder->branchIf($hasCaptures, $giStartOneBb, $giStartZeroBb);
+        $context->builder->positionAtEnd($giStartOneBb);
+        $context->builder->store($i32->constInt(1, false), $giSlot);
+        $context->builder->branch($giStartDoneBb);
+        $context->builder->positionAtEnd($giStartZeroBb);
+        $context->builder->store($giCount, $giSlot);
+        $context->builder->branch($giStartDoneBb);
+        $context->builder->positionAtEnd($giStartDoneBb);
+        $delimHead = $fn->appendBasicBlock('ps_delim_head');
+        $delimBody = $fn->appendBasicBlock('ps_delim_body');
+        $delimDone = $fn->appendBasicBlock('ps_delim_done');
+        $context->builder->branch($delimHead);
+
+        $context->builder->positionAtEnd($delimHead);
+        $gi = $context->builder->load($giSlot);
+        $moreDelim = $context->builder->icmp(Builder::INT_SLT, $gi, $giCount);
+        $context->builder->branchIf($moreDelim, $delimBody, $delimDone);
+
+        $context->builder->positionAtEnd($delimBody);
+        $gi64 = $context->builder->sext($gi, $i64);
+        $pairBase = $context->builder->mul($gi64, $i64->constInt(2, false));
+        $gStart = $context->builder->load(
+            $context->builder->inBoundsGEP($ovector, $context->builder->truncOrBitCast($pairBase, $sizeT))
+        );
+        $gEnd = $context->builder->load(
+            $context->builder->inBoundsGEP(
+                $ovector,
+                $context->builder->truncOrBitCast($context->builder->add($pairBase, $i64->constInt(1, false)), $sizeT)
+            )
+        );
+        $gValid = $context->builder->and(
+            $context->builder->icmp(Builder::INT_SGE, $gStart, $sizeT->constInt(0, false)),
+            $context->builder->icmp(Builder::INT_SGE, $gEnd, $sizeT->constInt(0, false))
+        );
+        $delimValidBb = $fn->appendBasicBlock('ps_delim_valid');
+        $delimNextBb = $fn->appendBasicBlock('ps_delim_next');
+        $context->builder->branchIf($gValid, $delimValidBb, $delimNextBb);
+
+        $context->builder->positionAtEnd($delimValidBb);
+        $gLen = $context->builder->sub($gEnd, $gStart);
+        $afterDelimBb = $fn->appendBasicBlock('ps_after_delim');
+        self::emitSplitMaybeAppend(
+            $context,
+            $fn,
+            $partsHt,
+            $indexSlot,
+            $subject,
+            $gStart,
+            $gLen,
+            $offsetCapture,
+            $noEmpty,
+            $afterDelimBb
+        );
+
+        $context->builder->positionAtEnd($afterDelimBb);
+        $context->builder->branch($delimNextBb);
+
+        $context->builder->positionAtEnd($delimNextBb);
+        $context->builder->store($context->builder->add($gi, $i32->constInt(1, false)), $giSlot);
+        $context->builder->branch($delimHead);
+
+        $context->builder->positionAtEnd($delimDone);
+        $context->builder->branch($delimSkipBb);
+
+        $context->builder->positionAtEnd($delimSkipBb);
         $context->builder->store($matchEnd, $offsetSlot);
+        $limitTailBb = $fn->appendBasicBlock('ps_limit_tail');
+        $loopContinueBb = $fn->appendBasicBlock('ps_loop_continue');
+        $atLimit = $context->builder->icmp(
+            Builder::INT_UGE,
+            $context->builder->load($indexSlot),
+            $maxPartsMinusOne
+        );
+        $context->builder->branchIf($atLimit, $limitTailBb, $loopContinueBb);
+
+        $context->builder->positionAtEnd($limitTailBb);
+        $tailOffset = $context->builder->load($offsetSlot);
+        $limitTailLen = $context->builder->sub($subjLen, $tailOffset);
+        self::emitSplitMaybeAppend(
+            $context,
+            $fn,
+            $partsHt,
+            $indexSlot,
+            $subject,
+            $tailOffset,
+            $limitTailLen,
+            $offsetCapture,
+            $noEmpty,
+            $loopDone
+        );
+
+        $context->builder->positionAtEnd($loopContinueBb);
         $context->builder->branch($loopHead);
 
         $context->builder->positionAtEnd($loopDone);
@@ -1792,20 +2024,9 @@ final class StringPregMatchJit
         $context->builder->branchIf($isEmpty, $emptyBb, $copyBb);
 
         $context->builder->positionAtEnd($emptyBb);
-        $emptyBuf = $context->builder->call($context->lookupFunction('malloc'), $sizeT->constInt(1, false));
-        $emptyFailBb = $fn->appendBasicBlock('slice_empty_fail_'.self::$blockSuffix);
         $emptyOkBb = $fn->appendBasicBlock('slice_empty_ok_'.self::$blockSuffix);
-        $context->builder->branchIf(
-            self::isNullI8Ptr($context, $emptyBuf),
-            $emptyFailBb,
-            $emptyOkBb
-        );
-        $context->builder->positionAtEnd($emptyFailBb);
-        $context->builder->call(
-            $context->lookupFunction('__phpc_preg_set_error'),
-            $context->getTypeFromString('int32')->constInt(self::PHPC_PREG_INTERNAL_ERROR, false)
-        );
-        $context->builder->returnValue($strPtr->constNull());
+        $emptyBuf = $context->builder->call($context->lookupFunction('malloc'), $sizeT->constInt(1, false));
+        $context->builder->branch($emptyOkBb);
         $context->builder->positionAtEnd($emptyOkBb);
         $buf = $context->builder->pointerCast($emptyBuf, $i8p);
         $context->builder->store($i8->constInt(0, false), $buf);
@@ -1818,29 +2039,17 @@ final class StringPregMatchJit
         $context->builder->branch($doneBb);
 
         $context->builder->positionAtEnd($copyBb);
+        $copyOkBb = $fn->appendBasicBlock('slice_copy_ok_'.self::$blockSuffix);
         $need = $context->builder->add($len, $sizeT->constInt(1, false));
         $buf = $context->builder->call($context->lookupFunction('malloc'), $need);
-        $copyFailBb = $fn->appendBasicBlock('slice_copy_fail_'.self::$blockSuffix);
-        $copyOkBb = $fn->appendBasicBlock('slice_copy_ok_'.self::$blockSuffix);
-        $context->builder->branchIf(
-            self::isNullI8Ptr($context, $buf),
-            $copyFailBb,
-            $copyOkBb
-        );
-        $context->builder->positionAtEnd($copyFailBb);
-        $context->builder->call(
-            $context->lookupFunction('__phpc_preg_set_error'),
-            $context->getTypeFromString('int32')->constInt(self::PHPC_PREG_INTERNAL_ERROR, false)
-        );
-        $context->builder->returnValue($strPtr->constNull());
+        $context->builder->branch($copyOkBb);
         $context->builder->positionAtEnd($copyOkBb);
         $buf = $context->builder->pointerCast($buf, $i8p);
-        $src = $context->builder->gep(self::stringData($context, $subject), $offset);
-        $context->builder->call(
-            $context->lookupFunction('memcpy'),
-            $context->builder->pointerCast($buf, $voidPtr),
-            $context->builder->pointerCast($context->bytePtr($src), $voidPtr),
-            $len
+        $context->intrinsic->memcpy(
+            $buf,
+            $context->builder->inBoundsGEP(self::stringData($context, $subject), $offset),
+            $len,
+            false
         );
         $context->builder->store($i8->constInt(0, false), $context->builder->gep($buf, $len));
         $sliceStr = $context->builder->call(
@@ -1855,7 +2064,9 @@ final class StringPregMatchJit
         $result = $context->builder->phi($strPtr);
         $result->addIncoming($emptyStr, $emptyOkBb);
         $result->addIncoming($sliceStr, $copyOkBb);
-        $context->builder->positionAtEnd($resume);
+        $continueBb = $fn->appendBasicBlock('slice_continue_'.self::$blockSuffix);
+        $context->builder->branch($continueBb);
+        $context->builder->positionAtEnd($continueBb);
 
         return $result;
     }
@@ -1916,6 +2127,7 @@ final class StringPregMatchJit
         $context->builder->positionAtEnd($matchedBb);
         $pieceLen = $context->builder->sub($end, $start);
         $pieceStr = self::sliceSubjectToString($context, $fn, $subject, $start, $pieceLen);
+        $pieceEnd = $context->builder->getInsertBlock();
         $context->builder->branch($afterBb);
 
         $context->builder->positionAtEnd($emptyBb);
@@ -1926,12 +2138,13 @@ final class StringPregMatchJit
             $sizeT->constInt(0, false),
             $sizeT->constInt(0, false)
         );
+        $emptyEnd = $context->builder->getInsertBlock();
         $context->builder->branch($afterBb);
 
         $context->builder->positionAtEnd($afterBb);
         $piecePhi = $context->builder->phi($pieceStr->typeOf());
-        $piecePhi->addIncoming($pieceStr, $matchedBb);
-        $piecePhi->addIncoming($emptyPiece, $emptyBb);
+        $piecePhi->addIncoming($pieceStr, $pieceEnd);
+        $piecePhi->addIncoming($emptyPiece, $emptyEnd);
         $index = $context->builder->truncOrBitCast($idx64, $sizeT);
         $context->builder->call(
             $context->lookupFunction('__hashtable__setStringAt'),
@@ -1950,11 +2163,12 @@ final class StringPregMatchJit
     private static function isNullI8Ptr(Context $context, Value $ptr): Value
     {
         $i8p = $context->getTypeFromString('int8*');
+        $i64 = $context->getTypeFromString('int64');
 
         return $context->builder->icmp(
             Builder::INT_EQ,
-            $context->builder->pointerCast($ptr, $i8p),
-            $i8p->constNull()
+            $context->builder->ptrToInt($context->builder->pointerCast($ptr, $i8p), $i64),
+            $i64->constInt(0, false)
         );
     }
 
