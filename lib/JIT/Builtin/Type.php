@@ -1130,6 +1130,7 @@ class Type extends Builtin {
         StringMicrotime::ensureLinked($this->context);
         StringGettimeofday::ensureLinked($this->context);
         StringGetrusage::ensureLinked($this->context);
+        StringNetInterfacesJit::ensureLinked($this->context);
         StringGetenvAll::ensureLinked($this->context);
         StringInfo::ensureLinked($this->context);
         StringDir::ensureLinked($this->context);
