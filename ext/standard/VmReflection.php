@@ -1368,6 +1368,56 @@ final class VmReflection
     }
 
     /**
+     * Instance properties with readonly flag or declared on a readonly class (#7186).
+     *
+     * php-src: ext/reflection/php_reflection.c — zim_ReflectionClass_getReadOnlyProperties
+     *
+     * @return list<ClassProperty>
+     */
+    public static function collectReadOnlyClassPropertiesForReflection(ClassEntry $entry, Context $ctx): array
+    {
+        $byLc = [];
+        foreach (array_reverse(self::classHierarchyChain($entry, $ctx)) as $class) {
+            foreach ($class->properties as $prop) {
+                if (!$prop->readonly && !$class->readonly) {
+                    continue;
+                }
+                $byLc[strtolower($prop->name)] = $prop;
+            }
+        }
+
+        return array_values($byLc);
+    }
+
+    /**
+     * ReflectionClass::getReadOnlyProperties() result array (#7186).
+     */
+    public static function reflectionReadOnlyPropertiesArray(
+        Context $ctx,
+        ClassEntry $entry,
+        string $reflectedClassName
+    ): Variable {
+        $rpClass = $ctx->classes[\PHPCompiler\VM\ReflectionSupport::REFLECTION_PROPERTY] ?? null;
+        if (null === $rpClass) {
+            throw new \LogicException('ReflectionProperty is not registered in this compiler build');
+        }
+        $result = new Variable();
+        $result->newArray();
+        $ht = $result->toArray();
+        foreach (self::collectReadOnlyClassPropertiesForReflection($entry, $ctx) as $prop) {
+            $obj = new \PHPCompiler\VM\ObjectEntry($rpClass);
+            $obj->constructed = true;
+            $obj->getProperty(\PHPCompiler\VM\ReflectionSupport::PROP_CLASS_NAME)->string($reflectedClassName);
+            $obj->getProperty(\PHPCompiler\VM\ReflectionSupport::PROP_PROPERTY_NAME)->string($prop->name);
+            $slot = new Variable(Variable::TYPE_OBJECT);
+            $slot->object($obj);
+            $ht->append($slot);
+        }
+
+        return $result;
+    }
+
+    /**
      * ReflectionClass::getProperties() result array (#3815).
      */
     public static function reflectionPropertiesArray(
