@@ -81,7 +81,7 @@ final class VmSerialize
     }
 
     /**
-     * @param array<string, mixed>|null $options unserialize() options (allowed_classes only; #3300)
+     * @param array<string, mixed>|null $options unserialize() options (allowed_classes, max_depth; #3300)
      */
     public static function unserializePayload(Context $ctx, string $payload, ?array $options = null): mixed
     {
@@ -164,7 +164,11 @@ final class VmSerialize
             return self::instantiatePlainObject($class, $data);
         }
 
-        return @\unserialize($payload);
+        if (null === $options || [] === $options) {
+            return @\unserialize($payload);
+        }
+
+        return @\unserialize($payload, $options);
     }
 
     /**

@@ -6997,7 +6997,16 @@ class JIT {
                     $prevStrict = $this->context->callerStrictTypes;
                     $this->context->callerStrictTypes = $block->strictTypes;
                     $this->emitJitLateStaticCallSiteBinding($callArgs);
+                    $savedUnserializeOptionsOperand = $this->context->jitUnserializeOptionsOperand;
+                    if (
+                        $this->context->scope->toCall instanceof CoreFunc\Internal
+                        && 'unserialize' === strtolower($this->context->scope->toCall->getName())
+                        && isset($callOperands[1])
+                    ) {
+                        $this->context->jitUnserializeOptionsOperand = $callOperands[1];
+                    }
                     $result = $this->context->scope->toCall->call($this->context, ...$callArgs);
+                    $this->context->jitUnserializeOptionsOperand = $savedUnserializeOptionsOperand;
                     $this->markNewObjectConstructedAfterCall($this->context->scope->toCall, $callArgs);
                     $this->context->callerStrictTypes = $prevStrict;
                     $this->assignCallResultOperand(

@@ -62,6 +62,9 @@ class Context {
     /** User function CFG block while compiling its body (func_get_args / func_num_args, #197). */
     public ?Block $jitEnclosingBlock = null;
 
+    /** Operand for unserialize() options arg during FUNCCALL lowering (#3300). */
+    public ?Operand $jitUnserializeOptionsOperand = null;
+
     /**
      * Backing property name for raw writes inside a lowering set-hook method (#4025).
      *
