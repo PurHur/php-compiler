@@ -73,6 +73,7 @@ use PHPCompiler\VM\Builtin\ReflectionClassGetDeprecatedMessage;
 use PHPCompiler\VM\Builtin\ReflectionClassGetDeprecatedVersion;
 use PHPCompiler\VM\Builtin\ReflectionClassGetStartLine;
 use PHPCompiler\VM\Builtin\ReflectionClassIsDeprecated;
+use PHPCompiler\VM\Builtin\ReflectionClassIsEnum;
 use PHPCompiler\VM\Builtin\ReflectionClassIsInternal;
 use PHPCompiler\VM\Builtin\ReflectionClassIsStatic;
 use PHPCompiler\VM\Builtin\ReflectionClassIsUserDefined;
@@ -488,6 +489,8 @@ final class BuiltinClasses
         $rc->methodVisibility['resetaslazyobject'] = $pub;
         $rc->methods['isinternal'] = new ReflectionClassIsInternal();
         $rc->methodVisibility['isinternal'] = $pub;
+        $rc->methods['isenum'] = new ReflectionClassIsEnum();
+        $rc->methodVisibility['isenum'] = $pub;
         $rc->methods['isstatic'] = new ReflectionClassIsStatic();
         $rc->methodVisibility['isstatic'] = $pub;
         $rc->methods['isdeprecated'] = new ReflectionClassIsDeprecated();
