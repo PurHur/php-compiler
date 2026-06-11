@@ -11,7 +11,7 @@ use PHPCompiler\VM;
 /**
  * posix extension module entry (php-src ext/posix/posix.c; issue #7105).
  *
- * v1 libc wrappers: #7271; access/mknod/set*: #7376; host delegation removed #7177; times/rlimit: #7173.
+ * v1 libc wrappers: #7271; access/mknod/set*: #7376; host delegation removed #7177; times/rlimit: #7173; euid/groups/uname: #6123.
  */
 class Module extends ModuleAbstract
 {
@@ -53,7 +53,10 @@ class Module extends ModuleAbstract
         return [
             new posix_getpid(),
             new posix_getppid(),
+            new posix_geteuid(),
             new posix_getegid(),
+            new posix_getgroups(),
+            new posix_uname(),
             new posix_strerror(),
             new posix_get_last_error(),
             new posix_getcwd(),

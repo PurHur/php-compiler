@@ -12,24 +12,24 @@ use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Value;
 
-/** posix_getegid() — effective group ID (php-src ext/posix/posix.c; #7376). */
-final class posix_getegid extends Internal
+/** posix_geteuid() — effective user ID (php-src ext/posix/posix.c; #6123). */
+final class posix_geteuid extends Internal
 {
     public function __construct()
     {
-        parent::__construct('posix_getegid');
+        parent::__construct('posix_geteuid');
     }
 
     public function execute(Frame $frame): void
     {
         $argc = \count($frame->calledArgs);
         if ($argc > 0) {
-            throw new \ArgumentCountError('posix_getegid() expects exactly 0 arguments, '.$argc.' given');
+            throw new \ArgumentCountError('posix_geteuid() expects exactly 0 arguments, '.$argc.' given');
         }
         if (null === $frame->returnVar) {
             return;
         }
-        $frame->returnVar->int(VmPosix::getegid());
+        $frame->returnVar->int(VmPosix::geteuid());
     }
 
     public function call(Context $context, JITVariable ...$args): Value
@@ -39,13 +39,13 @@ final class posix_getegid extends Internal
             TypeErrorRaise::ensureLinked($context);
             TypeErrorRaise::emitArgumentCountError(
                 $context,
-                'posix_getegid() expects exactly 0 arguments, '.$argc.' given'
+                'posix_geteuid() expects exactly 0 arguments, '.$argc.' given'
             );
             $slot = JitValueBox::alloc($context);
 
             return JitValueBox::pointer($context, $slot);
         }
 
-        return JitPosix::getegid($context);
+        return JitPosix::geteuid($context);
     }
 }

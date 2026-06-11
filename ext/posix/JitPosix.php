@@ -40,6 +40,28 @@ final class JitPosix
             : $context->builder->zExt($raw, $i64);
     }
 
+    public static function geteuid(Context $context): Value
+    {
+        self::ensureLibcEuid($context);
+        $i64 = $context->getTypeFromString('int64');
+        $raw = $context->builder->call($context->lookupFunction('geteuid'));
+
+        return $raw->typeOf() === $i64
+            ? $raw
+            : $context->builder->zExt($raw, $i64);
+    }
+
+    public static function getegid(Context $context): Value
+    {
+        self::ensureLibcEgid($context);
+        $i64 = $context->getTypeFromString('int64');
+        $raw = $context->builder->call($context->lookupFunction('getegid'));
+
+        return $raw->typeOf() === $i64
+            ? $raw
+            : $context->builder->zExt($raw, $i64);
+    }
+
     public static function strerror(Context $context, JITVariable $errnoArg): Value
     {
         self::ensureLibcStrerror($context);
@@ -151,6 +173,30 @@ final class JitPosix
                 $fn = $context->module->addFunction($name, $ft);
                 $context->registerFunction($name, $fn);
             }
+        }
+    }
+
+    private static function ensureLibcEuid(Context $context): void
+    {
+        $i32 = $context->getTypeFromString('int32');
+        try {
+            $context->lookupFunction('geteuid');
+        } catch (\Throwable $e) {
+            $ft = $context->context->functionType($i32, false);
+            $fn = $context->module->addFunction('geteuid', $ft);
+            $context->registerFunction('geteuid', $fn);
+        }
+    }
+
+    private static function ensureLibcEgid(Context $context): void
+    {
+        $i32 = $context->getTypeFromString('int32');
+        try {
+            $context->lookupFunction('getegid');
+        } catch (\Throwable $e) {
+            $ft = $context->context->functionType($i32, false);
+            $fn = $context->module->addFunction('getegid', $ft);
+            $context->registerFunction('getegid', $fn);
         }
     }
 
