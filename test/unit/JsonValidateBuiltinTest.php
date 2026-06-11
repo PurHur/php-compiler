@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace PHPCompiler;
 
 use PHPCompiler\ext\standard\json_validate;
+use PHPCompiler\ext\standard\VmJsonFlags;
 use PHPCompiler\VM\Variable as VMVariable;
 use PHPUnit\Framework\TestCase;
 
@@ -58,7 +59,42 @@ final class JsonValidateBuiltinTest extends TestCase
         $fn->execute($frame);
     }
 
-    private function runValidate(string $json, int $depth = 512): bool
+    public function testInvalidUtf8WithoutFlag(): void
+    {
+        $bad = '{"x":"' . "\xC3\x28" . '"}';
+        $this->assertFalse($this->runValidate($bad, 512, 0));
+    }
+
+    public function testInvalidUtf8WithIgnoreFlag(): void
+    {
+        $bad = '{"x":"' . "\xC3\x28" . '"}';
+        $this->assertTrue($this->runValidate($bad, 512, VmJsonFlags::INVALID_UTF8_IGNORE));
+    }
+
+    public function testValidJsonWithIgnoreFlag(): void
+    {
+        $this->assertTrue($this->runValidate('{"a":1}', 512, VmJsonFlags::INVALID_UTF8_IGNORE));
+    }
+
+    public function testInvalidFlagsThrow(): void
+    {
+        $runtime = new Runtime();
+        $fn = new json_validate();
+        $frame = $fn->getFrame($runtime->vmContext);
+        $jsonVar = new VMVariable();
+        $jsonVar->string('[]');
+        $depthVar = new VMVariable();
+        $depthVar->int(512);
+        $flagsVar = new VMVariable();
+        $flagsVar->int(VmJsonFlags::INVALID_UTF8_IGNORE | 1);
+        $frame->calledArgs = [$jsonVar, $depthVar, $flagsVar];
+        $frame->returnVar = new VMVariable();
+        $this->expectException(\ValueError::class);
+        $this->expectExceptionMessage('Argument #3 ($flags)');
+        $fn->execute($frame);
+    }
+
+    private function runValidate(string $json, int $depth = 512, int $flags = 0): bool
     {
         $runtime = new Runtime();
         $fn = new json_validate();
@@ -70,6 +106,16 @@ final class JsonValidateBuiltinTest extends TestCase
             $depthVar = new VMVariable();
             $depthVar->int($depth);
             $frame->calledArgs[] = $depthVar;
+        }
+        if (0 !== $flags) {
+            if (512 === $depth) {
+                $depthVar = new VMVariable();
+                $depthVar->int($depth);
+                $frame->calledArgs[] = $depthVar;
+            }
+            $flagsVar = new VMVariable();
+            $flagsVar->int($flags);
+            $frame->calledArgs[] = $flagsVar;
         }
         $frame->returnVar = new VMVariable();
         $fn->execute($frame);

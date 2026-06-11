@@ -14,10 +14,10 @@ use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
 
 /**
- * json_validate() — PHP 8.3 syntax check without building values (issue #3101).
+ * json_validate() — PHP 8.3 syntax check without building values (issue #3101, #4085).
  *
- * VM: VmJsonScanner (ext/json parity subset); JIT/AOT: __compiler_json_validate.
- * Unsupported $flags throw LogicException; depth ValueError on VM when nesting exceeds limit.
+ * VM: VmJsonScanner (ext/json parity subset); JIT/AOT: __compiler_json_validate (flags=0 runtime).
+ * Supported $flags: JSON_INVALID_UTF8_IGNORE | JSON_INVALID_UTF8_SUBSTITUTE (php-src ext/json/php_json.c).
  */
 final class json_validate extends Internal
 {
@@ -49,19 +49,18 @@ final class json_validate extends Internal
             }
             $depth = $depthVar->toInt();
         }
+        $flags = 0;
         if ($argc > 2) {
             $flagsVar = $frame->calledArgs[2]->resolveIndirect();
             if (Variable::TYPE_INTEGER !== $flagsVar->type) {
                 throw new \LogicException('json_validate() argument #3 must be an integer in this compiler build');
             }
-            if (0 !== $flagsVar->toInt()) {
-                throw new \LogicException('json_validate() flags not supported in this compiler build');
-            }
+            $flags = $flagsVar->toInt();
         }
         if ($argc > 3) {
             throw new \LogicException('json_validate() accepts at most three arguments');
         }
-        $frame->returnVar->bool(VmJsonValidate::validate($json, $depth));
+        $frame->returnVar->bool(VmJsonValidate::validate($json, $depth, $flags));
     }
 
     public function call(Context $context, JITVariable ...$args): Value
@@ -73,13 +72,7 @@ final class json_validate extends Internal
         if ($argc > 3) {
             throw new \LogicException('json_validate() accepts at most three arguments');
         }
-        if ($argc > 2) {
-            if (JITVariable::TYPE_NATIVE_LONG !== $args[2]->type
-                || JITVariable::KIND_VALUE !== $args[2]->kind
-                || 0 !== (int) $context->llvm->lib->LLVMConstIntGetZExtValue($args[2]->value->value)) {
-                throw new \LogicException('json_validate() flags not supported in this compiler build');
-            }
-        }
+        $flags = self::resolveFlagsArg($context, $args, $argc);
         $depth = 512;
         if ($argc > 1) {
             if (JITVariable::TYPE_NATIVE_LONG === $args[1]->type && JITVariable::KIND_VALUE === $args[1]->kind) {
@@ -91,16 +84,38 @@ final class json_validate extends Internal
                 return JitJsonValidate::invoke($context, $args[0], $args[1]);
             }
         }
+        if (null !== $flags && 0 !== $flags) {
+            VmJsonFlags::assertValidateFlags($flags);
+        }
         $literal = JitStringArg::compileTimeLiteral($args[0]);
         if (null !== $literal) {
-            $ok = VmJsonValidate::validate($literal, $depth);
+            $ok = VmJsonValidate::validate($literal, $depth, $flags ?? 0);
 
             return $context->getTypeFromString('int1')->constInt($ok ? 1 : 0, false);
+        }
+        if (null !== $flags && 0 !== $flags) {
+            throw new \LogicException('json_validate() flags not supported in this compiler build');
         }
 
         $jsonPtr = JitStringBuiltinArg::lower($context, $args[0], 'json_validate', 0, 'json');
         $depthConst = $context->getTypeFromString('int64')->constInt($depth, false);
 
         return JitJsonValidate::invokeWithDepth($context, $jsonPtr, $depthConst);
+    }
+
+    /**
+     * @param list<JITVariable> $args
+     */
+    private static function resolveFlagsArg(Context $context, array $args, int $argc): ?int
+    {
+        if ($argc <= 2) {
+            return 0;
+        }
+        $flagsArg = $args[2];
+        if (JITVariable::TYPE_NATIVE_LONG !== $flagsArg->type || JITVariable::KIND_VALUE !== $flagsArg->kind) {
+            return null;
+        }
+
+        return (int) $context->llvm->lib->LLVMConstIntGetZExtValue($flagsArg->value->value);
     }
 }
