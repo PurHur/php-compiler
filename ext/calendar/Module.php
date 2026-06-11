@@ -29,13 +29,18 @@ class Module extends ModuleAbstract
     {
         return [
             new cal_days_in_month(),
+            new cal_from_jd(),
+            new cal_info(),
             new cal_to_jd(),
+            new easter_date(),
+            new easter_days(),
             new gregoriantojd(),
+            new jddayofweek(),
+            new jdmonthname(),
             new jdtogregorian(),
             new jdtojulian(),
             new unixtojd(),
             new jdtounix(),
-            new easter_date(),
         ];
     }
 }
