@@ -30,7 +30,7 @@ final class utf8_encode extends Internal
             $frame->calledArgs[0],
             'utf8_encode',
             0,
-            'data'
+            'string'
         );
         BuiltinExecute::writeReturn(
             $frame,
@@ -46,7 +46,7 @@ final class utf8_encode extends Internal
 
         return JitUtf8Latin1::encode(
             $context,
-            JitStringBuiltinArg::lower($context, $args[0], 'utf8_encode', 0, 'data')
+            JitStringBuiltinArg::lower($context, $args[0], 'utf8_encode', 0, 'string')
         );
     }
 }

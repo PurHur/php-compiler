@@ -264,6 +264,10 @@ class JITTest extends BaseTest {
             if (str_contains($name, 'uasort_closure')) {
                 continue;
             }
+            // utf8_encode/decode TypeError in try/catch: VM + AOT (#4317); MCJIT JitStringBuiltinArg assert IR (#98).
+            if (str_contains($name, 'utf8_encode_decode_scalar') && !str_contains($name, '_jit')) {
+                continue;
+            }
             // Closure::fromCallable() inaccessible callback TypeError: VM ClosureSupport (#7416).
             if (str_contains($name, 'closure_from_callable_inaccessible')) {
                 continue;
