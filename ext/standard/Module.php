@@ -521,6 +521,7 @@ class Module extends ModuleAbstract
             new stream_filter_register(),
             new stream_filter_append(),
             new stream_filter_prepend(),
+            new stream_filter_remove(),
             new stream_get_wrappers(),
             new stream_wrapper_register(),
             new stream_register_wrapper(),
