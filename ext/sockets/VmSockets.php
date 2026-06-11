@@ -20,23 +20,21 @@ final class VmSockets
 
     public static function atmark(\Socket $socket): bool
     {
+        $ffi = self::ffi();
+        if (null !== $ffi) {
+            $fd = VmSocket::fdForHostSocket($socket);
+            if (null !== $fd) {
+                $r = (int) $ffi->sockatmark($fd);
+                if ($r >= 0) {
+                    return 0 !== $r;
+                }
+            }
+        }
         if (\function_exists('socket_atmark')) {
             return \socket_atmark($socket);
         }
-        $ffi = self::ffi();
-        if (null === $ffi) {
-            return false;
-        }
-        $fd = VmSocket::fdForHostSocket($socket);
-        if (null === $fd) {
-            return false;
-        }
-        $r = (int) $ffi->sockatmark($fd);
-        if ($r < 0) {
-            return false;
-        }
 
-        return 0 !== $r;
+        return false;
     }
 
     private static function ffi(): ?\FFI
