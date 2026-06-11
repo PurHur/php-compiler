@@ -4138,15 +4138,38 @@ final class VmString
      * @return string|false
      */
     public static function realpath(string $path) {
-        if ('' === $path) {
+        if ('' === $path || str_contains($path, "\0")) {
             return false;
         }
-        $normalized = self::normalizePath($path);
+        if (VmStatNative::available()) {
+            return VmStatNative::realpath($path);
+        }
+
+        return self::realpathWithoutLibc($path);
+    }
+
+    /**
+     * getcwd + normalizePath when libc FFI is unavailable (no symlink resolution).
+     *
+     * @return string|false
+     */
+    private static function realpathWithoutLibc(string $path): string|false
+    {
+        $absolute = '' !== $path && ('/' === $path[0] || '\\' === $path[0]);
+        if (!$absolute) {
+            $cwd = VmGetcwdNative::resolve();
+            if (false === $cwd || '' === $cwd) {
+                return false;
+            }
+            $path = self::normalizePath($cwd.'/'.$path);
+        } else {
+            $path = self::normalizePath($path);
+        }
         if (!file_exists($path)) {
             return false;
         }
 
-        return $normalized;
+        return $path;
     }
 
     public static function normalizePath(string $path): string
