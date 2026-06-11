@@ -13,6 +13,7 @@ namespace PHPCompiler\ext\standard;
 
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
+use PHPCompiler\JIT\Builtin\TypeErrorRaise;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\HashTableHelper;
 use PHPCompiler\JIT\JitStringBuiltinArg;
@@ -49,6 +50,7 @@ final class implode extends Internal
             );
         } else {
             self::rejectEnumSeparator($frame->calledArgs[0], $this->getName());
+            self::rejectArraySeparator($frame->calledArgs[0], $this->getName());
             $glue = VmString::coerceOperand($frame->calledArgs[0]);
             $ht = VmArray::requireArrayParam(
                 $frame->calledArgs[1],
@@ -85,13 +87,21 @@ final class implode extends Internal
             );
             $haystack = $this->loadHaystack($context, $args[0], false);
         } else {
+            if (0 !== ($args[0]->type & JITVariable::IS_NATIVE_ARRAY)
+                || JITVariable::TYPE_HASHTABLE === $args[0]->type
+            ) {
+                self::emitSeparatorArrayTypeErrorAndAbort($context, $this->getName());
+
+                return $context->getTypeFromString('__string__*')->constNull();
+            }
             $glue = JitStringBuiltinArg::lower(
                 $context,
                 $args[0],
                 $this->getName(),
                 0,
                 'separator',
-                'array|string'
+                'array|string',
+                'string'
             );
             $haystack = $this->loadHaystack($context, $args[1], true);
         }
@@ -153,5 +163,28 @@ final class implode extends Internal
             $function,
             EnumCaseSupport::typeNameForVariable($var)
         ));
+    }
+
+    /** php-src php_implode — two-arg form separator must not be array (#4160, ext/standard/string.c). */
+    private static function rejectArraySeparator(Variable $var, string $function): void
+    {
+        if (Variable::TYPE_ARRAY === $var->resolveIndirect()->type) {
+            throw new \TypeError(sprintf(
+                '%s(): Argument #1 ($separator) must be of type string, array given',
+                $function
+            ));
+        }
+    }
+
+    /** AOT standalone: libc abort like JitArrayElem::emitErrorAndAbort (#4160). */
+    private static function emitSeparatorArrayTypeErrorAndAbort(Context $context, string $function): void
+    {
+        TypeErrorRaise::registerDeclarations($context);
+        TypeErrorRaise::ensureLinked($context);
+        TypeErrorRaise::emitRaise($context, sprintf(
+            '%s(): Argument #1 ($separator) must be of type string, array given',
+            $function
+        ));
+        $context->builder->call($context->lookupFunction('abort'));
     }
 }

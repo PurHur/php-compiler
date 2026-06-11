@@ -23,10 +23,17 @@ final class JitStringBuiltinArg
         string $function,
         int $argIndex,
         string $paramName,
-        string $expectedType = 'string'
+        string $expectedType = 'string',
+        ?string $arrayExpectedType = null
     ): Value {
+        $arrayExpected = $arrayExpectedType ?? $expectedType;
         if (Variable::TYPE_HASHTABLE === $arg->type) {
-            self::emitTypeErrorAndAbort($context, $function, $argIndex, $paramName, 'array', $expectedType);
+            self::emitTypeErrorAndAbort($context, $function, $argIndex, $paramName, 'array', $arrayExpected);
+
+            return self::unreachableStringPtr($context);
+        }
+        if (0 !== ($arg->type & Variable::IS_NATIVE_ARRAY)) {
+            self::emitTypeErrorAndAbort($context, $function, $argIndex, $paramName, 'array', $arrayExpected);
 
             return self::unreachableStringPtr($context);
         }
@@ -43,7 +50,7 @@ final class JitStringBuiltinArg
             return self::unreachableStringPtr($context);
         }
         if (Variable::TYPE_VALUE === $arg->type) {
-            return self::lowerBoxed($context, $arg, $function, $argIndex, $paramName, $expectedType);
+            return self::lowerBoxed($context, $arg, $function, $argIndex, $paramName, $expectedType, $arrayExpected);
         }
 
         return JitStringArg::lower($context, $arg, "{$function}() argument #" . ($argIndex + 1));
@@ -55,7 +62,8 @@ final class JitStringBuiltinArg
         string $function,
         int $argIndex,
         string $paramName,
-        string $expectedType = 'string'
+        string $expectedType = 'string',
+        string $arrayExpectedType = 'string'
     ): Value {
         TypeErrorRaise::registerDeclarations($context);
         TypeErrorRaise::ensureLinked($context);
@@ -81,7 +89,7 @@ final class JitStringBuiltinArg
         $context->builder->branchIf($isArray, $arrayBlock, $okBlock);
 
         $context->builder->positionAtEnd($arrayBlock);
-        self::emitTypeErrorAndAbort($context, $function, $argIndex, $paramName, 'array', $expectedType);
+        self::emitTypeErrorAndAbort($context, $function, $argIndex, $paramName, 'array', $arrayExpectedType);
 
         $context->builder->positionAtEnd($okBlock);
         $isObjOrEnum = $context->builder->or($isObject, $isEnumCase);
