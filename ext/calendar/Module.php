@@ -29,7 +29,12 @@ class Module extends ModuleAbstract
     {
         return [
             new cal_days_in_month(),
+            new cal_to_jd(),
             new gregoriantojd(),
+            new jdtogregorian(),
+            new jdtojulian(),
+            new unixtojd(),
+            new jdtounix(),
             new easter_date(),
         ];
     }
