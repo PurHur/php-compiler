@@ -1657,6 +1657,51 @@ final class VmReflection
     }
 
     /**
+     * Construct a ReflectionClassConstant stub for $declaringClassName::$constantName (#6662).
+     */
+    public static function newReflectionClassConstant(
+        Context $ctx,
+        string $declaringClassName,
+        string $constantName
+    ): \PHPCompiler\VM\ObjectEntry {
+        $rcClass = $ctx->classes[ReflectionSupport::REFLECTION_CLASS_CONSTANT]
+            ?? $ctx->classes[ReflectionSupport::REFLECTION_CONSTANT]
+            ?? null;
+        if (null === $rcClass) {
+            throw new \LogicException('ReflectionClassConstant is not registered in this compiler build');
+        }
+        $rc = new \PHPCompiler\VM\ObjectEntry($rcClass);
+        $rc->constructed = true;
+        $rc->getProperty(ReflectionSupport::PROP_CLASS_NAME)->string($declaringClassName);
+        $rc->getProperty(ReflectionSupport::PROP_CONSTANT_NAME)->string($constantName);
+
+        return $rc;
+    }
+
+    /**
+     * ReflectionClass::getReflectionConstants() — ReflectionClassConstant list (#6662).
+     *
+     * php-src: ext/reflection/php_reflection.c — reflection_class_get_reflection_constants
+     */
+    public static function reflectionClassReflectionConstantsMap(
+        Context $ctx,
+        ClassEntry $entry,
+        int $filter
+    ): Variable {
+        $result = new Variable();
+        $result->newArray();
+        $ht = $result->toArray();
+        foreach (self::collectClassConstantsForReflection($entry, $ctx, $filter) as $spec) {
+            $obj = self::newReflectionClassConstant($ctx, $spec['declaring']->name, $spec['name']);
+            $slot = new Variable(Variable::TYPE_OBJECT);
+            $slot->object($obj);
+            $ht->append($slot);
+        }
+
+        return $result;
+    }
+
+    /**
      * Resolve ReflectionClass::getConstants() visibility filter (#6950, filter flags in #4479).
      *
      * php-src: null filter returns all constants; IS_* bitmasks narrow the set.
