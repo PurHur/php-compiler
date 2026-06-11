@@ -15,7 +15,8 @@ use PHPCompiler\VM\Variable;
  * CheckdnsrrRuntime.php (__compiler_checkdnsrr).
  *
  * php-src: ext/standard/dns.c — PHP_FUNCTION(gethostbynamel), PHP_FUNCTION(gethostbyaddr),
- * PHP_FUNCTION(gethostbyname), PHP_FUNCTION(checkdnsrr), PHP_FUNCTION(dns_check_record)
+ * PHP_FUNCTION(gethostbyname), PHP_FUNCTION(checkdnsrr), PHP_FUNCTION(dns_check_record),
+ * PHP_FUNCTION(dns_get_mx), PHP_FUNCTION(getmxrr)
  */
 final class VmDns
 {
@@ -164,6 +165,37 @@ final class VmDns
         }
 
         return $name;
+    }
+
+    /**
+     * dns_get_mx() / getmxrr() — MX host list + preference weights (#4125, #3662).
+     *
+     * @return array{hosts: list<string>, weights: list<int>}|false
+     */
+    public static function dnsGetMx(string $hostname)
+    {
+        if ('' === $hostname || \strlen($hostname) > 255) {
+            return false;
+        }
+
+        $packet = self::queryMxViaResQuery($hostname);
+        if (null === $packet) {
+            return false;
+        }
+
+        $records = self::parseDnsMxRecords($packet);
+        if ([] === $records) {
+            return false;
+        }
+
+        $hosts = [];
+        $weights = [];
+        foreach ($records as $record) {
+            $hosts[] = $record['host'];
+            $weights[] = $record['weight'];
+        }
+
+        return ['hosts' => $hosts, 'weights' => $weights];
     }
 
     public static function isValidIpv4Address(string $ip): bool
@@ -329,6 +361,154 @@ final class VmDns
     }
 
     /**
+     * @return string|null raw DNS response packet
+     */
+    private static function queryMxViaResQuery(string $hostname): ?string
+    {
+        if (!\extension_loaded('ffi')) {
+            return null;
+        }
+        try {
+            $ffi = self::dnsFfi();
+        } catch (\Throwable) {
+            return null;
+        }
+        $buf = $ffi->new('unsigned char[4096]');
+        $qtype = self::DNS_RECORD_TYPES['MX'];
+        $rc = (int) $ffi->res_query($hostname, self::DNS_CLASS_IN, $qtype, $buf, 4096);
+        if ($rc <= 0) {
+            return null;
+        }
+
+        return \FFI::string($buf, $rc);
+    }
+
+    /**
+     * @return list<array{host: string, weight: int}>
+     */
+    private static function parseDnsMxRecords(string $packet): array
+    {
+        $len = \strlen($packet);
+        if ($len < 12) {
+            return [];
+        }
+
+        $qdcount = self::readUint16($packet, 4);
+        $ancount = self::readUint16($packet, 6);
+        $offset = 12;
+
+        for ($i = 0; $i < $qdcount; ++$i) {
+            $next = self::skipDnsName($packet, $len, $offset);
+            if (null === $next) {
+                return [];
+            }
+            $offset = $next + 4;
+            if ($offset > $len) {
+                return [];
+            }
+        }
+
+        $mx = [];
+        for ($i = 0; $i < $ancount; ++$i) {
+            $parsed = self::readDnsName($packet, $len, $offset);
+            if (null === $parsed) {
+                break;
+            }
+            [$offset] = $parsed;
+            if ($offset + 10 > $len) {
+                break;
+            }
+            $type = self::readUint16($packet, $offset);
+            $offset += 8;
+            $rdlength = self::readUint16($packet, $offset);
+            $offset += 2;
+            if ($offset + $rdlength > $len) {
+                break;
+            }
+            if (15 === $type && $rdlength >= 2) {
+                $weight = self::readUint16($packet, $offset);
+                $exchange = self::readDnsName($packet, $len, $offset + 2);
+                if (null !== $exchange) {
+                    $mx[] = ['host' => $exchange[1], 'weight' => $weight];
+                }
+            }
+            $offset += $rdlength;
+        }
+
+        \usort($mx, static fn (array $a, array $b): int => $a['weight'] <=> $b['weight']);
+
+        return $mx;
+    }
+
+    private static function readUint16(string $packet, int $offset): int
+    {
+        return (\ord($packet[$offset]) << 8) | \ord($packet[$offset + 1]);
+    }
+
+    private static function skipDnsName(string $packet, int $len, int $offset): ?int
+    {
+        $parsed = self::readDnsName($packet, $len, $offset);
+
+        return null === $parsed ? null : $parsed[0];
+    }
+
+    /**
+     * @return array{0: int, 1: string}|null
+     */
+    private static function readDnsName(string $packet, int $len, int $offset, int $depth = 0): ?array
+    {
+        if ($depth > 16 || $offset >= $len) {
+            return null;
+        }
+
+        $labels = [];
+        $endOffset = $offset;
+        $jumped = false;
+
+        while ($offset < $len) {
+            $labellen = \ord($packet[$offset]);
+            if (0 === $labellen) {
+                $offset++;
+                if (!$jumped) {
+                    $endOffset = $offset;
+                }
+
+                break;
+            }
+            if (($labellen & 0xC0) === 0xC0) {
+                if ($offset + 1 >= $len) {
+                    return null;
+                }
+                $ptr = (($labellen & 0x3F) << 8) | \ord($packet[$offset + 1]);
+                if (!$jumped) {
+                    $endOffset = $offset + 2;
+                }
+                $target = self::readDnsName($packet, $len, $ptr, $depth + 1);
+                if (null === $target) {
+                    return null;
+                }
+                if ('' !== $target[1]) {
+                    $labels[] = $target[1];
+                }
+                $offset = $endOffset;
+
+                break;
+            }
+            if ($labellen > 63) {
+                return null;
+            }
+            $offset++;
+            if ($offset + $labellen > $len) {
+                return null;
+            }
+            $labels[] = \substr($packet, $offset, $labellen);
+            $offset += $labellen;
+        }
+
+        return [$offset, \implode('.', $labels)];
+    }
+
+    /**
      * @return bool|null null when FFI path unavailable
      */
     private static function checkdnsrrViaResQuery(string $hostname, int $qtype): ?bool
@@ -341,7 +521,6 @@ final class VmDns
         } catch (\Throwable) {
             return null;
         }
-        $ffi->res_init();
         $buf = $ffi->new('unsigned char[1024]');
         $rc = (int) $ffi->res_query($hostname, self::DNS_CLASS_IN, $qtype, $buf, 1024);
 
@@ -389,11 +568,10 @@ final class VmDns
         }
 
         $cdef = <<<'CDEF'
-int res_init(void);
 int res_query(const char *dname, int class, int type, unsigned char *answer, int anslen);
 CDEF;
 
-        foreach (['libresolv.so', 'libc.so.6', 'libc.so'] as $lib) {
+        foreach (['libresolv.so', 'libresolv.so.2', 'libc.so.6', 'libc.so'] as $lib) {
             try {
                 self::$dnsFfi = \FFI::cdef($cdef, $lib);
 
