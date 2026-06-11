@@ -20,10 +20,11 @@ final class memory_get_usage extends Internal
 
     public function execute(Frame $frame): void
     {
+        $usage = VmMemory::getUsage(self::resolveRealUsage($frame));
         if (null === $frame->returnVar) {
             return;
         }
-        $frame->returnVar->int(VmMemory::getUsage(self::resolveRealUsage($frame)));
+        $frame->returnVar->int($usage);
     }
 
     public function call(Context $context, JITVariable ...$args): Value

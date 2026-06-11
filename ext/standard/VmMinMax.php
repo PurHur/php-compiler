@@ -28,7 +28,7 @@ final class VmMinMax
      */
     public static function tryReduceEnumCasesTwoArg(Frame $frame, bool $pickMin): bool
     {
-        if (2 !== \count($frame->calledArgs) || null === $frame->returnVar) {
+        if (2 !== \count($frame->calledArgs)) {
             return false;
         }
         $values = [
@@ -75,10 +75,6 @@ final class VmMinMax
             );
         }
 
-        if (null === $frame->returnVar) {
-            return;
-        }
-
         if (self::finishEnumCaseReduce($frame, $values, $pickMin, 1 === $argc)) {
             return;
         }
@@ -91,6 +87,10 @@ final class VmMinMax
             if ($pickMin ? $cmp < 0 : $cmp > 0) {
                 $best = $candidate;
             }
+        }
+
+        if (null === $frame->returnVar) {
+            return;
         }
 
         $frame->returnVar->copyFrom($best);
@@ -131,7 +131,9 @@ final class VmMinMax
         if ($arrayForm) {
             // zend_hash_minmax + php_data_compare: max keeps first, min keeps last (#5707).
             $best = $normalized[$pickMin ? \count($normalized) - 1 : 0];
-            $frame->returnVar->copyFrom($best);
+            if (null !== $frame->returnVar) {
+                $frame->returnVar->copyFrom($best);
+            }
 
             return true;
         }
@@ -143,7 +145,9 @@ final class VmMinMax
                 $best = $candidate;
             }
         }
-        $frame->returnVar->copyFrom($best);
+        if (null !== $frame->returnVar) {
+            $frame->returnVar->copyFrom($best);
+        }
 
         return true;
     }

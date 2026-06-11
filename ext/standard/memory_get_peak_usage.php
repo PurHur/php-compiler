@@ -20,10 +20,11 @@ final class memory_get_peak_usage extends Internal
 
     public function execute(Frame $frame): void
     {
+        $usage = VmMemory::getPeakUsage(self::resolveRealUsage($frame));
         if (null === $frame->returnVar) {
             return;
         }
-        $frame->returnVar->int(VmMemory::getPeakUsage(self::resolveRealUsage($frame)));
+        $frame->returnVar->int($usage);
     }
 
     public function call(Context $context, JITVariable ...$args): Value

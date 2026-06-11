@@ -16,6 +16,7 @@ use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\ArrayBuiltinHelper;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\Variable as JITVariable;
+use PHPCompiler\VM\BuiltinExecute;
 use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
 
@@ -27,11 +28,8 @@ final class array_merge extends Internal
     public function execute(Frame $frame): void
     {
         $argc = \count($frame->calledArgs);
-        if (null === $frame->returnVar) {
-            return;
-        }
         if ($argc < 1) {
-            $frame->returnVar->newArray();
+            BuiltinExecute::writeReturn($frame, static fn (Variable $ret) => $ret->newArray());
 
             return;
         }
@@ -40,7 +38,8 @@ final class array_merge extends Internal
             throw new \LogicException('array_merge() arguments must be arrays in this compiler build');
         }
         if (1 === $argc) {
-            $frame->returnVar->array(VmArray::merge($first->toArray()));
+            $merged = VmArray::merge($first->toArray());
+            BuiltinExecute::writeReturn($frame, static fn (Variable $ret) => $ret->array($merged));
 
             return;
         }
@@ -52,7 +51,8 @@ final class array_merge extends Internal
             }
             $others[] = $arg->toArray();
         }
-        $frame->returnVar->array(VmArray::merge($first->toArray(), ...$others));
+        $merged = VmArray::merge($first->toArray(), ...$others);
+        BuiltinExecute::writeReturn($frame, static fn (Variable $ret) => $ret->array($merged));
     }
 
     public Context $context;

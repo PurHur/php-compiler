@@ -19,10 +19,11 @@ abstract class BcmathFunction extends Internal
 {
     public function execute(Frame $frame): void
     {
+        $result = $this->compute($frame);
         if (null === $frame->returnVar) {
             return;
         }
-        $this->writeReturn($frame, $this->compute($frame));
+        $this->writeReturn($frame, $result);
     }
 
     public function call(Context $context, JITVariable ...$args): Value

@@ -17,9 +17,6 @@ final class libxml_use_internal_errors extends LibxmlFunction
 
     public function execute(Frame $frame): void
     {
-        if (null === $frame->returnVar) {
-            return;
-        }
         $argc = \count($frame->calledArgs);
         if ($argc > 1) {
             throw new \ArgumentCountError('libxml_use_internal_errors() expects at most 1 argument, '.$argc.' given');
@@ -35,6 +32,10 @@ final class libxml_use_internal_errors extends LibxmlFunction
                 $useErrors = (bool) $arg->toInt();
             }
         }
-        $frame->returnVar->bool(VmLibxml::useInternalErrors($useErrors));
+        $result = VmLibxml::useInternalErrors($useErrors);
+        if (null === $frame->returnVar) {
+            return;
+        }
+        $frame->returnVar->bool($result);
     }
 }
