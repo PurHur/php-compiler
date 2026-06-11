@@ -93,6 +93,9 @@ final class Variable {
     /** String literal value when this variable represents a constant string operand. */
     public ?string $compileTimeString = null;
 
+    /** Float literal value when this variable represents a constant double operand. */
+    public ?float $compileTimeFloat = null;
+
     /** User/global constant name when this variable holds a compile-time const fetch. */
     public ?string $compileTimeConstantName = null;
 
@@ -492,6 +495,7 @@ final class Variable {
                 break;
             case self::TYPE_NATIVE_DOUBLE:
                 $value = $context->constantFromFloat($op->value, self::getStringType($type));
+                $literal = is_float($op->value) ? $op->value : null;
                 break;
             case self::TYPE_NATIVE_BOOL:
                 $value = $context->constantFromBool($op->value);
@@ -566,7 +570,11 @@ final class Variable {
             $value
         );
         if (isset($literal)) {
-            $var->compileTimeString = $literal;
+            if (\is_string($literal)) {
+                $var->compileTimeString = $literal;
+            } elseif (\is_float($literal)) {
+                $var->compileTimeFloat = $literal;
+            }
         }
 
         return $var;
