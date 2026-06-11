@@ -70,7 +70,13 @@ final class usort_ extends Internal
             $compare = VmInternalCompare::resolveStringCallback($name);
             VmInternalCompare::sortVariableValues($values, $compare);
         }
-        $ht->replacePackedValues($values);
+        $array->separateArrayForWrite();
+        $ht = $array->resolveIndirect()->toArray();
+        if (VmArray::isList($ht)) {
+            $ht->replacePackedValues($values);
+        } else {
+            $ht->assignPackedList($values);
+        }
         if (null !== $frame->returnVar) {
             $frame->returnVar->bool(true);
         }
