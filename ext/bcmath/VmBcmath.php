@@ -86,6 +86,38 @@ final class VmBcmath
         return [$quotient, $remainder];
     }
 
+    /** Ceiling toward +infinity (php-src ext/bcmath/bcmath.c PHP_FUNCTION(bcceil); issue #6026). */
+    public static function ceil(string $num): string
+    {
+        $parsed = self::parse($num);
+        if (!self::hasFractionalValue($parsed)) {
+            return self::formatIntegerMagnitude($parsed);
+        }
+        if ($parsed['sign'] > 0) {
+            return self::format(['sign' => 1, 'int' => self::addDigitStrings($parsed['int'], '1'), 'frac' => ''], 0);
+        }
+
+        return self::formatIntegerMagnitude($parsed);
+    }
+
+    /** Floor toward -infinity (php-src ext/bcmath/bcmath.c PHP_FUNCTION(bcfloor); issue #6026). */
+    public static function floor(string $num): string
+    {
+        $parsed = self::parse($num);
+        if (!self::hasFractionalValue($parsed)) {
+            return self::formatIntegerMagnitude($parsed);
+        }
+        if ($parsed['sign'] > 0) {
+            return self::formatIntegerMagnitude($parsed);
+        }
+
+        return self::format([
+            'sign' => -1,
+            'int' => self::addDigitStrings($parsed['int'], '1'),
+            'frac' => '',
+        ], 0);
+    }
+
     public static function comp(string $left, string $right, ?int $scale = null): int
     {
         $scale = self::resolveScale($scale);
@@ -511,6 +543,24 @@ final class VmBcmath
         $product = self::mul($quotient, $right, 0);
 
         return self::sub($left, $product, 0);
+    }
+
+    /**
+     * @param array{sign:int,int:string,frac:string} $parsed
+     */
+    private static function hasFractionalValue(array $parsed): bool
+    {
+        return '' !== \rtrim($parsed['frac'], '0');
+    }
+
+    /**
+     * @param array{sign:int,int:string,frac:string} $parsed
+     */
+    private static function formatIntegerMagnitude(array $parsed): string
+    {
+        $formatted = self::format(['sign' => $parsed['sign'], 'int' => $parsed['int'], 'frac' => ''], 0);
+
+        return '-0' === $formatted ? '0' : $formatted;
     }
 
     private static function divDigitStringByTwo(string $digits): string

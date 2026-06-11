@@ -31,6 +31,8 @@ class Module extends ModuleAbstract
             new bcscale(),
             new bccomp(),
             new bcpowmod(),
+            new bcceil(),
+            new bcfloor(),
         ];
     }
 }

@@ -235,6 +235,10 @@ class JITTest extends BaseTest {
             if (str_contains($name, 'bcmath_number')) {
                 continue;
             }
+            // bcceil()/bcfloor() VM-first (#6026); JIT lowering deferred to #5935 phase.
+            if (str_contains($name, 'bcceil_bcfloor')) {
+                continue;
+            }
             // ReflectionProperty/Function/Constant builtins are VM-only (#3354).
             if (str_contains($name, 'reflection_oop')) {
                 continue;
