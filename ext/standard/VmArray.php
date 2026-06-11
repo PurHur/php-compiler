@@ -54,6 +54,20 @@ final class VmArray
     }
 
     /**
+     * array_combine/array_fill_keys keys must be string or int — enum cases Error (ext/standard/array.c).
+     */
+    public static function rejectEnumCaseKeyVariable(Variable $key): void
+    {
+        $key = $key->resolveIndirect();
+        if (EnumCaseSupport::isEnumCaseVariable($key)) {
+            $enumClass = EnumCaseSupport::enumClassForCaseVariable($key);
+            throw new \Error(
+                'Object of class '.($enumClass->name ?? 'enum').' could not be converted to string'
+            );
+        }
+    }
+
+    /**
      * natsort/natcasesort natural compare requires string operands — Zend rejects enum cases (#5607).
      */
     public static function rejectEnumCaseNaturalSortValue(Variable $value): void
@@ -340,12 +354,7 @@ final class VmArray
             $stored = new Variable();
             $stored->copyFrom($value);
             $keyValue = $keyValue->resolveIndirect();
-            if (EnumCaseSupport::isEnumCaseVariable($keyValue)) {
-                $enumClass = EnumCaseSupport::enumClassForCaseVariable($keyValue);
-                throw new \Error(
-                    'Object of class '.($enumClass->name ?? 'enum').' could not be converted to string'
-                );
-            }
+            self::rejectEnumCaseKeyVariable($keyValue);
             if (Variable::TYPE_INTEGER === $keyValue->type) {
                 $dest->addIndex($keyValue->toInt(), $stored);
             } elseif (Variable::TYPE_FLOAT === $keyValue->type) {

@@ -22,6 +22,7 @@ use PHPCompiler\ext\standard\strtoupper;
 use PHPCompiler\ext\standard\VmInternalCall;
 use PHPCompiler\ext\types\strlen;
 use PHPCompiler\Func\Internal;
+use PHPCompiler\JIT\Builtin\ErrorRaise;
 use PHPCompiler\JIT\Builtin\TypeErrorRaise;
 use PHPCompiler\JIT\Call;
 use PHPCompiler\JIT\Call\ClosureWithCaptures;
@@ -7048,6 +7049,22 @@ final class ArrayBuiltinHelper
         );
         $i8 = $context->getTypeFromString('int8');
         $sizeT = $context->getTypeFromString('size_t');
+
+        $enumErrorBlock = BasicBlockHelper::append($context, 'array_combine_key_enum_error');
+        $afterEnumCheck = BasicBlockHelper::append($context, 'array_combine_after_enum_check');
+        $isEnumCase = $context->builder->icmp(
+            Builder::INT_EQ,
+            $typeByte,
+            $i8->constInt(\PHPCompiler\VM\Variable::TYPE_ENUM_CASE, false)
+        );
+        $context->builder->branchIf($isEnumCase, $enumErrorBlock, $afterEnumCheck);
+
+        $context->builder->positionAtEnd($enumErrorBlock);
+        ErrorRaise::ensureLinked($context);
+        $context->type->object->emitEnumCaseValueEntryStringCastError($context, $keyEntry);
+        $context->builder->call($context->lookupFunction('abort'));
+
+        $context->builder->positionAtEnd($afterEnumCheck);
 
         $stringBlock = BasicBlockHelper::append($context, 'array_combine_key_string');
         $longBlock = BasicBlockHelper::append($context, 'array_combine_key_long');

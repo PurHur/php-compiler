@@ -4771,9 +4771,50 @@ class Object_ extends Type {
     }
 
     /**
+     * Enum case __value__ entries used as array keys must throw Error (ext/standard/array.c #5538).
+     */
+    public function emitEnumCaseValueEntryStringCastError(Context $context, PHPLLVM\Value $valueEntry): void
+    {
+        $enumEntries = $this->knownEnumClassIdToName();
+        if ([] === $enumEntries) {
+            ErrorRaise::emitRaise($context, 'Object of class enum could not be converted to string');
+
+            return;
+        }
+
+        ErrorRaise::ensureLinked($context);
+        $enumMap = $context->structFieldMap['__enum_case__'] ?? null;
+        if (null === $enumMap || !isset($enumMap['class_id'])) {
+            ErrorRaise::emitRaise($context, 'Object of class enum could not be converted to string');
+
+            return;
+        }
+        $classId = $context->builder->load(
+            $context->builder->structGep($valueEntry, $enumMap['class_id'])
+        );
+        $this->emitEnumClassIdStringCastErrorChain($context, $classId, $enumEntries, 'enum_val_str_cast');
+    }
+
+    /**
      * Zend string cast on enum case objects must throw Error (zend_enum.c, #4819).
      */
     public function emitEnumObjectStringErrorIfMatches(Context $context, PHPLLVM\Value $objPtr): void
+    {
+        $enumEntries = $this->knownEnumClassIdToName();
+        if ([] === $enumEntries) {
+            return;
+        }
+
+        ErrorRaise::ensureLinked($context);
+        $map = $context->structFieldMap['__object__'];
+        $classId = $context->builder->load(
+            $context->builder->structGep($objPtr, $map['class_id'])
+        );
+        $this->emitEnumClassIdStringCastErrorChain($context, $classId, $enumEntries, 'enum_str_cast');
+    }
+
+    /** @return array<int, string> */
+    private function knownEnumClassIdToName(): array
     {
         $enumEntries = [];
         foreach ($this->classIdToName as $id => $name) {
@@ -4782,24 +4823,28 @@ class Object_ extends Type {
                 $enumEntries[(int) $id] = $name;
             }
         }
-        if ([] === $enumEntries) {
-            return;
-        }
 
-        \PHPCompiler\JIT\Builtin\ErrorRaise::ensureLinked($context);
-        $map = $context->structFieldMap['__object__'];
-        $classId = $context->builder->load(
-            $context->builder->structGep($objPtr, $map['class_id'])
-        );
+        return $enumEntries;
+    }
+
+    /**
+     * @param array<int, string> $enumEntries
+     */
+    private function emitEnumClassIdStringCastErrorChain(
+        Context $context,
+        PHPLLVM\Value $classId,
+        array $enumEntries,
+        string $tag
+    ): void {
         $i64 = $context->getTypeFromString('int64');
-        $doneBlock = BasicBlockHelper::append($context, 'enum_str_cast_done');
+        $doneBlock = BasicBlockHelper::append($context, $tag.'_done');
         $ids = array_keys($enumEntries);
         $lastIdx = count($ids) - 1;
         foreach ($ids as $idx => $id) {
-            $matchBlock = BasicBlockHelper::append($context, 'enum_str_cast_match_'.$id);
+            $matchBlock = BasicBlockHelper::append($context, $tag.'_match_'.$id);
             $nextBlock = $idx === $lastIdx
                 ? $doneBlock
-                : BasicBlockHelper::append($context, 'enum_str_cast_next_'.$id);
+                : BasicBlockHelper::append($context, $tag.'_next_'.$id);
             $context->builder->branchIf(
                 $context->builder->icmp(
                     PHPLLVM\Builder::INT_EQ,
@@ -4810,7 +4855,7 @@ class Object_ extends Type {
                 $nextBlock
             );
             $context->builder->positionAtEnd($matchBlock);
-            \PHPCompiler\JIT\Builtin\ErrorRaise::emitRaise(
+            ErrorRaise::emitRaise(
                 $context,
                 'Object of class '.$enumEntries[$id].' could not be converted to string'
             );
