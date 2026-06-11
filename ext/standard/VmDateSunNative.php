@@ -228,17 +228,11 @@ final class VmDateSunNative
         if ('UTC' === VmDate::defaultTimezoneGet()) {
             return 0.0;
         }
-        if (\function_exists('date_offset_get')) {
-            $tz = \timezone_open(VmDate::defaultTimezoneGet());
-            if (false !== $tz) {
-                $trans = \timezone_transitions_get($tz, $timestamp, $timestamp);
-                if (\is_array($trans) && isset($trans[0]['offset'])) {
-                    return ((int) $trans[0]['offset']) / 3600.0;
-                }
-            }
-        }
 
-        return 0.0;
+        return VmDateTimeNative::timezoneOffsetSeconds(
+            VmDate::defaultTimezoneGet(),
+            $timestamp
+        ) / 3600.0;
     }
 
     private static function tsToJ2000(int $ts): float
