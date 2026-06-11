@@ -28,6 +28,12 @@ final class memory_get_peak_usage extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
+        if (\count($args) > 1) {
+            throw new \ArgumentCountError(
+                'memory_get_peak_usage() expects at most 1 argument, '.\count($args).' given'
+            );
+        }
+
         return JitMemory::getPeakUsage($context, $args[0] ?? null);
     }
 
@@ -35,7 +41,9 @@ final class memory_get_peak_usage extends Internal
     {
         $argc = \count($frame->calledArgs);
         if ($argc > 1) {
-            throw new \LogicException('memory_get_peak_usage() accepts at most one argument');
+            throw new \ArgumentCountError(
+                'memory_get_peak_usage() expects at most 1 argument, '.$argc.' given'
+            );
         }
         if (0 === $argc) {
             return false;

@@ -31,4 +31,4 @@ default_ok
 real_ok
 legacy_ok
 peak_ok
-memory_get_usage(): Argument #1 ($usage) must be of type MemoryUsage|bool, Es given
+memory_get_usage(): Argument #1 ($real_usage) must be of type MemoryUsage|bool, Es given
