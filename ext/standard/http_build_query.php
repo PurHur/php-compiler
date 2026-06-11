@@ -43,7 +43,7 @@ final class http_build_query extends Internal
         $separator = self::resolveOptionalSeparatorArg($frame->calledArgs);
         $encoding = self::resolveOptionalEncodingArg($frame->calledArgs);
 
-        $exported = VmHttpBuildQuery::export($data);
+        $exported = VmHttpBuildQuery::export($data, $frame);
         if (!\is_array($exported)) {
             throw new \LogicException('http_build_query() argument #1 must be an array in this compiler build');
         }

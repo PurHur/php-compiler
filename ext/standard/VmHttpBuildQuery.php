@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace PHPCompiler\ext\standard;
 
+use PHPCompiler\Frame;
 use PHPCompiler\VM\EnumCaseSupport;
 use PHPCompiler\VM\Variable;
 
@@ -168,7 +169,7 @@ final class VmHttpBuildQuery
         return $keyStr;
     }
 
-    public static function export(Variable $v): mixed
+    public static function export(Variable $v, ?Frame $frame = null): mixed
     {
         $v = $v->resolveIndirect();
         switch ($v->type) {
@@ -183,29 +184,20 @@ final class VmHttpBuildQuery
             case Variable::TYPE_STRING:
                 return $v->toString();
             case Variable::TYPE_ENUM_CASE:
-                return self::exportEnumCase($v);
+                return self::exportEnumCase($v, $frame);
             case Variable::TYPE_OBJECT:
                 if (EnumCaseSupport::isEnumCaseVariable($v)) {
-                    return self::exportEnumCase($v);
+                    return self::exportEnumCase($v, $frame);
+                }
+                if (null === $frame) {
+                    throw new \LogicException(
+                        'http_build_query() value type not supported in this compiler build'
+                    );
                 }
 
-                break;
+                return self::exportObject($v, $frame);
             case Variable::TYPE_ARRAY:
-                $out = [];
-                foreach ($v->toArray()->iterateKeyed(true) as [$key, $value]) {
-                    $k = $key->resolveIndirect();
-                    if (Variable::TYPE_STRING === $k->type) {
-                        $out[$k->toString()] = self::export($value);
-                    } elseif (Variable::TYPE_INTEGER === $k->type) {
-                        $out[$k->toInt()] = self::export($value);
-                    } else {
-                        throw new \LogicException(
-                            'http_build_query() only supports string or integer keys in this compiler build'
-                        );
-                    }
-                }
-
-                return $out;
+                return self::exportArray($v, $frame);
             default:
                 throw new \LogicException(
                     'http_build_query() value type not supported in this compiler build'
@@ -214,15 +206,49 @@ final class VmHttpBuildQuery
     }
 
     /**
+     * @return array<int|string, mixed>
+     */
+    private static function exportArray(Variable $v, ?Frame $frame): array
+    {
+        $out = [];
+        foreach ($v->toArray()->iterateKeyed(true) as [$key, $value]) {
+            $k = $key->resolveIndirect();
+            if (Variable::TYPE_STRING === $k->type) {
+                $out[$k->toString()] = self::export($value, $frame);
+            } elseif (Variable::TYPE_INTEGER === $k->type) {
+                $out[$k->toInt()] = self::export($value, $frame);
+            } else {
+                throw new \LogicException(
+                    'http_build_query() only supports string or integer keys in this compiler build'
+                );
+            }
+        }
+
+        return $out;
+    }
+
+    /**
+     * php-src http.c — object operands use get_object_vars() semantics (public properties).
+     *
+     * @return array<string, mixed>
+     */
+    private static function exportObject(Variable $v, Frame $frame): array
+    {
+        $props = VmReflection::getObjectVars($v, $frame);
+
+        return self::exportArray($props, $frame);
+    }
+
+    /**
      * php-src http.c — backed/unit enum cases expand to name[/value] sub-arrays.
      *
      * @return array<string, mixed>
      */
-    private static function exportEnumCase(Variable $v): array
+    private static function exportEnumCase(Variable $v, ?Frame $frame): array
     {
         $out = [];
         foreach (EnumCaseSupport::objectVarsForCaseVariable($v) as $name => $propVar) {
-            $out[$name] = self::export($propVar);
+            $out[$name] = self::export($propVar, $frame);
         }
 
         return $out;
