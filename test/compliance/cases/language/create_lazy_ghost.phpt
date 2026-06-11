@@ -33,9 +33,21 @@ try {
 } catch (ValueError $e) {
     echo get_class($e), ': ', $e->getMessage(), "\n";
 }
+
+var_export(method_exists(ReflectionClass::class, 'createLazyGhost'));
+echo "\n";
+var_export(method_exists(ReflectionClass::class, 'createLazyProxy'));
+echo "\n";
+$rcGhost = ReflectionClass::createLazyGhost(C::class, function (C $c): void {
+    $c->name = 'rc-lazy';
+});
+echo $rcGhost->name, "\n";
 ?>
 --EXPECT--
 lazy
 lazy
 proxy
 ValueError: createLazyGhost(): Argument #1 ($class) must be a valid class name, 'NoSuchClass' given
+true
+true
+rc-lazy
