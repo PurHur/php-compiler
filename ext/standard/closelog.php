@@ -33,6 +33,14 @@ final class closelog extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        throw new \LogicException('closelog() is not implemented for JIT in this compiler build (issue #3676)');
+        $argc = \count($args);
+        if ($argc > 0) {
+            return JitSyslog::emitArgumentCountError(
+                $context,
+                'closelog() expects exactly 0 arguments, '.$argc.' given'
+            );
+        }
+
+        return JitSyslog::closelog($context);
     }
 }

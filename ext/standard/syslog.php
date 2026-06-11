@@ -35,6 +35,14 @@ final class syslog extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        throw new \LogicException('syslog() is not implemented for JIT in this compiler build (issue #3676)');
+        $argc = \count($args);
+        if (2 !== $argc) {
+            return JitSyslog::emitArgumentCountError(
+                $context,
+                'syslog() expects exactly 2 arguments, '.$argc.' given'
+            );
+        }
+
+        return JitSyslog::syslog($context, $args[0], $args[1]);
     }
 }

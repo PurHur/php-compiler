@@ -36,6 +36,14 @@ final class openlog extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        throw new \LogicException('openlog() is not implemented for JIT in this compiler build (issue #3676)');
+        $argc = \count($args);
+        if (3 !== $argc) {
+            return JitSyslog::emitArgumentCountError(
+                $context,
+                'openlog() expects exactly 3 arguments, '.$argc.' given'
+            );
+        }
+
+        return JitSyslog::openlog($context, $args[0], $args[1], $args[2]);
     }
 }

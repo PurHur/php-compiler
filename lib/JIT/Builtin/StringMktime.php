@@ -122,7 +122,7 @@ final class StringMktime
         $context->builder->branchIf($tmNull, $tmFailBb, $tmOkBb);
 
         $context->builder->positionAtEnd($tmFailBb);
-        $context->builder->call($context->lookupFunction('__value__writeBool'), $out, $context->getTypeFromString('int8')->constInt(0, false));
+        $context->builder->call($context->lookupFunction('__value__writeBool'), $out, $i32->constInt(0, false));
         $context->builder->returnVoid();
         $context->builder->clearInsertionPosition();
 
@@ -181,7 +181,7 @@ final class StringMktime
         $context->builder->branchIf($failed, $failBb, $okBb);
 
         $context->builder->positionAtEnd($failBb);
-        $context->builder->call($context->lookupFunction('__value__writeBool'), $out, $context->getTypeFromString('int8')->constInt(0, false));
+        $context->builder->call($context->lookupFunction('__value__writeBool'), $out, $i32->constInt(0, false));
         $context->builder->returnVoid();
         $context->builder->clearInsertionPosition();
 
@@ -216,7 +216,7 @@ final class StringMktime
     private static function ensureHelpers(Context $context): void
     {
         $i64 = $context->getTypeFromString('int64');
-        $i8 = $context->getTypeFromString('int8');
+        $i32 = $context->getTypeFromString('int32');
         $i8p = $context->getTypeFromString('int8*');
         $i64p = $context->getTypeFromString('int64*');
         $valuePtr = $context->getTypeFromString('__value__*');
@@ -227,7 +227,7 @@ final class StringMktime
             ['localtime', $i8p, [$i64p]],
             ['mktime', $i64, [$i8p]],
             ['__value__writeLong', $voidTy, [$valuePtr, $i64]],
-            ['__value__writeBool', $voidTy, [$valuePtr, $i8]],
+            ['__value__writeBool', $voidTy, [$valuePtr, $i32]],
         ] as [$name, $ret, $params]) {
             self::ensureExternal(
                 $context,
