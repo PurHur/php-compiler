@@ -6,10 +6,13 @@ namespace PHPCompiler\ext\standard;
 
 use PHPCompiler\ext\session\SessionConstants;
 use PHPCompiler\ext\session\SessionFileStorage;
+use PHPCompiler\Frame;
 use PHPCompiler\VM\BackedEnum;
 use PHPCompiler\VM\Context;
 use PHPCompiler\VM\EnumCaseSupport;
+use PHPCompiler\VM\ErrorReporter;
 use PHPCompiler\VM\HashTable;
+use PHPCompiler\VM\SapiOutput;
 use PHPCompiler\VM\Variable;
 use PHPCompiler\Web\ResponseContext;
 
@@ -27,17 +30,24 @@ final class VmSession
 
     public const DEFAULT_NAME = 'PHPSESSID';
 
+    public const DEFAULT_MODULE = 'files';
+
+    public const MAX_MODULE_LEN = 32;
+
     private static bool $active = false;
 
     private static string $name = self::DEFAULT_NAME;
 
     private static string $id = '';
 
+    private static string $moduleName = self::DEFAULT_MODULE;
+
     public static function reset(): void
     {
         self::$active = false;
         self::$name = self::DEFAULT_NAME;
         self::$id = '';
+        self::$moduleName = self::DEFAULT_MODULE;
     }
 
     public static function isActive(): bool
@@ -86,6 +96,67 @@ final class VmSession
     public static function getName(): string
     {
         return self::$name;
+    }
+
+    public static function getModuleName(): string
+    {
+        return self::$moduleName;
+    }
+
+    public static function isSupportedModule(string $module): bool
+    {
+        return self::DEFAULT_MODULE === strtolower($module);
+    }
+
+    public static function canChangeSaveHandler(?Frame $frame): bool
+    {
+        if (self::$active) {
+            self::triggerSaveHandlerWarning(
+                $frame,
+                'Session save handler cannot be changed when a session is active'
+            );
+
+            return false;
+        }
+        if (SapiOutput::headersSent()) {
+            self::triggerSaveHandlerWarning(
+                $frame,
+                'Session save handler cannot be changed after headers have already been sent'
+            );
+
+            return false;
+        }
+
+        return true;
+    }
+
+    /**
+     * @return string|false previous module name, or false when $module is empty
+     */
+    public static function setModuleName(string $module)
+    {
+        $module = strtolower($module);
+        if ('' === $module) {
+            return false;
+        }
+        $previous = self::$moduleName;
+        self::$moduleName = $module;
+
+        return $previous;
+    }
+
+    private static function triggerSaveHandlerWarning(?Frame $frame, string $message): void
+    {
+        if (null === $frame || null === $frame->vmContext) {
+            return;
+        }
+        $frame->vmContext->errors->triggerError(
+            $message,
+            ErrorReporter::E_WARNING,
+            '' !== $frame->scriptPath ? $frame->scriptPath : null,
+            $frame->vmContext,
+            $frame
+        );
     }
 
     /**

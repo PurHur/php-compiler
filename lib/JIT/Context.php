@@ -749,6 +749,7 @@ class Context {
                 Builtin\HttpResponseCode::emitResetForStandaloneMain($this);
                 Builtin\SessionId::emitResetForStandaloneMain($this);
                 Builtin\SessionName::emitResetForStandaloneMain($this);
+                Builtin\SessionModuleName::emitResetForStandaloneMain($this);
                 Builtin\PendingHeaders::emitResetForStandaloneMain($this);
                 $this->builder->call($this->lookupFunction('__superglobals__refresh'));
                 Builtin\JitThrow::registerDeclarations($this);

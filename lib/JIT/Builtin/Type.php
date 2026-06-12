@@ -1209,6 +1209,7 @@ class Type extends Builtin {
         SessionStorageRuntime::ensureLinked($this->context);
         SessionId::implement($this->context);
         SessionName::implement($this->context);
+        SessionModuleName::implement($this->context);
     }
 
     private function ensureExternalFunction(string $name, $fnType): void

@@ -35,6 +35,7 @@ class Module extends ModuleAbstract
             new session_start(),
             new session_id(),
             new session_name(),
+            new session_module_name(),
             new session_status(),
             new session_destroy(),
             new session_write_close(),
