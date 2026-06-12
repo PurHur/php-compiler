@@ -666,6 +666,8 @@ class Module extends ModuleAbstract
             new get_object_vars_(),
             new get_mangled_object_vars_(),
             new get_object_id(),
+            new spl_object_id(),
+            new spl_object_hash(),
             new get_class_(),
             new get_called_class_(),
             new get_class_vars_(),
