@@ -14,7 +14,7 @@ use PHPCompiler\VM\BuiltinExecute;
 use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
 
-/** hash() — sha256, sha1, md5, crc32*, adler32, fnv* (VM + JIT/AOT via __compiler_hash). */
+/** hash() — sha256, sha1, md5, crc32*, adler32, fnv*, xxh3/xxh128 (VM + JIT/AOT via __compiler_hash). */
 final class hash_ extends Internal
 {
     public function __construct()
