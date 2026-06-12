@@ -36,6 +36,26 @@ final class JitHashFile
         );
     }
 
+    public static function hash(Context $context, Value $algo, Value $path, Value $raw): Value
+    {
+        return self::hashFile(
+            $context,
+            $path,
+            $raw,
+            static fn (Context $ctx, Value $data, Value $r) => JitHash::hash($ctx, $algo, $data, $r)
+        );
+    }
+
+    public static function hashHmac(Context $context, Value $algo, Value $path, Value $key, Value $raw): Value
+    {
+        return self::hashFile(
+            $context,
+            $path,
+            $raw,
+            static fn (Context $ctx, Value $data, Value $r) => JitHash::hashHmac($ctx, $algo, $data, $key, $r)
+        );
+    }
+
     /**
      * @param callable(Context, Value, Value): Value $digest
      */
