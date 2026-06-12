@@ -179,6 +179,10 @@ class JITTest extends BaseTest {
             if (str_contains($name, 'filter_null_on_failure')) {
                 continue;
             }
+            // filter_var() FILTER_VALIDATE_REGEXP array options: VM + AOT (#5020); MCJIT defers array options.
+            if (str_contains($name, 'filter_validate_regexp')) {
+                continue;
+            }
             // gethostname() MCJIT: dedicated GethostnameJITTest (#3465); umbrella JITTest skips until stable.
             if (str_contains($name, 'gethostname')) {
                 continue;

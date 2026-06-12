@@ -210,6 +210,10 @@ class Context {
                 $var = new Variable(Variable::TYPE_INTEGER);
                 $var->int(\PHPCompiler\ext\filter\VmFilter::FILTER_VALIDATE_EMAIL);
                 return $var;
+            case 'filter_validate_regexp':
+                $var = new Variable(Variable::TYPE_INTEGER);
+                $var->int(\PHPCompiler\ext\filter\VmFilter::FILTER_VALIDATE_REGEXP);
+                return $var;
             case 'filter_null_on_failure':
                 $var = new Variable(Variable::TYPE_INTEGER);
                 $var->int(\PHPCompiler\ext\filter\VmFilter::FILTER_NULL_ON_FAILURE);

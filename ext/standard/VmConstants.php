@@ -188,6 +188,7 @@ final class VmConstants
                 'crypt_md5',
                 'crypt_blowfish',
                 'filter_validate_int',
+                'filter_validate_regexp',
                 'filter_validate_email',
                 'input_get',
                 'input_post',

@@ -14,7 +14,7 @@ use PHPCompiler\VM\Variable;
 use PHPLLVM\Builder;
 use PHPLLVM\Value;
 
-/** filter_var() subset — FILTER_VALIDATE_INT and FILTER_VALIDATE_EMAIL (issue #104, #6028). */
+/** filter_var() subset — FILTER_VALIDATE_INT, FILTER_VALIDATE_REGEXP, FILTER_VALIDATE_EMAIL (#104, #5020, #6028). */
 final class filter_var extends Internal
 {
     public function execute(Frame $frame): void
@@ -36,8 +36,9 @@ final class filter_var extends Internal
             $options = $frame->calledArgs[2]->resolveIndirect();
             if (!$options->isUndefined()
                 && Variable::TYPE_NULL !== $options->type
-                && Variable::TYPE_INTEGER !== $options->type) {
-                throw new \LogicException('filter_var() options must be an integer flag bitmask');
+                && Variable::TYPE_INTEGER !== $options->type
+                && Variable::TYPE_ARRAY !== $options->type) {
+                throw new \LogicException('filter_var() options must be an integer flag bitmask or array');
             }
         }
         $filterId = $filter->toInt();
@@ -70,8 +71,15 @@ final class filter_var extends Internal
         if (null !== $optionsArg
             && JITVariable::TYPE_NULL !== $optionsArg->type
             && JITVariable::TYPE_NATIVE_LONG !== $optionsArg->type
-            && JITVariable::TYPE_VALUE !== $optionsArg->type) {
-            throw new \LogicException('filter_var() options must be an integer flag bitmask');
+            && JITVariable::TYPE_VALUE !== $optionsArg->type
+            && JITVariable::TYPE_HASHTABLE !== ($optionsArg->type & ~JITVariable::IS_NATIVE_ARRAY)) {
+            throw new \LogicException('filter_var() options must be an integer flag bitmask or array');
+        }
+        if (null !== $optionsArg
+            && JITVariable::TYPE_NULL !== $optionsArg->type
+            && (JITVariable::TYPE_HASHTABLE === ($optionsArg->type & ~JITVariable::IS_NATIVE_ARRAY)
+                || JITVariable::TYPE_HASHTABLE === $optionsArg->type)) {
+            throw new \LogicException('filter_var() array options are not supported in JIT in this compiler build');
         }
 
         $value = JitFilter::asValueVar($context, $args[0]);
@@ -83,9 +91,16 @@ final class filter_var extends Internal
             $filterVal,
             $i64->constInt(VmFilter::FILTER_VALIDATE_INT, false)
         );
+        $isEmail = $context->builder->icmp(
+            Builder::INT_EQ,
+            $filterVal,
+            $i64->constInt(VmFilter::FILTER_VALIDATE_EMAIL, false)
+        );
 
         $intBlock = BasicBlockHelper::append($context, 'filter_var_int');
         $otherBlock = BasicBlockHelper::append($context, 'filter_var_other');
+        $emailBlock = BasicBlockHelper::append($context, 'filter_var_email');
+        $failBlock = BasicBlockHelper::append($context, 'filter_var_fail');
         $doneBlock = BasicBlockHelper::append($context, 'filter_var_done');
         $context->builder->branchIf($isInt, $intBlock, $otherBlock);
 
@@ -98,17 +113,26 @@ final class filter_var extends Internal
         $context->builder->branch($doneBlock);
 
         $context->builder->positionAtEnd($otherBlock);
-        $otherResult = JitFilter::validateEmail($context, $value);
+        $context->builder->branchIf($isEmail, $emailBlock, $failBlock);
+
+        $context->builder->positionAtEnd($emailBlock);
+        $emailResult = JitFilter::validateEmail($context, $value);
         if (null !== $optionsArg && JITVariable::TYPE_NULL !== $optionsArg->type) {
-            $otherResult = JitFilter::applyNullOnFailure($context, $otherResult, $nullOnFailure);
+            $emailResult = JitFilter::applyNullOnFailure($context, $emailResult, $nullOnFailure);
         }
-        $otherTail = $context->builder->getInsertBlock();
+        $emailTail = $context->builder->getInsertBlock();
+        $context->builder->branch($doneBlock);
+
+        $context->builder->positionAtEnd($failBlock);
+        $falseResult = JitFilter::boxedFalse($context);
+        $failTail = $context->builder->getInsertBlock();
         $context->builder->branch($doneBlock);
 
         $context->builder->positionAtEnd($doneBlock);
         $phi = $context->builder->phi($intResult->typeOf());
         $phi->addIncoming($intResult, $intTail);
-        $phi->addIncoming($otherResult, $otherTail);
+        $phi->addIncoming($emailResult, $emailTail);
+        $phi->addIncoming($falseResult, $failTail);
 
         return $phi;
     }

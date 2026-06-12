@@ -136,4 +136,63 @@ final class VmFilterTest extends TestCase
             VmFilter::unknownFilterWarningMessage(99999)
         );
     }
+
+    public function testValidateRegexpMatch(): void
+    {
+        $value = new Variable();
+        $value->string('abc123');
+        $options = new Variable();
+        $options->array(self::regexpOptions('/^[a-z0-9]+$/'));
+        $out = VmFilter::filterVar($value, VmFilter::FILTER_VALIDATE_REGEXP, $options);
+        $this->assertSame(Variable::TYPE_STRING, $out->type);
+        $this->assertSame('abc123', $out->toString());
+    }
+
+    public function testValidateRegexpNoMatchReturnsFalse(): void
+    {
+        $value = new Variable();
+        $value->string('!!!');
+        $options = new Variable();
+        $options->array(self::regexpOptions('/^[a-z0-9]+$/'));
+        $out = VmFilter::filterVar($value, VmFilter::FILTER_VALIDATE_REGEXP, $options);
+        $this->assertSame(Variable::TYPE_BOOLEAN, $out->type);
+        $this->assertFalse($out->toBool());
+    }
+
+    public function testValidateRegexpMissingOptionThrowsValueError(): void
+    {
+        $value = new Variable();
+        $value->string('abc');
+        $options = new Variable();
+        $options->array(new \PHPCompiler\VM\HashTable());
+        $this->expectException(\ValueError::class);
+        $this->expectExceptionMessage('filter_var(): "regexp" option is missing');
+        VmFilter::filterVar($value, VmFilter::FILTER_VALIDATE_REGEXP, $options);
+    }
+
+    public function testValidateRegexpInvalidPatternReturnsFalse(): void
+    {
+        $value = new Variable();
+        $value->string('abc');
+        $options = new Variable();
+        $options->array(self::regexpOptions('/[/'));
+        $out = VmFilter::filterVar($value, VmFilter::FILTER_VALIDATE_REGEXP, $options);
+        $this->assertSame(Variable::TYPE_BOOLEAN, $out->type);
+        $this->assertFalse($out->toBool());
+    }
+
+    /** @return \PHPCompiler\VM\HashTable */
+    private static function regexpOptions(string $pattern): \PHPCompiler\VM\HashTable
+    {
+        $outer = new \PHPCompiler\VM\HashTable();
+        $inner = new \PHPCompiler\VM\HashTable();
+        $regexp = new Variable();
+        $regexp->string($pattern);
+        $inner->add('regexp', $regexp);
+        $options = new Variable();
+        $options->array($inner);
+        $outer->add('options', $options);
+
+        return $outer;
+    }
 }
