@@ -69,6 +69,11 @@ final class VmSerializeFormat
         return self::formatSigDigits($num, $precision);
     }
 
+    public static function encodeStringLiteral(string $value): string
+    {
+        return self::encodeString($value);
+    }
+
     private static function encodeString(string $value): string
     {
         $len = \strlen($value);

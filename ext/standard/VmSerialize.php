@@ -164,11 +164,7 @@ final class VmSerialize
             return self::instantiatePlainObject($ctx, $class, $data, $frame);
         }
 
-        if (null === $options || [] === $options) {
-            return @\unserialize($payload);
-        }
-
-        return @\unserialize($payload, $options);
+        return VmUnserializeFormat::decodePayload($payload, $options);
     }
 
     /**
@@ -203,7 +199,7 @@ final class VmSerialize
      */
     public static function encodeCustomObject(string $className, array $data): string
     {
-        $inner = \serialize($data);
+        $inner = VmSerializeFormat::encodeExported($data);
         if (!str_starts_with($inner, 'a:')) {
             throw new \LogicException('serialize() failed');
         }
@@ -235,7 +231,7 @@ final class VmSerialize
             return null;
         }
         $arrayPayload = 'a:'.$m[3].':{'.$m[4].'}';
-        $data = @\unserialize($arrayPayload);
+        $data = VmUnserializeFormat::decodePayload($arrayPayload);
         if (false === $data || !\is_array($data)) {
             return null;
         }

@@ -13,7 +13,7 @@ use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
 
 /**
- * unserialize() — assoc arrays with scalar values (VM delegates to PHP; JIT/AOT via __compiler_unserialize).
+ * unserialize() — scalar/array via VmUnserializeFormat; objects via VmSerialize (JIT/AOT: __compiler_unserialize).
  */
 final class unserialize extends Internal
 {
@@ -104,7 +104,7 @@ final class unserialize extends Internal
         if (null === $literal) {
             return null;
         }
-        $decoded = @\unserialize($literal, $options ?? []);
+        $decoded = VmUnserializeFormat::decodePayload($literal, $options);
         if (false === $decoded) {
             return $context->helper->loadValue(
                 new JITVariable(

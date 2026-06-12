@@ -12,7 +12,7 @@ use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Value;
 
 /**
- * serialize() — assoc arrays with scalar values (VM delegates to PHP; JIT/AOT via __compiler_serialize_*).
+ * serialize() — VmSerialize/VmSerializeFormat on VM; JIT/AOT via __compiler_serialize_*.
  */
 final class serialize extends Internal
 {
@@ -70,7 +70,7 @@ final class serialize extends Internal
         if (JITVariable::TYPE_STRING === $arg->type) {
             $literal = JitStringArg::compileTimeLiteral($arg);
             if (null !== $literal) {
-                return \serialize($literal);
+                return VmSerializeFormat::encodeStringLiteral($literal);
             }
         }
 

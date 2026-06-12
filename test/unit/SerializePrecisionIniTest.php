@@ -39,5 +39,7 @@ final class SerializePrecisionIniTest extends TestCase
         $this->assertStringNotContainsString('ini_get', $source);
         $this->assertStringNotContainsString('ini_set', $source);
         $this->assertStringContainsString('VmSerializeFormat', $source);
+        $this->assertStringContainsString('VmUnserializeFormat', $source);
+        $this->assertDoesNotMatchRegularExpression('/@\\\\unserialize\\s*\\(/', $source);
     }
 }
