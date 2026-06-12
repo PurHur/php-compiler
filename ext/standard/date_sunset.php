@@ -13,7 +13,7 @@ use PHPLLVM\Value;
 /**
  * date_sunset() — procedural sunset helper (ext/date/php_date.c, #6137).
  *
- * VM: VmDate host bridge. JIT/AOT: deferred (VM-first v1).
+ * VM: VmDate host bridge. JIT/AOT: compile-time literal baking via JitDateSunFunc (#6137).
  */
 final class date_sunset extends Internal
 {
@@ -39,6 +39,6 @@ final class date_sunset extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        throw new \LogicException('date_sunset() is not implemented for JIT in this compiler build (issue #6137)');
+        return JitDateSunFunc::invoke($context, true, 'date_sunset', ...$args);
     }
 }

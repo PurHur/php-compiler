@@ -9284,6 +9284,7 @@ class JIT {
                 $var = $this->context->makeVariableFromValueOp($this->context->helper->loadValue($value), $resultOp);
                 $var->compileTimeConstantName = $value->compileTimeConstantName;
                 $var->compileTimeEnumCase = $value->compileTimeEnumCase;
+                $var->compileTimeFloat = $value->compileTimeFloat;
 
                 return;
             }
@@ -9534,6 +9535,7 @@ class JIT {
                     $result->compileTimeConstantName = $value->compileTimeConstantName;
                     $result->compileTimeEnumCase = $value->compileTimeEnumCase;
                     $this->syncCompileTimeString($result, $value, $force);
+                    $this->syncCompileTimeFloat($result, $value, $force);
 
                     return;
                 }
@@ -9551,6 +9553,7 @@ class JIT {
             $result->compileTimeConstantName = $value->compileTimeConstantName;
             $result->compileTimeEnumCase = $value->compileTimeEnumCase;
             $this->syncCompileTimeString($result, $value, $force);
+            $this->syncCompileTimeFloat($result, $value, $force);
             if ($value->isJitGenerator) {
                 $resolved = JIT\OperandName::resolve($resultOp);
                 if (null !== $resolved && '' !== $resolved) {
@@ -9633,6 +9636,7 @@ class JIT {
                     , $this->context->helper->loadValue($value)
                     
                 );
+                    $this->syncCompileTimeFloat($result, $value, $force);
     
                     return;
                 case Variable::TYPE_NATIVE_BOOL:
@@ -10212,6 +10216,13 @@ class JIT {
         }
     }
 
+    private function syncCompileTimeFloat(Variable $dest, Variable $src, bool $force): void
+    {
+        if ($force || null !== $src->compileTimeFloat) {
+            $dest->compileTimeFloat = $src->compileTimeFloat;
+        }
+    }
+
     private function copyValueBoxJitFlags(Variable $dest, Variable $src, bool $force = false): void
     {
         if (Variable::TYPE_VALUE !== $dest->type || Variable::TYPE_VALUE !== $src->type) {
@@ -10222,6 +10233,7 @@ class JIT {
         $dest->compileTimeConstantName = $src->compileTimeConstantName;
         $dest->compileTimeEnumCase = $src->compileTimeEnumCase;
         $this->syncCompileTimeString($dest, $src, $force);
+        $this->syncCompileTimeFloat($dest, $src, $force);
     }
 
     /** Keep borrowed object-property hashtable metadata on locals ($cfg = $this->config, #848). */

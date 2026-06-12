@@ -494,8 +494,14 @@ final class Variable {
                 $literal = is_string($op->value) ? $op->value : null;
                 break;
             case self::TYPE_NATIVE_DOUBLE:
-                $value = $context->constantFromFloat($op->value, self::getStringType($type));
-                $literal = is_float($op->value) ? $op->value : null;
+                $floatValue = \is_float($op->value)
+                    ? $op->value
+                    : (is_numeric($op->value) ? (float) $op->value : null);
+                if (null === $floatValue) {
+                    throw new \LogicException('Expected numeric float literal');
+                }
+                $value = $context->constantFromFloat($floatValue, self::getStringType($type));
+                $literal = $floatValue;
                 break;
             case self::TYPE_NATIVE_BOOL:
                 $value = $context->constantFromBool($op->value);
