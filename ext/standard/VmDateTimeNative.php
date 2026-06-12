@@ -8,6 +8,7 @@ use PHPCompiler\VM\DateTimeZoneSupport;
 
 /**
  * Native DateTime/DateTimeZone semantics without host Zend \\DateTime (issue #6164).
+ * TZ switching via {@see VmEnv} libc FFI — no host Zend env builtins (#8086).
  *
  * php-src ref: ext/date/php_datetime.c, ext/date/lib/timelib.c — parsing, formatting, offsets.
  * Thin libc FFI for mktime/localtime/timegm; timezone IDs validated via zoneinfo files.
@@ -591,9 +592,9 @@ final class VmDateTimeNative
      */
     private static function withTimezone(string $tzName, callable $fn): mixed
     {
-        $previous = getenv('TZ');
+        $previous = VmEnv::getenv('TZ');
         $ffi = self::ffi();
-        \putenv('TZ='.$tzName);
+        VmEnv::putenv('TZ='.$tzName);
         if (null !== $ffi) {
             $ffi->tzset();
         }
@@ -601,9 +602,9 @@ final class VmDateTimeNative
             return $fn();
         } finally {
             if (false === $previous || '' === $previous) {
-                \putenv('TZ');
+                VmEnv::putenv('TZ');
             } else {
-                \putenv('TZ='.$previous);
+                VmEnv::putenv('TZ='.$previous);
             }
             if (null !== $ffi) {
                 $ffi->tzset();
