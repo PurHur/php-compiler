@@ -128,6 +128,33 @@ final class SourceBundlerTest extends TestCase
         }
     }
 
+    public function testBundleWrapsDocblockNamespacedWordBeforeSemicolonNamespace(): void
+    {
+        $dir = sys_get_temp_dir().'/phpc_bundle_'.bin2hex(random_bytes(6));
+        $this->assertTrue(mkdir($dir));
+        try {
+            file_put_contents(
+                $dir.'/main.php',
+                "<?php\n\n"
+                ."/**\n"
+                ." * Phase D: link namespaced lib/OpCode.php (issue #540).\n"
+                ." * Bundles lib/OpCode.php via literal require_once.\n"
+                ." */\n\n"
+                ."namespace PHPCompiler;\n\n"
+                ."echo \"ok\\n\";\n"
+            );
+
+            [$bundled] = SourceBundler::bundleForAot($dir.'/main.php', []);
+
+            $this->assertStringContainsString('link namespaced lib/OpCode.php', $bundled);
+            $this->assertStringContainsString('namespace PHPCompiler {', $bundled);
+            $this->assertStringNotContainsString('link namespace PHPCompiler {', $bundled);
+        } finally {
+            @unlink($dir.'/main.php');
+            @rmdir($dir);
+        }
+    }
+
     public function testBundleWrapsRepeatedUseImportsInBracedNamespaces(): void
     {
         $dir = sys_get_temp_dir().'/phpc_bundle_'.bin2hex(random_bytes(6));
