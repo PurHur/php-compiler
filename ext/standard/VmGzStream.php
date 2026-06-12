@@ -58,4 +58,112 @@ final class VmGzStream
 
         return VmGzStreamNative::gzclose($handle);
     }
+
+    /**
+     * readgzfile() — output decompressed file bytes to stdout (ext/zlib/zlib.c, #4657).
+     */
+    public static function readgzfile(string $filename, int $useIncludePath = 0): int|false
+    {
+        $handle = self::gzopen($filename, 'rb', $useIncludePath);
+        if (false === $handle) {
+            return false;
+        }
+        $total = self::passthruHandle($handle);
+        self::gzclose($handle);
+
+        return $total;
+    }
+
+    /**
+     * gzfile() — read gzip file into a line array (ext/zlib/zlib.c, #4657).
+     *
+     * @return list<string>|false
+     */
+    public static function gzfile(string $filename, int $useIncludePath = 0): array|false
+    {
+        $handle = self::gzopen($filename, 'rb', $useIncludePath);
+        if (false === $handle) {
+            return false;
+        }
+        $content = self::readAll($handle);
+        self::gzclose($handle);
+        if (false === $content) {
+            return false;
+        }
+
+        return self::splitGzLines($content);
+    }
+
+    /**
+     * gzpassthru() — output remaining gzip stream bytes to stdout (ext/zlib/zlib.c, #4657).
+     */
+    public static function gzpassthru(int $handle): int|false
+    {
+        if (!VmGzStreamNative::isNativeHandle($handle)) {
+            return false;
+        }
+
+        return self::passthruHandle($handle);
+    }
+
+    /** @return list<string> */
+    private static function splitGzLines(string $content): array
+    {
+        if ('' === $content) {
+            return [];
+        }
+        $lines = [];
+        $offset = 0;
+        $len = \strlen($content);
+        while ($offset < $len) {
+            $pos = \strpos($content, "\n", $offset);
+            if (false === $pos) {
+                $lines[] = \substr($content, $offset);
+
+                break;
+            }
+            $lines[] = \substr($content, $offset, $pos - $offset + 1);
+            $offset = $pos + 1;
+        }
+
+        return $lines;
+    }
+
+    private static function readAll(int $handle): string|false
+    {
+        $out = '';
+        while (true) {
+            $chunk = self::gzread($handle, 8192);
+            if (false === $chunk) {
+                return false;
+            }
+            if ('' === $chunk) {
+                break;
+            }
+            $out .= $chunk;
+        }
+
+        return $out;
+    }
+
+    private static function passthruHandle(int $handle): int|false
+    {
+        $total = 0;
+        while (true) {
+            $chunk = self::gzread($handle, 8192);
+            if (false === $chunk) {
+                return false;
+            }
+            if ('' === $chunk) {
+                break;
+            }
+            $written = @\fwrite(\STDOUT, $chunk);
+            if (false === $written) {
+                return false;
+            }
+            $total += $written;
+        }
+
+        return $total;
+    }
 }

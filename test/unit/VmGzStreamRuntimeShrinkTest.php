@@ -45,4 +45,33 @@ final class VmGzStreamRuntimeShrinkTest extends TestCase
         VmGzStream::gzclose($handle);
         @unlink($path);
     }
+
+    public function testReadgzfileGzfileGzpassthruUseNativeFfi(): void
+    {
+        if (!VmGzStreamNative::available()) {
+            $this->markTestSkipped('libz gz* FFI unavailable on this host');
+        }
+
+        $path = sys_get_temp_dir().'/phpc_gz_file_'.getmypid().'.gz';
+        $handle = VmGzStream::gzopen($path, 'w9');
+        if (false === $handle) {
+            $this->markTestSkipped('VmGzStream::gzopen failed on this host');
+        }
+        VmGzStream::gzwrite($handle, "line1\nline2\n");
+        VmGzStream::gzclose($handle);
+
+        $lines = VmGzStream::gzfile($path);
+        $this->assertIsArray($lines);
+        $this->assertSame(["line1\n", "line2\n"], $lines);
+
+        $bytes = VmGzStream::readgzfile($path);
+        $this->assertSame(12, $bytes);
+
+        $handle = VmGzStream::gzopen($path, 'r');
+        $this->assertNotFalse($handle);
+        $passthru = VmGzStream::gzpassthru($handle);
+        VmGzStream::gzclose($handle);
+        $this->assertSame(12, $passthru);
+        @unlink($path);
+    }
 }
