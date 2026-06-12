@@ -102,6 +102,10 @@ function analyzeInternal(PHPCompiler\Func\Internal $fn): array
         && preg_match('/JitOpensslCipherKeyLength/i', $source)) {
         $notes[] = 'cipher key length table (VM OpensslCipherRegistry + JIT/AOT literals) (#6522)';
     }
+    if ('openssl_cipher_iv_length' === $fn->getName()
+        && preg_match('/JitOpensslCipherIvLength/i', $source)) {
+        $notes[] = 'cipher IV length table (VM OpensslCipherRegistry + JIT/AOT literals) (#7331)';
+    }
     if ('get_meta_tags' === $fn->getName() && preg_match('/JitGetMetaTags|MetaTagsRuntime/i', $source)) {
         $notes[] = 'HTML meta name/content (VM + JIT/AOT MetaTagsRuntime) (#3703, #4608)';
     }
