@@ -26,7 +26,7 @@ use PHPCompiler\VM\Variable;
  */
 final class VmSerialize
 {
-    public static function serializeValue(Context $ctx, Variable $value): string
+    public static function serializeValue(Context $ctx, Variable $value, ?Frame $frame = null): string
     {
         $value = $value->resolveIndirect();
         $resourceWire = self::serializeResourceWire($value);
@@ -57,7 +57,7 @@ final class VmSerialize
                 return self::encodeSleepObject($ctx, $entry);
             }
 
-            return self::encodePlainObject($ctx, $entry);
+            return self::encodePlainObject($ctx, $entry, $frame);
         }
 
         return self::serializeExported(self::exportForSerialize($ctx, $value));
@@ -83,7 +83,7 @@ final class VmSerialize
     /**
      * @param array<string, mixed>|null $options unserialize() options (allowed_classes, max_depth; #3300)
      */
-    public static function unserializePayload(Context $ctx, string $payload, ?array $options = null): mixed
+    public static function unserializePayload(Context $ctx, string $payload, ?array $options = null, ?Frame $frame = null): mixed
     {
         if (str_starts_with($payload, 'C:')) {
             $parsed = self::parseSerializableObjectPayload($payload);
@@ -152,7 +152,7 @@ final class VmSerialize
                     return false;
                 }
 
-                return self::instantiateWithWakeup($ctx, $class, $data);
+                return self::instantiateWithWakeup($ctx, $class, $data, $frame);
             }
             if (!\is_array($data)) {
                 return false;
@@ -161,7 +161,7 @@ final class VmSerialize
                 return false;
             }
 
-            return self::instantiatePlainObject($class, $data);
+            return self::instantiatePlainObject($ctx, $class, $data, $frame);
         }
 
         if (null === $options || [] === $options) {
@@ -288,10 +288,16 @@ final class VmSerialize
     /**
      * Zend var_unserializer.c — plain O: object with property bag (no __unserialize/__wakeup; #5140).
      */
-    public static function instantiatePlainObject(ClassEntry $class, array $data): Variable
-    {
+    public static function instantiatePlainObject(
+        Context $ctx,
+        ClassEntry $class,
+        array $data,
+        ?Frame $frame = null
+    ): Variable {
         $entry = new ObjectEntry($class);
-        self::restoreObjectProperties($entry, $data);
+        // Zend restores serialized props on a live object; hooks must run (#6474).
+        $entry->constructed = true;
+        self::restoreObjectProperties($ctx, $entry, $data, $frame);
         $recv = new Variable();
         $recv->object($entry);
 
@@ -301,10 +307,11 @@ final class VmSerialize
     public static function instantiateWithWakeup(
         Context $ctx,
         ClassEntry $class,
-        array $data
+        array $data,
+        ?Frame $frame = null
     ): Variable {
         $entry = new ObjectEntry($class);
-        self::restoreObjectProperties($entry, $data);
+        self::restoreObjectProperties($ctx, $entry, $data, $frame);
         $method = $class->methods['__wakeup'] ?? null;
         if (!$method instanceof PhpFunc) {
             throw new \LogicException(
@@ -488,20 +495,27 @@ final class VmSerialize
      * Zend php_var_serialize() plain object branch — public properties + dynamic props (#3621, var.c).
      * Private/protected mangling deferred to #3497.
      */
-    private static function encodePlainObject(Context $ctx, ObjectEntry $entry): string
+    private static function encodePlainObject(Context $ctx, ObjectEntry $entry, ?Frame $frame = null): string
     {
         return self::encodeObjectPropertyBag(
             $ctx,
             $entry->class->name,
-            self::collectPlainObjectSerializeProperties($ctx, $entry)
+            self::collectPlainObjectSerializeProperties($ctx, $entry, $frame)
         );
     }
 
     /**
      * @return array<string, Variable>
      */
-    private static function collectPlainObjectSerializeProperties(Context $ctx, ObjectEntry $entry): array
-    {
+    private static function collectPlainObjectSerializeProperties(
+        Context $ctx,
+        ObjectEntry $entry,
+        ?Frame $frame = null
+    ): array {
+        if (null !== $frame) {
+            return $ctx->runtime->vm()->collectPublicPropertiesForSerialize($entry, $frame);
+        }
+
         /** @var array<string, Variable> $props */
         $props = [];
         /** @var array<string, true> $seenLc */
@@ -571,14 +585,24 @@ final class VmSerialize
     }
 
     /** @param array<string, mixed> $data */
-    private static function restoreObjectProperties(ObjectEntry $entry, array $data): void
-    {
+    private static function restoreObjectProperties(
+        Context $ctx,
+        ObjectEntry $entry,
+        array $data,
+        ?Frame $frame = null
+    ): void {
+        $vm = $ctx->runtime->vm();
         foreach ($data as $name => $raw) {
             $propName = (string) $name;
+            $value = VmJson::import($raw);
+            if (null !== $frame) {
+                $vm->assignUnserializeProperty($entry, $propName, $value, $frame);
+                continue;
+            }
             $prop = $entry->hasProperty($propName)
                 ? $entry->getProperty($propName)
                 : $entry->allocateProperty($propName);
-            $prop->copyFrom(VmJson::import($raw));
+            $prop->copyFrom($value);
         }
     }
 
@@ -632,7 +656,7 @@ final class VmSerialize
         $entry = new ObjectEntry($icClass);
         $nameProp = $entry->allocateProperty('__PHP_Incomplete_Class_Name');
         $nameProp->string($missingClassName);
-        self::restoreObjectProperties($entry, $data);
+        self::restoreObjectProperties($ctx, $entry, $data, null);
         $recv = new Variable();
         $recv->object($entry);
 

@@ -32,7 +32,8 @@ final class serialize extends Internal
         }
         $encoded = VmSerialize::serializeValue(
             $frame->vmContext,
-            $frame->calledArgs[0]
+            $frame->calledArgs[0],
+            $frame
         );
         $frame->returnVar->string($encoded);
     }

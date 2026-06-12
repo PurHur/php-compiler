@@ -46,7 +46,8 @@ final class unserialize extends Internal
         $decoded = VmSerialize::unserializePayload(
             $frame->vmContext,
             $payloadVar->toString(),
-            $options
+            $options,
+            $frame
         );
         if (false === $decoded) {
             $frame->returnVar->bool(false);
