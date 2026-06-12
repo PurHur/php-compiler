@@ -40,7 +40,6 @@ final class ReflectionBuiltinHelper
         if (!$exists && null !== $context->runtime->vmContext) {
             $entry = $context->runtime->vmContext->classes[$lc] ?? null;
             $exists = null !== $entry
-                && !$entry->isEnum
                 && !$entry->isInterface
                 && !$entry->isTrait;
         }
