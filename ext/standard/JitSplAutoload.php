@@ -11,6 +11,7 @@ use PHPCompiler\JIT\Call\ExternalMethod;
 use PHPCompiler\JIT\Call\Native;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitLongArg;
+use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\SplAutoloadCallbackPolicy;
 use PHPCompiler\JIT\Variable as JITVariable;
@@ -88,6 +89,30 @@ final class JitSplAutoload
             $namePtr,
             $nameLen
         );
+    }
+
+    /** @return Value void sentinel for spl_autoload_call() (#3486). */
+    public static function dispatch(Context $context, JITVariable $className): Value
+    {
+        SplAutoloadOutput::ensureLinked($context);
+
+        $strPtr = JitStringBuiltinArg::lower($context, $className, 'spl_autoload_call', 0, 'class_name');
+        $map = $context->structFieldMap[$strPtr->typeOf()->getElementType()->getName()];
+        $classPtr = $context->builder->load(
+            $context->builder->structGep($strPtr, $map['value'])
+        );
+        $classLen = $context->builder->load(
+            $context->builder->structGep($strPtr, $map['length'])
+        );
+        $i8p = $context->getTypeFromString('int8*');
+        $sizeT = $context->getTypeFromString('size_t');
+        $context->builder->call(
+            $context->lookupFunction('__phpc_spl_autoload_dispatch'),
+            $context->builder->pointerCast($classPtr, $i8p),
+            $context->builder->zExt($classLen, $sizeT)
+        );
+
+        return $context->getTypeFromString('int32')->constInt(0, false);
     }
 
     private static function applyRegister(

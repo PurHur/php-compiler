@@ -770,6 +770,7 @@ class Module extends ModuleAbstract
             new ignore_user_abort(),
             new connection_aborted(),
             new spl_autoload_register(),
+            new spl_autoload_call(),
             new time_nanosleep(),
             new time_sleep_until(),
             new usleep(),
