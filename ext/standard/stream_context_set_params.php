@@ -38,8 +38,6 @@ final class stream_context_set_params extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        throw new \LogicException(
-            'stream_context_set_params() is not implemented for JIT in this compiler build (issue #6122)'
-        );
+        return JitStreamContextSetParams::invoke($context, ...$args);
     }
 }

@@ -24,6 +24,8 @@ final class StreamContextRuntime
 
     private const MARKER_KEY = '__phpc_stream_context';
 
+    private const PARAMS_MARKER_KEY = '__phpc_stream_context_params';
+
     public static function ensureLinked(Context $context): void
     {
         self::implement($context);
@@ -33,6 +35,7 @@ final class StreamContextRuntime
     {
         $probe = $context->module->getNamedFunction('__phpc_stream_context_create');
         if (null !== $probe && $probe->countBasicBlocks() > 0) {
+            self::ensureSetParamsIfMissing($context);
             self::registerLinkedRuntime($context);
 
             return;
@@ -65,7 +68,34 @@ final class StreamContextRuntime
             : $context->module->addFunction('__phpc_stream_context_get_options', $ftGetOpts);
         self::implementGetOptions($context, $fnGetOpts, $fnMerge);
 
+        $setParamsProbe = $context->module->getNamedFunction('__phpc_stream_context_set_params');
+        $ftSetParams = $context->context->functionType($voidTy, false, $htPtr, $htPtr);
+        $fnSetParams = null !== $setParamsProbe
+            ? $setParamsProbe
+            : $context->module->addFunction('__phpc_stream_context_set_params', $ftSetParams);
+        self::implementSetParams($context, $fnSetParams, $fnMerge);
+
         self::registerLinkedRuntime($context);
+    }
+
+    private static function ensureSetParamsIfMissing(Context $context): void
+    {
+        $setParamsProbe = $context->module->getNamedFunction('__phpc_stream_context_set_params');
+        if (null !== $setParamsProbe && $setParamsProbe->countBasicBlocks() > 0) {
+            return;
+        }
+
+        $fnMerge = $context->module->getNamedFunction('__phpc_stream_context_merge_options');
+        if (null === $fnMerge || 0 === $fnMerge->countBasicBlocks()) {
+            throw new \LogicException('StreamContextRuntime: __phpc_stream_context_merge_options missing');
+        }
+
+        $htPtr = $context->getTypeFromString('__hashtable__*');
+        $voidTy = $context->getTypeFromString('void');
+        $fnSetParams = null !== $setParamsProbe
+            ? $setParamsProbe
+            : $context->module->addFunction('__phpc_stream_context_set_params', $context->context->functionType($voidTy, false, $htPtr, $htPtr));
+        self::implementSetParams($context, $fnSetParams, $fnMerge);
     }
 
     private static function implementCreate(Context $context, Value $fn, Value $fnMerge): void
@@ -141,6 +171,40 @@ final class StreamContextRuntime
             self::literalKeyString($context, self::MARKER_KEY)
         );
         $context->builder->returnValue($out);
+        $context->builder->clearInsertionPosition();
+    }
+
+    private static function implementSetParams(Context $context, Value $fn, Value $fnMerge): void
+    {
+        $entry = $fn->appendBasicBlock('scsp_entry');
+        $nullBb = $fn->appendBasicBlock('scsp_null');
+        $bodyBb = $fn->appendBasicBlock('scsp_body');
+
+        $context->builder->positionAtEnd($entry);
+
+        $dest = $fn->getParam(0);
+        $src = $fn->getParam(1);
+        $htPtr = $context->getTypeFromString('__hashtable__*');
+        $nullHt = $htPtr->constNull();
+        $eitherNull = $context->builder->or(
+            $context->builder->icmp(Builder::INT_EQ, $dest, $nullHt),
+            $context->builder->icmp(Builder::INT_EQ, $src, $nullHt)
+        );
+        $context->builder->branchIf($eitherNull, $nullBb, $bodyBb);
+
+        $context->builder->positionAtEnd($nullBb);
+        $context->builder->returnVoid();
+
+        $context->builder->positionAtEnd($bodyBb);
+        $paramsBag = $context->builder->call($context->lookupFunction('__hashtable__alloc'));
+        $context->builder->call($fnMerge, $paramsBag, $src);
+        $context->builder->call(
+            $context->lookupFunction('__hashtable__setStringKeyHashtable'),
+            $dest,
+            self::literalKeyString($context, self::PARAMS_MARKER_KEY),
+            $paramsBag
+        );
+        $context->builder->returnVoid();
         $context->builder->clearInsertionPosition();
     }
 
@@ -442,6 +506,7 @@ final class StreamContextRuntime
                 '__phpc_stream_context_create',
                 '__phpc_stream_context_merge_options',
                 '__phpc_stream_context_get_options',
+                '__phpc_stream_context_set_params',
             ] as $name
         ) {
             $fn = $context->module->getNamedFunction($name);

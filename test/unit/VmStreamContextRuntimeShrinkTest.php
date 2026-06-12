@@ -63,6 +63,16 @@ final class VmStreamContextRuntimeShrinkTest extends TestCase
         $this->assertStringNotContainsString('if (null === $frame->returnVar)', $source);
     }
 
+    public function testStreamContextSetParamsJitLoweringWired(): void
+    {
+        $source = (string) file_get_contents(__DIR__.'/../../ext/standard/stream_context_set_params.php');
+        $this->assertStringContainsString('JitStreamContextSetParams::invoke', $source);
+        $this->assertStringNotContainsString('not implemented for JIT', $source);
+        $this->assertFileExists(__DIR__.'/../../ext/standard/JitStreamContextSetParams.php');
+        $jitSource = (string) file_get_contents(__DIR__.'/../../ext/standard/JitStreamContextSetParams.php');
+        $this->assertStringContainsString('__phpc_stream_context_set_params', $jitSource);
+    }
+
     public function testSetParamsStoresParamsBagInVmHashTable(): void
     {
         $ctx = VmStreamContext::create(['http' => ['timeout' => 5]]);
