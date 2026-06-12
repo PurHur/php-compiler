@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace PHPCompiler\ext\standard;
 
+use PHPCompiler\VM\DateTimeZoneSupport;
+
 /**
  * Native DateTime/DateTimeZone semantics without host Zend \\DateTime (issue #6164).
  *
@@ -20,6 +22,56 @@ final class VmDateTimeNative
 
     /** @var list<string>|null */
     private static ?array $zoneIdentifiers = null;
+
+    /** @var list<array{country: string, id: string}>|null */
+    private static ?array $zoneTabEntries = null;
+
+    /**
+     * timezone_identifiers_list() — Olson identifiers from zone.tab (ext/date/php_date.c, #3504).
+     *
+     * @return list<string>
+     */
+    public static function timezoneIdentifiersList(
+        int $timezoneGroup = DateTimeZoneSupport::GROUP_ALL,
+        ?string $countryCode = null
+    ): array {
+        if (DateTimeZoneSupport::GROUP_PER_COUNTRY === $timezoneGroup) {
+            if (null === $countryCode || 2 !== \strlen($countryCode)) {
+                throw new \ValueError(
+                    'timezone_identifiers_list(): Argument #2 ($countryCode) must be a two-letter ISO 3166-1 compatible country code '
+                    .'when argument #1 ($timezoneGroup) is DateTimeZone::PER_COUNTRY'
+                );
+            }
+            $country = strtoupper($countryCode);
+            $ids = [];
+            foreach (self::zoneTabEntries() as $entry) {
+                if ($entry['country'] === $country) {
+                    $ids[] = $entry['id'];
+                }
+            }
+            \sort($ids);
+
+            return $ids;
+        }
+
+        if (DateTimeZoneSupport::GROUP_ALL_WITH_BC === $timezoneGroup) {
+            return self::timezoneIdentifiersAllWithBackwardCompat();
+        }
+
+        $ids = self::canonicalTimezoneIdentifiers();
+        if (DateTimeZoneSupport::GROUP_ALL === $timezoneGroup) {
+            return $ids;
+        }
+
+        $filtered = [];
+        foreach ($ids as $id) {
+            if (self::timezoneGroupAllowsIdentifier($id, $timezoneGroup)) {
+                $filtered[] = $id;
+            }
+        }
+
+        return $filtered;
+    }
 
     public static function validateTimezoneId(string $timezone): string
     {
@@ -352,6 +404,130 @@ final class VmDateTimeNative
         }
 
         return ($negative ? '-' : '').\str_repeat('0', $width - \strlen($s)).$s;
+    }
+
+    /** @return list<string> */
+    private static function canonicalTimezoneIdentifiers(): array
+    {
+        $ids = [];
+        foreach (self::zoneTabEntries() as $entry) {
+            $ids[] = $entry['id'];
+        }
+        $ids[] = 'UTC';
+        \sort($ids);
+
+        return $ids;
+    }
+
+    /** @return list<array{country: string, id: string}> */
+    private static function zoneTabEntries(): array
+    {
+        if (null !== self::$zoneTabEntries) {
+            return self::$zoneTabEntries;
+        }
+        self::$zoneTabEntries = [];
+        $path = self::ZONEINFO_ROOT.'/zone.tab';
+        if (!\is_file($path)) {
+            return self::$zoneTabEntries;
+        }
+        $lines = @\file($path, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES);
+        if (false === $lines) {
+            return self::$zoneTabEntries;
+        }
+        foreach ($lines as $line) {
+            if ('' === $line || '#' === $line[0]) {
+                continue;
+            }
+            $parts = \preg_split('/\s+/', $line, 4);
+            if (!\is_array($parts) || \count($parts) < 3) {
+                continue;
+            }
+            self::$zoneTabEntries[] = [
+                'country' => $parts[0],
+                'id' => $parts[2],
+            ];
+        }
+
+        return self::$zoneTabEntries;
+    }
+
+    /** @return list<string> */
+    private static function timezoneIdentifiersAllWithBackwardCompat(): array
+    {
+        $ids = self::canonicalTimezoneIdentifiers();
+        $known = \array_fill_keys($ids, true);
+        if (!\is_dir(self::ZONEINFO_ROOT)) {
+            return $ids;
+        }
+        $iterator = new \RecursiveIteratorIterator(
+            new \RecursiveDirectoryIterator(self::ZONEINFO_ROOT, \FilesystemIterator::SKIP_DOTS)
+        );
+        $rootLen = \strlen(self::ZONEINFO_ROOT) + 1;
+        foreach ($iterator as $file) {
+            if (!$file->isFile()) {
+                continue;
+            }
+            $path = $file->getPathname();
+            if (str_contains($path, '.') && !str_ends_with($path, 'posixrules')) {
+                $base = \basename($path);
+                if (str_contains($base, '.')) {
+                    continue;
+                }
+            }
+            $id = \str_replace(\DIRECTORY_SEPARATOR, '/', \substr($path, $rootLen));
+            if (isset($known[$id])) {
+                continue;
+            }
+            if (!self::timezoneGroupAllowsIdentifier($id, DateTimeZoneSupport::GROUP_ALL)) {
+                continue;
+            }
+            if (\is_link($path) || !str_contains($id, '/')) {
+                $ids[] = $id;
+                $known[$id] = true;
+            }
+        }
+        \sort($ids);
+
+        return $ids;
+    }
+
+    private static function timezoneGroupAllowsIdentifier(string $id, int $timezoneGroup): bool
+    {
+        if ((DateTimeZoneSupport::GROUP_AFRICA & $timezoneGroup) && 0 === strncasecmp($id, 'Africa/', 7)) {
+            return true;
+        }
+        if ((DateTimeZoneSupport::GROUP_AMERICA & $timezoneGroup) && 0 === strncasecmp($id, 'America/', 8)) {
+            return true;
+        }
+        if ((DateTimeZoneSupport::GROUP_ANTARCTICA & $timezoneGroup) && 0 === strncasecmp($id, 'Antarctica/', 11)) {
+            return true;
+        }
+        if ((DateTimeZoneSupport::GROUP_ARCTIC & $timezoneGroup) && 0 === strncasecmp($id, 'Arctic/', 7)) {
+            return true;
+        }
+        if ((DateTimeZoneSupport::GROUP_ASIA & $timezoneGroup) && 0 === strncasecmp($id, 'Asia/', 5)) {
+            return true;
+        }
+        if ((DateTimeZoneSupport::GROUP_ATLANTIC & $timezoneGroup) && 0 === strncasecmp($id, 'Atlantic/', 9)) {
+            return true;
+        }
+        if ((DateTimeZoneSupport::GROUP_AUSTRALIA & $timezoneGroup) && 0 === strncasecmp($id, 'Australia/', 10)) {
+            return true;
+        }
+        if ((DateTimeZoneSupport::GROUP_EUROPE & $timezoneGroup) && 0 === strncasecmp($id, 'Europe/', 7)) {
+            return true;
+        }
+        if ((DateTimeZoneSupport::GROUP_INDIAN & $timezoneGroup) && 0 === strncasecmp($id, 'Indian/', 7)) {
+            return true;
+        }
+        if ((DateTimeZoneSupport::GROUP_PACIFIC & $timezoneGroup) && 0 === strncasecmp($id, 'Pacific/', 8)) {
+            return true;
+        }
+        if ((DateTimeZoneSupport::GROUP_UTC & $timezoneGroup) && 0 === strncasecmp($id, 'UTC', 3)) {
+            return true;
+        }
+
+        return false;
     }
 
     private static function zoneinfoPath(string $timezone): ?string

@@ -768,6 +768,7 @@ final class BuiltinClasses
         $pub = CfgFunc::FLAG_PUBLIC;
 
         $tz = new ClassEntry('DateTimeZone');
+        DateTimeZoneSupport::registerClassConstants($tz);
         $tz->properties[] = new ClassProperty(DateTimeSupport::TZ_NAME_PROPERTY, null, $strProto);
         $tz->constructor = new DateTimeZoneConstruct();
         $tz->methods['__construct'] = $tz->constructor;
