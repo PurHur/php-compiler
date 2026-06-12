@@ -1479,7 +1479,13 @@ class JIT {
         }
         if (!$this->shouldUseM3CompileDriverRealLowering()) {
             if ($this->shouldUseM3EmitTuEmitHelperSpineRealLowering()) {
-                $emitHelperSpineReal = ['parse', 'compileemitsmoke'];
+                $emitHelperSpineReal = [
+                    'preprocesssourceforparse',
+                    'rewritesourcebeforeparser',
+                    'preparesourceforparser',
+                    'parse',
+                    'compileemitsmoke',
+                ];
                 if ($this->shouldUseVendorPrelinkExecutableEmit()
                     || $this->shouldUseSelfHostExecutableEmit()) {
                     $emitHelperSpineReal = ['parse', 'compile', 'standalone'];
@@ -2870,6 +2876,8 @@ class JIT {
         }
         if (!$this->m3EmitTuRuntimeSpineLowered) {
             $this->m3EmitTuRuntimeSpineLowered = true;
+            $stubBlock = $this->m3EmitTuMainBlock ?? $this->m3CompileDriverMainBlock ?? $block;
+            $this->compileM3EmitTuRuntimeSpineDecls($stubBlock);
             $sidecar = $this->isM3EmitTuTrivialEchoSidecarActive();
             $inventoryEmit = $this->shouldUseM3InventoryEmitForCompileDriverBlock($block);
             foreach (['parse', 'compileemitsmoke', 'standalone'] as $methodLc) {
@@ -2879,8 +2887,6 @@ class JIT {
                 $this->compileM3EmitTuRuntimeMethodFromQueue($methodLc);
             }
             $this->runQueue();
-            $stubBlock = $this->m3EmitTuMainBlock ?? $this->m3CompileDriverMainBlock ?? $block;
-            $this->compileM3EmitTuRuntimeSpineDecls($stubBlock);
         }
         $i64 = $this->context->getTypeFromString('int64');
         $func = $this->context->module->addFunction(
@@ -2924,6 +2930,7 @@ class JIT {
         if ($this->shouldUseM3InventoryEmitForCompileDriverBlock($block)) {
             if (!$this->m3CompileDriverRuntimeSpineLowered) {
                 $this->m3CompileDriverRuntimeSpineLowered = true;
+                $this->compileM3EmitTuRuntimeSpineDecls($this->m3CompileDriverMainBlock);
                 $sidecar = $this->isM3EmitTuTrivialEchoSidecarActive();
                 $inventoryEmit = $this->shouldUseM3InventoryEmitForCompileDriverBlock($block);
                 foreach (['parse', 'compileemitsmoke', 'standalone'] as $methodLc) {
@@ -2933,7 +2940,6 @@ class JIT {
                     $this->compileM3EmitTuRuntimeMethodFromQueue($methodLc);
                 }
                 $this->runQueue();
-                $this->compileM3EmitTuRuntimeSpineDecls($this->m3CompileDriverMainBlock);
             }
             $logPrefix = getenv('PHP_COMPILER_M3_EMIT_LOG_PREFIX');
             if (!is_string($logPrefix) || '' === $logPrefix) {
@@ -3121,7 +3127,13 @@ class JIT {
         $savedClassName = $this->context->scope->className;
         $this->context->scope->classId = $this->context->type->object->lookup('PHPCompiler\\Runtime');
         $this->context->scope->className = 'phpcompiler\\runtime';
-        foreach (['parse', 'compileemitsmoke'] as $spineLc) {
+        foreach ([
+            'preprocesssourceforparse',
+            'rewritesourcebeforeparser',
+            'preparesourceforparser',
+            'parse',
+            'compileemitsmoke',
+        ] as $spineLc) {
             $spineLcKey = strtolower('PHPCompiler\\Runtime::'.$spineLc);
             if (isset($this->context->functions[$spineLcKey])) {
                 continue;
