@@ -118,10 +118,12 @@ bootstrap_ensure_m3_compiler_lib_sidecar() {
   rm -f "${blob}"
   local regen_log regen_code=0
   set +e
+  # Do not set PHP_COMPILER_CLI_SPINE_BUNDLE here — that skips bin/compile.php argv dispatch (#1492).
+  # SIDECAR_HOST stubs non-literal includes in spine/cli_driver (same as registerM3EmitTuSidecarFromPath).
   regen_log="$(
     env PHP_COMPILER_M3_EMIT_SIDECAR_RECURSION_GUARD=1 \
+      PHP_COMPILER_M3_SIDECAR_HOST=1 \
       PHP_COMPILER_SELFHOST_AOT=1 \
-      PHP_COMPILER_CLI_SPINE_BUNDLE=1 \
       PHP_COMPILER_MEMORY_LIMIT="${PHP_COMPILER_MEMORY_LIMIT:-4096M}" \
       php -d "memory_limit=${PHP_COMPILER_MEMORY_LIMIT:-4096M}" \
       "${root}/bin/compile.php" -o "${blob}" "${entry}" 2>&1
