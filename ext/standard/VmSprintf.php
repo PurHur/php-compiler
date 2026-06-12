@@ -3,7 +3,7 @@
 declare(strict_types=1);
 
 /**
- * VM-runtime sprintf() subset (%s, %d, %f, %%) without PHP userland builtins.
+ * VM-runtime sprintf() subset (%s, %d, %f, %%, %n$ positional, issue #3631).
  */
 
 namespace PHPCompiler\ext\standard;
@@ -23,6 +23,7 @@ final class VmSprintf
     {
         $out = '';
         $argIdx = 0;
+        $argCount = \count($args);
         $len = VmString::byteLength($format);
         for ($pos = 0; $pos < $len; ++$pos) {
             $ch = $format[$pos];
@@ -33,66 +34,161 @@ final class VmSprintf
             if ($pos + 1 >= $len) {
                 throw new \LogicException('sprintf() trailing % in format string');
             }
-            $spec = $format[++$pos];
-            if ('%' === $spec) {
+            $parsed = self::parseConversionSpec($format, $pos + 1, $len);
+            $pos = $parsed['nextPos'] - 1;
+            if ($parsed['literalPercent']) {
                 $out .= '%';
                 continue;
             }
-            if ($argIdx >= \count($args)) {
-                throw new \LogicException('sprintf() too few arguments for format string');
-            }
-            $var = $args[$argIdx++];
-            switch ($spec) {
-                case 's':
-                    $out .= self::argToString($var, $frame);
-                    break;
-                case 'd':
-                    $out .= self::intToDecimal(self::argToInt($var, $frame));
-                    break;
-                case 'f':
-                    $out .= VmNumberFormat::format(self::argToFloat($var, $frame), 6, '.', '');
-                    break;
-                case 'b':
-                    $out .= self::intToBinary(self::argToInt($var, $frame));
-                    break;
-                case 'x':
-                    $out .= self::intToRadix(self::argToInt($var, $frame), 16, false);
-                    break;
-                case 'X':
-                    $out .= self::intToRadix(self::argToInt($var, $frame), 16, true);
-                    break;
-                case 'o':
-                    $out .= self::intToRadix(self::argToInt($var, $frame), 8, false);
-                    break;
-                case 'u':
-                    $out .= self::intToUnsignedDecimal(self::argToInt($var, $frame));
-                    break;
-                case 'c':
-                    $out .= self::intToChar(self::argToInt($var, $frame));
-                    break;
-                case 'e':
-                    $out .= self::formatScientific(self::argToFloat($var, $frame), false);
-                    break;
-                case 'E':
-                    $out .= self::formatScientific(self::argToFloat($var, $frame), true);
-                    break;
-                case 'g':
-                    $out .= self::formatGeneral(self::argToFloat($var, $frame), false);
-                    break;
-                case 'G':
-                    $out .= self::formatGeneral(self::argToFloat($var, $frame), true);
-                    break;
-                default:
-                    throw new \LogicException(
-                        'sprintf() unsupported conversion specifier %'.$spec.' in this compiler build'
-                    );
-            }
+            $varIdx = self::resolveArgIndex($parsed['positional'], $argIdx, $argCount);
+            $out .= self::applyConversion(
+                $parsed['spec'],
+                $args[$varIdx],
+                $frame,
+                $parsed['precision']
+            );
             if (VmString::byteLength($out) > self::MAX_OUTPUT) {
                 throw new \LogicException('sprintf() output exceeds maximum length in this compiler build');
             }
         }
 
         return $out;
+    }
+
+    /**
+     * Parse a conversion after '%' (php-src ext/standard/sprintf.c — %n$ positional forms, #3631).
+     *
+     * @return array{
+     *     nextPos: int,
+     *     literalPercent: bool,
+     *     spec: string,
+     *     positional: ?int,
+     *     precision: ?int
+     * }
+     */
+    private static function parseConversionSpec(string $format, int $start, int $len): array
+    {
+        $pos = $start;
+        if ($pos < $len && '%' === $format[$pos]) {
+            return [
+                'nextPos' => $pos + 1,
+                'literalPercent' => true,
+                'spec' => '',
+                'positional' => null,
+                'precision' => null,
+            ];
+        }
+
+        $positional = null;
+        if ($pos < $len && \ctype_digit($format[$pos])) {
+            $numStart = $pos;
+            while ($pos < $len && \ctype_digit($format[$pos])) {
+                ++$pos;
+            }
+            if ($pos < $len && '$' === $format[$pos]) {
+                $argnum = (int) \substr($format, $numStart, $pos - $numStart);
+                if ($argnum <= 0) {
+                    throw new \ValueError(
+                        'Argument number specifier must be greater than zero and less than 2147483647'
+                    );
+                }
+                $positional = $argnum;
+                ++$pos;
+            } else {
+                $pos = $numStart;
+            }
+        }
+
+        if ($pos < $len && \ctype_digit($format[$pos])) {
+            while ($pos < $len && \ctype_digit($format[$pos])) {
+                ++$pos;
+            }
+        }
+
+        $precision = null;
+        if ($pos < $len && '.' === $format[$pos]) {
+            ++$pos;
+            if ($pos < $len && \ctype_digit($format[$pos])) {
+                $precStart = $pos;
+                while ($pos < $len && \ctype_digit($format[$pos])) {
+                    ++$pos;
+                }
+                $precision = (int) \substr($format, $precStart, $pos - $precStart);
+            }
+        }
+
+        if ($pos >= $len) {
+            throw new \LogicException('sprintf() trailing % in format string');
+        }
+
+        return [
+            'nextPos' => $pos + 1,
+            'literalPercent' => false,
+            'spec' => $format[$pos],
+            'positional' => $positional,
+            'precision' => $precision,
+        ];
+    }
+
+    private static function resolveArgIndex(?int $positional, int &$sequentialIdx, int $argCount): int
+    {
+        if (null !== $positional) {
+            if ($positional > $argCount) {
+                throw new \ArgumentCountError(\sprintf(
+                    '%d arguments are required, %d given',
+                    $positional + 1,
+                    $argCount + 1
+                ));
+            }
+
+            return $positional - 1;
+        }
+        if ($sequentialIdx >= $argCount) {
+            throw new \LogicException('sprintf() too few arguments for format string');
+        }
+
+        return $sequentialIdx++;
+    }
+
+    private static function applyConversion(
+        string $spec,
+        Variable $var,
+        ?Frame $frame,
+        ?int $precision
+    ): string {
+        $floatPrec = $precision ?? 6;
+        switch ($spec) {
+            case 's':
+                return self::argToString($var, $frame);
+            case 'd':
+                return self::intToDecimal(self::argToInt($var, $frame));
+            case 'f':
+                return VmNumberFormat::format(self::argToFloat($var, $frame), $floatPrec, '.', '');
+            case 'b':
+                return self::intToBinary(self::argToInt($var, $frame));
+            case 'x':
+                return self::intToRadix(self::argToInt($var, $frame), 16, false);
+            case 'X':
+                return self::intToRadix(self::argToInt($var, $frame), 16, true);
+            case 'o':
+                return self::intToRadix(self::argToInt($var, $frame), 8, false);
+            case 'u':
+                return self::intToUnsignedDecimal(self::argToInt($var, $frame));
+            case 'c':
+                return self::intToChar(self::argToInt($var, $frame));
+            case 'e':
+                return self::formatScientific(self::argToFloat($var, $frame), false, $floatPrec);
+            case 'E':
+                return self::formatScientific(self::argToFloat($var, $frame), true, $floatPrec);
+            case 'g':
+                return self::formatGeneral(self::argToFloat($var, $frame), false, $floatPrec);
+            case 'G':
+                return self::formatGeneral(self::argToFloat($var, $frame), true, $floatPrec);
+            default:
+                throw new \LogicException(
+                    'sprintf() unsupported conversion specifier %'.$spec.' in this compiler build'
+                );
+        }
     }
 
     private static function argToString(Variable $var, ?Frame $frame = null): string
@@ -253,7 +349,7 @@ final class VmSprintf
     }
 
     /** php-src sprintf.c — %e / %E (default precision 6). */
-    private static function formatScientific(float $value, bool $upper): string
+    private static function formatScientific(float $value, bool $upper, int $precision = 6): string
     {
         if (\is_nan($value)) {
             return 'NAN';
@@ -264,11 +360,13 @@ final class VmSprintf
         $sign = $value < 0 ? '-' : '';
         $abs = \abs($value);
         if (0.0 === $abs) {
-            return '0.000000'.($upper ? 'E' : 'e').'+0';
+            $zeros = \str_repeat('0', $precision);
+
+            return '0.'.$zeros.($upper ? 'E' : 'e').'+0';
         }
         $exp = (int) \floor(\log10($abs));
         $mantissa = $abs / (10 ** $exp);
-        $mant = VmNumberFormat::format($mantissa, 6, '.', '');
+        $mant = VmNumberFormat::format($mantissa, $precision, '.', '');
         $expChar = $upper ? 'E' : 'e';
         $expSign = $exp >= 0 ? '+' : '-';
 
@@ -276,7 +374,7 @@ final class VmSprintf
     }
 
     /** php-src sprintf.c — %g / %G (default precision 6). */
-    private static function formatGeneral(float $value, bool $upper): string
+    private static function formatGeneral(float $value, bool $upper, int $precision = 6): string
     {
         if (\is_nan($value)) {
             return 'NAN';
@@ -289,9 +387,9 @@ final class VmSprintf
             return '0';
         }
         if ($abs < 1e-4 || $abs >= 1e6) {
-            return self::trimGeneralScientific(self::formatScientific($value, $upper));
+            return self::trimGeneralScientific(self::formatScientific($value, $upper, $precision));
         }
-        $formatted = VmNumberFormat::format($value, 6, '.', '');
+        $formatted = VmNumberFormat::format($value, $precision, '.', '');
         if (str_contains($formatted, '.')) {
             $formatted = \rtrim(\rtrim($formatted, '0'), '.');
         }
