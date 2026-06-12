@@ -15,37 +15,65 @@ final class SplAutoloadCallbackPolicy
 
     public static function isVmSupportedType(int $type): bool
     {
-        return VMVariable::TYPE_STRING === $type;
+        return VMVariable::TYPE_STRING === $type
+            || VMVariable::TYPE_ARRAY === $type
+            || VMVariable::TYPE_OBJECT === $type;
     }
 
     public static function vmRejectionMessage(): string
     {
-        return 'spl_autoload_register() callback must be a string user-function name in this compiler build; '
+        return 'spl_autoload_register() callback must be a valid callable in this compiler build; '
             .self::DEFERRED_KINDS.' are deferred (#1369, #1776)';
     }
 
     public static function isJitLowerable(Variable $callback): bool
     {
-        return self::isJitLowerableScalar(
+        if (null !== $callback->closureCall) {
+            return true;
+        }
+        $static = self::compileTimeStaticMethodName($callback);
+        if (null !== $static) {
+            return true;
+        }
+
+        return self::isJitLowerableFunctionNameScalar(
             $callback->type,
             $callback->isNullConstant,
             $callback->compileTimeString
         );
     }
 
-    public static function isJitLowerableScalar(int $type, bool $isNullConstant, ?string $compileTimeString): bool
+    public static function isJitLowerableFunctionNameScalar(int $type, bool $isNullConstant, ?string $compileTimeString): bool
     {
         if ($isNullConstant) {
             return false;
         }
 
-        return Variable::TYPE_STRING === $type && null !== $compileTimeString && !str_contains($compileTimeString, '::');
+        return Variable::TYPE_STRING === $type
+            && null !== $compileTimeString
+            && !str_contains($compileTimeString, '::');
+    }
+
+    /**
+     * Compile-time `Class::method` or `[Class::class, 'method']` static callback (#4744).
+     */
+    public static function compileTimeStaticMethodName(Variable $callback): ?string
+    {
+        if (null !== $callback->closureCall) {
+            return null;
+        }
+        $literal = $callback->compileTimeString;
+        if (Variable::TYPE_STRING === $callback->type && null !== $literal && str_contains($literal, '::')) {
+            return $literal;
+        }
+
+        return null;
     }
 
     public static function jitRejectionMessage(): string
     {
-        return 'spl_autoload_register() callback must be a compile-time string function name in this compiler build; '
-            .self::DEFERRED_KINDS.' are deferred (#1776)';
+        return 'spl_autoload_register() callback must be a compile-time function name, Class::method, or closure in this compiler build; '
+            .self::DEFERRED_KINDS.' are deferred (#1776, #4744)';
     }
 
     /**

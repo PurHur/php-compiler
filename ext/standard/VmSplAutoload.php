@@ -6,6 +6,7 @@ namespace PHPCompiler\ext\standard;
 
 use PHPCompiler\Func\PHP as PhpFunc;
 use PHPCompiler\JIT\SplAutoloadCallbackPolicy;
+use PHPCompiler\VM\ClosureState;
 use PHPCompiler\VM\Context;
 use PHPCompiler\VM\EnumCaseSupport;
 use PHPCompiler\VM\ObjectEntry;
@@ -68,12 +69,18 @@ final class VmSplAutoload
 
             return self::bindFunction($ctx, $name);
         }
+        if (Variable::TYPE_OBJECT === $callback->type) {
+            if (VmClosureCall::isClosure($callback)) {
+                return new SplAutoloadClosureRunner(VmClosureCall::resolve($callback));
+            }
+
+            throw new \TypeError(SplAutoloadCallbackPolicy::invalidCallbackTypeError());
+        }
         if (Variable::TYPE_ARRAY === $callback->type) {
             return self::bindArrayCallable($ctx, $callback);
         }
-        throw new \LogicException(
-            'spl_autoload_register() callback must be a string or array callable in this compiler build'
-        );
+
+        throw new \TypeError(SplAutoloadCallbackPolicy::invalidCallbackTypeError());
     }
 
     private static function bindFunction(Context $ctx, string $name): SplAutoloadRunner
@@ -101,8 +108,8 @@ final class VmSplAutoload
         if (!$table->keyExists($idx0) || !$table->keyExists($idx1)) {
             throw new \LogicException('spl_autoload_register() array callback must have two elements');
         }
-        $target = $table->findVariable($idx0)->resolveIndirect();
-        $methodName = $table->findVariable($idx1)->resolveIndirect();
+        $target = $table->findVariable($idx0, false)->resolveIndirect();
+        $methodName = $table->findVariable($idx1, false)->resolveIndirect();
         if (Variable::TYPE_STRING !== $methodName->type) {
             throw new \LogicException('spl_autoload_register() method name must be a string');
         }
@@ -166,6 +173,20 @@ final class SplAutoloadFunctionRunner implements SplAutoloadRunner
         $arg = new Variable();
         $arg->string($className);
         $ctx->runtime->vm->invokePhpFunction($this->func, $arg);
+    }
+}
+
+final class SplAutoloadClosureRunner implements SplAutoloadRunner
+{
+    public function __construct(private ClosureState $closure)
+    {
+    }
+
+    public function run(Context $ctx, string $className): void
+    {
+        $arg = new Variable();
+        $arg->string($className);
+        VmClosureCall::invokeOne($ctx, $this->closure, $arg);
     }
 }
 

@@ -5,6 +5,8 @@ declare(strict_types=1);
 namespace PHPCompiler\ext\standard;
 
 use PHPCompiler\JIT\Builtin\SplAutoloadOutput;
+use PHPCompiler\JIT\Call;
+use PHPCompiler\JIT\Call\ClosureWithCaptures;
 use PHPCompiler\JIT\Call\ExternalMethod;
 use PHPCompiler\JIT\Call\Native;
 use PHPCompiler\JIT\Context;
@@ -14,7 +16,7 @@ use PHPCompiler\JIT\SplAutoloadCallbackPolicy;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Value;
 
-/** LLVM lowering helpers for spl_autoload_register() (#1776, #2441, #5300). */
+/** LLVM lowering helpers for spl_autoload_register() (#1776, #2441, #5300, #4744). */
 final class JitSplAutoload
 {
     /** @var array<string, Value> per-module autoload shims */
@@ -26,6 +28,32 @@ final class JitSplAutoload
         ?JITVariable $prependArg
     ): Value {
         SplAutoloadOutput::ensureLinked($context);
+
+        if (null !== $callback->closureCall) {
+            $shimFn = self::closureAutoloadShim($context, $callback->closureCall);
+
+            return self::applyRegister($context, $shimFn, $prependArg);
+        }
+
+        $staticName = SplAutoloadCallbackPolicy::compileTimeStaticMethodName($callback);
+        if (null !== $staticName) {
+            [$className, $methodName] = explode('::', $staticName, 2);
+            $proxyName = strtolower($className.'::'.$methodName);
+            if (!$context->functionIsRegistered($proxyName)) {
+                throw new \LogicException(
+                    "spl_autoload_register() callback '{$staticName}' is not a defined static method in this compile unit"
+                );
+            }
+            $proxy = $context->resolveFunctionProxy($proxyName);
+            if (!($proxy instanceof Native)) {
+                throw new \LogicException(
+                    "spl_autoload_register() callback '{$staticName}' must be a user-defined static method in this compile unit"
+                );
+            }
+            $shimFn = self::autoloadShim($context, $proxy, $staticName);
+
+            return self::applyRegister($context, $shimFn, $prependArg);
+        }
 
         $name = $callback->compileTimeString ?? null;
         if (null === $name) {
@@ -42,30 +70,9 @@ final class JitSplAutoload
                 "spl_autoload_register() callback '{$name}' must be a user-defined function in this compile unit"
             );
         }
-
-        $i32 = $context->getTypeFromString('int32');
-        $prepend = $i32->constInt(0, false);
-        if (null !== $prependArg) {
-            if (JITVariable::TYPE_NATIVE_BOOL === $prependArg->type) {
-                $prepend = $context->builder->zext($prependArg->nativeValue, $i32);
-            } else {
-                $prepend = JitLongArg::lower($context, $prependArg, 'spl_autoload_register() prepend flag');
-            }
-        }
-
-        $i8p = $context->getTypeFromString('int8*');
         $shimFn = self::autoloadShim($context, $proxy, $name);
-        $fnPtr = $context->builder->pointerCast($shimFn, $i8p);
-        $context->builder->call(
-            $context->lookupFunction('__phpc_spl_autoload_register_apply'),
-            $fnPtr,
-            $prepend
-        );
 
-        $slot = JitValueBox::alloc($context);
-        JitValueBox::writeBool($context, $slot, $context->getTypeFromString('int1')->constInt(1, false));
-
-        return JitValueBox::pointer($context, $slot);
+        return self::applyRegister($context, $shimFn, $prependArg);
     }
 
     public static function dispatchLiteral(Context $context, string $className): void
@@ -81,6 +88,35 @@ final class JitSplAutoload
             $namePtr,
             $nameLen
         );
+    }
+
+    private static function applyRegister(
+        Context $context,
+        Value $shimFn,
+        ?JITVariable $prependArg
+    ): Value {
+        $i32 = $context->getTypeFromString('int32');
+        $prepend = $i32->constInt(0, false);
+        if (null !== $prependArg) {
+            if (JITVariable::TYPE_NATIVE_BOOL === $prependArg->type) {
+                $prepend = $context->builder->zext($prependArg->nativeValue, $i32);
+            } else {
+                $prepend = JitLongArg::lower($context, $prependArg, 'spl_autoload_register() prepend flag');
+            }
+        }
+
+        $i8p = $context->getTypeFromString('int8*');
+        $fnPtr = $context->builder->pointerCast($shimFn, $i8p);
+        $context->builder->call(
+            $context->lookupFunction('__phpc_spl_autoload_register_apply'),
+            $fnPtr,
+            $prepend
+        );
+
+        $slot = JitValueBox::alloc($context);
+        JitValueBox::writeBool($context, $slot, $context->getTypeFromString('int1')->constInt(1, false));
+
+        return JitValueBox::pointer($context, $slot);
     }
 
     private static function autoloadShim(
@@ -125,5 +161,66 @@ final class JitSplAutoload
         self::$autoloadShims[$cacheKey] = $shimFn;
 
         return $shimFn;
+    }
+
+    private static function closureAutoloadShim(Context $context, Call $call): Value
+    {
+        $native = self::unwrapNative($call);
+        $captures = $call instanceof ClosureWithCaptures ? $call->captureVariables() : [];
+        $moduleKey = spl_object_hash($context->module);
+        $cacheKey = $moduleKey.'::spl::closure::'.$native->name;
+        if (isset(self::$autoloadShims[$cacheKey])) {
+            return self::$autoloadShims[$cacheKey];
+        }
+
+        $i32 = $context->getTypeFromString('int32');
+        $i8p = $context->getTypeFromString('int8*');
+        $sizeT = $context->getTypeFromString('size_t');
+        $cbFnTy = $context->context->functionType($i32, false, $i8p, $sizeT);
+
+        $safe = preg_replace('/[^a-zA-Z0-9_]/', '_', $native->name) ?: 'closure';
+        $shimName = '__spl_autoload_closure_shim_'.$safe;
+        $shimFn = $context->module->addFunction($shimName, $cbFnTy);
+        $context->registerFunction($shimName, $shimFn);
+
+        $resumeBlock = $context->builder->getInsertBlock();
+        $entry = $shimFn->appendBasicBlock('entry');
+        $context->builder->positionAtEnd($entry);
+
+        $classPtr = $shimFn->getParam(0);
+        $classLen = $shimFn->getParam(1);
+        $i64 = $context->getTypeFromString('int64');
+
+        $classStr = $context->builder->call(
+            $context->lookupFunction('__string__init'),
+            $context->builder->trunc($classLen, $i64),
+            $classPtr
+        );
+
+        $llvmArgs = [$classStr];
+        foreach ($captures as $capture) {
+            $llvmArgs[] = $context->helper->loadValue($capture);
+        }
+        $context->builder->call($native->function, ...$llvmArgs);
+        $context->builder->returnValue($i32->constInt(1, false));
+        $context->builder->positionAtEnd($resumeBlock);
+
+        self::$autoloadShims[$cacheKey] = $shimFn;
+
+        return $shimFn;
+    }
+
+    private static function unwrapNative(Call $call): Native
+    {
+        if ($call instanceof Native) {
+            return $call;
+        }
+        if ($call instanceof ClosureWithCaptures) {
+            return $call->innerNative();
+        }
+
+        throw new \LogicException(
+            'spl_autoload_register() closure callback must be a closure in this compiler build'
+        );
     }
 }

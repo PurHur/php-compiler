@@ -22,6 +22,10 @@ final class SplAutoloadRegisterJITTest extends BaseTest
             __DIR__.'/cases/stdlib/spl_autoload_register_jit.phpt',
             'spl_autoload_register_jit.phpt'
         );
+        yield 'spl_autoload_register_closure_jit.phpt' => self::parsePHPT(
+            __DIR__.'/cases/stdlib/spl_autoload_register_closure_jit.phpt',
+            'spl_autoload_register_closure_jit.phpt'
+        );
     }
 
     public function setUp(): void

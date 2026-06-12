@@ -29,6 +29,30 @@ PHP;
         }
     }
 
+    public function testClosureCallbackLoadsClassOnNew(): void
+    {
+        $code = <<<'PHP'
+<?php
+spl_autoload_register(function (string $class): void {
+    if ('Demo' === $class) {
+        class Demo
+        {
+            public function id(): int
+            {
+                return 7;
+            }
+        }
+    }
+});
+echo (new Demo())->id();
+PHP;
+        $runtime = new Runtime();
+        $block = $runtime->parseAndCompile($code, 'test.php');
+        ob_start();
+        $runtime->run($block);
+        $this->assertSame('7', ob_get_clean());
+    }
+
     public function testRegistersCallbackAndLoadsClassOnNew(): void
     {
         $code = <<<'PHP'
