@@ -14,6 +14,8 @@ final class FilterConstants
     /** @var array<string, int> lowercase filter name => id */
     public const NAME_TO_ID = [
         'validate_int' => VmFilter::FILTER_VALIDATE_INT,
+        'validate_boolean' => VmFilter::FILTER_VALIDATE_BOOLEAN,
+        'validate_float' => VmFilter::FILTER_VALIDATE_FLOAT,
         'validate_regexp' => VmFilter::FILTER_VALIDATE_REGEXP,
         'validate_email' => VmFilter::FILTER_VALIDATE_EMAIL,
     ];

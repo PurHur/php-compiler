@@ -14,7 +14,7 @@ use PHPCompiler\VM\Variable;
 use PHPLLVM\Builder;
 use PHPLLVM\Value;
 
-/** filter_var() subset — FILTER_VALIDATE_INT, FILTER_VALIDATE_REGEXP, FILTER_VALIDATE_EMAIL (#104, #5020, #6028). */
+/** filter_var() subset — FILTER_VALIDATE_INT/BOOLEAN/FLOAT/REGEXP/EMAIL (#104, #4742, #5020, #6028). */
 final class filter_var extends Internal
 {
     public function execute(Frame $frame): void
@@ -91,6 +91,16 @@ final class filter_var extends Internal
             $filterVal,
             $i64->constInt(VmFilter::FILTER_VALIDATE_INT, false)
         );
+        $isBool = $context->builder->icmp(
+            Builder::INT_EQ,
+            $filterVal,
+            $i64->constInt(VmFilter::FILTER_VALIDATE_BOOLEAN, false)
+        );
+        $isFloat = $context->builder->icmp(
+            Builder::INT_EQ,
+            $filterVal,
+            $i64->constInt(VmFilter::FILTER_VALIDATE_FLOAT, false)
+        );
         $isEmail = $context->builder->icmp(
             Builder::INT_EQ,
             $filterVal,
@@ -99,6 +109,10 @@ final class filter_var extends Internal
 
         $intBlock = BasicBlockHelper::append($context, 'filter_var_int');
         $otherBlock = BasicBlockHelper::append($context, 'filter_var_other');
+        $boolBlock = BasicBlockHelper::append($context, 'filter_var_bool');
+        $boolOtherBlock = BasicBlockHelper::append($context, 'filter_var_bool_other');
+        $floatBlock = BasicBlockHelper::append($context, 'filter_var_float');
+        $floatOtherBlock = BasicBlockHelper::append($context, 'filter_var_float_other');
         $emailBlock = BasicBlockHelper::append($context, 'filter_var_email');
         $failBlock = BasicBlockHelper::append($context, 'filter_var_fail');
         $doneBlock = BasicBlockHelper::append($context, 'filter_var_done');
@@ -113,6 +127,28 @@ final class filter_var extends Internal
         $context->builder->branch($doneBlock);
 
         $context->builder->positionAtEnd($otherBlock);
+        $context->builder->branchIf($isBool, $boolBlock, $boolOtherBlock);
+
+        $context->builder->positionAtEnd($boolBlock);
+        $boolResult = JitFilter::validateBoolean($context, $value);
+        if (null !== $optionsArg && JITVariable::TYPE_NULL !== $optionsArg->type) {
+            $boolResult = JitFilter::applyNullOnFailure($context, $boolResult, $nullOnFailure);
+        }
+        $boolTail = $context->builder->getInsertBlock();
+        $context->builder->branch($doneBlock);
+
+        $context->builder->positionAtEnd($boolOtherBlock);
+        $context->builder->branchIf($isFloat, $floatBlock, $floatOtherBlock);
+
+        $context->builder->positionAtEnd($floatBlock);
+        $floatResult = JitFilter::validateFloat($context, $value);
+        if (null !== $optionsArg && JITVariable::TYPE_NULL !== $optionsArg->type) {
+            $floatResult = JitFilter::applyNullOnFailure($context, $floatResult, $nullOnFailure);
+        }
+        $floatTail = $context->builder->getInsertBlock();
+        $context->builder->branch($doneBlock);
+
+        $context->builder->positionAtEnd($floatOtherBlock);
         $context->builder->branchIf($isEmail, $emailBlock, $failBlock);
 
         $context->builder->positionAtEnd($emailBlock);
@@ -131,6 +167,8 @@ final class filter_var extends Internal
         $context->builder->positionAtEnd($doneBlock);
         $phi = $context->builder->phi($intResult->typeOf());
         $phi->addIncoming($intResult, $intTail);
+        $phi->addIncoming($boolResult, $boolTail);
+        $phi->addIncoming($floatResult, $floatTail);
         $phi->addIncoming($emailResult, $emailTail);
         $phi->addIncoming($falseResult, $failTail);
 
@@ -151,6 +189,9 @@ final class filter_var extends Internal
                 break;
             case Variable::TYPE_BOOLEAN:
                 $frame->returnVar->bool($result->toBool());
+                break;
+            case Variable::TYPE_FLOAT:
+                $frame->returnVar->float($result->toFloat());
                 break;
             case Variable::TYPE_NULL:
                 $frame->returnVar->null();
