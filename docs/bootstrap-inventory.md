@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 2446 |
-| Phase A inventory files (M2 ratio SSOT) | 2446 |
+| PHP files on vm.php path | 2447 |
+| Phase A inventory files (M2 ratio SSOT) | 2447 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 6629 |
+| Source constructs flagged (warnings) | 6630 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -164,6 +164,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/mbstring/mb_trim.php` | 0 | 1 |
 | `ext/msgpack/Module.php` | 0 | 3 |
 | `ext/msgpack/MsgpackFunction.php` | 0 | 3 |
+| `ext/openssl/JitOpensslCipherIvLength.php` | 0 | 1 |
 | `ext/openssl/JitOpensslCipherKeyLength.php` | 0 | 1 |
 | `ext/openssl/Module.php` | 0 | 11 |
 | `ext/openssl/OpensslCipherRegistry.php` | 0 | 1 |
@@ -3339,6 +3340,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new Error (line 27)
 - 2 class method(s)
 
+### `ext/openssl/JitOpensslCipherIvLength.php`
+
+**Warnings** (review for bootstrap subset):
+- 1 class method(s)
+
 ### `ext/openssl/JitOpensslCipherKeyLength.php`
 
 **Warnings** (review for bootstrap subset):
@@ -3379,7 +3385,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/openssl/openssl_cipher_iv_length.php`
 
 **Warnings** (review for bootstrap subset):
-- new ArgumentCountError (line 28)
+- new ArgumentCountError (line 32)
 - 2 class method(s)
 
 ### `ext/openssl/openssl_cipher_key_length.php`
@@ -18315,7 +18321,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 
 **Warnings** (review for bootstrap subset):
 - new Variable (line 45)
-- new Variable (line 147)
+- new Variable (line 155)
 - 16 class method(s)
 
 ### `lib/Visitor/ExitFunctionResolver.php`
