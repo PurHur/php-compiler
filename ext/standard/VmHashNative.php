@@ -33,7 +33,13 @@ final class VmHashNative
         if (0 === $id) {
             return false;
         }
+        if ((9 === $id || 10 === $id) && !VmHashXxh::available()) {
+            return false;
+        }
         $digest = self::digest($id, $data);
+        if (null === $digest) {
+            return false;
+        }
 
         return self::resultString($id, $digest, $raw);
     }
@@ -135,7 +141,7 @@ final class VmHashNative
         return $hex;
     }
 
-    /** 0 unknown, 1 sha256, 2 sha1, 3 md5, 4 crc32b, 5 crc32, 6 adler32, 7 fnv132, 8 fnv1a32 */
+    /** 0 unknown, 1 sha256, 2 sha1, 3 md5, 4 crc32b, 5 crc32, 6 adler32, 7 fnv132, 8 fnv1a32, 9 xxh3, 10 xxh128 */
     private static function algoId(string $algo): int
     {
         if (self::eqCi($algo, 'sha256')) {
@@ -161,6 +167,12 @@ final class VmHashNative
         }
         if (self::eqCi($algo, 'fnv1a32')) {
             return 8;
+        }
+        if (self::eqCi($algo, 'xxh3')) {
+            return 9;
+        }
+        if (self::eqCi($algo, 'xxh128')) {
+            return 10;
         }
 
         return 0;
@@ -240,6 +252,12 @@ final class VmHashNative
 
     private static function digestLen(int $algo): int
     {
+        if (10 === $algo) {
+            return 16;
+        }
+        if (9 === $algo) {
+            return 8;
+        }
         if ($algo >= 4 && $algo <= 8) {
             return 4;
         }
@@ -276,8 +294,8 @@ final class VmHashNative
         return self::hexEncode($bin);
     }
 
-    /** @return list<int> */
-    private static function digest(int $algo, string $data): array
+    /** @return list<int>|null */
+    private static function digest(int $algo, string $data): ?array
     {
         if (1 === $algo) {
             return self::sha256($data);
@@ -302,6 +320,12 @@ final class VmHashNative
         }
         if (8 === $algo) {
             return VmHashNonCrypto::digestBytes(VmHashNonCrypto::fnv1a32($data));
+        }
+        if (9 === $algo) {
+            return VmHashXxh::xxh3DigestBytes($data);
+        }
+        if (10 === $algo) {
+            return VmHashXxh::xxh128DigestBytes($data);
         }
 
         return self::md5($data);
