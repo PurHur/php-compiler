@@ -24,8 +24,72 @@ final class VmGrapheme
         return self::strContainsUtf8($haystack, $needle);
     }
 
+    /**
+     * grapheme_strstr() — grapheme-cluster strstr (php-src ext/intl/grapheme; #7221).
+     *
+     * @return string|false
+     */
+    public static function strstr(string $haystack, string $needle, bool $beforeNeedle = false): string|false
+    {
+        if ('' === $needle) {
+            return $beforeNeedle ? '' : $haystack;
+        }
+
+        return self::strstrUtf8($haystack, $needle, $beforeNeedle, false);
+    }
+
+    /**
+     * grapheme_stristr() — case-insensitive grapheme strstr (php-src ext/intl/grapheme; #7221).
+     *
+     * @return string|false
+     */
+    public static function stristr(string $haystack, string $needle, bool $beforeNeedle = false): string|false
+    {
+        if ('' === $needle) {
+            return $beforeNeedle ? '' : $haystack;
+        }
+
+        return self::strstrUtf8($haystack, $needle, $beforeNeedle, true);
+    }
+
     private static function strContainsUtf8(string $haystack, string $needle): bool
     {
+        return false !== self::findGraphemeSubsequence($haystack, $needle, false);
+    }
+
+    /**
+     * @return string|false
+     */
+    private static function strstrUtf8(
+        string $haystack,
+        string $needle,
+        bool $beforeNeedle,
+        bool $caseInsensitive
+    ): string|false {
+        $matchIndex = self::findGraphemeSubsequence($haystack, $needle, $caseInsensitive);
+        if (false === $matchIndex) {
+            return false;
+        }
+        $hay = self::splitGraphemes($haystack);
+        if (null === $hay) {
+            return false;
+        }
+        $byteOffset = self::graphemeByteOffset($hay, $matchIndex);
+        if ($beforeNeedle) {
+            return \substr($haystack, 0, $byteOffset);
+        }
+
+        return \substr($haystack, $byteOffset);
+    }
+
+    /**
+     * @return int|false grapheme index of first match, or false
+     */
+    private static function findGraphemeSubsequence(
+        string $haystack,
+        string $needle,
+        bool $caseInsensitive
+    ): int|false {
         $hay = self::splitGraphemes($haystack);
         if (null === $hay) {
             return false;
@@ -37,22 +101,40 @@ final class VmGrapheme
         $hayLen = \count($hay);
         $needLen = \count($need);
         if (0 === $needLen) {
-            return true;
+            return 0;
         }
         for ($i = 0; $i <= $hayLen - $needLen; ++$i) {
             $matched = true;
             for ($j = 0; $j < $needLen; ++$j) {
-                if ($hay[$i + $j] !== $need[$j]) {
+                if ($caseInsensitive) {
+                    if (!self::graphemesEqualInsensitive($hay[$i + $j], $need[$j])) {
+                        $matched = false;
+                        break;
+                    }
+                } elseif ($hay[$i + $j] !== $need[$j]) {
                     $matched = false;
                     break;
                 }
             }
             if ($matched) {
-                return true;
+                return $i;
             }
         }
 
         return false;
+    }
+
+    /**
+     * @param list<string> $graphemes
+     */
+    private static function graphemeByteOffset(array $graphemes, int $index): int
+    {
+        $offset = 0;
+        for ($i = 0; $i < $index; ++$i) {
+            $offset += \strlen($graphemes[$i]);
+        }
+
+        return $offset;
     }
 
     /**
@@ -215,6 +297,16 @@ final class VmGrapheme
         }
 
         return UnicodeCanonical::graphemeCanonicalKey($left) === UnicodeCanonical::graphemeCanonicalKey($right);
+    }
+
+    private static function graphemesEqualInsensitive(string $left, string $right): bool
+    {
+        if ($left === $right) {
+            return true;
+        }
+
+        return UnicodeCanonical::graphemeCaseInsensitiveKey($left)
+            === UnicodeCanonical::graphemeCaseInsensitiveKey($right);
     }
 
     /**
