@@ -7,18 +7,15 @@ namespace PHPCompiler;
 use PHPCompiler\ext\sockets\VmSockets;
 use PHPUnit\Framework\TestCase;
 
-/** VmSockets libc sockatmark FFI without host socket_atmark() preference (#7998, #6544). */
+/** VmSockets libc sockatmark FFI without host socket_atmark() delegation (#7998, #8176, #6544). */
 final class VmSocketsRuntimeShrinkTest extends TestCase
 {
-    public function testAtmarkPrefersLibcFfiBeforeHostDelegation(): void
+    public function testAtmarkUsesLibcFfiOnlyWithoutHostDelegation(): void
     {
         $source = (string) file_get_contents(__DIR__.'/../../ext/sockets/VmSockets.php');
         $this->assertStringContainsString('sockatmark', $source);
-        $posFfi = strpos($source, '$ffi->sockatmark');
-        $posHost = strpos($source, '\\socket_atmark(');
-        $this->assertNotFalse($posFfi);
-        $this->assertNotFalse($posHost);
-        $this->assertLessThan($posHost, $posFfi, 'libc sockatmark must run before host socket_atmark fallback');
+        $this->assertStringNotContainsString('function_exists(', $source);
+        $this->assertStringNotContainsString('\\socket_atmark(', $source);
     }
 
     public function testSocketAtmarkBuiltinUsesBuiltinExecute(): void

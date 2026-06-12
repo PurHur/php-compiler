@@ -15,7 +15,7 @@ use PHPLLVM\Value;
 /**
  * socket_atmark() — TCP urgent-data mark probe (php-src ext/sockets/sockets.c; #6544).
  *
- * VM uses libc sockatmark(3) via {@see VmSockets} FFI; host fallback only when FFI unavailable (#7998).
+ * VM uses libc sockatmark(3) via {@see VmSockets} FFI only — no host delegation (#7998, #8176).
  *
  * @see https://github.com/php/php-src/blob/master/ext/sockets/sockets.c PHP_FUNCTION(socket_atmark)
  */
