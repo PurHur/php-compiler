@@ -26,6 +26,6 @@ final class filter_list extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        throw new \LogicException('filter_list() is not JIT-lowered in this compiler build');
+        return JitFilterList::invoke($context);
     }
 }
