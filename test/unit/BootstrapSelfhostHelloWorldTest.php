@@ -470,6 +470,24 @@ final class BootstrapSelfhostHelloWorldTest extends TestCase
         $this->assertStringNotContainsString('PHP_COMPILER_M3_COMPILER_UNIT_PROBE_EMIT', $jit);
     }
 
+    /** Issue #1492: M3 spine must lower prepareSourceForParser deps before parse is queued. */
+    public function testM3EmitSpineLowersPrepareChainBeforeParseQueue(): void
+    {
+        $jit = (string) file_get_contents(self::$root.'/lib/JIT.php');
+        $this->assertStringContainsString("'preprocesssourceforparse'", $jit);
+        $this->assertStringContainsString("'rewritesourcebeforeparser'", $jit);
+        $this->assertStringContainsString("'preparesourceforparser'", $jit);
+        $this->assertMatchesRegularExpression(
+            '/compileM3EmitTuRuntimeSpineDecls\(\$this->m3CompileDriverMainBlock\);\s+'
+            .'\$sidecar = \$this->isM3EmitTuTrivialEchoSidecarActive\(\);/s',
+            $jit
+        );
+        $allowlist = (string) file_get_contents(self::$root.'/script/m3-allowlist-snapshot.txt');
+        $this->assertStringContainsString('allow:\\runtime::preprocesssourceforparse', $allowlist);
+        $this->assertStringContainsString('allow:\\runtime::rewritesourcebeforeparser', $allowlist);
+        $this->assertStringContainsString('allow:\\runtime::preparesourceforparser', $allowlist);
+    }
+
     /** Issue #2843: inventory compile_driver links without *_m3_emit_native_entry.php. */
     public function testInventoryCompileDriverLinksWithRealLowering(): void
     {
