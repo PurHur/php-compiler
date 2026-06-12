@@ -14,7 +14,6 @@ namespace PHPCompiler\ext\standard;
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Context;
-use PHPCompiler\JIT\JitLongArg;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\Variable;
 use PHPLLVM\Builder;
@@ -39,12 +38,8 @@ final class is_infinite extends Internal
 
             return;
         }
-        if (Variable::TYPE_FLOAT === $v->type) {
-            $frame->returnVar->bool(\is_infinite($v->toFloat()));
-
-            return;
-        }
-        throw new \LogicException('is_infinite() only supports integers and floats in this compiler build');
+        $num = VmMath::parseDoubleBuiltinArg($v, 'is_infinite', 1, 'num');
+        $frame->returnVar->bool(\is_infinite($num));
     }
 
     public Context $context;
@@ -58,10 +53,7 @@ final class is_infinite extends Internal
         if (JITVariable::TYPE_NATIVE_LONG === $args[0]->type) {
             return $context->constantFromBool(false);
         }
-        if (JITVariable::TYPE_NATIVE_DOUBLE !== $args[0]->type) {
-            throw new \LogicException('is_infinite() only supports integers and floats in this compiler build');
-        }
-        $asFloat = JitLongArg::lower($context, $args[0], 'is_infinite() argument #1');
+        $asFloat = JitFdiv::lowerSingleOperand($context, $args[0], 1, 'num', 'is_infinite', 'float');
         $fn = $context->lookupFunction('isinf');
         $raw = $context->builder->call($fn, $asFloat);
         $zero = $raw->typeOf()->constInt(0, false);
