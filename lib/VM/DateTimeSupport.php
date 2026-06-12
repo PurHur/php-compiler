@@ -154,23 +154,43 @@ final class DateTimeSupport
     }
 
     /** php-src zim_DateTimeZone_getOffset — DateTimeInterface operand (#7131). */
-    public static function requireDateTimeInterface(Variable $var, string $label, Context $ctx): ObjectEntry
-    {
+    public static function requireDateTimeInterface(
+        Variable $var,
+        string $label,
+        Context $ctx,
+        ?int $argNum = null,
+        ?string $argName = null
+    ): ObjectEntry {
         $var = $var->resolveIndirect();
         if (Variable::TYPE_OBJECT !== $var->type) {
-            throw new \TypeError(
-                "{$label} must be of type DateTimeInterface, "
-                .ReflectionSupport::valueTypeLabelPublic($var).' given'
-            );
+            throw self::dateTimeInterfaceTypeError($label, $argNum, $argName, $var);
         }
         $obj = $var->toObject();
         if (InterfaceCheck::entryIsInstanceOf($obj->class, self::CLASS_DATETIMEINTERFACE, $ctx)) {
             return $obj;
         }
-        throw new \TypeError(
-            "{$label} must be of type DateTimeInterface, "
-            .$obj->class->name.' given'
-        );
+        throw self::dateTimeInterfaceTypeError($label, $argNum, $argName, $var, $obj->class->name);
+    }
+
+    private static function dateTimeInterfaceTypeError(
+        string $label,
+        ?int $argNum,
+        ?string $argName,
+        Variable $var,
+        ?string $objectClass = null
+    ): \TypeError {
+        $given = null !== $objectClass
+            ? $objectClass
+            : ReflectionSupport::valueTypeLabelPublic($var);
+        if (null !== $argNum) {
+            $param = null !== $argName ? " (\${$argName})" : '';
+
+            return new \TypeError(
+                "{$label}: Argument #{$argNum}{$param} must be of type DateTimeInterface, {$given} given"
+            );
+        }
+
+        return new \TypeError("{$label} must be of type DateTimeInterface, {$given} given");
     }
 
     /** php-src zim_DateTimeZone_getOffset (#7131). */
@@ -466,6 +486,52 @@ final class DateTimeSupport
         }
         $immutable = new ObjectEntry($class);
         self::copyDateTimeState($mutable, $immutable);
+        $immutable->constructed = true;
+        self::markDateTimeLikeInitialized($immutable);
+
+        return $immutable;
+    }
+
+    /** php-src zim_DateTime_createFromInterface — clone DateTimeInterface to mutable (#5936). */
+    public static function createDateTimeFromInterface(Variable $objectArg, Context $ctx): ObjectEntry
+    {
+        $source = self::requireDateTimeInterface(
+            $objectArg,
+            'DateTime::createFromInterface()',
+            $ctx,
+            1,
+            'object'
+        );
+        self::requireInitializedDateTimeLike($source, self::classLabel($source));
+        $class = $ctx->classes[self::CLASS_DATETIME] ?? null;
+        if (null === $class) {
+            throw new \LogicException('DateTime is not registered in this compiler build');
+        }
+        $mutable = new ObjectEntry($class);
+        self::copyDateTimeState($source, $mutable);
+        $mutable->constructed = true;
+        self::markDateTimeLikeInitialized($mutable);
+
+        return $mutable;
+    }
+
+    /** php-src zim_DateTimeImmutable_createFromInterface — clone DateTimeInterface to immutable (#5936). */
+    public static function createDateTimeImmutableFromInterface(Variable $objectArg, Context $ctx): ObjectEntry
+    {
+        $source = self::requireDateTimeInterface(
+            $objectArg,
+            'DateTimeImmutable::createFromInterface()',
+            $ctx,
+            1,
+            'object'
+        );
+        self::requireInitializedDateTimeLike($source, self::classLabel($source));
+        $class = $ctx->classes[self::CLASS_DATETIMEIMMUTABLE] ?? null;
+        if (null === $class) {
+            throw new \LogicException('DateTimeImmutable is not registered in this compiler build');
+        }
+        $immutable = new ObjectEntry($class);
+        self::copyDateTimeState($source, $immutable);
         $immutable->constructed = true;
         self::markDateTimeLikeInitialized($immutable);
 
