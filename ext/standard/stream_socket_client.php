@@ -12,10 +12,10 @@ use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
 
 /**
- * stream_socket_client() — VM host socket connect (php-src streamsfuncs.c, #6815, #3202).
+ * stream_socket_client() — libc TCP/UDP client via {@see VmStreamSocketNative} (#8097, #6815, #3202).
  *
- * Resolves {@see VmStreamContext} via {@see VmStreamContext::toHostResource()} only; never
- * passes VM array buckets to the host stream API.
+ * Stream context socket options are read from the VM representation; routed through
+ * {@see VmStreamSocketNative} (no host Zend stream wrapper delegation).
  */
 final class stream_socket_client extends Internal
 {
@@ -47,7 +47,7 @@ final class stream_socket_client extends Internal
         $errstr = '';
         $timeout = 60.0;
         $flags = \STREAM_CLIENT_CONNECT;
-        $hostContext = null;
+        $contextVar = $argc >= 6 ? $frame->calledArgs[5] : null;
 
         if ($argc >= 4) {
             $timeoutVar = $frame->calledArgs[3]->resolveIndirect();
@@ -75,24 +75,22 @@ final class stream_socket_client extends Internal
         }
 
         if ($argc >= 6) {
-            $hostContext = VmStreamContext::toHostResource($frame->calledArgs[5]);
-            if (null === $hostContext) {
-                $ctxVar = $frame->calledArgs[5]->resolveIndirect();
-                if (Variable::TYPE_NULL !== $ctxVar->type) {
-                    throw new \LogicException(
-                        'stream_socket_client() context must be a stream context resource in this compiler build'
-                    );
-                }
+            $ctxVar = $frame->calledArgs[5]->resolveIndirect();
+            if (Variable::TYPE_NULL !== $ctxVar->type && !VmStreamContext::isRepresentation($ctxVar)) {
+                throw new \LogicException(
+                    'stream_socket_client() context must be a stream context resource in this compiler build'
+                );
+            }
+            if (Variable::TYPE_NULL === $ctxVar->type) {
+                $contextVar = null;
             }
         }
 
-        $result = @\stream_socket_client(
+        [$result, $errno, $errstr] = VmStreamSocketNative::client(
             $remote,
-            $errno,
-            $errstr,
             $timeout,
             $flags,
-            $hostContext
+            $contextVar
         );
 
         if ($argc >= 2) {
