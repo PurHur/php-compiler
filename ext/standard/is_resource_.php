@@ -73,6 +73,11 @@ final class is_resource_ extends Internal
         if ($v->isStreamFilterResource()) {
             return VmStreamFilterChain::isValidFilter($v->toInt());
         }
+        if ($v->isProcessResource()) {
+            $handle = \PHPCompiler\VM\ResourceSupport::resolveHandle($v);
+
+            return null !== $handle && VmProcess::isValidHandle($handle);
+        }
 
         return false;
     }

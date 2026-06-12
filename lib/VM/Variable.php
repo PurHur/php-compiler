@@ -104,6 +104,9 @@ final class Variable {
     /** stream_filter_append/prepend() filter resource (#3283). */
     public bool $streamFilterResource = false;
 
+    /** proc_open() process handle (#3131). */
+    public bool $procResource = false;
+
     /** Lvalue proxy for __set dispatch when the property slot does not exist (#146). */
     public ?ObjectEntry $magicSetTarget = null;
 
@@ -206,6 +209,7 @@ final class Variable {
         $this->brigadeResource = false;
         $this->bucketResource = false;
         $this->streamFilterResource = false;
+        $this->procResource = false;
         $this->array = $ht;
         MemoryAccounting::noteBytes(MemoryAccounting::estimateArrayBytesForTable($ht));
     }
@@ -251,6 +255,7 @@ final class Variable {
         $this->brigadeResource = false;
         $this->bucketResource = false;
         $this->streamFilterResource = false;
+        $this->procResource = false;
     }
 
     public function streamHandle(int $value, ?Context $ctx = null): void
@@ -328,6 +333,21 @@ final class Variable {
         $this->legacyStreamFilterHandle($value);
     }
 
+    public function processHandle(int $value, ?Context $ctx = null): void
+    {
+        if ($this->type === self::TYPE_INDIRECT) {
+            $this->indirect->processHandle($value, $ctx);
+
+            return;
+        }
+        if (null !== $ctx) {
+            ResourceSupport::wrap($this, $value, ResourceState::KIND_PROCESS, $ctx);
+
+            return;
+        }
+        $this->legacyProcessHandle($value);
+    }
+
     public function legacyStreamHandle(int $value): void
     {
         $this->int($value);
@@ -336,6 +356,7 @@ final class Variable {
         $this->brigadeResource = false;
         $this->bucketResource = false;
         $this->streamFilterResource = false;
+        $this->procResource = false;
     }
 
     public function legacyDirHandle(int $value): void
@@ -346,6 +367,7 @@ final class Variable {
         $this->brigadeResource = false;
         $this->bucketResource = false;
         $this->streamFilterResource = false;
+        $this->procResource = false;
     }
 
     public function legacyBrigadeHandle(int $value): void
@@ -356,6 +378,7 @@ final class Variable {
         $this->dirResource = false;
         $this->bucketResource = false;
         $this->streamFilterResource = false;
+        $this->procResource = false;
     }
 
     public function legacyBucketHandle(int $value): void
@@ -376,6 +399,18 @@ final class Variable {
         $this->dirResource = false;
         $this->brigadeResource = false;
         $this->bucketResource = false;
+        $this->procResource = false;
+    }
+
+    public function legacyProcessHandle(int $value): void
+    {
+        $this->int($value);
+        $this->procResource = true;
+        $this->streamResource = false;
+        $this->dirResource = false;
+        $this->brigadeResource = false;
+        $this->bucketResource = false;
+        $this->streamFilterResource = false;
     }
 
     public function isStreamResource(): bool
@@ -401,6 +436,11 @@ final class Variable {
     public function isStreamFilterResource(): bool
     {
         return ResourceSupport::isStreamFilterResource($this);
+    }
+
+    public function isProcessResource(): bool
+    {
+        return ResourceSupport::isProcessResource($this);
     }
 
     public function isVmResource(): bool
@@ -870,6 +910,7 @@ final class Variable {
         $this->brigadeResource = false;
         $this->bucketResource = false;
         $this->streamFilterResource = false;
+        $this->procResource = false;
     }
 
     /** Drop emalloc-tracked bytes before replacing or clearing this slot (#7310). */
@@ -1192,6 +1233,7 @@ final class Variable {
                 $this->dirResource = $var->dirResource;
                 $this->brigadeResource = $var->brigadeResource;
                 $this->bucketResource = $var->bucketResource;
+                $this->procResource = $var->procResource;
                 break;
             case self::TYPE_FLOAT:
                 $this->float($var->float);
@@ -1231,6 +1273,7 @@ final class Variable {
                 $this->brigadeResource = false;
                 $this->bucketResource = false;
                 $this->streamFilterResource = false;
+                $this->procResource = false;
                 $this->array = $var->array;
                 $this->objectPropertyOwner = $owner;
                 $this->objectPropertyName = $propName;

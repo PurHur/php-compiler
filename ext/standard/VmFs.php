@@ -1420,6 +1420,21 @@ final class VmFs
         return self::lookup($handle);
     }
 
+    /** Reverse lookup for stream_select() write-back (#3131). */
+    public static function handleForHostResource($resource): ?int
+    {
+        if (!\is_resource($resource)) {
+            return null;
+        }
+        foreach (self::$handles as $id => $fp) {
+            if ($fp === $resource) {
+                return $id;
+            }
+        }
+
+        return null;
+    }
+
     private static function lookup(int $handle): mixed
     {
         return self::$handles[$handle] ?? null;

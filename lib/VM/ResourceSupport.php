@@ -6,6 +6,7 @@ namespace PHPCompiler\VM;
 
 use PHPCompiler\ext\standard\VmDir;
 use PHPCompiler\ext\standard\VmFs;
+use PHPCompiler\ext\standard\VmProcess;
 use PHPCompiler\ext\standard\VmStreamBucket;
 use PHPCompiler\ext\standard\VmStreamFilterChain;
 
@@ -114,13 +115,27 @@ final class ResourceSupport
         return $var->streamFilterResource && Variable::TYPE_INTEGER === $var->type;
     }
 
+    public static function isProcessResource(Variable $var): bool
+    {
+        $state = self::stateFromVariable($var);
+        if (null !== $state) {
+            return ResourceState::KIND_PROCESS === $state->kind
+                && VmProcess::isValidHandle($state->handle);
+        }
+
+        $var = $var->resolveIndirect();
+
+        return $var->procResource && Variable::TYPE_INTEGER === $var->type;
+    }
+
     public static function isVmResource(Variable $var): bool
     {
         return self::isStreamResource($var)
             || self::isDirResource($var)
             || self::isBrigadeResource($var)
             || self::isBucketResource($var)
-            || self::isStreamFilterResource($var);
+            || self::isStreamFilterResource($var)
+            || self::isProcessResource($var);
     }
 
     public static function resolveHandle(Variable $var): ?int
@@ -168,6 +183,9 @@ final class ResourceSupport
 
             return null !== $type ? 'resource ('.$type.')' : 'Resource';
         }
+        if (self::isProcessResource($var)) {
+            return 'resource (process)';
+        }
 
         return null;
     }
@@ -203,6 +221,9 @@ final class ResourceSupport
                 break;
             case ResourceState::KIND_STREAM_FILTER:
                 $var->legacyStreamFilterHandle($handle);
+                break;
+            case ResourceState::KIND_PROCESS:
+                $var->legacyProcessHandle($handle);
                 break;
             default:
                 throw new \LogicException('Unknown VM resource kind: '.$kind);
@@ -254,6 +275,7 @@ final class ResourceSupport
             && self::isDirResource($left) === self::isDirResource($right)
             && self::isBrigadeResource($left) === self::isBrigadeResource($right)
             && self::isBucketResource($left) === self::isBucketResource($right)
-            && self::isStreamFilterResource($left) === self::isStreamFilterResource($right);
+            && self::isStreamFilterResource($left) === self::isStreamFilterResource($right)
+            && self::isProcessResource($left) === self::isProcessResource($right);
     }
 }

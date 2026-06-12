@@ -21,6 +21,8 @@ final class ResourceState
 
     public const KIND_STREAM_FILTER = 'stream filter';
 
+    public const KIND_PROCESS = 'process';
+
     public function __construct(
         public int $handle,
         public string $kind,
