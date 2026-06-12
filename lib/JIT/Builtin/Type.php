@@ -860,6 +860,20 @@ class Type extends Builtin {
             $fntypeAssertFailStr
         );
         $this->context->registerFunction('__compiler_assert_fail_string', $fnAssertFailStr);
+        $valPtr = $this->context->getTypeFromString('__value__*');
+        $fntypeAssertOptions = $this->context->context->functionType(
+            $void,
+            false,
+            $i32,
+            $i64,
+            $valPtr,
+            $valPtr
+        );
+        $fnAssertOptions = $this->context->module->addFunction(
+            '__compiler_assert_options',
+            $fntypeAssertOptions
+        );
+        $this->context->registerFunction('__compiler_assert_options', $fnAssertOptions);
         $i8p = $this->context->getTypeFromString('int8*');
         $i64p = $this->context->getTypeFromString('int64*');
         $libcFns = [
@@ -1224,6 +1238,7 @@ class Type extends Builtin {
         CallArgv::implement($this->context);
         ProgressNoteRuntime::ensureLinked($this->context);
         AssertFail::ensureLinked($this->context);
+        AssertOptionsRuntime::ensureLinked($this->context);
         SessionLifecycleRuntime::ensureLinked($this->context);
         SessionStart::implement($this->context);
         SessionWriteClose::implement($this->context);

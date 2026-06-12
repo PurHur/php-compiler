@@ -657,6 +657,7 @@ class Context {
             ExceptionBridge::ensureStandaloneBodies($this);
             ErrorBridge::ensureStandaloneBodies($this);
             Builtin\AssertFail::ensureStandaloneBodies($this);
+            Builtin\AssertOptionsRuntime::ensureStandaloneBodies($this);
             Builtin\JitReturnPending::ensureStandaloneBodies($this);
             Builtin\CliArgvRuntime::ensureStandaloneBodies($this);
             Builtin\Sscanf::ensureStandaloneBodies($this);

@@ -19,19 +19,29 @@ final class AssertIniRuntime
 
     public const G_ASSERT_EXCEPTION = 'phpc_assert_exception';
 
+    public const G_ASSERT_BAIL = 'phpc_assert_bail';
+
+    public const G_ASSERT_CALLBACK = 'phpc_assert_callback';
+
     public static function ensureGlobals(Context $context): void
     {
         $i32 = $context->getTypeFromString('int32');
+        $i8p = $context->getTypeFromString('int8*');
         $defaults = [
             self::G_ZEND_ASSERTIONS => 1,
             self::G_ASSERT_ACTIVE => 1,
             self::G_ASSERT_EXCEPTION => 1,
+            self::G_ASSERT_BAIL => 0,
         ];
         foreach ($defaults as $name => $value) {
             if (null === $context->module->getNamedGlobal($name)) {
                 $global = $context->module->addGlobal($i32, $name);
                 $global->setInitializer($i32->constInt($value, false));
             }
+        }
+        if (null === $context->module->getNamedGlobal(self::G_ASSERT_CALLBACK)) {
+            $cb = $context->module->addGlobal($i8p, self::G_ASSERT_CALLBACK);
+            $cb->setInitializer($i8p->constNull());
         }
     }
 
@@ -44,6 +54,17 @@ final class AssertIniRuntime
         }
 
         return $context->builder->pointerCast($global, $i32->pointerType(0));
+    }
+
+    public static function callbackGlobalPtr(Context $context): Value
+    {
+        $i8p = $context->getTypeFromString('int8*');
+        $global = $context->module->getNamedGlobal(self::G_ASSERT_CALLBACK);
+        if (null === $global) {
+            throw new \LogicException('Missing assert ini global '.self::G_ASSERT_CALLBACK);
+        }
+
+        return $context->builder->pointerCast($global, $i8p->pointerType(0));
     }
 
     public static function loadAssertionsEnabled(Context $context): Value
