@@ -1182,6 +1182,127 @@ class VM {
         return $result;
     }
 
+    /**
+     * Public properties for plain-object serialize() — get hooks invoked (#6474, zend_property_hooks.c / var.c).
+     *
+     * @return array<string, Variable>
+     */
+    public function collectPublicPropertiesForSerialize(ObjectEntry $object, Frame $frame): array
+    {
+        $ctx = $this->context;
+        $hookFrame = $this->resolvePropertyHookParentFrame($frame);
+        /** @var array<string, Variable> $result */
+        $result = [];
+        /** @var array<string, true> $seenLc */
+        $seenLc = [];
+        foreach (array_reverse(ext\standard\VmReflection::classHierarchyChain($object->class, $ctx)) as $class) {
+            foreach ($class->properties as $meta) {
+                $lc = strtolower($meta->name);
+                if (isset($seenLc[$lc])) {
+                    continue;
+                }
+                $seenLc[$lc] = true;
+                if (!MethodVisibility::isPublic($meta->visibility)) {
+                    continue;
+                }
+                if ($meta->propertyHookVirtual && null === $meta->getHookMethodLc) {
+                    continue;
+                }
+                if (null !== $meta->getHookMethodLc) {
+                    $hookValue = $this->fetchPropertyWithHooks($object, $meta->name, $hookFrame);
+                    if (null === $hookValue) {
+                        continue;
+                    }
+                    $value = $hookValue->resolveIndirect();
+                    if (VM\TypedPropertyCheck::omitFromPropertyEnumeration($value)) {
+                        continue;
+                    }
+                    $copy = new Variable();
+                    $copy->copyFrom($value);
+                    $result[$meta->name] = $copy;
+
+                    continue;
+                }
+                if (!$object->hasProperty($meta->name)) {
+                    continue;
+                }
+                $value = $object->getProperty($meta->name)->resolveIndirect();
+                if (VM\TypedPropertyCheck::omitFromPropertyEnumeration($value)) {
+                    continue;
+                }
+                $copy = new Variable();
+                $copy->copyFrom($value);
+                $result[$meta->name] = $copy;
+            }
+        }
+        foreach ($object->getRawProperties() as $name => $prop) {
+            if (isset($seenLc[strtolower($name)])) {
+                continue;
+            }
+            $value = $prop->resolveIndirect();
+            if (VM\TypedPropertyCheck::omitFromPropertyEnumeration($value)) {
+                continue;
+            }
+            $copy = new Variable();
+            $copy->copyFrom($value);
+            $result[$name] = $copy;
+        }
+
+        return $result;
+    }
+
+    /**
+     * unserialize() property restore — set hooks when declared (#6474, var_unserializer.c).
+     */
+    public function assignUnserializeProperty(
+        ObjectEntry $object,
+        string $propName,
+        Variable $value,
+        Frame $frame
+    ): void {
+        if ($this->assignHookedPropertyBackingStorage($object, $propName, $value)) {
+            return;
+        }
+        $hookFrame = $this->resolvePropertyHookParentFrame($frame);
+        $writeLvalue = new Variable();
+        $writeLvalue->objectPropertyOwner = $object;
+        $writeLvalue->objectPropertyName = $propName;
+        if ($this->dispatchPropertySetHookAssign($writeLvalue, $value, $hookFrame)) {
+            return;
+        }
+        $prop = $object->hasProperty($propName)
+            ? $object->getProperty($propName)
+            : $object->allocateProperty($propName);
+        $prop->copyFrom($value);
+    }
+
+    /**
+     * unserialize() restore when set-hook dispatch is unavailable — write registry backing (#6474).
+     */
+    private function assignHookedPropertyBackingStorage(
+        ObjectEntry $object,
+        string $propName,
+        Variable $value
+    ): bool {
+        $lcClass = strtolower($object->class->name);
+        $propMeta = $this->context->propertyHookRegistry[$lcClass][$propName]
+            ?? $this->context->propertyHookRegistry[$lcClass][strtolower($propName)]
+            ?? null;
+        if (!is_array($propMeta)) {
+            return false;
+        }
+        $backingName = $propMeta['setBacking'] ?? $propMeta['getBacking'] ?? null;
+        if (null === $backingName) {
+            return false;
+        }
+        if (!$object->hasProperty($backingName)) {
+            $object->allocateProperty($backingName);
+        }
+        $object->getProperty($backingName)->copyFrom($value->resolveIndirect());
+
+        return true;
+    }
+
     private function isPropertyAccessibleForObjectVars(VM\ClassProperty $meta, ?string $callerClassLc): bool
     {
         if (MethodVisibility::isPublic($meta->visibility)) {
@@ -7876,6 +7997,22 @@ restart:
         }
 
         return $this->executingFrame;
+    }
+
+    /**
+     * Builtin serialize/unserialize invoke property hooks with a user PHP frame parent (#6474).
+     */
+    private function resolvePropertyHookParentFrame(?Frame $frame): Frame
+    {
+        $cursor = $frame ?? $this->executingFrame;
+        while (null !== $cursor) {
+            if (null !== $cursor->handler && null !== $cursor->block) {
+                return $cursor;
+            }
+            $cursor = $cursor->parent;
+        }
+
+        return $this->requireExecutingFrame();
     }
 
     /**
