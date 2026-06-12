@@ -95,6 +95,44 @@ class JIT {
                 $this->m3CompileDriverMainBlock = $block;
             }
         }
+        $emitHelperStubBlock = $this->m3CompileDriverMainBlock ?? $this->m3EmitTuMainBlock;
+        if (null !== $emitHelperStubBlock && $this->shouldStubInventoryEmitHelperBundledBodies()) {
+            foreach (['preparesourceforparser', 'preprocesssourceforparse', 'rewritesourcebeforeparser'] as $methodLc) {
+                $logical = 'PHPCompiler\\Runtime::'.$methodLc;
+                $lc = strtolower($logical);
+                if (isset($this->context->functions[$lc])) {
+                    continue;
+                }
+                $this->compileSkippedCompilerSplitCfgStub(
+                    $this->llvmInternalName($logical),
+                    $emitHelperStubBlock,
+                    $logical
+                );
+            }
+            $parseLc = 'phpcompiler\\runtime::parse';
+            if (!isset($this->context->functions[$parseLc])) {
+                $this->emitM3EmitTuRuntimeParseStubNative(
+                    $this->llvmInternalName('PHPCompiler\\Runtime::parse'),
+                    'PHPCompiler\\Runtime::parse',
+                    $emitHelperStubBlock
+                );
+            }
+            $runtimeEmitLc = 'phpcompiler\\runtime::compileemitsmoke';
+            if (!isset($this->context->functions[$runtimeEmitLc])) {
+                $this->emitM3EmitTuRuntimeCompileEmitSmokeNative(
+                    $this->llvmInternalName('PHPCompiler\\Runtime::compileEmitSmoke'),
+                    'PHPCompiler\\Runtime::compileEmitSmoke',
+                    $emitHelperStubBlock
+                );
+            }
+            $compilerEmitLc = 'phpcompiler\\compiler::compileemitsmoke';
+            if (!isset($this->context->functions[$compilerEmitLc])) {
+                $this->emitM3EmitTuCompilerCompileEmitSmokeNativeFunction(
+                    $this->llvmInternalName('PHPCompiler\\Compiler::compileEmitSmoke'),
+                    'PHPCompiler\\Compiler::compileEmitSmoke'
+                );
+            }
+        }
         JIT\Progress::noteFunction('jit_compile_compile_block_begin');
         $this->context->jitUndeclaredInstancePropertyWrites = Block::collectJitUndeclaredInstancePropertyWrites($block);
         $return = $this->compileBlock($block);
@@ -650,11 +688,11 @@ class JIT {
         if (str_ends_with($lower, '\\runtime::standalone')) {
             return true;
         }
-        if (str_ends_with($lower, '\\runtime::parse')) {
-            return true;
-        }
-        if (str_ends_with($lower, '\\runtime::preparesourceforparser')) {
-            return true;
+        if (str_ends_with($lower, '\\runtime::preparesourceforparser')
+            || str_ends_with($lower, '\\runtime::preprocesssourceforparse')
+            || str_ends_with($lower, '\\runtime::rewritesourcebeforeparser')
+            || str_ends_with($lower, '\\runtime::parse')) {
+            return !$this->shouldStubInventoryEmitHelperBundledBodies();
         }
         if (str_ends_with($lower, '\\runtime::compileemitsmoke')) {
             return true;
@@ -687,9 +725,6 @@ class JIT {
             return true;
         }
         if (str_ends_with($lower, '\\runtime::__destruct')) {
-            return true;
-        }
-        if (str_ends_with($lower, '\\runtime::compileemitsmoke')) {
             return true;
         }
         if (str_ends_with($lower, 'slotindexforvariablename')) {
@@ -2241,14 +2276,21 @@ class JIT {
         if (!$this->shouldUseM3EmitTuNativeBridge()) {
             return false;
         }
+        if ($this->shouldStubInventoryEmitHelperBundledBodies()) {
+            foreach (['parse', 'preparesourceforparser', 'preprocesssourceforparse', 'rewritesourcebeforeparser'] as $stubSuffix) {
+                if (str_ends_with($lower, '\\runtime::'.$stubSuffix)) {
+                    return false;
+                }
+            }
+        }
         foreach ([
             '__construct',
             'initparsepipeline',
             'initcompiler',
             'initvmcontext',
             'loadcoremodules',
-            'parse',
             'preparesourceforparser',
+            'parse',
             'compile',
             'compileemitsmoke',
             'parseandcompile',
@@ -2462,6 +2504,9 @@ class JIT {
     private function isLiteralIncludeDiscoveryRealLoweringMethod(string $lower): bool
     {
         if (!$this->shouldUseM3CompileDriverRealLowering()) {
+            return false;
+        }
+        if ($this->shouldStubInventoryEmitHelperBundledBodies()) {
             return false;
         }
         foreach ([
@@ -3139,6 +3184,9 @@ class JIT {
         if (!$this->shouldUseM3CompileDriverRealLowering()) {
             return;
         }
+        $emitHelperStubMethods = $this->shouldStubInventoryEmitHelperBundledBodies()
+            ? ['parse', 'preparesourceforparser', 'preprocesssourceforparse', 'rewritesourcebeforeparser', 'compileemitsmoke']
+            : [];
         foreach ([
             '__construct',
             'parse',
@@ -3152,6 +3200,9 @@ class JIT {
             'noteparsecompilenullforscript',
             'peeklastparsefailure',
         ] as $methodLc) {
+            if (in_array($methodLc, $emitHelperStubMethods, true)) {
+                continue;
+            }
             $this->compileM3EmitTuRuntimeMethodFromModules($methodLc);
         }
         if ($sidecar && null !== $this->m3EmitTuMainBlock) {
@@ -3173,23 +3224,50 @@ class JIT {
         if (!$this->shouldUseM3EmitTuNativeBridge() && !$this->shouldUseM3InventoryEmitDriver()) {
             return;
         }
-        $parseLc = strtolower('PHPCompiler\\Runtime::parse');
-        if (!isset($this->context->functions[$parseLc])) {
-            $this->compileM3EmitTuRuntimeMethodFromModules('parse');
-        }
-        $emitSmokeLc = strtolower('PHPCompiler\\Runtime::parseandcompileemitsmoke');
-        if (!isset($this->context->functions[$emitSmokeLc])) {
-            $this->compileM3EmitTuRuntimeMethodFromModules('parseandcompileemitsmoke');
-        }
-        foreach (['preparesourceforparser', 'compileemitsmoke', 'noteparsecompilenullforscript', 'peeklastparsefailure'] as $methodLc) {
-            $runtimeLc = strtolower('PHPCompiler\\Runtime::'.$methodLc);
-            if (!isset($this->context->functions[$runtimeLc])) {
-                $this->compileM3EmitTuRuntimeMethodFromModules($methodLc);
+        $stubBlock = $this->m3CompileDriverMainBlock ?? $this->m3EmitTuMainBlock;
+        if ($this->shouldStubInventoryEmitHelperBundledBodies() && null !== $stubBlock) {
+            $parseLc = strtolower('PHPCompiler\\Runtime::parse');
+            if (!isset($this->context->functions[$parseLc])) {
+                $this->emitM3EmitTuRuntimeParseStubNative(
+                    $this->llvmInternalName('PHPCompiler\\Runtime::parse'),
+                    'PHPCompiler\\Runtime::parse',
+                    $stubBlock
+                );
             }
-        }
-        $compilerEmitLc = 'phpcompiler\\compiler::compileemitsmoke';
-        if (!isset($this->context->functions[$compilerEmitLc])) {
-            $this->compileM3EmitTuCompilerMethodFromRuntimeModules('compileemitsmoke');
+            $runtimeEmitLc = strtolower('PHPCompiler\\Runtime::compileEmitSmoke');
+            if (!isset($this->context->functions[$runtimeEmitLc])) {
+                $this->emitM3EmitTuRuntimeCompileEmitSmokeNative(
+                    $this->llvmInternalName('PHPCompiler\\Runtime::compileEmitSmoke'),
+                    'PHPCompiler\\Runtime::compileEmitSmoke',
+                    $stubBlock
+                );
+            }
+            $compilerEmitLc = 'phpcompiler\\compiler::compileemitsmoke';
+            if (!isset($this->context->functions[$compilerEmitLc])) {
+                $this->emitM3EmitTuCompilerCompileEmitSmokeNativeFunction(
+                    $this->llvmInternalName('PHPCompiler\\Compiler::compileEmitSmoke'),
+                    'PHPCompiler\\Compiler::compileEmitSmoke'
+                );
+            }
+        } else {
+            $parseLc = strtolower('PHPCompiler\\Runtime::parse');
+            if (!isset($this->context->functions[$parseLc])) {
+                $this->compileM3EmitTuRuntimeMethodFromModules('parse');
+            }
+            $emitSmokeLc = strtolower('PHPCompiler\\Runtime::parseandcompileemitsmoke');
+            if (!isset($this->context->functions[$emitSmokeLc])) {
+                $this->compileM3EmitTuRuntimeMethodFromModules('parseandcompileemitsmoke');
+            }
+            foreach (['preparesourceforparser', 'compileemitsmoke', 'noteparsecompilenullforscript', 'peeklastparsefailure'] as $methodLc) {
+                $runtimeLc = strtolower('PHPCompiler\\Runtime::'.$methodLc);
+                if (!isset($this->context->functions[$runtimeLc])) {
+                    $this->compileM3EmitTuRuntimeMethodFromModules($methodLc);
+                }
+            }
+            $compilerEmitLc = 'phpcompiler\\compiler::compileemitsmoke';
+            if (!isset($this->context->functions[$compilerEmitLc])) {
+                $this->compileM3EmitTuCompilerMethodFromRuntimeModules('compileemitsmoke');
+            }
         }
     }
 
@@ -4164,7 +4242,7 @@ class JIT {
         if (isset($this->context->functions[$lc])) {
             return;
         }
-        if ($this->shouldUseM3InventoryEmitDriver() && !$this->shouldUseEmitHelperLinkStubs()) {
+        if ($this->shouldUseM3InventoryEmitDriver()) {
             // Never scan O(modules×funcs) on inventory argv links (#2967). parse/compileEmitSmoke from
             // Runtime.php; ctor/init* use native M3 via compileBlock / ensureM3EmitTuRuntimeInitSpineSymbols.
             if (in_array($methodLc, ['parse', 'preparesourceforparser', 'compileemitsmoke', 'peeklastparsefailure', 'noteparsecompilenullforscript'], true)) {
