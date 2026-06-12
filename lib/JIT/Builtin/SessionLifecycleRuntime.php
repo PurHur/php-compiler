@@ -39,6 +39,7 @@ final class SessionLifecycleRuntime
         self::implementStandaloneWriteClose($context);
         self::implementStandaloneRegenerateId($context);
         self::implementStandaloneDestroy($context);
+        self::implementStandaloneAbort($context);
     }
 
     private static function implementGenerateNewId(Context $context): void
@@ -244,6 +245,24 @@ final class SessionLifecycleRuntime
         $context->builder->positionAtEnd($bbDone);
         $context->builder->returnVoid();
         $context->builder->clearInsertionPosition();
+    }
+
+    private static function implementStandaloneAbort(Context $context): void
+    {
+        $fn = $context->lookupFunction('__phpc_session_abort_apply');
+        if ($fn->countBasicBlocks() > 0) {
+            return;
+        }
+
+        self::emitActiveGuardedLifecycle(
+            $context,
+            $fn,
+            static function (Context $context, Value $outPtr): void {
+                $i8 = $context->getTypeFromString('int8');
+                $context->builder->store($i8->constInt(0, false), SessionStorageGlobals::$activeGlobal);
+                SessionStart::emitWriteBool($context, $outPtr, true);
+            }
+        );
     }
 
     private static function implementStandaloneDestroy(Context $context): void

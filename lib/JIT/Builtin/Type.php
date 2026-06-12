@@ -1041,6 +1041,11 @@ class Type extends Builtin {
             $fntypeSessionApply
         );
         $this->context->registerFunction('__phpc_session_destroy_apply', $fnSessionDestroy);
+        $fnSessionAbort = $this->context->module->addFunction(
+            '__phpc_session_abort_apply',
+            $fntypeSessionApply
+        );
+        $this->context->registerFunction('__phpc_session_abort_apply', $fnSessionAbort);
         SessionStart::registerRuntimeDeclaration($this->context);
         $fntypeJsonEncodeValue = $this->context->context->functionType(
             $this->context->getTypeFromString('__string__*'),
@@ -1224,6 +1229,7 @@ class Type extends Builtin {
         SessionWriteClose::implement($this->context);
         SessionRegenerateId::implement($this->context);
         SessionDestroy::implement($this->context);
+        SessionAbort::implement($this->context);
         SessionStorageGlobals::ensureGlobals($this->context);
         SessionStorageRuntime::ensureLinked($this->context);
         SessionId::implement($this->context);

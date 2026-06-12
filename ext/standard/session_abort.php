@@ -35,6 +35,6 @@ class session_abort extends Internal
             throw new \LogicException('session_abort() expects exactly 0 arguments in this compiler build');
         }
 
-        throw new \LogicException('session_abort() not implemented for JIT');
+        return JitSessionAbort::invoke($context);
     }
 }
