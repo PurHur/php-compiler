@@ -33,5 +33,6 @@ final class GetClassMethodsRuntimeShrinkTest extends TestCase
         $this->assertStringNotContainsString('MethodRegistry', $source);
         $this->assertStringNotContainsString('invokeNativeForClassName', $source);
         $this->assertStringContainsString('invokeCompileTimeForClassName', $source);
+        $this->assertStringContainsString('invokeForRuntimeClassNameString', $source);
     }
 }
