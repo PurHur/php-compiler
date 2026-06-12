@@ -822,6 +822,23 @@ class Type extends Builtin {
         );
         $fnFormatDt = $this->context->module->addFunction('__compiler_format_datetime', $fntypeFormatDt);
         $this->context->registerFunction('__compiler_format_datetime', $fnFormatDt);
+        $fntypeDiFmt = $this->context->context->functionType(
+            $this->context->getTypeFromString('__string__*'),
+            false,
+            $i64,
+            $i64,
+            $i64,
+            $i64,
+            $i64,
+            $i64,
+            $f64,
+            $i64,
+            $i64,
+            $i64,
+            $strPtr
+        );
+        $fnDiFmt = $this->context->module->addFunction('__compiler_date_interval_format', $fntypeDiFmt);
+        $this->context->registerFunction('__compiler_date_interval_format', $fnDiFmt);
         $fntypeIdate = $this->context->context->functionType(
             $i64,
             false,
@@ -1201,6 +1218,7 @@ class Type extends Builtin {
         GethostbyaddrRuntime::ensureLinked($this->context);
         CheckdnsrrRuntime::ensureLinked($this->context);
         CheckdateRuntime::ensureLinked($this->context);
+        DateIntervalFormatRuntime::ensureLinked($this->context);
         DefaultTimezoneRuntime::ensureLinked($this->context);
         InetRuntime::ensureLinked($this->context);
         TimeSleepRuntime::ensureLinked($this->context);

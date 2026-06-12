@@ -51,6 +51,11 @@ final class date_interval_format extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        throw new \LogicException('date_interval_format() is not implemented for JIT in this compiler build');
+        $argc = \count($args);
+        if (2 !== $argc) {
+            throw new \LogicException('date_interval_format() expects exactly 2 arguments in this compiler build');
+        }
+
+        return JitDateIntervalFormat::invoke($context, $args[0], $args[1]);
     }
 }
