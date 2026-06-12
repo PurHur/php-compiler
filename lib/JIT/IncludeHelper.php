@@ -719,7 +719,7 @@ final class IncludeHelper
      * cli_spine_shim.php (src/cli.php) and src/cli_driver.php provide skip-entry helpers at runtime; this
      * avoids compiling vendor/autoload Expr_Closure during self-host AOT link.
      */
-    /** Stub dynamic requires while host-compiling M3 emit sidecars (issue #2699). */
+    /** Stub dynamic requires while host-compiling M3 emit sidecars (issue #2699, #1492). */
     private static function shouldStubM3SidecarHostNonLiteralInclude(Block $callerBlock): bool
     {
         $flag = getenv('PHP_COMPILER_M3_SIDECAR_HOST');
@@ -728,7 +728,8 @@ final class IncludeHelper
         }
         $caller = str_replace('\\', '/', $callerBlock->scriptPath());
 
-        return str_ends_with($caller, '/src/cli_driver.php');
+        return str_ends_with($caller, '/src/cli_driver.php')
+            || str_ends_with($caller, '/test/selfhost/compiler_lib_spine_smoke/main.php');
     }
 
     private static function shouldSkipSelfHostSpineCliInclude(string $path): bool

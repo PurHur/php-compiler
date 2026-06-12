@@ -3272,7 +3272,8 @@ class JIT {
             $this->registerM3EmitTuSidecarFromPath(
                 __DIR__.'/../test/selfhost/compiler_lib_spine_smoke/main.php',
                 \PHPCompiler\JIT\M3EmitTuTrivialEchoAot::COMPILER_LIB_SIDECAR_REL,
-                'PHPCompiler\\JIT\\M3EmitTuTrivialEchoAot::compilerLibSentinelBlock'
+                'PHPCompiler\\JIT\\M3EmitTuTrivialEchoAot::compilerLibSentinelBlock',
+                true
             );
             // Gen-3 argv driver (full revision) must be able to emit non-smoke fixtures (eg compiler unit probe)
             // without falling back to compile_smoke_m3_emit helpers (#2900, #2925).
@@ -3295,7 +3296,8 @@ class JIT {
             $this->registerM3EmitTuSidecarFromPath(
                 __DIR__.'/../test/selfhost/compiler_lib_spine_smoke/main.php',
                 \PHPCompiler\JIT\M3EmitTuTrivialEchoAot::COMPILER_LIB_SIDECAR_REL,
-                'PHPCompiler\\JIT\\M3EmitTuTrivialEchoAot::compilerLibSentinelBlock'
+                'PHPCompiler\\JIT\\M3EmitTuTrivialEchoAot::compilerLibSentinelBlock',
+                true
             );
             $this->registerM3EmitTuSidecarFromPath(
                 __DIR__.'/../lib/Compiler.php',
@@ -3348,7 +3350,8 @@ class JIT {
             $this->registerM3EmitTuSidecarFromPath(
                 __DIR__.'/../test/selfhost/compiler_lib_spine_smoke/main.php',
                 \PHPCompiler\JIT\M3EmitTuTrivialEchoAot::COMPILER_LIB_SIDECAR_REL,
-                'PHPCompiler\\JIT\\M3EmitTuTrivialEchoAot::compilerLibSentinelBlock'
+                'PHPCompiler\\JIT\\M3EmitTuTrivialEchoAot::compilerLibSentinelBlock',
+                true
             );
             $this->registerM3EmitTuSidecarFromPath(
                 __DIR__.'/../test/selfhost/compiler_minimal/main.php',
