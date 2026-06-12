@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 2403 |
-| Phase A inventory files (M2 ratio SSOT) | 2403 |
+| PHP files on vm.php path | 2406 |
+| Phase A inventory files (M2 ratio SSOT) | 2406 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 6518 |
+| Source constructs flagged (warnings) | 6523 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -234,6 +234,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/standard/JitArrayPush.php` | 0 | 1 |
 | `ext/standard/JitArrayRand.php` | 0 | 1 |
 | `ext/standard/JitAssert.php` | 0 | 2 |
+| `ext/standard/JitAssertOptions.php` | 0 | 2 |
 | `ext/standard/JitAttributeExists.php` | 0 | 1 |
 | `ext/standard/JitBase64Decode.php` | 0 | 1 |
 | `ext/standard/JitBase64Encode.php` | 0 | 1 |
@@ -764,6 +765,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/standard/VmSyslog.php` | 0 | 1 |
 | `ext/standard/VmTmpfileNative.php` | 0 | 1 |
 | `ext/standard/VmUnameNative.php` | 0 | 1 |
+| `ext/standard/VmUnserializeFormat.php` | 0 | 2 |
 | `ext/standard/VmUserCall.php` | 0 | 6 |
 | `ext/standard/VmUserStream.php` | 0 | 8 |
 | `ext/standard/VmVarFormat.php` | 0 | 1 |
@@ -1584,6 +1586,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/Builtin.php` | 0 | 1 |
 | `lib/JIT/Builtin/AssertFail.php` | 0 | 1 |
 | `lib/JIT/Builtin/AssertIniRuntime.php` | 0 | 1 |
+| `lib/JIT/Builtin/AssertOptionsRuntime.php` | 0 | 1 |
 | `lib/JIT/Builtin/AssertionErrorRaise.php` | 0 | 2 |
 | `lib/JIT/Builtin/AttributeRegistry.php` | 0 | 1 |
 | `lib/JIT/Builtin/AttributeRegistryLowering.php` | 0 | 5 |
@@ -3817,6 +3820,12 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - new boolval (line 33)
 - 6 class method(s)
+
+### `ext/standard/JitAssertOptions.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 20)
+- 2 class method(s)
 
 ### `ext/standard/JitAttributeExists.php`
 
@@ -7376,35 +7385,35 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/VmSerialize.php`
 
 **Warnings** (review for bootstrap subset):
-- new ObjectEntry (line 279)
-- new Variable (line 280)
-- new ObjectEntry (line 297)
-- new Variable (line 301)
-- new ObjectEntry (line 313)
-- new Variable (line 321)
-- new ObjectEntry (line 339)
-- new Variable (line 340)
-- new Variable (line 342)
-- new Variable (line 399)
-- new VmSerializeEnumCaseRef (line 472)
-- new VmSerializeEnumCaseRef (line 477)
-- new Variable (line 540)
-- new Variable (line 553)
-- new Variable (line 626)
-- new ObjectEntry (line 656)
-- new Variable (line 660)
-- new Frame (line 679)
-- new Variable (line 682)
-- new Variable (line 703)
-- new Variable (line 722)
-- new Variable (line 748)
+- new ObjectEntry (line 275)
+- new Variable (line 276)
+- new ObjectEntry (line 293)
+- new Variable (line 297)
+- new ObjectEntry (line 309)
+- new Variable (line 317)
+- new ObjectEntry (line 335)
+- new Variable (line 336)
+- new Variable (line 338)
+- new Variable (line 395)
+- new VmSerializeEnumCaseRef (line 468)
+- new VmSerializeEnumCaseRef (line 473)
+- new Variable (line 536)
+- new Variable (line 549)
+- new Variable (line 622)
+- new ObjectEntry (line 652)
+- new Variable (line 656)
+- new Frame (line 675)
+- new Variable (line 678)
+- new Variable (line 699)
+- new Variable (line 718)
+- new Variable (line 744)
 - 34 class method(s)
 - 1 closure(s)
 
 ### `ext/standard/VmSerializeFormat.php`
 
 **Warnings** (review for bootstrap subset):
-- 10 class method(s)
+- 11 class method(s)
 
 ### `ext/standard/VmSession.php`
 
@@ -7613,6 +7622,12 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 
 **Warnings** (review for bootstrap subset):
 - 4 class method(s)
+
+### `ext/standard/VmUnserializeFormat.php`
+
+**Warnings** (review for bootstrap subset):
+- new self (line 42)
+- 14 class method(s)
 
 ### `ext/standard/VmUserCall.php`
 
@@ -12827,7 +12842,12 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/Builtin/AssertIniRuntime.php`
 
 **Warnings** (review for bootstrap subset):
-- 4 class method(s)
+- 5 class method(s)
+
+### `lib/JIT/Builtin/AssertOptionsRuntime.php`
+
+**Warnings** (review for bootstrap subset):
+- 11 class method(s)
 
 ### `lib/JIT/Builtin/AssertionErrorRaise.php`
 
@@ -14466,53 +14486,53 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new Builtin\ErrorHandler (line 397)
 - new Scope (line 416)
 - new Call\ExternalMethod (line 464)
-- new Builtin\IsNullFn (line 679)
 - new Builtin\IsNullFn (line 680)
-- new Call\SplObjectStorageMethod (line 681)
+- new Builtin\IsNullFn (line 681)
 - new Call\SplObjectStorageMethod (line 682)
 - new Call\SplObjectStorageMethod (line 683)
 - new Call\SplObjectStorageMethod (line 684)
 - new Call\SplObjectStorageMethod (line 685)
 - new Call\SplObjectStorageMethod (line 686)
-- new Call\WeakReferenceCreate (line 688)
-- new Call\WeakReferenceGet (line 689)
-- new Call\WeakMapMethod (line 690)
+- new Call\SplObjectStorageMethod (line 687)
+- new Call\WeakReferenceCreate (line 689)
+- new Call\WeakReferenceGet (line 690)
 - new Call\WeakMapMethod (line 691)
 - new Call\WeakMapMethod (line 692)
 - new Call\WeakMapMethod (line 693)
 - new Call\WeakMapMethod (line 694)
-- new Call\ReflectionClassConstruct (line 696)
-- new Call\ReflectionClassGetName (line 697)
-- new Call\ReflectionClassGetAttributes (line 698)
-- new Call\ReflectionClassGetMethod (line 699)
-- new Call\ReflectionClassGetReflectionConstant (line 700)
-- new Call\ReflectionClassNewLazyProxy (line 701)
-- new Call\ReflectionClassNewLazyGhost (line 702)
-- new Call\ReflectionClassCreateLazyGhost (line 703)
-- new Call\ReflectionClassCreateLazyProxy (line 704)
-- new Call\ReflectionPropertyConstruct (line 705)
-- new Call\ReflectionPropertyGetAttributes (line 706)
-- new Call\ReflectionConstantConstruct (line 707)
-- new Call\ReflectionConstantGetAttributes (line 708)
-- new Call\ReflectionMethodGetAttributes (line 709)
-- new Call\ReflectionAttributeGetName (line 710)
-- new Call\ReflectionAttributeNewInstance (line 711)
-- new Call\ExceptionGetMessage (line 712)
-- new Result (line 844)
-- new Result (line 865)
-- new Variable (line 996)
-- new Variable (line 1312)
-- new Variable (line 1516)
-- new VMVariable (line 1642)
-- new VMVariable (line 1648)
-- new VMVariable (line 1654)
-- new VMVariable (line 1660)
-- new VMVariable (line 1667)
-- new VMVariable (line 1673)
-- new VMVariable (line 1679)
-- new VMVariable (line 1685)
-- new Variable (line 1710)
-- new Variable (line 1749)
+- new Call\WeakMapMethod (line 695)
+- new Call\ReflectionClassConstruct (line 697)
+- new Call\ReflectionClassGetName (line 698)
+- new Call\ReflectionClassGetAttributes (line 699)
+- new Call\ReflectionClassGetMethod (line 700)
+- new Call\ReflectionClassGetReflectionConstant (line 701)
+- new Call\ReflectionClassNewLazyProxy (line 702)
+- new Call\ReflectionClassNewLazyGhost (line 703)
+- new Call\ReflectionClassCreateLazyGhost (line 704)
+- new Call\ReflectionClassCreateLazyProxy (line 705)
+- new Call\ReflectionPropertyConstruct (line 706)
+- new Call\ReflectionPropertyGetAttributes (line 707)
+- new Call\ReflectionConstantConstruct (line 708)
+- new Call\ReflectionConstantGetAttributes (line 709)
+- new Call\ReflectionMethodGetAttributes (line 710)
+- new Call\ReflectionAttributeGetName (line 711)
+- new Call\ReflectionAttributeNewInstance (line 712)
+- new Call\ExceptionGetMessage (line 713)
+- new Result (line 845)
+- new Result (line 866)
+- new Variable (line 997)
+- new Variable (line 1313)
+- new Variable (line 1517)
+- new VMVariable (line 1643)
+- new VMVariable (line 1649)
+- new VMVariable (line 1655)
+- new VMVariable (line 1661)
+- new VMVariable (line 1668)
+- new VMVariable (line 1674)
+- new VMVariable (line 1680)
+- new VMVariable (line 1686)
+- new Variable (line 1711)
+- new Variable (line 1750)
 - 72 class method(s)
 
 ### `lib/JIT/DnfParamCheck.php`
