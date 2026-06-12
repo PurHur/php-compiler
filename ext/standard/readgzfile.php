@@ -50,6 +50,20 @@ final class readgzfile extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        throw new \LogicException('readgzfile() is VM-only in this compiler build (issue #4657)');
+        $argc = \count($args);
+        if ($argc < 1 || $argc > 2) {
+            throw new \LogicException('readgzfile() expects one or two arguments in this compiler build');
+        }
+        $i64 = $context->getTypeFromString('int64');
+        $useIncludePath = $i64->constInt(0, false);
+        if (2 === $argc) {
+            $useIncludePath = JitLongArg::lower($context, $args[1], 'readgzfile', 2, 'use_include_path');
+        }
+
+        return JitReadgzfile::invoke(
+            $context,
+            JitStringBuiltinArg::lower($context, $args[0], 'readgzfile', 0, 'filename'),
+            $useIncludePath
+        );
     }
 }
