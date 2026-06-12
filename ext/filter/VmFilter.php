@@ -15,6 +15,8 @@ use PHPCompiler\VM\Variable;
 final class VmFilter
 {
     public const FILTER_VALIDATE_INT = 257;
+    /** php-src ext/filter/filter_private.h — FILTER_VALIDATE_REGEXP */
+    public const FILTER_VALIDATE_REGEXP = 272;
     public const FILTER_VALIDATE_EMAIL = 274;
     /** php-src ext/filter/php_filter.h — PHP_FILTER_FLAG_NULL_ON_FAILURE */
     public const FILTER_NULL_ON_FAILURE = 134217728;
@@ -34,6 +36,7 @@ final class VmFilter
     public static function isSupportedFilter(int $filter): bool
     {
         return self::FILTER_VALIDATE_INT === $filter
+            || self::FILTER_VALIDATE_REGEXP === $filter
             || self::FILTER_VALIDATE_EMAIL === $filter;
     }
 
@@ -44,9 +47,13 @@ final class VmFilter
 
     public static function filterVar(Variable $value, int $filter, ?Variable $options = null): Variable
     {
-        $nullOnFailure = self::hasNullOnFailureFlag($options);
+        $parsed = self::parseFilterArgs($options);
+        $nullOnFailure = 0 !== ($parsed['flags'] & self::FILTER_NULL_ON_FAILURE);
         if (self::FILTER_VALIDATE_INT === $filter) {
             return self::validateInt($value, $nullOnFailure);
+        }
+        if (self::FILTER_VALIDATE_REGEXP === $filter) {
+            return self::validateRegexp($value, $parsed['filterOptions'], $nullOnFailure);
         }
         if (self::FILTER_VALIDATE_EMAIL === $filter) {
             return self::validateEmail($value, $nullOnFailure);
@@ -117,16 +124,74 @@ final class VmFilter
         return 0 === strcasecmp(ltrim($className, '\\'), 'PhpInputFilter');
     }
 
-    private static function hasNullOnFailureFlag(?Variable $options): bool
+    /**
+     * @return array{flags: int, filterOptions: ?\PHPCompiler\VM\HashTable}
+     */
+    private static function parseFilterArgs(?Variable $options): array
     {
         if (null === $options || $options->isUndefined() || Variable::TYPE_NULL === $options->type) {
-            return false;
+            return ['flags' => 0, 'filterOptions' => null];
         }
-        if (Variable::TYPE_INTEGER !== $options->type) {
-            throw new \LogicException('filter_var() options must be an integer flag bitmask');
+        $resolved = $options->resolveIndirect();
+        if (Variable::TYPE_INTEGER === $resolved->type) {
+            return ['flags' => $resolved->toInt(), 'filterOptions' => null];
+        }
+        if (Variable::TYPE_ARRAY !== $resolved->type) {
+            throw new \LogicException('filter_var() options must be an integer flag bitmask or array');
+        }
+        $ht = $resolved->toArray();
+        $flags = 0;
+        $flagsVar = $ht->find('flags');
+        if (null !== $flagsVar && !$flagsVar->isUndefined() && Variable::TYPE_NULL !== $flagsVar->type) {
+            if (Variable::TYPE_INTEGER !== $flagsVar->resolveIndirect()->type) {
+                throw new \LogicException('filter_var() options[flags] must be an integer');
+            }
+            $flags = $flagsVar->resolveIndirect()->toInt();
+        }
+        $filterOptions = null;
+        $optionsVar = $ht->find('options');
+        if (null !== $optionsVar && !$optionsVar->isUndefined() && Variable::TYPE_NULL !== $optionsVar->type) {
+            $nested = $optionsVar->resolveIndirect();
+            if (Variable::TYPE_ARRAY !== $nested->type) {
+                throw new \LogicException('filter_var() options[options] must be an array');
+            }
+            $filterOptions = $nested->toArray();
         }
 
-        return 0 !== ($options->toInt() & self::FILTER_NULL_ON_FAILURE);
+        return ['flags' => $flags, 'filterOptions' => $filterOptions];
+    }
+
+    private static function validateRegexp(
+        Variable $value,
+        ?\PHPCompiler\VM\HashTable $filterOptions,
+        bool $nullOnFailure = false
+    ): Variable {
+        if (null === $filterOptions) {
+            throw new \ValueError('filter_var(): "regexp" option is missing');
+        }
+        $regexpVar = $filterOptions->find('regexp');
+        if (null === $regexpVar
+            || $regexpVar->isUndefined()
+            || Variable::TYPE_NULL === $regexpVar->type
+            || Variable::TYPE_STRING !== $regexpVar->resolveIndirect()->type) {
+            throw new \ValueError('filter_var(): "regexp" option is missing');
+        }
+        $pattern = $regexpVar->resolveIndirect()->toString();
+        if ($value->isUndefined() || Variable::TYPE_NULL === $value->type) {
+            return self::failureResult($nullOnFailure);
+        }
+        if (Variable::TYPE_STRING !== $value->type) {
+            return self::failureResult($nullOnFailure);
+        }
+        $subject = $value->toString();
+        $matched = @\preg_match($pattern, $subject);
+        if (false === $matched || 0 === $matched) {
+            return self::failureResult($nullOnFailure);
+        }
+        $out = new Variable();
+        $out->string($subject);
+
+        return $out;
     }
 
     private static function failureResult(bool $nullOnFailure): Variable
