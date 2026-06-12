@@ -10,6 +10,7 @@ use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\Variable as VmVariable;
 use PHPLLVM\BasicBlock;
 use PHPLLVM\Builder;
+use PHPLLVM\LLVMAbstract\BasicBlock;
 use PHPLLVM\Value;
 
 /**
