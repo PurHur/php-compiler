@@ -87,6 +87,8 @@ final class ThrowableManifest
 
     public const LC_ASSERTION_ERROR = 'assertionerror';
 
+    public const LC_JSON_EXCEPTION = 'jsonexception';
+
     /**
      * Parent map in registration order: child => parent name, or null when implementing Throwable directly.
      *
@@ -130,6 +132,7 @@ final class ThrowableManifest
         'ArithmeticError' => 'Error',
         'DivisionByZeroError' => 'ArithmeticError',
         'AssertionError' => 'Error',
+        'JsonException' => 'Exception',
     ];
 
     /** @var array<string, class-string<\Throwable>> */
@@ -162,6 +165,7 @@ final class ThrowableManifest
         'ArithmeticError' => \ArithmeticError::class,
         'DivisionByZeroError' => \DivisionByZeroError::class,
         'AssertionError' => \AssertionError::class,
+        'JsonException' => \JsonException::class,
     ];
 
     /** @return list<string> */

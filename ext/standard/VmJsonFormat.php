@@ -14,13 +14,23 @@ final class VmJsonFormat
     /**
      * @param array<mixed>|bool|float|int|null|string $exported VmJson::export shape
      */
-    public static function encodeExported(mixed $exported): string|false
+    public static function encodeExported(mixed $exported, int $flags = 0): string|false
     {
         VmJson::setLastError(0);
         try {
-            return self::encodeValue($exported);
+            return self::encodeValue($exported, $flags);
+        } catch (VmJsonExportException $e) {
+            VmJson::setLastError($e->errorCode);
+            if (VmJsonFlags::throwsOnError($flags)) {
+                throw new \JsonException(VmJson::lastErrorMsg(), $e->errorCode);
+            }
+
+            return false;
         } catch (\Throwable) {
             VmJson::setLastError(VmJson::ERROR_UNSUPPORTED_TYPE);
+            if (VmJsonFlags::throwsOnError($flags)) {
+                throw new \JsonException(VmJson::lastErrorMsg(), VmJson::ERROR_UNSUPPORTED_TYPE);
+            }
 
             return false;
         }
@@ -49,7 +59,7 @@ final class VmJsonFormat
     /**
      * @param array<mixed>|bool|float|int|null|string $value
      */
-    private static function encodeValue(mixed $value): string
+    private static function encodeValue(mixed $value, int $flags, int $depth = 0): string
     {
         if (null === $value) {
             return 'null';
@@ -64,34 +74,37 @@ final class VmJsonFormat
             return self::encodeFloat($value);
         }
         if (\is_string($value)) {
-            return '"'.self::escapeString($value).'"';
+            return '"'.self::escapeString($value, $flags).'"';
         }
         if ($value instanceof \stdClass) {
             $props = get_object_vars($value);
             if ([] === $props) {
-                return '{}';
+                return self::wrapObject('{}', $flags, $depth);
             }
             $parts = [];
             foreach ($props as $key => $item) {
                 if (!\is_string($key)) {
                     throw new \LogicException('json_encode() only supports string keys in this compiler build');
                 }
-                $parts[] = '"'.self::escapeString($key).'":'.self::encodeValue($item);
+                $parts[] = '"'.self::escapeString($key, $flags).'"'.self::keyValueSeparator($flags)
+                    .self::encodePairValue($item, $flags, $depth);
             }
 
-            return '{'.implode(',', $parts).'}';
+            return self::wrapObject('{'.self::joinParts($parts, $flags, $depth).'}', $flags, $depth);
         }
         if (\is_array($value)) {
             if ([] === $value) {
-                return array_is_list($value) ? '[]' : '{}';
+                $empty = array_is_list($value) ? '[]' : '{}';
+
+                return self::wrapContainer($empty, $flags, $depth);
             }
             if (array_is_list($value)) {
                 $parts = [];
                 foreach ($value as $item) {
-                    $parts[] = self::encodeValue($item);
+                    $parts[] = self::encodePairValue($item, $flags, $depth);
                 }
 
-                return '['.\implode(',', $parts).']';
+                return self::wrapContainer('['.self::joinParts($parts, $flags, $depth).']', $flags, $depth);
             }
             $parts = [];
             foreach ($value as $key => $item) {
@@ -101,13 +114,60 @@ final class VmJsonFormat
                     );
                 }
                 $keyStr = \is_int($key) ? (string) $key : $key;
-                $parts[] = '"'.self::escapeString($keyStr).'":'.self::encodeValue($item);
+                $parts[] = '"'.self::escapeString($keyStr, $flags).'"'.self::keyValueSeparator($flags)
+                    .self::encodePairValue($item, $flags, $depth);
             }
 
-            return '{'.implode(',', $parts).'}';
+            return self::wrapObject('{'.self::joinParts($parts, $flags, $depth).'}', $flags, $depth);
         }
 
         throw new \LogicException('json_encode() unsupported exported type in this compiler build');
+    }
+
+    /**
+     * @param list<string> $parts
+     */
+    private static function joinParts(array $parts, int $flags, int $depth): string
+    {
+        if (0 === ($flags & VmJsonFlags::PRETTY_PRINT)) {
+            return \implode(',', $parts);
+        }
+        $indent = self::indent($depth + 1);
+        $inner = \implode(','."\n".$indent, $parts);
+
+        return "\n".$indent.$inner."\n".self::indent($depth);
+    }
+
+    private static function wrapObject(string $body, int $flags, int $depth): string
+    {
+        if (0 === ($flags & VmJsonFlags::PRETTY_PRINT) || '{}' === $body) {
+            return $body;
+        }
+
+        return $body;
+    }
+
+    private static function wrapContainer(string $body, int $flags, int $depth): string
+    {
+        return self::wrapObject($body, $flags, $depth);
+    }
+
+    /**
+     * @param array<mixed>|bool|float|int|null|string $value
+     */
+    private static function encodePairValue(mixed $value, int $flags, int $depth): string
+    {
+        return self::encodeValue($value, $flags, $depth + 1);
+    }
+
+    private static function indent(int $depth): string
+    {
+        return \str_repeat('    ', $depth);
+    }
+
+    private static function keyValueSeparator(int $flags): string
+    {
+        return 0 !== ($flags & VmJsonFlags::PRETTY_PRINT) ? ': ' : ':';
     }
 
     private static function encodeFloat(float $num): string
@@ -122,16 +182,28 @@ final class VmJsonFormat
         return rtrim(rtrim(sprintf('%.16G', $num), '0'), '.');
     }
 
-    private static function escapeString(string $value): string
+    private static function escapeString(string $value, int $flags): string
     {
+        $unescapedUnicode = 0 !== ($flags & VmJsonFlags::UNESCAPED_UNICODE);
+        $unescapedSlashes = 0 !== ($flags & VmJsonFlags::UNESCAPED_SLASHES);
         $out = '';
         $len = \strlen($value);
         for ($i = 0; $i < $len; $i++) {
             $c = $value[$i];
             $ord = \ord($c);
+            if ($unescapedUnicode && $ord >= 0x80) {
+                $run = self::utf8RunLength($value, $i);
+                if ($run > 0) {
+                    $out .= \substr($value, $i, $run);
+                    $i += $run - 1;
+
+                    continue;
+                }
+            }
             $out .= match ($c) {
                 '"' => '\\"',
                 '\\' => '\\\\',
+                '/' => $unescapedSlashes ? '/' : '\\/',
                 "\n" => '\\n',
                 "\r" => '\\r',
                 "\t" => '\\t',
@@ -144,5 +216,36 @@ final class VmJsonFormat
         }
 
         return $out;
+    }
+
+    private static function utf8RunLength(string $value, int $offset): int
+    {
+        $len = \strlen($value);
+        if ($offset >= $len) {
+            return 0;
+        }
+        $b0 = \ord($value[$offset]);
+        if ($b0 < 0x80) {
+            return 0;
+        }
+        if (($b0 & 0xE0) === 0xC0) {
+            $need = 2;
+        } elseif (($b0 & 0xF0) === 0xE0) {
+            $need = 3;
+        } elseif (($b0 & 0xF8) === 0xF0) {
+            $need = 4;
+        } else {
+            return 0;
+        }
+        if ($offset + $need > $len) {
+            return 0;
+        }
+        for ($j = 1; $j < $need; $j++) {
+            if ((\ord($value[$offset + $j]) & 0xC0) !== 0x80) {
+                return 0;
+            }
+        }
+
+        return $need;
     }
 }

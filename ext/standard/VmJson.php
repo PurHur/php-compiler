@@ -201,6 +201,9 @@ final class VmJson
     public static function export(Variable $v, ?Context $ctx = null, ?VM $vm = null): mixed
     {
         $v = $v->resolveIndirect();
+        if (is_resource_::isResource($v)) {
+            throw new VmJsonExportException(self::ERROR_UNSUPPORTED_TYPE);
+        }
         switch ($v->type) {
             case Variable::TYPE_NULL:
                 return null;
@@ -267,9 +270,7 @@ final class VmJson
 
                 return self::export($serialized, $ctx, $vm);
             default:
-                throw new \LogicException(
-                    'json_encode() value type not supported in this compiler build'
-                );
+                throw new VmJsonExportException(self::ERROR_UNSUPPORTED_TYPE);
         }
     }
 
