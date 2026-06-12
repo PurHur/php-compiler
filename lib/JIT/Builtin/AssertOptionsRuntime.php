@@ -196,7 +196,11 @@ final class AssertOptionsRuntime
         $context->builder->branchIf($isNull, $emptyBb, $copyBb);
 
         $context->builder->positionAtEnd($emptyBb);
-        self::writeValueStringFromCstr($context, $out, $context->constantFromString(''));
+        self::writeValueStringFromCstr(
+            $context,
+            $out,
+            $context->builder->pointerCast($context->constantFromString(''), $i8p)
+        );
         $context->builder->branch($afterReadBb);
 
         $context->builder->positionAtEnd($copyBb);
