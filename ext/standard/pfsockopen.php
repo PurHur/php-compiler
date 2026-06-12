@@ -71,7 +71,7 @@ final class pfsockopen extends Internal
             }
         }
 
-        [$result, $errno, $errstr] = VmPersistentSocket::open($hostname, $port, $timeout);
+        [$result, $errno, $errstr, $socketFd] = VmPersistentSocket::open($hostname, $port, $timeout);
 
         if ($argc >= 3) {
             $errnoOut = new Variable(Variable::TYPE_INTEGER);
@@ -91,7 +91,7 @@ final class pfsockopen extends Internal
         }
 
         $uri = VmPersistentSocket::remoteUri($hostname, $port);
-        $handle = VmFs::adoptStreamResource($result, $uri);
+        $handle = VmFs::adoptStreamResource($result, $uri, $socketFd);
         if (false === $handle) {
             $frame->returnVar->bool(false);
 

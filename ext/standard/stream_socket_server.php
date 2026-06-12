@@ -67,7 +67,7 @@ final class stream_socket_server extends Internal
             }
         }
 
-        [$result, $errno, $errstr] = VmStreamSocketNative::server($local, $flags, $contextVar);
+        [$result, $errno, $errstr, $socketFd] = VmStreamSocketNative::server($local, $flags, $contextVar);
 
         if ($argc >= 2) {
             $errnoOut = new Variable(Variable::TYPE_INTEGER);
@@ -86,7 +86,7 @@ final class stream_socket_server extends Internal
             return;
         }
 
-        $handle = VmFs::adoptStreamResource($result, $local);
+        $handle = VmFs::adoptStreamResource($result, $local, $socketFd);
         if (false === $handle) {
             $frame->returnVar->bool(false);
 

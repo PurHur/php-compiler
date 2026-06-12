@@ -86,7 +86,7 @@ final class stream_socket_client extends Internal
             }
         }
 
-        [$result, $errno, $errstr] = VmStreamSocketNative::client(
+        [$result, $errno, $errstr, $socketFd] = VmStreamSocketNative::client(
             $remote,
             $timeout,
             $flags,
@@ -110,7 +110,7 @@ final class stream_socket_client extends Internal
             return;
         }
 
-        $handle = VmFs::adoptStreamResource($result, $remote);
+        $handle = VmFs::adoptStreamResource($result, $remote, $socketFd);
         if (false === $handle) {
             $frame->returnVar->bool(false);
 
