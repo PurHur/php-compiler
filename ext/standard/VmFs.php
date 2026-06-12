@@ -1435,6 +1435,28 @@ final class VmFs
         return null;
     }
 
+    /**
+     * Remove a stream handle from the VM table without fclose/gzclose (#6168 gzclose).
+     *
+     * @return resource|null detached host resource
+     */
+    public static function detachStreamHandle(int $handle): mixed
+    {
+        if (VmUserStream::isValidHandle($handle)) {
+            return null;
+        }
+        $fp = self::lookup($handle);
+        if (null === $fp) {
+            return null;
+        }
+        VmStreamFilterChain::clearStream($handle);
+        unset(self::$handles[$handle], self::$handlePaths[$handle], self::$handleSocketFds[$handle], self::$popenHandles[$handle]);
+        self::releaseHostResourceRef($fp);
+        VmPersistentSocket::forgetResource($fp);
+
+        return $fp;
+    }
+
     private static function lookup(int $handle): mixed
     {
         return self::$handles[$handle] ?? null;
