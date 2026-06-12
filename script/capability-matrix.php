@@ -148,7 +148,9 @@ function analyzeInternal(PHPCompiler\Func\Internal $fn): array
     if ('array_walk' === $fn->getName() && str_contains($source, 'VmClosureCall::isClosure')) {
         $notes[] = 'callbacks: string builtins JIT/AOT; VM closure + optional userdata (#3627)';
     }
-    if ('array_reduce' === $fn->getName() && str_contains($source, 'VmClosureCall::isClosure')) {
+    if ('array_reduce' === $fn->getName() && str_contains($source, 'buildReduceArrayWithClosure')) {
+        $notes[] = 'callbacks: string user functions + closure/arrow JIT/AOT (#3531); php-src-strict invalid callback TypeError (#6679)';
+    } elseif ('array_reduce' === $fn->getName() && str_contains($source, 'VmClosureCall::isClosure')) {
         $notes[] = 'callbacks: string user functions + VM closures; php-src-strict invalid callback TypeError (#6679)';
     } elseif ('array_reduce' === $fn->getName() && preg_match('/callables are deferred/i', $source)) {
         $notes[] = 'callbacks: string user functions VM-only; closures deferred (#1213, #142)';

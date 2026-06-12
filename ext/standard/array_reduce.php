@@ -112,10 +112,13 @@ final class array_reduce extends Internal
         if (!ArrayReduceCallbackPolicy::isJitLowerable($args[1])) {
             throw new \LogicException(ArrayReduceCallbackPolicy::jitRejectionMessage());
         }
+        $initial = 3 === $argc ? $args[2] : null;
+        if (ArrayReduceCallbackPolicy::isClosureJitLowerable($args[1])) {
+            return ArrayBuiltinHelper::buildReduceArrayWithClosure($context, $args[0], $args[1], $initial);
+        }
         if (JITVariable::TYPE_STRING === $args[1]->type || JITVariable::TYPE_VALUE === $args[1]->type) {
             $this->jitString($context, $args[1], 'array_reduce() callback');
         }
-        $initial = 3 === $argc ? $args[2] : null;
 
         return ArrayBuiltinHelper::buildReduceArray($context, $args[0], $args[1], $initial);
     }
