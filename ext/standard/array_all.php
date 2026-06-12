@@ -38,8 +38,8 @@ final class array_all extends Internal
             throw new \LogicException('array_all() first argument must be an array in this compiler build');
         }
         $callback = $frame->calledArgs[1];
-        foreach ($array->toArray()->iterateKeyed(true) as [, $value]) {
-            $result = VmArrayValueCallback::invokePredicate($frame, $callback, $value);
+        foreach ($array->toArray()->iterateKeyed(true) as [$key, $value]) {
+            $result = VmArrayValueCallback::invokePredicate($frame, $callback, $value, $key);
             if (!VmArrayValueCallback::isTruthy($result)) {
                 $frame->returnVar->bool(false);
 

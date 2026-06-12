@@ -12,8 +12,15 @@ use PHPCompiler\VM\Variable;
  */
 final class VmArrayValueCallback
 {
-    public static function invokePredicate(Frame $frame, Variable $callback, Variable $value): Variable
-    {
+    /**
+     * Invoke array_find-family predicate with php-src (value, key) callback args (PHP 8.4 array.c).
+     */
+    public static function invokePredicate(
+        Frame $frame,
+        Variable $callback,
+        Variable $value,
+        Variable $key,
+    ): Variable {
         $callback = $callback->resolveIndirect();
         if (VmClosureCall::isClosure($callback)) {
             if (null === $frame->vmContext) {
@@ -22,10 +29,11 @@ final class VmArrayValueCallback
                 );
             }
 
-            return VmClosureCall::invokeOne(
+            return VmClosureCall::invoke(
                 $frame->vmContext,
                 VmClosureCall::resolve($callback),
-                $value
+                $value,
+                $key,
             );
         }
         if (Variable::TYPE_STRING !== $callback->type) {
@@ -37,6 +45,7 @@ final class VmArrayValueCallback
         try {
             $fn = VmInternalCall::resolveStringCallback($name);
 
+            // Zend 1-arg internals ignore the key operand; our Internal handlers count args.
             return VmInternalCall::invoke($fn, $value);
         } catch (\LogicException) {
             // Not a registered string builtin — try a user-defined function.
@@ -48,7 +57,7 @@ final class VmArrayValueCallback
         }
         $fn = VmUserCall::resolveStringCallback($frame->vmContext, $name);
 
-        return VmUserCall::invokeOne($frame->vmContext, $fn, $value);
+        return VmUserCall::invokeTwo($frame->vmContext, $fn, $value, $key);
     }
 
     public static function isTruthy(Variable $result): bool

@@ -110,7 +110,8 @@ final class ArrayFindHelper
                 $context->builder->load($slot)
             );
         }
-        $truthy = self::invokePredicateTruthy($context, $handler, $elem);
+        $keyVar = self::indexToKeyVariable($context, $idx);
+        $truthy = self::invokePredicateTruthy($context, $handler, $elem, $keyVar);
         $shouldStop = self::stopOnPredicate($context, $truthy, $mode);
         $context->builder->branchIf($shouldStop, $match, $advance);
 
@@ -192,7 +193,8 @@ final class ArrayFindHelper
 
         $context->builder->positionAtEnd($packedCheck);
         $elem = HashTableHelper::readIndexedToValueBox($context, $ht, $idx);
-        $truthy = self::invokePredicateTruthy($context, $handler, $elem);
+        $keyVar = self::indexToKeyVariable($context, $idx);
+        $truthy = self::invokePredicateTruthy($context, $handler, $elem, $keyVar);
         $shouldStop = self::stopOnPredicate($context, $truthy, $mode);
         $context->builder->branchIf($shouldStop, $packedMatch, $packedNext);
 
@@ -332,7 +334,9 @@ final class ArrayFindHelper
         $elemSlot = JitValueBox::alloc($context);
         JitValueBox::copyFromPointer($context, $elemSlot, $valEntry);
         $elem = new Variable($context, Variable::TYPE_VALUE, Variable::KIND_VARIABLE, $elemSlot);
-        $truthy = self::invokePredicateTruthy($context, $handler, $elem);
+        $keyStr = $context->builder->load($context->builder->structGep($node, $nodeMap['key']));
+        $keyVar = self::separatedStringToKeyVariable($context, $keyStr);
+        $truthy = self::invokePredicateTruthy($context, $handler, $elem, $keyVar);
         $shouldStop = self::stopOnPredicate($context, $truthy, $mode);
         $context->builder->branchIf($shouldStop, $strMatch, $strNext);
 
@@ -340,7 +344,6 @@ final class ArrayFindHelper
         if (self::MODE_FIND === $mode) {
             JitValueBox::copyFromPointer($context, $resultSlot, $valEntry);
         } elseif (self::MODE_FIND_KEY === $mode) {
-            $keyStr = $context->builder->load($context->builder->structGep($node, $nodeMap['key']));
             $owned = $context->builder->call($context->lookupFunction('__string__separate'), $keyStr);
             $context->builder->call(
                 $context->lookupFunction('__value__writeString'),
@@ -414,7 +417,8 @@ final class ArrayFindHelper
     private static function invokePredicateTruthy(
         Context $context,
         array $handler,
-        Variable $elem
+        Variable $elem,
+        Variable $key,
     ): Value {
         [$kind, $target] = $handler;
         if ('builtin' === $kind) {
@@ -424,9 +428,35 @@ final class ArrayFindHelper
             return self::jitCallResultTruthy($context, $mapped);
         }
         /** @var Call $target */
-        $result = $target->call($context, $elem);
+        $result = $target->call($context, $elem, $key);
 
         return self::jitCallResultTruthy($context, $result);
+    }
+
+    private static function indexToKeyVariable(Context $context, Value $idx): Variable
+    {
+        $i64 = $context->getTypeFromString('int64');
+        $slot = JitValueBox::alloc($context);
+        JitValueBox::writeLong(
+            $context,
+            $slot,
+            $context->builder->truncOrBitCast($idx, $i64)
+        );
+
+        return new Variable($context, Variable::TYPE_VALUE, Variable::KIND_VARIABLE, $slot);
+    }
+
+    private static function separatedStringToKeyVariable(Context $context, Value $keyStr): Variable
+    {
+        $owned = $context->builder->call($context->lookupFunction('__string__separate'), $keyStr);
+        $slot = JitValueBox::alloc($context);
+        $context->builder->call(
+            $context->lookupFunction('__value__writeString'),
+            JitValueBox::pointer($context, $slot),
+            $owned
+        );
+
+        return new Variable($context, Variable::TYPE_VALUE, Variable::KIND_VARIABLE, $slot);
     }
 
     private static function jitCallResultTruthy(Context $context, Value $result): Value
