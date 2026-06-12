@@ -75,7 +75,6 @@ final class VmArrayUserSetOps
         $dataCompare = self::resolveCompareCallback($frame, $frame->calledArgs[$argc - 1], $fn);
         $first = VmArray::requireArrayParam($frame->calledArgs[0], $fn, 1, 'array');
         $others = self::collectOtherArrays($frame, $fn, 1, $argc - 1);
-        self::guardOperands($first, $others);
         if (null === $frame->returnVar) {
             return;
         }
@@ -116,7 +115,6 @@ final class VmArrayUserSetOps
         $arrayEnd = $dualCompare ? $argc - 2 : $argc - 1;
         $first = VmArray::requireArrayParam($frame->calledArgs[0], $fn, 1, 'array');
         $others = self::collectOtherArrays($frame, $fn, 1, $arrayEnd);
-        self::guardOperands($first, $others);
         if (null === $frame->returnVar) {
             return;
         }
@@ -144,7 +142,6 @@ final class VmArrayUserSetOps
         $dataCompare = self::resolveCompareCallback($frame, $frame->calledArgs[$argc - 1], 'array_diff_uassoc');
         $first = VmArray::requireArrayParam($frame->calledArgs[0], 'array_diff_uassoc', 1, 'array');
         $others = self::collectOtherArrays($frame, 'array_diff_uassoc', 1, $argc - 1);
-        self::guardOperands($first, $others);
         if (null === $frame->returnVar) {
             return;
         }
@@ -173,7 +170,6 @@ final class VmArrayUserSetOps
         );
         $first = VmArray::requireArrayParam($frame->calledArgs[0], 'array_intersect_uassoc', 1, 'array');
         $others = self::collectOtherArrays($frame, 'array_intersect_uassoc', 1, $argc - 1);
-        self::guardOperands($first, $others);
         if (null === $frame->returnVar) {
             return;
         }
@@ -198,7 +194,6 @@ final class VmArrayUserSetOps
         $keyCompare = self::resolveCompareCallback($frame, $frame->calledArgs[$argc - 1], 'array_diff_ukey');
         $first = VmArray::requireArrayParam($frame->calledArgs[0], 'array_diff_ukey', 1, 'array');
         $others = self::collectOtherArrays($frame, 'array_diff_ukey', 1, $argc - 1);
-        self::guardOperands($first, $others);
         if (null === $frame->returnVar) {
             return;
         }
@@ -227,7 +222,6 @@ final class VmArrayUserSetOps
         );
         $first = VmArray::requireArrayParam($frame->calledArgs[0], 'array_intersect_ukey', 1, 'array');
         $others = self::collectOtherArrays($frame, 'array_intersect_ukey', 1, $argc - 1);
-        self::guardOperands($first, $others);
         if (null === $frame->returnVar) {
             return;
         }
@@ -280,14 +274,6 @@ final class VmArrayUserSetOps
         }
 
         return $others;
-    }
-
-    /**
-     * @param list<HashTable> $others
-     */
-    private static function guardOperands(HashTable $first, array $others): void
-    {
-        VmArray::rejectEnumCaseSetOpOperands($first, ...$others);
     }
 
     /**
