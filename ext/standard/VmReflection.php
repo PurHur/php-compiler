@@ -1264,6 +1264,25 @@ final class VmReflection
         return $current->block->func->class->value;
     }
 
+    /**
+     * Defining class for get_class() with no arguments (issue #4092).
+     *
+     * php-src / PHP 8.2: zero-arg get_class() matches __CLASS__ (method definition scope),
+     * not get_class($this). Use get_called_class() for the call-site / LSB class name.
+     */
+    public static function zeroArgGetClassName(Frame $frame): string
+    {
+        $current = $frame->parent;
+        if (null === $current) {
+            throw new \Error('get_class() without arguments must be called from within a class');
+        }
+        if (null === $current->block || null === $current->block->func || null === $current->block->func->class) {
+            throw new \Error('get_class() without arguments must be called from within a class');
+        }
+
+        return $current->block->func->class->value;
+    }
+
     /** php-src ZEND_ACC_* filter bitmask for getProperties()/getMethods() (not getModifiers()). */
     public const REFLECTION_IS_PUBLIC = 256;
 
