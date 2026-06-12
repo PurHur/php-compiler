@@ -111,8 +111,8 @@ class JITTest extends BaseTest {
             if (str_contains($name, 'exception_handler')) {
                 continue;
             }
-            // session_abort/session_reset/session_create_id/session_gc: VM lifecycle API (#6002/#6006); JIT deferred.
-            if (str_contains($name, 'session_abort') || str_contains($name, 'session_reset') || str_contains($name, 'session_create_id') || str_contains($name, 'session_gc')) {
+            // session_reset/session_create_id/session_gc: VM lifecycle API (#6002/#6006); JIT deferred.
+            if (str_contains($name, 'session_reset') || str_contains($name, 'session_create_id') || str_contains($name, 'session_gc')) {
                 continue;
             }
             // headers_sent($file, $line) by-ref origin: VM path only (#5134); JIT zero-arg #4110.

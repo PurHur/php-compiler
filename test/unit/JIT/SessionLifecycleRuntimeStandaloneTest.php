@@ -28,6 +28,7 @@ final class SessionLifecycleRuntimeStandaloneTest extends TestCase
                 '__phpc_session_write_close_apply',
                 '__phpc_session_regenerate_id_apply',
                 '__phpc_session_destroy_apply',
+                '__phpc_session_abort_apply',
                 '__phpc_session_generate_new_id',
             ] as $name
         ) {

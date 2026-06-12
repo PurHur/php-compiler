@@ -1174,8 +1174,8 @@ function builtinCapabilityCurations(): array
             'notes' => [$persistenceNote],
         ],
         'session_abort' => [
-            'aot' => 'no',
-            'notes' => ['VM lifecycle API (#6002); JIT/AOT pending'],
+            'aot' => 'yes',
+            'notes' => [$persistenceNote, 'lifecycle API (#6002)'],
         ],
         'session_reset' => [
             'aot' => 'no',
