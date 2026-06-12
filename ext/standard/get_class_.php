@@ -8,6 +8,7 @@ use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\Variable as JITVariable;
+use PHPCompiler\VM\BuiltinExecute;
 use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
 
@@ -23,28 +24,47 @@ final class get_class_ extends Internal
 
     public function execute(Frame $frame): void
     {
-        if (1 !== \count($frame->calledArgs)) {
-            throw new \LogicException('get_class() requires exactly one argument in this compiler build');
+        $argc = \count($frame->calledArgs);
+        if ($argc > 1) {
+            throw new \ArgumentCountError(
+                \sprintf('get_class() expects at most 1 argument, %d given', $argc)
+            );
         }
-        $value = $frame->calledArgs[0]->resolveIndirect();
-        if (null === $frame->returnVar) {
-            return;
-        }
-        if (Variable::TYPE_ENUM_CASE === $value->type) {
-            $frame->returnVar->string($value->toEnumCase()->enumClass->name);
+        if (0 === $argc) {
+            $definingClass = VmReflection::zeroArgGetClassName($frame);
+            BuiltinExecute::writeReturn(
+                $frame,
+                static function (Variable $ret) use ($definingClass): void {
+                    $ret->string($definingClass);
+                }
+            );
 
             return;
         }
-        if (Variable::TYPE_OBJECT !== $value->type) {
-            throw new \TypeError(\sprintf(self::TYPE_ERROR, self::vmTypeName($value->type)));
-        }
-        $frame->returnVar->string($value->toObject()->class->name);
+        $value = $frame->calledArgs[0]->resolveIndirect();
+        BuiltinExecute::writeReturn(
+            $frame,
+            function (Variable $ret) use ($value): void {
+                if (Variable::TYPE_ENUM_CASE === $value->type) {
+                    $ret->string($value->toEnumCase()->enumClass->name);
+
+                    return;
+                }
+                if (Variable::TYPE_OBJECT !== $value->type) {
+                    throw new \TypeError(\sprintf(self::TYPE_ERROR, self::vmTypeName($value->type)));
+                }
+                $ret->string($value->toObject()->class->name);
+            }
+        );
     }
 
     public function call(Context $context, JITVariable ...$args): Value
     {
+        if (0 === \count($args)) {
+            return JitGetClass::invokeNoArg($context);
+        }
         if (1 !== \count($args)) {
-            throw new \LogicException('get_class() requires exactly one argument in this compiler build');
+            throw new \LogicException('get_class() expects at most one argument in this compiler build');
         }
 
         return JitGetClass::invoke($context, $args[0]);

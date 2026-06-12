@@ -4,7 +4,9 @@ declare(strict_types=1);
 
 namespace PHPCompiler\ext\standard;
 
+use PHPCompiler\Block;
 use PHPCompiler\JIT\BasicBlockHelper;
+use PHPCompiler\JIT\Builtin\ErrorRaise;
 use PHPCompiler\JIT\Builtin\TypeErrorRaise;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitValueBox;
@@ -14,10 +16,27 @@ use PHPCompiler\VM\Variable;
 use PHPLLVM\Builder;
 use PHPLLVM\Value;
 
-/** LLVM lowering for get_class() — class name or TypeError (#1217, #5456). */
+/** LLVM lowering for get_class() — class name or TypeError (#1217, #5456, #4092). */
 final class JitGetClass
 {
     private const TYPE_ERROR = 'get_class(): Argument #1 ($object) must be of type object, %s given';
+
+    private const NO_THIS_ERROR = 'get_class() without arguments must be called from within a class';
+
+    public static function invokeNoArg(Context $context): Value
+    {
+        $block = $context->jitEnclosingBlock;
+        if (!$block instanceof Block || null === $block->func || null === $block->func->class) {
+            self::emitNoThisErrorAndAbort($context);
+
+            return self::emptyStringBox($context);
+        }
+
+        return self::boxString(
+            $context,
+            $context->builder->load($context->constantStringFromString($block->func->class->value))
+        );
+    }
 
     public static function invoke(Context $context, JITVariable $arg): Value
     {
@@ -95,5 +114,37 @@ final class JitGetClass
             default:
                 return \sprintf(self::TYPE_ERROR, 'mixed');
         }
+    }
+
+    private static function emitNoThisErrorAndAbort(Context $context): void
+    {
+        ErrorRaise::registerDeclarations($context);
+        ErrorRaise::ensureLinked($context);
+        ErrorRaise::emitRaise($context, self::NO_THIS_ERROR);
+        $context->builder->call($context->lookupFunction('abort'));
+    }
+
+    private static function boxString(Context $context, Value $nativeStr): Value
+    {
+        $slot = JitValueBox::alloc($context);
+        $context->builder->call(
+            $context->lookupFunction('__value__writeString'),
+            JitValueBox::pointer($context, $slot),
+            $nativeStr
+        );
+
+        return JitValueBox::pointer($context, $slot);
+    }
+
+    private static function emptyStringBox(Context $context): Value
+    {
+        $slot = JitValueBox::alloc($context);
+        $context->builder->call(
+            $context->lookupFunction('__value__writeString'),
+            JitValueBox::pointer($context, $slot),
+            $context->builder->load($context->constantStringFromString(''))
+        );
+
+        return JitValueBox::pointer($context, $slot);
     }
 }
