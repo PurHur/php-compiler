@@ -807,7 +807,7 @@ final class VmFs
     public static function fsync(int $handle): bool
     {
         $fp = self::lookup($handle);
-        if (null === $fp || !VmStreamSync::isSupportedResource($fp)) {
+        if (null === $fp || !VmStreamSync::isSupported($handle)) {
             return false;
         }
         @\fflush($fp);
@@ -819,7 +819,7 @@ final class VmFs
     public static function fdatasync(int $handle): bool
     {
         $fp = self::lookup($handle);
-        if (null === $fp || !VmStreamSync::isSupportedResource($fp)) {
+        if (null === $fp || !VmStreamSync::isSupported($handle)) {
             return false;
         }
         @\fflush($fp);
