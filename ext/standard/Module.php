@@ -298,6 +298,8 @@ class Module extends ModuleAbstract
             new implode('join'),
             new image_type_to_extension(),
             new image_type_to_mime_type(),
+            new iptcembed(),
+            new iptcparse(),
             new str_replace(),
             new str_ireplace(),
             new strtr(),
