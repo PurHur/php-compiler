@@ -1,0 +1,13 @@
+--- vendor/ircmaxell/php-llvm/lib/LLVMAbstract/Type/Vector.php
++++ vendor/ircmaxell/php-llvm/lib/LLVMAbstract/Type/Vector.php
+@@ -16,6 +16,10 @@
+         return $this->llvm->lib->LLVMGetVectorSize($this->type);
+     }
+ 
++    public function getAddressSpace(): int {
++        return 0;
++    }
++
+     public function getKind(): int {
+         return self::KIND_VECTOR;
+     }

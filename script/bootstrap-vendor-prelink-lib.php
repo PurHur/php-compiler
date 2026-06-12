@@ -486,13 +486,22 @@ function bootstrapVendorPrelinkCompilePackages(
         $cmd = bootstrapVendorPrelinkBuildCompileCommand($root, $buildBase, $bundleAbs, $invoker);
         $output = [];
         exec($cmd, $output, $code);
-        $objectCandidate = $buildBase.'.o';
+        $compileOut = $buildBase.'.o';
+        $objectCandidate = $compileOut;
 
         if (0 === $code && is_file($objectCandidate)) {
             copy($objectCandidate, $objectAbs);
             $manifest['packages'][$package]['status'] = 'object_ok';
             $manifest['packages'][$package]['blocker'] = null;
             fwrite(STDOUT, "OK {$package} → {$objectRel}\n");
+            continue;
+        }
+        // Legacy emit wrote $compileOut.o when -o already ended in .o (#3054).
+        if (0 === $code && !is_file($objectCandidate) && is_file($compileOut.'.o')) {
+            copy($compileOut.'.o', $objectAbs);
+            $manifest['packages'][$package]['status'] = 'object_ok';
+            $manifest['packages'][$package]['blocker'] = null;
+            fwrite(STDOUT, "OK {$package} → {$objectRel} (native compile, legacy .o.o)\n");
             continue;
         }
         // Native argv / emit-helper may write object bytes to -o without separate .o suffix (#3036).
