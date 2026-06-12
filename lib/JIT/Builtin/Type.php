@@ -887,6 +887,11 @@ class Type extends Builtin {
             $this->context->context->functionType($void, false)
         );
         $this->context->registerFunction('__phpc_pending_header_reset', $fnPendingReset);
+        $fnHeaderQueueEnable = $this->context->module->addFunction(
+            '__phpc_header_queue_enable',
+            $this->context->context->functionType($void, false)
+        );
+        $this->context->registerFunction('__phpc_header_queue_enable', $fnHeaderQueueEnable);
         $fnPendingAdd = $this->context->module->addFunction(
             '__phpc_pending_header_add',
             $this->context->context->functionType($void, false, $strPtr, $i32)

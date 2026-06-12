@@ -104,6 +104,9 @@ final class Superglobals
             $_ENV['SCRIPT_FILENAME'] = $scriptFilename;
             $_SERVER['SCRIPT_FILENAME'] = $scriptFilename;
         }
+        putenv('GATEWAY_INTERFACE=CGI/1.1');
+        $_ENV['GATEWAY_INTERFACE'] = 'CGI/1.1';
+        $_SERVER['GATEWAY_INTERFACE'] = 'CGI/1.1';
     }
 
     public static function populateFromEnvironment(

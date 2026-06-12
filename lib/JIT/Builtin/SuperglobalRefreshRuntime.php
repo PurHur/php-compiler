@@ -298,6 +298,7 @@ final class SuperglobalRefreshRuntime
         $context->builder->positionAtEnd($afterScriptFnBb);
         self::setServerKey($context, $serverHt, 'REQUEST_URI', $requestUri);
         self::setServerKey($context, $serverHt, 'GATEWAY_INTERFACE', self::literalCstr($context, self::GATEWAY_INTERFACE));
+        self::enableHeaderQueueWhenCgiEnv($context, $fn);
 
         $serverProtocol = $context->builder->call(
             $context->lookupFunction('getenv'),
@@ -1876,6 +1877,29 @@ final class SuperglobalRefreshRuntime
             return;
         }
         $context->builder->clearInsertionPosition();
+    }
+
+    /**
+     * Enable pending headers when real/simulated CGI env is present (issue #4037).
+     */
+    private static function enableHeaderQueueWhenCgiEnv(Context $context, LlvmFunction $fn): void
+    {
+        $i8p = $context->getTypeFromString('int8*');
+        $gi = $context->builder->call(
+            $context->lookupFunction('getenv'),
+            self::literalCstr($context, 'GATEWAY_INTERFACE')
+        );
+        $skip = $fn->appendBasicBlock('sg_refresh_hdr_queue_skip_'.++self::$blockSuffix);
+        $enable = $fn->appendBasicBlock('sg_refresh_hdr_queue_enable_'.self::$blockSuffix);
+        $merge = $fn->appendBasicBlock('sg_refresh_hdr_queue_merge_'.self::$blockSuffix);
+        $isNull = $context->builder->icmp(Builder::INT_EQ, $gi, $i8p->constNull());
+        $context->builder->branchIf($isNull, $skip, $enable);
+        $context->builder->positionAtEnd($enable);
+        $context->builder->call($context->lookupFunction('__phpc_header_queue_enable'));
+        $context->builder->branch($merge);
+        $context->builder->positionAtEnd($skip);
+        $context->builder->branch($merge);
+        $context->builder->positionAtEnd($merge);
     }
 
     private static function registerLinkedRuntime(Context $context): void

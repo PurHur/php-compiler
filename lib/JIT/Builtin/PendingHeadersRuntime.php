@@ -26,6 +26,8 @@ final class PendingHeadersRuntime
 
     private const G_SAPI_STARTED = '__phpc_sapi_output_started';
 
+    private const G_QUEUE_ENABLED = 'phpc_header_queue_enabled';
+
     private static int $blockSuffix = 0;
 
     public static function ensureLinked(Context $context): void
@@ -48,6 +50,7 @@ final class PendingHeadersRuntime
         self::ensureHashtableHelpers($context);
 
         self::implementReset($context);
+        self::implementEnableHeaderQueue($context);
         self::implementHeadersSent($context);
         self::implementRemove($context);
         self::implementAdd($context);
@@ -66,10 +69,22 @@ final class PendingHeadersRuntime
         $i32 = $context->getTypeFromString('int32');
         $context->builder->store($i32->constInt(0, false), self::countPtr($context));
         $context->builder->store($i32->constInt(0, false), self::flushedPtr($context));
+        $context->builder->store($i32->constInt(0, false), self::queueEnabledPtr($context));
         $sapi = $context->module->getNamedGlobal(self::G_SAPI_STARTED);
         if (null !== $sapi) {
             $context->builder->store($i32->constInt(0, false), self::globalPtr($context, self::G_SAPI_STARTED, $i32));
         }
+        $context->builder->returnVoid();
+        $context->builder->clearInsertionPosition();
+    }
+
+    private static function implementEnableHeaderQueue(Context $context): void
+    {
+        $fn = self::fn($context, '__phpc_header_queue_enable', $context->context->voidType(), false);
+        $entry = $fn->appendBasicBlock('ph_queue_enable_entry');
+        $context->builder->positionAtEnd($entry);
+        $i32 = $context->getTypeFromString('int32');
+        $context->builder->store($i32->constInt(1, false), self::queueEnabledPtr($context));
         $context->builder->returnVoid();
         $context->builder->clearInsertionPosition();
     }
@@ -100,6 +115,8 @@ final class PendingHeadersRuntime
         $strPtr = $context->getTypeFromString('__string__*');
         $fn = self::fn($context, '__phpc_pending_header_remove', $context->context->voidType(), false, $strPtr);
         $entry = $fn->appendBasicBlock('ph_rem_entry');
+        $disabled = $fn->appendBasicBlock('ph_rem_disabled');
+        $afterGate = $fn->appendBasicBlock('ph_rem_after_gate');
         $emptyName = $fn->appendBasicBlock('ph_rem_clear');
         $loopInit = $fn->appendBasicBlock('ph_rem_loop_init');
         $loopHead = $fn->appendBasicBlock('ph_rem_loop_head');
@@ -111,6 +128,16 @@ final class PendingHeadersRuntime
 
         $i32 = $context->getTypeFromString('int32');
         $i64 = $context->getTypeFromString('int64');
+        $queueOn = $context->builder->icmp(
+            Builder::INT_NE,
+            $context->builder->load(self::queueEnabledPtr($context)),
+            $i32->constInt(0, false)
+        );
+        $context->builder->branchIf($queueOn, $afterGate, $disabled);
+        $context->builder->positionAtEnd($disabled);
+        $context->builder->returnVoid();
+
+        $context->builder->positionAtEnd($afterGate);
         $name = $fn->getParam(0);
         $isNull = $context->builder->icmp(Builder::INT_EQ, $name, $strPtr->constNull());
         $nameLen = self::stringLen($context, $name);
@@ -176,6 +203,8 @@ final class PendingHeadersRuntime
         $fn = self::fn($context, '__phpc_pending_header_add', $context->context->voidType(), false, $strPtr, $i32);
         $entry = $fn->appendBasicBlock('ph_add_entry');
         $skip = $fn->appendBasicBlock('ph_add_skip');
+        $queueGate = $fn->appendBasicBlock('ph_add_queue_gate');
+        $statusOnly = $fn->appendBasicBlock('ph_add_status_only');
         $work = $fn->appendBasicBlock('ph_add_work');
         $context->builder->positionAtEnd($entry);
 
@@ -184,7 +213,19 @@ final class PendingHeadersRuntime
         $isNull = $context->builder->icmp(Builder::INT_EQ, $line, $strPtr->constNull());
         $hasCrlf = self::lineHasCrlf($context, $fn, $line);
         $bad = $context->builder->or($isNull, $hasCrlf);
-        $context->builder->branchIf($bad, $skip, $work);
+        $context->builder->branchIf($bad, $skip, $queueGate);
+
+        $context->builder->positionAtEnd($queueGate);
+        $queueOn = $context->builder->icmp(
+            Builder::INT_NE,
+            $context->builder->load(self::queueEnabledPtr($context)),
+            $i32->constInt(0, false)
+        );
+        $context->builder->branchIf($queueOn, $work, $statusOnly);
+
+        $context->builder->positionAtEnd($statusOnly);
+        self::maybeSetLocationStatus($context, $line);
+        $context->builder->branch($skip);
 
         $context->builder->positionAtEnd($work);
         self::maybeSetLocationStatus($context, $line);
@@ -229,6 +270,7 @@ final class PendingHeadersRuntime
         $htPtr = $context->getTypeFromString('__hashtable__*');
         $fn = self::fn($context, '__phpc_pending_header_list', $htPtr, false);
         $entry = $fn->appendBasicBlock('ph_list_entry');
+        $loopInit = $fn->appendBasicBlock('ph_list_init');
         $loopHead = $fn->appendBasicBlock('ph_list_loop');
         $loopBody = $fn->appendBasicBlock('ph_list_body');
         $done = $fn->appendBasicBlock('ph_list_done');
@@ -237,6 +279,14 @@ final class PendingHeadersRuntime
         $i32 = $context->getTypeFromString('int32');
         $i64 = $context->getTypeFromString('int64');
         $ht = $context->builder->call($context->lookupFunction('__hashtable__alloc'));
+        $queueOn = $context->builder->icmp(
+            Builder::INT_NE,
+            $context->builder->load(self::queueEnabledPtr($context)),
+            $i32->constInt(0, false)
+        );
+        $context->builder->branchIf($queueOn, $loopInit, $done);
+
+        $context->builder->positionAtEnd($loopInit);
         $idxSlot = $context->builder->alloca($i32, 1);
         $context->builder->store($i32->constInt(0, false), $idxSlot);
         $context->builder->branch($loopHead);
@@ -887,6 +937,11 @@ final class PendingHeadersRuntime
         return self::globalPtr($context, self::G_FLUSHED, $context->getTypeFromString('int32'));
     }
 
+    private static function queueEnabledPtr(Context $context): Value
+    {
+        return self::globalPtr($context, self::G_QUEUE_ENABLED, $context->getTypeFromString('int32'));
+    }
+
     private static function globalPtr(Context $context, string $name, $llvmType): Value
     {
         $global = $context->module->getNamedGlobal($name);
@@ -905,6 +960,7 @@ final class PendingHeadersRuntime
             [
                 self::G_COUNT => $i32->constInt(0, false),
                 self::G_FLUSHED => $i32->constInt(0, false),
+                self::G_QUEUE_ENABLED => $i32->constInt(0, false),
             ] as $name => $init
         ) {
             if (null === $context->module->getNamedGlobal($name)) {
@@ -994,6 +1050,7 @@ final class PendingHeadersRuntime
         foreach (
             [
                 '__phpc_pending_header_reset',
+                '__phpc_header_queue_enable',
                 '__phpc_pending_header_add',
                 '__phpc_pending_header_remove',
                 '__phpc_pending_header_list',
