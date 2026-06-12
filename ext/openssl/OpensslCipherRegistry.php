@@ -271,12 +271,6 @@ final class OpensslCipherRegistry
         return self::CIPHER_KEY_LENGTHS[$key] ?? false;
     }
 
-    /** @return array<string, int> EVP_CIPHER key lengths for JIT/AOT table lowering (#6522). */
-    public static function cipherKeyLengthTable(): array
-    {
-        return self::CIPHER_KEY_LENGTHS;
-    }
-
     /** @return list<string> */
     public static function cipherMethods(bool $aliases = false): array
     {
