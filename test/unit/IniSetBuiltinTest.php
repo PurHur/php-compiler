@@ -59,6 +59,22 @@ PHP;
     }
 
     /** @group llvm */
+    public function testAotNativeBinaryIniGetAll(): void
+    {
+        if (!LlvmToolchain::isReady(dirname(__DIR__, 2))) {
+            $this->markTestSkipped('LLVM 9 toolchain not available');
+        }
+        $code = <<<'PHP'
+$all = ini_get_all();
+echo isset($all['display_errors']) ? "all_ok\n" : "all_fail\n";
+$flat = ini_get_all(null, false);
+echo is_string($flat['display_errors']) ? "flat_ok\n" : "flat_fail\n";
+echo ini_get_all('nonexistent') === false ? "ext_false\n" : "ext_bad\n";
+PHP;
+        $this->assertSame("all_ok\nflat_ok\next_false\n", $this->runAotBinary($code));
+    }
+
+    /** @group llvm */
     public function testAotNativeBinaryIniSetSubset(): void
     {
         if (!LlvmToolchain::isReady(dirname(__DIR__, 2))) {

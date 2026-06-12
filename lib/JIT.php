@@ -9810,16 +9810,22 @@ class JIT {
 
             return;
         } elseif (Variable::TYPE_HASHTABLE === $result->type && Variable::TYPE_VALUE === $value->type) {
-            $ht = $this->context->builder->call(
-                $this->context->lookupFunction('__value__readHashtable'),
+            // ini_get_all() and similar builtins return array|false as __value__; keep the box
+            // so strict comparisons against false use JitValueCompare (issue #3205, #848).
+            $slot = JIT\JitValueBox::alloc($this->context);
+            JIT\JitValueBox::copyFromPointer(
+                $this->context,
+                $slot,
                 $this->valueBoxPointer($value)
             );
             $result->free();
-            $this->context->builder->store($ht, $result->value);
-            $this->maybeCopyObjectPropertyBacking($result, $value, $force);
-            if (null === $result->objectPropertySlot) {
-                $result->addref();
-            }
+            $result->type = Variable::TYPE_VALUE;
+            $result->value = $slot;
+            $this->copyValueBoxJitFlags($result, $value, $force);
+            $result->compileTimeConstantName = $value->compileTimeConstantName;
+            $result->compileTimeEnumCase = $value->compileTimeEnumCase;
+            $this->syncCompileTimeString($result, $value, $force);
+            $result->addref();
 
             return;
         } elseif (Variable::TYPE_VALUE === $result->type && Variable::TYPE_HASHTABLE === $value->type) {
