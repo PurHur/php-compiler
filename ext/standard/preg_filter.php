@@ -7,6 +7,7 @@ namespace PHPCompiler\ext\standard;
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\JitLongArg;
 use PHPCompiler\JIT\JitStringArg;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\HashTable;
@@ -121,15 +122,11 @@ final class preg_filter extends Internal
                 'preg_filter() expects 3 to 5 arguments in this compiler build'
             );
         }
-        if ($argc >= 4) {
-            throw new \LogicException(
-                'preg_filter() limit is not supported in JIT/AOT in this compiler build'
-            );
-        }
+        $limit = $argc >= 4
+            ? self::lowerLimit($context, $args[3])
+            : $context->getTypeFromString('int64')->constInt(-1, false);
         if (5 === $argc) {
-            throw new \LogicException(
-                'preg_filter() flags are not supported in JIT/AOT in this compiler build'
-            );
+            self::lowerFlags($context, $args[4]);
         }
 
         JitPregSubject::requireStringOrArray($context, $args[2], 'preg_filter', 2, 'subject');
@@ -138,7 +135,42 @@ final class preg_filter extends Internal
             $context,
             JitStringArg::lower($context, $args[0], 'preg_filter() pattern'),
             JitStringArg::lower($context, $args[1], 'preg_filter() replacement'),
-            $args[2]
+            $args[2],
+            $limit
         );
+    }
+
+    private static function lowerLimit(Context $context, JITVariable $arg): Value
+    {
+        $lit = self::compileTimeLimit($arg);
+        if (null !== $lit) {
+            return $context->constantFromInteger($lit, 'int64');
+        }
+
+        return JitLongArg::lower($context, $arg, 'preg_filter() argument #4 ($limit)');
+    }
+
+    /** @see VmPregNative::pregFilter() — flags accepted for arity parity; not applied yet */
+    private static function lowerFlags(Context $context, JITVariable $arg): Value
+    {
+        $lit = self::compileTimeLimit($arg);
+        if (null !== $lit) {
+            return $context->constantFromInteger($lit, 'int64');
+        }
+
+        return JitLongArg::lower($context, $arg, 'preg_filter() argument #5 ($flags)');
+    }
+
+    private static function compileTimeLimit(JITVariable $arg): ?int
+    {
+        if (JITVariable::TYPE_NATIVE_LONG !== $arg->type
+            || JITVariable::KIND_VALUE !== $arg->kind) {
+            return null;
+        }
+        if (null !== ($arg->compileTimeLong ?? null)) {
+            return (int) $arg->compileTimeLong;
+        }
+
+        return null;
     }
 }
