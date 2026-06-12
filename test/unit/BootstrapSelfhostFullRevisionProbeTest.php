@@ -53,6 +53,14 @@ final class BootstrapSelfhostFullRevisionProbeTest extends TestCase
         $this->assertStringContainsString('#2880', $script);
     }
 
+    public function testInventoryArgvDriverSmokeIncludesM4BinCompileLint(): void
+    {
+        $script = (string) file_get_contents(self::$root.'/script/bootstrap-resolve-compile-invoke.sh');
+        $this->assertStringContainsString('bootstrap_inventory_argv_driver_m4_smoke', $script);
+        $this->assertStringContainsString('bin/compile.php lint', $script);
+        $this->assertStringContainsString('#2880', $script);
+    }
+
     public function testJitRegistersM5DriverHostForBinCompileSidecar(): void
     {
         $jit = (string) file_get_contents(self::$root.'/lib/JIT.php');

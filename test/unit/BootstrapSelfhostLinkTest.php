@@ -61,7 +61,11 @@ final class BootstrapSelfhostLinkTest extends TestCase
         $this->assertStringContainsString('gen-0 sidecar emit fallback', $body);
         $this->assertStringContainsString('native parse spine null', $body);
         $this->assertStringContainsString('bootstrap_gen0_seed_prelinked_m3_sidecars', $body);
+        $this->assertStringContainsString('bootstrap_inventory_argv_driver_m4_smoke', $body);
         $this->assertStringContainsString('bootstrap_ensure_m3_compiler_lib_sidecar', $body);
+        $gen0 = (string) file_get_contents(self::$root.'/script/bootstrap-gen0-install-prelinked-driver.sh');
+        $this->assertStringContainsString('prelinked/bootstrap-gen0/.m3_', $gen0);
+        $this->assertStringContainsString('#2880', $gen0);
         $this->assertStringContainsString('build/selfhost-compile-driver', $body);
         $this->assertStringContainsString('build/bin-compile-aot', $body);
         $this->assertStringContainsString(

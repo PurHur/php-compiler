@@ -73,6 +73,16 @@ bootstrap_gen0_seed_prelinked_m3_sidecars() {
         "${root}/build/.m3_compiler_lib_sidecar.sha"
     fi
   fi
+  # Inventory argv emit needs the full M3 sidecar set baked at bin/compile.php link time (#2880, #1492).
+  local prelinked_dir="${root}/prelinked/bootstrap-gen0"
+  local sidecar
+  shopt -s nullglob
+  for sidecar in "${prelinked_dir}"/.m3_*; do
+    [[ -f "${sidecar}" && -s "${sidecar}" ]] || continue
+    cp -f "${sidecar}" "${root}/build/$(basename "${sidecar}")"
+    chmod +x "${root}/build/$(basename "${sidecar}")" 2>/dev/null || true
+  done
+  shopt -u nullglob
   return 0
 }
 

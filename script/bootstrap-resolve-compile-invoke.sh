@@ -148,6 +148,37 @@ bootstrap_inventory_argv_driver_smoke() {
   return 1
 }
 
+# M4 full-revision: inventory driver must parse+compile bin/compile.php (stale prelinked gen-0 fails here — #2880).
+bootstrap_inventory_argv_driver_m4_smoke() {
+  local driver=$1
+  local root="${ROOT:-}"
+  local bin_compile="${root}/bin/compile.php"
+  if [[ -z "${root}" || ! -x "${driver}" || ! -f "${bin_compile}" ]]; then
+    return 1
+  fi
+  local lint_log=""
+  local lint_code=0
+  set +e
+  lint_log="$(
+    env -u PHP_COMPILER_M3_SOURCE -u PHP_COMPILER_M3_OUT \
+      PHP_COMPILER_SELFHOST_AOT=1 \
+      PHP_COMPILER_M3_COMPILE_DRIVER=1 \
+      PHP_COMPILER_M4_BIN_COMPILE_DRIVER=1 \
+      PHP_COMPILER_M3_INVENTORY_EMIT_DRIVER=1 \
+      BOOTSTRAP_M3_USE_INVENTORY_EMIT_DRIVER=1 \
+      "${driver}" -l "${bin_compile}" 2>&1
+  )"
+  lint_code=$?
+  set -e
+  if [[ "${lint_code}" -eq 0 ]] \
+    && ! grep -qE 'parseAndCompile returned null|native emit failed at phase=parseAndCompile' <<< "${lint_log}"; then
+    return 0
+  fi
+  echo "bootstrap-inventory-argv-driver-m4-smoke: ${driver} failed bin/compile.php lint (stale gen-0? rebuild via Zend — #2880)" >&2
+  printf '%s\n' "${lint_log}" >&2
+  return 1
+}
+
 # Build or refresh build/bin-compile-aot-inventory for M4 full-revision / spine argv paths (#3012).
 bootstrap_ensure_inventory_argv_driver() {
   local root="${ROOT:-}"
@@ -156,7 +187,9 @@ bootstrap_ensure_inventory_argv_driver() {
     echo "bootstrap-ensure-inventory-argv-driver: ROOT unset" >&2
     return 1
   fi
-  if bootstrap_is_inventory_bin_compile_argv_driver "${out}" && bootstrap_inventory_argv_driver_smoke "${out}"; then
+  if bootstrap_is_inventory_bin_compile_argv_driver "${out}" \
+    && bootstrap_inventory_argv_driver_smoke "${out}" \
+    && bootstrap_inventory_argv_driver_m4_smoke "${out}"; then
     return 0
   fi
   if [[ -x "${out}" ]]; then
@@ -188,7 +221,8 @@ bootstrap_ensure_inventory_argv_driver() {
       cp -f "${prelink}" "${out}"
       cp -f "${prelink}" "${root}/build/.m3_bin_compile_aot_blob"
       chmod +x "${out}" "${root}/build/.m3_bin_compile_aot_blob"
-      if bootstrap_inventory_argv_driver_smoke "${out}"; then
+      if bootstrap_inventory_argv_driver_smoke "${out}" \
+        && bootstrap_inventory_argv_driver_m4_smoke "${out}"; then
         bootstrap_ensure_m3_compiler_lib_sidecar 2>/dev/null || true
         return 0
       fi
