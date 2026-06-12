@@ -1185,6 +1185,10 @@ function builtinCapabilityCurations(): array
             'aot' => 'no',
             'notes' => ['VM lifecycle API (#6002); JIT/AOT pending'],
         ],
+        'session_gc' => [
+            'aot' => 'no',
+            'notes' => ['VM lifecycle API (#6006); JIT/AOT pending'],
+        ],
         'move_uploaded_file' => [
             'aot' => 'yes',
             'notes' => [

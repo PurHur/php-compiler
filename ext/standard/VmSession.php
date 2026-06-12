@@ -262,6 +262,20 @@ final class VmSession
     }
 
     /**
+     * session_gc() — purge expired session files via files save handler (php-src php_session_gc).
+     *
+     * @return int|false number of deleted session files, or false on failure / inactive session
+     */
+    public static function gc(): int|false
+    {
+        if (!self::$active) {
+            return false;
+        }
+
+        return self::gcExpiredFiles();
+    }
+
+    /**
      * session_create_id() — collision-resistant id string (php-src php_session_create_id).
      *
      * @return string|false
@@ -284,6 +298,64 @@ final class VmSession
         }
 
         return $prefix.$generated;
+    }
+
+    /** Default session.gc_maxlifetime when ini is unavailable (php-src php.ini-production). */
+    private const DEFAULT_GC_MAXLIFETIME = 1440;
+
+    /**
+     * Scan save path and unlink sess_* files older than gc_maxlifetime (php-src mod_files.c ps_files_cleanup_dir).
+     *
+     * @return int|false deleted count, or false when directory cannot be opened
+     */
+    private static function gcExpiredFiles(): int|false
+    {
+        $dir = SessionFileStorage::storageDir();
+        if (!is_dir($dir)) {
+            return false;
+        }
+
+        $maxLifetime = self::DEFAULT_GC_MAXLIFETIME;
+        if (\function_exists('ini_get')) {
+            $fromIni = ini_get('session.gc_maxlifetime');
+            if (false !== $fromIni && '' !== $fromIni) {
+                $parsed = (int) $fromIni;
+                if ($parsed > 0) {
+                    $maxLifetime = $parsed;
+                }
+            }
+        }
+
+        $handle = @opendir($dir);
+        if (false === $handle) {
+            return false;
+        }
+
+        $prefix = SessionFileStorage::PATH_PREFIX;
+        $prefixLen = \strlen($prefix);
+        $now = time();
+        $deleted = 0;
+
+        while (false !== ($entry = readdir($handle))) {
+            if ('.' === $entry || '..' === $entry) {
+                continue;
+            }
+            if (\strncmp($entry, $prefix, $prefixLen) !== 0) {
+                continue;
+            }
+            $path = $dir.'/'.$entry;
+            $mtime = @filemtime($path);
+            if (false === $mtime) {
+                continue;
+            }
+            if (($now - $mtime) > $maxLifetime && @unlink($path)) {
+                ++$deleted;
+            }
+        }
+
+        closedir($handle);
+
+        return $deleted;
     }
 
     private static function readCookieId(Context $ctx): string

@@ -102,6 +102,7 @@ final class SelfHostBuiltinPolicy
         'session_abort' => 'session',
         'session_reset' => 'session',
         'session_create_id' => 'session',
+        'session_gc' => 'session',
     ];
 
     /** @var array<string, string> */

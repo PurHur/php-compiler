@@ -45,6 +45,7 @@ class Module extends ModuleAbstract
             new session_encode(),
             new session_decode(),
             new session_unset(),
+            new session_gc(),
         ];
     }
 }
