@@ -10,7 +10,7 @@ use PHPCompiler\VM\OutputBuffer;
 use PHPCompiler\VM\Variable;
 
 /**
- * VM helpers for phpversion/php_uname/php_sapi_name/version_compare/extension introspection (#3174, #3204, #7190)
+ * VM helpers for phpversion/php_uname/php_sapi_name/version_compare/extension introspection (#3174, #3204, #7190, #8171).
  * and phpinfo/phpcredits/zend_version runtime reports (#3359, #5304).
  *
  * php-src: ext/standard/info.c
@@ -75,7 +75,7 @@ final class VmInfo
     {
         self::validateUnameMode($mode);
 
-        return \php_uname($mode);
+        return VmUnameNative::php_uname($mode);
     }
 
     public static function extension_loaded(string $extension): bool
