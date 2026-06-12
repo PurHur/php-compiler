@@ -7,6 +7,8 @@ namespace PHPCompiler\ext\standard;
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\ExceptionHandlerCallbackPolicy;
+use PHPCompiler\JIT\JitOperandTypeLabel;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Value;
 
@@ -37,8 +39,16 @@ final class set_exception_handler extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        throw new \LogicException(
-            'set_exception_handler() is VM-only in this compiler build (issue #3146)'
-        );
+        if (1 !== \count($args)) {
+            throw new \LogicException('set_exception_handler() expects exactly 1 argument');
+        }
+        if (null !== JitOperandTypeLabel::compileTimeEnumClassName($context, $args[0])) {
+            throw new \TypeError(ExceptionHandlerCallbackPolicy::invalidCallbackTypeError());
+        }
+        if (!ExceptionHandlerCallbackPolicy::isJitLowerable($args[0])) {
+            throw new \LogicException(ExceptionHandlerCallbackPolicy::jitRejectionMessage());
+        }
+
+        return JitExceptionHandler::set($context, $args[0]);
     }
 }

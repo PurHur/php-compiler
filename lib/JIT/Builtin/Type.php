@@ -1196,6 +1196,7 @@ class Type extends Builtin {
         IncludePathRuntime::ensureLinked($this->context);
         StringEnvLocal::ensureLinked($this->context);
         ErrorHandlerOutput::registerExternals($this->context);
+        ExceptionHandlerOutput::registerExternals($this->context);
         StringTriggerError::ensureLinked($this->context);
         CallArgv::implement($this->context);
         ProgressNoteRuntime::ensureLinked($this->context);
