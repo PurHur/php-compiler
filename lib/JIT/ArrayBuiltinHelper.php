@@ -983,17 +983,18 @@ final class ArrayBuiltinHelper
 
     /** @var array<class-string<Internal>, int> */
     private const MAP_CALLBACK_RESULT_TYPE = [
-        strval::class => Variable::TYPE_STRING,
-        intval::class => Variable::TYPE_NATIVE_LONG,
-        floatval::class => Variable::TYPE_NATIVE_DOUBLE,
-        doubleval::class => Variable::TYPE_NATIVE_DOUBLE,
-        boolval::class => Variable::TYPE_NATIVE_BOOL,
-        strtolower::class => Variable::TYPE_STRING,
-        strtoupper::class => Variable::TYPE_STRING,
-        string_trim::class => Variable::TYPE_STRING,
-        string_ltrim::class => Variable::TYPE_STRING,
-        string_rtrim::class => Variable::TYPE_STRING,
-        strlen::class => Variable::TYPE_NATIVE_LONG,
+        // String keys avoid ::class const fetch during gen-0 bootstrap compile (#1492).
+        'PHPCompiler\\ext\\standard\\strval' => Variable::TYPE_STRING,
+        'PHPCompiler\\ext\\standard\\intval' => Variable::TYPE_NATIVE_LONG,
+        'PHPCompiler\\ext\\standard\\floatval' => Variable::TYPE_NATIVE_DOUBLE,
+        'PHPCompiler\\ext\\standard\\doubleval' => Variable::TYPE_NATIVE_DOUBLE,
+        'PHPCompiler\\ext\\standard\\boolval' => Variable::TYPE_NATIVE_BOOL,
+        'PHPCompiler\\ext\\standard\\strtolower' => Variable::TYPE_STRING,
+        'PHPCompiler\\ext\\standard\\strtoupper' => Variable::TYPE_STRING,
+        'PHPCompiler\\ext\\standard\\string_trim' => Variable::TYPE_STRING,
+        'PHPCompiler\\ext\\standard\\string_ltrim' => Variable::TYPE_STRING,
+        'PHPCompiler\\ext\\standard\\string_rtrim' => Variable::TYPE_STRING,
+        'PHPCompiler\\ext\\types\\strlen' => Variable::TYPE_NATIVE_LONG,
     ];
 
     private static function resolveMapCallback(Variable $callback): Internal

@@ -4963,7 +4963,9 @@ class Compiler {
      */
     protected function tryFoldNativePhpClassConstFetch(string $className, string $constName): ?Variable
     {
-        if (!class_exists($className, false)) {
+        // ::class on bootstrap Internal handlers may not be loaded yet (#1492 spine compile).
+        $autoload = 'class' === strtolower($constName);
+        if (!class_exists($className, $autoload)) {
             return null;
         }
         try {
@@ -6359,6 +6361,11 @@ class Compiler {
             : (null !== $dimFetch
                 ? $this->resolveIssetTargetFromArrayDimFetch($dimFetch, $block)
                 : $this->resolveIssetTarget($expr->vars[0], $block));
+        if (null === $containerSlot) {
+            $varSlot = $this->compileOperand($expr->vars[0], $block, true);
+
+            return [new OpCode(OpCode::TYPE_ISSET, $resultSlot, $varSlot, null)];
+        }
 
         return [$this->makeIssetOpCode($resultSlot, $containerSlot, $dimSlot, null !== $propFetch)];
     }
@@ -6734,8 +6741,14 @@ class Compiler {
                 : (null !== $expr->left
                     ? $this->resolveCoalesceIssetTarget($expr->left, $block)
                     : null));
-        if (null !== $issetTarget) {
+        $useContainerIsset = null !== $issetTarget;
+        if ($useContainerIsset) {
             [$containerSlot, $dimSlot] = $issetTarget;
+            if (null === $containerSlot) {
+                $useContainerIsset = false;
+            }
+        }
+        if ($useContainerIsset) {
             $issetOp = $this->makeIssetOpCode(
                 $checkSlot,
                 $containerSlot,
@@ -6808,7 +6821,7 @@ class Compiler {
         $leftBlock->syntheticCfgBranch = true;
         $leftBlock->inheritUndefinedLocals = true;
         $leftBlock->inheritScopeFrom($block);
-        if (null !== $issetTarget) {
+        if ($useContainerIsset) {
             if (null !== $dimFetch) {
                 $this->compileArrayDimFetchRead($dimFetch, $leftBlock);
                 $leftSlot = $this->compileOperand($dimFetch->result, $leftBlock, true);
@@ -8000,12 +8013,17 @@ class Compiler {
             if ($i < $last) {
                 $checkSlot = $this->compileBoolTemporary($current);
             }
-            $current->addOpCode($this->makeIssetOpCode(
-                $checkSlot,
-                $containerSlot,
-                $dimSlot,
-                null !== $propFetch
-            ));
+            if (null === $containerSlot) {
+                $varSlot = $this->compileOperand($var, $current, true);
+                $current->addOpCode(new OpCode(OpCode::TYPE_ISSET, $checkSlot, $varSlot, null));
+            } else {
+                $current->addOpCode($this->makeIssetOpCode(
+                    $checkSlot,
+                    $containerSlot,
+                    $dimSlot,
+                    null !== $propFetch
+                ));
+            }
             if ($i < $last) {
                 $next = new Block($block->orig);
                 $next->inheritUndefinedLocals = true;
