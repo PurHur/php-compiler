@@ -147,7 +147,7 @@ final class VmInternalCompare
         if (Variable::TYPE_INTEGER === $value->type) {
             return $value->toInt();
         }
-        if (Variable::TYPE_DOUBLE === $value->type) {
+        if (Variable::TYPE_FLOAT === $value->type) {
             return $value->toFloat();
         }
         if (Variable::TYPE_STRING === $value->type) {
@@ -158,11 +158,11 @@ final class VmInternalCompare
 
             return str_contains($s, '.') ? (float) $s : (int) $s;
         }
-        if (Variable::TYPE_NULL === $value->type || Variable::TYPE_FALSE === $value->type) {
+        if (Variable::TYPE_NULL === $value->type) {
             return 0;
         }
-        if (Variable::TYPE_TRUE === $value->type) {
-            return 1;
+        if (Variable::TYPE_BOOLEAN === $value->type) {
+            return $value->toBool() ? 1 : 0;
         }
 
         return 0;
@@ -222,6 +222,44 @@ final class VmInternalCompare
      *
      * @param list<Variable> $values
      */
+    /** Sort packed values ascending using php-src sort_type dispatch (#4076). */
+    public static function sortVariableValuesWithFlags(array &$values, int $flags): void
+    {
+        $n = \count($values);
+        for ($i = 1; $i < $n; ++$i) {
+            $j = $i;
+            while ($j > 0) {
+                $cmp = self::compareValuesForSortFlags($values[$j - 1], $values[$j], $flags);
+                if ($cmp <= 0) {
+                    break;
+                }
+                $tmp = $values[$j - 1];
+                $values[$j - 1] = $values[$j];
+                $values[$j] = $tmp;
+                --$j;
+            }
+        }
+    }
+
+    /** Sort packed values descending using php-src sort_type dispatch (#4076). */
+    public static function sortVariableValuesWithFlagsDesc(array &$values, int $flags): void
+    {
+        $n = \count($values);
+        for ($i = 1; $i < $n; ++$i) {
+            $j = $i;
+            while ($j > 0) {
+                $cmp = self::compareValuesForSortFlags($values[$j - 1], $values[$j], $flags);
+                if ($cmp >= 0) {
+                    break;
+                }
+                $tmp = $values[$j - 1];
+                $values[$j - 1] = $values[$j];
+                $values[$j] = $tmp;
+                --$j;
+            }
+        }
+    }
+
     public static function sortVariableValues(array &$values, Internal $compare): void
     {
         $n = \count($values);

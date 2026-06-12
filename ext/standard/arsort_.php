@@ -86,10 +86,14 @@ final class arsort_ extends Internal
         $first = $values[0]->resolveIndirect();
         $sortType = $flags & ~StdlibConstants::SORT_FLAG_CASE;
         if (Variable::TYPE_STRING === $first->type) {
-            VmInternalCompare::sortVariableValuesDesc(
-                $values,
-                VmInternalCompare::valueCompareForSortFlags($flags)
-            );
+            if (StdlibConstants::SORT_NUMERIC === $sortType) {
+                VmInternalCompare::sortVariableValuesWithFlagsDesc($values, $flags);
+            } else {
+                VmInternalCompare::sortVariableValuesDesc(
+                    $values,
+                    VmInternalCompare::valueCompareForSortFlags($flags)
+                );
+            }
         } elseif (Variable::TYPE_INTEGER === $first->type) {
             if (
                 StdlibConstants::SORT_STRING === $sortType

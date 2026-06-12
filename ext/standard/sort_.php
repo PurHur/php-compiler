@@ -62,11 +62,16 @@ final class sort_ extends Internal
             $values[] = $copy;
         }
         $first = $values[0]->resolveIndirect();
+        $sortType = $flags & ~StdlibConstants::SORT_FLAG_CASE;
         if (Variable::TYPE_STRING === $first->type) {
-            VmInternalCompare::sortVariableValues(
-                $values,
-                VmInternalCompare::stringCompareForSortFlags($flags)
-            );
+            if (StdlibConstants::SORT_NUMERIC === $sortType) {
+                VmInternalCompare::sortVariableValuesWithFlags($values, $flags);
+            } else {
+                VmInternalCompare::sortVariableValues(
+                    $values,
+                    VmInternalCompare::stringCompareForSortFlags($flags)
+                );
+            }
         } elseif (Variable::TYPE_INTEGER === $first->type) {
             $n = \count($values);
             for ($i = 1; $i < $n; ++$i) {
