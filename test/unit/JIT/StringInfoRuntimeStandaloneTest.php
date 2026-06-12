@@ -39,6 +39,7 @@ final class StringInfoRuntimeStandaloneTest extends TestCase
             '__compiler_php_uname',
             '__compiler_extension_loaded',
             '__compiler_get_loaded_extensions',
+            '__compiler_get_extension_funcs',
         ] as $name) {
             $fn = $ctx->lookupFunction($name);
             $this->assertNotNull($fn);

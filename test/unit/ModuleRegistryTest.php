@@ -8,7 +8,7 @@ use PHPCompiler\ext\standard\ModuleRegistry;
 use PHPCompiler\ext\standard\VmInfo;
 use PHPUnit\Framework\TestCase;
 
-/** ModuleRegistry extension introspection (#6372, #7190). */
+/** ModuleRegistry extension introspection (#6372, #7190, #3433). */
 final class ModuleRegistryTest extends TestCase
 {
     public function testRuntimeRegistersInTreeExtensions(): void
@@ -40,6 +40,39 @@ final class ModuleRegistryTest extends TestCase
     {
         $source = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/StringInfo.php');
         $this->assertStringContainsString('ModuleRegistry::getLoadedExtensions', $source);
+        $this->assertStringContainsString('ModuleRegistry::extensionFunctionMap', $source);
         $this->assertStringNotContainsString('LOADED_EXTENSIONS', $source);
+    }
+
+    public function testGetExtensionFunctionsReturnsNullWhenNotLoaded(): void
+    {
+        ModuleRegistry::reset();
+        $this->assertNull(ModuleRegistry::getExtensionFunctions('hash'));
+    }
+
+    public function testRegisterModulePartitionsJsonAndDateFromStandard(): void
+    {
+        ModuleRegistry::reset();
+        $runtime = new Runtime(Runtime::MODE_NORMAL);
+        $runtime->load(new ext\standard\Module());
+        $runtime->load(new ext\hash\Module());
+
+        $hash = ModuleRegistry::getExtensionFunctions('hash');
+        $this->assertIsArray($hash);
+        $this->assertContains('hash_init', $hash);
+
+        $json = ModuleRegistry::getExtensionFunctions('json');
+        $this->assertIsArray($json);
+        $this->assertContains('json_encode', $json);
+        $this->assertNotContains('json_encode', ModuleRegistry::getExtensionFunctions('standard') ?? []);
+
+        $date = ModuleRegistry::getExtensionFunctions('date');
+        $this->assertIsArray($date);
+        $this->assertContains('date', $date);
+        $this->assertNotContains('date', ModuleRegistry::getExtensionFunctions('standard') ?? []);
+
+        $this->assertNull(ModuleRegistry::getExtensionFunctions('missing_ext'));
+
+        unset($runtime);
     }
 }
