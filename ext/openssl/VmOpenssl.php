@@ -30,6 +30,21 @@ final class VmOpenssl
         return $length;
     }
 
+    /**
+     * openssl_cipher_key_length() — required key length for a cipher.
+     *
+     * @return int|false
+     */
+    public static function cipher_key_length(string $cipherAlgo): int|false
+    {
+        $length = OpensslCipherRegistry::cipherKeyLength($cipherAlgo);
+        if (false === $length) {
+            trigger_error('openssl_cipher_key_length(): Unknown cipher algorithm', E_USER_WARNING);
+        }
+
+        return $length;
+    }
+
     public static function cipherMethods(bool $aliases = false): HashTable
     {
         return self::stringListToHashTable(OpensslCipherRegistry::cipherMethods($aliases));

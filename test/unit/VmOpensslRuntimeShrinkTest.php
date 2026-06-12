@@ -13,9 +13,13 @@ final class VmOpensslRuntimeShrinkTest extends TestCase
     {
         $source = (string) file_get_contents(dirname(__DIR__, 2).'/ext/openssl/VmOpenssl.php');
         $this->assertStringContainsString('OpensslCipherRegistry::cipherIvLength', $source);
+        $this->assertStringContainsString('OpensslCipherRegistry::cipherKeyLength', $source);
         $this->assertStringContainsString('function cipher_iv_length', $source);
+        $this->assertStringContainsString('function cipher_key_length', $source);
         $this->assertStringNotContainsString("function_exists('openssl_cipher_iv_length')", $source);
+        $this->assertStringNotContainsString("function_exists('openssl_cipher_key_length')", $source);
         $this->assertStringNotContainsString('\\openssl_cipher_iv_length(', $source);
+        $this->assertStringNotContainsString('\\openssl_cipher_key_length(', $source);
         $this->assertStringNotContainsString('\\openssl_digest(', $source);
     }
 
@@ -23,6 +27,13 @@ final class VmOpensslRuntimeShrinkTest extends TestCase
     {
         $this->assertSame(16, \PHPCompiler\ext\openssl\VmOpenssl::cipher_iv_length('aes-256-cbc'));
         $length = @\PHPCompiler\ext\openssl\VmOpenssl::cipher_iv_length('not-a-real-cipher-method');
+        $this->assertFalse($length);
+    }
+
+    public function testCipherKeyLengthNativeLookup(): void
+    {
+        $this->assertSame(32, \PHPCompiler\ext\openssl\VmOpenssl::cipher_key_length('aes-256-cbc'));
+        $length = @\PHPCompiler\ext\openssl\VmOpenssl::cipher_key_length('not-a-real-cipher-method');
         $this->assertFalse($length);
     }
 
