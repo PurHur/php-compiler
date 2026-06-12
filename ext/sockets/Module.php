@@ -15,6 +15,7 @@ class Module extends ModuleAbstract
     public function init(Runtime $runtime): void
     {
         parent::init($runtime);
+        BuiltinEnums::register($runtime->vmContext);
         BuiltinClasses::register($runtime->vmContext);
     }
 

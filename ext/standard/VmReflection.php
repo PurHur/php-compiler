@@ -64,7 +64,7 @@ final class VmReflection
     {
         $entry = self::resolveClassEntry($ctx, $className);
 
-        return null !== $entry && !$entry->isEnum && !$entry->isInterface && !$entry->isTrait;
+        return null !== $entry && !$entry->isInterface && !$entry->isTrait;
     }
 
     public static function enumExists(Context $ctx, string $enumName): bool
