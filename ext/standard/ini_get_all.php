@@ -56,6 +56,6 @@ final class ini_get_all extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        throw new \LogicException('ini_get_all() is VM-only in this compiler build (issue #3205)');
+        return JitIniGetAll::invoke($context, ...$args);
     }
 }

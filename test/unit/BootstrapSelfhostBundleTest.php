@@ -131,6 +131,7 @@ final class BootstrapSelfhostBundleTest extends TestCase
         'ext/standard/JitHex2bin.php',
         'ext/standard/JitHtmlspecialchars.php',
         'ext/standard/JitIni.php',
+        'ext/standard/JitIniGetAll.php',
         'ext/standard/JitJsonDecode.php',
         'ext/standard/JitJsonEncode.php',
         'ext/standard/JitJsonLastError.php',
