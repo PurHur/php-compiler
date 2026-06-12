@@ -3670,6 +3670,25 @@ class JIT {
                 }
             }
         }
+        if (\PHPCompiler\JIT\M3EmitTuTrivialEchoAot::COMPILER_LIB_SIDECAR_REL === $sidecarRel) {
+            $prelinkedLib = $repoRoot.'/prelinked/bootstrap-gen0/compiler_lib_aot_blob';
+            if (is_readable($prelinkedLib)) {
+                $aotBytes = file_get_contents($prelinkedLib);
+                if (is_string($aotBytes) && '' !== $aotBytes) {
+                    \PHPCompiler\JIT\M3EmitTuTrivialEchoAot::registerLinktime(
+                        $this->context,
+                        $repoRoot,
+                        $code,
+                        $aotBytes,
+                        $sidecarRel,
+                        $sentinelLogical,
+                        true
+                    );
+
+                    return;
+                }
+            }
+        }
         $hostCompilePath = $path;
         if (str_ends_with($pathNorm, '/bin/compile.php')) {
             // For gen-3 (argv) and other bootstrap products, compiling bin/compile.php must default to the

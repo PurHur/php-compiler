@@ -348,6 +348,10 @@ bootstrap_compile_invoke() {
       fi
       echo "bootstrap-compile-invoke: compiled driver ${BOOTSTRAP_COMPILE_DRIVER} exited 0 but missing ${out} (#3046)" >&2
       last_code=1
+    elif grep -qE 'parseAndCompile returned null|native emit failed at phase=parseAndCompile' <<< "${invoke_out}" \
+      && bootstrap_gen0_sidecar_emit_fallback "${out}" "${entry}"; then
+      echo "bootstrap-compile-invoke: native parse spine null — recovered via gen-0 sidecar (#1492)" >&2
+      return 0
     else
       echo "bootstrap-compile-invoke: compiled driver ${BOOTSTRAP_COMPILE_DRIVER} failed (exit ${last_code})" >&2
     fi

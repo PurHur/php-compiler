@@ -176,8 +176,11 @@ if [[ "${BOOTSTRAP_LIB_SPINE_SMOKE_USE_COMPILE_INVOKE:-0}" != "1" ]]; then
       if [[ "${BOOTSTRAP_LIB_SPINE_SMOKE_GEN0_FALLBACK:-1}" == "1" ]] && command -v php >/dev/null 2>&1; then
         echo "bootstrap-selfhost-lib-spine-smoke-link: gen-0 Zend fallback (native argv driver blocked; #2967)" >&2
         rm -f "${OUT}"
-        env PHP_COMPILER_SELFHOST_AOT=1 PHP_COMPILER_CLI_SPINE_BUNDLE=1 \
-          php "${ROOT}/bin/compile.php" -o "${OUT}" "${ENTRY}" 2>&1 || true
+        # CLI_SPINE_BUNDLE skips bin/compile.php dispatch; SIDECAR_HOST stubs spine includes (#1492).
+        env PHP_COMPILER_SELFHOST_AOT=1 PHP_COMPILER_M3_SIDECAR_HOST=1 \
+          PHP_COMPILER_MEMORY_LIMIT="${PHP_COMPILER_MEMORY_LIMIT:-4096M}" \
+          php -d "memory_limit=${PHP_COMPILER_MEMORY_LIMIT:-4096M}" \
+          "${ROOT}/bin/compile.php" -o "${OUT}" "${ENTRY}" 2>&1 || true
       fi
       if [[ ! -x "${OUT}" ]]; then
         echo "bootstrap-selfhost-lib-spine-smoke-link: compile failed (progress gate; see stderr above)" >&2
