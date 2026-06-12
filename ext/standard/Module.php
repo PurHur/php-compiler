@@ -688,6 +688,7 @@ class Module extends ModuleAbstract
             new restore_exception_handler(),
             new error_get_last(),
             new error_clear_last(),
+            new exif_tagname(),
             new eval_(),
             new phpc_deploy_path(),
             new compiler_is_superglobal_name(),

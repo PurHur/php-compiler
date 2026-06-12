@@ -4,9 +4,11 @@ declare(strict_types=1);
 
 namespace PHPCompiler\JIT\Builtin;
 
+use PHPCompiler\JIT\Builtin;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\Variable as VmVariable;
+use PHPLLVM\BasicBlock;
 use PHPLLVM\Builder;
 use PHPLLVM\Value;
 
@@ -141,7 +143,7 @@ final class AssertOptionsRuntime
     private static function implementIntOption(
         Context $context,
         Value $fn,
-        Value $block,
+        BasicBlock $block,
         string $globalName,
         Value $hasValue,
         Value $valueIn,
@@ -175,7 +177,7 @@ final class AssertOptionsRuntime
     private static function implementCallbackOption(
         Context $context,
         Value $fn,
-        Value $block,
+        BasicBlock $block,
         Value $hasValue,
         Value $valueIn,
         Value $out
