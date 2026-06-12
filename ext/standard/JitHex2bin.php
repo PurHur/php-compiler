@@ -12,6 +12,7 @@ declare(strict_types=1);
 namespace PHPCompiler\ext\standard;
 
 use PHPCompiler\JIT\BasicBlockHelper;
+use PHPCompiler\JIT\Builtin\StringTriggerError;
 use PHPCompiler\JIT\Builtin\TypeErrorRaise;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitValueBox;
@@ -29,6 +30,7 @@ final class JitHex2bin
 
     public static function convert(Context $context, Value $strPtr, ?Value $strictPtr = null): Value
     {
+        StringTriggerError::ensureLinked($context);
         $slot = JitValueBox::alloc($context);
         $outPtr = JitValueBox::pointer($context, $slot);
 
