@@ -258,6 +258,20 @@ final class BootstrapSelfhostHelloWorldTest extends TestCase
         $this->assertStringContainsString('$visited', $source);
     }
 
+    public function testSpineSidecarHostCompileStubsNonLiteralIncludes(): void
+    {
+        $includeHelper = (string) file_get_contents(self::$root.'/lib/JIT/IncludeHelper.php');
+        $this->assertStringContainsString(
+            '/test/selfhost/compiler_lib_spine_smoke/main.php',
+            $includeHelper
+        );
+        $jit = (string) file_get_contents(self::$root.'/lib/JIT.php');
+        $this->assertMatchesRegularExpression(
+            '/registerM3EmitTuSidecarFromPath\(\s*__DIR__\.\'\/\.\.\/test\/selfhost\/compiler_lib_spine_smoke\/main\.php\'[\s\S]*?true\s*\)/',
+            $jit
+        );
+    }
+
     public function testJitDocumentsM3CompileDriverEnvGate(): void
     {
         $jit = (string) file_get_contents(self::$root.'/lib/JIT.php');
