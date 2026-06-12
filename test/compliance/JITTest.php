@@ -547,9 +547,8 @@ class JITTest extends BaseTest {
             if (str_contains($name, 'exception_subclass_parent_construct')) {
                 continue;
             }
-            // posix access/mknod/set* VM-only until LLVM libc wrappers (#7376).
+            // posix access/mknod VM-only until LLVM libc wrappers (#7376).
             if (str_contains($name, 'posix_access')
-                || str_contains($name, 'posix_setegid')
                 || str_contains($name, 'posix_mknod')) {
                 continue;
             }

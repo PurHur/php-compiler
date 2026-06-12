@@ -6,7 +6,9 @@ namespace PHPCompiler\ext\posix;
 
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
+use PHPCompiler\JIT\Builtin\TypeErrorRaise;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Value;
 
@@ -33,6 +35,18 @@ final class posix_setgid extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        throw new \Error('posix_setgid() is not implemented for JIT in this compiler build (issue #7376)');
+        $argc = \count($args);
+        if (1 !== $argc) {
+            TypeErrorRaise::ensureLinked($context);
+            TypeErrorRaise::emitArgumentCountError(
+                $context,
+                'posix_setgid() expects exactly 1 argument, '.$argc.' given'
+            );
+            $slot = JitValueBox::alloc($context);
+
+            return JitValueBox::pointer($context, $slot);
+        }
+
+        return JitPosix::setgid($context, $args[0]);
     }
 }
