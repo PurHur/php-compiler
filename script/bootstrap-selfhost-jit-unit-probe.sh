@@ -96,14 +96,14 @@ if [[ "${BOOTSTRAP_M3_LINK_COMPILE_DRIVER:-0}" == "1" ]]; then
       )"
       native_compile_code=$?
       set -e
-      if [[ "${native_compile_code}" -eq 0 ]] && grep -q 'compile_smoke_m3_emit: compile OK' <<< "${compile_out}"; then
+      if [[ "${native_compile_code}" -eq 0 ]] && grep -qE 'jit_unit_probe_m3_emit: compile OK|compile_smoke_m3_emit: compile OK' <<< "${compile_out}"; then
         M3_NATIVE_COMPILE=1
         M3_EMIT_PATH="native"
         M3_BLOCK_REASON=""
         echo "bootstrap-selfhost-jit-unit-probe: native emit via selfhost emit helper OK"
       else
         if grep -q 'native emit failed at phase=' <<< "${compile_out}"; then
-          M3_BLOCK_REASON="$(grep -m1 'native emit failed at phase=' <<< "${compile_out}" | sed 's/^compile_smoke_m3_emit: //')"
+          M3_BLOCK_REASON="$(grep -m1 'native emit failed at phase=' <<< "${compile_out}" | sed -E 's/^(jit_unit_probe_m3_emit|compile_smoke_m3_emit): //')"
         else
           M3_BLOCK_REASON="native emit runtime failed ($(m3_exit_label "${native_compile_code}"))"
         fi

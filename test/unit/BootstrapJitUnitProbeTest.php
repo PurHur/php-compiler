@@ -85,7 +85,7 @@ final class BootstrapJitUnitProbeTest extends TestCase
         $this->assertStringContainsString('jit_unit_probe/compile_driver.php', $source);
         $this->assertStringContainsString('inventory compile_driver (#3032)', $source);
         $this->assertStringContainsString('BOOTSTRAP_M3_USE_INVENTORY_EMIT_DRIVER', $source);
-        $this->assertStringContainsString('compile_smoke_m3_emit: compile OK', $source);
+        $this->assertStringContainsString('jit_unit_probe_m3_emit: compile OK', $source);
         $this->assertStringContainsString('PHP_COMPILER_M3_COMPILE_MODE=compile', $source);
         $this->assertStringContainsString('jit unit probe compile OK', $source);
     }
@@ -179,7 +179,7 @@ final class BootstrapJitUnitProbeTest extends TestCase
         }
         $runOut = implode("\n", $runLines);
         $this->assertSame(0, $runExit, $runOut);
-        $this->assertStringContainsString('compile_smoke_m3_emit: compile OK', $runOut);
+        $this->assertStringContainsString('jit_unit_probe_m3_emit: compile OK', $runOut);
         $this->assertFileExists($aotOut);
     }
 
