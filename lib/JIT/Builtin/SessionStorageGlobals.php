@@ -27,6 +27,10 @@ final class SessionStorageGlobals
 
     public const GLOBAL_ACTIVE = '__phpc_session_active';
 
+    public const GLOBAL_MODULE_BUF = '__phpc_session_module_storage';
+
+    public const GLOBAL_MODULE_LEN = '__phpc_session_module_len';
+
     /** @var Value|null */
     public static $idBufGlobal = null;
 
@@ -42,6 +46,12 @@ final class SessionStorageGlobals
     /** @var Value|null */
     public static $activeGlobal = null;
 
+    /** @var Value|null */
+    public static $moduleBufGlobal = null;
+
+    /** @var Value|null */
+    public static $moduleLenGlobal = null;
+
     public static function ensureGlobals(Context $context): void
     {
         $i8 = $context->getTypeFromString('int8');
@@ -49,6 +59,8 @@ final class SessionStorageGlobals
         $idBufType = $i8->arrayType(VmSession::MAX_ID_LEN + 1);
         $nameBufType = $i8->arrayType(VmSession::MAX_NAME_LEN + 1);
         $defaultNameLen = \strlen(VmSession::DEFAULT_NAME);
+        $moduleBufType = $i8->arrayType(VmSession::MAX_MODULE_LEN + 1);
+        $defaultModuleLen = \strlen(VmSession::DEFAULT_MODULE);
 
         self::$idBufGlobal = self::ensureGlobal($context, $idBufType, self::GLOBAL_ID_BUF, $idBufType->constNull());
         self::$idLenGlobal = self::ensureGlobal($context, $i64, self::GLOBAL_ID_LEN, $i64->constInt(0, false));
@@ -60,6 +72,18 @@ final class SessionStorageGlobals
             $i64->constInt($defaultNameLen, false)
         );
         self::$activeGlobal = self::ensureGlobal($context, $i8, self::GLOBAL_ACTIVE, $i8->constInt(0, false));
+        self::$moduleBufGlobal = self::ensureGlobal(
+            $context,
+            $moduleBufType,
+            self::GLOBAL_MODULE_BUF,
+            $moduleBufType->constNull()
+        );
+        self::$moduleLenGlobal = self::ensureGlobal(
+            $context,
+            $i64,
+            self::GLOBAL_MODULE_LEN,
+            $i64->constInt($defaultModuleLen, false)
+        );
     }
 
     /** @param mixed $initializer */
@@ -86,7 +110,7 @@ final class SessionStorageGlobals
             return;
         }
 
-        if (null === self::$nameLenGlobal) {
+        if (null === self::$nameLenGlobal || null === self::$moduleLenGlobal) {
             self::ensureGlobals($context);
         }
 
@@ -107,6 +131,7 @@ final class SessionStorageGlobals
         $i32 = $context->getTypeFromString('int32');
         $zero = $i64->constInt(0, false);
         $defaultLen = $i64->constInt(\strlen(VmSession::DEFAULT_NAME), false);
+        $defaultModuleLen = $i64->constInt(\strlen(VmSession::DEFAULT_MODULE), false);
 
         $curLen = $context->builder->load(self::$nameLenGlobal);
         $needsSeed = $context->builder->icmp(
@@ -129,6 +154,18 @@ final class SessionStorageGlobals
         }
         $nulPtr = $context->builder->inBoundsGEP($bufPtr, $defaultLen);
         $context->builder->store($i8->constInt(0, false), $nulPtr);
+        $modBufPtr = $context->builder->inBoundsGEP(
+            self::$moduleBufGlobal,
+            $i32->constInt(0, false),
+            $zero
+        );
+        $context->builder->store($defaultModuleLen, self::$moduleLenGlobal);
+        foreach (str_split(VmSession::DEFAULT_MODULE) as $i => $ch) {
+            $charPtr = $context->builder->inBoundsGEP($modBufPtr, $i64->constInt($i, false));
+            $context->builder->store($i8->constInt(\ord($ch), false), $charPtr);
+        }
+        $modNulPtr = $context->builder->inBoundsGEP($modBufPtr, $defaultModuleLen);
+        $context->builder->store($i8->constInt(0, false), $modNulPtr);
         $context->builder->branch($bbDone);
 
         $context->builder->positionAtEnd($bbDone);

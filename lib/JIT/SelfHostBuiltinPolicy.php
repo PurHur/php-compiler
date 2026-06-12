@@ -95,6 +95,7 @@ final class SelfHostBuiltinPolicy
         'session_start' => 'session',
         'session_id' => 'session',
         'session_name' => 'session',
+        'session_module_name' => 'session',
         'session_status' => 'session',
         'session_write_close' => 'session',
         'session_destroy' => 'session',
