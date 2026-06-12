@@ -299,7 +299,7 @@ final class VmDateTimeNative
     }
 
     /**
-     * php-src zim_DateTimeZone_getLocation — placeholder when tzdb geo unavailable (#7131).
+     * php-src zim_DateTimeZone_getLocation / timezone_location_get (#7131, #6041).
      *
      * @return array{country_code: string, latitude: float, longitude: float, comments: string}|false
      */
@@ -309,12 +309,69 @@ final class VmDateTimeNative
             return false;
         }
 
+        $entry = self::zoneTabEntryForId($tzName);
+        if (null === $entry) {
+            return [
+                'country_code' => '??',
+                'latitude' => 0.0,
+                'longitude' => 0.0,
+                'comments' => '?',
+            ];
+        }
+
         return [
-            'country_code' => '??',
-            'latitude' => 0.0,
-            'longitude' => 0.0,
-            'comments' => '?',
+            'country_code' => $entry['country'],
+            'latitude' => $entry['latitude'],
+            'longitude' => $entry['longitude'],
+            'comments' => $entry['comments'],
         ];
+    }
+
+    /**
+     * php-src timezone_transitions_get / zim_DateTimeZone_getTransitions (#6041).
+     *
+     * @return list<array{ts: int, time: string, offset: int, isdst: bool, abbr: string}>|false
+     */
+    public static function timezoneTransitions(string $tzName, int $begin, int $end): array|false
+    {
+        if (!self::zoneinfoPath($tzName)) {
+            return false;
+        }
+        if ($begin > $end) {
+            return false;
+        }
+
+        $transitions = [self::buildTransitionRecord($tzName, $begin)];
+        $state = self::transitionState($tzName, $begin);
+        $cursor = $begin;
+        $step = 86400;
+
+        while ($cursor < $end) {
+            $nextProbe = min($cursor + $step, $end);
+            $nextState = self::transitionState($tzName, $nextProbe);
+            if ($nextState['offset'] !== $state['offset'] || $nextState['isdst'] !== $state['isdst']) {
+                $lo = $cursor;
+                $hi = $nextProbe;
+                while ($hi - $lo > 1) {
+                    $mid = intdiv($lo + $hi, 2);
+                    $midState = self::transitionState($tzName, $mid);
+                    if ($midState['offset'] !== $state['offset'] || $midState['isdst'] !== $state['isdst']) {
+                        $hi = $mid;
+                    } else {
+                        $lo = $mid;
+                    }
+                }
+                if ($hi !== $begin && ($transitions[\count($transitions) - 1]['ts'] ?? null) !== $hi) {
+                    $transitions[] = self::buildTransitionRecord($tzName, $hi);
+                }
+                $state = self::transitionState($tzName, $hi);
+                $cursor = $hi;
+            } else {
+                $cursor = $nextProbe;
+            }
+        }
+
+        return $transitions;
     }
 
     private static function mktimeInTimezone(
@@ -407,6 +464,22 @@ final class VmDateTimeNative
         return ($negative ? '-' : '').\str_repeat('0', $width - \strlen($s)).$s;
     }
 
+    /**
+     * @return array{latitude: float, longitude: float}
+     */
+    private static function parseZoneTabCoordinates(string $coords): array
+    {
+        if (!preg_match('/^([+-])(\d{2})(\d{2})([+-])(\d{3})(\d{2})$/', $coords, $matches)) {
+            return ['latitude' => 0.0, 'longitude' => 0.0];
+        }
+        $latSign = '+' === $matches[1] ? 1 : -1;
+        $lat = $latSign * ((int) $matches[2] + ((int) $matches[3]) / 60);
+        $lonSign = '+' === $matches[4] ? 1 : -1;
+        $lon = $lonSign * ((int) $matches[5] + ((int) $matches[6]) / 60);
+
+        return ['latitude' => $lat, 'longitude' => $lon];
+    }
+
     /** @return list<string> */
     private static function canonicalTimezoneIdentifiers(): array
     {
@@ -420,7 +493,81 @@ final class VmDateTimeNative
         return $ids;
     }
 
-    /** @return list<array{country: string, id: string}> */
+    /**
+     * @return array{country: string, latitude: float, longitude: float, comments: string}|null
+     */
+    private static function zoneTabEntryForId(string $tzName): ?array
+    {
+        foreach (self::zoneTabEntries() as $entry) {
+            if (0 === strcasecmp($entry['id'], $tzName)) {
+                return [
+                    'country' => $entry['country'],
+                    'latitude' => $entry['latitude'],
+                    'longitude' => $entry['longitude'],
+                    'comments' => $entry['comments'],
+                ];
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * @return array{offset: int, isdst: bool}
+     */
+    private static function transitionState(string $tzName, int $timestamp): array
+    {
+        return self::withTimezone($tzName, static function () use ($timestamp): array {
+            $tm = self::localtime($timestamp);
+            if (null === $tm) {
+                return ['offset' => 0, 'isdst' => false];
+            }
+            $ffi = self::ffi();
+            $isdst = 1 === (int) $tm->tm_isdst;
+            if (null === $ffi) {
+                return ['offset' => 0, 'isdst' => $isdst];
+            }
+            $asUtc = (int) $ffi->timegm(\FFI::addr($tm));
+
+            return ['offset' => $asUtc - $timestamp, 'isdst' => $isdst];
+        });
+    }
+
+    /**
+     * @return array{ts: int, time: string, offset: int, isdst: bool, abbr: string}
+     */
+    private static function buildTransitionRecord(string $tzName, int $timestamp): array
+    {
+        $state = self::transitionState($tzName, $timestamp);
+
+        return [
+            'ts' => $timestamp,
+            'time' => self::format($timestamp, 0, $tzName, 'c'),
+            'offset' => $state['offset'],
+            'isdst' => $state['isdst'],
+            'abbr' => self::timezoneAbbreviation($tzName, $timestamp),
+        ];
+    }
+
+    private static function timezoneAbbreviation(string $tzName, int $timestamp): string
+    {
+        return self::withTimezone($tzName, static function () use ($timestamp): string {
+            $ffi = self::ffi();
+            $tm = self::localtime($timestamp);
+            if (null === $ffi || null === $tm) {
+                return '';
+            }
+            $buf = $ffi->new('char[16]');
+            $len = (int) $ffi->strftime(\FFI::addr($buf[0]), 16, '%Z', \FFI::addr($tm));
+            if ($len <= 0) {
+                return '';
+            }
+
+            return \rtrim(\FFI::string($buf), "\0");
+        });
+    }
+
+    /** @return list<array{country: string, id: string, latitude: float, longitude: float, comments: string}> */
     private static function zoneTabEntries(): array
     {
         if (null !== self::$zoneTabEntries) {
@@ -443,9 +590,13 @@ final class VmDateTimeNative
             if (!\is_array($parts) || \count($parts) < 3) {
                 continue;
             }
+            $coords = self::parseZoneTabCoordinates($parts[1]);
             self::$zoneTabEntries[] = [
                 'country' => $parts[0],
                 'id' => $parts[2],
+                'latitude' => $coords['latitude'],
+                'longitude' => $coords['longitude'],
+                'comments' => $parts[3] ?? '',
             ];
         }
 
@@ -687,6 +838,7 @@ time_t mktime(struct tm *tm);
 time_t timegm(struct tm *tm);
 struct tm *localtime_r(const time_t *timep, struct tm *result);
 int gettimeofday(struct timeval *tv, void *tz);
+size_t strftime(char *s, size_t max, const char *format, const struct tm *tm);
 CDEF;
 
         foreach (['libc.so.6', 'libc.so'] as $lib) {
