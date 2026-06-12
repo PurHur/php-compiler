@@ -24,6 +24,9 @@ final class VmFs
     /** @var array<int, true> popen() handles — pclose() vs fclose() at libc layer in JIT/AOT */
     private static array $popenHandles = [];
 
+    /** @var array<int, true> gz* stream placeholders — I/O via VmGzStreamNative libz FFI (#8220) */
+    private static array $gzNativePlaceholders = [];
+
     /** @var array<int, int> host stream identity => outstanding VM handle ids (#3384 pfsockopen persistent) */
     private static array $hostResourceRefcounts = [];
 
@@ -636,6 +639,45 @@ final class VmFs
         self::retainHostResourceRef($resource);
 
         return $id;
+    }
+
+    /**
+     * Register a VM stream handle for libz gzFile I/O (#6168, #8220).
+     *
+     * @return int|false
+     */
+    public static function adoptGzNativePlaceholder(string $uri)
+    {
+        $dummy = @fopen('php://memory', 'r+b');
+        if (false === $dummy) {
+            return false;
+        }
+        $id = self::adoptStreamResource($dummy, $uri);
+        if (false === $id) {
+            @fclose($dummy);
+
+            return false;
+        }
+        self::$gzNativePlaceholders[$id] = true;
+
+        return $id;
+    }
+
+    public static function isGzNativePlaceholder(int $handle): bool
+    {
+        return isset(self::$gzNativePlaceholders[$handle]);
+    }
+
+    public static function releaseGzNativePlaceholder(int $handle): void
+    {
+        if (!isset(self::$gzNativePlaceholders[$handle])) {
+            return;
+        }
+        unset(self::$gzNativePlaceholders[$handle]);
+        $fp = self::detachStreamHandle($handle);
+        if (\is_resource($fp)) {
+            @fclose($fp);
+        }
     }
 
     public static function socketFdForHandle(int $handle): ?int
