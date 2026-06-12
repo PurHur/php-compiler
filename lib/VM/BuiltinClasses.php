@@ -108,6 +108,10 @@ use PHPCompiler\VM\Builtin\ReflectionEnumUnitCaseGetValue;
 use PHPCompiler\VM\Builtin\ReflectionFunctionConstruct;
 use PHPCompiler\VM\Builtin\ReflectionFunctionCreateFromCallable;
 use PHPCompiler\VM\Builtin\ReflectionFunctionCreateFromFunction;
+use PHPCompiler\VM\Builtin\ReflectionFunctionGetClosureCalledClass;
+use PHPCompiler\VM\Builtin\ReflectionFunctionGetClosureScopeClass;
+use PHPCompiler\VM\Builtin\ReflectionFunctionGetClosureThis;
+use PHPCompiler\VM\Builtin\ReflectionFunctionGetClosureUsedVariables;
 use PHPCompiler\VM\Builtin\ReflectionFunctionGetExtensionName;
 use PHPCompiler\VM\Builtin\ReflectionFunctionGetName;
 use PHPCompiler\VM\Builtin\ReflectionFunctionGetParameters;
@@ -115,6 +119,7 @@ use PHPCompiler\VM\Builtin\ReflectionFunctionGetReturnType;
 use PHPCompiler\VM\Builtin\ReflectionFunctionHasReturnType;
 use PHPCompiler\VM\Builtin\ReflectionFunctionInvoke;
 use PHPCompiler\VM\Builtin\ReflectionFunctionIsAnonymous;
+use PHPCompiler\VM\Builtin\ReflectionFunctionIsClosure;
 use PHPCompiler\VM\Builtin\ReflectionFunctionIsInternal;
 use PHPCompiler\VM\Builtin\ReflectionFunctionIsUserDefined;
 use PHPCompiler\VM\Builtin\ReflectionMethodConstruct;
@@ -583,9 +588,14 @@ final class BuiltinClasses
                 'getreturntype' => new ReflectionFunctionGetReturnType(),
                 'hasreturntype' => new ReflectionFunctionHasReturnType(),
                 'isanonymous' => new ReflectionFunctionIsAnonymous(),
+                'isclosure' => new ReflectionFunctionIsClosure(),
                 'isinternal' => new ReflectionFunctionIsInternal(),
                 'isuserdefined' => new ReflectionFunctionIsUserDefined(),
                 'getextensionname' => new ReflectionFunctionGetExtensionName(),
+                'getclosurethis' => new ReflectionFunctionGetClosureThis(),
+                'getclosurescopeclass' => new ReflectionFunctionGetClosureScopeClass(),
+                'getclosurecalledclass' => new ReflectionFunctionGetClosureCalledClass(),
+                'getclosureusedvariables' => new ReflectionFunctionGetClosureUsedVariables(),
                 'invoke' => new ReflectionFunctionInvoke(),
             ] as $name => $method
         ) {
