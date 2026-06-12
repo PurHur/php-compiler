@@ -2380,6 +2380,80 @@ class Object_ extends Type {
     }
 
     /**
+     * property_exists() from a scope class — respects inheritance visibility (#4361).
+     */
+    public function propertyExistsFromScope(int $scopeClassId, string $property): bool
+    {
+        $lc = strtolower($property);
+        $currentId = $scopeClassId;
+        for ($depth = 0; $depth < 64; ++$depth) {
+            foreach ($this->properties[$currentId] ?? [] as $propset) {
+                if (strtolower($propset[1]) !== $lc) {
+                    continue;
+                }
+                $declId = $this->instancePropertyDeclaringClassId[$currentId][$lc] ?? $currentId;
+
+                return $this->propertyVisibleFromScopeId(
+                    $scopeClassId,
+                    $this->propertyVisibility($currentId, $propset[1]),
+                    $declId
+                );
+            }
+            if (isset($this->staticPropertyGlobals[$currentId][$lc])) {
+                $meta = $this->staticPropertyVisibilityMeta($currentId, $property);
+                if (null === $meta) {
+                    return false;
+                }
+
+                return $this->propertyVisibleFromScopeId(
+                    $scopeClassId,
+                    $meta['visibility'],
+                    $meta['declaringClassId']
+                );
+            }
+            $parentLc = $this->parentClassLc($this->classNameForId($currentId));
+            if (null === $parentLc) {
+                return false;
+            }
+            $currentId = $this->lookup($parentLc);
+        }
+
+        return false;
+    }
+
+    private function propertyVisibleFromScopeId(int $scopeClassId, int $visibility, int $declaringClassId): bool
+    {
+        if (MethodVisibility::isPublic($visibility)) {
+            return true;
+        }
+        if (($visibility & \PHPCfg\Func::FLAG_PRIVATE) !== 0) {
+            return $scopeClassId === $declaringClassId;
+        }
+        if (($visibility & \PHPCfg\Func::FLAG_PROTECTED) !== 0) {
+            return $this->isSameOrSubclassOfClassId($scopeClassId, $declaringClassId);
+        }
+
+        return true;
+    }
+
+    private function isSameOrSubclassOfClassId(int $classId, int $ancestorId): bool
+    {
+        $currentId = $classId;
+        for ($depth = 0; $depth < 64; ++$depth) {
+            if ($currentId === $ancestorId) {
+                return true;
+            }
+            $parentLc = $this->parentClassLc($this->classNameForId($currentId));
+            if (null === $parentLc) {
+                return false;
+            }
+            $currentId = $this->lookup($parentLc);
+        }
+
+        return false;
+    }
+
+    /**
      * Declared instance and static property names for a class (issue #1372).
      *
      * @return list<string>

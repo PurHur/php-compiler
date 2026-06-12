@@ -246,7 +246,7 @@ final class JitPropertyExists
                 $classId,
                 $context->constantFromInteger($id, 'int64')
             );
-            $classExists = $object->hasProperty($id, $property)
+            $classExists = $object->propertyExistsFromScope($id, $property)
                 ? $i1->constInt(1, false)
                 : $i1->constInt(0, false);
             $exists = $context->builder->select($isClass, $classExists, $exists);

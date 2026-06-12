@@ -8,6 +8,7 @@ use PHPCompiler\Frame;
 use PHPCompiler\Func;
 use PHPCompiler\Func\Internal as FuncInternal;
 use PHPCompiler\MethodVisibility;
+use PHPCfg\Func as CfgFunc;
 use PHPCompiler\VM\ClassEntry;
 use PHPCompiler\VM\ClassProperty;
 use PHPCompiler\VM\Context;
@@ -323,19 +324,73 @@ final class VmReflection
         return 'closure' === $classLc && '__invoke' === $methodLc;
     }
 
-    public static function propertyExistsOnClass(ClassEntry $class, string $property): bool
+    /**
+     * property_exists() scope check — php-src ext/standard/class.c + zend_get_property_info(silent=1).
+     */
+    public static function propertyExistsOnClass(ClassEntry $class, string $property, Context $ctx): bool
     {
-        $lc = strtolower($property);
-        if (isset($class->staticProperties[$lc])) {
-            return true;
-        }
-        foreach ($class->properties as $prop) {
-            if (strtolower($prop->name) === $lc) {
-                return true;
-            }
+        $meta = self::findClassProperty($class, $property, $ctx);
+        if (null !== $meta) {
+            $declaringLc = '' !== $meta->declaringClassLc
+                ? $meta->declaringClassLc
+                : strtolower(ltrim($class->name, '\\'));
+
+            return self::propertyVisibleFromScope($ctx, $class, $meta->visibility, $declaringLc);
         }
 
-        return false;
+        $lc = strtolower($property);
+        $current = $class;
+        while (true) {
+            if (isset($current->staticProperties[$lc])) {
+                $visibility = $current->staticPropertyVisibility[$lc] ?? CfgFunc::FLAG_PUBLIC;
+                $declaringLc = $current->staticPropertyDeclaringClassLc[$lc]
+                    ?? strtolower(ltrim($current->name, '\\'));
+
+                return self::propertyVisibleFromScope($ctx, $class, $visibility, $declaringLc);
+            }
+            if (null === $current->parentLc || !isset($ctx->classes[$current->parentLc])) {
+                return false;
+            }
+            $current = $ctx->classes[$current->parentLc];
+        }
+    }
+
+    private static function propertyVisibleFromScope(
+        Context $ctx,
+        ClassEntry $scopeClass,
+        int $visibility,
+        string $declaringClassLc
+    ): bool {
+        if (MethodVisibility::isPublic($visibility)) {
+            return true;
+        }
+        $scopeLc = strtolower(ltrim($scopeClass->name, '\\'));
+        if (($visibility & CfgFunc::FLAG_PRIVATE) !== 0) {
+            return $scopeLc === $declaringClassLc;
+        }
+        if (($visibility & CfgFunc::FLAG_PROTECTED) !== 0) {
+            return self::isSameOrSubclassOf($ctx, $scopeLc, $declaringClassLc);
+        }
+
+        return true;
+    }
+
+    private static function isSameOrSubclassOf(Context $ctx, string $classLc, string $ancestorLc): bool
+    {
+        $current = $classLc;
+        while (true) {
+            if ($current === $ancestorLc) {
+                return true;
+            }
+            if (!isset($ctx->classes[$current])) {
+                return false;
+            }
+            $parentLc = $ctx->classes[$current]->parentLc;
+            if (null === $parentLc) {
+                return false;
+            }
+            $current = $parentLc;
+        }
     }
 
     /**
@@ -490,7 +545,7 @@ final class VmReflection
                 return false;
             }
 
-            return self::propertyExistsOnClass($class, $property);
+            return self::propertyExistsOnClass($class, $property, $ctx);
         }
         if (Variable::TYPE_OBJECT === $objectOrClass->type) {
             $object = $objectOrClass->toObject();
@@ -498,7 +553,7 @@ final class VmReflection
                 return EnumCaseSupport::propertyExistsOnCase($object->class, $property);
             }
 
-            return self::propertyExistsOnClass($object->class, $property);
+            return self::propertyExistsOnClass($object->class, $property, $ctx);
         }
         if (Variable::TYPE_ENUM_CASE === $objectOrClass->type) {
             return EnumCaseSupport::propertyExistsOnCase(

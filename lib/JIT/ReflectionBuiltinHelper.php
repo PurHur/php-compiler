@@ -139,6 +139,16 @@ final class ReflectionBuiltinHelper
 
     public static function propertyExistsLiteral(Context $context, string $className, string $property): Value
     {
+        $ctx = $context->runtime->vmContext;
+        if (null !== $ctx) {
+            $lc = strtolower(ltrim($className, '\\'));
+            $entry = $ctx->classes[$lc] ?? null;
+            $exists = null !== $entry
+                && \PHPCompiler\ext\standard\VmReflection::propertyExistsOnClass($entry, $property, $ctx);
+            $i1 = $context->getTypeFromString('int1');
+
+            return $i1->constInt($exists ? 1 : 0, false);
+        }
         $object = self::objectBuiltin($context);
         if (!$object->hasUserDeclaredClass($className)) {
             $i1 = $context->getTypeFromString('int1');
@@ -146,7 +156,7 @@ final class ReflectionBuiltinHelper
             return $i1->constInt(0, false);
         }
         $classId = $object->lookup($className);
-        $exists = $object->hasProperty($classId, $property);
+        $exists = $object->propertyExistsFromScope($classId, $property);
         $i1 = $context->getTypeFromString('int1');
 
         return $i1->constInt($exists ? 1 : 0, false);
