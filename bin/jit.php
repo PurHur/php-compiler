@@ -47,6 +47,13 @@ function run(string $filename, string $code, array $options): void
         $postArg,
         $scriptFilename
     );
+    $scriptArgv = $options['--script-argv'] ?? null;
+    if (is_array($scriptArgv)) {
+        Superglobals::populateCliArgv(
+            $runtime->vmContext,
+            array_values(array_map('strval', $scriptArgv))
+        );
+    }
 
     $debugFile = null;
     if (isset($options['-y'])) {

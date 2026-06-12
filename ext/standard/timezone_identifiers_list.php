@@ -73,8 +73,6 @@ final class timezone_identifiers_list extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        throw new \LogicException(
-            'timezone_identifiers_list() is not implemented for JIT in this compiler build (issue #3504)'
-        );
+        return JitTimezoneIdentifiersList::invoke($context, ...$args);
     }
 }
