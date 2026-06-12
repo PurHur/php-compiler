@@ -36,8 +36,10 @@ final class restore_exception_handler extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        throw new \LogicException(
-            'restore_exception_handler() is VM-only in this compiler build (issue #3146)'
-        );
+        if (\count($args) > 0) {
+            throw new \LogicException('restore_exception_handler() takes no arguments');
+        }
+
+        return JitExceptionHandler::restore($context);
     }
 }

@@ -6,11 +6,14 @@ namespace PHPCompiler\JIT;
 
 use PHPCompiler\Block;
 use PHPCompiler\JIT\Builtin\ErrorRaise;
+use PHPCompiler\JIT\Builtin\ExceptionHandlerJitRuntime;
 use PHPCompiler\JIT\Builtin\JitReturnPending;
 use PHPCompiler\JIT\Builtin\JitThrow;
+use PHPCompiler\JIT\Builtin\ScriptExit;
 use PHPCompiler\OpCode;
 use PHPLLVM\BasicBlock;
 use PHPLLVM\Builder;
+use PHPLLVM\Value;
 use PHPLLVM\Value\Function_;
 
 /**
@@ -385,8 +388,22 @@ final class TryCatchHelper
                 $builder->positionAtEnd($throwBlock);
             }
             $context->freeDeadVariables($func, $throwBlock, $block);
-            $context->builder->call($context->lookupFunction('abort'));
-            $context->llvm->lib->LLVMBuildUnreachable($context->builder->builder);
+            $thrown = $context->getVariableFromOp($block->getOperand($op->arg1));
+            if (
+                Variable::TYPE_OBJECT !== $thrown->type
+                && Variable::TYPE_VALUE !== $thrown->type
+            ) {
+                self::emitCatchableClassError(
+                    $context,
+                    \PHPCompiler\VM\ExceptionSupport::CLASS_ERROR,
+                    \PHPCompiler\VM\ExceptionSupport::THROW_NON_THROWABLE_MESSAGE,
+                    $jit
+                );
+
+                return;
+            }
+            $obj = self::loadThrownObject($context, $thrown);
+            self::emitUncaughtUserHandlerOrAbort($context, $obj);
 
             return;
         }
@@ -590,8 +607,7 @@ final class TryCatchHelper
             $builder->branch($uncaught);
             $builder->positionAtEnd($uncaught);
             $builder->call($context->lookupFunction('phpc_jit_set_throw_pending'), $pendingObj);
-            $builder->call($context->lookupFunction('abort'));
-            $context->llvm->lib->LLVMBuildUnreachable($context->builder->builder);
+            self::emitUncaughtUserHandlerOrAbort($context, $pendingObj);
         }
 
         if (null !== $saved) {
@@ -626,6 +642,45 @@ final class TryCatchHelper
         }
         $handler = array_pop($context->tryCatch->handlerStack);
         unset($context->tryCatch->mergeHandlers[spl_object_id($handler->mergeBlock)]);
+    }
+
+    private static function loadThrownObject(Context $context, Variable $thrown): Value
+    {
+        $obj = $context->helper->loadValue($thrown);
+        if (Variable::TYPE_OBJECT !== $thrown->type) {
+            $valuePtr = JitValueBox::valuePtrFromVariable($context, $thrown);
+
+            return $context->builder->call($context->lookupFunction('__value__readObject'), $valuePtr);
+        }
+
+        return $obj;
+    }
+
+    private static function emitUncaughtUserHandlerOrAbort(Context $context, Value $exceptionObj): void
+    {
+        ExceptionHandlerJitRuntime::ensureLinked($context);
+        $builder = $context->builder;
+        $i32 = $context->getTypeFromString('int32');
+        $handled = $builder->call(
+            $context->lookupFunction('__phpc_exception_handler_dispatch'),
+            $exceptionObj
+        );
+        $func = $builder->getInsertBlock()->getParent();
+        if (!$func instanceof Function_) {
+            throw new \LogicException('emitUncaughtUserHandlerOrAbort requires parent function');
+        }
+        $handledBb = self::appendBlock($func, 'ex_handler_handled');
+        $abortBb = self::appendBlock($func, 'ex_handler_abort');
+        $builder->branchIf(
+            $builder->icmp(Builder::INT_NE, $handled, $i32->constInt(0, false)),
+            $handledBb,
+            $abortBb
+        );
+        $builder->positionAtEnd($handledBb);
+        ScriptExit::emitLibcExitWithStatus($context, $context->getTypeFromString('int64')->constInt(0, false));
+        $builder->positionAtEnd($abortBb);
+        $builder->call($context->lookupFunction('abort'));
+        $context->llvm->lib->LLVMBuildUnreachable($context->builder->builder);
     }
 
     /**
