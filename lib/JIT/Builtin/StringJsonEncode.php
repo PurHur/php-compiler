@@ -437,7 +437,7 @@ final class StringJsonEncode
             );
             $context->builder->store($backingEncoded, $resultSlot);
         } else {
-            $context->builder->store(self::quoteString($context, self::literalString($context, '')), $resultSlot);
+            $context->builder->store($context->getTypeFromString('__string__*')->constNull(), $resultSlot);
         }
         $context->builder->branch($bbDone);
 

@@ -347,7 +347,7 @@ final class VmJson
         }
 
         if (null === $case->enumClass->backedType) {
-            return '';
+            throw new VmJsonExportException(self::ERROR_UNSUPPORTED_TYPE);
         }
         $backing = $case->backingValue->resolveIndirect();
 
