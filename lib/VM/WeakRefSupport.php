@@ -86,7 +86,15 @@ final class WeakRefSupport
     /** Zend zend_weakrefs.c — WeakMap offset key must be object (#5433, #5681). */
     public static function requireWeakMapKey(Variable $var): Variable
     {
-        return self::requireWeakReferent($var, 'WeakMap key must be an object');
+        $var = $var->resolveIndirect();
+        if (Variable::TYPE_OBJECT === $var->type) {
+            return $var;
+        }
+        if (EnumCaseSupport::isEnumCaseVariable($var)) {
+            return EnumCaseSupport::receiverForInstanceMethod($var);
+        }
+
+        throw new \TypeError('WeakMap key must be an object');
     }
 
     public static function objectKey(Variable $key): string
