@@ -12,7 +12,7 @@ use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
 
-/** is_readable() — VM via host; JIT via libc access(2) R_OK. */
+/** is_readable() — VM via VmStatPath; JIT via libc access(2) R_OK (#8186). */
 final class is_readable extends Internal
 {
     public function execute(Frame $frame): void
@@ -24,7 +24,7 @@ final class is_readable extends Internal
         if (null === $frame->returnVar) {
             return;
         }
-        $frame->returnVar->bool(@is_readable($path));
+        $frame->returnVar->bool(VmStatPath::isReadable($path));
     }
 
     public function call(Context $context, JITVariable ...$args): Value

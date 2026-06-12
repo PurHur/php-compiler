@@ -10,7 +10,7 @@ use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Value;
 
-/** file_exists() — VM via host; JIT via libc stat (issue #194). */
+/** file_exists() — VM via VmStatPath; JIT via libc stat (issue #194, #8186). */
 final class file_exists extends Internal
 {
     public function execute(Frame $frame): void
@@ -27,7 +27,7 @@ final class file_exists extends Internal
         if (null === $frame->returnVar) {
             return;
         }
-        $frame->returnVar->bool(@file_exists($path));
+        $frame->returnVar->bool(VmStatPath::exists($path));
     }
 
     public function call(Context $context, JITVariable ...$args): Value

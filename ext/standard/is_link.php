@@ -11,7 +11,7 @@ use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Value;
 
-/** is_link() — VM via host; JIT/AOT via libc lstat(2) S_IFLNK. */
+/** is_link() — VM via VmStatPath; JIT/AOT via libc lstat(2) S_IFLNK (#8186). */
 final class is_link extends Internal
 {
     public function execute(Frame $frame): void
@@ -23,7 +23,7 @@ final class is_link extends Internal
         if (null === $frame->returnVar) {
             return;
         }
-        $frame->returnVar->bool(@is_link($path));
+        $frame->returnVar->bool(VmStatPath::isLink($path));
     }
 
     public function call(Context $context, JITVariable ...$args): Value

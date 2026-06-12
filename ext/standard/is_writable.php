@@ -12,7 +12,7 @@ use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
 
-/** is_writable() — VM via host; JIT via libc access(2) W_OK. */
+/** is_writable() — VM via VmStatPath; JIT via libc access(2) W_OK (#8186). */
 final class is_writable extends Internal
 {
     public function execute(Frame $frame): void
@@ -24,7 +24,7 @@ final class is_writable extends Internal
         if (null === $frame->returnVar) {
             return;
         }
-        $frame->returnVar->bool(@is_writable($path));
+        $frame->returnVar->bool(VmStatPath::isWritable($path));
     }
 
     public function call(Context $context, JITVariable ...$args): Value

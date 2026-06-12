@@ -52,12 +52,7 @@ final class VmFsTempnam
             return $ffiPath;
         }
 
-        if (!\is_dir($dir) || !\is_writable($dir)) {
-            return false;
-        }
-        $path = \tempnam($dir, $prefix);
-
-        return false === $path ? false : $path;
+        return false;
     }
 
     private static function emitNotice(Frame $frame): void

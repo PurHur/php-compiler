@@ -1198,12 +1198,8 @@ final class VmFs
         if (false !== $path) {
             return $path;
         }
-        if (!\is_dir($directory) || !\is_writable($directory)) {
-            return false;
-        }
-        $path = \tempnam($directory, $pfx);
 
-        return false === $path ? false : $path;
+        return false;
     }
 
     /**

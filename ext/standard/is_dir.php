@@ -12,7 +12,7 @@ use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
 
-/** is_dir() — VM via host; JIT via libc stat (issue #194). */
+/** is_dir() — VM via VmStatPath; JIT via libc stat (issue #194, #8186). */
 final class is_dir extends Internal
 {
     public function execute(Frame $frame): void
@@ -24,7 +24,7 @@ final class is_dir extends Internal
         if (null === $frame->returnVar) {
             return;
         }
-        $frame->returnVar->bool(@is_dir($path));
+        $frame->returnVar->bool(VmStatPath::isDir($path));
     }
 
     public function call(Context $context, JITVariable ...$args): Value
