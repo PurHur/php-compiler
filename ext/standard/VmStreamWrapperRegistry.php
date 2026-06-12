@@ -128,4 +128,11 @@ final class VmStreamWrapperRegistry
 
         return $protocol;
     }
+
+    /** @internal PHPUnit isolation */
+    public static function resetForTests(): void
+    {
+        self::$custom = [];
+        self::$restoreStack = [];
+    }
 }

@@ -7,6 +7,8 @@ namespace PHPCompiler\ext\standard;
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\JitStringBuiltinArg;
+use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Value;
 
@@ -45,6 +47,12 @@ final class stream_wrapper_register extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        throw new \LogicException('stream_wrapper_register() is not implemented for JIT in this compiler build (issue #3383)');
+        if (!JitStreamWrapperRegistry::requireExactArgCount($context, $args, 'stream_wrapper_register', 2)) {
+            return JitValueBox::pointer($context, JitValueBox::alloc($context));
+        }
+        JitStringBuiltinArg::lower($context, $args[0], 'stream_wrapper_register', 0, 'protocol');
+        JitStringBuiltinArg::lower($context, $args[1], 'stream_wrapper_register', 1, 'class');
+
+        return JitStreamWrapperRegistry::register($context, $args[0], $args[1]);
     }
 }
