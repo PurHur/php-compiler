@@ -12,7 +12,7 @@ Regenerate: `php script/bootstrap-inventory.php`
 | Phase A inventory files (M2 ratio SSOT) | 2345 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 6354 |
+| Source constructs flagged (warnings) | 6358 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -708,7 +708,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/standard/VmRandom.php` | 0 | 2 |
 | `ext/standard/VmReadline.php` | 0 | 5 |
 | `ext/standard/VmReduceCallback.php` | 0 | 1 |
-| `ext/standard/VmReflection.php` | 0 | 53 |
+| `ext/standard/VmReflection.php` | 0 | 55 |
 | `ext/standard/VmRound.php` | 0 | 1 |
 | `ext/standard/VmRoundMode.php` | 0 | 1 |
 | `ext/standard/VmScalarType.php` | 0 | 4 |
@@ -965,7 +965,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/standard/generator_to_array.php` | 0 | 1 |
 | `ext/standard/get_called_class_.php` | 0 | 1 |
 | `ext/standard/get_cfg_var.php` | 0 | 2 |
-| `ext/standard/get_class_.php` | 0 | 1 |
+| `ext/standard/get_class_.php` | 0 | 3 |
 | `ext/standard/get_class_methods_.php` | 0 | 1 |
 | `ext/standard/get_class_vars_.php` | 0 | 1 |
 | `ext/standard/get_current_user.php` | 0 | 2 |
@@ -4262,7 +4262,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/JitGetClass.php`
 
 **Warnings** (review for bootstrap subset):
-- 4 class method(s)
+- 8 class method(s)
 
 ### `ext/standard/JitGetClassMethods.php`
 
@@ -7140,25 +7140,27 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new Variable (line 1231)
 - new Error (line 1248)
 - new Error (line 1254)
-- new Variable (line 1431)
-- new Variable (line 1439)
-- new Variable (line 1460)
-- new Variable (line 1468)
-- new Variable (line 1489)
-- new Variable (line 1497)
-- new Variable (line 1569)
-- new Variable (line 1574)
-- new Error (line 1594)
-- new Error (line 1598)
-- new Variable (line 1639)
-- new Variable (line 1645)
-- new Variable (line 1651)
-- new Variable (line 1691)
-- new Variable (line 1696)
-- new Variable (line 1725)
-- new Variable (line 1735)
-- new Variable (line 1741)
-- 88 class method(s)
+- new Error (line 1277)
+- new Error (line 1280)
+- new Variable (line 1450)
+- new Variable (line 1458)
+- new Variable (line 1479)
+- new Variable (line 1487)
+- new Variable (line 1508)
+- new Variable (line 1516)
+- new Variable (line 1588)
+- new Variable (line 1593)
+- new Error (line 1613)
+- new Error (line 1617)
+- new Variable (line 1658)
+- new Variable (line 1664)
+- new Variable (line 1670)
+- new Variable (line 1710)
+- new Variable (line 1715)
+- new Variable (line 1744)
+- new Variable (line 1754)
+- new Variable (line 1760)
+- 89 class method(s)
 
 ### `ext/standard/VmRound.php`
 
@@ -8702,7 +8704,9 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/get_class_.php`
 
 **Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 29)
 - 3 class method(s)
+- 2 closure(s)
 
 ### `ext/standard/get_class_methods_.php`
 
