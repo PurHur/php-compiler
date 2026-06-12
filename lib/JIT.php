@@ -3577,7 +3577,8 @@ class JIT {
             $this->registerM3EmitTuSidecarFromPath(
                 __DIR__.'/../bin/vm.php',
                 \PHPCompiler\JIT\M3EmitTuTrivialEchoAot::BIN_VM_SIDECAR_REL,
-                'PHPCompiler\\JIT\\M3EmitTuTrivialEchoAot::binVmSentinelBlock'
+                'PHPCompiler\\JIT\\M3EmitTuTrivialEchoAot::binVmSentinelBlock',
+                true
             );
             $this->registerM3EmitTuSidecarFromPath(
                 __DIR__.'/../src/cli_driver.php',
@@ -3657,7 +3658,8 @@ class JIT {
             $this->registerM3EmitTuSidecarFromPath(
                 __DIR__.'/../bin/vm.php',
                 \PHPCompiler\JIT\M3EmitTuTrivialEchoAot::BIN_VM_SIDECAR_REL,
-                'PHPCompiler\\JIT\\M3EmitTuTrivialEchoAot::binVmSentinelBlock'
+                'PHPCompiler\\JIT\\M3EmitTuTrivialEchoAot::binVmSentinelBlock',
+                true
             );
             $this->registerM3EmitTuSidecarFromPath(
                 __DIR__.'/../src/cli_driver.php',
@@ -3792,11 +3794,17 @@ class JIT {
                     $code,
                     $aotBytes,
                     $sidecarRel,
-                    $sentinelLogical
+                    $sentinelLogical,
+                    false,
+                    $this->m3EmitTuSidecarSourcePathNorm($path)
                 );
 
                 return;
             }
+        }
+        if (\PHPCompiler\JIT\M3EmitTuTrivialEchoAot::BIN_VM_SIDECAR_REL === $sidecarRel
+            && $this->registerM3BinVmSidecarStubFallback($path, $sidecarRel, $sentinelLogical, $code, $repoRoot)) {
+            return;
         }
         // Zend host-compile of bin/compile.php inventory argv driver SIGSEGVs — reuse committed gen-0 (#2930).
         if (\PHPCompiler\JIT\M3EmitTuTrivialEchoAot::BIN_COMPILE_SIDECAR_REL === $sidecarRel) {
@@ -3975,11 +3983,16 @@ class JIT {
                         $code,
                         $aotBytes,
                         $sidecarRel,
-                        $sentinelLogical
+                        $sentinelLogical,
+                        false,
+                        $this->m3EmitTuSidecarSourcePathNorm($path)
                     );
 
                     return;
                 }
+            }
+            if ($this->registerM3BinVmSidecarStubFallback($path, $sidecarRel, $sentinelLogical, $code, $repoRoot)) {
+                return;
             }
 
             return;
@@ -4000,8 +4013,118 @@ class JIT {
             $aotBytes,
             $sidecarRel,
             $sentinelLogical,
-            $vendorObjectSidecar
+            $vendorObjectSidecar,
+            $this->m3EmitTuSidecarSourcePathNorm($path)
         );
+    }
+
+    private function m3EmitTuSidecarSourcePathNorm(string $path): ?string
+    {
+        $norm = str_replace('\\', '/', $path);
+        if (!str_ends_with($norm, '/bin/vm.php')) {
+            return null;
+        }
+        $resolved = realpath($path);
+
+        return false !== $resolved ? str_replace('\\', '/', $resolved) : $norm;
+    }
+
+    /**
+     * bin/vm.php honest AOT still LLVM-segfaults; register path-keyed stub sidecar (#2699, #1492).
+     */
+    private function registerM3BinVmSidecarStubFallback(
+        string $path,
+        string $sidecarRel,
+        string $sentinelLogical,
+        string $code,
+        string $repoRoot
+    ): bool {
+        if (\PHPCompiler\JIT\M3EmitTuTrivialEchoAot::BIN_VM_SIDECAR_REL !== $sidecarRel) {
+            return false;
+        }
+        $sourcePathNorm = $this->m3EmitTuSidecarSourcePathNorm($path);
+        if (null === $sourcePathNorm) {
+            return false;
+        }
+        foreach (
+            [
+                $repoRoot.'/prelinked/bootstrap-gen0/.m3_bin_vm_aot_blob',
+                $repoRoot.'/'.ltrim($sidecarRel, '/'),
+            ] as $prelinked
+        ) {
+            if (!is_readable($prelinked)) {
+                continue;
+            }
+            $aotBytes = file_get_contents($prelinked);
+            if (!is_string($aotBytes) || '' === $aotBytes) {
+                continue;
+            }
+            \PHPCompiler\JIT\M3EmitTuTrivialEchoAot::registerLinktime(
+                $this->context,
+                $repoRoot,
+                $code,
+                $aotBytes,
+                $sidecarRel,
+                $sentinelLogical,
+                true,
+                $sourcePathNorm
+            );
+
+            return true;
+        }
+        $stub = $repoRoot.'/test/bootstrap-aot/bin_vm_sidecar_stub.php';
+        if (!is_readable($stub)) {
+            return false;
+        }
+        $tmpOut = sys_get_temp_dir().'/m3_bin_vm_sidecar_stub_'.getmypid();
+        @unlink($tmpOut);
+        $compileCmd = 'php';
+        $memLimit = getenv('PHP_COMPILER_MEMORY_LIMIT');
+        if (is_string($memLimit) && '' !== $memLimit && '-1' !== $memLimit) {
+            $compileCmd .= ' -d memory_limit='.escapeshellarg($memLimit);
+        }
+        $compileCmd .= ' '.escapeshellarg($repoRoot.'/bin/compile.php')
+            .' -o '.escapeshellarg($tmpOut)
+            .' '.escapeshellarg($stub);
+        $compileEnv = $this->m3EmitSidecarHostCompileEnv();
+        $compileEnv['PHP_COMPILER_SELFHOST_AOT'] = '1';
+        $compileEnv['PHP_COMPILER_M3_SIDECAR_HOST'] = '1';
+        $compileEnv['PHP_COMPILER_M3_EMIT_SIDECAR_RECURSION_GUARD'] = '1';
+        unset($compileEnv['PHP_COMPILER_EMIT_HELPER_LINK'], $compileEnv['PHP_COMPILER_M3_EMIT_TU']);
+        $descriptor = [0 => ['pipe', 'r'], 1 => ['pipe', 'w'], 2 => ['pipe', 'w']];
+        $proc = proc_open($compileCmd, $descriptor, $pipes, $repoRoot, $compileEnv);
+        if (!is_resource($proc)) {
+            return false;
+        }
+        fclose($pipes[0]);
+        fclose($pipes[1]);
+        fclose($pipes[2]);
+        $exit = proc_close($proc);
+        if (0 !== $exit || !is_readable($tmpOut)) {
+            @unlink($tmpOut);
+
+            return false;
+        }
+        $aotBytes = file_get_contents($tmpOut);
+        @unlink($tmpOut);
+        if (!is_string($aotBytes) || '' === $aotBytes) {
+            return false;
+        }
+        $repoSidecar = $repoRoot.'/'.ltrim($sidecarRel, '/');
+        @file_put_contents($repoSidecar, $aotBytes);
+        @chmod($repoSidecar, 0755);
+        \PHPCompiler\JIT\M3EmitTuTrivialEchoAot::registerLinktime(
+            $this->context,
+            $repoRoot,
+            $code,
+            $aotBytes,
+            $sidecarRel,
+            $sentinelLogical,
+            true,
+            $sourcePathNorm
+        );
+
+        return true;
     }
 
     /**

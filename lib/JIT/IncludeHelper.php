@@ -728,7 +728,8 @@ final class IncludeHelper
         }
         $caller = str_replace('\\', '/', $callerBlock->scriptPath());
 
-        return str_ends_with($caller, '/src/cli_driver.php')
+        return str_ends_with($caller, '/bin/vm.php')
+            || str_ends_with($caller, '/src/cli_driver.php')
             || str_ends_with($caller, '/test/selfhost/compiler_lib_spine_smoke/main.php');
     }
 

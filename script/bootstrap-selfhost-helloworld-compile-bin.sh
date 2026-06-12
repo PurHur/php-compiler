@@ -86,7 +86,14 @@ rm -f "${OUT}" "${AOT_OUT}" "${PHP_COMPILER_JIT_PROGRESS_FILE}"
 
 set +e
 link_out="$(
-  php "${ROOT}/bin/compile.php" -o "${OUT}" "${ENTRY}" 2>&1
+  env PHP_COMPILER_SELFHOST_AOT=1 \
+    PHP_COMPILER_M3_COMPILE_DRIVER=1 \
+    PHP_COMPILER_EMIT_HELPER_LINK=1 \
+    PHP_COMPILER_M3_COMPILE_DRIVER_MAIN=1 \
+    PHP_COMPILER_M3_INVENTORY_EMIT_DRIVER=1 \
+    BOOTSTRAP_M3_USE_INVENTORY_EMIT_DRIVER=1 \
+    PHP_COMPILER_M3_EMIT_LOG_PREFIX=helloworld_compile_smoke \
+    php "${ROOT}/bin/compile.php" -o "${OUT}" "${ENTRY}" 2>&1
 )"
 link_code=$?
 set -e
