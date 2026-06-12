@@ -45,7 +45,7 @@ final class BootstrapLibSpineVmSmokeTest extends TestCase
         $this->assertStringContainsString('bootstrap-gen0-install-prelinked-driver.sh', $script);
         $this->assertStringContainsString('ci_ensure_vendor_patches', $script);
         $this->assertStringContainsString('bootstrap_ensure_m3_compiler_lib_sidecar', $script);
-        $this->assertStringContainsString('PHP_COMPILER_CLI_SPINE_BUNDLE=1', $script);
+        $this->assertStringContainsString('PHP_COMPILER_M3_SIDECAR_HOST=1', $script);
         $this->assertStringContainsString('BOOTSTRAP_LIB_SPINE_SMOKE_GEN0_FALLBACK', $script);
         $this->assertStringContainsString('gen-0 Zend fallback', $script);
     }

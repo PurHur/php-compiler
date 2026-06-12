@@ -39,8 +39,11 @@ final class BootstrapSelfhostLinkTest extends TestCase
         $this->assertStringContainsString('bootstrap_ensure_m3_compiler_lib_sidecar', $install);
         $this->assertStringContainsString('.m3_compiler_lib_aot_blob', $install);
         $this->assertStringContainsString('bootstrap_compiler_lib_spine_entry_sha', $install);
+        $this->assertStringContainsString('PHP_COMPILER_M3_SIDECAR_HOST=1', $install);
+        $this->assertStringNotContainsString('PHP_COMPILER_CLI_SPINE_BUNDLE=1', $install);
         $this->assertFileExists(self::$root.'/prelinked/bootstrap-gen0/bin-compile-aot');
         $this->assertFileExists(self::$root.'/prelinked/bootstrap-gen0/compiler_minimal_aot_blob');
+        $this->assertFileExists(self::$root.'/prelinked/bootstrap-gen0/compiler_lib_aot_blob');
     }
 
     public function testLinkScriptUsesCompiledDriverResolver(): void
@@ -56,6 +59,7 @@ final class BootstrapSelfhostLinkTest extends TestCase
         $this->assertStringContainsString('exited 0 but missing', $body);
         $this->assertStringContainsString('bootstrap_gen0_sidecar_emit_fallback', $body);
         $this->assertStringContainsString('gen-0 sidecar emit fallback', $body);
+        $this->assertStringContainsString('native parse spine null', $body);
         $this->assertStringContainsString('bootstrap_gen0_seed_prelinked_m3_sidecars', $body);
         $this->assertStringContainsString('bootstrap_ensure_m3_compiler_lib_sidecar', $body);
         $this->assertStringContainsString('build/selfhost-compile-driver', $body);
