@@ -4396,9 +4396,9 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/JitGetClassMethods.php`
 
 **Warnings** (review for bootstrap subset):
-- new JITVariable (line 47)
-- new JITVariable (line 160)
-- 6 class method(s)
+- new JITVariable (line 103)
+- new JITVariable (line 323)
+- 10 class method(s)
 
 ### `ext/standard/JitGetClassVars.php`
 
