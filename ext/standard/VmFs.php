@@ -226,17 +226,27 @@ final class VmFs
 
     public static function mkdir(string $path, int $mode = 0777, bool $recursive = false): bool
     {
-        return @mkdir($path, $mode, $recursive);
+        $ok = VmFsDirNative::mkdir($path, $mode, $recursive);
+        if ($ok) {
+            VmStatCache::invalidatePath($path);
+        }
+
+        return $ok;
     }
 
     public static function rmdir(string $path): bool
     {
-        return @rmdir($path);
+        $ok = VmFsDirNative::rmdir($path);
+        if ($ok) {
+            VmStatCache::invalidatePath($path);
+        }
+
+        return $ok;
     }
 
     public static function chmod(string $path, int $permissions): bool
     {
-        $ok = @chmod($path, $permissions);
+        $ok = VmFsDirNative::chmod($path, $permissions);
         if ($ok) {
             VmStatCache::invalidatePath($path);
         }
@@ -285,7 +295,7 @@ final class VmFs
             return false;
         }
 
-        return @chown($path, $uid);
+        return VmFsDirNative::chown($path, $uid);
     }
 
     public static function lchown(string $path, Variable $user): bool
@@ -295,7 +305,7 @@ final class VmFs
             return false;
         }
 
-        return @lchown($path, $uid);
+        return VmFsDirNative::lchown($path, $uid);
     }
 
     public static function chgrp(string $path, Variable $group): bool
@@ -305,7 +315,7 @@ final class VmFs
             return false;
         }
 
-        return @chgrp($path, $gid);
+        return VmFsDirNative::chgrp($path, $gid);
     }
 
     public static function lchgrp(string $path, Variable $group): bool
@@ -315,7 +325,7 @@ final class VmFs
             return false;
         }
 
-        return @lchgrp($path, $gid);
+        return VmFsDirNative::lchgrp($path, $gid);
     }
 
     public static function rename(string $from, string $to): bool
