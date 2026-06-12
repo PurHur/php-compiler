@@ -39,7 +39,7 @@ final class array_find_key extends Internal
         }
         $callback = $frame->calledArgs[1];
         foreach ($array->toArray()->iterateKeyed(true) as [$key, $value]) {
-            $result = VmArrayValueCallback::invokePredicate($frame, $callback, $value);
+            $result = VmArrayValueCallback::invokePredicate($frame, $callback, $value, $key);
             if (VmArrayValueCallback::isTruthy($result)) {
                 $frame->returnVar->copyFrom($key);
 

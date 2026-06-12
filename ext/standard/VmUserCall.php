@@ -48,4 +48,14 @@ final class VmUserCall
 
         return $context->runtime->vm->invokePhpFunction($func, $copy);
     }
+
+    public static function invokeTwo(Context $context, Func\PHP $func, Variable $a, Variable $b): Variable
+    {
+        $argA = new Variable();
+        $argA->copyFrom($a);
+        $argB = new Variable();
+        $argB->copyFrom($b);
+
+        return $context->runtime->vm->invokePhpFunction($func, $argA, $argB);
+    }
 }
