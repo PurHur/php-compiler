@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace PHPCompiler\ext\filter;
 
+use PHPCompiler\ext\standard\VmPregNative;
 use PHPCompiler\VM\EnumCaseSupport;
 use PHPCompiler\VM\Variable;
 
@@ -196,7 +197,7 @@ final class VmFilter
             return self::failureResult($nullOnFailure);
         }
         $subject = $value->toString();
-        $matched = @\preg_match($pattern, $subject);
+        $matched = VmPregNative::pregMatch($pattern, $subject);
         if (false === $matched || 0 === $matched) {
             return self::failureResult($nullOnFailure);
         }
