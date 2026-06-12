@@ -9,6 +9,7 @@ declare(strict_types=1);
 namespace PHPCompiler\ext\standard;
 
 use PHPCompiler\VM\HashTable;
+use PHPCompiler\VM\ResourceSupport;
 use PHPCompiler\VM\Variable;
 
 final class VmProcess
@@ -43,5 +44,148 @@ final class VmProcess
     public static function proc_nice(int $priority): bool
     {
         return VmProcNiceNative::proc_nice($priority);
+    }
+
+    /** @var array<int, resource> proc_open() host process resources (#3131) */
+    private static array $processHandles = [];
+
+    private static int $nextProcessId = 0;
+
+    public static function isValidHandle(int $handle): bool
+    {
+        return isset(self::$processHandles[$handle]);
+    }
+
+    /** @return resource|null */
+    public static function lookupProcess(int $handle): mixed
+    {
+        return self::$processHandles[$handle] ?? null;
+    }
+
+    /**
+     * proc_open() — spawn subprocess with pipe descriptors (php-src ext/standard/proc_open.c; #3131).
+     *
+     * @param string|list<string> $command
+     * @param array<int, array{0: string, 1?: string}> $descriptorSpec
+     * @param array<string, string>|null $env
+     *
+     * @return array{0: int, 1: array<int, int>}|false [processHandleId, pipeHandleIds by fd]
+     */
+    public static function procOpen(
+        string|array $command,
+        array $descriptorSpec,
+        ?string $cwd = null,
+        ?array $env = null,
+    ): array|false {
+        $pipes = [];
+        $proc = @\proc_open($command, $descriptorSpec, $pipes, $cwd, $env);
+        if (!\is_resource($proc)) {
+            return false;
+        }
+        $procId = ++self::$nextProcessId;
+        self::$processHandles[$procId] = $proc;
+        $pipeHandles = [];
+        foreach ($pipes as $fd => $hostPipe) {
+            if (!\is_resource($hostPipe)) {
+                continue;
+            }
+            $handleId = VmFs::adoptStreamResource($hostPipe, 'proc_open pipe');
+            if (false === $handleId) {
+                continue;
+            }
+            $pipeHandles[(int) $fd] = $handleId;
+        }
+
+        return [$procId, $pipeHandles];
+    }
+
+    /** proc_close() — wait for subprocess and return exit code (php-src ext/standard/proc_open.c; #3131). */
+    public static function procClose(int $handle): int
+    {
+        $proc = self::$processHandles[$handle] ?? null;
+        if (null === $proc) {
+            return -1;
+        }
+        unset(self::$processHandles[$handle]);
+        $result = @\proc_close($proc);
+        if (false === $result) {
+            return -1;
+        }
+
+        return (int) $result;
+    }
+
+    /**
+     * stream_select() — multiplex stream handles (php-src ext/standard/streams.c; #3131).
+     *
+     * @param list<resource> $read
+     * @param list<resource>|null $write
+     * @param list<resource>|null $except
+     */
+    public static function streamSelect(
+        array &$read,
+        ?array &$write,
+        ?array &$except,
+        int $seconds,
+        int $microseconds,
+    ): int|false {
+        return @\stream_select($read, $write, $except, $seconds, $microseconds);
+    }
+
+    /**
+     * Build host stream list from VM stream array variable.
+     *
+     * @return list<array{0: int, 1: resource}> [vmHandle, hostResource] pairs
+     */
+    public static function hostStreamsFromArray(Variable $arrayVar): array
+    {
+        $arrayVar = $arrayVar->resolveIndirect();
+        if (Variable::TYPE_ARRAY !== $arrayVar->type) {
+            return [];
+        }
+        $pairs = [];
+        foreach ($arrayVar->toArray()->iterateKeyed(true) as $pair) {
+            [, $streamVar] = $pair;
+            $streamVar = $streamVar->resolveIndirect();
+            if (!$streamVar->isStreamResource()) {
+                continue;
+            }
+            $handle = ResourceSupport::resolveHandle($streamVar);
+            if (null === $handle) {
+                continue;
+            }
+            $host = VmFs::lookupResource($handle);
+            if (!\is_resource($host)) {
+                continue;
+            }
+            $pairs[] = [$handle, $host];
+        }
+
+        return $pairs;
+    }
+
+    /**
+     * Write stream_select() result back into a VM array by-ref argument.
+     *
+     * @param list<resource> $readyHosts
+     */
+    public static function writeBackStreamArray(Variable $targetVar, array $readyHosts, \PHPCompiler\VM\Context $ctx): void
+    {
+        $targetVar = $targetVar->resolveIndirect();
+        $ht = new HashTable();
+        $index = 0;
+        foreach ($readyHosts as $host) {
+            $handle = VmFs::handleForHostResource($host);
+            if (null === $handle) {
+                continue;
+            }
+            $slot = new Variable();
+            $slot->streamHandle($handle, $ctx);
+            $ht->addIndex($index, $slot);
+            ++$index;
+        }
+        $replacement = new Variable();
+        $replacement->array($ht);
+        $targetVar->copyFrom($replacement);
     }
 }

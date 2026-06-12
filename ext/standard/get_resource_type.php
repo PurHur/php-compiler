@@ -64,6 +64,14 @@ final class get_resource_type extends Internal
                 return;
             }
         }
+        if ($v->isProcessResource()) {
+            $handle = \PHPCompiler\VM\ResourceSupport::resolveHandle($v);
+            if (null !== $handle && VmProcess::isValidHandle($handle)) {
+                $frame->returnVar->string('process');
+
+                return;
+            }
+        }
         if (!is_resource_::isResource($v)) {
             throw new \TypeError(\sprintf(self::TYPE_ERROR, VmStreamArg::debugTypeName($v)));
         }
