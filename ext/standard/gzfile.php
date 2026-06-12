@@ -7,6 +7,8 @@ namespace PHPCompiler\ext\standard;
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\JitLongArg;
+use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\HashTable;
 use PHPCompiler\VM\Variable;
@@ -56,6 +58,20 @@ final class gzfile extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        throw new \LogicException('gzfile() is VM-only in this compiler build (issue #4657)');
+        $argc = \count($args);
+        if ($argc < 1 || $argc > 2) {
+            throw new \LogicException('gzfile() expects one or two arguments in this compiler build');
+        }
+        $i64 = $context->getTypeFromString('int64');
+        $useIncludePath = $i64->constInt(0, false);
+        if (2 === $argc) {
+            $useIncludePath = JitLongArg::lower($context, $args[1], 'gzfile', 2, 'use_include_path');
+        }
+
+        return JitGzfile::invoke(
+            $context,
+            JitStringBuiltinArg::lower($context, $args[0], 'gzfile', 0, 'filename'),
+            $useIncludePath
+        );
     }
 }

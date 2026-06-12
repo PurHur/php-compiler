@@ -93,7 +93,8 @@ final class JitFile
         return $ptr;
     }
 
-    private static function splitLines(Context $context, Value $contents, Value $flags): Value
+    /** @internal Shared with {@see JitGzfile} — gzfile() line split (#4657 phase 2). */
+    public static function splitLines(Context $context, Value $contents, Value $flags): Value
     {
         $map = $context->structFieldMap['__string__'];
         $i8 = $context->getTypeFromString('int8');

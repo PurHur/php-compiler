@@ -31,6 +31,8 @@ final class GzStreamIoJit
         '__compiler_gzwrite',
         '__compiler_gzread',
         '__compiler_gzclose',
+        '__compiler_gz_read_all',
+        '__compiler_gz_passthru',
     ];
 
     public static function implement(Context $context): void
@@ -50,6 +52,8 @@ final class GzStreamIoJit
         self::implementIfMissing($context, '__compiler_gzwrite', self::emitGzwrite(...));
         self::implementIfMissing($context, '__compiler_gzread', self::emitGzread(...));
         self::implementIfMissing($context, '__compiler_gzclose', self::emitGzclose(...));
+        self::implementIfMissing($context, '__compiler_gz_read_all', self::emitGzReadAll(...));
+        self::implementIfMissing($context, '__compiler_gz_passthru', self::emitGzPassthru(...));
     }
 
     private static function ensureIsGzGlobal(Context $context): void
@@ -130,6 +134,14 @@ final class GzStreamIoJit
                 $name,
                 $context->context->functionType($i32, false, $i64)
             ),
+            '__compiler_gz_read_all' => $context->module->addFunction(
+                $name,
+                $context->context->functionType($strPtr, false, $i64)
+            ),
+            '__compiler_gz_passthru' => $context->module->addFunction(
+                $name,
+                $context->context->functionType($i64, false, $i64)
+            ),
             default => throw new \LogicException('GzStreamIoJit: unknown '.$name),
         };
         $context->registerFunction($name, $fn);
@@ -153,10 +165,14 @@ final class GzStreamIoJit
             ['__string__init', $strPtr, [$i64, $i8p]],
             ['malloc', $i8p, [$sizeT]],
             ['free', $void, [$i8p]],
+            ['__phpc_resolve_stream', $i8p, [$i64]],
             ['gzopen', $i8p, [$i8p, $i8p]],
             ['gzwrite', $i32, [$i8p, $i8p, $i32]],
             ['gzread', $i32, [$i8p, $i8p, $i32]],
             ['gzclose', $i32, [$i8p]],
+            ['fwrite', $context->getTypeFromString('size_t'), [$i8p, $context->getTypeFromString('size_t'), $context->getTypeFromString('size_t'), $i8p]],
+            ['realloc', $i8p, [$i8p, $sizeT]],
+            ['memcpy', $i8p, [$i8p, $i8p, $sizeT]],
         ] as [$name, $ret, $params]) {
             self::ensureExternal($context, $name, $context->context->functionType($ret, false, ...$params));
         }
@@ -533,5 +549,209 @@ final class GzStreamIoJit
 
         $context->builder->positionAtEnd($failBb);
         $context->builder->returnValue($zeroI32);
+    }
+
+    private static function emitGzReadAll(Context $context, LlvmFunction $fn): void
+    {
+        $entry = $fn->appendBasicBlock('gz_read_all_entry');
+        $context->builder->positionAtEnd($entry);
+
+        $handle = $fn->getParam(0);
+        $i64 = $context->getTypeFromString('int64');
+        $i32 = $context->getTypeFromString('int32');
+        $i8 = $context->getTypeFromString('int8');
+        $i8p = $context->getTypeFromString('int8*');
+        $sizeT = $context->getTypeFromString('size_t');
+        $strPtr = $context->getTypeFromString('__string__*');
+        $nullStr = $strPtr->constNull();
+        $nullPtr = $i8p->constNull();
+        $zeroI64 = $i64->constInt(0, false);
+        $chunkI32 = $i32->constInt(self::DEFAULT_CHUNK_SIZE, false);
+        $emptyCstr = $context->pointerFromStringConstant('');
+
+        $failBb = $fn->appendBasicBlock('gz_read_all_fail');
+        $checkBb = $fn->appendBasicBlock('gz_read_all_check');
+        $isGz = self::loadIsGz($context, $handle);
+        $notGz = $context->builder->icmp(Builder::INT_EQ, $isGz, $i8->constInt(0, false));
+        $context->builder->branchIf($notGz, $failBb, $checkBb);
+
+        $context->builder->positionAtEnd($checkBb);
+        $fp = self::loadPtrSlot($context, StreamGlobalsJit::GLOBAL_HANDLES, $handle);
+        $fpNull = $context->builder->icmp(Builder::INT_EQ, $fp, $nullPtr);
+        $initBb = $fn->appendBasicBlock('gz_read_all_init');
+        $context->builder->branchIf($fpNull, $failBb, $initBb);
+
+        $context->builder->positionAtEnd($initBb);
+        $chunk = $context->builder->alloca($i8, self::DEFAULT_CHUNK_SIZE, 'gz_read_all_chunk');
+        $bufSlot = $context->builder->alloca($i8p, 1, 'gz_read_all_buf');
+        $lenSlot = $context->builder->alloca($sizeT, 1, 'gz_read_all_len');
+        $capSlot = $context->builder->alloca($sizeT, 1, 'gz_read_all_cap');
+        $context->builder->store($nullPtr, $bufSlot);
+        $context->builder->store($sizeT->constInt(0, false), $lenSlot);
+        $context->builder->store($sizeT->constInt(0, false), $capSlot);
+        $loopHead = $fn->appendBasicBlock('gz_read_all_head');
+        $context->builder->branch($loopHead);
+
+        $context->builder->positionAtEnd($loopHead);
+        $got = $context->builder->call(
+            $context->lookupFunction('gzread'),
+            $fp,
+            $chunk,
+            $chunkI32
+        );
+        $gotZero = $context->builder->icmp(Builder::INT_EQ, $got, $i32->constInt(0, false));
+        $doneBb = $fn->appendBasicBlock('gz_read_all_done');
+        $appendBb = $fn->appendBasicBlock('gz_read_all_append');
+        $context->builder->branchIf($gotZero, $doneBb, $appendBb);
+
+        $context->builder->positionAtEnd($appendBb);
+        $lenNow = $context->builder->load($lenSlot);
+        $capNow = $context->builder->load($capSlot);
+        $gotSize = $context->builder->sext($got, $sizeT);
+        $needCap = $context->builder->add($lenNow, $gotSize);
+        $needsGrow = $context->builder->icmp(Builder::INT_ULE, $capNow, $needCap);
+        $growBb = $fn->appendBasicBlock('gz_read_all_grow');
+        $copyBb = $fn->appendBasicBlock('gz_read_all_copy');
+        $context->builder->branchIf($needsGrow, $growBb, $copyBb);
+
+        $context->builder->positionAtEnd($growBb);
+        $newCap = $context->builder->select(
+            $context->builder->icmp(Builder::INT_EQ, $capNow, $sizeT->constInt(0, false)),
+            $sizeT->constInt(self::DEFAULT_CHUNK_SIZE, false),
+            $context->builder->mul($capNow, $sizeT->constInt(2, false))
+        );
+        $growCap = $context->builder->select(
+            $context->builder->icmp(Builder::INT_ULT, $newCap, $needCap),
+            $needCap,
+            $newCap
+        );
+        $oldBuf = $context->builder->load($bufSlot);
+        $newBuf = $context->builder->call($context->lookupFunction('realloc'), $oldBuf, $growCap);
+        $growFail = $context->builder->icmp(Builder::INT_EQ, $newBuf, $nullPtr);
+        $afterGrowBb = $fn->appendBasicBlock('gz_read_all_after_grow');
+        $context->builder->branchIf($growFail, $failBb, $afterGrowBb);
+        $context->builder->positionAtEnd($afterGrowBb);
+        $context->builder->store($newBuf, $bufSlot);
+        $context->builder->store($growCap, $capSlot);
+        $context->builder->branch($copyBb);
+
+        $context->builder->positionAtEnd($copyBb);
+        $buf = $context->builder->load($bufSlot);
+        $context->builder->call(
+            $context->lookupFunction('memcpy'),
+            $context->builder->inBoundsGEP($buf, $lenNow),
+            $chunk,
+            $gotSize
+        );
+        $context->builder->store($context->builder->add($lenNow, $gotSize), $lenSlot);
+        $context->builder->branch($loopHead);
+
+        $context->builder->positionAtEnd($doneBb);
+        $finalLen = $context->builder->load($lenSlot);
+        $isEmpty = $context->builder->icmp(Builder::INT_EQ, $finalLen, $sizeT->constInt(0, false));
+        $emptyBb = $fn->appendBasicBlock('gz_read_all_empty');
+        $makeBb = $fn->appendBasicBlock('gz_read_all_make');
+        $context->builder->branchIf($isEmpty, $emptyBb, $makeBb);
+
+        $context->builder->positionAtEnd($emptyBb);
+        $context->builder->returnValue(
+            $context->builder->call($context->lookupFunction('__string__init'), $zeroI64, $emptyCstr)
+        );
+
+        $context->builder->positionAtEnd($makeBb);
+        $finalBuf = $context->builder->load($bufSlot);
+        $context->builder->returnValue(
+            $context->builder->call(
+                $context->lookupFunction('__string__init'),
+                $context->builder->sext($finalLen, $i64),
+                $finalBuf
+            )
+        );
+
+        $context->builder->positionAtEnd($failBb);
+        $context->builder->returnValue($nullStr);
+    }
+
+    private static function emitGzPassthru(Context $context, LlvmFunction $fn): void
+    {
+        $entry = $fn->appendBasicBlock('gz_passthru_entry');
+        $context->builder->positionAtEnd($entry);
+
+        $handle = $fn->getParam(0);
+        $i64 = $context->getTypeFromString('int64');
+        $i32 = $context->getTypeFromString('int32');
+        $i8 = $context->getTypeFromString('int8');
+        $i8p = $context->getTypeFromString('int8*');
+        $sizeT = $context->getTypeFromString('size_t');
+        $minusOne = $i64->constInt(-1, true);
+        $zeroI64 = $i64->constInt(0, false);
+        $nullPtr = $i8p->constNull();
+        $oneSize = $sizeT->constInt(1, false);
+        $bufCap = $sizeT->constInt(self::DEFAULT_CHUNK_SIZE, false);
+        $chunkI32 = $i32->constInt(self::DEFAULT_CHUNK_SIZE, false);
+
+        $failBb = $fn->appendBasicBlock('gz_passthru_fail');
+        $checkBb = $fn->appendBasicBlock('gz_passthru_check');
+        $isGz = self::loadIsGz($context, $handle);
+        $notGz = $context->builder->icmp(Builder::INT_EQ, $isGz, $i8->constInt(0, false));
+        $context->builder->branchIf($notGz, $failBb, $checkBb);
+
+        $context->builder->positionAtEnd($checkBb);
+        $fp = self::loadPtrSlot($context, StreamGlobalsJit::GLOBAL_HANDLES, $handle);
+        $fpNull = $context->builder->icmp(Builder::INT_EQ, $fp, $nullPtr);
+        $initBb = $fn->appendBasicBlock('gz_passthru_init');
+        $context->builder->branchIf($fpNull, $failBb, $initBb);
+
+        $context->builder->positionAtEnd($initBb);
+        $stdoutFp = $context->builder->call(
+            $context->lookupFunction('__phpc_resolve_stream'),
+            $i64->constInt(1, false)
+        );
+        $stdoutNull = $context->builder->icmp(Builder::INT_EQ, $stdoutFp, $nullPtr);
+        $loopInitBb = $fn->appendBasicBlock('gz_passthru_loop_init');
+        $context->builder->branchIf($stdoutNull, $failBb, $loopInitBb);
+
+        $context->builder->positionAtEnd($loopInitBb);
+        $buf = $context->builder->alloca($i8, self::DEFAULT_CHUNK_SIZE, 'gz_passthru_buf');
+        $loopBb = $fn->appendBasicBlock('gz_passthru_loop');
+        $context->builder->branch($loopBb);
+
+        $context->builder->positionAtEnd($loopBb);
+        $totalPhi = $context->builder->phi($i64, 'gz_passthru_total');
+        $totalPhi->addIncoming($zeroI64, $loopInitBb);
+        $got = $context->builder->call(
+            $context->lookupFunction('gzread'),
+            $fp,
+            $buf,
+            $chunkI32
+        );
+        $gotZero = $context->builder->icmp(Builder::INT_EQ, $got, $i32->constInt(0, false));
+        $doneBb = $fn->appendBasicBlock('gz_passthru_done');
+        $writeBb = $fn->appendBasicBlock('gz_passthru_write');
+        $context->builder->branchIf($gotZero, $doneBb, $writeBb);
+
+        $context->builder->positionAtEnd($writeBb);
+        $gotSize = $context->builder->sext($got, $sizeT);
+        $wrote = $context->builder->call(
+            $context->lookupFunction('fwrite'),
+            $buf,
+            $oneSize,
+            $gotSize,
+            $stdoutFp
+        );
+        $writeBad = $context->builder->icmp(Builder::INT_NE, $wrote, $gotSize);
+        $nextBb = $fn->appendBasicBlock('gz_passthru_next');
+        $context->builder->branchIf($writeBad, $failBb, $nextBb);
+
+        $context->builder->positionAtEnd($nextBb);
+        $nextTotal = $context->builder->add($totalPhi, $context->builder->sext($got, $i64));
+        $totalPhi->addIncoming($nextTotal, $nextBb);
+        $context->builder->branch($loopBb);
+
+        $context->builder->positionAtEnd($doneBb);
+        $context->builder->returnValue($totalPhi);
+
+        $context->builder->positionAtEnd($failBb);
+        $context->builder->returnValue($minusOne);
     }
 }

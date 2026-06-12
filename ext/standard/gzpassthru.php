@@ -7,6 +7,7 @@ namespace PHPCompiler\ext\standard;
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\JitLongArg;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Value;
 
@@ -38,6 +39,16 @@ final class gzpassthru extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        throw new \LogicException('gzpassthru() is VM-only in this compiler build (issue #4657)');
+        if (1 !== \count($args)) {
+            throw new \LogicException('gzpassthru() requires exactly one argument in this compiler build');
+        }
+
+        return JitGzpassthru::invoke(
+            $context,
+            $context->builder->truncOrBitCast(
+                JitLongArg::lower($context, $args[0], 'gzpassthru() stream'),
+                $context->getTypeFromString('int64')
+            )
+        );
     }
 }
