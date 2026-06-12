@@ -10,6 +10,8 @@ use PHPCompiler\VM\Variable;
 /**
  * Process environment helpers — putenv()/getenv() local table (php-src EG(env), issue #3710).
  *
+ * VM syncs the process environment via {@see VmEnvPutenvNative} (libc FFI) — no host Zend delegation (#8086).
+ *
  * php-src: ext/standard/basic_functions.c — zif_putenv, zif_getenv
  */
 final class VmEnv
@@ -42,7 +44,7 @@ final class VmEnv
             self::$local[$name] = $value;
         }
 
-        return \putenv($setting);
+        return VmEnvPutenvNative::putenv($setting);
     }
 
     public static function getenv(string $name, bool $localOnly = false): string|false
@@ -60,9 +62,11 @@ final class VmEnv
             return false;
         }
 
-        $result = \getenv($name);
+        if (\array_key_exists($name, self::$local)) {
+            return self::$local[$name];
+        }
 
-        return false === $result ? false : $result;
+        return VmEnvPutenvNative::getenv($name);
     }
 
     /**
