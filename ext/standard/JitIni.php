@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace PHPCompiler\ext\standard;
 
+use PHPCompiler\JIT\Builtin\IniRuntime;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitValueBox;
 use PHPLLVM\Value;
@@ -35,5 +36,11 @@ final class JitIni
         $context->builder->call($context->lookupFunction('__compiler_ini_cfg_get'), $optionStr, $ptr);
 
         return $ptr;
+    }
+
+    public static function restore(Context $context, Value $optionStr): void
+    {
+        IniRuntime::ensureLinked($context);
+        $context->builder->call($context->lookupFunction('__compiler_ini_restore'), $optionStr);
     }
 }

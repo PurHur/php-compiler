@@ -185,6 +185,13 @@ class Type extends Builtin {
         $this->context->registerFunction('__compiler_ini_get', $fnIniGet);
         $fnIniCfgGet = $this->context->module->addFunction('__compiler_ini_cfg_get', $fntypeIniGet);
         $this->context->registerFunction('__compiler_ini_cfg_get', $fnIniCfgGet);
+        $fntypeIniRestore = $this->context->context->functionType(
+            $this->context->getTypeFromString('void'),
+            false,
+            $this->context->getTypeFromString('__string__*')
+        );
+        $fnIniRestore = $this->context->module->addFunction('__compiler_ini_restore', $fntypeIniRestore);
+        $this->context->registerFunction('__compiler_ini_restore', $fnIniRestore);
         $fntypeErrorReporting = $this->context->context->functionType(
             $this->context->getTypeFromString('void'),
             false,
