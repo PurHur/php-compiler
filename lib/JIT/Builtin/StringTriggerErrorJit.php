@@ -112,6 +112,17 @@ final class StringTriggerErrorJit
         };
     }
 
+    /** Load libc stderr FILE* (external global), matching StreamGlobalsJit. */
+    public static function stderrFilePtr(Context $context): Value
+    {
+        $i8p = $context->getTypeFromString('int8*');
+        $stderrGlobal = $context->module->getNamedGlobal('stderr');
+
+        return $context->builder->load(
+            $context->builder->pointerCast($stderrGlobal, $i8p->pointerType(0))
+        );
+    }
+
     private static function ensureLibc(Context $context): void
     {
         $i32 = $context->getTypeFromString('int32');
@@ -157,8 +168,7 @@ final class StringTriggerErrorJit
         $i8 = $context->getTypeFromString('int8');
         $i8p = $context->getTypeFromString('int8*');
         $sizeT = $context->getTypeFromString('size_t');
-        $stderr = $context->module->getNamedGlobal('stderr');
-        $stderrPtr = $context->builder->pointerCast($stderr, $i8p);
+        $stderrPtr = self::stderrFilePtr($context);
 
         $prefix = self::selectErrorPrefix($context, $fn, $level);
         $emptyFile = $context->builder->pointerCast($context->constantFromString(''), $i8p);

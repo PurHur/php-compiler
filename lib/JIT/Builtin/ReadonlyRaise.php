@@ -233,8 +233,7 @@ final class ReadonlyRaise
 
         $lineBuf = $context->builder->alloca($i8->arrayType(512), 1, 'fatal_line');
         $linePtr = $context->builder->pointerCast($lineBuf, $i8p);
-        $stderr = $context->module->getNamedGlobal('stderr');
-        $stderrPtr = $context->builder->pointerCast($stderr, $i8p);
+        $stderrPtr = StringTriggerErrorJit::stderrFilePtr($context);
         $context->builder->call(
             $context->lookupFunction('snprintf'),
             $linePtr,
