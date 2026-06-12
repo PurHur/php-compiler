@@ -8,7 +8,6 @@ use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\Variable as JITVariable;
-use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
 
 /** get_defined_constants() — runtime constant introspection (issue #3135). */
@@ -26,11 +25,12 @@ final class get_defined_constants_ extends Internal
             throw new \LogicException('get_defined_constants() accepts at most one argument');
         }
         if (1 === \count($frame->calledArgs)) {
-            $arg = $frame->calledArgs[0]->resolveIndirect();
-            if (Variable::TYPE_BOOLEAN !== $arg->type) {
-                throw new \LogicException('get_defined_constants() categorize flag must be boolean');
-            }
-            $categorize = $arg->toBool();
+            $categorize = VmMath::parseBoolBuiltinArg(
+                $frame->calledArgs[0],
+                'get_defined_constants',
+                1,
+                'categorize'
+            );
         }
         if (null === $frame->returnVar) {
             return;
