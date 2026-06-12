@@ -5,9 +5,9 @@ declare(strict_types=1);
 namespace PHPCompiler\ext\standard;
 
 use PHPCompiler\JIT\BasicBlockHelper;
+use PHPCompiler\JIT\Builtin\TypeErrorRaise;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\HashTableHelper;
-use PHPCompiler\JIT\IssetHelper;
 use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\HashTable;
@@ -69,38 +69,118 @@ final class JitGetDefinedConstants
         if (JITVariable::TYPE_NATIVE_BOOL === $arg->type) {
             return $context->helper->loadValue($arg);
         }
+        if (JITVariable::TYPE_NATIVE_LONG === $arg->type) {
+            $zero = $context->getTypeFromString('int64')->constInt(0, false);
+
+            return $context->builder->icmp(
+                Builder::INT_NE,
+                $context->helper->loadValue($arg),
+                $zero
+            );
+        }
         if (JITVariable::TYPE_NULL === $arg->type || ($arg->isNullConstant ?? false)) {
             return $context->getTypeFromString('int1')->constInt(0, false);
         }
+        if (JITVariable::TYPE_HASHTABLE === $arg->type || ($arg->type & JITVariable::IS_NATIVE_ARRAY)) {
+            self::emitCategorizeTypeError($context, 'array');
+        }
+        if (JITVariable::TYPE_STRING === $arg->type) {
+            self::emitCategorizeTypeError($context, 'string');
+        }
+        if (JITVariable::TYPE_OBJECT === $arg->type) {
+            self::emitCategorizeTypeError($context, 'object');
+        }
         if (JITVariable::TYPE_VALUE === $arg->type) {
-            $valuePtr = JitValueBox::valuePtrFromVariable($context, $arg);
-            $typeByte = $context->builder->load(
-                $context->builder->structGep(
-                    $valuePtr,
-                    $context->structFieldMap['__value__']['type']
-                )
-            );
-            $i8 = $context->getTypeFromString('int8');
-            $isBool = $context->builder->icmp(
-                Builder::INT_EQ,
-                $typeByte,
-                $i8->constInt(JITVariable::TYPE_NATIVE_BOOL, false)
-            );
-            if (!$isBool) {
-                throw new \LogicException('get_defined_constants() categorize flag must be boolean');
-            }
-            $longVal = $context->builder->call(
-                $context->lookupFunction('__value__readLong'),
-                $valuePtr
-            );
-
-            return $context->builder->truncOrBitCast(
-                $longVal,
-                $context->getTypeFromString('int1')
-            );
+            return self::resolveCategorizeFlagBoxed($context, $arg);
         }
 
         throw new \LogicException('get_defined_constants() categorize flag must be boolean');
+    }
+
+    private static function resolveCategorizeFlagBoxed(Context $context, JITVariable $arg): Value
+    {
+        $valuePtr = JitValueBox::valuePtrFromVariable($context, $arg);
+        $map = $context->structFieldMap['__value__'];
+        $typeByte = $context->builder->load(
+            $context->builder->structGep($valuePtr, $map['type'])
+        );
+        $i8 = $context->getTypeFromString('int8');
+        $i1 = $context->getTypeFromString('int1');
+        $i64 = $context->getTypeFromString('int64');
+
+        foreach (
+            [
+                [VMVariable::TYPE_ARRAY, 'array'],
+                [VMVariable::TYPE_OBJECT, 'object'],
+                [VMVariable::TYPE_NULL, 'null'],
+                [VMVariable::TYPE_STRING, 'string'],
+                [VMVariable::TYPE_ENUM_CASE, 'object'],
+            ] as [$vmType, $label]
+        ) {
+            $check = $context->builder->icmp(Builder::INT_EQ, $typeByte, $i8->constInt($vmType, false));
+            $ok = BasicBlockHelper::append($context, 'gdc_cat_ok_'.$label);
+            $bad = BasicBlockHelper::append($context, 'gdc_cat_bad_'.$label);
+            $context->builder->branchIf($check, $bad, $ok);
+            $context->builder->positionAtEnd($bad);
+            self::emitCategorizeTypeError($context, $label);
+            $context->builder->positionAtEnd($ok);
+        }
+
+        $boolBlock = BasicBlockHelper::append($context, 'gdc_cat_bool');
+        $longBlock = BasicBlockHelper::append($context, 'gdc_cat_long');
+        $mergeBlock = BasicBlockHelper::append($context, 'gdc_cat_merge');
+        $isBool = $context->builder->icmp(
+            Builder::INT_EQ,
+            $typeByte,
+            $i8->constInt(JITVariable::TYPE_NATIVE_BOOL, false)
+        );
+        $context->builder->branchIf($isBool, $boolBlock, $longBlock);
+
+        $context->builder->positionAtEnd($boolBlock);
+        $valueField = $context->builder->structGep($valuePtr, $map['value']);
+        $firstByte = $context->builder->inBoundsGEP(
+            $valueField,
+            $context->getTypeFromString('int32')->constInt(0, false),
+            $i64->constInt(0, false)
+        );
+        $boolVal = $context->builder->icmp(
+            Builder::INT_NE,
+            $context->builder->load($firstByte),
+            $i8->constInt(0, false)
+        );
+        $boolEnd = $context->builder->getInsertBlock();
+        $context->builder->branch($mergeBlock);
+
+        $context->builder->positionAtEnd($longBlock);
+        $zero = $i64->constInt(0, false);
+        $longVal = $context->builder->icmp(
+            Builder::INT_NE,
+            $context->builder->call($context->lookupFunction('__value__readLong'), $valuePtr),
+            $zero
+        );
+        $longEnd = $context->builder->getInsertBlock();
+        $context->builder->branch($mergeBlock);
+
+        $context->builder->positionAtEnd($mergeBlock);
+        $phi = $context->builder->phi($i1);
+        $phi->addIncoming($boolVal, $boolEnd);
+        $phi->addIncoming($longVal, $longEnd);
+
+        return $phi;
+    }
+
+    private static function emitCategorizeTypeError(Context $context, string $given): void
+    {
+        TypeErrorRaise::registerDeclarations($context);
+        TypeErrorRaise::ensureLinked($context);
+        TypeErrorRaise::emitRaise(
+            $context,
+            sprintf(
+                'get_defined_constants(): Argument #1 ($categorize) must be of type bool, %s given',
+                $given
+            )
+        );
+        $context->builder->call($context->lookupFunction('abort'));
     }
 
     private static function emitHashTablePtr(Context $context, HashTable $table): Value
