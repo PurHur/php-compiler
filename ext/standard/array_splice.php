@@ -15,7 +15,7 @@ use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\ArrayBuiltinHelper;
 use PHPCompiler\JIT\Context;
-use PHPCompiler\JIT\JitLongArg;
+use PHPCompiler\JIT\JitIntdiv;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
@@ -34,21 +34,24 @@ final class array_splice extends Internal
         $arrayArg = $frame->calledArgs[0];
         $arrayArg->separateArrayForWrite();
         $array = $arrayArg->resolveIndirect();
-        $offset = $frame->calledArgs[1]->resolveIndirect();
         if (Variable::TYPE_ARRAY !== $array->type) {
             throw new \LogicException('array_splice() first argument must be an array in this compiler build');
         }
-        if (Variable::TYPE_INTEGER !== $offset->type) {
-            throw new \LogicException('array_splice() offset must be an integer in this compiler build');
-        }
+        $offsetInt = VmMath::parseIntBuiltinArg(
+            $frame->calledArgs[1],
+            'array_splice',
+            2,
+            'offset'
+        );
 
         $length = null;
         if ($argc >= 3) {
-            $lengthArg = $frame->calledArgs[2]->resolveIndirect();
-            if (Variable::TYPE_INTEGER !== $lengthArg->type) {
-                throw new \LogicException('array_splice() length must be an integer in this compiler build');
-            }
-            $length = $lengthArg->toInt();
+            $length = VmMath::parseIntBuiltinArg(
+                $frame->calledArgs[2],
+                'array_splice',
+                3,
+                'length'
+            );
         }
 
         $replacement = null;
@@ -64,7 +67,7 @@ final class array_splice extends Internal
             }
         }
 
-        $removed = $array->toArray()->spliceInPlace($offset->toInt(), $length, $replacement);
+        $removed = $array->toArray()->spliceInPlace($offsetInt, $length, $replacement);
         if (null === $frame->returnVar) {
             return;
         }
@@ -77,19 +80,12 @@ final class array_splice extends Internal
         if ($argc < 2 || $argc > 4) {
             throw new \LogicException('array_splice() requires two to four arguments in this compiler build');
         }
-        if (JITVariable::TYPE_NATIVE_LONG !== $args[1]->type) {
-            throw new \LogicException('array_splice() offset must be an integer in this compiler build');
-        }
-        if ($argc >= 3 && JITVariable::TYPE_NATIVE_LONG !== $args[2]->type) {
-            throw new \LogicException('array_splice() length must be an integer in this compiler build');
-        }
-
         $i64 = $context->getTypeFromString('int64');
         $i1 = $context->getTypeFromString('int1');
-        $offset = JitLongArg::lower($context, $args[1], 'array_splice() offset');
+        $offset = JitIntdiv::lowerIntBuiltinArg($context, $args[1], 'array_splice', 2, 'offset');
         $hasLength = $i1->constInt($argc >= 3 ? 1 : 0, false);
         $length = $argc >= 3
-            ? JitLongArg::lower($context, $args[2], 'array_splice() length')
+            ? JitIntdiv::lowerIntBuiltinArg($context, $args[2], 'array_splice', 3, 'length')
             : $i64->constInt(0, false);
         $replacement = 4 === $argc ? $args[3] : null;
 

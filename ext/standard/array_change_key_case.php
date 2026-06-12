@@ -8,7 +8,7 @@ use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\ArrayBuiltinHelper;
 use PHPCompiler\JIT\Context;
-use PHPCompiler\JIT\JitLongArg;
+use PHPCompiler\JIT\JitIntdiv;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
@@ -38,11 +38,12 @@ final class array_change_key_case extends Internal
         }
         $case = StdlibConstants::CASE_LOWER;
         if ($argc >= 2) {
-            $caseVar = $frame->calledArgs[1]->resolveIndirect();
-            if (Variable::TYPE_INTEGER !== $caseVar->type) {
-                throw new \LogicException('array_change_key_case() case must be an integer in this compiler build');
-            }
-            $case = $caseVar->toInt();
+            $case = VmMath::parseIntBuiltinArg(
+                $frame->calledArgs[1],
+                'array_change_key_case',
+                2,
+                'case'
+            );
         }
         $frame->returnVar->array(VmArray::changeKeyCase($array->toArray(), $case));
     }
@@ -60,7 +61,7 @@ final class array_change_key_case extends Internal
         $i64 = $context->getTypeFromString('int64');
         $case = $i64->constInt(StdlibConstants::CASE_LOWER, false);
         if ($argc >= 2) {
-            $case = JitLongArg::lower($context, $args[1], 'array_change_key_case() case');
+            $case = JitIntdiv::lowerIntBuiltinArg($context, $args[1], 'array_change_key_case', 2, 'case');
         }
 
         return ArrayBuiltinHelper::buildChangeKeyCaseArray($context, $args[0], $case);
