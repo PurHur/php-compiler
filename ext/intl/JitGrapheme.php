@@ -50,6 +50,30 @@ final class JitGrapheme
         );
     }
 
+    /**
+     * @param JITVariable[] $args
+     */
+    public static function tryStrstrFold(Context $context, array $args, bool $caseInsensitive): ?Value
+    {
+        $hay = self::compileTimeString($args, 0);
+        $needle = self::compileTimeString($args, 1);
+        if (null === $hay || null === $needle) {
+            return null;
+        }
+        $beforeNeedle = self::compileTimeBool($args, 2);
+        if (null === $beforeNeedle) {
+            return null;
+        }
+        $result = $caseInsensitive
+            ? VmGrapheme::stristr($hay, $needle, $beforeNeedle)
+            : VmGrapheme::strstr($hay, $needle, $beforeNeedle);
+        if (false === $result) {
+            return $context->getTypeFromString('bool')->constInt(0, false);
+        }
+
+        return $context->builder->load($context->constantStringFromString($result));
+    }
+
     public static function contains(Context $context, Value $haystack, Value $needle): Value
     {
         $map = $context->structFieldMap['__string__'];
@@ -89,5 +113,20 @@ final class JitGrapheme
         }
 
         return $args[$index]->compileTimeString ?? null;
+    }
+
+    /**
+     * @param JITVariable[] $args
+     */
+    private static function compileTimeBool(array $args, int $index): ?bool
+    {
+        if (!isset($args[$index])) {
+            return false;
+        }
+        if (JITVariable::TYPE_NATIVE_BOOL !== $args[$index]->type) {
+            return null;
+        }
+
+        return (bool) ($args[$index]->compileTimeBool ?? false);
     }
 }
