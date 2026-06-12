@@ -47,6 +47,43 @@ final class PasswordBuiltinTest extends TestCase
         $this->assertFalse($badFrame->returnVar->resolveIndirect()->toBool());
     }
 
+    public function testHashStringAlgo2y(): void
+    {
+        $runtime = new Runtime();
+        $pass = new VMVariable();
+        $pass->string('secret');
+        $algo = new VMVariable();
+        $algo->string('2y');
+
+        $hashFn = new password_hash();
+        $hashFrame = $hashFn->getFrame($runtime->vmContext);
+        $hashFrame->calledArgs = [$pass, $algo];
+        $hashFrame->returnVar = new VMVariable();
+        $hashFn->execute($hashFrame);
+
+        $hash = $hashFrame->returnVar->resolveIndirect();
+        $this->assertSame(VMVariable::TYPE_STRING, $hash->type);
+        $this->assertSame(60, strlen($hash->toString()));
+    }
+
+    public function testHashInvalidStringAlgoThrowsValueError(): void
+    {
+        $runtime = new Runtime();
+        $pass = new VMVariable();
+        $pass->string('x');
+        $algo = new VMVariable();
+        $algo->string('not-an-algo');
+
+        $hashFn = new password_hash();
+        $hashFrame = $hashFn->getFrame($runtime->vmContext);
+        $hashFrame->calledArgs = [$pass, $algo];
+        $hashFrame->returnVar = new VMVariable();
+
+        $this->expectException(\ValueError::class);
+        $this->expectExceptionMessage('must be a valid password hashing algorithm');
+        $hashFn->execute($hashFrame);
+    }
+
     public function testCryptBcryptAndInvalidSalt(): void
     {
         $runtime = new Runtime();

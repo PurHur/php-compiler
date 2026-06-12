@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace PHPCompiler\ext\standard;
 
+use PHPCompiler\VM\EnumCaseSupport;
 use PHPCompiler\VM\HashTable;
 use PHPCompiler\VM\Variable;
 
@@ -16,6 +17,13 @@ final class VmPassword
     public const PASSWORD_BCRYPT = 1;
 
     public const PASSWORD_DEFAULT = 1;
+
+    public const PASSWORD_ALGO_INVALID_MSG = 'password_hash(): Argument #2 ($algo) must be a valid password hashing algorithm';
+
+    /** @var array<string, int> php-src password_algos() names accepted by password_hash() (ext/standard/password.c). */
+    private const STRING_ALGOS = [
+        '2y' => self::PASSWORD_BCRYPT,
+    ];
 
     private const BCRYPT_DEFAULT_COST = 10;
 
@@ -31,6 +39,50 @@ final class VmPassword
     public static function hash(string $password, int $algo, array $options = [])
     {
         return VmPasswordNative::passwordHash($password, $algo, $options);
+    }
+
+    /**
+     * Resolve password_hash() $algo — int or string (php-src php_password_algo_find, issue #5039).
+     *
+     * @throws \TypeError when operand is not string|int
+     * @throws \ValueError when algo name/id is not a supported password hashing algorithm
+     */
+    public static function resolveAlgo(Variable $var, string $function, int $argIndex, string $paramName): int
+    {
+        $var = $var->resolveIndirect();
+        if (EnumCaseSupport::isEnumCaseVariable($var)) {
+            throw new \TypeError(\sprintf(
+                '%s(): Argument #%d ($%s) must be of type string|int, %s given',
+                $function,
+                $argIndex + 1,
+                $paramName,
+                EnumCaseSupport::typeNameForVariable($var)
+            ));
+        }
+        if (Variable::TYPE_INTEGER === $var->type) {
+            $algo = $var->toInt();
+            if (self::algoSupported($algo)) {
+                return $algo;
+            }
+
+            throw new \ValueError(self::PASSWORD_ALGO_INVALID_MSG);
+        }
+        if (Variable::TYPE_STRING === $var->type) {
+            $name = $var->toString();
+            if (isset(self::STRING_ALGOS[$name])) {
+                return self::STRING_ALGOS[$name];
+            }
+
+            throw new \ValueError(self::PASSWORD_ALGO_INVALID_MSG);
+        }
+
+        throw new \TypeError(\sprintf(
+            '%s(): Argument #%d ($%s) must be of type string|int, %s given',
+            $function,
+            $argIndex + 1,
+            $paramName,
+            self::algoTypeLabel($var)
+        ));
     }
 
     public static function verify(string $password, string $hash): bool
@@ -91,6 +143,20 @@ final class VmPassword
     private static function algoSupported(int $algo): bool
     {
         return self::PASSWORD_BCRYPT === $algo || self::PASSWORD_DEFAULT === $algo;
+    }
+
+    private static function algoTypeLabel(Variable $var): string
+    {
+        return match ($var->type) {
+            Variable::TYPE_NULL => 'null',
+            Variable::TYPE_BOOLEAN => 'bool',
+            Variable::TYPE_DOUBLE => 'float',
+            Variable::TYPE_STRING => 'string',
+            Variable::TYPE_ARRAY => 'array',
+            Variable::TYPE_OBJECT => $var->toObject()->class->name,
+            Variable::TYPE_RESOURCE => 'resource',
+            default => 'mixed',
+        };
     }
 
     private static function bcryptValid(string $hash): bool
