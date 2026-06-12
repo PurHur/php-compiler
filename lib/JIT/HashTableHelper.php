@@ -312,6 +312,13 @@ final class HashTableHelper
                         $idx,
                         $context->getTypeFromString('int64')->constInt($resolved->toBool() ? 1 : 0, false)
                     );
+                } elseif (\PHPCompiler\VM\Variable::TYPE_FLOAT === $resolved->type) {
+                    $context->builder->call(
+                        $context->lookupFunction('__hashtable__setDoubleAt'),
+                        $ht,
+                        $idx,
+                        $context->constantFromFloat($resolved->toFloat())
+                    );
                 } elseif (\PHPCompiler\VM\Variable::TYPE_NULL === $resolved->type) {
                     $nullSlot = JitValueBox::alloc($context);
                     $context->builder->call(
@@ -361,6 +368,13 @@ final class HashTableHelper
                     $ht,
                     $key,
                     $context->getTypeFromString('bool')->constInt($resolved->toBool() ? 1 : 0, false)
+                );
+            } elseif (\PHPCompiler\VM\Variable::TYPE_FLOAT === $resolved->type) {
+                $context->builder->call(
+                    $context->lookupFunction('__hashtable__setStringKeyDouble'),
+                    $ht,
+                    $key,
+                    $context->constantFromFloat($resolved->toFloat())
                 );
             } elseif (\PHPCompiler\VM\Variable::TYPE_ARRAY === $resolved->type) {
                 self::setAtKeyCoercingNumericString(
