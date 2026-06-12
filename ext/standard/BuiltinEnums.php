@@ -31,6 +31,7 @@ final class BuiltinEnums
         self::registerSortDirection($ctx);
         self::registerRoundingMode($ctx);
         self::registerParseUrl($ctx);
+        self::registerRequestMethod($ctx);
         foreach (array_diff(array_keys($ctx->classes), $before) as $lc) {
             $ctx->classes[$lc]->isInternal = true;
         }
@@ -367,6 +368,33 @@ final class BuiltinEnums
         $ctx->enums[$lc] = true;
     }
 
+    /**
+     * PHP 8.4 RequestMethod: string-backed enum for HTTP method introspection (#7230).
+     *
+     * php-src: ext/standard/basic_functions.stub.php — enum RequestMethod: string
+     */
+    private static function registerRequestMethod(Context $ctx): void
+    {
+        if (isset($ctx->classes['requestmethod'])) {
+            return;
+        }
+
+        $entry = new ClassEntry('RequestMethod');
+        $entry->isEnum = true;
+        $entry->backedType = 'string';
+
+        foreach (RequestMethodEnumData::cases() as $name => $value) {
+            self::registerStringBackedEnumCase($entry, $name, $value);
+        }
+
+        EnumSupport::ensureBuiltinCasesMethod($entry);
+        EnumSupport::ensureBuiltinEnumInterfaces($entry);
+
+        $lc = 'requestmethod';
+        $ctx->classes[$lc] = $entry;
+        $ctx->enums[$lc] = true;
+    }
+
     private static function registerPureEnumCase(ClassEntry $enum, string $name): void
     {
         $lc = strtolower($name);
@@ -386,6 +414,20 @@ final class BuiltinEnums
         $lc = strtolower($name);
         $backing = new Variable();
         $backing->int($value);
+        $case = EnumCaseSupport::createCase($enum, $name, $backing);
+        $enum->constants[$lc] = $case;
+        $enum->enumCaseCanonicalNames[$lc] = $name;
+        $enum->enumCases[] = [
+            'name' => $name,
+            'value' => $backing,
+        ];
+    }
+
+    private static function registerStringBackedEnumCase(ClassEntry $enum, string $name, string $value): void
+    {
+        $lc = strtolower($name);
+        $backing = new Variable();
+        $backing->string($value);
         $case = EnumCaseSupport::createCase($enum, $name, $backing);
         $enum->constants[$lc] = $case;
         $enum->enumCaseCanonicalNames[$lc] = $name;
