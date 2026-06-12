@@ -60,25 +60,6 @@ final class in_array extends Internal
         return $left->resolveIndirect()->equals($right->resolveIndirect());
     }
 
-    public static function toCompareValue(Variable $v): mixed
-    {
-        $v = $v->resolveIndirect();
-        switch ($v->type) {
-            case Variable::TYPE_NULL:
-                return null;
-            case Variable::TYPE_INTEGER:
-                return $v->toInt();
-            case Variable::TYPE_FLOAT:
-                return $v->toFloat();
-            case Variable::TYPE_BOOLEAN:
-                return $v->toBool();
-            case Variable::TYPE_STRING:
-                return $v->toString();
-            default:
-                throw new \LogicException('in_array() only supports scalar haystack values in this compiler build');
-        }
-    }
-
     public Context $context;
 
     public function call(Context $context, JITVariable ...$args): Value
