@@ -430,11 +430,6 @@ final class VmStreamSocketNative
 
     private static function gaiStrerror(\FFI $ffi, int $code): string
     {
-        if (\function_exists('gai_strerror')) {
-            $msg = \gai_strerror($code);
-
-            return \is_string($msg) && '' !== $msg ? $msg : 'getaddrinfo failed';
-        }
         $msg = $ffi->gai_strerror($code);
 
         return \is_string($msg) && '' !== $msg ? $msg : 'getaddrinfo failed';

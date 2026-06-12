@@ -38,4 +38,12 @@ final class VmStreamSocketRuntimeShrinkTest extends TestCase
         $this->assertIsInt($errno);
         $this->assertIsString($errstr);
     }
+
+    public function testGaiStrerrorUsesLibcFfiNotHostBuiltin(): void
+    {
+        $source = (string) file_get_contents(__DIR__.'/../../ext/standard/VmStreamSocketNative.php');
+        $this->assertStringContainsString('$ffi->gai_strerror', $source);
+        $this->assertDoesNotMatchRegularExpression('/\\\\gai_strerror\\s*\\(/', $source);
+        $this->assertDoesNotMatchRegularExpression("/function_exists\\('gai_strerror'\\)/", $source);
+    }
 }
