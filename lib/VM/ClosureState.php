@@ -261,6 +261,9 @@ final class ClosureState
         $entry->methods['__debuginfo'] = new Builtin\ClosureDebugInfo();
         $entry->methodVisibility['__debuginfo'] = \PHPCfg\Func::FLAG_PUBLIC;
         $entry->methodNames['__debuginfo'] = '__debugInfo';
+        $entry->methods['getusedvariables'] = new Builtin\ClosureGetUsedVariables();
+        $entry->methodVisibility['getusedvariables'] = \PHPCfg\Func::FLAG_PUBLIC;
+        $entry->methodNames['getusedvariables'] = 'getUsedVariables';
         $ctx->classes['closure'] = $entry;
     }
 
