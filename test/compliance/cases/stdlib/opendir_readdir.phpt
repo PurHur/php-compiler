@@ -6,12 +6,10 @@ $dir = 'test/compliance/cases/stdlib/glob_scandir_fixture';
 $dh = opendir($dir);
 echo is_resource($dh) ? 'resource' : 'not', "\n";
 $names = [];
-while (true) {
-    $file = readdir($dh);
-    if (gettype($file) !== 'string') {
-        break;
-    }
+$file = readdir($dh);
+while ($file !== false) {
     $names[] = $file;
+    $file = readdir($dh);
 }
 closedir($dh);
 sort($names);

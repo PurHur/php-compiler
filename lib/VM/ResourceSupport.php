@@ -163,7 +163,7 @@ final class ResourceSupport
             return 'resource ('.VmFs::resourceTypeForStreamTag($handle).')';
         }
         if (self::isDirResource($var)) {
-            return 'resource (stream)';
+            return 'resource (directory)';
         }
         if (self::isBrigadeResource($var)) {
             $handle = self::resolveHandle($var);
