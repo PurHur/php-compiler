@@ -15,6 +15,10 @@ use PHPCompiler\VM\Variable;
 final class VmFilter
 {
     public const FILTER_VALIDATE_INT = 257;
+    /** php-src ext/filter/php_filter.h — FILTER_VALIDATE_BOOLEAN */
+    public const FILTER_VALIDATE_BOOLEAN = 258;
+    /** php-src ext/filter/php_filter.h — FILTER_VALIDATE_FLOAT */
+    public const FILTER_VALIDATE_FLOAT = 259;
     /** php-src ext/filter/filter_private.h — FILTER_VALIDATE_REGEXP */
     public const FILTER_VALIDATE_REGEXP = 272;
     public const FILTER_VALIDATE_EMAIL = 274;
@@ -36,6 +40,8 @@ final class VmFilter
     public static function isSupportedFilter(int $filter): bool
     {
         return self::FILTER_VALIDATE_INT === $filter
+            || self::FILTER_VALIDATE_BOOLEAN === $filter
+            || self::FILTER_VALIDATE_FLOAT === $filter
             || self::FILTER_VALIDATE_REGEXP === $filter
             || self::FILTER_VALIDATE_EMAIL === $filter;
     }
@@ -51,6 +57,12 @@ final class VmFilter
         $nullOnFailure = 0 !== ($parsed['flags'] & self::FILTER_NULL_ON_FAILURE);
         if (self::FILTER_VALIDATE_INT === $filter) {
             return self::validateInt($value, $nullOnFailure);
+        }
+        if (self::FILTER_VALIDATE_BOOLEAN === $filter) {
+            return self::validateBoolean($value, $nullOnFailure);
+        }
+        if (self::FILTER_VALIDATE_FLOAT === $filter) {
+            return self::validateFloat($value, $nullOnFailure);
         }
         if (self::FILTER_VALIDATE_REGEXP === $filter) {
             return self::validateRegexp($value, $parsed['filterOptions'], $nullOnFailure);
@@ -204,6 +216,163 @@ final class VmFilter
         }
 
         return $out;
+    }
+
+    private static function validateBoolean(Variable $value, bool $nullOnFailure = false): Variable
+    {
+        if ($value->isUndefined() || Variable::TYPE_NULL === $value->type) {
+            return self::failureResult($nullOnFailure);
+        }
+        if (Variable::TYPE_BOOLEAN === $value->type) {
+            $out = new Variable();
+            $out->bool($value->toBool());
+
+            return $out;
+        }
+        if (Variable::TYPE_INTEGER === $value->type) {
+            $i = $value->toInt();
+            if (0 === $i) {
+                $out = new Variable();
+                $out->bool(false);
+
+                return $out;
+            }
+            if (1 === $i) {
+                $out = new Variable();
+                $out->bool(true);
+
+                return $out;
+            }
+
+            return self::failureResult($nullOnFailure);
+        }
+        if (Variable::TYPE_FLOAT === $value->type) {
+            $f = $value->toFloat();
+            if (0.0 === $f) {
+                $out = new Variable();
+                $out->bool(false);
+
+                return $out;
+            }
+            if (1.0 === $f) {
+                $out = new Variable();
+                $out->bool(true);
+
+                return $out;
+            }
+
+            return self::failureResult($nullOnFailure);
+        }
+        if (Variable::TYPE_STRING !== $value->type) {
+            return self::failureResult($nullOnFailure);
+        }
+        $parsed = self::parseBooleanString($value->toString());
+        if (null === $parsed) {
+            return self::failureResult($nullOnFailure);
+        }
+        $out = new Variable();
+        $out->bool($parsed);
+
+        return $out;
+    }
+
+    private static function validateFloat(Variable $value, bool $nullOnFailure = false): Variable
+    {
+        if ($value->isUndefined() || Variable::TYPE_NULL === $value->type) {
+            return self::failureResult($nullOnFailure);
+        }
+        if (Variable::TYPE_INTEGER === $value->type) {
+            $out = new Variable();
+            $out->float((float) $value->toInt());
+
+            return $out;
+        }
+        if (Variable::TYPE_FLOAT === $value->type) {
+            $f = $value->toFloat();
+            if (!is_finite($f)) {
+                return self::failureResult($nullOnFailure);
+            }
+            $out = new Variable();
+            $out->float($f);
+
+            return $out;
+        }
+        if (Variable::TYPE_STRING !== $value->type) {
+            return self::failureResult($nullOnFailure);
+        }
+        $parsed = self::parseFloatString($value->toString());
+        if (null === $parsed) {
+            return self::failureResult($nullOnFailure);
+        }
+        $out = new Variable();
+        $out->float($parsed);
+
+        return $out;
+    }
+
+    /**
+     * php-src ext/filter/logical_filters.c — php_filter_boolean (trim + token match).
+     */
+    public static function parseBooleanString(string $s): ?bool
+    {
+        $s = trim($s);
+        $len = strlen($s);
+        if (0 === $len) {
+            return false;
+        }
+        if (1 === $len) {
+            if ('1' === $s) {
+                return true;
+            }
+            if ('0' === $s) {
+                return false;
+            }
+
+            return null;
+        }
+        if (2 === $len) {
+            if (0 === strncasecmp($s, 'on', 2)) {
+                return true;
+            }
+            if (0 === strncasecmp($s, 'no', 2)) {
+                return false;
+            }
+
+            return null;
+        }
+        if (3 === $len) {
+            if (0 === strncasecmp($s, 'yes', 3)) {
+                return true;
+            }
+            if (0 === strncasecmp($s, 'off', 3)) {
+                return false;
+            }
+
+            return null;
+        }
+        if (4 === $len && 0 === strncasecmp($s, 'true', 4)) {
+            return true;
+        }
+        if (5 === $len && 0 === strncasecmp($s, 'false', 5)) {
+            return false;
+        }
+
+        return null;
+    }
+
+    /** php-src ext/filter/logical_filters.c — php_filter_float (trim + numeric parse). */
+    public static function parseFloatString(string $s): ?float
+    {
+        $s = trim($s);
+        if ('' === $s) {
+            return null;
+        }
+        if (!preg_match('/^[+-]?((\d+(\.\d*)?)|(\.\d+))([eE][+-]?\d+)?$/', $s)) {
+            return null;
+        }
+        $f = (float) $s;
+
+        return is_finite($f) ? $f : null;
     }
 
     private static function validateInt(Variable $value, bool $nullOnFailure = false): Variable
