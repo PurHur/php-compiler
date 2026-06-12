@@ -7,6 +7,7 @@ namespace PHPCompiler\ext\standard;
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Value;
 
@@ -32,6 +33,12 @@ final class ini_restore extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        throw new \LogicException('ini_restore() is VM-only in this compiler build (issue #3205)');
+        if (1 !== \count($args)) {
+            throw new \LogicException('ini_restore() requires exactly one argument');
+        }
+        $optionStr = JitStringBuiltinArg::lower($context, $args[0], 'ini_restore', 0, 'varname');
+        JitIni::restore($context, $optionStr);
+
+        return $context->getTypeFromString('int32')->constInt(0, false);
     }
 }

@@ -49,6 +49,7 @@ final class IniRuntime
         $cfgProbe = $context->module->getNamedFunction('__compiler_ini_cfg_get');
         if (null !== $probe && $probe->countBasicBlocks() > 0
             && null !== $cfgProbe && $cfgProbe->countBasicBlocks() > 0) {
+            self::ensureIniRestore($context);
             self::registerLinkedRuntime($context);
 
             return;
@@ -91,6 +92,8 @@ final class IniRuntime
             ? $setProbe
             : $context->module->addFunction('__compiler_ini_set', $ftSet);
         self::implementIniSet($context, $fnSet);
+
+        self::ensureIniRestore($context);
 
         $erProbe = $context->module->getNamedFunction('__compiler_error_reporting');
         $ftEr = $context->context->functionType($voidTy, false, $i32, $i64, $valPtr);
@@ -367,6 +370,100 @@ final class IniRuntime
         $context->builder->positionAtEnd($failBb);
         self::writeValueBoolFalse($context, $out);
         self::freeCstrPair($context, $fn, $optCstr, $valCstr);
+        $context->builder->returnVoid();
+        $context->builder->clearInsertionPosition();
+    }
+
+    private static function ensureIniRestore(Context $context): void
+    {
+        $restoreProbe = $context->module->getNamedFunction('__compiler_ini_restore');
+        if (null !== $restoreProbe && $restoreProbe->countBasicBlocks() > 0) {
+            return;
+        }
+
+        $restoreBlock = self::captureInsertBlock($context);
+        self::ensureGlobals($context);
+        self::ensureLibc($context);
+
+        $strPtr = $context->getTypeFromString('__string__*');
+        $voidTy = $context->getTypeFromString('void');
+        $fnRestore = null !== $restoreProbe
+            ? $restoreProbe
+            : $context->module->addFunction(
+                '__compiler_ini_restore',
+                $context->context->functionType($voidTy, false, $strPtr)
+            );
+        self::implementIniRestore($context, $fnRestore);
+        self::restoreInsertBlock($context, $restoreBlock);
+    }
+
+    private static function implementIniRestore(Context $context, Value $fn): void
+    {
+        $entry = $fn->appendBasicBlock('ir_entry');
+        $failBb = $fn->appendBasicBlock('ir_fail');
+        $erBb = $fn->appendBasicBlock('ir_er');
+        $deBb = $fn->appendBasicBlock('ir_de');
+        $mlBb = $fn->appendBasicBlock('ir_ml');
+        $spBb = $fn->appendBasicBlock('ir_sp');
+        $testEr = $fn->appendBasicBlock('ir_test_er');
+        $testDe = $fn->appendBasicBlock('ir_test_de');
+        $testMl = $fn->appendBasicBlock('ir_test_ml');
+        $testSp = $fn->appendBasicBlock('ir_test_sp');
+
+        $context->builder->positionAtEnd($entry);
+        self::ensureMemoryLimitBuffer($context, $fn);
+        $option = $fn->getParam(0);
+        $optCstr = self::copyStringObjectToCstr($context, $fn, $option);
+        $i8p = $context->getTypeFromString('int8*');
+        $optOk = $context->builder->icmp(
+            Builder::INT_NE,
+            $optCstr,
+            $i8p->constNull()
+        );
+        $context->builder->branchIf($optOk, $testEr, $failBb);
+
+        self::branchIfKey($context, $testEr, $optCstr, 'error_reporting', $erBb, $testDe);
+        self::branchIfKey($context, $testDe, $optCstr, 'display_errors', $deBb, $testMl);
+        self::branchIfKey($context, $testMl, $optCstr, 'memory_limit', $mlBb, $testSp);
+        self::branchIfKey($context, $testSp, $optCstr, 'serialize_precision', $spBb, $failBb);
+
+        $i32 = $context->getTypeFromString('int32');
+
+        $context->builder->positionAtEnd($erBb);
+        $context->builder->store(
+            $i32->constInt(32767, false),
+            self::globalPtr($context, self::G_ERROR_REPORTING, $i32)
+        );
+        self::freeCstr($context, $fn, $optCstr);
+        $context->builder->returnVoid();
+
+        $context->builder->positionAtEnd($deBb);
+        $context->builder->store(
+            $i32->constInt(1, false),
+            self::globalPtr($context, self::G_DISPLAY_ERRORS, $i32)
+        );
+        self::freeCstr($context, $fn, $optCstr);
+        $context->builder->returnVoid();
+
+        $context->builder->positionAtEnd($mlBb);
+        $defPtr = $context->builder->pointerCast(
+            $context->constantFromString(self::MEMORY_LIMIT_DEFAULT),
+            $i8p
+        );
+        self::storeMemoryLimitFromCstr($context, $defPtr);
+        self::freeCstr($context, $fn, $optCstr);
+        $context->builder->returnVoid();
+
+        $context->builder->positionAtEnd($spBb);
+        $context->builder->store(
+            $i32->constInt(-1, true),
+            self::globalPtr($context, self::G_SERIALIZE_PRECISION, $i32)
+        );
+        self::freeCstr($context, $fn, $optCstr);
+        $context->builder->returnVoid();
+
+        $context->builder->positionAtEnd($failBb);
+        self::freeCstr($context, $fn, $optCstr);
         $context->builder->returnVoid();
         $context->builder->clearInsertionPosition();
     }
@@ -909,6 +1006,7 @@ final class IniRuntime
                 '__compiler_ini_get',
                 '__compiler_ini_cfg_get',
                 '__compiler_ini_set',
+                '__compiler_ini_restore',
                 '__compiler_error_reporting',
                 '__compiler_begin_silence',
                 '__compiler_end_silence',

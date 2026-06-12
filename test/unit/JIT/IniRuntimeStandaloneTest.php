@@ -26,6 +26,7 @@ final class IniRuntimeStandaloneTest extends TestCase
                 '__compiler_phpc_error_level_enabled',
                 '__compiler_ini_get',
                 '__compiler_ini_set',
+                '__compiler_ini_restore',
                 '__compiler_error_reporting',
                 '__compiler_begin_silence',
                 '__compiler_end_silence',
