@@ -998,6 +998,19 @@ final class ReflectionSupport
     }
 
     /**
+     * php-src: reflection_method_has_tentative_return_type() (#6597).
+     *
+     * User-declared methods in this compiler always store explicit return types on the
+     * declaring Func; inherited ZEND_TYPE_IS_TENTATIVE is not modeled yet — false for VM users.
+     */
+    public static function reflectedMethodHasTentativeReturnType(Context $ctx, ObjectEntry $reflection): bool
+    {
+        self::resolveReflectedMethod($ctx, $reflection);
+
+        return false;
+    }
+
+    /**
      * @return array{0: ClassEntry, 1: string, 2: Func}
      */
     public static function resolveReflectedMethod(Context $ctx, ObjectEntry $reflection): array
