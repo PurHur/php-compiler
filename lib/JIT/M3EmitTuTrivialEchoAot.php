@@ -79,7 +79,8 @@ final class M3EmitTuTrivialEchoAot
         string $aotBytes,
         string $sidecarRel = self::TRIVIAL_ECHO_SIDECAR_REL,
         ?string $sentinelLogical = null,
-        bool $objectOnlySidecar = false
+        bool $objectOnlySidecar = false,
+        ?string $sourcePathNorm = null
     ): void {
         if ('' === $aotBytes || in_array($sidecarRel, self::$registeredSidecarRels, true)) {
             return;
@@ -137,11 +138,16 @@ final class M3EmitTuTrivialEchoAot
             $context->functionProxies[$sentinelLc] = new Call\Native($func, $sentinelLogical, [], []);
         }
 
+        $sourcePathGlobal = null;
+        if (is_string($sourcePathNorm) && '' !== $sourcePathNorm) {
+            $sourcePathGlobal = $context->constantStringFromString($sourcePathNorm);
+        }
         $context->m3EmitTuLinktimeSidecarEntries[] = [
             'sourceGlobal' => $sourceGlobal,
             'sidecarGlobal' => $sidecarGlobal,
             'sentinelLc' => $sentinelLc,
             'objectOnly' => $objectOnlySidecar,
+            'sourcePathGlobal' => $sourcePathGlobal,
         ];
 
         if (null === $context->m3EmitTuTrivialEchoSourceGlobal) {
@@ -184,7 +190,19 @@ final class M3EmitTuTrivialEchoAot
         foreach ($entries as $index => $entry) {
             $tag = 'e'.(string) $index;
             $cached = $context->builder->load($entry['sourceGlobal']);
-            $matches = JitStringCompare::identical($context, $code, $cached);
+            $contentMatch = JitStringCompare::identical($context, $code, $cached);
+            $pathMatch = null;
+            if (isset($entry['sourcePathGlobal']) && null !== $entry['sourcePathGlobal']) {
+                $pathMatch = JitStringCompare::identical(
+                    $context,
+                    $filename,
+                    $context->builder->load($entry['sourcePathGlobal'])
+                );
+            }
+            $matches = $contentMatch;
+            if (null !== $pathMatch) {
+                $matches = $context->builder->or($contentMatch, $pathMatch);
+            }
             $ok = BasicBlockHelper::append($context, 'm3te_pac_sidecar_'.$tag);
             $fail = BasicBlockHelper::append($context, 'm3te_pac_next_'.$tag);
             $context->builder->branchIf($matches, $ok, $fail);
