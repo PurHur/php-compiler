@@ -160,7 +160,12 @@ use PHPCompiler\VM\Builtin\ReflectionParameterGetValue;
 use PHPCompiler\VM\Builtin\ReflectionParameterIsSensitive;
 use PHPCompiler\VM\Builtin\ReflectionPropertyConstruct;
 use PHPCompiler\VM\Builtin\ReflectionPropertyGetAttributes;
+use PHPCompiler\VM\Builtin\ReflectionPropertyGetHooks;
+use PHPCompiler\VM\Builtin\ReflectionPropertyGetMangledName;
 use PHPCompiler\VM\Builtin\ReflectionPropertyGetName;
+use PHPCompiler\VM\Builtin\ReflectionPropertyHasHook;
+use PHPCompiler\VM\Builtin\ReflectionPropertyIsDynamic;
+use PHPCompiler\VM\Builtin\ReflectionPropertyIsVirtual;
 use PHPCompiler\VM\Builtin\ReflectionPropertyGetReadableType;
 use PHPCompiler\VM\Builtin\ReflectionPropertyGetSettableType;
 use PHPCompiler\VM\Builtin\ReflectionPropertyGetValue;
@@ -565,6 +570,11 @@ final class BuiltinClasses
                 'isprivate' => new ReflectionPropertyIsPrivate(),
                 'isprotected' => new ReflectionPropertyIsProtected(),
                 'isabstract' => new ReflectionPropertyIsAbstract(),
+                'isvirtual' => new ReflectionPropertyIsVirtual(),
+                'isdynamic' => new ReflectionPropertyIsDynamic(),
+                'getmangledname' => new ReflectionPropertyGetMangledName(),
+                'hashook' => new ReflectionPropertyHasHook(),
+                'gethooks' => new ReflectionPropertyGetHooks(),
                 'isreadonly' => new ReflectionPropertyIsReadOnly(),
                 'ispromoted' => new ReflectionPropertyIsPromoted(),
                 'islazy' => new ReflectionPropertyIsLazy(),
