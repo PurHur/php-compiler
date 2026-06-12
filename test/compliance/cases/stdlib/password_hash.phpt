@@ -10,7 +10,12 @@ $hash2 = password_hash('other', PASSWORD_BCRYPT);
 echo password_verify('other', $hash2) ? "bcrypt_ok\n" : "bcrypt_fail\n";
 echo password_verify('nope', $hash2) ? "bcrypt_wrong\n" : "bcrypt_no\n";
 
-echo password_hash('x', 99) === false ? "bad_algo\n" : "bad_algo_fail\n";
+try {
+    password_hash('x', 99);
+    echo "bad_algo_ok\n";
+} catch (ValueError $e) {
+    echo "bad_algo\n";
+}
 --EXPECT--
 verify_ok
 wrong_no

@@ -7,7 +7,6 @@ namespace PHPCompiler\ext\standard;
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Context;
-use PHPCompiler\JIT\JitLongArg;
 use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\Variable;
@@ -28,10 +27,7 @@ final class password_hash extends Internal
             throw new \LogicException('password_hash() requires two or three arguments in this compiler build');
         }
         $password = VmString::coerceStringBuiltinArg($frame->calledArgs[0], 'password_hash', 0, 'password');
-        $algo = $frame->calledArgs[1]->resolveIndirect();
-        if (Variable::TYPE_INTEGER !== $algo->type) {
-            throw new \LogicException('password_hash() requires an integer algorithm in this compiler build');
-        }
+        $algo = VmPassword::resolveAlgo($frame->calledArgs[1], 'password_hash', 1, 'algo');
         $options = [];
         if (3 === $argc) {
             $optVar = $frame->calledArgs[2]->resolveIndirect();
@@ -47,7 +43,7 @@ final class password_hash extends Internal
         if (null === $frame->returnVar) {
             return;
         }
-        $result = VmPassword::hash($password, $algo->toInt(), $options);
+        $result = VmPassword::hash($password, $algo, $options);
         if (false === $result) {
             $frame->returnVar->bool(false);
 
@@ -66,15 +62,11 @@ final class password_hash extends Internal
         if (3 === $argc) {
             $options = $args[2];
         }
-        $i64 = $context->getTypeFromString('int64');
 
         return JitPassword::hash(
             $context,
             JitStringBuiltinArg::lower($context, $args[0], 'password_hash', 0, 'password'),
-            $context->builder->truncOrBitCast(
-                JitLongArg::lower($context, $args[1], 'password_hash() algorithm'),
-                $i64
-            ),
+            JitPasswordAlgo::lower($context, $args[1], 'password_hash', 1, 'algo'),
             $options
         );
     }
