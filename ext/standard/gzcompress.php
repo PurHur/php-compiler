@@ -7,10 +7,9 @@ namespace PHPCompiler\ext\standard;
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Context;
-use PHPCompiler\JIT\JitLongArg;
+use PHPCompiler\JIT\JitStrictIntArg;
 use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\Variable as JITVariable;
-use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
 
 /** gzcompress() — zlib compress (ext/zlib/zlib.c parity, issue #3194). */
@@ -31,18 +30,10 @@ final class gzcompress extends Internal
         $level = -1;
         $encoding = \ZLIB_ENCODING_DEFLATE;
         if ($argc >= 2) {
-            $levelVar = $frame->calledArgs[1]->resolveIndirect();
-            if (Variable::TYPE_INTEGER !== $levelVar->type) {
-                throw new \LogicException('gzcompress() level must be an integer in this compiler build');
-            }
-            $level = $levelVar->toInt();
+            $level = VmZlibArg::requireLevel($frame->calledArgs[1], 'gzcompress');
         }
         if (3 === $argc) {
-            $encVar = $frame->calledArgs[2]->resolveIndirect();
-            if (Variable::TYPE_INTEGER !== $encVar->type) {
-                throw new \LogicException('gzcompress() encoding must be an integer in this compiler build');
-            }
-            $encoding = $encVar->toInt();
+            $encoding = VmZlibArg::requireInt($frame->calledArgs[2], 'gzcompress', 3, 'encoding');
         }
         if (null === $frame->returnVar) {
             return;
@@ -68,10 +59,10 @@ final class gzcompress extends Internal
         $level = $i64->constInt(-1, true);
         $encoding = $i64->constInt(\ZLIB_ENCODING_DEFLATE, false);
         if ($argc >= 2) {
-            $level = JitLongArg::lower($context, $args[1], 'gzcompress() level');
+            $level = JitStrictIntArg::lowerLevel($context, $args[1], 'gzcompress');
         }
         if (3 === $argc) {
-            $encoding = JitLongArg::lower($context, $args[2], 'gzcompress() encoding');
+            $encoding = JitStrictIntArg::lower($context, $args[2], 'gzcompress', 3, 'encoding');
         }
 
         return JitZlib::compress(

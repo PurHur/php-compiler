@@ -7,10 +7,9 @@ namespace PHPCompiler\ext\standard;
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Context;
-use PHPCompiler\JIT\JitLongArg;
+use PHPCompiler\JIT\JitStrictIntArg;
 use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\Variable as JITVariable;
-use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
 
 /** zlib_encode() — one-shot zlib/gzip/deflate compress (ext/zlib/zlib.c, issue #6288). */
@@ -28,19 +27,11 @@ final class zlib_encode extends Internal
             throw new \LogicException('zlib_encode() expects two or three arguments in this compiler build');
         }
         $data = VmString::coerceStringBuiltinArg($frame->calledArgs[0], 'zlib_encode', 0, 'data');
-        $encVar = $frame->calledArgs[1]->resolveIndirect();
-        if (Variable::TYPE_INTEGER !== $encVar->type) {
-            throw new \LogicException('zlib_encode() encoding must be an integer in this compiler build');
-        }
-        $encoding = $encVar->toInt();
+        $encoding = VmZlibArg::requireInt($frame->calledArgs[1], 'zlib_encode', 2, 'encoding');
         self::assertValidEncoding($encoding);
         $level = -1;
         if (3 === $argc) {
-            $levelVar = $frame->calledArgs[2]->resolveIndirect();
-            if (Variable::TYPE_INTEGER !== $levelVar->type) {
-                throw new \LogicException('zlib_encode() level must be an integer in this compiler build');
-            }
-            $level = $levelVar->toInt();
+            $level = VmZlibArg::requireLevel($frame->calledArgs[2], 'zlib_encode', 3, 'level');
         }
         if (null === $frame->returnVar) {
             return;
@@ -65,13 +56,13 @@ final class zlib_encode extends Internal
         $i64 = $context->getTypeFromString('int64');
         $level = $i64->constInt(-1, true);
         if (3 === $argc) {
-            $level = JitLongArg::lower($context, $args[2], 'zlib_encode() level');
+            $level = JitStrictIntArg::lowerLevel($context, $args[2], 'zlib_encode', 3, 'level');
         }
 
         return JitZlib::zlibEncode(
             $context,
             JitStringBuiltinArg::lower($context, $args[0], 'zlib_encode', 0, 'data'),
-            JitLongArg::lower($context, $args[1], 'zlib_encode() encoding'),
+            JitStrictIntArg::lower($context, $args[1], 'zlib_encode', 2, 'encoding'),
             $level
         );
     }

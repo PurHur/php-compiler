@@ -1,0 +1,51 @@
+<?php
+
+declare(strict_types=1);
+
+namespace PHPCompiler\ext\standard;
+
+use PHPCompiler\VM\EnumCaseSupport;
+use PHPCompiler\VM\Variable;
+
+/** Shared VM argument parsing for ext/zlib builtins (php-src ext/zlib/zlib.c, issue #4497). */
+final class VmZlibArg
+{
+    public static function requireInt(
+        Variable $var,
+        string $function,
+        int $position,
+        string $paramName
+    ): int {
+        $var = $var->resolveIndirect();
+        if (Variable::TYPE_INTEGER !== $var->type) {
+            throw new \TypeError(\sprintf(
+                '%s(): Argument #%d ($%s) must be of type int, %s given',
+                $function,
+                $position,
+                $paramName,
+                EnumCaseSupport::typeNameForVariable($var)
+            ));
+        }
+
+        return $var->toInt();
+    }
+
+    public static function requireLevel(
+        Variable $var,
+        string $function,
+        int $position = 2,
+        string $paramName = 'level'
+    ): int {
+        $level = self::requireInt($var, $function, $position, $paramName);
+        if ($level < -1 || $level > 9) {
+            throw new \ValueError(\sprintf(
+                '%s(): Argument #%d ($%s) must be between -1 and 9',
+                $function,
+                $position,
+                $paramName
+            ));
+        }
+
+        return $level;
+    }
+}
