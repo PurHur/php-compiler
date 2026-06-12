@@ -16,7 +16,7 @@ use PHPCompiler\VM\Variable;
  *
  * php-src: ext/standard/dns.c — PHP_FUNCTION(gethostbynamel), PHP_FUNCTION(gethostbyaddr),
  * PHP_FUNCTION(gethostbyname), PHP_FUNCTION(checkdnsrr), PHP_FUNCTION(dns_check_record),
- * PHP_FUNCTION(dns_get_mx), PHP_FUNCTION(getmxrr)
+ * PHP_FUNCTION(dns_get_mx), PHP_FUNCTION(getmxrr), PHP_FUNCTION(dns_get_record)
  */
 final class VmDns
 {
@@ -196,6 +196,173 @@ final class VmDns
         }
 
         return ['hosts' => $hosts, 'weights' => $weights];
+    }
+
+    /** php-src DNS_* bitmask → wire qtype (ext/standard/dns.c php_dns_record_types). */
+    private const DNS_TYPE_FLAGS = [
+        0x00000001 => ['name' => 'A', 'qtype' => 1],
+        0x00000002 => ['name' => 'NS', 'qtype' => 2],
+        0x00000004 => ['name' => 'CNAME', 'qtype' => 5],
+        0x00000008 => ['name' => 'SOA', 'qtype' => 6],
+        0x00000010 => ['name' => 'PTR', 'qtype' => 12],
+        0x00000020 => ['name' => 'HINFO', 'qtype' => 13],
+        0x00000040 => ['name' => 'MX', 'qtype' => 15],
+        0x00000080 => ['name' => 'TXT', 'qtype' => 16],
+        0x00000100 => ['name' => 'AAAA', 'qtype' => 28],
+        0x00000200 => ['name' => 'SRV', 'qtype' => 33],
+        0x00000400 => ['name' => 'NAPTR', 'qtype' => 35],
+        0x00000800 => ['name' => 'A6', 'qtype' => 38],
+        0x00001000 => ['name' => 'ANY', 'qtype' => 255],
+    ];
+
+    private const DNS_VALID_TYPE_MASK = 0x00001FFF;
+
+    /**
+     * dns_get_record() — DNS record list for hostname (#6392).
+     *
+     * php-src: ext/standard/dns.c — php_dns_get_record()
+     *
+     * @return HashTable|false indexed list of associative record arrays
+     */
+    public static function dnsGetRecord(string $hostname, int $type = 1)
+    {
+        if ('' === $hostname || \strlen($hostname) > 255) {
+            return false;
+        }
+        self::validateDnsGetRecordType($type);
+
+        $requested = self::expandDnsTypeBitmask($type);
+        if ([] === $requested) {
+            return false;
+        }
+
+        $records = [];
+        foreach ($requested as $flag => $meta) {
+            $chunk = match ($flag) {
+                0x00000001 => self::collectARecords($hostname),
+                0x00000040 => self::collectMxRecords($hostname),
+                default => [],
+            };
+            foreach ($chunk as $record) {
+                $records[] = $record;
+            }
+        }
+
+        if ([] === $records) {
+            return false;
+        }
+
+        $ht = new HashTable();
+        foreach ($records as $index => $record) {
+            $slot = new Variable();
+            $slot->array($record);
+            $ht->addIndex($index, $slot);
+        }
+
+        return $ht;
+    }
+
+    /** @throws \ValueError */
+    public static function validateDnsGetRecordType(int $type): void
+    {
+        if ($type <= 0 || 0 !== ($type & ~self::DNS_VALID_TYPE_MASK)) {
+            throw new \ValueError('dns_get_record(): Argument #2 ($type) must be a valid DNS record type');
+        }
+    }
+
+    /**
+     * @return array<int, array{name: string, qtype: int}>
+     */
+    private static function expandDnsTypeBitmask(int $type): array
+    {
+        if (0x00001000 & $type) {
+            return self::DNS_TYPE_FLAGS;
+        }
+
+        $requested = [];
+        foreach (self::DNS_TYPE_FLAGS as $flag => $meta) {
+            if (0x00001000 === $flag) {
+                continue;
+            }
+            if (0 !== ($type & $flag)) {
+                $requested[$flag] = $meta;
+            }
+        }
+
+        return $requested;
+    }
+
+    /** @return list<HashTable> */
+    private static function collectARecords(string $hostname): array
+    {
+        $list = self::gethostbynamel($hostname);
+        if (false === $list) {
+            return [];
+        }
+
+        $records = [];
+        foreach ($list->iterateKeyed(true) as $pair) {
+            [, $ipVar] = $pair;
+            $ipVar = $ipVar->resolveIndirect();
+            if (Variable::TYPE_STRING !== $ipVar->type) {
+                continue;
+            }
+            $records[] = self::makeDnsRecord($hostname, 'A', ['ttl' => 0, 'ip' => $ipVar->toString()]);
+        }
+
+        return $records;
+    }
+
+    /** @return list<HashTable> */
+    private static function collectMxRecords(string $hostname): array
+    {
+        $mx = self::dnsGetMx($hostname);
+        if (false === $mx) {
+            return [];
+        }
+
+        $records = [];
+        foreach ($mx['hosts'] as $index => $target) {
+            $records[] = self::makeDnsRecord($hostname, 'MX', [
+                'ttl' => 0,
+                'pri' => $mx['weights'][$index] ?? 0,
+                'target' => $target,
+            ]);
+        }
+
+        return $records;
+    }
+
+    /** @param array<string, int|string> $fields */
+    private static function makeDnsRecord(string $hostname, string $typeName, array $fields): HashTable
+    {
+        $ht = new HashTable();
+        self::addDnsStringField($ht, 'host', $hostname);
+        self::addDnsStringField($ht, 'class', 'IN');
+        self::addDnsStringField($ht, 'type', $typeName);
+        foreach ($fields as $key => $value) {
+            if (\is_int($value)) {
+                self::addDnsIntField($ht, $key, $value);
+            } else {
+                self::addDnsStringField($ht, $key, (string) $value);
+            }
+        }
+
+        return $ht;
+    }
+
+    private static function addDnsStringField(HashTable $ht, string $key, string $value): void
+    {
+        $slot = new Variable();
+        $slot->string($value);
+        $ht->add($key, $slot);
+    }
+
+    private static function addDnsIntField(HashTable $ht, string $key, int $value): void
+    {
+        $slot = new Variable();
+        $slot->int($value);
+        $ht->add($key, $slot);
     }
 
     public static function isValidIpv4Address(string $ip): bool

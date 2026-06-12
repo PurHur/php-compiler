@@ -195,6 +195,22 @@ final class StdlibConstants
     public const LOG_LOCAL6 = 176;
     public const LOG_LOCAL7 = 184;
 
+    /** dns_get_record() type bitmasks (ext/standard/dns.c). */
+    public const DNS_A = 1;
+    public const DNS_NS = 2;
+    public const DNS_CNAME = 4;
+    public const DNS_SOA = 8;
+    public const DNS_PTR = 16;
+    public const DNS_HINFO = 32;
+    public const DNS_MX = 64;
+    public const DNS_TXT = 128;
+    public const DNS_AAAA = 256;
+    public const DNS_SRV = 512;
+    public const DNS_NAPTR = 1024;
+    public const DNS_A6 = 2048;
+    public const DNS_ALL = 4095;
+    public const DNS_ANY = 4096;
+
     /** glob() flags (ext/standard/dir.c / glob.h; values match php-src on Linux). */
     public const GLOB_ERR = 1;
     public const GLOB_MARK = 2;
@@ -329,6 +345,20 @@ final class StdlibConstants
         'glob_brace' => self::GLOB_BRACE,
         'glob_onlydir' => self::GLOB_ONLYDIR,
         'glob_available_flags' => self::GLOB_AVAILABLE_FLAGS,
+        'dns_a' => self::DNS_A,
+        'dns_ns' => self::DNS_NS,
+        'dns_cname' => self::DNS_CNAME,
+        'dns_soa' => self::DNS_SOA,
+        'dns_ptr' => self::DNS_PTR,
+        'dns_hinfo' => self::DNS_HINFO,
+        'dns_mx' => self::DNS_MX,
+        'dns_txt' => self::DNS_TXT,
+        'dns_aaaa' => self::DNS_AAAA,
+        'dns_srv' => self::DNS_SRV,
+        'dns_naptr' => self::DNS_NAPTR,
+        'dns_a6' => self::DNS_A6,
+        'dns_all' => self::DNS_ALL,
+        'dns_any' => self::DNS_ANY,
         'password_bcrypt' => self::PASSWORD_BCRYPT,
         'password_default' => self::PASSWORD_DEFAULT,
         'assert_active' => self::ASSERT_ACTIVE,
