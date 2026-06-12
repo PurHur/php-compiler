@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace PHPCompiler\ext\posix;
 
 use PHPCompiler\ext\standard\JitGetcwd;
+use PHPCompiler\ext\standard\JitSleep;
 use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitLongArg;
@@ -131,6 +132,26 @@ final class JitPosix
         return JitGetcwd::boxed($context, $resolved);
     }
 
+    public static function setuid(Context $context, JITVariable $arg): Value
+    {
+        return self::setId($context, 'setuid', 'posix_setuid', $arg, 'uid');
+    }
+
+    public static function setgid(Context $context, JITVariable $arg): Value
+    {
+        return self::setId($context, 'setgid', 'posix_setgid', $arg, 'gid');
+    }
+
+    public static function seteuid(Context $context, JITVariable $arg): Value
+    {
+        return self::setId($context, 'seteuid', 'posix_seteuid', $arg, 'uid');
+    }
+
+    public static function setegid(Context $context, JITVariable $arg): Value
+    {
+        return self::setId($context, 'setegid', 'posix_setegid', $arg, 'gid');
+    }
+
     public static function ctermid(Context $context): Value
     {
         self::ensureLibcCtermid($context);
@@ -160,6 +181,38 @@ final class JitPosix
         );
 
         return $ptr;
+    }
+
+    private static function setId(
+        Context $context,
+        string $libcFn,
+        string $phpFn,
+        JITVariable $arg,
+        string $paramName
+    ): Value {
+        self::ensureLibcSetId($context, $libcFn);
+        $id = JitSleep::zParamLong($context, $arg, $phpFn, 1, $paramName);
+        $i32 = $context->getTypeFromString('int32');
+        $id32 = $context->builder->trunc($id, $i32);
+        $ret = $context->builder->call($context->lookupFunction($libcFn), $id32);
+        $slot = JitValueBox::alloc($context);
+        $ptr = JitValueBox::pointer($context, $slot);
+        $isTrue = $context->builder->icmp(Builder::INT_EQ, $ret, $i32->constInt(0, false));
+        JitValueBox::writeBool($context, $slot, $isTrue);
+
+        return $ptr;
+    }
+
+    private static function ensureLibcSetId(Context $context, string $name): void
+    {
+        $i32 = $context->getTypeFromString('int32');
+        try {
+            $context->lookupFunction($name);
+        } catch (\Throwable) {
+            $ft = $context->context->functionType($i32, false, $i32);
+            $fn = $context->module->addFunction($name, $ft);
+            $context->registerFunction($name, $fn);
+        }
     }
 
     private static function ensureLibcPid(Context $context): void
