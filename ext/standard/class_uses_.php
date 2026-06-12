@@ -7,6 +7,7 @@ namespace PHPCompiler\ext\standard;
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\JitBoolArg;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\EnumCaseSupport;
 use PHPCompiler\VM\Variable;
@@ -36,11 +37,12 @@ final class class_uses_ extends Internal
         $ctx = VmReflection::requireContext($frame);
         $autoload = true;
         if ($argc >= 2) {
-            $flag = $frame->calledArgs[1]->resolveIndirect();
-            if (Variable::TYPE_BOOLEAN !== $flag->type) {
-                throw new \LogicException('class_uses() autoload flag must be a boolean in this compiler build');
-            }
-            $autoload = $flag->toBool();
+            $autoload = VmMath::parseBoolBuiltinArg(
+                $frame->calledArgs[1],
+                'class_uses',
+                2,
+                'autoload'
+            );
         }
         $arg = $frame->calledArgs[0]->resolveIndirect();
         if (Variable::TYPE_ENUM_CASE === $arg->type) {
@@ -67,17 +69,14 @@ final class class_uses_ extends Internal
         if (\count($args) < 1 || \count($args) > 2) {
             throw new \LogicException('class_uses() requires one or two arguments in this compiler build');
         }
-        $autoload = true;
         if (\count($args) >= 2) {
-            if (JITVariable::TYPE_NATIVE_BOOL !== $args[1]->type) {
-                throw new \LogicException('class_uses() autoload flag must be a boolean in this compiler build');
-            }
-            $autoloadConst = $args[1]->value;
-            if ($autoloadConst instanceof \PHPLLVM\Value\ConstantInt) {
-                $autoload = 0 !== $autoloadConst->getValue();
-            }
+            JitBoolArg::lower(
+                $context,
+                $args[1],
+                'class_uses(): Argument #2 ($autoload)'
+            );
         }
 
-        return JitClassUses::invoke($context, $args[0], $autoload);
+        return JitClassUses::invoke($context, $args[0], true);
     }
 }
