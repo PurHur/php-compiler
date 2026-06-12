@@ -13,26 +13,24 @@ use PHPCompiler\VM\Variable;
 use PHPLLVM\Builder;
 use PHPLLVM\Value;
 
-/** LLVM lowering for get_object_id() — object handle as ptrToInt (#3537, #5291). */
+/** LLVM lowering for get_object_id() / spl_object_id() — object handle as ptrToInt (#3537, #3172, #5291). */
 final class JitGetObjectId
 {
-    private const TYPE_ERROR = 'get_object_id(): Argument #1 ($object) must be of type object, %s given';
-
-    public static function invoke(Context $context, JITVariable $arg): Value
+    public static function invoke(Context $context, JITVariable $arg, string $function = 'get_object_id'): Value
     {
         if (JITVariable::TYPE_OBJECT === $arg->type) {
             return self::objectHandle($context, $context->helper->loadValue($arg));
         }
         if (JITVariable::TYPE_VALUE === $arg->type) {
-            return self::boxed($context, $arg);
+            return self::boxed($context, $arg, $function);
         }
 
-        self::emitTypeErrorAndAbort($context, self::scalarTypeError($arg->type));
+        self::emitTypeErrorAndAbort($context, self::scalarTypeError($arg->type, $function));
 
         return $context->constantFromInteger(0, 'int64');
     }
 
-    public static function boxed(Context $context, JITVariable $arg): Value
+    public static function boxed(Context $context, JITVariable $arg, string $function = 'get_object_id'): Value
     {
         $loaded = JitValueBox::valuePtrFromVariable($context, $arg);
         $typeField = $context->structFieldMap['__value__']['type'];
@@ -50,7 +48,7 @@ final class JitGetObjectId
         $context->builder->branchIf($isObject, $okBlock, $errBlock);
 
         $context->builder->positionAtEnd($errBlock);
-        self::emitTypeErrorAndAbort($context, \sprintf(self::TYPE_ERROR, 'mixed'));
+        self::emitTypeErrorAndAbort($context, self::typeErrorMessage($function, 'mixed'));
 
         $context->builder->positionAtEnd($okBlock);
         $obj = $context->builder->call(
@@ -80,21 +78,26 @@ final class JitGetObjectId
         $context->builder->call($context->lookupFunction('abort'));
     }
 
-    private static function scalarTypeError(int $type): string
+    private static function scalarTypeError(int $type, string $function): string
     {
         switch ($type) {
             case JITVariable::TYPE_NATIVE_LONG:
-                return \sprintf(self::TYPE_ERROR, 'int');
+                return self::typeErrorMessage($function, 'int');
             case JITVariable::TYPE_NATIVE_DOUBLE:
-                return \sprintf(self::TYPE_ERROR, 'float');
+                return self::typeErrorMessage($function, 'float');
             case JITVariable::TYPE_NATIVE_BOOL:
-                return \sprintf(self::TYPE_ERROR, 'bool');
+                return self::typeErrorMessage($function, 'bool');
             case JITVariable::TYPE_STRING:
-                return \sprintf(self::TYPE_ERROR, 'string');
+                return self::typeErrorMessage($function, 'string');
             case JITVariable::TYPE_NULL:
-                return \sprintf(self::TYPE_ERROR, 'null');
+                return self::typeErrorMessage($function, 'null');
             default:
-                return \sprintf(self::TYPE_ERROR, 'mixed');
+                return self::typeErrorMessage($function, 'mixed');
         }
+    }
+
+    private static function typeErrorMessage(string $function, string $given): string
+    {
+        return \sprintf('%s(): Argument #1 ($object) must be of type object, %s given', $function, $given);
     }
 }

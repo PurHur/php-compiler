@@ -19,28 +19,28 @@ use PHPCompiler\VM\ObjectHandleSupport;
 use PHPLLVM\Value;
 
 /**
- * get_object_id() — stable per-instance object handle (ext/standard/basic_functions.c parity, #3537).
+ * spl_object_hash() — 32-char hex identity string (ext/spl/php_spl.c parity, #3172).
  *
- * @see https://github.com/php/php-src/blob/master/ext/standard/basic_functions.c PHP_FUNCTION(get_object_id)
- * @see https://github.com/php/php-src/blob/master/Zend/zend_objects_API.c zend_object_get_id()
+ * @see https://github.com/php/php-src/blob/master/ext/spl/php_spl.c php_spl_object_hash()
  */
-final class get_object_id extends Internal
+final class spl_object_hash extends Internal
 {
     public function execute(Frame $frame): void
     {
-        $this->requireExactArgCount($frame, 'get_object_id', 1);
+        $this->requireExactArgCount($frame, 'spl_object_hash', 1);
         if (null === $frame->returnVar) {
             return;
         }
-        $frame->returnVar->int(ObjectHandleSupport::requireObjectId($frame->calledArgs[0], 'get_object_id'));
+        $id = ObjectHandleSupport::requireObjectId($frame->calledArgs[0], 'spl_object_hash');
+        $frame->returnVar->string(ObjectHandleSupport::hashForObjectId($id));
     }
 
     public function call(Context $context, JITVariable ...$args): Value
     {
         if (1 !== \count($args)) {
-            throw new \LogicException('get_object_id() requires exactly one argument');
+            throw new \LogicException('spl_object_hash() requires exactly one argument');
         }
 
-        return JitGetObjectId::invoke($context, $args[0]);
+        return JitSplObjectHash::invoke($context, $args[0]);
     }
 }
