@@ -16,6 +16,18 @@ final class VmDnsGetMxRuntimeShrinkTest extends TestCase
         $this->assertStringNotContainsString('function_exists(\'dns_get_mx\')', $source);
         $this->assertStringNotContainsString('\\dns_get_mx(', $source);
         $this->assertStringNotContainsString('\\getmxrr(', $source);
+        $this->assertStringNotContainsString('stream_socket_client', $source);
+        $this->assertStringNotContainsString('stream_get_contents', $source);
+    }
+
+    public function testVmDnsUdpNativeUsesLibcSocketNotHostStreams(): void
+    {
+        $this->assertFileExists(__DIR__.'/../../ext/standard/VmDnsUdpNative.php');
+        $source = (string) file_get_contents(__DIR__.'/../../ext/standard/VmDnsUdpNative.php');
+        $this->assertStringContainsString('$ffi->socket', $source);
+        $this->assertStringContainsString('$ffi->send', $source);
+        $this->assertStringContainsString('$ffi->recv', $source);
+        $this->assertStringNotContainsString('stream_socket_client', $source);
     }
 
     public function testExampleComMxViaFfiWhenAvailable(): void

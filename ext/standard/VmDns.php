@@ -465,31 +465,7 @@ final class VmDns
 
     private static function udpDnsExchange(string $nameserver, string $query): ?string
     {
-        $errno = 0;
-        $errstr = '';
-        $socket = @\stream_socket_client(
-            'udp://'.$nameserver.':53',
-            $errno,
-            $errstr,
-            2,
-            STREAM_CLIENT_CONNECT
-        );
-        if (false === $socket) {
-            return null;
-        }
-
-        \stream_set_timeout($socket, 2);
-        $written = @\fwrite($socket, $query);
-        if (false === $written || $written !== \strlen($query)) {
-            \fclose($socket);
-
-            return null;
-        }
-
-        $response = @\stream_get_contents($socket);
-        \fclose($socket);
-
-        return false === $response ? null : $response;
+        return VmDnsUdpNative::exchange($nameserver, $query);
     }
 
     /**
