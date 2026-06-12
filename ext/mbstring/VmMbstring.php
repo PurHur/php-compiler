@@ -460,38 +460,140 @@ final class VmMbstring
     {
         $len = \strlen($value);
         for ($i = 0; $i < $len; ) {
-            $byte = \ord($value[$i]);
-            if ($byte < 0x80) {
-                ++$i;
-                continue;
-            }
-            if (($byte & 0xE0) === 0xC0) {
-                $need = 1;
-                $min = 0x80;
-            } elseif (($byte & 0xF0) === 0xE0) {
-                $need = 2;
-                $min = 0x800;
-            } elseif (($byte & 0xF8) === 0xF0) {
-                $need = 3;
-                $min = 0x10000;
-            } else {
-                return false;
-            }
-            if ($i + $need >= $len) {
-                return false;
-            }
-            $cp = $byte & (0xFF >> (2 + $need));
-            for ($j = 1; $j <= $need; ++$j) {
-                $next = \ord($value[$i + $j]);
-                if (($next & 0xC0) !== 0x80) {
-                    return false;
-                }
-                $cp = ($cp << 6) | ($next & 0x3F);
-            }
-            if ($cp < $min || ($cp >= 0xD800 && $cp <= 0xDFFF)) {
+            $need = 0;
+            if (!self::utf8SequenceValidAt($value, $len, $i, $need)) {
                 return false;
             }
             $i += $need + 1;
+        }
+
+        return true;
+    }
+
+    /**
+     * mb_scrub() — replace invalid byte sequences (php-src ext/mbstring/mbstring.c; PHP 8.4, #6050).
+     */
+    public static function scrub(string $value, ?string $encoding = null): string
+    {
+        $encoding = null === $encoding ? 'UTF-8' : $encoding;
+        self::assertScrubEncodingName($encoding);
+        $canonical = self::canonicalScrubEncoding($encoding);
+        if ('UTF-8' === $canonical) {
+            return self::scrubUtf8($value);
+        }
+        if ('ASCII' === $canonical) {
+            return self::scrubAscii($value);
+        }
+        if ('8BIT' === $canonical) {
+            return $value;
+        }
+
+        throw new \LogicException(
+            'mb_scrub() requires mbstring for encoding '.$encoding.' in this compiler build'
+        );
+    }
+
+    public static function assertScrubEncodingName(string $encoding): void
+    {
+        if (null !== self::canonicalScrubEncoding($encoding)) {
+            return;
+        }
+        throw new \ValueError(\sprintf(
+            'mb_scrub(): Argument #2 ($encoding) must be a valid encoding, "%s" given',
+            $encoding
+        ));
+    }
+
+    private static function canonicalScrubEncoding(string $encoding): ?string
+    {
+        $upper = strtoupper($encoding);
+        if ('UTF-8' === $upper || 'UTF8' === $upper) {
+            return 'UTF-8';
+        }
+        if ('ASCII' === $upper) {
+            return 'ASCII';
+        }
+        if ('8BIT' === $upper || 'BINARY' === $upper) {
+            return '8BIT';
+        }
+
+        return CharsetEngine::canonicalize($encoding);
+    }
+
+    private static function scrubAscii(string $value): string
+    {
+        $out = '';
+        $len = \strlen($value);
+        for ($i = 0; $i < $len; ++$i) {
+            $byte = \ord($value[$i]);
+            $out .= $byte < 0x80 ? $value[$i] : '?';
+        }
+
+        return $out;
+    }
+
+    private static function scrubUtf8(string $value): string
+    {
+        $out = '';
+        $len = \strlen($value);
+        for ($i = 0; $i < $len; ) {
+            $byte = \ord($value[$i]);
+            if ($byte < 0x80) {
+                $out .= $value[$i];
+                ++$i;
+                continue;
+            }
+            $need = 0;
+            if (!self::utf8SequenceValidAt($value, $len, $i, $need)) {
+                $out .= '?';
+                ++$i;
+                continue;
+            }
+            $out .= \substr($value, $i, $need + 1);
+            $i += $need + 1;
+        }
+
+        return $out;
+    }
+
+    /**
+     * @param-out int $need continuation byte count when lead byte is multi-byte
+     */
+    private static function utf8SequenceValidAt(string $value, int $len, int $i, ?int &$need = null): bool
+    {
+        $byte = \ord($value[$i]);
+        if ($byte < 0x80) {
+            $need = 0;
+
+            return true;
+        }
+        if (($byte & 0xE0) === 0xC0) {
+            $need = 1;
+            $min = 0x80;
+        } elseif (($byte & 0xF0) === 0xE0) {
+            $need = 2;
+            $min = 0x800;
+        } elseif (($byte & 0xF8) === 0xF0) {
+            $need = 3;
+            $min = 0x10000;
+        } else {
+            $need = 0;
+
+            return false;
+        }
+        if ($i + $need >= $len) {
+            return false;
+        }
+        $cp = $byte & (0xFF >> (2 + $need));
+        for ($j = 1; $j <= $need; ++$j) {
+            $next = \ord($value[$i + $j]);
+            if (($next & 0xC0) !== 0x80) {
+                return false;
+            }
+            $cp = ($cp << 6) | ($next & 0x3F);
+        }
+        if ($cp < $min || ($cp >= 0xD800 && $cp <= 0xDFFF)) {
+            return false;
         }
 
         return true;
