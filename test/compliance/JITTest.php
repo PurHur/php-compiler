@@ -203,6 +203,10 @@ class JITTest extends BaseTest {
             if (str_contains($name, 'getrusage')) {
                 continue;
             }
+            // DateInterval/date_interval_format VM builtins (#7278); JIT class ctor deferred with #3162 phase 2.
+            if (str_contains($name, 'date_interval_format')) {
+                continue;
+            }
             // memory_get_usage() MCJIT: VM + AOT (#3134); umbrella JITTest skips until stable.
             if (str_contains($name, 'memory_get_usage')) {
                 continue;

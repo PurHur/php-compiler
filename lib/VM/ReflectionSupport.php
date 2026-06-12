@@ -597,13 +597,12 @@ final class ReflectionSupport
     {
         return match ($var->type) {
             Variable::TYPE_NULL => 'null',
-            Variable::TYPE_BOOL => 'bool',
-            Variable::TYPE_LONG => 'int',
-            Variable::TYPE_DOUBLE => 'float',
+            Variable::TYPE_BOOLEAN => 'bool',
+            Variable::TYPE_INTEGER => 'int',
+            Variable::TYPE_FLOAT => 'float',
             Variable::TYPE_STRING => 'string',
             Variable::TYPE_ARRAY => 'array',
             Variable::TYPE_OBJECT => 'object',
-            Variable::TYPE_RESOURCE => 'resource',
             default => 'unknown',
         };
     }

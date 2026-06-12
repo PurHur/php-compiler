@@ -5,6 +5,8 @@ declare(strict_types=1);
 namespace PHPCompiler\VM;
 
 use PHPCfg\Func as CfgFunc;
+use PHPCompiler\VM\Builtin\DateIntervalConstruct;
+use PHPCompiler\VM\Builtin\DateIntervalFormat;
 use PHPCompiler\VM\Builtin\DateTimeConstruct;
 use PHPCompiler\VM\Builtin\DateTimeCreateFromImmutable;
 use PHPCompiler\VM\Builtin\DateTimeCreateFromTimestamp;
@@ -848,6 +850,25 @@ final class BuiltinClasses
         $dti->methods['createfromtimestamp'] = new DateTimeImmutableCreateFromTimestamp();
         $dti->methodVisibility['createfromtimestamp'] = $pubStatic;
         $ctx->classes[DateTimeSupport::CLASS_DATETIMEIMMUTABLE] = $dti;
+
+        $floatProto = new Variable(Variable::TYPE_FLOAT);
+        $boolProto = new Variable(Variable::TYPE_BOOLEAN);
+
+        $di = new ClassEntry('DateInterval');
+        foreach (['y', 'm', 'd', 'h', 'i', 's', 'invert'] as $propName) {
+            $di->properties[] = new ClassProperty($propName, null, $intProto);
+        }
+        $di->properties[] = new ClassProperty('f', null, $floatProto);
+        $di->properties[] = new ClassProperty('days', null, $boolProto);
+        foreach ($di->properties as $prop) {
+            $prop->visibility = $pub;
+        }
+        $di->constructor = new DateIntervalConstruct();
+        $di->methods['__construct'] = $di->constructor;
+        $di->methodVisibility['__construct'] = $pub;
+        $di->methods['format'] = new DateIntervalFormat();
+        $di->methodVisibility['format'] = $pub;
+        $ctx->classes[DateIntervalSupport::CLASS_DATEINTERVAL] = $di;
     }
 
     private static function registerExceptions(Context $ctx): void
