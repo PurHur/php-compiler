@@ -15,10 +15,8 @@ use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitIsFinite;
-use PHPCompiler\JIT\JitLongArg;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\Variable;
-use PHPLLVM\Builder;
 use PHPLLVM\Value;
 
 /**
@@ -40,12 +38,8 @@ final class is_finite extends Internal
 
             return;
         }
-        if (Variable::TYPE_FLOAT === $v->type) {
-            $frame->returnVar->bool(\is_finite($v->toFloat()));
-
-            return;
-        }
-        throw new \LogicException('is_finite() only supports integers and floats in this compiler build');
+        $num = VmMath::parseDoubleBuiltinArg($v, 'is_finite', 1, 'num');
+        $frame->returnVar->bool(\is_finite($num));
     }
 
     public Context $context;
@@ -59,10 +53,7 @@ final class is_finite extends Internal
         if (JITVariable::TYPE_NATIVE_LONG === $args[0]->type) {
             return $context->constantFromBool(true);
         }
-        if (JITVariable::TYPE_NATIVE_DOUBLE !== $args[0]->type) {
-            throw new \LogicException('is_finite() only supports integers and floats in this compiler build');
-        }
-        $asFloat = JitLongArg::lower($context, $args[0], 'is_finite() argument #1');
+        $asFloat = JitFdiv::lowerSingleOperand($context, $args[0], 1, 'num', 'is_finite', 'float');
 
         return JitIsFinite::lower($context, $asFloat);
     }

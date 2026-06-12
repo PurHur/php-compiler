@@ -99,6 +99,7 @@ final class AotRegressionFixtureCatalogTest extends TestCase
             'loose_scientific_string_eq.php' => ['loose_scientific_string_eq.php'],
             'bool_increment.php' => ['bool_increment.php'],
             'intdiv_division_by_zero.php' => ['intdiv_division_by_zero.php'],
+            'is_finite_numeric_string.php' => ['is_finite_numeric_string.php'],
             'ord_empty_4324.php' => ['ord_empty_4324.php'],
             'array_union_plus.php' => ['array_union_plus.php'],
             'match_guard.php' => ['match_guard.php'],
