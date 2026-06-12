@@ -53,6 +53,6 @@ final class assert_options extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        throw new \LogicException('assert_options() is VM-only in this compiler build (issue #3316)');
+        return JitAssertOptions::invoke($context, ...$args);
     }
 }
