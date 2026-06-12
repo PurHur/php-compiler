@@ -9,6 +9,7 @@ use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitStringArg;
 use PHPCompiler\JIT\JitValueBox;
+use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Builder;
 use PHPLLVM\Value;
 
@@ -17,14 +18,20 @@ final class JitPassword
 {
     private static int $blockSerial = 0;
 
-    public static function hash(Context $context, Value $password, Value $algoI64): Value
-    {
+    public static function hash(
+        Context $context,
+        Value $password,
+        Value $algoI64,
+        ?JITVariable $options = null
+    ): Value {
         StringPasswordCrypto::ensureLinked($context);
 
+        $cost = JitPasswordBcryptCost::lowerFromOptions($context, $options, 'password_hash');
         $digest = $context->builder->call(
             $context->lookupFunction('__compiler_password_hash'),
             $password,
-            $algoI64
+            $algoI64,
+            $cost
         );
 
         return self::nullableStringToValue($context, $digest);
