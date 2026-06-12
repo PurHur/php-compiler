@@ -4568,7 +4568,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/JitIni.php`
 
 **Warnings** (review for bootstrap subset):
-- 3 class method(s)
+- 4 class method(s)
 
 ### `ext/standard/JitIniIntrospection.php`
 
@@ -9265,7 +9265,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/ini_restore.php`
 
 **Warnings** (review for bootstrap subset):
-- new ArgumentCountError (line 24)
+- new ArgumentCountError (line 25)
 - 2 class method(s)
 
 ### `ext/standard/ini_set_.php`
@@ -12803,7 +12803,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/Builtin/IniRuntime.php`
 
 **Warnings** (review for bootstrap subset):
-- 34 class method(s)
+- 36 class method(s)
 
 ### `lib/JIT/Builtin/IniSet.php`
 
