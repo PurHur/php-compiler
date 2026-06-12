@@ -733,6 +733,7 @@ class Module extends ModuleAbstract
             new get_loaded_extensions(),
             new date(),
             new timezone_version_get(),
+            new timezone_identifiers_list(),
             new gmdate(),
             new getdate(),
             new gmgetdate(),
