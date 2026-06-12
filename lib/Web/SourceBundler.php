@@ -272,8 +272,8 @@ final class SourceBundler
             return "namespace {\n".rtrim($body)."\n}\n";
         }
 
-        $namespaceStart = strpos($trimmed, 'namespace');
-        if (false === $namespaceStart) {
+        $namespaceStart = self::semicolonNamespaceKeywordOffset($trimmed);
+        if (null === $namespaceStart) {
             $body = self::dedupeBundledUseStatements('', $trimmed);
 
             return "namespace {\n".rtrim($body)."\n}\n";
@@ -326,10 +326,7 @@ final class SourceBundler
     private static function semicolonNamespaceBodyOffset(string $trimmed): ?int
     {
         $tokens = token_get_all('<?php '.$trimmed);
-        $index = 0;
-        if (isset($tokens[0]) && is_array($tokens[0]) && T_OPEN_TAG === $tokens[0][0]) {
-            $index = 1;
-        }
+        $index = self::openTagTokenIndex($tokens);
 
         for ($i = $index, $n = count($tokens); $i < $n; ++$i) {
             $token = $tokens[$i];
@@ -351,6 +348,43 @@ final class SourceBundler
         }
 
         return null;
+    }
+
+    private static function semicolonNamespaceKeywordOffset(string $trimmed): ?int
+    {
+        $tokens = token_get_all('<?php '.$trimmed);
+        $index = self::openTagTokenIndex($tokens);
+
+        for ($i = $index, $n = count($tokens); $i < $n; ++$i) {
+            $token = $tokens[$i];
+            if (!is_array($token) || T_NAMESPACE !== $token[0]) {
+                continue;
+            }
+            $namespaceIndex = $i;
+            for (++$i; $i < $n; ++$i) {
+                $part = $tokens[$i];
+                if (is_string($part)) {
+                    if (';' === $part || '{' === $part) {
+                        return self::tokenOffsetBefore($tokens, $index, $namespaceIndex);
+                    }
+                }
+            }
+            break;
+        }
+
+        return null;
+    }
+
+    /**
+     * @param list<mixed> $tokens
+     */
+    private static function openTagTokenIndex(array $tokens): int
+    {
+        if (isset($tokens[0]) && is_array($tokens[0]) && T_OPEN_TAG === $tokens[0][0]) {
+            return 1;
+        }
+
+        return 0;
     }
 
     private static function dedupeBundledUseStatements(string $namespaceName, string $body): string
