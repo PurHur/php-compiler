@@ -23,6 +23,7 @@ final class TokenizerModuleSkeletonTest extends TestCase
             self::assertTrue(VmReflection::functionExists($ctx, $fn), $fn);
         }
         self::assertTrue(VmReflection::classExists($ctx, 'PhpToken'), 'PhpToken');
+        self::assertArrayHasKey('tokenize', $ctx->classes['phptoken']->methods, 'PhpToken::tokenize');
 
         $code = <<<'PHP'
 <?php

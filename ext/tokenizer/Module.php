@@ -11,7 +11,7 @@ use PHPCompiler\VM;
 /**
  * tokenizer extension module entry (php-src ext/tokenizer/tokenizer.c; issue #6940).
  *
- * Native lexer / PhpToken API tracked in #3171 / #6077.
+ * Native lexer + PhpToken::tokenize() (#3171, #6077, #6794).
  */
 class Module extends ModuleAbstract
 {
