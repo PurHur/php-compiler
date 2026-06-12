@@ -5,6 +5,10 @@ declare(strict_types=1);
 namespace PHPCompiler;
 
 use PHPCompiler\ext\standard\VmSettype;
+use PHPCompiler\Frame;
+use PHPCompiler\Runtime;
+use PHPCompiler\VM\BuiltinClasses;
+use PHPCompiler\VM\Context;
 use PHPCompiler\VM\Variable as VMVariable;
 use PHPUnit\Framework\TestCase;
 
@@ -19,5 +23,24 @@ final class SettypeBuiltinTest extends TestCase
         $this->expectException(\ValueError::class);
         $this->expectExceptionMessage('settype(): Argument #2 ($type) must be a valid type');
         VmSettype::apply($var, 'not-a-type');
+    }
+
+    public function testSettypeToObjectWrapsIntScalar(): void
+    {
+        $ctx = new Context(new Runtime());
+        BuiltinClasses::register($ctx);
+        $frame = $this->getMockBuilder(Frame::class)->disableOriginalConstructor()->getMock();
+        $frame->vmContext = $ctx;
+
+        $var = new VMVariable();
+        $var->int(1);
+        VmSettype::apply($var, 'object', $frame);
+
+        $resolved = $var->resolveIndirect();
+        $this->assertSame(VMVariable::TYPE_OBJECT, $resolved->type);
+        $object = $resolved->toObject();
+        $this->assertSame('stdClass', $object->class->name);
+        $this->assertArrayHasKey('scalar', $object->getRawProperties());
+        $this->assertSame(1, $object->getRawProperties()['scalar']->toInt());
     }
 }
