@@ -7,10 +7,9 @@ namespace PHPCompiler\ext\standard;
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Context;
-use PHPCompiler\JIT\JitLongArg;
+use PHPCompiler\JIT\JitStrictIntArg;
 use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\Variable as JITVariable;
-use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
 
 /** gzencode() — gzip-encoded string (ext/zlib/zlib.c parity, issue #3194). */
@@ -31,18 +30,10 @@ final class gzencode extends Internal
         $level = -1;
         $encoding = \ZLIB_ENCODING_GZIP;
         if ($argc >= 2) {
-            $levelVar = $frame->calledArgs[1]->resolveIndirect();
-            if (Variable::TYPE_INTEGER !== $levelVar->type) {
-                throw new \LogicException('gzencode() level must be an integer in this compiler build');
-            }
-            $level = $levelVar->toInt();
+            $level = VmZlibArg::requireLevel($frame->calledArgs[1], 'gzencode');
         }
         if (3 === $argc) {
-            $encVar = $frame->calledArgs[2]->resolveIndirect();
-            if (Variable::TYPE_INTEGER !== $encVar->type) {
-                throw new \LogicException('gzencode() encoding must be an integer in this compiler build');
-            }
-            $encoding = $encVar->toInt();
+            $encoding = VmZlibArg::requireInt($frame->calledArgs[2], 'gzencode', 3, 'encoding');
         }
         if (null === $frame->returnVar) {
             return;
@@ -68,10 +59,10 @@ final class gzencode extends Internal
         $level = $i64->constInt(-1, true);
         $encoding = $i64->constInt(\ZLIB_ENCODING_GZIP, false);
         if ($argc >= 2) {
-            $level = JitLongArg::lower($context, $args[1], 'gzencode() level');
+            $level = JitStrictIntArg::lowerLevel($context, $args[1], 'gzencode');
         }
         if (3 === $argc) {
-            $encoding = JitLongArg::lower($context, $args[2], 'gzencode() encoding');
+            $encoding = JitStrictIntArg::lower($context, $args[2], 'gzencode', 3, 'encoding');
         }
 
         return JitZlib::encode(

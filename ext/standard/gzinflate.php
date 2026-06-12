@@ -7,10 +7,9 @@ namespace PHPCompiler\ext\standard;
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Context;
-use PHPCompiler\JIT\JitLongArg;
+use PHPCompiler\JIT\JitStrictIntArg;
 use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\Variable as JITVariable;
-use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
 
 /** gzinflate() — inflate zlib-compressed data (ext/zlib/zlib.c parity, issue #3194). */
@@ -30,11 +29,7 @@ final class gzinflate extends Internal
         $data = VmString::coerceStringBuiltinArg($frame->calledArgs[0], 'gzinflate', 0, 'data');
         $maxLength = 0;
         if (2 === $argc) {
-            $maxVar = $frame->calledArgs[1]->resolveIndirect();
-            if (Variable::TYPE_INTEGER !== $maxVar->type) {
-                throw new \LogicException('gzinflate() max_length must be an integer in this compiler build');
-            }
-            $maxLength = $maxVar->toInt();
+            $maxLength = VmZlibArg::requireInt($frame->calledArgs[1], 'gzinflate', 2, 'max_length');
         }
         if (null === $frame->returnVar) {
             return;
@@ -58,7 +53,7 @@ final class gzinflate extends Internal
         }
         $maxLength = $context->getTypeFromString('int64')->constInt(0, false);
         if (2 === $argc) {
-            $maxLength = JitLongArg::lower($context, $args[1], 'gzinflate() max_length');
+            $maxLength = JitStrictIntArg::lower($context, $args[1], 'gzinflate', 2, 'max_length');
         }
 
         return JitZlib::inflate(
