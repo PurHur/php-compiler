@@ -177,6 +177,9 @@ patch_already_applied() {
       grep -q 'use llvm\\string_ptr;' "$ROOT/vendor/ircmaxell/php-llvm/lib/LLVMAbstract/MemoryBuffer.php" 2>/dev/null \
         && grep -q '\$this->llvm->lib->getFFI()' "$ROOT/vendor/ircmaxell/php-llvm/lib/LLVMAbstract/MemoryBuffer.php" 2>/dev/null
       ;;
+    php-llvm-vector-get-address-space.patch)
+      grep -q 'function getAddressSpace' "$ROOT/vendor/ircmaxell/php-llvm/lib/LLVMAbstract/Type/Vector.php" 2>/dev/null
+      ;;
     php-cfg-mixed-reserved.patch)
       [[ -f "$ROOT/vendor/ircmaxell/php-cfg/lib/PHPCfg/Op/Type/Mixed_.php" ]] \
         && [[ ! -f "$ROOT/vendor/ircmaxell/php-cfg/lib/PHPCfg/Op/Type/Mixed.php" ]]
@@ -4633,6 +4636,7 @@ apply_patch "$PATCH_DIR/php-llvm-pass-manager-builder-semicolon.patch"
 apply_patch "$PATCH_DIR/php-llvm-pass-manager-builder-typed-prop.patch"
 apply_patch "$PATCH_DIR/php-llvm-pass-manager-builder-populate.patch"
 apply_patch "$PATCH_DIR/php-llvm-memory-buffer-bitcode.patch"
+apply_patch "$PATCH_DIR/php-llvm-vector-get-address-space.patch"
 apply_patch "$PATCH_DIR/php-llvm-x86-posix-fallback.patch"
 
 # php-cfg before php-types: php-types-mixed-reserved.patch references Op\Type\Mixed_.

@@ -783,20 +783,19 @@ class Context {
         if (!is_null($this->debugFile)) {
             $machine->emitToFile($this->module, $this->debugFile . '.s', $machine::CODEGEN_FILE_TYPE_ASM);
         }
-        $objectFile = $file . '.o';
-        Progress::noteFunction('jit_context_emit_object_begin');
-        $machine->emitToFile($this->module, $objectFile, $machine::CODEGEN_FILE_TYPE_OBJECT);
-        Progress::noteFunction('jit_context_emit_object_done');
         $keepObject = getenv('PHP_COMPILER_KEEP_OBJECT_FILE');
         $vendorPrelink = getenv('PHP_COMPILER_VENDOR_PRELINK');
         $selfhostAot = getenv('PHP_COMPILER_SELFHOST_AOT');
         $vendorObjectOnly = ('1' === $vendorPrelink || 'true' === strtolower((string) $vendorPrelink))
             && ('0' === $selfhostAot || 'false' === strtolower((string) $selfhostAot));
-        if (
-            '1' === $keepObject
-            || 'true' === strtolower((string) $keepObject)
-            || $vendorObjectOnly
-        ) {
+        $keepingObjectOnly = ('1' === $keepObject || 'true' === strtolower((string) $keepObject))
+            || $vendorObjectOnly;
+        // M5 vendor argv uses -o path ending in .o; do not append a second .o (#3054).
+        $objectFile = $keepingObjectOnly && str_ends_with($file, '.o') ? $file : $file.'.o';
+        Progress::noteFunction('jit_context_emit_object_begin');
+        $machine->emitToFile($this->module, $objectFile, $machine::CODEGEN_FILE_TYPE_OBJECT);
+        Progress::noteFunction('jit_context_emit_object_done');
+        if ($keepingObjectOnly) {
             return;
         }
         Progress::noteFunction('jit_context_link_begin');
