@@ -32,6 +32,15 @@ final class VmFsGlobTest extends TestCase
         $this->assertStringNotContainsString('hostGlob', $source);
     }
 
+    /** Issue #8167: VmFsGlob pathIsDir must not delegate to host \\stat(). */
+    public function testVmFsGlobDoesNotReferenceHostStat(): void
+    {
+        $source = (string) file_get_contents(self::$root.'/ext/standard/VmFsGlob.php');
+        $this->assertStringContainsString('VmStatCache::stat', $source);
+        $this->assertDoesNotMatchRegularExpression('/@\\\\stat\\s*\\(/', $source);
+        $this->assertDoesNotMatchRegularExpression('/[^:]\\\\stat\\s*\\(/', $source);
+    }
+
     public function testScandirBuiltinDoesNotCallHostScandir(): void
     {
         $source = (string) file_get_contents(self::$root.'/ext/standard/scandir.php');

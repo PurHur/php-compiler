@@ -219,7 +219,7 @@ final class VmDate
         if ('' === $path || '-' === $path) {
             return false;
         }
-        $stat = @\stat($path);
+        $stat = VmStatCache::stat($path);
         if (false === $stat) {
             return false;
         }

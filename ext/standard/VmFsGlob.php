@@ -189,7 +189,7 @@ CDEF;
 
     private static function pathIsDir(string $path): bool
     {
-        $stat = @\stat($path);
+        $stat = VmStatCache::stat($path);
         if (false === $stat) {
             return false;
         }
