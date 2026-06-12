@@ -10,14 +10,13 @@ use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\BuiltinExecute;
 use PHPCompiler\VM\Variable;
-use PHPCompiler\ext\standard\VmFs;
 use PHPCompiler\ext\standard\VmStreamArg;
 use PHPLLVM\Value;
 
 /**
  * socket_import_stream() — adopt stream as Socket (php-src ext/sockets/sockets.c; #6203).
  *
- * PHP-owned import via {@see VmSocket::importStream()}; no host {@see \socket_import_stream()} delegation.
+ * PHP-owned import via {@see VmSocket::importStreamHandle()}; no host {@see \socket_import_stream()} delegation.
  */
 final class socket_import_stream extends Internal
 {
@@ -36,17 +35,7 @@ final class socket_import_stream extends Internal
         }
 
         $handle = VmStreamArg::requireStreamHandle($frame->calledArgs[0], 'socket_import_stream', 1);
-        $hostStream = VmFs::lookupResource($handle);
-        if (null === $hostStream) {
-            BuiltinExecute::writeReturn(
-                $frame,
-                static fn (Variable $ret) => $ret->bool(false)
-            );
-
-            return;
-        }
-
-        $wrapped = VmSocket::importStream($hostStream, $frame->vmContext);
+        $wrapped = VmSocket::importStreamHandle($handle, $frame->vmContext);
         if (false === $wrapped) {
             VmSockets::triggerWarning($frame, 'socket_import_stream(): Unable to import stream');
             BuiltinExecute::writeReturn(

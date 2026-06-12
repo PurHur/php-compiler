@@ -45,7 +45,7 @@ final class VmStreamSocketNative
     }
 
     /**
-     * @return array{0: resource|false, 1: int, 2: string}
+     * @return array{0: resource|false, 1: int, 2: string, 3: ?int}
      */
     public static function client(
         string $remote,
@@ -54,20 +54,20 @@ final class VmStreamSocketNative
         ?Variable $contextVar = null
     ): array {
         if (!self::available()) {
-            return [false, 0, 'VmStreamSocketNative FFI unavailable'];
+            return [false, 0, 'VmStreamSocketNative FFI unavailable', null];
         }
 
         $parsed = self::parseRemoteSocket($remote);
         if (null === $parsed) {
-            return [false, 0, 'Unable to parse remote socket path'];
+            return [false, 0, 'Unable to parse remote socket path', null];
         }
 
         if ('ssl' === $parsed['transport'] || 'tls' === $parsed['transport']) {
-            return [false, 0, 'ssl:// transport is not supported in this compiler build'];
+            return [false, 0, 'ssl:// transport is not supported in this compiler build', null];
         }
 
         if ('unix' === $parsed['transport']) {
-            return [false, 0, 'unix:// transport is not supported in this compiler build'];
+            return [false, 0, 'unix:// transport is not supported in this compiler build', null];
         }
 
         $contextTimeout = self::connectTimeoutFromContext($contextVar);
@@ -80,7 +80,7 @@ final class VmStreamSocketNative
 
         $ffi = self::ffi();
         if (null === $ffi) {
-            return [false, 0, 'VmStreamSocketNative FFI unavailable'];
+            return [false, 0, 'VmStreamSocketNative FFI unavailable', null];
         }
 
         $hints = $ffi->new('struct addrinfo');
@@ -94,7 +94,7 @@ final class VmStreamSocketNative
         if (0 !== $rc) {
             $err = self::gaiStrerror($ffi, $rc);
 
-            return [false, 0, $err];
+            return [false, 0, $err, null];
         }
 
         $lastErrno = 0;
@@ -133,7 +133,7 @@ final class VmStreamSocketNative
         }
 
         if ($connectedFd < 0) {
-            return [false, $lastErrno, $lastErrstr];
+            return [false, $lastErrno, $lastErrstr, null];
         }
 
         try {
@@ -142,7 +142,7 @@ final class VmStreamSocketNative
                 $errno = self::errno($ffi);
                 $ffi->close($connectedFd);
 
-                return [false, $errno, self::strerror($ffi, $errno)];
+                return [false, $errno, self::strerror($ffi, $errno), null];
             }
 
             $ffi->close($connectedFd);
@@ -152,21 +152,21 @@ final class VmStreamSocketNative
             if (false === $stream) {
                 $ffi->close($dupFd);
 
-                return [false, 0, 'Unable to create stream from socket'];
+                return [false, 0, 'Unable to create stream from socket', null];
             }
 
-            return [$stream, 0, ''];
+            return [$stream, 0, '', $dupFd];
         } catch (\Throwable) {
             if ($connectedFd >= 0) {
                 $ffi->close($connectedFd);
             }
 
-            return [false, 0, 'Unable to create stream from socket'];
+            return [false, 0, 'Unable to create stream from socket', null];
         }
     }
 
     /**
-     * @return array{0: resource|false, 1: int, 2: string}
+     * @return array{0: resource|false, 1: int, 2: string, 3: ?int}
      */
     public static function server(
         string $local,
@@ -175,20 +175,20 @@ final class VmStreamSocketNative
     ): array {
         unset($contextVar);
         if (!self::available()) {
-            return [false, 0, 'VmStreamSocketNative FFI unavailable'];
+            return [false, 0, 'VmStreamSocketNative FFI unavailable', null];
         }
 
         $parsed = self::parseSocketAddress($local);
         if (null === $parsed) {
-            return [false, 0, 'Unable to parse local socket path'];
+            return [false, 0, 'Unable to parse local socket path', null];
         }
 
         if ('ssl' === $parsed['transport'] || 'tls' === $parsed['transport']) {
-            return [false, 0, 'ssl:// transport is not supported in this compiler build'];
+            return [false, 0, 'ssl:// transport is not supported in this compiler build', null];
         }
 
         if ('unix' === $parsed['transport']) {
-            return [false, 0, 'unix:// transport is not supported in this compiler build'];
+            return [false, 0, 'unix:// transport is not supported in this compiler build', null];
         }
 
         if (0 === $flags) {
@@ -200,7 +200,7 @@ final class VmStreamSocketNative
 
         $ffi = self::ffi();
         if (null === $ffi) {
-            return [false, 0, 'VmStreamSocketNative FFI unavailable'];
+            return [false, 0, 'VmStreamSocketNative FFI unavailable', null];
         }
 
         $hints = $ffi->new('struct addrinfo');
@@ -214,7 +214,7 @@ final class VmStreamSocketNative
         $resHead = $ffi->new('struct addrinfo *');
         $rc = (int) $ffi->getaddrinfo($node, $port, \FFI::addr($hints), \FFI::addr($resHead));
         if (0 !== $rc) {
-            return [false, 0, self::gaiStrerror($ffi, $rc)];
+            return [false, 0, self::gaiStrerror($ffi, $rc), null];
         }
 
         $lastErrno = 0;
@@ -278,7 +278,7 @@ final class VmStreamSocketNative
         }
 
         if ($boundFd < 0) {
-            return [false, $lastErrno, $lastErrstr];
+            return [false, $lastErrno, $lastErrstr, null];
         }
 
         try {
@@ -287,7 +287,7 @@ final class VmStreamSocketNative
                 $errno = self::errno($ffi);
                 $ffi->close($boundFd);
 
-                return [false, $errno, self::strerror($ffi, $errno)];
+                return [false, $errno, self::strerror($ffi, $errno), null];
             }
 
             $ffi->close($boundFd);
@@ -296,16 +296,16 @@ final class VmStreamSocketNative
             if (false === $stream) {
                 $ffi->close($dupFd);
 
-                return [false, 0, 'Unable to create stream from socket'];
+                return [false, 0, 'Unable to create stream from socket', null];
             }
 
-            return [$stream, 0, ''];
+            return [$stream, 0, '', $dupFd];
         } catch (\Throwable) {
             if ($boundFd >= 0) {
                 $ffi->close($boundFd);
             }
 
-            return [false, 0, 'Unable to create stream from socket'];
+            return [false, 0, 'Unable to create stream from socket', null];
         }
     }
 

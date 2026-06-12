@@ -28,14 +28,14 @@ final class VmPersistentSocket
     }
 
     /**
-     * @return array{0: resource|false, 1: int, 2: string}
+     * @return array{0: resource|false, 1: int, 2: string, 3: ?int}
      */
     public static function open(string $hostname, int $port, ?float $timeout = null): array
     {
         $key = self::persistentKey($hostname, $port);
         $cached = self::$cache[$key] ?? null;
         if (\is_resource($cached)) {
-            return [$cached, 0, ''];
+            return [$cached, 0, '', null];
         }
         if (null !== $cached) {
             unset(self::$cache[$key]);
@@ -43,19 +43,19 @@ final class VmPersistentSocket
 
         $remote = self::remoteUri($hostname, $port);
         $connectTimeout = null === $timeout ? 60.0 : $timeout;
-        [$stream, $errno, $errstr] = VmStreamSocketNative::client(
+        [$stream, $errno, $errstr, $socketFd] = VmStreamSocketNative::client(
             $remote,
             $connectTimeout,
             \STREAM_CLIENT_CONNECT
         );
         if (false === $stream) {
-            return [false, $errno, $errstr];
+            return [false, $errno, $errstr, null];
         }
 
         self::$cache[$key] = $stream;
         self::$resourceKeys[self::resourceKey($stream)] = $key;
 
-        return [$stream, 0, ''];
+        return [$stream, 0, '', $socketFd];
     }
 
     /**

@@ -33,10 +33,11 @@ final class VmStreamSocketRuntimeShrinkTest extends TestCase
             $this->markTestSkipped('libc FFI unavailable');
         }
 
-        [$stream, $errno, $errstr] = VmStreamSocketNative::client('tcp://127.0.0.1:9', 1.0, 4);
+        [$stream, $errno, $errstr, $socketFd] = VmStreamSocketNative::client('tcp://127.0.0.1:9', 1.0, 4);
         $this->assertFalse($stream);
         $this->assertIsInt($errno);
         $this->assertIsString($errstr);
+        $this->assertNull($socketFd);
     }
 
     public function testGaiStrerrorUsesLibcFfiNotHostBuiltin(): void

@@ -20,12 +20,14 @@ final class VmStreamMeta
             || \str_starts_with($uri, 'php://temp')
             || \str_starts_with($uri, 'php://fd/');
 
+        $socketType = self::streamTypeForUri($uri);
+
         return [
             'timed_out' => false,
             'blocked' => true,
             'eof' => \feof($fp),
             'unread_bytes' => 0,
-            'stream_type' => $isPhpMemory ? 'MEMORY' : ($isPhp ? 'STDIO' : 'STDIO'),
+            'stream_type' => $socketType ?? ($isPhpMemory ? 'MEMORY' : ($isPhp ? 'STDIO' : 'STDIO')),
             'mode' => $isPhpMemory ? 'w+b' : 'r+b',
             'seekable' => true,
             'uri' => $uri,
@@ -65,12 +67,26 @@ final class VmStreamMeta
 
     public static function isSocketTransport(string $uri): bool
     {
+        return null !== self::streamTypeForUri($uri);
+    }
+
+    /**
+     * php-src stream_type strings for socket transports (ext/standard/streams.c; #6203, #8202).
+     */
+    public static function streamTypeForUri(string $uri): ?string
+    {
         if ('' === $uri) {
-            return false;
+            return null;
         }
         $scheme = \strtolower((string) \parse_url($uri, \PHP_URL_SCHEME));
 
-        return \in_array($scheme, ['tcp', 'udp', 'unix', 'ssl', 'tls', 'socket'], true);
+        return match ($scheme) {
+            'tcp' => 'tcp_socket',
+            'udp' => 'udp_socket',
+            'unix' => 'unix_socket',
+            'ssl', 'tls' => 'ssl_socket',
+            default => null,
+        };
     }
 
     /**

@@ -18,6 +18,9 @@ final class VmFs
     /** @var array<int, string> stream URI/path at open time (StreamMetaJit phpc_stream_paths parity; #7908) */
     private static array $handlePaths = [];
 
+    /** @var array<int, int> stream handle => dup(2) socket fd from VmStreamSocketNative (#8202) */
+    private static array $handleSocketFds = [];
+
     /** @var array<int, true> popen() handles — pclose() vs fclose() at libc layer in JIT/AOT */
     private static array $popenHandles = [];
 
@@ -602,7 +605,7 @@ final class VmFs
         if (null === $fp) {
             return -1;
         }
-        unset(self::$handles[$handle], self::$handlePaths[$handle]);
+        unset(self::$handles[$handle], self::$handlePaths[$handle], self::$handleSocketFds[$handle]);
         unset(self::$popenHandles[$handle]);
         self::releaseHostResourceRef($fp);
         $result = @\pclose($fp);
@@ -619,7 +622,7 @@ final class VmFs
     }
 
     /** @return int|false */
-    public static function adoptStreamResource($resource, string $uri = '')
+    public static function adoptStreamResource($resource, string $uri = '', ?int $socketFd = null)
     {
         if (!\is_resource($resource)) {
             return false;
@@ -627,9 +630,17 @@ final class VmFs
         $id = ++self::$nextHandleId;
         self::$handles[$id] = $resource;
         self::$handlePaths[$id] = $uri;
+        if (null !== $socketFd && $socketFd >= 0) {
+            self::$handleSocketFds[$id] = $socketFd;
+        }
         self::retainHostResourceRef($resource);
 
         return $id;
+    }
+
+    public static function socketFdForHandle(int $handle): ?int
+    {
+        return self::$handleSocketFds[$handle] ?? null;
     }
 
     /** @return int|false */
@@ -731,7 +742,7 @@ final class VmFs
             return false;
         }
         VmStreamFilterChain::clearStream($handle);
-        unset(self::$handles[$handle], self::$handlePaths[$handle]);
+        unset(self::$handles[$handle], self::$handlePaths[$handle], self::$handleSocketFds[$handle]);
         if (!self::releaseHostResourceRef($fp)) {
             return true;
         }

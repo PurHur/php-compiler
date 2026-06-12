@@ -80,7 +80,7 @@ final class VmSockets
         return null;
     }
 
-    /** Exposed for {@see VmSocket::fdForHostSocket()}. */
+    /** Exposed for {@see VmSocket::fdForObject()}. */
     public static function getsocknameFd(int $fd, string &$addr): bool
     {
         $ffi = self::ffi();

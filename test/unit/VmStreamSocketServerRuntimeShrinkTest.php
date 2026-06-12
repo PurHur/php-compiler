@@ -32,13 +32,15 @@ final class VmStreamSocketServerRuntimeShrinkTest extends TestCase
             $this->markTestSkipped('libc FFI unavailable');
         }
 
-        [$stream, $errno, $errstr] = VmStreamSocketNative::server(
+        [$stream, $errno, $errstr, $socketFd] = VmStreamSocketNative::server(
             'tcp://127.0.0.1:0',
             VmStreamSocketNative::STREAM_SERVER_BIND | VmStreamSocketNative::STREAM_SERVER_LISTEN
         );
         $this->assertIsResource($stream);
         $this->assertSame(0, $errno);
         $this->assertSame('', $errstr);
+        $this->assertIsInt($socketFd);
+        $this->assertGreaterThan(0, $socketFd);
         if (\is_resource($stream)) {
             \fclose($stream);
         }
