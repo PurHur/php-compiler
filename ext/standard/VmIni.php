@@ -20,6 +20,7 @@ final class VmIni
         'memory_limit',
         'serialize_precision',
         'unserialize_callback_func',
+        'session.gc_maxlifetime',
         ...VmAssertState::SUPPORTED_INI_KEYS,
     ];
 
@@ -30,6 +31,8 @@ final class VmIni
     private const CFG_MEMORY_LIMIT = '128M';
 
     private const CFG_SERIALIZE_PRECISION = '-1';
+
+    private const CFG_SESSION_GC_MAXLIFETIME = '1440';
 
     public static function set(Context $ctx, string $option, string $newValue) {
         $key = strtolower($option);
@@ -51,6 +54,8 @@ final class VmIni
                 return self::setSerializePrecision($newValue);
             case 'unserialize_callback_func':
                 return self::setUnserializeCallbackFunc($newValue);
+            case 'session.gc_maxlifetime':
+                return self::setSessionGcMaxLifetime($newValue);
             default:
                 return false;
         }
@@ -77,6 +82,8 @@ final class VmIni
                 return (string) self::$serializePrecision;
             case 'unserialize_callback_func':
                 return self::$unserializeCallbackFunc;
+            case 'session.gc_maxlifetime':
+                return (string) self::$sessionGcMaxLifetime;
             default:
                 return false;
         }
@@ -96,6 +103,7 @@ final class VmIni
             'memory_limit' => self::CFG_MEMORY_LIMIT,
             'serialize_precision' => self::CFG_SERIALIZE_PRECISION,
             'unserialize_callback_func' => '',
+            'session.gc_maxlifetime' => self::CFG_SESSION_GC_MAXLIFETIME,
             default => false,
         };
     }
@@ -111,6 +119,13 @@ final class VmIni
     private static int $serializePrecision = -1;
 
     private static string $unserializeCallbackFunc = '';
+
+    private static int $sessionGcMaxLifetime = 1440;
+
+    public static function getSessionGcMaxLifetime(): int
+    {
+        return self::$sessionGcMaxLifetime;
+    }
 
     private static function setErrorReporting(Context $ctx, string $newValue) {
         $old = (string) $ctx->errors->getErrorReporting();
@@ -146,6 +161,17 @@ final class VmIni
     private static function setUnserializeCallbackFunc(string $newValue) {
         $old = self::$unserializeCallbackFunc;
         self::$unserializeCallbackFunc = $newValue;
+
+        return $old;
+    }
+
+    private static function setSessionGcMaxLifetime(string $newValue) {
+        $parsed = (int) trim($newValue);
+        if ($parsed <= 0) {
+            return false;
+        }
+        $old = (string) self::$sessionGcMaxLifetime;
+        self::$sessionGcMaxLifetime = $parsed;
 
         return $old;
     }
@@ -211,6 +237,9 @@ final class VmIni
                 break;
             case 'unserialize_callback_func':
                 self::$unserializeCallbackFunc = '';
+                break;
+            case 'session.gc_maxlifetime':
+                self::$sessionGcMaxLifetime = (int) self::CFG_SESSION_GC_MAXLIFETIME;
                 break;
         }
     }

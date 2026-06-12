@@ -300,9 +300,6 @@ final class VmSession
         return $prefix.$generated;
     }
 
-    /** Default session.gc_maxlifetime when ini is unavailable (php-src php.ini-production). */
-    private const DEFAULT_GC_MAXLIFETIME = 1440;
-
     /**
      * Scan save path and unlink sess_* files older than gc_maxlifetime (php-src mod_files.c ps_files_cleanup_dir).
      *
@@ -315,16 +312,7 @@ final class VmSession
             return false;
         }
 
-        $maxLifetime = self::DEFAULT_GC_MAXLIFETIME;
-        if (\function_exists('ini_get')) {
-            $fromIni = ini_get('session.gc_maxlifetime');
-            if (false !== $fromIni && '' !== $fromIni) {
-                $parsed = (int) $fromIni;
-                if ($parsed > 0) {
-                    $maxLifetime = $parsed;
-                }
-            }
-        }
+        $maxLifetime = VmIni::getSessionGcMaxLifetime();
 
         $handle = @opendir($dir);
         if (false === $handle) {
