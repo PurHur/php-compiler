@@ -638,6 +638,8 @@ class Module extends ModuleAbstract
             new get_declared_traits_(),
             new get_declared_functions_(),
             new get_defined_functions_(),
+            new get_included_files_(),
+            new get_included_files_('get_required_files'),
             new debug_backtrace(),
             new get_debug_backtrace(),
             new class_exists_(),
