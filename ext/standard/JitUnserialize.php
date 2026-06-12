@@ -33,7 +33,7 @@ final class JitUnserialize
     ): Value {
         $literal = JitStringArg::compileTimeLiteral($payload);
         if (null !== $literal) {
-            $decoded = @\unserialize($literal, $options);
+            $decoded = VmUnserializeFormat::decodePayload($literal, $options);
             if (false === $decoded) {
                 return JitJsonDecode::materializeScalar($context, false);
             }
