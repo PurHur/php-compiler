@@ -267,9 +267,10 @@ final class BootstrapSelfhostHelloWorldTest extends TestCase
         );
         $jit = (string) file_get_contents(self::$root.'/lib/JIT.php');
         $this->assertMatchesRegularExpression(
-            '/registerM3EmitTuSidecarFromPath\(\s*__DIR__\.\'\/\.\.\/test\/selfhost\/compiler_lib_spine_smoke\/main\.php\'[\s\S]*?true\s*\)/',
+            '/registerM3EmitTuSidecarFromPath\(\s*\$repoRoot\.\'\/test\/selfhost\/compiler_lib_spine_smoke\/main\.php\'[\s\S]*?true\s*\)/',
             $jit
         );
+        $this->assertStringContainsString('m3EmitTuRuntimeRepoRoot', $jit);
     }
 
     public function testJitDocumentsM3CompileDriverEnvGate(): void

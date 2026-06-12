@@ -56,8 +56,11 @@ bootstrap_gen0_seed_prelinked_m3_sidecars() {
   mkdir -p "${root}/build"
   blob="${root}/build/.m3_bin_compile_aot_blob"
   minimal_blob="${root}/build/.m3_compiler_minimal_aot_blob"
+  local inventory="${root}/build/bin-compile-aot-inventory"
   local prelinked_blob="${root}/prelinked/bootstrap-gen0/.m3_bin_compile_aot_blob"
-  if [[ -f "${prelinked_blob}" && -s "${prelinked_blob}" ]]; then
+  if [[ -x "${inventory}" && -s "${inventory}" ]]; then
+    cp -f "${inventory}" "${blob}"
+  elif [[ -f "${prelinked_blob}" && -s "${prelinked_blob}" ]]; then
     cp -f "${prelinked_blob}" "${blob}"
   else
     cp -f "${seed}" "${blob}"
@@ -115,6 +118,11 @@ bootstrap_ensure_m3_compiler_lib_sidecar() {
   if [[ -f "${blob}" && -s "${blob}" && -f "${stamp}" && "$(cat "${stamp}" 2>/dev/null)" == "${want_sha}" ]]; then
     return 0
   fi
+  # Zend host-compile of full spine often SIGSEGV; keep seeded/prelinked sidecar when stamp is stale (#2967).
+  if [[ -f "${blob}" && -s "${blob}" && "${BOOTSTRAP_FORCE_COMPILER_LIB_SIDECAR_REGEN:-0}" != "1" ]]; then
+    echo "bootstrap-ensure-m3-compiler-lib-sidecar: using existing ${blob} (stamp stale; BOOTSTRAP_FORCE_COMPILER_LIB_SIDECAR_REGEN=1 to regen)" >&2
+    return 0
+  fi
   if [[ "${BOOTSTRAP_SKIP_COMPILER_LIB_SIDECAR_REGEN:-0}" == "1" ]]; then
     echo "bootstrap-ensure-m3-compiler-lib-sidecar: stale/missing ${blob} (BOOTSTRAP_SKIP_COMPILER_LIB_SIDECAR_REGEN=1)" >&2
     return 1
@@ -123,9 +131,11 @@ bootstrap_ensure_m3_compiler_lib_sidecar() {
     echo "bootstrap-ensure-m3-compiler-lib-sidecar: php required to host-compile ${entry}" >&2
     return 1
   fi
+  local prelinked_lib="${root}/prelinked/bootstrap-gen0/compiler_lib_aot_blob"
+  local regen_tmp="${blob}.regen.$$"
   echo "bootstrap-ensure-m3-compiler-lib-sidecar: host-compile spine entry -> ${blob} (#3012)" >&2
   mkdir -p "${root}/build"
-  rm -f "${blob}"
+  rm -f "${regen_tmp}"
   local regen_log regen_code=0
   set +e
   # Do not set PHP_COMPILER_CLI_SPINE_BUNDLE here — that skips bin/compile.php argv dispatch (#1492).
@@ -136,19 +146,30 @@ bootstrap_ensure_m3_compiler_lib_sidecar() {
       PHP_COMPILER_SELFHOST_AOT=1 \
       PHP_COMPILER_MEMORY_LIMIT="${PHP_COMPILER_MEMORY_LIMIT:-4096M}" \
       php -d "memory_limit=${PHP_COMPILER_MEMORY_LIMIT:-4096M}" \
-      "${root}/bin/compile.php" -o "${blob}" "${entry}" 2>&1
+      "${root}/bin/compile.php" -o "${regen_tmp}" "${entry}" 2>&1
   )"
   regen_code=$?
   set -e
-  if [[ "${regen_code}" -ne 0 || ! -f "${blob}" || ! -s "${blob}" ]]; then
-    printf '%s\n' "${regen_log}" >&2
-    echo "bootstrap-ensure-m3-compiler-lib-sidecar: host-compile failed (exit ${regen_code}); inventory argv driver may return parseAndCompile null (#2967)" >&2
-    echo "bootstrap-ensure-m3-compiler-lib-sidecar: hint: refresh prelinked/bootstrap-gen0 after spine entry changes, or fix Zend spine AOT (VM/JIT)" >&2
-    return 1
+  if [[ "${regen_code}" -eq 0 && -f "${regen_tmp}" && -s "${regen_tmp}" ]]; then
+    mv -f "${regen_tmp}" "${blob}"
+    chmod +x "${blob}"
+    printf '%s' "${want_sha}" >"${stamp}"
+    return 0
   fi
-  chmod +x "${blob}"
-  printf '%s' "${want_sha}" >"${stamp}"
-  return 0
+  rm -f "${regen_tmp}"
+  printf '%s\n' "${regen_log}" >&2
+  echo "bootstrap-ensure-m3-compiler-lib-sidecar: host-compile failed (exit ${regen_code}); inventory argv driver may return parseAndCompile null (#2967)" >&2
+  if [[ ! -f "${blob}" || ! -s "${blob}" ]] && [[ -f "${prelinked_lib}" && -s "${prelinked_lib}" ]]; then
+    cp -f "${prelinked_lib}" "${blob}"
+    chmod +x "${blob}"
+    if [[ -f "${root}/prelinked/bootstrap-gen0/.m3_compiler_lib_sidecar.sha" ]]; then
+      cp -f "${root}/prelinked/bootstrap-gen0/.m3_compiler_lib_sidecar.sha" "${stamp}"
+    fi
+    echo "bootstrap-ensure-m3-compiler-lib-sidecar: restored prelinked ${blob} after host-compile failure (#2967)" >&2
+    return 0
+  fi
+  echo "bootstrap-ensure-m3-compiler-lib-sidecar: hint: refresh prelinked/bootstrap-gen0 after spine entry changes, or fix Zend spine AOT (VM/JIT)" >&2
+  return 1
 }
 
 # Copy committed gen-0 argv driver to inventory outputs (mitigates Zend SIGSEGV on bin/compile.php — #2930).

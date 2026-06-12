@@ -41,8 +41,59 @@ function phpc_compile_is_user_script_aot(string $normalized): bool
     return true;
 }
 
+function phpc_compile_ensure_repo_root_env(): void
+{
+    $existing = getenv('PHP_COMPILER_REPO_ROOT');
+    if (is_string($existing) && '' !== $existing && is_readable($existing.'/bin/compile.php')) {
+        return;
+    }
+    global $argv;
+    /** @var list<string> $candidates */
+    $candidates = [];
+    $cwd = getcwd();
+    if (is_string($cwd) && '' !== $cwd) {
+        $candidates[] = $cwd;
+    }
+    if (isset($argv) && is_array($argv)) {
+        foreach ($argv as $arg) {
+            if (!is_string($arg)) {
+                continue;
+            }
+            $norm = str_replace('\\', '/', $arg);
+            if ('-' === $norm || !str_ends_with($norm, '.php') || !is_readable($arg)) {
+                continue;
+            }
+            $candidates[] = dirname($arg);
+        }
+    }
+    $candidates[] = dirname(__DIR__);
+    $seen = [];
+    foreach ($candidates as $start) {
+        if (!is_string($start) || '' === $start || isset($seen[$start])) {
+            continue;
+        }
+        $seen[$start] = true;
+        $dir = str_replace('\\', '/', $start);
+        for ($depth = 0; $depth < 16; ++$depth) {
+            if (is_readable($dir.'/bin/compile.php') && is_readable($dir.'/lib/JIT.php')) {
+                $real = realpath($dir);
+                $root = false !== $real ? $real : $dir;
+                putenv('PHP_COMPILER_REPO_ROOT='.$root);
+
+                return;
+            }
+            $parent = dirname($dir);
+            if ($parent === $dir) {
+                break;
+            }
+            $dir = $parent;
+        }
+    }
+}
+
 function run(string $filename, string $code, array $options): void
 {
+    phpc_compile_ensure_repo_root_env();
     $normalized = '-' !== $filename ? str_replace('\\', '/', $filename) : '';
     if (\class_exists(\PHPCompiler\JIT\Progress::class, false)) {
         \PHPCompiler\JIT\Progress::notePhase('bin_compile_run_begin');

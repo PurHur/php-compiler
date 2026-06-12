@@ -45,6 +45,15 @@ bootstrap_native_compile_output_ok() {
   grep -qE 'helloworld_compile_smoke: compile OK|compile_smoke_m3_emit: compile OK|bootstrap_loop_compile_smoke: gen-2 compile OK' <<< "${compile_out}"
 }
 
+# Inventory argv emit must materialize a real AOT binary (not stdout-only phantom success — #3046).
+bootstrap_inventory_argv_emit_output_ok() {
+  local out=$1
+  local out_bytes
+  [[ -f "${out}" && -x "${out}" ]] || return 1
+  out_bytes="$(wc -c <"${out}" 2>/dev/null || echo 0)"
+  [[ "${out_bytes}" =~ ^[0-9]+$ ]] && (( out_bytes > 0 ))
+}
+
 # Prelinked gen-0 argv drivers bake absolute /compiler/build/.m3_* sidecar paths at link time.
 # On harness hosts (repo not mounted at /compiler) __compiler_copy misses; recover from local blobs (#3046, #1492).
 bootstrap_gen0_sidecar_blob_for_entry() {
@@ -141,8 +150,14 @@ bootstrap_inventory_argv_driver_smoke() {
   )"
   smoke_code=$?
   set -e
-  if [[ "${smoke_code}" -eq 0 && -x "${smoke_out}" ]] && bootstrap_native_compile_output_ok "${smoke_log}"; then
+  if [[ "${smoke_code}" -eq 0 ]] \
+    && bootstrap_native_compile_output_ok "${smoke_log}" \
+    && bootstrap_inventory_argv_emit_output_ok "${smoke_out}"; then
     return 0
+  fi
+  if [[ "${smoke_code}" -eq 0 ]] && bootstrap_native_compile_output_ok "${smoke_log}" \
+    && ! bootstrap_inventory_argv_emit_output_ok "${smoke_out}"; then
+    echo "bootstrap-inventory-argv-driver-smoke: ${driver} exited 0 with compile OK but missing/non-empty ${smoke_out} (phantom emit — #3046)" >&2
   fi
   printf '%s\n' "${smoke_log}" >&2
   return 1
@@ -201,18 +216,15 @@ bootstrap_ensure_inventory_argv_driver() {
     return 1
   fi
   echo "bootstrap-ensure-inventory-argv-driver: building inventory argv driver ${out} (#3012)" >&2
-  if [[ "${BOOTSTRAP_INVENTORY_DRIVER_USE_PRELINKED:-}" == "" ]] \
-    && declare -F bootstrap_gen0_prelinked_driver_ready >/dev/null 2>&1 \
-    && bootstrap_gen0_prelinked_driver_ready; then
-    export BOOTSTRAP_INVENTORY_DRIVER_USE_PRELINKED=1
-  fi
   if ! declare -F bootstrap_gen0_seed_prelinked_m3_sidecars >/dev/null 2>&1; then
     # shellcheck source=bootstrap-gen0-install-prelinked-driver.sh
     source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/bootstrap-gen0-install-prelinked-driver.sh"
   fi
   bootstrap_gen0_seed_prelinked_m3_sidecars 2>/dev/null || true
   bootstrap_ensure_m3_compiler_lib_sidecar 2>/dev/null || true
-  if ! env PHP_COMPILER_M3_SOURCE="${root}/bin/compile.php" PHP_COMPILER_M3_OUT="${out}" \
+  # Prefer Zend inventory emit; stale prelinked gen-0 can print compile OK without writing -o (#3046).
+  if ! env BOOTSTRAP_INVENTORY_DRIVER_USE_PRELINKED=0 \
+    PHP_COMPILER_M3_SOURCE="${root}/bin/compile.php" PHP_COMPILER_M3_OUT="${out}" \
     "${root}/script/bootstrap-selfhost-helloworld-compile-bin.sh"; then
     local prelink="${root}/prelinked/bootstrap-gen0/bin-compile-aot"
     if [[ -x "${prelink}" ]]; then
@@ -231,8 +243,18 @@ bootstrap_ensure_inventory_argv_driver() {
     return 1
   fi
   bootstrap_ensure_m3_compiler_lib_sidecar 2>/dev/null || true
+  if [[ -x "${out}" && -s "${out}" ]]; then
+    cp -f "${out}" "${root}/build/.m3_bin_compile_aot_blob"
+    chmod +x "${root}/build/.m3_bin_compile_aot_blob"
+  fi
   if ! bootstrap_is_inventory_bin_compile_argv_driver "${out}"; then
     echo "bootstrap-ensure-inventory-argv-driver: ${out} is not a verified inventory argv driver" >&2
+    return 1
+  fi
+  if ! bootstrap_inventory_argv_driver_smoke "${out}" \
+    || ! bootstrap_inventory_argv_driver_m4_smoke "${out}"; then
+    echo "bootstrap-ensure-inventory-argv-driver: ${out} failed post-build inventory smoke (phantom emit? rebuild via Zend — #3046)" >&2
+    rm -f "${out}" "${root}/build/.m3_bin_compile_aot_blob"
     return 1
   fi
 }
@@ -358,7 +380,7 @@ bootstrap_compile_invoke() {
     last_code=$?
     set -e
     printf '%s\n' "${invoke_out}"
-    if [[ "${last_code}" -eq 0 && -x "${out}" ]]; then
+    if [[ "${last_code}" -eq 0 ]] && bootstrap_inventory_argv_emit_output_ok "${out}"; then
       if bootstrap_is_inventory_bin_compile_argv_driver "${BOOTSTRAP_COMPILE_DRIVER}"; then
         if ! bootstrap_native_compile_output_ok "${invoke_out}"; then
           echo "bootstrap-compile-invoke: inventory driver exited 0 but missing compile OK line (#3046)" >&2
