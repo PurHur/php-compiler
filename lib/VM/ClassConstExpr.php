@@ -143,7 +143,8 @@ final class ClassConstExpr
     ): void {
         $className = $frame->scope[$op->arg2]->toString();
         $lcClass = self::resolveClassName($context, $entry, $className);
-        $constName = strtolower($frame->scope[$op->arg3]->toString());
+        $constNameRaw = $frame->scope[$op->arg3]->toString();
+        $constName = strtolower($constNameRaw);
 
         if ($lcClass === strtolower($entry->name)) {
             self::fetchFromDeclaringClass($frame, $op, $entry, $constName);
@@ -154,9 +155,21 @@ final class ClassConstExpr
         if (!isset($context->classes[$lcClass])) {
             if ('self' !== strtolower($className) && 'static' !== strtolower($className)) {
                 $context->autoloadClass($className);
+                if (!isset($context->classes[$lcClass]) && !str_contains($className, '\\')) {
+                    $qualified = self::qualifyClassNameForConstFetch($className, $entry);
+                    if ($qualified !== $className) {
+                        $context->autoloadClass($qualified);
+                        $lcClass = strtolower($qualified);
+                    }
+                }
             }
         }
         if (!isset($context->classes[$lcClass])) {
+            foreach (self::classNameCandidatesForConstFetch($className, $entry) as $candidate) {
+                if (self::tryFetchNativePhpClassConstant($candidate, $constNameRaw, $frame->scope[$op->arg1])) {
+                    return;
+                }
+            }
             throw new \LogicException("Unknown class for constant fetch: {$className}");
         }
 
@@ -264,6 +277,124 @@ final class ClassConstExpr
             return;
         }
         $frame->scope[$op->arg1]->copyFrom($elem->resolveIndirect());
+    }
+
+    /**
+     * @return list<string>
+     */
+    private static function classNameCandidatesForConstFetch(string $className, ClassEntry $entry): array
+    {
+        $candidates = [ltrim($className, '\\')];
+        if (!str_contains($className, '\\')) {
+            $qualified = self::qualifyClassNameForConstFetch($className, $entry);
+            if ($qualified !== $className) {
+                $candidates[] = $qualified;
+            }
+        }
+
+        return array_values(array_unique($candidates));
+    }
+
+    private static function qualifyClassNameForConstFetch(string $className, ClassEntry $entry): string
+    {
+        if ('' === $className || str_contains($className, '\\')) {
+            return ltrim($className, '\\');
+        }
+        $declaring = ltrim($entry->name, '\\');
+        $nsPos = strrpos($declaring, '\\');
+        if (false === $nsPos) {
+            return $className;
+        }
+
+        return substr($declaring, 0, $nsPos).'\\'.$className;
+    }
+
+    /**
+     * Fold class constants from already-loaded native PHP classes (bootstrap spine; #6221).
+     */
+    private static function tryFetchNativePhpClassConstant(
+        string $className,
+        string $constName,
+        Variable $dest
+    ): bool {
+        $fqcn = ltrim($className, '\\');
+        if ('class' === strtolower($constName)) {
+            if (!class_exists($fqcn, true)) {
+                return false;
+            }
+            $dest->string($fqcn);
+
+            return true;
+        }
+        if (!class_exists($fqcn, true)) {
+            return false;
+        }
+        try {
+            $ref = new \ReflectionClassConstant($fqcn, $constName);
+        } catch (\ReflectionException) {
+            return false;
+        }
+        $raw = $ref->getValue();
+        $value = self::variableFromNativePhpValue($raw);
+        if (null === $value) {
+            return false;
+        }
+        $dest->copyFrom($value);
+
+        return true;
+    }
+
+    /**
+     * @return Variable|null
+     */
+    private static function variableFromNativePhpValue(mixed $raw): ?Variable
+    {
+        if (\is_int($raw)) {
+            $value = new Variable();
+            $value->int($raw);
+
+            return $value;
+        }
+        if (\is_bool($raw)) {
+            $value = new Variable();
+            $value->bool($raw);
+
+            return $value;
+        }
+        if (\is_float($raw)) {
+            $value = new Variable();
+            $value->float($raw);
+
+            return $value;
+        }
+        if (\is_string($raw)) {
+            $value = new Variable();
+            $value->string($raw);
+
+            return $value;
+        }
+        if (\is_array($raw)) {
+            $table = new HashTable();
+            foreach ($raw as $key => $item) {
+                $elem = self::variableFromNativePhpValue($item);
+                if (null === $elem) {
+                    return null;
+                }
+                if (\is_int($key)) {
+                    $table->updateIndex($key, $elem);
+                } elseif (\is_string($key)) {
+                    $table->update($key, $elem);
+                } else {
+                    return null;
+                }
+            }
+            $value = new Variable();
+            $value->array($table);
+
+            return $value;
+        }
+
+        return null;
     }
 
     private static function resolveClassName(Context $context, ClassEntry $entry, string $className): string
