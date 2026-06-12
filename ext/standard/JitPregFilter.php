@@ -23,25 +23,33 @@ final class JitPregFilter
         Context $context,
         Value $pattern,
         Value $replacement,
-        Variable $subject
+        Variable $subject,
+        ?Value $limit = null
     ): Value {
         StringPregMatch::ensureLinked($context);
+        $limitVal = $limit ?? self::unlimitedLimit($context);
 
         if (Variable::TYPE_STRING === $subject->type) {
-            return self::filterString($context, $pattern, $replacement, $subject->value);
+            return self::filterString($context, $pattern, $replacement, $subject->value, $limitVal);
         }
 
         $ht = ArrayBuiltinHelper::loadHashTable($context, $subject);
-        $resultHt = self::buildFilterHashTable($context, $ht, $pattern, $replacement);
+        $resultHt = self::buildFilterHashTable($context, $ht, $pattern, $replacement, $limitVal);
 
         return self::wrapHashTableResult($context, $resultHt);
+    }
+
+    private static function unlimitedLimit(Context $context): Value
+    {
+        return $context->getTypeFromString('int64')->constInt(-1, false);
     }
 
     private static function filterString(
         Context $context,
         Value $pattern,
         Value $replacement,
-        Value $subjectStr
+        Value $subjectStr,
+        Value $limit
     ): Value {
         $strPtrTy = $context->getTypeFromString('__string__*');
         $i64 = $context->getTypeFromString('int64');
@@ -76,7 +84,7 @@ final class JitPregFilter
             $pattern,
             $replacement,
             $subjectStr,
-            $context->getTypeFromString('int64')->constInt(-1, false)
+            $limit
         );
         $replaceFailed = $context->builder->icmp(Builder::INT_EQ, $replaced, $strPtrTy->constNull());
         $context->builder->branchIf($replaceFailed, $failBlock, $okBlock);
@@ -131,7 +139,8 @@ final class JitPregFilter
         Context $context,
         Value $src,
         Value $pattern,
-        Value $replacement
+        Value $replacement,
+        Value $limit
     ): Value {
         $id = (string) (++self::$blockSerial);
         $map = $context->structFieldMap['__hashtable__'];
@@ -222,7 +231,7 @@ final class JitPregFilter
             $pattern,
             $replacement,
             $subject,
-            $context->getTypeFromString('int64')->constInt(-1, false)
+            $limit
         );
         $replaceFailed = $context->builder->icmp(Builder::INT_EQ, $replaced, $strPtrTy->constNull());
         $storeBlock = BasicBlockHelper::append($context, 'preg_filter_append_store_'.$id);
