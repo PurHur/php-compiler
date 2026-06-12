@@ -753,6 +753,7 @@ class Module extends ModuleAbstract
             new localtime(),
             new idate(),
             new date_sun_info(),
+            new date_interval_format(),
             new date_sunrise(),
             new date_sunset(),
             new sleep(),
