@@ -6456,6 +6456,8 @@ restart:
             return $this->dispatchVmCompileError($e, $callerFrame);
         } catch (\ReflectionException $e) {
             return $this->dispatchVmReflectionException($e, $callerFrame);
+        } catch (\JsonException $e) {
+            return $this->dispatchVmJsonException($e, $callerFrame);
         } catch (VM\NativeDateInvalidTimeZoneException $e) {
             return $this->dispatchVmDateInvalidTimeZoneException($e, $callerFrame);
         } catch (VM\NativeDateMalformedStringException $e) {
@@ -6730,6 +6732,25 @@ restart:
     {
         [$file, $line] = VM\ExceptionSupport::userFatalSite($frame);
         $thrown = VM\BuiltinExceptionSupport::materializeReflectionException(
+            $this->context,
+            $error->getMessage(),
+            $file,
+            $line
+        );
+        $catchFrame = $this->findCatchFrameForThrow($frame, $thrown);
+        if (null !== $catchFrame) {
+            return $catchFrame;
+        }
+        $this->raiseUncaughtException($thrown);
+
+        return null;
+    }
+
+    /** Bridge native JsonException from ext/json builtins into user catch handlers (#3281). */
+    private function dispatchVmJsonException(\JsonException $error, Frame $frame): ?Frame
+    {
+        [$file, $line] = VM\ExceptionSupport::userFatalSite($frame);
+        $thrown = VM\BuiltinExceptionSupport::materializeJsonException(
             $this->context,
             $error->getMessage(),
             $file,

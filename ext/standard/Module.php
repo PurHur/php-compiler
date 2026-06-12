@@ -99,7 +99,7 @@ class Module extends ModuleAbstract
             'ZLIB_ENCODING_RAW' => -15,
             'ZLIB_ENCODING_DEFLATE' => 15,
             'ZLIB_ENCODING_GZIP' => 31,
-        ] + VmStreamSupports::constants() + VmImage::constants() as $name => $value) {
+        ] + VmStreamSupports::constants() + VmImage::constants() + VmJsonFlags::constants() as $name => $value) {
             $var = new VM\Variable();
             $var->int($value);
             $runtime->vmContext->defineConstant($name, $var);
