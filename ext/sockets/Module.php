@@ -26,10 +26,8 @@ class Module extends ModuleAbstract
 
         $fns = [
             new socket_atmark(),
+            new socket_import_stream(),
         ];
-        if (\function_exists('socket_import_stream')) {
-            $fns[] = new socket_import_stream();
-        }
 
         return $fns;
     }

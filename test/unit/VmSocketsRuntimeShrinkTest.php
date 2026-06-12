@@ -25,7 +25,7 @@ final class VmSocketsRuntimeShrinkTest extends TestCase
     {
         $source = (string) file_get_contents(__DIR__.'/../../ext/sockets/socket_atmark.php');
         $this->assertStringContainsString('BuiltinExecute::writeReturn', $source);
-        $this->assertStringContainsString('VmSockets::atmark', $source);
+        $this->assertStringContainsString('VmSockets::atmarkForObject', $source);
         $this->assertStringNotContainsString('VM delegates to host', $source);
     }
 

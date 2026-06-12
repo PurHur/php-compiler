@@ -35,8 +35,8 @@ final class socket_atmark extends Internal
             );
         }
 
-        $hostSocket = VmSocketArg::requireHostSocket($frame->calledArgs[0], 'socket_atmark', 1);
-        $atmark = VmSockets::atmark($hostSocket);
+        $object = VmSocketArg::requireSocketObject($frame->calledArgs[0], 'socket_atmark', 1);
+        $atmark = VmSockets::atmarkForObject($object);
         BuiltinExecute::writeReturn(
             $frame,
             static fn (Variable $ret) => $ret->bool($atmark)
