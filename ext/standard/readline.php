@@ -8,7 +8,6 @@ use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\Variable as JITVariable;
-use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
 
 /**
@@ -35,10 +34,7 @@ final class readline extends Internal
         }
         $prompt = null;
         if (1 === $argc) {
-            $v = $frame->calledArgs[0]->resolveIndirect();
-            if (Variable::TYPE_NULL !== $v->type) {
-                $prompt = VmString::coerceStringBuiltinArg($frame->calledArgs[0], 'readline', 0, 'prompt');
-            }
+            $prompt = VmString::coerceNullableStringBuiltinArg($frame->calledArgs[0], 'readline', 0, 'prompt');
         }
         $line = VmReadline::read($prompt);
         if (false === $line) {
