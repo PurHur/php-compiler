@@ -10,7 +10,6 @@ use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitLongArg;
 use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\Variable as JITVariable;
-use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
 
 /** rewinddir() — VM via VmDir; JIT/AOT via __compiler_rewinddir (issue #3235). */
@@ -21,8 +20,7 @@ final class rewinddir extends Internal
         if (1 !== \count($frame->calledArgs)) {
             throw new \LogicException('rewinddir() requires exactly one argument in this compiler build');
         }
-        $handleVar = $frame->calledArgs[0]->resolveIndirect();
-        $handle = VmStreamArg::requireStreamHandle($handleVar, 'rewinddir');
+        $handle = VmDirArg::requireDirHandle($frame->calledArgs[0], 'rewinddir');
         VmDir::rewinddir($handle);
     }
 

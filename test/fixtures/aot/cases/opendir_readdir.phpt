@@ -5,12 +5,10 @@ AOT: opendir/readdir/closedir (issue #3235)
 $dir = 'test/fixtures/aot/cases';
 $dh = opendir($dir);
 $count = 0;
-while (true) {
-    $entry = readdir($dh);
-    if (gettype($entry) !== 'string') {
-        break;
-    }
+$entry = readdir($dh);
+while ($entry !== false) {
     $count++;
+    $entry = readdir($dh);
 }
 closedir($dh);
 echo $count > 0 ? 'ok' : 'empty';

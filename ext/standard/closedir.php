@@ -10,7 +10,6 @@ use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitLongArg;
 use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\Variable as JITVariable;
-use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
 
 /** closedir() — VM via VmDir; JIT/AOT via __compiler_closedir (issue #3235). */
@@ -21,8 +20,7 @@ final class closedir extends Internal
         if (1 !== \count($frame->calledArgs)) {
             throw new \LogicException('closedir() requires exactly one argument in this compiler build');
         }
-        $handleVar = $frame->calledArgs[0]->resolveIndirect();
-        $handle = VmStreamArg::requireStreamHandle($handleVar, 'closedir');
+        $handle = VmDirArg::requireDirHandle($frame->calledArgs[0], 'closedir');
         VmDir::closedir($handle);
     }
 

@@ -9,7 +9,6 @@ use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitLongArg;
 use PHPCompiler\JIT\Variable as JITVariable;
-use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
 
 /** readdir() — VM via VmDir; JIT/AOT via __compiler_readdir (issue #3235). */
@@ -20,8 +19,7 @@ final class readdir extends Internal
         if (1 !== \count($frame->calledArgs)) {
             throw new \LogicException('readdir() requires exactly one argument in this compiler build');
         }
-        $handleVar = $frame->calledArgs[0]->resolveIndirect();
-        $handle = VmStreamArg::requireStreamHandle($handleVar, 'readdir');
+        $handle = VmDirArg::requireDirHandle($frame->calledArgs[0], 'readdir');
         if (null === $frame->returnVar) {
             return;
         }
