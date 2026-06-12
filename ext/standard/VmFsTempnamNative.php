@@ -28,10 +28,12 @@ final class VmFsTempnamNative
             return false;
         }
         try {
-            $buf = $ffi->new('char['.\strlen($template).']', false);
-            for ($i = 0, $n = \strlen($template); $i < $n; ++$i) {
+            $len = \strlen($template);
+            $buf = $ffi->new('char['.($len + 1).']', false);
+            for ($i = 0; $i < $len; ++$i) {
                 $buf[$i] = $template[$i];
             }
+            $buf[$len] = "\0";
             $fd = (int) $ffi->mkstemp(\FFI::addr($buf[0]));
             if ($fd < 0) {
                 return false;
