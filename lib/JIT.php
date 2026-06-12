@@ -69,6 +69,10 @@ class JIT {
     public function compile(Block $block): PHPLLVM\Value {
         JIT\Progress::noteFunction('jit_compile_begin');
         $this->context->resetScriptLocalBindings();
+        $mainPath = $block->scriptPath();
+        if ('' !== $mainPath) {
+            $this->context->recordJitIncludedFile($mainPath);
+        }
         $this->registeredGlobalConstDeclareOpcodes = new \SplObjectStorage();
         if ($this->shouldUseM3EmitTuNativeBridge() && $this->isM3EmitTuScriptMain($block)) {
             // Inventory emit-helper reuses thin TU spine (#3070); argv-only inventory keeps compile_driver {main}.

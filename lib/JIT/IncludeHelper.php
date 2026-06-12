@@ -86,6 +86,8 @@ final class IncludeHelper
             throw new \LogicException('include file not found for JIT/AOT: '.$path);
         }
 
+        $context->recordJitIncludedFile($path);
+
         $included = $context->runtime->parseAndCompileFile($path);
         if (null === $included) {
             $diag = $context->runtime->compiler->getCompileAbortDetail();

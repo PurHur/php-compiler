@@ -32,6 +32,9 @@ class Context {
     public array $splAutoloadCallbacks = [];
     /** @var array<string, true> */
     private array $loadedCompileUnits = [];
+
+    /** @var list<string> absolute paths from main script + include/require (issue #3315). */
+    private array $includedFiles = [];
     private ?RunStackEntry $runStack = null;
     public array $constants = [];
 
@@ -403,6 +406,27 @@ class Context {
         if ('' !== $normalized) {
             $this->loadedCompileUnits[$normalized] = true;
         }
+    }
+
+    /**
+     * Record a successfully loaded compile unit for get_included_files() (#3315).
+     *
+     * php-src: zend_execute_scripts / zend_execute — included_files list
+     */
+    public function recordIncludedFile(string $path): void
+    {
+        $normalized = ScriptStack::normalize($path);
+        if ('' !== $normalized) {
+            $this->includedFiles[] = $normalized;
+        }
+    }
+
+    /**
+     * @return list<string> absolute paths in load order
+     */
+    public function includedFiles(): array
+    {
+        return $this->includedFiles;
     }
 
   /** Try spl_autoload_register() callbacks, then PSR-4 project autoloaders (#155, #1369). */

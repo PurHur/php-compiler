@@ -1821,6 +1821,7 @@ class VM {
             return;
         }
         $this->context->markCompileUnitLoaded($resolved);
+        $this->context->recordIncludedFile($resolved);
 
         $savedStack = $this->context->swapRunStack(null);
         try {
@@ -1951,6 +1952,7 @@ class VM {
     {
         if ('' !== $frame->scriptPath) {
             $this->context->scriptStack->push($frame->scriptPath);
+            $this->context->recordIncludedFile($frame->scriptPath);
         }
     }
 
@@ -5272,6 +5274,7 @@ restart:
                     if ($once) {
                         $this->context->markCompileUnitLoaded($resolved);
                     }
+                    $this->context->recordIncludedFile($resolved);
                     $this->context->scriptStack->push($resolved);
                     $parsed = $this->context->runtime->parseAndCompileFile($resolved);
                     $new = $parsed->getFrame($this->context, $frame);

@@ -133,6 +133,23 @@ final class VmReflection
     }
 
     /**
+     * get_included_files() / get_required_files() — loaded compile units (#3315).
+     *
+     * php-src: ext/standard/basic_functions.c — PHP_FUNCTION(get_included_files)
+     */
+    public static function includedFilesTable(Context $ctx): \PHPCompiler\VM\HashTable
+    {
+        $result = new \PHPCompiler\VM\HashTable();
+        foreach ($ctx->includedFiles() as $path) {
+            $value = new Variable();
+            $value->string($path);
+            $result->append($value);
+        }
+
+        return $result;
+    }
+
+    /**
      * get_declared_classes() — numerically indexed class name list (issue #3128).
      *
      * php-src: ext/standard/basic_functions.c — PHP_FUNCTION(get_declared_classes)

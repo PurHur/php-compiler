@@ -265,12 +265,24 @@ class Context {
      */
     public array $jitUndeclaredInstancePropertyWrites = [];
 
+    /** @var list<string> compile-time included paths for get_included_files() (#3315) */
+    public array $jitIncludedFiles = [];
+
     /** Clear per-script local name/ref bindings before lowering a new {main} TU (#4763). */
     public function resetScriptLocalBindings(): void
     {
         $this->namedVariableBindings = [];
         $this->refAliasNames = [];
         $this->jitUndeclaredInstancePropertyWrites = [];
+        $this->jitIncludedFiles = [];
+    }
+
+    public function recordJitIncludedFile(string $path): void
+    {
+        $normalized = \PHPCompiler\VM\ScriptStack::normalize($path);
+        if ('' !== $normalized) {
+            $this->jitIncludedFiles[] = $normalized;
+        }
     }
 
     /**
