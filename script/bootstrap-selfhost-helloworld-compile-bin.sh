@@ -73,10 +73,19 @@ if [[ "${SOURCE_NORM}" == "${ROOT}/bin/compile.php" ]]; then
     echo "bootstrap-selfhost-helloworld-compile-bin: OK ${AOT_OUT} (prelinked inventory argv driver; SSOT ${INVENTORY_ARGV}; #2930)"
     exit 0
   fi
-  cp -f "${AOT_OUT}" "${EMIT_HELPER}"
-  cp -f "${AOT_OUT}" "${ROOT}/build/.m3_bin_compile_aot_blob"
-  cp -f "${AOT_OUT}" "${INVENTORY_ARGV}"
-  chmod +x "${EMIT_HELPER}" "${AOT_OUT}" "${INVENTORY_ARGV}" "${ROOT}/build/.m3_bin_compile_aot_blob"
+  if [[ -n "${EMIT_HELPER}" && "${EMIT_HELPER}" != "${AOT_OUT}" ]]; then
+    cp -f "${AOT_OUT}" "${EMIT_HELPER}"
+    chmod +x "${EMIT_HELPER}"
+  fi
+  if [[ "${ROOT}/build/.m3_bin_compile_aot_blob" != "${AOT_OUT}" ]]; then
+    cp -f "${AOT_OUT}" "${ROOT}/build/.m3_bin_compile_aot_blob"
+    chmod +x "${ROOT}/build/.m3_bin_compile_aot_blob"
+  fi
+  if [[ -n "${INVENTORY_ARGV}" && "${INVENTORY_ARGV}" != "${AOT_OUT}" ]]; then
+    cp -f "${AOT_OUT}" "${INVENTORY_ARGV}"
+    chmod +x "${INVENTORY_ARGV}"
+  fi
+  chmod +x "${AOT_OUT}"
   echo "bootstrap-selfhost-helloworld-compile-bin: OK ${AOT_OUT} (inventory bin/compile.php argv driver; SSOT ${INVENTORY_ARGV})"
   exit 0
 fi

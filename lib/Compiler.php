@@ -464,6 +464,7 @@ class Compiler {
         if ([] !== $script->functions || $this->emitSmokeScriptHasClassLike($script)) {
             $this->seen = new SplObjectStorage;
         }
+        $this->ternaryMergeVarSlots = new SplObjectStorage;
         $block = $this->compileCfgBlock($script->main->cfg, $script->main->params, $script->main);
         $this->seen = null;
         if (null === $block && null !== $this->compileAbortDetail && '' !== $this->compileAbortDetail) {
