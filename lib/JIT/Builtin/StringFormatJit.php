@@ -41,6 +41,7 @@ final class StringFormatJit
         '__phpc_fmt_append_decimal_ll',
         '__phpc_fmt_append_float',
         '__phpc_fmt_append_spec',
+        '__phpc_fmt_append_spec_snprintf',
         '__compiler_sprintf',
         '__compiler_printf',
         '__compiler_number_format',
@@ -53,9 +54,15 @@ final class StringFormatJit
         self::ensureRuntimeHelpers($context);
 
         $probe = $context->module->getNamedFunction('__compiler_sprintf');
-        if (null !== $probe && $probe->countBasicBlocks() > 0) {
+        $snprintfSpec = $context->module->getNamedFunction('__phpc_fmt_append_spec_snprintf');
+        if (
+            null !== $probe
+            && $probe->countBasicBlocks() > 0
+            && null !== $snprintfSpec
+            && $snprintfSpec->countBasicBlocks() > 0
+        ) {
             $context->registerFunction('__compiler_sprintf', $probe);
-            foreach (['__compiler_printf', '__compiler_number_format'] as $name) {
+            foreach (['__compiler_printf', '__compiler_number_format', '__phpc_fmt_append_spec_snprintf'] as $name) {
                 $existing = $context->module->getNamedFunction($name);
                 if (null !== $existing) {
                     $context->registerFunction($name, $existing);
@@ -85,6 +92,7 @@ final class StringFormatJit
         self::implementIfMissing($context, '__phpc_fmt_append_decimal_ll', self::emitAppendDecimalLl(...));
         self::implementIfMissing($context, '__phpc_fmt_append_float', self::emitAppendFloat(...));
         self::implementIfMissing($context, '__phpc_fmt_append_spec', self::emitAppendSpec(...));
+        self::implementIfMissing($context, '__phpc_fmt_append_spec_snprintf', self::emitAppendSpecSnprintf(...));
         self::implementIfMissing($context, '__compiler_sprintf', self::emitCompilerSprintf(...));
         self::implementIfMissing($context, '__compiler_printf', self::emitCompilerPrintf(...));
         self::implementIfMissing($context, '__compiler_number_format', self::emitCompilerNumberFormat(...));
@@ -170,6 +178,10 @@ final class StringFormatJit
                 $name,
                 $context->context->functionType($void, false, $i8p, $sizeTp, $sizeT, $valuePtr, $i8)
             ),
+            '__phpc_fmt_append_spec_snprintf' => $context->module->addFunction(
+                $name,
+                $context->context->functionType($void, false, $i8p, $sizeTp, $sizeT, $valuePtr, $i8)
+            ),
             '__compiler_sprintf' => $context->module->addFunction(
                 $name,
                 $context->context->functionType($strPtr, false, $strPtr, $i64, $valuePtr)
@@ -198,6 +210,7 @@ final class StringFormatJit
         foreach (
             [
                 ['strlen', $sizeT, [$i8p]],
+                ['snprintf', $i32, [$i8p, $sizeT, $i8p]],
                 ['strtod', $dbl, [$i8p, $i8pp]],
                 ['strtoll', $i64, [$i8p, $i8pp, $i32]],
                 ['isnan', $i32, [$dbl]],
@@ -926,12 +939,21 @@ final class StringFormatJit
         $caseS = $fn->appendBasicBlock('spec_s');
         $caseD = $fn->appendBasicBlock('spec_d');
         $caseF = $fn->appendBasicBlock('spec_f');
-        $switch = $context->builder->branchSwitch($spec32, $defaultBb, 3);
+        $caseSnprintf = $fn->appendBasicBlock('spec_snprintf');
+        $switch = $context->builder->branchSwitch($spec32, $defaultBb, 4);
         $switch->addCase($i32->constInt(ord('s'), false), $caseS);
         $switch->addCase($i32->constInt(ord('d'), false), $caseD);
         $switch->addCase($i32->constInt(ord('f'), false), $caseF);
+        foreach (['b', 'x', 'X', 'o', 'u', 'c', 'e', 'E', 'g', 'G'] as $snprintfSpec) {
+            $switch->addCase($i32->constInt(ord($snprintfSpec), false), $caseSnprintf);
+        }
 
         $context->builder->positionAtEnd($defaultBb);
+        $context->builder->returnVoid();
+
+        $appendSnprintf = $context->lookupFunction('__phpc_fmt_append_spec_snprintf');
+        $context->builder->positionAtEnd($caseSnprintf);
+        $context->builder->call($appendSnprintf, $buf, $posPtr, $cap, $valuePtr, $spec);
         $context->builder->returnVoid();
 
         $context->builder->positionAtEnd($caseS);
@@ -1074,6 +1096,187 @@ final class StringFormatJit
         $context->builder->branch($fDone);
 
         $context->builder->positionAtEnd($fDone);
+        $context->builder->returnVoid();
+    }
+
+    /**
+     * Extended sprintf conversions via libc snprintf (%b %x %o %u %c %e %g, issue #4156).
+     */
+    private static function emitAppendSpecSnprintf(Context $context, LlvmFunction $fn): void
+    {
+        $entry = $fn->appendBasicBlock('entry');
+        $context->builder->positionAtEnd($entry);
+
+        $i8 = $context->getTypeFromString('int8');
+        $i32 = $context->getTypeFromString('int32');
+        $i64 = $context->getTypeFromString('int64');
+        $dbl = $context->getTypeFromString('double');
+        $i8p = $context->getTypeFromString('int8*');
+        $i8pp = $i8p->pointerType(0);
+        $sizeT = $context->getTypeFromString('size_t');
+
+        $buf = $fn->getParam(0);
+        $posPtr = $fn->getParam(1);
+        $cap = $fn->getParam(2);
+        $valuePtr = $fn->getParam(3);
+        $spec = $fn->getParam(4);
+
+        $appendStr = $context->lookupFunction('__phpc_fmt_append_str');
+        $snprintfFn = $context->lookupFunction('snprintf');
+        $strlenFn = $context->lookupFunction('strlen');
+        $readLong = $context->lookupFunction('__value__readLong');
+        $readDouble = $context->lookupFunction('__value__readDouble');
+        $strtollFn = $context->lookupFunction('strtoll');
+        $strtodFn = $context->lookupFunction('strtod');
+        $nullPtr = $i8pp->constNull();
+        $tmpCap = $sizeT->constInt(64, false);
+        $tmpSlot = $context->builder->alloca($i8->arrayType(64), 1, 'spec_snprintf_tmp');
+        $tmp = $context->builder->pointerCast($tmpSlot, $i8p);
+
+        $spec32 = $context->builder->zExt($spec, $i32);
+        $isFloatSpec = $context->builder->or(
+            $context->builder->icmp(Builder::INT_EQ, $spec32, $i32->constInt(ord('e'), false)),
+            $context->builder->or(
+                $context->builder->icmp(Builder::INT_EQ, $spec32, $i32->constInt(ord('E'), false)),
+                $context->builder->or(
+                    $context->builder->icmp(Builder::INT_EQ, $spec32, $i32->constInt(ord('g'), false)),
+                    $context->builder->icmp(Builder::INT_EQ, $spec32, $i32->constInt(ord('G'), false))
+                )
+            )
+        );
+
+        $kind = self::valueTypeKind($context, $valuePtr);
+        $intValSlot = BasicBlockHelper::entryAlloca($context, $i64);
+        $floatValSlot = BasicBlockHelper::entryAlloca($context, $dbl);
+        $zeroDbl = $dbl->constReal(0.0);
+
+        $intPath = $fn->appendBasicBlock('spec_snprintf_int');
+        $floatPath = $fn->appendBasicBlock('spec_snprintf_float');
+        $done = $fn->appendBasicBlock('spec_snprintf_done');
+        $context->builder->branchIf($isFloatSpec, $floatPath, $intPath);
+
+        $context->builder->positionAtEnd($intPath);
+        $fmtBufSlot = $context->builder->alloca($i8->arrayType(8), 1, 'spec_snprintf_fmt');
+        $fmtPtr = $context->builder->pointerCast($fmtBufSlot, $i8p);
+        $context->builder->store($i8->constInt(ord('%'), false), $context->builder->inBoundsGEP($fmtPtr, $i64->constInt(0, false)));
+        $context->builder->store($spec, $context->builder->inBoundsGEP($fmtPtr, $i64->constInt(1, false)));
+        $context->builder->store($i8->constInt(0, false), $context->builder->inBoundsGEP($fmtPtr, $i64->constInt(2, false)));
+
+        $iDefault = $fn->appendBasicBlock('spec_snprintf_i_default');
+        $iLong = $fn->appendBasicBlock('spec_snprintf_i_long');
+        $iDouble = $fn->appendBasicBlock('spec_snprintf_i_double');
+        $iNull = $fn->appendBasicBlock('spec_snprintf_i_null');
+        $iString = $fn->appendBasicBlock('spec_snprintf_i_string');
+        $iEmit = $fn->appendBasicBlock('spec_snprintf_i_emit');
+        $iSwitch = $context->builder->branchSwitch($kind, $iDefault, 5);
+        $iSwitch->addCase($i32->constInt(self::PHPC_TYPE_LONG, false), $iLong);
+        $iSwitch->addCase($i32->constInt(self::PHPC_TYPE_BOOL, false), $iLong);
+        $iSwitch->addCase($i32->constInt(self::PHPC_TYPE_DOUBLE, false), $iDouble);
+        $iSwitch->addCase($i32->constInt(self::PHPC_TYPE_NULL, false), $iNull);
+        $iSwitch->addCase($i32->constInt(self::PHPC_TYPE_STRING, false), $iString);
+
+        $context->builder->positionAtEnd($iLong);
+        $context->builder->store($context->builder->call($readLong, $valuePtr), $intValSlot);
+        $context->builder->branch($iEmit);
+
+        $context->builder->positionAtEnd($iDouble);
+        $context->builder->store(
+            $context->builder->fptosi($context->builder->call($readDouble, $valuePtr), $i64),
+            $intValSlot
+        );
+        $context->builder->branch($iEmit);
+
+        $context->builder->positionAtEnd($iNull);
+        $context->builder->store($i64->constInt(0, false), $intValSlot);
+        $context->builder->branch($iEmit);
+
+        $context->builder->positionAtEnd($iString);
+        $iStr = $context->builder->call($context->lookupFunction('__value__readString'), $valuePtr);
+        $parsed = $context->builder->call(
+            $strtollFn,
+            self::stringData($context, $iStr),
+            $nullPtr,
+            $i32->constInt(10, false)
+        );
+        $context->builder->store($parsed, $intValSlot);
+        $context->builder->branch($iEmit);
+
+        $context->builder->positionAtEnd($iDefault);
+        $context->builder->store($i64->constInt(0, false), $intValSlot);
+        $context->builder->branch($iEmit);
+
+        $context->builder->positionAtEnd($iEmit);
+        $context->builder->call(
+            $snprintfFn,
+            $tmp,
+            $tmpCap,
+            $fmtPtr,
+            $context->builder->load($intValSlot)
+        );
+        $context->builder->branch($done);
+
+        $context->builder->positionAtEnd($floatPath);
+        $fmtBufSlotF = $context->builder->alloca($i8->arrayType(8), 1, 'spec_snprintf_fmt_f');
+        $fmtPtrF = $context->builder->pointerCast($fmtBufSlotF, $i8p);
+        $context->builder->store($i8->constInt(ord('%'), false), $context->builder->inBoundsGEP($fmtPtrF, $i64->constInt(0, false)));
+        $context->builder->store($spec, $context->builder->inBoundsGEP($fmtPtrF, $i64->constInt(1, false)));
+        $context->builder->store($i8->constInt(0, false), $context->builder->inBoundsGEP($fmtPtrF, $i64->constInt(2, false)));
+
+        $fDefault = $fn->appendBasicBlock('spec_snprintf_f_default');
+        $fDouble = $fn->appendBasicBlock('spec_snprintf_f_double');
+        $fLong = $fn->appendBasicBlock('spec_snprintf_f_long');
+        $fNull = $fn->appendBasicBlock('spec_snprintf_f_null');
+        $fString = $fn->appendBasicBlock('spec_snprintf_f_string');
+        $fEmit = $fn->appendBasicBlock('spec_snprintf_f_emit');
+        $fSwitch = $context->builder->branchSwitch($kind, $fDefault, 5);
+        $fSwitch->addCase($i32->constInt(self::PHPC_TYPE_DOUBLE, false), $fDouble);
+        $fSwitch->addCase($i32->constInt(self::PHPC_TYPE_LONG, false), $fLong);
+        $fSwitch->addCase($i32->constInt(self::PHPC_TYPE_BOOL, false), $fLong);
+        $fSwitch->addCase($i32->constInt(self::PHPC_TYPE_NULL, false), $fNull);
+        $fSwitch->addCase($i32->constInt(self::PHPC_TYPE_STRING, false), $fString);
+
+        $context->builder->positionAtEnd($fDouble);
+        $context->builder->store($context->builder->call($readDouble, $valuePtr), $floatValSlot);
+        $context->builder->branch($fEmit);
+
+        $context->builder->positionAtEnd($fLong);
+        $context->builder->store(
+            $context->builder->sitofp($context->builder->call($readLong, $valuePtr), $dbl),
+            $floatValSlot
+        );
+        $context->builder->branch($fEmit);
+
+        $context->builder->positionAtEnd($fNull);
+        $context->builder->store($zeroDbl, $floatValSlot);
+        $context->builder->branch($fEmit);
+
+        $context->builder->positionAtEnd($fString);
+        $fStr = $context->builder->call($context->lookupFunction('__value__readString'), $valuePtr);
+        $parsedF = $context->builder->call(
+            $strtodFn,
+            self::stringData($context, $fStr),
+            $nullPtr
+        );
+        $context->builder->store($parsedF, $floatValSlot);
+        $context->builder->branch($fEmit);
+
+        $context->builder->positionAtEnd($fDefault);
+        $context->builder->store($zeroDbl, $floatValSlot);
+        $context->builder->branch($fEmit);
+
+        $context->builder->positionAtEnd($fEmit);
+        $context->builder->call(
+            $snprintfFn,
+            $tmp,
+            $tmpCap,
+            $fmtPtrF,
+            $context->builder->load($floatValSlot)
+        );
+        $context->builder->branch($done);
+
+        $context->builder->positionAtEnd($done);
+        $outLen = $context->builder->call($strlenFn, $tmp);
+        $context->builder->call($appendStr, $buf, $posPtr, $cap, $tmp, $outLen);
         $context->builder->returnVoid();
     }
 

@@ -14,13 +14,12 @@ namespace PHPCompiler\ext\standard;
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Context;
-use PHPCompiler\JIT\JitNativeString;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
 
 /**
- * sprintf() with format subset %s, %d, %f, %% (LLVM JIT/AOT via __compiler_sprintf).
+ * sprintf() — %s %d %f %b %x %X %o %u %c %e %E %g %G %% (LLVM JIT/AOT via __compiler_sprintf, #4156).
  */
 final class sprintf_ extends Internal
 {
@@ -53,17 +52,10 @@ final class sprintf_ extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        if (
-            2 === count($args)
-            && (
-                JITVariable::TYPE_NATIVE_LONG === $args[1]->type
-                || JITVariable::TYPE_VALUE === $args[1]->type
-                || \PHPCompiler\JIT\JitValueBox::isValueOperand($args[1])
-            )
-        ) {
-            return $context->helper->loadValue(JitNativeString::coerce($context, $args[1]));
-        }
-
-        return JitSprintf::formatWithFmt($context, $this->jitString($context, $args[0], 'sprintf() format'), ...\array_slice($args, 1));
+        return JitSprintf::formatWithFmt(
+            $context,
+            $this->jitString($context, $args[0], 'sprintf() format'),
+            ...\array_slice($args, 1)
+        );
     }
 }
