@@ -31,30 +31,18 @@ final class JitStringArg
             return $context->helper->loadValue($coerced);
         }
         if (Variable::TYPE_VALUE === $arg->type) {
-            return $context->builder->call(
-                $context->lookupFunction('__value__readString'),
-                JitValueBox::valuePtrFromVariable($context, $arg)
-            );
-        }
-        if (Variable::TYPE_STRING === $arg->type && Variable::KIND_VARIABLE === $arg->kind) {
-            return $context->helper->loadValue($arg);
+            return self::stringPtrFromVariable($context, $arg);
         }
         $literal = self::compileTimeLiteral($arg);
         if (null !== $literal) {
             if (Variable::TYPE_STRING === $arg->type && Variable::KIND_VALUE === $arg->kind) {
-                return $context->helper->loadValue($arg);
+                return self::stringPtrFromVariable($context, $arg);
             }
 
             return $context->builder->load($context->constantStringFromString($literal));
         }
         if (Variable::TYPE_STRING === $arg->type) {
-            return $context->helper->loadValue($arg);
-        }
-        if (Variable::TYPE_VALUE === $arg->type) {
-            return $context->builder->call(
-                $context->lookupFunction('__value__readString'),
-                JitValueBox::valuePtrFromVariable($context, $arg)
-            );
+            return self::stringPtrFromVariable($context, $arg);
         }
         if (Variable::TYPE_HASHTABLE === $arg->type) {
             // FuncCall->args and similar may be lowered as hashtable pointers (issue #816).
@@ -70,6 +58,53 @@ final class JitStringArg
         }
 
         throw new \LogicException("{$contextLabel} must be a string in this compiler build");
+    }
+
+    /**
+     * Read {@see __string__*} from a JIT variable that may store a native string or boxed {@see __value__}.
+     */
+    public static function stringPtrFromVariable(Context $context, Variable $arg): Value
+    {
+        if (Variable::TYPE_VALUE === $arg->type) {
+            return $context->builder->call(
+                $context->lookupFunction('__value__readString'),
+                JitValueBox::valuePtrFromVariable($context, $arg)
+            );
+        }
+        if (Variable::KIND_VALUE === $arg->kind) {
+            $llvmType = $context->getStringFromType($arg->value->typeOf());
+            if ('__value__*' === $llvmType) {
+                return $context->builder->call(
+                    $context->lookupFunction('__value__readString'),
+                    $arg->value
+                );
+            }
+            if ('__value__' === $llvmType) {
+                return $context->builder->call(
+                    $context->lookupFunction('__value__readString'),
+                    JitValueBox::pointer($context, $arg->value)
+                );
+            }
+
+            return $arg->value;
+        }
+        if (Variable::KIND_VARIABLE === $arg->kind) {
+            $llvmType = $context->getStringFromType($arg->value->typeOf());
+            if ('__value__' === $llvmType) {
+                return $context->builder->call(
+                    $context->lookupFunction('__value__readString'),
+                    JitValueBox::pointer($context, $arg->value)
+                );
+            }
+            if ('__value__*' === $llvmType) {
+                return $context->builder->call(
+                    $context->lookupFunction('__value__readString'),
+                    $context->builder->load($arg->value)
+                );
+            }
+        }
+
+        return $context->helper->loadValue($arg);
     }
 
     /**

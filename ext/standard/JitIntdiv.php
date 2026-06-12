@@ -7,6 +7,7 @@ namespace PHPCompiler\ext\standard;
 use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Builtin\TypeErrorRaise;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\JitIsFinite;
 use PHPCompiler\JIT\JitLongArg;
 use PHPCompiler\JIT\JitOperandTypeLabel;
 use PHPCompiler\JIT\JitStringArg;
@@ -240,13 +241,7 @@ final class JitIntdiv
         string $paramName,
         bool $nullable = false
     ): Value {
-        $i32 = $context->getTypeFromString('int32');
-        $finite = $context->builder->call($context->lookupFunction('isfinite'), $doubleVal);
-        $isFinite = $context->builder->icmp(
-            Builder::INT_NE,
-            $finite,
-            $i32->constInt(0, false)
-        );
+        $isFinite = JitIsFinite::lower($context, $doubleVal);
         $okBlock = BasicBlockHelper::append($context, 'intdiv_dbl_ok');
         $errBlock = BasicBlockHelper::append($context, 'intdiv_dbl_err');
         $context->builder->branchIf($isFinite, $okBlock, $errBlock);

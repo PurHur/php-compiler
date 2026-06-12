@@ -175,14 +175,13 @@ final class AsymmetricVisibilityGuard
 
     private static function returnAfterPendingError(Context $context, Function_ $fn): void
     {
-        $fnType = $fn->typeOf();
-        if ($fnType instanceof \PHPLLVM\Type\Function_
-            && Type::KIND_VOID === $fnType->getReturnType()->getKind()) {
+        if (BasicBlockHelper::isVoidLlvmFunctionValue($fn)) {
             $context->builder->returnVoid();
 
             return;
         }
-        if ($fnType instanceof \PHPLLVM\Type\Function_) {
+        $fnType = BasicBlockHelper::llvmFunctionSignatureType($fn);
+        if (null !== $fnType) {
             $returnType = $fnType->getReturnType();
             if (Type::KIND_POINTER === $returnType->getKind()) {
                 $context->builder->returnValue($returnType->constNull());

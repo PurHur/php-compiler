@@ -1548,7 +1548,7 @@ final class HashTableHelper
      */
     private static function ownedString(Context $context, Variable $element): Value
     {
-        $str = $context->helper->loadValue($element);
+        $str = JitStringArg::stringPtrFromVariable($context, $element);
 
         return $context->builder->call(
             $context->lookupFunction('__string__separate'),

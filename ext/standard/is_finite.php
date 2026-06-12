@@ -14,6 +14,7 @@ namespace PHPCompiler\ext\standard;
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\JitIsFinite;
 use PHPCompiler\JIT\JitLongArg;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\Variable;
@@ -62,10 +63,7 @@ final class is_finite extends Internal
             throw new \LogicException('is_finite() only supports integers and floats in this compiler build');
         }
         $asFloat = JitLongArg::lower($context, $args[0], 'is_finite() argument #1');
-        $fn = $context->lookupFunction('isfinite');
-        $raw = $context->builder->call($fn, $asFloat);
-        $zero = $raw->typeOf()->constInt(0, false);
 
-        return $context->builder->icmp(Builder::INT_NE, $raw, $zero);
+        return JitIsFinite::lower($context, $asFloat);
     }
 }

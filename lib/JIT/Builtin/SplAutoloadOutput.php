@@ -24,11 +24,11 @@ final class SplAutoloadOutput
 
     public const GLOBAL_DEPTH = '__phpc_spl_autoload_depth';
 
-    /** @var Value|null */
-    public static $stackGlobal = null;
+  /** @var array<string, Value> */
+    private static array $stackGlobalsByModule = [];
 
-    /** @var Value|null */
-    public static $depthGlobal = null;
+    /** @var array<string, Value> */
+    private static array $depthGlobalsByModule = [];
 
     public static function ensureLinked(Context $context): void
     {
@@ -37,11 +37,7 @@ final class SplAutoloadOutput
 
     public static function implement(Context $context): void
     {
-        $probe = $context->module->getNamedFunction('__phpc_spl_autoload_register_apply');
-        if (null !== $probe && $probe->countBasicBlocks() > 0) {
-            return;
-        }
-
+        $moduleKey = spl_object_hash($context->module);
         $resumeBlock = $context->builder->getInsertBlock();
 
         $i32 = $context->getTypeFromString('int32');
@@ -51,13 +47,36 @@ final class SplAutoloadOutput
         $cbFnTy = $context->context->functionType($i32, false, $i8p, $sizeT);
         $cbPtrTy = $cbFnTy->pointerType(0);
 
-        $stackTy = $i8p->arrayType(self::MAX);
-        self::$stackGlobal = $context->module->addGlobal($stackTy, self::GLOBAL_STACK);
-        self::$depthGlobal = $context->module->addGlobal($i32, self::GLOBAL_DEPTH);
-        self::$depthGlobal->setInitializer($i32->constInt(0, false));
+        $stackGlobal = $context->module->getNamedGlobal(self::GLOBAL_STACK);
+        if (null === $stackGlobal) {
+            $stackTy = $i8p->arrayType(self::MAX);
+            $stackGlobal = $context->module->addGlobal($stackTy, self::GLOBAL_STACK);
+            $stackGlobal->setInitializer($stackTy->constNull());
+            $depthGlobal = $context->module->addGlobal($i32, self::GLOBAL_DEPTH);
+            $depthGlobal->setInitializer($i32->constInt(0, false));
+            self::$stackGlobalsByModule[$moduleKey] = $stackGlobal;
+            self::$depthGlobalsByModule[$moduleKey] = $depthGlobal;
+        } else {
+            self::$stackGlobalsByModule[$moduleKey] = $stackGlobal;
+            $depthGlobal = $context->module->getNamedGlobal(self::GLOBAL_DEPTH);
+            if (null !== $depthGlobal) {
+                self::$depthGlobalsByModule[$moduleKey] = $depthGlobal;
+            }
+        }
 
-        self::emitRegisterApply($context, $i32, $i8p, $cbPtrTy, $void);
-        self::emitDispatch($context, $i32, $i8p, $sizeT, $cbFnTy, $cbPtrTy);
+        $probe = $context->module->getNamedFunction('__phpc_spl_autoload_register_apply');
+        if (null !== $probe && $probe->countBasicBlocks() > 0) {
+            if (null !== $resumeBlock) {
+                $context->builder->positionAtEnd($resumeBlock);
+            } else {
+                $context->builder->clearInsertionPosition();
+            }
+
+            return;
+        }
+
+        self::emitRegisterApply($context, $moduleKey, $i32, $i8p, $cbPtrTy, $void);
+        self::emitDispatch($context, $moduleKey, $i32, $i8p, $sizeT, $cbFnTy, $cbPtrTy);
 
         if (null !== $resumeBlock) {
             $context->builder->positionAtEnd($resumeBlock);
@@ -66,8 +85,23 @@ final class SplAutoloadOutput
         }
     }
 
+    private static function stackGlobal(Context $context, string $moduleKey): Value
+    {
+        return self::$stackGlobalsByModule[$moduleKey]
+            ?? $context->module->getNamedGlobal(self::GLOBAL_STACK)
+            ?? throw new \LogicException('spl_autoload stack global is not linked');
+    }
+
+    private static function depthGlobal(Context $context, string $moduleKey): Value
+    {
+        return self::$depthGlobalsByModule[$moduleKey]
+            ?? $context->module->getNamedGlobal(self::GLOBAL_DEPTH)
+            ?? throw new \LogicException('spl_autoload depth global is not linked');
+    }
+
     private static function emitRegisterApply(
         Context $context,
+        string $moduleKey,
         $i32,
         $i8p,
         $cbPtrTy,
@@ -92,7 +126,7 @@ final class SplAutoloadOutput
         $fnOpaque = $fn->getParam(0);
         $prepend = $fn->getParam(1);
 
-        $depth = $context->builder->load(self::$depthGlobal);
+        $depth = $context->builder->load(self::depthGlobal($context, $moduleKey));
         $maxDepth = $context->builder->icmp(
             Builder::INT_SGE,
             $depth,
@@ -116,8 +150,8 @@ final class SplAutoloadOutput
         $oneI32 = $i32->constInt(1, false);
 
         $context->builder->positionAtEnd($bbAppend);
-        self::storeStackEntry($context, $i32, $depth, $fnOpaque);
-        $context->builder->store($context->builder->add($depth, $oneI32), self::$depthGlobal);
+        self::storeStackEntry($context, $moduleKey, $i32, $depth, $fnOpaque);
+        $context->builder->store($context->builder->add($depth, $oneI32), self::depthGlobal($context, $moduleKey));
         $context->builder->branch($bbDone);
 
         $context->builder->positionAtEnd($bbPrependShiftInit);
@@ -132,15 +166,15 @@ final class SplAutoloadOutput
 
         $context->builder->positionAtEnd($bbPrependShiftBody);
         $prevIdx = $context->builder->sub($iVal, $oneI32);
-        $curEntry = self::stackEntryPtr($context, $i32, $iVal);
-        $prevEntry = self::stackEntryPtr($context, $i32, $prevIdx);
+        $curEntry = self::stackEntryPtr($context, $moduleKey, $i32, $iVal);
+        $prevEntry = self::stackEntryPtr($context, $moduleKey, $i32, $prevIdx);
         $context->builder->store($context->builder->load($prevEntry), $curEntry);
         $context->builder->store($prevIdx, $iSlot);
         $context->builder->branch($bbPrependShiftHead);
 
         $context->builder->positionAtEnd($bbPrependStore);
-        self::storeStackEntry($context, $i32, $zeroI32, $fnOpaque);
-        $context->builder->store($context->builder->add($depth, $oneI32), self::$depthGlobal);
+        self::storeStackEntry($context, $moduleKey, $i32, $zeroI32, $fnOpaque);
+        $context->builder->store($context->builder->add($depth, $oneI32), self::depthGlobal($context, $moduleKey));
         $context->builder->branch($bbDone);
 
         $context->builder->positionAtEnd($bbDone);
@@ -149,6 +183,7 @@ final class SplAutoloadOutput
 
     private static function emitDispatch(
         Context $context,
+        string $moduleKey,
         $i32,
         $i8p,
         $sizeT,
@@ -172,6 +207,8 @@ final class SplAutoloadOutput
         $context->builder->positionAtEnd($entry);
         $classPtr = $fn->getParam(0);
         $classLen = $fn->getParam(1);
+        $iSlot = $context->builder->alloca($i32, 1, 'spl_disp_i');
+        $context->builder->store($i32->constInt(0, false), $iSlot);
 
         $badName = $context->builder->or(
             $context->builder->icmp(Builder::INT_EQ, $classPtr, $i8p->constNull()),
@@ -179,18 +216,14 @@ final class SplAutoloadOutput
         );
         $context->builder->branchIf($badName, $bbRetZero, $bbLoopHead);
 
-        $iSlot = $context->builder->alloca($i32, 1, 'spl_disp_i');
-        $context->builder->store($i32->constInt(0, false), $iSlot);
-        $context->builder->branch($bbLoopHead);
-
         $context->builder->positionAtEnd($bbLoopHead);
         $iVal = $context->builder->load($iSlot);
-        $depth = $context->builder->load(self::$depthGlobal);
+        $depth = $context->builder->load(self::depthGlobal($context, $moduleKey));
         $inRange = $context->builder->icmp(Builder::INT_SLT, $iVal, $depth);
         $context->builder->branchIf($inRange, $bbLoopBody, $bbRetZero);
 
         $context->builder->positionAtEnd($bbLoopBody);
-        $entryPtr = self::stackEntryPtr($context, $i32, $iVal);
+        $entryPtr = self::stackEntryPtr($context, $moduleKey, $i32, $iVal);
         $fnOpaque = $context->builder->load($entryPtr);
         $fnNull = $context->builder->icmp(Builder::INT_EQ, $fnOpaque, $i8p->constNull());
         $context->builder->branchIf($fnNull, $bbNext, $bbCall);
@@ -215,10 +248,10 @@ final class SplAutoloadOutput
         $context->builder->returnValue($i32->constInt(1, false));
     }
 
-    private static function stackEntryPtr(Context $context, $i32, Value $index): Value
+    private static function stackEntryPtr(Context $context, string $moduleKey, $i32, Value $index): Value
     {
         return $context->builder->inBoundsGEP(
-            self::$stackGlobal,
+            self::stackGlobal($context, $moduleKey),
             $i32->constInt(0, false),
             $index
         );
@@ -226,11 +259,12 @@ final class SplAutoloadOutput
 
     private static function storeStackEntry(
         Context $context,
+        string $moduleKey,
         $i32,
         Value $index,
         Value $fnOpaque
     ): void {
-        $context->builder->store($fnOpaque, self::stackEntryPtr($context, $i32, $index));
+        $context->builder->store($fnOpaque, self::stackEntryPtr($context, $moduleKey, $i32, $index));
     }
 
     private static function emitIndirectCall(Context $context, $fnTy, Value $fnPtr, Value ...$args): Value

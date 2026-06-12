@@ -8,6 +8,7 @@ use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Builtin\TimeSleepRuntime;
 use PHPCompiler\JIT\Builtin\TypeErrorRaise;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\JitIsFinite;
 use PHPCompiler\JIT\JitLongArg;
 use PHPCompiler\JIT\JitStringArg;
 use PHPCompiler\JIT\JitValueBox;
@@ -278,13 +279,7 @@ final class JitSleep
         int $argIndex,
         string $paramName
     ): Value {
-        $i32 = $context->getTypeFromString('int32');
-        $finite = $context->builder->call($context->lookupFunction('isfinite'), $doubleVal);
-        $isFinite = $context->builder->icmp(
-            Builder::INT_NE,
-            $finite,
-            $i32->constInt(0, false)
-        );
+        $isFinite = JitIsFinite::lower($context, $doubleVal);
         $okBlock = BasicBlockHelper::append($context, 'sleep_dbl_ok');
         $errBlock = BasicBlockHelper::append($context, 'sleep_dbl_err');
         $context->builder->branchIf($isFinite, $okBlock, $errBlock);

@@ -5210,7 +5210,7 @@ class JIT {
                             $value->magicGetOverloadedClass,
                             $value->magicGetOverloadedName
                         );
-                        $this->context->builder->returnVoid();
+                        $this->context->builder->call($this->context->lookupFunction('abort'));
                         $this->context->builder->clearInsertionPosition();
                         break;
                     }
@@ -6524,16 +6524,17 @@ class JIT {
                                     : 'A never-returning function must not return'
                             );
                         }
-                        if (
-                            !$this->isVoidLlvmFunction($func)
-                            && null !== $block->func
-                            && 'void' !== ($expectedReturn = $this->cfgFunctionReturnCallbackType($block->func))
-                        ) {
-                            $this->context->builder->returnValue(
-                                $this->defaultLlvmReturnValueForCallbackType($expectedReturn, $func)
-                            );
-                        } else {
+                        if ($this->isVoidLlvmFunction($func)) {
                             $this->context->builder->returnVoid();
+                        } else {
+                            $expectedReturn = null !== $block->func
+                                ? $this->cfgFunctionReturnCallbackType($block->func)
+                                : null;
+                            $this->context->builder->returnValue(
+                                null !== $expectedReturn
+                                    ? $this->defaultLlvmReturnValueForCallbackType($expectedReturn, $func)
+                                    : $this->defaultLlvmReturnValue($func)
+                            );
                         }
                     } else {
                         $this->context->inlineIncludeExitBlock = $returnBlock;
@@ -7328,7 +7329,7 @@ class JIT {
                                 JIT\TryCatchHelper::emitCatchableErrorMessage($this->context, $this, $message);
                             } else {
                                 JIT\Builtin\ErrorRaise::emitRaise($this->context, $message);
-                                $this->context->builder->returnVoid();
+                                $this->context->builder->call($this->context->lookupFunction('abort'));
                                 $this->context->builder->clearInsertionPosition();
                             }
                             break;
@@ -7340,7 +7341,7 @@ class JIT {
                                 JIT\TryCatchHelper::emitCatchableErrorMessage($this->context, $this, $message);
                             } else {
                                 JIT\Builtin\ErrorRaise::emitRaise($this->context, $message);
-                                $this->context->builder->returnVoid();
+                                $this->context->builder->call($this->context->lookupFunction('abort'));
                                 $this->context->builder->clearInsertionPosition();
                             }
                             break;
@@ -7420,7 +7421,7 @@ class JIT {
                                     $name->value
                                 )
                             );
-                            $this->context->builder->returnVoid();
+                            $this->context->builder->call($this->context->lookupFunction('abort'));
                             $this->context->builder->clearInsertionPosition();
                             break;
                         }
@@ -7739,12 +7740,7 @@ class JIT {
 
     private function isVoidLlvmFunction(PHPLLVM\Value $func): bool
     {
-        $fnType = $func->typeOf();
-        if (!$fnType instanceof \PHPLLVM\Type\Function_) {
-            return false;
-        }
-
-        return \PHPLLVM\Type::KIND_VOID === $fnType->getReturnType()->getKind();
+        return JIT\BasicBlockHelper::isVoidLlvmFunctionValue($func);
     }
 
     private function defaultLlvmReturnValue(PHPLLVM\Value $func): PHPLLVM\Value
@@ -7755,8 +7751,8 @@ class JIT {
                 return $this->defaultLlvmReturnValueForCallbackType($expected, $func);
             }
         }
-        $fnType = $func->typeOf();
-        if (!$fnType instanceof \PHPLLVM\Type\Function_) {
+        $fnType = JIT\BasicBlockHelper::llvmFunctionSignatureType($func);
+        if (null === $fnType) {
             return $this->context->constantFromInteger(0);
         }
         $llvmReturn = $this->context->getStringFromType($fnType->getReturnType());
@@ -9377,7 +9373,7 @@ class JIT {
 
                     return;
                 case Variable::TYPE_STRING:
-                    $str = $this->context->helper->loadValue($value);
+                    $str = JIT\JitStringArg::stringPtrFromVariable($this->context, $value);
                     $owned = $this->context->builder->call(
                         $this->context->lookupFunction('__string__separate'),
                         $str

@@ -75,7 +75,7 @@ final class TypedPropertyUninitGuard
                 $var->objectPropertyName
             )
         );
-        $context->builder->returnVoid();
+        self::emitRaiseAndTerminate($context);
 
         $context->builder->positionAtEnd($okBlock);
         $context->builder->branch($exitBlock);
@@ -141,14 +141,14 @@ final class TypedPropertyUninitGuard
     {
         $fn = $context->builder->getInsertBlock()->getParent();
         assert($fn instanceof \PHPLLVM\Value\Function_);
-        $expected = self::expectedReturnCallbackType($context, $fn);
-        if ('void' === $expected) {
+        if (BasicBlockHelper::isVoidLlvmFunctionValue($fn)) {
             $context->builder->returnVoid();
 
             return;
         }
-        $fnType = $fn->typeOf();
-        $retTy = $fnType instanceof \PHPLLVM\Type\Function_
+        $expected = self::expectedReturnCallbackType($context, $fn);
+        $fnType = BasicBlockHelper::llvmFunctionSignatureType($fn);
+        $retTy = null !== $fnType
             ? $fnType->getReturnType()
             : $context->getTypeFromString($expected ?? '__value__');
         $context->builder->returnValue(

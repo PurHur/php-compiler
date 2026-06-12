@@ -11,6 +11,33 @@ use PHPLLVM\Value\Function_;
 
 final class BasicBlockHelper
 {
+    /** LLVMTypeOf(function) is a pointer-to-signature, not Function_ (#1492 bootstrap). */
+    public static function llvmFunctionSignatureType(Value $func): ?\PHPLLVM\Type\Function_
+    {
+        $ty = $func->typeOf();
+        if ($ty instanceof \PHPLLVM\Type\Function_) {
+            return $ty;
+        }
+        if ($ty instanceof \PHPLLVM\Type\Pointer) {
+            $el = $ty->getElementType();
+            if ($el instanceof \PHPLLVM\Type\Function_) {
+                return $el;
+            }
+        }
+
+        return null;
+    }
+
+    public static function isVoidLlvmFunctionValue(Value $func): bool
+    {
+        $sig = self::llvmFunctionSignatureType($func);
+        if (null === $sig) {
+            return false;
+        }
+
+        return Type::KIND_VOID === $sig->getReturnType()->getKind();
+    }
+
     public static function parentFunction(Context $context): Function_
     {
         $parent = $context->builder->getInsertBlock()->getParent();
@@ -92,9 +119,7 @@ final class BasicBlockHelper
         if (0 === $function->countBasicBlocks()) {
             return;
         }
-        $fnType = $function->typeOf();
-        $isVoid = $fnType instanceof \PHPLLVM\Type\Function_
-            && \PHPLLVM\Type::KIND_VOID === $fnType->getReturnType()->getKind();
+        $isVoid = self::isVoidLlvmFunctionValue($function);
         $block = $function->getFirstBasicBlock();
         while (null !== $block) {
             self::sealPhiMergeBlocks($context, $block);

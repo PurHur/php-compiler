@@ -3722,7 +3722,7 @@ final class ArrayBuiltinHelper
             case Variable::TYPE_STRING:
                 $owned = $context->builder->call(
                     $context->lookupFunction('__string__separate'),
-                    $context->helper->loadValue($mapped)
+                    JitStringArg::stringPtrFromVariable($context, $mapped)
                 );
                 $context->builder->call(
                     $context->lookupFunction('__value__writeString'),
