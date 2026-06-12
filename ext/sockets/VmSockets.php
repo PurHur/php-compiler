@@ -11,7 +11,7 @@ use PHPCompiler\VM\ObjectEntry;
 /**
  * VM helpers for ext/sockets builtins (php-src ext/sockets/sockets.c; #6544, #6203).
  *
- * Uses libc sockatmark(3) via FFI when host PHP lacks HAVE_SOCKATMARK; no runtime/*.c.
+ * Uses libc sockatmark(3) via FFI only — no host Zend socket_atmark() delegation (#8176).
  */
 final class VmSockets
 {
@@ -31,10 +31,6 @@ final class VmSockets
             if ($r >= 0) {
                 return 0 !== $r;
             }
-        }
-        $host = VmSocket::hostSocket($object);
-        if ($host instanceof \Socket && \function_exists('socket_atmark')) {
-            return \socket_atmark($host);
         }
 
         return false;
