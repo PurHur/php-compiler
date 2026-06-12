@@ -65,27 +65,42 @@ final class StringGetenv
             $context->builder->inBoundsGEP($nameCStr, $nameLen)
         );
 
-        $useLocal = $fn->appendBasicBlock('getenv_use_local');
-        $useLibc = $fn->appendBasicBlock('getenv_use_libc');
-        $check = $fn->appendBasicBlock('getenv_check');
+        $routeLocal = $fn->appendBasicBlock('getenv_route_local');
+        $useLibcOnly = $fn->appendBasicBlock('getenv_use_libc_only');
+        $tryLocal = $fn->appendBasicBlock('getenv_try_local');
+        $localMiss = $fn->appendBasicBlock('getenv_local_miss');
+        $localHit = $fn->appendBasicBlock('getenv_local_hit');
+        $mergeEnv = $fn->appendBasicBlock('getenv_merge_env');
         $isLocal = $context->builder->icmp(Builder::INT_NE, $localOnly, $i8->constInt(0, false));
-        $context->builder->branchIf($isLocal, $useLocal, $useLibc);
+        $context->builder->branchIf($isLocal, $routeLocal, $useLibcOnly);
 
-        $context->builder->positionAtEnd($useLocal);
+        $context->builder->positionAtEnd($routeLocal);
+        $context->builder->branch($tryLocal);
+
+        $context->builder->positionAtEnd($tryLocal);
         $envLocal = $context->builder->call(
             $context->lookupFunction('__compiler_env_local_lookup'),
             $nameCStr
         );
-        $context->builder->branch($check);
+        $localNull = $context->builder->icmp(Builder::INT_EQ, $envLocal, $i8p->constNull());
+        $context->builder->branchIf($localNull, $localMiss, $localHit);
 
-        $context->builder->positionAtEnd($useLibc);
-        $envLibc = $context->builder->call($context->lookupFunction('getenv'), $nameCStr);
-        $context->builder->branch($check);
+        $context->builder->positionAtEnd($localMiss);
+        $envAfterMiss = $context->builder->call($context->lookupFunction('getenv'), $nameCStr);
+        $context->builder->branch($mergeEnv);
 
-        $context->builder->positionAtEnd($check);
+        $context->builder->positionAtEnd($localHit);
+        $context->builder->branch($mergeEnv);
+
+        $context->builder->positionAtEnd($useLibcOnly);
+        $envLibcOnly = $context->builder->call($context->lookupFunction('getenv'), $nameCStr);
+        $context->builder->branch($mergeEnv);
+
+        $context->builder->positionAtEnd($mergeEnv);
         $phi = $context->builder->phi($i8p, 'getenv_result');
-        $phi->addIncoming($envLocal, $useLocal);
-        $phi->addIncoming($envLibc, $useLibc);
+        $phi->addIncoming($envAfterMiss, $localMiss);
+        $phi->addIncoming($envLocal, $localHit);
+        $phi->addIncoming($envLibcOnly, $useLibcOnly);
         $env = $phi;
 
         $isNull = $context->builder->icmp(Builder::INT_EQ, $env, $i8p->constNull());

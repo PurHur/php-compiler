@@ -40,4 +40,24 @@ final class GetenvNativeRuntimeShrinkTest extends TestCase
         $this->assertFileExists($this->repoRoot.'/test/repro-maintainer/bootstrap_getenv_all_native.php');
         $this->assertFileExists($this->repoRoot.'/test/compliance/cases/bootstrap/getenv_all_native.phpt');
     }
+
+    public function testGetenvLocalOnlyUsesEnvironNotPutenvTableOnly(): void
+    {
+        $source = (string) file_get_contents($this->repoRoot.'/ext/standard/VmEnv.php');
+        $this->assertStringContainsString('VmEnvEnvironNative::enumerate()', $source);
+        $this->assertDoesNotMatchRegularExpression(
+            '/if \(\$localOnly\) \{\s*if \(!\\\\array_key_exists\(\$name, self::\$local\)\)/s',
+            $source
+        );
+    }
+
+    public function testGetenvLocalOnlyInheritedPathVisible(): void
+    {
+        \PHPCompiler\ext\standard\VmEnv::putenv('PHP_COMPILER_LOCAL_ONLY_TEST=from_putenv');
+        $this->assertSame(
+            'from_putenv',
+            \PHPCompiler\ext\standard\VmEnv::getenv('PHP_COMPILER_LOCAL_ONLY_TEST', true)
+        );
+        $this->assertNotFalse(\PHPCompiler\ext\standard\VmEnv::getenv('PATH', true));
+    }
 }

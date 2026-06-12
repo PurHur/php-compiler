@@ -9,4 +9,4 @@ echo getenv('PATH', true) === false ? "false\n" : "set\n";
 --EXPECT--
 from_putenv
 from_putenv
-false
+set
