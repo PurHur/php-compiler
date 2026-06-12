@@ -8,14 +8,16 @@ use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\Variable as JITVariable;
+use PHPCompiler\VM\BuiltinExecute;
+use PHPCompiler\VM\Variable;
 use PHPCompiler\ext\standard\VmFs;
 use PHPCompiler\ext\standard\VmStreamArg;
 use PHPLLVM\Value;
 
 /**
- * socket_import_stream() — adopt stream as Socket (php-src ext/sockets/sockets.c; #6544 helper).
+ * socket_import_stream() — adopt stream as Socket (php-src ext/sockets/sockets.c; #6203).
  *
- * Enables socket_atmark compliance when stream_socket_pair is available.
+ * PHP-owned import via {@see VmSocket::importStream()}; no host {@see \socket_import_stream()} delegation.
  */
 final class socket_import_stream extends Internal
 {
@@ -32,34 +34,37 @@ final class socket_import_stream extends Internal
                 'socket_import_stream() expects exactly 1 argument, '.$argc.' given'
             );
         }
-        if (null === $frame->returnVar) {
-            return;
-        }
-        if (!\function_exists('socket_import_stream')) {
-            $frame->returnVar->bool(false);
-
-            return;
-        }
 
         $handle = VmStreamArg::requireStreamHandle($frame->calledArgs[0], 'socket_import_stream', 1);
         $hostStream = VmFs::lookupResource($handle);
         if (null === $hostStream) {
-            $frame->returnVar->bool(false);
+            BuiltinExecute::writeReturn(
+                $frame,
+                static fn (Variable $ret) => $ret->bool(false)
+            );
 
             return;
         }
-        $hostSocket = @\socket_import_stream($hostStream);
-        if (false === $hostSocket || !($hostSocket instanceof \Socket)) {
-            $frame->returnVar->bool(false);
+
+        $wrapped = VmSocket::importStream($hostStream, $frame->vmContext);
+        if (false === $wrapped) {
+            VmSockets::triggerWarning($frame, 'socket_import_stream(): Unable to import stream');
+            BuiltinExecute::writeReturn(
+                $frame,
+                static fn (Variable $ret) => $ret->bool(false)
+            );
 
             return;
         }
-        $wrapped = VmSocket::wrapHost($hostSocket, $frame->vmContext);
-        $frame->returnVar->assign($wrapped);
+
+        BuiltinExecute::writeReturn(
+            $frame,
+            static fn (Variable $ret) => $ret->assign($wrapped)
+        );
     }
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        throw new \Error('socket_import_stream() is not implemented for JIT in this compiler build (issue #6544)');
+        throw new \Error('socket_import_stream() is not implemented for JIT in this compiler build (issue #6203)');
     }
 }

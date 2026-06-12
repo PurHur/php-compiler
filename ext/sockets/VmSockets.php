@@ -4,8 +4,12 @@ declare(strict_types=1);
 
 namespace PHPCompiler\ext\sockets;
 
+use PHPCompiler\Frame;
+use PHPCompiler\VM\ErrorReporter;
+use PHPCompiler\VM\ObjectEntry;
+
 /**
- * VM helpers for ext/sockets builtins (php-src ext/sockets/sockets.c; #6544).
+ * VM helpers for ext/sockets builtins (php-src ext/sockets/sockets.c; #6544, #6203).
  *
  * Uses libc sockatmark(3) via FFI when host PHP lacks HAVE_SOCKATMARK; no runtime/*.c.
  */
@@ -18,23 +22,36 @@ final class VmSockets
         return null !== self::ffi();
     }
 
-    public static function atmark(\Socket $socket): bool
+    public static function atmarkForObject(ObjectEntry $object): bool
     {
+        $fd = VmSocket::fdForObject($object);
         $ffi = self::ffi();
-        if (null !== $ffi) {
-            $fd = VmSocket::fdForHostSocket($socket);
-            if (null !== $fd) {
-                $r = (int) $ffi->sockatmark($fd);
-                if ($r >= 0) {
-                    return 0 !== $r;
-                }
+        if (null !== $fd && null !== $ffi) {
+            $r = (int) $ffi->sockatmark($fd);
+            if ($r >= 0) {
+                return 0 !== $r;
             }
         }
-        if (\function_exists('socket_atmark')) {
-            return \socket_atmark($socket);
+        $host = VmSocket::hostSocket($object);
+        if ($host instanceof \Socket && \function_exists('socket_atmark')) {
+            return \socket_atmark($host);
         }
 
         return false;
+    }
+
+    public static function triggerWarning(Frame $frame, string $message): void
+    {
+        if (null === $frame->vmContext) {
+            return;
+        }
+        $frame->vmContext->errors->triggerError(
+            $message,
+            ErrorReporter::E_WARNING,
+            '' !== $frame->scriptPath ? $frame->scriptPath : null,
+            $frame->vmContext,
+            $frame
+        );
     }
 
     private static function ffi(): ?\FFI

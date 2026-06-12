@@ -12,7 +12,7 @@ use PHPCompiler\ext\standard\VmStreamArg;
 /** Shared socket argument helpers (php-src ext/sockets/sockets.c Z_PARAM_OBJECT_OF_CLASS; #6544). */
 final class VmSocketArg
 {
-    public static function requireHostSocket(Variable $var, string $functionName, int $argNum = 1): \Socket
+    public static function requireSocketObject(Variable $var, string $functionName, int $argNum = 1): ObjectEntry
     {
         $var = $var->resolveIndirect();
         if (EnumCaseSupport::isEnumCaseVariable($var)) {
@@ -40,6 +40,19 @@ final class VmSocketArg
                 self::objectTypeName($object)
             ));
         }
+        if (!VmSocket::isValidSocketObject($object)) {
+            throw new \TypeError(\sprintf(
+                '%s(): supplied resource is not a valid Socket resource',
+                $functionName
+            ));
+        }
+
+        return $object;
+    }
+
+    public static function requireHostSocket(Variable $var, string $functionName, int $argNum = 1): \Socket
+    {
+        $object = self::requireSocketObject($var, $functionName, $argNum);
         $host = VmSocket::hostSocket($object);
         if (null === $host) {
             throw new \TypeError(\sprintf(
