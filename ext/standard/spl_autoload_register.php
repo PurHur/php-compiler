@@ -18,7 +18,7 @@ use PHPLLVM\Value;
 /**
  * spl_autoload_register() — register class autoload callbacks on VM context (issue #1369).
  *
- * VM: string callables. JIT: compile-time string user-function names (#1776).
+ * VM: string, array, and closure callables (#4744). JIT: compile-time function names, Class::method, closures (#1776).
  */
 final class spl_autoload_register extends Internal
 {
