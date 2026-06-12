@@ -6537,10 +6537,10 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/VmDateTimeNative.php`
 
 **Warnings** (review for bootstrap subset):
-- new RecursiveIteratorIterator (line 462)
-- new RecursiveDirectoryIterator (line 463)
-- new RecursiveIteratorIterator (line 564)
-- new RecursiveDirectoryIterator (line 565)
+- new RecursiveIteratorIterator (line 463)
+- new RecursiveDirectoryIterator (line 464)
+- new RecursiveIteratorIterator (line 565)
+- new RecursiveDirectoryIterator (line 566)
 - 26 class method(s)
 - 4 closure(s)
 
@@ -12715,7 +12715,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/Builtin/ErrorRaise.php`
 
 **Warnings** (review for bootstrap subset):
-- new Error (line 366)
+- new Error (line 365)
 - 18 class method(s)
 
 ### `lib/JIT/Builtin/ErrorReporting.php`
@@ -12991,7 +12991,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/Builtin/ReadonlyRaise.php`
 
 **Warnings** (review for bootstrap subset):
-- new Error (line 370)
+- new Error (line 369)
 - 16 class method(s)
 
 ### `lib/JIT/Builtin/Refcount.php`
@@ -13653,7 +13653,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/Builtin/StringTriggerErrorJit.php`
 
 **Warnings** (review for bootstrap subset):
-- 11 class method(s)
+- 12 class method(s)
 
 ### `lib/JIT/Builtin/StringTrimMask.php`
 
@@ -13862,7 +13862,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/Builtin/TypeErrorRaise.php`
 
 **Warnings** (review for bootstrap subset):
-- new ArgumentCountError (line 492)
+- new ArgumentCountError (line 491)
 - 23 class method(s)
 
 ### `lib/JIT/Builtin/UnpackJitRuntime.php`
