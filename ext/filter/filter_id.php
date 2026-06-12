@@ -4,11 +4,11 @@ declare(strict_types=1);
 
 namespace PHPCompiler\ext\filter;
 
+use PHPCompiler\ext\standard\VmString;
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\Variable as JITVariable;
-use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
 
 /**
@@ -24,11 +24,13 @@ final class filter_id extends Internal
         if (null === $frame->returnVar) {
             return;
         }
-        $nameVar = $frame->calledArgs[0]->resolveIndirect();
-        if (Variable::TYPE_STRING !== $nameVar->type) {
-            throw new \LogicException('filter_id() filter name must be a string');
-        }
-        $id = FilterConstants::idForName($nameVar->toString());
+        $name = VmString::coerceStringBuiltinArg(
+            $frame->calledArgs[0],
+            'filter_id',
+            0,
+            'name'
+        );
+        $id = FilterConstants::idForName($name);
         if (null === $id) {
             $frame->returnVar->bool(false);
 
@@ -39,6 +41,10 @@ final class filter_id extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        throw new \LogicException('filter_id() is not JIT-lowered in this compiler build');
+        if (\count($args) < 1) {
+            throw new \LogicException('filter_id() requires exactly one argument');
+        }
+
+        return JitFilterId::invoke($context, $args[0]);
     }
 }
