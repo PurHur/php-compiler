@@ -7609,6 +7609,14 @@ class Compiler {
                 continue;
             }
             $keyVm = $this->vmVariableFromCfgLiteralOperand($keyOp);
+            if (null === $keyVm && null !== $block && [] !== $defaultBlockChildren) {
+                $keyVm = $this->tryFoldCompileTimeOperandDefault(
+                    $keyOp,
+                    $block,
+                    $defaultBlockChildren,
+                    $materializeEnumCase
+                );
+            }
             if (null === $keyVm) {
                 return null;
             }
