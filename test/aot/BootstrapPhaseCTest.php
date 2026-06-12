@@ -207,6 +207,46 @@ final class BootstrapPhaseCTest extends TestCase
         @unlink($binary);
     }
 
+    /** bootstrap-aot-link.sh passes PHP_COMPILER_SELFHOST_AOT=0; standalone must still enable stubs (#1492). */
+    public function testBootstrapAotFixtureCompilesWithExplicitSelfhostAotZero(): void
+    {
+        if (!self::isLlvmReady()) {
+            $this->markTestSkipped(
+                'LLVM 9 toolchain not available. Run script/install-llvm9.sh from the repository root.'
+            );
+        }
+        $root = dirname(__DIR__, 2);
+        $source = $root.'/test/bootstrap-aot/vm_run_smoke.php';
+        $this->assertFileExists($source);
+
+        $env = ['PHP_COMPILER_SELFHOST_AOT' => '0'];
+        foreach (array_merge($_ENV, $_SERVER) as $key => $value) {
+            if (is_string($value) && !isset($env[$key])) {
+                $env[$key] = $value;
+            }
+        }
+        LlvmToolchain::applyProcessEnv($env, $root);
+        $binary = $root.'/build/bootstrap-aot/vm_run_smoke_selfhost0';
+        @unlink($binary);
+
+        $compile = [PHP_BINARY, $root.'/bin/compile.php', '-o', $binary, $source];
+        $descriptorSpec = [
+            0 => ['pipe', 'r'],
+            1 => ['pipe', 'w'],
+            2 => ['pipe', 'w'],
+        ];
+        $proc = proc_open($compile, $descriptorSpec, $pipes, $root, $env);
+        $this->assertIsResource($proc);
+        fclose($pipes[0]);
+        $stderr = stream_get_contents($pipes[2]);
+        fclose($pipes[1]);
+        fclose($pipes[2]);
+        $this->assertSame(0, proc_close($proc), trim($stderr !== false ? $stderr : ''));
+        $this->assertFileExists($binary);
+        $this->assertTrue(is_executable($binary));
+        @unlink($binary);
+    }
+
     public function testBootstrapAotLinkScript(): void
     {
         if (!self::isLlvmReady()) {
