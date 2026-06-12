@@ -36,39 +36,18 @@ final class VmStreamSync
     /**
      * php-src: php_stream_sync_supported() before fsync/fdatasync (ext/standard/file.c).
      *
-     * @param resource $fp
+     * Uses {@see VmStreamMeta::supportsSync()} + {@see VmFs::handleUri()} — no host
+     * stream_get_meta_data delegation (#8118).
      */
-    public static function isSupportedResource($fp): bool
-    {
-        $meta = @\stream_get_meta_data($fp);
-        if (!\is_array($meta)) {
-            return false;
-        }
-        $streamType = \strtoupper((string) ($meta['stream_type'] ?? ''));
-        if (\in_array($streamType, ['MEMORY', 'TEMP', 'INPUT', 'OUTPUT'], true)) {
-            return false;
-        }
-        $uri = \strtolower((string) ($meta['uri'] ?? ''));
-        if (\str_starts_with($uri, 'php://')) {
-            return false;
-        }
-        if (\in_array($streamType, ['TCP', 'UDP', 'UDG', 'UNIX', 'SSL', 'TLS', 'SOCKET'], true)) {
-            return false;
-        }
-
-        return true;
-    }
-
     public static function isSupported(int $handle): bool
     {
         if (!VmFs::isValidHandle($handle)) {
             return false;
         }
-        $fp = VmFs::lookupResource($handle);
-        if (null === $fp) {
+        if (null === VmFs::lookupResource($handle)) {
             return false;
         }
 
-        return self::isSupportedResource($fp);
+        return VmStreamMeta::supportsSync(VmFs::handleUri($handle));
     }
 }

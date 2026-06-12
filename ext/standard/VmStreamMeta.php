@@ -73,6 +73,24 @@ final class VmStreamMeta
         return \in_array($scheme, ['tcp', 'udp', 'unix', 'ssl', 'tls', 'socket'], true);
     }
 
+    /**
+     * php_stream_sync_supported() probe without host stream_get_meta_data() (#7339, #8118).
+     */
+    public static function supportsSync(string $uri): bool
+    {
+        $lower = \strtolower($uri);
+        if (\str_starts_with($lower, 'php://memory')
+            || \str_starts_with($lower, 'php://temp')
+            || \str_starts_with($lower, 'php://fd/')) {
+            return false;
+        }
+        if (\str_starts_with($lower, 'php://')) {
+            return false;
+        }
+
+        return !self::isSocketTransport($uri);
+    }
+
     /** @param resource $fp */
     public static function setBlocking($fp, bool $mode): bool
     {
