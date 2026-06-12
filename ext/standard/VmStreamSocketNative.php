@@ -7,12 +7,16 @@ namespace PHPCompiler\ext\standard;
 use PHPCompiler\VM\Variable;
 
 /**
- * libc TCP/UDP client sockets without host Zend stream wrappers (#8097, #3202).
+ * libc TCP/UDP socket streams without host Zend stream wrappers (#8097, #4993, #3202).
  *
- * php-src: ext/standard/streamsfuncs.c — PHP_FUNCTION(stream_socket_client)
+ * php-src: ext/standard/streamsfuncs.c — stream_socket_client / stream_socket_server
  */
 final class VmStreamSocketNative
 {
+    public const STREAM_SERVER_BIND = 4;
+
+    public const STREAM_SERVER_LISTEN = 8;
+
     private const AF_INET = 2;
 
     private const AF_INET6 = 10;
@@ -23,9 +27,13 @@ final class VmStreamSocketNative
 
     private const SOL_SOCKET = 1;
 
+    private const SO_REUSEADDR = 2;
+
     private const SO_SNDTIMEO = 21;
 
     private const IPPROTO_TCP = 6;
+
+    private const AI_PASSIVE = 1;
 
     private static ?\FFI $ffi = null;
 
@@ -155,6 +163,167 @@ final class VmStreamSocketNative
 
             return [false, 0, 'Unable to create stream from socket'];
         }
+    }
+
+    /**
+     * @return array{0: resource|false, 1: int, 2: string}
+     */
+    public static function server(
+        string $local,
+        int $flags,
+        ?Variable $contextVar = null
+    ): array {
+        unset($contextVar);
+        if (!self::available()) {
+            return [false, 0, 'VmStreamSocketNative FFI unavailable'];
+        }
+
+        $parsed = self::parseSocketAddress($local);
+        if (null === $parsed) {
+            return [false, 0, 'Unable to parse local socket path'];
+        }
+
+        if ('ssl' === $parsed['transport'] || 'tls' === $parsed['transport']) {
+            return [false, 0, 'ssl:// transport is not supported in this compiler build'];
+        }
+
+        if ('unix' === $parsed['transport']) {
+            return [false, 0, 'unix:// transport is not supported in this compiler build'];
+        }
+
+        if (0 === $flags) {
+            $flags = self::STREAM_SERVER_BIND | self::STREAM_SERVER_LISTEN;
+        }
+
+        $sockType = 'udp' === $parsed['transport'] ? self::SOCK_DGRAM : self::SOCK_STREAM;
+        $port = (string) $parsed['port'];
+
+        $ffi = self::ffi();
+        if (null === $ffi) {
+            return [false, 0, 'VmStreamSocketNative FFI unavailable'];
+        }
+
+        $hints = $ffi->new('struct addrinfo');
+        $hints->ai_family = \str_contains($parsed['host'], ':') ? self::AF_INET6 : self::AF_INET;
+        $hints->ai_socktype = $sockType;
+        $hints->ai_protocol = self::SOCK_STREAM === $sockType ? self::IPPROTO_TCP : 0;
+        $hints->ai_flags = self::AI_PASSIVE;
+
+        $node = self::bindNodeName($parsed['host']);
+
+        $resHead = $ffi->new('struct addrinfo *');
+        $rc = (int) $ffi->getaddrinfo($node, $port, \FFI::addr($hints), \FFI::addr($resHead));
+        if (0 !== $rc) {
+            return [false, 0, self::gaiStrerror($ffi, $rc)];
+        }
+
+        $lastErrno = 0;
+        $lastErrstr = 'Failed to create server socket';
+        $boundFd = -1;
+
+        try {
+            $rp = $resHead[0];
+            while (null !== $rp) {
+                $sock = (int) $ffi->socket((int) $rp->ai_family, $sockType, (int) $rp->ai_protocol);
+                if ($sock < 0) {
+                    $lastErrno = self::errno($ffi);
+                    $lastErrstr = self::strerror($ffi, $lastErrno);
+                    $rp = $rp->ai_next;
+
+                    continue;
+                }
+
+                if (0 !== ($flags & self::STREAM_SERVER_BIND)) {
+                    $reuse = $ffi->new('struct { int on; }');
+                    $reuse->on = 1;
+                    $ffi->setsockopt(
+                        $sock,
+                        self::SOL_SOCKET,
+                        self::SO_REUSEADDR,
+                        \FFI::addr($reuse),
+                        \FFI::sizeof($reuse)
+                    );
+
+                    $bindRc = (int) $ffi->bind($sock, $rp->ai_addr, (int) $rp->ai_addrlen);
+                    if (0 !== $bindRc) {
+                        $lastErrno = self::errno($ffi);
+                        $lastErrstr = self::strerror($ffi, $lastErrno);
+                        $ffi->close($sock);
+                        $rp = $rp->ai_next;
+
+                        continue;
+                    }
+                }
+
+                if (
+                    self::SOCK_STREAM === $sockType
+                    && 0 !== ($flags & self::STREAM_SERVER_LISTEN)
+                ) {
+                    $listenRc = (int) $ffi->listen($sock, 128);
+                    if (0 !== $listenRc) {
+                        $lastErrno = self::errno($ffi);
+                        $lastErrstr = self::strerror($ffi, $lastErrno);
+                        $ffi->close($sock);
+                        $rp = $rp->ai_next;
+
+                        continue;
+                    }
+                }
+
+                $boundFd = $sock;
+                break;
+            }
+        } finally {
+            $ffi->freeaddrinfo($resHead);
+        }
+
+        if ($boundFd < 0) {
+            return [false, $lastErrno, $lastErrstr];
+        }
+
+        try {
+            $dupFd = (int) $ffi->dup($boundFd);
+            if ($dupFd < 0) {
+                $errno = self::errno($ffi);
+                $ffi->close($boundFd);
+
+                return [false, $errno, self::strerror($ffi, $errno)];
+            }
+
+            $ffi->close($boundFd);
+
+            $stream = @\fopen('php://fd/'.$dupFd, 'r+');
+            if (false === $stream) {
+                $ffi->close($dupFd);
+
+                return [false, 0, 'Unable to create stream from socket'];
+            }
+
+            return [$stream, 0, ''];
+        } catch (\Throwable) {
+            if ($boundFd >= 0) {
+                $ffi->close($boundFd);
+            }
+
+            return [false, 0, 'Unable to create stream from socket'];
+        }
+    }
+
+    private static function bindNodeName(string $host): ?string
+    {
+        if ('' === $host || '0.0.0.0' === $host || '*' === $host) {
+            return null;
+        }
+
+        return $host;
+    }
+
+    /**
+     * @return array{transport: string, host: string, port: int}|null
+     */
+    private static function parseSocketAddress(string $address): ?array
+    {
+        return self::parseRemoteSocket($address);
     }
 
     /**
@@ -338,6 +507,8 @@ struct timeval {
 
 int socket(int domain, int type, int protocol);
 int connect(int sockfd, const struct sockaddr *addr, socklen_t addrlen);
+int bind(int sockfd, const struct sockaddr *addr, socklen_t addrlen);
+int listen(int sockfd, int backlog);
 int setsockopt(int sockfd, int level, int optname, const void *optval, socklen_t optlen);
 int close(int fd);
 int dup(int oldfd);

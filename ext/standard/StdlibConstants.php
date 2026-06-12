@@ -148,6 +148,13 @@ final class StdlibConstants
 
     public const STREAM_FILTER_WRITE = 2;
 
+    /** stream_socket_client() / stream_socket_server() flags (ext/standard/streamsfuncs.c, #4993). */
+    public const STREAM_CLIENT_CONNECT = 4;
+
+    public const STREAM_SERVER_BIND = 4;
+
+    public const STREAM_SERVER_LISTEN = 8;
+
     /** syslog priorities (syslog.h; ext/standard/basic_functions.c). */
     public const LOG_EMERG = 0;
     public const LOG_ALERT = 1;
@@ -239,6 +246,9 @@ final class StdlibConstants
         'fnm_casefold' => VmFnmatch::FNM_CASEFOLD,
         'stream_filter_read' => self::STREAM_FILTER_READ,
         'stream_filter_write' => self::STREAM_FILTER_WRITE,
+        'stream_client_connect' => self::STREAM_CLIENT_CONNECT,
+        'stream_server_bind' => self::STREAM_SERVER_BIND,
+        'stream_server_listen' => self::STREAM_SERVER_LISTEN,
         'sunfuncs_ret_string' => VmDate::SUNFUNCS_RET_STRING,
         'sunfuncs_ret_double' => VmDate::SUNFUNCS_RET_DOUBLE,
         'sunfuncs_ret_timestamp' => VmDate::SUNFUNCS_RET_TIMESTAMP,
