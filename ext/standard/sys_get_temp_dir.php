@@ -12,7 +12,7 @@ use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Value;
 
-/** sys_get_temp_dir() — system temp directory (VM host; JIT/AOT via __compiler_sys_get_temp_dir). */
+/** sys_get_temp_dir() — VM via VmSysGetTempDirNative; JIT/AOT via __compiler_sys_get_temp_dir (#8180). */
 final class sys_get_temp_dir extends Internal
 {
     public function __construct()
@@ -29,7 +29,7 @@ final class sys_get_temp_dir extends Internal
         if (null === $frame->returnVar) {
             return;
         }
-        $frame->returnVar->string(\sys_get_temp_dir());
+        $frame->returnVar->string(VmSysGetTempDirNative::resolve());
     }
 
     public function call(Context $context, JITVariable ...$args): Value

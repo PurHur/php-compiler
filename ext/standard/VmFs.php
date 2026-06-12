@@ -1419,7 +1419,7 @@ final class VmFs
 
     public static function tempDir(): string
     {
-        return \sys_get_temp_dir();
+        return VmSysGetTempDirNative::resolve();
     }
 
     public static function getcwd() {
@@ -1428,7 +1428,7 @@ final class VmFs
 
     public static function chdir(string $path): bool
     {
-        return @\chdir($path);
+        return VmChdirNative::chdir($path);
     }
 
     /**

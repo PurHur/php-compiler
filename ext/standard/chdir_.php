@@ -11,7 +11,7 @@ use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Value;
 
-/** chdir() — VM via VmFs; JIT/AOT via libc chdir(2). */
+/** chdir() — VM via VmChdirNative (libc); JIT/AOT via JitChdir (#8180). */
 final class chdir_ extends Internal
 {
     public function __construct()
