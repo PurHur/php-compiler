@@ -41,8 +41,10 @@ final class BootstrapLoopFullSpineProbeTest extends TestCase
         $spineScript = $root.'/script/bootstrap-loop-gen2-recompile-spine.sh';
         $body = (string) file_get_contents($spineScript);
         $this->assertStringContainsString('compiler_lib_spine_smoke', $body);
+        $this->assertStringContainsString('bootstrap-resolve-compile-invoke.sh', $body);
+        $this->assertStringContainsString('bootstrap_compile_invoke', $body);
+        $this->assertStringContainsString('bootstrap_ensure_m3_compiler_lib_sidecar', $body);
         $this->assertStringContainsString('build/bin-compile-aot', $body);
-        $this->assertStringContainsString('-o "${GEN3}"', $body);
         $this->assertStringNotContainsString('PHP_COMPILER_M3_SOURCE="${SOURCE}"', $body);
     }
 }

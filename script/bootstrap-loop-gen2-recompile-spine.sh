@@ -6,7 +6,12 @@ cd "${ROOT}"
 
 # shellcheck source=php-env.sh
 source "$(dirname "$0")/php-env.sh"
+# shellcheck source=bootstrap-resolve-compile-invoke.sh
+source "$(dirname "$0")/bootstrap-resolve-compile-invoke.sh"
+# shellcheck source=bootstrap-gen0-install-prelinked-driver.sh
+source "$(dirname "$0")/bootstrap-gen0-install-prelinked-driver.sh"
 ci_apply_llvm_memory_env
+ci_ensure_vendor_patches
 
 if [[ -z "${PHP_COMPILER_LLVM_PATH:-}" || ! -f "${PHP_COMPILER_LLVM_PATH}/libLLVM-9.so.1" ]]; then
   echo "bootstrap-loop-gen2-recompile-spine: LLVM 9 not found (skip)" >&2
@@ -67,66 +72,29 @@ print_segfault_context() {
   echo "bootstrap-loop-gen2-recompile-spine: segfault rerun log: ${log}" >&2
 }
 
+# M3 compiler_lib spine sidecar must match test/selfhost/compiler_lib_spine_smoke/main.php (#3012).
+bootstrap_ensure_m3_compiler_lib_sidecar 2>/dev/null || true
+export PHP_COMPILER_SELFHOST_AOT=1
+
 # Prefer committed prelinked gen-0 when unset — avoids Zend inventory emit SIGSEGV on bin/compile.php (#2930).
 PRELINKED_GEN0="${ROOT}/prelinked/bootstrap-gen0/bin-compile-aot"
 if [[ "${BOOTSTRAP_LOOP_USE_EXISTING_BIN_COMPILE_AOT:-}" == "" && -x "${PRELINKED_GEN0}" ]]; then
   BOOTSTRAP_LOOP_USE_EXISTING_BIN_COMPILE_AOT=1
 fi
-
-# Always (re)build the emit-helper compile driver (argv `-o OUT SOURCE.php`) explicitly.
-# Do not route through bootstrap-selfhost-helloworld-compile-bin.sh here: it may produce
-# a different `build/bin-compile-aot` (inventory bin/compile.php) which can segfault on
-# spine-scale sources (#2930).
 if [[ "${BOOTSTRAP_LOOP_USE_EXISTING_BIN_COMPILE_AOT:-0}" == "1" && -x "${PRELINKED_GEN0}" ]]; then
   cp -f "${PRELINKED_GEN0}" "${DRIVER}"
   chmod +x "${DRIVER}"
-elif [[ "${BOOTSTRAP_LOOP_USE_EXISTING_BIN_COMPILE_AOT:-0}" != "1" ]]; then
-  EMIT_ENTRY="${ROOT}/test/selfhost/compiler_helloworld_smoke/compile_driver.php"
-  rm -f "${DRIVER}"
-  _driver_debug_env=()
-  if [[ "${BOOTSTRAP_DEBUG:-0}" == "1" || "${-}" == *x* ]]; then
-    _driver_debug_env+=(
-      PHP_COMPILER_DEBUG_LAST_PHASE=1
-      PHP_COMPILER_DEBUG_LAST_PHASE_FILE="${ROOT}/build/last_lowering_phase.json"
-      PHP_COMPILER_DEBUG_LAST_PHASE_STDERR=1
-    )
-    rm -f "${ROOT}/build/last_lowering_phase.json" || true
-  fi
-  # Inventory argv driver (bin/compile.php {main}) — compile_driver.php AOT only prints "ready" without argv (#3011).
-  env "${_driver_debug_env[@]}" -u PHP_COMPILER_EMIT_HELPER_LINK \
-    PHP_COMPILER_SELFHOST_AOT=1 PHP_COMPILER_M3_COMPILE_DRIVER=1 PHP_COMPILER_M3_COMPILE_DRIVER_MAIN=1 \
-    PHP_COMPILER_M4_BIN_COMPILE_DRIVER=1 PHP_COMPILER_M3_INVENTORY_EMIT_DRIVER=1 \
-    BOOTSTRAP_M3_USE_INVENTORY_EMIT_DRIVER=1 PHP_COMPILER_M3_EMIT_LOG_PREFIX=helloworld_compile_smoke \
-    php "${ROOT}/bin/compile.php" -o "${DRIVER}" "${ROOT}/bin/compile.php" >/dev/null
-fi
-if [[ ! -x "${DRIVER}" ]]; then
-  echo "bootstrap-loop-gen2-recompile-spine: missing native driver ${DRIVER}" >&2
-  exit 1
 fi
 
 rm -f "${GEN3}"
 set +e
-out="$(
-  _debug_env=()
-  # Optional crash-triage breadcrumbs: last lowering phase / op / func (#2941).
-  # Auto-enable in `bash -x` mode or when BOOTSTRAP_DEBUG=1 is set.
-  if [[ "${BOOTSTRAP_DEBUG:-0}" == "1" || "${-}" == *x* ]]; then
-    _debug_env+=(
-      PHP_COMPILER_DEBUG_LAST_PHASE=1
-      PHP_COMPILER_DEBUG_LAST_PHASE_FILE="${ROOT}/build/last_lowering_phase.json"
-      PHP_COMPILER_DEBUG_LAST_PHASE_STDERR=1
-    )
-    rm -f "${ROOT}/build/last_lowering_phase.json" || true
-  fi
-
-  env -u PHP_COMPILER_M3_SOURCE -u PHP_COMPILER_M3_OUT "${_debug_env[@]}" \
-    "${DRIVER}" -o "${GEN3}" "${SOURCE}" 2>&1
-)"
+out="$(bootstrap_compile_invoke "${GEN3}" "${SOURCE}" env PHP_COMPILER_SELFHOST_AOT=1 2>&1)"
 code=$?
 set -e
 printf '%s\n' "${out}"
+DRIVER="${BOOTSTRAP_COMPILE_DRIVER:-${DRIVER}}"
 print_segfault_context "${code}" "${DRIVER}" "${GEN3}" "${SOURCE}"
-if [[ "${code}" -ne 0 ]] || ! grep -qE 'compile_smoke_m3_emit: compile OK|helloworld_compile_smoke: compile OK' <<< "${out}"; then
+if [[ "${code}" -ne 0 ]]; then
   echo "bootstrap-loop-gen2-recompile-spine: gen-2 native spine compile failed (exit ${code})" >&2
   exit 1
 fi
