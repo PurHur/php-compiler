@@ -34,6 +34,7 @@ $docroot = ProjectManifest::resolvePublicDir($docrootArg);
 
 DevServer::run($listen, $docroot, static function (string $script, array $cgiEnv): array {
     ResponseContext::reset();
+    ResponseContext::enableHeaderQueue();
     VmSession::reset();
     OutputBuffer::reset();
     ShutdownQueue::reset();

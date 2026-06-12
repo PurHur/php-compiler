@@ -18,10 +18,25 @@ final class ResponseContext
     /** @var list<string> */
     private static array $headers = [];
 
+    /** When false (CLI), header() does not queue lines for headers_list() — php-src head.c SAPI gate (#4037). */
+    private static bool $headerQueueEnabled = false;
+
     public static function reset(): void
     {
         self::$status = 0;
         self::$headers = [];
+        self::$headerQueueEnabled = false;
+    }
+
+    /** Enable pending-header tracking for CGI/dev-server requests (issue #4037). */
+    public static function enableHeaderQueue(): void
+    {
+        self::$headerQueueEnabled = true;
+    }
+
+    public static function isHeaderQueueEnabled(): bool
+    {
+        return self::$headerQueueEnabled;
     }
 
     public static function isHttpResponseCodeUnset(): bool
@@ -96,6 +111,9 @@ final class ResponseContext
         if (preg_match('#^HTTP/\d(?:\.\d)?\s+(\d{3})#', $line, $m)) {
             self::setStatus((int) $m[1]);
         }
+        if (!self::$headerQueueEnabled) {
+            return;
+        }
         $name = self::headerNameFromLine($line);
         if ($replace && null !== $name) {
             self::removeHeader($name);
@@ -105,6 +123,9 @@ final class ResponseContext
 
     public static function removeHeader(?string $name = null): void
     {
+        if (!self::$headerQueueEnabled) {
+            return;
+        }
         if (null === $name || '' === $name) {
             self::$headers = [];
 

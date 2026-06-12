@@ -34,6 +34,7 @@ final class PendingHeadersRuntimeStandaloneTest extends TestCase
         foreach (
             [
                 '__phpc_pending_header_reset',
+                '__phpc_header_queue_enable',
                 '__phpc_pending_header_add',
                 '__phpc_pending_header_remove',
                 '__phpc_pending_header_list',

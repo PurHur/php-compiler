@@ -15,4 +15,4 @@ foreach (headers_list() as $line) {
 echo $found ? "ok\n" : "missing\n";
 --EXPECT--
 body
-ok
+missing

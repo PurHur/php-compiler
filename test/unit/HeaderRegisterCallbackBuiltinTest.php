@@ -25,7 +25,7 @@ PHP;
 
     private const EXPECT = <<<'EXPECT'
 body
-ok
+missing
 
 EXPECT;
 

@@ -60,6 +60,7 @@ final class CgiDriver
     public static function runVmScript(string $script): array
     {
         ResponseContext::reset();
+        ResponseContext::enableHeaderQueue();
         VmSession::reset();
         OutputBuffer::reset();
         $code = file_get_contents($script);

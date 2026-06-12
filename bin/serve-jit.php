@@ -51,6 +51,7 @@ $executeScript = static function (
     array &$jitCache
 ): array {
     ResponseContext::reset();
+    ResponseContext::enableHeaderQueue();
     VmSession::reset();
     OutputBuffer::reset();
     ShutdownQueue::reset();
