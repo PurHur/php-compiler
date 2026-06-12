@@ -10,7 +10,7 @@ use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Value;
 
-/** connection_aborted() — detect closed HTTP connection (ext/standard/basic_functions.c; #3242). VM only v1. */
+/** connection_aborted() — detect closed HTTP connection (ext/standard/basic_functions.c; #3242, JIT #8078). */
 final class connection_aborted extends Internal
 {
     public function __construct()
@@ -36,6 +36,6 @@ final class connection_aborted extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        throw new \LogicException('connection_aborted() is not implemented for JIT in this compiler build (issue #3242)');
+        return JitExecutionLimits::connectionAborted($context, ...$args);
     }
 }
