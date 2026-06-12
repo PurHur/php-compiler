@@ -8,7 +8,6 @@ use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\ArrayBuiltinHelper;
 use PHPCompiler\JIT\Context;
-use PHPCompiler\JIT\JitLongArg;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
@@ -37,11 +36,9 @@ final class array_pad extends Internal
         if (Variable::TYPE_ARRAY !== $array->type) {
             throw new \LogicException('array_pad() argument #1 must be an array in this compiler build');
         }
-        if (Variable::TYPE_INTEGER !== $length->type) {
-            throw new \LogicException('array_pad() argument #2 must be an integer in this compiler build');
-        }
+        $lengthInt = VmMath::parseIntBuiltinArg($length, 'array_pad', 2, 'length');
         $frame->returnVar->array(
-            VmArray::pad($array->toArray(), $length->toInt(), $value)
+            VmArray::pad($array->toArray(), $lengthInt, $value)
         );
     }
 
@@ -54,15 +51,12 @@ final class array_pad extends Internal
             && !($args[0]->type & JITVariable::IS_NATIVE_ARRAY)) {
             throw new \LogicException('array_pad() argument #1 must be an array in this compiler build');
         }
-        if (JITVariable::TYPE_NATIVE_LONG !== $args[1]->type) {
-            throw new \LogicException('array_pad() argument #2 must be an integer in this compiler build');
-        }
         foreach ($args as $i => $arg) {
             if (JITVariable::TYPE_STRING === $arg->type || JITVariable::TYPE_VALUE === $arg->type) {
                 $this->jitString($context, $arg, 'array_pad() argument #'.((int) $i + 1));
             }
         }
-        $length = JitLongArg::lower($context, $args[1], 'array_pad() length');
+        $length = JitIntdiv::lowerIntBuiltinArg($context, $args[1], 'array_pad', 2, 'length');
 
         return ArrayBuiltinHelper::pad($context, $args[0], $length, $args[2]);
     }
