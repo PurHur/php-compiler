@@ -95,6 +95,12 @@ class JIT {
                 $this->m3CompileDriverMainBlock = $block;
             }
         }
+        if (
+            $this->shouldUseM3CompileDriverRealLowering()
+            && (null !== $this->m3EmitTuMainBlock || null !== $this->m3CompileDriverMainBlock)
+        ) {
+            $this->ensureM3EmitTuCompilerRuntimeCompileDeps();
+        }
         $emitHelperStubBlock = $this->m3CompileDriverMainBlock ?? $this->m3EmitTuMainBlock;
         if (null !== $emitHelperStubBlock && $this->shouldStubInventoryEmitHelperBundledBodies()) {
             foreach (['preparesourceforparser', 'preprocesssourceforparse', 'rewritesourcebeforeparser'] as $methodLc) {
@@ -663,6 +669,14 @@ class JIT {
         if (!$this->shouldUseM3CompileDriverRealLowering()) {
             return false;
         }
+        if ($this->shouldStubM3InventoryEmitJitSpineMethods()) {
+            if (preg_match('/\\\\runtime::(loadjit|loadjitcontext|createjit|jitcontextforloadjit|loadjitcompilemodulefuncs|jitemitinplace)$/', $lower)) {
+                return false;
+            }
+            if (str_ends_with($lower, '\\runtime::compile')) {
+                return false;
+            }
+        }
 
         if ($this->isM3CompileDriverSpineDenyName($lower)) {
             return false;
@@ -1003,6 +1017,24 @@ class JIT {
                 && !$this->shouldUseM3CompileDriverRealLowering()
             ) {
                 return $this->emitM3EmitTuCompilerCompileEmitSmokeNativeFunction($internalName, $logicalName);
+            }
+        }
+        if ($this->shouldUseM3CompileDriverRealLowering() && null !== $logicalName) {
+            $m3CompilerSetter = strtolower($logicalName);
+            if (str_ends_with($m3CompilerSetter, '\\compiler::setpropertyhookregistry')
+                || str_ends_with($m3CompilerSetter, '\\compiler::setknownclassreadonly')
+            ) {
+                return $this->emitM3EmitTuCompilerArrayPropertySetterVoidStub(
+                    $internalName,
+                    $logicalName,
+                    $this->m3EmitTuMainBlock ?? $this->m3CompileDriverMainBlock
+                );
+            }
+            if ('phpcompiler\\compiler::compile' === $m3CompilerSetter
+                && $this->shouldUseM3InventoryEmitDriver()
+                && $this->shouldUseEmitHelperLinkStubs()
+            ) {
+                return $this->emitM3EmitTuCompilerCompileNullStubNative($internalName, $logicalName);
             }
         }
         if ($this->shouldUseSelfHostJitStubs() && null !== $logicalName) {
@@ -1366,11 +1398,20 @@ class JIT {
      * M3 compile-driver loadJit (#1402, #1495): outer orchestration; inner helpers are separate FUNCDEFs (#2846, #2847).
      * Calls loadJitContext via jitContextForLoadJit — keep nested helpers out of loadJit to avoid LLVM 9 inlining crash.
      */
+    private function shouldStubM3InventoryEmitJitSpineMethods(): bool
+    {
+        return $this->shouldUseM3InventoryEmitDriver() && $this->shouldUseEmitHelperLinkStubs();
+    }
+
     private function compileRuntimeLoadJitM3Native(
         string $internalName,
         Block $block,
         string $logicalName
     ): PHPLLVM\Value {
+        if ($this->shouldStubM3InventoryEmitJitSpineMethods()) {
+            return $this->emitM3EmitTuRuntimeInitVoidStub($internalName, $logicalName, $block);
+        }
+
         return $this->compileRuntimeSpinePhpLowering($internalName, $block, $logicalName);
     }
 
@@ -1382,6 +1423,10 @@ class JIT {
         Block $block,
         string $logicalName
     ): PHPLLVM\Value {
+        if ($this->shouldStubM3InventoryEmitJitSpineMethods()) {
+            return $this->emitM3EmitTuRuntimeInitVoidStub($internalName, $logicalName, $block);
+        }
+
         return $this->compileRuntimeSpinePhpLowering($internalName, $block, $logicalName);
     }
 
@@ -1391,6 +1436,10 @@ class JIT {
         Block $block,
         string $logicalName
     ): PHPLLVM\Value {
+        if ($this->shouldStubM3InventoryEmitJitSpineMethods()) {
+            return $this->emitM3EmitTuRuntimeInitVoidStub($internalName, $logicalName, $block);
+        }
+
         return $this->compileRuntimeSpinePhpLowering($internalName, $block, $logicalName);
     }
 
@@ -1400,6 +1449,10 @@ class JIT {
         Block $block,
         string $logicalName
     ): PHPLLVM\Value {
+        if ($this->shouldStubM3InventoryEmitJitSpineMethods()) {
+            return $this->emitM3EmitTuRuntimeInitVoidStub($internalName, $logicalName, $block);
+        }
+
         return $this->compileRuntimeSpinePhpLowering($internalName, $block, $logicalName);
     }
 
@@ -1409,6 +1462,10 @@ class JIT {
         Block $block,
         string $logicalName
     ): PHPLLVM\Value {
+        if ($this->shouldStubM3InventoryEmitJitSpineMethods()) {
+            return $this->emitM3EmitTuRuntimeInitVoidStub($internalName, $logicalName, $block);
+        }
+
         return $this->compileRuntimeSpinePhpLowering($internalName, $block, $logicalName);
     }
 
@@ -1982,6 +2039,8 @@ class JIT {
             'compileclassconstfetch',
             'getopcodetype',
             'markcallerlocalsusedbyliteralinclude',
+            'setpropertyhookregistry',
+            'setknownclassreadonly',
         ];
     }
 
@@ -2121,6 +2180,8 @@ class JIT {
             'compilefirstclasscallable',
             'compilefirstclassfunctionnameslot',
             'compilefirstclassstaticnameslot',
+            'setpropertyhookregistry',
+            'setknownclassreadonly',
         ];
     }
 
@@ -2173,7 +2234,7 @@ class JIT {
             return $this->compileRuntimeLoadCoreModulesM3Native($internalName, $block, $logicalName);
         }
         if (str_ends_with($emitLc, '\\runtime::loadjitcontext')) {
-            if ($this->shouldUseM3CompileDriverRealLowering()) {
+            if ($this->shouldUseM3CompileDriverRealLowering() && !$this->shouldStubM3InventoryEmitJitSpineMethods()) {
                 return null;
             }
 
@@ -2183,7 +2244,7 @@ class JIT {
             || str_ends_with($emitLc, '\\runtime::jitcontextforloadjit')
             || str_ends_with($emitLc, '\\runtime::loadjitcompilemodulefuncs')
         ) {
-            if ($this->shouldUseM3CompileDriverRealLowering()) {
+            if ($this->shouldUseM3CompileDriverRealLowering() && !$this->shouldStubM3InventoryEmitJitSpineMethods()) {
                 return null;
             }
 
@@ -3196,9 +3257,11 @@ class JIT {
         if (!$this->shouldUseM3CompileDriverRealLowering()) {
             return;
         }
+        $this->ensureM3EmitTuCompilerRuntimeCompileDeps();
         $emitHelperStubMethods = $this->shouldStubInventoryEmitHelperBundledBodies()
             ? ['parse', 'preparesourceforparser', 'preprocesssourceforparse', 'rewritesourcebeforeparser', 'compileemitsmoke']
             : [];
+        $inventoryEmitHelper = $this->shouldStubM3InventoryEmitJitSpineMethods();
         foreach ([
             '__construct',
             'parse',
@@ -3212,7 +3275,9 @@ class JIT {
             'noteparsecompilenullforscript',
             'peeklastparsefailure',
         ] as $methodLc) {
-            if (in_array($methodLc, $emitHelperStubMethods, true)) {
+            if (in_array($methodLc, $emitHelperStubMethods, true)
+                || ('compile' === $methodLc && $inventoryEmitHelper)
+            ) {
                 continue;
             }
             $this->compileM3EmitTuRuntimeMethodFromModules($methodLc);
@@ -3227,6 +3292,115 @@ class JIT {
         $this->runQueue();
     }
 
+    /**
+     * Runtime::compile calls these before Compiler::compile — native void stubs avoid parsing
+     * lib/Compiler.php during inventory emit link (#1492).
+     */
+    private function ensureM3EmitTuCompilerRuntimeCompileDeps(): void
+    {
+        if (!$this->shouldUseM3CompileDriverRealLowering()) {
+            return;
+        }
+        if (!$this->shouldUseM3EmitTuNativeBridge() && !$this->shouldUseM3InventoryEmitDriver()) {
+            return;
+        }
+        $stubBlock = $this->m3EmitTuMainBlock ?? $this->m3CompileDriverMainBlock;
+        foreach (['setpropertyhookregistry', 'setknownclassreadonly'] as $methodLc) {
+            $logical = 'PHPCompiler\\Compiler::'.$methodLc;
+            $lc = strtolower($logical);
+            if (!isset($this->context->functions[$lc])) {
+                $this->emitM3EmitTuCompilerArrayPropertySetterVoidStub(
+                    $this->llvmInternalName($logical),
+                    $logical,
+                    $stubBlock
+                );
+            }
+        }
+        if ($this->shouldStubM3InventoryEmitJitSpineMethods()) {
+            $compileLogical = 'PHPCompiler\\Compiler::compile';
+            $compileLc = strtolower($compileLogical);
+            if (!isset($this->context->functions[$compileLc])) {
+                $this->emitM3EmitTuCompilerCompileNullStubNative(
+                    $this->llvmInternalName($compileLogical),
+                    $compileLogical
+                );
+            }
+            foreach (['loadjit', 'loadjitcontext', 'createjit', 'jitcontextforloadjit', 'loadjitcompilemodulefuncs', 'jitemitinplace'] as $methodLc) {
+                $logical = 'PHPCompiler\\Runtime::'.$methodLc;
+                $lc = strtolower($logical);
+                if (!isset($this->context->functions[$lc]) && null !== $stubBlock) {
+                    $this->emitM3EmitTuRuntimeInitVoidStub(
+                        $this->llvmInternalName($logical),
+                        $logical,
+                        $stubBlock
+                    );
+                }
+            }
+        }
+    }
+
+    /** Inventory emit spine: Compiler::compile link stub — emit path uses compileEmitSmoke (#1492). */
+    private function emitM3EmitTuCompilerCompileNullStubNative(string $internalName, string $logical): PHPLLVM\Value
+    {
+        $lc = strtolower($logical);
+        if (isset($this->context->functions[$lc])) {
+            return $this->context->functions[$lc];
+        }
+        $objPtr = $this->context->getTypeFromString('__object__*');
+        $func = $this->context->module->addFunction(
+            $internalName,
+            $this->context->context->functionType($objPtr, false, $objPtr, $objPtr)
+        );
+        $bb = $func->appendBasicBlock('entry');
+        $saved = $this->context->builder;
+        $this->context->builder = $this->context->context->builderCreate();
+        $this->context->builder->positionAtEnd($bb);
+        $this->context->builder->returnValue($objPtr->constNull());
+        $this->context->builder->clearInsertionPosition();
+        $this->context->builder = $saved;
+        $this->context->functions[$lc] = $func;
+        $this->context->functionReturnType[$lc] = '__object__*';
+        $this->context->functionProxies[$lc] = new JIT\Call\Native($func, $logical, [$objPtr, $objPtr], []);
+
+        return $func;
+    }
+
+    /** No-op array setter for Compiler spine — LLVM link only; real bodies deferred (#1492). */
+    private function emitM3EmitTuCompilerArrayPropertySetterVoidStub(
+        string $internalName,
+        string $logicalName,
+        ?Block $block
+    ): PHPLLVM\Value {
+        $lcname = strtolower($logicalName);
+        if (isset($this->context->functions[$lcname])) {
+            return $this->context->functions[$lcname];
+        }
+        $objectPtr = $this->context->getTypeFromString('__object__*');
+        $htPtr = $this->context->getTypeFromString('__hashtable__*');
+        $voidTy = $this->context->getTypeFromString('void');
+        $func = $this->context->module->addFunction(
+            $internalName,
+            $this->context->context->functionType($voidTy, false, $objectPtr, $htPtr)
+        );
+        $bb = $func->appendBasicBlock('entry');
+        $saved = $this->context->builder;
+        $this->context->builder = $this->context->context->builderCreate();
+        $this->context->builder->positionAtEnd($bb);
+        $this->context->builder->returnVoid();
+        $this->context->builder->clearInsertionPosition();
+        $this->context->builder = $saved;
+        $this->context->functions[$lcname] = $func;
+        $this->context->functionReturnType[$lcname] = 'void';
+        $this->context->functionProxies[$lcname] = new JIT\Call\Native(
+            $func,
+            $logicalName,
+            [$objectPtr, $htPtr],
+            null !== $block ? $this->collectParamDefaults($block) : []
+        );
+
+        return $func;
+    }
+
     /** Ensure parse + Compiler::compileEmitSmoke exist before emit-bridge LLVM (#2666). */
     private function ensureM3EmitTuEmitBridgeSpineSymbols(): void
     {
@@ -3236,6 +3410,7 @@ class JIT {
         if (!$this->shouldUseM3EmitTuNativeBridge() && !$this->shouldUseM3InventoryEmitDriver()) {
             return;
         }
+        $this->ensureM3EmitTuCompilerRuntimeCompileDeps();
         $stubBlock = $this->m3CompileDriverMainBlock ?? $this->m3EmitTuMainBlock;
         if ($this->shouldStubInventoryEmitHelperBundledBodies() && null !== $stubBlock) {
             $parseLc = strtolower('PHPCompiler\\Runtime::parse');
