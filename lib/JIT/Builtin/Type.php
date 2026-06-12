@@ -654,6 +654,12 @@ class Type extends Builtin {
             $fntypeLoadedExtensions
         );
         $this->context->registerFunction('__compiler_get_loaded_extensions', $fnLoadedExtensions);
+        $fntypeExtensionFuncs = $this->context->context->functionType($htPtr, false, $strPtr);
+        $fnExtensionFuncs = $this->context->module->addFunction(
+            '__compiler_get_extension_funcs',
+            $fntypeExtensionFuncs
+        );
+        $this->context->registerFunction('__compiler_get_extension_funcs', $fnExtensionFuncs);
         $fntypeGettimeofdayArray = $this->context->context->functionType($htPtr, false);
         $fnGettimeofdayArray = $this->context->module->addFunction(
             '__compiler_gettimeofday_array',

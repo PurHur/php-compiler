@@ -193,6 +193,40 @@ final class JitInfo
         return $ptr;
     }
 
+    public static function get_extension_funcs(Context $context, JITVariable $extension): Value
+    {
+        StringInfo::ensureLinked($context);
+        $raw = $context->builder->call(
+            $context->lookupFunction('__compiler_get_extension_funcs'),
+            JitStringBuiltinArg::lower($context, $extension, 'get_extension_funcs', 0, 'extension_name')
+        );
+        $htPtr = $context->getTypeFromString('__hashtable__*');
+        $failed = $context->builder->icmp(Builder::INT_EQ, $raw, $htPtr->constNull());
+
+        $slot = JitValueBox::alloc($context);
+        $ptr = JitValueBox::pointer($context, $slot);
+        $failBlock = BasicBlockHelper::append($context, 'get_extension_funcs_fail');
+        $okBlock = BasicBlockHelper::append($context, 'get_extension_funcs_ok');
+        $doneBlock = BasicBlockHelper::append($context, 'get_extension_funcs_done');
+        $context->builder->branchIf($failed, $failBlock, $okBlock);
+
+        $context->builder->positionAtEnd($failBlock);
+        JitValueBox::writeBool($context, $slot, $context->constantFromBool(false));
+        $context->builder->branch($doneBlock);
+
+        $context->builder->positionAtEnd($okBlock);
+        $context->builder->call(
+            $context->lookupFunction('__value__writeHashtable'),
+            $ptr,
+            $raw
+        );
+        $context->builder->branch($doneBlock);
+
+        $context->builder->positionAtEnd($doneBlock);
+
+        return $ptr;
+    }
+
     private static function versionCompareWithOperator(
         Context $context,
         Value $compare,

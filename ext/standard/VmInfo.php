@@ -98,6 +98,25 @@ final class VmInfo
         return $ht;
     }
 
+    /**
+     * @return HashTable|false
+     */
+    public static function get_extension_funcs(string $extension): HashTable|false
+    {
+        $funcs = ModuleRegistry::getExtensionFunctions($extension);
+        if (null === $funcs) {
+            return false;
+        }
+        $ht = new HashTable();
+        foreach ($funcs as $name) {
+            $var = new Variable();
+            $var->string($name);
+            $ht->append($var);
+        }
+
+        return $ht;
+    }
+
     public static function zend_version(): string
     {
         return self::ZEND_VERSION;

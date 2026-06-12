@@ -741,6 +741,7 @@ class Module extends ModuleAbstract
             new version_compare(),
             new extension_loaded(),
             new get_loaded_extensions(),
+            new get_extension_funcs(),
             new date(),
             new timezone_version_get(),
             new timezone_identifiers_list(),

@@ -14,7 +14,8 @@ use PHPLLVM\Value\Function_ as LlvmFunction;
 
 /**
  * LLVM __compiler_phpversion / __compiler_php_sapi_name / __compiler_php_uname /
- * __compiler_extension_loaded / __compiler_get_loaded_extensions (issue #6124).
+ * __compiler_extension_loaded / __compiler_get_loaded_extensions / __compiler_get_extension_funcs
+ * (issue #6124, #3433).
  *
  * Mirrors ext/standard/VmInfo.php; replaces lib/AOT/runtime/phpc_info.c introspection.
  * php-src: ext/standard/info.c
@@ -47,6 +48,7 @@ final class StringInfo
         '__compiler_php_uname',
         '__compiler_extension_loaded',
         '__compiler_get_loaded_extensions',
+        '__compiler_get_extension_funcs',
     ];
 
     public static function ensureLinked(Context $context): void
@@ -112,6 +114,13 @@ final class StringInfo
             $context->context->functionType($htPtr, false, $i32)
         );
         self::implementGetLoadedExtensions($context, $fnLoadedExt);
+
+        $fnExtFuncs = self::declareIfMissing(
+            $context,
+            '__compiler_get_extension_funcs',
+            $context->context->functionType($htPtr, false, $strPtr)
+        );
+        self::implementGetExtensionFuncs($context, $fnExtFuncs);
 
         self::registerLinkedRuntime($context);
     }
@@ -320,6 +329,72 @@ final class StringInfo
             );
         }
         $context->builder->returnValue($ht);
+        $context->builder->clearInsertionPosition();
+    }
+
+    private static function implementGetExtensionFuncs(Context $context, LlvmFunction $fn): void
+    {
+        $entry = $fn->appendBasicBlock('gef_entry');
+        $context->builder->positionAtEnd($entry);
+
+        $name = $fn->getParam(0);
+        $htPtr = $context->getTypeFromString('__hashtable__*');
+        $strPtr = $context->getTypeFromString('__string__*');
+        $nullName = $context->builder->icmp(Builder::INT_EQ, $name, $strPtr->constNull());
+        $missBb = $fn->appendBasicBlock('gef_miss');
+        $checkBb = $fn->appendBasicBlock('gef_check');
+        $context->builder->branchIf($nullName, $missBb, $checkBb);
+
+        $context->builder->positionAtEnd($checkBb);
+        $i64 = $context->getTypeFromString('int64');
+        $emptyName = $context->builder->icmp(Builder::INT_EQ, self::stringLen($context, $name), $i64->constInt(0, false));
+        $tooLong = $context->builder->icmp(
+            Builder::INT_UGE,
+            self::stringLen($context, $name),
+            $i64->constInt(64, false)
+        );
+        $invalid = $context->builder->or($emptyName, $tooLong);
+        $matchBb = $fn->appendBasicBlock('gef_match');
+        $context->builder->branchIf($invalid, $missBb, $matchBb);
+
+        $context->builder->positionAtEnd($matchBb);
+        $map = ModuleRegistry::extensionFunctionMap();
+        if ([] === $map) {
+            $context->builder->branch($missBb);
+        } else {
+            $extensions = array_keys($map);
+            $count = \count($extensions);
+            $context->builder->branch($fn->appendBasicBlock('gef_try_0'));
+            for ($i = 0; $i < $count; ++$i) {
+                $extension = $extensions[$i];
+                $tryBb = $fn->appendBasicBlock('gef_try_'.$i);
+                $context->builder->positionAtEnd($tryBb);
+                $matches = self::stringEqualsIgnoreCase($context, $fn, $name, $extension);
+                $fillBb = $fn->appendBasicBlock('gef_fill_'.$i);
+                $nextBb = $i + 1 < $count
+                    ? $fn->appendBasicBlock('gef_try_'.($i + 1))
+                    : $missBb;
+                $context->builder->branchIf($matches, $fillBb, $nextBb);
+
+                $context->builder->positionAtEnd($fillBb);
+                $ht = $context->builder->call($context->lookupFunction('__hashtable__alloc'));
+                foreach ($map[$extension] as $index => $literal) {
+                    $context->builder->call(
+                        $context->lookupFunction('__hashtable__setStringAt'),
+                        $ht,
+                        $context->builder->zExt(
+                            $i64->constInt($index, false),
+                            $context->getTypeFromString('size_t')
+                        ),
+                        self::literalString($context, $literal)
+                    );
+                }
+                $context->builder->returnValue($ht);
+            }
+        }
+
+        $context->builder->positionAtEnd($missBb);
+        $context->builder->returnValue($htPtr->constNull());
         $context->builder->clearInsertionPosition();
     }
 
