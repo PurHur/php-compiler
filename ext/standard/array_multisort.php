@@ -209,9 +209,15 @@ final class array_multisort extends Internal
     {
         $first = $primaryValues[0]->resolveIndirect();
         $stringCompare = null;
+        $useSpaceship = false;
         if (Variable::TYPE_STRING === $first->type) {
             $stringCompare = VmInternalCompare::resolveStringCallback('strcmp');
-        } elseif (Variable::TYPE_INTEGER !== $first->type) {
+        } elseif (Variable::TYPE_INTEGER === $first->type) {
+            // integer compare via compareIntegerPrimary()
+        } elseif (Variable::TYPE_OBJECT === $first->type || EnumCaseSupport::isEnumCaseVariable($first)) {
+            VmInternalCompare::assertHomogeneousEnumOrObjectValues($primaryValues, 'array_multisort()');
+            $useSpaceship = true;
+        } else {
             throw new \LogicException(
                 'array_multisort() only supports homogeneous string or integer arrays in this compiler build'
             );
@@ -220,16 +226,23 @@ final class array_multisort extends Internal
         for ($i = 1; $i < $n; ++$i) {
             $j = $i;
             while ($j > 0) {
-                $cmp = null !== $stringCompare
-                    ? VmInternalCompare::invoke(
+                if (null !== $stringCompare) {
+                    $cmp = VmInternalCompare::invoke(
                         $stringCompare,
                         $primaryValues[$indices[$j - 1]],
                         $primaryValues[$indices[$j]]
-                    )
-                    : self::compareIntegerPrimary(
+                    );
+                } elseif ($useSpaceship) {
+                    $cmp = VmInternalCompare::comparePackedValuesForSort(
                         $primaryValues[$indices[$j - 1]],
                         $primaryValues[$indices[$j]]
                     );
+                } else {
+                    $cmp = self::compareIntegerPrimary(
+                        $primaryValues[$indices[$j - 1]],
+                        $primaryValues[$indices[$j]]
+                    );
+                }
                 if ($descending) {
                     $cmp = -$cmp;
                 }

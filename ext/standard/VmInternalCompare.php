@@ -462,6 +462,12 @@ final class VmInternalCompare
         );
     }
 
+    /** Compare packed array values for sort()/array_multisort() enum and object operands (#5624). */
+    public static function comparePackedValuesForSort(Variable $left, Variable $right): int
+    {
+        return self::compareValuesForSort($left, $right);
+    }
+
     private static function compareValuesForSort(Variable $left, Variable $right): int
     {
         if (EnumCaseSupport::isEnumCaseVariable($left) && EnumCaseSupport::isEnumCaseVariable($right)) {
