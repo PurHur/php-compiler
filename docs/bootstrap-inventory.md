@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 2345 |
-| Phase A inventory files (M2 ratio SSOT) | 2345 |
+| PHP files on vm.php path | 2352 |
+| Phase A inventory files (M2 ratio SSOT) | 2352 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 6358 |
+| Source constructs flagged (warnings) | 6385 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -1402,14 +1402,21 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/standard/zend_version.php` | 0 | 1 |
 | `ext/standard/zlib_decode.php` | 0 | 1 |
 | `ext/standard/zlib_encode.php` | 0 | 1 |
-| `ext/tokenizer/BuiltinClasses.php` | 0 | 2 |
+| `ext/tokenizer/BuiltinClasses.php` | 0 | 1 |
 | `ext/tokenizer/JitTokenGetAll.php` | 0 | 2 |
 | `ext/tokenizer/JitTokenName.php` | 0 | 2 |
 | `ext/tokenizer/LanguageScanner.php` | 0 | 3 |
 | `ext/tokenizer/Module.php` | 0 | 4 |
+| `ext/tokenizer/PhpTokenConstruct.php` | 0 | 2 |
+| `ext/tokenizer/PhpTokenGetTokenName.php` | 0 | 2 |
+| `ext/tokenizer/PhpTokenIs.php` | 0 | 2 |
+| `ext/tokenizer/PhpTokenIsIgnorable.php` | 0 | 2 |
+| `ext/tokenizer/PhpTokenToString.php` | 0 | 1 |
+| `ext/tokenizer/PhpTokenTokenize.php` | 0 | 4 |
 | `ext/tokenizer/TokenConstants.php` | 0 | 1 |
 | `ext/tokenizer/TokenConstantsData.php` | 0 | 1 |
 | `ext/tokenizer/TokenGetAllJitHelper.php` | 0 | 1 |
+| `ext/tokenizer/VmPhpToken.php` | 0 | 15 |
 | `ext/tokenizer/VmTokenizer.php` | 0 | 5 |
 | `ext/tokenizer/token_get_all.php` | 0 | 2 |
 | `ext/tokenizer/token_name.php` | 0 | 3 |
@@ -11110,8 +11117,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/tokenizer/BuiltinClasses.php`
 
 **Warnings** (review for bootstrap subset):
-- new ClassEntry (line 28)
-- 2 class method(s)
+- 1 class method(s)
 
 ### `ext/tokenizer/JitTokenGetAll.php`
 
@@ -11140,6 +11146,43 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new token_name (line 33)
 - 2 class method(s)
 
+### `ext/tokenizer/PhpTokenConstruct.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 24)
+- 1 class method(s)
+
+### `ext/tokenizer/PhpTokenGetTokenName.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 21)
+- 1 class method(s)
+
+### `ext/tokenizer/PhpTokenIs.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 22)
+- 3 class method(s)
+
+### `ext/tokenizer/PhpTokenIsIgnorable.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 21)
+- 1 class method(s)
+
+### `ext/tokenizer/PhpTokenToString.php`
+
+**Warnings** (review for bootstrap subset):
+- 1 class method(s)
+
+### `ext/tokenizer/PhpTokenTokenize.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 29)
+- new HashTable (line 40)
+- new Variable (line 42)
+- 1 class method(s)
+
 ### `ext/tokenizer/TokenConstants.php`
 
 **Warnings** (review for bootstrap subset):
@@ -11154,6 +11197,25 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 
 **Warnings** (review for bootstrap subset):
 - 1 class method(s)
+
+### `ext/tokenizer/VmPhpToken.php`
+
+**Warnings** (review for bootstrap subset):
+- new Variable (line 37)
+- new Variable (line 38)
+- new ClassEntry (line 42)
+- new ClassProperty (line 44)
+- new ClassProperty (line 45)
+- new ClassProperty (line 46)
+- new ClassProperty (line 47)
+- new PhpTokenConstruct (line 49)
+- new PhpTokenTokenize (line 52)
+- new PhpTokenIs (line 54)
+- new PhpTokenIsIgnorable (line 56)
+- new PhpTokenGetTokenName (line 58)
+- new PhpTokenToString (line 60)
+- new ObjectEntry (line 102)
+- 13 class method(s)
 
 ### `ext/tokenizer/VmTokenizer.php`
 
