@@ -36,5 +36,20 @@ final class VmCliProcessTitleTest extends TestCase
     public function testCompliancePhptPresent(): void
     {
         $this->assertFileExists($this->repoRoot.'/test/compliance/cases/stdlib/cli_process_title.phpt');
+        $this->assertFileExists($this->repoRoot.'/test/compliance/cases/stdlib/cli_process_title_jit.phpt');
+    }
+
+    public function testJitLoweringWired(): void
+    {
+        $set = (string) file_get_contents($this->repoRoot.'/ext/standard/cli_set_process_title.php');
+        $get = (string) file_get_contents($this->repoRoot.'/ext/standard/cli_get_process_title.php');
+        $this->assertStringContainsString('JitCliProcessTitle::set', $set);
+        $this->assertStringContainsString('JitCliProcessTitle::get', $get);
+        $this->assertStringNotContainsString('not implemented for JIT', $set);
+        $this->assertStringNotContainsString('not implemented for JIT', $get);
+        $this->assertFileExists($this->repoRoot.'/ext/standard/JitCliProcessTitle.php');
+        $jit = (string) file_get_contents($this->repoRoot.'/ext/standard/JitCliProcessTitle.php');
+        $this->assertStringContainsString('prctl', $jit);
+        $this->assertStringContainsString('phpc_cli_process_title_ptr', $jit);
     }
 }
