@@ -159,6 +159,8 @@ use PHPCompiler\VM\Builtin\ReflectionParameterIsSensitive;
 use PHPCompiler\VM\Builtin\ReflectionPropertyConstruct;
 use PHPCompiler\VM\Builtin\ReflectionPropertyGetAttributes;
 use PHPCompiler\VM\Builtin\ReflectionPropertyGetName;
+use PHPCompiler\VM\Builtin\ReflectionPropertyGetReadableType;
+use PHPCompiler\VM\Builtin\ReflectionPropertyGetSettableType;
 use PHPCompiler\VM\Builtin\ReflectionPropertyGetValue;
 use PHPCompiler\VM\Builtin\ReflectionPropertyAsymmetricProbe;
 use PHPCompiler\VM\Builtin\ReflectionPropertyIsAbstract;
@@ -569,6 +571,8 @@ final class BuiltinClasses
                 'isprivateget' => ReflectionPropertyAsymmetricProbe::isPrivateGet(),
                 'isprotectedget' => ReflectionPropertyAsymmetricProbe::isProtectedGet(),
                 'ispublicget' => ReflectionPropertyAsymmetricProbe::isPublicGet(),
+                'getreadabletype' => new ReflectionPropertyGetReadableType(),
+                'getsettabletype' => new ReflectionPropertyGetSettableType(),
             ] as $name => $method
         ) {
             $rp->methods[$name] = $method;

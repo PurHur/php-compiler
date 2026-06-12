@@ -111,6 +111,64 @@ final class ReflectionTypeSupport
         throw new \LogicException('Unsupported declared type for reflection: '.get_class($type));
     }
 
+    public static function cfgTypeFromLabel(string $label): ?CfgType
+    {
+        $label = trim($label);
+        if ('' === $label) {
+            return null;
+        }
+        if ('mixed' === strtolower($label)) {
+            return new CfgType\Mixed_();
+        }
+        if ('never' === strtolower($label)) {
+            return new CfgType\Never_();
+        }
+        if ('void' === strtolower($label)) {
+            return new CfgType\Void_();
+        }
+        if (str_starts_with($label, '?')) {
+            $inner = self::cfgTypeFromLabel(substr($label, 1));
+
+            return null !== $inner ? new CfgType\Nullable($inner) : null;
+        }
+        if (str_contains($label, '|')) {
+            $members = [];
+            foreach (explode('|', $label) as $part) {
+                $member = self::cfgTypeFromLabel(trim($part));
+                if (null !== $member) {
+                    $members[] = $member;
+                }
+            }
+            if ([] === $members) {
+                return null;
+            }
+            if (1 === \count($members)) {
+                return $members[0];
+            }
+
+            return new CfgType\Union_($members);
+        }
+        if (str_contains($label, '&')) {
+            $members = [];
+            foreach (explode('&', $label) as $part) {
+                $member = self::cfgTypeFromLabel(trim($part));
+                if (null !== $member) {
+                    $members[] = $member;
+                }
+            }
+            if ([] === $members) {
+                return null;
+            }
+            if (1 === \count($members)) {
+                return $members[0];
+            }
+
+            return new CfgType\Intersection($members);
+        }
+
+        return new CfgType\Literal($label);
+    }
+
     public static function allowsNullFromCfg(CfgType $type): bool
     {
         if ($type instanceof CfgType\Nullable) {
