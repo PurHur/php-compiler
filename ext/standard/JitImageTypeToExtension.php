@@ -109,18 +109,27 @@ final class JitImageTypeToExtension
         );
     }
 
-    public static function lowerImageType(Context $context, JITVariable $arg, string $builtinName): Value
-    {
+    public static function lowerImageType(
+        Context $context,
+        JITVariable $arg,
+        string $builtinName,
+        string $paramName = 'image_type'
+    ): Value {
         if (JITVariable::TYPE_NULL === $arg->type) {
             return $context->getTypeFromString('int64')->constInt(0, false);
         }
         if (($arg->type & JITVariable::IS_NATIVE_ARRAY) || JITVariable::TYPE_HASHTABLE === $arg->type) {
-            self::emitIntTypeErrorAndAbort($context, 'array', $builtinName);
+            self::emitIntTypeErrorAndAbort($context, 'array', $builtinName, $paramName);
 
             return $context->getTypeFromString('int64')->constInt(0, false);
         }
         if (JITVariable::TYPE_OBJECT === $arg->type) {
-            self::emitIntTypeErrorAndAbort($context, self::compileTimeObjectGivenLabel($context, $arg), $builtinName);
+            self::emitIntTypeErrorAndAbort(
+                $context,
+                self::compileTimeObjectGivenLabel($context, $arg),
+                $builtinName,
+                $paramName
+            );
 
             return $context->getTypeFromString('int64')->constInt(0, false);
         }
@@ -131,30 +140,39 @@ final class JitImageTypeToExtension
             );
         }
         if (JITVariable::TYPE_STRING === $arg->type) {
-            return self::lowerStringOperand($context, $arg, $builtinName);
+            return self::lowerStringOperand($context, $arg, $builtinName, $paramName);
         }
         if (JITVariable::TYPE_VALUE === $arg->type) {
-            return self::lowerBoxedOperand($context, $arg, $builtinName);
+            return self::lowerBoxedOperand($context, $arg, $builtinName, $paramName);
         }
 
-        return JitLongArg::lower($context, $arg, $builtinName . '() image_type');
+        return JitLongArg::lower($context, $arg, $builtinName . '() ' . $paramName);
     }
 
-    private static function lowerStringOperand(Context $context, JITVariable $arg, string $builtinName): Value
-    {
-        $strPtr = JitStringArg::lower($context, $arg, $builtinName . '() image_type');
+    private static function lowerStringOperand(
+        Context $context,
+        JITVariable $arg,
+        string $builtinName,
+        string $paramName
+    ): Value {
+        $strPtr = JitStringArg::lower($context, $arg, $builtinName . '() ' . $paramName);
         $isNumeric = self::stringPtrIsNumeric($context, $strPtr);
         $okBlock = BasicBlockHelper::append($context, 'imgext_str_ok');
         $errBlock = BasicBlockHelper::append($context, 'imgext_str_err');
         $context->builder->branchIf($isNumeric, $okBlock, $errBlock);
         $context->builder->positionAtEnd($errBlock);
-        self::emitIntTypeErrorAndAbort($context, 'string', $builtinName);
+        self::emitIntTypeErrorAndAbort($context, 'string', $builtinName, $paramName);
         $context->builder->positionAtEnd($okBlock);
 
         return self::stringPtrToLong($context, $strPtr);
     }
 
-    private static function lowerBoxedOperand(Context $context, JITVariable $arg, string $builtinName): Value
+    private static function lowerBoxedOperand(
+        Context $context,
+        JITVariable $arg,
+        string $builtinName,
+        string $paramName
+    ): Value {
     {
         TypeErrorRaise::registerDeclarations($context);
         TypeErrorRaise::ensureLinked($context);
@@ -193,7 +211,7 @@ final class JitImageTypeToExtension
         $context->builder->branchIf($isArray, $arrayBlock, $objectBlock);
 
         $context->builder->positionAtEnd($arrayBlock);
-        self::emitIntTypeErrorAndAbort($context, 'array', $builtinName);
+        self::emitIntTypeErrorAndAbort($context, 'array', $builtinName, $paramName);
 
         $context->builder->positionAtEnd($objectBlock);
         $isObject = $context->builder->icmp(Builder::INT_EQ, $typeByte, $objectTy);
@@ -202,7 +220,7 @@ final class JitImageTypeToExtension
         $context->builder->branchIf($isObject, $errBlock, $afterObject);
 
         $context->builder->positionAtEnd($errBlock);
-        self::emitIntTypeErrorAndAbort($context, 'object', $builtinName);
+        self::emitIntTypeErrorAndAbort($context, 'object', $builtinName, $paramName);
 
         $context->builder->positionAtEnd($afterObject);
         $isEnumCase = $context->builder->icmp(Builder::INT_EQ, $typeByte, $enumCaseTy);
@@ -211,7 +229,12 @@ final class JitImageTypeToExtension
         $context->builder->branchIf($isEnumCase, $enumErrBlock, $afterEnum);
 
         $context->builder->positionAtEnd($enumErrBlock);
-        self::emitIntTypeErrorAndAbort($context, self::compileTimeEnumCaseGivenLabel($context, $arg), $builtinName);
+        self::emitIntTypeErrorAndAbort(
+            $context,
+            self::compileTimeEnumCaseGivenLabel($context, $arg),
+            $builtinName,
+            $paramName
+        );
 
         $context->builder->positionAtEnd($afterEnum);
         $isDouble = $context->builder->icmp(Builder::INT_EQ, $typeByte, $doubleTy);
@@ -230,7 +253,7 @@ final class JitImageTypeToExtension
 
         $context->builder->positionAtEnd($stringCoerce);
         $strVal = $context->builder->call($context->lookupFunction('__value__readString'), $valuePtr);
-        $strLong = self::lowerStringOperandFromPtr($context, $strVal, $builtinName);
+        $strLong = self::lowerStringOperandFromPtr($context, $strVal, $builtinName, $paramName);
         $stringEnd = $context->builder->getInsertBlock();
         $context->builder->branch($mergeBlock);
 
@@ -249,14 +272,18 @@ final class JitImageTypeToExtension
         return $phi;
     }
 
-    private static function lowerStringOperandFromPtr(Context $context, Value $strPtr, string $builtinName): Value
-    {
+    private static function lowerStringOperandFromPtr(
+        Context $context,
+        Value $strPtr,
+        string $builtinName,
+        string $paramName
+    ): Value {
         $isNumeric = self::stringPtrIsNumeric($context, $strPtr);
         $okBlock = BasicBlockHelper::append($context, 'imgext_box_str_ok');
         $errBlock = BasicBlockHelper::append($context, 'imgext_box_str_err');
         $context->builder->branchIf($isNumeric, $okBlock, $errBlock);
         $context->builder->positionAtEnd($errBlock);
-        self::emitIntTypeErrorAndAbort($context, 'string', $builtinName);
+        self::emitIntTypeErrorAndAbort($context, 'string', $builtinName, $paramName);
         $context->builder->positionAtEnd($okBlock);
 
         return self::stringPtrToLong($context, $strPtr);
@@ -334,20 +361,25 @@ final class JitImageTypeToExtension
         return self::compileTimeObjectGivenLabel($context, $arg);
     }
 
-    private static function intTypeError(string $given, string $builtinName): string
+    private static function intTypeError(string $given, string $builtinName, string $paramName): string
     {
         return sprintf(
-            '%s(): Argument #1 ($image_type) must be of type int, %s given',
+            '%s(): Argument #1 ($%s) must be of type int, %s given',
             $builtinName,
+            $paramName,
             $given
         );
     }
 
-    private static function emitIntTypeErrorAndAbort(Context $context, string $given, string $builtinName): void
-    {
+    private static function emitIntTypeErrorAndAbort(
+        Context $context,
+        string $given,
+        string $builtinName,
+        string $paramName = 'image_type'
+    ): void {
         TypeErrorRaise::registerDeclarations($context);
         TypeErrorRaise::ensureLinked($context);
-        TypeErrorRaise::emitRaise($context, self::intTypeError($given, $builtinName));
+        TypeErrorRaise::emitRaise($context, self::intTypeError($given, $builtinName, $paramName));
         $context->builder->call($context->lookupFunction('abort'));
     }
 }
