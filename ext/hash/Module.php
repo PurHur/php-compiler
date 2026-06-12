@@ -29,6 +29,8 @@ class Module extends ModuleAbstract
             new hash_final(),
             new hash_copy(),
             new hash_algos(),
+            new hash_file(),
+            new hash_hmac_file(),
         ];
     }
 }

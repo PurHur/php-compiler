@@ -20,4 +20,16 @@ final class VmHashFile
 
         return VmHash::hash($algo, $data, $raw);
     }
+
+    /**
+     * @return string|false hex or raw digest
+     */
+    public static function hashHmacFile(string $algo, string $path, string $key, bool $raw = false) {
+        $data = VmFs::fileGetContents($path);
+        if (false === $data) {
+            return false;
+        }
+
+        return VmHash::hashHmac($algo, $data, $key, $raw);
+    }
 }

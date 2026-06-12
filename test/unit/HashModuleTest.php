@@ -19,7 +19,7 @@ final class HashModuleTest extends TestCase
         $runtime = new Runtime();
         $ctx = $runtime->vmContext;
 
-        foreach (['hash_init', 'hash_update', 'hash_update_stream', 'hash_final', 'hash_copy', 'hash_algos'] as $fn) {
+        foreach (['hash_init', 'hash_update', 'hash_update_stream', 'hash_final', 'hash_copy', 'hash_algos', 'hash_file', 'hash_hmac_file'] as $fn) {
             self::assertTrue(VmReflection::functionExists($ctx, $fn), $fn);
         }
 
@@ -31,15 +31,21 @@ echo (int) function_exists('hash_update_stream');
 echo (int) function_exists('hash_final');
 echo (int) function_exists('hash_copy');
 echo (int) function_exists('hash_algos');
+echo (int) function_exists('hash_file');
+echo (int) function_exists('hash_hmac_file');
 echo (int) class_exists('HashContext');
-$algos = hash_algos();
-sort($algos);
-echo implode(',', $algos);
+$path = sys_get_temp_dir() . '/hash_mod_test.txt';
+file_put_contents($path, 'hello');
+echo hash_file('sha256', $path), "\n";
+unlink($path);
 PHP;
         $block = $runtime->parseAndCompile($code, 'hash_module.php');
         ob_start();
         $runtime->run($block);
-        self::assertSame('1111111md5,sha1,sha256', ob_get_clean());
+        self::assertSame(
+            '1111111112cf24dba5fb0a30e26e83b2ac5b9e29e1b161e5c1fa7425e73043362938b9824'."\n",
+            ob_get_clean()
+        );
     }
 
     public function test_hash_context_incremental_vm(): void
