@@ -1362,6 +1362,23 @@ final class VmReflection
 
     public const REFLECTION_IS_PRIVATE = 1024;
 
+    /** Register ReflectionProperty::IS_* class constants (#5060). */
+    public static function registerReflectionPropertyClassConstants(ClassEntry $entry): void
+    {
+        foreach (
+            [
+                'is_public' => self::REFLECTION_IS_PUBLIC,
+                'is_protected' => self::REFLECTION_IS_PROTECTED,
+                'is_private' => self::REFLECTION_IS_PRIVATE,
+            ] as $name => $value
+        ) {
+            $const = new Variable();
+            $const->int($value);
+            $entry->constants[$name] = $const;
+            $entry->constNames[$name] = strtoupper($name);
+        }
+    }
+
     /** php-src ReflectionMethod::IS_* values returned by getModifiers() (#7116). */
     public const REFLECTION_METHOD_IS_STATIC = 16;
 

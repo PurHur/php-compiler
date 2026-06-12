@@ -161,6 +161,7 @@ use PHPCompiler\VM\Builtin\ReflectionParameterGetType;
 use PHPCompiler\VM\Builtin\ReflectionParameterGetValue;
 use PHPCompiler\VM\Builtin\ReflectionParameterIsSensitive;
 use PHPCompiler\VM\Builtin\ReflectionPropertyConstruct;
+use PHPCompiler\VM\Builtin\ReflectionPropertyGetAsymmetricVisibility;
 use PHPCompiler\VM\Builtin\ReflectionPropertyGetAttributes;
 use PHPCompiler\VM\Builtin\ReflectionPropertyGetHooks;
 use PHPCompiler\VM\Builtin\ReflectionPropertyGetMangledName;
@@ -557,6 +558,7 @@ final class BuiltinClasses
         $rp = new ClassEntry('ReflectionProperty');
         $rp->properties[] = new ClassProperty(ReflectionSupport::PROP_CLASS_NAME, null, $strProto);
         $rp->properties[] = new ClassProperty(ReflectionSupport::PROP_PROPERTY_NAME, null, $strProto);
+        \PHPCompiler\ext\standard\VmReflection::registerReflectionPropertyClassConstants($rp);
         $rp->constructor = new ReflectionPropertyConstruct();
         $rp->methods['__construct'] = $rp->constructor;
         $rp->methodVisibility['__construct'] = $pub;
@@ -589,6 +591,7 @@ final class BuiltinClasses
                 'isprivateget' => ReflectionPropertyAsymmetricProbe::isPrivateGet(),
                 'isprotectedget' => ReflectionPropertyAsymmetricProbe::isProtectedGet(),
                 'ispublicget' => ReflectionPropertyAsymmetricProbe::isPublicGet(),
+                'getasymmetricvisibility' => new ReflectionPropertyGetAsymmetricVisibility(),
                 'getreadabletype' => new ReflectionPropertyGetReadableType(),
                 'getsettabletype' => new ReflectionPropertyGetSettableType(),
             ] as $name => $method
