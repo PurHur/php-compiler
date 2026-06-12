@@ -610,6 +610,7 @@ class Module extends ModuleAbstract
             new checkdnsrr(),
             new checkdnsrr('dns_check_record'),
             new dns_get_mx(),
+            new dns_get_record(),
             new getmxrr(),
             new long2ip(),
             new ip2long(),
