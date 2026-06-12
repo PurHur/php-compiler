@@ -23,5 +23,9 @@ final class DateTimeSupportRuntimeShrinkTest extends TestCase
         $this->assertStringNotContainsString('syncFromHost', $support);
         $this->assertStringNotContainsString('new \\DateTime', $native);
         $this->assertStringNotContainsString('new \\DateTimeZone', $native);
+        $this->assertStringNotContainsString('\\putenv(', $native);
+        $this->assertDoesNotMatchRegularExpression('/(?<!VmEnv::)getenv\\([\'"]TZ[\'"]\\)/', $native);
+        $this->assertStringContainsString('VmEnv::putenv', $native);
+        $this->assertStringContainsString('VmEnv::getenv', $native);
     }
 }
