@@ -4,10 +4,12 @@ declare(strict_types=1);
 
 namespace PHPCompiler\JIT\Builtin;
 
+use PHPCompiler\JIT\Builtin;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\Variable as VmVariable;
 use PHPLLVM\Builder;
+use PHPLLVM\LLVMAbstract\BasicBlock;
 use PHPLLVM\Value;
 
 /**
@@ -141,7 +143,7 @@ final class AssertOptionsRuntime
     private static function implementIntOption(
         Context $context,
         Value $fn,
-        Value $block,
+        BasicBlock $block,
         string $globalName,
         Value $hasValue,
         Value $valueIn,
@@ -175,7 +177,7 @@ final class AssertOptionsRuntime
     private static function implementCallbackOption(
         Context $context,
         Value $fn,
-        Value $block,
+        BasicBlock $block,
         Value $hasValue,
         Value $valueIn,
         Value $out
@@ -194,7 +196,11 @@ final class AssertOptionsRuntime
         $context->builder->branchIf($isNull, $emptyBb, $copyBb);
 
         $context->builder->positionAtEnd($emptyBb);
-        self::writeValueStringFromCstr($context, $out, $context->constantFromString(''));
+        self::writeValueStringFromCstr(
+            $context,
+            $out,
+            $context->builder->pointerCast($context->constantFromString(''), $i8p)
+        );
         $context->builder->branch($afterReadBb);
 
         $context->builder->positionAtEnd($copyBb);
