@@ -232,7 +232,14 @@ function run(string $filename, string $code, array $options): void
             }
         }
         $prevSelfHostAot = getenv('PHP_COMPILER_SELFHOST_AOT');
-        $setSelfHostAotForCompile = \function_exists('putenv') && (false === $prevSelfHostAot || '' === (string) $prevSelfHostAot);
+        $bootstrapAotFixture = '' !== $normalized && str_contains($normalized, 'bootstrap-aot/');
+        // parseAndCompile uses real lowering (SELFHOST_AOT=0) for bootstrap-aot fixtures (#1086); standalone
+        // LLVM emit still needs self-host Runtime stubs when the env is explicitly `0` (#1492 bootstrap gate).
+        $setSelfHostAotForCompile = \function_exists('putenv') && (
+            false === $prevSelfHostAot
+            || '' === (string) $prevSelfHostAot
+            || ($bootstrapAotFixture && '0' === (string) $prevSelfHostAot)
+        );
         if ($setSelfHostAotForCompile) {
             // Keep LLVM 9 stable during AOT compilation; some lowering paths are still sensitive (#2600).
             putenv('PHP_COMPILER_SELFHOST_AOT=1');
@@ -261,8 +268,14 @@ function run(string $filename, string $code, array $options): void
                 }
             }
             if ($setSelfHostAotForCompile) {
-                putenv('PHP_COMPILER_SELFHOST_AOT=');
-                unset($_ENV['PHP_COMPILER_SELFHOST_AOT'], $_SERVER['PHP_COMPILER_SELFHOST_AOT']);
+                if (false === $prevSelfHostAot || '' === (string) $prevSelfHostAot) {
+                    putenv('PHP_COMPILER_SELFHOST_AOT=');
+                    unset($_ENV['PHP_COMPILER_SELFHOST_AOT'], $_SERVER['PHP_COMPILER_SELFHOST_AOT']);
+                } else {
+                    putenv('PHP_COMPILER_SELFHOST_AOT='.$prevSelfHostAot);
+                    $_ENV['PHP_COMPILER_SELFHOST_AOT'] = $prevSelfHostAot;
+                    $_SERVER['PHP_COMPILER_SELFHOST_AOT'] = $prevSelfHostAot;
+                }
             }
         }
     }
