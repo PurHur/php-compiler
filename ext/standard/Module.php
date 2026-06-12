@@ -522,6 +522,7 @@ class Module extends ModuleAbstract
             new stream_context_set_options(),
             new stream_context_set_params(),
             new stream_socket_client(),
+            new stream_socket_server(),
             new pfsockopen(),
             new stream_set_chunk_size_(),
             new stream_set_timeout_(),
