@@ -11,6 +11,10 @@ namespace PHPCompiler\ext\intl;
  */
 final class VmGrapheme
 {
+    public const EXTR_COUNT = 0;
+    public const EXTR_MAXBYTES = 1;
+    public const EXTR_MAXCHARS = 2;
+
     public static function strContains(string $haystack, string $needle): bool
     {
         if ('' === $needle) {
@@ -83,6 +87,75 @@ final class VmGrapheme
     }
 
     /**
+     * grapheme_extract() — extract grapheme clusters from UTF-8 buffer (php-src ext/intl/grapheme; #6023).
+     */
+    public static function extract(
+        string $haystack,
+        int $size,
+        int $extractType = self::EXTR_COUNT,
+        int $start = 0,
+        ?int &$next = null
+    ): string|false {
+        if ($extractType < self::EXTR_COUNT || $extractType > self::EXTR_MAXCHARS) {
+            return false;
+        }
+        $strLen = \strlen($haystack);
+        if ($start < 0 || $start >= $strLen) {
+            return false;
+        }
+        if ($size < 0) {
+            return false;
+        }
+        if (0 === $size) {
+            if (null !== $next) {
+                $next = $start;
+            }
+
+            return '';
+        }
+
+        $adjustedStart = self::advanceOffsetToUtf8Lead($haystack, $start);
+        if (false === $adjustedStart) {
+            return false;
+        }
+
+        $substring = \substr($haystack, $adjustedStart);
+        if ('' === $substring) {
+            if (null !== $next) {
+                $next = $adjustedStart;
+            }
+
+            return '';
+        }
+
+        if (self::isAscii($substring)) {
+            $extractLen = \min($size, \strlen($substring));
+            if (null !== $next) {
+                $next = $adjustedStart + $extractLen;
+            }
+
+            return \substr($substring, 0, $extractLen);
+        }
+
+        $graphemes = self::splitGraphemes($substring);
+        if (null === $graphemes) {
+            return false;
+        }
+
+        $result = match ($extractType) {
+            self::EXTR_COUNT => self::extractByCount($graphemes, $size),
+            self::EXTR_MAXBYTES => self::extractByMaxBytes($graphemes, $size),
+            self::EXTR_MAXCHARS => self::extractByMaxChars($graphemes, $size),
+        };
+
+        if (null !== $next) {
+            $next = $adjustedStart + \strlen($result);
+        }
+
+        return $result;
+    }
+
+    /**
      * grapheme_levenshtein() — grapheme-cluster edit distance (php-src ext/intl/grapheme; #6998).
      */
     public static function levenshtein(string $string1, string $string2): int
@@ -142,6 +215,103 @@ final class VmGrapheme
         }
 
         return UnicodeCanonical::graphemeCanonicalKey($left) === UnicodeCanonical::graphemeCanonicalKey($right);
+    }
+
+    /**
+     * @param list<string> $graphemes
+     */
+    private static function extractByCount(array $graphemes, int $count): string
+    {
+        return \implode('', \array_slice($graphemes, 0, $count));
+    }
+
+    /**
+     * @param list<string> $graphemes
+     */
+    private static function extractByMaxBytes(array $graphemes, int $maxBytes): string
+    {
+        $result = '';
+        $bytes = 0;
+        foreach ($graphemes as $grapheme) {
+            $graphemeBytes = \strlen($grapheme);
+            if ($bytes + $graphemeBytes > $maxBytes) {
+                break;
+            }
+            $result .= $grapheme;
+            $bytes += $graphemeBytes;
+        }
+
+        return $result;
+    }
+
+    /**
+     * @param list<string> $graphemes
+     */
+    private static function extractByMaxChars(array $graphemes, int $maxChars): string
+    {
+        $result = '';
+        $chars = 0;
+        foreach ($graphemes as $grapheme) {
+            $graphemeChars = self::utf16CodeUnitCount($grapheme);
+            if ($chars + $graphemeChars > $maxChars) {
+                break;
+            }
+            $result .= $grapheme;
+            $chars += $graphemeChars;
+        }
+
+        return $result;
+    }
+
+    private static function advanceOffsetToUtf8Lead(string $haystack, int $offset): int|false
+    {
+        $len = \strlen($haystack);
+        if ($offset >= $len) {
+            return false;
+        }
+        $pos = $offset;
+        while ($pos < $len && self::isUtf8ContinuationByte($haystack[$pos])) {
+            ++$pos;
+        }
+        if ($pos >= $len && $offset < $len) {
+            return false;
+        }
+
+        return $pos;
+    }
+
+    private static function isUtf8ContinuationByte(string $byte): bool
+    {
+        return 0x80 === (\ord($byte) & 0xC0);
+    }
+
+    private static function isAscii(string $string): bool
+    {
+        return (bool) \preg_match('/^[\x00-\x7F]*$/D', $string);
+    }
+
+    private static function utf16CodeUnitCount(string $utf8): int
+    {
+        $count = 0;
+        $len = \strlen($utf8);
+        for ($i = 0; $i < $len; ) {
+            $byte = \ord($utf8[$i]);
+            if ($byte < 0x80) {
+                ++$i;
+                ++$count;
+            } elseif ($byte < 0xE0) {
+                $i += 2;
+                ++$count;
+            } elseif ($byte < 0xF0) {
+                $i += 3;
+                ++$count;
+            } else {
+                $i += 4;
+                $count += 2;
+            }
+        }
+
+        return $count;
     }
 
     /**
