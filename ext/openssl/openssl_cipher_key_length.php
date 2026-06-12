@@ -7,12 +7,16 @@ namespace PHPCompiler\ext\openssl;
 use PHPCompiler\ext\standard\VmString;
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
+use PHPCompiler\JIT\Builtin\TypeErrorRaise;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Value;
 
 /**
  * openssl_cipher_key_length() — cipher key length probe (php-src ext/openssl/openssl.c; #6522).
+ *
+ * VM: VmOpenssl + OpensslCipherRegistry. JIT/AOT: compile-time literal baking via JitOpensslCipherKeyLength.
  */
 final class openssl_cipher_key_length extends Internal
 {
@@ -49,8 +53,18 @@ final class openssl_cipher_key_length extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        throw new \LogicException(
-            'openssl_cipher_key_length() is not implemented for JIT in this compiler build (issue #6522)'
-        );
+        $argc = \count($args);
+        if (1 !== $argc) {
+            TypeErrorRaise::ensureLinked($context);
+            TypeErrorRaise::emitArgumentCountError(
+                $context,
+                'openssl_cipher_key_length() expects exactly 1 argument, '.$argc.' given'
+            );
+            $slot = JitValueBox::alloc($context);
+
+            return JitValueBox::pointer($context, $slot);
+        }
+
+        return JitOpensslCipherKeyLength::invoke($context, $args[0]);
     }
 }
