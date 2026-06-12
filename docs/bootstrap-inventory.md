@@ -12,7 +12,7 @@ Regenerate: `php script/bootstrap-inventory.php`
 | Phase A inventory files (M2 ratio SSOT) | 2446 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 6627 |
+| Source constructs flagged (warnings) | 6629 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -763,7 +763,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/standard/VmSleep.php` | 0 | 1 |
 | `ext/standard/VmSleepNative.php` | 0 | 1 |
 | `ext/standard/VmSplAutoload.php` | 0 | 12 |
-| `ext/standard/VmSprintf.php` | 0 | 2 |
+| `ext/standard/VmSprintf.php` | 0 | 3 |
 | `ext/standard/VmSscanf.php` | 0 | 8 |
 | `ext/standard/VmStatCache.php` | 0 | 1 |
 | `ext/standard/VmStatNative.php` | 0 | 1 |
@@ -1753,7 +1753,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/Builtin/StringFilterBoolean.php` | 0 | 1 |
 | `lib/JIT/Builtin/StringFilterEmail.php` | 0 | 1 |
 | `lib/JIT/Builtin/StringFormat.php` | 0 | 1 |
-| `lib/JIT/Builtin/StringFormatJit.php` | 0 | 1 |
+| `lib/JIT/Builtin/StringFormatJit.php` | 0 | 2 |
 | `lib/JIT/Builtin/StringFsDir.php` | 0 | 1 |
 | `lib/JIT/Builtin/StringFsDirJit.php` | 0 | 1 |
 | `lib/JIT/Builtin/StringFsGlob.php` | 0 | 1 |
@@ -7666,8 +7666,9 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/VmSprintf.php`
 
 **Warnings** (review for bootstrap subset):
-- new Error (line 102)
-- 13 class method(s)
+- new ArgumentCountError (line 137)
+- new Error (line 198)
+- 16 class method(s)
 
 ### `ext/standard/VmSscanf.php`
 
@@ -13801,7 +13802,8 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/Builtin/StringFormatJit.php`
 
 **Warnings** (review for bootstrap subset):
-- 26 class method(s)
+- 30 class method(s)
+- 3 closure(s)
 
 ### `lib/JIT/Builtin/StringFsDir.php`
 
