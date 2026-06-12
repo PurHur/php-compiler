@@ -173,7 +173,6 @@ final class JitImageTypeToExtension
         string $builtinName,
         string $paramName
     ): Value {
-    {
         TypeErrorRaise::registerDeclarations($context);
         TypeErrorRaise::ensureLinked($context);
         $valuePtr = JitValueBox::valuePtrFromVariable($context, $arg);
