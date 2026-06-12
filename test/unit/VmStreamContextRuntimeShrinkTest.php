@@ -7,9 +7,17 @@ namespace PHPCompiler;
 use PHPCompiler\ext\standard\VmStreamContext;
 use PHPUnit\Framework\TestCase;
 
-/** VmStreamContext must not sync to host Zend stream resources (#6517/#6122 phase 2, #8058). */
+/** VmStreamContext must not sync to host Zend stream resources (#6517/#6122 phase 2, #8058, #8131). */
 final class VmStreamContextRuntimeShrinkTest extends TestCase
 {
+    public function testCreateDoesNotDelegateToHostStreamContextCreate(): void
+    {
+        $source = (string) file_get_contents(__DIR__.'/../../ext/standard/VmStreamContext.php');
+        $this->assertDoesNotMatchRegularExpression('/=\\s*\\\\stream_context_create\\s*\\(/', $source);
+        $this->assertStringNotContainsString('$resources', $source);
+        $this->assertStringNotContainsString('function toHostResource', $source);
+    }
+
     public function testSetParamsDoesNotDelegateToHostStreamContextSetParams(): void
     {
         $source = (string) file_get_contents(__DIR__.'/../../ext/standard/VmStreamContext.php');

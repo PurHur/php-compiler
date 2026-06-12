@@ -8,9 +8,10 @@ use PHPCompiler\VM\HashTable;
 use PHPCompiler\VM\Variable;
 
 /**
- * VM stream-context handles as arrays (issue #1377).
+ * VM stream-context handles as arrays (issue #1377, #8131).
  *
- * fopen() and file_get_contents() can resolve these via {@see self::toHostResource()}.
+ * Pure VM HashTable + marker id — mirrors JIT {@see \PHPCompiler\JIT\Builtin\StreamContextRuntime}
+ * without host Zend stream_context_create() delegation (bootstrap/M5).
  */
 final class VmStreamContext
 {
@@ -18,9 +19,6 @@ final class VmStreamContext
 
     /** Params bag (distinct from wrapper options; php-src php_stream_context.params). */
     public const PARAMS_MARKER_KEY = '__phpc_stream_context_params';
-
-    /** @var array<int, resource> */
-    private static array $resources = [];
 
     private static int $nextId = 0;
 
@@ -66,9 +64,7 @@ final class VmStreamContext
             $hostParams = $exportedParams;
         }
 
-        $resource = \stream_context_create($hostOptions, $hostParams);
         $id = ++self::$nextId;
-        self::$resources[$id] = $resource;
 
         $ht = null !== $optionsVar && Variable::TYPE_ARRAY === $optionsVar->resolveIndirect()->type
             ? $optionsVar->resolveIndirect()->toArray()->duplicate()
@@ -89,9 +85,7 @@ final class VmStreamContext
      */
     public static function create(array $options = [], ?array $params = null): HashTable
     {
-        $resource = \stream_context_create($options, $params ?? []);
         $id = ++self::$nextId;
-        self::$resources[$id] = $resource;
 
         $ht = new HashTable();
         VmParseStr::mergeInto($ht, $options);
@@ -126,16 +120,6 @@ final class VmStreamContext
         }
 
         return $idVar->toInt();
-    }
-
-    public static function toHostResource(Variable $var): mixed
-    {
-        $id = self::idFrom($var);
-        if (null === $id) {
-            return null;
-        }
-
-        return self::$resources[$id] ?? null;
     }
 
     /**
