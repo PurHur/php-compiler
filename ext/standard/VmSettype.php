@@ -6,6 +6,7 @@ namespace PHPCompiler\ext\standard;
 
 use PHPCompiler\Frame;
 use PHPCompiler\VM\HashTable;
+use PHPCompiler\VM\ObjectEntry;
 use PHPCompiler\VM\Variable;
 
 /**
@@ -51,7 +52,8 @@ final class VmSettype
                     $result->copyFrom($value);
                     break;
                 }
-                throw new \LogicException('settype() to object is not supported in this compiler build');
+                self::toObject($result, $value, $frame);
+                break;
             case 'resource':
                 throw new \ValueError('Cannot convert to resource type');
             default:
@@ -176,5 +178,48 @@ final class VmSettype
         $ht->addIndex(0, $elem);
 
         return $ht;
+    }
+
+    /** Zend convert_to_object / php_settype object branch (ext/standard/type.c, #4254). */
+    private static function toObject(Variable $result, Variable $value, ?Frame $frame): void
+    {
+        $v = $value->resolveIndirect();
+        if (Variable::TYPE_OBJECT === $v->type) {
+            $result->copyFrom($v);
+
+            return;
+        }
+
+        $ctx = $frame?->vmContext;
+        if (null === $ctx || !isset($ctx->classes['stdclass'])) {
+            throw new \LogicException('stdClass is not registered');
+        }
+
+        $object = new ObjectEntry($ctx->classes['stdclass']);
+        $object->constructed = true;
+
+        if (Variable::TYPE_ARRAY === $v->type) {
+            foreach ($v->toArray()->iterateKeyed(true) as [$key, $elem]) {
+                $keyVar = $key->resolveIndirect();
+                $name = Variable::TYPE_INTEGER === $keyVar->type
+                    ? (string) $keyVar->toInt()
+                    : $keyVar->toString();
+                $prop = $object->allocateProperty($name);
+                $prop->copyFrom($elem->resolveIndirect());
+            }
+            $result->object($object);
+
+            return;
+        }
+
+        if (Variable::TYPE_NULL === $v->type) {
+            $result->object($object);
+
+            return;
+        }
+
+        $scalar = $object->allocateProperty('scalar');
+        $scalar->copyFrom($v);
+        $result->object($object);
     }
 }

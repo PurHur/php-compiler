@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace PHPCompiler\ext\standard;
 
 use PHPCompiler\JIT\BasicBlockHelper;
+use PHPCompiler\JIT\Builtin\Type\Object_ as ObjectBuiltin;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitStringArg;
 use PHPCompiler\JIT\JitValueBox;
@@ -55,7 +56,8 @@ final class JitSettype
                 $context->builder->call($context->lookupFunction('__value__writeNull'), $destPtr);
                 break;
             case 'object':
-                throw new \LogicException('settype() to object is not supported in this compiler build');
+                self::convertInPlaceToObject($context, $destPtr);
+                break;
             case 'resource':
                 throw new \ValueError('Cannot convert to resource type');
             default:
@@ -585,4 +587,147 @@ final class JitSettype
 
         $context->builder->branch($nonEnumTarget);
     }
+
+    /** Zend settype(..., 'object') in-place (#4254, ext/standard/type.c). */
+    private static function convertInPlaceToObject(Context $context, Value $ptr): void
+    {
+        $map = $context->structFieldMap['__value__'];
+        $i8 = $context->getTypeFromString('int8');
+        $typeByte = $context->builder->load($context->builder->structGep($ptr, $map['type']));
+        $tag = 'sto'.(string) spl_object_id($context);
+
+        $stringBb = BasicBlockHelper::append($context, 'settype_'.$tag.'_obj_str');
+        $afterStr = BasicBlockHelper::append($context, 'settype_'.$tag.'_obj_after_str');
+        $longBb = BasicBlockHelper::append($context, 'settype_'.$tag.'_obj_long');
+        $dblBb = BasicBlockHelper::append($context, 'settype_'.$tag.'_obj_dbl');
+        $boolBb = BasicBlockHelper::append($context, 'settype_'.$tag.'_obj_bool');
+        $nullBb = BasicBlockHelper::append($context, 'settype_'.$tag.'_obj_null');
+        $objectBb = BasicBlockHelper::append($context, 'settype_'.$tag.'_obj_obj');
+        $done = BasicBlockHelper::append($context, 'settype_'.$tag.'_obj_done');
+
+        $context->builder->branchIf(
+            $context->builder->icmp(
+                Builder::INT_EQ,
+                $typeByte,
+                $i8->constInt(JITVariable::TYPE_STRING, false)
+            ),
+            $stringBb,
+            $afterStr
+        );
+
+        $context->builder->positionAtEnd($stringBb);
+        self::writeStdClassWithScalarProperty($context, $ptr, $ptr);
+        $context->builder->branch($done);
+
+        $context->builder->positionAtEnd($afterStr);
+        $afterDbl = BasicBlockHelper::append($context, 'settype_'.$tag.'_obj_after_dbl');
+        $context->builder->branchIf(
+            $context->builder->icmp(
+                Builder::INT_EQ,
+                $typeByte,
+                $i8->constInt(JITVariable::TYPE_NATIVE_DOUBLE, false)
+            ),
+            $dblBb,
+            $afterDbl
+        );
+
+        $context->builder->positionAtEnd($dblBb);
+        self::writeStdClassWithScalarProperty($context, $ptr, $ptr);
+        $context->builder->branch($done);
+
+        $context->builder->positionAtEnd($afterDbl);
+        $afterBool = BasicBlockHelper::append($context, 'settype_'.$tag.'_obj_after_bool');
+        $context->builder->branchIf(
+            $context->builder->icmp(
+                Builder::INT_EQ,
+                $typeByte,
+                $i8->constInt(JITVariable::TYPE_NATIVE_BOOL, false)
+            ),
+            $boolBb,
+            $afterBool
+        );
+
+        $context->builder->positionAtEnd($boolBb);
+        self::writeStdClassWithScalarProperty($context, $ptr, $ptr);
+        $context->builder->branch($done);
+
+        $context->builder->positionAtEnd($afterBool);
+        $afterObj = BasicBlockHelper::append($context, 'settype_'.$tag.'_obj_after_obj');
+        $context->builder->branchIf(
+            $context->builder->icmp(
+                Builder::INT_EQ,
+                $typeByte,
+                $i8->constInt(JITVariable::TYPE_OBJECT, false)
+            ),
+            $objectBb,
+            $afterObj
+        );
+
+        $context->builder->positionAtEnd($objectBb);
+        $objPtr = $context->builder->call($context->lookupFunction('__value__readObject'), $ptr);
+        $context->builder->call($context->lookupFunction('__value__writeObject'), $ptr, $objPtr);
+        $context->builder->branch($done);
+
+        $context->builder->positionAtEnd($afterObj);
+        $context->builder->branchIf(
+            $context->builder->icmp(
+                Builder::INT_EQ,
+                $typeByte,
+                $i8->constInt(JITVariable::TYPE_NATIVE_LONG, false)
+            ),
+            $longBb,
+            $nullBb
+        );
+
+        $context->builder->positionAtEnd($longBb);
+        self::writeStdClassWithScalarProperty($context, $ptr, $ptr);
+        $context->builder->branch($done);
+
+        $context->builder->positionAtEnd($nullBb);
+        self::writeEmptyStdClass($context, $ptr);
+        $context->builder->branch($done);
+
+        $context->builder->positionAtEnd($done);
+    }
+
+    private static function writeEmptyStdClass(Context $context, Value $dest): void
+    {
+        /** @var ObjectBuiltin $object */
+        $object = $context->type->object;
+        $classId = $object->lookup('stdClass');
+        $objVal = $object->allocate($classId);
+        $object->markObjectConstructed($objVal);
+        $context->builder->call(
+            $context->lookupFunction('__value__writeObject'),
+            $dest,
+            $objVal
+        );
+    }
+
+    private static function writeStdClassWithScalarProperty(
+        Context $context,
+        Value $dest,
+        Value $scalarValuePtr
+    ): void {
+        /** @var ObjectBuiltin $object */
+        $object = $context->type->object;
+        $classId = $object->lookup('stdClass');
+        if (!$object->hasProperty($classId, 'scalar')) {
+            $object->defineProperty($classId, 'scalar', JITVariable::TYPE_VALUE);
+        }
+        $objVal = $object->allocate($classId);
+        $object->markObjectConstructed($objVal);
+        $slot = $object->propertySlotFor($objVal, 'stdClass', 'scalar');
+        $context->builder->call(
+            $context->lookupFunction('__object__load_value_slot'),
+            $slot,
+            $scalarValuePtr
+        );
+        $context->builder->call(
+            $context->lookupFunction('__value__writeObject'),
+            $dest,
+            $objVal
+        );
+    }
+
 }
