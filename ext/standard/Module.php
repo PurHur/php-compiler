@@ -717,6 +717,8 @@ class Module extends ModuleAbstract
             new getmyinode(),
             new getlastmod(),
             new getrusage(),
+            new cli_get_process_title(),
+            new cli_set_process_title(),
             new proc_nice(),
             new memory_get_peak_usage(),
             new memory_get_usage(),
