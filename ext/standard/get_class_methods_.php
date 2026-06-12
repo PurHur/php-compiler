@@ -6,9 +6,10 @@ namespace PHPCompiler\ext\standard;
 
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
+use PHPCompiler\JIT\Builtin\TypeErrorRaise;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\Variable as JITVariable;
-use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
 
 /**
@@ -26,46 +27,40 @@ final class get_class_methods_ extends Internal
     public function execute(Frame $frame): void
     {
         $argc = \count($frame->calledArgs);
-        if ($argc < 1 || $argc > 2) {
-            throw new \LogicException('get_class_methods() requires one or two arguments in this compiler build');
+        if (1 !== $argc) {
+            throw new \ArgumentCountError(
+                \sprintf('get_class_methods() expects exactly 1 argument, %d given', $argc)
+            );
         }
         if (null === $frame->returnVar) {
             return;
         }
         $ctx = VmReflection::requireContext($frame);
-        $filter = VmReflection::METHOD_FILTER_DEFAULT;
-        if ($argc >= 2) {
-            $filterVar = $frame->calledArgs[1]->resolveIndirect();
-            if (Variable::TYPE_INTEGER !== $filterVar->type) {
-                throw new \LogicException('get_class_methods() filter must be an integer in this compiler build');
-            }
-            $filter = $filterVar->toInt();
-        }
         $entry = VmReflection::resolveClassForGetClassMethods($ctx, $frame->calledArgs[0]);
         if (null === $entry) {
             $frame->returnVar->bool(false);
 
             return;
         }
-        $frame->returnVar->copyFrom(VmReflection::classMethodsArray($entry, $filter));
+        $frame->returnVar->copyFrom(
+            VmReflection::classMethodsArray($entry, VmReflection::METHOD_FILTER_DEFAULT)
+        );
     }
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        if (\count($args) < 1 || \count($args) > 2) {
-            throw new \LogicException('get_class_methods() requires one or two arguments in this compiler build');
-        }
-        $filter = VmReflection::METHOD_FILTER_DEFAULT;
-        if (\count($args) >= 2) {
-            if (JITVariable::TYPE_NATIVE_LONG !== $args[1]->type) {
-                throw new \LogicException('get_class_methods() filter must be a compile-time integer in this compiler build');
-            }
-            $filterConst = $args[1]->value;
-            if ($filterConst instanceof \PHPLLVM\Value\ConstantInt) {
-                $filter = $filterConst->getValue();
-            }
+        $argc = \count($args);
+        if (1 !== $argc) {
+            TypeErrorRaise::ensureLinked($context);
+            TypeErrorRaise::emitArgumentCountError(
+                $context,
+                \sprintf('get_class_methods() expects exactly 1 argument, %d given', $argc)
+            );
+            $slot = JitValueBox::alloc($context);
+
+            return JitValueBox::pointer($context, $slot);
         }
 
-        return JitGetClassMethods::invoke($context, $args[0], $filter);
+        return JitGetClassMethods::invoke($context, $args[0]);
     }
 }

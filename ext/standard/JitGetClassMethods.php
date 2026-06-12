@@ -18,8 +18,9 @@ final class JitGetClassMethods
 {
     private static int $seq = 0;
 
-    public static function invoke(Context $context, JITVariable $classArg, int $filter): Value
+    public static function invoke(Context $context, JITVariable $classArg): Value
     {
+        $filter = VmReflection::METHOD_FILTER_DEFAULT;
         if (JITVariable::TYPE_OBJECT === $classArg->type) {
             return self::invokeForObject($context, $classArg, $filter);
         }
