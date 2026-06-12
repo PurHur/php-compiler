@@ -12,10 +12,10 @@ use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
 
 /**
- * pfsockopen() — persistent TCP socket streams (ext/standard/fsock.c parity, #3384).
+ * pfsockopen() — persistent TCP socket streams (ext/standard/fsock.c parity, #3384, #8107).
  *
- * VM delegates connect + persistence to host {@see \pfsockopen()} and adopts the stream
- * into {@see VmFs} (PHP-in-PHP; no runtime/*.c socket table).
+ * VM connects via {@see VmStreamSocketNative} + {@see VmPersistentSocket} registry — no host
+ * {@see \pfsockopen()} delegation (PHP-in-PHP; no runtime/*.c socket table).
  *
  * @see https://github.com/php/php-src/blob/master/ext/standard/fsock.c PHP_FUNCTION(pfsockopen)
  */
@@ -71,11 +71,7 @@ final class pfsockopen extends Internal
             }
         }
 
-        if ($argc >= 5) {
-            $result = @\pfsockopen($hostname, $port, $errno, $errstr, $timeout);
-        } else {
-            $result = @\pfsockopen($hostname, $port, $errno, $errstr);
-        }
+        [$result, $errno, $errstr] = VmPersistentSocket::open($hostname, $port, $timeout);
 
         if ($argc >= 3) {
             $errnoOut = new Variable(Variable::TYPE_INTEGER);

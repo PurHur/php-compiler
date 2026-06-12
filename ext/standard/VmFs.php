@@ -726,6 +726,8 @@ final class VmFs
             return true;
         }
 
+        VmPersistentSocket::forgetResource($fp);
+
         return @fclose($fp);
     }
 
