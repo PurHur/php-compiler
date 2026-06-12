@@ -783,6 +783,340 @@ final class ArrayBuiltinHelper
     }
 
     /**
+     * array_map() with multiple source arrays — null zip or closure (#4539, ext/standard/array.c).
+     *
+     * @param list<Variable> $arrays
+     */
+    public static function buildMapMultipleArrays(Context $context, Variable $callback, array $arrays): Value
+    {
+        if (Variable::TYPE_NULL === $callback->type || $callback->isNullConstant) {
+            return self::buildMapNullZipFromMultiple($context, $arrays);
+        }
+        if (ArrayMapCallbackPolicy::isClosureJitLowerable($callback)) {
+            return self::buildMapClosureZipFromMultiple($context, $callback, $arrays);
+        }
+
+        throw new \LogicException(
+            'array_map() with multiple arrays requires a null or closure callback for JIT/AOT in this compiler build'
+        );
+    }
+
+    /**
+     * @param list<Variable> $arrays
+     *
+     * @return list<Value>
+     */
+    private static function loadMapSourceHashTables(Context $context, array $arrays): array
+    {
+        $loaded = [];
+        foreach ($arrays as $array) {
+            if (self::isNativeArray($array->type)) {
+                $loaded[] = self::nativeListToHashTable($context, $array);
+            } else {
+                $loaded[] = self::loadHashTable($context, $array);
+            }
+        }
+
+        return $loaded;
+    }
+
+    /**
+     * @param list<Variable> $arrays
+     */
+    private static function buildMapNullZipFromMultiple(Context $context, array $arrays): Value
+    {
+        $sources = self::loadMapSourceHashTables($context, $arrays);
+        $first = $sources[0];
+        $map = $context->structFieldMap['__hashtable__'];
+        $sizeT = $context->getTypeFromString('size_t');
+        $nextFree = $context->builder->load(
+            $context->builder->structGep($first, $map['nextFreeElement'])
+        );
+        $zero = $sizeT->constInt(0, false);
+        $one = $sizeT->constInt(1, false);
+        $isEmpty = $context->builder->icmp(Builder::INT_EQ, $nextFree, $zero);
+        $emptyBlock = BasicBlockHelper::append($context, 'array_map_nullzip_empty');
+        $workBlock = BasicBlockHelper::append($context, 'array_map_nullzip_work');
+        $doneBlock = BasicBlockHelper::append($context, 'array_map_nullzip_done');
+        $context->builder->branchIf($isEmpty, $emptyBlock, $workBlock);
+
+        $context->builder->positionAtEnd($emptyBlock);
+        $emptyHt = HashTableHelper::alloc($context);
+        $context->builder->branch($doneBlock);
+
+        $context->builder->positionAtEnd($workBlock);
+        $dest = HashTableHelper::alloc($context);
+        $srcIdxSlot = $context->builder->alloca($sizeT, 1, 'array_map_nullzip_src');
+        $destIdxSlot = $context->builder->alloca($sizeT, 1, 'array_map_nullzip_dest');
+        $context->builder->store($zero, $srcIdxSlot);
+        $context->builder->store($zero, $destIdxSlot);
+        $head = BasicBlockHelper::append($context, 'array_map_nullzip_head');
+        $check = BasicBlockHelper::append($context, 'array_map_nullzip_check');
+        $zipBlock = BasicBlockHelper::append($context, 'array_map_nullzip_zip');
+        $skip = BasicBlockHelper::append($context, 'array_map_nullzip_skip');
+        $advance = BasicBlockHelper::append($context, 'array_map_nullzip_advance');
+        $context->builder->branch($head);
+
+        $context->builder->positionAtEnd($head);
+        $srcIdx = $context->builder->load($srcIdxSlot);
+        $atEnd = $context->builder->icmp(Builder::INT_SGE, $srcIdx, $nextFree);
+        $context->builder->branchIf($atEnd, $doneBlock, $check);
+
+        $context->builder->positionAtEnd($check);
+        $isSet = $context->builder->call(
+            $context->lookupFunction('__hashtable__offsetIsSet'),
+            $first,
+            $srcIdx
+        );
+        $context->builder->branchIf($isSet, $zipBlock, $skip);
+
+        $context->builder->positionAtEnd($zipBlock);
+        $row = self::buildNullZipRowAtIndex($context, $sources, $srcIdx);
+        $destIdx = $context->builder->load($destIdxSlot);
+        $context->builder->call(
+            $context->lookupFunction('__hashtable__setHashtableAt'),
+            $dest,
+            $destIdx,
+            $row
+        );
+        $context->builder->store(
+            $context->builder->addNoSignedWrap($destIdx, $one),
+            $destIdxSlot
+        );
+        $context->builder->branch($advance);
+
+        $context->builder->positionAtEnd($skip);
+        $context->builder->branch($advance);
+
+        $context->builder->positionAtEnd($advance);
+        $context->builder->store(
+            $context->builder->addNoSignedWrap($srcIdx, $one),
+            $srcIdxSlot
+        );
+        $context->builder->branch($head);
+
+        $context->builder->positionAtEnd($doneBlock);
+        $phi = $context->builder->phi($emptyHt->typeOf());
+        $phi->addIncoming($emptyHt, $emptyBlock);
+        $phi->addIncoming($dest, $head);
+
+        return $phi;
+    }
+
+    /**
+     * @param list<Value> $sources
+     */
+    private static function buildNullZipRowAtIndex(Context $context, array $sources, Value $index): Value
+    {
+        $row = HashTableHelper::alloc($context);
+        $sizeT = $context->getTypeFromString('size_t');
+        $colIdxSlot = $context->builder->alloca($sizeT, 1, 'array_map_nullzip_col');
+        $context->builder->store($sizeT->constInt(0, false), $colIdxSlot);
+        foreach ($sources as $src) {
+            $tag = (string) ++self::$copyListEntrySeq;
+            $colIdx = $context->builder->load($colIdxSlot);
+            $isSet = $context->builder->call(
+                $context->lookupFunction('__hashtable__offsetIsSet'),
+                $src,
+                $index
+            );
+            $setBlock = BasicBlockHelper::append($context, 'array_map_nullzip_row_set_'.$tag);
+            $nullBlock = BasicBlockHelper::append($context, 'array_map_nullzip_row_null_'.$tag);
+            $after = BasicBlockHelper::append($context, 'array_map_nullzip_row_after_'.$tag);
+            $context->builder->branchIf($isSet, $setBlock, $nullBlock);
+
+            $context->builder->positionAtEnd($setBlock);
+            $elem = HashTableHelper::readIndexedToValueBox($context, $src, $index);
+            self::storeValueEntryAtIndexWithHashtable(
+                $context,
+                $row,
+                $colIdx,
+                JitValueBox::valuePtrFromVariable($context, $elem)
+            );
+            $context->builder->branch($after);
+
+            $context->builder->positionAtEnd($nullBlock);
+            $context->builder->call(
+                $context->lookupFunction('__hashtable__setNullAt'),
+                $row,
+                $colIdx
+            );
+            $context->builder->branch($after);
+
+            $context->builder->positionAtEnd($after);
+            $context->builder->store(
+                $context->builder->addNoSignedWrap($colIdx, $sizeT->constInt(1, false)),
+                $colIdxSlot
+            );
+        }
+
+        return $row;
+    }
+
+    /**
+     * @param list<Value> $sources
+     *
+     * @return list<Variable>
+     */
+    private static function readIndexedOrNullArgsAtIndex(
+        Context $context,
+        array $sources,
+        Value $index,
+        BasicBlock $finalBlock
+    ): array {
+        $args = [];
+        $count = \count($sources);
+        $mergeBlocks = [];
+        for ($i = 0; $i < $count - 1; ++$i) {
+            $mergeBlocks[$i] = BasicBlockHelper::append($context, 'array_map_clzip_arg_merge_'.$i);
+        }
+        for ($i = 0; $i < $count; ++$i) {
+            $merge = ($i + 1 === $count) ? $finalBlock : $mergeBlocks[$i];
+            $args[] = self::readIndexedOrNullValueBox($context, $sources[$i], $index, $merge);
+            if ($i + 1 < $count) {
+                $context->builder->positionAtEnd($merge);
+            }
+        }
+
+        return $args;
+    }
+
+    private static function readIndexedOrNullValueBox(
+        Context $context,
+        Value $src,
+        Value $index,
+        BasicBlock $mergeBlock
+    ): Variable {
+        $tag = (string) ++self::$copyListEntrySeq;
+        $isSet = $context->builder->call(
+            $context->lookupFunction('__hashtable__offsetIsSet'),
+            $src,
+            $index
+        );
+        $hasElem = BasicBlockHelper::append($context, 'array_map_read_or_null_yes_'.$tag);
+        $noElem = BasicBlockHelper::append($context, 'array_map_read_or_null_no_'.$tag);
+        $done = BasicBlockHelper::append($context, 'array_map_read_or_null_done_'.$tag);
+        $slot = JitValueBox::alloc($context);
+        $destPtr = JitValueBox::pointer($context, $slot);
+        $context->builder->branchIf($isSet, $hasElem, $noElem);
+
+        $context->builder->positionAtEnd($hasElem);
+        $elem = HashTableHelper::readIndexedToValueBox($context, $src, $index);
+        JitValueBox::copyFromPointer(
+            $context,
+            $slot,
+            JitValueBox::valuePtrFromVariable($context, $elem)
+        );
+        $context->builder->branch($done);
+
+        $context->builder->positionAtEnd($noElem);
+        $context->builder->call(
+            $context->lookupFunction('__value__writeNull'),
+            $destPtr
+        );
+        $context->builder->branch($done);
+
+        $context->builder->positionAtEnd($done);
+        $context->builder->branch($mergeBlock);
+
+        return new Variable(
+            $context,
+            Variable::TYPE_VALUE,
+            Variable::KIND_VALUE,
+            $destPtr
+        );
+    }
+
+    /**
+     * @param list<Variable> $arrays
+     */
+    private static function buildMapClosureZipFromMultiple(
+        Context $context,
+        Variable $callback,
+        array $arrays
+    ): Value {
+        $closureCall = $callback->closureCall;
+        if (null === $closureCall) {
+            throw new \LogicException(ArrayMapCallbackPolicy::jitRejectionMessage());
+        }
+        $returnTypeTag = self::closureMapReturnTypeTag($context, $closureCall);
+        $sources = self::loadMapSourceHashTables($context, $arrays);
+        $first = $sources[0];
+        $map = $context->structFieldMap['__hashtable__'];
+        $sizeT = $context->getTypeFromString('size_t');
+        $nextFree = $context->builder->load(
+            $context->builder->structGep($first, $map['nextFreeElement'])
+        );
+        $zero = $sizeT->constInt(0, false);
+        $one = $sizeT->constInt(1, false);
+        $isEmpty = $context->builder->icmp(Builder::INT_EQ, $nextFree, $zero);
+        $emptyBlock = BasicBlockHelper::append($context, 'array_map_clzip_empty');
+        $workBlock = BasicBlockHelper::append($context, 'array_map_clzip_work');
+        $doneBlock = BasicBlockHelper::append($context, 'array_map_clzip_done');
+        $context->builder->branchIf($isEmpty, $emptyBlock, $workBlock);
+
+        $context->builder->positionAtEnd($emptyBlock);
+        $emptyHt = HashTableHelper::alloc($context);
+        $context->builder->branch($doneBlock);
+
+        $context->builder->positionAtEnd($workBlock);
+        $dest = HashTableHelper::alloc($context);
+        $srcIdxSlot = $context->builder->alloca($sizeT, 1, 'array_map_clzip_src');
+        $destIdxSlot = $context->builder->alloca($sizeT, 1, 'array_map_clzip_dest');
+        $context->builder->store($zero, $srcIdxSlot);
+        $context->builder->store($zero, $destIdxSlot);
+        $head = BasicBlockHelper::append($context, 'array_map_clzip_head');
+        $check = BasicBlockHelper::append($context, 'array_map_clzip_check');
+        $mapBlock = BasicBlockHelper::append($context, 'array_map_clzip_map');
+        $skip = BasicBlockHelper::append($context, 'array_map_clzip_skip');
+        $advance = BasicBlockHelper::append($context, 'array_map_clzip_advance');
+        $context->builder->branch($head);
+
+        $context->builder->positionAtEnd($head);
+        $srcIdx = $context->builder->load($srcIdxSlot);
+        $atEnd = $context->builder->icmp(Builder::INT_SGE, $srcIdx, $nextFree);
+        $context->builder->branchIf($atEnd, $doneBlock, $check);
+
+        $context->builder->positionAtEnd($check);
+        $isSet = $context->builder->call(
+            $context->lookupFunction('__hashtable__offsetIsSet'),
+            $first,
+            $srcIdx
+        );
+        $context->builder->branchIf($isSet, $mapBlock, $skip);
+
+        $context->builder->positionAtEnd($mapBlock);
+        $invokeBlock = BasicBlockHelper::append($context, 'array_map_clzip_invoke');
+        $callArgs = self::readIndexedOrNullArgsAtIndex($context, $sources, $srcIdx, $invokeBlock);
+        $context->builder->positionAtEnd($invokeBlock);
+        $mapped = $closureCall->call($context, ...$callArgs);
+        $destIdx = $context->builder->load($destIdxSlot);
+        self::storeClosureMappedAtIndex($context, $dest, $destIdx, $mapped, $returnTypeTag);
+        $context->builder->store(
+            $context->builder->addNoSignedWrap($destIdx, $one),
+            $destIdxSlot
+        );
+        $context->builder->branch($advance);
+
+        $context->builder->positionAtEnd($skip);
+        $context->builder->branch($advance);
+
+        $context->builder->positionAtEnd($advance);
+        $context->builder->store(
+            $context->builder->addNoSignedWrap($srcIdx, $one),
+            $srcIdxSlot
+        );
+        $context->builder->branch($head);
+
+        $context->builder->positionAtEnd($doneBlock);
+        $phi = $context->builder->phi($emptyHt->typeOf());
+        $phi->addIncoming($emptyHt, $emptyBlock);
+        $phi->addIncoming($dest, $head);
+
+        return $phi;
+    }
+
+    /**
      * array_reduce() with compile-time string user-function callbacks (issue #1213).
      */
     public static function buildReduceArray(
