@@ -38,7 +38,8 @@ final class StreamContextCreateBuiltinTest extends TestCase
         $table = $ctx->toArray();
         $httpOut = $table->find('http')->resolveIndirect()->toArray();
         $this->assertSame(5, $httpOut->find('timeout')->resolveIndirect()->toInt());
-        $this->assertNotNull(VmStreamContext::toHostResource($ctx));
+        $marker = $table->find(VmStreamContext::MARKER_KEY)->resolveIndirect();
+        $this->assertGreaterThan(0, $marker->toInt());
     }
 
     public function testDefaultEmptyContext(): void
@@ -52,7 +53,8 @@ final class StreamContextCreateBuiltinTest extends TestCase
 
         $ctx = $callFrame->returnVar->resolveIndirect();
         $this->assertTrue(VmStreamContext::isRepresentation($ctx));
-        $this->assertNotNull(VmStreamContext::toHostResource($ctx));
+        $marker = $ctx->toArray()->find(VmStreamContext::MARKER_KEY)->resolveIndirect();
+        $this->assertGreaterThan(0, $marker->toInt());
     }
 
     public function testNestedOptionsDeepCopyDoesNotShareInputBuckets(): void
