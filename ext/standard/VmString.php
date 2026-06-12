@@ -2107,6 +2107,7 @@ final class VmString
         }
         $quoteBoth = 0 !== ($flags & ENT_QUOTES);
         $quoteDouble = !$quoteBoth && (0 !== ($flags & ENT_COMPAT));
+        $entHtml5 = 0 !== ($flags & ENT_HTML5);
         $out = '';
         $len = self::byteLength($string);
         for ($i = 0; $i < $len; ++$i) {
@@ -2133,7 +2134,7 @@ final class VmString
                     $out .= ($quoteBoth || $quoteDouble) ? '&quot;' : '"';
                     break;
                 case "'":
-                    $out .= $quoteBoth ? '&#039;' : "'";
+                    $out .= $quoteBoth ? ($entHtml5 ? '&apos;' : '&#039;') : "'";
                     break;
                 default:
                     $out .= $ch;
@@ -2160,6 +2161,7 @@ final class VmString
         }
         $quoteBoth = ENT_QUOTES === ($flags & ENT_QUOTES);
         $quoteDouble = !$quoteBoth && (0 !== ($flags & ENT_COMPAT));
+        $entHtml5 = 0 !== ($flags & ENT_HTML5);
 
         if (HTML_SPECIALCHARS === $table) {
             $entries = [
@@ -2171,7 +2173,7 @@ final class VmString
                 $entries['"'] = '&quot;';
             }
             if ($quoteBoth) {
-                $entries["'"] = '&#039;';
+                $entries["'"] = $entHtml5 ? '&apos;' : '&#039;';
             }
         } else {
             $entries = HtmlEntityTable::entitiesEntQuotes();

@@ -32,7 +32,7 @@ final class StringHtmlspecialchars
 
         $string = $fn->getParam(0);
         $flags = $fn->getParam(1);
-        [$quoteBoth, $quoteDouble] = self::quoteFlags($context, $flags);
+        [$quoteBoth, $quoteDouble, $entHtml5] = self::quoteFlags($context, $flags);
 
         $map = $context->structFieldMap['__string__'];
         $i64 = $context->getTypeFromString('int64');
@@ -58,6 +58,7 @@ final class StringHtmlspecialchars
             $outLenSlot,
             $quoteBoth,
             $quoteDouble,
+            $entHtml5,
             $i64,
             $zero,
             $one
@@ -82,6 +83,7 @@ final class StringHtmlspecialchars
             $posSlot,
             $quoteBoth,
             $quoteDouble,
+            $entHtml5,
             $i64,
             $zero,
             $one,
@@ -93,7 +95,7 @@ final class StringHtmlspecialchars
     }
 
     /**
-     * @return array{0: Value, 1: Value} i1 quoteBoth, i1 quoteDouble (VmString parity)
+     * @return array{0: Value, 1: Value, 2: Value} i1 quoteBoth, i1 quoteDouble, i1 entHtml5 (VmString parity)
      */
     private static function quoteFlags(Context $context, Value $flags): array
     {
@@ -101,6 +103,7 @@ final class StringHtmlspecialchars
         $zero = $i64->constInt(0, false);
         $entQuotes = $i64->constInt(3, false);
         $entCompat = $i64->constInt(2, false);
+        $entHtml5Mask = $i64->constInt(48, false);
 
         $flagsAndQuotes = $context->builder->and($flags, $entQuotes);
         $quoteBoth = $context->builder->icmp(Builder::INT_NE, $flagsAndQuotes, $zero);
@@ -111,7 +114,10 @@ final class StringHtmlspecialchars
             $context->builder->icmp(Builder::INT_NE, $flagsAndCompat, $zero)
         );
 
-        return [$quoteBoth, $quoteDouble];
+        $flagsAndHtml5 = $context->builder->and($flags, $entHtml5Mask);
+        $entHtml5 = $context->builder->icmp(Builder::INT_NE, $flagsAndHtml5, $zero);
+
+        return [$quoteBoth, $quoteDouble, $entHtml5];
     }
 
     private static function countLoop(
@@ -123,6 +129,7 @@ final class StringHtmlspecialchars
         Value $outLenSlot,
         Value $quoteBoth,
         Value $quoteDouble,
+        Value $entHtml5,
         $i64,
         Value $zero,
         Value $one
@@ -160,6 +167,7 @@ final class StringHtmlspecialchars
         Value $posSlot,
         Value $quoteBoth,
         Value $quoteDouble,
+        Value $entHtml5,
         $i64,
         Value $zero,
         Value $one,
@@ -182,7 +190,7 @@ final class StringHtmlspecialchars
         $pos = $context->builder->load($posSlot);
         $destAt = $context->builder->gep($destChars, $pos);
         $afterChar = $fn->appendBasicBlock('htmlspecialchars_write_after_char');
-        self::writeChar($context, $fn, $destAt, $ch, $chI64, $quoteBoth, $quoteDouble, $afterChar, $charPtr, $i64);
+        self::writeChar($context, $fn, $destAt, $ch, $chI64, $quoteBoth, $quoteDouble, $entHtml5, $afterChar, $charPtr, $i64);
         $context->builder->positionAtEnd($afterChar);
         $step = self::replacementLen($context, $chI64, $quoteBoth, $quoteDouble, $one);
         $context->builder->store($context->builder->addNoSignedWrap($pos, $step), $posSlot);
@@ -240,6 +248,7 @@ final class StringHtmlspecialchars
         Value $chI64,
         Value $quoteBoth,
         Value $quoteDouble,
+        Value $entHtml5,
         BasicBlock $mergeBlock,
         $charPtr,
         $i64
@@ -289,7 +298,7 @@ final class StringHtmlspecialchars
             'double'
         );
 
-        $fallthrough = self::writeConditionalQuote(
+        $fallthrough = self::writeConditionalQuoteHtml5(
             $context,
             $fn,
             $fallthrough,
@@ -297,9 +306,11 @@ final class StringHtmlspecialchars
             $ch,
             $chI64,
             self::QUOTE_SINGLE,
+            '&apos;',
             '&#039;',
             6,
             $quoteBoth,
+            $entHtml5,
             $mergeBlock,
             $charPtr,
             $i64,
@@ -344,6 +355,58 @@ final class StringHtmlspecialchars
 
         $context->builder->positionAtEnd($entityBlock);
         $src = $context->builder->pointerCast($context->constantFromString($entity), $charPtr);
+        $context->intrinsic->memcpy($destAt, $src, $i64->constInt($entityLen, false), false);
+        $context->builder->branch($mergeBlock);
+
+        $context->builder->positionAtEnd($literalBlock);
+        $context->builder->store($ch, $destAt);
+        $context->builder->branch($mergeBlock);
+
+        return $nextBlock;
+    }
+
+    private static function writeConditionalQuoteHtml5(
+        Context $context,
+        Value $fn,
+        BasicBlock $fallthrough,
+        Value $destAt,
+        Value $ch,
+        Value $chI64,
+        int $ord,
+        string $html5Entity,
+        string $legacyEntity,
+        int $entityLen,
+        Value $escapeWhen,
+        Value $useHtml5Entity,
+        BasicBlock $mergeBlock,
+        $charPtr,
+        $i64,
+        string $suffix
+    ): BasicBlock {
+        $matchBlock = $fn->appendBasicBlock('htmlspecialchars_char_quote_'.$suffix.'_match');
+        $entityBlock = $fn->appendBasicBlock('htmlspecialchars_char_quote_'.$suffix.'_entity');
+        $html5Block = $fn->appendBasicBlock('htmlspecialchars_char_quote_'.$suffix.'_html5');
+        $legacyBlock = $fn->appendBasicBlock('htmlspecialchars_char_quote_'.$suffix.'_legacy');
+        $literalBlock = $fn->appendBasicBlock('htmlspecialchars_char_quote_'.$suffix.'_literal');
+        $nextBlock = $fn->appendBasicBlock('htmlspecialchars_char_quote_'.$suffix.'_next');
+
+        $context->builder->positionAtEnd($fallthrough);
+        $isQuote = $context->builder->icmp(Builder::INT_EQ, $chI64, $i64->constInt($ord, false));
+        $context->builder->branchIf($isQuote, $matchBlock, $nextBlock);
+
+        $context->builder->positionAtEnd($matchBlock);
+        $context->builder->branchIf($escapeWhen, $entityBlock, $literalBlock);
+
+        $context->builder->positionAtEnd($entityBlock);
+        $context->builder->branchIf($useHtml5Entity, $html5Block, $legacyBlock);
+
+        $context->builder->positionAtEnd($html5Block);
+        $src = $context->builder->pointerCast($context->constantFromString($html5Entity), $charPtr);
+        $context->intrinsic->memcpy($destAt, $src, $i64->constInt($entityLen, false), false);
+        $context->builder->branch($mergeBlock);
+
+        $context->builder->positionAtEnd($legacyBlock);
+        $src = $context->builder->pointerCast($context->constantFromString($legacyEntity), $charPtr);
         $context->intrinsic->memcpy($destAt, $src, $i64->constInt($entityLen, false), false);
         $context->builder->branch($mergeBlock);
 
