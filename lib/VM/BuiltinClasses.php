@@ -9,6 +9,7 @@ use PHPCompiler\VM\Builtin\DateIntervalConstruct;
 use PHPCompiler\VM\Builtin\DateIntervalFormat;
 use PHPCompiler\VM\Builtin\DateTimeConstruct;
 use PHPCompiler\VM\Builtin\DateTimeCreateFromImmutable;
+use PHPCompiler\VM\Builtin\DateTimeCreateFromInterface;
 use PHPCompiler\VM\Builtin\DateTimeCreateFromTimestamp;
 use PHPCompiler\VM\Builtin\DateTimeImmutableCreateFromTimestamp;
 use PHPCompiler\VM\Builtin\DateTimeFormat;
@@ -16,6 +17,7 @@ use PHPCompiler\VM\Builtin\DateTimeGetMicrosecond;
 use PHPCompiler\VM\Builtin\DateTimeGetTimestamp;
 use PHPCompiler\VM\Builtin\DateTimeImmutableConstruct;
 use PHPCompiler\VM\Builtin\DateTimeImmutableCreateFromFormat;
+use PHPCompiler\VM\Builtin\DateTimeImmutableCreateFromInterface;
 use PHPCompiler\VM\Builtin\DateTimeImmutableCreateFromMutable;
 use PHPCompiler\VM\Builtin\DateTimeModify;
 use PHPCompiler\VM\Builtin\DateTimeSetMicrosecond;
@@ -830,6 +832,8 @@ final class BuiltinClasses
         }
         $dt->methods['createfromimmutable'] = new DateTimeCreateFromImmutable();
         $dt->methodVisibility['createfromimmutable'] = $pubStatic;
+        $dt->methods['createfrominterface'] = new DateTimeCreateFromInterface();
+        $dt->methodVisibility['createfrominterface'] = $pubStatic;
         $dt->methods['createfromtimestamp'] = new DateTimeCreateFromTimestamp();
         $dt->methodVisibility['createfromtimestamp'] = $pubStatic;
         $ctx->classes[DateTimeSupport::CLASS_DATETIME] = $dt;
@@ -850,6 +854,8 @@ final class BuiltinClasses
         $dti->methodVisibility['createfromformat'] = $pubStatic;
         $dti->methods['createfrommutable'] = new DateTimeImmutableCreateFromMutable();
         $dti->methodVisibility['createfrommutable'] = $pubStatic;
+        $dti->methods['createfrominterface'] = new DateTimeImmutableCreateFromInterface();
+        $dti->methodVisibility['createfrominterface'] = $pubStatic;
         $dti->methods['createfromtimestamp'] = new DateTimeImmutableCreateFromTimestamp();
         $dti->methodVisibility['createfromtimestamp'] = $pubStatic;
         $ctx->classes[DateTimeSupport::CLASS_DATETIMEIMMUTABLE] = $dti;
