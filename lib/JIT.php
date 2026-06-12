@@ -6887,22 +6887,6 @@ class JIT {
                     }
                     if (
                         $this->context->scope->toCall instanceof CoreFunc\Internal
-                        && 'sprintf' === strtolower($this->context->scope->toCall->getName())
-                        && 2 === count($callArgs)
-                        && (
-                            Variable::TYPE_NATIVE_LONG === $callArgs[1]->type
-                            || Variable::TYPE_VALUE === $callArgs[1]->type
-                            || JIT\JitValueBox::isValueOperand($callArgs[1])
-                        )
-                    ) {
-                        $this->assignOperand(
-                            $block->getOperand($op->arg1),
-                            JIT\JitNativeString::coerce($this->context, $callArgs[1])
-                        );
-                        break;
-                    }
-                    if (
-                        $this->context->scope->toCall instanceof CoreFunc\Internal
                         && 'parse_url' === strtolower($this->context->scope->toCall->getName())
                         && 2 === count($callArgs)
                         && isset($callOperands[1])
