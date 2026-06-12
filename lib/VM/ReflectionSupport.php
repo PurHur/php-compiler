@@ -1414,6 +1414,73 @@ final class ReflectionSupport
     /**
      * @return array{0: ?string, 1: ?string}
      */
+    public static function isReflectionClosure(ObjectEntry $reflection): bool
+    {
+        return null !== $reflection->reflectionClosureState;
+    }
+
+    public static function newReflectionClassObjectForName(Context $ctx, string $className): ObjectEntry
+    {
+        $entry = VmReflection::resolveClassEntry($ctx, $className);
+        if (null === $entry) {
+            self::throwReflectionException('Class '.$className.' does not exist');
+        }
+        $rcClass = $ctx->classes[self::REFLECTION_CLASS] ?? null;
+        if (null === $rcClass) {
+            throw new \LogicException('ReflectionClass is not registered in this compiler build');
+        }
+        $rc = new ObjectEntry($rcClass);
+        $rc->constructed = true;
+        $rc->getProperty(self::PROP_CLASS_NAME)->string($entry->name);
+
+        return $rc;
+    }
+
+    /** php-src: closure_func->common.scope (definition site). */
+    public static function closureDefinitionScopeClassName(ClosureState $state): ?string
+    {
+        $cfgFunc = $state->func->block->func ?? null;
+        if (null === $cfgFunc || null === $cfgFunc->class || null === $cfgFunc->class->value || '' === $cfgFunc->class->value) {
+            return null;
+        }
+
+        return $cfgFunc->class->value;
+    }
+
+    /** php-src: get_closure called_scope, else definition scope. */
+    public static function closureCalledScopeClassName(ClosureState $state): ?string
+    {
+        if (null !== $state->boundScopeClass && '' !== $state->boundScopeClass) {
+            return $state->boundScopeClass;
+        }
+
+        return self::closureDefinitionScopeClassName($state);
+    }
+
+    /** php-src: ReflectionFunctionAbstract::getClosureUsedVariables(). */
+    public static function returnClosureUsedVariables(?Variable $returnVar, ClosureState $state): void
+    {
+        if (null === $returnVar) {
+            return;
+        }
+        $returnVar->newArray();
+        $ht = $returnVar->toArray();
+        $block = $state->func->block;
+        /** @var array<int, Variable> $bySlot */
+        $bySlot = [];
+        foreach ($state->captures as $capture) {
+            $bySlot[$capture['slot']] = $capture['var'];
+        }
+        foreach ($block->eachNamedScopeSlot() as [$name, $slot]) {
+            if (!isset($block->closureCaptureSlots[$slot]) || !isset($bySlot[$slot])) {
+                continue;
+            }
+            $copy = new Variable();
+            $copy->copyFrom($bySlot[$slot]->resolveIndirect());
+            $ht->add($name, $copy);
+        }
+    }
+
     private static function methodScopeAndNameFromClosureState(Context $ctx, ClosureState $state): array
     {
         if (null !== $state->methodName && '' !== $state->methodName) {
