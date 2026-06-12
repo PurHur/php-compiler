@@ -34,7 +34,7 @@ final class VmFsTempnam
             return $path;
         }
         self::emitNotice($frame);
-        $fallback = \sys_get_temp_dir();
+        $fallback = VmSysGetTempDirNative::resolve();
         if ('' === $fallback) {
             return false;
         }
