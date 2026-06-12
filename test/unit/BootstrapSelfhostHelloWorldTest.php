@@ -486,6 +486,9 @@ final class BootstrapSelfhostHelloWorldTest extends TestCase
         $this->assertStringContainsString('allow:\\runtime::preprocesssourceforparse', $allowlist);
         $this->assertStringContainsString('allow:\\runtime::rewritesourcebeforeparser', $allowlist);
         $this->assertStringContainsString('allow:\\runtime::preparesourceforparser', $allowlist);
+        $this->assertStringContainsString('ensureM3EmitTuCompilerRuntimeCompileDeps', $jit);
+        $this->assertStringContainsString("'setpropertyhookregistry'", $jit);
+        $this->assertStringContainsString("'setknownclassreadonly'", $jit);
     }
 
     /** Issue #2843: inventory compile_driver links without *_m3_emit_native_entry.php. */
