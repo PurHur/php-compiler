@@ -1160,9 +1160,6 @@ final class VmFs
         if (null === $length) {
             $row = @\fgetcsv($fp, separator: $separator, enclosure: $enclosure, escape: $escape);
         } else {
-            if ($length <= 0) {
-                return false;
-            }
             $row = @\fgetcsv($fp, $length, $separator, $enclosure, $escape);
         }
         if (false === $row) {

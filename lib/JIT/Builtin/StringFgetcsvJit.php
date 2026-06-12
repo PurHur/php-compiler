@@ -136,17 +136,16 @@ final class StringFgetcsvJit
         $context->builder->returnValue($htPtr->constNull());
 
         $context->builder->positionAtEnd($lenBb);
-        $lenZero = $context->builder->icmp(Builder::INT_EQ, $length, $zero64);
-        $noLenBb = $fn->appendBasicBlock('fgetcsv_no_len');
+        $lenNotPositive = $context->builder->icmp(Builder::INT_SLE, $length, $zero64);
         $allocBb = $fn->appendBasicBlock('fgetcsv_alloc');
-        $context->builder->branchIf($lenZero, $noLenBb, $allocBb);
-
-        $context->builder->positionAtEnd($noLenBb);
-        $context->builder->returnValue($htPtr->constNull());
+        $context->builder->branch($allocBb);
 
         $context->builder->positionAtEnd($allocBb);
-        $lenNeg = $context->builder->icmp(Builder::INT_SLT, $length, $zero64);
-        $bufSize = $context->builder->select($lenNeg, $defaultBuf, $context->builder->truncOrBitCast($length, $sizeT));
+        $bufSize = $context->builder->select(
+            $lenNotPositive,
+            $defaultBuf,
+            $context->builder->truncOrBitCast($length, $sizeT)
+        );
         $buf = $context->builder->call($context->lookupFunction('malloc'), $bufSize);
         $noBufBb = $fn->appendBasicBlock('fgetcsv_no_buf');
         $readBb = $fn->appendBasicBlock('fgetcsv_read');
