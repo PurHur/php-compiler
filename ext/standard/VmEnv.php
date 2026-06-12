@@ -48,11 +48,16 @@ final class VmEnv
     public static function getenv(string $name, bool $localOnly = false): string|false
     {
         if ($localOnly) {
-            if (!\array_key_exists($name, self::$local)) {
-                return false;
+            // php-src zif_getenv: local_only skips sapi_getenv, uses php_getenv (overlay + environ).
+            if (\array_key_exists($name, self::$local)) {
+                return self::$local[$name];
+            }
+            $environ = VmEnvEnvironNative::enumerate();
+            if (\array_key_exists($name, $environ)) {
+                return $environ[$name];
             }
 
-            return self::$local[$name];
+            return false;
         }
 
         $result = \getenv($name);
