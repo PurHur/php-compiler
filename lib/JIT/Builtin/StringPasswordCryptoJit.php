@@ -24,6 +24,10 @@ final class StringPasswordCryptoJit
 
     private const BCRYPT_DEFAULT_COST = 10;
 
+    private const BCRYPT_MIN_COST = 4;
+
+    private const BCRYPT_MAX_COST = 31;
+
     /** @var list<string> */
     private const FUNCTION_NAMES = [
         '__compiler_password_hash',
@@ -88,6 +92,7 @@ final class StringPasswordCryptoJit
 
         $password = $fn->getParam(0);
         $algo = $fn->getParam(1);
+        $requestedCost = $fn->getParam(2);
         $strPtr = $context->getTypeFromString('__string__*');
         $i64 = $context->getTypeFromString('int64');
         $i32 = $context->getTypeFromString('int32');
@@ -104,10 +109,48 @@ final class StringPasswordCryptoJit
             $i64->constInt(self::PASSWORD_BCRYPT, false)
         );
         $badAlgo = $fn->appendBasicBlock('pw_hash_bad_algo');
-        $body = $fn->appendBasicBlock('pw_hash_body');
-        $context->builder->branchIf($supported, $body, $badAlgo);
+        $costPrep = $fn->appendBasicBlock('pw_hash_cost_prep');
+        $context->builder->branchIf($supported, $costPrep, $badAlgo);
 
         $context->builder->positionAtEnd($badAlgo);
+        $context->builder->returnValue($nullStr);
+
+        $context->builder->positionAtEnd($costPrep);
+        $useDefault = $context->builder->icmp(Builder::INT_SLE, $requestedCost, $i64->constInt(0, false));
+        $defaultBb = $fn->appendBasicBlock('pw_hash_cost_default');
+        $useReq = $fn->appendBasicBlock('pw_hash_cost_use_req');
+        $costReady = $fn->appendBasicBlock('pw_hash_cost_ready');
+        $context->builder->branchIf($useDefault, $defaultBb, $useReq);
+
+        $context->builder->positionAtEnd($defaultBb);
+        $context->builder->branch($costReady);
+
+        $context->builder->positionAtEnd($useReq);
+        $context->builder->branch($costReady);
+
+        $context->builder->positionAtEnd($costReady);
+        $defaultCostI32 = $i32->constInt(self::BCRYPT_DEFAULT_COST, false);
+        $reqCostI32 = $context->builder->truncOrBitCast($requestedCost, $i32);
+        $effCostPhi = $context->builder->phi($i32);
+        $effCostPhi->addIncoming($defaultCostI32, $defaultBb);
+        $effCostPhi->addIncoming($reqCostI32, $useReq);
+        $effCostI64 = $context->builder->sextOrBitCast($effCostPhi, $i64);
+        $tooLow = $context->builder->icmp(
+            Builder::INT_SLT,
+            $effCostI64,
+            $i64->constInt(self::BCRYPT_MIN_COST, false)
+        );
+        $tooHigh = $context->builder->icmp(
+            Builder::INT_SGT,
+            $effCostI64,
+            $i64->constInt(self::BCRYPT_MAX_COST, false)
+        );
+        $costBad = $context->builder->or($tooLow, $tooHigh);
+        $costFail = $fn->appendBasicBlock('pw_hash_cost_fail');
+        $body = $fn->appendBasicBlock('pw_hash_body');
+        $context->builder->branchIf($costBad, $costFail, $body);
+
+        $context->builder->positionAtEnd($costFail);
         $context->builder->returnValue($nullStr);
 
         $context->builder->positionAtEnd($body);
@@ -134,7 +177,7 @@ final class StringPasswordCryptoJit
             $settingPtr,
             $i64->constInt(64, false),
             $fmt,
-            $i32->constInt(self::BCRYPT_DEFAULT_COST, false),
+            $effCostPhi,
             $context->builder->pointerCast($salt22, $i8p)
         );
         $snBad = $context->builder->icmp(Builder::INT_SGE, $snLen, $i64->constInt(64, false));

@@ -62,8 +62,9 @@ final class password_hash extends Internal
         if ($argc < 2 || $argc > 3) {
             throw new \LogicException('password_hash() requires two or three arguments in this compiler build');
         }
+        $options = null;
         if (3 === $argc) {
-            throw new \LogicException('password_hash() options are not supported for JIT in this compiler build');
+            $options = $args[2];
         }
         $i64 = $context->getTypeFromString('int64');
 
@@ -73,7 +74,8 @@ final class password_hash extends Internal
             $context->builder->truncOrBitCast(
                 JitLongArg::lower($context, $args[1], 'password_hash() algorithm'),
                 $i64
-            )
+            ),
+            $options
         );
     }
 }

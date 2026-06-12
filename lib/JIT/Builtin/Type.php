@@ -693,7 +693,7 @@ class Type extends Builtin {
             $fntypeTimeSleepUntil
         );
         $this->context->registerFunction('__compiler_time_sleep_until', $fnTimeSleepUntil);
-        $fntypePasswordHash = $this->context->context->functionType($strPtr, false, $strPtr, $i64);
+        $fntypePasswordHash = $this->context->context->functionType($strPtr, false, $strPtr, $i64, $i64);
         $fnPasswordHash = $this->context->module->addFunction('__compiler_password_hash', $fntypePasswordHash);
         $this->context->registerFunction('__compiler_password_hash', $fnPasswordHash);
         $fntypePasswordVerify = $this->context->context->functionType($i32, false, $strPtr, $strPtr);
