@@ -183,6 +183,8 @@ final class VmConstants
                 'false',
                 'password_bcrypt',
                 'password_default',
+                'password_argon2i',
+                'password_argon2id',
                 'crypt_std_des',
                 'crypt_ext_des',
                 'crypt_md5',

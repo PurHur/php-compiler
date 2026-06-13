@@ -32,7 +32,25 @@ final class VmPasswordNativeTest extends TestCase
 
     public function testPasswordAlgosNativeList(): void
     {
-        $this->assertSame(['2y'], VmPasswordNative::passwordAlgos());
+        $expected = ['2y'];
+        if (VmPasswordNative::argon2Available()) {
+            $expected[] = 'argon2i';
+            $expected[] = 'argon2id';
+        }
+        $this->assertSame($expected, VmPasswordNative::passwordAlgos());
+    }
+
+    public function testPasswordHashArgon2WhenHostAvailable(): void
+    {
+        if (!VmPasswordNative::argon2Available()) {
+            $this->markTestSkipped('host PASSWORD_ARGON2ID unavailable');
+        }
+        $hash = VmPassword::hash('secret', VmPassword::PASSWORD_ARGON2ID);
+        $this->assertIsString($hash);
+        $this->assertTrue(str_starts_with($hash, '$argon2id$'));
+        $this->assertTrue(VmPassword::verify('secret', $hash));
+        $info = VmPassword::getInfo($hash);
+        $this->assertSame('argon2id', $info['algoName']);
     }
 
     public function testCryptBcryptSetting(): void

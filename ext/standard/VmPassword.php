@@ -18,11 +18,18 @@ final class VmPassword
 
     public const PASSWORD_DEFAULT = 1;
 
+    /** php-src ext/standard/password.c — registered when Argon2 is available. */
+    public const PASSWORD_ARGON2I = 2;
+
+    public const PASSWORD_ARGON2ID = 3;
+
     public const PASSWORD_ALGO_INVALID_MSG = 'password_hash(): Argument #2 ($algo) must be a valid password hashing algorithm';
 
     /** @var array<string, int> php-src password_algos() names accepted by password_hash() (ext/standard/password.c). */
     private const STRING_ALGOS = [
         '2y' => self::PASSWORD_BCRYPT,
+        'argon2i' => self::PASSWORD_ARGON2I,
+        'argon2id' => self::PASSWORD_ARGON2ID,
     ];
 
     private const BCRYPT_DEFAULT_COST = 10;
@@ -120,29 +127,78 @@ final class VmPassword
         return self::passwordInfoUnknown();
     }
 
-    /** password_needs_rehash() — bcrypt cost compare (ext/standard/password.c, #3279, #6503). */
+    /** password_needs_rehash() — bcrypt/argon option compare (ext/standard/password.c, #3279, #6503, #4149). */
     public static function needsRehash(string $hash, int $algo, array $options = []): bool
     {
         if (!self::algoSupported($algo)) {
             return false;
         }
-        if (!self::hashIdentIsBcrypt($hash)) {
-            return true;
+        $info = self::getInfo($hash);
+        $hashAlgo = $info['algo'];
+        if (self::PASSWORD_BCRYPT === $algo || self::PASSWORD_DEFAULT === $algo) {
+            if ('2y' !== $hashAlgo) {
+                return true;
+            }
+            $newCost = 0;
+            if (isset($options['cost']) && \is_int($options['cost'])) {
+                $newCost = $options['cost'];
+            }
+            if ($newCost <= 0) {
+                $newCost = self::BCRYPT_DEFAULT_COST;
+            }
+
+            return self::bcryptCostFromHash($hash) !== $newCost;
         }
-        $newCost = 0;
-        if (isset($options['cost']) && \is_int($options['cost'])) {
-            $newCost = $options['cost'];
+        if (self::PASSWORD_ARGON2I === $algo) {
+            if ('argon2i' !== $hashAlgo) {
+                return true;
+            }
+
+            return self::argon2OptionsDiffer($info['options'], $options);
         }
-        if ($newCost <= 0) {
-            $newCost = self::BCRYPT_DEFAULT_COST;
+        if (self::PASSWORD_ARGON2ID === $algo) {
+            if ('argon2id' !== $hashAlgo) {
+                return true;
+            }
+
+            return self::argon2OptionsDiffer($info['options'], $options);
         }
 
-        return self::bcryptCostFromHash($hash) !== $newCost;
+        return true;
     }
 
     private static function algoSupported(int $algo): bool
     {
-        return self::PASSWORD_BCRYPT === $algo || self::PASSWORD_DEFAULT === $algo;
+        if (self::PASSWORD_BCRYPT === $algo || self::PASSWORD_DEFAULT === $algo) {
+            return true;
+        }
+        if (!VmPasswordNative::argon2Available()) {
+            return false;
+        }
+
+        return self::PASSWORD_ARGON2I === $algo || self::PASSWORD_ARGON2ID === $algo;
+    }
+
+    /** @param array<string, mixed> $hashOptions */
+    /** @param array<string, mixed> $requested */
+    private static function argon2OptionsDiffer(array $hashOptions, array $requested): bool
+    {
+        $memoryCost = 65536;
+        $timeCost = 4;
+        $threads = 1;
+        if (isset($requested['memory_cost']) && \is_int($requested['memory_cost'])) {
+            $memoryCost = $requested['memory_cost'];
+        }
+        if (isset($requested['time_cost']) && \is_int($requested['time_cost'])) {
+            $timeCost = $requested['time_cost'];
+        }
+        if (isset($requested['threads']) && \is_int($requested['threads'])) {
+            $threads = $requested['threads'];
+        }
+
+        return ($hashOptions['memory_cost'] ?? 65536) !== $memoryCost
+            || ($hashOptions['time_cost'] ?? 4) !== $timeCost
+            || ($hashOptions['threads'] ?? 1) !== $threads;
     }
 
     private static function algoTypeLabel(Variable $var): string
@@ -220,13 +276,6 @@ final class VmPassword
                 'threads' => $threads,
             ],
         ];
-    }
-
-    private static function hashIdentIsBcrypt(string $hash): bool
-    {
-        $ident = self::extractIdent($hash);
-
-        return null !== $ident && '2y' === $ident && self::bcryptValid($hash);
     }
 
     private static function bcryptCostFromHash(string $hash): int
