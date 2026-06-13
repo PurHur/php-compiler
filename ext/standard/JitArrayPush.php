@@ -11,6 +11,7 @@ use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\Variable;
 use PHPLLVM\Builder;
+use PHPLLVM\Value;
 
 /** JIT/AOT guard for array_push() by-reference array argument (#4881). */
 final class JitArrayPush
@@ -29,25 +30,6 @@ final class JitArrayPush
             return true;
         }
         if (JITVariable::TYPE_VALUE === $array->type) {
-            $loaded = JitValueBox::valuePtrFromVariable($context, $array);
-            $typeField = $context->structFieldMap['__value__']['type'];
-            $typeByte = $context->builder->load(
-                $context->builder->structGep($loaded, $typeField)
-            );
-            $i8 = $context->getTypeFromString('int8');
-            $isArray = $context->builder->icmp(
-                Builder::INT_EQ,
-                $typeByte,
-                $i8->constInt(Variable::TYPE_ARRAY, false)
-            );
-            $okBlock = BasicBlockHelper::append($context, 'array_push_req_ok');
-            $errBlock = BasicBlockHelper::append($context, 'array_push_req_err');
-            $context->builder->branchIf($isArray, $okBlock, $errBlock);
-            $context->builder->positionAtEnd($errBlock);
-            self::emitPendingError($context);
-            $context->builder->ret($context->constantFromInteger(0, 'int64'));
-            $context->builder->positionAtEnd($okBlock);
-
             return true;
         }
 
@@ -56,7 +38,54 @@ final class JitArrayPush
         return false;
     }
 
-    private static function emitPendingError(Context $context): void
+    /**
+     * Runtime guard for boxed array_push() argument #1; merges push count vs 0 on Error (#4881).
+     *
+     * @param JITVariable[] $values
+     */
+    public static function pushWithValueBoxGuard(
+        Context $context,
+        JITVariable $array,
+        array $values,
+        callable $pushFn
+    ): Value {
+        $loaded = JitValueBox::valuePtrFromVariable($context, $array);
+        $typeField = $context->structFieldMap['__value__']['type'];
+        $typeByte = $context->builder->load(
+            $context->builder->structGep($loaded, $typeField)
+        );
+        $i8 = $context->getTypeFromString('int8');
+        $isArray = $context->builder->icmp(
+            Builder::INT_EQ,
+            $typeByte,
+            $i8->constInt(Variable::TYPE_ARRAY, false)
+        );
+        $okBlock = BasicBlockHelper::append($context, 'array_push_vbox_ok');
+        $errBlock = BasicBlockHelper::append($context, 'array_push_vbox_err');
+        $mergeBlock = BasicBlockHelper::append($context, 'array_push_vbox_merge');
+        $context->builder->branchIf($isArray, $okBlock, $errBlock);
+
+        $context->builder->positionAtEnd($errBlock);
+        self::emitPendingError($context);
+        $errEnd = $context->builder->getInsertBlock();
+        $context->builder->branch($mergeBlock);
+
+        $context->builder->positionAtEnd($okBlock);
+        $result = $pushFn($context, $array, $values);
+        $okEnd = $context->builder->getInsertBlock();
+        $context->builder->branch($mergeBlock);
+
+        $context->builder->positionAtEnd($mergeBlock);
+        $i64 = $context->getTypeFromString('int64');
+        $zero = $i64->constInt(0, false);
+        $phi = $context->builder->phi($i64, 'array_push_vbox_phi');
+        $phi->addIncoming($zero, $errEnd);
+        $phi->addIncoming($result, $okEnd);
+
+        return $phi;
+    }
+
+    public static function emitPendingError(Context $context): void
     {
         ErrorRaise::registerDeclarations($context);
         ErrorRaise::ensureLinked($context);

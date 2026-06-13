@@ -15,7 +15,7 @@ use PHPLLVM\Value;
  */
 final class JitFilterInputTypeArg
 {
-    public static function lower(Context $context, JITVariable $arg): Value
+    public static function lower(Context $context, Variable $arg): Value
     {
         $compileTime = FilterInputTypeJit::compileTimeInputType($context, $arg);
         if (null !== $compileTime) {
