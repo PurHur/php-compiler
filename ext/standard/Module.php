@@ -455,6 +455,8 @@ class Module extends ModuleAbstract
             new ob_get_status(),
             new ob_implicit_flush(),
             new http_response_code(),
+            new output_add_rewrite_var(),
+            new output_reset_rewrite_vars(),
             new json_encode(),
             new json_decode(),
             new json_validate(),

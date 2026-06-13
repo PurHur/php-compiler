@@ -219,6 +219,7 @@ final class SelfHostBuiltinPolicy
         'htmlentities' => 'string', 'html_entity_decode' => 'string',
         'get_html_translation_table' => 'string',
         'header' => 'string', 'http_response_code' => 'string',
+        'output_add_rewrite_var' => 'string', 'output_reset_rewrite_vars' => 'string',
         'getallheaders' => 'string', 'apache_request_headers' => 'string',
         'header_list' => 'string', 'headers_list' => 'string',
         'headers_sent' => 'string', 'header_register_callback' => 'string',
