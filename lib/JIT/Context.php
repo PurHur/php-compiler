@@ -675,6 +675,7 @@ class Context {
             \PHPCompiler\ext\standard\JitStrspn::ensureStandaloneBodies($this);
             Builtin\TokenGetAll::ensureStandaloneBodies($this);
             Builtin\Highlight::ensureStandaloneBodies($this);
+            Builtin\Hebrev::ensureStandaloneBodies($this);
         }
 
         $this->functionProxies['is_null'] = new Builtin\IsNullFn();
