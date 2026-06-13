@@ -1,0 +1,90 @@
+<?php
+
+declare(strict_types=1);
+
+namespace PHPCompiler\ext\standard;
+
+use PHPCompiler\Frame;
+use PHPCompiler\Func\Internal;
+use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\Variable as JITVariable;
+use PHPCompiler\VM\BuiltinExecute;
+use PHPCompiler\VM\DateTimeSupport;
+use PHPCompiler\VM\ErrorReporter;
+use PHPCompiler\VM\Variable;
+use PHPLLVM\Value;
+
+/**
+ * date_create() — procedural DateTime factory (ext/date/php_date.c, #4124).
+ *
+ * php-src: ext/date/php_date.c — PHP_FUNCTION(date_create)
+ */
+final class date_create extends Internal
+{
+    public function __construct()
+    {
+        parent::__construct('date_create');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $argc = \count($frame->calledArgs);
+        if ($argc > 2) {
+            throw new \ArgumentCountError(\sprintf(
+                'date_create() expects at most 2 arguments, %d given',
+                $argc
+            ));
+        }
+        if (null === $frame->returnVar || null === $frame->vmContext) {
+            return;
+        }
+
+        $time = 'now';
+        if ($argc >= 1) {
+            $timeVar = $frame->calledArgs[0]->resolveIndirect();
+            if (Variable::TYPE_NULL !== $timeVar->type) {
+                $time = VmString::coerceStringBuiltinArg(
+                    $frame->calledArgs[0],
+                    'date_create',
+                    1,
+                    'datetime'
+                );
+            }
+        }
+        $timezone = null;
+        if ($argc >= 2) {
+            $tzVar = $frame->calledArgs[1]->resolveIndirect();
+            if (Variable::TYPE_NULL !== $tzVar->type) {
+                $timezone = DateTimeSupport::requireDateTimeZone(
+                    $frame->calledArgs[1],
+                    'date_create(): Argument #2 ($timezone)'
+                );
+            }
+        }
+
+        $created = DateTimeSupport::tryNewDateTimeVariable($frame->vmContext, $time, $timezone);
+        if (null === $created) {
+            $frame->vmContext->errors->triggerError(
+                'date_create(): Failed to parse time string ('.$time.')',
+                ErrorReporter::E_WARNING,
+                '' !== $frame->scriptPath ? $frame->scriptPath : null,
+                $frame->vmContext,
+                $frame
+            );
+            BuiltinExecute::writeReturn($frame, static function (Variable $ret): void {
+                $ret->bool(false);
+            });
+
+            return;
+        }
+
+        BuiltinExecute::writeReturn($frame, static function (Variable $ret) use ($created): void {
+            $ret->copyFrom($created);
+        });
+    }
+
+    public function call(Context $context, JITVariable ...$args): Value
+    {
+        throw new \LogicException('date_create() is not implemented for JIT in this compiler build (issue #4124)');
+    }
+}
