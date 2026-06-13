@@ -133,4 +133,41 @@ final class DateIntervalSupport
 
         return $var;
     }
+
+    /**
+     * @param array{y: int, m: int, d: int, h: int, i: int, s: int, f: float, invert: int, days: bool|int} $state
+     */
+    public static function writeState(ObjectEntry $interval, array $state): void
+    {
+        self::requireIntProperty($interval, 'y')->int($state['y']);
+        self::requireIntProperty($interval, 'm')->int($state['m']);
+        self::requireIntProperty($interval, 'd')->int($state['d']);
+        self::requireIntProperty($interval, 'h')->int($state['h']);
+        self::requireIntProperty($interval, 'i')->int($state['i']);
+        self::requireIntProperty($interval, 's')->int($state['s']);
+        self::requireFloatProperty($interval, 'f')->float($state['f']);
+        self::requireIntProperty($interval, 'invert')->int($state['invert']);
+        $daysVar = self::requireProperty($interval, 'days')->resolveIndirect();
+        if (\is_int($state['days'])) {
+            $daysVar->int($state['days']);
+        } else {
+            $daysVar->bool(false);
+        }
+        $interval->constructed = true;
+    }
+
+    /**
+     * @param array{y: int, m: int, d: int, h: int, i: int, s: int, f: float, invert: int, days: bool|int} $state
+     */
+    public static function createFromState(Context $ctx, array $state): ObjectEntry
+    {
+        $class = $ctx->classes[self::CLASS_DATEINTERVAL] ?? null;
+        if (null === $class) {
+            throw new \LogicException('DateInterval is not registered in this compiler build');
+        }
+        $interval = new ObjectEntry($class);
+        self::writeState($interval, $state);
+
+        return $interval;
+    }
 }

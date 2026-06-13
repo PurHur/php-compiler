@@ -425,6 +425,53 @@ final class DateTimeSupport
         self::requireStringProperty($dt, self::TZ_PROPERTY, self::classLabel($dt))->string($tzName);
     }
 
+    /** php-src php_date_add — mutable in-place (#4604). */
+    public static function addInterval(ObjectEntry $dt, ObjectEntry $interval): void
+    {
+        $label = self::classLabel($dt);
+        self::requireInitializedDateTimeLike($dt, 'date_add()');
+        $state = DateIntervalSupport::readState($interval);
+        $tzName = self::requireStringProperty($dt, self::TZ_PROPERTY, $label)->toString();
+        $timestamp = self::requireIntProperty($dt, self::TS_PROPERTY, $label)->toInt();
+        $microsecond = self::requireIntProperty($dt, self::MICROSECOND_PROPERTY, $label)->toInt();
+        $updated = VmDateTimeNative::applyIntervalState($timestamp, $microsecond, $state, $tzName, true);
+        self::requireIntProperty($dt, self::TS_PROPERTY, $label)->int($updated['timestamp']);
+        self::requireIntProperty($dt, self::MICROSECOND_PROPERTY, $label)->int($updated['microsecond']);
+    }
+
+    /** php-src php_date_sub — mutable in-place (#4604). */
+    public static function subInterval(ObjectEntry $dt, ObjectEntry $interval): void
+    {
+        $label = self::classLabel($dt);
+        self::requireInitializedDateTimeLike($dt, 'date_sub()');
+        $state = DateIntervalSupport::readState($interval);
+        $tzName = self::requireStringProperty($dt, self::TZ_PROPERTY, $label)->toString();
+        $timestamp = self::requireIntProperty($dt, self::TS_PROPERTY, $label)->toInt();
+        $microsecond = self::requireIntProperty($dt, self::MICROSECOND_PROPERTY, $label)->toInt();
+        $updated = VmDateTimeNative::applyIntervalState($timestamp, $microsecond, $state, $tzName, false);
+        self::requireIntProperty($dt, self::TS_PROPERTY, $label)->int($updated['timestamp']);
+        self::requireIntProperty($dt, self::MICROSECOND_PROPERTY, $label)->int($updated['microsecond']);
+    }
+
+    /** php-src php_date_diff — returns new DateInterval (#4604). */
+    public static function diffDateTimes(
+        ObjectEntry $base,
+        ObjectEntry $target,
+        bool $absolute,
+        Context $ctx
+    ): ObjectEntry {
+        self::requireInitializedDateTimeLike($base, 'date_diff()');
+        self::requireInitializedDateTimeLike($target, 'date_diff()');
+        $baseLabel = self::classLabel($base);
+        $targetLabel = self::classLabel($target);
+        $baseTs = self::requireIntProperty($base, self::TS_PROPERTY, $baseLabel)->toInt();
+        $targetTs = self::requireIntProperty($target, self::TS_PROPERTY, $targetLabel)->toInt();
+        $tzName = self::requireStringProperty($base, self::TZ_PROPERTY, $baseLabel)->toString();
+        $diffState = VmDateTimeNative::diffTimestamps($baseTs, $targetTs, $tzName, $absolute);
+
+        return DateIntervalSupport::createFromState($ctx, $diffState);
+    }
+
     /** php-src zim_DateTime_modify — mutable in-place (#6132). */
     public static function modify(ObjectEntry $dt, string $modifier): void
     {
