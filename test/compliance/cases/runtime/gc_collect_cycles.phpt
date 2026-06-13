@@ -2,7 +2,9 @@
 runtime gc_collect_cycles() — two-node object cycle (#3113)
 --FILE--
 <?php
-class Node { public $next; }
+#[\AllowDynamicProperties]
+class Node {
+}
 $a = new Node();
 $b = new Node();
 $a->next = $b;
