@@ -18,6 +18,12 @@ final class VmFsPathNative
 
     private const COPY_BUF_SIZE = 8192;
 
+    /** Linux PATH_MAX; readlink(2) does not NUL-terminate on success. */
+    private const READLINK_BUF_SIZE = 4096;
+
+    /** Linux AT_FDCWD — same as fcntl.h (pairs JitSymlink). */
+    private const AT_FDCWD = -100;
+
     private static ?\FFI $ffi = null;
 
     public static function rename(string $from, string $to): bool
@@ -63,6 +69,49 @@ final class VmFsPathNative
         }
 
         return false;
+    }
+
+    /** @return string|false */
+    public static function readlink(string $path)
+    {
+        if (str_contains($path, "\0")) {
+            return false;
+        }
+        if (!self::ffiEnabled()) {
+            return false;
+        }
+        $ffi = self::ffi();
+        if (null === $ffi) {
+            return false;
+        }
+
+        try {
+            $buf = $ffi->new('char['.self::READLINK_BUF_SIZE.']');
+            $len = (int) $ffi->readlink($path, \FFI::addr($buf[0]), self::READLINK_BUF_SIZE);
+            if ($len < 0) {
+                return false;
+            }
+
+            return \FFI::string($buf, $len);
+        } catch (\Throwable) {
+            return false;
+        }
+    }
+
+    public static function symlink(string $target, string $link): bool
+    {
+        if (str_contains($target, "\0") || str_contains($link, "\0")) {
+            return false;
+        }
+        if (!self::ffiEnabled()) {
+            return false;
+        }
+        $ffi = self::ffi();
+        if (null === $ffi) {
+            return false;
+        }
+
+        return 0 === (int) $ffi->symlinkat($target, self::AT_FDCWD, $link);
     }
 
     private static function copyViaFfi(\FFI $ffi, string $from, string $to): bool
@@ -134,6 +183,8 @@ typedef unsigned long size_t;
 typedef int mode_t;
 int rename(const char *oldpath, const char *newpath);
 int link(const char *oldpath, const char *newpath);
+ssize_t readlink(const char *pathname, char *buf, size_t bufsiz);
+int symlinkat(const char *target, int newdirfd, const char *linkpath);
 int open(const char *pathname, int flags, ...);
 ssize_t read(int fd, void *buf, size_t count);
 ssize_t write(int fd, const void *buf, size_t count);

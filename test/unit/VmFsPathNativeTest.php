@@ -16,9 +16,15 @@ final class VmFsPathNativeTest extends TestCase
         $this->assertStringContainsString('VmFsPathNative::rename', $source);
         $this->assertStringContainsString('VmFsPathNative::copy', $source);
         $this->assertStringContainsString('VmFsPathNative::link', $source);
+        $this->assertStringContainsString('VmFsPathNative::readlink', $source);
+        $this->assertStringContainsString('VmFsPathNative::symlink', $source);
+        $this->assertStringContainsString('VmFsTouchNative::touch', $source);
         $this->assertDoesNotMatchRegularExpression('/@rename\\s*\\(/', $source);
         $this->assertDoesNotMatchRegularExpression('/@copy\\s*\\(/', $source);
         $this->assertDoesNotMatchRegularExpression('/@link\\s*\\(/', $source);
+        $this->assertDoesNotMatchRegularExpression('/@readlink\\s*\\(/', $source);
+        $this->assertDoesNotMatchRegularExpression('/@symlink\\s*\\(/', $source);
+        $this->assertDoesNotMatchRegularExpression('/@touch\\s*\\(/', $source);
     }
 
     public function testNativeDefinesLibcPathOps(): void
@@ -26,6 +32,8 @@ final class VmFsPathNativeTest extends TestCase
         $source = (string) file_get_contents(__DIR__.'/../../ext/standard/VmFsPathNative.php');
         $this->assertStringContainsString('int rename(const char *oldpath', $source);
         $this->assertStringContainsString('int link(const char *oldpath', $source);
+        $this->assertStringContainsString('ssize_t readlink(const char *pathname', $source);
+        $this->assertStringContainsString('int symlinkat(const char *target', $source);
         $this->assertStringContainsString('int open(const char *pathname', $source);
     }
 
@@ -53,9 +61,14 @@ final class VmFsPathNativeTest extends TestCase
         $this->assertTrue(VmFsPathNative::link($src, $hard));
         $this->assertSame('payload', file_get_contents($hard));
 
+        $sym = $dir.'/phpc_path_sym_'.bin2hex(random_bytes(4));
+        $this->assertTrue(VmFsPathNative::symlink($src, $sym));
+        $this->assertSame($src, VmFsPathNative::readlink($sym));
+
         @unlink($src);
         @unlink($renamed);
         @unlink($hard);
+        @unlink($sym);
     }
 
     public function testNullBytePathsRejected(): void
@@ -63,5 +76,8 @@ final class VmFsPathNativeTest extends TestCase
         $this->assertFalse(VmFsPathNative::rename("a\0b", 'c'));
         $this->assertFalse(VmFsPathNative::copy("a\0b", 'c'));
         $this->assertFalse(VmFsPathNative::link("a\0b", 'c'));
+        $this->assertFalse(VmFsPathNative::readlink("a\0b"));
+        $this->assertFalse(VmFsPathNative::symlink("a\0b", 'c'));
+        $this->assertFalse(VmFsPathNative::symlink('a', "b\0c"));
     }
 }

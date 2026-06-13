@@ -215,12 +215,7 @@ final class VmFs
     }
 
     public static function readlink(string $path) {
-        $target = @readlink($path);
-        if (false === $target) {
-            return false;
-        }
-
-        return $target;
+        return VmFsPathNative::readlink($path);
     }
 
     public static function unlink(string $path): bool
@@ -355,7 +350,7 @@ final class VmFs
 
     public static function symlink(string $target, string $link): bool
     {
-        $ok = @symlink($target, $link);
+        $ok = VmFsPathNative::symlink($target, $link);
         if ($ok) {
             VmStatCache::invalidatePath($link);
         }
@@ -426,13 +421,7 @@ final class VmFs
 
     public static function touch(string $path, ?int $mtime = null, ?int $atime = null): bool
     {
-        if (null === $mtime && null === $atime) {
-            $ok = @touch($path);
-        } elseif (null === $atime) {
-            $ok = @touch($path, $mtime);
-        } else {
-            $ok = @touch($path, $mtime, $atime);
-        }
+        $ok = VmFsTouchNative::touch($path, $mtime, $atime);
         if ($ok) {
             VmStatCache::invalidatePath($path);
         }
