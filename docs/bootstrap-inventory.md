@@ -7576,8 +7576,8 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/VmInternalCompare.php`
 
 **Warnings** (review for bootstrap subset):
-- new Frame (line 173)
-- new Variable (line 175)
+- new Frame (line 176)
+- new Variable (line 178)
 - 28 class method(s)
 
 ### `ext/standard/VmIptc.php`
@@ -13576,24 +13576,24 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new Variable (line 8979)
 - new Variable (line 9030)
 - new Variable (line 9038)
-- new Variable (line 9376)
-- new Variable (line 11312)
-- new Variable (line 11337)
-- new Variable (line 11353)
-- new strval (line 11378)
-- new Variable (line 11627)
-- new Variable (line 11643)
-- new Variable (line 11816)
-- new Variable (line 11832)
-- new Variable (line 11880)
-- new Variable (line 12185)
-- new Variable (line 12194)
-- new Variable (line 12680)
-- new Variable (line 12696)
-- new Variable (line 12746)
-- new Variable (line 13252)
-- new Variable (line 13258)
-- 264 class method(s)
+- new Variable (line 9388)
+- new Variable (line 11381)
+- new Variable (line 11406)
+- new Variable (line 11422)
+- new strval (line 11447)
+- new Variable (line 11696)
+- new Variable (line 11712)
+- new Variable (line 11885)
+- new Variable (line 11901)
+- new Variable (line 11949)
+- new Variable (line 12254)
+- new Variable (line 12263)
+- new Variable (line 12749)
+- new Variable (line 12765)
+- new Variable (line 12815)
+- new Variable (line 13321)
+- new Variable (line 13327)
+- 269 class method(s)
 
 ### `lib/JIT/ArrayFindCallbackPolicy.php`
 
@@ -14930,7 +14930,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/Builtin/Type/HashTable.php`
 
 **Warnings** (review for bootstrap subset):
-- 63 class method(s)
+- 66 class method(s)
 
 ### `lib/JIT/Builtin/Type/MaskedArray.php`
 
