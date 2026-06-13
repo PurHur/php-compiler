@@ -1513,6 +1513,53 @@ final class VmReflection
     }
 
     /**
+     * ReflectionClass::hasMethod() — php-src ext/reflection/php_reflection.c (#6301).
+     */
+    public static function classHasMethodForReflection(
+        ClassEntry $entry,
+        Context $ctx,
+        string $method,
+        int $filter = 0
+    ): bool {
+        $methodLc = strtolower($method);
+        foreach (self::collectClassMethodsForReflection($entry, $ctx, $filter) as $spec) {
+            if ($spec['methodLc'] === $methodLc) {
+                return true;
+            }
+        }
+        if ($entry->isEnum && self::methodExistsOnClass($entry, $method)) {
+            return true;
+        }
+
+        return false;
+    }
+
+    /**
+     * ReflectionClass::hasProperty() — php-src ext/reflection/php_reflection.c (#6301).
+     */
+    public static function classHasPropertyForReflection(
+        ClassEntry $entry,
+        Context $ctx,
+        string $property,
+        int $filter = 0
+    ): bool {
+        $meta = self::propertyVisibilityMeta($entry, $property, $ctx);
+        if (null === $meta) {
+            return false;
+        }
+
+        return self::matchesReflectionVisibilityFilter($meta['visibility'], $filter);
+    }
+
+    /**
+     * ReflectionClass::hasConstant() — php-src ext/reflection/php_reflection.c (#6301).
+     */
+    public static function classHasConstantForReflection(ClassEntry $entry, Context $ctx, string $constant): bool
+    {
+        return null !== self::findClassConstantDecl($entry, $constant, $ctx);
+    }
+
+    /**
      * Instance properties with readonly flag or declared on a readonly class (#7186).
      *
      * php-src: ext/reflection/php_reflection.c — zim_ReflectionClass_getReadOnlyProperties
