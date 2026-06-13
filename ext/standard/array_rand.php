@@ -36,11 +36,12 @@ final class array_rand extends Internal
         }
         $num = 1;
         if (2 === $argc) {
-            $numArg = $frame->calledArgs[1]->resolveIndirect();
-            if (Variable::TYPE_INTEGER !== $numArg->type) {
-                throw new \LogicException('array_rand() argument #2 must be an integer in this compiler build');
-            }
-            $num = $numArg->toInt();
+            $num = VmMath::parseIntBuiltinArg(
+                $frame->calledArgs[1],
+                'array_rand',
+                2,
+                'num'
+            );
         }
         $result = VmArray::arrayRandPacked($array->toArray(), $num);
         if (null === $frame->returnVar) {
