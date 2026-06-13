@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace PHPCompiler\Test\Unit;
 
 use PHPCompiler\ext\standard\VmMemory;
+use PHPCompiler\VM\MemoryAccounting;
 use PHPUnit\Framework\TestCase;
 
 /** VmMemory RSS path without host getrusage() delegation (issue #7287, #4862). */
@@ -25,5 +26,13 @@ final class VmMemoryTest extends TestCase
         }
 
         $this->assertGreaterThan(0, VmMemory::getUsage(true));
+    }
+
+    public function testUsageAfterPeakQueryToleratesInterpreterSlop(): void
+    {
+        MemoryAccounting::resetPeakToCurrent();
+        MemoryAccounting::markPeakQuery(MemoryAccounting::peakBytes());
+        MemoryAccounting::noteBytes(6);
+        $this->assertSame(0, MemoryAccounting::usageAfterPeakQuery());
     }
 }
