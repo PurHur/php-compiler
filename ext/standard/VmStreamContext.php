@@ -220,6 +220,16 @@ final class VmStreamContext
             );
         }
 
+        if (\array_key_exists('notification', $exported)) {
+            $notificationVar = $params->toArray()->find('notification');
+            if (null !== $notificationVar) {
+                VmStreamNotification::validateContextNotificationParam(
+                    $notificationVar,
+                    'stream_context_set_params'
+                );
+            }
+        }
+
         self::replaceParamsHashTable($context, $exported);
 
         return true;
