@@ -64,6 +64,16 @@ final class BootstrapLibSpineVmSmokeTest extends TestCase
     {
         $makefile = (string) file_get_contents(self::$root.'/Makefile');
         $this->assertStringContainsString('bootstrap-selfhost-lib-spine-vm-smoke:', $makefile);
+        $this->assertStringContainsString('bootstrap-selfhost-lib-spine-smoke-lint:', $makefile);
+    }
+
+    public function testLibSpineSmokeLintScriptUsesLlvmMemoryEnv(): void
+    {
+        $script = self::$root.'/script/bootstrap-selfhost-lib-spine-smoke-lint.sh';
+        $this->assertFileExists($script);
+        $body = (string) file_get_contents($script);
+        $this->assertStringContainsString('ci_apply_llvm_memory_env', $body);
+        $this->assertStringContainsString('compiler_lib_spine_smoke/main.php', $body);
     }
 
     public function testCliDriverSkipsArgvWhenVmSpineSmoke(): void

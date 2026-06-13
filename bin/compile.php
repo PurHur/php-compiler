@@ -18,6 +18,23 @@ use PHPCompiler\Web\Superglobals;
 /**
  * True when bin/compile.php is building a user/test fixture binary (not bootstrap/self-host spine).
  */
+/**
+ * AOT lint on compiler_lib_spine_smoke must not mega-bundle ~2k literal includes (#8391).
+ * compileIncludeOp handles literal require_once paths like the inventory argv driver.
+ */
+function phpc_compile_should_skip_source_bundler_for_lint(string $normalized, array $options): bool
+{
+    if (!isset($options['-l'])) {
+        return false;
+    }
+    if ('' === $normalized) {
+        return false;
+    }
+
+    return str_ends_with($normalized, 'test/selfhost/compiler_lib_spine_smoke/main.php')
+        || str_ends_with($normalized, '/compiler_lib_spine_smoke/main.php');
+}
+
 function phpc_compile_is_user_script_aot(string $normalized): bool
 {
     if ('' === $normalized || '-' === $normalized
@@ -197,7 +214,7 @@ function run(string $filename, string $code, array $options): void
         $runtime = new Runtime(Runtime::MODE_AOT);
         $includes = LiteralIncludeDiscovery::discoverDirectAbsolutePaths($runtime, $filename);
     }
-    if ([] !== $includes) {
+    if ([] !== $includes && !phpc_compile_should_skip_source_bundler_for_lint($normalized, $options)) {
         $projectRoot = DeployRoot::findProjectRootForPath($filename);
         [$code, $filename] = SourceBundler::bundleForAot($filename, $includes, $projectRoot);
     }

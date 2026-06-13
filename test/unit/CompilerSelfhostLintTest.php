@@ -17,6 +17,7 @@ use PHPUnit\Framework\TestCase;
 final class CompilerSelfhostLintTest extends TestCase
 {
     private const BUNDLE_ENTRY = 'test/selfhost/compiler_minimal/main.php';
+    private const LIB_SPINE_ENTRY = 'test/selfhost/compiler_lib_spine_smoke/main.php';
 
     public function testBundledCompilerMinimalLintExitZero(): void
     {
@@ -34,6 +35,38 @@ final class CompilerSelfhostLintTest extends TestCase
             $exit,
             implode("\n", $lines)."\n".'compile.php -l failed for '.self::BUNDLE_ENTRY
         );
+    }
+
+    public function testCompilerLibSpineSmokeLintExitZero(): void
+    {
+        $root = dirname(__DIR__, 2);
+        $llvm = getenv('PHP_COMPILER_LLVM_PATH') ?: $root.'/.llvm';
+        if (!is_file($llvm.'/libLLVM-9.so.1')) {
+            $this->markTestSkipped('LLVM 9 not available for compiler_lib_spine_smoke AOT lint');
+        }
+        $bin = realpath($root.'/bin/compile.php');
+        $this->assertNotFalse($bin);
+        $target = $root.'/'.self::LIB_SPINE_ENTRY;
+        $this->assertFileExists($target);
+
+        $prefix = 'PHP_COMPILER_LLVM_PATH='.escapeshellarg($llvm)
+            .' LD_LIBRARY_PATH='.escapeshellarg($llvm.(getenv('LD_LIBRARY_PATH') ? ':'.getenv('LD_LIBRARY_PATH') : ''))
+            .' PATH='.escapeshellarg($llvm.':'.getenv('PATH'));
+        $cmd = $prefix.' '.escapeshellarg(PHP_BINARY).' '.escapeshellarg($bin)
+            .' -l '.escapeshellarg($target).' 2>&1';
+        exec($cmd, $lines, $exit);
+        $this->assertSame(
+            0,
+            $exit,
+            implode("\n", $lines)."\n".'compile.php -l failed for '.self::LIB_SPINE_ENTRY.' (#8391)'
+        );
+    }
+
+    public function testCompilePhpSkipsSourceBundlerForSpineLint(): void
+    {
+        $compile = (string) file_get_contents(dirname(__DIR__, 2).'/bin/compile.php');
+        $this->assertStringContainsString('phpc_compile_should_skip_source_bundler_for_lint', $compile);
+        $this->assertStringContainsString('compiler_lib_spine_smoke/main.php', $compile);
     }
 
     public function testLiteralIncludeDiscoveryFindsCompilerClosure(): void
