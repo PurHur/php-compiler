@@ -8,16 +8,19 @@ declare(strict_types=1);
  * php-src: ext/standard/basename.c, ext/standard/file.c
  */
 
-try {
-    basename('/path', []);
-    echo "basename_suffix: uncaught\n";
-} catch (Throwable $e) {
-    echo 'basename_suffix: ', $e::class, ': ', $e->getMessage(), "\n";
-}
-
-try {
-    dirname('/a/b/c', []);
-    echo "dirname_levels: uncaught\n";
-} catch (Throwable $e) {
-    echo 'dirname_levels: ', $e::class, ': ', $e->getMessage(), "\n";
+$tests = [
+    'basename_suffix' => static function (): void {
+        basename('/path', []);
+    },
+    'dirname_levels' => static function (): void {
+        dirname('/a/b/c', []);
+    },
+];
+foreach ($tests as $label => $fn) {
+    try {
+        $fn();
+        echo $label, ": uncaught\n";
+    } catch (Throwable $e) {
+        echo $label, ': ', $e::class, ': ', $e->getMessage(), "\n";
+    }
 }
