@@ -19,7 +19,7 @@ use PHPLLVM\Value;
  *
  * php-src: ext/standard/array.c — PHP_FUNCTION(array_walk_recursive)
  *
- * JIT/AOT: compile-time string builtin callbacks (#3111); VM closure callbacks (#3086).
+ * JIT/AOT: compile-time string builtin callbacks (#3111); closure/arrow callbacks (#4039).
  * Optional $userdata is VM-only for closure callbacks (#4913, mirrors #3627).
  */
 final class array_walk_recursive extends Internal
@@ -74,18 +74,22 @@ final class array_walk_recursive extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        if (2 !== \count($args)) {
-            if (3 === \count($args)) {
-                throw new \LogicException(
-                    'array_walk_recursive() userdata is not supported for JIT/AOT in this compiler build (#4913)'
-                );
-            }
+        $argc = \count($args);
+        if ($argc < 2 || $argc > 3) {
             throw new \LogicException(
-                'array_walk_recursive() requires exactly two arguments in this compiler build'
+                'array_walk_recursive() requires two or three arguments in this compiler build'
+            );
+        }
+        if (3 === $argc) {
+            throw new \LogicException(
+                'array_walk_recursive() userdata is not supported for JIT/AOT in this compiler build (#4913)'
             );
         }
         if (!ArrayMapCallbackPolicy::isJitLowerable($args[1])) {
             throw new \LogicException(ArrayMapCallbackPolicy::jitRejectionMessage());
+        }
+        if (ArrayMapCallbackPolicy::isClosureJitLowerable($args[1])) {
+            return ArrayBuiltinHelper::walkRecursiveInPlaceWithClosure($context, $args[0], $args[1], null);
         }
         if (JITVariable::TYPE_STRING === $args[1]->type || JITVariable::TYPE_VALUE === $args[1]->type) {
             $this->jitString($context, $args[1], 'array_walk_recursive() callback');
