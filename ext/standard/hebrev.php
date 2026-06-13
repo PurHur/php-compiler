@@ -14,7 +14,7 @@ use PHPLLVM\Value;
 /**
  * hebrev() — convert logical Hebrew text to visual text (php-src string.c parity, #3450).
  *
- * VM: {@see VmHebrev::convert()}; JIT/AOT deferred (VM-only).
+ * VM: {@see VmHebrev::convert()}; JIT/AOT via {@see JitHebrev} + {@see HebrevJitHelper} (#3450).
  */
 final class hebrev extends Internal
 {
@@ -51,6 +51,6 @@ final class hebrev extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        throw new \LogicException('hebrev() is VM-only in this compiler build (issue #3450)');
+        return JitHebrev::invoke($context, ...$args);
     }
 }
