@@ -1668,17 +1668,17 @@ final class VmString
     }
 
     /**
-     * Cryptographically secure pseudo-random bytes (read from /dev/urandom).
+     * Cryptographically secure pseudo-random bytes (libc getrandom /dev/urandom via {@see VmRandomNative}).
      *
      * @throws \ValueError when length is less than 1
      * @throws \Exception when the operating system cannot supply random data
      */
     /**
-     * uniqid() subset: gettimeofday-based id + optional 8 hex entropy chars (#2219).
+     * uniqid() subset: VmDate::wallClock() id + optional 8 hex entropy chars (#2219, #8402).
      */
     public static function uniqid(string $prefix = '', bool $moreEntropy = false): string
     {
-        $tv = \gettimeofday();
+        $tv = VmDate::wallClock();
         $usec = $tv['usec'] % 0x100000;
         $core = \sprintf('%08x%05x', $tv['sec'], $usec);
         if ($moreEntropy) {
@@ -1696,27 +1696,7 @@ final class VmString
 
     public static function randomBytes(int $length): string
     {
-        if ($length < 1) {
-            throw new \ValueError('random_bytes(): Argument #1 ($length) must be greater than 0');
-        }
-        $fp = @\fopen('/dev/urandom', 'rb');
-        if (false === $fp) {
-            throw new \Exception('Could not gather sufficient random data');
-        }
-        $buf = '';
-        $remaining = $length;
-        while ($remaining > 0) {
-            $chunk = \fread($fp, $remaining);
-            if (false === $chunk || '' === $chunk) {
-                \fclose($fp);
-                throw new \Exception('Could not gather sufficient random data');
-            }
-            $buf .= $chunk;
-            $remaining -= self::byteLength($chunk);
-        }
-        \fclose($fp);
-
-        return $buf;
+        return VmRandomNative::randomBytes($length);
     }
 
     /**
