@@ -106,6 +106,13 @@ bootstrap_gen0_sidecar_emit_fallback() {
   return 0
 }
 
+bootstrap_is_gen0_prelinked_seed_driver() {
+  local driver=$1
+  [[ "${driver}" == *"/bin-compile-aot-inventory" ]] && return 1
+  [[ "${driver}" == */bin-compile-aot ]] && return 0
+  return 1
+}
+
 bootstrap_is_inventory_bin_compile_argv_driver() {
   local driver=$1
   local root="${ROOT:-}"
@@ -408,6 +415,11 @@ bootstrap_compile_invoke() {
     elif grep -qE 'parseAndCompile returned null|native emit failed at phase=parseAndCompile' <<< "${invoke_out}" \
       && bootstrap_gen0_sidecar_emit_fallback "${out}" "${entry}"; then
       echo "bootstrap-compile-invoke: native parse spine null — recovered via gen-0 sidecar (#1492)" >&2
+      return 0
+    elif [[ "${last_code}" -ne 0 ]] \
+      && bootstrap_is_gen0_prelinked_seed_driver "${BOOTSTRAP_COMPILE_DRIVER}" \
+      && bootstrap_gen0_sidecar_emit_fallback "${out}" "${entry}"; then
+      echo "bootstrap-compile-invoke: gen-0 native emit failed — recovered via sidecar (#1492, #3046)" >&2
       return 0
     else
       echo "bootstrap-compile-invoke: compiled driver ${BOOTSTRAP_COMPILE_DRIVER} failed (exit ${last_code})" >&2
