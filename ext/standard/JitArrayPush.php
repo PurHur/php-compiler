@@ -60,10 +60,26 @@ final class JitArrayPush
             $typeByte,
             $i8->constInt(Variable::TYPE_ARRAY, false)
         );
+        // Uninitialized boxed property slots (TYPE_UNDEFINED) and null may materialize arrays
+        // like HashTableHelper::ensureHashtablePointer (#1086, bootstrap array_value_box).
+        $isUndefined = $context->builder->icmp(
+            Builder::INT_EQ,
+            $typeByte,
+            $i8->constInt(Variable::TYPE_UNDEFINED, false)
+        );
+        $isNull = $context->builder->icmp(
+            Builder::INT_EQ,
+            $typeByte,
+            $i8->constInt(Variable::TYPE_NULL, false)
+        );
+        $canPush = $context->builder->or(
+            $isArray,
+            $context->builder->or($isUndefined, $isNull)
+        );
         $okBlock = BasicBlockHelper::append($context, 'array_push_vbox_ok');
         $errBlock = BasicBlockHelper::append($context, 'array_push_vbox_err');
         $mergeBlock = BasicBlockHelper::append($context, 'array_push_vbox_merge');
-        $context->builder->branchIf($isArray, $okBlock, $errBlock);
+        $context->builder->branchIf($canPush, $okBlock, $errBlock);
 
         $context->builder->positionAtEnd($errBlock);
         self::emitPendingError($context);

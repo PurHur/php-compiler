@@ -65,6 +65,16 @@ final class array_push extends Internal
         }
         $values = \array_slice($args, 1);
         if (JITVariable::TYPE_VALUE === $array->type) {
+            // Object property lvalues are referencable; loadHashTable materializes boxed arrays (#1086).
+            if (null !== $array->objectPropertySlot) {
+                foreach ($values as $i => $arg) {
+                    if (JITVariable::TYPE_STRING === $arg->type || JITVariable::TYPE_VALUE === $arg->type) {
+                        $this->jitString($context, $arg, 'array_push() argument #'.((int) $i + 2));
+                    }
+                }
+
+                return ArrayBuiltinHelper::push($context, $array, ...$values);
+            }
             return JitArrayPush::pushWithValueBoxGuard(
                 $context,
                 $array,
