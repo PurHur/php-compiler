@@ -21,6 +21,7 @@ final class VmRoundBuiltinTest extends TestCase
         $this->assertSame(2.0, VmRound::mathRound(2.5, 0, StdlibConstants::PHP_ROUND_HALF_EVEN));
         $this->assertSame(4.0, VmRound::mathRound(3.5, 0, StdlibConstants::PHP_ROUND_HALF_EVEN));
         $this->assertSame(3.0, VmRound::mathRound(2.5, 0, StdlibConstants::PHP_ROUND_HALF_ODD));
+        $this->assertSame(3.0, VmRound::mathRound(2.5, 0, 99));
     }
 
     public function testBuiltinExecuteMatchesMathRound(): void

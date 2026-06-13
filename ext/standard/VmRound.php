@@ -23,15 +23,7 @@ final class VmRound
         int $precision = 0,
         int $mode = StdlibConstants::PHP_ROUND_HALF_UP
     ): void {
-        self::validateMode($mode);
         $returnVar->float(self::mathRound(VmMath::toFloat($numVar), $precision, $mode));
-    }
-
-    public static function validateMode(int $mode): void
-    {
-        if ($mode < StdlibConstants::PHP_ROUND_HALF_UP || $mode > StdlibConstants::PHP_ROUND_AWAY_FROM_ZERO) {
-            throw new \ValueError('round(): Argument #3 ($mode) must be a valid rounding mode');
-        }
     }
 
     public static function mathRound(float $value, int $places, int $mode): float
@@ -102,13 +94,6 @@ final class VmRound
         $zeroEdgeCase = self::getZeroEdgeCase($integral, $exponent, $places);
 
         switch ($mode) {
-            case StdlibConstants::PHP_ROUND_HALF_UP:
-                if ($valueAbs >= $edgeCase) {
-                    return $integral + self::copySign(1.0, $integral);
-                }
-
-                return $integral;
-
             case StdlibConstants::PHP_ROUND_HALF_DOWN:
                 if ($valueAbs > $edgeCase) {
                     return $integral + self::copySign(1.0, $integral);
@@ -166,8 +151,14 @@ final class VmRound
 
                 return $integral;
 
+            case StdlibConstants::PHP_ROUND_HALF_UP:
             default:
-                throw new \ValueError('round(): Argument #3 ($mode) must be a valid rounding mode');
+                // php-src 8.2 ext/standard/math.c — unknown int modes use HALF_UP.
+                if ($valueAbs >= $edgeCase) {
+                    return $integral + self::copySign(1.0, $integral);
+                }
+
+                return $integral;
         }
     }
 

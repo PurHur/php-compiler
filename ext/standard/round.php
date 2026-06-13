@@ -59,7 +59,6 @@ final class round extends Internal
                 $frame->calledArgs[2]->resolveIndirect(),
                 'round'
             );
-            VmRound::validateMode($mode);
         }
 
         if (null === $frame->returnVar) {
