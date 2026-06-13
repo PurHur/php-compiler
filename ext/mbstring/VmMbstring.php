@@ -194,6 +194,112 @@ final class VmMbstring
     }
 
     /**
+     * @return int|false
+     */
+    public static function strpos(string $haystack, string $needle, int $offset = 0, string $encoding = 'UTF-8')
+    {
+        return self::utf8Strpos($haystack, $needle, $offset, false, $encoding, 'mb_strpos');
+    }
+
+    public static function substr(
+        string $string,
+        int $start,
+        ?int $length = null,
+        string $encoding = 'UTF-8'
+    ): string {
+        self::assertSubstrCountEncoding($encoding, 'mb_substr');
+        $charLen = VmString::utf8CharLength($string);
+        if ($start < 0) {
+            $start += $charLen;
+        }
+        if ($start < 0) {
+            $start = 0;
+        }
+        if ($start > $charLen) {
+            return '';
+        }
+        if (null === $length) {
+            $length = $charLen - $start;
+        } elseif ($length < 0) {
+            $length = $charLen - $start + $length;
+            if ($length < 0) {
+                return '';
+            }
+        }
+        if ($length <= 0) {
+            return '';
+        }
+
+        return VmString::utf8CharSubstr($string, $start, $length);
+    }
+
+    public static function strtolower(string $string, string $encoding = 'UTF-8'): string
+    {
+        return self::convertCase($string, MbstringConstants::MB_CASE_LOWER, $encoding);
+    }
+
+    public static function strtoupper(string $string, string $encoding = 'UTF-8'): string
+    {
+        return self::convertCase($string, MbstringConstants::MB_CASE_UPPER, $encoding);
+    }
+
+    public static function coerceStartArg(Variable $var, string $function, int $argIndex = 1): int
+    {
+        $var = $var->resolveIndirect();
+        if (EnumCaseSupport::isEnumCaseVariable($var)) {
+            throw new \TypeError(sprintf(
+                '%s(): Argument #%d ($start) must be of type int, %s given',
+                $function,
+                $argIndex + 1,
+                EnumCaseSupport::typeNameForVariable($var)
+            ));
+        }
+        if (Variable::TYPE_INTEGER !== $var->type) {
+            throw new \TypeError(sprintf(
+                '%s(): Argument #%d ($start) must be of type int, %s given',
+                $function,
+                $argIndex + 1,
+                self::typeLabel($var)
+            ));
+        }
+
+        return $var->toInt();
+    }
+
+    public static function coerceLengthArg(Variable $var, string $function, int $argIndex = 2): int
+    {
+        $var = $var->resolveIndirect();
+        if (EnumCaseSupport::isEnumCaseVariable($var)) {
+            throw new \TypeError(sprintf(
+                '%s(): Argument #%d ($length) must be of type int, %s given',
+                $function,
+                $argIndex + 1,
+                EnumCaseSupport::typeNameForVariable($var)
+            ));
+        }
+        if (Variable::TYPE_INTEGER !== $var->type) {
+            throw new \TypeError(sprintf(
+                '%s(): Argument #%d ($length) must be of type int, %s given',
+                $function,
+                $argIndex + 1,
+                self::typeLabel($var)
+            ));
+        }
+
+        return $var->toInt();
+    }
+
+    public static function coerceOptionalLengthArg(Variable $var, string $function, int $argIndex = 2): ?int
+    {
+        $var = $var->resolveIndirect();
+        if (Variable::TYPE_NULL === $var->type) {
+            return null;
+        }
+
+        return self::coerceLengthArg($var, $function, $argIndex);
+    }
+
+    /**
      * @return string|false
      */
     public static function strrichr(string $haystack, string $needle, bool $part = false, string $encoding = 'UTF-8')
