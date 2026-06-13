@@ -882,20 +882,14 @@ final class VmReflection
                 continue;
             }
             $copy = new Variable();
-            // php-src add_class_vars: skip ZEND_ACC_VIRTUAL (no class-level get-hook invocation).
+            // php-src add_class_vars: public hooked props appear with declared defaults, not get-hook reads (#6603).
             if ($prop->propertyHookVirtual) {
+                self::copyClassVarDefault($copy, $prop);
+                $ht->add($prop->name, $copy);
+
                 continue;
             }
-            if (null !== $prop->default && !$prop->hasRuntimeDefaultInit()) {
-                $copy->copyFrom($prop->default);
-            } else {
-                $src = $prop->getVariable();
-                if ($src->isUndefined()) {
-                    $copy->null();
-                } else {
-                    $copy->copyFrom($src);
-                }
-            }
+            self::copyClassVarDefault($copy, $prop);
             $ht->add($prop->name, $copy);
         }
         self::addPublicStaticClassVars($entry, $ht);
@@ -916,6 +910,22 @@ final class VmReflection
         }
 
         return $result;
+    }
+
+    /** Declared default for get_class_vars() — never invoke property get hooks (#6603). */
+    private static function copyClassVarDefault(Variable $copy, ClassProperty $prop): void
+    {
+        if (null !== $prop->default && !$prop->hasRuntimeDefaultInit()) {
+            $copy->copyFrom($prop->default);
+
+            return;
+        }
+        $src = $prop->getVariable();
+        if ($src->isUndefined()) {
+            $copy->null();
+        } else {
+            $copy->copyFrom($src);
+        }
     }
 
     /**

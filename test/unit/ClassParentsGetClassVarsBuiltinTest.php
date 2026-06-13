@@ -103,4 +103,30 @@ PHP;
         $rt->run($block);
         $this->assertSame("3\n1\nx\n2\nno-hidden\n1\n3\n", ob_get_clean());
     }
+
+    /** Issue #6603: get_class_vars() lists public hooked properties with declared defaults (null). */
+    public function testVmGetClassVarsPropertyHooks(): void
+    {
+        $code = <<<'PHP'
+<?php
+class C6603 {
+    private string $backing = 'x';
+    public string $title { get => 'hook:' . $this->backing; }
+}
+echo array_key_exists('title', get_class_vars(C6603::class)) ? "yes\n" : "no\n";
+$vars = get_class_vars(C6603::class);
+echo array_key_exists('title', $vars) && $vars['title'] === null ? "null-default\n" : "bad-default\n";
+class G6603 {
+    private string $x = 'g_only';
+    public string $y { get => $this->x; }
+}
+$gVars = get_class_vars(G6603::class);
+echo array_key_exists('y', $gVars) ? "g-yes\n" : "g-no\n";
+PHP;
+        $rt = new Runtime();
+        $block = $rt->parseAndCompile($code, 'get_class_vars_property_hooks.php');
+        ob_start();
+        $rt->run($block);
+        $this->assertSame("yes\nnull-default\ng-yes\n", ob_get_clean());
+    }
 }

@@ -16,7 +16,9 @@ print_r(get_class_vars(C::class));
 $o = new C();
 var_export(get_class_vars(C::class) === get_object_vars($o));
 echo "\n";
-var_export(get_object_vars($o)['title'] ?? 'MISSING');
+$gov = get_object_vars($o);
+$titleVal = $gov['title'];
+var_export($titleVal);
 echo "\n";
 
 class G {
@@ -26,13 +28,16 @@ class G {
 $g = new G();
 $vars = get_class_vars(G::class);
 echo "gcv_key:", array_key_exists('y', $vars) ? 'yes' : 'no', "\n";
-echo "gov:", get_object_vars($g)['y'] ?? 'MISSING', "\n";
+$og = get_object_vars($g);
+$yVal = $og['y'];
+echo "gov:", $yVal, "\n";
 --EXPECT--
-false
+true
 Array
 (
+    [title] => 
 )
 false
 'hook:x'
-gcv_key:no
+gcv_key:yes
 gov:g_only
