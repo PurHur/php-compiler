@@ -12,7 +12,7 @@ Regenerate: `php script/bootstrap-inventory.php`
 | Phase A inventory files (M2 ratio SSOT) | 2527 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 6839 |
+| Source constructs flagged (warnings) | 6845 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -290,7 +290,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/standard/JitCreateLazyGhost.php` | 0 | 1 |
 | `ext/standard/JitCreateLazyProxy.php` | 0 | 1 |
 | `ext/standard/JitCsvArg.php` | 0 | 1 |
-| `ext/standard/JitDate.php` | 0 | 1 |
+| `ext/standard/JitDate.php` | 0 | 3 |
 | `ext/standard/JitDateIntervalFormat.php` | 0 | 1 |
 | `ext/standard/JitDateSunFunc.php` | 0 | 1 |
 | `ext/standard/JitDateSunInfo.php` | 0 | 1 |
@@ -965,7 +965,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/standard/create_lazy_proxy.php` | 0 | 3 |
 | `ext/standard/crypt.php` | 0 | 1 |
 | `ext/standard/current.php` | 0 | 3 |
-| `ext/standard/date.php` | 0 | 1 |
+| `ext/standard/date.php` | 0 | 3 |
 | `ext/standard/date_add.php` | 0 | 2 |
 | `ext/standard/date_create.php` | 0 | 3 |
 | `ext/standard/date_create_immutable.php` | 0 | 3 |
@@ -1123,7 +1123,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/standard/gettimeofday.php` | 0 | 1 |
 | `ext/standard/gettype.php` | 0 | 1 |
 | `ext/standard/glob_.php` | 0 | 1 |
-| `ext/standard/gmdate.php` | 0 | 1 |
+| `ext/standard/gmdate.php` | 0 | 3 |
 | `ext/standard/gmgetdate.php` | 0 | 2 |
 | `ext/standard/gmmktime.php` | 0 | 3 |
 | `ext/standard/gzclose.php` | 0 | 1 |
@@ -4282,7 +4282,9 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/JitDate.php`
 
 **Warnings** (review for bootstrap subset):
-- 15 class method(s)
+- new ArgumentCountError (line 260)
+- new ArgumentCountError (line 263)
+- 14 class method(s)
 
 ### `ext/standard/JitDateIntervalFormat.php`
 
@@ -7321,12 +7323,12 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new HashTable (line 203)
 - new Variable (line 206)
 - new Variable (line 209)
-- new HashTable (line 1027)
-- new Variable (line 1029)
-- new HashTable (line 1542)
-- new Variable (line 1545)
-- new Variable (line 1551)
-- 103 class method(s)
+- new HashTable (line 1063)
+- new Variable (line 1065)
+- new HashTable (line 1578)
+- new Variable (line 1581)
+- new Variable (line 1587)
+- 104 class method(s)
 
 ### `ext/standard/VmFsAccessNative.php`
 
@@ -9001,7 +9003,9 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/date.php`
 
 **Warnings** (review for bootstrap subset):
-- 2 class method(s)
+- new ArgumentCountError (line 22)
+- new ArgumentCountError (line 25)
+- 3 class method(s)
 
 ### `ext/standard/date_add.php`
 
@@ -9873,7 +9877,9 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/gmdate.php`
 
 **Warnings** (review for bootstrap subset):
-- 2 class method(s)
+- new ArgumentCountError (line 21)
+- new ArgumentCountError (line 24)
+- 3 class method(s)
 
 ### `ext/standard/gmgetdate.php`
 
