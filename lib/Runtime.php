@@ -477,12 +477,9 @@ class Runtime {
     /** php-parser NameResolver aliases persist across traversals on one PHPCfg Parser (#1416). */
     private function resetParserNameResolverState(): void
     {
-        static $traverser = null;
-        if (null === $traverser) {
-            $parserRef = new \ReflectionProperty(\PHPCfg\Parser::class, 'astTraverser');
-            $parserRef->setAccessible(true);
-            $traverser = $parserRef->getValue($this->parser);
-        }
+        $parserRef = new \ReflectionProperty(\PHPCfg\Parser::class, 'astTraverser');
+        $parserRef->setAccessible(true);
+        $traverser = $parserRef->getValue($this->parser);
         $visitorsRef = new \ReflectionProperty($traverser, 'visitors');
         $visitorsRef->setAccessible(true);
         foreach ($visitorsRef->getValue($traverser) as $visitor) {
