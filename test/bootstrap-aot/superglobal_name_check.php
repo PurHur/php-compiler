@@ -8,6 +8,7 @@ declare(strict_types=1);
 
 use PHPCompiler\Web\Superglobals;
 
+require_once __DIR__.'/../../ext/standard/SuperglobalNames.php';
 require_once __DIR__.'/../../lib/Web/Superglobals.php';
 
 echo Superglobals::isSuperglobalName('_GET') ? '1' : '0';

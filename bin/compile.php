@@ -284,12 +284,15 @@ function run(string $filename, string $code, array $options): void
         }
         $prevSelfHostAot = getenv('PHP_COMPILER_SELFHOST_AOT');
         $bootstrapAotFixture = '' !== $normalized && str_contains($normalized, 'bootstrap-aot/');
+        $bootstrapAotLink = getenv('PHP_COMPILER_BOOTSTRAP_AOT_LINK');
+        $isBootstrapAotLink = '1' === $bootstrapAotLink || 'true' === strtolower((string) $bootstrapAotLink);
         // parseAndCompile uses real lowering (SELFHOST_AOT=0) for bootstrap-aot fixtures (#1086); standalone
         // LLVM emit still needs self-host Runtime stubs when the env is explicitly `0` (#1492 bootstrap gate).
+        // bootstrap-aot-link sets PHP_COMPILER_BOOTSTRAP_AOT_LINK=1 to keep real lowering for user FUNCDEF bodies.
         $setSelfHostAotForCompile = \function_exists('putenv') && (
             false === $prevSelfHostAot
             || '' === (string) $prevSelfHostAot
-            || ($bootstrapAotFixture && '0' === (string) $prevSelfHostAot)
+            || ($bootstrapAotFixture && '0' === (string) $prevSelfHostAot && !$isBootstrapAotLink)
         );
         if ($setSelfHostAotForCompile) {
             // Keep LLVM 9 stable during AOT compilation; some lowering paths are still sensitive (#2600).
