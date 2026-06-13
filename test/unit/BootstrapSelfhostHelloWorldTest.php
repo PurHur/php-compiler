@@ -465,6 +465,8 @@ final class BootstrapSelfhostHelloWorldTest extends TestCase
         $this->assertStringContainsString('compile_driver.php', $jit);
         $this->assertStringContainsString('COMPILE_DRIVER_SIDECAR_REL', $jit);
         $this->assertStringContainsString('HELLOWORLD_SMOKE_MAIN_SIDECAR_REL', $jit);
+        $this->assertStringContainsString('BOOTSTRAP_LOOP_SMOKE_MAIN_SIDECAR_REL', $jit);
+        $this->assertStringContainsString('bootstrap_loop_smoke/main.php', $jit);
         $this->assertStringContainsString('compiler_helloworld_smoke/main.php', $jit);
         $this->assertStringContainsString('COMPILER_PHP_SIDECAR_REL', $jit);
         $this->assertStringContainsString('BIN_COMPILE_SIDECAR_REL', $jit);

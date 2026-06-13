@@ -34,6 +34,8 @@ final class M3EmitTuTrivialEchoAot
 
     private const HELLOWORLD_SMOKE_MAIN_SENTINEL_LOGICAL = 'PHPCompiler\\JIT\\M3EmitTuTrivialEchoAot::helloworldSmokeMainSentinelBlock';
 
+    private const BOOTSTRAP_LOOP_SMOKE_MAIN_SENTINEL_LOGICAL = 'PHPCompiler\\JIT\\M3EmitTuTrivialEchoAot::bootstrapLoopSmokeMainSentinelBlock';
+
     public const TRIVIAL_ECHO_SIDECAR_REL = 'build/.m3_trivial_echo_aot_blob';
 
     public const HELLOWORLD_SIDECAR_REL = 'build/.m3_helloworld_aot_blob';
@@ -53,6 +55,8 @@ final class M3EmitTuTrivialEchoAot
     public const COMPILE_DRIVER_SIDECAR_REL = 'build/.m3_compile_driver_aot_blob';
 
     public const HELLOWORLD_SMOKE_MAIN_SIDECAR_REL = 'build/.m3_helloworld_smoke_main_aot_blob';
+
+    public const BOOTSTRAP_LOOP_SMOKE_MAIN_SIDECAR_REL = 'build/.m3_bootstrap_loop_smoke_main_aot_blob';
 
     public const COMPILER_PHP_SIDECAR_REL = 'build/.m3_compiler_php_aot_blob';
 
@@ -98,6 +102,9 @@ final class M3EmitTuTrivialEchoAot
         }
         if (str_ends_with($norm, '/test/selfhost/compiler_helloworld_smoke/main.php')) {
             return 'test/selfhost/compiler_helloworld_smoke/main.php';
+        }
+        if (str_ends_with($norm, '/test/selfhost/bootstrap_loop_smoke/main.php')) {
+            return 'test/selfhost/bootstrap_loop_smoke/main.php';
         }
 
         return null;
@@ -146,6 +153,7 @@ final class M3EmitTuTrivialEchoAot
                 self::COMPILER_MINIMAL_SIDECAR_REL => 'PHPCompiler\\JIT\\M3EmitTuTrivialEchoAot::compilerMinimalSentinelBlock',
                 self::COMPILE_DRIVER_SIDECAR_REL => self::COMPILE_DRIVER_SENTINEL_LOGICAL,
                 self::HELLOWORLD_SMOKE_MAIN_SIDECAR_REL => self::HELLOWORLD_SMOKE_MAIN_SENTINEL_LOGICAL,
+                self::BOOTSTRAP_LOOP_SMOKE_MAIN_SIDECAR_REL => self::BOOTSTRAP_LOOP_SMOKE_MAIN_SENTINEL_LOGICAL,
                 self::COMPILER_PHP_SIDECAR_REL => 'PHPCompiler\\JIT\\M3EmitTuTrivialEchoAot::compilerPhpSentinelBlock',
                 self::BIN_COMPILE_SIDECAR_REL => 'PHPCompiler\\JIT\\M3EmitTuTrivialEchoAot::binCompileSentinelBlock',
                 self::BIN_VM_SIDECAR_REL => 'PHPCompiler\\JIT\\M3EmitTuTrivialEchoAot::binVmSentinelBlock',
