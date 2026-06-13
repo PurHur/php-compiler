@@ -18,6 +18,9 @@ final class ResponseContext
     /** @var list<string> */
     private static array $headers = [];
 
+    /** @var array<string, string> mod_rewrite-style name/value pairs (ext/standard/url.c, #6031) */
+    private static array $rewriteVars = [];
+
     /** When false (CLI), header() does not queue lines for headers_list() — php-src head.c SAPI gate (#4037). */
     private static bool $headerQueueEnabled = false;
 
@@ -25,6 +28,7 @@ final class ResponseContext
     {
         self::$status = 0;
         self::$headers = [];
+        self::$rewriteVars = [];
         self::$headerQueueEnabled = false;
     }
 
@@ -178,5 +182,29 @@ final class ResponseContext
         }
 
         return trim(substr($line, 0, $colon));
+    }
+
+    /** output_add_rewrite_var() — register mod_rewrite pair; same name replaces prior value (#6031). */
+    public static function addRewriteVar(string $name, string $value): bool
+    {
+        self::$rewriteVars[$name] = $value;
+
+        return true;
+    }
+
+    /** output_reset_rewrite_vars() — clear rewrite var table (#6031). */
+    public static function resetRewriteVars(): bool
+    {
+        self::$rewriteVars = [];
+
+        return true;
+    }
+
+    /**
+     * @return array<string, string>
+     */
+    public static function listRewriteVars(): array
+    {
+        return self::$rewriteVars;
     }
 }
