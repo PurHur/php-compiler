@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 2457 |
-| Phase A inventory files (M2 ratio SSOT) | 2457 |
+| PHP files on vm.php path | 2460 |
+| Phase A inventory files (M2 ratio SSOT) | 2460 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 6653 |
+| Source constructs flagged (warnings) | 6659 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -73,7 +73,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/ctype/JitCtype.php` | 0 | 1 |
 | `ext/ctype/Module.php` | 0 | 13 |
 | `ext/ctype/VmCtype.php` | 0 | 1 |
-| `ext/curl/BuiltinClasses.php` | 0 | 2 |
+| `ext/curl/BuiltinClasses.php` | 0 | 5 |
 | `ext/curl/CurlFunction.php` | 0 | 1 |
 | `ext/curl/Module.php` | 0 | 7 |
 | `ext/dom/BuiltinClasses.php` | 0 | 1 |
@@ -386,7 +386,9 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/standard/JitGmgetdate.php` | 0 | 1 |
 | `ext/standard/JitGmmktime.php` | 0 | 1 |
 | `ext/standard/JitGzclose.php` | 0 | 1 |
+| `ext/standard/JitGzfile.php` | 0 | 1 |
 | `ext/standard/JitGzopen.php` | 0 | 1 |
+| `ext/standard/JitGzpassthru.php` | 0 | 1 |
 | `ext/standard/JitGzread.php` | 0 | 1 |
 | `ext/standard/JitGzwrite.php` | 0 | 1 |
 | `ext/standard/JitHash.php` | 0 | 1 |
@@ -503,6 +505,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/standard/JitRandomIntArg.php` | 0 | 1 |
 | `ext/standard/JitReaddir.php` | 0 | 1 |
 | `ext/standard/JitReadfile.php` | 0 | 1 |
+| `ext/standard/JitReadgzfile.php` | 0 | 1 |
 | `ext/standard/JitReadline.php` | 0 | 1 |
 | `ext/standard/JitReadlink.php` | 0 | 1 |
 | `ext/standard/JitReadonly.php` | 0 | 1 |
@@ -2733,8 +2736,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/curl/BuiltinClasses.php`
 
 **Warnings** (review for bootstrap subset):
-- new ClassEntry (line 28)
-- 2 class method(s)
+- new ClassEntry (line 36)
+- new ClassEntry (line 46)
+- new ClassEntry (line 56)
+- new ClassEntry (line 66)
+- 5 class method(s)
 
 ### `ext/curl/CurlFunction.php`
 
@@ -4693,7 +4699,17 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - 1 class method(s)
 
+### `ext/standard/JitGzfile.php`
+
+**Warnings** (review for bootstrap subset):
+- 1 class method(s)
+
 ### `ext/standard/JitGzopen.php`
+
+**Warnings** (review for bootstrap subset):
+- 1 class method(s)
+
+### `ext/standard/JitGzpassthru.php`
 
 **Warnings** (review for bootstrap subset):
 - 1 class method(s)
@@ -5289,6 +5305,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - 1 class method(s)
 
 ### `ext/standard/JitReadfile.php`
+
+**Warnings** (review for bootstrap subset):
+- 1 class method(s)
+
+### `ext/standard/JitReadgzfile.php`
 
 **Warnings** (review for bootstrap subset):
 - 1 class method(s)
@@ -9521,8 +9542,8 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/gzfile.php`
 
 **Warnings** (review for bootstrap subset):
-- new HashTable (line 48)
-- new Variable (line 50)
+- new HashTable (line 50)
+- new Variable (line 52)
 - 2 class method(s)
 
 ### `ext/standard/gzinflate.php`
@@ -13364,7 +13385,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/Builtin/GzStreamIoJit.php`
 
 **Warnings** (review for bootstrap subset):
-- 19 class method(s)
+- 21 class method(s)
 
 ### `lib/JIT/Builtin/Highlight.php`
 
