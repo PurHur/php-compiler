@@ -19,6 +19,8 @@ use PHPLLVM\Value;
 
 /**
  * setrawcookie() — emit Set-Cookie without URL-encoding the value (mirrors setcookie; issue #1368).
+ *
+ * VM uses ResponseContext only — no host Zend setrawcookie() delegation (bootstrap/M5; #5344 phase 3).
  */
 final class setrawcookie extends Internal
 {
@@ -30,15 +32,6 @@ final class setrawcookie extends Internal
     public function execute(Frame $frame): void
     {
         $parsed = self::parseArgs($frame->calledArgs);
-        $ok = \setrawcookie(
-            $parsed['name'],
-            $parsed['value'],
-            $parsed['expires'],
-            $parsed['path'],
-            $parsed['domain'],
-            $parsed['secure'],
-            $parsed['httponly']
-        );
         ResponseContext::addHeader(SetcookieLine::build(
             $parsed['name'],
             $parsed['value'],
@@ -49,7 +42,7 @@ final class setrawcookie extends Internal
             $parsed['httponly']
         ), false);
         if (null !== $frame->returnVar) {
-            $frame->returnVar->bool($ok);
+            $frame->returnVar->bool(true);
         }
     }
 
