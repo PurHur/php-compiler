@@ -271,6 +271,7 @@ final class BootstrapSelfhostHelloWorldTest extends TestCase
             $jit
         );
         $this->assertStringContainsString('m3EmitTuRuntimeRepoRoot', $jit);
+        $this->assertStringContainsString('m3EmitTuPrelinkedSidecarLooksStale', $jit);
     }
 
     public function testJitDocumentsM3CompileDriverEnvGate(): void

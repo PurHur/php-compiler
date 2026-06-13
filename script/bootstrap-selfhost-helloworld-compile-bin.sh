@@ -6,6 +6,9 @@ ENTRY="${ROOT}/test/selfhost/compiler_helloworld_smoke/compile_driver.php"
 OUT="${ROOT}/build/selfhost-helloworld-compile"
 SOURCE="${PHP_COMPILER_M3_SOURCE:-${ROOT}/examples/000-HelloWorld/example.php}"
 AOT_OUT="${PHP_COMPILER_M3_OUT:-${ROOT}/build/helloworld-compile-bin-aot}"
+if [[ "${AOT_OUT}" != /* ]]; then
+  AOT_OUT="${ROOT}/${AOT_OUT#./}"
+fi
 # shellcheck source=php-env.sh
 source "$(dirname "$0")/php-env.sh"
 # shellcheck source=bootstrap-gen0-install-prelinked-driver.sh
@@ -41,7 +44,12 @@ if [[ "${SOURCE_NORM}" == "${ROOT}/bin/compile.php" ]]; then
   if [[ "${BOOTSTRAP_INVENTORY_DRIVER_USE_PRELINKED:-}" == "" && bootstrap_gen0_prelinked_driver_ready ]]; then
     BOOTSTRAP_INVENTORY_DRIVER_USE_PRELINKED=1
   fi
-  rm -f "${EMIT_HELPER}" "${AOT_OUT}" "${INVENTORY_ARGV}" "${ROOT}/build/.last-jit-func-native-compile-driver"
+  rm -f "${EMIT_HELPER}" "${ROOT}/build/.last-jit-func-native-compile-driver"
+  if [[ "${AOT_OUT}" != "${INVENTORY_ARGV}" ]]; then
+    rm -f "${AOT_OUT}" "${INVENTORY_ARGV}"
+  else
+    rm -f "${AOT_OUT}"
+  fi
   export PHP_COMPILER_JIT_PROGRESS_FILE="${ROOT}/build/.last-jit-func-native-compile-driver"
   _inventory_zend_ok=0
   if [[ "${BOOTSTRAP_INVENTORY_DRIVER_USE_PRELINKED:-0}" != "1" ]]; then

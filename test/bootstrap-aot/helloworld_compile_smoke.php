@@ -75,8 +75,9 @@ function helloworld_compile_smoke(string $sourceFile, string $outFile): int
     }
 
     $runtime = new \PHPCompiler\Runtime(\PHPCompiler\Runtime::MODE_AOT);
+    $compilePath = \PHPCompiler\JIT\M3EmitTuTrivialEchoAot::normalizeSidecarSourcePath($resolved) ?? $resolved;
     try {
-        $script = $runtime->parse($code, $resolved);
+        $script = $runtime->parse($code, $compilePath);
     } catch (\Throwable $e) {
         $detail = \PHPCompiler\Runtime::getLastParseFailure();
         if (null === $detail || '' === $detail) {
@@ -85,7 +86,7 @@ function helloworld_compile_smoke(string $sourceFile, string $outFile): int
         if (null === $detail || '' === $detail) {
             $detail = $e->getMessage();
         }
-        echo sprintf("parseAndCompile failure: target=%s: %s\n", $resolved, $detail);
+        echo sprintf("parseAndCompile failure: target=%s: %s\n", $compilePath, $detail);
         $excFile = $e->getFile();
         if ('' !== $excFile && 0 !== $e->getLine()) {
             echo sprintf("%s in %s:%d\n", $e::class, $excFile, $e->getLine());
@@ -103,7 +104,7 @@ function helloworld_compile_smoke(string $sourceFile, string $outFile): int
             $detail = $runtime->formatParseAndCompileNullDetail($script);
         }
         if (null !== $detail && '' !== $detail) {
-            echo sprintf("parseAndCompile failure: target=%s: %s\n", $resolved, $detail);
+            echo sprintf("parseAndCompile failure: target=%s: %s\n", $compilePath, $detail);
         }
         $extra = null !== $detail && '' !== $detail ? ' — '.$detail : '';
         echo "helloworld_compile_smoke: parseAndCompile returned null (CFG/compile spine)".$extra."\n";

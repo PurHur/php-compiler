@@ -408,6 +408,26 @@ class Runtime {
     }
 
     /**
+     * Parse for literal include discovery without type reconstruction (#1416).
+     *
+     * Resets php-parser NameResolver state so consecutive file parses do not collide on `use` imports.
+     */
+    public function parseForIncludeDiscovery(string $code, string $filename): Script
+    {
+        [$code, $bareRethrowLines] = $this->prepareSourceForParser($code, $filename);
+        $this->compiler->setBareRethrowLines($bareRethrowLines);
+        $this->resetParserNameResolverState();
+        try {
+            $script = $this->parser->parse($code, $filename);
+        } finally {
+            $this->abstractEnumMarker->clear();
+        }
+        $this->preprocessor->traverse($script);
+
+        return $script;
+    }
+
+    /**
      * Source rewrites applied immediately before php-parser / PHPCfg (issue #3243, #4456).
      *
      * Must run on any path that calls Parser::parse() directly (AOT include discovery, etc.).

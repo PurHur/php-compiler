@@ -400,6 +400,10 @@ final class SourceBundler
         $rewrites = [];
         foreach ($lines as $line) {
             if (preg_match('/^\s*use\s+([^;]+);\s*$/', $line, $m)) {
+                if (self::isBundledClassTraitUseLine($line, $m[1])) {
+                    $kept[] = $line;
+                    continue;
+                }
                 $stmt = trim($m[1]);
                 $canonical = self::canonicalUseStmt($stmt);
                 if (isset($seen[$canonical])) {
@@ -460,6 +464,19 @@ final class SourceBundler
     private static function normalizeUseImportLocalKey(string $local): string
     {
         return strtolower($local);
+    }
+
+    /** Indented unqualified `use Trait;` inside a class — not a top-level import. */
+    private static function isBundledClassTraitUseLine(string $line, string $stmt): bool
+    {
+        if (!preg_match('/^\s+/', $line)) {
+            return false;
+        }
+        if (str_contains($stmt, '\\')) {
+            return false;
+        }
+
+        return true;
     }
 
     private static function canonicalUseStmt(string $stmt): string

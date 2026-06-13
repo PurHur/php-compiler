@@ -29,4 +29,45 @@ PHP
             @rmdir($dir);
         }
     }
+
+    public function testDiscoverDirectResetsNameResolverBetweenFiles(): void
+    {
+        $dir = sys_get_temp_dir().'/phpc_use_reset_'.getmypid();
+        $this->assertTrue(is_dir($dir) || mkdir($dir, 0775, true));
+        $a = $dir.'/a.php';
+        $b = $dir.'/b.php';
+        $entry = $dir.'/entry.php';
+        file_put_contents($a, <<<'PHP'
+<?php
+namespace Foo;
+use PHPCompiler\JIT\Context;
+class A {}
+PHP
+        );
+        file_put_contents($b, <<<'PHP'
+<?php
+namespace Foo;
+use PHPCompiler\JIT\Context;
+class B {}
+PHP
+        );
+        file_put_contents($entry, <<<'PHP'
+<?php
+require __DIR__.'/a.php';
+require __DIR__.'/b.php';
+PHP
+        );
+        try {
+            $runtime = new Runtime(Runtime::MODE_AOT);
+            $paths = LiteralIncludeDiscovery::discoverDirectAbsolutePaths($runtime, $entry);
+            $this->assertCount(2, $paths);
+            $transitive = LiteralIncludeDiscovery::discoverAbsolutePaths($runtime, $entry);
+            $this->assertCount(2, $transitive);
+        } finally {
+            foreach ([$entry, $a, $b] as $f) {
+                @unlink($f);
+            }
+            @rmdir($dir);
+        }
+    }
 }

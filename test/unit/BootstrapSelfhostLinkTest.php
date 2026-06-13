@@ -65,7 +65,8 @@ final class BootstrapSelfhostLinkTest extends TestCase
         $this->assertStringContainsString('bootstrap_ensure_m3_compiler_lib_sidecar', $body);
         $gen0 = (string) file_get_contents(self::$root.'/script/bootstrap-gen0-install-prelinked-driver.sh');
         $this->assertStringContainsString('prelinked/bootstrap-gen0/.m3_', $gen0);
-        $this->assertStringContainsString('#2880', $gen0);
+        $this->assertStringContainsString('bootstrap_gen0_prelinked_sidecar_looks_stale', $gen0);
+        $this->assertStringContainsString('#3046', $gen0);
         $this->assertStringContainsString('build/selfhost-compile-driver', $body);
         $this->assertStringContainsString('build/bin-compile-aot', $body);
         $this->assertStringContainsString(

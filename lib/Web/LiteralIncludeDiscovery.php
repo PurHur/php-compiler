@@ -31,9 +31,7 @@ final class LiteralIncludeDiscovery
             return [];
         }
         $code = (string) file_get_contents($entryFile);
-        [$code] = $runtime->prepareSourceForParser($code, $entryFile);
-        $script = $runtime->parser->parse($code, $entryFile);
-        $runtime->preprocessor->traverse($script);
+        $script = $runtime->parseForIncludeDiscovery($code, $entryFile);
 
         $paths = [];
         foreach (self::pathsFromMainScopeForBundle($script, $entryFile) as $includePath) {
@@ -53,9 +51,7 @@ final class LiteralIncludeDiscovery
             return [];
         }
         $code = (string) file_get_contents($entryFile);
-        [$code] = $runtime->prepareSourceForParser($code, $entryFile);
-        $script = $runtime->parser->parse($code, $entryFile);
-        $runtime->preprocessor->traverse($script);
+        $script = $runtime->parseForIncludeDiscovery($code, $entryFile);
 
         $paths = [];
         $seen = new \SplObjectStorage();
@@ -76,9 +72,7 @@ final class LiteralIncludeDiscovery
                 $paths[] = $resolved;
                 try {
                     $includedCode = (string) file_get_contents($resolved);
-                    [$includedCode] = $runtime->prepareSourceForParser($includedCode, $resolved);
-                    $included = $runtime->parser->parse($includedCode, $resolved);
-                    $runtime->preprocessor->traverse($included);
+                    $included = $runtime->parseForIncludeDiscovery($includedCode, $resolved);
                 } catch (\Throwable $e) {
                     continue;
                 }

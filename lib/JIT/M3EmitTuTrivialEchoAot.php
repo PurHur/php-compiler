@@ -72,6 +72,42 @@ final class M3EmitTuTrivialEchoAot
         return $repoRoot.'/'.$sidecarRel;
     }
 
+    /**
+     * Stable repo-relative path keys for link-time sidecar entries (#3046, #2967).
+     *
+     * Inventory argv drivers pass realpath() absolutes to parseAndCompile; content-hash sidecars
+     * go stale when bundled entrypoints change, so path keys must match both forms.
+     */
+    public static function normalizeSidecarSourcePath(string $path): ?string
+    {
+        $norm = str_replace('\\', '/', $path);
+        if (str_ends_with($norm, '/bin/vm.php')) {
+            $resolved = realpath($path);
+
+            return false !== $resolved ? str_replace('\\', '/', $resolved) : $norm;
+        }
+        if (str_ends_with($norm, '/test/selfhost/compiler_lib_spine_smoke/main.php')) {
+            return 'test/selfhost/compiler_lib_spine_smoke/main.php';
+        }
+        if (str_ends_with($norm, '/test/selfhost/compiler_minimal/main.php')) {
+            return 'test/selfhost/compiler_minimal/main.php';
+        }
+
+        return null;
+    }
+
+    public static function sidecarSourcePathMatches(string $filename, string $pathKey): bool
+    {
+        $filenameNorm = str_replace('\\', '/', $filename);
+        $keyNorm = str_replace('\\', '/', $pathKey);
+        if ($filenameNorm === $keyNorm) {
+            return true;
+        }
+        $suffix = '/'.$keyNorm;
+
+        return str_ends_with($filenameNorm, $suffix);
+    }
+
     public static function registerLinktime(
         Context $context,
         string $repoRoot,
@@ -193,11 +229,10 @@ final class M3EmitTuTrivialEchoAot
             $contentMatch = JitStringCompare::identical($context, $code, $cached);
             $pathMatch = null;
             if (isset($entry['sourcePathGlobal']) && null !== $entry['sourcePathGlobal']) {
-                $pathMatch = JitStringCompare::identical(
-                    $context,
-                    $filename,
-                    $context->builder->load($entry['sourcePathGlobal'])
-                );
+                $pathKey = $context->builder->load($entry['sourcePathGlobal']);
+                $pathExact = JitStringCompare::identical($context, $filename, $pathKey);
+                $pathSuffix = JitStringCompare::suffixIdentical($context, $filename, $pathKey);
+                $pathMatch = $context->builder->or($pathExact, $pathSuffix);
             }
             $matches = $contentMatch;
             if (null !== $pathMatch) {

@@ -236,7 +236,7 @@ final class VmArrayUserSetOps
     }
 
     /**
-     * @return callable(Variable, Variable): int
+     * @return callable
      */
     private static function resolveCompareCallback(Frame $frame, Variable $callback, string $fn): callable
     {
@@ -278,7 +278,7 @@ final class VmArrayUserSetOps
 
     /**
      * @param list<HashTable> $others
-     * @param callable(Variable, Variable): int $compare
+     * @param callable $compare
      */
     private static function valueInAnyOther(Variable $needle, array $others, callable $compare): bool
     {
@@ -296,7 +296,7 @@ final class VmArrayUserSetOps
 
     /**
      * @param list<HashTable> $others
-     * @param callable(Variable, Variable): int $compare
+     * @param callable $compare
      */
     private static function valueInAllOthers(Variable $needle, array $others, callable $compare): bool
     {
@@ -311,8 +311,8 @@ final class VmArrayUserSetOps
 
     /**
      * @param list<HashTable> $others
-     * @param callable(Variable, Variable): int $keyCompare
-     * @param callable(Variable, Variable): int|null $dataCompare
+     * @param callable $keyCompare
+     * @param callable|null $dataCompare
      */
     private static function pairInAnyOther(
         Variable $key,
@@ -343,8 +343,8 @@ final class VmArrayUserSetOps
 
     /**
      * @param list<HashTable> $others
-     * @param callable(Variable, Variable): int $keyCompare
-     * @param callable(Variable, Variable): int|null $dataCompare
+     * @param callable $keyCompare
+     * @param callable|null $dataCompare
      */
     private static function pairInAllOthers(
         Variable $key,
@@ -364,7 +364,7 @@ final class VmArrayUserSetOps
 
     /**
      * @param list<HashTable> $others
-     * @param callable(Variable, Variable): int $dataCompare
+     * @param callable $dataCompare
      */
     private static function exactPairInAnyOther(
         Variable $key,
@@ -387,7 +387,7 @@ final class VmArrayUserSetOps
 
     /**
      * @param list<HashTable> $others
-     * @param callable(Variable, Variable): int $dataCompare
+     * @param callable $dataCompare
      */
     private static function exactPairInAllOthers(
         Variable $key,
@@ -410,7 +410,7 @@ final class VmArrayUserSetOps
 
     /**
      * @param list<HashTable> $others
-     * @param callable(Variable, Variable): int $keyCompare
+     * @param callable $keyCompare
      */
     private static function keyInAnyOther(Variable $key, array $others, callable $keyCompare): bool
     {
@@ -427,7 +427,7 @@ final class VmArrayUserSetOps
 
     /**
      * @param list<HashTable> $others
-     * @param callable(Variable, Variable): int $keyCompare
+     * @param callable $keyCompare
      */
     private static function keyInAllOthers(Variable $key, array $others, callable $keyCompare): bool
     {

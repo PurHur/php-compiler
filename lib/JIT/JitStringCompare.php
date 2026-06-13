@@ -41,6 +41,53 @@ final class JitStringCompare
         }
     }
 
+    /** True when $haystack ends with the same bytes as $suffix (inventory argv absolute paths — #3046). */
+    public static function suffixIdentical(Context $context, Value $haystack, Value $suffix): Value
+    {
+        $map = $context->structFieldMap['__string__'];
+        $i64 = $context->getTypeFromString('int64');
+        $i1 = $context->getTypeFromString('int1');
+        $falseVal = $i1->constInt(0, false);
+        $hayLen = $context->builder->load(
+            $context->builder->structGep($haystack, $map['length'])
+        );
+        $suffixLen = $context->builder->load(
+            $context->builder->structGep($suffix, $map['length'])
+        );
+        $lenOk = $context->builder->icmp(Builder::INT_SGE, $hayLen, $suffixLen);
+        $lenOkBb = BasicBlockHelper::append($context, 'jit_suffix_len_ok');
+        $lenBadBb = BasicBlockHelper::append($context, 'jit_suffix_len_bad');
+        $mergeBb = BasicBlockHelper::append($context, 'jit_suffix_done');
+        $context->builder->branchIf($lenOk, $lenOkBb, $lenBadBb);
+        $context->builder->positionAtEnd($lenBadBb);
+        $context->builder->branch($mergeBb);
+        $context->builder->positionAtEnd($lenOkBb);
+        $offset = $context->builder->sub($hayLen, $suffixLen);
+        $i8p = $context->getTypeFromString('int8*');
+        $hayChars = $context->builder->structGep($haystack, $map['value']);
+        $hayTail = $context->builder->gep($hayChars, $offset);
+        $suffixChars = $context->builder->structGep($suffix, $map['value']);
+        $sizeT = $context->getTypeFromString('size_t');
+        $cmp = $context->builder->call(
+            $context->lookupFunction('memcmp'),
+            $hayTail,
+            $suffixChars,
+            $context->builder->zExt($suffixLen, $sizeT)
+        );
+        $suffixEq = $context->builder->icmp(
+            Builder::INT_EQ,
+            $cmp,
+            $cmp->typeOf()->constInt(0, false)
+        );
+        $context->builder->branch($mergeBb);
+        $context->builder->positionAtEnd($mergeBb);
+        $phi = $context->builder->phi($i1);
+        $phi->addIncoming($falseVal, $lenBadBb);
+        $phi->addIncoming($suffixEq, $lenOkBb);
+
+        return $phi;
+    }
+
     public static function identical(Context $context, Value $leftStr, Value $rightStr): Value
     {
         $map = $context->structFieldMap['__string__'];

@@ -149,7 +149,7 @@ final class VmCalendar
         return $ht;
     }
 
-    /** @return HashTable<int, HashTable> */
+    /** @return HashTable */
     public static function calInfoAll(): HashTable
     {
         $all = new HashTable();

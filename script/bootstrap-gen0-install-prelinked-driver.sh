@@ -21,6 +21,19 @@ bootstrap_gen0_prelinked_minimal_sidecar_path() {
   echo "${ROOT}/prelinked/bootstrap-gen0/compiler_minimal_aot_blob"
 }
 
+# Docker-built gen-0 embeds /compiler/build/.m3_* sidecar paths — unusable on host harness (#3046).
+bootstrap_gen0_prelinked_sidecar_looks_stale() {
+  local blob=$1
+  [[ -f "${blob}" && -s "${blob}" ]] || return 1
+  if strings "${blob}" 2>/dev/null | grep -q '/compiler/build/.m3_'; then
+    return 0
+  fi
+  if strings "${blob}" 2>/dev/null | grep -q '/compiler/bin/compile.php'; then
+    return 0
+  fi
+  return 1
+}
+
 # True when build artifacts byte-match committed prelinked seeds (#1492 stale driver-smoke overwrite).
 bootstrap_gen0_installed_driver_matches_prelinked() {
   local out=$1
@@ -60,7 +73,8 @@ bootstrap_gen0_seed_prelinked_m3_sidecars() {
   local prelinked_blob="${root}/prelinked/bootstrap-gen0/.m3_bin_compile_aot_blob"
   if [[ -x "${inventory}" && -s "${inventory}" ]]; then
     cp -f "${inventory}" "${blob}"
-  elif [[ -f "${prelinked_blob}" && -s "${prelinked_blob}" ]]; then
+  elif [[ -f "${prelinked_blob}" && -s "${prelinked_blob}" ]] \
+    && ! bootstrap_gen0_prelinked_sidecar_looks_stale "${prelinked_blob}"; then
     cp -f "${prelinked_blob}" "${blob}"
   else
     cp -f "${seed}" "${blob}"
@@ -82,6 +96,9 @@ bootstrap_gen0_seed_prelinked_m3_sidecars() {
   shopt -s nullglob
   for sidecar in "${prelinked_dir}"/.m3_*; do
     [[ -f "${sidecar}" && -s "${sidecar}" ]] || continue
+    if bootstrap_gen0_prelinked_sidecar_looks_stale "${sidecar}"; then
+      continue
+    fi
     cp -f "${sidecar}" "${root}/build/$(basename "${sidecar}")"
     chmod +x "${root}/build/$(basename "${sidecar}")" 2>/dev/null || true
   done
@@ -185,6 +202,10 @@ bootstrap_gen0_copy_prelinked_inventory_driver() {
   seed="$(bootstrap_gen0_prelinked_driver_path)"
   if [[ ! -f "${seed}" || ! -s "${seed}" ]]; then
     echo "bootstrap-gen0-install: missing committed driver ${seed} (#2930)" >&2
+    return 1
+  fi
+  if bootstrap_gen0_prelinked_sidecar_looks_stale "${seed}"; then
+    echo "bootstrap-gen0-install: prelinked inventory driver has stale /compiler sidecar paths — rebuild via Zend (BOOTSTRAP_INVENTORY_DRIVER_USE_PRELINKED=0) (#3046)" >&2
     return 1
   fi
   mkdir -p "${root}/build" "$(dirname "${aot_out}")"
