@@ -10,6 +10,7 @@ use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM;
 use PHPCompiler\VM\ClassEntry;
+use PHPCompiler\VM\OutputBuffer;
 use PHPCompiler\VM\TypedPropertyCheck;
 use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
@@ -48,7 +49,7 @@ final class print_r extends Internal
             return;
         }
         if ('' !== $out) {
-            echo $out;
+            OutputBuffer::append($out);
         }
         if (null !== $frame->returnVar) {
             $frame->returnVar->bool(true);
