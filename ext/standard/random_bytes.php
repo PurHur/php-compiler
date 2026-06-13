@@ -12,7 +12,7 @@ use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
 
 /**
- * random_bytes() — CSPRNG via OS (VM: /dev/urandom; JIT/AOT: libc getrandom).
+ * random_bytes() — CSPRNG via OS (VM: VmRandomNative FFI; JIT/AOT: libc getrandom).
  */
 final class random_bytes extends Internal
 {

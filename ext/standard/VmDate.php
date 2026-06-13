@@ -637,6 +637,16 @@ final class VmDate
         return (float) $tv['sec'] + (float) $tv['usec'] / 1_000_000.0;
     }
 
+    /**
+     * Wall-clock sec/usec for uniqid() and other builtins — libc FFI only (#8402, pairs #6722).
+     *
+     * @return array{sec: int, usec: int}
+     */
+    public static function wallClock(): array
+    {
+        return self::readTimeval();
+    }
+
     public static function gettimeofdayArray(): HashTable
     {
         $ffi = self::ffi();
