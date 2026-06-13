@@ -10635,7 +10635,7 @@ final class ArrayBuiltinHelper
     /**
      * array_unique() for arrays of scalar values (ext/standard/array.c subset).
      *
-     * @param int $flags SORT_REGULAR (identical) or SORT_STRING (string cast compare)
+     * @param int $flags SORT_REGULAR (identical), SORT_STRING (string cast), or SORT_NUMERIC
      */
     public static function arrayUnique(Context $context, Variable $array, int $flags = 0): Value
     {
@@ -10746,13 +10746,16 @@ final class ArrayBuiltinHelper
     /**
      * Duplicate check against values already stored in $dest.
      *
-     * @param int $flags SORT_REGULAR (identical) or SORT_STRING (string cast)
+     * @param int $flags SORT_REGULAR (identical), SORT_STRING (string cast), or SORT_NUMERIC
      */
     private static function destContainsPackedEntry(Context $context, Value $dest, Value $entry, int $flags): Value
     {
         $sortType = $flags & ~\PHPCompiler\ext\standard\StdlibConstants::SORT_FLAG_CASE;
         if (\PHPCompiler\ext\standard\StdlibConstants::SORT_STRING === $sortType) {
             return self::destContainsPackedEntryString($context, $dest, $entry);
+        }
+        if (\PHPCompiler\ext\standard\StdlibConstants::SORT_NUMERIC === $sortType) {
+            return self::destContainsPackedEntryNumeric($context, $dest, $entry);
         }
 
         $valueMap = $context->structFieldMap['__value__'];
@@ -10880,6 +10883,163 @@ final class ArrayBuiltinHelper
         $context->builder->positionAtEnd($done);
 
         return $context->builder->load($foundSlot);
+    }
+
+    /**
+     * SORT_NUMERIC duplicate check (ext/standard/array.c numeric_compare_function).
+     */
+    private static function destContainsPackedEntryNumeric(Context $context, Value $dest, Value $entry): Value
+    {
+        $needleNum = self::valueEntryToNumericDouble($context, $entry);
+        $sizeT = $context->getTypeFromString('size_t');
+        $zero = $sizeT->constInt(0, false);
+        $one = $sizeT->constInt(1, false);
+        $idxSlot = $context->builder->alloca($sizeT, 1, 'array_unique_num_dup_idx');
+        $context->builder->store($zero, $idxSlot);
+        $num = $context->builder->call(
+            $context->lookupFunction('__hashtable__getNumElements'),
+            $dest
+        );
+
+        $foundSlot = $context->builder->alloca(
+            $context->getTypeFromString('int1'),
+            1,
+            'array_unique_num_dup_found'
+        );
+        $context->builder->store($context->getTypeFromString('int1')->constInt(0, false), $foundSlot);
+
+        $done = BasicBlockHelper::append($context, 'array_unique_num_dup_done');
+        $head = BasicBlockHelper::append($context, 'array_unique_num_dup_head');
+        $body = BasicBlockHelper::append($context, 'array_unique_num_dup_body');
+        $foundBlock = BasicBlockHelper::append($context, 'array_unique_num_dup_found_block');
+        $context->builder->branch($head);
+
+        $context->builder->positionAtEnd($head);
+        $idx = $context->builder->load($idxSlot);
+        $atEnd = $context->builder->icmp(Builder::INT_SGE, $idx, $num);
+        $context->builder->branchIf($atEnd, $done, $body);
+
+        $context->builder->positionAtEnd($body);
+        $candEntry = self::listEntryAt($context, $dest, $idx);
+        $candNum = self::valueEntryToNumericDouble($context, $candEntry);
+        $match = $context->builder->fcmp(Builder::REAL_OEQ, $candNum, $needleNum);
+        $continueBlock = BasicBlockHelper::append($context, 'array_unique_num_dup_continue');
+        $context->builder->branchIf($match, $foundBlock, $continueBlock);
+
+        $context->builder->positionAtEnd($continueBlock);
+        $context->builder->store(
+            $context->builder->addNoSignedWrap($idx, $one),
+            $idxSlot
+        );
+        $context->builder->branch($head);
+
+        $context->builder->positionAtEnd($foundBlock);
+        $context->builder->store($context->getTypeFromString('int1')->constInt(1, false), $foundSlot);
+        $context->builder->branch($done);
+
+        $context->builder->positionAtEnd($done);
+
+        return $context->builder->load($foundSlot);
+    }
+
+    /** Coerce boxed __value__* to double for array_unique SORT_NUMERIC (numeric_compare_function). */
+    private static function valueEntryToNumericDouble(Context $context, Value $entry): Value
+    {
+        $valueMap = $context->structFieldMap['__value__'];
+        $typeByte = $context->builder->load(
+            $context->builder->structGep($entry, $valueMap['type'])
+        );
+        $i8 = $context->getTypeFromString('int8');
+        $double = $context->getTypeFromString('double');
+        $zero = $double->constReal(0.0);
+        $numSlot = $context->builder->alloca($double, 1, 'array_unique_num_scalar');
+        $context->builder->store($zero, $numSlot);
+
+        $longBlock = BasicBlockHelper::append($context, 'array_unique_num_long');
+        $dblBlock = BasicBlockHelper::append($context, 'array_unique_num_double');
+        $stringBlock = BasicBlockHelper::append($context, 'array_unique_num_string');
+        $boolBlock = BasicBlockHelper::append($context, 'array_unique_num_bool');
+        $nullBlock = BasicBlockHelper::append($context, 'array_unique_num_null');
+        $defaultBlock = BasicBlockHelper::append($context, 'array_unique_num_default');
+        $mergeBlock = BasicBlockHelper::append($context, 'array_unique_num_merge');
+
+        $isLong = $context->builder->icmp(
+            Builder::INT_EQ,
+            $typeByte,
+            $i8->constInt(Variable::TYPE_NATIVE_LONG, false)
+        );
+        $afterLong = BasicBlockHelper::append($context, 'array_unique_num_after_long');
+        $context->builder->branchIf($isLong, $longBlock, $afterLong);
+
+        $context->builder->positionAtEnd($longBlock);
+        $longVal = $context->builder->call($context->lookupFunction('__value__readLong'), $entry);
+        $context->builder->store($context->builder->sitofp($longVal, $double), $numSlot);
+        $context->builder->branch($mergeBlock);
+
+        $context->builder->positionAtEnd($afterLong);
+        $isDouble = $context->builder->icmp(
+            Builder::INT_EQ,
+            $typeByte,
+            $i8->constInt(Variable::TYPE_NATIVE_DOUBLE, false)
+        );
+        $afterDouble = BasicBlockHelper::append($context, 'array_unique_num_after_double');
+        $context->builder->branchIf($isDouble, $dblBlock, $afterDouble);
+
+        $context->builder->positionAtEnd($dblBlock);
+        $context->builder->store(
+            $context->builder->call($context->lookupFunction('__value__readDouble'), $entry),
+            $numSlot
+        );
+        $context->builder->branch($mergeBlock);
+
+        $context->builder->positionAtEnd($afterDouble);
+        $isString = $context->builder->icmp(
+            Builder::INT_EQ,
+            $typeByte,
+            $i8->constInt(Variable::TYPE_STRING, false)
+        );
+        $afterString = BasicBlockHelper::append($context, 'array_unique_num_after_string');
+        $context->builder->branchIf($isString, $stringBlock, $afterString);
+
+        $context->builder->positionAtEnd($stringBlock);
+        $strPtr = $context->builder->call($context->lookupFunction('__value__readString'), $entry);
+        $context->builder->store(self::stringPtrToDouble($context, $strPtr), $numSlot);
+        $context->builder->branch($mergeBlock);
+
+        $context->builder->positionAtEnd($afterString);
+        $isBool = $context->builder->icmp(
+            Builder::INT_EQ,
+            $typeByte,
+            $i8->constInt(Variable::TYPE_NATIVE_BOOL, false)
+        );
+        $afterBool = BasicBlockHelper::append($context, 'array_unique_num_after_bool');
+        $context->builder->branchIf($isBool, $boolBlock, $afterBool);
+
+        $context->builder->positionAtEnd($boolBlock);
+        $boolVal = $context->builder->call($context->lookupFunction('__value__readLong'), $entry);
+        $context->builder->store(
+            $context->builder->uitofp($boolVal, $double),
+            $numSlot
+        );
+        $context->builder->branch($mergeBlock);
+
+        $context->builder->positionAtEnd($afterBool);
+        $isNull = $context->builder->icmp(
+            Builder::INT_EQ,
+            $typeByte,
+            $i8->constInt(Variable::TYPE_NULL, false)
+        );
+        $context->builder->branchIf($isNull, $nullBlock, $defaultBlock);
+
+        $context->builder->positionAtEnd($nullBlock);
+        $context->builder->branch($mergeBlock);
+
+        $context->builder->positionAtEnd($defaultBlock);
+        $context->builder->branch($mergeBlock);
+
+        $context->builder->positionAtEnd($mergeBlock);
+
+        return $context->builder->load($numSlot);
     }
 
     /**
