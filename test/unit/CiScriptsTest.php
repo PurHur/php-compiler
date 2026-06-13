@@ -2753,39 +2753,43 @@ final class CiScriptsTest extends TestCase
         $this->assertStringContainsString('#730', $doc);
     }
 
-    public function testCiCommonDefinesMiniWebAppVmOopGateOptIn(): void
+    public function testCiCommonDefinesMiniWebAppVmOopGateDefaultOn(): void
     {
         $common = (string) file_get_contents(dirname(__DIR__, 2).'/script/ci-common.sh');
         $this->assertStringContainsString('ci_run_miniwebapp_vm_oop', $common);
-        $this->assertStringContainsString('MINIWEBAPP_VM_OOP_GATE:-0', $common);
+        $this->assertStringContainsString('MINIWEBAPP_VM_OOP_GATE:-1', $common);
         $this->assertStringContainsString('check-miniwebapp-vm-oop.sh', $common);
 
         $defaults = (string) file_get_contents(dirname(__DIR__, 2).'/script/ci-defaults.env');
         $this->assertStringContainsString(
-            'MINIWEBAPP_VM_OOP_GATE="${MINIWEBAPP_VM_OOP_GATE:-0}"',
+            'MINIWEBAPP_VM_OOP_GATE="${MINIWEBAPP_VM_OOP_GATE:-1}"',
             $defaults
         );
-        $this->assertStringContainsString('#2189', $defaults);
+        $this->assertStringContainsString('#2293', $defaults);
 
         $fast = (string) file_get_contents(dirname(__DIR__, 2).'/script/ci-fast.sh');
         $this->assertStringContainsString('ci_run_miniwebapp_vm_oop', $fast);
 
+        $local = (string) file_get_contents(dirname(__DIR__, 2).'/script/ci-local.sh');
+        $this->assertStringContainsString('ci_run_miniwebapp_vm_oop', $local);
+
         $this->assertFileExists(dirname(__DIR__, 2).'/script/check-miniwebapp-vm-oop.sh');
     }
 
-    public function testLocalCiMatrixDocumentsMiniWebAppVmOopGate(): void
+    public function testLocalCiMatrixDocumentsMiniWebAppVmOopGateDefaultOn(): void
     {
         $doc = (string) file_get_contents(dirname(__DIR__, 2).'/docs/local-ci-matrix.md');
         $this->assertStringContainsString('MINIWEBAPP_VM_OOP_GATE', $doc);
         $this->assertStringContainsString('check-miniwebapp-vm-oop.sh', $doc);
-        $this->assertMatchesRegularExpression('/\| `MINIWEBAPP_VM_OOP_GATE` \| `0` \|/', $doc);
-        $this->assertStringContainsString('#2189', $doc);
+        $this->assertMatchesRegularExpression('/\| `MINIWEBAPP_VM_OOP_GATE` \| `1` \|/', $doc);
+        $this->assertStringContainsString('ci-local.sh', $doc);
+        $this->assertStringContainsString('#2293', $doc);
     }
 
-    public function testCiDockerRunPassesMiniWebAppVmOopGateEnv(): void
+    public function testCiDockerRunPassesMiniWebAppVmOopGateEnvDefaultOn(): void
     {
         $body = (string) file_get_contents(dirname(__DIR__, 2).'/script/ci-docker-run.sh');
-        $this->assertStringContainsString('MINIWEBAPP_VM_OOP_GATE=${MINIWEBAPP_VM_OOP_GATE:-0}', $body);
+        $this->assertStringContainsString('MINIWEBAPP_VM_OOP_GATE=${MINIWEBAPP_VM_OOP_GATE:-1}', $body);
     }
 
     public function testCiDefaultsEnvDefinesNestedReturnComplianceGateOn(): void

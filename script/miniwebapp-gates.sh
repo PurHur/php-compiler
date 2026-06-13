@@ -28,7 +28,7 @@ Probes phpc lint --all by default; use --no-lint to report env/repo state only.
 Environment (enable next gates):
   MINIWEBAPP_LINT_GATE=0      skeleton: web-smoke continues on lint failure (default gate on — #621)
   MINIWEBAPP_VM_CLI_GATE=1    run MiniWebApp*VmCli in ci-fast (default on; #597)
-  MINIWEBAPP_VM_OOP_GATE=1    lint zero + VM serve PATH_INFO curls in ci-fast (default off; #2189)
+  MINIWEBAPP_VM_OOP_GATE=1    lint zero + VM serve PATH_INFO curls in ci-fast/ci-local (default on; #2293)
   MINIWEBAPP_SERVE_GATE=1     ServeTest MiniWebApp routes (default on in ci-local — #641)
   MINIWEBAPP_SERVE_GATE=0     skip ServeTest miniwebapp during fast iteration
   MINIWEBAPP_WEB_SMOKE_GATE=1     003 PATH_INFO curls in ci-local (default on — #664)
@@ -72,7 +72,7 @@ fi
 
 lint_gate="${MINIWEBAPP_LINT_GATE:-1}"
 vm_cli_gate="${MINIWEBAPP_VM_CLI_GATE:-1}"
-vm_oop_gate="${MINIWEBAPP_VM_OOP_GATE:-0}"
+vm_oop_gate="${MINIWEBAPP_VM_OOP_GATE:-1}"
 serve_gate="${MINIWEBAPP_SERVE_GATE:-1}"
 serve_aot_gate="${MINIWEBAPP_SERVE_AOT_GATE:-1}"
 serve_gate_explicit=0
@@ -161,9 +161,9 @@ if grep -q 'MINIWEBAPP_VM_CLI_GATE' "${ROOT}/script/ci-fast.sh" 2>/dev/null \
   stage1b=1
 fi
 
-# Stage 1c: ci-fast opt-in VM OOP lint + serve curls (#2189, #2059).
+# Stage 1c: ci-fast/ci-local VM OOP lint + serve curls (#2189, #2059, #2293).
 if grep -q 'ci_run_miniwebapp_vm_oop' "${ROOT}/script/ci-common.sh" 2>/dev/null \
-  && grep -q 'MINIWEBAPP_VM_OOP_GATE:-0' "${ROOT}/script/ci-defaults.env" 2>/dev/null; then
+  && grep -q 'MINIWEBAPP_VM_OOP_GATE:-1' "${ROOT}/script/ci-defaults.env" 2>/dev/null; then
   stage1c_wired=1
 fi
 if [[ "${stage1c_wired}" -eq 1 && "${vm_oop_gate}" == "1" ]]; then
@@ -400,9 +400,9 @@ echo "       ${REPO_URL}/issues/621"
 echo "$(mark "${stage1b}") Stage 1b VM CLI — MINIWEBAPP_VM_CLI_GATE=1 in ci-fast (#597)"
 echo "       ${REPO_URL}/issues/597  (unset or =0 to skip MiniWebApp*VmCli)"
 
-echo "$(mark "${stage1c}") Stage 1c VM OOP serve — MINIWEBAPP_VM_OOP_GATE=1 opt-in in ci-fast (#2189, #2059)"
+echo "$(mark "${stage1c}") Stage 1c VM OOP serve — MINIWEBAPP_VM_OOP_GATE=1 default in ci-fast/ci-local (#2189, #2059, #2293)"
 if [[ "${stage1c_wired}" -eq 1 ]]; then
-  echo "       script/check-miniwebapp-vm-oop.sh wired; default off until #2293"
+  echo "       script/check-miniwebapp-vm-oop.sh wired; default on (#2293)"
 else
   echo "       not wired in ci-common.sh / ci-defaults.env"
 fi
