@@ -1,0 +1,76 @@
+<?php
+
+declare(strict_types=1);
+
+namespace PHPCompiler\ext\standard;
+
+use PHPCompiler\Frame;
+use PHPCompiler\Func\Internal;
+use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\Variable as JITVariable;
+use PHPCompiler\VM\HashTable;
+use PHPCompiler\VM\Variable;
+use PHPLLVM\Value;
+
+/**
+ * proc_get_status() — subprocess status (php-src ext/standard/proc_open.c; #3740).
+ *
+ * VM-only v1; JIT/AOT deferred until proc_open() lowering lands (#3131).
+ */
+final class proc_get_status extends Internal
+{
+    public function __construct()
+    {
+        parent::__construct('proc_get_status');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        if (1 !== \count($frame->calledArgs)) {
+            throw new \LogicException('proc_get_status() requires exactly one argument in this compiler build');
+        }
+        if (null === $frame->returnVar) {
+            return;
+        }
+        $procVar = $frame->calledArgs[0]->resolveIndirect();
+        $handle = proc_close::requireProcessHandle($procVar, 'proc_get_status');
+        $status = VmProcess::procGetStatus($handle);
+        if (false === $status) {
+            $frame->returnVar->bool(false);
+
+            return;
+        }
+        $ht = new HashTable();
+        foreach ($status as $key => $value) {
+            $slot = new Variable();
+            self::assignStatusValue($slot, $value);
+            $ht->add((string) $key, $slot);
+        }
+        $frame->returnVar->array($ht);
+    }
+
+    public function call(Context $context, JITVariable ...$args): Value
+    {
+        throw new \LogicException('proc_get_status() is VM-only in this compiler build (issue #3131)');
+    }
+
+    private static function assignStatusValue(Variable $slot, mixed $value): void
+    {
+        if (\is_bool($value)) {
+            $slot->bool($value);
+
+            return;
+        }
+        if (\is_int($value)) {
+            $slot->int($value);
+
+            return;
+        }
+        if (\is_string($value)) {
+            $slot->string($value);
+
+            return;
+        }
+        $slot->null();
+    }
+}
