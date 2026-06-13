@@ -7,6 +7,7 @@ namespace PHPCompiler\JIT\Builtin;
 use PHPCompiler\ext\standard\JitStringConcat;
 use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\LibcExtern;
 use PHPCompiler\JIT\SuperglobalInit;
 use PHPCompiler\JIT\Variable;
 use PHPLLVM\Builder;
@@ -274,7 +275,7 @@ final class SessionEncodeRuntime
 
     private static function emitDecodeWire(Context $context, LlvmFunction $fn): void
     {
-        self::ensureLibc($context);
+        LibcExtern::register($context);
         $entry = $fn->appendBasicBlock('se_wire_dec_entry');
         $context->builder->positionAtEnd($entry);
 
@@ -285,7 +286,7 @@ final class SessionEncodeRuntime
         $i64 = $context->getTypeFromString('int64');
         $i8p = $context->getTypeFromString('int8*');
         $sizeT = $context->getTypeFromString('size_t');
-        $pipeByte = $context->getTypeFromString('int8')->constInt(ord('|'), false);
+        $pipeByte = $i32->constInt(ord('|'), false);
 
         $bodyLen = $context->builder->load($context->builder->structGep($payload, $strMap['length']));
         $bodyPtr = $context->builder->pointerCast(
@@ -326,7 +327,10 @@ final class SessionEncodeRuntime
         $context->builder->branchIf($atEnd, $okBb, $loopBody);
         $context->builder->positionAtEnd($loopBody);
         $pos = $context->builder->load($posSlot);
-        $remain = $context->builder->sub($end, $pos);
+        $remain = $context->builder->sub(
+            $context->builder->ptrToInt($end, $i64),
+            $context->builder->ptrToInt($pos, $i64)
+        );
         $pipePtr = $context->builder->call(
             $context->lookupFunction('memchr'),
             $pos,
@@ -338,7 +342,10 @@ final class SessionEncodeRuntime
         $context->builder->branchIf($noPipe, $bbFail, $bbAfterPipe);
 
         $context->builder->positionAtEnd($bbAfterPipe);
-        $keyLen = $context->builder->sub($pipePtr, $pos);
+        $keyLen = $context->builder->sub(
+            $context->builder->ptrToInt($pipePtr, $i64),
+            $context->builder->ptrToInt($pos, $i64)
+        );
         $keyLenZero = $context->builder->icmp(Builder::INT_SLE, $keyLen, $i64->constInt(0, false));
         $bbKeyOk = BasicBlockHelper::append($context, 'se_wire_dec_key_ok');
         $context->builder->branchIf($keyLenZero, $bbFail, $bbKeyOk);
@@ -477,11 +484,12 @@ final class SessionEncodeRuntime
 
     private static function stringContainsPipe(Context $context, Value $str): Value
     {
-        self::ensureLibc($context);
+        LibcExtern::register($context);
         $strMap = $context->structFieldMap['__string__'];
+        $i32 = $context->getTypeFromString('int32');
         $i8p = $context->getTypeFromString('int8*');
         $sizeT = $context->getTypeFromString('size_t');
-        $pipeByte = $context->getTypeFromString('int8')->constInt(ord('|'), false);
+        $pipeByte = $i32->constInt(ord('|'), false);
         $body = $context->builder->pointerCast(
             $context->builder->structGep($str, $strMap['value']),
             $i8p
@@ -519,25 +527,4 @@ final class SessionEncodeRuntime
         );
     }
 
-    private static function ensureLibc(Context $context): void
-    {
-        $i8 = $context->getTypeFromString('int8');
-        $i8p = $context->getTypeFromString('int8*');
-        $sizeT = $context->getTypeFromString('size_t');
-        foreach (
-            [
-                ['memchr', $i8p, [$i8p, $i8, $sizeT]],
-            ] as [$name, $ret, $params]
-        ) {
-            try {
-                $context->lookupFunction($name);
-            } catch (\Throwable) {
-                $fn = $context->module->addFunction(
-                    $name,
-                    $context->context->functionType($ret, false, ...$params)
-                );
-                $context->registerFunction($name, $fn);
-            }
-        }
-    }
 }
