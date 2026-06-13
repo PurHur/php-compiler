@@ -239,6 +239,25 @@ final class DateTimeSupport
         $zone->constructed = true;
     }
 
+    /**
+     * Allocate a DateTimeZone object (ext/date/php_date.c — PHP_FUNCTION(timezone_open), #4634).
+     *
+     * @throws NativeDateInvalidTimeZoneException when the timezone id is invalid
+     */
+    public static function newDateTimeZoneVariable(Context $ctx, string $timezone): Variable
+    {
+        $class = $ctx->classes[self::CLASS_DATETIMEZONE] ?? null;
+        if (null === $class) {
+            throw new \LogicException('DateTimeZone is not registered in this compiler build');
+        }
+        $entry = new ObjectEntry($class);
+        self::initDateTimeZone($entry, $timezone);
+        $var = new Variable(Variable::TYPE_OBJECT);
+        $var->object($entry);
+
+        return $var;
+    }
+
     /** php-src ext/date/php_datetimezone.c — invalid id throws DateInvalidTimeZoneException (#7279). */
     public static function throwDateInvalidTimeZoneException(string $timezone): void
     {
