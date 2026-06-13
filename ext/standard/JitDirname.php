@@ -7,9 +7,6 @@ namespace PHPCompiler\ext\standard;
 use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Builtin\TypeErrorRaise;
 use PHPCompiler\JIT\Context;
-use PHPCompiler\JIT\JitLongArg;
-use PHPCompiler\JIT\JitStringArg;
-use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Builder;
 use PHPLLVM\Value;
@@ -21,30 +18,7 @@ final class JitDirname
 
     public static function coerceLevels(Context $context, JITVariable $arg): Value
     {
-        $i64 = $context->getTypeFromString('int64');
-        if (JITVariable::TYPE_NATIVE_LONG === $arg->type) {
-            return $context->helper->loadValue($arg);
-        }
-        if (JITVariable::TYPE_NATIVE_DOUBLE === $arg->type) {
-            return $context->builder->fptosi($context->helper->loadValue($arg), $i64);
-        }
-        if (JITVariable::TYPE_STRING === $arg->type) {
-            $literal = JitStringArg::compileTimeLiteral($arg);
-            if (null !== $literal) {
-                return $i64->constInt((int) $literal, false);
-            }
-            $str = JitStringArg::lower($context, $arg, 'dirname() levels');
-
-            return self::strtolString($context, $str);
-        }
-        if (JITVariable::TYPE_VALUE === $arg->type) {
-            return $context->builder->call(
-                $context->lookupFunction('__value__readLong'),
-                JitValueBox::valuePtrFromVariable($context, $arg)
-            );
-        }
-
-        return JitLongArg::lower($context, $arg, 'dirname() levels');
+        return JitIntdiv::lowerIntBuiltinArg($context, $arg, 'dirname', 2, 'levels');
     }
 
     public static function emitRuntimeLevelsGuard(Context $context, Value $levels): void
@@ -61,22 +35,5 @@ final class JitDirname
         TypeErrorRaise::emitRaise($context, self::LEVELS_ERROR);
         $context->builder->call($context->lookupFunction('abort'));
         $context->builder->positionAtEnd($okBlock);
-    }
-
-    private static function strtolString(Context $context, Value $str): Value
-    {
-        $map = $context->structFieldMap['__string__'];
-        $charPtr = $context->builder->structGep($str, $map['value']);
-        $i8p = $context->getTypeFromString('int8*');
-        $i64 = $context->getTypeFromString('int64');
-        $end = $context->builder->alloca($i8p, 1, 'dirname_levels_strtol_end');
-        $context->builder->store($i8p->constNull(), $end);
-
-        return $context->builder->call(
-            $context->lookupFunction('strtol'),
-            $charPtr,
-            $end,
-            $i64->constInt(10, false)
-        );
     }
 }
