@@ -7753,8 +7753,8 @@ class JIT {
                             $this->context->type->object->allocate($classId)
                         );
                         $resultOp = $block->getOperand($op->arg1);
-                        $this->assignOperand($resultOp, $obj, true);
                         $resultOp->type = new Type(Type::TYPE_OBJECT, [], 'SplObjectStorage');
+                        $this->assignOperand($resultOp, $obj, true);
                         $this->context->type->object->markObjectConstructed(
                             $this->context->helper->loadValue($obj)
                         );
@@ -8896,6 +8896,12 @@ class JIT {
                         ) {
                             // User classes: native slots for declared scalars (VALUE-box fetch segfaults MCJIT, #5111).
                             $jitType = $declaredJitType;
+                            $propType = $block->getOperand($op->arg3)->type;
+                            $userType = is_object($propType) ? ($propType->userType ?? null) : null;
+                            if (is_string($userType) && 0 === strcasecmp($userType, 'SplObjectStorage')) {
+                                // Boxed object slots: native TYPE_OBJECT property fetch breaks method calls (#8422).
+                                $jitType = Variable::TYPE_VALUE;
+                            }
                         } else {
                             $jitType = $this->context->type->object->externalPropertyJitType(
                                 $className,

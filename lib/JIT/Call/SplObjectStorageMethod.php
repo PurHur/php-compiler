@@ -127,7 +127,7 @@ final class SplObjectStorageMethod implements Call
     private static function loadKeyObject(Context $context, Variable $key): Value
     {
         if (Variable::TYPE_OBJECT === $key->type) {
-            return $context->helper->loadValue($key);
+            return self::materializeObjectPointer($context, $key);
         }
 
         return $context->builder->call(
@@ -153,8 +153,12 @@ final class SplObjectStorageMethod implements Call
             return $context->helper->loadValue($receiver);
         }
         if (Variable::TYPE_OBJECT === $receiver->type) {
+            $obj = self::materializeObjectPointer($context, $receiver);
+
             return $context->helper->loadValue(
-                $context->type->object->splBackingHashtable($receiver)
+                $context->type->object->splBackingHashtable(
+                    new Variable($context, Variable::TYPE_OBJECT, Variable::KIND_VALUE, $obj)
+                )
             );
         }
         if (Variable::TYPE_VALUE === $receiver->type) {
@@ -216,5 +220,18 @@ final class SplObjectStorageMethod implements Call
         $htPhi->addIncoming($objHt->typeOf()->constNull(), $empty);
 
         return $htPhi;
+    }
+
+    /** Resolve storage receiver to __object__* without property-lvalue indirection (#8422). */
+    private static function materializeObjectPointer(Context $context, Variable $receiver): Value
+    {
+        if (null !== $receiver->objectPropertySlot && Variable::TYPE_OBJECT === ($receiver->objectPropertyType ?? null)) {
+            return $context->builder->pointerCast(
+                $context->builder->load($receiver->objectPropertySlot),
+                $context->getTypeFromString('__object__*')
+            );
+        }
+
+        return $context->helper->loadValue($receiver);
     }
 }
