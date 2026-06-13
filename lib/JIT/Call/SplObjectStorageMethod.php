@@ -4,11 +4,13 @@ declare(strict_types=1);
 
 namespace PHPCompiler\JIT\Call;
 
+use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Call;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\HashTableHelper;
 use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\Variable;
+use PHPLLVM\Builder;
 use PHPLLVM\Value;
 
 /**
@@ -93,12 +95,15 @@ final class SplObjectStorageMethod implements Call
         }
         $ht = self::backingHashtable($context, $args[0]);
         $keyObj = self::loadKeyObject($context, $args[1]);
-
-        return $context->builder->call(
+        $isSet = $context->builder->call(
             $context->lookupFunction('__hashtable__offsetIsSetObjectKey'),
             $ht,
             $keyObj
         );
+        $slot = JitValueBox::alloc($context);
+        JitValueBox::writeBool($context, $slot, $isSet);
+
+        return $slot;
     }
 
     private function callCount(Context $context, Variable ...$args): Value
@@ -109,8 +114,14 @@ final class SplObjectStorageMethod implements Call
         $ht = self::backingHashtable($context, $args[0]);
         $map = $context->structFieldMap['__hashtable__'];
         $num = $context->builder->load($context->builder->structGep($ht, $map['numElements']));
+        $slot = JitValueBox::alloc($context);
+        JitValueBox::writeLong(
+            $context,
+            $slot,
+            $context->builder->truncOrBitCast($num, $context->getTypeFromString('int64'))
+        );
 
-        return $context->builder->truncOrBitCast($num, $context->getTypeFromString('int64'));
+        return $slot;
     }
 
     private static function loadKeyObject(Context $context, Variable $key): Value
@@ -121,9 +132,7 @@ final class SplObjectStorageMethod implements Call
 
         return $context->builder->call(
             $context->lookupFunction('__value__readObject'),
-            Variable::KIND_VARIABLE === $key->kind
-                ? JitValueBox::pointer($context, $key->value)
-                : $context->helper->loadValue($key)
+            JitValueBox::valuePtrFromVariable($context, $key)
         );
     }
 
@@ -149,19 +158,63 @@ final class SplObjectStorageMethod implements Call
             );
         }
         if (Variable::TYPE_VALUE === $receiver->type) {
-            $valPtr = Variable::KIND_VARIABLE === $receiver->kind
-                ? JitValueBox::pointer($context, $receiver->value)
-                : $context->helper->loadValue($receiver);
-
-            return $context->builder->call(
-                $context->lookupFunction('__value__readHashtable'),
-                $valPtr
-            );
+            return self::backingHashtableFromValueBox($context, $receiver);
         }
 
         throw new \LogicException(
             'SplObjectStorage method receiver must be a hashtable or object, got '
             .Variable::getStringType($receiver->type)
         );
+    }
+
+    private static function backingHashtableFromValueBox(Context $context, Variable $receiver): Value
+    {
+        $valPtr = JitValueBox::valuePtrFromVariable($context, $receiver);
+        $map = $context->structFieldMap['__value__'];
+        $typeByte = $context->builder->load(
+            $context->builder->structGep($valPtr, $map['type'])
+        );
+        $i8 = $context->getTypeFromString('int8');
+        $isObject = $context->builder->icmp(
+            Builder::INT_EQ,
+            $typeByte,
+            $i8->constInt(Variable::TYPE_OBJECT, false)
+        );
+        $isHashtable = $context->builder->icmp(
+            Builder::INT_EQ,
+            $typeByte,
+            $i8->constInt(Variable::TYPE_HASHTABLE, false)
+        );
+        $fromObject = BasicBlockHelper::append($context, 'spl_ht_from_object');
+        $fromHashtable = BasicBlockHelper::append($context, 'spl_ht_from_hashtable');
+        $empty = BasicBlockHelper::append($context, 'spl_ht_empty');
+        $merge = BasicBlockHelper::append($context, 'spl_ht_merge');
+        $context->builder->branchIf($isObject, $fromObject, $empty);
+        $context->builder->positionAtEnd($empty);
+        $context->builder->branchIf($isHashtable, $fromHashtable, $merge);
+        $context->builder->positionAtEnd($fromObject);
+        $obj = $context->builder->call(
+            $context->lookupFunction('__value__readObject'),
+            $valPtr
+        );
+        $objHt = $context->helper->loadValue(
+            $context->type->object->splBackingHashtable(
+                new Variable($context, Variable::TYPE_OBJECT, Variable::KIND_VALUE, $obj)
+            )
+        );
+        $context->builder->branch($merge);
+        $context->builder->positionAtEnd($fromHashtable);
+        $boxedHt = $context->builder->call(
+            $context->lookupFunction('__value__readHashtable'),
+            $valPtr
+        );
+        $context->builder->branch($merge);
+        $context->builder->positionAtEnd($merge);
+        $htPhi = $context->builder->phi($objHt->typeOf());
+        $htPhi->addIncoming($objHt, $fromObject);
+        $htPhi->addIncoming($boxedHt, $fromHashtable);
+        $htPhi->addIncoming($objHt->typeOf()->constNull(), $empty);
+
+        return $htPhi;
     }
 }
