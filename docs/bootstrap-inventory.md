@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 2476 |
-| Phase A inventory files (M2 ratio SSOT) | 2476 |
+| PHP files on vm.php path | 2478 |
+| Phase A inventory files (M2 ratio SSOT) | 2478 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 6706 |
+| Source constructs flagged (warnings) | 6716 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -622,7 +622,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/standard/JitWordwrap.php` | 0 | 1 |
 | `ext/standard/JitZendScalarCast.php` | 0 | 1 |
 | `ext/standard/JitZlib.php` | 0 | 1 |
-| `ext/standard/Module.php` | 0 | 688 |
+| `ext/standard/Module.php` | 0 | 690 |
 | `ext/standard/ModuleRegistry.php` | 0 | 1 |
 | `ext/standard/NativeLastError.php` | 0 | 7 |
 | `ext/standard/NativeObStorage.php` | 0 | 1 |
@@ -937,6 +937,8 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/standard/current.php` | 0 | 3 |
 | `ext/standard/date.php` | 0 | 1 |
 | `ext/standard/date_add.php` | 0 | 2 |
+| `ext/standard/date_create.php` | 0 | 3 |
+| `ext/standard/date_create_immutable.php` | 0 | 3 |
 | `ext/standard/date_default_timezone_get.php` | 0 | 4 |
 | `ext/standard/date_default_timezone_set.php` | 0 | 4 |
 | `ext/standard/date_diff.php` | 0 | 2 |
@@ -2327,7 +2329,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/VM/CycleCollector.php` | 0 | 2 |
 | `lib/VM/DateIntervalSupport.php` | 0 | 2 |
 | `lib/VM/DateTimeInterfaceSupport.php` | 0 | 3 |
-| `lib/VM/DateTimeSupport.php` | 0 | 14 |
+| `lib/VM/DateTimeSupport.php` | 0 | 16 |
 | `lib/VM/DateTimeZoneSupport.php` | 0 | 2 |
 | `lib/VM/DnfCheck.php` | 0 | 1 |
 | `lib/VM/EnumCaseEntry.php` | 0 | 5 |
@@ -6616,21 +6618,23 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new idate (line 779)
 - new date_sun_info (line 780)
 - new date_interval_format (line 781)
-- new date_add (line 782)
-- new date_sub (line 783)
-- new date_modify (line 784)
-- new date_diff (line 785)
-- new date_sunrise (line 786)
-- new date_sunset (line 787)
-- new sleep (line 788)
-- new set_time_limit (line 789)
-- new ignore_user_abort (line 790)
-- new connection_aborted (line 791)
-- new spl_autoload_register (line 792)
-- new spl_autoload_call (line 793)
-- new time_nanosleep (line 794)
-- new time_sleep_until (line 795)
-- new usleep (line 796)
+- new date_create (line 782)
+- new date_create_immutable (line 783)
+- new date_add (line 784)
+- new date_sub (line 785)
+- new date_modify (line 786)
+- new date_diff (line 787)
+- new date_sunrise (line 788)
+- new date_sunset (line 789)
+- new sleep (line 790)
+- new set_time_limit (line 791)
+- new ignore_user_abort (line 792)
+- new connection_aborted (line 793)
+- new spl_autoload_register (line 794)
+- new spl_autoload_call (line 795)
+- new time_nanosleep (line 796)
+- new time_sleep_until (line 797)
+- new usleep (line 798)
 - 4 class method(s)
 
 ### `ext/standard/ModuleRegistry.php`
@@ -8756,6 +8760,20 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - new ArgumentCountError (line 29)
 - 2 class method(s)
+
+### `ext/standard/date_create.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 33)
+- 2 class method(s)
+- 2 closure(s)
+
+### `ext/standard/date_create_immutable.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 33)
+- 2 class method(s)
+- 2 closure(s)
 
 ### `ext/standard/date_default_timezone_get.php`
 
@@ -17912,16 +17930,18 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new Variable (line 216)
 - new ObjectEntry (line 253)
 - new Variable (line 255)
-- new NativeDateInvalidTimeZoneException (line 264)
-- new NativeDateRangeError (line 272)
-- new NativeDateObjectError (line 278)
-- new NativeDateMalformedStringException (line 304)
-- new ObjectEntry (line 531)
-- new ObjectEntry (line 553)
-- new ObjectEntry (line 576)
-- new ObjectEntry (line 599)
-- new ObjectEntry (line 609)
-- 46 class method(s)
+- new ObjectEntry (line 289)
+- new Variable (line 302)
+- new NativeDateInvalidTimeZoneException (line 311)
+- new NativeDateRangeError (line 319)
+- new NativeDateObjectError (line 325)
+- new NativeDateMalformedStringException (line 351)
+- new ObjectEntry (line 578)
+- new ObjectEntry (line 600)
+- new ObjectEntry (line 623)
+- new ObjectEntry (line 646)
+- new ObjectEntry (line 656)
+- 49 class method(s)
 
 ### `lib/VM/DateTimeZoneSupport.php`
 
