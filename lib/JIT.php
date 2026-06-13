@@ -11878,6 +11878,14 @@ class JIT {
         if (!JIT\LateStaticBindingHelper::useRuntimeLateStatic($this->context)) {
             return;
         }
+        // Store call-site class before Internal early-out — get_called_class() reads phpc_late_static_class_id (#4255).
+        if (null !== $this->context->scope->lateStaticCallClassId) {
+            JIT\LateStaticBindingHelper::emitStoreClassId(
+                $this->context,
+                $this->context->constantFromInteger($this->context->scope->lateStaticCallClassId, 'int64')
+            );
+            $this->context->scope->lateStaticCallClassId = null;
+        }
         $toCall = $this->context->scope->toCall;
         if (
             $toCall instanceof CoreFunc\Internal
@@ -11885,15 +11893,6 @@ class JIT {
             || $toCall instanceof JIT\Call\ExternalMethod
             || $toCall instanceof JIT\Call\RuntimeIndirectInstanceMethodCall
         ) {
-            return;
-        }
-        if (null !== $this->context->scope->lateStaticCallClassId) {
-            JIT\LateStaticBindingHelper::emitStoreClassId(
-                $this->context,
-                $this->context->constantFromInteger($this->context->scope->lateStaticCallClassId, 'int64')
-            );
-            $this->context->scope->lateStaticCallClassId = null;
-
             return;
         }
         if ([] === $callArgs) {
