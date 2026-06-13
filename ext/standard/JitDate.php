@@ -285,4 +285,37 @@ final class JitDate
         );
     }
 
+    public static function formatStrftime(Context $context, bool $gmt, JITVariable ...$args): Value
+    {
+        $argc = \count($args);
+        $function = $gmt ? 'gmstrftime' : 'strftime';
+        if ($argc < 1) {
+            throw new \ArgumentCountError("{$function}() expects at least 1 argument, 0 given");
+        }
+        if ($argc > 2) {
+            throw new \ArgumentCountError("{$function}() expects at most 2 arguments, {$argc} given");
+        }
+        JitInternalStrictArg::requireString($context, $args[0], $function, 'format', 1);
+        $format = JitStringArg::lower($context, $args[0], "{$function}() argument #1 (format)");
+        $i64 = $context->getTypeFromString('int64');
+        $timestamp = $argc >= 2
+            ? JitDateTimestampArg::lowerNullable(
+                $context,
+                $args[1],
+                $gmt ? 'gmstrftime' : 'strftime',
+                2,
+                'timestamp',
+                self::time($context)
+            )
+            : self::time($context);
+        $gmtI8 = $context->getTypeFromString('int8')->constInt($gmt ? 1 : 0, false);
+
+        return $context->builder->call(
+            $context->lookupFunction('__compiler_strftime'),
+            $format,
+            $timestamp,
+            $gmtI8
+        );
+    }
+
 }

@@ -796,6 +796,8 @@ class Module extends ModuleAbstract
             new timezone_location_get(),
             new timezone_transitions_get(),
             new gmdate(),
+            new strftime(),
+            new gmstrftime(),
             new getdate(),
             new gmgetdate(),
             new gmmktime(),

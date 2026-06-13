@@ -275,6 +275,19 @@ final class VmDate
     }
 
     /**
+     * strftime() / gmstrftime() — locale time via libc strftime (ext/standard/datetime.c, #3692).
+     */
+    public static function strftime(string $format, ?int $timestamp = null): string
+    {
+        return self::libcStrftime($format, $timestamp ?? self::time(), false);
+    }
+
+    public static function gmstrftime(string $format, ?int $timestamp = null): string
+    {
+        return self::libcStrftime($format, $timestamp ?? self::time(), true);
+    }
+
+    /**
      * Coerce optional ?int timestamp for date()/gmdate()/getdate() family (php-src Z_PARAM_LONG_OR_NULL, #5842).
      *
      * @throws \TypeError when operand is not int|null (enum cases name the enum class, not backing int)
@@ -910,6 +923,30 @@ final class VmDate
         return ['sec' => (int) $tv->tv_sec, 'usec' => (int) $tv->tv_usec];
     }
 
+    private static function libcStrftime(string $format, int $timestamp, bool $gmt): string
+    {
+        $ffi = self::ffi();
+        if (null === $ffi) {
+            return '';
+        }
+        $tm = $gmt ? self::gmtime($timestamp) : self::localtime($timestamp);
+        if (null === $tm) {
+            return '';
+        }
+        $buf = $ffi->new('char['.self::FORMAT_OUT_BYTES.']');
+        $len = (int) $ffi->strftime(
+            \FFI::addr($buf[0]),
+            self::FORMAT_OUT_BYTES,
+            $format,
+            \FFI::addr($tm)
+        );
+        if ($len <= 0) {
+            return '';
+        }
+
+        return \FFI::string($buf, $len);
+    }
+
     private static function localtime(int $timestamp): ?\FFI\CData
     {
         $ffi = self::ffi();
@@ -1010,6 +1047,7 @@ final class VmDate
         }
         $cdef = <<<'CDEF'
 typedef long time_t;
+typedef unsigned long size_t;
 struct timeval {
     time_t tv_sec;
     long tv_usec;
@@ -1035,6 +1073,7 @@ struct tm *localtime_r(const time_t *timep, struct tm *result);
 struct tm *gmtime_r(const time_t *timep, struct tm *result);
 time_t timegm(struct tm *tm);
 time_t mktime(struct tm *tm);
+size_t strftime(char *s, size_t max, const char *format, const struct tm *tm);
 CDEF;
 
         foreach (['libc.so.6', 'libc.so'] as $lib) {
