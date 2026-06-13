@@ -11875,14 +11875,24 @@ restart:
                     throw new \TypeError('Illegal offset type');
                 }
                 VM\EnumCaseSupport::rejectIllegalArrayOffset($key);
+                $storeIndirect = $value->isIndirect();
                 if ($key->is(Variable::TYPE_INTEGER) || $key->is(Variable::TYPE_FLOAT)) {
-                    $ht->updateIndex($key->toInt(), $value);
+                    $storeIndirect
+                        ? $ht->updateIndirectIndex($key->toInt(), $value)
+                        : $ht->updateIndex($key->toInt(), $value);
                 } elseif ($key->is(Variable::TYPE_STRING)) {
-                    $ht->update($key->toString(), $value);
+                    $storeIndirect
+                        ? $ht->updateIndirect($key->toString(), $value)
+                        : $ht->update($key->toString(), $value);
                 } elseif ($key->is(Variable::TYPE_BOOLEAN)) {
-                    $ht->updateIndex($key->toBool() ? 1 : 0, $value);
+                    $index = $key->toBool() ? 1 : 0;
+                    $storeIndirect
+                        ? $ht->updateIndirectIndex($index, $value)
+                        : $ht->updateIndex($index, $value);
                 } elseif ($key->is(Variable::TYPE_NULL)) {
-                    $ht->update('', $value);
+                    $storeIndirect
+                        ? $ht->updateIndirect('', $value)
+                        : $ht->update('', $value);
                 } else {
                     throw new \TypeError('Illegal offset type');
                 }
