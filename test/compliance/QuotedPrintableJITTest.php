@@ -22,6 +22,10 @@ final class QuotedPrintableJITTest extends BaseTest
             __DIR__.'/cases/stdlib/quoted_printable_jit.phpt',
             'quoted_printable_jit.phpt'
         );
+        yield 'quoted_printable_type_jit.phpt' => self::parsePHPT(
+            __DIR__.'/cases/stdlib/quoted_printable_type_jit.phpt',
+            'quoted_printable_type_jit.phpt'
+        );
     }
 
     public function setUp(): void

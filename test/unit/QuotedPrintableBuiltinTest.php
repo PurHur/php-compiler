@@ -73,6 +73,24 @@ PHP,
     }
 
     /**
+     * Issue #4596: AOT compile-only verify for quoted_printable_* TypeError lowering.
+     *
+     * @group llvm
+     */
+    public function testAotCompileOnlyTypeErrorLowering(): void
+    {
+        if (!LlvmToolchain::isReady(dirname(__DIR__, 2))) {
+            $this->markTestSkipped('LLVM 9 toolchain not available');
+        }
+        $target = dirname(__DIR__, 2).'/test/fixtures/aot/compile-only/quoted_printable_type.php';
+        $this->assertFileExists($target);
+        $runtime = new Runtime();
+        $block = $runtime->parseAndCompile((string) file_get_contents($target), 'quoted_printable_type_jit_compile.php');
+        $runtime->jitCompileBlock($block);
+        $this->addToAssertionCount(1);
+    }
+
+    /**
      * @group llvm
      * @group jit
      */
