@@ -35,6 +35,8 @@ use PHPCompiler\VM\NamedArgs;
 use PHPCompiler\VM\ObjectEntry;
 use PHPCompiler\VM\ObjectLifetime;
 use PHPCompiler\VM\ObjectPropertyIterator;
+use PHPCompiler\VM\WeakMapIterator;
+use PHPCompiler\VM\WeakRefSupport;
 use PHPCompiler\VM\ReferencableCheck;
 use PHPCompiler\VM\ScriptExit;
 use PHPCompiler\VM\TypeCheck;
@@ -5413,6 +5415,7 @@ restart:
                     if ($this->variableIsGenerator($container)) {
                         unset($this->context->foreachObjectAdvance[$op->arg1]);
                         unset($this->context->objectPropertyIterators[$op->arg1]);
+                        unset($this->context->weakMapIterators[$op->arg1]);
                         $frame->iterators[$op->arg1] = $container;
                         $this->context->foreachIterators[$op->arg1] = $container;
                         $container->toObject()->generatorState->rewind();
@@ -5421,6 +5424,7 @@ restart:
                     if (Variable::TYPE_ARRAY === $container->type) {
                         unset($this->context->foreachObjectAdvance[$op->arg1]);
                         unset($this->context->objectPropertyIterators[$op->arg1]);
+                        unset($this->context->weakMapIterators[$op->arg1]);
                         $frame->iterators[$op->arg1] = $container;
                         $this->context->foreachIterators[$op->arg1] = $container;
                         $container->toArray()->iterReset();
@@ -5429,6 +5433,7 @@ restart:
                     if (Variable::TYPE_OBJECT === $container->type) {
                         try {
                             unset($this->context->objectPropertyIterators[$op->arg1]);
+                            unset($this->context->weakMapIterators[$op->arg1]);
                             $iterable = VM\ForeachIterator::resolveTraversableObject($this, $frame, $container);
                             $frame->iterators[$op->arg1] = $iterable;
                             $this->context->foreachIterators[$op->arg1] = $iterable;
@@ -5442,6 +5447,14 @@ restart:
                             break;
                         } catch (\TypeError) {
                             unset($this->context->foreachObjectAdvance[$op->arg1]);
+                            if (WeakRefSupport::isWeakMap($container->toObject())) {
+                                unset($this->context->objectPropertyIterators[$op->arg1]);
+                                unset($this->context->weakMapIterators[$op->arg1]);
+                                $iter = new WeakMapIterator($container->toObject());
+                                $iter->reset();
+                                $this->context->weakMapIterators[$op->arg1] = $iter;
+                                break;
+                            }
                             $iter = new ObjectPropertyIterator($container->toObject());
                             $iter->reset();
                             $this->context->objectPropertyIterators[$op->arg1] = $iter;
@@ -5451,6 +5464,7 @@ restart:
                     $this->warnForeachNonTraversable($container, $frame);
                     unset($this->context->foreachObjectAdvance[$op->arg1]);
                     unset($this->context->objectPropertyIterators[$op->arg1]);
+                    unset($this->context->weakMapIterators[$op->arg1]);
                     unset($this->context->foreachIterators[$op->arg1]);
                     unset($frame->iterators[$op->arg1]);
                     $this->context->foreachInvalidSlots[$op->arg1] = true;
@@ -5482,6 +5496,12 @@ restart:
                         break;
                     }
                     if (Variable::TYPE_OBJECT === $container->type) {
+                        if ($this->isWeakMapForeachSlot((int) $op->arg2)) {
+                            $frame->scope[$op->arg1]->bool(
+                                $this->weakMapForeachIterator($op->arg2)->valid()
+                            );
+                            break;
+                        }
                         $frame->scope[$op->arg1]->bool(
                             $this->objectForeachIterator($op->arg2)->valid()
                         );
@@ -5509,6 +5529,12 @@ restart:
                         break;
                     }
                     if (Variable::TYPE_OBJECT === $container->type) {
+                        if ($this->isWeakMapForeachSlot((int) $op->arg2)) {
+                            $frame->scope[$op->arg1]->copyFrom(
+                                $this->weakMapForeachIterator($op->arg2)->currentKey()
+                            );
+                            break;
+                        }
                         $frame->scope[$op->arg1]->copyFrom(
                             $this->objectForeachIterator($op->arg2)->currentKey()
                         );
@@ -5560,6 +5586,16 @@ restart:
                     }
                     if (Variable::TYPE_OBJECT === $container->type) {
                         $byRef = (bool) $op->arg3;
+                        if ($this->isWeakMapForeachSlot((int) $op->arg2)) {
+                            $iter = $this->weakMapForeachIterator($op->arg2);
+                            if ($byRef) {
+                                $frame->scope[$op->arg1]->indirect($iter->currentValue(true));
+                                $this->markScopeSlotInitialized($frame, (int) $op->arg1);
+                            } else {
+                                $frame->scope[$op->arg1]->assignForeachByValue($iter->currentValue(false));
+                            }
+                            break;
+                        }
                         if ($byRef) {
                             $frame->scope[$op->arg1]->indirect(
                                 $this->objectForeachIterator($op->arg2)->currentValue(true)
@@ -9234,6 +9270,20 @@ restart:
         }
 
         return $this->context->objectPropertyIterators[$slot];
+    }
+
+    private function weakMapForeachIterator(int $slot): WeakMapIterator
+    {
+        if (!isset($this->context->weakMapIterators[$slot])) {
+            throw new \LogicException('WeakMap foreach iterator not initialized');
+        }
+
+        return $this->context->weakMapIterators[$slot];
+    }
+
+    private function isWeakMapForeachSlot(int $slot): bool
+    {
+        return isset($this->context->weakMapIterators[$slot]);
     }
 
     private function isForeachObjectIteratorSlot(int $slot): bool

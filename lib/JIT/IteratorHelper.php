@@ -383,6 +383,9 @@ final class IteratorHelper
         if (self::usesObjectKeys($containerUserType)) {
             return self::compileKeyObject($context, $slotKey);
         }
+        if (self::usesWeakMapHashtable($containerUserType)) {
+            return self::compileKeyWeakMap($context, $array, $slotKey);
+        }
 
         return self::compileKeyHashtable($context, $array, $slotKey);
     }
@@ -436,6 +439,30 @@ final class IteratorHelper
         );
         $context->builder->branch($done);
         $context->builder->positionAtEnd($done);
+
+        return new Variable($context, Variable::TYPE_VALUE, Variable::KIND_VARIABLE, $slot);
+    }
+
+    private static function compileKeyWeakMap(Context $context, Variable $array, Variable $slotKey): Variable
+    {
+        Builtin\WeakRefRuntime::ensureLinked($context);
+        Builtin\WeakRefNative::registerDeclarations($context);
+
+        $ht = $context->helper->loadValue($array);
+        $map = $context->structFieldMap['__hashtable__'];
+        $nodeMap = $context->structFieldMap['__strkey_node__'];
+        $node = self::stringKeyNodeAt($context, $ht, $map, $nodeMap, $slotKey);
+        $keyStr = $context->builder->load($context->builder->structGep($node, $nodeMap['key']));
+        $obj = $context->builder->call(
+            $context->lookupFunction('phpc_weakref_map_key_to_object'),
+            $keyStr
+        );
+        $slot = JitValueBox::alloc($context);
+        $context->builder->call(
+            $context->lookupFunction('__value__writeObject'),
+            JitValueBox::pointer($context, $slot),
+            $obj
+        );
 
         return new Variable($context, Variable::TYPE_VALUE, Variable::KIND_VARIABLE, $slot);
     }

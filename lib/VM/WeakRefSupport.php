@@ -102,6 +102,30 @@ final class WeakRefSupport
         return 'o:'.self::requireWeakMapKey($key)->toObject()->id;
     }
 
+    /** Resolve WeakMap backing string key (o:<id>) to a live object Variable, or null if stale (#4434). */
+    public static function resolveMapKeyVariable(string $storedKey): ?Variable
+    {
+        if (!str_starts_with($storedKey, 'o:')) {
+            return null;
+        }
+        $rest = substr($storedKey, 2);
+        if ('' === $rest || !ctype_digit($rest)) {
+            return null;
+        }
+        $id = (int) $rest;
+        if (!ObjectRegistry::isRegistered($id)) {
+            return null;
+        }
+        $entry = ObjectRegistry::find($id);
+        if (null === $entry) {
+            return null;
+        }
+        $key = new Variable(Variable::TYPE_OBJECT);
+        $key->object($entry);
+
+        return $key;
+    }
+
     public static function targetSlot(ObjectEntry $weakRef): Variable
     {
         return $weakRef->getProperty(self::TARGET_PROPERTY);
