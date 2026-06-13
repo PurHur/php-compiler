@@ -233,6 +233,98 @@ final class VmMbstring
         return VmString::utf8CharSubstr($string, $start, $length);
     }
 
+    /**
+     * mb_strcut() — byte-oriented slice aligned to character boundaries (php-src mb_strcut; #4573).
+     *
+     * $from and $length are measured in bytes (not codepoints, unlike mb_substr).
+     */
+    public static function strcut(
+        string $string,
+        int $from,
+        ?int $length = null,
+        string $encoding = 'UTF-8'
+    ): string {
+        self::assertSubstrCountEncoding($encoding, 'mb_strcut');
+        $byteLen = VmString::byteLength($string);
+        if (null === $length) {
+            $length = $byteLen;
+        }
+        if ($from < 0) {
+            $from = $byteLen + $from;
+            if ($from < 0) {
+                $from = 0;
+            }
+        }
+        if ($length < 0) {
+            $length = ($byteLen - $from) + $length;
+            if ($length < 0) {
+                $length = 0;
+            }
+        }
+        if ($from > $byteLen || 0 === $length) {
+            return '';
+        }
+        if ('ASCII' === $encoding || '8BIT' === $encoding) {
+            if ($length > $byteLen - $from) {
+                $length = $byteLen - $from;
+            }
+
+            return VmString::byteSlice($string, $from, $length);
+        }
+
+        return self::utf8ByteSafeCut($string, $from, $length);
+    }
+
+    /** UTF-8 byte cut with character-boundary alignment (php-src ext/mbstring/mbstring.c mb_strcut). */
+    private static function utf8ByteSafeCut(string $string, int $from, int $length): string
+    {
+        $byteLen = VmString::byteLength($string);
+        $start = self::utf8AlignByteStart($string, $from, $byteLen);
+        if ($start >= $byteLen) {
+            return '';
+        }
+        if ($length >= $byteLen - $start) {
+            return VmString::byteSlice($string, $start, $byteLen - $start);
+        }
+        $end = self::utf8AlignByteEnd($string, $start, $start + $length, $byteLen);
+
+        return VmString::byteSlice($string, $start, $end - $start);
+    }
+
+    private static function utf8AlignByteStart(string $string, int $from, int $byteLen): int
+    {
+        $p = 0;
+        $lastWidth = 1;
+        while ($p < $from && $p < $byteLen) {
+            $lastWidth = VmString::utf8CharByteWidth($string, $p);
+            $p += $lastWidth;
+        }
+        if ($p > $from) {
+            $p -= $lastWidth;
+        }
+
+        return $p;
+    }
+
+    private static function utf8AlignByteEnd(
+        string $string,
+        int $start,
+        int $target,
+        int $byteLen
+    ): int {
+        $p = $start;
+        $lastWidth = 1;
+        while ($p < $target && $p < $byteLen) {
+            $lastWidth = VmString::utf8CharByteWidth($string, $p);
+            $p += $lastWidth;
+        }
+        if ($p > $target) {
+            $p -= $lastWidth;
+        }
+
+        return $p;
+    }
+
     public static function strtolower(string $string, string $encoding = 'UTF-8'): string
     {
         return self::convertCase($string, MbstringConstants::MB_CASE_LOWER, $encoding);

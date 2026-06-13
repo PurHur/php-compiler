@@ -33,6 +33,7 @@ class Module extends ModuleAbstract
             new mb_check_encoding(),
             new mb_strlen(),
             new mb_substr(),
+            new mb_strcut(),
             new mb_substr_count(),
             new mb_strpos(),
             new mb_strtolower(),
