@@ -42,6 +42,6 @@ class session_decode extends Internal
             throw new \LogicException('session_decode() expects exactly 1 argument in this compiler build');
         }
 
-        throw new \LogicException('session_decode() not implemented for JIT');
+        return JitSessionDecode::invoke($context, ...$args);
     }
 }

@@ -42,6 +42,6 @@ class session_encode extends Internal
             throw new \LogicException('session_encode() expects exactly 0 arguments in this compiler build');
         }
 
-        throw new \LogicException('session_encode() not implemented for JIT');
+        return JitSessionEncode::invoke($context, ...$args);
     }
 }
