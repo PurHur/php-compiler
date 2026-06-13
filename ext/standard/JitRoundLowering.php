@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace PHPCompiler\ext\standard;
 
 use PHPCompiler\JIT\BasicBlockHelper;
-use PHPCompiler\JIT\Builtin\TypeErrorRaise;
 use PHPCompiler\JIT\Context;
 use PHPLLVM\Builder;
 use PHPLLVM\Value;
@@ -23,8 +22,6 @@ final class JitRoundLowering
 
     public static function lower(Context $context, Value $value, Value $precision, Value $mode): Value
     {
-        self::ensureModeValid($context, $mode);
-
         $f64 = $context->getTypeFromString('double');
         $i32 = $context->getTypeFromString('int32');
         $i64 = $context->getTypeFromString('int64');
@@ -154,29 +151,6 @@ final class JitRoundLowering
         $outPhi->addIncoming($resultPhi, $mainEnd);
 
         return $outPhi;
-    }
-
-    private static function ensureModeValid(Context $context, Value $mode): void
-    {
-        $i64 = $context->getTypeFromString('int64');
-        $min = $i64->constInt(StdlibConstants::PHP_ROUND_HALF_UP, false);
-        $max = $i64->constInt(StdlibConstants::PHP_ROUND_AWAY_FROM_ZERO, false);
-        $valid = $context->builder->and(
-            $context->builder->icmp(Builder::INT_SGE, $mode, $min),
-            $context->builder->icmp(Builder::INT_SLE, $mode, $max)
-        );
-        $okBlock = BasicBlockHelper::append($context, 'round_mode_ok');
-        $errBlock = BasicBlockHelper::append($context, 'round_mode_err');
-        $context->builder->branchIf($valid, $okBlock, $errBlock);
-        $context->builder->positionAtEnd($errBlock);
-        TypeErrorRaise::registerDeclarations($context);
-        TypeErrorRaise::ensureLinked($context);
-        TypeErrorRaise::emitValueError(
-            $context,
-            'round(): Argument #3 ($mode) must be a valid rounding mode'
-        );
-        $context->builder->call($context->lookupFunction('abort'));
-        $context->builder->positionAtEnd($okBlock);
     }
 
     private static function clampPlaces(Context $context, Value $precision): Value
@@ -333,9 +307,8 @@ final class JitRoundLowering
         $defaultBlock = BasicBlockHelper::append($context, 'round_mode_default');
         $context->builder->branchIf($isAway, $awayBlock, $defaultBlock);
         $context->builder->positionAtEnd($defaultBlock);
-        $defaultResult = $integral;
-        $defaultEnd = $context->builder->getInsertBlock();
-        $context->builder->branch($merge);
+        // php-src 8.2: unrecognized mode ints use PHP_ROUND_HALF_UP.
+        $context->builder->branch($upBlock);
 
         $context->builder->positionAtEnd($upBlock);
         $upGe = $context->builder->fcmp(Builder::REAL_OGE, $valueAbs, $edgeCase);
@@ -403,7 +376,6 @@ final class JitRoundLowering
         $phi->addIncoming($floorResult, $floorEnd);
         $phi->addIncoming($towardResult, $towardEnd);
         $phi->addIncoming($awayResult, $awayEnd);
-        $phi->addIncoming($defaultResult, $defaultEnd);
 
         return $phi;
     }
