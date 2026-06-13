@@ -50,6 +50,9 @@ final class VmStatCache
         if (null === $filename) {
             self::$stat = [];
             self::$lstat = [];
+            if ($clearRealpath) {
+                VmRealpathCache::clear();
+            }
 
             return;
         }
@@ -59,6 +62,10 @@ final class VmStatCache
             $resolved = VmStatNative::realpath($filename);
             if (false !== $resolved) {
                 unset(self::$stat[$resolved], self::$lstat[$resolved]);
+            }
+            VmRealpathCache::remove($filename);
+            if (false !== $resolved) {
+                VmRealpathCache::remove($resolved);
             }
         }
     }
@@ -72,5 +79,6 @@ final class VmStatCache
     {
         self::$stat = [];
         self::$lstat = [];
+        VmRealpathCache::reset();
     }
 }
