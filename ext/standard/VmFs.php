@@ -612,6 +612,14 @@ final class VmFs
 
             return VmUserStream::open($ctx->runtime->vm, $ctx, $path, $mode);
         }
+        if (VmFsStdio::isStdioUri($path)) {
+            $fp = VmFsStdio::open($path, $mode);
+            if (false === $fp) {
+                return false;
+            }
+
+            return self::adoptStreamResource($fp, $path);
+        }
         $fp = @fopen($path, $mode);
         if (false === $fp) {
             return false;
