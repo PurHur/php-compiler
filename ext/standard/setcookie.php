@@ -19,6 +19,8 @@ use PHPLLVM\Value;
 
 /**
  * setcookie() — emit Set-Cookie response header (VM ResponseContext + JIT pending queue; issue #63, #1170).
+ *
+ * VM uses ResponseContext only — no host Zend setcookie() delegation (bootstrap/M5; #5344 phase 3).
  */
 final class setcookie extends Internal
 {
@@ -30,15 +32,6 @@ final class setcookie extends Internal
     public function execute(Frame $frame): void
     {
         $parsed = self::parseArgs($frame->calledArgs);
-        $ok = \setcookie(
-            $parsed['name'],
-            $parsed['value'],
-            $parsed['expires'],
-            $parsed['path'],
-            $parsed['domain'],
-            $parsed['secure'],
-            $parsed['httponly']
-        );
         ResponseContext::addHeader(SetcookieLine::build(
             $parsed['name'],
             $parsed['value'],
@@ -49,7 +42,7 @@ final class setcookie extends Internal
             $parsed['httponly']
         ), false);
         if (null !== $frame->returnVar) {
-            $frame->returnVar->bool($ok);
+            $frame->returnVar->bool(true);
         }
     }
 
