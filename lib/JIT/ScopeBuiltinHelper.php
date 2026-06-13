@@ -930,6 +930,54 @@ final class ScopeBuiltinHelper
         return self::wrapHashTableValue($context, $ht);
     }
 
+    /**
+     * get_declared_variables() — export names of set locals in the current scope (issue #4780).
+     */
+    public static function getDeclaredVariables(Context $context): Value
+    {
+        $named = self::namedVariablesForDefinedVars($context);
+        $ht = HashTableHelper::alloc($context);
+        if ([] === $named) {
+            return self::wrapHashTableValue($context, $ht);
+        }
+
+        $sizeT = $context->getTypeFromString('size_t');
+        $idxSlot = $context->builder->alloca($sizeT, 1, 'gdlv_idx');
+        $context->builder->store($sizeT->constInt(0, false), $idxSlot);
+        $setStringAt = $context->lookupFunction('__hashtable__setStringAt');
+
+        $tag = 'gdlv'.(string) ++self::$blockSeq;
+        $done = BasicBlockHelper::append($context, 'gdlv_done_'.$tag);
+        $first = $context->builder->getInsertBlock();
+        $blocks = [$first];
+        $names = array_keys($named);
+        $n = \count($names);
+        for ($i = 1; $i < $n; ++$i) {
+            $blocks[$i] = BasicBlockHelper::append($context, 'gdlv_check_'.$tag.'_'.$i);
+        }
+
+        foreach ($names as $i => $name) {
+            $dest = $named[$name];
+            $context->builder->positionAtEnd($blocks[$i]);
+            $isSet = IssetHelper::compile($context, $dest, null);
+            $storeBlock = BasicBlockHelper::append($context, 'gdlv_store_'.$tag.'_'.$i);
+            $nextBlock = ($i < $n - 1) ? $blocks[$i + 1] : $done;
+            $context->builder->branchIf($isSet, $storeBlock, $nextBlock);
+
+            $context->builder->positionAtEnd($storeBlock);
+            $idx = $context->builder->load($idxSlot);
+            $nameStr = $context->builder->load($context->constantStringFromString($name));
+            $context->builder->call($setStringAt, $ht, $idx, $nameStr);
+            $one = $sizeT->constInt(1, false);
+            $context->builder->store($context->builder->addNoSignedWrap($idx, $one), $idxSlot);
+            $context->builder->branch($nextBlock);
+        }
+
+        $context->builder->positionAtEnd($done);
+
+        return self::wrapHashTableValue($context, $ht);
+    }
+
     private static function storeDefinedVarAtStringKey(
         Context $context,
         Value $ht,

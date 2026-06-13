@@ -640,6 +640,7 @@ class Module extends ModuleAbstract
             new class_constants_(),
             new get_defined_constants_(),
             new get_defined_vars_(),
+            new get_declared_variables_(),
             new get_declared_interfaces_(),
             new get_declared_classes_(),
             new get_declared_traits_(),
