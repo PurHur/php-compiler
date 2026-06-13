@@ -18,6 +18,7 @@ class Module extends ModuleAbstract
     public function init(Runtime $runtime): void
     {
         parent::init($runtime);
+        BuiltinClasses::register($runtime->vmContext);
         foreach ([
             'OPENSSL_RAW_DATA' => OpensslConstants::OPENSSL_RAW_DATA,
             'OPENSSL_ZERO_PADDING' => OpensslConstants::OPENSSL_ZERO_PADDING,
@@ -40,6 +41,8 @@ class Module extends ModuleAbstract
             new openssl_cipher_iv_length(),
             new openssl_cipher_key_length(),
             new openssl_digest(),
+            new openssl_x509_read(),
+            new openssl_free_key(),
         ];
     }
 }
