@@ -138,38 +138,39 @@ final class filter_input extends Internal
         $badTypeBlock = BasicBlockHelper::append($context, 'filter_input_bad_type_'.$id);
         $doneBlock = BasicBlockHelper::append($context, 'filter_input_type_done_'.$id);
 
+        $cookieBodyBlock = BasicBlockHelper::append($context, 'filter_input_cookie_body_'.$id);
+        $envBodyBlock = BasicBlockHelper::append($context, 'filter_input_env_body_'.$id);
+        $serverBodyBlock = BasicBlockHelper::append($context, 'filter_input_server_body_'.$id);
+        $sessionBodyBlock = BasicBlockHelper::append($context, 'filter_input_session_body_'.$id);
+
         $context->builder->branchIf($isGet, $getBlock, $pickPostBlock);
         $context->builder->positionAtEnd($pickPostBlock);
         $context->builder->branchIf($isPost, $postBlock, $cookieBlock);
 
         $context->builder->positionAtEnd($cookieBlock);
-        $context->builder->branchIf($isCookie, $cookieBlock.'_body', $envBlock);
-        $cookieBody = BasicBlockHelper::append($context, $cookieBlock.'_body');
-        $context->builder->positionAtEnd($cookieBody);
+        $context->builder->branchIf($isCookie, $cookieBodyBlock, $envBlock);
+        $context->builder->positionAtEnd($cookieBodyBlock);
         $cookieResult = self::filterFromSuperglobal($context, '_COOKIE', $keyVar, $args[2]);
         $cookieTail = $context->builder->getInsertBlock();
         $context->builder->branch($doneBlock);
 
         $context->builder->positionAtEnd($envBlock);
-        $context->builder->branchIf($isEnv, $envBlock.'_body', $serverBlock);
-        $envBody = BasicBlockHelper::append($context, $envBlock.'_body');
-        $context->builder->positionAtEnd($envBody);
+        $context->builder->branchIf($isEnv, $envBodyBlock, $serverBlock);
+        $context->builder->positionAtEnd($envBodyBlock);
         $envResult = self::filterFromSuperglobal($context, '_ENV', $keyVar, $args[2]);
         $envTail = $context->builder->getInsertBlock();
         $context->builder->branch($doneBlock);
 
         $context->builder->positionAtEnd($serverBlock);
-        $context->builder->branchIf($isServer, $serverBlock.'_body', $sessionBlock);
-        $serverBody = BasicBlockHelper::append($context, $serverBlock.'_body');
-        $context->builder->positionAtEnd($serverBody);
+        $context->builder->branchIf($isServer, $serverBodyBlock, $sessionBlock);
+        $context->builder->positionAtEnd($serverBodyBlock);
         $serverResult = self::filterFromSuperglobal($context, '_SERVER', $keyVar, $args[2]);
         $serverTail = $context->builder->getInsertBlock();
         $context->builder->branch($doneBlock);
 
         $context->builder->positionAtEnd($sessionBlock);
-        $context->builder->branchIf($isSession, $sessionBlock.'_body', $badTypeBlock);
-        $sessionBody = BasicBlockHelper::append($context, $sessionBlock.'_body');
-        $context->builder->positionAtEnd($sessionBody);
+        $context->builder->branchIf($isSession, $sessionBodyBlock, $badTypeBlock);
+        $context->builder->positionAtEnd($sessionBodyBlock);
         $sessionResult = self::filterFromSuperglobal($context, '_SESSION', $keyVar, $args[2]);
         $sessionTail = $context->builder->getInsertBlock();
         $context->builder->branch($doneBlock);

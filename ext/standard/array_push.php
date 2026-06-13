@@ -64,12 +64,29 @@ final class array_push extends Internal
             return $context->constantFromInteger(0, 'int64');
         }
         $values = \array_slice($args, 1);
+        if (JITVariable::TYPE_VALUE === $array->type) {
+            return JitArrayPush::pushWithValueBoxGuard(
+                $context,
+                $array,
+                $values,
+                function (Context $context, JITVariable $array, array $values): Value {
+                    foreach ($values as $i => $arg) {
+                        if (JITVariable::TYPE_STRING === $arg->type || JITVariable::TYPE_VALUE === $arg->type) {
+                            $this->jitString($context, $arg, 'array_push() argument #'.((int) $i + 2));
+                        }
+                    }
+
+                    return ArrayBuiltinHelper::push($context, $array, ...$values);
+                }
+            );
+        }
 
         foreach ($values as $i => $arg) {
             if (JITVariable::TYPE_STRING === $arg->type || JITVariable::TYPE_VALUE === $arg->type) {
                 $this->jitString($context, $arg, 'array_push() argument #'.((int) $i + 1));
             }
         }
+
         return ArrayBuiltinHelper::push($context, $array, ...$values);
     }
 }
