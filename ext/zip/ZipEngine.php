@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace PHPCompiler\ext\zip;
 
+use PHPCompiler\ext\standard\VmFsReadNative;
+
 /**
  * Pure-PHP ZIP store/unstore engine (php-src ext/zip/php_zip.c subset; issue #6414).
  *
@@ -25,7 +27,7 @@ final class ZipEngine
         if (!is_file($path)) {
             return ['ok' => false, 'code' => ZipArchiveConstants::ER_NOENT];
         }
-        $data = @file_get_contents($path);
+        $data = VmFsReadNative::read($path);
         if (false === $data) {
             return ['ok' => false, 'code' => ZipArchiveConstants::ER_READ];
         }

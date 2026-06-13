@@ -10,6 +10,14 @@ use PHPUnit\Framework\TestCase;
 /** VmSockets libc sockatmark FFI without host socket_atmark() delegation (#7998, #8176, #6544). */
 final class VmSocketsRuntimeShrinkTest extends TestCase
 {
+    public function testEnumerateSocketFdsUsesNativeReadlink(): void
+    {
+        $source = (string) file_get_contents(__DIR__.'/../../ext/sockets/VmSockets.php');
+        $this->assertStringContainsString('VmFsPathNative::readlink', $source);
+        $this->assertDoesNotMatchRegularExpression('/@readlink\\s*\\(/', $source);
+        $this->assertDoesNotMatchRegularExpression('/@\\\\readlink\\s*\\(/', $source);
+    }
+
     public function testAtmarkUsesLibcFfiOnlyWithoutHostDelegation(): void
     {
         $source = (string) file_get_contents(__DIR__.'/../../ext/sockets/VmSockets.php');

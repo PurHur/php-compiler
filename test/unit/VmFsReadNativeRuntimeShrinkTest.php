@@ -86,6 +86,8 @@ final class VmFsReadNativeRuntimeShrinkTest extends TestCase
             'ext/standard/VmIptc.php',
             'ext/standard/VmSession.php',
             'ext/standard/VmParseIni.php',
+            'ext/zip/ZipEngine.php',
+            'ext/zip/VmZipArchive.php',
         ];
     }
 

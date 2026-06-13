@@ -10,6 +10,7 @@ use PHPCompiler\VM\ClassProperty;
 use PHPCompiler\VM\Context;
 use PHPCompiler\VM\EnumCaseSupport;
 use PHPCompiler\VM\ObjectEntry;
+use PHPCompiler\ext\standard\VmFsReadNative;
 use PHPCompiler\VM\Variable;
 
 /**
@@ -247,7 +248,7 @@ final class VmZipArchive
 
             return false;
         }
-        $data = @file_get_contents($filepath);
+        $data = VmFsReadNative::read($filepath);
         if (false === $data) {
             self::setStatus($entry, $state, ZipArchiveConstants::ER_READ);
 

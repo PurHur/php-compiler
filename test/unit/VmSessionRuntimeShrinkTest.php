@@ -34,6 +34,14 @@ final class VmSessionRuntimeShrinkTest extends TestCase
         parent::tearDown();
     }
 
+    public function testLoadSessionDoesNotReferenceHostUnserialize(): void
+    {
+        $source = (string) file_get_contents(__DIR__.'/../../ext/standard/VmSession.php');
+        $this->assertStringContainsString('VmUnserializeFormat::decodePayload', $source);
+        $this->assertDoesNotMatchRegularExpression('/@\\\\unserialize\\s*\\(/', $source);
+        $this->assertDoesNotMatchRegularExpression('/(?<!\\\\)unserialize\\s*\\(/', $source);
+    }
+
     public function testGcExpiredFilesDoesNotReferenceHostIniGet(): void
     {
         $source = (string) file_get_contents(__DIR__.'/../../ext/standard/VmSession.php');
