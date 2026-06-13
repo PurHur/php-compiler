@@ -138,6 +138,44 @@ final class ResourceSupport
             || self::isProcessResource($var);
     }
 
+    /** php-src ext/standard/type.c — gettype()/get_debug_type() on stale resource zvals (#5147). */
+    public static function isClosedVmResource(Variable $var): bool
+    {
+        if (!self::isVmResource($var)) {
+            return false;
+        }
+        if (self::isStreamResource($var)) {
+            return !self::isOpenStreamResource($var);
+        }
+        if (self::isDirResource($var)) {
+            $handle = self::resolveHandle($var);
+
+            return null === $handle || !VmDir::isValidHandle($handle);
+        }
+        if (self::isBrigadeResource($var)) {
+            $handle = self::resolveHandle($var);
+
+            return null === $handle || !VmStreamBucket::isValidBrigade($handle);
+        }
+        if (self::isBucketResource($var)) {
+            $handle = self::resolveHandle($var);
+
+            return null === $handle || !VmStreamBucket::isValidBucket($handle);
+        }
+        if (self::isStreamFilterResource($var)) {
+            $handle = self::resolveHandle($var);
+
+            return null === $handle || !VmStreamFilterChain::isValidFilter($handle);
+        }
+        if (self::isProcessResource($var)) {
+            $handle = self::resolveHandle($var);
+
+            return null === $handle || !VmProcess::isValidHandle($handle);
+        }
+
+        return false;
+    }
+
     public static function resolveHandle(Variable $var): ?int
     {
         $state = self::stateFromVariable($var);
@@ -154,6 +192,9 @@ final class ResourceSupport
 
     public static function debugTypeName(Variable $var): ?string
     {
+        if (self::isClosedVmResource($var)) {
+            return 'resource (closed)';
+        }
         if (self::isStreamResource($var)) {
             $handle = self::resolveHandle($var);
             if (null === $handle) {

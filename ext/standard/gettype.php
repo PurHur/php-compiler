@@ -16,6 +16,7 @@ use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitLongArg;
 use PHPCompiler\JIT\Variable as JITVariable;
+use PHPCompiler\VM\ResourceSupport;
 use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
 
@@ -45,7 +46,9 @@ final class gettype extends Internal
             return;
         }
         if ($v->isVmResource()) {
-            $frame->returnVar->string('resource');
+            $frame->returnVar->string(
+                ResourceSupport::isClosedVmResource($v) ? 'resource (closed)' : 'resource'
+            );
 
             return;
         }
