@@ -155,6 +155,17 @@ final class StdlibConstants
 
     public const STREAM_SERVER_LISTEN = 8;
 
+    /** stream_socket_pair() domain/type/protocol (ext/standard/streams.c, #3437). */
+    public const STREAM_PF_UNIX = 1;
+
+    public const STREAM_PF_INET = 2;
+
+    public const STREAM_SOCK_STREAM = 1;
+
+    public const STREAM_SOCK_DGRAM = 2;
+
+    public const STREAM_IPPROTO_IP = 0;
+
     /** syslog priorities (syslog.h; ext/standard/basic_functions.c). */
     public const LOG_EMERG = 0;
     public const LOG_ALERT = 1;
@@ -265,6 +276,11 @@ final class StdlibConstants
         'stream_client_connect' => self::STREAM_CLIENT_CONNECT,
         'stream_server_bind' => self::STREAM_SERVER_BIND,
         'stream_server_listen' => self::STREAM_SERVER_LISTEN,
+        'stream_pf_unix' => self::STREAM_PF_UNIX,
+        'stream_pf_inet' => self::STREAM_PF_INET,
+        'stream_sock_stream' => self::STREAM_SOCK_STREAM,
+        'stream_sock_dgram' => self::STREAM_SOCK_DGRAM,
+        'stream_iproto_ip' => self::STREAM_IPPROTO_IP,
         'sunfuncs_ret_string' => VmDate::SUNFUNCS_RET_STRING,
         'sunfuncs_ret_double' => VmDate::SUNFUNCS_RET_DOUBLE,
         'sunfuncs_ret_timestamp' => VmDate::SUNFUNCS_RET_TIMESTAMP,
