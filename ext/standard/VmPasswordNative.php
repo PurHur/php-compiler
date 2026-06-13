@@ -17,6 +17,10 @@ final class VmPasswordNative
 
     private const PASSWORD_BCRYPT = 1;
 
+    private const PASSWORD_ARGON2I = 2;
+
+    private const PASSWORD_ARGON2ID = 3;
+
     private const BCRYPT_DEFAULT_COST = 10;
 
     private const BCRYPT_MIN_COST = 4;
@@ -35,8 +39,16 @@ final class VmPasswordNative
     /**
      * @param array<string, mixed> $options
      */
+    public static function argon2Available(): bool
+    {
+        return \defined('PASSWORD_ARGON2ID') && \function_exists('password_hash');
+    }
+
     public static function passwordHash(string $password, int $algo, array $options = []): string|false
     {
+        if (self::PASSWORD_ARGON2I === $algo || self::PASSWORD_ARGON2ID === $algo) {
+            return self::hostPasswordHash($password, $algo, $options);
+        }
         if ($algo !== self::PASSWORD_BCRYPT && $algo !== VmPassword::PASSWORD_DEFAULT) {
             return false;
         }
@@ -68,6 +80,9 @@ final class VmPasswordNative
 
     public static function passwordVerify(string $password, string $hash): bool
     {
+        if (str_starts_with($hash, '$argon2')) {
+            return self::hostPasswordVerify($password, $hash);
+        }
         if (\strlen($hash) < 29 || !str_starts_with($hash, '$2y$')) {
             return false;
         }
@@ -101,7 +116,40 @@ final class VmPasswordNative
     /** @return list<string> */
     public static function passwordAlgos(): array
     {
-        return ['2y'];
+        $algos = ['2y'];
+        if (self::argon2Available()) {
+            $algos[] = 'argon2i';
+            $algos[] = 'argon2id';
+        }
+
+        return $algos;
+    }
+
+    /** @param array<string, mixed> $options */
+    private static function hostPasswordHash(string $password, int $algo, array $options): string|false
+    {
+        if (!self::argon2Available()) {
+            return false;
+        }
+        try {
+            $result = \password_hash($password, $algo, $options);
+        } catch (\Throwable) {
+            return false;
+        }
+
+        return \is_string($result) ? $result : false;
+    }
+
+    private static function hostPasswordVerify(string $password, string $hash): bool
+    {
+        if (!self::argon2Available()) {
+            return false;
+        }
+        try {
+            return \password_verify($password, $hash);
+        } catch (\Throwable) {
+            return false;
+        }
     }
 
     /**

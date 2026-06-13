@@ -12,7 +12,7 @@ use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
 
-/** password_hash() — PASSWORD_DEFAULT / PASSWORD_BCRYPT; JIT/AOT via libcrypt (issue #172). */
+/** password_hash() — PASSWORD_DEFAULT / PASSWORD_BCRYPT / PASSWORD_ARGON2* (VM); JIT/AOT bcrypt via libcrypt (#172, #4149). */
 final class password_hash extends Internal
 {
     public function __construct()

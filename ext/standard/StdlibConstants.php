@@ -136,6 +136,10 @@ final class StdlibConstants
 
     public const PASSWORD_DEFAULT = VmPassword::PASSWORD_DEFAULT;
 
+    public const PASSWORD_ARGON2I = VmPassword::PASSWORD_ARGON2I;
+
+    public const PASSWORD_ARGON2ID = VmPassword::PASSWORD_ARGON2ID;
+
     /** assert_options() selectors (ext/standard/assert.c). */
     public const ASSERT_ACTIVE = 1;
     public const ASSERT_CALLBACK = 2;
@@ -377,6 +381,8 @@ final class StdlibConstants
         'dns_any' => self::DNS_ANY,
         'password_bcrypt' => self::PASSWORD_BCRYPT,
         'password_default' => self::PASSWORD_DEFAULT,
+        'password_argon2i' => self::PASSWORD_ARGON2I,
+        'password_argon2id' => self::PASSWORD_ARGON2ID,
         'assert_active' => self::ASSERT_ACTIVE,
         'assert_callback' => self::ASSERT_CALLBACK,
         'assert_bail' => self::ASSERT_BAIL,
@@ -515,6 +521,8 @@ final class StdlibConstants
         'glob_available_flags',
         'password_bcrypt',
         'password_default',
+        'password_argon2i',
+        'password_argon2id',
         'assert_active',
         'assert_callback',
         'assert_bail',
