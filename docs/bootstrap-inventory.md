@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 2460 |
-| Phase A inventory files (M2 ratio SSOT) | 2460 |
+| PHP files on vm.php path | 2462 |
+| Phase A inventory files (M2 ratio SSOT) | 2462 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 6659 |
+| Source constructs flagged (warnings) | 6661 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -747,6 +747,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/standard/VmPasswordNative.php` | 0 | 1 |
 | `ext/standard/VmPersistentSocket.php` | 0 | 1 |
 | `ext/standard/VmPhpCoreConstants.php` | 0 | 5 |
+| `ext/standard/VmPopenNative.php` | 0 | 1 |
 | `ext/standard/VmPreg.php` | 0 | 6 |
 | `ext/standard/VmPregNative.php` | 0 | 1 |
 | `ext/standard/VmPregReplaceCallback.php` | 0 | 1 |
@@ -767,6 +768,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/standard/VmSession.php` | 0 | 10 |
 | `ext/standard/VmSessionSerializer.php` | 0 | 3 |
 | `ext/standard/VmSettype.php` | 0 | 6 |
+| `ext/standard/VmShellExecNative.php` | 0 | 1 |
 | `ext/standard/VmSleep.php` | 0 | 1 |
 | `ext/standard/VmSleepNative.php` | 0 | 1 |
 | `ext/standard/VmSplAutoload.php` | 0 | 12 |
@@ -7043,18 +7045,18 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/VmFs.php`
 
 **Warnings** (review for bootstrap subset):
-- new HashTable (line 40)
-- new Variable (line 42)
-- new HashTable (line 57)
-- new Variable (line 59)
-- new HashTable (line 200)
-- new Variable (line 203)
+- new HashTable (line 43)
+- new Variable (line 45)
+- new HashTable (line 60)
+- new Variable (line 62)
+- new HashTable (line 203)
 - new Variable (line 206)
-- new HashTable (line 1011)
-- new Variable (line 1013)
-- new HashTable (line 1441)
-- new Variable (line 1444)
-- new Variable (line 1450)
+- new Variable (line 209)
+- new HashTable (line 1038)
+- new Variable (line 1040)
+- new HashTable (line 1468)
+- new Variable (line 1471)
+- new Variable (line 1477)
 - 103 class method(s)
 
 ### `ext/standard/VmFsAccessNative.php`
@@ -7482,6 +7484,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new Variable (line 141)
 - 4 class method(s)
 
+### `ext/standard/VmPopenNative.php`
+
+**Warnings** (review for bootstrap subset):
+- 6 class method(s)
+
 ### `ext/standard/VmPreg.php`
 
 **Warnings** (review for bootstrap subset):
@@ -7698,6 +7705,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new Variable (line 176)
 - new ObjectEntry (line 198)
 - 6 class method(s)
+
+### `ext/standard/VmShellExecNative.php`
+
+**Warnings** (review for bootstrap subset):
+- 1 class method(s)
 
 ### `ext/standard/VmSleep.php`
 
