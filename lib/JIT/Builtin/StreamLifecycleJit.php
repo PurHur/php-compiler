@@ -117,6 +117,7 @@ final class StreamLifecycleJit
         foreach ([
             ['__phpc_resolve_stream', $i8p, [$i64]],
             ['__compiler_is_dir_resource', $i32, [$i64]],
+            ['__compiler_is_process_resource', $i32, [$i64]],
             ['fclose', $i32, [$i8p]],
             ['pclose', $i32, [$i8p]],
             ['feof', $i32, [$i8p]],
@@ -193,16 +194,32 @@ final class StreamLifecycleJit
 
         $isDirRange = $context->builder->icmp(Builder::INT_SGE, $handle, $dirBase);
         $dirCheckBb = $fn->appendBasicBlock('is_res_dir_check');
-        $stdioBb = $fn->appendBasicBlock('is_res_stdio');
-        $context->builder->branchIf($isDirRange, $dirCheckBb, $stdioBb);
+        $processCheckBb = $fn->appendBasicBlock('is_res_process_check');
+        $context->builder->branchIf($isDirRange, $dirCheckBb, $processCheckBb);
 
         $context->builder->positionAtEnd($dirCheckBb);
         $isDir = $context->builder->call($context->lookupFunction('__compiler_is_dir_resource'), $handle);
         $dirOk = $context->builder->icmp(Builder::INT_NE, $isDir, $zeroI32);
         $dirTrueBb = $fn->appendBasicBlock('is_res_dir_true');
-        $context->builder->branchIf($dirOk, $dirTrueBb, $stdioBb);
+        $context->builder->branchIf($dirOk, $dirTrueBb, $processCheckBb);
 
         $context->builder->positionAtEnd($dirTrueBb);
+        $context->builder->returnValue($oneI32);
+
+        $context->builder->positionAtEnd($processCheckBb);
+        $processBase = $i64->constInt(ProcessOpenJit::PROCESS_HANDLE_BASE, false);
+        $isProcessRange = $context->builder->icmp(Builder::INT_SGE, $handle, $processBase);
+        $stdioBb = $fn->appendBasicBlock('is_res_stdio');
+        $processProbeBb = $fn->appendBasicBlock('is_res_process_probe');
+        $context->builder->branchIf($isProcessRange, $processProbeBb, $stdioBb);
+
+        $context->builder->positionAtEnd($processProbeBb);
+        $isProcess = $context->builder->call($context->lookupFunction('__compiler_is_process_resource'), $handle);
+        $processOk = $context->builder->icmp(Builder::INT_NE, $isProcess, $zeroI32);
+        $processTrueBb = $fn->appendBasicBlock('is_res_process_true');
+        $context->builder->branchIf($processOk, $processTrueBb, $stdioBb);
+
+        $context->builder->positionAtEnd($processTrueBb);
         $context->builder->returnValue($oneI32);
 
         $context->builder->positionAtEnd($stdioBb);

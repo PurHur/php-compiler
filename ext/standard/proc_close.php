@@ -12,9 +12,9 @@ use PHPCompiler\VM\ResourceSupport;
 use PHPLLVM\Value;
 
 /**
- * proc_close() — close proc_open() process (php-src ext/standard/proc_open.c; #3131).
+ * proc_close() — close proc_open() process (php-src ext/standard/proc_open.c; #3131, #6904).
  *
- * VM-only v1; JIT/AOT deferred.
+ * VM: {@see VmProcess::procClose()}; JIT/AOT: __compiler_proc_close.
  */
 final class proc_close extends Internal
 {
@@ -38,7 +38,11 @@ final class proc_close extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        throw new \LogicException('proc_close() is VM-only in this compiler build (issue #3131)');
+        if (1 !== \count($args)) {
+            throw new \LogicException('proc_close() requires exactly one argument in this compiler build');
+        }
+
+        return JitProcClose::invoke($context, $args[0]);
     }
 
     public static function requireProcessHandle(\PHPCompiler\VM\Variable $v, string $functionName): int

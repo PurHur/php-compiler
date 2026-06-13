@@ -104,9 +104,24 @@ final class StreamResourceJit
 
         $isRes = $context->builder->call($context->lookupFunction('__compiler_is_resource'), $handle);
         $isOpen = $context->builder->icmp(Builder::INT_NE, $isRes, $zeroI32);
-        $streamBb = $fn->appendBasicBlock('grt_stream');
+        $openBb = $fn->appendBasicBlock('grt_open');
         $closedBb = $fn->appendBasicBlock('grt_closed');
-        $context->builder->branchIf($isOpen, $streamBb, $closedBb);
+        $context->builder->branchIf($isOpen, $openBb, $closedBb);
+
+        $context->builder->positionAtEnd($openBb);
+        $isProcess = $context->builder->call($context->lookupFunction('__compiler_is_process_resource'), $handle);
+        $isProcessRes = $context->builder->icmp(Builder::INT_NE, $isProcess, $zeroI32);
+        $processBb = $fn->appendBasicBlock('grt_process');
+        $streamBb = $fn->appendBasicBlock('grt_stream');
+        $context->builder->branchIf($isProcessRes, $processBb, $streamBb);
+
+        $context->builder->positionAtEnd($processBb);
+        $processType = $context->builder->call(
+            $context->lookupFunction('__string__init'),
+            $i64->constInt(7, false),
+            self::literalCstr($context, 'process')
+        );
+        $context->builder->returnValue($processType);
 
         $context->builder->positionAtEnd($streamBb);
         $streamType = $context->builder->call(
@@ -265,6 +280,7 @@ final class StreamResourceJit
                 ['__hashtable__alloc', $htPtr, []],
                 ['__hashtable__setLongAt', $context->getTypeFromString('void'), [$htPtr, $sizeT, $i64]],
                 ['__compiler_is_resource', $i32, [$i64]],
+                ['__compiler_is_process_resource', $i32, [$i64]],
             ] as [$name, $ret, $params]
         ) {
             self::ensureExternal($context, $name, $context->context->functionType($ret, false, ...$params));
