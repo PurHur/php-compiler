@@ -589,6 +589,8 @@ class Module extends ModuleAbstract
             new pclose(),
             new proc_open(),
             new proc_close(),
+            new proc_get_status(),
+            new proc_terminate(),
             new stream_select(),
             new escapeshellarg(),
             new escapeshellcmd(),

@@ -116,6 +116,36 @@ final class VmProcess
     }
 
     /**
+     * proc_get_status() — inspect child process (php-src ext/standard/proc_open.c; #3740).
+     *
+     * @return array<string, mixed>|false
+     */
+    public static function procGetStatus(int $handle): array|false
+    {
+        $proc = self::$processHandles[$handle] ?? null;
+        if (null === $proc) {
+            return false;
+        }
+        $status = @\proc_get_status($proc);
+        if (!\is_array($status)) {
+            return false;
+        }
+
+        return $status;
+    }
+
+    /** proc_terminate() — signal child process (php-src ext/standard/proc_open.c; #3740). */
+    public static function procTerminate(int $handle, int $signal = 15): bool
+    {
+        $proc = self::$processHandles[$handle] ?? null;
+        if (null === $proc) {
+            return false;
+        }
+
+        return @\proc_terminate($proc, $signal);
+    }
+
+    /**
      * stream_select() — multiplex stream handles (php-src ext/standard/streams.c; #3131).
      *
      * @param list<resource> $read
