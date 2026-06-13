@@ -555,8 +555,16 @@ class JIT {
         }
 
         $norm = str_replace('\\', '/', $path);
+        if (!str_contains($norm, 'test/selfhost/') || !str_contains($norm, '/compile_driver.php')) {
+            return false;
+        }
+        $mainBlock = $this->m3CompileDriverMainBlock ?? $this->m3EmitTuMainBlock;
+        if (null === $mainBlock) {
+            return false;
+        }
+        $mainPath = str_replace('\\', '/', $mainBlock->scriptPath());
 
-        return str_contains($norm, 'test/selfhost/') && str_contains($norm, '/compile_driver.php');
+        return $mainPath === $norm || str_ends_with($mainPath, '/'.basename($norm));
     }
 
     private function isM3CompileDriverScriptMain(Block $block): bool
@@ -3628,6 +3636,11 @@ class JIT {
                 'PHPCompiler\\JIT\\M3EmitTuTrivialEchoAot::compileDriverSentinelBlock'
             );
             $this->registerM3EmitTuSidecarFromPath(
+                $repoRoot.'/test/selfhost/compiler_helloworld_smoke/main.php',
+                \PHPCompiler\JIT\M3EmitTuTrivialEchoAot::HELLOWORLD_SMOKE_MAIN_SIDECAR_REL,
+                'PHPCompiler\\JIT\\M3EmitTuTrivialEchoAot::helloworldSmokeMainSentinelBlock'
+            );
+            $this->registerM3EmitTuSidecarFromPath(
                 $repoRoot.'/test/selfhost/compiler_minimal/main.php',
                 \PHPCompiler\JIT\M3EmitTuTrivialEchoAot::COMPILER_MINIMAL_SIDECAR_REL,
                 'PHPCompiler\\JIT\\M3EmitTuTrivialEchoAot::compilerMinimalSentinelBlock'
@@ -3718,6 +3731,11 @@ class JIT {
                 $repoRoot.'/test/selfhost/compiler_helloworld_smoke/compile_driver.php',
                 \PHPCompiler\JIT\M3EmitTuTrivialEchoAot::COMPILE_DRIVER_SIDECAR_REL,
                 'PHPCompiler\\JIT\\M3EmitTuTrivialEchoAot::compileDriverSentinelBlock'
+            );
+            $this->registerM3EmitTuSidecarFromPath(
+                $repoRoot.'/test/selfhost/compiler_helloworld_smoke/main.php',
+                \PHPCompiler\JIT\M3EmitTuTrivialEchoAot::HELLOWORLD_SMOKE_MAIN_SIDECAR_REL,
+                'PHPCompiler\\JIT\\M3EmitTuTrivialEchoAot::helloworldSmokeMainSentinelBlock'
             );
             // M5 inventory emit via selfhost-helloworld-emit (#2666, #2681): mirror helloworld_compile_smoke branch.
             $this->registerM3EmitTuSidecarFromPath(

@@ -1,11 +1,11 @@
 {
     "version": 1,
-    "generated_at": "2026-06-13T18:16:00+00:00",
+    "generated_at": "2026-06-13T18:40:00+00:00",
     "driver": "prelinked/bootstrap-gen0/bin-compile-aot",
     "compiler_minimal_sidecar": "prelinked/bootstrap-gen0/compiler_minimal_aot_blob",
     "compiler_lib_sidecar": "prelinked/bootstrap-gen0/compiler_lib_aot_blob",
     "role": "gen-0 native argv compile driver + M0/M2/M4 link-time sidecars (no Zend)",
-    "sha256_driver": "50796f09c35198ecdac809905fa8218a73f1cb1c713cf6c4c6d3cb5089bbdbbf",
+    "sha256_driver": "778d9d7b00b781bee0446261e6613b06013741948281da5c8cb707edec095bdb",
     "sha256_compiler_minimal_sidecar": "0e1b201f6e493f5838e5aa61112b6000063005e2bb5ab3755a872583f5714dbc",
     "sha256_compiler_lib_sidecar": "365fd287567c878b0b316e158e68624665d65ac6fbdb496830462cfb2f9bbaf0",
     "size_bytes_driver": 1053664,
@@ -14,16 +14,18 @@
     "m3_sidecars": [
         ".m3_bin_compile_aot_blob",
         ".m3_cli_driver_aot_blob",
+        ".m3_compile_driver_aot_blob",
         ".m3_compile_smoke_aot_blob",
         ".m3_compiler_lib_aot_blob",
         ".m3_compiler_minimal_aot_blob",
         ".m3_compiler_php_aot_blob",
         ".m3_compiler_unit_probe_aot_blob",
         ".m3_helloworld_aot_blob",
+        ".m3_helloworld_smoke_main_aot_blob",
         ".m3_vendor_php_cfg_prelink.o",
         ".m3_vendor_php_llvm_prelink.o",
         ".m3_vendor_php_types_prelink.o"
     ],
-    "build_target": "inventory argv emit (host rebuild, SidecarPathRemap + #3046 null-read guard)",
+    "build_target": "inventory argv emit (host rebuild, helloworld smoke main sidecar #3046)",
     "issue": "#3053, #1492, #2880, #3046"
 }
