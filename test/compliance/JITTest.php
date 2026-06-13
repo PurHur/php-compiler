@@ -71,10 +71,6 @@ class JITTest extends BaseTest {
             if (str_contains($name, 'cli_argv')) {
                 continue;
             }
-            // array_key_exists() null key → "": VM + AOT (#3687); MCJIT execute segfaults (pre-existing hashtable path).
-            if (str_contains($name, 'array_key_exists_null_key')) {
-                continue;
-            }
             // array_key_exists() float key coercion: VM + AOT (#3470); MCJIT execute unstable (float array keys).
             if (str_contains($name, 'array_key_exists_float')) {
                 continue;
