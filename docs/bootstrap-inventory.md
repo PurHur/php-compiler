@@ -7900,11 +7900,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/VmString.php`
 
 **Warnings** (review for bootstrap subset):
-- new Exception (line 1678)
-- new Exception (line 1686)
-- new Error (line 2964)
-- new Error (line 2989)
-- 176 class method(s)
+- new Exception (line 1704)
+- new Exception (line 1712)
+- new Error (line 2990)
+- new Error (line 3015)
+- 177 class method(s)
 
 ### `ext/standard/VmStripWhitespace.php`
 
@@ -15399,7 +15399,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/JitStringBuiltinArg.php`
 
 **Warnings** (review for bootstrap subset):
-- 6 class method(s)
+- 8 class method(s)
 
 ### `lib/JIT/JitStringCompare.php`
 
