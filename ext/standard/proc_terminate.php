@@ -14,7 +14,7 @@ use PHPLLVM\Value;
 /**
  * proc_terminate() — signal subprocess (php-src ext/standard/proc_open.c; #3740).
  *
- * VM-only v1; JIT/AOT deferred until proc_open() lowering lands (#3131).
+ * VM: {@see VmProcess::procTerminate()}; JIT/AOT: __compiler_proc_terminate (#3740).
  */
 final class proc_terminate extends Internal
 {
@@ -48,6 +48,11 @@ final class proc_terminate extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        throw new \LogicException('proc_terminate() is VM-only in this compiler build (issue #3131)');
+        $argc = \count($args);
+        if ($argc < 1 || $argc > 2) {
+            throw new \LogicException('proc_terminate() requires one or two arguments in this compiler build');
+        }
+
+        return JitProcTerminate::invoke($context, $args[0], $args[1] ?? null);
     }
 }

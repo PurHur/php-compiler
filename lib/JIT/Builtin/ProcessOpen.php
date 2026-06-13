@@ -6,7 +6,7 @@ namespace PHPCompiler\JIT\Builtin;
 
 use PHPCompiler\JIT\Context;
 
-/** JIT LLVM bodies for proc_open()/proc_close() (php-src ext/standard/proc_open.c; #6904). */
+/** JIT LLVM bodies for proc_open()/proc_close()/proc_get_status()/proc_terminate() (php-src ext/standard/proc_open.c; #6904, #3740). */
 final class ProcessOpen
 {
     public static function ensureLinked(Context $context): void
