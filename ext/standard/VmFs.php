@@ -476,20 +476,19 @@ final class VmFs
 
             return $data;
         }
-        $data = @file_get_contents($path);
         if (VmHttpLastResponseHeaders::isHttpUrl($path)) {
+            $data = @file_get_contents($path);
             /** @var list<string> $http_response_header */
             VmHttpLastResponseHeaders::store(
                 isset($http_response_header) && \is_array($http_response_header)
                     ? $http_response_header
                     : null
             );
-        }
-        if (false === $data) {
-            return false;
+
+            return false === $data ? false : $data;
         }
 
-        return $data;
+        return VmFsReadNative::read($path);
     }
 
     /**

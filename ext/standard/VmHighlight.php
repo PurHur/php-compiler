@@ -32,15 +32,7 @@ final class VmHighlight
      */
     public static function highlightFile(string $filename, bool $return): string|bool
     {
-        if (!is_readable($filename) || !is_file($filename)) {
-            $contents = VmFs::fileGetContents($filename);
-            if (false === $contents) {
-                return false;
-            }
-
-            return self::highlightString($contents, $return);
-        }
-        $contents = file_get_contents($filename);
+        $contents = VmFs::fileGetContents($filename);
         if (false === $contents) {
             return false;
         }
