@@ -103,6 +103,7 @@ final class array_unique extends Internal
         if (
             StdlibConstants::SORT_REGULAR !== $sortType
             && StdlibConstants::SORT_STRING !== $sortType
+            && StdlibConstants::SORT_NUMERIC !== $sortType
         ) {
             throw new \LogicException(
                 'array_unique() flags are not supported in this compiler build'
@@ -132,8 +133,65 @@ final class array_unique extends Internal
         if (StdlibConstants::SORT_STRING === $sortType) {
             return $a->resolveIndirect()->toString() === $b->resolveIndirect()->toString();
         }
+        if (StdlibConstants::SORT_NUMERIC === $sortType) {
+            return 0 === self::compareNumericOperandsForUnique($a, $b);
+        }
 
         return $a->identicalTo($b);
+    }
+
+    /** numeric_compare_function equality for array_unique SORT_NUMERIC (ext/standard/array.c). */
+    private static function compareNumericOperandsForUnique(Variable $a, Variable $b): int
+    {
+        $av = self::numericUniqueScalar($a);
+        $bv = self::numericUniqueScalar($b);
+        if (\is_float($av) || \is_float($bv)) {
+            return (float) $av <=> (float) $bv;
+        }
+
+        return (int) $av <=> (int) $bv;
+    }
+
+    private static function numericUniqueScalar(Variable $value): int|float
+    {
+        $value = $value->resolveIndirect();
+        if (Variable::TYPE_INTEGER === $value->type) {
+            return $value->toInt();
+        }
+        if (Variable::TYPE_FLOAT === $value->type) {
+            return $value->toFloat();
+        }
+        if (Variable::TYPE_BOOLEAN === $value->type) {
+            return $value->toBool() ? 1 : 0;
+        }
+        if (Variable::TYPE_NULL === $value->type) {
+            return 0;
+        }
+        if (Variable::TYPE_STRING === $value->type) {
+            $s = $value->toString();
+            if (is_numeric($s)) {
+                if (((string) (int) $s) === $s
+                    && !str_contains($s, '.')
+                    && !str_contains(strtolower($s), 'e')) {
+                    return (int) $s;
+                }
+
+                return (float) $s;
+            }
+            if (!preg_match('/^\s*[+-]?(?:(?:\d+(?:\.\d*)?|\.\d+)(?:[eE][+-]?\d+)?)/', $s, $m)) {
+                return 0;
+            }
+            $numPart = ltrim($m[0], " \t\n\r\0\x0B");
+            if (((string) (int) $numPart) === $numPart
+                && !str_contains($numPart, '.')
+                && !str_contains(strtolower($numPart), 'e')) {
+                return (int) $numPart;
+            }
+
+            return (float) $numPart;
+        }
+
+        return 0;
     }
 
     public Context $context;
