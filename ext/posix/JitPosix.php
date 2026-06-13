@@ -7,6 +7,7 @@ namespace PHPCompiler\ext\posix;
 use PHPCompiler\ext\standard\JitGetcwd;
 use PHPCompiler\ext\standard\JitSleep;
 use PHPCompiler\JIT\BasicBlockHelper;
+use PHPCompiler\JIT\Builtin\StringInfo;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitLongArg;
 use PHPCompiler\JIT\JitValueBox;
@@ -179,6 +180,42 @@ final class JitPosix
             $ptr,
             $resultStr
         );
+
+        return $ptr;
+    }
+
+    /** posix_uname() — hashtable of utsname fields or false (#6123 JIT phase). */
+    public static function uname(Context $context): Value
+    {
+        StringInfo::ensureLinked($context);
+
+        $slot = JitValueBox::alloc($context);
+        $ptr = JitValueBox::pointer($context, $slot);
+        $htPtr = $context->getTypeFromString('__hashtable__*');
+        $ht = $context->builder->call($context->lookupFunction('__compiler_posix_uname'));
+        $failed = $context->builder->icmp(Builder::INT_EQ, $ht, $htPtr->constNull());
+
+        $id = (string) (++self::$blockSerial);
+        $failBlock = BasicBlockHelper::append($context, 'posix_uname_fail_'.$id);
+        $okBlock = BasicBlockHelper::append($context, 'posix_uname_ok_'.$id);
+        $doneBlock = BasicBlockHelper::append($context, 'posix_uname_done_'.$id);
+        $context->builder->branchIf($failed, $failBlock, $okBlock);
+
+        $i1 = $context->getTypeFromString('int1');
+        $context->builder->positionAtEnd($failBlock);
+        JitValueBox::writeBool($context, $slot, $i1->constInt(0, false));
+        $context->builder->branch($doneBlock);
+
+        $context->builder->positionAtEnd($okBlock);
+        $context->builder->call(
+            $context->lookupFunction('__value__writeHashtable'),
+            $ptr,
+            $ht
+        );
+        $context->refcount->addref($ht);
+        $context->builder->branch($doneBlock);
+
+        $context->builder->positionAtEnd($doneBlock);
 
         return $ptr;
     }

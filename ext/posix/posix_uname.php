@@ -70,6 +70,6 @@ final class posix_uname extends Internal
             return JitValueBox::pointer($context, $slot);
         }
 
-        throw new \Error('posix_uname() is not implemented for JIT in this compiler build (issue #6123)');
+        return JitPosix::uname($context);
     }
 }

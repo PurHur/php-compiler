@@ -46,6 +46,7 @@ final class StringInfo
         '__compiler_php_sapi_name',
         '__compiler_zend_version',
         '__compiler_php_uname',
+        '__compiler_posix_uname',
         '__compiler_extension_loaded',
         '__compiler_get_loaded_extensions',
         '__compiler_get_extension_funcs',
@@ -107,6 +108,13 @@ final class StringInfo
             $context->context->functionType($strPtr, false, $strPtr)
         );
         self::implementPhpUname($context, $fnUname);
+
+        $fnPosixUname = self::declareIfMissing(
+            $context,
+            '__compiler_posix_uname',
+            $context->context->functionType($htPtr, false)
+        );
+        self::implementPosixUname($context, $fnPosixUname);
 
         $fnLoadedExt = self::declareIfMissing(
             $context,
@@ -256,6 +264,48 @@ final class StringInfo
         $phi->addIncoming($single, $singleBb);
         $phi->addIncoming($allStr, $allBb);
         $context->builder->returnValue($phi);
+        $context->builder->clearInsertionPosition();
+    }
+
+    private static function implementPosixUname(Context $context, LlvmFunction $fn): void
+    {
+        $entry = $fn->appendBasicBlock('pun_entry');
+        $context->builder->positionAtEnd($entry);
+
+        $i8 = $context->getTypeFromString('int8');
+        $i32 = $context->getTypeFromString('int32');
+        $i8p = $context->getTypeFromString('int8*');
+        $htPtr = $context->getTypeFromString('__hashtable__*');
+        $nullHt = $htPtr->constNull();
+
+        $uts = $context->builder->alloca($i8, self::UTSNAME_SIZE, 'pun_uts');
+        $utsPtr = $context->builder->pointerCast($uts, $i8p);
+        $status = $context->builder->call($context->lookupFunction('uname'), $utsPtr);
+        $ok = $context->builder->icmp(Builder::INT_EQ, $status, $i32->constInt(0, false));
+        $failBb = $fn->appendBasicBlock('pun_fail');
+        $fillBb = $fn->appendBasicBlock('pun_fill');
+        $context->builder->branchIf($ok, $fillBb, $failBb);
+
+        $context->builder->positionAtEnd($failBb);
+        $context->builder->returnValue($nullHt);
+
+        $context->builder->positionAtEnd($fillBb);
+        $ht = $context->builder->call($context->lookupFunction('__hashtable__alloc'));
+        foreach ([
+            ['sysname', self::UTSNAME_OFF_SYSNAME],
+            ['nodename', self::UTSNAME_OFF_NODENAME],
+            ['release', self::UTSNAME_OFF_RELEASE],
+            ['version', self::UTSNAME_OFF_VERSION],
+            ['machine', self::UTSNAME_OFF_MACHINE],
+        ] as [$key, $offset]) {
+            $context->builder->call(
+                $context->lookupFunction('__hashtable__setStringKeyString'),
+                $ht,
+                self::literalString($context, $key),
+                self::cstringToString($context, self::fieldCstr($context, $uts, $offset))
+            );
+        }
+        $context->builder->returnValue($ht);
         $context->builder->clearInsertionPosition();
     }
 
@@ -627,6 +677,7 @@ final class StringInfo
         foreach ([
             ['__hashtable__alloc', $htPtr, []],
             ['__hashtable__setStringAt', $voidTy, [$htPtr, $sizeT, $strPtr]],
+            ['__hashtable__setStringKeyString', $voidTy, [$htPtr, $strPtr, $strPtr]],
             ['__string__init', $strPtr, [$i64, $charPtr]],
         ] as [$name, $ret, $params]) {
             self::ensureExternal(
