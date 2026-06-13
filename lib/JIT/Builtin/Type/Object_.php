@@ -2494,6 +2494,26 @@ class Object_ extends Type {
     }
 
     /**
+     * Class ids with declared instance properties — bounds get_object_vars() JIT dispatch (#4038).
+     *
+     * @return list<int>
+     */
+    public function classIdsWithInstanceProperties(): array
+    {
+        $ids = [];
+        foreach ($this->classIdToName as $id => $_name) {
+            if ($this->isExternalOnlyClass((int) $id)) {
+                continue;
+            }
+            if ([] !== ($this->properties[$id] ?? [])) {
+                $ids[] = (int) $id;
+            }
+        }
+
+        return $ids;
+    }
+
+    /**
      * Public static property compile-time defaults for get_class_vars() (#7420).
      *
      * @return array<string, array{type: int, value: int|float|bool|string|null}>

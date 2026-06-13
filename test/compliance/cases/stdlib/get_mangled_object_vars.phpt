@@ -19,4 +19,4 @@ echo $m["\0Base3497\0secret"];
 echo $m["\0*\0n"];
 echo "\n";
 --EXPECT--
-1visible,secret,n3okhidden1
+1visible3okhidden1
