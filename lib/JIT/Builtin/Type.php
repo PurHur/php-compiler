@@ -838,6 +838,15 @@ class Type extends Builtin {
         );
         $fnFormatDt = $this->context->module->addFunction('__compiler_format_datetime', $fntypeFormatDt);
         $this->context->registerFunction('__compiler_format_datetime', $fnFormatDt);
+        $fntypeStrftime = $this->context->context->functionType(
+            $this->context->getTypeFromString('__string__*'),
+            false,
+            $this->context->getTypeFromString('__string__*'),
+            $i64,
+            $this->context->getTypeFromString('int8')
+        );
+        $fnStrftime = $this->context->module->addFunction('__compiler_strftime', $fntypeStrftime);
+        $this->context->registerFunction('__compiler_strftime', $fnStrftime);
         $fntypeDiFmt = $this->context->context->functionType(
             $this->context->getTypeFromString('__string__*'),
             false,
@@ -909,6 +918,8 @@ class Type extends Builtin {
         $this->context->registerFunction('__compiler_assert_options', $fnAssertOptions);
         $i8p = $this->context->getTypeFromString('int8*');
         $i64p = $this->context->getTypeFromString('int64*');
+        $charPtr = $this->context->getTypeFromString('char*');
+        $sizeT = $this->context->getTypeFromString('size_t');
         $libcFns = [
             'time' => [$i64, false, [$i8p]],
             'gettimeofday' => [$i32, false, [$i8p, $i8p]],
@@ -921,6 +932,7 @@ class Type extends Builtin {
             'getpwuid' => [$i8p, false, [$i32]],
             'localtime' => [$i8p, false, [$i64p]],
             'gmtime' => [$i8p, false, [$i64p]],
+            'strftime' => [$sizeT, false, [$i8p, $sizeT, $charPtr, $i8p]],
             'timegm' => [$i64, false, [$i8p]],
             'mktime' => [$i64, false, [$i8p]],
             'sleep' => [$i32, false, [$i32]],
