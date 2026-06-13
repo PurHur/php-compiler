@@ -720,6 +720,7 @@ class Module extends ModuleAbstract
             new gzopen(),
             new gzwrite(),
             new gzread(),
+            new gzgets(),
             new gzclose(),
             new readgzfile(),
             new gzfile(),

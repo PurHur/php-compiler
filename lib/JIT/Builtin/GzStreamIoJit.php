@@ -30,6 +30,7 @@ final class GzStreamIoJit
         '__compiler_gzopen',
         '__compiler_gzwrite',
         '__compiler_gzread',
+        '__compiler_gzgets',
         '__compiler_gzclose',
         '__compiler_gz_read_all',
         '__compiler_gz_passthru',
@@ -51,6 +52,7 @@ final class GzStreamIoJit
         self::implementIfMissing($context, '__compiler_gzopen', self::emitGzopen(...));
         self::implementIfMissing($context, '__compiler_gzwrite', self::emitGzwrite(...));
         self::implementIfMissing($context, '__compiler_gzread', self::emitGzread(...));
+        self::implementIfMissing($context, '__compiler_gzgets', self::emitGzgets(...));
         self::implementIfMissing($context, '__compiler_gzclose', self::emitGzclose(...));
         self::implementIfMissing($context, '__compiler_gz_read_all', self::emitGzReadAll(...));
         self::implementIfMissing($context, '__compiler_gz_passthru', self::emitGzPassthru(...));
@@ -127,6 +129,10 @@ final class GzStreamIoJit
                 $context->context->functionType($i64, false, $i64, $strPtr, $i64)
             ),
             '__compiler_gzread' => $context->module->addFunction(
+                $name,
+                $context->context->functionType($strPtr, false, $i64, $i64)
+            ),
+            '__compiler_gzgets' => $context->module->addFunction(
                 $name,
                 $context->context->functionType($strPtr, false, $i64, $i64)
             ),
@@ -499,6 +505,125 @@ final class GzStreamIoJit
             $buf
         );
         $context->builder->returnValue($result);
+
+        $context->builder->positionAtEnd($failBb);
+        $context->builder->returnValue($nullStr);
+    }
+
+    private static function emitGzgets(Context $context, LlvmFunction $fn): void
+    {
+        $entry = $fn->appendBasicBlock('gzgets_entry');
+        $context->builder->positionAtEnd($entry);
+
+        $handle = $fn->getParam(0);
+        $length = $fn->getParam(1);
+        $i64 = $context->getTypeFromString('int64');
+        $i32 = $context->getTypeFromString('int32');
+        $i8 = $context->getTypeFromString('int8');
+        $i8p = $context->getTypeFromString('int8*');
+        $strPtr = $context->getTypeFromString('__string__*');
+        $nullStr = $strPtr->constNull();
+        $nullPtr = $i8p->constNull();
+        $zeroI64 = $i64->constInt(0, false);
+        $oneI64 = $i64->constInt(1, false);
+        $oneI32 = $i32->constInt(1, false);
+        $zeroI32 = $i32->constInt(0, false);
+        $nl = $i8->constInt(10, false);
+
+        $badLen = $context->builder->icmp(Builder::INT_SLE, $length, $zeroI64);
+        $failBb = $fn->appendBasicBlock('gzgets_fail');
+        $checkBb = $fn->appendBasicBlock('gzgets_check');
+        $context->builder->branchIf($badLen, $failBb, $checkBb);
+
+        $context->builder->positionAtEnd($checkBb);
+        $maxRead = $context->builder->sub($length, $oneI64);
+        $maxZero = $context->builder->icmp(Builder::INT_SLE, $maxRead, $zeroI64);
+        $isGzBb = $fn->appendBasicBlock('gzgets_is_gz');
+        $context->builder->branchIf($maxZero, $failBb, $isGzBb);
+
+        $context->builder->positionAtEnd($isGzBb);
+        $isGz = self::loadIsGz($context, $handle);
+        $notGz = $context->builder->icmp(Builder::INT_EQ, $isGz, $i8->constInt(0, false));
+        $loadBb = $fn->appendBasicBlock('gzgets_load');
+        $context->builder->branchIf($notGz, $failBb, $loadBb);
+
+        $context->builder->positionAtEnd($loadBb);
+        $fp = self::loadPtrSlot($context, StreamGlobalsJit::GLOBAL_HANDLES, $handle);
+        $fpNull = $context->builder->icmp(Builder::INT_EQ, $fp, $nullPtr);
+        $allocBb = $fn->appendBasicBlock('gzgets_alloc');
+        $context->builder->branchIf($fpNull, $failBb, $allocBb);
+
+        $context->builder->positionAtEnd($allocBb);
+        $readLen = $context->builder->trunc($maxRead, $i32);
+        $buf = $context->builder->call(
+            $context->lookupFunction('malloc'),
+            $context->builder->sext($readLen, $context->getTypeFromString('size_t'))
+        );
+        $bufNull = $context->builder->icmp(Builder::INT_EQ, $buf, $nullPtr);
+        $readBb = $fn->appendBasicBlock('gzgets_read');
+        $context->builder->branchIf($bufNull, $failBb, $readBb);
+
+        $context->builder->positionAtEnd($readBb);
+        $got = $context->builder->call(
+            $context->lookupFunction('gzread'),
+            $fp,
+            $buf,
+            $readLen
+        );
+        $gotNeg = $context->builder->icmp(Builder::INT_SLT, $got, $zeroI32);
+        $freeFailBb = $fn->appendBasicBlock('gzgets_free_fail');
+        $eofBb = $fn->appendBasicBlock('gzgets_eof');
+        $context->builder->branchIf($gotNeg, $freeFailBb, $eofBb);
+
+        $context->builder->positionAtEnd($eofBb);
+        $gotZero = $context->builder->icmp(Builder::INT_EQ, $got, $zeroI32);
+        $scanBb = $fn->appendBasicBlock('gzgets_scan');
+        $context->builder->branchIf($gotZero, $freeFailBb, $scanBb);
+
+        $context->builder->positionAtEnd($scanBb);
+        $scanIdx = $context->builder->alloca($i64, 'gzgets_idx');
+        $context->builder->store($zeroI64, $scanIdx);
+        $outLen = $context->builder->alloca($i64, 'gzgets_out_len');
+        $context->builder->store($context->builder->sext($got, $i64), $outLen);
+        $scanLoopBb = $fn->appendBasicBlock('gzgets_scan_loop');
+        $scanDoneBb = $fn->appendBasicBlock('gzgets_scan_done');
+        $context->builder->branch($scanLoopBb);
+
+        $context->builder->positionAtEnd($scanLoopBb);
+        $idx = $context->builder->load($scanIdx);
+        $gotI64 = $context->builder->sext($got, $i64);
+        $idxEnd = $context->builder->icmp(Builder::INT_SGE, $idx, $gotI64);
+        $scanBodyBb = $fn->appendBasicBlock('gzgets_scan_body');
+        $context->builder->branchIf($idxEnd, $scanDoneBb, $scanBodyBb);
+
+        $context->builder->positionAtEnd($scanBodyBb);
+        $chPtr = $context->builder->gep($buf, $context->builder->trunc($idx, $i32));
+        $ch = $context->builder->load($chPtr);
+        $isNl = $context->builder->icmp(Builder::INT_EQ, $ch, $nl);
+        $scanIncBb = $fn->appendBasicBlock('gzgets_scan_inc');
+        $nlFoundBb = $fn->appendBasicBlock('gzgets_nl_found');
+        $context->builder->branchIf($isNl, $nlFoundBb, $scanIncBb);
+
+        $context->builder->positionAtEnd($nlFoundBb);
+        $context->builder->store($context->builder->add($idx, $oneI64), $outLen);
+        $context->builder->branch($scanDoneBb);
+
+        $context->builder->positionAtEnd($scanIncBb);
+        $context->builder->store($context->builder->add($idx, $oneI64), $scanIdx);
+        $context->builder->branch($scanLoopBb);
+
+        $context->builder->positionAtEnd($scanDoneBb);
+        $finalLen = $context->builder->load($outLen);
+        $result = $context->builder->call(
+            $context->lookupFunction('__string__init'),
+            $finalLen,
+            $buf
+        );
+        $context->builder->returnValue($result);
+
+        $context->builder->positionAtEnd($freeFailBb);
+        $context->builder->call($context->lookupFunction('free'), $buf);
+        $context->builder->branch($failBb);
 
         $context->builder->positionAtEnd($failBb);
         $context->builder->returnValue($nullStr);
