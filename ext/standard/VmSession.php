@@ -445,7 +445,7 @@ final class VmSession
 
             return;
         }
-        $raw = file_get_contents($path);
+        $raw = VmFsReadNative::read($path);
         if (false === $raw || '' === $raw) {
             $sessionVar->array(new HashTable());
 

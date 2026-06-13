@@ -19,6 +19,14 @@ final class VmMemoryTest extends TestCase
         $this->assertStringContainsString('/proc/self/statm', $source);
     }
 
+    public function testVmMemorySourceDoesNotDelegateToHostFileGetContents(): void
+    {
+        $source = (string) file_get_contents(__DIR__.'/../../ext/standard/VmMemory.php');
+        $this->assertStringContainsString('VmFsReadNative::read', $source);
+        $this->assertDoesNotMatchRegularExpression('/\\\\file_get_contents\\s*\\(/', $source);
+        $this->assertDoesNotMatchRegularExpression('/(?<!\\\\)file_get_contents\\s*\\(/', $source);
+    }
+
     public function testRealUsageReadsProcStatmOnLinux(): void
     {
         if ('Linux' !== \PHP_OS_FAMILY || !is_readable('/proc/self/statm')) {

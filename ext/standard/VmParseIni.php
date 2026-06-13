@@ -35,7 +35,7 @@ final class VmParseIni
 
             return false;
         }
-        $contents = @file_get_contents($filename);
+        $contents = VmFsReadNative::read($filename);
         if (false === $contents) {
             self::triggerFileWarning($frame, $filename);
 
