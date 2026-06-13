@@ -23,6 +23,7 @@ final class StringFsDirStandaloneTest extends TestCase
 
         foreach ([
             '__compiler_copy',
+            '__compiler_resolve_sidecar_source_path',
             '__compiler_touch',
             '__compiler_mkdir',
             '__phpc_stat',

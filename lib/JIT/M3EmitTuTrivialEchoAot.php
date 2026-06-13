@@ -366,11 +366,31 @@ final class M3EmitTuTrivialEchoAot
             $phi->addIncoming($matchedSidecarPath, $ok);
             $currentSidecarPath = $phi;
         }
-        $context->builder->call(
+        $resolvedSidecar = $context->builder->call(
+            $context->lookupFunction('__compiler_resolve_sidecar_source_path'),
+            $currentSidecarPath
+        );
+        $copyOk = $context->builder->call(
             $context->lookupFunction('__compiler_copy'),
-            $currentSidecarPath,
+            $resolvedSidecar,
             $outFile
         );
+        $i32 = $context->getTypeFromString('int32');
+        $copyFailed = $context->builder->icmp(
+            Builder::INT_EQ,
+            $copyOk,
+            $i32->constInt(0, false)
+        );
+        $copyFailBb = BasicBlockHelper::append($context, 'm3te_std_copy_fail');
+        $copyDoneBb = BasicBlockHelper::append($context, 'm3te_std_copy_done');
+        $context->builder->branchIf($copyFailed, $copyFailBb, $copyDoneBb);
+        $context->builder->positionAtEnd($copyFailBb);
+        $context->builder->call(
+            $context->lookupFunction('exit'),
+            $i32->constInt(1, false)
+        );
+        $context->builder->returnVoid();
+        $context->builder->positionAtEnd($copyDoneBb);
         $context->builder->returnVoid();
     }
 

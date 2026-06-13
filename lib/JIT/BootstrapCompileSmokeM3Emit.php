@@ -135,23 +135,14 @@ final class BootstrapCompileSmokeM3Emit
         $retOk = $i64->constInt(0, false);
         $retFail = $i64->constInt(1, false);
 
-        $code = $context->builder->call(
-            $context->lookupFunction('__compiler_file_get_contents'),
-            $sourceFile
+        [$code, $readOk] = self::emitSourceReadOrFail(
+            $context,
+            $sourceFile,
+            'csm3_lint_read_'.$tag,
+            $logPrefix.': empty source (lint)',
+            $logPrefix,
+            $retFail
         );
-        $codeLen = $context->builder->call($context->lookupFunction('__string__strlen'), $code);
-        $codeBad = $context->builder->or(
-            $context->builder->icmp(Builder::INT_EQ, $code, $strPtr->constNull()),
-            $context->builder->icmp(Builder::INT_EQ, $codeLen, $i64->constInt(0, false))
-        );
-        $readOk = BasicBlockHelper::append($context, 'csm3_lint_read_ok_'.$tag);
-        $readFail = BasicBlockHelper::append($context, 'csm3_lint_read_fail_'.$tag);
-        $context->builder->branchIf($codeBad, $readFail, $readOk);
-
-        $context->builder->positionAtEnd($readFail);
-        self::echoPhaseError($context, $logPrefix, $logPrefix.': empty source (lint)', 'source');
-        self::exitWithStatus($context, $retFail);
-
         $context->builder->positionAtEnd($readOk);
         $runtime = RuntimeEmitTuAlloc::emit($context);
         $mode = $i64->constInt(self::MODE_AOT, false);
@@ -266,23 +257,14 @@ final class BootstrapCompileSmokeM3Emit
         $retOk = $i64->constInt(0, false);
         $retFail = $i64->constInt(1, false);
 
-        $code = $context->builder->call(
-            $context->lookupFunction('__compiler_file_get_contents'),
-            $sourceFile
+        [$code, $readOk] = self::emitSourceReadOrFail(
+            $context,
+            $sourceFile,
+            'csm3_read_'.$tag,
+            $logPrefix.': empty source (native bridge)',
+            $logPrefix,
+            $retFail
         );
-        $codeLen = $context->builder->call($context->lookupFunction('__string__strlen'), $code);
-        $codeBad = $context->builder->or(
-            $context->builder->icmp(Builder::INT_EQ, $code, $strPtr->constNull()),
-            $context->builder->icmp(Builder::INT_EQ, $codeLen, $i64->constInt(0, false))
-        );
-        $readOk = BasicBlockHelper::append($context, 'csm3_read_ok_'.$tag);
-        $readFail = BasicBlockHelper::append($context, 'csm3_read_fail_'.$tag);
-        $context->builder->branchIf($codeBad, $readFail, $readOk);
-
-        $context->builder->positionAtEnd($readFail);
-        self::echoPhaseError($context, $logPrefix, $logPrefix.': empty source (native bridge)', 'source');
-        self::exitWithStatus($context, $retFail);
-
         $context->builder->positionAtEnd($readOk);
         $runtime = RuntimeEmitTuAlloc::emit($context);
         $mode = $i64->constInt(self::MODE_AOT, false);
@@ -335,6 +317,49 @@ final class BootstrapCompileSmokeM3Emit
         );
         ValueEchoHelper::echoLiteral($context, "\n");
         $context->builder->returnValue($retOk);
+    }
+
+    /**
+     * Read source via __compiler_file_get_contents; fail before __string__strlen on null (#3046).
+     *
+     * @return array{Value, \PHPLLVM\BasicBlock} [$code, $readOkBlock]
+     */
+    private static function emitSourceReadOrFail(
+        Context $context,
+        Value $sourceFile,
+        string $tagPrefix,
+        string $emptyMessage,
+        string $logPrefix,
+        Value $retFail
+    ): array {
+        $i64 = $context->getTypeFromString('int64');
+        $strPtr = $context->getTypeFromString('__string__*');
+
+        $code = $context->builder->call(
+            $context->lookupFunction('__compiler_file_get_contents'),
+            $sourceFile
+        );
+        $codeNull = $context->builder->icmp(Builder::INT_EQ, $code, $strPtr->constNull());
+        $readNullFail = BasicBlockHelper::append($context, $tagPrefix.'_null_fail');
+        $readCheckLen = BasicBlockHelper::append($context, $tagPrefix.'_check_len');
+        $context->builder->branchIf($codeNull, $readNullFail, $readCheckLen);
+
+        $context->builder->positionAtEnd($readNullFail);
+        self::echoPhaseError($context, $logPrefix, $emptyMessage, 'source');
+        self::exitWithStatus($context, $retFail);
+
+        $context->builder->positionAtEnd($readCheckLen);
+        $codeLen = $context->builder->call($context->lookupFunction('__string__strlen'), $code);
+        $codeEmpty = $context->builder->icmp(Builder::INT_EQ, $codeLen, $i64->constInt(0, false));
+        $readOk = BasicBlockHelper::append($context, $tagPrefix.'_ok');
+        $readEmptyFail = BasicBlockHelper::append($context, $tagPrefix.'_empty_fail');
+        $context->builder->branchIf($codeEmpty, $readEmptyFail, $readOk);
+
+        $context->builder->positionAtEnd($readEmptyFail);
+        self::echoPhaseError($context, $logPrefix, $emptyMessage, 'source');
+        self::exitWithStatus($context, $retFail);
+
+        return [$code, $readOk];
     }
 
     private static function shouldUseEmitTuRealLowering(Context $context): bool

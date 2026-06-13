@@ -58,6 +58,7 @@ final class LibcExtern
             'read' => [$i64, false, [$i32, $i8p, $i64]],
             'write' => [$i64, false, [$i32, $i8p, $i64]],
             'stat' => [$i32, false, [$i8p, $i8p]],
+            'access' => [$i32, false, [$i8p, $i32]],
             'lstat' => [$i32, false, [$i8p, $i8p]],
             'chmod' => [$i32, false, [$i8p, $i32]],
             'utime' => [$i32, false, [$i8p, $i8p]],

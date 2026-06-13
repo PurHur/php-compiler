@@ -139,6 +139,7 @@ require_once __DIR__.'/../../../lib/JIT/Scope.php';
 require_once __DIR__.'/../../../lib/JIT/ScopeBuiltinHelper.php';
 require_once __DIR__.'/../../../lib/JIT/ScriptMagic.php';
 require_once __DIR__.'/../../../lib/JIT/SelfHostBuiltinPolicy.php';
+require_once __DIR__.'/../../../lib/JIT/SidecarPathRemap.php';
 require_once __DIR__.'/../../../lib/JIT/StringOffsetHelper.php';
 require_once __DIR__.'/../../../lib/JIT/CliArgvGlobalInit.php';
 require_once __DIR__.'/../../../lib/JIT/SuperglobalInit.php';

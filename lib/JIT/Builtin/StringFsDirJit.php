@@ -52,6 +52,7 @@ final class StringFsDirJit
     /** @var list<string> */
     private const RUNTIME_FUNCTIONS = [
         '__compiler_copy',
+        '__compiler_resolve_sidecar_source_path',
         '__compiler_touch',
         '__compiler_mkdir',
         '__phpc_stat',
@@ -74,6 +75,7 @@ final class StringFsDirJit
         self::ensureLibc($context);
 
         self::implementIfMissing($context, '__compiler_copy', self::emitCopy(...));
+        self::implementIfMissing($context, '__compiler_resolve_sidecar_source_path', self::emitResolveSidecarSourcePath(...));
         self::implementIfMissing($context, '__compiler_touch', self::emitTouch(...));
         self::implementIfMissing($context, '__compiler_mkdir', self::emitMkdir(...));
         self::implementIfMissing($context, '__phpc_stat', self::emitStat(...));
@@ -120,6 +122,10 @@ final class StringFsDirJit
             '__compiler_copy' => $context->module->addFunction(
                 $name,
                 $context->context->functionType($i32, false, $strPtr, $strPtr)
+            ),
+            '__compiler_resolve_sidecar_source_path' => $context->module->addFunction(
+                $name,
+                $context->context->functionType($strPtr, false, $strPtr)
             ),
             '__compiler_touch' => $context->module->addFunction(
                 $name,
@@ -269,6 +275,80 @@ final class StringFsDirJit
         $created = $context->builder->icmp(Builder::INT_EQ, $rc, $i32->constInt(0, false));
 
         return $context->builder->or($created, self::pathIsDir($context, $path));
+    }
+
+    private static function emitResolveSidecarSourcePath(Context $context, LlvmFunction $fn): void
+    {
+        $entry = $fn->appendBasicBlock('entry');
+        $context->builder->positionAtEnd($entry);
+
+        $i8 = $context->getTypeFromString('int8');
+        $i32 = $context->getTypeFromString('int32');
+        $i8p = $context->getTypeFromString('int8*');
+        $sizeT = $context->getTypeFromString('size_t');
+        $strPtr = $context->getTypeFromString('__string__*');
+
+        $path = $fn->getParam(0);
+        $src = self::stringData($context, $path);
+        $exists = $context->builder->call($context->lookupFunction('access'), $src, $i32->constInt(0, false));
+        $existsOk = $context->builder->icmp(Builder::INT_EQ, $exists, $i32->constInt(0, false));
+        $returnOriginal = $fn->appendBasicBlock('resolve_return_original');
+        $tryRemap = $fn->appendBasicBlock('resolve_try_remap');
+        $context->builder->branchIf($existsOk, $returnOriginal, $tryRemap);
+
+        $context->builder->positionAtEnd($tryRemap);
+        $repoKey = $context->builder->pointerCast(
+            $context->constantFromString('PHP_COMPILER_REPO_ROOT'),
+            $i8p
+        );
+        $repo = $context->builder->call($context->lookupFunction('getenv'), $repoKey);
+        $repoNull = $context->builder->icmp(Builder::INT_EQ, $repo, $i8p->constNull());
+        $prefix = self::literalCstr($context, '/compiler/build/');
+        $prefixMatch = $context->builder->call(
+            $context->lookupFunction('strncmp'),
+            $src,
+            $prefix,
+            $sizeT->constInt(17, false)
+        );
+        $prefixOk = $context->builder->icmp(Builder::INT_EQ, $prefixMatch, $i32->constInt(0, false));
+        $canRemap = $context->builder->and(
+            $context->builder->not($repoNull),
+            $prefixOk
+        );
+        $returnOriginalFromRemap = $fn->appendBasicBlock('resolve_return_original_from_remap');
+        $remap = $fn->appendBasicBlock('resolve_remap');
+        $context->builder->branchIf($canRemap, $remap, $returnOriginalFromRemap);
+
+        $context->builder->positionAtEnd($returnOriginalFromRemap);
+        $context->builder->branch($returnOriginal);
+
+        $context->builder->positionAtEnd($remap);
+        $bufSlot = BasicBlockHelper::entryAlloca($context, $i8->arrayType(self::PATH_MAX));
+        $buf = self::stackBytesPtr($context, $bufSlot);
+        $suffix = $context->builder->gep($src, $sizeT->constInt(9, false));
+        $context->builder->call(
+            $context->lookupFunction('snprintf'),
+            $buf,
+            $sizeT->constInt(self::PATH_MAX, false),
+            self::literalCstr($context, '%s%s'),
+            $repo,
+            $suffix
+        );
+        $remappedOk = $context->builder->call($context->lookupFunction('access'), $buf, $i32->constInt(0, false));
+        $remappedExists = $context->builder->icmp(Builder::INT_EQ, $remappedOk, $i32->constInt(0, false));
+        $returnOriginalAfterRemap = $fn->appendBasicBlock('resolve_return_original_after_remap');
+        $returnRemapped = $fn->appendBasicBlock('resolve_return_remapped');
+        $context->builder->branchIf($remappedExists, $returnRemapped, $returnOriginalAfterRemap);
+
+        $context->builder->positionAtEnd($returnOriginalAfterRemap);
+        $context->builder->branch($returnOriginal);
+
+        $context->builder->positionAtEnd($returnRemapped);
+        $remappedStr = self::cstrToString($context, $buf);
+        $context->builder->returnValue($remappedStr);
+
+        $context->builder->positionAtEnd($returnOriginal);
+        $context->builder->returnValue($path);
     }
 
     private static function emitCopy(Context $context, LlvmFunction $fn): void

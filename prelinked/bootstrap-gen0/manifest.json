@@ -1,14 +1,14 @@
 {
     "version": 1,
-    "generated_at": "2026-06-12T16:06:00+00:00",
+    "generated_at": "2026-06-13T18:16:00+00:00",
     "driver": "prelinked/bootstrap-gen0/bin-compile-aot",
     "compiler_minimal_sidecar": "prelinked/bootstrap-gen0/compiler_minimal_aot_blob",
     "compiler_lib_sidecar": "prelinked/bootstrap-gen0/compiler_lib_aot_blob",
     "role": "gen-0 native argv compile driver + M0/M2/M4 link-time sidecars (no Zend)",
-    "sha256_driver": "d19391d815775efa7254b75046cced8433c091160ece4d5e5a6ec4da81e89873",
+    "sha256_driver": "50796f09c35198ecdac809905fa8218a73f1cb1c713cf6c4c6d3cb5089bbdbbf",
     "sha256_compiler_minimal_sidecar": "0e1b201f6e493f5838e5aa61112b6000063005e2bb5ab3755a872583f5714dbc",
     "sha256_compiler_lib_sidecar": "365fd287567c878b0b316e158e68624665d65ac6fbdb496830462cfb2f9bbaf0",
-    "size_bytes_driver": 944304,
+    "size_bytes_driver": 1053664,
     "size_bytes_compiler_minimal_sidecar": 185800,
     "size_bytes_compiler_lib_sidecar": 371296,
     "m3_sidecars": [
@@ -24,6 +24,6 @@
         ".m3_vendor_php_llvm_prelink.o",
         ".m3_vendor_php_types_prelink.o"
     ],
-    "build_target": "inventory argv emit (php-compiler:22.04-dev, LLVM 9)",
-    "issue": "#3053, #1492, #2880"
+    "build_target": "inventory argv emit (host rebuild, SidecarPathRemap + #3046 null-read guard)",
+    "issue": "#3053, #1492, #2880, #3046"
 }

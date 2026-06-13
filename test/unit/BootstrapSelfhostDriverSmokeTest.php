@@ -91,6 +91,14 @@ final class BootstrapSelfhostDriverSmokeTest extends TestCase
         $this->assertStringNotContainsString('unset($runtimeThis, $code, $filename)', $emit);
     }
 
+    /** Issue #3046: inventory argv must not __string__strlen null after missing file_get_contents. */
+    public function testInventoryEmitGuardsNullSourceBeforeStrlen(): void
+    {
+        $emit = (string) file_get_contents(self::$root.'/lib/JIT/BootstrapCompileSmokeM3Emit.php');
+        $this->assertStringContainsString('emitSourceReadOrFail', $emit);
+        $this->assertStringContainsString('Read source via __compiler_file_get_contents; fail before __string__strlen on null', $emit);
+    }
+
     /** Issue #3011: M4 argv gen-3 must register parseAndCompile decls without inventory env. */
     public function testM4BinCompileArgvParseAndCompileDeclWithoutInventoryEnv(): void
     {

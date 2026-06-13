@@ -275,10 +275,10 @@ if (!function_exists('php_compiler_cli_dispatch')) {
                         die("Unsupported bare argument {$opt}\n");
                     }
                     $scriptPath = php_compiler_cli_resolve_user_path($opt);
-                    if (! file_exists($scriptPath)) {
+                    $execCode = file_get_contents($scriptPath);
+                    if (false === $execCode) {
                         die("Could not open file {$opt}\n");
                     }
-                    $execCode = file_get_contents($scriptPath);
                     $execFile = realpath($scriptPath) ?: $scriptPath;
                     // Allow arbitrary user script args after the script path (Zend CLI parity, #4139).
                     $scriptArgv = array_merge([$execFile], array_slice($argv, $i));

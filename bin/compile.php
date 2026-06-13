@@ -95,6 +95,14 @@ function run(string $filename, string $code, array $options): void
 {
     phpc_compile_ensure_repo_root_env();
     $normalized = '-' !== $filename ? str_replace('\\', '/', $filename) : '';
+    if ('' !== $normalized
+        && '-' !== $filename
+        && 'Standard input code' !== $filename
+        && 'Command line code' !== $filename
+        && !is_file($filename)) {
+        fwrite(STDERR, "Could not open file {$filename}\n");
+        exit(1);
+    }
     if (\class_exists(\PHPCompiler\JIT\Progress::class, false)) {
         \PHPCompiler\JIT\Progress::notePhase('bin_compile_run_begin');
         \PHPCompiler\JIT\Progress::noteEntry($filename);
