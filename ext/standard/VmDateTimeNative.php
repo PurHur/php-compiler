@@ -786,6 +786,163 @@ final class VmDateTimeNative
     }
 
     /**
+     * Apply DateInterval fields to a timestamp (php-src php_date_add / php_date_sub, #4604).
+     *
+     * @param array{y: int, m: int, d: int, h: int, i: int, s: int, f: float, invert: int} $state
+     *
+     * @return array{timestamp: int, microsecond: int}
+     */
+    public static function applyIntervalState(
+        int $timestamp,
+        int $microsecond,
+        array $state,
+        string $tzName,
+        bool $add
+    ): array {
+        $invert = 0 !== $state['invert'];
+        $subtract = $add ? $invert : !$invert;
+        $sign = $subtract ? -1 : 1;
+
+        return self::withTimezone($tzName, static function () use (
+            $timestamp,
+            $microsecond,
+            $state,
+            $tzName,
+            $sign
+        ): array {
+            $tm = self::localtime($timestamp);
+            if (null === $tm) {
+                throw new \LogicException('Invalid timestamp for DateInterval application');
+            }
+            $year = (int) $tm->tm_year + 1900;
+            $month = (int) $tm->tm_mon + 1;
+            $day = (int) $tm->tm_mday;
+            $hour = (int) $tm->tm_hour;
+            $minute = (int) $tm->tm_min;
+            $second = (int) $tm->tm_sec;
+
+            $year += $sign * $state['y'];
+            $month += $sign * $state['m'];
+            $day += $sign * $state['d'];
+            $hour += $sign * $state['h'];
+            $minute += $sign * $state['i'];
+            $second += $sign * $state['s'];
+
+            $newTs = self::mktimeInTimezone($year, $month, $day, $hour, $minute, $second, $tzName);
+            $newMicro = $microsecond + (int) \round($sign * $state['f'] * 1_000_000);
+            if ($newMicro >= 1_000_000) {
+                $newTs += intdiv($newMicro, 1_000_000);
+                $newMicro %= 1_000_000;
+            } elseif ($newMicro < 0) {
+                --$newTs;
+                $newMicro += 1_000_000;
+            }
+
+            return ['timestamp' => $newTs, 'microsecond' => $newMicro];
+        });
+    }
+
+    /**
+     * Calendar diff between two timestamps (php-src php_date_diff v1, #4604).
+     *
+     * @return array{y: int, m: int, d: int, h: int, i: int, s: int, f: float, invert: int, days: int}
+     */
+    public static function diffTimestamps(
+        int $baseTs,
+        int $targetTs,
+        string $tzName,
+        bool $absolute = false
+    ): array {
+        $invert = $targetTs < $baseTs ? 1 : 0;
+        $earlier = $invert ? $targetTs : $baseTs;
+        $later = $invert ? $baseTs : $targetTs;
+        if ($absolute) {
+            $invert = 0;
+        }
+        $days = (int) \floor(\abs($targetTs - $baseTs) / 86_400);
+
+        return self::withTimezone($tzName, static function () use ($earlier, $later, $invert, $days): array {
+            $tm1 = self::localtime($earlier);
+            $tm2 = self::localtime($later);
+            if (null === $tm1 || null === $tm2) {
+                throw new \LogicException('Invalid timestamp for date_diff()');
+            }
+
+            $y1 = (int) $tm1->tm_year + 1900;
+            $m1 = (int) $tm1->tm_mon + 1;
+            $d1 = (int) $tm1->tm_mday;
+            $h1 = (int) $tm1->tm_hour;
+            $i1 = (int) $tm1->tm_min;
+            $s1 = (int) $tm1->tm_sec;
+
+            $y2 = (int) $tm2->tm_year + 1900;
+            $m2 = (int) $tm2->tm_mon + 1;
+            $d2 = (int) $tm2->tm_mday;
+            $h2 = (int) $tm2->tm_hour;
+            $i2 = (int) $tm2->tm_min;
+            $s2 = (int) $tm2->tm_sec;
+
+            $s = $s2 - $s1;
+            $i = $i2 - $i1;
+            $h = $h2 - $h1;
+            $d = $d2 - $d1;
+            $m = $m2 - $m1;
+            $y = $y2 - $y1;
+
+            if ($s < 0) {
+                $s += 60;
+                --$i;
+            }
+            if ($i < 0) {
+                $i += 60;
+                --$h;
+            }
+            if ($h < 0) {
+                $h += 24;
+                --$d;
+            }
+            if ($d < 0) {
+                $prevMonth = $m2 - 1;
+                $prevYear = $y2;
+                if ($prevMonth < 1) {
+                    $prevMonth = 12;
+                    --$prevYear;
+                }
+                $d += self::daysInMonth($prevYear, $prevMonth);
+                --$m;
+            }
+            if ($m < 0) {
+                $m += 12;
+                --$y;
+            }
+
+            return [
+                'y' => $y,
+                'm' => $m,
+                'd' => $d,
+                'h' => $h,
+                'i' => $i,
+                's' => $s,
+                'f' => 0.0,
+                'invert' => $invert,
+                'days' => $days,
+            ];
+        });
+    }
+
+    private static function daysInMonth(int $year, int $month): int
+    {
+        static $mdays = [31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
+        if (2 === $month) {
+            $leap = (0 === $year % 4) && (0 !== $year % 100 || 0 === $year % 400);
+
+            return $leap ? 29 : 28;
+        }
+
+        return $mdays[$month - 1];
+    }
+
+    /**
      * @return array{amount: int, unit: string}
      */
     private static function parseSignedRelativeDelta(string $modifier): array
