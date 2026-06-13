@@ -73,37 +73,12 @@ final class VmOpensslObjects
 
     public static function createCertificateFromPem(Context $ctx, string $pem): Variable
     {
-        if (!\function_exists('openssl_x509_parse')) {
+        $normalized = VmOpensslX509Native::normalizeCertificatePem($pem);
+        if (false === $normalized) {
             $result = new Variable();
             $result->bool(false);
 
             return $result;
-        }
-        $parsed = @\openssl_x509_parse($pem);
-        if (false === $parsed) {
-            $result = new Variable();
-            $result->bool(false);
-
-            return $result;
-        }
-        if (!\function_exists('openssl_x509_export')) {
-            $normalized = $pem;
-        } else {
-            $hostCert = @\openssl_x509_read($pem);
-            if (false === $hostCert) {
-                $result = new Variable();
-                $result->bool(false);
-
-                return $result;
-            }
-            $exported = '';
-            if (!@\openssl_x509_export($hostCert, $exported)) {
-                $result = new Variable();
-                $result->bool(false);
-
-                return $result;
-            }
-            $normalized = $exported;
         }
 
         return self::wrapCertificate($ctx, $normalized);
