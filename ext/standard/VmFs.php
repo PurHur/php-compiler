@@ -626,6 +626,14 @@ final class VmFs
 
             return self::adoptStreamResource($fp, $path);
         }
+        if (self::isBuiltinPhpStreamUri($path)) {
+            $fp = @fopen($path, $mode);
+            if (false === $fp) {
+                return false;
+            }
+
+            return self::adoptStreamResource($fp, $path);
+        }
         if (VmFsOpenNative::available()) {
             $fp = VmFsOpenNative::open($path, $mode);
             if (false === $fp) {
@@ -1720,6 +1728,18 @@ final class VmFs
         }
 
         return false;
+    }
+
+    /**
+     * Built-in php:// wrappers (memory, temp, fd, filter, …) — host PHP streams, not libc open(2).
+     */
+    private static function isBuiltinPhpStreamUri(string $path): bool
+    {
+        if (!\str_starts_with($path, 'php://')) {
+            return false;
+        }
+
+        return !VmFsStdio::isStdioUri($path);
     }
 
     private static function ffiEnabledForDisk(): bool
