@@ -19,6 +19,9 @@ final class VmLocale
     /** @var array<string, int>|null */
     private static ?array $lcConstants = null;
 
+    /** @var array<string, int>|null */
+    private static ?array $nlLanginfoConstants = null;
+
     private static ?\FFI $ffi = null;
 
     /** @return array<string, int> */
@@ -59,6 +62,106 @@ final class VmLocale
         }
 
         return self::$lcConstants;
+    }
+
+    /**
+     * nl_langinfo() item constants (php-src ext/standard/basic_functions.c + langinfo.h; #3382).
+     *
+     * @return array<string, int>
+     */
+    public static function nlLanginfoConstants(): array
+    {
+        if (null !== self::$nlLanginfoConstants) {
+            return self::$nlLanginfoConstants;
+        }
+
+        self::$nlLanginfoConstants = [
+            'ABDAY_1' => 131072,
+            'ABDAY_2' => 131073,
+            'ABDAY_3' => 131074,
+            'ABDAY_4' => 131075,
+            'ABDAY_5' => 131076,
+            'ABDAY_6' => 131077,
+            'ABDAY_7' => 131078,
+            'ABMON_1' => 131086,
+            'ABMON_2' => 131087,
+            'ABMON_3' => 131088,
+            'ABMON_4' => 131089,
+            'ABMON_5' => 131090,
+            'ABMON_6' => 131091,
+            'ABMON_7' => 131092,
+            'ABMON_8' => 131093,
+            'ABMON_9' => 131094,
+            'ABMON_10' => 131095,
+            'ABMON_11' => 131096,
+            'ABMON_12' => 131097,
+            'AM_STR' => 131110,
+            'CODESET' => 14,
+            'CRNCYSTR' => 262159,
+            'DAY_1' => 131079,
+            'DAY_2' => 131080,
+            'DAY_3' => 131081,
+            'DAY_4' => 131082,
+            'DAY_5' => 131083,
+            'DAY_6' => 131084,
+            'DAY_7' => 131085,
+            'D_FMT' => 131113,
+            'D_T_FMT' => 131112,
+            'MON_1' => 131098,
+            'MON_2' => 131099,
+            'MON_3' => 131100,
+            'MON_4' => 131101,
+            'MON_5' => 131102,
+            'MON_6' => 131103,
+            'MON_7' => 131104,
+            'MON_8' => 131105,
+            'MON_9' => 131106,
+            'MON_10' => 131107,
+            'MON_11' => 131108,
+            'MON_12' => 131109,
+            'MON_DECIMAL_POINT' => 262146,
+            'MON_GROUPING' => 262148,
+            'MON_THOUSANDS_SEP' => 262147,
+            'PM_STR' => 131111,
+            'RADIXCHAR' => 65536,
+            'THOUSEP' => 65537,
+            'T_FMT' => 131114,
+            'T_FMT_AMPM' => 131115,
+        ];
+
+        $ffi = self::ffi();
+        if (null === $ffi) {
+            return self::$nlLanginfoConstants;
+        }
+
+        foreach (self::$nlLanginfoConstants as $name => $fallback) {
+            try {
+                self::$nlLanginfoConstants[$name] = (int) $ffi->{$name};
+            } catch (\Throwable) {
+                self::$nlLanginfoConstants[$name] = $fallback;
+            }
+        }
+
+        return self::$nlLanginfoConstants;
+    }
+
+    /**
+     * nl_langinfo() — locale item lookup (php-src ext/standard/nl_langinfo.c; #3382).
+     */
+    public static function nlLanginfo(int $item): string|false
+    {
+        $ffi = self::ffi();
+        if (null === $ffi) {
+            return false;
+        }
+
+        $result = $ffi->nl_langinfo($item);
+        if (null === $result) {
+            return false;
+        }
+        $text = \FFI::string($result);
+
+        return '' === $text ? false : $text;
     }
 
     /**
@@ -274,6 +377,7 @@ struct lconv {
 };
 char *setlocale(int category, const char *locale);
 struct lconv *localeconv(void);
+char *nl_langinfo(int item);
 CDEF;
 
         foreach (['libc.so.6', 'libc.so'] as $lib) {
