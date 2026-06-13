@@ -25,6 +25,7 @@ final class WeakRefNative
                 ['phpc_weakref_clear_object', $void, [$i8p]],
                 ['phpc_weakref_clear_object_typed', $void, [$i8p, $i32]],
                 ['phpc_weakref_format_object_key', $void, [$i8p, $i8p, $sizeT]],
+                ['phpc_weakref_map_key_to_object', $context->getTypeFromString('__object__*'), [$context->getTypeFromString('__string__*')]],
             ] as [$name, $ret, $params]
         ) {
             $existing = $context->module->getNamedFunction($name);

@@ -132,6 +132,9 @@ class Context {
     /** @var array<int, ObjectPropertyIterator> foreach object property walk (#3661). */
     public array $objectPropertyIterators = [];
 
+    /** @var array<int, WeakMapIterator> foreach WeakMap entry walk (#4434). */
+    public array $weakMapIterators = [];
+
     /**
      * Handler frames for active try regions (block with TYPE_TRY/CATCH), innermost last (#3521).
      *

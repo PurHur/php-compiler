@@ -80,6 +80,12 @@ final class WeakRefRegistryRuntime
         $fnFmt = $context->module->addFunction('phpc_weakref_format_object_key', $ftFmt);
         self::implementFormatObjectKey($context, $fnFmt);
 
+        $objPtr = $context->getTypeFromString('__object__*');
+        $strPtr = $context->getTypeFromString('__string__*');
+        $ftResolve = $context->context->functionType($objPtr, false, $strPtr);
+        $fnResolve = $context->module->addFunction('phpc_weakref_map_key_to_object', $ftResolve);
+        self::implementMapKeyToObject($context, $fnResolve);
+
         $ftClear = $context->context->functionType($voidTy, false, $i8p);
         $fnClear = $context->module->addFunction('phpc_weakref_clear_object', $ftClear);
         self::implementClearObject($context, $fnClear);
@@ -394,6 +400,69 @@ final class WeakRefRegistryRuntime
         $context->builder->clearInsertionPosition();
     }
 
+    private static function implementMapKeyToObject(Context $context, Value $fn): void
+    {
+        $entry = $fn->appendBasicBlock('wr_resolve_entry');
+        $doneBb = $fn->appendBasicBlock('wr_resolve_done');
+        $context->builder->positionAtEnd($entry);
+
+        $keyStr = $fn->getParam(0);
+        $objPtrTy = $context->getTypeFromString('__object__*');
+        $nullObj = $objPtrTy->constNull();
+        $strMap = $context->structFieldMap['__string__'];
+        $i64 = $context->getTypeFromString('int64');
+        $i8p = $context->getTypeFromString('int8*');
+        $sizeT = $context->getTypeFromString('size_t');
+
+        $keyNull = $context->builder->icmp(Builder::INT_EQ, $keyStr, $keyStr->typeOf()->constNull());
+        $checkLen = $fn->appendBasicBlock('wr_resolve_check_len');
+        $context->builder->branchIf($keyNull, $doneBb, $checkLen);
+
+        $context->builder->positionAtEnd($checkLen);
+        $len = $context->builder->load($context->builder->structGep($keyStr, $strMap['length']));
+        $len64 = $context->builder->zExt($len, $i64);
+        $minLen = $i64->constInt(3, false);
+        $tooShort = $context->builder->icmp(Builder::INT_ULT, $len64, $minLen);
+        $checkPrefix = $fn->appendBasicBlock('wr_resolve_check_prefix');
+        $context->builder->branchIf($tooShort, $doneBb, $checkPrefix);
+
+        $context->builder->positionAtEnd($checkPrefix);
+        $bytes = $context->builder->load($context->builder->structGep($keyStr, $strMap['value']));
+        $oByte = $context->builder->load($bytes);
+        $colonByte = $context->builder->load($context->builder->inBoundsGep($bytes, $i64->constInt(1, false)));
+        $isO = $context->builder->icmp(Builder::INT_EQ, $oByte, $context->getTypeFromString('int8')->constInt(ord('o'), false));
+        $isColon = $context->builder->icmp(Builder::INT_EQ, $colonByte, $context->getTypeFromString('int8')->constInt(ord(':'), false));
+        $prefixOk = $context->builder->and($isO, $isColon);
+        $parseBb = $fn->appendBasicBlock('wr_resolve_parse');
+        $context->builder->branchIf($prefixOk, $parseBb, $doneBb);
+
+        $context->builder->positionAtEnd($parseBb);
+        $suffix = $context->builder->call(
+            $context->lookupFunction('__string__init'),
+            $context->builder->sub($len64, $i64->constInt(2, false)),
+            $context->builder->inBoundsGep($bytes, $i64->constInt(2, false))
+        );
+        $suffixBytes = $context->builder->load($context->builder->structGep($suffix, $strMap['value']));
+        $endPtr = $context->builder->alloca($i8p);
+        $handle = $context->builder->call(
+            $context->lookupFunction('strtoull'),
+            $suffixBytes,
+            $endPtr,
+            $sizeT->constInt(16, false)
+        );
+        $obj = $context->builder->intToPtr($handle, $objPtrTy);
+        $context->builder->branch($doneBb);
+
+        $context->builder->positionAtEnd($doneBb);
+        $result = $context->builder->phi($objPtrTy);
+        $result->addIncoming($nullObj, $entry);
+        $result->addIncoming($nullObj, $checkLen);
+        $result->addIncoming($nullObj, $checkPrefix);
+        $result->addIncoming($obj, $parseBb);
+        $context->builder->returnValue($result);
+        $context->builder->clearInsertionPosition();
+    }
+
     private static function implementClearObject(Context $context, Value $fn): void
     {
         $entry = $fn->appendBasicBlock('wr_clear_entry');
@@ -667,6 +736,11 @@ final class WeakRefRegistryRuntime
         );
         self::ensureExternal(
             $context,
+            'strtoull',
+            $context->context->functionType($i64, false, $i8p, $i8p->pointerType(0), $i32)
+        );
+        self::ensureExternal(
+            $context,
             '__value__writeNull',
             $context->context->functionType($voidTy, false, $valuePtr)
         );
@@ -703,6 +777,7 @@ final class WeakRefRegistryRuntime
                 'phpc_weakref_clear_object',
                 'phpc_weakref_clear_object_typed',
                 'phpc_weakref_format_object_key',
+                'phpc_weakref_map_key_to_object',
                 'phpc_gc_notify_object_freed',
             ] as $name
         ) {
