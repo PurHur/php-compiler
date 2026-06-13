@@ -598,7 +598,11 @@ final class HashTable {
         $result->copyFrom($bucket->value->resolveIndirect());
         --$this->numUsed;
         --$this->numElements;
-        --$this->nextFreeElement;
+        if ($this->isPackedList()) {
+            --$this->nextFreeElement;
+        } else {
+            $this->recalcNextFreeElementFromBuckets();
+        }
         $this->rehash();
 
         return $result;
@@ -621,16 +625,27 @@ final class HashTable {
         $firstBucket = $this->buckets->read(0);
         $result = new Variable();
         $result->copyFrom($firstBucket->value->resolveIndirect());
-        for ($i = 0; $i < $this->numUsed - 1; ++$i) {
-            $src = $this->buckets->read($i + 1);
-            $dst = $this->buckets->read($i);
-            $dst->value->copyFrom($src->value);
-            $dst->hash = $i;
-            $dst->key = null;
+        if ($this->isPackedList()) {
+            for ($i = 0; $i < $this->numUsed - 1; ++$i) {
+                $src = $this->buckets->read($i + 1);
+                $dst = $this->buckets->read($i);
+                $dst->value->copyFrom($src->value);
+                $dst->hash = $i;
+                $dst->key = null;
+            }
+            --$this->nextFreeElement;
+        } else {
+            for ($i = 0; $i < $this->numUsed - 1; ++$i) {
+                $src = $this->buckets->read($i + 1);
+                $dst = $this->buckets->read($i);
+                $dst->value->copyFrom($src->value);
+                $dst->hash = $src->hash;
+                $dst->key = $src->key;
+            }
+            $this->recalcNextFreeElementFromBuckets();
         }
         --$this->numUsed;
         --$this->numElements;
-        --$this->nextFreeElement;
         $this->rehash();
 
         return $result;
@@ -663,22 +678,39 @@ final class HashTable {
         while ($this->numUsed + $k > $this->indexes->size()) {
             $this->resize();
         }
-        for ($i = $this->numUsed - 1; $i >= 0; --$i) {
-            $src = $this->buckets->read($i);
-            $dst = $this->buckets->read($i + $k);
-            $dst->value->copyFrom($src->value);
-            $dst->hash = $i + $k;
-            $dst->key = null;
-        }
-        for ($j = 0; $j < $k; ++$j) {
-            $bucket = $this->buckets->read($j);
-            $bucket->value->copyFrom($values[$j]);
-            $bucket->hash = $j;
-            $bucket->key = null;
+        if ($this->isPackedList()) {
+            for ($i = $this->numUsed - 1; $i >= 0; --$i) {
+                $src = $this->buckets->read($i);
+                $dst = $this->buckets->read($i + $k);
+                $dst->value->copyFrom($src->value);
+                $dst->hash = $i + $k;
+                $dst->key = null;
+            }
+            for ($j = 0; $j < $k; ++$j) {
+                $bucket = $this->buckets->read($j);
+                $bucket->value->copyFrom($values[$j]);
+                $bucket->hash = $j;
+                $bucket->key = null;
+            }
+            $this->nextFreeElement += $k;
+        } else {
+            for ($i = $this->numUsed - 1; $i >= 0; --$i) {
+                $src = $this->buckets->read($i);
+                $dst = $this->buckets->read($i + $k);
+                $dst->value->copyFrom($src->value);
+                $dst->hash = $src->hash;
+                $dst->key = $src->key;
+            }
+            for ($j = 0; $j < $k; ++$j) {
+                $bucket = $this->buckets->read($j);
+                $bucket->value->copyFrom($values[$j]);
+                $bucket->hash = $j;
+                $bucket->key = null;
+            }
+            $this->recalcNextFreeElementFromBuckets();
         }
         $this->numUsed += $k;
         $this->numElements += $k;
-        $this->nextFreeElement += $k;
         $this->rehash();
 
         return $this->numElements;
@@ -1994,6 +2026,22 @@ final class HashTable {
 
     private function isWithoutHoles(): bool {
         return $this->numUsed === $this->numElements;
+    }
+
+    /** Recompute nextFreeElement from int-key buckets (ext/standard/array.c keyed pop/shift/unshift). */
+    private function recalcNextFreeElementFromBuckets(): void
+    {
+        $next = 0;
+        for ($i = 0; $i < $this->numUsed; ++$i) {
+            $bucket = $this->buckets->read($i);
+            if ($bucket->value->isUndefined()) {
+                continue;
+            }
+            if (null === $bucket->key && $bucket->hash >= $next) {
+                $next = $bucket->hash + 1;
+            }
+        }
+        $this->nextFreeElement = $next;
     }
 
     private function reset() {
