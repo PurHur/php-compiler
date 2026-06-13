@@ -237,14 +237,15 @@ final class JitValueBox
 
                 return;
             case Variable::TYPE_NATIVE_BOOL:
-                $long = $context->builder->zExt(
-                    $context->helper->loadValue($value),
-                    $context->getTypeFromString('int64')
-                );
+                $boolVal = $context->helper->loadValue($value);
+                $i32 = $context->getTypeFromString('int32');
                 $context->builder->call(
-                    $context->lookupFunction('__value__writeLong'),
+                    $context->lookupFunction('__value__writeBool'),
                     $destPtr,
-                    $long
+                    $context->builder->zExt(
+                        $context->builder->truncOrBitCast($boolVal, $context->getTypeFromString('int1')),
+                        $i32
+                    )
                 );
 
                 return;
@@ -508,10 +509,15 @@ final class JitValueBox
         $context->builder->branchIf($isBool, $boolBlock, $afterBool);
 
         $context->builder->positionAtEnd($boolBlock);
+        $boolLong = $context->builder->call($context->lookupFunction('__value__readLong'), $srcPtr);
+        $i32 = $context->getTypeFromString('int32');
         $context->builder->call(
-            $context->lookupFunction('__value__writeLong'),
+            $context->lookupFunction('__value__writeBool'),
             $destPtr,
-            $context->builder->call($context->lookupFunction('__value__readLong'), $srcPtr)
+            $context->builder->zExt(
+                $context->builder->truncOrBitCast($boolLong, $context->getTypeFromString('int1')),
+                $i32
+            )
         );
         $context->builder->branch($done);
 

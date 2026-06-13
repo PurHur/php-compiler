@@ -8102,15 +8102,25 @@ class JIT {
 
                 return $this->context->builder->load($slot);
             }
-            if (Variable::TYPE_NATIVE_LONG === $return->type || Variable::TYPE_NATIVE_BOOL === $return->type) {
+            if (Variable::TYPE_NATIVE_BOOL === $return->type) {
                 $slot = JIT\JitValueBox::alloc($this->context);
-                $long = Variable::TYPE_NATIVE_BOOL === $return->type
-                    ? $this->context->builder->zExt($retval, $this->context->getTypeFromString('int64'))
-                    : $retval;
+                JIT\JitValueBox::writeBool(
+                    $this->context,
+                    $slot,
+                    $this->context->builder->truncOrBitCast(
+                        $retval,
+                        $this->context->getTypeFromString('int1')
+                    )
+                );
+
+                return $this->context->builder->load($slot);
+            }
+            if (Variable::TYPE_NATIVE_LONG === $return->type) {
+                $slot = JIT\JitValueBox::alloc($this->context);
                 $this->context->builder->call(
                     $this->context->lookupFunction('__value__writeLong'),
                     JIT\JitValueBox::pointer($this->context, $slot),
-                    $long
+                    $retval
                 );
 
                 return $this->context->builder->load($slot);
@@ -12397,11 +12407,7 @@ class JIT {
                 JIT\JitValueBox::writeLong($this->context, $slot, $native);
                 break;
             case Variable::TYPE_NATIVE_BOOL:
-                JIT\JitValueBox::writeLong(
-                    $this->context,
-                    $slot,
-                    $this->context->builder->zExt($native, $this->context->getTypeFromString('int64'))
-                );
+                JIT\JitValueBox::writeBool($this->context, $slot, $native);
                 break;
             case Variable::TYPE_NATIVE_DOUBLE:
                 $this->context->builder->call(
