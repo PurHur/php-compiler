@@ -18,6 +18,19 @@ use PHPCompiler\Web\Superglobals;
 /**
  * True when bin/compile.php is building a user/test fixture binary (not bootstrap/self-host spine).
  */
+/**
+ * Self-host spine bundles: lint must not mega-concat via SourceBundler (OOM at ~2465 units; #8391).
+ * Native argv drivers already compile the entry file and fold literal includes incrementally.
+ */
+function phpc_compile_skip_aot_bundle_for_lint(string $normalized): bool
+{
+    if ('' === $normalized) {
+        return false;
+    }
+
+    return str_contains($normalized, 'test/selfhost/compiler_lib_spine_smoke/main.php');
+}
+
 function phpc_compile_is_user_script_aot(string $normalized): bool
 {
     if ('' === $normalized || '-' === $normalized
@@ -193,13 +206,16 @@ function run(string $filename, string $code, array $options): void
         $includes = [] === $includes || '' === $includes ? [] : [$includes];
     }
     /** @var list<string> $includes */
+    $skipBundleForLint = isset($options['-l']) && phpc_compile_skip_aot_bundle_for_lint($normalized);
     if ([] === $includes && '-' !== $filename && is_file($filename)) {
         $runtime = new Runtime(Runtime::MODE_AOT);
         $includes = LiteralIncludeDiscovery::discoverDirectAbsolutePaths($runtime, $filename);
     }
-    if ([] !== $includes) {
+    if ([] !== $includes && !$skipBundleForLint) {
         $projectRoot = DeployRoot::findProjectRootForPath($filename);
         [$code, $filename] = SourceBundler::bundleForAot($filename, $includes, $projectRoot);
+    } elseif ('' === $code && '-' !== $filename && is_file($filename)) {
+        $code = (string) file_get_contents($filename);
     }
 
     $runtime = new Runtime(Runtime::MODE_AOT);
