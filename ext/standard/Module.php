@@ -317,6 +317,7 @@ class Module extends ModuleAbstract
             new preg_filter(),
             new preg_replace(),
             new preg_replace_callback(),
+            new preg_replace_callback_array(),
             new preg_split(),
             new preg_last_error_(),
             new preg_last_error_msg_(),

@@ -164,6 +164,9 @@ function analyzeInternal(PHPCompiler\Func\Internal $fn): array
     } elseif ('preg_replace_callback' === $fn->getName() && preg_match('/closures deferred/i', $source)) {
         $notes[] = 'compile-time string user-function callbacks; closures deferred (#1177, #142)';
     }
+    if ('preg_replace_callback_array' === $fn->getName() && str_contains($source, 'VmPregReplaceCallbackArray::invoke')) {
+        $notes[] = 'VM any callable; JIT/AOT deferred (#3568, #1177); closures use VM lowering';
+    }
     if (\PHPCompiler\JIT\SelfHostBuiltinPolicy::isVmOnlyDeferred($fn->getName())) {
         $deferLib = __DIR__.'/stdlib-jit-deferred-lib.php';
         if (is_readable($deferLib)) {
