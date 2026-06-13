@@ -44,6 +44,7 @@ final class BootstrapSelfhostLinkTest extends TestCase
         $this->assertFileExists(self::$root.'/prelinked/bootstrap-gen0/bin-compile-aot');
         $this->assertFileExists(self::$root.'/prelinked/bootstrap-gen0/compiler_minimal_aot_blob');
         $this->assertFileExists(self::$root.'/prelinked/bootstrap-gen0/compiler_lib_aot_blob');
+        $this->assertFileExists(self::$root.'/prelinked/bootstrap-gen0/.m3_bootstrap_loop_smoke_main_aot_blob');
     }
 
     public function testLinkScriptUsesCompiledDriverResolver(): void
@@ -58,6 +59,8 @@ final class BootstrapSelfhostLinkTest extends TestCase
         $this->assertStringContainsString('build/bin-compile-aot-inventory', $body);
         $this->assertStringContainsString('exited 0 but missing', $body);
         $this->assertStringContainsString('bootstrap_gen0_sidecar_emit_fallback', $body);
+        $this->assertStringContainsString('bootstrap_loop_smoke/main.php', $body);
+        $this->assertStringContainsString('.m3_bootstrap_loop_smoke_main_aot_blob', $body);
         $this->assertStringContainsString('gen-0 sidecar emit fallback', $body);
         $this->assertStringContainsString('native parse spine null', $body);
         $this->assertStringContainsString('gen-0 native emit failed — recovered via sidecar', $body);

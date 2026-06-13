@@ -22,6 +22,7 @@
         ".m3_compiler_unit_probe_aot_blob",
         ".m3_helloworld_aot_blob",
         ".m3_helloworld_smoke_main_aot_blob",
+        ".m3_bootstrap_loop_smoke_main_aot_blob",
         ".m3_vendor_php_cfg_prelink.o",
         ".m3_vendor_php_llvm_prelink.o",
         ".m3_vendor_php_types_prelink.o"
