@@ -25,6 +25,24 @@ final class VmGrapheme
     }
 
     /**
+     * grapheme_strlen() — count grapheme clusters (php-src ext/intl/grapheme; #5914).
+     *
+     * @return int|false grapheme count, or false on invalid UTF-8
+     */
+    public static function strlen(string $string): int|false
+    {
+        if ('' === $string) {
+            return 0;
+        }
+        $graphemes = self::splitGraphemes($string);
+        if (null === $graphemes) {
+            return false;
+        }
+
+        return \count($graphemes);
+    }
+
+    /**
      * grapheme_strstr() — grapheme-cluster strstr (php-src ext/intl/grapheme; #7221).
      *
      * @return string|false
