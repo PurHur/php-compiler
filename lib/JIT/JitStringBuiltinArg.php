@@ -281,4 +281,10 @@ final class JitStringBuiltinArg
     {
         return $context->getTypeFromString('__string__*')->constNull();
     }
+
+    /** Compile-time string operand for builtins that only lower literals (timezone_open, date_create, …). */
+    public static function compileTimeLiteral(Variable $arg): ?string
+    {
+        return JitStringArg::compileTimeLiteral($arg);
+    }
 }
