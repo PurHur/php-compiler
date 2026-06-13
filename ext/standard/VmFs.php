@@ -586,7 +586,8 @@ final class VmFs
     }
 
     /**
-     * popen() — open pipe to subprocess (php-src ext/standard/exec.c; #6211).
+     * popen() — open pipe to subprocess (php-src ext/standard/exec.c; #6211, #8244).
+     * VmPopenNative (libc FFI) only — no host \\popen() fallback.
      *
      * @return int|false stream handle id
      */
@@ -610,14 +611,7 @@ final class VmFs
             return $id;
         }
 
-        $fp = @\popen($command, $mode);
-        if (false === $fp) {
-            return false;
-        }
-        $id = self::adoptStreamResource($fp, 'popen://'.$command);
-        self::$popenHandles[$id] = true;
-
-        return $id;
+        return false;
     }
 
     /**
@@ -638,12 +632,8 @@ final class VmFs
 
             return VmPopenNative::pclose($nativeFile);
         }
-        $result = @\pclose($fp);
-        if (false === $result) {
-            return -1;
-        }
 
-        return (int) $result;
+        return -1;
     }
 
     public static function isPopenHandle(int $handle): bool

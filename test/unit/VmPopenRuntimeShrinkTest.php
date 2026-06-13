@@ -18,6 +18,8 @@ final class VmPopenRuntimeShrinkTest extends TestCase
         $this->assertStringContainsString('VmPopenNative::open', $source);
         $this->assertStringContainsString('VmPopenNative::pclose', $source);
         $this->assertStringContainsString('$popenNativeFiles', $source);
+        $this->assertDoesNotMatchRegularExpression('/@\\\\popen\\(/', $source);
+        $this->assertDoesNotMatchRegularExpression('/@\\\\pclose\\(/', $source);
     }
 
     public function testShellExecBuiltinDoesNotCallHostShellExec(): void
