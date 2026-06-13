@@ -1084,6 +1084,11 @@ class Type extends Builtin {
             $fntypeSessionApply
         );
         $this->context->registerFunction('__phpc_session_abort_apply', $fnSessionAbort);
+        $fnSessionUnset = $this->context->module->addFunction(
+            '__phpc_session_unset_apply',
+            $fntypeSessionApply
+        );
+        $this->context->registerFunction('__phpc_session_unset_apply', $fnSessionUnset);
         $fnSessionEncode = $this->context->module->addFunction(
             '__phpc_session_encode_apply',
             $fntypeSessionApply
@@ -1295,6 +1300,7 @@ class Type extends Builtin {
         SessionRegenerateId::implement($this->context);
         SessionDestroy::implement($this->context);
         SessionAbort::implement($this->context);
+        SessionUnset::implement($this->context);
         SessionStorageGlobals::ensureGlobals($this->context);
         SessionStorageRuntime::ensureLinked($this->context);
         SessionId::implement($this->context);
