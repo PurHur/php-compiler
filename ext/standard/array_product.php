@@ -41,50 +41,26 @@ final class array_product extends Internal
         $prodFloat = 1.0;
         $useFloat = false;
         foreach ($ht->iterate(true) as $value) {
-            $v = $value->resolveIndirect();
-            if (VmArray::shouldSkipNumericArrayFoldElement($v)) {
+            $coerced = VmArray::coerceArrayFoldNumericElement($value);
+            if (null === $coerced) {
                 continue;
             }
-            if (Variable::TYPE_INTEGER === $v->type) {
-                if ($useFloat) {
-                    $prodFloat *= (float) $v->toInt();
-                } else {
-                    $prodInt *= $v->toInt();
-                }
-                continue;
-            }
-            if (Variable::TYPE_FLOAT === $v->type) {
+            [$num, $isFloat] = $coerced;
+            if ($isFloat) {
                 if (!$useFloat) {
                     $useFloat = true;
-                    $prodFloat = (float) $prodInt * $v->toFloat();
+                    $prodFloat = (float) $prodInt * (float) $num;
                 } else {
-                    $prodFloat *= $v->toFloat();
+                    $prodFloat *= (float) $num;
                 }
                 continue;
             }
-            if (Variable::TYPE_STRING === $v->type) {
-                $s = $v->toString();
-                if (!\is_numeric($s)) {
-                    throw new \TypeError(self::ELEMENT_TYPE_ERROR);
-                }
-                $num = $v->toNumeric();
-                if (\is_int($num)) {
-                    if ($useFloat) {
-                        $prodFloat *= (float) $num;
-                    } else {
-                        $prodInt *= $num;
-                    }
-                } else {
-                    if (!$useFloat) {
-                        $useFloat = true;
-                        $prodFloat = (float) $prodInt * (float) $num;
-                    } else {
-                        $prodFloat *= (float) $num;
-                    }
-                }
-                continue;
+            $intNum = (int) $num;
+            if ($useFloat) {
+                $prodFloat *= (float) $intNum;
+            } else {
+                $prodInt *= $intNum;
             }
-            throw new \TypeError(self::ELEMENT_TYPE_ERROR);
         }
         if (null === $frame->returnVar) {
             return;
