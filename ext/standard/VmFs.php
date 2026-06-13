@@ -389,14 +389,14 @@ final class VmFs
         if (!str_starts_with($base, self::UPLOAD_TEMP_PREFIX)) {
             return false;
         }
-        if (!is_file($path)) {
+        if (!VmStatPath::isFile($path)) {
             return false;
         }
-        $real = realpath($path);
+        $real = VmStatNative::realpath($path);
         if (false === $real) {
             return false;
         }
-        $tmpdir = realpath(self::tempDir());
+        $tmpdir = VmStatNative::realpath(self::tempDir());
         if (false === $tmpdir) {
             return false;
         }
@@ -504,7 +504,7 @@ final class VmFs
         if ($filename[0] === '/' || (\strlen($filename) > 1 && $filename[1] === ':')) {
             $normalized = ScriptStack::normalize($filename);
 
-            return '' !== $normalized && \is_file($normalized) ? $normalized : false;
+            return '' !== $normalized && VmStatPath::isFile($normalized) ? $normalized : false;
         }
         $includePath = VmIncludePath::get();
         if ('' === $includePath) {
@@ -515,7 +515,7 @@ final class VmFs
                 continue;
             }
             $candidate = ScriptStack::normalize(\rtrim($dir, '/\\').'/'.$filename);
-            if ('' !== $candidate && \is_file($candidate)) {
+            if ('' !== $candidate && VmStatPath::isFile($candidate)) {
                 return $candidate;
             }
         }
@@ -534,9 +534,45 @@ final class VmFs
             }
             $flags &= ~StdlibConstants::FILE_USE_INCLUDE_PATH;
         }
-        $lines = @\file($path, $flags);
-        if (false === $lines) {
+        return self::readFileLines($path, $flags);
+    }
+
+    /**
+     * @return list<string>|false
+     */
+    private static function readFileLines(string $path, int $flags): array|false
+    {
+        $content = VmFsReadNative::read($path);
+        if (false === $content) {
             return false;
+        }
+        if ('' === $content) {
+            if (0 !== ($flags & StdlibConstants::FILE_SKIP_EMPTY_LINES)) {
+                return [];
+            }
+
+            return [''];
+        }
+
+        $lines = [];
+        $offset = 0;
+        $len = \strlen($content);
+        while ($offset < $len) {
+            $pos = \strpos($content, "\n", $offset);
+            if (false === $pos) {
+                $line = \substr($content, $offset);
+                $offset = $len;
+            } else {
+                $line = \substr($content, $offset, $pos - $offset + 1);
+                $offset = $pos + 1;
+            }
+            if (0 !== ($flags & StdlibConstants::FILE_IGNORE_NEW_LINES)) {
+                $line = \rtrim($line, "\r\n");
+            }
+            if (0 !== ($flags & StdlibConstants::FILE_SKIP_EMPTY_LINES) && '' === $line) {
+                continue;
+            }
+            $lines[] = $line;
         }
 
         return $lines;

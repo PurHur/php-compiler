@@ -22,6 +22,35 @@ final class VmFsReadNativeRuntimeShrinkTest extends TestCase
         );
     }
 
+    public function testVmFsFileDoesNotDelegateToHostFile(): void
+    {
+        $source = (string) file_get_contents(__DIR__.'/../../ext/standard/VmFs.php');
+        $this->assertStringContainsString('readFileLines', $source);
+        $this->assertStringContainsString('VmStatPath::isFile', $source);
+        $this->assertDoesNotMatchRegularExpression('/@\\\\file\\s*\\(/', $source);
+        $this->assertDoesNotMatchRegularExpression('/\\\\is_file\\s*\\(/', $source);
+    }
+
+    public function testFileBuiltinRoundTripViaReadNative(): void
+    {
+        if (!VmFsReadNative::available()) {
+            $this->markTestSkipped('ext/ffi required for VmFsReadNative libc read');
+        }
+
+        $path = tempnam(sys_get_temp_dir(), 'phpc_file_');
+        $this->assertNotFalse($path);
+        file_put_contents($path, "alpha\nbeta\n");
+
+        $lines = VmFs::file($path);
+        $this->assertIsArray($lines);
+        $this->assertSame(["alpha\n", "beta\n"], $lines);
+
+        $trimmed = VmFs::file($path, \PHPCompiler\ext\standard\StdlibConstants::FILE_IGNORE_NEW_LINES);
+        $this->assertSame(['alpha', 'beta'], $trimmed);
+
+        @unlink($path);
+    }
+
     public function testReadNativeDeclaresLibcOpenReadClose(): void
     {
         $source = (string) file_get_contents(__DIR__.'/../../ext/standard/VmFsReadNative.php');
