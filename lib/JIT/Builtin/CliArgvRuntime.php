@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace PHPCompiler\JIT\Builtin;
 
+use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\Progress;
 use PHPLLVM\Builder;
@@ -334,6 +335,56 @@ final class CliArgvRuntime
             $fn = $context->module->addFunction($name, $ft);
             $context->registerFunction($name, $fn);
         }
+    }
+
+    /** Packed argv list from phpc_cli_* globals (getopt JIT, #3251). */
+    public static function buildArgvHashtable(Context $context): Value
+    {
+        self::ensureLinked($context);
+
+        $i32 = $context->getTypeFromString('int32');
+        $i64 = $context->getTypeFromString('int64');
+        $sizeT = $context->getTypeFromString('size_t');
+        $htPtr = $context->getTypeFromString('__hashtable__*');
+        $ht = $context->builder->call($context->lookupFunction('__hashtable__alloc'));
+
+        $argc = $context->builder->load(self::globalPtr($context, self::G_ARGC, $i32));
+        $iSlot = $context->builder->alloca($i32, 1, 'getopt_argv_i');
+        $context->builder->store($i32->constInt(0, false), $iSlot);
+
+        $loopHead = BasicBlockHelper::append($context, 'getopt_argv_head');
+        $loopDone = BasicBlockHelper::append($context, 'getopt_argv_done');
+        $loopBody = BasicBlockHelper::append($context, 'getopt_argv_body');
+        $context->builder->branch($loopHead);
+
+        $context->builder->positionAtEnd($loopHead);
+        $i = $context->builder->load($iSlot);
+        $done = $context->builder->icmp(Builder::INT_SGE, $i, $argc);
+        $context->builder->branchIf($done, $loopDone, $loopBody);
+
+        $context->builder->positionAtEnd($loopBody);
+        $cstr = $context->builder->call($context->lookupFunction('__phpc_cli_argv_cstr'), $i);
+        $len = $context->builder->call($context->lookupFunction('strlen'), $cstr);
+        $str = $context->builder->call(
+            $context->lookupFunction('__string__init'),
+            $context->builder->sext($len, $i64),
+            $cstr
+        );
+        $context->builder->call(
+            $context->lookupFunction('__hashtable__setStringAt'),
+            $ht,
+            $context->builder->zExt($i, $sizeT),
+            $str
+        );
+        $context->builder->store(
+            $context->builder->add($i, $i32->constInt(1, false)),
+            $iSlot
+        );
+        $context->builder->branch($loopHead);
+
+        $context->builder->positionAtEnd($loopDone);
+
+        return $ht;
     }
 
     private static function registerLinkedRuntime(Context $context): void

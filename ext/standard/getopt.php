@@ -15,7 +15,8 @@ use PHPLLVM\Value;
 /**
  * getopt() — CLI option parsing (ext/standard/php_getopt.c parity, issue #3251).
  *
- * VM: GetoptEngine over SAPI argv snapshot. JIT/AOT: VM-only v1.
+ * VM: GetoptEngine over SAPI argv snapshot. JIT/AOT: GetoptJitHelper via JitGetopt (#3251 phase 2).
+ * rest_index by-ref is VM-only.
  */
 final class getopt extends Internal
 {
@@ -94,6 +95,82 @@ final class getopt extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        throw new \LogicException('getopt() is not implemented for JIT in this compiler build (issue #3251)');
+        $argc = \count($args);
+        if ($argc < 1 || $argc > 3) {
+            throw new \LogicException('getopt() expects between 1 and 3 arguments in this compiler build');
+        }
+        if ($argc >= 3) {
+            throw new \LogicException('getopt() rest_index by-ref is VM-only in this compiler build (issue #3251)');
+        }
+        $longOptions = 2 === $argc ? self::resolveJitLongOptions($context, $args[1]) : [];
+
+        return JitGetopt::invoke($context, $args[0], $longOptions);
+    }
+
+    /**
+     * @return list<string>
+     */
+    private static function resolveJitLongOptions(Context $context, JITVariable $arg): array
+    {
+        if (JITVariable::TYPE_NULL === $arg->type || $arg->isNullConstant) {
+            return [];
+        }
+        if (0 !== ($arg->type & JITVariable::IS_NATIVE_ARRAY) && \is_array($arg->compileTimeArray ?? null)) {
+            $specs = [];
+            foreach ($arg->compileTimeArray as $entry) {
+                if (!\is_string($entry)) {
+                    throw new \LogicException('getopt(): Argument #2 ($long_options) must be a list of strings');
+                }
+                $specs[] = $entry;
+            }
+
+            return $specs;
+        }
+        if (null === $context->runtime->vmContext) {
+            throw new \LogicException('getopt() requires VM context for long_options lowering');
+        }
+        $phpVar = self::materializeJitArrayArg($context, $arg);
+        if (null === $phpVar || Variable::TYPE_ARRAY !== $phpVar->type) {
+            throw new \LogicException(
+                'getopt(): Argument #2 ($long_options) must be a compile-time array literal in JIT/AOT'
+            );
+        }
+        $specs = [];
+        foreach ($phpVar->toArray()->iterate(true) as $entry) {
+            $entry = $entry->resolveIndirect();
+            $specs[] = VmString::coerceStringBuiltinArg($entry, 'getopt', 1, 'long_options');
+        }
+
+        return $specs;
+    }
+
+    private static function materializeJitArrayArg(Context $context, JITVariable $arg): ?Variable
+    {
+        if (null !== $arg->compileTimeConstantName) {
+            $resolved = $context->runtime->vmContext->constantFetch($arg->compileTimeConstantName);
+            if (null !== $resolved) {
+                return $resolved->resolveIndirect();
+            }
+        }
+        if (JITVariable::TYPE_STRING === $arg->type && null !== $arg->compileTimeString) {
+            $v = new Variable();
+            $v->string($arg->compileTimeString);
+
+            return $v;
+        }
+        if (JITVariable::TYPE_VALUE !== $arg->type || null === $context->runtime->vm) {
+            return null;
+        }
+        $frame = $context->runtime->vm->getTopFrame();
+        if (null === $frame) {
+            return null;
+        }
+        foreach ($frame->locals as $local) {
+            if ($local->jitVariable === $arg) {
+                return $local->resolveIndirect();
+            }
+        }
+
+        return null;
     }
 }
