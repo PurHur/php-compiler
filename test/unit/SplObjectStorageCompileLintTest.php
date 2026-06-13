@@ -16,6 +16,7 @@ final class SplObjectStorageCompileLintTest extends TestCase
     public static function lintTargets(): iterable
     {
         yield 'spl_object_storage_dim' => ['test/bootstrap-aot/spl_object_storage_dim.php'];
+        yield 'spl_object_storage_attach' => ['test/bootstrap-aot/spl_object_storage_attach.php'];
         yield 'block_getframe_args_contains' => ['test/bootstrap-aot/block_getframe_args_contains.php'];
         yield 'spl_object_storage_jit_fixture' => ['test/compliance/fixtures/spl_object_storage_jit.phpt'];
     }

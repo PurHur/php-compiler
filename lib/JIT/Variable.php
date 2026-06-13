@@ -317,9 +317,6 @@ final class Variable {
                 return self::getTypeFromType($nonNull[0]);
             }
         }
-        if (null !== $type->userType && 0 === strcasecmp($type->userType, 'SplObjectStorage')) {
-            return self::TYPE_HASHTABLE;
-        }
         if (null !== $type->userType && 0 === strcasecmp($type->userType, 'mixed')) {
             return self::TYPE_VALUE;
         }
