@@ -553,6 +553,10 @@ class JITTest extends BaseTest {
             if ($name === 'language/null_property_read_error') {
                 continue;
             }
+            // dirname() $levels Z_PARAM_LONG TypeError in try/catch: VM + AOT (#4715); MCJIT execute LLVM verify/segfault like chunk_split_type_error.
+            if (str_contains($name, 'path_functions_type_error')) {
+                continue;
+            }
             yield $name => $case;
         }
     }
