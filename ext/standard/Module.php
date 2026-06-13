@@ -429,6 +429,7 @@ class Module extends ModuleAbstract
             new header_list(),
             new headers_list(),
             new getallheaders_(),
+            new getallheaders_('apache_request_headers'),
             new http_get_last_response_headers(),
             new get_last_response_headers(),
             new http_clear_last_response_headers(),

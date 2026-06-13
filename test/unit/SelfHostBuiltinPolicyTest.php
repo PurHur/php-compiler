@@ -89,6 +89,7 @@ final class SelfHostBuiltinPolicyTest extends TestCase
             'headers_list',
             'header_list',
             'getallheaders',
+            'apache_request_headers',
         ] as $fn) {
             $this->assertTrue(
                 SelfHostBuiltinPolicy::isRequiredForBundle($fn),
