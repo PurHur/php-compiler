@@ -153,11 +153,15 @@ final class asort_ extends Internal
     private static function jitSortByValueWithFlags(Context $context, JITVariable $array, int $flags): void
     {
         $sortType = $flags & ~StdlibConstants::SORT_FLAG_CASE;
+        if (StdlibConstants::SORT_LOCALE_STRING === $sortType) {
+            ArrayBuiltinHelper::asortByValueLocale($context, $array);
+
+            return;
+        }
         if (
             StdlibConstants::SORT_REGULAR === $sortType
             || StdlibConstants::SORT_NUMERIC === $sortType
             || StdlibConstants::SORT_STRING === $sortType
-            || StdlibConstants::SORT_LOCALE_STRING === $sortType
         ) {
             ArrayBuiltinHelper::asortByValue($context, $array);
 

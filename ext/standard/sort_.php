@@ -162,11 +162,15 @@ final class sort_ extends Internal
 
             return;
         }
+        if (StdlibConstants::SORT_LOCALE_STRING === $sortType) {
+            ArrayBuiltinHelper::sortPackedLocale($context, $array);
+
+            return;
+        }
         if (
             StdlibConstants::SORT_REGULAR === $sortType
             || StdlibConstants::SORT_STRING === $sortType
             || StdlibConstants::SORT_NUMERIC === $sortType
-            || StdlibConstants::SORT_LOCALE_STRING === $sortType
         ) {
             ArrayBuiltinHelper::sortPacked($context, $array);
 

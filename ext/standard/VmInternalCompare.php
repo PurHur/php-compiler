@@ -18,6 +18,7 @@ final class VmInternalCompare
     private const STRING_CALLBACKS = [
         'strcmp' => strcmp::class,
         'strcasecmp' => strcasecmp::class,
+        'strcoll' => strcoll::class,
         'strnatcmp' => strnatcmp::class,
         'strnatcasecmp' => strnatcasecmp::class,
     ];
@@ -55,9 +56,9 @@ final class VmInternalCompare
             StdlibConstants::SORT_STRING => self::resolveStringCallback(
                 0 !== $caseFlag ? 'strcasecmp' : 'strcmp'
             ),
+            StdlibConstants::SORT_LOCALE_STRING => self::resolveStringCallback('strcoll'),
             StdlibConstants::SORT_REGULAR,
-            StdlibConstants::SORT_NUMERIC,
-            StdlibConstants::SORT_LOCALE_STRING => self::resolveStringCallback(
+            StdlibConstants::SORT_NUMERIC => self::resolveStringCallback(
                 0 !== $caseFlag ? 'strcasecmp' : 'strcmp'
             ),
             default => self::resolveStringCallback(
@@ -97,10 +98,10 @@ final class VmInternalCompare
                 $b
             );
         }
-        if (
-            StdlibConstants::SORT_STRING === $sortType
-            || StdlibConstants::SORT_LOCALE_STRING === $sortType
-        ) {
+        if (StdlibConstants::SORT_LOCALE_STRING === $sortType) {
+            return self::invoke(self::resolveStringCallback('strcoll'), $a, $b);
+        }
+        if (StdlibConstants::SORT_STRING === $sortType) {
             return self::invoke(
                 self::resolveStringCallback(0 !== $caseFlag ? 'strcasecmp' : 'strcmp'),
                 $a,
@@ -118,9 +119,11 @@ final class VmInternalCompare
         if (StdlibConstants::SORT_NUMERIC === $sortType) {
             return self::compareNumericOperandsForSort($a, $b);
         }
+        if (StdlibConstants::SORT_LOCALE_STRING === $sortType) {
+            return self::invoke(self::resolveStringCallback('strcoll'), $a, $b);
+        }
         if (
             StdlibConstants::SORT_STRING === $sortType
-            || StdlibConstants::SORT_LOCALE_STRING === $sortType
             || StdlibConstants::SORT_NATURAL === $sortType
         ) {
             return self::invoke(self::valueCompareForSortFlags($flags), $a, $b);
