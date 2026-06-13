@@ -61,7 +61,13 @@ final class stream_copy_to_stream extends Internal
                 'offset'
             );
         }
-        $copied = VmFs::streamCopyToStream($source, $dest, $maxlength, $offset);
+        $copied = VmFs::streamCopyToStream(
+            $source,
+            $dest,
+            $maxlength,
+            $offset,
+            $frame->vmContext
+        );
         if (false === $copied) {
             $frame->returnVar->bool(false);
 

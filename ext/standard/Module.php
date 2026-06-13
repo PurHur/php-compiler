@@ -104,7 +104,7 @@ class Module extends ModuleAbstract
             'STREAM_SOCK_STREAM' => StdlibConstants::STREAM_SOCK_STREAM,
             'STREAM_SOCK_DGRAM' => StdlibConstants::STREAM_SOCK_DGRAM,
             'STREAM_IPPROTO_IP' => StdlibConstants::STREAM_IPPROTO_IP,
-        ] + VmStreamSupports::constants() + VmImage::constants() + VmJsonFlags::constants() as $name => $value) {
+        ] + VmStreamSupports::constants() + VmStreamNotification::constants() + VmImage::constants() + VmJsonFlags::constants() as $name => $value) {
             $var = new VM\Variable();
             $var->int($value);
             $runtime->vmContext->defineConstant($name, $var);
@@ -532,6 +532,7 @@ class Module extends ModuleAbstract
             new stream_context_get_options(),
             new stream_context_set_options(),
             new stream_context_set_params(),
+            new stream_notification_callback(),
             new stream_socket_client(),
             new stream_socket_server(),
             new stream_socket_pair(),

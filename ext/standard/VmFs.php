@@ -1317,8 +1317,14 @@ final class VmFs
      *
      * @return int|false Bytes copied, or false on I/O failure
      */
-    public static function streamCopyToStream(int $source, int $dest, int $maxlength = -1, int $offset = 0)
-    {
+    public static function streamCopyToStream(
+        int $source,
+        int $dest,
+        int $maxlength = -1,
+        int $offset = 0,
+        ?\PHPCompiler\VM\Context $ctx = null,
+        ?\PHPCompiler\VM\Variable $streamContext = null
+    ) {
         $srcFp = self::lookup($source);
         $dstFp = self::lookup($dest);
         if (null === $srcFp || null === $dstFp) {
@@ -1330,6 +1336,34 @@ final class VmFs
         if (0 === $maxlength) {
             return 0;
         }
+
+        $bytesMax = -1;
+        if ($maxlength > 0) {
+            $bytesMax = $maxlength;
+        } else {
+            $stat = @\fstat($srcFp);
+            if (\is_array($stat) && isset($stat['size'])) {
+                $size = (int) $stat['size'];
+                if ($offset > 0) {
+                    $size = max(0, $size - $offset);
+                }
+                $bytesMax = $size;
+            }
+        }
+
+        if (null !== $ctx && null !== VmStreamNotification::resolveForContext($streamContext)) {
+            VmStreamNotification::dispatch(
+                $ctx,
+                $streamContext,
+                VmStreamNotification::NOTIFY_FILE_SIZE_IS,
+                VmStreamNotification::SEVERITY_INFO,
+                '',
+                0,
+                0,
+                max(0, $bytesMax)
+            );
+        }
+
         $total = 0;
         $chunkSize = 8192;
         while (!\feof($srcFp)) {
@@ -1344,6 +1378,19 @@ final class VmFs
             }
             $chunk = @\fread($srcFp, $toRead);
             if (false === $chunk) {
+                if (null !== $ctx) {
+                    VmStreamNotification::dispatch(
+                        $ctx,
+                        $streamContext,
+                        VmStreamNotification::NOTIFY_FAILURE,
+                        VmStreamNotification::SEVERITY_ERR,
+                        'Failed to read from source stream',
+                        0,
+                        $total,
+                        max(0, $bytesMax)
+                    );
+                }
+
                 return false;
             }
             if ('' === $chunk) {
@@ -1352,12 +1399,50 @@ final class VmFs
             $readLen = \strlen($chunk);
             $written = @\fwrite($dstFp, $chunk);
             if (false === $written) {
+                if (null !== $ctx) {
+                    VmStreamNotification::dispatch(
+                        $ctx,
+                        $streamContext,
+                        VmStreamNotification::NOTIFY_FAILURE,
+                        VmStreamNotification::SEVERITY_ERR,
+                        'Failed to write to destination stream',
+                        0,
+                        $total,
+                        max(0, $bytesMax)
+                    );
+                }
+
                 return false;
             }
             $total += $written;
+            if (null !== $ctx && null !== VmStreamNotification::resolveForContext($streamContext)) {
+                VmStreamNotification::dispatch(
+                    $ctx,
+                    $streamContext,
+                    VmStreamNotification::NOTIFY_PROGRESS,
+                    VmStreamNotification::SEVERITY_INFO,
+                    '',
+                    0,
+                    $total,
+                    max(0, $bytesMax)
+                );
+            }
             if ($written < $readLen) {
                 break;
             }
+        }
+
+        if (null !== $ctx && null !== VmStreamNotification::resolveForContext($streamContext)) {
+            VmStreamNotification::dispatch(
+                $ctx,
+                $streamContext,
+                VmStreamNotification::NOTIFY_COMPLETED,
+                VmStreamNotification::SEVERITY_INFO,
+                '',
+                0,
+                $total,
+                max(0, $bytesMax)
+            );
         }
 
         return $total;
