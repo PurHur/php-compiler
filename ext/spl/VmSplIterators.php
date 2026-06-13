@@ -19,6 +19,7 @@ final class VmSplIterators
         EmptyIteratorBuiltin::registerClass($ctx);
         ArrayIteratorBuiltin::registerClass($ctx);
         RecursiveArrayIteratorBuiltin::registerClass($ctx);
+        RecursiveCallbackFilterIteratorBuiltin::registerClass($ctx);
     }
 
     private static function registerRecursiveIteratorInterface(Context $ctx): void
