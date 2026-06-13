@@ -1720,28 +1720,34 @@ final class VmString
     }
 
     /**
-     * Minimal parse_url() for routing (http/https, path, query, host).
+     * parse_url() — php-src ext/standard/url.c parity (#4458).
      *
-     * @return array|string|int|false
+     * @return array|string|int|null|false
      */
     public static function parseUrl(string $url, int $component = -1)
     {
         $scheme = null;
         $host = null;
-        $port = null;
+        $port = 0;
+        $hasPort = false;
         $user = null;
         $pass = null;
-        $path = '';
+        $path = null;
         $query = null;
         $fragment = null;
         $rest = $url;
+        $hadAuthority = false;
 
         if (preg_match('#^([a-z][a-z0-9+.-]*):#i', $rest, $m)) {
             $scheme = strtolower($m[1]);
             $rest = substr($rest, strlen($m[0]));
-            self::parseUrlAuthority($rest, $host, $port, $user, $pass);
+            $hadAuthority = self::parseUrlAuthority($rest, $host, $port, $hasPort, $user, $pass);
         } elseif (str_starts_with($rest, '//')) {
-            self::parseUrlAuthority($rest, $host, $port, $user, $pass);
+            $hadAuthority = self::parseUrlAuthority($rest, $host, $port, $hasPort, $user, $pass);
+        }
+
+        if ($hadAuthority && (null === $host || '' === $host)) {
+            return false;
         }
 
         if (str_contains($rest, '#')) {
@@ -1749,51 +1755,62 @@ final class VmString
         }
         if (str_contains($rest, '?')) {
             [$path, $query] = explode('?', $rest, 2);
-        } else {
+        } elseif ('' !== $rest) {
             $path = $rest;
         }
 
-        $parts = [
-            'scheme' => $scheme,
-            'host' => $host,
-            'port' => $port,
-            'user' => $user,
-            'pass' => $pass,
-            'path' => $path,
-            'query' => $query,
-            'fragment' => $fragment,
-        ];
-
         if (-1 === $component) {
             $filtered = [];
-            foreach ($parts as $key => $value) {
-                if (null !== $value && '' !== $value) {
-                    $filtered[$key] = $value;
-                }
+            if (null !== $scheme && '' !== $scheme) {
+                $filtered['scheme'] = $scheme;
+            }
+            if (null !== $host && '' !== $host) {
+                $filtered['host'] = $host;
+            }
+            if ($hasPort) {
+                $filtered['port'] = $port;
+            }
+            if (null !== $user && '' !== $user) {
+                $filtered['user'] = $user;
+            }
+            if (null !== $pass && '' !== $pass) {
+                $filtered['pass'] = $pass;
+            }
+            if (null !== $path && '' !== $path) {
+                $filtered['path'] = $path;
+            }
+            if (null !== $query && '' !== $query) {
+                $filtered['query'] = $query;
+            }
+            if (null !== $fragment && '' !== $fragment) {
+                $filtered['fragment'] = $fragment;
             }
 
             return $filtered;
         }
 
         switch ($component) {
-            case \PHP_URL_SCHEME:
-                return self::parseUrlComponentOrFalse($scheme);
-            case \PHP_URL_HOST:
-                return self::parseUrlComponentOrFalse($host);
-            case \PHP_URL_PORT:
-                return null !== $port && $port > 0 ? $port : false;
-            case \PHP_URL_USER:
-                return self::parseUrlComponentOrFalse($user);
-            case \PHP_URL_PASS:
-                return self::parseUrlComponentOrFalse($pass);
-            case \PHP_URL_PATH:
-                return $path;
-            case \PHP_URL_QUERY:
-                return self::parseUrlComponentOrFalse($query);
-            case \PHP_URL_FRAGMENT:
-                return self::parseUrlComponentOrFalse($fragment);
+            case VmParseUrl::PHP_URL_SCHEME:
+                return null !== $scheme && '' !== $scheme ? $scheme : null;
+            case VmParseUrl::PHP_URL_HOST:
+                return null !== $host && '' !== $host ? $host : null;
+            case VmParseUrl::PHP_URL_PORT:
+                return $hasPort ? $port : null;
+            case VmParseUrl::PHP_URL_USER:
+                return null !== $user && '' !== $user ? $user : null;
+            case VmParseUrl::PHP_URL_PASS:
+                return null !== $pass && '' !== $pass ? $pass : null;
+            case VmParseUrl::PHP_URL_PATH:
+                return null !== $path && '' !== $path ? $path : null;
+            case VmParseUrl::PHP_URL_QUERY:
+                return null !== $query && '' !== $query ? $query : null;
+            case VmParseUrl::PHP_URL_FRAGMENT:
+                return null !== $fragment && '' !== $fragment ? $fragment : null;
             default:
-                throw new \LogicException('parse_url() component not supported in this compiler build');
+                throw new \ValueError(sprintf(
+                    'parse_url(): Argument #2 ($component) must be a valid URL component identifier, %d given',
+                    $component
+                ));
         }
     }
 
@@ -1803,12 +1820,13 @@ final class VmString
     private static function parseUrlAuthority(
         string &$rest,
         ?string &$host,
-        ?int &$port,
+        int &$port,
+        bool &$hasPort,
         ?string &$user,
         ?string &$pass
-    ): void {
+    ): bool {
         if (!str_starts_with($rest, '//')) {
-            return;
+            return false;
         }
         $rest = substr($rest, 2);
         $slash = strpos($rest, '/');
@@ -1833,24 +1851,16 @@ final class VmString
         }
         if (str_contains($authority, ':')) {
             [$host, $portStr] = explode(':', $authority, 2);
-            $port = (int) $portStr;
+            $portVal = (int) $portStr;
+            if ($portVal > 0 && $portVal <= 65535) {
+                $port = $portVal;
+                $hasPort = true;
+            }
         } else {
             $host = $authority;
         }
-    }
 
-    /**
-     * @param string|null $value
-     *
-     * @return string|false
-     */
-    private static function parseUrlComponentOrFalse(?string $value)
-    {
-        if (null === $value || '' === $value) {
-            return false;
-        }
-
-        return $value;
+        return true;
     }
 
     private static function percentEncode(string $data, bool $formEncoding): string
