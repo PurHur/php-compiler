@@ -14359,7 +14359,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/Builtin/StreamIoJit.php`
 
 **Warnings** (review for bootstrap subset):
-- 25 class method(s)
+- 33 class method(s)
 
 ### `lib/JIT/Builtin/StreamLifecycle.php`
 
@@ -14419,7 +14419,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/Builtin/StreamSocketPairJit.php`
 
 **Warnings** (review for bootstrap subset):
-- 21 class method(s)
+- 23 class method(s)
 
 ### `lib/JIT/Builtin/StreamSync.php`
 
