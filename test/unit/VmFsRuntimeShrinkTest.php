@@ -7,6 +7,7 @@ namespace PHPCompiler\Test\Unit;
 use PHPCompiler\ext\standard\VmFs;
 use PHPCompiler\ext\standard\VmFsDiskNative;
 use PHPCompiler\ext\standard\VmFsPathNative;
+use PHPCompiler\ext\standard\VmFsTouchNative;
 use PHPCompiler\ext\standard\VmFsUnlink;
 use PHPUnit\Framework\TestCase;
 
@@ -38,10 +39,24 @@ final class VmFsRuntimeShrinkTest extends TestCase
         $source = (string) file_get_contents(__DIR__.'/../../ext/standard/VmFs.php');
         $this->assertStringContainsString('VmFsDiskNative::diskFreeSpace', $source);
         $this->assertStringContainsString('VmFsDiskNative::diskTotalSpace', $source);
+        $this->assertStringContainsString('VmFsPathNative::readlink', $source);
+        $this->assertStringContainsString('VmFsPathNative::symlink', $source);
+        $this->assertStringContainsString('VmFsTouchNative::touch', $source);
         $this->assertDoesNotMatchRegularExpression("/function_exists\\('disk_free_space'\\)/", $source);
         $this->assertDoesNotMatchRegularExpression("/function_exists\\('disk_total_space'\\)/", $source);
         $this->assertDoesNotMatchRegularExpression('/\\\\disk_free_space\\s*\\(/', $source);
         $this->assertDoesNotMatchRegularExpression('/\\\\disk_total_space\\s*\\(/', $source);
+        $this->assertDoesNotMatchRegularExpression('/@\\\\readlink\\s*\\(/', $source);
+        $this->assertDoesNotMatchRegularExpression('/@\\\\symlink\\s*\\(/', $source);
+        $this->assertDoesNotMatchRegularExpression('/@\\\\touch\\s*\\(/', $source);
+    }
+
+    public function testVmFsTouchNativeDoesNotReferenceHostDelegation(): void
+    {
+        $source = (string) file_get_contents(__DIR__.'/../../ext/standard/VmFsTouchNative.php');
+        $this->assertStringContainsString('int utime(const char *filename', $source);
+        $this->assertDoesNotMatchRegularExpression('/@\\\\touch\\s*\\(/', $source);
+        $this->assertDoesNotMatchRegularExpression("/function_exists\\('touch'\\)/", $source);
     }
 
     public function testPathOpsRequireFfiWhenHostDelegationDisabled(): void
@@ -55,6 +70,9 @@ final class VmFsRuntimeShrinkTest extends TestCase
             $this->assertFalse(VmFsPathNative::rename('a', 'b'));
             $this->assertFalse(VmFsPathNative::copy('a', 'b'));
             $this->assertFalse(VmFsPathNative::link('a', 'b'));
+            $this->assertFalse(VmFsPathNative::readlink('a'));
+            $this->assertFalse(VmFsPathNative::symlink('a', 'b'));
+            $this->assertFalse(VmFsTouchNative::touch('a'));
             $this->assertFalse(VmFsUnlink::unlink('a'));
             $this->assertFalse(VmFs::diskFreeSpace(sys_get_temp_dir()));
             $this->assertFalse(VmFs::diskTotalSpace(sys_get_temp_dir()));

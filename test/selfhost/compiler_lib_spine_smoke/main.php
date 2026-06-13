@@ -1481,6 +1481,7 @@ require_once __DIR__.'/../../../ext/standard/VmFilestatArg.php';
 require_once __DIR__.'/../../../ext/standard/VmFnmatchPure.php';
 require_once __DIR__.'/../../../ext/standard/VmFsAccessNative.php';
 require_once __DIR__.'/../../../ext/standard/VmFsPathNative.php';
+require_once __DIR__.'/../../../ext/standard/VmFsTouchNative.php';
 require_once __DIR__.'/../../../ext/standard/VmFsTempnam.php';
 require_once __DIR__.'/../../../ext/standard/VmFsTempnamNative.php';
 require_once __DIR__.'/../../../ext/standard/VmFsUnlink.php';
