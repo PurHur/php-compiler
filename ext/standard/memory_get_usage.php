@@ -8,6 +8,7 @@ use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\Variable as JITVariable;
+use PHPCompiler\VM\MemoryAccounting;
 use PHPLLVM\Value;
 
 /** memory_get_usage() — current memory usage bytes (issue #3134). */
@@ -20,7 +21,10 @@ final class memory_get_usage extends Internal
 
     public function execute(Frame $frame): void
     {
-        $usage = VmMemory::getUsage(self::resolveRealUsage($frame));
+        $realUsage = self::resolveRealUsage($frame);
+        $usage = $realUsage
+            ? VmMemory::getUsage(true)
+            : MemoryAccounting::usageAfterPeakQuery();
         if (null === $frame->returnVar) {
             return;
         }
