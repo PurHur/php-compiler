@@ -9510,6 +9510,34 @@ class JIT {
         $this->assignOperand($result, $value, true);
     }
 
+    /**
+     * First assignment to a {main} script global must populate the heap box (#1492 bootstrap-aot).
+     *
+     * Without this, makeVariableFromValueOp keeps an SSA rvalue while a later VAR_FETCH rebinds
+     * the name to an empty script-global wrapper — SplObjectStorage::contains() then reads null.
+     */
+    private function tryAssignScriptGlobalFirstBinding(Operand $resultOp, JIT\Variable $value): bool
+    {
+        $block = $this->context->jitEnclosingBlock;
+        if (null === $block || !$block->isMainScript()) {
+            return false;
+        }
+        $name = JIT\OperandName::resolve($resultOp);
+        if (null === $name || '' === $name || \PHPCompiler\Web\Superglobals::isSuperglobalName($name)) {
+            return false;
+        }
+        $globalVar = $this->context->ensureScriptGlobal($name);
+        $this->context->setVariableOp($resultOp, $globalVar);
+        JIT\JitValueBox::assignToPointer(
+            $this->context,
+            JIT\JitValueBox::valuePtrFromVariable($this->context, $globalVar),
+            $value
+        );
+        $this->context->bindVariableByName($this->context->resolveRefAliasName($name), $globalVar);
+
+        return true;
+    }
+
     private function assignOperand(Operand $resultOp, Variable $value, bool $force = false): void {
         $branchMergeTarget = $force && $this->context->coalesceAssignTargets->contains($resultOp);
         $resolvedName = JIT\OperandName::resolve($resultOp);
@@ -9527,6 +9555,8 @@ class JIT {
                 && $this->context->aliasVariableOpFromSlot($this->context->jitCurrentBlock, $resultOp)
             ) {
                 // fall through to normal assign on the aliased lvalue
+            } elseif ($this->tryAssignScriptGlobalFirstBinding($resultOp, $value)) {
+                return;
             } else {
                 // it's a kind!
                 $var = $this->context->makeVariableFromValueOp($this->context->helper->loadValue($value), $resultOp);
@@ -9706,6 +9736,13 @@ class JIT {
                 JIT\JitValueBox::valuePtrFromVariable($this->context, $result),
                 $value
             );
+            $resolved = JIT\OperandName::resolve($resultOp);
+            if (null !== $resolved && '' !== $resolved) {
+                $this->context->bindVariableByName(
+                    $this->context->resolveRefAliasName($resolved),
+                    $result
+                );
+            }
 
             return;
         }
@@ -11624,7 +11661,8 @@ class JIT {
         $proxyName = $this->resolveJitInstanceMethodProxyName($declaringClassLc, $methodLc);
         $receiverVar = $this->context->getVariableFromOp($receiverOp);
         $dispatchReceiver = $this->jitInstanceMethodReceiverVariable($receiverVar);
-        if (Type::TYPE_OBJECT === $receiverOp->type?->type) {
+        $splObjectStorageMethod = str_starts_with(strtolower($proxyName), 'splobjectstorage::');
+        if (Type::TYPE_OBJECT === $receiverOp->type?->type && !$splObjectStorageMethod) {
             JIT\LazyObjectHelper::emitEnsureInitialized(
                 $this->context,
                 $this->context->helper->loadValue($dispatchReceiver)
@@ -11711,7 +11749,7 @@ class JIT {
             $this->context->scope->lateStaticCallClassId = $this->context->type->object->lookup($receiverUserType);
         }
         $this->context->scope->toCall = $staticProxy;
-        $this->context->scope->args = [$dispatchReceiver];
+        $this->context->scope->args = [$splObjectStorageMethod ? $receiverVar : $dispatchReceiver];
     }
 
     /**
