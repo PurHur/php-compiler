@@ -8,8 +8,8 @@ use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Builtin\StringStrtok;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\Variable as JITVariable;
-use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
 
 /**
@@ -31,22 +31,10 @@ final class strtok extends Internal
         if (null === $frame->returnVar) {
             return;
         }
-        $arg0 = $frame->calledArgs[0]->resolveIndirect();
-        $str = null;
-        if (Variable::TYPE_NULL === $arg0->type) {
-            $str = null;
-        } elseif (Variable::TYPE_STRING === $arg0->type) {
-            $str = $arg0->toString();
-        } else {
-            throw new \LogicException('strtok() argument #1 must be a string in this compiler build');
-        }
+        $str = VmString::coerceNullableStringBuiltinArg($frame->calledArgs[0], 'strtok', 0, 'string');
         $tok = null;
         if (2 === $argc) {
-            $arg1 = $frame->calledArgs[1]->resolveIndirect();
-            if (Variable::TYPE_STRING !== $arg1->type) {
-                throw new \LogicException('strtok() argument #2 must be a string in this compiler build');
-            }
-            $tok = $arg1->toString();
+            $tok = VmString::coerceStringBuiltinArg($frame->calledArgs[1], 'strtok', 1, 'token');
         }
         $result = VmString::strtok($str, $tok);
         if (false === $result) {
@@ -67,18 +55,18 @@ final class strtok extends Internal
             return JitStrtok::tokenize(
                 $context,
                 null,
-                $this->jitString($context, $args[0], 'strtok() token')
+                JitStringBuiltinArg::lower($context, $args[0], 'strtok', 0, 'token')
             );
         }
 
-        $tok = $this->jitString($context, $args[1], 'strtok() token');
+        $tok = JitStringBuiltinArg::lower($context, $args[1], 'strtok', 1, 'token');
         if (JITVariable::TYPE_NULL === $args[0]->type) {
             return JitStrtok::tokenize($context, null, $tok);
         }
 
         return JitStrtok::tokenize(
             $context,
-            $this->jitString($context, $args[0], 'strtok() string'),
+            JitStringBuiltinArg::lower($context, $args[0], 'strtok', 0, 'string'),
             $tok
         );
     }
