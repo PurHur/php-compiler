@@ -19,6 +19,7 @@ use PHPLLVM\Value;
  * debug_zval_dump() — internal zval introspection (Zend/zend_builtin_functions.c, #6576).
  *
  * @see https://github.com/php/php-src/blob/master/Zend/zend_builtin_functions.c zif_debug_zval_dump
+ * JIT/AOT: scalar lowering via JitDebugZvalDump → JitVarDump (#6084).
  */
 final class debug_zval_dump extends Internal
 {
@@ -43,7 +44,7 @@ final class debug_zval_dump extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        throw new \LogicException('debug_zval_dump() is VM-only in this compiler build (issue #6576)');
+        return JitDebugZvalDump::invoke($context, ...$args);
     }
 
     private static function dumpVariable(VM $vm, Variable $var, int $level, bool $showRefMarker = false, ?Frame $frame = null): void
