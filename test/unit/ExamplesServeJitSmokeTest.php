@@ -61,6 +61,12 @@ final class ExamplesServeJitSmokeTest extends TestCase
         $this->assertStringContainsString('examples-serve-jit-smoke.sh', $common);
     }
 
+    public function testCiLocalWiresServeJitSmokeGate(): void
+    {
+        $local = (string) file_get_contents(self::$root.'/script/ci-local.sh');
+        $this->assertStringContainsString('ci_run_examples_serve_jit_smoke', $local);
+    }
+
     public function testPhpcServeSupportsJitFlag(): void
     {
         $phpc = (string) file_get_contents(self::$root.'/bin/phpc.php');

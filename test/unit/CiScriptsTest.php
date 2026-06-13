@@ -558,6 +558,12 @@ final class CiScriptsTest extends TestCase
         $this->assertStringContainsString('examples-serve-jit-smoke.sh', $common);
     }
 
+    public function testCiLocalRunsServeJitSmokeGate(): void
+    {
+        $local = (string) file_get_contents(dirname(__DIR__, 2).'/script/ci-local.sh');
+        $this->assertStringContainsString('ci_run_examples_serve_jit_smoke', $local);
+    }
+
     public function testMakefileHasExamplesSelfhostprobeSmokeTarget(): void
     {
         $makefile = (string) file_get_contents(dirname(__DIR__, 2).'/Makefile');
