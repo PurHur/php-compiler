@@ -7,6 +7,7 @@ namespace PHPCompiler\JIT\Builtin;
 use PHPCompiler\JIT\Builtin;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\VM\ErrorReporter;
+use PHPLLVM\BasicBlock;
 use PHPLLVM\Builder;
 use PHPLLVM\Value;
 
@@ -43,6 +44,7 @@ final class AssertFail
             return;
         }
 
+        AssertionErrorRaise::ensureLinked($context);
         self::implementAssertFail($context, $probe);
         $strFn = $context->lookupFunction('__compiler_assert_fail_string');
         self::implementAssertFailString($context, $strFn);
@@ -65,7 +67,7 @@ final class AssertFail
 
         $defaultBb = $fn->appendBasicBlock('assert_fail_default');
         $customBb = $fn->appendBasicBlock('assert_fail_custom');
-        $msgReadyBb = $fn->appendBasicBlock('assert_fail_msg_ready');
+        $doneBb = $fn->appendBasicBlock('assert_fail_done');
         $context->builder->branchIf($useDefault, $defaultBb, $customBb);
 
         $defaultMsgPtr = $context->builder->pointerCast(
@@ -75,31 +77,36 @@ final class AssertFail
         $defaultLen = $sizeT->constInt(\strlen(self::DEFAULT_MSG), false);
 
         $context->builder->positionAtEnd($defaultBb);
-        $context->builder->branch($msgReadyBb);
+        self::emitFailWithMessage($context, $fn, $defaultMsgPtr, $defaultLen, $doneBb);
 
         $context->builder->positionAtEnd($customBb);
-        $context->builder->branch($msgReadyBb);
+        self::emitFailWithMessage($context, $fn, $message, $len, $doneBb);
 
-        $context->builder->positionAtEnd($msgReadyBb);
-        $finalMsg = $context->builder->phi($i8p);
-        $finalLen = $context->builder->phi($sizeT);
-        $finalMsg->addIncoming($defaultMsgPtr, $defaultBb);
-        $finalMsg->addIncoming($message, $customBb);
-        $finalLen->addIncoming($defaultLen, $defaultBb);
-        $finalLen->addIncoming($len, $customBb);
+        $context->builder->positionAtEnd($doneBb);
+        $context->builder->returnVoid();
+        $context->builder->clearInsertionPosition();
+    }
+
+    private static function emitFailWithMessage(
+        Context $context,
+        Value $fn,
+        Value $msgPtr,
+        Value $msgLen,
+        BasicBlock $doneBb
+    ): void {
+        $i8p = $context->getTypeFromString('int8*');
+        $i32 = $context->getTypeFromString('int32');
 
         $exceptionBb = $fn->appendBasicBlock('assert_fail_exception');
         $warningBb = $fn->appendBasicBlock('assert_fail_warning');
-        $doneBb = $fn->appendBasicBlock('assert_fail_done');
         $exceptionOn = AssertIniRuntime::loadExceptionMode($context);
         $context->builder->branchIf($exceptionOn, $exceptionBb, $warningBb);
 
         $context->builder->positionAtEnd($exceptionBb);
-        AssertionErrorRaise::ensureLinked($context);
         $context->builder->call(
             $context->lookupFunction('__compiler_jit_raise_assertion_error'),
-            $finalMsg,
-            $finalLen
+            $msgPtr,
+            $msgLen
         );
         $context->builder->branch($doneBb);
 
@@ -109,12 +116,8 @@ final class AssertFail
         $trigger = $context->lookupFunction('__compiler_trigger_error');
 
         $context->builder->positionAtEnd($warningBb);
-        $context->builder->call($trigger, $finalMsg, $finalLen, $level, $emptyFile, $zeroLine);
+        $context->builder->call($trigger, $msgPtr, $msgLen, $level, $emptyFile, $zeroLine);
         $context->builder->branch($doneBb);
-
-        $context->builder->positionAtEnd($doneBb);
-        $context->builder->returnVoid();
-        $context->builder->clearInsertionPosition();
     }
 
     private static function implementAssertFailString(Context $context, Value $fn): void
@@ -183,7 +186,6 @@ final class AssertFail
         $context->builder->branchIf($exceptionOn, $exceptionBb, $warningBb);
 
         $context->builder->positionAtEnd($exceptionBb);
-        AssertionErrorRaise::ensureLinked($context);
         $descLen = $context->builder->sub($totalLen, $sizeT->constInt($prefixLen, false));
         $descPtr = $context->builder->inBoundsGEP($bufPtr, $sizeT->constInt($prefixLen, false));
         $context->builder->call(
