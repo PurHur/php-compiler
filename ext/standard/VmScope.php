@@ -240,4 +240,29 @@ final class VmScope
         return $result;
     }
 
+    /** get_declared_variables() — caller local names only (php-src: php_get_defined_vars names). */
+    public static function getDeclaredVariables(Frame $frame): HashTable
+    {
+        $caller = self::requireCaller($frame);
+        $result = new HashTable();
+        $index = 0;
+        foreach ($caller->block->eachNamedScopeSlot() as [$name, $slot]) {
+            if ('this' === $name || Superglobals::isSuperglobalName($name)) {
+                continue;
+            }
+            if (!isset($caller->scope[$slot])) {
+                continue;
+            }
+            if (!self::callerVarIsSet($caller->scope[$slot])) {
+                continue;
+            }
+            $entry = new Variable();
+            $entry->string($name);
+            $result->addIndex($index, $entry);
+            ++$index;
+        }
+
+        return $result;
+    }
+
 }
