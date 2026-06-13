@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 2469 |
-| Phase A inventory files (M2 ratio SSOT) | 2469 |
+| PHP files on vm.php path | 2471 |
+| Phase A inventory files (M2 ratio SSOT) | 2471 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 6677 |
+| Source constructs flagged (warnings) | 6686 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -601,6 +601,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/standard/JitSyslog.php` | 0 | 1 |
 | `ext/standard/JitTempnam.php` | 0 | 1 |
 | `ext/standard/JitTimezoneIdentifiersList.php` | 0 | 1 |
+| `ext/standard/JitTimezoneOpen.php` | 0 | 3 |
 | `ext/standard/JitTmpfile.php` | 0 | 1 |
 | `ext/standard/JitTouch.php` | 0 | 1 |
 | `ext/standard/JitTraitExists.php` | 0 | 1 |
@@ -621,7 +622,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/standard/JitWordwrap.php` | 0 | 1 |
 | `ext/standard/JitZendScalarCast.php` | 0 | 1 |
 | `ext/standard/JitZlib.php` | 0 | 1 |
-| `ext/standard/Module.php` | 0 | 682 |
+| `ext/standard/Module.php` | 0 | 683 |
 | `ext/standard/ModuleRegistry.php` | 0 | 1 |
 | `ext/standard/NativeLastError.php` | 0 | 7 |
 | `ext/standard/NativeObStorage.php` | 0 | 1 |
@@ -1453,6 +1454,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/standard/timezone_identifiers_list.php` | 0 | 3 |
 | `ext/standard/timezone_location_get.php` | 0 | 3 |
 | `ext/standard/timezone_offset_get.php` | 0 | 3 |
+| `ext/standard/timezone_open.php` | 0 | 3 |
 | `ext/standard/timezone_transitions_get.php` | 0 | 7 |
 | `ext/standard/timezone_version_get.php` | 0 | 2 |
 | `ext/standard/tmpfile.php` | 0 | 1 |
@@ -2320,7 +2322,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/VM/CycleCollector.php` | 0 | 2 |
 | `lib/VM/DateIntervalSupport.php` | 0 | 1 |
 | `lib/VM/DateTimeInterfaceSupport.php` | 0 | 3 |
-| `lib/VM/DateTimeSupport.php` | 0 | 12 |
+| `lib/VM/DateTimeSupport.php` | 0 | 14 |
 | `lib/VM/DateTimeZoneSupport.php` | 0 | 2 |
 | `lib/VM/DnfCheck.php` | 0 | 1 |
 | `lib/VM/EnumCaseEntry.php` | 0 | 5 |
@@ -5808,6 +5810,13 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - 3 class method(s)
 
+### `ext/standard/JitTimezoneOpen.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 21)
+- new JITVariable (line 54)
+- 3 class method(s)
+
 ### `ext/standard/JitTmpfile.php`
 
 **Warnings** (review for bootstrap subset):
@@ -6585,32 +6594,33 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new date (line 762)
 - new timezone_version_get (line 763)
 - new timezone_identifiers_list (line 764)
-- new timezone_offset_get (line 765)
-- new timezone_location_get (line 766)
-- new timezone_transitions_get (line 767)
-- new gmdate (line 768)
-- new getdate (line 769)
-- new gmgetdate (line 770)
-- new gmmktime (line 771)
-- new mktime (line 772)
-- new checkdate (line 773)
-- new date_default_timezone_get (line 774)
-- new date_default_timezone_set (line 775)
-- new localtime (line 776)
-- new idate (line 777)
-- new date_sun_info (line 778)
-- new date_interval_format (line 779)
-- new date_sunrise (line 780)
-- new date_sunset (line 781)
-- new sleep (line 782)
-- new set_time_limit (line 783)
-- new ignore_user_abort (line 784)
-- new connection_aborted (line 785)
-- new spl_autoload_register (line 786)
-- new spl_autoload_call (line 787)
-- new time_nanosleep (line 788)
-- new time_sleep_until (line 789)
-- new usleep (line 790)
+- new timezone_open (line 765)
+- new timezone_offset_get (line 766)
+- new timezone_location_get (line 767)
+- new timezone_transitions_get (line 768)
+- new gmdate (line 769)
+- new getdate (line 770)
+- new gmgetdate (line 771)
+- new gmmktime (line 772)
+- new mktime (line 773)
+- new checkdate (line 774)
+- new date_default_timezone_get (line 775)
+- new date_default_timezone_set (line 776)
+- new localtime (line 777)
+- new idate (line 778)
+- new date_sun_info (line 779)
+- new date_interval_format (line 780)
+- new date_sunrise (line 781)
+- new date_sunset (line 782)
+- new sleep (line 783)
+- new set_time_limit (line 784)
+- new ignore_user_abort (line 785)
+- new connection_aborted (line 786)
+- new spl_autoload_register (line 787)
+- new spl_autoload_call (line 788)
+- new time_nanosleep (line 789)
+- new time_sleep_until (line 790)
+- new usleep (line 791)
 - 4 class method(s)
 
 ### `ext/standard/ModuleRegistry.php`
@@ -11583,6 +11593,13 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new ArgumentCountError (line 31)
 - 2 class method(s)
 - 1 closure(s)
+
+### `ext/standard/timezone_open.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 32)
+- 2 class method(s)
+- 2 closure(s)
 
 ### `ext/standard/timezone_transitions_get.php`
 
@@ -17848,16 +17865,18 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - new HashTable (line 214)
 - new Variable (line 216)
-- new NativeDateInvalidTimeZoneException (line 245)
-- new NativeDateRangeError (line 253)
-- new NativeDateObjectError (line 259)
-- new NativeDateMalformedStringException (line 285)
-- new ObjectEntry (line 465)
-- new ObjectEntry (line 487)
-- new ObjectEntry (line 510)
-- new ObjectEntry (line 533)
-- new ObjectEntry (line 543)
-- 42 class method(s)
+- new ObjectEntry (line 253)
+- new Variable (line 255)
+- new NativeDateInvalidTimeZoneException (line 264)
+- new NativeDateRangeError (line 272)
+- new NativeDateObjectError (line 278)
+- new NativeDateMalformedStringException (line 304)
+- new ObjectEntry (line 484)
+- new ObjectEntry (line 506)
+- new ObjectEntry (line 529)
+- new ObjectEntry (line 552)
+- new ObjectEntry (line 562)
+- 43 class method(s)
 
 ### `lib/VM/DateTimeZoneSupport.php`
 
