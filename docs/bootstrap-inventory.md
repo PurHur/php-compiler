@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 2487 |
-| Phase A inventory files (M2 ratio SSOT) | 2487 |
+| PHP files on vm.php path | 2493 |
+| Phase A inventory files (M2 ratio SSOT) | 2493 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 6744 |
+| Source constructs flagged (warnings) | 6757 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -608,7 +608,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/standard/JitSyslog.php` | 0 | 1 |
 | `ext/standard/JitTempnam.php` | 0 | 1 |
 | `ext/standard/JitTimezoneIdentifiersList.php` | 0 | 1 |
+| `ext/standard/JitTimezoneLocationGet.php` | 0 | 2 |
+| `ext/standard/JitTimezoneOffsetGet.php` | 0 | 2 |
 | `ext/standard/JitTimezoneOpen.php` | 0 | 3 |
+| `ext/standard/JitTimezoneProceduralArg.php` | 0 | 1 |
+| `ext/standard/JitTimezoneTransitionsGet.php` | 0 | 6 |
 | `ext/standard/JitTmpfile.php` | 0 | 1 |
 | `ext/standard/JitTouch.php` | 0 | 1 |
 | `ext/standard/JitTraitExists.php` | 0 | 1 |
@@ -1890,6 +1894,8 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/Builtin/SuperglobalNameRuntime.php` | 0 | 1 |
 | `lib/JIT/Builtin/SuperglobalRefreshRuntime.php` | 0 | 1 |
 | `lib/JIT/Builtin/TimeSleepRuntime.php` | 0 | 1 |
+| `lib/JIT/Builtin/TimezoneLocationRuntime.php` | 0 | 1 |
+| `lib/JIT/Builtin/TimezoneOffsetRuntime.php` | 0 | 1 |
 | `lib/JIT/Builtin/TokenGetAll.php` | 0 | 2 |
 | `lib/JIT/Builtin/Type.php` | 0 | 5 |
 | `lib/JIT/Builtin/Type/HashTable.php` | 0 | 1 |
@@ -5873,12 +5879,39 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - 3 class method(s)
 
+### `ext/standard/JitTimezoneLocationGet.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 24)
+- 1 class method(s)
+
+### `ext/standard/JitTimezoneOffsetGet.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 31)
+- 10 class method(s)
+
 ### `ext/standard/JitTimezoneOpen.php`
 
 **Warnings** (review for bootstrap subset):
 - new ArgumentCountError (line 21)
 - new JITVariable (line 54)
 - 3 class method(s)
+
+### `ext/standard/JitTimezoneProceduralArg.php`
+
+**Warnings** (review for bootstrap subset):
+- 10 class method(s)
+
+### `ext/standard/JitTimezoneTransitionsGet.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 27)
+- new HashTable (line 70)
+- new HashTable (line 72)
+- new Variable (line 74)
+- new Variable (line 84)
+- 4 class method(s)
 
 ### `ext/standard/JitTmpfile.php`
 
@@ -6988,11 +7021,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/VmDateTimeNative.php`
 
 **Warnings** (review for bootstrap subset):
-- new RecursiveIteratorIterator (line 614)
-- new RecursiveDirectoryIterator (line 615)
-- new RecursiveIteratorIterator (line 716)
-- new RecursiveDirectoryIterator (line 717)
-- 35 class method(s)
+- new RecursiveIteratorIterator (line 634)
+- new RecursiveDirectoryIterator (line 635)
+- new RecursiveIteratorIterator (line 736)
+- new RecursiveDirectoryIterator (line 737)
+- 37 class method(s)
 - 8 closure(s)
 
 ### `ext/standard/VmDebugBacktrace.php`
@@ -14595,6 +14628,16 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - 12 class method(s)
 
+### `lib/JIT/Builtin/TimezoneLocationRuntime.php`
+
+**Warnings** (review for bootstrap subset):
+- 10 class method(s)
+
+### `lib/JIT/Builtin/TimezoneOffsetRuntime.php`
+
+**Warnings** (review for bootstrap subset):
+- 6 class method(s)
+
 ### `lib/JIT/Builtin/TokenGetAll.php`
 
 **Warnings** (review for bootstrap subset):
@@ -18193,84 +18236,84 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new Variable (line 425)
 - new Variable (line 465)
 - new Variable (line 597)
-- new Variable (line 622)
-- new Variable (line 656)
-- new self (line 719)
-- new Variable (line 721)
-- new self (line 734)
-- new Variable (line 740)
-- new self (line 757)
-- new Variable (line 762)
-- new Variable (line 784)
-- new self (line 800)
-- new Variable (line 802)
-- new Variable (line 812)
-- new self (line 844)
-- new Variable (line 846)
-- new Variable (line 855)
-- new self (line 883)
-- new Variable (line 885)
-- new Variable (line 903)
-- new self (line 952)
-- new Variable (line 954)
-- new Variable (line 972)
-- new Variable (line 1008)
-- new Variable (line 1013)
-- new self (line 1014)
-- new Variable (line 1018)
-- new Variable (line 1026)
-- new Variable (line 1030)
-- new Variable (line 1035)
-- new Variable (line 1038)
-- new self (line 1052)
-- new Variable (line 1054)
-- new Variable (line 1079)
-- new Variable (line 1087)
-- new Variable (line 1113)
-- new self (line 1131)
-- new Variable (line 1134)
-- new self (line 1160)
-- new Variable (line 1162)
-- new self (line 1181)
-- new Variable (line 1183)
-- new Variable (line 1191)
-- new self (line 1194)
-- new Variable (line 1196)
-- new Variable (line 1201)
-- new Variable (line 1210)
-- new self (line 1214)
-- new Variable (line 1217)
-- new self (line 1233)
-- new Variable (line 1239)
-- new Variable (line 1247)
-- new self (line 1275)
-- new Variable (line 1286)
-- new self (line 1302)
-- new Variable (line 1399)
-- new Variable (line 1405)
-- new Variable (line 1411)
-- new self (line 1427)
-- new Variable (line 1459)
-- new Variable (line 1461)
-- new Variable (line 1476)
-- new Variable (line 1482)
-- new Variable (line 1490)
-- new self (line 1575)
-- new self (line 1580)
-- new Variable (line 1582)
-- new Variable (line 1587)
-- new Variable (line 1595)
-- new self (line 1605)
-- new self (line 1613)
-- new Variable (line 1615)
-- new Variable (line 1624)
-- new Variable (line 1632)
-- new Variable (line 1767)
-- new HashTableBucket (line 1956)
-- new Variable (line 1956)
-- new HashTableBucket (line 1967)
-- new Variable (line 1967)
-- 96 class method(s)
+- new Variable (line 626)
+- new Variable (line 671)
+- new self (line 751)
+- new Variable (line 753)
+- new self (line 766)
+- new Variable (line 772)
+- new self (line 789)
+- new Variable (line 794)
+- new Variable (line 816)
+- new self (line 832)
+- new Variable (line 834)
+- new Variable (line 844)
+- new self (line 876)
+- new Variable (line 878)
+- new Variable (line 887)
+- new self (line 915)
+- new Variable (line 917)
+- new Variable (line 935)
+- new self (line 984)
+- new Variable (line 986)
+- new Variable (line 1004)
+- new Variable (line 1040)
+- new Variable (line 1045)
+- new self (line 1046)
+- new Variable (line 1050)
+- new Variable (line 1058)
+- new Variable (line 1062)
+- new Variable (line 1067)
+- new Variable (line 1070)
+- new self (line 1084)
+- new Variable (line 1086)
+- new Variable (line 1111)
+- new Variable (line 1119)
+- new Variable (line 1145)
+- new self (line 1163)
+- new Variable (line 1166)
+- new self (line 1192)
+- new Variable (line 1194)
+- new self (line 1213)
+- new Variable (line 1215)
+- new Variable (line 1223)
+- new self (line 1226)
+- new Variable (line 1228)
+- new Variable (line 1233)
+- new Variable (line 1242)
+- new self (line 1246)
+- new Variable (line 1249)
+- new self (line 1265)
+- new Variable (line 1271)
+- new Variable (line 1279)
+- new self (line 1307)
+- new Variable (line 1318)
+- new self (line 1334)
+- new Variable (line 1431)
+- new Variable (line 1437)
+- new Variable (line 1443)
+- new self (line 1459)
+- new Variable (line 1491)
+- new Variable (line 1493)
+- new Variable (line 1508)
+- new Variable (line 1514)
+- new Variable (line 1522)
+- new self (line 1607)
+- new self (line 1612)
+- new Variable (line 1614)
+- new Variable (line 1619)
+- new Variable (line 1627)
+- new self (line 1637)
+- new self (line 1645)
+- new Variable (line 1647)
+- new Variable (line 1656)
+- new Variable (line 1664)
+- new Variable (line 1799)
+- new HashTableBucket (line 1988)
+- new Variable (line 1988)
+- new HashTableBucket (line 1999)
+- new Variable (line 1999)
+- 97 class method(s)
 
 ### `lib/VM/HeaderCallbackQueue.php`
 
