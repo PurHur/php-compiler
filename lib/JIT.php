@@ -7334,6 +7334,10 @@ class JIT {
                     if (is_null($this->context->scope->toCall)) {
                         // Self-host stub/short-circuit (eg runtime variable function): represent as null.
                         $this->context->callSiteLine = (int) ($op->arg2 ?? 0);
+                        if ($this->context->scope->preserveNewResultOnNullCall) {
+                            $this->context->scope->preserveNewResultOnNullCall = false;
+                            break;
+                        }
                         $nullVar = new Variable(
                             $this->context,
                             Variable::TYPE_NULL,
@@ -7735,6 +7739,7 @@ class JIT {
                             $this->context->type->object->markObjectConstructed(
                                 $this->context->helper->loadValue($obj)
                             );
+                            $this->context->scope->preserveNewResultOnNullCall = true;
                             $this->context->scope->toCall = null;
                             $this->context->scope->args = [];
                         } else {
@@ -7765,6 +7770,7 @@ class JIT {
                                 $this->context->scope->toCall = $this->context->resolveFunctionProxy($proxyName);
                                 $this->context->scope->args = [$this->context->getVariableFromOp($resultOp)];
                             } else {
+                                $this->context->scope->preserveNewResultOnNullCall = true;
                                 $this->context->type->object->markObjectConstructed(
                                     $this->context->helper->loadValue($obj)
                                 );

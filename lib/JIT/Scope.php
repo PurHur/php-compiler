@@ -32,6 +32,9 @@ class Scope {
     /** Parallel to {@see $args}: CFG operands for the current call (issue #3161). */
     public array $argOperands = [];
 
+    /** `new` without __construct: FUNCCALL_EXEC_RETURN must not clobber the object slot (#8308). */
+    public bool $preserveNewResultOnNullCall = false;
+
     public function __construct() {
         $this->blockStorage = new \SplObjectStorage;
         $this->variables = new \SplObjectStorage;
