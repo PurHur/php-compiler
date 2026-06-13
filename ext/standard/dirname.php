@@ -26,7 +26,12 @@ final class dirname extends Internal
         }
         $levels = 1;
         if (2 === $argc) {
-            $levels = $frame->calledArgs[1]->resolveIndirect()->toInt();
+            $levels = VmMath::parseIntBuiltinArg(
+                $frame->calledArgs[1],
+                'dirname',
+                2,
+                'levels'
+            );
         }
         $frame->returnVar->string(VmString::dirname($path, $levels));
     }
@@ -41,7 +46,7 @@ final class dirname extends Internal
         if (1 === $argc) {
             return JitPath::dirname($context, $path);
         }
-        $levels = JitDirname::coerceLevels($context, $args[1]);
+        $levels = JitIntdiv::lowerIntBuiltinArg($context, $args[1], 'dirname', 2, 'levels');
 
         return JitPath::dirnameWithLevels($context, $path, $levels);
     }
