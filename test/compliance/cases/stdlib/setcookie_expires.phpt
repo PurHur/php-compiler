@@ -1,5 +1,7 @@
 --TEST--
 stdlib setcookie() expires attribute (issue #6340, SetcookieLine parity)
+--ENV--
+GATEWAY_INTERFACE=CGI/1.1
 --FILE--
 <?php
 // Thu, 15-Jan-2026 12:30:45 GMT

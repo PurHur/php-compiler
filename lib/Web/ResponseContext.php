@@ -34,6 +34,17 @@ final class ResponseContext
         self::$headerQueueEnabled = true;
     }
 
+    /**
+     * Mirror JIT {@see SuperglobalRefreshRuntime} — queue pending headers only when CGI env is present (#4037, #4110).
+     */
+    public static function syncHeaderQueueFromEnvironment(): void
+    {
+        $gateway = getenv('GATEWAY_INTERFACE');
+        if (false !== $gateway && '' !== $gateway) {
+            self::enableHeaderQueue();
+        }
+    }
+
     public static function isHeaderQueueEnabled(): bool
     {
         return self::$headerQueueEnabled;
