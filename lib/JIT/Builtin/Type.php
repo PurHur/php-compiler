@@ -352,6 +352,13 @@ class Type extends Builtin {
         );
         $fnCompilerFwrite = $this->context->module->addFunction('__compiler_fwrite', $fntypeFwrite);
         $this->context->registerFunction('__compiler_fwrite', $fnCompilerFwrite);
+        $fntypeErrorLog = $this->context->context->functionType(
+            $this->context->getTypeFromString('int1'),
+            false,
+            $this->context->getTypeFromString('__string__*')
+        );
+        $fnErrorLog = $this->context->module->addFunction('__compiler_error_log', $fntypeErrorLog);
+        $this->context->registerFunction('__compiler_error_log', $fnErrorLog);
         $strPtr = $this->context->getTypeFromString('__string__*');
         $fntypeFopen = $this->context->context->functionType(
             $i64,

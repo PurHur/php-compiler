@@ -642,6 +642,7 @@ class Module extends ModuleAbstract
             new parse_ini_string(),
             new parse_ini_file(),
             new error_reporting(),
+            new error_log(),
             new define_(),
             new defined_(),
             new constant_(),
