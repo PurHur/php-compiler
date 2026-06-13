@@ -979,7 +979,7 @@ final class Doctor
         $uncaughtDefault = $defaults['THROWSWEB_UNCAUGHT_500_GATE'] ?? '0';
         $linkDefault = $defaults['THROWSWEB_AOT_LINK_GATE'] ?? '1';
         $aotDefault = $defaults['THROWSWEB_AOT_SMOKE_GATE'] ?? '1';
-        $deployDefault = $defaults['THROWSWEB_DEPLOY_SMOKE_GATE'] ?? '0';
+        $deployDefault = $defaults['THROWSWEB_DEPLOY_SMOKE_GATE'] ?? '1';
 
         $smokeOn = self::gateEnabled('THROWS_WEB_SMOKE_GATE', $smokeDefault);
         $serveAotOn = self::gateEnabled('THROWSWEB_SERVE_AOT_SMOKE_GATE', $serveAotDefault);
@@ -1061,10 +1061,10 @@ final class Doctor
         fwrite(STDOUT, "      Shell:   THROWSWEB_AOT_SMOKE_GATE=1 EXAMPLES_AOT_SMOKE_ONLY=007 ./script/examples-aot-smoke.sh (#2104)\n");
         $deployStatus = $deployOn && $llvmReady ? '✅' : '📋';
         $deployNote = $deployOn
-            ? '#2124 ✅ · ci-local when THROWSWEB_DEPLOY_SMOKE_GATE=1 (#2264)'
-            : 'opt-in default 0 — #2124 · #2264';
+            ? '#2388 ✅ · ci-local default-on (#2124, #2264)'
+            : 'opt-out — set THROWSWEB_DEPLOY_SMOKE_GATE=0 (#2388)';
         fwrite(STDOUT, "  [{$deployStatus}] Stage 5 Deploy CGI — THROWSWEB_DEPLOY_SMOKE_GATE default {$deployDefault} ({$deployNote})\n");
-        fwrite(STDOUT, "      Run:     THROWSWEB_DEPLOY_SMOKE_GATE=1 make deploy-smoke-all\n");
+        fwrite(STDOUT, "      Run:     make deploy-smoke-all\n");
         fwrite(STDOUT, "      Or:      make examples-throwsweb-deploy-smoke\n");
         fwrite(STDOUT, "      Ladder:  make deploy-smoke-all (skips 007 with hint when gate=0; #2077)\n");
 

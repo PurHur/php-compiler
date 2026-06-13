@@ -66,7 +66,7 @@ else
   skip_006
 fi
 
-if [ "${THROWSWEB_DEPLOY_SMOKE_GATE:-0}" = "1" ]; then
+if [ "${THROWSWEB_DEPLOY_SMOKE_GATE:-1}" = "1" ]; then
   run_example 007
 else
   skip_007

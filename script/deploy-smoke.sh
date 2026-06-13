@@ -52,7 +52,7 @@ Usage: script/deploy-smoke.sh [--example 001|002|003|005|006|007|009]
 003 execute smoke is default on (DEPLOY_SMOKE_003_EXECUTE=1); set DEPLOY_SMOKE_003_EXECUTE=0 to skip (#1530, #745).
 005 requires SESSIONS_WEB_DEPLOY_SMOKE_GATE=1 (default 0 until stable — #1893).
 006 requires FILE_UPLOAD_WEB_DEPLOY_SMOKE_GATE=1 (default 0 until stable — #2028).
-007 requires THROWSWEB_DEPLOY_SMOKE_GATE=1 (default 0 until stable — #2124).
+007 runs when THROWSWEB_DEPLOY_SMOKE_GATE=1 (default-on #2388; set 0 to skip — #2124).
 009 requires FASTCGI_WEB_DEPLOY_SMOKE_GATE=1 (default 0 until stable — #2359).
 EOF
   exit 1
@@ -157,7 +157,7 @@ deploy_smoke_006_enabled() {
 }
 
 deploy_smoke_007_enabled() {
-  [[ "${THROWSWEB_DEPLOY_SMOKE_GATE:-0}" == "1" ]]
+  [[ "${THROWSWEB_DEPLOY_SMOKE_GATE:-1}" == "1" ]]
 }
 
 deploy_smoke_009_enabled() {
