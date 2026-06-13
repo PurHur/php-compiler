@@ -135,17 +135,23 @@ class Helper {
                                 $valuePtr
                             );
                             $i64 = $this->context->getTypeFromString('int64');
-                            $long = $this->context->builder->fpToSi($doubleVal, $i64);
-                            $result = $this->context->builder->not($long);
+                            $longFromDouble = $this->context->builder->fpToSi($doubleVal, $i64);
+                            $notDouble = $this->context->builder->not($longFromDouble);
+                            $doubleEnd = $this->context->builder->getInsertBlock();
                             $this->context->builder->branch($doneBlock);
                             $this->context->builder->positionAtEnd($longBlock);
-                            $long = $this->context->builder->call(
+                            $longVal = $this->context->builder->call(
                                 $this->context->lookupFunction('__value__readLong'),
                                 $valuePtr
                             );
-                            $result = $this->context->builder->not($long);
+                            $notLong = $this->context->builder->not($longVal);
+                            $longEnd = $this->context->builder->getInsertBlock();
                             $this->context->builder->branch($doneBlock);
                             $this->context->builder->positionAtEnd($doneBlock);
+                            $resultPhi = $this->context->builder->phi($i64, 'bitwise_not_vbox_long_phi');
+                            $resultPhi->addIncoming($notDouble, $doubleEnd);
+                            $resultPhi->addIncoming($notLong, $longEnd);
+                            $result = $resultPhi;
                             goto return_long;
                         }
                         $long = JitLongArg::lower($this->context, $var, 'bitwise not operand');
