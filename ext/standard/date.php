@@ -7,8 +7,9 @@ namespace PHPCompiler\ext\standard;
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\InternalStrictArg as JitInternalStrictArg;
 use PHPCompiler\JIT\Variable as JITVariable;
-use PHPCompiler\VM\Variable;
+use PHPCompiler\VM\InternalStrictArg;
 use PHPLLVM\Value;
 
 /** date() — format local time (subset; JIT/AOT via __compiler_format_datetime). */
@@ -17,26 +18,34 @@ final class date extends Internal
     public function execute(Frame $frame): void
     {
         $argc = \count($frame->calledArgs);
-        if ($argc < 1 || $argc > 2) {
-            throw new \LogicException('date() requires one or two arguments');
+        if ($argc < 1) {
+            throw new \ArgumentCountError('date() expects at least 1 argument, 0 given');
         }
-        $formatVar = $frame->calledArgs[0]->resolveIndirect();
+        if ($argc > 2) {
+            throw new \ArgumentCountError('date() expects at most 2 arguments, '.$argc.' given');
+        }
         if (null === $frame->returnVar) {
             return;
         }
-        if (Variable::TYPE_STRING !== $formatVar->type) {
-            throw new \LogicException('date() format must be a string in this compiler build');
-        }
+        $format = self::vmFormatArg($frame);
         $timestamp = null;
         if (2 === $argc) {
             $timestamp = VmDate::coerceNullableTimestampArg($frame->calledArgs[1], 'date', 2, 'timestamp');
         }
-        $frame->returnVar->string(VmDate::date($formatVar->toString(), $timestamp));
+        $frame->returnVar->string(VmDate::date($format, $timestamp));
     }
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        $this->jitString($context, $args[0], 'date() argument #1');
-        return \call_user_func_array([JitDate::class, 'formatDate'], array_merge([$context, false], $args));
+        return JitDate::formatDate($context, false, ...$args);
+    }
+
+    private static function vmFormatArg(Frame $frame): string
+    {
+        if (null !== $frame->parent && $frame->parent->block->strictTypes) {
+            return InternalStrictArg::requireString($frame, 0, 'date', 'format')->toString();
+        }
+
+        return VmString::coerceStringBuiltinArg($frame->calledArgs[0], 'date', 0, 'format');
     }
 }
