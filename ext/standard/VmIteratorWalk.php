@@ -117,7 +117,8 @@ final class VmIteratorWalk
             throw new \TypeError('iterator_apply(): Argument #3 must be of type array');
         }
         $out = [];
-        foreach ($paramsArray->toArray()->iterateKeyed(true) as [, $value]) {
+        // Preserve ref slots — iterateKeyed(true) would resolve before isIndirect() (#4547).
+        foreach ($paramsArray->toArray()->iterateKeyed(false) as [, $value]) {
             if ($value->isIndirect()) {
                 $out[] = $value;
 
