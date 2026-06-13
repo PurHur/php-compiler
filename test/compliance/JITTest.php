@@ -249,7 +249,8 @@ class JITTest extends BaseTest {
             }
             // ReflectionClass::getProperties/getMethods are VM-only (#3815).
             if (str_contains($name, 'reflection_class_members')
-                || str_contains($name, 'reflection_class_getmethods_private')) {
+                || str_contains($name, 'reflection_class_getmethods_private')
+                || str_contains($name, 'reflection_class_static_properties')) {
                 continue;
             }
             // ReflectionProperty/Constant::getAttributes() MCJIT: VM read path (#4136, #2467).
