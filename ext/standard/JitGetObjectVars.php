@@ -148,22 +148,81 @@ final class JitGetObjectVars
 
         $ht = HashTableHelper::alloc($context);
         $object = $context->type->object;
-        foreach ($object->allClassNamesById() as $id => $className) {
-            $isClass = $context->builder->icmp(
+        if (!$object instanceof ObjectBuiltin) {
+            return self::boxedHashtable($context, $ht);
+        }
+
+        $dispatchIds = $object->classIdsWithInstanceProperties();
+        if ([] === $dispatchIds) {
+            return self::boxedHashtable($context, $ht);
+        }
+
+        $fn = BasicBlockHelper::parentFunction($context);
+        $entry = $context->builder->getInsertBlock();
+        $doneBlock = $fn->appendBasicBlock('gov_plain_done');
+        $nomatchBlock = $fn->appendBasicBlock('gov_plain_nomatch');
+        $resultSlot = BasicBlockHelper::entryAlloca($context, $context->getTypeFromString('__value__*'));
+        $checkBlock = $entry;
+        $lastIdx = \count($dispatchIds) - 1;
+        foreach ($dispatchIds as $idx => $id) {
+            $context->builder->positionAtEnd($checkBlock);
+            $match = $context->builder->icmp(
                 Builder::INT_EQ,
                 $classId,
                 $context->constantFromInteger($id, 'int64')
             );
-            $classBlock = BasicBlockHelper::append($context, 'gov_class_'.$id);
-            $nextClass = BasicBlockHelper::append($context, 'gov_next_class_'.$id);
-            $context->builder->branchIf($isClass, $classBlock, $nextClass);
-            $context->builder->positionAtEnd($classBlock);
-            self::appendInstanceProperties($context, $object, $obj, $className, $id, $ht, $mangledKeys);
-            $context->builder->branch($nextClass);
-            $context->builder->positionAtEnd($nextClass);
+            $matchBlock = $fn->appendBasicBlock('gov_plain_match_'.$id);
+            $nextBlock = $idx < $lastIdx
+                ? $fn->appendBasicBlock('gov_plain_try_'.$dispatchIds[$idx + 1])
+                : $nomatchBlock;
+            $context->builder->branchIf($match, $matchBlock, $nextBlock);
+            $context->builder->positionAtEnd($matchBlock);
+            self::appendClassHierarchyProperties($context, $object, $obj, $id, $ht, $mangledKeys);
+            $context->builder->store(self::boxedHashtable($context, $ht), $resultSlot);
+            $context->builder->branch($doneBlock);
+            $checkBlock = $nextBlock;
         }
+        $context->builder->positionAtEnd($nomatchBlock);
+        $context->builder->store(self::boxedHashtable($context, $ht), $resultSlot);
+        $context->builder->branch($doneBlock);
+        $context->builder->positionAtEnd($doneBlock);
 
-        return self::boxedHashtable($context, $ht);
+        return $context->builder->load($resultSlot);
+    }
+
+    /**
+     * Append instance properties for a runtime class id and its parent chain (#4038).
+     */
+    private static function appendClassHierarchyProperties(
+        Context $context,
+        ObjectBuiltin $object,
+        Value $obj,
+        int $leafClassId,
+        Value $ht,
+        bool $mangledKeys
+    ): void {
+        $chain = [];
+        $currentId = $leafClassId;
+        while ($currentId >= 0) {
+            \array_unshift($chain, $currentId);
+            $className = $object->classNameForId($currentId);
+            $parentLc = $object->parentClassLc(\strtolower(\ltrim($className, '\\')));
+            if (null === $parentLc) {
+                break;
+            }
+            $currentId = $object->lookup($parentLc);
+        }
+        foreach ($chain as $id) {
+            self::appendInstanceProperties(
+                $context,
+                $object,
+                $obj,
+                $object->classNameForId($id),
+                $id,
+                $ht,
+                $mangledKeys
+            );
+        }
     }
 
     private static function boxedHashtable(Context $context, Value $ht): Value
