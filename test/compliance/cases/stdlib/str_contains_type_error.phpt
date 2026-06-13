@@ -1,5 +1,5 @@
 --TEST--
-stdlib str_contains()/str_starts_with()/str_ends_with() — TypeError for int operands (#5018, ext/standard/string.c)
+stdlib str_contains()/str_starts_with()/str_ends_with() — int operands coerce like Zend (ext/standard/string.c)
 --FILE--
 <?php
 foreach (['str_contains', 'str_starts_with', 'str_ends_with'] as $fn) {
@@ -10,8 +10,15 @@ foreach (['str_contains', 'str_starts_with', 'str_ends_with'] as $fn) {
         echo "$fn: ", $e->getMessage(), "\n";
     }
 }
+try {
+    str_contains([], 'a');
+    echo "array: no throw\n";
+} catch (TypeError $e) {
+    echo "array: TypeError\n";
+}
 ?>
 --EXPECT--
-str_contains: str_contains(): Argument #1 ($haystack) must be of type string, int given
-str_starts_with: str_starts_with(): Argument #1 ($haystack) must be of type string, int given
-str_ends_with: str_ends_with(): Argument #1 ($haystack) must be of type string, int given
+str_contains: no throw
+str_starts_with: no throw
+str_ends_with: no throw
+array: TypeError
