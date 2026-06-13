@@ -13,9 +13,9 @@ use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
 
 /**
- * proc_open() — subprocess pipes (php-src ext/standard/proc_open.c; #3131).
+ * proc_open() — subprocess pipes (php-src ext/standard/proc_open.c; #3131, #6904).
  *
- * VM-only v1; JIT/AOT deferred.
+ * VM: {@see VmProcess::procOpen()}; JIT/AOT: __compiler_proc_open (string command + pipe spec v1).
  */
 final class proc_open extends Internal
 {
@@ -72,7 +72,7 @@ final class proc_open extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        throw new \LogicException('proc_open() is VM-only in this compiler build (issue #3131)');
+        return JitProcOpen::invoke($context, ...$args);
     }
 
     /** @return string|list<string> */

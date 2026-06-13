@@ -404,6 +404,15 @@ class Type extends Builtin {
         $fnIsResource = $this->context->module->addFunction('__compiler_is_resource', $fntypeIsResource);
         $this->context->registerFunction('__compiler_is_resource', $fnIsResource);
         $htPtr = $this->context->getTypeFromString('__hashtable__*');
+        $fntypeProcOpen = $this->context->context->functionType($i64, false, $strPtr, $htPtr);
+        $fnProcOpen = $this->context->module->addFunction('__compiler_proc_open', $fntypeProcOpen);
+        $this->context->registerFunction('__compiler_proc_open', $fnProcOpen);
+        $fntypeProcClose = $this->context->context->functionType($i32, false, $i64);
+        $fnProcClose = $this->context->module->addFunction('__compiler_proc_close', $fntypeProcClose);
+        $this->context->registerFunction('__compiler_proc_close', $fnProcClose);
+        $fntypeIsProcessResource = $this->context->context->functionType($i32, false, $i64);
+        $fnIsProcessResource = $this->context->module->addFunction('__compiler_is_process_resource', $fntypeIsProcessResource);
+        $this->context->registerFunction('__compiler_is_process_resource', $fnIsProcessResource);
         $fntypeGetResources = $this->context->context->functionType($htPtr, false, $strPtr);
         $fnGetResources = $this->context->module->addFunction('__compiler_get_resources', $fntypeGetResources);
         $this->context->registerFunction('__compiler_get_resources', $fnGetResources);
@@ -1259,6 +1268,7 @@ class Type extends Builtin {
         InetRuntime::ensureLinked($this->context);
         TimeSleepRuntime::ensureLinked($this->context);
         ProcessRuntime::ensureLinked($this->context);
+        ProcessOpen::ensureLinked($this->context);
         StringHrtime::ensureLinked($this->context);
         StringMicrotime::ensureLinked($this->context);
         StringGettimeofday::ensureLinked($this->context);
