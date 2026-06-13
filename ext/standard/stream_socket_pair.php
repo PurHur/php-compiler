@@ -15,7 +15,7 @@ use PHPLLVM\Value;
 /**
  * stream_socket_pair() — connected socket stream pair (php-src ext/standard/streams.c; #3437).
  *
- * VM: {@see VmStreamSocketPairNative}; JIT/AOT deferred (VM-first).
+ * VM: {@see VmStreamSocketPairNative}; JIT/AOT: {@see JitStreamSocketPair} / __compiler_stream_socket_pair.
  */
 final class stream_socket_pair extends Internal
 {
@@ -82,8 +82,8 @@ final class stream_socket_pair extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        throw new \LogicException(
-            'stream_socket_pair() is not implemented for JIT in this compiler build (issue #3437)'
-        );
+        \PHPCompiler\JIT\Builtin\StreamSocketPair::ensureLinked($context);
+
+        return JitStreamSocketPair::invoke($context, ...$args);
     }
 }
