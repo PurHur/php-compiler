@@ -19046,9 +19046,9 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/VM/ResourceSupport.php`
 
 **Warnings** (review for bootstrap subset):
-- new ObjectEntry (line 201)
-- new ResourceState (line 203)
-- 17 class method(s)
+- new ObjectEntry (line 242)
+- new ResourceState (line 244)
+- 18 class method(s)
 
 ### `lib/VM/SapiOutput.php`
 
