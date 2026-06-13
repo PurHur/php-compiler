@@ -150,7 +150,11 @@ final class floatval extends Internal
         );
 
         $context->builder->positionAtEnd($boolBlock);
-        $boolVal = $context->builder->call($context->lookupFunction('__value__readLong'), $valuePtr);
+        $boolVal = JitZendScalarCast::readBoolByteFromValueBox(
+            $context,
+            $valuePtr,
+            $context->getTypeFromString('int8')
+        );
         $boolFloat = $context->builder->uiToFp($boolVal, $double);
         $boolEndBlock = $context->builder->getInsertBlock();
         $context->builder->branch($doneBlock);

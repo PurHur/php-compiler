@@ -231,8 +231,8 @@ final class intval extends Internal
         );
 
         $context->builder->positionAtEnd($boolBlock);
-        $boolVal = $context->builder->call($context->lookupFunction('__value__readLong'), $valuePtr);
-        $boolInt = $context->builder->zExt($boolVal, $i64);
+        $boolVal = JitZendScalarCast::readBoolByteFromValueBox($context, $valuePtr, $i64);
+        $boolInt = $boolVal;
         $boolEndBlock = $context->builder->getInsertBlock();
         $context->builder->branch($doneBlock);
 
