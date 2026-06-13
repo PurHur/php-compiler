@@ -2471,6 +2471,13 @@ require_once __DIR__.'/../../../lib/Visitor/InOperatorResolver.php';
 require_once __DIR__.'/../../../lib/Visitor/VoidCastResolver.php';
 require_once __DIR__.'/../../../lib/Web/MultipartParser.php';
 require_once __DIR__.'/../../../lib/Web/UploadTemp.php';
+require_once __DIR__.'/../../../ext/standard/JitLocale.php';
+require_once __DIR__.'/../../../ext/standard/VmLocale.php';
+require_once __DIR__.'/../../../ext/standard/localeconv.php';
+require_once __DIR__.'/../../../ext/standard/setlocale.php';
+require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionClassHasConstant.php';
+require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionClassHasMethod.php';
+require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionClassHasProperty.php';
 // VM -r smoke: bootstrap-selfhost-lib-spine-vm-smoke.sh (#1846).
 // VM driver execute: bootstrap-selfhost-vm-driver-execute-probe.sh (#2201).
 
