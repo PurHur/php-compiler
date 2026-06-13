@@ -39,6 +39,22 @@ final class BootstrapLibSpineVmSmokeTest extends TestCase
         $this->assertStringContainsString('bootstrap_spine_emit_crash_diag', $script);
     }
 
+    public function testLibSpineLintScriptUsesLlvmMemoryAndSpineEntry(): void
+    {
+        $script = (string) file_get_contents(self::$root.'/script/bootstrap-selfhost-lib-spine-smoke-lint.sh');
+        $this->assertStringContainsString('ci_apply_llvm_memory_env', $script);
+        $this->assertStringContainsString('compiler_lib_spine_smoke/main.php', $script);
+        $this->assertStringContainsString('bootstrap-selfhost-lib-spine-smoke-lint: OK', $script);
+    }
+
+    public function testCompilePhpSkipsSourceBundlerForSpineLint(): void
+    {
+        $compile = (string) file_get_contents(self::$root.'/bin/compile.php');
+        $this->assertStringContainsString('phpc_compile_skip_aot_bundle_for_lint', $compile);
+        $this->assertStringContainsString('compiler_lib_spine_smoke/main.php', $compile);
+        $this->assertStringContainsString('skipBundleForLint', $compile);
+    }
+
     public function testLibSpineLinkScriptSeedsSidecarsAndGen0Fallback(): void
     {
         $script = (string) file_get_contents(self::$root.'/script/bootstrap-selfhost-lib-spine-smoke-link.sh');
