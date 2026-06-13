@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 2550 |
-| Phase A inventory files (M2 ratio SSOT) | 2550 |
+| PHP files on vm.php path | 2555 |
+| Phase A inventory files (M2 ratio SSOT) | 2555 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 6906 |
+| Source constructs flagged (warnings) | 6935 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -229,6 +229,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/spl/RecursiveCallbackFilterIteratorBuiltin.php` | 0 | 16 |
 | `ext/spl/SplIteratorSupport.php` | 0 | 1 |
 | `ext/spl/VmSplIterators.php` | 0 | 3 |
+| `ext/spl/VmSplObserver.php` | 0 | 3 |
 | `ext/standard/BuiltinAttributes.php` | 0 | 17 |
 | `ext/standard/BuiltinClasses.php` | 0 | 5 |
 | `ext/standard/BuiltinEnums.php` | 0 | 17 |
@@ -656,7 +657,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/standard/JitWordwrap.php` | 0 | 1 |
 | `ext/standard/JitZendScalarCast.php` | 0 | 1 |
 | `ext/standard/JitZlib.php` | 0 | 1 |
-| `ext/standard/Module.php` | 0 | 701 |
+| `ext/standard/Module.php` | 0 | 705 |
 | `ext/standard/ModuleRegistry.php` | 0 | 1 |
 | `ext/standard/NativeLastError.php` | 0 | 7 |
 | `ext/standard/NativeObStorage.php` | 0 | 1 |
@@ -690,7 +691,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/standard/VmCrc32c.php` | 0 | 1 |
 | `ext/standard/VmCsv.php` | 0 | 1 |
 | `ext/standard/VmCsvArg.php` | 0 | 1 |
-| `ext/standard/VmDate.php` | 0 | 8 |
+| `ext/standard/VmDate.php` | 0 | 16 |
 | `ext/standard/VmDateInterval.php` | 0 | 2 |
 | `ext/standard/VmDateSunFunc.php` | 0 | 3 |
 | `ext/standard/VmDateSunNative.php` | 0 | 1 |
@@ -980,12 +981,16 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/standard/date.php` | 0 | 3 |
 | `ext/standard/date_add.php` | 0 | 2 |
 | `ext/standard/date_create.php` | 0 | 3 |
+| `ext/standard/date_create_from_format.php` | 0 | 3 |
 | `ext/standard/date_create_immutable.php` | 0 | 3 |
+| `ext/standard/date_create_immutable_from_format.php` | 0 | 3 |
 | `ext/standard/date_default_timezone_get.php` | 0 | 4 |
 | `ext/standard/date_default_timezone_set.php` | 0 | 4 |
 | `ext/standard/date_diff.php` | 0 | 2 |
 | `ext/standard/date_interval_format.php` | 0 | 2 |
 | `ext/standard/date_modify.php` | 0 | 2 |
+| `ext/standard/date_parse.php` | 0 | 2 |
+| `ext/standard/date_parse_from_format.php` | 0 | 2 |
 | `ext/standard/date_sub.php` | 0 | 2 |
 | `ext/standard/date_sun_info.php` | 0 | 2 |
 | `ext/standard/date_sunrise.php` | 0 | 1 |
@@ -1683,7 +1688,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/GenericArrayTypeSpec.php` | 0 | 4 |
 | `lib/Handler.php` | 0 | 1 |
 | `lib/HexFloat.php` | 0 | 1 |
-| `lib/JIT.php` | 0 | 97 |
+| `lib/JIT.php` | 0 | 99 |
 | `lib/JIT/Analyzer.php` | 0 | 1 |
 | `lib/JIT/AotDebugSymbols.php` | 0 | 1 |
 | `lib/JIT/ArrayAccessHelper.php` | 0 | 6 |
@@ -2401,7 +2406,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/VM/CycleCollector.php` | 0 | 2 |
 | `lib/VM/DateIntervalSupport.php` | 0 | 2 |
 | `lib/VM/DateTimeInterfaceSupport.php` | 0 | 3 |
-| `lib/VM/DateTimeSupport.php` | 0 | 16 |
+| `lib/VM/DateTimeSupport.php` | 0 | 18 |
 | `lib/VM/DateTimeZoneSupport.php` | 0 | 2 |
 | `lib/VM/DnfCheck.php` | 0 | 1 |
 | `lib/VM/EnumCaseEntry.php` | 0 | 5 |
@@ -3896,8 +3901,8 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/spl/BuiltinClasses.php`
 
 **Warnings** (review for bootstrap subset):
-- new ClassEntry (line 30)
-- new ClassEntry (line 42)
+- new ClassEntry (line 31)
+- new ClassEntry (line 43)
 - 3 class method(s)
 
 ### `ext/spl/EmptyIteratorBuiltin.php`
@@ -3963,6 +3968,13 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - new ClassEntry (line 31)
 - new ClassEntry (line 45)
+- 3 class method(s)
+
+### `ext/spl/VmSplObserver.php`
+
+**Warnings** (review for bootstrap subset):
+- new ClassEntry (line 29)
+- new ClassEntry (line 40)
 - 3 class method(s)
 
 ### `ext/standard/BuiltinAttributes.php`
@@ -6929,23 +6941,27 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new date_interval_format (line 805)
 - new date_create (line 806)
 - new date_create_immutable (line 807)
-- new date_add (line 808)
-- new date_sub (line 809)
-- new date_modify (line 810)
-- new date_diff (line 811)
-- new date_sunrise (line 812)
-- new date_sunset (line 813)
-- new sleep (line 814)
-- new set_time_limit (line 815)
-- new setlocale (line 816)
-- new nl_langinfo (line 817)
-- new ignore_user_abort (line 818)
-- new connection_aborted (line 819)
-- new spl_autoload_register (line 820)
-- new spl_autoload_call (line 821)
-- new time_nanosleep (line 822)
-- new time_sleep_until (line 823)
-- new usleep (line 824)
+- new date_create_from_format (line 808)
+- new date_create_immutable_from_format (line 809)
+- new date_parse (line 810)
+- new date_parse_from_format (line 811)
+- new date_add (line 812)
+- new date_sub (line 813)
+- new date_modify (line 814)
+- new date_diff (line 815)
+- new date_sunrise (line 816)
+- new date_sunset (line 817)
+- new sleep (line 818)
+- new set_time_limit (line 819)
+- new setlocale (line 820)
+- new nl_langinfo (line 821)
+- new ignore_user_abort (line 822)
+- new connection_aborted (line 823)
+- new spl_autoload_register (line 824)
+- new spl_autoload_call (line 825)
+- new time_nanosleep (line 826)
+- new time_sleep_until (line 827)
+- new usleep (line 828)
 - 4 class method(s)
 
 ### `ext/standard/ModuleRegistry.php`
@@ -7214,12 +7230,20 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - new HashTable (line 199)
 - new HashTable (line 416)
-- new HashTable (line 613)
-- new HashTable (line 653)
-- new Variable (line 912)
-- new Variable (line 919)
-- new Variable (line 926)
-- 53 class method(s)
+- new HashTable (line 482)
+- new Variable (line 493)
+- new Variable (line 502)
+- new Variable (line 506)
+- new HashTable (line 514)
+- new Variable (line 518)
+- new HashTable (line 522)
+- new Variable (line 526)
+- new HashTable (line 684)
+- new HashTable (line 724)
+- new Variable (line 983)
+- new Variable (line 990)
+- new Variable (line 997)
+- 54 class method(s)
 
 ### `ext/standard/VmDateInterval.php`
 
@@ -7242,11 +7266,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/VmDateTimeNative.php`
 
 **Warnings** (review for bootstrap subset):
-- new RecursiveIteratorIterator (line 634)
-- new RecursiveDirectoryIterator (line 635)
-- new RecursiveIteratorIterator (line 736)
-- new RecursiveDirectoryIterator (line 737)
-- 37 class method(s)
+- new RecursiveIteratorIterator (line 1004)
+- new RecursiveDirectoryIterator (line 1005)
+- new RecursiveIteratorIterator (line 1106)
+- new RecursiveDirectoryIterator (line 1107)
+- 44 class method(s)
 - 8 closure(s)
 
 ### `ext/standard/VmDebugBacktrace.php`
@@ -9136,7 +9160,21 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - 2 class method(s)
 - 2 closure(s)
 
+### `ext/standard/date_create_from_format.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 33)
+- 2 class method(s)
+- 2 closure(s)
+
 ### `ext/standard/date_create_immutable.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 33)
+- 2 class method(s)
+- 2 closure(s)
+
+### `ext/standard/date_create_immutable_from_format.php`
 
 **Warnings** (review for bootstrap subset):
 - new ArgumentCountError (line 33)
@@ -9172,6 +9210,18 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - 2 class method(s)
 
 ### `ext/standard/date_modify.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 28)
+- 2 class method(s)
+
+### `ext/standard/date_parse.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 28)
+- 2 class method(s)
+
+### `ext/standard/date_parse_from_format.php`
 
 **Warnings** (review for bootstrap subset):
 - new ArgumentCountError (line 28)
@@ -13536,56 +13586,58 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new VM (line 7536)
 - new VM\Variable (line 7549)
 - new Variable (line 7736)
-- new Variable (line 7759)
-- new Type (line 7767)
-- new Variable (line 7783)
-- new Type (line 7791)
-- new Variable (line 7887)
-- new Variable (line 7908)
-- new Variable (line 8658)
-- new CompileError (line 9347)
-- new CompileError (line 9449)
-- new Variable (line 9494)
-- new Variable (line 9572)
-- new Variable (line 9591)
-- new Variable (line 9601)
-- new Variable (line 10238)
-- new Variable (line 10320)
-- new Variable (line 10340)
-- new Variable (line 10410)
-- new VM\Variable (line 10751)
-- new Variable (line 10785)
-- new Variable (line 10847)
-- new Variable (line 10866)
-- new OpCode (line 10880)
-- new Variable (line 10881)
-- new Variable (line 11046)
-- new Variable (line 11076)
-- new OpCode (line 11090)
-- new Variable (line 11091)
-- new Variable (line 11150)
-- new OpCode (line 11171)
-- new Variable (line 11172)
-- new Variable (line 11269)
-- new Variable (line 11291)
-- new Variable (line 11359)
-- new Operand\Literal (line 11368)
-- new Variable (line 11383)
-- new VM\PropertyIsInitializedHandler (line 11531)
-- new JIT\Call\RuntimeIndirectInstanceMethodCall (line 11571)
-- new JIT\Call\RuntimeIndirectInstanceMethodCall (line 11620)
-- new JIT\Call\RuntimeIndirectInstanceMethodCall (line 11658)
-- new Variable (line 12471)
-- new VM (line 12512)
-- new VM\Variable (line 12519)
-- new Operand\Literal (line 12533)
-- new Operand\Literal (line 12537)
-- new Operand\Literal (line 12541)
-- new Variable (line 12545)
-- new Variable (line 12569)
-- new Variable (line 12581)
-- new Variable (line 12986)
-- 278 class method(s)
+- new Type (line 7744)
+- new Variable (line 7764)
+- new Type (line 7772)
+- new Variable (line 7788)
+- new Type (line 7796)
+- new Variable (line 7892)
+- new Variable (line 7913)
+- new Variable (line 8663)
+- new CompileError (line 9352)
+- new CompileError (line 9454)
+- new Variable (line 9499)
+- new Variable (line 9577)
+- new Variable (line 9596)
+- new Variable (line 9606)
+- new Variable (line 10243)
+- new Variable (line 10325)
+- new Variable (line 10345)
+- new Variable (line 10415)
+- new VM\Variable (line 10756)
+- new Variable (line 10790)
+- new Variable (line 10852)
+- new Variable (line 10871)
+- new OpCode (line 10885)
+- new Variable (line 10886)
+- new Variable (line 11051)
+- new Variable (line 11081)
+- new OpCode (line 11095)
+- new Variable (line 11096)
+- new Variable (line 11155)
+- new OpCode (line 11176)
+- new Variable (line 11177)
+- new Variable (line 11274)
+- new Variable (line 11296)
+- new Variable (line 11364)
+- new Operand\Literal (line 11373)
+- new Variable (line 11388)
+- new Variable (line 11522)
+- new VM\PropertyIsInitializedHandler (line 11553)
+- new JIT\Call\RuntimeIndirectInstanceMethodCall (line 11593)
+- new JIT\Call\RuntimeIndirectInstanceMethodCall (line 11643)
+- new JIT\Call\RuntimeIndirectInstanceMethodCall (line 11681)
+- new Variable (line 12494)
+- new VM (line 12535)
+- new VM\Variable (line 12542)
+- new Operand\Literal (line 12556)
+- new Operand\Literal (line 12560)
+- new Operand\Literal (line 12564)
+- new Variable (line 12568)
+- new Variable (line 12592)
+- new Variable (line 12604)
+- new Variable (line 13009)
+- 279 class method(s)
 - 5 closure(s)
 
 ### `lib/JIT/Analyzer.php`
@@ -15266,9 +15318,9 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/Call/Native.php`
 
 **Warnings** (review for bootstrap subset):
-- new Variable (line 533)
-- new Variable (line 541)
-- new Variable (line 550)
+- new Variable (line 537)
+- new Variable (line 545)
+- new Variable (line 554)
 - 7 class method(s)
 
 ### `lib/JIT/Call/ReflectionAttributeGetName.php`
@@ -15723,17 +15775,17 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new Variable (line 1310)
 - new Variable (line 1509)
 - new Variable (line 1542)
-- new Variable (line 2084)
-- new Variable (line 2119)
-- new Variable (line 2162)
-- new Variable (line 2164)
-- new Variable (line 2193)
-- new Variable (line 2206)
-- new Variable (line 2216)
-- new Variable (line 2288)
-- new Variable (line 2302)
-- new Variable (line 2388)
-- new Variable (line 2395)
+- new Variable (line 2078)
+- new Variable (line 2113)
+- new Variable (line 2156)
+- new Variable (line 2158)
+- new Variable (line 2187)
+- new Variable (line 2200)
+- new Variable (line 2210)
+- new Variable (line 2282)
+- new Variable (line 2296)
+- new Variable (line 2382)
+- new Variable (line 2389)
 - 54 class method(s)
 
 ### `lib/JIT/Helper.php`
@@ -18480,18 +18532,20 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new Variable (line 216)
 - new ObjectEntry (line 253)
 - new Variable (line 255)
-- new ObjectEntry (line 289)
-- new Variable (line 302)
-- new NativeDateInvalidTimeZoneException (line 311)
-- new NativeDateRangeError (line 319)
-- new NativeDateObjectError (line 325)
-- new NativeDateMalformedStringException (line 351)
-- new ObjectEntry (line 578)
-- new ObjectEntry (line 600)
-- new ObjectEntry (line 623)
-- new ObjectEntry (line 646)
-- new ObjectEntry (line 656)
-- 49 class method(s)
+- new ObjectEntry (line 322)
+- new Variable (line 326)
+- new ObjectEntry (line 342)
+- new Variable (line 355)
+- new NativeDateInvalidTimeZoneException (line 364)
+- new NativeDateRangeError (line 372)
+- new NativeDateObjectError (line 378)
+- new NativeDateMalformedStringException (line 404)
+- new ObjectEntry (line 631)
+- new ObjectEntry (line 653)
+- new ObjectEntry (line 676)
+- new ObjectEntry (line 699)
+- new ObjectEntry (line 709)
+- 52 class method(s)
 
 ### `lib/VM/DateTimeZoneSupport.php`
 
