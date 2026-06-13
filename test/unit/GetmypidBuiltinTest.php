@@ -13,6 +13,10 @@ final class GetmypidBuiltinTest extends TestCase
 {
     public function testReturnsHostPid(): void
     {
+        if (!\PHPCompiler\ext\standard\VmProcessIdentityNative::available()) {
+            $this->markTestSkipped('libc FFI unavailable');
+        }
+
         $runtime = new Runtime();
         $fn = new getmypid();
         $frame = $fn->getFrame($runtime->vmContext);

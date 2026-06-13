@@ -5,10 +5,10 @@ declare(strict_types=1);
 namespace PHPCompiler\ext\standard;
 
 /**
- * libc getuid/getgid/geteuid/getpwuid for VM without host PHP POSIX delegation (#7891).
+ * libc getuid/getgid/geteuid/getpwuid/getpid for VM without host PHP POSIX delegation (#7891, #8351).
  *
- * php-src: ext/standard/basic_functions.c — getmyuid, getmygid, get_current_user
- * JIT/AOT: JitDate.php, JitGetCurrentUser.php (getuid/getgid/geteuid/getpwuid).
+ * php-src: ext/standard/basic_functions.c — getmyuid, getmygid, get_current_user, getmypid
+ * JIT/AOT: JitDate.php, JitGetCurrentUser.php (getuid/getgid/geteuid/getpwuid/getpid).
  */
 final class VmProcessIdentityNative
 {
@@ -63,6 +63,20 @@ final class VmProcessIdentityNative
         }
     }
 
+    public static function getpid(): ?int
+    {
+        $ffi = self::ffi();
+        if (null === $ffi) {
+            return null;
+        }
+
+        try {
+            return (int) $ffi->getpid();
+        } catch (\Throwable) {
+            return null;
+        }
+    }
+
     public static function getpwuidName(int $uid): ?string
     {
         $ffi = self::ffi();
@@ -112,9 +126,11 @@ struct passwd {
     char *pw_dir;
     char *pw_shell;
 };
+typedef int pid_t;
 uid_t getuid(void);
 gid_t getgid(void);
 uid_t geteuid(void);
+pid_t getpid(void);
 struct passwd *getpwuid(uid_t uid);
 CDEF;
 

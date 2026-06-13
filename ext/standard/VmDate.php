@@ -41,12 +41,12 @@ final class VmDate
 
     public static function getmypid(): int
     {
-        $ffi = self::ffi();
-        if (null !== $ffi) {
-            return (int) $ffi->getpid();
+        $pid = VmProcessIdentityNative::getpid();
+        if (null !== $pid) {
+            return $pid;
         }
 
-        return (int) \getmypid();
+        return 0;
     }
 
     /** getmygrgid() — real group id (ext/standard/basic_functions.c, #3611, native #7891). */
@@ -929,7 +929,6 @@ final class VmDate
         }
         $cdef = <<<'CDEF'
 typedef long time_t;
-typedef int pid_t;
 struct timeval {
     time_t tv_sec;
     long tv_usec;
@@ -955,7 +954,6 @@ struct tm *localtime_r(const time_t *timep, struct tm *result);
 struct tm *gmtime_r(const time_t *timep, struct tm *result);
 time_t timegm(struct tm *tm);
 time_t mktime(struct tm *tm);
-pid_t getpid(void);
 CDEF;
 
         foreach (['libc.so.6', 'libc.so'] as $lib) {

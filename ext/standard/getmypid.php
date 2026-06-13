@@ -12,7 +12,7 @@ use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Value;
 
-/** getmypid() — current process ID (VM host; JIT/AOT via libc getpid, issue #2195). */
+/** getmypid() — current process ID (VM VmProcessIdentityNative; JIT/AOT libc getpid, #2195, #8351). */
 final class getmypid extends Internal
 {
     public function __construct()

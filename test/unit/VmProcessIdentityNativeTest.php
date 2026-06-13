@@ -6,6 +6,7 @@ namespace PHPCompiler\Test\Unit;
 
 use PHPCompiler\ext\standard\VmProcessIdentity;
 use PHPCompiler\ext\standard\VmProcessIdentityNative;
+use PHPCompiler\ext\standard\VmDate;
 use PHPUnit\Framework\TestCase;
 
 /** VmProcessIdentityNative libc path without host POSIX delegation (#7891). */
@@ -35,14 +36,23 @@ final class VmProcessIdentityNativeTest extends TestCase
         $this->assertStringNotContainsString('posix_getgid', $source);
     }
 
+    public function testVmDateGetmypidUsesProcessIdentityNative(): void
+    {
+        $source = (string) file_get_contents(__DIR__.'/../../ext/standard/VmDate.php');
+        $this->assertStringContainsString('VmProcessIdentityNative::getpid()', $source);
+        $this->assertDoesNotMatchRegularExpression('/@?\\\\getmypid\\s*\\(/', $source);
+    }
+
     public function testNativeDefinesLibcIdentityFfi(): void
     {
         $source = (string) file_get_contents(__DIR__.'/../../ext/standard/VmProcessIdentityNative.php');
         $this->assertStringContainsString('uid_t getuid(void)', $source);
         $this->assertStringContainsString('gid_t getgid(void)', $source);
         $this->assertStringContainsString('uid_t geteuid(void)', $source);
+        $this->assertStringContainsString('pid_t getpid(void)', $source);
         $this->assertStringContainsString('struct passwd *getpwuid', $source);
         $this->assertStringContainsString('$ffi->getuid()', $source);
+        $this->assertStringContainsString('$ffi->getpid()', $source);
     }
 
     public function testNativeIdentityMatchesHostOnLinux(): void
@@ -67,6 +77,11 @@ final class VmProcessIdentityNativeTest extends TestCase
 
         $this->assertSame($uid, VmProcessIdentity::getmyuid());
         $this->assertSame($gid, VmProcessIdentity::getmygid());
+        $pid = VmProcessIdentityNative::getpid();
+        if (null !== $pid) {
+            $this->assertGreaterThan(0, $pid);
+            $this->assertSame($pid, VmDate::getmypid());
+        }
         $user = VmProcessIdentity::getCurrentUser();
         $this->assertIsString($user);
         $this->assertNotSame('', $user);
