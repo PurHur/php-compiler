@@ -314,9 +314,14 @@ final class VmMbstring
 
     private static function assertSearchEncoding(string $encoding): void
     {
+        self::assertSubstrCountEncoding($encoding, 'mbstring search');
+    }
+
+    public static function assertSubstrCountEncoding(string $encoding, string $context = 'mb_substr_count'): void
+    {
         if ('UTF-8' !== $encoding && 'ASCII' !== $encoding && '8BIT' !== $encoding) {
             throw new \LogicException(
-                'mbstring search requires mbstring for encoding '.$encoding.' in this compiler build'
+                $context.' requires mbstring for encoding '.$encoding.' in this compiler build'
             );
         }
     }
