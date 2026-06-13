@@ -18,6 +18,8 @@ final class SplModuleTest extends TestCase
         self::assertTrue(VmReflection::classExists($ctx, 'ArrayObject'));
         self::assertTrue(VmReflection::classExists($ctx, 'SplDoublyLinkedList'));
         self::assertFalse(VmReflection::classExists($ctx, 'SplQueue'));
+        self::assertTrue(VmReflection::interfaceExists($ctx, 'SplObserver'));
+        self::assertTrue(VmReflection::interfaceExists($ctx, 'SplSubject'));
 
         $code = <<<'PHP'
 <?php
