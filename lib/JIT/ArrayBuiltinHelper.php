@@ -3660,6 +3660,94 @@ final class ArrayBuiltinHelper
         return $context->getTypeFromString('int1')->constInt(1, false);
     }
 
+    /**
+     * array_walk() in-place with closure/arrow callbacks and optional userdata (#4916).
+     */
+    public static function walkInPlaceWithClosure(
+        Context $context,
+        Variable $array,
+        Variable $callback,
+        ?Variable $userdata
+    ): Value {
+        $closureCall = $callback->closureCall;
+        if (null === $closureCall) {
+            throw new \LogicException(ArrayMapCallbackPolicy::jitRejectionMessage());
+        }
+        if (self::isNativeArray($array->type)) {
+            throw new \LogicException(
+                'array_walk() cannot compile fixed-size literal arrays in JIT/AOT yet; assign to a variable first'
+            );
+        }
+        $ht = self::loadHashTable($context, $array);
+        self::walkInPlaceHashTableWithClosure($context, $ht, $closureCall, $userdata);
+        HashTableHelper::storeHashtableInArrayVariable($context, $array, $ht);
+
+        return $context->getTypeFromString('int1')->constInt(1, false);
+    }
+
+    private static function walkInPlaceHashTableWithClosure(
+        Context $context,
+        Value $src,
+        Call $closureCall,
+        ?Variable $userdata
+    ): void {
+        $map = $context->structFieldMap['__hashtable__'];
+        $sizeT = $context->getTypeFromString('size_t');
+        $nextFree = $context->builder->load(
+            $context->builder->structGep($src, $map['nextFreeElement'])
+        );
+        $zero = $sizeT->constInt(0, false);
+        $one = $sizeT->constInt(1, false);
+        $isEmpty = $context->builder->icmp(Builder::INT_EQ, $nextFree, $zero);
+        $doneBlock = BasicBlockHelper::append($context, 'array_walk_cl_done');
+        $workBlock = BasicBlockHelper::append($context, 'array_walk_cl_work');
+        $context->builder->branchIf($isEmpty, $doneBlock, $workBlock);
+
+        $context->builder->positionAtEnd($workBlock);
+        $idxSlot = $context->builder->alloca($sizeT, 1, 'array_walk_cl_idx');
+        $context->builder->store($zero, $idxSlot);
+        $head = BasicBlockHelper::append($context, 'array_walk_cl_head');
+        $check = BasicBlockHelper::append($context, 'array_walk_cl_check');
+        $walkBlock = BasicBlockHelper::append($context, 'array_walk_cl_map');
+        $skip = BasicBlockHelper::append($context, 'array_walk_cl_skip');
+        $advance = BasicBlockHelper::append($context, 'array_walk_cl_advance');
+        $context->builder->branch($head);
+
+        $context->builder->positionAtEnd($head);
+        $idx = $context->builder->load($idxSlot);
+        $atEnd = $context->builder->icmp(Builder::INT_SGE, $idx, $nextFree);
+        $context->builder->branchIf($atEnd, $doneBlock, $check);
+
+        $context->builder->positionAtEnd($check);
+        $isSet = $context->builder->call(
+            $context->lookupFunction('__hashtable__offsetIsSet'),
+            $src,
+            $idx
+        );
+        $context->builder->branchIf($isSet, $walkBlock, $skip);
+
+        $context->builder->positionAtEnd($walkBlock);
+        $entryPtr = HashTableHelper::listEntryPointer($context, $src, $idx);
+        $elem = new Variable($context, Variable::TYPE_VALUE, Variable::KIND_VARIABLE, $entryPtr);
+        $elem->borrowedValueEntry = true;
+        $key = new Variable($context, Variable::TYPE_NATIVE_LONG, Variable::KIND_VALUE, $idx);
+        if (null !== $userdata) {
+            $closureCall->call($context, $elem, $key, $userdata);
+        } else {
+            $closureCall->call($context, $elem, $key);
+        }
+        $context->builder->branch($advance);
+
+        $context->builder->positionAtEnd($skip);
+        $context->builder->branch($advance);
+
+        $context->builder->positionAtEnd($advance);
+        $context->builder->store($context->builder->addNoSignedWrap($idx, $one), $idxSlot);
+        $context->builder->branch($head);
+
+        $context->builder->positionAtEnd($doneBlock);
+    }
+
     private static function walkInPlaceHashTable(
         Context $context,
         Value $src,

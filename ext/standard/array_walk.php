@@ -19,8 +19,8 @@ use PHPLLVM\Value;
  *
  * php-src: ext/standard/array.c — php_array_walk()
  *
- * JIT/AOT: compile-time string builtin callbacks (subset; #1209). Closure callbacks and
- * optional $userdata are VM-only (#3627).
+ * JIT/AOT: compile-time string builtin callbacks (#1209) and closure callbacks with optional
+ * $userdata (#4916). String callbacks with userdata remain VM-only (#3627).
  */
 final class array_walk extends Internal
 {
@@ -82,16 +82,21 @@ final class array_walk extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        if (2 !== \count($args)) {
-            if (3 === \count($args)) {
-                throw new \LogicException(
-                    'array_walk() userdata is not supported for JIT/AOT in this compiler build (#3627)'
-                );
-            }
-            throw new \LogicException('array_walk() requires exactly two arguments in this compiler build');
+        $argc = \count($args);
+        if ($argc < 2 || $argc > 3) {
+            throw new \LogicException('array_walk() requires two or three arguments in this compiler build');
         }
         if (!ArrayMapCallbackPolicy::isJitLowerable($args[1])) {
             throw new \LogicException(ArrayMapCallbackPolicy::jitRejectionMessage());
+        }
+        $userdata = 3 === $argc ? $args[2] : null;
+        if (ArrayMapCallbackPolicy::isClosureJitLowerable($args[1])) {
+            return ArrayBuiltinHelper::walkInPlaceWithClosure($context, $args[0], $args[1], $userdata);
+        }
+        if (null !== $userdata) {
+            throw new \LogicException(
+                'array_walk() userdata is not supported for JIT/AOT string callbacks in this compiler build (#3627)'
+            );
         }
         if (JITVariable::TYPE_STRING === $args[1]->type || JITVariable::TYPE_VALUE === $args[1]->type) {
             $this->jitString($context, $args[1], 'array_walk() callback');
