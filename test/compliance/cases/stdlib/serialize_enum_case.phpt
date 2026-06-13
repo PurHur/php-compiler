@@ -1,5 +1,5 @@
 --TEST--
-Stdlib: serialize()/unserialize() enum case round-trip (#6131, ext/standard/var.c)
+Stdlib: serialize()/unserialize() enum case round-trip (#5739, #6131, ext/standard/var.c)
 --FILE--
 <?php
 enum U { case A; }
