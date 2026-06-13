@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 2549 |
-| Phase A inventory files (M2 ratio SSOT) | 2549 |
+| PHP files on vm.php path | 2550 |
+| Phase A inventory files (M2 ratio SSOT) | 2550 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 6905 |
+| Source constructs flagged (warnings) | 6906 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -800,6 +800,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/standard/VmProcessIdentity.php` | 0 | 1 |
 | `ext/standard/VmProcessIdentityNative.php` | 0 | 1 |
 | `ext/standard/VmRandom.php` | 0 | 2 |
+| `ext/standard/VmRandomNative.php` | 0 | 3 |
 | `ext/standard/VmReadline.php` | 0 | 5 |
 | `ext/standard/VmReduceCallback.php` | 0 | 1 |
 | `ext/standard/VmReflection.php` | 0 | 62 |
@@ -834,7 +835,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/standard/VmStreamSync.php` | 0 | 1 |
 | `ext/standard/VmStreamTransports.php` | 0 | 1 |
 | `ext/standard/VmStreamWrapperRegistry.php` | 0 | 1 |
-| `ext/standard/VmString.php` | 0 | 5 |
+| `ext/standard/VmString.php` | 0 | 3 |
 | `ext/standard/VmStripWhitespace.php` | 0 | 1 |
 | `ext/standard/VmSys.php` | 0 | 3 |
 | `ext/standard/VmSysGetTempDirNative.php` | 0 | 1 |
@@ -7214,11 +7215,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new HashTable (line 199)
 - new HashTable (line 416)
 - new HashTable (line 613)
-- new HashTable (line 643)
-- new Variable (line 902)
-- new Variable (line 909)
-- new Variable (line 916)
-- 52 class method(s)
+- new HashTable (line 653)
+- new Variable (line 912)
+- new Variable (line 919)
+- new Variable (line 926)
+- 53 class method(s)
 
 ### `ext/standard/VmDateInterval.php`
 
@@ -7934,6 +7935,13 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new Exception (line 57)
 - 2 class method(s)
 
+### `ext/standard/VmRandomNative.php`
+
+**Warnings** (review for bootstrap subset):
+- new Exception (line 38)
+- new Exception (line 48)
+- 6 class method(s)
+
 ### `ext/standard/VmReadline.php`
 
 **Warnings** (review for bootstrap subset):
@@ -8262,10 +8270,8 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/VmString.php`
 
 **Warnings** (review for bootstrap subset):
-- new Exception (line 1704)
-- new Exception (line 1712)
-- new Error (line 3000)
-- new Error (line 3025)
+- new Error (line 2980)
+- new Error (line 3005)
 - 176 class method(s)
 
 ### `ext/standard/VmStripWhitespace.php`
