@@ -75,7 +75,7 @@ final class proc_open extends Internal
         return JitProcOpen::invoke($context, ...$args);
     }
 
-    /** @return string|list<string> */
+    /** @return string|array */
     private static function parseCommand(Variable $arg, string $functionName, int $argNum): string|array
     {
         $arg = $arg->resolveIndirect();

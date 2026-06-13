@@ -20,7 +20,7 @@ final class RecursiveArrayIteratorBuiltin
 {
     public const CLASS_LC = 'recursivearrayiterator';
 
-    /** @var array<int, array{keys: list<int|string>, table: HashTable, pos: int}> */
+    /** @var array<int, array> */
     private static array $store = [];
 
     public static function registerClass(Context $ctx): void
@@ -161,7 +161,7 @@ final class RecursiveArrayIteratorBuiltin
     }
 
     /**
-     * @return array{keys: list<int|string>, table: HashTable, pos: int}
+     * @return array
      */
     private static function state(ObjectEntry $object): array
     {

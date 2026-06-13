@@ -14,7 +14,7 @@ use PHPCompiler\VM\Variable;
  */
 final class VmInternalCompare
 {
-    /** @var array<string, class-string<Internal>> */
+    /** @var array<string, class-string> */
     private const STRING_CALLBACKS = [
         'strcmp' => strcmp::class,
         'strcasecmp' => strcasecmp::class,

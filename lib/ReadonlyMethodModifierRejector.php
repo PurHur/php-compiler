@@ -136,7 +136,7 @@ final class ReadonlyMethodModifierRejector
     }
 
     /**
-     * @param list<array{0: int, 1: string, 2: int}|string> $tokens
+     * @param list<mixed> $tokens
      */
     private static function findFunctionBodyBraceDepth(array $tokens, int $functionIndex, int $currentBraceDepth): ?int
     {
@@ -171,7 +171,7 @@ final class ReadonlyMethodModifierRejector
     }
 
     /**
-     * @param list<array{0: int, 1: string, 2: int}|string> $tokens
+     * @param list<mixed> $tokens
      */
     private static function readonlyPrecedesMemberFunction(array $tokens, int $readonlyIndex, int $n): ?int
     {

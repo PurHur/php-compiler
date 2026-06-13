@@ -1492,7 +1492,7 @@ final class ArrayBuiltinHelper
         return JitValueBox::pointer($context, $resultSlot);
     }
 
-    /** @var array<class-string<Internal>, int> */
+    /** @var array<class-string, int> */
     private const MAP_CALLBACK_RESULT_TYPE = [
         // String keys avoid ::class const fetch during gen-0 bootstrap compile (#1492).
         'PHPCompiler\\ext\\standard\\strval' => Variable::TYPE_STRING,

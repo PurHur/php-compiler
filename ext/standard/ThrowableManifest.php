@@ -135,7 +135,7 @@ final class ThrowableManifest
         'JsonException' => 'Exception',
     ];
 
-    /** @var array<string, class-string<\Throwable>> */
+    /** @var array<string, class-string> */
     public const NATIVE_CLASSES = [
         'Exception' => \Exception::class,
         'LogicException' => \LogicException::class,
@@ -219,13 +219,13 @@ final class ThrowableManifest
         }
     }
 
-    /** @return class-string<\Throwable>|null */
+    /** @return class-string|null */
     public static function nativeClass(string $className): ?string
     {
         return self::NATIVE_CLASSES[$className] ?? null;
     }
 
-    /** @return class-string<\Throwable>|null */
+    /** @return class-string|null */
     public static function nativeClassForLc(string $lc): ?string
     {
         $name = self::nameForLc($lc);

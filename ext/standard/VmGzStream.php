@@ -110,7 +110,7 @@ final class VmGzStream
     /**
      * gzfile() — read gzip file into a line array (ext/zlib/zlib.c, #4657).
      *
-     * @return list<string>|false
+     * @return array|false
      */
     public static function gzfile(string $filename, int $useIncludePath = 0): array|false
     {

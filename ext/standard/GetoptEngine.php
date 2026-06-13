@@ -17,7 +17,7 @@ final class GetoptEngine
      * @param list<string> $argv SAPI argv including script name at index 0
      * @param list<string> $longOptions
      *
-     * @return array<string, bool|string|list<bool|string>>|false
+     * @return array|false
      */
     public static function parse(array $argv, string $shortOptions, array $longOptions, ?int &$restIndex = null): array|false
     {
@@ -190,7 +190,7 @@ final class GetoptEngine
     }
 
     /**
-     * @param array<string, bool|string|list<bool|string>> $result
+     * @param array $result
      */
     private static function addResult(array &$result, string $name, bool|string $value): void
     {

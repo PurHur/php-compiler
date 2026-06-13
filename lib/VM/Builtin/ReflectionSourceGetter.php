@@ -15,11 +15,11 @@ use PHPCompiler\VM\ReflectionSupport;
  */
 abstract class ReflectionSourceGetter extends VmClassMethod
 {
-    /** @var callable(SourceLocation, ClassEntry, Frame): void */
+    /** @var callable */
     private $apply;
 
     /**
-     * @param callable(SourceLocation, ClassEntry, Frame): void $apply
+     * @param callable $apply
      */
     public function __construct(string $methodName, callable $apply)
     {
