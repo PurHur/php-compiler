@@ -460,6 +460,77 @@ final class VmDate
     }
 
     /**
+     * Build date_parse()/date_parse_from_format() return array (#6172).
+     *
+     * @param array{
+     *   year: int|false,
+     *   month: int|false,
+     *   day: int|false,
+     *   hour: int|false,
+     *   minute: int|false,
+     *   second: int|false,
+     *   fraction: float|false,
+     *   warning_count: int,
+     *   warnings: array<int, string>,
+     *   error_count: int,
+     *   errors: array<int, string>,
+     *   is_localtime: bool
+     * } $result
+     */
+    public static function parseResultToHashTable(array $result): HashTable
+    {
+        $ht = new HashTable();
+        foreach ([
+            'year',
+            'month',
+            'day',
+            'hour',
+            'minute',
+            'second',
+        ] as $key) {
+            $value = $result[$key];
+            if (false === $value) {
+                $var = new Variable(Variable::TYPE_BOOLEAN);
+                $var->bool(false);
+                $ht->add($key, $var);
+            } else {
+                self::hashSetLong($ht, $key, $value);
+            }
+        }
+        $fraction = $result['fraction'];
+        if (false === $fraction) {
+            $var = new Variable(Variable::TYPE_BOOLEAN);
+            $var->bool(false);
+            $ht->add('fraction', $var);
+        } else {
+            $var = new Variable(Variable::TYPE_FLOAT);
+            $var->float((float) $fraction);
+            $ht->add('fraction', $var);
+        }
+        self::hashSetLong($ht, 'warning_count', $result['warning_count']);
+        self::hashSetLong($ht, 'error_count', $result['error_count']);
+        self::hashSetBool($ht, 'is_localtime', $result['is_localtime']);
+
+        $warnings = new HashTable();
+        foreach ($result['warnings'] as $pos => $message) {
+            self::hashSetString($warnings, (string) $pos, $message);
+        }
+        $warningsVar = new Variable();
+        $warningsVar->array($warnings);
+        $ht->add('warnings', $warningsVar);
+
+        $errors = new HashTable();
+        foreach ($result['errors'] as $pos => $message) {
+            self::hashSetString($errors, (string) $pos, $message);
+        }
+        $errorsVar = new Variable();
+        $errorsVar->array($errors);
+        $ht->add('errors', $errorsVar);
+
+        return $ht;
+    }
+
+    /**
      * gmgetdate() — UTC getdate() breakdown (php-src userland pattern; pairs #6706, #7001).
      */
     public static function gmgetdate(?int $timestamp = null): HashTable
