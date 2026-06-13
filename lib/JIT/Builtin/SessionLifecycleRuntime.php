@@ -40,6 +40,7 @@ final class SessionLifecycleRuntime
         self::implementStandaloneRegenerateId($context);
         self::implementStandaloneDestroy($context);
         self::implementStandaloneAbort($context);
+        self::implementStandaloneUnset($context);
     }
 
     private static function implementGenerateNewId(Context $context): void
@@ -260,6 +261,28 @@ final class SessionLifecycleRuntime
             static function (Context $context, Value $outPtr): void {
                 $i8 = $context->getTypeFromString('int8');
                 $context->builder->store($i8->constInt(0, false), SessionStorageGlobals::$activeGlobal);
+                SessionStart::emitWriteBool($context, $outPtr, true);
+            }
+        );
+    }
+
+    private static function implementStandaloneUnset(Context $context): void
+    {
+        $fn = $context->lookupFunction('__phpc_session_unset_apply');
+        if ($fn->countBasicBlocks() > 0) {
+            return;
+        }
+
+        self::emitActiveGuardedLifecycle(
+            $context,
+            $fn,
+            static function (Context $context, Value $outPtr): void {
+                $empty = $context->builder->call($context->lookupFunction('__hashtable__alloc'));
+                $sgSession = self::sgSessionPtr($context);
+                $context->builder->store($empty, $sgSession);
+                if (isset(SuperglobalInit::$globals['_SESSION'])) {
+                    $context->builder->store($empty, SuperglobalInit::$globals['_SESSION']);
+                }
                 SessionStart::emitWriteBool($context, $outPtr, true);
             }
         );

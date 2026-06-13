@@ -36,6 +36,6 @@ class session_unset extends Internal
             throw new \LogicException('session_unset() expects exactly 0 arguments in this compiler build');
         }
 
-        throw new \LogicException('session_unset() not implemented for JIT');
+        return JitSessionUnset::invoke($context);
     }
 }
