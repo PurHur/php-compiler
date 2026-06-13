@@ -86,19 +86,39 @@ final class SplObjectStorageMethod implements Call
         return $fetched->value;
     }
 
+    private static function receiverObjectVariable(Context $context, Variable $receiver): Variable
+    {
+        if (Variable::TYPE_OBJECT === $receiver->type) {
+            return $receiver;
+        }
+        $obj = self::loadReceiverObject($context, $receiver);
+
+        return new Variable(
+            $context,
+            Variable::TYPE_OBJECT,
+            Variable::KIND_VALUE,
+            $obj
+        );
+    }
+
     private function callContains(Context $context, Variable ...$args): Value
     {
         if (count($args) < 2) {
             throw new \LogicException('SplObjectStorage::contains() requires an object key');
         }
-        $ht = self::backingHashtable($context, $args[0]);
+        $receiverVar = self::receiverObjectVariable($context, $args[0]);
+        $htVar = $context->type->object->splBackingHashtable($receiverVar);
+        $htVal = $context->helper->loadValue($htVar);
         $keyObj = self::loadKeyObject($context, $args[1]);
-
-        return $context->builder->call(
+        $isSet = $context->builder->call(
             $context->lookupFunction('__hashtable__offsetIsSetObjectKey'),
-            $ht,
+            $htVal,
             $keyObj
         );
+        $slot = JitValueBox::alloc($context);
+        JitValueBox::writeBool($context, $slot, $isSet);
+
+        return $slot;
     }
 
     private function callCount(Context $context, Variable ...$args): Value
@@ -106,11 +126,19 @@ final class SplObjectStorageMethod implements Call
         if ([] === $args) {
             throw new \LogicException('SplObjectStorage::count() requires the storage receiver');
         }
-        $ht = self::backingHashtable($context, $args[0]);
+        $receiverVar = self::receiverObjectVariable($context, $args[0]);
+        $htVar = $context->type->object->splBackingHashtable($receiverVar);
+        $htVal = $context->helper->loadValue($htVar);
         $map = $context->structFieldMap['__hashtable__'];
-        $num = $context->builder->load($context->builder->structGep($ht, $map['numElements']));
+        $num = $context->builder->load($context->builder->structGep($htVal, $map['numElements']));
+        $slot = JitValueBox::alloc($context);
+        JitValueBox::writeLong(
+            $context,
+            $slot,
+            $context->builder->truncOrBitCast($num, $context->getTypeFromString('int64'))
+        );
 
-        return $context->builder->truncOrBitCast($num, $context->getTypeFromString('int64'));
+        return $slot;
     }
 
     private static function loadKeyObject(Context $context, Variable $key): Value
@@ -143,19 +171,24 @@ final class SplObjectStorageMethod implements Call
         if (Variable::TYPE_HASHTABLE === $receiver->type) {
             return $context->helper->loadValue($receiver);
         }
+        $obj = self::loadReceiverObject($context, $receiver);
+
+        return $context->helper->loadValue(
+            $context->type->object->splBackingHashtable(
+                new Variable($context, Variable::TYPE_OBJECT, Variable::KIND_VALUE, $obj)
+            )
+        );
+    }
+
+    private static function loadReceiverObject(Context $context, Variable $receiver): Value
+    {
         if (Variable::TYPE_OBJECT === $receiver->type) {
-            return $context->helper->loadValue(
-                $context->type->object->splBackingHashtable($receiver)
-            );
+            return $context->helper->loadValue($receiver);
         }
         if (Variable::TYPE_VALUE === $receiver->type) {
-            $valPtr = Variable::KIND_VARIABLE === $receiver->kind
-                ? JitValueBox::pointer($context, $receiver->value)
-                : $context->helper->loadValue($receiver);
-
             return $context->builder->call(
-                $context->lookupFunction('__value__readHashtable'),
-                $valPtr
+                $context->lookupFunction('__value__readObject'),
+                JitValueBox::valuePtrFromVariable($context, $receiver)
             );
         }
 

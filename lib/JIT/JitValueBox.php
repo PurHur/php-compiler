@@ -641,6 +641,7 @@ final class JitValueBox
 
     /**
      * Instance method calls may return {@see __value__} or {@see __value__*} (#3098, #4012).
+     * Indirect dispatch also boxes native LLVM scalars (SplObjectStorage::count(), etc.).
      */
     public static function coerceToValuePtrForStore(Context $context, Value $raw): Value
     {
@@ -651,6 +652,28 @@ final class JitValueBox
         if ('__value__' === $tyName) {
             $slot = self::alloc($context);
             $context->builder->store($raw, $slot);
+
+            return self::pointer($context, $slot);
+        }
+        if ('int64' === $tyName) {
+            $slot = self::alloc($context);
+            self::writeLong($context, $slot, $raw);
+
+            return self::pointer($context, $slot);
+        }
+        if ('int1' === $tyName || 'bool' === $tyName) {
+            $slot = self::alloc($context);
+            self::writeBool($context, $slot, $raw);
+
+            return self::pointer($context, $slot);
+        }
+        if ('double' === $tyName) {
+            $slot = self::alloc($context);
+            $context->builder->call(
+                $context->lookupFunction('__value__writeDouble'),
+                self::pointer($context, $slot),
+                $raw
+            );
 
             return self::pointer($context, $slot);
         }
