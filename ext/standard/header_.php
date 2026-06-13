@@ -24,7 +24,7 @@ use PHPCompiler\Web\ResponseContext;
 use PHPLLVM\Value;
 
 /**
- * header() for HTTP response headers (AOT/JIT emit via printf; VM delegates to PHP).
+ * header() for HTTP response headers (VM ResponseContext + JIT pending queue; issue #5344, #8274).
  */
 final class header_ extends Internal
 {
@@ -50,13 +50,9 @@ final class header_ extends Internal
         }
         ResponseContext::assertSafeHeaderLine($line);
         if (0 !== $responseCode) {
-            \header($line, $replace, $responseCode);
             ResponseContext::setStatus($responseCode);
-        } else {
-            \header($line, $replace);
-            if (0 === strncasecmp($line, 'Location:', 9) && ResponseContext::isHttpResponseCodeUnset()) {
-                ResponseContext::setStatus(302);
-            }
+        } elseif (0 === strncasecmp($line, 'Location:', 9) && ResponseContext::isHttpResponseCodeUnset()) {
+            ResponseContext::setStatus(302);
         }
         ResponseContext::addHeader($line, $replace);
     }
