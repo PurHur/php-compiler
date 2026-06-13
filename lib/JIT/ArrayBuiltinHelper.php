@@ -9149,6 +9149,18 @@ final class ArrayBuiltinHelper
         HashTableHelper::storeHashtableInArrayVariable($context, $array, $ht);
     }
 
+    public static function sortPackedLocale(Context $context, Variable $array): void
+    {
+        if (self::isNativeArray($array->type)) {
+            throw new \LogicException(
+                'sort() cannot compile fixed-size literal arrays in JIT/AOT yet; use bin/vm.php or bin/serve.php, or build the list with [] append'
+            );
+        }
+        $ht = self::loadHashTable($context, $array);
+        $context->builder->call($context->lookupFunction('__hashtable__sortPackedLocale'), $ht);
+        HashTableHelper::storeHashtableInArrayVariable($context, $array, $ht);
+    }
+
     /**
      * usort() packed list with closure/arrow comparator (issue #3597).
      */
@@ -9473,10 +9485,36 @@ final class ArrayBuiltinHelper
         $context->builder->positionAtEnd($done);
     }
 
+    public static function ksortByKeyLocale(Context $context, Variable $array): void
+    {
+        if (self::isNativeArray($array->type)) {
+            throw new \LogicException(
+                'ksort() cannot compile fixed-size literal arrays in JIT/AOT yet; use bin/vm.php or bin/serve.php'
+            );
+        }
+        $isList = \PHPCompiler\ext\standard\JitArrayIsList::invoke($context, $array);
+        $done = BasicBlockHelper::append($context, 'ksort_locale_done');
+        $sort = BasicBlockHelper::append($context, 'ksort_locale_sort');
+        $context->builder->branchIf($isList, $done, $sort);
+
+        $context->builder->positionAtEnd($sort);
+        self::sortStringKeysLocale($context, $array);
+        $context->builder->branch($done);
+
+        $context->builder->positionAtEnd($done);
+    }
+
     public static function sortStringKeys(Context $context, Variable $array): void
     {
         $ht = self::loadHashTable($context, $array);
         $context->builder->call($context->lookupFunction('__hashtable__sortStringKeys'), $ht);
+        HashTableHelper::storeHashtableInArrayVariable($context, $array, $ht);
+    }
+
+    public static function sortStringKeysLocale(Context $context, Variable $array): void
+    {
+        $ht = self::loadHashTable($context, $array);
+        $context->builder->call($context->lookupFunction('__hashtable__sortStringKeysLocale'), $ht);
         HashTableHelper::storeHashtableInArrayVariable($context, $array, $ht);
     }
 
@@ -9525,6 +9563,30 @@ final class ArrayBuiltinHelper
 
         $context->builder->positionAtEnd($sortAssoc);
         self::sortStringKeyValues($context, $array);
+        $context->builder->branch($done);
+
+        $context->builder->positionAtEnd($done);
+    }
+
+    public static function asortByValueLocale(Context $context, Variable $array): void
+    {
+        if (self::isNativeArray($array->type)) {
+            throw new \LogicException(
+                'asort() cannot compile fixed-size literal arrays in JIT/AOT yet; use bin/vm.php or bin/serve.php'
+            );
+        }
+        $isList = \PHPCompiler\ext\standard\JitArrayIsList::invoke($context, $array);
+        $done = BasicBlockHelper::append($context, 'asort_locale_done');
+        $sortList = BasicBlockHelper::append($context, 'asort_locale_sort_list');
+        $sortAssoc = BasicBlockHelper::append($context, 'asort_locale_sort_assoc');
+        $context->builder->branchIf($isList, $sortList, $sortAssoc);
+
+        $context->builder->positionAtEnd($sortList);
+        self::sortPackedLocale($context, $array);
+        $context->builder->branch($done);
+
+        $context->builder->positionAtEnd($sortAssoc);
+        self::sortStringKeyValuesLocale($context, $array);
         $context->builder->branch($done);
 
         $context->builder->positionAtEnd($done);
@@ -9620,6 +9682,13 @@ final class ArrayBuiltinHelper
     {
         $ht = self::loadHashTable($context, $array);
         $context->builder->call($context->lookupFunction('__hashtable__sortStringKeyValues'), $ht);
+        HashTableHelper::storeHashtableInArrayVariable($context, $array, $ht);
+    }
+
+    public static function sortStringKeyValuesLocale(Context $context, Variable $array): void
+    {
+        $ht = self::loadHashTable($context, $array);
+        $context->builder->call($context->lookupFunction('__hashtable__sortStringKeyValuesLocale'), $ht);
         HashTableHelper::storeHashtableInArrayVariable($context, $array, $ht);
     }
 

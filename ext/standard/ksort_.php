@@ -78,10 +78,14 @@ final class ksort_ extends Internal
     private static function jitSortByKeyWithFlags(Context $context, JITVariable $array, int $flags): void
     {
         $sortType = $flags & ~StdlibConstants::SORT_FLAG_CASE;
+        if (StdlibConstants::SORT_LOCALE_STRING === $sortType) {
+            ArrayBuiltinHelper::ksortByKeyLocale($context, $array);
+
+            return;
+        }
         if (
             StdlibConstants::SORT_REGULAR === $sortType
             || StdlibConstants::SORT_STRING === $sortType
-            || StdlibConstants::SORT_LOCALE_STRING === $sortType
         ) {
             ArrayBuiltinHelper::ksortByKey($context, $array);
 
