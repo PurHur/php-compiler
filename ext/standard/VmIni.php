@@ -142,9 +142,6 @@ final class VmIni
     }
 
     private static function setMemoryLimit(string $newValue) {
-        if ('-1' === $newValue) {
-            return false;
-        }
         $old = self::$memoryLimit;
         self::$memoryLimit = $newValue;
 
