@@ -11,7 +11,7 @@ use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Value;
 
-/** shell_exec() — run command via host shell (VM; JIT/AOT via __compiler_shell_exec). */
+/** shell_exec() — VM via VmShellExecNative libc popen; JIT/AOT via __compiler_shell_exec (#8250). */
 final class shell_exec extends Internal
 {
     public function __construct()
@@ -28,7 +28,7 @@ final class shell_exec extends Internal
             return;
         }
         $command = VmString::coerceStringBuiltinArg($frame->calledArgs[0], 'shell_exec', 0, 'command');
-        $result = \shell_exec($command);
+        $result = VmShellExecNative::shellExec($command);
         if (false === $result) {
             $frame->returnVar->bool(false);
         } elseif (null === $result) {

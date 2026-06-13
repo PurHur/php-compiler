@@ -24,6 +24,9 @@ final class VmFs
     /** @var array<int, true> popen() handles — pclose() vs fclose() at libc layer in JIT/AOT */
     private static array $popenHandles = [];
 
+    /** @var array<int, \FFI\CData> libc FILE* for VmPopenNative handles (#8250) */
+    private static array $popenNativeFiles = [];
+
     /** @var array<int, true> gz* stream placeholders — I/O via VmGzStreamNative libz FFI (#8220) */
     private static array $gzNativePlaceholders = [];
 
@@ -589,6 +592,24 @@ final class VmFs
      */
     public static function popen(string $command, string $mode)
     {
+        if (VmPopenNative::available()) {
+            $opened = VmPopenNative::open($command, $mode);
+            if (false === $opened) {
+                return false;
+            }
+            $id = self::adoptStreamResource($opened['stream'], 'popen://'.$command);
+            if (false === $id) {
+                @\fclose($opened['stream']);
+                VmPopenNative::pclose($opened['file']);
+
+                return false;
+            }
+            self::$popenHandles[$id] = true;
+            self::$popenNativeFiles[$id] = $opened['file'];
+
+            return $id;
+        }
+
         $fp = @\popen($command, $mode);
         if (false === $fp) {
             return false;
@@ -608,9 +629,15 @@ final class VmFs
         if (null === $fp) {
             return -1;
         }
+        $nativeFile = self::$popenNativeFiles[$handle] ?? null;
         unset(self::$handles[$handle], self::$handlePaths[$handle], self::$handleSocketFds[$handle]);
-        unset(self::$popenHandles[$handle]);
+        unset(self::$popenHandles[$handle], self::$popenNativeFiles[$handle]);
         self::releaseHostResourceRef($fp);
+        if (null !== $nativeFile) {
+            @\fclose($fp);
+
+            return VmPopenNative::pclose($nativeFile);
+        }
         $result = @\pclose($fp);
         if (false === $result) {
             return -1;
