@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 2506 |
-| Phase A inventory files (M2 ratio SSOT) | 2506 |
+| PHP files on vm.php path | 2508 |
+| Phase A inventory files (M2 ratio SSOT) | 2508 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 6786 |
+| Source constructs flagged (warnings) | 6788 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -543,6 +543,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/standard/JitSessionRegenerateId.php` | 0 | 1 |
 | `ext/standard/JitSessionStart.php` | 0 | 1 |
 | `ext/standard/JitSessionStatus.php` | 0 | 1 |
+| `ext/standard/JitSessionUnset.php` | 0 | 1 |
 | `ext/standard/JitSessionWriteClose.php` | 0 | 1 |
 | `ext/standard/JitSetcookie.php` | 0 | 1 |
 | `ext/standard/JitSettype.php` | 0 | 1 |
@@ -1766,6 +1767,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/Builtin/SessionStart.php` | 0 | 1 |
 | `lib/JIT/Builtin/SessionStorageGlobals.php` | 0 | 1 |
 | `lib/JIT/Builtin/SessionStorageRuntime.php` | 0 | 1 |
+| `lib/JIT/Builtin/SessionUnset.php` | 0 | 1 |
 | `lib/JIT/Builtin/SessionWriteClose.php` | 0 | 1 |
 | `lib/JIT/Builtin/SpaceshipCompareJit.php` | 0 | 2 |
 | `lib/JIT/Builtin/SpaceshipRuntime.php` | 0 | 1 |
@@ -5552,6 +5554,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - 1 class method(s)
 
 ### `ext/standard/JitSessionStatus.php`
+
+**Warnings** (review for bootstrap subset):
+- 1 class method(s)
+
+### `ext/standard/JitSessionUnset.php`
 
 **Warnings** (review for bootstrap subset):
 - 1 class method(s)
@@ -13972,8 +13979,8 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/Builtin/SessionLifecycleRuntime.php`
 
 **Warnings** (review for bootstrap subset):
-- 15 class method(s)
-- 3 closure(s)
+- 16 class method(s)
+- 4 closure(s)
 
 ### `lib/JIT/Builtin/SessionModuleName.php`
 
@@ -14004,6 +14011,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 
 **Warnings** (review for bootstrap subset):
 - 27 class method(s)
+
+### `lib/JIT/Builtin/SessionUnset.php`
+
+**Warnings** (review for bootstrap subset):
+- 1 class method(s)
 
 ### `lib/JIT/Builtin/SessionWriteClose.php`
 
