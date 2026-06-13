@@ -43,4 +43,22 @@ final class PackEngineTest extends TestCase
         $this->expectExceptionMessage('Type c: too few arguments');
         PackEngine::pack('cc', [1]);
     }
+
+    public function testFloatFormatsMatchZend(): void
+    {
+        foreach ([0.0, 1.5, -2.25, 3.14159] as $value) {
+            $this->assertSame(\pack('f', $value), PackEngine::pack('f', [$value]));
+            $this->assertSame(\pack('d', $value), PackEngine::pack('d', [$value]));
+            $this->assertSame(\pack('g', $value), PackEngine::pack('g', [$value]));
+            $this->assertSame(\pack('e', $value), PackEngine::pack('e', [$value]));
+        }
+    }
+
+    public function testPackEngineDoesNotUseHostFloatPack(): void
+    {
+        $source = (string) file_get_contents(__DIR__.'/../../ext/standard/PackEngine.php');
+        $this->assertStringNotContainsString("\\pack('f'", $source);
+        $this->assertStringNotContainsString("\\pack('d'", $source);
+        $this->assertStringContainsString('Ieee754::encodeFloat32', $source);
+    }
 }

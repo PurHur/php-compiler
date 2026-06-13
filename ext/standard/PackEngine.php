@@ -159,7 +159,7 @@ final class PackEngine
                         $output = self::writeAt(
                             $output,
                             $outputPos,
-                            \pack('f', (float) self::argDouble($args[$currentArg++], $frame))
+                            self::putFloat((float) self::argDouble($args[$currentArg++], $frame), self::machineLe())
                         );
                         $outputPos += 4;
                     }
@@ -189,7 +189,7 @@ final class PackEngine
                         $output = self::writeAt(
                             $output,
                             $outputPos,
-                            \pack('d', self::argDouble($args[$currentArg++], $frame))
+                            self::putDouble(self::argDouble($args[$currentArg++], $frame), self::machineLe())
                         );
                         $outputPos += 8;
                     }
@@ -453,22 +453,12 @@ final class PackEngine
 
     private static function putFloat(float $value, bool $littleEndian): string
     {
-        $bytes = \pack('f', $value);
-        if ($littleEndian !== self::machineLe()) {
-            $bytes = \strrev($bytes);
-        }
-
-        return $bytes;
+        return Ieee754::encodeFloat32($value, $littleEndian);
     }
 
     private static function putDouble(float $value, bool $littleEndian): string
     {
-        $bytes = \pack('d', $value);
-        if ($littleEndian !== self::machineLe()) {
-            $bytes = \strrev($bytes);
-        }
-
-        return $bytes;
+        return Ieee754::encodeFloat64($value, $littleEndian);
     }
 
     private static function writeAt(string $output, int $pos, string $chunk): string

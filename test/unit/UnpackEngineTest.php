@@ -34,4 +34,22 @@ final class UnpackEngineTest extends TestCase
         $this->assertSame(\unpack('n', PackEngine::pack('n', [0x1234])), UnpackEngine::unpack('n', PackEngine::pack('n', [0x1234])));
         $this->assertSame(\unpack('N', PackEngine::pack('N', [42])), UnpackEngine::unpack('N', PackEngine::pack('N', [42])));
     }
+
+    public function testFloatFormatsMatchZend(): void
+    {
+        foreach ([0.0, 1.5, -2.25, 3.14159] as $value) {
+            foreach (['f', 'd', 'g', 'G', 'e', 'E'] as $code) {
+                $packed = PackEngine::pack($code, [$value]);
+                $this->assertSame(\unpack($code, $packed), UnpackEngine::unpack($code, $packed));
+            }
+        }
+    }
+
+    public function testUnpackEngineDoesNotUseHostFloatUnpack(): void
+    {
+        $source = (string) file_get_contents(__DIR__.'/../../ext/standard/UnpackEngine.php');
+        $this->assertStringNotContainsString("\\unpack('f'", $source);
+        $this->assertStringNotContainsString("\\unpack('d'", $source);
+        $this->assertStringContainsString('Ieee754::decodeFloat32', $source);
+    }
 }
