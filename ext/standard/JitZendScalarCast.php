@@ -323,7 +323,7 @@ final class JitZendScalarCast
      * Read a boxed bool from {@see __value__::value} (writeBool stores int8 at offset 0).
      * {@see __value__readLong} has no TYPE_NATIVE_BOOL arm (#1056 object_identity_compare).
      */
-    private static function readBoolByteFromValueBox(Context $context, Value $valuePtr, LlvmType $targetTy): Value
+    public static function readBoolByteFromValueBox(Context $context, Value $valuePtr, LlvmType $targetTy): Value
     {
         $map = $context->structFieldMap['__value__'];
         $valueField = $context->builder->structGep($valuePtr, $map['value']);
