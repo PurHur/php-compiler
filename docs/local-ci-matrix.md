@@ -143,7 +143,7 @@ Defaults are exported from [`script/ci-defaults.env`](../script/ci-defaults.env)
 | `FILE_UPLOAD_WEB_DEPLOY_SMOKE_GATE` | `0` | `deploy-smoke.sh`, `ci-local.sh` | Opt-in 006 deploy + `PHPC_DEPLOY_ROOT` multipart upload CGI ([#2028](https://github.com/PurHur/php-compiler/issues/2028)); VM curls stay on `FILE_UPLOAD_WEB_SMOKE_GATE=1` ([#2009](https://github.com/PurHur/php-compiler/issues/2009)) |
 | `THROWSWEB_SERVE_AOT_SMOKE_GATE` | `1` | `ci-local.sh` (`ci_run_throws_web_serve_aot_smoke`) | `examples-web-smoke.sh --throws-only --aot` — 007 `phpc serve --aot` caught invalid POST ([#2390](https://github.com/PurHur/php-compiler/issues/2390), [#2387](https://github.com/PurHur/php-compiler/issues/2387)); set `0` to skip |
 | `THROWSWEB_SERVE_JIT_SMOKE_GATE` | `1` | `ci-fast.sh` (`ci_run_throws_web_serve_jit_smoke`) | `examples-web-smoke.sh --throws-only --jit` — 007 `phpc serve --jit` caught invalid POST ([#2435](https://github.com/PurHur/php-compiler/issues/2435), [#2408](https://github.com/PurHur/php-compiler/issues/2408)); set `0` to skip |
-| `THROWSWEB_DEPLOY_SMOKE_GATE` | `0` | `deploy-smoke.sh`, `ci-local.sh` | Opt-in 007 deploy + `PHPC_DEPLOY_ROOT` caught invalid POST CGI ([#2124](https://github.com/PurHur/php-compiler/issues/2124), [#2264](https://github.com/PurHur/php-compiler/issues/2264)); VM curls stay on `THROWS_WEB_SMOKE_GATE=1` ([#2125](https://github.com/PurHur/php-compiler/issues/2125)) |
+| `THROWSWEB_DEPLOY_SMOKE_GATE` | `1` | `deploy-smoke.sh`, `ci-local.sh` | Default-on 007 deploy + `PHPC_DEPLOY_ROOT` caught invalid POST CGI ([#2388](https://github.com/PurHur/php-compiler/issues/2388), [#2124](https://github.com/PurHur/php-compiler/issues/2124)); set `0` to skip; VM curls stay on `THROWS_WEB_SMOKE_GATE=1` ([#2125](https://github.com/PurHur/php-compiler/issues/2125)) |
 | `FASTCGI_WEB_SMOKE_GATE` | `1` | `ci-fast.sh`, `ci-local.sh` | `examples-web-smoke.sh --fastcgi-only` / 009 health + PATH_INFO curls ([#2351](https://github.com/PurHur/php-compiler/issues/2351), default-on [#2369](https://github.com/PurHur/php-compiler/issues/2369)); set `0` to skip |
 | `FASTCGI_WEB_AOT_SMOKE_GATE` | `1` | `ci-local.sh` (`ci_run_fastcgi_web_aot_execute`) | `FastCGIWebAotExecuteTest` / `EXAMPLES_AOT_SMOKE_ONLY=009 ./script/examples-aot-smoke.sh` ([#2352](https://github.com/PurHur/php-compiler/issues/2352), default-on [#2369](https://github.com/PurHur/php-compiler/issues/2369)); set `0` to skip |
 | `DEPLOY_SMOKE_ALL` | `0` | `Makefile` `deploy-smoke` | When `1`, `make deploy-smoke` delegates to `deploy-smoke-all.sh` (same as `make deploy-smoke-all`) ([#2077](https://github.com/PurHur/php-compiler/issues/2077)) |
@@ -300,7 +300,7 @@ Progressive ladder (VM throw/catch → AOT link → AOT execute → deploy CGI).
 | JIT serve | `THROWSWEB_SERVE_JIT_SMOKE_GATE` | `1` | `make examples-throws-jit-smoke` · `ci-fast.sh` ([#2435](https://github.com/PurHur/php-compiler/issues/2435), [#2408](https://github.com/PurHur/php-compiler/issues/2408)); set `0` to skip |
 | AOT link | `THROWSWEB_AOT_LINK_GATE` | `1` | `./script/ci-local.sh --filter test007ThrowsWebAotLink` ([#2101](https://github.com/PurHur/php-compiler/issues/2101), [#2135](https://github.com/PurHur/php-compiler/issues/2135)); set `0` to skip during iteration |
 | AOT execute | `THROWSWEB_AOT_SMOKE_GATE` | `1` | `ThrowsWebAotExecuteTest` or `EXAMPLES_AOT_SMOKE_ONLY=007 ./script/examples-aot-smoke.sh` ([#2101](https://github.com/PurHur/php-compiler/issues/2101), [#2135](https://github.com/PurHur/php-compiler/issues/2135)) |
-| Deploy CGI | `THROWSWEB_DEPLOY_SMOKE_GATE` | `0` | `THROWSWEB_DEPLOY_SMOKE_GATE=1 make deploy-smoke-all` ([#2124](https://github.com/PurHur/php-compiler/issues/2124), [#2077](https://github.com/PurHur/php-compiler/issues/2077)); `make examples-throwsweb-deploy-smoke` (007 only); `ci-local` opt-in ([#2264](https://github.com/PurHur/php-compiler/issues/2264)) |
+| Deploy CGI | `THROWSWEB_DEPLOY_SMOKE_GATE` | `1` | `make deploy-smoke-all` ([#2388](https://github.com/PurHur/php-compiler/issues/2388), [#2124](https://github.com/PurHur/php-compiler/issues/2124), [#2077](https://github.com/PurHur/php-compiler/issues/2077)); `make examples-throwsweb-deploy-smoke` (007 only); set `0` to skip |
 
 ```bash
 ./phpc doctor --gates | grep -E 'THROWS|007-ThrowsWeb'
@@ -312,7 +312,8 @@ THROWSWEB_SERVE_JIT_SMOKE_GATE=0 ./script/examples-web-smoke.sh --throws-only --
 ./script/examples-web-smoke.sh --throws-only --jit   # default-on (#2435)
 THROWSWEB_AOT_LINK_GATE=1 THROWSWEB_AOT_SMOKE_GATE=1 ./script/ci-local.sh --filter ThrowsWebAot
 make examples-throwsweb-deploy-smoke
-THROWSWEB_DEPLOY_SMOKE_GATE=1 ./script/deploy-smoke.sh --example 007
+./script/deploy-smoke.sh --example 007   # default-on (#2388)
+THROWSWEB_DEPLOY_SMOKE_GATE=0 ./script/deploy-smoke.sh --example 007   # opt-out
 ```
 
 ## 009-FastCGIWeb gates ([#2331](https://github.com/PurHur/php-compiler/issues/2331), [#2351](https://github.com/PurHur/php-compiler/issues/2351))
