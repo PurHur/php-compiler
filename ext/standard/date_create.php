@@ -85,6 +85,6 @@ final class date_create extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        throw new \LogicException('date_create() is not implemented for JIT in this compiler build (issue #4124)');
+        return JitDateCreate::invoke($context, false, ...$args);
     }
 }
