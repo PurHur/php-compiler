@@ -8,5 +8,5 @@ echo parse_url('/only-path', 0) === false ? 'false' : 'not-false', "\n";
 echo parse_url('http://', 5), "\n";
 --EXPECT--
 false
-false
-false
+not-false
+not-false

@@ -51,6 +51,11 @@ final class parse_url extends Internal
 
             return;
         }
+        if (null === $result) {
+            $frame->returnVar->null();
+
+            return;
+        }
         if (\is_int($result)) {
             $frame->returnVar->int($result);
 

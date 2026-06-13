@@ -24,6 +24,8 @@ final class ParseUrlJit
 
     private const OFF_PORT = 16;
 
+    private const OFF_HAS_PORT = 20;
+
     private const OFF_USER = 24;
 
     private const OFF_PASS = 32;
@@ -357,6 +359,7 @@ final class ParseUrlJit
             $context->builder->store($null, self::partsStrField($context, $parts, $off));
         }
         $context->builder->store($zero, self::partsPortField($context, $parts));
+        $context->builder->store($zero, self::partsHasPortField($context, $parts));
         $context->builder->returnVoid();
     }
 
@@ -684,29 +687,50 @@ final class ParseUrlJit
         $context->builder->store($i8->constInt(0, false), $portSep);
         $portEndSlot = BasicBlockHelper::entryAlloca($context, $i8p);
         $context->builder->store($i8p->constNull(), $portEndSlot);
-        $context->builder->store(
-            $context->builder->trunc(
-                $context->builder->call(
-                    $context->lookupFunction('strtol'),
-                    $context->builder->inBoundsGEP($portSep, $one),
-                    $portEndSlot,
-                    $i32->constInt(10, false)
-                ),
-                $i32
+        $parsedPort = $context->builder->trunc(
+            $context->builder->call(
+                $context->lookupFunction('strtol'),
+                $context->builder->inBoundsGEP($portSep, $one),
+                $portEndSlot,
+                $i32->constInt(10, false)
             ),
-            self::partsPortField($context, $parts)
+            $i32
         );
+        $portOkBb = $fn->appendBasicBlock('pp_port_ok');
+        $portBadBb = $fn->appendBasicBlock('pp_port_bad');
+        $context->builder->branchIf(
+            $context->builder->and(
+                $context->builder->icmp(Builder::INT_SGT, $parsedPort, $i32->constInt(0, false)),
+                $context->builder->icmp(Builder::INT_SLE, $parsedPort, $i32->constInt(65535, false))
+            ),
+            $portOkBb,
+            $portBadBb
+        );
+        $context->builder->positionAtEnd($portBadBb);
+        $context->builder->call($partsFree, $parts);
+        $context->builder->returnValue($i32->constInt(-1, true));
+        $context->builder->positionAtEnd($portOkBb);
+        $context->builder->store($parsedPort, self::partsPortField($context, $parts));
+        $one32 = $i32->constInt(1, false);
+        $context->builder->store($one32, self::partsHasPortField($context, $parts));
         $context->builder->branch($noPortBb);
 
         $hostOkBb = $fn->appendBasicBlock('pp_host_ok');
+        $hostEmptyBb = $fn->appendBasicBlock('pp_host_empty');
+        $hostStoreBb = $fn->appendBasicBlock('pp_host_store');
         $context->builder->positionAtEnd($noPortBb);
         $host = $context->builder->call($strdup, $authBase);
         $context->builder->branchIf($context->builder->icmp(Builder::INT_EQ, $host, $i8p->constNull()), $authFail, $hostOkBb);
-        $context->builder->positionAtEnd($authFail);
-        $context->builder->call($partsFree, $parts);
-        $context->builder->returnValue($i32->constInt(-1, true));
-
         $context->builder->positionAtEnd($hostOkBb);
+        $context->builder->branchIf(
+            $context->builder->icmp(Builder::INT_EQ, $context->builder->load($host), $i8->constInt(0, false)),
+            $hostEmptyBb,
+            $hostStoreBb
+        );
+        $context->builder->positionAtEnd($hostEmptyBb);
+        $context->builder->call($context->lookupFunction('free'), $host);
+        $context->builder->branch($authFail);
+        $context->builder->positionAtEnd($hostStoreBb);
         $context->builder->store($host, self::partsStrField($context, $parts, self::OFF_HOST));
         $curRest = $context->builder->load($restSlot);
         $restEmptyBb = $fn->appendBasicBlock('pp_rest_empty');
@@ -786,6 +810,10 @@ final class ParseUrlJit
         $context->builder->store($emptyPath, self::partsStrField($context, $parts, self::OFF_PATH));
         $context->builder->branch($okBb);
 
+        $context->builder->positionAtEnd($authFail);
+        $context->builder->call($partsFree, $parts);
+        $context->builder->returnValue($i32->constInt(-1, true));
+
         $context->builder->positionAtEnd($okBb);
         $context->builder->returnValue($i32->constInt(0, false));
         $context->builder->positionAtEnd($failBb);
@@ -804,12 +832,10 @@ final class ParseUrlJit
         $i64 = $context->getTypeFromString('int64');
         $i8 = $context->getTypeFromString('int8');
         $i8p = $context->getTypeFromString('int8*');
-        $writeBool = $context->lookupFunction('__value__writeBool');
+        $writeNull = $context->lookupFunction('__value__writeNull');
         $writeString = $context->lookupFunction('__value__writeString');
         $writeLong = $context->lookupFunction('__value__writeLong');
         $cstr = $context->lookupFunction('__phpc_parse_url_cstr');
-        $falseVal = $i32->constInt(0, false);
-        $emptyLit = self::cstrLiteral($context, '');
 
         $defaultBb = $fn->appendBasicBlock('wc_default');
         $doneBb = $fn->appendBasicBlock('wc_done');
@@ -846,29 +872,32 @@ final class ParseUrlJit
         }
 
         $context->builder->positionAtEnd($blocks[2]);
-        $port = $context->builder->load(self::partsPortField($context, $parts));
+        $hasPort = $context->builder->load(self::partsHasPortField($context, $parts));
         $portBad = $fn->appendBasicBlock('wc_port_bad');
         $portOk = $fn->appendBasicBlock('wc_port_ok');
-        $context->builder->branchIf($context->builder->icmp(Builder::INT_SLE, $port, $i32->constInt(0, false)), $portBad, $portOk);
+        $context->builder->branchIf($context->builder->icmp(Builder::INT_EQ, $hasPort, $i32->constInt(0, false)), $portBad, $portOk);
         $context->builder->positionAtEnd($portBad);
-        $context->builder->call($writeBool, $out, $falseVal);
+        $context->builder->call($writeNull, $out);
         $context->builder->branch($doneBb);
         $context->builder->positionAtEnd($portOk);
+        $port = $context->builder->load(self::partsPortField($context, $parts));
         $context->builder->call($writeLong, $out, $context->builder->zExt($port, $i64));
         $context->builder->branch($doneBb);
 
         $context->builder->positionAtEnd($blocks[5]);
         $pathPtr = $context->builder->load(self::partsStrField($context, $parts, self::OFF_PATH));
-        $pathCstr = $context->builder->select(
+        $pathEmpty = $context->builder->or(
             $context->builder->icmp(Builder::INT_EQ, $pathPtr, $i8p->constNull()),
-            $emptyLit,
-            $pathPtr
+            $context->builder->icmp(Builder::INT_EQ, $context->builder->load($pathPtr), $i8->constInt(0, false))
         );
-        $context->builder->call($writeString, $out, $context->builder->call($cstr, $pathCstr));
+        $pathWriteBb = $fn->appendBasicBlock('wc_path_write');
+        $context->builder->branchIf($pathEmpty, $defaultBb, $pathWriteBb);
+        $context->builder->positionAtEnd($pathWriteBb);
+        $context->builder->call($writeString, $out, $context->builder->call($cstr, $pathPtr));
         $context->builder->branch($doneBb);
 
         $context->builder->positionAtEnd($defaultBb);
-        $context->builder->call($writeBool, $out, $falseVal);
+        $context->builder->call($writeNull, $out);
         $context->builder->branch($doneBb);
 
         $context->builder->positionAtEnd($doneBb);
@@ -933,7 +962,7 @@ final class ParseUrlJit
         $context->builder->branchIf($context->builder->icmp(Builder::INT_NE, $status, $i32->constInt(0, false)), $fail, $ok);
 
         $context->builder->positionAtEnd($fail);
-        $context->builder->call($context->lookupFunction('__value__writeNull'), $out);
+        $context->builder->call($context->lookupFunction('__value__writeBool'), $out, $i32->constInt(0, false));
         $context->builder->returnVoid();
 
         $context->builder->positionAtEnd($ok);
@@ -974,7 +1003,7 @@ final class ParseUrlJit
         $context->builder->branchIf($context->builder->icmp(Builder::INT_NE, $status, $i32->constInt(0, false)), $fail, $ok);
 
         $context->builder->positionAtEnd($fail);
-        $context->builder->call($context->lookupFunction('__value__writeNull'), $out);
+        $context->builder->call($context->lookupFunction('__value__writeBool'), $out, $i32->constInt(0, false));
         $context->builder->returnVoid();
 
         $context->builder->positionAtEnd($ok);
@@ -1003,9 +1032,10 @@ final class ParseUrlJit
             $context->builder->call($maybe, $ht, self::cstrLiteral($context, $key), $ptr);
         }
         $port = $context->builder->load(self::partsPortField($context, $parts));
+        $hasPort = $context->builder->load(self::partsHasPortField($context, $parts));
         $portPos = $fn->appendBasicBlock('pua_port');
         $doneFill = $fn->appendBasicBlock('pua_done_fill');
-        $context->builder->branchIf($context->builder->icmp(Builder::INT_SGT, $port, $i32->constInt(0, false)), $portPos, $doneFill);
+        $context->builder->branchIf($context->builder->icmp(Builder::INT_NE, $hasPort, $i32->constInt(0, false)), $portPos, $doneFill);
         $context->builder->positionAtEnd($portPos);
         $context->builder->call(
             $context->lookupFunction('__hashtable__setStringKeyLong'),
@@ -1040,6 +1070,18 @@ final class ParseUrlJit
 
         return $context->builder->pointerCast(
             $context->builder->gep($context->builder->pointerCast($parts, $i8p), $i64->constInt(self::OFF_PORT, false)),
+            $i32p
+        );
+    }
+
+    private static function partsHasPortField(Context $context, Value $parts): Value
+    {
+        $i64 = $context->getTypeFromString('int64');
+        $i8p = $context->getTypeFromString('int8*');
+        $i32p = $context->getTypeFromString('int32')->pointerType(0);
+
+        return $context->builder->pointerCast(
+            $context->builder->gep($context->builder->pointerCast($parts, $i8p), $i64->constInt(self::OFF_HAS_PORT, false)),
             $i32p
         );
     }
