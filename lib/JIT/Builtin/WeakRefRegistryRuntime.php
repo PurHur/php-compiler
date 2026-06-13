@@ -403,63 +403,60 @@ final class WeakRefRegistryRuntime
     private static function implementMapKeyToObject(Context $context, Value $fn): void
     {
         $entry = $fn->appendBasicBlock('wr_resolve_entry');
-        $doneBb = $fn->appendBasicBlock('wr_resolve_done');
+        $exitBb = $fn->appendBasicBlock('wr_resolve_exit');
         $context->builder->positionAtEnd($entry);
 
         $keyStr = $fn->getParam(0);
         $objPtrTy = $context->getTypeFromString('__object__*');
+        $strNull = $keyStr->typeOf()->constNull();
         $nullObj = $objPtrTy->constNull();
         $strMap = $context->structFieldMap['__string__'];
         $i64 = $context->getTypeFromString('int64');
+        $i8 = $context->getTypeFromString('int8');
         $i8p = $context->getTypeFromString('int8*');
-        $sizeT = $context->getTypeFromString('size_t');
+        $i32 = $context->getTypeFromString('int32');
 
-        $keyNull = $context->builder->icmp(Builder::INT_EQ, $keyStr, $keyStr->typeOf()->constNull());
+        $resultSlot = $context->builder->alloca($objPtrTy, 1, 'wr_resolve_result');
+        $context->builder->store($nullObj, $resultSlot);
+
+        $keyNull = $context->builder->icmp(Builder::INT_EQ, $keyStr, $strNull);
         $checkLen = $fn->appendBasicBlock('wr_resolve_check_len');
-        $context->builder->branchIf($keyNull, $doneBb, $checkLen);
+        $context->builder->branchIf($keyNull, $exitBb, $checkLen);
 
         $context->builder->positionAtEnd($checkLen);
         $len = $context->builder->load($context->builder->structGep($keyStr, $strMap['length']));
         $len64 = $context->builder->zExt($len, $i64);
-        $minLen = $i64->constInt(3, false);
-        $tooShort = $context->builder->icmp(Builder::INT_ULT, $len64, $minLen);
+        $tooShort = $context->builder->icmp(Builder::INT_ULT, $len64, $i64->constInt(3, false));
         $checkPrefix = $fn->appendBasicBlock('wr_resolve_check_prefix');
-        $context->builder->branchIf($tooShort, $doneBb, $checkPrefix);
+        $context->builder->branchIf($tooShort, $exitBb, $checkPrefix);
 
         $context->builder->positionAtEnd($checkPrefix);
-        $bytes = $context->builder->load($context->builder->structGep($keyStr, $strMap['value']));
-        $oByte = $context->builder->load($bytes);
-        $colonByte = $context->builder->load($context->builder->inBoundsGep($bytes, $i64->constInt(1, false)));
-        $isO = $context->builder->icmp(Builder::INT_EQ, $oByte, $context->getTypeFromString('int8')->constInt(ord('o'), false));
-        $isColon = $context->builder->icmp(Builder::INT_EQ, $colonByte, $context->getTypeFromString('int8')->constInt(ord(':'), false));
+        $bytes = $context->builder->structGep($keyStr, $strMap['value']);
+        $dataPtr = $context->builder->pointerCast($bytes, $i8p);
+        $oByte = $context->builder->load($dataPtr);
+        $colonByte = $context->builder->load($context->builder->inBoundsGep($dataPtr, $i64->constInt(1, false)));
+        $isO = $context->builder->icmp(Builder::INT_EQ, $oByte, $i8->constInt(ord('o'), false));
+        $isColon = $context->builder->icmp(Builder::INT_EQ, $colonByte, $i8->constInt(ord(':'), false));
         $prefixOk = $context->builder->and($isO, $isColon);
         $parseBb = $fn->appendBasicBlock('wr_resolve_parse');
-        $context->builder->branchIf($prefixOk, $parseBb, $doneBb);
+        $context->builder->branchIf($prefixOk, $parseBb, $exitBb);
 
         $context->builder->positionAtEnd($parseBb);
-        $suffix = $context->builder->call(
-            $context->lookupFunction('__string__init'),
-            $context->builder->sub($len64, $i64->constInt(2, false)),
-            $context->builder->inBoundsGep($bytes, $i64->constInt(2, false))
-        );
-        $suffixBytes = $context->builder->load($context->builder->structGep($suffix, $strMap['value']));
-        $endPtr = $context->builder->alloca($i8p);
+        $suffixPtr = $context->builder->inBoundsGep($dataPtr, $i64->constInt(2, false));
+        $endPtr = $context->builder->alloca($i8p, 1, 'wr_resolve_end');
+        $context->builder->store($i8p->constNull(), $endPtr);
         $handle = $context->builder->call(
             $context->lookupFunction('strtoull'),
-            $suffixBytes,
+            $suffixPtr,
             $endPtr,
-            $sizeT->constInt(16, false)
+            $i32->constInt(16, false)
         );
         $obj = $context->builder->intToPtr($handle, $objPtrTy);
-        $context->builder->branch($doneBb);
+        $context->builder->store($obj, $resultSlot);
+        $context->builder->branch($exitBb);
 
-        $context->builder->positionAtEnd($doneBb);
-        $result = $context->builder->phi($objPtrTy);
-        $result->addIncoming($nullObj, $entry);
-        $result->addIncoming($nullObj, $checkLen);
-        $result->addIncoming($nullObj, $checkPrefix);
-        $result->addIncoming($obj, $parseBb);
-        $context->builder->returnValue($result);
+        $context->builder->positionAtEnd($exitBb);
+        $context->builder->returnValue($context->builder->load($resultSlot));
         $context->builder->clearInsertionPosition();
     }
 
