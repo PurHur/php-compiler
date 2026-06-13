@@ -9270,6 +9270,86 @@ final class ArrayBuiltinHelper
         $context->builder->call($context->lookupFunction('abort'));
     }
 
+    /** php-src array.c: non-numeric fold operands contribute 0 to array_product (#4278). */
+    private static function arrayProductMultiplyIntSlotByZero(Context $context, Value $prodIntSlot): void
+    {
+        $i64 = $context->getTypeFromString('int64');
+        $prodInt = $context->builder->load($prodIntSlot);
+        $context->builder->store(
+            $context->builder->mulNoSignedWrap($prodInt, $i64->constInt(0, false)),
+            $prodIntSlot
+        );
+    }
+
+    private static function arraySumAccumulateLongValue(
+        Context $context,
+        Value $longVal,
+        Value $sumIntSlot,
+        Value $sumFloatSlot,
+        Value $useFloatSlot,
+        string $tag
+    ): void {
+        $double = $context->getTypeFromString('double');
+        $useFloat = $context->builder->load($useFloatSlot);
+        $floatPath = BasicBlockHelper::append($context, 'array_sum_'.$tag.'_long_as_float');
+        $intPath = BasicBlockHelper::append($context, 'array_sum_'.$tag.'_long_as_int');
+        $longDone = BasicBlockHelper::append($context, 'array_sum_'.$tag.'_long_done');
+        $context->builder->branchIf($useFloat, $floatPath, $intPath);
+
+        $context->builder->positionAtEnd($intPath);
+        $sumInt = $context->builder->load($sumIntSlot);
+        $context->builder->store(
+            $context->builder->addNoSignedWrap($sumInt, $longVal),
+            $sumIntSlot
+        );
+        $context->builder->branch($longDone);
+
+        $context->builder->positionAtEnd($floatPath);
+        $sumFloat = $context->builder->load($sumFloatSlot);
+        $context->builder->store(
+            $context->builder->fadd($sumFloat, $context->builder->siToFp($longVal, $double)),
+            $sumFloatSlot
+        );
+        $context->builder->branch($longDone);
+
+        $context->builder->positionAtEnd($longDone);
+    }
+
+    private static function arrayProductAccumulateLongValue(
+        Context $context,
+        Value $longVal,
+        Value $prodIntSlot,
+        Value $prodFloatSlot,
+        Value $useFloatSlot,
+        string $tag
+    ): void {
+        $double = $context->getTypeFromString('double');
+        $i1 = $context->getTypeFromString('int1');
+        $useFloat = $context->builder->load($useFloatSlot);
+        $floatPath = BasicBlockHelper::append($context, 'array_product_'.$tag.'_long_as_float');
+        $intPath = BasicBlockHelper::append($context, 'array_product_'.$tag.'_long_as_int');
+        $longDone = BasicBlockHelper::append($context, 'array_product_'.$tag.'_long_done');
+        $context->builder->branchIf($useFloat, $floatPath, $intPath);
+
+        $context->builder->positionAtEnd($intPath);
+        $prodInt = $context->builder->load($prodIntSlot);
+        $context->builder->store(
+            $context->builder->mulNoSignedWrap($prodInt, $longVal),
+            $prodIntSlot
+        );
+        $context->builder->branch($longDone);
+
+        $context->builder->positionAtEnd($floatPath);
+        $prodFloat = $context->builder->load($prodFloatSlot);
+        $context->builder->store(
+            $context->builder->fmul($prodFloat, $context->builder->siToFp($longVal, $double)),
+            $prodFloatSlot
+        );
+        $context->builder->branch($longDone);
+
+        $context->builder->positionAtEnd($longDone);
+    }
+
     private static function stringPtrToDouble(Context $context, Value $strPtr): Value
     {
         $structName = $strPtr->typeOf()->getElementType()->getName();
@@ -9415,7 +9495,8 @@ final class ArrayBuiltinHelper
         $context->builder->branchIf($isNumeric, $validBlock, $invalidBlock);
 
         $context->builder->positionAtEnd($invalidBlock);
-        self::arrayProductEmitInvalidElementType($context);
+        self::arrayProductMultiplyIntSlotByZero($context, $prodIntSlot);
+        $context->builder->branch($strDone);
 
         $context->builder->positionAtEnd($validBlock);
         $isIntNumeric = self::stringPtrIsIntegerNumeric($context, $strPtr);
@@ -9576,6 +9657,40 @@ final class ArrayBuiltinHelper
             return self::arraySumNativeString($context, $array);
         }
 
+        if (Variable::TYPE_NATIVE_BOOL === $elemType) {
+            $sumSlot = $context->builder->alloca($i64, 1, 'array_sum_native_b');
+            $context->builder->store($i64->constInt(0, false), $sumSlot);
+            if (0 === $array->nextFreeElement) {
+                return $context->builder->load($sumSlot);
+            }
+            $idxSlot = $context->builder->alloca($sizeT, 1, 'array_sum_native_b_idx');
+            $context->builder->store($zero, $idxSlot);
+            $head = BasicBlockHelper::append($context, 'array_sum_native_b_head');
+            $body = BasicBlockHelper::append($context, 'array_sum_native_b_body');
+            $done = BasicBlockHelper::append($context, 'array_sum_native_b_done');
+            $context->builder->branch($head);
+
+            $context->builder->positionAtEnd($head);
+            $idx = $context->builder->load($idxSlot);
+            $atEnd = $context->builder->icmp(Builder::INT_SGE, $idx, $count);
+            $context->builder->branchIf($atEnd, $done, $body);
+
+            $context->builder->positionAtEnd($body);
+            $slot = $context->builder->inBoundsGep($array->value, $zero, $idx);
+            $elem = $context->builder->load($slot);
+            $sum = $context->builder->load($sumSlot);
+            $context->builder->store(
+                $context->builder->addNoSignedWrap($sum, $context->builder->zext($elem, $i64)),
+                $sumSlot
+            );
+            $context->builder->store($context->builder->addNoSignedWrap($idx, $one), $idxSlot);
+            $context->builder->branch($head);
+
+            $context->builder->positionAtEnd($done);
+
+            return $context->builder->load($sumSlot);
+        }
+
         if (Variable::TYPE_NATIVE_LONG !== $elemType) {
             throw new \LogicException(
                 'array_sum() only supports integer and float elements in this compiler build'
@@ -9643,6 +9758,8 @@ final class ArrayBuiltinHelper
         $longBlock = BasicBlockHelper::append($context, 'array_sum_ht_long');
         $doubleBlock = BasicBlockHelper::append($context, 'array_sum_ht_double');
         $afterDouble = BasicBlockHelper::append($context, 'array_sum_ht_after_double');
+        $boolBlock = BasicBlockHelper::append($context, 'array_sum_ht_bool');
+        $afterBool = BasicBlockHelper::append($context, 'array_sum_ht_after_bool');
         $stringBlock = BasicBlockHelper::append($context, 'array_sum_ht_string');
         $continueBlock = BasicBlockHelper::append($context, 'array_sum_ht_continue');
         $doneBlock = BasicBlockHelper::append($context, 'array_sum_ht_done');
@@ -9677,6 +9794,26 @@ final class ArrayBuiltinHelper
         $context->builder->branchIf($isDouble, $doubleBlock, $afterDouble);
 
         $context->builder->positionAtEnd($afterDouble);
+        $isBool = $context->builder->icmp(
+            Builder::INT_EQ,
+            $typeByte,
+            $i8->constInt(Variable::TYPE_NATIVE_BOOL, false)
+        );
+        $context->builder->branchIf($isBool, $boolBlock, $afterBool);
+
+        $context->builder->positionAtEnd($boolBlock);
+        $boolLongVal = $context->builder->call($context->lookupFunction('__value__readLong'), $entry);
+        self::arraySumAccumulateLongValue(
+            $context,
+            $boolLongVal,
+            $sumIntSlot,
+            $sumFloatSlot,
+            $useFloatSlot,
+            'ht_bool'
+        );
+        $context->builder->branch($continueBlock);
+
+        $context->builder->positionAtEnd($afterBool);
         $isString = $context->builder->icmp(
             Builder::INT_EQ,
             $typeByte,
@@ -9697,29 +9834,14 @@ final class ArrayBuiltinHelper
 
         $context->builder->positionAtEnd($longBlock);
         $longVal = $context->builder->call($context->lookupFunction('__value__readLong'), $entry);
-        $useFloat = $context->builder->load($useFloatSlot);
-        $floatPath = BasicBlockHelper::append($context, 'array_sum_ht_long_as_float');
-        $intPath = BasicBlockHelper::append($context, 'array_sum_ht_long_as_int');
-        $longDone = BasicBlockHelper::append($context, 'array_sum_ht_long_done');
-        $context->builder->branchIf($useFloat, $floatPath, $intPath);
-
-        $context->builder->positionAtEnd($intPath);
-        $sumInt = $context->builder->load($sumIntSlot);
-        $context->builder->store(
-            $context->builder->addNoSignedWrap($sumInt, $longVal),
-            $sumIntSlot
+        self::arraySumAccumulateLongValue(
+            $context,
+            $longVal,
+            $sumIntSlot,
+            $sumFloatSlot,
+            $useFloatSlot,
+            'ht'
         );
-        $context->builder->branch($longDone);
-
-        $context->builder->positionAtEnd($floatPath);
-        $sumFloat = $context->builder->load($sumFloatSlot);
-        $context->builder->store(
-            $context->builder->fadd($sumFloat, $context->builder->siToFp($longVal, $double)),
-            $sumFloatSlot
-        );
-        $context->builder->branch($longDone);
-
-        $context->builder->positionAtEnd($longDone);
         $context->builder->branch($continueBlock);
 
         $context->builder->positionAtEnd($doubleBlock);
@@ -9795,6 +9917,8 @@ final class ArrayBuiltinHelper
         $longBlock = BasicBlockHelper::append($context, 'array_sum_nv_long');
         $doubleBlock = BasicBlockHelper::append($context, 'array_sum_nv_double');
         $afterDouble = BasicBlockHelper::append($context, 'array_sum_nv_after_double');
+        $boolBlock = BasicBlockHelper::append($context, 'array_sum_nv_bool');
+        $afterBool = BasicBlockHelper::append($context, 'array_sum_nv_after_bool');
         $stringBlock = BasicBlockHelper::append($context, 'array_sum_nv_string');
         $continueBlock = BasicBlockHelper::append($context, 'array_sum_nv_continue');
         $doneBlock = BasicBlockHelper::append($context, 'array_sum_nv_done');
@@ -9826,6 +9950,26 @@ final class ArrayBuiltinHelper
         $context->builder->branchIf($isDouble, $doubleBlock, $afterDouble);
 
         $context->builder->positionAtEnd($afterDouble);
+        $isBool = $context->builder->icmp(
+            Builder::INT_EQ,
+            $typeByte,
+            $i8->constInt(Variable::TYPE_NATIVE_BOOL, false)
+        );
+        $context->builder->branchIf($isBool, $boolBlock, $afterBool);
+
+        $context->builder->positionAtEnd($boolBlock);
+        $boolLongVal = $context->builder->call($context->lookupFunction('__value__readLong'), $entry);
+        self::arraySumAccumulateLongValue(
+            $context,
+            $boolLongVal,
+            $sumIntSlot,
+            $sumFloatSlot,
+            $useFloatSlot,
+            'nv_bool'
+        );
+        $context->builder->branch($continueBlock);
+
+        $context->builder->positionAtEnd($afterBool);
         $isString = $context->builder->icmp(
             Builder::INT_EQ,
             $typeByte,
@@ -9846,29 +9990,14 @@ final class ArrayBuiltinHelper
 
         $context->builder->positionAtEnd($longBlock);
         $longVal = $context->builder->call($context->lookupFunction('__value__readLong'), $entry);
-        $useFloat = $context->builder->load($useFloatSlot);
-        $floatPath = BasicBlockHelper::append($context, 'array_sum_nv_long_f');
-        $intPath = BasicBlockHelper::append($context, 'array_sum_nv_long_i');
-        $longDone = BasicBlockHelper::append($context, 'array_sum_nv_long_done');
-        $context->builder->branchIf($useFloat, $floatPath, $intPath);
-
-        $context->builder->positionAtEnd($intPath);
-        $sumInt = $context->builder->load($sumIntSlot);
-        $context->builder->store(
-            $context->builder->addNoSignedWrap($sumInt, $longVal),
-            $sumIntSlot
+        self::arraySumAccumulateLongValue(
+            $context,
+            $longVal,
+            $sumIntSlot,
+            $sumFloatSlot,
+            $useFloatSlot,
+            'nv'
         );
-        $context->builder->branch($longDone);
-
-        $context->builder->positionAtEnd($floatPath);
-        $sumFloat = $context->builder->load($sumFloatSlot);
-        $context->builder->store(
-            $context->builder->fadd($sumFloat, $context->builder->siToFp($longVal, $double)),
-            $sumFloatSlot
-        );
-        $context->builder->branch($longDone);
-
-        $context->builder->positionAtEnd($longDone);
         $context->builder->branch($continueBlock);
 
         $context->builder->positionAtEnd($doubleBlock);
@@ -10041,6 +10170,40 @@ final class ArrayBuiltinHelper
             return self::arrayProductNativeString($context, $array);
         }
 
+        if (Variable::TYPE_NATIVE_BOOL === $elemType) {
+            $prodSlot = $context->builder->alloca($i64, 1, 'array_product_native_b');
+            $context->builder->store($i64->constInt(1, false), $prodSlot);
+            if (0 === $array->nextFreeElement) {
+                return $context->builder->load($prodSlot);
+            }
+            $idxSlot = $context->builder->alloca($sizeT, 1, 'array_product_native_b_idx');
+            $context->builder->store($zero, $idxSlot);
+            $head = BasicBlockHelper::append($context, 'array_product_native_b_head');
+            $body = BasicBlockHelper::append($context, 'array_product_native_b_body');
+            $done = BasicBlockHelper::append($context, 'array_product_native_b_done');
+            $context->builder->branch($head);
+
+            $context->builder->positionAtEnd($head);
+            $idx = $context->builder->load($idxSlot);
+            $atEnd = $context->builder->icmp(Builder::INT_SGE, $idx, $count);
+            $context->builder->branchIf($atEnd, $done, $body);
+
+            $context->builder->positionAtEnd($body);
+            $slot = $context->builder->inBoundsGep($array->value, $zero, $idx);
+            $elem = $context->builder->load($slot);
+            $prod = $context->builder->load($prodSlot);
+            $context->builder->store(
+                $context->builder->mulNoSignedWrap($prod, $context->builder->zext($elem, $i64)),
+                $prodSlot
+            );
+            $context->builder->store($context->builder->addNoSignedWrap($idx, $one), $idxSlot);
+            $context->builder->branch($head);
+
+            $context->builder->positionAtEnd($done);
+
+            return $context->builder->load($prodSlot);
+        }
+
         if (Variable::TYPE_NATIVE_LONG !== $elemType) {
             throw new \TypeError(self::ARRAY_PRODUCT_ELEMENT_TYPE_ERROR);
         }
@@ -10174,8 +10337,10 @@ final class ArrayBuiltinHelper
         $longBlock = BasicBlockHelper::append($context, 'array_product_ht_long');
         $doubleBlock = BasicBlockHelper::append($context, 'array_product_ht_double');
         $afterDouble = BasicBlockHelper::append($context, 'array_product_ht_after_double');
+        $boolBlock = BasicBlockHelper::append($context, 'array_product_ht_bool');
+        $afterBool = BasicBlockHelper::append($context, 'array_product_ht_after_bool');
         $stringBlock = BasicBlockHelper::append($context, 'array_product_ht_string');
-        $invalidBlock = BasicBlockHelper::append($context, 'array_product_ht_invalid');
+        $zeroBlock = BasicBlockHelper::append($context, 'array_product_ht_zero');
         $continueBlock = BasicBlockHelper::append($context, 'array_product_ht_continue');
         $doneBlock = BasicBlockHelper::append($context, 'array_product_ht_done');
 
@@ -10209,16 +10374,37 @@ final class ArrayBuiltinHelper
         $context->builder->branchIf($isDouble, $doubleBlock, $afterDouble);
 
         $context->builder->positionAtEnd($afterDouble);
+        $isBool = $context->builder->icmp(
+            Builder::INT_EQ,
+            $typeByte,
+            $i8->constInt(Variable::TYPE_NATIVE_BOOL, false)
+        );
+        $context->builder->branchIf($isBool, $boolBlock, $afterBool);
+
+        $context->builder->positionAtEnd($boolBlock);
+        $boolLongVal = $context->builder->call($context->lookupFunction('__value__readLong'), $entry);
+        self::arrayProductAccumulateLongValue(
+            $context,
+            $boolLongVal,
+            $prodIntSlot,
+            $prodFloatSlot,
+            $useFloatSlot,
+            'ht_bool'
+        );
+        $context->builder->branch($continueBlock);
+
+        $context->builder->positionAtEnd($afterBool);
         self::branchArrayProductStringOrEnumSkipOrInvalid(
             $context,
             $typeByte,
             $stringBlock,
             $continueBlock,
-            $invalidBlock
+            $zeroBlock
         );
 
-        $context->builder->positionAtEnd($invalidBlock);
-        self::arrayProductEmitInvalidElementType($context);
+        $context->builder->positionAtEnd($zeroBlock);
+        self::arrayProductMultiplyIntSlotByZero($context, $prodIntSlot);
+        $context->builder->branch($continueBlock);
 
         $context->builder->positionAtEnd($stringBlock);
         self::arrayProductAccumulateStringEntry(
@@ -10233,29 +10419,14 @@ final class ArrayBuiltinHelper
 
         $context->builder->positionAtEnd($longBlock);
         $longVal = $context->builder->call($context->lookupFunction('__value__readLong'), $entry);
-        $useFloat = $context->builder->load($useFloatSlot);
-        $floatPath = BasicBlockHelper::append($context, 'array_product_ht_long_as_float');
-        $intPath = BasicBlockHelper::append($context, 'array_product_ht_long_as_int');
-        $longDone = BasicBlockHelper::append($context, 'array_product_ht_long_done');
-        $context->builder->branchIf($useFloat, $floatPath, $intPath);
-
-        $context->builder->positionAtEnd($intPath);
-        $prodInt = $context->builder->load($prodIntSlot);
-        $context->builder->store(
-            $context->builder->mulNoSignedWrap($prodInt, $longVal),
-            $prodIntSlot
+        self::arrayProductAccumulateLongValue(
+            $context,
+            $longVal,
+            $prodIntSlot,
+            $prodFloatSlot,
+            $useFloatSlot,
+            'ht'
         );
-        $context->builder->branch($longDone);
-
-        $context->builder->positionAtEnd($floatPath);
-        $prodFloat = $context->builder->load($prodFloatSlot);
-        $context->builder->store(
-            $context->builder->fmul($prodFloat, $context->builder->siToFp($longVal, $double)),
-            $prodFloatSlot
-        );
-        $context->builder->branch($longDone);
-
-        $context->builder->positionAtEnd($longDone);
         $context->builder->branch($continueBlock);
 
         $context->builder->positionAtEnd($doubleBlock);
@@ -10331,8 +10502,10 @@ final class ArrayBuiltinHelper
         $longBlock = BasicBlockHelper::append($context, 'array_product_nv_long');
         $doubleBlock = BasicBlockHelper::append($context, 'array_product_nv_double');
         $afterDouble = BasicBlockHelper::append($context, 'array_product_nv_after_double');
+        $boolBlock = BasicBlockHelper::append($context, 'array_product_nv_bool');
+        $afterBool = BasicBlockHelper::append($context, 'array_product_nv_after_bool');
         $stringBlock = BasicBlockHelper::append($context, 'array_product_nv_string');
-        $invalidBlock = BasicBlockHelper::append($context, 'array_product_nv_invalid');
+        $zeroBlock = BasicBlockHelper::append($context, 'array_product_nv_zero');
         $continueBlock = BasicBlockHelper::append($context, 'array_product_nv_continue');
         $doneBlock = BasicBlockHelper::append($context, 'array_product_nv_done');
         $context->builder->branch($head);
@@ -10363,16 +10536,37 @@ final class ArrayBuiltinHelper
         $context->builder->branchIf($isDouble, $doubleBlock, $afterDouble);
 
         $context->builder->positionAtEnd($afterDouble);
+        $isBool = $context->builder->icmp(
+            Builder::INT_EQ,
+            $typeByte,
+            $i8->constInt(Variable::TYPE_NATIVE_BOOL, false)
+        );
+        $context->builder->branchIf($isBool, $boolBlock, $afterBool);
+
+        $context->builder->positionAtEnd($boolBlock);
+        $boolLongVal = $context->builder->call($context->lookupFunction('__value__readLong'), $entry);
+        self::arrayProductAccumulateLongValue(
+            $context,
+            $boolLongVal,
+            $prodIntSlot,
+            $prodFloatSlot,
+            $useFloatSlot,
+            'nv_bool'
+        );
+        $context->builder->branch($continueBlock);
+
+        $context->builder->positionAtEnd($afterBool);
         self::branchArrayProductStringOrEnumSkipOrInvalid(
             $context,
             $typeByte,
             $stringBlock,
             $continueBlock,
-            $invalidBlock
+            $zeroBlock
         );
 
-        $context->builder->positionAtEnd($invalidBlock);
-        self::arrayProductEmitInvalidElementType($context);
+        $context->builder->positionAtEnd($zeroBlock);
+        self::arrayProductMultiplyIntSlotByZero($context, $prodIntSlot);
+        $context->builder->branch($continueBlock);
 
         $context->builder->positionAtEnd($stringBlock);
         self::arrayProductAccumulateStringEntry(
@@ -10387,29 +10581,14 @@ final class ArrayBuiltinHelper
 
         $context->builder->positionAtEnd($longBlock);
         $longVal = $context->builder->call($context->lookupFunction('__value__readLong'), $entry);
-        $useFloat = $context->builder->load($useFloatSlot);
-        $floatPath = BasicBlockHelper::append($context, 'array_product_nv_long_f');
-        $intPath = BasicBlockHelper::append($context, 'array_product_nv_long_i');
-        $longDone = BasicBlockHelper::append($context, 'array_product_nv_long_done');
-        $context->builder->branchIf($useFloat, $floatPath, $intPath);
-
-        $context->builder->positionAtEnd($intPath);
-        $prodInt = $context->builder->load($prodIntSlot);
-        $context->builder->store(
-            $context->builder->mulNoSignedWrap($prodInt, $longVal),
-            $prodIntSlot
+        self::arrayProductAccumulateLongValue(
+            $context,
+            $longVal,
+            $prodIntSlot,
+            $prodFloatSlot,
+            $useFloatSlot,
+            'nv'
         );
-        $context->builder->branch($longDone);
-
-        $context->builder->positionAtEnd($floatPath);
-        $prodFloat = $context->builder->load($prodFloatSlot);
-        $context->builder->store(
-            $context->builder->fmul($prodFloat, $context->builder->siToFp($longVal, $double)),
-            $prodFloatSlot
-        );
-        $context->builder->branch($longDone);
-
-        $context->builder->positionAtEnd($longDone);
         $context->builder->branch($continueBlock);
 
         $context->builder->positionAtEnd($doubleBlock);

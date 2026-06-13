@@ -1,25 +1,11 @@
 --TEST--
-stdlib array_product() — empty array and invalid element TypeError (#4262)
+stdlib array_product() — empty array and non-numeric string contributes zero (#4262, #4278)
 --FILE--
 <?php
 echo array_product([]), "\n";
-
-try {
-    array_product([1, 'x']);
-} catch (Throwable $e) {
-    echo get_class($e), "\n";
-    echo $e->getMessage(), "\n";
-}
-
-try {
-    array_product([1, 'notnum']);
-} catch (Throwable $e) {
-    echo get_class($e), "\n";
-    echo $e->getMessage(), "\n";
-}
+echo array_product([1, 'x']), "\n";
+echo array_product([1, 'notnum']), "\n";
 --EXPECT--
 1
-TypeError
-array_product(): Argument #1 ($array) must contain only int and float values
-TypeError
-array_product(): Argument #1 ($array) must contain only int and float values
+0
+0

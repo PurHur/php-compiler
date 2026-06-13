@@ -10,6 +10,7 @@ use PHPCompiler\VM\EnumCaseSupport;
 use PHPCompiler\VM\ErrorReporter;
 use PHPCompiler\VM\HashTable;
 use PHPCompiler\VM\InterfaceCheck;
+use PHPCompiler\VM\ResourceSupport;
 use PHPCompiler\VM\Variable;
 
 /** VM array helpers (no PHP internal wrappers in compiled paths). */
@@ -26,6 +27,64 @@ final class VmArray
     public static function shouldSkipNumericArrayFoldElement(Variable $value): bool
     {
         return EnumCaseSupport::isEnumCaseVariable($value);
+    }
+
+    /**
+     * php-src ext/standard/array.c zval_get_long semantics for array_sum()/array_product() (#4278).
+     *
+     * Non-numeric strings and unconvertible objects contribute 0. Enum cases are skipped (null).
+     *
+     * @return array{0: int|float, 1: bool}|null [numeric value, is-float]
+     */
+    public static function coerceArrayFoldNumericElement(Variable $value): ?array
+    {
+        $value = $value->resolveIndirect();
+        if (self::shouldSkipNumericArrayFoldElement($value)) {
+            return null;
+        }
+
+        return match ($value->type) {
+            Variable::TYPE_NULL => [0, false],
+            Variable::TYPE_INTEGER => [$value->toInt(), false],
+            Variable::TYPE_FLOAT => [$value->toFloat(), true],
+            Variable::TYPE_BOOLEAN => [$value->toInt(), false],
+            Variable::TYPE_STRING => self::coerceArrayFoldNumericString($value->toString()),
+            Variable::TYPE_OBJECT => self::coerceArrayFoldNumericObject($value),
+            Variable::TYPE_RESOURCE => [ResourceSupport::resolveHandle($value) ?? 0, false],
+            default => [0, false],
+        };
+    }
+
+    /**
+     * @return array{0: int|float, 1: bool}
+     */
+    private static function coerceArrayFoldNumericString(string $s): array
+    {
+        if (!is_numeric($s)) {
+            return [0, false];
+        }
+        if (((string) (int) $s) === $s
+            && !str_contains($s, '.')
+            && !str_contains(strtolower($s), 'e')) {
+            return [(int) $s, false];
+        }
+
+        return [(float) $s, true];
+    }
+
+    /**
+     * @return array{0: int|float, 1: bool}
+     */
+    private static function coerceArrayFoldNumericObject(Variable $value): array
+    {
+        $object = $value->toObject();
+        if (ResourceSupport::isResourceObject($object)) {
+            $handle = ResourceSupport::resolveHandle($value);
+
+            return [null !== $handle ? $handle : 0, false];
+        }
+
+        return [0, false];
     }
 
     /**

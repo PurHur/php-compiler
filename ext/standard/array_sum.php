@@ -40,50 +40,25 @@ final class array_sum extends Internal
         $sumFloat = 0.0;
         $useFloat = false;
         foreach ($array->toArray()->iterate(true) as $value) {
-            $v = $value->resolveIndirect();
-            if (VmArray::shouldSkipNumericArrayFoldElement($v)) {
+            $coerced = VmArray::coerceArrayFoldNumericElement($value);
+            if (null === $coerced) {
                 continue;
             }
-            if (Variable::TYPE_INTEGER === $v->type) {
-                if ($useFloat) {
-                    $sumFloat += (float) $v->toInt();
-                } else {
-                    $sumInt += $v->toInt();
-                }
-                continue;
-            }
-            if (Variable::TYPE_FLOAT === $v->type) {
+            [$num, $isFloat] = $coerced;
+            if ($isFloat) {
                 if (!$useFloat) {
                     $useFloat = true;
-                    $sumFloat = (float) $sumInt + $v->toFloat();
+                    $sumFloat = (float) $sumInt + (float) $num;
                 } else {
-                    $sumFloat += $v->toFloat();
+                    $sumFloat += (float) $num;
                 }
                 continue;
             }
-            if (Variable::TYPE_STRING === $v->type) {
-                $s = $v->toString();
-                if (!\is_numeric($s)) {
-                    throw new \TypeError('Unsupported operand types: string');
-                }
-                $num = $v->toNumeric();
-                if (\is_int($num)) {
-                    if ($useFloat) {
-                        $sumFloat += (float) $num;
-                    } else {
-                        $sumInt += $num;
-                    }
-                } else {
-                    if (!$useFloat) {
-                        $useFloat = true;
-                        $sumFloat = (float) $sumInt + (float) $num;
-                    } else {
-                        $sumFloat += (float) $num;
-                    }
-                }
-                continue;
+            if ($useFloat) {
+                $sumFloat += (float) $num;
+            } else {
+                $sumInt += (int) $num;
             }
-            throw new \LogicException('array_sum() only supports integer, float, and numeric string elements in this compiler build');
         }
         if ($useFloat) {
             $frame->returnVar->float($sumFloat);
