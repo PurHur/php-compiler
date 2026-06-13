@@ -4245,10 +4245,15 @@ final class VmString
             return false;
         }
         if (VmStatNative::available()) {
-            return VmStatNative::realpath($path);
+            $resolved = VmStatNative::realpath($path);
+        } else {
+            $resolved = self::realpathWithoutLibc($path);
+        }
+        if (false !== $resolved) {
+            VmRealpathCache::record($path, $resolved);
         }
 
-        return self::realpathWithoutLibc($path);
+        return $resolved;
     }
 
     /**

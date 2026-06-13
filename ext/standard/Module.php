@@ -475,6 +475,8 @@ class Module extends ModuleAbstract
             new dirname(),
             new basename(),
             new realpath(),
+            new realpath_cache_get(),
+            new realpath_cache_size(),
             new pathinfo(),
             new file_get_contents(),
             new readfile(),
