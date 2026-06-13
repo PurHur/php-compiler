@@ -1,5 +1,6 @@
 --TEST--
 stdlib setrawcookie() JIT emits Set-Cookie line (raw value)
+--JIT--
 --FILE--
 <?php
 setrawcookie('theme', 'dark', 0, '/');

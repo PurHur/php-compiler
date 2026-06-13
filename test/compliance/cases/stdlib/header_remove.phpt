@@ -1,5 +1,7 @@
 --TEST--
 stdlib header_remove() and header_list() (issue #311)
+--ENV--
+GATEWAY_INTERFACE=CGI/1.1
 --FILE--
 <?php
 header('X-Test: 1');

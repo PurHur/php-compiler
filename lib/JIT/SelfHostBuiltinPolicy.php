@@ -68,7 +68,6 @@ final class SelfHostBuiltinPolicy
     private const CATEGORY_OUTPUT = [
         'ob_start' => 'output', 'ob_get_clean' => 'output', 'ob_get_flush' => 'output',
         'ob_end_flush' => 'output', 'ob_get_level' => 'output', 'ob_implicit_flush' => 'output', 'flush' => 'output',
-        'getallheaders' => 'output', 'header_list' => 'output', 'headers_list' => 'output',
         'http_get_last_response_headers' => 'output', 'get_last_response_headers' => 'output',
         'http_clear_last_response_headers' => 'output',
         'headers_sent' => 'output', 'header_register_callback' => 'output',
@@ -219,6 +218,7 @@ final class SelfHostBuiltinPolicy
         'htmlentities' => 'string', 'html_entity_decode' => 'string',
         'get_html_translation_table' => 'string',
         'header' => 'string', 'http_response_code' => 'string',
+        'getallheaders' => 'string', 'header_list' => 'string', 'headers_list' => 'string',
         'headers_sent' => 'string', 'header_register_callback' => 'string',
         'register_shutdown_function' => 'string',
         'substr' => 'string', 'trim' => 'string', 'ltrim' => 'string', 'rtrim' => 'string', 'chop' => 'string',

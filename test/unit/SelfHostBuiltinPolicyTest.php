@@ -86,6 +86,9 @@ final class SelfHostBuiltinPolicyTest extends TestCase
             'gettype',
             'get_debug_type',
             'var_export',
+            'headers_list',
+            'header_list',
+            'getallheaders',
         ] as $fn) {
             $this->assertTrue(
                 SelfHostBuiltinPolicy::isRequiredForBundle($fn),

@@ -28,6 +28,9 @@ class VMTest extends BaseTest {
             if (str_contains(strtolower($case[0]), 'spl_autoload_register_jit')) {
                 continue;
             }
+            if (str_contains($name, 'setcookie_jit') || str_contains($name, 'setrawcookie_jit')) {
+                continue;
+            }
             if (str_contains($name, 'dynamic_property_deprecation')) {
                 continue;
             }

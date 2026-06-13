@@ -104,9 +104,6 @@ final class Superglobals
             $_ENV['SCRIPT_FILENAME'] = $scriptFilename;
             $_SERVER['SCRIPT_FILENAME'] = $scriptFilename;
         }
-        putenv('GATEWAY_INTERFACE=CGI/1.1');
-        $_ENV['GATEWAY_INTERFACE'] = 'CGI/1.1';
-        $_SERVER['GATEWAY_INTERFACE'] = 'CGI/1.1';
     }
 
     public static function populateFromEnvironment(
@@ -139,6 +136,7 @@ final class Superglobals
         );
         self::populateServer($context, $queryString, $postBody);
         self::populateRequest($context);
+        ResponseContext::syncHeaderQueueFromEnvironment();
         // Keep context for putenv() → $_ENV/$_SERVER sync during script execution (#1058, #1960).
     }
 

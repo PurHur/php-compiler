@@ -1,5 +1,7 @@
 --TEST--
 stdlib setrawcookie() VM (raw value, no URL encoding)
+--ENV--
+GATEWAY_INTERFACE=CGI/1.1
 --FILE--
 <?php
 echo setrawcookie('tok', 'a=b') ? 'ok' : 'no', "\n";
