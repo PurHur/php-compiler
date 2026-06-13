@@ -5,9 +5,9 @@ declare(strict_types=1);
 namespace PHPCompiler\JIT\Builtin;
 
 use PHPCompiler\JIT\Context;
+use PHPLLVM\BasicBlock;
 use PHPLLVM\Builder;
 use PHPLLVM\Value;
-use PHPLLVM\Value\BasicBlock;
 use PHPLLVM\Value\Function_ as LlvmFunction;
 
 /**
@@ -454,23 +454,9 @@ final class StreamIoJit
 
     private static function literalCstr(Context $context, string $text): Value
     {
-        $i8 = $context->getTypeFromString('int8');
-        $chars = [$i8->constInt(0, false)];
-        for ($i = \strlen($text) - 1; $i >= 0; --$i) {
-            $chars[] = $i8->constInt(\ord($text[$i]), false);
-        }
-        $arr = $i8->constArray($chars);
-        $name = 'phpc_stdio_lit_'.substr(hash('sha256', $text), 0, 12);
-        $existing = $context->module->getNamedGlobal($name);
-        if (null !== $existing) {
-            return $context->builder->pointerCast($existing, $context->getTypeFromString('int8*'));
-        }
-        $global = $context->module->addGlobal($arr, $name);
-        $global->setUnnamedAddr(true);
-        $global->setLinkage(\PHPLLVM\Value::LINKAGE_PRIVATE);
-        $global->setInitializer($arr);
+        $i8p = $context->getTypeFromString('int8*');
 
-        return $context->builder->pointerCast($global, $context->getTypeFromString('int8*'));
+        return $context->builder->pointerCast($context->constantFromString($text), $i8p);
     }
 
     private static function emitPopen(Context $context, LlvmFunction $fn): void
@@ -614,8 +600,7 @@ final class StreamIoJit
             $context->builder->positionAtEnd($mergeBb);
             $fpPhi = $context->builder->phi($i8p, $prefix.'_fp');
             $fpPhi->addIncoming($stdioFp, $openBb);
-            $plainEnd = $context->builder->getInsertBlock();
-            $fpPhi->addIncoming($plainFp, $plainEnd);
+            $fpPhi->addIncoming($plainFp, $plainBb);
             $fp = $fpPhi;
         } else {
             $context->builder->branch($openBb);
