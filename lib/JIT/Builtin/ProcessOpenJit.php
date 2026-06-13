@@ -30,6 +30,12 @@ final class ProcessOpenJit
 
     private const GLOBAL_ACTIVE = 'phpc_process_active';
 
+    private const GLOBAL_COMMANDS = 'phpc_process_commands';
+
+    private const GLOBAL_STATUS = 'phpc_process_status';
+
+    private const GLOBAL_STATUS_KNOWN = 'phpc_process_status_known';
+
     private const GLOBAL_STREAM_HANDLES = 'phpc_stream_handles';
 
     private const GLOBAL_STREAM_PATHS = 'phpc_stream_paths';
@@ -52,15 +58,16 @@ final class ProcessOpenJit
     private const RUNTIME_FUNCTIONS = [
         '__compiler_is_process_resource',
         '__compiler_proc_close',
+        '__compiler_proc_get_status',
         '__compiler_proc_open',
+        '__compiler_proc_terminate',
     ];
 
     public static function implement(Context $context): void
     {
         $restore = self::captureInsertBlock($context);
 
-        $probe = $context->module->getNamedFunction('__compiler_proc_close');
-        if (null !== $probe && $probe->countBasicBlocks() > 0) {
+        if (self::allRuntimeFunctionsLinked($context)) {
             self::registerLinkedRuntime($context);
             self::restoreInsertBlock($context, $restore);
 
@@ -74,7 +81,9 @@ final class ProcessOpenJit
 
         self::implementIfMissing($context, '__compiler_is_process_resource', self::emitIsProcessResource(...));
         self::implementIfMissing($context, '__compiler_proc_close', self::emitProcClose(...));
+        self::implementIfMissing($context, '__compiler_proc_get_status', self::emitProcGetStatus(...));
         self::implementIfMissing($context, '__compiler_proc_open', self::emitProcOpen(...));
+        self::implementIfMissing($context, '__compiler_proc_terminate', self::emitProcTerminate(...));
 
         self::registerLinkedRuntime($context);
         self::restoreInsertBlock($context, $restore);
@@ -120,9 +129,17 @@ final class ProcessOpenJit
                 $name,
                 $context->context->functionType($i32, false, $i64)
             ),
+            '__compiler_proc_get_status' => $context->module->addFunction(
+                $name,
+                $context->context->functionType($htPtr, false, $i64)
+            ),
             '__compiler_proc_open' => $context->module->addFunction(
                 $name,
                 $context->context->functionType($i64, false, $strPtr, $htPtr)
+            ),
+            '__compiler_proc_terminate' => $context->module->addFunction(
+                $name,
+                $context->context->functionType($i32, false, $i64, $i32)
             ),
             default => throw new \LogicException('ProcessOpenJit: unknown '.$name),
         };
@@ -186,8 +203,44 @@ final class ProcessOpenJit
         $context->builder->positionAtEnd($workBb);
         $slot = self::processSlotIndex($context, $handle);
         $pid = self::loadPid($context, $slot);
+        $statusKnown = self::loadStatusKnown($context, $slot);
+        $knownBb = $fn->appendBasicBlock('po_close_known');
+        $waitBb = $fn->appendBasicBlock('po_close_wait');
+        $context->builder->branchIf(
+            $context->builder->icmp(Builder::INT_NE, $statusKnown, $i8->constInt(0, false)),
+            $knownBb,
+            $waitBb
+        );
+
+        $context->builder->positionAtEnd($knownBb);
+        $cachedStatus = self::loadStatus($context, $slot);
         self::storeActiveFlag($context, $slot, $i8->constInt(0, false));
         self::storePid($context, $slot, $i32->constInt(0, false));
+        self::storeCommand($context, $slot, $context->getTypeFromString('__string__*')->constNull());
+        self::storeStatusKnown($context, $slot, $i8->constInt(0, false));
+        $exitedKnown = $context->builder->icmp(
+            Builder::INT_EQ,
+            $context->builder->and($cachedStatus, $i32->constInt(0xff, false)),
+            $i32->constInt(0, false)
+        );
+        $exitKnownOk = $fn->appendBasicBlock('po_close_known_exit_ok');
+        $exitKnownBad = $fn->appendBasicBlock('po_close_known_exit_bad');
+        $context->builder->branchIf($exitedKnown, $exitKnownOk, $exitKnownBad);
+        $context->builder->positionAtEnd($exitKnownOk);
+        $context->builder->returnValue(
+            $context->builder->and(
+                $context->builder->lShr($cachedStatus, $i32->constInt(8, false)),
+                $i32->constInt(0xff, false)
+            )
+        );
+        $context->builder->positionAtEnd($exitKnownBad);
+        $context->builder->returnValue($i32->constInt(self::EXIT_127, false));
+
+        $context->builder->positionAtEnd($waitBb);
+        self::storeActiveFlag($context, $slot, $i8->constInt(0, false));
+        self::storePid($context, $slot, $i32->constInt(0, false));
+        self::storeCommand($context, $slot, $context->getTypeFromString('__string__*')->constNull());
+        self::storeStatusKnown($context, $slot, $i8->constInt(0, false));
 
         $statusSlot = $context->builder->alloca($i32, 1, 'po_close_status');
         $waitRc = $context->builder->call(
@@ -358,6 +411,10 @@ final class ProcessOpenJit
         $context->builder->positionAtEnd($slotUse);
         self::storeActiveFlag($context, $slotIdx, $i8->constInt(1, false));
         self::storePid($context, $slotIdx, $pid);
+        self::storeStatusKnown($context, $slotIdx, $i8->constInt(0, false));
+        self::storeStatus($context, $slotIdx, $i32->constInt(0, false));
+        $ownedCmd = $context->builder->call($context->lookupFunction('__string__separate'), $command);
+        self::storeCommand($context, $slotIdx, $ownedCmd);
         $context->builder->branch($registerBb);
 
         $context->builder->positionAtEnd($slotLoopInc);
@@ -658,6 +715,22 @@ final class ProcessOpenJit
             $global = $context->module->addGlobal($activeTy, self::GLOBAL_ACTIVE);
             $global->setInitializer($activeTy->constNull());
         }
+        if (null === $context->module->getNamedGlobal(self::GLOBAL_COMMANDS)) {
+            $strPtr = $context->getTypeFromString('__string__*');
+            $commandsTy = $strPtr->arrayType(self::MAX_PROCESS_HANDLES);
+            $global = $context->module->addGlobal($commandsTy, self::GLOBAL_COMMANDS);
+            $global->setInitializer($commandsTy->constNull());
+        }
+        if (null === $context->module->getNamedGlobal(self::GLOBAL_STATUS)) {
+            $statusTy = $i32->arrayType(self::MAX_PROCESS_HANDLES);
+            $global = $context->module->addGlobal($statusTy, self::GLOBAL_STATUS);
+            $global->setInitializer($statusTy->constNull());
+        }
+        if (null === $context->module->getNamedGlobal(self::GLOBAL_STATUS_KNOWN)) {
+            $knownTy = $i8->arrayType(self::MAX_PROCESS_HANDLES);
+            $global = $context->module->addGlobal($knownTy, self::GLOBAL_STATUS_KNOWN);
+            $global->setInitializer($knownTy->constNull());
+        }
 
         $ptrTableTy = $i8p->arrayType(self::MAX_STREAM_HANDLES);
         $i32TableTy = $i32->arrayType(self::MAX_STREAM_HANDLES);
@@ -704,12 +777,21 @@ final class ProcessOpenJit
     private static function ensureRuntimeHelpers(Context $context): void
     {
         $htPtr = $context->getTypeFromString('__hashtable__*');
+        $strPtr = $context->getTypeFromString('__string__*');
         $sizeT = $context->getTypeFromString('size_t');
         $i64 = $context->getTypeFromString('int64');
+        $i8p = $context->getTypeFromString('int8*');
         $voidTy = $context->getTypeFromString('void');
+        $i1 = $context->getTypeFromString('int1');
 
         foreach ([
+            ['__hashtable__alloc', $htPtr, []],
             ['__hashtable__setLongAt', $voidTy, [$htPtr, $sizeT, $i64]],
+            ['__hashtable__setStringKeyString', $voidTy, [$htPtr, $strPtr, $strPtr]],
+            ['__hashtable__setStringKeyLong', $voidTy, [$htPtr, $strPtr, $i64]],
+            ['__hashtable__setStringKeyBool', $voidTy, [$htPtr, $strPtr, $i1]],
+            ['__string__init', $strPtr, [$i64, $i8p]],
+            ['__string__separate', $strPtr, [$strPtr]],
         ] as [$name, $ret, $params]) {
             self::ensureExternal($context, $name, $context->context->functionType($ret, false, ...$params));
         }
@@ -723,6 +805,280 @@ final class ProcessOpenJit
             $fn = $context->module->addFunction($name, $ft);
             $context->registerFunction($name, $fn);
         }
+    }
+
+    private static function emitProcGetStatus(Context $context, LlvmFunction $fn): void
+    {
+        $entry = $fn->appendBasicBlock('po_status_entry');
+        $context->builder->positionAtEnd($entry);
+
+        $handle = $fn->getParam(0);
+        $i32 = $context->getTypeFromString('int32');
+        $i64 = $context->getTypeFromString('int64');
+        $i8 = $context->getTypeFromString('int8');
+        $i1 = $context->getTypeFromString('int1');
+        $htPtr = $context->getTypeFromString('__hashtable__*');
+        $nullHt = $htPtr->constNull();
+        $wnoHang = $i32->constInt(1, false);
+        $minusOneI64 = $i64->constInt(-1, true);
+        $zeroI32 = $i32->constInt(0, false);
+
+        $isProc = $context->builder->call($context->lookupFunction('__compiler_is_process_resource'), $handle);
+        $failBb = $fn->appendBasicBlock('po_status_fail');
+        $workBb = $fn->appendBasicBlock('po_status_work');
+        $context->builder->branchIf(
+            $context->builder->icmp(Builder::INT_EQ, $isProc, $zeroI32),
+            $failBb,
+            $workBb
+        );
+
+        $context->builder->positionAtEnd($workBb);
+        $slot = self::processSlotIndex($context, $handle);
+        $pid = self::loadPid($context, $slot);
+        $cmd = self::loadCommand($context, $slot);
+        $buildBb = $fn->appendBasicBlock('po_status_build');
+        $knownBb = $fn->appendBasicBlock('po_status_known');
+        $queryBb = $fn->appendBasicBlock('po_status_query');
+        $context->builder->branchIf(
+            $context->builder->icmp(Builder::INT_NE, self::loadStatusKnown($context, $slot), $i8->constInt(0, false)),
+            $knownBb,
+            $queryBb
+        );
+
+        $context->builder->positionAtEnd($knownBb);
+        $knownStatus = self::loadStatus($context, $slot);
+        $context->builder->branch($buildBb);
+
+        $context->builder->positionAtEnd($queryBb);
+        $statusSlot = $context->builder->alloca($i32, 1, 'po_status_raw');
+        $waitRc = $context->builder->call(
+            $context->lookupFunction('waitpid'),
+            $pid,
+            $statusSlot,
+            $wnoHang
+        );
+        $waitRunningBb = $fn->appendBasicBlock('po_status_wait_running');
+        $waitReapedBb = $fn->appendBasicBlock('po_status_wait_reaped');
+        $waitErrBb = $fn->appendBasicBlock('po_status_wait_err');
+        $waitZero = $context->builder->icmp(Builder::INT_EQ, $waitRc, $zeroI32);
+        $waitDone = $context->builder->icmp(Builder::INT_SGT, $waitRc, $zeroI32);
+        $waitRoleBb = $fn->appendBasicBlock('po_status_wait_role');
+        $context->builder->branchIf($waitZero, $waitRunningBb, $waitRoleBb);
+
+        $context->builder->positionAtEnd($waitRoleBb);
+        $context->builder->branchIf($waitDone, $waitReapedBb, $waitErrBb);
+
+        $context->builder->positionAtEnd($waitRunningBb);
+        $context->builder->branch($buildBb);
+
+        $context->builder->positionAtEnd($waitReapedBb);
+        $reapedStatus = $context->builder->load($statusSlot);
+        self::storeStatus($context, $slot, $reapedStatus);
+        self::storeStatusKnown($context, $slot, $i8->constInt(1, false));
+        $context->builder->branch($buildBb);
+
+        $context->builder->positionAtEnd($waitErrBb);
+        $killAlive = $context->builder->icmp(
+            Builder::INT_EQ,
+            $context->builder->call($context->lookupFunction('kill'), $pid, $zeroI32),
+            $zeroI32
+        );
+        $context->builder->branch($buildBb);
+
+        $context->builder->positionAtEnd($buildBb);
+        $status = $context->builder->phi($i32);
+        $status->addIncoming($knownStatus, $knownBb);
+        $status->addIncoming($zeroI32, $waitRunningBb);
+        $status->addIncoming($reapedStatus, $waitReapedBb);
+        $status->addIncoming($zeroI32, $waitErrBb);
+        $stillRunning = $context->builder->phi($i1);
+        $stillRunning->addIncoming($i1->constInt(0, false), $knownBb);
+        $stillRunning->addIncoming($i1->constInt(1, false), $waitRunningBb);
+        $stillRunning->addIncoming($i1->constInt(0, false), $waitReapedBb);
+        $stillRunning->addIncoming($killAlive, $waitErrBb);
+
+        $lowByte = $context->builder->and($status, $i32->constInt(0xff, false));
+        $exited = $context->builder->icmp(Builder::INT_EQ, $lowByte, $zeroI32);
+        $stopped = $context->builder->icmp(Builder::INT_EQ, $lowByte, $i32->constInt(0x7f, false));
+        $signaled = $context->builder->and(
+            $context->builder->icmp(Builder::INT_UGT, $lowByte, $zeroI32),
+            $context->builder->icmp(Builder::INT_NE, $lowByte, $i32->constInt(0x7f, false))
+        );
+
+        $result = $context->builder->call($context->lookupFunction('__hashtable__alloc'));
+        $resultNull = $context->builder->icmp(Builder::INT_EQ, $result, $nullHt);
+        $buildFail = $fn->appendBasicBlock('po_status_build_fail');
+        $buildOk = $fn->appendBasicBlock('po_status_build_ok');
+        $context->builder->branchIf($resultNull, $buildFail, $buildOk);
+
+        $context->builder->positionAtEnd($buildFail);
+        $context->builder->returnValue($nullHt);
+
+        $setStr = $context->lookupFunction('__hashtable__setStringKeyString');
+        $setLong = $context->lookupFunction('__hashtable__setStringKeyLong');
+        $setBool = $context->lookupFunction('__hashtable__setStringKeyBool');
+
+        $context->builder->positionAtEnd($buildOk);
+        $context->builder->call($setStr, $result, self::literalKeyString($context, 'command'), $cmd);
+        $context->builder->call(
+            $setLong,
+            $result,
+            self::literalKeyString($context, 'pid'),
+            $context->builder->sext($pid, $i64)
+        );
+        $context->builder->call(
+            $setBool,
+            $result,
+            self::literalKeyString($context, 'running'),
+            $stillRunning
+        );
+
+        $exitRunning = $fn->appendBasicBlock('po_status_exit_running');
+        $exitDone = $fn->appendBasicBlock('po_status_exit_done');
+        $context->builder->branchIf($stillRunning, $exitRunning, $exitDone);
+
+        $context->builder->positionAtEnd($exitRunning);
+        $context->builder->call($setLong, $result, self::literalKeyString($context, 'exitcode'), $minusOneI64);
+        $context->builder->call($setBool, $result, self::literalKeyString($context, 'signaled'), $i1->constInt(0, false));
+        $context->builder->call($setBool, $result, self::literalKeyString($context, 'stopped'), $i1->constInt(0, false));
+        $context->builder->returnValue($result);
+
+        $context->builder->positionAtEnd($exitDone);
+        $exitCode = $context->builder->select(
+            $exited,
+            $context->builder->sext(
+                $context->builder->and(
+                    $context->builder->lShr($status, $i32->constInt(8, false)),
+                    $i32->constInt(0xff, false)
+                ),
+                $i64
+            ),
+            $minusOneI64
+        );
+        $context->builder->call($setLong, $result, self::literalKeyString($context, 'exitcode'), $exitCode);
+        $context->builder->call($setBool, $result, self::literalKeyString($context, 'signaled'), $signaled);
+        $context->builder->call($setBool, $result, self::literalKeyString($context, 'stopped'), $stopped);
+        $context->builder->returnValue($result);
+
+        $context->builder->positionAtEnd($failBb);
+        $context->builder->returnValue($nullHt);
+    }
+
+    private static function emitProcTerminate(Context $context, LlvmFunction $fn): void
+    {
+        $entry = $fn->appendBasicBlock('po_term_entry');
+        $context->builder->positionAtEnd($entry);
+
+        $handle = $fn->getParam(0);
+        $signal = $fn->getParam(1);
+        $i32 = $context->getTypeFromString('int32');
+        $zeroI32 = $i32->constInt(0, false);
+        $oneI32 = $i32->constInt(1, false);
+
+        $isProc = $context->builder->call($context->lookupFunction('__compiler_is_process_resource'), $handle);
+        $failBb = $fn->appendBasicBlock('po_term_fail');
+        $workBb = $fn->appendBasicBlock('po_term_work');
+        $context->builder->branchIf(
+            $context->builder->icmp(Builder::INT_EQ, $isProc, $zeroI32),
+            $failBb,
+            $workBb
+        );
+
+        $context->builder->positionAtEnd($workBb);
+        $slot = self::processSlotIndex($context, $handle);
+        $pid = self::loadPid($context, $slot);
+        $killRc = $context->builder->call($context->lookupFunction('kill'), $pid, $signal);
+        $ok = $context->builder->icmp(Builder::INT_EQ, $killRc, $zeroI32);
+        $context->builder->returnValue($context->builder->select($ok, $oneI32, $zeroI32));
+
+        $context->builder->positionAtEnd($failBb);
+        $context->builder->returnValue($zeroI32);
+    }
+
+    private static function loadCommand(Context $context, Value $slot): Value
+    {
+        $i64 = $context->getTypeFromString('int64');
+        $strPtr = $context->getTypeFromString('__string__*');
+        $zero = $i64->constInt(0, false);
+        $global = $context->module->getNamedGlobal(self::GLOBAL_COMMANDS);
+        $ptr = $context->builder->gep($global, $zero, $slot);
+
+        return $context->builder->load($context->builder->bitcast($ptr, $strPtr->pointerType(0)));
+    }
+
+    private static function storeCommand(Context $context, Value $slot, Value $cmd): void
+    {
+        $i64 = $context->getTypeFromString('int64');
+        $strPtr = $context->getTypeFromString('__string__*');
+        $zero = $i64->constInt(0, false);
+        $global = $context->module->getNamedGlobal(self::GLOBAL_COMMANDS);
+        $ptr = $context->builder->gep($global, $zero, $slot);
+        $context->builder->store($cmd, $context->builder->bitcast($ptr, $strPtr->pointerType(0)));
+    }
+
+    private static function loadStatus(Context $context, Value $slot): Value
+    {
+        $i64 = $context->getTypeFromString('int64');
+        $i32 = $context->getTypeFromString('int32');
+        $zero = $i64->constInt(0, false);
+        $global = $context->module->getNamedGlobal(self::GLOBAL_STATUS);
+        $ptr = $context->builder->gep($global, $zero, $slot);
+
+        return $context->builder->load($context->builder->bitcast($ptr, $i32->pointerType(0)));
+    }
+
+    private static function storeStatus(Context $context, Value $slot, Value $status): void
+    {
+        $i64 = $context->getTypeFromString('int64');
+        $i32 = $context->getTypeFromString('int32');
+        $zero = $i64->constInt(0, false);
+        $global = $context->module->getNamedGlobal(self::GLOBAL_STATUS);
+        $ptr = $context->builder->gep($global, $zero, $slot);
+        $context->builder->store($status, $context->builder->bitcast($ptr, $i32->pointerType(0)));
+    }
+
+    private static function loadStatusKnown(Context $context, Value $slot): Value
+    {
+        $i64 = $context->getTypeFromString('int64');
+        $i8 = $context->getTypeFromString('int8');
+        $zero = $i64->constInt(0, false);
+        $global = $context->module->getNamedGlobal(self::GLOBAL_STATUS_KNOWN);
+        $ptr = $context->builder->gep($global, $zero, $slot);
+
+        return $context->builder->load($context->builder->bitcast($ptr, $i8->pointerType(0)));
+    }
+
+    private static function storeStatusKnown(Context $context, Value $slot, Value $flag): void
+    {
+        $i64 = $context->getTypeFromString('int64');
+        $i8 = $context->getTypeFromString('int8');
+        $zero = $i64->constInt(0, false);
+        $global = $context->module->getNamedGlobal(self::GLOBAL_STATUS_KNOWN);
+        $ptr = $context->builder->gep($global, $zero, $slot);
+        $context->builder->store($flag, $context->builder->bitcast($ptr, $i8->pointerType(0)));
+    }
+
+    private static function literalKeyString(Context $context, string $text): Value
+    {
+        $i64 = $context->getTypeFromString('int64');
+
+        return $context->builder->call(
+            $context->lookupFunction('__string__init'),
+            $i64->constInt(\strlen($text), false),
+            self::literalCstr($context, $text)
+        );
+    }
+
+    private static function allRuntimeFunctionsLinked(Context $context): bool
+    {
+        foreach (self::RUNTIME_FUNCTIONS as $name) {
+            $fn = $context->module->getNamedFunction($name);
+            if (null === $fn || 0 === $fn->countBasicBlocks()) {
+                return false;
+            }
+        }
+
+        return true;
     }
 
     private static function registerLinkedRuntime(Context $context): void

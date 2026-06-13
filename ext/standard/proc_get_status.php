@@ -15,7 +15,7 @@ use PHPLLVM\Value;
 /**
  * proc_get_status() — subprocess status (php-src ext/standard/proc_open.c; #3740).
  *
- * VM-only v1; JIT/AOT deferred until proc_open() lowering lands (#3131).
+ * VM: {@see VmProcess::procGetStatus()}; JIT/AOT: __compiler_proc_get_status (#3740).
  */
 final class proc_get_status extends Internal
 {
@@ -51,7 +51,11 @@ final class proc_get_status extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        throw new \LogicException('proc_get_status() is VM-only in this compiler build (issue #3131)');
+        if (1 !== \count($args)) {
+            throw new \LogicException('proc_get_status() requires exactly one argument in this compiler build');
+        }
+
+        return JitProcGetStatus::invoke($context, $args[0]);
     }
 
     private static function assignStatusValue(Variable $slot, mixed $value): void
