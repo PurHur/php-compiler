@@ -105,6 +105,7 @@ class Module extends ModuleAbstract
             'LOG_LOCAL6' => StdlibConstants::LOG_LOCAL6,
             'LOG_LOCAL7' => StdlibConstants::LOG_LOCAL7,
             ...VmLocale::lcConstants(),
+            ...VmLocale::nlLanginfoConstants(),
             'ZLIB_ENCODING_RAW' => -15,
             'ZLIB_ENCODING_DEFLATE' => 15,
             'ZLIB_ENCODING_GZIP' => 31,
@@ -813,6 +814,7 @@ class Module extends ModuleAbstract
             new sleep(),
             new set_time_limit(),
             new setlocale(),
+            new nl_langinfo(),
             new ignore_user_abort(),
             new connection_aborted(),
             new spl_autoload_register(),
@@ -842,6 +844,15 @@ class Module extends ModuleAbstract
             $ft = $context->context->functionType($i32, false, $i8p, $i8p);
             $fn = $context->module->addFunction('strcoll', $ft);
             $context->registerFunction('strcoll', $fn);
+        }
+        try {
+            $context->lookupFunction('nl_langinfo');
+        } catch (\Throwable $e) {
+            $i8p = $context->getTypeFromString('int8*');
+            $i32 = $context->getTypeFromString('int32');
+            $ft = $context->context->functionType($i8p, false, $i32);
+            $fn = $context->module->addFunction('nl_langinfo', $ft);
+            $context->registerFunction('nl_langinfo', $fn);
         }
         try {
             $context->lookupFunction('strxfrm');
