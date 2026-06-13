@@ -1178,16 +1178,16 @@ function builtinCapabilityCurations(): array
             'notes' => [$persistenceNote, 'lifecycle API (#6002)'],
         ],
         'session_reset' => [
-            'aot' => 'no',
-            'notes' => ['VM lifecycle API (#6002); JIT/AOT pending'],
+            'aot' => 'yes',
+            'notes' => [$persistenceNote, 'lifecycle API (#6002)', 'JIT PHPT'],
         ],
         'session_create_id' => [
-            'aot' => 'no',
-            'notes' => ['VM lifecycle API (#6002); JIT/AOT pending'],
+            'aot' => 'yes',
+            'notes' => [$persistenceNote, 'lifecycle API (#6002)', 'JIT PHPT'],
         ],
         'session_gc' => [
-            'aot' => 'no',
-            'notes' => ['VM lifecycle API (#6006); JIT/AOT pending'],
+            'aot' => 'yes',
+            'notes' => [$persistenceNote, 'lifecycle API (#6006)', 'JIT PHPT'],
         ],
         'move_uploaded_file' => [
             'aot' => 'yes',

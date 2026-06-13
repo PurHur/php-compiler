@@ -1093,6 +1093,36 @@ class Type extends Builtin {
             $fntypeSessionApply
         );
         $this->context->registerFunction('__phpc_session_abort_apply', $fnSessionAbort);
+        $fnSessionReset = $this->context->module->addFunction(
+            '__phpc_session_reset_apply',
+            $fntypeSessionApply
+        );
+        $this->context->registerFunction('__phpc_session_reset_apply', $fnSessionReset);
+        $fnSessionCreateId = $this->context->module->addFunction(
+            '__phpc_session_create_id_apply',
+            $this->context->context->functionType($void, false, $valuePtr, $strPtr)
+        );
+        $this->context->registerFunction('__phpc_session_create_id_apply', $fnSessionCreateId);
+        $fnSessionCreateIdBoxed = $this->context->module->addFunction(
+            '__phpc_session_create_id_apply_boxed',
+            $this->context->context->functionType($void, false, $valuePtr, $valuePtr)
+        );
+        $this->context->registerFunction('__phpc_session_create_id_apply_boxed', $fnSessionCreateIdBoxed);
+        $fnSessionRandomId = $this->context->module->addFunction(
+            'phpc_session_random_id_string',
+            $this->context->context->functionType($strPtr, false)
+        );
+        $this->context->registerFunction('phpc_session_random_id_string', $fnSessionRandomId);
+        $fnSessionGcApply = $this->context->module->addFunction(
+            '__phpc_session_gc_apply',
+            $fntypeSessionApply
+        );
+        $this->context->registerFunction('__phpc_session_gc_apply', $fnSessionGcApply);
+        $fnSessionGcExpired = $this->context->module->addFunction(
+            'phpc_session_gc_expired_files',
+            $this->context->context->functionType($this->context->getTypeFromString('int64'), false)
+        );
+        $this->context->registerFunction('phpc_session_gc_expired_files', $fnSessionGcExpired);
         $fnSessionUnset = $this->context->module->addFunction(
             '__phpc_session_unset_apply',
             $fntypeSessionApply
@@ -1305,6 +1335,8 @@ class Type extends Builtin {
         AssertFail::ensureLinked($this->context);
         AssertOptionsRuntime::ensureLinked($this->context);
         SessionLifecycleRuntime::ensureLinked($this->context);
+        SessionCreateIdRuntime::ensureLinked($this->context);
+        SessionGcRuntime::ensureLinked($this->context);
         SessionStart::implement($this->context);
         SessionWriteClose::implement($this->context);
         SessionRegenerateId::implement($this->context);

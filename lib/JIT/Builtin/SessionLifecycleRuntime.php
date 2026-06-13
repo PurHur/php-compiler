@@ -40,6 +40,7 @@ final class SessionLifecycleRuntime
         self::implementStandaloneRegenerateId($context);
         self::implementStandaloneDestroy($context);
         self::implementStandaloneAbort($context);
+        self::implementStandaloneReset($context);
         self::implementStandaloneUnset($context);
     }
 
@@ -261,6 +262,23 @@ final class SessionLifecycleRuntime
             static function (Context $context, Value $outPtr): void {
                 $i8 = $context->getTypeFromString('int8');
                 $context->builder->store($i8->constInt(0, false), SessionStorageGlobals::$activeGlobal);
+                SessionStart::emitWriteBool($context, $outPtr, true);
+            }
+        );
+    }
+
+    private static function implementStandaloneReset(Context $context): void
+    {
+        $fn = $context->lookupFunction('__phpc_session_reset_apply');
+        if ($fn->countBasicBlocks() > 0) {
+            return;
+        }
+
+        self::emitActiveGuardedLifecycle(
+            $context,
+            $fn,
+            static function (Context $context, Value $outPtr): void {
+                $context->builder->call($context->lookupFunction('phpc_session_load_from_disk'));
                 SessionStart::emitWriteBool($context, $outPtr, true);
             }
         );

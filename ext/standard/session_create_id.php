@@ -47,6 +47,6 @@ class session_create_id extends Internal
             throw new \LogicException('session_create_id() accepts at most one argument in this compiler build');
         }
 
-        throw new \LogicException('session_create_id() not implemented for JIT');
+        return JitSessionCreateId::invoke($context, ...$args);
     }
 }
