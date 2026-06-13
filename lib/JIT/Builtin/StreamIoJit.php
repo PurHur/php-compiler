@@ -57,8 +57,13 @@ final class StreamIoJit
             return;
         }
 
-        self::ensureExternGlobals($context);
-        self::ensureLibc($context);
+        self::ensureStreamGlobals($context);
+
+        if (self::shouldDeferHeavyStreamIoEmitters($context)) {
+            self::implementDeferredStreamIoStubs($context);
+
+            return;
+        }
 
         self::implementIfMissing($context, '__compiler_fwrite', self::emitFwrite(...));
         self::implementIfMissing($context, '__phpc_try_fopen_stdio', self::emitTryFopenStdio(...));
@@ -66,6 +71,99 @@ final class StreamIoJit
         self::implementIfMissing($context, '__compiler_popen', self::emitPopen(...));
         self::implementIfMissing($context, '__compiler_tmpfile', self::emitTmpfile(...));
         self::implementIfMissing($context, '__compiler_fread', self::emitFread(...));
+    }
+
+    /** Stream handle globals for stream_socket_pair() without pulling full I/O emitters (#3437). */
+    public static function ensureStreamGlobals(Context $context): void
+    {
+        self::ensureExternGlobals($context);
+        self::ensureLibc($context);
+    }
+
+    private static function shouldDeferHeavyStreamIoEmitters(Context $context): bool
+    {
+        unset($context);
+        foreach (['PHP_COMPILER_M3_INVENTORY_EMIT_DRIVER', 'BOOTSTRAP_M3_USE_INVENTORY_EMIT_DRIVER'] as $key) {
+            $flag = getenv($key);
+            if ('1' === $flag || 'true' === strtolower((string) $flag)) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private static function implementDeferredStreamIoStubs(Context $context): void
+    {
+        $i64 = $context->getTypeFromString('int64');
+        $strPtr = $context->getTypeFromString('__string__*');
+        $i8p = $context->getTypeFromString('int8*');
+        $minusOne = $i64->constInt(-1, true);
+        $nullStr = $strPtr->constNull();
+        $nullPtr = $i8p->constNull();
+
+        self::implementNullaryI64Stub($context, '__compiler_tmpfile', $minusOne);
+        self::implementBinaryI64Stub($context, '__compiler_fwrite', $minusOne);
+        self::implementBinaryI64Stub($context, '__compiler_fopen', $minusOne);
+        self::implementBinaryI64Stub($context, '__compiler_popen', $minusOne);
+        self::implementBinaryStrStub($context, '__compiler_fread', $nullStr);
+        self::implementBinaryPtrStub($context, '__phpc_try_fopen_stdio', $nullPtr);
+    }
+
+    private static function implementNullaryI64Stub(Context $context, string $name, Value $ret): void
+    {
+        self::implementStub($context, $name, $context->context->functionType($context->getTypeFromString('int64'), false), $ret);
+    }
+
+    private static function implementBinaryI64Stub(Context $context, string $name, Value $ret): void
+    {
+        $i64 = $context->getTypeFromString('int64');
+        $strPtr = $context->getTypeFromString('__string__*');
+        self::implementStub(
+            $context,
+            $name,
+            $context->context->functionType($i64, false, $strPtr, $strPtr),
+            $ret
+        );
+    }
+
+    private static function implementBinaryStrStub(Context $context, string $name, Value $ret): void
+    {
+        $i64 = $context->getTypeFromString('int64');
+        $strPtr = $context->getTypeFromString('__string__*');
+        self::implementStub(
+            $context,
+            $name,
+            $context->context->functionType($strPtr, false, $i64, $i64),
+            $ret
+        );
+    }
+
+    private static function implementBinaryPtrStub(Context $context, string $name, Value $ret): void
+    {
+        $i8p = $context->getTypeFromString('int8*');
+        self::implementStub(
+            $context,
+            $name,
+            $context->context->functionType($i8p, false, $i8p, $i8p),
+            $ret
+        );
+    }
+
+    private static function implementStub(Context $context, string $name, $ft, Value $ret): void
+    {
+        $probe = $context->module->getNamedFunction($name);
+        if (null !== $probe && $probe->countBasicBlocks() > 0) {
+            $context->registerFunction($name, $probe);
+
+            return;
+        }
+        $fn = $context->module->addFunction($name, $ft);
+        $entry = $fn->appendBasicBlock('entry');
+        $context->builder->positionAtEnd($entry);
+        $context->builder->returnValue($ret);
+        $context->registerFunction($name, $fn);
+        $context->builder->clearInsertionPosition();
     }
 
     private static function allRuntimeFunctionsLinked(Context $context): bool
@@ -388,7 +486,7 @@ final class StreamIoJit
             ['uri' => 'php://stdout', 'fd' => 1],
             ['uri' => 'php://stderr', 'fd' => 2],
         ];
-        $nextMiss = $missBb;
+        $nextBb = $missBb;
         foreach (array_reverse($stdio) as $entryDef) {
             $checkBb = $fn->appendBasicBlock('stdio_try_check_'.$entryDef['fd']);
             $matchBb = $fn->appendBasicBlock('stdio_try_match_'.$entryDef['fd']);
@@ -399,15 +497,15 @@ final class StreamIoJit
                 self::literalCstr($context, $entryDef['uri'])
             );
             $isMatch = $context->builder->icmp(Builder::INT_EQ, $cmp, $zero);
-            $context->builder->branchIf($isMatch, $matchBb, $nextMiss);
+            $context->builder->branchIf($isMatch, $matchBb, $nextBb);
             $context->builder->positionAtEnd($matchBb);
             $fp = self::fdopenDupStdio($context, $fn, $i32->constInt($entryDef['fd'], false), $mode, $failBb);
             $context->builder->returnValue($fp);
-            $nextMiss = $checkBb;
+            $nextBb = $checkBb;
         }
 
         $context->builder->positionAtEnd($entry);
-        $context->builder->branch($nextMiss);
+        $context->builder->branch($nextBb);
 
         $context->builder->positionAtEnd($missBb);
         $context->builder->returnValue($nullPtr);
@@ -595,12 +693,13 @@ final class StreamIoJit
                 self::stringData($context, $path),
                 self::stringData($context, $mode)
             );
+            $plainTail = $context->builder->getInsertBlock();
             $context->builder->branch($mergeBb);
 
             $context->builder->positionAtEnd($mergeBb);
             $fpPhi = $context->builder->phi($i8p, $prefix.'_fp');
             $fpPhi->addIncoming($stdioFp, $openBb);
-            $fpPhi->addIncoming($plainFp, $plainBb);
+            $fpPhi->addIncoming($plainFp, $plainTail);
             $fp = $fpPhi;
         } else {
             $context->builder->branch($openBb);

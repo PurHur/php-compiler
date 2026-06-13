@@ -63,11 +63,15 @@ final class StreamSocketPairJit
         }
 
         self::$blockSuffix = 0;
-        StreamIoJit::implement($context);
+        StreamIoJit::ensureStreamGlobals($context);
         self::ensureLibc($context);
         self::ensureRuntimeHelpers($context);
 
-        self::implementIfMissing($context, '__compiler_stream_socket_pair', self::emitStreamSocketPair(...));
+        self::implementIfMissing(
+            $context,
+            '__compiler_stream_socket_pair',
+            self::shouldDeferInventoryEmit($context) ? self::emitStreamSocketPairStub(...) : self::emitStreamSocketPair(...)
+        );
         self::registerLinkedRuntime($context);
         self::restoreInsertBlock($context, $restore);
     }
@@ -108,6 +112,27 @@ final class StreamSocketPairJit
         $context->registerFunction($name, $fn);
 
         return $fn;
+    }
+
+    private static function shouldDeferInventoryEmit(Context $context): bool
+    {
+        unset($context);
+        foreach (['PHP_COMPILER_M3_INVENTORY_EMIT_DRIVER', 'BOOTSTRAP_M3_USE_INVENTORY_EMIT_DRIVER'] as $key) {
+            $flag = getenv($key);
+            if ('1' === $flag || 'true' === strtolower((string) $flag)) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private static function emitStreamSocketPairStub(Context $context, LlvmFunction $fn): void
+    {
+        $entry = $fn->appendBasicBlock('ssp_stub_entry');
+        $context->builder->positionAtEnd($entry);
+        $htPtr = $context->getTypeFromString('__hashtable__*');
+        $context->builder->returnValue($htPtr->constNull());
     }
 
     private static function emitStreamSocketPair(Context $context, LlvmFunction $fn): void
@@ -183,7 +208,9 @@ final class StreamSocketPairJit
         $i64 = $context->getTypeFromString('int64');
         $unixBb = $fn->appendBasicBlock('ssp_domain_unix');
         $inetBb = $fn->appendBasicBlock('ssp_domain_inet');
-        $doneBb = $fn->appendBasicBlock('ssp_domain_done');
+        $unixDoneBb = $fn->appendBasicBlock('ssp_domain_unix_done');
+        $mergeBb = $fn->appendBasicBlock('ssp_domain_done');
+        $resultSlot = $context->builder->alloca($i64, 1, 'ssp_af');
 
         $isUnix = $context->builder->icmp(
             Builder::INT_EQ,
@@ -199,17 +226,19 @@ final class StreamSocketPairJit
         $context->builder->branchIf($known, $unixBb, $failBb);
 
         $context->builder->positionAtEnd($unixBb);
-        $context->builder->branchIf($isUnix, $doneBb, $inetBb);
+        $context->builder->branchIf($isUnix, $unixDoneBb, $inetBb);
+
+        $context->builder->positionAtEnd($unixDoneBb);
+        $context->builder->store($i64->constInt(self::AF_UNIX, false), $resultSlot);
+        $context->builder->branch($mergeBb);
 
         $context->builder->positionAtEnd($inetBb);
-        $context->builder->branch($doneBb);
+        $context->builder->store($i64->constInt(self::AF_INET, false), $resultSlot);
+        $context->builder->branch($mergeBb);
 
-        $context->builder->positionAtEnd($doneBb);
-        $af = $context->builder->phi($i64, 'ssp_af');
-        $af->addIncoming($i64->constInt(self::AF_UNIX, false), $unixBb);
-        $af->addIncoming($i64->constInt(self::AF_INET, false), $inetBb);
+        $context->builder->positionAtEnd($mergeBb);
 
-        return $af;
+        return $context->builder->load($resultSlot);
     }
 
     private static function mapType(Context $context, LlvmFunction $fn, Value $type, BasicBlock $failBb): Value
@@ -217,7 +246,9 @@ final class StreamSocketPairJit
         $i64 = $context->getTypeFromString('int64');
         $streamBb = $fn->appendBasicBlock('ssp_type_stream');
         $dgramBb = $fn->appendBasicBlock('ssp_type_dgram');
-        $doneBb = $fn->appendBasicBlock('ssp_type_done');
+        $streamDoneBb = $fn->appendBasicBlock('ssp_type_stream_done');
+        $mergeBb = $fn->appendBasicBlock('ssp_type_done');
+        $resultSlot = $context->builder->alloca($i64, 1, 'ssp_sock_type');
 
         $isStream = $context->builder->icmp(
             Builder::INT_EQ,
@@ -233,17 +264,19 @@ final class StreamSocketPairJit
         $context->builder->branchIf($known, $streamBb, $failBb);
 
         $context->builder->positionAtEnd($streamBb);
-        $context->builder->branchIf($isStream, $doneBb, $dgramBb);
+        $context->builder->branchIf($isStream, $streamDoneBb, $dgramBb);
+
+        $context->builder->positionAtEnd($streamDoneBb);
+        $context->builder->store($i64->constInt(self::SOCK_STREAM, false), $resultSlot);
+        $context->builder->branch($mergeBb);
 
         $context->builder->positionAtEnd($dgramBb);
-        $context->builder->branch($doneBb);
+        $context->builder->store($i64->constInt(self::SOCK_DGRAM, false), $resultSlot);
+        $context->builder->branch($mergeBb);
 
-        $context->builder->positionAtEnd($doneBb);
-        $sockType = $context->builder->phi($i64, 'ssp_sock_type');
-        $sockType->addIncoming($i64->constInt(self::SOCK_STREAM, false), $streamBb);
-        $sockType->addIncoming($i64->constInt(self::SOCK_DGRAM, false), $dgramBb);
+        $context->builder->positionAtEnd($mergeBb);
 
-        return $sockType;
+        return $context->builder->load($resultSlot);
     }
 
     private static function guardProtocolTriple(
@@ -330,6 +363,7 @@ final class StreamSocketPairJit
         $suffix = (string) ++self::$blockSuffix;
 
         $resultSlot = $context->builder->alloca($i64, 1, 'ssp_reg_result_'.$suffix);
+        $idSlot = $context->builder->alloca($i64, 1, 'ssp_reg_id_'.$suffix);
         $doneBb = $fn->appendBasicBlock('ssp_reg_done_'.$suffix);
 
         $fpNull = $context->builder->icmp(Builder::INT_EQ, $fp, $nullPtr);
@@ -348,11 +382,11 @@ final class StreamSocketPairJit
         $exhaust = $fn->appendBasicBlock('ssp_reg_exhaust_'.$suffix);
 
         $context->builder->positionAtEnd($loopInit);
+        $context->builder->store($i64->constInt(self::STREAM_HANDLE_BASE, false), $idSlot);
         $context->builder->branch($loopCheck);
 
         $context->builder->positionAtEnd($loopCheck);
-        $idPhi = $context->builder->phi($i64, 'ssp_reg_id_'.$suffix);
-        $idPhi->addIncoming($i64->constInt(self::STREAM_HANDLE_BASE, false), $loopInit);
+        $idPhi = $context->builder->load($idSlot);
         $atEnd = $context->builder->icmp(Builder::INT_SGE, $idPhi, $i64->constInt(self::MAX_STREAM_HANDLES, false));
         $context->builder->branchIf($atEnd, $exhaust, $loopBody);
 
@@ -377,7 +411,7 @@ final class StreamSocketPairJit
 
         $context->builder->positionAtEnd($loopInc);
         $nextId = $context->builder->add($idPhi, $i64->constInt(1, false));
-        $idPhi->addIncoming($nextId, $loopInc);
+        $context->builder->store($nextId, $idSlot);
         $context->builder->branch($loopCheck);
 
         $context->builder->positionAtEnd($exhaust);
