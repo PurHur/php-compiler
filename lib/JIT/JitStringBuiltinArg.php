@@ -56,6 +56,102 @@ final class JitStringBuiltinArg
         return JitStringArg::lower($context, $arg, "{$function}() argument #" . ($argIndex + 1));
     }
 
+    /**
+     * Lower string builtin operands with strict Z_PARAM_STR parity (#5018, ext/standard/string.c).
+     *
+     * Rejects int/float/bool operands that {@see lower()} would coerce via JitStringArg.
+     */
+    public static function lowerRequiredString(
+        Context $context,
+        Variable $arg,
+        string $function,
+        int $argIndex,
+        string $paramName
+    ): Value {
+        if (Variable::TYPE_HASHTABLE === $arg->type || Variable::TYPE_OBJECT === $arg->type) {
+            return self::lower($context, $arg, $function, $argIndex, $paramName);
+        }
+        if (Variable::TYPE_VALUE === $arg->type) {
+            return self::lowerRequiredBoxed($context, $arg, $function, $argIndex, $paramName);
+        }
+        if (Variable::TYPE_STRING !== $arg->type) {
+            $errBlock = BasicBlockHelper::append($context, 'str_req_scalar_err');
+            $context->builder->branch($errBlock);
+            $context->builder->positionAtEnd($errBlock);
+            self::emitTypeErrorAndAbort(
+                $context,
+                $function,
+                $argIndex,
+                $paramName,
+                JitOperandTypeLabel::givenLabel($context, $arg)
+            );
+
+            return self::unreachableStringPtr($context);
+        }
+
+        return $context->helper->loadValue($arg);
+    }
+
+    private static function lowerRequiredBoxed(
+        Context $context,
+        Variable $arg,
+        string $function,
+        int $argIndex,
+        string $paramName
+    ): Value {
+        TypeErrorRaise::registerDeclarations($context);
+        TypeErrorRaise::ensureLinked($context);
+        $valuePtr = JitValueBox::valuePtrFromVariable($context, $arg);
+        $map = $context->structFieldMap['__value__'];
+        $typeByte = $context->builder->load(
+            $context->builder->structGep($valuePtr, $map['type'])
+        );
+        $i8 = $context->getTypeFromString('int8');
+        $typeKind = $context->builder->and($typeByte, $i8->constInt(0x7f, false));
+        $arrayTy = $i8->constInt(Variable::TYPE_HASHTABLE & 0x7f, false);
+        $objectTy = $i8->constInt(Variable::TYPE_OBJECT & 0x7f, false);
+        $enumCaseTy = $i8->constInt(VmVariable::TYPE_ENUM_CASE, false);
+        $stringTy = $i8->constInt(VmVariable::TYPE_STRING, false);
+
+        $arrayBlock = BasicBlockHelper::append($context, 'str_req_array');
+        $rejectBlock = BasicBlockHelper::append($context, 'str_req_reject');
+        $stringBlock = BasicBlockHelper::append($context, 'str_req_string');
+        $scalarBlock = BasicBlockHelper::append($context, 'str_req_scalar');
+        $okBlock = BasicBlockHelper::append($context, 'str_req_ok');
+
+        $isArray = $context->builder->icmp(Builder::INT_EQ, $typeKind, $arrayTy);
+        $context->builder->branchIf($isArray, $arrayBlock, $okBlock);
+
+        $context->builder->positionAtEnd($arrayBlock);
+        self::emitTypeErrorAndAbort($context, $function, $argIndex, $paramName, 'array');
+
+        $context->builder->positionAtEnd($okBlock);
+        $isObject = $context->builder->icmp(Builder::INT_EQ, $typeKind, $objectTy);
+        $isEnumCase = $context->builder->icmp(Builder::INT_EQ, $typeKind, $enumCaseTy);
+        $isObjOrEnum = $context->builder->or($isObject, $isEnumCase);
+        $context->builder->branchIf($isObjOrEnum, $rejectBlock, $scalarBlock);
+
+        $context->builder->positionAtEnd($rejectBlock);
+        self::emitTypeErrorAndAbort(
+            $context,
+            $function,
+            $argIndex,
+            $paramName,
+            self::compileTimeGivenLabel($context, $arg)
+        );
+
+        $context->builder->positionAtEnd($scalarBlock);
+        $isString = $context->builder->icmp(Builder::INT_EQ, $typeKind, $stringTy);
+        $context->builder->branchIf($isString, $stringBlock, $rejectBlock);
+
+        $context->builder->positionAtEnd($stringBlock);
+
+        return $context->builder->call(
+            $context->lookupFunction('__value__readString'),
+            $valuePtr
+        );
+    }
+
     private static function lowerBoxed(
         Context $context,
         Variable $arg,

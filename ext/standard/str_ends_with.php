@@ -29,13 +29,13 @@ final class str_ends_with extends Internal
     public function execute(Frame $frame): void
     {
         $this->requireExactArgCount($frame, 'str_ends_with', 2);
-        $haystackStr = VmString::coerceStringBuiltinArg(
+        $haystackStr = VmString::requireStringBuiltinArg(
             $frame->calledArgs[0],
             'str_ends_with',
             0,
             'haystack'
         );
-        $needleStr = VmString::coerceStringBuiltinArg(
+        $needleStr = VmString::requireStringBuiltinArg(
             $frame->calledArgs[1],
             'str_ends_with',
             1,
@@ -55,8 +55,8 @@ final class str_ends_with extends Internal
         if (!$this->requireExactJitArgCount($context, $args, 'str_ends_with', 2)) {
             return $context->getTypeFromString('int1')->constInt(0, false);
         }
-        $hay = JitStringBuiltinArg::lower($context, $args[0], 'str_ends_with', 0, 'haystack');
-        $needle = JitStringBuiltinArg::lower($context, $args[1], 'str_ends_with', 1, 'needle');
+        $hay = JitStringBuiltinArg::lowerRequiredString($context, $args[0], 'str_ends_with', 0, 'haystack');
+        $needle = JitStringBuiltinArg::lowerRequiredString($context, $args[1], 'str_ends_with', 1, 'needle');
         $hayMap = $context->structFieldMap[$hay->typeOf()->getElementType()->getName()];
         $needleMap = $context->structFieldMap[$needle->typeOf()->getElementType()->getName()];
         $hayLen = $context->builder->load($context->builder->structGep($hay, $hayMap['length']));

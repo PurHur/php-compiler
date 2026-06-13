@@ -80,6 +80,32 @@ final class VmString
     }
 
     /**
+     * Require a string builtin operand (php-src Z_PARAM_STR; string type only, #5018).
+     *
+     * @throws \TypeError when the operand is not a string like Zend PHP 8.x
+     */
+    public static function requireStringBuiltinArg(
+        Variable $var,
+        string $function,
+        int $argIndex = 0,
+        string $paramName = 'string'
+    ): string {
+        $var = $var->resolveIndirect();
+        if (Variable::TYPE_STRING !== $var->type) {
+            throw new \TypeError(
+                self::stringBuiltinTypeError(
+                    $function,
+                    $argIndex,
+                    $paramName,
+                    VmStreamArg::debugTypeName($var)
+                )
+            );
+        }
+
+        return $var->toString();
+    }
+
+    /**
      * Coerce a path builtin operand (php-src Z_PARAM_PATH; rejects embedded NUL, #4401).
      *
      * @throws \ValueError when the path contains a null byte
