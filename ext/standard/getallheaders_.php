@@ -14,13 +14,15 @@ use PHPCompiler\Web\Superglobals;
 use PHPLLVM\Value;
 
 /**
- * getallheaders() — request headers from $_SERVER HTTP_* entries (issue #307).
+ * getallheaders() / apache_request_headers() — request headers from $_SERVER HTTP_* entries.
+ *
+ * php-src: ext/standard/head.c — PHP_FUNCTION(getallheaders), PHP_FUNCTION(apache_request_headers)
  */
 final class getallheaders_ extends Internal
 {
-    public function __construct()
+    public function __construct(string $name = 'getallheaders')
     {
-        parent::__construct('getallheaders');
+        parent::__construct($name);
     }
 
     public function execute(Frame $frame): void
@@ -41,7 +43,7 @@ final class getallheaders_ extends Internal
     public function call(Context $context, JITVariable ...$args): Value
     {
         if (\count($args) > 0) {
-            throw new \LogicException('getallheaders() takes no arguments');
+            throw new \LogicException($this->getName().'() takes no arguments');
         }
 
         return JitGetallheaders::invoke($context);
