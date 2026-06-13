@@ -53,6 +53,45 @@ final class JitGrapheme
     /**
      * @param JITVariable[] $args
      */
+    public static function tryStriposFold(Context $context, array $args): ?Value
+    {
+        return self::tryPosFoldInternal($context, $args, static fn (string $h, string $n, int $o): int|false => VmGrapheme::stripos($h, $n, $o));
+    }
+
+    /**
+     * @param JITVariable[] $args
+     */
+    public static function tryStrrposFold(Context $context, array $args): ?Value
+    {
+        return self::tryPosFoldInternal($context, $args, static fn (string $h, string $n, int $o): int|false => VmGrapheme::strrpos($h, $n, $o));
+    }
+
+    /**
+     * @param JITVariable[] $args
+     * @param callable(string, string, int): (int|false) $search
+     */
+    private static function tryPosFoldInternal(Context $context, array $args, callable $search): ?Value
+    {
+        $hay = self::compileTimeString($args, 0);
+        $needle = self::compileTimeString($args, 1);
+        if (null === $hay || null === $needle) {
+            return null;
+        }
+        $offset = self::compileTimeInt($args, 2);
+        if (null === $offset) {
+            return null;
+        }
+        $result = $search($hay, $needle, $offset);
+        if (false === $result) {
+            return $context->getTypeFromString('bool')->constInt(0, false);
+        }
+
+        return $context->constantFromInteger($result, 'int64');
+    }
+
+    /**
+     * @param JITVariable[] $args
+     */
     public static function tryStrstrFold(Context $context, array $args, bool $caseInsensitive): ?Value
     {
         $hay = self::compileTimeString($args, 0);
@@ -113,6 +152,26 @@ final class JitGrapheme
         }
 
         return $args[$index]->compileTimeString ?? null;
+    }
+
+    /**
+     * @param JITVariable[] $args
+     */
+    private static function compileTimeInt(array $args, int $index): ?int
+    {
+        if (!isset($args[$index])) {
+            return 0;
+        }
+        $arg = $args[$index];
+        if (JITVariable::TYPE_NATIVE_LONG !== $arg->type || JITVariable::KIND_VALUE !== $arg->kind) {
+            return null;
+        }
+        $const = $arg->value;
+        if ($const instanceof Value && $const->isConstant()) {
+            return (int) $const->constInt();
+        }
+
+        return null;
     }
 
     /**
