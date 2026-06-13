@@ -7,6 +7,7 @@ namespace PHPCompiler\ext\standard;
 use PHPCompiler\Frame;
 use PHPCompiler\VM;
 use PHPCompiler\VM\Context;
+use PHPCompiler\VM\ForeachIterator;
 use PHPCompiler\VM\Variable;
 
 /**
@@ -116,7 +117,13 @@ final class VmIteratorWalk
             throw new \TypeError('iterator_apply(): Argument #3 must be of type array');
         }
         $out = [];
-        foreach ($paramsArray->toArray()->iterateKeyed(true) as [, $value]) {
+        // Preserve ref slots — iterateKeyed(true) would resolve before isIndirect() (#4547).
+        foreach ($paramsArray->toArray()->iterateKeyed(false) as [, $value]) {
+            if ($value->isIndirect()) {
+                $out[] = $value;
+
+                continue;
+            }
             $copy = new Variable();
             $copy->copyFrom($value);
             $out[] = $copy;
@@ -135,14 +142,14 @@ final class VmIteratorWalk
         Variable $key,
         array $params
     ): bool {
+        unset($value, $key);
         $callback = $callback->resolveIndirect();
         if (VmClosureCall::isClosure($callback)) {
             if (null === $frame->vmContext) {
                 throw new \LogicException('iterator_apply() requires VM context in this compiler build');
             }
             $closure = VmClosureCall::resolve($callback);
-            $args = [$value, $key, ...$params];
-            $result = VmClosureCall::invoke($frame->vmContext, $closure, ...$args);
+            $result = VmClosureCall::invoke($frame->vmContext, $closure, ...$params);
 
             return self::applyCallbackTruthy($result);
         }
@@ -151,9 +158,17 @@ final class VmIteratorWalk
                 'iterator_apply(): Argument #2 must be a valid callback in this compiler build'
             );
         }
-        $fn = VmInternalCall::resolveStringCallback($callback->toString());
-        $args = [$value, $key, ...$params];
-        $result = VmInternalCall::invoke($fn, ...$args);
+        $name = $callback->toString();
+        try {
+            $fn = VmInternalCall::resolveStringCallback($name);
+            $result = VmInternalCall::invoke($fn, ...$params);
+        } catch (\LogicException) {
+            if (null === $frame->vmContext) {
+                throw new \LogicException('iterator_apply() requires VM context in this compiler build');
+            }
+            $fn = VmUserCall::resolveStringCallback($frame->vmContext, $name);
+            $result = VmUserCall::invokeArgs($frame->vmContext, $fn, ...$params);
+        }
 
         return self::applyCallbackTruthy($result);
     }

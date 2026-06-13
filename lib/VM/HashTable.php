@@ -1910,7 +1910,11 @@ final class HashTable {
         $bucket->hash = $hash;
         $bucket->value->next = $this->indexes->read($hash);
         $this->indexes->write($hash, $id);
-        $bucket->value->copyFrom($data);
+        if ($data->isIndirect()) {
+            $bucket->value->duplicateFrom($data);
+        } else {
+            $bucket->value->copyFrom($data);
+        }
         if (is_null($key) && $hash >= $this->nextFreeElement) {
             $this->nextFreeElement = $hash + 1;
         }

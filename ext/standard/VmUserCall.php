@@ -58,4 +58,21 @@ final class VmUserCall
 
         return $context->runtime->vm->invokePhpFunction($func, $argA, $argB);
     }
+
+    public static function invokeArgs(Context $context, Func\PHP $func, Variable ...$args): Variable
+    {
+        $copies = [];
+        foreach ($args as $arg) {
+            if ($arg->isIndirect()) {
+                $copies[] = $arg;
+
+                continue;
+            }
+            $copy = new Variable();
+            $copy->copyFrom($arg);
+            $copies[] = $copy;
+        }
+
+        return $context->runtime->vm->invokePhpFunction($func, ...$copies);
+    }
 }
