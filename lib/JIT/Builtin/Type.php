@@ -1077,6 +1077,30 @@ class Type extends Builtin {
             $fntypeSessionApply
         );
         $this->context->registerFunction('__phpc_session_abort_apply', $fnSessionAbort);
+        $fnSessionEncode = $this->context->module->addFunction(
+            '__phpc_session_encode_apply',
+            $fntypeSessionApply
+        );
+        $this->context->registerFunction('__phpc_session_encode_apply', $fnSessionEncode);
+        $fnSessionDecode = $this->context->module->addFunction(
+            '__phpc_session_decode_apply',
+            $this->context->context->functionType($void, false, $valuePtr, $strPtr)
+        );
+        $this->context->registerFunction('__phpc_session_decode_apply', $fnSessionDecode);
+        $fnSessionEncodeWire = $this->context->module->addFunction(
+            'phpc_session_encode_wire',
+            $this->context->context->functionType($strPtr, false, $this->context->getTypeFromString('__hashtable__*'))
+        );
+        $this->context->registerFunction('phpc_session_encode_wire', $fnSessionEncodeWire);
+        $fnSessionDecodeWire = $this->context->module->addFunction(
+            'phpc_session_decode_wire',
+            $this->context->context->functionType(
+                $this->context->getTypeFromString('__hashtable__*'),
+                false,
+                $strPtr
+            )
+        );
+        $this->context->registerFunction('phpc_session_decode_wire', $fnSessionDecodeWire);
         SessionStart::registerRuntimeDeclaration($this->context);
         $fntypeJsonEncodeValue = $this->context->context->functionType(
             $this->context->getTypeFromString('__string__*'),
@@ -1269,6 +1293,7 @@ class Type extends Builtin {
         SessionId::implement($this->context);
         SessionName::implement($this->context);
         SessionModuleName::implement($this->context);
+        SessionEncodeRuntime::ensureLinked($this->context);
     }
 
     private function ensureExternalFunction(string $name, $fnType): void
