@@ -276,6 +276,59 @@ final class DateTimeSupport
         return self::tryNewDateTimeLikeVariable($ctx, self::CLASS_DATETIMEIMMUTABLE, $time, $timezone);
     }
 
+    /** php-src PHP_FUNCTION(date_create_from_format) — false on parse failure (#6172). */
+    public static function tryNewDateTimeFromFormatVariable(
+        Context $ctx,
+        string $format,
+        string $time,
+        ?ObjectEntry $timezone = null
+    ): ?Variable {
+        return self::tryNewDateTimeLikeFromFormatVariable($ctx, self::CLASS_DATETIME, $format, $time, $timezone);
+    }
+
+    /** php-src PHP_FUNCTION(date_create_immutable_from_format) — false on parse failure (#6172). */
+    public static function tryNewDateTimeImmutableFromFormatVariable(
+        Context $ctx,
+        string $format,
+        string $time,
+        ?ObjectEntry $timezone = null
+    ): ?Variable {
+        return self::tryNewDateTimeLikeFromFormatVariable($ctx, self::CLASS_DATETIMEIMMUTABLE, $format, $time, $timezone);
+    }
+
+    private static function tryNewDateTimeLikeFromFormatVariable(
+        Context $ctx,
+        string $classKey,
+        string $format,
+        string $time,
+        ?ObjectEntry $timezone
+    ): ?Variable {
+        $class = $ctx->classes[$classKey] ?? null;
+        if (null === $class) {
+            throw new \LogicException('DateTime is not registered in this compiler build');
+        }
+        $tzName = null !== $timezone
+            ? self::timezoneName($timezone)
+            : VmDate::defaultTimezoneGet();
+        try {
+            VmDateTimeNative::validateTimezoneId($tzName);
+        } catch (NativeDateInvalidTimeZoneException) {
+            return null;
+        }
+        $parsed = VmDateTimeNative::parseFromFormat($format, $time, $tzName);
+        if (false === $parsed) {
+            return null;
+        }
+        $entry = new ObjectEntry($class);
+        self::applyParsedState($entry, $parsed, $tzName);
+        $entry->constructed = true;
+        self::markDateTimeLikeInitialized($entry);
+        $var = new Variable(Variable::TYPE_OBJECT);
+        $var->object($entry);
+
+        return $var;
+    }
+
     private static function tryNewDateTimeLikeVariable(
         Context $ctx,
         string $classKey,

@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace PHPCompiler\ext\standard;
 
 use PHPCompiler\VM\DateTimeZoneSupport;
+use PHPCompiler\VM\NativeDateMalformedStringException;
 
 /**
  * Native DateTime/DateTimeZone semantics without host Zend \\DateTime (issue #6164).
@@ -135,22 +136,391 @@ final class VmDateTimeNative
     }
 
     /**
+     * php-src PHP_FUNCTION(date_parse) — associative component breakdown (#6172).
+     *
+     * @return array{
+     *   year: int|false,
+     *   month: int|false,
+     *   day: int|false,
+     *   hour: int|false,
+     *   minute: int|false,
+     *   second: int|false,
+     *   fraction: float|false,
+     *   warning_count: int,
+     *   warnings: array<int, string>,
+     *   error_count: int,
+     *   errors: array<int, string>,
+     *   is_localtime: bool
+     * }
+     */
+    public static function parseDate(string $date): array
+    {
+        $tzName = VmDate::defaultTimezoneGet();
+        try {
+            VmDateTimeNative::validateTimezoneId($tzName);
+            $parsed = self::parseDateTime($date, $tzName);
+
+            return self::parseResultFromTimestamp($parsed['timestamp'], $parsed['microsecond']);
+        } catch (NativeDateMalformedStringException) {
+            return self::failedParseResult([
+                0 => 'The timezone could not be found in the database',
+            ]);
+        }
+    }
+
+    /**
+     * php-src PHP_FUNCTION(date_parse_from_format) — format-string breakdown (#6172).
+     *
+     * @return array{
+     *   year: int|false,
+     *   month: int|false,
+     *   day: int|false,
+     *   hour: int|false,
+     *   minute: int|false,
+     *   second: int|false,
+     *   fraction: float|false,
+     *   warning_count: int,
+     *   warnings: array<int, string>,
+     *   error_count: int,
+     *   errors: array<int, string>,
+     *   is_localtime: bool
+     * }
+     */
+    public static function parseFromFormatComponents(string $format, string $time): array
+    {
+        $matched = self::matchFormatComponents($format, $time);
+        if (false === $matched) {
+            return self::failedParseResult([
+                0 => 'A four digit year could not be found',
+                3 => 'Not enough data available to satisfy format',
+            ]);
+        }
+
+        return self::parseResultFromComponents($matched);
+    }
+
+    /**
      * @return array{timestamp: int, microsecond: int}|false
      */
     public static function parseFromFormat(string $format, string $time, string $tzName): array|false
     {
-        if ('U.u' === $format) {
-            if (1 !== preg_match('/^(\d+)\.(\d+)$/', $time, $matches)) {
-                return false;
-            }
+        $matched = self::matchFormatComponents($format, $time);
+        if (false === $matched) {
+            return false;
+        }
+        $year = $matched['year'] ?? false;
+        $month = $matched['month'] ?? false;
+        $day = $matched['day'] ?? false;
+        if (false === $year || false === $month || false === $day) {
+            return false;
+        }
+        $hour = false === $matched['hour'] ? 0 : $matched['hour'];
+        $minute = false === $matched['minute'] ? 0 : $matched['minute'];
+        $second = false === $matched['second'] ? 0 : $matched['second'];
+        $microsecond = (int) \round(($matched['fraction'] ?? 0.0) * 1_000_000);
 
+        try {
             return [
-                'timestamp' => (int) $matches[1],
-                'microsecond' => (int) \str_pad(\substr($matches[2], 0, 6), 6, '0', STR_PAD_RIGHT),
+                'timestamp' => self::mktimeInTimezone($year, $month, $day, $hour, $minute, $second, $tzName),
+                'microsecond' => $microsecond,
             ];
+        } catch (NativeDateMalformedStringException) {
+            return false;
+        }
+    }
+
+    /**
+     * @param array<int, string> $errors
+     *
+     * @return array{
+     *   year: false,
+     *   month: false,
+     *   day: false,
+     *   hour: false,
+     *   minute: false,
+     *   second: false,
+     *   fraction: false,
+     *   warning_count: int,
+     *   warnings: array<int, string>,
+     *   error_count: int,
+     *   errors: array<int, string>,
+     *   is_localtime: bool
+     * }
+     */
+    private static function failedParseResult(array $errors): array
+    {
+        return [
+            'year' => false,
+            'month' => false,
+            'day' => false,
+            'hour' => false,
+            'minute' => false,
+            'second' => false,
+            'fraction' => false,
+            'warning_count' => 0,
+            'warnings' => [],
+            'error_count' => \count($errors),
+            'errors' => $errors,
+            'is_localtime' => false,
+        ];
+    }
+
+    /**
+     * @return array{
+     *   year: int|false,
+     *   month: int|false,
+     *   day: int|false,
+     *   hour: int|false,
+     *   minute: int|false,
+     *   second: int|false,
+     *   fraction: float|false,
+     *   warning_count: int,
+     *   warnings: array<int, string>,
+     *   error_count: int,
+     *   errors: array<int, string>,
+     *   is_localtime: bool
+     * }
+     */
+    private static function parseResultFromTimestamp(int $timestamp, int $microsecond): array
+    {
+        $tm = self::localtime($timestamp);
+        if (null === $tm) {
+            return self::failedParseResult([0 => 'The timezone could not be found in the database']);
         }
 
-        return false;
+        return self::parseResultFromComponents([
+            'year' => (int) $tm->tm_year + 1900,
+            'month' => (int) $tm->tm_mon + 1,
+            'day' => (int) $tm->tm_mday,
+            'hour' => (int) $tm->tm_hour,
+            'minute' => (int) $tm->tm_min,
+            'second' => (int) $tm->tm_sec,
+            'fraction' => $microsecond / 1_000_000,
+        ]);
+    }
+
+    /**
+     * @param array{
+     *   year: int|false,
+     *   month: int|false,
+     *   day: int|false,
+     *   hour: int|false,
+     *   minute: int|false,
+     *   second: int|false,
+     *   fraction: float|false
+     * } $components
+     *
+     * @return array{
+     *   year: int|false,
+     *   month: int|false,
+     *   day: int|false,
+     *   hour: int|false,
+     *   minute: int|false,
+     *   second: int|false,
+     *   fraction: float|false,
+     *   warning_count: int,
+     *   warnings: array<int, string>,
+     *   error_count: int,
+     *   errors: array<int, string>,
+     *   is_localtime: bool
+     * }
+     */
+    private static function parseResultFromComponents(array $components): array
+    {
+        return [
+            'year' => $components['year'],
+            'month' => $components['month'],
+            'day' => $components['day'],
+            'hour' => $components['hour'],
+            'minute' => $components['minute'],
+            'second' => $components['second'],
+            'fraction' => $components['fraction'],
+            'warning_count' => 0,
+            'warnings' => [],
+            'error_count' => 0,
+            'errors' => [],
+            'is_localtime' => false,
+        ];
+    }
+
+    /**
+     * @return array{
+     *   year: int|false,
+     *   month: int|false,
+     *   day: int|false,
+     *   hour: int|false,
+     *   minute: int|false,
+     *   second: int|false,
+     *   fraction: float
+     * }|false
+     */
+    private static function matchFormatComponents(string $format, string $time): array|false
+    {
+        $pos = 0;
+        $timeLen = \strlen($time);
+        $components = [
+            'year' => false,
+            'month' => false,
+            'day' => false,
+            'hour' => false,
+            'minute' => false,
+            'second' => false,
+            'fraction' => 0.0,
+        ];
+        $formatLen = \strlen($format);
+        for ($i = 0; $i < $formatLen; ++$i) {
+            $fc = $format[$i];
+            if ('\\' === $fc) {
+                if ($i + 1 >= $formatLen) {
+                    return false;
+                }
+                $literal = $format[++$i];
+                if ($pos >= $timeLen || $time[$pos] !== $literal) {
+                    return false;
+                }
+                ++$pos;
+
+                continue;
+            }
+            switch ($fc) {
+                case 'Y':
+                    $digits = self::readDigits($time, $pos, 4, 4);
+                    if (false === $digits) {
+                        return false;
+                    }
+                    $components['year'] = (int) $digits;
+
+                    break;
+                case 'y':
+                    $digits = self::readDigits($time, $pos, 2, 2);
+                    if (false === $digits) {
+                        return false;
+                    }
+                    $yy = (int) $digits;
+                    $components['year'] = $yy >= 69 ? 1900 + $yy : 2000 + $yy;
+
+                    break;
+                case 'm':
+                    $digits = self::readDigits($time, $pos, 2, 2);
+                    if (false === $digits) {
+                        return false;
+                    }
+                    $components['month'] = (int) $digits;
+
+                    break;
+                case 'n':
+                    $digits = self::readDigits($time, $pos, 1, 2);
+                    if (false === $digits) {
+                        return false;
+                    }
+                    $components['month'] = (int) $digits;
+
+                    break;
+                case 'd':
+                    $digits = self::readDigits($time, $pos, 2, 2);
+                    if (false === $digits) {
+                        return false;
+                    }
+                    $components['day'] = (int) $digits;
+
+                    break;
+                case 'j':
+                    $digits = self::readDigits($time, $pos, 1, 2);
+                    if (false === $digits) {
+                        return false;
+                    }
+                    $components['day'] = (int) $digits;
+
+                    break;
+                case 'H':
+                    $digits = self::readDigits($time, $pos, 2, 2);
+                    if (false === $digits) {
+                        return false;
+                    }
+                    $components['hour'] = (int) $digits;
+
+                    break;
+                case 'G':
+                    $digits = self::readDigits($time, $pos, 1, 2);
+                    if (false === $digits) {
+                        return false;
+                    }
+                    $components['hour'] = (int) $digits;
+
+                    break;
+                case 'i':
+                    $digits = self::readDigits($time, $pos, 2, 2);
+                    if (false === $digits) {
+                        return false;
+                    }
+                    $components['minute'] = (int) $digits;
+
+                    break;
+                case 's':
+                    $digits = self::readDigits($time, $pos, 2, 2);
+                    if (false === $digits) {
+                        return false;
+                    }
+                    $components['second'] = (int) $digits;
+
+                    break;
+                case 'u':
+                    $digits = self::readDigits($time, $pos, 1, 6);
+                    if (false === $digits) {
+                        return false;
+                    }
+                    $components['fraction'] = (int) \str_pad($digits, 6, '0', STR_PAD_RIGHT) / 1_000_000;
+
+                    break;
+                case 'U':
+                    $digits = self::readDigits($time, $pos, 1, null);
+                    if (false === $digits) {
+                        return false;
+                    }
+                    $tm = self::localtime((int) $digits);
+                    if (null === $tm) {
+                        return false;
+                    }
+                    $components['year'] = (int) $tm->tm_year + 1900;
+                    $components['month'] = (int) $tm->tm_mon + 1;
+                    $components['day'] = (int) $tm->tm_mday;
+                    $components['hour'] = (int) $tm->tm_hour;
+                    $components['minute'] = (int) $tm->tm_min;
+                    $components['second'] = (int) $tm->tm_sec;
+
+                    break;
+                default:
+                    if ($pos >= $timeLen || $time[$pos] !== $fc) {
+                        return false;
+                    }
+                    ++$pos;
+            }
+        }
+        if ($pos !== $timeLen) {
+            return false;
+        }
+
+        return $components;
+    }
+
+    private static function readDigits(string $time, int &$pos, int $min, ?int $max): string|false
+    {
+        $timeLen = \strlen($time);
+        $start = $pos;
+        while ($pos < $timeLen && \ctype_digit($time[$pos])) {
+            ++$pos;
+            if (null !== $max && $pos - $start >= $max) {
+                break;
+            }
+        }
+        $len = $pos - $start;
+        if ($len < $min) {
+            $pos = $start;
+
+            return false;
+        }
+
+        return \substr($time, $start, $len);
     }
 
     /**
