@@ -7,6 +7,7 @@ namespace PHPCompiler\JIT\Builtin;
 use PHPCompiler\JIT\Context;
 use PHPLLVM\Builder;
 use PHPLLVM\Value;
+use PHPLLVM\Value\BasicBlock;
 use PHPLLVM\Value\Function_ as LlvmFunction;
 
 /**
@@ -60,6 +61,7 @@ final class StreamIoJit
         self::ensureLibc($context);
 
         self::implementIfMissing($context, '__compiler_fwrite', self::emitFwrite(...));
+        self::implementIfMissing($context, '__phpc_try_fopen_stdio', self::emitTryFopenStdio(...));
         self::implementIfMissing($context, '__compiler_fopen', self::emitFopen(...));
         self::implementIfMissing($context, '__compiler_popen', self::emitPopen(...));
         self::implementIfMissing($context, '__compiler_tmpfile', self::emitTmpfile(...));
@@ -131,6 +133,10 @@ final class StreamIoJit
                 $name,
                 $context->context->functionType($strPtr, false, $i64, $i64)
             ),
+            '__phpc_try_fopen_stdio' => $context->module->addFunction(
+                $name,
+                $context->context->functionType($i8p, false, $i8p, $i8p)
+            ),
             default => throw new \LogicException('StreamIoJit: unknown '.$name),
         };
         $context->registerFunction($name, $fn);
@@ -162,6 +168,10 @@ final class StreamIoJit
             ['malloc', $i8p, [$sizeT]],
             ['fread', $sizeT, [$i8p, $sizeT, $sizeT, $i8p]],
             ['ferror', $i32, [$i8p]],
+            ['strcmp', $i32, [$i8p, $i8p]],
+            ['dup', $i32, [$i32]],
+            ['fdopen', $i8p, [$i32, $i8p]],
+            ['close', $i32, [$i32]],
         ] as [$name, $ret, $params]) {
             self::ensureExternal($context, $name, $context->context->functionType($ret, false, ...$params));
         }
@@ -354,6 +364,115 @@ final class StreamIoJit
         self::emitOpenHandle($context, $fn, withPath: true);
     }
 
+    /**
+     * __phpc_try_fopen_stdio(path, mode) — fdopen dup of fd 0/1/2 for php://stdin|stdout|stderr (#4648).
+     */
+    private static function emitTryFopenStdio(Context $context, LlvmFunction $fn): void
+    {
+        $entry = $fn->appendBasicBlock('stdio_try_entry');
+        $context->builder->positionAtEnd($entry);
+
+        $path = $fn->getParam(0);
+        $mode = $fn->getParam(1);
+        $i32 = $context->getTypeFromString('int32');
+        $i8p = $context->getTypeFromString('int8*');
+        $nullPtr = $i8p->constNull();
+        $zero = $i32->constInt(0, false);
+
+        $missBb = $fn->appendBasicBlock('stdio_try_miss');
+        $failBb = $fn->appendBasicBlock('stdio_try_fail');
+
+        /** @var list<array{uri: string, fd: int}> $stdio */
+        $stdio = [
+            ['uri' => 'php://stdin', 'fd' => 0],
+            ['uri' => 'php://stdout', 'fd' => 1],
+            ['uri' => 'php://stderr', 'fd' => 2],
+        ];
+        $nextMiss = $missBb;
+        foreach (array_reverse($stdio) as $entryDef) {
+            $checkBb = $fn->appendBasicBlock('stdio_try_check_'.$entryDef['fd']);
+            $matchBb = $fn->appendBasicBlock('stdio_try_match_'.$entryDef['fd']);
+            $context->builder->positionAtEnd($checkBb);
+            $cmp = $context->builder->call(
+                $context->lookupFunction('strcmp'),
+                $path,
+                self::literalCstr($context, $entryDef['uri'])
+            );
+            $isMatch = $context->builder->icmp(Builder::INT_EQ, $cmp, $zero);
+            $context->builder->branchIf($isMatch, $matchBb, $nextMiss);
+            $context->builder->positionAtEnd($matchBb);
+            $fp = self::fdopenDupStdio($context, $fn, $i32->constInt($entryDef['fd'], false), $mode, $failBb);
+            $context->builder->returnValue($fp);
+            $nextMiss = $checkBb;
+        }
+
+        $context->builder->positionAtEnd($entry);
+        $context->builder->branch($nextMiss);
+
+        $context->builder->positionAtEnd($missBb);
+        $context->builder->returnValue($nullPtr);
+
+        $context->builder->positionAtEnd($failBb);
+        $context->builder->returnValue($nullPtr);
+    }
+
+    private static function fdopenDupStdio(
+        Context $context,
+        LlvmFunction $fn,
+        Value $fd,
+        Value $mode,
+        BasicBlock $failReturnBb
+    ): Value {
+        $i32 = $context->getTypeFromString('int32');
+        $i8p = $context->getTypeFromString('int8*');
+        $nullPtr = $i8p->constNull();
+
+        $dupFd = $context->builder->call($context->lookupFunction('dup'), $fd);
+        $dupFail = $context->builder->icmp(Builder::INT_SLT, $dupFd, $i32->constInt(0, false));
+        $openBb = $fn->appendBasicBlock('stdio_fdopen');
+        $context->builder->branchIf($dupFail, $failReturnBb, $openBb);
+
+        $context->builder->positionAtEnd($openBb);
+        $fp = $context->builder->call(
+            $context->lookupFunction('fdopen'),
+            $dupFd,
+            $mode
+        );
+        $fpNull = $context->builder->icmp(Builder::INT_EQ, $fp, $nullPtr);
+        $closeDupBb = $fn->appendBasicBlock('stdio_fdopen_close_dup');
+        $okBb = $fn->appendBasicBlock('stdio_fdopen_ok');
+        $context->builder->branchIf($fpNull, $closeDupBb, $okBb);
+
+        $context->builder->positionAtEnd($closeDupBb);
+        $context->builder->call($context->lookupFunction('close'), $dupFd);
+        $context->builder->branch($failReturnBb);
+
+        $context->builder->positionAtEnd($okBb);
+
+        return $fp;
+    }
+
+    private static function literalCstr(Context $context, string $text): Value
+    {
+        $i8 = $context->getTypeFromString('int8');
+        $chars = [$i8->constInt(0, false)];
+        for ($i = \strlen($text) - 1; $i >= 0; --$i) {
+            $chars[] = $i8->constInt(\ord($text[$i]), false);
+        }
+        $arr = $i8->constArray($chars);
+        $name = 'phpc_stdio_lit_'.substr(hash('sha256', $text), 0, 12);
+        $existing = $context->module->getNamedGlobal($name);
+        if (null !== $existing) {
+            return $context->builder->pointerCast($existing, $context->getTypeFromString('int8*'));
+        }
+        $global = $context->module->addGlobal($arr, $name);
+        $global->setUnnamedAddr(true);
+        $global->setLinkage(\PHPLLVM\Value::LINKAGE_PRIVATE);
+        $global->setInitializer($arr);
+
+        return $context->builder->pointerCast($global, $context->getTypeFromString('int8*'));
+    }
+
     private static function emitPopen(Context $context, LlvmFunction $fn): void
     {
         $prefix = 'popen';
@@ -474,11 +593,30 @@ final class StreamIoJit
             $context->builder->branchIf($badArgs, $failBb, $openBb);
 
             $context->builder->positionAtEnd($openBb);
-            $fp = $context->builder->call(
+            $stdioFp = $context->builder->call(
+                $context->lookupFunction('__phpc_try_fopen_stdio'),
+                self::stringData($context, $path),
+                self::stringData($context, $mode)
+            );
+            $plainBb = $fn->appendBasicBlock($prefix.'_plain');
+            $mergeBb = $fn->appendBasicBlock($prefix.'_fp_merge');
+            $stdioNull = $context->builder->icmp(Builder::INT_EQ, $stdioFp, $nullPtr);
+            $context->builder->branchIf($stdioNull, $plainBb, $mergeBb);
+
+            $context->builder->positionAtEnd($plainBb);
+            $plainFp = $context->builder->call(
                 $context->lookupFunction('fopen'),
                 self::stringData($context, $path),
                 self::stringData($context, $mode)
             );
+            $context->builder->branch($mergeBb);
+
+            $context->builder->positionAtEnd($mergeBb);
+            $fpPhi = $context->builder->phi($i8p, $prefix.'_fp');
+            $fpPhi->addIncoming($stdioFp, $openBb);
+            $plainEnd = $context->builder->getInsertBlock();
+            $fpPhi->addIncoming($plainFp, $plainEnd);
+            $fp = $fpPhi;
         } else {
             $context->builder->branch($openBb);
 
