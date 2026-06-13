@@ -93,7 +93,10 @@ if [[ "${BOOTSTRAP_M4_LINK_COMPILE_DRIVER:-0}" == "1" ]]; then
   m4_link_env=()
   m4_link_mode="stub"
   if [[ "${BOOTSTRAP_M4_COMPILE_DRIVER_REAL_LOWERING:-${BOOTSTRAP_M3_COMPILE_DRIVER_REAL_LOWERING:-1}}" == "1" ]]; then
-    m4_link_env=(env PHP_COMPILER_SELFHOST_AOT=1 PHP_COMPILER_M3_COMPILE_DRIVER=1 PHP_COMPILER_EMIT_HELPER_LINK=1 PHP_COMPILER_M3_INVENTORY_EMIT_DRIVER=1 BOOTSTRAP_M3_USE_INVENTORY_EMIT_DRIVER=1 PHP_COMPILER_M3_EMIT_LOG_PREFIX=helloworld_compile_smoke)
+    # Zend inventory emit link — mirror M3 helloworld probe / helloworld-compile-bin (#3032).
+    # Post-M2 inventory argv driver (bin-compile-aot-inventory) can bake stub "ready" {main}
+    # when invoked via bootstrap_compile_invoke; bootstrap-loop-probe then exits 2 (#1498).
+    m4_link_env=(env PHP_COMPILER_SELFHOST_AOT=1 PHP_COMPILER_M3_COMPILE_DRIVER=1 PHP_COMPILER_EMIT_HELPER_LINK=1 PHP_COMPILER_M3_COMPILE_DRIVER_MAIN=1 PHP_COMPILER_M3_INVENTORY_EMIT_DRIVER=1 BOOTSTRAP_M3_USE_INVENTORY_EMIT_DRIVER=1 PHP_COMPILER_M3_EMIT_LOG_PREFIX=helloworld_compile_smoke)
     m4_link_mode="inventory compile_driver (#3032)"
     m4_emit_entry="${INVENTORY_EMIT_DRIVER}"
   else
@@ -104,8 +107,17 @@ if [[ "${BOOTSTRAP_M4_LINK_COMPILE_DRIVER:-0}" == "1" ]]; then
   rm -f "${EMIT_HELPER}" "build/.last-jit-func-bootstrap-loop-gen1-emit"
   export PHP_COMPILER_JIT_PROGRESS_FILE="build/.last-jit-func-bootstrap-loop-gen1-emit"
   set +e
-  bootstrap_compile_invoke "${EMIT_HELPER}" "${m4_emit_entry}" "${m4_link_env[@]}" >/dev/null 2>&1
-  emit_link_code=$?
+  if [[ "${BOOTSTRAP_M4_COMPILE_DRIVER_REAL_LOWERING:-${BOOTSTRAP_M3_COMPILE_DRIVER_REAL_LOWERING:-1}}" == "1" ]]; then
+    emit_link_out="$(
+      "${m4_link_env[@]}" php "${ROOT}/bin/compile.php" -o "${EMIT_HELPER}" "${m4_emit_entry}" 2>&1
+    )"
+    emit_link_code=$?
+  else
+    emit_link_out="$(
+      bootstrap_compile_invoke "${EMIT_HELPER}" "${m4_emit_entry}" "${m4_link_env[@]}" 2>&1
+    )"
+    emit_link_code=$?
+  fi
   set -e
   if [[ -x "${EMIT_HELPER}" ]]; then
     echo "bootstrap-loop-gen1-link: emit helper link OK (${ROOT}/${EMIT_HELPER}, ${m4_link_mode})"
