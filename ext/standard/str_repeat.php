@@ -16,7 +16,6 @@ use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\Variable as JITVariable;
-use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
 
 /**
@@ -35,11 +34,13 @@ final class str_repeat extends Internal
             0,
             'string'
         );
-        $mult = $frame->calledArgs[1]->resolveIndirect();
-        if (Variable::TYPE_INTEGER !== $mult->type) {
-            throw new \LogicException('str_repeat() multiplier must be an integer in this compiler build');
-        }
-        $result = VmString::repeat($input, $mult->toInt());
+        $times = VmMath::parseIntBuiltinArg(
+            $frame->calledArgs[1],
+            'str_repeat',
+            2,
+            'times'
+        );
+        $result = VmString::repeat($input, $times);
         if (null === $frame->returnVar) {
             return;
         }
@@ -54,10 +55,7 @@ final class str_repeat extends Internal
         if (2 !== count($args)) {
             throw new \LogicException('str_repeat() requires exactly two arguments');
         }
-        if (JITVariable::TYPE_NATIVE_LONG !== $args[1]->type) {
-            throw new \LogicException('str_repeat() multiplier must be an integer in this compiler build');
-        }
-        $multiplier = $context->helper->loadValue($args[1]);
+        $multiplier = JitIntdiv::lowerIntBuiltinArg($context, $args[1], 'str_repeat', 2, 'times');
         JitStrRepeat::emitRuntimeTimesGuard($context, $multiplier);
 
         return JitStrRepeat::repeat(
