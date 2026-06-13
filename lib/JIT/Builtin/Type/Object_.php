@@ -1040,6 +1040,18 @@ class Object_ extends Type {
         }
         foreach ($this->propertyDefaults[$classId] as $slotIndex => $entry) {
             $slot = $this->propertySlotPtr($obj, $slotIndex);
+            if (!empty($entry['emptyArray'])) {
+                $ht = HashTableHelper::alloc($this->context);
+                $emptyHt = new Variable(
+                    $this->context,
+                    Variable::TYPE_HASHTABLE,
+                    Variable::KIND_VALUE,
+                    $ht
+                );
+                $this->propertyStore($slot, $emptyHt, $entry['propertyType']);
+
+                continue;
+            }
             $constEntry = isset($entry['global'])
                 ? ['type' => $entry['type'], 'global' => $entry['global']]
                 : ['type' => $entry['type'], 'value' => $entry['value']];
@@ -3279,7 +3291,20 @@ class Object_ extends Type {
     public function definePropertyDefault(int $classId, string $name, VMVariable $value): void
     {
         if (VMVariable::TYPE_ARRAY === $value->type) {
-            return;
+            foreach ($this->properties[$classId] as $propset) {
+                if ($propset[1] !== $name) {
+                    continue;
+                }
+                // Per-instance empty array default (Zend zend_objects.c; bootstrap array_value_box).
+                $this->propertyDefaults[$classId][$propset[3]] = [
+                    'propertyType' => $propset[2],
+                    'type' => Variable::TYPE_HASHTABLE,
+                    'emptyArray' => true,
+                ];
+
+                return;
+            }
+            throw new \LogicException("Property {$name} not defined for class {$classId}");
         }
         foreach ($this->properties[$classId] as $propset) {
             if ($propset[1] !== $name) {
