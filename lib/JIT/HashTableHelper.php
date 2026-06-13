@@ -1563,9 +1563,7 @@ final class HashTableHelper
         Variable $element
     ): void {
         $tag = (string) self::nextSeq();
-        $valuePtr = Variable::KIND_VARIABLE === $element->kind
-            ? JitValueBox::pointer($context, $element->value)
-            : $element->value;
+        $valuePtr = JitValueBox::valuePtrFromVariable($context, $element);
         $map = $context->structFieldMap['__value__'];
         $typeByte = $context->builder->load(
             $context->builder->structGep($valuePtr, $map['type'])
@@ -1872,9 +1870,7 @@ final class HashTableHelper
         Variable $element
     ): void {
         $tag = (string) self::nextSeq();
-        $valuePtr = Variable::KIND_VARIABLE === $element->kind
-            ? JitValueBox::pointer($context, $element->value)
-            : $element->value;
+        $valuePtr = JitValueBox::valuePtrFromVariable($context, $element);
         $map = $context->structFieldMap['__value__'];
         $typeByte = $context->builder->load(
             $context->builder->structGep($valuePtr, $map['type'])
@@ -2014,9 +2010,7 @@ final class HashTableHelper
                 );
                 break;
             case Variable::TYPE_VALUE:
-                $valuePtr = Variable::KIND_VARIABLE === $element->kind
-                    ? JitValueBox::pointer($context, $element->value)
-                    : $element->value;
+                $valuePtr = JitValueBox::valuePtrFromVariable($context, $element);
                 $str = $context->builder->call(
                     $context->lookupFunction('__value__readString'),
                     $valuePtr

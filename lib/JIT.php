@@ -7739,8 +7739,13 @@ class JIT {
                             Variable::KIND_VALUE,
                             $this->context->type->object->allocate($classId)
                         );
-                        $ht = $this->context->type->object->splBackingHashtable($obj);
-                        $this->assignOperand($block->getOperand($op->arg1), $ht, true);
+                        $resultOp = $block->getOperand($op->arg1);
+                        $this->assignOperand($resultOp, $obj, true);
+                        $resultOp->type = new Type(Type::TYPE_OBJECT, [], 'SplObjectStorage');
+                        $this->context->type->object->markObjectConstructed(
+                            $this->context->helper->loadValue($obj)
+                        );
+                        $this->context->scope->preserveNewResultOnNullCall = true;
                         $this->context->scope->toCall = null;
                         $this->context->scope->args = [];
                     } else {
