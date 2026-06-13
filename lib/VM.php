@@ -981,17 +981,7 @@ class VM {
      */
     public function invokeForeachInstanceMethod(Frame $_parentFrame, Variable $receiver, string $methodName): Variable
     {
-        $methodLc = strtolower($methodName);
-        $object = $receiver->toObject();
-        $class = $object->class;
-        if (!isset($class->methods[$methodLc])) {
-            throw new \LogicException("Call to undefined method {$class->name}::{$methodLc}()");
-        }
-
-        $recv = new Variable();
-        $recv->copyFrom($receiver);
-
-        return $this->invokePhpFunction($class->methods[$methodLc], $recv);
+        return $this->invokeInstanceMethod($receiver->toObject(), $methodName);
     }
 
     /**
@@ -1912,6 +1902,9 @@ class VM {
             }
             $before = $value;
             $this->invokeForeachInstanceMethod($frame, $object, 'next');
+            if (!$this->invokeForeachInstanceMethod($frame, $object, 'valid')->toBool()) {
+                break;
+            }
             $after = $this->invokeForeachInstanceMethod($frame, $object, 'current')->resolveIndirect();
             if (self::iteratorStepStalled($before, $after) && $index > 0) {
                 break;

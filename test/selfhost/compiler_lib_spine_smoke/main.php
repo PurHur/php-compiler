@@ -2129,6 +2129,7 @@ require_once __DIR__.'/../../../ext/sockets/VmSocketArg.php';
 require_once __DIR__.'/../../../ext/sockets/VmSockets.php';
 require_once __DIR__.'/../../../ext/sockets/socket_atmark.php';
 require_once __DIR__.'/../../../ext/sockets/socket_import_stream.php';
+require_once __DIR__.'/../../../ext/spl/ArrayIteratorBuiltin.php';
 require_once __DIR__.'/../../../ext/spl/BuiltinClasses.php';
 require_once __DIR__.'/../../../ext/spl/EmptyIteratorBuiltin.php';
 require_once __DIR__.'/../../../ext/spl/Module.php';

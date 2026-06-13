@@ -17,6 +17,7 @@ final class VmSplIterators
         self::registerRecursiveIteratorInterface($ctx);
         self::registerOuterIteratorInterface($ctx);
         EmptyIteratorBuiltin::registerClass($ctx);
+        ArrayIteratorBuiltin::registerClass($ctx);
         RecursiveArrayIteratorBuiltin::registerClass($ctx);
     }
 
