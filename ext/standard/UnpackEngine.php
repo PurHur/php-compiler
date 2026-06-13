@@ -441,15 +441,11 @@ final class UnpackEngine
         $size = \in_array($code, ['f', 'g', 'G'], true) ? 4 : 8;
         $slice = \substr($data, $pos, $size);
         $le = self::ieeeLittleEndian($code);
-        $machineLe = self::machineLe();
-        if (null === $le) {
-            return 4 === $size ? \unpack('f', $slice)[1] : \unpack('d', $slice)[1];
-        }
-        if ($le !== $machineLe) {
-            $slice = \strrev($slice);
-        }
+        $little = null === $le ? self::machineLe() : $le;
 
-        return 4 === $size ? \unpack('f', $slice)[1] : \unpack('d', $slice)[1];
+        return 4 === $size
+            ? Ieee754::decodeFloat32($slice, $little)
+            : Ieee754::decodeFloat64($slice, $little);
     }
 
     /** @return array{0: bool, 1: bool} little-endian, signed */
