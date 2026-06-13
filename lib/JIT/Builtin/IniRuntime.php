@@ -272,7 +272,6 @@ final class IniRuntime
         $deBb = $fn->appendBasicBlock('is_de');
         $mlBb = $fn->appendBasicBlock('is_ml');
         $spBb = $fn->appendBasicBlock('is_sp');
-        $mlRejectBb = $fn->appendBasicBlock('is_ml_reject');
         $mlApplyBb = $fn->appendBasicBlock('is_ml_apply');
         $testEr = $fn->appendBasicBlock('is_test_er');
         $testDe = $fn->appendBasicBlock('is_test_de');
@@ -329,22 +328,11 @@ final class IniRuntime
         $context->builder->returnVoid();
 
         $context->builder->positionAtEnd($mlBb);
-        $minusOnePtr = $context->builder->pointerCast($context->constantFromString('-1'), $i8p);
-        $isUnlimited = $context->builder->icmp(
-            Builder::INT_EQ,
-            $context->builder->call($context->lookupFunction('strcmp'), $valCstr, $minusOnePtr),
-            $i32->constInt(0, false)
-        );
-        $context->builder->branchIf($isUnlimited, $mlRejectBb, $mlApplyBb);
+        $context->builder->branch($mlApplyBb);
 
         $context->builder->positionAtEnd($mlApplyBb);
         self::writeValueStringFromMemoryLimitGlobal($context, $out);
         self::storeMemoryLimitFromCstr($context, $valCstr);
-        self::freeCstrPair($context, $fn, $optCstr, $valCstr);
-        $context->builder->returnVoid();
-
-        $context->builder->positionAtEnd($mlRejectBb);
-        self::writeValueBoolFalse($context, $out);
         self::freeCstrPair($context, $fn, $optCstr, $valCstr);
         $context->builder->returnVoid();
 
