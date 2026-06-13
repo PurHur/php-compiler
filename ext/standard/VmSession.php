@@ -451,7 +451,7 @@ final class VmSession
 
             return;
         }
-        $decoded = @unserialize($raw);
+        $decoded = VmUnserializeFormat::decodePayload($raw);
         if (!is_array($decoded)) {
             $sessionVar->array(new HashTable());
 

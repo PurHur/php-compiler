@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace PHPCompiler\ext\sockets;
 
+use PHPCompiler\ext\standard\VmFsPathNative;
 use PHPCompiler\Frame;
 use PHPCompiler\VM\ErrorReporter;
 use PHPCompiler\VM\ObjectEntry;
@@ -105,8 +106,8 @@ final class VmSockets
     {
         $out = [];
         foreach (glob('/proc/self/fd/*') ?: [] as $path) {
-            $target = @readlink($path);
-            if (!\is_string($target) || !str_starts_with($target, 'socket:')) {
+            $target = VmFsPathNative::readlink($path);
+            if (false === $target || !str_starts_with($target, 'socket:')) {
                 continue;
             }
             $out[(int) basename($path)] = $target;
