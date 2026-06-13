@@ -8,19 +8,20 @@ use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Builtin\TypeErrorRaise;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\JitStringArg;
 use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\ErrorReporter;
 use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
 
-/** define() — register a user constant at runtime (issue #204). */
+/** define() — register a user constant at runtime (issue #204, JIT #4435). */
 final class define_ extends Internal
 {
-    private const MSG_CASE_INSENSITIVE_IGNORED =
+    public const MSG_CASE_INSENSITIVE_IGNORED =
         'define(): Argument #3 ($case_insensitive) is ignored since declaration of case-insensitive constants is no longer supported';
 
-    private const MSG_CLASS_CONSTANT =
+    public const MSG_CLASS_CONSTANT =
         'define(): Argument #1 ($constant_name) cannot be a class constant';
 
     public function __construct()
@@ -63,10 +64,16 @@ final class define_ extends Internal
         if (JITVariable::TYPE_VALUE === $args[0]->type || JITVariable::TYPE_OBJECT === $args[0]->type) {
             JitStringBuiltinArg::lower($context, $args[0], 'define', 0, 'constant_name');
         }
-        if (JITVariable::TYPE_STRING !== $args[0]->type || null === $args[0]->compileTimeString) {
-            throw new \LogicException('define() constant name must be a string literal in this compiler build');
+        if (\count($args) >= 3
+            && (JITVariable::TYPE_NATIVE_BOOL !== $args[2]->type || null === $args[2]->value->value)) {
+            throw new \LogicException('define() case_insensitive must be a boolean literal in this compiler build');
         }
-        $name = $args[0]->compileTimeString;
+
+        return JitDefine::invoke($context, $args[0], $args[1]);
+    }
+
+    public static function invokeLiteral(Context $context, string $name, JITVariable $valueArg): Value
+    {
         if (str_contains($name, '::')) {
             TypeErrorRaise::registerDeclarations($context);
             TypeErrorRaise::ensureLinked($context);
@@ -76,17 +83,14 @@ final class define_ extends Internal
 
             return $i1->constInt(0, false);
         }
-        $value = self::compileTimeVmVariable($context, $args[1]);
-        if (\count($args) >= 3
-            && (JITVariable::TYPE_NATIVE_BOOL !== $args[2]->type || null === $args[2]->value->value)) {
-            throw new \LogicException('define() case_insensitive must be a boolean literal in this compiler build');
-        }
-        if (!$context->runtime->vmContext->defineConstant($name, $value)) {
-            throw new \LogicException("Cannot redefine constant {$name}");
+        $value = self::compileTimeVmVariable($context, $valueArg);
+        $ok = true;
+        if (null !== $context->runtime->vmContext) {
+            $ok = $context->runtime->vmContext->defineConstant($name, $value);
         }
         $i1 = $context->getTypeFromString('int1');
 
-        return $i1->constInt(1, false);
+        return $i1->constInt($ok ? 1 : 0, false);
     }
 
     private static function compileTimeVmVariable(Context $context, JITVariable $arg): Variable

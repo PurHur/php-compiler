@@ -1294,6 +1294,7 @@ class Type extends Builtin {
         SessionName::implement($this->context);
         SessionModuleName::implement($this->context);
         SessionEncodeRuntime::ensureLinked($this->context);
+        DefineRuntime::ensureLinked($this->context);
     }
 
     private function ensureExternalFunction(string $name, $fnType): void
