@@ -1431,7 +1431,7 @@ function renderMiniWebAppOopNorthStarMarkdown(array $rows): string
     $lines[] = '';
     $lines[] = '_OOP rows are curated from ROADMAP issue state; methods [#58](' . CAPABILITY_ISSUE_URL_BASE
         . '58); visibility/ctor [#145](' . CAPABILITY_ISSUE_URL_BASE . '145); return types [#55]('
-        . CAPABILITY_ISSUE_URL_BASE . '55). Opt-in gates: `MINIWEBAPP_VM_OOP_GATE` (#2189), '
+        . CAPABILITY_ISSUE_URL_BASE . '55). Gates: `MINIWEBAPP_VM_OOP_GATE` default-on (#2293), '
         . '`MINIWEBAPP_JIT_PROJECT_GATE` (#587); drift guard `CAPABILITIES_OOP_SYNC_GATE` (#2190)._';
     $lines[] = '';
 

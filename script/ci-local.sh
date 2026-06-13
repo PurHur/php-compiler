@@ -59,6 +59,8 @@ if [[ -z "${PHP_COMPILER_SKIP_SERVE_TESTS:-}" ]]; then
     ci_run_miniwebapp_web_smoke
   fi
 
+  ci_run_miniwebapp_vm_oop
+
   ci_run_sessions_web_smoke
   ci_run_file_upload_web_smoke
   ci_run_throws_web_smoke

@@ -445,11 +445,11 @@ final class Doctor
             ? 'ci-fast/ci-local MiniWebAppJitProjectTest when LLVM ready (#587, #730)'
             : 'opt-out — MINIWEBAPP_JIT_PROJECT_GATE=0 skips project JIT (#730)';
         fwrite(STDOUT, '  003 project JIT  MINIWEBAPP_JIT_PROJECT_GATE='.($jitProjectOn ? '1' : '0')." (default {$jitProjectDefault}) — {$jitProjectDetail}\n");
-        $vmOopDefault = $defaultsWeb['MINIWEBAPP_VM_OOP_GATE'] ?? '0';
+        $vmOopDefault = $defaultsWeb['MINIWEBAPP_VM_OOP_GATE'] ?? '1';
         $vmOopOn = self::gateEnabled('MINIWEBAPP_VM_OOP_GATE', $vmOopDefault);
         $vmOopDetail = $vmOopOn
-            ? 'opt-in when gate=1 — ci-fast check-miniwebapp-vm-oop.sh (#2189, #2059)'
-            : 'opt-in default 0 — MINIWEBAPP_VM_OOP_GATE=1 for VM serve OOP curls (#2189)';
+            ? 'ci-fast + ci-local check-miniwebapp-vm-oop.sh (#2189, #2059, #2293)'
+            : 'opt-out — MINIWEBAPP_VM_OOP_GATE=0 skips VM serve OOP curls (#2293)';
         fwrite(STDOUT, '  003 VM OOP e2e  MINIWEBAPP_VM_OOP_GATE='.($vmOopOn ? '1' : '0')." (default {$vmOopDefault}) — {$vmOopDetail}\n");
         fwrite(STDOUT, "  Full AOT tail    ./script/ci-local.sh --filter MiniWebAppAotExecuteTest   LLVM required\n");
         fwrite(STDOUT, "  Presenter bundle make north-star1-verify            --require-llvm / --skip-llvm-tail\n");
