@@ -29,7 +29,11 @@ final class SessionLifecycleRuntimeStandaloneTest extends TestCase
                 '__phpc_session_regenerate_id_apply',
                 '__phpc_session_destroy_apply',
                 '__phpc_session_abort_apply',
+                '__phpc_session_reset_apply',
+                '__phpc_session_create_id_apply',
+                '__phpc_session_gc_apply',
                 '__phpc_session_generate_new_id',
+                'phpc_session_random_id_string',
             ] as $name
         ) {
             $fn = $ctx->lookupFunction($name);

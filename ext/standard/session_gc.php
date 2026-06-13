@@ -52,7 +52,7 @@ class session_gc extends Internal
             throw new \LogicException('session_gc() expects exactly 0 arguments in this compiler build');
         }
 
-        throw new \LogicException('session_gc() not implemented for JIT');
+        return JitSessionGc::invoke($context);
     }
 
     private function triggerWarning(Frame $frame, string $message): void

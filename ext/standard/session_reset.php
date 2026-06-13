@@ -36,6 +36,6 @@ class session_reset extends Internal
             throw new \LogicException('session_reset() expects exactly 0 arguments in this compiler build');
         }
 
-        throw new \LogicException('session_reset() not implemented for JIT');
+        return JitSessionReset::invoke($context);
     }
 }
