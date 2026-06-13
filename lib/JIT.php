@@ -23,6 +23,7 @@ require_once __DIR__.'/JIT/VmUnitProbeExecuteNative.php';
 use PHPCfg\Operand;
 use PHPCfg\Op;
 use PHPTypes\Type;
+use PHPCompiler\Compiler\AttributeClassRegistry;
 use PHPCompiler\Compiler\AttributeNames;
 use PHPCompiler\JIT\Builtin\AttributeRegistry;
 use PHPCompiler\JIT\Context;
@@ -7592,6 +7593,9 @@ class JIT {
                     $this->context->scope->classId = $this->context->type->object->declareClass($nameOp);
                     $this->context->scope->className = strtolower($nameOp->value);
                     $this->context->type->object->markInterfaceClass($nameOp->value);
+                    if (AttributeClassRegistry::isRegisteredAttributeClass($op->attributeEntries)) {
+                        $this->context->type->object->markAttributeClass($nameOp->value);
+                    }
                     if ([] !== $op->classImplements) {
                         $this->context->type->object->setInterfaceExtends(
                             $nameOp->value,
@@ -7618,6 +7622,9 @@ class JIT {
                     $this->context->scope->classId = $this->context->type->object->declareClass($nameOp);
                     $this->context->scope->className = strtolower($nameOp->value);
                     $this->context->type->object->markTraitClass($this->context->scope->className);
+                    if (AttributeClassRegistry::isRegisteredAttributeClass($op->attributeEntries)) {
+                        $this->context->type->object->markAttributeClass($nameOp->value);
+                    }
                     if (null !== $this->context->runtime->vmContext) {
                         $lcname = strtolower($nameOp->value);
                         if (!isset($this->context->runtime->vmContext->classes[$lcname])) {
@@ -7635,6 +7642,9 @@ class JIT {
                     $this->context->pushScope();
                     $this->context->scope->classId = $this->context->type->object->declareEnum($nameOp);
                     $this->context->scope->className = strtolower($nameOp->value);
+                    if (AttributeClassRegistry::isRegisteredAttributeClass($op->attributeEntries)) {
+                        $this->context->type->object->markAttributeClass($nameOp->value);
+                    }
                     if (null !== $op->arg2 && isset($block->constants[$op->arg2])) {
                         $this->context->type->object->setEnumBackedType(
                             $this->context->scope->classId,
@@ -7697,6 +7707,9 @@ class JIT {
                             strtolower(ltrim($nameOp->value, '\\')),
                             [] !== $op->attributeEntries ? $op->attributeEntries : $attrNames
                         );
+                    }
+                    if (AttributeClassRegistry::isRegisteredAttributeClass($op->attributeEntries)) {
+                        $this->context->type->object->markAttributeClass($nameOp->value);
                     }
                     $this->compileClass($op->block1, $this->context->scope->classId);
                     if ($parentOp instanceof Operand\Literal) {

@@ -7,6 +7,7 @@ namespace PHPCompiler\ext\standard;
 use PHPCompiler\Frame;
 use PHPCompiler\Func;
 use PHPCompiler\Func\Internal as FuncInternal;
+use PHPCompiler\Compiler\AttributeClassRegistry;
 use PHPCompiler\MethodVisibility;
 use PHPCfg\Func as CfgFunc;
 use PHPCompiler\VM\ClassEntry;
@@ -182,6 +183,29 @@ final class VmReflection
                 continue;
             }
             if (LazyGhostTraitSupport::isLazyGhostTrait($entry->name)) {
+                continue;
+            }
+            $value = new Variable();
+            $value->string($entry->name);
+            $result->append($value);
+        }
+
+        return $result;
+    }
+
+    /**
+     * get_declared_attributes() — user #[Attribute] class names (#6450).
+     *
+     * php-src: ext/reflection/php_reflection.c — PHP_FUNCTION(get_declared_attributes)
+     */
+    public static function declaredAttributesTable(Context $ctx): \PHPCompiler\VM\HashTable
+    {
+        $result = new \PHPCompiler\VM\HashTable();
+        foreach ($ctx->classes as $lc => $entry) {
+            if ($entry->isInternal || isset($ctx->classAliases[$lc])) {
+                continue;
+            }
+            if (!AttributeClassRegistry::isRegisteredAttributeClass($entry->attributeEntries)) {
                 continue;
             }
             $value = new Variable();
