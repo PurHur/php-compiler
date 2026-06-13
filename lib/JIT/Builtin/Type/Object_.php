@@ -76,6 +76,8 @@ class Object_ extends Type {
     private array $interfaceClassLcs = [];
     /** @var array<string, true> trait lc => registered (#3789) */
     private array $traitClassLcs = [];
+    /** @var array<string, true> user attribute class lc => registered (#6450) */
+    private array $attributeClassLcs = [];
     /** @var array<int, array<string, string>> class id => method lc => trait lc (#3789) */
     private array $classTraitMethodSources = [];
     /** @var array<int, array<string, Block>> trait id => method lc => CFG block (#3789) */
@@ -1948,6 +1950,28 @@ class Object_ extends Type {
     }
 
     /**
+     * User #[Attribute] classes from DECLARE_* (#6450).
+     *
+     * @return list<string>
+     */
+    public function allDeclaredAttributeClassNames(): array
+    {
+        $names = [];
+        foreach (array_keys($this->attributeClassLcs) as $classLc) {
+            $resolved = null;
+            foreach ($this->classIdToName as $name) {
+                if (strtolower(ltrim($name, '\\')) === $classLc) {
+                    $resolved = $name;
+                    break;
+                }
+            }
+            $names[] = $resolved ?? $classLc;
+        }
+
+        return $names;
+    }
+
+    /**
      * @return list<string>
      */
     public function allDeclaredTraitNames(): array
@@ -3548,6 +3572,11 @@ class Object_ extends Type {
     public function markTraitClass(string $classLc): void
     {
         $this->traitClassLcs[strtolower(ltrim($classLc, '\\'))] = true;
+    }
+
+    public function markAttributeClass(string $classLc): void
+    {
+        $this->attributeClassLcs[strtolower(ltrim($classLc, '\\'))] = true;
     }
 
     public function isTraitClass(string $classLc): bool

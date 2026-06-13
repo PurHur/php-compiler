@@ -52,6 +52,16 @@ final class AttributeClassRegistry
     }
 
     /**
+     * True when the declaring class/interface/trait/enum carries #[Attribute] (#6450).
+     *
+     * @param list<AttributeEntry> $entries
+     */
+    public static function isRegisteredAttributeClass(array $entries): bool
+    {
+        return null !== self::extractSelfAttributeFlags($entries);
+    }
+
+    /**
      * @param list<AttributeEntry> $entries
      */
     public static function extractSelfAttributeFlags(array $entries): ?int
