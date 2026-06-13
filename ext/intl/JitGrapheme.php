@@ -36,6 +36,23 @@ final class JitGrapheme
     /**
      * @param JITVariable[] $args
      */
+    public static function tryStrlenFold(Context $context, array $args): ?Value
+    {
+        $string = self::compileTimeString($args, 0);
+        if (null === $string) {
+            return null;
+        }
+        $result = VmGrapheme::strlen($string);
+        if (false === $result) {
+            return $context->getTypeFromString('bool')->constInt(0, false);
+        }
+
+        return $context->constantFromInteger($result, 'int64');
+    }
+
+    /**
+     * @param JITVariable[] $args
+     */
     public static function tryLevenshteinFold(Context $context, array $args): ?Value
     {
         $string1 = self::compileTimeString($args, 0);

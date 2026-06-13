@@ -31,6 +31,7 @@ class Module extends ModuleAbstract
     public function getFunctions(): array
     {
         return [
+            new grapheme_strlen(),
             new grapheme_str_contains(),
             new grapheme_strstr(),
             new grapheme_stristr(),
