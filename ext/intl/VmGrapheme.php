@@ -39,6 +39,34 @@ final class VmGrapheme
     }
 
     /**
+     * grapheme_stripos() — case-insensitive grapheme index search (php-src ext/intl/grapheme; #6153).
+     *
+     * @return int|false grapheme index of first match
+     */
+    public static function stripos(string $haystack, string $needle, int $offset = 0): int|false
+    {
+        if ('' === $needle) {
+            return false;
+        }
+
+        return self::graphemePosSearch($haystack, $needle, $offset, true, false);
+    }
+
+    /**
+     * grapheme_strrpos() — reverse grapheme index search (php-src ext/intl/grapheme; #6153).
+     *
+     * @return int|false grapheme index of last match
+     */
+    public static function strrpos(string $haystack, string $needle, int $offset = 0): int|false
+    {
+        if ('' === $needle) {
+            return false;
+        }
+
+        return self::graphemePosSearch($haystack, $needle, $offset, false, true);
+    }
+
+    /**
      * grapheme_stristr() — case-insensitive grapheme strstr (php-src ext/intl/grapheme; #7221).
      *
      * @return string|false
@@ -90,6 +118,19 @@ final class VmGrapheme
         string $needle,
         bool $caseInsensitive
     ): int|false {
+        return self::graphemePosSearch($haystack, $needle, 0, $caseInsensitive, false);
+    }
+
+    /**
+     * @return int|false grapheme index
+     */
+    private static function graphemePosSearch(
+        string $haystack,
+        string $needle,
+        int $offset,
+        bool $caseInsensitive,
+        bool $reverse
+    ): int|false {
         $hay = self::splitGraphemes($haystack);
         if (null === $hay) {
             return false;
@@ -98,30 +139,89 @@ final class VmGrapheme
         if (null === $need) {
             return false;
         }
+        $start = self::normalizeGraphemeSearchOffset($offset, \count($hay));
+        if (false === $start) {
+            return false;
+        }
+
+        return self::findGraphemeSubsequenceAt($hay, $need, $start, $caseInsensitive, $reverse);
+    }
+
+    /**
+     * @return int|false normalized start grapheme index
+     */
+    private static function normalizeGraphemeSearchOffset(int $offset, int $hayLen): int|false
+    {
+        if ($offset < 0) {
+            $offset += $hayLen;
+        }
+        if ($offset < 0 || $offset > $hayLen) {
+            return false;
+        }
+
+        return $offset;
+    }
+
+    /**
+     * @param list<string> $hay
+     * @param list<string> $need
+     *
+     * @return int|false grapheme index
+     */
+    private static function findGraphemeSubsequenceAt(
+        array $hay,
+        array $need,
+        int $startIndex,
+        bool $caseInsensitive,
+        bool $reverse
+    ): int|false {
         $hayLen = \count($hay);
         $needLen = \count($need);
         if (0 === $needLen) {
             return 0;
         }
-        for ($i = 0; $i <= $hayLen - $needLen; ++$i) {
-            $matched = true;
-            for ($j = 0; $j < $needLen; ++$j) {
-                if ($caseInsensitive) {
-                    if (!self::graphemesEqualInsensitive($hay[$i + $j], $need[$j])) {
-                        $matched = false;
-                        break;
-                    }
-                } elseif ($hay[$i + $j] !== $need[$j]) {
-                    $matched = false;
-                    break;
+        if ($needLen > $hayLen) {
+            return false;
+        }
+        if ($reverse) {
+            for ($i = $hayLen - $needLen; $i >= $startIndex; --$i) {
+                if (self::graphemeSubsequenceMatchesAt($hay, $need, $i, $caseInsensitive)) {
+                    return $i;
                 }
             }
-            if ($matched) {
-                return $i;
+        } else {
+            for ($i = $startIndex; $i <= $hayLen - $needLen; ++$i) {
+                if (self::graphemeSubsequenceMatchesAt($hay, $need, $i, $caseInsensitive)) {
+                    return $i;
+                }
             }
         }
 
         return false;
+    }
+
+    /**
+     * @param list<string> $hay
+     * @param list<string> $need
+     */
+    private static function graphemeSubsequenceMatchesAt(
+        array $hay,
+        array $need,
+        int $index,
+        bool $caseInsensitive
+    ): bool {
+        $needLen = \count($need);
+        for ($j = 0; $j < $needLen; ++$j) {
+            if ($caseInsensitive) {
+                if (!self::graphemesEqualInsensitive($hay[$index + $j], $need[$j])) {
+                    return false;
+                }
+            } elseif ($hay[$index + $j] !== $need[$j]) {
+                return false;
+            }
+        }
+
+        return true;
     }
 
     /**

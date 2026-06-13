@@ -34,6 +34,8 @@ class Module extends ModuleAbstract
             new grapheme_str_contains(),
             new grapheme_strstr(),
             new grapheme_stristr(),
+            new grapheme_stripos(),
+            new grapheme_strrpos(),
             new grapheme_extract(),
             new grapheme_levenshtein(),
             new grapheme_str_split(),
