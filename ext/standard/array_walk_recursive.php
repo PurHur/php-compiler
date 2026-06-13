@@ -126,7 +126,7 @@ final class array_walk_recursive extends Internal
         \PHPCompiler\VM\ClosureState $closure,
         ?Variable $userdata
     ): bool {
-        foreach ($table->iterateKeyed(true) as [$key, $value]) {
+        foreach ($table->iterateKeyed(false) as [$key, $value]) {
             if (Variable::TYPE_ARRAY === $value->type) {
                 $value->separateArrayForWrite();
                 if (!self::walkClosure($context, $value->toArray(), $closure, $userdata)) {
