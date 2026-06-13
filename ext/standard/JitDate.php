@@ -9,8 +9,9 @@ use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Builtin\DefaultTimezoneRuntime;
 use PHPCompiler\JIT\Builtin\StringHrtime;
 use PHPCompiler\JIT\Builtin\StringMicrotime;
-use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\InternalStrictArg as JitInternalStrictArg;
+use PHPCompiler\JIT\JitStringArg;
 use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\ScriptMagic;
 use PHPCompiler\JIT\Variable as JITVariable;
@@ -254,10 +255,15 @@ final class JitDate
     public static function formatDate(Context $context, bool $gmt, JITVariable ...$args): Value
     {
         $argc = \count($args);
-        if ($argc < 1 || $argc > 2) {
-            throw new \LogicException('date()/gmdate() require one or two arguments');
+        $function = $gmt ? 'gmdate' : 'date';
+        if ($argc < 1) {
+            throw new \ArgumentCountError("{$function}() expects at least 1 argument, 0 given");
         }
-        $format = self::jitStringArg($context, $args[0]);
+        if ($argc > 2) {
+            throw new \ArgumentCountError("{$function}() expects at most 2 arguments, {$argc} given");
+        }
+        JitInternalStrictArg::requireString($context, $args[0], $function, 'format', 1);
+        $format = JitStringArg::lower($context, $args[0], "{$function}() argument #1 ($format)");
         $i64 = $context->getTypeFromString('int64');
         $timestamp = $argc >= 2
             ? JitDateTimestampArg::lowerNullable(
@@ -279,18 +285,4 @@ final class JitDate
         );
     }
 
-    private static function jitStringArg(Context $context, JITVariable $arg): Value
-    {
-        if (JITVariable::TYPE_STRING === $arg->type) {
-            return $context->helper->loadValue($arg);
-        }
-        if (JITVariable::TYPE_VALUE === $arg->type) {
-            return $context->builder->call(
-                $context->lookupFunction('__value__readString'),
-                $arg->value
-            );
-        }
-
-        throw new \LogicException('date() format must be a string in this compiler build');
-    }
 }
