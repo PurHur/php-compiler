@@ -91,6 +91,6 @@ final class timezone_transitions_get extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        throw new \LogicException('timezone_transitions_get() is not implemented for JIT in this compiler build (issue #6041)');
+        return JitTimezoneTransitionsGet::invoke($context, ...$args);
     }
 }

@@ -496,6 +496,26 @@ final class VmDateTimeNative
     /**
      * @return array{country: string, latitude: float, longitude: float, comments: string}|null
      */
+    /**
+     * Zone.tab rows for JIT/AOT location lowering (#6041 phase 2).
+     *
+     * @return list<array{country: string, id: string, latitude: float, longitude: float, comments: string}>
+     */
+    public static function exportZoneTabEntries(): array
+    {
+        return self::zoneTabEntries();
+    }
+
+    /**
+     * DST transitions for JIT/AOT lowering (#6041 phase 2).
+     *
+     * @return list<array{ts: int, time: string, offset: int, isdst: bool, abbr: string}>|false
+     */
+    public static function exportTimezoneTransitions(string $tzName, int $begin, int $end): array|false
+    {
+        return self::timezoneTransitions($tzName, $begin, $end);
+    }
+
     private static function zoneTabEntryForId(string $tzName): ?array
     {
         foreach (self::zoneTabEntries() as $entry) {
