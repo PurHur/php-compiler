@@ -50,6 +50,39 @@ final class VmGzStream
         return VmGzStreamNative::gzread($handle, $length);
     }
 
+    /**
+     * gzgets() — read a line from gzip stream (php-src ext/zlib/zlib.c PHP_FUNCTION(gzgets); #6290).
+     */
+    public static function gzgets(int $handle, int $length = 8192): string|false
+    {
+        if (!VmGzStreamNative::isNativeHandle($handle)) {
+            return false;
+        }
+        if ($length <= 0) {
+            return false;
+        }
+        $maxRead = $length - 1;
+        if ($maxRead <= 0) {
+            return false;
+        }
+        $line = '';
+        while (\strlen($line) < $maxRead) {
+            $byte = VmGzStreamNative::gzread($handle, 1);
+            if (false === $byte) {
+                return false;
+            }
+            if ('' === $byte) {
+                return '' === $line ? false : $line;
+            }
+            $line .= $byte;
+            if ("\n" === $byte) {
+                break;
+            }
+        }
+
+        return $line;
+    }
+
     public static function gzclose(int $handle): bool
     {
         if (!VmGzStreamNative::isNativeHandle($handle)) {
