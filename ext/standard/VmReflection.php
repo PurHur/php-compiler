@@ -1592,6 +1592,104 @@ final class VmReflection
     }
 
     /**
+     * ReflectionClass::getStaticProperties() — static slot values (#6948).
+     *
+     * php-src: ext/reflection/php_reflection.c — zim_ReflectionClass_getStaticProperties
+     */
+    public static function staticPropertiesValuesArray(ClassEntry $entry): Variable
+    {
+        $result = new Variable();
+        $result->newArray();
+        $ht = $result->toArray();
+        $entryLc = strtolower($entry->name);
+        foreach ($entry->staticProperties as $propLc => $storage) {
+            $vis = $entry->staticPropertyVisibility[$propLc] ?? CfgFunc::FLAG_PUBLIC;
+            $declLc = $entry->staticPropertyDeclaringClassLc[$propLc] ?? $entryLc;
+            if (($vis & CfgFunc::FLAG_PRIVATE) !== 0 && $declLc !== $entryLc) {
+                continue;
+            }
+            if (TypedPropertyCheck::isUninitialized($storage)) {
+                continue;
+            }
+            $displayName = $storage->objectPropertyName ?? $propLc;
+            $copy = new Variable();
+            $copy->copyFrom($storage->resolveIndirect());
+            $ht->add($displayName, $copy);
+        }
+
+        return $result;
+    }
+
+    /**
+     * ReflectionClass::getStaticPropertyValue($name, $default) (#6948).
+     *
+     * php-src: ext/reflection/php_reflection.c — zim_ReflectionClass_getStaticPropertyValue
+     */
+    public static function getStaticPropertyValueForReflection(
+        ClassEntry $entry,
+        Context $ctx,
+        string $propertyName,
+        ?Variable $default
+    ): Variable {
+        $staticKey = self::findStaticPropertyKey($entry, $propertyName, $ctx);
+        if (null === $staticKey) {
+            ReflectionSupport::throwReflectionException(sprintf(
+                'Property %s::$%s does not exist',
+                $entry->name,
+                $propertyName
+            ));
+        }
+        $storage = $entry->staticProperties[$staticKey];
+        if (TypedPropertyCheck::isUninitialized($storage)) {
+            if (null !== $default) {
+                $out = new Variable();
+                $out->copyFrom($default);
+
+                return $out;
+            }
+            throw new \Error(TypedPropertyCheck::errorMessage($storage));
+        }
+        $out = new Variable();
+        $out->copyFrom($storage->resolveIndirect());
+
+        return $out;
+    }
+
+    /**
+     * ReflectionClass::setStaticPropertyValue($name, $value) (#6948).
+     *
+     * php-src: ext/reflection/php_reflection.c — zim_ReflectionClass_setStaticPropertyValue
+     */
+    public static function setStaticPropertyValueForReflection(
+        ClassEntry $entry,
+        Context $ctx,
+        string $propertyName,
+        Variable $value
+    ): void {
+        $staticKey = self::findStaticPropertyKey($entry, $propertyName, $ctx);
+        if (null === $staticKey) {
+            ReflectionSupport::throwReflectionException(sprintf(
+                'Class %s does not have a property named %s',
+                $entry->name,
+                $propertyName
+            ));
+        }
+        $storage = $entry->staticProperties[$staticKey];
+        $storage->copyFrom($value);
+        \PHPCompiler\VM\TypeCheck::coercePropertyWrite($storage, false);
+        $resolved = $storage->resolveIndirect();
+        if (null !== $resolved->dnfArms) {
+            \PHPCompiler\VM\DnfCheck::assertMatches(
+                $value,
+                $resolved->dnfArms,
+                $ctx,
+                'Property',
+                $resolved
+            );
+        }
+    }
+
+    /**
      * ReflectionClass::getMethods() result array (#3815).
      */
     public static function reflectionMethodsArray(
