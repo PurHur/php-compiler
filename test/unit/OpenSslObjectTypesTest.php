@@ -53,8 +53,8 @@ PHP;
 
     public function test_openssl_x509_read_returns_certificate_object(): void
     {
-        if (!\function_exists('openssl_x509_parse')) {
-            self::markTestSkipped('host ext/openssl required for openssl_x509_read() test');
+        if (!\PHPCompiler\ext\openssl\VmOpensslX509Native::available()) {
+            self::markTestSkipped('libcrypto FFI unavailable for openssl_x509_read() test');
         }
 
         $runtime = new Runtime();
