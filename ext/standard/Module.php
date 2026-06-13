@@ -99,6 +99,11 @@ class Module extends ModuleAbstract
             'ZLIB_ENCODING_RAW' => -15,
             'ZLIB_ENCODING_DEFLATE' => 15,
             'ZLIB_ENCODING_GZIP' => 31,
+            'STREAM_PF_UNIX' => StdlibConstants::STREAM_PF_UNIX,
+            'STREAM_PF_INET' => StdlibConstants::STREAM_PF_INET,
+            'STREAM_SOCK_STREAM' => StdlibConstants::STREAM_SOCK_STREAM,
+            'STREAM_SOCK_DGRAM' => StdlibConstants::STREAM_SOCK_DGRAM,
+            'STREAM_IPPROTO_IP' => StdlibConstants::STREAM_IPPROTO_IP,
         ] + VmStreamSupports::constants() + VmImage::constants() + VmJsonFlags::constants() as $name => $value) {
             $var = new VM\Variable();
             $var->int($value);
@@ -528,6 +533,7 @@ class Module extends ModuleAbstract
             new stream_context_set_params(),
             new stream_socket_client(),
             new stream_socket_server(),
+            new stream_socket_pair(),
             new pfsockopen(),
             new stream_set_chunk_size_(),
             new stream_set_timeout_(),
