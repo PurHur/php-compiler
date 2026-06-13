@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 2478 |
-| Phase A inventory files (M2 ratio SSOT) | 2478 |
+| PHP files on vm.php path | 2480 |
+| Phase A inventory files (M2 ratio SSOT) | 2480 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 6716 |
+| Source constructs flagged (warnings) | 6723 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -287,6 +287,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/standard/JitDateSunInfoMaterializer.php` | 0 | 1 |
 | `ext/standard/JitDateTimestampArg.php` | 0 | 1 |
 | `ext/standard/JitDebugBacktrace.php` | 0 | 6 |
+| `ext/standard/JitDefine.php` | 0 | 1 |
 | `ext/standard/JitDeployPath.php` | 0 | 1 |
 | `ext/standard/JitDirname.php` | 0 | 1 |
 | `ext/standard/JitDiskPath.php` | 0 | 1 |
@@ -1663,6 +1664,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/Builtin/CtypeJit.php` | 0 | 1 |
 | `lib/JIT/Builtin/DateIntervalFormatRuntime.php` | 0 | 1 |
 | `lib/JIT/Builtin/DefaultTimezoneRuntime.php` | 0 | 1 |
+| `lib/JIT/Builtin/DefineRuntime.php` | 0 | 6 |
 | `lib/JIT/Builtin/EmbedObOutput.php` | 0 | 1 |
 | `lib/JIT/Builtin/ErrorHandler.php` | 0 | 1 |
 | `lib/JIT/Builtin/ErrorHandlerJitRuntime.php` | 0 | 2 |
@@ -4108,7 +4110,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/JitConstant.php`
 
 **Warnings** (review for bootstrap subset):
-- 2 class method(s)
+- 4 class method(s)
 
 ### `ext/standard/JitConvertUudecode.php`
 
@@ -4199,6 +4201,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new JITVariable (line 133)
 - new JITVariable (line 139)
 - 6 class method(s)
+
+### `ext/standard/JitDefine.php`
+
+**Warnings** (review for bootstrap subset):
+- 2 class method(s)
 
 ### `ext/standard/JitDeployPath.php`
 
@@ -8859,13 +8866,13 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/define_.php`
 
 **Warnings** (review for bootstrap subset):
-- new Variable (line 95)
-- new Variable (line 98)
+- new Variable (line 99)
 - new Variable (line 102)
-- new Variable (line 136)
-- new Variable (line 144)
-- new Variable (line 153)
-- 6 class method(s)
+- new Variable (line 106)
+- new Variable (line 140)
+- new Variable (line 148)
+- new Variable (line 157)
+- 7 class method(s)
 
 ### `ext/standard/defined_.php`
 
@@ -13408,6 +13415,16 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 
 **Warnings** (review for bootstrap subset):
 - 13 class method(s)
+
+### `lib/JIT/Builtin/DefineRuntime.php`
+
+**Warnings** (review for bootstrap subset):
+- new JITVariable (line 138)
+- new JITVariable (line 145)
+- new JITVariable (line 152)
+- new JITVariable (line 159)
+- new JITVariable (line 172)
+- 7 class method(s)
 
 ### `lib/JIT/Builtin/EmbedObOutput.php`
 
