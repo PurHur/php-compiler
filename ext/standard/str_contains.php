@@ -28,13 +28,13 @@ final class str_contains extends Internal
     public function execute(Frame $frame): void
     {
         $this->requireExactArgCount($frame, 'str_contains', 2);
-        $haystackStr = VmString::requireStringBuiltinArg(
+        $haystackStr = VmString::coerceStringBuiltinArg(
             $frame->calledArgs[0],
             'str_contains',
             0,
             'haystack'
         );
-        $needleStr = VmString::requireStringBuiltinArg(
+        $needleStr = VmString::coerceStringBuiltinArg(
             $frame->calledArgs[1],
             'str_contains',
             1,
@@ -61,8 +61,8 @@ final class str_contains extends Internal
         if (!$this->requireExactJitArgCount($context, $args, 'str_contains', 2)) {
             return $context->getTypeFromString('int1')->constInt(0, false);
         }
-        $hay = JitStringBuiltinArg::lowerRequiredString($context, $args[0], 'str_contains', 0, 'haystack');
-        $needle = JitStringBuiltinArg::lowerRequiredString($context, $args[1], 'str_contains', 1, 'needle');
+        $hay = JitStringBuiltinArg::lower($context, $args[0], 'str_contains', 0, 'haystack');
+        $needle = JitStringBuiltinArg::lower($context, $args[1], 'str_contains', 1, 'needle');
 
         return JitStringSearch::contains($context, $hay, $needle);
     }
