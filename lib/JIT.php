@@ -11513,6 +11513,23 @@ class JIT {
         return true;
     }
 
+    private function jitInstanceMethodReceiverVariable(Variable $receiverVar): Variable
+    {
+        if (Variable::TYPE_VALUE !== $receiverVar->type) {
+            return $receiverVar;
+        }
+        $objVal = JIT\ClosureHelper::loadObjectFromCallable($this->context, $receiverVar);
+        $objVar = new Variable(
+            $this->context,
+            Variable::TYPE_OBJECT,
+            Variable::KIND_VALUE,
+            $objVal
+        );
+        $objVar->addref();
+
+        return $objVar;
+    }
+
     private function initJitMethodCall(Block $block, Operand $receiverOp, string $methodName): void
     {
         if ('__invoke' === strtolower($methodName)) {
@@ -11606,10 +11623,11 @@ class JIT {
 
         $proxyName = $this->resolveJitInstanceMethodProxyName($declaringClassLc, $methodLc);
         $receiverVar = $this->context->getVariableFromOp($receiverOp);
+        $dispatchReceiver = $this->jitInstanceMethodReceiverVariable($receiverVar);
         if (Type::TYPE_OBJECT === $receiverOp->type?->type) {
             JIT\LazyObjectHelper::emitEnsureInitialized(
                 $this->context,
-                $this->context->helper->loadValue($receiverVar)
+                $this->context->helper->loadValue($dispatchReceiver)
             );
         }
         if (!$this->context->functionIsRegistered($proxyName)) {
@@ -11693,7 +11711,7 @@ class JIT {
             $this->context->scope->lateStaticCallClassId = $this->context->type->object->lookup($receiverUserType);
         }
         $this->context->scope->toCall = $staticProxy;
-        $this->context->scope->args = [$receiverVar];
+        $this->context->scope->args = [$dispatchReceiver];
     }
 
     /**

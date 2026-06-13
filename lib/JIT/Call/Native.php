@@ -285,11 +285,17 @@ class Native implements Call {
             case '__value__':
                 switch ($arg->type) {
                     case Variable::TYPE_VALUE:
-                        if ('__value__*' === $context->getStringFromType($value->typeOf())) {
+                        $valueTyName = $context->getStringFromType($value->typeOf());
+                        if ('__value__*' === $valueTyName) {
+                            return $context->builder->load($value);
+                        }
+                        if ('__value__' === $valueTyName) {
                             return $value;
                         }
 
-                        return $context->builder->load($value);
+                        return $context->builder->load(
+                            \PHPCompiler\JIT\JitValueBox::valuePtrFromVariable($context, $arg)
+                        );
                     case Variable::TYPE_OBJECT:
                         $slot = \PHPCompiler\JIT\JitValueBox::alloc($context);
                         $context->builder->call(
