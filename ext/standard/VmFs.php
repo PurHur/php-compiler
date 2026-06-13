@@ -579,12 +579,18 @@ final class VmFs
     }
 
     public static function readfile(string $path) {
-        $fp = @fopen($path, 'rb');
-        if (false === $fp) {
+        $handle = self::fopen($path, 'rb');
+        if (false === $handle) {
+            return false;
+        }
+        $fp = self::lookup($handle);
+        if (null === $fp) {
+            self::fclose($handle);
+
             return false;
         }
         $total = self::passthruStreamToStdout($fp);
-        @fclose($fp);
+        self::fclose($handle);
 
         return $total;
     }
@@ -614,6 +620,14 @@ final class VmFs
         }
         if (VmFsStdio::isStdioUri($path)) {
             $fp = VmFsStdio::open($path, $mode);
+            if (false === $fp) {
+                return false;
+            }
+
+            return self::adoptStreamResource($fp, $path);
+        }
+        if (VmFsOpenNative::available()) {
+            $fp = VmFsOpenNative::open($path, $mode);
             if (false === $fp) {
                 return false;
             }
