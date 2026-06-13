@@ -75,4 +75,39 @@ final class VmFsReadNativeRuntimeShrinkTest extends TestCase
 
         @unlink($path);
     }
+
+    /** @return list<string> */
+    private function vmNativeReadSites(): array
+    {
+        return [
+            'ext/standard/VmHrtimeNative.php',
+            'ext/standard/VmEnvEnvironNative.php',
+            'ext/standard/VmMemory.php',
+            'ext/standard/VmIptc.php',
+            'ext/standard/VmSession.php',
+            'ext/standard/VmParseIni.php',
+        ];
+    }
+
+    public function testVmNativeHelpersRouteProcAndFileReadsThroughReadNative(): void
+    {
+        foreach ($this->vmNativeReadSites() as $relativePath) {
+            $source = (string) file_get_contents(__DIR__.'/../../'.$relativePath);
+            $this->assertStringContainsString(
+                'VmFsReadNative::read',
+                $source,
+                "{$relativePath} must use VmFsReadNative::read()"
+            );
+            $this->assertDoesNotMatchRegularExpression(
+                '/\\\\file_get_contents\\s*\\(/',
+                $source,
+                "{$relativePath} must not call host \\file_get_contents()"
+            );
+            $this->assertDoesNotMatchRegularExpression(
+                '/(?<!\\\\)file_get_contents\\s*\\(/',
+                $source,
+                "{$relativePath} must not call host file_get_contents()"
+            );
+        }
+    }
 }

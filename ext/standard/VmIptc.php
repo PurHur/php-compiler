@@ -97,7 +97,7 @@ final class VmIptc
             throw new \ValueError('iptcembed(): Argument #1 ($iptcdata) is too large');
         }
 
-        $jpeg = @\file_get_contents($jpegPath);
+        $jpeg = VmFsReadNative::read($jpegPath);
         if (false === $jpeg) {
             return false;
         }

@@ -114,7 +114,7 @@ final class VmMemory
     }
 
     /**
-     * RSS via /proc/self/statm only (issue #7287, #4862).
+     * RSS via /proc/self/statm only (VmFsReadNative; #7287, #4862, #8426).
      *
      * JIT/AOT use the same source in MemoryRuntime::__phpc_memory_read_rss_bytes.
      */
@@ -123,7 +123,7 @@ final class VmMemory
         if ('Linux' !== \PHP_OS_FAMILY || !is_readable('/proc/self/statm')) {
             return 0;
         }
-        $statm = @file_get_contents('/proc/self/statm');
+        $statm = VmFsReadNative::read('/proc/self/statm');
         if (false === $statm || '' === $statm) {
             return 0;
         }

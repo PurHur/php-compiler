@@ -27,7 +27,7 @@ final class VmHrtimeNative
     }
 
     /**
-     * CLOCK_MONOTONIC approximation via /proc/uptime (issue #7287 pattern for VmMemory RSS).
+     * CLOCK_MONOTONIC approximation via /proc/uptime (VmFsReadNative; #7287, #8426).
      *
      * @return array{0: int, 1: int}
      */
@@ -36,7 +36,7 @@ final class VmHrtimeNative
         if (!\is_readable('/proc/uptime')) {
             return [0, 0];
         }
-        $raw = @\file_get_contents('/proc/uptime');
+        $raw = VmFsReadNative::read('/proc/uptime');
         if (false === $raw || '' === $raw) {
             return [0, 0];
         }

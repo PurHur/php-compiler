@@ -72,7 +72,7 @@ final class VmEnvEnvironNative
     }
 
     /**
-     * Linux bootstrap without FFI: /proc/self/environ (issue #5079 pattern).
+     * Linux bootstrap without FFI: /proc/self/environ via VmFsReadNative (#5079, #8426).
      *
      * @return array<string, string>
      */
@@ -82,7 +82,7 @@ final class VmEnvEnvironNative
             return [];
         }
 
-        $raw = @\file_get_contents('/proc/self/environ');
+        $raw = VmFsReadNative::read('/proc/self/environ');
         if (false === $raw || '' === $raw) {
             return [];
         }
