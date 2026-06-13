@@ -20,6 +20,7 @@ final class BuiltinClasses
         self::registerArrayObject($ctx);
         self::registerSplDoublyLinkedList($ctx);
         VmSplIterators::register($ctx);
+        VmSplObserver::register($ctx);
         foreach (array_diff(array_keys($ctx->classes), $before) as $lc) {
             $ctx->classes[$lc]->isInternal = true;
         }
