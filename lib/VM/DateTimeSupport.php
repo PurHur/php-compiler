@@ -258,6 +258,53 @@ final class DateTimeSupport
         return $var;
     }
 
+    /** php-src PHP_FUNCTION(date_create) — false on parse failure (#4124). */
+    public static function tryNewDateTimeVariable(
+        Context $ctx,
+        string $time,
+        ?ObjectEntry $timezone = null
+    ): ?Variable {
+        return self::tryNewDateTimeLikeVariable($ctx, self::CLASS_DATETIME, $time, $timezone);
+    }
+
+    /** php-src PHP_FUNCTION(date_create_immutable) — false on parse failure (#4124). */
+    public static function tryNewDateTimeImmutableVariable(
+        Context $ctx,
+        string $time,
+        ?ObjectEntry $timezone = null
+    ): ?Variable {
+        return self::tryNewDateTimeLikeVariable($ctx, self::CLASS_DATETIMEIMMUTABLE, $time, $timezone);
+    }
+
+    private static function tryNewDateTimeLikeVariable(
+        Context $ctx,
+        string $classKey,
+        string $time,
+        ?ObjectEntry $timezone
+    ): ?Variable {
+        $class = $ctx->classes[$classKey] ?? null;
+        if (null === $class) {
+            throw new \LogicException('DateTime is not registered in this compiler build');
+        }
+        $entry = new ObjectEntry($class);
+        $tzName = null !== $timezone
+            ? self::timezoneName($timezone)
+            : VmDate::defaultTimezoneGet();
+        try {
+            VmDateTimeNative::validateTimezoneId($tzName);
+            $parsed = VmDateTimeNative::parseDateTime($time, $tzName);
+        } catch (NativeDateInvalidTimeZoneException|NativeDateMalformedStringException) {
+            return null;
+        }
+        self::applyParsedState($entry, $parsed, $tzName);
+        $entry->constructed = true;
+        self::markDateTimeLikeInitialized($entry);
+        $var = new Variable(Variable::TYPE_OBJECT);
+        $var->object($entry);
+
+        return $var;
+    }
+
     /** php-src ext/date/php_datetimezone.c — invalid id throws DateInvalidTimeZoneException (#7279). */
     public static function throwDateInvalidTimeZoneException(string $timezone): void
     {

@@ -779,6 +779,8 @@ class Module extends ModuleAbstract
             new idate(),
             new date_sun_info(),
             new date_interval_format(),
+            new date_create(),
+            new date_create_immutable(),
             new date_add(),
             new date_sub(),
             new date_modify(),
