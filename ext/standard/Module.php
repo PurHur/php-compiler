@@ -196,6 +196,7 @@ class Module extends ModuleAbstract
             new similar_text(),
             new soundex(),
             new metaphone(),
+            new hebrev(),
             new strnatcmp(),
             new strnatcasecmp(),
             new strcasecmp(),
