@@ -23,7 +23,9 @@ final class MultiBlockNameContext extends NameContext
     public function beginCompilationUnit(): void
     {
         $this->savedAliasesByNamespace = [];
-        parent::startNamespace(null);
+        // Fresh compilation unit — do not snapshot prior namespace aliases into savedAliasesByNamespace
+        // (startNamespace(null) would re-save PHPCompiler\JIT use imports from the previous file parse).
+        NameContext::startNamespace(null);
     }
 
     public function startNamespace(?Name $namespace = null): void

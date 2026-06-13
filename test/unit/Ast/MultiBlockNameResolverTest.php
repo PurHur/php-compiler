@@ -50,4 +50,14 @@ TXT;
         $rt->run($block);
         $this->assertSame(self::EXPECT, rtrim((string) ob_get_clean()));
     }
+
+    /** Consecutive file parses in the same namespace must not restore stale use imports (#4425). */
+    public function testConsecutiveFileParsesSameNamespaceDoNotCollideOnUseImports(): void
+    {
+        $rt = new Runtime(Runtime::MODE_AOT);
+        $root = dirname(__DIR__, 3);
+        $rt->parseAndCompileFile($root.'/lib/JIT/JitStringCompare.php');
+        $block = $rt->parseAndCompileFile($root.'/lib/JIT/M3EmitTuTrivialEchoAot.php');
+        $this->assertNotNull($block);
+    }
 }
