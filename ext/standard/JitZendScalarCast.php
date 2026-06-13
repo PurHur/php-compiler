@@ -10,6 +10,7 @@ use PHPCompiler\JIT\JitStringArg;
 use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Builder;
+use PHPLLVM\LLVMAbstract\Type as LlvmType;
 use PHPLLVM\Value;
 
 /**
@@ -122,8 +123,7 @@ final class JitZendScalarCast
         );
 
         $context->builder->positionAtEnd($boolBlock);
-        $boolVal = $context->builder->call($context->lookupFunction('__value__readLong'), $valuePtr);
-        $boolInt = $context->builder->zExt($boolVal, $i64);
+        $boolInt = self::readBoolByteFromValueBox($context, $valuePtr, $i64);
         $boolEndBlock = $context->builder->getInsertBlock();
         $context->builder->branch($doneBlock);
 
@@ -245,8 +245,8 @@ final class JitZendScalarCast
         );
 
         $context->builder->positionAtEnd($boolBlock);
-        $boolVal = $context->builder->call($context->lookupFunction('__value__readLong'), $valuePtr);
-        $boolFloat = $context->builder->uiToFp($boolVal, $double);
+        $boolByte = self::readBoolByteFromValueBox($context, $valuePtr, $context->getTypeFromString('int8'));
+        $boolFloat = $context->builder->uiToFp($boolByte, $double);
         $boolEndBlock = $context->builder->getInsertBlock();
         $context->builder->branch($doneBlock);
 
@@ -317,6 +317,26 @@ final class JitZendScalarCast
         $phi->addIncoming($zero, $fallbackBlock);
 
         return $phi;
+    }
+
+    /**
+     * Read a boxed bool from {@see __value__::value} (writeBool stores int8 at offset 0).
+     * {@see __value__readLong} has no TYPE_NATIVE_BOOL arm (#1056 object_identity_compare).
+     */
+    private static function readBoolByteFromValueBox(Context $context, Value $valuePtr, LlvmType $targetTy): Value
+    {
+        $map = $context->structFieldMap['__value__'];
+        $valueField = $context->builder->structGep($valuePtr, $map['value']);
+        $i32 = $context->getTypeFromString('int32');
+        $i64 = $context->getTypeFromString('int64');
+        $firstByte = $context->builder->inBoundsGEP(
+            $valueField,
+            $i32->constInt(0, false),
+            $i64->constInt(0, false)
+        );
+        $boolByte = $context->builder->load($firstByte);
+
+        return $context->builder->zExt($boolByte, $targetTy);
     }
 
     private static function stringToInt(Context $context, Value $strPtr): Value

@@ -25,6 +25,21 @@ final class AotBoolScriptGlobalTest extends TestCase
         $this->assertSame($vmOut, $aotOut, 'AOT must match VM for false script-global echo');
     }
 
+    public function testBoxedBoolIntCastMatchesVm(): void
+    {
+        $root = dirname(__DIR__, 2);
+        $source = $root.'/test/repro/bool_int_cast_boxed.php';
+        $expected = "1\n1\n1\n";
+        $vmOut = $this->runCommand([PHP_BINARY, $root.'/bin/vm.php', $source], $root);
+        $this->assertSame($expected, $vmOut);
+
+        $out = $root.'/build/test-aot-bool-int-cast-boxed';
+        @mkdir(dirname($out), 0775, true);
+        $this->runCommand([PHP_BINARY, $root.'/bin/compile.php', '-o', $out, $source], $root, expectExit: 0);
+        $aotOut = $this->runCommand([$out], $root);
+        $this->assertSame($expected, $aotOut, 'AOT (int) on boxed bool must match VM');
+    }
+
     /**
      * @param list<string> $cmd
      */
