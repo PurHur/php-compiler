@@ -762,6 +762,7 @@ class Module extends ModuleAbstract
             new date(),
             new timezone_version_get(),
             new timezone_identifiers_list(),
+            new timezone_open(),
             new timezone_offset_get(),
             new timezone_location_get(),
             new timezone_transitions_get(),
