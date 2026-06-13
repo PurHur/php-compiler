@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 2580 |
-| Phase A inventory files (M2 ratio SSOT) | 2580 |
+| PHP files on vm.php path | 2587 |
+| Phase A inventory files (M2 ratio SSOT) | 2587 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 6997 |
+| Source constructs flagged (warnings) | 7017 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -155,7 +155,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/mbstring/JitMbScrub.php` | 0 | 1 |
 | `ext/mbstring/JitMbSearch.php` | 0 | 1 |
 | `ext/mbstring/JitMbStrlen.php` | 0 | 1 |
-| `ext/mbstring/Module.php` | 0 | 16 |
+| `ext/mbstring/Module.php` | 0 | 20 |
 | `ext/mbstring/VmMbstring.php` | 0 | 2 |
 | `ext/mbstring/mb_check_encoding.php` | 0 | 2 |
 | `ext/mbstring/mb_convert_case.php` | 0 | 3 |
@@ -167,8 +167,12 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/mbstring/mb_scrub.php` | 0 | 2 |
 | `ext/mbstring/mb_stripos.php` | 0 | 3 |
 | `ext/mbstring/mb_strlen.php` | 0 | 1 |
+| `ext/mbstring/mb_strpos.php` | 0 | 3 |
 | `ext/mbstring/mb_strrichr.php` | 0 | 3 |
 | `ext/mbstring/mb_strrpos.php` | 0 | 3 |
+| `ext/mbstring/mb_strtolower.php` | 0 | 3 |
+| `ext/mbstring/mb_strtoupper.php` | 0 | 3 |
+| `ext/mbstring/mb_substr.php` | 0 | 3 |
 | `ext/mbstring/mb_substr_count.php` | 0 | 2 |
 | `ext/mbstring/mb_trim.php` | 0 | 1 |
 | `ext/msgpack/Module.php` | 0 | 3 |
@@ -243,6 +247,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/standard/GetimagesizeJitHelper.php` | 0 | 1 |
 | `ext/standard/GetoptEngine.php` | 0 | 1 |
 | `ext/standard/GetoptJitHelper.php` | 0 | 1 |
+| `ext/standard/HebrevJitHelper.php` | 0 | 1 |
 | `ext/standard/HighlightEngine.php` | 0 | 1 |
 | `ext/standard/HighlightJitHelper.php` | 0 | 1 |
 | `ext/standard/Html5NamedEntities.php` | 0 | 1 |
@@ -423,6 +428,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/standard/JitHeader.php` | 0 | 1 |
 | `ext/standard/JitHeaderRegisterCallback.php` | 0 | 1 |
 | `ext/standard/JitHeadersSent.php` | 0 | 1 |
+| `ext/standard/JitHebrev.php` | 0 | 1 |
 | `ext/standard/JitHex2bin.php` | 0 | 1 |
 | `ext/standard/JitHighlight.php` | 0 | 1 |
 | `ext/standard/JitHtmlEntityDecode.php` | 0 | 1 |
@@ -1763,6 +1769,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/Builtin/Getopt.php` | 0 | 2 |
 | `lib/JIT/Builtin/GzStreamIo.php` | 0 | 1 |
 | `lib/JIT/Builtin/GzStreamIoJit.php` | 0 | 1 |
+| `lib/JIT/Builtin/Hebrev.php` | 0 | 2 |
 | `lib/JIT/Builtin/Highlight.php` | 0 | 2 |
 | `lib/JIT/Builtin/HtmlEntityDecodeJit.php` | 0 | 2 |
 | `lib/JIT/Builtin/HttpResponseCode.php` | 0 | 1 |
@@ -3417,25 +3424,29 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new VM\Variable (line 24)
 - new mb_check_encoding (line 33)
 - new mb_strlen (line 34)
-- new mb_substr_count (line 35)
-- new mb_convert_case (line 36)
-- new mb_convert_encoding (line 37)
-- new mb_stripos (line 38)
-- new mb_strrpos (line 39)
-- new mb_strrichr (line 40)
-- new mb_trim (line 41)
-- new mb_ltrim (line 42)
-- new mb_rtrim (line 43)
-- new mb_scrub (line 44)
-- new mb_encode_numericentity (line 45)
-- new mb_decode_numericentity (line 46)
+- new mb_substr (line 35)
+- new mb_substr_count (line 36)
+- new mb_strpos (line 37)
+- new mb_strtolower (line 38)
+- new mb_strtoupper (line 39)
+- new mb_convert_case (line 40)
+- new mb_convert_encoding (line 41)
+- new mb_stripos (line 42)
+- new mb_strrpos (line 43)
+- new mb_strrichr (line 44)
+- new mb_trim (line 45)
+- new mb_ltrim (line 46)
+- new mb_rtrim (line 47)
+- new mb_scrub (line 48)
+- new mb_encode_numericentity (line 49)
+- new mb_decode_numericentity (line 50)
 - 2 class method(s)
 
 ### `ext/mbstring/VmMbstring.php`
 
 **Warnings** (review for bootstrap subset):
-- new ArgumentCountError (line 640)
-- 54 class method(s)
+- new ArgumentCountError (line 746)
+- 61 class method(s)
 
 ### `ext/mbstring/mb_check_encoding.php`
 
@@ -3497,6 +3508,13 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - 3 class method(s)
 
+### `ext/mbstring/mb_strpos.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 30)
+- 2 class method(s)
+- 1 closure(s)
+
 ### `ext/mbstring/mb_strrichr.php`
 
 **Warnings** (review for bootstrap subset):
@@ -3505,6 +3523,27 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - 1 closure(s)
 
 ### `ext/mbstring/mb_strrpos.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 30)
+- 2 class method(s)
+- 1 closure(s)
+
+### `ext/mbstring/mb_strtolower.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 30)
+- 2 class method(s)
+- 1 closure(s)
+
+### `ext/mbstring/mb_strtoupper.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 30)
+- 2 class method(s)
+- 1 closure(s)
+
+### `ext/mbstring/mb_substr.php`
 
 **Warnings** (review for bootstrap subset):
 - new ArgumentCountError (line 30)
@@ -4105,6 +4144,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - 4 class method(s)
 
 ### `ext/standard/GetoptJitHelper.php`
+
+**Warnings** (review for bootstrap subset):
+- 1 class method(s)
+
+### `ext/standard/HebrevJitHelper.php`
 
 **Warnings** (review for bootstrap subset):
 - 1 class method(s)
@@ -5059,6 +5103,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 
 **Warnings** (review for bootstrap subset):
 - 1 class method(s)
+
+### `ext/standard/JitHebrev.php`
+
+**Warnings** (review for bootstrap subset):
+- 3 class method(s)
 
 ### `ext/standard/JitHex2bin.php`
 
@@ -14182,6 +14231,12 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - 22 class method(s)
 
+### `lib/JIT/Builtin/Hebrev.php`
+
+**Warnings** (review for bootstrap subset):
+- new JIT (line 50)
+- 4 class method(s)
+
 ### `lib/JIT/Builtin/Highlight.php`
 
 **Warnings** (review for bootstrap subset):
@@ -15748,53 +15803,53 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new Builtin\ErrorHandler (line 397)
 - new Scope (line 416)
 - new Call\ExternalMethod (line 464)
-- new Builtin\IsNullFn (line 680)
 - new Builtin\IsNullFn (line 681)
-- new Call\SplObjectStorageMethod (line 682)
+- new Builtin\IsNullFn (line 682)
 - new Call\SplObjectStorageMethod (line 683)
 - new Call\SplObjectStorageMethod (line 684)
 - new Call\SplObjectStorageMethod (line 685)
 - new Call\SplObjectStorageMethod (line 686)
 - new Call\SplObjectStorageMethod (line 687)
-- new Call\WeakReferenceCreate (line 689)
-- new Call\WeakReferenceGet (line 690)
-- new Call\WeakMapMethod (line 691)
+- new Call\SplObjectStorageMethod (line 688)
+- new Call\WeakReferenceCreate (line 690)
+- new Call\WeakReferenceGet (line 691)
 - new Call\WeakMapMethod (line 692)
 - new Call\WeakMapMethod (line 693)
 - new Call\WeakMapMethod (line 694)
 - new Call\WeakMapMethod (line 695)
-- new Call\ReflectionClassConstruct (line 697)
-- new Call\ReflectionClassGetName (line 698)
-- new Call\ReflectionClassGetAttributes (line 699)
-- new Call\ReflectionClassGetMethod (line 700)
-- new Call\ReflectionClassGetReflectionConstant (line 701)
-- new Call\ReflectionClassNewLazyProxy (line 702)
-- new Call\ReflectionClassNewLazyGhost (line 703)
-- new Call\ReflectionClassCreateLazyGhost (line 704)
-- new Call\ReflectionClassCreateLazyProxy (line 705)
-- new Call\ReflectionPropertyConstruct (line 706)
-- new Call\ReflectionPropertyGetAttributes (line 707)
-- new Call\ReflectionConstantConstruct (line 708)
-- new Call\ReflectionConstantGetAttributes (line 709)
-- new Call\ReflectionMethodGetAttributes (line 710)
-- new Call\ReflectionAttributeGetName (line 711)
-- new Call\ReflectionAttributeNewInstance (line 712)
-- new Call\ExceptionGetMessage (line 713)
-- new Result (line 845)
-- new Result (line 866)
-- new Variable (line 997)
-- new Variable (line 1313)
-- new Variable (line 1517)
-- new VMVariable (line 1643)
-- new VMVariable (line 1649)
-- new VMVariable (line 1655)
-- new VMVariable (line 1661)
-- new VMVariable (line 1668)
-- new VMVariable (line 1674)
-- new VMVariable (line 1680)
-- new VMVariable (line 1686)
-- new Variable (line 1711)
-- new Variable (line 1750)
+- new Call\WeakMapMethod (line 696)
+- new Call\ReflectionClassConstruct (line 698)
+- new Call\ReflectionClassGetName (line 699)
+- new Call\ReflectionClassGetAttributes (line 700)
+- new Call\ReflectionClassGetMethod (line 701)
+- new Call\ReflectionClassGetReflectionConstant (line 702)
+- new Call\ReflectionClassNewLazyProxy (line 703)
+- new Call\ReflectionClassNewLazyGhost (line 704)
+- new Call\ReflectionClassCreateLazyGhost (line 705)
+- new Call\ReflectionClassCreateLazyProxy (line 706)
+- new Call\ReflectionPropertyConstruct (line 707)
+- new Call\ReflectionPropertyGetAttributes (line 708)
+- new Call\ReflectionConstantConstruct (line 709)
+- new Call\ReflectionConstantGetAttributes (line 710)
+- new Call\ReflectionMethodGetAttributes (line 711)
+- new Call\ReflectionAttributeGetName (line 712)
+- new Call\ReflectionAttributeNewInstance (line 713)
+- new Call\ExceptionGetMessage (line 714)
+- new Result (line 846)
+- new Result (line 867)
+- new Variable (line 998)
+- new Variable (line 1314)
+- new Variable (line 1518)
+- new VMVariable (line 1644)
+- new VMVariable (line 1650)
+- new VMVariable (line 1656)
+- new VMVariable (line 1662)
+- new VMVariable (line 1669)
+- new VMVariable (line 1675)
+- new VMVariable (line 1681)
+- new VMVariable (line 1687)
+- new Variable (line 1712)
+- new Variable (line 1751)
 - 72 class method(s)
 
 ### `lib/JIT/DnfParamCheck.php`
