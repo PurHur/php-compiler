@@ -43,6 +43,6 @@ final class timezone_location_get extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        throw new \LogicException('timezone_location_get() is not implemented for JIT in this compiler build (issue #6041)');
+        return JitTimezoneLocationGet::invoke($context, ...$args);
     }
 }
