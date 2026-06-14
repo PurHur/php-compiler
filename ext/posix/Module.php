@@ -73,6 +73,9 @@ class Module extends ModuleAbstract
             new posix_getrlimit(),
             new posix_setrlimit(),
             new posix_setsid(),
+            new posix_getsid(),
+            new posix_getpgid(),
+            new posix_setpgid(),
         ];
     }
 }
