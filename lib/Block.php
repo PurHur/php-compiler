@@ -308,6 +308,19 @@ class Block {
 
             return $this->scope[$operand];
         }
+        // Call-site arg clones wrap inline Expr temps; reuse the producer slot (#8560, #3553).
+        if ($operand instanceof Temporary && null !== $operand->original && $this->scope->contains($operand->original)) {
+            $existing = $this->scope[$operand->original];
+            $this->scope[$operand] = $existing;
+            if ($isRead && $this->shouldRegisterInheritedArg($operand)) {
+                $this->args[$operand] = $existing;
+            }
+            if (!$isRead) {
+                $this->markLocallyWritten($operand);
+            }
+
+            return $existing;
+        }
         $name = self::resolveVariableName($operand);
         if (null !== $name) {
             $existing = $this->slotIndexForVariableName($name);

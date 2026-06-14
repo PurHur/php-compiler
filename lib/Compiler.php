@@ -8623,6 +8623,81 @@ class Compiler {
         return null;
     }
 
+    /**
+     * php-cfg may lower inline Expr_Array / Expr_New results and call/ctor args to distinct
+     * temporaries (`f(['a' => 1])`, `new C(['x'])`, `g(new C('x'))`) (#8561).
+     *
+     * @return ?string producer slot to pass to TYPE_ARG_SEND instead of the empty arg slot
+     */
+    private function findInlineExprCallArgProducerSlot(Operand $arg, Block $block): ?string
+    {
+        if (!$arg instanceof Operand\Temporary || null === $block->orig) {
+            return null;
+        }
+        $children = $block->orig->children;
+        $argRoot = Block::cfgVarRoot($arg);
+        for ($i = 0, $n = count($children); $i < $n; ++$i) {
+            $child = $children[$i];
+            if (!$this->isInlineExprCallArgConsumer($child)) {
+                continue;
+            }
+            if (!$this->inlineExprCallArgUsesOperand($child, $arg, $argRoot) || 0 === $i) {
+                continue;
+            }
+            $prev = $children[$i - 1];
+            if (!$this->isInlineExprCallArgProducer($prev)) {
+                continue;
+            }
+            $producerSlot = $block->slotForOperand($prev->result);
+            if (null === $producerSlot) {
+                continue;
+            }
+            $argSlot = $this->compileOperand($arg, $block, false);
+            if (null === $argSlot || $producerSlot === $argSlot) {
+                return null;
+            }
+
+            return $producerSlot;
+        }
+
+        return null;
+    }
+
+    private function isInlineExprCallArgConsumer(Op $op): bool
+    {
+        return $op instanceof Op\Expr\FuncCall
+            || $op instanceof Op\Expr\NsFuncCall
+            || $op instanceof Op\Expr\MethodCall
+            || $op instanceof Op\Expr\StaticCall
+            || $op instanceof Op\Expr\New_;
+    }
+
+    private function isInlineExprCallArgProducer(Op $op): bool
+    {
+        return $op instanceof Op\Expr\Array_
+            || $op instanceof Op\Expr\New_;
+    }
+
+    /**
+     * @param ?Operand $argRoot from Block::cfgVarRoot($arg)
+     */
+    private function inlineExprCallArgUsesOperand(Op $consumer, Operand $arg, ?Operand $argRoot): bool
+    {
+        if (!property_exists($consumer, 'args') || !is_array($consumer->args)) {
+            return false;
+        }
+        foreach ($consumer->args as $callArg) {
+            if ($callArg === $arg) {
+                return true;
+            }
+            if (null !== $argRoot && Block::cfgVarRoot($callArg) === $argRoot) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
     protected function findPropertyFetchForResult(Operand $result, Block $block): ?Op\Expr\PropertyFetch
     {
         foreach ($block->orig->children as $child) {
@@ -9814,7 +9889,10 @@ class Compiler {
 
         $sends = [];
         foreach ($args as $arg) {
-            $valueSlot = $this->tryFoldCallArgCompileTimeValue($arg, $block);
+            $valueSlot = $this->findInlineExprCallArgProducerSlot($arg, $block);
+            if (null === $valueSlot) {
+                $valueSlot = $this->tryFoldCallArgCompileTimeValue($arg, $block);
+            }
             if (null === $valueSlot) {
                 $valueSlot = $this->compileOperand($arg, $block, true);
             }

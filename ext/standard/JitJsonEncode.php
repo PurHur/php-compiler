@@ -4,7 +4,9 @@ declare(strict_types=1);
 
 namespace PHPCompiler\ext\standard;
 
+use PHPCompiler\JIT\ArrayBuiltinHelper;
 use PHPCompiler\JIT\BasicBlockHelper;
+use PHPCompiler\JIT\Builtin\StringJsonEncode;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\Variable as JITVariable;
@@ -20,12 +22,18 @@ final class JitJsonEncode
 
     public static function encode(Context $context, JITVariable $arg): Value
     {
-        if (JITVariable::TYPE_HASHTABLE === $arg->type) {
+        StringJsonEncode::ensureLinked($context);
+
+        if (JITVariable::TYPE_HASHTABLE === $arg->type || ArrayBuiltinHelper::isNativeArray($arg->type)) {
+            $ht = JITVariable::TYPE_HASHTABLE === $arg->type
+                ? $context->helper->loadValue($arg)
+                : ArrayBuiltinHelper::loadHashTable($context, $arg);
+
             return self::stringOrFalse(
                 $context,
                 $context->builder->call(
                     $context->lookupFunction('__compiler_json_encode_array'),
-                    $context->helper->loadValue($arg)
+                    $ht
                 )
             );
         }
@@ -34,12 +42,22 @@ final class JitJsonEncode
                 $context,
                 $context->builder->call(
                     $context->lookupFunction('__compiler_json_encode_value'),
-                    $context->helper->loadValue($arg)
+                    JitValueBox::valuePtrFromVariable($context, $arg)
                 )
             );
         }
 
-        throw new \LogicException('json_encode() only supports arrays in this compiler build');
+        $slot = JitValueBox::alloc($context);
+        $ptr = JitValueBox::pointer($context, $slot);
+        JitValueBox::assignToPointer($context, $ptr, $arg);
+
+        return self::stringOrFalse(
+            $context,
+            $context->builder->call(
+                $context->lookupFunction('__compiler_json_encode_value'),
+                $ptr
+            )
+        );
     }
 
     /** @return Value __value__* — false bool when {@param $result} is null (Zend json_encode failure). */

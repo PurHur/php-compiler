@@ -67,6 +67,32 @@ final class BootstrapPhaseCTest extends TestCase
         @unlink($binary);
     }
 
+    /** Inline array literal call args: php-cfg uses distinct temporaries for Expr_Array vs FuncCall (#8561). */
+    public function testInlineArrayLiteralCallArgAotLinkAndExecute(): void
+    {
+        $this->assertBootstrapFixtureLinkAndExecute(
+            'switch_equal_value_long.php',
+            'one'
+        );
+    }
+
+    /** Inline new/array call args: php-cfg uses distinct temporaries for Expr_New vs FuncCall/New (#8561). */
+    public function testInlineNewExprCallArgAotLinkAndExecute(): void
+    {
+        $this->assertBootstrapFixtureLinkAndExecute(
+            'const_string_folder_smoke.php',
+            '11'
+        );
+    }
+
+    public function testInlineNewArrayCtorArgAotLinkAndExecute(): void
+    {
+        $this->assertBootstrapFixtureLinkAndExecute(
+            'const_string_folder_func_call_args.php',
+            '1'
+        );
+    }
+
     public function testMinimalClassAotLinkAndExecute(): void
     {
         if (!self::isLlvmReady()) {
