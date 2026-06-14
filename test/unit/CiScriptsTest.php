@@ -2248,6 +2248,22 @@ final class CiScriptsTest extends TestCase
         $this->assertStringContainsString('BOOTSTRAP_WAVE_CHECK=0', $doc);
     }
 
+    public function testInstallLlvm14ScriptMirrorsLlvm9Layout(): void
+    {
+        $script = dirname(__DIR__, 2).'/script/install-llvm14.sh';
+        $this->assertFileExists($script);
+        $body = (string) file_get_contents($script);
+        $this->assertStringContainsString('libLLVM-14.so.1', $body);
+        $this->assertStringContainsString('clang-14', $body);
+        $this->assertStringContainsString('PHP_COMPILER_LLVM14_INSTALL_DIR', $body);
+        $this->assertStringContainsString('.llvm14', $body);
+        $this->assertStringContainsString('PHPLLVM FFI still targets LLVM 9', $body);
+
+        $doc = (string) file_get_contents(dirname(__DIR__, 2).'/docs/local-ci-matrix.md');
+        $this->assertStringContainsString('install-llvm14.sh', $doc);
+        $this->assertStringContainsString('LLVM 14 migration', $doc);
+    }
+
     public function testCiFastSupportsOptionalJitPreflightGate(): void
     {
         $fast = (string) file_get_contents(dirname(__DIR__, 2).'/script/ci-fast.sh');

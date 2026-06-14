@@ -1,5 +1,6 @@
 vendor
 .llvm
+.llvm14
 test.*
 result.*
 demo
