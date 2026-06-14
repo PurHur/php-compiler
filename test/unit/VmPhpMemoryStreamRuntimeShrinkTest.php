@@ -50,4 +50,28 @@ final class VmPhpMemoryStreamRuntimeShrinkTest extends TestCase
         $this->assertSame('c', VmFs::fgetc($handle));
         VmFs::fclose($handle);
     }
+
+    public function testMemoryStreamFgetsAndStreamGetLine(): void
+    {
+        $handle = VmFs::fopen('php://memory', 'r+');
+        $this->assertNotFalse($handle);
+        VmFs::fwrite($handle, "mem\n");
+        VmFs::rewind($handle);
+        $this->assertSame('mem', VmFs::streamGetLine($handle, 10, "\n"));
+        VmFs::rewind($handle);
+        $this->assertSame("mem\n", VmFs::fgets($handle));
+        VmFs::fclose($handle);
+    }
+
+    public function testVmPhpMemoryStreamFgetsAndStreamGetLine(): void
+    {
+        $handle = VmPhpMemoryStream::open('php://memory', 'r+');
+        $this->assertNotFalse($handle);
+        VmPhpMemoryStream::write($handle, "line1\nline2");
+        VmPhpMemoryStream::seek($handle, 0, SEEK_SET);
+        $this->assertSame('line1', VmPhpMemoryStream::streamGetLine($handle, 1024, "\n"));
+        $this->assertSame('line2', VmPhpMemoryStream::streamGetLine($handle, 1024, "\n"));
+        $this->assertFalse(VmPhpMemoryStream::streamGetLine($handle, 1024));
+        VmPhpMemoryStream::close($handle);
+    }
 }
