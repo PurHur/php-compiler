@@ -78,6 +78,9 @@ class Compiler {
     /** @var SplObjectStorage<CfgBlock, SplObjectStorage<CfgVariable, int>> ?: merge var slots (#3790) */
     private SplObjectStorage $ternaryMergeVarSlots;
 
+    /** @var SplObjectStorage<Op\Stmt\JumpIf, true> ?: return `null !== $p ? $p : null` rewritten (#8563) */
+    private SplObjectStorage $rewrittenNeNullReturnJumpIf;
+
     private ?string $debugLastPhaseInputFile = null;
     private int $debugLastPhaseCounter = 0;
     private ?string $debugLastPhaseKey = null;
@@ -396,6 +399,7 @@ class Compiler {
         $this->attributeClassRegistry = new AttributeClassRegistry();
         $this->seen = new SplObjectStorage;
         $this->ternaryMergeVarSlots = new SplObjectStorage;
+        $this->rewrittenNeNullReturnJumpIf = new SplObjectStorage;
         $this->debugWriteLastPhase('Compiler::compile enter');
 
         Compiler\InheritanceVariance::validateScript(
@@ -465,6 +469,7 @@ class Compiler {
             $this->seen = new SplObjectStorage;
         }
         $this->ternaryMergeVarSlots = new SplObjectStorage;
+        $this->rewrittenNeNullReturnJumpIf = new SplObjectStorage;
         $block = $this->compileCfgBlock($script->main->cfg, $script->main->params, $script->main);
         $this->seen = null;
         if (null === $block && null !== $this->compileAbortDetail && '' !== $this->compileAbortDetail) {
@@ -820,6 +825,118 @@ class Compiler {
         return $this->mergeCfgBlockUsesEchoPhi($ifMerge);
     }
 
+    /** Both ?: arms jump to a merge block ending in RETURN (#4280, #8563). */
+    private function jumpIfTargetsReturnMerge(Op\Stmt\JumpIf $stmt): bool
+    {
+        $ifMerge = $this->branchJumpMergeTarget($stmt->if);
+        $elseMerge = $this->branchJumpMergeTarget($stmt->else);
+        if (null === $ifMerge || $ifMerge !== $elseMerge) {
+            return false;
+        }
+        foreach ($ifMerge->children as $child) {
+            if ($child instanceof Op\Terminal\Return_) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /**
+     * `null !== $param ? $param : null` mis-lowers in AOT when the param arm is if-entry (#8563).
+     * Rewrite to `null === $param ? null : $param` at compile time (php-src equivalent).
+     */
+    private function shouldRewriteNullableNeNullReturnTernary(
+        Op\Stmt\JumpIf $stmt,
+        ?Op\Expr\BinaryOp\NotIdentical $ne = null
+    ): bool {
+        if (!$this->jumpIfTargetsReturnMerge($stmt)) {
+            return false;
+        }
+        if (null !== $ne) {
+            return $this->branchCfgAssignsNullConst($stmt->else)
+                && $this->branchCfgAssignsNonNullValue($stmt->if)
+                && ($this->operandIsNull($ne->left) || $this->operandIsNull($ne->right));
+        }
+        $ne = $this->unwrapOperandToNotIdentical($stmt->cond);
+        if (null === $ne) {
+            return false;
+        }
+
+        return $this->branchCfgAssignsNullConst($stmt->else)
+            && $this->branchCfgAssignsNonNullValue($stmt->if)
+            && ($this->operandIsNull($ne->left) || $this->operandIsNull($ne->right));
+    }
+
+    private function operandIsNull(Operand $operand): bool
+    {
+        if ($operand->type instanceof Type && Type::TYPE_NULL === $operand->type->type) {
+            return true;
+        }
+
+        return $this->exprIsNullConst($operand);
+    }
+
+    private function unwrapOperandToNotIdentical(Operand $operand): ?Op\Expr\BinaryOp\NotIdentical
+    {
+        while ($operand instanceof Operand\Temporary) {
+            if ($operand->original instanceof Op\Expr\BinaryOp\NotIdentical) {
+                return $operand->original;
+            }
+            if (null === $operand->original) {
+                return null;
+            }
+            $operand = $operand->original;
+        }
+
+        return $operand instanceof Op\Expr\BinaryOp\NotIdentical ? $operand : null;
+    }
+
+    private function branchCfgAssignsNullConst(CfgBlock $branchCfg): bool
+    {
+        foreach ($branchCfg->children as $child) {
+            if ($child instanceof Op\Expr\Assign && $this->operandIsNull($child->expr)) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private function exprIsNullConst(Operand $expr): bool
+    {
+        while ($expr instanceof Operand\Temporary && null !== $expr->original) {
+            if ($expr->original instanceof Op\Expr\ConstFetch) {
+                return $this->constFetchIsNull($expr->original);
+            }
+            $expr = $expr->original;
+        }
+
+        return $expr instanceof Op\Expr\ConstFetch && $this->constFetchIsNull($expr);
+    }
+
+    private function constFetchIsNull(Op\Expr\ConstFetch $fetch): bool
+    {
+        $name = $fetch->name;
+        while ($name instanceof Operand\Temporary && null !== $name->original) {
+            $name = $name->original;
+        }
+
+        return $name instanceof Operand\Literal
+            && 'null' === strtolower((string) $name->value);
+    }
+
+    private function branchCfgAssignsNonNullValue(CfgBlock $branchCfg): bool
+    {
+        foreach ($branchCfg->children as $child) {
+            if ($child instanceof Op\Expr\Assign && !$this->exprIsNullConst($child->expr)) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
     /** `?:` in `echo`/concat merge uses echo phi slots; `return ?:` uses RETURN (#4280); `throw ?:` uses TYPE_THROW (#7037). */
     private function mergeCfgBlockUsesEchoPhi(CfgBlock $merge): bool
     {
@@ -828,9 +945,6 @@ class Compiler {
                 return true;
             }
             if ($child instanceof Op\Terminal\Throw_) {
-                return true;
-            }
-            if ($child instanceof Op\Terminal\Return_) {
                 return true;
             }
         }
@@ -1374,6 +1488,20 @@ class Compiler {
                         $echoBlock = $this->compileEchoWithEmbeddedCoalesce($child, $block, $ops, $i);
                         if (null !== $echoBlock) {
                             $block = $echoBlock;
+                            break;
+                        }
+                        if (
+                            $child instanceof Op\Expr\BinaryOp\NotIdentical
+                            && ($ops[$i + 1] ?? null) instanceof Op\Stmt\JumpIf
+                            && $this->shouldRewriteNullableNeNullReturnTernary($ops[$i + 1], $child)
+                        ) {
+                            $block->addOpCode(new OpCode(
+                                OpCode::TYPE_IDENTICAL,
+                                $this->compileOperand($child->result, $block, false),
+                                $this->compileOperand($child->left, $block, true),
+                                $this->compileOperand($child->right, $block, true)
+                            ));
+                            $this->rewrittenNeNullReturnJumpIf[$ops[$i + 1]] = true;
                             break;
                         }
                         $savedAssignRefFlags = $this->assignRefBindRefFlags;
@@ -4775,24 +4903,6 @@ class Compiler {
     /**
      * Fold define('NAME', expr) value operands for compile-time const registration (#5409).
      */
-    protected function cfgTypeForFoldedVmConstant(Variable $vm): Type
-    {
-        switch ($vm->type) {
-            case Variable::TYPE_BOOLEAN:
-                return Type::bool();
-            case Variable::TYPE_INTEGER:
-                return Type::int();
-            case Variable::TYPE_FLOAT:
-                return Type::float();
-            case Variable::TYPE_STRING:
-                return Type::string();
-            case Variable::TYPE_NULL:
-                return Type::null();
-            default:
-                return Type::mixed();
-        }
-    }
-
     protected function tryFoldDefineValueOperand(Operand $valueArg, Block $block): ?Variable
     {
         $vm = $this->vmVariableFromCfgLiteralOperand($valueArg);
@@ -5425,8 +5535,12 @@ class Compiler {
             if (null !== $block->orig && $this->isErrorSuppressEndBlock($block->orig)) {
                 $block->addOpCode(new OpCode(OpCode::TYPE_END_SILENCE));
             }
+            $rewriteNeNull = $this->rewrittenNeNullReturnJumpIf->contains($stmt);
             $op = new OpCode(OpCode::TYPE_JUMPIF, $this->compileOperand($stmt->cond, $block, true));
-            if ($this->jumpIfTargetsTernaryMerge($stmt)) {
+            if ($rewriteNeNull) {
+                $op->block1 = $this->compileCfgBranch($stmt->else, $block);
+                $op->block2 = $this->compileCfgBranch($stmt->if, $block);
+            } elseif ($this->jumpIfTargetsTernaryMerge($stmt)) {
                 // Lower else before if so merge blocks record both branch phi slots (#3790, #5510).
                 $op->block2 = $this->compileCfgBranch($stmt->else, $block);
                 $op->block1 = $this->compileCfgBranch($stmt->if, $block);
@@ -9440,29 +9554,9 @@ class Compiler {
      *
      * @return list<OpCode>
      */
-    private function formatCallArgOrderError(?Block $block, Operand $arg, string $detail): string
-    {
-        if (null === $block) {
-            return $detail;
-        }
-        $path = $block->scriptPath();
-        $line = 0;
-        if (method_exists($arg, 'getLine')) {
-            $line = (int) $arg->getLine();
-        }
-        if ('' !== $path && $line > 0) {
-            return $detail.' in '.$path.':'.$line;
-        }
-        if ('' !== $path) {
-            return $detail.' in '.$path;
-        }
-
-        return $detail;
-    }
-
     protected function compileCallArgSends(array $args, Block $block): array
     {
-        $this->validateCallArgOrder($args, $block);
+        $this->validateCallArgOrder($args);
 
         $sends = [];
         foreach ($args as $arg) {
@@ -9496,7 +9590,7 @@ class Compiler {
      *
      * @param list<Operand> $args
      */
-    private function validateCallArgOrder(array $args, ?Block $block = null): void
+    private function validateCallArgOrder(array $args): void
     {
         $hadNamed = false;
         $hadUnpack = false;
@@ -9507,34 +9601,18 @@ class Compiler {
             $isNamed = null !== $argName;
             $isUnpack = $this->callArgUnpack($arg);
             if ($isUnpack && $hadNamed) {
-                $this->throwCompileError($this->formatCallArgOrderError(
-                    $block,
-                    $arg,
-                    'Cannot use argument unpacking after named arguments'
-                ));
+                $this->throwCompileError('Cannot use argument unpacking after named arguments');
             }
             if (!$isNamed && !$isUnpack && $hadNamed) {
-                $this->throwCompileError($this->formatCallArgOrderError(
-                    $block,
-                    $arg,
-                    'Cannot use positional argument after named argument'
-                ));
+                $this->throwCompileError('Cannot use positional argument after named argument');
             }
             if (!$isNamed && !$isUnpack && $hadUnpack) {
-                $this->throwCompileError($this->formatCallArgOrderError(
-                    $block,
-                    $arg,
-                    'Cannot use positional argument after argument unpacking'
-                ));
+                $this->throwCompileError('Cannot use positional argument after argument unpacking');
             }
             if ($isNamed) {
                 $lc = strtolower($argName);
                 if (isset($seenNamedLc[$lc])) {
-                    $this->throwCompileError($this->formatCallArgOrderError(
-                        $block,
-                        $arg,
-                        "Named parameter \${$argName} overwrites previous argument"
-                    ));
+                    $this->throwCompileError("Named parameter \${$argName} overwrites previous argument");
                 }
                 $seenNamedLc[$lc] = true;
                 $hadNamed = true;
@@ -9767,14 +9845,10 @@ class Compiler {
         }
         $constNameArg = $args[0];
         $valueArg = $args[1];
-        if (!$constNameArg instanceof Operand\Literal) {
+        if (!$constNameArg instanceof Operand\Literal || !$valueArg instanceof Operand\Literal) {
             return null;
         }
         if (Variable::TYPE_STRING !== Variable::mapFromType($constNameArg->type)) {
-            return null;
-        }
-        $foldedValue = $this->tryFoldDefineValueOperand($valueArg, $block);
-        if (null === $foldedValue) {
             return null;
         }
         $caseInsensitiveSlot = null;
@@ -9792,17 +9866,15 @@ class Compiler {
             }
         }
         $constNameSlot = $this->compileOperand($constNameArg, $block, true);
-        if (!isset($block->constants[$constNameSlot])) {
+        $valueSlot = $this->compileOperand($valueArg, $block, true);
+        if (!isset($block->constants[$constNameSlot], $block->constants[$valueSlot])) {
             return null;
         }
-        $valueOperand = new Temporary();
-        $valueOperand->type = $this->cfgTypeForFoldedVmConstant($foldedValue);
-        $valueSlot = $block->registerConstant($valueOperand, $foldedValue);
         $constName = $block->constants[$constNameSlot]->toString();
         if ('' === $constName || str_contains($constName, '::')) {
             return null;
         }
-        $this->storeCompileTimeGlobalConst($constName, $foldedValue);
+        $this->storeCompileTimeGlobalConst($constName, $block->constants[$valueSlot]);
         $ops = [new OpCode(
             OpCode::TYPE_DECLARE_GLOBAL_CONST,
             $constNameSlot,
