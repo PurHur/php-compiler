@@ -18,6 +18,10 @@ final class VmReadlineRuntimeShrinkTest extends TestCase
         $this->assertStringNotContainsString('\\readline_add_history(', $source);
         $this->assertStringNotContainsString('\\readline_list_history(', $source);
         $this->assertStringNotContainsString('\\readline_info(', $source);
+        $this->assertStringContainsString('VmFs::filePutContents', $source);
+        $this->assertStringContainsString('VmFs::file(', $source);
+        $this->assertDoesNotMatchRegularExpression('/\\\\file_put_contents\\s*\\(/', $source);
+        $this->assertDoesNotMatchRegularExpression('/\\\\file\\s*\\(/', $source);
     }
 
     public function testInMemoryHistoryRoundtrip(): void

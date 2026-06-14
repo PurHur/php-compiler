@@ -54,16 +54,16 @@ final class VmReadline
         }
         $content = '' === self::$history ? '' : \implode("\n", self::$history)."\n";
 
-        return false !== \file_put_contents($filename, $content);
+        return false !== VmFs::filePutContents($filename, $content);
     }
 
     public static function readHistory(?string $filename = null): bool
     {
-        if (null === $filename || !\is_readable($filename)) {
+        if (null === $filename) {
             return false;
         }
         self::$history = [];
-        $lines = \file($filename, \FILE_IGNORE_NEW_LINES);
+        $lines = VmFs::file($filename, StdlibConstants::FILE_IGNORE_NEW_LINES);
         if (false === $lines) {
             return false;
         }
