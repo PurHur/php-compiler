@@ -63,7 +63,7 @@ final class debug_zval_dump extends Internal
             return;
         }
         if (Variable::TYPE_FLOAT === $var->type) {
-            echo 'float(', $var->toFloat(), ")\n";
+            echo 'float(', VmFloatDtoa::formatVarDump($var->toFloat()), ")\n";
 
             return;
         }

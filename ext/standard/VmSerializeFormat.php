@@ -140,6 +140,10 @@ final class VmSerializeFormat
     /** php-src %.*H with precision -1 (dtoa mode 0). */
     private static function formatDtoa(float $num): string
     {
+        if (abs($num) >= 1e14) {
+            return VmFloatDtoa::formatH($num);
+        }
+
         $negative = $num < 0.0;
         $num = abs($num);
 
