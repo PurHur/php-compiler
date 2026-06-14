@@ -25,4 +25,14 @@ final class MbStrwidthJitHelper
     ): string {
         return VmMbstring::strimwidth($string, $from, $width, $trimmarker, $encoding);
     }
+
+    public static function strPad(
+        string $input,
+        int $padLength,
+        string $padString,
+        int $padType,
+        string $encoding
+    ): string {
+        return VmMbstring::strPad($input, $padLength, $padString, $padType, $encoding);
+    }
 }

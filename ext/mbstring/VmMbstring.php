@@ -301,6 +301,91 @@ final class VmMbstring
     }
 
     /**
+     * mb_str_pad() — multibyte-aware str_pad (php-src ext/mbstring/mbstring.c; #6081).
+     */
+    public static function strPad(
+        string $input,
+        int $padLength,
+        string $padString = ' ',
+        int $padType = 1,
+        string $encoding = 'UTF-8'
+    ): string {
+        self::assertSubstrCountEncoding($encoding, 'mb_str_pad');
+        $inputLength = 'UTF-8' === $encoding
+            ? VmString::utf8CharLength($input)
+            : VmString::byteLength($input);
+        if ($padLength < 0 || $padLength <= $inputLength) {
+            return $input;
+        }
+        if ('' === $padString) {
+            throw new \ValueError('mb_str_pad(): Argument #3 ($pad_string) must be a non-empty string');
+        }
+        $padUnitLength = 'UTF-8' === $encoding
+            ? VmString::utf8CharLength($padString)
+            : VmString::byteLength($padString);
+        if (0 === $padUnitLength) {
+            throw new \ValueError('mb_str_pad(): Argument #3 ($pad_string) must be a non-empty string');
+        }
+        if ($padType < 0 || $padType > 2) {
+            throw new \ValueError(
+                'mb_str_pad(): Argument #4 ($pad_type) must be STR_PAD_LEFT, STR_PAD_RIGHT, or STR_PAD_BOTH'
+            );
+        }
+
+        $numPadUnits = $padLength - $inputLength;
+        if (1 === $padType) {
+            $leftPad = 0;
+            $rightPad = $numPadUnits;
+        } elseif (0 === $padType) {
+            $leftPad = $numPadUnits;
+            $rightPad = 0;
+        } else {
+            $leftPad = intdiv($numPadUnits, 2);
+            $rightPad = $numPadUnits - $leftPad;
+        }
+
+        if ('UTF-8' === $encoding) {
+            return self::repeatUtf8PadString($padString, $padUnitLength, $leftPad)
+                .$input
+                .self::repeatUtf8PadString($padString, $padUnitLength, $rightPad);
+        }
+
+        return self::repeatBytePadString($padString, $padUnitLength, $leftPad)
+            .$input
+            .self::repeatBytePadString($padString, $padUnitLength, $rightPad);
+    }
+
+    private static function repeatUtf8PadString(string $padString, int $padCharLength, int $charLength): string
+    {
+        if ($charLength <= 0) {
+            return '';
+        }
+        $fullCopies = intdiv($charLength, $padCharLength);
+        $remainder = $charLength % $padCharLength;
+        $result = \str_repeat($padString, $fullCopies);
+        if ($remainder > 0) {
+            $result .= VmString::utf8CharSubstr($padString, 0, $remainder);
+        }
+
+        return $result;
+    }
+
+    private static function repeatBytePadString(string $padString, int $padByteLength, int $byteLength): string
+    {
+        if ($byteLength <= 0) {
+            return '';
+        }
+        $fullCopies = intdiv($byteLength, $padByteLength);
+        $remainder = $byteLength % $padByteLength;
+        $result = \str_repeat($padString, $fullCopies);
+        if ($remainder > 0) {
+            $result .= VmString::byteSlice($padString, 0, $remainder);
+        }
+
+        return $result;
+    }
+
+    /**
      * mb_strcut() — byte-oriented slice aligned to character boundaries (php-src mb_strcut; #4573).
      *
      * $from and $length are measured in bytes (not codepoints, unlike mb_substr).
