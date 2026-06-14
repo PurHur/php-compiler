@@ -8256,19 +8256,13 @@ class JIT {
                 return JIT\HashTableHelper::materializeNativeArrayForCall($this->context, $return);
             }
             if ('__string__*' === $expected && Variable::TYPE_VALUE === $return->type) {
-                return $this->context->builder->call(
-                    $this->context->lookupFunction('__value__readString'),
-                    JIT\JitValueBox::valuePtrFromVariable($this->context, $return)
-                );
+                return JIT\JitValueBox::readStringOrNull($this->context, $return);
             }
 
             return $retval;
         }
-        if ('__string__*' === $expected) {
-            return $this->context->builder->call(
-                $this->context->lookupFunction('__value__readString'),
-                JIT\JitValueBox::valuePtrFromVariable($this->context, $return)
-            );
+        if ('__string__*' === $expected && Variable::TYPE_VALUE === $return->type) {
+            return JIT\JitValueBox::readStringOrNull($this->context, $return);
         }
         if ($return->functionStaticGlobal) {
             $valuePtr = JIT\JitValueBox::valuePtrFromVariable($this->context, $return);
@@ -9626,6 +9620,35 @@ class JIT {
             ) {
                 // fall through to normal assign on the aliased lvalue
             } elseif ($this->tryAssignScriptGlobalFirstBinding($resultOp, $value)) {
+                return;
+            } elseif (
+                Variable::TYPE_VALUE === $value->type
+                && Variable::KIND_VALUE === $value->kind
+                && '__value__*' === $this->context->getStringFromType($this->context->helper->loadValue($value)->typeOf())
+            ) {
+                // getenv() and similar return __value__* rvalues — copy into a stack slot (#8555).
+                $slot = JIT\JitValueBox::alloc($this->context);
+                JIT\JitValueBox::copyFromPointer(
+                    $this->context,
+                    $slot,
+                    JIT\JitValueBox::normalizeValuePtr(
+                        $this->context,
+                        $this->context->helper->loadValue($value)
+                    )
+                );
+                $var = new Variable(
+                    $this->context,
+                    Variable::TYPE_VALUE,
+                    Variable::KIND_VARIABLE,
+                    $slot
+                );
+                $var->addref();
+                $this->context->setVariableOp($resultOp, $var);
+                $resolved = JIT\OperandName::resolve($resultOp);
+                if (null !== $resolved && '' !== $resolved) {
+                    $this->context->bindVariableByName($resolved, $var);
+                }
+
                 return;
             } else {
                 // it's a kind!
