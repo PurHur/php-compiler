@@ -6,6 +6,7 @@ namespace PHPCompiler\JIT\Builtin;
 
 use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Context;
+use PHPLLVM\BasicBlock;
 use PHPLLVM\Builder;
 use PHPLLVM\Value;
 use PHPLLVM\Value\Function_ as LlvmFunction;
@@ -27,9 +28,12 @@ final class StringZstdJit
 
     public static function implement(Context $context): void
     {
+        $restore = self::captureInsertBlock($context);
+
         $probe = $context->module->getNamedFunction('__compiler_zstd_compress');
         if (null !== $probe && $probe->countBasicBlocks() > 0) {
             self::registerLinkedRuntime($context);
+            self::restoreInsertBlock($context, $restore);
 
             return;
         }
@@ -41,6 +45,7 @@ final class StringZstdJit
         self::implementIfMissing($context, '__compiler_zstd_decompress', self::emitZstdDecompress(...));
 
         self::registerLinkedRuntime($context);
+        self::restoreInsertBlock($context, $restore);
     }
 
     /**
@@ -58,7 +63,6 @@ final class StringZstdJit
         $fn = self::declareFunction($context, $name);
         $emit($context, $fn);
         $context->registerFunction($name, $fn);
-        $context->builder->clearInsertionPosition();
     }
 
     private static function declareFunction(Context $context, string $name): LlvmFunction
@@ -343,15 +347,11 @@ final class StringZstdJit
 
     private static function literalCstr(Context $context, string $text): Value
     {
-        $slot = BasicBlockHelper::entryAlloca($context, $context->getTypeFromString('int8')->arrayType(\strlen($text) + 1));
-        $builder = $context->builder;
-        $i8 = $context->getTypeFromString('int8');
-        for ($i = 0, $n = \strlen($text); $i < $n; ++$i) {
-            $builder->store($i8->constInt(\ord($text[$i]), false), $builder->gep($slot, $i));
-        }
-        $builder->store($i8->constInt(0, false), $builder->gep($slot, \strlen($text)));
+        $litGlobal = $context->constantStringFromString($text);
+        $litPtr = $context->builder->load($litGlobal);
+        $map = $context->structFieldMap['__string__'];
 
-        return $builder->pointerCast($slot, $context->getTypeFromString('int8*'));
+        return $context->builder->structGep($litPtr, $map['value']);
     }
 
     private static function registerLinkedRuntime(Context $context): void
@@ -363,5 +363,24 @@ final class StringZstdJit
             }
             $context->registerFunction($name, $fn);
         }
+    }
+
+    private static function captureInsertBlock(Context $context): ?BasicBlock
+    {
+        try {
+            return $context->builder->getInsertBlock();
+        } catch (\Throwable) {
+            return null;
+        }
+    }
+
+    private static function restoreInsertBlock(Context $context, ?BasicBlock $block): void
+    {
+        if (null !== $block) {
+            $context->builder->positionAtEnd($block);
+
+            return;
+        }
+        $context->builder->clearInsertionPosition();
     }
 }
