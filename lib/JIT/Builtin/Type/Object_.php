@@ -5071,6 +5071,11 @@ class Object_ extends Type {
         return $this->classes['roundingmode'] ?? null;
     }
 
+    public function infoViewEnumClassId(): ?int
+    {
+        return $this->classes['infoview'] ?? null;
+    }
+
     public function connectionStatusEnumClassId(): ?int
     {
         return $this->classes['connectionstatus'] ?? null;

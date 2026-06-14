@@ -6,6 +6,7 @@ namespace PHPCompiler\ext\standard;
 
 use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Builtin\StringInfo;
+use PHPCompiler\JIT\Builtin\StringPhpinfoRuntime;
 use PHPCompiler\JIT\Builtin\StringVersionCompare;
 use PHPCompiler\JIT\Builtin\TypeErrorRaise;
 use PHPCompiler\JIT\Context;
@@ -55,6 +56,30 @@ final class JitInfo
         $ptr = JitValueBox::pointer($context, $slot);
         $owned = $context->builder->call($context->lookupFunction('__string__separate'), $raw);
         $context->builder->call($context->lookupFunction('__value__writeString'), $ptr, $owned);
+
+        return $ptr;
+    }
+
+    public static function phpinfo(Context $context, ?JITVariable $flagsArg): Value
+    {
+        StringPhpinfoRuntime::ensureLinked($context);
+        $flags = JitPhpinfoFlags::resolvePhpinfoFlags($context, $flagsArg);
+        $context->builder->call($context->lookupFunction('__compiler_phpinfo'), $flags);
+        $slot = JitValueBox::alloc($context);
+        $ptr = JitValueBox::pointer($context, $slot);
+        JitValueBox::writeBool($context, $slot, $context->constantFromBool(true));
+
+        return $ptr;
+    }
+
+    public static function phpcredits(Context $context, ?JITVariable $flagsArg): Value
+    {
+        StringPhpinfoRuntime::ensureLinked($context);
+        $flags = JitPhpinfoFlags::resolvePhpcreditsFlags($context, $flagsArg);
+        $context->builder->call($context->lookupFunction('__compiler_phpcredits'), $flags);
+        $slot = JitValueBox::alloc($context);
+        $ptr = JitValueBox::pointer($context, $slot);
+        $context->builder->call($context->lookupFunction('__value__writeNull'), $ptr);
 
         return $ptr;
     }
