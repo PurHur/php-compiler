@@ -7274,7 +7274,7 @@ restart:
             }
             $this->context->activeCatchHandlerFrame = $handler;
             // Abandon suspended try-body call sites (throw from callee/finally; #5331).
-            $this->context->clearRunStack();
+            $this->context->truncateRunStackForCatch($handler);
             $this->clearThrowDispatchState();
 
             return $catchFrame;

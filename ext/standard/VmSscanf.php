@@ -35,6 +35,7 @@ final class VmSscanf
         if ([] !== $outVars) {
             self::validateOutVarArity($format, \count($outVars));
         }
+        self::validateConversionCharacters($format);
 
         $outIdx = 0;
         $assigned = 0;
@@ -76,6 +77,51 @@ final class VmSscanf
                     ++$outIdx;
                     ++$assigned;
                     break;
+                case 'u':
+                    [$val, $consumed, $asString] = self::scanUnsigned($input, $inPos, $inLen);
+                    if (null === $val && null === $asString) {
+                        return [$assigned, $inPos];
+                    }
+                    if (null !== $asString) {
+                        self::assignString($outVars[$outIdx], $asString);
+                    } else {
+                        self::assignInt($outVars[$outIdx], $val);
+                    }
+                    $inPos += $consumed;
+                    ++$outIdx;
+                    ++$assigned;
+                    break;
+                case 'x':
+                case 'X':
+                    [$val, $consumed] = self::scanHex($input, $inPos, $inLen);
+                    if (null === $val) {
+                        return [$assigned, $inPos];
+                    }
+                    self::assignInt($outVars[$outIdx], $val);
+                    $inPos += $consumed;
+                    ++$outIdx;
+                    ++$assigned;
+                    break;
+                case 'o':
+                    [$val, $consumed] = self::scanOct($input, $inPos, $inLen);
+                    if (null === $val) {
+                        return [$assigned, $inPos];
+                    }
+                    self::assignInt($outVars[$outIdx], $val);
+                    $inPos += $consumed;
+                    ++$outIdx;
+                    ++$assigned;
+                    break;
+                case 'c':
+                    [$str, $consumed] = self::scanChar($input, $inPos, $inLen);
+                    if (null === $str) {
+                        return [$assigned, $inPos];
+                    }
+                    self::assignString($outVars[$outIdx], $str);
+                    $inPos += $consumed;
+                    ++$outIdx;
+                    ++$assigned;
+                    break;
                 case 's':
                     [$str, $consumed] = self::scanString($input, $inPos, $inLen);
                     if (null === $str) {
@@ -97,9 +143,7 @@ final class VmSscanf
                     ++$assigned;
                     break;
                 default:
-                    throw new \LogicException(
-                        'sscanf() unsupported conversion specifier %'.$spec.' in this compiler build'
-                    );
+                    throw new \ValueError('Bad scan conversion character "'.$spec.'"');
             }
         }
 
@@ -164,6 +208,32 @@ final class VmSscanf
         return $count;
     }
 
+    /** php-src ext/standard/sscanf.c — reject unsupported conversion letters before scanning (#4158). */
+    public static function validateConversionCharacters(string $format): void
+    {
+        $len = VmString::byteLength($format);
+        for ($fpos = 0; $fpos < $len; ++$fpos) {
+            if ('%' !== $format[$fpos]) {
+                continue;
+            }
+            if ($fpos + 1 >= $len) {
+                break;
+            }
+            $spec = $format[++$fpos];
+            if ('%' === $spec) {
+                continue;
+            }
+            if (!self::isSupportedConversionSpec($spec)) {
+                throw new \ValueError('Bad scan conversion character "'.$spec.'"');
+            }
+        }
+    }
+
+    private static function isSupportedConversionSpec(string $spec): bool
+    {
+        return \in_array($spec, ['d', 'u', 'f', 's', 'x', 'X', 'o', 'c'], true);
+    }
+
     /**
      * @return array{0: ?int, 1: int}
      */
@@ -220,6 +290,121 @@ final class VmSscanf
     }
 
     /**
+     * @return array{0: ?int, 1: int}
+     */
+    private static function scanHex(string $input, int $pos, int $len): array
+    {
+        $orig = $pos;
+        $pos = self::skipSpace($input, $pos, $len);
+        if ($pos >= $len) {
+            return [null, 0];
+        }
+        if (
+            $pos + 1 < $len
+            && '0' === $input[$pos]
+            && ('x' === $input[$pos + 1] || 'X' === $input[$pos + 1])
+        ) {
+            $pos += 2;
+        }
+        $value = 0;
+        $any = false;
+        while ($pos < $len) {
+            $ch = $input[$pos];
+            $digit = null;
+            if ($ch >= '0' && $ch <= '9') {
+                $digit = ord($ch) - 48;
+            } elseif ($ch >= 'a' && $ch <= 'f') {
+                $digit = ord($ch) - 87;
+            } elseif ($ch >= 'A' && $ch <= 'F') {
+                $digit = ord($ch) - 55;
+            }
+            if (null === $digit) {
+                break;
+            }
+            $any = true;
+            $value = ($value << 4) + $digit;
+            ++$pos;
+        }
+        if (!$any) {
+            return [null, 0];
+        }
+
+        return [$value, $pos - $orig];
+    }
+
+    /**
+     * @return array{0: ?int, 1: int}
+     */
+    private static function scanOct(string $input, int $pos, int $len): array
+    {
+        $orig = $pos;
+        $pos = self::skipSpace($input, $pos, $len);
+        if ($pos >= $len) {
+            return [null, 0];
+        }
+        $value = 0;
+        $any = false;
+        while ($pos < $len && $input[$pos] >= '0' && $input[$pos] <= '7') {
+            $any = true;
+            $value = ($value << 3) + (ord($input[$pos]) - 48);
+            ++$pos;
+        }
+        if (!$any) {
+            return [null, 0];
+        }
+
+        return [$value, $pos - $orig];
+    }
+
+    /**
+     * @return array{0: ?int, 1: int, 2: ?string}
+     */
+    private static function scanUnsigned(string $input, int $pos, int $len): array
+    {
+        $orig = $pos;
+        $pos = self::skipSpace($input, $pos, $len);
+        if ($pos >= $len) {
+            return [null, 0, null];
+        }
+        $negative = false;
+        if ('-' === $input[$pos]) {
+            $negative = true;
+            ++$pos;
+        } elseif ('+' === $input[$pos]) {
+            ++$pos;
+        }
+        $value = 0;
+        $any = false;
+        while ($pos < $len && $input[$pos] >= '0' && $input[$pos] <= '9') {
+            $any = true;
+            $value = $value * 10 + (ord($input[$pos]) - 48);
+            ++$pos;
+        }
+        if (!$any) {
+            return [null, 0, null];
+        }
+        if ($negative) {
+            return [null, $pos - $orig, self::unsignedWrapDecimal($value)];
+        }
+
+        return [$value, $pos - $orig, null];
+    }
+
+    /**
+     * @return array{0: ?string, 1: int}
+     */
+    private static function scanChar(string $input, int $pos, int $len): array
+    {
+        if ($pos >= $len) {
+            return [null, 0];
+        }
+        $ch = $input[$pos];
+        $value = self::isSpace($ch) ? '' : $ch;
+
+        return [$value, 1];
+    }
+
+    /**
      * @return array{0: ?float, 1: int}
      */
     private static function scanFloat(string $input, int $pos, int $len): array
@@ -265,6 +450,32 @@ final class VmSscanf
     private static function isSpace(string $ch): bool
     {
         return ' ' === $ch || "\t" === $ch || "\n" === $ch || "\r" === $ch || "\f" === $ch || "\v" === $ch;
+    }
+
+    /** 2^64 − $magnitude as decimal string (php-src %u negative input, ext/standard/sscanf.c). */
+    private static function unsignedWrapDecimal(int $magnitude): string
+    {
+        return self::subtractDecimalStrings('18446744073709551616', (string) $magnitude);
+    }
+
+    private static function subtractDecimalStrings(string $minuend, string $subtrahend): string
+    {
+        $aDigits = \str_split($minuend);
+        $bDigits = \str_split(\str_pad($subtrahend, \strlen($minuend), '0', \STR_PAD_LEFT));
+        $borrow = 0;
+        for ($i = \count($aDigits) - 1; $i >= 0; --$i) {
+            $d = (int) $aDigits[$i] - (int) $bDigits[$i] - $borrow;
+            if ($d < 0) {
+                $d += 10;
+                $borrow = 1;
+            } else {
+                $borrow = 0;
+            }
+            $aDigits[$i] = (string) $d;
+        }
+        $result = \ltrim(\implode('', $aDigits), '0');
+
+        return '' === $result ? '0' : $result;
     }
 
     private static function assignInt(Variable $dest, int $value): void

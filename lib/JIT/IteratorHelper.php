@@ -590,6 +590,13 @@ final class IteratorHelper
         $entry->addIncoming($strEntry, $strEntryBlock);
         $var = new Variable($context, Variable::TYPE_VALUE, Variable::KIND_VARIABLE, $entry);
         $var->borrowedValueEntry = true;
+        $var->writableHt = $ht;
+        $var->writableIndex = $idx;
+        $i1 = $context->getTypeFromString('int1');
+        $packedArm = $context->builder->phi($i1);
+        $packedArm->addIncoming($i1->constInt(1, false), $packed);
+        $packedArm->addIncoming($i1->constInt(0, false), $strEntryBlock);
+        $var->foreachByRefPackedArm = $packedArm;
 
         return $var;
     }

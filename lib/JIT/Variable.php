@@ -80,6 +80,9 @@ final class Variable {
     /** @var \PHPLLVM\Value|null */
     public ?\PHPLLVM\Value $writableIndex = null;
 
+    /** Foreach by-ref: int1 phi selecting packed-index vs string-key writable arm (#4364). */
+    public ?\PHPLLVM\Value $foreachByRefPackedArm = null;
+
     /** Boxed foreach / SplObjectStorage offset key for $arr[$key] = … (issue #86). */
     public ?Variable $writableValueBoxKey = null;
 
@@ -345,6 +348,13 @@ final class Variable {
         if ([] === $subTypes) {
             return null;
         }
+        foreach ($subTypes as $sub) {
+            $userType = $sub->userType ?? '';
+            if ('' !== $userType && 0 !== strcasecmp($userType, 'mixed')) {
+                // Enum cases and class-valued literals must use hashtable slots (#5722, #5638).
+                return null;
+            }
+        }
         $elemType = self::getTypeFromType($subTypes[0]);
         if (!in_array($elemType, [
             self::TYPE_NATIVE_LONG,
@@ -388,6 +398,7 @@ final class Variable {
             && '' !== $name
             && !Superglobals::isSuperglobalName($name)
             && $block->isMainScript()
+            && !$context->isForeachByRefLocalName($name, $block)
         ) {
             return $context->ensureScriptGlobal($name);
         }
