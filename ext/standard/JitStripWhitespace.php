@@ -26,7 +26,9 @@ final class JitStripWhitespace
 
         $pathLit = $args[0]->compileTimeString ?? null;
         if (null !== $pathLit) {
-            $contents = @\file_get_contents($pathLit);
+            $contents = VmFsReadNative::available()
+                ? VmFsReadNative::read($pathLit)
+                : false;
             if (false === $contents) {
                 return self::materializeString($context, '');
             }

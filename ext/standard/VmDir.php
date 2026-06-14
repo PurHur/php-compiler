@@ -11,123 +11,71 @@ namespace PHPCompiler\ext\standard;
  */
 final class VmDir
 {
-    private const HANDLE_BASE = 0x10000000;
-
-    /** @var array<int, resource> */
-    private static array $handles = [];
-
-    private static int $nextHandleId = 0;
-
     /** @return int|false */
-    public static function opendir(string $path)
+    public static function opendir(string $path): int|false
     {
-        $dh = @\opendir($path);
-        if (false === $dh) {
+        if (!VmDirNative::available()) {
             return false;
         }
-        $id = ++self::$nextHandleId;
-        self::$handles[$id] = $dh;
 
-        return self::HANDLE_BASE + $id;
+        return VmDirNative::opendir($path);
     }
 
     /** @return string|false */
-    public static function readdir(int $handle)
+    public static function readdir(int $handle): string|false
     {
-        $dh = self::lookup($handle);
-        if (null === $dh) {
-            return false;
-        }
-        $entry = @\readdir($dh);
-        if (false === $entry) {
+        if (!VmDirNative::available()) {
             return false;
         }
 
-        return $entry;
+        return VmDirNative::readdir($handle);
     }
 
     public static function closedir(int $handle): void
     {
-        $dh = self::lookup($handle);
-        if (null === $dh) {
+        if (!VmDirNative::available()) {
             return;
         }
-        $slot = self::slot($handle);
-        if (null === $slot) {
-            return;
-        }
-        unset(self::$handles[$slot]);
-        @\closedir($dh);
+        VmDirNative::closedir($handle);
     }
 
     public static function rewinddir(int $handle): void
     {
-        $dh = self::lookup($handle);
-        if (null === $dh) {
+        if (!VmDirNative::available()) {
             return;
         }
-        @\rewinddir($dh);
+        VmDirNative::rewinddir($handle);
     }
 
     public static function isValidHandle(int $handle): bool
     {
-        $slot = self::slot($handle);
+        if (!VmDirNative::available()) {
+            return false;
+        }
 
-        return null !== $slot && isset(self::$handles[$slot]);
+        return VmDirNative::isValidHandle($handle);
     }
 
     /**
-     * scandir() for VM — opendir/readdir/closedir stack, no host \\scandir() (#5048, php-src dir.c).
+     * scandir() for VM — libc scandir(3) via VmDirNative, no host \\scandir() (#5048, php-src dir.c).
      *
      * @return list<string>|false
      */
-    public static function scandir(string $path, int $sortingOrder = \SCANDIR_SORT_ASCENDING)
+    public static function scandir(string $path, int $sortingOrder = \SCANDIR_SORT_ASCENDING): array|false
     {
-        $handle = self::opendir($path);
-        if (false === $handle) {
+        if (!VmDirNative::available()) {
             return false;
         }
-        $names = [];
-        while (true) {
-            $entry = self::readdir($handle);
-            if (false === $entry) {
-                break;
-            }
-            $names[] = $entry;
+        $names = VmDirNative::listSorted($path);
+        if (false === $names) {
+            return false;
         }
-        self::closedir($handle);
         if (\SCANDIR_SORT_NONE !== $sortingOrder) {
-            \sort($names, \SORT_STRING);
             if (\SCANDIR_SORT_DESCENDING === $sortingOrder) {
                 $names = \array_reverse($names, false);
             }
         }
 
         return $names;
-    }
-
-    /** @return int|null */
-    private static function slot(int $handle): ?int
-    {
-        if ($handle < self::HANDLE_BASE) {
-            return null;
-        }
-        $slot = $handle - self::HANDLE_BASE;
-        if ($slot <= 0) {
-            return null;
-        }
-
-        return $slot;
-    }
-
-    /** @return resource|null */
-    private static function lookup(int $handle)
-    {
-        $slot = self::slot($handle);
-        if (null === $slot) {
-            return null;
-        }
-
-        return self::$handles[$slot] ?? null;
     }
 }
