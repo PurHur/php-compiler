@@ -27,6 +27,13 @@ final class ReflectionPropertyIsPublic extends VmClassMethod
             throw new \LogicException('ReflectionProperty refers to unknown class in this compiler build');
         }
         $property = ReflectionSupport::propertyNameFromReflection($receiver);
+        if (VmReflection::isEnumReflectionPseudoProperty($entry, $property)) {
+            if (null !== $frame->returnVar) {
+                $frame->returnVar->bool(true);
+            }
+
+            return;
+        }
         $meta = VmReflection::findClassProperty($entry, $property, $ctx);
         if (null === $meta) {
             ReflectionSupport::throwReflectionException(
