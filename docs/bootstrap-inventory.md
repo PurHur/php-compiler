@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 2601 |
-| Phase A inventory files (M2 ratio SSOT) | 2601 |
+| PHP files on vm.php path | 2602 |
+| Phase A inventory files (M2 ratio SSOT) | 2602 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 7055 |
+| Source constructs flagged (warnings) | 7056 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -719,6 +719,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/standard/VmDebugBacktrace.php` | 0 | 9 |
 | `ext/standard/VmDir.php` | 0 | 1 |
 | `ext/standard/VmDirArg.php` | 0 | 1 |
+| `ext/standard/VmDirNative.php` | 0 | 1 |
 | `ext/standard/VmDns.php` | 0 | 9 |
 | `ext/standard/VmDnsMx.php` | 0 | 8 |
 | `ext/standard/VmDnsUdpNative.php` | 0 | 1 |
@@ -7476,12 +7477,17 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/VmDir.php`
 
 **Warnings** (review for bootstrap subset):
-- 8 class method(s)
+- 6 class method(s)
 
 ### `ext/standard/VmDirArg.php`
 
 **Warnings** (review for bootstrap subset):
 - 2 class method(s)
+
+### `ext/standard/VmDirNative.php`
+
+**Warnings** (review for bootstrap subset):
+- 11 class method(s)
 
 ### `ext/standard/VmDns.php`
 
