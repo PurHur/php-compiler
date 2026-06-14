@@ -39,6 +39,42 @@ final class VmPhpFdStreamRuntimeShrinkTest extends TestCase
         $this->assertDoesNotMatchRegularExpression('/@fopen\\s*\\(/', $source);
     }
 
+    public function testVmFsFopenPhpFdUriUsesNativeFdStream(): void
+    {
+        $source = (string) file_get_contents(__DIR__.'/../../ext/standard/VmFs.php');
+        $this->assertStringContainsString('VmPhpFdStream::openFromUri', $source);
+        $this->assertDoesNotMatchRegularExpression(
+            "/@\\\\?fopen\\s*\\(\\s*['\"]php:\\/\\/fd\\//",
+            $source,
+            'VmFs::fopen must not call host @fopen on php://fd/'
+        );
+    }
+
+    public function testFopenPhpFdUriRoundTrip(): void
+    {
+        if (!VmFsOpenNative::available()) {
+            $this->markTestSkipped('ext/ffi required for VmFsOpenNative libc open');
+        }
+
+        $path = tempnam(sys_get_temp_dir(), 'phpc_phpfd_');
+        $this->assertNotFalse($path);
+        file_put_contents($path, 'php-fd-uri');
+
+        $baseHandle = VmFs::fopen($path, 'rb');
+        $this->assertNotFalse($baseHandle);
+        $osFd = VmPhpFdStream::fdForHandle($baseHandle);
+        $this->assertNotNull($osFd);
+
+        $fdHandle = VmFs::fopen('php://fd/'.$osFd, 'rb');
+        $this->assertNotFalse($fdHandle);
+        $this->assertTrue(VmPhpFdStream::isValidHandle($fdHandle));
+        $this->assertSame('php-fd-uri', VmFs::fread($fdHandle, 8192));
+
+        VmFs::fclose($fdHandle);
+        VmFs::fclose($baseHandle);
+        @unlink($path);
+    }
+
     public function testVmPhpFdStreamUsesLibcReadWrite(): void
     {
         $source = (string) file_get_contents(__DIR__.'/../../ext/standard/VmPhpFdStream.php');
