@@ -714,42 +714,32 @@ final class VmMath
         }
 
         $num = 0;
-        $fnum = 0.0;
-        $mode = 0;
         $cutoff = intdiv(\PHP_INT_MAX, $base);
         $cutlim = \PHP_INT_MAX % $base;
         $invalidChars = 0;
 
         for ($i = $start; $i < $end; ++$i) {
-            $c = $str[$i];
-            if ($c >= '0' && $c <= '9') {
-                $digit = (int) ($c - '0');
-            } elseif ($c >= 'A' && $c <= 'Z') {
-                $digit = (int) (\ord($c) - \ord('A') + 10);
-            } elseif ($c >= 'a' && $c <= 'z') {
-                $digit = (int) (\ord($c) - \ord('a') + 10);
-            } else {
+            $digit = self::radixDigit($str[$i], $base);
+            if (null === $digit) {
                 ++$invalidChars;
 
                 continue;
             }
 
-            if ($digit >= $base) {
-                ++$invalidChars;
+            if ($num < $cutoff || ($num === $cutoff && $digit <= $cutlim)) {
+                $num = $num * $base + $digit;
 
                 continue;
             }
 
-            if (0 === $mode) {
-                if ($num < $cutoff || ($num === $cutoff && $digit <= $cutlim)) {
-                    $num = $num * $base + $digit;
-
-                    continue;
-                }
-                $fnum = (float) $num;
-                $mode = 1;
+            if ($invalidChars > 0) {
+                @\trigger_error(
+                    'Invalid characters passed for attempted conversion, these have been ignored',
+                    \E_USER_DEPRECATED
+                );
             }
-            $fnum = $fnum * $base + $digit;
+
+            return self::baseToZvalFloat($str, $start, $end, $base);
         }
 
         if ($invalidChars > 0) {
@@ -759,7 +749,40 @@ final class VmMath
             );
         }
 
-        return 1 === $mode ? $fnum : $num;
+        return $num;
+    }
+
+    /**
+     * Parse a radix string as float when integer range is exhausted (php-src strtod overflow path).
+     */
+    private static function baseToZvalFloat(string $str, int $start, int $end, int $base): float
+    {
+        $fnum = 0.0;
+
+        for ($i = $start; $i < $end; ++$i) {
+            $digit = self::radixDigit($str[$i], $base);
+            if (null === $digit) {
+                continue;
+            }
+            $fnum = $fnum * $base + $digit;
+        }
+
+        return $fnum;
+    }
+
+    private static function radixDigit(string $c, int $base): ?int
+    {
+        if ($c >= '0' && $c <= '9') {
+            $digit = (int) ($c - '0');
+        } elseif ($c >= 'A' && $c <= 'Z') {
+            $digit = (int) (\ord($c) - \ord('A') + 10);
+        } elseif ($c >= 'a' && $c <= 'z') {
+            $digit = (int) (\ord($c) - \ord('a') + 10);
+        } else {
+            return null;
+        }
+
+        return $digit >= $base ? null : $digit;
     }
 
     public static function assignRadixToReturn(?Variable $returnVar, string $str, int $base): void
