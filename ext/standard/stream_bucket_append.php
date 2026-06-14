@@ -39,6 +39,6 @@ final class stream_bucket_append extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        throw new \LogicException('stream_bucket_append() is not implemented for JIT in this compiler build');
+        return JitStreamBucket::streamBucketAppend($context, ...$args);
     }
 }

@@ -2872,6 +2872,12 @@ class Object_ extends Type {
             $this->defineProperty($id, '__weak_map', Variable::TYPE_HASHTABLE);
             $this->setClassInterfaces($displayName, ['arrayaccess', 'countable']);
         }
+        if ('streambucket' === $lcname) {
+            // ext/standard/streams.c — bucket resource handle + buffer string (#6323, #7089).
+            $this->defineProperty($id, 'bucket', Variable::TYPE_NATIVE_LONG);
+            $this->defineProperty($id, 'data', Variable::TYPE_STRING);
+            unset($this->externalOnlyClassIds[$id]);
+        }
         if ('phpcompiler\\vm\\variable' === $lcname) {
             foreach ([
                 'type_undefined' => \PHPCompiler\VM\Variable::TYPE_UNDEFINED,

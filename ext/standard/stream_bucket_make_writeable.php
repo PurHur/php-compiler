@@ -40,6 +40,6 @@ final class stream_bucket_make_writeable extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        throw new \LogicException('stream_bucket_make_writeable() is not implemented for JIT in this compiler build');
+        return JitStreamBucket::streamBucketMakeWriteable($context, ...$args);
     }
 }

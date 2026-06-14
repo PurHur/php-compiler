@@ -676,6 +676,7 @@ class Context {
             Builtin\TokenGetAll::ensureStandaloneBodies($this);
             Builtin\Highlight::ensureStandaloneBodies($this);
             Builtin\Hebrev::ensureStandaloneBodies($this);
+            Builtin\StreamBucketRuntime::ensureStandaloneBodies($this);
         }
 
         $this->functionProxies['is_null'] = new Builtin\IsNullFn();

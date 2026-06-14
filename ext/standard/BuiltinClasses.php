@@ -26,10 +26,11 @@ final class BuiltinClasses
 
     private static function registerStreamBucket(Context $ctx): void
     {
+        $resProto = new Variable(Variable::TYPE_INTEGER);
         $strProto = new Variable(Variable::TYPE_STRING);
         $entry = new ClassEntry('StreamBucket');
         $pub = CfgFunc::FLAG_PUBLIC;
-        $entry->properties[] = new ClassProperty('bucket', null, $strProto);
+        $entry->properties[] = new ClassProperty('bucket', null, $resProto);
         $entry->properties[] = new ClassProperty('data', null, $strProto);
         foreach ($entry->properties as $prop) {
             $prop->visibility = $pub;
