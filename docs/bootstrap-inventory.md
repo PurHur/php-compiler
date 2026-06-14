@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 2600 |
-| Phase A inventory files (M2 ratio SSOT) | 2600 |
+| PHP files on vm.php path | 2601 |
+| Phase A inventory files (M2 ratio SSOT) | 2601 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 7051 |
+| Source constructs flagged (warnings) | 7055 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -677,7 +677,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/standard/JitWordwrap.php` | 0 | 1 |
 | `ext/standard/JitZendScalarCast.php` | 0 | 1 |
 | `ext/standard/JitZlib.php` | 0 | 1 |
-| `ext/standard/Module.php` | 0 | 717 |
+| `ext/standard/Module.php` | 0 | 718 |
 | `ext/standard/ModuleRegistry.php` | 0 | 1 |
 | `ext/standard/NativeLastError.php` | 0 | 7 |
 | `ext/standard/NativeObStorage.php` | 0 | 1 |
@@ -1012,6 +1012,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/standard/date_default_timezone_get.php` | 0 | 4 |
 | `ext/standard/date_default_timezone_set.php` | 0 | 4 |
 | `ext/standard/date_diff.php` | 0 | 2 |
+| `ext/standard/date_interval_create_from_date_string.php` | 0 | 3 |
 | `ext/standard/date_interval_format.php` | 0 | 2 |
 | `ext/standard/date_modify.php` | 0 | 2 |
 | `ext/standard/date_parse.php` | 0 | 2 |
@@ -7123,29 +7124,30 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new idate (line 815)
 - new date_sun_info (line 816)
 - new date_interval_format (line 817)
-- new date_create (line 818)
-- new date_create_immutable (line 819)
-- new date_create_from_format (line 820)
-- new date_create_immutable_from_format (line 821)
-- new date_parse (line 822)
-- new date_parse_from_format (line 823)
-- new date_add (line 824)
-- new date_sub (line 825)
-- new date_modify (line 826)
-- new date_diff (line 827)
-- new date_sunrise (line 828)
-- new date_sunset (line 829)
-- new sleep (line 830)
-- new set_time_limit (line 831)
-- new setlocale (line 832)
-- new nl_langinfo (line 833)
-- new ignore_user_abort (line 834)
-- new connection_aborted (line 835)
-- new spl_autoload_register (line 836)
-- new spl_autoload_call (line 837)
-- new time_nanosleep (line 838)
-- new time_sleep_until (line 839)
-- new usleep (line 840)
+- new date_interval_create_from_date_string (line 818)
+- new date_create (line 819)
+- new date_create_immutable (line 820)
+- new date_create_from_format (line 821)
+- new date_create_immutable_from_format (line 822)
+- new date_parse (line 823)
+- new date_parse_from_format (line 824)
+- new date_add (line 825)
+- new date_sub (line 826)
+- new date_modify (line 827)
+- new date_diff (line 828)
+- new date_sunrise (line 829)
+- new date_sunset (line 830)
+- new sleep (line 831)
+- new set_time_limit (line 832)
+- new setlocale (line 833)
+- new nl_langinfo (line 834)
+- new ignore_user_abort (line 835)
+- new connection_aborted (line 836)
+- new spl_autoload_register (line 837)
+- new spl_autoload_call (line 838)
+- new time_nanosleep (line 839)
+- new time_sleep_until (line 840)
+- new usleep (line 841)
 - 4 class method(s)
 
 ### `ext/standard/ModuleRegistry.php`
@@ -7434,7 +7436,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 
 **Warnings** (review for bootstrap subset):
 - new Exception (line 230)
-- 4 class method(s)
+- 7 class method(s)
 
 ### `ext/standard/VmDateSunFunc.php`
 
@@ -9420,6 +9422,13 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - new ArgumentCountError (line 28)
 - 2 class method(s)
+
+### `ext/standard/date_interval_create_from_date_string.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 33)
+- 2 class method(s)
+- 2 closure(s)
 
 ### `ext/standard/date_interval_format.php`
 
