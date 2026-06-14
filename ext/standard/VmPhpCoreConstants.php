@@ -98,6 +98,15 @@ final class VmPhpCoreConstants
 
     private static function canonicalName(string $name): ?string
     {
+        // Zend resolves parent/self/static as magic constants in class scope; defined() throws
+        // when the current class has no parent (#1492 bootstrap-selfhost-helloworld).
+        if (in_array(strtolower($name), ['parent', 'self', 'static'], true)) {
+            return null;
+        }
+        // Qualified names like parent::CONST throw from defined() inside a class; core constants are bare.
+        if (str_contains($name, '::')) {
+            return null;
+        }
         if (\defined($name)) {
             return $name;
         }
