@@ -1402,6 +1402,15 @@ final class VmFs
         string $enclosure = '"',
         string $escape = '\\',
     ) {
+        if (self::isNativeCsvStreamHandle($handle)) {
+            $line = VmCsv::formatLine($fields, $separator, $enclosure, $escape)."\n";
+            $written = self::fwrite($handle, $line);
+            if (false === $written) {
+                return false;
+            }
+
+            return (int) $written;
+        }
         $fp = self::lookup($handle);
         if (null === $fp) {
             return false;
@@ -1415,7 +1424,7 @@ final class VmFs
     }
 
     /**
-     * @return list<string>|false
+     * @return list<string|null>|false
      */
     public static function fgetcsv(
         int $handle,
@@ -1424,6 +1433,9 @@ final class VmFs
         string $enclosure = '"',
         string $escape = '\\',
     ) {
+        if (self::isNativeCsvStreamHandle($handle)) {
+            return self::fgetcsvNative($handle, $length, $separator, $enclosure, $escape);
+        }
         $fp = self::lookup($handle);
         if (null === $fp) {
             return false;
@@ -1438,6 +1450,37 @@ final class VmFs
         }
 
         return $row;
+    }
+
+    private static function isNativeCsvStreamHandle(int $handle): bool
+    {
+        return VmPhpMemoryStream::isValidHandle($handle)
+            || VmPhpInputOutputStream::isValidHandle($handle)
+            || VmPhpFdStream::isValidHandle($handle);
+    }
+
+    /**
+     * fgetcsv() on native VM streams via fgets + VmCsv::parseLine (#5243, StringFgetcsvJit).
+     *
+     * @return list<string|null>|false
+     */
+    private static function fgetcsvNative(
+        int $handle,
+        ?int $length,
+        string $separator,
+        string $enclosure,
+        string $escape,
+    ): array|false {
+        if (self::feof($handle)) {
+            return false;
+        }
+        $line = self::fgets($handle, $length);
+        if (false === $line) {
+            return false;
+        }
+        $line = \rtrim($line, "\r\n");
+
+        return VmCsv::parseLine($line, $separator, $enclosure, $escape);
     }
 
     public static function fseek(int $handle, int $offset, int $whence = \SEEK_SET): int
