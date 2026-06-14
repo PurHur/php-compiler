@@ -229,4 +229,186 @@ final class VmDateInterval
     {
         throw new \Exception('Unknown or bad format ('.$spec.')');
     }
+
+    /**
+     * Parse relative interval strings for date_interval_create_from_date_string() (#4606).
+     *
+     * php-src: ext/date/lib/interval.c — timelib_parse_from_string (relative units only; not ISO P…).
+     *
+     * @return array{y: int, m: int, d: int, h: int, i: int, s: int, f: float, invert: int}|null
+     */
+    public static function parseFromDateString(string $input, ?string &$warning = null): ?array
+    {
+        $warning = null;
+        $baseOffset = \strlen($input) - \strlen(ltrim($input));
+        $spec = ltrim($input);
+        $len = \strlen($spec);
+        if (0 === $len) {
+            $warning = self::fromDateStringWarning($input, 0, 'The timezone could not be found in the database');
+
+            return null;
+        }
+
+        if ('P' === $spec[0]) {
+            $pos = 1;
+            if ($pos < $len && \ctype_digit($spec[$pos])) {
+                $warning = self::fromDateStringWarning($input, $baseOffset + $pos, 'Unexpected character');
+            } else {
+                $warning = self::fromDateStringWarning($input, $baseOffset, 'The timezone could not be found in the database');
+            }
+
+            return null;
+        }
+
+        $y = $m = $d = $h = $i = $s = 0;
+        $f = 0.0;
+        $hasValue = false;
+        $pos = 0;
+
+        while ($pos < $len) {
+            while ($pos < $len && \ctype_space($spec[$pos])) {
+                ++$pos;
+            }
+            if ($pos >= $len) {
+                break;
+            }
+
+            $sign = 1;
+            if ('+' === $spec[$pos] || '-' === $spec[$pos]) {
+                if ('-' === $spec[$pos]) {
+                    $sign = -1;
+                }
+                ++$pos;
+            }
+            if ($pos >= $len || !\ctype_digit($spec[$pos])) {
+                $warning = self::fromDateStringWarning(
+                    $input,
+                    $baseOffset + $pos,
+                    'The timezone could not be found in the database'
+                );
+
+                return null;
+            }
+            $numStart = $pos;
+            while ($pos < $len && \ctype_digit($spec[$pos])) {
+                ++$pos;
+            }
+            $num = (int) \substr($spec, $numStart, $pos - $numStart) * $sign;
+
+            while ($pos < $len && \ctype_space($spec[$pos])) {
+                ++$pos;
+            }
+            if ($pos >= $len || !\ctype_alpha($spec[$pos])) {
+                $warning = self::fromDateStringWarning(
+                    $input,
+                    $baseOffset + $pos,
+                    'The timezone could not be found in the database'
+                );
+
+                return null;
+            }
+
+            $unitMatch = self::matchFromDateStringUnit($spec, $pos);
+            if (null === $unitMatch) {
+                $warning = self::fromDateStringWarning(
+                    $input,
+                    $baseOffset + $pos,
+                    'The timezone could not be found in the database'
+                );
+
+                return null;
+            }
+            [$field, $consumed, $weekFactor] = $unitMatch;
+            $pos += $consumed;
+
+            switch ($field) {
+                case 'y':
+                    $y += $num;
+                    break;
+                case 'm':
+                    $m += $num;
+                    break;
+                case 'd':
+                    $d += $num * $weekFactor;
+                    break;
+                case 'h':
+                    $h += $num;
+                    break;
+                case 'i':
+                    $i += $num;
+                    break;
+                case 's':
+                    $s += $num;
+                    break;
+            }
+            $hasValue = true;
+        }
+
+        if (!$hasValue) {
+            $warning = self::fromDateStringWarning($input, $baseOffset, 'The timezone could not be found in the database');
+
+            return null;
+        }
+
+        return [
+            'y' => $y,
+            'm' => $m,
+            'd' => $d,
+            'h' => $h,
+            'i' => $i,
+            's' => $s,
+            'f' => $f,
+            'invert' => 0,
+        ];
+    }
+
+    /** @return array{0: string, 1: int, 2: int}|null field, consumed chars, week multiplier */
+    private static function matchFromDateStringUnit(string $spec, int $pos): ?array
+    {
+        static $units = [
+            'years' => ['y', 1],
+            'year' => ['y', 1],
+            'months' => ['m', 1],
+            'month' => ['m', 1],
+            'weeks' => ['d', 7],
+            'week' => ['d', 7],
+            'days' => ['d', 1],
+            'day' => ['d', 1],
+            'hours' => ['h', 1],
+            'hour' => ['h', 1],
+            'minutes' => ['i', 1],
+            'minute' => ['i', 1],
+            'seconds' => ['s', 1],
+            'second' => ['s', 1],
+        ];
+        $tail = strtolower(\substr($spec, $pos));
+        $best = null;
+        foreach ($units as $word => [$field, $factor]) {
+            if (!str_starts_with($tail, $word)) {
+                continue;
+            }
+            $next = $pos + \strlen($word);
+            if ($next < \strlen($spec) && \ctype_alpha($spec[$next])) {
+                continue;
+            }
+            if (null === $best || \strlen($word) > $best[1]) {
+                $best = [$field, \strlen($word), $factor];
+            }
+        }
+
+        return $best;
+    }
+
+    public static function fromDateStringWarning(string $input, int $pos, string $reason): string
+    {
+        $char = $pos < \strlen($input) ? $input[$pos] : '?';
+
+        return \sprintf(
+            'Unknown or bad format (%s) at position %d (%s): %s',
+            $input,
+            $pos,
+            $char,
+            $reason
+        );
+    }
 }

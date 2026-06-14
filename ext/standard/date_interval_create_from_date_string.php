@@ -1,0 +1,81 @@
+<?php
+
+declare(strict_types=1);
+
+namespace PHPCompiler\ext\standard;
+
+use PHPCompiler\Frame;
+use PHPCompiler\Func\Internal;
+use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\Variable as JITVariable;
+use PHPCompiler\VM\BuiltinExecute;
+use PHPCompiler\VM\DateIntervalSupport;
+use PHPCompiler\VM\ErrorReporter;
+use PHPCompiler\VM\Variable;
+use PHPLLVM\Value;
+
+/**
+ * date_interval_create_from_date_string() — parse relative interval spec (#4606, ext/date/php_date.c).
+ *
+ * php-src: ext/date/php_date.c — PHP_FUNCTION(date_interval_create_from_date_string)
+ */
+final class date_interval_create_from_date_string extends Internal
+{
+    public function __construct()
+    {
+        parent::__construct('date_interval_create_from_date_string');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $argc = \count($frame->calledArgs);
+        if (1 !== $argc) {
+            throw new \ArgumentCountError(\sprintf(
+                'date_interval_create_from_date_string() expects exactly 1 argument, %d given',
+                $argc
+            ));
+        }
+        if (null === $frame->returnVar || null === $frame->vmContext) {
+            return;
+        }
+
+        $datetime = VmString::coerceStringBuiltinArg(
+            $frame->calledArgs[0],
+            'date_interval_create_from_date_string',
+            0,
+            'datetime'
+        );
+
+        $warning = null;
+        $parsed = VmDateInterval::parseFromDateString($datetime, $warning);
+        if (null === $parsed) {
+            $frame->vmContext->errors->triggerError(
+                'date_interval_create_from_date_string(): '.$warning,
+                ErrorReporter::E_WARNING,
+                '' !== $frame->scriptPath ? $frame->scriptPath : null,
+                $frame->vmContext,
+                $frame
+            );
+            BuiltinExecute::writeReturn($frame, static function (Variable $ret): void {
+                $ret->bool(false);
+            });
+
+            return;
+        }
+
+        $interval = DateIntervalSupport::createFromState(
+            $frame->vmContext,
+            [...$parsed, 'days' => false]
+        );
+        BuiltinExecute::writeReturn($frame, static function (Variable $ret) use ($interval): void {
+            $ret->object($interval);
+        });
+    }
+
+    public function call(Context $context, JITVariable ...$args): Value
+    {
+        throw new \LogicException(
+            'date_interval_create_from_date_string() is not implemented for JIT in this compiler build (issue #4606)'
+        );
+    }
+}
