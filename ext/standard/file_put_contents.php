@@ -12,7 +12,7 @@ use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
 
-/** file_put_contents() — string data; flags 0 or FILE_APPEND (8) in JIT (issue #194). */
+/** file_put_contents() — string data; flags FILE_APPEND (8) and LOCK_EX (2) in JIT (#194, #4275). */
 final class file_put_contents extends Internal
 {
     public function execute(Frame $frame): void
@@ -56,8 +56,8 @@ final class file_put_contents extends Internal
                 throw new \LogicException('file_put_contents() flags must be an integer in this compiler build');
             }
             $flagsVal = $args[2]->compileTimeLong ?? null;
-            if (null !== $flagsVal && 0 !== $flagsVal && 8 !== $flagsVal) {
-                throw new \LogicException('file_put_contents() flags must be 0 or FILE_APPEND (8) in this compiler build');
+            if (null !== $flagsVal) {
+                self::assertSupportedFlags($flagsVal);
             }
             $flags = $context->builder->truncOrBitCast(
                 JitLongArg::lower($context, $args[2], 'file_put_contents() flags'),
@@ -73,6 +73,17 @@ final class file_put_contents extends Internal
             $context->helper->loadValue($args[1]),
             $flags
         );
+    }
+
+    /** Zend bitmask: FILE_APPEND (8) | LOCK_EX (2) only (#4275). */
+    private static function assertSupportedFlags(int $flags): void
+    {
+        $known = 2 | 8;
+        if (0 !== ($flags & ~$known)) {
+            throw new \LogicException(
+                'file_put_contents() flags must be 0, LOCK_EX (2), FILE_APPEND (8), or their combination in this compiler build'
+            );
+        }
     }
 
     /**

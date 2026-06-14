@@ -6,7 +6,7 @@ declare(strict_types=1);
  * LLVM implementation of __compiler_file_put_contents — write a __string__* to a path.
  *
  * Returns total bytes written, or -1 when the path cannot be opened or a write error occurs.
- * flags: 0 = truncate ("w"), 8 = FILE_APPEND ("a").
+ * flags: 0 = truncate ("w"), 8 = FILE_APPEND ("a"), 2 = LOCK_EX (flock before write).
  */
 
 namespace PHPCompiler\JIT\Builtin;
@@ -18,6 +18,8 @@ use PHPLLVM\Builder;
 
 final class StringFilePutContents
 {
+    private const LOCK_EX = 2;
+
     private const FILE_APPEND = 8;
 
     public static function implement(Context $context): void
@@ -38,8 +40,10 @@ final class StringFilePutContents
         $oneI64 = $i64->constInt(1, false);
         $oneSizeT = $sizeT->constInt(1, false);
         $minusOne = $i64->constInt(-1, false);
+        $lockEx = $i64->constInt(self::LOCK_EX, false);
         $fileAppend = $i64->constInt(self::FILE_APPEND, false);
         $nullPtr = $i8p->constNull();
+        $zeroI32 = $i32->constInt(0, false);
 
         $pathLen = $context->builder->load(
             $context->builder->structGep($path, $strMap['length'])
@@ -61,7 +65,11 @@ final class StringFilePutContents
 
         $modeW = self::modeCString($context, 'w');
         $modeA = self::modeCString($context, 'a');
-        $isAppend = $context->builder->icmp(Builder::INT_EQ, $flags, $fileAppend);
+        $isAppend = $context->builder->icmp(
+            Builder::INT_NE,
+            $context->builder->and($flags, $fileAppend),
+            $i64->constInt(0, false)
+        );
         $mode = $context->builder->select($isAppend, $modeA, $modeW);
 
         $stream = $context->builder->call(
@@ -82,6 +90,30 @@ final class StringFilePutContents
         $context->builder->returnValue($minusOne);
 
         $context->builder->positionAtEnd($okBlock);
+        $wantLock = $context->builder->icmp(
+            Builder::INT_NE,
+            $context->builder->and($flags, $lockEx),
+            $i64->constInt(0, false)
+        );
+        $flockBlock = $fn->appendBasicBlock('fpc_flock');
+        $writeBlock = $fn->appendBasicBlock('fpc_write');
+        $lockFailBlock = $fn->appendBasicBlock('fpc_lock_fail');
+        $context->builder->branchIf($wantLock, $flockBlock, $writeBlock);
+
+        $context->builder->positionAtEnd($flockBlock);
+        $lockRc = $context->builder->call(
+            $context->lookupFunction('flock'),
+            $stream,
+            $i32->constInt(self::LOCK_EX, false)
+        );
+        $lockFailed = $context->builder->icmp(Builder::INT_NE, $lockRc, $zeroI32);
+        $context->builder->branchIf($lockFailed, $lockFailBlock, $writeBlock);
+
+        $context->builder->positionAtEnd($lockFailBlock);
+        $context->builder->call($context->lookupFunction('fclose'), $stream);
+        $context->builder->returnValue($minusOne);
+
+        $context->builder->positionAtEnd($writeBlock);
         $dataLen = $context->builder->load(
             $context->builder->structGep($data, $strMap['length'])
         );
