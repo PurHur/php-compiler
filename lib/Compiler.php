@@ -8584,11 +8584,12 @@ class Compiler {
     }
 
     /**
-     * php-cfg may lower `f(['a' => 1])` as Expr_Array (result Var#n) then FuncCall (arg Var#m) (#8561).
+     * php-cfg may lower inline Expr_Array / Expr_New results and call/ctor args to distinct
+     * temporaries (`f(['a' => 1])`, `new C(['x'])`, `g(new C('x'))`) (#8561).
      *
-     * @return ?OpCode TYPE_ASSIGN bridging producer slot → call-arg slot
+     * @return ?string producer slot to pass to TYPE_ARG_SEND instead of the empty arg slot
      */
-    private function tryBridgeInlineArrayLiteralCallArg(Operand $arg, Block $block): ?OpCode
+    private function findInlineExprCallArgProducerSlot(Operand $arg, Block $block): ?string
     {
         if (!$arg instanceof Operand\Temporary || null === $block->orig) {
             return null;
@@ -8597,28 +8598,14 @@ class Compiler {
         $argRoot = Block::cfgVarRoot($arg);
         for ($i = 0, $n = count($children); $i < $n; ++$i) {
             $child = $children[$i];
-            if (!($child instanceof Op\Expr\FuncCall
-                || $child instanceof Op\Expr\NsFuncCall
-                || $child instanceof Op\Expr\MethodCall
-                || $child instanceof Op\Expr\StaticCall)) {
+            if (!$this->isInlineExprCallArgConsumer($child)) {
                 continue;
             }
-            $usesArg = false;
-            foreach ($child->args as $callArg) {
-                if ($callArg === $arg) {
-                    $usesArg = true;
-                    break;
-                }
-                if (null !== $argRoot && Block::cfgVarRoot($callArg) === $argRoot) {
-                    $usesArg = true;
-                    break;
-                }
-            }
-            if (!$usesArg || 0 === $i) {
+            if (!$this->inlineExprCallArgUsesOperand($child, $arg, $argRoot) || 0 === $i) {
                 continue;
             }
             $prev = $children[$i - 1];
-            if (!$prev instanceof Op\Expr\Array_) {
+            if (!$this->isInlineExprCallArgProducer($prev)) {
                 continue;
             }
             $producerSlot = $block->slotForOperand($prev->result);
@@ -8630,10 +8617,45 @@ class Compiler {
                 return null;
             }
 
-            return new OpCode(OpCode::TYPE_ASSIGN, $argSlot, $argSlot, $producerSlot);
+            return $producerSlot;
         }
 
         return null;
+    }
+
+    private function isInlineExprCallArgConsumer(Op $op): bool
+    {
+        return $op instanceof Op\Expr\FuncCall
+            || $op instanceof Op\Expr\NsFuncCall
+            || $op instanceof Op\Expr\MethodCall
+            || $op instanceof Op\Expr\StaticCall
+            || $op instanceof Op\Expr\New_;
+    }
+
+    private function isInlineExprCallArgProducer(Op $op): bool
+    {
+        return $op instanceof Op\Expr\Array_
+            || $op instanceof Op\Expr\New_;
+    }
+
+    /**
+     * @param ?Operand $argRoot from Block::cfgVarRoot($arg)
+     */
+    private function inlineExprCallArgUsesOperand(Op $consumer, Operand $arg, ?Operand $argRoot): bool
+    {
+        if (!property_exists($consumer, 'args') || !is_array($consumer->args)) {
+            return false;
+        }
+        foreach ($consumer->args as $callArg) {
+            if ($callArg === $arg) {
+                return true;
+            }
+            if (null !== $argRoot && Block::cfgVarRoot($callArg) === $argRoot) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     protected function findPropertyFetchForResult(Operand $result, Block $block): ?Op\Expr\PropertyFetch
@@ -9720,11 +9742,10 @@ class Compiler {
 
         $sends = [];
         foreach ($args as $arg) {
-            $bridge = $this->tryBridgeInlineArrayLiteralCallArg($arg, $block);
-            if (null !== $bridge) {
-                $sends[] = $bridge;
+            $valueSlot = $this->findInlineExprCallArgProducerSlot($arg, $block);
+            if (null === $valueSlot) {
+                $valueSlot = $this->compileOperand($arg, $block, true);
             }
-            $valueSlot = $this->compileOperand($arg, $block, true);
             if (null === $valueSlot && $arg instanceof Operand\NullOperand) {
                 $valueSlot = $this->registerNullConstantSlot($block, $arg);
             }
