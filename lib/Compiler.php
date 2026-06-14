@@ -4775,6 +4775,24 @@ class Compiler {
     /**
      * Fold define('NAME', expr) value operands for compile-time const registration (#5409).
      */
+    protected function cfgTypeForFoldedVmConstant(Variable $vm): Type
+    {
+        switch ($vm->type) {
+            case Variable::TYPE_BOOLEAN:
+                return Type::bool();
+            case Variable::TYPE_INTEGER:
+                return Type::int();
+            case Variable::TYPE_FLOAT:
+                return Type::float();
+            case Variable::TYPE_STRING:
+                return Type::string();
+            case Variable::TYPE_NULL:
+                return Type::null();
+            default:
+                return Type::mixed();
+        }
+    }
+
     protected function tryFoldDefineValueOperand(Operand $valueArg, Block $block): ?Variable
     {
         $vm = $this->vmVariableFromCfgLiteralOperand($valueArg);
@@ -9749,10 +9767,14 @@ class Compiler {
         }
         $constNameArg = $args[0];
         $valueArg = $args[1];
-        if (!$constNameArg instanceof Operand\Literal || !$valueArg instanceof Operand\Literal) {
+        if (!$constNameArg instanceof Operand\Literal) {
             return null;
         }
         if (Variable::TYPE_STRING !== Variable::mapFromType($constNameArg->type)) {
+            return null;
+        }
+        $foldedValue = $this->tryFoldDefineValueOperand($valueArg, $block);
+        if (null === $foldedValue) {
             return null;
         }
         $caseInsensitiveSlot = null;
@@ -9770,15 +9792,17 @@ class Compiler {
             }
         }
         $constNameSlot = $this->compileOperand($constNameArg, $block, true);
-        $valueSlot = $this->compileOperand($valueArg, $block, true);
-        if (!isset($block->constants[$constNameSlot], $block->constants[$valueSlot])) {
+        if (!isset($block->constants[$constNameSlot])) {
             return null;
         }
+        $valueOperand = new Temporary();
+        $valueOperand->type = $this->cfgTypeForFoldedVmConstant($foldedValue);
+        $valueSlot = $block->registerConstant($valueOperand, $foldedValue);
         $constName = $block->constants[$constNameSlot]->toString();
         if ('' === $constName || str_contains($constName, '::')) {
             return null;
         }
-        $this->storeCompileTimeGlobalConst($constName, $block->constants[$valueSlot]);
+        $this->storeCompileTimeGlobalConst($constName, $foldedValue);
         $ops = [new OpCode(
             OpCode::TYPE_DECLARE_GLOBAL_CONST,
             $constNameSlot,

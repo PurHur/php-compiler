@@ -18,7 +18,10 @@ final class JitDefine
     {
         $literal = JitStringArg::compileTimeLiteral($nameArg);
         if (null !== $literal) {
-            return define_::invokeLiteral($context, $literal, $valueArg);
+            $folded = define_::tryCompileTimeVmVariable($context, $valueArg);
+            if (null !== $folded) {
+                return define_::invokeLiteralWithValue($context, $literal, $folded);
+            }
         }
 
         return self::invokeRuntime($context, $nameArg, $valueArg);
