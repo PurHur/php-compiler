@@ -11,7 +11,6 @@ use PHPCompiler\JIT\JitBoolArg;
 use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\BuiltinExecute;
-use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
 
 /** hash() — sha256, sha1, md5, crc32*, adler32, fnv*, xxh3/xxh128 (VM + JIT/AOT via __compiler_hash). */
@@ -25,18 +24,23 @@ final class hash_ extends Internal
     public function execute(Frame $frame): void
     {
         $argc = \count($frame->calledArgs);
-        if ($argc < 2 || $argc > 3) {
-            throw new \LogicException('hash() requires two or three arguments in this compiler build');
+        if ($argc < 2) {
+            throw new \ArgumentCountError(\sprintf(
+                'hash() expects at least 2 arguments, %d given',
+                $argc
+            ));
+        }
+        if ($argc > 3) {
+            throw new \ArgumentCountError(\sprintf(
+                'hash() expects at most 3 arguments, %d given',
+                $argc
+            ));
         }
         $algo = VmString::coerceStringBuiltinArg($frame->calledArgs[0], 'hash', 0, 'algo');
         $data = VmString::coerceStringBuiltinArg($frame->calledArgs[1], 'hash', 1, 'data');
         $raw = false;
         if (3 === $argc) {
-            $rawArg = $frame->calledArgs[2]->resolveIndirect();
-            if (Variable::TYPE_BOOLEAN !== $rawArg->type) {
-                throw new \LogicException('hash() raw_output must be boolean in this compiler build');
-            }
-            $raw = $rawArg->toBool();
+            $raw = VmMath::parseBoolBuiltinArg($frame->calledArgs[2], 'hash', 3, 'binary');
         }
         $result = VmHash::hash($algo, $data, $raw);
         BuiltinExecute::writeReturn($frame, static function (Variable $ret) use ($result): void {
@@ -46,11 +50,23 @@ final class hash_ extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        if (\count($args) < 2 || \count($args) > 3) {
-            throw new \LogicException('hash() requires two or three arguments in this compiler build');
+        $argc = \count($args);
+        if ($argc < 2) {
+            throw new \ArgumentCountError(\sprintf(
+                'hash() expects at least 2 arguments, %d given',
+                $argc
+            ));
+        }
+        if ($argc > 3) {
+            throw new \ArgumentCountError(\sprintf(
+                'hash() expects at most 3 arguments, %d given',
+                $argc
+            ));
         }
         $raw = $context->getTypeFromString('int1')->constInt(0, false);
-        if (isset($args[2])) { $raw = JitBoolArg::lower($context, $args[2], 'hash() raw_output'); }
+        if (isset($args[2])) {
+            $raw = JitBoolArg::lower($context, $args[2], 'hash(): Argument #3 ($binary)');
+        }
         return JitHash::hash(
             $context,
             JitStringBuiltinArg::lower($context, $args[0], 'hash', 0, 'algo'),
