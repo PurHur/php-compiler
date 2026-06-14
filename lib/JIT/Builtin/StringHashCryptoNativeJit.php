@@ -199,7 +199,9 @@ final class StringHashCryptoNativeJit
         );
 
         $context->builder->positionAtEnd($bad);
-        $context->builder->returnValue($nullStr);
+        TypeErrorRaise::ensureLinked($context);
+        TypeErrorRaise::emitValueError($context, \PHPCompiler\ext\standard\VmHash::HASH_UNKNOWN_ALGO_MSG);
+        BasicBlockHelper::sealOpenBlock($context, $bad);
 
         $context->builder->positionAtEnd($body);
         $digest = $context->builder->alloca($i8, self::SHA256_DIGEST_SIZE, 'hc_hmac_digest');
@@ -430,6 +432,8 @@ final class StringHashCryptoNativeJit
         $keyLen = self::stringLen($context, $key);
         $saltLen = self::stringLen($context, $salt);
         $saltData = self::stringData($context, $salt);
+        $infoData = self::stringData($context, $info);
+        $infoLen = self::stringLen($context, $info);
         $saltEmpty = $context->builder->icmp(Builder::INT_EQ, $saltLen, $zeroI64);
         $zeroSalt = $context->builder->alloca($i8, self::SHA256_DIGEST_SIZE, 'hc_hkdf_zero_salt');
         $context->builder->call(
@@ -477,15 +481,13 @@ final class StringHashCryptoNativeJit
         $blockSlot = BasicBlockHelper::entryAlloca($context, $i32);
         $writtenSlot = BasicBlockHelper::entryAlloca($context, $i64);
         $tLenSlot = BasicBlockHelper::entryAlloca($context, $i64);
+
+        $context->builder->positionAtEnd($loopHead);
         $tBuf = $context->builder->alloca($i8, self::SHA256_DIGEST_SIZE, 'hc_hkdf_t');
         $context->builder->store($oneI32, $blockSlot);
         $context->builder->store($zeroI64, $writtenSlot);
         $context->builder->store($zeroI64, $tLenSlot);
 
-        $infoData = self::stringData($context, $info);
-        $infoLen = self::stringLen($context, $info);
-
-        $context->builder->positionAtEnd($loopHead);
         $block = $context->builder->load($blockSlot);
         $doneLoop = $context->builder->icmp(Builder::INT_SGT, $block, $context->builder->truncOrBitCast($blocks, $i32));
         $loopBody = $fn->appendBasicBlock('hc_hkdf_loop_body');
@@ -531,7 +533,7 @@ final class StringHashCryptoNativeJit
             $context->builder->truncOrBitCast($infoLen, $sizeT)
         );
         $context->builder->store(
-            $context->builder->truncOrBitCast($block, $i8),
+            $context->builder->trunc($block, $i8),
             $context->builder->inBoundsGep($input, $context->builder->add($tLen, $infoLen))
         );
         self::callHmac(
@@ -615,7 +617,7 @@ final class StringHashCryptoNativeJit
     {
         $i32 = $context->getTypeFromString('int32');
 
-        return $context->builder->and($context->builder->truncOrBitCast($v, $i32), $i32->constInt(0xFFFFFFFF, false));
+        return $context->builder->and($context->builder->zExtOrBitCast($v, $i32), $i32->constInt(0xFFFFFFFF, false));
     }
 
     private static function u32Add(Context $context, Value $a, Value $b): Value
@@ -893,8 +895,8 @@ final class StringHashCryptoNativeJit
             ['__phpc_hc_digest_len', $i64, [$i32]],
             ['__phpc_hc_hex_encode', $voidTy, [$i8p, $sizeT, $i8p]],
             ['__phpc_hc_md5_transform', $voidTy, [$i32->pointerType(0), $i8p]],
-            ['__phpc_hc_sha256_transform', $voidTy, [$i8p, $i8p]],
-            ['__phpc_hc_sha1_transform', $voidTy, [$i8p, $i8p]],
+            ['__phpc_hc_sha256_transform', $voidTy, [$i32->pointerType(0), $i8p]],
+            ['__phpc_hc_sha1_transform', $voidTy, [$i32->pointerType(0), $i8p]],
             ['__phpc_hc_digest', $voidTy, [$i32, $i8p, $sizeT, $i8p]],
             ['__phpc_hc_hmac', $voidTy, [$i32, $i8p, $sizeT, $i8p, $sizeT, $i8p]],
             ['__phpc_hc_pbkdf2_f', $voidTy, [$i32, $i8p, $sizeT, $i8p, $sizeT, $i32, $i64, $i8p]],
@@ -1904,12 +1906,12 @@ final class StringHashCryptoNativeJit
 
         $context->builder->positionAtEnd($loopBody);
         $b = $context->builder->zExt(
-            $context->builder->load($context->builder->gep($bin, $context->builder->truncOrBitCast($i, $i64))),
+            $context->builder->load($context->builder->gep($bin, $context->builder->zExtOrBitCast($i, $i64))),
             $i32
         );
         $hi = $context->builder->and($context->builder->lShr($b, $i32->constInt(4, false)), $i32->constInt(0xF, false));
         $lo = $context->builder->and($b, $i32->constInt(0xF, false));
-        $outIdx = $context->builder->mul($context->builder->truncOrBitCast($i, $i64), $i64->constInt(2, false));
+        $outIdx = $context->builder->mul($context->builder->zExtOrBitCast($i, $i64), $i64->constInt(2, false));
         foreach ([$hi, $lo] as $j => $nibble) {
             $isDigit = $context->builder->icmp(Builder::INT_SLT, $nibble, $i32->constInt(10, false));
             $ch = $context->builder->select(
@@ -1926,7 +1928,7 @@ final class StringHashCryptoNativeJit
         $context->builder->branch($loopHead);
 
         $context->builder->positionAtEnd($loopDone);
-        $nullPos = $context->builder->mul($context->builder->truncOrBitCast($binLen, $i64), $i64->constInt(2, false));
+        $nullPos = $context->builder->mul($context->builder->zExtOrBitCast($binLen, $i64), $i64->constInt(2, false));
         $context->builder->store($i8->constInt(0, false), $context->builder->gep($out, $nullPos));
         $context->builder->returnVoid();
         $context->builder->clearInsertionPosition();
@@ -2134,7 +2136,7 @@ final class StringHashCryptoNativeJit
         $context->builder->positionAtEnd($updBody);
         $b = $context->builder->load($context->builder->gep($data, $i));
         $dl = $context->builder->load($datalenSlot);
-        $context->builder->store($b, $context->builder->gep($buf, $context->builder->truncOrBitCast($dl, $i64)));
+        $context->builder->store($b, $context->builder->gep($buf, $context->builder->zExtOrBitCast($dl, $i64)));
         $dl1 = $context->builder->add($dl, $i32->constInt(1, false));
         $context->builder->store($dl1, $datalenSlot);
         $full = $context->builder->icmp(Builder::INT_EQ, $dl1, $i32->constInt(64, false));
@@ -2154,7 +2156,7 @@ final class StringHashCryptoNativeJit
         $context->builder->store($context->builder->add($context->builder->load($bitlenSlot), $context->builder->mul($context->builder->zExtOrBitCast($dlFinal, $i64), $i64->constInt(8, false))), $bitlenSlot);
         $lt56 = $context->builder->icmp(Builder::INT_SLT, $dlFinal, $i32->constInt(56, false));
         $padLen = $context->builder->select($lt56, $context->builder->sub($i32->constInt(56, false), $dlFinal), $context->builder->sub($i32->constInt(120, false), $dlFinal));
-        $context->builder->store($i8->constInt(0x80, false), $context->builder->gep($buf, $context->builder->truncOrBitCast($dlFinal, $i64)));
+        $context->builder->store($i8->constInt(0x80, false), $context->builder->gep($buf, $context->builder->zExtOrBitCast($dlFinal, $i64)));
         $pSlot = BasicBlockHelper::entryAlloca($context, $i32);
         $context->builder->store($i32->constInt(1, false), $pSlot);
         $padHead = $fn->appendBasicBlock('sha256_pad_head');
@@ -2167,7 +2169,7 @@ final class StringHashCryptoNativeJit
         $context->builder->branchIf($padMore, $padBody, $padDone);
         $context->builder->positionAtEnd($padBody);
         $pdl = $context->builder->load($datalenSlot);
-        $context->builder->store($i8->constInt(0, false), $context->builder->gep($buf, $context->builder->truncOrBitCast($pdl, $i64)));
+        $context->builder->store($i8->constInt(0, false), $context->builder->gep($buf, $context->builder->zExtOrBitCast($pdl, $i64)));
         $pdl1 = $context->builder->add($pdl, $i32->constInt(1, false));
         $context->builder->store($pdl1, $datalenSlot);
         $pf = $context->builder->icmp(Builder::INT_EQ, $pdl1, $i32->constInt(64, false));
@@ -2195,7 +2197,7 @@ final class StringHashCryptoNativeJit
         $context->builder->branchIf($bitsCont, $bitsBody, $bitsDone);
         $context->builder->positionAtEnd($bitsBody);
         $shift = $context->builder->sub($i32->constInt(56, false), $context->builder->mul($bi, $i32->constInt(8, false)));
-        $context->builder->store($context->builder->truncOrBitCast($context->builder->lshr($context->builder->truncOrBitCast($context->builder->load($bitlenSlot), $i32), $shift), $i8), $context->builder->gep($bits, $context->builder->truncOrBitCast($bi, $i64)));
+        $context->builder->store($context->builder->truncOrBitCast($context->builder->lshr($context->builder->truncOrBitCast($context->builder->load($bitlenSlot), $i32), $shift), $i8), $context->builder->gep($bits, $context->builder->zExtOrBitCast($bi, $i64)));
         $context->builder->store($context->builder->add($bi, $i32->constInt(1, false)), $biSlot);
         $context->builder->branch($bitsHead);
         $context->builder->positionAtEnd($bitsDone);
@@ -2211,7 +2213,7 @@ final class StringHashCryptoNativeJit
         $context->builder->branchIf($bMore, $bBody, $bitsPadDone);
         $context->builder->positionAtEnd($bBody);
         $bdl = $context->builder->load($datalenSlot);
-        $context->builder->store($context->builder->load($context->builder->gep($bits, $context->builder->truncOrBitCast($bpi, $i64))), $context->builder->gep($buf, $context->builder->truncOrBitCast($bdl, $i64)));
+        $context->builder->store($context->builder->load($context->builder->gep($bits, $context->builder->zExtOrBitCast($bpi, $i64))), $context->builder->gep($buf, $context->builder->zExtOrBitCast($bdl, $i64)));
         $bdl1 = $context->builder->add($bdl, $i32->constInt(1, false));
         $context->builder->store($bdl1, $datalenSlot);
         $bf = $context->builder->icmp(Builder::INT_EQ, $bdl1, $i32->constInt(64, false));
@@ -2313,7 +2315,7 @@ final class StringHashCryptoNativeJit
         $context->builder->branchIf($xorDone, $afterXor, $xorBody);
         $context->builder->positionAtEnd($xorBody);
         $kp = $context->builder->gep($kPad, $i);
-        $context->builder->store($context->builder->xor($context->builder->zExt($context->builder->load($kp), $i32), $i32->constInt(0x36, false)), $kp);
+        $context->builder->store($context->builder->truncOrBitCast($context->builder->xor($context->builder->zExt($context->builder->load($kp), $i32), $i32->constInt(0x36, false)), $i8), $kp);
         $context->builder->store($context->builder->addNoSignedWrap($i, $i64->constInt(1, false)), $iSlot);
         $context->builder->branch($xorLoop);
         $context->builder->positionAtEnd($afterXor);
@@ -2337,7 +2339,7 @@ final class StringHashCryptoNativeJit
         $context->builder->branchIf($xor2Done, $afterXor2, $xor2Body);
         $context->builder->positionAtEnd($xor2Body);
         $kp2 = $context->builder->gep($kPad, $i2);
-        $context->builder->store($context->builder->xor($context->builder->zExt($context->builder->load($kp2), $i32), $i32->constInt(0x6A, false)), $kp2);
+        $context->builder->store($context->builder->truncOrBitCast($context->builder->xor($context->builder->zExt($context->builder->load($kp2), $i32), $i32->constInt(0x6A, false)), $i8), $kp2);
         $context->builder->store($context->builder->addNoSignedWrap($i2, $i64->constInt(1, false)), $iSlot);
         $context->builder->branch($xor2Loop);
         $context->builder->positionAtEnd($afterXor2);
@@ -2384,7 +2386,7 @@ final class StringHashCryptoNativeJit
             $context->builder->lshr($context->builder->load($context->builder->gep($count, $i64->constInt(0, false))), $i32->constInt(3, false)),
             $i32->constInt(63, false)
         );
-        $context->builder->store($context->builder->load($context->builder->gep($data, $i)), $context->builder->gep($buf, $context->builder->truncOrBitCast($j, $i64)));
+        $context->builder->store($context->builder->load($context->builder->gep($data, $i)), $context->builder->gep($buf, $context->builder->zExtOrBitCast($j, $i64)));
         $c0 = $context->builder->load($context->builder->gep($count, $i64->constInt(0, false)));
         $c0n = self::u32Add($context, $c0, $i32->constInt(8, false));
         $context->builder->store($c0n, $context->builder->gep($count, $i64->constInt(0, false)));
@@ -2417,7 +2419,7 @@ final class StringHashCryptoNativeJit
             $context->builder->lshr($context->builder->load($context->builder->gep($count, $i64->constInt(0, false))), $i32->constInt(3, false)),
             $i32->constInt(63, false)
         );
-        $context->builder->store($i8->constInt(0x80, false), $context->builder->gep($buf, $context->builder->truncOrBitCast($j, $i64)));
+        $context->builder->store($i8->constInt(0x80, false), $context->builder->gep($buf, $context->builder->zExtOrBitCast($j, $i64)));
         $c0 = $context->builder->load($context->builder->gep($count, $i64->constInt(0, false)));
         $c0n = self::u32Add($context, $c0, $i32->constInt(8, false));
         $context->builder->store($c0n, $context->builder->gep($count, $i64->constInt(0, false)));
@@ -2447,7 +2449,7 @@ final class StringHashCryptoNativeJit
             $context->builder->lshr($context->builder->load($context->builder->gep($count, $i64->constInt(0, false))), $i32->constInt(3, false)),
             $i32->constInt(63, false)
         );
-        $context->builder->store($i8->constInt(0, false), $context->builder->gep($buf, $context->builder->truncOrBitCast($j, $i64)));
+        $context->builder->store($i8->constInt(0, false), $context->builder->gep($buf, $context->builder->zExtOrBitCast($j, $i64)));
         $c0 = $context->builder->load($context->builder->gep($count, $i64->constInt(0, false)));
         $c0n = self::u32Add($context, $c0, $i32->constInt(8, false));
         $context->builder->store($c0n, $context->builder->gep($count, $i64->constInt(0, false)));
@@ -2476,13 +2478,13 @@ final class StringHashCryptoNativeJit
         $fcBody = $fn->appendBasicBlock('sha1_fc_body');
         $context->builder->branchIf($fcCont, $fcBody, $fcDone);
         $context->builder->positionAtEnd($fcBody);
-        $fcByte = $context->builder->load($context->builder->gep($finalcount, $context->builder->truncOrBitCast($fci, $i64)));
+        $fcByte = $context->builder->load($context->builder->gep($finalcount, $context->builder->zExtOrBitCast($fci, $i64)));
 
         $j = $context->builder->and(
             $context->builder->lshr($context->builder->load($context->builder->gep($count, $i64->constInt(0, false))), $i32->constInt(3, false)),
             $i32->constInt(63, false)
         );
-        $context->builder->store($fcByte, $context->builder->gep($buf, $context->builder->truncOrBitCast($j, $i64)));
+        $context->builder->store($fcByte, $context->builder->gep($buf, $context->builder->zExtOrBitCast($j, $i64)));
         $c0 = $context->builder->load($context->builder->gep($count, $i64->constInt(0, false)));
         $c0n = self::u32Add($context, $c0, $i32->constInt(8, false));
         $context->builder->store($c0n, $context->builder->gep($count, $i64->constInt(0, false)));
@@ -2555,7 +2557,7 @@ final class StringHashCryptoNativeJit
             $context->builder->lshr($context->builder->load($context->builder->gep($count, $i64->constInt(0, false))), $i32->constInt(3, false)),
             $i32->constInt(0x3F, false)
         );
-        $context->builder->store($context->builder->load($context->builder->gep($data, $i)), $context->builder->gep($buf, $context->builder->truncOrBitCast($index, $i64)));
+        $context->builder->store($context->builder->load($context->builder->gep($data, $i)), $context->builder->gep($buf, $context->builder->zExtOrBitCast($index, $i64)));
         $c0 = $context->builder->load($context->builder->gep($count, $i64->constInt(0, false)));
         $c0n = self::u32Add($context, $c0, $i32->constInt(8, false));
         $context->builder->store($c0n, $context->builder->gep($count, $i64->constInt(0, false)));
@@ -2594,7 +2596,7 @@ final class StringHashCryptoNativeJit
             $context->builder->lshr($context->builder->load($context->builder->gep($count, $i64->constInt(0, false))), $i32->constInt(3, false)),
             $i32->constInt(0x3F, false)
         );
-        $context->builder->store($i8->constInt(0x80, false), $context->builder->gep($buf, $context->builder->truncOrBitCast($index, $i64)));
+        $context->builder->store($i8->constInt(0x80, false), $context->builder->gep($buf, $context->builder->zExtOrBitCast($index, $i64)));
         $c0 = $context->builder->load($context->builder->gep($count, $i64->constInt(0, false)));
         $c0n = self::u32Add($context, $c0, $i32->constInt(8, false));
         $context->builder->store($c0n, $context->builder->gep($count, $i64->constInt(0, false)));
@@ -2626,7 +2628,7 @@ final class StringHashCryptoNativeJit
             $context->builder->lshr($context->builder->load($context->builder->gep($count, $i64->constInt(0, false))), $i32->constInt(3, false)),
             $i32->constInt(0x3F, false)
         );
-        $context->builder->store($i8->constInt(0, false), $context->builder->gep($buf, $context->builder->truncOrBitCast($index, $i64)));
+        $context->builder->store($i8->constInt(0, false), $context->builder->gep($buf, $context->builder->zExtOrBitCast($index, $i64)));
         $c0 = $context->builder->load($context->builder->gep($count, $i64->constInt(0, false)));
         $c0n = self::u32Add($context, $c0, $i32->constInt(8, false));
         $context->builder->store($c0n, $context->builder->gep($count, $i64->constInt(0, false)));
@@ -2656,13 +2658,13 @@ final class StringHashCryptoNativeJit
         $bitsBody = $fn->appendBasicBlock('md5_bits_body');
         $context->builder->branchIf($bitsCont, $bitsBody, $bitsDone);
         $context->builder->positionAtEnd($bitsBody);
-        $bitByte = $context->builder->load($context->builder->gep($bits, $context->builder->truncOrBitCast($bi, $i64)));
+        $bitByte = $context->builder->load($context->builder->gep($bits, $context->builder->zExtOrBitCast($bi, $i64)));
 
         $index = $context->builder->and(
             $context->builder->lshr($context->builder->load($context->builder->gep($count, $i64->constInt(0, false))), $i32->constInt(3, false)),
             $i32->constInt(0x3F, false)
         );
-        $context->builder->store($bitByte, $context->builder->gep($buf, $context->builder->truncOrBitCast($index, $i64)));
+        $context->builder->store($bitByte, $context->builder->gep($buf, $context->builder->zExtOrBitCast($index, $i64)));
         $c0 = $context->builder->load($context->builder->gep($count, $i64->constInt(0, false)));
         $c0n = self::u32Add($context, $c0, $i32->constInt(8, false));
         $context->builder->store($c0n, $context->builder->gep($count, $i64->constInt(0, false)));
@@ -2764,7 +2766,7 @@ final class StringHashCryptoNativeJit
         $context->builder->positionAtEnd($jBody);
         $oj = $context->builder->gep($out, $j);
         $uj = $context->builder->gep($u, $j);
-        $context->builder->store($context->builder->xor($context->builder->zExt($context->builder->load($oj), $i32), $context->builder->zExt($context->builder->load($uj), $i32)), $oj);
+        $context->builder->store($context->builder->truncOrBitCast($context->builder->xor($context->builder->zExt($context->builder->load($oj), $i32), $context->builder->zExt($context->builder->load($uj), $i32)), $i8), $oj);
         $context->builder->store($context->builder->addNoSignedWrap($j, $i64->constInt(1, false)), $jSlot);
         $context->builder->branch($jHead);
         $context->builder->positionAtEnd($jCont);
