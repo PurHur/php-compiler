@@ -18,7 +18,7 @@ final class JitHash
 
     public static function hash(Context $context, Value $algo, Value $data, Value $raw): Value
     {
-        StringHashCrypto::ensureLinked($context);
+        self::ensureHashCryptoLinked($context);
         $rawI32 = $context->builder->zExt($raw, $context->getTypeFromString('int32'));
 
         return self::digestToValue($context, $context->builder->call(
@@ -31,7 +31,7 @@ final class JitHash
 
     public static function hashHmac(Context $context, Value $algo, Value $data, Value $key, Value $raw): Value
     {
-        StringHashCrypto::ensureLinked($context);
+        self::ensureHashCryptoLinked($context);
         $rawI32 = $context->builder->zExt($raw, $context->getTypeFromString('int32'));
 
         return self::digestToValue($context, $context->builder->call(
@@ -52,7 +52,7 @@ final class JitHash
         Value $length,
         Value $raw
     ): Value {
-        StringHashCrypto::ensureLinked($context);
+        self::ensureHashCryptoLinked($context);
         $rawI32 = $context->builder->zExt($raw, $context->getTypeFromString('int32'));
 
         return self::digestToValue($context, $context->builder->call(
@@ -74,7 +74,7 @@ final class JitHash
         Value $info,
         Value $salt
     ): Value {
-        StringHashCrypto::ensureLinked($context);
+        self::ensureHashCryptoLinked($context);
 
         return self::digestToValue($context, $context->builder->call(
             $context->lookupFunction('__compiler_hash_hkdf'),
@@ -88,7 +88,7 @@ final class JitHash
 
     public static function equals(Context $context, Value $known, Value $user): Value
     {
-        StringHashCrypto::ensureLinked($context);
+        self::ensureHashCryptoLinked($context);
         $i32 = $context->getTypeFromString('int32');
         $result = $context->builder->call(
             $context->lookupFunction('__compiler_hash_equals'),
@@ -132,5 +132,18 @@ final class JitHash
         $context->builder->positionAtEnd($doneBlock);
 
         return $ptr;
+    }
+
+    private static function ensureHashCryptoLinked(Context $context): void
+    {
+        $savedInsert = null;
+        try {
+            $savedInsert = $context->builder->getInsertBlock();
+        } catch (\Throwable) {
+        }
+        StringHashCrypto::ensureLinked($context);
+        if (null !== $savedInsert) {
+            $context->builder->positionAtEnd($savedInsert);
+        }
     }
 }
