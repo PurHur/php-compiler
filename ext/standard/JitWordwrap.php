@@ -62,6 +62,16 @@ final class JitWordwrap
                 return (int) $const->constInt();
             }
         }
+        if (JITVariable::TYPE_NATIVE_DOUBLE === $arg->type && JITVariable::KIND_VALUE === $arg->kind) {
+            $const = $arg->value;
+            if ($const instanceof Value && $const->isConstant()) {
+                return VmMath::floatToZendLong((float) $const->constDouble());
+            }
+        }
+        $literal = JitStringArg::compileTimeLiteral($arg);
+        if (null !== $literal && '' !== $literal && is_numeric($literal)) {
+            return (int) $literal;
+        }
 
         return null;
     }
