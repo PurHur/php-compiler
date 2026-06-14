@@ -7755,6 +7755,9 @@ class JIT {
                                     if ($this->tryResolveSelfHostSuperglobalsStaticCall($staticClass, $staticMethod)) {
                                         break;
                                     }
+                                    if ($this->tryResolveProgressStaticCall($staticClass, $staticMethod)) {
+                                        break;
+                                    }
                                     throw new \LogicException("Call to undefined static method {$nameVar->compileTimeString}()");
                                 }
                                 throw new \LogicException("Call to undefined function {$lcname}()");
@@ -12652,6 +12655,30 @@ class JIT {
         return false;
     }
 
+    /**
+     * Lower Progress::{noteFunction,notePhase,noteEntry} to __phpc_progress_note when the PHP
+     * method is not yet queued (self-host spine compile order — #8560, #6748).
+     */
+    private function tryResolveProgressStaticCall(string $className, string $methodName): bool
+    {
+        $declaringClassLc = strtolower(ltrim($className, '\\'));
+        if ('phpcompiler\\jit\\progress' !== $declaringClassLc && 'jit\\progress' !== $declaringClassLc) {
+            return false;
+        }
+        $methodLc = strtolower($methodName);
+        if (!in_array($methodLc, ['notefunction', 'notephase', 'noteentry'], true)) {
+            return false;
+        }
+        JIT\Builtin\ProgressNoteRuntime::ensureLinked($this->context);
+        $proxy = 'phpcompiler\\jit\\progress::'.strtolower($methodName);
+        if (!$this->context->functionIsRegistered($proxy)) {
+            return false;
+        }
+        $this->context->scope->toCall = $this->context->resolveFunctionProxy($proxy);
+
+        return true;
+    }
+
     private function resolveJitStaticMethodProxyName(string $classLc, string $methodLc): string
     {
         $methodLc = strtolower($methodLc);
@@ -12817,6 +12844,11 @@ class JIT {
                 return;
             }
             if ($this->tryResolveSelfHostSuperglobalsStaticCall($className, $nameOp->value)) {
+                $this->context->scope->args = [];
+
+                return;
+            }
+            if ($this->tryResolveProgressStaticCall($className, $nameOp->value)) {
                 $this->context->scope->args = [];
 
                 return;
