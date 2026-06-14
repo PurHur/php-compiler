@@ -8,6 +8,7 @@ use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Builtin;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\Variable;
+use PHPLLVM\BasicBlock;
 use PHPLLVM\Builder;
 use PHPLLVM\Value;
 
@@ -22,13 +23,37 @@ final class StreamContextRuntime
 
     private const GLOBAL_NEXT_ID = 'phpc_stream_context_next_id';
 
+    private const GLOBAL_DEFAULT = 'phpc_stream_context_default';
+
     private const MARKER_KEY = '__phpc_stream_context';
 
     private const PARAMS_MARKER_KEY = '__phpc_stream_context_params';
 
     public static function ensureLinked(Context $context): void
     {
+        $savedInsert = $context->builder->getInsertBlock();
         self::implement($context);
+        self::resumeBuilderAfterEnsureLinked($context, $savedInsert);
+    }
+
+    /** Reposition builder in the user function after runtime helper codegen (#6367). */
+    public static function resumeBuilderAfterEnsureLinked(Context $context, ?BasicBlock $savedInsert): void
+    {
+        unset($savedInsert);
+
+        $targetFn = null;
+        if ('' !== $context->activeFunction && isset($context->functions[$context->activeFunction])) {
+            $targetFn = $context->functions[$context->activeFunction];
+        }
+        if (null === $targetFn) {
+            $targetFn = $context->main;
+        }
+        if (null === $targetFn) {
+            throw new \LogicException('StreamContext JIT: no active insert block after ensureLinked');
+        }
+
+        $resume = $targetFn->appendBasicBlock('stream_ctx_jit_resume_'.(++self::$blockSerial));
+        $context->builder->positionAtEnd($resume);
     }
 
     public static function implement(Context $context): void
@@ -96,6 +121,11 @@ final class StreamContextRuntime
             ? $setParamsProbe
             : $context->module->addFunction('__phpc_stream_context_set_params', $context->context->functionType($voidTy, false, $htPtr, $htPtr));
         self::implementSetParams($context, $fnSetParams, $fnMerge);
+    }
+
+    public static function ensureDefaultGlobalDeclared(Context $context): void
+    {
+        self::ensureDefaultGlobal($context);
     }
 
     private static function implementCreate(Context $context, Value $fn, Value $fnMerge): void
@@ -210,8 +240,13 @@ final class StreamContextRuntime
 
     private static function implementMergeOptions(Context $context, Value $fn): void
     {
+        if ($fn->countBasicBlocks() > 0) {
+            return;
+        }
+
         $entry = $fn->appendBasicBlock('scm_entry');
         $nullBb = $fn->appendBasicBlock('scm_null');
+        $loopInit = $fn->appendBasicBlock('scm_init');
         $loopHead = $fn->appendBasicBlock('scm_head');
         $loopBody = $fn->appendBasicBlock('scm_body');
         $loopAdvance = $fn->appendBasicBlock('scm_advance');
@@ -227,7 +262,7 @@ final class StreamContextRuntime
             $context->builder->icmp(Builder::INT_EQ, $dest, $nullHt),
             $context->builder->icmp(Builder::INT_EQ, $src, $nullHt)
         );
-        $context->builder->branchIf($eitherNull, $nullBb, $loopHead);
+        $context->builder->branchIf($eitherNull, $nullBb, $loopInit);
 
         $context->builder->positionAtEnd($nullBb);
         $context->builder->returnVoid();
@@ -235,6 +270,7 @@ final class StreamContextRuntime
         $map = $context->structFieldMap['__hashtable__'];
         $nodeMap = $context->structFieldMap['__strkey_node__'];
         $nodePtrType = $context->getTypeFromString('__strkey_node__*');
+        $context->builder->positionAtEnd($loopInit);
         $nodeSlot = BasicBlockHelper::entryAlloca($context, $nodePtrType);
         $context->builder->store(
             $context->builder->load($context->builder->structGep($src, $map['strKeys'])),
@@ -436,6 +472,18 @@ final class StreamContextRuntime
         $i32 = $context->getTypeFromString('int32');
         $g = $context->module->addGlobal($i32, self::GLOBAL_NEXT_ID);
         $g->setInitializer($i32->constInt(0, false));
+    }
+
+    private static function ensureDefaultGlobal(Context $context): void
+    {
+        $existing = $context->module->getNamedGlobal(self::GLOBAL_DEFAULT);
+        if (null !== $existing) {
+            return;
+        }
+
+        $htPtr = $context->getTypeFromString('__hashtable__*');
+        $g = $context->module->addGlobal($htPtr, self::GLOBAL_DEFAULT);
+        $g->setInitializer($htPtr->constNull());
     }
 
     private static function literalKeyString(Context $context, string $text): Value

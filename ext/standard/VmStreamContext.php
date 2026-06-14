@@ -22,6 +22,9 @@ final class VmStreamContext
 
     private static int $nextId = 0;
 
+    /** Process-wide default context (php-src php_stream_context_get(), #6367). */
+    private static ?Variable $defaultContext = null;
+
     /**
      * Build a VM stream-context array from caller options (issue #1377, #2457, #6815).
      *
@@ -75,6 +78,7 @@ final class VmStreamContext
         if ([] !== $hostParams) {
             self::attachParamsHashTable($ht, $hostParams);
         }
+        $ht->markResourceLikeHandle();
 
         return $ht;
     }
@@ -95,6 +99,7 @@ final class VmStreamContext
         if (null !== $params && [] !== $params) {
             self::attachParamsHashTable($ht, $params);
         }
+        $ht->markResourceLikeHandle();
 
         return $ht;
     }
@@ -180,12 +185,52 @@ final class VmStreamContext
     }
 
     /**
+     * stream_context_get_default() — lazy singleton with optional merge (ext/standard/streams.c, #6367).
+     */
+    public static function getDefault(?Variable $optionsVar = null): Variable
+    {
+        $context = self::ensureDefaultContext();
+        if (null !== $optionsVar) {
+            self::setOptions(
+                $context,
+                self::requireOptionsArray($optionsVar, 'stream_context_get_default', 1)
+            );
+        }
+
+        return $context;
+    }
+
+    /**
+     * stream_context_set_default() — merge options into process default (#6367, pairs #3448).
+     */
+    public static function setDefault(Variable $optionsVar): Variable
+    {
+        $context = self::ensureDefaultContext();
+        self::setOptions(
+            $context,
+            self::requireOptionsArray($optionsVar, 'stream_context_set_default', 1)
+        );
+
+        return $context;
+    }
+
+    private static function ensureDefaultContext(): Variable
+    {
+        if (null === self::$defaultContext) {
+            self::$defaultContext = new Variable();
+            self::$defaultContext->array(self::create());
+        }
+
+        return self::$defaultContext;
+    }
+
+    /**
      * Merge options into an existing stream context (issue #6517).
      */
     public static function setOptions(Variable $context, Variable $options): bool
     {
-        $context->separateArrayForWrite();
         $context = self::requireRepresentation($context, 'stream_context_set_options');
+        $context->separateArrayForWrite();
         $options = self::requireOptionsArray($options, 'stream_context_set_options');
 
         $exported = VmHttpBuildQuery::export($options);
@@ -208,8 +253,8 @@ final class VmStreamContext
      */
     public static function setParams(Variable $context, Variable $params): bool
     {
-        $context->separateArrayForWrite();
         $context = self::requireRepresentation($context, 'stream_context_set_params');
+        $context->separateArrayForWrite();
         $params = self::requireParamsArray($params, 'stream_context_set_params');
 
         $exported = VmHttpBuildQuery::export($params);
