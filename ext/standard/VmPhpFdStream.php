@@ -33,6 +33,54 @@ final class VmPhpFdStream
         return null !== self::ffi();
     }
 
+    public static function isFdUri(string $uri): bool
+    {
+        return \str_starts_with($uri, 'php://fd/');
+    }
+
+    /**
+     * fopen('php://fd/N') — dup OS fd N and register a VM stream handle (#8533 phase 2).
+     *
+     * php-src: main/streams/php_stream_fd_wrapper.c
+     *
+     * @return int|false VM stream handle id
+     */
+    public static function openFromUri(string $uri, string $mode): int|false
+    {
+        if (!self::isFdUri($uri)) {
+            return false;
+        }
+        $fdStr = \substr($uri, 9);
+        if ('' === $fdStr || !\ctype_digit($fdStr)) {
+            return false;
+        }
+        $sourceFd = (int) $fdStr;
+        if ($sourceFd < 0) {
+            return false;
+        }
+        $ffi = self::ffi();
+        if (null === $ffi) {
+            return false;
+        }
+
+        try {
+            $dupFd = (int) $ffi->dup($sourceFd);
+            if ($dupFd < 0) {
+                return false;
+            }
+            $handle = self::adopt($dupFd, $uri, self::phpStreamMode($mode));
+            if (false === $handle) {
+                self::closeFd($dupFd);
+
+                return false;
+            }
+
+            return $handle;
+        } catch (\Throwable) {
+            return false;
+        }
+    }
+
     /**
      * Take ownership of a dup'd fd and register a VM stream handle.
      */
@@ -323,6 +371,18 @@ final class VmPhpFdStream
     /**
      * @return array{canRead: bool, canWrite: bool}|null
      */
+    private static function phpStreamMode(string $mode): string
+    {
+        if ('' === $mode) {
+            return 'rb';
+        }
+        if (!\str_contains($mode, 'b')) {
+            return $mode.'b';
+        }
+
+        return $mode;
+    }
+
     private static function parseMode(string $mode): ?array
     {
         $mode = \strtolower($mode);
@@ -405,6 +465,7 @@ ssize_t read(int fd, void *buf, size_t count);
 ssize_t write(int fd, const void *buf, size_t count);
 off_t lseek(int fd, off_t offset, int whence);
 int close(int fd);
+int dup(int oldfd);
 CDEF;
 
         foreach (['libc.so.6', 'libc.so'] as $lib) {

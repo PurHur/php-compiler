@@ -646,6 +646,9 @@ final class VmFs
         if (VmPhpFilterStream::isSupportedUri($path)) {
             return VmPhpFilterStream::open($path, $mode, $ctx);
         }
+        if (VmPhpFdStream::isFdUri($path)) {
+            return VmPhpFdStream::openFromUri($path, $mode);
+        }
         if (self::isBuiltinPhpStreamUri($path)) {
             $fp = @fopen($path, $mode);
             if (false === $fp) {
@@ -2069,7 +2072,7 @@ final class VmFs
     }
 
     /**
-     * Remaining php:// wrappers (fd, …) — host PHP streams, not libc open(2).
+     * Remaining php:// wrappers not yet lowered to VmPhp* — host PHP streams, not libc open(2).
      */
     private static function isBuiltinPhpStreamUri(string $path): bool
     {
@@ -2081,6 +2084,7 @@ final class VmFs
             || VmPhpMemoryStream::isSupportedUri($path)
             || VmPhpInputOutputStream::isSupportedUri($path)
             || VmPhpFilterStream::isSupportedUri($path)
+            || VmPhpFdStream::isFdUri($path)
         ) {
             return false;
         }
