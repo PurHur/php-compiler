@@ -6,6 +6,7 @@ namespace PHPCompiler\JIT;
 
 use PHPCompiler\ext\standard\boolval;
 use PHPCompiler\Func\Internal;
+use PHPLLVM\BasicBlock;
 use PHPLLVM\Builder;
 use PHPLLVM\Value;
 
@@ -222,6 +223,7 @@ final class ArrayFindHelper
         $context->builder->positionAtEnd($packedDone);
         self::buildStringKeyPredicateLoop($context, $ht, $handler, $mode, $resultSlot, $boolSlot, $done);
 
+        $context->builder->positionAtEnd($done);
         $retBlock = BasicBlockHelper::append($context, 'array_find_ht_return');
         $context->builder->branch($retBlock);
         $context->builder->positionAtEnd($retBlock);
@@ -236,7 +238,7 @@ final class ArrayFindHelper
         int $mode,
         ?Value $resultSlot,
         ?Value $boolSlot,
-        Value $doneBlock
+        BasicBlock $doneBlock
     ): void {
         $map = $context->structFieldMap['__hashtable__'];
         $nodeMap = $context->structFieldMap['__strkey_node__'];
