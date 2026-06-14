@@ -178,6 +178,15 @@ class Context {
     /** ?? / ?-> result operands that must receive branch assigns even when php-cfg marks them dead (#99, #3219). */
     public \SplObjectStorage $coalesceAssignTargets;
 
+    /**
+     * Per-function scope slot → JIT variable for ?: phi temps (#72, #8555).
+     *
+     * php-cfg may emit distinct {@see Operand\Temporary} objects per CFG block for one slot.
+     *
+     * @var array<int, Variable>
+     */
+    public array $functionScopeSlotBindings = [];
+
     /** Guarded list destruct: assign-path dim fetches compile as unreachable stubs (#4308). */
     public bool $listUnpackSkipAssignPath = false;
 
@@ -1415,12 +1424,47 @@ class Context {
 
             return;
         }
-        $this->scope->variables[$op] = Variable::fromOp($this, $func, $basicBlock, $block, $op);
-        $this->scope->variables[$op]->initialize();
+        $var = Variable::fromOp($this, $func, $basicBlock, $block, $op);
+        $var->initialize();
+        $this->setVariableOp($op, $var);
     }
 
     public function setVariableOp(Operand $op, Variable $var) {
         $this->scope->variables[$op] = $var;
+        foreach ($this->jitScopeBlocksForOperand($op) as $scopeBlock) {
+            $slot = $scopeBlock->slotForOperand($op);
+            if (null !== $slot) {
+                $this->functionScopeSlotBindings[$slot] = $var;
+            }
+        }
+    }
+
+    /**
+     * @return list<Block>
+     */
+    private function jitScopeBlocksForOperand(Operand $op): array
+    {
+        $blocks = [];
+        if (null !== $this->jitCurrentBlock) {
+            $blocks[] = $this->jitCurrentBlock;
+        }
+        if (null !== $this->jitEnclosingBlock && $this->jitEnclosingBlock !== $this->jitCurrentBlock) {
+            $blocks[] = $this->jitEnclosingBlock;
+        }
+
+        return $blocks;
+    }
+
+    public function jitScopeSlotForOperand(Operand $op): ?int
+    {
+        foreach ($this->jitScopeBlocksForOperand($op) as $scopeBlock) {
+            $slot = $scopeBlock->slotForOperand($op);
+            if (null !== $slot) {
+                return $slot;
+            }
+        }
+
+        return null;
     }
 
     /**
@@ -1447,17 +1491,34 @@ class Context {
                 }
             }
         }
-        $slot = $block->slotForOperand($op);
-        if (null === $slot) {
-            return false;
+        $blocks = [];
+        if (null !== $this->jitCurrentBlock) {
+            $blocks[] = $this->jitCurrentBlock;
         }
-        foreach ($block->scopedOperands() as $scopeOp) {
-            if ($block->slotForOperand($scopeOp) !== $slot || !$this->scope->variables->contains($scopeOp)) {
+        if (null !== $this->jitEnclosingBlock && $this->jitEnclosingBlock !== $this->jitCurrentBlock) {
+            $blocks[] = $this->jitEnclosingBlock;
+        }
+        if (null !== $block && !in_array($block, $blocks, true)) {
+            $blocks[] = $block;
+        }
+        foreach ($blocks as $scopeBlock) {
+            $slot = $scopeBlock->slotForOperand($op);
+            if (null === $slot) {
                 continue;
             }
-            $this->scope->variables[$op] = $this->scope->variables[$scopeOp];
+            foreach ($scopeBlock->scopedOperands() as $scopeOp) {
+                if ($scopeBlock->slotForOperand($scopeOp) !== $slot || !$this->scope->variables->contains($scopeOp)) {
+                    continue;
+                }
+                $this->scope->variables[$op] = $this->scope->variables[$scopeOp];
 
-            return true;
+                return true;
+            }
+            if (isset($this->functionScopeSlotBindings[$slot])) {
+                $this->scope->variables[$op] = $this->functionScopeSlotBindings[$slot];
+
+                return true;
+            }
         }
 
         return false;
@@ -1470,6 +1531,10 @@ class Context {
         if ($op instanceof Operand\Literal) {
             return true;
         }
+        if (null !== ($slot = $this->jitScopeSlotForOperand($op)) && isset($this->functionScopeSlotBindings[$slot])) {
+            return true;
+        }
+
         return false;
     }
 
@@ -1503,6 +1568,11 @@ class Context {
             }
         }
         if (!$this->scope->variables->contains($op)) {
+            foreach ($this->jitScopeBlocksForOperand($op) as $scopeBlock) {
+                if ($this->aliasVariableOpFromSlot($scopeBlock, $op)) {
+                    return $this->scope->variables[$op];
+                }
+            }
             if ($op instanceof Operand\Literal) {
                 $this->scope->variables[$op] = Variable::fromLiteral($this, $op);
             } elseif ('this' === OperandName::resolve($op)) {
@@ -1513,6 +1583,12 @@ class Context {
                     throw new \LogicException("Unknown variable referenced: " . get_class($op));
                 }
             } elseif ($op instanceof Operand\Temporary) {
+                $slot = $this->jitScopeSlotForOperand($op);
+                if (null !== $slot && isset($this->functionScopeSlotBindings[$slot])) {
+                    $this->scope->variables[$op] = $this->functionScopeSlotBindings[$slot];
+
+                    return $this->functionScopeSlotBindings[$slot];
+                }
                 // Temporaries can be introduced by CFG transforms after scope variable allocation.
                 // Treat unknown temporaries as boxed __value__ slots to keep self-host emit paths alive.
                 $slot = JitValueBox::alloc($this);
@@ -1580,10 +1656,12 @@ class Context {
         PHPLLVM\Value $value,
         Operand $op
     ): Variable {
-        $this->scope->variables[$op] = Variable::fromValueOp(
+        $var = Variable::fromValueOp(
             $this, $value, $op
         );
-        return $this->scope->variables[$op];
+        $this->setVariableOp($op, $var);
+
+        return $var;
     }
 
     public function freeDeadVariables(
@@ -1599,17 +1677,20 @@ class Context {
             }
         }
         $returnVarNames = [];
+        $returnOperands = new \SplObjectStorage();
         foreach ($block->opCodes as $blockOp) {
             if (OpCode::TYPE_RETURN !== $blockOp->type || null === $blockOp->arg1) {
                 continue;
             }
             $returnOp = $block->getOperand($blockOp->arg1);
+            $returnOperands[$returnOp] = true;
             $name = OperandName::resolve($returnOp);
             if (null !== $name) {
                 $returnVarNames[$name] = true;
             }
         }
         if (null !== $skipOperand) {
+            $returnOperands[$skipOperand] = true;
             $name = OperandName::resolve($skipOperand);
             if (null !== $name) {
                 $returnVarNames[$name] = true;
@@ -1618,6 +1699,9 @@ class Context {
         foreach ($block->orig->deadOperands as $op) {
             $name = OperandName::resolve($op);
             if (null !== $name && isset($returnVarNames[$name])) {
+                continue;
+            }
+            if ($returnOperands->contains($op)) {
                 continue;
             }
             if ($coalesceResults->contains($op)) {

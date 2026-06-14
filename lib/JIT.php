@@ -1239,6 +1239,7 @@ class JIT {
 
         $lcname = strtolower($logicalName ?? $internalName);
         $this->context->functions[$lcname] = $func;
+        $this->context->functionScopeSlotBindings = [];
         $this->context->activeFunction = $lcname;
         if (!is_null($funcName)) {
             $lcname = strtolower($funcName);
@@ -7107,7 +7108,16 @@ class JIT {
                         ? $returnBlock
                         : $origBasicBlock;
                 case OpCode::TYPE_RETURN:
-                    $return = $this->context->getVariableFromOp($block->getOperand($op->arg1));
+                    $returnOperand = $block->getOperand($op->arg1);
+                    $returnSlot = $block->slotForOperand($returnOperand);
+                    if (
+                        null !== $returnSlot
+                        && isset($this->context->functionScopeSlotBindings[$returnSlot])
+                    ) {
+                        $return = $this->context->functionScopeSlotBindings[$returnSlot];
+                    } else {
+                        $return = $this->context->getVariableFromOp($returnOperand);
+                    }
                     $returnBlock = $builder->getInsertBlock();
                     $builder->positionAtEnd($returnBlock);
                     $this->markJitThisConstructedIfLeavingConstruct($block);
@@ -7139,7 +7149,6 @@ class JIT {
 
                         return $origBasicBlock;
                     }
-                    $returnOperand = $block->getOperand($op->arg1);
                     if ($this->shouldFreeDeadVariablesBeforeBranch()) {
                         // php-cfg may mark inline `new class` temps dead before return (#3098).
                         $this->context->freeDeadVariables($func, $returnBlock, $block, $returnOperand);
