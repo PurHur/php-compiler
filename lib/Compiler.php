@@ -8652,7 +8652,10 @@ class Compiler {
             return null;
         }
         $argSlot = $this->compileOperand($arg, $block, false);
-        if (null === $argSlot || $producerSlot === $argSlot) {
+        if (null === $argSlot) {
+            return $producerSlot;
+        }
+        if ($producerSlot === $argSlot) {
             return null;
         }
 
@@ -9909,6 +9912,9 @@ class Compiler {
             if ($child instanceof Op\Expr\ClassConstFetch) {
                 array_unshift($fetches, $child);
 
+                continue;
+            }
+            if ($child instanceof Op\Expr && $this->isInlineExprCallArgProducer($child)) {
                 continue;
             }
             break;

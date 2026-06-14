@@ -8,6 +8,7 @@ use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitLongArg;
+use PHPCompiler\JIT\JitResourceArg;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
@@ -37,6 +38,7 @@ final class flock extends Internal
         if (\count($args) < 2) {
             throw new \LogicException('flock() requires at least two arguments in this compiler build');
         }
+        JitResourceArg::rejectEnumCaseOperand($context, $args[0], 'flock', 0, 'stream');
 
         return JitFlock::invoke(
             $context,

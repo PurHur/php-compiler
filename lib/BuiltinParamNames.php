@@ -65,6 +65,8 @@ final class BuiltinParamNames
                 return ['stream', 'format'];
             case 'fprintf':
                 return ['stream', 'format'];
+            case 'flock':
+                return ['stream', 'operation', 'wouldblock'];
             case 'get_resources':
                 return ['resource_type'];
             case 'get_defined_constants':
