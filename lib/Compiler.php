@@ -937,6 +937,97 @@ class Compiler {
         return false;
     }
 
+    private function funcReturnTypeIsNullableScalar(Block $block): bool
+    {
+        if (null === $block->func) {
+            return false;
+        }
+        $returnType = $block->func->returnType;
+
+        return $returnType instanceof Op\Type\Nullable;
+    }
+
+    private function operandIsImplicitNullableParam(Operand $operand, Block $block): bool
+    {
+        if (!$operand instanceof CfgVariable) {
+            return false;
+        }
+        if (null === $block->func) {
+            return false;
+        }
+        $varName = $operand->name;
+        while ($varName instanceof Temporary && null !== $varName->original) {
+            $varName = $varName->original;
+        }
+        if (!$varName instanceof Literal || !is_string($varName->value)) {
+            return false;
+        }
+        foreach ($block->func->params as $param) {
+            $paramName = $param->name;
+            while ($paramName instanceof Temporary && null !== $paramName->original) {
+                $paramName = $paramName->original;
+            }
+            if (!$paramName instanceof Literal || $paramName->value !== $varName->value) {
+                continue;
+            }
+            if ($param->declaredType instanceof Op\Type\Nullable) {
+                return true;
+            }
+            $slot = $block->slotForOperand($param->result);
+
+            return null !== $slot && isset($block->paramImplicitNullable[$slot]);
+        }
+
+        return false;
+    }
+
+    /** `return (null ?… $param : null)` / `return (null !== $param ? $param : null)` → `$param ?? null` (#8563). */
+    private function nullableParamFromReturnTernaryArms(Op\Stmt\JumpIf $stmt, Block $block): ?Operand
+    {
+        if (!$this->jumpIfTargetsReturnMerge($stmt) || !$this->funcReturnTypeIsNullableScalar($block)) {
+            return null;
+        }
+        $ifNull = $this->branchCfgAssignsNullConst($stmt->if);
+        $elseNull = $this->branchCfgAssignsNullConst($stmt->else);
+        if ($ifNull === $elseNull) {
+            return null;
+        }
+        $valueBranch = $ifNull ? $stmt->else : $stmt->if;
+        foreach ($valueBranch->children as $child) {
+            if (!$child instanceof Op\Expr\Assign || $this->exprIsNullConst($child->expr)) {
+                continue;
+            }
+            $src = $child->expr;
+            while ($src instanceof Temporary && null !== $src->original) {
+                $src = $src->original;
+            }
+            if ($src instanceof CfgVariable && $this->operandIsImplicitNullableParam($src, $block)) {
+                return $src;
+            }
+        }
+
+        return null;
+    }
+
+    private function syntheticNullConstOperand(): Operand
+    {
+        $nullLit = new Literal(null);
+        $nullLit->type = Type::null();
+
+        return $nullLit;
+    }
+
+    /** AOT-safe lowering: implicit nullable param returns via ?? null (proven native ABI path). */
+    private function emitImplicitNullableParamCoalesceReturn(Operand $paramOp, Block $block): void
+    {
+        $coalesce = new Op\Expr\BinaryOp\Coalesce($paramOp, $this->syntheticNullConstOperand());
+        $endBlock = $this->compileCoalesce($coalesce, $block);
+        $endBlock->addOpCode(new OpCode(
+            OpCode::TYPE_RETURN,
+            $this->compileOperand($coalesce->result, $endBlock, true)
+        ));
+    }
+
     /** `?:` in `echo`/concat merge uses echo phi slots; `return ?:` uses RETURN (#4280); `throw ?:` uses TYPE_THROW (#7037). */
     private function mergeCfgBlockUsesEchoPhi(CfgBlock $merge): bool
     {
@@ -1491,17 +1582,14 @@ class Compiler {
                             break;
                         }
                         if (
-                            $child instanceof Op\Expr\BinaryOp\NotIdentical
-                            && ($ops[$i + 1] ?? null) instanceof Op\Stmt\JumpIf
-                            && $this->shouldRewriteNullableNeNullReturnTernary($ops[$i + 1], $child)
+                            ($ops[$i + 1] ?? null) instanceof Op\Stmt\JumpIf
+                            && null !== ($paramOp = $this->nullableParamFromReturnTernaryArms($ops[$i + 1], $block))
+                            && (
+                                $child instanceof Op\Expr\BinaryOp\NotIdentical
+                                || $child instanceof Op\Expr\BinaryOp\Identical
+                            )
                         ) {
-                            $block->addOpCode(new OpCode(
-                                OpCode::TYPE_IDENTICAL,
-                                $this->compileOperand($child->result, $block, false),
-                                $this->compileOperand($child->left, $block, true),
-                                $this->compileOperand($child->right, $block, true)
-                            ));
-                            $this->rewrittenNeNullReturnJumpIf[$ops[$i + 1]] = true;
+                            $this->emitImplicitNullableParamCoalesceReturn($paramOp, $block);
                             break;
                         }
                         $savedAssignRefFlags = $this->assignRefBindRefFlags;
@@ -5532,6 +5620,11 @@ class Compiler {
                 $block->addOpCode($op);
             }
         } elseif ($stmt instanceof Op\Stmt\JumpIf) {
+            if (null !== ($paramOp = $this->nullableParamFromReturnTernaryArms($stmt, $block))) {
+                $this->emitImplicitNullableParamCoalesceReturn($paramOp, $block);
+
+                return;
+            }
             if (null !== $block->orig && $this->isErrorSuppressEndBlock($block->orig)) {
                 $block->addOpCode(new OpCode(OpCode::TYPE_END_SILENCE));
             }
@@ -8973,6 +9066,20 @@ class Compiler {
                 $callResultSlot = $this->funcCallExecReturnSlotForReturn($block, $terminal->expr);
                 if (null !== $callResultSlot) {
                     return [new OpCode(OpCode::TYPE_RETURN, $callResultSlot)];
+                }
+
+                $returnExpr = $terminal->expr;
+                while ($returnExpr instanceof Temporary && null !== $returnExpr->original) {
+                    $returnExpr = $returnExpr->original;
+                }
+                if (
+                    $returnExpr instanceof CfgVariable
+                    && $this->funcReturnTypeIsNullableScalar($block)
+                    && $this->operandIsImplicitNullableParam($returnExpr, $block)
+                ) {
+                    $this->emitImplicitNullableParamCoalesceReturn($returnExpr, $block);
+
+                    return [];
                 }
 
                 return [new OpCode(

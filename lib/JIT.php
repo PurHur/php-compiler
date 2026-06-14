@@ -9260,6 +9260,12 @@ class JIT {
             if (null !== $rawReturn) {
                 $callback = $this->callbackTypeFromPhptype($rawReturn);
                 if (null !== $callback) {
+                    // Nullable scalar returns use __value__* (param/return ABI parity with
+                    // cfgParamIsImplicitNullable); non-nullable __string__* cannot carry null (#8563).
+                    if ('__value__' !== $callback && '__object__*' !== $callback) {
+                        return '__value__*';
+                    }
+
                     return $callback;
                 }
             }

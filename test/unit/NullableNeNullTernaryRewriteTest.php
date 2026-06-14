@@ -23,17 +23,17 @@ final class NullableNeNullTernaryRewriteTest extends TestCase
             }
         }
         $this->assertNotNull($funcBlock);
-        $hasIdentical = false;
-        $hasNotIdentical = false;
+        $hasCoalesce = false;
+        $hasTernaryJump = false;
         foreach ($funcBlock->opCodes as $op) {
-            if (OpCode::TYPE_IDENTICAL === $op->type) {
-                $hasIdentical = true;
+            if (OpCode::TYPE_COALESCE === $op->type) {
+                $hasCoalesce = true;
             }
-            if (OpCode::TYPE_NOT_IDENTICAL === $op->type) {
-                $hasNotIdentical = true;
+            if (OpCode::TYPE_JUMPIF === $op->type) {
+                $hasTernaryJump = true;
             }
         }
-        $this->assertTrue($hasIdentical, 'expected TYPE_IDENTICAL for rewritten ?: return');
-        $this->assertFalse($hasNotIdentical, 'TYPE_NOT_IDENTICAL should be rewritten away');
+        $this->assertTrue($hasCoalesce, 'expected TYPE_COALESCE for rewritten ?: return');
+        $this->assertFalse($hasTernaryJump, '?: ternary JumpIf should be rewritten away');
     }
 }
