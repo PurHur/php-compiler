@@ -7261,27 +7261,45 @@ class JIT {
                         0 === $this->context->inlineIncludeDepth
                         && $this->jumpIfTargetsReturnMerge($op->block1, $op->block2)
                     ) {
-                        $mergeBlock = $this->branchJumpMergeBlock($op->block1);
+                        $jumpIfBlock = $op->block1;
+                        $jumpElseBlock = $op->block2;
+                        $mergeBlock = $this->branchJumpMergeBlock($jumpIfBlock);
                         assert(null !== $mergeBlock);
-                        $ifString = $this->branchAssignsStringToTernaryPhi($op->block1, $mergeBlock)
-                            || (
-                                !$this->branchAssignsOnlyNullToTernaryPhi($op->block1, $mergeBlock)
-                                && $this->branchAssignsOnlyNullToTernaryPhi($op->block2, $mergeBlock)
+                        $ifSourceProbe = $this->ternaryPhiAssignSourceOperand($jumpIfBlock, $mergeBlock);
+                        if (
+                            null !== $ifSourceProbe
+                            && Variable::TYPE_VALUE === Variable::getTypeFromType($ifSourceProbe->type)
+                            && $this->operandTypeIncludesString($ifSourceProbe)
+                            && $this->branchAssignsStringToTernaryPhi($jumpIfBlock, $mergeBlock)
+                            && !$this->branchAssignsStringToTernaryPhi($jumpElseBlock, $mergeBlock)
+                        ) {
+                            // Boxed ?string on if-entry: rewrite to null === ? : $x CFG shape (#8555).
+                            [$jumpIfBlock, $jumpElseBlock] = [$jumpElseBlock, $jumpIfBlock];
+                            $builder->positionAtEnd($branchBlock);
+                            $condition = $this->context->builder->xor(
+                                $condition,
+                                $this->context->getTypeFromString('int1')->constInt(1, false)
                             );
-                        $elseString = $this->branchAssignsStringToTernaryPhi($op->block2, $mergeBlock);
+                        }
+                        $ifString = $this->branchAssignsStringToTernaryPhi($jumpIfBlock, $mergeBlock)
+                            || (
+                                !$this->branchAssignsOnlyNullToTernaryPhi($jumpIfBlock, $mergeBlock)
+                                && $this->branchAssignsOnlyNullToTernaryPhi($jumpElseBlock, $mergeBlock)
+                            );
+                        $elseString = $this->branchAssignsStringToTernaryPhi($jumpElseBlock, $mergeBlock);
                         if ($ifString && !$elseString) {
                             $returnOp = $this->ternaryReturnPhiOperand($mergeBlock);
                             assert(null !== $returnOp);
                             [$firstArm, $secondArm] = $this->ternaryReturnMergeCompileOrder(
-                                $op->block1,
-                                $op->block2,
+                                $jumpIfBlock,
+                                $jumpElseBlock,
                                 $mergeBlock
                             );
-                            $ifSource = $this->ternaryPhiAssignSourceOperand($op->block1, $mergeBlock);
+                            $ifSource = $this->ternaryPhiAssignSourceOperand($jumpIfBlock, $mergeBlock);
                             $ifDirectString = null !== $ifSource
                                 && Variable::TYPE_STRING === Variable::getTypeFromType($ifSource->type);
                             if ($ifDirectString) {
-                                $stringArm = $op->block1;
+                                $stringArm = $jumpIfBlock;
                                 $firstTail = $this->compileSubBlock($func, $firstArm, ...$args);
                                 if ($firstArm === $stringArm) {
                                     $this->emitCfgReturnOperand(
@@ -7307,22 +7325,22 @@ class JIT {
                                     $this->emitCfgReturnOperand($func, $secondArm, $returnOp, $secondTail);
                                 }
                             } else {
-                                $firstTail = $this->compileSubBlock($func, $op->block1, ...$args);
-                                $this->emitCfgReturnOperand($func, $op->block1, $returnOp, $firstTail);
-                                $secondTail = $this->compileSubBlock($func, $op->block2, ...$args);
-                                $this->emitCfgReturnOperand($func, $op->block2, $returnOp, $secondTail);
+                                $firstTail = $this->compileSubBlock($func, $jumpIfBlock, ...$args);
+                                $this->emitCfgReturnOperand($func, $jumpIfBlock, $returnOp, $firstTail);
+                                $secondTail = $this->compileSubBlock($func, $jumpElseBlock, ...$args);
+                                $this->emitCfgReturnOperand($func, $jumpElseBlock, $returnOp, $secondTail);
                             }
                         } else {
                             [$firstArm, $secondArm] = $this->ternaryReturnMergeCompileOrder(
-                                $op->block1,
-                                $op->block2,
+                                $jumpIfBlock,
+                                $jumpElseBlock,
                                 $mergeBlock
                             );
                             $this->compileBlockInternal($func, $firstArm, null, null, 0, false, ...$args);
                             $this->compileBlockInternal($func, $secondArm, null, null, 0, false, ...$args);
                         }
-                        $ifEntry = $this->context->scope->blockStorage[$op->block1];
-                        $elseEntry = $this->context->scope->blockStorage[$op->block2];
+                        $ifEntry = $this->context->scope->blockStorage[$jumpIfBlock];
+                        $elseEntry = $this->context->scope->blockStorage[$jumpElseBlock];
                         $builder->positionAtEnd($branchBlock);
                         if ($this->shouldFreeDeadVariablesBeforeBranch()) {
                             $this->context->freeDeadVariables($func, $branchBlock, $block);
