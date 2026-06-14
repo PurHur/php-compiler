@@ -1097,13 +1097,33 @@ class VM {
     }
 
     /**
-     * Declared + dynamic properties for get_object_vars() / var_export() get-hook reads (#5203, #6453).
+     * Declared + dynamic properties for get_object_vars() get-hook reads (#5203, #6453).
      *
      * php-src: zend_hooked_object_build_properties + zend_read_property_ex
      *
      * @return array<string, Variable>
      */
     public function collectObjectVarsForBuiltin(ObjectEntry $object, Frame $frame): array
+    {
+        return $this->collectObjectPropertiesForBuiltin($object, $frame, false);
+    }
+
+    /**
+     * All set instance properties for var_export() — ignores caller visibility (#3594).
+     *
+     * php-src: zend_get_properties_for(..., ZEND_PROP_PURPOSE_VAR_EXPORT)
+     *
+     * @return array<string, Variable>
+     */
+    public function collectVarExportPropertiesForBuiltin(ObjectEntry $object, Frame $frame): array
+    {
+        return $this->collectObjectPropertiesForBuiltin($object, $frame, true);
+    }
+
+    /**
+     * @return array<string, Variable>
+     */
+    private function collectObjectPropertiesForBuiltin(ObjectEntry $object, Frame $frame, bool $forVarExport): array
     {
         $ctx = $this->context;
         $scopeFrame = $frame;
@@ -1113,7 +1133,7 @@ class VM {
         if (null === $scopeFrame) {
             $scopeFrame = $frame;
         }
-        $callerClassLc = $this->callerClassLc($scopeFrame);
+        $callerClassLc = $forVarExport ? null : $this->callerClassLc($scopeFrame);
         /** @var array<string, Variable> $result */
         $result = [];
         /** @var array<string, true> $seenLc */
@@ -1125,7 +1145,7 @@ class VM {
                     continue;
                 }
                 $seenLc[$lc] = true;
-                if (!$this->isPropertyAccessibleForObjectVars($meta, $callerClassLc)) {
+                if (!$forVarExport && !$this->isPropertyAccessibleForObjectVars($meta, $callerClassLc)) {
                     continue;
                 }
                 if ($meta->propertyHookVirtual && null === $meta->getHookMethodLc) {
