@@ -3741,6 +3741,44 @@ PY
   echo "Applied php-cfg-spread.patch (overlay)"
 }
 
+apply_php_cfg_call_arg_site_clone_overlay() {
+  local parser="$ROOT/vendor/ircmaxell/php-cfg/lib/PHPCfg/Parser.php"
+  if grep -q 'Per-call-site wrapper: unpack/named flags must not leak' "$parser" 2>/dev/null; then
+    echo "Skip php-cfg-call-arg-site-clone.patch (already applied)"
+    return 0
+  fi
+  python3 - "$parser" <<'PY'
+import sys
+from pathlib import Path
+
+path = Path(sys.argv[1])
+text = path.read_text()
+old = """        $op = $this->readVariable($this->parseExprNode($expr->value));
+        if (null !== $expr->name) {
+            $op->callArgName = $expr->name->toString();
+        }
+        $op->callArgUnpack = $expr->unpack;
+
+        return $op;"""
+new = """        $op = $this->readVariable($this->parseExprNode($expr->value));
+        // Per-call-site wrapper: unpack/named flags must not leak across calls on shared Var operands (#8560).
+        $site = clone $op;
+        $site->callArgName = null;
+        $site->callArgUnpack = false;
+        if (null !== $expr->name) {
+            $site->callArgName = $expr->name->toString();
+        }
+        $site->callArgUnpack = $expr->unpack;
+
+        return $site;"""
+if old not in text:
+    sys.stderr.write("php-cfg-call-arg-site-clone: Parser.php parseArg anchor not found\n")
+    raise SystemExit(1)
+path.write_text(text.replace(old, new, 1))
+PY
+  echo "Applied php-cfg-call-arg-site-clone.patch (overlay)"
+}
+
 apply_php_cfg_simplifier_call_unpack_overlay() {
   local simplifier="$ROOT/vendor/ircmaxell/php-cfg/lib/PHPCfg/Visitor/Simplifier.php"
   if grep -q 'preserveCallSiteOperandMetadata' "$simplifier" 2>/dev/null; then
@@ -4758,6 +4796,10 @@ apply_patch() {
     apply_php_cfg_spread_overlay
     return $?
   fi
+  if [[ "$(basename "$patch")" == "php-cfg-call-arg-site-clone.patch" ]]; then
+    apply_php_cfg_call_arg_site_clone_overlay
+    return $?
+  fi
   if [[ "$(basename "$patch")" == "php-cfg-simplifier-call-unpack.patch" ]]; then
     apply_php_cfg_simplifier_call_unpack_overlay
     return $?
@@ -4990,6 +5032,7 @@ if [[ -d "$ROOT/vendor/ircmaxell/php-cfg" ]]; then
   apply_patch "$PATCH_DIR/php-cfg-named-args.patch"
   apply_patch "$PATCH_DIR/php-cfg-call-time-pass-by-ref.patch"
   apply_patch "$PATCH_DIR/php-cfg-spread.patch"
+  apply_patch "$PATCH_DIR/php-cfg-call-arg-site-clone.patch" || true
   apply_patch "$PATCH_DIR/php-cfg-never-type.patch"
   apply_patch "$PATCH_DIR/php-cfg-intersection-type.patch"
   apply_patch "$PATCH_DIR/php-cfg-instanceof-union.patch"

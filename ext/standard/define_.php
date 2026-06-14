@@ -74,6 +74,16 @@ final class define_ extends Internal
 
     public static function invokeLiteral(Context $context, string $name, JITVariable $valueArg): Value
     {
+        $value = self::compileTimeVmVariable($context, $valueArg);
+        if (null === $value) {
+            throw new \LogicException('define() value must be a compile-time constant in this compiler build');
+        }
+
+        return self::invokeLiteralWithValue($context, $name, $value);
+    }
+
+    public static function invokeLiteralWithValue(Context $context, string $name, Variable $value): Value
+    {
         if (str_contains($name, '::')) {
             TypeErrorRaise::registerDeclarations($context);
             TypeErrorRaise::ensureLinked($context);
@@ -83,7 +93,6 @@ final class define_ extends Internal
 
             return $i1->constInt(0, false);
         }
-        $value = self::compileTimeVmVariable($context, $valueArg);
         $ok = true;
         if (null !== $context->runtime->vmContext) {
             $ok = $context->runtime->vmContext->defineConstant($name, $value);
@@ -93,7 +102,12 @@ final class define_ extends Internal
         return $i1->constInt($ok ? 1 : 0, false);
     }
 
-    private static function compileTimeVmVariable(Context $context, JITVariable $arg): Variable
+    public static function tryCompileTimeVmVariable(Context $context, JITVariable $arg): ?Variable
+    {
+        return self::compileTimeVmVariable($context, $arg);
+    }
+
+    private static function compileTimeVmVariable(Context $context, JITVariable $arg): ?Variable
     {
         if (JITVariable::TYPE_NULL === $arg->type) {
             return new Variable(Variable::TYPE_NULL);
@@ -110,9 +124,15 @@ final class define_ extends Internal
         }
         $constName = $arg->compileTimeConstantName ?? null;
         if (null !== $constName) {
-            $phpVar = $context->runtime->vmContext->constantFetch($constName);
+            if (null !== $context->runtime->vmContext) {
+                $phpVar = $context->runtime->vmContext->constantFetch($constName);
+                if (null !== $phpVar) {
+                    return clone $phpVar;
+                }
+            }
+            $phpVar = self::compileTimeVmVariableFromCoreConstantName($constName);
             if (null !== $phpVar) {
-                return clone $phpVar;
+                return $phpVar;
             }
         }
         if (JITVariable::KIND_VALUE === $arg->kind) {
@@ -126,7 +146,27 @@ final class define_ extends Internal
             }
         }
 
-        throw new \LogicException('define() value must be a compile-time constant in this compiler build');
+        return null;
+    }
+
+    private static function compileTimeVmVariableFromCoreConstantName(string $name): ?Variable
+    {
+        switch (strtolower($name)) {
+            case 'null':
+                return new Variable(Variable::TYPE_NULL);
+            case 'true':
+                $vm = new Variable(Variable::TYPE_BOOLEAN);
+                $vm->bool(true);
+
+                return $vm;
+            case 'false':
+                $vm = new Variable(Variable::TYPE_BOOLEAN);
+                $vm->bool(false);
+
+                return $vm;
+            default:
+                return null;
+        }
     }
 
     private static function compileTimeVmVariableFromLlvmConstant(Context $context, JITVariable $arg): ?Variable
