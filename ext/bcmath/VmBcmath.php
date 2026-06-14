@@ -133,6 +133,96 @@ final class VmBcmath
         return $pa['sign'] * $mag;
     }
 
+    /** Remainder of arbitrary-precision division (php-src ext/bcmath/bcmath.c PHP_FUNCTION(bcmod); issue #6042). */
+    public static function mod(string $left, string $right, ?int $scale = null): string
+    {
+        $scale = self::resolveScale($scale);
+        $b = self::parse($right);
+        if (self::isZero($b)) {
+            throw new \DivisionByZeroError('Division by zero');
+        }
+        [, $remainder] = self::divmod($left, $right, $scale);
+
+        return $remainder;
+    }
+
+    /** Exponentiation (php-src ext/bcmath/libbcmath/src/raise.c; issue #6042). */
+    public static function pow(string $base, string $exponent, ?int $scale = null): string
+    {
+        $scale = self::resolveScale($scale);
+        $baseParsed = self::parse($base);
+        $expoParsed = self::parse($exponent);
+        if ($expoParsed['sign'] < 0) {
+            throw new \ValueError('bcpow(): Argument #2 ($exponent) must be greater than or equal to 0');
+        }
+        if (self::isZero($baseParsed) && self::isZero($expoParsed)) {
+            throw new \ValueError('bcpow(): 0 raised to the power of 0 is undefined');
+        }
+        if (self::isZero($expoParsed)) {
+            return self::format(['sign' => 1, 'int' => '1', 'frac' => ''], $scale);
+        }
+        if (self::isZero($baseParsed)) {
+            return self::format(['sign' => 1, 'int' => '0', 'frac' => ''], $scale);
+        }
+        if (self::hasFractionalValue($expoParsed)) {
+            if (self::isHalfExponent($expoParsed)) {
+                if ($baseParsed['sign'] < 0) {
+                    throw new \ValueError('bcpow(): Argument #1 ($num) must be greater than or equal to 0 for fractional exponents');
+                }
+
+                return self::sqrt($base, $scale);
+            }
+
+            return self::powGeneralFractional($base, $exponent, $scale);
+        }
+
+        $internalScale = max($scale + 2, self::$defaultScale + 2);
+        $expoDigits = self::unscaledDigits($expoParsed);
+        $result = '1';
+        $baseStr = $base;
+        while (self::cmpDigitStrings($expoDigits, '0') > 0) {
+            if (1 === ((int) $expoDigits[\strlen($expoDigits) - 1] % 2)) {
+                $result = self::mul($result, $baseStr, $internalScale);
+            }
+            $baseStr = self::mul($baseStr, $baseStr, $internalScale);
+            $expoDigits = self::divDigitStringByTwo($expoDigits);
+        }
+
+        return self::format(self::parse($result), $scale);
+    }
+
+    /** Square root (php-src ext/bcmath/libbcmath/src/sqrt.c; issue #6042). */
+    public static function sqrt(string $num, ?int $scale = null): string
+    {
+        $scale = self::resolveScale($scale);
+        $parsed = self::parse($num);
+        if ($parsed['sign'] < 0 && !self::isZero($parsed)) {
+            throw new \ValueError('bcsqrt(): Argument #1 ($num) must be greater than or equal to 0');
+        }
+        if (self::isZero($parsed)) {
+            return self::format(['sign' => 1, 'int' => '0', 'frac' => ''], $scale);
+        }
+
+        $workScale = max($scale + 4, 8);
+        $guess = self::div($num, '2', $workScale);
+        if (self::comp($guess, '0', $workScale) <= 0) {
+            $guess = $num;
+        }
+        for ($i = 0; $i < 50; ++$i) {
+            $next = self::div(
+                self::add($guess, self::div($num, $guess, $workScale), $workScale),
+                '2',
+                $workScale
+            );
+            if (0 === self::comp($next, $guess, $workScale)) {
+                break;
+            }
+            $guess = $next;
+        }
+
+        return self::format(self::parse($guess), $scale);
+    }
+
     /**
      * Modular exponentiation (php-src ext/bcmath/libbcmath/src/raisemod.c; issue #6976).
      */
@@ -578,5 +668,93 @@ final class VmBcmath
         }
 
         return self::stripLeadingZeros($out);
+    }
+
+    /** True when exponent is exactly 0.5 (php-src bcpow half-integer fast path). */
+    private static function isHalfExponent(array $expoParsed): bool
+    {
+        if ($expoParsed['sign'] < 0 || '0' !== $expoParsed['int']) {
+            return false;
+        }
+        $frac = \rtrim($expoParsed['frac'], '0');
+
+        return '5' === $frac;
+    }
+
+    /** a^b for general fractional exponent via exp(b * ln(a)) (php-src libbcmath raise.c). */
+    private static function powGeneralFractional(string $base, string $exponent, int $scale): string
+    {
+        $baseParsed = self::parse($base);
+        if ($baseParsed['sign'] < 0) {
+            throw new \ValueError('bcpow(): Argument #1 ($num) must be greater than or equal to 0 for fractional exponents');
+        }
+        if (self::isZero($baseParsed)) {
+            return self::format(['sign' => 1, 'int' => '0', 'frac' => ''], $scale);
+        }
+
+        $workScale = max($scale + 6, 12);
+        $lnBase = self::naturalLog($base, $workScale);
+        $product = self::mul($exponent, $lnBase, $workScale);
+
+        return self::format(self::parse(self::naturalExp($product, $workScale)), $scale);
+    }
+
+    private static function naturalLog(string $num, int $scale): string
+    {
+        $parsed = self::parse($num);
+        if ($parsed['sign'] < 0 || self::isZero($parsed)) {
+            throw new \ValueError('bcmath function(): Argument is not a valid number');
+        }
+
+        $workScale = $scale + 4;
+        $x = self::format($parsed, $workScale);
+        if (self::comp($x, '1', $workScale) < 0) {
+            return self::mul('-1', self::naturalLog(self::div('1', $x, $workScale), $scale), $scale);
+        }
+
+        $u = self::div(self::sub($x, '1', $workScale), self::add($x, '1', $workScale), $workScale);
+        $u2 = self::mul($u, $u, $workScale);
+        $term = $u;
+        $sum = $term;
+        for ($k = 1; $k <= max(40, $scale + 10); ++$k) {
+            $term = self::mul($term, $u2, $workScale);
+            $denom = (string) (2 * $k + 1);
+            $sum = self::add($sum, self::div($term, $denom, $workScale), $workScale);
+        }
+
+        return self::mul('2', $sum, $scale);
+    }
+
+    private static function naturalExp(string $num, int $scale): string
+    {
+        $workScale = $scale + 4;
+        $term = '1';
+        $sum = '1';
+        for ($k = 1; $k <= max(40, $scale + 10); ++$k) {
+            $term = self::mul($term, self::div($num, (string) $k, $workScale), $workScale);
+            $sum = self::add($sum, $term, $workScale);
+            if (0 === self::comp($term, '0', $workScale) || self::comp(self::absDecimal($term), self::pow10(-($workScale + 2)), $workScale) < 0) {
+                break;
+            }
+        }
+
+        return self::format(self::parse($sum), $scale);
+    }
+
+    private static function absDecimal(string $num): string
+    {
+        $parsed = self::parse($num);
+
+        return self::format(['sign' => 1, 'int' => $parsed['int'], 'frac' => $parsed['frac']], \strlen($parsed['frac']));
+    }
+
+    private static function pow10(int $negExponent): string
+    {
+        if ($negExponent >= 0) {
+            return '1'.($negExponent > 0 ? \str_repeat('0', $negExponent) : '');
+        }
+        $places = -$negExponent;
+
+        return '0.'.(\str_repeat('0', $places - 1)).'1';
     }
 }

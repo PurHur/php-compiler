@@ -144,6 +144,52 @@ final class JitBcmath
         return self::boxLong($context, $result);
     }
 
+    public static function mod(Context $context, JITVariable ...$args): Value
+    {
+        return self::stringBinaryOp($context, 'bcmod', 'mod', $args, 'num1', 'num2');
+    }
+
+    public static function pow(Context $context, JITVariable ...$args): Value
+    {
+        if (\count($args) < 2 || \count($args) > 3) {
+            throw new \LogicException('bcpow() requires two or three arguments in this compiler build');
+        }
+
+        $baseLit = self::compileTimeString($args[0]);
+        $expLit = self::compileTimeString($args[1]);
+        $scaleLit = isset($args[2]) ? self::compileTimeLong($args[2]) : null;
+        $canFold = null !== $baseLit && null !== $expLit && (!isset($args[2]) || null !== $scaleLit);
+        if ($canFold && self::$compileTimeScaleKnown) {
+            $scale = null !== $scaleLit ? $scaleLit : self::$compileTimeScale;
+
+            return $context->builder->load(
+                $context->constantStringFromString(VmBcmath::pow($baseLit, $expLit, $scale))
+            );
+        }
+
+        throw new \LogicException('bcpow() not implemented for JIT with non-constant operands in this compiler build');
+    }
+
+    public static function sqrt(Context $context, JITVariable ...$args): Value
+    {
+        if (\count($args) < 1 || \count($args) > 2) {
+            throw new \LogicException('bcsqrt() requires one or two arguments in this compiler build');
+        }
+
+        $numLit = self::compileTimeString($args[0]);
+        $scaleLit = isset($args[1]) ? self::compileTimeLong($args[1]) : null;
+        $canFold = null !== $numLit && (!isset($args[1]) || null !== $scaleLit);
+        if ($canFold && self::$compileTimeScaleKnown) {
+            $scale = null !== $scaleLit ? $scaleLit : self::$compileTimeScale;
+
+            return $context->builder->load(
+                $context->constantStringFromString(VmBcmath::sqrt($numLit, $scale))
+            );
+        }
+
+        throw new \LogicException('bcsqrt() not implemented for JIT with non-constant operands in this compiler build');
+    }
+
     public static function powmod(Context $context, JITVariable ...$args): Value
     {
         if (\count($args) < 3 || \count($args) > 4) {
