@@ -9422,9 +9422,29 @@ class Compiler {
      *
      * @return list<OpCode>
      */
+    private function formatCallArgOrderError(?Block $block, Operand $arg, string $detail): string
+    {
+        if (null === $block) {
+            return $detail;
+        }
+        $path = $block->scriptPath();
+        $line = 0;
+        if (method_exists($arg, 'getLine')) {
+            $line = (int) $arg->getLine();
+        }
+        if ('' !== $path && $line > 0) {
+            return $detail.' in '.$path.':'.$line;
+        }
+        if ('' !== $path) {
+            return $detail.' in '.$path;
+        }
+
+        return $detail;
+    }
+
     protected function compileCallArgSends(array $args, Block $block): array
     {
-        $this->validateCallArgOrder($args);
+        $this->validateCallArgOrder($args, $block);
 
         $sends = [];
         foreach ($args as $arg) {
@@ -9458,7 +9478,7 @@ class Compiler {
      *
      * @param list<Operand> $args
      */
-    private function validateCallArgOrder(array $args): void
+    private function validateCallArgOrder(array $args, ?Block $block = null): void
     {
         $hadNamed = false;
         $hadUnpack = false;
@@ -9469,18 +9489,34 @@ class Compiler {
             $isNamed = null !== $argName;
             $isUnpack = $this->callArgUnpack($arg);
             if ($isUnpack && $hadNamed) {
-                $this->throwCompileError('Cannot use argument unpacking after named arguments');
+                $this->throwCompileError($this->formatCallArgOrderError(
+                    $block,
+                    $arg,
+                    'Cannot use argument unpacking after named arguments'
+                ));
             }
             if (!$isNamed && !$isUnpack && $hadNamed) {
-                $this->throwCompileError('Cannot use positional argument after named argument');
+                $this->throwCompileError($this->formatCallArgOrderError(
+                    $block,
+                    $arg,
+                    'Cannot use positional argument after named argument'
+                ));
             }
             if (!$isNamed && !$isUnpack && $hadUnpack) {
-                $this->throwCompileError('Cannot use positional argument after argument unpacking');
+                $this->throwCompileError($this->formatCallArgOrderError(
+                    $block,
+                    $arg,
+                    'Cannot use positional argument after argument unpacking'
+                ));
             }
             if ($isNamed) {
                 $lc = strtolower($argName);
                 if (isset($seenNamedLc[$lc])) {
-                    $this->throwCompileError("Named parameter \${$argName} overwrites previous argument");
+                    $this->throwCompileError($this->formatCallArgOrderError(
+                        $block,
+                        $arg,
+                        "Named parameter \${$argName} overwrites previous argument"
+                    ));
                 }
                 $seenNamedLc[$lc] = true;
                 $hadNamed = true;
