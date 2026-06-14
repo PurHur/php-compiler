@@ -143,19 +143,7 @@ final class var_export extends Internal
             return (string) $v->toInt();
         }
         if (Variable::TYPE_FLOAT === $v->type) {
-            $f = $v->toFloat();
-            if (is_nan($f)) {
-                return $f < 0 ? '-NAN' : 'NAN';
-            }
-            if (is_infinite($f)) {
-                return $f < 0 ? '-INF' : 'INF';
-            }
-            $s = (string) $f;
-            if (false === strpos($s, '.')) {
-                return $s.'.0';
-            }
-
-            return $s;
+            return VmVarExportFloat::format($v->toFloat());
         }
         if (Variable::TYPE_STRING === $v->type) {
             return "'".str_replace(["\\", "'"], ["\\\\", "\\'"], $v->toString())."'";

@@ -20,5 +20,8 @@ final class StringVarExportRuntimeStandaloneTest extends TestCase
         $this->assertStringNotContainsString('phpc_var_export.c', $linker);
         $jit = (string) file_get_contents(__DIR__.'/../../../lib/JIT/Builtin/StringVarExportJit.php');
         $this->assertStringContainsString('__compiler_var_export', $jit);
+        $this->assertStringContainsString('isnan', $jit);
+        $this->assertStringContainsString("'NAN'", $jit);
+        $this->assertStringContainsString("'INF'", $jit);
     }
 }
