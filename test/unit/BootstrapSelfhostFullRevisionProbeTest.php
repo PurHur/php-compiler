@@ -58,6 +58,8 @@ final class BootstrapSelfhostFullRevisionProbeTest extends TestCase
         $script = (string) file_get_contents(self::$root.'/script/bootstrap-resolve-compile-invoke.sh');
         $this->assertStringContainsString('bootstrap_inventory_argv_driver_m4_smoke', $script);
         $this->assertStringContainsString('bin/compile.php lint', $script);
+        $this->assertStringContainsString('bin/compile.php argv compile', $script);
+        $this->assertStringContainsString('prelinked gen-0 sidecar', $script);
         $this->assertStringContainsString('#2880', $script);
     }
 
