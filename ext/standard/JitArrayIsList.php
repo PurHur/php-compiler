@@ -237,4 +237,20 @@ final class JitArrayIsList
 
         return $context->builder->load($resultSlot);
     }
+
+    /**
+     * Integer / numeric-string keys only (array_merge reindex-append path; #4231).
+     *
+     * Accepts reindexable 0..n-1 lists and int-key-only arrays (e.g. [1 => 'b']).
+     */
+    public static function hashTableHasOnlyNumericKeys(Context $context, Value $ht): Value
+    {
+        $isReindexable = self::hashTableIsReindexableList($context, $ht);
+        $map = $context->structFieldMap['__hashtable__'];
+        $nodePtrType = $context->getTypeFromString('__strkey_node__*');
+        $head = $context->builder->load($context->builder->structGep($ht, $map['strKeys']));
+        $noStringKeys = $context->builder->icmp(Builder::INT_EQ, $head, $nodePtrType->constNull());
+
+        return $context->builder->or($isReindexable, $noStringKeys);
+    }
 }

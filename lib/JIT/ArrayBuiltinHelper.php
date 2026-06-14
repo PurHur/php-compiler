@@ -7585,9 +7585,9 @@ final class ArrayBuiltinHelper
         foreach ($arrays as $array) {
             $ht = self::loadHashTable($context, $array);
             $hts[] = $ht;
-            $isReindexable = \PHPCompiler\ext\standard\JitArrayIsList::hashTableIsReindexableList($context, $ht);
+            $isNumericOnly = \PHPCompiler\ext\standard\JitArrayIsList::hashTableHasOnlyNumericKeys($context, $ht);
             $context->builder->store(
-                $context->builder->and($context->builder->load($allReindexableSlot), $isReindexable),
+                $context->builder->and($context->builder->load($allReindexableSlot), $isNumericOnly),
                 $allReindexableSlot
             );
         }
@@ -9357,20 +9357,20 @@ final class ArrayBuiltinHelper
     }
 
     /**
-     * Append values from a packed list or numeric-string-key list (#3607).
+     * Append values from integer-key / numeric-string-key arrays (#3607, #4231).
      */
     public static function copyReindexableInto(Context $context, Value $dest, Value $src): void
     {
+        $map = $context->structFieldMap['__hashtable__'];
         $sizeT = $context->getTypeFromString('size_t');
         $i64 = $context->getTypeFromString('int64');
         $zero = $sizeT->constInt(0, false);
         $one = $sizeT->constInt(1, false);
+        $oneI64 = $i64->constInt(1, false);
+
+        $nextFree = $context->builder->load($context->builder->structGep($src, $map['nextFreeElement']));
         $idxSlot = $context->builder->alloca($sizeT, 1, 'merge_idx');
         $context->builder->store($zero, $idxSlot);
-        $num = $context->builder->call(
-            $context->lookupFunction('__hashtable__getNumElements'),
-            $src
-        );
 
         $done = BasicBlockHelper::append($context, 'merge_copy_done');
         $head = BasicBlockHelper::append($context, 'merge_copy_head');
@@ -9378,11 +9378,12 @@ final class ArrayBuiltinHelper
         $bodyInt = BasicBlockHelper::append($context, 'merge_copy_body_int');
         $bodyStr = BasicBlockHelper::append($context, 'merge_copy_body_str');
         $bodyStore = BasicBlockHelper::append($context, 'merge_copy_body_store');
+        $bodySkip = BasicBlockHelper::append($context, 'merge_copy_body_skip');
         $context->builder->branch($head);
 
         $context->builder->positionAtEnd($head);
         $idx = $context->builder->load($idxSlot);
-        $atEnd = $context->builder->icmp(Builder::INT_SGE, $idx, $num);
+        $atEnd = $context->builder->icmp(Builder::INT_SGE, $idx, $nextFree);
         $context->builder->branchIf($atEnd, $done, $body);
 
         $context->builder->positionAtEnd($body);
@@ -9400,6 +9401,15 @@ final class ArrayBuiltinHelper
         $context->builder->positionAtEnd($bodyStr);
         $idxI64 = $context->builder->zExt($idx, $i64);
         $keyStr = \PHPCompiler\JIT\JitNativeString::formatIndexKey($context, $idxI64);
+        $presentStr = $context->builder->call(
+            $context->lookupFunction('__hashtable__offsetIsSetStringKey'),
+            $src,
+            $keyStr
+        );
+        $bodyStrHit = BasicBlockHelper::append($context, 'merge_copy_body_str_hit');
+        $context->builder->branchIf($presentStr, $bodyStrHit, $bodySkip);
+
+        $context->builder->positionAtEnd($bodyStrHit);
         $srcEntryStr = $context->builder->call(
             $context->lookupFunction('__hashtable__readStringKeyValue'),
             $src,
@@ -9410,11 +9420,11 @@ final class ArrayBuiltinHelper
         $context->builder->positionAtEnd($bodyStore);
         $srcEntry = $context->builder->phi($srcEntryInt->typeOf());
         $srcEntry->addIncoming($srcEntryInt, $bodyInt);
-        $srcEntry->addIncoming($srcEntryStr, $bodyStr);
-        $destMap = $context->structFieldMap['__hashtable__'];
-        $destNextPtr = $context->builder->structGep($dest, $destMap['nextFreeElement']);
-        $destIdx = $context->builder->load($destNextPtr);
-        self::copyPackedValueEntry($context, $srcEntry, $dest, $destIdx);
+        $srcEntry->addIncoming($srcEntryStr, $bodyStrHit);
+        self::appendValueEntryToPacked($context, $dest, $srcEntry);
+        $context->builder->branch($bodySkip);
+
+        $context->builder->positionAtEnd($bodySkip);
         $context->builder->store(
             $context->builder->addNoSignedWrap($idx, $one),
             $idxSlot

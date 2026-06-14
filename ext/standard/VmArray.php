@@ -220,6 +220,29 @@ final class VmArray
     }
 
     /**
+     * All keys are integer or canonical numeric strings (php-src array_merge numeric branch; #4231).
+     */
+    public static function hasOnlyNumericKeys(HashTable $ht): bool
+    {
+        foreach ($ht->iterateKeyed() as $pair) {
+            $keyVar = $pair[0]->resolveIndirect();
+            if (Variable::TYPE_INTEGER === $keyVar->type) {
+                continue;
+            }
+            if (Variable::TYPE_STRING === $keyVar->type) {
+                if (!self::isCanonicalNonNegativeIntStringKey($keyVar->toString())) {
+                    return false;
+                }
+                continue;
+            }
+
+            return false;
+        }
+
+        return true;
+    }
+
+    /**
      * Packed list or numeric-string keys 0..n-1 (Zend zend_hash numeric-key rules; #3607).
      */
     public static function isReindexableList(HashTable $ht): bool
@@ -271,7 +294,7 @@ final class VmArray
         }
 
         foreach ([$first, ...$others] as $ht) {
-            if (!self::isReindexableList($ht)) {
+            if (!self::hasOnlyNumericKeys($ht)) {
                 $out = $first->replaceCopy();
                 foreach ($others as $other) {
                     $out->mergeStringKeysFrom($other, true);
