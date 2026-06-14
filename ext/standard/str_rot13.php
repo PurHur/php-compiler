@@ -34,7 +34,7 @@ final class str_rot13 extends Internal
             $frame->calledArgs[0],
             'str_rot13',
             0,
-            'str'
+            'string'
         );
         BuiltinExecute::writeReturn(
             $frame,
@@ -51,7 +51,7 @@ final class str_rot13 extends Internal
             throw new \LogicException('str_rot13() requires exactly one argument');
         }
 
-        $str = JitStringBuiltinArg::lower($context, $args[0], 'str_rot13', 0, 'str');
+        $str = JitStringBuiltinArg::lower($context, $args[0], 'str_rot13', 0, 'string');
         $copy = $context->builder->call($context->lookupFunction('__string__separate'), $str);
         JitStrRot13::transformInPlace($context, $copy);
 
