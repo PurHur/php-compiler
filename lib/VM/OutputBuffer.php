@@ -11,17 +11,25 @@ namespace PHPCompiler\VM;
  */
 final class OutputBuffer
 {
-    /** @var list<string> */
+    /** @var list<array{content: string, handler: ?string}> */
     private static array $stack = [];
 
     private static bool $implicitFlush = false;
+
+    private static ?Context $activeContext = null;
 
     public static function reset(): void
     {
         self::$stack = [];
         self::$implicitFlush = false;
+        self::$activeContext = null;
         SapiOutput::reset();
         HeaderCallbackQueue::reset();
+    }
+
+    public static function setActiveContext(?Context $ctx): void
+    {
+        self::$activeContext = $ctx;
     }
 
     public static function setImplicitFlush(bool $on): void
@@ -44,15 +52,33 @@ final class OutputBuffer
      */
     public static function getBuffers(): array
     {
-        return self::$stack;
+        $buffers = [];
+        foreach (self::$stack as $level) {
+            $buffers[] = $level['content'];
+        }
+
+        return $buffers;
     }
 
-    public static function start(): void
+    /**
+     * @return list<?string> handler name per buffer level (null = default handler)
+     */
+    public static function getHandlerNames(): array
+    {
+        $names = [];
+        foreach (self::$stack as $level) {
+            $names[] = $level['handler'];
+        }
+
+        return $names;
+    }
+
+    public static function start(?string $handlerName = null): void
     {
         if (self::getLevel() >= ObStackLimits::MAX_DEPTH) {
             return;
         }
-        self::$stack[] = '';
+        self::$stack[] = ['content' => '', 'handler' => $handlerName];
     }
 
     public static function append(string $chunk, ?string $file = null, int $line = 0): void
@@ -67,7 +93,7 @@ final class OutputBuffer
             return;
         }
         $idx = count(self::$stack) - 1;
-        self::$stack[$idx] .= $chunk;
+        self::$stack[$idx]['content'] .= $chunk;
         if (self::$implicitFlush) {
             self::flush();
         }
@@ -78,8 +104,9 @@ final class OutputBuffer
         if ([] === self::$stack) {
             return '';
         }
+        $level = array_pop(self::$stack);
 
-        return array_pop(self::$stack);
+        return $level['content'];
     }
 
     /** ob_get_contents() — read active buffer without ending (ext/standard/output.c, issue #3236). */
@@ -89,7 +116,7 @@ final class OutputBuffer
             return null;
         }
 
-        return self::$stack[count(self::$stack) - 1];
+        return self::$stack[count(self::$stack) - 1]['content'];
     }
 
     /** ob_get_length() — byte length of active buffer (issue #3236). */
@@ -119,7 +146,10 @@ final class OutputBuffer
         if ([] === self::$stack) {
             return;
         }
-        self::append(array_pop(self::$stack));
+        $content = self::popWithHandler();
+        if ('' !== $content) {
+            self::append($content);
+        }
     }
 
     /**
@@ -131,17 +161,21 @@ final class OutputBuffer
             return false;
         }
         $idx = \count(self::$stack) - 1;
-        $content = self::$stack[$idx];
-        self::$stack[$idx] = '';
+        $content = self::$stack[$idx]['content'];
+        self::$stack[$idx]['content'] = '';
 
         if ('' !== $content) {
+            $handler = self::$stack[$idx]['handler'];
+            if (null !== $handler) {
+                $content = self::applyHandler($content, $handler);
+            }
             if ($idx > 0) {
-                self::$stack[$idx - 1] .= $content;
-                $parent = self::$stack[$idx - 1];
+                self::$stack[$idx - 1]['content'] .= $content;
+                $parent = self::$stack[$idx - 1]['content'];
                 if ('' !== $parent) {
                     SapiOutput::markStarted();
                     echo $parent;
-                    self::$stack[$idx - 1] = '';
+                    self::$stack[$idx - 1]['content'] = '';
                 }
             } else {
                 SapiOutput::markStarted();
@@ -161,7 +195,7 @@ final class OutputBuffer
             return false;
         }
         $idx = \count(self::$stack) - 1;
-        self::$stack[$idx] = '';
+        self::$stack[$idx]['content'] = '';
 
         return true;
     }
@@ -178,7 +212,7 @@ final class OutputBuffer
         if ([] === self::$stack) {
             return false;
         }
-        $content = array_pop(self::$stack);
+        $content = self::popWithHandler();
         if ('' !== $content) {
             self::append($content);
         }
@@ -200,5 +234,25 @@ final class OutputBuffer
         while ([] !== self::$stack) {
             self::endFlush();
         }
+    }
+
+    private static function popWithHandler(): string
+    {
+        $level = array_pop(self::$stack);
+        if (null === $level) {
+            return '';
+        }
+        $content = $level['content'];
+        $handler = $level['handler'];
+        if (null === $handler) {
+            return $content;
+        }
+
+        return self::applyHandler($content, $handler);
+    }
+
+    private static function applyHandler(string $content, string $handlerName): string
+    {
+        return OutputBufferHandlers::apply($content, $handlerName, self::$activeContext);
     }
 }

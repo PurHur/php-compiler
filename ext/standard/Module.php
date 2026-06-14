@@ -27,6 +27,13 @@ class Module extends ModuleAbstract
     public function init(Runtime $runtime): void
     {
         parent::init($runtime);
+        \PHPCompiler\VM\OutputBufferHandlers::register(
+            static fn (string $content, string $handlerName, ?\PHPCompiler\VM\Context $ctx): string => VmObOutput::processHandler(
+                $ctx ?? $runtime->vmContext,
+                $handlerName,
+                $content
+            )
+        );
         BuiltinAttributes::register($runtime->vmContext);
         BuiltinEnums::register($runtime->vmContext);
         BuiltinClasses::register($runtime->vmContext);
@@ -447,6 +454,7 @@ class Module extends ModuleAbstract
             new http_clear_last_response_headers(),
             new get_headers(),
             new ob_start(),
+            new ob_gzhandler(),
             new ob_get_clean(),
             new ob_get_contents(),
             new ob_get_flush(),

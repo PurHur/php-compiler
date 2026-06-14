@@ -28,5 +28,6 @@ final class NativeObStorage
     public static function reset(): void
     {
         OutputBuffer::reset();
+        VmObGzhandler::reset();
     }
 }
