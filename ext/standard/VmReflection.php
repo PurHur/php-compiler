@@ -923,7 +923,9 @@ final class VmReflection
             foreach ($ht->iterate(false) as $key => $_value) {
                 $seen[(string) $key] = true;
             }
-            foreach (['name', 'value'] as $enumProp) {
+            // php-src add_class_vars: unit enums expose `name` only; backed enums add `value` (#5012).
+            $enumProps = null !== $entry->backedType ? ['name', 'value'] : ['name'];
+            foreach ($enumProps as $enumProp) {
                 if (isset($seen[$enumProp])) {
                     continue;
                 }
