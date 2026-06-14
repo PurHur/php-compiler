@@ -57,6 +57,59 @@ final class VmGrapheme
     }
 
     /**
+     * grapheme_substr() — slice by grapheme cluster index (php-src ext/intl/grapheme; #3352).
+     *
+     * @return string|false substring, or false on invalid UTF-8
+     */
+    public static function substr(string $string, int $start, ?int $length = null): string|false
+    {
+        if ('' === $string) {
+            return '';
+        }
+        $graphemes = self::splitGraphemes($string);
+        if (null === $graphemes) {
+            return false;
+        }
+        $graphemeCount = \count($graphemes);
+        if ($start < 0) {
+            $start += $graphemeCount;
+        }
+        if ($start < 0) {
+            $start = 0;
+        }
+        if ($start >= $graphemeCount) {
+            return '';
+        }
+        if (null === $length) {
+            $slice = \array_slice($graphemes, $start);
+        } else {
+            if ($length < 0) {
+                $length = $graphemeCount - $start + $length;
+            }
+            if ($length <= 0) {
+                return '';
+            }
+            $slice = \array_slice($graphemes, $start, $length);
+        }
+
+        return \implode('', $slice);
+    }
+
+    /**
+     * grapheme_strpos() — grapheme index search (php-src ext/intl/grapheme; #3352).
+     *
+     * @return int|false grapheme index of first match
+     */
+    public static function strpos(string $haystack, string $needle, int $offset = 0): int|false
+    {
+        if ('' === $needle) {
+            return false;
+        }
+
+        return self::graphemePosSearch($haystack, $needle, $offset, false, false);
+    }
+
+    /**
      * grapheme_stripos() — case-insensitive grapheme index search (php-src ext/intl/grapheme; #6153).
      *
      * @return int|false grapheme index of first match
