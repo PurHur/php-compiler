@@ -5373,6 +5373,7 @@ class JIT {
         $builder->positionAtEnd($basicBlock);
         $this->context->jitCurrentBlock = $block;
         if (null !== $block->func && $block->orig === $block->func->cfg) {
+            $this->context->jitFunctionRootBlock = $block;
             $this->emitJitDestructAllowDelref($block);
         }
         if ([] !== $args) {
@@ -5654,10 +5655,17 @@ class JIT {
                     if (null === $destName) {
                         throw new \LogicException('Reference assignment requires named destination variable');
                     }
+                    if (null === $srcName) {
+                        $this->context->foreachByRefLocalNames[$this->context->resolveRefAliasName($destName)] = true;
+                    }
                     if (null !== $srcName) {
                         if ($this->context->hasVariableOp($srcOp)) {
                             $srcVar = $this->context->getVariableFromOp($srcOp);
-                            if (Variable::TYPE_VALUE === $srcVar->type && null === $srcVar->valueBoxAliasPtr) {
+                            if (
+                                Variable::TYPE_VALUE === $srcVar->type
+                                && null === $srcVar->valueBoxAliasPtr
+                                && !$srcVar->borrowedValueEntry
+                            ) {
                                 $srcVar->valueBoxAliasPtr = JIT\JitValueBox::valuePtrFromVariable(
                                     $this->context,
                                     $srcVar
@@ -5674,7 +5682,11 @@ class JIT {
                         throw new \LogicException('Reference assignment requires a bound source variable');
                     }
                     $srcVar = $this->context->getVariableFromOp($srcOp);
-                    if (Variable::TYPE_VALUE === $srcVar->type && null === $srcVar->valueBoxAliasPtr) {
+                    if (
+                        Variable::TYPE_VALUE === $srcVar->type
+                        && null === $srcVar->valueBoxAliasPtr
+                        && !$srcVar->borrowedValueEntry
+                    ) {
                         $srcVar->valueBoxAliasPtr = JIT\JitValueBox::valuePtrFromVariable(
                             $this->context,
                             $srcVar
@@ -6185,13 +6197,23 @@ class JIT {
                         break;
                     }
                     if ($op->arg3) {
+                        $destOp = $block->getOperand($op->arg1);
+                        $destName = JIT\OperandName::resolve($destOp);
+                        if (null !== $destName) {
+                            $this->context->foreachByRefLocalNames[
+                                $this->context->resolveRefAliasName($destName)
+                            ] = true;
+                        }
                         $value = JIT\IteratorHelper::compileValueByRef(
                             $this->context,
                             $array,
                             self::foreachContainerUserType($arrayOp),
                             $this
                         );
-                        $this->context->setVariableOp($block->getOperand($op->arg1), $value);
+                        $this->context->setVariableOp($destOp, $value);
+                        if (null !== $destName) {
+                            $this->context->bindVariableByName($destName, $value);
+                        }
                         break;
                     }
                     $value = JIT\IteratorHelper::compileValue(
@@ -9725,6 +9747,9 @@ class JIT {
         if (null === $name || '' === $name || \PHPCompiler\Web\Superglobals::isSuperglobalName($name)) {
             return false;
         }
+        if ($this->context->isForeachByRefLocalName($name, $block)) {
+            return false;
+        }
         $globalVar = $this->context->ensureScriptGlobal($name);
         $this->context->setVariableOp($resultOp, $globalVar);
         JIT\JitValueBox::assignToPointer(
@@ -9735,6 +9760,47 @@ class JIT {
         $this->context->bindVariableByName($this->context->resolveRefAliasName($name), $globalVar);
 
         return true;
+    }
+
+    /**
+     * Prefer active foreach by-ref lvalues over {main} script-global slots (#4364).
+     */
+    private function resolveAssignLvalue(Operand $resultOp): JIT\Variable
+    {
+        $result = $this->context->getVariableFromOp($resultOp);
+        if (null !== $result->foreachByRefPackedArm || $result->borrowedValueEntry) {
+            return $result;
+        }
+        $name = JIT\OperandName::resolve($resultOp);
+        if (null === $name || '' === $name || !$result->functionStaticGlobal) {
+            return $result;
+        }
+        $resolved = $this->context->resolveRefAliasName($name);
+        if (isset($this->context->namedVariableBindings[$resolved])) {
+            $bound = $this->context->namedVariableBindings[$resolved];
+            if (null !== $bound->foreachByRefPackedArm || $bound->borrowedValueEntry) {
+                $this->context->scope->variables[$resultOp] = $bound;
+
+                return $bound;
+            }
+        }
+        foreach ($this->context->scope->variables as $scopeOp) {
+            if (!$scopeOp instanceof Operand) {
+                continue;
+            }
+            $scopeName = JIT\OperandName::resolve($scopeOp);
+            if (null === $scopeName || $resolved !== $this->context->resolveRefAliasName($scopeName)) {
+                continue;
+            }
+            $scopeVar = $this->context->scope->variables[$scopeOp];
+            if (null !== $scopeVar->foreachByRefPackedArm || $scopeVar->borrowedValueEntry) {
+                $this->context->scope->variables[$resultOp] = $scopeVar;
+
+                return $scopeVar;
+            }
+        }
+
+        return $result;
     }
 
     /** Both ?: arms jump to a shared RETURN/THROW merge block (#4280, #8555). */
@@ -9864,8 +9930,28 @@ class JIT {
                 return;
             }
         }
-        $result = $this->context->getVariableFromOp($resultOp);
+        $result = $this->resolveAssignLvalue($resultOp);
         if ($result === $value) {
+            return;
+        }
+        // Foreach by-ref must use hashtable index writes, not valueBoxAliasPtr (#4364, AOT {main}).
+        if (null !== $result->foreachByRefPackedArm) {
+            JIT\HashTableHelper::assignForeachByRefWritable($this->context, $result, $value);
+
+            return;
+        }
+        if (
+            $result->borrowedValueEntry
+            && null !== $result->writableHt
+            && null !== $result->writableIndex
+        ) {
+            JIT\HashTableHelper::setAtIndex(
+                $this->context,
+                $result->writableHt,
+                $result->writableIndex,
+                $value
+            );
+
             return;
         }
         // Reference aliases to object properties keep objectPropertySlot; guard before

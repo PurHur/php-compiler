@@ -80,6 +80,9 @@ final class Variable {
     /** @var \PHPLLVM\Value|null */
     public ?\PHPLLVM\Value $writableIndex = null;
 
+    /** Foreach by-ref: int1 phi selecting packed-index vs string-key writable arm (#4364). */
+    public ?\PHPLLVM\Value $foreachByRefPackedArm = null;
+
     /** Boxed foreach / SplObjectStorage offset key for $arr[$key] = … (issue #86). */
     public ?Variable $writableValueBoxKey = null;
 
@@ -395,6 +398,7 @@ final class Variable {
             && '' !== $name
             && !Superglobals::isSuperglobalName($name)
             && $block->isMainScript()
+            && !$context->isForeachByRefLocalName($name, $block)
         ) {
             return $context->ensureScriptGlobal($name);
         }
