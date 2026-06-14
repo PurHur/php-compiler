@@ -177,6 +177,8 @@ bootstrap_inventory_argv_driver_m4_smoke() {
   local driver=$1
   local root="${ROOT:-}"
   local bin_compile="${root}/bin/compile.php"
+  local prelink="${root}/prelinked/bootstrap-gen0/bin-compile-aot"
+  local compile_out="${root}/build/.bootstrap-inventory-argv-driver-m4-compile-smoke-aot"
   if [[ -z "${root}" || ! -x "${driver}" || ! -f "${bin_compile}" ]]; then
     return 1
   fi
@@ -194,13 +196,49 @@ bootstrap_inventory_argv_driver_m4_smoke() {
   )"
   lint_code=$?
   set -e
-  if [[ "${lint_code}" -eq 0 ]] \
-    && ! grep -qE 'parseAndCompile returned null|native emit failed at phase=parseAndCompile' <<< "${lint_log}"; then
-    return 0
+  if [[ "${lint_code}" -ne 0 ]] \
+    || grep -qE 'parseAndCompile returned null|native emit failed at phase=parseAndCompile' <<< "${lint_log}"; then
+    echo "bootstrap-inventory-argv-driver-m4-smoke: ${driver} failed bin/compile.php lint (stale gen-0? rebuild via Zend — #2880)" >&2
+    printf '%s\n' "${lint_log}" >&2
+    return 1
   fi
-  echo "bootstrap-inventory-argv-driver-m4-smoke: ${driver} failed bin/compile.php lint (stale gen-0? rebuild via Zend — #2880)" >&2
-  printf '%s\n' "${lint_log}" >&2
-  return 1
+
+  # Lint-only smoke misses gen-0 sidecar emit: driver prints compile OK but copies prelinked seed (#1492).
+  rm -f "${compile_out}"
+  local compile_log=""
+  local compile_code=0
+  set +e
+  compile_log="$(
+    env -u PHP_COMPILER_M3_SOURCE -u PHP_COMPILER_M3_OUT \
+      PHP_COMPILER_SELFHOST_AOT=1 \
+      PHP_COMPILER_M3_COMPILE_DRIVER=1 \
+      PHP_COMPILER_M4_BIN_COMPILE_DRIVER=1 \
+      PHP_COMPILER_M3_INVENTORY_EMIT_DRIVER=1 \
+      BOOTSTRAP_M3_USE_INVENTORY_EMIT_DRIVER=1 \
+      "${driver}" -o "${compile_out}" "${bin_compile}" 2>&1
+  )"
+  compile_code=$?
+  set -e
+  if [[ "${compile_code}" -ne 0 ]] \
+    || ! bootstrap_native_compile_output_ok "${compile_log}" \
+    || ! bootstrap_inventory_argv_emit_output_ok "${compile_out}"; then
+    echo "bootstrap-inventory-argv-driver-m4-smoke: ${driver} failed bin/compile.php argv compile (rebuild inventory — #2880)" >&2
+    printf '%s\n' "${compile_log}" >&2
+    rm -f "${compile_out}"
+    return 1
+  fi
+  if [[ -f "${prelink}" ]] && cmp -s "${compile_out}" "${prelink}"; then
+    echo "bootstrap-inventory-argv-driver-m4-smoke: ${driver} bin/compile.php emit is prelinked gen-0 sidecar (not inventory Compiler — #1492)" >&2
+    rm -f "${compile_out}"
+    return 1
+  fi
+  if ! bootstrap_inventory_argv_driver_size_ok "${compile_out}"; then
+    echo "bootstrap-inventory-argv-driver-m4-smoke: ${driver} bin/compile.php emit too small (sidecar stub — #3012)" >&2
+    rm -f "${compile_out}"
+    return 1
+  fi
+  rm -f "${compile_out}"
+  return 0
 }
 
 # Build or refresh build/bin-compile-aot-inventory for M4 full-revision / spine argv paths (#3012).

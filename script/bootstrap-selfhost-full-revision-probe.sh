@@ -66,6 +66,11 @@ if [[ "${gen3_bytes}" -lt 350000 ]]; then
   echo "bootstrap-selfhost-full-revision-probe: gen-3 driver looks like link-time sidecar stub (${gen3_bytes} bytes; want inventory argv driver #3012)" >&2
   exit 1
 fi
+PRELINKED_GEN0="${ROOT}/prelinked/bootstrap-gen0/bin-compile-aot"
+if [[ -f "${PRELINKED_GEN0}" ]] && cmp -s "${GEN3}" "${PRELINKED_GEN0}"; then
+  echo "bootstrap-selfhost-full-revision-probe: gen-3 is prelinked gen-0 sidecar (inventory stale — rebuild via bootstrap-ensure-inventory-argv-driver #1492)" >&2
+  exit 1
+fi
 if grep -qE 'compile_smoke_m3_emit:' <<< "${gen3_link_out}"; then
   echo "bootstrap-selfhost-full-revision-probe: unexpected compile_smoke_m3_emit log while building gen-3 (want inventory Compiler path)" >&2
   exit 1
