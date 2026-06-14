@@ -365,6 +365,7 @@ require_once __DIR__.'/../../../ext/standard/JitCsvArg.php';
 require_once __DIR__.'/../../../ext/standard/JitDate.php';
 require_once __DIR__.'/../../../ext/standard/JitDateCreate.php';
 require_once __DIR__.'/../../../ext/standard/JitDateIntervalFormat.php';
+require_once __DIR__.'/../../../ext/standard/JitDateIntervalCreateFromDateString.php';
 require_once __DIR__.'/../../../ext/standard/JitDateSunFunc.php';
 require_once __DIR__.'/../../../ext/standard/JitDateSunInfo.php';
 require_once __DIR__.'/../../../ext/standard/JitDateSunInfoMaterializer.php';

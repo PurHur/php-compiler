@@ -17,6 +17,8 @@ use PHPLLVM\Value;
 /**
  * date_interval_create_from_date_string() — parse relative interval spec (#4606, ext/date/php_date.c).
  *
+ * VM: {@see VmDateInterval::parseFromDateString}. JIT/AOT: {@see JitDateIntervalCreateFromDateString}.
+ *
  * php-src: ext/date/php_date.c — PHP_FUNCTION(date_interval_create_from_date_string)
  */
 final class date_interval_create_from_date_string extends Internal
@@ -74,8 +76,6 @@ final class date_interval_create_from_date_string extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        throw new \LogicException(
-            'date_interval_create_from_date_string() is not implemented for JIT in this compiler build (issue #4606)'
-        );
+        return JitDateIntervalCreateFromDateString::invoke($context, ...$args);
     }
 }
