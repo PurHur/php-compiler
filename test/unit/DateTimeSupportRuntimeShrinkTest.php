@@ -27,5 +27,7 @@ final class DateTimeSupportRuntimeShrinkTest extends TestCase
         $this->assertDoesNotMatchRegularExpression('/(?<!VmEnv::)getenv\\([\'"]TZ[\'"]\\)/', $native);
         $this->assertStringContainsString('VmEnv::putenv', $native);
         $this->assertStringContainsString('VmEnv::getenv', $native);
+        $this->assertStringContainsString('VmFs::file', $native);
+        $this->assertDoesNotMatchRegularExpression('/@\\\\file\\s*\\(/', $native);
     }
 }

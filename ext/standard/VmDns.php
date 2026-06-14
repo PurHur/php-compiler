@@ -11,6 +11,7 @@ use PHPCompiler\VM\Variable;
  * DNS helpers for stdlib builtins (issue #3707, #5854, #7315).
  *
  * VM resolves via /etc/hosts without host Zend DNS builtins; optional libc getaddrinfo/res_query when FFI is loaded.
+ * Config reads (/etc/hosts, /etc/resolv.conf) via {@see VmFs::file()} / {@see VmFsReadNative} — no host \\file() (#8529).
  * JIT/AOT: lib/JIT/Builtin/GethostbynamelRuntime.php (__compiler_gethostbynamel),
  * CheckdnsrrRuntime.php (__compiler_checkdnsrr).
  *
@@ -448,7 +449,10 @@ final class VmDns
         if (!\is_readable($path)) {
             return null;
         }
-        $lines = @\file($path, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES);
+        $lines = VmFs::file(
+            $path,
+            StdlibConstants::FILE_IGNORE_NEW_LINES | StdlibConstants::FILE_SKIP_EMPTY_LINES
+        );
         if (false === $lines) {
             return null;
         }
@@ -603,7 +607,10 @@ final class VmDns
         if (!\is_readable($path)) {
             return [];
         }
-        $lines = @\file($path, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES);
+        $lines = VmFs::file(
+            $path,
+            StdlibConstants::FILE_IGNORE_NEW_LINES | StdlibConstants::FILE_SKIP_EMPTY_LINES
+        );
         if (false === $lines) {
             return [];
         }
@@ -903,7 +910,10 @@ CDEF;
         if (!\is_readable($path)) {
             return null;
         }
-        $lines = @\file($path, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES);
+        $lines = VmFs::file(
+            $path,
+            StdlibConstants::FILE_IGNORE_NEW_LINES | StdlibConstants::FILE_SKIP_EMPTY_LINES
+        );
         if (false === $lines) {
             return null;
         }
