@@ -1204,6 +1204,38 @@ final class VmReflection
     }
 
     /**
+     * Property snapshot for var_export() — all set properties regardless of scope (#3594).
+     *
+     * php-src: zend_get_properties_for(..., ZEND_PROP_PURPOSE_VAR_EXPORT)
+     */
+    public static function getVarExportObjectProperties(Variable $object, Frame $frame): Variable
+    {
+        $object = $object->resolveIndirect();
+        if (EnumCaseSupport::isEnumCaseVariable($object)) {
+            $result = new Variable();
+            $result->newArray();
+            $ht = $result->toArray();
+            foreach (EnumCaseSupport::objectVarsForCaseVariable($object) as $name => $value) {
+                $ht->add($name, $value);
+            }
+
+            return $result;
+        }
+        if (Variable::TYPE_OBJECT !== $object->type) {
+            throw new \LogicException('var_export() object branch expects an object in this compiler build');
+        }
+        $ctx = self::requireContext($frame);
+        $result = new Variable();
+        $result->newArray();
+        $ht = $result->toArray();
+        foreach ($ctx->runtime->vm()->collectVarExportPropertiesForBuiltin($object->toObject(), $frame) as $name => $value) {
+            $ht->add($name, $value);
+        }
+
+        return $result;
+    }
+
+    /**
      * get_mangled_object_vars() — all set instance properties with Zend-mangled keys (issue #3497).
      *
      * php-src: ext/standard/var.c — PHP_FUNCTION(get_mangled_object_vars)

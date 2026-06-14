@@ -190,7 +190,7 @@ final class var_export extends Internal
             return self::exportVmEnumCaseLiteral($object->class->name, $object->enumCaseName ?? '');
         }
         $className = $object->class->name;
-        $props = VmReflection::getObjectVars($v, $frame);
+        $props = VmReflection::getVarExportObjectProperties($v, $frame);
         $exported = self::exportVmArray($props->toArray(), $level, $frame);
         if ('stdClass' === $className) {
             return '(object) '.$exported;
