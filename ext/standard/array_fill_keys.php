@@ -27,15 +27,12 @@ final class array_fill_keys extends Internal
         if (2 !== \count($frame->calledArgs)) {
             throw new \LogicException('array_fill_keys() requires exactly two arguments');
         }
-        $keysArg = $frame->calledArgs[0]->resolveIndirect();
+        $keysHt = VmArray::requireArrayParam($frame->calledArgs[0], 'array_fill_keys', 1, 'keys');
         $value = $frame->calledArgs[1]->resolveIndirect();
         if (null === $frame->returnVar) {
             return;
         }
-        if (Variable::TYPE_ARRAY !== $keysArg->type) {
-            throw new \LogicException('array_fill_keys() argument #1 must be an array in this compiler build');
-        }
-        $frame->returnVar->array(VmArray::fillKeys($keysArg->toArray(), $value));
+        $frame->returnVar->array(VmArray::fillKeys($keysHt, $value));
     }
 
     public function call(Context $context, JITVariable ...$args): Value
@@ -43,9 +40,15 @@ final class array_fill_keys extends Internal
         if (2 !== \count($args)) {
             throw new \LogicException('array_fill_keys() requires exactly two arguments');
         }
-        if (JITVariable::TYPE_HASHTABLE !== $args[0]->type
-            && !($args[0]->type & JITVariable::IS_NATIVE_ARRAY)) {
-            throw new \LogicException('array_fill_keys() argument #1 must be an array in this compiler build');
+        $keysArg = $args[0];
+        if (JITVariable::TYPE_HASHTABLE !== $keysArg->type
+            && !($keysArg->type & JITVariable::IS_NATIVE_ARRAY)
+        ) {
+            if (JITVariable::TYPE_VALUE === $keysArg->type) {
+                JitArrayElem::requireArrayParam($context, $keysArg, 'array_fill_keys', 1, 'keys');
+            } else {
+                throw new \LogicException('array_fill_keys() argument #1 must be an array in this compiler build');
+            }
         }
         foreach ($args as $i => $arg) {
             if (JITVariable::TYPE_STRING === $arg->type || JITVariable::TYPE_VALUE === $arg->type) {
