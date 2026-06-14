@@ -303,17 +303,13 @@ final class StringFsDirJit
         );
         $repo = $context->builder->call($context->lookupFunction('getenv'), $repoKey);
         $repoNull = $context->builder->icmp(Builder::INT_EQ, $repo, $i8p->constNull());
-        $prefix = self::literalCstr($context, '/compiler/build/');
-        $prefixMatch = $context->builder->call(
-            $context->lookupFunction('strncmp'),
-            $src,
-            $prefix,
-            $sizeT->constInt(17, false)
-        );
-        $prefixOk = $context->builder->icmp(Builder::INT_EQ, $prefixMatch, $i32->constInt(0, false));
+        self::ensureExternal($context, 'strstr', $context->context->functionType($i8p, false, $i8p, $i8p));
+        $buildMarker = self::literalCstr($context, '/build/');
+        $suffix = $context->builder->call($context->lookupFunction('strstr'), $src, $buildMarker);
+        $suffixNull = $context->builder->icmp(Builder::INT_EQ, $suffix, $i8p->constNull());
         $canRemap = $context->builder->and(
             $context->builder->not($repoNull),
-            $prefixOk
+            $context->builder->not($suffixNull)
         );
         $returnOriginalFromRemap = $fn->appendBasicBlock('resolve_return_original_from_remap');
         $remap = $fn->appendBasicBlock('resolve_remap');
@@ -325,7 +321,6 @@ final class StringFsDirJit
         $context->builder->positionAtEnd($remap);
         $bufSlot = BasicBlockHelper::entryAlloca($context, $i8->arrayType(self::PATH_MAX));
         $buf = self::stackBytesPtr($context, $bufSlot);
-        $suffix = $context->builder->gep($src, $sizeT->constInt(9, false));
         $context->builder->call(
             $context->lookupFunction('snprintf'),
             $buf,

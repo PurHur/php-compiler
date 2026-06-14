@@ -34,10 +34,13 @@ if ! bootstrap_ensure_inventory_argv_driver_ssot "${GEN2_INVENTORY}"; then
   exit 1
 fi
 
+bootstrap_ensure_prelinked_sidecar_path_symlink 2>/dev/null || true
+
 rm -f "${GEN3}" "${FIXTURE_AOT}"
 set +e
 gen3_link_out="$(
   env -u PHP_COMPILER_M3_SOURCE -u PHP_COMPILER_M3_OUT \
+    PHP_COMPILER_REPO_ROOT="${ROOT}" \
     PHP_COMPILER_SELFHOST_AOT=1 \
     PHP_COMPILER_M3_COMPILE_DRIVER=1 \
     PHP_COMPILER_M4_BIN_COMPILE_DRIVER=1 \
@@ -82,6 +85,7 @@ fi
 set +e
 gen3_emit_out="$(
   env -u PHP_COMPILER_M3_SOURCE -u PHP_COMPILER_M3_OUT \
+    PHP_COMPILER_REPO_ROOT="${ROOT}" \
     PHP_COMPILER_SELFHOST_AOT=1 \
     PHP_COMPILER_M3_COMPILE_DRIVER=1 \
     PHP_COMPILER_M4_BIN_COMPILE_DRIVER=1 \

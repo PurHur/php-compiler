@@ -150,6 +150,7 @@ bootstrap_inventory_argv_driver_smoke() {
   set +e
   smoke_log="$(
     env -u PHP_COMPILER_M3_SOURCE -u PHP_COMPILER_M3_OUT \
+      PHP_COMPILER_REPO_ROOT="${root}" \
       PHP_COMPILER_SELFHOST_AOT=1 \
       PHP_COMPILER_M3_COMPILE_DRIVER=1 \
       PHP_COMPILER_M4_BIN_COMPILE_DRIVER=1 \
@@ -187,6 +188,7 @@ bootstrap_inventory_argv_driver_m4_smoke() {
   set +e
   lint_log="$(
     env -u PHP_COMPILER_M3_SOURCE -u PHP_COMPILER_M3_OUT \
+      PHP_COMPILER_REPO_ROOT="${root}" \
       PHP_COMPILER_SELFHOST_AOT=1 \
       PHP_COMPILER_M3_COMPILE_DRIVER=1 \
       PHP_COMPILER_M4_BIN_COMPILE_DRIVER=1 \
@@ -210,6 +212,7 @@ bootstrap_inventory_argv_driver_m4_smoke() {
   set +e
   compile_log="$(
     env -u PHP_COMPILER_M3_SOURCE -u PHP_COMPILER_M3_OUT \
+      PHP_COMPILER_REPO_ROOT="${root}" \
       PHP_COMPILER_SELFHOST_AOT=1 \
       PHP_COMPILER_M3_COMPILE_DRIVER=1 \
       PHP_COMPILER_M4_BIN_COMPILE_DRIVER=1 \
