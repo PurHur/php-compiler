@@ -3253,6 +3253,52 @@ PY
   apply_php_types_ns_func_call_overlay_to_target "$ROOT/prelinked/bootstrap-vendor/sources/ircmaxell/php-types/lib/PHPTypes/TypeReconstructor.php"
 }
 
+apply_php_types_arrow_function_overlay() {
+  apply_php_types_arrow_function_overlay_to_target() {
+    local target="$1"
+    if [[ ! -f "$target" ]]; then
+      return 0
+    fi
+    if grep -q 'function resolveOp_Expr_ArrowFunction' "$target" 2>/dev/null; then
+      echo "Skip php-types-arrow-function.patch (already applied): ${target}"
+      return 0
+    fi
+    python3 - "$target" <<'PY'
+import sys
+from pathlib import Path
+
+path = Path(sys.argv[1])
+text = path.read_text()
+arrow_block = """    protected function resolveOp_Expr_ArrowFunction(Operand $var, Op\\Expr\\ArrowFunction $op, SplObjectStorage $resolved)
+    {
+        return [new Type(Type::TYPE_OBJECT, [], 'Closure')];
+    }
+
+"""
+anchor = "    protected function resolveOp_Expr_FuncCall(Operand $var, Op\\Expr\\FuncCall $op, SplObjectStorage $resolved)"
+closure_anchor = "    protected function resolveOp_Expr_Closure(Operand $var, Op\\Expr\\Closure $op, SplObjectStorage $resolved)"
+if closure_anchor in text and anchor in text:
+    needle = """    protected function resolveOp_Expr_Closure(Operand $var, Op\\Expr\\Closure $op, SplObjectStorage $resolved)
+    {
+        return [new Type(Type::TYPE_OBJECT, [], 'Closure')];
+    }
+
+"""
+    if needle in text:
+        path.write_text(text.replace(needle, needle + arrow_block, 1))
+        raise SystemExit(0)
+if anchor not in text:
+    sys.stderr.write("php-types-arrow-function: resolveOp_Expr_FuncCall anchor not found\\n")
+    raise SystemExit(1)
+path.write_text(text.replace(anchor, arrow_block + anchor, 1))
+PY
+    echo "Applied php-types-arrow-function.patch (overlay): ${target}"
+  }
+
+  apply_php_types_arrow_function_overlay_to_target "$ROOT/vendor/ircmaxell/php-types/lib/PHPTypes/TypeReconstructor.php"
+  apply_php_types_arrow_function_overlay_to_target "$ROOT/prelinked/bootstrap-vendor/sources/ircmaxell/php-types/lib/PHPTypes/TypeReconstructor.php"
+}
+
 apply_php_types_fromdecl_junk_fragments_overlay() {
   local target="$ROOT/vendor/ircmaxell/php-types/lib/PHPTypes/Type.php"
   if patch_already_applied "$PATCH_DIR/php-types-fromdecl-junk-fragments.patch"; then
@@ -4672,6 +4718,10 @@ apply_patch() {
     apply_php_types_ns_func_call_overlay
     return $?
   fi
+  if [[ "$(basename "$patch")" == "php-types-arrow-function.patch" ]]; then
+    apply_php_types_arrow_function_overlay
+    return $?
+  fi
   if [[ "$(basename "$patch")" == "php-types-fromdecl-junk-fragments.patch" ]]; then
     apply_php_types_fromdecl_junk_fragments_overlay
     return $?
@@ -4960,6 +5010,7 @@ fi
 
 if [[ -d "$ROOT/vendor/ircmaxell/php-types" ]]; then
   apply_php_types_incdec_type_overlay
+  apply_php_types_arrow_function_overlay
   apply_patch "$PATCH_DIR/php-types-binaryop-pow.patch"
   apply_patch "$PATCH_DIR/php-types-binaryop-coalesce.patch"
   apply_patch "$PATCH_DIR/php-types-cast-object.patch"
@@ -5151,6 +5202,9 @@ verify_critical_language_patches() {
   fi
   if ! grep -q "case 'Expr_PostInc':" "$recon" 2>/dev/null; then
     missing+=("php-types-incdec-type")
+  fi
+  if ! grep -q 'function resolveOp_Expr_ArrowFunction' "$recon" 2>/dev/null; then
+    missing+=("php-types-arrow-function")
   fi
   if ! grep -q 'FirstClassCallable::KIND_METHOD' "$recon" 2>/dev/null; then
     missing+=("php-types-first-class-callable")
