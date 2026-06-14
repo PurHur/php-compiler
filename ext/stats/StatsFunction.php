@@ -30,7 +30,12 @@ abstract class StatsFunction extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        throw new \LogicException($this->getName().'() is not implemented for JIT in this compiler build (issue #5748)');
+        return match ($this->getName()) {
+            'stats_variance' => JitStats::variance($context, ...$args),
+            'stats_standard_deviation' => JitStats::standardDeviation($context, ...$args),
+            'stats_covariance' => JitStats::covariance($context, ...$args),
+            default => throw new \LogicException('unsupported stats builtin: '.$this->getName()),
+        };
     }
 
     /** @return float|false */
