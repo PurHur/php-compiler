@@ -4097,7 +4097,7 @@ restart:
                     }
                     $argSlot = (int) $op->arg1;
                     $this->warnUndefinedVariableForScopeRead($frame, $argSlot);
-                    $value = $frame->scope[$argSlot];
+                    $value = $this->resolveOutgoingCallArgValue($frame, $argSlot);
                     if ($this->isUnboundLocalScopeRead($frame, $argSlot)) {
                         $sent = new Variable();
                         $sent->null();
@@ -9614,6 +9614,27 @@ restart:
                 $calledArgs[$i]->separateArrayForWrite();
             }
         }
+    }
+
+    /**
+     * Resolve a call argument slot — use compile-time constants when scope is still unset (#5933).
+     */
+    private function resolveOutgoingCallArgValue(Frame $frame, int $slot): Variable
+    {
+        if (isset($frame->scope[$slot])) {
+            $resolved = $frame->scope[$slot]->resolveIndirect();
+            if (Variable::TYPE_NULL !== $resolved->type) {
+                return $frame->scope[$slot];
+            }
+        }
+        if (null !== $frame->block && isset($frame->block->constants[$slot])) {
+            $value = new Variable();
+            $value->copyFrom($frame->block->constants[$slot]);
+
+            return $value;
+        }
+
+        return $frame->scope[$slot];
     }
 
     /**
