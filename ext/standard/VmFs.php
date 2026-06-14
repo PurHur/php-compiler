@@ -8,6 +8,7 @@ use PHPCompiler\ext\posix\VmPosix;
 use PHPCompiler\VM\HashTable;
 use PHPCompiler\VM\ScriptStack;
 use PHPCompiler\VM\Variable;
+use PHPCompiler\Web\Superglobals;
 
 /** Host filesystem helpers for stdlib builtins (VM). */
 final class VmFs
@@ -447,7 +448,7 @@ final class VmFs
 
     public static function fileGetContents(string $path, ?\PHPCompiler\VM\Context $ctx = null) {
         if ('php://input' === $path) {
-            return false;
+            return Superglobals::readRequestBody();
         }
         if (VmStreamWrapperRegistry::isCustomProtocol($path)) {
             if (null === $ctx) {
@@ -614,6 +615,9 @@ final class VmFs
         if (VmPhpMemoryStream::isSupportedUri($path)) {
             return VmPhpMemoryStream::open($path, $mode);
         }
+        if (VmPhpInputOutputStream::isSupportedUri($path)) {
+            return VmPhpInputOutputStream::open($path, $mode);
+        }
         if (self::isBuiltinPhpStreamUri($path)) {
             $fp = @fopen($path, $mode);
             if (false === $fp) {
@@ -779,6 +783,9 @@ final class VmFs
 
             return VmStreamFilterChain::applyReadFilters($handle, $data);
         }
+        if (VmPhpInputOutputStream::isValidHandle($handle)) {
+            return VmPhpInputOutputStream::read($handle, $length);
+        }
         $fp = self::lookup($handle);
         if (null === $fp) {
             return false;
@@ -838,6 +845,9 @@ final class VmFs
 
             return VmPhpMemoryStream::write($handle, $data, $length);
         }
+        if (VmPhpInputOutputStream::isValidHandle($handle)) {
+            return VmPhpInputOutputStream::write($handle, $data, $length);
+        }
         $fp = self::lookup($handle);
         if (null === $fp) {
             return false;
@@ -867,6 +877,9 @@ final class VmFs
             unset(self::$handlePaths[$handle]);
 
             return VmPhpMemoryStream::close($handle);
+        }
+        if (VmPhpInputOutputStream::isValidHandle($handle)) {
+            return VmPhpInputOutputStream::close($handle);
         }
         $fp = self::lookup($handle);
         if (null === $fp) {
@@ -939,6 +952,9 @@ final class VmFs
         }
         if (VmPhpMemoryStream::isValidHandle($handle)) {
             return VmPhpMemoryStream::eof($handle);
+        }
+        if (VmPhpInputOutputStream::isValidHandle($handle)) {
+            return VmPhpInputOutputStream::eof($handle);
         }
         $fp = self::lookup($handle);
         if (null === $fp) {
@@ -1187,6 +1203,9 @@ final class VmFs
         if (VmPhpMemoryStream::isValidHandle($handle)) {
             return VmPhpMemoryStream::tell($handle);
         }
+        if (VmPhpInputOutputStream::isValidHandle($handle)) {
+            return VmPhpInputOutputStream::tell($handle);
+        }
         $fp = self::lookup($handle);
         if (null === $fp) {
             return false;
@@ -1207,6 +1226,17 @@ final class VmFs
             }
             if ('' === $byte) {
                 return VmPhpMemoryStream::eof($handle) ? '' : false;
+            }
+
+            return $byte;
+        }
+        if (VmPhpInputOutputStream::isValidHandle($handle)) {
+            $byte = VmPhpInputOutputStream::read($handle, 1);
+            if (false === $byte) {
+                return false;
+            }
+            if ('' === $byte) {
+                return VmPhpInputOutputStream::eof($handle) ? '' : false;
             }
 
             return $byte;
@@ -1345,6 +1375,9 @@ final class VmFs
         if (VmPhpMemoryStream::isValidHandle($handle)) {
             return VmPhpMemoryStream::seek($handle, $offset, $whence);
         }
+        if (VmPhpInputOutputStream::isValidHandle($handle)) {
+            return VmPhpInputOutputStream::seek($handle, $offset, $whence);
+        }
         $fp = self::lookup($handle);
         if (null === $fp) {
             return -1;
@@ -1357,6 +1390,9 @@ final class VmFs
     {
         if (VmPhpMemoryStream::isValidHandle($handle)) {
             return 0 === VmPhpMemoryStream::seek($handle, 0, \SEEK_SET);
+        }
+        if (VmPhpInputOutputStream::isValidHandle($handle)) {
+            return 0 === VmPhpInputOutputStream::seek($handle, 0, \SEEK_SET);
         }
         $fp = self::lookup($handle);
         if (null === $fp) {
@@ -1391,6 +1427,9 @@ final class VmFs
             }
 
             return VmStreamFilterChain::applyReadFilters($handle, $data);
+        }
+        if (VmPhpInputOutputStream::isValidHandle($handle)) {
+            return VmPhpInputOutputStream::streamGetContents($handle, $maxlength, $offset);
         }
         $fp = self::lookup($handle);
         if (null === $fp) {
@@ -1744,7 +1783,7 @@ final class VmFs
      */
     public static function getResourceType(int $handle): ?string
     {
-        if (isset(self::$handles[$handle]) || VmPhpMemoryStream::isValidHandle($handle)) {
+        if (isset(self::$handles[$handle]) || VmPhpMemoryStream::isValidHandle($handle) || VmPhpInputOutputStream::isValidHandle($handle)) {
             return 'stream';
         }
 
@@ -1767,6 +1806,9 @@ final class VmFs
         if (VmPhpMemoryStream::isValidHandle($handle)) {
             return 'stream';
         }
+        if (VmPhpInputOutputStream::isValidHandle($handle)) {
+            return 'stream';
+        }
 
         return 'Unknown';
     }
@@ -1775,7 +1817,8 @@ final class VmFs
     {
         return isset(self::$handles[$handle])
             || VmUserStream::isValidHandle($handle)
-            || VmPhpMemoryStream::isValidHandle($handle);
+            || VmPhpMemoryStream::isValidHandle($handle)
+            || VmPhpInputOutputStream::isValidHandle($handle);
     }
 
     /**
@@ -1803,6 +1846,12 @@ final class VmFs
             ++$index;
         }
         foreach (VmPhpMemoryStream::openHandleIds() as $id) {
+            $value = new Variable();
+            $value->streamHandle($id, $ctx);
+            $ht->addIndex($index, $value);
+            ++$index;
+        }
+        foreach (VmPhpInputOutputStream::openHandleIds() as $id) {
             $value = new Variable();
             $value->streamHandle($id, $ctx);
             $ht->addIndex($index, $value);
@@ -1868,6 +1917,9 @@ final class VmFs
         if (VmPhpMemoryStream::isValidHandle($handle)) {
             return VmPhpMemoryStream::uriForHandle($handle);
         }
+        if (VmPhpInputOutputStream::isValidHandle($handle)) {
+            return VmPhpInputOutputStream::uriForHandle($handle);
+        }
 
         return self::$handlePaths[$handle] ?? '';
     }
@@ -1930,7 +1982,7 @@ final class VmFs
         if (!\str_starts_with($path, 'php://')) {
             return false;
         }
-        if (VmFsStdio::isStdioUri($path) || VmPhpMemoryStream::isSupportedUri($path)) {
+        if (VmFsStdio::isStdioUri($path) || VmPhpMemoryStream::isSupportedUri($path) || VmPhpInputOutputStream::isSupportedUri($path)) {
             return false;
         }
 
