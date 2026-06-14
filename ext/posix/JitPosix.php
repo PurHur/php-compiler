@@ -153,6 +153,53 @@ final class JitPosix
         return self::setId($context, 'setegid', 'posix_setegid', $arg, 'gid');
     }
 
+    /** posix_getpgid() — process group ID or false (php-src ext/posix/posix.c; #6505 JIT). */
+    public static function getpgid(Context $context, JITVariable $pidArg): Value
+    {
+        self::ensureLibcPidLookup($context, 'getpgid');
+        $pid = JitSleep::zParamLong($context, $pidArg, 'posix_getpgid', 1, 'pid');
+        $i32 = $context->getTypeFromString('int32');
+        $raw = $context->builder->call(
+            $context->lookupFunction('getpgid'),
+            $context->builder->trunc($pid, $i32)
+        );
+
+        return self::boxedPidOrFalse($context, $raw, 'posix_getpgid');
+    }
+
+    /** posix_getsid() — session ID or false (php-src ext/posix/posix.c; #6505 JIT). */
+    public static function getsid(Context $context, JITVariable $pidArg): Value
+    {
+        self::ensureLibcPidLookup($context, 'getsid');
+        $pid = JitSleep::zParamLong($context, $pidArg, 'posix_getsid', 1, 'pid');
+        $i32 = $context->getTypeFromString('int32');
+        $raw = $context->builder->call(
+            $context->lookupFunction('getsid'),
+            $context->builder->trunc($pid, $i32)
+        );
+
+        return self::boxedPidOrFalse($context, $raw, 'posix_getsid');
+    }
+
+    /** posix_setpgid() — set process group (php-src ext/posix/posix.c; #6505 JIT). */
+    public static function setpgid(Context $context, JITVariable $pidArg, JITVariable $pgidArg): Value
+    {
+        self::ensureLibcSetpgid($context);
+        $pid = JitSleep::zParamLong($context, $pidArg, 'posix_setpgid', 1, 'process_id');
+        $pgid = JitSleep::zParamLong($context, $pgidArg, 'posix_setpgid', 2, 'process_group_id');
+        $i32 = $context->getTypeFromString('int32');
+        $ret = $context->builder->call(
+            $context->lookupFunction('setpgid'),
+            $context->builder->trunc($pid, $i32),
+            $context->builder->trunc($pgid, $i32)
+        );
+        $slot = JitValueBox::alloc($context);
+        $isTrue = $context->builder->icmp(Builder::INT_EQ, $ret, $i32->constInt(0, false));
+        JitValueBox::writeBool($context, $slot, $isTrue);
+
+        return JitValueBox::pointer($context, $slot);
+    }
+
     public static function ctermid(Context $context): Value
     {
         self::ensureLibcCtermid($context);
@@ -220,6 +267,40 @@ final class JitPosix
         return $ptr;
     }
 
+    private static function boxedPidOrFalse(Context $context, Value $raw, string $label): Value
+    {
+        $i32 = $context->getTypeFromString('int32');
+        $i64 = $context->getTypeFromString('int64');
+        $rawI32 = $raw->typeOf() === $i32
+            ? $raw
+            : $context->builder->trunc($raw, $i32);
+        $failed = $context->builder->icmp(Builder::INT_SLT, $rawI32, $i32->constInt(0, false));
+
+        $slot = JitValueBox::alloc($context);
+        $id = (string) (++self::$blockSerial);
+        $failBlock = BasicBlockHelper::append($context, $label.'_fail_'.$id);
+        $okBlock = BasicBlockHelper::append($context, $label.'_ok_'.$id);
+        $doneBlock = BasicBlockHelper::append($context, $label.'_done_'.$id);
+        $context->builder->branchIf($failed, $failBlock, $okBlock);
+
+        $i1 = $context->getTypeFromString('int1');
+        $context->builder->positionAtEnd($failBlock);
+        JitValueBox::writeBool($context, $slot, $i1->constInt(0, false));
+        $context->builder->branch($doneBlock);
+
+        $context->builder->positionAtEnd($okBlock);
+        JitValueBox::writeLong(
+            $context,
+            $slot,
+            $context->builder->zExt($rawI32, $i64)
+        );
+        $context->builder->branch($doneBlock);
+
+        $context->builder->positionAtEnd($doneBlock);
+
+        return JitValueBox::pointer($context, $slot);
+    }
+
     private static function setId(
         Context $context,
         string $libcFn,
@@ -249,6 +330,30 @@ final class JitPosix
             $ft = $context->context->functionType($i32, false, $i32);
             $fn = $context->module->addFunction($name, $ft);
             $context->registerFunction($name, $fn);
+        }
+    }
+
+    private static function ensureLibcPidLookup(Context $context, string $name): void
+    {
+        $i32 = $context->getTypeFromString('int32');
+        try {
+            $context->lookupFunction($name);
+        } catch (\Throwable) {
+            $ft = $context->context->functionType($i32, false, $i32);
+            $fn = $context->module->addFunction($name, $ft);
+            $context->registerFunction($name, $fn);
+        }
+    }
+
+    private static function ensureLibcSetpgid(Context $context): void
+    {
+        $i32 = $context->getTypeFromString('int32');
+        try {
+            $context->lookupFunction('setpgid');
+        } catch (\Throwable) {
+            $ft = $context->context->functionType($i32, false, $i32, $i32);
+            $fn = $context->module->addFunction('setpgid', $ft);
+            $context->registerFunction('setpgid', $fn);
         }
     }
 
