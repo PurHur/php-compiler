@@ -9,11 +9,10 @@ use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\ErrorReporter;
-use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
 
 /**
- * dl() — runtime extension load stub (ext/standard/dl.c parity, issue #3779).
+ * dl() — runtime extension load stub (ext/standard/dl.c parity, issues #3591/#3779).
  *
  * v1: enable_dl is always off; emit Zend warning and return false (no .so loading).
  */
@@ -28,15 +27,20 @@ final class dl extends Internal
 
     public function execute(Frame $frame): void
     {
-        if (1 !== \count($frame->calledArgs)) {
-            throw new \LogicException('dl() requires exactly one argument');
+        $argc = \count($frame->calledArgs);
+        if (1 !== $argc) {
+            throw new \ArgumentCountError(
+                'dl() expects exactly 1 argument, '.\max(0, $argc - 1).' given'
+            );
         }
+        VmString::coerceStringBuiltinArg(
+            $frame->calledArgs[0],
+            'dl',
+            0,
+            'extension_filename'
+        );
         if (null === $frame->returnVar) {
             return;
-        }
-        $v = $frame->calledArgs[0]->resolveIndirect();
-        if (Variable::TYPE_STRING !== $v->type) {
-            throw new \LogicException('dl() requires a string filename in this compiler build');
         }
         if (null !== $frame->vmContext) {
             $frame->vmContext->errors->triggerError(
@@ -52,6 +56,6 @@ final class dl extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        throw new \LogicException('dl() is VM-only in this compiler build');
+        return JitDl::invoke($context, ...$args);
     }
 }

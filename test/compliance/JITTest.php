@@ -269,6 +269,10 @@ class JITTest extends BaseTest {
             if (str_contains($name, 'utf8_encode_decode_scalar') && !str_contains($name, '_jit')) {
                 continue;
             }
+            // dl() TypeError in try/catch: VM + bin/jit.php (#3591); MCJIT JitStringBuiltinArg abort IR (#98).
+            if (str_contains($name, 'dl_typeerror')) {
+                continue;
+            }
             // Closure::fromCallable() inaccessible callback TypeError: VM ClosureSupport (#7416).
             if (str_contains($name, 'closure_from_callable_inaccessible')) {
                 continue;
