@@ -236,6 +236,32 @@ try {
         );
     }
 
+    /** Issue #8574: caught exception in function must resume caller (Zend/zend_execute.c). */
+    public function testFunctionTryCatchResumesCallerAfterCaughtException(): void
+    {
+        $this->assertVmOutput(
+            '<?php
+function probe(string $label, callable $fn): void
+{
+    try {
+        $fn();
+        echo $label, ": ok\n";
+    } catch (TypeError $e) {
+        echo $label, ": caught\n";
+    }
+}
+probe("p1", static function (): void {
+    substr_compare([], "a", 0);
+});
+probe("p2", static function (): void {
+    substr_compare("abc", [], 0);
+});
+echo "after\n";
+',
+            "p1: caught\np2: caught\nafter\n"
+        );
+    }
+
     public function testNestedFinallyOnReturn(): void
     {
         $this->assertVmOutput(
