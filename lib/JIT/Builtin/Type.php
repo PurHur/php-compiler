@@ -1329,6 +1329,7 @@ class Type extends Builtin {
         StringNetInterfacesJit::ensureLinked($this->context);
         StringGetenvAll::ensureLinked($this->context);
         StringInfo::ensureLinked($this->context);
+        StringPhpinfoRuntime::ensureLinked($this->context);
         StringDir::ensureLinked($this->context);
         StringFsGlob::ensureLinked($this->context);
         StringFsDir::ensureLinked($this->context);

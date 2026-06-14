@@ -6,7 +6,9 @@ namespace PHPCompiler\ext\standard;
 
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
+use PHPCompiler\JIT\Builtin\TypeErrorRaise;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
@@ -40,6 +42,18 @@ final class phpcredits extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        throw new \LogicException('phpcredits() is VM-only in this compiler build (issue #5304)');
+        $argc = \count($args);
+        if ($argc > 1) {
+            TypeErrorRaise::ensureLinked($context);
+            TypeErrorRaise::emitArgumentCountError(
+                $context,
+                'phpcredits() accepts at most 1 argument, '.$argc.' given'
+            );
+            $slot = JitValueBox::alloc($context);
+
+            return JitValueBox::pointer($context, $slot);
+        }
+
+        return JitInfo::phpcredits($context, $argc > 0 ? $args[0] : null);
     }
 }
