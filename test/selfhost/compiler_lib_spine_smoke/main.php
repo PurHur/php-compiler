@@ -38,6 +38,7 @@ require_once __DIR__.'/../../../ext/bcmath/bcmod.php';
 require_once __DIR__.'/../../../ext/bcmath/bcmul.php';
 require_once __DIR__.'/../../../ext/bcmath/bcpow.php';
 require_once __DIR__.'/../../../ext/bcmath/bcpowmod.php';
+require_once __DIR__.'/../../../ext/bcmath/bcround.php';
 require_once __DIR__.'/../../../ext/bcmath/bcscale.php';
 require_once __DIR__.'/../../../ext/bcmath/bcsqrt.php';
 require_once __DIR__.'/../../../ext/bcmath/bcsub.php';

@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace PHPCompiler\ext\bcmath;
 
 use PHPCompiler\JIT\Builtin\Bcmath;
+use PHPCompiler\JIT\Builtin\RoundingModeJit;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitStringArg;
 use PHPCompiler\JIT\JitStringBuiltinArg;
@@ -225,6 +226,55 @@ final class JitBcmath
         );
     }
 
+    public static function round(Context $context, JITVariable ...$args): Value
+    {
+        if (\count($args) < 1 || \count($args) > 3) {
+            throw new \LogicException('bcround() requires one to three arguments in this compiler build');
+        }
+
+        $numLit = self::compileTimeString($args[0]);
+        $precisionLit = isset($args[1]) ? self::compileTimeLong($args[1]) : 0;
+        $modeLit = isset($args[2]) ? self::compileTimeRoundMode($context, $args[2]) : null;
+        $canFold = null !== $numLit
+            && (!isset($args[1]) || null !== $precisionLit)
+            && (!isset($args[2]) || null !== $modeLit);
+        if ($canFold) {
+            $precision = null !== $precisionLit ? $precisionLit : 0;
+            $mode = null !== $modeLit ? $modeLit : \PHPCompiler\ext\standard\StdlibConstants::PHP_ROUND_HALF_UP;
+
+            return $context->builder->load(
+                $context->constantStringFromString(VmBcmath::round($numLit, $precision, $mode))
+            );
+        }
+
+        Bcmath::ensureLinked($context);
+        $num = JitStringBuiltinArg::lower($context, $args[0], 'bcround', 0, 'num');
+        $i64 = $context->getTypeFromString('int64');
+        $precision = isset($args[1])
+            ? self::lowerScaleArg($context, $args[1], 'bcround', 1, 'precision')
+            : $i64->constInt(0, true);
+        $mode = isset($args[2])
+            ? self::lowerRoundModeArg($context, $args[2])
+            : $i64->constInt(\PHPCompiler\ext\standard\StdlibConstants::PHP_ROUND_HALF_UP, false);
+
+        return $context->builder->call(
+            $context->lookupFunction('__compiler_bcround'),
+            $num,
+            $precision,
+            $mode
+        );
+    }
+
+    private static function lowerRoundModeArg(Context $context, JITVariable $arg): Value
+    {
+        $mode = self::compileTimeRoundMode($context, $arg);
+        if (null !== $mode) {
+            return $context->getTypeFromString('int64')->constInt($mode, false);
+        }
+
+        throw new \LogicException('bcround(): Argument #3 ($mode) must be a compile-time RoundingMode or int in this compiler build');
+    }
+
     /** @param array<int, JITVariable> $args */
     private static function stringBinaryOp(
         Context $context,
@@ -313,6 +363,16 @@ final class JitBcmath
         }
 
         return (int) $arg->value->getConstantValue();
+    }
+
+    private static function compileTimeRoundMode(Context $context, JITVariable $arg): ?int
+    {
+        if (JITVariable::TYPE_NATIVE_LONG === $arg->type && JITVariable::KIND_VALUE === $arg->kind
+            && method_exists($arg->value, 'isConstant') && $arg->value->isConstant()) {
+            return (int) $arg->value->getConstantValue();
+        }
+
+        return RoundingModeJit::compileTimeRoundMode($context, $arg);
     }
 
     private static function boxLong(Context $context, Value $long): Value
