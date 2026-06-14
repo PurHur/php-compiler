@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace PHPCompiler\JIT\Builtin;
 
+use PHPCompiler\JIT\Call;
 use PHPCompiler\JIT\Context;
 use PHPLLVM\Builder;
 use PHPLLVM\Value;
@@ -42,6 +43,41 @@ final class ProgressNoteRuntime
     public static function ensureLinked(Context $context): void
     {
         self::implement($context);
+        self::registerStaticProxies($context);
+    }
+
+    /** Register Progress::{noteFunction,notePhase,noteEntry} before spine callees compile (#8560). */
+    private static function registerStaticProxies(Context $context): void
+    {
+        $voidTy = $context->getTypeFromString('void');
+        $strPtr = $context->getTypeFromString('__string__*');
+        $ft = $context->context->functionType($voidTy, false, $strPtr);
+        $savedBuilder = $context->builder;
+        foreach ([
+            'phpcompiler\\jit\\progress::notefunction' => 'phpc_progress_notefunction_stub',
+            'phpcompiler\\jit\\progress::notephase' => 'phpc_progress_notephase_stub',
+            'phpcompiler\\jit\\progress::noteentry' => 'phpc_progress_noteentry_stub',
+        ] as $proxy => $internal) {
+            if ($context->functionIsRegistered($proxy)) {
+                continue;
+            }
+            $probe = $context->module->getNamedFunction($internal);
+            $fn = (null !== $probe && $probe->countBasicBlocks() > 0)
+                ? $probe
+                : $context->module->addFunction($internal, $ft);
+            if (0 === $fn->countBasicBlocks()) {
+                $entry = $fn->appendBasicBlock('entry');
+                $context->builder = $context->context->builderCreate();
+                $context->builder->positionAtEnd($entry);
+                $context->builder->returnVoid();
+                $context->builder->clearInsertionPosition();
+            }
+            $context->registerFunction($proxy, $fn);
+            $context->functions[$proxy] = $fn;
+            $context->functionProxies[$proxy] = new Call\Native($fn, $proxy, [$strPtr], []);
+            $context->functionReturnType[$proxy] = 'void';
+        }
+        $context->builder = $savedBuilder;
     }
 
     public static function emitCall(Context $context, string $message): void
