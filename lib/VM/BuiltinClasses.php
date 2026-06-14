@@ -8,6 +8,7 @@ use PHPCfg\Func as CfgFunc;
 use PHPCompiler\VM\Builtin\DateIntervalConstruct;
 use PHPCompiler\VM\Builtin\DateIntervalFormat;
 use PHPCompiler\VM\Builtin\DateTimeConstruct;
+use PHPCompiler\VM\Builtin\DateTimeDiff;
 use PHPCompiler\VM\Builtin\DateTimeCreateFromImmutable;
 use PHPCompiler\VM\Builtin\DateTimeCreateFromInterface;
 use PHPCompiler\VM\Builtin\DateTimeCreateFromTimestamp;
@@ -832,6 +833,7 @@ final class BuiltinClasses
             'gettimestamp' => new DateTimeGetTimestamp(),
             'getmicrosecond' => new DateTimeGetMicrosecond(),
             'modify' => new DateTimeModify(),
+            'diff' => new DateTimeDiff(),
             'setmicrosecond' => new DateTimeSetMicrosecond(),
             'settimezone' => new DateTimeSetTimezone(),
         ];
