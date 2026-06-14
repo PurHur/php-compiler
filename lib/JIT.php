@@ -5523,6 +5523,10 @@ class JIT {
                     $value = $this->context->getVariableFromOp($block->getOperand($op->arg3));
                     $destOp = $block->getOperand($op->arg1);
                     $aliasOp = $block->getOperand($op->arg2);
+                    if (null !== $this->context->ternarySharedReturnSlot && $this->isTernaryBranchMergeAssign($block, $op)) {
+                        $this->emitJitReturnFromValue($func, $block, $value);
+                        break;
+                    }
                     $coalesceTarget = null;
                     if ($this->context->coalesceAssignTargets->contains($destOp)) {
                         $coalesceTarget = $destOp;
@@ -6897,10 +6901,14 @@ class JIT {
                     $builder->positionAtEnd($nextBb);
                     break;
                 case OpCode::TYPE_JUMP:
-                    $skippedListUnpackAssign = $this->context->listUnpackSkipAssignPath;
-                    $this->context->listUnpackSkipAssignPath = false;
+                    $branchBlock = $builder->getInsertBlock();
+                    if (null !== $branchBlock->getTerminator()) {
+                        break;
+                    }
                     $branchBlock = $builder->getInsertBlock();
                     $builder->positionAtEnd($branchBlock);
+                    $skippedListUnpackAssign = $this->context->listUnpackSkipAssignPath;
+                    $this->context->listUnpackSkipAssignPath = false;
                     $mergeLlvm = null;
                     $allowRecompile = false;
                     if ($this->context->listUnpackMergeLlvmBlocks->contains($op->block1)) {
@@ -7027,10 +7035,20 @@ class JIT {
                     $builder->positionAtEnd($branchBlock);
                     $this->maybeRefreshIncludeBindingsBeforeUse();
                     $ternaryMergeReturn = null;
-                    if ('__value__*' === ($this->cfgFunctionReturnCallbackType($block->func) ?? '')) {
-                        $ternaryMergeReturn = $this->findJumpIfSharedReturnOperand($op->block1, $op->block2);
-                        if (null !== $ternaryMergeReturn) {
-                            $this->context->coalesceAssignTargets[$ternaryMergeReturn] = true;
+                    $savedTernarySharedReturn = $this->context->ternarySharedReturnOperand;
+                    $savedTernarySharedReturnSlot = $this->context->ternarySharedReturnSlot;
+                    $ternaryMergeReturn = $this->findJumpIfSharedReturnOperand($op->block1, $op->block2);
+                    if (null !== $ternaryMergeReturn) {
+                        $this->context->coalesceAssignTargets[$ternaryMergeReturn] = true;
+                        $this->context->ternarySharedReturnOperand = $ternaryMergeReturn;
+                        $mergeBlock = $this->jumpBlockTarget($op->block1);
+                        if (null !== $mergeBlock) {
+                            foreach ($mergeBlock->opCodes as $mergeOp) {
+                                if (OpCode::TYPE_RETURN === $mergeOp->type && null !== $mergeOp->arg1) {
+                                    $this->context->ternarySharedReturnSlot = (int) $mergeOp->arg1;
+                                    break;
+                                }
+                            }
                         }
                     }
                     $condition = $this->context->castToBool(
@@ -7067,6 +7085,8 @@ class JIT {
                     if (null !== $ternaryMergeReturn) {
                         unset($this->context->coalesceAssignTargets[$ternaryMergeReturn]);
                     }
+                    $this->context->ternarySharedReturnOperand = $savedTernarySharedReturn;
+                    $this->context->ternarySharedReturnSlot = $savedTernarySharedReturnSlot;
 
                     return $origBasicBlock;
                 case OpCode::TYPE_TRY:
@@ -8155,6 +8175,74 @@ class JIT {
         }
 
         return $builder->getInsertBlock();
+    }
+
+    /** `return $c ? $a : $b` nullable arm — direct return avoids AOT merge-slot segfault (#8555). */
+    private function emitJitReturnFromValue(PHPLLVM\Value $func, Block $block, Variable $value): void
+    {
+        $builder = $this->context->builder;
+        $returnBlock = $builder->getInsertBlock();
+        $builder->positionAtEnd($returnBlock);
+        $this->markJitThisConstructedIfLeavingConstruct($block);
+        if (
+            0 === $this->context->inlineIncludeDepth
+            && JIT\TryCatchHelper::deferReturnIfNeeded($this, $this->context, $func, $block, false, $value)
+        ) {
+            return;
+        }
+        if ($this->context->inlineIncludeDepth > 0) {
+            if ([] !== $this->context->inlineIncludeReturnOperands) {
+                $holderOp = $this->context->inlineIncludeReturnOperands[
+                    array_key_last($this->context->inlineIncludeReturnOperands)
+                ];
+                $value->addref();
+                $this->assignOperand($holderOp, $value, true);
+            }
+            $this->context->inlineIncludeExitBlock = $returnBlock;
+
+            return;
+        }
+        if ($block->returnTypeVoid) {
+            JIT\Builtin\TypeErrorRaise::registerDeclarations($this->context);
+            JIT\Builtin\TypeErrorRaise::ensureLinked($this->context);
+            JIT\Builtin\TypeErrorRaise::emitRaise(
+                $this->context,
+                'A void function must not return a value'
+            );
+
+            return;
+        }
+        if ($this->shouldFreeDeadVariablesBeforeBranch()) {
+            $this->context->freeDeadVariables($func, $returnBlock, $block);
+        }
+        if ($this->isVoidLlvmFunction($func)) {
+            $builder->returnVoid();
+
+            return;
+        }
+        if ($this->cfgFunctionReturnsByRef($block->func)) {
+            $value->addref();
+            $builder->returnValue(
+                JIT\JitValueBox::valuePtrFromVariable($this->context, $value)
+            );
+
+            return;
+        }
+        $value->addref();
+        if (null !== $block->returnDnfConstraints) {
+            JIT\DnfParamCheck::enforce(
+                $this->context,
+                $value,
+                $block->returnDnfConstraints,
+                'Return value'
+            );
+        }
+        $expected = $this->cfgFunctionReturnCallbackType($block->func);
+        if (null === $expected && null !== $this->context->activeFunction) {
+            $expected = $this->context->functionReturnType[strtolower($this->context->activeFunction)] ?? null;
+        }
+        $retval = $this->coerceReturnValue($value, $this->context->helper->loadValue($value), $expected);
+        $builder->returnValue($retval);
     }
 
     private function coerceReturnValue(Variable $return, PHPLLVM\Value $retval, ?string $expected): PHPLLVM\Value
@@ -9689,6 +9777,35 @@ class JIT {
         return null;
     }
 
+    /** Last assign before a ?: branch JUMP targets the shared RETURN merge (#8555). */
+    private function isTernaryBranchMergeAssign(Block $branch, OpCode $assignOp): bool
+    {
+        if (null === $this->context->ternarySharedReturnSlot) {
+            return false;
+        }
+        $merge = $this->jumpBlockTarget($branch);
+        if (null === $merge) {
+            return false;
+        }
+        $mergeReturns = false;
+        foreach ($merge->opCodes as $mergeOp) {
+            if (OpCode::TYPE_RETURN === $mergeOp->type) {
+                $mergeReturns = true;
+                break;
+            }
+        }
+        if (!$mergeReturns) {
+            return false;
+        }
+        $limit = min($branch->nOpCodes, \count($branch->opCodes));
+        if ($limit < 2 || OpCode::TYPE_JUMP !== $branch->opCodes[$limit - 1]->type) {
+            return false;
+        }
+        $prior = $branch->opCodes[$limit - 2];
+
+        return OpCode::TYPE_ASSIGN === $prior->type && $prior === $assignOp;
+    }
+
     private function assignOperand(Operand $resultOp, Variable $value, bool $force = false): void {
         $branchMergeTarget = $force && $this->context->coalesceAssignTargets->contains($resultOp);
         $resolvedName = JIT\OperandName::resolve($resultOp);
@@ -9981,6 +10098,36 @@ class JIT {
             throw new \LogicException("Cannot assign to a value");
         }
         if (
+            $branchMergeTarget
+            && null === $result->objectPropertySlot
+            && !$result->functionStaticGlobal
+        ) {
+            if (Variable::TYPE_VALUE !== $result->type || Variable::KIND_VARIABLE !== $result->kind) {
+                $slot = JIT\JitValueBox::alloc($this->context);
+                $this->context->setVariableOp(
+                    $resultOp,
+                    new Variable(
+                        $this->context,
+                        Variable::TYPE_VALUE,
+                        Variable::KIND_VARIABLE,
+                        $slot
+                    )
+                );
+                $result = $this->context->getVariableFromOp($resultOp);
+            }
+            JIT\JitValueBox::assignToPointer(
+                $this->context,
+                JIT\JitValueBox::pointer($this->context, $result->value),
+                $value
+            );
+            $resolved = JIT\OperandName::resolve($resultOp);
+            if (null !== $resolved && '' !== $resolved) {
+                $this->context->bindVariableByName($resolved, $result);
+            }
+
+            return;
+        }
+        if (
             $value->type === $result->type
             && !($branchMergeTarget && Variable::TYPE_VALUE === $result->type)
         ) {
@@ -10148,7 +10295,7 @@ class JIT {
 
                     return;
                 case Variable::TYPE_STRING:
-                    $str = JIT\JitStringArg::stringPtrFromVariable($this->context, $value);
+                    $str = JIT\JitStringArg::lowerDominating($this->context, $value, 'value box write');
                     $owned = $this->context->builder->call(
                         $this->context->lookupFunction('__string__separate'),
                         $str
@@ -10482,36 +10629,6 @@ class JIT {
             $result->value = $slot;
             $result->addref();
             $this->context->setVariableOp($resultOp, $result);
-            $resolved = JIT\OperandName::resolve($resultOp);
-            if (null !== $resolved && '' !== $resolved) {
-                $this->context->bindVariableByName($resolved, $result);
-            }
-
-            return;
-        }
-        if (
-            $branchMergeTarget
-            && null === $result->objectPropertySlot
-            && !$result->functionStaticGlobal
-        ) {
-            if (Variable::TYPE_VALUE !== $result->type) {
-                $slot = JIT\JitValueBox::alloc($this->context);
-                $this->context->setVariableOp(
-                    $resultOp,
-                    new Variable(
-                        $this->context,
-                        Variable::TYPE_VALUE,
-                        Variable::KIND_VARIABLE,
-                        $slot
-                    )
-                );
-                $result = $this->context->getVariableFromOp($resultOp);
-            }
-            JIT\JitValueBox::assignToPointer(
-                $this->context,
-                JIT\JitValueBox::pointer($this->context, $result->value),
-                $value
-            );
             $resolved = JIT\OperandName::resolve($resultOp);
             if (null !== $resolved && '' !== $resolved) {
                 $this->context->bindVariableByName($resolved, $result);

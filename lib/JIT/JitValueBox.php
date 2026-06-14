@@ -256,7 +256,7 @@ final class JitValueBox
             case Variable::TYPE_STRING:
                 $owned = $context->builder->call(
                     $context->lookupFunction('__string__separate'),
-                    $context->helper->loadValue($value)
+                    JitStringArg::lowerDominating($context, $value, 'value box assign')
                 );
                 $context->builder->call(
                     $context->lookupFunction('__value__writeString'),
