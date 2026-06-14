@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 2665 |
-| Phase A inventory files (M2 ratio SSOT) | 2665 |
+| PHP files on vm.php path | 2668 |
+| Phase A inventory files (M2 ratio SSOT) | 2668 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 7200 |
+| Source constructs flagged (warnings) | 7205 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -1640,6 +1640,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/standard/zend_version.php` | 0 | 1 |
 | `ext/standard/zlib_decode.php` | 0 | 1 |
 | `ext/standard/zlib_encode.php` | 0 | 1 |
+| `ext/stats/JitStats.php` | 0 | 2 |
 | `ext/stats/Module.php` | 0 | 4 |
 | `ext/stats/StatsFunction.php` | 0 | 1 |
 | `ext/stats/VmStats.php` | 0 | 1 |
@@ -1905,6 +1906,8 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/Builtin/SplAutoloadOutput.php` | 0 | 2 |
 | `lib/JIT/Builtin/Sscanf.php` | 0 | 1 |
 | `lib/JIT/Builtin/SscanfJit.php` | 0 | 1 |
+| `lib/JIT/Builtin/Stats.php` | 0 | 1 |
+| `lib/JIT/Builtin/StatsJit.php` | 0 | 2 |
 | `lib/JIT/Builtin/StreamBucket.php` | 0 | 1 |
 | `lib/JIT/Builtin/StreamBucketRuntime.php` | 0 | 3 |
 | `lib/JIT/Builtin/StreamBuffer.php` | 0 | 1 |
@@ -13009,6 +13012,12 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - 3 class method(s)
 
+### `ext/stats/JitStats.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 100)
+- 8 class method(s)
+
 ### `ext/stats/Module.php`
 
 **Warnings** (review for bootstrap subset):
@@ -15089,6 +15098,17 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 
 **Warnings** (review for bootstrap subset):
 - 25 class method(s)
+
+### `lib/JIT/Builtin/Stats.php`
+
+**Warnings** (review for bootstrap subset):
+- 2 class method(s)
+
+### `lib/JIT/Builtin/StatsJit.php`
+
+**Warnings** (review for bootstrap subset):
+- 13 class method(s)
+- 1 closure(s)
 
 ### `lib/JIT/Builtin/StreamBucket.php`
 
