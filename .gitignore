@@ -11,3 +11,4 @@ demo
 .php_cs.cache
 .env
 .php-compiler-ci.lock
+.libs
