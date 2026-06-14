@@ -197,6 +197,7 @@ class Module extends ModuleAbstract
             new soundex(),
             new metaphone(),
             new hebrev(),
+            new convert_cyr_string(),
             new strnatcmp(),
             new strnatcasecmp(),
             new strcasecmp(),
