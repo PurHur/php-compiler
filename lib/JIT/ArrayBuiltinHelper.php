@@ -290,6 +290,7 @@ final class ArrayBuiltinHelper
         $context->builder->branchIf($isEmpty, $emptyBlock, $popBlock);
 
         $context->builder->positionAtEnd($emptyBlock);
+        self::emitArrayPopEmptyWarning($context);
         $context->builder->call(
             $context->lookupFunction('__value__writeNull'),
             $resultPtr
@@ -536,6 +537,7 @@ final class ArrayBuiltinHelper
         $context->builder->branchIf($isEmpty, $emptyBlock, $shiftBlock);
 
         $context->builder->positionAtEnd($emptyBlock);
+        self::emitArrayShiftEmptyWarning($context);
         $context->builder->call(
             $context->lookupFunction('__value__writeNull'),
             $resultPtr
@@ -2721,6 +2723,35 @@ final class ArrayBuiltinHelper
             $context->constantFromString(
                 'array_flip(): Can only flip string and integer values, entry skipped'
             ),
+            $i8p
+        );
+        $msgLen = $context->builder->call($context->lookupFunction('strlen'), $msg);
+        $context->builder->call(
+            $context->lookupFunction('__compiler_trigger_error'),
+            $msg,
+            $msgLen,
+            $i32->constInt(2, false),
+            $context->builder->pointerCast($context->constantFromString(''), $i8p),
+            $i32->constInt(0, false)
+        );
+    }
+
+    private static function emitArrayPopEmptyWarning(Context $context): void
+    {
+        self::emitBuiltinWarning($context, 'array_pop(): Trying to pop an empty array');
+    }
+
+    private static function emitArrayShiftEmptyWarning(Context $context): void
+    {
+        self::emitBuiltinWarning($context, 'array_shift(): Trying to shift an empty array');
+    }
+
+    private static function emitBuiltinWarning(Context $context, string $message): void
+    {
+        $i8p = $context->getTypeFromString('int8*');
+        $i32 = $context->getTypeFromString('int32');
+        $msg = $context->builder->pointerCast(
+            $context->constantFromString($message),
             $i8p
         );
         $msgLen = $context->builder->call($context->lookupFunction('strlen'), $msg);
