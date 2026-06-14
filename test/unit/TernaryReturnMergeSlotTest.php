@@ -33,4 +33,17 @@ final class TernaryReturnMergeSlotTest extends TestCase
         $out = ob_get_clean();
         $this->assertSame("null\nhello\n", $out);
     }
+
+    public function testNullableStringTernaryIfArmValue(): void
+    {
+        $runtime = new Runtime();
+        $block = $runtime->parseAndCompile(
+            '<?php declare(strict_types=1); function f(?string $name): ?string { return null !== $name ? $name : null; } echo f("hello"), "\\n";',
+            'ternary_nullable_if.php'
+        );
+        ob_start();
+        $runtime->run($block);
+        $out = ob_get_clean();
+        $this->assertSame("hello\n", $out);
+    }
 }

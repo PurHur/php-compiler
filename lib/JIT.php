@@ -295,6 +295,103 @@ class JIT {
         return false;
     }
 
+    /**
+     * When a ?: merge RETURN has ?string on the if-entry arm and null on else, route the param
+     * arm through the else LLVM target — if-entry phi stores are broken for nullable strings (#8563).
+     *
+     * @return array{0: \PHPLLVM\Value, 1: \PHPLLVM\BasicBlock, 2: \PHPLLVM\BasicBlock}
+     */
+    private function nullableStringTernaryBranchTargets(
+        Block $ifBlock,
+        Block $elseBlock,
+        ?Block $mergeBlock,
+        \PHPLLVM\Value $condition,
+        \PHPLLVM\BasicBlock $ifEntry,
+        \PHPLLVM\BasicBlock $elseEntry
+    ): array {
+        if (null !== $mergeBlock) {
+            if (
+                $this->branchAssignsStringToTernaryPhi($ifBlock, $mergeBlock)
+                && !$this->branchAssignsPureStringToTernaryPhi($ifBlock, $mergeBlock)
+                && $this->branchAssignsOnlyNullToTernaryPhi($elseBlock, $mergeBlock)
+            ) {
+                return [
+                    $this->context->builder->not($condition),
+                    $elseEntry,
+                    $ifEntry,
+                ];
+            }
+
+            return [$condition, $ifEntry, $elseEntry];
+        }
+
+        return $this->nullableStringIfEntryReturnBranchTargets(
+            $ifBlock,
+            $elseBlock,
+            $condition,
+            $ifEntry,
+            $elseEntry
+        );
+    }
+
+    /**
+     * AOT mis-lowers ?string param returns on the if-entry arm; swap branch targets (#8563).
+     *
+     * @return array{0: \PHPLLVM\Value, 1: \PHPLLVM\BasicBlock, 2: \PHPLLVM\BasicBlock}
+     */
+    private function nullableStringIfEntryReturnBranchTargets(
+        Block $ifBlock,
+        Block $elseBlock,
+        \PHPLLVM\Value $condition,
+        \PHPLLVM\BasicBlock $ifEntry,
+        \PHPLLVM\BasicBlock $elseEntry
+    ): array {
+        if (
+            $this->blockReturnsNullableStringOperand($ifBlock)
+            && $this->blockReturnsOnlyNull($elseBlock)
+        ) {
+            return [
+                $this->context->builder->not($condition),
+                $elseEntry,
+                $ifEntry,
+            ];
+        }
+
+        return [$condition, $ifEntry, $elseEntry];
+    }
+
+    private function blockReturnsNullableStringOperand(Block $block): bool
+    {
+        foreach ($block->opCodes as $op) {
+            if (OpCode::TYPE_RETURN !== $op->type || null === $op->arg1) {
+                continue;
+            }
+            $operand = $block->getOperand($op->arg1);
+
+            return Variable::TYPE_VALUE === Variable::getTypeFromType($operand->type)
+                && $this->operandTypeIncludesString($operand);
+        }
+
+        return false;
+    }
+
+    private function blockReturnsOnlyNull(Block $block): bool
+    {
+        foreach ($block->opCodes as $op) {
+            if (OpCode::TYPE_RETURN !== $op->type) {
+                continue;
+            }
+            if (null === $op->arg1) {
+                return true;
+            }
+            $operand = $block->getOperand($op->arg1);
+
+            return Variable::TYPE_NULL === Variable::getTypeFromType($operand->type);
+        }
+
+        return false;
+    }
+
     private function ternaryReturnPhiOperand(Block $mergeBlock): ?Operand
     {
         foreach ($mergeBlock->opCodes as $mergeOp) {
@@ -316,6 +413,17 @@ class JIT {
 
         return Variable::TYPE_STRING === Variable::getTypeFromType($source->type)
             || $this->operandTypeIncludesString($source);
+    }
+
+    /** True when the branch assigns a non-nullable string into the shared ?: phi (#8555, #8563). */
+    private function branchAssignsPureStringToTernaryPhi(Block $branch, Block $mergeBlock): bool
+    {
+        $source = $this->ternaryPhiAssignSourceOperand($branch, $mergeBlock);
+        if (null === $source) {
+            return false;
+        }
+
+        return Variable::TYPE_STRING === Variable::getTypeFromType($source->type);
     }
 
     /**
@@ -410,8 +518,17 @@ class JIT {
      */
     private function ternaryReturnMergeCompileOrder(Block $ifBlock, Block $elseBlock, Block $mergeBlock): array
     {
+        $ifPureString = $this->branchAssignsPureStringToTernaryPhi($ifBlock, $mergeBlock);
+        $elsePureString = $this->branchAssignsPureStringToTernaryPhi($elseBlock, $mergeBlock);
+        if ($ifPureString && !$elsePureString) {
+            return [$elseBlock, $ifBlock];
+        }
+        if ($elsePureString && !$ifPureString) {
+            return [$ifBlock, $elseBlock];
+        }
         $ifString = $this->branchAssignsStringToTernaryPhi($ifBlock, $mergeBlock);
         $elseString = $this->branchAssignsStringToTernaryPhi($elseBlock, $mergeBlock);
+        // ?string / union arms must compile after the null arm so param locals survive (#8563).
         if ($ifString && !$elseString) {
             return [$elseBlock, $ifBlock];
         }
@@ -7287,7 +7404,8 @@ class JIT {
                                 && $this->branchAssignsOnlyNullToTernaryPhi($jumpElseBlock, $mergeBlock)
                             );
                         $elseString = $this->branchAssignsStringToTernaryPhi($jumpElseBlock, $mergeBlock);
-                        if ($ifString && !$elseString) {
+                        $ifPureString = $this->branchAssignsPureStringToTernaryPhi($jumpIfBlock, $mergeBlock);
+                        if ($ifPureString && !$elseString) {
                             $returnOp = $this->ternaryReturnPhiOperand($mergeBlock);
                             assert(null !== $returnOp);
                             [$firstArm, $secondArm] = $this->ternaryReturnMergeCompileOrder(
@@ -7345,7 +7463,15 @@ class JIT {
                         if ($this->shouldFreeDeadVariablesBeforeBranch()) {
                             $this->context->freeDeadVariables($func, $branchBlock, $block);
                         }
-                        $builder->branchIf($condition, $ifEntry, $elseEntry);
+                        [$branchCond, $branchIfTarget, $branchElseTarget] = $this->nullableStringTernaryBranchTargets(
+                            $op->block1,
+                            $op->block2,
+                            $mergeBlock,
+                            $condition,
+                            $ifEntry,
+                            $elseEntry
+                        );
+                        $builder->branchIf($branchCond, $branchIfTarget, $branchElseTarget);
 
                         return $origBasicBlock;
                     }
@@ -7362,11 +7488,22 @@ class JIT {
                     }
                     $ifEntry = $this->context->scope->blockStorage[$op->block1];
                     $elseEntry = $this->context->scope->blockStorage[$op->block2];
+                    $mergeBlock = $this->jumpIfTargetsReturnMerge($op->block1, $op->block2)
+                        ? $this->branchJumpMergeBlock($op->block1)
+                        : null;
                     $builder->positionAtEnd($branchBlock);
                     if ($this->shouldFreeDeadVariablesBeforeBranch()) {
                         $this->context->freeDeadVariables($func, $branchBlock, $block);
                     }
-                    $builder->branchIf($condition, $ifEntry, $elseEntry);
+                    [$branchCond, $branchIfTarget, $branchElseTarget] = $this->nullableStringTernaryBranchTargets(
+                        $op->block1,
+                        $op->block2,
+                        $mergeBlock,
+                        $condition,
+                        $ifEntry,
+                        $elseEntry
+                    );
+                    $builder->branchIf($branchCond, $branchIfTarget, $branchElseTarget);
                     return $origBasicBlock;
                 case OpCode::TYPE_TRY:
                     JIT\TryCatchHelper::beginTry($this, $func, $this->context, $block, $op, $i, $args);
