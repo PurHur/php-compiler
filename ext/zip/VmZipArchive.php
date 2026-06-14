@@ -11,6 +11,7 @@ use PHPCompiler\VM\Context;
 use PHPCompiler\VM\EnumCaseSupport;
 use PHPCompiler\VM\ObjectEntry;
 use PHPCompiler\ext\standard\VmFsReadNative;
+use PHPCompiler\ext\standard\VmFsWriteNative;
 use PHPCompiler\VM\Variable;
 
 /**
@@ -319,7 +320,7 @@ final class VmZipArchive
 
                 return false;
             }
-            if (false === @file_put_contents($target, $zipEntry['data'])) {
+            if (false === VmFsWriteNative::write($target, $zipEntry['data'])) {
                 self::setStatus($entry, $state, ZipArchiveConstants::ER_WRITE);
 
                 return false;

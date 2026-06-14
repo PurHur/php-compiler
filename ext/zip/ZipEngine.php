@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace PHPCompiler\ext\zip;
 
 use PHPCompiler\ext\standard\VmFsReadNative;
+use PHPCompiler\ext\standard\VmFsWriteNative;
 
 /**
  * Pure-PHP ZIP store/unstore engine (php-src ext/zip/php_zip.c subset; issue #6414).
@@ -83,7 +84,7 @@ final class ZipEngine
     {
         $binary = self::buildArchive($entries);
 
-        return false !== @file_put_contents($path, $binary);
+        return false !== VmFsWriteNative::write($path, $binary);
     }
 
     /**
