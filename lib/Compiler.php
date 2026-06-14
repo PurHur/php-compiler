@@ -8631,36 +8631,42 @@ class Compiler {
      */
     private function findInlineExprCallArgProducerSlot(Operand $arg, Block $block): ?string
     {
-        if (!$arg instanceof Operand\Temporary || null === $block->orig) {
+        if (null === $block->orig) {
             return null;
         }
-        $children = $block->orig->children;
-        $argRoot = Block::cfgVarRoot($arg);
-        for ($i = 0, $n = count($children); $i < $n; ++$i) {
-            $child = $children[$i];
-            if (!$this->isInlineExprCallArgConsumer($child)) {
-                continue;
-            }
-            if (!$this->inlineExprCallArgUsesOperand($child, $arg, $argRoot) || 0 === $i) {
-                continue;
-            }
-            $prev = $children[$i - 1];
-            if (!$this->isInlineExprCallArgProducer($prev)) {
-                continue;
-            }
-            $producerSlot = $block->slotForOperand($prev->result);
-            if (null === $producerSlot) {
-                continue;
-            }
-            $argSlot = $this->compileOperand($arg, $block, false);
-            if (null === $argSlot || $producerSlot === $argSlot) {
-                return null;
-            }
-
-            return $producerSlot;
+        $callSite = $this->findCfgCallSiteForArg($block->orig->children, $arg);
+        if (null === $callSite) {
+            return null;
+        }
+        [$callOp, $argIndex] = $callSite;
+        if (!property_exists($callOp, 'args') || !is_array($callOp->args)) {
+            return null;
+        }
+        $producers = $this->precedingInlineCallArgProducersBeforeCfgOp($block->orig->children, $callOp);
+        if (count($producers) === count($callOp->args)) {
+            $producer = $producers[$argIndex] ?? null;
+        } elseif (
+            1 === count($producers)
+            && $producers[0] instanceof Op\Expr\ConstFetch
+            && $argIndex === count($callOp->args) - 1
+        ) {
+            $producer = $producers[0];
+        } else {
+            return null;
+        }
+        if (null === $producer) {
+            return null;
+        }
+        $producerSlot = $block->slotForOperand($producer->result);
+        if (null === $producerSlot) {
+            return null;
+        }
+        $argSlot = $this->compileOperand($arg, $block, false);
+        if (null === $argSlot || $producerSlot === $argSlot) {
+            return null;
         }
 
-        return null;
+        return $producerSlot;
     }
 
     private function isInlineExprCallArgConsumer(Op $op): bool
@@ -8675,7 +8681,52 @@ class Compiler {
     private function isInlineExprCallArgProducer(Op $op): bool
     {
         return $op instanceof Op\Expr\Array_
-            || $op instanceof Op\Expr\New_;
+            || $op instanceof Op\Expr\New_
+            || $op instanceof Op\Expr\ConstFetch
+            || $op instanceof Op\Expr\FuncCall
+            || $op instanceof Op\Expr\NsFuncCall
+            || $op instanceof Op\Expr\UnaryMinus
+            || $op instanceof Op\Expr\UnaryPlus;
+    }
+
+    /**
+     * php-cfg dead call-arg temps: inline producers immediately before the call (#8561, #4633).
+     *
+     * @param list<Op> $cfgChildren
+     *
+     * @return list<Op\Expr>
+     */
+    private function precedingInlineCallArgProducersBeforeCfgOp(array $cfgChildren, Op $callOp): array
+    {
+        $callIndex = null;
+        foreach ($cfgChildren as $i => $child) {
+            if ($child === $callOp) {
+                $callIndex = $i;
+                break;
+            }
+        }
+        if (null === $callIndex) {
+            return [];
+        }
+        $producers = [];
+        for ($i = $callIndex - 1; $i >= 0; --$i) {
+            $child = $cfgChildren[$i];
+            if (!$child instanceof Op\Expr || !$this->isInlineExprCallArgProducer($child)) {
+                break;
+            }
+            if ($child instanceof Op\Expr\ConstFetch) {
+                $next = $cfgChildren[$i + 1] ?? null;
+                if (
+                    ($next instanceof Op\Expr\UnaryMinus || $next instanceof Op\Expr\UnaryPlus)
+                    && $next->expr === $child->result
+                ) {
+                    continue;
+                }
+            }
+            array_unshift($producers, $child);
+        }
+
+        return $producers;
     }
 
     /**
@@ -9016,7 +9067,32 @@ class Compiler {
      */
     private function callNeedsReturnSlot(Operand $result, Block $block): bool
     {
-        return !empty($result->usages) || $block->callResultFeedsReturn($result);
+        if (!empty($result->usages) || $block->callResultFeedsReturn($result)) {
+            return true;
+        }
+
+        return $this->callResultFeedsInlineCallArg($result, $block);
+    }
+
+    /** php-cfg dead temps: inline FuncCall/New_/Array_ producer before a call (#8561, #4633). */
+    private function callResultFeedsInlineCallArg(Operand $result, Block $block): bool
+    {
+        if (null === $block->orig) {
+            return false;
+        }
+        foreach ($block->orig->children as $child) {
+            if (!$this->isInlineExprCallArgConsumer($child)) {
+                continue;
+            }
+            $producers = $this->precedingInlineCallArgProducersBeforeCfgOp($block->orig->children, $child);
+            foreach ($producers as $producer) {
+                if ($producer->result === $result || $this->operandsReferToSameVariable($producer->result, $result)) {
+                    return true;
+                }
+            }
+        }
+
+        return false;
     }
 
     /**
@@ -9810,12 +9886,20 @@ class Compiler {
      */
     private function findCfgCallSiteForArg(array $cfgChildren, Operand $arg): ?array
     {
+        $argRoot = Block::cfgVarRoot($arg);
+        $argChain = $this->unwrapOperandChain($arg);
         foreach ($cfgChildren as $child) {
             if (!property_exists($child, 'args') || !is_array($child->args)) {
                 continue;
             }
             foreach ($child->args as $argIndex => $callArg) {
                 if ($callArg === $arg) {
+                    return [$child, $argIndex];
+                }
+                if ($this->unwrapOperandChain($callArg) === $argChain) {
+                    return [$child, $argIndex];
+                }
+                if (null !== $argRoot && Block::cfgVarRoot($callArg) === $argRoot) {
                     return [$child, $argIndex];
                 }
             }
@@ -9831,6 +9915,33 @@ class Compiler {
     {
         $vm = $this->vmVariableFromCfgLiteralOperand($arg);
         if (null !== $vm) {
+            if (Variable::TYPE_STRING === $vm->type) {
+                $lc = strtolower($vm->toString());
+                if ('true' === $lc || 'false' === $lc) {
+                    $bool = new Variable(Variable::TYPE_BOOLEAN);
+                    $bool->bool('true' === $lc);
+                    $vm = $bool;
+                } elseif ('null' === $lc) {
+                    $vm = new Variable(Variable::TYPE_NULL);
+                } else {
+                    $folded = \PHPCompiler\ext\standard\VmPhpCoreConstants::fetch($vm->toString());
+                    if (null !== $folded) {
+                        $vm = $folded;
+                    } else {
+                        $errorInt = \PHPCompiler\VM\Context::errorReportingConstant($vm->toString());
+                        if (null !== $errorInt) {
+                            $intVar = new Variable(Variable::TYPE_INTEGER);
+                            $intVar->int($errorInt);
+                            $vm = $intVar;
+                        } elseif ('inf' === $lc || 'nan' === $lc) {
+                            $floatVar = new Variable(Variable::TYPE_FLOAT);
+                            $floatVar->float('inf' === $lc ? INF : NAN);
+                            $vm = $floatVar;
+                        }
+                    }
+                }
+            }
+
             return $block->registerConstant($arg, $vm);
         }
         $root = $this->unwrapOperandChain($arg);
@@ -9846,6 +9957,29 @@ class Compiler {
         $callSite = $this->findCfgCallSiteForArg($block->orig->children, $arg);
         if (null !== $callSite) {
             [$callOp, $argIndex] = $callSite;
+            $producers = $this->precedingInlineCallArgProducersBeforeCfgOp($block->orig->children, $callOp);
+            $producer = null;
+            if (
+                property_exists($callOp, 'args')
+                && is_array($callOp->args)
+                && count($producers) === count($callOp->args)
+            ) {
+                $producer = $producers[$argIndex] ?? null;
+            } elseif (
+                property_exists($callOp, 'args')
+                && is_array($callOp->args)
+                && 1 === count($producers)
+                && $producers[0] instanceof Op\Expr\ConstFetch
+                && $argIndex === count($callOp->args) - 1
+            ) {
+                $producer = $producers[0];
+            }
+            if ($producer instanceof Op\Expr\ConstFetch) {
+                $vm = $this->tryFoldGlobalConstFetch($producer);
+                if (null !== $vm) {
+                    return $block->registerConstant($arg, $vm);
+                }
+            }
             $fetches = $this->precedingClassConstFetchesBeforeCfgOp($block->orig->children, $callOp);
             $fetch = $fetches[$argIndex] ?? null;
             if ($fetch instanceof Op\Expr\ClassConstFetch) {
