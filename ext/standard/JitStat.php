@@ -445,6 +445,34 @@ final class JitStat
     /** @return Value */
     private static function loadModeOrFail(Context $context, Value $str, string $statFn = 'stat'): Value
     {
+        $fn = self::ensureLoadModeStandalone($context, $statFn);
+
+        return $context->builder->call($fn, $str);
+    }
+
+    /** Standalone stat/lstat mode helper — avoids LLVM miscompile when {main} mixes getenv(M3_SOURCE) + stat (#8555). */
+    private static function ensureLoadModeStandalone(Context $context, string $statFn): Value
+    {
+        $name = '__phpc_jit_stat_mode_'.$statFn;
+        $existing = $context->module->getNamedFunction($name);
+        if (null !== $existing && $existing->countBasicBlocks() > 0) {
+            $context->registerFunction($name, $existing);
+
+            return $existing;
+        }
+
+        $strPtr = $context->getTypeFromString('__string__*');
+        $i32 = $context->getTypeFromString('int32');
+        $fn = $context->module->addFunction(
+            $name,
+            $context->context->functionType($i32, false, $strPtr)
+        );
+        $entry = $fn->appendBasicBlock('entry');
+        $saved = $context->builder;
+        $context->builder = $context->context->builderCreate();
+        $context->builder->positionAtEnd($entry);
+
+        $str = $fn->getParam(0);
         $map = $context->structFieldMap['__string__'];
         $pathPtr = $context->builder->structGep($str, $map['value']);
         $i8 = $context->getTypeFromString('int8');
@@ -457,7 +485,6 @@ final class JitStat
             $pathPtr,
             $bufPtr
         );
-        $i32 = $context->getTypeFromString('int32');
         $i64 = $context->getTypeFromString('int64');
         $zero = $i32->constInt(0, false);
         $failed = $context->builder->icmp(Builder::INT_NE, $ret, $zero);
@@ -465,8 +492,12 @@ final class JitStat
         $modePtr = $context->builder->pointerCast($bytePtr, $i32->pointerType(0));
         $mode = $context->builder->load($modePtr);
         $minusOne = $i32->constInt(-1, true);
+        $context->builder->returnValue($context->builder->select($failed, $minusOne, $mode));
+        $context->builder->clearInsertionPosition();
+        $context->builder = $saved;
+        $context->registerFunction($name, $fn);
 
-        return $context->builder->select($failed, $minusOne, $mode);
+        return $fn;
     }
 
     private static function writeFiletypeFromMode(Context $context, Value $slot, Value $mode, BasicBlock $startBlock, BasicBlock $mergeBlock): void

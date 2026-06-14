@@ -21,6 +21,42 @@ final class JitRealpath
 
     public static function resolve(Context $context, Value $str): Value
     {
+        $fn = self::ensureResolveStandalone($context);
+
+        return $context->builder->call($fn, $str);
+    }
+
+    /** Standalone realpath helper — same {main} miscompile class as {@see JitStat::ensureLoadModeStandalone}. */
+    private static function ensureResolveStandalone(Context $context): Value
+    {
+        $name = '__phpc_jit_realpath';
+        $existing = $context->module->getNamedFunction($name);
+        if (null !== $existing && $existing->countBasicBlocks() > 0) {
+            $context->registerFunction($name, $existing);
+
+            return $existing;
+        }
+
+        $strPtr = $context->getTypeFromString('__string__*');
+        $fn = $context->module->addFunction(
+            $name,
+            $context->context->functionType($strPtr, false, $strPtr)
+        );
+        $entry = $fn->appendBasicBlock('entry');
+        $saved = $context->builder;
+        $context->builder = $context->context->builderCreate();
+        $context->builder->positionAtEnd($entry);
+        $result = self::resolveInline($context, $fn->getParam(0));
+        $context->builder->returnValue($result);
+        $context->builder->clearInsertionPosition();
+        $context->builder = $saved;
+        $context->registerFunction($name, $fn);
+
+        return $fn;
+    }
+
+    private static function resolveInline(Context $context, Value $str): Value
+    {
         $id = (string) (++self::$blockSerial);
         $map = $context->structFieldMap['__string__'];
         $pathPtr = $context->builder->structGep($str, $map['value']);
