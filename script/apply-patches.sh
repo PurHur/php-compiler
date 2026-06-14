@@ -2185,10 +2185,10 @@ PY
   echo "Applied php-types-first-class-callable.patch (overlay)"
 }
 
-apply_php_types_magic_script_const_overlay() {
-  local target="$ROOT/vendor/ircmaxell/php-types/lib/PHPTypes/TypeReconstructor.php"
+apply_php_types_magic_script_const_overlay_to_target() {
+  local target="$1"
+  [[ -f "$target" ]] || return 0
   if grep -q 'MagicScriptConst::KIND_LINE' "$target" 2>/dev/null; then
-    echo "Skip php-types-magic-script-const.patch (already applied)"
     return 0
   fi
   python3 - "$target" <<'PY'
@@ -2205,6 +2205,32 @@ msc_case = """            case 'Expr_MagicScriptConst':
                 return [Type::string()];
 """
 anchors = [
+    (
+        """            case 'Expr_Yield':
+            case 'Expr_YieldFrom':
+            case 'Expr_Include':
+                // TODO: we may be able to determine these...
+                return false;
+            case 'Expr_FirstClassCallable':
+                if (\\PHPCfg\\Op\\Expr\\FirstClassCallable::KIND_METHOD === $op->kind) {
+                    return [new Type(Type::TYPE_ARRAY)];
+                }
+
+                return [Type::string()];
+            case 'Expr_PostInc':""",
+        """            case 'Expr_Yield':
+            case 'Expr_YieldFrom':
+            case 'Expr_Include':
+                // TODO: we may be able to determine these...
+                return false;
+""" + msc_case + """            case 'Expr_FirstClassCallable':
+                if (\\PHPCfg\\Op\\Expr\\FirstClassCallable::KIND_METHOD === $op->kind) {
+                    return [new Type(Type::TYPE_ARRAY)];
+                }
+
+                return [Type::string()];
+            case 'Expr_PostInc':""",
+    ),
     (
         """            case 'Expr_Yield':
             case 'Expr_YieldFrom':
@@ -2278,9 +2304,23 @@ for old, new in anchors:
     if old in text:
         path.write_text(text.replace(old, new, 1))
         raise SystemExit(0)
-sys.stderr.write("php-types-magic-script-const: TypeReconstructor anchor not found\n")
+sys.stderr.write("php-types-magic-script-const: TypeReconstructor anchor not found in " + sys.argv[1] + "\n")
 raise SystemExit(1)
 PY
+}
+
+apply_php_types_magic_script_const_overlay() {
+  local vendor="$ROOT/vendor/ircmaxell/php-types/lib/PHPTypes/TypeReconstructor.php"
+  local prelinked="$ROOT/prelinked/bootstrap-vendor/sources/ircmaxell/php-types/lib/PHPTypes/TypeReconstructor.php"
+  if grep -q 'MagicScriptConst::KIND_LINE' "$vendor" 2>/dev/null \
+    && { [[ ! -f "$prelinked" ]] || grep -q 'MagicScriptConst::KIND_LINE' "$prelinked" 2>/dev/null; }; then
+    echo "Skip php-types-magic-script-const.patch (already applied)"
+    return 0
+  fi
+  apply_php_types_magic_script_const_overlay_to_target "$vendor" \
+    || return 1
+  apply_php_types_magic_script_const_overlay_to_target "$prelinked" \
+    || return 1
   echo "Applied php-types-magic-script-const.patch (overlay)"
 }
 
@@ -2789,7 +2829,7 @@ apply_php_types_never_method_overlay() {
   if [[ "$rc" -ne 0 ]]; then
     record_patch_failure "php-types-never-type.patch" "Type::never() missing — fix overlay anchors (#4137)"
   fi
-  return "$rc"
+  return 0
 }
 
 apply_php_types_hex2bin_strict_overlay() {
@@ -4921,8 +4961,6 @@ if [[ -d "$ROOT/vendor/ircmaxell/php-types" ]]; then
   apply_patch "$PATCH_DIR/php-types-ns-func-call.patch"
   apply_patch "$PATCH_DIR/php-types-arrow-function.patch"
   apply_patch "$PATCH_DIR/php-types-closure-unbound-this.patch"
-  apply_patch "$PATCH_DIR/php-types-magic-script-const.patch"
-  apply_php_types_compiler_halt_offset_overlay
   apply_patch "$PATCH_DIR/php-types-first-class-callable.patch"
   apply_patch "$PATCH_DIR/php-types-incdec-type.patch"
   apply_patch "$PATCH_DIR/php-types-never-type.patch"
@@ -4930,6 +4968,8 @@ if [[ -d "$ROOT/vendor/ircmaxell/php-types" ]]; then
   apply_patch "$PATCH_DIR/php-types-union-type.patch"
   apply_patch "$PATCH_DIR/php-types-throw-expr.patch"
   apply_php_types_fcc_overlay_final_repair
+  apply_patch "$PATCH_DIR/php-types-magic-script-const.patch"
+  apply_php_types_compiler_halt_offset_overlay
 fi
 
 if [[ -d "$ROOT/vendor/pre/plugin" ]]; then
@@ -5001,6 +5041,9 @@ verify_critical_language_patches() {
   fi
   if ! grep -q 'instanceof Op\\Type\\Intersection' "$recon" 2>/dev/null; then
     missing+=("php-types-intersection-type")
+  fi
+  if ! grep -q "case 'Expr_MagicScriptConst':" "$recon" 2>/dev/null; then
+    missing+=("php-types-magic-script-const")
   fi
   if [[ -f "$vendor_type" ]] && ! grep -q 'instanceof CfgType\\Intersection' "$vendor_type" 2>/dev/null; then
     missing+=("php-types-intersection-type-Type")
