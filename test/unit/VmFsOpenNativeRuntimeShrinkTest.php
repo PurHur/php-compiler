@@ -16,6 +16,7 @@ final class VmFsOpenNativeRuntimeShrinkTest extends TestCase
         $source = (string) file_get_contents(__DIR__.'/../../ext/standard/VmFs.php');
         $this->assertStringContainsString('VmFsOpenNative::open', $source);
         $this->assertStringContainsString('VmFsOpenNative::available', $source);
+        $this->assertDoesNotMatchRegularExpression('/@fopen\s*\(/', $source);
         $this->assertDoesNotMatchRegularExpression(
             '/VmFsStdio::isStdioUri[^}]+\$fp = @fopen\(\$path, \$mode\)/s',
             $source
@@ -24,6 +25,18 @@ final class VmFsOpenNativeRuntimeShrinkTest extends TestCase
             '/VmFsOpenNative::available\(\)[^}]*@fopen\(\$path, \$mode\)/s',
             $source
         );
+    }
+
+    public function testFopenUnknownPhpStreamReturnsFalse(): void
+    {
+        $this->assertFalse(VmFs::fopen('php://unknown-runtime-shrink-scheme', 'r'));
+    }
+
+    public function testFopenPhpMemoryStillNative(): void
+    {
+        $handle = VmFs::fopen('php://memory', 'r+');
+        $this->assertNotFalse($handle);
+        VmFs::fclose($handle);
     }
 
     public function testFopenReturnsFalseWhenOpenNativeUnavailable(): void

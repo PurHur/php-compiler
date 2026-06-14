@@ -649,13 +649,8 @@ final class VmFs
         if (VmPhpFdStream::isFdUri($path)) {
             return VmPhpFdStream::openFromUri($path, $mode);
         }
-        if (self::isBuiltinPhpStreamUri($path)) {
-            $fp = @fopen($path, $mode);
-            if (false === $fp) {
-                return false;
-            }
-
-            return self::adoptStreamResource($fp, $path);
+        if (\str_starts_with($path, 'php://')) {
+            return false;
         }
         if (!VmFsOpenNative::available()) {
             return false;
@@ -2069,27 +2064,6 @@ final class VmFs
         }
 
         return false;
-    }
-
-    /**
-     * Remaining php:// wrappers not yet lowered to VmPhp* — host PHP streams, not libc open(2).
-     */
-    private static function isBuiltinPhpStreamUri(string $path): bool
-    {
-        if (!\str_starts_with($path, 'php://')) {
-            return false;
-        }
-        if (
-            VmFsStdio::isStdioUri($path)
-            || VmPhpMemoryStream::isSupportedUri($path)
-            || VmPhpInputOutputStream::isSupportedUri($path)
-            || VmPhpFilterStream::isSupportedUri($path)
-            || VmPhpFdStream::isFdUri($path)
-        ) {
-            return false;
-        }
-
-        return true;
     }
 
     private static function ffiEnabledForDisk(): bool
