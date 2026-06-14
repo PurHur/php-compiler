@@ -2157,6 +2157,39 @@ anchors = [
 """ + fcc_case + """            case 'Expr_MagicScriptConst':""",
     ),
     (
+        """            case 'Expr_MagicScriptConst':""",
+        fcc_case + """            case 'Expr_MagicScriptConst':""",
+    ),
+    (
+        """            case 'Expr_Yield':
+            case 'Expr_YieldFrom':
+            case 'Expr_Include':
+                // TODO: we may be able to determine these...
+                return false;
+            case 'Expr_PostInc':""",
+        """            case 'Expr_Yield':
+            case 'Expr_YieldFrom':
+            case 'Expr_Include':
+                // TODO: we may be able to determine these...
+                return false;
+""" + fcc_case + """
+            case 'Expr_PostInc':""",
+    ),
+    (
+        """            case 'Expr_Yield':
+            case 'Expr_Include':
+                // TODO: we may be able to determine these...
+                return false;
+
+            case 'Expr_PostInc':""",
+        """            case 'Expr_Yield':
+            case 'Expr_Include':
+                // TODO: we may be able to determine these...
+                return false;
+""" + fcc_case + """
+            case 'Expr_PostInc':""",
+    ),
+    (
         """            case 'Expr_Yield':
             case 'Expr_YieldFrom':
             case 'Expr_Include':
@@ -2237,6 +2270,20 @@ anchors = [
             case 'Expr_Include':
                 // TODO: we may be able to determine these...
                 return false;
+            case 'Expr_PostInc':""",
+        """            case 'Expr_Yield':
+            case 'Expr_YieldFrom':
+            case 'Expr_Include':
+                // TODO: we may be able to determine these...
+                return false;
+""" + msc_case + """            case 'Expr_PostInc':""",
+    ),
+    (
+        """            case 'Expr_Yield':
+            case 'Expr_YieldFrom':
+            case 'Expr_Include':
+                // TODO: we may be able to determine these...
+                return false;
 
             case 'Expr_PostInc':""",
         """            case 'Expr_Yield':
@@ -2252,14 +2299,12 @@ anchors = [
             case 'Expr_Include':
                 // TODO: we may be able to determine these...
                 return false;
-
             case 'Expr_PostInc':""",
         """            case 'Expr_Yield':
             case 'Expr_Include':
                 // TODO: we may be able to determine these...
                 return false;
-""" + msc_case + """
-            case 'Expr_PostInc':""",
+""" + msc_case + """            case 'Expr_PostInc':""",
     ),
     (
         """            case 'Expr_Yield':
@@ -4961,6 +5006,7 @@ if [[ -d "$ROOT/vendor/ircmaxell/php-types" ]]; then
   apply_patch "$PATCH_DIR/php-types-ns-func-call.patch"
   apply_patch "$PATCH_DIR/php-types-arrow-function.patch"
   apply_patch "$PATCH_DIR/php-types-closure-unbound-this.patch"
+  apply_patch "$PATCH_DIR/php-types-magic-script-const.patch"
   apply_patch "$PATCH_DIR/php-types-first-class-callable.patch"
   apply_patch "$PATCH_DIR/php-types-incdec-type.patch"
   apply_patch "$PATCH_DIR/php-types-never-type.patch"
@@ -4968,7 +5014,6 @@ if [[ -d "$ROOT/vendor/ircmaxell/php-types" ]]; then
   apply_patch "$PATCH_DIR/php-types-union-type.patch"
   apply_patch "$PATCH_DIR/php-types-throw-expr.patch"
   apply_php_types_fcc_overlay_final_repair
-  apply_patch "$PATCH_DIR/php-types-magic-script-const.patch"
   apply_php_types_compiler_halt_offset_overlay
 fi
 

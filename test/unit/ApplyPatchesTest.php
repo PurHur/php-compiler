@@ -492,6 +492,20 @@ PHP;
         );
     }
 
+    public function testMagicScriptConstOverlayRunsBeforeFirstClassCallable(): void
+    {
+        $script = (string) file_get_contents(self::$root.'/script/apply-patches.sh');
+        $magicPos = strpos($script, 'apply_patch "$PATCH_DIR/php-types-magic-script-const.patch"');
+        $fccPos = strpos($script, 'apply_patch "$PATCH_DIR/php-types-first-class-callable.patch"');
+        self::assertNotFalse($magicPos, 'apply-patches must invoke php-types-magic-script-const.patch');
+        self::assertNotFalse($fccPos, 'apply-patches must invoke php-types-first-class-callable.patch');
+        self::assertLessThan(
+            $fccPos,
+            $magicPos,
+            'magic-script-const overlay must run before first-class-callable (#1492 bootstrap-selfhost-helloworld)'
+        );
+    }
+
     public function testIncdecTypeOverlayDoesNotReintroduceFccTypeArrayTypo(): void
     {
         $recon = self::$root.'/vendor/ircmaxell/php-types/lib/PHPTypes/TypeReconstructor.php';
