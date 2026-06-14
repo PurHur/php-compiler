@@ -14,6 +14,7 @@ namespace PHPCompiler\ext\standard;
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\ArrayBuiltinHelper;
+use PHPCompiler\JIT\Builtin\TypeErrorRaise;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\Variable;
@@ -29,17 +30,14 @@ final class array_sum extends Internal
         if (1 !== \count($frame->calledArgs)) {
             throw new \LogicException('array_sum() requires exactly one argument');
         }
-        $array = $frame->calledArgs[0]->resolveIndirect();
+        $ht = VmArray::requireArray($frame->calledArgs[0]->resolveIndirect(), 'array_sum');
         if (null === $frame->returnVar) {
             return;
-        }
-        if (Variable::TYPE_ARRAY !== $array->type) {
-            throw new \LogicException('array_sum() argument must be an array in this compiler build');
         }
         $sumInt = 0;
         $sumFloat = 0.0;
         $useFloat = false;
-        foreach ($array->toArray()->iterate(true) as $value) {
+        foreach ($ht->iterate(true) as $value) {
             $coerced = VmArray::coerceArrayFoldNumericElement($value);
             if (null === $coerced) {
                 continue;
@@ -71,6 +69,7 @@ final class array_sum extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
+        TypeErrorRaise::ensureLinked($context);
         if (1 !== \count($args)) {
             throw new \LogicException('array_sum() requires exactly one argument');
         }
@@ -85,7 +84,35 @@ final class array_sum extends Internal
         if (JITVariable::TYPE_HASHTABLE === $args[0]->type) {
             return ArrayBuiltinHelper::arraySum($context, $args[0]);
         }
+        if (JITVariable::TYPE_VALUE === $args[0]->type) {
+            JitArrayElem::requireArrayArg($context, $args[0], 'array_sum');
 
-        throw new \LogicException('array_sum() only supports arrays in this compiler build');
+            return ArrayBuiltinHelper::arraySum($context, $args[0]);
+        }
+        TypeErrorRaise::emitRaise(
+            $context,
+            'array_sum(): Argument #1 ($array) must be of type array, '
+            .$this->jitArgTypeLabel($args[0]).' given'
+        );
+
+        return $context->getTypeFromString('int64')->constInt(0, false);
+    }
+
+    private function jitArgTypeLabel(JITVariable $arg): string
+    {
+        switch ($arg->type) {
+            case JITVariable::TYPE_NATIVE_LONG:
+                return 'int';
+            case JITVariable::TYPE_NATIVE_DOUBLE:
+                return 'float';
+            case JITVariable::TYPE_NATIVE_BOOL:
+                return 'bool';
+            case JITVariable::TYPE_STRING:
+                return 'string';
+            case JITVariable::TYPE_OBJECT:
+                return 'object';
+            default:
+                return 'mixed';
+        }
     }
 }
