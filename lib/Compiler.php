@@ -8699,7 +8699,11 @@ class Compiler {
                     return $producers[0];
                 }
             }
-            if (0 === $argIndex && !($producers[0] instanceof Op\Expr\Array_)) {
+            if (
+                0 === $argIndex
+                && !($producers[0] instanceof Op\Expr\Array_)
+                && !$this->isEmbeddedCallLiteralArg($callArgs[0] ?? null)
+            ) {
                 return $producers[0];
             }
 
@@ -8776,10 +8780,35 @@ class Compiler {
                     continue;
                 }
             }
+            if (
+                ($child instanceof Op\Expr\FuncCall || $child instanceof Op\Expr\NsFuncCall)
+                && !$this->inlineCallArgProducerFeedsConsumer($child, $callOp)
+            ) {
+                break;
+            }
             array_unshift($producers, $child);
         }
 
         return $producers;
+    }
+
+    /** True when a hoisted FuncCall temp is an operand of the consumer call (#8561). */
+    private function inlineCallArgProducerFeedsConsumer(Op\Expr $producer, Op $consumer): bool
+    {
+        if (!property_exists($producer, 'result') || !property_exists($consumer, 'args') || !is_array($consumer->args)) {
+            return false;
+        }
+        $producerRoot = Block::cfgVarRoot($producer->result);
+        foreach ($consumer->args as $callArg) {
+            if ($callArg === $producer->result) {
+                return true;
+            }
+            if (null !== $producerRoot && Block::cfgVarRoot($callArg) === $producerRoot) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     /**
