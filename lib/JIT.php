@@ -9830,8 +9830,30 @@ class JIT {
 
             return;
         }
-        if ($result->kind === Variable::KIND_VALUE && $result->type === Variable::TYPE_STRING) {
+        if (
+            $result->kind === Variable::KIND_VALUE
+            && $result->type === Variable::TYPE_STRING
+            && JIT\StringOffsetHelper::isWritableCharOffsetLvalue($result, $this->context)
+        ) {
             JIT\StringOffsetHelper::dimAssign($this->context, $result->value, $value);
+
+            return;
+        }
+        if (
+            Variable::TYPE_NATIVE_BOOL === $value->type
+            && Variable::TYPE_STRING === $result->type
+            && Variable::KIND_VARIABLE === $result->kind
+        ) {
+            // && short-circuit false branch can target a phi slot still typed from a string dim fetch (#1492).
+            $this->context->setVariableOp(
+                $resultOp,
+                new Variable(
+                    $this->context,
+                    Variable::TYPE_NATIVE_BOOL,
+                    Variable::KIND_VALUE,
+                    $this->context->helper->loadValue($value)
+                )
+            );
 
             return;
         }
