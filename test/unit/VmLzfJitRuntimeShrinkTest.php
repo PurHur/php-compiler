@@ -31,4 +31,21 @@ final class VmLzfJitRuntimeShrinkTest extends TestCase
         $this->assertStringContainsString('lzf_compress', $source);
         $this->assertStringContainsString('lzf_decompress', $source);
     }
+
+    /** AOT link embeds bundled liblzf.a (llvm ld cannot -Wl,-rpath; #6384 bootstrap-aot-link). */
+    public function testLinkerUsesBundledLiblzfStaticArchive(): void
+    {
+        $linker = (string) file_get_contents(__DIR__.'/../../lib/AOT/Linker.php');
+        $this->assertStringContainsString('ensureBundledLiblzf', $linker);
+        $this->assertStringContainsString('bundledLiblzfLinkArg', $linker);
+        $this->assertStringContainsString('liblzf.a', $linker);
+        $this->assertDoesNotMatchRegularExpression(
+            "/private const RUNTIME_LINK_LIBS = '[^']*-llzf/",
+            $linker
+        );
+
+        $build = (string) file_get_contents(__DIR__.'/../../script/build-liblzf.sh');
+        $this->assertStringContainsString('liblzf.a', $build);
+        $this->assertStringContainsString('liblzf.so', $build);
+    }
 }
