@@ -20,6 +20,7 @@ use PHPCompiler\Web\ResponseContext;
  * VM session state for session_* builtins (issues #64, #1182–#1186).
  *
  * File-backed $_SESSION persistence under sys temp or PHP_COMPILER_SESSION_DIR.
+ * File I/O via VmFs* / VmDirNative — no host mkdir/unlink/write builtins (#8514).
  */
 final class VmSession
 {
@@ -235,8 +236,8 @@ final class VmSession
         }
         if ('' !== self::$id) {
             $path = SessionFileStorage::storagePath(self::$id);
-            if (is_file($path)) {
-                @unlink($path);
+            if (VmStatPath::isFile($path)) {
+                VmFsUnlink::unlink($path);
             }
         }
         $ctx->ensureSuperglobal('_SESSION')->array(new HashTable());
@@ -255,8 +256,8 @@ final class VmSession
         $oldId = self::$id;
         if ($deleteOld && '' !== $oldId) {
             $oldPath = SessionFileStorage::storagePath($oldId);
-            if (is_file($oldPath)) {
-                @unlink($oldPath);
+            if (VmStatPath::isFile($oldPath)) {
+                VmFsUnlink::unlink($oldPath);
             }
         }
         self::$id = self::generateId();
@@ -379,14 +380,13 @@ final class VmSession
     private static function gcExpiredFiles(): int|false
     {
         $dir = SessionFileStorage::storageDir();
-        if (!is_dir($dir)) {
+        if (!VmStatPath::isDir($dir)) {
             return false;
         }
 
         $maxLifetime = VmIni::getSessionGcMaxLifetime();
-
-        $handle = @opendir($dir);
-        if (false === $handle) {
+        $entries = VmDir::scandir($dir, \SCANDIR_SORT_NONE);
+        if (false === $entries) {
             return false;
         }
 
@@ -395,7 +395,7 @@ final class VmSession
         $now = time();
         $deleted = 0;
 
-        while (false !== ($entry = readdir($handle))) {
+        foreach ($entries as $entry) {
             if ('.' === $entry || '..' === $entry) {
                 continue;
             }
@@ -403,16 +403,14 @@ final class VmSession
                 continue;
             }
             $path = $dir.'/'.$entry;
-            $mtime = @filemtime($path);
+            $mtime = VmFs::fileMtime($path);
             if (false === $mtime) {
                 continue;
             }
-            if (($now - $mtime) > $maxLifetime && @unlink($path)) {
+            if (($now - $mtime) > $maxLifetime && VmFsUnlink::unlink($path)) {
                 ++$deleted;
             }
         }
-
-        closedir($handle);
 
         return $deleted;
     }
@@ -440,7 +438,7 @@ final class VmSession
             return;
         }
         $path = SessionFileStorage::storagePath(self::$id);
-        if (!is_file($path)) {
+        if (!VmStatPath::isFile($path)) {
             $sessionVar->array(new HashTable());
 
             return;
@@ -472,10 +470,10 @@ final class VmSession
         $exported = VmJson::export($sessionVar);
         $payload = serialize($exported);
         $dir = SessionFileStorage::storageDir();
-        if (!is_dir($dir)) {
-            @mkdir($dir, 0700, true);
+        if (!VmStatPath::isDir($dir)) {
+            VmFs::mkdir($dir, 0700, true);
         }
-        file_put_contents(SessionFileStorage::storagePath(self::$id), $payload, LOCK_EX);
+        VmFs::filePutContents(SessionFileStorage::storagePath(self::$id), $payload, \LOCK_EX);
     }
 
     private static function importArray(array $decoded): HashTable
