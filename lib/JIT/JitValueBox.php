@@ -69,6 +69,18 @@ final class JitValueBox
     }
 
     /**
+     * Ensure later reads observe a prior {@see assignToPointer} (bootstrap concat → strcmp; #1492).
+     */
+    public static function publishAfterWrite(Context $context, Value $valuePtr): void
+    {
+        $valuePtr = self::normalizeValuePtr($context, $valuePtr);
+        $map = $context->structFieldMap['__value__'];
+        $context->builder->load(
+            $context->builder->structGep($valuePtr, $map['type'])
+        );
+    }
+
+    /**
      * {@see __value__*} for a boxed {@see Variable::TYPE_VALUE} (by-value or alloca slot).
      */
     public static function valuePtrFromVariable(Context $context, Variable $var): Value

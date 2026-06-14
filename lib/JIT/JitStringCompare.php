@@ -88,6 +88,48 @@ final class JitStringCompare
         return $phi;
     }
 
+    /**
+     * Zend strcmp() ordering on native {@see __string__} operands (ext/standard/string.c).
+     *
+     * Length-tracked buffers are not guaranteed null-terminated; C strcmp on raw
+     * char* can read past the buffer (bootstrap concat VALUE-box globals — #1492).
+     */
+    public static function strcmp(Context $context, Value $leftStr, Value $rightStr): Value
+    {
+        $map = $context->structFieldMap['__string__'];
+        $i64 = $context->getTypeFromString('int64');
+        $sizeT = $context->getTypeFromString('size_t');
+        $nullStr = $context->getTypeFromString('__string__*')->constNull();
+        $emptyStr = $context->builder->load($context->constantStringFromString(''));
+        $leftNull = $context->builder->icmp(Builder::INT_EQ, $leftStr, $nullStr);
+        $rightNull = $context->builder->icmp(Builder::INT_EQ, $rightStr, $nullStr);
+        $leftStr = $context->builder->select($leftNull, $emptyStr, $leftStr);
+        $rightStr = $context->builder->select($rightNull, $emptyStr, $rightStr);
+        $leftLen = $context->builder->load(
+            $context->builder->structGep($leftStr, $map['length'])
+        );
+        $rightLen = $context->builder->load(
+            $context->builder->structGep($rightStr, $map['length'])
+        );
+        $leftLtRight = $context->builder->icmp(Builder::INT_SLT, $leftLen, $rightLen);
+        $minLen = $context->builder->select($leftLtRight, $leftLen, $rightLen);
+        $cmp = $context->builder->call(
+            $context->lookupFunction('memcmp'),
+            $context->builder->structGep($leftStr, $map['value']),
+            $context->builder->structGep($rightStr, $map['value']),
+            $context->builder->zExt($minLen, $sizeT)
+        );
+        $cmpNeZero = $context->builder->icmp(
+            Builder::INT_NE,
+            $cmp,
+            $cmp->typeOf()->constInt(0, false)
+        );
+        $prefixResult = $context->builder->sExt($cmp, $i64);
+        $lenDiff = $context->builder->sub($leftLen, $rightLen);
+
+        return $context->builder->select($cmpNeZero, $prefixResult, $lenDiff);
+    }
+
     public static function identical(Context $context, Value $leftStr, Value $rightStr): Value
     {
         $map = $context->structFieldMap['__string__'];

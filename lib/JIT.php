@@ -6347,6 +6347,10 @@ class JIT {
                             $this->valueBoxPointer($result),
                             $newVal
                         );
+                        JIT\JitValueBox::publishAfterWrite(
+                            $this->context,
+                            $this->valueBoxPointer($result)
+                        );
                     } else {
                         $this->context->type->string->concat($result, $left, $right);
                     }
