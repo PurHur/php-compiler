@@ -7,7 +7,7 @@ namespace PHPCompiler\ext\standard;
 /**
  * error_log() dispatch (php-src ext/standard/basic_functions.c::_php_error_log).
  *
- * PHP-in-PHP: no runtime/*.c — stderr/file append via PHP stream APIs.
+ * PHP-in-PHP: no runtime/*.c — stderr via fwrite; file append via VmFsWriteNative (#8613).
  */
 final class VmErrorLog
 {
@@ -32,7 +32,7 @@ final class VmErrorLog
                 if (null === $destination || '' === $destination) {
                     throw new \ValueError('Path cannot be empty');
                 }
-                $written = @\file_put_contents(
+                $written = VmFs::filePutContents(
                     $destination,
                     $message,
                     \LOCK_EX | StdlibConstants::FILE_APPEND
