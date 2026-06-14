@@ -6,7 +6,6 @@ namespace PHPCompiler\VM\Builtin;
 
 use PHPCompiler\Frame;
 use PHPCompiler\VM\Builtin\VmClassMethod;
-use PHPCompiler\VM\ObjectRegistry;
 use PHPCompiler\VM\Variable;
 use PHPCompiler\VM\WeakRefSupport;
 
@@ -28,8 +27,7 @@ final class WeakMapOffsetGet extends VmClassMethod
         $receiver = WeakRefSupport::requireObject($frame->calledArgs[0], 'WeakMap');
         $map = $receiver->toObject();
         WeakRefSupport::purgeStaleMapEntries($map);
-        $targetId = WeakRefSupport::targetObjectId($frame->calledArgs[1]);
-        if (!ObjectRegistry::isRegistered($targetId)) {
+        if (!WeakRefSupport::isTargetAlive($frame->calledArgs[1])) {
             $frame->returnVar->null();
 
             return;

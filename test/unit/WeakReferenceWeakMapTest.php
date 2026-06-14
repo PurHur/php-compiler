@@ -162,6 +162,22 @@ PHP;
         $this->assertSame('v', ob_get_clean());
     }
 
+    public function testWeakMapIntBackedEnumCaseKey(): void
+    {
+        $runtime = new Runtime();
+        $code = <<<'PHP'
+<?php
+enum E: int { case A = 1; }
+$m = new WeakMap();
+$m[E::A] = 42;
+echo $m[E::A];
+echo isset($m[E::A]) ? '1' : '0';
+PHP;
+        ob_start();
+        $runtime->run($runtime->parseAndCompile($code, 'weakmap_int_enum.php'));
+        $this->assertSame('421', ob_get_clean());
+    }
+
     public function testWeakReferenceGetNullAfterGcCollect(): void
     {
         $runtime = new Runtime();
