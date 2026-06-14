@@ -446,9 +446,33 @@ final class VmFs
         };
     }
 
-    public static function fileGetContents(string $path, ?\PHPCompiler\VM\Context $ctx = null) {
+    /**
+     * @param mixed $streamContext accepted for Zend arity; stream context wiring deferred
+     *
+     * @return string|false
+     */
+    public static function fileGetContents(
+        string $path,
+        bool $useIncludePath = false,
+        mixed $streamContext = null,
+        int $offset = 0,
+        ?int $length = null,
+        ?\PHPCompiler\VM\Context $ctx = null
+    ) {
+        unset($streamContext);
         if ('php://input' === $path) {
-            return Superglobals::readRequestBody();
+            $body = Superglobals::readRequestBody();
+            if (0 === $offset && null === $length) {
+                return $body;
+            }
+
+            return VmString::byteSlice($body, $offset, $length);
+        }
+        if ($useIncludePath) {
+            $resolved = self::resolveIncludePath($path);
+            if (false !== $resolved) {
+                $path = $resolved;
+            }
         }
         if (VmStreamWrapperRegistry::isCustomProtocol($path)) {
             if (null === $ctx) {
@@ -463,6 +487,9 @@ final class VmFs
             if (false === $data) {
                 return false;
             }
+            if (0 !== $offset || null !== $length) {
+                return VmString::byteSlice($data, $offset, $length);
+            }
 
             return $data;
         }
@@ -474,11 +501,20 @@ final class VmFs
                     ? $http_response_header
                     : null
             );
+            if (false === $data) {
+                return false;
+            }
+            if (0 !== $offset || null !== $length) {
+                return VmString::byteSlice($data, $offset, $length);
+            }
 
-            return false === $data ? false : $data;
+            return $data;
+        }
+        if (0 === $offset && null === $length) {
+            return VmFsReadNative::read($path);
         }
 
-        return VmFsReadNative::read($path);
+        return VmFsReadNative::readSlice($path, $offset, $length);
     }
 
     /**

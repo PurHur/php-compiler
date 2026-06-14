@@ -247,6 +247,7 @@ class Type extends Builtin {
         $this->ensureExternalFunction('fwrite', $this->context->context->functionType($sizeT, false, $i8p, $sizeT, $sizeT, $i8p));
         $this->ensureExternalFunction('fclose', $this->context->context->functionType($i32, false, $i8p));
         $this->ensureExternalFunction('read', $this->context->context->functionType($i64, false, $i32, $i8p, $sizeT));
+        $this->ensureExternalFunction('lseek', $this->context->context->functionType($i64, false, $i32, $i64, $i32));
         $this->ensureExternalFunction('write', $this->context->context->functionType($i64, false, $i32, $i8p, $sizeT));
         $this->ensureExternalFunction('close', $this->context->context->functionType($i32, false, $i32));
         $fntypeReadfile = $this->context->context->functionType(
