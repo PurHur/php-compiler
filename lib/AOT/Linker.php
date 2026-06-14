@@ -26,10 +26,20 @@ final class Linker
     ];
 
     /** libz.so symlink is often absent without zlib1g-dev; link the versioned .so directly. */
-    private const RUNTIME_LINK_LIBS = '-lpcre2-8 -lcrypt -l:libz.so.1 -l:libbz2.so.1.0';
+    private const RUNTIME_LINK_LIBS = '-lpcre2-8 -lcrypt -l:libz.so.1 -l:libbz2.so.1.0 -llzf';
 
     /** Host multiarch lib dir for bundled LLVM ld (libz.so.1 lives here, not in LLVM sysroot). */
     private const HOST_LIB_SEARCH = '-L/usr/lib/x86_64-linux-gnu';
+
+    private static function bundledLibSearch(): string
+    {
+        $libs = \dirname(__DIR__, 2).'/.libs';
+        if (\is_file($libs.'/liblzf.so')) {
+            return '-L'.\escapeshellarg($libs);
+        }
+
+        return '';
+    }
 
     /** Runtime units that need host libc headers (glob/scandir; llvm sysroot lacks linux/limits.h). */
     private const RUNTIME_HOST_LIBC_BASENAMES = [
@@ -104,6 +114,7 @@ final class Linker
                 '-lc',
                 '-lm',
                 self::HOST_LIB_SEARCH,
+                self::bundledLibSearch(),
                 self::RUNTIME_LINK_LIBS,
                 escapeshellarg($libgcc),
                 escapeshellarg($crtend),
@@ -131,7 +142,7 @@ final class Linker
             // When linking with the bundled clang, ensure we can still resolve host libraries
             // (libpcre2-8, libcrypt, ...). Some bootstrap envs only ship the runtime .so/.a under
             // /usr/lib/x86_64-linux-gnu without a full sysroot lib tree.
-            $cmd = escapeshellarg($clang).' '.AotDebugSymbols::linkFlag().$objects.' '.self::HOST_LIB_SEARCH.' -lm '.self::RUNTIME_LINK_LIBS.' -o '.escapeshellarg($executable);
+            $cmd = escapeshellarg($clang).' '.AotDebugSymbols::linkFlag().$objects.' '.self::HOST_LIB_SEARCH.' '.self::bundledLibSearch().' -lm '.self::RUNTIME_LINK_LIBS.' -o '.escapeshellarg($executable);
             self::run($cmd, $env);
             self::unlinkIfTemp($runtimeObjects);
 
@@ -434,7 +445,7 @@ final class Linker
                 continue;
             }
             $cmd = escapeshellarg($path) . ' '
-                . AotDebugSymbols::linkFlag() . $objects . ' '.self::HOST_LIB_SEARCH.' -lm '.self::RUNTIME_LINK_LIBS.' -o ' . escapeshellarg($executable);
+                . AotDebugSymbols::linkFlag() . $objects . ' '.self::HOST_LIB_SEARCH.' '.self::bundledLibSearch().' -lm '.self::RUNTIME_LINK_LIBS.' -o ' . escapeshellarg($executable);
             $captured = self::runCaptured($cmd, null);
             if (0 === $captured['code']) {
                 self::unlinkIfTemp($runtimeObjects);
