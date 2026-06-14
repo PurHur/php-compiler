@@ -12,6 +12,7 @@ use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Builtin\TypeErrorRaise;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\HashTableHelper;
+use PHPCompiler\JIT\JitStringArg;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Builder;
 use PHPLLVM\Value;
@@ -85,13 +86,27 @@ final class JitStrSplit
 
     public static function compileTimeLong(Context $context, JITVariable $var): int
     {
-        if (JITVariable::TYPE_NATIVE_LONG !== $var->type
-            || JITVariable::KIND_VALUE !== $var->kind) {
-            throw new \LogicException('str_split() length must be a compile-time integer in this compiler build');
+        if (JITVariable::TYPE_NATIVE_LONG === $var->type && JITVariable::KIND_VALUE === $var->kind) {
+            $lib = $context->llvm->lib;
+            if (null !== $lib->LLVMIsAConstantInt($var->value->value)) {
+                return (int) $lib->LLVMConstIntGetZExtValue($var->value->value);
+            }
         }
-        $lib = $context->llvm->lib;
-        if (null !== $lib->LLVMIsAConstantInt($var->value->value)) {
-            return (int) $lib->LLVMConstIntGetZExtValue($var->value->value);
+        if (JITVariable::TYPE_NATIVE_DOUBLE === $var->type && JITVariable::KIND_VALUE === $var->kind) {
+            $const = $var->value;
+            if ($const instanceof Value && $const->isConstant()) {
+                return VmMath::floatToZendLong((float) $const->constDouble());
+            }
+        }
+        $literal = JitStringArg::compileTimeLiteral($var);
+        if (null !== $literal) {
+            if ('' === $literal || !is_numeric($literal)) {
+                throw new \TypeError(sprintf(
+                    'str_split(): Argument #2 ($length) must be of type int, string given'
+                ));
+            }
+
+            return (int) $literal;
         }
 
         throw new \LogicException('str_split() length must be a compile-time integer in this compiler build');
