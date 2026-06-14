@@ -84,6 +84,7 @@ final class LibcExtern
             'waitpid' => [$i32, false, [$i32, $i32p, $i32]],
             '__phpc_resolve_stream' => [$i8p, false, [$i64]],
             'fileno' => [$i32, false, [$i8p]],
+            'flock' => [$i32, false, [$i32, $i32]],
         ];
 
         foreach ($specs as $name => [$ret, $vararg, $params]) {

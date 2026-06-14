@@ -101,9 +101,10 @@ final class StringFilePutContents
         $context->builder->branchIf($wantLock, $flockBlock, $writeBlock);
 
         $context->builder->positionAtEnd($flockBlock);
+        $fd = $context->builder->call($context->lookupFunction('fileno'), $stream);
         $lockRc = $context->builder->call(
             $context->lookupFunction('flock'),
-            $stream,
+            $fd,
             $i32->constInt(self::LOCK_EX, false)
         );
         $lockFailed = $context->builder->icmp(Builder::INT_NE, $lockRc, $zeroI32);
