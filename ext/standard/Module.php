@@ -652,6 +652,7 @@ class Module extends ModuleAbstract
             new getservbyname(),
             new getservbyport(),
             new chdir_(),
+            new chroot_(),
             new putenv_(),
             new ini_set_(),
             new ini_set_('ini_alter'),
@@ -1174,6 +1175,15 @@ class Module extends ModuleAbstract
             $ft = $context->context->functionType($i32, false, $i8p);
             $fn = $context->module->addFunction('chdir', $ft);
             $context->registerFunction('chdir', $fn);
+        }
+        try {
+            $context->lookupFunction('chroot');
+        } catch (\Throwable $e) {
+            $i8p = $context->getTypeFromString('int8*');
+            $i32 = $context->getTypeFromString('int32');
+            $ft = $context->context->functionType($i32, false, $i8p);
+            $fn = $context->module->addFunction('chroot', $ft);
+            $context->registerFunction('chroot', $fn);
         }
         try {
             $context->lookupFunction('gethostname');
