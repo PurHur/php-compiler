@@ -66,18 +66,10 @@ final class array_combine extends Internal
         $ht = new HashTable();
         $n = \count($keys);
         for ($i = 0; $i < $n; ++$i) {
-            $key = $keys[$i]->resolveIndirect();
-            VmArray::rejectEnumCaseKeyVariable($key);
             $stored = new Variable();
             $stored->copyFrom($values[$i]);
             // Zend array_combine: duplicate keys keep the last value (ext/standard/array.c).
-            if (Variable::TYPE_INTEGER === $key->type) {
-                $ht->updateIndex($key->toInt(), $stored);
-            } elseif (Variable::TYPE_STRING === $key->type) {
-                $ht->update($key->toString(), $stored);
-            } else {
-                throw new \LogicException('array_combine() keys must be integers or strings in this compiler build');
-            }
+            VmArray::storeCombineKey($ht, $keys[$i], $stored);
         }
         $frame->returnVar->array($ht);
     }
