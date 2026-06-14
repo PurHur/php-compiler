@@ -419,6 +419,58 @@ final class VmPosix
         return $sid;
     }
 
+    public static function getsid(int $pid): int|false
+    {
+        self::$lastError = 0;
+        $ffi = self::ffi();
+        if (null === $ffi) {
+            throw new \Error('posix_getsid() is not available in this compiler build');
+        }
+
+        $sid = (int) $ffi->getsid($pid);
+        if ($sid < 0) {
+            self::$lastError = self::readErrno($ffi);
+
+            return false;
+        }
+
+        return $sid;
+    }
+
+    public static function getpgid(int $pid): int|false
+    {
+        self::$lastError = 0;
+        $ffi = self::ffi();
+        if (null === $ffi) {
+            throw new \Error('posix_getpgid() is not available in this compiler build');
+        }
+
+        $pgid = (int) $ffi->getpgid($pid);
+        if ($pgid < 0) {
+            self::$lastError = self::readErrno($ffi);
+
+            return false;
+        }
+
+        return $pgid;
+    }
+
+    public static function setpgid(int $pid, int $pgid): bool
+    {
+        self::$lastError = 0;
+        $ffi = self::ffi();
+        if (null === $ffi) {
+            throw new \Error('posix_setpgid() is not available in this compiler build');
+        }
+        if (0 !== (int) $ffi->setpgid($pid, $pgid)) {
+            self::$lastError = self::readErrno($ffi);
+
+            return false;
+        }
+
+        return true;
+    }
+
     private static function setId(string $fn, int $id): bool
     {
         self::$lastError = 0;
@@ -566,6 +618,9 @@ struct rlimit {
 int getrlimit(int resource, struct rlimit *rlim);
 int setrlimit(int resource, const struct rlimit *rlim);
 pid_t setsid(void);
+pid_t getsid(pid_t pid);
+pid_t getpgid(pid_t pid);
+int setpgid(pid_t pid, pid_t pgid);
 CDEF;
 
         foreach (['libc.so.6', 'libc.so'] as $lib) {
