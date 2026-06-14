@@ -8,7 +8,7 @@ use PHPCompiler\ext\standard\VmFs;
 use PHPCompiler\ext\standard\VmFsOpenNative;
 use PHPUnit\Framework\TestCase;
 
-/** VmFsOpenNative libc open without host @fopen delegation (#5214). */
+/** VmFsOpenNative libc open without host @fopen delegation (#5214, #8517). */
 final class VmFsOpenNativeRuntimeShrinkTest extends TestCase
 {
     public function testVmFsFopenRoutesThroughOpenNativeForRegularPaths(): void
@@ -20,6 +20,31 @@ final class VmFsOpenNativeRuntimeShrinkTest extends TestCase
             '/VmFsStdio::isStdioUri[^}]+\$fp = @fopen\(\$path, \$mode\)/s',
             $source
         );
+        $this->assertDoesNotMatchRegularExpression(
+            '/VmFsOpenNative::available\(\)[^}]*@fopen\(\$path, \$mode\)/s',
+            $source
+        );
+    }
+
+    public function testFopenReturnsFalseWhenOpenNativeUnavailable(): void
+    {
+        if (!\extension_loaded('ffi')) {
+            $this->markTestSkipped('ext/ffi required to test VmFsOpenNative availability gate');
+        }
+        $prev = getenv('PHP_COMPILER_DISABLE_FFI');
+        putenv('PHP_COMPILER_DISABLE_FFI=1');
+        try {
+            $path = tempnam(sys_get_temp_dir(), 'phpc_fopen_gate_');
+            $this->assertNotFalse($path);
+            $this->assertFalse(VmFs::fopen($path, 'rb'));
+            @unlink($path);
+        } finally {
+            if (false === $prev) {
+                putenv('PHP_COMPILER_DISABLE_FFI');
+            } else {
+                putenv('PHP_COMPILER_DISABLE_FFI='.$prev);
+            }
+        }
     }
 
     public function testVmFsReadfileUsesFopenNotHostOpen(): void
