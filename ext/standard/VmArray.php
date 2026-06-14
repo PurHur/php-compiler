@@ -491,32 +491,9 @@ final class VmArray
         if ($ht->getNumElements() < 2 || self::isList($ht)) {
             return $ht;
         }
-        $pairs = [];
-        foreach ($ht->iterateKeyed(true) as [$key, $value]) {
-            $keyCopy = new Variable();
-            $keyCopy->copyFrom($key);
-            $valCopy = new Variable();
-            $valCopy->copyFrom($value);
-            $pairs[] = [$keyCopy, $valCopy];
-        }
+        $pairs = self::copyKeyedPairs($ht);
         VmInternalCompare::sortKeyedPairsByKey($pairs, $flags);
-        $sorted = new HashTable();
-        foreach ($pairs as [$key, $value]) {
-            $resolvedKey = $key->resolveIndirect();
-            $copy = new Variable();
-            $copy->copyFrom($value);
-            if (Variable::TYPE_INTEGER === $resolvedKey->type) {
-                $sorted->addIndex($resolvedKey->toInt(), $copy);
-            } elseif (Variable::TYPE_STRING === $resolvedKey->type) {
-                $sorted->add($resolvedKey->toString(), $copy);
-            } else {
-                throw new \LogicException(
-                    'ksort() only supports homogeneous string or integer keys in this compiler build'
-                );
-            }
-        }
-
-        return $sorted;
+        return self::hashTableFromSortedPairs($pairs);
     }
 
     /** krsort() — return array sorted by key descending; packed lists are unchanged. */
@@ -525,32 +502,9 @@ final class VmArray
         if ($ht->getNumElements() < 2 || self::isList($ht)) {
             return $ht;
         }
-        $pairs = [];
-        foreach ($ht->iterateKeyed(true) as [$key, $value]) {
-            $keyCopy = new Variable();
-            $keyCopy->copyFrom($key);
-            $valCopy = new Variable();
-            $valCopy->copyFrom($value);
-            $pairs[] = [$keyCopy, $valCopy];
-        }
+        $pairs = self::copyKeyedPairs($ht);
         VmInternalCompare::sortKeyedPairsByKeyDesc($pairs, $flags);
-        $sorted = new HashTable();
-        foreach ($pairs as [$key, $value]) {
-            $resolvedKey = $key->resolveIndirect();
-            $copy = new Variable();
-            $copy->copyFrom($value);
-            if (Variable::TYPE_INTEGER === $resolvedKey->type) {
-                $sorted->addIndex($resolvedKey->toInt(), $copy);
-            } elseif (Variable::TYPE_STRING === $resolvedKey->type) {
-                $sorted->add($resolvedKey->toString(), $copy);
-            } else {
-                throw new \LogicException(
-                    'krsort() only supports homogeneous string or integer keys in this compiler build'
-                );
-            }
-        }
-
-        return $sorted;
+        return self::hashTableFromSortedPairs($pairs);
     }
 
     /** asort() — return array sorted by value ascending; packed lists are unchanged (handled in-place). */
@@ -559,62 +513,9 @@ final class VmArray
         if ($ht->getNumElements() < 2 || self::isList($ht)) {
             return $ht;
         }
-        $pairs = [];
-        foreach ($ht->iterateKeyed(true) as [$key, $value]) {
-            $keyCopy = new Variable();
-            $keyCopy->copyFrom($key);
-            $valCopy = new Variable();
-            $valCopy->copyFrom($value);
-            $pairs[] = [$keyCopy, $valCopy];
-        }
-        $first = $pairs[0][1]->resolveIndirect();
-        $sortType = $flags & ~StdlibConstants::SORT_FLAG_CASE;
-        if (Variable::TYPE_STRING === $first->type) {
-            VmInternalCompare::sortKeyedPairsByValue(
-                $pairs,
-                VmInternalCompare::valueCompareForSortFlags($flags)
-            );
-        } elseif (Variable::TYPE_INTEGER === $first->type) {
-            if (
-                StdlibConstants::SORT_STRING === $sortType
-                || StdlibConstants::SORT_LOCALE_STRING === $sortType
-                || StdlibConstants::SORT_NATURAL === $sortType
-            ) {
-                VmInternalCompare::sortKeyedPairsByValue(
-                    $pairs,
-                    VmInternalCompare::valueCompareForSortFlags($flags)
-                );
-            } elseif (StdlibConstants::SORT_NUMERIC === $sortType) {
-                VmInternalCompare::sortKeyedPairsByValueInt($pairs);
-            } else {
-                VmInternalCompare::sortKeyedPairsByValueInt($pairs);
-            }
-        } elseif (Variable::TYPE_OBJECT === $first->type || EnumCaseSupport::isEnumCaseVariable($first)) {
-            $values = array_map(static fn (array $pair): Variable => $pair[1], $pairs);
-            VmInternalCompare::assertHomogeneousEnumOrObjectValues($values, 'asort()');
-            VmInternalCompare::sortKeyedPairsByValueSpaceship($pairs);
-        } else {
-            throw new \LogicException(
-                'asort() only supports homogeneous string or integer values in this compiler build'
-            );
-        }
-        $sorted = new HashTable();
-        foreach ($pairs as [$key, $value]) {
-            $resolvedKey = $key->resolveIndirect();
-            $copy = new Variable();
-            $copy->copyFrom($value);
-            if (Variable::TYPE_INTEGER === $resolvedKey->type) {
-                $sorted->addIndex($resolvedKey->toInt(), $copy);
-            } elseif (Variable::TYPE_STRING === $resolvedKey->type) {
-                $sorted->add($resolvedKey->toString(), $copy);
-            } else {
-                throw new \LogicException(
-                    'asort() only supports homogeneous string or integer keys in this compiler build'
-                );
-            }
-        }
-
-        return $sorted;
+        $pairs = self::copyKeyedPairs($ht);
+        self::sortKeyedPairsByValue($pairs, $flags, 'asort()', false);
+        return self::hashTableFromSortedPairs($pairs);
     }
 
     /** natsort() — return array sorted by value using natural order; packed lists unchanged (in-place). */
@@ -623,45 +524,20 @@ final class VmArray
         if ($ht->getNumElements() < 2 || self::isList($ht)) {
             return $ht;
         }
-        $pairs = [];
-        foreach ($ht->iterateKeyed(true) as [$key, $value]) {
-            $keyCopy = new Variable();
-            $keyCopy->copyFrom($key);
-            $valCopy = new Variable();
-            $valCopy->copyFrom($value);
-            $pairs[] = [$keyCopy, $valCopy];
-        }
-        $first = $pairs[0][1]->resolveIndirect();
-        if (Variable::TYPE_STRING === $first->type) {
+        $pairs = self::copyKeyedPairs($ht);
+        $values = array_map(static fn (array $pair): Variable => $pair[1], $pairs);
+        if (VmInternalCompare::valuesShareScalarType($values, Variable::TYPE_STRING)) {
             VmInternalCompare::sortKeyedPairsByValue(
                 $pairs,
                 VmInternalCompare::resolveStringCallback('strnatcmp')
             );
-        } elseif (Variable::TYPE_INTEGER === $first->type) {
+        } elseif (VmInternalCompare::valuesShareScalarType($values, Variable::TYPE_INTEGER)) {
             VmInternalCompare::sortKeyedPairsByValueInt($pairs);
         } else {
-            self::rejectEnumCaseNaturalSortValue($first);
-            throw new \LogicException(
-                'natsort() only supports homogeneous string or integer values in this compiler build'
-            );
-        }
-        $sorted = new HashTable();
-        foreach ($pairs as [$key, $value]) {
-            $resolvedKey = $key->resolveIndirect();
-            $copy = new Variable();
-            $copy->copyFrom($value);
-            if (Variable::TYPE_INTEGER === $resolvedKey->type) {
-                $sorted->addIndex($resolvedKey->toInt(), $copy);
-            } elseif (Variable::TYPE_STRING === $resolvedKey->type) {
-                $sorted->add($resolvedKey->toString(), $copy);
-            } else {
-                throw new \LogicException(
-                    'natsort() only supports homogeneous string or integer keys in this compiler build'
-                );
-            }
+            VmInternalCompare::sortKeyedPairsByValueWithFlags($pairs, StdlibConstants::SORT_REGULAR);
         }
 
-        return $sorted;
+        return self::hashTableFromSortedPairs($pairs);
     }
 
     /** natcasesort() — return array sorted by value using natural case-insensitive order (#2372). */
@@ -670,45 +546,20 @@ final class VmArray
         if ($ht->getNumElements() < 2 || self::isList($ht)) {
             return $ht;
         }
-        $pairs = [];
-        foreach ($ht->iterateKeyed(true) as [$key, $value]) {
-            $keyCopy = new Variable();
-            $keyCopy->copyFrom($key);
-            $valCopy = new Variable();
-            $valCopy->copyFrom($value);
-            $pairs[] = [$keyCopy, $valCopy];
-        }
-        $first = $pairs[0][1]->resolveIndirect();
-        if (Variable::TYPE_STRING === $first->type) {
+        $pairs = self::copyKeyedPairs($ht);
+        $values = array_map(static fn (array $pair): Variable => $pair[1], $pairs);
+        if (VmInternalCompare::valuesShareScalarType($values, Variable::TYPE_STRING)) {
             VmInternalCompare::sortKeyedPairsByValue(
                 $pairs,
                 VmInternalCompare::resolveStringCallback('strnatcasecmp')
             );
-        } elseif (Variable::TYPE_INTEGER === $first->type) {
+        } elseif (VmInternalCompare::valuesShareScalarType($values, Variable::TYPE_INTEGER)) {
             VmInternalCompare::sortKeyedPairsByValueInt($pairs);
         } else {
-            self::rejectEnumCaseNaturalSortValue($first);
-            throw new \LogicException(
-                'natcasesort() only supports homogeneous string or integer values in this compiler build'
-            );
-        }
-        $sorted = new HashTable();
-        foreach ($pairs as [$key, $value]) {
-            $resolvedKey = $key->resolveIndirect();
-            $copy = new Variable();
-            $copy->copyFrom($value);
-            if (Variable::TYPE_INTEGER === $resolvedKey->type) {
-                $sorted->addIndex($resolvedKey->toInt(), $copy);
-            } elseif (Variable::TYPE_STRING === $resolvedKey->type) {
-                $sorted->add($resolvedKey->toString(), $copy);
-            } else {
-                throw new \LogicException(
-                    'natcasesort() only supports homogeneous string or integer keys in this compiler build'
-                );
-            }
+            VmInternalCompare::sortKeyedPairsByValueWithFlags($pairs, StdlibConstants::SORT_REGULAR);
         }
 
-        return $sorted;
+        return self::hashTableFromSortedPairs($pairs);
     }
 
     /** arsort() — return array sorted by value descending; packed lists are unchanged (handled in-place). */
@@ -717,60 +568,10 @@ final class VmArray
         if ($ht->getNumElements() < 2 || self::isList($ht)) {
             return $ht;
         }
-        $pairs = [];
-        foreach ($ht->iterateKeyed(true) as [$key, $value]) {
-            $keyCopy = new Variable();
-            $keyCopy->copyFrom($key);
-            $valCopy = new Variable();
-            $valCopy->copyFrom($value);
-            $pairs[] = [$keyCopy, $valCopy];
-        }
-        $first = $pairs[0][1]->resolveIndirect();
-        $sortType = $flags & ~StdlibConstants::SORT_FLAG_CASE;
-        if (Variable::TYPE_STRING === $first->type) {
-            VmInternalCompare::sortKeyedPairsByValueDesc(
-                $pairs,
-                VmInternalCompare::valueCompareForSortFlags($flags)
-            );
-        } elseif (Variable::TYPE_INTEGER === $first->type) {
-            if (
-                StdlibConstants::SORT_STRING === $sortType
-                || StdlibConstants::SORT_LOCALE_STRING === $sortType
-                || StdlibConstants::SORT_NATURAL === $sortType
-            ) {
-                VmInternalCompare::sortKeyedPairsByValueDesc(
-                    $pairs,
-                    VmInternalCompare::valueCompareForSortFlags($flags)
-                );
-            } else {
-                VmInternalCompare::sortKeyedPairsByValueIntDesc($pairs);
-            }
-        } elseif (Variable::TYPE_OBJECT === $first->type || EnumCaseSupport::isEnumCaseVariable($first)) {
-            $values = array_map(static fn (array $pair): Variable => $pair[1], $pairs);
-            VmInternalCompare::assertHomogeneousEnumOrObjectValues($values, 'arsort()');
-            VmInternalCompare::sortKeyedPairsByValueSpaceshipDesc($pairs);
-        } else {
-            throw new \LogicException(
-                'arsort() only supports homogeneous string or integer values in this compiler build'
-            );
-        }
-        $sorted = new HashTable();
-        foreach ($pairs as [$key, $value]) {
-            $resolvedKey = $key->resolveIndirect();
-            $copy = new Variable();
-            $copy->copyFrom($value);
-            if (Variable::TYPE_INTEGER === $resolvedKey->type) {
-                $sorted->addIndex($resolvedKey->toInt(), $copy);
-            } elseif (Variable::TYPE_STRING === $resolvedKey->type) {
-                $sorted->add($resolvedKey->toString(), $copy);
-            } else {
-                throw new \LogicException(
-                    'arsort() only supports homogeneous string or integer keys in this compiler build'
-                );
-            }
-        }
+        $pairs = self::copyKeyedPairs($ht);
+        self::sortKeyedPairsByValue($pairs, $flags, 'arsort()', true);
 
-        return $sorted;
+        return self::hashTableFromSortedPairs($pairs);
     }
 
     /**
@@ -1098,6 +899,74 @@ final class VmArray
                 return $value->toObject()->class->name;
             default:
                 return 'mixed';
+        }
+    }
+
+    /**
+     * @return list<array{0: Variable, 1: Variable}>
+     */
+    private static function copyKeyedPairs(HashTable $ht): array
+    {
+        $pairs = [];
+        foreach ($ht->iterateKeyed(true) as [$key, $value]) {
+            $keyCopy = new Variable();
+            $keyCopy->copyFrom($key);
+            $valCopy = new Variable();
+            $valCopy->copyFrom($value);
+            $pairs[] = [$keyCopy, $valCopy];
+        }
+
+        return $pairs;
+    }
+
+    /**
+     * @param list<array{0: Variable, 1: Variable}> $pairs
+     */
+    private static function hashTableFromSortedPairs(array $pairs, string $function = 'ksort()'): HashTable
+    {
+        $sorted = new HashTable();
+        foreach ($pairs as [$key, $value]) {
+            $resolvedKey = $key->resolveIndirect();
+            $copy = new Variable();
+            $copy->copyFrom($value);
+            if (Variable::TYPE_INTEGER === $resolvedKey->type) {
+                $sorted->addIndex($resolvedKey->toInt(), $copy);
+            } elseif (Variable::TYPE_STRING === $resolvedKey->type) {
+                $sorted->add($resolvedKey->toString(), $copy);
+            } else {
+                throw new \LogicException(
+                    $function.' only supports string or integer keys in this compiler build'
+                );
+            }
+        }
+
+        return $sorted;
+    }
+
+    /**
+     * @param list<array{0: Variable, 1: Variable}> $pairs
+     */
+    private static function sortKeyedPairsByValue(
+        array &$pairs,
+        int $flags,
+        string $function,
+        bool $desc
+    ): void {
+        $values = array_map(static fn (array $pair): Variable => $pair[1], $pairs);
+        if (VmInternalCompare::valuesAreEnumOrObjectOnly($values)) {
+            VmInternalCompare::assertHomogeneousEnumOrObjectValues($values, $function);
+            if ($desc) {
+                VmInternalCompare::sortKeyedPairsByValueSpaceshipDesc($pairs);
+            } else {
+                VmInternalCompare::sortKeyedPairsByValueSpaceship($pairs);
+            }
+
+            return;
+        }
+        if ($desc) {
+            VmInternalCompare::sortKeyedPairsByValueWithFlagsDesc($pairs, $flags);
+        } else {
+            VmInternalCompare::sortKeyedPairsByValueWithFlags($pairs, $flags);
         }
     }
 }

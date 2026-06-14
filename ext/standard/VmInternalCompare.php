@@ -497,10 +497,90 @@ final class VmInternalCompare
         if (Variable::TYPE_INTEGER === $a->type && Variable::TYPE_INTEGER === $b->type) {
             return $a->toInt() <=> $b->toInt();
         }
+        if (Variable::TYPE_INTEGER === $a->type && Variable::TYPE_STRING === $b->type) {
+            return -1;
+        }
+        if (Variable::TYPE_STRING === $a->type && Variable::TYPE_INTEGER === $b->type) {
+            return 1;
+        }
 
         throw new \LogicException(
-            'ksort() only supports homogeneous string or integer keys in this compiler build'
+            'ksort() only supports string or integer keys in this compiler build'
         );
+    }
+
+    /**
+     * @param list<array{0: Variable, 1: Variable}> $pairs
+     */
+    public static function sortKeyedPairsByValueWithFlags(array &$pairs, int $flags): void
+    {
+        $n = \count($pairs);
+        for ($i = 1; $i < $n; ++$i) {
+            $j = $i;
+            while ($j > 0) {
+                $cmp = self::compareValuesForSortFlags($pairs[$j - 1][1], $pairs[$j][1], $flags);
+                if ($cmp <= 0) {
+                    break;
+                }
+                $tmp = $pairs[$j - 1];
+                $pairs[$j - 1] = $pairs[$j];
+                $pairs[$j] = $tmp;
+                --$j;
+            }
+        }
+    }
+
+    /**
+     * @param list<array{0: Variable, 1: Variable}> $pairs
+     */
+    public static function sortKeyedPairsByValueWithFlagsDesc(array &$pairs, int $flags): void
+    {
+        $n = \count($pairs);
+        for ($i = 1; $i < $n; ++$i) {
+            $j = $i;
+            while ($j > 0) {
+                $cmp = self::compareValuesForSortFlags($pairs[$j - 1][1], $pairs[$j][1], $flags);
+                if ($cmp >= 0) {
+                    break;
+                }
+                $tmp = $pairs[$j - 1];
+                $pairs[$j - 1] = $pairs[$j];
+                $pairs[$j] = $tmp;
+                --$j;
+            }
+        }
+    }
+
+    /**
+     * @param list<Variable> $values
+     */
+    public static function valuesAreEnumOrObjectOnly(array $values): bool
+    {
+        if ([] === $values) {
+            return false;
+        }
+        foreach ($values as $value) {
+            $resolved = $value->resolveIndirect();
+            if (!EnumCaseSupport::isEnumCaseVariable($resolved) && Variable::TYPE_OBJECT !== $resolved->type) {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    /**
+     * @param list<Variable> $values
+     */
+    public static function valuesShareScalarType(array $values, int $type): bool
+    {
+        foreach ($values as $value) {
+            if ($type !== $value->resolveIndirect()->type) {
+                return false;
+            }
+        }
+
+        return true;
     }
 
     /** Compare packed array values for sort()/array_multisort() enum and object operands (#5624). */

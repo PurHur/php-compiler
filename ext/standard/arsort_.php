@@ -83,55 +83,13 @@ final class arsort_ extends Internal
      */
     private static function sortPackedValuesDesc(array &$values, int $flags, string $function): void
     {
-        $first = $values[0]->resolveIndirect();
-        $sortType = $flags & ~StdlibConstants::SORT_FLAG_CASE;
-        if (Variable::TYPE_STRING === $first->type) {
-            if (StdlibConstants::SORT_NUMERIC === $sortType) {
-                VmInternalCompare::sortVariableValuesWithFlagsDesc($values, $flags);
-            } else {
-                VmInternalCompare::sortVariableValuesDesc(
-                    $values,
-                    VmInternalCompare::valueCompareForSortFlags($flags)
-                );
-            }
-        } elseif (Variable::TYPE_INTEGER === $first->type) {
-            if (
-                StdlibConstants::SORT_STRING === $sortType
-                || StdlibConstants::SORT_LOCALE_STRING === $sortType
-                || StdlibConstants::SORT_NATURAL === $sortType
-            ) {
-                VmInternalCompare::sortVariableValuesDesc(
-                    $values,
-                    VmInternalCompare::valueCompareForSortFlags($flags)
-                );
-            } else {
-                $n = \count($values);
-                for ($i = 1; $i < $n; ++$i) {
-                    $j = $i;
-                    while ($j > 0) {
-                        $cmp = VmInternalCompare::compareValuesForSortFlags(
-                            $values[$j - 1],
-                            $values[$j],
-                            $flags
-                        );
-                        if ($cmp >= 0) {
-                            break;
-                        }
-                        $tmp = $values[$j - 1];
-                        $values[$j - 1] = $values[$j];
-                        $values[$j] = $tmp;
-                        --$j;
-                    }
-                }
-            }
-        } elseif (Variable::TYPE_OBJECT === $first->type || EnumCaseSupport::isEnumCaseVariable($first)) {
+        if (VmInternalCompare::valuesAreEnumOrObjectOnly($values)) {
             VmInternalCompare::assertHomogeneousEnumOrObjectValues($values, $function);
             VmInternalCompare::sortVariableValuesBySpaceshipDesc($values);
-        } else {
-            throw new \LogicException(
-                $function.' only supports homogeneous string or integer values in this compiler build'
-            );
+
+            return;
         }
+        VmInternalCompare::sortVariableValuesWithFlagsDesc($values, $flags);
     }
 
     private static function resolveJitSortFlags(Context $context, JITVariable $flagsArg): int
