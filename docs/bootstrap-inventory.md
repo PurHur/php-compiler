@@ -12,7 +12,7 @@ Regenerate: `php script/bootstrap-inventory.php`
 | Phase A inventory files (M2 ratio SSOT) | 2616 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 7108 |
+| Source constructs flagged (warnings) | 7109 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -250,7 +250,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/spl/VmSplObserver.php` | 0 | 3 |
 | `ext/standard/BuiltinAttributes.php` | 0 | 17 |
 | `ext/standard/BuiltinClasses.php` | 0 | 6 |
-| `ext/standard/BuiltinEnums.php` | 0 | 17 |
+| `ext/standard/BuiltinEnums.php` | 0 | 18 |
 | `ext/standard/BuiltinRegistry.php` | 0 | 3 |
 | `ext/standard/GetimagesizeJitHelper.php` | 0 | 1 |
 | `ext/standard/GetoptEngine.php` | 0 | 1 |
@@ -4201,23 +4201,24 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/BuiltinEnums.php`
 
 **Warnings** (review for bootstrap subset):
-- new ClassEntry (line 51)
-- new ClassEntry (line 77)
-- new ClassEntry (line 103)
-- new ClassEntry (line 130)
-- new ClassEntry (line 157)
-- new ClassEntry (line 183)
-- new ClassEntry (line 210)
-- new ClassEntry (line 237)
-- new ClassEntry (line 264)
-- new ClassEntry (line 290)
-- new ClassEntry (line 315)
-- new ClassEntry (line 350)
-- new ClassEntry (line 382)
-- new Variable (line 401)
-- new Variable (line 415)
-- new Variable (line 429)
-- 17 class method(s)
+- new ClassEntry (line 52)
+- new ClassEntry (line 78)
+- new ClassEntry (line 104)
+- new ClassEntry (line 131)
+- new ClassEntry (line 158)
+- new ClassEntry (line 184)
+- new ClassEntry (line 211)
+- new ClassEntry (line 238)
+- new ClassEntry (line 265)
+- new ClassEntry (line 291)
+- new ClassEntry (line 316)
+- new ClassEntry (line 351)
+- new ClassEntry (line 383)
+- new ClassEntry (line 410)
+- new Variable (line 434)
+- new Variable (line 448)
+- new Variable (line 462)
+- 18 class method(s)
 
 ### `ext/standard/BuiltinRegistry.php`
 
@@ -7926,11 +7927,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/VmInfo.php`
 
 **Warnings** (review for bootstrap subset):
-- new HashTable (line 88)
-- new Variable (line 93)
-- new HashTable (line 110)
-- new Variable (line 112)
-- 26 class method(s)
+- new HashTable (line 89)
+- new Variable (line 94)
+- new HashTable (line 111)
+- new Variable (line 113)
+- 29 class method(s)
 
 ### `ext/standard/VmIni.php`
 
