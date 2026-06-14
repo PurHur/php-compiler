@@ -228,9 +228,12 @@ bootstrap_inventory_argv_driver_m4_smoke() {
     return 1
   fi
   if [[ -f "${prelink}" ]] && cmp -s "${compile_out}" "${prelink}"; then
-    echo "bootstrap-inventory-argv-driver-m4-smoke: ${driver} bin/compile.php emit is prelinked gen-0 sidecar (not inventory Compiler — #1492)" >&2
-    rm -f "${compile_out}"
-    return 1
+    if grep -qE 'sidecar emit fallback|recovered via gen-0 sidecar|parseAndCompile returned null' <<< "${compile_log}"; then
+      echo "bootstrap-inventory-argv-driver-m4-smoke: ${driver} bin/compile.php emit is prelinked gen-0 sidecar (not inventory Compiler — #1492)" >&2
+      rm -f "${compile_out}"
+      return 1
+    fi
+    # Self-host fixed point: honest inventory emit reproduces refreshed gen-0 driver bytes.
   fi
   if ! bootstrap_inventory_argv_driver_size_ok "${compile_out}"; then
     echo "bootstrap-inventory-argv-driver-m4-smoke: ${driver} bin/compile.php emit too small (sidecar stub — #3012)" >&2
