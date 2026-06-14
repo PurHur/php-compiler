@@ -11,7 +11,7 @@
 
 > **Stable line (2026)** — First maintained **stable** release of this fork: demo-ready VM + AOT for a **web-capable PHP subset**, reference examples **000–009**, and an experimental **self-host** path (compiler compiling its own `lib/`). Not full Zend PHP compatibility — see [what’s missing](https://purhur.github.io/php-compiler/docs/pages/missing-implementation.html).
 
-**Snapshot (`master` @ `5df5a6cf9`, 14 Jun 2026):** VM + AOT for shipped examples ✅ · **321+** builtins · self-host spine **2558**/**2627** (`php script/bootstrap-spine-count.php`) · M4 loop + M5 strict ✅ — details below.
+**Snapshot (`master`, 14 Jun 2026):** VM + AOT for shipped examples ✅ · self-host spine **2627**/**2627** · M4 loop + M5 strict ✅
 
 ---
 
@@ -40,7 +40,7 @@ Counts from `php script/bootstrap-spine-count.php` (literal `require_once` in `c
 | Milestone | Status | What it means |
 |-----------|--------|----------------|
 | **M0–M1** | ✅ | `compiler_minimal` + compile-smoke bundles link and run natively |
-| **M2** | 🚧 **2558**/**2627** | Spine literal ratio grows toward full closure; Phase A inventory coverage **2627/2627** ✅; native spine **link** + **lint** ✅ |
+| **M2** | ✅ **2627**/**2627** | Full Phase A inventory in spine smoke; native link + lint ✅ |
 | **M3** | ✅ | HelloWorld strict native ✅; inventory argv `bin/compile.php` ✅ |
 | **M4** | ✅ | `make bootstrap-loop-probe` full ladder ✅ (gen-1→gen-2→gen-3 + full-revision) |
 | **M5** | 🚧 | `north-star5-verify --strict` ✅; vendor prelink 3/3 ✅; Zend on empty `build/` still open |

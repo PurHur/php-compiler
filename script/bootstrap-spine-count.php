@@ -36,10 +36,35 @@ if (PHP_SAPI === 'cli' && realpath($argv[0] ?? '') === realpath(__FILE__)) {
 function bootstrap_spine_counts(string $root): array
 {
     $spineMain = $root.'/test/selfhost/compiler_lib_spine_smoke/main.php';
-    $spine = bootstrap_count_spine_requires($spineMain);
+    $spine = bootstrap_count_spine_inventory_aligned($root, $spineMain);
     $inventory = bootstrap_spine_phase_a_inventory_files($root);
 
     return ['spine' => $spine, 'inventory' => $inventory];
+}
+
+/** M2 ratio: Phase A inventory paths literally required (+ shim substitute adjustment). */
+function bootstrap_count_spine_inventory_aligned(string $root, string $spineMain): int
+{
+    if (!is_readable($spineMain)) {
+        return 0;
+    }
+    if (!function_exists('bootstrapCollectInventoryReport')) {
+        return bootstrap_count_spine_requires($spineMain);
+    }
+    $report = bootstrapCollectInventoryReport($root);
+    $inv = array_flip(array_keys($report['files'] ?? []));
+    $count = 0;
+    foreach (bootstrap_spine_require_paths($spineMain) as $path) {
+        if (isset($inv[$path])) {
+            ++$count;
+        }
+    }
+    if (!function_exists('bootstrap_spine_shim_substitute_extra_inventory')) {
+        require_once __DIR__.'/bootstrap-spine-deferred-lib.php';
+    }
+    $count += bootstrap_spine_shim_substitute_extra_inventory();
+
+    return $count;
 }
 
 /** Phase A file count from the inventory generator (M2 ratio SSOT — #2553). */

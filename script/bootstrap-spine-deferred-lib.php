@@ -21,5 +21,6 @@ function bootstrap_spine_shim_substitute_extra_inventory(): int
 {
     // Inventory paths covered by spine shims (not a 1:1 require_once in the spine bundle).
     // Keep in sync with script/check-selfhost-spine-coverage-sync.php `$spineSubstitutes`.
-    return 6;
+    // 0 when every Phase A file has a literal require_once (2627/2627, Jun 2026).
+    return 0;
 }

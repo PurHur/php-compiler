@@ -14,7 +14,7 @@ permalink: /development-status.html
 | **What it is** | PHP → CFG → VM / LLVM JIT → AOT native binaries |
 | **North star** | Compiler compiles itself without Zend ([#1492](https://github.com/PurHur/php-compiler/issues/1492)) |
 | **Wave 3** | Language **12/12** · Stdlib **13/13** on master ([#1380](https://github.com/PurHur/php-compiler/issues/1380)) |
-| **Spine SSOT** | `php script/bootstrap-spine-count.php` → **2558** / **2627** literal `require_once`; inventory coverage **2627/2627** |
+| **Spine SSOT** | `php script/bootstrap-spine-count.php` → **2627** / **2627** |
 | **Builtin matrix** | **321+** functions ([`docs/capabilities.md`](https://github.com/PurHur/php-compiler/blob/master/docs/capabilities.md)) |
 | **Try it** | [`docs/GETTING-STARTED.md`](https://github.com/PurHur/php-compiler/blob/master/docs/GETTING-STARTED.md) |
 
@@ -47,7 +47,7 @@ permalink: /development-status.html
 ### Still open (high signal)
 
 - **MCJIT execute** — `bin/jit.php -r` SIGSEGV ([#98](https://github.com/PurHur/php-compiler/issues/98))
-- **Literal spine ratio** — 2558/2627 `require_once` lines (coverage full; ratio still growing)
+- **Literal spine ratio** — **2627/2627** ✅ (Jun 2026)
 - **Compile-spine stub retirement** — shrink `PHP_COMPILER_SELFHOST_AOT` on M3 allowlist ([#1402](https://github.com/PurHur/php-compiler/issues/1402))
 - **LLVM 14+ upgrade** — experimental `script/install-llvm14.sh` ([#174](https://github.com/PurHur/php-compiler/issues/174))
 
@@ -58,7 +58,7 @@ permalink: /development-status.html
 - **`phpc` CLI** — `run`, `serve`, `build`, `deploy`, `lint`, `test`, `init`, `doctor`
 - **Examples 000–009** — VM and AOT link/execute for the curated web subset
 - **Self-host M0** — `compiler_minimal bundle OK` ✅
-- **Self-host M2** — spine **2558/2627** literal 🚧; inventory coverage **2627/2627** ✅; spine link + lint ✅
+- **Self-host M2** — spine **2627/2627** ✅; native link + lint ✅
 - **Self-host M3** — HelloWorld strict `emit_path=native` ✅; inventory argv `bin/compile.php` ✅ ([#3024](https://github.com/PurHur/php-compiler/issues/3024) closed)
 - **Self-host M4** — `make bootstrap-loop-probe` full ladder ✅; gen-2→gen-3 full-spine recompile ✅
 - **Self-host M5 (partial)** — vendor prelink **3/3** ✅; `north-star5-verify --strict` ✅; gen-0 refreshed; Zend on empty `build/` still open on some hosts
@@ -83,7 +83,7 @@ Shipped examples under `examples/` are **regression fixtures** for VM/JIT/AOT an
 |-----------|--------|
 | **M0** — Small `lib/` bundle runs | ✅ |
 | **M1** — Compiler-shaped bundle + compile-smoke | ✅ |
-| **M2** — Spine toward full inventory | 🚧 **2558** / **2627** literal; **2627/2627** coverage ✅ |
+| **M2** — Spine toward full inventory | ✅ **2627** / **2627** |
 | **M3** — Native compiles PHP (no Zend emit) | ✅ Smoke + inventory argv driver strict native |
 | **M4** — Bootstrap loop (next revision) | ✅ `bootstrap-loop-probe` full ladder |
 | **M5** — Full self-host, no `vendor/` cold boot | 🚧 Presenter strict ✅; compiled-only cold boot open |

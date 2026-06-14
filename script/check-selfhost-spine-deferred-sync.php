@@ -23,6 +23,7 @@ sort($deferred, SORT_STRING);
 $deferredCount = count($deferred);
 
 $counts = bootstrap_spine_counts($root);
+$spineMain = $root.'/test/selfhost/compiler_lib_spine_smoke/main.php';
 $spineCount = $counts['spine'];
 $inventoryTotal = $counts['inventory'];
 
