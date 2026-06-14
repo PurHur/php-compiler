@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 2649 |
-| Phase A inventory files (M2 ratio SSOT) | 2649 |
+| PHP files on vm.php path | 2654 |
+| Phase A inventory files (M2 ratio SSOT) | 2654 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 7168 |
+| Source constructs flagged (warnings) | 7174 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -154,23 +154,25 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/libxml/libxml_clear_errors.php` | 0 | 1 |
 | `ext/libxml/libxml_get_errors.php` | 0 | 1 |
 | `ext/libxml/libxml_use_internal_errors.php` | 0 | 2 |
+| `ext/lzf/JitLzf.php` | 0 | 1 |
 | `ext/lzf/Module.php` | 0 | 3 |
 | `ext/lzf/VmLzf.php` | 0 | 1 |
 | `ext/lzf/VmLzfNative.php` | 0 | 1 |
-| `ext/lzf/lzf_compress.php` | 0 | 2 |
-| `ext/lzf/lzf_decompress.php` | 0 | 2 |
+| `ext/lzf/lzf_compress.php` | 0 | 1 |
+| `ext/lzf/lzf_decompress.php` | 0 | 1 |
 | `ext/mbstring/EastAsianWidthTable.php` | 0 | 1 |
 | `ext/mbstring/JitMbCheckEncoding.php` | 0 | 1 |
 | `ext/mbstring/JitMbConvertCase.php` | 0 | 1 |
 | `ext/mbstring/JitMbNumericEntity.php` | 0 | 1 |
 | `ext/mbstring/JitMbScrub.php` | 0 | 1 |
 | `ext/mbstring/JitMbSearch.php` | 0 | 1 |
+| `ext/mbstring/JitMbStrPad.php` | 0 | 1 |
 | `ext/mbstring/JitMbStrcut.php` | 0 | 1 |
 | `ext/mbstring/JitMbStrlen.php` | 0 | 1 |
 | `ext/mbstring/JitMbStrwidth.php` | 0 | 1 |
 | `ext/mbstring/MbStrcutJitHelper.php` | 0 | 1 |
 | `ext/mbstring/MbStrwidthJitHelper.php` | 0 | 1 |
-| `ext/mbstring/Module.php` | 0 | 23 |
+| `ext/mbstring/Module.php` | 0 | 24 |
 | `ext/mbstring/VmMbstring.php` | 0 | 2 |
 | `ext/mbstring/mb_check_encoding.php` | 0 | 2 |
 | `ext/mbstring/mb_convert_case.php` | 0 | 3 |
@@ -180,6 +182,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/mbstring/mb_ltrim.php` | 0 | 1 |
 | `ext/mbstring/mb_rtrim.php` | 0 | 1 |
 | `ext/mbstring/mb_scrub.php` | 0 | 2 |
+| `ext/mbstring/mb_str_pad.php` | 0 | 3 |
 | `ext/mbstring/mb_strcut.php` | 0 | 3 |
 | `ext/mbstring/mb_strimwidth.php` | 0 | 3 |
 | `ext/mbstring/mb_stripos.php` | 0 | 3 |
@@ -1964,6 +1967,8 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/Builtin/StringJsonDecodeJit.php` | 0 | 1 |
 | `lib/JIT/Builtin/StringJsonEncode.php` | 0 | 1 |
 | `lib/JIT/Builtin/StringLocaltime.php` | 0 | 1 |
+| `lib/JIT/Builtin/StringLzf.php` | 0 | 1 |
+| `lib/JIT/Builtin/StringLzfJit.php` | 0 | 1 |
 | `lib/JIT/Builtin/StringMicrotime.php` | 0 | 1 |
 | `lib/JIT/Builtin/StringMktime.php` | 0 | 1 |
 | `lib/JIT/Builtin/StringMultipart.php` | 0 | 1 |
@@ -3486,6 +3491,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new ArgumentCountError (line 22)
 - 1 class method(s)
 
+### `ext/lzf/JitLzf.php`
+
+**Warnings** (review for bootstrap subset):
+- 3 class method(s)
+
 ### `ext/lzf/Module.php`
 
 **Warnings** (review for bootstrap subset):
@@ -3506,13 +3516,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/lzf/lzf_compress.php`
 
 **Warnings** (review for bootstrap subset):
-- new Error (line 42)
 - 2 class method(s)
 
 ### `ext/lzf/lzf_decompress.php`
 
 **Warnings** (review for bootstrap subset):
-- new Error (line 42)
 - 2 class method(s)
 
 ### `ext/mbstring/EastAsianWidthTable.php`
@@ -3545,6 +3553,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - 8 class method(s)
 
+### `ext/mbstring/JitMbStrPad.php`
+
+**Warnings** (review for bootstrap subset):
+- 5 class method(s)
+
 ### `ext/mbstring/JitMbStrcut.php`
 
 **Warnings** (review for bootstrap subset):
@@ -3568,7 +3581,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/mbstring/MbStrwidthJitHelper.php`
 
 **Warnings** (review for bootstrap subset):
-- 2 class method(s)
+- 3 class method(s)
 
 ### `ext/mbstring/Module.php`
 
@@ -3578,30 +3591,31 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new mb_strlen (line 34)
 - new mb_strwidth (line 35)
 - new mb_strimwidth (line 36)
-- new mb_substr (line 37)
-- new mb_strcut (line 38)
-- new mb_substr_count (line 39)
-- new mb_strpos (line 40)
-- new mb_strtolower (line 41)
-- new mb_strtoupper (line 42)
-- new mb_convert_case (line 43)
-- new mb_convert_encoding (line 44)
-- new mb_stripos (line 45)
-- new mb_strrpos (line 46)
-- new mb_strrichr (line 47)
-- new mb_trim (line 48)
-- new mb_ltrim (line 49)
-- new mb_rtrim (line 50)
-- new mb_scrub (line 51)
-- new mb_encode_numericentity (line 52)
-- new mb_decode_numericentity (line 53)
+- new mb_str_pad (line 37)
+- new mb_substr (line 38)
+- new mb_strcut (line 39)
+- new mb_substr_count (line 40)
+- new mb_strpos (line 41)
+- new mb_strtolower (line 42)
+- new mb_strtoupper (line 43)
+- new mb_convert_case (line 44)
+- new mb_convert_encoding (line 45)
+- new mb_stripos (line 46)
+- new mb_strrpos (line 47)
+- new mb_strrichr (line 48)
+- new mb_trim (line 49)
+- new mb_ltrim (line 50)
+- new mb_rtrim (line 51)
+- new mb_scrub (line 52)
+- new mb_encode_numericentity (line 53)
+- new mb_decode_numericentity (line 54)
 - 2 class method(s)
 
 ### `ext/mbstring/VmMbstring.php`
 
 **Warnings** (review for bootstrap subset):
-- new ArgumentCountError (line 905)
-- 69 class method(s)
+- new ArgumentCountError (line 990)
+- 72 class method(s)
 
 ### `ext/mbstring/mb_check_encoding.php`
 
@@ -3650,6 +3664,13 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - new ArgumentCountError (line 28)
 - 2 class method(s)
+
+### `ext/mbstring/mb_str_pad.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 31)
+- 2 class method(s)
+- 1 closure(s)
 
 ### `ext/mbstring/mb_strcut.php`
 
@@ -13244,7 +13265,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/AOT/Linker.php`
 
 **Warnings** (review for bootstrap subset):
-- 20 class method(s)
+- 21 class method(s)
 - 1 closure(s)
 
 ### `lib/AOT/LinkerProcessPolyfill.php`
@@ -14714,8 +14735,8 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/Builtin/MbStrwidth.php`
 
 **Warnings** (review for bootstrap subset):
-- new JIT (line 58)
-- 4 class method(s)
+- new JIT (line 71)
+- 5 class method(s)
 
 ### `lib/JIT/Builtin/MemoryManager.php`
 
@@ -15357,6 +15378,16 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 
 **Warnings** (review for bootstrap subset):
 - 8 class method(s)
+
+### `lib/JIT/Builtin/StringLzf.php`
+
+**Warnings** (review for bootstrap subset):
+- 3 class method(s)
+
+### `lib/JIT/Builtin/StringLzfJit.php`
+
+**Warnings** (review for bootstrap subset):
+- 12 class method(s)
 
 ### `lib/JIT/Builtin/StringMicrotime.php`
 
