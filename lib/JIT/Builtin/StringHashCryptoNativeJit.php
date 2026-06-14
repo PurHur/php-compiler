@@ -161,7 +161,7 @@ final class StringHashCryptoNativeJit
         $context->builder->positionAtEnd($bad);
         TypeErrorRaise::ensureLinked($context);
         TypeErrorRaise::emitValueError($context, \PHPCompiler\ext\standard\VmHash::HASH_UNKNOWN_ALGO_MSG);
-        $context->builder->unreachable();
+        BasicBlockHelper::sealOpenBlock($context, $bad);
 
         $context->builder->positionAtEnd($body);
         $digest = $context->builder->alloca($i8, self::SHA256_DIGEST_SIZE, 'hc_hash_digest');
