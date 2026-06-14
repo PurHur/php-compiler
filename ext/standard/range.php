@@ -19,14 +19,11 @@ use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitLongArg;
 use PHPCompiler\JIT\HashTableHelper;
 use PHPCompiler\JIT\Variable as JITVariable;
-use PHPCompiler\VM\EnumCaseSupport;
-use PHPCompiler\VM\HashTable;
-use PHPCompiler\VM\Variable;
 use PHPLLVM\Builder;
 use PHPLLVM\Value;
 
 /**
- * range() for integer start, end, and optional integer step (subset of PHP).
+ * range() — int/float/char bounds (php-src ext/standard/array.c; #4258 VM, JIT int-only).
  */
 final class range extends Internal
 {
@@ -39,44 +36,15 @@ final class range extends Internal
         if (\count($frame->calledArgs) < 2 || \count($frame->calledArgs) > 3) {
             throw new \LogicException('range() requires two or three arguments');
         }
-        $startVar = $frame->calledArgs[0]->resolveIndirect();
-        $endVar = $frame->calledArgs[1]->resolveIndirect();
-        $start = self::resolveRangeEndpoint($frame, $startVar);
-        $end = self::resolveRangeEndpoint($frame, $endVar);
-        $step = 1;
-        if (3 === \count($frame->calledArgs)) {
-            $stepVar = $frame->calledArgs[2]->resolveIndirect();
-            if (Variable::TYPE_INTEGER !== $stepVar->type) {
-                throw new \LogicException('range() step must be an integer in this compiler build');
-            }
-            $step = $stepVar->toInt();
-        } elseif ($start > $end) {
-            $step = -1;
-        }
-        if (0 === $step) {
-            throw new \ValueError(self::ZERO_STEP_ERROR);
-        }
+        $stepVar = 3 === \count($frame->calledArgs) ? $frame->calledArgs[2] : null;
         if (null === $frame->returnVar) {
+            VmRange::build($frame, $frame->calledArgs[0], $frame->calledArgs[1], $stepVar);
+
             return;
         }
-        $ht = new HashTable();
-        $index = 0;
-        if ($step > 0) {
-            for ($i = $start; $i <= $end; $i += $step) {
-                $stored = new Variable();
-                $stored->int($i);
-                $ht->addIndex($index, $stored);
-                ++$index;
-            }
-        } else {
-            for ($i = $start; $i >= $end; $i += $step) {
-                $stored = new Variable();
-                $stored->int($i);
-                $ht->addIndex($index, $stored);
-                ++$index;
-            }
-        }
-        $frame->returnVar->array($ht);
+        $frame->returnVar->array(
+            VmRange::build($frame, $frame->calledArgs[0], $frame->calledArgs[1], $stepVar)
+        );
     }
 
     public Context $context;
@@ -127,22 +95,4 @@ final class range extends Internal
         $context->builder->positionAtEnd($ok);
     }
 
-    /**
-     * Zend range() int endpoints: enum cases warn and coerce to legacy object cast 1.
-     *
-     * @see php-src ext/standard/array.c PHP_FUNCTION(range), zval_get_long()
-     */
-    private static function resolveRangeEndpoint(Frame $frame, Variable $var): int
-    {
-        $var = $var->resolveIndirect();
-        if (Variable::TYPE_INTEGER === $var->type) {
-            return $var->toInt();
-        }
-        $enumInt = EnumCaseSupport::tryCastToInt($var, $frame->vmContext, $frame);
-        if (null !== $enumInt) {
-            return $enumInt;
-        }
-
-        throw new \LogicException('range() start and end must be integers in this compiler build');
-    }
 }
