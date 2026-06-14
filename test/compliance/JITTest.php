@@ -71,10 +71,6 @@ class JITTest extends BaseTest {
             if (str_contains($name, 'cli_argv')) {
                 continue;
             }
-            // array_key_exists() float key coercion: VM + AOT (#3470); MCJIT execute unstable (float array keys).
-            if (str_contains($name, 'array_key_exists_float')) {
-                continue;
-            }
             // array literal int / numeric-string key collision: VM + AOT (#4151); MCJIT execute unstable (#98).
             if (str_contains($name, 'array_literal_numeric_string_key')) {
                 continue;
