@@ -1965,7 +1965,7 @@ final class ArrayBuiltinHelper
     }
 
     /**
-     * Store a __value__ list entry into a packed hashtable (string/long only; AOT linker subset).
+     * Store a __value__ list entry into a packed hashtable (enum case/object aware; #5597).
      */
     private static function copyPackedValueEntry(
         Context $context,
@@ -1979,7 +1979,10 @@ final class ArrayBuiltinHelper
             $context->builder->structGep($srcEntry, $valueMap['type'])
         );
         $i8 = $context->getTypeFromString('int8');
+
         $stringBlock = BasicBlockHelper::append($context, 'ht_copy_packed_str_'.$tag);
+        $htBlock = BasicBlockHelper::append($context, 'ht_copy_packed_ht_'.$tag);
+        $objectBlock = BasicBlockHelper::append($context, 'ht_copy_packed_obj_'.$tag);
         $longBlock = BasicBlockHelper::append($context, 'ht_copy_packed_long_'.$tag);
         $done = BasicBlockHelper::append($context, 'ht_copy_packed_done_'.$tag);
 
@@ -1988,13 +1991,7 @@ final class ArrayBuiltinHelper
             $typeByte,
             $i8->constInt(Variable::TYPE_STRING & 0xff, false)
         );
-        $isHt = $context->builder->icmp(
-            Builder::INT_EQ,
-            $typeByte,
-            $i8->constInt(Variable::TYPE_HASHTABLE, false)
-        );
         $afterString = BasicBlockHelper::append($context, 'ht_copy_packed_after_str_'.$tag);
-        $htBlock = BasicBlockHelper::append($context, 'ht_copy_packed_ht_'.$tag);
         $context->builder->branchIf($isString, $stringBlock, $afterString);
 
         $context->builder->positionAtEnd($stringBlock);
@@ -2007,7 +2004,13 @@ final class ArrayBuiltinHelper
         $context->builder->branch($done);
 
         $context->builder->positionAtEnd($afterString);
-        $context->builder->branchIf($isHt, $htBlock, $longBlock);
+        $isHt = $context->builder->icmp(
+            Builder::INT_EQ,
+            $typeByte,
+            $i8->constInt(Variable::TYPE_HASHTABLE, false)
+        );
+        $afterHt = BasicBlockHelper::append($context, 'ht_copy_packed_after_ht_'.$tag);
+        $context->builder->branchIf($isHt, $htBlock, $afterHt);
 
         $context->builder->positionAtEnd($htBlock);
         $context->builder->call(
@@ -2015,6 +2018,32 @@ final class ArrayBuiltinHelper
             $dest,
             $destIndex,
             $context->builder->call($context->lookupFunction('__value__readHashtable'), $srcEntry)
+        );
+        $context->builder->branch($done);
+
+        $context->builder->positionAtEnd($afterHt);
+        $isObject = $context->builder->icmp(
+            Builder::INT_EQ,
+            $typeByte,
+            $i8->constInt(\PHPCompiler\VM\Variable::TYPE_OBJECT, false)
+        );
+        $checkEnumCase = BasicBlockHelper::append($context, 'ht_copy_packed_check_enum_'.$tag);
+        $context->builder->branchIf($isObject, $objectBlock, $checkEnumCase);
+
+        $context->builder->positionAtEnd($checkEnumCase);
+        $isEnumCase = $context->builder->icmp(
+            Builder::INT_EQ,
+            $typeByte,
+            $i8->constInt(\PHPCompiler\VM\Variable::TYPE_ENUM_CASE, false)
+        );
+        $context->builder->branchIf($isEnumCase, $objectBlock, $longBlock);
+
+        $context->builder->positionAtEnd($objectBlock);
+        $context->builder->call(
+            $context->lookupFunction('__hashtable__setObjectAt'),
+            $dest,
+            $destIndex,
+            $context->builder->call($context->lookupFunction('__value__readObject'), $srcEntry)
         );
         $context->builder->branch($done);
 
