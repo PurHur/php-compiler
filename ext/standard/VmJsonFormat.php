@@ -180,7 +180,7 @@ final class VmJsonFormat
     private static function encodeFloat(float $num): string
     {
         if (is_nan($num) || is_infinite($num)) {
-            return 'null';
+            throw new VmJsonExportException(VmJson::ERROR_INF_OR_NAN);
         }
         if ((float) (int) $num === $num && abs($num) < 1.0e15) {
             return (string) (int) $num;

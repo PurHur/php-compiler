@@ -23,8 +23,26 @@ final class StringJsonEncode
 {
     public static function ensureLinked(Context $context): void
     {
+        self::ensureLibc($context);
         self::implementIfMissing($context, '__compiler_json_encode_array', self::implementArray(...));
         self::implementIfMissing($context, '__compiler_json_encode_value', self::implementValue(...));
+    }
+
+    private static function ensureLibc(Context $context): void
+    {
+        $i32 = $context->getTypeFromString('int32');
+        $dbl = $context->getTypeFromString('double');
+        foreach (
+            [
+                ['isnan', $i32, [$dbl]],
+                ['isinf', $i32, [$dbl]],
+            ] as [$name, $ret, $params]
+        ) {
+            if (null === $context->module->getNamedFunction($name)) {
+                $fn = $context->module->addFunction($name, $context->context->functionType($ret, false, ...$params));
+                $context->registerFunction($name, $fn);
+            }
+        }
     }
 
     /**
@@ -52,6 +70,10 @@ final class StringJsonEncode
         $fn = $context->lookupFunction('__compiler_json_encode_value');
         $entry = $fn->appendBasicBlock('je_val_entry');
         $context->builder->positionAtEnd($entry);
+
+        $i32 = $context->getTypeFromString('int32');
+        $lastErr = StringJsonDecodeJit::ensureLastErrorGlobal($context);
+        $context->builder->store($i32->constInt(0, false), $lastErr);
 
         $valPtr = $fn->getParam(0);
         $htPtrTy = $context->getTypeFromString('__hashtable__*');
@@ -426,6 +448,31 @@ final class StringJsonEncode
 
         $context->builder->positionAtEnd($bbDouble);
         $doubleVal = $context->builder->call($context->lookupFunction('__value__readDouble'), $valPtr);
+        $isNan = $context->builder->icmp(
+            Builder::INT_NE,
+            $context->builder->call($context->lookupFunction('isnan'), $doubleVal),
+            $i32->constInt(0, false)
+        );
+        $isInf = $context->builder->icmp(
+            Builder::INT_NE,
+            $context->builder->call($context->lookupFunction('isinf'), $doubleVal),
+            $i32->constInt(0, false)
+        );
+        $nonFinite = $context->builder->or($isNan, $isInf);
+        $bbDoubleFail = $fn->appendBasicBlock('je_scalar_double_fail');
+        $bbDoubleOk = $fn->appendBasicBlock('je_scalar_double_ok');
+        $context->builder->branchIf($nonFinite, $bbDoubleFail, $bbDoubleOk);
+
+        $context->builder->positionAtEnd($bbDoubleFail);
+        $lastErr = StringJsonDecodeJit::ensureLastErrorGlobal($context);
+        $context->builder->store(
+            $i32->constInt(StringJsonDecodeJit::errorInfOrNan(), false),
+            $lastErr
+        );
+        $context->builder->store($strPtr->constNull(), $resultSlot);
+        $context->builder->branch($bbDone);
+
+        $context->builder->positionAtEnd($bbDoubleOk);
         $bufC = $context->builder->pointerCast($numBuf, $i8p);
         $fmt = $context->builder->pointerCast($context->constantFromString('%.16G'), $i8p);
         $context->builder->call($context->lookupFunction('sprintf'), $bufC, $fmt, $doubleVal);

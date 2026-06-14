@@ -30,10 +30,25 @@ final class StringJsonDecodeJit
 
     private const ERROR_SYNTAX = 4;
 
+    private const ERROR_INF_OR_NAN = 7;
+
     private const GLOBAL_LAST_ERROR = 'phpc_json_last_error';
 
     /** @var Value|null */
     private static $lastErrorGlobal = null;
+
+    /** Shared phpc_json_last_error global for encode/decode JIT helpers (#3606). */
+    public static function ensureLastErrorGlobal(Context $context): Value
+    {
+        self::ensureGlobals($context);
+
+        return self::$lastErrorGlobal;
+    }
+
+    public static function errorInfOrNan(): int
+    {
+        return self::ERROR_INF_OR_NAN;
+    }
 
     /** Standalone AOT: JSON POST helper for superglobals_refresh.c (#7389). */
     public static function ensureStandaloneBodies(Context $context): void
@@ -2049,14 +2064,16 @@ final class StringJsonDecodeJit
         $noneBb = $fn->appendBasicBlock('none');
         $depthBb = $fn->appendBasicBlock('depth');
         $syntaxBb = $fn->appendBasicBlock('syntax');
+        $infNanBb = $fn->appendBasicBlock('inf_nan');
         $unknownBb = $fn->appendBasicBlock('unknown');
         $done = $fn->appendBasicBlock('done');
         $resultSlot = BasicBlockHelper::entryAlloca($context, $context->getTypeFromString('__string__*'));
 
-        $switch = $context->builder->branchSwitch($code, $unknownBb, 3);
+        $switch = $context->builder->branchSwitch($code, $unknownBb, 4);
         $switch->addCase($i32->constInt(self::ERROR_NONE, false), $noneBb);
         $switch->addCase($i32->constInt(self::ERROR_DEPTH, false), $depthBb);
         $switch->addCase($i32->constInt(self::ERROR_SYNTAX, false), $syntaxBb);
+        $switch->addCase($i32->constInt(self::ERROR_INF_OR_NAN, false), $infNanBb);
 
         $context->builder->positionAtEnd($noneBb);
         $context->builder->store(self::msgString($context, 'No error'), $resultSlot);
@@ -2066,6 +2083,9 @@ final class StringJsonDecodeJit
         $context->builder->branch($done);
         $context->builder->positionAtEnd($syntaxBb);
         $context->builder->store(self::msgString($context, 'Syntax error'), $resultSlot);
+        $context->builder->branch($done);
+        $context->builder->positionAtEnd($infNanBb);
+        $context->builder->store(self::msgString($context, 'Inf and NaN cannot be JSON encoded'), $resultSlot);
         $context->builder->branch($done);
         $context->builder->positionAtEnd($unknownBb);
         $context->builder->store(self::msgString($context, 'Unknown error'), $resultSlot);
