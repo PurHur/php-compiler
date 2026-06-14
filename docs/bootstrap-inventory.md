@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 2617 |
-| Phase A inventory files (M2 ratio SSOT) | 2617 |
+| PHP files on vm.php path | 2621 |
+| Phase A inventory files (M2 ratio SSOT) | 2621 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 7110 |
+| Source constructs flagged (warnings) | 7120 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -30,7 +30,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/bcmath/BcmathFunction.php` | 0 | 1 |
 | `ext/bcmath/BuiltinClasses.php` | 0 | 1 |
 | `ext/bcmath/JitBcmath.php` | 0 | 4 |
-| `ext/bcmath/Module.php` | 0 | 11 |
+| `ext/bcmath/Module.php` | 0 | 14 |
 | `ext/bcmath/NumberAdd.php` | 0 | 2 |
 | `ext/bcmath/NumberCompare.php` | 0 | 2 |
 | `ext/bcmath/NumberConstruct.php` | 0 | 2 |
@@ -39,16 +39,19 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/bcmath/NumberSub.php` | 0 | 2 |
 | `ext/bcmath/NumberToString.php` | 0 | 1 |
 | `ext/bcmath/VmBcMathNumber.php` | 0 | 15 |
-| `ext/bcmath/VmBcmath.php` | 0 | 4 |
+| `ext/bcmath/VmBcmath.php` | 0 | 5 |
 | `ext/bcmath/bcadd.php` | 0 | 1 |
 | `ext/bcmath/bcceil.php` | 0 | 1 |
 | `ext/bcmath/bccomp.php` | 0 | 1 |
 | `ext/bcmath/bcdiv.php` | 0 | 1 |
 | `ext/bcmath/bcdivmod.php` | 0 | 4 |
 | `ext/bcmath/bcfloor.php` | 0 | 1 |
+| `ext/bcmath/bcmod.php` | 0 | 1 |
 | `ext/bcmath/bcmul.php` | 0 | 1 |
+| `ext/bcmath/bcpow.php` | 0 | 1 |
 | `ext/bcmath/bcpowmod.php` | 0 | 1 |
 | `ext/bcmath/bcscale.php` | 0 | 1 |
+| `ext/bcmath/bcsqrt.php` | 0 | 1 |
 | `ext/bcmath/bcsub.php` | 0 | 1 |
 | `ext/bz2/JitBz2.php` | 0 | 1 |
 | `ext/bz2/Module.php` | 0 | 3 |
@@ -745,7 +748,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/standard/VmFnmatch.php` | 0 | 1 |
 | `ext/standard/VmFnmatchPure.php` | 0 | 1 |
 | `ext/standard/VmForwardStaticCall.php` | 0 | 6 |
-| `ext/standard/VmFs.php` | 0 | 14 |
+| `ext/standard/VmFs.php` | 0 | 15 |
 | `ext/standard/VmFsAccessNative.php` | 0 | 1 |
 | `ext/standard/VmFsDirNative.php` | 0 | 1 |
 | `ext/standard/VmFsDiskNative.php` | 0 | 1 |
@@ -823,6 +826,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/standard/VmPasswordNative.php` | 0 | 1 |
 | `ext/standard/VmPersistentSocket.php` | 0 | 1 |
 | `ext/standard/VmPhpCoreConstants.php` | 0 | 5 |
+| `ext/standard/VmPhpInputOutputStream.php` | 0 | 2 |
 | `ext/standard/VmPhpMemoryStream.php` | 0 | 2 |
 | `ext/standard/VmPopenNative.php` | 0 | 1 |
 | `ext/standard/VmPreg.php` | 0 | 6 |
@@ -2588,7 +2592,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new HashTable (line 94)
 - new VmVariable (line 95)
 - new VmVariable (line 97)
-- 14 class method(s)
+- 17 class method(s)
 
 ### `ext/bcmath/Module.php`
 
@@ -2598,11 +2602,14 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new bcmul (line 28)
 - new bcdiv (line 29)
 - new bcdivmod (line 30)
-- new bcscale (line 31)
-- new bccomp (line 32)
-- new bcpowmod (line 33)
-- new bcceil (line 34)
-- new bcfloor (line 35)
+- new bcmod (line 31)
+- new bcpow (line 32)
+- new bcsqrt (line 33)
+- new bcscale (line 34)
+- new bccomp (line 35)
+- new bcpowmod (line 36)
+- new bcceil (line 37)
+- new bcfloor (line 38)
 - 2 class method(s)
 
 ### `ext/bcmath/NumberAdd.php`
@@ -2670,8 +2677,9 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - new DivisionByZeroError (line 57)
 - new DivisionByZeroError (line 80)
-- new DivisionByZeroError (line 147)
-- 32 class method(s)
+- new DivisionByZeroError (line 142)
+- new DivisionByZeroError (line 237)
+- 41 class method(s)
 
 ### `ext/bcmath/bcadd.php`
 
@@ -2706,7 +2714,17 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - 1 class method(s)
 
+### `ext/bcmath/bcmod.php`
+
+**Warnings** (review for bootstrap subset):
+- 1 class method(s)
+
 ### `ext/bcmath/bcmul.php`
+
+**Warnings** (review for bootstrap subset):
+- 1 class method(s)
+
+### `ext/bcmath/bcpow.php`
 
 **Warnings** (review for bootstrap subset):
 - 1 class method(s)
@@ -2720,6 +2738,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 
 **Warnings** (review for bootstrap subset):
 - 2 class method(s)
+
+### `ext/bcmath/bcsqrt.php`
+
+**Warnings** (review for bootstrap subset):
+- 1 class method(s)
 
 ### `ext/bcmath/bcsub.php`
 
@@ -7701,19 +7724,20 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/VmFs.php`
 
 **Warnings** (review for bootstrap subset):
-- new HashTable (line 43)
-- new Variable (line 45)
-- new HashTable (line 60)
-- new Variable (line 62)
-- new HashTable (line 203)
-- new Variable (line 206)
-- new Variable (line 209)
-- new HashTable (line 1103)
-- new Variable (line 1105)
-- new HashTable (line 1791)
-- new Variable (line 1794)
-- new Variable (line 1800)
-- new Variable (line 1806)
+- new HashTable (line 44)
+- new Variable (line 46)
+- new HashTable (line 61)
+- new Variable (line 63)
+- new HashTable (line 204)
+- new Variable (line 207)
+- new Variable (line 210)
+- new HashTable (line 1119)
+- new Variable (line 1121)
+- new HashTable (line 1834)
+- new Variable (line 1837)
+- new Variable (line 1843)
+- new Variable (line 1849)
+- new Variable (line 1855)
 - 106 class method(s)
 
 ### `ext/standard/VmFsAccessNative.php`
@@ -8183,6 +8207,12 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new Variable (line 135)
 - new Variable (line 141)
 - 4 class method(s)
+
+### `ext/standard/VmPhpInputOutputStream.php`
+
+**Warnings** (review for bootstrap subset):
+- new PhpInputOutputStreamState (line 35)
+- 13 class method(s)
 
 ### `ext/standard/VmPhpMemoryStream.php`
 
