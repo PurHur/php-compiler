@@ -12,6 +12,7 @@ final class MbStrwidth
 {
     private const HELPER_STRWIDTH = 'PHPCompiler\\ext\\mbstring\\MbStrwidthJitHelper::strwidth';
     private const HELPER_STRIMWIDTH = 'PHPCompiler\\ext\\mbstring\\MbStrwidthJitHelper::strimwidth';
+    private const HELPER_STRPAD = 'PHPCompiler\\ext\\mbstring\\MbStrwidthJitHelper::strPad';
 
     public static function ensureLinked(Context $context): void
     {
@@ -37,6 +38,18 @@ final class MbStrwidth
         $fn = $context->functions[$lc] ?? null;
         if (null === $fn) {
             throw new \LogicException('MbStrwidthJitHelper::strimwidth missing after compile (#3495)');
+        }
+
+        return $fn;
+    }
+
+    public static function strPadFunction(Context $context): \PHPLLVM\Value\Function_
+    {
+        self::ensureJitHelperCompiled($context);
+        $lc = strtolower(self::HELPER_STRPAD);
+        $fn = $context->functions[$lc] ?? null;
+        if (null === $fn) {
+            throw new \LogicException('MbStrwidthJitHelper::strPad missing after compile (#6081)');
         }
 
         return $fn;
