@@ -8583,6 +8583,59 @@ class Compiler {
         return null;
     }
 
+    /**
+     * php-cfg may lower `f(['a' => 1])` as Expr_Array (result Var#n) then FuncCall (arg Var#m) (#8561).
+     *
+     * @return ?OpCode TYPE_ASSIGN bridging producer slot → call-arg slot
+     */
+    private function tryBridgeInlineArrayLiteralCallArg(Operand $arg, Block $block): ?OpCode
+    {
+        if (!$arg instanceof Operand\Temporary || null === $block->orig) {
+            return null;
+        }
+        $children = $block->orig->children;
+        $argRoot = Block::cfgVarRoot($arg);
+        for ($i = 0, $n = count($children); $i < $n; ++$i) {
+            $child = $children[$i];
+            if (!($child instanceof Op\Expr\FuncCall
+                || $child instanceof Op\Expr\NsFuncCall
+                || $child instanceof Op\Expr\MethodCall
+                || $child instanceof Op\Expr\StaticCall)) {
+                continue;
+            }
+            $usesArg = false;
+            foreach ($child->args as $callArg) {
+                if ($callArg === $arg) {
+                    $usesArg = true;
+                    break;
+                }
+                if (null !== $argRoot && Block::cfgVarRoot($callArg) === $argRoot) {
+                    $usesArg = true;
+                    break;
+                }
+            }
+            if (!$usesArg || 0 === $i) {
+                continue;
+            }
+            $prev = $children[$i - 1];
+            if (!$prev instanceof Op\Expr\Array_) {
+                continue;
+            }
+            $producerSlot = $block->slotForOperand($prev->result);
+            if (null === $producerSlot) {
+                continue;
+            }
+            $argSlot = $this->compileOperand($arg, $block, false);
+            if (null === $argSlot || $producerSlot === $argSlot) {
+                return null;
+            }
+
+            return new OpCode(OpCode::TYPE_ASSIGN, $argSlot, $argSlot, $producerSlot);
+        }
+
+        return null;
+    }
+
     protected function findPropertyFetchForResult(Operand $result, Block $block): ?Op\Expr\PropertyFetch
     {
         foreach ($block->orig->children as $child) {
@@ -9667,6 +9720,10 @@ class Compiler {
 
         $sends = [];
         foreach ($args as $arg) {
+            $bridge = $this->tryBridgeInlineArrayLiteralCallArg($arg, $block);
+            if (null !== $bridge) {
+                $sends[] = $bridge;
+            }
             $valueSlot = $this->compileOperand($arg, $block, true);
             if (null === $valueSlot && $arg instanceof Operand\NullOperand) {
                 $valueSlot = $this->registerNullConstantSlot($block, $arg);
