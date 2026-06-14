@@ -11,7 +11,7 @@
 
 > **Stable line (2026)** — First maintained **stable** release of this fork: demo-ready VM + AOT for a **web-capable PHP subset**, reference examples **000–009**, and an experimental **self-host** path (compiler compiling its own `lib/`). Not full Zend PHP compatibility — see [what’s missing](https://purhur.github.io/php-compiler/docs/pages/missing-implementation.html).
 
-**Snapshot (`master` @ `cbc7e80c`, 3 Jun 2026):** VM + AOT for shipped examples ✅ · **321** builtins · self-host spine **1298**/**1681** (`php script/bootstrap-spine-count.php`) · M0 smoke ✅ in Docker — details below.
+**Snapshot (`master` @ `5df5a6cf9`, 14 Jun 2026):** VM + AOT for shipped examples ✅ · **321+** builtins · self-host spine **2558**/**2627** (`php script/bootstrap-spine-count.php`) · M4 loop + M5 strict ✅ — details below.
 
 ---
 
@@ -40,12 +40,12 @@ Counts from `php script/bootstrap-spine-count.php` (literal `require_once` in `c
 | Milestone | Status | What it means |
 |-----------|--------|----------------|
 | **M0–M1** | ✅ | `compiler_minimal` + compile-smoke bundles link and run natively |
-| **M2** | 🚧 **1298**/**1681** | Spine grows toward full `lib/` inventory; native spine **link** ✅ when patches + LLVM wired; full-spine **lint** still in progress |
-| **M3** | 🚧 | HelloWorld + **inventory emit** strict native ✅ ([#3070](https://github.com/PurHur/php-compiler/pull/3070)); production `bin/compile.php` inventory path without thin TU open ([#3024](https://github.com/PurHur/php-compiler/issues/3024)) |
-| **M4** | 🚧 | Gen-1 link + revision probe partial; **gen-2→gen-3 full-spine recompile** still failing on many trees — native driver when ready, **`emit_path=zend partial`** Zend fallback when blocked ([#2697](https://github.com/PurHur/php-compiler/pull/2697)) |
-| **M5** | 🚧 | Vendor prelink **3/3** ✅; committed `.o` cold boot ✅; Zend still default when `build/` is empty ([#1416](https://github.com/PurHur/php-compiler/issues/1416)) |
+| **M2** | 🚧 **2558**/**2627** | Spine literal ratio grows toward full closure; Phase A inventory coverage **2627/2627** ✅; native spine **link** + **lint** ✅ |
+| **M3** | ✅ | HelloWorld strict native ✅; inventory argv `bin/compile.php` ✅ |
+| **M4** | ✅ | `make bootstrap-loop-probe` full ladder ✅ (gen-1→gen-2→gen-3 + full-revision) |
+| **M5** | 🚧 | `north-star5-verify --strict` ✅; vendor prelink 3/3 ✅; Zend on empty `build/` still open |
 
-**Reproduce M0 smoke on a clean clone (verified May 2026):**
+**Reproduce M0 smoke on a clean clone (verified Jun 2026):**
 
 ```bash
 make docker-build-22   # once
@@ -56,7 +56,7 @@ make docker-build-22   # once
 ./build/selfhost   # → compiler_minimal bundle OK
 ```
 
-Deeper ladder: [`docs/bootstrap-selfhost.md`](docs/bootstrap-selfhost.md) · [`docs/GETTING-STARTED.md` §6–7](docs/GETTING-STARTED.md) · `make north-star4-verify`.
+Deeper ladder: [`docs/bootstrap-selfhost.md`](docs/bootstrap-selfhost.md) · [`docs/GETTING-STARTED.md` §6–7](docs/GETTING-STARTED.md) · `make bootstrap-loop-probe` · `./script/north-star5-verify.sh --strict`.
 
 ### Still open (high signal)
 
@@ -255,7 +255,7 @@ Full matrices (auto-generated): [`docs/capabilities.md`](docs/capabilities.md) (
 
 **Self-host (experimental, not “stable app” scope)**
 
-See [Current implementation status](#current-implementation-status-june-2026) for the full M0–M5 ladder. Summary: M0 smoke ✅ in Docker; M2 **1298**/**1681** spine toward inventory; M3 inventory emit ✅ / production `bin/compile.php` 🚧 ([#3024](https://github.com/PurHur/php-compiler/issues/3024)); M4 gen-2→gen-3 recompile 🚧; M5 partial ([#1492](https://github.com/PurHur/php-compiler/issues/1492)). Recent: union-type php-cfg overlays ([#5096](https://github.com/PurHur/php-compiler/pull/5096)); JIT try/catch/finally ([#4264](https://github.com/PurHur/php-compiler/pull/4264)).
+See [Current implementation status](#current-implementation-status-june-2026) for the full M0–M5 ladder. Summary: M0–M1 ✅; M2 **2558**/**2627** literal spine (2627/2627 coverage ✅); M3 strict native + inventory argv ✅; M4 full `bootstrap-loop-probe` ✅; M5 `north-star5-verify --strict` ✅ ([#1492](https://github.com/PurHur/php-compiler/issues/1492)). Recent: gen-0 refresh, mb_strwidth/bcmath/php:// I/O, spine lint ([#8391](https://github.com/PurHur/php-compiler/issues/8391)).
 
 **What we do not target in v1.0**
 

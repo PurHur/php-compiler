@@ -5,7 +5,7 @@ description: High-level snapshot of php-compiler — VM, AOT web apps, language 
 permalink: /development-status.html
 ---
 
-*Last updated: 3 Jun 2026 (`master` @ cbc7e80c) · Tracker: [#1492](https://github.com/PurHur/php-compiler/issues/1492) · Roadmap: [#78](https://github.com/PurHur/php-compiler/issues/78)*
+*Last updated: 14 Jun 2026 (`master` @ [5df5a6cf9](https://github.com/PurHur/php-compiler/commit/5df5a6cf9)) · Tracker: [#1492](https://github.com/PurHur/php-compiler/issues/1492) · Roadmap: [#78](https://github.com/PurHur/php-compiler/issues/78)*
 
 ## At a glance
 
@@ -14,8 +14,8 @@ permalink: /development-status.html
 | **What it is** | PHP → CFG → VM / LLVM JIT → AOT native binaries |
 | **North star** | Compiler compiles itself without Zend ([#1492](https://github.com/PurHur/php-compiler/issues/1492)) |
 | **Wave 3** | Language **12/12** · Stdlib **13/13** on master ([#1380](https://github.com/PurHur/php-compiler/issues/1380)) |
-| **Spine SSOT** | `php script/bootstrap-spine-count.php` → **1298** / **1681** |
-| **Builtin matrix** | **321** functions ([`docs/capabilities.md`](https://github.com/PurHur/php-compiler/blob/master/docs/capabilities.md)) |
+| **Spine SSOT** | `php script/bootstrap-spine-count.php` → **2558** / **2627** literal `require_once`; inventory coverage **2627/2627** |
+| **Builtin matrix** | **321+** functions ([`docs/capabilities.md`](https://github.com/PurHur/php-compiler/blob/master/docs/capabilities.md)) |
 | **Try it** | [`docs/GETTING-STARTED.md`](https://github.com/PurHur/php-compiler/blob/master/docs/GETTING-STARTED.md) |
 
 [← Overview](index.html) · [**Missing implementation**](missing-implementation.html) · [**PHP capability comparison**](capability-comparison.html) · [GitHub](https://github.com/PurHur/php-compiler)
@@ -24,26 +24,32 @@ permalink: /development-status.html
 
 ## Recent landings (Jun 2026)
 
-### Bootstrap / php-cfg
+### Bootstrap / self-host
+
+| Area | PR / commit | Notes |
+|------|-------------|-------|
+| M4 full ladder | `make bootstrap-loop-probe` | Gen-1→gen-2 native + gen-2→gen-3 full spine + full-revision argv ✅ |
+| M5 presenter | `north-star5-verify --strict` | Inventory + spine + vendor 3/3 + cold boot without `vendor/` ✅ |
+| Gen-0 refresh | [5df5a6cf9](https://github.com/PurHur/php-compiler/commit/5df5a6cf9) | Honest inventory argv emit into `prelinked/bootstrap-gen0/`; fixed-point smoke |
+| Spine lint OOM | [#8391](https://github.com/PurHur/php-compiler/issues/8391) | Skip SourceBundler mega-concat on spine `-l` |
+| Stream I/O JIT | inventory defer stubs | Full emitters outside inventory driver path; inventory rebuild unblocked |
+| Inventory driver | [#3046](https://github.com/PurHur/php-compiler/issues/3046) | Phantom emit guards + sidecar path remap |
+
+### Stdlib / php-in-php (Jun wave)
 
 | Area | PR | Notes |
 |------|-----|-------|
-| Union-type overlays | [#5096](https://github.com/PurHur/php-compiler/pull/5096) | Apply overlay when `parseTypeNode` lacks `UnionType` handler — spine parse progress |
-| JIT try/catch/finally | [#4264](https://github.com/PurHur/php-compiler/pull/4264) | EH LLVM IR; MCJIT execute still VM fallback ([#2114](https://github.com/PurHur/php-compiler/issues/2114)) |
-
-### Language & compiler (May wave, still current)
-
-| Area | PR / issue | Notes |
-|------|------------|-------|
-| Closures + arrows | [#3071](https://github.com/PurHur/php-compiler/pull/3071)–[#3108](https://github.com/PurHur/php-compiler/pull/3108) | VM `ClosureState`; JIT `use()` value + **by-ref** |
-| Try / catch / finally | [#3081](https://github.com/PurHur/php-compiler/pull/3081), [#3106](https://github.com/PurHur/php-compiler/pull/3106) | VM finally; JIT EH IR verify |
-| Inventory emit driver | [#3070](https://github.com/PurHur/php-compiler/pull/3070) | HelloWorld strict **`emit_path=native`** ✅ |
+| mb_strwidth / mb_strimwidth | [#8497](https://github.com/PurHur/php-compiler/pull/8497) | JIT/AOT lowering + spine sync |
+| bcmath phase 2 | [#8491](https://github.com/PurHur/php-compiler/pull/8491) | `bcmod` / `bcpow` / `bcsqrt` |
+| php:// I/O streams | [#8493](https://github.com/PurHur/php-compiler/pull/8493) | Native `php://input` / `php://output` without host `@fopen` |
+| VmFsWriteNative | [#8488](https://github.com/PurHur/php-compiler/pull/8488) | `file_put_contents` VM path |
 
 ### Still open (high signal)
 
 - **MCJIT execute** — `bin/jit.php -r` SIGSEGV ([#98](https://github.com/PurHur/php-compiler/issues/98))
-- **M4 gen-2→gen-3 full-spine recompile** — still 🚧; Zend fallback when native driver blocked
-- **Native `bin/compile.php` without thin emit TU** — [#3024](https://github.com/PurHur/php-compiler/issues/3024)
+- **Literal spine ratio** — 2558/2627 `require_once` lines (coverage full; ratio still growing)
+- **Compile-spine stub retirement** — shrink `PHP_COMPILER_SELFHOST_AOT` on M3 allowlist ([#1402](https://github.com/PurHur/php-compiler/issues/1402))
+- **LLVM 14+ upgrade** — experimental `script/install-llvm14.sh` ([#174](https://github.com/PurHur/php-compiler/issues/174))
 
 ---
 
@@ -51,11 +57,11 @@ permalink: /development-status.html
 
 - **`phpc` CLI** — `run`, `serve`, `build`, `deploy`, `lint`, `test`, `init`, `doctor`
 - **Examples 000–009** — VM and AOT link/execute for the curated web subset
-- **Self-host M0** — `compiler_minimal bundle OK` ✅ in Docker
-- **Self-host M2** — spine **1298** / **1681** 🚧; native spine **link** ✅ when LLVM + patches wired
-- **Self-host M3** — HelloWorld + inventory emit strict native ✅; production `bin/compile.php` 🚧 ([#3024](https://github.com/PurHur/php-compiler/issues/3024))
-- **Self-host M4** — gen-1 link partial; **gen-2→gen-3 recompile** 🚧 (native driver vs Zend fallback)
-- **Self-host M5 (partial)** — vendor prelink **3/3** ✅; Zend still default for empty `build/`
+- **Self-host M0** — `compiler_minimal bundle OK` ✅
+- **Self-host M2** — spine **2558/2627** literal 🚧; inventory coverage **2627/2627** ✅; spine link + lint ✅
+- **Self-host M3** — HelloWorld strict `emit_path=native` ✅; inventory argv `bin/compile.php` ✅ ([#3024](https://github.com/PurHur/php-compiler/issues/3024) closed)
+- **Self-host M4** — `make bootstrap-loop-probe` full ladder ✅; gen-2→gen-3 full-spine recompile ✅
+- **Self-host M5 (partial)** — vendor prelink **3/3** ✅; `north-star5-verify --strict` ✅; gen-0 refreshed; Zend on empty `build/` still open on some hosts
 
 **Not claimed:** full Zend PHP compatibility (subset compiler only).
 
@@ -77,12 +83,12 @@ Shipped examples under `examples/` are **regression fixtures** for VM/JIT/AOT an
 |-----------|--------|
 | **M0** — Small `lib/` bundle runs | ✅ |
 | **M1** — Compiler-shaped bundle + compile-smoke | ✅ |
-| **M2** — Spine toward full inventory | 🚧 **1298** / **1681** |
-| **M3** — Native compiles PHP (no Zend emit) | 🚧 Smoke + inventory emit ✅ · `bin/compile.php` production emit 🚧 |
-| **M4** — Bootstrap loop (next revision) | 🚧 Gen-2→gen-3 full-spine recompile open |
-| **M5** — Full self-host, no `vendor/` cold boot | 🚧 |
+| **M2** — Spine toward full inventory | 🚧 **2558** / **2627** literal; **2627/2627** coverage ✅ |
+| **M3** — Native compiles PHP (no Zend emit) | ✅ Smoke + inventory argv driver strict native |
+| **M4** — Bootstrap loop (next revision) | ✅ `bootstrap-loop-probe` full ladder |
+| **M5** — Full self-host, no `vendor/` cold boot | 🚧 Presenter strict ✅; compiled-only cold boot open |
 
-**Critical path:** native `bin/compile.php` on inventory argv driver ([#3024](https://github.com/PurHur/php-compiler/issues/3024)) → retire Zend on empty `build/` ([#1416](https://github.com/PurHur/php-compiler/issues/1416)).
+**Critical path:** shrink compile-spine stubs on M3 allowlist → grow literal spine ratio → retire Zend on empty `build/` ([#1492](https://github.com/PurHur/php-compiler/issues/1492)).
 
 Contributor detail: [`docs/self-host-target.md`](https://github.com/PurHur/php-compiler/blob/master/docs/self-host-target.md), [`docs/bootstrap-selfhost.md`](https://github.com/PurHur/php-compiler/blob/master/docs/bootstrap-selfhost.md).
 
