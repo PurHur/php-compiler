@@ -1147,12 +1147,21 @@ final class VmFs
      */
     public static function streamSetBlocking(int $handle, bool $mode): bool
     {
+        if (VmPhpMemoryStream::isValidHandle($handle)
+            || VmPhpInputOutputStream::isValidHandle($handle)
+            || VmUserStream::isValidHandle($handle)) {
+            return true;
+        }
+        $fd = self::socketFdForHandle($handle);
+        if (null !== $fd) {
+            return VmStreamBlockingNative::setBlocking($fd, $mode);
+        }
         $fp = self::lookup($handle);
         if (null === $fp) {
             return false;
         }
 
-        return VmStreamMeta::setBlocking($fp, $mode);
+        return VmStreamBlockingNative::setBlockingForHostResource($fp, $mode);
     }
 
     /**
