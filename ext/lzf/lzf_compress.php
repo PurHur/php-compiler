@@ -8,6 +8,7 @@ use PHPCompiler\ext\standard\VmString;
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Value;
 
@@ -39,6 +40,13 @@ final class lzf_compress extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        throw new \Error('lzf_compress() is not implemented for JIT in this compiler build (issue #6384)');
+        if (1 !== \count($args)) {
+            throw new \LogicException('lzf_compress() expects exactly one argument in this compiler build');
+        }
+
+        return JitLzf::compress(
+            $context,
+            JitStringBuiltinArg::lower($context, $args[0], 'lzf_compress', 0, 'data')
+        );
     }
 }
