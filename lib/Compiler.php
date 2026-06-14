@@ -8014,10 +8014,10 @@ class Compiler {
             $propFetch = $this->findCoalescePropertyFetch($var, $block);
             $dimFetch = null !== $propFetch ? null : $this->findCoalesceArrayDimFetch($var, $block);
             [$containerSlot, $dimSlot] = null !== $propFetch
-                ? $this->resolveIssetTargetFromPropertyFetch($propFetch, $block)
+                ? $this->resolveIssetTargetFromPropertyFetch($propFetch, $current)
                 : (null !== $dimFetch
-                    ? $this->resolveIssetTargetFromArrayDimFetch($dimFetch, $block)
-                    : $this->resolveIssetTarget($var, $block));
+                    ? $this->resolveIssetTargetFromArrayDimFetch($dimFetch, $current)
+                    : $this->resolveIssetTarget($var, $current));
             $checkSlot = $resultSlot;
             if ($i < $last) {
                 $checkSlot = $this->compileBoolTemporary($current);
