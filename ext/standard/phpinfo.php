@@ -8,7 +8,6 @@ use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\Variable as JITVariable;
-use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
 
 /** phpinfo() — runtime configuration report (ext/standard/info.c parity, #3359, #5304). */
@@ -30,13 +29,7 @@ final class phpinfo extends Internal
         }
         $flags = VmInfo::INFO_ALL;
         if (1 === $argc) {
-            $arg = $frame->calledArgs[0]->resolveIndirect();
-            if (Variable::TYPE_NULL !== $arg->type) {
-                if (Variable::TYPE_INTEGER !== $arg->type && Variable::TYPE_FLOAT !== $arg->type) {
-                    throw new \LogicException('phpinfo() flags must be an integer in this compiler build');
-                }
-                $flags = (int) $arg->toInt();
-            }
+            $flags = VmInfo::resolvePhpinfoFlagsArg($frame->calledArgs[0]);
         }
         $frame->returnVar->bool(VmInfo::phpinfo($flags));
     }
