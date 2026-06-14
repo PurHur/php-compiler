@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 2655 |
-| Phase A inventory files (M2 ratio SSOT) | 2655 |
+| PHP files on vm.php path | 2662 |
+| Phase A inventory files (M2 ratio SSOT) | 2662 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 7178 |
+| Source constructs flagged (warnings) | 7193 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -849,6 +849,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/standard/VmPasswordNative.php` | 0 | 1 |
 | `ext/standard/VmPersistentSocket.php` | 0 | 1 |
 | `ext/standard/VmPhpCoreConstants.php` | 0 | 5 |
+| `ext/standard/VmPhpFdStream.php` | 0 | 2 |
 | `ext/standard/VmPhpFilterStream.php` | 0 | 2 |
 | `ext/standard/VmPhpInputOutputStream.php` | 0 | 2 |
 | `ext/standard/VmPhpMemoryStream.php` | 0 | 2 |
@@ -1636,6 +1637,12 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/standard/zend_version.php` | 0 | 1 |
 | `ext/standard/zlib_decode.php` | 0 | 1 |
 | `ext/standard/zlib_encode.php` | 0 | 1 |
+| `ext/stats/Module.php` | 0 | 4 |
+| `ext/stats/StatsFunction.php` | 0 | 1 |
+| `ext/stats/VmStats.php` | 0 | 1 |
+| `ext/stats/stats_covariance.php` | 0 | 2 |
+| `ext/stats/stats_standard_deviation.php` | 0 | 2 |
+| `ext/stats/stats_variance.php` | 0 | 2 |
 | `ext/tokenizer/BuiltinClasses.php` | 0 | 1 |
 | `ext/tokenizer/JitTokenGetAll.php` | 0 | 2 |
 | `ext/tokenizer/JitTokenName.php` | 0 | 2 |
@@ -2238,7 +2245,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/PropertyVisibility.php` | 0 | 1 |
 | `lib/PseudoClassScope.php` | 0 | 1 |
 | `lib/ReadonlyMethodModifierRejector.php` | 0 | 2 |
-| `lib/Runtime.php` | 0 | 64 |
+| `lib/Runtime.php` | 0 | 65 |
 | `lib/RuntimeStrictness.php` | 0 | 1 |
 | `lib/SourceBareThrowRewriter.php` | 0 | 1 |
 | `lib/SourcePreprocessor/PropertyHooks.php` | 0 | 1 |
@@ -7712,10 +7719,10 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/VmDateTimeNative.php`
 
 **Warnings** (review for bootstrap subset):
-- new RecursiveIteratorIterator (line 1004)
-- new RecursiveDirectoryIterator (line 1005)
-- new RecursiveIteratorIterator (line 1106)
-- new RecursiveDirectoryIterator (line 1107)
+- new RecursiveIteratorIterator (line 1008)
+- new RecursiveDirectoryIterator (line 1009)
+- new RecursiveIteratorIterator (line 1110)
+- new RecursiveDirectoryIterator (line 1111)
 - 44 class method(s)
 - 8 closure(s)
 
@@ -7750,13 +7757,13 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/VmDns.php`
 
 **Warnings** (review for bootstrap subset):
-- new HashTable (line 104)
-- new Variable (line 106)
-- new HashTable (line 255)
-- new Variable (line 257)
-- new HashTable (line 339)
-- new Variable (line 356)
-- new Variable (line 363)
+- new HashTable (line 105)
+- new Variable (line 107)
+- new HashTable (line 256)
+- new Variable (line 258)
+- new HashTable (line 340)
+- new Variable (line 357)
+- new Variable (line 364)
 - 34 class method(s)
 - 1 closure(s)
 
@@ -7895,14 +7902,14 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new HashTable (line 204)
 - new Variable (line 207)
 - new Variable (line 210)
-- new HashTable (line 1153)
-- new Variable (line 1155)
-- new HashTable (line 1874)
-- new Variable (line 1877)
-- new Variable (line 1883)
-- new Variable (line 1889)
-- new Variable (line 1895)
-- 106 class method(s)
+- new HashTable (line 1171)
+- new Variable (line 1173)
+- new HashTable (line 1925)
+- new Variable (line 1928)
+- new Variable (line 1934)
+- new Variable (line 1940)
+- new Variable (line 1946)
+- 107 class method(s)
 
 ### `ext/standard/VmFsAccessNative.php`
 
@@ -8371,6 +8378,12 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new Variable (line 135)
 - new Variable (line 141)
 - 4 class method(s)
+
+### `ext/standard/VmPhpFdStream.php`
+
+**Warnings** (review for bootstrap subset):
+- new PhpFdStreamState (line 52)
+- 18 class method(s)
 
 ### `ext/standard/VmPhpFilterStream.php`
 
@@ -12462,9 +12475,9 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 
 **Warnings** (review for bootstrap subset):
 - new ArgumentCountError (line 30)
-- new HashTable (line 73)
-- new Variable (line 74)
-- new Variable (line 77)
+- new HashTable (line 71)
+- new Variable (line 72)
+- new Variable (line 75)
 - 2 class method(s)
 
 ### `ext/standard/stream_socket_server.php`
@@ -12973,6 +12986,42 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 
 **Warnings** (review for bootstrap subset):
 - 3 class method(s)
+
+### `ext/stats/Module.php`
+
+**Warnings** (review for bootstrap subset):
+- new stats_standard_deviation (line 19)
+- new stats_variance (line 20)
+- new stats_covariance (line 21)
+- 1 class method(s)
+
+### `ext/stats/StatsFunction.php`
+
+**Warnings** (review for bootstrap subset):
+- 6 class method(s)
+
+### `ext/stats/VmStats.php`
+
+**Warnings** (review for bootstrap subset):
+- 5 class method(s)
+
+### `ext/stats/stats_covariance.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 21)
+- 1 class method(s)
+
+### `ext/stats/stats_standard_deviation.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 21)
+- 1 class method(s)
+
+### `ext/stats/stats_variance.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 21)
+- 1 class method(s)
 
 ### `ext/tokenizer/BuiltinClasses.php`
 
@@ -17188,29 +17237,30 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new ext\calendar\Module (line 214)
 - new ext\session\Module (line 215)
 - new ext\bcmath\Module (line 216)
-- new ext\openssl\Module (line 217)
-- new ext\curl\Module (line 218)
-- new ext\hash\Module (line 219)
-- new ext\posix\Module (line 220)
-- new ext\sockets\Module (line 221)
-- new ext\ctype\Module (line 222)
-- new ext\tokenizer\Module (line 223)
-- new ext\random\Module (line 224)
-- new ext\igbinary\Module (line 225)
-- new ext\msgpack\Module (line 226)
-- new ext\zstd\Module (line 227)
-- new ext\lzf\Module (line 228)
-- new ext\bz2\Module (line 229)
-- new ext\standard\Module (line 230)
-- new JIT (line 306)
-- new JITContext (line 320)
-- new SealedClassPreprocessor (line 345)
-- new StaticClassPreprocessor (line 348)
-- new SourcePreprocessor\PropertyHooks (line 351)
-- new State (line 466)
-- new ReflectionProperty (line 482)
-- new ReflectionProperty (line 485)
-- new LintCompiler (line 867)
+- new ext\stats\Module (line 217)
+- new ext\openssl\Module (line 218)
+- new ext\curl\Module (line 219)
+- new ext\hash\Module (line 220)
+- new ext\posix\Module (line 221)
+- new ext\sockets\Module (line 222)
+- new ext\ctype\Module (line 223)
+- new ext\tokenizer\Module (line 224)
+- new ext\random\Module (line 225)
+- new ext\igbinary\Module (line 226)
+- new ext\msgpack\Module (line 227)
+- new ext\zstd\Module (line 228)
+- new ext\lzf\Module (line 229)
+- new ext\bz2\Module (line 230)
+- new ext\standard\Module (line 231)
+- new JIT (line 307)
+- new JITContext (line 321)
+- new SealedClassPreprocessor (line 346)
+- new StaticClassPreprocessor (line 349)
+- new SourcePreprocessor\PropertyHooks (line 352)
+- new State (line 467)
+- new ReflectionProperty (line 483)
+- new ReflectionProperty (line 486)
+- new LintCompiler (line 868)
 - 50 class method(s)
 
 ### `lib/RuntimeStrictness.php`
