@@ -234,6 +234,73 @@ final class VmMbstring
     }
 
     /**
+     * mb_strwidth() — terminal display width (php-src ext/mbstring/mbstring.c mb_get_strwidth; #3495).
+     */
+    public static function strwidth(string $string, string $encoding = 'UTF-8'): int
+    {
+        self::assertSubstrCountEncoding($encoding, 'mb_strwidth');
+        if ('ASCII' === $encoding || '8BIT' === $encoding) {
+            return VmString::byteLength($string);
+        }
+
+        $width = 0;
+        $charLen = VmString::utf8CharLength($string);
+        for ($i = 0; $i < $charLen; ++$i) {
+            $width += EastAsianWidthTable::characterWidth(
+                self::decodeUtf8Char(VmString::utf8CharSubstr($string, $i, 1))
+            );
+        }
+
+        return $width;
+    }
+
+    /**
+     * mb_strimwidth() — truncate to display width with optional trim marker (php-src mb_trim_string; #3495).
+     */
+    public static function strimwidth(
+        string $string,
+        int $from,
+        int $width,
+        string $trimmarker = '',
+        string $encoding = 'UTF-8'
+    ): string {
+        self::assertSubstrCountEncoding($encoding, 'mb_strimwidth');
+        if (0 !== $from) {
+            $charLen = 'UTF-8' === $encoding
+                ? VmString::utf8CharLength($string)
+                : VmString::byteLength($string);
+            if ($from < 0) {
+                $from += $charLen;
+            }
+            if ($from < 0 || $from > $charLen) {
+                throw new \ValueError('mb_strimwidth(): Argument #2 ($start) is out of range');
+            }
+            $string = self::substr($string, $from, null, $encoding);
+        }
+
+        if ($width < 0) {
+            throw new \ValueError('mb_strimwidth(): Argument #3 ($width) is out of range');
+        }
+
+        $totalWidth = self::strwidth($string, $encoding);
+        if ($totalWidth <= $width) {
+            return $string;
+        }
+
+        $markerWidth = '' !== $trimmarker ? self::strwidth($trimmarker, $encoding) : 0;
+        if ('' !== $trimmarker && $width <= $markerWidth) {
+            return $trimmarker;
+        }
+
+        $contentWidth = $width - $markerWidth;
+        if ('ASCII' === $encoding || '8BIT' === $encoding) {
+            return self::trimSingleByteToWidth($string, $contentWidth).$trimmarker;
+        }
+
+        return self::trimUtf8ToWidth($string, $contentWidth).$trimmarker;
+    }
+
+    /**
      * mb_strcut() — byte-oriented slice aligned to character boundaries (php-src mb_strcut; #4573).
      *
      * $from and $length are measured in bytes (not codepoints, unlike mb_substr).
@@ -1002,6 +1069,40 @@ final class VmMbstring
         }
 
         return \substr($source, $left, $byteLen - $left - $right);
+    }
+
+    private static function trimUtf8ToWidth(string $string, int $contentWidth): string
+    {
+        if ($contentWidth <= 0) {
+            return '';
+        }
+        $used = 0;
+        $out = '';
+        $charLen = VmString::utf8CharLength($string);
+        for ($i = 0; $i < $charLen; ++$i) {
+            $char = VmString::utf8CharSubstr($string, $i, 1);
+            $charWidth = EastAsianWidthTable::characterWidth(self::decodeUtf8Char($char));
+            if ($used + $charWidth > $contentWidth) {
+                break;
+            }
+            $out .= $char;
+            $used += $charWidth;
+        }
+
+        return $out;
+    }
+
+    private static function trimSingleByteToWidth(string $string, int $contentWidth): string
+    {
+        if ($contentWidth <= 0) {
+            return '';
+        }
+        $byteLen = VmString::byteLength($string);
+        if ($contentWidth >= $byteLen) {
+            return $string;
+        }
+
+        return VmString::byteSlice($string, 0, $contentWidth);
     }
 
     private static function decodeUtf8Char(string $char): int

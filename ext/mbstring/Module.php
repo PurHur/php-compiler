@@ -32,6 +32,8 @@ class Module extends ModuleAbstract
         return [
             new mb_check_encoding(),
             new mb_strlen(),
+            new mb_strwidth(),
+            new mb_strimwidth(),
             new mb_substr(),
             new mb_strcut(),
             new mb_substr_count(),
