@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace PHPCompiler\ext\standard;
 
 use PHPCompiler\CompilerVersion;
+use PHPCompiler\VM\EnumCaseSupport;
 use PHPCompiler\VM\HashTable;
 use PHPCompiler\VM\OutputBuffer;
 use PHPCompiler\VM\Variable;
@@ -120,6 +121,57 @@ final class VmInfo
     public static function zend_version(): string
     {
         return self::ZEND_VERSION;
+    }
+
+    /**
+     * Coerce phpinfo() $flags from int|InfoView|null (php-src-strict, #7285).
+     */
+    public static function resolvePhpinfoFlagsArg(Variable $var): int
+    {
+        $resolved = $var->resolveIndirect();
+        if (Variable::TYPE_NULL === $resolved->type) {
+            return self::INFO_ALL;
+        }
+        $fromEnum = self::tryInfoViewInt($resolved);
+        if (null !== $fromEnum) {
+            return $fromEnum;
+        }
+        if (EnumCaseSupport::isEnumCaseVariable($resolved)) {
+            throw new \TypeError(sprintf(
+                'phpinfo(): Argument #1 ($flags) must be of type InfoView|int|null, %s given',
+                EnumCaseSupport::typeNameForVariable($resolved)
+            ));
+        }
+        if (Variable::TYPE_INTEGER !== $resolved->type && Variable::TYPE_FLOAT !== $resolved->type) {
+            throw new \TypeError(sprintf(
+                'phpinfo(): Argument #1 ($flags) must be of type InfoView|int|null, %s given',
+                EnumCaseSupport::typeNameForVariable($resolved)
+            ));
+        }
+
+        return (int) $resolved->toInt();
+    }
+
+    public static function tryInfoViewInt(Variable $var): ?int
+    {
+        if (!EnumCaseSupport::isEnumCaseVariable($var)) {
+            return null;
+        }
+        $enumClass = EnumCaseSupport::enumClassForCaseVariable($var);
+        if (null === $enumClass || !self::isInfoViewEnum($enumClass->name)) {
+            return null;
+        }
+        $entry = EnumCaseSupport::enumCaseEntryForVariable($var);
+        if (null === $entry || null === $entry->backingValue) {
+            throw new \LogicException('InfoView case missing backing value');
+        }
+
+        return $entry->backingValue->resolveIndirect()->toInt();
+    }
+
+    private static function isInfoViewEnum(string $className): bool
+    {
+        return 0 === strcasecmp(ltrim($className, '\\'), 'InfoView');
     }
 
     public static function phpinfo(int $flags = self::INFO_ALL): bool

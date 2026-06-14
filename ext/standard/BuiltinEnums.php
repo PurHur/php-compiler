@@ -32,6 +32,7 @@ final class BuiltinEnums
         self::registerRoundingMode($ctx);
         self::registerParseUrl($ctx);
         self::registerRequestMethod($ctx);
+        self::registerInfoView($ctx);
         foreach (array_diff(array_keys($ctx->classes), $before) as $lc) {
             $ctx->classes[$lc]->isInternal = true;
         }
@@ -391,6 +392,38 @@ final class BuiltinEnums
         EnumSupport::ensureBuiltinEnumInterfaces($entry);
 
         $lc = 'requestmethod';
+        $ctx->classes[$lc] = $entry;
+        $ctx->enums[$lc] = true;
+    }
+
+    /**
+     * PHP 8.4 InfoView: int-backed enum for phpinfo() flags (#7285).
+     *
+     * php-src: ext/standard/basic_functions.stub.php — enum InfoView: int
+     */
+    private static function registerInfoView(Context $ctx): void
+    {
+        if (isset($ctx->classes['infoview'])) {
+            return;
+        }
+
+        $entry = new ClassEntry('InfoView');
+        $entry->isEnum = true;
+        $entry->backedType = 'int';
+
+        self::registerBackedEnumCase($entry, 'All', VmInfo::INFO_ALL);
+        self::registerBackedEnumCase($entry, 'General', VmInfo::INFO_GENERAL);
+        self::registerBackedEnumCase($entry, 'Credits', VmInfo::INFO_CREDITS);
+        self::registerBackedEnumCase($entry, 'Configuration', VmInfo::INFO_CONFIGURATION);
+        self::registerBackedEnumCase($entry, 'Modules', VmInfo::INFO_MODULES);
+        self::registerBackedEnumCase($entry, 'Environment', VmInfo::INFO_ENVIRONMENT);
+        self::registerBackedEnumCase($entry, 'Variables', VmInfo::INFO_VARIABLES);
+        self::registerBackedEnumCase($entry, 'License', VmInfo::INFO_LICENSE);
+
+        EnumSupport::ensureBuiltinCasesMethod($entry);
+        EnumSupport::ensureBuiltinEnumInterfaces($entry);
+
+        $lc = 'infoview';
         $ctx->classes[$lc] = $entry;
         $ctx->enums[$lc] = true;
     }
