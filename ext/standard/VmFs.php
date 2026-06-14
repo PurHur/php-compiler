@@ -665,15 +665,10 @@ final class VmFs
 
             return self::adoptStreamResource($fp, $path);
         }
-        if (VmFsOpenNative::available()) {
-            $fp = VmFsOpenNative::open($path, $mode);
-            if (false === $fp) {
-                return false;
-            }
-
-            return self::adoptStreamResource($fp, $path);
+        if (!VmFsOpenNative::available()) {
+            return false;
         }
-        $fp = @fopen($path, $mode);
+        $fp = VmFsOpenNative::open($path, $mode);
         if (false === $fp) {
             return false;
         }
