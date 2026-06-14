@@ -941,6 +941,7 @@ final class HashTableHelper
         $checkHt = BasicBlockHelper::append($context, 'ht_rb_check_ht_'.$tag);
         $checkObject = BasicBlockHelper::append($context, 'ht_rb_check_obj_'.$tag);
         $objectBlock = BasicBlockHelper::append($context, 'ht_rb_object_'.$tag);
+        $enumCaseBlock = BasicBlockHelper::append($context, 'ht_rb_enum_case_'.$tag);
         $longBlock = BasicBlockHelper::append($context, 'ht_rb_long_'.$tag);
         $done = BasicBlockHelper::append($context, 'ht_rb_done_'.$tag);
 
@@ -965,7 +966,16 @@ final class HashTableHelper
             $typeByte,
             $i8->constInt(Variable::TYPE_OBJECT, false)
         );
-        $context->builder->branchIf($isObject, $objectBlock, $longBlock);
+        $checkEnumCase = BasicBlockHelper::append($context, 'ht_rb_check_enum_'.$tag);
+        $context->builder->branchIf($isObject, $objectBlock, $checkEnumCase);
+
+        $context->builder->positionAtEnd($checkEnumCase);
+        $isEnumCase = $context->builder->icmp(
+            Builder::INT_EQ,
+            $typeByte,
+            $i8->constInt(\PHPCompiler\VM\Variable::TYPE_ENUM_CASE, false)
+        );
+        $context->builder->branchIf($isEnumCase, $enumCaseBlock, $longBlock);
 
         $context->builder->positionAtEnd($stringBlock);
         $str = $context->builder->call(
@@ -1004,6 +1014,18 @@ final class HashTableHelper
             $context->lookupFunction('__value__writeObject'),
             $destPtr,
             $obj
+        );
+        $context->builder->branch($done);
+
+        $context->builder->positionAtEnd($enumCaseBlock);
+        $enumObj = $context->builder->call(
+            $context->lookupFunction('__value__readObject'),
+            $entryPtr
+        );
+        $context->builder->call(
+            $context->lookupFunction('__value__writeObject'),
+            $destPtr,
+            $enumObj
         );
         $context->builder->branch($done);
 
@@ -1345,9 +1367,13 @@ final class HashTableHelper
         Variable $key
     ): void {
         if ($array->type & Variable::IS_NATIVE_ARRAY) {
-            self::addNativeElement($context, $array, $element, $key);
+            if (self::nativeArrayNeedsHashtablePromotion($array, $element)) {
+                self::promoteNativeArrayVariableToHashtable($context, $array);
+            } else {
+                self::addNativeElement($context, $array, $element, $key);
 
-            return;
+                return;
+            }
         }
         $ht = self::loadHashtablePointer($context, $array);
         if (Variable::TYPE_STRING !== $key->type) {
@@ -1416,9 +1442,13 @@ final class HashTableHelper
         ?Variable $key = null
     ): void {
         if ($array->type & Variable::IS_NATIVE_ARRAY) {
-            self::addNativeElement($context, $array, $element, $key);
+            if (self::nativeArrayNeedsHashtablePromotion($array, $element)) {
+                self::promoteNativeArrayVariableToHashtable($context, $array);
+            } else {
+                self::addNativeElement($context, $array, $element, $key);
 
-            return;
+                return;
+            }
         }
         $ht = self::loadHashtablePointer($context, $array);
         $sizeT = $context->getTypeFromString('size_t');
@@ -1448,6 +1478,36 @@ final class HashTableHelper
         }
         $index = self::arrayKeyToIndex($context, $key);
         self::setAtIndex($context, $ht, $index, $element);
+    }
+
+    /**
+     * Native packed arrays inferred as scalar must widen when storing enum case objects (#5722, #5638).
+     */
+    private static function nativeArrayNeedsHashtablePromotion(Variable $array, Variable $element): bool
+    {
+        if (0 === ($array->type & Variable::IS_NATIVE_ARRAY)) {
+            return false;
+        }
+        $elemType = $array->type & ~Variable::IS_NATIVE_ARRAY;
+
+        return $element->type !== $elemType;
+    }
+
+    private static function promoteNativeArrayVariableToHashtable(Context $context, Variable $array): void
+    {
+        if (0 === ($array->type & Variable::IS_NATIVE_ARRAY)) {
+            return;
+        }
+        $ht = self::materializeNativeArrayForCall($context, $array);
+        $slot = JitValueBox::alloc($context);
+        $context->builder->call(
+            $context->lookupFunction('__value__writeHashtable'),
+            JitValueBox::pointer($context, $slot),
+            $ht
+        );
+        $array->type = Variable::TYPE_VALUE;
+        $array->value = $slot;
+        $array->valueBoxHashtable = true;
     }
 
     /**
@@ -1575,6 +1635,8 @@ final class HashTableHelper
         $boolBlock = BasicBlockHelper::append($context, 'ht_idx_vb_bool_'.$tag);
         $doubleBlock = BasicBlockHelper::append($context, 'ht_idx_vb_double_'.$tag);
         $nullBlock = BasicBlockHelper::append($context, 'ht_idx_vb_null_'.$tag);
+        $objectBlock = BasicBlockHelper::append($context, 'ht_idx_vb_object_'.$tag);
+        $enumCaseBlock = BasicBlockHelper::append($context, 'ht_idx_vb_enum_'.$tag);
         $done = BasicBlockHelper::append($context, 'ht_idx_vb_done_'.$tag);
 
         $isString = $context->builder->icmp(
@@ -1618,7 +1680,25 @@ final class HashTableHelper
             $typeByte,
             $i8->constInt(Variable::TYPE_NULL, false)
         );
-        $context->builder->branchIf($isNull, $nullBlock, $longBlock);
+        $checkObject = BasicBlockHelper::append($context, 'ht_idx_vb_check_object_'.$tag);
+        $context->builder->branchIf($isNull, $nullBlock, $checkObject);
+
+        $context->builder->positionAtEnd($checkObject);
+        $isObject = $context->builder->icmp(
+            Builder::INT_EQ,
+            $typeByte,
+            $i8->constInt(Variable::TYPE_OBJECT, false)
+        );
+        $checkEnumCase = BasicBlockHelper::append($context, 'ht_idx_vb_check_enum_'.$tag);
+        $context->builder->branchIf($isObject, $objectBlock, $checkEnumCase);
+
+        $context->builder->positionAtEnd($checkEnumCase);
+        $isEnumCase = $context->builder->icmp(
+            Builder::INT_EQ,
+            $typeByte,
+            $i8->constInt(\PHPCompiler\VM\Variable::TYPE_ENUM_CASE, false)
+        );
+        $context->builder->branchIf($isEnumCase, $enumCaseBlock, $longBlock);
 
         $context->builder->positionAtEnd($stringBlock);
         $str = $context->builder->call(
@@ -1677,6 +1757,32 @@ final class HashTableHelper
             $context->lookupFunction('__hashtable__setNullAt'),
             $ht,
             $index
+        );
+        $context->builder->branch($done);
+
+        $context->builder->positionAtEnd($objectBlock);
+        $obj = $context->builder->call(
+            $context->lookupFunction('__value__readObject'),
+            $valuePtr
+        );
+        $context->builder->call(
+            $context->lookupFunction('__hashtable__setObjectAt'),
+            $ht,
+            $index,
+            $obj
+        );
+        $context->builder->branch($done);
+
+        $context->builder->positionAtEnd($enumCaseBlock);
+        $enumObj = $context->builder->call(
+            $context->lookupFunction('__value__readObject'),
+            $valuePtr
+        );
+        $context->builder->call(
+            $context->lookupFunction('__hashtable__setObjectAt'),
+            $ht,
+            $index,
+            $enumObj
         );
         $context->builder->branch($done);
 

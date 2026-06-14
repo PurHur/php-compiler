@@ -82,6 +82,9 @@ class is_type extends Internal {
                         $ptr->typeOf()->constNull()
                     );
                 }
+                if (Variable::TYPE_OBJECT === $this->type) {
+                    return $context->constantFromBool(true);
+                }
 
                 return $context->constantFromBool(false);
             case JITVariable::TYPE_VALUE:

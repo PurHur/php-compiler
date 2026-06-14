@@ -345,6 +345,13 @@ final class Variable {
         if ([] === $subTypes) {
             return null;
         }
+        foreach ($subTypes as $sub) {
+            $userType = $sub->userType ?? '';
+            if ('' !== $userType && 0 !== strcasecmp($userType, 'mixed')) {
+                // Enum cases and class-valued literals must use hashtable slots (#5722, #5638).
+                return null;
+            }
+        }
         $elemType = self::getTypeFromType($subTypes[0]);
         if (!in_array($elemType, [
             self::TYPE_NATIVE_LONG,
