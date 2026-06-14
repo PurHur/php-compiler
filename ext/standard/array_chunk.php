@@ -9,7 +9,7 @@ use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\ArrayBuiltinHelper;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitBoolArg;
-use PHPCompiler\JIT\JitLongArg;
+use PHPCompiler\JIT\JitIntdiv;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
@@ -30,10 +30,7 @@ final class array_chunk extends Internal
         if (Variable::TYPE_ARRAY !== $array->type) {
             throw new \LogicException('array_chunk() first argument must be an array in this compiler build');
         }
-        if (Variable::TYPE_INTEGER !== $size->type) {
-            throw new \LogicException('array_chunk() size must be an integer in this compiler build');
-        }
-        $chunkSize = $size->toInt();
+        $chunkSize = VmMath::parseIntBuiltinArg($size, 'array_chunk', 2, 'length');
         if ($chunkSize <= 0) {
             throw new \ValueError('array_chunk(): Argument #2 ($length) must be greater than 0');
         }
@@ -54,11 +51,7 @@ final class array_chunk extends Internal
         if ($argc < 2 || $argc > 3) {
             throw new \LogicException('array_chunk() requires two or three arguments in this compiler build');
         }
-        if (JITVariable::TYPE_NATIVE_LONG !== $args[1]->type) {
-            throw new \LogicException('array_chunk() size must be an integer in this compiler build');
-        }
-
-        $size = JitLongArg::lower($context, $args[1], 'array_chunk() size');
+        $size = JitIntdiv::lowerIntBuiltinArg($context, $args[1], 'array_chunk', 2, 'length');
         JitArrayChunk::emitRuntimeLengthGuard($context, $size);
         $preserveKeys = 3 === $argc
             ? JitBoolArg::lower($context, $args[2], 'array_chunk() preserve_keys')
