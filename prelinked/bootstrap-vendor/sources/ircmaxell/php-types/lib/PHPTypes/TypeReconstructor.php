@@ -295,15 +295,15 @@ class TypeReconstructor
             case 'Expr_Include':
                 // TODO: we may be able to determine these...
                 return false;
-            case 'Expr_FirstClassCallable':
-                if (\PHPCfg\Op\Expr\FirstClassCallable::KIND_METHOD === $op->kind) {
-                    return [new Type(Type::TYPE_ARRAY)];
-                }
-
-                return [Type::string()];
             case 'Expr_MagicScriptConst':
                 if (\PHPCfg\Op\Expr\MagicScriptConst::KIND_LINE === $op->kind) {
                     return [Type::int()];
+                }
+
+                return [Type::string()];
+            case 'Expr_FirstClassCallable':
+                if (\PHPCfg\Op\Expr\FirstClassCallable::KIND_METHOD === $op->kind) {
+                    return [new Type(Type::TYPE_ARRAY)];
                 }
 
                 return [Type::string()];
