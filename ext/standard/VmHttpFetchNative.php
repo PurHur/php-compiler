@@ -46,25 +46,73 @@ final class VmHttpFetchNative
      */
     public static function fetch(string $url): string|false
     {
+        $response = self::request($url, 'GET');
+        if (null === $response) {
+            return false;
+        }
+
+        $headers = $response['headers'];
+        VmHttpLastResponseHeaders::store($headers);
+
+        $statusCode = self::statusCodeFromStatusLine($headers[0]);
+        if (null === $statusCode || $statusCode < 200 || $statusCode >= 300) {
+            return false;
+        }
+
+        $body = $response['body'];
+        $contentLength = self::headerValue($headers, 'Content-Length');
+        if (null !== $contentLength && \ctype_digit($contentLength)) {
+            $expected = (int) $contentLength;
+            if (\strlen($body) > $expected) {
+                $body = \substr($body, 0, $expected);
+            }
+        }
+
+        return $body;
+    }
+
+    /**
+     * HEAD/GET response headers for get_headers() — any HTTP status, no body required (#3309).
+     *
+     * @return list<string>|false
+     */
+    public static function fetchHeaders(string $url): array|false
+    {
+        $response = self::request($url, 'HEAD');
+        if (null === $response) {
+            return false;
+        }
+
+        $headers = $response['headers'];
+        VmHttpLastResponseHeaders::store($headers);
+
+        return $headers;
+    }
+
+    /**
+     * @return array{headers: list<string>, body: string}|null
+     */
+    private static function request(string $url, string $method): ?array
+    {
         VmHttpLastResponseHeaders::clear();
 
         if (!self::available()) {
-            return false;
+            return null;
         }
 
         $parts = VmString::parseUrl($url);
         if (!\is_array($parts) || !isset($parts['scheme'], $parts['host'])) {
-            return false;
+            return null;
         }
 
         $scheme = \strtolower((string) $parts['scheme']);
         if ('http' !== $scheme) {
-            return false;
+            return null;
         }
 
         $host = (string) $parts['host'];
         if ('' === $host) {
-            return false;
+            return null;
         }
 
         $port = isset($parts['port']) ? (int) $parts['port'] : 80;
@@ -73,7 +121,7 @@ final class VmHttpFetchNative
             $path .= '?'.$parts['query'];
         }
 
-        $request = "GET {$path} HTTP/1.0\r\n";
+        $request = $method.' '.$path." HTTP/1.0\r\n";
         $request .= "Host: {$host}";
         if (80 !== $port) {
             $request .= ":{$port}";
@@ -88,29 +136,29 @@ final class VmHttpFetchNative
 
         $ffi = self::ffi();
         if (null === $ffi) {
-            return false;
+            return null;
         }
 
         $sock = self::connect($ffi, $host, (string) $port);
         if ($sock < 0) {
-            return false;
+            return null;
         }
 
         try {
             self::applySocketTimeout($ffi, $sock, (float) self::DEFAULT_TIMEOUT_SEC);
 
             if (!self::sendAll($ffi, $sock, $request)) {
-                return false;
+                return null;
             }
 
             $raw = self::recvAll($ffi, $sock);
             if ('' === $raw) {
-                return false;
+                return null;
             }
 
             $headerEnd = \strpos($raw, "\r\n\r\n");
             if (false === $headerEnd) {
-                return false;
+                return null;
             }
 
             $headerBlock = \substr($raw, 0, $headerEnd);
@@ -118,25 +166,10 @@ final class VmHttpFetchNative
 
             $headers = self::parseHeaderBlock($headerBlock);
             if ([] === $headers) {
-                return false;
+                return null;
             }
 
-            VmHttpLastResponseHeaders::store($headers);
-
-            $statusCode = self::statusCodeFromStatusLine($headers[0]);
-            if (null === $statusCode || $statusCode < 200 || $statusCode >= 300) {
-                return false;
-            }
-
-            $contentLength = self::headerValue($headers, 'Content-Length');
-            if (null !== $contentLength && \ctype_digit($contentLength)) {
-                $expected = (int) $contentLength;
-                if (\strlen($body) > $expected) {
-                    $body = \substr($body, 0, $expected);
-                }
-            }
-
-            return $body;
+            return ['headers' => $headers, 'body' => $body];
         } finally {
             $ffi->close($sock);
         }
