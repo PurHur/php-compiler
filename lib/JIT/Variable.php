@@ -392,7 +392,7 @@ final class Variable {
             return $context->ensureScriptGlobal($name);
         }
         $type = self::getTypeFromType($op->type);
-        if ($type === self::TYPE_NULL) {
+        if ($type === self::TYPE_NULL || $type === self::TYPE_VALUE) {
             $slot = JitValueBox::alloc($context);
 
             return new Variable(

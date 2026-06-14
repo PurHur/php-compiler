@@ -179,9 +179,10 @@ class Context {
     public \SplObjectStorage $coalesceAssignTargets;
 
     /**
-     * Per-function scope slot → JIT variable for ?: phi temps (#72, #8555).
+     * Per-function ?: phi temp → JIT variable (#72, #8555).
      *
-     * php-cfg may emit distinct {@see Operand\Temporary} objects per CFG block for one slot.
+     * Keyed by {@see Block::cfgVarRoot()} identity when present; branch and merge
+     * blocks otherwise reuse different block-local slot integers for one phi.
      *
      * @var array<int, Variable>
      */
@@ -1424,18 +1425,56 @@ class Context {
 
             return;
         }
+        foreach ($this->jitScopeBlocksForOperand($op) as $scopeBlock) {
+            $bound = $this->functionScopeBindingVariable($op, $scopeBlock);
+            if (null !== $bound) {
+                $this->scope->variables[$op] = $bound;
+
+                return;
+            }
+        }
         $var = Variable::fromOp($this, $func, $basicBlock, $block, $op);
         $var->initialize();
         $this->setVariableOp($op, $var);
     }
 
-    public function setVariableOp(Operand $op, Variable $var) {
-        $this->scope->variables[$op] = $var;
-        foreach ($this->jitScopeBlocksForOperand($op) as $scopeBlock) {
-            $slot = $scopeBlock->slotForOperand($op);
+    /**
+     * Stable binding key for ?: phi temps across CFG blocks (#8555).
+     */
+    public function functionScopeBindingKey(Operand $op, ?Block $block = null): ?int
+    {
+        $root = Block::cfgVarRoot($op);
+        if (null !== $root) {
+            return spl_object_id($root);
+        }
+        if (null !== $block) {
+            $slot = $block->slotForOperand($op);
             if (null !== $slot) {
-                $this->functionScopeSlotBindings[$slot] = $var;
+                return $slot;
             }
+        }
+
+        return $this->jitScopeSlotForOperand($op);
+    }
+
+    public function functionScopeBindingVariable(Operand $op, ?Block $block = null): ?Variable
+    {
+        $key = $this->functionScopeBindingKey($op, $block);
+        if (null === $key) {
+            return null;
+        }
+
+        return $this->functionScopeSlotBindings[$key] ?? null;
+    }
+
+    public function setVariableOp(Operand $op, Variable $var) {
+        $key = $this->functionScopeBindingKey($op);
+        if (null !== $key && isset($this->functionScopeSlotBindings[$key])) {
+            $var = $this->functionScopeSlotBindings[$key];
+        }
+        $this->scope->variables[$op] = $var;
+        if (null !== $key) {
+            $this->functionScopeSlotBindings[$key] = $var;
         }
     }
 
@@ -1514,8 +1553,8 @@ class Context {
 
                 return true;
             }
-            if (isset($this->functionScopeSlotBindings[$slot])) {
-                $this->scope->variables[$op] = $this->functionScopeSlotBindings[$slot];
+            if (null !== ($bound = $this->functionScopeBindingVariable($op, $scopeBlock))) {
+                $this->scope->variables[$op] = $bound;
 
                 return true;
             }
@@ -1531,7 +1570,7 @@ class Context {
         if ($op instanceof Operand\Literal) {
             return true;
         }
-        if (null !== ($slot = $this->jitScopeSlotForOperand($op)) && isset($this->functionScopeSlotBindings[$slot])) {
+        if (null !== $this->functionScopeBindingVariable($op)) {
             return true;
         }
 
@@ -1583,11 +1622,11 @@ class Context {
                     throw new \LogicException("Unknown variable referenced: " . get_class($op));
                 }
             } elseif ($op instanceof Operand\Temporary) {
-                $slot = $this->jitScopeSlotForOperand($op);
-                if (null !== $slot && isset($this->functionScopeSlotBindings[$slot])) {
-                    $this->scope->variables[$op] = $this->functionScopeSlotBindings[$slot];
+                $bound = $this->functionScopeBindingVariable($op);
+                if (null !== $bound) {
+                    $this->scope->variables[$op] = $bound;
 
-                    return $this->functionScopeSlotBindings[$slot];
+                    return $bound;
                 }
                 // Temporaries can be introduced by CFG transforms after scope variable allocation.
                 // Treat unknown temporaries as boxed __value__ slots to keep self-host emit paths alive.
@@ -1678,12 +1717,18 @@ class Context {
         }
         $returnVarNames = [];
         $returnOperands = new \SplObjectStorage();
+        /** @var array<int, true> */
+        $returnBindingKeys = [];
         foreach ($block->opCodes as $blockOp) {
             if (OpCode::TYPE_RETURN !== $blockOp->type || null === $blockOp->arg1) {
                 continue;
             }
             $returnOp = $block->getOperand($blockOp->arg1);
             $returnOperands[$returnOp] = true;
+            $bindingKey = $this->functionScopeBindingKey($returnOp, $block);
+            if (null !== $bindingKey) {
+                $returnBindingKeys[$bindingKey] = true;
+            }
             $name = OperandName::resolve($returnOp);
             if (null !== $name) {
                 $returnVarNames[$name] = true;
@@ -1691,9 +1736,19 @@ class Context {
         }
         if (null !== $skipOperand) {
             $returnOperands[$skipOperand] = true;
+            $bindingKey = $this->functionScopeBindingKey($skipOperand, $block);
+            if (null !== $bindingKey) {
+                $returnBindingKeys[$bindingKey] = true;
+            }
             $name = OperandName::resolve($skipOperand);
             if (null !== $name) {
                 $returnVarNames[$name] = true;
+            }
+        }
+        $returnBoundVars = new \SplObjectStorage();
+        foreach (array_keys($returnBindingKeys) as $bindingKey) {
+            if (isset($this->functionScopeSlotBindings[$bindingKey])) {
+                $returnBoundVars[$this->functionScopeSlotBindings[$bindingKey]] = true;
             }
         }
         foreach ($block->orig->deadOperands as $op) {
@@ -1704,6 +1759,10 @@ class Context {
             if ($returnOperands->contains($op)) {
                 continue;
             }
+            $deadBindingKey = $this->functionScopeBindingKey($op, $block);
+            if (null !== $deadBindingKey && isset($returnBindingKeys[$deadBindingKey])) {
+                continue;
+            }
             if ($coalesceResults->contains($op)) {
                 continue;
             }
@@ -1711,6 +1770,9 @@ class Context {
                 continue;
             }
             $var = $this->scope->variables[$op];
+            if ($returnBoundVars->contains($var)) {
+                continue;
+            }
             $name = OperandName::resolve($op);
             if (
                 null !== $var->superglobalName

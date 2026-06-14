@@ -692,4 +692,18 @@ final class JitValueBox
             self::valuePtrFromVariable($context, $var)
         );
     }
+
+    /**
+     * Nullable ?string return value that survives phi/box delref at function exit (#8555).
+     *
+     * AOT may reorder {@see __value__valueDelref} ahead of the returned __string__* when the
+     * pointer still aliases the boxed slot; {@see __string__separate} is null-safe.
+     */
+    public static function readOwnedStringOrNull(Context $context, Variable $var): Value
+    {
+        return $context->builder->call(
+            $context->lookupFunction('__string__separate'),
+            self::readStringOrNull($context, $var)
+        );
+    }
 }
