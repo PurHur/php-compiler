@@ -703,6 +703,52 @@ final class JitValueCompare
         return self::orderedLongCompare($context, $opcodeType, $__left, $rightLong);
     }
 
+    public static function orderedValueToNativeDouble(
+        Context $context,
+        int $opcodeType,
+        Variable $boxed,
+        Value $nativeDouble
+    ): Value {
+        if (!JitValueBox::isValueOperand($boxed)) {
+            throw new \LogicException('Expected boxed __value__ operand');
+        }
+        $valuePtr = JitValueBox::valuePtrFromVariable($context, $boxed);
+        $leftDouble = $context->builder->call(
+            $context->lookupFunction('__value__readDouble'),
+            $valuePtr
+        );
+
+        return JitFloatCompare::relationalCompare(
+            $context,
+            $opcodeType,
+            $leftDouble,
+            $nativeDouble
+        );
+    }
+
+    public static function orderedNativeDoubleToValue(
+        Context $context,
+        int $opcodeType,
+        Value $nativeDouble,
+        Variable $boxed
+    ): Value {
+        if (!JitValueBox::isValueOperand($boxed)) {
+            throw new \LogicException('Expected boxed __value__ operand');
+        }
+        $valuePtr = JitValueBox::valuePtrFromVariable($context, $boxed);
+        $rightDouble = $context->builder->call(
+            $context->lookupFunction('__value__readDouble'),
+            $valuePtr
+        );
+
+        return JitFloatCompare::relationalCompare(
+            $context,
+            $opcodeType,
+            $nativeDouble,
+            $rightDouble
+        );
+    }
+
     public static function orderedValueToValue(
         Context $context,
         int $opcodeType,

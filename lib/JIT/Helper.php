@@ -991,6 +991,15 @@ restart:
                 );
                 goto return_bool;
             }
+            if (Variable::TYPE_NATIVE_DOUBLE === $rightType && self::isOrderedCompareOpcode($opcode->type)) {
+                $result = JitValueCompare::orderedValueToNativeDouble(
+                    $this->context,
+                    $opcode->type,
+                    $left,
+                    $rightValue
+                );
+                goto return_bool;
+            }
             if (OpCode::TYPE_IDENTICAL === $opcode->type) {
                 if (Variable::TYPE_NATIVE_BOOL === $rightType) {
                     $valuePtr = Variable::KIND_VARIABLE === $left->kind
@@ -1095,6 +1104,15 @@ restart:
             }
             if (Variable::TYPE_NATIVE_LONG === $leftType && self::isOrderedCompareOpcode($opcode->type)) {
                 $result = JitValueCompare::orderedNativeLongToValue(
+                    $this->context,
+                    $opcode->type,
+                    $leftValue,
+                    $right
+                );
+                goto return_bool;
+            }
+            if (Variable::TYPE_NATIVE_DOUBLE === $leftType && self::isOrderedCompareOpcode($opcode->type)) {
+                $result = JitValueCompare::orderedNativeDoubleToValue(
                     $this->context,
                     $opcode->type,
                     $leftValue,
