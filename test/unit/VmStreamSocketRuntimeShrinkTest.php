@@ -23,7 +23,7 @@ final class VmStreamSocketRuntimeShrinkTest extends TestCase
         $source = (string) file_get_contents(__DIR__.'/../../ext/standard/VmStreamSocketNative.php');
         $this->assertStringContainsString('$ffi->socket', $source);
         $this->assertStringContainsString('$ffi->connect', $source);
-        $this->assertStringContainsString('php://fd/', $source);
+        $this->assertStringContainsString('VmPhpFdStream::adopt', $source);
         $this->assertDoesNotMatchRegularExpression('/@?\\\\stream_socket_client\\s*\\(/', $source);
     }
 

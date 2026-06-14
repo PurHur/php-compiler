@@ -51,7 +51,7 @@ final class VmFsOpenNativeRuntimeShrinkTest extends TestCase
     {
         $source = (string) file_get_contents(__DIR__.'/../../ext/standard/VmFs.php');
         $this->assertStringContainsString('self::fopen($path, \'rb\')', $source);
-        $this->assertStringContainsString('self::lookup($handle)', $source);
+        $this->assertStringContainsString('passthruHandleToStdout', $source);
         $this->assertDoesNotMatchRegularExpression('/readfile\([^)]+\)\s*\{[^}]*@fopen\(\$path/s', $source);
     }
 

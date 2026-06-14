@@ -36,7 +36,7 @@ final class VmFsOpenNative
     }
 
     /**
-     * @return resource|false PHP stream backed by dup'd fd via php://fd/
+     * @return int|false VM fd stream handle
      */
     public static function open(string $path, string $mode)
     {
@@ -67,14 +67,15 @@ final class VmFsOpenNative
                 return false;
             }
 
-            $stream = @fopen('php://fd/'.$dupFd, self::phpStreamMode($mode));
-            if (false === $stream) {
+            $streamMode = self::phpStreamMode($mode);
+            $handle = VmPhpFdStream::adopt($dupFd, $path, $streamMode);
+            if (false === $handle) {
                 $ffi->close($dupFd);
 
                 return false;
             }
 
-            return $stream;
+            return $handle;
         } catch (\Throwable) {
             return false;
         }

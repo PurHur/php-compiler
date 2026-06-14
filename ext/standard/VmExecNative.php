@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace PHPCompiler\ext\standard;
 
 /**
- * VM exec()/passthru()/system() via libc popen(3) — no host PHP wrappers (#3278).
+ * VM exec()/passthru()/system() via libc popen(3) — no host PHP wrappers (#3278, #8533).
  *
  * php-src: ext/standard/exec.c — PHP_FUNCTION(exec), passthru, system
  */
@@ -27,16 +27,16 @@ final class VmExecNative
             return false;
         }
 
-        $stream = $opened['stream'];
+        $handle = $opened['handle'];
         $lines = [];
-        while (!\feof($stream)) {
-            $line = @\fgets($stream);
+        while (!VmPhpFdStream::eof($handle)) {
+            $line = VmPhpFdStream::fgets($handle);
             if (false === $line) {
                 break;
             }
             $lines[] = \rtrim($line, "\r\n");
         }
-        @\fclose($stream);
+        VmPhpFdStream::close($handle);
 
         $status = VmPopenNative::pclose($opened['file']);
         if (-1 === $status) {

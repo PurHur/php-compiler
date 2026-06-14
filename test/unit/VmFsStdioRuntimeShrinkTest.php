@@ -16,10 +16,11 @@ final class VmFsStdioRuntimeShrinkTest extends TestCase
         $this->assertStringContainsString('VmFsStdio::open', $source);
     }
 
-    public function testVmFsStdioUsesNativeDupBeforeHostFallback(): void
+    public function testVmFsStdioUsesNativeDupOnly(): void
     {
         $source = (string) file_get_contents(__DIR__.'/../../ext/standard/VmFsStdio.php');
         $this->assertStringContainsString('VmFsStdioNative::openDupFd', $source);
+        $this->assertDoesNotMatchRegularExpression('/@fopen\\s*\\(/', $source);
     }
 
     public function testStreamIoJitDefinesStdioHelper(): void
