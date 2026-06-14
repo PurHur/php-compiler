@@ -835,6 +835,7 @@ require_once __DIR__.'/../../../ext/standard/VmHost.php';
 require_once __DIR__.'/../../../ext/standard/VmHrtime.php';
 require_once __DIR__.'/../../../ext/standard/VmHrtimeNative.php';
 require_once __DIR__.'/../../../ext/standard/VmHttpBuildQuery.php';
+require_once __DIR__.'/../../../ext/standard/VmHttpFetchNative.php';
 require_once __DIR__.'/../../../ext/standard/VmHttpLastResponseHeaders.php';
 require_once __DIR__.'/../../../ext/standard/VmHttpResponse.php';
 require_once __DIR__.'/../../../ext/standard/VmImage.php';
