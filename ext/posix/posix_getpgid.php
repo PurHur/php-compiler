@@ -53,6 +53,6 @@ final class posix_getpgid extends Internal
             return JitValueBox::pointer($context, $slot);
         }
 
-        throw new \Error('posix_getpgid() is not implemented for JIT in this compiler build (issue #6505)');
+        return JitPosix::getpgid($context, $args[0]);
     }
 }
