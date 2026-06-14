@@ -8647,9 +8647,6 @@ class Compiler {
         if (null === $producer) {
             return null;
         }
-        if (!$this->operandsReferToSameVariable($arg, $producer->result)) {
-            return null;
-        }
         $producerSlot = $block->slotForOperand($producer->result);
         if (null === $producerSlot) {
             return null;
@@ -8689,6 +8686,20 @@ class Compiler {
                 return $producers[0];
             }
             if ($argCount - 1 === $argIndex && $this->isEmbeddedCallLiteralArg($callArgs[0] ?? null)) {
+                return $producers[0];
+            }
+            if ($producers[0] instanceof Op\Expr\Array_) {
+                if (1 === $argCount) {
+                    return $producers[0];
+                }
+                if (
+                    $argCount - 1 === $argIndex
+                    && !$this->isEmbeddedCallLiteralArg($callArgs[$argIndex] ?? null)
+                ) {
+                    return $producers[0];
+                }
+            }
+            if (0 === $argIndex && !($producers[0] instanceof Op\Expr\Array_)) {
                 return $producers[0];
             }
 
