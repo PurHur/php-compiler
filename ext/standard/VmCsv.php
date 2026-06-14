@@ -85,4 +85,58 @@ final class VmCsv
 
         return $fields;
     }
+
+    /**
+     * Format one CSV row for fputcsv() (php-src ext/standard/file.c; #5243).
+     *
+     * @param list<string> $fields
+     */
+    public static function formatLine(
+        array $fields,
+        string $separator = ',',
+        string $enclosure = '"',
+        string $escape = '\\',
+    ): string {
+        $delim = '' === $separator ? ',' : $separator[0];
+        $enc = '' === $enclosure ? '"' : $enclosure[0];
+        $esc = '' === $escape ? '\\' : $escape[0];
+
+        $parts = [];
+        foreach ($fields as $field) {
+            $parts[] = self::formatField($field, $delim, $enc, $esc);
+        }
+
+        return \implode($delim, $parts);
+    }
+
+    private static function formatField(string $field, string $delim, string $enc, string $esc): string
+    {
+        $needsQuotes = false;
+        for ($i = 0, $len = \strlen($field); $i < $len; ++$i) {
+            $c = $field[$i];
+            if ($c === $delim || $c === $enc || $c === $esc || "\n" === $c || "\r" === $c) {
+                $needsQuotes = true;
+                break;
+            }
+        }
+        if (!$needsQuotes) {
+            return $field;
+        }
+
+        $out = $enc;
+        for ($i = 0, $len = \strlen($field); $i < $len; ++$i) {
+            $c = $field[$i];
+            if ($c === $enc) {
+                $out .= $enc.$enc;
+                continue;
+            }
+            if ($c === $esc) {
+                $out .= $esc.$esc;
+                continue;
+            }
+            $out .= $c;
+        }
+
+        return $out.$enc;
+    }
 }
