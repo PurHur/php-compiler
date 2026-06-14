@@ -3531,6 +3531,98 @@ class Object_ extends Type {
         return $globalName;
     }
 
+    public function embedClassConstArrayVmElementAtIndex(
+        Context $context,
+        PHPLLVM\Value $ht,
+        PHPLLVM\Value $index,
+        VMVariable $resolved
+    ): void {
+        $resolved = $resolved->resolveIndirect();
+        if (VMVariable::TYPE_ENUM_CASE === $resolved->type
+            || (VMVariable::TYPE_OBJECT === $resolved->type
+                && \PHPCompiler\VM\EnumCaseSupport::isEnumCase($resolved->toObject()))) {
+            $enumClass = \PHPCompiler\VM\EnumCaseSupport::enumClassForCaseVariable($resolved);
+            if (null === $enumClass) {
+                throw new \LogicException('Class constant array enum case requires enum class');
+            }
+            $caseKey = strtolower(\PHPCompiler\VM\EnumCaseSupport::enumCaseNameForVariable($resolved));
+            $enumClassId = $this->lookup(strtolower($enumClass->name));
+            $globalName = $this->ensureEnumCaseSingletonGlobal($enumClassId, $caseKey);
+            $obj = $context->builder->load($this->classConstObjectGlobals[$globalName]);
+            $context->builder->call(
+                $context->lookupFunction('__hashtable__setObjectAt'),
+                $ht,
+                $index,
+                $obj
+            );
+
+            return;
+        }
+        if (VMVariable::TYPE_OBJECT === $resolved->type) {
+            $object = $resolved->toObject();
+            $jitClassId = $this->lookup(strtolower($object->class->name));
+            $obj = $this->allocateClassConstantObject($jitClassId);
+            $context->builder->call(
+                $context->lookupFunction('__hashtable__setObjectAt'),
+                $ht,
+                $index,
+                $obj
+            );
+
+            return;
+        }
+        throw new \LogicException(
+            'Unsupported class constant array element type for JIT: '
+            .Variable::getStringType(Variable::fromVMVariable($resolved->type))
+        );
+    }
+
+    public function embedClassConstArrayVmElementAtStringKey(
+        Context $context,
+        PHPLLVM\Value $ht,
+        PHPLLVM\Value $stringKey,
+        VMVariable $resolved
+    ): void {
+        $resolved = $resolved->resolveIndirect();
+        if (VMVariable::TYPE_ENUM_CASE === $resolved->type
+            || (VMVariable::TYPE_OBJECT === $resolved->type
+                && \PHPCompiler\VM\EnumCaseSupport::isEnumCase($resolved->toObject()))) {
+            $enumClass = \PHPCompiler\VM\EnumCaseSupport::enumClassForCaseVariable($resolved);
+            if (null === $enumClass) {
+                throw new \LogicException('Class constant array enum case requires enum class');
+            }
+            $caseKey = strtolower(\PHPCompiler\VM\EnumCaseSupport::enumCaseNameForVariable($resolved));
+            $enumClassId = $this->lookup(strtolower($enumClass->name));
+            $globalName = $this->ensureEnumCaseSingletonGlobal($enumClassId, $caseKey);
+            $obj = $context->builder->load($this->classConstObjectGlobals[$globalName]);
+            $context->builder->call(
+                $context->lookupFunction('__hashtable__setObjectKeyObject'),
+                $ht,
+                $stringKey,
+                $obj
+            );
+
+            return;
+        }
+        if (VMVariable::TYPE_OBJECT === $resolved->type) {
+            $object = $resolved->toObject();
+            $jitClassId = $this->lookup(strtolower($object->class->name));
+            $obj = $this->allocateClassConstantObject($jitClassId);
+            $context->builder->call(
+                $context->lookupFunction('__hashtable__setObjectKeyObject'),
+                $ht,
+                $stringKey,
+                $obj
+            );
+
+            return;
+        }
+        throw new \LogicException(
+            'Unsupported class constant array element type for JIT: '
+            .Variable::getStringType(Variable::fromVMVariable($resolved->type))
+        );
+    }
+
     public function inheritInterfaceConstants(int $classId, string $className): void
     {
         $classLc = strtolower(ltrim($className, '\\'));

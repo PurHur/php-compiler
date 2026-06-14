@@ -216,6 +216,7 @@ class Analyzer
                 return null;
             } elseif ($op instanceof Op\Expr\BinaryOp
                 || $op instanceof Op\Expr\ArrayDimFetch
+                || $op instanceof Op\Expr\Assertion
                 || $op instanceof Op\Expr\New_
                 || $op instanceof Op\Expr\FuncCall
                 || $op instanceof Op\Expr\NsFuncCall
