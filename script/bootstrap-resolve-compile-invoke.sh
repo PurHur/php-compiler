@@ -265,11 +265,26 @@ bootstrap_ensure_inventory_argv_driver() {
     echo "bootstrap-ensure-inventory-argv-driver: missing ${root}/bin/compile.php" >&2
     return 1
   fi
-  echo "bootstrap-ensure-inventory-argv-driver: building inventory argv driver ${out} (#3012)" >&2
   if ! declare -F bootstrap_gen0_seed_prelinked_m3_sidecars >/dev/null 2>&1; then
     # shellcheck source=bootstrap-gen0-install-prelinked-driver.sh
     source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/bootstrap-gen0-install-prelinked-driver.sh"
   fi
+  if [[ "${BOOTSTRAP_M5_NO_ZEND:-0}" == "1" || "${BOOTSTRAP_NO_ZEND_FALLBACK:-0}" == "1" ]]; then
+    bootstrap_gen0_seed_prelinked_m3_sidecars 2>/dev/null || true
+    bootstrap_ensure_m3_compiler_lib_sidecar 2>/dev/null || true
+    if bootstrap_gen0_copy_prelinked_inventory_driver "${out}" "" "${out}"; then
+      if bootstrap_is_inventory_bin_compile_argv_driver "${out}" \
+        && bootstrap_inventory_argv_driver_smoke "${out}" \
+        && bootstrap_inventory_argv_driver_m4_smoke "${out}"; then
+        return 0
+      fi
+    fi
+    if [[ "${BOOTSTRAP_M5_NO_ZEND:-0}" == "1" ]]; then
+      echo "bootstrap-ensure-inventory-argv-driver: BOOTSTRAP_M5_NO_ZEND=1 — prelinked inventory driver failed smoke (#3053)" >&2
+      return 1
+    fi
+  fi
+  echo "bootstrap-ensure-inventory-argv-driver: building inventory argv driver ${out} (#3012)" >&2
   bootstrap_gen0_seed_prelinked_m3_sidecars 2>/dev/null || true
   bootstrap_ensure_m3_compiler_lib_sidecar 2>/dev/null || true
   # Prefer Zend inventory emit; stale prelinked gen-0 can print compile OK without writing -o (#3046).
@@ -351,7 +366,9 @@ bootstrap_resolve_compile_driver() {
     fi
   done < <(bootstrap_list_native_compile_drivers)
 
-  if [[ "${BOOTSTRAP_ALLOW_GEN0_ZEND:-1}" == "1" ]] && command -v php >/dev/null 2>&1; then
+  if [[ "${BOOTSTRAP_ALLOW_GEN0_ZEND:-1}" == "1" ]] \
+    && [[ "${BOOTSTRAP_M5_NO_ZEND:-0}" != "1" ]] \
+    && command -v php >/dev/null 2>&1; then
     BOOTSTRAP_COMPILE_DRIVER_MODE=zend
     BOOTSTRAP_COMPILE_DRIVER="${root}/bin/compile.php"
     return 0

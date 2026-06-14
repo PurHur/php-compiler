@@ -86,9 +86,9 @@ Shipped examples under `examples/` are **regression fixtures** for VM/JIT/AOT an
 | **M2** — Spine toward full inventory | ✅ **2627** / **2627** |
 | **M3** — Native compiles PHP (no Zend emit) | ✅ Smoke + inventory argv driver strict native |
 | **M4** — Bootstrap loop (next revision) | ✅ `bootstrap-loop-probe` full ladder |
-| **M5** — Full self-host, no `vendor/` cold boot | 🚧 Presenter strict ✅; compiled-only cold boot open |
+| **M5** — Full self-host, no `vendor/` cold boot | ✅ Presenter strict + compiled-only empty `build/` cold boot ([#3053](https://github.com/PurHur/php-compiler/issues/3053)) |
 
-**Critical path:** shrink compile-spine stubs on M3 allowlist → grow literal spine ratio → retire Zend on empty `build/` ([#1492](https://github.com/PurHur/php-compiler/issues/1492)).
+**Critical path:** VM driver execute probe ([#2201](https://github.com/PurHur/php-compiler/issues/2201)), MCJIT execute ([#98](https://github.com/PurHur/php-compiler/issues/98)).
 
 Contributor detail: [`docs/self-host-target.md`](https://github.com/PurHur/php-compiler/blob/master/docs/self-host-target.md), [`docs/bootstrap-selfhost.md`](https://github.com/PurHur/php-compiler/blob/master/docs/bootstrap-selfhost.md).
 

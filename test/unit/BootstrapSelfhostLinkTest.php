@@ -29,6 +29,12 @@ final class BootstrapSelfhostLinkTest extends TestCase
         $this->assertStringContainsString('bootstrap-gen0-install-prelinked-driver.sh', $link);
         $this->assertStringContainsString('bootstrap_gen0_install_prelinked_driver', $link);
         $this->assertStringContainsString('BOOTSTRAP_M5_NO_ZEND', $link);
+        $this->assertStringContainsString('bootstrap_gen0_copy_prelinked_inventory_driver', $link);
+        $this->assertMatchesRegularExpression(
+            '/BOOTSTRAP_M5_NO_ZEND[\s\S]*bootstrap_gen0_install_prelinked_driver[\s\S]*bootstrap_resolve_compile_driver/s',
+            $link,
+            'M5 cold boot installs prelinked gen-0 before compile driver resolve (#3053)'
+        );
         $install = (string) file_get_contents(self::$root.'/script/bootstrap-gen0-install-prelinked-driver.sh');
         $this->assertStringContainsString('prelinked/bootstrap-gen0/bin-compile-aot', $install);
         $this->assertStringContainsString('bootstrap_gen0_copy_prelinked_inventory_driver', $install);
@@ -102,6 +108,15 @@ final class BootstrapSelfhostLinkTest extends TestCase
         $this->assertStringContainsString('failed (exit', $body);
         $this->assertStringContainsString('falling back to Zend gen-0', $body);
         $this->assertStringContainsString('BOOTSTRAP_M5_NO_ZEND', $body);
+        $this->assertStringContainsString(
+            'BOOTSTRAP_M5_NO_ZEND=1 — prelinked inventory driver failed smoke',
+            $body,
+            'inventory argv driver refuses Zend rebuild under M5 no-Zend (#3053)'
+        );
+
+        $coldBoot = self::$root.'/script/bootstrap-selfhost-cold-boot-probe.sh';
+        $this->assertFileExists($coldBoot);
+        $this->assertStringContainsString('BOOTSTRAP_M5_NO_ZEND=1', (string) file_get_contents($coldBoot));
 
         $dockerExec = (string) file_get_contents(self::$root.'/script/docker-exec.sh');
         $this->assertStringContainsString('bootstrap-selfhost-link', $dockerExec);

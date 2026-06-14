@@ -17,6 +17,17 @@ ci_apply_llvm_memory_env
 if [[ "${BOOTSTRAP_M5_NO_ZEND:-0}" == "1" ]]; then
   export BOOTSTRAP_NO_ZEND_FALLBACK=1
   export BOOTSTRAP_GEN0_ENSURE_COMPILED_DRIVER=0
+  export BOOTSTRAP_ALLOW_GEN0_ZEND=0
+  mkdir -p "${ROOT}/build"
+  if ! bootstrap_gen0_install_prelinked_driver; then
+    echo "bootstrap-selfhost-link: BOOTSTRAP_M5_NO_ZEND=1 requires prelinked/bootstrap-gen0/bin-compile-aot (#3053)" >&2
+    exit 1
+  fi
+  bootstrap_gen0_seed_prelinked_m3_sidecars 2>/dev/null || true
+  bootstrap_ensure_m3_compiler_lib_sidecar 2>/dev/null || true
+  bootstrap_gen0_copy_prelinked_inventory_driver \
+    "${ROOT}/build/bin-compile-aot-inventory" "" "${ROOT}/build/bin-compile-aot-inventory" \
+    2>/dev/null || true
 fi
 
 if bootstrap_resolve_compile_driver; then

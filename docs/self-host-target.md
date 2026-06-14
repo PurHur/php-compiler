@@ -71,7 +71,7 @@ That is **M5**. Everything below is the honest path from today’s bootstrap to 
 | **M2** | Spine grows toward full `bin/vm.php` inventory | ✅ **2627/2627** | **100%** |
 | **M3** | Self-host binary **compiles external PHP** (HelloWorld) without Zend emit | ✅ strict **native** + inventory argv | **~85%** |
 | **M4** | Self-host binary **rebuilds** the next compiler tree | ✅ full `bootstrap-loop-probe` ladder | **~90%** |
-| **M5** | Full self-host; Zend retired from loop | 🚧 `north-star5-verify --strict` ✅; Zend empty `build/` open | **~75%** |
+| **M5** | Full self-host; Zend retired from loop | ✅ `north-star5-verify --strict` + `BOOTSTRAP_M5_NO_ZEND=1` empty `build/` ([#3053](https://github.com/PurHur/php-compiler/issues/3053)) | **~90%** |
 
 **Indicative north star composite:** **~90%** (weighted across M0–M5; see formula below).
 
@@ -79,7 +79,7 @@ That is **M5**. Everything below is the honest path from today’s bootstrap to 
 
 | Indicator | Formula | Jun 2026 |
 |-----------|---------|----------|
-| **M2 spine progress** | `require_once` units in `compiler_lib_spine_smoke` ÷ Phase A inventory file count | **2558 / 2627** (`php script/bootstrap-spine-count.php`) |
+| **M2 spine progress** | `require_once` units in `compiler_lib_spine_smoke` ÷ Phase A inventory file count | **2627 / 2627** (`php script/bootstrap-spine-count.php`) |
 | **Public “Self-host” row** | Same M2 ratio until M3–M5 gates add weight ([`development-status.md`](pages/development-status.md)) | **~97%** |
 | **M5 vendor prelink** | `object_ok` packages ÷ 3 | **3 / 3** (cfg, types, llvm) |
 | **Composite (internal)** | Milestone weights in table above (M0–M1 = 100%, M2 = spine %, M3–M5 = gate %) | **~90%** |

@@ -285,6 +285,10 @@ bootstrap-selfhost-ensure-gen0-driver:
 	@test -x build/bin-compile-aot || BOOTSTRAP_M5_DRIVER_SMOKE=1 ./script/bootstrap-selfhost-driver-smoke.sh
 bootstrap-selfhost-link:
 	./script/bootstrap-selfhost-link.sh
+bootstrap-selfhost-link-no-zend:
+	BOOTSTRAP_M5_NO_ZEND=1 ./script/bootstrap-selfhost-link.sh
+bootstrap-selfhost-cold-boot-probe:
+	./script/bootstrap-selfhost-cold-boot-probe.sh
 bootstrap-selfhost-link-compiled: bootstrap-selfhost-ensure-gen0-driver
 	BOOTSTRAP_GEN0_ENSURE_COMPILED_DRIVER=1 ./script/bootstrap-selfhost-link.sh
 bootstrap-selfhost-compile-smoke:

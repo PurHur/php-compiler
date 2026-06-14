@@ -392,7 +392,8 @@ make examples-web-smoke # phpc serve + HTTP curls</pre>
           M2 spine SSOT: <code>php script/bootstrap-spine-count.php</code> → <strong>2627/2627</strong> Phase A inventory (literal coverage ✅).
           M4: <code>make bootstrap-loop-probe</code> full ladder ✅.
           M5: <code>./script/north-star5-verify.sh --strict</code> ✅.
-          Remaining M5: compiled-only cold boot on empty <code>build/</code> (no Zend), MCJIT execute ([#98](https://github.com/PurHur/php-compiler/issues/98)).
+          Remaining M5: MCJIT execute ([#98](https://github.com/PurHur/php-compiler/issues/98)).
+          Compiled-only cold boot on empty <code>build/</code>: <code>BOOTSTRAP_M5_NO_ZEND=1 make bootstrap-selfhost-link</code> ✅ ([#3053](https://github.com/PurHur/php-compiler/issues/3053)).
         </p>
       </div>
     </section>
@@ -435,8 +436,9 @@ make examples-web-smoke # phpc serve + HTTP curls</pre>
           <h4>M5</h4>
           <p>Vendor prelink <strong>3/3</strong> ✅; committed <code>.o</code> cold boot ✅;
             <code>north-star5-verify --strict</code> ✅; prelinked gen-0 refreshed via honest inventory emit;
-            Zend still used for empty <code>build/</code> on some hosts — compiled-only cold boot open
-            (<a href="https://github.com/PurHur/php-compiler/issues/1492">#1492</a>).</p>
+            compiled-only cold boot on empty <code>build/</code> via <code>BOOTSTRAP_M5_NO_ZEND=1</code> ✅
+            (<a href="https://github.com/PurHur/php-compiler/issues/3053">#3053</a>,
+            <a href="https://github.com/PurHur/php-compiler/issues/1492">#1492</a>).</p>
         </li>
       </ol>
     </section>
