@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 2662 |
-| Phase A inventory files (M2 ratio SSOT) | 2662 |
+| PHP files on vm.php path | 2665 |
+| Phase A inventory files (M2 ratio SSOT) | 2665 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 7193 |
+| Source constructs flagged (warnings) | 7200 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -333,8 +333,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/standard/JitCsvArg.php` | 0 | 1 |
 | `ext/standard/JitDate.php` | 0 | 5 |
 | `ext/standard/JitDateCreate.php` | 0 | 5 |
+| `ext/standard/JitDateCreateFromFormat.php` | 0 | 5 |
 | `ext/standard/JitDateIntervalCreateFromDateString.php` | 0 | 4 |
 | `ext/standard/JitDateIntervalFormat.php` | 0 | 1 |
+| `ext/standard/JitDateParse.php` | 0 | 1 |
+| `ext/standard/JitDateParseMaterializer.php` | 0 | 1 |
 | `ext/standard/JitDateSunFunc.php` | 0 | 1 |
 | `ext/standard/JitDateSunInfo.php` | 0 | 1 |
 | `ext/standard/JitDateSunInfoMaterializer.php` | 0 | 1 |
@@ -4713,6 +4716,15 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new JITVariable (line 183)
 - 7 class method(s)
 
+### `ext/standard/JitDateCreateFromFormat.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 29)
+- new JITVariable (line 175)
+- new JITVariable (line 185)
+- new JITVariable (line 193)
+- 7 class method(s)
+
 ### `ext/standard/JitDateIntervalCreateFromDateString.php`
 
 **Warnings** (review for bootstrap subset):
@@ -4725,6 +4737,16 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 
 **Warnings** (review for bootstrap subset):
 - 9 class method(s)
+
+### `ext/standard/JitDateParse.php`
+
+**Warnings** (review for bootstrap subset):
+- 4 class method(s)
+
+### `ext/standard/JitDateParseMaterializer.php`
+
+**Warnings** (review for bootstrap subset):
+- 4 class method(s)
 
 ### `ext/standard/JitDateSunFunc.php`
 

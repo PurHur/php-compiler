@@ -51,6 +51,6 @@ final class date_parse_from_format extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        throw new \LogicException('date_parse_from_format() is not implemented for JIT in this compiler build (issue #6172)');
+        return JitDateParse::invokeDateParseFromFormat($context, ...$args);
     }
 }
