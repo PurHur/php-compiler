@@ -68,7 +68,7 @@ final class var_dump_ extends Internal
             return;
         }
         if (Variable::TYPE_FLOAT === $var->type) {
-            self::write('float('.$var->toFloat().")\n");
+            self::write('float('.VmFloatDtoa::formatVarDump($var->toFloat()).")\n");
 
             return;
         }
