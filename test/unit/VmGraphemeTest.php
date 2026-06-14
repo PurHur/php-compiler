@@ -65,4 +65,24 @@ final class VmGraphemeTest extends TestCase
         $this->assertSame('', VmGrapheme::extract('abc', 0));
         $this->assertFalse(VmGrapheme::extract('abc', 1, 99));
     }
+
+    public function testSubstrGraphemeClusters(): void
+    {
+        $s = "a\xCC\x81b";
+        $this->assertSame(2, VmGrapheme::strlen($s));
+        $this->assertSame("a\xCC\x81", VmGrapheme::substr($s, 0, 1));
+        $this->assertSame('b', VmGrapheme::substr($s, 1));
+        $this->assertSame('', VmGrapheme::substr($s, 5));
+        $this->assertSame('bc', VmGrapheme::substr('abc', 1, 2));
+        $this->assertFalse(VmGrapheme::substr("\xFF", 0, 1));
+    }
+
+    public function testStrposGraphemeClusters(): void
+    {
+        $s = "a\xCC\x81b";
+        $this->assertSame(1, VmGrapheme::strpos($s, 'b'));
+        $this->assertFalse(VmGrapheme::strpos($s, 'z'));
+        $this->assertFalse(VmGrapheme::strpos($s, ''));
+        $this->assertSame(1, VmGrapheme::strpos('ababa', 'b', 1));
+    }
 }

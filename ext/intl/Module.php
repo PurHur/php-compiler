@@ -32,6 +32,8 @@ class Module extends ModuleAbstract
     {
         return [
             new grapheme_strlen(),
+            new grapheme_substr(),
+            new grapheme_strpos(),
             new grapheme_str_contains(),
             new grapheme_strstr(),
             new grapheme_stristr(),

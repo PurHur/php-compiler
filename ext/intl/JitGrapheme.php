@@ -70,6 +70,42 @@ final class JitGrapheme
     /**
      * @param JITVariable[] $args
      */
+    public static function tryStrposFold(Context $context, array $args): ?Value
+    {
+        return self::tryPosFoldInternal($context, $args, static fn (string $h, string $n, int $o): int|false => VmGrapheme::strpos($h, $n, $o));
+    }
+
+    /**
+     * @param JITVariable[] $args
+     */
+    public static function trySubstrFold(Context $context, array $args): ?Value
+    {
+        $string = self::compileTimeString($args, 0);
+        if (null === $string) {
+            return null;
+        }
+        $start = self::compileTimeInt($args, 1);
+        if (null === $start) {
+            return null;
+        }
+        $length = null;
+        if (isset($args[2])) {
+            $length = self::compileTimeInt($args, 2);
+            if (null === $length) {
+                return null;
+            }
+        }
+        $result = VmGrapheme::substr($string, $start, $length);
+        if (false === $result) {
+            return $context->getTypeFromString('bool')->constInt(0, false);
+        }
+
+        return $context->builder->load($context->constantStringFromString($result));
+    }
+
+    /**
+     * @param JITVariable[] $args
+     */
     public static function tryStriposFold(Context $context, array $args): ?Value
     {
         return self::tryPosFoldInternal($context, $args, static fn (string $h, string $n, int $o): int|false => VmGrapheme::stripos($h, $n, $o));
