@@ -591,12 +591,8 @@ final class VmFs
         if (\is_array($data)) {
             $data = implode('', $data);
         }
-        $written = @file_put_contents($path, $data, $flags);
-        if (false === $written) {
-            return false;
-        }
 
-        return $written;
+        return VmFsWriteNative::write($path, $data, $flags);
     }
 
     public static function fopen(string $path, string $mode, ?\PHPCompiler\VM\Context $ctx = null) {
