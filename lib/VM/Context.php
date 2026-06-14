@@ -737,6 +737,36 @@ class Context {
     }
 
     /**
+     * Drop suspended try-body call sites when catch takes over from a nested throw (#5331, #5896).
+     *
+     * The run stack holds suspended *callers* only (see TYPE_FUNC_CALL push). Remove entries for
+     * $handler and callees invoked from its try body, but keep $handler's callers so catch/return
+     * can resume (maintainer probe() parity scripts).
+     */
+    public function truncateRunStackForCatch(Frame $handler): void
+    {
+        while (null !== $this->runStack) {
+            $suspended = $this->runStack->frame;
+            if ($suspended === $handler || $this->frameIsDescendantOf($suspended, $handler)) {
+                $this->runStack = $this->runStack->prev;
+                continue;
+            }
+            break;
+        }
+    }
+
+    private function frameIsDescendantOf(Frame $frame, Frame $ancestor): bool
+    {
+        for ($f = $frame; null !== $f; $f = $f->parent) {
+            if ($f === $ancestor) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /**
      * Active user frames, innermost first (matches debug_backtrace() order, #1378, #3626).
      *
      * @return list<Frame>
