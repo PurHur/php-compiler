@@ -6266,6 +6266,13 @@ class JIT {
                     $right = $this->context->getVariableFromOp($block->getOperand($op->arg3));
                     if (null !== $result->objectPropertySlot) {
                         $this->compileObjectPropertyConcatOp($result, $left, $right);
+                    } elseif (Variable::TYPE_VALUE === $result->type || JIT\JitValueBox::isValueOperand($result)) {
+                        $newVal = $this->compileConcatIntoNewString($left, $right);
+                        $this->context->builder->call(
+                            $this->context->lookupFunction('__value__writeString'),
+                            $this->valueBoxPointer($result),
+                            $this->context->helper->loadValue($newVal)
+                        );
                     } else {
                         $this->context->type->string->concat($result, $left, $right);
                     }
