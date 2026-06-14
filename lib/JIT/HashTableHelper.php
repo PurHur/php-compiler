@@ -320,17 +320,11 @@ final class HashTableHelper
                         $context->constantFromFloat($resolved->toFloat())
                     );
                 } elseif (\PHPCompiler\VM\Variable::TYPE_NULL === $resolved->type) {
-                    $nullSlot = JitValueBox::alloc($context);
                     $context->builder->call(
-                        $context->lookupFunction('__value__writeNull'),
-                        JitValueBox::pointer($context, $nullSlot)
+                        $context->lookupFunction('__hashtable__setNullAt'),
+                        $ht,
+                        $idx
                     );
-                    self::setAtIndex($context, $ht, $idx, new Variable(
-                        $context,
-                        Variable::TYPE_VALUE,
-                        Variable::KIND_VARIABLE,
-                        $nullSlot
-                    ));
                 } elseif (\PHPCompiler\VM\Variable::TYPE_ARRAY === $resolved->type) {
                     self::setAtIndex(
                         $context,
@@ -338,8 +332,14 @@ final class HashTableHelper
                         $idx,
                         self::variableFromVmHashTable($context, $resolved->toArray())
                     );
+                } elseif (\PHPCompiler\VM\Variable::TYPE_OBJECT === $resolved->type
+                    || \PHPCompiler\VM\Variable::TYPE_ENUM_CASE === $resolved->type) {
+                    $context->type->object->embedClassConstArrayVmElementAtIndex($context, $ht, $idx, $resolved);
                 } else {
-                    throw new \LogicException('Unsupported class constant array element type for JIT');
+                    throw new \LogicException(
+                        'Unsupported class constant array element type for JIT: '
+                        .Variable::getStringType(Variable::fromVMVariable($resolved->type))
+                    );
                 }
 
                 continue;
@@ -383,8 +383,26 @@ final class HashTableHelper
                     $key,
                     self::variableFromVmHashTable($context, $resolved->toArray())
                 );
+            } elseif (\PHPCompiler\VM\Variable::TYPE_NULL === $resolved->type) {
+                self::setAtKeyCoercingNumericString(
+                    $context,
+                    $ht,
+                    $key,
+                    new Variable(
+                        $context,
+                        Variable::TYPE_NULL,
+                        Variable::KIND_VALUE,
+                        $context->getTypeFromString('__value__*')->constNull()
+                    )
+                );
+            } elseif (\PHPCompiler\VM\Variable::TYPE_OBJECT === $resolved->type
+                || \PHPCompiler\VM\Variable::TYPE_ENUM_CASE === $resolved->type) {
+                $context->type->object->embedClassConstArrayVmElementAtStringKey($context, $ht, $key, $resolved);
             } else {
-                throw new \LogicException('Unsupported class constant array element type for JIT');
+                throw new \LogicException(
+                    'Unsupported class constant array element type for JIT: '
+                    .Variable::getStringType(Variable::fromVMVariable($resolved->type))
+                );
             }
         }
 
@@ -2122,6 +2140,13 @@ final class HashTableHelper
                     $ht,
                     $keyPtr,
                     $context->helper->loadValue($element)
+                );
+                break;
+            case Variable::TYPE_NULL:
+                $context->builder->call(
+                    $context->lookupFunction('__hashtable__setStringKeyNull'),
+                    $ht,
+                    $keyPtr
                 );
                 break;
             case Variable::TYPE_VALUE:

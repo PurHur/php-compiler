@@ -72,7 +72,8 @@ final class array_map extends Internal
         $arrays = \array_slice($args, 1);
         foreach ($arrays as $i => $array) {
             if (JITVariable::TYPE_HASHTABLE !== ($array->type & ~JITVariable::IS_NATIVE_ARRAY)
-                && !ArrayBuiltinHelper::isNativeArray($array->type)) {
+                && !ArrayBuiltinHelper::isNativeArray($array->type)
+                && JITVariable::TYPE_VALUE !== $array->type) {
                 throw new \LogicException(
                     'array_map() argument #'.($i + 2).' must be an array in this compiler build'
                 );
