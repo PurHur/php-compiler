@@ -107,9 +107,7 @@ final class IteratorHelper
             return $fromPropertySlot;
         }
         if (Variable::TYPE_VALUE === $array->type) {
-            $valPtr = Variable::KIND_VARIABLE === $array->kind
-                ? JitValueBox::pointer($context, $array->value)
-                : $array->value;
+            $valPtr = JitValueBox::valuePtrFromVariable($context, $array);
             $ht = $context->builder->call(
                 $context->lookupFunction('__value__readHashtable'),
                 $valPtr

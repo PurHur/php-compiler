@@ -36,42 +36,9 @@ final class JitValueCompare
 
         switch ($native->type) {
             case Variable::TYPE_NATIVE_BOOL:
-                $nullTag = $i8->constInt(Variable::TYPE_NULL, false);
-                $isNull = $context->builder->icmp(Builder::INT_EQ, $typeByte, $nullTag);
-                $boolTag = $i8->constInt(Variable::TYPE_NATIVE_BOOL, false);
-                $isBool = $context->builder->icmp(Builder::INT_EQ, $typeByte, $boolTag);
-                $stored = $context->builder->call(
-                    $context->lookupFunction('__value__readLong'),
-                    $valuePtr
-                );
-                $nativeBool = $context->helper->loadValue($native);
-                $matches = $context->builder->icmp(
-                    Builder::INT_EQ,
-                    $context->builder->zExt($stored, $nativeBool->typeOf()),
-                    $nativeBool
-                );
-
-                return $context->builder->select(
-                    $isNull,
-                    $falseVal,
-                    $context->builder->select($isBool, $matches, $falseVal)
-                );
+                return self::identicalValueToNativeBool($context, $valuePtr, $typeByte, $native);
             case Variable::TYPE_NATIVE_LONG:
-                $expectedType = $i8->constInt(Variable::TYPE_NATIVE_LONG, false);
-                $sameType = $context->builder->icmp(Builder::INT_EQ, $typeByte, $expectedType);
-                $stored = $context->builder->call(
-                    $context->lookupFunction('__value__readLong'),
-                    $valuePtr
-                );
-                $nativeLong = $context->helper->loadValue($native);
-                $isResource = self::nativeLongIsResource($context, $stored);
-                $matches = self::nativeLongEqualWithResourceIdentity($context, $stored, $nativeLong);
-
-                return $context->builder->select(
-                    $sameType,
-                    $context->builder->select($isResource, $falseVal, $matches),
-                    $falseVal
-                );
+                return self::identicalValueToNativeLong($context, $valuePtr, $typeByte, $native);
             case Variable::TYPE_NULL:
                 $nullTag = $i8->constInt(Variable::TYPE_NULL, false);
 
@@ -703,6 +670,52 @@ final class JitValueCompare
         return self::orderedLongCompare($context, $opcodeType, $__left, $rightLong);
     }
 
+    public static function orderedValueToNativeDouble(
+        Context $context,
+        int $opcodeType,
+        Variable $boxed,
+        Value $nativeDouble
+    ): Value {
+        if (!JitValueBox::isValueOperand($boxed)) {
+            throw new \LogicException('Expected boxed __value__ operand');
+        }
+        $valuePtr = JitValueBox::valuePtrFromVariable($context, $boxed);
+        $leftDouble = $context->builder->call(
+            $context->lookupFunction('__value__readDouble'),
+            $valuePtr
+        );
+
+        return JitFloatCompare::relationalCompare(
+            $context,
+            $opcodeType,
+            $leftDouble,
+            $nativeDouble
+        );
+    }
+
+    public static function orderedNativeDoubleToValue(
+        Context $context,
+        int $opcodeType,
+        Value $nativeDouble,
+        Variable $boxed
+    ): Value {
+        if (!JitValueBox::isValueOperand($boxed)) {
+            throw new \LogicException('Expected boxed __value__ operand');
+        }
+        $valuePtr = JitValueBox::valuePtrFromVariable($context, $boxed);
+        $rightDouble = $context->builder->call(
+            $context->lookupFunction('__value__readDouble'),
+            $valuePtr
+        );
+
+        return JitFloatCompare::relationalCompare(
+            $context,
+            $opcodeType,
+            $nativeDouble,
+            $rightDouble
+        );
+    }
+
     public static function orderedValueToValue(
         Context $context,
         int $opcodeType,
@@ -988,5 +1001,107 @@ final class JitValueCompare
         $match = $context->builder->or($plainMatch, $resourceMatch);
 
         return $context->builder->select($sameResKind, $match, $falseVal);
+    }
+
+    /** Avoid eager {@see __value__readLong} under LLVM select on non-bool tags (#8555). */
+    private static function identicalValueToNativeBool(
+        Context $context,
+        Value $valuePtr,
+        Value $typeByte,
+        Variable $native
+    ): Value {
+        $i8 = $context->getTypeFromString('int8');
+        $i1 = $context->getTypeFromString('int1');
+        $falseVal = $i1->constInt(0, false);
+        $nullTag = $i8->constInt(Variable::TYPE_NULL, false);
+        $boolTag = $i8->constInt(Variable::TYPE_NATIVE_BOOL, false);
+        $isNull = $context->builder->icmp(Builder::INT_EQ, $typeByte, $nullTag);
+        $isBool = $context->builder->icmp(Builder::INT_EQ, $typeByte, $boolTag);
+
+        $falseBlock = BasicBlockHelper::append($context, 'identical_value_native_bool_false');
+        $boolBlock = BasicBlockHelper::append($context, 'identical_value_native_bool_match');
+        $afterNullBlock = BasicBlockHelper::append($context, 'identical_value_native_bool_after_null');
+        $doneBlock = BasicBlockHelper::append($context, 'identical_value_native_bool_done');
+
+        $context->builder->branchIf($isNull, $falseBlock, $afterNullBlock);
+        $context->builder->positionAtEnd($afterNullBlock);
+        $context->builder->branchIf($isBool, $boolBlock, $falseBlock);
+
+        $context->builder->positionAtEnd($falseBlock);
+        $context->builder->branch($doneBlock);
+
+        $context->builder->positionAtEnd($boolBlock);
+        $stored = self::readBoolBoxedAsLong($context, $valuePtr);
+        $nativeBool = $context->helper->loadValue($native);
+        $expectedStored = $context->builder->zExt($nativeBool, $context->getTypeFromString('int64'));
+        $matches = $context->builder->icmp(Builder::INT_EQ, $stored, $expectedStored);
+        $context->builder->branch($doneBlock);
+
+        $context->builder->positionAtEnd($doneBlock);
+        $phi = $context->builder->phi($i1, 'identical_value_native_bool_phi');
+        $phi->addIncoming($falseVal, $falseBlock);
+        $phi->addIncoming($matches, $boolBlock);
+
+        return $phi;
+    }
+
+    /** Avoid eager {@see __value__readLong} under LLVM select on non-long tags (#8555). */
+    private static function identicalValueToNativeLong(
+        Context $context,
+        Value $valuePtr,
+        Value $typeByte,
+        Variable $native
+    ): Value {
+        $i8 = $context->getTypeFromString('int8');
+        $i1 = $context->getTypeFromString('int1');
+        $falseVal = $i1->constInt(0, false);
+        $longTag = $i8->constInt(Variable::TYPE_NATIVE_LONG, false);
+        $isLong = $context->builder->icmp(Builder::INT_EQ, $typeByte, $longTag);
+
+        $falseBlock = BasicBlockHelper::append($context, 'identical_value_native_long_false');
+        $longBlock = BasicBlockHelper::append($context, 'identical_value_native_long_match');
+        $doneBlock = BasicBlockHelper::append($context, 'identical_value_native_long_done');
+
+        $context->builder->branchIf($isLong, $longBlock, $falseBlock);
+
+        $context->builder->positionAtEnd($falseBlock);
+        $context->builder->branch($doneBlock);
+
+        $context->builder->positionAtEnd($longBlock);
+        $stored = $context->builder->call(
+            $context->lookupFunction('__value__readLong'),
+            $valuePtr
+        );
+        $nativeLong = $context->helper->loadValue($native);
+        $isResource = self::nativeLongIsResource($context, $stored);
+        $matches = self::nativeLongEqualWithResourceIdentity($context, $stored, $nativeLong);
+        $longResult = $context->builder->select($isResource, $falseVal, $matches);
+        $context->builder->branch($doneBlock);
+
+        $context->builder->positionAtEnd($doneBlock);
+        $phi = $context->builder->phi($i1, 'identical_value_native_long_phi');
+        $phi->addIncoming($falseVal, $falseBlock);
+        $phi->addIncoming($longResult, $longBlock);
+
+        return $phi;
+    }
+
+    private static function readBoolBoxedAsLong(Context $context, Value $valuePtr): Value
+    {
+        $map = $context->structFieldMap['__value__'];
+        $valueField = $context->builder->structGep($valuePtr, $map['value']);
+        $firstBytePtr = $context->builder->inBoundsGEP(
+            $valueField,
+            $context->getTypeFromString('int32')->constInt(0, false),
+            $context->getTypeFromString('int64')->constInt(0, false)
+        );
+        $firstByte = $context->builder->load($firstBytePtr);
+        $truthy = $context->builder->icmp(
+            Builder::INT_NE,
+            $firstByte,
+            $context->getTypeFromString('int8')->constInt(0, false)
+        );
+
+        return $context->builder->zExt($truthy, $context->getTypeFromString('int64'));
     }
 }

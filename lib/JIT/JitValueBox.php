@@ -256,7 +256,7 @@ final class JitValueBox
             case Variable::TYPE_STRING:
                 $owned = $context->builder->call(
                     $context->lookupFunction('__string__separate'),
-                    $context->helper->loadValue($value)
+                    JitStringArg::lowerDominating($context, $value, 'value box assign')
                 );
                 $context->builder->call(
                     $context->lookupFunction('__value__writeString'),
@@ -679,5 +679,18 @@ final class JitValueBox
         }
 
         return self::normalizeValuePtr($context, $raw);
+    }
+
+    /**
+     * Read a nullable string return from a boxed union (ternary string|null, issue #8555).
+     *
+     * {@see __value__readString} returns null for TYPE_NULL / non-string tags (Value.pre).
+     */
+    public static function readStringOrNull(Context $context, Variable $var): Value
+    {
+        return $context->builder->call(
+            $context->lookupFunction('__value__readString'),
+            self::valuePtrFromVariable($context, $var)
+        );
     }
 }

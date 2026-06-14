@@ -921,6 +921,15 @@ restart:
         }
         if (Variable::TYPE_VALUE === $leftType && Variable::TYPE_VALUE !== $rightType) {
             if (Variable::TYPE_NATIVE_LONG === $rightType || Variable::TYPE_NATIVE_BOOL === $rightType) {
+                // Strict compare before JitLongArg::lower — __value__readLong on bool tags segfaults (#8555).
+                if (OpCode::TYPE_IDENTICAL === $opcode->type) {
+                    $result = JitValueCompare::identicalToNative($this->context, $left, $right);
+                    goto return_bool;
+                }
+                if (OpCode::TYPE_NOT_IDENTICAL === $opcode->type) {
+                    $result = JitValueCompare::notIdenticalToNative($this->context, $left, $right);
+                    goto return_bool;
+                }
                 $leftLong = JitLongArg::lower($this->context, $left, 'binary op left operand');
                 if (Variable::TYPE_NATIVE_BOOL === $rightType) {
                     $__right = $this->context->builder->zExt($rightValue, $leftLong->typeOf());
@@ -991,47 +1000,34 @@ restart:
                 );
                 goto return_bool;
             }
+            if (Variable::TYPE_NATIVE_DOUBLE === $rightType && self::isOrderedCompareOpcode($opcode->type)) {
+                $result = JitValueCompare::orderedValueToNativeDouble(
+                    $this->context,
+                    $opcode->type,
+                    $left,
+                    $rightValue
+                );
+                goto return_bool;
+            }
             if (OpCode::TYPE_IDENTICAL === $opcode->type) {
-                if (Variable::TYPE_NATIVE_BOOL === $rightType) {
-                    $valuePtr = Variable::KIND_VARIABLE === $left->kind
-                        ? $left->value
-                        : $this->loadValue($left);
-                    $stored = $this->context->builder->call(
-                        $this->context->lookupFunction('__value__readLong'),
-                        $valuePtr
-                    );
-                    $result = $this->context->builder->icmp(
-                        Builder::INT_EQ,
-                        $stored,
-                        $stored->typeOf()->constInt(0, false)
-                    );
-                    goto return_bool;
-                }
                 $result = JitValueCompare::identicalToNative($this->context, $left, $right);
                 goto return_bool;
             }
             if (OpCode::TYPE_NOT_IDENTICAL === $opcode->type) {
-                if (Variable::TYPE_NATIVE_BOOL === $rightType) {
-                    $valuePtr = Variable::KIND_VARIABLE === $left->kind
-                        ? $left->value
-                        : $this->loadValue($left);
-                    $stored = $this->context->builder->call(
-                        $this->context->lookupFunction('__value__readLong'),
-                        $valuePtr
-                    );
-                    $result = $this->context->builder->icmp(
-                        Builder::INT_NE,
-                        $stored,
-                        $stored->typeOf()->constInt(0, false)
-                    );
-                    goto return_bool;
-                }
                 $result = JitValueCompare::notIdenticalToNative($this->context, $left, $right);
                 goto return_bool;
             }
         }
         if (Variable::TYPE_VALUE === $rightType && Variable::TYPE_VALUE !== $leftType) {
             if (Variable::TYPE_NATIVE_LONG === $leftType || Variable::TYPE_NATIVE_BOOL === $leftType) {
+                if (OpCode::TYPE_IDENTICAL === $opcode->type) {
+                    $result = JitValueCompare::identicalNativeToValue($this->context, $left, $right);
+                    goto return_bool;
+                }
+                if (OpCode::TYPE_NOT_IDENTICAL === $opcode->type) {
+                    $result = JitValueCompare::notIdenticalNativeToValue($this->context, $left, $right);
+                    goto return_bool;
+                }
                 $rightLong = JitLongArg::lower($this->context, $right, 'binary op right operand');
                 if (Variable::TYPE_NATIVE_BOOL === $leftType) {
                     $__left = $this->context->builder->zExt($leftValue, $rightLong->typeOf());
@@ -1102,41 +1098,20 @@ restart:
                 );
                 goto return_bool;
             }
+            if (Variable::TYPE_NATIVE_DOUBLE === $leftType && self::isOrderedCompareOpcode($opcode->type)) {
+                $result = JitValueCompare::orderedNativeDoubleToValue(
+                    $this->context,
+                    $opcode->type,
+                    $leftValue,
+                    $right
+                );
+                goto return_bool;
+            }
             if (OpCode::TYPE_IDENTICAL === $opcode->type) {
-                if (Variable::TYPE_NATIVE_BOOL === $leftType) {
-                    $valuePtr = Variable::KIND_VARIABLE === $right->kind
-                        ? $right->value
-                        : $this->loadValue($right);
-                    $stored = $this->context->builder->call(
-                        $this->context->lookupFunction('__value__readLong'),
-                        $valuePtr
-                    );
-                    $result = $this->context->builder->icmp(
-                        Builder::INT_EQ,
-                        $stored,
-                        $stored->typeOf()->constInt(0, false)
-                    );
-                    goto return_bool;
-                }
                 $result = JitValueCompare::identicalNativeToValue($this->context, $left, $right);
                 goto return_bool;
             }
             if (OpCode::TYPE_NOT_IDENTICAL === $opcode->type) {
-                if (Variable::TYPE_NATIVE_BOOL === $leftType) {
-                    $valuePtr = Variable::KIND_VARIABLE === $right->kind
-                        ? $right->value
-                        : $this->loadValue($right);
-                    $stored = $this->context->builder->call(
-                        $this->context->lookupFunction('__value__readLong'),
-                        $valuePtr
-                    );
-                    $result = $this->context->builder->icmp(
-                        Builder::INT_NE,
-                        $stored,
-                        $stored->typeOf()->constInt(0, false)
-                    );
-                    goto return_bool;
-                }
                 $result = JitValueCompare::notIdenticalNativeToValue($this->context, $left, $right);
                 goto return_bool;
             }

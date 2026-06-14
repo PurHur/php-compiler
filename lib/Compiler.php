@@ -830,6 +830,9 @@ class Compiler {
             if ($child instanceof Op\Terminal\Throw_) {
                 return true;
             }
+            if ($child instanceof Op\Terminal\Return_) {
+                return true;
+            }
         }
 
         return false;

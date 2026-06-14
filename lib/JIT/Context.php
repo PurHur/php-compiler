@@ -178,6 +178,12 @@ class Context {
     /** ?? / ?-> result operands that must receive branch assigns even when php-cfg marks them dead (#99, #3219). */
     public \SplObjectStorage $coalesceAssignTargets;
 
+    /** `return $c ? $a : $b` shared merge operand — emit direct returns per arm (#8555 AOT). */
+    public ?Operand $ternarySharedReturnOperand = null;
+
+    /** Scope slot for {@see $ternarySharedReturnOperand} on the merge RETURN (#8555). */
+    public ?int $ternarySharedReturnSlot = null;
+
     /** Guarded list destruct: assign-path dim fetches compile as unreachable stubs (#4308). */
     public bool $listUnpackSkipAssignPath = false;
 
@@ -1598,24 +1604,45 @@ class Context {
                 $coalesceResults[$block->getOperand($blockOp->arg1)] = true;
             }
         }
-        $returnVarNames = [];
+        $returnOperands = new \SplObjectStorage();
+        $returnSlots = [];
         foreach ($block->opCodes as $blockOp) {
             if (OpCode::TYPE_RETURN !== $blockOp->type || null === $blockOp->arg1) {
                 continue;
             }
             $returnOp = $block->getOperand($blockOp->arg1);
+            $returnOperands[$returnOp] = true;
+            $returnSlots[(int) $blockOp->arg1] = true;
+        }
+        if (null !== $skipOperand) {
+            $returnOperands[$skipOperand] = true;
+            $skipSlot = $block->slotForOperand($skipOperand);
+            if (null !== $skipSlot) {
+                $returnSlots[$skipSlot] = true;
+            }
+        }
+        foreach ($this->coalesceAssignTargets as $mergeOp) {
+            $returnOperands[$mergeOp] = true;
+            $mergeSlot = $block->slotForOperand($mergeOp);
+            if (null !== $mergeSlot) {
+                $returnSlots[$mergeSlot] = true;
+            }
+        }
+        $returnVarNames = [];
+        foreach ($returnOperands as $returnOp) {
             $name = OperandName::resolve($returnOp);
             if (null !== $name) {
                 $returnVarNames[$name] = true;
             }
         }
-        if (null !== $skipOperand) {
-            $name = OperandName::resolve($skipOperand);
-            if (null !== $name) {
-                $returnVarNames[$name] = true;
-            }
-        }
         foreach ($block->orig->deadOperands as $op) {
+            if ($returnOperands->contains($op)) {
+                continue;
+            }
+            $deadSlot = $block->slotForOperand($op);
+            if (null !== $deadSlot && isset($returnSlots[$deadSlot])) {
+                continue;
+            }
             $name = OperandName::resolve($op);
             if (null !== $name && isset($returnVarNames[$name])) {
                 continue;
