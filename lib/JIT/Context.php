@@ -264,6 +264,13 @@ class Context {
     /** @var array<string, Variable> */
     public array $namedVariableBindings = [];
 
+    /** {main} foreach loop locals must not use script-global slots (#4364, #1492). */
+    /** @var array<string, true> */
+    public array $foreachByRefLocalNames = [];
+
+    /** CFG entry block for the function currently being lowered (foreach local scan). */
+    public ?Block $jitFunctionRootBlock = null;
+
     /**
      * Undeclared instance property writes collected before JIT lowering (#5111).
      *
@@ -278,6 +285,7 @@ class Context {
     public function resetScriptLocalBindings(): void
     {
         $this->namedVariableBindings = [];
+        $this->foreachByRefLocalNames = [];
         $this->refAliasNames = [];
         $this->jitUndeclaredInstancePropertyWrites = [];
         $this->jitIncludedFiles = [];
@@ -1415,11 +1423,13 @@ class Context {
             return;
         }
         if (null !== $name && $block->isMainScript()) {
-            $global = $this->ensureScriptGlobal($name);
-            $this->scope->variables[$op] = $global;
-            $this->bindVariableByName($name, $global);
+            if (!$this->isForeachByRefLocalName($name, $block)) {
+                $global = $this->ensureScriptGlobal($name);
+                $this->scope->variables[$op] = $global;
+                $this->bindVariableByName($name, $global);
 
-            return;
+                return;
+            }
         }
         $this->scope->variables[$op] = Variable::fromOp($this, $func, $basicBlock, $block, $op);
         $this->scope->variables[$op]->initialize();
@@ -1486,6 +1496,54 @@ class Context {
         }
 
         return $name;
+    }
+
+    /** True when $name is the dest of foreach Iterator_Value → AssignRef in $block (#4364). */
+    public function isForeachByRefLocalName(string $name, Block $block): bool
+    {
+        $resolved = $this->resolveRefAliasName($name);
+        if (isset($this->foreachByRefLocalNames[$resolved])) {
+            return true;
+        }
+        $root = $this->jitFunctionRootBlock ?? $block;
+        $seen = [];
+        $queue = [$root];
+        while ([] !== $queue) {
+            $scan = array_shift($queue);
+            $id = spl_object_id($scan);
+            if (isset($seen[$id])) {
+                continue;
+            }
+            $seen[$id] = true;
+            foreach ($scan->opCodes as $op) {
+                if (OpCode::TYPE_ASSIGN_REF === $op->type) {
+                    $destName = OperandName::resolve($scan->getOperand($op->arg1));
+                    if (null !== $destName && $resolved === $this->resolveRefAliasName($destName)) {
+                        $srcName = OperandName::resolve($scan->getOperand($op->arg2));
+                        if (null === $srcName) {
+                            $this->foreachByRefLocalNames[$resolved] = true;
+
+                            return true;
+                        }
+                    }
+                }
+                if (OpCode::TYPE_ITER_VALUE === $op->type && $op->arg3) {
+                    $destName = OperandName::resolve($scan->getOperand($op->arg1));
+                    if (null !== $destName && $resolved === $this->resolveRefAliasName($destName)) {
+                        $this->foreachByRefLocalNames[$resolved] = true;
+
+                        return true;
+                    }
+                }
+                foreach ([$op->block1 ?? null, $op->block2 ?? null, $op->block3 ?? null] as $target) {
+                    if ($target instanceof Block && !isset($seen[spl_object_id($target)])) {
+                        $queue[] = $target;
+                    }
+                }
+            }
+        }
+
+        return false;
     }
 
     public function getVariableFromOp(Operand $op): Variable {
