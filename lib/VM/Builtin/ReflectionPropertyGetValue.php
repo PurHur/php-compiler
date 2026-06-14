@@ -6,6 +6,7 @@ namespace PHPCompiler\VM\Builtin;
 
 use PHPCompiler\ext\standard\VmReflection;
 use PHPCompiler\Frame;
+use PHPCompiler\VM\EnumCaseSupport;
 use PHPCompiler\VM\ReflectionSupport;
 use PHPCompiler\VM\Variable;
 
@@ -36,6 +37,42 @@ final class ReflectionPropertyGetValue extends VmClassMethod
                 return;
             }
             $frame->returnVar->copyFrom($entry->staticProperties[$staticKey]);
+
+            return;
+        }
+        if (VmReflection::isEnumReflectionPseudoProperty($entry, $property)) {
+            $object = $frame->calledArgs[1]->resolveIndirect();
+            if (!EnumCaseSupport::isEnumCaseVariable($object)) {
+                if (Variable::TYPE_OBJECT !== $object->type && Variable::TYPE_ENUM_CASE !== $object->type) {
+                    throw new \LogicException('ReflectionProperty::getValue() expects an object');
+                }
+                ReflectionSupport::throwReflectionException(
+                    'Given object is not an instance of the class this property was declared in'
+                );
+            }
+            if (!VmReflection::isInstanceOfObject($ctx, $object, $className)) {
+                ReflectionSupport::throwReflectionException(
+                    'Given object is not an instance of the class this property was declared in'
+                );
+            }
+            if (null === $frame->returnVar) {
+                return;
+            }
+            $propLc = strtolower($property);
+            $vars = EnumCaseSupport::objectVarsForCaseVariable($object);
+            if (isset($vars[$propLc])) {
+                $frame->returnVar->copyFrom($vars[$propLc]);
+
+                return;
+            }
+            if (Variable::TYPE_OBJECT === $object->type) {
+                $frame->returnVar->copyFrom(
+                    EnumCaseSupport::getProperty($object->toObject(), $property, $ctx, $frame)
+                );
+
+                return;
+            }
+            $frame->returnVar->null();
 
             return;
         }

@@ -447,6 +447,14 @@ final class VmReflection
     }
 
     /**
+     * Enum pseudo-properties name/value via ReflectionProperty (php_reflection.c, #5680).
+     */
+    public static function isEnumReflectionPseudoProperty(ClassEntry $entry, string $property): bool
+    {
+        return $entry->isEnum && EnumCaseSupport::propertyExistsOnCase($entry, $property);
+    }
+
+    /**
      * Instance property metadata on $class or an ancestor, or null (#4395).
      */
     public static function findClassProperty(ClassEntry $class, string $property, Context $ctx): ?ClassProperty
