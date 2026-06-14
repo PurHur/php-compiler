@@ -3890,20 +3890,29 @@ class JIT {
         }
         $repoSidecar = $repoRoot.'/'.ltrim($sidecarRel, '/');
         if (is_readable($repoSidecar)) {
-            $aotBytes = file_get_contents($repoSidecar);
-            if (is_string($aotBytes) && '' !== $aotBytes) {
-                \PHPCompiler\JIT\M3EmitTuTrivialEchoAot::registerLinktime(
-                    $this->context,
+            $compilerLibSidecar = \PHPCompiler\JIT\M3EmitTuTrivialEchoAot::COMPILER_LIB_SIDECAR_REL === $sidecarRel;
+            $compilerLibStampOk = !$compilerLibSidecar
+                || $this->m3EmitTuCompilerLibSidecarStampUsable(
                     $repoRoot,
-                    $code,
-                    $aotBytes,
                     $sidecarRel,
-                    $sentinelLogical,
-                    false,
-                    $this->m3EmitTuSidecarSourcePathNorm($path)
+                    $repoRoot.'/build/.m3_compiler_lib_sidecar.sha'
                 );
+            if ($compilerLibStampOk) {
+                $aotBytes = file_get_contents($repoSidecar);
+                if (is_string($aotBytes) && '' !== $aotBytes) {
+                    \PHPCompiler\JIT\M3EmitTuTrivialEchoAot::registerLinktime(
+                        $this->context,
+                        $repoRoot,
+                        $code,
+                        $aotBytes,
+                        $sidecarRel,
+                        $sentinelLogical,
+                        false,
+                        $this->m3EmitTuSidecarSourcePathNorm($path)
+                    );
 
-                return;
+                    return;
+                }
             }
         }
         if (\PHPCompiler\JIT\M3EmitTuTrivialEchoAot::BIN_VM_SIDECAR_REL === $sidecarRel
@@ -3965,7 +3974,12 @@ class JIT {
             $prelinkedLib = $repoRoot.'/prelinked/bootstrap-gen0/compiler_lib_aot_blob';
             if (is_readable($prelinkedLib)) {
                 $aotBytes = file_get_contents($prelinkedLib);
-                if (is_string($aotBytes) && '' !== $aotBytes && !$this->m3EmitTuPrelinkedSidecarLooksStale($aotBytes)) {
+                if (is_string($aotBytes) && '' !== $aotBytes && !$this->m3EmitTuPrelinkedSidecarLooksStale($aotBytes)
+                    && $this->m3EmitTuCompilerLibSidecarStampUsable(
+                        $repoRoot,
+                        $sidecarRel,
+                        $repoRoot.'/prelinked/bootstrap-gen0/.m3_compiler_lib_sidecar.sha'
+                    )) {
                     \PHPCompiler\JIT\M3EmitTuTrivialEchoAot::registerLinktime(
                         $this->context,
                         $repoRoot,
@@ -4036,7 +4050,12 @@ class JIT {
         if (!str_ends_with($pathNorm, '/bin/compile.php')) {
             unset($compileEnv['PHP_COMPILER_EMIT_HELPER_LINK'], $compileEnv['PHP_COMPILER_M3_EMIT_TU']);
         }
-        if (is_readable($cacheOut)) {
+        if (is_readable($cacheOut)
+            && $this->m3EmitTuCompilerLibSidecarStampUsable(
+                $repoRoot,
+                $sidecarRel,
+                $repoRoot.'/build/.m3_compiler_lib_sidecar.sha'
+            )) {
             $aotBytes = file_get_contents($cacheOut);
             if (is_string($aotBytes) && '' !== $aotBytes) {
                 \PHPCompiler\JIT\M3EmitTuTrivialEchoAot::registerLinktime(
@@ -4083,7 +4102,12 @@ class JIT {
             // Gen-2 native argv driver cannot always spawn Zend during link; reuse blobs from an
             // earlier Zend host-compile in the same workspace (#3004).
             $repoSidecar = $repoRoot.'/'.ltrim($sidecarRel, '/');
-            if (is_readable($repoSidecar)) {
+            if (is_readable($repoSidecar)
+                && $this->m3EmitTuCompilerLibSidecarStampUsable(
+                    $repoRoot,
+                    $sidecarRel,
+                    $repoRoot.'/build/.m3_compiler_lib_sidecar.sha'
+                )) {
                 $aotBytes = file_get_contents($repoSidecar);
                 if (is_string($aotBytes) && '' !== $aotBytes) {
                     \PHPCompiler\JIT\M3EmitTuTrivialEchoAot::registerLinktime(
@@ -4134,6 +4158,15 @@ class JIT {
     {
         return str_contains($aotBytes, '/compiler/build/.m3_')
             || str_contains($aotBytes, '/compiler/bin/compile.php');
+    }
+
+    private function m3EmitTuCompilerLibSidecarStampUsable(string $repoRoot, string $sidecarRel, string $stampPath): bool
+    {
+        if (\PHPCompiler\JIT\M3EmitTuTrivialEchoAot::COMPILER_LIB_SIDECAR_REL !== $sidecarRel) {
+            return true;
+        }
+
+        return \PHPCompiler\JIT\M3EmitTuTrivialEchoAot::compilerLibSidecarStampMatches($repoRoot, $stampPath);
     }
 
     private function m3EmitTuSidecarSourcePathNorm(string $path): ?string

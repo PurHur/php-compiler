@@ -75,8 +75,24 @@ bootstrap_gen0_sidecar_blob_for_entry() {
   esac
   local build_blob="${root}/${rel}"
   if [[ -f "${build_blob}" && -s "${build_blob}" ]]; then
-    printf '%s\n' "${build_blob}"
-    return 0
+    if [[ "${rel}" == "build/.m3_compiler_lib_aot_blob" ]] \
+      && declare -F bootstrap_compiler_lib_spine_entry_sha >/dev/null 2>&1; then
+      local want_sha have_sha stamp="${root}/build/.m3_compiler_lib_sidecar.sha"
+      want_sha="$(bootstrap_compiler_lib_spine_entry_sha)" || return 1
+      have_sha=""
+      if [[ -f "${stamp}" ]]; then
+        have_sha="$(tr -d '\n' <"${stamp}")"
+      fi
+      if [[ "${want_sha}" != "${have_sha}" ]]; then
+        :
+      else
+        printf '%s\n' "${build_blob}"
+        return 0
+      fi
+    else
+      printf '%s\n' "${build_blob}"
+      return 0
+    fi
   fi
   local prelinked=""
   case "${rel}" in
@@ -85,6 +101,21 @@ bootstrap_gen0_sidecar_blob_for_entry() {
     build/.m3_compiler_lib_aot_blob) prelinked="${root}/prelinked/bootstrap-gen0/compiler_lib_aot_blob" ;;
   esac
   if [[ -n "${prelinked}" && -f "${prelinked}" && -s "${prelinked}" ]]; then
+    if [[ "${rel}" == "build/.m3_compiler_lib_aot_blob" ]] \
+      && declare -F bootstrap_compiler_lib_spine_entry_sha >/dev/null 2>&1; then
+      local want_sha have_sha stamp="${root}/build/.m3_compiler_lib_sidecar.sha"
+      want_sha="$(bootstrap_compiler_lib_spine_entry_sha)" || return 1
+      have_sha=""
+      if [[ -f "${stamp}" ]]; then
+        have_sha="$(tr -d '\n' <"${stamp}")"
+      elif [[ -f "${root}/prelinked/bootstrap-gen0/.m3_compiler_lib_sidecar.sha" ]]; then
+        have_sha="$(tr -d '\n' <"${root}/prelinked/bootstrap-gen0/.m3_compiler_lib_sidecar.sha")"
+      fi
+      if [[ "${want_sha}" != "${have_sha}" ]]; then
+        echo "bootstrap-gen0-sidecar-fallback: stale compiler_lib sidecar (want ${want_sha}, have ${have_sha:-<none>}) — refusing (#2201)" >&2
+        return 1
+      fi
+    fi
     printf '%s\n' "${prelinked}"
     return 0
   fi

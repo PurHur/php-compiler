@@ -2,10 +2,13 @@
 # M2 VM driver execute smoke: spine-linked binary runs bin/vm.php run() on -r fixture (#2201).
 set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+ENTRY="${ROOT}/test/selfhost/compiler_lib_spine_smoke/main.php"
 OUT="${ROOT}/build/selfhost-lib-spine-smoke"
 LINK="${ROOT}/script/bootstrap-selfhost-lib-spine-smoke-link.sh"
 # shellcheck source=php-env.sh
 source "$(dirname "$0")/php-env.sh"
+# shellcheck source=bootstrap-gen0-install-prelinked-driver.sh
+source "$(dirname "$0")/bootstrap-gen0-install-prelinked-driver.sh"
 ci_apply_llvm_memory_env
 
 if [[ -z "${PHP_COMPILER_LLVM_PATH:-}" || ! -f "${PHP_COMPILER_LLVM_PATH}/libLLVM-9.so.1" ]]; then
@@ -13,30 +16,58 @@ if [[ -z "${PHP_COMPILER_LLVM_PATH:-}" || ! -f "${PHP_COMPILER_LLVM_PATH}/libLLV
   exit 2
 fi
 
+want_sha="$(bootstrap_compiler_lib_spine_entry_sha)" || {
+  echo "bootstrap-selfhost-vm-driver-execute-probe: missing spine entry ${ENTRY}" >&2
+  exit 1
+}
+stamp="${ROOT}/build/.m3_compiler_lib_sidecar.sha"
+have_sha=""
+if [[ -f "${stamp}" ]]; then
+  have_sha="$(tr -d '\n' <"${stamp}")"
+fi
+
+relink=0
 if [[ ! -x "${OUT}" ]]; then
-  "${LINK}"
-else
-  ENTRY="${ROOT}/test/selfhost/compiler_lib_spine_smoke/main.php"
-  if [[ "${ENTRY}" -nt "${OUT}" ]]; then
-    "${LINK}"
+  relink=1
+elif [[ "${ENTRY}" -nt "${OUT}" ]]; then
+  relink=1
+elif [[ "${want_sha}" != "${have_sha}" ]]; then
+  echo "bootstrap-selfhost-vm-driver-execute-probe: stale compiler_lib sidecar (want ${want_sha}, have ${have_sha:-<none>})" >&2
+  relink=1
+fi
+
+if [[ "${relink}" == "1" ]]; then
+  if [[ "${want_sha}" != "${have_sha}" ]]; then
+    BOOTSTRAP_FORCE_COMPILER_LIB_SIDECAR_REGEN=1 bootstrap_ensure_m3_compiler_lib_sidecar 2>/dev/null || true
   fi
+  "${LINK}"
 fi
 
 test -x "${OUT}"
+if [[ -f "${stamp}" ]]; then
+  have_sha="$(tr -d '\n' <"${stamp}")"
+fi
 set +e
-out="$(
+probe_out="$(
   env PHP_COMPILER_VM_DRIVER_EXECUTE=1 "${OUT}" 2>&1
 )"
-code=$?
+probe_code=$?
 set -e
-if [[ "${code}" -ne 0 ]]; then
-  echo "bootstrap-selfhost-vm-driver-execute-probe: native execute failed (exit ${code})" >&2
-  printf '%s\n' "${out}" >&2
+if [[ "${probe_code}" -eq 0 ]] && grep -q 'vm driver ok' <<< "${probe_out}"; then
+  echo "bootstrap-selfhost-vm-driver-execute-probe: OK ${OUT}"
+  exit 0
+fi
+if [[ "${want_sha}" != "${have_sha}" ]]; then
+  echo "bootstrap-selfhost-vm-driver-execute-probe: sidecar stamp stale after link (want ${want_sha}, have ${have_sha:-<none>})" >&2
+fi
+if [[ "${probe_code}" -ne 0 ]]; then
+  echo "bootstrap-selfhost-vm-driver-execute-probe: native execute failed (exit ${probe_code})" >&2
+  printf '%s\n' "${probe_out}" >&2
   exit 1
 fi
-if ! grep -q 'vm driver ok' <<< "${out}"; then
+if ! grep -q 'vm driver ok' <<< "${probe_out}"; then
   echo "bootstrap-selfhost-vm-driver-execute-probe: unexpected stdout (want vm driver ok)" >&2
-  printf '%s\n' "${out}" >&2
+  printf '%s\n' "${probe_out}" >&2
   exit 1
 fi
 echo "bootstrap-selfhost-vm-driver-execute-probe: OK ${OUT}"

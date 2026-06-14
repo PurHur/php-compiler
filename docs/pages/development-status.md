@@ -88,7 +88,7 @@ Shipped examples under `examples/` are **regression fixtures** for VM/JIT/AOT an
 | **M4** — Bootstrap loop (next revision) | ✅ `bootstrap-loop-probe` full ladder |
 | **M5** — Full self-host, no `vendor/` cold boot | ✅ Presenter strict + compiled-only empty `build/` cold boot ([#3053](https://github.com/PurHur/php-compiler/issues/3053)) |
 
-**Critical path:** VM driver execute probe ([#2201](https://github.com/PurHur/php-compiler/issues/2201)), MCJIT execute ([#98](https://github.com/PurHur/php-compiler/issues/98)).
+**Critical path:** Refresh `prelinked/bootstrap-gen0/compiler_lib_aot_blob` for full spine VM probe ([#2201](https://github.com/PurHur/php-compiler/issues/2201)); native main env probe landed ✅ on newly linked binaries; MCJIT execute ([#98](https://github.com/PurHur/php-compiler/issues/98)).
 
 Contributor detail: [`docs/self-host-target.md`](https://github.com/PurHur/php-compiler/blob/master/docs/self-host-target.md), [`docs/bootstrap-selfhost.md`](https://github.com/PurHur/php-compiler/blob/master/docs/bootstrap-selfhost.md).
 

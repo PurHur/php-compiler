@@ -227,4 +227,12 @@ if ! grep -q 'compiler_lib_spine_smoke bundle OK' <<< "${out}"; then
   printf '%s\n' "${out}" >&2
   exit 1
 fi
+if strings "${OUT}" 2>/dev/null | grep -q 'vm driver ok'; then
+  want_sha="$(bootstrap_compiler_lib_spine_entry_sha)" || true
+  if [[ -n "${want_sha:-}" ]]; then
+    cp -f "${OUT}" "${ROOT}/build/.m3_compiler_lib_aot_blob"
+    chmod +x "${ROOT}/build/.m3_compiler_lib_aot_blob"
+    printf '%s' "${want_sha}" >"${ROOT}/build/.m3_compiler_lib_sidecar.sha"
+  fi
+fi
 echo "bootstrap-selfhost-lib-spine-smoke-link: OK ${OUT}"

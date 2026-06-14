@@ -122,6 +122,33 @@ final class M3EmitTuTrivialEchoAot
         return str_ends_with($filenameNorm, $suffix);
     }
 
+    public static function compilerLibSpineEntryPath(string $repoRoot): string
+    {
+        return $repoRoot.'/test/selfhost/compiler_lib_spine_smoke/main.php';
+    }
+
+    public static function compilerLibSpineEntrySha(string $repoRoot): ?string
+    {
+        $entry = self::compilerLibSpineEntryPath($repoRoot);
+        if (!is_readable($entry)) {
+            return null;
+        }
+        $sha = @sha1_file($entry);
+
+        return is_string($sha) && '' !== $sha ? $sha : null;
+    }
+
+    public static function compilerLibSidecarStampMatches(string $repoRoot, string $stampPath): bool
+    {
+        $want = self::compilerLibSpineEntrySha($repoRoot);
+        if (null === $want || !is_readable($stampPath)) {
+            return false;
+        }
+        $have = trim((string) file_get_contents($stampPath));
+
+        return $have === $want;
+    }
+
     public static function registerLinktime(
         Context $context,
         string $repoRoot,

@@ -117,7 +117,7 @@ final class EnumAbstractMethodCompileCheck
         }
 
         $enumDisplay = $this->operandDisplayName($enum->name, 'enum');
-        $abstract = $this->collectAbstractMethodNames($enum->stmts->children);
+        $abstractMethods = $this->collectAbstractMethodNames($enum->stmts->children);
         $concrete = $this->collectConcreteMethodNames($enum->stmts->children);
 
         foreach ($enum->stmts->children as $member) {
@@ -130,8 +130,8 @@ final class EnumAbstractMethodCompileCheck
                     continue;
                 }
                 foreach ($this->traits[$traitLc]['abstract'] as $methodLc => $methodName) {
-                    if (!isset($abstract[$methodLc])) {
-                        $abstract[$methodLc] = $methodName;
+                    if (!isset($abstractMethods[$methodLc])) {
+                        $abstractMethods[$methodLc] = $methodName;
                     }
                 }
                 foreach ($this->traits[$traitLc]['concrete'] as $methodLc => $_) {
@@ -152,8 +152,8 @@ final class EnumAbstractMethodCompileCheck
                     continue;
                 }
                 foreach ($implemented['abstractMethods'] as $methodLc => $methodName) {
-                    if (!isset($abstract[$methodLc])) {
-                        $abstract[$methodLc] = $methodName;
+                    if (!isset($abstractMethods[$methodLc])) {
+                        $abstractMethods[$methodLc] = $methodName;
                     }
                 }
                 continue;
@@ -165,7 +165,7 @@ final class EnumAbstractMethodCompileCheck
 
         /** @var list<array{0: string, 1: string}> owner display, method display */
         $missing = [];
-        foreach ($abstract as $methodLc => $methodName) {
+        foreach ($abstractMethods as $methodLc => $methodName) {
             if (!isset($concrete[$methodLc])) {
                 $missing[] = [$enumDisplay, $methodName];
             }

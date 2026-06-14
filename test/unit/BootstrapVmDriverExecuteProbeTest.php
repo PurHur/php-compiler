@@ -30,6 +30,8 @@ final class BootstrapVmDriverExecuteProbeTest extends TestCase
         $this->assertStringContainsString('selfhost-lib-spine-smoke', $script);
         $this->assertStringContainsString('vm driver ok', $script);
         $this->assertStringContainsString('bootstrap-selfhost-lib-spine-smoke-link.sh', $script);
+        $this->assertStringContainsString('bootstrap_compiler_lib_spine_entry_sha', $script);
+        $this->assertStringContainsString('.m3_compiler_lib_sidecar.sha', $script);
     }
 
     public function testSpineEntryDocumentsVmDriverExecutePath(): void
@@ -44,5 +46,39 @@ final class BootstrapVmDriverExecuteProbeTest extends TestCase
     {
         $makefile = (string) file_get_contents(self::$root.'/Makefile');
         $this->assertStringContainsString('bootstrap-selfhost-vm-driver-execute-probe:', $makefile);
+    }
+
+    public function testNativeMainEnvProbePrintsVmDriverOkWhenLlvmPresent(): void
+    {
+        if (!LlvmToolchain::isReady(self::$root)) {
+            $this->markTestSkipped('LLVM 9 not available for VM driver execute native probe test.');
+        }
+
+        $out = self::$root.'/build/.bootstrap-vm-driver-execute-probe-minimal-aot';
+        $entry = self::$root.'/test/selfhost/compiler_minimal/main.php';
+        $prefix = LlvmToolchain::envPrefix(self::$root);
+        $compileCmd = implode(' ', array_map('escapeshellarg', [
+            ...$prefix,
+            'php',
+            self::$root.'/bin/compile.php',
+            '-o',
+            $out,
+            $entry,
+        ])).' 2>&1';
+        exec($compileCmd, $compileLines, $compileCode);
+        $compileOut = implode("\n", $compileLines);
+        $this->assertSame(0, $compileCode, $compileOut);
+        $this->assertTrue(is_executable($out), $out);
+
+        $runCmd = implode(' ', array_map('escapeshellarg', [
+            ...$prefix,
+            'env',
+            'PHP_COMPILER_VM_DRIVER_EXECUTE=1',
+            $out,
+        ])).' 2>&1';
+        exec($runCmd, $runLines, $runCode);
+        $runOut = implode("\n", $runLines);
+        $this->assertSame(0, $runCode, $runOut);
+        $this->assertStringContainsString('vm driver ok', $runOut);
     }
 }

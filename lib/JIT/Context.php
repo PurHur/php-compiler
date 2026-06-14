@@ -775,7 +775,11 @@ class Context {
                 ExceptionBridge::emitClearForStandaloneMain($this);
             }
             Progress::emitNativeNote($this, 'c:main_before_php');
-            $this->builder->call($this->main);
+            if (Builtin::LOAD_TYPE_STANDALONE === $this->loadType) {
+                VmDriverExecuteNative::emitStandaloneMainEnvProbeGate($this, $this->main);
+            } else {
+                $this->builder->call($this->main);
+            }
             Progress::emitNativeNote($this, 'c:main_after_php');
             if (Builtin::LOAD_TYPE_STANDALONE === $this->loadType) {
                 ErrorBridge::emitAbortIfPendingForStandaloneMain($this);
