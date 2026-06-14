@@ -29,11 +29,9 @@ final class stream_get_line extends Internal
         }
         $handleVar = $frame->calledArgs[0]->resolveIndirect();
         $maxLenVar = $frame->calledArgs[1]->resolveIndirect();
+        $handle = VmStreamArg::requireStreamHandle($handleVar, 'stream_get_line');
         if (null === $frame->returnVar) {
             return;
-        }
-        if (Variable::TYPE_INTEGER !== $handleVar->type) {
-            throw new \LogicException('stream_get_line() stream must be an integer handle in this compiler build');
         }
         if (Variable::TYPE_INTEGER !== $maxLenVar->type) {
             throw new \LogicException('stream_get_line() maxlen must be an integer in this compiler build');
@@ -52,7 +50,7 @@ final class stream_get_line extends Internal
         if (3 === $argc) {
             $ending = VmReflection::stringArg($frame->calledArgs[2], 'stream_get_line() ending', 2);
         }
-        $line = VmFs::streamGetLine($handleVar->toInt(), $maxLength, $ending);
+        $line = VmFs::streamGetLine($handle, $maxLength, $ending);
         if (false === $line) {
             $frame->returnVar->bool(false);
 

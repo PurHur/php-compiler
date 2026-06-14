@@ -1258,6 +1258,9 @@ final class VmFs
     }
 
     public static function fgets(int $handle, ?int $length = null) {
+        if (VmPhpMemoryStream::isValidHandle($handle)) {
+            return VmPhpMemoryStream::fgets($handle, $length);
+        }
         $fp = self::lookup($handle);
         if (null === $fp) {
             return false;
@@ -1281,6 +1284,9 @@ final class VmFs
      * php-src ext/standard/streamsfuncs.c — PHP_FUNCTION(stream_get_line).
      */
     public static function streamGetLine(int $handle, int $maxLength, ?string $ending = null) {
+        if (VmPhpMemoryStream::isValidHandle($handle)) {
+            return VmPhpMemoryStream::streamGetLine($handle, $maxLength, $ending);
+        }
         $fp = self::lookup($handle);
         if (null === $fp) {
             return false;
