@@ -5090,6 +5090,14 @@ class Compiler {
 
                 return $value;
             }
+            if ($this->isCompileTimeEnumCaseConstantMember($lcClass, $lcConst)) {
+                return $this->materializeCompileTimeEnumCaseConstant(
+                    $className,
+                    $constName,
+                    $stored,
+                    $this->compileTimeEnumBackedTypes[$lcClass] ?? null
+                );
+            }
             $value = new Variable();
             $value->copyFrom($stored);
 
@@ -5097,6 +5105,38 @@ class Compiler {
         }
 
         return $this->tryFoldExternalClassConstFetch($className, $constName);
+    }
+
+    private function isCompileTimeEnumCaseConstantMember(string $lcClass, string $lcConst): bool
+    {
+        return isset($this->compileTimeEnumCaseConstNames[$lcClass][$lcConst]);
+    }
+
+    /**
+     * Fold enum `case` fetches to enum case objects — never expose backing scalars (#5933, #5858).
+     */
+    private function materializeCompileTimeEnumCaseConstant(
+        string $enumName,
+        string $caseName,
+        Variable $stored,
+        ?string $backedType
+    ): Variable {
+        if (Variable::TYPE_OBJECT === $stored->type && EnumCaseSupport::isEnumCase($stored->toObject())) {
+            $value = new Variable();
+            $value->copyFrom($stored);
+
+            return $value;
+        }
+        if (Variable::TYPE_ENUM_CASE === $stored->type) {
+            $value = new Variable();
+            $value->copyFrom($stored);
+
+            return $value;
+        }
+        $backing = new Variable();
+        $backing->copyFrom($stored);
+
+        return $this->compileTimeEnumCaseVar($enumName, $caseName, $backing, $backedType);
     }
 
     /**
@@ -9236,7 +9276,7 @@ class Compiler {
      */
     protected function compileClassConstFetch(Op\Expr\ClassConstFetch $expr, Block $block): array
     {
-        $folded = $this->tryFoldClassConstFetchDefault($expr, $block);
+        $folded = $this->tryFoldClassConstFetchDefault($expr, $block, true);
         if (null !== $folded) {
             $block->registerConstant($expr->result, $folded);
 
@@ -9657,6 +9697,113 @@ class Compiler {
     }
 
     /**
+     * php-cfg may linearize `E::A; E::B; foo($a, $b)` into dead ClassConstFetch stmts
+     * plus distinct call-arg temporaries with no dataflow edge (#5933, #5858).
+     *
+     * @param list<Op> $cfgChildren
+     *
+     * @return list<Op\Expr\ClassConstFetch>
+     */
+    private function precedingClassConstFetchesBeforeCfgOp(array $cfgChildren, Op $callOp): array
+    {
+        $callIndex = null;
+        foreach ($cfgChildren as $i => $child) {
+            if ($child === $callOp) {
+                $callIndex = $i;
+                break;
+            }
+        }
+        if (null === $callIndex) {
+            return [];
+        }
+        $fetches = [];
+        for ($i = $callIndex - 1; $i >= 0; --$i) {
+            $child = $cfgChildren[$i];
+            if ($child instanceof Op\Expr\ClassConstFetch) {
+                array_unshift($fetches, $child);
+
+                continue;
+            }
+            break;
+        }
+
+        return $fetches;
+    }
+
+    /**
+     * @return array{0: Op, 1: int}|null
+     */
+    private function findCfgCallSiteForArg(array $cfgChildren, Operand $arg): ?array
+    {
+        foreach ($cfgChildren as $child) {
+            if (!property_exists($child, 'args') || !is_array($child->args)) {
+                continue;
+            }
+            foreach ($child->args as $argIndex => $callArg) {
+                if ($callArg === $arg) {
+                    return [$child, $argIndex];
+                }
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * Fold compile-time call arguments, including php-cfg dead ClassConstFetch preludes (#5933).
+     */
+    protected function tryFoldCallArgCompileTimeValue(Operand $arg, Block $block): ?int
+    {
+        $vm = $this->vmVariableFromCfgLiteralOperand($arg);
+        if (null !== $vm) {
+            return $block->registerConstant($arg, $vm);
+        }
+        $root = $this->unwrapOperandChain($arg);
+        if ($root instanceof Op\Expr\ClassConstFetch) {
+            $vm = $this->tryFoldClassConstFetchDefault($root, $block, true);
+            if (null !== $vm) {
+                return $block->registerConstant($arg, $vm);
+            }
+        }
+        if (null === $block->orig) {
+            return null;
+        }
+        $callSite = $this->findCfgCallSiteForArg($block->orig->children, $arg);
+        if (null !== $callSite) {
+            [$callOp, $argIndex] = $callSite;
+            $fetches = $this->precedingClassConstFetchesBeforeCfgOp($block->orig->children, $callOp);
+            $fetch = $fetches[$argIndex] ?? null;
+            if ($fetch instanceof Op\Expr\ClassConstFetch) {
+                $vm = $this->tryFoldClassConstFetchDefault($fetch, $block, true);
+                if (null !== $vm) {
+                    return $block->registerConstant($arg, $vm);
+                }
+            }
+        }
+        foreach ($block->orig->children as $child) {
+            if ($child instanceof Op\Expr\Array_
+                && $this->operandsReferToSameVariable($child->result, $root)
+            ) {
+                $vm = $this->tryBuildCompileTimeArrayFromExpr($child, $block, [$child]);
+                if (null !== $vm) {
+                    return $block->registerConstant($arg, $vm);
+                }
+
+                continue;
+            }
+            if (!$child instanceof Op\Expr || !$this->operandsReferToSameVariable($child->result, $root)) {
+                continue;
+            }
+            $vm = $this->tryFoldCompileTimeExprDefault($child, $block, [$child], true);
+            if (null !== $vm) {
+                return $block->registerConstant($arg, $vm);
+            }
+        }
+
+        return null;
+    }
+
+    /**
      * @param list<Operand> $args
      *
      * @return list<OpCode>
@@ -9667,7 +9814,10 @@ class Compiler {
 
         $sends = [];
         foreach ($args as $arg) {
-            $valueSlot = $this->compileOperand($arg, $block, true);
+            $valueSlot = $this->tryFoldCallArgCompileTimeValue($arg, $block);
+            if (null === $valueSlot) {
+                $valueSlot = $this->compileOperand($arg, $block, true);
+            }
             if (null === $valueSlot && $arg instanceof Operand\NullOperand) {
                 $valueSlot = $this->registerNullConstantSlot($block, $arg);
             }
