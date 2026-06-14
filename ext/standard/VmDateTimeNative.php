@@ -10,6 +10,7 @@ use PHPCompiler\VM\NativeDateMalformedStringException;
 /**
  * Native DateTime/DateTimeZone semantics without host Zend \\DateTime (issue #6164).
  * TZ switching via {@see VmEnv} libc FFI — no host Zend env builtins (#8086).
+ * zone.tab reads via {@see VmFs::file()} / {@see VmFsReadNative} — no host \\file() (#8529).
  *
  * php-src ref: ext/date/php_datetime.c, ext/date/lib/timelib.c — parsing, formatting, offsets.
  * Thin libc FFI for mktime/localtime/timegm; timezone IDs validated via zoneinfo files.
@@ -968,7 +969,10 @@ final class VmDateTimeNative
         if (!\is_file($path)) {
             return self::$zoneTabEntries;
         }
-        $lines = @\file($path, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES);
+        $lines = VmFs::file(
+            $path,
+            StdlibConstants::FILE_IGNORE_NEW_LINES | StdlibConstants::FILE_SKIP_EMPTY_LINES
+        );
         if (false === $lines) {
             return self::$zoneTabEntries;
         }

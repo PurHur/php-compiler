@@ -86,6 +86,8 @@ final class VmFsReadNativeRuntimeShrinkTest extends TestCase
             'ext/standard/VmIptc.php',
             'ext/standard/VmSession.php',
             'ext/standard/VmParseIni.php',
+            'ext/standard/VmDns.php',
+            'ext/standard/VmDateTimeNative.php',
             'ext/zip/ZipEngine.php',
             'ext/zip/VmZipArchive.php',
         ];
@@ -95,10 +97,11 @@ final class VmFsReadNativeRuntimeShrinkTest extends TestCase
     {
         foreach ($this->vmNativeReadSites() as $relativePath) {
             $source = (string) file_get_contents(__DIR__.'/../../'.$relativePath);
-            $this->assertStringContainsString(
-                'VmFsReadNative::read',
-                $source,
-                "{$relativePath} must use VmFsReadNative::read()"
+            $usesNativeRead = str_contains($source, 'VmFsReadNative::read')
+                || str_contains($source, 'VmFs::file');
+            $this->assertTrue(
+                $usesNativeRead,
+                "{$relativePath} must use VmFsReadNative::read() or VmFs::file()"
             );
             $this->assertDoesNotMatchRegularExpression(
                 '/\\\\file_get_contents\\s*\\(/',
@@ -109,6 +112,11 @@ final class VmFsReadNativeRuntimeShrinkTest extends TestCase
                 '/(?<!\\\\)file_get_contents\\s*\\(/',
                 $source,
                 "{$relativePath} must not call host file_get_contents()"
+            );
+            $this->assertDoesNotMatchRegularExpression(
+                '/@\\\\file\\s*\\(/',
+                $source,
+                "{$relativePath} must not call host \\file()"
             );
         }
     }

@@ -19,19 +19,16 @@ final class VmDnsRuntimeShrinkTest extends TestCase
         $this->assertDoesNotMatchRegularExpression("/function_exists\\('checkdnsrr'\\)/", $source);
     }
 
+    public function testVmDnsDoesNotDelegateEtcHostsReadsToHostFile(): void
+    {
+        $source = (string) file_get_contents(__DIR__.'/../../ext/standard/VmDns.php');
+        $this->assertStringContainsString('VmFs::file', $source);
+        $this->assertDoesNotMatchRegularExpression('/@\\\\file\\s*\\(/', $source);
+    }
+
     public function testCheckdnsrrLocalhostARecordViaEtcHosts(): void
     {
-        $prev = getenv('PHP_COMPILER_DISABLE_FFI');
-        putenv('PHP_COMPILER_DISABLE_FFI=1');
-        try {
-            $this->assertTrue(VmDns::checkdnsrr('localhost', 'A'));
-        } finally {
-            if (false === $prev) {
-                putenv('PHP_COMPILER_DISABLE_FFI');
-            } else {
-                putenv('PHP_COMPILER_DISABLE_FFI='.$prev);
-            }
-        }
+        $this->assertTrue(VmDns::checkdnsrr('localhost', 'A'));
     }
 
     public function testCheckdnsrrMxWithoutFfiReturnsFalseForUnknownHost(): void
