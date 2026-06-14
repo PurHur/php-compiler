@@ -110,6 +110,6 @@ final class VmStreamMeta
     /** @param resource $fp */
     public static function setBlocking($fp, bool $mode): bool
     {
-        return @\stream_set_blocking($fp, $mode);
+        return VmStreamBlockingNative::setBlockingForHostResource($fp, $mode);
     }
 }

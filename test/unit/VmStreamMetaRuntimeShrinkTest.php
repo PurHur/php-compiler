@@ -19,6 +19,12 @@ final class VmStreamMetaRuntimeShrinkTest extends TestCase
         $this->assertStringNotContainsString('\\stream_get_meta_data(', $source);
     }
 
+    public function testVmStreamMetaDoesNotReferenceHostStreamSetBlocking(): void
+    {
+        $source = (string) file_get_contents(__DIR__.'/../../ext/standard/VmStreamMeta.php');
+        $this->assertStringNotContainsString('\\stream_set_blocking(', $source);
+    }
+
     public function testBuildMetaArrayForPlainFilePath(): void
     {
         $fp = fopen('php://memory', 'r+');
