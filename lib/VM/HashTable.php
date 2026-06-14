@@ -58,7 +58,30 @@ final class HashTable {
     }
 
     public function needsSeparate(): bool {
+        if ($this->flags & self::FLAG_ALLOW_COW_VIOLATION) {
+            return false;
+        }
+
         return $this->refcount->needsSeparate();
+    }
+
+    /** Stream/resource handles (e.g. stream-context) mutate in place like Zend resources (#6367). */
+    public function markResourceLikeHandle(): void
+    {
+        $this->flags |= self::FLAG_ALLOW_COW_VIOLATION;
+    }
+
+    public function isResourceLikeHandle(): bool
+    {
+        return 0 !== ($this->flags & self::FLAG_ALLOW_COW_VIOLATION);
+    }
+
+    private function assertSeparatedForWrite(): void
+    {
+        if ($this->flags & self::FLAG_ALLOW_COW_VIOLATION) {
+            return;
+        }
+        $this->refcount->assertSeparated();
     }
 
     /** Zend GC refcount for debug_zval_dump() (#6576). */
@@ -105,7 +128,7 @@ final class HashTable {
     private function insertDuplicatedIndex(int $index, Variable $data): void
     {
         $this->assertConsistent();
-        $this->refcount->assertSeparated();
+        $this->assertSeparatedForWrite();
         if ($this->flags & self::FLAG_UNINITIALIZED) {
             $this->initMixed();
         }
@@ -132,7 +155,7 @@ final class HashTable {
             return;
         }
         $this->assertConsistent();
-        $this->refcount->assertSeparated();
+        $this->assertSeparatedForWrite();
         if ($this->flags & self::FLAG_UNINITIALIZED) {
             $this->initMixed();
         }
@@ -591,7 +614,7 @@ final class HashTable {
         if (!$this->isWithoutHoles()) {
             throw new \LogicException('popLast() only supports packed list arrays without holes');
         }
-        $this->refcount->assertSeparated();
+        $this->assertSeparatedForWrite();
         $lastSlot = $this->numUsed - 1;
         $bucket = $this->buckets->read($lastSlot);
         $result = new Variable();
@@ -621,7 +644,7 @@ final class HashTable {
         if (!$this->isWithoutHoles()) {
             throw new \LogicException('shiftFirst() only supports packed list arrays without holes');
         }
-        $this->refcount->assertSeparated();
+        $this->assertSeparatedForWrite();
         $firstBucket = $this->buckets->read(0);
         $result = new Variable();
         $result->copyFrom($firstBucket->value->resolveIndirect());
@@ -665,7 +688,7 @@ final class HashTable {
         if (!$this->isWithoutHoles()) {
             throw new \LogicException('unshiftPrepend() only supports packed list arrays without holes');
         }
-        $this->refcount->assertSeparated();
+        $this->assertSeparatedForWrite();
         if (0 === $this->numElements) {
             foreach ($values as $value) {
                 $copy = new Variable();
@@ -730,7 +753,7 @@ final class HashTable {
         if (\count($values) !== $this->numElements) {
             throw new \LogicException('replacePackedValues() value count must match array length');
         }
-        $this->refcount->assertSeparated();
+        $this->assertSeparatedForWrite();
         for ($i = 0; $i < $this->numUsed; ++$i) {
             $bucket = $this->buckets->read($i);
             if ($bucket->value->isUndefined()) {
@@ -1102,7 +1125,7 @@ final class HashTable {
     public function unionInPlace(HashTable $other): void
     {
         $this->assertConsistent();
-        $this->refcount->assertSeparated();
+        $this->assertSeparatedForWrite();
         foreach ($other->iterateKeyed(true) as [$key, $value]) {
             if (Variable::TYPE_INTEGER === $key->type) {
                 if (null !== $this->findIndex($key->toInt())) {
@@ -1377,7 +1400,7 @@ final class HashTable {
     public function spliceInPlace(int $offset, ?int $length = null, ?HashTable $replacement = null): HashTable
     {
         $this->assertConsistent();
-        $this->refcount->assertSeparated();
+        $this->assertSeparatedForWrite();
         if ($this->isPackedList()) {
             return $this->splicePackedInPlace($offset, $length, $replacement);
         }
@@ -1534,7 +1557,7 @@ final class HashTable {
     private function assignFromKeyedPairs(array $pairs): void
     {
         $this->assertConsistent();
-        $this->refcount->assertSeparated();
+        $this->assertSeparatedForWrite();
         if ($this->flags & self::FLAG_UNINITIALIZED) {
             $this->initMixed();
         }
@@ -1565,7 +1588,7 @@ final class HashTable {
         if ($this->numElements > 0 && !$this->isWithoutHoles()) {
             throw new \LogicException('assignPackedList() only supports packed list arrays without holes');
         }
-        $this->refcount->assertSeparated();
+        $this->assertSeparatedForWrite();
         if ($this->flags & self::FLAG_UNINITIALIZED) {
             $this->initMixed();
         }
@@ -1724,7 +1747,7 @@ final class HashTable {
         if ($this->flags & self::FLAG_UNINITIALIZED) {
             return;
         }
-        $this->refcount->assertSeparated();
+        $this->assertSeparatedForWrite();
         $bucket = null;
         $index = self::normalizeIndexKey($index);
         switch ($index->type) {
@@ -1871,7 +1894,7 @@ final class HashTable {
 
     private function addOrUpdate(int $hash, ?string $key, Variable $data, int $flags): ?Variable {
         $this->assertConsistent();
-        $this->refcount->assertSeparated();
+        $this->assertSeparatedForWrite();
         if ($this->flags & self::FLAG_UNINITIALIZED) {
             $this->initMixed();
         }
@@ -1958,7 +1981,7 @@ final class HashTable {
     }
 
     private function init(bool $packed) {
-        $this->refcount->assertSeparated();
+        $this->assertSeparatedForWrite();
         $this->assertUninitialized();
         if ($packed) {
             $this->initPacked();

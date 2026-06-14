@@ -544,6 +544,8 @@ class Module extends ModuleAbstract
             new touch_(),
             new filetype(),
             new stream_context_create(),
+            new stream_context_get_default(),
+            new stream_context_set_default(),
             new stream_context_get_options(),
             new stream_context_set_options(),
             new stream_context_set_params(),

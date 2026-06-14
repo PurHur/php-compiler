@@ -164,6 +164,8 @@ final class SelfHostBuiltinPolicy
         'inet_ntop' => 'filesystem',
         'inet_pton' => 'filesystem',
         'stream_context_create' => 'filesystem',
+        'stream_context_get_default' => 'filesystem',
+        'stream_context_set_default' => 'filesystem',
         'stream_context_get_options' => 'filesystem',
         'stream_context_set_options' => 'filesystem',
         'stream_notification_callback' => 'filesystem',

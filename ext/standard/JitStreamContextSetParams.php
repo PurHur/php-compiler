@@ -34,14 +34,9 @@ final class JitStreamContextSetParams
         );
 
         $slot = JitValueBox::alloc($context);
-        $ptr = JitValueBox::pointer($context, $slot);
-        $context->builder->call(
-            $context->lookupFunction('__value__writeBool'),
-            $ptr,
-            $context->constantBool(true)
-        );
+        JitValueBox::writeBool($context, $slot, $context->constantFromBool(true));
 
-        return $ptr;
+        return JitValueBox::pointer($context, $slot);
     }
 
     private static function loadContextArray(Context $context, JITVariable $arg): Value
