@@ -309,13 +309,37 @@ class JIT {
     /** True when the branch assigns a string into the shared ?: phi (#8555). */
     private function branchAssignsStringToTernaryPhi(Block $branch, Block $mergeBlock): bool
     {
+        $source = $this->ternaryPhiAssignSourceOperand($branch, $mergeBlock);
+        if (null === $source) {
+            return false;
+        }
+
+        return Variable::TYPE_STRING === Variable::getTypeFromType($source->type)
+            || $this->operandTypeIncludesString($source);
+    }
+
+    /**
+     * True when the branch assigns only null into the shared ?: phi (#8555).
+     */
+    private function branchAssignsOnlyNullToTernaryPhi(Block $branch, Block $mergeBlock): bool
+    {
+        $source = $this->ternaryPhiAssignSourceOperand($branch, $mergeBlock);
+        if (null === $source) {
+            return false;
+        }
+
+        return Variable::TYPE_NULL === Variable::getTypeFromType($source->type);
+    }
+
+    private function ternaryPhiAssignSourceOperand(Block $branch, Block $mergeBlock): ?Operand
+    {
         $phi = $this->ternaryReturnPhiOperand($mergeBlock);
         if (null === $phi) {
-            return false;
+            return null;
         }
         $phiSlot = $mergeBlock->slotForOperand($phi);
         if (null === $phiSlot) {
-            return false;
+            return null;
         }
         foreach ($branch->opCodes as $branchOp) {
             if (OpCode::TYPE_ASSIGN !== $branchOp->type) {
@@ -326,8 +350,24 @@ class JIT {
             if ($destSlot !== $phiSlot && $aliasSlot !== $phiSlot) {
                 continue;
             }
-            $expr = $branch->getOperand($branchOp->arg3);
-            if (Variable::TYPE_STRING === Variable::getTypeFromType($expr->type)) {
+
+            return $branch->getOperand($branchOp->arg3);
+        }
+
+        return null;
+    }
+
+    private function operandTypeIncludesString(Operand $op): bool
+    {
+        $type = $op->type;
+        if (null === $type) {
+            return false;
+        }
+        if (\PHPTypes\Type::TYPE_STRING === $type->type) {
+            return true;
+        }
+        foreach ($type->subTypes ?? [] as $sub) {
+            if (\PHPTypes\Type::TYPE_STRING === ($sub->type ?? null)) {
                 return true;
             }
         }
@@ -380,6 +420,92 @@ class JIT {
         }
 
         return [$ifBlock, $elseBlock];
+    }
+
+    private function ternaryArmAssignSourceVariable(Block $armBlock, Block $mergeBlock): ?Variable
+    {
+        $source = $this->ternaryPhiAssignSourceOperand($armBlock, $mergeBlock);
+        if (null === $source) {
+            return null;
+        }
+        if (
+            Variable::TYPE_NULL === Variable::getTypeFromType($source->type)
+            && !$this->operandTypeIncludesString($source)
+        ) {
+            return null;
+        }
+
+        return $this->context->getVariableFromOp($source);
+    }
+
+    /**
+     * Lower CFG RETURN for a shared ?: phi at an arm tail (issue #8555).
+     */
+    private function emitCfgReturnOperand(
+        PHPLLVM\Value\Function_ $func,
+        Block $cfgBlock,
+        Operand $returnOperand,
+        PHPLLVM\BasicBlock $tailBlock,
+        ?Variable $returnValue = null
+    ): void {
+        if (null !== $tailBlock->getTerminator()) {
+            return;
+        }
+        if (null !== $returnValue) {
+            $return = $returnValue;
+        } else {
+            $bound = $this->context->functionScopeBindingVariable($returnOperand, $cfgBlock);
+            if (null !== $bound) {
+                $return = $bound;
+            } else {
+                $return = $this->context->getVariableFromOp($returnOperand);
+            }
+        }
+        $builder = $this->context->builder;
+        $builder->positionAtEnd($tailBlock);
+        $this->markJitThisConstructedIfLeavingConstruct($cfgBlock);
+        if (
+            0 === $this->context->inlineIncludeDepth
+            && JIT\TryCatchHelper::deferReturnIfNeeded($this, $this->context, $func, $cfgBlock, false, $return)
+        ) {
+            return;
+        }
+        if ($cfgBlock->returnTypeVoid) {
+            JIT\Builtin\TypeErrorRaise::registerDeclarations($this->context);
+            JIT\Builtin\TypeErrorRaise::ensureLinked($this->context);
+            JIT\Builtin\TypeErrorRaise::emitRaise(
+                $this->context,
+                'A void function must not return a value'
+            );
+
+            return;
+        }
+        $return->addref();
+        if (null !== $cfgBlock->returnDnfConstraints) {
+            JIT\DnfParamCheck::enforce(
+                $this->context,
+                $return,
+                $cfgBlock->returnDnfConstraints,
+                'Return value'
+            );
+        }
+        $retval = $this->context->helper->loadValue($return);
+        $expected = $this->cfgFunctionReturnCallbackType($cfgBlock->func);
+        if (null === $expected && null !== $this->context->activeFunction) {
+            $expected = $this->context->functionReturnType[strtolower($this->context->activeFunction)] ?? null;
+        }
+        $retval = $this->coerceReturnValue($return, $retval, $expected);
+        // Arm-tail ?: returns must not use merge-block dead operands — they free branch
+        // locals (e.g. string params) before coerceReturnValue finishes (#8555).
+        if ($this->isVoidLlvmFunction($func)) {
+            $builder->returnVoid();
+        } elseif ($this->cfgFunctionReturnsByRef($cfgBlock->func)) {
+            $builder->returnValue(
+                JIT\JitValueBox::valuePtrFromVariable($this->context, $return)
+            );
+        } else {
+            $builder->returnValue($retval);
+        }
     }
 
     /** Main `{main}` defers __destruct until `phpc_gc_run_shutdown_destructors` (#4013). */
@@ -7137,13 +7263,64 @@ class JIT {
                     ) {
                         $mergeBlock = $this->branchJumpMergeBlock($op->block1);
                         assert(null !== $mergeBlock);
-                        [$firstArm, $secondArm] = $this->ternaryReturnMergeCompileOrder(
-                            $op->block1,
-                            $op->block2,
-                            $mergeBlock
-                        );
-                        $this->compileBlockInternal($func, $firstArm, null, null, 0, false, ...$args);
-                        $this->compileBlockInternal($func, $secondArm, null, null, 0, false, ...$args);
+                        $ifString = $this->branchAssignsStringToTernaryPhi($op->block1, $mergeBlock)
+                            || (
+                                !$this->branchAssignsOnlyNullToTernaryPhi($op->block1, $mergeBlock)
+                                && $this->branchAssignsOnlyNullToTernaryPhi($op->block2, $mergeBlock)
+                            );
+                        $elseString = $this->branchAssignsStringToTernaryPhi($op->block2, $mergeBlock);
+                        if ($ifString && !$elseString) {
+                            $returnOp = $this->ternaryReturnPhiOperand($mergeBlock);
+                            assert(null !== $returnOp);
+                            [$firstArm, $secondArm] = $this->ternaryReturnMergeCompileOrder(
+                                $op->block1,
+                                $op->block2,
+                                $mergeBlock
+                            );
+                            $ifSource = $this->ternaryPhiAssignSourceOperand($op->block1, $mergeBlock);
+                            $ifDirectString = null !== $ifSource
+                                && Variable::TYPE_STRING === Variable::getTypeFromType($ifSource->type);
+                            if ($ifDirectString) {
+                                $stringArm = $op->block1;
+                                $firstTail = $this->compileSubBlock($func, $firstArm, ...$args);
+                                if ($firstArm === $stringArm) {
+                                    $this->emitCfgReturnOperand(
+                                        $func,
+                                        $firstArm,
+                                        $returnOp,
+                                        $firstTail,
+                                        $this->ternaryArmAssignSourceVariable($firstArm, $mergeBlock)
+                                    );
+                                } else {
+                                    $this->emitCfgReturnOperand($func, $firstArm, $returnOp, $firstTail);
+                                }
+                                $secondTail = $this->compileSubBlock($func, $secondArm, ...$args);
+                                if ($secondArm === $stringArm) {
+                                    $this->emitCfgReturnOperand(
+                                        $func,
+                                        $secondArm,
+                                        $returnOp,
+                                        $secondTail,
+                                        $this->ternaryArmAssignSourceVariable($secondArm, $mergeBlock)
+                                    );
+                                } else {
+                                    $this->emitCfgReturnOperand($func, $secondArm, $returnOp, $secondTail);
+                                }
+                            } else {
+                                $firstTail = $this->compileSubBlock($func, $op->block1, ...$args);
+                                $this->emitCfgReturnOperand($func, $op->block1, $returnOp, $firstTail);
+                                $secondTail = $this->compileSubBlock($func, $op->block2, ...$args);
+                                $this->emitCfgReturnOperand($func, $op->block2, $returnOp, $secondTail);
+                            }
+                        } else {
+                            [$firstArm, $secondArm] = $this->ternaryReturnMergeCompileOrder(
+                                $op->block1,
+                                $op->block2,
+                                $mergeBlock
+                            );
+                            $this->compileBlockInternal($func, $firstArm, null, null, 0, false, ...$args);
+                            $this->compileBlockInternal($func, $secondArm, null, null, 0, false, ...$args);
+                        }
                         $ifEntry = $this->context->scope->blockStorage[$op->block1];
                         $elseEntry = $this->context->scope->blockStorage[$op->block2];
                         $builder->positionAtEnd($branchBlock);
