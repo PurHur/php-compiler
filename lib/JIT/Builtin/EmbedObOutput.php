@@ -28,6 +28,8 @@ final class EmbedObOutput
         self::implementReturnZero($context, '__phpc_ob_end_clean');
         self::implementReturnZero($context, '__phpc_ob_get_flush');
         self::implementReturnZero($context, '__phpc_ob_end_flush');
+        self::implementReturnZero($context, '__phpc_ob_flush');
+        self::implementReturnZero($context, '__phpc_ob_clean');
         self::implementNoop($context, '__phpc_flush');
         self::implementNoop($context, '__phpc_ob_end_all');
         self::implementObImplicitFlush($context);
