@@ -19,7 +19,7 @@ final class ReflectionEnumUnitCaseGetAttributes extends VmClassMethod
 
     public function execute(Frame $frame): void
     {
-        $receiver = ReflectionSupport::requireReflectionEnumUnitCase($frame, $frame->calledArgs[0]);
+        $receiver = ReflectionSupport::requireReflectionEnumCase($frame, $frame->calledArgs[0]);
         $ctx = VmReflection::requireContext($frame);
         $enumName = ReflectionSupport::classNameFromReflection($receiver);
         $caseName = ReflectionSupport::enumCaseNameFromReflection($receiver);
