@@ -1,16 +1,21 @@
 --- vendor/ircmaxell/php-cfg/lib/PHPCfg/Parser.php
 +++ vendor/ircmaxell/php-cfg/lib/PHPCfg/Parser.php
-@@ -1146,11 +1146,14 @@
+@@ -1146,11 +1146,18 @@
          if ($expr->byRef) {
              throw new \CompileError('syntax error, unexpected token "&"');
          }
          $op = $this->readVariable($this->parseExprNode($expr->value));
+-        if (null !== $expr->name) {
+-            $op->callArgName = $expr->name->toString();
 +        // Per-call-site wrapper: unpack/named flags must not leak across calls on shared Var operands (#8560).
 +        $site = clone $op;
++        // Preserve SSA slot identity for inline Expr temps (array literals in calls, #3553).
++        if ($site instanceof Operand\Temporary && null === $site->original) {
++            $site->original = $op;
++        }
 +        $site->callArgName = null;
 +        $site->callArgUnpack = false;
-         if (null !== $expr->name) {
--            $op->callArgName = $expr->name->toString();
++        if (null !== $expr->name) {
 +            $site->callArgName = $expr->name->toString();
          }
 -        $op->callArgUnpack = $expr->unpack;
