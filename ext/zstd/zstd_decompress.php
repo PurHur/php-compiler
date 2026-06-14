@@ -8,6 +8,7 @@ use PHPCompiler\ext\standard\VmString;
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Value;
 
@@ -39,6 +40,13 @@ final class zstd_decompress extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        throw new \Error('zstd_decompress() is not implemented for JIT in this compiler build (issue #6387)');
+        if (1 !== \count($args)) {
+            throw new \LogicException('zstd_decompress() expects exactly one argument in this compiler build');
+        }
+
+        return JitZstd::decompress(
+            $context,
+            JitStringBuiltinArg::lower($context, $args[0], 'zstd_decompress', 0, 'data')
+        );
     }
 }
