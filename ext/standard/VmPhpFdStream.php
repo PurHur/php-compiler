@@ -6,6 +6,7 @@ namespace PHPCompiler\ext\standard;
 
 /**
  * Native libc fd stream handles without host PHP fopen on php fd URLs (#8533, ext/standard/streams.c).
+ * flock/fflush/fsync via libc FFI — no host @flock/@fsync (#8594).
  *
  * php-src: php_stream_fd_ops — adopted dup(2) fds for open/popen/tmpfile/socket paths.
  */
@@ -18,6 +19,24 @@ final class VmPhpFdStream
     private const SEEK_END = 2;
 
     private const CHUNK = 8192;
+
+    /** PHP LOCK_* operands (ext/standard/flock.c). */
+    private const PHP_LOCK_SH = 1;
+
+    private const PHP_LOCK_EX = 2;
+
+    private const PHP_LOCK_UN = 3;
+
+    private const PHP_LOCK_NB = 4;
+
+    /** Linux flock(2) flags. */
+    private const SYS_LOCK_SH = 1;
+
+    private const SYS_LOCK_EX = 2;
+
+    private const SYS_LOCK_NB = 4;
+
+    private const SYS_LOCK_UN = 8;
 
     /** @var array<int, PhpFdStreamState> */
     private static array $streams = [];
@@ -253,6 +272,69 @@ final class VmPhpFdStream
         return $state->eof;
     }
 
+    /** flock() on adopted fd — libc flock(2), no host PHP @flock (#8594, ext/standard/flock.c). */
+    public static function flock(int $handle, int $operation): bool
+    {
+        $state = self::$streams[$handle] ?? null;
+        if (null === $state) {
+            return false;
+        }
+        $ffi = self::ffi();
+        if (null === $ffi) {
+            return false;
+        }
+
+        try {
+            return 0 === (int) $ffi->flock($state->fd, self::phpLockToSys($operation));
+        } catch (\Throwable) {
+            return false;
+        }
+    }
+
+    /** fflush() — direct write(2) path has no userspace buffer; parity true (#8594). */
+    public static function fflush(int $handle): bool
+    {
+        return isset(self::$streams[$handle]);
+    }
+
+    /** fsync() — libc fsync(2) on stream fd (#8594, ext/standard/file.c). */
+    public static function fsync(int $handle): bool
+    {
+        $state = self::$streams[$handle] ?? null;
+        if (null === $state) {
+            return false;
+        }
+        $ffi = self::ffi();
+        if (null === $ffi) {
+            return false;
+        }
+
+        try {
+            return 0 === (int) $ffi->fsync($state->fd);
+        } catch (\Throwable) {
+            return false;
+        }
+    }
+
+    /** fdatasync() — libc fdatasync(2) on stream fd (#8594, ext/standard/file.c). */
+    public static function fdatasync(int $handle): bool
+    {
+        $state = self::$streams[$handle] ?? null;
+        if (null === $state) {
+            return false;
+        }
+        $ffi = self::ffi();
+        if (null === $ffi) {
+            return false;
+        }
+
+        try {
+            return 0 === (int) $ffi->fdatasync($state->fd);
+        } catch (\Throwable) {
+            return false;
+        }
+    }
+
     public static function close(int $handle): bool
     {
         $state = self::$streams[$handle] ?? null;
@@ -417,6 +499,27 @@ final class VmPhpFdStream
         return ['canRead' => $read, 'canWrite' => $write];
     }
 
+    private static function phpLockToSys(int $operation): int
+    {
+        $hasUn = ($operation & self::PHP_LOCK_UN) === self::PHP_LOCK_UN;
+        $opWithoutUn = $hasUn ? ($operation & ~self::PHP_LOCK_UN) : $operation;
+        $sys = 0;
+        if ($hasUn) {
+            $sys |= self::SYS_LOCK_UN;
+        }
+        if (0 !== ($opWithoutUn & self::PHP_LOCK_SH)) {
+            $sys |= self::SYS_LOCK_SH;
+        }
+        if (0 !== ($opWithoutUn & self::PHP_LOCK_EX)) {
+            $sys |= self::SYS_LOCK_EX;
+        }
+        if (0 !== ($opWithoutUn & self::PHP_LOCK_NB)) {
+            $sys |= self::SYS_LOCK_NB;
+        }
+
+        return $sys;
+    }
+
     private static function closeFd(int $fd): void
     {
         $ffi = self::ffi();
@@ -466,6 +569,9 @@ ssize_t write(int fd, const void *buf, size_t count);
 off_t lseek(int fd, off_t offset, int whence);
 int close(int fd);
 int dup(int oldfd);
+int flock(int fd, int operation);
+int fsync(int fd);
+int fdatasync(int fd);
 CDEF;
 
         foreach (['libc.so.6', 'libc.so'] as $lib) {

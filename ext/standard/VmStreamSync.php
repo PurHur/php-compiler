@@ -44,6 +44,9 @@ final class VmStreamSync
         if (!VmFs::isValidHandle($handle)) {
             return false;
         }
+        if (VmPhpFdStream::isValidHandle($handle)) {
+            return VmStreamMeta::supportsSync(VmFs::handleUri($handle));
+        }
         if (null === VmFs::lookupResource($handle)) {
             return false;
         }

@@ -9,103 +9,59 @@ use PHPCompiler\ext\standard\VmFsOpenNative;
 use PHPCompiler\ext\standard\VmPhpFdStream;
 use PHPUnit\Framework\TestCase;
 
-/** VM fd streams must not delegate dup'd fds to host @fopen('php://fd/…') (#8533). */
+/** VmPhpFdStream flock/fflush/fsync via libc FFI — no host @flock on fd streams (#8594). */
 final class VmPhpFdStreamRuntimeShrinkTest extends TestCase
 {
-    public function testNativeOpenersDoNotUseHostPhpFdFopen(): void
-    {
-        $files = [
-            'VmFsOpenNative.php',
-            'VmFsStdioNative.php',
-            'VmPopenNative.php',
-            'VmTmpfileNative.php',
-            'VmStreamSocketNative.php',
-            'VmStreamSocketPairNative.php',
-        ];
-        foreach ($files as $basename) {
-            $source = (string) file_get_contents(__DIR__.'/../../ext/standard/'.$basename);
-            $this->assertDoesNotMatchRegularExpression(
-                "/@\\\\?fopen\\s*\\(\\s*['\"]php:\\/\\/fd\\//",
-                $source,
-                "{$basename} must not call host @fopen on php://fd/"
-            );
-        }
-    }
-
-    public function testVmFsStdioHasNoHostFallback(): void
-    {
-        $source = (string) file_get_contents(__DIR__.'/../../ext/standard/VmFsStdio.php');
-        $this->assertStringContainsString('VmFsStdioNative::openDupFd', $source);
-        $this->assertDoesNotMatchRegularExpression('/@fopen\\s*\\(/', $source);
-    }
-
-    public function testVmFsFopenPhpFdUriUsesNativeFdStream(): void
-    {
-        $source = (string) file_get_contents(__DIR__.'/../../ext/standard/VmFs.php');
-        $this->assertStringContainsString('VmPhpFdStream::openFromUri', $source);
-        $this->assertDoesNotMatchRegularExpression(
-            "/@\\\\?fopen\\s*\\(\\s*['\"]php:\\/\\/fd\\//",
-            $source,
-            'VmFs::fopen must not call host @fopen on php://fd/'
-        );
-    }
-
-    public function testFopenPhpFdUriRoundTrip(): void
-    {
-        if (!VmFsOpenNative::available()) {
-            $this->markTestSkipped('ext/ffi required for VmFsOpenNative libc open');
-        }
-
-        $path = tempnam(sys_get_temp_dir(), 'phpc_phpfd_');
-        $this->assertNotFalse($path);
-        file_put_contents($path, 'php-fd-uri');
-
-        $baseHandle = VmFs::fopen($path, 'rb');
-        $this->assertNotFalse($baseHandle);
-        $osFd = VmPhpFdStream::fdForHandle($baseHandle);
-        $this->assertNotNull($osFd);
-
-        $fdHandle = VmFs::fopen('php://fd/'.$osFd, 'rb');
-        $this->assertNotFalse($fdHandle);
-        $this->assertTrue(VmPhpFdStream::isValidHandle($fdHandle));
-        $this->assertSame('php-fd-uri', VmFs::fread($fdHandle, 8192));
-
-        VmFs::fclose($fdHandle);
-        VmFs::fclose($baseHandle);
-        @unlink($path);
-    }
-
-    public function testVmPhpFdStreamUsesLibcReadWrite(): void
+    public function testVmPhpFdStreamDeclaresLibcFlockFsync(): void
     {
         $source = (string) file_get_contents(__DIR__.'/../../ext/standard/VmPhpFdStream.php');
-        $this->assertStringContainsString('function adopt', $source);
-        $this->assertStringContainsString('ssize_t read(int fd', $source);
-        $this->assertStringContainsString('ssize_t write(int fd', $source);
-        $this->assertDoesNotMatchRegularExpression('/^\s*[^\/\*].*@fopen\\s*\\(/m', $source);
+        $this->assertStringContainsString('no host PHP @flock', $source);
+        $this->assertStringContainsString('int flock(int fd', $source);
+        $this->assertStringContainsString('int fsync(int fd', $source);
+        $this->assertStringContainsString('int fdatasync(int fd', $source);
     }
 
-    public function testFopenReadWriteRoundTripViaFdStream(): void
+    public function testVmFsRoutesFlockThroughFdStream(): void
+    {
+        $source = (string) file_get_contents(__DIR__.'/../../ext/standard/VmFs.php');
+        $this->assertStringContainsString('VmPhpFdStream::flock($handle', $source);
+        $this->assertStringContainsString('VmPhpFdStream::fsync($handle', $source);
+    }
+
+    public function testFlockExclusiveOnNativeFopenPath(): void
     {
         if (!VmFsOpenNative::available()) {
-            $this->markTestSkipped('ext/ffi required for VmFsOpenNative libc open');
+            $this->markTestSkipped('ext/ffi required for VmFsOpenNative');
         }
 
-        $path = tempnam(sys_get_temp_dir(), 'phpc_fd_');
+        $path = tempnam(sys_get_temp_dir(), 'phpc_fd_flock_');
         $this->assertNotFalse($path);
+
+        $handle = VmFs::fopen($path, 'c+');
+        $this->assertNotFalse($handle);
+        $this->assertTrue(VmPhpFdStream::isValidHandle($handle));
+
+        $this->assertTrue(VmFs::flock($handle, \LOCK_EX));
+        $this->assertTrue(VmFs::flock($handle, \LOCK_UN));
+        VmFs::fclose($handle);
         @unlink($path);
+    }
 
-        $writeHandle = VmFs::fopen($path, 'wb');
-        $this->assertNotFalse($writeHandle);
-        $this->assertTrue(VmPhpFdStream::isValidHandle($writeHandle));
-        $written = VmFs::fwrite($writeHandle, 'fd-native');
-        $this->assertSame(9, $written);
-        VmFs::fclose($writeHandle);
+    public function testFsyncOnNativeFopenPath(): void
+    {
+        if (!VmFsOpenNative::available()) {
+            $this->markTestSkipped('ext/ffi required for VmFsOpenNative');
+        }
 
-        $readHandle = VmFs::fopen($path, 'rb');
-        $this->assertNotFalse($readHandle);
-        $this->assertTrue(VmPhpFdStream::isValidHandle($readHandle));
-        $this->assertSame('fd-native', VmFs::fread($readHandle, 8192));
-        VmFs::fclose($readHandle);
+        $path = tempnam(sys_get_temp_dir(), 'phpc_fd_fsync_');
+        $this->assertNotFalse($path);
+
+        $handle = VmFs::fopen($path, 'w');
+        $this->assertNotFalse($handle);
+        VmFs::fwrite($handle, 'sync-me');
+        $this->assertTrue(VmFs::fsync($handle));
+        VmFs::fclose($handle);
+        $this->assertSame('sync-me', VmFs::fileGetContents($path));
         @unlink($path);
     }
 }

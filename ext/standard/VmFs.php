@@ -978,6 +978,9 @@ final class VmFs
 
     public static function flock(int $handle, int $operation): bool
     {
+        if (VmPhpFdStream::isValidHandle($handle)) {
+            return VmPhpFdStream::flock($handle, $operation);
+        }
         $fp = self::lookup($handle);
         if (null === $fp) {
             return false;
@@ -1010,6 +1013,9 @@ final class VmFs
 
     public static function fflush(int $handle): bool
     {
+        if (VmPhpFdStream::isValidHandle($handle)) {
+            return VmPhpFdStream::fflush($handle);
+        }
         $fp = self::lookup($handle);
         if (null === $fp) {
             return false;
@@ -1021,6 +1027,9 @@ final class VmFs
     /** fsync() — flush buffers and sync to disk (php-src ext/standard/file.c, #6062). */
     public static function fsync(int $handle): bool
     {
+        if (VmPhpFdStream::isValidHandle($handle)) {
+            return VmPhpFdStream::fsync($handle);
+        }
         $fp = self::lookup($handle);
         if (null === $fp || !VmStreamSync::isSupported($handle)) {
             return false;
@@ -1033,6 +1042,9 @@ final class VmFs
     /** fdatasync() — sync file data without metadata (php-src ext/standard/file.c, #6813). */
     public static function fdatasync(int $handle): bool
     {
+        if (VmPhpFdStream::isValidHandle($handle)) {
+            return VmPhpFdStream::fdatasync($handle);
+        }
         $fp = self::lookup($handle);
         if (null === $fp || !VmStreamSync::isSupported($handle)) {
             return false;
