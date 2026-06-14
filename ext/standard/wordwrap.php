@@ -37,11 +37,12 @@ final class wordwrap extends Internal
         );
         $width = 75;
         if ($argc >= 2) {
-            $w = $frame->calledArgs[1]->resolveIndirect();
-            if (Variable::TYPE_INTEGER !== $w->type) {
-                throw new \LogicException('wordwrap() width must be an integer in this compiler build');
-            }
-            $width = $w->toInt();
+            $width = VmMath::parseIntBuiltinArg(
+                $frame->calledArgs[1],
+                'wordwrap',
+                2,
+                'width'
+            );
         }
         $break = "\n";
         if ($argc >= 3) {
@@ -75,10 +76,7 @@ final class wordwrap extends Internal
         $i64 = $context->getTypeFromString('int64');
         $width = $i64->constInt(75, false);
         if ($argc >= 2) {
-            if (JITVariable::TYPE_NATIVE_LONG !== $args[1]->type) {
-                throw new \LogicException('wordwrap() width must be an integer in this compiler build');
-            }
-            $width = $context->helper->loadValue($args[1]);
+            $width = JitIntdiv::lowerIntBuiltinArg($context, $args[1], 'wordwrap', 2, 'width');
         }
         if ($argc >= 3) {
             $break = JitStringBuiltinArg::lower($context, $args[2], 'wordwrap', 2, 'break');
