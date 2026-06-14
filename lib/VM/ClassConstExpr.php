@@ -180,6 +180,11 @@ final class ClassConstExpr
             return;
         }
         if (!isset($classEntry->constants[$constName])) {
+            foreach (self::classNameCandidatesForConstFetch($className, $entry) as $candidate) {
+                if (self::tryFetchNativePhpClassConstant($candidate, $constNameRaw, $frame->scope[$op->arg1])) {
+                    return;
+                }
+            }
             throw new \LogicException("Undefined class constant {$className}::{$constName}");
         }
         if (EnumCaseSupport::tryMaterializeEnumCaseConstantFetch($classEntry, $constName, $frame->scope[$op->arg1])) {

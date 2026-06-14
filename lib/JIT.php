@@ -2639,8 +2639,28 @@ class JIT {
         return str_ends_with($lower, '\\web\\sourcebundler::bundleforaot');
     }
 
+    /** @var list<string> */
+    private const WEB_BOOTSTRAP_STUBBED_SUPERGLOBALS_SUFFIXES = [
+        'populatefromenvironment',
+        'populatecliargv',
+    ];
+
+    private function isSuperglobalsStubbedMethod(string $lower): bool
+    {
+        foreach (self::WEB_BOOTSTRAP_STUBBED_SUPERGLOBALS_SUFFIXES as $suffix) {
+            if (str_ends_with($lower, '\\web\\superglobals::'.$suffix)) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
     private function isSuperglobalsRealLoweringMethod(string $lower): bool
     {
+        if ($this->isSuperglobalsStubbedMethod($lower)) {
+            return false;
+        }
         if (str_ends_with($lower, '\\web\\superglobals::readrequestbody')
             || str_ends_with($lower, '\\web\\superglobals::exportcgienvironment')) {
             return true;
@@ -7387,6 +7407,10 @@ class JIT {
                             $lcname = strtolower($nameVar->compileTimeString);
                             if (!$this->context->functionIsRegistered($lcname)) {
                                 if (str_contains($nameVar->compileTimeString, '::')) {
+                                    [$staticClass, $staticMethod] = explode('::', $nameVar->compileTimeString, 2);
+                                    if ($this->tryResolveSelfHostSuperglobalsStaticCall($staticClass, $staticMethod)) {
+                                        break;
+                                    }
                                     throw new \LogicException("Call to undefined static method {$nameVar->compileTimeString}()");
                                 }
                                 throw new \LogicException("Call to undefined function {$lcname}()");
@@ -10635,6 +10659,39 @@ class JIT {
             }
 
             return;
+        } elseif (Variable::TYPE_OBJECT === $result->type && Variable::TYPE_STRING === $value->type) {
+            $slot = JIT\JitValueBox::alloc($this->context);
+            $str = JIT\JitStringArg::stringPtrFromVariable($this->context, $value);
+            $owned = $this->context->builder->call(
+                $this->context->lookupFunction('__string__separate'),
+                $str
+            );
+            $this->context->builder->call(
+                $this->context->lookupFunction('__value__writeString'),
+                JIT\JitValueBox::pointer($this->context, $slot),
+                $owned
+            );
+            $result->free();
+            $result->type = Variable::TYPE_VALUE;
+            $result->value = $slot;
+            $this->syncCompileTimeString($result, $value, $force);
+            $result->addref();
+
+            return;
+        } elseif (Variable::TYPE_STRING === $result->type && Variable::TYPE_OBJECT === $value->type) {
+            $slot = JIT\JitValueBox::alloc($this->context);
+            $this->context->builder->call(
+                $this->context->lookupFunction('__value__writeObject'),
+                JIT\JitValueBox::pointer($this->context, $slot),
+                $this->context->helper->loadValue($value)
+            );
+            $result->free();
+            $result->type = Variable::TYPE_VALUE;
+            $result->value = $slot;
+            $result->compileTimeEnumCase = $value->compileTimeEnumCase;
+            $result->addref();
+
+            return;
         }
         throw new \LogicException("Cannot assign operands of different types (yet): {$value->type}, {$result->type}");
     }
@@ -12143,6 +12200,44 @@ class JIT {
         return strtolower(ltrim($classLc, '\\')).'::'.$methodLc;
     }
 
+    private function isSelfHostSuperglobalsClassLc(string $classLc): bool
+    {
+        $classLc = strtolower(ltrim($classLc, '\\'));
+
+        return 'superglobals' === $classLc || str_ends_with($classLc, '\\superglobals');
+    }
+
+    private function tryResolveSelfHostSuperglobalsStaticCall(string $className, string $methodName): bool
+    {
+        if (!$this->shouldUseSelfHostJitStubs()) {
+            return false;
+        }
+        $declaringClassLc = strtolower(ltrim($className, '\\'));
+        if (!$this->isSelfHostSuperglobalsClassLc($declaringClassLc)) {
+            return false;
+        }
+        $methodLc = strtolower($methodName);
+        $fullLower = ('superglobals' === $declaringClassLc ? 'phpcompiler\\web\\superglobals' : $declaringClassLc)
+            .'::'.$methodLc;
+        if ('populatefromenvironment' === $methodLc) {
+            JIT\Builtin\SuperglobalRefreshRuntime::ensureLinked($this->context);
+            if (!$this->context->functionIsRegistered('__superglobals__refresh')) {
+                JIT\SuperglobalInit::declareRefresh($this->context);
+            }
+            $this->context->scope->toCall = $this->context->resolveFunctionProxy('__superglobals__refresh');
+
+            return true;
+        }
+        if (!$this->isSuperglobalsRealLoweringMethod($fullLower)
+            && !str_ends_with($fullLower, '::issuperglobalname')) {
+            $this->context->scope->toCall = $this->context->resolveFunctionProxy($fullLower);
+
+            return true;
+        }
+
+        return false;
+    }
+
     private function resolveJitStaticMethodProxyName(string $classLc, string $methodLc): string
     {
         $methodLc = strtolower($methodLc);
@@ -12303,6 +12398,11 @@ class JIT {
                     );
                 }
                 $this->context->scope->toCall = $this->context->resolveFunctionProxy('phpc_run_command');
+                $this->context->scope->args = [];
+
+                return;
+            }
+            if ($this->tryResolveSelfHostSuperglobalsStaticCall($className, $nameOp->value)) {
                 $this->context->scope->args = [];
 
                 return;
