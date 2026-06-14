@@ -28,14 +28,16 @@ final class array_column extends Internal
         if ($argc < 2 || $argc > 3) {
             throw new \LogicException('array_column() requires two or three arguments in this compiler build');
         }
-        $array = $frame->calledArgs[0]->resolveIndirect();
+        $ht = VmArray::requireArrayParam(
+            $frame->calledArgs[0]->resolveIndirect(),
+            'array_column',
+            1,
+            'array'
+        );
         $column = $frame->calledArgs[1]->resolveIndirect();
         $indexKeySpec = 3 === $argc ? $frame->calledArgs[2]->resolveIndirect() : null;
         if (null === $frame->returnVar) {
             return;
-        }
-        if (Variable::TYPE_ARRAY !== $array->type) {
-            throw new \LogicException('array_column() first argument must be an array in this compiler build');
         }
         $columnField = null;
         if (Variable::TYPE_NULL !== $column->type) {
@@ -48,7 +50,7 @@ final class array_column extends Internal
 
         $out = new HashTable();
         if (null === $columnField) {
-            foreach ($array->toArray()->iterate(true) as $rowVar) {
+            foreach ($ht->iterate(true) as $rowVar) {
                 $row = $rowVar->resolveIndirect();
                 $stored = new Variable();
                 $stored->copyFrom($row);
@@ -65,7 +67,7 @@ final class array_column extends Internal
 
             return;
         }
-        foreach ($array->toArray()->iterate(true) as $rowVar) {
+        foreach ($ht->iterate(true) as $rowVar) {
             $row = $rowVar->resolveIndirect();
             if (Variable::TYPE_ARRAY !== $row->type) {
                 if (null === $indexField) {
@@ -102,6 +104,7 @@ final class array_column extends Internal
         if ($argc < 2 || $argc > 3) {
             throw new \LogicException('array_column() requires two or three arguments in this compiler build');
         }
+        JitArrayElem::requireArrayParam($context, $args[0], 'array_column', 1, 'array');
         if (!JitArrayColumnArg::guardStrIntNullOperand($context, $args[1], 'array_column', 1, 'column_key')) {
             return HashTableHelper::alloc($context);
         }
