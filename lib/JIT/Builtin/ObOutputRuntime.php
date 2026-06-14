@@ -61,6 +61,8 @@ final class ObOutputRuntime
         self::implementObGetClean($context);
         self::implementObEndFlush($context);
         self::implementObGetFlush($context);
+        self::implementObFlush($context);
+        self::implementObClean($context);
         self::implementShutdownMarkRegistered($context);
         self::implementFlush($context);
         self::implementObEndAll($context);
@@ -338,6 +340,74 @@ final class ObOutputRuntime
         self::implementPopBuffer($context, '__phpc_ob_get_flush', true, true);
     }
 
+    private static function implementObFlush(Context $context): void
+    {
+        $i32 = $context->getTypeFromString('int32');
+        $valuePtr = $context->getTypeFromString('__value__*');
+        $fn = self::fn($context, '__phpc_ob_flush', $i32, false, $valuePtr);
+        $entry = $fn->appendBasicBlock('ofl_entry');
+        $fail = $fn->appendBasicBlock('ofl_fail');
+        $work = $fn->appendBasicBlock('ofl_work');
+        $context->builder->positionAtEnd($entry);
+        $out = $fn->getParam(0);
+        if (self::branchNoActiveBuffer($context, $fn, $out, $fail, $work)) {
+            $context->builder->positionAtEnd($fail);
+            $context->builder->call($context->lookupFunction('__value__writeBool'), $out, $i32->constInt(0, false));
+            $context->builder->returnValue($i32->constInt(0, false));
+            $context->builder->positionAtEnd($work);
+            $idx = self::activeIdx($context);
+            $level = $context->builder->load(self::levelPtr($context));
+            $hasParent = $context->builder->icmp(Builder::INT_SGT, $level, $i32->constInt(1, false));
+            $parentBb = $fn->appendBasicBlock('ofl_parent');
+            $directBb = $fn->appendBasicBlock('ofl_direct');
+            $doneBb = $fn->appendBasicBlock('ofl_done');
+            $context->builder->branchIf($hasParent, $parentBb, $directBb);
+            $context->builder->positionAtEnd($parentBb);
+            $parentIdx = $context->builder->sub($idx, $i32->constInt(1, false));
+            self::mergeRowIntoRow($context, $fn, $parentIdx, $idx);
+            self::clearBufferAt($context, $idx);
+            self::emitStdoutFromRow($context, $fn, $parentIdx);
+            $context->builder->branch($doneBb);
+            $context->builder->positionAtEnd($directBb);
+            self::emitStdoutFromRow($context, $fn, $idx);
+            $context->builder->branch($doneBb);
+            $context->builder->positionAtEnd($doneBb);
+            $context->builder->call(
+                $context->lookupFunction('__value__writeBool'),
+                $out,
+                $i32->constInt(1, false)
+            );
+            $context->builder->returnValue($i32->constInt(1, false));
+        }
+        $context->builder->clearInsertionPosition();
+    }
+
+    private static function implementObClean(Context $context): void
+    {
+        $i32 = $context->getTypeFromString('int32');
+        $valuePtr = $context->getTypeFromString('__value__*');
+        $fn = self::fn($context, '__phpc_ob_clean', $i32, false, $valuePtr);
+        $entry = $fn->appendBasicBlock('ocl_entry');
+        $fail = $fn->appendBasicBlock('ocl_fail');
+        $work = $fn->appendBasicBlock('ocl_work');
+        $context->builder->positionAtEnd($entry);
+        $out = $fn->getParam(0);
+        if (self::branchNoActiveBuffer($context, $fn, $out, $fail, $work)) {
+            $context->builder->positionAtEnd($fail);
+            $context->builder->call($context->lookupFunction('__value__writeBool'), $out, $i32->constInt(0, false));
+            $context->builder->returnValue($i32->constInt(0, false));
+            $context->builder->positionAtEnd($work);
+            self::clearBufferAt($context, self::activeIdx($context));
+            $context->builder->call(
+                $context->lookupFunction('__value__writeBool'),
+                $out,
+                $i32->constInt(1, false)
+            );
+            $context->builder->returnValue($i32->constInt(1, false));
+        }
+        $context->builder->clearInsertionPosition();
+    }
+
     private static function implementValueFromActiveBuffer(
         Context $context,
         string $name,
@@ -562,6 +632,63 @@ final class ObOutputRuntime
             $context->builder->pointerCast($context->constantFromString(''), $i8p)
         );
         $context->builder->call($context->lookupFunction('__value__writeString'), $out, $emptyStr);
+    }
+
+    private static function mergeRowIntoRow(Context $context, LlvmFunction $fn, Value $destIdx, Value $srcIdx): void
+    {
+        $sizeT = $context->getTypeFromString('size_t');
+        $srcLen = $context->builder->load(self::lenElemPtr($context, $srcIdx));
+        $empty = $fn->appendBasicBlock('mrr_empty_'.++self::$blockSuffix);
+        $work = $fn->appendBasicBlock('mrr_work_'.self::$blockSuffix);
+        $done = $fn->appendBasicBlock('mrr_done_'.self::$blockSuffix);
+        $hasLen = $context->builder->icmp(Builder::INT_UGT, $srcLen, $sizeT->constInt(0, false));
+        $context->builder->branchIf($hasLen, $work, $empty);
+        $context->builder->positionAtEnd($work);
+        $destPos = $context->builder->load(self::lenElemPtr($context, $destIdx));
+        $cap = $sizeT->constInt(self::BUF_CAP, false);
+        $room = $context->builder->sub($cap, $destPos);
+        $useLen = $context->builder->select(
+            $context->builder->icmp(Builder::INT_UGT, $srcLen, $room),
+            $room,
+            $srcLen
+        );
+        $destRow = self::storageRowPtr($context, $destIdx);
+        $srcRow = self::storageRowPtr($context, $srcIdx);
+        $destPtr = $context->builder->inBoundsGEP($destRow, $destPos);
+        $context->builder->call(
+            $context->lookupFunction('memcpy'),
+            $context->bytePtr($destPtr),
+            $context->bytePtr($srcRow),
+            $useLen
+        );
+        $newPos = $context->builder->add($destPos, $useLen);
+        $context->builder->store($newPos, self::lenElemPtr($context, $destIdx));
+        $term = $context->builder->inBoundsGEP($destRow, $newPos);
+        $context->builder->store($context->getTypeFromString('int8')->constInt(0, false), $term);
+        $context->builder->branch($done);
+        $context->builder->positionAtEnd($empty);
+        $context->builder->branch($done);
+        $context->builder->positionAtEnd($done);
+    }
+
+    private static function emitStdoutFromRow(Context $context, LlvmFunction $fn, Value $idx): void
+    {
+        $sizeT = $context->getTypeFromString('size_t');
+        $i32 = $context->getTypeFromString('int32');
+        $len = $context->builder->load(self::lenElemPtr($context, $idx));
+        $empty = $fn->appendBasicBlock('esr_empty_'.++self::$blockSuffix);
+        $work = $fn->appendBasicBlock('esr_work_'.self::$blockSuffix);
+        $done = $fn->appendBasicBlock('esr_done_'.self::$blockSuffix);
+        $hasLen = $context->builder->icmp(Builder::INT_UGT, $len, $sizeT->constInt(0, false));
+        $context->builder->branchIf($hasLen, $work, $empty);
+        $context->builder->positionAtEnd($work);
+        $context->builder->store($i32->constInt(1, false), self::globalPtr($context, self::G_SAPI_STARTED, $i32));
+        self::emitWriteStdout($context, self::storageRowPtr($context, $idx), $len);
+        self::clearBufferAt($context, $idx);
+        $context->builder->branch($done);
+        $context->builder->positionAtEnd($empty);
+        $context->builder->branch($done);
+        $context->builder->positionAtEnd($done);
     }
 
     private static function appendBufferAt(Context $context, LlvmFunction $fn, Value $idx): void
@@ -856,6 +983,8 @@ final class ObOutputRuntime
                 '__phpc_ob_get_clean',
                 '__phpc_ob_end_flush',
                 '__phpc_ob_get_flush',
+                '__phpc_ob_flush',
+                '__phpc_ob_clean',
                 '__phpc_shutdown_mark_registered',
                 '__phpc_flush',
                 '__phpc_ob_end_all',

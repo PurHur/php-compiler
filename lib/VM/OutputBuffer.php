@@ -123,6 +123,50 @@ final class OutputBuffer
     }
 
     /**
+     * ob_flush() — flush active buffer to parent/SAPI without ending level (ext/standard/output.c, #3588).
+     */
+    public static function flushBuffer(): bool
+    {
+        if ([] === self::$stack) {
+            return false;
+        }
+        $idx = \count(self::$stack) - 1;
+        $content = self::$stack[$idx];
+        self::$stack[$idx] = '';
+
+        if ('' !== $content) {
+            if ($idx > 0) {
+                self::$stack[$idx - 1] .= $content;
+                $parent = self::$stack[$idx - 1];
+                if ('' !== $parent) {
+                    SapiOutput::markStarted();
+                    echo $parent;
+                    self::$stack[$idx - 1] = '';
+                }
+            } else {
+                SapiOutput::markStarted();
+                echo $content;
+            }
+        }
+
+        return true;
+    }
+
+    /**
+     * ob_clean() — discard active buffer contents without ending level (ext/standard/output.c, #3588).
+     */
+    public static function clean(): bool
+    {
+        if ([] === self::$stack) {
+            return false;
+        }
+        $idx = \count(self::$stack) - 1;
+        self::$stack[$idx] = '';
+
+        return true;
+    }
+
+    /**
      * ob_get_flush() — pop active buffer, flush to parent/SAPI, return contents (issue #3753).
      *
      * php-src: ext/standard/output.c — like ob_end_flush but returns string|false.

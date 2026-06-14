@@ -15,7 +15,7 @@ use PHPCompiler\VM\Variable;
  */
 final class VmOb
 {
-    private const HANDLER_NAME = 'default output handler';
+    public const HANDLER_NAME = 'default output handler';
 
     /** PHP_OUTPUT_HANDLER_INTERNAL */
     private const HANDLER_TYPE = 0;
@@ -24,6 +24,17 @@ final class VmOb
     private const HANDLER_FLAGS = 112;
 
     private const DEFAULT_BUFFER_SIZE = 16384;
+
+    /** ob_list_handlers() — handler name per buffer level (ext/standard/output.c, #3588). */
+    public static function listHandlers(): HashTable
+    {
+        $names = [];
+        for ($i = 0, $level = OutputBuffer::getLevel(); $i < $level; ++$i) {
+            $names[] = self::HANDLER_NAME;
+        }
+
+        return VmFs::stringListToArray($names);
+    }
 
     public static function getStatus(bool $full): HashTable
     {

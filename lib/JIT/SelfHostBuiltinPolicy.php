@@ -67,7 +67,9 @@ final class SelfHostBuiltinPolicy
     /** @var array<string, string> */
     private const CATEGORY_OUTPUT = [
         'ob_start' => 'output', 'ob_get_clean' => 'output', 'ob_get_flush' => 'output',
-        'ob_end_flush' => 'output', 'ob_get_level' => 'output', 'ob_implicit_flush' => 'output', 'flush' => 'output',
+        'ob_end_flush' => 'output', 'ob_get_level' => 'output', 'ob_implicit_flush' => 'output',
+        'ob_flush' => 'output', 'ob_clean' => 'output', 'ob_list_handlers' => 'output',
+        'flush' => 'output',
         'http_get_last_response_headers' => 'output', 'get_last_response_headers' => 'output',
         'http_clear_last_response_headers' => 'output',
         'headers_sent' => 'output', 'header_register_callback' => 'output',
@@ -82,6 +84,9 @@ final class SelfHostBuiltinPolicy
         'ob_get_flush' => true,
         'ob_end_flush' => true,
         'ob_get_level' => true,
+        'ob_flush' => true,
+        'ob_clean' => true,
+        'ob_list_handlers' => true,
         'flush' => true,
         'gc_collect_cycles' => true,
         'gc_disable' => true,
