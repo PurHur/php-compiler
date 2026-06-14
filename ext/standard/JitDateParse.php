@@ -1,0 +1,75 @@
+<?php
+
+declare(strict_types=1);
+
+namespace PHPCompiler\ext\standard;
+
+use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\JitStringBuiltinArg;
+use PHPCompiler\JIT\JitValueBox;
+use PHPCompiler\JIT\Variable as JITVariable;
+use PHPLLVM\Value;
+
+/**
+ * LLVM lowering for date_parse() / date_parse_from_format() (#6172).
+ *
+ * php-src: ext/date/php_date.c — PHP_FUNCTION(date_parse), PHP_FUNCTION(date_parse_from_format)
+ */
+final class JitDateParse
+{
+    public static function invokeDateParse(Context $context, JITVariable ...$args): Value
+    {
+        if (1 !== \count($args)) {
+            throw new \LogicException('date_parse() expects exactly 1 argument in this compiler build');
+        }
+        $lit = self::compileTimeStringArg($args[0]);
+        if (null === $lit) {
+            throw new \LogicException(
+                'date_parse() requires compile-time string operands in this compiler build (issue #6172)'
+            );
+        }
+
+        $parsed = VmDateTimeNative::parseDate($lit);
+        $ht = JitDateParseMaterializer::materialize($context, $parsed);
+
+        return self::wrapHashtable($context, $ht);
+    }
+
+    public static function invokeDateParseFromFormat(Context $context, JITVariable ...$args): Value
+    {
+        if (2 !== \count($args)) {
+            throw new \LogicException('date_parse_from_format() expects exactly 2 arguments in this compiler build');
+        }
+        $formatLit = self::compileTimeStringArg($args[0]);
+        $dateLit = self::compileTimeStringArg($args[1]);
+        if (null === $formatLit || null === $dateLit) {
+            throw new \LogicException(
+                'date_parse_from_format() requires compile-time string operands in this compiler build (issue #6172)'
+            );
+        }
+
+        $parsed = VmDateTimeNative::parseFromFormatComponents($formatLit, $dateLit);
+        $ht = JitDateParseMaterializer::materialize($context, $parsed);
+
+        return self::wrapHashtable($context, $ht);
+    }
+
+    private static function compileTimeStringArg(JITVariable $arg): ?string
+    {
+        $lit = JitStringBuiltinArg::compileTimeLiteral($arg);
+        if (null !== $lit) {
+            return $lit;
+        }
+
+        return $arg->compileTimeString;
+    }
+
+    private static function wrapHashtable(Context $context, Value $ht): Value
+    {
+        $slot = JitValueBox::alloc($context);
+        $ptr = JitValueBox::pointer($context, $slot);
+        $context->builder->call($context->lookupFunction('__value__writeHashtable'), $ptr, $ht);
+
+        return $ptr;
+    }
+}
