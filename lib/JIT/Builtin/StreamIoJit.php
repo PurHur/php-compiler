@@ -103,7 +103,7 @@ final class StreamIoJit
         $nullPtr = $i8p->constNull();
 
         self::implementNullaryI64Stub($context, '__compiler_tmpfile', $minusOne);
-        self::implementBinaryI64Stub($context, '__compiler_fwrite', $minusOne);
+        self::implementFwriteStub($context, '__compiler_fwrite', $minusOne);
         self::implementBinaryI64Stub($context, '__compiler_fopen', $minusOne);
         self::implementBinaryI64Stub($context, '__compiler_popen', $minusOne);
         self::implementBinaryStrStub($context, '__compiler_fread', $nullStr);
@@ -123,6 +123,18 @@ final class StreamIoJit
             $context,
             $name,
             $context->context->functionType($i64, false, $strPtr, $strPtr),
+            $ret
+        );
+    }
+
+    private static function implementFwriteStub(Context $context, string $name, Value $ret): void
+    {
+        $i64 = $context->getTypeFromString('int64');
+        $strPtr = $context->getTypeFromString('__string__*');
+        self::implementStub(
+            $context,
+            $name,
+            $context->context->functionType($i64, false, $i64, $strPtr, $i64),
             $ret
         );
     }
@@ -158,7 +170,14 @@ final class StreamIoJit
 
             return;
         }
-        $fn = $context->module->addFunction($name, $ft);
+        if (null === $probe) {
+            try {
+                $probe = $context->lookupFunction($name);
+            } catch (\Throwable) {
+                $probe = null;
+            }
+        }
+        $fn = $probe ?? $context->module->addFunction($name, $ft);
         $entry = $fn->appendBasicBlock('entry');
         $context->builder->positionAtEnd($entry);
         $context->builder->returnValue($ret);
