@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace PHPCompiler\JIT;
 
+use PHPCompiler\JIT\Builtin\Type\Object_ as JitObjectType;
 use PHPCompiler\JIT\Builtin\TypeErrorRaise;
 use PHPCompiler\VM\Variable as VmVariable;
 use PHPLLVM\Builder;
@@ -38,14 +39,7 @@ final class JitStringBuiltinArg
             return self::unreachableStringPtr($context);
         }
         if (Variable::TYPE_OBJECT === $arg->type) {
-            self::emitTypeErrorAndAbort(
-                $context,
-                $function,
-                $argIndex,
-                $paramName,
-                self::compileTimeGivenLabel($context, $arg),
-                $expectedType
-            );
+            self::emitRejectTypeError($context, $arg, $function, $argIndex, $paramName, $expectedType);
 
             return self::unreachableStringPtr($context);
         }
@@ -131,13 +125,25 @@ final class JitStringBuiltinArg
         $isObjOrEnum = $context->builder->or($isObject, $isEnumCase);
         $context->builder->branchIf($isObjOrEnum, $rejectBlock, $scalarBlock);
 
+        $enumRejectBlock = BasicBlockHelper::append($context, 'str_req_enum_reject');
+        $objectRejectBlock = BasicBlockHelper::append($context, 'str_req_object_reject');
         $context->builder->positionAtEnd($rejectBlock);
-        self::emitTypeErrorAndAbort(
+        $context->builder->branchIf($isEnumCase, $enumRejectBlock, $objectRejectBlock);
+        $context->builder->positionAtEnd($enumRejectBlock);
+        self::emitRuntimeBoxedEnumCaseReject(
             $context,
+            $valuePtr,
             $function,
             $argIndex,
-            $paramName,
-            self::compileTimeGivenLabel($context, $arg)
+            $paramName
+        );
+        $context->builder->positionAtEnd($objectRejectBlock);
+        self::emitRuntimeBoxedObjectReject(
+            $context,
+            $valuePtr,
+            $function,
+            $argIndex,
+            $paramName
         );
 
         $context->builder->positionAtEnd($scalarBlock);
@@ -191,13 +197,26 @@ final class JitStringBuiltinArg
         $isObjOrEnum = $context->builder->or($isObject, $isEnumCase);
         $context->builder->branchIf($isObjOrEnum, $rejectBlock, $coerceBlock);
 
+        $enumRejectBlock = BasicBlockHelper::append($context, 'str_builtin_enum_reject');
+        $objectRejectBlock = BasicBlockHelper::append($context, 'str_builtin_object_reject');
         $context->builder->positionAtEnd($rejectBlock);
-        self::emitTypeErrorAndAbort(
+        $context->builder->branchIf($isEnumCase, $enumRejectBlock, $objectRejectBlock);
+        $context->builder->positionAtEnd($enumRejectBlock);
+        self::emitRuntimeBoxedEnumCaseReject(
             $context,
+            $valuePtr,
             $function,
             $argIndex,
             $paramName,
-            self::compileTimeGivenLabel($context, $arg),
+            $expectedType
+        );
+        $context->builder->positionAtEnd($objectRejectBlock);
+        self::emitRuntimeBoxedObjectReject(
+            $context,
+            $valuePtr,
+            $function,
+            $argIndex,
+            $paramName,
             $expectedType
         );
 
@@ -222,28 +241,147 @@ final class JitStringBuiltinArg
         );
     }
 
-    private static function compileTimeGivenLabel(Context $context, Variable $arg): string
-    {
-        $enumLabel = JitOperandTypeLabel::compileTimeEnumClassName($context, $arg);
-        if (null !== $enumLabel) {
-            return $enumLabel;
+    private static function emitRejectTypeError(
+        Context $context,
+        Variable $arg,
+        string $function,
+        int $argIndex,
+        string $paramName,
+        string $expectedType = 'string'
+    ): void {
+        $compileTimeLabel = JitOperandTypeLabel::compileTimeEnumClassName($context, $arg);
+        if (null !== $compileTimeLabel) {
+            self::emitTypeErrorAndAbort($context, $function, $argIndex, $paramName, $compileTimeLabel, $expectedType);
+
+            return;
         }
-        if (Variable::KIND_VALUE !== $arg->kind || Variable::TYPE_OBJECT !== $arg->type) {
-            return 'object';
+        if (Variable::TYPE_OBJECT === $arg->type) {
+            self::emitRuntimeObjectReject($context, $arg, $function, $argIndex, $paramName, $expectedType);
+
+            return;
         }
+        self::emitTypeErrorAndAbort($context, $function, $argIndex, $paramName, 'object', $expectedType);
+    }
+
+    private static function emitRuntimeObjectReject(
+        Context $context,
+        Variable $arg,
+        string $function,
+        int $argIndex,
+        string $paramName,
+        string $expectedType
+    ): void {
         $objMap = $context->structFieldMap['__object__'] ?? null;
         if (null === $objMap || !isset($objMap['class_id'])) {
-            return 'object';
-        }
-        $classIdVal = $context->builder->load(
-            $context->builder->structGep($arg->value, $objMap['class_id'])
-        );
-        if (!method_exists($classIdVal, 'isConstant') || !$classIdVal->isConstant()) {
-            return 'object';
-        }
-        $classId = (int) $classIdVal->getConstantValue();
+            self::emitTypeErrorAndAbort($context, $function, $argIndex, $paramName, 'object', $expectedType);
 
-        return $context->type->object->classNameForId($classId);
+            return;
+        }
+        $objPtr = Variable::KIND_VALUE === $arg->kind
+            ? $arg->value
+            : $context->builder->load($arg->value);
+        $classId = $context->builder->load(
+            $context->builder->structGep($objPtr, $objMap['class_id'])
+        );
+        self::emitRuntimeEnumClassIdReject($context, $classId, $function, $argIndex, $paramName, $expectedType);
+    }
+
+    private static function emitRuntimeBoxedEnumCaseReject(
+        Context $context,
+        Value $valuePtr,
+        string $function,
+        int $argIndex,
+        string $paramName,
+        string $expectedType
+    ): void {
+        $enumMap = $context->structFieldMap['__enum_case__'] ?? null;
+        if (null === $enumMap || !isset($enumMap['class_id'])) {
+            self::emitTypeErrorAndAbort($context, $function, $argIndex, $paramName, 'object', $expectedType);
+
+            return;
+        }
+        $classId = $context->builder->load(
+            $context->builder->structGep($valuePtr, $enumMap['class_id'])
+        );
+        self::emitRuntimeEnumClassIdReject($context, $classId, $function, $argIndex, $paramName, $expectedType);
+    }
+
+    private static function emitRuntimeBoxedObjectReject(
+        Context $context,
+        Value $valuePtr,
+        string $function,
+        int $argIndex,
+        string $paramName,
+        string $expectedType
+    ): void {
+        $objPtr = $context->builder->call(
+            $context->lookupFunction('__value__readObject'),
+            $valuePtr
+        );
+        $objMap = $context->structFieldMap['__object__'] ?? null;
+        if (null === $objMap || !isset($objMap['class_id'])) {
+            self::emitTypeErrorAndAbort($context, $function, $argIndex, $paramName, 'object', $expectedType);
+
+            return;
+        }
+        $classId = $context->builder->load(
+            $context->builder->structGep($objPtr, $objMap['class_id'])
+        );
+        self::emitRuntimeEnumClassIdReject($context, $classId, $function, $argIndex, $paramName, $expectedType);
+    }
+
+    private static function emitRuntimeEnumClassIdReject(
+        Context $context,
+        Value $classId,
+        string $function,
+        int $argIndex,
+        string $paramName,
+        string $expectedType
+    ): void {
+        $jitObject = $context->type->object;
+        if (!$jitObject instanceof JitObjectType) {
+            self::emitTypeErrorAndAbort($context, $function, $argIndex, $paramName, 'object', $expectedType);
+
+            return;
+        }
+        $enumNames = $jitObject->allDeclaredEnumLowerNames();
+        if ([] === $enumNames) {
+            self::emitTypeErrorAndAbort($context, $function, $argIndex, $paramName, 'object', $expectedType);
+
+            return;
+        }
+        $i64 = $context->getTypeFromString('int64');
+        $fn = BasicBlockHelper::parentFunction($context);
+        $checkBlock = $context->builder->getInsertBlock();
+        $okBlock = BasicBlockHelper::append($context, 'str_enum_class_reject_ok');
+        $ids = [];
+        foreach ($enumNames as $lc) {
+            $enumId = $jitObject->lookup($lc);
+            $ids[] = [$enumId, $jitObject->classNameForId($enumId)];
+        }
+        $lastIdx = \count($ids) - 1;
+        foreach ($ids as $idx => [$enumId, $enumName]) {
+            $context->builder->positionAtEnd($checkBlock);
+            $match = $context->builder->icmp(
+                Builder::INT_EQ,
+                $classId,
+                $i64->constInt($enumId, false)
+            );
+            $rejectBlock = $fn->appendBasicBlock('str_enum_class_reject_'.$enumId);
+            $nextBlock = $idx === $lastIdx
+                ? $okBlock
+                : $fn->appendBasicBlock('str_enum_class_try_'.($idx + 1));
+            $context->builder->branchIf($match, $rejectBlock, $nextBlock);
+            $context->builder->positionAtEnd($rejectBlock);
+            self::emitTypeErrorAndAbort($context, $function, $argIndex, $paramName, $enumName, $expectedType);
+            $checkBlock = $nextBlock;
+        }
+        if ($checkBlock !== $okBlock) {
+            $context->builder->positionAtEnd($checkBlock);
+            self::emitTypeErrorAndAbort($context, $function, $argIndex, $paramName, 'object', $expectedType);
+            $context->builder->branch($okBlock);
+        }
+        $context->builder->positionAtEnd($okBlock);
     }
 
     private static function typeErrorMessage(
@@ -271,10 +409,16 @@ final class JitStringBuiltinArg
         string $given,
         string $expectedType = 'string'
     ): void {
-        ExceptionBridge::emitTypeErrorAndAbort(
-            $context,
-            self::typeErrorMessage($function, $argIndex, $paramName, $given, $expectedType)
-        );
+        TypeErrorRaise::registerDeclarations($context);
+        TypeErrorRaise::ensureLinked($context);
+        $message = self::typeErrorMessage($function, $argIndex, $paramName, $given, $expectedType);
+        if (null !== TryCatchHelper::resolveThrowHandler($context)) {
+            TryCatchHelper::emitCatchableClassError($context, 'TypeError', $message);
+
+            return;
+        }
+        TypeErrorRaise::emitRaise($context, $message);
+        $context->builder->call($context->lookupFunction('abort'));
     }
 
     private static function unreachableStringPtr(Context $context): Value
