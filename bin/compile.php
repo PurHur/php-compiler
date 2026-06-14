@@ -158,7 +158,15 @@ function run(string $filename, string $code, array $options): void
         // Use a runtime-native marker instead of getenv(): self-host AOT execution stubs and
         // env access can be unreliable precisely in the scenarios we're trying to debug.
         if (!\function_exists('php_compiler_cli_should_skip_entry_driver')) {
-            putenv('PHP_COMPILER_SELFHOST_AOT=0');
+            $bootstrapAotLink = getenv('PHP_COMPILER_BOOTSTRAP_AOT_LINK');
+            $isBootstrapAotLink = '1' === $bootstrapAotLink || 'true' === strtolower((string) $bootstrapAotLink);
+            if ($isBootstrapAotLink) {
+                // bootstrap-aot-link: Runtime spine via self-host stubs; user FUNCDEF bodies stay real (#1492).
+                putenv('PHP_COMPILER_SELFHOST_AOT=1');
+                putenv('PHP_COMPILER_M3_COMPILE_DRIVER=1');
+            } else {
+                putenv('PHP_COMPILER_SELFHOST_AOT=0');
+            }
         }
     }
     if ('-' !== $filename && str_contains($normalized, 'test/selfhost/')) {
