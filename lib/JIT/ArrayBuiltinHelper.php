@@ -771,6 +771,146 @@ final class ArrayBuiltinHelper
     }
 
     /**
+     * array_column() with runtime string or int column_key (#4091).
+     */
+    public static function buildColumnArrayWithRuntimeColumnKey(
+        Context $context,
+        Variable $array,
+        Variable $columnKey
+    ): Value {
+        $ht = self::isNativeArray($array->type)
+            ? self::nativeListToHashTable($context, $array)
+            : self::loadHashTable($context, $array);
+
+        return self::buildColumnFromHashTableRuntimeKey($context, $ht, $columnKey);
+    }
+
+    /**
+     * array_column() with runtime column_key and compile-time index_key (#4091).
+     */
+    public static function buildColumnArrayWithRuntimeColumnKeyAndIndex(
+        Context $context,
+        Variable $array,
+        Variable $columnKey,
+        Value $indexKeyStr
+    ): Value {
+        $ht = self::isNativeArray($array->type)
+            ? self::nativeListToHashTable($context, $array)
+            : self::loadHashTable($context, $array);
+
+        return self::buildColumnWithIndexFromHashTableRuntimeKey($context, $ht, $columnKey, $indexKeyStr);
+    }
+
+    /**
+     * array_column() with null column_key and runtime index_key (#4091).
+     */
+    public static function buildColumnArrayNullColumnWithRuntimeIndex(
+        Context $context,
+        Variable $array,
+        Variable $indexKey
+    ): Value {
+        $ht = self::isNativeArray($array->type)
+            ? self::nativeListToHashTable($context, $array)
+            : self::loadHashTable($context, $array);
+
+        return self::buildColumnNullWithIndexFromHashTableRuntimeKey($context, $ht, $indexKey);
+    }
+
+    /**
+     * array_column() with compile-time column_key and runtime index_key (#4091).
+     */
+    public static function buildColumnArrayWithRuntimeIndexKey(
+        Context $context,
+        Variable $array,
+        Value $columnKeyStr,
+        Variable $indexKey
+    ): Value {
+        $ht = self::isNativeArray($array->type)
+            ? self::nativeListToHashTable($context, $array)
+            : self::loadHashTable($context, $array);
+
+        return self::dispatchRuntimeStrIntKey(
+            $context,
+            $indexKey,
+            'array_column',
+            2,
+            'index_key',
+            static fn (Context $ctx, Value $keyStr): Value => self::buildColumnWithIndexFromHashTable(
+                $ctx,
+                $ht,
+                $columnKeyStr,
+                $keyStr
+            ),
+            static fn (Context $ctx, Value $keyIdx): Value => self::buildColumnWithIndexFromHashTableStringColumnIntIndex(
+                $ctx,
+                $ht,
+                $columnKeyStr,
+                $keyIdx
+            )
+        );
+    }
+
+    /**
+     * array_column() with runtime column_key and runtime index_key (#4091).
+     */
+    public static function buildColumnArrayWithRuntimeColumnKeyAndRuntimeIndex(
+        Context $context,
+        Variable $array,
+        Variable $columnKey,
+        Variable $indexKey
+    ): Value {
+        $ht = self::isNativeArray($array->type)
+            ? self::nativeListToHashTable($context, $array)
+            : self::loadHashTable($context, $array);
+
+        return self::dispatchRuntimeStrIntKey(
+            $context,
+            $columnKey,
+            'array_column',
+            1,
+            'column_key',
+            static fn (Context $ctx, Value $colStr): Value => self::dispatchRuntimeStrIntKey(
+                $ctx,
+                $indexKey,
+                'array_column',
+                2,
+                'index_key',
+                static fn (Context $c2, Value $idxStr): Value => self::buildColumnWithIndexFromHashTable(
+                    $c2,
+                    $ht,
+                    $colStr,
+                    $idxStr
+                ),
+                static fn (Context $c2, Value $idxInt): Value => self::buildColumnWithIndexFromHashTableStringColumnIntIndex(
+                    $c2,
+                    $ht,
+                    $colStr,
+                    $idxInt
+                )
+            ),
+            static fn (Context $ctx, Value $colInt): Value => self::dispatchRuntimeStrIntKey(
+                $ctx,
+                $indexKey,
+                'array_column',
+                2,
+                'index_key',
+                static fn (Context $c2, Value $idxStr): Value => self::buildColumnWithIndexFromHashTableIntKey(
+                    $c2,
+                    $ht,
+                    $colInt,
+                    $idxStr
+                ),
+                static fn (Context $c2, Value $idxInt): Value => self::buildColumnWithIndexFromHashTableIntColumnIntIndex(
+                    $c2,
+                    $ht,
+                    $colInt,
+                    $idxInt
+                )
+            )
+        );
+    }
+
+    /**
      * array_filter() default mask: copy elements that are truthy, preserving keys (subset of PHP).
      */
     public static function buildFilterArray(Context $context, Variable $array): Value
@@ -5453,6 +5593,266 @@ final class ArrayBuiltinHelper
         return $phi;
     }
 
+    /**
+     * @param callable(Context, Value): Value $onStringKey
+     * @param callable(Context, Value): Value $onIntKey size_t index
+     */
+    private static function dispatchRuntimeStrIntKey(
+        Context $context,
+        Variable $key,
+        string $function,
+        int $argIndex,
+        string $paramName,
+        callable $onStringKey,
+        callable $onIntKey
+    ): Value {
+        $tag = (string) ++self::$copyListEntrySeq;
+        $valueMap = $context->structFieldMap['__value__'];
+        $keyPtr = JitValueBox::valuePtrFromVariable($context, $key);
+        $typeByte = $context->builder->load(
+            $context->builder->structGep($keyPtr, $valueMap['type'])
+        );
+        $i8 = $context->getTypeFromString('int8');
+        $stringBlock = BasicBlockHelper::append($context, 'array_column_rtkey_str_'.$tag);
+        $intBlock = BasicBlockHelper::append($context, 'array_column_rtkey_int_'.$tag);
+        $doneBlock = BasicBlockHelper::append($context, 'array_column_rtkey_done_'.$tag);
+        $checkInt = BasicBlockHelper::append($context, 'array_column_rtkey_check_int_'.$tag);
+
+        $isString = $context->builder->icmp(
+            Builder::INT_EQ,
+            $typeByte,
+            $i8->constInt(Variable::TYPE_STRING, false)
+        );
+        $context->builder->branchIf($isString, $stringBlock, $checkInt);
+
+        $context->builder->positionAtEnd($checkInt);
+        $isInt = $context->builder->icmp(
+            Builder::INT_EQ,
+            $typeByte,
+            $i8->constInt(Variable::TYPE_NATIVE_LONG, false)
+        );
+        $rejectBlock = BasicBlockHelper::append($context, 'array_column_rtkey_reject_'.$tag);
+        $context->builder->branchIf($isInt, $intBlock, $rejectBlock);
+
+        $context->builder->positionAtEnd($rejectBlock);
+        JitArrayColumnArg::emitStrIntNullTypeErrorAndAbort(
+            $context,
+            $function,
+            $argIndex,
+            $paramName,
+            JitOperandTypeLabel::givenLabel($context, $key)
+        );
+
+        $context->builder->positionAtEnd($stringBlock);
+        $keyStr = JitStringArg::lower($context, $key, $function.'() '.$paramName);
+        $strResult = $onStringKey($context, $keyStr);
+        $context->builder->branch($doneBlock);
+
+        $context->builder->positionAtEnd($intBlock);
+        $keyLong = $context->builder->call(
+            $context->lookupFunction('__value__readLong'),
+            $keyPtr
+        );
+        $sizeT = $context->getTypeFromString('size_t');
+        $keyIdx = $context->builder->trunc($keyLong, $sizeT);
+        $intResult = $onIntKey($context, $keyIdx);
+        $context->builder->branch($doneBlock);
+
+        $context->builder->positionAtEnd($doneBlock);
+        $phi = $context->builder->phi($strResult->typeOf());
+        $phi->addIncoming($strResult, $stringBlock);
+        $phi->addIncoming($intResult, $intBlock);
+
+        return $phi;
+    }
+
+    private static function buildColumnFromHashTableRuntimeKey(
+        Context $context,
+        Value $src,
+        Variable $columnKey
+    ): Value {
+        return self::dispatchRuntimeStrIntKey(
+            $context,
+            $columnKey,
+            'array_column',
+            1,
+            'column_key',
+            static fn (Context $ctx, Value $keyStr): Value => self::buildColumnFromHashTable($ctx, $src, $keyStr),
+            static fn (Context $ctx, Value $keyIdx): Value => self::buildColumnFromHashTableIntKey($ctx, $src, $keyIdx)
+        );
+    }
+
+    private static function buildColumnWithIndexFromHashTableRuntimeKey(
+        Context $context,
+        Value $src,
+        Variable $columnKey,
+        Value $indexKeyStr
+    ): Value {
+        return self::dispatchRuntimeStrIntKey(
+            $context,
+            $columnKey,
+            'array_column',
+            1,
+            'column_key',
+            static fn (Context $ctx, Value $keyStr): Value => self::buildColumnWithIndexFromHashTable(
+                $ctx,
+                $src,
+                $keyStr,
+                $indexKeyStr
+            ),
+            static fn (Context $ctx, Value $keyIdx): Value => self::buildColumnWithIndexFromHashTableIntKey(
+                $ctx,
+                $src,
+                $keyIdx,
+                $indexKeyStr
+            )
+        );
+    }
+
+    private static function buildColumnNullWithIndexFromHashTableRuntimeKey(
+        Context $context,
+        Value $src,
+        Variable $indexKey
+    ): Value {
+        return self::dispatchRuntimeStrIntKey(
+            $context,
+            $indexKey,
+            'array_column',
+            2,
+            'index_key',
+            static fn (Context $ctx, Value $keyStr): Value => self::buildColumnNullWithIndexFromHashTable(
+                $ctx,
+                $src,
+                $keyStr
+            ),
+            static fn (Context $ctx, Value $keyIdx): Value => self::buildColumnNullWithIndexFromHashTableIntKey(
+                $ctx,
+                $src,
+                $keyIdx
+            )
+        );
+    }
+
+    private static function buildColumnFromHashTableIntKey(
+        Context $context,
+        Value $src,
+        Value $columnKeyIdx
+    ): Value {
+        $tag = (string) ++self::$copyListEntrySeq;
+        $map = $context->structFieldMap['__hashtable__'];
+        $valueMap = $context->structFieldMap['__value__'];
+        $sizeT = $context->getTypeFromString('size_t');
+        $nextFree = $context->builder->load(
+            $context->builder->structGep($src, $map['nextFreeElement'])
+        );
+        $zero = $sizeT->constInt(0, false);
+        $one = $sizeT->constInt(1, false);
+        $isEmpty = $context->builder->icmp(Builder::INT_EQ, $nextFree, $zero);
+        $emptyBlock = BasicBlockHelper::append($context, 'array_column_int_empty_'.$tag);
+        $workBlock = BasicBlockHelper::append($context, 'array_column_int_work_'.$tag);
+        $doneBlock = BasicBlockHelper::append($context, 'array_column_int_done_'.$tag);
+        $context->builder->branchIf($isEmpty, $emptyBlock, $workBlock);
+
+        $context->builder->positionAtEnd($emptyBlock);
+        $emptyHt = HashTableHelper::alloc($context);
+        $context->builder->branch($doneBlock);
+
+        $context->builder->positionAtEnd($workBlock);
+        $dest = HashTableHelper::alloc($context);
+        $srcIdxSlot = $context->builder->alloca($sizeT, 1, 'array_column_int_src');
+        $destIdxSlot = $context->builder->alloca($sizeT, 1, 'array_column_int_dest');
+        $context->builder->store($zero, $srcIdxSlot);
+        $context->builder->store($zero, $destIdxSlot);
+
+        $head = BasicBlockHelper::append($context, 'array_column_int_head_'.$tag);
+        $check = BasicBlockHelper::append($context, 'array_column_int_check_'.$tag);
+        $copyBlock = BasicBlockHelper::append($context, 'array_column_int_copy_'.$tag);
+        $skip = BasicBlockHelper::append($context, 'array_column_int_skip_'.$tag);
+        $rowHtBlock = BasicBlockHelper::append($context, 'array_column_int_row_ht_'.$tag);
+        $rowNullBlock = BasicBlockHelper::append($context, 'array_column_int_row_null_'.$tag);
+        $rowDone = BasicBlockHelper::append($context, 'array_column_int_row_done_'.$tag);
+        $advance = BasicBlockHelper::append($context, 'array_column_int_advance_'.$tag);
+        $context->builder->branch($head);
+
+        $context->builder->positionAtEnd($head);
+        $srcIdx = $context->builder->load($srcIdxSlot);
+        $atEnd = $context->builder->icmp(Builder::INT_SGE, $srcIdx, $nextFree);
+        $context->builder->branchIf($atEnd, $doneBlock, $check);
+
+        $context->builder->positionAtEnd($check);
+        $isSet = $context->builder->call(
+            $context->lookupFunction('__hashtable__offsetIsSet'),
+            $src,
+            $srcIdx
+        );
+        $context->builder->branchIf($isSet, $copyBlock, $skip);
+
+        $context->builder->positionAtEnd($copyBlock);
+        $destIdx = $context->builder->load($destIdxSlot);
+        $rowEntry = self::listEntryAt($context, $src, $srcIdx);
+        $typeByte = $context->builder->load(
+            $context->builder->structGep($rowEntry, $valueMap['type'])
+        );
+        $i8 = $context->getTypeFromString('int8');
+        $isHt = $context->builder->icmp(
+            Builder::INT_EQ,
+            $typeByte,
+            $i8->constInt(Variable::TYPE_HASHTABLE, false)
+        );
+        $context->builder->branchIf($isHt, $rowHtBlock, $rowNullBlock);
+
+        $context->builder->positionAtEnd($rowHtBlock);
+        $rowHt = $context->builder->call(
+            $context->lookupFunction('__value__readHashtable'),
+            $rowEntry
+        );
+        $columnIsSet = $context->builder->call(
+            $context->lookupFunction('__hashtable__offsetIsSet'),
+            $rowHt,
+            $columnKeyIdx
+        );
+        $columnPresent = BasicBlockHelper::append($context, 'array_column_int_col_present_'.$tag);
+        $columnMissing = BasicBlockHelper::append($context, 'array_column_int_col_missing_'.$tag);
+        $context->builder->branchIf($columnIsSet, $columnPresent, $columnMissing);
+
+        $context->builder->positionAtEnd($columnPresent);
+        $cell = HashTableHelper::readIndexedToValueBox($context, $rowHt, $columnKeyIdx);
+        HashTableHelper::setAtIndex($context, $dest, $destIdx, $cell);
+        $context->builder->branch($rowDone);
+
+        $context->builder->positionAtEnd($columnMissing);
+        self::appendNullAtIndex($context, $dest, $destIdx);
+        $context->builder->branch($rowDone);
+
+        $context->builder->positionAtEnd($rowNullBlock);
+        self::appendNullAtIndex($context, $dest, $destIdx);
+        $context->builder->branch($rowDone);
+
+        $context->builder->positionAtEnd($rowDone);
+        $context->builder->store(
+            $context->builder->addNoSignedWrap($destIdx, $one),
+            $destIdxSlot
+        );
+        $context->builder->branch($advance);
+
+        $context->builder->positionAtEnd($skip);
+        $context->builder->branch($advance);
+
+        $context->builder->positionAtEnd($advance);
+        $context->builder->store(
+            $context->builder->addNoSignedWrap($srcIdx, $one),
+            $srcIdxSlot
+        );
+        $context->builder->branch($head);
+
+        $context->builder->positionAtEnd($doneBlock);
+        $phi = $context->builder->phi($emptyHt->typeOf());
+        $phi->addIncoming($emptyHt, $emptyBlock);
+        $phi->addIncoming($dest, $head);
+
+        return $phi;
+    }
+
     private static function buildColumnFromHashTable(
         Context $context,
         Value $src,
@@ -5608,7 +6008,20 @@ final class ArrayBuiltinHelper
 
         $context->builder->positionAtEnd($copyBlock);
         $destIdx = $context->builder->load($destIdxSlot);
-        self::copyPackedListEntry($context, $src, $srcIdx, $dest, $destIdx);
+        $srcEntry = self::listEntryAt($context, $src, $srcIdx);
+        $rowCopySlot = JitValueBox::alloc($context);
+        JitValueBox::copyFromPointer(
+            $context,
+            $rowCopySlot,
+            $srcEntry
+        );
+        $rowElem = new Variable(
+            $context,
+            Variable::TYPE_VALUE,
+            Variable::KIND_VARIABLE,
+            $rowCopySlot
+        );
+        HashTableHelper::setAtIndex($context, $dest, $destIdx, $rowElem);
         $context->builder->store(
             $context->builder->addNoSignedWrap($destIdx, $one),
             $destIdxSlot
@@ -5743,6 +6156,500 @@ final class ArrayBuiltinHelper
             $context->builder->addNoSignedWrap($destIdx, $one),
             $destIdxSlot
         );
+        $context->builder->branch($advance);
+
+        $context->builder->positionAtEnd($skip);
+        $context->builder->branch($advance);
+
+        $context->builder->positionAtEnd($advance);
+        $context->builder->store(
+            $context->builder->addNoSignedWrap($srcIdx, $one),
+            $srcIdxSlot
+        );
+        $context->builder->branch($head);
+
+        $context->builder->positionAtEnd($doneBlock);
+        $phi = $context->builder->phi($emptyHt->typeOf());
+        $phi->addIncoming($emptyHt, $emptyBlock);
+        $phi->addIncoming($dest, $head);
+
+        return $phi;
+    }
+
+    private static function buildColumnWithIndexFromHashTableStringColumnIntIndex(
+        Context $context,
+        Value $src,
+        Value $columnKeyStr,
+        Value $indexKeyIdx
+    ): Value {
+        $tag = (string) ++self::$copyListEntrySeq;
+        $map = $context->structFieldMap['__hashtable__'];
+        $valueMap = $context->structFieldMap['__value__'];
+        $sizeT = $context->getTypeFromString('size_t');
+        $nextFree = $context->builder->load(
+            $context->builder->structGep($src, $map['nextFreeElement'])
+        );
+        $zero = $sizeT->constInt(0, false);
+        $one = $sizeT->constInt(1, false);
+        $isEmpty = $context->builder->icmp(Builder::INT_EQ, $nextFree, $zero);
+        $emptyBlock = BasicBlockHelper::append($context, 'array_column_idx_sint_empty_'.$tag);
+        $workBlock = BasicBlockHelper::append($context, 'array_column_idx_sint_work_'.$tag);
+        $doneBlock = BasicBlockHelper::append($context, 'array_column_idx_sint_done_'.$tag);
+        $context->builder->branchIf($isEmpty, $emptyBlock, $workBlock);
+
+        $context->builder->positionAtEnd($emptyBlock);
+        $emptyHt = HashTableHelper::alloc($context);
+        $context->builder->branch($doneBlock);
+
+        $context->builder->positionAtEnd($workBlock);
+        $dest = HashTableHelper::alloc($context);
+        $srcIdxSlot = $context->builder->alloca($sizeT, 1, 'array_column_idx_sint_src');
+        $context->builder->store($zero, $srcIdxSlot);
+
+        $head = BasicBlockHelper::append($context, 'array_column_idx_sint_head_'.$tag);
+        $check = BasicBlockHelper::append($context, 'array_column_idx_sint_check_'.$tag);
+        $copyBlock = BasicBlockHelper::append($context, 'array_column_idx_sint_copy_'.$tag);
+        $skip = BasicBlockHelper::append($context, 'array_column_idx_sint_skip_'.$tag);
+        $rowHtBlock = BasicBlockHelper::append($context, 'array_column_idx_sint_row_ht_'.$tag);
+        $rowSkip = BasicBlockHelper::append($context, 'array_column_idx_sint_row_skip_'.$tag);
+        $indexCheck = BasicBlockHelper::append($context, 'array_column_idx_sint_index_check_'.$tag);
+        $columnCheck = BasicBlockHelper::append($context, 'array_column_idx_sint_column_check_'.$tag);
+        $storeBlock = BasicBlockHelper::append($context, 'array_column_idx_sint_store_'.$tag);
+        $advance = BasicBlockHelper::append($context, 'array_column_idx_sint_advance_'.$tag);
+        $context->builder->branch($head);
+
+        $context->builder->positionAtEnd($head);
+        $srcIdx = $context->builder->load($srcIdxSlot);
+        $atEnd = $context->builder->icmp(Builder::INT_SGE, $srcIdx, $nextFree);
+        $context->builder->branchIf($atEnd, $doneBlock, $check);
+
+        $context->builder->positionAtEnd($check);
+        $isSet = $context->builder->call(
+            $context->lookupFunction('__hashtable__offsetIsSet'),
+            $src,
+            $srcIdx
+        );
+        $context->builder->branchIf($isSet, $copyBlock, $skip);
+
+        $context->builder->positionAtEnd($copyBlock);
+        $rowEntry = self::listEntryAt($context, $src, $srcIdx);
+        $typeByte = $context->builder->load(
+            $context->builder->structGep($rowEntry, $valueMap['type'])
+        );
+        $i8 = $context->getTypeFromString('int8');
+        $isHt = $context->builder->icmp(
+            Builder::INT_EQ,
+            $typeByte,
+            $i8->constInt(Variable::TYPE_HASHTABLE, false)
+        );
+        $context->builder->branchIf($isHt, $rowHtBlock, $rowSkip);
+
+        $context->builder->positionAtEnd($rowHtBlock);
+        $rowHt = $context->builder->call(
+            $context->lookupFunction('__value__readHashtable'),
+            $rowEntry
+        );
+        $indexIsSet = $context->builder->call(
+            $context->lookupFunction('__hashtable__offsetIsSet'),
+            $rowHt,
+            $indexKeyIdx
+        );
+        $context->builder->branchIf($indexIsSet, $indexCheck, $rowSkip);
+
+        $context->builder->positionAtEnd($indexCheck);
+        $columnIsSet = $context->builder->call(
+            $context->lookupFunction('__hashtable__offsetIsSetStringKey'),
+            $rowHt,
+            $columnKeyStr
+        );
+        $context->builder->branchIf($columnIsSet, $columnCheck, $rowSkip);
+
+        $context->builder->positionAtEnd($columnCheck);
+        $indexEntryVar = HashTableHelper::readIndexedToValueBox($context, $rowHt, $indexKeyIdx);
+        $indexEntry = JitValueBox::valuePtrFromVariable($context, $indexEntryVar);
+        $columnEntry = $context->builder->call(
+            $context->lookupFunction('__hashtable__readStringKeyValue'),
+            $rowHt,
+            $columnKeyStr
+        );
+        $context->builder->branch($storeBlock);
+
+        $context->builder->positionAtEnd($storeBlock);
+        self::storeCombinedEntry($context, $dest, $indexEntry, $columnEntry);
+        $context->builder->branch($advance);
+
+        $context->builder->positionAtEnd($rowSkip);
+        $context->builder->branch($advance);
+
+        $context->builder->positionAtEnd($skip);
+        $context->builder->branch($advance);
+
+        $context->builder->positionAtEnd($advance);
+        $context->builder->store(
+            $context->builder->addNoSignedWrap($srcIdx, $one),
+            $srcIdxSlot
+        );
+        $context->builder->branch($head);
+
+        $context->builder->positionAtEnd($doneBlock);
+        $phi = $context->builder->phi($emptyHt->typeOf());
+        $phi->addIncoming($emptyHt, $emptyBlock);
+        $phi->addIncoming($dest, $head);
+
+        return $phi;
+    }
+
+    private static function buildColumnWithIndexFromHashTableIntKey(
+        Context $context,
+        Value $src,
+        Value $columnKeyIdx,
+        Value $indexKeyStr
+    ): Value {
+        $tag = (string) ++self::$copyListEntrySeq;
+        $map = $context->structFieldMap['__hashtable__'];
+        $valueMap = $context->structFieldMap['__value__'];
+        $sizeT = $context->getTypeFromString('size_t');
+        $nextFree = $context->builder->load(
+            $context->builder->structGep($src, $map['nextFreeElement'])
+        );
+        $zero = $sizeT->constInt(0, false);
+        $one = $sizeT->constInt(1, false);
+        $isEmpty = $context->builder->icmp(Builder::INT_EQ, $nextFree, $zero);
+        $emptyBlock = BasicBlockHelper::append($context, 'array_column_idx_int_empty_'.$tag);
+        $workBlock = BasicBlockHelper::append($context, 'array_column_idx_int_work_'.$tag);
+        $doneBlock = BasicBlockHelper::append($context, 'array_column_idx_int_done_'.$tag);
+        $context->builder->branchIf($isEmpty, $emptyBlock, $workBlock);
+
+        $context->builder->positionAtEnd($emptyBlock);
+        $emptyHt = HashTableHelper::alloc($context);
+        $context->builder->branch($doneBlock);
+
+        $context->builder->positionAtEnd($workBlock);
+        $dest = HashTableHelper::alloc($context);
+        $srcIdxSlot = $context->builder->alloca($sizeT, 1, 'array_column_idx_int_src');
+        $context->builder->store($zero, $srcIdxSlot);
+
+        $head = BasicBlockHelper::append($context, 'array_column_idx_int_head_'.$tag);
+        $check = BasicBlockHelper::append($context, 'array_column_idx_int_check_'.$tag);
+        $copyBlock = BasicBlockHelper::append($context, 'array_column_idx_int_copy_'.$tag);
+        $skip = BasicBlockHelper::append($context, 'array_column_idx_int_skip_'.$tag);
+        $rowHtBlock = BasicBlockHelper::append($context, 'array_column_idx_int_row_ht_'.$tag);
+        $rowSkip = BasicBlockHelper::append($context, 'array_column_idx_int_row_skip_'.$tag);
+        $indexCheck = BasicBlockHelper::append($context, 'array_column_idx_int_index_check_'.$tag);
+        $columnCheck = BasicBlockHelper::append($context, 'array_column_idx_int_column_check_'.$tag);
+        $storeBlock = BasicBlockHelper::append($context, 'array_column_idx_int_store_'.$tag);
+        $advance = BasicBlockHelper::append($context, 'array_column_idx_int_advance_'.$tag);
+        $context->builder->branch($head);
+
+        $context->builder->positionAtEnd($head);
+        $srcIdx = $context->builder->load($srcIdxSlot);
+        $atEnd = $context->builder->icmp(Builder::INT_SGE, $srcIdx, $nextFree);
+        $context->builder->branchIf($atEnd, $doneBlock, $check);
+
+        $context->builder->positionAtEnd($check);
+        $isSet = $context->builder->call(
+            $context->lookupFunction('__hashtable__offsetIsSet'),
+            $src,
+            $srcIdx
+        );
+        $context->builder->branchIf($isSet, $copyBlock, $skip);
+
+        $context->builder->positionAtEnd($copyBlock);
+        $rowEntry = self::listEntryAt($context, $src, $srcIdx);
+        $typeByte = $context->builder->load(
+            $context->builder->structGep($rowEntry, $valueMap['type'])
+        );
+        $i8 = $context->getTypeFromString('int8');
+        $isHt = $context->builder->icmp(
+            Builder::INT_EQ,
+            $typeByte,
+            $i8->constInt(Variable::TYPE_HASHTABLE, false)
+        );
+        $context->builder->branchIf($isHt, $rowHtBlock, $rowSkip);
+
+        $context->builder->positionAtEnd($rowHtBlock);
+        $rowHt = $context->builder->call(
+            $context->lookupFunction('__value__readHashtable'),
+            $rowEntry
+        );
+        $indexIsSet = $context->builder->call(
+            $context->lookupFunction('__hashtable__offsetIsSetStringKey'),
+            $rowHt,
+            $indexKeyStr
+        );
+        $context->builder->branchIf($indexIsSet, $indexCheck, $rowSkip);
+
+        $context->builder->positionAtEnd($indexCheck);
+        $columnIsSet = $context->builder->call(
+            $context->lookupFunction('__hashtable__offsetIsSet'),
+            $rowHt,
+            $columnKeyIdx
+        );
+        $context->builder->branchIf($columnIsSet, $columnCheck, $rowSkip);
+
+        $context->builder->positionAtEnd($columnCheck);
+        $indexEntry = $context->builder->call(
+            $context->lookupFunction('__hashtable__readStringKeyValue'),
+            $rowHt,
+            $indexKeyStr
+        );
+        $columnEntryVar = HashTableHelper::readIndexedToValueBox($context, $rowHt, $columnKeyIdx);
+        $columnEntry = JitValueBox::valuePtrFromVariable($context, $columnEntryVar);
+        $context->builder->branch($storeBlock);
+
+        $context->builder->positionAtEnd($storeBlock);
+        self::storeCombinedEntry($context, $dest, $indexEntry, $columnEntry);
+        $context->builder->branch($advance);
+
+        $context->builder->positionAtEnd($rowSkip);
+        $context->builder->branch($advance);
+
+        $context->builder->positionAtEnd($skip);
+        $context->builder->branch($advance);
+
+        $context->builder->positionAtEnd($advance);
+        $context->builder->store(
+            $context->builder->addNoSignedWrap($srcIdx, $one),
+            $srcIdxSlot
+        );
+        $context->builder->branch($head);
+
+        $context->builder->positionAtEnd($doneBlock);
+        $phi = $context->builder->phi($emptyHt->typeOf());
+        $phi->addIncoming($emptyHt, $emptyBlock);
+        $phi->addIncoming($dest, $head);
+
+        return $phi;
+    }
+
+    private static function buildColumnNullWithIndexFromHashTableIntKey(
+        Context $context,
+        Value $src,
+        Value $indexKeyIdx
+    ): Value {
+        $tag = (string) ++self::$copyListEntrySeq;
+        $map = $context->structFieldMap['__hashtable__'];
+        $valueMap = $context->structFieldMap['__value__'];
+        $sizeT = $context->getTypeFromString('size_t');
+        $nextFree = $context->builder->load(
+            $context->builder->structGep($src, $map['nextFreeElement'])
+        );
+        $zero = $sizeT->constInt(0, false);
+        $one = $sizeT->constInt(1, false);
+        $isEmpty = $context->builder->icmp(Builder::INT_EQ, $nextFree, $zero);
+        $emptyBlock = BasicBlockHelper::append($context, 'array_column_null_idx_int_empty_'.$tag);
+        $workBlock = BasicBlockHelper::append($context, 'array_column_null_idx_int_work_'.$tag);
+        $doneBlock = BasicBlockHelper::append($context, 'array_column_null_idx_int_done_'.$tag);
+        $context->builder->branchIf($isEmpty, $emptyBlock, $workBlock);
+
+        $context->builder->positionAtEnd($emptyBlock);
+        $emptyHt = HashTableHelper::alloc($context);
+        $context->builder->branch($doneBlock);
+
+        $context->builder->positionAtEnd($workBlock);
+        $dest = HashTableHelper::alloc($context);
+        $srcIdxSlot = $context->builder->alloca($sizeT, 1, 'array_column_null_idx_int_src');
+        $destIdxSlot = $context->builder->alloca($sizeT, 1, 'array_column_null_idx_int_dest');
+        $context->builder->store($zero, $srcIdxSlot);
+        $context->builder->store($zero, $destIdxSlot);
+
+        $head = BasicBlockHelper::append($context, 'array_column_null_idx_int_head_'.$tag);
+        $check = BasicBlockHelper::append($context, 'array_column_null_idx_int_check_'.$tag);
+        $copyBlock = BasicBlockHelper::append($context, 'array_column_null_idx_int_copy_'.$tag);
+        $skip = BasicBlockHelper::append($context, 'array_column_null_idx_int_skip_'.$tag);
+        $rowHtBlock = BasicBlockHelper::append($context, 'array_column_null_idx_int_row_ht_'.$tag);
+        $appendBlock = BasicBlockHelper::append($context, 'array_column_null_idx_int_append_'.$tag);
+        $indexCheck = BasicBlockHelper::append($context, 'array_column_null_idx_int_index_check_'.$tag);
+        $storeBlock = BasicBlockHelper::append($context, 'array_column_null_idx_int_store_'.$tag);
+        $appendDone = BasicBlockHelper::append($context, 'array_column_null_idx_int_append_done_'.$tag);
+        $advance = BasicBlockHelper::append($context, 'array_column_null_idx_int_advance_'.$tag);
+        $context->builder->branch($head);
+
+        $context->builder->positionAtEnd($head);
+        $srcIdx = $context->builder->load($srcIdxSlot);
+        $atEnd = $context->builder->icmp(Builder::INT_SGE, $srcIdx, $nextFree);
+        $context->builder->branchIf($atEnd, $doneBlock, $check);
+
+        $context->builder->positionAtEnd($check);
+        $isSet = $context->builder->call(
+            $context->lookupFunction('__hashtable__offsetIsSet'),
+            $src,
+            $srcIdx
+        );
+        $context->builder->branchIf($isSet, $copyBlock, $skip);
+
+        $context->builder->positionAtEnd($copyBlock);
+        $rowEntry = self::listEntryAt($context, $src, $srcIdx);
+        $typeByte = $context->builder->load(
+            $context->builder->structGep($rowEntry, $valueMap['type'])
+        );
+        $i8 = $context->getTypeFromString('int8');
+        $isHt = $context->builder->icmp(
+            Builder::INT_EQ,
+            $typeByte,
+            $i8->constInt(Variable::TYPE_HASHTABLE, false)
+        );
+        $context->builder->branchIf($isHt, $rowHtBlock, $appendBlock);
+
+        $context->builder->positionAtEnd($rowHtBlock);
+        $rowHt = $context->builder->call(
+            $context->lookupFunction('__value__readHashtable'),
+            $rowEntry
+        );
+        $indexIsSet = $context->builder->call(
+            $context->lookupFunction('__hashtable__offsetIsSet'),
+            $rowHt,
+            $indexKeyIdx
+        );
+        $context->builder->branchIf($indexIsSet, $indexCheck, $appendBlock);
+
+        $context->builder->positionAtEnd($indexCheck);
+        $indexEntryVar = HashTableHelper::readIndexedToValueBox($context, $rowHt, $indexKeyIdx);
+        $indexEntry = JitValueBox::valuePtrFromVariable($context, $indexEntryVar);
+        $rowElem = HashTableHelper::readIndexedToValueBox($context, $src, $srcIdx);
+        $rowCopySlot = JitValueBox::alloc($context);
+        JitValueBox::copyFromPointer(
+            $context,
+            $rowCopySlot,
+            JitValueBox::valuePtrFromVariable($context, $rowElem)
+        );
+        $context->builder->branch($storeBlock);
+
+        $context->builder->positionAtEnd($storeBlock);
+        self::storeCombinedEntry($context, $dest, $indexEntry, JitValueBox::pointer($context, $rowCopySlot));
+        $context->builder->branch($advance);
+
+        $context->builder->positionAtEnd($appendBlock);
+        $destIdx = $context->builder->load($destIdxSlot);
+        $rowElem = HashTableHelper::readIndexedToValueBox($context, $src, $srcIdx);
+        HashTableHelper::setAtIndex($context, $dest, $destIdx, $rowElem);
+        $context->builder->branch($appendDone);
+
+        $context->builder->positionAtEnd($appendDone);
+        $context->builder->store(
+            $context->builder->addNoSignedWrap($destIdx, $one),
+            $destIdxSlot
+        );
+        $context->builder->branch($advance);
+
+        $context->builder->positionAtEnd($skip);
+        $context->builder->branch($advance);
+
+        $context->builder->positionAtEnd($advance);
+        $context->builder->store(
+            $context->builder->addNoSignedWrap($srcIdx, $one),
+            $srcIdxSlot
+        );
+        $context->builder->branch($head);
+
+        $context->builder->positionAtEnd($doneBlock);
+        $phi = $context->builder->phi($emptyHt->typeOf());
+        $phi->addIncoming($emptyHt, $emptyBlock);
+        $phi->addIncoming($dest, $head);
+
+        return $phi;
+    }
+
+    private static function buildColumnWithIndexFromHashTableIntColumnIntIndex(
+        Context $context,
+        Value $src,
+        Value $columnKeyIdx,
+        Value $indexKeyIdx
+    ): Value {
+        $tag = (string) ++self::$copyListEntrySeq;
+        $map = $context->structFieldMap['__hashtable__'];
+        $valueMap = $context->structFieldMap['__value__'];
+        $sizeT = $context->getTypeFromString('size_t');
+        $nextFree = $context->builder->load(
+            $context->builder->structGep($src, $map['nextFreeElement'])
+        );
+        $zero = $sizeT->constInt(0, false);
+        $one = $sizeT->constInt(1, false);
+        $isEmpty = $context->builder->icmp(Builder::INT_EQ, $nextFree, $zero);
+        $emptyBlock = BasicBlockHelper::append($context, 'array_column_idx_ii_empty_'.$tag);
+        $workBlock = BasicBlockHelper::append($context, 'array_column_idx_ii_work_'.$tag);
+        $doneBlock = BasicBlockHelper::append($context, 'array_column_idx_ii_done_'.$tag);
+        $context->builder->branchIf($isEmpty, $emptyBlock, $workBlock);
+
+        $context->builder->positionAtEnd($emptyBlock);
+        $emptyHt = HashTableHelper::alloc($context);
+        $context->builder->branch($doneBlock);
+
+        $context->builder->positionAtEnd($workBlock);
+        $dest = HashTableHelper::alloc($context);
+        $srcIdxSlot = $context->builder->alloca($sizeT, 1, 'array_column_idx_ii_src');
+        $context->builder->store($zero, $srcIdxSlot);
+
+        $head = BasicBlockHelper::append($context, 'array_column_idx_ii_head_'.$tag);
+        $check = BasicBlockHelper::append($context, 'array_column_idx_ii_check_'.$tag);
+        $copyBlock = BasicBlockHelper::append($context, 'array_column_idx_ii_copy_'.$tag);
+        $skip = BasicBlockHelper::append($context, 'array_column_idx_ii_skip_'.$tag);
+        $rowHtBlock = BasicBlockHelper::append($context, 'array_column_idx_ii_row_ht_'.$tag);
+        $rowSkip = BasicBlockHelper::append($context, 'array_column_idx_ii_row_skip_'.$tag);
+        $indexCheck = BasicBlockHelper::append($context, 'array_column_idx_ii_index_check_'.$tag);
+        $columnCheck = BasicBlockHelper::append($context, 'array_column_idx_ii_column_check_'.$tag);
+        $storeBlock = BasicBlockHelper::append($context, 'array_column_idx_ii_store_'.$tag);
+        $advance = BasicBlockHelper::append($context, 'array_column_idx_ii_advance_'.$tag);
+        $context->builder->branch($head);
+
+        $context->builder->positionAtEnd($head);
+        $srcIdx = $context->builder->load($srcIdxSlot);
+        $atEnd = $context->builder->icmp(Builder::INT_SGE, $srcIdx, $nextFree);
+        $context->builder->branchIf($atEnd, $doneBlock, $check);
+
+        $context->builder->positionAtEnd($check);
+        $isSet = $context->builder->call(
+            $context->lookupFunction('__hashtable__offsetIsSet'),
+            $src,
+            $srcIdx
+        );
+        $context->builder->branchIf($isSet, $copyBlock, $skip);
+
+        $context->builder->positionAtEnd($copyBlock);
+        $rowEntry = self::listEntryAt($context, $src, $srcIdx);
+        $typeByte = $context->builder->load(
+            $context->builder->structGep($rowEntry, $valueMap['type'])
+        );
+        $i8 = $context->getTypeFromString('int8');
+        $isHt = $context->builder->icmp(
+            Builder::INT_EQ,
+            $typeByte,
+            $i8->constInt(Variable::TYPE_HASHTABLE, false)
+        );
+        $context->builder->branchIf($isHt, $rowHtBlock, $rowSkip);
+
+        $context->builder->positionAtEnd($rowHtBlock);
+        $rowHt = $context->builder->call(
+            $context->lookupFunction('__value__readHashtable'),
+            $rowEntry
+        );
+        $indexIsSet = $context->builder->call(
+            $context->lookupFunction('__hashtable__offsetIsSet'),
+            $rowHt,
+            $indexKeyIdx
+        );
+        $context->builder->branchIf($indexIsSet, $indexCheck, $rowSkip);
+
+        $context->builder->positionAtEnd($indexCheck);
+        $columnIsSet = $context->builder->call(
+            $context->lookupFunction('__hashtable__offsetIsSet'),
+            $rowHt,
+            $columnKeyIdx
+        );
+        $context->builder->branchIf($columnIsSet, $columnCheck, $rowSkip);
+
+        $context->builder->positionAtEnd($columnCheck);
+        $indexEntryVar = HashTableHelper::readIndexedToValueBox($context, $rowHt, $indexKeyIdx);
+        $indexEntry = JitValueBox::valuePtrFromVariable($context, $indexEntryVar);
+        $columnEntryVar = HashTableHelper::readIndexedToValueBox($context, $rowHt, $columnKeyIdx);
+        $columnEntry = JitValueBox::valuePtrFromVariable($context, $columnEntryVar);
+        $context->builder->branch($storeBlock);
+
+        $context->builder->positionAtEnd($storeBlock);
+        self::storeCombinedEntry($context, $dest, $indexEntry, $columnEntry);
+        $context->builder->branch($advance);
+
+        $context->builder->positionAtEnd($rowSkip);
         $context->builder->branch($advance);
 
         $context->builder->positionAtEnd($skip);
