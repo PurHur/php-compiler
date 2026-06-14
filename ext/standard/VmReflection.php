@@ -1803,6 +1803,21 @@ final class VmReflection
     }
 
     /**
+     * Build a constructed ReflectionEnumUnitCase or ReflectionEnumBackedCase (#4121, #5675).
+     */
+    public static function newReflectionEnumCase(
+        Context $ctx,
+        ClassEntry $enumEntry,
+        string $caseName
+    ): \PHPCompiler\VM\ObjectEntry {
+        if (null !== $enumEntry->backedType) {
+            return self::newReflectionEnumBackedCase($ctx, $enumEntry, $caseName);
+        }
+
+        return self::newReflectionEnumUnitCase($ctx, $enumEntry, $caseName);
+    }
+
+    /**
      * Build a constructed ReflectionEnumUnitCase for an enum case (#4121).
      */
     public static function newReflectionEnumUnitCase(
@@ -1821,6 +1836,37 @@ final class VmReflection
             );
         }
         $obj = new \PHPCompiler\VM\ObjectEntry($reucClass);
+        $obj->constructed = true;
+        $obj->getProperty(\PHPCompiler\VM\ReflectionSupport::PROP_CLASS_NAME)->string($enumEntry->name);
+        $obj->getProperty(\PHPCompiler\VM\ReflectionSupport::PROP_ENUM_CASE_NAME)->string(
+            $enumEntry->enumCaseCanonicalNames[$caseLc]
+        );
+
+        return $obj;
+    }
+
+    /**
+     * Build a constructed ReflectionEnumBackedCase for a backed enum case (#5675).
+     */
+    public static function newReflectionEnumBackedCase(
+        Context $ctx,
+        ClassEntry $enumEntry,
+        string $caseName
+    ): \PHPCompiler\VM\ObjectEntry {
+        $rebcClass = $ctx->classes[\PHPCompiler\VM\ReflectionSupport::REFLECTION_ENUM_BACKED_CASE] ?? null;
+        if (null === $rebcClass) {
+            throw new \LogicException('ReflectionEnumBackedCase is not registered in this compiler build');
+        }
+        if (null === $enumEntry->backedType) {
+            throw new \LogicException('ReflectionEnumBackedCase expects a backed enum class');
+        }
+        $caseLc = strtolower($caseName);
+        if (!isset($enumEntry->enumCaseCanonicalNames[$caseLc])) {
+            ReflectionSupport::throwReflectionException(
+                ReflectionSupport::enumCaseNotFoundMessage($enumEntry->name, $caseName)
+            );
+        }
+        $obj = new \PHPCompiler\VM\ObjectEntry($rebcClass);
         $obj->constructed = true;
         $obj->getProperty(\PHPCompiler\VM\ReflectionSupport::PROP_CLASS_NAME)->string($enumEntry->name);
         $obj->getProperty(\PHPCompiler\VM\ReflectionSupport::PROP_ENUM_CASE_NAME)->string(
@@ -1857,7 +1903,7 @@ final class VmReflection
         $result->newArray();
         $ht = $result->toArray();
         foreach ($enumEntry->enumCases as $case) {
-            $obj = self::newReflectionEnumUnitCase($ctx, $enumEntry, $case['name']);
+            $obj = self::newReflectionEnumCase($ctx, $enumEntry, $case['name']);
             $slot = new Variable(Variable::TYPE_OBJECT);
             $slot->object($obj);
             $ht->append($slot);

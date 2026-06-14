@@ -41,6 +41,8 @@ final class ReflectionSupport
 
     public const REFLECTION_ENUM_UNIT_CASE = 'reflectionenumunitcase';
 
+    public const REFLECTION_ENUM_BACKED_CASE = 'reflectionenumbackedcase';
+
     public const REFLECTION_PARAMETER = 'reflectionparameter';
 
     public const REFLECTION_TYPE = 'reflectiontype';
@@ -542,6 +544,28 @@ final class ReflectionSupport
         return $obj;
     }
 
+    public static function isReflectionEnumCaseObject(ObjectEntry $obj): bool
+    {
+        $lc = strtolower($obj->class->name);
+
+        return self::REFLECTION_ENUM_UNIT_CASE === $lc
+            || self::REFLECTION_ENUM_BACKED_CASE === $lc;
+    }
+
+    public static function requireReflectionEnumCase(Frame $frame, Variable $receiver): ObjectEntry
+    {
+        $receiver = $receiver->resolveIndirect();
+        if (Variable::TYPE_OBJECT !== $receiver->type) {
+            throw new \LogicException('ReflectionEnumUnitCase method called without object');
+        }
+        $obj = $receiver->toObject();
+        if (!self::isReflectionEnumCaseObject($obj)) {
+            throw new \LogicException('Expected ReflectionEnumUnitCase instance');
+        }
+
+        return $obj;
+    }
+
     public static function requireReflectionEnumUnitCase(Frame $frame, Variable $receiver): ObjectEntry
     {
         $receiver = $receiver->resolveIndirect();
@@ -551,6 +575,20 @@ final class ReflectionSupport
         $obj = $receiver->toObject();
         if (strtolower($obj->class->name) !== self::REFLECTION_ENUM_UNIT_CASE) {
             throw new \LogicException('Expected ReflectionEnumUnitCase instance');
+        }
+
+        return $obj;
+    }
+
+    public static function requireReflectionEnumBackedCase(Frame $frame, Variable $receiver): ObjectEntry
+    {
+        $receiver = $receiver->resolveIndirect();
+        if (Variable::TYPE_OBJECT !== $receiver->type) {
+            throw new \LogicException('ReflectionEnumBackedCase method called without object');
+        }
+        $obj = $receiver->toObject();
+        if (strtolower($obj->class->name) !== self::REFLECTION_ENUM_BACKED_CASE) {
+            throw new \LogicException('Expected ReflectionEnumBackedCase instance');
         }
 
         return $obj;

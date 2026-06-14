@@ -7,10 +7,9 @@ namespace PHPCompiler\VM\Builtin;
 use PHPCompiler\ext\standard\VmReflection;
 use PHPCompiler\Frame;
 use PHPCompiler\VM\ReflectionSupport;
-use PHPCompiler\VM\Variable;
 
-/** ReflectionEnumUnitCase::__construct($enum, $case) — VM (#3800). */
-final class ReflectionEnumUnitCaseConstruct extends VmClassMethod
+/** ReflectionEnumBackedCase::__construct($enum, $case) — VM (#5675). */
+final class ReflectionEnumBackedCaseConstruct extends VmClassMethod
 {
     public function __construct()
     {
@@ -20,26 +19,28 @@ final class ReflectionEnumUnitCaseConstruct extends VmClassMethod
     public function execute(Frame $frame): void
     {
         if (\count($frame->calledArgs) < 3) {
-            throw new \LogicException('ReflectionEnumUnitCase::__construct() expects exactly 2 arguments');
+            throw new \LogicException('ReflectionEnumBackedCase::__construct() expects exactly 2 arguments');
         }
         $ctx = VmReflection::requireContext($frame);
         $enumEntry = VmReflection::resolveClassFromArg($ctx, $frame->calledArgs[1]);
         if (!$enumEntry->isEnum) {
-            throw new \LogicException('ReflectionEnumUnitCase expects an enum class');
+            throw new \LogicException('ReflectionEnumBackedCase expects an enum class');
         }
-        $caseName = VmReflection::stringArg($frame->calledArgs[2], 'ReflectionEnumUnitCase::__construct() case', 2);
+        if (null === $enumEntry->backedType) {
+            throw new \LogicException('ReflectionEnumBackedCase expects a backed enum class');
+        }
+        $caseName = VmReflection::stringArg($frame->calledArgs[2], 'ReflectionEnumBackedCase::__construct() case', 2);
         $caseLc = strtolower($caseName);
         if (!isset($enumEntry->enumCaseCanonicalNames[$caseLc])) {
             ReflectionSupport::throwReflectionException(
                 ReflectionSupport::enumCaseNotFoundMessage($enumEntry->name, $caseName)
             );
         }
-        $receiver = ReflectionSupport::requireReflectionEnumCase($frame, $frame->calledArgs[0]);
+        $receiver = ReflectionSupport::requireReflectionEnumBackedCase($frame, $frame->calledArgs[0]);
         $receiver->getProperty(ReflectionSupport::PROP_CLASS_NAME)->string($enumEntry->name);
         $receiver->getProperty(ReflectionSupport::PROP_ENUM_CASE_NAME)->string(
             $enumEntry->enumCaseCanonicalNames[$caseLc]
         );
         $receiver->constructed = true;
-        // Do not touch returnVar: it may alias the `new ReflectionEnumUnitCase()` result slot (#1885, #5699).
     }
 }
