@@ -10358,6 +10358,25 @@ class JIT {
             }
 
             return;
+        } elseif (Variable::TYPE_STRING === $result->type && Variable::TYPE_NATIVE_BOOL === $value->type) {
+            // JumpIf `&&` chains may reuse a string dim-fetch operand for a bool compare (#816, ns_func).
+            $slot = JIT\JitValueBox::alloc($this->context);
+            JIT\JitValueBox::writeBool(
+                $this->context,
+                $slot,
+                $this->context->helper->loadValue($value)
+            );
+            $result->free();
+            $result->type = Variable::TYPE_VALUE;
+            $result->value = $slot;
+            $result->addref();
+            $this->context->setVariableOp($resultOp, $result);
+            $resolved = JIT\OperandName::resolve($resultOp);
+            if (null !== $resolved && '' !== $resolved) {
+                $this->context->bindVariableByName($resolved, $result);
+            }
+
+            return;
         }
         if (
             $branchMergeTarget
