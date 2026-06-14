@@ -12,7 +12,7 @@ Regenerate: `php script/bootstrap-inventory.php`
 | Phase A inventory files (M2 ratio SSOT) | 2631 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 7137 |
+| Source constructs flagged (warnings) | 7138 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -1088,7 +1088,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/standard/fgets.php` | 0 | 1 |
 | `ext/standard/file_.php` | 0 | 3 |
 | `ext/standard/file_exists.php` | 0 | 1 |
-| `ext/standard/file_get_contents.php` | 0 | 1 |
+| `ext/standard/file_get_contents.php` | 0 | 2 |
 | `ext/standard/file_put_contents.php` | 0 | 1 |
 | `ext/standard/fileatime.php` | 0 | 1 |
 | `ext/standard/filectime.php` | 0 | 1 |
@@ -4826,7 +4826,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/JitFileGetContents.php`
 
 **Warnings** (review for bootstrap subset):
-- 2 class method(s)
+- 6 class method(s)
 
 ### `ext/standard/JitFilePutContents.php`
 
@@ -7779,13 +7779,13 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new HashTable (line 204)
 - new Variable (line 207)
 - new Variable (line 210)
-- new HashTable (line 1122)
-- new Variable (line 1124)
-- new HashTable (line 1843)
-- new Variable (line 1846)
-- new Variable (line 1852)
-- new Variable (line 1858)
-- new Variable (line 1864)
+- new HashTable (line 1158)
+- new Variable (line 1160)
+- new HashTable (line 1879)
+- new Variable (line 1882)
+- new Variable (line 1888)
+- new Variable (line 1894)
+- new Variable (line 1900)
 - 106 class method(s)
 
 ### `ext/standard/VmFsAccessNative.php`
@@ -7821,7 +7821,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/VmFsReadNative.php`
 
 **Warnings** (review for bootstrap subset):
-- 4 class method(s)
+- 5 class method(s)
 
 ### `ext/standard/VmFsStdio.php`
 
@@ -9910,6 +9910,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/file_get_contents.php`
 
 **Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 30)
 - 2 class method(s)
 
 ### `ext/standard/file_put_contents.php`
