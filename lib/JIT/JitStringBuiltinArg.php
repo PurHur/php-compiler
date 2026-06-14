@@ -44,7 +44,9 @@ final class JitStringBuiltinArg
             return self::unreachableStringPtr($context);
         }
         if (Variable::TYPE_VALUE === $arg->type) {
-            return self::lowerBoxed($context, $arg, $function, $argIndex, $paramName, $expectedType, $arrayExpected);
+            $native = JitNativeString::coerce($context, $arg);
+
+            return $context->helper->loadValue($native);
         }
 
         return JitStringArg::lower($context, $arg, "{$function}() argument #" . ($argIndex + 1));
