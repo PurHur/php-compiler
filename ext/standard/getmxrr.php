@@ -7,6 +7,7 @@ namespace PHPCompiler\ext\standard;
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Value;
 
@@ -61,6 +62,8 @@ final class getmxrr extends Internal
         }
 
         $weightsArg = $argc >= 3 ? $args[2] : null;
+
+        JitStringBuiltinArg::lower($context, $args[0], 'getmxrr', 0, 'hostname');
 
         return JitDnsGetMx::invoke($context, $args[0], $args[1], $weightsArg, 'getmxrr');
     }
