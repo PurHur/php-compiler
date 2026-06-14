@@ -39,6 +39,6 @@ final class stream_bucket_prepend extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        throw new \LogicException('stream_bucket_prepend() is not implemented for JIT in this compiler build');
+        return JitStreamBucket::streamBucketPrepend($context, ...$args);
     }
 }
