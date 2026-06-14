@@ -1,0 +1,11 @@
+--- vendor/ircmaxell/php-types/lib/PHPTypes/InternalArgInfo.php
++++ vendor/ircmaxell/php-types/lib/PHPTypes/InternalArgInfo.php
+@@ -1837,7 +1837,7 @@
+         'get_defined_constants' => ['array', 'categorize=' => 'bool'],
+         'get_defined_functions' => ['array'],
+         'get_defined_vars' => ['array'],
+-        'getenv' => ['string', 'varname' => 'string'],
++        'getenv' => ['string|false', 'varname' => 'string'],
+         'get_extension_funcs' => ['array', 'extension_name' => 'string'],
+         'get_headers' => ['array', 'url' => 'string', 'format=' => 'int'],
+         'gethostbyaddr' => ['string', 'ip_address' => 'string'],

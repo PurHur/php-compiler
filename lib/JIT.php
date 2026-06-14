@@ -2516,7 +2516,8 @@ class JIT {
 
         return str_ends_with($lower, '\\compiler::compilefunc')
             || str_ends_with($lower, '\\compiler::compile')
-            || 'type_pair' === $lower
+            || str_ends_with($lower, '\\jit\\type_pair')
+            || str_ends_with($lower, '\\vm\\type_pair')
             || $this->isBootstrapRuntimeCtorSmokeName($lower)
             || ($this->isBootstrapHelloWorldSmokeName($lower) && !$this->shouldUseM3CompileDriverRealLowering())
             || ($this->isBootstrapM3RuntimeEmitBridgeName($lower) && !$this->shouldUseM3CompileDriverRealLowering());
@@ -9649,6 +9650,31 @@ class JIT {
                 }
 
                 return;
+            } elseif (
+                null !== $this->context->activeFunction
+                && null !== $this->context->jitCurrentBlock
+                && Variable::TYPE_VALUE === Variable::getTypeFromType($resultOp->type)
+            ) {
+                $func = $this->context->functions[$this->context->activeFunction] ?? null;
+                if (null !== $func) {
+                    // ?: return phi (string|null) needs an initialized VALUE box (#8555).
+                    $this->context->makeVariableFromOp(
+                        $func,
+                        $this->context->builder->getInsertBlock(),
+                        $this->context->jitCurrentBlock,
+                        $resultOp
+                    );
+                } else {
+                    $var = $this->context->makeVariableFromValueOp(
+                        $this->context->helper->loadValue($value),
+                        $resultOp
+                    );
+                    $var->compileTimeConstantName = $value->compileTimeConstantName;
+                    $var->compileTimeEnumCase = $value->compileTimeEnumCase;
+                    $var->compileTimeFloat = $value->compileTimeFloat;
+
+                    return;
+                }
             } else {
                 // it's a kind!
                 $var = $this->context->makeVariableFromValueOp($this->context->helper->loadValue($value), $resultOp);
@@ -9963,7 +9989,8 @@ class JIT {
             return;
         } elseif ($result->type === Variable::TYPE_VALUE) {
             // wrap
-            $valueRef = $result->value;
+            $valueSlot = $result->value;
+            $valueRef = JIT\JitValueBox::pointer($this->context, $valueSlot);
             $valueFrom = $value->value;
             if ($value->type & Variable::IS_NATIVE_ARRAY) {
                 $ht = JIT\HashTableHelper::materializeNativeArrayForCall($this->context, $value);
@@ -10054,7 +10081,7 @@ class JIT {
                     }
                     JIT\JitValueBox::writeBool(
                         $this->context,
-                        $valueRef,
+                        $valueSlot,
                         $this->context->helper->loadValue($value)
                     );
 
@@ -10127,7 +10154,7 @@ class JIT {
                 case Variable::TYPE_VALUE:
                     JIT\JitValueBox::copyFromPointer(
                         $this->context,
-                        $valueRef,
+                        $valueSlot,
                         $this->valueBoxPointer($value)
                     );
                     $this->copyValueBoxJitFlags($result, $value, $force);

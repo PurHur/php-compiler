@@ -116,6 +116,9 @@ patch_already_applied() {
     php-types-get-meta-tags-array-false.patch)
       grep -q "'get_meta_tags' => \['array|false'" "$ROOT/vendor/ircmaxell/php-types/lib/PHPTypes/InternalArgInfo.php" 2>/dev/null
       ;;
+    php-types-getenv-string-false.patch)
+      grep -q "'getenv' => \['string|false'" "$ROOT/vendor/ircmaxell/php-types/lib/PHPTypes/InternalArgInfo.php" 2>/dev/null
+      ;;
     php-types-array-combine-array-false.patch)
       grep -qF "'array_combine' => ['array|false'" "$ROOT/vendor/ircmaxell/php-types/lib/PHPTypes/InternalArgInfo.php" 2>/dev/null
       ;;
@@ -4971,6 +4974,7 @@ if [[ -d "$ROOT/vendor/ircmaxell/php-types" ]]; then
   apply_patch "$PATCH_DIR/php-types-str-split-string-array.patch"
   apply_patch "$PATCH_DIR/php-types-readfile-int-false.patch"
   apply_patch "$PATCH_DIR/php-types-get-meta-tags-array-false.patch"
+  apply_patch "$PATCH_DIR/php-types-getenv-string-false.patch"
   apply_patch "$PATCH_DIR/php-types-array-combine-array-false.patch"
   apply_patch "$PATCH_DIR/php-types-stream-context-array-return.patch"
   apply_patch "$PATCH_DIR/php-types-strpbrk-string-false.patch"
