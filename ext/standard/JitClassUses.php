@@ -21,6 +21,10 @@ final class JitClassUses
 
     public static function invoke(Context $context, JITVariable $whatArg, bool $autoload): Value
     {
+        if (null !== $whatArg->compileTimeEnumCase) {
+            return self::returnEmptyArray($context);
+        }
+
         if (JITVariable::TYPE_OBJECT === $whatArg->type) {
             return self::invokeForObject($context, $whatArg, $autoload);
         }
@@ -28,6 +32,14 @@ final class JitClassUses
         $literal = JitStringArg::compileTimeLiteral($whatArg);
         if (null !== $literal) {
             return self::invokeForClassName($context, $literal, $autoload);
+        }
+
+        if (JITVariable::TYPE_STRING === $whatArg->type) {
+            return self::invokeForRuntimeClassNameString(
+                $context,
+                JitStringArg::stringPtrFromVariable($context, $whatArg),
+                $autoload
+            );
         }
 
         if (JITVariable::TYPE_VALUE === $whatArg->type) {
@@ -55,32 +67,50 @@ final class JitClassUses
             $typeByte,
             $i8->constInt(VmVariable::TYPE_ENUM_CASE, false)
         );
+        $isString = $context->builder->icmp(
+            Builder::INT_EQ,
+            $typeByte,
+            $i8->constInt(VmVariable::TYPE_STRING, false)
+        );
+        $isObject = $context->builder->icmp(
+            Builder::INT_EQ,
+            $typeByte,
+            $i8->constInt(VmVariable::TYPE_OBJECT, false)
+        );
         $tag = 'cu_box_'.(string) ++self::$seq;
         $enumCaseBlock = BasicBlockHelper::append($context, $tag.'_enum');
+        $stringBlock = BasicBlockHelper::append($context, $tag.'_str');
         $objectBlock = BasicBlockHelper::append($context, $tag.'_obj');
+        $falseBlock = BasicBlockHelper::append($context, $tag.'_false');
         $doneBlock = BasicBlockHelper::append($context, $tag.'_done');
-        $context->builder->branchIf($isEnumCase, $enumCaseBlock, $objectBlock);
+        $afterEnumCheck = BasicBlockHelper::append($context, $tag.'_after_enum');
+        $afterStringCheck = BasicBlockHelper::append($context, $tag.'_after_str');
+        $context->builder->branchIf($isEnumCase, $enumCaseBlock, $afterEnumCheck);
 
         $context->builder->positionAtEnd($enumCaseBlock);
         $emptyPtr = self::returnEmptyArray($context);
         $context->builder->branch($doneBlock);
+
+        $context->builder->positionAtEnd($afterEnumCheck);
+        $context->builder->branchIf($isString, $stringBlock, $afterStringCheck);
+
+        $context->builder->positionAtEnd($stringBlock);
+        $nameStr = $context->builder->call(
+            $context->lookupFunction('__value__readString'),
+            $valuePtr
+        );
+        $stringResult = self::invokeForRuntimeClassNameString($context, $nameStr, $autoload);
+        $stringEndBlock = $context->builder->getInsertBlock();
+        $context->builder->branch($doneBlock);
+
+        $context->builder->positionAtEnd($afterStringCheck);
+        $context->builder->branchIf($isObject, $objectBlock, $falseBlock);
 
         $context->builder->positionAtEnd($objectBlock);
         $obj = $context->builder->call(
             $context->lookupFunction('__value__readObject'),
             $valuePtr
         );
-        $objType = $context->getTypeFromString('__object__*');
-        $isObject = $context->builder->icmp(
-            Builder::INT_NE,
-            $obj,
-            $objType->constNull()
-        );
-        if (!$isObject) {
-            throw new \LogicException(
-                'class_uses() argument must be an object or class name string in this compiler build'
-            );
-        }
         $objVar = new JITVariable(
             $context,
             JITVariable::TYPE_OBJECT,
@@ -91,11 +121,86 @@ final class JitClassUses
         $objectEndBlock = $context->builder->getInsertBlock();
         $context->builder->branch($doneBlock);
 
+        $context->builder->positionAtEnd($falseBlock);
+        $falsePtr = self::returnFalse($context);
+        $context->builder->branch($doneBlock);
+
         $context->builder->positionAtEnd($doneBlock);
         $valuePtrTy = $context->getTypeFromString('__value__*');
         $result = $context->builder->phi($valuePtrTy);
         $result->addIncoming($emptyPtr, $enumCaseBlock);
+        $result->addIncoming($stringResult, $stringEndBlock);
         $result->addIncoming($objectResult, $objectEndBlock);
+        $result->addIncoming($falsePtr, $falseBlock);
+
+        return $result;
+    }
+
+    private static function invokeForRuntimeClassNameString(
+        Context $context,
+        Value $nameStr,
+        bool $autoload
+    ): Value {
+        $object = $context->type->object;
+        $names = $object->allClassNamesById();
+        if ([] === $names) {
+            return self::returnFalse($context);
+        }
+
+        $i32 = $context->getTypeFromString('int32');
+        $strcasecmpFn = $context->lookupFunction('strcasecmp');
+        $nameData = JitClassExists::stringDataPtr($context, $nameStr);
+
+        $tag = 'cu_str_'.(string) ++self::$seq;
+        $done = BasicBlockHelper::append($context, $tag.'_done');
+        $falseBlock = BasicBlockHelper::append($context, $tag.'_false');
+        $valuePtrTy = $context->getTypeFromString('__value__*');
+        /** @var list<array{0: \PHPLLVM\BasicBlock, 1: Value}> $incoming */
+        $incoming = [];
+
+        $ids = array_keys($names);
+        $lastIdx = \count($ids) - 1;
+        foreach ($ids as $idx => $id) {
+            $className = $names[$id];
+            $displayName = ltrim($className, '\\');
+            $lcName = strtolower($displayName);
+            $matchCmp = null;
+            foreach ([$displayName, $lcName] as $candidateLabel) {
+                $candidate = $context->builder->load(
+                    $context->constantStringFromString($candidateLabel)
+                );
+                $candidateData = JitClassExists::stringDataPtr($context, $candidate);
+                $cmp = $context->builder->call($strcasecmpFn, $nameData, $candidateData);
+                $isCandidate = $context->builder->icmp(
+                    Builder::INT_EQ,
+                    $cmp,
+                    $i32->constInt(0, false)
+                );
+                $matchCmp = null === $matchCmp ? $isCandidate : $context->builder->or($matchCmp, $isCandidate);
+            }
+            $isMatch = $matchCmp;
+            $matchBlock = BasicBlockHelper::append($context, $tag.'_match_'.$id);
+            $nextBlock = $lastIdx === $idx
+                ? $falseBlock
+                : BasicBlockHelper::append($context, $tag.'_next_'.$id);
+            $context->builder->branchIf($isMatch, $matchBlock, $nextBlock);
+            $context->builder->positionAtEnd($matchBlock);
+            $ptr = self::invokeForClassName($context, $className, $autoload);
+            $incoming[] = [$context->builder->getInsertBlock(), $ptr];
+            $context->builder->branch($done);
+            $context->builder->positionAtEnd($nextBlock);
+        }
+
+        $context->builder->positionAtEnd($falseBlock);
+        $falsePtr = self::returnFalse($context);
+        $incoming[] = [$falseBlock, $falsePtr];
+        $context->builder->branch($done);
+
+        $context->builder->positionAtEnd($done);
+        $result = $context->builder->phi($valuePtrTy);
+        foreach ($incoming as [$block, $ptr]) {
+            $result->addIncoming($ptr, $block);
+        }
 
         return $result;
     }

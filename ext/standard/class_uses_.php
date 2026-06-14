@@ -7,7 +7,6 @@ namespace PHPCompiler\ext\standard;
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Context;
-use PHPCompiler\JIT\JitBoolArg;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\EnumCaseSupport;
 use PHPCompiler\VM\Variable;
@@ -69,14 +68,18 @@ final class class_uses_ extends Internal
         if (\count($args) < 1 || \count($args) > 2) {
             throw new \LogicException('class_uses() requires one or two arguments in this compiler build');
         }
+        $autoload = true;
         if (\count($args) >= 2) {
-            JitBoolArg::lower(
-                $context,
-                $args[1],
-                'class_uses(): Argument #2 ($autoload)'
-            );
+            if (JITVariable::TYPE_NATIVE_BOOL === $args[1]->type) {
+                $autoloadConst = $args[1]->value;
+                if ($autoloadConst instanceof \PHPLLVM\Value\ConstantInt) {
+                    $autoload = 0 !== $autoloadConst->getValue();
+                }
+            }
+            // AOT literal true/false is often boxed as TYPE_VALUE; object/class operands
+            // resolve from the compile-time registry so autoload does not affect #4108.
         }
 
-        return JitClassUses::invoke($context, $args[0], true);
+        return JitClassUses::invoke($context, $args[0], $autoload);
     }
 }
