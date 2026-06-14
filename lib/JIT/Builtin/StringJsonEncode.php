@@ -23,13 +23,28 @@ final class StringJsonEncode
 {
     public static function ensureLinked(Context $context): void
     {
-        self::implement($context);
+        self::implementIfMissing($context, '__compiler_json_encode_array', self::implementArray(...));
+        self::implementIfMissing($context, '__compiler_json_encode_value', self::implementValue(...));
+    }
+
+    /**
+     * @param callable(Context): void $emit
+     */
+    private static function implementIfMissing(Context $context, string $name, callable $emit): void
+    {
+        $probe = $context->module->getNamedFunction($name);
+        if (null !== $probe && $probe->countBasicBlocks() > 0) {
+            $context->registerFunction($name, $probe);
+
+            return;
+        }
+
+        $emit($context);
     }
 
     public static function implement(Context $context): void
     {
-        self::implementArray($context);
-        self::implementValue($context);
+        self::ensureLinked($context);
     }
 
     private static function implementValue(Context $context): void
