@@ -2273,6 +2273,7 @@ require_once __DIR__.'/../../../ext/standard/VmErrorLog.php';
 require_once __DIR__.'/../../../ext/standard/VmExif.php';
 require_once __DIR__.'/../../../ext/standard/VmFsDirNative.php';
 require_once __DIR__.'/../../../ext/standard/VmFsReadNative.php';
+require_once __DIR__.'/../../../ext/standard/VmFsWriteNative.php';
 require_once __DIR__.'/../../../ext/standard/VmFsStdio.php';
 require_once __DIR__.'/../../../ext/standard/VmFsStdioNative.php';
 require_once __DIR__.'/../../../ext/standard/VmGzStream.php';
