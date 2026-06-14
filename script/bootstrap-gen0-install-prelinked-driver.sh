@@ -51,6 +51,21 @@ bootstrap_gen0_installed_minimal_sidecar_matches_prelinked() {
   cmp -s "${blob}" "${seed}"
 }
 
+# Prelinked gen-0 argv drivers bake /home/ai/php-compiler/build/.m3_* link-time paths (#1492).
+# Symlink that prefix to the live build/ tree so __compiler_copy sidecar emit succeeds.
+bootstrap_ensure_prelinked_sidecar_path_symlink() {
+  local root="${ROOT:-}"
+  local baked="/home/ai/php-compiler/build"
+  if [[ -z "${root}" || ! -d "${root}/build" ]]; then
+    return 1
+  fi
+  if [[ -e "${baked}" && ! -L "${baked}" ]]; then
+    return 0
+  fi
+  mkdir -p "$(dirname "${baked}")" 2>/dev/null || true
+  ln -sfn "${root}/build" "${baked}" 2>/dev/null || true
+}
+
 # Seed link-time sidecars so Zend inventory emit skips bin/compile.php host-compile (#2930).
 bootstrap_gen0_seed_prelinked_m3_sidecars() {
   local root="${ROOT:-}"
@@ -103,6 +118,7 @@ bootstrap_gen0_seed_prelinked_m3_sidecars() {
     chmod +x "${root}/build/$(basename "${sidecar}")" 2>/dev/null || true
   done
   shopt -u nullglob
+  bootstrap_ensure_prelinked_sidecar_path_symlink 2>/dev/null || true
   return 0
 }
 
