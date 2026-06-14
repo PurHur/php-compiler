@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 2669 |
-| Phase A inventory files (M2 ratio SSOT) | 2669 |
+| PHP files on vm.php path | 2670 |
+| Phase A inventory files (M2 ratio SSOT) | 2670 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 7207 |
+| Source constructs flagged (warnings) | 7188 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -724,7 +724,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/standard/SuperglobalNames.php` | 0 | 1 |
 | `ext/standard/ThrowableManifest.php` | 0 | 1 |
 | `ext/standard/UnpackEngine.php` | 0 | 1 |
-| `ext/standard/VmArray.php` | 0 | 50 |
+| `ext/standard/VmArray.php` | 0 | 30 |
 | `ext/standard/VmArrayAssocSetOps.php` | 0 | 2 |
 | `ext/standard/VmArrayColumnArg.php` | 0 | 1 |
 | `ext/standard/VmArrayPointer.php` | 0 | 1 |
@@ -809,6 +809,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/standard/VmHrtime.php` | 0 | 1 |
 | `ext/standard/VmHrtimeNative.php` | 0 | 1 |
 | `ext/standard/VmHttpBuildQuery.php` | 0 | 1 |
+| `ext/standard/VmHttpFetchNative.php` | 0 | 1 |
 | `ext/standard/VmHttpLastResponseHeaders.php` | 0 | 1 |
 | `ext/standard/VmHttpResponse.php` | 0 | 2 |
 | `ext/standard/VmImage.php` | 0 | 6 |
@@ -7518,44 +7519,24 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new Variable (line 307)
 - new HashTable (line 460)
 - new Variable (line 462)
-- new Variable (line 496)
-- new Variable (line 498)
-- new HashTable (line 503)
-- new Variable (line 506)
-- new Variable (line 530)
-- new Variable (line 532)
-- new HashTable (line 537)
-- new Variable (line 540)
-- new Variable (line 564)
-- new Variable (line 566)
-- new HashTable (line 601)
-- new Variable (line 604)
-- new Variable (line 628)
-- new Variable (line 630)
-- new HashTable (line 648)
-- new Variable (line 651)
-- new Variable (line 675)
-- new Variable (line 677)
-- new HashTable (line 695)
-- new Variable (line 698)
-- new Variable (line 722)
-- new Variable (line 724)
+- new Variable (line 590)
+- new Variable (line 618)
+- new Variable (line 629)
+- new HashTable (line 635)
+- new Variable (line 637)
+- new HashTable (line 706)
+- new Variable (line 717)
 - new HashTable (line 757)
-- new Variable (line 760)
-- new Variable (line 789)
-- new Variable (line 817)
-- new Variable (line 828)
-- new HashTable (line 834)
-- new Variable (line 836)
-- new HashTable (line 905)
-- new Variable (line 916)
-- new HashTable (line 956)
-- new Variable (line 967)
-- new Variable (line 980)
-- new HashTable (line 1020)
-- new Variable (line 1029)
-- 44 class method(s)
-- 2 closure(s)
+- new Variable (line 768)
+- new Variable (line 781)
+- new HashTable (line 821)
+- new Variable (line 830)
+- new Variable (line 912)
+- new Variable (line 914)
+- new HashTable (line 927)
+- new Variable (line 930)
+- 47 class method(s)
+- 3 closure(s)
 
 ### `ext/standard/VmArrayAssocSetOps.php`
 
@@ -7934,13 +7915,13 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new HashTable (line 204)
 - new Variable (line 207)
 - new Variable (line 210)
-- new HashTable (line 1169)
-- new Variable (line 1171)
-- new HashTable (line 1923)
+- new HashTable (line 1163)
+- new Variable (line 1165)
+- new HashTable (line 1917)
+- new Variable (line 1920)
 - new Variable (line 1926)
 - new Variable (line 1932)
 - new Variable (line 1938)
-- new Variable (line 1944)
 - 106 class method(s)
 
 ### `ext/standard/VmFsAccessNative.php`
@@ -8116,6 +8097,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - 11 class method(s)
 
+### `ext/standard/VmHttpFetchNative.php`
+
+**Warnings** (review for bootstrap subset):
+- 11 class method(s)
+
 ### `ext/standard/VmHttpLastResponseHeaders.php`
 
 **Warnings** (review for bootstrap subset):
@@ -8203,7 +8189,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - new Frame (line 176)
 - new Variable (line 178)
-- 28 class method(s)
+- 32 class method(s)
 
 ### `ext/standard/VmIptc.php`
 
