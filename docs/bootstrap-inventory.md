@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 2587 |
-| Phase A inventory files (M2 ratio SSOT) | 2587 |
+| PHP files on vm.php path | 2592 |
+| Phase A inventory files (M2 ratio SSOT) | 2592 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 7017 |
+| Source constructs flagged (warnings) | 7030 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -154,8 +154,10 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/mbstring/JitMbNumericEntity.php` | 0 | 1 |
 | `ext/mbstring/JitMbScrub.php` | 0 | 1 |
 | `ext/mbstring/JitMbSearch.php` | 0 | 1 |
+| `ext/mbstring/JitMbStrcut.php` | 0 | 1 |
 | `ext/mbstring/JitMbStrlen.php` | 0 | 1 |
-| `ext/mbstring/Module.php` | 0 | 20 |
+| `ext/mbstring/MbStrcutJitHelper.php` | 0 | 1 |
+| `ext/mbstring/Module.php` | 0 | 21 |
 | `ext/mbstring/VmMbstring.php` | 0 | 2 |
 | `ext/mbstring/mb_check_encoding.php` | 0 | 2 |
 | `ext/mbstring/mb_convert_case.php` | 0 | 3 |
@@ -165,6 +167,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/mbstring/mb_ltrim.php` | 0 | 1 |
 | `ext/mbstring/mb_rtrim.php` | 0 | 1 |
 | `ext/mbstring/mb_scrub.php` | 0 | 2 |
+| `ext/mbstring/mb_strcut.php` | 0 | 3 |
 | `ext/mbstring/mb_stripos.php` | 0 | 3 |
 | `ext/mbstring/mb_strlen.php` | 0 | 1 |
 | `ext/mbstring/mb_strpos.php` | 0 | 3 |
@@ -305,6 +308,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/standard/JitCreateLazyProxy.php` | 0 | 1 |
 | `ext/standard/JitCsvArg.php` | 0 | 1 |
 | `ext/standard/JitDate.php` | 0 | 5 |
+| `ext/standard/JitDateCreate.php` | 0 | 5 |
 | `ext/standard/JitDateIntervalFormat.php` | 0 | 1 |
 | `ext/standard/JitDateSunFunc.php` | 0 | 1 |
 | `ext/standard/JitDateSunInfo.php` | 0 | 1 |
@@ -1787,6 +1791,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/Builtin/LastErrorRuntime.php` | 0 | 1 |
 | `lib/JIT/Builtin/MathBaseConvert.php` | 0 | 1 |
 | `lib/JIT/Builtin/MathBaseConvertJit.php` | 0 | 1 |
+| `lib/JIT/Builtin/MbStrcut.php` | 0 | 2 |
 | `lib/JIT/Builtin/MemoryManager.php` | 0 | 4 |
 | `lib/JIT/Builtin/MemoryManager/EmbedMcjit.php` | 0 | 1 |
 | `lib/JIT/Builtin/MemoryManager/Native.php` | 0 | 1 |
@@ -3413,10 +3418,20 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - 8 class method(s)
 
+### `ext/mbstring/JitMbStrcut.php`
+
+**Warnings** (review for bootstrap subset):
+- 4 class method(s)
+
 ### `ext/mbstring/JitMbStrlen.php`
 
 **Warnings** (review for bootstrap subset):
 - 2 class method(s)
+
+### `ext/mbstring/MbStrcutJitHelper.php`
+
+**Warnings** (review for bootstrap subset):
+- 1 class method(s)
 
 ### `ext/mbstring/Module.php`
 
@@ -3425,28 +3440,29 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new mb_check_encoding (line 33)
 - new mb_strlen (line 34)
 - new mb_substr (line 35)
-- new mb_substr_count (line 36)
-- new mb_strpos (line 37)
-- new mb_strtolower (line 38)
-- new mb_strtoupper (line 39)
-- new mb_convert_case (line 40)
-- new mb_convert_encoding (line 41)
-- new mb_stripos (line 42)
-- new mb_strrpos (line 43)
-- new mb_strrichr (line 44)
-- new mb_trim (line 45)
-- new mb_ltrim (line 46)
-- new mb_rtrim (line 47)
-- new mb_scrub (line 48)
-- new mb_encode_numericentity (line 49)
-- new mb_decode_numericentity (line 50)
+- new mb_strcut (line 36)
+- new mb_substr_count (line 37)
+- new mb_strpos (line 38)
+- new mb_strtolower (line 39)
+- new mb_strtoupper (line 40)
+- new mb_convert_case (line 41)
+- new mb_convert_encoding (line 42)
+- new mb_stripos (line 43)
+- new mb_strrpos (line 44)
+- new mb_strrichr (line 45)
+- new mb_trim (line 46)
+- new mb_ltrim (line 47)
+- new mb_rtrim (line 48)
+- new mb_scrub (line 49)
+- new mb_encode_numericentity (line 50)
+- new mb_decode_numericentity (line 51)
 - 2 class method(s)
 
 ### `ext/mbstring/VmMbstring.php`
 
 **Warnings** (review for bootstrap subset):
-- new ArgumentCountError (line 746)
-- 61 class method(s)
+- new ArgumentCountError (line 838)
+- 65 class method(s)
 
 ### `ext/mbstring/mb_check_encoding.php`
 
@@ -3495,6 +3511,13 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - new ArgumentCountError (line 28)
 - 2 class method(s)
+
+### `ext/mbstring/mb_strcut.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 30)
+- 2 class method(s)
+- 1 closure(s)
 
 ### `ext/mbstring/mb_stripos.php`
 
@@ -4457,6 +4480,15 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new ArgumentCountError (line 293)
 - new ArgumentCountError (line 296)
 - 15 class method(s)
+
+### `ext/standard/JitDateCreate.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 24)
+- new JITVariable (line 165)
+- new JITVariable (line 175)
+- new JITVariable (line 183)
+- 7 class method(s)
 
 ### `ext/standard/JitDateIntervalFormat.php`
 
@@ -12770,20 +12802,20 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/zip/VmZipArchive.php`
 
 **Warnings** (review for bootstrap subset):
-- new Variable (line 37)
 - new Variable (line 38)
-- new ClassEntry (line 41)
-- new ClassProperty (line 43)
+- new Variable (line 39)
+- new ClassEntry (line 42)
 - new ClassProperty (line 44)
 - new ClassProperty (line 45)
-- new Variable (line 48)
-- new ZipArchiveConstruct (line 54)
-- new ZipArchiveOpen (line 59)
-- new ZipArchiveClose (line 60)
-- new ZipArchiveAddFile (line 61)
-- new ZipArchiveExtractTo (line 62)
-- new ZipArchiveGetStatusString (line 63)
-- new ZipArchiveState (line 76)
+- new ClassProperty (line 46)
+- new Variable (line 49)
+- new ZipArchiveConstruct (line 55)
+- new ZipArchiveOpen (line 60)
+- new ZipArchiveClose (line 61)
+- new ZipArchiveAddFile (line 62)
+- new ZipArchiveExtractTo (line 63)
+- new ZipArchiveGetStatusString (line 64)
+- new ZipArchiveState (line 77)
 - 17 class method(s)
 
 ### `ext/zip/ZipArchiveAddFile.php`
@@ -14325,6 +14357,12 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 
 **Warnings** (review for bootstrap subset):
 - 18 class method(s)
+
+### `lib/JIT/Builtin/MbStrcut.php`
+
+**Warnings** (review for bootstrap subset):
+- new JIT (line 49)
+- 4 class method(s)
 
 ### `lib/JIT/Builtin/MemoryManager.php`
 
@@ -16220,7 +16258,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/JitStringBuiltinArg.php`
 
 **Warnings** (review for bootstrap subset):
-- 8 class method(s)
+- 9 class method(s)
 
 ### `lib/JIT/JitStringCompare.php`
 
