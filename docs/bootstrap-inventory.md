@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 2616 |
-| Phase A inventory files (M2 ratio SSOT) | 2616 |
+| PHP files on vm.php path | 2617 |
+| Phase A inventory files (M2 ratio SSOT) | 2617 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 7109 |
+| Source constructs flagged (warnings) | 7110 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -759,6 +759,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/standard/VmFsTempnamNative.php` | 0 | 1 |
 | `ext/standard/VmFsTouchNative.php` | 0 | 1 |
 | `ext/standard/VmFsUnlink.php` | 0 | 1 |
+| `ext/standard/VmFsWriteNative.php` | 0 | 1 |
 | `ext/standard/VmFtok.php` | 0 | 1 |
 | `ext/standard/VmGcStatus.php` | 0 | 3 |
 | `ext/standard/VmGeneratorArray.php` | 0 | 1 |
@@ -7707,12 +7708,12 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new HashTable (line 203)
 - new Variable (line 206)
 - new Variable (line 209)
-- new HashTable (line 1107)
-- new Variable (line 1109)
-- new HashTable (line 1795)
-- new Variable (line 1798)
-- new Variable (line 1804)
-- new Variable (line 1810)
+- new HashTable (line 1103)
+- new Variable (line 1105)
+- new HashTable (line 1791)
+- new Variable (line 1794)
+- new Variable (line 1800)
+- new Variable (line 1806)
 - 106 class method(s)
 
 ### `ext/standard/VmFsAccessNative.php`
@@ -7779,6 +7780,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 
 **Warnings** (review for bootstrap subset):
 - 3 class method(s)
+
+### `ext/standard/VmFsWriteNative.php`
+
+**Warnings** (review for bootstrap subset):
+- 4 class method(s)
 
 ### `ext/standard/VmFtok.php`
 
