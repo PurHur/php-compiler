@@ -8643,17 +8643,7 @@ class Compiler {
             return null;
         }
         $producers = $this->precedingInlineCallArgProducersBeforeCfgOp($block->orig->children, $callOp);
-        if (count($producers) === count($callOp->args)) {
-            $producer = $producers[$argIndex] ?? null;
-        } elseif (
-            1 === count($producers)
-            && $producers[0] instanceof Op\Expr\ConstFetch
-            && $argIndex === count($callOp->args) - 1
-        ) {
-            $producer = $producers[0];
-        } else {
-            return null;
-        }
+        $producer = $this->matchInlineCallArgProducer($producers, $callOp->args, $argIndex);
         if (null === $producer) {
             return null;
         }
@@ -8667,6 +8657,52 @@ class Compiler {
         }
 
         return $producerSlot;
+    }
+
+    /**
+     * Map a hoisted inline call-arg producer to the callee argument index (#8561, #5799).
+     *
+     * php-cfg may emit fewer preceding Expr_* producers than call args when literals stay
+     * embedded in the FuncCall (e.g. array_fill_keys(array('a'), 'x')).
+     *
+     * @param list<Op\Expr> $producers
+     * @param list<Operand> $callArgs
+     */
+    private function matchInlineCallArgProducer(array $producers, array $callArgs, int $argIndex): ?Op\Expr
+    {
+        $producerCount = count($producers);
+        $argCount = count($callArgs);
+        if (0 === $producerCount || $argCount < $producerCount) {
+            return null;
+        }
+        if ($producerCount === $argCount) {
+            return $producers[$argIndex] ?? null;
+        }
+        if (1 === $producerCount) {
+            if (0 === $argIndex && $this->isEmbeddedCallLiteralArg($callArgs[1] ?? null)) {
+                return $producers[0];
+            }
+            if ($argCount - 1 === $argIndex && $this->isEmbeddedCallLiteralArg($callArgs[0] ?? null)) {
+                return $producers[0];
+            }
+
+            return null;
+        }
+        if ($argIndex < $producerCount) {
+            return $producers[$argIndex];
+        }
+
+        return null;
+    }
+
+    /** True when php-cfg left the operand as an embedded literal in the FuncCall. */
+    private function isEmbeddedCallLiteralArg(?Operand $arg): bool
+    {
+        if (null === $arg) {
+            return false;
+        }
+
+        return null !== $this->unwrapCfgLiteralOperand($arg);
     }
 
     private function isInlineExprCallArgConsumer(Op $op): bool
