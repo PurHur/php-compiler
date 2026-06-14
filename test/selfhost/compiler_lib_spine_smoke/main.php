@@ -2642,6 +2642,32 @@ require_once __DIR__.'/../../../src/yay-php8-compat.php';
 require_once __DIR__.'/../../../test/bootstrap-aot/cli_spine_shim.php';
 require_once __DIR__.'/../../../test/bootstrap-aot/llvm_env_spine_shim.php';
 require_once __DIR__.'/../../../test/bootstrap-aot/macro_functions_spine_shim.php';
+require_once __DIR__.'/../../../ext/lzf/JitLzf.php';
+require_once __DIR__.'/../../../ext/lzf/Module.php';
+require_once __DIR__.'/../../../ext/lzf/VmLzf.php';
+require_once __DIR__.'/../../../ext/lzf/VmLzfNative.php';
+require_once __DIR__.'/../../../ext/lzf/lzf_compress.php';
+require_once __DIR__.'/../../../ext/lzf/lzf_decompress.php';
+require_once __DIR__.'/../../../ext/mbstring/JitMbStrPad.php';
+require_once __DIR__.'/../../../ext/mbstring/mb_str_pad.php';
+require_once __DIR__.'/../../../ext/standard/ConvertCyrStringJitHelper.php';
+require_once __DIR__.'/../../../ext/standard/JitChroot.php';
+require_once __DIR__.'/../../../ext/standard/JitConvertCyrString.php';
+require_once __DIR__.'/../../../ext/standard/JitDl.php';
+require_once __DIR__.'/../../../ext/standard/JitPhpinfoFlags.php';
+require_once __DIR__.'/../../../ext/standard/JitStreamContextGetDefault.php';
+require_once __DIR__.'/../../../ext/standard/JitStreamContextSetDefault.php';
+require_once __DIR__.'/../../../ext/standard/VmChrootNative.php';
+require_once __DIR__.'/../../../ext/standard/VmConvertCyrString.php';
+require_once __DIR__.'/../../../ext/standard/VmPhpFilterStream.php';
+require_once __DIR__.'/../../../ext/standard/chroot_.php';
+require_once __DIR__.'/../../../ext/standard/convert_cyr_string.php';
+require_once __DIR__.'/../../../ext/standard/stream_context_get_default.php';
+require_once __DIR__.'/../../../ext/standard/stream_context_set_default.php';
+require_once __DIR__.'/../../../lib/JIT/Builtin/ConvertCyrString.php';
+require_once __DIR__.'/../../../lib/JIT/Builtin/StringLzf.php';
+require_once __DIR__.'/../../../lib/JIT/Builtin/StringLzfJit.php';
+require_once __DIR__.'/../../../lib/JIT/Builtin/StringPhpinfoRuntime.php';
 // VM -r smoke: bootstrap-selfhost-lib-spine-vm-smoke.sh (#1846).
 // VM driver execute: bootstrap-selfhost-vm-driver-execute-probe.sh (#2201).
 
