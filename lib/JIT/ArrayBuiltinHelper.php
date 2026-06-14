@@ -9028,13 +9028,14 @@ final class ArrayBuiltinHelper
         $doubleBlock = BasicBlockHelper::append($context, 'array_combine_key_double');
         $doubleWholeBlock = BasicBlockHelper::append($context, 'array_combine_key_double_whole');
         $doubleStringBlock = BasicBlockHelper::append($context, 'array_combine_key_double_str');
+        $afterDouble = BasicBlockHelper::append($context, 'array_combine_after_double');
         $context->builder->positionAtEnd($afterLong);
         $isDouble = $context->builder->icmp(
             Builder::INT_EQ,
             $typeByte,
             $i8->constInt(Variable::TYPE_NATIVE_DOUBLE, false)
         );
-        $context->builder->branchIf($isDouble, $doubleBlock, $done);
+        $context->builder->branchIf($isDouble, $doubleBlock, $afterDouble);
 
         $context->builder->positionAtEnd($doubleBlock);
         $doubleVal = $context->builder->call(
@@ -9056,6 +9057,61 @@ final class ArrayBuiltinHelper
         $context->builder->positionAtEnd($doubleStringBlock);
         $keyStrFromDouble = self::formatDoubleStringKey($context, $doubleVal);
         self::storeValueEntryAtStringKey($context, $dest, $keyStrFromDouble, $valEntry);
+        $context->builder->branch($done);
+
+        $boolBlock = BasicBlockHelper::append($context, 'array_combine_key_bool');
+        $nullBlock = BasicBlockHelper::append($context, 'array_combine_key_null');
+        $objectErrorBlock = BasicBlockHelper::append($context, 'array_combine_key_object_error');
+        $defaultErrorBlock = BasicBlockHelper::append($context, 'array_combine_key_default_error');
+
+        $context->builder->positionAtEnd($afterDouble);
+        $isBool = $context->builder->icmp(
+            Builder::INT_EQ,
+            $typeByte,
+            $i8->constInt(Variable::TYPE_NATIVE_BOOL, false)
+        );
+        $afterBool = BasicBlockHelper::append($context, 'array_combine_after_bool');
+        $context->builder->branchIf($isBool, $boolBlock, $afterBool);
+
+        $context->builder->positionAtEnd($boolBlock);
+        $boolKey = $context->builder->truncOrBitCast(
+            $context->builder->call($context->lookupFunction('__value__readLong'), $keyEntry),
+            $sizeT
+        );
+        self::storeValueEntryAtIndex($context, $dest, $boolKey, $valEntry);
+        $context->builder->branch($done);
+
+        $context->builder->positionAtEnd($afterBool);
+        $isNull = $context->builder->icmp(
+            Builder::INT_EQ,
+            $typeByte,
+            $i8->constInt(Variable::TYPE_NULL, false)
+        );
+        $afterNull = BasicBlockHelper::append($context, 'array_combine_after_null');
+        $context->builder->branchIf($isNull, $nullBlock, $afterNull);
+
+        $context->builder->positionAtEnd($nullBlock);
+        $emptyKey = $context->builder->load($context->constantStringFromString(''));
+        self::storeValueEntryAtStringKey($context, $dest, $emptyKey, $valEntry);
+        $context->builder->branch($done);
+
+        $context->builder->positionAtEnd($afterNull);
+        $isObject = $context->builder->icmp(
+            Builder::INT_EQ,
+            $typeByte,
+            $i8->constInt(Variable::TYPE_OBJECT, false)
+        );
+        $context->builder->branchIf($isObject, $objectErrorBlock, $defaultErrorBlock);
+
+        $context->builder->positionAtEnd($objectErrorBlock);
+        $context->type->object->emitObjectValueEntryStringCastError($context, $keyEntry);
+        $context->builder->call($context->lookupFunction('abort'));
+        $context->builder->branch($done);
+
+        $context->builder->positionAtEnd($defaultErrorBlock);
+        ErrorRaise::ensureLinked($context);
+        ErrorRaise::emitRaise($context, 'Object of class stdClass could not be converted to string');
+        $context->builder->call($context->lookupFunction('abort'));
         $context->builder->branch($done);
 
         $context->builder->positionAtEnd($done);

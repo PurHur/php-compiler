@@ -4950,6 +4950,35 @@ class Object_ extends Type {
     }
 
     /**
+     * Non-enum object __value__ entries used as array keys must throw Error (ext/standard/array.c #4161).
+     */
+    public function emitObjectValueEntryStringCastError(Context $context, PHPLLVM\Value $valueEntry): void
+    {
+        ErrorRaise::ensureLinked($context);
+        $objPtr = $context->builder->call(
+            $context->lookupFunction('__value__readObject'),
+            $valueEntry
+        );
+        $map = $context->structFieldMap['__object__'];
+        $classId = $context->builder->load(
+            $context->builder->structGep($objPtr, $map['class_id'])
+        );
+        $nonEnumClasses = [];
+        foreach ($this->classIdToName as $id => $name) {
+            $lc = strtolower(ltrim($name, '\\'));
+            if (!isset($this->enums[$lc])) {
+                $nonEnumClasses[(int) $id] = $name;
+            }
+        }
+        if ([] === $nonEnumClasses) {
+            ErrorRaise::emitRaise($context, 'Object of class stdClass could not be converted to string');
+
+            return;
+        }
+        $this->emitEnumClassIdStringCastErrorChain($context, $classId, $nonEnumClasses, 'obj_val_str_cast');
+    }
+
+    /**
      * Zend string cast on enum case objects must throw Error (zend_enum.c, #4819).
      */
     public function emitEnumObjectStringErrorIfMatches(Context $context, PHPLLVM\Value $objPtr): void

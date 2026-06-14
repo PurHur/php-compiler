@@ -127,6 +127,55 @@ final class VmArray
     }
 
     /**
+     * array_combine() key slot — Zend convert_to_key rules (ext/standard/array.c, #4161).
+     */
+    public static function storeCombineKey(HashTable $ht, Variable $key, Variable $stored): void
+    {
+        $key = $key->resolveIndirect();
+        self::rejectEnumCaseKeyVariable($key);
+        if (Variable::TYPE_INTEGER === $key->type) {
+            $ht->updateIndex($key->toInt(), $stored);
+
+            return;
+        }
+        if (Variable::TYPE_FLOAT === $key->type) {
+            $floatKey = $key->toFloat();
+            $intKey = (int) $floatKey;
+            if ($floatKey === (float) $intKey) {
+                $ht->updateIndex($intKey, $stored);
+            } else {
+                $ht->update($key->toString(), $stored);
+            }
+
+            return;
+        }
+        if (Variable::TYPE_STRING === $key->type) {
+            $ht->update($key->toString(), $stored);
+
+            return;
+        }
+        if (Variable::TYPE_BOOLEAN === $key->type) {
+            $ht->updateIndex($key->toBool() ? 1 : 0, $stored);
+
+            return;
+        }
+        if (Variable::TYPE_NULL === $key->type) {
+            $ht->update('', $stored);
+
+            return;
+        }
+        if (Variable::TYPE_OBJECT === $key->type) {
+            throw new \Error(
+                'Object of class '.$key->toObject()->class->name.' could not be converted to string'
+            );
+        }
+
+        throw new \Error(
+            'Object of class '.self::valueTypeLabel($key).' could not be converted to string'
+        );
+    }
+
+    /**
      * natsort/natcasesort natural compare requires string operands — Zend rejects enum cases (#5607).
      */
     public static function rejectEnumCaseNaturalSortValue(Variable $value): void
