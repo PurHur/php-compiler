@@ -20,7 +20,7 @@ foreach ($tests as [$name, $fn]) {
     }
 }
 --EXPECT--
-utf8_encode: utf8_encode(): Argument #1 ($data) must be of type string, E given
-str_rot13: str_rot13(): Argument #1 ($str) must be of type string, E given
+utf8_encode: utf8_encode(): Argument #1 ($string) must be of type string, E given
+str_rot13: str_rot13(): Argument #1 ($string) must be of type string, E given
 addcslashes: addcslashes(): Argument #1 ($str) must be of type string, E given
 stripcslashes: stripcslashes(): Argument #1 ($str) must be of type string, E given
