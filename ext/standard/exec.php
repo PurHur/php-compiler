@@ -1,0 +1,68 @@
+<?php
+
+declare(strict_types=1);
+
+namespace PHPCompiler\ext\standard;
+
+use PHPCompiler\Frame;
+use PHPCompiler\Func\Internal;
+use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\Variable as JITVariable;
+use PHPCompiler\VM\HashTable;
+use PHPCompiler\VM\Variable;
+use PHPLLVM\Value;
+
+/**
+ * exec() — run external program (php-src ext/standard/exec.c; #3278).
+ *
+ * VM: {@see VmExecNative}; JIT/AOT deferred (issue #3278).
+ */
+final class exec extends Internal
+{
+    public function __construct()
+    {
+        parent::__construct('exec');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $argc = \count($frame->calledArgs);
+        if ($argc < 1 || $argc > 3) {
+            throw new \LogicException('exec() accepts one to three arguments in this compiler build');
+        }
+        $command = VmString::coerceStringBuiltinArg($frame->calledArgs[0], 'exec', 0, 'command');
+        $result = VmExecNative::run($command);
+        if (false !== $result && $argc >= 2) {
+            $ht = new HashTable();
+            foreach ($result['lines'] as $line) {
+                $var = new Variable();
+                $var->string($line);
+                $ht->append($var);
+            }
+            $frame->calledArgs[1]->resolveIndirect()->array($ht);
+        }
+        if (false !== $result && $argc >= 3) {
+            $frame->calledArgs[2]->resolveIndirect()->int($result['status']);
+        }
+        if (null === $frame->returnVar) {
+            return;
+        }
+        if (false === $result) {
+            $frame->returnVar->bool(false);
+
+            return;
+        }
+        $lines = $result['lines'];
+        if ([] === $lines) {
+            $frame->returnVar->string('');
+
+            return;
+        }
+        $frame->returnVar->string($lines[\count($lines) - 1]);
+    }
+
+    public function call(Context $context, JITVariable ...$args): Value
+    {
+        throw new \LogicException('exec() is not implemented for JIT/AOT in this compiler build (issue #3278)');
+    }
+}
