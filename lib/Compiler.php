@@ -10062,15 +10062,20 @@ class Compiler {
      *
      * @return list<OpCode>
      */
-    protected function compileCallArgSends(array $args, Block $block): array
+    protected function compileCallArgSends(array $args, Block $block, ?string $calleeName = null): array
     {
         $this->validateCallArgOrder($args);
 
         $sends = [];
-        foreach ($args as $arg) {
+        foreach ($args as $argIndex => $arg) {
             $valueSlot = $this->findInlineExprCallArgProducerSlot($arg, $block);
             if (null === $valueSlot) {
-                $valueSlot = $this->tryFoldCallArgCompileTimeValue($arg, $block);
+                if (
+                    null === $calleeName
+                    || !$this->callArgRequiresByRef($calleeName, (int) $argIndex)
+                ) {
+                    $valueSlot = $this->tryFoldCallArgCompileTimeValue($arg, $block);
+                }
             }
             if (null === $valueSlot) {
                 $valueSlot = $this->compileOperand($arg, $block, true);
@@ -10092,6 +10097,16 @@ class Compiler {
         }
 
         return $sends;
+    }
+
+    private function callArgRequiresByRef(string $calleeName, int $argIndex): bool
+    {
+        if (\in_array($argIndex, BuiltinByRefParams::forFunction($calleeName), true)) {
+            return true;
+        }
+        $variadicFrom = BuiltinByRefParams::variadicByRefFromIndex($calleeName);
+
+        return null !== $variadicFrom && $argIndex >= $variadicFrom;
     }
 
     private function callArgUnpack(Operand $arg): bool
@@ -10267,9 +10282,11 @@ class Compiler {
         }
 
         $callName = $this->tryFoldVariableFunctionName($name, $block) ?? $name;
+        $calleeName = $this->resolveCompileTimeStringSlot($callName, $block)
+            ?? ($name !== null ? $this->resolveCompileTimeStringSlot($name, $block) : null);
 
         $return = [new OpCode(OpCode::TYPE_FUNCCALL_INIT, $callName)];
-        foreach ($this->compileCallArgSends($args, $block) as $send) {
+        foreach ($this->compileCallArgSends($args, $block, $calleeName) as $send) {
             $return[] = $send;
         }
         $return[] = $this->compileFuncCallExecOpcode($result, $block, $startLine);
