@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 2654 |
-| Phase A inventory files (M2 ratio SSOT) | 2654 |
+| PHP files on vm.php path | 2655 |
+| Phase A inventory files (M2 ratio SSOT) | 2655 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 7174 |
+| Source constructs flagged (warnings) | 7178 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -333,6 +333,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/standard/JitCsvArg.php` | 0 | 1 |
 | `ext/standard/JitDate.php` | 0 | 5 |
 | `ext/standard/JitDateCreate.php` | 0 | 5 |
+| `ext/standard/JitDateIntervalCreateFromDateString.php` | 0 | 4 |
 | `ext/standard/JitDateIntervalFormat.php` | 0 | 1 |
 | `ext/standard/JitDateSunFunc.php` | 0 | 1 |
 | `ext/standard/JitDateSunInfo.php` | 0 | 1 |
@@ -4704,6 +4705,14 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new JITVariable (line 175)
 - new JITVariable (line 183)
 - 7 class method(s)
+
+### `ext/standard/JitDateIntervalCreateFromDateString.php`
+
+**Warnings** (review for bootstrap subset):
+- new JITVariable (line 106)
+- new JITVariable (line 117)
+- new JITVariable (line 127)
+- 5 class method(s)
 
 ### `ext/standard/JitDateIntervalFormat.php`
 
@@ -9718,7 +9727,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/date_interval_create_from_date_string.php`
 
 **Warnings** (review for bootstrap subset):
-- new ArgumentCountError (line 33)
+- new ArgumentCountError (line 35)
 - 2 class method(s)
 - 2 closure(s)
 
