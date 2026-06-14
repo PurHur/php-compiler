@@ -41,4 +41,11 @@ final class NetworkServicesRuntimeShrinkTest extends TestCase
     {
         $this->assertFileDoesNotExist($this->repoRoot.'/ext/standard/VmNetwork.php');
     }
+
+    public function testVmNetworkServicesDoesNotDelegateConfigReadsToHostFile(): void
+    {
+        $source = (string) file_get_contents($this->repoRoot.'/ext/standard/VmNetworkServices.php');
+        $this->assertStringContainsString('VmFs::file', $source);
+        $this->assertDoesNotMatchRegularExpression('/@\\\\file\\s*\\(/', $source);
+    }
 }

@@ -7,6 +7,8 @@ namespace PHPCompiler\ext\standard;
 /**
  * Network service/protocol lookups (issue #3650, #5333).
  *
+ * Config reads (/etc/protocols, /etc/services) via {@see VmFs::file()} / {@see VmFsReadNative} — no host \\file() (#8538).
+ *
  * @see https://github.com/php/php-src/blob/master/ext/standard/network.c
  */
 final class VmNetworkServices
@@ -203,7 +205,7 @@ final class VmNetworkServices
      */
     private static function parseProtocolFile(string $path): array
     {
-        $lines = @file($path, FILE_IGNORE_NEW_LINES);
+        $lines = VmFs::file($path, StdlibConstants::FILE_IGNORE_NEW_LINES);
         if (false === $lines) {
             return [];
         }
@@ -246,7 +248,7 @@ final class VmNetworkServices
      */
     private static function parseServiceFile(string $path): array
     {
-        $lines = @file($path, FILE_IGNORE_NEW_LINES);
+        $lines = VmFs::file($path, StdlibConstants::FILE_IGNORE_NEW_LINES);
         if (false === $lines) {
             return [];
         }
