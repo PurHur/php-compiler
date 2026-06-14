@@ -45,7 +45,7 @@ final class VmStreamSocketNative
     }
 
     /**
-     * @return array{0: resource|false, 1: int, 2: string, 3: ?int}
+     * @return array{0: int|false, 1: int, 2: string, 3: ?int}
      */
     public static function client(
         string $remote,
@@ -148,14 +148,14 @@ final class VmStreamSocketNative
             $ffi->close($connectedFd);
 
             $mode = self::SOCK_DGRAM === $sockType ? 'r+' : 'r+';
-            $stream = @\fopen('php://fd/'.$dupFd, $mode);
-            if (false === $stream) {
+            $handle = VmPhpFdStream::adopt($dupFd, $remote, $mode);
+            if (false === $handle) {
                 $ffi->close($dupFd);
 
                 return [false, 0, 'Unable to create stream from socket', null];
             }
 
-            return [$stream, 0, '', $dupFd];
+            return [$handle, 0, '', $dupFd];
         } catch (\Throwable) {
             if ($connectedFd >= 0) {
                 $ffi->close($connectedFd);
@@ -166,7 +166,7 @@ final class VmStreamSocketNative
     }
 
     /**
-     * @return array{0: resource|false, 1: int, 2: string, 3: ?int}
+     * @return array{0: int|false, 1: int, 2: string, 3: ?int}
      */
     public static function server(
         string $local,
@@ -292,14 +292,14 @@ final class VmStreamSocketNative
 
             $ffi->close($boundFd);
 
-            $stream = @\fopen('php://fd/'.$dupFd, 'r+');
-            if (false === $stream) {
+            $handle = VmPhpFdStream::adopt($dupFd, $local, 'r+');
+            if (false === $handle) {
                 $ffi->close($dupFd);
 
                 return [false, 0, 'Unable to create stream from socket', null];
             }
 
-            return [$stream, 0, '', $dupFd];
+            return [$handle, 0, '', $dupFd];
         } catch (\Throwable) {
             if ($boundFd >= 0) {
                 $ffi->close($boundFd);

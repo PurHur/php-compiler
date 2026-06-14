@@ -22,7 +22,7 @@ final class VmFsStdioNative
     }
 
     /**
-     * @return resource|false PHP stream for duplicated stdio fd
+     * @return int|false VM fd stream handle
      */
     public static function openDupFd(int $fd, string $mode)
     {
@@ -41,14 +41,20 @@ final class VmFsStdioNative
             }
 
             $phpMode = self::phpStreamMode($mode);
-            $stream = @fopen('php://fd/'.$dupFd, $phpMode);
-            if (false === $stream) {
+            $uri = match ($fd) {
+                0 => 'php://stdin',
+                1 => 'php://stdout',
+                2 => 'php://stderr',
+                default => 'php://fd/'.$dupFd,
+            };
+            $handle = VmPhpFdStream::adopt($dupFd, $uri, $phpMode);
+            if (false === $handle) {
                 $ffi->close($dupFd);
 
                 return false;
             }
 
-            return $stream;
+            return $handle;
         } catch (\Throwable) {
             return false;
         }

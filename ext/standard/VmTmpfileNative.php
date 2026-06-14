@@ -17,7 +17,7 @@ final class VmTmpfileNative
     private static bool $ffiUnavailable = false;
 
     /**
-     * @return resource|false PHP stream open for read/write; unlinked on fclose (Zend semantics)
+     * @return int|false VM fd stream handle; unlinked on fclose (Zend semantics)
      */
     public static function open()
     {
@@ -49,14 +49,14 @@ final class VmTmpfileNative
             // Close libc FILE*; dup keeps the anonymous temp file alive until stream fclose.
             $ffi->fclose($libcFp);
 
-            $stream = @fopen('php://fd/'.$dupFd, 'w+b');
-            if (false === $stream) {
+            $handle = VmPhpFdStream::adopt($dupFd, 'php://temp', 'w+b');
+            if (false === $handle) {
                 $ffi->close($dupFd);
 
                 return false;
             }
 
-            return $stream;
+            return $handle;
         } catch (\Throwable) {
             return false;
         }

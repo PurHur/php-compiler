@@ -61,9 +61,7 @@ final class stream_socket_pair extends Internal
             return;
         }
 
-        [$stream0, $stream1, $fd0, $fd1] = $pair;
-        $handle0 = VmFs::adoptStreamResource($stream0, 'unix://stream_socket_pair', $fd0);
-        $handle1 = VmFs::adoptStreamResource($stream1, 'unix://stream_socket_pair', $fd1);
+        [$handle0, $handle1] = $pair;
         if (false === $handle0 || false === $handle1) {
             $frame->returnVar->bool(false);
 

@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace PHPCompiler\ext\standard;
 
 /**
- * VM shell_exec() via libc popen(3) — no host PHP \shell_exec() (#8250, #5348).
+ * VM shell_exec() via libc popen(3) — no host PHP \shell_exec() (#8250, #5348, #8533).
  *
  * php-src: ext/standard/exec.c — PHP_FUNCTION(shell_exec)
  * JIT/AOT: {@see JitShellExec} / __compiler_shell_exec via ProcessRuntime.
@@ -25,16 +25,16 @@ final class VmShellExecNative
             return null;
         }
 
-        $stream = $opened['stream'];
+        $handle = $opened['handle'];
         $output = '';
-        while (!\feof($stream)) {
-            $chunk = @\fread($stream, self::READ_CHUNK);
+        while (!VmPhpFdStream::eof($handle)) {
+            $chunk = VmPhpFdStream::read($handle, self::READ_CHUNK);
             if (false === $chunk || '' === $chunk) {
                 break;
             }
             $output .= $chunk;
         }
-        @\fclose($stream);
+        VmPhpFdStream::close($handle);
 
         $status = VmPopenNative::pclose($opened['file']);
         if (-1 === $status) {

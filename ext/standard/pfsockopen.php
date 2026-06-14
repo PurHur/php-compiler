@@ -90,14 +90,7 @@ final class pfsockopen extends Internal
             return;
         }
 
-        $uri = VmPersistentSocket::remoteUri($hostname, $port);
-        $handle = VmFs::adoptStreamResource($result, $uri, $socketFd);
-        if (false === $handle) {
-            $frame->returnVar->bool(false);
-
-            return;
-        }
-        $frame->returnVar->streamHandle($handle, $frame->vmContext);
+        $frame->returnVar->streamHandle($result, $frame->vmContext);
     }
 
     public function call(Context $context, JITVariable ...$args): Value

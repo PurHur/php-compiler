@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace PHPCompiler\ext\standard;
 
 /**
- * libc socketpair(2) for stream_socket_pair() without host PHP delegation (#3437).
+ * libc socketpair(2) for stream_socket_pair() without host PHP delegation (#3437, #8533).
  *
  * php-src: ext/standard/streams.c — PHP_FUNCTION(stream_socket_pair)
  */
@@ -29,7 +29,7 @@ final class VmStreamSocketPairNative
     }
 
     /**
-     * @return array{0: resource, 1: resource, 2: int, 3: int}|false
+     * @return array{0: int, 1: int, 2: int, 3: int}|false
      */
     public static function pair(int $domain, int $type, int $protocol): array|false
     {
@@ -61,14 +61,14 @@ final class VmStreamSocketPairNative
 
             $fd0 = (int) $sv[0];
             $fd1 = (int) $sv[1];
-            $stream0 = self::streamFromFd($ffi, $fd0);
-            $stream1 = self::streamFromFd($ffi, $fd1);
-            if (false === $stream0 || false === $stream1) {
-                if (false !== $stream0) {
-                    @fclose($stream0['stream']);
+            $handle0 = self::handleFromFd($fd0);
+            $handle1 = self::handleFromFd($fd1);
+            if (false === $handle0 || false === $handle1) {
+                if (false !== $handle0) {
+                    VmPhpFdStream::close($handle0);
                 }
-                if (false !== $stream1) {
-                    @fclose($stream1['stream']);
+                if (false !== $handle1) {
+                    VmPhpFdStream::close($handle1);
                 }
                 $ffi->close($fd0);
                 $ffi->close($fd1);
@@ -76,7 +76,12 @@ final class VmStreamSocketPairNative
                 return false;
             }
 
-            return [$stream0['stream'], $stream1['stream'], $stream0['fd'], $stream1['fd']];
+            return [
+                $handle0,
+                $handle1,
+                VmPhpFdStream::fdForHandle($handle0) ?? $fd0,
+                VmPhpFdStream::fdForHandle($handle1) ?? $fd1,
+            ];
         } catch (\Throwable) {
             return false;
         }
@@ -113,24 +118,19 @@ final class VmStreamSocketPairNative
         return false;
     }
 
-    /**
-     * @return array{stream: resource, fd: int}|false
-     */
-    private static function streamFromFd(\FFI $ffi, int $fd): array|false
+    private static function handleFromFd(int $fd): int|false
     {
+        $ffi = self::ffi();
+        if (null === $ffi) {
+            return false;
+        }
+
         $dupFd = (int) $ffi->dup($fd);
         if ($dupFd < 0) {
             return false;
         }
 
-        $stream = @fopen('php://fd/'.$dupFd, 'r+');
-        if (false === $stream) {
-            $ffi->close($dupFd);
-
-            return false;
-        }
-
-        return ['stream' => $stream, 'fd' => $dupFd];
+        return VmPhpFdStream::adopt($dupFd, 'unix://stream_socket_pair', 'r+');
     }
 
     private static function ffiEnabled(): bool

@@ -86,13 +86,7 @@ final class stream_socket_server extends Internal
             return;
         }
 
-        $handle = VmFs::adoptStreamResource($result, $local, $socketFd);
-        if (false === $handle) {
-            $frame->returnVar->bool(false);
-
-            return;
-        }
-        $frame->returnVar->streamHandle($handle, $frame->vmContext);
+        $frame->returnVar->streamHandle($result, $frame->vmContext);
     }
 
     public function call(Context $context, JITVariable ...$args): Value

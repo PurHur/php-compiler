@@ -22,7 +22,7 @@ final class VmPopenNative
     }
 
     /**
-     * @return array{stream: resource, file: \FFI\CData}|false
+     * @return array{handle: int, file: \FFI\CData}|false
      */
     public static function open(string $command, string $mode): array|false
     {
@@ -52,15 +52,16 @@ final class VmPopenNative
             }
 
             $phpMode = self::phpStreamMode($mode);
-            $stream = @fopen('php://fd/'.$dupFd, $phpMode);
-            if (false === $stream) {
+            $uri = 'popen://'.$command;
+            $handle = VmPhpFdStream::adopt($dupFd, $uri, $phpMode);
+            if (false === $handle) {
                 $ffi->close($dupFd);
                 $ffi->pclose($libcFp);
 
                 return false;
             }
 
-            return ['stream' => $stream, 'file' => $libcFp];
+            return ['handle' => $handle, 'file' => $libcFp];
         } catch (\Throwable) {
             return false;
         }

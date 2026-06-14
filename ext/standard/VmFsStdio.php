@@ -7,7 +7,7 @@ namespace PHPCompiler\ext\standard;
 /**
  * php://stdin / php://stdout / php://stderr — CLI standard I/O wrappers (#4648).
  *
- * VM opens via {@see VmFsStdioNative} (libc dup + php://fd/) before host @fopen fallback.
+ * VM opens via {@see VmFsStdioNative} (libc dup + VmPhpFdStream, #8533).
  */
 final class VmFsStdio
 {
@@ -28,21 +28,13 @@ final class VmFsStdio
         return isset(self::STDIO_URIS[$uri]);
     }
 
-    /**
-     * @return resource|false
-     */
-    public static function open(string $uri, string $mode)
+    public static function open(string $uri, string $mode): int|false
     {
         $fd = self::stdioFdForUri($uri);
         if (null === $fd) {
             return false;
         }
 
-        $native = VmFsStdioNative::openDupFd($fd, $mode);
-        if (false !== $native) {
-            return $native;
-        }
-
-        return @fopen($uri, $mode);
+        return VmFsStdioNative::openDupFd($fd, $mode);
     }
 }
