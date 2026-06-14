@@ -5,10 +5,10 @@ echo 'Sorting enum: ', enum_exists('Sorting', false) ? 'yes' : 'no', "\n";
 
 $a = [3, 1, 2];
 $b = ['c', 'a', 'b'];
-array_multisort($a, $b, Sorting::Ascending);
+array_multisort($a, Sorting::Ascending, $b);
 echo 'asc: ', implode(',', $a), "\n";
 
 $a = [3, 1, 2];
 $b = ['c', 'a', 'b'];
-array_multisort($a, $b, Sorting::Descending);
-echo 'desc: ', implode(',', $b), "\n";
+array_multisort($a, Sorting::Descending, $b);
+echo 'desc: ', implode(',', $a), "\n";

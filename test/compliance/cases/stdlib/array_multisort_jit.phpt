@@ -21,7 +21,7 @@ $d = array();
 $d[] = 3;
 $d[] = 1;
 $d[] = 2;
-array_multisort($d, $c, 3);
+array_multisort($d, SORT_DESC, $c);
 echo implode(',', $d), "\n";
 echo implode(',', $c), "\n";
 --EXPECT--

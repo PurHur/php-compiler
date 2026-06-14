@@ -35,15 +35,15 @@ PHP;
 <?php
 $a = [3, 1, 2];
 $b = ['c', 'a', 'b'];
-array_multisort($a, $b, Sorting::Ascending);
+array_multisort($a, Sorting::Ascending, $b);
 echo implode(',', $a), "\n";
 $a = [3, 1, 2];
 $b = ['c', 'a', 'b'];
-array_multisort($a, $b, Sorting::Descending);
-echo implode(',', $b), "\n";
+array_multisort($a, Sorting::Descending, $b);
+echo implode(',', $a), "\n";
 PHP;
         ob_start();
         $runtime->run($runtime->parseAndCompile($code, 'sorting_multisort.php'));
-        $this->assertSame("1,2,3\nc,b,a\n", ob_get_clean());
+        $this->assertSame("1,2,3\n3,2,1\n", ob_get_clean());
     }
 }

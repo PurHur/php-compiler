@@ -8,12 +8,66 @@ use PHPCompiler\VM\EnumCaseSupport;
 use PHPCompiler\VM\Variable;
 
 /**
- * Sort order resolution for array_multisort() — Sorting enum + legacy SORT_* ints (#7229).
+ * array_multisort() argument parsing — Sorting enum + SORT_* flags (#7229, #3532).
  *
- * php-src: ext/standard/basic_functions.stub.php — enum Sorting: int
+ * php-src: ext/standard/array.c PHP_FUNCTION(array_multisort)
  */
 final class VmArraySort
 {
+    private const PARSE_ORDER = 0;
+    private const PARSE_TYPE = 1;
+
+    /**
+     * @param list<Variable> $args frame calledArgs (by-ref slots)
+     *
+     * @return list<array{array: Variable, sortOrder: int, sortType: int}>
+     */
+    public static function parseMultisortEntries(array $args): array
+    {
+        $argc = \count($args);
+        if ($argc < 1) {
+            throw new \ArgumentCountError('array_multisort() expects at least 1 argument, 0 given');
+        }
+
+        $entries = [];
+        $sortOrder = StdlibConstants::SORT_ASC;
+        $sortType = StdlibConstants::SORT_REGULAR;
+        $parseState = [self::PARSE_ORDER => 0, self::PARSE_TYPE => 0];
+
+        for ($i = 0; $i < $argc; ++$i) {
+            $arg = $args[$i]->resolveIndirect();
+            if (Variable::TYPE_ARRAY === $arg->type) {
+                if ($i > 0 && \count($entries) > 0) {
+                    $last = \count($entries) - 1;
+                    $entries[$last]['sortOrder'] = $sortOrder;
+                    $entries[$last]['sortType'] = $sortType;
+                }
+                $entries[] = [
+                    'array' => $args[$i],
+                    'sortOrder' => StdlibConstants::SORT_ASC,
+                    'sortType' => StdlibConstants::SORT_REGULAR,
+                ];
+                $sortOrder = StdlibConstants::SORT_ASC;
+                $sortType = StdlibConstants::SORT_REGULAR;
+                $parseState = [self::PARSE_ORDER => 1, self::PARSE_TYPE => 1];
+                continue;
+            }
+            self::consumeMultisortFlag($arg, $i, $sortOrder, $sortType, $parseState);
+        }
+
+        if (\count($entries) < 1) {
+            throw new \LogicException(
+                'array_multisort() requires at least one array argument in this compiler build'
+            );
+        }
+
+        $last = \count($entries) - 1;
+        $entries[$last]['sortOrder'] = $sortOrder;
+        $entries[$last]['sortType'] = $sortType;
+
+        return $entries;
+    }
+
     public static function resolveMultisortOrderArg(Variable $var): int
     {
         $var = $var->resolveIndirect();
@@ -59,6 +113,80 @@ final class VmArraySort
             StdlibConstants::SORT_ASC, StdlibConstants::SORT_DESC => $backing,
             default => throw new \ValueError('Invalid Sorting enum value '.$backing),
         };
+    }
+
+    /**
+     * @param array{0: int, 1: int} $parseState
+     */
+    private static function consumeMultisortFlag(
+        Variable $arg,
+        int $argIndex,
+        int &$sortOrder,
+        int &$sortType,
+        array &$parseState
+    ): void {
+        $fromEnum = self::trySortingOrderInt($arg);
+        if (null !== $fromEnum) {
+            if (0 === $parseState[self::PARSE_ORDER]) {
+                throw new \TypeError(sprintf(
+                    'array_multisort(): Argument #%d must be an array or a sort flag that has not already been specified',
+                    $argIndex + 1
+                ));
+            }
+            $sortOrder = $fromEnum;
+            $parseState[self::PARSE_ORDER] = 0;
+
+            return;
+        }
+        if (EnumCaseSupport::isEnumCaseVariable($arg)) {
+            throw new \TypeError(sprintf(
+                'array_multisort(): Argument #%d must be an array or a sort flag',
+                $argIndex + 1
+            ));
+        }
+        if (Variable::TYPE_INTEGER !== $arg->type) {
+            throw new \TypeError(sprintf(
+                'array_multisort(): Argument #%d must be an array or a sort flag',
+                $argIndex + 1
+            ));
+        }
+
+        $val = $arg->toInt();
+        $masked = $val & ~StdlibConstants::SORT_FLAG_CASE;
+        switch ($masked) {
+            case StdlibConstants::SORT_ASC:
+            case StdlibConstants::SORT_DESC:
+                if (0 === $parseState[self::PARSE_ORDER]) {
+                    throw new \TypeError(sprintf(
+                        'array_multisort(): Argument #%d must be an array or a sort flag that has not already been specified',
+                        $argIndex + 1
+                    ));
+                }
+                $sortOrder = $masked;
+                $parseState[self::PARSE_ORDER] = 0;
+                break;
+
+            case StdlibConstants::SORT_REGULAR:
+            case StdlibConstants::SORT_NUMERIC:
+            case StdlibConstants::SORT_STRING:
+            case StdlibConstants::SORT_NATURAL:
+            case StdlibConstants::SORT_LOCALE_STRING:
+                if (0 === $parseState[self::PARSE_TYPE]) {
+                    throw new \TypeError(sprintf(
+                        'array_multisort(): Argument #%d must be an array or a sort flag that has not already been specified',
+                        $argIndex + 1
+                    ));
+                }
+                $sortType = $val;
+                $parseState[self::PARSE_TYPE] = 0;
+                break;
+
+            default:
+                throw new \ValueError(sprintf(
+                    'array_multisort(): Argument #%d must be a valid sort flag',
+                    $argIndex + 1
+                ));
+        }
     }
 
     private static function isSortingEnum(string $className): bool
