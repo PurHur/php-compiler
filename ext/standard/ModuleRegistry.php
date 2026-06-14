@@ -34,6 +34,7 @@ final class ModuleRegistry
         'localtime',
         'mktime',
         'strftime',
+        'strptime',
         'strtotime',
         'time',
     ];

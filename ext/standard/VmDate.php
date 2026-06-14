@@ -288,6 +288,45 @@ final class VmDate
     }
 
     /**
+     * strptime() — parse date/time string to tm array (ext/standard/datetime.c, #3694).
+     *
+     * php-src: ext/standard/datetime.c — PHP_FUNCTION(strptime)
+     */
+    public static function strptime(string $date, string $format): HashTable|false
+    {
+        $ffi = self::ffi();
+        if (null === $ffi) {
+            return false;
+        }
+        $tm = $ffi->new('struct tm');
+        $tm->tm_sec = 0;
+        $tm->tm_min = 0;
+        $tm->tm_hour = 0;
+        $tm->tm_mday = 0;
+        $tm->tm_mon = 0;
+        $tm->tm_year = 0;
+        $tm->tm_wday = 0;
+        $tm->tm_yday = 0;
+        $tm->tm_isdst = 0;
+        $rest = $ffi->strptime($date, $format, \FFI::addr($tm));
+        if (null === $rest) {
+            return false;
+        }
+        $ht = new HashTable();
+        self::hashSetLong($ht, 'tm_sec', (int) $tm->tm_sec);
+        self::hashSetLong($ht, 'tm_min', (int) $tm->tm_min);
+        self::hashSetLong($ht, 'tm_hour', (int) $tm->tm_hour);
+        self::hashSetLong($ht, 'tm_mday', (int) $tm->tm_mday);
+        self::hashSetLong($ht, 'tm_mon', (int) $tm->tm_mon);
+        self::hashSetLong($ht, 'tm_year', (int) $tm->tm_year);
+        self::hashSetLong($ht, 'tm_wday', (int) $tm->tm_wday);
+        self::hashSetLong($ht, 'tm_yday', (int) $tm->tm_yday);
+        self::hashSetString($ht, 'unparsed', \FFI::string($rest));
+
+        return $ht;
+    }
+
+    /**
      * Coerce optional ?int timestamp for date()/gmdate()/getdate() family (php-src Z_PARAM_LONG_OR_NULL, #5842).
      *
      * @throws \TypeError when operand is not int|null (enum cases name the enum class, not backing int)
@@ -1074,6 +1113,7 @@ struct tm *gmtime_r(const time_t *timep, struct tm *result);
 time_t timegm(struct tm *tm);
 time_t mktime(struct tm *tm);
 size_t strftime(char *s, size_t max, const char *format, const struct tm *tm);
+char *strptime(const char *s, const char *format, struct tm *tm);
 CDEF;
 
         foreach (['libc.so.6', 'libc.so'] as $lib) {

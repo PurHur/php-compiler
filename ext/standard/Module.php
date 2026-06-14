@@ -802,6 +802,7 @@ class Module extends ModuleAbstract
             new gmdate(),
             new strftime(),
             new gmstrftime(),
+            new strptime(),
             new getdate(),
             new gmgetdate(),
             new gmmktime(),

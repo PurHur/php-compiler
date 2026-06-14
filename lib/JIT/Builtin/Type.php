@@ -847,6 +847,15 @@ class Type extends Builtin {
         );
         $fnStrftime = $this->context->module->addFunction('__compiler_strftime', $fntypeStrftime);
         $this->context->registerFunction('__compiler_strftime', $fnStrftime);
+        $fntypeStrptime = $this->context->context->functionType(
+            $void,
+            false,
+            $this->context->getTypeFromString('__string__*'),
+            $this->context->getTypeFromString('__string__*'),
+            $this->context->getTypeFromString('__value__*')
+        );
+        $fnStrptime = $this->context->module->addFunction('__compiler_strptime', $fntypeStrptime);
+        $this->context->registerFunction('__compiler_strptime', $fnStrptime);
         $fntypeDiFmt = $this->context->context->functionType(
             $this->context->getTypeFromString('__string__*'),
             false,
@@ -933,6 +942,7 @@ class Type extends Builtin {
             'localtime' => [$i8p, false, [$i64p]],
             'gmtime' => [$i8p, false, [$i64p]],
             'strftime' => [$sizeT, false, [$i8p, $sizeT, $charPtr, $i8p]],
+            'strptime' => [$charPtr, false, [$charPtr, $charPtr, $i8p]],
             'timegm' => [$i64, false, [$i8p]],
             'mktime' => [$i64, false, [$i8p]],
             'sleep' => [$i32, false, [$i32]],
