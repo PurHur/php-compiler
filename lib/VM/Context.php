@@ -80,6 +80,9 @@ class Context {
     /** Ghost object currently running its lazy initializer (#6531, Zend/zend_lazy_objects.c). */
     public ?ObjectEntry $lazyGhostInitializing = null;
 
+    /** Lazy ghost/proxy running ensureInitialized() — capture init Throwable (#6514). */
+    public ?ObjectEntry $lazyInitializingObject = null;
+
     /**
      * SAPI argv snapshot for getopt() (php-src SG(request_info).argv; issue #3251).
      *

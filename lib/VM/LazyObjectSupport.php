@@ -119,6 +119,64 @@ final class LazyObjectSupport
         if (!$object->lazyPending) {
             return;
         }
+        $ctx = $vm->context;
+        $prevLazyInit = $ctx->lazyInitializingObject;
+        $ctx->lazyInitializingObject = $object;
+        try {
+            self::ensureInitializedInner($vm, $object);
+        } finally {
+            $ctx->lazyInitializingObject = $prevLazyInit;
+        }
+    }
+
+    /**
+     * Persist initializer Throwable for ReflectionClass::getLazyInitializationException() (#6514).
+     *
+     * @see Zend/zend_lazy_objects.c — stored init exception on lazy object
+     */
+    public static function captureLazyInitException(ObjectEntry $object, Variable $thrown): void
+    {
+        if (null !== $object->lazyInitException) {
+            return;
+        }
+        $resolved = $thrown->resolveIndirect();
+        if (Variable::TYPE_OBJECT !== $resolved->type) {
+            return;
+        }
+        $object->lazyInitException = $resolved->toObject();
+        if (null !== $object->lazyResetInitializer) {
+            $object->lazyInitializer = $object->lazyResetInitializer;
+        }
+        $object->lazyPending = true;
+        $object->constructed = false;
+    }
+
+    public static function isLazyObject(ObjectEntry $object): bool
+    {
+        return $object->lazyPending
+            || null !== $object->lazyResetInitializer
+            || null !== $object->lazyInitException;
+    }
+
+    /** ReflectionClass::getLazyInitializationException() — VM (#6514). */
+    public static function getLazyInitializationException(ObjectEntry $object): Variable
+    {
+        $out = new Variable();
+        if (null === $object->lazyInitException) {
+            $out->null();
+
+            return $out;
+        }
+        $out->object($object->lazyInitException);
+
+        return $out;
+    }
+
+    private static function ensureInitializedInner(\PHPCompiler\VM $vm, ObjectEntry $object): void
+    {
+        if (!$object->lazyPending) {
+            return;
+        }
         if (null === $object->lazyInitializer) {
             self::markAsInitialized($object);
 
@@ -147,6 +205,7 @@ final class LazyObjectSupport
             }
             $object->constructed = true;
             $object->lazyPending = false;
+            $object->lazyInitException = null;
             self::clearLazyRawInitializedProperties($object);
 
             return;
@@ -175,6 +234,7 @@ final class LazyObjectSupport
         }
         $object->constructed = true;
         $object->lazyPending = false;
+        $object->lazyInitException = null;
         self::clearLazyRawInitializedProperties($object);
     }
 
@@ -250,6 +310,7 @@ final class LazyObjectSupport
         $object->lazyInitializer = null;
         $object->lazyPending = false;
         $object->constructed = true;
+        $object->lazyInitException = null;
         self::clearLazyRawInitializedProperties($object);
 
         return $object;

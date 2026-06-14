@@ -55,6 +55,9 @@ class ObjectEntry {
     /** Archived initializer for ReflectionClass::resetAsLazyObject() (#6125). */
     public ?ClosureState $lazyResetInitializer = null;
 
+    /** Pending initializer failure for ReflectionClass::getLazyInitializationException() (#6514). */
+    public ?ObjectEntry $lazyInitException = null;
+
     /**
      * Instance properties written via ReflectionProperty::setRawValueWithoutLazyInitialization() (#7095).
      *
@@ -293,6 +296,7 @@ class ObjectEntry {
         $clone->lazyPending = $this->lazyPending;
         $clone->lazyGhost = $this->lazyGhost;
         $clone->lazyResetInitializer = $this->lazyResetInitializer;
+        $clone->lazyInitException = $this->lazyInitException;
         $clone->lazyRawInitializedProperties = $this->lazyRawInitializedProperties;
 
         return $clone;

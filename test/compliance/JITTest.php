@@ -227,6 +227,10 @@ class JITTest extends BaseTest {
             if (str_contains($name, 'phpversion')) {
                 continue;
             }
+            // ReflectionClass::getLazyInitializationException MCJIT: VM (#6514); JIT proxy pending.
+            if (str_contains($name, 'reflection_lazy_init_exception')) {
+                continue;
+            }
             // extension_loaded/phpversion introspection: VM + AOT (#6372, #7190); MCJIT LLVM verify until stable.
             if (str_contains($name, 'extension_loaded_in_tree')) {
                 continue;

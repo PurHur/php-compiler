@@ -7431,6 +7431,12 @@ restart:
     /** Snapshot throw operand so scope reuse cannot clobber pending try exceptions (#5867, #6457). */
     private function stashPendingException(Variable $thrown): void
     {
+        if (null !== $this->context->lazyInitializingObject) {
+            VM\LazyObjectSupport::captureLazyInitException(
+                $this->context->lazyInitializingObject,
+                $thrown
+            );
+        }
         if (null === $this->context->pendingException) {
             $this->context->pendingException = new Variable();
         }
