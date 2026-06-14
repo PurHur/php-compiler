@@ -149,13 +149,13 @@ CDEF;
             return false;
         }
 
-        $handle = @\opendir($dir);
-        if (false === $handle) {
+        $entries = VmDirNative::listSorted($dir);
+        if (false === $entries) {
             return false;
         }
 
         $matches = [];
-        while (false !== ($entry = \readdir($handle))) {
+        foreach ($entries as $entry) {
             if ('.' === $entry || '..' === $entry) {
                 continue;
             }
@@ -168,7 +168,6 @@ CDEF;
             }
             $matches[] = $full;
         }
-        \closedir($handle);
 
         if (0 === ($libcFlags & StdlibConstants::GLOB_NOSORT)) {
             sort($matches, SORT_STRING);

@@ -983,6 +983,7 @@ require_once __DIR__.'/../../../ext/standard/JitVfprintf.php';
 require_once __DIR__.'/../../../ext/standard/JitVsprintf.php';
 require_once __DIR__.'/../../../ext/standard/SpnJitExtended.php';
 require_once __DIR__.'/../../../ext/standard/VmArrayValueCallback.php';
+require_once __DIR__.'/../../../ext/standard/VmDirNative.php';
 require_once __DIR__.'/../../../ext/standard/VmDir.php';
 require_once __DIR__.'/../../../ext/standard/VmDns.php';
 require_once __DIR__.'/../../../ext/standard/VmExceptionHandler.php';
