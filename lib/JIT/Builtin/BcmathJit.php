@@ -34,6 +34,7 @@ final class BcmathJit
         self::implementIfMissing($context, '__compiler_bcdiv', self::emitBcdiv(...));
         self::implementIfMissing($context, '__compiler_bccomp', self::emitBccomp(...));
         self::implementIfMissing($context, '__compiler_bcpowmod', self::emitBcpowmod(...));
+        self::implementIfMissing($context, '__compiler_bcround', self::emitBcround(...));
     }
 
     private static function ensureDefaultScaleGlobal(Context $context): void
@@ -62,6 +63,7 @@ final class BcmathJit
         self::ensureExternalFunction($context, 'strtod', $context->context->functionType($double, false, $i8p, $i8pp));
         self::ensureExternalFunction($context, 'pow', $context->context->functionType($double, false, $double, $double));
         self::ensureExternalFunction($context, 'floor', $context->context->functionType($double, false, $double));
+        self::ensureExternalFunction($context, 'round', $context->context->functionType($double, false, $double));
         self::ensureExternalFunction($context, 'fmod', $context->context->functionType($double, false, $double, $double));
         self::ensureExternalFunction($context, 'snprintf', $context->context->functionType($i32, true, $i8p, $i64, $i8p));
     }
@@ -138,6 +140,10 @@ final class BcmathJit
             '__compiler_bcpowmod' => $context->module->addFunction(
                 $name,
                 $context->context->functionType($str, false, $str, $str, $str, $i64, $i32)
+            ),
+            '__compiler_bcround' => $context->module->addFunction(
+                $name,
+                $context->context->functionType($str, false, $str, $i64, $i64)
             ),
             default => throw new \LogicException('Unknown bcmath runtime function: '.$name),
         };
@@ -428,6 +434,50 @@ final class BcmathJit
                 $context->builder->siToFp($powmod, $double),
                 $scale
             )
+        );
+    }
+
+    /**
+     * Double-based bcround fallback for JIT/AOT (VM uses VmBcmath::round; issue #5935).
+     */
+    private static function emitBcround(Context $context, LlvmFunction $fn): void
+    {
+        $entry = $fn->appendBasicBlock('entry');
+        $negPrecision = $fn->appendBasicBlock('neg_precision');
+        $posPrecision = $fn->appendBasicBlock('pos_precision');
+        $context->builder->positionAtEnd($entry);
+        $double = $context->getTypeFromString('double');
+        $i64 = $context->getTypeFromString('int64');
+        $num = $context->builder->call($context->lookupFunction('__phpc_bcmath_read_double'), $fn->getParam(0));
+        $precision = $fn->getParam(1);
+        $isNeg = $context->builder->icmp(Builder::INT_SLT, $precision, $i64->constInt(0, true));
+        $context->builder->branchIf($isNeg, $negPrecision, $posPrecision);
+
+        $context->builder->positionAtEnd($posPrecision);
+        $expPos = $context->builder->call(
+            $context->lookupFunction('pow'),
+            $double->constReal(10.0),
+            $context->builder->siToFp($precision, $double)
+        );
+        $scaledPos = $context->builder->fMul($num, $expPos);
+        $roundedPos = $context->builder->call($context->lookupFunction('round'), $scaledPos);
+        $resultPos = $context->builder->fDiv($roundedPos, $expPos);
+        $context->builder->returnValue(
+            $context->builder->call($context->lookupFunction('__phpc_bcmath_format'), $resultPos, $precision)
+        );
+
+        $context->builder->positionAtEnd($negPrecision);
+        $negAbs = $context->builder->sub($i64->constInt(0, false), $precision);
+        $expNeg = $context->builder->call(
+            $context->lookupFunction('pow'),
+            $double->constReal(10.0),
+            $context->builder->siToFp($negAbs, $double)
+        );
+        $scaledNeg = $context->builder->fDiv($num, $expNeg);
+        $roundedNeg = $context->builder->call($context->lookupFunction('round'), $scaledNeg);
+        $resultNeg = $context->builder->fMul($roundedNeg, $expNeg);
+        $context->builder->returnValue(
+            $context->builder->call($context->lookupFunction('__phpc_bcmath_format'), $resultNeg, $i64->constInt(0, false))
         );
     }
 }

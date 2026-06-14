@@ -36,6 +36,7 @@ class Module extends ModuleAbstract
             new bcpowmod(),
             new bcceil(),
             new bcfloor(),
+            new bcround(),
         ];
     }
 }

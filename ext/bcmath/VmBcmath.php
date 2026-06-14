@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace PHPCompiler\ext\bcmath;
 
+use PHPCompiler\ext\standard\StdlibConstants;
+
 /**
  * Arbitrary-precision decimal string math (php-src ext/bcmath/libbcmath; issue #3365).
  */
@@ -116,6 +118,61 @@ final class VmBcmath
             'int' => self::addDigitStrings($parsed['int'], '1'),
             'frac' => '',
         ], 0);
+    }
+
+    /**
+     * Round to precision with RoundingMode (php-src ext/bcmath/libbcmath/src/round.c; issue #5935).
+     */
+    public static function round(
+        string $num,
+        int $precision = 0,
+        int $mode = StdlibConstants::PHP_ROUND_HALF_UP
+    ): string {
+        if ($precision < \PHP_INT_MIN || $precision > \PHP_INT_MAX) {
+            throw new \ValueError(\sprintf(
+                'bcround(): Argument #2 ($precision) must be between %d and %d',
+                \PHP_INT_MIN,
+                \PHP_INT_MAX
+            ));
+        }
+
+        try {
+            $parsed = self::parse($num);
+        } catch (\ValueError) {
+            throw new \ValueError('bcround(): Argument #1 ($num) is not well-formed');
+        }
+
+        if ($precision < 0 && \strlen($parsed['int']) < (-($precision + 1)) + 1) {
+            return self::roundOverscaleNegativePrecision($parsed, $precision, $mode);
+        }
+
+        if ($precision >= 0 && \strlen($parsed['frac']) <= $precision) {
+            if (\strlen($parsed['frac']) < $precision) {
+                $parsed['frac'] = \str_pad($parsed['frac'], $precision, '0', STR_PAD_RIGHT);
+            }
+
+            return self::formatRoundOutput($parsed, $precision);
+        }
+
+        $nLen = \strlen($parsed['int']);
+        $nValue = $parsed['int'].$parsed['frac'];
+        $roundedLen = $nLen + $precision;
+        $kept = $roundedLen <= 0 ? '' : \substr($nValue, 0, $roundedLen);
+
+        if (self::shouldRoundUpBc($parsed, $roundedLen, $mode)) {
+            if ($roundedLen <= 0) {
+                $kept = \str_pad('1', $nLen + 1, '0', STR_PAD_RIGHT);
+            } else {
+                $kept = self::addDigitStrings($kept, '1');
+            }
+        }
+
+        $resultScale = $precision > 0 ? $precision : 0;
+        if ('' === $kept || self::isAllZeroDigits($kept)) {
+            return '0';
+        }
+
+        return self::formatKeptBcDigits($kept, $parsed['sign'], $resultScale);
     }
 
     public static function comp(string $left, string $right, ?int $scale = null): int
@@ -756,5 +813,186 @@ final class VmBcmath
         $places = -$negExponent;
 
         return '0.'.(\str_repeat('0', $places - 1)).'1';
+    }
+
+    /**
+     * @param array{sign:int,int:string,frac:string} $parsed
+     */
+    private static function roundOverscaleNegativePrecision(array $parsed, int $precision, int $mode): string
+    {
+        switch ($mode) {
+            case StdlibConstants::PHP_ROUND_HALF_UP:
+            case StdlibConstants::PHP_ROUND_HALF_DOWN:
+            case StdlibConstants::PHP_ROUND_HALF_EVEN:
+            case StdlibConstants::PHP_ROUND_HALF_ODD:
+            case StdlibConstants::PHP_ROUND_TOWARD_ZERO:
+                return '0';
+
+            case StdlibConstants::PHP_ROUND_CEILING:
+                if ($parsed['sign'] < 0) {
+                    return '0';
+                }
+                break;
+
+            case StdlibConstants::PHP_ROUND_FLOOR:
+                if ($parsed['sign'] > 0) {
+                    return '0';
+                }
+                break;
+
+            case StdlibConstants::PHP_ROUND_AWAY_FROM_ZERO:
+                break;
+
+            default:
+                return '0';
+        }
+
+        if (self::isZero($parsed)) {
+            return '0';
+        }
+
+        $magnitude = -$precision;
+        $power = '1'.\str_repeat('0', $magnitude);
+
+        return ($parsed['sign'] < 0 ? '-' : '').$power;
+    }
+
+    /**
+     * @param array{sign:int,int:string,frac:string} $parsed
+     */
+    private static function formatRoundOutput(array $parsed, int $scale): string
+    {
+        if (self::isZero($parsed)) {
+            return '0';
+        }
+
+        $sign = $parsed['sign'] < 0 ? '-' : '';
+        if (0 === $scale) {
+            return $sign.$parsed['int'];
+        }
+
+        return $sign.$parsed['int'].'.'.$parsed['frac'];
+    }
+
+    private static function formatKeptBcDigits(string $kept, int $sign, int $scale): string
+    {
+        $kept = self::stripLeadingZeros($kept);
+        if ('0' === $kept) {
+            return '0';
+        }
+
+        $prefix = $sign < 0 ? '-' : '';
+        if ($scale <= 0) {
+            return $prefix.$kept;
+        }
+
+        if (\strlen($kept) <= $scale) {
+            return $prefix.'0.'.\str_pad($kept, $scale, '0', STR_PAD_LEFT);
+        }
+
+        $intPart = self::stripLeadingZeros(\substr($kept, 0, -$scale));
+        $fracPart = \substr($kept, -$scale);
+
+        return $prefix.$intPart.'.'.$fracPart;
+    }
+
+    private static function isAllZeroDigits(string $digits): bool
+    {
+        return '' === $digits || '0' === self::stripLeadingZeros($digits);
+    }
+
+    /**
+     * @param array{sign:int,int:string,frac:string} $parsed
+     */
+    private static function shouldRoundUpBc(array $parsed, int $roundedLen, int $mode): bool
+    {
+        $nValue = $parsed['int'].$parsed['frac'];
+        $totalLen = \strlen($nValue);
+        if ($roundedLen >= $totalLen) {
+            return false;
+        }
+
+        $firstDigit = (int) $nValue[$roundedLen];
+
+        switch ($mode) {
+            case StdlibConstants::PHP_ROUND_HALF_UP:
+                return $firstDigit >= 5;
+
+            case StdlibConstants::PHP_ROUND_HALF_DOWN:
+            case StdlibConstants::PHP_ROUND_HALF_EVEN:
+            case StdlibConstants::PHP_ROUND_HALF_ODD:
+                if ($firstDigit > 5) {
+                    return true;
+                }
+                if ($firstDigit < 5) {
+                    return false;
+                }
+                break;
+
+            case StdlibConstants::PHP_ROUND_CEILING:
+                if ($parsed['sign'] < 0) {
+                    return false;
+                }
+                if ($firstDigit > 0) {
+                    return true;
+                }
+                break;
+
+            case StdlibConstants::PHP_ROUND_FLOOR:
+                if ($parsed['sign'] > 0) {
+                    return false;
+                }
+                if ($firstDigit > 0) {
+                    return true;
+                }
+                break;
+
+            case StdlibConstants::PHP_ROUND_TOWARD_ZERO:
+                return false;
+
+            case StdlibConstants::PHP_ROUND_AWAY_FROM_ZERO:
+                if ($firstDigit > 0) {
+                    return true;
+                }
+                break;
+
+            default:
+                return $firstDigit >= 5;
+        }
+
+        $count = $totalLen - $roundedLen - 1;
+        $idx = $roundedLen + 1;
+        while ($count > 0 && isset($nValue[$idx]) && '0' === $nValue[$idx]) {
+            --$count;
+            ++$idx;
+        }
+        if ($count > 0) {
+            return true;
+        }
+
+        switch ($mode) {
+            case StdlibConstants::PHP_ROUND_HALF_DOWN:
+            case StdlibConstants::PHP_ROUND_CEILING:
+            case StdlibConstants::PHP_ROUND_FLOOR:
+            case StdlibConstants::PHP_ROUND_AWAY_FROM_ZERO:
+                return false;
+
+            case StdlibConstants::PHP_ROUND_HALF_EVEN:
+                if ($roundedLen <= 0) {
+                    return false;
+                }
+
+                return 0 !== ((int) $nValue[$roundedLen - 1] % 2);
+
+            case StdlibConstants::PHP_ROUND_HALF_ODD:
+                if ($roundedLen <= 0) {
+                    return true;
+                }
+
+                return 0 === ((int) $nValue[$roundedLen - 1] % 2);
+
+            default:
+                return false;
+        }
     }
 }

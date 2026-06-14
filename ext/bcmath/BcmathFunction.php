@@ -38,6 +38,7 @@ abstract class BcmathFunction extends Internal
             'bcpow' => JitBcmath::pow($context, ...$args),
             'bcsqrt' => JitBcmath::sqrt($context, ...$args),
             'bcpowmod' => JitBcmath::powmod($context, ...$args),
+            'bcround' => JitBcmath::round($context, ...$args),
             default => throw new \LogicException('unsupported bcmath builtin: '.$this->getName()),
         };
     }
