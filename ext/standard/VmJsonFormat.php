@@ -39,16 +39,23 @@ final class VmJsonFormat
     /**
      * @return array<mixed>|bool|float|int|null|string|\stdClass
      */
-    public static function decode(string $json, bool $assoc = false, int $maxDepth = 512): mixed
+    public static function decode(string $json, bool $assoc = false, int $maxDepth = 512, int $flags = 0): mixed
     {
         VmJson::setLastError(0);
         $parser = new VmJsonParser($json, $maxDepth, $assoc);
         $value = $parser->parseTop();
         if (null === $value && VmJson::lastError() !== 0) {
+            if (VmJsonFlags::throwsOnError($flags)) {
+                throw new \JsonException(VmJson::lastErrorMsg(), VmJson::lastError());
+            }
+
             return null;
         }
         if (!$parser->atEnd()) {
             VmJson::setLastError(4);
+            if (VmJsonFlags::throwsOnError($flags)) {
+                throw new \JsonException(VmJson::lastErrorMsg(), 4);
+            }
 
             return null;
         }

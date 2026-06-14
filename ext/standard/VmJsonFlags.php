@@ -60,6 +60,11 @@ final class VmJsonFlags
         | self::UNESCAPED_UNICODE
         | self::THROW_ON_ERROR;
 
+    /** Flags honored by json_decode() in this compiler build (issue #3267). */
+    public const DECODE_SUPPORTED = self::INVALID_UTF8_IGNORE
+        | self::INVALID_UTF8_SUBSTITUTE
+        | self::THROW_ON_ERROR;
+
     /** Flags accepted by json_validate() (issue #4085). */
     public const VALIDATE_ALLOWED = self::INVALID_UTF8_IGNORE | self::INVALID_UTF8_SUBSTITUTE;
 
