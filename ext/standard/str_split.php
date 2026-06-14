@@ -38,13 +38,14 @@ final class str_split extends Internal
         );
         $length = 1;
         if (2 === $argc) {
-            $lenArg = $frame->calledArgs[1]->resolveIndirect();
-            if (Variable::TYPE_INTEGER !== $lenArg->type) {
-                throw new \LogicException('str_split() length must be an integer in this compiler build');
-            }
-            $length = $lenArg->toInt();
+            $length = VmMath::parseIntBuiltinArg(
+                $frame->calledArgs[1],
+                'str_split',
+                2,
+                'length'
+            );
         }
-        $parts = VmString::strSplit($string->toString(), $length);
+        $parts = VmString::strSplit($string, $length);
         if (null === $frame->returnVar) {
             return;
         }
@@ -76,10 +77,7 @@ final class str_split extends Internal
         }
         $chunkLen = $context->constantFromInteger(1, 'int64');
         if (2 === $argc) {
-            if (JITVariable::TYPE_NATIVE_LONG !== $args[1]->type) {
-                throw new \LogicException('str_split() length must be an integer in this compiler build');
-            }
-            $chunkLen = $context->helper->loadValue($args[1]);
+            $chunkLen = JitIntdiv::lowerIntBuiltinArg($context, $args[1], 'str_split', 2, 'length');
             JitStrSplit::emitRuntimeLengthGuard($context, $chunkLen);
         }
 
