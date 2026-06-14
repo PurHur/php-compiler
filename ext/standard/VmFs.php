@@ -494,13 +494,7 @@ final class VmFs
             return $data;
         }
         if (VmHttpLastResponseHeaders::isHttpUrl($path)) {
-            $data = @file_get_contents($path);
-            /** @var list<string> $http_response_header */
-            VmHttpLastResponseHeaders::store(
-                isset($http_response_header) && \is_array($http_response_header)
-                    ? $http_response_header
-                    : null
-            );
+            $data = VmHttpFetchNative::fetch($path);
             if (false === $data) {
                 return false;
             }

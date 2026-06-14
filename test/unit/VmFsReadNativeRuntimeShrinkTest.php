@@ -16,9 +16,11 @@ final class VmFsReadNativeRuntimeShrinkTest extends TestCase
         $source = (string) file_get_contents(__DIR__.'/../../ext/standard/VmFs.php');
         $this->assertStringContainsString('VmFsReadNative::read', $source);
         $this->assertStringContainsString('VmHttpLastResponseHeaders::isHttpUrl', $source);
+        $this->assertStringContainsString('VmHttpFetchNative::fetch', $source);
         $this->assertDoesNotMatchRegularExpression(
-            '/return VmFsReadNative::read[^;]+;\s*\n\s*\$data = @file_get_contents/s',
-            $source
+            '/@file_get_contents\\s*\\(/',
+            $source,
+            'VmFs must not delegate HTTP fetches to host @file_get_contents()'
         );
     }
 
