@@ -2516,7 +2516,8 @@ class JIT {
 
         return str_ends_with($lower, '\\compiler::compilefunc')
             || str_ends_with($lower, '\\compiler::compile')
-            || 'type_pair' === $lower
+            || str_ends_with($lower, '\\jit\\type_pair')
+            || str_ends_with($lower, '\\vm\\type_pair')
             || $this->isBootstrapRuntimeCtorSmokeName($lower)
             || ($this->isBootstrapHelloWorldSmokeName($lower) && !$this->shouldUseM3CompileDriverRealLowering())
             || ($this->isBootstrapM3RuntimeEmitBridgeName($lower) && !$this->shouldUseM3CompileDriverRealLowering());

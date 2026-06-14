@@ -826,6 +826,29 @@ final class JitCompilerSelfHostStubTest extends TestCase
         }
     }
 
+    public function testIsSkippedSelfHostEntryNameScopesCompilerTypePairOnly(): void
+    {
+        $prev = getenv('PHP_COMPILER_SELFHOST_AOT');
+        putenv('PHP_COMPILER_SELFHOST_AOT=1');
+        try {
+            $this->assertTrue(
+                $this->invokeSkipCheck('isSkippedSelfHostEntryName', 'phpcompiler\\jit\\type_pair')
+            );
+            $this->assertTrue(
+                $this->invokeSkipCheck('isSkippedSelfHostEntryName', 'phpcompiler\\vm\\type_pair')
+            );
+            $this->assertFalse(
+                $this->invokeSkipCheck('isSkippedSelfHostEntryName', 'type_pair')
+            );
+        } finally {
+            if (false === $prev) {
+                putenv('PHP_COMPILER_SELFHOST_AOT');
+            } else {
+                putenv('PHP_COMPILER_SELFHOST_AOT='.$prev);
+            }
+        }
+    }
+
     /**
      * @dataProvider constStringFolderShortHotPathProvider
      */
