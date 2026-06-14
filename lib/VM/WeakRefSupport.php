@@ -49,6 +49,15 @@ final class WeakRefSupport
 
     public static function targetObjectId(Variable $key): int
     {
+        $key = $key->resolveIndirect();
+        if (EnumCaseSupport::isEnumCaseVariable($key)) {
+            $enumClass = EnumCaseSupport::enumClassForCaseVariable($key);
+            $caseName = EnumCaseSupport::enumCaseNameForVariable($key);
+            if (null !== $enumClass && '' !== $caseName) {
+                return self::stableEnumCaseTargetId($enumClass->name, $caseName);
+            }
+        }
+
         return self::requireWeakMapKey($key)->toObject()->id;
     }
 
@@ -99,12 +108,28 @@ final class WeakRefSupport
 
     public static function objectKey(Variable $key): string
     {
-        return 'o:'.self::requireWeakMapKey($key)->toObject()->id;
+        $key = $key->resolveIndirect();
+        if (EnumCaseSupport::isEnumCaseVariable($key)) {
+            $enumClass = EnumCaseSupport::enumClassForCaseVariable($key);
+            $caseName = EnumCaseSupport::enumCaseNameForVariable($key);
+            if (null !== $enumClass && '' !== $caseName) {
+                return self::stableEnumCaseMapKey($enumClass->name, $caseName);
+            }
+        }
+        $object = self::requireWeakMapKey($key)->toObject();
+        if (EnumCaseSupport::isEnumCase($object)) {
+            return self::stableEnumCaseMapKey($object->class->name, $object->enumCaseName ?? '');
+        }
+
+        return 'o:'.$object->id;
     }
 
-    /** Resolve WeakMap backing string key (o:<id>) to a live object Variable, or null if stale (#4434). */
+    /** Resolve WeakMap backing string key (o:<id> or e:<enum>:<case>) to a live object Variable, or null if stale (#4434, #5629). */
     public static function resolveMapKeyVariable(string $storedKey): ?Variable
     {
+        if (str_starts_with($storedKey, 'e:')) {
+            return self::resolveStableEnumCaseMapKey($storedKey);
+        }
         if (!str_starts_with($storedKey, 'o:')) {
             return null;
         }
@@ -154,6 +179,9 @@ final class WeakRefSupport
         if ($target->isUndefined() || Variable::TYPE_NULL === $target->type) {
             return false;
         }
+        if (EnumCaseSupport::isEnumCaseVariable($target)) {
+            return true;
+        }
         if (Variable::TYPE_OBJECT === $target->type) {
             $object = $target->toObject();
             if (EnumCaseSupport::isEnumCase($object)) {
@@ -183,6 +211,9 @@ final class WeakRefSupport
                 continue;
             }
             $storedKey = $storedKeyVar->toString();
+            if (str_starts_with($storedKey, 'e:')) {
+                continue;
+            }
             if (!str_starts_with($storedKey, 'o:')) {
                 continue;
             }
@@ -213,5 +244,42 @@ final class WeakRefSupport
             }
         }
         $dst->copyFrom($target);
+    }
+
+    /** Stable WeakMap hash key for enum case operands — identity is class+name, not ephemeral object id (#5629). */
+    public static function stableEnumCaseMapKey(string $enumName, string $caseName): string
+    {
+        return 'e:'.strtolower(ltrim($enumName, '\\')).':'.$caseName;
+    }
+
+    /** Synthetic registry id for immortal enum case weak-map targets (negative — never ObjectRegistry ids). */
+    public static function stableEnumCaseTargetId(string $enumName, string $caseName): int
+    {
+        return -(int) (crc32(strtolower(ltrim($enumName, '\\'))."\0".$caseName) & 0x7FFFFFFF);
+    }
+
+    private static function resolveStableEnumCaseMapKey(string $storedKey): ?Variable
+    {
+        $parts = explode(':', $storedKey, 3);
+        if (3 !== \count($parts) || 'e' !== $parts[0] || '' === $parts[1] || '' === $parts[2]) {
+            return null;
+        }
+        $vm = VM::running();
+        if (null === $vm) {
+            return null;
+        }
+        $enumClass = $vm->context->classes[$parts[1]] ?? null;
+        if (null === $enumClass || !$enumClass->isEnum) {
+            return null;
+        }
+        $canonical = BackedEnum::canonicalCaseVariable($enumClass, $parts[2]);
+        if (null === $canonical) {
+            return null;
+        }
+        if (EnumCaseSupport::isEnumCaseVariable($canonical)) {
+            return EnumCaseSupport::receiverForInstanceMethod($canonical);
+        }
+
+        return null;
     }
 }
