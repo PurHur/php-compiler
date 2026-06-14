@@ -6,11 +6,11 @@ var_export(enum_exists('Sorting', false));
 echo "\n";
 $a = [3, 1, 2];
 $b = ['c', 'a', 'b'];
-array_multisort($a, $b, Sorting::Ascending);
+array_multisort($a, Sorting::Ascending, $b);
 echo implode(',', $a), "\n";
-array_multisort($a, $b, Sorting::Descending);
-echo implode(',', $b), "\n";
+array_multisort($a, Sorting::Descending, $b);
+echo implode(',', $a), "\n";
 --EXPECT--
 true
 1,2,3
-c,b,a
+3,2,1

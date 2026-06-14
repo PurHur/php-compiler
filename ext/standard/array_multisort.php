@@ -14,16 +14,12 @@ use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
 
 /**
- * array_multisort() — sort multiple packed arrays by the first (subset of PHP; issue #1212).
+ * array_multisort() — coupled multi-array sort with per-array SORT_* flags (#1212, #3532).
  *
- * VM: homogeneous string or integer arrays, same length, optional trailing SORT_ASC (4) or
- * SORT_DESC (3) for the primary array. JIT/AOT: coupled packed bubble sort (#1212).
+ * php-src: ext/standard/array.c PHP_FUNCTION(array_multisort)
  */
 final class array_multisort extends Internal
 {
-    private const SORT_DESC = 3;
-    private const SORT_ASC = 4;
-
     public function __construct()
     {
         parent::__construct('array_multisort');
@@ -31,64 +27,32 @@ final class array_multisort extends Internal
 
     public function execute(Frame $frame): void
     {
-        $argc = \count($frame->calledArgs);
-        if ($argc < 1) {
-            throw new \ArgumentCountError('array_multisort() expects at least 1 argument, 0 given');
-        }
-        $arrays = [];
-        $descending = false;
-        for ($i = 0; $i < $argc; ++$i) {
-            $arg = $frame->calledArgs[$i]->resolveIndirect();
-            if (Variable::TYPE_ARRAY === $arg->type) {
-                $arrays[] = $arg;
-                continue;
-            }
-            if (Variable::TYPE_INTEGER === $arg->type
-                || EnumCaseSupport::isEnumCaseVariable($arg)) {
-                $order = VmArraySort::resolveMultisortOrderArg($arg);
-                if (self::SORT_DESC === $order) {
-                    $descending = true;
-                } elseif (self::SORT_ASC !== $order) {
-                    throw new \LogicException(
-                        'array_multisort() only supports SORT_ASC or SORT_DESC in this compiler build'
-                    );
-                }
-                continue;
-            }
-            throw new \LogicException(
-                'array_multisort() arguments must be arrays or SORT_* order flags in this compiler build'
-            );
-        }
-        if (\count($arrays) < 1) {
-            throw new \LogicException(
-                'array_multisort() requires at least one array argument in this compiler build'
-            );
-        }
-        if (1 === \count($arrays)) {
-            self::executeSingleArray($frame, $arrays[0], $descending);
+        $entries = VmArraySort::parseMultisortEntries($frame->calledArgs);
+        if (1 === \count($entries)) {
+            self::executeSingleArray($frame, $entries[0]);
 
             return;
         }
+
         $length = null;
-        $primaryValues = [];
-        foreach ($arrays as $idx => $array) {
-            $ht = $array->toArray();
+        $allValues = [];
+        foreach ($entries as $entryIdx => $entry) {
+            $ht = $entry['array']->resolveIndirect()->toArray();
             $count = $ht->getNumElements();
             if (null === $length) {
                 $length = $count;
             } elseif ($count !== $length) {
-                throw new \LogicException(
-                    'array_multisort() array lengths must match in this compiler build'
-                );
+                throw new \ValueError('Array sizes are inconsistent');
             }
-            if (0 === $idx) {
-                foreach ($ht->iterate(true) as $value) {
-                    $copy = new Variable();
-                    $copy->copyFrom($value);
-                    $primaryValues[] = $copy;
-                }
+            $values = [];
+            foreach ($ht->iterate(true) as $value) {
+                $copy = new Variable();
+                $copy->copyFrom($value);
+                $values[] = $copy;
             }
+            $allValues[$entryIdx] = $values;
         }
+
         if (null === $length || $length < 2) {
             if (null !== $frame->returnVar) {
                 $frame->returnVar->bool(true);
@@ -96,22 +60,16 @@ final class array_multisort extends Internal
 
             return;
         }
+
         $indices = range(0, $length - 1);
-        self::sortIndicesByPrimary($indices, $primaryValues, $descending);
-        foreach ($arrays as $array) {
-            $ht = $array->toArray();
-            $values = [];
-            foreach ($ht->iterate(true) as $value) {
-                $copy = new Variable();
-                $copy->copyFrom($value);
-                $values[] = $copy;
-            }
+        self::sortIndicesByMultisort($indices, $allValues, $entries);
+        foreach ($entries as $entryIdx => $entry) {
             $reordered = [];
             foreach ($indices as $idx) {
-                $reordered[] = $values[$idx];
+                $reordered[] = $allValues[$entryIdx][$idx];
             }
-            $array->separateArrayForWrite();
-            $array->resolveIndirect()->toArray()->replacePackedValues($reordered);
+            $entry['array']->separateArrayForWrite();
+            $entry['array']->resolveIndirect()->toArray()->replacePackedValues($reordered);
         }
         if (null !== $frame->returnVar) {
             $frame->returnVar->bool(true);
@@ -120,47 +78,20 @@ final class array_multisort extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        $argc = \count($args);
-        if ($argc < 1) {
-            throw new \ArgumentCountError('array_multisort() expects at least 1 argument, 0 given');
-        }
-        $arrays = [];
-        $descending = false;
-        for ($i = 0; $i < $argc; ++$i) {
-            $arg = $args[$i];
-            $order = self::tryResolveJitMultisortOrder($context, $arg);
-            if (null !== $order) {
-                if (self::SORT_DESC === $order) {
-                    $descending = true;
-                } elseif (self::SORT_ASC !== $order) {
-                    throw new \LogicException(
-                        'array_multisort() only supports SORT_ASC or SORT_DESC in this compiler build'
-                    );
-                }
-                continue;
-            }
-            if (self::isJitArrayArg($arg)) {
-                $arrays[] = $arg;
-                continue;
-            }
-            throw new \LogicException(
-                'array_multisort() arguments must be arrays or SORT_* order flags in this compiler build'
-            );
-        }
-        if (\count($arrays) < 1) {
-            throw new \LogicException(
-                'array_multisort() requires at least one array argument in this compiler build'
-            );
-        }
-        if (1 === \count($arrays)) {
-            if ($descending) {
-                ArrayBuiltinHelper::sortPackedReverse($context, $arrays[0]);
+        $entries = self::parseJitMultisortEntries($context, $args);
+        if (1 === \count($entries)) {
+            $entry = $entries[0];
+            if (StdlibConstants::SORT_DESC === $entry['sortOrder']) {
+                ArrayBuiltinHelper::sortPackedReverse($context, $entry['array']);
             } else {
-                ArrayBuiltinHelper::sortPacked($context, $arrays[0]);
+                ArrayBuiltinHelper::sortPacked($context, $entry['array']);
             }
 
             return $context->getTypeFromString('int1')->constInt(1, false);
         }
+
+        $arrays = array_column($entries, 'array');
+        $descending = StdlibConstants::SORT_DESC === $entries[0]['sortOrder'];
         ArrayBuiltinHelper::multisortPacked($context, $arrays, $descending);
 
         return $context->getTypeFromString('int1')->constInt(1, false);
@@ -168,10 +99,14 @@ final class array_multisort extends Internal
 
     /**
      * php-src php_array_multisort: one array sorts that array in place (ext/standard/array.c, #4945).
+     *
+     * @param array{array: Variable, sortOrder: int, sortType: int} $entry
      */
-    private static function executeSingleArray(Frame $frame, Variable $array, bool $descending): void
+    private static function executeSingleArray(Frame $frame, array $entry): void
     {
-        $ht = $array->toArray();
+        $array = $entry['array'];
+        $resolved = $array->resolveIndirect();
+        $ht = $resolved->toArray();
         $length = $ht->getNumElements();
         if ($length < 2) {
             if (null !== $frame->returnVar) {
@@ -187,7 +122,7 @@ final class array_multisort extends Internal
             $values[] = $copy;
         }
         $indices = range(0, $length - 1);
-        self::sortIndicesByPrimary($indices, $values, $descending);
+        self::sortIndicesByMultisort($indices, [0 => $values], [$entry]);
         $reordered = [];
         foreach ($indices as $idx) {
             $reordered[] = $values[$idx];
@@ -200,52 +135,20 @@ final class array_multisort extends Internal
     }
 
     /**
-     * Sort index permutation by primary array values (no PHP closures — AOT self-host spine safe).
-     *
-     * @param list<int>      $indices
-     * @param list<Variable> $primaryValues
+     * @param list<int>                                           $indices
+     * @param array<int, list<Variable>>                          $allValues
+     * @param list<array{array: Variable, sortOrder: int, sortType: int}> $entries
      */
-    private static function sortIndicesByPrimary(array &$indices, array $primaryValues, bool $descending): void
-    {
-        $first = $primaryValues[0]->resolveIndirect();
-        $stringCompare = null;
-        $useSpaceship = false;
-        if (Variable::TYPE_STRING === $first->type) {
-            $stringCompare = VmInternalCompare::resolveStringCallback('strcmp');
-        } elseif (Variable::TYPE_INTEGER === $first->type) {
-            // integer compare via compareIntegerPrimary()
-        } elseif (Variable::TYPE_OBJECT === $first->type || EnumCaseSupport::isEnumCaseVariable($first)) {
-            VmInternalCompare::assertHomogeneousEnumOrObjectValues($primaryValues, 'array_multisort()');
-            $useSpaceship = true;
-        } else {
-            throw new \LogicException(
-                'array_multisort() only supports homogeneous string or integer arrays in this compiler build'
-            );
-        }
+    private static function sortIndicesByMultisort(
+        array &$indices,
+        array $allValues,
+        array $entries
+    ): void {
         $n = \count($indices);
         for ($i = 1; $i < $n; ++$i) {
             $j = $i;
             while ($j > 0) {
-                if (null !== $stringCompare) {
-                    $cmp = VmInternalCompare::invoke(
-                        $stringCompare,
-                        $primaryValues[$indices[$j - 1]],
-                        $primaryValues[$indices[$j]]
-                    );
-                } elseif ($useSpaceship) {
-                    $cmp = VmInternalCompare::comparePackedValuesForSort(
-                        $primaryValues[$indices[$j - 1]],
-                        $primaryValues[$indices[$j]]
-                    );
-                } else {
-                    $cmp = self::compareIntegerPrimary(
-                        $primaryValues[$indices[$j - 1]],
-                        $primaryValues[$indices[$j]]
-                    );
-                }
-                if ($descending) {
-                    $cmp = -$cmp;
-                }
+                $cmp = self::compareMultisortIndices($allValues, $entries, $indices[$j - 1], $indices[$j]);
                 if ($cmp <= 0) {
                     break;
                 }
@@ -257,17 +160,135 @@ final class array_multisort extends Internal
         }
     }
 
-    private static function compareIntegerPrimary(Variable $a, Variable $b): int
+    /**
+     * @param array<int, list<Variable>>                          $allValues
+     * @param list<array{array: Variable, sortOrder: int, sortType: int}> $entries
+     */
+    private static function compareMultisortIndices(
+        array $allValues,
+        array $entries,
+        int $idxA,
+        int $idxB
+    ): int {
+        foreach ($entries as $entryIdx => $entry) {
+            $cmp = self::compareMultisortValues(
+                $allValues[$entryIdx][$idxA],
+                $allValues[$entryIdx][$idxB],
+                $entry['sortOrder'],
+                $entry['sortType']
+            );
+            if (0 !== $cmp) {
+                return $cmp;
+            }
+        }
+
+        return $idxA <=> $idxB;
+    }
+
+    private static function compareMultisortValues(
+        Variable $a,
+        Variable $b,
+        int $sortOrder,
+        int $sortType
+    ): int {
+        $ra = $a->resolveIndirect();
+        $rb = $b->resolveIndirect();
+        if (EnumCaseSupport::isEnumCaseVariable($ra)
+            || EnumCaseSupport::isEnumCaseVariable($rb)
+            || Variable::TYPE_OBJECT === $ra->type
+            || Variable::TYPE_OBJECT === $rb->type) {
+            VmInternalCompare::assertHomogeneousEnumOrObjectValues([$a, $b], 'array_multisort()');
+            $cmp = VmInternalCompare::comparePackedValuesForSort($a, $b);
+        } else {
+            $cmp = VmInternalCompare::compareValuesForSortFlags($a, $b, $sortType);
+        }
+        if (StdlibConstants::SORT_DESC === $sortOrder) {
+            $cmp = -$cmp;
+        }
+
+        return $cmp;
+    }
+
+    /**
+     * @param list<JITVariable> $args
+     *
+     * @return list<array{array: JITVariable, sortOrder: int, sortType: int}>
+     */
+    private static function parseJitMultisortEntries(Context $context, array $args): array
     {
-        $a = $a->resolveIndirect();
-        $b = $b->resolveIndirect();
-        if (Variable::TYPE_INTEGER !== $a->type || Variable::TYPE_INTEGER !== $b->type) {
+        $argc = \count($args);
+        if ($argc < 1) {
+            throw new \ArgumentCountError('array_multisort() expects at least 1 argument, 0 given');
+        }
+
+        $entries = [];
+        $sortOrder = StdlibConstants::SORT_ASC;
+        $sortType = StdlibConstants::SORT_REGULAR;
+        $parseOrder = true;
+        $parseType = true;
+
+        for ($i = 0; $i < $argc; ++$i) {
+            $arg = $args[$i];
+            if (self::isJitArrayArg($arg)) {
+                if ($i > 0 && \count($entries) > 0) {
+                    $last = \count($entries) - 1;
+                    $entries[$last]['sortOrder'] = $sortOrder;
+                    $entries[$last]['sortType'] = $sortType;
+                }
+                $entries[] = [
+                    'array' => $arg,
+                    'sortOrder' => StdlibConstants::SORT_ASC,
+                    'sortType' => StdlibConstants::SORT_REGULAR,
+                ];
+                $sortOrder = StdlibConstants::SORT_ASC;
+                $sortType = StdlibConstants::SORT_REGULAR;
+                $parseOrder = true;
+                $parseType = true;
+                continue;
+            }
+
+            $flag = self::tryResolveJitMultisortFlag($context, $arg);
+            if (null === $flag) {
+                throw new \TypeError(sprintf(
+                    'array_multisort(): Argument #%d must be an array or a sort flag',
+                    $i + 1
+                ));
+            }
+
+            $masked = $flag & ~StdlibConstants::SORT_FLAG_CASE;
+            if (StdlibConstants::SORT_ASC === $masked || StdlibConstants::SORT_DESC === $masked) {
+                if (!$parseOrder) {
+                    throw new \TypeError(sprintf(
+                        'array_multisort(): Argument #%d must be an array or a sort flag that has not already been specified',
+                        $i + 1
+                    ));
+                }
+                $sortOrder = $masked;
+                $parseOrder = false;
+                continue;
+            }
+
+            if (!$parseType) {
+                throw new \TypeError(sprintf(
+                    'array_multisort(): Argument #%d must be an array or a sort flag that has not already been specified',
+                    $i + 1
+                ));
+            }
+            $sortType = $flag;
+            $parseType = false;
+        }
+
+        if (\count($entries) < 1) {
             throw new \LogicException(
-                'array_multisort() only supports homogeneous string or integer arrays in this compiler build'
+                'array_multisort() requires at least one array argument in this compiler build'
             );
         }
 
-        return $a->toInt() <=> $b->toInt();
+        $last = \count($entries) - 1;
+        $entries[$last]['sortOrder'] = $sortOrder;
+        $entries[$last]['sortType'] = $sortType;
+
+        return $entries;
     }
 
     private static function isJitArrayArg(JITVariable $arg): bool
@@ -280,7 +301,7 @@ final class array_multisort extends Internal
         return JITVariable::TYPE_VALUE === $arg->type;
     }
 
-    private static function tryResolveJitMultisortOrder(Context $context, JITVariable $arg): ?int
+    private static function tryResolveJitMultisortFlag(Context $context, JITVariable $arg): ?int
     {
         if (null !== $arg->compileTimeConstantName) {
             $lookup = strtolower($arg->compileTimeConstantName);

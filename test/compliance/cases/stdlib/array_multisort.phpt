@@ -9,7 +9,7 @@ echo implode(',', $a), "\n";
 echo implode(',', $b), "\n";
 $c = ['z', 'x', 'y'];
 $d = [3, 1, 2];
-array_multisort($d, $c, 3);
+array_multisort($d, SORT_DESC, $c);
 echo implode(',', $d), "\n";
 echo implode(',', $c), "\n";
 --EXPECT--

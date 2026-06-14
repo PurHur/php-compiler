@@ -8647,6 +8647,9 @@ class Compiler {
         if (null === $producer) {
             return null;
         }
+        if (!$this->operandsReferToSameVariable($arg, $producer->result)) {
+            return null;
+        }
         $producerSlot = $block->slotForOperand($producer->result);
         if (null === $producerSlot) {
             return null;
