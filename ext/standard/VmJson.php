@@ -21,6 +21,9 @@ use PHPCompiler\VM\Variable;
  */
 final class VmJson
 {
+    /** JSON_ERROR_INF_OR_NAN — non-finite float (Zend ext/json/php_json_encoder.c). */
+    public const ERROR_INF_OR_NAN = 7;
+
     /** JSON_ERROR_UNSUPPORTED_TYPE — object without JsonSerializable (Zend ext/json). */
     public const ERROR_UNSUPPORTED_TYPE = 8;
 
@@ -48,6 +51,7 @@ final class VmJson
             0 => 'No error',
             1 => 'Maximum stack depth exceeded',
             4 => 'Syntax error',
+            self::ERROR_INF_OR_NAN => 'Inf and NaN cannot be JSON encoded',
             self::ERROR_UNSUPPORTED_TYPE => 'Type is not supported',
             default => 'Unknown error',
         };
