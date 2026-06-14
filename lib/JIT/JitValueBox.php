@@ -683,42 +683,14 @@ final class JitValueBox
 
     /**
      * Read a nullable string return from a boxed union (ternary string|null, issue #8555).
+     *
+     * {@see __value__readString} returns null for TYPE_NULL / non-string tags (Value.pre).
      */
     public static function readStringOrNull(Context $context, Variable $var): Value
     {
-        $valuePtr = self::valuePtrFromVariable($context, $var);
-        $map = $context->structFieldMap['__value__'];
-        $typeByte = $context->builder->load(
-            $context->builder->structGep($valuePtr, $map['type'])
-        );
-        $i8 = $context->getTypeFromString('int8');
-        $strPtrTy = $context->getTypeFromString('__string__*');
-
-        $isNull = $context->builder->icmp(
-            Builder::INT_EQ,
-            $typeByte,
-            $i8->constInt(Variable::TYPE_NULL, false)
-        );
-        $nullBlock = BasicBlockHelper::append($context, 'read_str_or_null_null');
-        $strBlock = BasicBlockHelper::append($context, 'read_str_or_null_str');
-        $done = BasicBlockHelper::append($context, 'read_str_or_null_done');
-        $context->builder->branchIf($isNull, $nullBlock, $strBlock);
-
-        $context->builder->positionAtEnd($nullBlock);
-        $context->builder->branch($done);
-
-        $context->builder->positionAtEnd($strBlock);
-        $str = $context->builder->call(
+        return $context->builder->call(
             $context->lookupFunction('__value__readString'),
-            $valuePtr
+            self::valuePtrFromVariable($context, $var)
         );
-        $context->builder->branch($done);
-
-        $context->builder->positionAtEnd($done);
-        $phi = $context->builder->phi($strPtrTy, 'read_str_or_null_phi');
-        $phi->addIncoming($strPtrTy->constNull(), $nullBlock);
-        $phi->addIncoming($str, $strBlock);
-
-        return $phi;
     }
 }

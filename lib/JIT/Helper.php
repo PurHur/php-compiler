@@ -921,6 +921,15 @@ restart:
         }
         if (Variable::TYPE_VALUE === $leftType && Variable::TYPE_VALUE !== $rightType) {
             if (Variable::TYPE_NATIVE_LONG === $rightType || Variable::TYPE_NATIVE_BOOL === $rightType) {
+                // Strict compare before JitLongArg::lower — __value__readLong on bool tags segfaults (#8555).
+                if (OpCode::TYPE_IDENTICAL === $opcode->type) {
+                    $result = JitValueCompare::identicalToNative($this->context, $left, $right);
+                    goto return_bool;
+                }
+                if (OpCode::TYPE_NOT_IDENTICAL === $opcode->type) {
+                    $result = JitValueCompare::notIdenticalToNative($this->context, $left, $right);
+                    goto return_bool;
+                }
                 $leftLong = JitLongArg::lower($this->context, $left, 'binary op left operand');
                 if (Variable::TYPE_NATIVE_BOOL === $rightType) {
                     $__right = $this->context->builder->zExt($rightValue, $leftLong->typeOf());
@@ -1011,6 +1020,14 @@ restart:
         }
         if (Variable::TYPE_VALUE === $rightType && Variable::TYPE_VALUE !== $leftType) {
             if (Variable::TYPE_NATIVE_LONG === $leftType || Variable::TYPE_NATIVE_BOOL === $leftType) {
+                if (OpCode::TYPE_IDENTICAL === $opcode->type) {
+                    $result = JitValueCompare::identicalNativeToValue($this->context, $left, $right);
+                    goto return_bool;
+                }
+                if (OpCode::TYPE_NOT_IDENTICAL === $opcode->type) {
+                    $result = JitValueCompare::notIdenticalNativeToValue($this->context, $left, $right);
+                    goto return_bool;
+                }
                 $rightLong = JitLongArg::lower($this->context, $right, 'binary op right operand');
                 if (Variable::TYPE_NATIVE_BOOL === $leftType) {
                     $__left = $this->context->builder->zExt($leftValue, $rightLong->typeOf());

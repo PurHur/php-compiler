@@ -5522,20 +5522,27 @@ class JIT {
                 case OpCode::TYPE_ASSIGN:
                     $value = $this->context->getVariableFromOp($block->getOperand($op->arg3));
                     $destOp = $block->getOperand($op->arg1);
-                    $forceCoalesce = $this->context->coalesceAssignTargets->contains($destOp);
+                    $aliasOp = $block->getOperand($op->arg2);
+                    $coalesceTarget = null;
+                    if ($this->context->coalesceAssignTargets->contains($destOp)) {
+                        $coalesceTarget = $destOp;
+                    } elseif ($this->context->coalesceAssignTargets->contains($aliasOp)) {
+                        $coalesceTarget = $aliasOp;
+                    }
+                    $forceCoalesce = null !== $coalesceTarget;
                     $srcOp = $block->getOperand($op->arg3);
                     $isNullSource = $value->isNullConstant
                         || Variable::TYPE_NULL === $value->type
                         || ($srcOp instanceof Operand\Literal && null === $srcOp->value);
                     if ($forceCoalesce && $isNullSource) {
-                        if (!$this->context->hasVariableOp($destOp)) {
-                            $this->context->makeVariableFromOp($func, $basicBlock, $block, $destOp);
+                        if (!$this->context->hasVariableOp($coalesceTarget)) {
+                            $this->context->makeVariableFromOp($func, $basicBlock, $block, $coalesceTarget);
                         }
-                        $mergeDest = $this->context->getVariableFromOp($destOp);
+                        $mergeDest = $this->context->getVariableFromOp($coalesceTarget);
                         if (Variable::KIND_VALUE === $mergeDest->kind) {
                             $slot = JIT\JitValueBox::alloc($this->context);
                             $this->context->setVariableOp(
-                                $destOp,
+                                $coalesceTarget,
                                 new Variable(
                                     $this->context,
                                     Variable::TYPE_VALUE,
@@ -5543,7 +5550,7 @@ class JIT {
                                     $slot
                                 )
                             );
-                            $mergeDest = $this->context->getVariableFromOp($destOp);
+                            $mergeDest = $this->context->getVariableFromOp($coalesceTarget);
                         }
                         if (
                             Variable::TYPE_VALUE === $mergeDest->type
@@ -5557,9 +5564,29 @@ class JIT {
                             break;
                         }
                     }
+                    if ($forceCoalesce && !$isNullSource) {
+                        if (!$this->context->hasVariableOp($coalesceTarget)) {
+                            $this->context->makeVariableFromOp($func, $basicBlock, $block, $coalesceTarget);
+                        }
+                        $mergeDest = $this->context->getVariableFromOp($coalesceTarget);
+                        if (
+                            Variable::TYPE_VALUE !== $mergeDest->type
+                            || Variable::KIND_VARIABLE !== $mergeDest->kind
+                        ) {
+                            $slot = JIT\JitValueBox::alloc($this->context);
+                            $this->context->setVariableOp(
+                                $coalesceTarget,
+                                new Variable(
+                                    $this->context,
+                                    Variable::TYPE_VALUE,
+                                    Variable::KIND_VARIABLE,
+                                    $slot
+                                )
+                            );
+                        }
+                    }
                     $forceAssign = $forceCoalesce
                         || $this->assignOperandsUsedByLiteralInclude($block, $op);
-                    $aliasOp = $block->getOperand($op->arg2);
                     if (
                         $this->context->hasVariableOp($aliasOp)
                         && $this->context->hasVariableOp($block->getOperand($op->arg3))
@@ -6999,6 +7026,13 @@ class JIT {
                     $branchBlock = $builder->getInsertBlock();
                     $builder->positionAtEnd($branchBlock);
                     $this->maybeRefreshIncludeBindingsBeforeUse();
+                    $ternaryMergeReturn = null;
+                    if ('__value__*' === ($this->cfgFunctionReturnCallbackType($block->func) ?? '')) {
+                        $ternaryMergeReturn = $this->findJumpIfSharedReturnOperand($op->block1, $op->block2);
+                        if (null !== $ternaryMergeReturn) {
+                            $this->context->coalesceAssignTargets[$ternaryMergeReturn] = true;
+                        }
+                    }
                     $condition = $this->context->castToBool(
                         $this->context->helper->loadValue(
                             $this->context->getVariableFromOp($this->operandAt($block, $op->arg1, 'branch condition'))
@@ -7030,6 +7064,10 @@ class JIT {
                         $this->context->freeDeadVariables($func, $branchBlock, $block);
                     }
                     $builder->branchIf($condition, $ifEntry, $elseEntry);
+                    if (null !== $ternaryMergeReturn) {
+                        unset($this->context->coalesceAssignTargets[$ternaryMergeReturn]);
+                    }
+
                     return $origBasicBlock;
                 case OpCode::TYPE_TRY:
                     JIT\TryCatchHelper::beginTry($this, $func, $this->context, $block, $op, $i, $args);
@@ -8126,7 +8164,16 @@ class JIT {
         }
         if ('__value__*' === $expected) {
             if (Variable::TYPE_VALUE === $return->type) {
-                return JIT\JitValueBox::valuePtrFromVariable($this->context, $return);
+                // Nullable returns use __value__*; copy merge/ternary slots into a fresh
+                // return slot instead of returning an interior pointer (#8555).
+                $slot = JIT\JitValueBox::alloc($this->context);
+                JIT\JitValueBox::copyFromPointer(
+                    $this->context,
+                    $slot,
+                    JIT\JitValueBox::valuePtrFromVariable($this->context, $return)
+                );
+
+                return JIT\JitValueBox::pointer($this->context, $slot);
             }
             if (Variable::TYPE_NULL === $return->type) {
                 return $this->context->getTypeFromString('__value__*')->constNull();
@@ -9600,6 +9647,46 @@ class JIT {
         $this->context->bindVariableByName($this->context->resolveRefAliasName($name), $globalVar);
 
         return true;
+    }
+
+    /** Both ?: arms jump to a shared RETURN/THROW merge block (#4280, #8555). */
+    private function findJumpIfSharedReturnOperand(?Block $ifBranch, ?Block $elseBranch): ?\PHPCfg\Operand
+    {
+        if (null === $ifBranch || null === $elseBranch) {
+            return null;
+        }
+        $ifMerge = $this->jumpBlockTarget($ifBranch);
+        $elseMerge = $this->jumpBlockTarget($elseBranch);
+        if (null === $ifMerge || $ifMerge !== $elseMerge) {
+            return null;
+        }
+
+        foreach ($ifMerge->opCodes as $mergeOp) {
+            if (OpCode::TYPE_RETURN === $mergeOp->type) {
+                return $ifMerge->getOperand($mergeOp->arg1);
+            }
+            if (OpCode::TYPE_THROW === $mergeOp->type) {
+                return $ifMerge->getOperand($mergeOp->arg1);
+            }
+        }
+
+        return null;
+    }
+
+    private function jumpBlockTarget(Block $branch): ?Block
+    {
+        $limit = min($branch->nOpCodes, \count($branch->opCodes));
+        for ($i = $limit - 1; $i >= 0; --$i) {
+            $branchOp = $branch->opCodes[$i] ?? null;
+            if (null === $branchOp) {
+                continue;
+            }
+            if (OpCode::TYPE_JUMP === $branchOp->type) {
+                return $branchOp->block1;
+            }
+        }
+
+        return null;
     }
 
     private function assignOperand(Operand $resultOp, Variable $value, bool $force = false): void {
