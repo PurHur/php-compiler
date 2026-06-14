@@ -49,6 +49,7 @@ use PHPCompiler\Lint\LintCompiler;
 use PHPCompiler\Compiler\CompileFatal;
 use PHPCompiler\VM\OutputBuffer;
 use PHPCompiler\VM\ShutdownQueue;
+use PHPCompiler\ext\standard\VmObGzhandler;
 use PHPCompiler\VM\ClassEntry;
 
 class Runtime {
@@ -933,11 +934,14 @@ class Runtime {
     public function run(?Block $block) {
         $this->ensureVm();
         Superglobals::setActiveContext($this->vmContext);
+        OutputBuffer::setActiveContext($this->vmContext);
         try {
             return $this->vm->run($block);
         } finally {
             ShutdownQueue::run($this->vmContext);
             OutputBuffer::endAllAtShutdown();
+            OutputBuffer::setActiveContext(null);
+            VmObGzhandler::reset();
             Superglobals::setActiveContext(null);
         }
     }

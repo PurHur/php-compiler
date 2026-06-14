@@ -29,8 +29,8 @@ final class VmOb
     public static function listHandlers(): HashTable
     {
         $names = [];
-        for ($i = 0, $level = OutputBuffer::getLevel(); $i < $level; ++$i) {
-            $names[] = self::HANDLER_NAME;
+        foreach (OutputBuffer::getHandlerNames() as $handler) {
+            $names[] = null !== $handler ? $handler : self::HANDLER_NAME;
         }
 
         return VmFs::stringListToArray($names);
@@ -42,26 +42,35 @@ final class VmOb
         if ([] === $buffers) {
             return new HashTable();
         }
+        $handlerNames = OutputBuffer::getHandlerNames();
         if (!$full) {
             $idx = \count($buffers) - 1;
 
-            return self::bufferStatusToHashTable($idx, $buffers[$idx]);
+            return self::bufferStatusToHashTable(
+                $idx,
+                $buffers[$idx],
+                $handlerNames[$idx] ?? null
+            );
         }
         $list = new HashTable();
         foreach ($buffers as $idx => $contents) {
             $entry = new Variable();
-            $entry->array(self::bufferStatusToHashTable($idx, $contents));
+            $entry->array(self::bufferStatusToHashTable(
+                $idx,
+                $contents,
+                $handlerNames[$idx] ?? null
+            ));
             $list->append($entry);
         }
 
         return $list;
     }
 
-    private static function bufferStatusToHashTable(int $level, string $contents): HashTable
+    private static function bufferStatusToHashTable(int $level, string $contents, ?string $handlerName = null): HashTable
     {
         $used = \strlen($contents);
         $ht = new HashTable();
-        self::addString($ht, 'name', self::HANDLER_NAME);
+        self::addString($ht, 'name', null !== $handlerName ? $handlerName : self::HANDLER_NAME);
         self::addInt($ht, 'type', self::HANDLER_TYPE);
         self::addInt($ht, 'flags', self::HANDLER_FLAGS);
         self::addInt($ht, 'level', $level);

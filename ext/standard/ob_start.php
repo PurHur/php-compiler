@@ -23,10 +23,18 @@ final class ob_start extends Internal
 
     public function execute(Frame $frame): void
     {
-        if (\count($frame->calledArgs) > 0) {
-            throw new \LogicException('ob_start() callback arguments not supported in this compiler build');
+        $argc = \count($frame->calledArgs);
+        if ($argc > 3) {
+            throw new \LogicException('ob_start() accepts at most three arguments in this compiler build');
         }
-        OutputBuffer::start();
+        $handler = null;
+        if ($argc >= 1) {
+            $handler = VmObOutput::resolveHandlerName($frame);
+        }
+        OutputBuffer::start($handler);
+        if (null !== $frame->returnVar) {
+            $frame->returnVar->bool(true);
+        }
     }
 
     public function call(Context $context, JITVariable ...$args): Value
