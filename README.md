@@ -285,11 +285,13 @@ Regenerate maintainer matrices after builtin changes: `php script/capability-mat
 - **PHP 8.1+** (8.2 recommended): `tokenizer`, `mbstring`, `dom`, `xml`, `xmlwriter`, `ffi`, `posix`, `phar`
 - **Composer**
 - **LLVM 9** for JIT/AOT — bundled into `.llvm/` by `./script/install-llvm9.sh` or first `./script/ci-local.sh`
+- **LLVM 14** (opt-in migration, [#174](https://github.com/PurHur/php-compiler/issues/174)) — `./script/install-llvm14.sh` installs to `.llvm14/`; default CI still uses LLVM 9 until PHPLLVM llvm14 FFI lands
 
 ```bash
 composer install --ignore-platform-reqs   # if host PHP is 8.3+ (locked deps target 8.1–8.2)
 script/apply-patches.sh    # php-cfg overlays; required before compile
 ./script/install-llvm9.sh  # optional until you run full CI or phpc build
+# ./script/install-llvm14.sh  # opt-in LLVM 14 tree (.llvm14/); see docs/local-ci-matrix.md
 ```
 
 ### Docker-only hosts
@@ -306,7 +308,8 @@ On Runforge/harness sandboxes use `make test-harness` or `./script/docker-ci-loc
 | Variable | Purpose |
 |----------|---------|
 | `PHP_COMPILER_PHP` | PHP binary for tests (default `php` or `php8.2`) |
-| `PHP_COMPILER_LLVM_PATH` | LLVM 9 tree (default: repo `.llvm/`) |
+| `PHP_COMPILER_LLVM_PATH` | LLVM tree (default: repo `.llvm/` for LLVM 9; opt-in `.llvm14/` after [#174](https://github.com/PurHur/php-compiler/issues/174) FFI) |
+| `PHP_COMPILER_LLVM14_INSTALL_DIR` | LLVM 14 install target (default: repo `.llvm14/`) |
 | `PHP_COMPILER_SKIP_SERVE_TESTS` | Skip HTTP tests when loopback bind fails |
 | `PHP_COMPILER_DEBUG` | Verbose errors on `phpc serve` (500 responses) |
 

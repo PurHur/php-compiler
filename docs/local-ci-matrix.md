@@ -105,6 +105,19 @@ Both paths run `composer install`, `script/apply-patches.sh`, then the three boo
 
 **Former GHA llvm job** (full VM + JIT + AOT gate): reproduce with `./script/ci-local.sh` or `make test-docker` (see Entry points above). Fast iteration without LLVM link: `./script/ci-fast.sh` or `make test-fast`.
 
+## LLVM 14 migration (opt-in, [#174](https://github.com/PurHur/php-compiler/issues/174))
+
+Default CI and Docker still use **LLVM 9** (`script/install-llvm9.sh`, `/opt/llvm9`). LLVM 14 is an **opt-in** migration path until PHPLLVM FFI and linker paths are proven on `master`.
+
+| Step | Command / variable | Notes |
+|------|-------------------|-------|
+| Install LLVM 14 tree | `./script/install-llvm14.sh` | Installs under repo `.llvm14/` (Debian bookworm packages) |
+| Override install dir | `PHP_COMPILER_LLVM14_INSTALL_DIR=/path` | Separate from `.llvm/` so LLVM 9 fallback stays intact |
+| Point at LLVM 14 (future) | `export PHP_COMPILER_LLVM_PATH="$PWD/.llvm14"` | **Not** default until `vendor/ircmaxell/php-llvm` llvm14 FFI lands |
+| Verify (when FFI ready) | `PHP_COMPILER_LLVM_PATH="$PWD/.llvm14" ./script/ci-local.sh` | Dual-support period: LLVM 9 remains canonical until flip in `ci-defaults.env` |
+
+**Current status:** `install-llvm14.sh` mirrors the `install-llvm9.sh` tarball layout (`libLLVM-14.so.1`, `clang-14`, bundled `ld`, gcc-12 crt). `PHPLLVM\Chooser` still selects `libLLVM-9.so.1` first — do not expect JIT/AOT green on LLVM 14 until follow-up PRs add llvm14 FFI + linker updates.
+
 ## MiniWebApp gates ([#472](https://github.com/PurHur/php-compiler/issues/472), [#664](https://github.com/PurHur/php-compiler/issues/664))
 
 Defaults are exported from [`script/ci-defaults.env`](../script/ci-defaults.env) and read by `ci-local.sh`, `ci-fast.sh`, and helpers in [`script/ci-common.sh`](../script/ci-common.sh). For the progressive stage ladder (lint → serve → AOT link → execute), see **[miniwebapp-gates.md](miniwebapp-gates.md)** ([#472](https://github.com/PurHur/php-compiler/issues/472)); probe status with [`script/miniwebapp-gates.sh`](../script/miniwebapp-gates.sh), `make miniwebapp-gates`, or `phpc doctor --gates`. **Example web regression bundle** (gates + `ci-fast` MiniWebApp + AOT execute + optional AOT web-smoke; legacy name `north-star1-verify`): [`script/north-star1-verify.sh`](../script/north-star1-verify.sh) / `make north-star1-verify` ([#1845](https://github.com/PurHur/php-compiler/issues/1845), [#1044](https://github.com/PurHur/php-compiler/issues/1044) closed).
