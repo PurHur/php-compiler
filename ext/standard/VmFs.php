@@ -615,6 +615,9 @@ final class VmFs
 
             return self::adoptStreamResource($fp, $path);
         }
+        if (VmPhpMemoryStream::isSupportedUri($path)) {
+            return VmPhpMemoryStream::open($path, $mode);
+        }
         if (self::isBuiltinPhpStreamUri($path)) {
             $fp = @fopen($path, $mode);
             if (false === $fp) {
@@ -719,16 +722,11 @@ final class VmFs
      */
     public static function adoptGzNativePlaceholder(string $uri)
     {
-        $dummy = @fopen('php://memory', 'r+b');
-        if (false === $dummy) {
-            return false;
-        }
-        $id = self::adoptStreamResource($dummy, $uri);
+        $id = VmPhpMemoryStream::open('php://memory', 'r+b');
         if (false === $id) {
-            @fclose($dummy);
-
             return false;
         }
+        self::$handlePaths[$id] = $uri;
         self::$gzNativePlaceholders[$id] = true;
 
         return $id;
@@ -745,6 +743,12 @@ final class VmFs
             return;
         }
         unset(self::$gzNativePlaceholders[$handle]);
+        if (VmPhpMemoryStream::isValidHandle($handle)) {
+            VmPhpMemoryStream::close($handle);
+            unset(self::$handlePaths[$handle]);
+
+            return;
+        }
         $fp = self::detachStreamHandle($handle);
         if (\is_resource($fp)) {
             @fclose($fp);
@@ -770,6 +774,14 @@ final class VmFs
     public static function fread(int $handle, int $length) {
         if (VmUserStream::isValidHandle($handle)) {
             return VmUserStream::read($handle, $length);
+        }
+        if (VmPhpMemoryStream::isValidHandle($handle)) {
+            $data = VmPhpMemoryStream::read($handle, $length);
+            if (false === $data) {
+                return false;
+            }
+
+            return VmStreamFilterChain::applyReadFilters($handle, $data);
         }
         $fp = self::lookup($handle);
         if (null === $fp) {
@@ -825,6 +837,11 @@ final class VmFs
     }
 
     public static function fwrite(int $handle, string $data, ?int $length = null) {
+        if (VmPhpMemoryStream::isValidHandle($handle)) {
+            $data = VmStreamFilterChain::applyWriteFilters($handle, $data);
+
+            return VmPhpMemoryStream::write($handle, $data, $length);
+        }
         $fp = self::lookup($handle);
         if (null === $fp) {
             return false;
@@ -849,6 +866,11 @@ final class VmFs
     {
         if (VmUserStream::isValidHandle($handle)) {
             return VmUserStream::close($handle);
+        }
+        if (VmPhpMemoryStream::isValidHandle($handle)) {
+            unset(self::$handlePaths[$handle]);
+
+            return VmPhpMemoryStream::close($handle);
         }
         $fp = self::lookup($handle);
         if (null === $fp) {
@@ -918,6 +940,9 @@ final class VmFs
     {
         if (VmUserStream::isValidHandle($handle)) {
             return VmUserStream::feof($handle);
+        }
+        if (VmPhpMemoryStream::isValidHandle($handle)) {
+            return VmPhpMemoryStream::eof($handle);
         }
         $fp = self::lookup($handle);
         if (null === $fp) {
@@ -1163,6 +1188,9 @@ final class VmFs
     }
 
     public static function ftell(int $handle) {
+        if (VmPhpMemoryStream::isValidHandle($handle)) {
+            return VmPhpMemoryStream::tell($handle);
+        }
         $fp = self::lookup($handle);
         if (null === $fp) {
             return false;
@@ -1176,6 +1204,17 @@ final class VmFs
     }
 
     public static function fgetc(int $handle) {
+        if (VmPhpMemoryStream::isValidHandle($handle)) {
+            $byte = VmPhpMemoryStream::read($handle, 1);
+            if (false === $byte) {
+                return false;
+            }
+            if ('' === $byte) {
+                return VmPhpMemoryStream::eof($handle) ? '' : false;
+            }
+
+            return $byte;
+        }
         $fp = self::lookup($handle);
         if (null === $fp) {
             return false;
@@ -1307,6 +1346,9 @@ final class VmFs
 
     public static function fseek(int $handle, int $offset, int $whence = \SEEK_SET): int
     {
+        if (VmPhpMemoryStream::isValidHandle($handle)) {
+            return VmPhpMemoryStream::seek($handle, $offset, $whence);
+        }
         $fp = self::lookup($handle);
         if (null === $fp) {
             return -1;
@@ -1317,6 +1359,9 @@ final class VmFs
 
     public static function rewind(int $handle): bool
     {
+        if (VmPhpMemoryStream::isValidHandle($handle)) {
+            return 0 === VmPhpMemoryStream::seek($handle, 0, \SEEK_SET);
+        }
         $fp = self::lookup($handle);
         if (null === $fp) {
             return false;
@@ -1343,6 +1388,14 @@ final class VmFs
      */
     public static function streamGetContents(int $handle, int $maxlength = -1, int $offset = -1)
     {
+        if (VmPhpMemoryStream::isValidHandle($handle)) {
+            $data = VmPhpMemoryStream::streamGetContents($handle, $maxlength, $offset);
+            if (false === $data) {
+                return false;
+            }
+
+            return VmStreamFilterChain::applyReadFilters($handle, $data);
+        }
         $fp = self::lookup($handle);
         if (null === $fp) {
             return false;
@@ -1380,6 +1433,20 @@ final class VmFs
         ?\PHPCompiler\VM\Context $ctx = null,
         ?\PHPCompiler\VM\Variable $streamContext = null
     ) {
+        if (VmPhpMemoryStream::isValidHandle($source)
+            || VmPhpMemoryStream::isValidHandle($dest)
+            || VmUserStream::isValidHandle($source)
+            || VmUserStream::isValidHandle($dest)) {
+            return self::streamCopyToStreamVm(
+                $source,
+                $dest,
+                $maxlength,
+                $offset,
+                $ctx,
+                $streamContext
+            );
+        }
+
         $srcFp = self::lookup($source);
         $dstFp = self::lookup($dest);
         if (null === $srcFp || null === $dstFp) {
@@ -1504,6 +1571,132 @@ final class VmFs
     }
 
     /**
+     * @return int|false Bytes copied, or false on I/O failure
+     */
+    private static function streamCopyToStreamVm(
+        int $source,
+        int $dest,
+        int $maxlength,
+        int $offset,
+        ?\PHPCompiler\VM\Context $ctx,
+        ?\PHPCompiler\VM\Variable $streamContext
+    ) {
+        if ($offset > 0 && 0 !== self::fseek($source, $offset, \SEEK_SET)) {
+            return false;
+        }
+        if (0 === $maxlength) {
+            return 0;
+        }
+
+        $bytesMax = -1;
+        if ($maxlength > 0) {
+            $bytesMax = $maxlength;
+        } elseif (VmPhpMemoryStream::isValidHandle($source)) {
+            $len = VmPhpMemoryStream::bufferLength($source);
+            $pos = VmPhpMemoryStream::tell($source);
+            if (false !== $len && false !== $pos) {
+                $bytesMax = max(0, $len - $pos);
+            }
+        }
+
+        if (null !== $ctx && null !== VmStreamNotification::resolveForContext($streamContext)) {
+            VmStreamNotification::dispatch(
+                $ctx,
+                $streamContext,
+                VmStreamNotification::NOTIFY_FILE_SIZE_IS,
+                VmStreamNotification::SEVERITY_INFO,
+                '',
+                0,
+                0,
+                max(0, $bytesMax)
+            );
+        }
+
+        $total = 0;
+        $chunkSize = 8192;
+        while (!self::feof($source)) {
+            if ($maxlength > 0) {
+                $remaining = $maxlength - $total;
+                if ($remaining <= 0) {
+                    break;
+                }
+                $toRead = min($chunkSize, $remaining);
+            } else {
+                $toRead = $chunkSize;
+            }
+            $chunk = self::fread($source, $toRead);
+            if (false === $chunk) {
+                if (null !== $ctx) {
+                    VmStreamNotification::dispatch(
+                        $ctx,
+                        $streamContext,
+                        VmStreamNotification::NOTIFY_FAILURE,
+                        VmStreamNotification::SEVERITY_ERR,
+                        'Failed to read from source stream',
+                        0,
+                        $total,
+                        max(0, $bytesMax)
+                    );
+                }
+
+                return false;
+            }
+            if ('' === $chunk) {
+                break;
+            }
+            $readLen = \strlen($chunk);
+            $written = self::fwrite($dest, $chunk);
+            if (false === $written) {
+                if (null !== $ctx) {
+                    VmStreamNotification::dispatch(
+                        $ctx,
+                        $streamContext,
+                        VmStreamNotification::NOTIFY_FAILURE,
+                        VmStreamNotification::SEVERITY_ERR,
+                        'Failed to write to destination stream',
+                        0,
+                        $total,
+                        max(0, $bytesMax)
+                    );
+                }
+
+                return false;
+            }
+            $total += $written;
+            if (null !== $ctx && null !== VmStreamNotification::resolveForContext($streamContext)) {
+                VmStreamNotification::dispatch(
+                    $ctx,
+                    $streamContext,
+                    VmStreamNotification::NOTIFY_PROGRESS,
+                    VmStreamNotification::SEVERITY_INFO,
+                    '',
+                    0,
+                    $total,
+                    max(0, $bytesMax)
+                );
+            }
+            if ($written < $readLen) {
+                break;
+            }
+        }
+
+        if (null !== $ctx && null !== VmStreamNotification::resolveForContext($streamContext)) {
+            VmStreamNotification::dispatch(
+                $ctx,
+                $streamContext,
+                VmStreamNotification::NOTIFY_COMPLETED,
+                VmStreamNotification::SEVERITY_INFO,
+                '',
+                0,
+                $total,
+                max(0, $bytesMax)
+            );
+        }
+
+        return $total;
+    }
+
+    /**
      * stream_copy_to_string() — read stream bytes into a string (ext/standard/streams.c, #6547).
      *
      * php-src: PHP_FUNCTION(stream_copy_to_string) — offset defaults to 0 (start of stream).
@@ -1555,11 +1748,11 @@ final class VmFs
      */
     public static function getResourceType(int $handle): ?string
     {
-        if (!isset(self::$handles[$handle])) {
-            return null;
+        if (isset(self::$handles[$handle]) || VmPhpMemoryStream::isValidHandle($handle)) {
+            return 'stream';
         }
 
-        return 'stream';
+        return null;
     }
 
     /**
@@ -1575,13 +1768,18 @@ final class VmFs
         if (VmUserStream::isValidHandle($handle)) {
             return VmUserStream::protocolForHandle($handle);
         }
+        if (VmPhpMemoryStream::isValidHandle($handle)) {
+            return 'stream';
+        }
 
         return 'Unknown';
     }
 
     public static function isValidHandle(int $handle): bool
     {
-        return isset(self::$handles[$handle]) || VmUserStream::isValidHandle($handle);
+        return isset(self::$handles[$handle])
+            || VmUserStream::isValidHandle($handle)
+            || VmPhpMemoryStream::isValidHandle($handle);
     }
 
     /**
@@ -1603,6 +1801,12 @@ final class VmFs
             ++$index;
         }
         foreach (VmUserStream::openHandleIds() as $id) {
+            $value = new Variable();
+            $value->streamHandle($id, $ctx);
+            $ht->addIndex($index, $value);
+            ++$index;
+        }
+        foreach (VmPhpMemoryStream::openHandleIds() as $id) {
             $value = new Variable();
             $value->streamHandle($id, $ctx);
             $ht->addIndex($index, $value);
@@ -1665,6 +1869,9 @@ final class VmFs
         if (VmUserStream::isValidHandle($handle)) {
             return VmUserStream::uriForHandle($handle);
         }
+        if (VmPhpMemoryStream::isValidHandle($handle)) {
+            return VmPhpMemoryStream::uriForHandle($handle);
+        }
 
         return self::$handlePaths[$handle] ?? '';
     }
@@ -1720,15 +1927,18 @@ final class VmFs
     }
 
     /**
-     * Built-in php:// wrappers (memory, temp, fd, filter, …) — host PHP streams, not libc open(2).
+     * Remaining php:// wrappers (fd, filter, input, …) — host PHP streams, not libc open(2).
      */
     private static function isBuiltinPhpStreamUri(string $path): bool
     {
         if (!\str_starts_with($path, 'php://')) {
             return false;
         }
+        if (VmFsStdio::isStdioUri($path) || VmPhpMemoryStream::isSupportedUri($path)) {
+            return false;
+        }
 
-        return !VmFsStdio::isStdioUri($path);
+        return true;
     }
 
     private static function ffiEnabledForDisk(): bool
