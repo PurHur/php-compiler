@@ -341,10 +341,10 @@ patch_already_applied() {
       [[ -f "$ROOT/vendor/ircmaxell/php-cfg/lib/PHPCfg/Op/Type/Union_.php" ]]
       ;;
     php-cfg-ctor-promotion.patch)
-      grep -q 'promotionFlags' "$ROOT/vendor/ircmaxell/php-cfg/lib/PHPCfg/Op/Expr/Param.php" 2>/dev/null
+      grep -q '\$p->promotionFlags = \$param->flags' "$ROOT/vendor/ircmaxell/php-cfg/lib/PHPCfg/Parser.php" 2>/dev/null
       ;;
     php-cfg-ctor-promotion-readonly.patch)
-      grep -q 'promotionReadonly' "$ROOT/vendor/ircmaxell/php-cfg/lib/PHPCfg/Op/Expr/Param.php" 2>/dev/null
+      grep -q '\$p->promotionReadonly' "$ROOT/vendor/ircmaxell/php-cfg/lib/PHPCfg/Parser.php" 2>/dev/null
       ;;
     php-cfg-readonly-function.patch)
       grep -q 'FLAG_READONLY' "$ROOT/vendor/ircmaxell/php-cfg/lib/PHPCfg/Func.php" 2>/dev/null \
@@ -631,6 +631,135 @@ insert = method_path.read_text().rstrip("\n") + "\n\n"
 parser_path.write_text(text.replace(anchor, insert + anchor, 1))
 PY
   echo "Applied php-cfg yield-from overlay"
+}
+
+# Vendor may ship promotionSetVisibility on Param without promotionFlags (#1492 partial vendor).
+apply_php_cfg_ctor_promotion_overlay() {
+  local param="$ROOT/vendor/ircmaxell/php-cfg/lib/PHPCfg/Op/Expr/Param.php"
+  local parser="$ROOT/vendor/ircmaxell/php-cfg/lib/PHPCfg/Parser.php"
+  if [[ ! -f "$param" || ! -f "$parser" ]]; then
+    return 0
+  fi
+  if patch_already_applied "$PATCH_DIR/php-cfg-ctor-promotion.patch"; then
+    echo "Skip php-cfg-ctor-promotion.patch (already applied)"
+    return 0
+  fi
+  python3 - "$param" "$parser" <<'PY'
+import re
+import sys
+from pathlib import Path
+
+param_path = Path(sys.argv[1])
+parser_path = Path(sys.argv[2])
+param_text = param_path.read_text()
+parser_text = parser_path.read_text()
+
+flags_field = (
+    "\n    /** Constructor property promotion visibility (PhpParser Class_ flags), or 0. */\n"
+    "    public $promotionFlags = 0;\n"
+)
+if "promotionFlags" not in param_text:
+    for needle in (
+        "    /** Constructor promotion: asymmetric set visibility (#3165). */\n",
+        "    public int $promotionSetVisibility = 0;\n",
+        "    public $promotionSetVisibility = 0;\n",
+    ):
+        if needle in param_text:
+            param_text = param_text.replace(needle, flags_field + needle, 1)
+            break
+    else:
+        needle = "    public $declaredType;\n\n    // A helper\n    public $function;"
+        if needle in param_text:
+            insert = (
+                "    public $declaredType;\n"
+                + flags_field
+                + "\n    // A helper\n    public $function;"
+            )
+            param_text = param_text.replace(needle, insert, 1)
+        else:
+            sys.stderr.write("php-cfg-ctor-promotion: Param.php anchor missing\n")
+            raise SystemExit(1)
+    param_path.write_text(param_text)
+
+flags_line = "            $p->promotionFlags = $param->flags & Stmt\\Class_::VISIBILITY_MODIFIER_MASK;\n"
+if flags_line.strip() not in parser_text:
+    inserted = False
+    for needle in (
+        "            $p->promotionReadonly = 0 !== ($param->flags & Stmt\\Class_::MODIFIER_READONLY);\n",
+        "            $p->promotionSetVisibility = $this->extractAsymmetricSetVisibilityFromAttributes($p->getAttributes());\n",
+        "            $p->promotionGetVisibility = $this->extractAsymmetricGetVisibilityFromAttributes($p->getAttributes());\n",
+        "            $p->result->original = new Operand\\Variable(new Operand\\Literal($p->name->value));\n",
+    ):
+        if needle in parser_text:
+            parser_text = parser_text.replace(needle, flags_line + needle, 1)
+            inserted = True
+            break
+    if not inserted:
+        needle = (
+            "            );\n"
+            "            $p->result->original = new Operand\\Variable(new Operand\\Literal($p->name->value));"
+        )
+        if needle not in parser_text:
+            sys.stderr.write("php-cfg-ctor-promotion: Parser.php parseParameterList anchor missing\n")
+            raise SystemExit(1)
+        parser_text = parser_text.replace(
+            needle,
+            "            );\n" + flags_line + "            $p->result->original = new Operand\\Variable(new Operand\\Literal($p->name->value));",
+            1,
+        )
+    parser_path.write_text(parser_text)
+PY
+  echo "Applied php-cfg-ctor-promotion.patch (overlay)"
+}
+
+apply_php_cfg_ctor_promotion_readonly_overlay() {
+  local param="$ROOT/vendor/ircmaxell/php-cfg/lib/PHPCfg/Op/Expr/Param.php"
+  local parser="$ROOT/vendor/ircmaxell/php-cfg/lib/PHPCfg/Parser.php"
+  if [[ ! -f "$param" || ! -f "$parser" ]]; then
+    return 0
+  fi
+  if patch_already_applied "$PATCH_DIR/php-cfg-ctor-promotion-readonly.patch"; then
+    echo "Skip php-cfg-ctor-promotion-readonly.patch (already applied)"
+    return 0
+  fi
+  python3 - "$param" "$parser" <<'PY'
+import sys
+from pathlib import Path
+
+param_path = Path(sys.argv[1])
+parser_path = Path(sys.argv[2])
+param_text = param_path.read_text()
+parser_text = parser_path.read_text()
+
+readonly_field = (
+    "\n    /** Constructor property promotion readonly (PhpParser Class_::MODIFIER_READONLY). */\n"
+    "    public $promotionReadonly = false;\n"
+)
+if "promotionReadonly" not in param_text:
+    for needle in (
+        "    public $promotionFlags = 0;\n",
+        "    public int $promotionFlags = 0;\n",
+        "    /** Constructor promotion: asymmetric set visibility (#3165). */\n",
+        "    public int $promotionSetVisibility = 0;\n",
+    ):
+        if needle in param_text:
+            param_text = param_text.replace(needle, needle + readonly_field, 1)
+            break
+    else:
+        sys.stderr.write("php-cfg-ctor-promotion-readonly: Param.php anchor missing\n")
+        raise SystemExit(1)
+    param_path.write_text(param_text)
+
+readonly_line = "            $p->promotionReadonly = 0 !== ($param->flags & Stmt\\Class_::MODIFIER_READONLY);\n"
+if readonly_line.strip() not in parser_text:
+    flags_line = "            $p->promotionFlags = $param->flags & Stmt\\Class_::VISIBILITY_MODIFIER_MASK;\n"
+    if flags_line not in parser_text:
+        sys.stderr.write("php-cfg-ctor-promotion-readonly: Parser promotionFlags anchor missing\n")
+        raise SystemExit(1)
+    parser_text = parser_text.replace(flags_line, flags_line + readonly_line, 1)
+    parser_path.write_text(parser_text)
+PY
+  echo "Applied php-cfg-ctor-promotion-readonly.patch (overlay)"
 }
 
 # Vendor may ship promotionSetVisibility on Param before Property gains setVisibility (#3165, #1492).
@@ -4512,6 +4641,14 @@ apply_patch() {
   fi
   if [[ "$(basename "$patch")" == "php-cfg-property-type.patch" ]]; then
     apply_php_cfg_property_type_overlay
+    return $?
+  fi
+  if [[ "$(basename "$patch")" == "php-cfg-ctor-promotion.patch" ]]; then
+    apply_php_cfg_ctor_promotion_overlay
+    return $?
+  fi
+  if [[ "$(basename "$patch")" == "php-cfg-ctor-promotion-readonly.patch" ]]; then
+    apply_php_cfg_ctor_promotion_readonly_overlay
     return $?
   fi
   if [[ "$(basename "$patch")" == "php-cfg-assignop-coalesce.patch" ]]; then

@@ -681,6 +681,73 @@ PHP;
         }
     }
 
+    public function testPhpCfgCtorPromotionOverlayAddsFlagsForPartialVendorParam(): void
+    {
+        $param = self::$root.'/vendor/ircmaxell/php-cfg/lib/PHPCfg/Op/Expr/Param.php';
+        $parser = self::$root.'/vendor/ircmaxell/php-cfg/lib/PHPCfg/Parser.php';
+        if (!is_readable($param) || !is_readable($parser)) {
+            self::markTestSkipped('vendor/ircmaxell/php-cfg not installed');
+        }
+
+        $originalParam = (string) file_get_contents($param);
+        $originalParser = (string) file_get_contents($parser);
+        $simParam = preg_replace(
+            '/\n    \/\*\* Constructor property promotion visibility[^\n]*\n    public \$promotionFlags = 0;\n/',
+            "\n",
+            $originalParam,
+            1
+        );
+        $simParser = preg_replace(
+            '/\n            \$p->promotionFlags = \$param->flags & Stmt\\\\Class_::VISIBILITY_MODIFIER_MASK;\n/',
+            "\n",
+            $originalParser,
+            1
+        );
+        if ($simParser === $originalParser) {
+            $simParser = preg_replace(
+                '/\n            \$p->promotionFlags = \$param->flags & Stmt\\Class_::VISIBILITY_MODIFIER_MASK;\n/',
+                "\n",
+                $originalParser,
+                1
+            );
+        }
+        self::assertStringContainsString(
+            'promotionSetVisibility',
+            $simParam,
+            'fixture must keep partial-vendor promotionSetVisibility (#1492)'
+        );
+        self::assertStringNotContainsString('promotionFlags', $simParam, 'fixture must drop promotionFlags');
+        self::assertStringNotContainsString('$p->promotionFlags', $simParser, 'fixture must drop Parser promotionFlags');
+        file_put_contents($param, $simParam);
+        file_put_contents($parser, $simParser);
+
+        try {
+            $output = [];
+            $exitCode = 0;
+            exec('bash '.escapeshellarg(self::$root.'/script/apply-patches.sh').' 2>&1', $output, $exitCode);
+            $joined = implode("\n", $output);
+            self::assertSame(0, $exitCode, "apply-patches failed on partial vendor Param:\n".$joined);
+            self::assertStringContainsString(
+                'php-cfg-ctor-promotion.patch (overlay)',
+                $joined,
+                $joined
+            );
+            self::assertStringContainsString(
+                'promotionFlags',
+                (string) file_get_contents($param),
+                'overlay must restore Param promotionFlags (#1492 partial vendor)'
+            );
+            self::assertStringContainsString(
+                '$p->promotionFlags = $param->flags',
+                (string) file_get_contents($parser),
+                'overlay must restore Parser promotionFlags assignment'
+            );
+        } finally {
+            file_put_contents($param, $originalParam);
+            file_put_contents($parser, $originalParser);
+        }
+    }
+
     public function testPhpCfgMatchOverlayIncludesUnhandledMatchLowering(): void
     {
         $parser = self::$root.'/vendor/ircmaxell/php-cfg/lib/PHPCfg/Parser.php';
