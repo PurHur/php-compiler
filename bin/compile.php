@@ -346,6 +346,7 @@ function run(string $filename, string $code, array $options): void
         }
         try {
             $runtime->standalone($block, $options['-o'], $code, $filename);
+            \PHPCompiler\AOT\Linker::assertNonEmptyRequestedOutput((string) $options['-o']);
         } catch (\LogicException $e) {
             fwrite(STDERR, $e->getMessage()."\n");
             exit(2);

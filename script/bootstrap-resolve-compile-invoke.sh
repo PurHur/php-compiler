@@ -67,13 +67,23 @@ bootstrap_native_compile_output_ok() {
   grep -qE 'helloworld_compile_smoke: compile OK|compile_smoke_m3_emit: compile OK|bootstrap_loop_compile_smoke: gen-2 compile OK' <<< "${compile_out}"
 }
 
-# Inventory argv emit must materialize a real AOT binary (not stdout-only phantom success — #3046).
+# Inventory argv emit must materialize a real AOT binary (not stdout-only phantom success — #3046, #8709).
 bootstrap_inventory_argv_emit_output_ok() {
   local out=$1
   local out_bytes
-  [[ -f "${out}" && -x "${out}" ]] || return 1
+  if [[ ! -f "${out}" ]]; then
+    echo "bootstrap-inventory-argv-emit: missing -o output file: ${out} (#8709)" >&2
+    return 1
+  fi
+  if [[ ! -x "${out}" ]]; then
+    echo "bootstrap-inventory-argv-emit: -o output is not executable: ${out} (#8709)" >&2
+    return 1
+  fi
   out_bytes="$(wc -c <"${out}" 2>/dev/null || echo 0)"
-  [[ "${out_bytes}" =~ ^[0-9]+$ ]] && (( out_bytes > 0 ))
+  if [[ ! "${out_bytes}" =~ ^[0-9]+$ ]] || (( out_bytes <= 0 )); then
+    echo "bootstrap-inventory-argv-emit: -o output is empty (${out_bytes} bytes): ${out} (#8709)" >&2
+    return 1
+  fi
 }
 
 # Prelinked gen-0 argv drivers bake absolute /compiler/build/.m3_* sidecar paths at link time.
