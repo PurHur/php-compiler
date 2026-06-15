@@ -7,6 +7,7 @@ namespace PHPCompiler\ext\standard;
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\HashTable;
 use PHPCompiler\VM\Variable;
@@ -15,7 +16,7 @@ use PHPLLVM\Value;
 /**
  * exec() — run external program (php-src ext/standard/exec.c; #3278).
  *
- * VM: {@see VmExecNative}; JIT/AOT deferred (issue #3278).
+ * VM: {@see VmExecNative}; JIT/AOT: {@see JitExec} / ProcessRuntime (#8640, phase 2 #3278).
  */
 final class exec extends Internal
 {
@@ -63,6 +64,6 @@ final class exec extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        throw new \LogicException('exec() is not implemented for JIT/AOT in this compiler build (issue #3278)');
+        return JitExec::exec($context, ...$args);
     }
 }

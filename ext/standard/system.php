@@ -13,7 +13,7 @@ use PHPLLVM\Value;
 /**
  * system() — run external program and print output; return last line (php-src ext/standard/exec.c; #3278).
  *
- * VM: {@see VmExecNative}; JIT/AOT deferred (issue #3278).
+ * VM: {@see VmExecNative}; JIT/AOT: {@see JitExec} / ProcessRuntime (#8640, phase 2 #3278).
  */
 final class system extends Internal
 {
@@ -56,6 +56,6 @@ final class system extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        throw new \LogicException('system() is not implemented for JIT/AOT in this compiler build (issue #3278)');
+        return JitExec::system($context, ...$args);
     }
 }
