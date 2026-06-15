@@ -8719,6 +8719,7 @@ class Compiler {
                 0 === $argIndex
                 && !($producers[0] instanceof Op\Expr\Array_)
                 && !($producers[0] instanceof Op\Expr\ConstFetch)
+                && !($producers[0] instanceof Op\Expr\ClassConstFetch)
                 && !$this->isEmbeddedCallLiteralArg($callArgs[0] ?? null)
             ) {
                 return $producers[0];
