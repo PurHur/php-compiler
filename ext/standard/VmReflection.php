@@ -346,6 +346,41 @@ final class VmReflection
     }
 
     /**
+     * method_exists() operand dispatch — php-src ext/standard/class.c (#4360).
+     *
+     * Class-name strings see only methods on that class table (private parent methods excluded).
+     * Object operands walk inheritance (private parent methods included).
+     */
+    public static function methodExists(Context $ctx, Variable $objectOrClass, string $method): bool
+    {
+        $objectOrClass = $objectOrClass->resolveIndirect();
+        if (Variable::TYPE_STRING === $objectOrClass->type) {
+            $class = self::resolveClassEntry($ctx, $objectOrClass->toString());
+            if (null === $class) {
+                return false;
+            }
+
+            return self::methodExistsOnClass($class, $method);
+        }
+        if (Variable::TYPE_OBJECT === $objectOrClass->type) {
+            $object = $objectOrClass->toObject();
+            if (EnumCaseSupport::isEnumCase($object)) {
+                $class = EnumSupport::resolveRuntimeEnumClass($ctx, $object->class);
+
+                return self::methodExistsOnClass($class, $method);
+            }
+
+            return $ctx->runtime->vm->hasInstanceMethod($object->class, $method);
+        }
+        if (Variable::TYPE_ENUM_CASE === $objectOrClass->type) {
+            $class = EnumSupport::resolveRuntimeEnumClass($ctx, $objectOrClass->toEnumCase()->enumClass);
+
+            return self::methodExistsOnClass($class, $method);
+        }
+        throw new \LogicException('Expected object or class name string in this compiler build');
+    }
+
+    /**
      * class_meth_exists() — method on a class name string (#7068).
      *
      * php-src: Zend/zend_builtin_functions.c — class_meth_exists (string $class only)
