@@ -8656,7 +8656,7 @@ class Compiler {
             return $producerSlot;
         }
         if ($producerSlot === $argSlot) {
-            return null;
+            return $producerSlot;
         }
 
         return $producerSlot;
@@ -8738,6 +8738,7 @@ class Compiler {
     private function isInlineExprCallArgProducer(Op $op): bool
     {
         return $op instanceof Op\Expr\Array_
+            || $op instanceof Op\Expr\ArrayDimFetch
             || $op instanceof Op\Expr\New_
             || $op instanceof Op\Expr\ConstFetch
             || $op instanceof Op\Expr\FuncCall
