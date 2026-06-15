@@ -22,6 +22,13 @@ final class ErrorReporter
     public const E_USER_DEPRECATED = 16384;
     public const E_DEPRECATED = 8192;
 
+    /**
+     * Zend startup mask: E_ALL & ~E_DEPRECATED & ~E_STRICT (main/main.c; issue #4842).
+     *
+     * E_STRICT is 2048 on PHP ≤8.3; bit cleared even when the constant is removed (PHP 8.4+).
+     */
+    public const DEFAULT_STARTUP_REPORTING = \E_ALL & ~self::E_DEPRECATED & ~2048;
+
     /** Valid trigger_error() $error_level values (ext/standard/basic_functions.c). */
     public static function isUserErrorLevel(int $level): bool
     {
@@ -45,7 +52,7 @@ final class ErrorReporter
     private array $handlerStack = [];
 
     public function __construct(
-        int $errorReporting = E_ALL,
+        int $errorReporting = self::DEFAULT_STARTUP_REPORTING,
         bool $displayErrors = true
     ) {
         $this->errorReporting = $errorReporting;
