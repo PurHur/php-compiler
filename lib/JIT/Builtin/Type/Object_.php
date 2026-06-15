@@ -4095,6 +4095,8 @@ class Object_ extends Type {
         }
         if (Variable::TYPE_VALUE === $jitType && null !== $default && EnumCaseSupport::isEnumCaseVariable($default)) {
             $this->initStaticValuePropertyEnumCase($global, $default);
+        } elseif (Variable::TYPE_VALUE === $jitType && null !== $default && VMVariable::TYPE_ARRAY === $default->type) {
+            $this->initStaticValuePropertyEmptyArray($global);
         } elseif (Variable::TYPE_VALUE === $jitType && null !== $default && VMVariable::TYPE_NULL !== $default->type) {
             $this->initStaticValuePropertyScalarDefault($global, $default);
         } elseif (Variable::TYPE_VALUE === $jitType && (null === $default || VMVariable::TYPE_NULL === $default->type)) {
@@ -4159,6 +4161,29 @@ class Object_ extends Type {
         $this->context->builder->call(
             $this->context->lookupFunction('__value__writeNull'),
             $heapPtr
+        );
+        $this->context->builder->store($heapPtr, $global);
+        if (null !== $restore) {
+            BasicBlockHelper::restoreInsertBlock($this->context, $restore);
+        }
+    }
+
+    /** Box an empty compile-time array default into a union/DNF static {@see __value__} property (#8726, #8719). */
+    private function initStaticValuePropertyEmptyArray(\PHPLLVM\Value $global): void
+    {
+        $restore = $this->context->builder->getInsertBlock();
+        $this->context->positionBuilderAtInitEmission();
+        $valueType = $this->context->getTypeFromString('__value__');
+        $heapVal = $this->context->memory->malloc($valueType);
+        $heapPtr = $this->context->builder->pointerCast(
+            $heapVal,
+            $this->context->getTypeFromString('__value__*')
+        );
+        $ht = HashTableHelper::alloc($this->context);
+        $this->context->builder->call(
+            $this->context->lookupFunction('__value__writeHashtable'),
+            $heapPtr,
+            $ht
         );
         $this->context->builder->store($heapPtr, $global);
         if (null !== $restore) {
