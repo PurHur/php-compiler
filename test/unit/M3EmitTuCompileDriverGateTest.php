@@ -28,5 +28,8 @@ final class M3EmitTuCompileDriverGateTest extends TestCase
         $this->assertStringContainsString('return true;', $emit);
         $this->assertStringContainsString('contentMatchOnly', $aot);
         $this->assertStringContainsString('COMPILER_LIB_SOURCE_PATH_NORM', $aot);
+        $this->assertStringContainsString('COMPILER_LIB_SIDECAR_REL === $sidecarRel', $jit);
+        $this->assertStringContainsString("memLimit = '8192M'", $jit);
+        $this->assertStringContainsString('full-spine sidecar host-compile OOMs below 8GB (#8559)', $jit);
     }
 }

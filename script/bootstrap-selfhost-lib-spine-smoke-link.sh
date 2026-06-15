@@ -13,6 +13,9 @@ source "$(dirname "$0")/bootstrap-gen0-install-prelinked-driver.sh"
 ci_apply_llvm_memory_env
 ci_ensure_vendor_patches
 
+# Full-spine sidecar host-compile OOMs below 8GB (php-types TypeReconstructor — #8559).
+export PHP_COMPILER_MEMORY_LIMIT=8192M
+
 bootstrap_spine_emit_crash_diag() {
   local binary="$1"
   shift
@@ -187,8 +190,8 @@ if [[ "${BOOTSTRAP_LIB_SPINE_SMOKE_USE_COMPILE_INVOKE:-0}" != "1" ]]; then
         rm -f "${OUT}"
         # CLI_SPINE_BUNDLE skips bin/compile.php dispatch; SIDECAR_HOST stubs spine includes (#1492).
         env PHP_COMPILER_SELFHOST_AOT=1 PHP_COMPILER_M3_SIDECAR_HOST=1 \
-          PHP_COMPILER_MEMORY_LIMIT="${PHP_COMPILER_MEMORY_LIMIT:-4096M}" \
-          php -d "memory_limit=${PHP_COMPILER_MEMORY_LIMIT:-4096M}" \
+          PHP_COMPILER_MEMORY_LIMIT=8192M \
+          php -d memory_limit=8192M \
           "${ROOT}/bin/compile.php" -o "${OUT}" "${ENTRY}" 2>&1 || true
       fi
       if [[ ! -x "${OUT}" ]]; then
@@ -250,6 +253,19 @@ if [[ -n "${want_sha:-}" ]]; then
     cp -f "${OUT}" "${ROOT}/build/.m3_compiler_lib_aot_blob"
     chmod +x "${ROOT}/build/.m3_compiler_lib_aot_blob"
     printf '%s' "${want_sha}" >"${ROOT}/build/.m3_compiler_lib_sidecar.sha"
+  fi
+  have_sha=""
+  if [[ -f "${ROOT}/build/.m3_compiler_lib_sidecar.sha" ]]; then
+    have_sha="$(tr -d '\n' <"${ROOT}/build/.m3_compiler_lib_sidecar.sha")"
+  fi
+  if [[ "${want_sha}" != "${have_sha}" ]]; then
+    echo "bootstrap-selfhost-lib-spine-smoke-link: sidecar stamp still stale after link (want ${want_sha}, have ${have_sha:-<none>}) — honest emit required (#8559)" >&2
+    exit 1
+  fi
+  prelinked_lib="${ROOT}/prelinked/bootstrap-gen0/compiler_lib_aot_blob"
+  if [[ -f "${prelinked_lib}" ]] && cmp -s "${OUT}" "${prelinked_lib}"; then
+    echo "bootstrap-selfhost-lib-spine-smoke-link: output still byte-matches stale prelinked ${prelinked_lib} — refresh prelinked after honest emit (#8559)" >&2
+    exit 1
   fi
 fi
 echo "bootstrap-selfhost-lib-spine-smoke-link: OK ${OUT}"
