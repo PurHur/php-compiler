@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace PHPCompiler\ext\standard;
 
 use PHPCompiler\VM\Context;
+use PHPCompiler\VM\ErrorReporter;
 use PHPCompiler\VM\HashTable;
 use PHPCompiler\VM\Variable;
 
@@ -23,8 +24,6 @@ final class VmIni
         'session.gc_maxlifetime',
         ...VmAssertState::SUPPORTED_INI_KEYS,
     ];
-
-    private const CFG_ERROR_REPORTING = '32767';
 
     private const CFG_DISPLAY_ERRORS = '1';
 
@@ -98,7 +97,7 @@ final class VmIni
         }
 
         return match ($key) {
-            'error_reporting' => self::CFG_ERROR_REPORTING,
+            'error_reporting' => self::defaultErrorReportingString(),
             'display_errors' => self::CFG_DISPLAY_ERRORS,
             'memory_limit' => self::CFG_MEMORY_LIMIT,
             'serialize_precision' => self::CFG_SERIALIZE_PRECISION,
@@ -221,7 +220,7 @@ final class VmIni
 
         switch ($key) {
             case 'error_reporting':
-                $ctx->errors->setErrorReporting(self::parseErrorReporting(self::CFG_ERROR_REPORTING));
+                $ctx->errors->setErrorReporting(self::parseErrorReporting(self::defaultErrorReportingString()));
                 break;
             case 'display_errors':
                 $ctx->errors->setDisplayErrors(self::parseBoolIni(self::CFG_DISPLAY_ERRORS));
@@ -292,5 +291,10 @@ final class VmIni
         $var->int($value);
 
         return $var;
+    }
+
+    private static function defaultErrorReportingString(): string
+    {
+        return (string) ErrorReporter::DEFAULT_STARTUP_REPORTING;
     }
 }

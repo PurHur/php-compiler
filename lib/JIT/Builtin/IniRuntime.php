@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace PHPCompiler\JIT\Builtin;
 
 use PHPCompiler\JIT\Context;
+use PHPCompiler\VM\ErrorReporter;
 use PHPLLVM\BasicBlock;
 use PHPLLVM\Builder;
 use PHPLLVM\Value;
@@ -225,7 +226,10 @@ final class IniRuntime
         self::writeValueStringFromCstr(
             $context,
             $out,
-            $context->builder->pointerCast($context->constantFromString('32767'), $i8p)
+            $context->builder->pointerCast(
+                $context->constantFromString((string) ErrorReporter::DEFAULT_STARTUP_REPORTING),
+                $i8p
+            )
         );
         self::freeCstr($context, $fn, $optCstr);
         $context->builder->returnVoid();
@@ -419,7 +423,7 @@ final class IniRuntime
 
         $context->builder->positionAtEnd($erBb);
         $context->builder->store(
-            $i32->constInt(32767, false),
+            $i32->constInt(ErrorReporter::DEFAULT_STARTUP_REPORTING, false),
             self::globalPtr($context, self::G_ERROR_REPORTING, $i32)
         );
         self::freeCstr($context, $fn, $optCstr);
@@ -889,7 +893,7 @@ final class IniRuntime
 
         if (null === $context->module->getNamedGlobal(self::G_ERROR_REPORTING)) {
             $g = $context->module->addGlobal($i32, self::G_ERROR_REPORTING);
-            $g->setInitializer($i32->constInt(32767, false));
+            $g->setInitializer($i32->constInt(ErrorReporter::DEFAULT_STARTUP_REPORTING, false));
         }
         if (null === $context->module->getNamedGlobal(self::G_DISPLAY_ERRORS)) {
             $g = $context->module->addGlobal($i32, self::G_DISPLAY_ERRORS);
