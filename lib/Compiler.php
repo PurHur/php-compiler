@@ -8791,6 +8791,37 @@ class Compiler {
         if (!property_exists($callOp, 'args') || !is_array($callOp->args)) {
             return null;
         }
+        if (
+            0 === $argIndex
+            && ($callOp instanceof Op\Expr\FuncCall || $callOp instanceof Op\Expr\NsFuncCall)
+        ) {
+            $callIndex = null;
+            foreach ($block->orig->children as $i => $child) {
+                if ($child === $callOp) {
+                    $callIndex = $i;
+                    break;
+                }
+            }
+            if (null !== $callIndex) {
+                $nestedProducer = $this->findNestedFuncCallArgProducerForInvokableCallee(
+                    $callOp,
+                    $block->orig->children,
+                    $callIndex
+                );
+                if (null !== $nestedProducer) {
+                    $producerSlot = $block->slotForOperand($nestedProducer->result);
+                    if (null === $producerSlot) {
+                        foreach ($this->compileExpr($nestedProducer, $block) as $op) {
+                            $block->addOpCode($op);
+                        }
+                        $producerSlot = $block->slotForOperand($nestedProducer->result);
+                    }
+                    if (null !== $producerSlot) {
+                        return $producerSlot;
+                    }
+                }
+            }
+        }
         $producers = $this->precedingInlineCallArgProducersBeforeCfgOp($block->orig->children, $callOp);
         $producer = $this->matchInlineCallArgProducer($producers, $callOp->args, $argIndex);
         if (null === $producer) {
@@ -8817,7 +8848,14 @@ class Compiler {
             if (
                 null !== $callIndex
                 && null !== $producerIndex
-                && $this->isAdjacentNestedFuncCallProducer($producer, $callOp, $producerIndex, $callIndex)
+                && (
+                    $this->isAdjacentNestedFuncCallProducer($producer, $callOp, $producerIndex, $callIndex)
+                    || $this->findNestedFuncCallArgProducerForInvokableCallee(
+                        $callOp,
+                        $block->orig->children,
+                        $callIndex
+                    ) === $producer
+                )
             ) {
                 foreach ($this->compileExpr($producer, $block) as $op) {
                     $block->addOpCode($op);
@@ -8878,7 +8916,14 @@ class Compiler {
             if (
                 null !== $callIndex
                 && null !== $producerIndex
-                && $this->isAdjacentNestedFuncCallProducer($producer, $callOp, $producerIndex, $callIndex)
+                && (
+                    $this->isAdjacentNestedFuncCallProducer($producer, $callOp, $producerIndex, $callIndex)
+                    || $this->findNestedFuncCallArgProducerForInvokableCallee(
+                        $callOp,
+                        $block->orig->children,
+                        $callIndex
+                    ) === $producer
+                )
             ) {
                 return $producerSlot;
             }
@@ -9171,6 +9216,7 @@ class Compiler {
                 ($child instanceof Op\Expr\FuncCall || $child instanceof Op\Expr\NsFuncCall)
                 && !$this->inlineCallArgProducerFeedsConsumer($child, $callOp)
                 && !$this->isAdjacentNestedFuncCallProducer($child, $callOp, $i, $callIndex)
+                && $this->findNestedFuncCallArgProducerForInvokableCallee($callOp, $cfgChildren, $callIndex) !== $child
             ) {
                 break;
             }
@@ -9181,6 +9227,46 @@ class Compiler {
         }
 
         return $producers;
+    }
+
+    /**
+     * php-cfg `(fn($x) => f($x))(g())`: inner FuncCall feeds outer invokable call arg
+     * with outer ArrowFunction/Closure between producer and consumer (#8836, #7219).
+     *
+     * @param list<Op> $cfgChildren
+     */
+    private function findNestedFuncCallArgProducerForInvokableCallee(
+        Op\Expr\FuncCall|Op\Expr\NsFuncCall $callOp,
+        array $cfgChildren,
+        int $callIndex
+    ): Op\Expr\FuncCall|Op\Expr\NsFuncCall|null {
+        if (!property_exists($callOp, 'args') || !is_array($callOp->args) || 1 !== count($callOp->args)) {
+            return null;
+        }
+        $arg = $callOp->args[0];
+        if ($arg instanceof Operand\Literal) {
+            return null;
+        }
+        $calleePrep = $cfgChildren[$callIndex - 1] ?? null;
+        if (!$calleePrep instanceof Op\Expr\ArrowFunction && !$calleePrep instanceof Op\Expr\Closure) {
+            return null;
+        }
+        if (!property_exists($calleePrep, 'result')
+            || !property_exists($callOp, 'name')
+            || !$this->operandsReferToSameVariable($calleePrep->result, $callOp->name)) {
+            return null;
+        }
+        for ($j = $callIndex - 2; $j >= 0; --$j) {
+            $prev = $cfgChildren[$j];
+            if ($prev instanceof Op\Expr\FuncCall || $prev instanceof Op\Expr\NsFuncCall) {
+                return $prev;
+            }
+            if (!$prev instanceof Op\Expr\ArrowFunction && !$prev instanceof Op\Expr\Closure) {
+                break;
+            }
+        }
+
+        return null;
     }
 
     /**
@@ -9609,9 +9695,20 @@ class Compiler {
         if (null === $block->orig) {
             return false;
         }
-        foreach ($block->orig->children as $child) {
+        foreach ($block->orig->children as $i => $child) {
             if (!$this->isInlineExprCallArgConsumer($child)) {
                 continue;
+            }
+            if (
+                ($child instanceof Op\Expr\FuncCall || $child instanceof Op\Expr\NsFuncCall)
+                && null !== ($nested = $this->findNestedFuncCallArgProducerForInvokableCallee(
+                    $child,
+                    $block->orig->children,
+                    $i
+                ))
+                && ($nested->result === $result || $this->operandsReferToSameVariable($nested->result, $result))
+            ) {
+                return true;
             }
             $producers = $this->precedingInlineCallArgProducersBeforeCfgOp($block->orig->children, $child);
             foreach ($producers as $producer) {
