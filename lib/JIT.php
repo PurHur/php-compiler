@@ -7759,10 +7759,7 @@ class JIT {
                             if (!$this->context->functionIsRegistered($lcname)) {
                                 if (str_contains($nameVar->compileTimeString, '::')) {
                                     [$staticClass, $staticMethod] = explode('::', $nameVar->compileTimeString, 2);
-                                    if ($this->tryResolveSelfHostSuperglobalsStaticCall($staticClass, $staticMethod)) {
-                                        break;
-                                    }
-                                    if ($this->tryResolveProgressStaticCall($staticClass, $staticMethod)) {
+                                    if ($this->tryResolveSelfHostStubbedStaticCall($staticClass, $staticMethod)) {
                                         break;
                                     }
                                     throw new \LogicException("Call to undefined static method {$nameVar->compileTimeString}()");
@@ -11085,37 +11082,31 @@ class JIT {
             }
 
             return;
-        } elseif (Variable::TYPE_OBJECT === $result->type && Variable::TYPE_STRING === $value->type) {
+        } elseif (
+            (Variable::TYPE_OBJECT === $result->type && Variable::TYPE_STRING === $value->type)
+            || (Variable::TYPE_STRING === $result->type && Variable::TYPE_OBJECT === $value->type)
+        ) {
             $slot = JIT\JitValueBox::alloc($this->context);
-            $str = JIT\JitStringArg::stringPtrFromVariable($this->context, $value);
-            $owned = $this->context->builder->call(
-                $this->context->lookupFunction('__string__separate'),
-                $str
-            );
-            $this->context->builder->call(
-                $this->context->lookupFunction('__value__writeString'),
+            JIT\JitValueBox::assignToPointer(
+                $this->context,
                 JIT\JitValueBox::pointer($this->context, $slot),
-                $owned
+                $value
             );
-            $result->free();
-            $result->type = Variable::TYPE_VALUE;
-            $result->value = $slot;
-            $this->syncCompileTimeString($result, $value, $force);
-            $result->addref();
-
-            return;
-        } elseif (Variable::TYPE_STRING === $result->type && Variable::TYPE_OBJECT === $value->type) {
-            $slot = JIT\JitValueBox::alloc($this->context);
-            $this->context->builder->call(
-                $this->context->lookupFunction('__value__writeObject'),
-                JIT\JitValueBox::pointer($this->context, $slot),
-                $this->context->helper->loadValue($value)
+            $newResult = new Variable(
+                $this->context,
+                Variable::TYPE_VALUE,
+                Variable::KIND_VARIABLE,
+                $slot
             );
+            $this->syncCompileTimeString($newResult, $value, $force);
+            $newResult->compileTimeEnumCase = $value->compileTimeEnumCase;
+            $newResult->addref();
             $result->free();
-            $result->type = Variable::TYPE_VALUE;
-            $result->value = $slot;
-            $result->compileTimeEnumCase = $value->compileTimeEnumCase;
-            $result->addref();
+            $this->context->setVariableOp($resultOp, $newResult);
+            $resolved = JIT\OperandName::resolve($resultOp);
+            if (null !== $resolved && '' !== $resolved) {
+                $this->context->bindVariableByName($resolved, $newResult);
+            }
 
             return;
         }
@@ -12664,28 +12655,37 @@ class JIT {
         return false;
     }
 
-    /**
-     * Lower Progress::{noteFunction,notePhase,noteEntry} to __phpc_progress_note when the PHP
-     * method is not yet queued (self-host spine compile order — #8560, #6748).
-     */
-    private function tryResolveProgressStaticCall(string $className, string $methodName): bool
+    private function isSelfHostProgressClassLc(string $classLc): bool
     {
+        $classLc = strtolower(ltrim($classLc, '\\'));
+
+        return 'progress' === $classLc || str_ends_with($classLc, '\\progress');
+    }
+
+    private function tryResolveSelfHostProgressStaticCall(string $className, string $methodName): bool
+    {
+        if (!$this->shouldUseSelfHostJitStubs()) {
+            return false;
+        }
         $declaringClassLc = strtolower(ltrim($className, '\\'));
-        if ('phpcompiler\\jit\\progress' !== $declaringClassLc && 'jit\\progress' !== $declaringClassLc) {
+        if (!$this->isSelfHostProgressClassLc($declaringClassLc)) {
             return false;
         }
         $methodLc = strtolower($methodName);
         if (!in_array($methodLc, ['notefunction', 'notephase', 'noteentry'], true)) {
             return false;
         }
-        JIT\Builtin\ProgressNoteRuntime::ensureLinked($this->context);
-        $proxy = 'phpcompiler\\jit\\progress::'.strtolower($methodName);
-        if (!$this->context->functionIsRegistered($proxy)) {
-            return false;
-        }
-        $this->context->scope->toCall = $this->context->resolveFunctionProxy($proxy);
+        $fullLower = ('progress' === $declaringClassLc ? 'phpcompiler\\jit\\progress' : $declaringClassLc)
+            .'::'.$methodLc;
+        $this->context->scope->toCall = $this->context->resolveFunctionProxy($fullLower);
 
         return true;
+    }
+
+    private function tryResolveSelfHostStubbedStaticCall(string $className, string $methodName): bool
+    {
+        return $this->tryResolveSelfHostSuperglobalsStaticCall($className, $methodName)
+            || $this->tryResolveSelfHostProgressStaticCall($className, $methodName);
     }
 
     private function resolveJitStaticMethodProxyName(string $classLc, string $methodLc): string
@@ -12852,12 +12852,7 @@ class JIT {
 
                 return;
             }
-            if ($this->tryResolveSelfHostSuperglobalsStaticCall($className, $nameOp->value)) {
-                $this->context->scope->args = [];
-
-                return;
-            }
-            if ($this->tryResolveProgressStaticCall($className, $nameOp->value)) {
+            if ($this->tryResolveSelfHostStubbedStaticCall($className, $nameOp->value)) {
                 $this->context->scope->args = [];
 
                 return;

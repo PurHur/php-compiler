@@ -56,6 +56,7 @@ fi
 
 mkdir -p "${ROOT}/build"
 export PHP_COMPILER_SELFHOST_AOT=1
+export PHP_COMPILER_LIB_SPINE_BUNDLE=1
 export BOOTSTRAP_NO_ZEND_FALLBACK=1
 
 # M5: link spine with committed prelinked vendor .o when composer tree is absent (#3052, #1416).
@@ -176,7 +177,7 @@ if [[ "${BOOTSTRAP_LIB_SPINE_SMOKE_USE_COMPILE_INVOKE:-0}" != "1" ]]; then
         exit 1
       fi
     fi
-    _spine_compile_env=(env PHP_COMPILER_SELFHOST_AOT=1)
+    _spine_compile_env=(env PHP_COMPILER_SELFHOST_AOT=1 PHP_COMPILER_LIB_SPINE_BUNDLE=1)
     if [[ -n "${PHP_COMPILER_VENDOR_PRELINK:-}" ]]; then
       _spine_compile_env+=(PHP_COMPILER_VENDOR_PRELINK="${PHP_COMPILER_VENDOR_PRELINK}")
     fi
@@ -212,7 +213,7 @@ if [[ "${BOOTSTRAP_LIB_SPINE_SMOKE_USE_COMPILE_INVOKE:-0}" == "1" ]]; then
       exit 1
     fi
   fi
-  _spine_compile_env=(env PHP_COMPILER_SELFHOST_AOT=1)
+  _spine_compile_env=(env PHP_COMPILER_SELFHOST_AOT=1 PHP_COMPILER_LIB_SPINE_BUNDLE=1)
   if [[ -n "${PHP_COMPILER_VENDOR_PRELINK:-}" ]]; then
     _spine_compile_env+=(PHP_COMPILER_VENDOR_PRELINK="${PHP_COMPILER_VENDOR_PRELINK}")
   fi

@@ -50,9 +50,9 @@ final class BootstrapLibSpineVmSmokeTest extends TestCase
     public function testCompilePhpSkipsSourceBundlerForSpineLint(): void
     {
         $compile = (string) file_get_contents(self::$root.'/bin/compile.php');
-        $this->assertStringContainsString('phpc_compile_skip_aot_bundle_for_lint', $compile);
+        $this->assertStringContainsString('phpc_compile_skip_aot_bundle', $compile);
         $this->assertStringContainsString('compiler_lib_spine_smoke/main.php', $compile);
-        $this->assertStringContainsString('skipBundleForLint', $compile);
+        $this->assertStringContainsString('!$skipBundle', $compile);
     }
 
     public function testLibSpineLinkScriptSeedsSidecarsAndGen0Fallback(): void
