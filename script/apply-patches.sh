@@ -3004,6 +3004,10 @@ if 'stripTrailingDocText' not in text:
                     break;
                 default:
                     if ($ch <= ' ' && 0 === $depthAngle && 0 === $depthParen && 0 === $depthSquare && 0 === $depthCurly) {
+                        // callable(T): R — space after ':' is return type, not trailing prose (#8559 spine).
+                        if ($i > 0 && ':' === $decl[$i - 1]) {
+                            break;
+                        }
                         return trim(substr($decl, 0, $i));
                     }
                     break;
@@ -3018,6 +3022,72 @@ if 'stripTrailingDocText' not in text:
 path.write_text(text)
 PY
   echo "Applied php-types-docblock-trailing-text.patch (overlay)"
+}
+
+apply_php_types_callable_return_strip_overlay_to_target() {
+  local target="$1"
+  [[ -f "$target" ]] || return 0
+  python3 - "$target" <<'PY'
+import sys
+from pathlib import Path
+
+path = Path(sys.argv[1])
+text = path.read_text()
+needle = """                    if ($ch <= ' ' && 0 === $depthAngle && 0 === $depthParen && 0 === $depthSquare && 0 === $depthCurly) {
+                        return trim(substr($decl, 0, $i));
+                    }"""
+replacement = """                    if ($ch <= ' ' && 0 === $depthAngle && 0 === $depthParen && 0 === $depthSquare && 0 === $depthCurly) {
+                        // callable(T): R — space after ':' is return type, not trailing prose (#8559 spine).
+                        if ($i > 0 && ':' === $decl[$i - 1]) {
+                            break;
+                        }
+                        return trim(substr($decl, 0, $i));
+                    }"""
+if 'callable(T): R' not in text:
+    if needle not in text:
+        sys.stderr.write("php-types-callable-return-strip: stripTrailingDocText anchor not found\n")
+        raise SystemExit(1)
+    text = text.replace(needle, replacement, 1)
+
+fromdecl_needle = "        // Docblock union splits may leave a lone \"string,\" fragment (M2 spine; #3012).\n"
+fromdecl_insert = (
+    "        // Docblock callable signatures: vendor only supports bare callable keyword (#8559 spine).\n"
+    "        if (preg_match('/^callable\\s*\\(/i', $decl)) {\n"
+    "            return new self(self::TYPE_CALLABLE);\n"
+    "        }\n"
+    + fromdecl_needle
+)
+fromdecl_alt_needle = "        switch (strtolower($decl)) {\n"
+fromdecl_alt_insert = (
+    "        // Docblock callable signatures: vendor only supports bare callable keyword (#8559 spine).\n"
+    "        if (preg_match('/^callable\\s*\\(/i', $decl)) {\n"
+    "            return new self(self::TYPE_CALLABLE);\n"
+    "        }\n"
+    + fromdecl_alt_needle
+)
+if 'callable signatures: vendor only supports bare callable' not in text:
+    if fromdecl_needle in text:
+        text = text.replace(fromdecl_needle, fromdecl_insert, 1)
+    elif fromdecl_alt_needle in text:
+        text = text.replace(fromdecl_alt_needle, fromdecl_alt_insert, 1)
+    else:
+        sys.stderr.write("php-types-callable-return-strip: fromDecl anchor not found\n")
+        raise SystemExit(1)
+
+path.write_text(text)
+PY
+}
+
+apply_php_types_callable_return_strip_overlay() {
+  if patch_already_applied "$PATCH_DIR/php-types-callable-return-strip.patch"; then
+    echo "Skip php-types-callable-return-strip.patch (already applied)"
+    return 0
+  fi
+  apply_php_types_callable_return_strip_overlay_to_target \
+    "$ROOT/vendor/ircmaxell/php-types/lib/PHPTypes/Type.php"
+  apply_php_types_callable_return_strip_overlay_to_target \
+    "$ROOT/prelinked/bootstrap-vendor/sources/ircmaxell/php-types/lib/PHPTypes/Type.php"
+  echo "Applied php-types-callable-return-strip.patch (overlay)"
 }
 
 apply_php_types_docblock_full_type_overlay() {
@@ -4731,6 +4801,10 @@ apply_patch() {
     apply_php_types_docblock_trailing_text_overlay
     return $?
   fi
+  if [[ "$(basename "$patch")" == "php-types-callable-return-strip.patch" ]]; then
+    apply_php_types_callable_return_strip_overlay
+    return $?
+  fi
   if [[ "$(basename "$patch")" == "php-types-generic-null-tail.patch" ]]; then
     apply_php_types_generic_null_tail_overlay
     return $?
@@ -5092,6 +5166,7 @@ if [[ -d "$ROOT/vendor/ircmaxell/php-types" ]]; then
   apply_patch "$PATCH_DIR/php-types-generics-list-array.patch"
   apply_patch "$PATCH_DIR/php-types-iterable-generic.patch"
   apply_patch "$PATCH_DIR/php-types-docblock-trailing-text.patch"
+  apply_patch "$PATCH_DIR/php-types-callable-return-strip.patch"
   apply_patch "$PATCH_DIR/php-types-generic-null-tail.patch"
   apply_patch "$PATCH_DIR/php-types-fromdecl-junk-fragments.patch"
   apply_patch "$PATCH_DIR/php-types-fromdecl-trailing-comma.patch"

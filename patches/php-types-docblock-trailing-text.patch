@@ -71,6 +71,10 @@ diff --git vendor/ircmaxell/php-types/lib/PHPTypes/Type.php vendor/ircmaxell/php
 +                    break;
 +                default:
 +                    if ($ch <= ' ' && 0 === $depthAngle && 0 === $depthParen && 0 === $depthSquare && 0 === $depthCurly) {
++                        // callable(T): R — space after ':' is return type, not trailing prose (#8559 spine).
++                        if ($i > 0 && ':' === $decl[$i - 1]) {
++                            break;
++                        }
 +                        return trim(substr($decl, 0, $i));
 +                    }
 +                    break;
