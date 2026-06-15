@@ -86,6 +86,15 @@ final class IncludeHelper
             throw new \LogicException('include file not found for JIT/AOT: '.$path);
         }
 
+        if ($context->hasJitIncludedFileCompiled($path)) {
+            $context->recordJitIncludedFile($path);
+            if (null !== $resultOperand) {
+                $jit->assignIncludeResult($resultOperand);
+            }
+
+            return;
+        }
+
         $context->recordJitIncludedFile($path);
 
         $included = $context->runtime->parseAndCompileFile($path);
@@ -94,6 +103,8 @@ final class IncludeHelper
             $suffix = null !== $diag && '' !== $diag ? ' — '.$diag : ' — (no compiler abort detail; parser/CFG returned null)';
             throw new \LogicException('failed to compile include: '.$path.$suffix);
         }
+
+        $context->markJitIncludedFileCompiled($path);
 
         self::compileInlinedBlock($jit, $func, $callerBlock, $included, $resultOperand, false, 'c:include:'.$path);
     }

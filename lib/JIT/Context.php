@@ -268,6 +268,9 @@ class Context {
     /** @var list<string> compile-time included paths for get_included_files() (#3315) */
     public array $jitIncludedFiles = [];
 
+    /** @var array<string, true> require_once dedupe while lowering literal includes (#8559) */
+    public array $jitAotIncludedCompileDone = [];
+
     /** Clear per-script local name/ref bindings before lowering a new {main} TU (#4763). */
     public function resetScriptLocalBindings(): void
     {
@@ -275,6 +278,7 @@ class Context {
         $this->refAliasNames = [];
         $this->jitUndeclaredInstancePropertyWrites = [];
         $this->jitIncludedFiles = [];
+        $this->jitAotIncludedCompileDone = [];
     }
 
     public function recordJitIncludedFile(string $path): void
@@ -282,6 +286,29 @@ class Context {
         $normalized = \PHPCompiler\VM\ScriptStack::normalize($path);
         if ('' !== $normalized) {
             $this->jitIncludedFiles[] = $normalized;
+        }
+    }
+
+    public function hasJitIncludedFileCompiled(string $path): bool
+    {
+        $resolved = realpath($path);
+        if (false === $resolved) {
+            $resolved = $path;
+        }
+        $normalized = \PHPCompiler\VM\ScriptStack::normalize($resolved);
+
+        return '' !== $normalized && isset($this->jitAotIncludedCompileDone[$normalized]);
+    }
+
+    public function markJitIncludedFileCompiled(string $path): void
+    {
+        $resolved = realpath($path);
+        if (false === $resolved) {
+            $resolved = $path;
+        }
+        $normalized = \PHPCompiler\VM\ScriptStack::normalize($resolved);
+        if ('' !== $normalized) {
+            $this->jitAotIncludedCompileDone[$normalized] = true;
         }
     }
 

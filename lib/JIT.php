@@ -10383,37 +10383,31 @@ class JIT {
             }
 
             return;
-        } elseif (Variable::TYPE_OBJECT === $result->type && Variable::TYPE_STRING === $value->type) {
+        } elseif (
+            (Variable::TYPE_OBJECT === $result->type && Variable::TYPE_STRING === $value->type)
+            || (Variable::TYPE_STRING === $result->type && Variable::TYPE_OBJECT === $value->type)
+        ) {
             $slot = JIT\JitValueBox::alloc($this->context);
-            $str = JIT\JitStringArg::stringPtrFromVariable($this->context, $value);
-            $owned = $this->context->builder->call(
-                $this->context->lookupFunction('__string__separate'),
-                $str
-            );
-            $this->context->builder->call(
-                $this->context->lookupFunction('__value__writeString'),
+            JIT\JitValueBox::assignToPointer(
+                $this->context,
                 JIT\JitValueBox::pointer($this->context, $slot),
-                $owned
+                $value
             );
-            $result->free();
-            $result->type = Variable::TYPE_VALUE;
-            $result->value = $slot;
-            $this->syncCompileTimeString($result, $value, $force);
-            $result->addref();
-
-            return;
-        } elseif (Variable::TYPE_STRING === $result->type && Variable::TYPE_OBJECT === $value->type) {
-            $slot = JIT\JitValueBox::alloc($this->context);
-            $this->context->builder->call(
-                $this->context->lookupFunction('__value__writeObject'),
-                JIT\JitValueBox::pointer($this->context, $slot),
-                $this->context->helper->loadValue($value)
+            $newResult = new Variable(
+                $this->context,
+                Variable::TYPE_VALUE,
+                Variable::KIND_VARIABLE,
+                $slot
             );
+            $this->syncCompileTimeString($newResult, $value, $force);
+            $newResult->compileTimeEnumCase = $value->compileTimeEnumCase;
+            $newResult->addref();
             $result->free();
-            $result->type = Variable::TYPE_VALUE;
-            $result->value = $slot;
-            $result->compileTimeEnumCase = $value->compileTimeEnumCase;
-            $result->addref();
+            $this->context->setVariableOp($resultOp, $newResult);
+            $resolved = JIT\OperandName::resolve($resultOp);
+            if (null !== $resolved && '' !== $resolved) {
+                $this->context->bindVariableByName($resolved, $newResult);
+            }
 
             return;
         }
