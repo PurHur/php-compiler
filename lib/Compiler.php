@@ -8864,6 +8864,7 @@ class Compiler {
             if (
                 ($child instanceof Op\Expr\FuncCall || $child instanceof Op\Expr\NsFuncCall)
                 && !$this->inlineCallArgProducerFeedsConsumer($child, $callOp)
+                && !$this->isAdjacentNestedFuncCallProducer($child, $callOp, $i, $callIndex)
             ) {
                 break;
             }
@@ -8871,6 +8872,54 @@ class Compiler {
         }
 
         return $producers;
+    }
+
+    /**
+     * php-cfg `f(g())` may lower to adjacent FuncCalls with distinct result/arg temporaries
+     * (`strlen(trim($s))` → trim #6, strlen arg #7) (#8561, bootstrap-aot trim).
+     */
+    private function isAdjacentNestedFuncCallProducer(
+        Op\Expr $producer,
+        Op $consumer,
+        int $producerIndex,
+        int $consumerIndex
+    ): bool {
+        if ($producerIndex !== $consumerIndex - 1) {
+            return false;
+        }
+        if (!$producer instanceof Op\Expr\FuncCall && !$producer instanceof Op\Expr\NsFuncCall) {
+            return false;
+        }
+        if (
+            !$consumer instanceof Op\Expr\FuncCall
+            && !$consumer instanceof Op\Expr\NsFuncCall
+            && !$consumer instanceof Op\Expr\MethodCall
+            && !$consumer instanceof Op\Expr\StaticCall
+            && !$consumer instanceof Op\Expr\New_
+        ) {
+            return false;
+        }
+        if (!property_exists($consumer, 'args') || !is_array($consumer->args) || [] === $consumer->args) {
+            return false;
+        }
+        $args = $consumer->args;
+        if (1 === count($args)) {
+            $arg = $args[0];
+
+            return $arg instanceof Operand\Temporary
+                || ($arg instanceof Operand\Variable && !$this->isNamedVariableOperand($arg));
+        }
+        $lastArg = $args[count($args) - 1];
+
+        return $lastArg instanceof Operand\Temporary;
+    }
+
+    private function isNamedVariableOperand(Operand $arg): bool
+    {
+        return $arg instanceof Operand\Variable
+            && $arg->name instanceof Operand\Literal
+            && is_string($arg->name->value)
+            && '' !== $arg->name->value;
     }
 
     /** True when a hoisted FuncCall temp is an operand of the consumer call (#8561). */
