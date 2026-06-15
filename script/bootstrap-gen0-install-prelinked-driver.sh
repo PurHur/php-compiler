@@ -146,7 +146,8 @@ bootstrap_compiler_lib_honest_zend_compile() {
   fi
   mkdir -p "$(dirname "${out}")"
   rm -f "${out}"
-  local mem_limit="${PHP_COMPILER_MEMORY_LIMIT:-8192M}"
+  # ci_apply_llvm_memory_env pins 4096M; full-spine sidecar host-compile OOMs below 8GB (#8559).
+  local mem_limit="8192M"
   env PHP_COMPILER_M3_EMIT_SIDECAR_RECURSION_GUARD=1 \
     PHP_COMPILER_SELFHOST_AOT=1 \
     PHP_COMPILER_MEMORY_LIMIT="${mem_limit}" \
