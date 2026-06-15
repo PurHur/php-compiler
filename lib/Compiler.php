@@ -10547,14 +10547,20 @@ class Compiler {
             }
             $fetches = $this->precedingClassConstFetchesBeforeCfgOp($block->orig->children, $callOp);
             $fetch = $fetches[$argIndex] ?? null;
-            if ($fetch instanceof Op\Expr\ClassConstFetch) {
+            if (
+                $fetch instanceof Op\Expr\ClassConstFetch
+                && $this->callArgNeedsRuntimeEnumConstFetch($arg, $fetch, $block)
+            ) {
                 $vm = $this->tryFoldClassConstFetchDefault($fetch, $block, true);
                 if (null !== $vm) {
                     return $block->registerConstant($arg, $vm);
                 }
             }
             $fetch = $this->classConstFetchForHoistedDeadPrelude($callOp, $argIndex, $block);
-            if ($fetch instanceof Op\Expr\ClassConstFetch) {
+            if (
+                $fetch instanceof Op\Expr\ClassConstFetch
+                && $this->callArgNeedsRuntimeEnumConstFetch($arg, $fetch, $block)
+            ) {
                 $vm = $this->tryFoldClassConstFetchDefault($fetch, $block, true);
                 if (null !== $vm) {
                     return $block->registerConstant($arg, $vm);
