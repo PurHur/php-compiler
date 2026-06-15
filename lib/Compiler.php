@@ -9921,7 +9921,39 @@ class Compiler {
                 || $this->operandsReferToSameVariable($fetch->result, $callRoot->result);
         }
 
-        return false;
+        // php-cfg dead prelude: ClassConstFetch stmt + distinct call-arg temp (#5933, #8725).
+        return $this->isPositionalEnumCaseConstFetchForCallArg($fetch, $callOp, $siteArgIndex, $block);
+    }
+
+    /**
+     * php-cfg may emit `E::A; f($unrelatedTemp)` with no CFG edge between fetch and arg (#5933, #8725).
+     */
+    private function isPositionalEnumCaseConstFetchForCallArg(
+        Op\Expr\ClassConstFetch $fetch,
+        Op $callOp,
+        int $argIndex,
+        Block $block
+    ): bool {
+        if (null === $block->orig) {
+            return false;
+        }
+        $constName = $this->staticNameFromOperand($fetch->name);
+        $className = $this->staticNameFromOperand($fetch->class);
+        if (null === $constName || null === $className) {
+            return false;
+        }
+        $lcClass = $this->resolveDefaultClassConstScope($className, $block);
+        if (null === $lcClass || !$this->isCompileTimeEnumCaseConstantMember($lcClass, strtolower($constName))) {
+            return false;
+        }
+        $children = $block->orig->children;
+        $preceding = $this->precedingClassConstFetchesBeforeCfgOp($children, $callOp);
+        if (($preceding[$argIndex] ?? null) === $fetch) {
+            return true;
+        }
+        $hoisted = $this->classConstFetchForHoistedDeadPrelude($callOp, $argIndex, $block);
+
+        return $hoisted === $fetch;
     }
 
     /**
