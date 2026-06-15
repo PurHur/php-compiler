@@ -9668,6 +9668,10 @@ restart:
                 if (null === $const || $resolved->type === $const->type) {
                     return $frame->scope[$slot];
                 }
+                // Array dim fetch / spread temps hold live objects; do not substitute NULL block constants (#8814).
+                if (!$this->isEnumSlotClobberCandidate($resolved)) {
+                    return $frame->scope[$slot];
+                }
             }
         }
         if (null !== $const) {

@@ -8842,6 +8842,22 @@ class Compiler {
         if ($this->operandsReferToSameVariable($producer->result, $arg)) {
             return $producerSlot;
         }
+        // php-cfg uses distinct result/arg temps for `$f($a[0])` (#8814, zend_compile.c).
+        if ($producer instanceof Op\Expr\ArrayDimFetch) {
+            $callIndex = null;
+            $producerIndex = null;
+            foreach ($block->orig->children as $i => $child) {
+                if ($child === $callOp) {
+                    $callIndex = $i;
+                }
+                if ($child === $producer) {
+                    $producerIndex = $i;
+                }
+            }
+            if (null !== $callIndex && null !== $producerIndex && $producerIndex === $callIndex - 1) {
+                return $producerSlot;
+            }
+        }
         // php-cfg `f(g())` uses distinct result/arg temporaries (#8561, #7075).
         if (
             $producer instanceof Op\Expr\FuncCall
