@@ -56,18 +56,6 @@ final class iconv extends Internal
             throw new \LogicException('iconv() requires exactly three arguments');
         }
 
-        $fromLit = JitStringBuiltinArg::compileTimeLiteral($args[0]);
-        $toLit = JitStringBuiltinArg::compileTimeLiteral($args[1]);
-        $inputLit = JitStringBuiltinArg::compileTimeLiteral($args[2]);
-        if (null !== $fromLit && null !== $toLit && null !== $inputLit) {
-            $converted = VmIconv::iconv($fromLit, $toLit, $inputLit);
-            if (false === $converted) {
-                return $context->getTypeFromString('bool')->constInt(0, false);
-            }
-
-            return $context->constantFromString($converted);
-        }
-
-        throw new \LogicException('iconv() is not lowered for JIT/AOT in this compiler build');
+        return JitIconv::invoke($context, ...$args);
     }
 }
