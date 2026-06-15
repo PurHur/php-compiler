@@ -9462,6 +9462,11 @@ class JIT {
                         $name->value,
                         (int) ($op->propertySetVisibility ?? 0)
                     );
+                    $this->context->type->object->defineStaticPropertyGetVisibility(
+                        $classId,
+                        $name->value,
+                        (int) ($op->propertyGetVisibility ?? 0)
+                    );
                     break;
                 case OpCode::TYPE_DECLARE_PROPERTY:
                     $name = $block->getOperand($op->arg1);

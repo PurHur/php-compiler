@@ -3584,10 +3584,13 @@ restart:
                     }
                     $propNameRaw = $frame->scope[$op->arg3]->toString();
                     $propName = strtolower($propNameRaw);
-                    $visFrame = $this->enforceStaticPropertyReadVisibility($lcClass, $propNameRaw, $frame);
-                    if (null !== $visFrame) {
-                        $frame = $visFrame;
-                        goto restart;
+                    $forWrite = $this->propertyFetchDestUsedAsAssignLvalue($frame, $op);
+                    if (!$forWrite) {
+                        $visFrame = $this->enforceStaticPropertyReadVisibility($lcClass, $propNameRaw, $frame);
+                        if (null !== $visFrame) {
+                            $frame = $visFrame;
+                            goto restart;
+                        }
                     }
                     $storage = $this->resolveStaticPropertyStorage($lcClass, $propName);
                     if (null === $storage) {
@@ -3598,7 +3601,6 @@ restart:
                             $frame
                         );
                     }
-                    $forWrite = $this->propertyFetchDestUsedAsAssignLvalue($frame, $op);
                     if ($forWrite) {
                         $writeVisFrame = $this->enforceStaticPropertyWriteVisibility($lcClass, $propNameRaw, $frame);
                         if (null !== $writeVisFrame) {
@@ -9004,7 +9006,7 @@ restart:
         if (null === $meta) {
             return null;
         }
-        $readVis = PropertyVisibility::effectiveGetVisibility($meta['visibility'], 0);
+        $readVis = PropertyVisibility::effectiveGetVisibility($meta['visibility'], $meta['getVisibility']);
         if (MethodVisibility::isPublic($readVis)) {
             return null;
         }
@@ -9018,7 +9020,7 @@ restart:
                 $propNameRaw,
                 $callerLc ?? $meta['declaringClassLc'],
                 fn (string $classLcArg, string $ancestorLc): bool => $this->isClassSameOrSubclassOf($classLcArg, $ancestorLc),
-                0
+                $meta['getVisibility']
             );
         } catch (\LogicException $e) {
             return $this->dispatchVmError($e->getMessage(), $frame);
