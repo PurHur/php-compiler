@@ -4214,7 +4214,8 @@ class JIT {
                     $aotBytes,
                     $sidecarRel,
                     $sentinelLogical,
-                    true
+                    true,
+                    $this->m3EmitTuSidecarSourcePathNorm($path)
                 );
 
                 return;

@@ -108,6 +108,9 @@ final class M3EmitTuTrivialEchoAot
         if (str_ends_with($norm, '/test/selfhost/bootstrap_loop_smoke/main.php')) {
             return 'test/selfhost/bootstrap_loop_smoke/main.php';
         }
+        if (str_ends_with($norm, '/bin/compile.php')) {
+            return 'bin/compile.php';
+        }
 
         return null;
     }
