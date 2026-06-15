@@ -5068,6 +5068,10 @@ class Compiler {
                 return null;
             }
             $stored = $this->compileTimeClassConsts[$lcClass][$lcConst];
+            // Enum case fetches must materialize at runtime as TYPE_ENUM_CASE (#8767, zend_enum.c).
+            if ($this->isCompileTimeEnumCaseConstantMember($lcClass, $lcConst)) {
+                return null;
+            }
             if ($this->compileTimeStoredValueIsEnumCaseBackingScalar($lcClass, $lcConst, $stored)) {
                 return $this->compileTimeEnumCaseVar(
                     $className,
@@ -5775,7 +5779,7 @@ class Compiler {
                 'switch equality temporary'
             );
             $caseSlot = $this->requireOperandSlot(
-                $this->compileOperand($switch->cases[$i], $current, true),
+                $this->compileSwitchCaseOperand($switch->cases[$i], $current),
                 'switch case #'.$i
             );
             $current->addOpCode(new OpCode(
@@ -5807,6 +5811,30 @@ class Compiler {
                 $current = $elseTarget;
             }
         }
+    }
+
+    /**
+     * Materialize switch case labels at runtime — php-cfg Switch_ cases may lack preceding fetches (#8767).
+     */
+    protected function compileSwitchCaseOperand(Operand $caseOperand, Block $block): ?int
+    {
+        if (null !== $block->orig) {
+            foreach ($block->orig->children as $child) {
+                if (!$child instanceof Op\Expr\ClassConstFetch) {
+                    continue;
+                }
+                if ($child->result !== $caseOperand && !$this->operandsReferToSameVariable($child->result, $caseOperand)) {
+                    continue;
+                }
+                foreach ($this->compileClassConstFetch($child, $block) as $op) {
+                    $block->addOpCode($op);
+                }
+
+                return $this->compileOperand($caseOperand, $block, true);
+            }
+        }
+
+        return $this->compileOperand($caseOperand, $block, true);
     }
 
     protected function getOpCodeTypeFromBinaryOp(Op\Expr\BinaryOp $expr): int {
@@ -9827,7 +9855,6 @@ class Compiler {
         if (null !== $constName && null !== $className) {
             $lcClass = $this->resolveDefaultClassConstScope($className, $block);
             if (null !== $lcClass
-                && isset($this->compileTimeEnumBackedTypes[$lcClass])
                 && $this->isCompileTimeEnumCaseConstantMember($lcClass, strtolower($constName))) {
                 return $this->compileClassConstFetchRuntimeOpCodes($expr, $block, $expr->result);
             }
