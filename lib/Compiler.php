@@ -8675,7 +8675,13 @@ class Compiler {
             return null;
         }
         $producerSlot = $block->slotForOperand($producer->result);
-        if (null === $producerSlot && ($producer instanceof Op\Expr\FuncCall || $producer instanceof Op\Expr\NsFuncCall)) {
+        if (
+            null === $producerSlot
+            && ($producer instanceof Op\Expr\FuncCall
+                || $producer instanceof Op\Expr\NsFuncCall
+                || $producer instanceof Op\Expr\StaticCall
+                || $producer instanceof Op\Expr\MethodCall)
+        ) {
             $callIndex = null;
             $producerIndex = null;
             foreach ($block->orig->children as $i => $child) {
@@ -8711,7 +8717,12 @@ class Compiler {
             return $producerSlot;
         }
         // php-cfg `f(g())` uses distinct result/arg temporaries (#8561, #7075).
-        if ($producer instanceof Op\Expr\FuncCall || $producer instanceof Op\Expr\NsFuncCall) {
+        if (
+            $producer instanceof Op\Expr\FuncCall
+            || $producer instanceof Op\Expr\NsFuncCall
+            || $producer instanceof Op\Expr\StaticCall
+            || $producer instanceof Op\Expr\MethodCall
+        ) {
             $callIndex = null;
             $producerIndex = null;
             foreach ($block->orig->children as $i => $child) {
@@ -8947,6 +8958,8 @@ class Compiler {
             || $op instanceof Op\Expr\ArrowFunction
             || $op instanceof Op\Expr\FuncCall
             || $op instanceof Op\Expr\NsFuncCall
+            || $op instanceof Op\Expr\StaticCall
+            || $op instanceof Op\Expr\MethodCall
             || $op instanceof Op\Expr\UnaryMinus
             || $op instanceof Op\Expr\UnaryPlus;
     }
@@ -9011,7 +9024,12 @@ class Compiler {
         if ($producerIndex !== $consumerIndex - 1) {
             return false;
         }
-        if (!$producer instanceof Op\Expr\FuncCall && !$producer instanceof Op\Expr\NsFuncCall) {
+        if (
+            !$producer instanceof Op\Expr\FuncCall
+            && !$producer instanceof Op\Expr\NsFuncCall
+            && !$producer instanceof Op\Expr\StaticCall
+            && !$producer instanceof Op\Expr\MethodCall
+        ) {
             return false;
         }
         if (
