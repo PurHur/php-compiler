@@ -8651,6 +8651,28 @@ class Compiler {
             return null;
         }
         $producerSlot = $block->slotForOperand($producer->result);
+        if (null === $producerSlot && ($producer instanceof Op\Expr\FuncCall || $producer instanceof Op\Expr\NsFuncCall)) {
+            $callIndex = null;
+            $producerIndex = null;
+            foreach ($block->orig->children as $i => $child) {
+                if ($child === $callOp) {
+                    $callIndex = $i;
+                }
+                if ($child === $producer) {
+                    $producerIndex = $i;
+                }
+            }
+            if (
+                null !== $callIndex
+                && null !== $producerIndex
+                && $this->isAdjacentNestedFuncCallProducer($producer, $callOp, $producerIndex, $callIndex)
+            ) {
+                foreach ($this->compileExpr($producer, $block) as $op) {
+                    $block->addOpCode($op);
+                }
+                $producerSlot = $block->slotForOperand($producer->result);
+            }
+        }
         if (null === $producerSlot) {
             return null;
         }
@@ -8663,6 +8685,26 @@ class Compiler {
         }
         if ($this->operandsReferToSameVariable($producer->result, $arg)) {
             return $producerSlot;
+        }
+        // php-cfg `f(g())` uses distinct result/arg temporaries (#8561, #7075).
+        if ($producer instanceof Op\Expr\FuncCall || $producer instanceof Op\Expr\NsFuncCall) {
+            $callIndex = null;
+            $producerIndex = null;
+            foreach ($block->orig->children as $i => $child) {
+                if ($child === $callOp) {
+                    $callIndex = $i;
+                }
+                if ($child === $producer) {
+                    $producerIndex = $i;
+                }
+            }
+            if (
+                null !== $callIndex
+                && null !== $producerIndex
+                && $this->isAdjacentNestedFuncCallProducer($producer, $callOp, $producerIndex, $callIndex)
+            ) {
+                return $producerSlot;
+            }
         }
 
         return null;
