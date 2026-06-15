@@ -403,6 +403,20 @@ class VM {
     }
 
     /**
+     * Snapshot array literal elements so compiler expr temps can be reused (#5593, #5598, #5627).
+     */
+    private function materializeArrayElementForStorage(Variable $value): Variable
+    {
+        if (!$value->isIndirect()) {
+            return $value;
+        }
+        $copy = new Variable();
+        $copy->copyFrom($value->resolveIndirect());
+
+        return $copy;
+    }
+
+    /**
      * Materialize Iterator / Generator RHS into a packed list array for integer-key dim fetches (#7452).
      */
     private function materializeListDestructIterableRhs(Variable $rhsSlot, Frame $frame): ?Frame
@@ -4971,11 +4985,11 @@ restart:
                         }
                         $ht = $result->toArray();
                         if (is_null($op->arg3)) {
-                            $ht->append($frame->scope[$op->arg2]);
+                            $ht->append($this->materializeArrayElementForStorage($frame->scope[$op->arg2]));
                             break;
                         }
                         $key = $frame->scope[$op->arg3]->resolveIndirect();
-                        $value = $frame->scope[$op->arg2];
+                        $value = $this->materializeArrayElementForStorage($frame->scope[$op->arg2]);
                         if ($key->is(Variable::TYPE_OBJECT) || $key->is(Variable::TYPE_ARRAY)) {
                             throw new \TypeError('Illegal offset type');
                         }
