@@ -16,7 +16,9 @@ final class SetcookieLine
         string $path = '',
         string $domain = '',
         bool $secure = false,
-        bool $httponly = false
+        bool $httponly = false,
+        string $samesite = '',
+        bool $partitioned = false
     ): string {
         $parts = [$name.'='.$value];
         if ($expires > 0) {
@@ -33,6 +35,12 @@ final class SetcookieLine
         }
         if ($httponly) {
             $parts[] = 'httponly';
+        }
+        if ('' !== $samesite) {
+            $parts[] = 'samesite='.$samesite;
+        }
+        if ($partitioned) {
+            $parts[] = 'partitioned';
         }
 
         return 'Set-Cookie: '.implode('; ', $parts);
