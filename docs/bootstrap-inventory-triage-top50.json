@@ -1,10 +1,10 @@
 {
-    "scanned": 2649,
+    "scanned": 2721,
     "top": 50,
     "rows": [
         {
             "message": "Cannot use PHPCompiler\\Frame as Frame because the name is already in use on line 7",
-            "file_count": 841,
+            "file_count": 865,
             "examples": [
                 "ext/bcmath/BcmathFunction.php",
                 "ext/bcmath/NumberAdd.php",
@@ -15,7 +15,7 @@
         },
         {
             "message": "Cannot use PHPCompiler\\JIT\\Context as Context because the name is already in use on line 7",
-            "file_count": 291,
+            "file_count": 301,
             "examples": [
                 "ext/filter/JitFilterList.php",
                 "ext/libxml/LibxmlFunction.php",
@@ -26,7 +26,7 @@
         },
         {
             "message": "Cannot use PHPCompiler\\JIT\\BasicBlockHelper as BasicBlockHelper because the name is already in use on line 7",
-            "file_count": 192,
+            "file_count": 199,
             "examples": [
                 "ext/standard/JitArrayCountRecursive.php",
                 "ext/standard/JitArrayFill.php",
@@ -59,9 +59,9 @@
         },
         {
             "message": "Cannot use PHPCompiler\\JIT\\Context as Context because the name is already in use on line 8",
-            "file_count": 65,
+            "file_count": 64,
             "examples": [
-                "ext/bcmath/JitBcmath.php",
+                "ext/gettext/JitGettext.php",
                 "ext/hash/JitHashAlgos.php",
                 "ext/mbstring/JitMbConvertCase.php"
             ],
@@ -103,14 +103,25 @@
         },
         {
             "message": "Cannot use PHPCompiler\\JIT\\Call as Call because the name is already in use on line 7",
-            "file_count": 17,
+            "file_count": 18,
             "examples": [
+                "lib/JIT/Builtin/ProgressNoteRuntime.php",
                 "lib/JIT/Call/ClosureBindTo.php",
-                "lib/JIT/Call/ClosureWithBinding.php",
-                "lib/JIT/Call/ClosureWithCaptures.php"
+                "lib/JIT/Call/ClosureWithBinding.php"
             ],
             "issue": null,
             "rank": 10
+        },
+        {
+            "message": "Cannot use PHPCompiler\\VM\\HashTable as HashTable because the name is already in use on line 7",
+            "file_count": 17,
+            "examples": [
+                "ext/standard/NativeLastError.php",
+                "ext/standard/VmArrayAssocSetOps.php",
+                "ext/standard/VmDns.php"
+            ],
+            "issue": null,
+            "rank": 11
         },
         {
             "message": "Cannot use PHPCompiler\\JIT\\BasicBlockHelper as BasicBlockHelper because the name is already in use on line 11",
@@ -121,7 +132,29 @@
                 "ext/standard/JitImplode.php"
             ],
             "issue": null,
-            "rank": 11
+            "rank": 12
+        },
+        {
+            "message": "Cannot use PHPCompiler\\JIT\\BasicBlockHelper as BasicBlockHelper because the name is already in use on line 8",
+            "file_count": 16,
+            "examples": [
+                "ext/filter/JitFilterId.php",
+                "ext/standard/JitArrayElem.php",
+                "ext/standard/JitDate.php"
+            ],
+            "issue": null,
+            "rank": 13
+        },
+        {
+            "message": "Cannot use PHPCompiler\\JIT\\Context as Context because the name is already in use on line 9",
+            "file_count": 16,
+            "examples": [
+                "ext/bcmath/JitBcmath.php",
+                "ext/ctype/JitCtype.php",
+                "ext/curl/CurlFunction.php"
+            ],
+            "issue": null,
+            "rank": 14
         },
         {
             "message": "Cannot use PHPCfg\\Op as Op because the name is already in use on line 7",
@@ -132,7 +165,7 @@
                 "lib/Compiler/DeprecatedMetadata.php"
             ],
             "issue": null,
-            "rank": 12
+            "rank": 15
         },
         {
             "message": "Cannot use PHPCompiler\\Frame as Frame because the name is already in use on line 8",
@@ -143,29 +176,7 @@
                 "ext/hash/hash_init.php"
             ],
             "issue": null,
-            "rank": 13
-        },
-        {
-            "message": "Cannot use PHPCompiler\\JIT\\BasicBlockHelper as BasicBlockHelper because the name is already in use on line 8",
-            "file_count": 15,
-            "examples": [
-                "ext/filter/JitFilterId.php",
-                "ext/standard/JitArrayElem.php",
-                "ext/standard/JitDate.php"
-            ],
-            "issue": null,
-            "rank": 14
-        },
-        {
-            "message": "Cannot use PHPCompiler\\VM\\HashTable as HashTable because the name is already in use on line 7",
-            "file_count": 15,
-            "examples": [
-                "ext/standard/NativeLastError.php",
-                "ext/standard/VmArrayAssocSetOps.php",
-                "ext/standard/VmDns.php"
-            ],
-            "issue": null,
-            "rank": 15
+            "rank": 16
         },
         {
             "message": "Cannot use PHPCfg\\Func as CfgFunc because the name is already in use on line 7",
@@ -176,18 +187,18 @@
                 "lib/Compiler/InterfaceConstVisibilityCheck.php"
             ],
             "issue": null,
-            "rank": 16
+            "rank": 17
         },
         {
-            "message": "Cannot use PHPCompiler\\JIT\\Context as Context because the name is already in use on line 9",
+            "message": "Cannot use PHPCompiler\\JIT\\ArrayBuiltinHelper as ArrayBuiltinHelper because the name is already in use on line 7",
             "file_count": 13,
             "examples": [
-                "ext/ctype/JitCtype.php",
-                "ext/curl/CurlFunction.php",
-                "ext/gd/GdFunction.php"
+                "ext/standard/JitArrayIsList.php",
+                "ext/standard/JitArrayKey.php",
+                "ext/standard/JitArrayMergeRecursive.php"
             ],
             "issue": null,
-            "rank": 17
+            "rank": 18
         },
         {
             "message": "Cannot use PHPCompiler\\VM\\EnumCaseSupport as EnumCaseSupport because the name is already in use on line 7",
@@ -198,7 +209,7 @@
                 "ext/standard/VmDirArg.php"
             ],
             "issue": null,
-            "rank": 18
+            "rank": 19
         },
         {
             "message": "Cannot use PHPCompiler\\Compiler\\SourceLocation as SourceLocation because the name is already in use on line 7",
@@ -207,17 +218,6 @@
                 "lib/VM/Builtin/ReflectionClassGetEndLine.php",
                 "lib/VM/Builtin/ReflectionClassGetExtensionName.php",
                 "lib/VM/Builtin/ReflectionClassGetFileName.php"
-            ],
-            "issue": null,
-            "rank": 19
-        },
-        {
-            "message": "Cannot use PHPCompiler\\JIT\\ArrayBuiltinHelper as ArrayBuiltinHelper because the name is already in use on line 7",
-            "file_count": 12,
-            "examples": [
-                "ext/standard/JitArrayIsList.php",
-                "ext/standard/JitArrayKey.php",
-                "ext/standard/JitArrayMergeRecursive.php"
             ],
             "issue": null,
             "rank": 20
@@ -256,6 +256,17 @@
             "rank": 23
         },
         {
+            "message": "Cannot use PHPCompiler\\VM\\Context as Context because the name is already in use on line 7",
+            "file_count": 9,
+            "examples": [
+                "ext/standard/VmGcStatus.php",
+                "ext/standard/VmIni.php",
+                "ext/standard/VmIniQuantity.php"
+            ],
+            "issue": null,
+            "rank": 24
+        },
+        {
             "message": "Cannot use PHPCompiler\\ext\\standard\\VmMath as VmMath because the name is already in use on line 7",
             "file_count": 9,
             "examples": [
@@ -264,7 +275,7 @@
                 "ext/intl/grapheme_strpos.php"
             ],
             "issue": null,
-            "rank": 24
+            "rank": 25
         },
         {
             "message": "Cannot use PHPCfg\\Block as CfgBlock because the name is already in use on line 7",
@@ -275,7 +286,7 @@
                 "lib/Compiler/GeneratorNeverReturnCompileCheck.php"
             ],
             "issue": null,
-            "rank": 25
+            "rank": 26
         },
         {
             "message": "Cannot use PHPCompiler\\JIT\\Builtin\\TypeErrorRaise as TypeErrorRaise because the name is already in use on line 8",
@@ -284,17 +295,6 @@
                 "ext/standard/JitExecutionLimits.php",
                 "ext/standard/JitGcMemCaches.php",
                 "ext/standard/JitGcStatus.php"
-            ],
-            "issue": null,
-            "rank": 26
-        },
-        {
-            "message": "Cannot use PHPCompiler\\VM\\Context as Context because the name is already in use on line 7",
-            "file_count": 8,
-            "examples": [
-                "ext/standard/VmGcStatus.php",
-                "ext/standard/VmIni.php",
-                "ext/standard/VmIniQuantity.php"
             ],
             "issue": null,
             "rank": 27
@@ -355,6 +355,17 @@
             "rank": 32
         },
         {
+            "message": "Cannot use PHPCompiler\\JIT\\Context as Context because the name is already in use on line 10",
+            "file_count": 6,
+            "examples": [
+                "ext/bz2/bzcompress.php",
+                "ext/filter/JitFilter.php",
+                "ext/filter/filter_id.php"
+            ],
+            "issue": null,
+            "rank": 33
+        },
+        {
             "message": "Cannot use PHPCompiler\\VM\\Context as Context because the name is already in use on line 8",
             "file_count": 6,
             "examples": [
@@ -363,7 +374,7 @@
                 "ext/standard/VmCallable.php"
             ],
             "issue": null,
-            "rank": 33
+            "rank": 34
         },
         {
             "message": "Cannot use PHPCompiler\\VM\\Variable as Variable because the name is already in use on line 7",
@@ -374,7 +385,7 @@
                 "ext/standard/VmPhpCoreConstants.php"
             ],
             "issue": null,
-            "rank": 34
+            "rank": 35
         },
         {
             "message": "Cannot use PHPCompiler\\JIT\\Context as Context because the name is already in use on line 11",
@@ -385,7 +396,7 @@
                 "ext/standard/JitNl2br.php"
             ],
             "issue": null,
-            "rank": 35
+            "rank": 36
         },
         {
             "message": "Cannot use PHPCompiler\\ext\\standard\\VmReflection as VmReflection because the name is already in use on line 8",
@@ -396,7 +407,7 @@
                 "lib/VM/Builtin/ReflectionDeprecatedReturn.php"
             ],
             "issue": null,
-            "rank": 36
+            "rank": 37
         },
         {
             "message": "Cannot use PHPCompiler\\CompilerVersion as CompilerVersion because the name is already in use on line 7",
@@ -407,7 +418,7 @@
                 "lib/Ast/VoidCastDesugar.php"
             ],
             "issue": null,
-            "rank": 37
+            "rank": 38
         },
         {
             "message": "Cannot use PHPCompiler\\Func as Func because the name is already in use on line 7",
@@ -418,7 +429,7 @@
                 "lib/VM/HeaderCallbackQueue.php"
             ],
             "issue": null,
-            "rank": 38
+            "rank": 39
         },
         {
             "message": "Cannot use PHPCompiler\\JIT\\Builtin as Builtin because the name is already in use on line 15",
@@ -429,7 +440,7 @@
                 "lib/JIT/Builtin/Output.php"
             ],
             "issue": null,
-            "rank": 39
+            "rank": 40
         },
         {
             "message": "Cannot use PHPCompiler\\JIT\\Builtin\\ReflectionNative as ReflectionNative because the name is already in use on line 7",
@@ -440,7 +451,7 @@
                 "lib/JIT/Call/ReflectionConstantConstruct.php"
             ],
             "issue": null,
-            "rank": 40
+            "rank": 41
         },
         {
             "message": "Cannot use PHPCompiler\\JIT\\Builtin\\ReflectionSetup as ReflectionSetup because the name is already in use on line 7",
@@ -449,17 +460,6 @@
                 "lib/JIT/Call/ReflectionAttributeGetName.php",
                 "lib/JIT/Call/ReflectionClassConstruct.php",
                 "lib/JIT/Call/ReflectionClassGetMethod.php"
-            ],
-            "issue": null,
-            "rank": 41
-        },
-        {
-            "message": "Cannot use PHPCompiler\\JIT\\Context as Context because the name is already in use on line 10",
-            "file_count": 4,
-            "examples": [
-                "ext/bz2/bzcompress.php",
-                "ext/filter/JitFilter.php",
-                "ext/filter/filter_id.php"
             ],
             "issue": null,
             "rank": 42

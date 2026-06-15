@@ -4,7 +4,7 @@
             "Cannot use PHPCompiler\\Frame as Frame because the name is already in use on line 7"
         ],
         "ext/bcmath/JitBcmath.php": [
-            "Cannot use PHPCompiler\\JIT\\Context as Context because the name is already in use on line 8"
+            "Cannot use PHPCompiler\\JIT\\Context as Context because the name is already in use on line 9"
         ],
         "ext/bcmath/NumberAdd.php": [
             "Cannot use PHPCompiler\\Frame as Frame because the name is already in use on line 7"
@@ -58,6 +58,9 @@
             "Cannot use PHPCompiler\\Frame as Frame because the name is already in use on line 7"
         ],
         "ext/bcmath/bcpowmod.php": [
+            "Cannot use PHPCompiler\\Frame as Frame because the name is already in use on line 7"
+        ],
+        "ext/bcmath/bcround.php": [
             "Cannot use PHPCompiler\\Frame as Frame because the name is already in use on line 7"
         ],
         "ext/bcmath/bcscale.php": [
@@ -126,6 +129,12 @@
         "ext/curl/CurlFunction.php": [
             "Cannot use PHPCompiler\\JIT\\Context as Context because the name is already in use on line 9"
         ],
+        "ext/curl/curl_escape.php": [
+            "Cannot use PHPCompiler\\ext\\standard\\VmString as VmString because the name is already in use on line 8"
+        ],
+        "ext/curl/curl_unescape.php": [
+            "Cannot use PHPCompiler\\ext\\standard\\JitUrlencode as JitUrlencode because the name is already in use on line 7"
+        ],
         "ext/dom/DomClassMethod.php": [
             "Cannot use PHPCompiler\\Frame as Frame because the name is already in use on line 7"
         ],
@@ -167,6 +176,33 @@
         ],
         "ext/gd/GdFunction.php": [
             "Cannot use PHPCompiler\\JIT\\Context as Context because the name is already in use on line 9"
+        ],
+        "ext/gettext/JitGettext.php": [
+            "Cannot use PHPCompiler\\JIT\\Context as Context because the name is already in use on line 8"
+        ],
+        "ext/gettext/bind_textdomain_codeset.php": [
+            "Cannot use PHPCompiler\\Frame as Frame because the name is already in use on line 7"
+        ],
+        "ext/gettext/bindtextdomain.php": [
+            "Cannot use PHPCompiler\\Frame as Frame because the name is already in use on line 7"
+        ],
+        "ext/gettext/dcgettext.php": [
+            "Cannot use PHPCompiler\\Frame as Frame because the name is already in use on line 7"
+        ],
+        "ext/gettext/dcngettext.php": [
+            "Cannot use PHPCompiler\\Frame as Frame because the name is already in use on line 7"
+        ],
+        "ext/gettext/dgettext.php": [
+            "Cannot use PHPCompiler\\Frame as Frame because the name is already in use on line 7"
+        ],
+        "ext/gettext/dngettext.php": [
+            "Cannot use PHPCompiler\\Frame as Frame because the name is already in use on line 7"
+        ],
+        "ext/gettext/gettext.php": [
+            "Cannot use PHPCompiler\\Frame as Frame because the name is already in use on line 7"
+        ],
+        "ext/gettext/textdomain.php": [
+            "Cannot use PHPCompiler\\Frame as Frame because the name is already in use on line 7"
         ],
         "ext/hash/HashFunction.php": [
             "Cannot use PHPCompiler\\Frame as Frame because the name is already in use on line 7"
@@ -261,6 +297,9 @@
         "ext/libxml/libxml_use_internal_errors.php": [
             "Cannot use PHPCompiler\\Frame as Frame because the name is already in use on line 7"
         ],
+        "ext/lzf/lzf_compress.php": [
+            "Cannot use PHPCompiler\\JIT\\Context as Context because the name is already in use on line 10"
+        ],
         "ext/lzf/lzf_decompress.php": [
             "Cannot use PHPCompiler\\ext\\standard\\VmString as VmString because the name is already in use on line 7"
         ],
@@ -276,6 +315,9 @@
         "ext/mbstring/JitMbSearch.php": [
             "Cannot use PHPCompiler\\JIT\\Context as Context because the name is already in use on line 7"
         ],
+        "ext/mbstring/JitMbStrPad.php": [
+            "Cannot use PHPCompiler\\JIT\\Context as Context because the name is already in use on line 9"
+        ],
         "ext/mbstring/JitMbStrcut.php": [
             "Cannot use PHPCompiler\\JIT\\Context as Context because the name is already in use on line 8"
         ],
@@ -283,7 +325,7 @@
             "Cannot use PHPCompiler\\JIT\\Context as Context because the name is already in use on line 9"
         ],
         "ext/mbstring/JitMbStrwidth.php": [
-            "Cannot use PHPCompiler\\JIT\\Context as Context because the name is already in use on line 8"
+            "Cannot use PHPCompiler\\JIT\\Builtin\\MbStrwidth as MbStrwidth because the name is already in use on line 7"
         ],
         "ext/mbstring/VmMbstring.php": [
             "Cannot use PHPCompiler\\ext\\standard\\VmString as VmString because the name is already in use on line 8"
@@ -311,6 +353,9 @@
         ],
         "ext/mbstring/mb_scrub.php": [
             "Cannot use PHPCompiler\\ext\\standard\\VmString as VmString because the name is already in use on line 7"
+        ],
+        "ext/mbstring/mb_str_pad.php": [
+            "Cannot use PHPCompiler\\ext\\standard\\VmString as VmString because the name is already in use on line 8"
         ],
         "ext/mbstring/mb_strcut.php": [
             "Cannot use PHPCompiler\\ext\\standard\\VmString as VmString because the name is already in use on line 7"
@@ -663,8 +708,23 @@
         "ext/standard/JitDateCreate.php": [
             "Cannot use PHPCompiler\\JIT\\Context as Context because the name is already in use on line 7"
         ],
+        "ext/standard/JitDateCreateFromFormat.php": [
+            "Cannot use PHPCompiler\\JIT\\Context as Context because the name is already in use on line 7"
+        ],
+        "ext/standard/JitDateIntervalCreateFromDateString.php": [
+            "Cannot use PHPCompiler\\JIT\\Context as Context because the name is already in use on line 7"
+        ],
         "ext/standard/JitDateIntervalFormat.php": [
             "Cannot use PHPCompiler\\JIT\\BasicBlockHelper as BasicBlockHelper because the name is already in use on line 7"
+        ],
+        "ext/standard/JitDateMutation.php": [
+            "Cannot use PHPCompiler\\JIT\\BasicBlockHelper as BasicBlockHelper because the name is already in use on line 7"
+        ],
+        "ext/standard/JitDateParse.php": [
+            "Cannot use PHPCompiler\\JIT\\Context as Context because the name is already in use on line 7"
+        ],
+        "ext/standard/JitDateParseMaterializer.php": [
+            "Cannot use PHPCompiler\\JIT\\Context as Context because the name is already in use on line 7"
         ],
         "ext/standard/JitDateSunFunc.php": [
             "Cannot use PHPCompiler\\JIT\\Builtin\\TypeErrorRaise as TypeErrorRaise because the name is already in use on line 7"
@@ -743,6 +803,9 @@
         ],
         "ext/standard/JitExceptionHandler.php": [
             "Cannot use PHPCompiler\\JIT\\Call\\ExternalMethod as ExternalMethod because the name is already in use on line 7"
+        ],
+        "ext/standard/JitExec.php": [
+            "Cannot use PHPCompiler\\JIT\\BasicBlockHelper as BasicBlockHelper because the name is already in use on line 7"
         ],
         "ext/standard/JitExecutionLimits.php": [
             "Cannot use PHPCompiler\\JIT\\Builtin\\TypeErrorRaise as TypeErrorRaise because the name is already in use on line 8"
@@ -1132,7 +1195,7 @@
             "Cannot use PHPCompiler\\JIT\\Context as Context because the name is already in use on line 8"
         ],
         "ext/standard/JitJsonEncode.php": [
-            "Cannot use PHPCompiler\\JIT\\BasicBlockHelper as BasicBlockHelper because the name is already in use on line 7"
+            "Cannot use PHPCompiler\\JIT\\ArrayBuiltinHelper as ArrayBuiltinHelper because the name is already in use on line 7"
         ],
         "ext/standard/JitJsonLastError.php": [
             "Cannot use PHPCompiler\\JIT\\Context as Context because the name is already in use on line 7"
@@ -1170,6 +1233,9 @@
         "ext/standard/JitMetaphone.php": [
             "Cannot use PHPCompiler\\JIT\\BasicBlockHelper as BasicBlockHelper because the name is already in use on line 7"
         ],
+        "ext/standard/JitMethodExists.php": [
+            "Cannot use PHPCompiler\\JIT\\BasicBlockHelper as BasicBlockHelper because the name is already in use on line 7"
+        ],
         "ext/standard/JitMimeContentType.php": [
             "Cannot use PHPCompiler\\JIT\\BasicBlockHelper as BasicBlockHelper because the name is already in use on line 7"
         ],
@@ -1200,10 +1266,16 @@
         "ext/standard/JitNumberFormat.php": [
             "Cannot use PHPCompiler\\JIT\\Context as Context because the name is already in use on line 7"
         ],
+        "ext/standard/JitObClean.php": [
+            "Cannot use PHPCompiler\\JIT\\Context as Context because the name is already in use on line 7"
+        ],
         "ext/standard/JitObEndClean.php": [
             "Cannot use PHPCompiler\\JIT\\Context as Context because the name is already in use on line 7"
         ],
         "ext/standard/JitObEndFlush.php": [
+            "Cannot use PHPCompiler\\JIT\\Context as Context because the name is already in use on line 7"
+        ],
+        "ext/standard/JitObFlush.php": [
             "Cannot use PHPCompiler\\JIT\\Context as Context because the name is already in use on line 7"
         ],
         "ext/standard/JitObGetClean.php": [
@@ -1226,6 +1298,9 @@
         ],
         "ext/standard/JitObImplicitFlush.php": [
             "Cannot use PHPCompiler\\JIT\\Context as Context because the name is already in use on line 7"
+        ],
+        "ext/standard/JitObListHandlers.php": [
+            "Cannot use PHPCompiler\\JIT\\Builtin\\ObStatusRuntime as ObStatusRuntime because the name is already in use on line 7"
         ],
         "ext/standard/JitObStart.php": [
             "Cannot use PHPCompiler\\JIT\\Context as Context because the name is already in use on line 7"
@@ -1315,6 +1390,12 @@
             "Cannot use PHPCompiler\\JIT\\BasicBlockHelper as BasicBlockHelper because the name is already in use on line 7"
         ],
         "ext/standard/JitPregMatchAll.php": [
+            "Cannot use PHPCompiler\\JIT\\BasicBlockHelper as BasicBlockHelper because the name is already in use on line 7"
+        ],
+        "ext/standard/JitPregMatchAllEx.php": [
+            "Cannot use PHPCompiler\\JIT\\BasicBlockHelper as BasicBlockHelper because the name is already in use on line 7"
+        ],
+        "ext/standard/JitPregMatchEx.php": [
             "Cannot use PHPCompiler\\JIT\\BasicBlockHelper as BasicBlockHelper because the name is already in use on line 7"
         ],
         "ext/standard/JitPregQuote.php": [
@@ -1908,6 +1989,9 @@
         "ext/standard/VmHttpBuildQuery.php": [
             "Cannot use PHPCompiler\\Frame as Frame because the name is already in use on line 7"
         ],
+        "ext/standard/VmHttpHeaders.php": [
+            "Cannot use PHPCompiler\\VM\\HashTable as HashTable because the name is already in use on line 7"
+        ],
         "ext/standard/VmHttpResponse.php": [
             "Cannot use PHPCompiler\\VM\\BackedEnum as BackedEnum because the name is already in use on line 7"
         ],
@@ -1962,6 +2046,12 @@
         "ext/standard/VmOb.php": [
             "Cannot use PHPCompiler\\VM\\HashTable as HashTable because the name is already in use on line 7"
         ],
+        "ext/standard/VmObGzhandler.php": [
+            "Cannot use PHPCompiler\\VM\\Context as Context because the name is already in use on line 7"
+        ],
+        "ext/standard/VmObOutput.php": [
+            "Cannot use PHPCompiler\\Frame as Frame because the name is already in use on line 7"
+        ],
         "ext/standard/VmPack.php": [
             "Cannot use PHPCompiler\\Frame as Frame because the name is already in use on line 7"
         ],
@@ -1986,6 +2076,9 @@
         "ext/standard/VmPreg.php": [
             "Cannot use PHPCompiler\\VM\\EnumCaseSupport as EnumCaseSupport because the name is already in use on line 8"
         ],
+        "ext/standard/VmPregMatches.php": [
+            "Cannot use PHPCompiler\\VM\\HashTable as HashTable because the name is already in use on line 7"
+        ],
         "ext/standard/VmPregReplaceCallback.php": [
             "Cannot use PHPCompiler\\VM\\Context as Context because the name is already in use on line 7"
         ],
@@ -1994,6 +2087,9 @@
         ],
         "ext/standard/VmProcess.php": [
             "Cannot use PHPCompiler\\VM\\HashTable as HashTable because the name is already in use on line 11"
+        ],
+        "ext/standard/VmRange.php": [
+            "Cannot use PHPCompiler\\Frame as Frame because the name is already in use on line 7"
         ],
         "ext/standard/VmReadline.php": [
             "Cannot use PHPCompiler\\VM\\HashTable as HashTable because the name is already in use on line 7"
@@ -2853,6 +2949,9 @@
         "ext/standard/get_extension_funcs.php": [
             "Cannot use PHPCompiler\\Frame as Frame because the name is already in use on line 7"
         ],
+        "ext/standard/get_headers.php": [
+            "Cannot use PHPCompiler\\Frame as Frame because the name is already in use on line 7"
+        ],
         "ext/standard/get_html_translation_table.php": [
             "Cannot use PHPCompiler\\Frame as Frame because the name is already in use on line 7"
         ],
@@ -3354,10 +3453,16 @@
         "ext/standard/number_format.php": [
             "Cannot use PHPCompiler\\Frame as Frame because the name is already in use on line 14"
         ],
+        "ext/standard/ob_clean.php": [
+            "Cannot use PHPCompiler\\Frame as Frame because the name is already in use on line 7"
+        ],
         "ext/standard/ob_end_clean.php": [
             "Cannot use PHPCompiler\\Frame as Frame because the name is already in use on line 7"
         ],
         "ext/standard/ob_end_flush.php": [
+            "Cannot use PHPCompiler\\Frame as Frame because the name is already in use on line 7"
+        ],
+        "ext/standard/ob_flush.php": [
             "Cannot use PHPCompiler\\Frame as Frame because the name is already in use on line 7"
         ],
         "ext/standard/ob_get_clean.php": [
@@ -3378,7 +3483,13 @@
         "ext/standard/ob_get_status.php": [
             "Cannot use PHPCompiler\\Frame as Frame because the name is already in use on line 7"
         ],
+        "ext/standard/ob_gzhandler.php": [
+            "Cannot use PHPCompiler\\Frame as Frame because the name is already in use on line 7"
+        ],
         "ext/standard/ob_implicit_flush.php": [
+            "Cannot use PHPCompiler\\Frame as Frame because the name is already in use on line 7"
+        ],
+        "ext/standard/ob_list_handlers.php": [
             "Cannot use PHPCompiler\\Frame as Frame because the name is already in use on line 7"
         ],
         "ext/standard/ob_start.php": [
@@ -3795,10 +3906,22 @@
         "ext/standard/soundex.php": [
             "Cannot use PHPCompiler\\Frame as Frame because the name is already in use on line 7"
         ],
+        "ext/standard/spl_autoload.php": [
+            "Cannot use PHPCompiler\\Frame as Frame because the name is already in use on line 7"
+        ],
         "ext/standard/spl_autoload_call.php": [
             "Cannot use PHPCompiler\\Frame as Frame because the name is already in use on line 7"
         ],
+        "ext/standard/spl_autoload_extensions.php": [
+            "Cannot use PHPCompiler\\Frame as Frame because the name is already in use on line 7"
+        ],
+        "ext/standard/spl_autoload_functions.php": [
+            "Cannot use PHPCompiler\\Frame as Frame because the name is already in use on line 7"
+        ],
         "ext/standard/spl_autoload_register.php": [
+            "Cannot use PHPCompiler\\Frame as Frame because the name is already in use on line 7"
+        ],
+        "ext/standard/spl_autoload_unregister.php": [
             "Cannot use PHPCompiler\\Frame as Frame because the name is already in use on line 7"
         ],
         "ext/standard/spl_object_hash.php": [
@@ -4254,6 +4377,21 @@
         "ext/standard/zlib_encode.php": [
             "Cannot use PHPCompiler\\Frame as Frame because the name is already in use on line 7"
         ],
+        "ext/stats/StatsFunction.php": [
+            "Cannot use PHPCompiler\\JIT\\Context as Context because the name is already in use on line 9"
+        ],
+        "ext/stats/VmStats.php": [
+            "Cannot use PHPCompiler\\Frame as Frame because the name is already in use on line 7"
+        ],
+        "ext/stats/stats_covariance.php": [
+            "Cannot use PHPCompiler\\Frame as Frame because the name is already in use on line 7"
+        ],
+        "ext/stats/stats_standard_deviation.php": [
+            "Cannot use PHPCompiler\\Frame as Frame because the name is already in use on line 7"
+        ],
+        "ext/stats/stats_variance.php": [
+            "Cannot use PHPCompiler\\Frame as Frame because the name is already in use on line 7"
+        ],
         "ext/tokenizer/JitTokenGetAll.php": [
             "Cannot use PHPCompiler\\JIT\\Context as Context because the name is already in use on line 8"
         ],
@@ -4322,6 +4460,9 @@
         ],
         "ext/zip/ZipClassMethod.php": [
             "Cannot use PHPCompiler\\Frame as Frame because the name is already in use on line 7"
+        ],
+        "ext/zstd/zstd_compress.php": [
+            "Cannot use PHPCompiler\\JIT\\Context as Context because the name is already in use on line 10"
         ],
         "ext/zstd/zstd_decompress.php": [
             "Cannot use PHPCompiler\\ext\\standard\\VmString as VmString because the name is already in use on line 7"
@@ -4551,6 +4692,9 @@
         "lib/JIT/Builtin/DateIntervalFormatRuntime.php": [
             "Cannot use PHPCompiler\\JIT\\BasicBlockHelper as BasicBlockHelper because the name is already in use on line 7"
         ],
+        "lib/JIT/Builtin/DateMutationRuntime.php": [
+            "Cannot use PHPCompiler\\JIT\\Context as Context because the name is already in use on line 7"
+        ],
         "lib/JIT/Builtin/DefaultTimezoneRuntime.php": [
             "Cannot use PHPCompiler\\JIT\\Context as Context because the name is already in use on line 7"
         ],
@@ -4750,7 +4894,7 @@
             "Cannot use PHPCompiler\\JIT\\BasicBlockHelper as BasicBlockHelper because the name is already in use on line 7"
         ],
         "lib/JIT/Builtin/ProgressNoteRuntime.php": [
-            "Cannot use PHPCompiler\\JIT\\Context as Context because the name is already in use on line 7"
+            "Cannot use PHPCompiler\\JIT\\Call as Call because the name is already in use on line 7"
         ],
         "lib/JIT/Builtin/ReadonlyRaise.php": [
             "Cannot use PHPCompiler\\JIT\\Builtin as Builtin because the name is already in use on line 7"
@@ -4835,6 +4979,12 @@
         ],
         "lib/JIT/Builtin/SscanfJit.php": [
             "Cannot use PHPCompiler\\JIT\\BasicBlockHelper as BasicBlockHelper because the name is already in use on line 7"
+        ],
+        "lib/JIT/Builtin/Stats.php": [
+            "Cannot use PHPCompiler\\JIT\\Context as Context because the name is already in use on line 7"
+        ],
+        "lib/JIT/Builtin/StatsJit.php": [
+            "Cannot use PHPCompiler\\JIT\\BasicBlockHelper as BasicBlockHelper because the name is already in use on line 8"
         ],
         "lib/JIT/Builtin/StreamBucket.php": [
             "Cannot use PHPCompiler\\JIT\\Context as Context because the name is already in use on line 7"
@@ -5001,6 +5151,12 @@
         "lib/JIT/Builtin/StringGetrusage.php": [
             "Cannot use PHPCompiler\\JIT\\Context as Context because the name is already in use on line 7"
         ],
+        "lib/JIT/Builtin/StringGettext.php": [
+            "Cannot use PHPCompiler\\JIT\\Context as Context because the name is already in use on line 7"
+        ],
+        "lib/JIT/Builtin/StringGettextJit.php": [
+            "Cannot use PHPCompiler\\JIT\\BasicBlockHelper as BasicBlockHelper because the name is already in use on line 7"
+        ],
         "lib/JIT/Builtin/StringGettimeofday.php": [
             "Cannot use PHPCompiler\\JIT\\Context as Context because the name is already in use on line 7"
         ],
@@ -5054,6 +5210,12 @@
         ],
         "lib/JIT/Builtin/StringLocaltime.php": [
             "Cannot use PHPCompiler\\JIT\\Context as Context because the name is already in use on line 7"
+        ],
+        "lib/JIT/Builtin/StringLzf.php": [
+            "Cannot use PHPCompiler\\JIT\\Context as Context because the name is already in use on line 7"
+        ],
+        "lib/JIT/Builtin/StringLzfJit.php": [
+            "Cannot use PHPCompiler\\JIT\\BasicBlockHelper as BasicBlockHelper because the name is already in use on line 7"
         ],
         "lib/JIT/Builtin/StringMicrotime.php": [
             "Cannot use PHPCompiler\\JIT\\Context as Context because the name is already in use on line 7"
@@ -5257,6 +5419,12 @@
             "Cannot use PHPCompiler\\JIT\\Context as Context because the name is already in use on line 7"
         ],
         "lib/JIT/Builtin/StringZlibJit.php": [
+            "Cannot use PHPCompiler\\JIT\\BasicBlockHelper as BasicBlockHelper because the name is already in use on line 7"
+        ],
+        "lib/JIT/Builtin/StringZstd.php": [
+            "Cannot use PHPCompiler\\JIT\\Context as Context because the name is already in use on line 7"
+        ],
+        "lib/JIT/Builtin/StringZstdJit.php": [
             "Cannot use PHPCompiler\\JIT\\BasicBlockHelper as BasicBlockHelper because the name is already in use on line 7"
         ],
         "lib/JIT/Builtin/StripWhitespace.php": [
