@@ -7,6 +7,7 @@ namespace PHPCompiler\ext\standard;
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Value;
 
@@ -53,7 +54,7 @@ final class ucwords extends Internal
         if ($argc < 1 || $argc > 2) {
             throw new \LogicException('ucwords() requires one or two arguments');
         }
-        $str = JitQuotPrint::lowerStringSubject($context, $args[0], 'ucwords', 1, 'string');
+        $str = JitStringBuiltinArg::lower($context, $args[0], 'ucwords', 0, 'string');
         if (1 === $argc) {
             return $context->builder->call(
                 $context->lookupFunction('__string__ucwords'),
@@ -64,7 +65,7 @@ final class ucwords extends Internal
         return $context->builder->call(
             $context->lookupFunction('__string__ucwords_ex'),
             $str,
-            JitQuotPrint::lowerStringSubject($context, $args[1], 'ucwords', 2, 'separators')
+            JitStringBuiltinArg::lower($context, $args[1], 'ucwords', 1, 'separators')
         );
     }
 }
