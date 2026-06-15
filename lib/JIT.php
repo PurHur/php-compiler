@@ -8517,6 +8517,16 @@ class JIT {
                         )) {
                             break;
                         }
+                        if (!$forWrite) {
+                            JIT\InstancePropertyVisibilityJitGuard::emitBeforeFetch(
+                                $this->context->type->object,
+                                $this,
+                                $block,
+                                $classId,
+                                $name->value,
+                                $declaringClass
+                            );
+                        }
                         JIT\LazyObjectHelper::emitEnsureInitialized(
                             $this->context,
                             $this->loadPropertyFetchReceiver($obj)

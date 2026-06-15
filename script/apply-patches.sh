@@ -831,6 +831,31 @@ raise SystemExit(1)
 PY
       echo "Applied php-cfg-asymmetric-visibility.patch (Param getVisibility overlay #5059)"
     fi
+    if ! grep -q 'promotionSetVisibility' "$param" 2>/dev/null; then
+      python3 - "$param" <<'PY'
+import sys
+from pathlib import Path
+
+path = Path(sys.argv[1])
+text = path.read_text()
+if 'promotionSetVisibility' in text:
+    raise SystemExit(0)
+set_vis_block = (
+    "\n    /** Constructor promotion: asymmetric set visibility (#3165). */\n"
+    "    public int $promotionSetVisibility = 0;\n"
+)
+for needle in (
+    "    public int $promotionGetVisibility = 0;\n",
+    "    public $promotionGetVisibility = 0;\n",
+):
+    if needle in text:
+        path.write_text(text.replace(needle, needle + set_vis_block, 1))
+        raise SystemExit(0)
+sys.stderr.write("php-cfg-asymmetric-visibility: Param.php promotionGetVisibility anchor missing for set overlay\n")
+raise SystemExit(1)
+PY
+      echo "Applied php-cfg-asymmetric-visibility.patch (Param setVisibility overlay #8760)"
+    fi
     echo "Skip php-cfg-asymmetric-visibility.patch (already applied)"
     return 0
   fi

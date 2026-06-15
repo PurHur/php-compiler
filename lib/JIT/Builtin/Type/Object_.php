@@ -4350,6 +4350,56 @@ class Object_ extends Type {
         return null;
     }
 
+    /**
+     * @return array{
+     *     visibility: int,
+     *     setVisibility: int,
+     *     getVisibility: int,
+     *     declaringClassId: int,
+     *     declaringClassName: string
+     * }|null
+     */
+    public function instancePropertyVisibilityMeta(int $classId, string $name): ?array
+    {
+        $key = strtolower($name);
+        $currentId = $classId;
+        for ($depth = 0; $depth < 64; ++$depth) {
+            if (!isset($this->properties[$currentId])) {
+                $parentLc = $this->parentClassLc($this->classNameForId($currentId));
+                if (null === $parentLc) {
+                    break;
+                }
+                $currentId = $this->lookup($parentLc);
+                continue;
+            }
+            $found = false;
+            foreach ($this->properties[$currentId] as $propset) {
+                if (strtolower($propset[1]) === $key) {
+                    $found = true;
+                    break;
+                }
+            }
+            if (!$found) {
+                $parentLc = $this->parentClassLc($this->classNameForId($currentId));
+                if (null === $parentLc) {
+                    break;
+                }
+                $currentId = $this->lookup($parentLc);
+                continue;
+            }
+
+            return [
+                'visibility' => $this->propertyVisibility($currentId, $name),
+                'setVisibility' => $this->propertySetVisibility($currentId, $name),
+                'getVisibility' => $this->propertyGetVisibility($currentId, $name),
+                'declaringClassId' => $currentId,
+                'declaringClassName' => $this->classNameForId($currentId),
+            ];
+        }
+
+        return null;
+    }
+
     public function staticPropertyFetch(int $classId, string $name): Variable
     {
         $key = strtolower($name);
