@@ -38,13 +38,35 @@ final class BasicBlockHelper
         return Type::KIND_VOID === $sig->getReturnType()->getKind();
     }
 
+    public static function tryGetInsertBlock(Context $context): ?BasicBlock
+    {
+        $ref = $context->llvm->lib->LLVMGetInsertBlock($context->builder->builder);
+        if (null === $ref) {
+            return null;
+        }
+
+        return $context->llvm->factory->basicBlock($context->context, $ref);
+    }
+
     public static function parentFunction(Context $context): Function_
     {
-        $parent = $context->builder->getInsertBlock()->getParent();
-        if (!$parent instanceof Function_) {
-            throw new \LogicException('Current basic block has no parent function');
+        $insert = self::tryGetInsertBlock($context);
+        if (null !== $insert) {
+            $parent = $insert->getParent();
+            if ($parent instanceof Function_) {
+                return $parent;
+            }
         }
-        return $parent;
+        if ('' !== $context->activeFunction && isset($context->functions[$context->activeFunction])) {
+            $fn = $context->functions[$context->activeFunction];
+            if ($fn instanceof Function_) {
+                return $fn;
+            }
+        }
+        if ($context->main instanceof Function_) {
+            return $context->main;
+        }
+        throw new \LogicException('Current basic block has no parent function');
     }
 
     public static function append(Context $context, string $name): BasicBlock
@@ -68,8 +90,9 @@ final class BasicBlockHelper
 
     public static function entryAlloca(Context $context, Type $type): Value
     {
-        $entry = self::parentFunction($context)->getEntryBasicBlock();
-        $restore = $context->builder->getInsertBlock();
+        $fn = self::parentFunction($context);
+        $entry = $fn->getEntryBasicBlock();
+        $restore = self::tryGetInsertBlock($context);
         try {
             $first = $entry->getFirstInstruction();
             $context->builder->position($entry, $first);

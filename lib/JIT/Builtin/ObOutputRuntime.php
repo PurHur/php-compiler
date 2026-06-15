@@ -760,7 +760,8 @@ final class ObOutputRuntime
             $context->lookupFunction('snprintf'),
             $bufPtr,
             $sizeT->constInt($bufSize, false),
-            $context->builder->pointerCast($context->constantFromString('%G'), $i8p),
+            // php-src zend_gcvt / (string)double cast — %.14g matches Zend, not default %G (6 sig figs).
+            $context->builder->pointerCast($context->constantFromString('%.14g'), $i8p),
             $arg
         );
         $ok = $context->builder->icmp(Builder::INT_SGT, $n, $i32->constInt(0, false));

@@ -4680,6 +4680,9 @@ class Compiler {
                 $materializeEnumCase
             );
         }
+        if ($expr instanceof Op\Expr\BinaryOp\Coalesce) {
+            return null;
+        }
         if ($expr instanceof Op\Expr\BinaryOp) {
             return $this->tryFoldCompileTimeBinaryExprDefault(
                 $expr,
@@ -8673,16 +8676,59 @@ class Compiler {
      */
     private function matchInlineCallArgProducer(array $producers, array $callArgs, int $argIndex): ?Op\Expr
     {
+        $producers = $this->filterDeadClassConstFetchInlineProducers($producers);
         $producerCount = count($producers);
         $argCount = count($callArgs);
-        if (0 === $producerCount || $argCount < $producerCount) {
+        if (0 === $producerCount) {
             return null;
         }
+        if ($argCount < $producerCount) {
+            $extra = $producerCount - $argCount;
+            $tail = array_slice($producers, -$extra);
+            if (!$this->producersAreNestedArrayLiteralChain($tail)) {
+                return null;
+            }
+            $mappedIndex = 1 === $argCount
+                ? $producerCount - 1
+                : ($argIndex + ($argIndex > 0 ? $extra : 0));
+            if ($mappedIndex >= $producerCount || $mappedIndex < 0) {
+                return null;
+            }
+
+            return $producers[$mappedIndex] ?? null;
+        }
         if ($producerCount === $argCount) {
+            if ($this->producersAreNestedArrayLiteralChain($producers)) {
+                $callArg = $callArgs[$argIndex] ?? null;
+                $paired = $producers[$argIndex] ?? null;
+                if (
+                    null !== $callArg
+                    && $paired instanceof Op\Expr\Array_
+                    && $this->operandsReferToSameVariable($paired->result, $callArg)
+                ) {
+                    return $paired;
+                }
+                if ($argIndex < $argCount - 1) {
+                    return null;
+                }
+                if ($producerCount > 1) {
+                    return $producers[$producerCount - 1];
+                }
+            }
+
             return $producers[$argIndex] ?? null;
         }
         if (1 === $producerCount) {
-            if (0 === $argIndex && $this->isEmbeddedCallLiteralArg($callArgs[1] ?? null)) {
+            if (
+                ($producers[0] instanceof Op\Expr\ConstFetch || $producers[0] instanceof Op\Expr\ClassConstFetch)
+                && $argCount - 1 === $argIndex
+            ) {
+                return $producers[0];
+            }
+            if (
+                $argCount - 1 === $argIndex
+                && $producers[0] instanceof Op\Expr\Array_
+            ) {
                 return $producers[0];
             }
             if ($argCount - 1 === $argIndex && $this->isEmbeddedCallLiteralArg($callArgs[0] ?? null)) {
@@ -8692,9 +8738,13 @@ class Compiler {
                 if (1 === $argCount) {
                     return $producers[0];
                 }
+                $callArg = $callArgs[$argIndex] ?? null;
+                if (null === $callArg || $this->isEmbeddedCallLiteralArg($callArg)) {
+                    return null;
+                }
                 if (
-                    $argCount - 1 === $argIndex
-                    && !$this->isEmbeddedCallLiteralArg($callArgs[$argIndex] ?? null)
+                    $callArg instanceof Operand\Temporary
+                    || $this->operandsReferToSameVariable($producers[0]->result, $callArg)
                 ) {
                     return $producers[0];
                 }
@@ -8702,6 +8752,8 @@ class Compiler {
             if (
                 0 === $argIndex
                 && !($producers[0] instanceof Op\Expr\Array_)
+                && !($producers[0] instanceof Op\Expr\ConstFetch)
+                && !($producers[0] instanceof Op\Expr\ClassConstFetch)
                 && !$this->isEmbeddedCallLiteralArg($callArgs[0] ?? null)
             ) {
                 return $producers[0];
@@ -8716,6 +8768,66 @@ class Compiler {
         return null;
     }
 
+    /**
+     * php-cfg dead ClassConstFetch preludes before inline Array_/Concat call args (#5933, #4109).
+     *
+     * @param list<Op\Expr> $producers
+     *
+     * @return list<Op\Expr>
+     */
+    private function filterDeadClassConstFetchInlineProducers(array $producers): array
+    {
+        if (count($producers) < 2) {
+            return $producers;
+        }
+        $filtered = [];
+        foreach ($producers as $i => $producer) {
+            if ($producer instanceof Op\Expr\ClassConstFetch) {
+                $feedsLater = false;
+                for ($j = $i + 1, $n = count($producers); $j < $n; ++$j) {
+                    if ($this->cfgExprUsesOperand($producers[$j], $producer->result)) {
+                        $feedsLater = true;
+                        break;
+                    }
+                }
+                if ($feedsLater) {
+                    continue;
+                }
+            }
+            $filtered[] = $producer;
+        }
+
+        return $filtered;
+    }
+
+    private function cfgExprUsesOperand(Op\Expr $expr, Operand $operand): bool
+    {
+        if ($expr instanceof Op\Expr\Array_) {
+            foreach ($expr->values as $value) {
+                if (null === $value) {
+                    continue;
+                }
+                if ($value === $operand || $this->operandsReferToSameVariable($value, $operand)) {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+        if ($expr instanceof Op\Expr\BinaryOp\Concat) {
+            return $expr->left === $operand
+                || $expr->right === $operand
+                || $this->operandsReferToSameVariable($expr->left, $operand)
+                || $this->operandsReferToSameVariable($expr->right, $operand);
+        }
+        if ($expr instanceof Op\Expr\UnaryMinus || $expr instanceof Op\Expr\UnaryPlus) {
+            return $expr->expr === $operand
+                || $this->operandsReferToSameVariable($expr->expr, $operand);
+        }
+
+        return false;
+    }
+
     /** True when php-cfg left the operand as an embedded literal in the FuncCall. */
     private function isEmbeddedCallLiteralArg(?Operand $arg): bool
     {
@@ -8724,6 +8836,25 @@ class Compiler {
         }
 
         return null !== $this->unwrapCfgLiteralOperand($arg);
+    }
+
+    /**
+     * php-cfg emits one Expr_Array producer per nesting level for inline literal args (#4738).
+     *
+     * @param list<Op\Expr> $producers
+     */
+    private function producersAreNestedArrayLiteralChain(array $producers): bool
+    {
+        if ([] === $producers) {
+            return false;
+        }
+        foreach ($producers as $producer) {
+            if (!$producer instanceof Op\Expr\Array_) {
+                return false;
+            }
+        }
+
+        return true;
     }
 
     private function isInlineExprCallArgConsumer(Op $op): bool
@@ -8739,8 +8870,12 @@ class Compiler {
     {
         return $op instanceof Op\Expr\Array_
             || $op instanceof Op\Expr\ArrayDimFetch
+            || $op instanceof Op\Expr\BinaryOp\Concat
             || $op instanceof Op\Expr\New_
             || $op instanceof Op\Expr\ConstFetch
+            || $op instanceof Op\Expr\ClassConstFetch
+            || $op instanceof Op\Expr\Closure
+            || $op instanceof Op\Expr\ArrowFunction
             || $op instanceof Op\Expr\FuncCall
             || $op instanceof Op\Expr\NsFuncCall
             || $op instanceof Op\Expr\UnaryMinus
@@ -8784,6 +8919,7 @@ class Compiler {
             if (
                 ($child instanceof Op\Expr\FuncCall || $child instanceof Op\Expr\NsFuncCall)
                 && !$this->inlineCallArgProducerFeedsConsumer($child, $callOp)
+                && !$this->isAdjacentNestedFuncCallProducer($child, $callOp, $i, $callIndex)
             ) {
                 break;
             }
@@ -8791,6 +8927,54 @@ class Compiler {
         }
 
         return $producers;
+    }
+
+    /**
+     * php-cfg `f(g())` may lower to adjacent FuncCalls with distinct result/arg temporaries
+     * (`strlen(trim($s))` → trim #6, strlen arg #7) (#8561, bootstrap-aot trim).
+     */
+    private function isAdjacentNestedFuncCallProducer(
+        Op\Expr $producer,
+        Op $consumer,
+        int $producerIndex,
+        int $consumerIndex
+    ): bool {
+        if ($producerIndex !== $consumerIndex - 1) {
+            return false;
+        }
+        if (!$producer instanceof Op\Expr\FuncCall && !$producer instanceof Op\Expr\NsFuncCall) {
+            return false;
+        }
+        if (
+            !$consumer instanceof Op\Expr\FuncCall
+            && !$consumer instanceof Op\Expr\NsFuncCall
+            && !$consumer instanceof Op\Expr\MethodCall
+            && !$consumer instanceof Op\Expr\StaticCall
+            && !$consumer instanceof Op\Expr\New_
+        ) {
+            return false;
+        }
+        if (!property_exists($consumer, 'args') || !is_array($consumer->args) || [] === $consumer->args) {
+            return false;
+        }
+        $args = $consumer->args;
+        if (1 === count($args)) {
+            $arg = $args[0];
+
+            return $arg instanceof Operand\Temporary
+                || ($arg instanceof Operand\Variable && !$this->isNamedVariableOperand($arg));
+        }
+        $lastArg = $args[count($args) - 1];
+
+        return $lastArg instanceof Operand\Temporary;
+    }
+
+    private function isNamedVariableOperand(Operand $arg): bool
+    {
+        return $arg instanceof Operand\Variable
+            && $arg->name instanceof Operand\Literal
+            && is_string($arg->name->value)
+            && '' !== $arg->name->value;
     }
 
     /** True when a hoisted FuncCall temp is an operand of the consumer call (#8561). */
@@ -9961,6 +10145,9 @@ class Compiler {
 
                 continue;
             }
+            if ($child instanceof Op\Expr\FuncCall || $child instanceof Op\Expr\NsFuncCall) {
+                break;
+            }
             if ($child instanceof Op\Expr && $this->isInlineExprCallArgProducer($child)) {
                 continue;
             }
@@ -10208,6 +10395,121 @@ class Compiler {
     }
 
     /**
+     * Resolve enum `case` fetches feeding array literals — emit runtime CLASS_CONST_FETCH (#5636).
+     *
+     * @return list<OpCode>
+     */
+    protected function compileRuntimeEnumCaseFetchOpsForArrayElement(
+        Operand $valueOperand,
+        Block $block,
+        Op\Expr\Array_ $arrayExpr,
+        int $elementIndex
+    ): array {
+        $fetch = $this->findEnumCaseClassConstFetchForArrayElement(
+            $valueOperand,
+            $block,
+            $arrayExpr,
+            $elementIndex
+        );
+        if (null === $fetch) {
+            return [];
+        }
+        $valueSlot = $this->compileOperand($valueOperand, $block, true);
+
+        return [
+            new OpCode(
+                OpCode::TYPE_CLASS_CONST_FETCH,
+                $valueSlot,
+                $this->compileOperand($fetch->class, $block, true),
+                $this->compileOperand($fetch->name, $block, true)
+            ),
+        ];
+    }
+
+    private function findEnumCaseClassConstFetchForArrayElement(
+        Operand $valueOperand,
+        Block $block,
+        Op\Expr\Array_ $arrayExpr,
+        int $elementIndex
+    ): ?Op\Expr\ClassConstFetch {
+        if (null !== $block->orig) {
+            foreach ($block->orig->children as $child) {
+                if (!$child instanceof Op\Expr\Array_
+                    || !$this->operandsReferToSameVariable($child->result, $arrayExpr->result)
+                ) {
+                    continue;
+                }
+                $fetches = $this->precedingClassConstFetchesBeforeCfgOp($block->orig->children, $child);
+                $fetch = $fetches[$elementIndex] ?? null;
+                if ($fetch instanceof Op\Expr\ClassConstFetch
+                    && $this->isCompileTimeEnumCaseClassConstFetch($fetch, $block)
+                ) {
+                    return $fetch;
+                }
+
+                break;
+            }
+        }
+        $root = $this->unwrapOperandChain($valueOperand);
+        if ($root instanceof Op\Expr\ClassConstFetch
+            && $this->isCompileTimeEnumCaseClassConstFetch($root, $block)
+        ) {
+            return $root;
+        }
+
+        return null;
+    }
+
+    private function isCompileTimeEnumCaseClassConstFetch(
+        Op\Expr\ClassConstFetch $fetch,
+        Block $block
+    ): bool {
+        $className = $this->staticNameFromOperand($fetch->class);
+        $constName = $this->staticNameFromOperand($fetch->name);
+        if (null === $className || null === $constName) {
+            return false;
+        }
+        $lcClass = $this->resolveDefaultClassConstScope($className, $block);
+        if (null === $lcClass) {
+            return false;
+        }
+
+        return $this->isCompileTimeEnumCaseConstantMember($lcClass, strtolower($constName));
+    }
+
+    /**
+     * Fold array element operands, including php-cfg dead ClassConstFetch preludes (#5636).
+     */
+    protected function tryFoldArrayElementCompileTimeValue(
+        Operand $valueOperand,
+        Block $block,
+        Op\Expr\Array_ $arrayExpr,
+        int $elementIndex
+    ): ?int {
+        if (null !== $block->orig) {
+            foreach ($block->orig->children as $child) {
+                if (!$child instanceof Op\Expr\Array_
+                    || !$this->operandsReferToSameVariable($child->result, $arrayExpr->result)
+                ) {
+                    continue;
+                }
+                $fetches = $this->precedingClassConstFetchesBeforeCfgOp($block->orig->children, $child);
+                $fetch = $fetches[$elementIndex] ?? null;
+                if ($fetch instanceof Op\Expr\ClassConstFetch) {
+                    $vm = $this->tryFoldClassConstFetchDefault($fetch, $block, true);
+                    if (null !== $vm) {
+                        return $block->registerConstant($valueOperand, $vm);
+                    }
+                }
+
+                break;
+            }
+        }
+
+        return $this->tryFoldCallArgCompileTimeValue($valueOperand, $block);
+    }
+
+    /**
      * @return list<OpCode>
      */
     protected function compileArrayLiteral(Op\Expr\Array_ $expr, Block $block): array
@@ -10236,7 +10538,21 @@ class Compiler {
                 continue;
             }
 
-            $valueSlot = $this->compileOperand($expr->values[$i], $block, true);
+            $prefetchOps = $this->compileRuntimeEnumCaseFetchOpsForArrayElement(
+                $expr->values[$i],
+                $block,
+                $expr,
+                $i
+            );
+            if ([] !== $prefetchOps) {
+                $valueSlot = $prefetchOps[0]->arg1;
+                $return = array_merge($return, $prefetchOps);
+            } else {
+                $valueSlot = $this->tryFoldArrayElementCompileTimeValue($expr->values[$i], $block, $expr, $i);
+                if (null === $valueSlot) {
+                    $valueSlot = $this->compileOperand($expr->values[$i], $block, true);
+                }
+            }
             $keySlot = $this->compileOperand($expr->keys[$i], $block, true);
             if (!empty($byRefFlags[$i])) {
                 if (!$started) {

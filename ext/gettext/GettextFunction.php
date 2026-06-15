@@ -11,13 +11,23 @@ use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Value;
 
 /**
- * Shared VM wiring for gettext builtins; JIT/AOT deferred v1 (#3449).
+ * Shared VM wiring for gettext builtins; JIT via {@see JitGettext} (#3449, #8625).
  */
 abstract class GettextFunction extends Internal
 {
     public function call(Context $context, JITVariable ...$args): Value
     {
-        throw new \LogicException($this->getName().'() is not implemented for JIT in this compiler build (issue #3449)');
+        return match ($this->getName()) {
+            'gettext' => JitGettext::gettext($context, ...$args),
+            'dgettext' => JitGettext::dgettext($context, ...$args),
+            'dcgettext' => JitGettext::dcgettext($context, ...$args),
+            'dngettext' => JitGettext::dngettext($context, ...$args),
+            'dcngettext' => JitGettext::dcngettext($context, ...$args),
+            'bindtextdomain' => JitGettext::bindtextdomain($context, ...$args),
+            'textdomain' => JitGettext::textdomain($context, ...$args),
+            'bind_textdomain_codeset' => JitGettext::bindTextdomainCodeset($context, ...$args),
+            default => throw new \LogicException($this->getName().'() JIT dispatch missing'),
+        };
     }
 
     protected function requireArgCount(Frame $frame, int $expected, int $max = null): void

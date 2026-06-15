@@ -52,6 +52,6 @@ final class date_sub extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        throw new \LogicException('date_sub() is not implemented for JIT in this compiler build (issue #4604)');
+        return JitDateMutation::invokeSub($context, ...$args);
     }
 }

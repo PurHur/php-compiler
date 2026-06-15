@@ -52,6 +52,6 @@ final class date_add extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        throw new \LogicException('date_add() is not implemented for JIT in this compiler build (issue #4604)');
+        return JitDateMutation::invokeAdd($context, ...$args);
     }
 }

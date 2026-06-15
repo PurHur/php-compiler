@@ -1,6 +1,6 @@
 --- vendor/ircmaxell/php-types/lib/PHPTypes/Type.php
 +++ vendor/ircmaxell/php-types/lib/PHPTypes/Type.php
-@@ -525,7 +525,7 @@ class Type
+@@ -534,7 +534,7 @@
              }
          }
          if (empty($new)) {

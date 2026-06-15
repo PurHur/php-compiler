@@ -13,7 +13,7 @@ use PHPLLVM\Value;
 /**
  * passthru() — run external program and print raw output (php-src ext/standard/exec.c; #3278).
  *
- * VM: {@see VmExecNative}; JIT/AOT deferred (issue #3278).
+ * VM: {@see VmExecNative}; JIT/AOT: {@see JitExec} / ProcessRuntime (#8640, phase 2 #3278).
  */
 final class passthru extends Internal
 {
@@ -50,6 +50,6 @@ final class passthru extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        throw new \LogicException('passthru() is not implemented for JIT/AOT in this compiler build (issue #3278)');
+        return JitExec::passthru($context, ...$args);
     }
 }

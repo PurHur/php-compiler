@@ -41,6 +41,8 @@ class Module extends ModuleAbstract
             new curl_exec(),
             new curl_close(),
             new curl_version(),
+            new curl_escape(),
+            new curl_unescape(),
         ];
     }
 }

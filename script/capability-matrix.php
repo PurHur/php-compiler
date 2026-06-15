@@ -36,6 +36,7 @@ function collectCapabilities(string $root): array
         'standard' => new PHPCompiler\ext\standard\Module(),
         'openssl' => new PHPCompiler\ext\openssl\Module(),
         'sockets' => new PHPCompiler\ext\sockets\Module(),
+        'curl' => new PHPCompiler\ext\curl\Module(),
     ];
 
     $capabilities = [];

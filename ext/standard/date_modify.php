@@ -51,6 +51,6 @@ final class date_modify extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        throw new \LogicException('date_modify() is not implemented for JIT in this compiler build (issue #4604)');
+        return JitDateMutation::invokeModify($context, ...$args);
     }
 }

@@ -85,6 +85,12 @@ final class BootstrapPhaseCTest extends TestCase
         );
     }
 
+    /** Inline __DIR__ concat call args: php-cfg Concat temp vs FuncCall arg (#1492 bootstrap-aot-link). */
+    public function testInlineDirnameConcatCallArgAotLinkAndExecute(): void
+    {
+        $this->assertBootstrapFixtureLinkAndExecute('dirname_value_path.php', "1\n0\n");
+    }
+
     public function testInlineNewArrayCtorArgAotLinkAndExecute(): void
     {
         $this->assertBootstrapFixtureLinkAndExecute(

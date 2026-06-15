@@ -13,6 +13,19 @@ use PHPLLVM\Value;
 
 final class JitNativeString
 {
+    private static int $coerceResumeSerial = 0;
+
+    /** Reposition when ensureLinked cleared LLVM insertion before boxed strval (#1492). */
+    public static function ensureInsertBlock(Context $context): void
+    {
+        if (null !== BasicBlockHelper::tryGetInsertBlock($context)) {
+            return;
+        }
+        $fn = BasicBlockHelper::parentFunction($context);
+        $resume = $fn->appendBasicBlock('jit_native_string_resume_'.(++self::$coerceResumeSerial));
+        $context->builder->positionAtEnd($resume);
+    }
+
     public static function coerce(Context $context, Variable $var): Variable
     {
         if (Variable::TYPE_STRING === $var->type) {
@@ -47,6 +60,8 @@ final class JitNativeString
             );
         }
         if (Variable::TYPE_VALUE === $var->type) {
+            self::ensureInsertBlock($context);
+
             return new Variable(
                 $context,
                 Variable::TYPE_STRING,
@@ -72,9 +87,10 @@ final class JitNativeString
                     $context,
                     Variable::TYPE_STRING,
                     Variable::KIND_VALUE,
-                    self::format($context, $value, '%G')
+                    self::format($context, $value, '%.14g')
                 );
             case Variable::TYPE_NATIVE_BOOL:
+                self::ensureInsertBlock($context);
                 $trueBlock = BasicBlockHelper::append($context, 'coerce_bool_true');
                 $falseBlock = BasicBlockHelper::append($context, 'coerce_bool_false');
                 $endBlock = BasicBlockHelper::append($context, 'coerce_bool_end');
