@@ -18,7 +18,9 @@ final class JitValueBox
 
     public static function alloc(Context $context): Value
     {
+        BasicBlockHelper::ensureOpenInsertBlock($context, 'value_box_alloc_cont');
         $slot = BasicBlockHelper::entryAlloca($context, $context->getTypeFromString('__value__'));
+        BasicBlockHelper::ensureOpenInsertBlock($context, 'value_box_init_cont');
         // LLVM alloca is uninitialized; __value__write* calls valueDelref first (issue #AOT heap).
         $map = $context->structFieldMap['__value__'];
         $context->builder->store(

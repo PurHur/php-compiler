@@ -214,7 +214,7 @@ function run(string $filename, string $code, array $options): void
     }
     /** @var list<string> $includes */
     $skipBundle = phpc_compile_skip_aot_bundle($normalized);
-    if ([] === $includes && '-' !== $filename && is_file($filename)) {
+    if ([] === $includes && '-' !== $filename && is_file($filename) && !$skipBundle) {
         $runtime = new Runtime(Runtime::MODE_AOT);
         $includes = LiteralIncludeDiscovery::discoverDirectAbsolutePaths($runtime, $filename);
     }

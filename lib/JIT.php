@@ -72,7 +72,13 @@ class JIT {
         $this->context->resetScriptLocalBindings();
         $mainPath = $block->scriptPath();
         if ('' !== $mainPath) {
+            $resolvedMain = realpath($mainPath);
+            $this->context->jitAotEntryScriptPath = \PHPCompiler\VM\ScriptStack::normalize(
+                false !== $resolvedMain ? $resolvedMain : $mainPath
+            );
             $this->context->recordJitIncludedFile($mainPath);
+        } else {
+            $this->context->jitAotEntryScriptPath = '';
         }
         $this->registeredGlobalConstDeclareOpcodes = new \SplObjectStorage();
         if ($this->shouldUseM3EmitTuNativeBridge() && $this->isM3EmitTuScriptMain($block)) {
@@ -566,6 +572,27 @@ class JIT {
         $mainPath = str_replace('\\', '/', $mainBlock->scriptPath());
 
         return $mainPath === $norm || str_ends_with($mainPath, '/'.basename($norm));
+    }
+
+    /**
+     * Skip host-compiling a sidecar when the outer JIT TU is already that source (#8559).
+     *
+     * Inventory argv drivers compiling compiler_lib_spine_smoke/main.php otherwise subprocess-compile
+     * the same entry during finalize and corrupt or duplicate the in-flight module.
+     */
+    private function shouldSkipM3EmitTuSelfSidecarHostCompile(string $path): bool
+    {
+        $entry = $this->context->jitAotEntryScriptPath ?? '';
+        if ('' === $entry) {
+            return false;
+        }
+        $resolved = realpath($path);
+        if (false === $resolved) {
+            return false;
+        }
+        $normalized = \PHPCompiler\VM\ScriptStack::normalize($resolved);
+
+        return '' !== $normalized && $normalized === $entry;
     }
 
     private function isM3CompileDriverScriptMain(Block $block): bool
@@ -3868,6 +3895,9 @@ class JIT {
             return;
         }
         if ($this->shouldSkipM3InventoryEmitDriverSelfSidecar($path)) {
+            return;
+        }
+        if ($this->shouldSkipM3EmitTuSelfSidecarHostCompile($path)) {
             return;
         }
         if (!is_readable($path)) {
@@ -13261,7 +13291,13 @@ class JIT {
             $heapPtr
         );
         $this->context->builder->store($heapPtr, $global);
-        $this->context->builder->positionAtEnd($restore);
+        if (null !== $restore) {
+            if (null !== $restore->getTerminator()) {
+                BasicBlockHelper::ensureOpenInsertBlock($this->context, 'func_static_init_cont');
+            } else {
+                $this->context->builder->positionAtEnd($restore);
+            }
+        }
     }
 
     private static function operandSlotRank(\PHPCfg\Operand $op): int
