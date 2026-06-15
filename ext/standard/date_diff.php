@@ -60,6 +60,6 @@ final class date_diff extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        throw new \LogicException('date_diff() is not implemented for JIT in this compiler build (issue #4604)');
+        return JitDateMutation::invokeDiff($context, ...$args);
     }
 }
