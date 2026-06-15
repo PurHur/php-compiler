@@ -16,6 +16,7 @@ use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Builtin\StringTrimMask;
 use PHPCompiler\JIT\Builtin\StringTrimModeJit;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\JitNativeString;
 use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Value;
@@ -60,6 +61,7 @@ final class string_rtrim extends Internal
     public function call(Context $context, JITVariable ...$args): Value
     {
         $this->context = $context;
+        JitNativeString::ensureInsertBlock($context);
         $fn = $this->getName();
         $argc = \count($args);
         if ($argc < 1 || $argc > 2) {

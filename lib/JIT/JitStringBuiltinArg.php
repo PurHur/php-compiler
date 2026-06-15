@@ -27,6 +27,7 @@ final class JitStringBuiltinArg
         string $expectedType = 'string',
         ?string $arrayExpectedType = null
     ): Value {
+        JitNativeString::ensureInsertBlock($context);
         $arrayExpected = $arrayExpectedType ?? $expectedType;
         if (Variable::TYPE_HASHTABLE === $arg->type) {
             self::emitTypeErrorAndAbort($context, $function, $argIndex, $paramName, 'array', $arrayExpected);
