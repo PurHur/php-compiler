@@ -2735,6 +2735,26 @@ require_once __DIR__.'/../../../lib/JIT/Builtin/StringGettextJit.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/StringZstd.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/StringZstdJit.php';
 require_once __DIR__.'/../../../lib/VM/OutputBufferHandlers.php';
+require_once __DIR__.'/../../../ext/curl/VmCurlEscape.php';
+require_once __DIR__.'/../../../ext/curl/curl_escape.php';
+require_once __DIR__.'/../../../ext/curl/curl_unescape.php';
+require_once __DIR__.'/../../../ext/mbstring/JitMbMimeheader.php';
+require_once __DIR__.'/../../../ext/mbstring/mb_decode_mimeheader.php';
+require_once __DIR__.'/../../../ext/mbstring/mb_encode_mimeheader.php';
+require_once __DIR__.'/../../../ext/standard/JitDateMutation.php';
+require_once __DIR__.'/../../../ext/standard/JitPregMatchAllEx.php';
+require_once __DIR__.'/../../../ext/standard/JitPregMatchEx.php';
+require_once __DIR__.'/../../../ext/standard/JitSetcookieOptions.php';
+require_once __DIR__.'/../../../ext/standard/SetcookieOptions.php';
+require_once __DIR__.'/../../../ext/standard/VmPhpcRunCommandNative.php';
+require_once __DIR__.'/../../../ext/standard/VmPregMatches.php';
+require_once __DIR__.'/../../../ext/standard/VmProcessExecCaptureNative.php';
+require_once __DIR__.'/../../../ext/standard/VmProcessProcOpenNative.php';
+require_once __DIR__.'/../../../ext/standard/spl_autoload.php';
+require_once __DIR__.'/../../../ext/standard/spl_autoload_extensions.php';
+require_once __DIR__.'/../../../ext/standard/spl_autoload_functions.php';
+require_once __DIR__.'/../../../ext/standard/spl_autoload_unregister.php';
+require_once __DIR__.'/../../../lib/JIT/Builtin/DateMutationRuntime.php';
 // VM -r smoke: bootstrap-selfhost-lib-spine-vm-smoke.sh (#1846).
 // VM driver execute: bootstrap-selfhost-vm-driver-execute-probe.sh (#2201).
 
