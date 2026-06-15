@@ -220,6 +220,11 @@ if [[ "${FAST_M5}" -eq 1 ]]; then
     exit 1
   fi
   echo "north-star5-verify: step 4f ok (prelinked gen-0 seed present)"
+  if ! "${PHP_BIN}" "${PHP_OPTS[@]}" "${_CI_REPO_ROOT}/script/check-bootstrap-gen0-manifest-sync.php"; then
+    echo "north-star5-verify: step 4f-m FAILED (gen-0 manifest/driver mismatch — #8713)" >&2
+    exit 1
+  fi
+  echo "north-star5-verify: step 4f-m ok (gen-0 manifest matches committed driver)"
 
   if ! ns5_prelinked_vendor_ready; then
     echo "north-star5-verify: step 4f-v FAILED (prelinked/bootstrap-vendor/*.o missing)" >&2

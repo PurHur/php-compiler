@@ -393,6 +393,14 @@ ci_run_bootstrap_vendor_prelink_sync_check() {
   "$PHP_BIN" "${PHP_OPTS[@]}" script/bootstrap-vendor-objects.php --check
 }
 
+ci_run_bootstrap_gen0_manifest_sync_check() {
+  if [[ "${BOOTSTRAP_GEN0_MANIFEST_SYNC_GATE:-0}" != "1" ]]; then
+    return 0
+  fi
+  echo "Bootstrap gen-0 manifest sync (BOOTSTRAP_GEN0_MANIFEST_SYNC_GATE=1, issue #8713)..."
+  "$PHP_BIN" "${PHP_OPTS[@]}" script/check-bootstrap-gen0-manifest-sync.php
+}
+
 ci_run_init_miniwebapp_parity_check() {
   if [[ "${INIT_MINIWEBAPP_PARITY_GATE:-1}" != "1" ]]; then
     return 0
@@ -523,6 +531,7 @@ ci_run_inventory_checks() {
   ci_run_bootstrap_m3_strict_sync_check
   ci_run_bootstrap_vendor_inventory_sync_check
   ci_run_bootstrap_vendor_prelink_sync_check
+  ci_run_bootstrap_gen0_manifest_sync_check
   ci_run_bootstrap_inventory_lint_sync_check
   ci_run_bootstrap_inventory_triage_sync_check
   ci_run_stdlib_jit_deferred_sync_check
