@@ -10224,6 +10224,121 @@ class Compiler {
     }
 
     /**
+     * Resolve enum `case` fetches feeding array literals — emit runtime CLASS_CONST_FETCH (#5636).
+     *
+     * @return list<OpCode>
+     */
+    protected function compileRuntimeEnumCaseFetchOpsForArrayElement(
+        Operand $valueOperand,
+        Block $block,
+        Op\Expr\Array_ $arrayExpr,
+        int $elementIndex
+    ): array {
+        $fetch = $this->findEnumCaseClassConstFetchForArrayElement(
+            $valueOperand,
+            $block,
+            $arrayExpr,
+            $elementIndex
+        );
+        if (null === $fetch) {
+            return [];
+        }
+        $valueSlot = $this->compileOperand($valueOperand, $block, true);
+
+        return [
+            new OpCode(
+                OpCode::TYPE_CLASS_CONST_FETCH,
+                $valueSlot,
+                $this->compileOperand($fetch->class, $block, true),
+                $this->compileOperand($fetch->name, $block, true)
+            ),
+        ];
+    }
+
+    private function findEnumCaseClassConstFetchForArrayElement(
+        Operand $valueOperand,
+        Block $block,
+        Op\Expr\Array_ $arrayExpr,
+        int $elementIndex
+    ): ?Op\Expr\ClassConstFetch {
+        if (null !== $block->orig) {
+            foreach ($block->orig->children as $child) {
+                if (!$child instanceof Op\Expr\Array_
+                    || !$this->operandsReferToSameVariable($child->result, $arrayExpr->result)
+                ) {
+                    continue;
+                }
+                $fetches = $this->precedingClassConstFetchesBeforeCfgOp($block->orig->children, $child);
+                $fetch = $fetches[$elementIndex] ?? null;
+                if ($fetch instanceof Op\Expr\ClassConstFetch
+                    && $this->isCompileTimeEnumCaseClassConstFetch($fetch, $block)
+                ) {
+                    return $fetch;
+                }
+
+                break;
+            }
+        }
+        $root = $this->unwrapOperandChain($valueOperand);
+        if ($root instanceof Op\Expr\ClassConstFetch
+            && $this->isCompileTimeEnumCaseClassConstFetch($root, $block)
+        ) {
+            return $root;
+        }
+
+        return null;
+    }
+
+    private function isCompileTimeEnumCaseClassConstFetch(
+        Op\Expr\ClassConstFetch $fetch,
+        Block $block
+    ): bool {
+        $className = $this->staticNameFromOperand($fetch->class);
+        $constName = $this->staticNameFromOperand($fetch->name);
+        if (null === $className || null === $constName) {
+            return false;
+        }
+        $lcClass = $this->resolveDefaultClassConstScope($className, $block);
+        if (null === $lcClass) {
+            return false;
+        }
+
+        return $this->isCompileTimeEnumCaseConstantMember($lcClass, strtolower($constName));
+    }
+
+    /**
+     * Fold array element operands, including php-cfg dead ClassConstFetch preludes (#5636).
+     */
+    protected function tryFoldArrayElementCompileTimeValue(
+        Operand $valueOperand,
+        Block $block,
+        Op\Expr\Array_ $arrayExpr,
+        int $elementIndex
+    ): ?int {
+        if (null !== $block->orig) {
+            foreach ($block->orig->children as $child) {
+                if (!$child instanceof Op\Expr\Array_
+                    || !$this->operandsReferToSameVariable($child->result, $arrayExpr->result)
+                ) {
+                    continue;
+                }
+                $fetches = $this->precedingClassConstFetchesBeforeCfgOp($block->orig->children, $child);
+                $fetch = $fetches[$elementIndex] ?? null;
+                if ($fetch instanceof Op\Expr\ClassConstFetch) {
+                    $vm = $this->tryFoldClassConstFetchDefault($fetch, $block, true);
+                    if (null !== $vm) {
+                        return $block->registerConstant($valueOperand, $vm);
+                    }
+                }
+
+                break;
+            }
+        }
+
+        return $this->tryFoldCallArgCompileTimeValue($valueOperand, $block);
+    }
+
+    /**
      * @return list<OpCode>
      */
     protected function compileArrayLiteral(Op\Expr\Array_ $expr, Block $block): array
@@ -10252,7 +10367,21 @@ class Compiler {
                 continue;
             }
 
-            $valueSlot = $this->compileOperand($expr->values[$i], $block, true);
+            $prefetchOps = $this->compileRuntimeEnumCaseFetchOpsForArrayElement(
+                $expr->values[$i],
+                $block,
+                $expr,
+                $i
+            );
+            if ([] !== $prefetchOps) {
+                $valueSlot = $prefetchOps[0]->arg1;
+                $return = array_merge($return, $prefetchOps);
+            } else {
+                $valueSlot = $this->tryFoldArrayElementCompileTimeValue($expr->values[$i], $block, $expr, $i);
+                if (null === $valueSlot) {
+                    $valueSlot = $this->compileOperand($expr->values[$i], $block, true);
+                }
+            }
             $keySlot = $this->compileOperand($expr->keys[$i], $block, true);
             if (!empty($byRefFlags[$i])) {
                 if (!$started) {
