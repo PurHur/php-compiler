@@ -259,7 +259,7 @@ final class TryCatchHelper
         );
         $builder->branchIf($hasBool, $dispatchBb, $mergeBb);
         if (null !== $saved) {
-            $builder->positionAtEnd($saved);
+            BasicBlockHelper::restoreInsertBlock($context, $saved);
         }
     }
 
@@ -611,7 +611,7 @@ final class TryCatchHelper
         }
 
         if (null !== $saved) {
-            $builder->positionAtEnd($saved);
+            BasicBlockHelper::restoreInsertBlock($context, $saved);
         }
 
         return $dispatch;
@@ -658,6 +658,7 @@ final class TryCatchHelper
 
     private static function emitUncaughtUserHandlerOrAbort(Context $context, Value $exceptionObj): void
     {
+        BasicBlockHelper::ensureOpenInsertBlock($context, 'ex_handler_cont');
         ExceptionHandlerJitRuntime::ensureLinked($context);
         $builder = $context->builder;
         $i32 = $context->getTypeFromString('int32');
@@ -681,6 +682,7 @@ final class TryCatchHelper
         $builder->positionAtEnd($abortBb);
         $builder->call($context->lookupFunction('abort'));
         $context->llvm->lib->LLVMBuildUnreachable($context->builder->builder);
+        BasicBlockHelper::ensureOpenInsertBlock($context, 'ex_handler_after_abort');
     }
 
     /**
@@ -812,7 +814,7 @@ final class TryCatchHelper
         $builder->call($context->lookupFunction('abort'));
         $context->llvm->lib->LLVMBuildUnreachable($context->builder->builder);
         if (null !== $saved) {
-            $builder->positionAtEnd($saved);
+            BasicBlockHelper::restoreInsertBlock($context, $saved);
         }
 
         return $epilogue;
@@ -834,7 +836,7 @@ final class TryCatchHelper
         $builder->positionAtEnd($resume);
         $jit->emitPendingReturnResume($func);
         if (null !== $saved) {
-            $builder->positionAtEnd($saved);
+            BasicBlockHelper::restoreInsertBlock($context, $saved);
         }
 
         return $resume;

@@ -140,15 +140,9 @@ final class IncludeHelper
         $bindingRefreshIndex = \count($context->inlineIncludeBindingRefreshStack) - 1;
         $returnHolderOp = new Temporary();
         $entryBb = $func->appendBasicBlock('include_entry_'.(++self::$includeEntrySerial));
-        if (null !== $preIncludeBb) {
-            if (null !== $preIncludeBb->getTerminator()) {
-                BasicBlockHelper::ensureOpenInsertBlock($context, 'include_pre_cont');
-                $preIncludeBb = $context->builder->getInsertBlock();
-            }
-            if (null === $preIncludeBb->getTerminator()) {
-                $context->builder->positionAtEnd($preIncludeBb);
-                $context->builder->branch($entryBb);
-            }
+        if (null !== $preIncludeBb && null === $preIncludeBb->getTerminator()) {
+            $context->builder->positionAtEnd($preIncludeBb);
+            $context->builder->branch($entryBb);
         }
         $context->builder->positionAtEnd($entryBb);
         $returnHolder = new Variable(
@@ -234,15 +228,9 @@ final class IncludeHelper
         $bodyBb = $func->appendBasicBlock('include_body_'.(++self::$includeEntrySerial));
         // Bindings may end in copyFromPointer tails; entryBb can already have a terminator (#776).
         $bindTail = $context->builder->getInsertBlock();
-        if (null !== $bindTail) {
-            if (null !== $bindTail->getTerminator()) {
-                BasicBlockHelper::ensureOpenInsertBlock($context, 'include_bind_cont');
-                $bindTail = $context->builder->getInsertBlock();
-            }
-            if (null === $bindTail->getTerminator()) {
-                $context->builder->positionAtEnd($bindTail);
-                $context->builder->branch($bodyBb);
-            }
+        if (null !== $bindTail && null === $bindTail->getTerminator()) {
+            $context->builder->positionAtEnd($bindTail);
+            $context->builder->branch($bodyBb);
         } elseif (null === $entryBb->getTerminator()) {
             $context->builder->positionAtEnd($entryBb);
             $context->builder->branch($bodyBb);
@@ -399,12 +387,7 @@ final class IncludeHelper
 
     private static function restoreInsertBlock(Context $context, BasicBlock $block): void
     {
-        if (null !== $block->getTerminator()) {
-            BasicBlockHelper::ensureOpenInsertBlock($context, 'include_binding_cont');
-
-            return;
-        }
-        $context->builder->positionAtEnd($block);
+        BasicBlockHelper::restoreInsertBlock($context, $block);
     }
 
     private static function emitCalleeLocalBinding(

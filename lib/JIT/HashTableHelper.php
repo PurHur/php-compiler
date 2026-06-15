@@ -2046,6 +2046,30 @@ final class HashTableHelper
         Value $keyPtr,
         Variable $element
     ): void {
+        $insert = $context->builder->getInsertBlock();
+        $initLinear = $context->initLinearBlock ?? $context->initBlock;
+        if ($insert === $initLinear) {
+            $host = $context->initFunc->appendBasicBlock('arr_key_host_'.self::nextSeq());
+            $resume = $context->initFunc->appendBasicBlock('arr_key_resume_'.self::nextSeq());
+            $context->splitInitLinearTo($host);
+            $context->initLinearBlock = $resume;
+            $context->builder->positionAtEnd($host);
+            self::setAtKeyCoercingNumericStringBody($context, $ht, $keyPtr, $element);
+            $context->builder->branch($resume);
+            $context->builder->positionAtEnd($resume);
+
+            return;
+        }
+
+        self::setAtKeyCoercingNumericStringBody($context, $ht, $keyPtr, $element);
+    }
+
+    private static function setAtKeyCoercingNumericStringBody(
+        Context $context,
+        Value $ht,
+        Value $keyPtr,
+        Variable $element
+    ): void {
         $builder = $context->builder;
         $map = $context->structFieldMap['__string__'];
         $len = $builder->load($builder->structGep($keyPtr, $map['length']));
