@@ -17,6 +17,8 @@ use PHPLLVM\Value;
  * phpc_run_command() — capture exit code + stdout/stderr for AOT linker (#2779).
  *
  * Replaces proc_open()/stream_get_contents() in lib/AOT/Linker.php for native self-host.
+ *
+ * VM: {@see VmPhpcRunCommandNative} (popen when env null); env path via {@see VmPhpcRunCommandHost} (#8633).
  */
 final class phpc_run_command extends Internal
 {
@@ -53,28 +55,21 @@ final class phpc_run_command extends Internal
                 $env[$keyVar->toString()] = $valVar->toString();
             }
         }
-        $descriptor = [0 => ['pipe', 'r'], 1 => ['pipe', 'w'], 2 => ['pipe', 'w']];
-        $proc = \proc_open($cmdVar->toString(), $descriptor, $pipes, null, $env);
-        if (!\is_resource($proc)) {
+        $captured = VmPhpcRunCommandNative::run($cmdVar->toString(), $env);
+        if (null === $captured) {
             $frame->returnVar->null();
 
             return;
         }
-        \fclose($pipes[0]);
-        $stdout = \stream_get_contents($pipes[1]);
-        $stderr = \stream_get_contents($pipes[2]);
-        \fclose($pipes[1]);
-        \fclose($pipes[2]);
-        $code = \proc_close($proc);
         $ht = new HashTable();
         $codeVar = new Variable();
-        $codeVar->int((int) $code);
+        $codeVar->int($captured['code']);
         $ht->add('code', $codeVar);
         $stdoutVar = new Variable();
-        $stdoutVar->string(false === $stdout ? '' : $stdout);
+        $stdoutVar->string($captured['stdout']);
         $ht->add('stdout', $stdoutVar);
         $stderrVar = new Variable();
-        $stderrVar->string(false === $stderr ? '' : $stderr);
+        $stderrVar->string($captured['stderr']);
         $ht->add('stderr', $stderrVar);
         $frame->returnVar->array($ht);
     }
