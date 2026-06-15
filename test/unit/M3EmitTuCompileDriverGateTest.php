@@ -14,6 +14,7 @@ final class M3EmitTuCompileDriverGateTest extends TestCase
         $root = dirname(__DIR__, 2);
         $jit = (string) file_get_contents($root.'/lib/JIT.php');
         $emit = (string) file_get_contents($root.'/lib/JIT/BootstrapCompileSmokeM3Emit.php');
+        $aot = (string) file_get_contents($root.'/lib/JIT/M3EmitTuTrivialEchoAot.php');
 
         $this->assertStringContainsString('isM3EmitTuCompilerCompileChainLoweringName', $jit);
         $this->assertStringContainsString('m3EmitTuCompilerCompileChainLoweringSuffixes', $jit);
@@ -25,5 +26,7 @@ final class M3EmitTuCompileDriverGateTest extends TestCase
         $this->assertStringContainsString('Emit-helper binaries must init parse/compiler spine (#2633)', $emit);
         $this->assertStringContainsString('exitWithStatus', $emit);
         $this->assertStringContainsString('return true;', $emit);
+        $this->assertStringContainsString('contentMatchOnly', $aot);
+        $this->assertStringContainsString('COMPILER_LIB_SOURCE_PATH_NORM', $aot);
     }
 }

@@ -48,6 +48,13 @@ final class BootstrapVmDriverExecuteProbeTest extends TestCase
         $this->assertStringContainsString('bootstrap-selfhost-vm-driver-execute-probe:', $makefile);
     }
 
+    public function testSpineLinkScriptRefreshesSidecarAfterHonestBundleEmit(): void
+    {
+        $script = (string) file_get_contents(self::$root.'/script/bootstrap-selfhost-lib-spine-smoke-link.sh');
+        $this->assertStringContainsString('compiler_lib_spine_smoke bundle OK', $script);
+        $this->assertStringContainsString('.m3_compiler_lib_sidecar.sha', $script);
+    }
+
     public function testNativeMainEnvProbePrintsVmDriverOkWhenLlvmPresent(): void
     {
         if (!LlvmToolchain::isReady(self::$root)) {
