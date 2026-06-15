@@ -8661,8 +8661,11 @@ class Compiler {
         if ($producerSlot === $argSlot) {
             return $producerSlot;
         }
+        if ($this->operandsReferToSameVariable($producer->result, $arg)) {
+            return $producerSlot;
+        }
 
-        return $producerSlot;
+        return null;
     }
 
     /**
