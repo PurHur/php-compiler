@@ -1127,6 +1127,7 @@ final class HashTable {
         $this->assertConsistent();
         $this->assertSeparatedForWrite();
         foreach ($other->iterateKeyed(true) as [$key, $value]) {
+            EnumCaseSupport::rejectIllegalArrayOffset($key);
             if (Variable::TYPE_INTEGER === $key->type) {
                 if (null !== $this->findIndex($key->toInt())) {
                     continue;
@@ -1799,6 +1800,8 @@ final class HashTable {
      */
     public static function spreadMergeKey(HashTable $dest, Variable $key, Variable $value): void
     {
+        $key = $key->resolveIndirect();
+        EnumCaseSupport::rejectIllegalArrayOffset($key);
         if ($key->is(Variable::TYPE_INTEGER)) {
             $dest->append($value);
 
