@@ -53,6 +53,7 @@ final class EnumVMTest extends BaseTest
                 'enum_case_incdec_type_error.phpt',
                 'enum_compare_backing_scalar.phpt',
                 'switch_enum_case_scalar.phpt',
+                'switch_enum_scalar_no_match.phpt',
                 'enum_case_attributes.phpt',
                 'enum_in_operator.phpt',
                 'foreach_enum_case_by_value.phpt',
