@@ -66,6 +66,28 @@ if ([] === $requires) {
 
 $requires = array_slice($requires, 0, $limit);
 
+$inResolved = realpath($in);
+if (false === $inResolved) {
+    fwrite(STDERR, "bootstrap-spine-minimize-entry: realpath failed for {$in}\n");
+    exit(2);
+}
+$inDir = dirname($inResolved);
+$requires = array_map(
+    static function (string $line) use ($inDir): string {
+        if (!preg_match("/^require_once __DIR__\\.'([^']+)';$/", $line, $matches)) {
+            return $line;
+        }
+        $target = realpath($inDir.$matches[1]);
+        if (false === $target) {
+            fwrite(STDERR, "bootstrap-spine-minimize-entry: unresolved require target {$inDir}{$matches[1]}\n");
+            exit(2);
+        }
+
+        return "require_once '{$target}';";
+    },
+    $requires
+);
+
 $dir = dirname($out);
 if ('' !== $dir && !is_dir($dir) && !@mkdir($dir, 0775, true) && !is_dir($dir)) {
     fwrite(STDERR, "bootstrap-spine-minimize-entry: failed to create output dir {$dir}\n");
