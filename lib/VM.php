@@ -1969,12 +1969,20 @@ class VM {
     {
         $copy = new Variable();
         $copy->copyFrom($value);
+        $key = $key->resolveIndirect();
         if (Variable::TYPE_INTEGER === $key->type) {
-            $out->append($copy);
+            $out->updateIndex($key->toInt(), $copy);
 
             return;
         }
-        $out->add($key->toString(), $copy);
+        $keyStr = $key->toString();
+        $intKey = HashTable::tryIntFromNumericString($keyStr);
+        if (null !== $intKey) {
+            $out->updateIndex($intKey, $copy);
+
+            return;
+        }
+        $out->update($keyStr, $copy);
     }
 
     private function seedScriptPath(Frame $frame): void
