@@ -66,8 +66,9 @@ if [[ -z "${PHP_COMPILER_LLVM_PATH:-}" || ! -f "${PHP_COMPILER_LLVM_PATH}/libLLV
 fi
 
 # Default-on native compile-driver when LLVM present (mirror make bootstrap-loop-gen1-link; #2611).
-# Strict requires native gen-2 emit — force link env even if caller cleared defaults.
-if [[ "${BOOTSTRAP_M4_GEN2_STRICT:-0}" == "1" ]]; then
+# Strict requires native gen-2 emit — default-on (#8711); opt-out BOOTSTRAP_M4_GEN2_STRICT=0.
+: "${BOOTSTRAP_M4_GEN2_STRICT:=1}"
+if [[ "${BOOTSTRAP_M4_GEN2_STRICT}" == "1" ]]; then
   export BOOTSTRAP_M4_LINK_COMPILE_DRIVER=1
   export BOOTSTRAP_M4_COMPILE_DRIVER_REAL_LOWERING=1
   export BOOTSTRAP_M4_RUNTIME_COMPILE=1
@@ -170,8 +171,8 @@ fi
 echo "bootstrap-loop-gen1-link: gen-1 link OK (${ROOT}/${GEN1})"
 
 if [[ "${M4_NATIVE_COMPILE}" -eq 0 ]]; then
-  if [[ "${BOOTSTRAP_M4_GEN2_STRICT:-0}" == "1" ]]; then
-    echo "bootstrap-loop-gen1-link: BOOTSTRAP_M4_GEN2_STRICT=1 — require native gen-2 emit; refusing Zend fallback" >&2
+  if [[ "${BOOTSTRAP_M4_GEN2_STRICT}" == "1" && "${BOOTSTRAP_M4_GEN2_ZEND_FALLBACK:-0}" != "1" ]]; then
+    echo "bootstrap-loop-gen1-link: BOOTSTRAP_M4_GEN2_STRICT=1 — require native gen-2 emit; refusing Zend fallback (opt-in: BOOTSTRAP_M4_GEN2_ZEND_FALLBACK=1)" >&2
     echo "bootstrap-loop-gen1-link: emit_path=zend_fallback_would_be_used block_reason=${M4_BLOCK_REASON}" >&2
     exit 1
   fi
