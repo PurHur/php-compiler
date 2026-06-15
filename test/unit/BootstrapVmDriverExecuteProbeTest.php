@@ -64,9 +64,12 @@ final class BootstrapVmDriverExecuteProbeTest extends TestCase
     {
         $native = (string) file_get_contents(self::$root.'/lib/JIT/VmDriverExecuteNative.php');
         $this->assertStringNotContainsString('vm_probe_bundle_default', $native);
+        $this->assertStringContainsString('isCompilerLibSpineSmokeEntry', $native);
         $this->assertStringContainsString('#8692', $native);
+        $this->assertStringContainsString('#8693', $native);
         $entry = (string) file_get_contents(self::$root.'/test/selfhost/compiler_lib_spine_smoke/main.php');
         $this->assertStringContainsString('compiler_lib_spine_smoke bundle OK', $entry);
+        $this->assertStringNotContainsString("echo \"vm driver ok\\n\";\n    exit", $entry);
     }
 
     public function testNativeMainEnvProbePrintsVmDriverOkWhenLlvmPresent(): void
