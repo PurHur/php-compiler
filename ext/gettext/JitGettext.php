@@ -202,7 +202,8 @@ final class JitGettext
         StringGettext::ensureLinked($context);
         $slot = JitValueBox::alloc($context);
         $ptr = JitValueBox::pointer($context, $slot);
-        $context->builder->call($context->lookupFunction($name), ...$params, $ptr);
+        $params[] = $ptr;
+        $context->builder->call($context->lookupFunction($name), ...$params);
 
         return $ptr;
     }
