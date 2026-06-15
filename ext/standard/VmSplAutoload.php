@@ -42,6 +42,28 @@ final class VmSplAutoload
         return true;
     }
 
+    public static function unregister(Context $ctx, Variable $callbackArg): bool
+    {
+        if (EnumCaseSupport::isEnumCaseVariable($callbackArg)) {
+            throw new \TypeError(SplAutoloadCallbackPolicy::invalidCallbackTypeErrorUnregister());
+        }
+        $callback = $callbackArg->resolveIndirect();
+        if (!SplAutoloadCallbackPolicy::isVmSupportedType($callback->type)
+            && Variable::TYPE_NULL !== $callback->type
+        ) {
+            throw new \TypeError(SplAutoloadCallbackPolicy::invalidCallbackTypeErrorUnregister());
+        }
+        foreach ($ctx->splAutoloadCallbacks as $index => $runner) {
+            if ($runner->matches($ctx, $callback)) {
+                array_splice($ctx->splAutoloadCallbacks, $index, 1);
+
+                return true;
+            }
+        }
+
+        return false;
+    }
+
     public static function runStack(Context $ctx, string $className): bool
     {
         $lc = strtolower($className);
@@ -240,6 +262,8 @@ interface SplAutoloadRunner
 
     /** @return string|array{0: string, 1: string} */
     public function callableLabel(): string|array;
+
+    public function matches(Context $ctx, Variable $callback): bool;
 }
 
 final class SplAutoloadDefaultRunner implements SplAutoloadRunner
@@ -252,6 +276,18 @@ final class SplAutoloadDefaultRunner implements SplAutoloadRunner
     public function callableLabel(): string
     {
         return 'spl_autoload';
+    }
+
+    public function matches(Context $ctx, Variable $callback): bool
+    {
+        if (Variable::TYPE_NULL === $callback->type) {
+            return true;
+        }
+        if (Variable::TYPE_STRING === $callback->type) {
+            return 'spl_autoload' === $callback->toString();
+        }
+
+        return false;
     }
 }
 
@@ -274,6 +310,40 @@ final class SplAutoloadFunctionRunner implements SplAutoloadRunner
     {
         return $this->label;
     }
+
+    public function matches(Context $ctx, Variable $callback): bool
+    {
+        if (Variable::TYPE_STRING === $callback->type) {
+            return $callback->toString() === $this->label;
+        }
+        if (Variable::TYPE_ARRAY === $callback->type) {
+            $label = self::arrayCallableLabel($callback);
+
+            return null !== $label && $label === $this->label;
+        }
+
+        return false;
+    }
+
+    /** @return ?string */
+    private static function arrayCallableLabel(Variable $callable): ?string
+    {
+        $table = $callable->toArray();
+        $idx0 = new Variable(Variable::TYPE_INTEGER);
+        $idx0->int(0);
+        $idx1 = new Variable(Variable::TYPE_INTEGER);
+        $idx1->int(1);
+        if (!$table->keyExists($idx0) || !$table->keyExists($idx1)) {
+            return null;
+        }
+        $target = $table->findVariable($idx0, false)->resolveIndirect();
+        $methodName = $table->findVariable($idx1, false)->resolveIndirect();
+        if (Variable::TYPE_STRING !== $methodName->type || Variable::TYPE_STRING !== $target->type) {
+            return null;
+        }
+
+        return $target->toString().'::'.$methodName->toString();
+    }
 }
 
 final class SplAutoloadClosureRunner implements SplAutoloadRunner
@@ -294,6 +364,15 @@ final class SplAutoloadClosureRunner implements SplAutoloadRunner
     public function callableLabel(): string
     {
         return $this->label;
+    }
+
+    public function matches(Context $ctx, Variable $callback): bool
+    {
+        if (!VmClosureCall::isClosure($callback)) {
+            return false;
+        }
+
+        return VmClosureCall::resolve($callback) === $this->closure;
     }
 }
 
@@ -321,5 +400,28 @@ final class SplAutoloadInstanceMethodRunner implements SplAutoloadRunner
     public function callableLabel(): array
     {
         return $this->label;
+    }
+
+    public function matches(Context $ctx, Variable $callback): bool
+    {
+        if (Variable::TYPE_ARRAY !== $callback->type) {
+            return false;
+        }
+        $table = $callback->toArray();
+        $idx0 = new Variable(Variable::TYPE_INTEGER);
+        $idx0->int(0);
+        $idx1 = new Variable(Variable::TYPE_INTEGER);
+        $idx1->int(1);
+        if (!$table->keyExists($idx0) || !$table->keyExists($idx1)) {
+            return false;
+        }
+        $target = $table->findVariable($idx0, false)->resolveIndirect();
+        $methodName = $table->findVariable($idx1, false)->resolveIndirect();
+        if (Variable::TYPE_OBJECT !== $target->type || Variable::TYPE_STRING !== $methodName->type) {
+            return false;
+        }
+
+        return $target->toObject() === $this->receiver
+            && $methodName->toString() === $this->label[1];
     }
 }

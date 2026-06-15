@@ -17,7 +17,7 @@ use PHPCompiler\JIT\SplAutoloadCallbackPolicy;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Value;
 
-/** LLVM lowering helpers for spl_autoload_register() (#1776, #2441, #5300, #4744). */
+/** LLVM lowering helpers for spl_autoload_register() / spl_autoload_unregister() (#1776, #2441, #5300, #4744, #3580). */
 final class JitSplAutoload
 {
     /** @var array<string, Value> per-module autoload shims */
@@ -30,50 +30,14 @@ final class JitSplAutoload
     ): Value {
         SplAutoloadOutput::ensureLinked($context);
 
-        if (null !== $callback->closureCall) {
-            $shimFn = self::closureAutoloadShim($context, $callback->closureCall);
+        return self::applyRegister($context, self::resolveShim($context, $callback), $prependArg);
+    }
 
-            return self::applyRegister($context, $shimFn, $prependArg);
-        }
+    public static function unregister(Context $context, JITVariable $callback): Value
+    {
+        SplAutoloadOutput::ensureLinked($context);
 
-        $staticName = SplAutoloadCallbackPolicy::compileTimeStaticMethodName($callback);
-        if (null !== $staticName) {
-            [$className, $methodName] = explode('::', $staticName, 2);
-            $proxyName = strtolower($className.'::'.$methodName);
-            if (!$context->functionIsRegistered($proxyName)) {
-                throw new \LogicException(
-                    "spl_autoload_register() callback '{$staticName}' is not a defined static method in this compile unit"
-                );
-            }
-            $proxy = $context->resolveFunctionProxy($proxyName);
-            if (!($proxy instanceof Native)) {
-                throw new \LogicException(
-                    "spl_autoload_register() callback '{$staticName}' must be a user-defined static method in this compile unit"
-                );
-            }
-            $shimFn = self::autoloadShim($context, $proxy, $staticName);
-
-            return self::applyRegister($context, $shimFn, $prependArg);
-        }
-
-        $name = $callback->compileTimeString ?? null;
-        if (null === $name) {
-            throw new \LogicException(SplAutoloadCallbackPolicy::jitRejectionMessage());
-        }
-        if (!$context->functionIsRegistered($name)) {
-            throw new \LogicException(
-                "spl_autoload_register() callback '{$name}' is not a defined function in this compile unit"
-            );
-        }
-        $proxy = $context->resolveFunctionProxy($name);
-        if ($proxy instanceof ExternalMethod || !($proxy instanceof Native)) {
-            throw new \LogicException(
-                "spl_autoload_register() callback '{$name}' must be a user-defined function in this compile unit"
-            );
-        }
-        $shimFn = self::autoloadShim($context, $proxy, $name);
-
-        return self::applyRegister($context, $shimFn, $prependArg);
+        return self::applyUnregister($context, self::resolveShim($context, $callback));
     }
 
     public static function dispatchLiteral(Context $context, string $className): void
@@ -142,6 +106,70 @@ final class JitSplAutoload
         JitValueBox::writeBool($context, $slot, $context->getTypeFromString('int1')->constInt(1, false));
 
         return JitValueBox::pointer($context, $slot);
+    }
+
+    private static function applyUnregister(Context $context, Value $shimFn): Value
+    {
+        $i32 = $context->getTypeFromString('int32');
+        $i8p = $context->getTypeFromString('int8*');
+        $fnPtr = $context->builder->pointerCast($shimFn, $i8p);
+        $found = $context->builder->call(
+            $context->lookupFunction('__phpc_spl_autoload_unregister_apply'),
+            $fnPtr
+        );
+
+        $slot = JitValueBox::alloc($context);
+        JitValueBox::writeBool($context, $slot, $context->builder->icmp(
+            \PHPLLVM\Builder::INT_NE,
+            $found,
+            $i32->constInt(0, false)
+        ));
+
+        return JitValueBox::pointer($context, $slot);
+    }
+
+    private static function resolveShim(Context $context, JITVariable $callback): Value
+    {
+        if (null !== $callback->closureCall) {
+            return self::closureAutoloadShim($context, $callback->closureCall);
+        }
+
+        $staticName = SplAutoloadCallbackPolicy::compileTimeStaticMethodName($callback);
+        if (null !== $staticName) {
+            [$className, $methodName] = explode('::', $staticName, 2);
+            $proxyName = strtolower($className.'::'.$methodName);
+            if (!$context->functionIsRegistered($proxyName)) {
+                throw new \LogicException(
+                    "spl_autoload_register() callback '{$staticName}' is not a defined static method in this compile unit"
+                );
+            }
+            $proxy = $context->resolveFunctionProxy($proxyName);
+            if (!($proxy instanceof Native)) {
+                throw new \LogicException(
+                    "spl_autoload_register() callback '{$staticName}' must be a user-defined static method in this compile unit"
+                );
+            }
+
+            return self::autoloadShim($context, $proxy, $staticName);
+        }
+
+        $name = $callback->compileTimeString ?? null;
+        if (null === $name) {
+            throw new \LogicException(SplAutoloadCallbackPolicy::jitRejectionMessage());
+        }
+        if (!$context->functionIsRegistered($name)) {
+            throw new \LogicException(
+                "spl_autoload_register() callback '{$name}' is not a defined function in this compile unit"
+            );
+        }
+        $proxy = $context->resolveFunctionProxy($name);
+        if ($proxy instanceof ExternalMethod || !($proxy instanceof Native)) {
+            throw new \LogicException(
+                "spl_autoload_register() callback '{$name}' must be a user-defined function in this compile unit"
+            );
+        }
+
+        return self::autoloadShim($context, $proxy, $name);
     }
 
     private static function autoloadShim(
