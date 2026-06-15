@@ -8682,7 +8682,18 @@ class Compiler {
             return $producers[$argIndex] ?? null;
         }
         if (1 === $producerCount) {
-            if (0 === $argIndex && $this->isEmbeddedCallLiteralArg($callArgs[1] ?? null)) {
+            if (
+                ($producers[0] instanceof Op\Expr\ConstFetch || $producers[0] instanceof Op\Expr\ClassConstFetch)
+                && $argCount - 1 === $argIndex
+            ) {
+                return $producers[0];
+            }
+            if (
+                0 === $argIndex
+                && $this->isEmbeddedCallLiteralArg($callArgs[1] ?? null)
+                && !($producers[0] instanceof Op\Expr\ConstFetch)
+                && !($producers[0] instanceof Op\Expr\ClassConstFetch)
+            ) {
                 return $producers[0];
             }
             if ($argCount - 1 === $argIndex && $this->isEmbeddedCallLiteralArg($callArgs[0] ?? null)) {
