@@ -59,6 +59,16 @@ final class BootstrapVmDriverExecuteProbeTest extends TestCase
         $this->assertStringContainsString('honest emit required (#8559)', $script);
     }
 
+    /** Issue #8692: default spine smoke must run PHP main(), not native bundle-OK echo stub. */
+    public function testSpineSmokeDefaultPathRunsPhpMainNotNativeBundleStub(): void
+    {
+        $native = (string) file_get_contents(self::$root.'/lib/JIT/VmDriverExecuteNative.php');
+        $this->assertStringNotContainsString('vm_probe_bundle_default', $native);
+        $this->assertStringContainsString('#8692', $native);
+        $entry = (string) file_get_contents(self::$root.'/test/selfhost/compiler_lib_spine_smoke/main.php');
+        $this->assertStringContainsString('compiler_lib_spine_smoke bundle OK', $entry);
+    }
+
     public function testNativeMainEnvProbePrintsVmDriverOkWhenLlvmPresent(): void
     {
         if (!LlvmToolchain::isReady(self::$root)) {
