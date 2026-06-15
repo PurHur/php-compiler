@@ -10,8 +10,10 @@ use PHPCompiler\VM\ClassProperty;
 use PHPCompiler\VM\Context;
 use PHPCompiler\VM\EnumCaseSupport;
 use PHPCompiler\VM\ObjectEntry;
+use PHPCompiler\ext\standard\VmFsDirNative;
 use PHPCompiler\ext\standard\VmFsReadNative;
 use PHPCompiler\ext\standard\VmFsWriteNative;
+use PHPCompiler\ext\standard\VmStatPath;
 use PHPCompiler\VM\Variable;
 
 /**
@@ -315,7 +317,7 @@ final class VmZipArchive
             }
             $target = rtrim($pathto, '/\\') . DIRECTORY_SEPARATOR . str_replace('/', DIRECTORY_SEPARATOR, $zipEntry['name']);
             $dir = dirname($target);
-            if (!is_dir($dir) && !@mkdir($dir, 0777, true) && !is_dir($dir)) {
+            if (!VmStatPath::isDir($dir) && !VmFsDirNative::mkdir($dir, 0777, true) && !VmStatPath::isDir($dir)) {
                 self::setStatus($entry, $state, ZipArchiveConstants::ER_OPEN);
 
                 return false;
