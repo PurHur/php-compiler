@@ -50,6 +50,8 @@ final class M3EmitTuTrivialEchoAot
 
     public const COMPILER_LIB_SIDECAR_REL = 'build/.m3_compiler_lib_aot_blob';
 
+    public const COMPILER_LIB_SOURCE_PATH_NORM = 'test/selfhost/compiler_lib_spine_smoke/main.php';
+
     public const COMPILER_MINIMAL_SIDECAR_REL = 'build/.m3_compiler_minimal_aot_blob';
 
     public const COMPILE_DRIVER_SIDECAR_REL = 'build/.m3_compile_driver_aot_blob';
@@ -94,8 +96,8 @@ final class M3EmitTuTrivialEchoAot
 
             return false !== $resolved ? str_replace('\\', '/', $resolved) : $norm;
         }
-        if (str_ends_with($norm, '/test/selfhost/compiler_lib_spine_smoke/main.php')) {
-            return 'test/selfhost/compiler_lib_spine_smoke/main.php';
+        if (str_ends_with($norm, '/'.self::COMPILER_LIB_SOURCE_PATH_NORM)) {
+            return self::COMPILER_LIB_SOURCE_PATH_NORM;
         }
         if (str_ends_with($norm, '/test/selfhost/compiler_minimal/main.php')) {
             return 'test/selfhost/compiler_minimal/main.php';
@@ -147,6 +149,16 @@ final class M3EmitTuTrivialEchoAot
         $have = trim((string) file_get_contents($stampPath));
 
         return $have === $want;
+    }
+
+    public static function isCompilerLibSidecarRel(string $sidecarRel): bool
+    {
+        return self::COMPILER_LIB_SIDECAR_REL === $sidecarRel;
+    }
+
+    public static function isCompilerLibSourcePathNorm(?string $sourcePathNorm): bool
+    {
+        return self::COMPILER_LIB_SOURCE_PATH_NORM === $sourcePathNorm;
     }
 
     public static function registerLinktime(
@@ -227,6 +239,7 @@ final class M3EmitTuTrivialEchoAot
             'sentinelLc' => $sentinelLc,
             'objectOnly' => $objectOnlySidecar,
             'sourcePathGlobal' => $sourcePathGlobal,
+            'contentMatchOnly' => self::isCompilerLibSidecarRel($sidecarRel),
         ];
 
         if (null === $context->m3EmitTuTrivialEchoSourceGlobal) {
@@ -278,7 +291,9 @@ final class M3EmitTuTrivialEchoAot
                 $pathMatch = $context->builder->or($pathExact, $pathSuffix);
             }
             $matches = $contentMatch;
-            if (null !== $pathMatch) {
+            if (null !== $pathMatch && empty($entry['contentMatchOnly'])) {
+                // compiler_lib spine: path is stable but entry body changes — path-only match
+                // must not resurrect a stale sidecar when the SHA stamp is behind (#2201, #8559).
                 $matches = $context->builder->or($contentMatch, $pathMatch);
             }
             $ok = BasicBlockHelper::append($context, 'm3te_pac_sidecar_'.$tag);

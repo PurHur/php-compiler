@@ -102,6 +102,15 @@ INVENTORY_ARGV_DRIVER="${ROOT}/build/bin-compile-aot-inventory"
 
 # M3 compiler_lib spine sidecar must match test/selfhost/compiler_lib_spine_smoke/main.php (#3012).
 bootstrap_ensure_m3_compiler_lib_sidecar 2>/dev/null || true
+want_sha="$(bootstrap_compiler_lib_spine_entry_sha)" || true
+have_sha=""
+if [[ -f "${ROOT}/build/.m3_compiler_lib_sidecar.sha" ]]; then
+  have_sha="$(tr -d '\n' <"${ROOT}/build/.m3_compiler_lib_sidecar.sha")"
+fi
+if [[ -n "${want_sha:-}" && "${want_sha}" != "${have_sha}" ]]; then
+  rm -f "${ROOT}/build/.m3_compiler_lib_aot_blob"
+  echo "bootstrap-selfhost-lib-spine-smoke-link: removed stale compiler_lib sidecar (want ${want_sha}, have ${have_sha:-<none>}) — honest native emit (#8559)" >&2
+fi
 
 # Prefer the proven inventory argv driver path (same strategy as bootstrap-selfhost-full-revision-probe, #2968).
 if [[ "${BOOTSTRAP_LIB_SPINE_SMOKE_USE_COMPILE_INVOKE:-0}" != "1" ]]; then
@@ -227,9 +236,17 @@ if ! grep -q 'compiler_lib_spine_smoke bundle OK' <<< "${out}"; then
   printf '%s\n' "${out}" >&2
   exit 1
 fi
-if strings "${OUT}" 2>/dev/null | grep -q 'vm driver ok'; then
-  want_sha="$(bootstrap_compiler_lib_spine_entry_sha)" || true
-  if [[ -n "${want_sha:-}" ]]; then
+want_sha="$(bootstrap_compiler_lib_spine_entry_sha)" || true
+if [[ -n "${want_sha:-}" ]]; then
+  refresh_sidecar=0
+  if strings "${OUT}" 2>/dev/null | grep -q 'vm driver ok'; then
+    refresh_sidecar=1
+  elif [[ -x "${OUT}" ]] && grep -q 'compiler_lib_spine_smoke bundle OK' <<< "${out}"; then
+    # Native full-spine emit succeeded; refresh sidecar even when env-probe strings
+    # are not yet embedded (honest compile path after stale sidecar refusal — #8559).
+    refresh_sidecar=1
+  fi
+  if [[ "${refresh_sidecar}" == "1" ]]; then
     cp -f "${OUT}" "${ROOT}/build/.m3_compiler_lib_aot_blob"
     chmod +x "${ROOT}/build/.m3_compiler_lib_aot_blob"
     printf '%s' "${want_sha}" >"${ROOT}/build/.m3_compiler_lib_sidecar.sha"
