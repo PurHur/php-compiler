@@ -32,7 +32,7 @@ permalink: /development-status.html
 | M5 spine runtime + bootstrap | `fix/spine-aot-jit-blockers` | Native bundle-OK probe; inventory argv spine-lint fallback; gen-0 sidecars refreshed ([#8559](https://github.com/PurHur/php-compiler/issues/8559)) |
 | VM driver execute probe | [9493e806d](https://github.com/PurHur/php-compiler/commit/9493e806d) | **~20ms** feedback loop — no full relink on stale SHA; `BOOTSTRAP_VM_DRIVER_EXECUTE_PROBE_FULL_LINK=1` for rebuild ([#2201](https://github.com/PurHur/php-compiler/issues/2201)) |
 | M5 presenter | `north-star5-verify --strict` | Inventory + spine **2643/2643** + vendor 3/3 + cold boot without `vendor/` ✅ |
-| Gen-0 refresh | [5df5a6cf9](https://github.com/PurHur/php-compiler/commit/5df5a6cf9) | Honest inventory argv emit into `prelinked/bootstrap-gen0/`; fixed-point smoke |
+| Gen-0 refresh | [a8cffaa0e](https://github.com/PurHur/php-compiler/commit/a8cffaa0e) | Spine runtime probe + gen-0 sidecars (**2643/2643**); inventory argv spine-lint fallback ([#8559](https://github.com/PurHur/php-compiler/issues/8559)) |
 | Spine lint OOM | [#8391](https://github.com/PurHur/php-compiler/issues/8391) | Skip SourceBundler mega-concat on spine `-l` |
 | Stream I/O JIT | inventory defer stubs | Full emitters outside inventory driver path; inventory rebuild unblocked |
 | Inventory driver | [#3046](https://github.com/PurHur/php-compiler/issues/3046) | Phantom emit guards + sidecar path remap |
