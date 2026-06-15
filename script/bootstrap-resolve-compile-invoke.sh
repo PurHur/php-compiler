@@ -32,9 +32,31 @@ BOOTSTRAP_COMPILE_DRIVER=""
 # Inventory argv driver must be large enough to be real Compiler {main}, not a link sidecar stub (#3012, #3046).
 BOOTSTRAP_INVENTORY_ARGV_DRIVER_MIN_BYTES="${BOOTSTRAP_INVENTORY_ARGV_DRIVER_MIN_BYTES:-350000}"
 
+# Committed gen-0 manifest size_bytes_driver is the SSOT floor (#8713, #3046).
+bootstrap_gen0_manifest_driver_min_bytes() {
+  local root="${ROOT:-}"
+  local bytes=""
+  if [[ -z "${root}" || ! -f "${root}/prelinked/bootstrap-gen0/manifest.json" ]]; then
+    return 1
+  fi
+  bytes="$("${PHP_BIN:-php}" -r '
+    $m = json_decode(file_get_contents($argv[1]), true);
+    $n = (int)($m["size_bytes_driver"] ?? 0);
+    echo $n > 0 ? $n : "";
+  ' "${root}/prelinked/bootstrap-gen0/manifest.json" 2>/dev/null)" || return 1
+  [[ -n "${bytes}" && "${bytes}" =~ ^[0-9]+$ ]] || return 1
+  echo "${bytes}"
+}
+
 bootstrap_inventory_argv_driver_size_ok() {
   local driver=$1
   local min_bytes="${2:-${BOOTSTRAP_INVENTORY_ARGV_DRIVER_MIN_BYTES}}"
+  local manifest_min=""
+  if manifest_min="$(bootstrap_gen0_manifest_driver_min_bytes 2>/dev/null)"; then
+    if (( manifest_min > min_bytes )); then
+      min_bytes="${manifest_min}"
+    fi
+  fi
   local driver_bytes
   driver_bytes="$(wc -c <"${driver}" 2>/dev/null || echo 0)"
   [[ "${driver_bytes}" =~ ^[0-9]+$ ]] && (( driver_bytes >= min_bytes ))
