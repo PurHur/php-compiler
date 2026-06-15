@@ -9,6 +9,7 @@ use PHPCompiler\JIT\SplAutoloadCallbackPolicy;
 use PHPCompiler\VM\ClosureState;
 use PHPCompiler\VM\Context;
 use PHPCompiler\VM\EnumCaseSupport;
+use PHPCompiler\VM\HashTable;
 use PHPCompiler\VM\ObjectEntry;
 use PHPCompiler\VM\ScriptStack;
 use PHPCompiler\VM\Variable;
@@ -80,20 +81,17 @@ final class VmSplAutoload
         return false;
     }
 
-    /**
-     * @return list<string|array{0: string, 1: string}> registered callback labels for spl_autoload_functions()
-     */
-    public static function registeredFunctions(Context $ctx): array
+    public static function callbackSnapshot(Context $ctx): HashTable
     {
-        if ([] === $ctx->splAutoloadCallbacks) {
-            return [];
-        }
-        $out = [];
+        $ht = new HashTable();
+        $index = 0;
         foreach ($ctx->splAutoloadCallbacks as $runner) {
-            $out[] = $runner->callableLabel();
+            $key = new Variable();
+            $key->int($index++);
+            array_map::appendKeyedCopy($ht, $key, $runner->materializeCallback());
         }
 
-        return $out;
+        return $ht;
     }
 
     public static function fileExtensions(): string
@@ -166,7 +164,7 @@ final class VmSplAutoload
         }
         if (Variable::TYPE_OBJECT === $callback->type) {
             if (VmClosureCall::isClosure($callback)) {
-                return new SplAutoloadClosureRunner(VmClosureCall::resolve($callback));
+                return new SplAutoloadClosureRunner(VmClosureCall::resolve($callback), $callback);
             }
 
             throw new \TypeError(SplAutoloadCallbackPolicy::invalidCallbackTypeError());
@@ -180,6 +178,9 @@ final class VmSplAutoload
 
     private static function bindFunction(Context $ctx, string $name): SplAutoloadRunner
     {
+        if ('spl_autoload' === $name) {
+            return new SplAutoloadDefaultRunner();
+        }
         $func = VmUserCall::resolveStringCallback($ctx, $name);
 
         return new SplAutoloadFunctionRunner($func, $name);
@@ -260,8 +261,7 @@ interface SplAutoloadRunner
 {
     public function run(Context $ctx, string $className): void;
 
-    /** @return string|array{0: string, 1: string} */
-    public function callableLabel(): string|array;
+    public function materializeCallback(): Variable;
 
     public function matches(Context $ctx, Variable $callback): bool;
 }
@@ -273,9 +273,12 @@ final class SplAutoloadDefaultRunner implements SplAutoloadRunner
         VmSplAutoload::defaultAutoload($ctx, $className);
     }
 
-    public function callableLabel(): string
+    public function materializeCallback(): Variable
     {
-        return 'spl_autoload';
+        $value = new Variable();
+        $value->string('spl_autoload');
+
+        return $value;
     }
 
     public function matches(Context $ctx, Variable $callback): bool
@@ -306,9 +309,12 @@ final class SplAutoloadFunctionRunner implements SplAutoloadRunner
         $ctx->runtime->vm->invokePhpFunction($this->func, $arg);
     }
 
-    public function callableLabel(): string
+    public function materializeCallback(): Variable
     {
-        return $this->label;
+        $value = new Variable();
+        $value->string($this->label);
+
+        return $value;
     }
 
     public function matches(Context $ctx, Variable $callback): bool
@@ -350,7 +356,7 @@ final class SplAutoloadClosureRunner implements SplAutoloadRunner
 {
     public function __construct(
         private ClosureState $closure,
-        private string $label = 'Closure',
+        private Variable $callback,
     ) {
     }
 
@@ -361,9 +367,12 @@ final class SplAutoloadClosureRunner implements SplAutoloadRunner
         VmClosureCall::invokeOne($ctx, $this->closure, $arg);
     }
 
-    public function callableLabel(): string
+    public function materializeCallback(): Variable
     {
-        return $this->label;
+        $value = new Variable();
+        $value->copyFrom($this->callback->resolveIndirect());
+
+        return $value;
     }
 
     public function matches(Context $ctx, Variable $callback): bool
@@ -397,9 +406,23 @@ final class SplAutoloadInstanceMethodRunner implements SplAutoloadRunner
         $ctx->runtime->vm->invokePhpFunction($this->func, $recv, $arg);
     }
 
-    public function callableLabel(): array
+    public function materializeCallback(): Variable
     {
-        return $this->label;
+        $elem0 = new Variable();
+        $elem0->string($this->label[0]);
+        $elem1 = new Variable();
+        $elem1->string($this->label[1]);
+        $inner = new HashTable();
+        $k0 = new Variable();
+        $k0->int(0);
+        $k1 = new Variable();
+        $k1->int(1);
+        array_map::appendKeyedCopy($inner, $k0, $elem0);
+        array_map::appendKeyedCopy($inner, $k1, $elem1);
+        $value = new Variable();
+        $value->array($inner);
+
+        return $value;
     }
 
     public function matches(Context $ctx, Variable $callback): bool
