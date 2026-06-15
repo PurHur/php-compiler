@@ -175,6 +175,7 @@ Use these during LLVM/JIT iteration — avoid full spine relink unless you chang
 | `make bootstrap-gen0-refresh-sidecar` | minutes | Full spine link + copy `build/.m3_*` → `prelinked/bootstrap-gen0/` + manifest refresh ([#8704](https://github.com/PurHur/php-compiler/issues/8704)) |
 | `php script/bootstrap-inventory.php --check` | seconds | Inventory SSOT without LLVM |
 | `php script/check-selfhost-spine-coverage-sync.php` | seconds | Spine ↔ inventory coverage (**2643/2643**) |
+| `php script/check-selfhost-spine-sidecar-sync.php` | seconds | Prelinked gen-0 stamp ↔ spine entry SHA-1 ([#8703](https://github.com/PurHur/php-compiler/issues/8703)) |
 
 **Env flags**
 
@@ -182,4 +183,5 @@ Use these during LLVM/JIT iteration — avoid full spine relink unless you chang
 |------|------|
 | `BOOTSTRAP_VM_DRIVER_EXECUTE_PROBE_FULL_LINK=1` | VM probe must rebuild spine (post-entry edit, refresh gen-0) |
 | `BOOTSTRAP_FORCE_COMPILER_LIB_SIDECAR_REGEN=1` | Regenerate `build/.m3_compiler_lib_aot_blob` via Zend (slow) |
+| `BOOTSTRAP_ALLOW_STALE_SIDECAR=1` | Waive `check-selfhost-spine-sidecar-sync.php` during intentional gen-0 blob batch PRs only ([#8703](https://github.com/PurHur/php-compiler/issues/8703)) |
 | `BOOTSTRAP_M5_NO_ZEND=1` | Cold boot from prelinked gen-0 only ([#3053](https://github.com/PurHur/php-compiler/issues/3053)) |

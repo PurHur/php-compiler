@@ -296,6 +296,14 @@ ci_run_selfhost_spine_deferred_sync_check() {
   "$PHP_BIN" "${PHP_OPTS[@]}" script/check-selfhost-spine-deferred-sync.php
 }
 
+ci_run_selfhost_spine_sidecar_sync_check() {
+  if [[ "${SELFHOST_SPINE_SIDECAR_SYNC_GATE:-0}" != "1" ]]; then
+    return 0
+  fi
+  echo "Self-host spine sidecar sync (SELFHOST_SPINE_SIDECAR_SYNC_GATE=1, issue #8703)..."
+  "$PHP_BIN" "${PHP_OPTS[@]}" script/check-selfhost-spine-sidecar-sync.php
+}
+
 ci_run_bootstrap_spine_phpcfg_parse_check() {
   if [[ "${BOOTSTRAP_SPINE_PHPCFG_PARSE_GATE:-1}" != "1" ]]; then
     return 0
@@ -532,6 +540,7 @@ ci_run_inventory_checks() {
   ci_run_selfhost_spine_count_sync_check
   ci_run_selfhost_spine_coverage_sync_check
   ci_run_selfhost_spine_deferred_sync_check
+  ci_run_selfhost_spine_sidecar_sync_check
   ci_run_bootstrap_spine_phpcfg_parse_check
   ci_run_m3_allowlist_sync_check
   ci_run_selfhost_aot_stub_audit_check
