@@ -316,6 +316,7 @@ final class Linker
             $sysroot = $llvmDir.'/sysroot';
             if (is_file($sysroot.'/usr/include/stdio.h')) {
                 $flags = ' --sysroot='.escapeshellarg($sysroot);
+                $flags .= self::runtimeCSysrootGccIncludeFlags($sysroot);
             }
         }
         $hostFlags = self::runtimeCHostLibcIncludeFlags();
@@ -324,6 +325,23 @@ final class Linker
         }
 
         return '' !== $flags ? $flags : self::runtimeCHostLibcIncludeFlags();
+    }
+
+    /**
+     * Bundled LLVM sysroots ship stdio.h under usr/include but stddef.h under gcc's include tree.
+     */
+    private static function runtimeCSysrootGccIncludeFlags(string $sysroot): string
+    {
+        $flags = '';
+        $pattern = rtrim($sysroot, '/').'/usr/lib/gcc/*/*/include';
+        foreach (glob($pattern) ?: [] as $dir) {
+            if (!is_file($dir.'/stddef.h')) {
+                continue;
+            }
+            $flags .= ' -isystem '.escapeshellarg($dir);
+        }
+
+        return $flags;
     }
 
     private static function runtimeCHostLibcIncludeFlags(): string

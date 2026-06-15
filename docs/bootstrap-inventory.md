@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 2721 |
-| Phase A inventory files (M2 ratio SSOT) | 2721 |
+| PHP files on vm.php path | 2723 |
+| Phase A inventory files (M2 ratio SSOT) | 2723 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 7359 |
+| Source constructs flagged (warnings) | 7368 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -637,6 +637,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/standard/JitSessionUnset.php` | 0 | 1 |
 | `ext/standard/JitSessionWriteClose.php` | 0 | 1 |
 | `ext/standard/JitSetcookie.php` | 0 | 1 |
+| `ext/standard/JitSetcookieOptions.php` | 0 | 1 |
 | `ext/standard/JitSettype.php` | 0 | 1 |
 | `ext/standard/JitSha1.php` | 0 | 1 |
 | `ext/standard/JitShellExec.php` | 0 | 1 |
@@ -744,6 +745,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/standard/ParseStrEngine.php` | 0 | 2 |
 | `ext/standard/RequestMethodEnumData.php` | 0 | 1 |
 | `ext/standard/SetcookieLine.php` | 0 | 1 |
+| `ext/standard/SetcookieOptions.php` | 0 | 4 |
 | `ext/standard/StripWhitespaceJitHelper.php` | 0 | 1 |
 | `ext/standard/SuperglobalNames.php` | 0 | 1 |
 | `ext/standard/ThrowableManifest.php` | 0 | 1 |
@@ -918,7 +920,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/standard/VmShellExecNative.php` | 0 | 1 |
 | `ext/standard/VmSleep.php` | 0 | 1 |
 | `ext/standard/VmSleepNative.php` | 0 | 1 |
-| `ext/standard/VmSplAutoload.php` | 0 | 17 |
+| `ext/standard/VmSplAutoload.php` | 0 | 29 |
 | `ext/standard/VmSprintf.php` | 0 | 3 |
 | `ext/standard/VmSscanf.php` | 0 | 8 |
 | `ext/standard/VmStatCache.php` | 0 | 1 |
@@ -1532,7 +1534,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/standard/spl_autoload.php` | 0 | 2 |
 | `ext/standard/spl_autoload_call.php` | 0 | 1 |
 | `ext/standard/spl_autoload_extensions.php` | 0 | 2 |
-| `ext/standard/spl_autoload_functions.php` | 0 | 10 |
+| `ext/standard/spl_autoload_functions.php` | 0 | 2 |
 | `ext/standard/spl_autoload_register.php` | 0 | 1 |
 | `ext/standard/spl_autoload_unregister.php` | 0 | 2 |
 | `ext/standard/spl_object_hash.php` | 0 | 1 |
@@ -6385,6 +6387,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - 2 class method(s)
 
+### `ext/standard/JitSetcookieOptions.php`
+
+**Warnings** (review for bootstrap subset):
+- 7 class method(s)
+
 ### `ext/standard/JitSettype.php`
 
 **Warnings** (review for bootstrap subset):
@@ -6413,7 +6420,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/JitSplAutoload.php`
 
 **Warnings** (review for bootstrap subset):
-- 10 class method(s)
+- 11 class method(s)
 
 ### `ext/standard/JitSplObjectHash.php`
 
@@ -7700,6 +7707,14 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - 1 class method(s)
 
+### `ext/standard/SetcookieOptions.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 43)
+- new ArgumentCountError (line 49)
+- new ArgumentCountError (line 65)
+- 4 class method(s)
+
 ### `ext/standard/StripWhitespaceJitHelper.php`
 
 **Warnings** (review for bootstrap subset):
@@ -8384,12 +8399,12 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/VmIni.php`
 
 **Warnings** (review for bootstrap subset):
-- new HashTable (line 255)
-- new HashTable (line 262)
-- new Variable (line 270)
-- new Variable (line 283)
-- new Variable (line 291)
-- 20 class method(s)
+- new HashTable (line 254)
+- new HashTable (line 261)
+- new Variable (line 269)
+- new Variable (line 282)
+- new Variable (line 290)
+- 21 class method(s)
 
 ### `ext/standard/VmIniIntrospection.php`
 
@@ -8989,22 +9004,34 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/VmSplAutoload.php`
 
 **Warnings** (review for bootstrap subset):
-- new SplAutoloadDefaultRunner (line 34)
-- new SplAutoloadClosureRunner (line 169)
-- new SplAutoloadFunctionRunner (line 185)
-- new SplAutoloadFunctionRunner (line 193)
-- new Variable (line 199)
-- new Variable (line 201)
-- new SplAutoloadFunctionRunner (line 215)
-- new SplAutoloadInstanceMethodRunner (line 225)
-- new Variable (line 304)
-- new Variable (line 332)
-- new Variable (line 334)
-- new Variable (line 359)
-- new Variable (line 393)
-- new Variable (line 395)
+- new SplAutoloadDefaultRunner (line 35)
+- new HashTable (line 86)
+- new Variable (line 89)
+- new SplAutoloadClosureRunner (line 167)
+- new SplAutoloadDefaultRunner (line 182)
+- new SplAutoloadFunctionRunner (line 186)
+- new SplAutoloadFunctionRunner (line 194)
+- new Variable (line 200)
+- new Variable (line 202)
+- new SplAutoloadFunctionRunner (line 216)
+- new SplAutoloadInstanceMethodRunner (line 226)
+- new Variable (line 278)
+- new Variable (line 307)
+- new Variable (line 314)
+- new Variable (line 338)
+- new Variable (line 340)
+- new Variable (line 365)
+- new Variable (line 372)
+- new Variable (line 402)
+- new Variable (line 404)
 - new Variable (line 411)
 - new Variable (line 413)
+- new HashTable (line 415)
+- new Variable (line 416)
+- new Variable (line 418)
+- new Variable (line 422)
+- new Variable (line 434)
+- new Variable (line 436)
 - 29 class method(s)
 
 ### `ext/standard/VmSprintf.php`
@@ -12412,7 +12439,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/setcookie.php`
 
 **Warnings** (review for bootstrap subset):
-- 5 class method(s)
+- 4 class method(s)
 
 ### `ext/standard/setlocale.php`
 
@@ -12423,7 +12450,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/setrawcookie.php`
 
 **Warnings** (review for bootstrap subset):
-- 5 class method(s)
+- 4 class method(s)
 
 ### `ext/standard/settype.php`
 
@@ -12506,15 +12533,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/spl_autoload_functions.php`
 
 **Warnings** (review for bootstrap subset):
-- new ArgumentCountError (line 28)
-- new HashTable (line 42)
-- new Variable (line 45)
-- new Variable (line 47)
-- new Variable (line 51)
-- new Variable (line 53)
-- new HashTable (line 55)
-- new Variable (line 56)
-- new Variable (line 58)
+- new ArgumentCountError (line 26)
 - 2 class method(s)
 
 ### `ext/standard/spl_autoload_register.php`
@@ -13722,7 +13741,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/AOT/Linker.php`
 
 **Warnings** (review for bootstrap subset):
-- 22 class method(s)
+- 23 class method(s)
 - 1 closure(s)
 
 ### `lib/AOT/LinkerProcessPolyfill.php`
@@ -14208,73 +14227,73 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new Variable (line 8341)
 - new Operand\Temporary (line 8343)
 - new OpCode (line 8390)
-- new CfgVariable (line 9213)
-- new Literal (line 9213)
-- new Variable (line 9245)
-- new Variable (line 9293)
-- new OpCode (line 9317)
-- new OpCode (line 9494)
-- new OpCode (line 9508)
-- new OpCode (line 9515)
-- new OpCode (line 9521)
-- new OpCode (line 9532)
-- new OpCode (line 9549)
-- new OpCode (line 9554)
-- new OpCode (line 9560)
-- new OpCode (line 9565)
-- new OpCode (line 9581)
-- new OpCode (line 9594)
-- new Variable (line 9605)
-- new Operand\Literal (line 9607)
-- new OpCode (line 9610)
-- new OpCode (line 9642)
-- new OpCode (line 9653)
-- new OpCode (line 9666)
-- new OpCode (line 9741)
-- new OpCode (line 9829)
-- new OpCode (line 9835)
-- new OpCode (line 9841)
-- new OpCode (line 9862)
-- new Variable (line 9889)
-- new Temporary (line 9891)
-- new Variable (line 9899)
-- new Temporary (line 9901)
-- new OpCode (line 9934)
-- new Operand\Temporary (line 9953)
-- new Operand\Temporary (line 9959)
-- new Operand\Temporary (line 9965)
-- new Operand\Temporary (line 9971)
-- new Operand\Temporary (line 9980)
-- new Variable (line 10370)
-- new Variable (line 10374)
-- new Variable (line 10382)
-- new Variable (line 10386)
-- new Operand\Literal (line 10511)
-- new Variable (line 10513)
-- new OpCode (line 10521)
-- new OpCode (line 10614)
-- new OpCode (line 10713)
-- new OpCode (line 10723)
-- new OpCode (line 10726)
-- new OpCode (line 10753)
-- new Operand\Temporary (line 10756)
-- new OpCode (line 10758)
-- new OpCode (line 10766)
-- new OpCode (line 10773)
-- new OpCode (line 10781)
-- new OpCode (line 10784)
-- new OpCode (line 10800)
-- new OpCode (line 10818)
-- new OpCode (line 10825)
-- new OpCode (line 10842)
-- new Literal (line 10864)
-- new OpCode (line 10963)
-- new Variable (line 10970)
-- new Temporary (line 10972)
-- new OpCode (line 10975)
-- new CompileFatal (line 11273)
-- new CompileFatal (line 11312)
-- 399 class method(s)
+- new CfgVariable (line 9280)
+- new Literal (line 9280)
+- new Variable (line 9312)
+- new Variable (line 9360)
+- new OpCode (line 9384)
+- new OpCode (line 9561)
+- new OpCode (line 9575)
+- new OpCode (line 9582)
+- new OpCode (line 9588)
+- new OpCode (line 9599)
+- new OpCode (line 9616)
+- new OpCode (line 9621)
+- new OpCode (line 9627)
+- new OpCode (line 9632)
+- new OpCode (line 9648)
+- new OpCode (line 9661)
+- new Variable (line 9672)
+- new Operand\Literal (line 9674)
+- new OpCode (line 9677)
+- new OpCode (line 9709)
+- new OpCode (line 9720)
+- new OpCode (line 9733)
+- new OpCode (line 9808)
+- new OpCode (line 9899)
+- new OpCode (line 9905)
+- new OpCode (line 9911)
+- new OpCode (line 9932)
+- new Variable (line 9959)
+- new Temporary (line 9961)
+- new Variable (line 9969)
+- new Temporary (line 9971)
+- new OpCode (line 10004)
+- new Operand\Temporary (line 10023)
+- new Operand\Temporary (line 10029)
+- new Operand\Temporary (line 10035)
+- new Operand\Temporary (line 10041)
+- new Operand\Temporary (line 10050)
+- new Variable (line 10443)
+- new Variable (line 10447)
+- new Variable (line 10455)
+- new Variable (line 10459)
+- new Operand\Literal (line 10594)
+- new Variable (line 10596)
+- new OpCode (line 10604)
+- new OpCode (line 10697)
+- new OpCode (line 10796)
+- new OpCode (line 10806)
+- new OpCode (line 10809)
+- new OpCode (line 10836)
+- new Operand\Temporary (line 10839)
+- new OpCode (line 10841)
+- new OpCode (line 10849)
+- new OpCode (line 10856)
+- new OpCode (line 10864)
+- new OpCode (line 10867)
+- new OpCode (line 10883)
+- new OpCode (line 10901)
+- new OpCode (line 10908)
+- new OpCode (line 10925)
+- new Literal (line 10947)
+- new OpCode (line 11046)
+- new Variable (line 11053)
+- new Temporary (line 11055)
+- new OpCode (line 11058)
+- new CompileFatal (line 11356)
+- new CompileFatal (line 11395)
+- 400 class method(s)
 - 15 closure(s)
 
 ### `lib/Compiler/AbstractMethodVisibilityCheck.php`
@@ -19850,8 +19869,8 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/VM/ErrorReporter.php`
 
 **Warnings** (review for bootstrap subset):
-- new Variable (line 118)
-- new Variable (line 436)
+- new Variable (line 125)
+- new Variable (line 443)
 - 33 class method(s)
 
 ### `lib/VM/ExceptionHandlerStack.php`
