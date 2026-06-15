@@ -37,3 +37,10 @@ Filter locally:
 ## Patches
 
 Vendor fixes go in `patches/` and `script/apply-patches.sh` — never edit `vendor/` directly.
+
+## Self-host / bootstrap (M5)
+
+- **Default verify:** `make north-star5-verify-fast` + `make bootstrap-selfhost-vm-driver-execute-probe` — not `north-star5-verify --strict` unless merging bootstrap blobs.
+- Spine entry: `test/selfhost/compiler_lib_spine_smoke/main.php` — sync with `php script/check-selfhost-spine-coverage-sync.php`.
+- After spine edits: full link `make bootstrap-selfhost-lib-spine-smoke`; refresh `prelinked/bootstrap-gen0/` when gen-0 seed moves.
+- Doc: `docs/bootstrap-m5-fast-path.md`.

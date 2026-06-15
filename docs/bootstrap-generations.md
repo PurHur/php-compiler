@@ -64,7 +64,8 @@ make bootstrap-loop-probe              # M2 + M3 strict + gen-1→gen-2 + gen-2�
 make bootstrap-native-compile-driver-smoke   # build bin-compile-aot + smoke compile
 make bootstrap-selfhost-driver-smoke         # helloworld driver → gen-2 smoke + run
 make north-star4-verify                      # inventory + M3 strict + M4 ladder
-make north-star5-verify                      # M5 vendor + spine presenter
+make north-star5-verify-fast                      # M5 PR gate (~1–2 min)
+make north-star5-verify ARGS=--strict             # pre-merge bootstrap only (~1h)
 ```
 
 **Docker:**

@@ -122,11 +122,20 @@ make north-star4-verify
 
 ### 7b. (Optional) North Star 5 — M5 presenter
 
+**PR / daily iteration** (~1–2 min — no spine relink):
+
+```bash
+make north-star5-verify-fast
+# or: ./script/north-star5-verify.sh --fast
+```
+
+**Before merging bootstrap/M5 work** (~1h — full ladder; not every PR):
+
 ```bash
 ./script/north-star5-verify.sh --strict
 ```
 
-Expect: inventory **2643/2643**, spine link + run, vendor prelink **3/3**, cold boot without `vendor/`. For day-to-day LLVM iteration use the fast probes in [bootstrap-m5-fast-path.md](bootstrap-m5-fast-path.md) (`make bootstrap-selfhost-vm-driver-execute-probe` ~20ms).
+Expect on `--strict`: inventory **2643/2643**, spine link + run, vendor prelink **3/3**, cold boot without `vendor/`. For LLVM hot loops use `make bootstrap-selfhost-vm-driver-execute-probe` (~**20ms**); see [bootstrap-m5-fast-path.md](bootstrap-m5-fast-path.md).
 
 On Runforge / harness hosts (do **not** use raw `docker run -v "$(pwd):/compiler"`):
 
@@ -170,7 +179,8 @@ Needs LLVM + ~8 GiB RAM; includes JIT/AOT lint/link and example smokes.
 | `make north-star2-verify` | Self-host M0–M4 presenter bundle ([#1865](https://github.com/PurHur/php-compiler/issues/1865); listed in `phpc doctor --gates` when script exists) |
 | `make north-star3-verify` | M3 native unit probe bundle — 008 + compiler/JIT/VM/parser/PHPTypes probes ([#2360](https://github.com/PurHur/php-compiler/issues/2360); [#2216](https://github.com/PurHur/php-compiler/issues/2216) / [#2332](https://github.com/PurHur/php-compiler/issues/2332) / [#2354](https://github.com/PurHur/php-compiler/issues/2354) / [#2418](https://github.com/PurHur/php-compiler/issues/2418) / [#2434](https://github.com/PurHur/php-compiler/issues/2434)) |
 | `make north-star4-verify` | M4 strict bootstrap-loop presenter — inventory + M3 strict + gen-1 link + loop probe + gen-2→gen-3 ([#2379](https://github.com/PurHur/php-compiler/issues/2379)); `--dry-run-only` on partial M4; opt-in CI [#2429](https://github.com/PurHur/php-compiler/issues/2429) |
-| `make north-star5-verify` | M5 presenter — inventory + spine **2643/2643** + vendor prelink **3/3** + committed `.o` cold boot without `vendor/` ([#1416](https://github.com/PurHur/php-compiler/issues/1416)); `--strict` before merging bootstrap work |
+| `make north-star5-verify-fast` | M5 PR presenter (~**1–2 min**) — inventory + spine + committed prelink blobs + VM probe; no relink ([#1492](https://github.com/PurHur/php-compiler/issues/1492)) |
+| `make north-star5-verify --strict` | Full M5 ladder (~**1h**) — vendor **3/3** + cold boot without `vendor/`; before merging bootstrap work only ([#1416](https://github.com/PurHur/php-compiler/issues/1416)) |
 | `make bootstrap-selfhost-vm-driver-execute-probe` | Fast M2 smoke (~**20ms**) — native `PHP_COMPILER_VM_DRIVER_EXECUTE` gate; seeds from prelinked gen-0 ([#2201](https://github.com/PurHur/php-compiler/issues/2201)) |
 | `make bootstrap-loop-gen2-recompile-spine` | Gen-2 native driver recompiles full spine → gen-3 without Zend on compile ([#2697](https://github.com/PurHur/php-compiler/pull/2697), [#2866](https://github.com/PurHur/php-compiler/issues/2866)) |
 | `make bootstrap-selfhost-full-revision-probe` | M4 full revision — gen-2 inventory argv compiles `bin/compile.php` → gen-3 ✅ ([#2880](https://github.com/PurHur/php-compiler/issues/2880), [#3046](https://github.com/PurHur/php-compiler/issues/3046)) |

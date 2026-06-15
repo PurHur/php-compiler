@@ -56,7 +56,7 @@
         that run <strong>without Zend PHP at runtime</strong> after <code>phpc build</code> or <code>phpc deploy</code>.
         The <strong>north star</strong> is the compiler rebuilding its own <code>lib/</code> tree — today you can
         reproduce <strong>M0 link</strong> (<code>compiler_minimal bundle OK</code>), the <strong>M4 bootstrap loop</strong>
-        (<code>make bootstrap-loop-probe</code>), and <strong>M5 presenter</strong> (<code>north-star5-verify --strict</code>)
+        (<code>make bootstrap-loop-probe</code>), and <strong>M5 presenter</strong> (<code>make north-star5-verify-fast</code>)
         on a clean clone with Docker and LLVM&nbsp;9.
       </p>
       <div class="callout callout--stable">
@@ -204,6 +204,8 @@ composer install
           <span class="demo-card__step">5</span>
           <h3>North star (M4 + M5)</h3>
           <pre><code>make bootstrap-loop-probe
+make north-star5-verify-fast
+# pre-merge bootstrap only (~1h):
 ./script/north-star5-verify.sh --strict</code></pre>
           <p>Full bootstrap ladder (gen-1→gen-2→gen-3 + full-revision) and M5 presenter — heavy; see <a href="https://github.com/PurHur/php-compiler/blob/master/docs/GETTING-STARTED.md#7-optional-north-star-4--m4-strict-bootstrap-loop">GETTING-STARTED §7</a>.</p>
         </article>
@@ -364,7 +366,7 @@ make examples-web-smoke # phpc serve + HTTP curls</pre>
               <td class="status-yes">Native</td>
             </tr>
             <tr>
-              <td>M5 presenter (<code>north-star5-verify</code>)</td>
+              <td>M5 presenter (<code>north-star5-verify-fast</code>)</td>
               <td class="status-yes">—</td>
               <td class="status-yes">Strict ✅</td>
             </tr>
@@ -391,7 +393,7 @@ make examples-web-smoke # phpc serve + HTTP curls</pre>
           <code>fix/spine-aot-jit-blockers</code> @ <a href="https://github.com/PurHur/php-compiler/commit/a8cffaa0e">a8cffaa0e</a> (15 Jun 2026, LLVM 9).
           M2 spine SSOT: <code>php script/bootstrap-spine-count.php</code> → <strong>2643/2643</strong> Phase A inventory (literal coverage ✅).
           M4: <code>make bootstrap-loop-probe</code> full ladder ✅.
-          M5: <code>./script/north-star5-verify.sh --strict</code> ✅; gen-0 sidecars refreshed; VM driver probe ~<strong>20ms</strong> in CI loops.
+          M5: <code>make north-star5-verify-fast</code> ✅ daily; <code>--strict</code> pre-merge; VM driver probe ~<strong>20ms</strong> in CI loops.
           Remaining: MCJIT execute ([#98](https://github.com/PurHur/php-compiler/issues/98)); honest PHP <code>main()</code> in full spine AOT (native bundle-OK probe is bootstrap smoke).
           Compiled-only cold boot on empty <code>build/</code>: <code>BOOTSTRAP_M5_NO_ZEND=1 make bootstrap-selfhost-link</code> ✅ ([#3053](https://github.com/PurHur/php-compiler/issues/3053)).
         </p>
@@ -435,7 +437,7 @@ make examples-web-smoke # phpc serve + HTTP curls</pre>
           <span class="ladder__marker" aria-hidden="true">✓</span>
           <h4>M5</h4>
           <p>Vendor prelink <strong>3/3</strong> ✅; committed <code>.o</code> cold boot ✅;
-            <code>north-star5-verify --strict</code> ✅; spine <strong>2643/2643</strong>; prelinked gen-0 refreshed;
+            <code>north-star5-verify-fast</code> ✅ daily; <code>--strict</code> pre-merge; spine <strong>2643/2643</strong>; prelinked gen-0 refreshed;
             fast VM execute probe (~20ms); compiled-only cold boot via <code>BOOTSTRAP_M5_NO_ZEND=1</code> ✅
             (<a href="https://github.com/PurHur/php-compiler/issues/3053">#3053</a>,
             <a href="https://github.com/PurHur/php-compiler/issues/8559">#8559</a>,

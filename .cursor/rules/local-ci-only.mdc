@@ -12,9 +12,18 @@ This project **does not use GitHub Actions for CI** (billing limits). Do **not**
 From repo root, after `composer install`:
 
 ```bash
-./script/ci-local.sh   # full gate (JIT + AOT lint + link)
-./script/ci-fast.sh    # VM/compliance only while iterating (#436)
+./script/ci-fast.sh    # default PR gate — inventory, spine, VM probes (#436)
+./script/ci-local.sh   # full LLVM gate before merge
 ```
+
+**Self-host M5 iteration** (fast — use during development):
+
+```bash
+make bootstrap-selfhost-vm-driver-execute-probe   # ~20ms
+make north-star5-verify-fast                      # ~1–2 min
+```
+
+Reserve `make north-star5-verify ARGS=--strict` (~1h) for bootstrap/M5 PRs only — see `.cursor/rules/m5-fast-development.mdc`.
 
 Or in Docker (preferred on harness hosts without host PHP/LLVM):
 
@@ -44,4 +53,4 @@ If `-v "$(pwd):/compiler"` shows an empty tree, use:
 
 ## Before merge
 
-Run `./script/ci-local.sh` (full LLVM phases). Use `ci-fast.sh` only for iteration. Defaults: `script/ci-defaults.env` (`1536M` PHP, `8` GiB ulimit, `10g` Docker). Raise caps only on large hosts (#497).
+Run `./script/ci-local.sh` (full LLVM phases). For self-host/M5 work, also `make north-star5-verify-fast`. Use `north-star5-verify --strict` only when merging bootstrap/gen-0/vendor-prelink changes. Defaults: `script/ci-defaults.env` (`1536M` PHP, `8` GiB ulimit, `10g` Docker). Raise caps only on large hosts (#497).

@@ -1612,6 +1612,44 @@ final class CiScriptsTest extends TestCase
         $this->assertStringContainsString('#2429', $doc);
     }
 
+    public function testCiFastHonorsNorthStar5VerifyFastGate(): void
+    {
+        $fast = (string) file_get_contents(dirname(__DIR__, 2).'/script/ci-fast.sh');
+        $this->assertStringContainsString('ci_run_north_star5_verify_fast', $fast);
+
+        $common = (string) file_get_contents(dirname(__DIR__, 2).'/script/ci-common.sh');
+        $this->assertStringContainsString('NORTH_STAR5_VERIFY_FAST_GATE', $common);
+        $this->assertStringContainsString('NORTH_STAR5_VERIFY_FAST_GATE:-1', $common);
+        $this->assertStringContainsString('north-star5-verify.sh', $common);
+        $this->assertStringContainsString('--fast', $common);
+        $this->assertFileExists(dirname(__DIR__, 2).'/script/north-star5-verify.sh');
+
+        $defaults = (string) file_get_contents(dirname(__DIR__, 2).'/script/ci-defaults.env');
+        $this->assertStringContainsString(
+            'NORTH_STAR5_VERIFY_FAST_GATE="${NORTH_STAR5_VERIFY_FAST_GATE:-1}"',
+            $defaults
+        );
+        $this->assertStringContainsString(
+            'NORTH_STAR5_VERIFY_STRICT_GATE="${NORTH_STAR5_VERIFY_STRICT_GATE:-0}"',
+            $defaults
+        );
+
+        $docker = (string) file_get_contents(dirname(__DIR__, 2).'/script/ci-docker-run.sh');
+        $this->assertStringContainsString(
+            'NORTH_STAR5_VERIFY_FAST_GATE=${NORTH_STAR5_VERIFY_FAST_GATE:-1}',
+            $docker
+        );
+    }
+
+    public function testLocalCiMatrixDocumentsNorthStar5VerifyFastGate(): void
+    {
+        $doc = (string) file_get_contents(dirname(__DIR__, 2).'/docs/local-ci-matrix.md');
+        $this->assertStringContainsString('NORTH_STAR5_VERIFY_FAST_GATE', $doc);
+        $this->assertStringContainsString('north-star5-verify-fast', $doc);
+        $this->assertMatchesRegularExpression('/\| `NORTH_STAR5_VERIFY_FAST_GATE` \| `1` \|/', $doc);
+        $this->assertStringContainsString('#1492', $doc);
+    }
+
     public function testCiFastHonorsBootstrapTestSubsetGate(): void
     {
         $fast = (string) file_get_contents(dirname(__DIR__, 2).'/script/ci-fast.sh');

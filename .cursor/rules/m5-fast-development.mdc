@@ -1,0 +1,55 @@
+---
+description: M5 self-host — use fast feedback loops; reserve strict north-star5 for pre-merge only
+alwaysApply: true
+---
+
+# M5 fast development (default)
+
+Self-host **M5** work should optimize for **fast feedback**. The full `north-star5-verify --strict` ladder (~1h) is a **pre-merge / bootstrap PR** gate only — not the daily iteration loop.
+
+## Default verification (run these)
+
+From repo root after `composer install`:
+
+```bash
+make bootstrap-selfhost-vm-driver-execute-probe   # ~20ms LLVM hot loop (#2201)
+make north-star5-verify-fast                    # ~1–2 min M5 PR presenter
+php script/bootstrap-inventory.php --check      # seconds
+php script/check-selfhost-spine-coverage-sync.php
+```
+
+Or one presenter:
+
+```bash
+./script/north-star5-verify.sh --fast
+# NORTH_STAR5_VERIFY_FAST=1 is equivalent
+```
+
+**`ci-fast.sh`** runs inventory + spine sync + VM driver probe by default; opt-in consolidated M5 fast presenter: `NORTH_STAR5_VERIFY_FAST_GATE=1` (default **on** in `ci-defaults.env`).
+
+## When to use full strict (rare)
+
+Run **only** before merging bootstrap/M5 work that touches spine entry, gen-0 blobs, vendor prelink, or cold-boot without `vendor/`:
+
+```bash
+make north-star5-verify ARGS=--strict   # ~1h
+```
+
+Do **not** suggest or run `--strict` during normal LLVM/JIT/compiler iteration unless the user explicitly asks.
+
+## After spine entry edits
+
+When `test/selfhost/compiler_lib_spine_smoke/main.php` changes:
+
+1. `php script/check-selfhost-spine-coverage-sync.php`
+2. `make bootstrap-selfhost-lib-spine-smoke` (full link — minutes)
+3. Refresh `prelinked/bootstrap-gen0/` sidecars if gen-0 seed must move
+4. `BOOTSTRAP_VM_DRIVER_EXECUTE_PROBE_FULL_LINK=1 make bootstrap-selfhost-vm-driver-execute-probe`
+5. `make north-star5-verify-fast` — then `--strict` only if merging that bootstrap batch
+
+## Agent behavior
+
+- Prefer **fast M5** commands in plans, PR test plans, and post-change verification.
+- Shrink self-host stubs on the **compile spine** (`parseAndCompile` → `standalone` → `Compiler::compile`) per `docs/bootstrap-m5-fast-path.md`.
+- Keep committed `prelinked/bootstrap-gen0/` and `prelinked/bootstrap-vendor/` blobs valid so fast path stays green without relink.
+- Reference: `docs/bootstrap-m5-fast-path.md`, `docs/local-ci-matrix.md` (`NORTH_STAR5_VERIFY_FAST_GATE`).

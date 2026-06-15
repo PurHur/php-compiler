@@ -31,7 +31,7 @@ permalink: /development-status.html
 | M4 full ladder | `make bootstrap-loop-probe` | Gen-1→gen-2 native + gen-2→gen-3 full spine + full-revision argv ✅ |
 | M5 spine runtime + bootstrap | `fix/spine-aot-jit-blockers` | Native bundle-OK probe; inventory argv spine-lint fallback; gen-0 sidecars refreshed ([#8559](https://github.com/PurHur/php-compiler/issues/8559)) |
 | VM driver execute probe | [9493e806d](https://github.com/PurHur/php-compiler/commit/9493e806d) | **~20ms** feedback loop — no full relink on stale SHA; `BOOTSTRAP_VM_DRIVER_EXECUTE_PROBE_FULL_LINK=1` for rebuild ([#2201](https://github.com/PurHur/php-compiler/issues/2201)) |
-| M5 presenter | `north-star5-verify --strict` | Inventory + spine **2643/2643** + vendor 3/3 + cold boot without `vendor/` ✅ |
+| M5 presenter | `make north-star5-verify-fast` | Daily PR gate (~1–2 min); `--strict` (~1h) pre-merge only ([#1492](https://github.com/PurHur/php-compiler/issues/1492)) |
 | Gen-0 refresh | [a8cffaa0e](https://github.com/PurHur/php-compiler/commit/a8cffaa0e) | Spine runtime probe + gen-0 sidecars (**2643/2643**); inventory argv spine-lint fallback ([#8559](https://github.com/PurHur/php-compiler/issues/8559)) |
 | Spine lint OOM | [#8391](https://github.com/PurHur/php-compiler/issues/8391) | Skip SourceBundler mega-concat on spine `-l` |
 | Stream I/O JIT | inventory defer stubs | Full emitters outside inventory driver path; inventory rebuild unblocked |
@@ -63,7 +63,7 @@ permalink: /development-status.html
 - **Self-host M2** — spine **2643/2643** ✅; native link + lint ✅
 - **Self-host M3** — HelloWorld strict `emit_path=native` ✅; inventory argv `bin/compile.php` ✅ ([#3024](https://github.com/PurHur/php-compiler/issues/3024) closed)
 - **Self-host M4** — `make bootstrap-loop-probe` full ladder ✅; gen-2→gen-3 full-spine recompile ✅
-- **Self-host M5** — vendor prelink **3/3** ✅; `north-star5-verify --strict` ✅; gen-0 refreshed; fast VM/spine probes for local iteration
+- **Self-host M5** — vendor prelink **3/3** ✅; **`make north-star5-verify-fast`** daily ✅; `--strict` pre-merge; gen-0 refreshed; VM probe ~**20ms**
 
 **Not claimed:** full Zend PHP compatibility (subset compiler only).
 
