@@ -128,7 +128,7 @@ if [[ "${BOOTSTRAP_LIB_SPINE_SMOKE_USE_COMPILE_INVOKE:-0}" != "1" ]]; then
   printf '%s' "${ENTRY}" > "${PHP_COMPILER_JIT_ENTRY_FILE}" 2>/dev/null || true
   printf '%s' "compile_invoke:${SPINE_COMPILE_DRIVER}" > "${PHP_COMPILER_JIT_PHASE_FILE}" 2>/dev/null || true
   rm -f "${OUT}"
-  _spine_driver_env=(PHP_COMPILER_SELFHOST_AOT=1 BOOTSTRAP_NO_ZEND_FALLBACK=1)
+  _spine_driver_env=(PHP_COMPILER_SELFHOST_AOT=1 PHP_COMPILER_LIB_SPINE_BUNDLE=1 BOOTSTRAP_NO_ZEND_FALLBACK=1)
   if [[ -n "${PHP_COMPILER_VENDOR_PRELINK:-}" ]]; then
     _spine_driver_env+=(PHP_COMPILER_VENDOR_PRELINK="${PHP_COMPILER_VENDOR_PRELINK}")
   fi

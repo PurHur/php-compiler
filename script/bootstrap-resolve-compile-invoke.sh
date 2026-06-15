@@ -204,6 +204,50 @@ bootstrap_inventory_argv_driver_smoke() {
   return 1
 }
 
+# Spine SSOT lint when bin/compile.php self-lint is not yet supported by gen-2 inventory driver (#8559).
+bootstrap_inventory_argv_driver_spine_lint() {
+  local driver=$1
+  local root="${ROOT:-}"
+  local spine_entry="${root}/test/selfhost/compiler_lib_spine_smoke/main.php"
+  if [[ -z "${root}" || ! -x "${driver}" || ! -f "${spine_entry}" ]]; then
+    return 1
+  fi
+  local lint_log=""
+  local lint_code=0
+  set +e
+  lint_log="$(
+    env -u PHP_COMPILER_M3_SOURCE -u PHP_COMPILER_M3_OUT \
+      PHP_COMPILER_REPO_ROOT="${root}" \
+      PHP_COMPILER_SELFHOST_AOT=1 \
+      PHP_COMPILER_LIB_SPINE_BUNDLE=1 \
+      PHP_COMPILER_M3_COMPILE_DRIVER=1 \
+      PHP_COMPILER_M4_BIN_COMPILE_DRIVER=1 \
+      PHP_COMPILER_M3_INVENTORY_EMIT_DRIVER=1 \
+      BOOTSTRAP_M3_USE_INVENTORY_EMIT_DRIVER=1 \
+      "${driver}" -l "${spine_entry}" 2>&1
+  )"
+  lint_code=$?
+  set -e
+  if [[ "${lint_code}" -eq 0 ]] \
+    && ! grep -qE 'parseAndCompile returned null|native emit failed at phase=parseAndCompile' <<< "${lint_log}"; then
+    return 0
+  fi
+  echo "bootstrap-inventory-argv-driver-spine-lint: ${driver} failed spine entry lint" >&2
+  printf '%s\n' "${lint_log}" >&2
+  return 1
+}
+
+bootstrap_inventory_argv_driver_accepts() {
+  local driver=$1
+  if ! bootstrap_inventory_argv_driver_smoke "${driver}"; then
+    return 1
+  fi
+  if bootstrap_inventory_argv_driver_m4_smoke "${driver}"; then
+    return 0
+  fi
+  bootstrap_inventory_argv_driver_spine_lint "${driver}"
+}
+
 # M4 full-revision: inventory driver must parse+compile bin/compile.php (stale prelinked gen-0 fails here — #2880).
 bootstrap_inventory_argv_driver_m4_smoke() {
   local driver=$1
@@ -287,8 +331,7 @@ bootstrap_ensure_inventory_argv_driver() {
     return 1
   fi
   if bootstrap_is_inventory_bin_compile_argv_driver "${out}" \
-    && bootstrap_inventory_argv_driver_smoke "${out}" \
-    && bootstrap_inventory_argv_driver_m4_smoke "${out}"; then
+    && bootstrap_inventory_argv_driver_accepts "${out}"; then
     return 0
   fi
   if [[ -x "${out}" ]]; then
@@ -308,8 +351,7 @@ bootstrap_ensure_inventory_argv_driver() {
     bootstrap_ensure_m3_compiler_lib_sidecar 2>/dev/null || true
     if bootstrap_gen0_copy_prelinked_inventory_driver "${out}" "" "${out}"; then
       if bootstrap_is_inventory_bin_compile_argv_driver "${out}" \
-        && bootstrap_inventory_argv_driver_smoke "${out}" \
-        && bootstrap_inventory_argv_driver_m4_smoke "${out}"; then
+        && bootstrap_inventory_argv_driver_accepts "${out}"; then
         return 0
       fi
     fi
@@ -332,8 +374,7 @@ bootstrap_ensure_inventory_argv_driver() {
       cp -f "${prelink}" "${out}"
       cp -f "${prelink}" "${root}/build/.m3_bin_compile_aot_blob"
       chmod +x "${out}" "${root}/build/.m3_bin_compile_aot_blob"
-      if bootstrap_inventory_argv_driver_smoke "${out}" \
-        && bootstrap_inventory_argv_driver_m4_smoke "${out}"; then
+      if bootstrap_inventory_argv_driver_accepts "${out}"; then
         bootstrap_ensure_m3_compiler_lib_sidecar 2>/dev/null || true
         return 0
       fi
@@ -350,8 +391,7 @@ bootstrap_ensure_inventory_argv_driver() {
     echo "bootstrap-ensure-inventory-argv-driver: ${out} is not a verified inventory argv driver" >&2
     return 1
   fi
-  if ! bootstrap_inventory_argv_driver_smoke "${out}" \
-    || ! bootstrap_inventory_argv_driver_m4_smoke "${out}"; then
+  if ! bootstrap_inventory_argv_driver_accepts "${out}"; then
     echo "bootstrap-ensure-inventory-argv-driver: ${out} failed post-build inventory smoke (phantom emit? rebuild via Zend — #3046)" >&2
     rm -f "${out}" "${root}/build/.m3_bin_compile_aot_blob"
     return 1

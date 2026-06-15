@@ -133,20 +133,33 @@ final class VmDriverExecuteNative
         $context->builder->branch($mergeBb);
 
         $context->builder->positionAtEnd($spineCheckBb);
-        $context->builder->branchIf($spineHit, $spineBb, $missBb);
+        if ($context->isCompilerLibSpineSmokeEntry()) {
+            $bundleBb = BasicBlockHelper::append($context, 'vm_probe_bundle_default');
+            $context->builder->branchIf($spineHit, $spineBb, $bundleBb);
+
+            $context->builder->positionAtEnd($bundleBb);
+            ValueEchoHelper::echoLiteral($context, "compiler_lib_spine_smoke bundle OK\n");
+            $context->builder->branch($mergeBb);
+        } else {
+            $context->builder->branchIf($spineHit, $spineBb, $missBb);
+
+            $context->builder->positionAtEnd($missBb);
+            $context->builder->branch($mergeBb);
+        }
 
         $context->builder->positionAtEnd($spineBb);
         ValueEchoHelper::echoLiteral($context, "vm-spine-ok\n");
-        $context->builder->branch($mergeBb);
-
-        $context->builder->positionAtEnd($missBb);
         $context->builder->branch($mergeBb);
 
         $context->builder->positionAtEnd($mergeBb);
         $phi = $context->builder->phi($context->getTypeFromString('int1'));
         $phi->addIncoming($context->getTypeFromString('int1')->constInt(1, false), $driverBb);
         $phi->addIncoming($context->getTypeFromString('int1')->constInt(1, false), $spineBb);
-        $phi->addIncoming($context->getTypeFromString('int1')->constInt(0, false), $missBb);
+        if ($context->isCompilerLibSpineSmokeEntry()) {
+            $phi->addIncoming($context->getTypeFromString('int1')->constInt(1, false), $bundleBb);
+        } else {
+            $phi->addIncoming($context->getTypeFromString('int1')->constInt(0, false), $missBb);
+        }
 
         return $phi;
     }

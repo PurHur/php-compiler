@@ -63,6 +63,7 @@ require_once __DIR__.'/../../../vendor/ircmaxell/php-cfg/lib/PHPCfg/Op/Expr/Cast
 require_once __DIR__.'/../../../vendor/ircmaxell/php-cfg/lib/PHPCfg/Op/Expr/Cast/Object_.php';
 require_once __DIR__.'/../../../vendor/ircmaxell/php-cfg/lib/PHPCfg/Op/Expr/Cast/String_.php';
 require_once __DIR__.'/../../../vendor/ircmaxell/php-cfg/lib/PHPCfg/Op/Expr/Cast/Unset_.php';
+require_once __DIR__.'/../../../vendor/ircmaxell/php-cfg/lib/PHPCfg/Op/Expr/Cast/Void_.php';
 require_once __DIR__.'/../../../vendor/ircmaxell/php-cfg/lib/PHPCfg/Op/Expr/ClassConstFetch.php';
 require_once __DIR__.'/../../../vendor/ircmaxell/php-cfg/lib/PHPCfg/Op/Expr/Clone_.php';
 require_once __DIR__.'/../../../vendor/ircmaxell/php-cfg/lib/PHPCfg/Op/Expr/Closure.php';
@@ -73,6 +74,7 @@ require_once __DIR__.'/../../../vendor/ircmaxell/php-cfg/lib/PHPCfg/Op/Expr/Eval
 require_once __DIR__.'/../../../vendor/ircmaxell/php-cfg/lib/PHPCfg/Op/Expr/Exit_.php';
 require_once __DIR__.'/../../../vendor/ircmaxell/php-cfg/lib/PHPCfg/Op/Expr/FirstClassCallable.php';
 require_once __DIR__.'/../../../vendor/ircmaxell/php-cfg/lib/PHPCfg/Op/Expr/FuncCall.php';
+require_once __DIR__.'/../../../vendor/ircmaxell/php-cfg/lib/PHPCfg/Op/Expr/In_.php';
 require_once __DIR__.'/../../../vendor/ircmaxell/php-cfg/lib/PHPCfg/Op/Expr/Include_.php';
 require_once __DIR__.'/../../../vendor/ircmaxell/php-cfg/lib/PHPCfg/Op/Expr/InstanceOf_.php';
 require_once __DIR__.'/../../../vendor/ircmaxell/php-cfg/lib/PHPCfg/Op/Expr/Isset_.php';

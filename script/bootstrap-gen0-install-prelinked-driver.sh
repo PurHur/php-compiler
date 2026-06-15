@@ -175,8 +175,8 @@ bootstrap_ensure_m3_compiler_lib_sidecar() {
   # SIDECAR_HOST stubs non-literal includes in spine/cli_driver (same as registerM3EmitTuSidecarFromPath).
   regen_log="$(
     env PHP_COMPILER_M3_EMIT_SIDECAR_RECURSION_GUARD=1 \
-      PHP_COMPILER_M3_SIDECAR_HOST=1 \
       PHP_COMPILER_SELFHOST_AOT=1 \
+      PHP_COMPILER_LIB_SPINE_BUNDLE=1 \
       PHP_COMPILER_MEMORY_LIMIT="${PHP_COMPILER_MEMORY_LIMIT:-4096M}" \
       php -d "memory_limit=${PHP_COMPILER_MEMORY_LIMIT:-4096M}" \
       "${root}/bin/compile.php" -o "${regen_tmp}" "${entry}" 2>&1

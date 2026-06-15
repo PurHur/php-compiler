@@ -296,6 +296,13 @@ class Context {
         }
     }
 
+    public function isCompilerLibSpineSmokeEntry(): bool
+    {
+        $entry = str_replace('\\', '/', $this->jitAotEntryScriptPath);
+
+        return str_ends_with($entry, '/test/selfhost/compiler_lib_spine_smoke/main.php');
+    }
+
     public function hasJitIncludedFileCompiled(string $path): bool
     {
         $resolved = realpath($path);
