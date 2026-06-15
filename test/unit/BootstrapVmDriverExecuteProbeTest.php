@@ -56,6 +56,7 @@ final class BootstrapVmDriverExecuteProbeTest extends TestCase
         $this->assertStringContainsString('8192M', $script);
         $this->assertStringContainsString('honest emit required (#8559)', $script);
         $this->assertStringContainsString('refreshed prelinked', $script);
+        $this->assertStringContainsString('bootstrap_compiler_lib_honest_zend_compile', $script);
     }
 
     public function testNativeMainEnvProbePrintsVmDriverOkWhenLlvmPresent(): void

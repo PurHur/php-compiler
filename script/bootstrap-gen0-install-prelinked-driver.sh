@@ -132,6 +132,28 @@ bootstrap_compiler_lib_spine_entry_sha() {
   sha1sum "${entry}" | awk '{print $1}'
 }
 
+# Honest Zend spine compile for compiler_lib sidecar refresh (#8559).
+# PHP_COMPILER_M3_SIDECAR_HOST=1 stubs non-literal includes and reproduces stale prelinked bytes.
+bootstrap_compiler_lib_honest_zend_compile() {
+  local out=$1
+  local entry=$2
+  local root="${ROOT:-}"
+  if [[ -z "${root}" || -z "${out}" || -z "${entry}" || ! -f "${entry}" ]]; then
+    return 1
+  fi
+  if ! command -v php >/dev/null 2>&1; then
+    return 1
+  fi
+  mkdir -p "$(dirname "${out}")"
+  rm -f "${out}"
+  local mem_limit="${PHP_COMPILER_MEMORY_LIMIT:-8192M}"
+  env PHP_COMPILER_M3_EMIT_SIDECAR_RECURSION_GUARD=1 \
+    PHP_COMPILER_SELFHOST_AOT=1 \
+    PHP_COMPILER_MEMORY_LIMIT="${mem_limit}" \
+    php -d "memory_limit=${mem_limit}" \
+    "${root}/bin/compile.php" -o "${out}" "${entry}"
+}
+
 # Ensure build/.m3_compiler_lib_aot_blob matches current spine entry (#3012, #2967).
 bootstrap_ensure_m3_compiler_lib_sidecar() {
   local root="${ROOT:-}"
@@ -166,21 +188,13 @@ bootstrap_ensure_m3_compiler_lib_sidecar() {
   fi
   local prelinked_lib="${root}/prelinked/bootstrap-gen0/compiler_lib_aot_blob"
   local regen_tmp="${blob}.regen.$$"
-  echo "bootstrap-ensure-m3-compiler-lib-sidecar: host-compile spine entry -> ${blob} (#3012)" >&2
+  echo "bootstrap-ensure-m3-compiler-lib-sidecar: honest Zend host-compile spine entry -> ${blob} (#8559)" >&2
   mkdir -p "${root}/build"
   rm -f "${regen_tmp}"
   local regen_log regen_code=0
   set +e
   # Do not set PHP_COMPILER_CLI_SPINE_BUNDLE here — that skips bin/compile.php argv dispatch (#1492).
-  # SIDECAR_HOST stubs non-literal includes in spine/cli_driver (same as registerM3EmitTuSidecarFromPath).
-  regen_log="$(
-    env PHP_COMPILER_M3_EMIT_SIDECAR_RECURSION_GUARD=1 \
-      PHP_COMPILER_M3_SIDECAR_HOST=1 \
-      PHP_COMPILER_SELFHOST_AOT=1 \
-      PHP_COMPILER_MEMORY_LIMIT="${PHP_COMPILER_MEMORY_LIMIT:-8192M}" \
-      php -d "memory_limit=${PHP_COMPILER_MEMORY_LIMIT:-8192M}" \
-      "${root}/bin/compile.php" -o "${regen_tmp}" "${entry}" 2>&1
-  )"
+  regen_log="$(bootstrap_compiler_lib_honest_zend_compile "${regen_tmp}" "${entry}" 2>&1)"
   regen_code=$?
   set -e
   if [[ "${regen_code}" -eq 0 && -f "${regen_tmp}" && -s "${regen_tmp}" ]]; then
