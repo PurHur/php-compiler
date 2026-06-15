@@ -8751,6 +8751,7 @@ class Compiler {
     {
         return $op instanceof Op\Expr\Array_
             || $op instanceof Op\Expr\ArrayDimFetch
+            || $op instanceof Op\Expr\BinaryOp\Concat
             || $op instanceof Op\Expr\New_
             || $op instanceof Op\Expr\ConstFetch
             || $op instanceof Op\Expr\ClassConstFetch
