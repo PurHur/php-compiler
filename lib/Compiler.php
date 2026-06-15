@@ -8676,10 +8676,43 @@ class Compiler {
         $producers = $this->filterDeadClassConstFetchInlineProducers($producers);
         $producerCount = count($producers);
         $argCount = count($callArgs);
-        if (0 === $producerCount || $argCount < $producerCount) {
+        if (0 === $producerCount) {
             return null;
         }
+        if ($argCount < $producerCount) {
+            $extra = $producerCount - $argCount;
+            $tail = array_slice($producers, -$extra);
+            if (!$this->producersAreNestedArrayLiteralChain($tail)) {
+                return null;
+            }
+            $mappedIndex = 1 === $argCount
+                ? $producerCount - 1
+                : ($argIndex + ($argIndex > 0 ? $extra : 0));
+            if ($mappedIndex >= $producerCount || $mappedIndex < 0) {
+                return null;
+            }
+
+            return $producers[$mappedIndex] ?? null;
+        }
         if ($producerCount === $argCount) {
+            if ($this->producersAreNestedArrayLiteralChain($producers)) {
+                $callArg = $callArgs[$argIndex] ?? null;
+                $paired = $producers[$argIndex] ?? null;
+                if (
+                    null !== $callArg
+                    && $paired instanceof Op\Expr\Array_
+                    && $this->operandsReferToSameVariable($paired->result, $callArg)
+                ) {
+                    return $paired;
+                }
+                if ($argIndex < $argCount - 1) {
+                    return null;
+                }
+                if ($producerCount > 1) {
+                    return $producers[$producerCount - 1];
+                }
+            }
+
             return $producers[$argIndex] ?? null;
         }
         if (1 === $producerCount) {
@@ -8690,10 +8723,8 @@ class Compiler {
                 return $producers[0];
             }
             if (
-                0 === $argIndex
-                && $this->isEmbeddedCallLiteralArg($callArgs[1] ?? null)
-                && !($producers[0] instanceof Op\Expr\ConstFetch)
-                && !($producers[0] instanceof Op\Expr\ClassConstFetch)
+                $argCount - 1 === $argIndex
+                && $producers[0] instanceof Op\Expr\Array_
             ) {
                 return $producers[0];
             }
@@ -8802,6 +8833,25 @@ class Compiler {
         }
 
         return null !== $this->unwrapCfgLiteralOperand($arg);
+    }
+
+    /**
+     * php-cfg emits one Expr_Array producer per nesting level for inline literal args (#4738).
+     *
+     * @param list<Op\Expr> $producers
+     */
+    private function producersAreNestedArrayLiteralChain(array $producers): bool
+    {
+        if ([] === $producers) {
+            return false;
+        }
+        foreach ($producers as $producer) {
+            if (!$producer instanceof Op\Expr\Array_) {
+                return false;
+            }
+        }
+
+        return true;
     }
 
     private function isInlineExprCallArgConsumer(Op $op): bool
