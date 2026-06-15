@@ -28,7 +28,7 @@ final class BootstrapLibSpineVmSmokeTest extends TestCase
         $script = (string) file_get_contents(self::$root.'/script/bootstrap-selfhost-lib-spine-vm-smoke.sh');
         $this->assertStringContainsString('PHP_COMPILER_VM_SPINE_SMOKE=1', $script);
         $this->assertStringContainsString('selfhost-lib-spine-smoke', $script);
-        $this->assertStringContainsString('vm-spine-ok', $script);
+        $this->assertStringContainsString("grep -Fxq '1'", $script);
         $this->assertStringContainsString('bootstrap-selfhost-lib-spine-smoke-link.sh', $script);
     }
 
@@ -72,8 +72,16 @@ final class BootstrapLibSpineVmSmokeTest extends TestCase
         $this->assertStringContainsString('bin/vm.php', $entry);
         $this->assertStringContainsString('PHP_COMPILER_LIB_SPINE_SMOKE', $entry);
         $this->assertStringContainsString('PHP_COMPILER_VM_SPINE_SMOKE', $entry);
-        $this->assertStringContainsString('vm-spine-ok', $entry);
+        $this->assertStringContainsString("run('Standard input code', '<?php echo \"1\\n\";', [])", $entry);
+        $this->assertStringNotContainsString('vm-spine-ok', $entry);
         $this->assertStringContainsString('bootstrap-selfhost-lib-spine-vm-smoke', $entry);
+    }
+
+    public function testVmDriverExecuteNativeDoesNotStubVmSpineSmokeAtMainEntry(): void
+    {
+        $native = (string) file_get_contents(self::$root.'/lib/JIT/VmDriverExecuteNative.php');
+        $this->assertStringNotContainsString('vm-spine-ok', $native);
+        $this->assertStringContainsString('emitRunProbeEcho', $native);
     }
 
     public function testMakefileDefinesVmSpineSmokeTarget(): void
