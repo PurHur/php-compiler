@@ -3,7 +3,7 @@
 declare(strict_types=1);
 
 /**
- * VM process helpers — libc FFI when available (#5388, #7862).
+ * VM process helpers — libc FFI when available (#5388, #7862, #8652).
  */
 
 namespace PHPCompiler\ext\standard;
@@ -46,24 +46,23 @@ final class VmProcess
         return VmProcNiceNative::proc_nice($priority);
     }
 
-    /** @var array<int, resource> proc_open() host process resources (#3131) */
-    private static array $processHandles = [];
-
-    private static int $nextProcessId = 0;
-
     public static function isValidHandle(int $handle): bool
     {
-        return isset(self::$processHandles[$handle]);
+        if (VmProcessProcOpenNative::isValidHandle($handle)) {
+            return true;
+        }
+
+        return isset(self::$legacyHostHandles[$handle]);
     }
 
     /** @return resource|null */
     public static function lookupProcess(int $handle): mixed
     {
-        return self::$processHandles[$handle] ?? null;
+        return self::$legacyHostHandles[$handle] ?? null;
     }
 
     /**
-     * proc_open() — spawn subprocess with pipe descriptors (php-src ext/standard/proc_open.c; #3131).
+     * proc_open() — spawn subprocess with pipe descriptors (php-src ext/standard/proc_open.c; #3131, #8652).
      *
      * @param string|list<string> $command
      * @param array<int, array{0: string, 1?: string}> $descriptorSpec
@@ -77,36 +76,28 @@ final class VmProcess
         ?string $cwd = null,
         ?array $env = null,
     ): array|false {
-        $pipes = [];
-        $proc = @\proc_open($command, $descriptorSpec, $pipes, $cwd, $env);
-        if (!\is_resource($proc)) {
-            return false;
-        }
-        $procId = ++self::$nextProcessId;
-        self::$processHandles[$procId] = $proc;
-        $pipeHandles = [];
-        foreach ($pipes as $fd => $hostPipe) {
-            if (!\is_resource($hostPipe)) {
-                continue;
+        if (\is_string($command) && VmProcessProcOpenNative::available()) {
+            $native = VmProcessProcOpenNative::open($command, $descriptorSpec, $cwd, $env);
+            if (false !== $native) {
+                return $native;
             }
-            $handleId = VmFs::adoptStreamResource($hostPipe, 'proc_open pipe');
-            if (false === $handleId) {
-                continue;
-            }
-            $pipeHandles[(int) $fd] = $handleId;
         }
 
-        return [$procId, $pipeHandles];
+        return self::procOpenHost($command, $descriptorSpec, $cwd, $env);
     }
 
     /** proc_close() — wait for subprocess and return exit code (php-src ext/standard/proc_open.c; #3131). */
     public static function procClose(int $handle): int
     {
-        $proc = self::$processHandles[$handle] ?? null;
+        if (VmProcessProcOpenNative::isValidHandle($handle)) {
+            return VmProcessProcOpenNative::close($handle);
+        }
+
+        $proc = self::$legacyHostHandles[$handle] ?? null;
         if (null === $proc) {
             return -1;
         }
-        unset(self::$processHandles[$handle]);
+        unset(self::$legacyHostHandles[$handle]);
         $result = @\proc_close($proc);
         if (false === $result) {
             return -1;
@@ -122,7 +113,11 @@ final class VmProcess
      */
     public static function procGetStatus(int $handle): array|false
     {
-        $proc = self::$processHandles[$handle] ?? null;
+        if (VmProcessProcOpenNative::isValidHandle($handle)) {
+            return VmProcessProcOpenNative::getStatus($handle);
+        }
+
+        $proc = self::$legacyHostHandles[$handle] ?? null;
         if (null === $proc) {
             return false;
         }
@@ -137,7 +132,11 @@ final class VmProcess
     /** proc_terminate() — signal child process (php-src ext/standard/proc_open.c; #3740). */
     public static function procTerminate(int $handle, int $signal = 15): bool
     {
-        $proc = self::$processHandles[$handle] ?? null;
+        if (VmProcessProcOpenNative::isValidHandle($handle)) {
+            return VmProcessProcOpenNative::terminate($handle, $signal);
+        }
+
+        $proc = self::$legacyHostHandles[$handle] ?? null;
         if (null === $proc) {
             return false;
         }
@@ -217,5 +216,45 @@ final class VmProcess
         $replacement = new Variable();
         $replacement->array($ht);
         $targetVar->copyFrom($replacement);
+    }
+
+    /** @var array<int, resource> legacy host proc_open handles (array command or FFI unavailable) */
+    private static array $legacyHostHandles = [];
+
+    private static int $nextLegacyHandleId = 0;
+
+    /**
+     * @param string|list<string> $command
+     * @param array<int, array{0: string, 1?: string}> $descriptorSpec
+     * @param array<string, string>|null $env
+     *
+     * @return array{0: int, 1: array<int, int>}|false
+     */
+    private static function procOpenHost(
+        string|array $command,
+        array $descriptorSpec,
+        ?string $cwd,
+        ?array $env,
+    ): array|false {
+        $pipes = [];
+        $proc = @\proc_open($command, $descriptorSpec, $pipes, $cwd, $env);
+        if (!\is_resource($proc)) {
+            return false;
+        }
+        $procId = ++self::$nextLegacyHandleId;
+        self::$legacyHostHandles[$procId] = $proc;
+        $pipeHandles = [];
+        foreach ($pipes as $fd => $hostPipe) {
+            if (!\is_resource($hostPipe)) {
+                continue;
+            }
+            $handleId = VmFs::adoptStreamResource($hostPipe, 'proc_open pipe');
+            if (false === $handleId) {
+                continue;
+            }
+            $pipeHandles[(int) $fd] = $handleId;
+        }
+
+        return [$procId, $pipeHandles];
     }
 }
