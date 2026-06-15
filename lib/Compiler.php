@@ -8710,6 +8710,10 @@ class Compiler {
         if (null === $producerSlot) {
             return null;
         }
+        // php-cfg uses distinct result/arg temps for hoisted inline producers (#8766, #8561).
+        if ($producer instanceof Op\Expr\BinaryOp || $producer instanceof Op\Expr\ConstFetch) {
+            return $producerSlot;
+        }
         $argSlot = $this->compileOperand($arg, $block, false);
         if (null === $argSlot) {
             return $producerSlot;
@@ -8898,7 +8902,7 @@ class Compiler {
 
             return false;
         }
-        if ($expr instanceof Op\Expr\BinaryOp\Concat) {
+        if ($expr instanceof Op\Expr\BinaryOp) {
             return $expr->left === $operand
                 || $expr->right === $operand
                 || $this->operandsReferToSameVariable($expr->left, $operand)
@@ -8981,7 +8985,7 @@ class Compiler {
     {
         return $op instanceof Op\Expr\Array_
             || $op instanceof Op\Expr\ArrayDimFetch
-            || $op instanceof Op\Expr\BinaryOp\Concat
+            || $op instanceof Op\Expr\BinaryOp
             || $op instanceof Op\Expr\New_
             || $op instanceof Op\Expr\ConstFetch
             || $op instanceof Op\Expr\ClassConstFetch
@@ -9037,6 +9041,9 @@ class Compiler {
                 break;
             }
             array_unshift($producers, $child);
+            if ($child instanceof Op\Expr\Array_) {
+                break;
+            }
         }
 
         return $producers;
@@ -9940,10 +9947,14 @@ class Compiler {
         Op\Expr\ClassConstFetch $fetch,
         Block $block
     ): bool {
+        $root = $this->unwrapOperandChain($arg);
+        // Compare/arithmetic on enum case — compile the full Expr_* producer, not bare fetch (#8766).
+        if ($root instanceof Op\Expr\BinaryOp) {
+            return false;
+        }
         if ($this->operandsReferToSameVariable($fetch->result, $arg)) {
             return true;
         }
-        $root = $this->unwrapOperandChain($arg);
         if ($root instanceof Op\Expr\ClassConstFetch) {
             return $root === $fetch
                 || $this->operandsReferToSameVariable($fetch->result, $root->result);
@@ -10698,25 +10709,26 @@ class Compiler {
                 }
                 $valueSlot = $this->compileOperand($inlineArray->result, $block, true);
             } else {
-                $prefetchOps = $this->compileCallArgRuntimeEnumConstFetchOps($arg, $block, (int) $argIndex, $callOrdinal);
-                if ([] !== $prefetchOps) {
-                    $valueSlot = $prefetchOps[0]->arg1;
-                } else {
-                    $valueSlot = $this->findInlineExprCallArgProducerSlot($arg, $block);
-                    if (null === $valueSlot) {
-                        if (
-                            null === $calleeName
-                            || !$this->callArgRequiresByRef($calleeName, (int) $argIndex)
-                        ) {
-                            $valueSlot = $this->tryFoldCallArgCompileTimeValue($arg, $block);
-                        }
+                $valueSlot = $this->findInlineExprCallArgProducerSlot($arg, $block);
+                if (null === $valueSlot) {
+                    $prefetchOps = $this->compileCallArgRuntimeEnumConstFetchOps($arg, $block, (int) $argIndex, $callOrdinal);
+                    if ([] !== $prefetchOps) {
+                        $valueSlot = $prefetchOps[0]->arg1;
                     }
-                    if (null === $valueSlot) {
-                        $valueSlot = $this->compileOperand($arg, $block, true);
+                }
+                if (null === $valueSlot) {
+                    if (
+                        null === $calleeName
+                        || !$this->callArgRequiresByRef($calleeName, (int) $argIndex)
+                    ) {
+                        $valueSlot = $this->tryFoldCallArgCompileTimeValue($arg, $block);
                     }
-                    if (null === $valueSlot && $arg instanceof Operand\NullOperand) {
-                        $valueSlot = $this->registerNullConstantSlot($block, $arg);
-                    }
+                }
+                if (null === $valueSlot) {
+                    $valueSlot = $this->compileOperand($arg, $block, true);
+                }
+                if (null === $valueSlot && $arg instanceof Operand\NullOperand) {
+                    $valueSlot = $this->registerNullConstantSlot($block, $arg);
                 }
             }
             $nameSlot = null;
