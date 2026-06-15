@@ -70,12 +70,12 @@ function bootstrap_m4_gen2_validate_doc(string $rel, string $doc, array $profile
     }
 
     if ($profile['zend_fallback']) {
-        if (!preg_match('/gen-2.*Zend|Zend.*gen-2|gen-2 \*\*Zend\*\*|emit_path=zend partial/i', $doc)) {
-            $errors[] = "{$rel}: M4 gen-2 must mention Zend partial emit while bootstrap-loop-gen1-link.sh retains Zend fallback";
+        if (!preg_match('/gen-2.*Zend|Zend.*gen-2|gen-2 \*\*Zend\*\*|emit_path=zend partial|BOOTSTRAP_M4_GEN2_ZEND_FALLBACK/i', $doc)) {
+            $errors[] = "{$rel}: M4 gen-2 must mention opt-in Zend fallback (BOOTSTRAP_M4_GEN2_ZEND_FALLBACK) while bootstrap-loop-gen1-link.sh retains Zend bisect path";
         }
         if (preg_match('/native gen-2 emit\s*[✅]|native gen-2 emit\s*\|\s*✅/i', $doc)
-            && !preg_match('/Zend (partial|fallback)|emit_path=zend partial/i', $doc)) {
-            $errors[] = "{$rel}: claims native gen-2 emit complete while script still has Zend fallback path";
+            && !preg_match('/Zend (partial|fallback)|emit_path=zend partial|BOOTSTRAP_M4_GEN2_ZEND_FALLBACK/i', $doc)) {
+            $errors[] = "{$rel}: claims native gen-2 emit complete while script still has Zend fallback path — document opt-in BOOTSTRAP_M4_GEN2_ZEND_FALLBACK";
         }
     }
 

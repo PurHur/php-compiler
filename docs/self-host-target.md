@@ -51,7 +51,7 @@ That is **M5**. Everything below is the honest path from today’s bootstrap to 
 | M3 compiler-unit strict | ✅ `make bootstrap-selfhost-compiler-unit-probe-strict` → `emit_path=native` (#2618) |
 | M2 `BOOTSTRAP_LIB_SPINE_SMOKE=1` spine link | ✅ `compiler_lib_spine_smoke bundle OK` |
 | M3 `make bootstrap-selfhost-helloworld` | ✅ strict default — HelloWorld `emit_path=native` (verified 27 May 2026) |
-| M4 `make bootstrap-loop-gen1-link` | ✅ gen-1 link + gen-2 smoke **`emit_path=native`** (`BOOTSTRAP_M4_LINK_COMPILE_DRIVER=1`, #2611); **Zend fallback** (`emit_path=zend partial`) when native blocked; strict: `BOOTSTRAP_M4_GEN2_STRICT=1`; presenter: [GETTING-STARTED §7](GETTING-STARTED.md) ([#2464](https://github.com/PurHur/php-compiler/issues/2464)) |
+| M4 `make bootstrap-loop-gen1-link` | ✅ gen-1 link + gen-2 smoke **`emit_path=native`** (`BOOTSTRAP_M4_LINK_COMPILE_DRIVER=1`, #2611); **`BOOTSTRAP_M4_GEN2_STRICT=1` default-on** ([#8711](https://github.com/PurHur/php-compiler/issues/8711)); opt-in Zend bisect: `BOOTSTRAP_M4_GEN2_ZEND_FALLBACK=1`; presenter: [GETTING-STARTED §7](GETTING-STARTED.md) ([#2464](https://github.com/PurHur/php-compiler/issues/2464)) |
 | M4 `make bootstrap-loop-gen1-full-spine-emit` | 🚧 gen-1→gen-2 full spine — heavy opt-in |
 | M4 `make bootstrap-selfhost-full-revision-probe` | ✅ gen-2 inventory argv → gen-3 + fixture smoke ([#2880](https://github.com/PurHur/php-compiler/issues/2880)) |
 | M4 `make bootstrap-loop-gen2-recompile-spine` | ✅ gen-2→gen-3 full spine native argv |

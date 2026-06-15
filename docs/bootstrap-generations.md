@@ -16,7 +16,7 @@ This document is the **canonical reference** for generation numbering, artifacts
 | **2 (spine)** | Gen-1 full-spine emit | `build/bootstrap-loop-gen2-full-spine` | Gen-1 **native-emits** the **2643/2643** spine bundle |
 | **3** | Gen-2 native driver | `build/bootstrap-loop-gen3-full-spine` | Gen-2 **recompiles** the **2643/2643** spine via argv `-o` (no `PHP_COMPILER_M3_*` on compile; [#2866](https://github.com/PurHur/php-compiler/issues/2866)) |
 
-**Gen-2 compiles itself** in the M4 sense: `build/bin-compile-aot` (M3 native compile driver, linked via `./script/bootstrap-loop-gen1-link.sh` or `bootstrap-selfhost-helloworld-compile-bin.sh` for `bin/compile.php`) emits the next native binary via **argv** `-o OUT SOURCE.php` (preferred; [#2866](https://github.com/PurHur/php-compiler/issues/2866)) or legacy `PHP_COMPILER_M3_SOURCE` / `PHP_COMPILER_M3_OUT`. Zend **fallback** (`emit_path=zend partial`) remains in gen-1 link when native emit is blocked. Inventory-scale spine uses link-time sidecar fast paths inside the emit bridge; full `php_compiler_cli_dispatch` lowering for arbitrary PHP remains ([#1937](https://github.com/PurHur/php-compiler/issues/1937), [#2866](https://github.com/PurHur/php-compiler/issues/2866)).
+**Gen-2 compiles itself** in the M4 sense: `build/bin-compile-aot` (M3 native compile driver, linked via `./script/bootstrap-loop-gen1-link.sh` or `bootstrap-selfhost-helloworld-compile-bin.sh` for `bin/compile.php`) emits the next native binary via **argv** `-o OUT SOURCE.php` (preferred; [#2866](https://github.com/PurHur/php-compiler/issues/2866)) or legacy `PHP_COMPILER_M3_SOURCE` / `PHP_COMPILER_M3_OUT`. **`BOOTSTRAP_M4_GEN2_STRICT=1` default-on** ([#8711](https://github.com/PurHur/php-compiler/issues/8711)); opt-in Zend bisect: `BOOTSTRAP_M4_GEN2_ZEND_FALLBACK=1` (`emit_path=zend partial`). Inventory-scale spine uses link-time sidecar fast paths inside the emit bridge; full `php_compiler_cli_dispatch` lowering for arbitrary PHP remains ([#1937](https://github.com/PurHur/php-compiler/issues/1937), [#2866](https://github.com/PurHur/php-compiler/issues/2866)).
 
 ---
 
@@ -85,7 +85,7 @@ Gen-1 link defaults (see `./script/bootstrap-loop-gen1-link.sh`):
 
 - `BOOTSTRAP_M4_LINK_COMPILE_DRIVER=1` — link M3 compile-driver TU for native emit (`emit_path=native` when LLVM present)
 - `BOOTSTRAP_M4_RUNTIME_COMPILE=1` — run gen-1 emit helper at link time
-- `BOOTSTRAP_M4_GEN2_STRICT=1` — opt-in: refuse Zend fallback (`emit_path=zend_fallback_would_be_used`)
+- `BOOTSTRAP_M4_GEN2_STRICT=1` — **default-on** ([#8711](https://github.com/PurHur/php-compiler/issues/8711)): refuse Zend fallback (`emit_path=zend_fallback_would_be_used`); opt-in bisect: `BOOTSTRAP_M4_GEN2_ZEND_FALLBACK=1`
 
 **Preferred** — production-shaped argv (gen-2→gen-3 spine, driver smoke; [#2866](https://github.com/PurHur/php-compiler/issues/2866)):
 

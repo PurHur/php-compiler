@@ -121,6 +121,12 @@ bootstrap_gen0_sidecar_blob_for_entry() {
     build/.m3_compiler_minimal_aot_blob) prelinked="${root}/prelinked/bootstrap-gen0/compiler_minimal_aot_blob" ;;
     build/.m3_bin_compile_aot_blob) prelinked="${root}/prelinked/bootstrap-gen0/bin-compile-aot" ;;
     build/.m3_compiler_lib_aot_blob) prelinked="${root}/prelinked/bootstrap-gen0/compiler_lib_aot_blob" ;;
+    build/.m3_*)
+      local sidecar_name="${rel#build/}"
+      if [[ -f "${root}/prelinked/bootstrap-gen0/${sidecar_name}" ]]; then
+        prelinked="${root}/prelinked/bootstrap-gen0/${sidecar_name}"
+      fi
+      ;;
   esac
   if [[ -n "${prelinked}" && -f "${prelinked}" && -s "${prelinked}" ]]; then
     if [[ "${rel}" == "build/.m3_compiler_lib_aot_blob" ]] \
@@ -617,6 +623,11 @@ bootstrap_compile_invoke() {
   if ! command -v php >/dev/null 2>&1; then
     echo "bootstrap-compile-invoke: compiled driver(s) failed and php missing — cannot fall back (#2842)" >&2
     return "${last_code}"
+  fi
+
+  if bootstrap_gen0_sidecar_emit_fallback "${out}" "${entry}"; then
+    echo "bootstrap-compile-invoke: gen-0 sidecar emit after native driver sweep (#8711, #3046)" >&2
+    return 0
   fi
 
   echo "bootstrap-compile-invoke: compiled driver(s) failed — falling back to Zend gen-0 (#2842)" >&2
