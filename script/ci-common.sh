@@ -312,6 +312,14 @@ ci_run_m3_allowlist_sync_check() {
   "$PHP_BIN" "${PHP_OPTS[@]}" script/check-m3-allowlist-snapshot.php
 }
 
+ci_run_selfhost_aot_stub_audit_check() {
+  if [[ "${SELFHOST_AOT_STUB_AUDIT_GATE:-0}" != "1" ]]; then
+    return 0
+  fi
+  echo "Self-host AOT stub audit (SELFHOST_AOT_STUB_AUDIT_GATE=1, issue #8720)..."
+  "$PHP_BIN" "${PHP_OPTS[@]}" script/check-selfhost-aot-stub-audit.php
+}
+
 ci_run_bootstrap_m5_doc_sync_check() {
   if [[ "${BOOTSTRAP_M5_DOC_SYNC_GATE:-0}" != "1" ]]; then
     return 0
@@ -526,6 +534,7 @@ ci_run_inventory_checks() {
   ci_run_selfhost_spine_deferred_sync_check
   ci_run_bootstrap_spine_phpcfg_parse_check
   ci_run_m3_allowlist_sync_check
+  ci_run_selfhost_aot_stub_audit_check
   ci_run_bootstrap_m5_doc_sync_check
   ci_run_selfhost_m4_gen2_sync_check
   ci_run_bootstrap_m3_strict_sync_check
