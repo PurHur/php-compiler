@@ -2,7 +2,7 @@
 Language: bare throw; escapes to uncaught handler (#3508)
 --FILE--
 <?php
-class Ex {
+class Ex extends Exception {
     public string $message = 'orig';
 }
 

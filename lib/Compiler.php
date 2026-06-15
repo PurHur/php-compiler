@@ -6864,6 +6864,10 @@ class Compiler {
      */
     private function compileThrowExpression(Op\Expr\Throw_ $expr, Block $block, Block ...$extraSearchBlocks): array
     {
+        if ($this->isBareRethrowLine($expr->getLine())) {
+            return [new OpCode(OpCode::TYPE_RETHROW)];
+        }
+
         $newOp = $this->findNewExprForThrowOperand($expr, $block, ...$extraSearchBlocks);
         $ops = [];
         $throwSlot = null;
@@ -9707,12 +9711,12 @@ class Compiler {
 
     private function isBareRethrowThrow(Op\Terminal\Throw_ $terminal): bool
     {
-        $line = $terminal->getLine();
-        if ($line < 1 || !isset($this->bareRethrowLines[$line])) {
-            return false;
-        }
+        return $this->isBareRethrowLine($terminal->getLine());
+    }
 
-        return true;
+    private function isBareRethrowLine(int $line): bool
+    {
+        return $line >= 1 && isset($this->bareRethrowLines[$line]);
     }
 
     /**
