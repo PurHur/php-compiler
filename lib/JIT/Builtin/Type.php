@@ -1332,6 +1332,7 @@ class Type extends Builtin {
         StringStripTags::ensureLinked($this->context);
         HttpResponseCode::implement($this->context);
         ObOutput::registerExternals($this->context);
+        ObGzhandler::ensureLinked($this->context);
         ObOutputRuntime::ensureLinked($this->context);
         PendingHeadersRuntime::ensureLinked($this->context);
         PowIntRuntime::ensureLinked($this->context);
