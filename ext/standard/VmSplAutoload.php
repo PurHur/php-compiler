@@ -10,6 +10,7 @@ use PHPCompiler\VM\ClosureState;
 use PHPCompiler\VM\Context;
 use PHPCompiler\VM\EnumCaseSupport;
 use PHPCompiler\VM\ObjectEntry;
+use PHPCompiler\VM\ScriptStack;
 use PHPCompiler\VM\Variable;
 
 /**
@@ -19,17 +20,19 @@ use PHPCompiler\VM\Variable;
  */
 final class VmSplAutoload
 {
+    private const DEFAULT_FILE_EXTENSIONS = '.inc,.php';
+
+    /** @var ?string spl_autoload_extensions() override (php-src spl_autoload_extensions TLS). */
+    private static ?string $fileExtensions = null;
+
     public static function register(
         Context $ctx,
         ?Variable $callback,
         bool $prepend
     ): bool {
-        if (null === $callback) {
-            throw new \LogicException(
-                'spl_autoload_register() without a callback is not supported in this compiler build'
-            );
-        }
-        $runner = self::bindCallback($ctx, $callback);
+        $runner = null === $callback
+            ? new SplAutoloadDefaultRunner()
+            : self::bindCallback($ctx, $callback);
         if ($prepend) {
             array_unshift($ctx->splAutoloadCallbacks, $runner);
         } else {
@@ -53,6 +56,76 @@ final class VmSplAutoload
         }
 
         return false;
+    }
+
+    /**
+     * @return list<string|array{0: string, 1: string}> registered callback labels for spl_autoload_functions()
+     */
+    public static function registeredFunctions(Context $ctx): array
+    {
+        if ([] === $ctx->splAutoloadCallbacks) {
+            return [];
+        }
+        $out = [];
+        foreach ($ctx->splAutoloadCallbacks as $runner) {
+            $out[] = $runner->callableLabel();
+        }
+
+        return $out;
+    }
+
+    public static function fileExtensions(): string
+    {
+        return self::$fileExtensions ?? self::DEFAULT_FILE_EXTENSIONS;
+    }
+
+    public static function setFileExtensions(?string $extensions): void
+    {
+        self::$fileExtensions = $extensions;
+    }
+
+    /**
+     * spl_autoload() — default include_path class loader (ext/spl/php_spl.c, #4256).
+     */
+    public static function defaultAutoload(Context $ctx, string $className, ?string $fileExts = null): void
+    {
+        $lc = strtolower($className);
+        if (isset($ctx->classes[$lc])) {
+            return;
+        }
+        $extList = null !== $fileExts && '' !== $fileExts ? $fileExts : self::fileExtensions();
+        $base = str_replace('\\', '/', $lc);
+        foreach (explode(',', $extList) as $ext) {
+            $ext = trim($ext);
+            if ('' === $ext) {
+                continue;
+            }
+            if (!str_starts_with($ext, '.')) {
+                $ext = '.'.$ext;
+            }
+            $resolved = self::resolveAutoloadFile($base.$ext);
+            if (false === $resolved) {
+                continue;
+            }
+            $ctx->runtime->vm->executeCompileUnit($resolved);
+            if (isset($ctx->classes[$lc])) {
+                return;
+            }
+        }
+    }
+
+  /** @return string|false */
+    private static function resolveAutoloadFile(string $relative): string|false
+    {
+        if ('' === $relative || str_contains($relative, "\0")) {
+            return false;
+        }
+        $candidate = ScriptStack::normalize($relative);
+        if ('' !== $candidate && VmStatPath::isFile($candidate)) {
+            return $candidate;
+        }
+
+        return VmFs::resolveIncludePath($relative);
     }
 
     private static function bindCallback(Context $ctx, Variable $callback): SplAutoloadRunner
@@ -87,7 +160,7 @@ final class VmSplAutoload
     {
         $func = VmUserCall::resolveStringCallback($ctx, $name);
 
-        return new SplAutoloadFunctionRunner($func);
+        return new SplAutoloadFunctionRunner($func, $name);
     }
 
     private static function bindStaticName(Context $ctx, string $callable): SplAutoloadRunner
@@ -95,7 +168,7 @@ final class VmSplAutoload
         [$className, $methodName] = explode('::', $callable, 2);
         $func = self::resolveStaticMethod($ctx, $className, $methodName);
 
-        return new SplAutoloadFunctionRunner($func);
+        return new SplAutoloadFunctionRunner($func, $callable);
     }
 
     private static function bindArrayCallable(Context $ctx, Variable $callable): SplAutoloadRunner
@@ -117,7 +190,7 @@ final class VmSplAutoload
         if (Variable::TYPE_STRING === $target->type) {
             $func = self::resolveStaticMethod($ctx, $target->toString(), $method);
 
-            return new SplAutoloadFunctionRunner($func);
+            return new SplAutoloadFunctionRunner($func, $target->toString().'::'.$method);
         }
         if (Variable::TYPE_OBJECT === $target->type) {
             $class = $target->toObject()->class;
@@ -127,7 +200,11 @@ final class VmSplAutoload
             }
             $func = $class->methods[$methodLc];
 
-            return new SplAutoloadInstanceMethodRunner($func, $target->toObject());
+            return new SplAutoloadInstanceMethodRunner(
+                $func,
+                $target->toObject(),
+                [$class->name, $method]
+            );
         }
         throw new \LogicException(
             'spl_autoload_register() array callback first element must be a class name string or object'
@@ -160,12 +237,30 @@ final class VmSplAutoload
 interface SplAutoloadRunner
 {
     public function run(Context $ctx, string $className): void;
+
+    /** @return string|array{0: string, 1: string} */
+    public function callableLabel(): string|array;
+}
+
+final class SplAutoloadDefaultRunner implements SplAutoloadRunner
+{
+    public function run(Context $ctx, string $className): void
+    {
+        VmSplAutoload::defaultAutoload($ctx, $className);
+    }
+
+    public function callableLabel(): string
+    {
+        return 'spl_autoload';
+    }
 }
 
 final class SplAutoloadFunctionRunner implements SplAutoloadRunner
 {
-    public function __construct(private PhpFunc $func)
-    {
+    public function __construct(
+        private PhpFunc $func,
+        private string $label,
+    ) {
     }
 
     public function run(Context $ctx, string $className): void
@@ -174,12 +269,19 @@ final class SplAutoloadFunctionRunner implements SplAutoloadRunner
         $arg->string($className);
         $ctx->runtime->vm->invokePhpFunction($this->func, $arg);
     }
+
+    public function callableLabel(): string
+    {
+        return $this->label;
+    }
 }
 
 final class SplAutoloadClosureRunner implements SplAutoloadRunner
 {
-    public function __construct(private ClosureState $closure)
-    {
+    public function __construct(
+        private ClosureState $closure,
+        private string $label = 'Closure',
+    ) {
     }
 
     public function run(Context $ctx, string $className): void
@@ -188,13 +290,22 @@ final class SplAutoloadClosureRunner implements SplAutoloadRunner
         $arg->string($className);
         VmClosureCall::invokeOne($ctx, $this->closure, $arg);
     }
+
+    public function callableLabel(): string
+    {
+        return $this->label;
+    }
 }
 
 final class SplAutoloadInstanceMethodRunner implements SplAutoloadRunner
 {
+    /**
+     * @param array{0: string, 1: string} $label
+     */
     public function __construct(
         private PhpFunc $func,
-        private ObjectEntry $receiver
+        private ObjectEntry $receiver,
+        private array $label,
     ) {
     }
 
@@ -205,5 +316,10 @@ final class SplAutoloadInstanceMethodRunner implements SplAutoloadRunner
         $arg = new Variable();
         $arg->string($className);
         $ctx->runtime->vm->invokePhpFunction($this->func, $recv, $arg);
+    }
+
+    public function callableLabel(): array
+    {
+        return $this->label;
     }
 }
