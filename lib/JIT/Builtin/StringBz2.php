@@ -31,24 +31,7 @@ final class StringBz2
         if ($loaded) {
             return;
         }
-        if (!\extension_loaded('FFI')) {
-            return;
-        }
-        $selfHost = getenv('PHP_COMPILER_SELFHOST_AOT');
-        if ('1' === $selfHost || 'true' === strtolower((string) $selfHost)) {
-            $loaded = 1;
-
-            return;
-        }
-        try {
-            $dl = \FFI::cdef('void *dlopen(const char *filename, int flags);', 'libdl.so.2');
-            foreach (['libbz2.so.1.0', 'libbz2.so.1', 'libbz2.so'] as $lib) {
-                if (null !== $dl->dlopen($lib, 0x101)) {
-                    break;
-                }
-            }
-        } catch (\Throwable) {
-        }
+        NativeDlopen::preloadLibraries(['libbz2.so.1.0', 'libbz2.so.1', 'libbz2.so']);
         $loaded = 1;
     }
 }

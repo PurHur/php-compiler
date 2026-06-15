@@ -1970,6 +1970,7 @@ require_once __DIR__.'/../../../lib/JIT/Builtin/StreamSync.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/StreamSyncJit.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/StringAddslashes.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/StringBitwiseNot.php';
+require_once __DIR__.'/../../../lib/JIT/Builtin/NativeDlopen.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/StringBz2.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/StringBz2Jit.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/StringConvertUu.php';

@@ -31,31 +31,13 @@ final class StringLzf
         if ($loaded) {
             return;
         }
-        if (!\extension_loaded('FFI')) {
-            return;
-        }
-        $selfHost = getenv('PHP_COMPILER_SELFHOST_AOT');
-        if ('1' === $selfHost || 'true' === strtolower((string) $selfHost)) {
-            $loaded = 1;
-
-            return;
-        }
         $root = \dirname(__DIR__, 3);
         $bundled = $root.'/.libs/liblzf.so';
-        try {
-            $dl = \FFI::cdef('void *dlopen(const char *filename, int flags);', 'libdl.so.2');
-            if (\is_file($bundled) && null !== $dl->dlopen($bundled, 0x101)) {
-                $loaded = 1;
-
-                return;
-            }
-            foreach (['liblzf.so', 'liblzf.so.0'] as $lib) {
-                if (null !== $dl->dlopen($lib, 0x101)) {
-                    break;
-                }
-            }
-        } catch (\Throwable) {
+        $candidates = [];
+        if (\is_file($bundled)) {
+            $candidates[] = $bundled;
         }
+        NativeDlopen::preloadLibraries(array_merge($candidates, ['liblzf.so', 'liblzf.so.0']));
         $loaded = 1;
     }
 }
