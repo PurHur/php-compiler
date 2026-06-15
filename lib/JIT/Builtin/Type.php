@@ -796,6 +796,20 @@ class Type extends Builtin {
         $this->context->registerFunction('__compiler_preg_match', $fnPregMatch);
         $fnPregMatchAll = $this->context->module->addFunction('__compiler_preg_match_all', $fntypePregMatch);
         $this->context->registerFunction('__compiler_preg_match_all', $fnPregMatchAll);
+        $valuePtr = $this->context->getTypeFromString('__value__*');
+        $fntypePregMatchEx = $this->context->context->functionType(
+            $i64,
+            false,
+            $strPtr,
+            $strPtr,
+            $valuePtr,
+            $i64,
+            $i64
+        );
+        $fnPregMatchEx = $this->context->module->addFunction('__compiler_preg_match_ex', $fntypePregMatchEx);
+        $this->context->registerFunction('__compiler_preg_match_ex', $fnPregMatchEx);
+        $fnPregMatchAllEx = $this->context->module->addFunction('__compiler_preg_match_all_ex', $fntypePregMatchEx);
+        $this->context->registerFunction('__compiler_preg_match_all_ex', $fnPregMatchAllEx);
         $fntypePregReplace = $this->context->context->functionType(
             $strPtr,
             false,

@@ -63,16 +63,6 @@ final class preg_match extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        if (2 !== \count($args)) {
-            throw new \LogicException(
-                'preg_match() in JIT/AOT supports exactly two arguments (no $matches, flags, or offset) in this compiler build'
-            );
-        }
-
-        return JitPregMatch::invoke(
-            $context,
-            JitStringBuiltinArg::lower($context, $args[0], 'preg_match', 0, 'pattern'),
-            JitStringBuiltinArg::lower($context, $args[1], 'preg_match', 1, 'subject')
-        );
+        return JitPregMatchEx::invoke($context, ...$args);
     }
 }
