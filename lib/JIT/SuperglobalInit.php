@@ -153,7 +153,7 @@ final class SuperglobalInit
         }
         self::$globals = [];
         $oldBuilder = $context->builder;
-        $context->builder->positionAtEnd($context->initBlock);
+        $context->positionBuilderAtInitEmission();
 
         $htPtr = $context->getTypeFromString('__hashtable__*');
         foreach (Superglobals::NAMES as $name) {

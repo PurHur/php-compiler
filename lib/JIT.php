@@ -13279,7 +13279,7 @@ class JIT {
     private function initJitFunctionStaticValueGlobal(PHPLLVM\Value $global): void
     {
         $restore = $this->context->builder->getInsertBlock();
-        $this->context->builder->positionAtEnd($this->context->initBlock);
+        $this->context->positionBuilderAtInitEmission();
         $valueType = $this->context->getTypeFromString('__value__');
         $heapVal = $this->context->memory->malloc($valueType);
         $heapPtr = $this->context->builder->pointerCast(
@@ -13292,11 +13292,7 @@ class JIT {
         );
         $this->context->builder->store($heapPtr, $global);
         if (null !== $restore) {
-            if (null !== $restore->getTerminator()) {
-                BasicBlockHelper::ensureOpenInsertBlock($this->context, 'func_static_init_cont');
-            } else {
-                $this->context->builder->positionAtEnd($restore);
-            }
+            BasicBlockHelper::restoreInsertBlock($this->context, $restore);
         }
     }
 

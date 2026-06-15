@@ -4086,7 +4086,7 @@ class Object_ extends Type {
             throw new \LogicException('Static string property default must be a string');
         }
         $restore = $this->context->builder->getInsertBlock();
-        $this->context->builder->positionAtEnd($this->context->initBlock);
+        $this->context->positionBuilderAtInitEmission();
         $str = $this->context->builder->load(
             $this->context->constantStringFromString($value->toString())
         );
@@ -4095,14 +4095,16 @@ class Object_ extends Type {
             $str
         );
         $this->context->builder->store($owned, $global);
-        $this->context->builder->positionAtEnd($restore);
+        if (null !== $restore) {
+            BasicBlockHelper::restoreInsertBlock($this->context, $restore);
+        }
     }
 
     /** Allocate a null {@see __value__} box for untyped static properties (bootstrap JIT helpers). */
     private function initStaticValuePropertyNull(\PHPLLVM\Value $global): void
     {
         $restore = $this->context->builder->getInsertBlock();
-        $this->context->builder->positionAtEnd($this->context->initBlock);
+        $this->context->positionBuilderAtInitEmission();
         $valueType = $this->context->getTypeFromString('__value__');
         $heapVal = $this->context->memory->malloc($valueType);
         $heapPtr = $this->context->builder->pointerCast(
@@ -4114,7 +4116,9 @@ class Object_ extends Type {
             $heapPtr
         );
         $this->context->builder->store($heapPtr, $global);
-        $this->context->builder->positionAtEnd($restore);
+        if (null !== $restore) {
+            BasicBlockHelper::restoreInsertBlock($this->context, $restore);
+        }
     }
 
     /** Box a compile-time enum case singleton into a typed static {@see __value__} property (#5891). */
