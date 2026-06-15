@@ -135,6 +135,9 @@ class Compiler {
     /** @var array<string, array<string, true>> lowercase enum => lowercase `case` names (#5054) */
     private array $compileTimeEnumCaseConstNames = [];
 
+    /** @var array<string, array<int|string, string>> lowercase enum => backing scalar => first case name (#8687) */
+    private array $compileTimeEnumBackingValues = [];
+
     /** @var array<string, array<string, true>> lowercase class => declared static property names (#3814). */
     private array $compiledClassStaticProperties = [];
 
@@ -388,6 +391,7 @@ class Compiler {
         $this->abstractEnums = [];
         $this->compileTimeEnumBackedTypes = [];
         $this->compileTimeEnumCaseConstNames = [];
+        $this->compileTimeEnumBackingValues = [];
         $this->compileTimeGlobalConsts = [];
         $this->haltCompilerRemaining = null;
         $this->haltCompilerOffset = null;
@@ -3976,6 +3980,12 @@ class Compiler {
                 $backing = new Variable();
                 $backing->copyFrom($result->constants[$valueSlot]);
                 if ($constOp->isEnumCaseDeclare) {
+                    $this->rejectDuplicateEnumBackingValueAtCompileTime(
+                        $child,
+                        $this->compilingClassDisplayName ?? $this->compilingClassLc,
+                        $constName,
+                        $backing
+                    );
                     $stored = $this->compileTimeEnumCaseVar(
                         $this->compilingClassDisplayName ?? $this->compilingClassLc,
                         $constName,
@@ -4016,6 +4026,63 @@ class Compiler {
         }
 
         return 0 === (property_exists($child, 'flags') ? (int) $child->flags : 0);
+    }
+
+    /**
+     * Zend zend_enum.c / zend_compile.c — duplicate backed enum case values are a compile fatal (#8687).
+     *
+     * @return never
+     */
+    private function rejectDuplicateEnumBackingValueAtCompileTime(
+        Op\Terminal\Const_ $child,
+        string $enumDisplayName,
+        string $caseName,
+        Variable $backing
+    ): void {
+        if (null === $this->compilingClassLc) {
+            return;
+        }
+        $backedType = $this->compileTimeEnumBackedTypes[$this->compilingClassLc] ?? null;
+        if (null === $backedType) {
+            return;
+        }
+        $key = $this->compileTimeEnumBackingScalarKey($backing, $backedType);
+        if (null === $key) {
+            return;
+        }
+        $lc = $this->compilingClassLc;
+        if (isset($this->compileTimeEnumBackingValues[$lc][$key])) {
+            $sourceFile = $child->getFile() ?? '';
+            if ('' === $sourceFile) {
+                $sourceFile = 'unknown';
+            }
+            throw new CompileFatal(
+                $sourceFile,
+                max(1, $child->getLine()),
+                sprintf(
+                    'Duplicate value in enum %s for cases %s and %s',
+                    $enumDisplayName,
+                    $this->compileTimeEnumBackingValues[$lc][$key],
+                    $caseName
+                )
+            );
+        }
+        $this->compileTimeEnumBackingValues[$lc][$key] = $caseName;
+    }
+
+    /**
+     * @return int|string|null compile-time backing scalar key, or null when not foldable
+     */
+    private function compileTimeEnumBackingScalarKey(Variable $backing, string $backedType): int|string|null
+    {
+        if ('int' === $backedType && $backing->is(Variable::TYPE_INTEGER)) {
+            return $backing->toInt();
+        }
+        if ('string' === $backedType && $backing->is(Variable::TYPE_STRING)) {
+            return $backing->toString();
+        }
+
+        return null;
     }
 
     /**
@@ -5080,7 +5147,7 @@ class Compiler {
                     $this->compileTimeEnumBackedTypes[$lcClass] ?? null
                 );
             }
-            // Defer enum case fetches to runtime so duplicate backing is caught on first use (#5773).
+            // Non-literal duplicate backing falls back to runtime ensureBackedEnumValuesUnique (#5773).
             if (Variable::TYPE_OBJECT === $stored->type && EnumCaseSupport::isEnumCase($stored->toObject())) {
                 if (!$materializeEnumCase) {
                     return null;
@@ -6646,12 +6713,34 @@ class Compiler {
         return false;
     }
 
+    private const ISSET_EXPRESSION_COMPILE_ERROR =
+        'Cannot use isset() on the result of an expression (you can use "null !== expression" instead)';
+
+    /**
+     * Zend zend_compile.c zend_is_variable(): isset() operands must be variables, dims, or properties (#8802).
+     */
+    protected function assertIssetVariableOperand(Operand $operand, Block $block): void
+    {
+        if (null !== $this->findCoalescePropertyFetch($operand, $block)) {
+            return;
+        }
+        if (null !== $this->findCoalesceArrayDimFetch($operand, $block)) {
+            return;
+        }
+        if (null !== $this->unwrapVariableOperand($operand)) {
+            return;
+        }
+
+        $this->throwCompileError(self::ISSET_EXPRESSION_COMPILE_ERROR);
+    }
+
     /**
      * @return OpCode[]
      */
     protected function compileIsset(Op\Expr\Isset_ $expr, Block $block): array
     {
         assert(1 === count($expr->vars));
+        $this->assertIssetVariableOperand($expr->vars[0], $block);
         $resultSlot = $this->compileOperand($expr->result, $block, false);
         $propFetch = $this->findCoalescePropertyFetch($expr->vars[0], $block);
         $dimFetch = null !== $propFetch ? null : $this->findCoalesceArrayDimFetch($expr->vars[0], $block);
@@ -8313,6 +8402,7 @@ class Compiler {
         $vars = $expr->vars;
         $last = count($vars) - 1;
         foreach ($vars as $i => $var) {
+            $this->assertIssetVariableOperand($var, $block);
             $propFetch = $this->findCoalescePropertyFetch($var, $block);
             $dimFetch = null !== $propFetch ? null : $this->findCoalesceArrayDimFetch($var, $block);
             [$containerSlot, $dimSlot] = null !== $propFetch
@@ -8751,6 +8841,22 @@ class Compiler {
         }
         if ($this->operandsReferToSameVariable($producer->result, $arg)) {
             return $producerSlot;
+        }
+        // php-cfg uses distinct result/arg temps for `$f($a[0])` (#8814, zend_compile.c).
+        if ($producer instanceof Op\Expr\ArrayDimFetch) {
+            $callIndex = null;
+            $producerIndex = null;
+            foreach ($block->orig->children as $i => $child) {
+                if ($child === $callOp) {
+                    $callIndex = $i;
+                }
+                if ($child === $producer) {
+                    $producerIndex = $i;
+                }
+            }
+            if (null !== $callIndex && null !== $producerIndex && $producerIndex === $callIndex - 1) {
+                return $producerSlot;
+            }
         }
         // php-cfg `f(g())` uses distinct result/arg temporaries (#8561, #7075).
         if (

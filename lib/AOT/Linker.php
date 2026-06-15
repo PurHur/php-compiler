@@ -69,7 +69,7 @@ final class Linker
         foreach (['gcc', 'cc'] as $compiler) {
             if (null !== self::which($compiler)) {
                 $cmd = 'bash '.\escapeshellarg($buildScript).' 2>/dev/null';
-                @\shell_exec($cmd);
+                self::runCaptured($cmd, null);
 
                 return;
             }

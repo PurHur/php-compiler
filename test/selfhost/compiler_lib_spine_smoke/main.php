@@ -2761,15 +2761,16 @@ require_once __DIR__.'/../../../lib/JIT/Builtin/DateMutationRuntime.php';
 
 $vmDriverExecute = getenv('PHP_COMPILER_VM_DRIVER_EXECUTE');
 if (is_string($vmDriverExecute) && ('1' === $vmDriverExecute || 'true' === strtolower($vmDriverExecute))) {
-    // Dispatch bin/vm.php run() (native LLVM echo bridge; main fallback until link wires run — #2201).
+    // Honest bin/vm.php run() dispatch: main() → run() on -r fixture (#8693, #2201).
     run('Standard input code', '<?php echo "vm driver ok\n";', []);
-    echo "vm driver ok\n";
     exit(0);
 }
 
 $vmSpineSmoke = getenv('PHP_COMPILER_VM_SPINE_SMOKE');
 if (is_string($vmSpineSmoke) && ('1' === $vmSpineSmoke || 'true' === strtolower($vmSpineSmoke))) {
-    echo "vm-spine-ok\n";
-} else {
-    echo "compiler_lib_spine_smoke bundle OK\n";
+    // Honest bin/vm.php -r echo fixture via native run() bridge (#8719, pairs #2201).
+    run('Standard input code', '<?php echo "1\n";', []);
+    exit(0);
 }
+
+echo "compiler_lib_spine_smoke bundle OK\n";

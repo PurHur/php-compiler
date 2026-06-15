@@ -13,9 +13,14 @@ final class RuntimeInitVmContextTest extends TestCase
         $source = (string) file_get_contents($root.'/lib/JIT/RuntimeInitVmContext.php');
         $this->assertStringContainsString('ErrorReporter', $source);
         $this->assertStringContainsString('ScriptStack', $source);
+        $this->assertStringContainsString('ExceptionHandlerStack', $source);
+        $this->assertStringContainsString('VmExecutionLimits', $source);
         $this->assertStringContainsString("'errors'", $source);
         $this->assertStringContainsString("'scriptStack'", $source);
+        $this->assertStringContainsString("'exceptionHandlers'", $source);
+        $this->assertStringContainsString("'executionLimits'", $source);
         $this->assertStringContainsString("'functions'", $source);
+        $this->assertStringContainsString("'classAliases'", $source);
         $this->assertStringContainsString('HashTableHelper::alloc', $source);
     }
 

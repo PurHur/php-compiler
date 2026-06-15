@@ -3,7 +3,7 @@
 declare(strict_types=1);
 
 /**
- * Repro for #5773 — duplicate backed enum values compile; Error at first use (zend_enum.c).
+ * Repro for #5773 / #8687 — duplicate backed enum values compile-time fatal (zend_enum.c).
  */
 
 enum E: int
@@ -12,10 +12,4 @@ enum E: int
     case B = 1;
 }
 
-echo "before\n";
-try {
-    echo E::A->name, "\n";
-} catch (Error $e) {
-    echo $e->getMessage(), "\n";
-}
-echo "after\n";
+echo "compiled\n";

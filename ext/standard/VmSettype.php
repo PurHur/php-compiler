@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace PHPCompiler\ext\standard;
 
 use PHPCompiler\Frame;
+use PHPCompiler\VM\EnumCaseSupport;
 use PHPCompiler\VM\HashTable;
 use PHPCompiler\VM\ObjectEntry;
 use PHPCompiler\VM\Variable;
@@ -96,11 +97,13 @@ final class VmSettype
 
             return;
         }
-        $enumInt = VmScalarType::tryEnumCaseToInt($frame, $v);
-        if (null !== $enumInt) {
-            $result->int($enumInt);
+        if (Variable::TYPE_OBJECT === $v->type || Variable::TYPE_ENUM_CASE === $v->type) {
+            $objectInt = EnumCaseSupport::tryCastToInt($v, $frame?->vmContext, $frame);
+            if (null !== $objectInt) {
+                $result->int($objectInt);
 
-            return;
+                return;
+            }
         }
         throw new \LogicException('settype() to integer does not support this value type in this compiler build');
     }
@@ -138,11 +141,13 @@ final class VmSettype
 
             return;
         }
-        $enumFloat = VmScalarType::tryEnumCaseToFloat($frame, $v);
-        if (null !== $enumFloat) {
-            $result->float($enumFloat);
+        if (Variable::TYPE_OBJECT === $v->type || Variable::TYPE_ENUM_CASE === $v->type) {
+            $objectFloat = EnumCaseSupport::tryCastToFloat($v, $frame?->vmContext, $frame);
+            if (null !== $objectFloat) {
+                $result->float($objectFloat);
 
-            return;
+                return;
+            }
         }
         throw new \LogicException('settype() to float does not support this value type in this compiler build');
     }
