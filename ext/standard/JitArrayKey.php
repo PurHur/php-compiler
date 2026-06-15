@@ -14,6 +14,8 @@ use PHPCompiler\VM\Variable;
 use PHPLLVM\Builder;
 use PHPLLVM\Value;
 
+/** @internal AOT standalone must not call unresolved __hashtable__* decls — use struct helpers (#4462). */
+
 /** LLVM JIT helpers for array_key_first() / array_key_last(). */
 final class JitArrayKey
 {
@@ -21,12 +23,21 @@ final class JitArrayKey
 
     public static function keyFirst(Context $context, JITVariable $array): Value
     {
+        self::ensureLinked($context);
+
         return self::keyAtEnd($context, $array, true);
     }
 
     public static function keyLast(Context $context, JITVariable $array): Value
     {
+        self::ensureLinked($context);
+
         return self::keyAtEnd($context, $array, false);
+    }
+
+    private static function ensureLinked(Context $context): void
+    {
+        TypeErrorRaise::ensureLinked($context);
     }
 
     /**
@@ -42,18 +53,30 @@ final class JitArrayKey
         ) {
             return;
         }
-        if (JITVariable::TYPE_VALUE === $array->type) {
+        if (JITVariable::TYPE_VALUE === $array->type || JitValueBox::isValueOperand($array)) {
             $loaded = JitValueBox::valuePtrFromVariable($context, $array);
             $typeField = $context->structFieldMap['__value__']['type'];
             $typeByte = $context->builder->load(
                 $context->builder->structGep($loaded, $typeField)
             );
             $i8 = $context->getTypeFromString('int8');
-            $isArray = $context->builder->icmp(
+            $isArrayType = $context->builder->icmp(
                 Builder::INT_EQ,
                 $typeByte,
                 $i8->constInt(Variable::TYPE_ARRAY, false)
             );
+            // AOT standalone may pass array literals as boxed values whose type byte is not
+            // yet TYPE_ARRAY; accept when a hashtable payload is present (#4462).
+            $ht = $context->builder->call(
+                $context->lookupFunction('__value__readHashtable'),
+                $loaded
+            );
+            $hasHt = $context->builder->icmp(
+                Builder::INT_NE,
+                $ht,
+                $ht->typeOf()->constNull()
+            );
+            $isArray = $context->builder->or($isArrayType, $hasHt);
             $okBlock = BasicBlockHelper::append($context, 'array_key_req_ok');
             $errBlock = BasicBlockHelper::append($context, 'array_key_req_err');
             $context->builder->branchIf($isArray, $okBlock, $errBlock);
@@ -186,14 +209,13 @@ final class JitArrayKey
         $nodeMap = $context->structFieldMap['__strkey_node__'];
         $sizeT = $context->getTypeFromString('size_t');
         $i64 = $context->getTypeFromString('int64');
+        $i8 = $context->getTypeFromString('int8');
         $nodePtrType = $context->getTypeFromString('__strkey_node__*');
-        $zero = $sizeT->constInt(0, false);
+        $zeroSize = $sizeT->constInt(0, false);
         $one = $sizeT->constInt(1, false);
-        $num = $context->builder->call(
-            $context->lookupFunction('__hashtable__getNumElements'),
-            $ht
-        );
-        $isEmpty = $context->builder->icmp(Builder::INT_EQ, $num, $zero);
+        $zeroI64 = $i64->constInt(0, false);
+        $num = ArrayBuiltinHelper::getNumElements($context, $ht);
+        $isEmpty = $context->builder->icmp(Builder::INT_EQ, $num, $zeroI64);
 
         $emptyBb = BasicBlockHelper::append($context, 'array_key_'.($first ? 'first' : 'last').'_empty');
         $workBb = BasicBlockHelper::append($context, 'array_key_'.($first ? 'first' : 'last').'_work');
@@ -201,17 +223,14 @@ final class JitArrayKey
         $context->builder->branchIf($isEmpty, $emptyBb, $workBb);
 
         $context->builder->positionAtEnd($emptyBb);
-        $context->builder->call(
-            $context->lookupFunction('__value__writeNull'),
-            $resultPtr
-        );
+        // JitValueBox::alloc() already initializes TYPE_NULL (#4462 AOT standalone).
         $context->builder->branch($doneBb);
 
         $context->builder->positionAtEnd($workBb);
         $nextFree = $context->builder->load(
             $context->builder->structGep($ht, $map['nextFreeElement'])
         );
-        $hasPacked = $context->builder->icmp(Builder::INT_NE, $nextFree, $zero);
+        $hasPacked = $context->builder->icmp(Builder::INT_NE, $nextFree, $zeroSize);
         $packedBb = BasicBlockHelper::append($context, 'array_key_'.($first ? 'first' : 'last').'_packed');
         $stringBb = BasicBlockHelper::append($context, 'array_key_'.($first ? 'first' : 'last').'_string');
         $context->builder->branchIf($hasPacked, $packedBb, $stringBb);
@@ -220,7 +239,7 @@ final class JitArrayKey
         $context->builder->positionAtEnd($packedBb);
         $idxSlot = $context->builder->alloca($sizeT, 1, 'array_key_'.$tag.'_idx');
         if ($first) {
-            $context->builder->store($zero, $idxSlot);
+            $context->builder->store($zeroSize, $idxSlot);
         } else {
             $context->builder->store($context->builder->sub($nextFree, $one), $idxSlot);
         }
@@ -237,16 +256,12 @@ final class JitArrayKey
             $atEnd = $context->builder->icmp(Builder::INT_SGE, $idx, $nextFree);
             $context->builder->branchIf($atEnd, $loopFail, $loopBody);
         } else {
-            $atStart = $context->builder->icmp(Builder::INT_EQ, $idx, $zero);
+            $atStart = $context->builder->icmp(Builder::INT_EQ, $idx, $zeroSize);
             $context->builder->branchIf($atStart, $loopFail, $loopBody);
         }
 
         $context->builder->positionAtEnd($loopBody);
-        $present = $context->builder->call(
-            $context->lookupFunction('__hashtable__offsetIsSet'),
-            $ht,
-            $idx
-        );
+        $present = self::offsetIsSetAt($context, $ht, $map, $idx, $nextFree, $i8);
         $context->builder->branchIf($present, $loopFound, $loopNext);
 
         $context->builder->positionAtEnd($loopFound);
@@ -266,10 +281,6 @@ final class JitArrayKey
         $context->builder->branch($loopHead);
 
         $context->builder->positionAtEnd($loopFail);
-        $context->builder->call(
-            $context->lookupFunction('__value__writeNull'),
-            $resultPtr
-        );
         $context->builder->branch($doneBb);
 
         $context->builder->positionAtEnd($stringBb);
@@ -280,10 +291,6 @@ final class JitArrayKey
             $strFound = BasicBlockHelper::append($context, 'array_key_first_str_found');
             $context->builder->branchIf($headNull, $strEmpty, $strFound);
             $context->builder->positionAtEnd($strEmpty);
-            $context->builder->call(
-                $context->lookupFunction('__value__writeNull'),
-                $resultPtr
-            );
             $context->builder->branch($doneBb);
             $context->builder->positionAtEnd($strFound);
             $keyStr = $context->builder->load($context->builder->structGep($head, $nodeMap['key']));
@@ -322,10 +329,6 @@ final class JitArrayKey
             $strFound = BasicBlockHelper::append($context, 'array_key_last_str_found');
             $context->builder->branchIf($lastNull, $strEmpty, $strFound);
             $context->builder->positionAtEnd($strEmpty);
-            $context->builder->call(
-                $context->lookupFunction('__value__writeNull'),
-                $resultPtr
-            );
             $context->builder->branch($doneBb);
             $context->builder->positionAtEnd($strFound);
             $keyStr = $context->builder->load($context->builder->structGep($lastNode, $nodeMap['key']));
@@ -341,5 +344,39 @@ final class JitArrayKey
         $context->builder->positionAtEnd($doneBb);
 
         return $resultPtr;
+    }
+
+    /** Mirrors HashTable::implementOffsetIsSet — inlined for AOT standalone (#4462). */
+    private static function offsetIsSetAt(
+        Context $context,
+        Value $ht,
+        array $map,
+        Value $index,
+        Value $nextFree,
+        $i8
+    ): Value {
+        $i1 = $context->getTypeFromString('int1');
+        $inRange = $context->builder->icmp(Builder::INT_ULT, $index, $nextFree);
+        $okBb = BasicBlockHelper::append($context, 'array_key_offset_ok');
+        $noBb = BasicBlockHelper::append($context, 'array_key_offset_no');
+        $mergeBb = BasicBlockHelper::append($context, 'array_key_offset_merge');
+        $context->builder->branchIf($inRange, $okBb, $noBb);
+        $context->builder->positionAtEnd($noBb);
+        $context->builder->branch($mergeBb);
+        $context->builder->positionAtEnd($okBb);
+        $values = $context->builder->load($context->builder->structGep($ht, $map['values']));
+        $entry = $context->builder->inBoundsGEP($values, $index);
+        $typeByte = $context->builder->load(
+            $context->builder->structGep($entry, $context->structFieldMap['__value__']['type'])
+        );
+        $nullType = $i8->constInt(Variable::TYPE_NULL, false);
+        $set = $context->builder->icmp(Builder::INT_NE, $typeByte, $nullType);
+        $context->builder->branch($mergeBb);
+        $context->builder->positionAtEnd($mergeBb);
+        $result = $context->builder->phi($i1);
+        $result->addIncoming($set, $okBb);
+        $result->addIncoming($i1->constInt(0, false), $noBb);
+
+        return $result;
     }
 }
