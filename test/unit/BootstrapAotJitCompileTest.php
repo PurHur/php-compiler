@@ -255,6 +255,45 @@ PHP;
         $this->assertSame("1\n", $stdout !== false ? $stdout : '');
     }
 
+    public function testBootstrapAotRtrimOnConcatValueBoxCompiles(): void
+    {
+        $this->skipUnlessLlvmReady();
+        $repoRoot = dirname(__DIR__, 2);
+        $sourcePath = $repoRoot.'/test/bootstrap-aot/rtrim_value_box.php';
+
+        $env = [];
+        foreach (array_merge($_ENV, $_SERVER) as $key => $value) {
+            if (is_string($value)) {
+                $env[$key] = $value;
+            }
+        }
+        $env['PHP_COMPILER_BOOTSTRAP_AOT_LINK'] = '1';
+        LlvmToolchain::applyProcessEnv($env, $repoRoot);
+
+        $outfile = tempnam(sys_get_temp_dir(), 'bootstrap_aot_rtrim_out_');
+        $this->assertNotFalse($outfile);
+        unlink($outfile);
+
+        $compileArgv = array_merge(
+            LlvmToolchain::envPrefix($repoRoot),
+            [PHP_BINARY, $repoRoot.'/bin/compile.php', '-o', $outfile, $sourcePath]
+        );
+        $descriptorSpec = [0 => ['pipe', 'r'], 1 => ['pipe', 'w'], 2 => ['pipe', 'w']];
+        $compile = proc_open($compileArgv, $descriptorSpec, $pipes, $repoRoot, $env);
+        $this->assertIsResource($compile);
+        fclose($pipes[0]);
+        fclose($pipes[1]);
+        $stderr = stream_get_contents($pipes[2]);
+        fclose($pipes[2]);
+        $exitCode = proc_close($compile);
+        $stderr = trim($stderr !== false ? $stderr : '');
+        $this->assertSame(0, $exitCode, 'bootstrap rtrim VALUE-box AOT compile: '.$stderr);
+        $this->assertStringNotContainsString('Factory::basicBlock()', $stderr);
+        $this->assertStringNotContainsString('Module verification failed', $stderr);
+        $this->assertFileExists($outfile);
+        @unlink($outfile);
+    }
+
     private function skipUnlessLlvmReady(): void
     {
         if (!LlvmToolchain::isReady(dirname(__DIR__, 2))) {
