@@ -1,5 +1,7 @@
 --TEST--
 stdlib pack() on backed enum — E_WARNING + backing int (#5713, #6213, ext/standard/pack.c)
+--ENV--
+PHP_COMPILER_RUNTIME_STRICT=php-compiler
 --FILE--
 <?php
 declare(strict_types=1);

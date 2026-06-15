@@ -81,7 +81,7 @@ final class PackEngine
                         $output = self::writeAt(
                             $output,
                             $outputPos,
-                            self::putLong(self::argLong($args[$currentArg++], $frame), 1, self::machineLe())
+                            self::putLong(self::takeArgLong($args, $currentArg, $frame), 1, self::machineLe())
                         );
                         ++$outputPos;
                     }
@@ -100,7 +100,7 @@ final class PackEngine
                         $output = self::writeAt(
                             $output,
                             $outputPos,
-                            self::putLong(self::argLong($args[$currentArg++], $frame), 2, $le)
+                            self::putLong(self::takeArgLong($args, $currentArg, $frame), 2, $le)
                         );
                         $outputPos += 2;
                     }
@@ -111,7 +111,7 @@ final class PackEngine
                         $output = self::writeAt(
                             $output,
                             $outputPos,
-                            self::putLong(self::argLong($args[$currentArg++], $frame), self::PACK_INT_SIZE, self::machineLe())
+                            self::putLong(self::takeArgLong($args, $currentArg, $frame), self::PACK_INT_SIZE, self::machineLe())
                         );
                         $outputPos += self::PACK_INT_SIZE;
                     }
@@ -130,7 +130,7 @@ final class PackEngine
                         $output = self::writeAt(
                             $output,
                             $outputPos,
-                            self::putLong(self::argLong($args[$currentArg++], $frame), 4, $le)
+                            self::putLong(self::takeArgLong($args, $currentArg, $frame), 4, $le)
                         );
                         $outputPos += 4;
                     }
@@ -149,7 +149,7 @@ final class PackEngine
                         $output = self::writeAt(
                             $output,
                             $outputPos,
-                            self::putLong(self::argLong($args[$currentArg++], $frame), 8, $le)
+                            self::putLong(self::takeArgLong($args, $currentArg, $frame), 8, $le)
                         );
                         $outputPos += 8;
                     }
@@ -159,7 +159,7 @@ final class PackEngine
                         $output = self::writeAt(
                             $output,
                             $outputPos,
-                            self::putFloat((float) self::argDouble($args[$currentArg++], $frame), self::machineLe())
+                            self::putFloat((float) self::takeArgDouble($args, $currentArg, $frame), self::machineLe())
                         );
                         $outputPos += 4;
                     }
@@ -169,7 +169,7 @@ final class PackEngine
                         $output = self::writeAt(
                             $output,
                             $outputPos,
-                            self::putFloat((float) self::argDouble($args[$currentArg++], $frame), true)
+                            self::putFloat((float) self::takeArgDouble($args, $currentArg, $frame), true)
                         );
                         $outputPos += 4;
                     }
@@ -179,7 +179,7 @@ final class PackEngine
                         $output = self::writeAt(
                             $output,
                             $outputPos,
-                            self::putFloat((float) self::argDouble($args[$currentArg++], $frame), false)
+                            self::putFloat((float) self::takeArgDouble($args, $currentArg, $frame), false)
                         );
                         $outputPos += 4;
                     }
@@ -189,7 +189,7 @@ final class PackEngine
                         $output = self::writeAt(
                             $output,
                             $outputPos,
-                            self::putDouble(self::argDouble($args[$currentArg++], $frame), self::machineLe())
+                            self::putDouble(self::takeArgDouble($args, $currentArg, $frame), self::machineLe())
                         );
                         $outputPos += 8;
                     }
@@ -199,7 +199,7 @@ final class PackEngine
                         $output = self::writeAt(
                             $output,
                             $outputPos,
-                            self::putDouble(self::argDouble($args[$currentArg++], $frame), true)
+                            self::putDouble(self::takeArgDouble($args, $currentArg, $frame), true)
                         );
                         $outputPos += 8;
                     }
@@ -209,7 +209,7 @@ final class PackEngine
                         $output = self::writeAt(
                             $output,
                             $outputPos,
-                            self::putDouble(self::argDouble($args[$currentArg++], $frame), false)
+                            self::putDouble(self::takeArgDouble($args, $currentArg, $frame), false)
                         );
                         $outputPos += 8;
                     }
@@ -231,6 +231,35 @@ final class PackEngine
         }
 
         return \substr($output, 0, $outputPos);
+    }
+
+    /**
+     * Operand kinds consumed by $format value args (php-src ext/standard/pack.c; #8816 JIT guard).
+     *
+     * @return list<'string'|'int'|'float'>
+     */
+    public static function valueOperandKinds(string $format, int $numValueArgs): array
+    {
+        if ('' === $format || 0 === $numValueArgs) {
+            return [];
+        }
+
+        $specs = self::parseFormat($format, array_fill(0, $numValueArgs, 0), null);
+        $kinds = [];
+        foreach ($specs as $spec) {
+            $code = $spec['code'];
+            $arg = $spec['arg'];
+            if (\in_array($code, ['a', 'A', 'Z', 'h', 'H'], true)) {
+                $kinds[] = 'string';
+                continue;
+            }
+            $kind = \in_array($code, ['f', 'g', 'G', 'd', 'e', 'E'], true) ? 'float' : 'int';
+            for ($r = 0; $r < $arg; ++$r) {
+                $kinds[] = $kind;
+            }
+        }
+
+        return $kinds;
     }
 
     /**
@@ -471,6 +500,26 @@ final class PackEngine
         return \substr($output, 0, $pos).$chunk.\substr($output, $pos + \strlen($chunk));
     }
 
+    /**
+     * @param list<int|float|string|bool|null|Variable> $args
+     */
+    private static function takeArgLong(array $args, int &$currentArg, ?Frame $frame): int
+    {
+        $idx = $currentArg++;
+
+        return self::argLong($args[$idx], $frame, $idx);
+    }
+
+    /**
+     * @param list<int|float|string|bool|null|Variable> $args
+     */
+    private static function takeArgDouble(array $args, int &$currentArg, ?Frame $frame): float
+    {
+        $idx = $currentArg++;
+
+        return self::argDouble($args[$idx], $frame, $idx);
+    }
+
     private static function argString(mixed $value, ?Frame $frame = null): string
     {
         if ($value instanceof Variable) {
@@ -510,10 +559,11 @@ final class PackEngine
         return (string) $value;
     }
 
-    private static function argLong(mixed $value, ?Frame $frame = null): int
+    private static function argLong(mixed $value, ?Frame $frame = null, int $valueArgIndex = 0): int
     {
         if ($value instanceof Variable) {
             $resolved = $value->resolveIndirect();
+            EnumCaseSupport::packRejectNumericOperand($resolved, $valueArgIndex, 'int');
             $enumLong = EnumCaseSupport::packCoerceToLong($resolved, $frame?->vmContext, $frame);
             if (null !== $enumLong) {
                 return $enumLong;
@@ -552,10 +602,11 @@ final class PackEngine
         return 0;
     }
 
-    private static function argDouble(mixed $value, ?Frame $frame = null): float
+    private static function argDouble(mixed $value, ?Frame $frame = null, int $valueArgIndex = 0): float
     {
         if ($value instanceof Variable) {
             $resolved = $value->resolveIndirect();
+            EnumCaseSupport::packRejectNumericOperand($resolved, $valueArgIndex, 'float');
             $enumDouble = EnumCaseSupport::packCoerceToDouble($resolved, $frame?->vmContext, $frame);
             if (null !== $enumDouble) {
                 return $enumDouble;
