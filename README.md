@@ -56,7 +56,7 @@ make docker-build-22   # once
 ./build/selfhost   # → compiler_minimal bundle OK
 ```
 
-Deeper ladder: [`docs/bootstrap-selfhost.md`](docs/bootstrap-selfhost.md) · [`docs/GETTING-STARTED.md` §6–7](docs/GETTING-STARTED.md) · `make bootstrap-loop-probe` · `./script/north-star5-verify.sh --strict`.
+Deeper ladder: [`docs/bootstrap-selfhost.md`](docs/bootstrap-selfhost.md) · [`docs/GETTING-STARTED.md` §6–7](docs/GETTING-STARTED.md) · `make bootstrap-loop-probe` · `make north-star5-verify-fast` (daily) · `./script/north-star5-verify.sh --strict` (pre-merge).
 
 ### Still open (high signal)
 

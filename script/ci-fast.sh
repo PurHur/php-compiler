@@ -12,6 +12,8 @@
 #   NORTH_STAR2_VERIFY_GATE=0 ./script/ci-fast.sh
 # M3 unit-probe presenter (opt-in; issue #2396, #2360):
 #   NORTH_STAR3_VERIFY_GATE=1 ./script/ci-fast.sh
+# M5 fast prelink presenter (default on; issue #8683). Opt-out:
+#   NORTH_STAR5_VERIFY_FAST_GATE=0 ./script/ci-fast.sh
 # Development status page sync (default on; issue #2083). Opt-out:
 #   DEVELOPMENT_STATUS_SYNC_GATE=0 ./script/ci-fast.sh
 # Bootstrap test subset (opt-in; issue #2069):
@@ -130,6 +132,9 @@ ci_run_north_star2_verify
 
 # M3 unit-probe presenter when opt-in (issue #2396, #2360).
 ci_run_north_star3_verify
+
+# M5 fast prelink presenter (default on; issue #8683). Opt-out: NORTH_STAR5_VERIFY_FAST_GATE=0
+ci_run_north_star5_verify_fast
 
 # Optional bootstrap tail when LLVM 9 present (aot-lint + probe + wave-check; issue #436).
 if [[ "${CI_FAST_BOOTSTRAP:-0}" == "1" ]]; then

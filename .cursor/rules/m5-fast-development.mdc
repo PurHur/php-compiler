@@ -1,0 +1,39 @@
+---
+description: M5 fast development gate — north-star5-verify --fast for daily self-host iteration
+globs:
+  - script/north-star5-verify.sh
+  - script/ci-fast.sh
+  - script/bootstrap-selfhost-vm-driver-execute-probe.sh
+  - Makefile
+---
+
+# M5 fast development gate (#8683)
+
+Use the **fast M5 presenter** for daily self-host / bootstrap iteration (~1–2 min). Reserve `--strict` for pre-merge bootstrap/gen-0/vendor-prelink PRs.
+
+## Commands
+
+```bash
+make north-star5-verify-fast
+./script/north-star5-verify.sh --fast
+NORTH_STAR5_VERIFY_FAST_GATE=1 ./script/ci-fast.sh   # default on
+```
+
+## Fast path checks (read-only)
+
+1. `bootstrap-inventory.php --check`
+2. Live spine N/N + `check-selfhost-spine-coverage-sync.php`
+3. `bootstrap-vendor-objects.php --check`
+4. Prelinked gen-0 + vendor `.o` presence (manifest 3/3 with committed objects)
+5. `bootstrap-selfhost-vm-driver-execute-probe.sh --prelinked-only` (~20ms)
+6. Spine `bundle OK` from `prelinked/bootstrap-gen0/compiler_lib_aot_blob` (no relink)
+
+## Not in fast path
+
+- Full spine relink (`bootstrap-selfhost-lib-spine-smoke`)
+- Vendor AOT `--compile` rebuild
+- `north-star5-verify --strict` (~1h) — still required before merging bootstrap/gen-0 changes
+
+## Opt-out
+
+`NORTH_STAR5_VERIFY_FAST_GATE=0 ./script/ci-fast.sh`

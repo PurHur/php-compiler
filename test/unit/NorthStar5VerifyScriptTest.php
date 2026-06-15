@@ -40,11 +40,23 @@ final class NorthStar5VerifyScriptTest extends TestCase
         $this->assertStringContainsString('bootstrap-spine-count.php', $combined);
         $this->assertStringContainsString('live N/N', $combined);
         $this->assertStringContainsString('--strict', $combined);
+        $this->assertStringContainsString('--fast', $combined);
         $this->assertStringContainsString('#1416', $combined);
         $this->assertStringContainsString('#1492', $combined);
+        $this->assertStringContainsString('#8683', $combined);
     }
 
-    public function testNorthStar5VerifyScriptDocumentsSteps(): void
+    public function testNorthStar5VerifyScriptDocumentsFastPath(): void
+    {
+        $body = (string) file_get_contents(dirname(__DIR__, 2).'/script/north-star5-verify.sh');
+        $this->assertStringContainsString('--fast', $body);
+        $this->assertStringContainsString('FAST_M5', $body);
+        $this->assertStringContainsString('ns5_fast_spine_bundle_ok', $body);
+        $this->assertStringContainsString('--prelinked-only', $body);
+        $this->assertStringContainsString('OK (fast)', $body);
+    }
+
+    public function testNorthStar5VerifyScriptDocumentsStepsLegacy(): void
     {
         $body = (string) file_get_contents(dirname(__DIR__, 2).'/script/north-star5-verify.sh');
         $this->assertStringContainsString('bootstrap-vendor-objects.php', $body);
@@ -60,6 +72,8 @@ final class NorthStar5VerifyScriptTest extends TestCase
     {
         $makefile = (string) file_get_contents(dirname(__DIR__, 2).'/Makefile');
         $this->assertStringContainsString('north-star5-verify:', $makefile);
+        $this->assertStringContainsString('north-star5-verify-fast:', $makefile);
         $this->assertStringContainsString('script/north-star5-verify.sh', $makefile);
+        $this->assertStringContainsString('--fast', $makefile);
     }
 }

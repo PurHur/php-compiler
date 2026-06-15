@@ -809,6 +809,21 @@ ci_run_north_star3_verify() {
   make -C "$_CI_REPO_ROOT" north-star3-verify
 }
 
+# M5 fast prelink presenter in ci-fast (issue #8683); default on — opt-out with NORTH_STAR5_VERIFY_FAST_GATE=0.
+ci_run_north_star5_verify_fast() {
+  if [[ "${NORTH_STAR5_VERIFY_FAST_GATE:-1}" != "1" ]]; then
+    echo "north-star5-verify: skipped (NORTH_STAR5_VERIFY_FAST_GATE=0 opt-out)"
+    return 0
+  fi
+  local ns5_script="$_CI_SCRIPT_DIR/north-star5-verify.sh"
+  if [[ ! -x "$ns5_script" ]]; then
+    echo "north-star5-verify: skipped (script missing — run from repo root)"
+    return 0
+  fi
+  echo "north-star5-verify --fast (NORTH_STAR5_VERIFY_FAST_GATE=1, issue #8683)..."
+  "$ns5_script" --fast
+}
+
 # M4 strict-loop presenter in ci-local LLVM tail (issue #2429, #2379); default off — opt-in with NORTH_STAR4_VERIFY_GATE=1.
 ci_run_north_star4_verify() {
   if [[ "${NORTH_STAR4_VERIFY_GATE:-0}" != "1" ]]; then
