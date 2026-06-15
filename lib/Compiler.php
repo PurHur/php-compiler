@@ -8702,6 +8702,7 @@ class Compiler {
             if (
                 0 === $argIndex
                 && !($producers[0] instanceof Op\Expr\Array_)
+                && !($producers[0] instanceof Op\Expr\ConstFetch)
                 && !$this->isEmbeddedCallLiteralArg($callArgs[0] ?? null)
             ) {
                 return $producers[0];
@@ -8741,6 +8742,7 @@ class Compiler {
             || $op instanceof Op\Expr\ArrayDimFetch
             || $op instanceof Op\Expr\New_
             || $op instanceof Op\Expr\ConstFetch
+            || $op instanceof Op\Expr\ClassConstFetch
             || $op instanceof Op\Expr\FuncCall
             || $op instanceof Op\Expr\NsFuncCall
             || $op instanceof Op\Expr\UnaryMinus
@@ -9960,6 +9962,9 @@ class Compiler {
                 array_unshift($fetches, $child);
 
                 continue;
+            }
+            if ($child instanceof Op\Expr\FuncCall || $child instanceof Op\Expr\NsFuncCall) {
+                break;
             }
             if ($child instanceof Op\Expr && $this->isInlineExprCallArgProducer($child)) {
                 continue;
