@@ -40,8 +40,7 @@ final class PipeOperatorDesugar
                 break;
             }
 
-            $bindAsClosure = self::shouldBindPipeAsClosure($tokens, $lhs['startIdx'], $pipeIdx, $rhs['endIdx']);
-            $replacement = self::rewritePipe($lhs['text'], $rhs['text'], $bindAsClosure);
+            $replacement = self::rewritePipe($lhs['text'], $rhs['text']);
             $code = substr($code, 0, $lhs['start'])
                 . $replacement
                 . substr($code, $rhs['end']);
@@ -638,52 +637,7 @@ final class PipeOperatorDesugar
         }
     }
 
-    /**
-     * When pipe + first-class callable is assigned to a variable, Zend keeps a Closure
-     * with the piped value bound as the first argument (#4943, zend_compile.c).
-     *
-     * Chained pipes and statement/expression contexts still invoke immediately.
-     *
-     * @param array<int, array{0: int, 1: string, 2: int}|string> $tokens
-     */
-    private static function shouldBindPipeAsClosure(array $tokens, int $lhsStartIdx, int $pipeIdx, int $rhsEndIdx): bool
-    {
-        $after = $rhsEndIdx + 1;
-        while ($after < \count($tokens) && self::isIgnorable($tokens[$after])) {
-            ++$after;
-        }
-        if ($after < \count($tokens) && self::isPipeAt($tokens, $after)) {
-            return false;
-        }
-
-        $pos = $lhsStartIdx - 1;
-        self::skipBackwardIgnorable($tokens, $pos);
-        if ($pos < 0 || !\is_string($tokens[$pos]) || '=' !== $tokens[$pos]) {
-            return false;
-        }
-
-        --$pos;
-        self::skipBackwardIgnorable($tokens, $pos);
-        if ($pos < 0 || !\is_array($tokens[$pos]) || \T_VARIABLE !== $tokens[$pos][0]) {
-            return false;
-        }
-
-        --$pos;
-        self::skipBackwardIgnorable($tokens, $pos);
-        if ($pos >= 0) {
-            $token = $tokens[$pos];
-            if (\is_string($token) && '(' === $token) {
-                return false;
-            }
-            if (\is_array($token) && \in_array($token[0], [\T_RETURN, \T_ECHO, \T_PRINT, \T_THROW], true)) {
-                return false;
-            }
-        }
-
-        return true;
-    }
-
-    private static function rewritePipe(string $lhs, string $rhs, bool $bindAsClosure): string
+    private static function rewritePipe(string $lhs, string $rhs): string
     {
         $trimmed = ltrim($rhs);
         if (preg_match('/^\(\s*fn\s*\(/s', $trimmed)) {
@@ -706,12 +660,8 @@ final class PipeOperatorDesugar
         $inner = ltrim($suffix);
         $callee = substr($rhs, 0, $open);
 
-        // First-class callable: func(...) → func($lhs) or bound Closure for assignment (#4943).
+        // First-class callable: func(...) → func($lhs) (zend_compile.c pipe + ZEND_AST_CALLABLE_CONVERT).
         if (preg_match('/^\\.\\.\\.(\\s*\\))/s', $inner, $m)) {
-            if ($bindAsClosure) {
-                return '(fn() => '.$callee.'('.$lhs.'))';
-            }
-
             return $prefix.$lhs.$m[1];
         }
 

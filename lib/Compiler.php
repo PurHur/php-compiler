@@ -8817,7 +8817,7 @@ class Compiler {
             if (
                 null !== $callIndex
                 && null !== $producerIndex
-                && $this->isAdjacentNestedFuncCallProducer($producer, $callOp, $producerIndex, $callIndex)
+                && $this->isNestedCallArgProducerForConsumer($producer, $callOp, $producerIndex, $callIndex, $block->orig->children)
             ) {
                 foreach ($this->compileExpr($producer, $block) as $op) {
                     $block->addOpCode($op);
@@ -8878,7 +8878,7 @@ class Compiler {
             if (
                 null !== $callIndex
                 && null !== $producerIndex
-                && $this->isAdjacentNestedFuncCallProducer($producer, $callOp, $producerIndex, $callIndex)
+                && $this->isNestedCallArgProducerForConsumer($producer, $callOp, $producerIndex, $callIndex, $block->orig->children)
             ) {
                 return $producerSlot;
             }
@@ -9158,6 +9158,15 @@ class Compiler {
             if (!$child instanceof Op\Expr || !$this->isInlineExprCallArgProducer($child)) {
                 break;
             }
+            if (
+                ($child instanceof Op\Expr\ArrowFunction || $child instanceof Op\Expr\Closure)
+                && $callOp instanceof Op\Expr\FuncCall
+                && property_exists($callOp, 'name')
+                && ($callOp->name === $child->result
+                    || $this->operandsReferToSameVariable($callOp->name, $child->result))
+            ) {
+                continue;
+            }
             if ($child instanceof Op\Expr\ConstFetch) {
                 $next = $cfgChildren[$i + 1] ?? null;
                 if (
@@ -9170,11 +9179,17 @@ class Compiler {
             if (
                 ($child instanceof Op\Expr\FuncCall || $child instanceof Op\Expr\NsFuncCall)
                 && !$this->inlineCallArgProducerFeedsConsumer($child, $callOp)
-                && !$this->isAdjacentNestedFuncCallProducer($child, $callOp, $i, $callIndex)
+                && !$this->isNestedCallArgProducerForConsumer($child, $callOp, $i, $callIndex, $cfgChildren)
             ) {
                 break;
             }
             array_unshift($producers, $child);
+            if (
+                ($child instanceof Op\Expr\FuncCall || $child instanceof Op\Expr\NsFuncCall)
+                && $this->isNestedCallArgProducerForConsumer($child, $callOp, $i, $callIndex, $cfgChildren)
+            ) {
+                break;
+            }
             if ($child instanceof Op\Expr\Array_) {
                 break;
             }
@@ -9186,7 +9201,48 @@ class Compiler {
     /**
      * php-cfg `f(g())` may lower to adjacent FuncCalls with distinct result/arg temporaries
      * (`strlen(trim($s))` → trim #6, strlen arg #7) (#8561, bootstrap-aot trim).
+     *
+     * Also `(fn($x) => ...)(g())` where php-cfg inserts the closure callee between nested calls (#8836).
+     *
+     * @param list<Op> $cfgChildren
      */
+    private function isNestedCallArgProducerForConsumer(
+        Op\Expr $producer,
+        Op $consumer,
+        int $producerIndex,
+        int $consumerIndex,
+        array $cfgChildren
+    ): bool {
+        if ($this->isAdjacentNestedFuncCallProducer($producer, $consumer, $producerIndex, $consumerIndex)) {
+            return true;
+        }
+        if ($producerIndex + 2 !== $consumerIndex) {
+            return false;
+        }
+        if (
+            !$producer instanceof Op\Expr\FuncCall
+            && !$producer instanceof Op\Expr\NsFuncCall
+        ) {
+            return false;
+        }
+        if (
+            !$consumer instanceof Op\Expr\FuncCall
+            && !$consumer instanceof Op\Expr\NsFuncCall
+        ) {
+            return false;
+        }
+        $callee = $cfgChildren[$producerIndex + 1] ?? null;
+        if (!$callee instanceof Op\Expr\ArrowFunction && !$callee instanceof Op\Expr\Closure) {
+            return false;
+        }
+        if (!property_exists($consumer, 'name')) {
+            return false;
+        }
+
+        return $consumer->name === $callee->result
+            || $this->operandsReferToSameVariable($consumer->name, $callee->result);
+    }
+
     private function isAdjacentNestedFuncCallProducer(
         Op\Expr $producer,
         Op $consumer,
