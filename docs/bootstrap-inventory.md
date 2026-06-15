@@ -883,7 +883,6 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/standard/VmPhpFilterStream.php` | 0 | 2 |
 | `ext/standard/VmPhpInputOutputStream.php` | 0 | 2 |
 | `ext/standard/VmPhpMemoryStream.php` | 0 | 2 |
-| `ext/standard/VmPhpcRunCommandHost.php` | 0 | 1 |
 | `ext/standard/VmPhpcRunCommandNative.php` | 0 | 1 |
 | `ext/standard/VmPopenNative.php` | 0 | 1 |
 | `ext/standard/VmPreg.php` | 0 | 6 |
@@ -892,6 +891,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/standard/VmPregReplaceCallbackArray.php` | 0 | 5 |
 | `ext/standard/VmProcNiceNative.php` | 0 | 1 |
 | `ext/standard/VmProcess.php` | 0 | 6 |
+| `ext/standard/VmProcessExecCaptureNative.php` | 0 | 1 |
 | `ext/standard/VmProcessIdentity.php` | 0 | 1 |
 | `ext/standard/VmProcessIdentityNative.php` | 0 | 1 |
 | `ext/standard/VmRandom.php` | 0 | 2 |
@@ -8637,11 +8637,6 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new PhpMemoryStreamState (line 36)
 - 17 class method(s)
 
-### `ext/standard/VmPhpcRunCommandHost.php`
-
-**Warnings** (review for bootstrap subset):
-- 1 class method(s)
-
 ### `ext/standard/VmPhpcRunCommandNative.php`
 
 **Warnings** (review for bootstrap subset):
@@ -8695,6 +8690,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new Variable (line 212)
 - new Variable (line 217)
 - 11 class method(s)
+
+### `ext/standard/VmProcessExecCaptureNative.php`
+
+**Warnings** (review for bootstrap subset):
+- 7 class method(s)
 
 ### `ext/standard/VmProcessIdentity.php`
 
