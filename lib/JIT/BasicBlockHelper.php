@@ -88,6 +88,23 @@ final class BasicBlockHelper
         $context->builder->positionAtEnd($after);
     }
 
+    /**
+     * Continue emission in an open block; if the insert block is already sealed, branch to a fresh one.
+     */
+    public static function ensureOpenInsertBlock(Context $context, string $label): void
+    {
+        $insert = $context->builder->getInsertBlock();
+        if (null === $insert) {
+            throw new \LogicException('JIT lowering requires an active basic block');
+        }
+        if (null !== $insert->getTerminator()) {
+            $next = self::append($context, $label);
+            $context->builder->positionAtEnd($insert);
+            $context->builder->branch($next);
+            $context->builder->positionAtEnd($next);
+        }
+    }
+
     public static function entryAlloca(Context $context, Type $type): Value
     {
         $fn = self::parentFunction($context);

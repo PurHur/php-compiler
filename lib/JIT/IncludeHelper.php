@@ -139,9 +139,18 @@ final class IncludeHelper
         $context->inlineIncludeBindingRefreshStack[] = [];
         $bindingRefreshIndex = \count($context->inlineIncludeBindingRefreshStack) - 1;
         $returnHolderOp = new Temporary();
+        $entryBb = $func->appendBasicBlock('include_entry_'.(++self::$includeEntrySerial));
         if (null !== $preIncludeBb) {
-            $context->builder->positionAtEnd($preIncludeBb);
+            if (null !== $preIncludeBb->getTerminator()) {
+                BasicBlockHelper::ensureOpenInsertBlock($context, 'include_pre_cont');
+                $preIncludeBb = $context->builder->getInsertBlock();
+            }
+            if (null === $preIncludeBb->getTerminator()) {
+                $context->builder->positionAtEnd($preIncludeBb);
+                $context->builder->branch($entryBb);
+            }
         }
+        $context->builder->positionAtEnd($entryBb);
         $returnHolder = new Variable(
             $context,
             Variable::TYPE_VALUE,
@@ -158,12 +167,6 @@ final class IncludeHelper
         }
         $context->setVariableOp($returnHolderOp, $returnHolder);
         $context->inlineIncludeReturnOperands[] = $returnHolderOp;
-        $entryBb = $func->appendBasicBlock('include_entry_'.(++self::$includeEntrySerial));
-        if (null !== $preIncludeBb && null === $preIncludeBb->getTerminator()) {
-            $context->builder->positionAtEnd($preIncludeBb);
-            $context->builder->branch($entryBb);
-        }
-        $context->builder->positionAtEnd($entryBb);
         // Best-effort breadcrumb for self-host segfault triage: many bootstrap bundles are pure include
         // spines; record which include boundary we last entered before a fatal crash.
         Progress::emitNativeNote($context, $progressNote);
@@ -231,9 +234,15 @@ final class IncludeHelper
         $bodyBb = $func->appendBasicBlock('include_body_'.(++self::$includeEntrySerial));
         // Bindings may end in copyFromPointer tails; entryBb can already have a terminator (#776).
         $bindTail = $context->builder->getInsertBlock();
-        if (null !== $bindTail && null === $bindTail->getTerminator()) {
-            $context->builder->positionAtEnd($bindTail);
-            $context->builder->branch($bodyBb);
+        if (null !== $bindTail) {
+            if (null !== $bindTail->getTerminator()) {
+                BasicBlockHelper::ensureOpenInsertBlock($context, 'include_bind_cont');
+                $bindTail = $context->builder->getInsertBlock();
+            }
+            if (null === $bindTail->getTerminator()) {
+                $context->builder->positionAtEnd($bindTail);
+                $context->builder->branch($bodyBb);
+            }
         } elseif (null === $entryBb->getTerminator()) {
             $context->builder->positionAtEnd($entryBb);
             $context->builder->branch($bodyBb);
@@ -360,7 +369,7 @@ final class IncludeHelper
             $context->builder->store($owned, $slot);
             $stringVar->addref();
             if (null !== $saved) {
-                $context->builder->positionAtEnd($saved);
+                self::restoreInsertBlock($context, $saved);
             }
 
             return $stringVar;
@@ -382,10 +391,20 @@ final class IncludeHelper
         $context->builder->store($owned, $slot);
         $stringVar->addref();
         if (null !== $saved) {
-            $context->builder->positionAtEnd($saved);
+            self::restoreInsertBlock($context, $saved);
         }
 
         return $stringVar;
+    }
+
+    private static function restoreInsertBlock(Context $context, BasicBlock $block): void
+    {
+        if (null !== $block->getTerminator()) {
+            BasicBlockHelper::ensureOpenInsertBlock($context, 'include_binding_cont');
+
+            return;
+        }
+        $context->builder->positionAtEnd($block);
     }
 
     private static function emitCalleeLocalBinding(
@@ -646,6 +665,9 @@ final class IncludeHelper
         $bb = $context->builder->getInsertBlock();
         if (null === $bb) {
             return;
+        }
+        if (null !== $bb->getTerminator()) {
+            BasicBlockHelper::ensureOpenInsertBlock($context, 'include_refresh_cont');
         }
         foreach ($frame as $entry) {
             [$calleeOp, $prepared, $calleeVar, $compileTimeString] = array_pad($entry, 4, null);

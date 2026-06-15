@@ -281,8 +281,11 @@ class Context {
     /** @var list<string> compile-time included paths for get_included_files() (#3315) */
     public array $jitIncludedFiles = [];
 
-    /** @var array<string, true> require_once dedupe while lowering literal includes (#8559) */
+    /** @var list<string> require_once dedupe while lowering literal includes (#8559) */
     public array $jitAotIncludedCompileDone = [];
+
+    /** Normalized realpath of the outer {main} TU being JIT-compiled (#8559). */
+    public string $jitAotEntryScriptPath = '';
 
     /** Clear per-script local name/ref bindings before lowering a new {main} TU (#4763). */
     public function resetScriptLocalBindings(): void
@@ -374,7 +377,11 @@ class Context {
         );
         $this->builder->store($heapPtr, $global);
         if (null !== $restore) {
-            $this->builder->positionAtEnd($restore);
+            if (null !== $restore->getTerminator()) {
+                BasicBlockHelper::ensureOpenInsertBlock($this, 'script_global_init_cont');
+            } else {
+                $this->builder->positionAtEnd($restore);
+            }
         }
     }
 
@@ -935,6 +942,15 @@ class Context {
         $this->targetData = $this->module->getModuleDataLayout();
     }
 
+    private function sealInitShutdownReturn(\PHPLLVM\BasicBlock $block): void
+    {
+        if (null !== $block->getTerminator()) {
+            return;
+        }
+        $this->builder->positionAtEnd($block);
+        $this->builder->returnVoid();
+    }
+
     private function compileCommon() {
         Progress::noteFunction('jit_context_compile_common_phase_modules_shutdown');
         foreach ($this->modules as $module) {
@@ -945,12 +961,9 @@ class Context {
             $builtin->shutdown();
         }
         Builtin\AttributeRegistryLowering::implementLookupFunctions($this);
-        $this->builder->positionAtEnd($this->initBlock);
-        $this->builder->returnVoid();
-        $this->builder->positionAtEnd($this->shutdownBlock);
-        $this->builder->returnVoid();
-        $this->builder->positionAtEnd($this->headerPreFlushBlock);
-        $this->builder->returnVoid();
+        $this->sealInitShutdownReturn($this->initBlock);
+        $this->sealInitShutdownReturn($this->shutdownBlock);
+        $this->sealInitShutdownReturn($this->headerPreFlushBlock);
 
         if (!is_null($this->debugFile)) {
             $this->module->printToFile($this->debugFile . '.bc');
