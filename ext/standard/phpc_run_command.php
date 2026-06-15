@@ -18,7 +18,7 @@ use PHPLLVM\Value;
  *
  * Replaces proc_open()/stream_get_contents() in lib/AOT/Linker.php for native self-host.
  *
- * VM: {@see VmPhpcRunCommandNative} (popen when env null); env path via {@see VmPhpcRunCommandHost} (#8633).
+ * VM: {@see VmPhpcRunCommandNative} (popen when env null; fork/pipe when env set, #8648).
  */
 final class phpc_run_command extends Internal
 {

@@ -8,7 +8,7 @@ namespace PHPCompiler\ext\standard;
  * VM phpc_run_command() without host process API when env is null (#8633, #2779).
  *
  * Uses libc popen(3) via {@see VmPopenNative} — mirrors JIT {@see ProcessRuntime} capture for simple commands.
- * Env replacement still uses isolated host bridge in {@see VmPhpcRunCommandHost} (follow-up: native fork/pipe ABI).
+ * Env replacement uses {@see VmProcessExecCaptureNative} (fork/pipe/wait; #8648).
  */
 final class VmPhpcRunCommandNative
 {
@@ -26,7 +26,7 @@ final class VmPhpcRunCommandNative
         }
 
         if (null !== $env) {
-            return VmPhpcRunCommandHost::runWithEnv($command, $env);
+            return VmProcessExecCaptureNative::runWithEnv($command, $env);
         }
 
         if (!VmPopenNative::available()) {
