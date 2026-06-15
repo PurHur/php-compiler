@@ -1094,7 +1094,7 @@ class Type extends Builtin {
         $this->context->registerFunction('__phpc_response_headers_flush', $fnPendingFlush);
         $fnSetcookieAdd = $this->context->module->addFunction(
             '__phpc_setcookie_add',
-            $this->context->context->functionType($void, false, $strPtr, $strPtr, $i64, $strPtr, $strPtr, $i32, $i32)
+            $this->context->context->functionType($void, false, $strPtr, $strPtr, $i64, $strPtr, $strPtr, $i32, $i32, $strPtr, $i32)
         );
         $this->context->registerFunction('__phpc_setcookie_add', $fnSetcookieAdd);
         $fntypeSessionApply = $this->context->context->functionType($void, false, $valuePtr);

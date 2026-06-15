@@ -341,6 +341,8 @@ final class SessionStorageRuntime
             $pathStr,
             $strPtr->constNull(),
             $i32->constInt(0, false),
+            $i32->constInt(0, false),
+            $strPtr->constNull(),
             $i32->constInt(0, false)
         );
         $context->builder->branch($bbDone);
