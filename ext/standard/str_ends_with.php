@@ -18,7 +18,6 @@ use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\BuiltinExecute;
 use PHPCompiler\VM\Variable;
-use PHPLLVM\Builder;
 use PHPLLVM\Value;
 
 /**
@@ -47,48 +46,14 @@ final class str_ends_with extends Internal
         );
     }
 
-    public Context $context;
-
     public function call(Context $context, JITVariable ...$args): Value
     {
-        $this->context = $context;
         if (!$this->requireExactJitArgCount($context, $args, 'str_ends_with', 2)) {
             return $context->getTypeFromString('int1')->constInt(0, false);
         }
         $hay = JitStringBuiltinArg::lower($context, $args[0], 'str_ends_with', 0, 'haystack');
         $needle = JitStringBuiltinArg::lower($context, $args[1], 'str_ends_with', 1, 'needle');
-        $hayMap = $context->structFieldMap[$hay->typeOf()->getElementType()->getName()];
-        $needleMap = $context->structFieldMap[$needle->typeOf()->getElementType()->getName()];
-        $hayLen = $context->builder->load($context->builder->structGep($hay, $hayMap['length']));
-        $needleLen = $context->builder->load($context->builder->structGep($needle, $needleMap['length']));
-        $zero = $hayLen->typeOf()->constInt(0, false);
-        $tooLong = $context->builder->icmp(Builder::INT_ULT, $hayLen, $needleLen);
-        $isEmptyNeedle = $context->builder->icmp(Builder::INT_EQ, $needleLen, $zero);
-        $start = $context->builder->sub($hayLen, $needleLen);
-        $hayPtr = $context->builder->structGep($hay, $hayMap['value']);
-        $suffixPtr = $context->builder->gep($hayPtr, $start);
-        $needlePtr = $context->builder->structGep($needle, $needleMap['value']);
-        $compareLen = $context->builder->zExt(
-            $context->builder->trunc(
-                $needleLen,
-                $context->getTypeFromString('int32')
-            ),
-            $context->getTypeFromString('size_t')
-        );
-        $cmp = $context->builder->call(
-            $context->lookupFunction('strncmp'),
-            $suffixPtr,
-            $needlePtr,
-            $compareLen
-        );
-        $cmpZero = $cmp->typeOf()->constInt(0, false);
-        $matches = $context->builder->icmp(Builder::INT_EQ, $cmp, $cmpZero);
-        $ok = $context->builder->and($context->builder->not($tooLong), $matches);
 
-        return $context->builder->select(
-            $isEmptyNeedle,
-            $context->constantFromBool(true),
-            $context->builder->select($tooLong, $context->constantFromBool(false), $ok)
-        );
+        return JitStringSearch::endsWith($context, $hay, $needle);
     }
 }
