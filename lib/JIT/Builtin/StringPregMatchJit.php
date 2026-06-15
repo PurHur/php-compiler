@@ -69,7 +69,9 @@ final class StringPregMatchJit
         '__compiler_preg_last_error',
         '__compiler_preg_last_error_msg',
         '__compiler_preg_match',
+        '__compiler_preg_match_ex',
         '__compiler_preg_match_all',
+        '__compiler_preg_match_all_ex',
         '__compiler_preg_replace',
         '__compiler_preg_replace_callback',
         '__compiler_preg_split',
@@ -109,7 +111,9 @@ final class StringPregMatchJit
         self::implementIfMissing($context, '__compiler_preg_last_error', self::emitLastError(...));
         self::implementIfMissing($context, '__compiler_preg_last_error_msg', self::emitLastErrorMsg(...));
         self::implementIfMissing($context, '__compiler_preg_match', self::emitMatch(...));
+        self::implementIfMissing($context, '__compiler_preg_match_ex', self::emitMatchEx(...));
         self::implementIfMissing($context, '__compiler_preg_match_all', self::emitMatchAll(...));
+        self::implementIfMissing($context, '__compiler_preg_match_all_ex', self::emitMatchAllEx(...));
         self::implementIfMissing($context, '__compiler_preg_replace', self::emitReplace(...));
         self::implementIfMissing($context, '__compiler_preg_replace_callback', self::emitReplaceCallback(...));
         self::implementIfMissing($context, '__compiler_preg_split', self::emitSplit(...));
@@ -207,6 +211,10 @@ final class StringPregMatchJit
             '__compiler_preg_match', '__compiler_preg_match_all' => $context->module->addFunction(
                 $name,
                 $context->context->functionType($i64, false, $strPtr, $strPtr)
+            ),
+            '__compiler_preg_match_ex', '__compiler_preg_match_all_ex' => $context->module->addFunction(
+                $name,
+                $context->context->functionType($i64, false, $strPtr, $strPtr, $valuePtr, $i64, $i64)
             ),
             '__compiler_preg_replace' => $context->module->addFunction(
                 $name,
@@ -2218,6 +2226,746 @@ final class StringPregMatchJit
         $i8p = $context->getTypeFromString('int8*');
 
         return $context->builder->pointerCast($context->constantFromString($text), $i8p);
+    }
+
+    private const PREG_OFFSET_CAPTURE = 256;
+
+    private const PREG_UNMATCHED_AS_NULL = 512;
+
+    private const PREG_PATTERN_ORDER = 1;
+
+    private const PREG_SET_ORDER = 2;
+
+    private static function emitMatchEx(Context $context, LlvmFunction $fn): void
+    {
+        $entry = $fn->appendBasicBlock('cme_entry');
+        $context->builder->positionAtEnd($entry);
+
+        $pattern = $fn->getParam(0);
+        $subject = $fn->getParam(1);
+        $matchesOut = $fn->getParam(2);
+        $flagsArg = $fn->getParam(3);
+        $offsetArg = $fn->getParam(4);
+
+        $i32 = $context->getTypeFromString('int32');
+        $i64 = $context->getTypeFromString('int64');
+        $sizeT = $context->getTypeFromString('size_t');
+        $voidPtr = $context->getTypeFromString('void*');
+        $valuePtr = $context->getTypeFromString('__value__*');
+        $negOneI64 = $i64->constInt(-1, true);
+        $zeroI64 = $i64->constInt(0, false);
+        $oneI64 = $i64->constInt(1, false);
+        $offsetCapture = $context->builder->icmp(
+            Builder::INT_NE,
+            $context->builder->and($flagsArg, $i64->constInt(self::PREG_OFFSET_CAPTURE, false)),
+            $zeroI64
+        );
+        $unmatchedNull = $context->builder->icmp(
+            Builder::INT_NE,
+            $context->builder->and($flagsArg, $i64->constInt(self::PREG_UNMATCHED_AS_NULL, false)),
+            $zeroI64
+        );
+        $startOffset = $context->builder->truncOrBitCast($offsetArg, $sizeT);
+
+        $pregErrorSlot = BasicBlockHelper::entryAlloca($context, $i32);
+        $code = $context->builder->call(
+            $context->lookupFunction('__phpc_preg_compile'),
+            $pattern,
+            $pregErrorSlot
+        );
+        $codeNull = self::isNullI8Ptr($context, $code);
+        $compileFailBb = $fn->appendBasicBlock('cme_compile_fail');
+        $createMdBb = $fn->appendBasicBlock('cme_create_md');
+        $context->builder->branchIf($codeNull, $compileFailBb, $createMdBb);
+
+        $context->builder->positionAtEnd($compileFailBb);
+        $context->builder->call(
+            $context->lookupFunction('__phpc_preg_set_error'),
+            $context->builder->load($pregErrorSlot)
+        );
+        $context->builder->returnValue($negOneI64);
+
+        $context->builder->positionAtEnd($createMdBb);
+        $matchData = $context->builder->call(
+            $context->lookupFunction('pcre2_match_data_create_from_pattern_8'),
+            $code,
+            $voidPtr->constNull()
+        );
+        $mdNull = self::isNullI8Ptr($context, $matchData);
+        $matchBb = $fn->appendBasicBlock('cme_match');
+        $mdFailBb = $fn->appendBasicBlock('cme_md_fail');
+        $context->builder->branchIf($mdNull, $mdFailBb, $matchBb);
+
+        $context->builder->positionAtEnd($mdFailBb);
+        $context->builder->call($context->lookupFunction('pcre2_code_free_8'), $code);
+        $context->builder->call(
+            $context->lookupFunction('__phpc_preg_set_error'),
+            $i32->constInt(self::PHPC_PREG_INTERNAL_ERROR, false)
+        );
+        $context->builder->returnValue($negOneI64);
+
+        $context->builder->positionAtEnd($matchBb);
+        $subj = self::stringData($context, $subject);
+        $subjLen = $context->builder->truncOrBitCast(self::stringLen($context, $subject), $sizeT);
+        $rc = $context->builder->call(
+            $context->lookupFunction('pcre2_match_8'),
+            $code,
+            $subj,
+            $subjLen,
+            $startOffset,
+            $i32->constInt(0, false),
+            $matchData,
+            $voidPtr->constNull()
+        );
+        $isNomatch = $context->builder->icmp(Builder::INT_EQ, $rc, $i32->constInt(self::PCRE2_ERROR_NOMATCH, true));
+        $isError = $context->builder->icmp(Builder::INT_SLT, $rc, $i32->constInt(0, false));
+        $nomatchBb = $fn->appendBasicBlock('cme_nomatch');
+        $matchErrBb = $fn->appendBasicBlock('cme_match_err');
+        $successBb = $fn->appendBasicBlock('cme_success');
+        $checkErrBb = $fn->appendBasicBlock('cme_check_err');
+        $context->builder->branchIf($isNomatch, $nomatchBb, $checkErrBb);
+
+        $context->builder->positionAtEnd($checkErrBb);
+        $context->builder->branchIf($isError, $matchErrBb, $successBb);
+
+        $context->builder->positionAtEnd($nomatchBb);
+        $emptyHt = $context->builder->call($context->lookupFunction('__hashtable__alloc'));
+        $context->builder->call(
+            $context->lookupFunction('__value__writeHashtable'),
+            $matchesOut,
+            $emptyHt
+        );
+        $context->builder->call($context->lookupFunction('pcre2_match_data_free_8'), $matchData);
+        $context->builder->call($context->lookupFunction('pcre2_code_free_8'), $code);
+        $context->builder->call(
+            $context->lookupFunction('__phpc_preg_set_error'),
+            $i32->constInt(self::PHPC_PREG_NO_ERROR, false)
+        );
+        $context->builder->returnValue($zeroI64);
+
+        $context->builder->positionAtEnd($matchErrBb);
+        $context->builder->call($context->lookupFunction('pcre2_match_data_free_8'), $matchData);
+        $context->builder->call($context->lookupFunction('pcre2_code_free_8'), $code);
+        $mapped = $context->builder->call($context->lookupFunction('__phpc_pcre2_error_to_preg'), $rc);
+        $context->builder->call($context->lookupFunction('__phpc_preg_set_error'), $mapped);
+        $context->builder->returnValue($negOneI64);
+
+        $context->builder->positionAtEnd($successBb);
+        $matchesHt = self::buildMatchHashtableWithFlags(
+            $context,
+            $fn,
+            $matchData,
+            $subject,
+            $offsetCapture,
+            $unmatchedNull
+        );
+        $context->builder->call(
+            $context->lookupFunction('__value__writeHashtable'),
+            $matchesOut,
+            $matchesHt
+        );
+        $context->builder->call($context->lookupFunction('pcre2_match_data_free_8'), $matchData);
+        $context->builder->call($context->lookupFunction('pcre2_code_free_8'), $code);
+        $context->builder->call(
+            $context->lookupFunction('__phpc_preg_set_error'),
+            $i32->constInt(self::PHPC_PREG_NO_ERROR, false)
+        );
+        $context->builder->returnValue($oneI64);
+    }
+
+    private static function emitMatchAllEx(Context $context, LlvmFunction $fn): void
+    {
+        $entry = $fn->appendBasicBlock('cmae_entry');
+        $context->builder->positionAtEnd($entry);
+
+        $pattern = $fn->getParam(0);
+        $subject = $fn->getParam(1);
+        $matchesOut = $fn->getParam(2);
+        $flagsArg = $fn->getParam(3);
+        $offsetArg = $fn->getParam(4);
+
+        $i32 = $context->getTypeFromString('int32');
+        $i64 = $context->getTypeFromString('int64');
+        $sizeT = $context->getTypeFromString('size_t');
+        $voidPtr = $context->getTypeFromString('void*');
+        $negOneI64 = $i64->constInt(-1, true);
+        $zeroI64 = $i64->constInt(0, false);
+        $oneI64 = $i64->constInt(1, false);
+        $offsetCapture = $context->builder->icmp(
+            Builder::INT_NE,
+            $context->builder->and($flagsArg, $i64->constInt(self::PREG_OFFSET_CAPTURE, false)),
+            $zeroI64
+        );
+        $setOrder = $context->builder->icmp(
+            Builder::INT_NE,
+            $context->builder->and($flagsArg, $i64->constInt(self::PREG_SET_ORDER, false)),
+            $zeroI64
+        );
+        $startOffsetInit = $context->builder->truncOrBitCast($offsetArg, $sizeT);
+
+        $pregErrorSlot = BasicBlockHelper::entryAlloca($context, $i32);
+        $code = $context->builder->call(
+            $context->lookupFunction('__phpc_preg_compile'),
+            $pattern,
+            $pregErrorSlot
+        );
+        $codeNull = self::isNullI8Ptr($context, $code);
+        $compileFailBb = $fn->appendBasicBlock('cmae_compile_fail');
+        $createMdBb = $fn->appendBasicBlock('cmae_create_md');
+        $context->builder->branchIf($codeNull, $compileFailBb, $createMdBb);
+
+        $context->builder->positionAtEnd($compileFailBb);
+        $context->builder->call(
+            $context->lookupFunction('__phpc_preg_set_error'),
+            $context->builder->load($pregErrorSlot)
+        );
+        $context->builder->returnValue($negOneI64);
+
+        $context->builder->positionAtEnd($createMdBb);
+        $matchData = $context->builder->call(
+            $context->lookupFunction('pcre2_match_data_create_from_pattern_8'),
+            $code,
+            $voidPtr->constNull()
+        );
+        $mdNull = self::isNullI8Ptr($context, $matchData);
+        $initLoopBb = $fn->appendBasicBlock('cmae_init_loop');
+        $mdFailBb = $fn->appendBasicBlock('cmae_md_fail');
+        $context->builder->branchIf($mdNull, $mdFailBb, $initLoopBb);
+
+        $context->builder->positionAtEnd($mdFailBb);
+        $context->builder->call($context->lookupFunction('pcre2_code_free_8'), $code);
+        $context->builder->call(
+            $context->lookupFunction('__phpc_preg_set_error'),
+            $i32->constInt(self::PHPC_PREG_INTERNAL_ERROR, false)
+        );
+        $context->builder->returnValue($negOneI64);
+
+        $context->builder->positionAtEnd($initLoopBb);
+        $subj = self::stringData($context, $subject);
+        $subjLen = $context->builder->truncOrBitCast(self::stringLen($context, $subject), $sizeT);
+        $countSlot = BasicBlockHelper::entryAlloca($context, $i64);
+        $startOffsetSlot = BasicBlockHelper::entryAlloca($context, $sizeT);
+        $rootHt = $context->builder->call($context->lookupFunction('__hashtable__alloc'));
+        $htPtr = $context->getTypeFromString('__hashtable__*');
+        $htPtrPtr = $htPtr->pointerType(0);
+        $maxGroups = 32;
+        $groupSlots = $context->builder->call(
+            $context->lookupFunction('__mm__malloc'),
+            $context->builder->mul(
+                $context->builder->ptrToInt(
+                    $context->builder->gep($htPtrPtr->constNull(), $i32->constInt(1, false)),
+                    $sizeT
+                ),
+                $context->builder->intCast($i64->constInt($maxGroups, false), $sizeT)
+            )
+        );
+        $groupSlotsPtr = $context->builder->pointerCast($groupSlots, $htPtrPtr);
+        for ($gi = 0; $gi < $maxGroups; ++$gi) {
+            $context->builder->store(
+                $htPtr->constNull(),
+                $context->builder->inBoundsGEP($groupSlotsPtr, $i64->constInt($gi, false))
+            );
+        }
+        $context->builder->store($zeroI64, $countSlot);
+        $context->builder->store($startOffsetInit, $startOffsetSlot);
+
+        $loopHead = $fn->appendBasicBlock('cmae_loop_head');
+        $loopBody = $fn->appendBasicBlock('cmae_loop_body');
+        $loopDone = $fn->appendBasicBlock('cmae_loop_done');
+        $context->builder->branch($loopHead);
+
+        $context->builder->positionAtEnd($loopHead);
+        $startOffset = $context->builder->load($startOffsetSlot);
+        $continueLoop = $context->builder->icmp(Builder::INT_ULE, $startOffset, $subjLen);
+        $context->builder->branchIf($continueLoop, $loopBody, $loopDone);
+
+        $context->builder->positionAtEnd($loopBody);
+        $rc = $context->builder->call(
+            $context->lookupFunction('pcre2_match_8'),
+            $code,
+            $subj,
+            $subjLen,
+            $startOffset,
+            $i32->constInt(0, false),
+            $matchData,
+            $voidPtr->constNull()
+        );
+        $isError = $context->builder->icmp(Builder::INT_SLT, $rc, $i32->constInt(0, false));
+        $isNomatch = $context->builder->icmp(Builder::INT_EQ, $rc, $i32->constInt(self::PCRE2_ERROR_NOMATCH, true));
+        $breakBb = $fn->appendBasicBlock('cmae_break');
+        $matchErrBb = $fn->appendBasicBlock('cmae_match_err');
+        $countBb = $fn->appendBasicBlock('cmae_count');
+        $checkNomatchBb = $fn->appendBasicBlock('cmae_check_nomatch');
+        $context->builder->branchIf($isError, $checkNomatchBb, $countBb);
+
+        $context->builder->positionAtEnd($checkNomatchBb);
+        $context->builder->branchIf($isNomatch, $breakBb, $matchErrBb);
+
+        $context->builder->positionAtEnd($breakBb);
+        $context->builder->branch($loopDone);
+
+        $context->builder->positionAtEnd($matchErrBb);
+        $context->builder->call($context->lookupFunction('pcre2_match_data_free_8'), $matchData);
+        $context->builder->call($context->lookupFunction('pcre2_code_free_8'), $code);
+        $mapped = $context->builder->call($context->lookupFunction('__phpc_pcre2_error_to_preg'), $rc);
+        $context->builder->call($context->lookupFunction('__phpc_preg_set_error'), $mapped);
+        $context->builder->returnValue($negOneI64);
+
+        $context->builder->positionAtEnd($countBb);
+        $count = $context->builder->load($countSlot);
+        $context->builder->store($context->builder->addNoSignedWrap($count, $oneI64), $countSlot);
+        self::accumulateMatchAllIteration(
+            $context,
+            $fn,
+            $rootHt,
+            $groupSlotsPtr,
+            $matchData,
+            $subject,
+            $count,
+            $offsetCapture,
+            $setOrder
+        );
+        $ovector = $context->builder->call(
+            $context->lookupFunction('pcre2_get_ovector_pointer_8'),
+            $matchData
+        );
+        $start = $context->builder->load($ovector);
+        $end = $context->builder->load($context->builder->inBoundsGEP($ovector, $sizeT->constInt(1, false)));
+        $samePos = $context->builder->icmp(Builder::INT_EQ, $end, $start);
+        $nextOffset = $context->builder->select(
+            $samePos,
+            $context->builder->add($end, $sizeT->constInt(1, false)),
+            $end
+        );
+        $context->builder->store($nextOffset, $startOffsetSlot);
+        $pastEnd = $context->builder->icmp(Builder::INT_UGT, $nextOffset, $subjLen);
+        $afterAdvanceBb = $fn->appendBasicBlock('cmae_after_advance');
+        $stopBb = $fn->appendBasicBlock('cmae_stop');
+        $context->builder->branchIf($pastEnd, $stopBb, $afterAdvanceBb);
+        $context->builder->positionAtEnd($stopBb);
+        $context->builder->branch($loopDone);
+        $context->builder->positionAtEnd($afterAdvanceBb);
+        $context->builder->branch($loopHead);
+
+        $context->builder->positionAtEnd($loopDone);
+        self::finalizePatternOrderSlots($context, $fn, $rootHt, $groupSlotsPtr, $maxGroups);
+        $context->builder->call($context->lookupFunction('__mm__free'), $groupSlots);
+        $context->builder->call(
+            $context->lookupFunction('__value__writeHashtable'),
+            $matchesOut,
+            $rootHt
+        );
+        $context->builder->call($context->lookupFunction('pcre2_match_data_free_8'), $matchData);
+        $context->builder->call($context->lookupFunction('pcre2_code_free_8'), $code);
+        $context->builder->call(
+            $context->lookupFunction('__phpc_preg_set_error'),
+            $i32->constInt(self::PHPC_PREG_NO_ERROR, false)
+        );
+        $context->builder->returnValue($context->builder->load($countSlot));
+    }
+
+    private static function accumulateMatchAllIteration(
+        Context $context,
+        LlvmFunction $fn,
+        Value $rootHt,
+        Value $groupSlotsPtr,
+        Value $matchData,
+        Value $subject,
+        Value $matchIndex,
+        Value $offsetCapture,
+        Value $setOrder
+    ): void {
+        $setOrderBb = $fn->appendBasicBlock('cmae_iter_set_'.(++self::$blockSuffix));
+        $patternBb = $fn->appendBasicBlock('cmae_iter_pattern_'.self::$blockSuffix);
+        $afterBb = $fn->appendBasicBlock('cmae_iter_after_'.self::$blockSuffix);
+        $context->builder->branchIf($setOrder, $setOrderBb, $patternBb);
+
+        $context->builder->positionAtEnd($setOrderBb);
+        $oneMatchHt = self::buildMatchHashtableWithFlags(
+            $context,
+            $fn,
+            $matchData,
+            $subject,
+            $offsetCapture,
+            $context->getTypeFromString('int1')->constInt(0, false)
+        );
+        $sizeT = $context->getTypeFromString('size_t');
+        $context->builder->call(
+            $context->lookupFunction('__hashtable__setHashtableAt'),
+            $rootHt,
+            $context->builder->truncOrBitCast($matchIndex, $sizeT),
+            $oneMatchHt
+        );
+        $context->builder->branch($afterBb);
+
+        $context->builder->positionAtEnd($patternBb);
+        self::appendPatternOrderGroups(
+            $context,
+            $fn,
+            $groupSlotsPtr,
+            $matchData,
+            $subject,
+            $offsetCapture
+        );
+        $context->builder->branch($afterBb);
+
+        $context->builder->positionAtEnd($afterBb);
+    }
+
+    private static function appendPatternOrderGroups(
+        Context $context,
+        LlvmFunction $fn,
+        Value $groupSlotsPtr,
+        Value $matchData,
+        Value $subject,
+        Value $offsetCapture
+    ): void {
+        $i32 = $context->getTypeFromString('int32');
+        $i64 = $context->getTypeFromString('int64');
+        $sizeT = $context->getTypeFromString('size_t');
+        $htPtr = $context->getTypeFromString('__hashtable__*');
+        $groupCount = $context->builder->call(
+            $context->lookupFunction('pcre2_get_ovector_count_8'),
+            $matchData
+        );
+        $ovector = $context->builder->call(
+            $context->lookupFunction('pcre2_get_ovector_pointer_8'),
+            $matchData
+        );
+        $giSlot = BasicBlockHelper::entryAlloca($context, $i32);
+        $context->builder->store($i32->constInt(0, false), $giSlot);
+        $gHead = $fn->appendBasicBlock('cmae_pg_head_'.(++self::$blockSuffix));
+        $gBody = $fn->appendBasicBlock('cmae_pg_body_'.self::$blockSuffix);
+        $gDone = $fn->appendBasicBlock('cmae_pg_done_'.self::$blockSuffix);
+        $context->builder->branch($gHead);
+
+        $context->builder->positionAtEnd($gHead);
+        $gi = $context->builder->load($giSlot);
+        $more = $context->builder->icmp(Builder::INT_SLT, $gi, $groupCount);
+        $context->builder->branchIf($more, $gBody, $gDone);
+
+        $context->builder->positionAtEnd($gBody);
+        $gi64 = $context->builder->sext($gi, $i64);
+        $slotPtr = $context->builder->inBoundsGEP($groupSlotsPtr, $gi64);
+        $slotHt = $context->builder->load($slotPtr);
+        $slotNull = self::isNullI8Ptr($context, $slotHt);
+        $allocBb = $fn->appendBasicBlock('cmae_pg_alloc_'.self::$blockSuffix);
+        $useBb = $fn->appendBasicBlock('cmae_pg_use_'.self::$blockSuffix);
+        $mergeBb = $fn->appendBasicBlock('cmae_pg_merge_'.self::$blockSuffix);
+        $context->builder->branchIf($slotNull, $allocBb, $useBb);
+
+        $context->builder->positionAtEnd($allocBb);
+        $newHt = $context->builder->call($context->lookupFunction('__hashtable__alloc'));
+        $context->builder->store($newHt, $slotPtr);
+        $allocEnd = $context->builder->getInsertBlock();
+        $context->builder->branch($mergeBb);
+
+        $context->builder->positionAtEnd($useBb);
+        $useEnd = $context->builder->getInsertBlock();
+        $context->builder->branch($mergeBb);
+
+        $context->builder->positionAtEnd($mergeBb);
+        $groupHt = $context->builder->phi($htPtr);
+        $groupHt->addIncoming($newHt, $allocEnd);
+        $groupHt->addIncoming($slotHt, $useEnd);
+        $entryIndex = $context->builder->call(
+            $context->lookupFunction('__hashtable__getNumElements'),
+            $groupHt
+        );
+        $pairBase = $context->builder->mul($gi64, $i64->constInt(2, false));
+        $start = $context->builder->load(
+            $context->builder->inBoundsGEP($ovector, $context->builder->truncOrBitCast($pairBase, $sizeT))
+        );
+        $end = $context->builder->load(
+            $context->builder->inBoundsGEP(
+                $ovector,
+                $context->builder->truncOrBitCast($context->builder->add($pairBase, $i64->constInt(1, false)), $sizeT)
+            )
+        );
+        $valid = $context->builder->and(
+            $context->builder->icmp(Builder::INT_SGE, $start, $sizeT->constInt(0, false)),
+            $context->builder->icmp(Builder::INT_SGE, $end, $sizeT->constInt(0, false))
+        );
+        $pieceLen = $context->builder->sub($end, $start);
+        $pieceStr = self::sliceSubjectToString($context, $fn, $subject, $start, $pieceLen);
+        $offsetBb = $fn->appendBasicBlock('cmae_pg_offset_'.self::$blockSuffix);
+        $plainBb = $fn->appendBasicBlock('cmae_pg_plain_'.self::$blockSuffix);
+        $storeDoneBb = $fn->appendBasicBlock('cmae_pg_store_done_'.self::$blockSuffix);
+        $context->builder->branchIf($offsetCapture, $offsetBb, $plainBb);
+
+        $context->builder->positionAtEnd($offsetBb);
+        $pairHt = $context->builder->call($context->lookupFunction('__hashtable__alloc'));
+        $unmatchedBb = $fn->appendBasicBlock('cmae_pg_unmatched_'.self::$blockSuffix);
+        $matchedBb = $fn->appendBasicBlock('cmae_pg_matched_'.self::$blockSuffix);
+        $pairDoneBb = $fn->appendBasicBlock('cmae_pg_pair_done_'.self::$blockSuffix);
+        $context->builder->branchIf($valid, $matchedBb, $unmatchedBb);
+
+        $context->builder->positionAtEnd($unmatchedBb);
+        $context->builder->call(
+            $context->lookupFunction('__hashtable__setNullAt'),
+            $pairHt,
+            $sizeT->constInt(0, false)
+        );
+        $context->builder->call(
+            $context->lookupFunction('__hashtable__setLongAt'),
+            $pairHt,
+            $sizeT->constInt(1, false),
+            $i64->constInt(-1, true)
+        );
+        $context->builder->branch($pairDoneBb);
+
+        $context->builder->positionAtEnd($matchedBb);
+        $context->builder->call(
+            $context->lookupFunction('__hashtable__setStringAt'),
+            $pairHt,
+            $sizeT->constInt(0, false),
+            $pieceStr
+        );
+        $context->builder->call(
+            $context->lookupFunction('__hashtable__setLongAt'),
+            $pairHt,
+            $sizeT->constInt(1, false),
+            $context->builder->sext($start, $i64)
+        );
+        $context->builder->branch($pairDoneBb);
+
+        $context->builder->positionAtEnd($pairDoneBb);
+        $context->builder->call(
+            $context->lookupFunction('__hashtable__setHashtableAt'),
+            $groupHt,
+            $entryIndex,
+            $pairHt
+        );
+        $context->builder->branch($storeDoneBb);
+
+        $context->builder->positionAtEnd($plainBb);
+        $context->builder->call(
+            $context->lookupFunction('__hashtable__setStringAt'),
+            $groupHt,
+            $entryIndex,
+            $pieceStr
+        );
+        $context->builder->branch($storeDoneBb);
+
+        $context->builder->positionAtEnd($storeDoneBb);
+        $context->builder->store($context->builder->add($gi, $i32->constInt(1, false)), $giSlot);
+        $context->builder->branch($gHead);
+
+        $context->builder->positionAtEnd($gDone);
+    }
+
+    private static function finalizePatternOrderSlots(
+        Context $context,
+        LlvmFunction $fn,
+        Value $rootHt,
+        Value $groupSlotsPtr,
+        int $maxGroups
+    ): void {
+        $i64 = $context->getTypeFromString('int64');
+        $sizeT = $context->getTypeFromString('size_t');
+        $htPtr = $context->getTypeFromString('__hashtable__*');
+        for ($gi = 0; $gi < $maxGroups; ++$gi) {
+            $slotHt = $context->builder->load(
+                $context->builder->inBoundsGEP($groupSlotsPtr, $i64->constInt($gi, false))
+            );
+            $slotNull = self::isNullI8Ptr($context, $slotHt);
+            $skipBb = $fn->appendBasicBlock('cmae_fin_skip_'.$gi.'_'.(++self::$blockSuffix));
+            $storeBb = $fn->appendBasicBlock('cmae_fin_store_'.$gi.'_'.self::$blockSuffix);
+            $afterBb = $fn->appendBasicBlock('cmae_fin_after_'.$gi.'_'.self::$blockSuffix);
+            $context->builder->branchIf($slotNull, $skipBb, $storeBb);
+            $context->builder->positionAtEnd($storeBb);
+            $context->builder->call(
+                $context->lookupFunction('__hashtable__setHashtableAt'),
+                $rootHt,
+                $sizeT->constInt($gi, false),
+                $slotHt
+            );
+            $context->builder->branch($afterBb);
+            $context->builder->positionAtEnd($skipBb);
+            $context->builder->branch($afterBb);
+            $context->builder->positionAtEnd($afterBb);
+        }
+    }
+
+    private static function buildMatchHashtableWithFlags(
+        Context $context,
+        LlvmFunction $fn,
+        Value $matchData,
+        Value $subject,
+        Value $offsetCapture,
+        Value $unmatchedNull
+    ): Value {
+        $i32 = $context->getTypeFromString('int32');
+        $i64 = $context->getTypeFromString('int64');
+        $sizeT = $context->getTypeFromString('size_t');
+
+        $ht = $context->builder->call($context->lookupFunction('__hashtable__alloc'));
+        $count = $context->builder->call(
+            $context->lookupFunction('pcre2_get_ovector_count_8'),
+            $matchData
+        );
+        $ovector = $context->builder->call(
+            $context->lookupFunction('pcre2_get_ovector_pointer_8'),
+            $matchData
+        );
+
+        $idxSlot = BasicBlockHelper::entryAlloca($context, $i32);
+        $context->builder->store($i32->constInt(0, false), $idxSlot);
+        $loopHead = $fn->appendBasicBlock('bmf_loop_head_'.(++self::$blockSuffix));
+        $loopBody = $fn->appendBasicBlock('bmf_loop_body_'.self::$blockSuffix);
+        $loopDone = $fn->appendBasicBlock('bmf_loop_done_'.self::$blockSuffix);
+        $context->builder->branch($loopHead);
+
+        $context->builder->positionAtEnd($loopHead);
+        $idx = $context->builder->load($idxSlot);
+        $continueLoop = $context->builder->icmp(Builder::INT_SLT, $idx, $count);
+        $context->builder->branchIf($continueLoop, $loopBody, $loopDone);
+
+        $context->builder->positionAtEnd($loopBody);
+        $idx64 = $context->builder->sext($idx, $i64);
+        $pairBase = $context->builder->mul($idx64, $i64->constInt(2, false));
+        $start = $context->builder->load(
+            $context->builder->inBoundsGEP($ovector, $context->builder->truncOrBitCast($pairBase, $sizeT))
+        );
+        $end = $context->builder->load(
+            $context->builder->inBoundsGEP(
+                $ovector,
+                $context->builder->truncOrBitCast($context->builder->add($pairBase, $i64->constInt(1, false)), $sizeT)
+            )
+        );
+        $valid = $context->builder->and(
+            $context->builder->icmp(Builder::INT_SGE, $start, $sizeT->constInt(0, false)),
+            $context->builder->icmp(Builder::INT_SGE, $end, $sizeT->constInt(0, false))
+        );
+        $matchedBb = $fn->appendBasicBlock('bmf_matched_'.self::$blockSuffix);
+        $emptyBb = $fn->appendBasicBlock('bmf_empty_'.self::$blockSuffix);
+        $afterBb = $fn->appendBasicBlock('bmf_after_'.self::$blockSuffix);
+        $context->builder->branchIf($valid, $matchedBb, $emptyBb);
+
+        $context->builder->positionAtEnd($matchedBb);
+        $pieceLen = $context->builder->sub($end, $start);
+        $pieceStr = self::sliceSubjectToString($context, $fn, $subject, $start, $pieceLen);
+        $matchedEnd = $context->builder->getInsertBlock();
+        $context->builder->branch($afterBb);
+
+        $context->builder->positionAtEnd($emptyBb);
+        $emptyPiece = self::sliceSubjectToString(
+            $context,
+            $fn,
+            $subject,
+            $sizeT->constInt(0, false),
+            $sizeT->constInt(0, false)
+        );
+        $emptyEnd = $context->builder->getInsertBlock();
+        $context->builder->branch($afterBb);
+
+        $context->builder->positionAtEnd($afterBb);
+        $piecePhi = $context->builder->phi($pieceStr->typeOf());
+        $piecePhi->addIncoming($pieceStr, $matchedEnd);
+        $piecePhi->addIncoming($emptyPiece, $emptyEnd);
+        $validPhi = $context->builder->phi($valid->typeOf());
+        $validPhi->addIncoming($valid, $matchedEnd);
+        $validPhi->addIncoming($valid, $emptyEnd);
+        $index = $context->builder->truncOrBitCast($idx64, $sizeT);
+
+        $offsetBb = $fn->appendBasicBlock('bmf_offset_'.self::$blockSuffix);
+        $plainBb = $fn->appendBasicBlock('bmf_plain_'.self::$blockSuffix);
+        $storeDoneBb = $fn->appendBasicBlock('bmf_store_done_'.self::$blockSuffix);
+        $context->builder->branchIf($offsetCapture, $offsetBb, $plainBb);
+
+        $context->builder->positionAtEnd($offsetBb);
+        $pairHt = $context->builder->call($context->lookupFunction('__hashtable__alloc'));
+        $unmatchedBb = $fn->appendBasicBlock('bmf_unmatched_'.self::$blockSuffix);
+        $matchedStoreBb = $fn->appendBasicBlock('bmf_matched_store_'.self::$blockSuffix);
+        $pairMergeBb = $fn->appendBasicBlock('bmf_pair_merge_'.self::$blockSuffix);
+        $context->builder->branchIf($validPhi, $matchedStoreBb, $unmatchedBb);
+
+        $context->builder->positionAtEnd($unmatchedBb);
+        $context->builder->call(
+            $context->lookupFunction('__hashtable__setNullAt'),
+            $pairHt,
+            $sizeT->constInt(0, false)
+        );
+        $context->builder->call(
+            $context->lookupFunction('__hashtable__setLongAt'),
+            $pairHt,
+            $sizeT->constInt(1, false),
+            $i64->constInt(-1, true)
+        );
+        $unmatchedEnd = $context->builder->getInsertBlock();
+        $context->builder->branch($pairMergeBb);
+
+        $context->builder->positionAtEnd($matchedStoreBb);
+        $context->builder->call(
+            $context->lookupFunction('__hashtable__setStringAt'),
+            $pairHt,
+            $sizeT->constInt(0, false),
+            $piecePhi
+        );
+        $context->builder->call(
+            $context->lookupFunction('__hashtable__setLongAt'),
+            $pairHt,
+            $sizeT->constInt(1, false),
+            $context->builder->sext($start, $i64)
+        );
+        $matchedStoreEnd = $context->builder->getInsertBlock();
+        $context->builder->branch($pairMergeBb);
+
+        $context->builder->positionAtEnd($pairMergeBb);
+        $context->builder->call(
+            $context->lookupFunction('__hashtable__setHashtableAt'),
+            $ht,
+            $index,
+            $pairHt
+        );
+        $context->builder->branch($storeDoneBb);
+
+        $context->builder->positionAtEnd($plainBb);
+        $nullPlainBb = $fn->appendBasicBlock('bmf_null_plain_'.self::$blockSuffix);
+        $emptyPlainBb = $fn->appendBasicBlock('bmf_empty_plain_'.self::$blockSuffix);
+        $strPlainBb = $fn->appendBasicBlock('bmf_str_plain_'.self::$blockSuffix);
+        $plainCheckBb = $fn->appendBasicBlock('bmf_plain_check_'.self::$blockSuffix);
+        $context->builder->branchIf($validPhi, $strPlainBb, $plainCheckBb);
+
+        $context->builder->positionAtEnd($plainCheckBb);
+        $context->builder->branchIf($unmatchedNull, $nullPlainBb, $emptyPlainBb);
+
+        $context->builder->positionAtEnd($nullPlainBb);
+        $context->builder->call(
+            $context->lookupFunction('__hashtable__setNullAt'),
+            $ht,
+            $index
+        );
+        $nullPlainEnd = $context->builder->getInsertBlock();
+        $context->builder->branch($storeDoneBb);
+
+        $context->builder->positionAtEnd($emptyPlainBb);
+        $context->builder->call(
+            $context->lookupFunction('__hashtable__setStringAt'),
+            $ht,
+            $index,
+            $piecePhi
+        );
+        $emptyPlainEnd = $context->builder->getInsertBlock();
+        $context->builder->branch($storeDoneBb);
+
+        $context->builder->positionAtEnd($strPlainBb);
+        $context->builder->call(
+            $context->lookupFunction('__hashtable__setStringAt'),
+            $ht,
+            $index,
+            $piecePhi
+        );
+        $strPlainEnd = $context->builder->getInsertBlock();
+        $context->builder->branch($storeDoneBb);
+
+        $context->builder->positionAtEnd($storeDoneBb);
+        $context->builder->store($context->builder->add($idx, $i32->constInt(1, false)), $idxSlot);
+        $context->builder->branch($loopHead);
+
+        $context->builder->positionAtEnd($loopDone);
+
+        return $ht;
     }
 
     private static function registerLinkedRuntime(Context $context): void
