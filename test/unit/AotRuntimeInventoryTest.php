@@ -38,12 +38,22 @@ final class AotRuntimeInventoryTest extends TestCase
     {
         $linker = (string) file_get_contents($this->repoRoot.'/lib/AOT/Linker.php');
         $this->assertStringContainsString("'/runtime/phpc_progress.c'", $linker);
+        $this->assertStringContainsString("'phpc_progress.c'", $linker);
 
         if (!preg_match('/private const RUNTIME_C_SOURCES = \[(.*?)\];/s', $linker, $m)) {
             $this->fail('Linker::RUNTIME_C_SOURCES not found');
         }
         $block = $m[1];
         $this->assertStringNotContainsString('.c', preg_replace('/phpc_progress\.c/', '', $block) ?? $block);
+    }
+
+    /** Bundled LLVM sysroot may ship stdio.h without stddef.h — layer host -isystem on sysroot (#1492). */
+    public function testLinkerRuntimeCIncludeFlagsLayerHostOnSysroot(): void
+    {
+        $linker = (string) file_get_contents($this->repoRoot.'/lib/AOT/Linker.php');
+        $this->assertStringContainsString('runtimeCHostLibcIncludeFlags()', $linker);
+        $this->assertStringContainsString('$hostFlags = self::runtimeCHostLibcIncludeFlags()', $linker);
+        $this->assertStringContainsString("return \$flags.\$hostFlags", $linker);
     }
 
     public function testNoJitBuiltinCRuntimeSources(): void

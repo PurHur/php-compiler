@@ -38,7 +38,9 @@ final class StringPregMatchRuntimeStandaloneTest extends TestCase
 
         foreach ([
             '__compiler_preg_match',
+            '__compiler_preg_match_ex',
             '__compiler_preg_match_all',
+            '__compiler_preg_match_all_ex',
             '__compiler_preg_replace',
             '__compiler_preg_replace_callback',
             '__compiler_preg_split',

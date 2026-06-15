@@ -26,5 +26,9 @@ final class GetDebugTypeBuiltinTest extends BaseTest
             __DIR__.'/../compliance/cases/language/get_debug_type_enum.phpt',
             'get_debug_type_enum.phpt'
         );
+        yield 'get_debug_type_enum_stdlib.phpt' => self::parsePHPT(
+            __DIR__.'/../compliance/cases/stdlib/get_debug_type_enum.phpt',
+            'get_debug_type_enum_stdlib.phpt'
+        );
     }
 }

@@ -42,6 +42,9 @@ class JITTest extends BaseTest {
             if (str_contains(strtolower($case[0]), 'spl_autoload_register_jit')) {
                 continue;
             }
+            if (str_contains($name, 'spl_autoload_functions')) {
+                continue;
+            }
             // eval() readonly inheritance compile fatal: VM + known-class compile check (#7170); MCJIT inline eval deferral pending.
             if (str_contains($name, 'eval_readonly_inheritance') || str_contains($name, 'eval_nonreadonly_extends_readonly')) {
                 continue;

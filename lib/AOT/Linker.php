@@ -76,8 +76,9 @@ final class Linker
         }
     }
 
-    /** Runtime units that need host libc headers (glob/scandir; llvm sysroot lacks linux/limits.h). */
+    /** Runtime units that need host libc headers layered on the LLVM sysroot (incomplete headers). */
     private const RUNTIME_HOST_LIBC_BASENAMES = [
+        'phpc_progress.c',
     ];
 
     private static function which(string $binary): ?string
@@ -309,15 +310,20 @@ final class Linker
 
     private static function runtimeCIncludeFlags(): string
     {
+        $flags = '';
         $llvmDir = getenv('PHP_COMPILER_LLVM_PATH');
         if (false !== $llvmDir && '' !== $llvmDir) {
             $sysroot = $llvmDir.'/sysroot';
             if (is_file($sysroot.'/usr/include/stdio.h')) {
-                return ' --sysroot='.escapeshellarg($sysroot);
+                $flags = ' --sysroot='.escapeshellarg($sysroot);
             }
         }
+        $hostFlags = self::runtimeCHostLibcIncludeFlags();
+        if ('' !== $hostFlags) {
+            return $flags.$hostFlags;
+        }
 
-        return self::runtimeCHostLibcIncludeFlags();
+        return '' !== $flags ? $flags : self::runtimeCHostLibcIncludeFlags();
     }
 
     private static function runtimeCHostLibcIncludeFlags(): string

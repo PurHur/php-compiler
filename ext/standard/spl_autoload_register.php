@@ -97,7 +97,9 @@ final class spl_autoload_register extends Internal
         if (!SplAutoloadCallbackPolicy::isJitLowerable($args[0])) {
             throw new \LogicException(SplAutoloadCallbackPolicy::jitRejectionMessage());
         }
-        $this->jitString($context, $args[0], 'spl_autoload_register() callback');
+        if (null === $args[0]->closureCall) {
+            $this->jitString($context, $args[0], 'spl_autoload_register() callback');
+        }
         $prependArg = 3 === $argc ? $args[2] : null;
         if (null !== $prependArg
             && JITVariable::TYPE_NATIVE_LONG !== $prependArg->type

@@ -17,7 +17,7 @@ use PHPCompiler\JIT\SplAutoloadCallbackPolicy;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Value;
 
-/** LLVM lowering helpers for spl_autoload_register() / spl_autoload_unregister() (#1776, #2441, #5300, #4744, #3580). */
+/** LLVM lowering helpers for spl_autoload_register() / spl_autoload_unregister() (#1776, #2441, #5300, #4744, #3580, #3534). */
 final class JitSplAutoload
 {
     /** @var array<string, Value> per-module autoload shims */
@@ -157,6 +157,9 @@ final class JitSplAutoload
         if (null === $name) {
             throw new \LogicException(SplAutoloadCallbackPolicy::jitRejectionMessage());
         }
+        if ('spl_autoload' === $name) {
+            return self::defaultAutoloadShim($context);
+        }
         if (!$context->functionIsRegistered($name)) {
             throw new \LogicException(
                 "spl_autoload_register() callback '{$name}' is not a defined function in this compile unit"
@@ -208,6 +211,47 @@ final class JitSplAutoload
         );
 
         $context->builder->call($userFn->function, $classStr);
+        $context->builder->returnValue($i32->constInt(1, false));
+        $context->builder->positionAtEnd($resumeBlock);
+
+        self::$autoloadShims[$cacheKey] = $shimFn;
+
+        return $shimFn;
+    }
+
+    private static function defaultAutoloadShim(Context $context): Value
+    {
+        $moduleKey = spl_object_hash($context->module);
+        $cacheKey = $moduleKey.'::spl::default';
+        if (isset(self::$autoloadShims[$cacheKey])) {
+            return self::$autoloadShims[$cacheKey];
+        }
+
+        $i32 = $context->getTypeFromString('int32');
+        $i8p = $context->getTypeFromString('int8*');
+        $sizeT = $context->getTypeFromString('size_t');
+        $cbFnTy = $context->context->functionType($i32, false, $i8p, $sizeT);
+
+        $shimName = '__spl_autoload_default_shim';
+        $shimFn = $context->module->addFunction($shimName, $cbFnTy);
+        $context->registerFunction($shimName, $shimFn);
+
+        $resumeBlock = $context->builder->getInsertBlock();
+        $entry = $shimFn->appendBasicBlock('entry');
+        $context->builder->positionAtEnd($entry);
+
+        $classPtr = $shimFn->getParam(0);
+        $classLen = $shimFn->getParam(1);
+        $i64 = $context->getTypeFromString('int64');
+        $classStr = $context->builder->call(
+            $context->lookupFunction('__string__init'),
+            $context->builder->trunc($classLen, $i64),
+            $classPtr
+        );
+        $context->builder->call(
+            $context->lookupFunction('spl_autoload'),
+            $classStr
+        );
         $context->builder->returnValue($i32->constInt(1, false));
         $context->builder->positionAtEnd($resumeBlock);
 

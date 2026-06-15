@@ -68,16 +68,6 @@ final class preg_match_all extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        if (2 !== \count($args)) {
-            throw new \LogicException(
-                'preg_match_all() in JIT/AOT supports exactly two arguments (no $matches, flags, or offset) in this compiler build'
-            );
-        }
-
-        return JitPregMatchAll::invoke(
-            $context,
-            JitStringBuiltinArg::lower($context, $args[0], 'preg_match_all', 0, 'pattern'),
-            JitStringBuiltinArg::lower($context, $args[1], 'preg_match_all', 1, 'subject')
-        );
+        return JitPregMatchAllEx::invoke($context, ...$args);
     }
 }
