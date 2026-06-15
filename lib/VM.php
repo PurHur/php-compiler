@@ -4985,11 +4985,15 @@ restart:
                         }
                         $ht = $result->toArray();
                         if (is_null($op->arg3)) {
-                            $ht->append($this->materializeArrayElementForStorage($frame->scope[$op->arg2]));
+                            $ht->append($this->materializeArrayElementForStorage(
+                                $this->resolveOutgoingCallArgValue($frame, $op->arg2)
+                            ));
                             break;
                         }
-                        $key = $frame->scope[$op->arg3]->resolveIndirect();
-                        $value = $this->materializeArrayElementForStorage($frame->scope[$op->arg2]);
+                        $key = $this->resolveOutgoingCallArgValue($frame, $op->arg3)->resolveIndirect();
+                        $value = $this->materializeArrayElementForStorage(
+                            $this->resolveOutgoingCallArgValue($frame, $op->arg2)
+                        );
                         if ($key->is(Variable::TYPE_OBJECT) || $key->is(Variable::TYPE_ARRAY)) {
                             throw new \TypeError('Illegal offset type');
                         }
@@ -9631,24 +9635,50 @@ restart:
     }
 
     /**
-     * Resolve a call argument slot — use compile-time constants when scope is still unset (#5933).
+     * Resolve an operand slot — use compile-time constants when scope is unset or clobbered (#5933, #5636).
      */
     private function resolveOutgoingCallArgValue(Frame $frame, int $slot): Variable
     {
+        $const = null;
+        if (null !== $frame->block && isset($frame->block->constants[$slot])) {
+            $const = $frame->block->constants[$slot];
+        }
         if (isset($frame->scope[$slot])) {
             $resolved = $frame->scope[$slot]->resolveIndirect();
-            if (Variable::TYPE_NULL !== $resolved->type) {
-                return $frame->scope[$slot];
+            if (Variable::TYPE_NULL !== $resolved->type && !$resolved->isUndefined()) {
+                if (null !== $const && $this->isImmortalEnumCaseBlockConstant($const)) {
+                    if (!VM\EnumCaseSupport::isEnumCaseVariable($resolved)) {
+                        $value = new Variable();
+                        $value->copyFrom($const);
+
+                        return $value;
+                    }
+
+                    return $frame->scope[$slot];
+                }
+                if (null === $const || $resolved->type === $const->type) {
+                    return $frame->scope[$slot];
+                }
             }
         }
-        if (null !== $frame->block && isset($frame->block->constants[$slot])) {
+        if (null !== $const) {
             $value = new Variable();
-            $value->copyFrom($frame->block->constants[$slot]);
+            $value->copyFrom($const);
 
             return $value;
         }
 
         return $frame->scope[$slot];
+    }
+
+    private function isImmortalEnumCaseBlockConstant(Variable $const): bool
+    {
+        if (Variable::TYPE_ENUM_CASE === $const->type) {
+            return true;
+        }
+
+        return Variable::TYPE_OBJECT === $const->type
+            && VM\EnumCaseSupport::isEnumCaseVariable($const);
     }
 
     /**
@@ -11926,12 +11956,12 @@ restart:
                 $result = $frame->scope[$op->arg1];
                 $ht = $result->toArray();
                 if (is_null($op->arg3)) {
-                    $ht->append($frame->scope[$op->arg2]);
+                    $ht->append($this->resolveOutgoingCallArgValue($frame, $op->arg2));
 
                     break;
                 }
-                $key = $frame->scope[$op->arg3]->resolveIndirect();
-                $value = $frame->scope[$op->arg2];
+                $key = $this->resolveOutgoingCallArgValue($frame, $op->arg3)->resolveIndirect();
+                $value = $this->resolveOutgoingCallArgValue($frame, $op->arg2);
                 if ($key->is(Variable::TYPE_OBJECT) || $key->is(Variable::TYPE_ARRAY)) {
                     throw new \TypeError('Illegal offset type');
                 }
