@@ -9643,7 +9643,10 @@ restart:
             $resolved = $frame->scope[$slot]->resolveIndirect();
             if (Variable::TYPE_NULL !== $resolved->type && !$resolved->isUndefined()) {
                 if (null !== $const && $this->isImmortalEnumCaseBlockConstant($const)) {
-                    if (!VM\EnumCaseSupport::isEnumCaseVariable($resolved)) {
+                    if (VM\EnumCaseSupport::isEnumCaseVariable($resolved)) {
+                        return $frame->scope[$slot];
+                    }
+                    if ($this->isEnumSlotClobberCandidate($resolved)) {
                         $value = new Variable();
                         $value->copyFrom($const);
 
@@ -9675,6 +9678,27 @@ restart:
 
         return Variable::TYPE_OBJECT === $const->type
             && VM\EnumCaseSupport::isEnumCaseVariable($const);
+    }
+
+    /**
+     * Scalar types that may clobber an enum-case scope slot (#5636); not resources/objects/arrays (#6204).
+     */
+    private function isEnumSlotClobberCandidate(Variable $resolved): bool
+    {
+        if (VM\ResourceSupport::isVmResource($resolved)) {
+            return false;
+        }
+        if (VM\EnumCaseSupport::isEnumCaseVariable($resolved)) {
+            return false;
+        }
+
+        return \in_array($resolved->type, [
+            Variable::TYPE_NULL,
+            Variable::TYPE_BOOLEAN,
+            Variable::TYPE_INTEGER,
+            Variable::TYPE_FLOAT,
+            Variable::TYPE_STRING,
+        ], true);
     }
 
     /**
