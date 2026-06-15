@@ -8804,6 +8804,9 @@ class Compiler {
             if ($callArg === $producer->result) {
                 return true;
             }
+            if ($this->operandsReferToSameVariable($callArg, $producer->result)) {
+                return true;
+            }
             if (null !== $producerRoot && Block::cfgVarRoot($callArg) === $producerRoot) {
                 return true;
             }
