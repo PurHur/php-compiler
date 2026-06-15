@@ -4049,14 +4049,19 @@ class Object_ extends Type {
             && Variable::TYPE_NATIVE_BOOL !== $jitType
             && Variable::TYPE_NATIVE_DOUBLE !== $jitType
             && Variable::TYPE_VALUE !== $jitType
+            && Variable::TYPE_HASHTABLE !== $jitType
         ) {
             throw new \LogicException(
-                'JIT static property requires a scalar declared type (int, string, float, bool) or boxed value'
+                'JIT static property requires a scalar declared type (int, string, float, bool), hashtable, or boxed value'
             );
         }
         $globalName = 'sp_'.$classId.'_'.$key;
         if (Variable::TYPE_VALUE === $jitType) {
             $llvmType = $this->context->getTypeFromString('__value__*');
+            $global = $this->context->module->addGlobal($llvmType, $globalName);
+            $global->setInitializer($llvmType->constNull());
+        } elseif (Variable::TYPE_HASHTABLE === $jitType) {
+            $llvmType = $this->context->getTypeFromString('__hashtable__*');
             $global = $this->context->module->addGlobal($llvmType, $globalName);
             $global->setInitializer($llvmType->constNull());
         } elseif (Variable::TYPE_STRING === $jitType) {
@@ -4092,6 +4097,15 @@ class Object_ extends Type {
         $this->staticPropertyDeclaringClassId[$classId][$key] = $classId;
         if (Variable::TYPE_STRING === $jitType && null !== $default) {
             $this->initStaticStringPropertyDefault($global, $default);
+        }
+        if (Variable::TYPE_HASHTABLE === $jitType) {
+            if (null === $default || VMVariable::TYPE_ARRAY === $default->type) {
+                $this->initStaticHashtablePropertyEmpty($global);
+            } else {
+                throw new \LogicException(
+                    'Static array property default must be an empty array literal for '.$this->classNameForId($classId).'::'.$name
+                );
+            }
         }
         if (Variable::TYPE_VALUE === $jitType && null !== $default && EnumCaseSupport::isEnumCaseVariable($default)) {
             $this->initStaticValuePropertyEnumCase($global, $default);
@@ -4163,6 +4177,18 @@ class Object_ extends Type {
             $heapPtr
         );
         $this->context->builder->store($heapPtr, $global);
+        if (null !== $restore) {
+            BasicBlockHelper::restoreInsertBlock($this->context, $restore);
+        }
+    }
+
+    /** Initialize a typed static array property with an empty hashtable (#8716). */
+    private function initStaticHashtablePropertyEmpty(\PHPLLVM\Value $global): void
+    {
+        $restore = $this->context->builder->getInsertBlock();
+        $this->context->positionBuilderAtInitEmission();
+        $ht = HashTableHelper::alloc($this->context);
+        $this->context->builder->store($ht, $global);
         if (null !== $restore) {
             BasicBlockHelper::restoreInsertBlock($this->context, $restore);
         }
