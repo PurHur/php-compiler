@@ -9877,8 +9877,51 @@ class Compiler {
         if (null === $lcClass || !$this->isCompileTimeEnumCaseConstantMember($lcClass, strtolower($constName))) {
             return [];
         }
+        if (!$this->callArgNeedsRuntimeEnumConstFetch($arg, $fetch, $block)) {
+            return [];
+        }
 
         return $this->compileClassConstFetchRuntimeOpCodes($fetch, $block, $arg);
+    }
+
+    /**
+     * Guard ordinal/hoisted enum fetch injection — do not overwrite unrelated call-arg slots (#5637).
+     */
+    private function callArgNeedsRuntimeEnumConstFetch(
+        Operand $arg,
+        Op\Expr\ClassConstFetch $fetch,
+        Block $block
+    ): bool {
+        if ($this->operandsReferToSameVariable($fetch->result, $arg)) {
+            return true;
+        }
+        $root = $this->unwrapOperandChain($arg);
+        if ($root instanceof Op\Expr\ClassConstFetch) {
+            return $root === $fetch
+                || $this->operandsReferToSameVariable($fetch->result, $root->result);
+        }
+        if (null === $block->orig) {
+            return false;
+        }
+        $callSite = $this->findCfgCallSiteForArg($block->orig->children, $arg);
+        if (null === $callSite) {
+            return false;
+        }
+        [$callOp, $siteArgIndex] = $callSite;
+        $callArg = $callOp->args[$siteArgIndex] ?? null;
+        if (null === $callArg) {
+            return false;
+        }
+        if ($this->operandsReferToSameVariable($fetch->result, $callArg)) {
+            return true;
+        }
+        $callRoot = $this->unwrapOperandChain($callArg);
+        if ($callRoot instanceof Op\Expr\ClassConstFetch) {
+            return $callRoot === $fetch
+                || $this->operandsReferToSameVariable($fetch->result, $callRoot->result);
+        }
+
+        return false;
     }
 
     /**
@@ -10709,6 +10752,12 @@ class Compiler {
         Op\Expr\Array_ $arrayExpr,
         int $elementIndex
     ): ?Op\Expr\ClassConstFetch {
+        $root = $this->unwrapOperandChain($valueOperand);
+        if ($root instanceof Op\Expr\ClassConstFetch
+            && $this->isCompileTimeEnumCaseClassConstFetch($root, $block)
+        ) {
+            return $root;
+        }
         if (null !== $block->orig) {
             foreach ($block->orig->children as $child) {
                 if (!$child instanceof Op\Expr\Array_
@@ -10720,18 +10769,13 @@ class Compiler {
                 $fetch = $fetches[$elementIndex] ?? null;
                 if ($fetch instanceof Op\Expr\ClassConstFetch
                     && $this->isCompileTimeEnumCaseClassConstFetch($fetch, $block)
+                    && $this->operandsReferToSameVariable($fetch->result, $valueOperand)
                 ) {
                     return $fetch;
                 }
 
                 break;
             }
-        }
-        $root = $this->unwrapOperandChain($valueOperand);
-        if ($root instanceof Op\Expr\ClassConstFetch
-            && $this->isCompileTimeEnumCaseClassConstFetch($root, $block)
-        ) {
-            return $root;
         }
 
         return null;

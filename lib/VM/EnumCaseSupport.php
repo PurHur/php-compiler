@@ -230,30 +230,23 @@ final class EnumCaseSupport
         if (!$left->isEnumCase || !$right->isEnumCase) {
             throw new \LogicException('compareSpaceship requires enum case objects');
         }
-        if ($left === $right) {
-            return 0;
-        }
-        if ($left->class !== $right->class) {
-            return 1;
-        }
-        if (0 === strcasecmp($left->enumCaseName ?? '', $right->enumCaseName ?? '')) {
-            return 0;
-        }
+        $leftVar = new Variable();
+        $leftVar->object($left);
+        $rightVar = new Variable();
+        $rightVar->object($right);
 
-        return 1;
+        return self::compareEnumCasesForSort($leftVar, $rightVar);
     }
 
     /** @see EnumCaseEntry spaceship for TYPE_ENUM_CASE operands (#4554). */
     public static function compareEnumCaseEntrySpaceship(EnumCaseEntry $left, EnumCaseEntry $right): int
     {
-        if ($left->enumClass !== $right->enumClass) {
-            return 1;
-        }
-        if ($left->caseName === $right->caseName) {
-            return 0;
-        }
+        $leftVar = new Variable();
+        $leftVar->enumCase($left);
+        $rightVar = new Variable();
+        $rightVar->enumCase($right);
 
-        return 1;
+        return self::compareEnumCasesForSort($leftVar, $rightVar);
     }
 
     /**

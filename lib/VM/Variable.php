@@ -1889,59 +1889,62 @@ restart:
 
             return;
         }
+        $left = $left->resolveIndirect();
+        $right = $right->resolveIndirect();
+        $leftCopy = new self();
+        $leftCopy->copyFrom($left);
+        $rightCopy = new self();
+        $rightCopy->copyFrom($right);
         $this->reset();
 restart:
-        switch (type_pair($left->type, $right->type)) {
+        switch (type_pair($leftCopy->type, $rightCopy->type)) {
             case TYPE_PAIR_INTEGER_INTEGER:
-                $this->int($this->_spaceship($left->integer, $right->integer));
+                $this->int($this->_spaceship($leftCopy->integer, $rightCopy->integer));
                 break;
             case TYPE_PAIR_INTEGER_FLOAT:
-                $this->int($this->_spaceship($left->integer, $right->float));
+                $this->int($this->_spaceship($leftCopy->integer, $rightCopy->float));
                 break;
             case TYPE_PAIR_FLOAT_INTEGER:
-                $this->int($this->_spaceship($left->float, $right->integer));
+                $this->int($this->_spaceship($leftCopy->float, $rightCopy->integer));
                 break;
             case TYPE_PAIR_FLOAT_FLOAT:
-                $this->int($this->_spaceship($left->float, $right->float));
+                $this->int($this->_spaceship($leftCopy->float, $rightCopy->float));
                 break;
             case TYPE_PAIR_STRING_STRING:
-                $cmp = strcmp($left->string, $right->string);
+                $cmp = strcmp($leftCopy->string, $rightCopy->string);
                 $this->int($cmp < 0 ? -1 : ($cmp > 0 ? 1 : 0));
                 break;
             case TYPE_PAIR_BOOLEAN_BOOLEAN:
-                $this->int($this->_spaceship((int) $left->bool, (int) $right->bool));
+                $this->int($this->_spaceship((int) $leftCopy->bool, (int) $rightCopy->bool));
                 break;
             case TYPE_PAIR_NULL_NULL:
                 $this->int(0);
                 break;
             case TYPE_PAIR_OBJECT_OBJECT:
-                $this->int($left->object->compareSpaceship($right->object));
+                $this->int($leftCopy->object->compareSpaceship($rightCopy->object));
                 break;
             case TYPE_PAIR_ENUM_CASE_ENUM_CASE:
-                $this->int(EnumCaseSupport::compareEnumCaseEntrySpaceship(
-                    $left->toEnumCase(),
-                    $right->toEnumCase()
-                ));
+                $this->int(EnumCaseSupport::compareEnumCasesForSort($leftCopy, $rightCopy));
                 break;
             case TYPE_PAIR_ARRAY_ARRAY:
-                $this->int($left->array->compareSpaceship($right->array));
+                $this->int($leftCopy->array->compareSpaceship($rightCopy->array));
                 break;
             default:
-                if ($left->type === self::TYPE_INDIRECT) {
-                    $left = $left->indirect;
+                if ($leftCopy->type === self::TYPE_INDIRECT) {
+                    $leftCopy = $leftCopy->indirect;
                     goto restart;
-                } elseif ($right->type === self::TYPE_INDIRECT) {
-                    $right = $right->indirect;
+                } elseif ($rightCopy->type === self::TYPE_INDIRECT) {
+                    $rightCopy = $rightCopy->indirect;
                     goto restart;
-                } elseif (self::isEnumCaseOperand($left) || self::isEnumCaseOperand($right)) {
-                    if (self::isEnumCaseOperand($left) && self::isEnumCaseOperand($right)) {
-                        $this->int(self::compareEnumCaseOperands($left, $right));
+                } elseif (self::isEnumCaseOperand($leftCopy) || self::isEnumCaseOperand($rightCopy)) {
+                    if (self::isEnumCaseOperand($leftCopy) && self::isEnumCaseOperand($rightCopy)) {
+                        $this->int(EnumCaseSupport::compareEnumCasesForSort($leftCopy, $rightCopy));
                     } else {
                         // Zend compare_function: enum case vs non-case is always 1 (#4554).
                         $this->int(1);
                     }
                 } else {
-                    $this->int(self::spaceshipMixedScalars($left, $right));
+                    $this->int(self::spaceshipMixedScalars($leftCopy, $rightCopy));
                 }
         }
     }
@@ -2070,17 +2073,6 @@ restart:
         }
 
         return self::TYPE_OBJECT === $var->type && EnumCaseSupport::isEnumCase($var->object);
-    }
-
-    private static function compareEnumCaseOperands(Variable $left, Variable $right): int
-    {
-        $leftEntry = EnumCaseSupport::enumCaseEntryForVariable($left);
-        $rightEntry = EnumCaseSupport::enumCaseEntryForVariable($right);
-        if (null !== $leftEntry && null !== $rightEntry) {
-            return EnumCaseSupport::compareEnumCaseEntrySpaceship($leftEntry, $rightEntry);
-        }
-
-        return 1;
     }
 
     private function _spaceship($left, $right): int {

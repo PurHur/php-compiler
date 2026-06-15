@@ -3967,18 +3967,14 @@ restart:
                     }
                     goto return_void_complete;
                 case OpCode::TYPE_RETURN:
-                    if (isset($frame->scope[$op->arg1])) {
+                    if (null !== $op->arg1 && isset($frame->scope[$op->arg1])) {
                         $catchFrame = $this->guardUnboundThisRead($frame, (int) $op->arg1);
                         if (null !== $catchFrame) {
                             $frame = $catchFrame;
                             goto restart;
                         }
-                        $returnValue = $frame->scope[$op->arg1]->resolveIndirect();
-                    } elseif (isset($frame->block->constants[$op->arg1])) {
-                        $returnValue = $frame->block->constants[$op->arg1];
-                    } else {
-                        $returnValue = new Variable(Variable::TYPE_NULL);
                     }
+                    $returnValue = $this->resolveVmReturnValue($frame, $op);
                     $finallyFrame = $this->beginReturnFinallyUnwind($frame, $returnValue, false);
                     if (null !== $finallyFrame) {
                         $frame = $finallyFrame;
@@ -12029,6 +12025,26 @@ restart:
 
         return null !== $decl
             && (($decl->flags ?? 0) & \PHPCfg\Func::FLAG_RETURNS_REF) !== 0;
+    }
+
+    private function resolveVmReturnValue(Frame $frame, OpCode $op): Variable
+    {
+        $slot = $op->arg1;
+        if (null === $slot) {
+            return new Variable(Variable::TYPE_NULL);
+        }
+        $operand = $frame->block->getOperand($slot);
+        if ($operand instanceof \PHPCfg\Operand\Literal && isset($frame->block->constants[$slot])) {
+            return $frame->block->constants[$slot];
+        }
+        if (isset($frame->scope[$slot])) {
+            return $frame->scope[$slot]->resolveIndirect();
+        }
+        if (isset($frame->block->constants[$slot])) {
+            return $frame->block->constants[$slot];
+        }
+
+        return new Variable(Variable::TYPE_NULL);
     }
 
     private function enforceReturnType(Frame $frame, ?Variable $value): void
