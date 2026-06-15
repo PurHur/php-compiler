@@ -91,6 +91,10 @@ final class VmDriverExecuteNative
         $i8p = $context->getTypeFromString('int8*');
         $charPtr = $context->getTypeFromString('char*');
         $i32 = $context->context->int32Type();
+        // Leave the C wrapper entry block linear — envIsTruthy emits terminators (#8559).
+        $probeEntryBb = BasicBlockHelper::append($context, 'vm_probe_entry');
+        $context->builder->branch($probeEntryBb);
+        $context->builder->positionAtEnd($probeEntryBb);
         $runMainBb = BasicBlockHelper::append($context, 'vm_probe_run_main');
         $doneBb = BasicBlockHelper::append($context, 'vm_probe_done');
 
