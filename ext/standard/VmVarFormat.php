@@ -58,6 +58,7 @@ final class VmVarFormat
                 ResourceState::KIND_DIR => VmDir::isValidHandle($handle) ? 'directory' : 'Unknown',
                 ResourceState::KIND_BRIGADE => VmStreamBucket::getResourceType($handle, true) ?? 'Unknown',
                 ResourceState::KIND_BUCKET => VmStreamBucket::getResourceType($handle, false) ?? 'Unknown',
+                ResourceState::KIND_STREAM_FILTER => VmStreamFilterChain::getResourceType($handle) ?? 'Unknown',
                 default => 'Unknown',
             };
         }
@@ -72,6 +73,9 @@ final class VmVarFormat
         }
         if (ResourceSupport::isBucketResource($var)) {
             return VmStreamBucket::getResourceType($handle, false) ?? 'Unknown';
+        }
+        if (ResourceSupport::isStreamFilterResource($var)) {
+            return VmStreamFilterChain::getResourceType($handle) ?? 'Unknown';
         }
 
         return 'Unknown';
