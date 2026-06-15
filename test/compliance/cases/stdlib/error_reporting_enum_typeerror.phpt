@@ -14,7 +14,7 @@ try {
 }
 
 $prev = error_reporting(0);
-echo $prev === 32767 ? "old-level\n" : "old-bad\n";
+echo $prev === 22527 ? "old-level\n" : "old-bad\n";
 $unchanged = error_reporting(null);
 echo $unchanged === 0 ? "null-unchanged\n" : "null-bad\n";
 --EXPECT--

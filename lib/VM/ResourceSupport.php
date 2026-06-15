@@ -184,7 +184,7 @@ final class ResourceSupport
         }
         $var = $var->resolveIndirect();
         if ($var->isVmResource() && Variable::TYPE_INTEGER === $var->type) {
-            return $var->integer;
+            return $var->toInt();
         }
 
         return null;

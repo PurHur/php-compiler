@@ -62,16 +62,24 @@ final class is_resource_ extends Internal
             return null !== $handle && VmFs::isValidHandle($handle);
         }
         if ($v->isDirResource()) {
-            return VmDir::isValidHandle($v->toInt());
+            $handle = \PHPCompiler\VM\ResourceSupport::resolveHandle($v);
+
+            return null !== $handle && VmDir::isValidHandle($handle);
         }
         if ($v->isBrigadeResource()) {
-            return VmStreamBucket::isValidBrigade($v->toInt());
+            $handle = \PHPCompiler\VM\ResourceSupport::resolveHandle($v);
+
+            return null !== $handle && VmStreamBucket::isValidBrigade($handle);
         }
         if ($v->isBucketResource()) {
-            return VmStreamBucket::isValidBucket($v->toInt());
+            $handle = \PHPCompiler\VM\ResourceSupport::resolveHandle($v);
+
+            return null !== $handle && VmStreamBucket::isValidBucket($handle);
         }
         if ($v->isStreamFilterResource()) {
-            return VmStreamFilterChain::isValidFilter($v->toInt());
+            $handle = \PHPCompiler\VM\ResourceSupport::resolveHandle($v);
+
+            return null !== $handle && VmStreamFilterChain::isValidFilter($handle);
         }
         if ($v->isProcessResource()) {
             $handle = \PHPCompiler\VM\ResourceSupport::resolveHandle($v);
