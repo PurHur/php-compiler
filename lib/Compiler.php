@@ -8673,6 +8673,7 @@ class Compiler {
      */
     private function matchInlineCallArgProducer(array $producers, array $callArgs, int $argIndex): ?Op\Expr
     {
+        $producers = $this->filterDeadClassConstFetchInlineProducers($producers);
         $producerCount = count($producers);
         $argCount = count($callArgs);
         if (0 === $producerCount || $argCount < $producerCount) {
@@ -8703,9 +8704,13 @@ class Compiler {
                 if (1 === $argCount) {
                     return $producers[0];
                 }
+                $callArg = $callArgs[$argIndex] ?? null;
+                if (null === $callArg || $this->isEmbeddedCallLiteralArg($callArg)) {
+                    return null;
+                }
                 if (
-                    $argCount - 1 === $argIndex
-                    && !$this->isEmbeddedCallLiteralArg($callArgs[$argIndex] ?? null)
+                    $callArg instanceof Operand\Temporary
+                    || $this->operandsReferToSameVariable($producers[0]->result, $callArg)
                 ) {
                     return $producers[0];
                 }
@@ -8726,6 +8731,66 @@ class Compiler {
         }
 
         return null;
+    }
+
+    /**
+     * php-cfg dead ClassConstFetch preludes before inline Array_/Concat call args (#5933, #4109).
+     *
+     * @param list<Op\Expr> $producers
+     *
+     * @return list<Op\Expr>
+     */
+    private function filterDeadClassConstFetchInlineProducers(array $producers): array
+    {
+        if (count($producers) < 2) {
+            return $producers;
+        }
+        $filtered = [];
+        foreach ($producers as $i => $producer) {
+            if ($producer instanceof Op\Expr\ClassConstFetch) {
+                $feedsLater = false;
+                for ($j = $i + 1, $n = count($producers); $j < $n; ++$j) {
+                    if ($this->cfgExprUsesOperand($producers[$j], $producer->result)) {
+                        $feedsLater = true;
+                        break;
+                    }
+                }
+                if ($feedsLater) {
+                    continue;
+                }
+            }
+            $filtered[] = $producer;
+        }
+
+        return $filtered;
+    }
+
+    private function cfgExprUsesOperand(Op\Expr $expr, Operand $operand): bool
+    {
+        if ($expr instanceof Op\Expr\Array_) {
+            foreach ($expr->values as $value) {
+                if (null === $value) {
+                    continue;
+                }
+                if ($value === $operand || $this->operandsReferToSameVariable($value, $operand)) {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+        if ($expr instanceof Op\Expr\BinaryOp\Concat) {
+            return $expr->left === $operand
+                || $expr->right === $operand
+                || $this->operandsReferToSameVariable($expr->left, $operand)
+                || $this->operandsReferToSameVariable($expr->right, $operand);
+        }
+        if ($expr instanceof Op\Expr\UnaryMinus || $expr instanceof Op\Expr\UnaryPlus) {
+            return $expr->expr === $operand
+                || $this->operandsReferToSameVariable($expr->expr, $operand);
+        }
+
+        return false;
     }
 
     /** True when php-cfg left the operand as an embedded literal in the FuncCall. */
