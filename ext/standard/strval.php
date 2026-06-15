@@ -67,7 +67,7 @@ final class strval extends Internal
             case JITVariable::TYPE_NATIVE_LONG:
                 return $this->formatToString($context, $context->helper->loadValue($args[0]), '%lld');
             case JITVariable::TYPE_NATIVE_DOUBLE:
-                return $this->formatToString($context, $context->helper->loadValue($args[0]), '%G');
+                return $this->formatToString($context, $context->helper->loadValue($args[0]), '%.14g');
             case JITVariable::TYPE_VALUE:
                 return $this->valueToString($context, $args[0]->value);
             default:
@@ -154,7 +154,7 @@ final class strval extends Internal
         $doubleStr = $this->formatToString(
             $context,
             $context->builder->call($context->lookupFunction('__value__readDouble'), $valuePtr),
-            '%G'
+            '%.14g'
         );
         $doubleEndBlock = $context->builder->getInsertBlock();
         $context->builder->branch($doneBlock);

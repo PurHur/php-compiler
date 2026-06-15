@@ -72,7 +72,7 @@ final class JitNativeString
                     $context,
                     Variable::TYPE_STRING,
                     Variable::KIND_VALUE,
-                    self::format($context, $value, '%G')
+                    self::format($context, $value, '%.14g')
                 );
             case Variable::TYPE_NATIVE_BOOL:
                 $trueBlock = BasicBlockHelper::append($context, 'coerce_bool_true');
