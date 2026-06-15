@@ -15,10 +15,11 @@ final class LinkerRuntimeShrinkTest extends TestCase
         $this->assertDoesNotMatchRegularExpression('/\\\\shell_exec\\(/', $source);
     }
 
-    public function testEnsureBundledLiblzfUsesPhpcRunCommand(): void
+    public function testLinkerDoesNotEmbedBundledLiblzf(): void
     {
         $source = (string) file_get_contents(__DIR__.'/../../lib/AOT/Linker.php');
-        $this->assertStringContainsString('ensureBundledLiblzf', $source);
+        $this->assertStringNotContainsString('ensureBundledLiblzf', $source);
+        $this->assertStringNotContainsString('liblzf.a', $source);
         $this->assertStringContainsString('runCaptured', $source);
         $this->assertStringContainsString('phpc_run_command', $source);
     }

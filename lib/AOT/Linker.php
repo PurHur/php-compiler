@@ -31,51 +31,6 @@ final class Linker
     /** Host multiarch lib dir for bundled LLVM ld (libz.so.1 lives here, not in LLVM sysroot). */
     private const HOST_LIB_SEARCH = '-L/usr/lib/x86_64-linux-gnu';
 
-    /** Static bundled liblzf for AOT link (llvm ld has no -Wl,-rpath). */
-    private static function bundledLiblzfLinkArg(): string
-    {
-        self::ensureBundledLiblzf();
-        $libs = \dirname(__DIR__, 2).'/.libs';
-        $archive = $libs.'/liblzf.a';
-        if (\is_file($archive)) {
-            return escapeshellarg(realpath($archive) ?: $archive);
-        }
-        if (\is_file($libs.'/liblzf.so')) {
-            return '-L'.escapeshellarg(realpath($libs) ?: $libs).' -llzf';
-        }
-
-        return '';
-    }
-
-    /** Build bundled liblzf when missing (#6384; bootstrap-aot-link -llzf). */
-    private static function ensureBundledLiblzf(): void
-    {
-        static $ensured = false;
-        if ($ensured) {
-            return;
-        }
-        $ensured = true;
-
-        $root = \dirname(__DIR__, 2);
-        if (\is_file($root.'/.libs/liblzf.a') && \is_file($root.'/.libs/liblzf.so')) {
-            return;
-        }
-
-        $buildScript = $root.'/script/build-liblzf.sh';
-        if (!\is_file($buildScript)) {
-            return;
-        }
-
-        foreach (['gcc', 'cc'] as $compiler) {
-            if (null !== self::which($compiler)) {
-                $cmd = 'bash '.\escapeshellarg($buildScript).' 2>/dev/null';
-                self::runCaptured($cmd, null);
-
-                return;
-            }
-        }
-    }
-
     /** Runtime units that need host libc headers layered on the LLVM sysroot (incomplete headers). */
     private const RUNTIME_HOST_LIBC_BASENAMES = [
         'phpc_progress.c',
@@ -150,7 +105,6 @@ final class Linker
                 '-lc',
                 '-lm',
                 self::HOST_LIB_SEARCH,
-                self::bundledLiblzfLinkArg(),
                 self::RUNTIME_LINK_LIBS,
                 escapeshellarg($libgcc),
                 escapeshellarg($crtend),
@@ -178,7 +132,7 @@ final class Linker
             // When linking with the bundled clang, ensure we can still resolve host libraries
             // (libpcre2-8, libcrypt, ...). Some bootstrap envs only ship the runtime .so/.a under
             // /usr/lib/x86_64-linux-gnu without a full sysroot lib tree.
-            $cmd = escapeshellarg($clang).' '.AotDebugSymbols::linkFlag().$objects.' '.self::HOST_LIB_SEARCH.' '.self::bundledLiblzfLinkArg().' -lm '.self::RUNTIME_LINK_LIBS.' -o '.escapeshellarg($executable);
+            $cmd = escapeshellarg($clang).' '.AotDebugSymbols::linkFlag().$objects.' '.self::HOST_LIB_SEARCH.' -lm '.self::RUNTIME_LINK_LIBS.' -o '.escapeshellarg($executable);
             self::run($cmd, $env);
             self::unlinkIfTemp($runtimeObjects);
 
@@ -504,7 +458,7 @@ final class Linker
                 continue;
             }
             $cmd = escapeshellarg($path) . ' '
-                . AotDebugSymbols::linkFlag() . $objects . ' '.self::HOST_LIB_SEARCH.' '.self::bundledLiblzfLinkArg().' -lm '.self::RUNTIME_LINK_LIBS.' -o ' . escapeshellarg($executable);
+                . AotDebugSymbols::linkFlag() . $objects . ' '.self::HOST_LIB_SEARCH.' -lm '.self::RUNTIME_LINK_LIBS.' -o ' . escapeshellarg($executable);
             $captured = self::runCaptured($cmd, null);
             if (0 === $captured['code']) {
                 self::unlinkIfTemp($runtimeObjects);
