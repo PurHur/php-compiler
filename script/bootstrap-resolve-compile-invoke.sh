@@ -328,8 +328,17 @@ bootstrap_inventory_argv_driver_m4_smoke() {
     return 1
   fi
   if [[ -f "${prelink}" ]] && cmp -s "${compile_out}" "${prelink}"; then
-    if grep -qE 'sidecar emit fallback|recovered via gen-0 sidecar|parseAndCompile returned null' <<< "${compile_log}"; then
+    if grep -qE 'sidecar emit fallback|recovered via gen-0 sidecar|parseAndCompile returned null|installed inventory argv driver from prelinked' <<< "${compile_log}"; then
       echo "bootstrap-inventory-argv-driver-m4-smoke: ${driver} bin/compile.php emit is prelinked gen-0 sidecar (not inventory Compiler — #1492)" >&2
+      rm -f "${compile_out}"
+      return 1
+    fi
+    if ! declare -F bootstrap_gen3_emit_matches_stale_prelinked_gen0 >/dev/null 2>&1; then
+      # shellcheck source=bootstrap-gen0-install-prelinked-driver.sh
+      source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/bootstrap-gen0-install-prelinked-driver.sh"
+    fi
+    if bootstrap_gen3_emit_matches_stale_prelinked_gen0 "${compile_out}"; then
+      echo "bootstrap-inventory-argv-driver-m4-smoke: ${driver} bin/compile.php emit matches stale prelinked/bootstrap-gen0/ (refresh gen-0 — #8710)" >&2
       rm -f "${compile_out}"
       return 1
     fi
