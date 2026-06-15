@@ -9217,7 +9217,9 @@ class JIT {
             return;
         }
         if (!$returnsByRef) {
-            $this->assignOperandValue($result, $llvmResult);
+            // FUNCCALL_EXEC_RETURN must materialize even when php-cfg dropped result usages
+            // (nested f(g()) arg temps — strlen(trim($s)), #8561).
+            $this->assignOperandValue($result, $llvmResult, true);
 
             return;
         }
@@ -11154,8 +11156,8 @@ class JIT {
         );
     }
 
-    private function assignOperandValue(Operand $result, PHPLLVM\Value $value): void {
-        if (empty($result->usages) && !$this->context->scope->variables->contains($result)) {
+    private function assignOperandValue(Operand $result, PHPLLVM\Value $value, bool $force = false): void {
+        if (!$force && empty($result->usages) && !$this->context->scope->variables->contains($result)) {
             return;
         }
         if (!$this->context->hasVariableOp($result)) {
