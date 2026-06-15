@@ -4278,6 +4278,10 @@ class JIT {
         @unlink($tmpOut);
         $compileCmd = 'php';
         $memLimit = getenv('PHP_COMPILER_MEMORY_LIMIT');
+        if (\PHPCompiler\JIT\M3EmitTuTrivialEchoAot::COMPILER_LIB_SIDECAR_REL === $sidecarRel
+            && (!is_string($memLimit) || '' === $memLimit || '-1' === $memLimit)) {
+            $memLimit = '8192M';
+        }
         if (is_string($memLimit) && '' !== $memLimit && '-1' !== $memLimit) {
             $compileCmd .= ' -d memory_limit='.escapeshellarg($memLimit);
         }
@@ -4285,6 +4289,10 @@ class JIT {
             .' -o '.escapeshellarg($tmpOut)
             .' '.escapeshellarg($hostCompilePath);
         $compileEnv = $this->m3EmitSidecarHostCompileEnv();
+        if (\PHPCompiler\JIT\M3EmitTuTrivialEchoAot::COMPILER_LIB_SIDECAR_REL === $sidecarRel
+            && is_string($memLimit) && '' !== $memLimit && '-1' !== $memLimit) {
+            $compileEnv['PHP_COMPILER_MEMORY_LIMIT'] = $memLimit;
+        }
         // Self-host skips cli/vendor includes during link; M3 compile-driver Runtime ctor native (#2600, #2633).
         $compileEnv['PHP_COMPILER_SELFHOST_AOT'] = '1';
         $compileEnv['PHP_COMPILER_M3_COMPILE_DRIVER'] = '1';

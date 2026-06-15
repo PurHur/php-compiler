@@ -177,8 +177,8 @@ bootstrap_ensure_m3_compiler_lib_sidecar() {
     env PHP_COMPILER_M3_EMIT_SIDECAR_RECURSION_GUARD=1 \
       PHP_COMPILER_M3_SIDECAR_HOST=1 \
       PHP_COMPILER_SELFHOST_AOT=1 \
-      PHP_COMPILER_MEMORY_LIMIT="${PHP_COMPILER_MEMORY_LIMIT:-4096M}" \
-      php -d "memory_limit=${PHP_COMPILER_MEMORY_LIMIT:-4096M}" \
+      PHP_COMPILER_MEMORY_LIMIT="${PHP_COMPILER_MEMORY_LIMIT:-8192M}" \
+      php -d "memory_limit=${PHP_COMPILER_MEMORY_LIMIT:-8192M}" \
       "${root}/bin/compile.php" -o "${regen_tmp}" "${entry}" 2>&1
   )"
   regen_code=$?

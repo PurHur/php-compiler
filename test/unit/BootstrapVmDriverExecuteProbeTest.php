@@ -53,6 +53,8 @@ final class BootstrapVmDriverExecuteProbeTest extends TestCase
         $script = (string) file_get_contents(self::$root.'/script/bootstrap-selfhost-lib-spine-smoke-link.sh');
         $this->assertStringContainsString('compiler_lib_spine_smoke bundle OK', $script);
         $this->assertStringContainsString('.m3_compiler_lib_sidecar.sha', $script);
+        $this->assertStringContainsString('8192M', $script);
+        $this->assertStringContainsString('honest emit required (#8559)', $script);
     }
 
     public function testNativeMainEnvProbePrintsVmDriverOkWhenLlvmPresent(): void
