@@ -83,4 +83,13 @@ final class SplAutoloadCallbackPolicy
     {
         return 'spl_autoload_register(): Argument #1 ($callback) must be a valid callback or null, no array or string given';
     }
+
+    /**
+     * Zend spl_autoload_unregister() invalid callback TypeError (ext/spl/php_spl.c).
+     */
+    public static function invalidCallbackTypeErrorUnregister(): string
+    {
+        return 'spl_autoload_unregister(): Argument #1 ($callback) must be a valid callback, '
+            .'no array or string given';
+    }
 }

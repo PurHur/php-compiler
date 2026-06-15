@@ -854,6 +854,7 @@ class Module extends ModuleAbstract
             new spl_autoload_extensions(),
             new spl_autoload_functions(),
             new spl_autoload_register(),
+            new spl_autoload_unregister(),
             new spl_autoload_call(),
             new time_nanosleep(),
             new time_sleep_until(),
