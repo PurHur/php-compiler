@@ -24,6 +24,17 @@ final class GettextJitRuntimeShrinkTest extends TestCase
         $this->assertStringContainsString('__compiler_dngettext', $source);
     }
 
+    public function testCallValueOutDoesNotUseInvalidSpreadSyntax(): void
+    {
+        $source = (string) file_get_contents(__DIR__.'/../../ext/gettext/JitGettext.php');
+        $this->assertDoesNotMatchRegularExpression(
+            '/\.\.\.\$params,\s*\$ptr\)/',
+            $source,
+            'callValueOut must not pass $ptr after argument unpacking'
+        );
+        $this->assertStringContainsString('...[...$params, $ptr]', $source);
+    }
+
     public function testNoNewAotRuntimeCSources(): void
     {
         $runtimeDir = dirname(__DIR__, 2).'/lib/AOT/runtime';
