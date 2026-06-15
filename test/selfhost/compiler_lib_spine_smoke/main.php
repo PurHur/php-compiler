@@ -570,6 +570,7 @@ require_once __DIR__.'/../../../ext/standard/JitOpendir.php';
 require_once __DIR__.'/../../../ext/standard/JitOrd.php';
 require_once __DIR__.'/../../../ext/standard/JitOutputRewriteVars.php';
 require_once __DIR__.'/../../../ext/standard/JitPack.php';
+require_once __DIR__.'/../../../ext/standard/JitPackNumericGuard.php';
 require_once __DIR__.'/../../../ext/standard/JitParseIniMaterializer.php';
 require_once __DIR__.'/../../../ext/standard/JitParseStr.php';
 require_once __DIR__.'/../../../ext/standard/JitParseStrMaterializer.php';
