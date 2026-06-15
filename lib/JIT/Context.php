@@ -31,6 +31,8 @@ class Context {
     public PHPLLVM\BasicBlock $initBlock;
     /** Open tail for linear __init__ emission after the first CFG split (#8559). */
     public ?PHPLLVM\BasicBlock $initLinearBlock = null;
+    /** Nesting depth for {@see emitInInit()} / class-const hashtable linear emission (#8559). */
+    private int $initLinearEmissionDepth = 0;
     public PHPLLVM\BasicBlock $shutdownBlock;
     public PHPLLVM\BasicBlock $headerPreFlushBlock;
     public PHPLLVM\Builder $builder;
@@ -945,15 +947,29 @@ class Context {
         }
     }
 
+    public function emitsInitLinearIR(): bool
+    {
+        return $this->initLinearEmissionDepth > 0;
+    }
+
     public function positionBuilderAtInitEmission(): void
     {
+        $initParent = $this->initBlock->getParent();
+        if ($initParent instanceof \PHPLLVM\Value\Function_) {
+            $this->initFunc = $initParent;
+        }
         $block = $this->initLinearBlock ?? $this->initBlock;
         if (null !== $block->getTerminator()) {
-            $next = $this->initFunc->appendBasicBlock('init_tail');
-            $this->initLinearBlock = $next;
-            $block = $next;
+            throw new \LogicException(
+                '__init__ linear emission block is already sealed: '.$block->getName()
+            );
         }
         $this->builder->positionAtEnd($block);
+    }
+
+    public function builderInsertsInInitFunction(): bool
+    {
+        return $this->emitsInitLinearIR();
     }
 
     public function splitInitLinearTo(\PHPLLVM\BasicBlock $target): void
@@ -1367,6 +1383,7 @@ class Context {
             $global = $this->module->addGlobal($this->type->string->pointer, 'string_const_' . count($this->stringConstantMap));
             $global->setInitializer($this->type->string->pointer->constNull());
             $oldBuilder = $this->builder;
+            $resumeInitEmission = $this->emitsInitLinearIR();
             $this->builder = $this->context->builderCreate();
             $this->positionBuilderAtInitEmission();
             $this->type->string->init(
@@ -1378,6 +1395,9 @@ class Context {
             $this->builder->positionAtEnd($this->shutdownBlock);
             $this->memory->free($this->builder->load($global));
             $this->builder = $oldBuilder;
+            if ($resumeInitEmission) {
+                $this->positionBuilderAtInitEmission();
+            }
             $this->stringConstantMap[$string] = $global;
         }
         return $this->stringConstantMap[$string];
@@ -1476,10 +1496,14 @@ class Context {
     {
         $oldBuilder = $this->builder;
         $this->builder = $this->context->builderCreate();
+        ++$this->initLinearEmissionDepth;
         $this->positionBuilderAtInitEmission();
         try {
             $emit($this);
         } finally {
+            if ($this->initLinearEmissionDepth > 0) {
+                --$this->initLinearEmissionDepth;
+            }
             $this->builder = $oldBuilder;
         }
     }
