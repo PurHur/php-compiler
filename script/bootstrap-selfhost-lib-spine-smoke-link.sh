@@ -53,6 +53,7 @@ fi
 
 mkdir -p "${ROOT}/build"
 export PHP_COMPILER_SELFHOST_AOT=1
+export PHP_COMPILER_LIB_SPINE_BUNDLE=1
 export BOOTSTRAP_NO_ZEND_FALLBACK=1
 
 # M5: link spine with committed prelinked vendor .o when composer tree is absent (#3052, #1416).
@@ -164,7 +165,7 @@ if [[ "${BOOTSTRAP_LIB_SPINE_SMOKE_USE_COMPILE_INVOKE:-0}" != "1" ]]; then
         exit 1
       fi
     fi
-    _spine_compile_env=(env PHP_COMPILER_SELFHOST_AOT=1)
+    _spine_compile_env=(env PHP_COMPILER_SELFHOST_AOT=1 PHP_COMPILER_LIB_SPINE_BUNDLE=1)
     if [[ -n "${PHP_COMPILER_VENDOR_PRELINK:-}" ]]; then
       _spine_compile_env+=(PHP_COMPILER_VENDOR_PRELINK="${PHP_COMPILER_VENDOR_PRELINK}")
     fi
@@ -177,7 +178,7 @@ if [[ "${BOOTSTRAP_LIB_SPINE_SMOKE_USE_COMPILE_INVOKE:-0}" != "1" ]]; then
         echo "bootstrap-selfhost-lib-spine-smoke-link: gen-0 Zend fallback (native argv driver blocked; #2967)" >&2
         rm -f "${OUT}"
         # CLI_SPINE_BUNDLE skips bin/compile.php dispatch; SIDECAR_HOST stubs spine includes (#1492).
-        env PHP_COMPILER_SELFHOST_AOT=1 PHP_COMPILER_M3_SIDECAR_HOST=1 \
+        env PHP_COMPILER_SELFHOST_AOT=1 PHP_COMPILER_LIB_SPINE_BUNDLE=1 PHP_COMPILER_M3_SIDECAR_HOST=1 \
           PHP_COMPILER_MEMORY_LIMIT="${PHP_COMPILER_MEMORY_LIMIT:-4096M}" \
           php -d "memory_limit=${PHP_COMPILER_MEMORY_LIMIT:-4096M}" \
           "${ROOT}/bin/compile.php" -o "${OUT}" "${ENTRY}" 2>&1 || true
@@ -204,7 +205,7 @@ if [[ "${BOOTSTRAP_LIB_SPINE_SMOKE_USE_COMPILE_INVOKE:-0}" == "1" ]]; then
       exit 1
     fi
   fi
-  _spine_compile_env=(env PHP_COMPILER_SELFHOST_AOT=1)
+  _spine_compile_env=(env PHP_COMPILER_SELFHOST_AOT=1 PHP_COMPILER_LIB_SPINE_BUNDLE=1)
   if [[ -n "${PHP_COMPILER_VENDOR_PRELINK:-}" ]]; then
     _spine_compile_env+=(PHP_COMPILER_VENDOR_PRELINK="${PHP_COMPILER_VENDOR_PRELINK}")
   fi

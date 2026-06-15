@@ -7342,7 +7342,7 @@ class JIT {
                             if (!$this->context->functionIsRegistered($lcname)) {
                                 if (str_contains($nameVar->compileTimeString, '::')) {
                                     [$staticClass, $staticMethod] = explode('::', $nameVar->compileTimeString, 2);
-                                    if ($this->tryResolveSelfHostSuperglobalsStaticCall($staticClass, $staticMethod)) {
+                                    if ($this->tryResolveSelfHostStubbedStaticCall($staticClass, $staticMethod)) {
                                         break;
                                     }
                                     throw new \LogicException("Call to undefined static method {$nameVar->compileTimeString}()");
@@ -11962,6 +11962,39 @@ class JIT {
         return false;
     }
 
+    private function isSelfHostProgressClassLc(string $classLc): bool
+    {
+        $classLc = strtolower(ltrim($classLc, '\\'));
+
+        return 'progress' === $classLc || str_ends_with($classLc, '\\progress');
+    }
+
+    private function tryResolveSelfHostProgressStaticCall(string $className, string $methodName): bool
+    {
+        if (!$this->shouldUseSelfHostJitStubs()) {
+            return false;
+        }
+        $declaringClassLc = strtolower(ltrim($className, '\\'));
+        if (!$this->isSelfHostProgressClassLc($declaringClassLc)) {
+            return false;
+        }
+        $methodLc = strtolower($methodName);
+        if (!in_array($methodLc, ['notefunction', 'notephase', 'noteentry'], true)) {
+            return false;
+        }
+        $fullLower = ('progress' === $declaringClassLc ? 'phpcompiler\\jit\\progress' : $declaringClassLc)
+            .'::'.$methodLc;
+        $this->context->scope->toCall = $this->context->resolveFunctionProxy($fullLower);
+
+        return true;
+    }
+
+    private function tryResolveSelfHostStubbedStaticCall(string $className, string $methodName): bool
+    {
+        return $this->tryResolveSelfHostSuperglobalsStaticCall($className, $methodName)
+            || $this->tryResolveSelfHostProgressStaticCall($className, $methodName);
+    }
+
     private function resolveJitStaticMethodProxyName(string $classLc, string $methodLc): string
     {
         $methodLc = strtolower($methodLc);
@@ -12126,7 +12159,7 @@ class JIT {
 
                 return;
             }
-            if ($this->tryResolveSelfHostSuperglobalsStaticCall($className, $nameOp->value)) {
+            if ($this->tryResolveSelfHostStubbedStaticCall($className, $nameOp->value)) {
                 $this->context->scope->args = [];
 
                 return;
