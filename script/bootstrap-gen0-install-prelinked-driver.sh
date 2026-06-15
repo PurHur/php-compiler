@@ -187,6 +187,12 @@ bootstrap_ensure_m3_compiler_lib_sidecar() {
     mv -f "${regen_tmp}" "${blob}"
     chmod +x "${blob}"
     printf '%s' "${want_sha}" >"${stamp}"
+    if [[ -f "${prelinked_lib}" ]] && ! cmp -s "${blob}" "${prelinked_lib}"; then
+      cp -f "${blob}" "${prelinked_lib}"
+      chmod +x "${prelinked_lib}"
+      printf '%s' "${want_sha}" >"${root}/prelinked/bootstrap-gen0/.m3_compiler_lib_sidecar.sha"
+      echo "bootstrap-ensure-m3-compiler-lib-sidecar: refreshed prelinked ${prelinked_lib} (#8559)" >&2
+    fi
     return 0
   fi
   rm -f "${regen_tmp}"

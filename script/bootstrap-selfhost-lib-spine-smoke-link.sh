@@ -263,9 +263,21 @@ if [[ -n "${want_sha:-}" ]]; then
     exit 1
   fi
   prelinked_lib="${ROOT}/prelinked/bootstrap-gen0/compiler_lib_aot_blob"
-  if [[ -f "${prelinked_lib}" ]] && cmp -s "${OUT}" "${prelinked_lib}"; then
-    echo "bootstrap-selfhost-lib-spine-smoke-link: output still byte-matches stale prelinked ${prelinked_lib} — refresh prelinked after honest emit (#8559)" >&2
+  prelinked_stamp="${ROOT}/prelinked/bootstrap-gen0/.m3_compiler_lib_sidecar.sha"
+  prelinked_sha=""
+  if [[ -f "${prelinked_stamp}" ]]; then
+    prelinked_sha="$(tr -d '\n' <"${prelinked_stamp}")"
+  fi
+  if [[ -f "${prelinked_lib}" ]] && cmp -s "${OUT}" "${prelinked_lib}" \
+    && [[ -n "${want_sha}" && "${want_sha}" != "${prelinked_sha}" ]]; then
+    echo "bootstrap-selfhost-lib-spine-smoke-link: output still byte-matches stale prelinked ${prelinked_lib} (want ${want_sha}, prelinked ${prelinked_sha:-<none>}) — honest emit required (#8559)" >&2
     exit 1
+  fi
+  if [[ "${refresh_sidecar}" == "1" && -n "${want_sha}" && "${want_sha}" != "${prelinked_sha}" ]]; then
+    cp -f "${OUT}" "${prelinked_lib}"
+    chmod +x "${prelinked_lib}"
+    printf '%s' "${want_sha}" >"${prelinked_stamp}"
+    echo "bootstrap-selfhost-lib-spine-smoke-link: refreshed prelinked ${prelinked_lib} (#8559)" >&2
   fi
 fi
 echo "bootstrap-selfhost-lib-spine-smoke-link: OK ${OUT}"
