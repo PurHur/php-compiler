@@ -12297,9 +12297,13 @@ restart:
                 VM\EnumSupport::ensureBackedEnumValuesUnique($classEntry);
             }
             if (EnumCaseSupport::tryMaterializeEnumCaseConstantFetch($classEntry, $memberLc, $dest)) {
+                $dest->copyFrom(EnumCaseSupport::materializeConstantValue($this->context, $dest));
+
                 return true;
             }
-            $dest->copyFrom($classEntry->constants[$memberLc]);
+            $dest->copyFrom(
+                EnumCaseSupport::materializeConstantValue($this->context, $classEntry->constants[$memberLc])
+            );
 
             return true;
         }
