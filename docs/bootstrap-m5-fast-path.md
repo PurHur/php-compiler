@@ -157,3 +157,25 @@ Presenter: `make north-star5-verify` / `./script/north-star5-verify.sh` ([#1416]
 **Stub policy:** shrink `PHP_COMPILER_SELFHOST_AOT` stubs on the **compile spine first** (`parseAndCompile` → `standalone` → `Compiler::compile`), not whole-tree at once.
 
 **Related:** [self-host-target.md](self-host-target.md) · [bootstrap-selfhost.md](bootstrap-selfhost.md) · [#1056](https://github.com/PurHur/php-compiler/issues/1056) · vendor prelink [#1416](https://github.com/PurHur/php-compiler/issues/1416)
+
+---
+
+## Fast feedback loops (M5 green, Jun 2026)
+
+Use these during LLVM/JIT iteration — avoid full spine relink unless you changed `compiler_lib_spine_smoke/main.php` or need freshness.
+
+| Command | Typical time | Notes |
+|---------|--------------|-------|
+| `make bootstrap-selfhost-vm-driver-execute-probe` | **~20ms** | Native env gate only; seeds from `prelinked/bootstrap-gen0` if binary missing |
+| `make bootstrap-selfhost-lib-spine-smoke` | minutes | Full spine link — run after spine entry edits or before refreshing gen-0 blobs |
+| `make north-star5-verify` | ~1h strict | Full M5 presenter; use `--strict` before merging bootstrap work |
+| `php script/bootstrap-inventory.php --check` | seconds | Inventory SSOT without LLVM |
+| `php script/check-selfhost-spine-coverage-sync.php` | seconds | Spine ↔ inventory coverage (**2643/2643**) |
+
+**Env flags**
+
+| Flag | When |
+|------|------|
+| `BOOTSTRAP_VM_DRIVER_EXECUTE_PROBE_FULL_LINK=1` | VM probe must rebuild spine (post-entry edit, refresh gen-0) |
+| `BOOTSTRAP_FORCE_COMPILER_LIB_SIDECAR_REGEN=1` | Regenerate `build/.m3_compiler_lib_aot_blob` via Zend (slow) |
+| `BOOTSTRAP_M5_NO_ZEND=1` | Cold boot from prelinked gen-0 only ([#3053](https://github.com/PurHur/php-compiler/issues/3053)) |
