@@ -9440,6 +9440,7 @@ class JIT {
                         && Variable::TYPE_STRING !== $declaredJitType
                         && Variable::TYPE_NATIVE_BOOL !== $declaredJitType
                         && Variable::TYPE_NATIVE_DOUBLE !== $declaredJitType
+                        && Variable::TYPE_HASHTABLE !== $declaredJitType
                     ) {
                         $declaredJitType = $this->context->type->object->externalPropertyJitType(
                             $className,
