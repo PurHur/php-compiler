@@ -135,6 +135,9 @@ class Compiler {
     /** @var array<string, array<string, true>> lowercase enum => lowercase `case` names (#5054) */
     private array $compileTimeEnumCaseConstNames = [];
 
+    /** @var array<string, array<int|string, string>> lowercase enum => backing scalar => first case name (#8687) */
+    private array $compileTimeEnumBackingValues = [];
+
     /** @var array<string, array<string, true>> lowercase class => declared static property names (#3814). */
     private array $compiledClassStaticProperties = [];
 
@@ -388,6 +391,7 @@ class Compiler {
         $this->abstractEnums = [];
         $this->compileTimeEnumBackedTypes = [];
         $this->compileTimeEnumCaseConstNames = [];
+        $this->compileTimeEnumBackingValues = [];
         $this->compileTimeGlobalConsts = [];
         $this->haltCompilerRemaining = null;
         $this->haltCompilerOffset = null;
@@ -3976,6 +3980,12 @@ class Compiler {
                 $backing = new Variable();
                 $backing->copyFrom($result->constants[$valueSlot]);
                 if ($constOp->isEnumCaseDeclare) {
+                    $this->rejectDuplicateEnumBackingValueAtCompileTime(
+                        $child,
+                        $this->compilingClassDisplayName ?? $this->compilingClassLc,
+                        $constName,
+                        $backing
+                    );
                     $stored = $this->compileTimeEnumCaseVar(
                         $this->compilingClassDisplayName ?? $this->compilingClassLc,
                         $constName,
@@ -4016,6 +4026,63 @@ class Compiler {
         }
 
         return 0 === (property_exists($child, 'flags') ? (int) $child->flags : 0);
+    }
+
+    /**
+     * Zend zend_enum.c / zend_compile.c — duplicate backed enum case values are a compile fatal (#8687).
+     *
+     * @return never
+     */
+    private function rejectDuplicateEnumBackingValueAtCompileTime(
+        Op\Terminal\Const_ $child,
+        string $enumDisplayName,
+        string $caseName,
+        Variable $backing
+    ): void {
+        if (null === $this->compilingClassLc) {
+            return;
+        }
+        $backedType = $this->compileTimeEnumBackedTypes[$this->compilingClassLc] ?? null;
+        if (null === $backedType) {
+            return;
+        }
+        $key = $this->compileTimeEnumBackingScalarKey($backing, $backedType);
+        if (null === $key) {
+            return;
+        }
+        $lc = $this->compilingClassLc;
+        if (isset($this->compileTimeEnumBackingValues[$lc][$key])) {
+            $sourceFile = $child->getFile() ?? '';
+            if ('' === $sourceFile) {
+                $sourceFile = 'unknown';
+            }
+            throw new CompileFatal(
+                $sourceFile,
+                max(1, $child->getLine()),
+                sprintf(
+                    'Duplicate value in enum %s for cases %s and %s',
+                    $enumDisplayName,
+                    $this->compileTimeEnumBackingValues[$lc][$key],
+                    $caseName
+                )
+            );
+        }
+        $this->compileTimeEnumBackingValues[$lc][$key] = $caseName;
+    }
+
+    /**
+     * @return int|string|null compile-time backing scalar key, or null when not foldable
+     */
+    private function compileTimeEnumBackingScalarKey(Variable $backing, string $backedType): int|string|null
+    {
+        if ('int' === $backedType && $backing->is(Variable::TYPE_INTEGER)) {
+            return $backing->toInt();
+        }
+        if ('string' === $backedType && $backing->is(Variable::TYPE_STRING)) {
+            return $backing->toString();
+        }
+
+        return null;
     }
 
     /**
@@ -5080,7 +5147,7 @@ class Compiler {
                     $this->compileTimeEnumBackedTypes[$lcClass] ?? null
                 );
             }
-            // Defer enum case fetches to runtime so duplicate backing is caught on first use (#5773).
+            // Non-literal duplicate backing falls back to runtime ensureBackedEnumValuesUnique (#5773).
             if (Variable::TYPE_OBJECT === $stored->type && EnumCaseSupport::isEnumCase($stored->toObject())) {
                 if (!$materializeEnumCase) {
                     return null;
