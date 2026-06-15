@@ -52,6 +52,8 @@ class Module extends ModuleAbstract
             new mb_scrub(),
             new mb_encode_numericentity(),
             new mb_decode_numericentity(),
+            new mb_encode_mimeheader(),
+            new mb_decode_mimeheader(),
         ];
     }
 }

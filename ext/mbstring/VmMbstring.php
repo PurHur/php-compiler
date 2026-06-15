@@ -1559,4 +1559,317 @@ final class VmMbstring
             );
         }
     }
+
+    /**
+     * mb_encode_mimeheader() — RFC 2047 encoded-word headers (php-src ext/mbstring/mbstring.c; #6038).
+     */
+    public static function encodeMimeheader(
+        string $str,
+        string $charset = 'UTF-8',
+        bool $base64 = true,
+        string $linefeed = "\r\n",
+        int $indent = 0
+    ): string {
+        if ('' === $str) {
+            return '';
+        }
+        self::assertMimeHeaderCharset($charset);
+        if ($indent < 0 || $indent >= 74) {
+            $indent = 0;
+        }
+        if (self::mimeHeaderCanPassThrough($str)) {
+            return $str;
+        }
+
+        $parts = self::mimeHeaderSplitSegments($str);
+        $out = '';
+        foreach ($parts as $part) {
+            if ('ascii' === $part['type']) {
+                $out .= $part['text'];
+                continue;
+            }
+            if ('' !== $out && !str_ends_with($out, ' ')) {
+                $out .= ' ';
+            }
+            $out .= self::mimeHeaderEncodeWord($part['text'], $charset, $base64);
+        }
+
+        return $out;
+    }
+
+    /**
+     * mb_decode_mimeheader() — decode RFC 2047 encoded words (php-src ext/mbstring/mbstring.c; #6038).
+     */
+    public static function decodeMimeheader(string $str): string
+    {
+        if ('' === $str) {
+            return '';
+        }
+
+        $len = \strlen($str);
+        $out = '';
+        $i = 0;
+        while ($i < $len) {
+            if ('=' === $str[$i] && ($i + 1) < $len && '?' === $str[$i + 1]) {
+                $decoded = self::mimeHeaderDecodeWordAt($str, $i, $len);
+                if (null !== $decoded) {
+                    [$text, $next] = $decoded;
+                    $out .= $text;
+                    $i = $next;
+                    while ($i < $len && self::mimeHeaderIsWhitespace($str[$i])) {
+                        ++$i;
+                    }
+                    if ($i < $len && '=' === $str[$i] && ($i + 1) < $len && '?' === $str[$i + 1]) {
+                        continue;
+                    }
+                    if ($i < $len) {
+                        $out .= ' ';
+                    }
+                    continue;
+                }
+            }
+
+            $start = $i;
+            while ($i < $len) {
+                if ('=' === $str[$i] && ($i + 1) < $len && '?' === $str[$i + 1]) {
+                    break;
+                }
+                if ("\n" === $str[$i] || "\r" === $str[$i]) {
+                    ++$i;
+                    while ($i < $len && self::mimeHeaderIsWhitespace($str[$i])) {
+                        ++$i;
+                    }
+                    if ($i < $len) {
+                        $out .= ' ';
+                    }
+                    break;
+                }
+                ++$i;
+            }
+            if ($i > $start) {
+                $out .= \substr($str, $start, $i - $start);
+            }
+        }
+
+        return $out;
+    }
+
+    public static function coerceMimeHeaderTransferEncoding(Variable $var, string $function, int $argIndex): bool
+    {
+        $var = $var->resolveIndirect();
+        if (Variable::TYPE_NULL === $var->type) {
+            return true;
+        }
+        $name = VmString::coerceStringBuiltinArg($var, $function, $argIndex, 'transfer_encoding');
+        if ('' === $name) {
+            return true;
+        }
+        $flag = $name[0];
+
+        return 'B' !== $flag && 'b' !== $flag ? false : true;
+    }
+
+    public static function coerceMimeHeaderLinefeed(Variable $var, string $function, int $argIndex): string
+    {
+        $var = $var->resolveIndirect();
+        if (Variable::TYPE_NULL === $var->type) {
+            return "\r\n";
+        }
+
+        return VmString::coerceStringBuiltinArg($var, $function, $argIndex, 'linefeed');
+    }
+
+    public static function coerceMimeHeaderIndent(Variable $var, string $function, int $argIndex): int
+    {
+        $var = $var->resolveIndirect();
+        if (EnumCaseSupport::isEnumCaseVariable($var)) {
+            throw new \TypeError(\sprintf(
+                '%s(): Argument #%d ($indent) must be of type int, %s given',
+                $function,
+                $argIndex + 1,
+                EnumCaseSupport::typeNameForVariable($var)
+            ));
+        }
+        if (Variable::TYPE_INTEGER !== $var->type) {
+            throw new \TypeError(\sprintf(
+                '%s(): Argument #%d ($indent) must be of type int, %s given',
+                $function,
+                $argIndex + 1,
+                self::typeLabel($var)
+            ));
+        }
+
+        return $var->toInt();
+    }
+
+    private static function assertMimeHeaderCharset(string $charset): void
+    {
+        if ('UTF-8' !== $charset && 'ASCII' !== $charset && '8BIT' !== $charset) {
+            throw new \ValueError(\sprintf(
+                'mb_encode_mimeheader(): Argument #2 ($charset) is not a supported encoding, "%s" given',
+                $charset
+            ));
+        }
+        if ('ASCII' === $charset || '8BIT' === $charset) {
+            return;
+        }
+    }
+
+    private static function mimeHeaderCanPassThrough(string $str): bool
+    {
+        $checkingLeading = true;
+        $len = \strlen($str);
+        for ($i = 0; $i < $len; ++$i) {
+            $byte = \ord($str[$i]);
+            if ($checkingLeading && 0x20 === $byte) {
+                continue;
+            }
+            $checkingLeading = false;
+            if ($byte < 0x21 || $byte > 0x7E || 0x3D === $byte || 0x3F === $byte || 0x5F === $byte) {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    /**
+     * @return list<array{type: 'ascii'|'encoded', text: string}>
+     */
+    private static function mimeHeaderSplitSegments(string $str): array
+    {
+        $parts = [];
+        $len = \strlen($str);
+        $i = 0;
+        while ($i < $len) {
+            $start = $i;
+            while ($i < $len && self::mimeHeaderIsSafeAsciiByte($str[$i])) {
+                ++$i;
+            }
+            if ($i > $start) {
+                $parts[] = ['type' => 'ascii', 'text' => \substr($str, $start, $i - $start)];
+            }
+            if ($i >= $len) {
+                break;
+            }
+            $start = $i;
+            while ($i < $len && !self::mimeHeaderIsSafeAsciiByte($str[$i])) {
+                $i += VmString::utf8CharByteWidth($str, $i);
+            }
+            $parts[] = ['type' => 'encoded', 'text' => \substr($str, $start, $i - $start)];
+        }
+
+        return $parts;
+    }
+
+    private static function mimeHeaderIsSafeAsciiByte(string $byte): bool
+    {
+        $ord = \ord($byte);
+
+        return $ord >= 0x20 && $ord <= 0x7E && 0x3D !== $ord && 0x3F !== $ord && 0x5F !== $ord;
+    }
+
+    private static function mimeHeaderIsWhitespace(string $byte): bool
+    {
+        return ' ' === $byte || "\t" === $byte || "\r" === $byte || "\n" === $byte;
+    }
+
+    private static function mimeHeaderEncodeWord(string $text, string $charset, bool $base64): string
+    {
+        $mimeCharset = 'ASCII' === $charset || '8BIT' === $charset ? 'ISO-8859-1' : $charset;
+
+        return $base64
+            ? '=?'.$mimeCharset.'?B?'.\base64_encode($text).'?='
+            : '=?'.$mimeCharset.'?Q?'.self::mimeHeaderQEncode($text).'?=';
+    }
+
+    private static function mimeHeaderQEncode(string $text): string
+    {
+        $out = '';
+        $len = \strlen($text);
+        for ($i = 0; $i < $len; ++$i) {
+            $byte = $text[$i];
+            $ord = \ord($byte);
+            if ($ord >= 0x20 && $ord <= 0x7E && 0x3D !== $ord && 0x3F !== $ord && 0x5F !== $ord) {
+                $out .= $byte;
+                continue;
+            }
+            if (0x20 === $ord) {
+                $out .= '_';
+                continue;
+            }
+            $out .= \sprintf('=%02X', $ord);
+        }
+
+        return $out;
+    }
+
+    /**
+     * @return array{0: string, 1: int}|null
+     */
+    private static function mimeHeaderDecodeWordAt(string $str, int $pos, int $len): ?array
+    {
+        if (($pos + 5) >= $len || '=' !== $str[$pos] || '?' !== $str[$pos + 1]) {
+            return null;
+        }
+        $charsetEnd = \strpos($str, '?', $pos + 2);
+        if (false === $charsetEnd || ($charsetEnd + 2) >= $len) {
+            return null;
+        }
+        $encoding = $str[$charsetEnd + 1];
+        if ('?' !== $str[$charsetEnd + 2]) {
+            return null;
+        }
+        $dataStart = $charsetEnd + 3;
+        $dataEnd = \strpos($str, '?=', $dataStart);
+        if (false === $dataEnd) {
+            if ($len > $dataStart && '?' === $str[$len - 1]) {
+                $dataEnd = $len - 1;
+                $next = $len;
+            } else {
+                return null;
+            }
+        } else {
+            $next = $dataEnd + 2;
+        }
+        $payload = \substr($str, $dataStart, $dataEnd - $dataStart);
+        $decoded = ('Q' === $encoding || 'q' === $encoding)
+            ? self::mimeHeaderQDecode($payload)
+            : self::mimeHeaderBase64Decode($payload);
+
+        return [$decoded, $next];
+    }
+
+    private static function mimeHeaderBase64Decode(string $payload): string
+    {
+        $clean = \preg_replace('/[\r\n\t =]/', '', $payload);
+        if (!\is_string($clean) || '' === $clean) {
+            return '';
+        }
+        $decoded = \base64_decode($clean, true);
+
+        return false === $decoded ? '' : $decoded;
+    }
+
+    private static function mimeHeaderQDecode(string $payload): string
+    {
+        $out = '';
+        $len = \strlen($payload);
+        for ($i = 0; $i < $len; ++$i) {
+            $byte = $payload[$i];
+            if ('_' === $byte) {
+                $out .= ' ';
+                continue;
+            }
+            if ('=' === $byte && ($i + 2) < $len) {
+                $hex = \hexdec(\substr($payload, $i + 1, 2));
+                $out .= \chr((int) $hex);
+                $i += 2;
+                continue;
+            }
+            $out .= $byte;
+        }
+
+        return $out;
+    }
 }
