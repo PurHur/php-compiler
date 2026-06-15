@@ -20,7 +20,9 @@ final class JitSetcookie
         Value $pathPtr,
         Value $domainPtr,
         Value $secureI32,
-        Value $httponlyI32
+        Value $httponlyI32,
+        Value $samesitePtr,
+        Value $partitionedI32
     ): void {
         $context->builder->call(
             $context->lookupFunction('__phpc_setcookie_add'),
@@ -30,7 +32,9 @@ final class JitSetcookie
             $pathPtr,
             $domainPtr,
             $secureI32,
-            $httponlyI32
+            $httponlyI32,
+            $samesitePtr,
+            $partitionedI32
         );
     }
 

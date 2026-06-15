@@ -422,6 +422,8 @@ final class PendingHeadersRuntime
             $strPtr,
             $strPtr,
             $i32,
+            $i32,
+            $strPtr,
             $i32
         );
         $entry = $fn->appendBasicBlock('sc_entry');
@@ -440,6 +442,8 @@ final class PendingHeadersRuntime
         $domain = $fn->getParam(4);
         $secure = $fn->getParam(5);
         $httponly = $fn->getParam(6);
+        $samesite = $fn->getParam(7);
+        $partitioned = $fn->getParam(8);
 
         $bufTy = $context->getTypeFromString('int8')->arrayType(2048);
         $buf = $context->builder->alloca($bufTy, 1);
@@ -472,6 +476,16 @@ final class PendingHeadersRuntime
         $posAfterPath = self::appendSetcookiePart($context, $fn, $buf, $posAfterExpires, $path, '; path=', 7);
         $posAfterDomain = self::appendSetcookiePart($context, $fn, $buf, $posAfterPath, $domain, '; domain=', 9);
         $posAfterFlags = self::appendSetcookieFlags($context, $fn, $buf, $posAfterDomain, $secure, $httponly);
+        $posAfterSamesite = self::appendSetcookiePart($context, $fn, $buf, $posAfterFlags, $samesite, '; samesite=', 11);
+        $posAfterPartitioned = self::appendSetcookieLiteralFlag(
+            $context,
+            $fn,
+            $buf,
+            $posAfterSamesite,
+            $partitioned,
+            '; partitioned',
+            14
+        );
 
         $lineLen = $context->builder->call(
             $context->lookupFunction('strlen'),

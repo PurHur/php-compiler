@@ -31,7 +31,7 @@ final class setcookie extends Internal
 
     public function execute(Frame $frame): void
     {
-        $parsed = self::parseArgs($frame->calledArgs);
+        $parsed = SetcookieOptions::parseArgs('setcookie', $frame->calledArgs);
         ResponseContext::addHeader(SetcookieLine::build(
             $parsed['name'],
             $parsed['value'],
@@ -39,7 +39,9 @@ final class setcookie extends Internal
             $parsed['path'],
             $parsed['domain'],
             $parsed['secure'],
-            $parsed['httponly']
+            $parsed['httponly'],
+            $parsed['samesite'],
+            $parsed['partitioned']
         ), false);
         if (null !== $frame->returnVar) {
             $frame->returnVar->bool(true);
@@ -49,11 +51,15 @@ final class setcookie extends Internal
     public function call(Context $context, JITVariable ...$args): Value
     {
         $argc = \count($args);
+        if ($argc >= 3 && JitSetcookieOptions::isOptionsArrayArg($args[2])) {
+            return JitSetcookieOptions::invoke($context, 'setcookie', ...$args);
+        }
         if ($argc < 1 || $argc > 7) {
             throw new \LogicException('setcookie() accepts one to seven arguments');
         }
         $i32 = $context->getTypeFromString('int32');
         $i64 = $context->getTypeFromString('int64');
+        $strPtr = $context->getTypeFromString('__string__*');
         $namePtr = JitStringBuiltinArg::lower($context, $args[0], 'setcookie', 0, 'name');
         $valuePtr = $context->builder->load($context->constantStringFromString(''));
         if ($argc >= 2) {
@@ -89,6 +95,8 @@ final class setcookie extends Internal
                 $i32
             );
         }
+        $samesitePtr = $strPtr->constNull();
+        $partitionedI32 = $i32->constInt(0, false);
 
         if (Builtin::LOAD_TYPE_STANDALONE === $context->loadType) {
             JitSetcookie::emitPending(
@@ -99,7 +107,9 @@ final class setcookie extends Internal
                 $pathPtr,
                 $domainPtr,
                 $secureI32,
-                $httponlyI32
+                $httponlyI32,
+                $samesitePtr,
+                $partitionedI32
             );
 
             return $context->constantFromBool(true);
@@ -181,66 +191,6 @@ final class setcookie extends Internal
         }
 
         return null;
-    }
-
-    /**
-     * @param Variable[] $args
-     *
-     * @return array{name: string, value: string, expires: int, path: string, domain: string, secure: bool, httponly: bool}
-     */
-    private static function parseArgs(array $args): array
-    {
-        $argc = \count($args);
-        if ($argc < 1 || $argc > 7) {
-            throw new \LogicException('setcookie() accepts one to seven arguments');
-        }
-        $name = VmString::coerceStringBuiltinArg($args[0], 'setcookie', 0, 'name');
-        $value = '';
-        if ($argc >= 2) {
-            $value = VmString::coerceStringBuiltinArg($args[1], 'setcookie', 1, 'value');
-        }
-        $expires = 0;
-        if ($argc >= 3) {
-            $e = $args[2]->resolveIndirect();
-            if (Variable::TYPE_INTEGER !== $e->type) {
-                throw new \LogicException('setcookie() expires must be an integer in this compiler build');
-            }
-            $expires = $e->toInt();
-        }
-        $path = '';
-        if ($argc >= 4) {
-            $path = VmString::coerceStringBuiltinArg($args[3], 'setcookie', 3, 'path');
-        }
-        $domain = '';
-        if ($argc >= 5) {
-            $domain = VmString::coerceStringBuiltinArg($args[4], 'setcookie', 4, 'domain');
-        }
-        $secure = false;
-        if ($argc >= 6) {
-            $s = $args[5]->resolveIndirect();
-            if (Variable::TYPE_BOOLEAN !== $s->type) {
-                throw new \LogicException('setcookie() secure must be a boolean in this compiler build');
-            }
-            $secure = $s->toBool();
-        }
-        $httponly = false;
-        if ($argc >= 7) {
-            $h = $args[6]->resolveIndirect();
-            if (Variable::TYPE_BOOLEAN !== $h->type) {
-                throw new \LogicException('setcookie() httponly must be a boolean in this compiler build');
-            }
-            $httponly = $h->toBool();
-        }
-
-        return [
-            'name' => $name,
-            'value' => $value,
-            'expires' => $expires,
-            'path' => $path,
-            'domain' => $domain,
-            'secure' => $secure,
-            'httponly' => $httponly,
-        ];
     }
 
 }
