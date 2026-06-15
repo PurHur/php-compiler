@@ -622,7 +622,8 @@ final class EnumCaseSupport
             return false;
         }
 
-        return $leftClass === $rightClass && $leftName === $rightName;
+        return strcasecmp(ltrim($leftClass->name, '\\'), ltrim($rightClass->name, '\\')) === 0
+            && $leftName === $rightName;
     }
 
     /**

@@ -142,9 +142,13 @@ final class VmConstants
             \PHPCompiler\VM\EnumSupport::ensureBackedEnumValuesUnique($classEntry);
         }
         if (EnumCaseSupport::tryMaterializeEnumCaseConstantFetch($classEntry, $constKey, $result)) {
+            $result->copyFrom(EnumCaseSupport::materializeConstantValue($ctx, $result));
+
             return $result;
         }
-        $result->copyFrom($classEntry->constants[$constKey]);
+        $result->copyFrom(
+            EnumCaseSupport::materializeConstantValue($ctx, $classEntry->constants[$constKey])
+        );
 
         return $result;
     }
