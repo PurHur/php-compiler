@@ -29,12 +29,7 @@ class http_get_last_response_headers extends Internal
             return;
         }
         $headers = VmHttpLastResponseHeaders::get();
-        if (null === $headers) {
-            $frame->returnVar->null();
-
-            return;
-        }
-        $frame->returnVar->array(VmFs::stringListToArray($headers));
+        $frame->returnVar->array(VmFs::stringListToArray(null === $headers ? [] : $headers));
     }
 
     public function call(Context $context, JITVariable ...$args): Value
