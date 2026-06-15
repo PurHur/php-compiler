@@ -16,7 +16,8 @@ echo $h === http_get_last_response_headers() ? 'yes' : 'no', "\n";
 --EXPECT--
 true
 true
-NULL
+array (
+)
 yes
 yes
 yes
