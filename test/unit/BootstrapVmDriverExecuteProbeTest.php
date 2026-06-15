@@ -30,8 +30,10 @@ final class BootstrapVmDriverExecuteProbeTest extends TestCase
         $this->assertStringContainsString('selfhost-lib-spine-smoke', $script);
         $this->assertStringContainsString('vm driver ok', $script);
         $this->assertStringContainsString('bootstrap-selfhost-lib-spine-smoke-link.sh', $script);
-        $this->assertStringContainsString('bootstrap_compiler_lib_spine_entry_sha', $script);
         $this->assertStringContainsString('.m3_compiler_lib_sidecar.sha', $script);
+        $this->assertStringContainsString('BOOTSTRAP_VM_DRIVER_EXECUTE_PROBE_FULL_LINK', $script);
+        $this->assertStringContainsString('bootstrap_copy_prelinked_compiler_lib_spine_blob', $script);
+        $this->assertStringContainsString('bootstrap_vm_driver_execute_probe_llvm_env', $script);
     }
 
     public function testSpineEntryDocumentsVmDriverExecutePath(): void

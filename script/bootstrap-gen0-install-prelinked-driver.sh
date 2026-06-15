@@ -122,6 +122,27 @@ bootstrap_gen0_seed_prelinked_m3_sidecars() {
   return 0
 }
 
+# Copy committed gen-0 spine AOT blob (no Zend/inventory compile — feedback-loop fast path #2201).
+bootstrap_copy_prelinked_compiler_lib_spine_blob() {
+  local out=$1
+  local root="${ROOT:-}"
+  local prelinked="${root}/prelinked/bootstrap-gen0/compiler_lib_aot_blob"
+  local stamp_src="${root}/prelinked/bootstrap-gen0/.m3_compiler_lib_sidecar.sha"
+  local stamp_dst="${root}/build/.m3_compiler_lib_sidecar.sha"
+  if [[ -z "${root}" || -z "${out}" || ! -f "${prelinked}" || ! -s "${prelinked}" ]]; then
+    return 1
+  fi
+  mkdir -p "$(dirname "${out}")" "${root}/build"
+  cp -f "${prelinked}" "${out}"
+  chmod +x "${out}"
+  cp -f "${prelinked}" "${root}/build/.m3_compiler_lib_aot_blob"
+  chmod +x "${root}/build/.m3_compiler_lib_aot_blob"
+  if [[ -f "${stamp_src}" ]]; then
+    cp -f "${stamp_src}" "${stamp_dst}"
+  fi
+  return 0
+}
+
 # SHA-1 of M2 compiler_lib_spine_smoke entry (sidecar + inventory argv driver must match).
 bootstrap_compiler_lib_spine_entry_sha() {
   local root="${ROOT:-}"
