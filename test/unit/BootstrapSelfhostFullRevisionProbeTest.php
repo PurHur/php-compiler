@@ -29,6 +29,9 @@ final class BootstrapSelfhostFullRevisionProbeTest extends TestCase
         $this->assertStringContainsString('emit_path=native', $script);
         $this->assertStringContainsString('#2880', $script);
         $this->assertStringContainsString('compile_smoke_m3_emit:', $script);
+        $this->assertStringContainsString('bootstrap_gen3_emit_matches_stale_prelinked_gen0', $script);
+        $this->assertStringContainsString('stale prelinked/bootstrap-gen0/', $script);
+        $this->assertStringContainsString('#8710', $script);
     }
 
     public function testHelloworldCompileBinLinksInventoryBinCompile(): void

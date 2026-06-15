@@ -46,6 +46,8 @@ final class BootstrapSelfhostLinkTest extends TestCase
         $this->assertStringContainsString('bootstrap_ensure_prelinked_sidecar_path_symlink', $install);
         $this->assertStringContainsString('.m3_compiler_lib_aot_blob', $install);
         $this->assertStringContainsString('bootstrap_compiler_lib_spine_entry_sha', $install);
+        $this->assertStringContainsString('bootstrap_prelinked_gen0_compiler_lib_stamp_stale', $install);
+        $this->assertStringContainsString('bootstrap_gen3_emit_matches_stale_prelinked_gen0', $install);
         $this->assertStringContainsString('PHP_COMPILER_M3_SIDECAR_HOST=1', $install);
         $this->assertStringNotContainsString('PHP_COMPILER_CLI_SPINE_BUNDLE=1', $install);
         $this->assertFileExists(self::$root.'/prelinked/bootstrap-gen0/bin-compile-aot');
