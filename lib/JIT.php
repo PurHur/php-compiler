@@ -1662,12 +1662,12 @@ class JIT {
     }
 
     /**
-     * M3 compile-driver loadJit (#1402, #1495): outer orchestration; inner helpers are separate FUNCDEFs (#2846, #2847).
-     * Calls loadJitContext via jitContextForLoadJit — keep nested helpers out of loadJit to avoid LLVM 9 inlining crash.
+     * Retired (#8707): inventory emit-helper now real-lowers JIT spine methods; deny-list only via
+     * isM3CompileDriverSpineDenyName() for proven LLVM 9 crashers.
      */
     private function shouldStubM3InventoryEmitJitSpineMethods(): bool
     {
-        return $this->shouldUseM3InventoryEmitDriver() && $this->shouldUseEmitHelperLinkStubs();
+        return false;
     }
 
     private function compileRuntimeLoadJitM3Native(
@@ -2520,6 +2520,10 @@ class JIT {
         if (str_ends_with($emitLc, '\\runtime::loadjit')
             || str_ends_with($emitLc, '\\runtime::jitemitinplace')
         ) {
+            if ($this->shouldUseM3CompileDriverRealLowering()) {
+                return null;
+            }
+
             return $this->emitM3EmitTuRuntimeInitVoidStub($internalName, $logicalName, $block);
         }
         if ($this->shouldUseM3CompileDriverRealLowering()) {
