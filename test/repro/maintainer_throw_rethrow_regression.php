@@ -1,6 +1,3 @@
---TEST--
-Language: bare throw; rethrows caught exception (#3508)
---FILE--
 <?php
 class Ex extends Exception {}
 
@@ -13,5 +10,3 @@ try {
 } catch (Ex $e) {
     echo "ok\n";
 }
---EXPECT--
-ok
