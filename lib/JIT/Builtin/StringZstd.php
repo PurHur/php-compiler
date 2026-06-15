@@ -32,25 +32,7 @@ final class StringZstd
         if ($loaded) {
             return;
         }
-        if (!\extension_loaded('FFI')) {
-            return;
-        }
-        $selfHost = getenv('PHP_COMPILER_SELFHOST_AOT');
-        if ('1' === $selfHost || 'true' === strtolower((string) $selfHost)) {
-            $loaded = 1;
-
-            return;
-        }
-        try {
-            $dl = \FFI::cdef('void *dlopen(const char *filename, int flags);', 'libdl.so.2');
-            foreach (['libzstd.so.1', 'libzstd.so'] as $lib) {
-                if (null !== $dl->dlopen($lib, 0x101)) {
-                    break;
-                }
-            }
-        } catch (\Throwable) {
-            // Best-effort: AOT links -lzstd explicitly.
-        }
+        NativeDlopen::preloadLibraries(['libzstd.so.1', 'libzstd.so']);
         $loaded = 1;
     }
 }
