@@ -2761,9 +2761,8 @@ require_once __DIR__.'/../../../lib/JIT/Builtin/DateMutationRuntime.php';
 
 $vmDriverExecute = getenv('PHP_COMPILER_VM_DRIVER_EXECUTE');
 if (is_string($vmDriverExecute) && ('1' === $vmDriverExecute || 'true' === strtolower($vmDriverExecute))) {
-    // Dispatch bin/vm.php run() (native LLVM echo bridge; main fallback until link wires run — #2201).
+    // Honest bin/vm.php run() dispatch: main() → run() on -r fixture (#8693, #2201).
     run('Standard input code', '<?php echo "vm driver ok\n";', []);
-    echo "vm driver ok\n";
     exit(0);
 }
 

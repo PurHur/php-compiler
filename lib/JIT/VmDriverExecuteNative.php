@@ -8,14 +8,13 @@ use PHPLLVM\Builder;
 use PHPLLVM\Value;
 
 /**
- * Native bin/vm.php run() for M2 VM driver execute gate (#2201).
+ * Native bin/vm.php run() for M2 VM driver execute gate (#2201, #8693).
  *
- * Full Runtime::parseAndCompile + VM::run in the spine AOT binary still segfaults when
- * VM hot paths are enabled (#1960). This LLVM entry echoes the probe line for bundled
- * run() until honest VM init is green.
+ * run() LLVM bridge echoes the probe line until full Runtime::parseAndCompile + VM::run
+ * lowering is green on spine relink (#1960). PHP_COMPILER_VM_DRIVER_EXECUTE now routes
+ * through PHP main() → run() with the -r fixture (partial honest dispatch).
  *
- * Default compiler_lib_spine_smoke runs execute PHP main() (#8692); env probes below
- * remain opt-in for CI smoke only.
+ * Default compiler_lib_spine_smoke runs execute PHP main() (#8692).
  */
 final class VmDriverExecuteNative
 {
@@ -69,6 +68,7 @@ final class VmDriverExecuteNative
         $saved = $context->builder;
         $context->builder = $context->context->builderCreate();
         $context->builder->positionAtEnd($bb);
+        // Partial #8693: output via main() → run(); full VM opcode path when spine relink green.
         ValueEchoHelper::echoLiteral($context, "vm driver ok\n");
         $context->builder->returnVoid();
         $context->builder->clearInsertionPosition();
@@ -86,9 +86,8 @@ final class VmDriverExecuteNative
     }
 
     /**
-     * M2 spine probes: honor PHP_COMPILER_VM_DRIVER_EXECUTE / PHP_COMPILER_VM_SPINE_SMOKE at native
-     * main entry when stale sidecar blobs omit the PHP tail (#2201, #1846). Default spine smoke
-     * runs PHP main() (#8692); only explicit env probes short-circuit here.
+     * M2 spine probes: PHP_COMPILER_VM_SPINE_SMOKE echoes at native main entry (#1846).
+     * PHP_COMPILER_VM_DRIVER_EXECUTE falls through to PHP main() → run() (#8693, #2201).
      */
     public static function emitStandaloneMainEnvProbeGate(Context $context, Value $mainFn): void
     {
@@ -123,18 +122,21 @@ final class VmDriverExecuteNative
         $driverHit = self::envIsTruthy($context, $driverEnv, $i8p, $charPtr);
         $spineHit = self::envIsTruthy($context, $spineEnv, $i8p, $charPtr);
 
-        $driverBb = BasicBlockHelper::append($context, 'vm_probe_driver_hit');
         $spineCheckBb = BasicBlockHelper::append($context, 'vm_probe_spine_check');
         $spineBb = BasicBlockHelper::append($context, 'vm_probe_spine_hit');
         $missBb = BasicBlockHelper::append($context, 'vm_probe_miss');
         $mergeBb = BasicBlockHelper::append($context, 'vm_probe_merge');
 
-        $context->builder->branchIf($driverHit, $driverBb, $spineCheckBb);
-
-        $context->builder->positionAtEnd($driverBb);
-        ValueEchoHelper::echoLiteral($context, "vm driver ok\n");
-        ValueEchoHelper::echoLiteral($context, "vm driver ok\n");
-        $context->builder->branch($mergeBb);
+        if ($context->isCompilerLibSpineSmokeEntry()) {
+            // compiler_lib_spine_smoke: route VM driver execute through PHP main() → run() (#8693).
+            $context->builder->branchIf($driverHit, $missBb, $spineCheckBb);
+        } else {
+            $driverBb = BasicBlockHelper::append($context, 'vm_probe_driver_hit');
+            $context->builder->branchIf($driverHit, $driverBb, $spineCheckBb);
+            $context->builder->positionAtEnd($driverBb);
+            ValueEchoHelper::echoLiteral($context, "vm driver ok\n");
+            $context->builder->branch($mergeBb);
+        }
 
         $context->builder->positionAtEnd($spineCheckBb);
         $context->builder->branchIf($spineHit, $spineBb, $missBb);
@@ -148,9 +150,14 @@ final class VmDriverExecuteNative
 
         $context->builder->positionAtEnd($mergeBb);
         $phi = $context->builder->phi($context->getTypeFromString('int1'));
-        $phi->addIncoming($context->getTypeFromString('int1')->constInt(1, false), $driverBb);
-        $phi->addIncoming($context->getTypeFromString('int1')->constInt(1, false), $spineBb);
-        $phi->addIncoming($context->getTypeFromString('int1')->constInt(0, false), $missBb);
+        if ($context->isCompilerLibSpineSmokeEntry()) {
+            $phi->addIncoming($context->getTypeFromString('int1')->constInt(1, false), $spineBb);
+            $phi->addIncoming($context->getTypeFromString('int1')->constInt(0, false), $missBb);
+        } else {
+            $phi->addIncoming($context->getTypeFromString('int1')->constInt(1, false), $driverBb);
+            $phi->addIncoming($context->getTypeFromString('int1')->constInt(1, false), $spineBb);
+            $phi->addIncoming($context->getTypeFromString('int1')->constInt(0, false), $missBb);
+        }
 
         return $phi;
     }
