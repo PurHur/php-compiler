@@ -3817,8 +3817,7 @@ class Compiler {
                         null !== $propertyDeclName ? $propertyDeclName : $child->declaredType
                     );
                     if (
-                        !$child->static
-                        && isset($result->constants[$typeSlot])
+                        isset($result->constants[$typeSlot])
                         && null !== $result->constants[$typeSlot]->dnfArms
                     ) {
                         $this->scriptHasDnfTypedProperties = true;

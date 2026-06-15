@@ -98,6 +98,9 @@ class Object_ extends Type {
     /** @var array<int, array<string, list<array{kind: string, interfaces?: list<string>, display?: string, name?: string}>>> */
     private array $propertyDnfArms = [];
 
+    /** @var array<int, array<string, list<array{kind: string, interfaces?: list<string>, display?: string, name?: string}>>> */
+    private array $staticPropertyDnfArms = [];
+
     /** @var array<int, array<int, true>> class id => property slot => true when declared type allows null (#5220) */
     private array $propertyAllowsNullSlots = [];
     /** @var array<int, array<string, string>> class id => method lc => declared casing (#3118) */
@@ -3316,12 +3319,28 @@ class Object_ extends Type {
         $this->propertyDnfArms[$classId][strtolower($name)] = $arms;
     }
 
+    public function defineStaticPropertyDnfArms(int $classId, string $name, array $arms): void
+    {
+        if ([] === $arms) {
+            return;
+        }
+        $this->staticPropertyDnfArms[$classId][strtolower($name)] = $arms;
+    }
+
     /**
      * @return list<array{kind: string, interfaces?: list<string>, display?: string, name?: string}>|null
      */
     public function dnfArmsForProperty(int $classId, string $name): ?array
     {
         return $this->propertyDnfArms[$classId][strtolower($name)] ?? null;
+    }
+
+    /**
+     * @return list<array{kind: string, interfaces?: list<string>, display?: string, name?: string}>|null
+     */
+    public function dnfArmsForStaticProperty(int $classId, string $name): ?array
+    {
+        return $this->staticPropertyDnfArms[$classId][strtolower($name)] ?? null;
     }
 
     public function definePropertyRuntimeNewDefault(int $classId, string $name, string $newClassName): void
@@ -3783,6 +3802,10 @@ class Object_ extends Type {
                 $this->staticPropertyDeclaringClassId[$classId][$name]
                     = $this->staticPropertyDeclaringClassId[$traitId][$name];
             }
+            $arms = $this->dnfArmsForStaticProperty($traitId, $name);
+            if (null !== $arms) {
+                $this->defineStaticPropertyDnfArms($classId, $name, $arms);
+            }
         }
     }
 
@@ -4052,6 +4075,8 @@ class Object_ extends Type {
         }
         if (Variable::TYPE_VALUE === $jitType && null !== $default && EnumCaseSupport::isEnumCaseVariable($default)) {
             $this->initStaticValuePropertyEnumCase($global, $default);
+        } elseif (Variable::TYPE_VALUE === $jitType && null !== $default && VMVariable::TYPE_NULL !== $default->type) {
+            $this->initStaticValuePropertyScalarDefault($global, $default);
         } elseif (Variable::TYPE_VALUE === $jitType && (null === $default || VMVariable::TYPE_NULL === $default->type)) {
             $this->initStaticValuePropertyNull($global);
         }
@@ -4115,6 +4140,64 @@ class Object_ extends Type {
             $this->context->lookupFunction('__value__writeNull'),
             $heapPtr
         );
+        $this->context->builder->store($heapPtr, $global);
+        if (null !== $restore) {
+            BasicBlockHelper::restoreInsertBlock($this->context, $restore);
+        }
+    }
+
+    /** Box a compile-time scalar default into a union/DNF static {@see __value__} property (#8726). */
+    private function initStaticValuePropertyScalarDefault(\PHPLLVM\Value $global, VMVariable $default): void
+    {
+        $restore = $this->context->builder->getInsertBlock();
+        $this->context->positionBuilderAtInitEmission();
+        $valueType = $this->context->getTypeFromString('__value__');
+        $heapVal = $this->context->memory->malloc($valueType);
+        $heapPtr = $this->context->builder->pointerCast(
+            $heapVal,
+            $this->context->getTypeFromString('__value__*')
+        );
+        $valueMap = $this->context->structFieldMap['__value__'];
+        $this->context->builder->store(
+            $this->context->getTypeFromString('int8')->constInt($default->type, false),
+            $this->context->builder->structGep($heapVal, $valueMap['type'])
+        );
+        if (VMVariable::TYPE_STRING === $default->type) {
+            $str = $this->context->builder->load(
+                $this->context->constantStringFromString($default->toString())
+            );
+            $owned = $this->context->builder->call(
+                $this->context->lookupFunction('__string__separate'),
+                $str
+            );
+            $this->context->builder->call(
+                $this->context->lookupFunction('__value__writeString'),
+                $heapPtr,
+                $owned
+            );
+        } elseif (VMVariable::TYPE_INTEGER === $default->type) {
+            $this->context->builder->call(
+                $this->context->lookupFunction('__value__writeLong'),
+                $heapPtr,
+                $this->context->getTypeFromString('int64')->constInt($default->toInt(), false)
+            );
+        } elseif (VMVariable::TYPE_FLOAT === $default->type) {
+            $this->context->builder->call(
+                $this->context->lookupFunction('__value__writeDouble'),
+                $heapPtr,
+                $this->context->getTypeFromString('double')->constReal($default->toFloat())
+            );
+        } elseif (VMVariable::TYPE_BOOLEAN === $default->type) {
+            $this->context->builder->call(
+                $this->context->lookupFunction('__value__writeLong'),
+                $heapPtr,
+                $this->context->getTypeFromString('int64')->constInt($default->toBool() ? 1 : 0, false)
+            );
+        } else {
+            throw new \LogicException(
+                'Static union/DNF property default must be a scalar compile-time constant'
+            );
+        }
         $this->context->builder->store($heapPtr, $global);
         if (null !== $restore) {
             BasicBlockHelper::restoreInsertBlock($this->context, $restore);
@@ -4266,6 +4349,7 @@ class Object_ extends Type {
             $var->staticPropertyGlobal = $entry['global'];
             $var->staticPropertyType = $entry['type'];
             $var->staticPropertyInitGlobal = $entry['initGlobal'] ?? null;
+            $var->staticPropertyDnfArms = $this->dnfArmsForStaticProperty($classId, $name);
 
             return $var;
         }
@@ -4278,6 +4362,7 @@ class Object_ extends Type {
         $var->staticPropertyGlobal = $entry['global'];
         $var->staticPropertyType = $entry['type'];
         $var->staticPropertyInitGlobal = $entry['initGlobal'] ?? null;
+        $var->staticPropertyDnfArms = $this->dnfArmsForStaticProperty($classId, $name);
 
         return $var;
     }

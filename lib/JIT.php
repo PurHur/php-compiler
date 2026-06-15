@@ -9446,6 +9446,13 @@ class JIT {
                         false,
                         \PHPCompiler\MethodVisibility::mask($op->propertyVisibility)
                     );
+                    if (null !== $prototype && null !== $prototype->dnfArms) {
+                        $this->context->type->object->defineStaticPropertyDnfArms(
+                            $classId,
+                            $name->value,
+                            $prototype->dnfArms
+                        );
+                    }
                     $this->context->type->object->defineStaticPropertySetVisibility(
                         $classId,
                         $name->value,
@@ -10485,6 +10492,13 @@ class JIT {
                 $this
             )) {
                 return;
+            }
+            if (null !== $result->staticPropertyDnfArms) {
+                JIT\DnfParamCheck::enforcePropertyWrite(
+                    $this->context,
+                    $value,
+                    $result->staticPropertyDnfArms
+                );
             }
             $this->context->type->object->staticPropertyStore(
                 $result->staticPropertyGlobal,
