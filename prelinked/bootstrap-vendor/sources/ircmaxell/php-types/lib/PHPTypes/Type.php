@@ -381,6 +381,10 @@ class Type
             || str_starts_with($trimmedDecl, '*/')) {
             return self::mixed();
         }
+        // Docblock callable signatures: vendor only supports bare callable keyword (#8559 spine).
+        if (preg_match('/^callable\s*\(/i', $decl)) {
+            return new self(self::TYPE_CALLABLE);
+        }
         switch (strtolower($decl)) {
             case 'boolean':
             case 'bool':
@@ -653,6 +657,10 @@ class Type
                     break;
                 default:
                     if ($ch <= ' ' && 0 === $depthAngle && 0 === $depthParen && 0 === $depthSquare && 0 === $depthCurly) {
+                        // callable(T): R — space after ':' is return type, not trailing prose (#8559 spine).
+                        if ($i > 0 && ':' === $decl[$i - 1]) {
+                            break;
+                        }
                         return trim(substr($decl, 0, $i));
                     }
                     break;

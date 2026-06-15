@@ -36,4 +36,14 @@ final class BootstrapPhpTypesDocblockTrailingPatchTest extends TestCase
         $this->assertSame(Type::TYPE_OBJECT, $type->type);
         $this->assertSame('PHPTypes\\Type', $type->userType);
     }
+
+    /** Issue #8559: stripTrailingDocText must not truncate callable return types (OutputBufferHandlers @var). */
+    public function testFromDeclPreservesCallableReturnType(): void
+    {
+        $type = Type::fromDecl('null|callable(string, string, ?Context): string');
+        $this->assertSame(Type::TYPE_UNION, $type->type);
+        $this->assertCount(2, $type->subTypes);
+        $this->assertSame(Type::TYPE_NULL, $type->subTypes[0]->type);
+        $this->assertSame(Type::TYPE_CALLABLE, $type->subTypes[1]->type);
+    }
 }

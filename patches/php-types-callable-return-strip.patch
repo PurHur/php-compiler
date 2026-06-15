@@ -1,0 +1,25 @@
+diff --git vendor/ircmaxell/php-types/lib/PHPTypes/Type.php vendor/ircmaxell/php-types/lib/PHPTypes/Type.php
+--- vendor/ircmaxell/php-types/lib/PHPTypes/Type.php
++++ vendor/ircmaxell/php-types/lib/PHPTypes/Type.php
+@@ -384,6 +384,10 @@
+         if (str_ends_with($trimmedDecl, ',') && !str_contains($trimmedDecl, '|') && !str_contains($trimmedDecl, '&')) {
+             return self::fromDecl(rtrim($trimmedDecl, ', '));
+         }
++        // Docblock callable signatures: vendor only supports bare callable keyword (#8559 spine).
++        if (preg_match('/^callable\s*\(/i', $decl)) {
++            return new self(self::TYPE_CALLABLE);
++        }
+         switch (strtolower($decl)) {
+             case 'boolean':
+             case 'bool':
+@@ -663,6 +667,10 @@
+                     break;
+                 default:
+                     if ($ch <= ' ' && 0 === $depthAngle && 0 === $depthParen && 0 === $depthSquare && 0 === $depthCurly) {
++                        // callable(T): R — space after ':' is return type, not trailing prose (#8559 spine).
++                        if ($i > 0 && ':' === $decl[$i - 1]) {
++                            break;
++                        }
+                         return trim(substr($decl, 0, $i));
+                     }
+                     break;
