@@ -8908,6 +8908,33 @@ class Compiler {
         return false;
     }
 
+    /**
+     * Hoisted enum case fetches already feeding an array literal must not be reused for later calls (#8749).
+     */
+    private function hoistedEnumCaseFetchConsumedInCfg(Op\Expr\ClassConstFetch $fetch, Block $block): bool
+    {
+        if (null === $block->orig) {
+            return false;
+        }
+        foreach ($block->orig->children as $child) {
+            if ($child === $fetch || $child instanceof Op\Expr\ClassConstFetch) {
+                continue;
+            }
+            if ($child instanceof Op\Expr\Assign) {
+                if ($this->operandsReferToSameVariable($child->expr, $fetch->result)) {
+                    return true;
+                }
+
+                continue;
+            }
+            if ($child instanceof Op\Expr && $this->cfgExprUsesOperand($child, $fetch->result)) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
     /** True when php-cfg left the operand as an embedded literal in the FuncCall. */
     private function isEmbeddedCallLiteralArg(?Operand $arg): bool
     {
@@ -10445,7 +10472,9 @@ class Compiler {
         $hoistedFetches = [];
         for ($i = 0; $i < $firstCallIndex; ++$i) {
             $child = $children[$i];
-            if ($child instanceof Op\Expr\ClassConstFetch) {
+            if ($child instanceof Op\Expr\ClassConstFetch
+                && !$this->hoistedEnumCaseFetchConsumedInCfg($child, $block)
+            ) {
                 $hoistedFetches[] = $child;
             }
         }
