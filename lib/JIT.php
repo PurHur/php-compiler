@@ -6602,8 +6602,25 @@ class JIT {
                             $this->context,
                             $this->valueBoxPointer($result)
                         );
+                        if (null !== ($newVal->compileTimeString ?? null)) {
+                            $result->compileTimeString = $newVal->compileTimeString;
+                        }
                     } else {
                         $this->context->type->string->concat($result, $left, $right);
+                    }
+                    if (
+                        null !== ($left->compileTimeString ?? null)
+                        && null !== ($right->compileTimeString ?? null)
+                    ) {
+                        $result->compileTimeString = $left->compileTimeString.$right->compileTimeString;
+                    } else {
+                        $leftResolved = $left->compileTimeString
+                            ?? $this->resolveJitCompileTimeStringSlot($block, (int) $op->arg2);
+                        $rightResolved = $right->compileTimeString
+                            ?? $this->resolveJitCompileTimeStringSlot($block, (int) $op->arg3);
+                        if (null !== $leftResolved && null !== $rightResolved) {
+                            $result->compileTimeString = $leftResolved.$rightResolved;
+                        }
                     }
                     $this->maybeRefreshIncludeBindingsBeforeUse();
                     break;
@@ -8001,6 +8018,7 @@ class JIT {
                     ) {
                         $this->context->jitUnserializeOptionsOperand = $callOperands[1];
                     }
+                    $this->promoteCompileTimeStringOnCallArgs($block, $callOperands, $callArgs);
                     $result = $this->context->scope->toCall->call($this->context, ...$callArgs);
                     $this->context->jitUnserializeOptionsOperand = $savedUnserializeOptionsOperand;
                     $this->markNewObjectConstructedAfterCall($this->context->scope->toCall, $callArgs);
@@ -11906,12 +11924,20 @@ class JIT {
         $rightChar = $this->context->builder->structGep($rightVar, $map['value']);
         $this->context->intrinsic->memcpy($char, $rightChar, $rightSize, false);
 
-        return new Variable(
+        $var = new Variable(
             $this->context,
             Variable::TYPE_STRING,
             Variable::KIND_VALUE,
             $result
         );
+        if (
+            null !== ($left->compileTimeString ?? null)
+            && null !== ($right->compileTimeString ?? null)
+        ) {
+            $var->compileTimeString = $left->compileTimeString.$right->compileTimeString;
+        }
+
+        return $var;
     }
 
     /** ++/-- on static hooked properties: get hook read, set hook write (#6319). */
@@ -13621,6 +13647,28 @@ class JIT {
     }
 
     /**
+     * @param list<Operand|null> $operands
+     * @param list<Variable> $args
+     */
+    private function promoteCompileTimeStringOnCallArgs(Block $block, array $operands, array $args): void
+    {
+        foreach ($args as $i => $arg) {
+            if (null !== $arg->compileTimeString) {
+                continue;
+            }
+            $operand = $operands[$i] ?? null;
+            if (!$operand instanceof \PHPCfg\Operand) {
+                continue;
+            }
+            $slot = $block->slotForOperand($operand);
+            if (null === $slot) {
+                continue;
+            }
+            $this->foldCompileTimeStringFromSlot($block, $slot, $arg);
+        }
+    }
+
+    /**
      * @param array<int, true> $visited
      */
     private function resolveJitCompileTimeStringSlot(Block $block, int $slot, array &$visited = []): ?string
@@ -13638,6 +13686,13 @@ class JIT {
             return $const->toString();
         }
         foreach ($block->opCodes as $prior) {
+            if (OpCode::TYPE_CONCAT === $prior->type && $prior->arg1 === $slot) {
+                $left = $this->resolveJitCompileTimeStringSlot($block, (int) $prior->arg2, $visited);
+                $right = $this->resolveJitCompileTimeStringSlot($block, (int) $prior->arg3, $visited);
+                if (null !== $left && null !== $right) {
+                    return $left.$right;
+                }
+            }
             if (OpCode::TYPE_ASSIGN !== $prior->type || $prior->arg2 !== $slot) {
                 continue;
             }
