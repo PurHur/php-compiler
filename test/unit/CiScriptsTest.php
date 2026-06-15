@@ -1127,6 +1127,35 @@ final class CiScriptsTest extends TestCase
         $this->assertStringContainsString('#2202', $doc);
     }
 
+    public function testCiDefaultsEnvDefinesSelfhostSpineSidecarSyncGateOn(): void
+    {
+        $defaults = (string) file_get_contents(dirname(__DIR__, 2).'/script/ci-defaults.env');
+        $this->assertStringContainsString('SELFHOST_SPINE_SIDECAR_SYNC_GATE="${SELFHOST_SPINE_SIDECAR_SYNC_GATE:-1}"', $defaults);
+    }
+
+    public function testCiFastRunsSelfhostSpineSidecarSyncViaInventoryChecks(): void
+    {
+        $common = (string) file_get_contents(dirname(__DIR__, 2).'/script/ci-common.sh');
+        $this->assertStringContainsString('ci_run_selfhost_spine_sidecar_sync_check', $common);
+        $this->assertStringContainsString('check-selfhost-spine-sidecar-sync.php', $common);
+        $this->assertStringContainsString('SELFHOST_SPINE_SIDECAR_SYNC_GATE:-0', $common);
+    }
+
+    public function testCiDockerRunPassesSelfhostSpineSidecarSyncGateDefaultOn(): void
+    {
+        $body = (string) file_get_contents(dirname(__DIR__, 2).'/script/ci-docker-run.sh');
+        $this->assertStringContainsString('SELFHOST_SPINE_SIDECAR_SYNC_GATE=${SELFHOST_SPINE_SIDECAR_SYNC_GATE:-1}', $body);
+    }
+
+    public function testLocalCiMatrixDocumentsSelfhostSpineSidecarSyncGate(): void
+    {
+        $doc = (string) file_get_contents(dirname(__DIR__, 2).'/docs/local-ci-matrix.md');
+        $this->assertStringContainsString('SELFHOST_SPINE_SIDECAR_SYNC_GATE', $doc);
+        $this->assertStringContainsString('check-selfhost-spine-sidecar-sync.php', $doc);
+        $this->assertMatchesRegularExpression('/\| `SELFHOST_SPINE_SIDECAR_SYNC_GATE` \| `1` \|/', $doc);
+        $this->assertStringContainsString('#8703', $doc);
+    }
+
     public function testCiDefaultsEnvDefinesM3AllowlistSyncGateOn(): void
     {
         $defaults = (string) file_get_contents(dirname(__DIR__, 2).'/script/ci-defaults.env');
