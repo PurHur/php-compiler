@@ -24,6 +24,17 @@ final class GettextJitRuntimeShrinkTest extends TestCase
         $this->assertStringContainsString('__compiler_dngettext', $source);
     }
 
+    public function testJitGettextPhpSourceParses(): void
+    {
+        $path = dirname(__DIR__, 2).'/ext/gettext/JitGettext.php';
+        $output = [];
+        $exitCode = 0;
+        exec('php -l '.escapeshellarg($path).' 2>&1', $output, $exitCode);
+        $this->assertSame(0, $exitCode, implode("\n", $output));
+        $source = (string) file_get_contents($path);
+        $this->assertStringNotContainsString('...$params, $ptr', $source);
+    }
+
     public function testNoNewAotRuntimeCSources(): void
     {
         $runtimeDir = dirname(__DIR__, 2).'/lib/AOT/runtime';
