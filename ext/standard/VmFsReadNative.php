@@ -57,9 +57,17 @@ final class VmFsReadNative
 
             $fileSize = (int) $ffi->lseek($fd, 0, self::SEEK_END);
             if ($fileSize < 0) {
+                // /proc, pipes, devices — no size via lseek; stream from open position (#8744).
+                if (0 !== $offset) {
+                    $ffi->close($fd);
+
+                    return false;
+                }
+                $ffi->lseek($fd, 0, self::SEEK_SET);
+                $content = self::readStreaming($ffi, $fd, $length);
                 $ffi->close($fd);
 
-                return false;
+                return $content;
             }
             if ($offset < 0) {
                 $offset = $fileSize + $offset;
@@ -117,6 +125,40 @@ final class VmFsReadNative
         } catch (\Throwable) {
             return false;
         }
+    }
+
+    /**
+     * Read until EOF (or $maxBytes) for non-seekable fds opened at offset 0.
+     *
+     * @return string|false
+     */
+    private static function readStreaming(\FFI $ffi, int $fd, ?int $maxBytes = null): string|false
+    {
+        $parts = [];
+        $remaining = $maxBytes;
+        $buf = $ffi->new('char['.self::CHUNK.']');
+        while (true) {
+            $chunk = null === $remaining ? self::CHUNK : min(self::CHUNK, $remaining);
+            if ($chunk <= 0) {
+                break;
+            }
+            $n = (int) $ffi->read($fd, \FFI::addr($buf[0]), $chunk);
+            if ($n < 0) {
+                return false;
+            }
+            if (0 === $n) {
+                break;
+            }
+            $parts[] = \FFI::string($buf, $n);
+            if (null !== $remaining) {
+                $remaining -= $n;
+                if ($remaining <= 0) {
+                    break;
+                }
+            }
+        }
+
+        return '' === $parts ? '' : implode('', $parts);
     }
 
     private static function ffiEnabled(): bool
