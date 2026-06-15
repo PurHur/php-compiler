@@ -339,6 +339,8 @@ bootstrap-selfhost-types-unit-probe:
 	./script/bootstrap-selfhost-types-unit-probe.sh
 bootstrap-selfhost-lib-spine-smoke:
 	./script/bootstrap-selfhost-lib-spine-smoke-link.sh
+bootstrap-gen0-refresh-sidecar:
+	./script/bootstrap-refresh-gen0-sidecar.sh
 bootstrap-selfhost-lib-spine-smoke-lint:
 	./script/bootstrap-selfhost-lib-spine-smoke-lint.sh
 bootstrap-selfhost-lib-spine-vm-smoke:

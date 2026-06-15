@@ -172,6 +172,7 @@ Use these during LLVM/JIT iteration — avoid full spine relink unless you chang
 | `make north-star5-verify-fast` | **~1–2 min** | PR M5 presenter — inventory + spine + prelinked blobs + VM probe (no relink) |
 | `make north-star5-verify --strict` | **~1h** | Full M5 ladder before merging bootstrap/M5 work (not every PR) |
 | `make bootstrap-selfhost-lib-spine-smoke` | minutes | Full spine link — run after spine entry edits or before refreshing gen-0 blobs |
+| `make bootstrap-gen0-refresh-sidecar` | minutes | Full spine link + copy `build/.m3_*` → `prelinked/bootstrap-gen0/` + manifest refresh ([#8704](https://github.com/PurHur/php-compiler/issues/8704)) |
 | `php script/bootstrap-inventory.php --check` | seconds | Inventory SSOT without LLVM |
 | `php script/check-selfhost-spine-coverage-sync.php` | seconds | Spine ↔ inventory coverage (**2643/2643**) |
 

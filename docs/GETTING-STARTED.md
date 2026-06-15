@@ -137,6 +137,15 @@ make north-star5-verify-fast
 
 Expect on `--strict`: inventory **2643/2643**, spine link + run, vendor prelink **3/3**, cold boot without `vendor/`. For LLVM hot loops use `make bootstrap-selfhost-vm-driver-execute-probe` (~**20ms**); see [bootstrap-m5-fast-path.md](bootstrap-m5-fast-path.md).
 
+After **spine entry** edits (`test/selfhost/compiler_lib_spine_smoke/main.php`), refresh committed gen-0 sidecars in one step:
+
+```bash
+make bootstrap-gen0-refresh-sidecar
+# or: ./script/bootstrap-refresh-gen0-sidecar.sh
+```
+
+This runs a full spine link (`BOOTSTRAP_VM_DRIVER_EXECUTE_PROBE_FULL_LINK=1`), copies `build/.m3_*` into `prelinked/bootstrap-gen0/`, updates `manifest.json`, and runs `check-bootstrap-gen0-manifest-sync.php` ([#8704](https://github.com/PurHur/php-compiler/issues/8704)).
+
 On Runforge / harness hosts (do **not** use raw `docker run -v "$(pwd):/compiler"`):
 
 ```bash
