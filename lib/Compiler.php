@@ -6713,12 +6713,34 @@ class Compiler {
         return false;
     }
 
+    private const ISSET_EXPRESSION_COMPILE_ERROR =
+        'Cannot use isset() on the result of an expression (you can use "null !== expression" instead)';
+
+    /**
+     * Zend zend_compile.c zend_is_variable(): isset() operands must be variables, dims, or properties (#8802).
+     */
+    protected function assertIssetVariableOperand(Operand $operand, Block $block): void
+    {
+        if (null !== $this->findCoalescePropertyFetch($operand, $block)) {
+            return;
+        }
+        if (null !== $this->findCoalesceArrayDimFetch($operand, $block)) {
+            return;
+        }
+        if (null !== $this->unwrapVariableOperand($operand)) {
+            return;
+        }
+
+        $this->throwCompileError(self::ISSET_EXPRESSION_COMPILE_ERROR);
+    }
+
     /**
      * @return OpCode[]
      */
     protected function compileIsset(Op\Expr\Isset_ $expr, Block $block): array
     {
         assert(1 === count($expr->vars));
+        $this->assertIssetVariableOperand($expr->vars[0], $block);
         $resultSlot = $this->compileOperand($expr->result, $block, false);
         $propFetch = $this->findCoalescePropertyFetch($expr->vars[0], $block);
         $dimFetch = null !== $propFetch ? null : $this->findCoalesceArrayDimFetch($expr->vars[0], $block);
@@ -8380,6 +8402,7 @@ class Compiler {
         $vars = $expr->vars;
         $last = count($vars) - 1;
         foreach ($vars as $i => $var) {
+            $this->assertIssetVariableOperand($var, $block);
             $propFetch = $this->findCoalescePropertyFetch($var, $block);
             $dimFetch = null !== $propFetch ? null : $this->findCoalesceArrayDimFetch($var, $block);
             [$containerSlot, $dimSlot] = null !== $propFetch
