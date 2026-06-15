@@ -1,5 +1,5 @@
 --TEST--
-stdlib lzf_compress/lzf_decompress round-trip via VmLzfNative FFI (#6384, ext/lzf/lzf.c)
+stdlib lzf_compress/lzf_decompress round-trip via VmLzfCore PHP (#6384, #8805, ext/lzf/lzf.c)
 --FILE--
 <?php
 $s = str_repeat('abc', 100);
