@@ -4680,6 +4680,9 @@ class Compiler {
                 $materializeEnumCase
             );
         }
+        if ($expr instanceof Op\Expr\BinaryOp\Coalesce) {
+            return null;
+        }
         if ($expr instanceof Op\Expr\BinaryOp) {
             return $this->tryFoldCompileTimeBinaryExprDefault(
                 $expr,

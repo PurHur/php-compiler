@@ -1,6 +1,6 @@
 --- vendor/ircmaxell/php-types/lib/PHPTypes/Type.php
 +++ vendor/ircmaxell/php-types/lib/PHPTypes/Type.php
-@@ -298,6 +298,12 @@
+@@ -305,6 +305,12 @@
          if ($decl instanceof CfgType\Mixed_) {
              return self::mixed();
          }
@@ -11,5 +11,5 @@
 +            ]))->simplify();
 +        }
  
-         throw new \LogicException('Unsupported declaration type: '.get_class($decl));
-     }
+         if ($decl instanceof CfgType\Union_) {
+             $subs = [];

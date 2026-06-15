@@ -1,6 +1,6 @@
 --- vendor/ircmaxell/php-types/lib/PHPTypes/Type.php
 +++ vendor/ircmaxell/php-types/lib/PHPTypes/Type.php
-@@ -376,6 +376,10 @@ class Type
+@@ -382,6 +382,10 @@
              $trimmedDecl = rtrim(substr($trimmedDecl, 0, -1));
              $decl = $trimmedDecl;
          }
@@ -10,4 +10,4 @@
 +        }
          switch (strtolower($decl)) {
              case 'boolean':
-             case 'bool';
+             case 'bool':
