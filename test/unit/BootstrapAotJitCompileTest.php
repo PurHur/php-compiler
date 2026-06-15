@@ -291,7 +291,20 @@ PHP;
         $this->assertStringNotContainsString('Factory::basicBlock()', $stderr);
         $this->assertStringNotContainsString('Module verification failed', $stderr);
         $this->assertFileExists($outfile);
+
+        $runArgv = [$outfile];
+        $run = proc_open($runArgv, $descriptorSpec, $runPipes, $repoRoot, $env);
+        $this->assertIsResource($run);
+        fclose($runPipes[0]);
+        $stdout = stream_get_contents($runPipes[1]);
+        fclose($runPipes[1]);
+        $runStderr = stream_get_contents($runPipes[2]);
+        fclose($runPipes[2]);
+        $runExit = proc_close($run);
         @unlink($outfile);
+
+        $this->assertSame(0, $runExit, trim($runStderr !== false ? $runStderr : ''));
+        $this->assertSame("lib/JIT.php\n", $stdout !== false ? $stdout : '');
     }
 
     private function skipUnlessLlvmReady(): void
