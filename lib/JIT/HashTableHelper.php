@@ -1494,6 +1494,11 @@ final class HashTableHelper
 
             return;
         }
+        if (Variable::TYPE_VALUE === $key->type || JitValueBox::isValueOperand($key)) {
+            self::setValueBoxKey($context, $ht, $key, $element);
+
+            return;
+        }
         $index = self::arrayKeyToIndex($context, $key);
         self::setAtIndex($context, $ht, $index, $element);
     }
