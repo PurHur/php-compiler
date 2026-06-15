@@ -645,6 +645,7 @@ require_once __DIR__.'/../../../ext/standard/JitSetcookie.php';
 require_once __DIR__.'/../../../ext/standard/JitSettype.php';
 require_once __DIR__.'/../../../ext/standard/JitSha1.php';
 require_once __DIR__.'/../../../ext/standard/JitShellExec.php';
+require_once __DIR__.'/../../../ext/standard/JitExec.php';
 require_once __DIR__.'/../../../ext/standard/JitSleep.php';
 require_once __DIR__.'/../../../ext/standard/JitSoundex.php';
 require_once __DIR__.'/../../../ext/standard/JitSplAutoload.php';

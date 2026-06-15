@@ -52,11 +52,13 @@ final class ProcessRuntime
         self::ensureRuntimeHelpers($context);
 
         self::implementIfMissing($context, '__phpc_process_read_stream_all', self::emitReadStreamAll(...));
+        self::implementIfMissing($context, '__phpc_process_read_stream_lines', self::emitReadStreamLines(...));
         self::implementIfMissing($context, '__phpc_process_apply_env', self::emitApplyEnv(...));
         self::implementIfMissing($context, '__compiler_shell_exec', self::emitShellExec(...));
         self::implementIfMissing($context, '__compiler_escapeshellarg', self::emitEscapeshellarg(...));
         self::implementIfMissing($context, '__compiler_escapeshellcmd', self::emitEscapeshellcmd(...));
         self::implementIfMissing($context, '__compiler_phpc_run_command', self::emitPhpcRunCommand(...));
+        self::implementIfMissing($context, '__compiler_process_exec_capture', self::emitProcessExecCapture(...));
 
         self::registerLinkedRuntime($context);
         self::restoreInsertBlock($context, $restore);
@@ -98,6 +100,10 @@ final class ProcessRuntime
                 $name,
                 $context->context->functionType($strPtr, false, $i8p)
             ),
+            '__phpc_process_read_stream_lines' => $context->module->addFunction(
+                $name,
+                $context->context->functionType($htPtr, false, $i8p)
+            ),
             '__phpc_process_apply_env' => $context->module->addFunction(
                 $name,
                 $context->context->functionType($voidTy, false, $htPtr)
@@ -117,6 +123,10 @@ final class ProcessRuntime
             '__compiler_phpc_run_command' => $context->module->addFunction(
                 $name,
                 $context->context->functionType($htPtr, false, $strPtr, $htPtr)
+            ),
+            '__compiler_process_exec_capture' => $context->module->addFunction(
+                $name,
+                $context->context->functionType($htPtr, false, $strPtr)
             ),
             default => throw new \LogicException('Unknown process runtime helper: '.$name),
         };
@@ -249,6 +259,97 @@ final class ProcessRuntime
 
         $context->builder->positionAtEnd($failBb);
         $context->builder->returnValue($strPtr->constNull());
+    }
+
+    /** Read FILE* into packed __hashtable__ of stdout lines (rtrim \\r\\n per line, #8640). */
+    private static function emitReadStreamLines(Context $context, LlvmFunction $fn): void
+    {
+        $entry = $fn->appendBasicBlock('prl_entry');
+        $context->builder->positionAtEnd($entry);
+
+        $fp = $fn->getParam(0);
+        $htPtr = $context->getTypeFromString('__hashtable__*');
+        $i8 = $context->getTypeFromString('int8');
+        $i32 = $context->getTypeFromString('int32');
+        $i64 = $context->getTypeFromString('int64');
+        $i8p = $context->getTypeFromString('int8*');
+        $sizeT = $context->getTypeFromString('size_t');
+        $chunkSizeT = $sizeT->constInt(self::CHUNK, false);
+
+        $result = $context->builder->call($context->lookupFunction('__hashtable__alloc'));
+        $resultNull = $context->builder->icmp(Builder::INT_EQ, $result, $htPtr->constNull());
+        $failBb = $fn->appendBasicBlock('prl_malloc_fail');
+        $loopHead = $fn->appendBasicBlock('prl_loop_head');
+        $context->builder->branchIf($resultNull, $failBb, $loopHead);
+
+        $chunk = $context->builder->alloca($i8, self::CHUNK, 'prl_chunk');
+        $chunkPtr = $context->builder->pointerCast($chunk, $i8p);
+        $indexSlot = $context->builder->alloca($sizeT, 1, 'prl_index');
+        $context->builder->store($sizeT->constInt(0, false), $indexSlot);
+
+        $context->builder->positionAtEnd($loopHead);
+        $line = $context->builder->call(
+            $context->lookupFunction('fgets'),
+            $chunkPtr,
+            $i32->constInt(self::CHUNK, false),
+            $fp
+        );
+        $done = $context->builder->icmp(Builder::INT_EQ, $line, $i8p->constNull());
+        $loopBody = $fn->appendBasicBlock('prl_loop_body');
+        $loopDone = $fn->appendBasicBlock('prl_loop_done');
+        $context->builder->branchIf($done, $loopDone, $loopBody);
+
+        $context->builder->positionAtEnd($loopBody);
+        $chunkLen = $context->builder->call($context->lookupFunction('strlen'), $chunkPtr);
+        $lenSlot = $context->builder->alloca($sizeT, 1, 'prl_len');
+        $context->builder->store($chunkLen, $lenSlot);
+        $trimHead = $fn->appendBasicBlock('prl_trim_head');
+        $trimBody = $fn->appendBasicBlock('prl_trim_body');
+        $storeBb = $fn->appendBasicBlock('prl_store');
+        $context->builder->branch($trimHead);
+
+        $context->builder->positionAtEnd($trimHead);
+        $curLen = $context->builder->load($lenSlot);
+        $zeroLen = $context->builder->icmp(Builder::INT_EQ, $curLen, $sizeT->constInt(0, false));
+        $context->builder->branchIf($zeroLen, $storeBb, $trimBody);
+
+        $context->builder->positionAtEnd($trimBody);
+        $idx = $context->builder->sub($context->builder->load($lenSlot), $sizeT->constInt(1, false));
+        $ch = $context->builder->load($context->builder->gep($chunkPtr, $idx));
+        $isCr = $context->builder->icmp(Builder::INT_EQ, $ch, $i8->constInt(13, false));
+        $isNl = $context->builder->icmp(Builder::INT_EQ, $ch, $i8->constInt(10, false));
+        $trimIt = $context->builder->or($isCr, $isNl);
+        $trimCont = $fn->appendBasicBlock('prl_trim_cont');
+        $context->builder->branchIf($trimIt, $trimCont, $storeBb);
+
+        $context->builder->positionAtEnd($trimCont);
+        $context->builder->store($idx, $lenSlot);
+        $context->builder->branch($trimHead);
+
+        $context->builder->positionAtEnd($storeBb);
+        $finalLen = $context->builder->load($lenSlot);
+        $lineStr = $context->builder->call(
+            $context->lookupFunction('__string__init'),
+            $context->builder->zExt($finalLen, $i64),
+            $chunkPtr
+        );
+        $context->builder->call(
+            $context->lookupFunction('__hashtable__setStringAt'),
+            $result,
+            $context->builder->load($indexSlot),
+            $lineStr
+        );
+        $context->builder->store(
+            $context->builder->add($context->builder->load($indexSlot), $sizeT->constInt(1, false)),
+            $indexSlot
+        );
+        $context->builder->branch($loopHead);
+
+        $context->builder->positionAtEnd($loopDone);
+        $context->builder->returnValue($result);
+
+        $context->builder->positionAtEnd($failBb);
+        $context->builder->returnValue($htPtr->constNull());
     }
 
     private static function emitApplyEnv(Context $context, LlvmFunction $fn): void
@@ -396,6 +497,90 @@ final class ProcessRuntime
 
         $context->builder->positionAtEnd($failBb);
         $context->builder->returnValue($strPtr->constNull());
+    }
+
+    /** popen + read all stdout + pclose status → hashtable {output, status} (#8640, phase 2 #3278). */
+    private static function emitProcessExecCapture(Context $context, LlvmFunction $fn): void
+    {
+        $entry = $fn->appendBasicBlock('pec_entry');
+        $context->builder->positionAtEnd($entry);
+
+        $cmd = $fn->getParam(0);
+        $strPtr = $context->getTypeFromString('__string__*');
+        $htPtr = $context->getTypeFromString('__hashtable__*');
+        $i8 = $context->getTypeFromString('int8');
+        $i32 = $context->getTypeFromString('int32');
+        $i64 = $context->getTypeFromString('int64');
+        $nullCmd = $context->builder->icmp(Builder::INT_EQ, $cmd, $strPtr->constNull());
+        $failBb = $fn->appendBasicBlock('pec_fail');
+        $checkEmpty = $fn->appendBasicBlock('pec_check_empty');
+        $context->builder->branchIf($nullCmd, $failBb, $checkEmpty);
+
+        $context->builder->positionAtEnd($checkEmpty);
+        $command = self::stringData($context, $cmd);
+        $first = $context->builder->load($command);
+        $empty = $context->builder->icmp(Builder::INT_EQ, $first, $i8->constInt(0, false));
+        $popenBb = $fn->appendBasicBlock('pec_popen');
+        $context->builder->branchIf($empty, $failBb, $popenBb);
+
+        $context->builder->positionAtEnd($popenBb);
+        $fp = $context->builder->call(
+            $context->lookupFunction('popen'),
+            $command,
+            self::literalCstr($context, 'r')
+        );
+        $fpNull = $context->builder->icmp(Builder::INT_EQ, $fp, $context->getTypeFromString('int8*')->constNull());
+        $readBb = $fn->appendBasicBlock('pec_read');
+        $context->builder->branchIf($fpNull, $failBb, $readBb);
+
+        $context->builder->positionAtEnd($readBb);
+        $lines = $context->builder->call(
+            $context->lookupFunction('__phpc_process_read_stream_lines'),
+            $fp
+        );
+        $closeRet = $context->builder->call($context->lookupFunction('pclose'), $fp);
+        $closeFail = $context->builder->icmp(Builder::INT_EQ, $closeRet, $i32->constInt(-1, true));
+        $buildBb = $fn->appendBasicBlock('pec_build');
+        $context->builder->branchIf($closeFail, $failBb, $buildBb);
+
+        $context->builder->positionAtEnd($buildBb);
+        $linesNull = $context->builder->icmp(Builder::INT_EQ, $lines, $htPtr->constNull());
+        $linesFail = $fn->appendBasicBlock('pec_lines_fail');
+        $linesOk = $fn->appendBasicBlock('pec_lines_ok');
+        $context->builder->branchIf($linesNull, $linesFail, $linesOk);
+
+        $context->builder->positionAtEnd($linesFail);
+        $context->builder->branch($failBb);
+
+        $context->builder->positionAtEnd($linesOk);
+        $result = $context->builder->call($context->lookupFunction('__hashtable__alloc'));
+        $resultNull = $context->builder->icmp(Builder::INT_EQ, $result, $htPtr->constNull());
+        $resultFail = $fn->appendBasicBlock('pec_result_fail');
+        $resultOk = $fn->appendBasicBlock('pec_result_ok');
+        $context->builder->branchIf($resultNull, $resultFail, $resultOk);
+
+        $context->builder->positionAtEnd($resultFail);
+        $context->builder->returnValue($htPtr->constNull());
+
+        $context->builder->positionAtEnd($resultOk);
+        $setLong = $context->lookupFunction('__hashtable__setStringKeyLong');
+        $setHt = $context->lookupFunction('__hashtable__setStringKeyHashtable');
+        $context->builder->call(
+            $setHt,
+            $result,
+            self::literalKeyString($context, 'lines'),
+            $lines
+        );
+        $context->builder->call(
+            $setLong,
+            $result,
+            self::literalKeyString($context, 'status'),
+            $context->builder->sext($closeRet, $i64)
+        );
+        $context->builder->returnValue($result);
+
+        $context->builder->positionAtEnd($failBb);
+        $context->builder->returnValue($htPtr->constNull());
     }
 
     private static function emitEscapeshellarg(Context $context, LlvmFunction $fn): void
@@ -1073,6 +1258,7 @@ final class ProcessRuntime
         $valuePtr = $context->getTypeFromString('__value__*');
         $i64 = $context->getTypeFromString('int64');
         $i8p = $context->getTypeFromString('int8*');
+        $sizeT = $context->getTypeFromString('size_t');
         $voidTy = $context->getTypeFromString('void');
 
         foreach (
@@ -1080,9 +1266,12 @@ final class ProcessRuntime
                 ['__hashtable__alloc', $htPtr, []],
                 ['__hashtable__setStringKeyLong', $voidTy, [$htPtr, $strPtr, $i64]],
                 ['__hashtable__setStringKeyString', $voidTy, [$htPtr, $strPtr, $strPtr]],
+                ['__hashtable__setStringKeyHashtable', $voidTy, [$htPtr, $strPtr, $htPtr]],
+                ['__hashtable__setStringAt', $voidTy, [$htPtr, $sizeT, $strPtr]],
                 ['__string__init', $strPtr, [$i64, $i8p]],
                 ['__value__readString', $strPtr, [$valuePtr]],
                 ['__phpc_process_read_stream_all', $strPtr, [$i8p]],
+                ['__phpc_process_read_stream_lines', $htPtr, [$i8p]],
                 ['__phpc_process_apply_env', $voidTy, [$htPtr]],
             ] as [$name, $ret, $params]
         ) {
@@ -1105,11 +1294,13 @@ final class ProcessRuntime
         foreach (
             [
                 '__phpc_process_read_stream_all',
+                '__phpc_process_read_stream_lines',
                 '__phpc_process_apply_env',
                 '__compiler_shell_exec',
                 '__compiler_escapeshellarg',
                 '__compiler_escapeshellcmd',
                 '__compiler_phpc_run_command',
+                '__compiler_process_exec_capture',
             ] as $name
         ) {
             $fn = $context->module->getNamedFunction($name);
