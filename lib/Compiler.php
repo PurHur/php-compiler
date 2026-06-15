@@ -8871,6 +8871,8 @@ class Compiler {
             || $op instanceof Op\Expr\New_
             || $op instanceof Op\Expr\ConstFetch
             || $op instanceof Op\Expr\ClassConstFetch
+            || $op instanceof Op\Expr\Closure
+            || $op instanceof Op\Expr\ArrowFunction
             || $op instanceof Op\Expr\FuncCall
             || $op instanceof Op\Expr\NsFuncCall
             || $op instanceof Op\Expr\UnaryMinus
