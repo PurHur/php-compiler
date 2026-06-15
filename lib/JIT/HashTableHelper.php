@@ -2046,6 +2046,70 @@ final class HashTableHelper
         Value $keyPtr,
         Variable $element
     ): void {
+        $insert = $context->builder->getInsertBlock();
+        if ($context->emitsInitLinearIR()
+            || (null !== $insert && self::emitsInInitFunction($context, $insert))) {
+            // __init__ must stay a linear basic-block chain; no strtol coercion CFG (#8559).
+            self::setAtStringKey($context, $ht, $keyPtr, $element);
+
+            return;
+        }
+        self::setAtKeyCoercingNumericStringBody($context, $ht, $keyPtr, $element);
+    }
+
+    private static function sameLlvmBasicBlock(\PHPLLVM\BasicBlock $a, \PHPLLVM\BasicBlock $b): bool
+    {
+        if ($a === $b) {
+            return true;
+        }
+        if ($a instanceof \PHPLLVM\LLVMAbstract\BasicBlock
+            && $b instanceof \PHPLLVM\LLVMAbstract\BasicBlock) {
+            return $a->block === $b->block;
+        }
+
+        return false;
+    }
+
+    private static function sameLlvmFunction(?\PHPLLVM\Value $a, ?\PHPLLVM\Value $b): bool
+    {
+        if (null === $a || null === $b) {
+            return false;
+        }
+        if ($a === $b) {
+            return true;
+        }
+        if ($a instanceof \PHPLLVM\LLVMAbstract\Value
+            && $b instanceof \PHPLLVM\LLVMAbstract\Value) {
+            return $a->value === $b->value;
+        }
+
+        return false;
+    }
+
+    private static function emitsInInitFunction(Context $context, \PHPLLVM\BasicBlock $insert): bool
+    {
+        if (self::sameLlvmBasicBlock($insert, $context->initBlock)) {
+            return true;
+        }
+        $linear = $context->initLinearBlock;
+        if (null !== $linear && self::sameLlvmBasicBlock($insert, $linear)) {
+            return true;
+        }
+        $initParent = $context->initBlock->getParent();
+        $insertParent = $insert->getParent();
+        if (self::sameLlvmFunction($initParent, $insertParent)) {
+            return true;
+        }
+
+        return false;
+    }
+
+    private static function setAtKeyCoercingNumericStringBody(
+        Context $context,
+        Value $ht,
+        Value $keyPtr,
+        Variable $element
+    ): void {
         $builder = $context->builder;
         $map = $context->structFieldMap['__string__'];
         $len = $builder->load($builder->structGep($keyPtr, $map['length']));

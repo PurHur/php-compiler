@@ -12,3 +12,20 @@ demo
 .env
 .php-compiler-ci.lock
 .libs
+# Local bisect / spine debug artifacts (not committed)
+build/selfhost-lib-spine-smoke
+build/bin-compile-aot-inventory
+build/bisect-*
+build/spine-*
+build/quick-hw-test
+build/full-main-copy*
+build/helloworld-compile-bin-aot
+build/selfhost-*
+build/bootstrap-driver-smoke-*
+build/.m3_*
+build/.last-jit-*
+build/.bootstrap-*
+script/diag-*.php
+test/selfhost/compiler_lib_spine_smoke/bisect-*.php
+-.o
+-.o.*

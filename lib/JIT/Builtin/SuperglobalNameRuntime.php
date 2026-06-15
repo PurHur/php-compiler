@@ -44,34 +44,39 @@ final class SuperglobalNameRuntime
     {
         self::ensureMemcmp($context);
 
-        $entry = $fn->appendBasicBlock('sg_name_entry');
-        $context->builder->positionAtEnd($entry);
+        $saved = $context->builder;
+        $context->builder = $context->context->builderCreate();
+        try {
+            $entry = $fn->appendBasicBlock('sg_name_entry');
+            $context->builder->positionAtEnd($entry);
 
-        $name = $fn->getParam(0);
-        $i64 = $context->getTypeFromString('int64');
-        $i1 = $context->getTypeFromString('int1');
-        $zeroI64 = $i64->constInt(0, false);
-        $falseI1 = $i1->constInt(0, false);
+            $name = $fn->getParam(0);
+            $i64 = $context->getTypeFromString('int64');
+            $i1 = $context->getTypeFromString('int1');
+            $zeroI64 = $i64->constInt(0, false);
+            $falseI1 = $i1->constInt(0, false);
 
-        $nullName = $context->builder->icmp(Builder::INT_EQ, $name, $name->typeOf()->constNull());
-        $nullBb = $fn->appendBasicBlock('sg_name_null');
-        $checkBb = $fn->appendBasicBlock('sg_name_check');
-        $context->builder->branchIf($nullName, $nullBb, $checkBb);
+            $nullName = $context->builder->icmp(Builder::INT_EQ, $name, $name->typeOf()->constNull());
+            $nullBb = $fn->appendBasicBlock('sg_name_null');
+            $checkBb = $fn->appendBasicBlock('sg_name_check');
+            $context->builder->branchIf($nullName, $nullBb, $checkBb);
 
-        $context->builder->positionAtEnd($nullBb);
-        $context->builder->returnValue($zeroI64);
-        $context->builder->clearInsertionPosition();
+            $context->builder->positionAtEnd($nullBb);
+            $context->builder->returnValue($zeroI64);
 
-        $context->builder->positionAtEnd($checkBb);
-        $hit = $falseI1;
-        foreach (SuperglobalNames::ALL as $idx => $literal) {
-            $match = self::identicalToAsciiLiteral($context, $fn, $name, $literal, $idx);
-            $hit = $context->builder->or($hit, $match);
+            $context->builder->positionAtEnd($checkBb);
+            $hit = $falseI1;
+            foreach (SuperglobalNames::ALL as $idx => $literal) {
+                $match = self::identicalToAsciiLiteral($context, $fn, $name, $literal, $idx);
+                $hit = $context->builder->or($hit, $match);
+            }
+            $context->builder->returnValue(
+                $context->builder->zExt($hit, $i64)
+            );
+        } finally {
+            $context->builder->clearInsertionPosition();
+            $context->builder = $saved;
         }
-        $context->builder->returnValue(
-            $context->builder->zExt($hit, $i64)
-        );
-        $context->builder->clearInsertionPosition();
     }
 
     private static function identicalToAsciiLiteral(

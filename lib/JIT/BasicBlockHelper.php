@@ -88,6 +88,38 @@ final class BasicBlockHelper
         $context->builder->positionAtEnd($after);
     }
 
+    /**
+     * Continue emission in an open block; if the insert block is already sealed, use a fresh one.
+     *
+     * Never append instructions after an existing terminator (invalid IR).
+     */
+    public static function ensureOpenInsertBlock(Context $context, string $label): void
+    {
+        $insert = $context->builder->getInsertBlock();
+        if (null === $insert || null === $insert->getTerminator()) {
+            return;
+        }
+        $next = self::append($context, $label);
+        $context->builder->positionAtEnd($next);
+    }
+
+    public static function restoreInsertBlock(Context $context, BasicBlock $block): void
+    {
+        if (null === $block->getTerminator()) {
+            $context->builder->positionAtEnd($block);
+
+            return;
+        }
+        $func = $block->getParent();
+        if ($func instanceof Function_) {
+            $next = $func->appendBasicBlock('restore_insert_cont');
+            $context->builder->positionAtEnd($next);
+
+            return;
+        }
+        $context->builder->clearInsertionPosition();
+    }
+
     public static function entryAlloca(Context $context, Type $type): Value
     {
         $fn = self::parentFunction($context);

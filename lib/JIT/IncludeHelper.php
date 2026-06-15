@@ -86,6 +86,15 @@ final class IncludeHelper
             throw new \LogicException('include file not found for JIT/AOT: '.$path);
         }
 
+        if ($context->hasJitIncludedFileCompiled($path)) {
+            $context->recordJitIncludedFile($path);
+            if (null !== $resultOperand) {
+                $jit->assignIncludeResult($resultOperand);
+            }
+
+            return;
+        }
+
         $context->recordJitIncludedFile($path);
 
         $included = $context->runtime->parseAndCompileFile($path);
@@ -94,6 +103,8 @@ final class IncludeHelper
             $suffix = null !== $diag && '' !== $diag ? ' — '.$diag : ' — (no compiler abort detail; parser/CFG returned null)';
             throw new \LogicException('failed to compile include: '.$path.$suffix);
         }
+
+        $context->markJitIncludedFileCompiled($path);
 
         self::compileInlinedBlock($jit, $func, $callerBlock, $included, $resultOperand, false, 'c:include:'.$path);
     }
@@ -128,9 +139,12 @@ final class IncludeHelper
         $context->inlineIncludeBindingRefreshStack[] = [];
         $bindingRefreshIndex = \count($context->inlineIncludeBindingRefreshStack) - 1;
         $returnHolderOp = new Temporary();
-        if (null !== $preIncludeBb) {
+        $entryBb = $func->appendBasicBlock('include_entry_'.(++self::$includeEntrySerial));
+        if (null !== $preIncludeBb && null === $preIncludeBb->getTerminator()) {
             $context->builder->positionAtEnd($preIncludeBb);
+            $context->builder->branch($entryBb);
         }
+        $context->builder->positionAtEnd($entryBb);
         $returnHolder = new Variable(
             $context,
             Variable::TYPE_VALUE,
@@ -147,12 +161,6 @@ final class IncludeHelper
         }
         $context->setVariableOp($returnHolderOp, $returnHolder);
         $context->inlineIncludeReturnOperands[] = $returnHolderOp;
-        $entryBb = $func->appendBasicBlock('include_entry_'.(++self::$includeEntrySerial));
-        if (null !== $preIncludeBb && null === $preIncludeBb->getTerminator()) {
-            $context->builder->positionAtEnd($preIncludeBb);
-            $context->builder->branch($entryBb);
-        }
-        $context->builder->positionAtEnd($entryBb);
         // Best-effort breadcrumb for self-host segfault triage: many bootstrap bundles are pure include
         // spines; record which include boundary we last entered before a fatal crash.
         Progress::emitNativeNote($context, $progressNote);
@@ -349,7 +357,7 @@ final class IncludeHelper
             $context->builder->store($owned, $slot);
             $stringVar->addref();
             if (null !== $saved) {
-                $context->builder->positionAtEnd($saved);
+                self::restoreInsertBlock($context, $saved);
             }
 
             return $stringVar;
@@ -371,10 +379,15 @@ final class IncludeHelper
         $context->builder->store($owned, $slot);
         $stringVar->addref();
         if (null !== $saved) {
-            $context->builder->positionAtEnd($saved);
+            self::restoreInsertBlock($context, $saved);
         }
 
         return $stringVar;
+    }
+
+    private static function restoreInsertBlock(Context $context, BasicBlock $block): void
+    {
+        BasicBlockHelper::restoreInsertBlock($context, $block);
     }
 
     private static function emitCalleeLocalBinding(
@@ -636,6 +649,9 @@ final class IncludeHelper
         if (null === $bb) {
             return;
         }
+        if (null !== $bb->getTerminator()) {
+            BasicBlockHelper::ensureOpenInsertBlock($context, 'include_refresh_cont');
+        }
         foreach ($frame as $entry) {
             [$calleeOp, $prepared, $calleeVar, $compileTimeString] = array_pad($entry, 4, null);
             if (Variable::KIND_VARIABLE !== $calleeVar->kind) {
@@ -721,18 +737,35 @@ final class IncludeHelper
      * cli_spine_shim.php (src/cli.php) and src/cli_driver.php provide skip-entry helpers at runtime; this
      * avoids compiling vendor/autoload Expr_Closure during self-host AOT link.
      */
-    /** Stub dynamic requires while host-compiling M3 emit sidecars (issue #2699, #1492). */
+    /** Stub dynamic requires while host-compiling M3 emit sidecars or full lib-spine AOT (#2699, #8559). */
     private static function shouldStubM3SidecarHostNonLiteralInclude(Block $callerBlock): bool
     {
-        $flag = getenv('PHP_COMPILER_M3_SIDECAR_HOST');
-        if ('1' !== $flag && 'true' !== strtolower((string) $flag)) {
-            return false;
-        }
         $caller = str_replace('\\', '/', $callerBlock->scriptPath());
+        $isSpineSmokeEntry = str_ends_with($caller, '/test/selfhost/compiler_lib_spine_smoke/main.php');
+        $isSpineSmokeTree = str_contains($caller, '/test/selfhost/compiler_lib_spine_smoke/');
 
-        return str_ends_with($caller, '/bin/vm.php')
-            || str_ends_with($caller, '/src/cli_driver.php')
-            || str_ends_with($caller, '/test/selfhost/compiler_lib_spine_smoke/main.php');
+        $sidecarHost = getenv('PHP_COMPILER_M3_SIDECAR_HOST');
+        if ('1' === $sidecarHost || 'true' === strtolower((string) $sidecarHost)) {
+            return str_ends_with($caller, '/bin/vm.php')
+                || str_ends_with($caller, '/src/cli_driver.php')
+                || $isSpineSmokeEntry;
+        }
+
+        $libSpineBundle = getenv('PHP_COMPILER_LIB_SPINE_BUNDLE');
+        if ('1' === $libSpineBundle || 'true' === strtolower((string) $libSpineBundle)) {
+            return true;
+        }
+
+        $selfhost = getenv('PHP_COMPILER_SELFHOST_AOT');
+        if ('1' === $selfhost || 'true' === strtolower((string) $selfhost)) {
+            return $isSpineSmokeEntry
+                || $isSpineSmokeTree
+                || str_ends_with($caller, '/bin/vm.php')
+                || str_ends_with($caller, '/src/cli_driver.php')
+                || str_ends_with($caller, '/src/cli.php');
+        }
+
+        return false;
     }
 
     private static function shouldSkipSelfHostSpineCliInclude(string $path): bool

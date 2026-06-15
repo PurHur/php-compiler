@@ -29,16 +29,16 @@ That is **M5**. Everything below is the honest path from today’s bootstrap to 
 
 ---
 
-## Where we are (Jun 2026, `master` @ 5df5a6cf9)
+## Where we are (Jun 2026, `fix/spine-aot-jit-blockers` @ 9493e806d)
 
 | Layer | Today | Target |
 |-------|-------|--------|
 | **Bootstrap driver** | Prelinked gen-0 refreshed via honest inventory argv emit; native `build/bin-compile-aot-inventory` for M4/M5 | Compiled `bin/compile.php` only |
-| **Bundle size** | **2627** literal Phase A inventory in spine smoke | Full vm.php closure |
-| **Inventory coverage** | **2627/2627** ✅ | Full closure |
+| **Bundle size** | **2643** literal Phase A inventory in spine smoke | Full vm.php closure |
+| **Inventory coverage** | **2643/2643** ✅ | Full closure |
 | **HelloWorld** | Strict probe **emit_path=native** ✅ | Native compile for arbitrary PHP |
 | **Bootstrap loop (M4)** | `make bootstrap-loop-probe` full ladder ✅ — gen-1→gen-2, gen-2→gen-3 full spine, full-revision argv | Native full revision rebuild |
-| **Vendor** | **3/3** vendor `object_ok`; committed `.o` cold boot without `vendor/` ✅; `north-star5-verify --strict` ✅ | No Zend `vendor/autoload.php` at bootstrap |
+| **Vendor** | **3/3** vendor `object_ok`; committed `.o` cold boot without `vendor/` ✅; `make north-star5-verify-fast` daily; `--strict` pre-merge ✅ | No Zend `vendor/autoload.php` at bootstrap |
 
 ### Gates (run after `script/apply-patches.sh`)
 
@@ -54,11 +54,11 @@ That is **M5**. Everything below is the honest path from today’s bootstrap to 
 | M4 `make bootstrap-loop-gen1-link` | ✅ gen-1 link + gen-2 smoke **`emit_path=native`** (`BOOTSTRAP_M4_LINK_COMPILE_DRIVER=1`, #2611); **Zend fallback** (`emit_path=zend partial`) when native blocked; strict: `BOOTSTRAP_M4_GEN2_STRICT=1`; presenter: [GETTING-STARTED §7](GETTING-STARTED.md) ([#2464](https://github.com/PurHur/php-compiler/issues/2464)) |
 | M4 `make bootstrap-loop-gen1-full-spine-emit` | 🚧 gen-1→gen-2 full spine — heavy opt-in |
 | M4 `make bootstrap-selfhost-full-revision-probe` | ✅ gen-2 inventory argv → gen-3 + fixture smoke ([#2880](https://github.com/PurHur/php-compiler/issues/2880)) |
-| M4 `make bootstrap-loop-gen2-recompile-spine` | ✅ gen-2→gen-3 full spine (**2558/2627**) native argv |
+| M4 `make bootstrap-loop-gen2-recompile-spine` | ✅ gen-2→gen-3 full spine native argv |
 | M4 `make bootstrap-loop-probe` | ✅ full ladder ([#1498](https://github.com/PurHur/php-compiler/issues/1498)) |
 | `make bootstrap-aot-link` | ✅ **71/71** |
-| `make bootstrap-inventory-check` | ✅ **2627** Phase A files, **0** source blockers |
-| `make north-star5-verify` | ✅ `--strict` green; vendor **3/3**; cold boot without `vendor/` |
+| `make bootstrap-inventory-check` | ✅ **2643** Phase A files, **0** source blockers |
+| `make north-star5-verify-fast` | ✅ daily M5 PR gate (~1–2 min); `ARGS=--strict` pre-merge (~1h) |
 
 ---
 
@@ -68,10 +68,10 @@ That is **M5**. Everything below is the honest path from today’s bootstrap to 
 |-----------|----------------|--------|-----|
 | **M0** | AOT can link a **small** honest `lib/` subset | ✅ | 100% |
 | **M1** | Bundle is **compiler-shaped** (lint + compile-smoke) | ✅ | 100% |
-| **M2** | Spine grows toward full `bin/vm.php` inventory | ✅ **2627/2627** | **100%** |
+| **M2** | Spine grows toward full `bin/vm.php` inventory | ✅ **2643/2643** | **100%** |
 | **M3** | Self-host binary **compiles external PHP** (HelloWorld) without Zend emit | ✅ strict **native** + inventory argv | **~85%** |
 | **M4** | Self-host binary **rebuilds** the next compiler tree | ✅ full `bootstrap-loop-probe` ladder | **~90%** |
-| **M5** | Full self-host; Zend retired from loop | ✅ `north-star5-verify --strict` + `BOOTSTRAP_M5_NO_ZEND=1` empty `build/` ([#3053](https://github.com/PurHur/php-compiler/issues/3053)) | **~90%** |
+| **M5** | Full self-host; Zend retired from loop | ✅ `north-star5-verify-fast` daily + `--strict` pre-merge; `BOOTSTRAP_M5_NO_ZEND=1` empty `build/` ([#3053](https://github.com/PurHur/php-compiler/issues/3053)) | **~90%** |
 
 **Indicative north star composite:** **~90%** (weighted across M0–M5; see formula below).
 
@@ -79,7 +79,7 @@ That is **M5**. Everything below is the honest path from today’s bootstrap to 
 
 | Indicator | Formula | Jun 2026 |
 |-----------|---------|----------|
-| **M2 spine progress** | `require_once` units in `compiler_lib_spine_smoke` ÷ Phase A inventory file count | **2627 / 2627** (`php script/bootstrap-spine-count.php`) |
+| **M2 spine progress** | `require_once` units in `compiler_lib_spine_smoke` ÷ Phase A inventory file count | **2643 / 2643** (`php script/bootstrap-spine-count.php`) |
 | **Public “Self-host” row** | Same M2 ratio until M3–M5 gates add weight ([`development-status.md`](pages/development-status.md)) | **~97%** |
 | **M5 vendor prelink** | `object_ok` packages ÷ 3 | **3 / 3** (cfg, types, llvm) |
 | **Composite (internal)** | Milestone weights in table above (M0–M1 = 100%, M2 = spine %, M3–M5 = gate %) | **~90%** |
@@ -133,7 +133,7 @@ Parallel batches ([#1419](https://github.com/PurHur/php-compiler/issues/1419), [
 | Entry | Units | Role |
 |-------|------:|------|
 | `test/selfhost/compiler_minimal/main.php` | **108** | M0 core |
-| `test/selfhost/compiler_lib_spine_smoke/main.php` | **2558** literal | M2 in progress ([#2868](https://github.com/PurHur/php-compiler/issues/2868)) |
+| `test/selfhost/compiler_lib_spine_smoke/main.php` | **2643** Phase A | M2 complete ([#8559](https://github.com/PurHur/php-compiler/issues/8559)) |
 | `test/selfhost/compiler_helloworld_smoke/` | — | M3 probe + compile driver |
 | `test/selfhost/bootstrap_loop_smoke/` | — | M4 scaffold (gen-1→gen-2→gen-3 loop; [#1498](https://github.com/PurHur/php-compiler/issues/1498)) |
 

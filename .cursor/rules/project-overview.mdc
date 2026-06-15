@@ -29,4 +29,5 @@ PurHur/php-compiler compiles a **subset of PHP** to VM bytecode, LLVM JIT, or na
 - Run `composer install` and `script/apply-patches.sh` after vendor changes.
 - LLVM 9: `.llvm/` or `PHP_COMPILER_LLVM_PATH` (see `script/install-llvm9.sh`).
 - Capability or bootstrap changes: update `script/capability-matrix.php` / `script/bootstrap-inventory.php` checks if applicable.
+- **Self-host M5:** default to fast gates (`make north-star5-verify-fast`, VM driver probe ~20ms); full `north-star5-verify --strict` only before merging bootstrap work — see `.cursor/rules/m5-fast-development.mdc`.
 - Match existing style in the file you edit; avoid drive-by refactors.

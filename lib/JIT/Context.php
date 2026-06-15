@@ -29,6 +29,10 @@ class Context {
     public PHPLLVM\Context $context;
     public PHPLLVM\Module $module;
     public PHPLLVM\BasicBlock $initBlock;
+    /** Open tail for linear __init__ emission after the first CFG split (#8559). */
+    public ?PHPLLVM\BasicBlock $initLinearBlock = null;
+    /** Nesting depth for {@see emitInInit()} / class-const hashtable linear emission (#8559). */
+    private int $initLinearEmissionDepth = 0;
     public PHPLLVM\BasicBlock $shutdownBlock;
     public PHPLLVM\BasicBlock $headerPreFlushBlock;
     public PHPLLVM\Builder $builder;
@@ -281,6 +285,12 @@ class Context {
     /** @var list<string> compile-time included paths for get_included_files() (#3315) */
     public array $jitIncludedFiles = [];
 
+    /** @var list<string> require_once dedupe while lowering literal includes (#8559) */
+    public array $jitAotIncludedCompileDone = [];
+
+    /** Normalized realpath of the outer {main} TU being JIT-compiled (#8559). */
+    public string $jitAotEntryScriptPath = '';
+
     /** Clear per-script local name/ref bindings before lowering a new {main} TU (#4763). */
     public function resetScriptLocalBindings(): void
     {
@@ -289,6 +299,7 @@ class Context {
         $this->refAliasNames = [];
         $this->jitUndeclaredInstancePropertyWrites = [];
         $this->jitIncludedFiles = [];
+        $this->jitAotIncludedCompileDone = [];
     }
 
     public function recordJitIncludedFile(string $path): void
@@ -296,6 +307,36 @@ class Context {
         $normalized = \PHPCompiler\VM\ScriptStack::normalize($path);
         if ('' !== $normalized) {
             $this->jitIncludedFiles[] = $normalized;
+        }
+    }
+
+    public function isCompilerLibSpineSmokeEntry(): bool
+    {
+        $entry = str_replace('\\', '/', $this->jitAotEntryScriptPath);
+
+        return str_ends_with($entry, '/test/selfhost/compiler_lib_spine_smoke/main.php');
+    }
+
+    public function hasJitIncludedFileCompiled(string $path): bool
+    {
+        $resolved = realpath($path);
+        if (false === $resolved) {
+            $resolved = $path;
+        }
+        $normalized = \PHPCompiler\VM\ScriptStack::normalize($resolved);
+
+        return '' !== $normalized && isset($this->jitAotIncludedCompileDone[$normalized]);
+    }
+
+    public function markJitIncludedFileCompiled(string $path): void
+    {
+        $resolved = realpath($path);
+        if (false === $resolved) {
+            $resolved = $path;
+        }
+        $normalized = \PHPCompiler\VM\ScriptStack::normalize($resolved);
+        if ('' !== $normalized) {
+            $this->jitAotIncludedCompileDone[$normalized] = true;
         }
     }
 
@@ -334,7 +375,7 @@ class Context {
     private function initScriptGlobalHeapBox(PHPLLVM\Value $global): void
     {
         $restore = $this->builder->getInsertBlock();
-        $this->builder->positionAtEnd($this->initBlock);
+        $this->positionBuilderAtInitEmission();
         $valueType = $this->getTypeFromString('__value__');
         $heapVal = $this->memory->malloc($valueType);
         $heapPtr = $this->builder->pointerCast(
@@ -347,7 +388,7 @@ class Context {
         );
         $this->builder->store($heapPtr, $global);
         if (null !== $restore) {
-            $this->builder->positionAtEnd($restore);
+            BasicBlockHelper::restoreInsertBlock($this, $restore);
         }
     }
 
@@ -646,6 +687,7 @@ class Context {
         );
         $this->initFunc = $this->module->addFunction('__init__', $signature);
         $this->initBlock = $this->initFunc->appendBasicBlock('main');
+        $this->initLinearBlock = $this->initBlock;
 
         $this->shutdownFunc = $this->module->addFunction('__shutdown__', $signature);
         $this->shutdownBlock = $this->shutdownFunc->appendBasicBlock('main');
@@ -908,6 +950,67 @@ class Context {
         $this->targetData = $this->module->getModuleDataLayout();
     }
 
+    private function sealInitShutdownReturn(\PHPLLVM\BasicBlock $block): void
+    {
+        if (null !== $block->getTerminator()) {
+            return;
+        }
+        $this->builder->positionAtEnd($block);
+        $this->builder->returnVoid();
+    }
+
+    private function sealInitFunction(): void
+    {
+        $tail = $this->initLinearBlock ?? $this->initBlock;
+        $this->sealInitShutdownReturn($tail);
+        if ($tail !== $this->initBlock) {
+            $this->sealInitShutdownReturn($this->initBlock);
+        }
+    }
+
+    public function emitsInitLinearIR(): bool
+    {
+        return $this->initLinearEmissionDepth > 0;
+    }
+
+    public function positionBuilderAtInitEmission(): void
+    {
+        $initParent = $this->initBlock->getParent();
+        if ($initParent instanceof \PHPLLVM\Value\Function_) {
+            $this->initFunc = $initParent;
+        }
+        $block = $this->initLinearBlock ?? $this->initBlock;
+        if (null !== $block->getTerminator()) {
+            throw new \LogicException(
+                '__init__ linear emission block is already sealed: '.$block->getName()
+            );
+        }
+        $this->builder->positionAtEnd($block);
+    }
+
+    public function builderInsertsInInitFunction(): bool
+    {
+        return $this->emitsInitLinearIR();
+    }
+
+    public function splitInitLinearTo(\PHPLLVM\BasicBlock $target): void
+    {
+        $block = $this->initLinearBlock ?? $this->initBlock;
+        if (null === $block->getTerminator()) {
+            $this->builder->positionAtEnd($block);
+            $this->builder->branch($target);
+        }
+    }
+
+    public function advanceInitLinearTail(\PHPLLVM\BasicBlock $resume): void
+    {
+        if (null !== $resume->getTerminator()) {
+            throw new \LogicException('__init__ resume block must be open');
+        }
+        $this->initLinearBlock = $resume;
+        $this->builder->positionAtEnd($resume);
+    }
+
     private function compileCommon() {
         Progress::noteFunction('jit_context_compile_common_phase_modules_shutdown');
         foreach ($this->modules as $module) {
@@ -918,12 +1021,9 @@ class Context {
             $builtin->shutdown();
         }
         Builtin\AttributeRegistryLowering::implementLookupFunctions($this);
-        $this->builder->positionAtEnd($this->initBlock);
-        $this->builder->returnVoid();
-        $this->builder->positionAtEnd($this->shutdownBlock);
-        $this->builder->returnVoid();
-        $this->builder->positionAtEnd($this->headerPreFlushBlock);
-        $this->builder->returnVoid();
+        $this->sealInitFunction();
+        $this->sealInitShutdownReturn($this->shutdownBlock);
+        $this->sealInitShutdownReturn($this->headerPreFlushBlock);
 
         if (!is_null($this->debugFile)) {
             $this->module->printToFile($this->debugFile . '.bc');
@@ -942,8 +1042,65 @@ class Context {
             $function = $next;
         }
         Progress::noteFunction('jit_context_verify_begin');
+        $this->debugScanForPostTerminatorInstructions();
+        $dumpIr = getenv('PHP_COMPILER_DUMP_IR');
+        if ('1' === $dumpIr || 'true' === strtolower((string) $dumpIr)) {
+            $this->module->printToFile('/tmp/phpc-last.ll');
+        }
         $this->module->verify($this->module::VERIFY_ACTION_THROW, $message);   
         Progress::noteFunction('jit_context_verify_done');
+    }
+
+    private function debugScanForPostTerminatorInstructions(): void
+    {
+        $flag = getenv('PHP_COMPILER_DEBUG_LLVM_BLOCKS');
+        if ('1' !== $flag && 'true' !== strtolower((string) $flag)) {
+            return;
+        }
+        $function = $this->module->getFirstFunction();
+        while (null !== $function) {
+            if ($function instanceof \PHPLLVM\Value\Function_) {
+                $block = $function->getFirstBasicBlock();
+                while (null !== $block) {
+                    $terminator = $block->getTerminator();
+                    if (null === $terminator) {
+                        $block = $block->getNext();
+                        continue;
+                    }
+                    $seenTerminator = false;
+                    try {
+                        $inst = $block->getFirstInstruction();
+                    } catch (\Throwable) {
+                        $block = $block->getNext();
+                        continue;
+                    }
+                    while (null !== $inst) {
+                        if ($seenTerminator) {
+                            fwrite(
+                                STDERR,
+                                'llvm-block-debug: fn='.$function->getName()
+                                .' bb='.$block->getName()
+                                ." has instruction after terminator\n"
+                            );
+                            break;
+                        }
+                        if ($inst === $terminator) {
+                            $seenTerminator = true;
+                        } elseif ($inst instanceof \PHPLLVM\Value\Instruction) {
+                            try {
+                                if ($inst->isABranchInst() || $inst->isAReturnInst() || $inst->isAUnreachableInst()) {
+                                    $seenTerminator = true;
+                                }
+                            } catch (\Throwable) {
+                            }
+                        }
+                        $inst = $inst instanceof \PHPLLVM\Value\Instruction ? $inst->getNext() : null;
+                    }
+                    $block = $block->getNext();
+                }
+            }
+            $function = $function->getNext();
+        }
     }
 
     private function registerAotDebugSourceGlobal(): void
@@ -1247,8 +1404,9 @@ class Context {
             $global = $this->module->addGlobal($this->type->string->pointer, 'string_const_' . count($this->stringConstantMap));
             $global->setInitializer($this->type->string->pointer->constNull());
             $oldBuilder = $this->builder;
+            $resumeInitEmission = $this->emitsInitLinearIR();
             $this->builder = $this->context->builderCreate();
-            $this->builder->positionAtEnd($this->initBlock);
+            $this->positionBuilderAtInitEmission();
             $this->type->string->init(
                 $global,
                 $this->constantFromString($string),
@@ -1258,6 +1416,9 @@ class Context {
             $this->builder->positionAtEnd($this->shutdownBlock);
             $this->memory->free($this->builder->load($global));
             $this->builder = $oldBuilder;
+            if ($resumeInitEmission) {
+                $this->positionBuilderAtInitEmission();
+            }
             $this->stringConstantMap[$string] = $global;
         }
         return $this->stringConstantMap[$string];
@@ -1288,7 +1449,7 @@ class Context {
     {
         $oldBuilder = $this->builder;
         $this->builder = $this->context->builderCreate();
-        $this->builder->positionAtEnd($this->initBlock);
+        $this->positionBuilderAtInitEmission();
         $htVar = HashTableHelper::variableFromVmHashTable($this, $table);
         $ht = HashTableHelper::loadHashtablePointer($this, $htVar);
         $this->refcount->addref($ht);
@@ -1356,10 +1517,14 @@ class Context {
     {
         $oldBuilder = $this->builder;
         $this->builder = $this->context->builderCreate();
-        $this->builder->positionAtEnd($this->initBlock);
+        ++$this->initLinearEmissionDepth;
+        $this->positionBuilderAtInitEmission();
         try {
             $emit($this);
         } finally {
+            if ($this->initLinearEmissionDepth > 0) {
+                --$this->initLinearEmissionDepth;
+            }
             $this->builder = $oldBuilder;
         }
     }
