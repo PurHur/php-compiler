@@ -4565,7 +4565,7 @@ class JIT {
             return $this->emitM3EmitTuRuntimeConstructNativeFunction($internalName, $logicalName, $block);
         }
         if (str_ends_with($lower, '\\runtime::initvmcontext')) {
-            return $this->emitM3EmitTuRuntimeInitVoidStub($internalName, $logicalName, $block);
+            return $this->compileRuntimeInitVmContextM3Native($internalName, $block, $logicalName);
         }
         if (
             str_ends_with($lower, '\\runtime::initparsepipeline')
