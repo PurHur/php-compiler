@@ -15,7 +15,7 @@ use PHPLLVM\Value;
 /**
  * proc_open() — subprocess pipes (php-src ext/standard/proc_open.c; #3131, #6904).
  *
- * VM: {@see VmProcess::procOpen()}; JIT/AOT: __compiler_proc_open (string command + pipe spec v1).
+ * VM: {@see VmProcess::procOpen()} via {@see VmProcessProcOpenNative} when FFI available; JIT/AOT: __compiler_proc_open (string command + pipe spec v1).
  */
 final class proc_open extends Internal
 {
