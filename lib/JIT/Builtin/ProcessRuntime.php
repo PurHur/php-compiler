@@ -276,16 +276,16 @@ final class ProcessRuntime
         $sizeT = $context->getTypeFromString('size_t');
         $chunkSizeT = $sizeT->constInt(self::CHUNK, false);
 
+        $chunk = $context->builder->alloca($i8, self::CHUNK, 'prl_chunk');
+        $chunkPtr = $context->builder->pointerCast($chunk, $i8p);
+        $indexSlot = $context->builder->alloca($sizeT, 1, 'prl_index');
+        $context->builder->store($sizeT->constInt(0, false), $indexSlot);
+
         $result = $context->builder->call($context->lookupFunction('__hashtable__alloc'));
         $resultNull = $context->builder->icmp(Builder::INT_EQ, $result, $htPtr->constNull());
         $failBb = $fn->appendBasicBlock('prl_malloc_fail');
         $loopHead = $fn->appendBasicBlock('prl_loop_head');
         $context->builder->branchIf($resultNull, $failBb, $loopHead);
-
-        $chunk = $context->builder->alloca($i8, self::CHUNK, 'prl_chunk');
-        $chunkPtr = $context->builder->pointerCast($chunk, $i8p);
-        $indexSlot = $context->builder->alloca($sizeT, 1, 'prl_index');
-        $context->builder->store($sizeT->constInt(0, false), $indexSlot);
 
         $context->builder->positionAtEnd($loopHead);
         $line = $context->builder->call(
