@@ -65,6 +65,15 @@ final class BootstrapSelfhostFullRevisionProbeTest extends TestCase
         $this->assertStringContainsString('bin/compile.php argv compile', $script);
         $this->assertStringContainsString('prelinked gen-0 sidecar', $script);
         $this->assertStringContainsString('#2880', $script);
+        $this->assertStringNotContainsString('bootstrap_inventory_argv_driver_spine_lint', $script);
+    }
+
+    public function testBinCompileSidecarPathNorm(): void
+    {
+        $norm = \PHPCompiler\JIT\M3EmitTuTrivialEchoAot::normalizeSidecarSourcePath(
+            self::$root.'/bin/compile.php'
+        );
+        $this->assertSame('bin/compile.php', $norm);
     }
 
     public function testJitRegistersM5DriverHostForBinCompileSidecar(): void
