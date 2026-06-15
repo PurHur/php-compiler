@@ -10141,11 +10141,28 @@ class Compiler {
         $children = $block->orig->children;
         $preceding = $this->precedingClassConstFetchesBeforeCfgOp($children, $callOp);
         if (($preceding[$argIndex] ?? null) === $fetch) {
+            $callArg = $callOp->args[$argIndex] ?? null;
+            if ($this->isUnrelatedScalarLiteralCallArg($callArg, $fetch)) {
+                return false;
+            }
+
             return true;
         }
         $hoisted = $this->classConstFetchForHoistedDeadPrelude($callOp, $argIndex, $block);
 
         return $hoisted === $fetch;
+    }
+
+    /**
+     * Hoisted enum fetches must not bind to unrelated literal slots (pack('i', E::A); #8816).
+     */
+    private function isUnrelatedScalarLiteralCallArg(?Operand $callArg, Op\Expr\ClassConstFetch $fetch): bool
+    {
+        if (!$callArg instanceof Operand\Literal) {
+            return false;
+        }
+
+        return !$this->operandsReferToSameVariable($fetch->result, $callArg);
     }
 
     /**
