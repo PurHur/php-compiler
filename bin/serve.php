@@ -20,10 +20,12 @@ use PHPCompiler\VM\OutputBuffer;
 use PHPCompiler\VM\ScriptExit;
 use PHPCompiler\VM\ShutdownQueue;
 use PHPCompiler\ext\standard\VmSession;
+use PHPCompiler\ext\standard\VmStatCache;
 use PHPCompiler\Web\DevServer;
 use PHPCompiler\Web\ProjectBootstrap;
 use PHPCompiler\Web\ProjectManifest;
 use PHPCompiler\Web\ResponseContext;
+use PHPCompiler\Web\ServeCompileCache;
 use PHPCompiler\Web\Superglobals;
 
 $listen = $argv[1] ?? '127.0.0.1:8080';
@@ -36,6 +38,7 @@ DevServer::run($listen, $docroot, static function (string $script, array $cgiEnv
     ResponseContext::reset();
     ResponseContext::enableHeaderQueue();
     VmSession::reset();
+    VmStatCache::reset();
     OutputBuffer::reset();
     ShutdownQueue::reset();
     $code = file_get_contents($script);
@@ -53,7 +56,10 @@ DevServer::run($listen, $docroot, static function (string $script, array $cgiEnv
         );
         [$bootProjectDir, $bootManifest] = ProjectBootstrap::resolveFromScript($script);
         ProjectBootstrap::prepare($runtime, $bootProjectDir, $bootManifest);
-        $block = $runtime->parseAndCompile($code, $script);
+        $block = ServeCompileCache::get($runtime, $script, $code);
+        if (null === $block) {
+            throw new \RuntimeException('Could not compile script');
+        }
         $runtime->run($block);
         $output = ob_get_clean();
         if (VmSession::isActive()) {
