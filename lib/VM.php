@@ -10556,6 +10556,7 @@ restart:
                     'deprecated' => $data['deprecated'],
                     'attributeEntries' => $data['attributeEntries'],
                     'parameterMetadata' => $data['parameterMetadata'],
+                    'sourceLocation' => $data['sourceLocation'] ?? null,
                 ];
             }
         }
@@ -10621,6 +10622,7 @@ restart:
                     'deprecated' => $orig['deprecated'],
                     'attributeEntries' => $orig['attributeEntries'],
                     'parameterMetadata' => $orig['parameterMetadata'],
+                    'sourceLocation' => $orig['sourceLocation'] ?? null,
                 ];
             } else {
                 if (isset($merged[$methodLc])) {
@@ -10679,19 +10681,19 @@ restart:
             $entry->methodVisibility[$methodLc] = $data['vis'];
             $entry->methodDeclaringClassLc[$methodLc] = strtolower(ltrim($data['traitName'], '\\'));
             $entry->methodNames[$methodLc] = $data['methodNames'];
-            if (null !== $data['attrs']) {
+            if (null !== ($data['attrs'] ?? null)) {
                 $entry->methodAttributeNames[$methodLc] = $data['attrs'];
             }
-            if (null !== $data['deprecated']) {
+            if (null !== ($data['deprecated'] ?? null)) {
                 $entry->methodDeprecated[$methodLc] = $data['deprecated'];
             }
-            if (null !== $data['attributeEntries']) {
+            if (null !== ($data['attributeEntries'] ?? null)) {
                 $entry->methodAttributeEntries[$methodLc] = $data['attributeEntries'];
             }
-            if (null !== $data['parameterMetadata']) {
+            if (null !== ($data['parameterMetadata'] ?? null)) {
                 $entry->methodParameterMetadata[$methodLc] = $data['parameterMetadata'];
             }
-            if (null !== $data['sourceLocation']) {
+            if (null !== ($data['sourceLocation'] ?? null)) {
                 $entry->methodSourceLocations[$methodLc] = $data['sourceLocation'];
             }
             if ('__construct' === $methodLc && null === $entry->constructor) {
