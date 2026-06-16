@@ -480,6 +480,50 @@ final class CiScriptsTest extends TestCase
         $this->assertStringContainsString('.phpc/smoke', $body);
     }
 
+    public function testReleaseReadinessScriptExistsAndJsonSchema(): void
+    {
+        $repoRoot = dirname(__DIR__, 2);
+        $script = $repoRoot.'/script/release-readiness.sh';
+        $this->assertFileExists($script);
+        $this->assertTrue(is_executable($script));
+        $body = (string) file_get_contents($script);
+        $this->assertStringContainsString('--full', $body);
+        $this->assertStringContainsString('--json', $body);
+        $this->assertStringContainsString('user_release_ready', $body);
+        $this->assertStringContainsString('bootstrap-inventory.php --check', $body);
+        $this->assertStringContainsString('check-selfhost-spine-coverage-sync.php', $body);
+        $this->assertStringContainsString('check-root-readme-sync.php', $body);
+        $this->assertStringContainsString('examples-aot-smoke.sh', $body);
+        $this->assertStringContainsString('examples-web-smoke.sh', $body);
+        $this->assertStringContainsString('RELEASE_READINESS_CI_FAST', $body);
+        $this->assertStringContainsString('#8737', $body);
+
+        $doc = (string) file_get_contents($repoRoot.'/docs/local-ci-matrix.md');
+        $this->assertStringContainsString('release-readiness.sh', $doc);
+        $this->assertStringContainsString('user_release_ready', $doc);
+
+        $this->assertFileExists($repoRoot.'/CHANGELOG.md');
+        $changelog = (string) file_get_contents($repoRoot.'/CHANGELOG.md');
+        $this->assertMatchesRegularExpression('/^## v1\.1\.0\b/m', $changelog);
+
+        $cmd = 'bash '.escapeshellarg($script).' --json --dry-run 2>/dev/null';
+        $raw = shell_exec($cmd);
+        $this->assertIsString($raw);
+        $payload = json_decode($raw, true);
+        $this->assertIsArray($payload);
+        $this->assertArrayHasKey('user_release_ready', $payload);
+        $this->assertContains($payload['user_release_ready'], ['yes', 'no']);
+        $this->assertSame('quick', $payload['mode'] ?? null);
+        $this->assertArrayHasKey('gates', $payload);
+        $this->assertIsArray($payload['gates']);
+        $this->assertNotEmpty($payload['gates']);
+        foreach ($payload['gates'] as $gate) {
+            $this->assertArrayHasKey('name', $gate);
+            $this->assertArrayHasKey('status', $gate);
+            $this->assertArrayHasKey('message', $gate);
+        }
+    }
+
     public function testDeploySmokeScriptExists(): void
     {
         $script = dirname(__DIR__, 2).'/script/deploy-smoke.sh';
