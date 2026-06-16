@@ -8111,15 +8111,23 @@ restart:
      */
     private function resolvePropertyHookRefWriteLvalue(Variable $operand, Frame $frame): ?Variable
     {
-        if (null === $this->resolvePropertyWriteOwner($operand)) {
-            return null;
-        }
         $propName = $this->resolvePropertyWriteName($operand);
         if (null === $propName || $this->isPropertyHookRawWrite($frame, $propName)) {
             return null;
         }
+        if (null !== $this->resolvePropertyWriteOwner($operand)) {
+            return $operand;
+        }
+        $target = $operand->resolveIndirect();
+        $classLc = $operand->staticPropertyClassLc ?? $target->staticPropertyClassLc;
+        $staticPropName = $operand->objectPropertyName ?? $target->objectPropertyName;
+        if (is_string($classLc) && is_string($staticPropName) && '' !== $staticPropName) {
+            if (null !== $this->resolveStaticPropertyHooks($classLc, strtolower($staticPropName))) {
+                return $operand;
+            }
+        }
 
-        return $operand;
+        return null;
     }
 
     /** Live property storage cell for hooked ref bindings (#6426). */
@@ -8150,27 +8158,45 @@ restart:
     ): void {
         $owner = $this->resolvePropertyWriteOwner($writeLvalue);
         $propName = $this->resolvePropertyWriteName($writeLvalue);
-        if (null === $owner || null === $propName) {
-            $this->stablePropertyHookRefWriteLvalue($writeLvalue)->copyFrom($value->resolveIndirect());
+        if (null !== $owner && null !== $propName) {
+            $lcClass = strtolower($owner->class->name);
+            $propMeta = $this->context->propertyHookRegistry[$lcClass][$propName]
+                ?? $this->context->propertyHookRegistry[$lcClass][strtolower($propName)]
+                ?? null;
+            $backingName = is_array($propMeta)
+                ? ($propMeta['getBacking'] ?? $propMeta['setBacking'] ?? null)
+                : null;
+            if (null !== $backingName && $owner->hasProperty($backingName)) {
+                $owner->getProperty($backingName)->copyFrom($value->resolveIndirect());
 
-            return;
-        }
-        $lcClass = strtolower($owner->class->name);
-        $propMeta = $this->context->propertyHookRegistry[$lcClass][$propName]
-            ?? $this->context->propertyHookRegistry[$lcClass][strtolower($propName)]
-            ?? null;
-        $backingName = is_array($propMeta)
-            ? ($propMeta['getBacking'] ?? $propMeta['setBacking'] ?? null)
-            : null;
-        if (null !== $backingName && $owner->hasProperty($backingName)) {
-            $owner->getProperty($backingName)->copyFrom($value->resolveIndirect());
+                return;
+            }
+            if ($owner->hasProperty($propName)) {
+                $owner->getProperty($propName)->copyFrom($value->resolveIndirect());
 
-            return;
-        }
-        if ($owner->hasProperty($propName)) {
-            $owner->getProperty($propName)->copyFrom($value->resolveIndirect());
+                return;
+            }
+        } else {
+            $target = $writeLvalue->resolveIndirect();
+            $classLc = $writeLvalue->staticPropertyClassLc ?? $target->staticPropertyClassLc;
+            $staticPropName = $writeLvalue->objectPropertyName ?? $target->objectPropertyName;
+            if (is_string($classLc) && is_string($staticPropName) && '' !== $staticPropName) {
+                $propLc = strtolower($staticPropName);
+                $propMeta = $this->context->propertyHookRegistry[$classLc][$staticPropName]
+                    ?? $this->context->propertyHookRegistry[$classLc][$propLc]
+                    ?? null;
+                $backingName = is_array($propMeta)
+                    ? ($propMeta['getBacking'] ?? $propMeta['setBacking'] ?? null)
+                    : null;
+                if (null !== $backingName) {
+                    $backingStorage = $this->resolveStaticPropertyStorage($classLc, strtolower($backingName));
+                    if (null !== $backingStorage) {
+                        $backingStorage->copyFrom($value->resolveIndirect());
 
-            return;
+                        return;
+                    }
+                }
+            }
         }
         $this->stablePropertyHookRefWriteLvalue($writeLvalue)->copyFrom($value->resolveIndirect());
     }
