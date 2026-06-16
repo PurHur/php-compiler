@@ -41,6 +41,7 @@ final class NorthStar5VerifyScriptTest extends TestCase
         $this->assertStringContainsString('live N/N', $combined);
         $this->assertStringContainsString('--strict', $combined);
         $this->assertStringContainsString('--fast', $combined);
+        $this->assertStringContainsString('BOOTSTRAP_VENDOR_REBUILD_AUDIT', $combined);
         $this->assertStringContainsString('#1416', $combined);
         $this->assertStringContainsString('#1492', $combined);
     }

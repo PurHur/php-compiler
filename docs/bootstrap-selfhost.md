@@ -166,6 +166,16 @@ BOOTSTRAP_INVENTORY_TRIAGE_SYNC_GATE=1 ./script/ci-fast.sh
 
 CI: `./script/ci-fast.sh` runs `--check` by default (`BOOTSTRAP_VENDOR_INVENTORY_SYNC_GATE=1`, [#2040](https://github.com/PurHur/php-compiler/issues/2040)). Opt out with `BOOTSTRAP_VENDOR_INVENTORY_SYNC_GATE=0` during vendor-only iteration. See [`bootstrap-vendor-inventory.md`](bootstrap-vendor-inventory.md).
 
+**Native vendor `.o` rebuild audit** ([#8718](https://github.com/PurHur/php-compiler/issues/8718)): verify committed `prelinked/bootstrap-vendor/*.o` sidecars still match a native rebuild from `prelinked/bootstrap-vendor/sources/` (no `vendor/`, no Zend gen-0):
+
+```bash
+BOOTSTRAP_M5_VENDOR_ALLOW_ZEND=0 ./script/bootstrap-vendor-native-rebuild-audit.sh
+# opt-in during M5 fast presenter:
+BOOTSTRAP_VENDOR_REBUILD_AUDIT=1 make north-star5-verify-fast
+```
+
+Run monthly or before vendor-prelink PRs that touch `sources/` or committed `.o` blobs. On drift, the audit prints an issue template with per-package SHA-256 diffs.
+
 **Docker** (optional; LLVM 9 in `php-compiler:22.04-dev` — see README):
 
 ```console
