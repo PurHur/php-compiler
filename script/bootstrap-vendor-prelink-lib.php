@@ -797,6 +797,154 @@ function bootstrapVendorPrelinkFailuresAreNativeParseSpine(array $manifest, arra
 }
 
 /**
+ * @return list<string> repo-relative paths under prelinked/bootstrap-vendor/sources only
+ */
+function bootstrapVendorPrelinkSourcesOnlyPhpFiles(string $root, string $package): array
+{
+    $libDir = bootstrapVendorPrelinkSourcesRoot($root).'/'.$package.'/lib';
+    if (!is_dir($libDir)) {
+        return [];
+    }
+    $paths = [];
+    $it = new RecursiveIteratorIterator(
+        new RecursiveDirectoryIterator($libDir, FilesystemIterator::SKIP_DOTS)
+    );
+    foreach ($it as $file) {
+        if (!$file->isFile() || !str_ends_with(strtolower($file->getFilename()), '.php')) {
+            continue;
+        }
+        $paths[] = ltrim(str_replace('\\', '/', substr($file->getPathname(), strlen($root))), '/');
+    }
+    sort($paths);
+
+    return $paths;
+}
+
+function bootstrapVendorPrelinkSha256File(string $path): ?string
+{
+    if (!is_file($path)) {
+        return null;
+    }
+    $hash = hash_file('sha256', $path);
+
+    return is_string($hash) && '' !== $hash ? $hash : null;
+}
+
+function bootstrapVendorPrelinkSourcesContentHash(string $root, string $package): ?string
+{
+    $paths = bootstrapVendorPrelinkSourcesOnlyPhpFiles($root, $package);
+    if ([] === $paths) {
+        return null;
+    }
+    $ctx = hash_init('sha256');
+    foreach ($paths as $rel) {
+        hash_update($ctx, $rel."\0");
+        hash_update($ctx, (string) file_get_contents($root.'/'.$rel));
+    }
+
+    return hash_final($ctx);
+}
+
+/**
+ * Native rebuild audit for one vendor package (#8718).
+ *
+ * @param array{mode: 'native'|'zend', argv: list<string>} $invoker
+ *
+ * @return array{
+ *   status: 'match'|'drift'|'rebuild_failed'|'missing_committed'|'missing_bundle'|'missing_sources',
+ *   package: string,
+ *   slug: string,
+ *   committed_hash: ?string,
+ *   rebuilt_hash: ?string,
+ *   sources_hash: ?string,
+ *   blocker: ?string,
+ *   cmd: ?string
+ * }
+ */
+function bootstrapVendorPrelinkAuditPackage(
+    string $root,
+    string $package,
+    array $invoker,
+    string $auditDir
+): array {
+    $slug = bootstrapVendorPrelinkSlug($package);
+    $result = [
+        'status' => 'rebuild_failed',
+        'package' => $package,
+        'slug' => $slug,
+        'committed_hash' => null,
+        'rebuilt_hash' => null,
+        'sources_hash' => bootstrapVendorPrelinkSourcesContentHash($root, $package),
+        'blocker' => null,
+        'cmd' => null,
+    ];
+    if ([] === bootstrapVendorPrelinkSourcesOnlyPhpFiles($root, $package)) {
+        $result['status'] = 'missing_sources';
+
+        return $result;
+    }
+    $manifestPath = $root.'/prelinked/bootstrap-vendor/manifest.json';
+    $manifest = bootstrapVendorPrelinkReadManifest($manifestPath) ?? bootstrapVendorPrelinkEmptyManifest($root);
+    $bundleRel = (string) ($manifest['packages'][$package]['bundle'] ?? '');
+    $bundleAbs = '' !== $bundleRel ? $root.'/'.$bundleRel : '';
+    if ('' === $bundleRel || !is_file($bundleAbs)) {
+        $result['status'] = 'missing_bundle';
+
+        return $result;
+    }
+    $committedRel = (string) ($manifest['packages'][$package]['object'] ?? '');
+    $committedAbs = '' !== $committedRel ? $root.'/'.$committedRel : '';
+    if ('' === $committedRel || !is_file($committedAbs)) {
+        $result['status'] = 'missing_committed';
+
+        return $result;
+    }
+    $result['committed_hash'] = bootstrapVendorPrelinkSha256File($committedAbs);
+
+    if (!is_dir($auditDir)) {
+        mkdir($auditDir, 0775, true);
+    }
+    $buildBase = $auditDir.'/'.$slug;
+    $rebuiltAbs = $buildBase.'.o';
+    @unlink($buildBase);
+    @unlink($rebuiltAbs);
+
+    $cmd = bootstrapVendorPrelinkBuildCompileCommand($root, $buildBase, $bundleAbs, $invoker);
+    $result['cmd'] = $cmd;
+    $output = [];
+    exec($cmd, $output, $code);
+    $objectCandidate = $rebuiltAbs;
+    if (0 === $code && !is_file($objectCandidate) && is_file($buildBase)) {
+        copy($buildBase, $rebuiltAbs);
+    }
+    if (0 === $code && !is_file($objectCandidate) && is_file($rebuiltAbs.'.o')) {
+        copy($rebuiltAbs.'.o', $rebuiltAbs);
+    }
+    if (0 !== $code || !is_file($rebuiltAbs)) {
+        $blocker = 0 !== $code
+            ? 'compile exit '.$code
+            : 'missing rebuilt object after compile';
+        $detail = bootstrapVendorPrelinkExtractCompileFailureDetail($output);
+        if (null !== $detail) {
+            $blocker .= ' — '.$detail;
+        }
+        $result['status'] = 'rebuild_failed';
+        $result['blocker'] = $blocker;
+
+        return $result;
+    }
+
+    $result['rebuilt_hash'] = bootstrapVendorPrelinkSha256File($rebuiltAbs);
+    if ($result['committed_hash'] === $result['rebuilt_hash']) {
+        $result['status'] = 'match';
+    } else {
+        $result['status'] = 'drift';
+    }
+
+    return $result;
+}
+
+/**
  * @param array{mode: 'native'|'zend', argv: list<string>}|null $invoker
  */
 function bootstrapVendorPrelinkBuildCompileCommand(

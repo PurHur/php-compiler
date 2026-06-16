@@ -64,6 +64,7 @@ Options:
 
 Env:
   NORTH_STAR5_VERIFY_FAST=1   same as --fast
+  BOOTSTRAP_VENDOR_REBUILD_AUDIT=1   opt-in native vendor .o drift audit (#8718)
 
 Docker:
   ./script/docker-exec.sh -- bash -lc './script/north-star5-verify.sh --fast'
@@ -262,6 +263,21 @@ if [[ "${FAST_M5}" -eq 1 ]]; then
       exit 1
     fi
     echo "north-star5-verify: steps 4f2–4f3 skipped (LLVM 9 not available)"
+  fi
+
+  if [[ "${BOOTSTRAP_VENDOR_REBUILD_AUDIT:-0}" == "1" ]]; then
+    echo
+    echo "=== north-star5-verify step 4f-a: vendor native rebuild audit (#8718) ==="
+    if ci_llvm_ready; then
+      ci_apply_llvm_memory_env
+      if ! "${_CI_SCRIPT_DIR}/bootstrap-vendor-native-rebuild-audit.sh"; then
+        echo "north-star5-verify: step 4f-a FAILED (vendor prelink drift — see audit output)" >&2
+        exit 1
+      fi
+      echo "north-star5-verify: step 4f-a ok"
+    else
+      echo "north-star5-verify: step 4f-a skipped (LLVM 9 not available; set BOOTSTRAP_VENDOR_REBUILD_AUDIT=0 to silence)"
+    fi
   fi
 
   ns5_print_summary "${VENDOR_OK}"
