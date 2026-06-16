@@ -8829,8 +8829,25 @@ class Compiler {
             return null;
         }
         // php-cfg uses distinct result/arg temps for hoisted inline producers (#8766, #8561).
-        if ($producer instanceof Op\Expr\BinaryOp || $producer instanceof Op\Expr\ConstFetch) {
+        if (
+            $producer instanceof Op\Expr\BinaryOp
+            || $producer instanceof Op\Expr\ConstFetch
+            || $producer instanceof Op\Expr\InstanceOf_
+        ) {
             return $producerSlot;
+        }
+        if ($producer instanceof Op\Expr\ClassConstFetch) {
+            $constName = $this->staticNameFromOperand($producer->name);
+            $className = $this->staticNameFromOperand($producer->class);
+            if (null !== $constName && null !== $className) {
+                $lcClass = $this->resolveDefaultClassConstScope($className, $block);
+                if (
+                    null !== $lcClass
+                    && $this->isCompileTimeEnumCaseConstantMember($lcClass, strtolower($constName))
+                ) {
+                    return $producerSlot;
+                }
+            }
         }
         $argSlot = $this->compileOperand($arg, $block, false);
         if (null === $argSlot) {
@@ -9223,7 +9240,8 @@ class Compiler {
             || $op instanceof Op\Expr\StaticCall
             || $op instanceof Op\Expr\MethodCall
             || $op instanceof Op\Expr\UnaryMinus
-            || $op instanceof Op\Expr\UnaryPlus;
+            || $op instanceof Op\Expr\UnaryPlus
+            || $op instanceof Op\Expr\InstanceOf_;
     }
 
     /**
@@ -11023,26 +11041,30 @@ class Compiler {
                 }
                 $valueSlot = $this->compileOperand($inlineArray->result, $block, true);
             } else {
-                $valueSlot = $this->findInlineExprCallArgProducerSlot($arg, $block);
-                if (null === $valueSlot) {
-                    $prefetchOps = $this->compileCallArgRuntimeEnumConstFetchOps($arg, $block, (int) $argIndex, $callOrdinal);
-                    if ([] !== $prefetchOps) {
-                        $valueSlot = $prefetchOps[0]->arg1;
+                $prefetchOps = $this->compileCallArgRuntimeEnumConstFetchOps(
+                    $arg,
+                    $block,
+                    (int) $argIndex,
+                    $callOrdinal
+                );
+                if ([] !== $prefetchOps) {
+                    $valueSlot = $prefetchOps[0]->arg1;
+                } else {
+                    $valueSlot = $this->findInlineExprCallArgProducerSlot($arg, $block);
+                    if (null === $valueSlot) {
+                        if (
+                            null === $calleeName
+                            || !$this->callArgRequiresByRef($calleeName, (int) $argIndex)
+                        ) {
+                            $valueSlot = $this->tryFoldCallArgCompileTimeValue($arg, $block);
+                        }
                     }
-                }
-                if (null === $valueSlot) {
-                    if (
-                        null === $calleeName
-                        || !$this->callArgRequiresByRef($calleeName, (int) $argIndex)
-                    ) {
-                        $valueSlot = $this->tryFoldCallArgCompileTimeValue($arg, $block);
+                    if (null === $valueSlot) {
+                        $valueSlot = $this->compileOperand($arg, $block, true);
                     }
-                }
-                if (null === $valueSlot) {
-                    $valueSlot = $this->compileOperand($arg, $block, true);
-                }
-                if (null === $valueSlot && $arg instanceof Operand\NullOperand) {
-                    $valueSlot = $this->registerNullConstantSlot($block, $arg);
+                    if (null === $valueSlot && $arg instanceof Operand\NullOperand) {
+                        $valueSlot = $this->registerNullConstantSlot($block, $arg);
+                    }
                 }
             }
             $nameSlot = null;

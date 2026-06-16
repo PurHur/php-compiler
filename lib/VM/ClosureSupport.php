@@ -129,7 +129,9 @@ final class ClosureSupport
         if (Variable::TYPE_NULL === $newThis->type) {
             $bound->boundThis = null;
         } else {
-            $bound->boundThis = $newThis;
+            $boundThis = new Variable();
+            $boundThis->copyFrom($newThis);
+            $bound->boundThis = $boundThis;
         }
         $scopeClass = self::resolveScopeClass($newScope, $newThis, $context);
         if (null !== $scopeClass && self::isExplicitStringScope($newScope)) {
@@ -430,15 +432,23 @@ final class ClosureSupport
         );
     }
 
-    /** Enum cases are objects in Zend; materialize before bindTo/bind/call (#7201). */
+    /** Enum cases are objects in Zend; bind canonical singleton before bindTo/bind/call (#7201, #8877). */
     private static function normalizeNewThis(Variable $newThis): Variable
     {
         $newThis = $newThis->resolveIndirect();
-        if (EnumCaseSupport::isEnumCaseVariable($newThis)) {
-            return EnumCaseSupport::receiverForInstanceMethod($newThis);
+        if (!EnumCaseSupport::isEnumCaseVariable($newThis)) {
+            return $newThis;
+        }
+        $enumClass = EnumCaseSupport::enumClassForCaseVariable($newThis);
+        $caseName = EnumCaseSupport::enumCaseNameForVariable($newThis);
+        if (null !== $enumClass && '' !== $caseName) {
+            $canonical = BackedEnum::canonicalCaseVariable($enumClass, $caseName);
+            if (null !== $canonical) {
+                return $canonical->resolveIndirect();
+            }
         }
 
-        return $newThis;
+        return EnumCaseSupport::receiverForInstanceMethod($newThis);
     }
 
     private static function valueTypeName(Variable $value): string
