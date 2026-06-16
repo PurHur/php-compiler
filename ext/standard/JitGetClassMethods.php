@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace PHPCompiler\ext\standard;
 
+use PHPCompiler\JIT\Builtin\Type\Object_ as ObjectBuiltin;
 use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Builtin\TypeErrorRaise;
 use PHPCompiler\JIT\Context;
@@ -26,6 +27,17 @@ final class JitGetClassMethods
     public static function invoke(Context $context, JITVariable $classArg): Value
     {
         $filter = VmReflection::METHOD_FILTER_DEFAULT;
+        $compileTimeEnum = $classArg->compileTimeEnumCase ?? null;
+        if (\is_array($compileTimeEnum) && isset($compileTimeEnum['classId'])) {
+            $object = $context->type->object;
+            if ($object instanceof ObjectBuiltin) {
+                return self::invokeForClassName(
+                    $context,
+                    $object->classNameForId((int) $compileTimeEnum['classId']),
+                    $filter
+                );
+            }
+        }
         if (JITVariable::TYPE_OBJECT === $classArg->type) {
             return self::invokeForObject($context, $classArg, $filter);
         }
@@ -68,6 +80,11 @@ final class JitGetClassMethods
             $typeByte,
             $i8->constInt(Variable::TYPE_NULL, false)
         );
+        $isEnumCase = $context->builder->icmp(
+            Builder::INT_EQ,
+            $typeByte,
+            $i8->constInt(Variable::TYPE_ENUM_CASE, false)
+        );
         $isObject = $context->builder->icmp(
             Builder::INT_EQ,
             $typeByte,
@@ -81,6 +98,8 @@ final class JitGetClassMethods
 
         $nullBlock = BasicBlockHelper::append($context, 'gcm_null');
         $notNull = BasicBlockHelper::append($context, 'gcm_not_null');
+        $enumBlock = BasicBlockHelper::append($context, 'gcm_enum');
+        $objectCheck = BasicBlockHelper::append($context, 'gcm_obj_check');
         $objectBlock = BasicBlockHelper::append($context, 'gcm_obj');
         $notObject = BasicBlockHelper::append($context, 'gcm_not_obj');
         $stringBlock = BasicBlockHelper::append($context, 'gcm_str');
@@ -93,6 +112,14 @@ final class JitGetClassMethods
         self::emitTypeErrorAndAbort($context, \sprintf(self::TYPE_ERROR, 'null'));
 
         $context->builder->positionAtEnd($notNull);
+        $context->builder->branchIf($isEnumCase, $enumBlock, $objectCheck);
+
+        $context->builder->positionAtEnd($enumBlock);
+        $enumResult = self::invokeForEnumCaseValueBox($context, $valuePtr, $filter);
+        $enumEnd = $context->builder->getInsertBlock();
+        $context->builder->branch($mergeBlock);
+
+        $context->builder->positionAtEnd($objectCheck);
         $context->builder->branchIf($isObject, $objectBlock, $notObject);
 
         $context->builder->positionAtEnd($objectBlock);
@@ -107,6 +134,7 @@ final class JitGetClassMethods
             $obj
         );
         $objResult = self::invokeForObject($context, $objVar, $filter);
+        $objEnd = $context->builder->getInsertBlock();
         $context->builder->branch($mergeBlock);
 
         $context->builder->positionAtEnd($notObject);
@@ -118,6 +146,7 @@ final class JitGetClassMethods
             $valuePtr
         );
         $strResult = self::invokeForRuntimeClassNameString($context, $strVal, $filter);
+        $strEnd = $context->builder->getInsertBlock();
         $context->builder->branch($mergeBlock);
 
         $context->builder->positionAtEnd($errBlock);
@@ -126,10 +155,35 @@ final class JitGetClassMethods
         $context->builder->positionAtEnd($mergeBlock);
         $valuePtrTy = $context->getTypeFromString('__value__*');
         $phi = $context->builder->phi($valuePtrTy);
-        $phi->addIncoming($objResult, $objectBlock);
-        $phi->addIncoming($strResult, $stringBlock);
+        $phi->addIncoming($enumResult, $enumEnd);
+        $phi->addIncoming($objResult, $objEnd);
+        $phi->addIncoming($strResult, $strEnd);
 
         return $phi;
+    }
+
+    private static function invokeForEnumCaseValueBox(Context $context, Value $enumCasePtr, int $filter): Value
+    {
+        $object = $context->type->object;
+        if (!$object instanceof ObjectBuiltin) {
+            return self::returnFalse($context);
+        }
+        $enumMap = $context->structFieldMap['__enum_case__'] ?? null;
+        if (null === $enumMap || !isset($enumMap['class_id'])) {
+            return self::returnFalse($context);
+        }
+        $classIdVal = $context->builder->load(
+            $context->builder->structGep($enumCasePtr, $enumMap['class_id'])
+        );
+        if (!method_exists($classIdVal, 'isConstant') || !$classIdVal->isConstant()) {
+            return self::returnFalse($context);
+        }
+
+        return self::invokeForClassName(
+            $context,
+            $object->classNameForId((int) $classIdVal->getConstantValue()),
+            $filter
+        );
     }
 
     private static function invokeForRuntimeClassNameString(
