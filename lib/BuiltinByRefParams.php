@@ -39,6 +39,9 @@ final class BuiltinByRefParams
                 return [1];
             case 'stream_socket_client':
                 return [1, 2];
+            case 'fsockopen':
+            case 'pfsockopen':
+                return [2, 3];
             case 'settype':
                 return [0];
             case 'similar_text':
