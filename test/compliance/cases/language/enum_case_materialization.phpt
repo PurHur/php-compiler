@@ -17,6 +17,12 @@ try {
 } catch (TypeError $e) {
     echo 'backed str_contains: TypeError', "\n";
 }
+try {
+    explode('.', ES::A);
+    echo "backed explode second arg: no TypeError\n";
+} catch (TypeError $e) {
+    echo 'backed explode second arg: TypeError', "\n";
+}
 
 $p = Pure::A;
 echo 'pure var debug_type=', get_debug_type($p), "\n";
@@ -29,6 +35,7 @@ backed direct debug_type=ES
 backed direct is_object=yes
 backed serialize=E:4:"ES:A";
 backed str_contains: TypeError
+backed explode second arg: TypeError
 pure var debug_type=Pure
 pure var is_object=yes
 pure serialize=E:6:"Pure:A";
