@@ -10,6 +10,7 @@ use PHPUnit\Framework\TestCase;
 
 /**
  * Issue #5634: AOT standalone must define hrtime helpers without phpc_hrtime.c.
+ * Issue #9018: JIT hrtime must not depend on libc clock_gettime.
  *
  * @group aot-lint
  */
@@ -26,5 +27,16 @@ final class StringHrtimeRuntimeStandaloneTest extends TestCase
             $this->assertNotNull($fn);
             $this->assertGreaterThan(0, $fn->countBasicBlocks());
         }
+        $reader = $ctx->lookupFunction('__phpc_hrtime_monotonic_read');
+        $this->assertNotNull($reader);
+        $this->assertGreaterThan(0, $reader->countBasicBlocks());
+    }
+
+    public function testStringHrtimeDoesNotUseClockGettime(): void
+    {
+        $source = (string) \file_get_contents(__DIR__.'/../../../lib/JIT/Builtin/StringHrtime.php');
+        $this->assertDoesNotMatchRegularExpression("/lookupFunction\\(\\s*'clock_gettime'\\s*\\)/", $source);
+        $this->assertStringContainsString('/proc/uptime', $source);
+        $this->assertStringContainsString('VmHrtimeNative', $source);
     }
 }
