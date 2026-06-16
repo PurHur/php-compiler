@@ -521,6 +521,30 @@ class VM {
         return null;
     }
 
+    /**
+     * Deferred $obj[$key] = $value — let TypeError bubble to ASSIGN for catch dispatch (#8949).
+     */
+    public function executeArrayAccessOffsetSet(
+        ObjectEntry $object,
+        Variable $key,
+        Variable $value,
+        Frame $callerFrame
+    ): void {
+        [$declaring, $methodLc] = $this->resolveInstanceMethod($object->class, 'offsetSet');
+        $func = $declaring->methods[$methodLc];
+        $thisVar = new Variable();
+        $thisVar->object($object);
+        if ($func instanceof Func\Internal) {
+            $handlerFrame = $func->getFrame($this->context, $callerFrame);
+            $handlerFrame->calledArgs = [$thisVar, $key, $value];
+            $handlerFrame->returnVar = new Variable();
+            $func->execute($handlerFrame);
+
+            return;
+        }
+        $this->invokePhpFunction($func, $thisVar, $key, $value);
+    }
+
     public function invokeArrayAccessOffsetExists(
         ObjectEntry $object,
         Variable $key,
@@ -2233,7 +2257,11 @@ restart:
                             $arg1->copyFrom($arg3);
                         }
                     } else {
-                        $arg2->copyFrom($arg3);
+                        $catchFrame = $this->assignCopyFrom($arg2, $arg3, $frame);
+                        if (null !== $catchFrame) {
+                            $frame = $catchFrame;
+                            goto restart;
+                        }
                         $arg1->copyFrom($arg3);
                     }
                     $catchFrame = $this->flushHookedPropertyDimWriteBackAfterAssign($arg2, $frame);
@@ -5821,6 +5849,9 @@ restart:
             } catch (VM\PropertyHookRefWriteSignal $signal) {
                 $frame = $signal->catchFrame;
                 goto restart;
+            } catch (VM\ArrayAccessOffsetSignal $signal) {
+                $frame = $signal->catchFrame;
+                goto restart;
             }
             if ($frame->generatorYield) {
                 $frame->generatorYield = false;
@@ -6820,6 +6851,23 @@ restart:
         $this->raiseUncaughtException($thrown);
 
         return null;
+    }
+
+    /** ASSIGN to ArrayAccess lvalue — dispatch deferred offsetSet TypeError (#8949). */
+    private function assignCopyFrom(Variable $dst, Variable $src, Frame $frame): ?Frame
+    {
+        try {
+            $dst->copyFrom($src);
+
+            return null;
+        } catch (\TypeError $e) {
+            $resolved = $dst->resolveIndirect();
+            if ($resolved->isArrayAccessOffset()) {
+                $dst->null();
+            }
+
+            return $this->dispatchVmTypeError($e, $frame);
+        }
     }
 
     /**

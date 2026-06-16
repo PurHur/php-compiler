@@ -178,6 +178,24 @@ PHP;
         $this->assertSame('421', ob_get_clean());
     }
 
+    public function testWeakMapNonObjectKeyWriteCatchable(): void
+    {
+        $runtime = new Runtime();
+        $code = <<<'PHP'
+<?php
+$m = new WeakMap();
+try {
+    $m[1] = 'bad';
+    echo 'ok';
+} catch (TypeError) {
+    echo 'err';
+}
+PHP;
+        ob_start();
+        $runtime->run($runtime->parseAndCompile($code, 'weakmap_int_key.php'));
+        $this->assertSame('err', ob_get_clean());
+    }
+
     public function testWeakReferenceGetNullAfterGcCollect(): void
     {
         $runtime = new Runtime();

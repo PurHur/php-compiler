@@ -2309,6 +2309,7 @@ require_once __DIR__.'/../../../lib/TraitMethodFunctionStatic.php';
 require_once __DIR__.'/../../../lib/VM.php';
 require_once __DIR__.'/../../../lib/VM/AbstractPropertyHookCheck.php';
 require_once __DIR__.'/../../../lib/VM/ArrayAccessDimension.php';
+require_once __DIR__.'/../../../lib/VM/ArrayAccessOffsetSignal.php';
 require_once __DIR__.'/../../../lib/VM/ArraySpread.php';
 require_once __DIR__.'/../../../lib/VM/AttributeRegistry.php';
 require_once __DIR__.'/../../../lib/VM/AttributeSupport.php';
