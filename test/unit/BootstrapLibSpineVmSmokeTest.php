@@ -97,6 +97,16 @@ final class BootstrapLibSpineVmSmokeTest extends TestCase
         $this->assertStringContainsString('PHP_COMPILER_VM_SPINE_SMOKE', $driver);
     }
 
+    public function testSpineSmokeRoutesThroughMainNotNativeEchoStub(): void
+    {
+        $native = (string) file_get_contents(self::$root.'/lib/JIT/VmDriverExecuteNative.php');
+        $this->assertStringContainsString('#8719', $native);
+        $this->assertStringContainsString('honest -r via main() → run()', $native);
+        $entry = (string) file_get_contents(self::$root.'/test/selfhost/compiler_lib_spine_smoke/main.php');
+        $this->assertStringContainsString("run('Standard input code', '<?php echo \"1\\n\";', [])", $entry);
+        $this->assertStringNotContainsString("echo \"vm-spine-ok\\n\";", $entry);
+    }
+
     public function testWaveCheckDocumentsVmSpineSmokeFlag(): void
     {
         $script = (string) file_get_contents(self::$root.'/script/bootstrap-wave-check.sh');

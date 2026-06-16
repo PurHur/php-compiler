@@ -27,7 +27,7 @@ fi
 test -x "${OUT}"
 out="$({ PHP_COMPILER_VM_SPINE_SMOKE=1 "${OUT}"; })"
 if ! grep -Fxq '1' <<< "${out}"; then
-  echo "bootstrap-selfhost-lib-spine-vm-smoke: unexpected stdout (want echo 1 from -r fixture)" >&2
+  echo "bootstrap-selfhost-lib-spine-vm-smoke: unexpected stdout (want 1 from -r echo fixture)" >&2
   printf '%s\n' "${out}" >&2
   exit 1
 fi

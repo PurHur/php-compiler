@@ -4194,7 +4194,7 @@ class Object_ extends Type {
         }
     }
 
-    /** Box an empty compile-time array default into a union/DNF static {@see __value__} property (#8708, #8719). */
+    /** Box an empty compile-time array default into a union/DNF static {@see __value__} property (#8708, #8719, DomRegistry::$states #6140). */
     private function initStaticValuePropertyEmptyArray(\PHPLLVM\Value $global): void
     {
         $restore = $this->context->builder->getInsertBlock();

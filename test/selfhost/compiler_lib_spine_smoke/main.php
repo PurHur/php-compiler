@@ -2776,7 +2776,7 @@ if (is_string($vmDriverExecute) && ('1' === $vmDriverExecute || 'true' === strto
 
 $vmSpineSmoke = getenv('PHP_COMPILER_VM_SPINE_SMOKE');
 if (is_string($vmSpineSmoke) && ('1' === $vmSpineSmoke || 'true' === strtolower($vmSpineSmoke))) {
-    // Honest bin/vm.php -r echo fixture via native run() bridge (#8719, pairs #2201).
+    // Honest bin/vm.php run() dispatch: main() → run() on -r fixture (#8719, #1846).
     run('Standard input code', '<?php echo "1\n";', []);
     exit(0);
 }
