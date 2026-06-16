@@ -20,6 +20,10 @@ final class SettypeBackedEnumJITTest extends BaseTest
             __DIR__.'/cases/stdlib/settype_backed_enum_jit.phpt',
             'settype_backed_enum_jit.phpt'
         );
+        yield 'settype_enum_error_jit.phpt' => self::parsePHPT(
+            __DIR__.'/cases/stdlib/settype_enum_error_jit.phpt',
+            'settype_enum_error_jit.phpt'
+        );
     }
 
     public function setUp(): void

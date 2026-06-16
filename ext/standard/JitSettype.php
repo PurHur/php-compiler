@@ -585,6 +585,21 @@ final class JitSettype
             return;
         }
 
+        if ('string' === $target) {
+            if (JitScalarEnumCoerce::tryEmitObjectEnumCaseStringError(
+                $context,
+                $objPtr,
+                'settype',
+                $afterEnum
+            )) {
+                return;
+            }
+            $context->builder->positionAtEnd($afterEnum);
+            $context->builder->branch($nonEnumTarget);
+
+            return;
+        }
+
         $context->builder->branch($nonEnumTarget);
     }
 

@@ -9,6 +9,7 @@ use PHPCompiler\Frame;
 use PHPCompiler\Runtime;
 use PHPCompiler\VM\BuiltinClasses;
 use PHPCompiler\VM\Context;
+use PHPCompiler\VM\EnumCaseSupport;
 use PHPCompiler\VM\Variable as VMVariable;
 use PHPUnit\Framework\TestCase;
 
@@ -42,5 +43,22 @@ final class SettypeBuiltinTest extends TestCase
         $this->assertSame('stdClass', $object->class->name);
         $this->assertArrayHasKey('scalar', $object->getRawProperties());
         $this->assertSame(1, $object->getRawProperties()['scalar']->toInt());
+    }
+
+    public function testSettypeToStringOnBackedEnumCaseThrowsError(): void
+    {
+        $enum = new \PHPCompiler\VM\ClassEntry('Es');
+        $enum->isEnum = true;
+        $enum->backedType = 'string';
+
+        $backing = new VMVariable();
+        $backing->string('a');
+        $case = EnumCaseSupport::createCase($enum, 'A', $backing);
+        $var = new VMVariable();
+        $var->copyFrom($case);
+
+        $this->expectException(\Error::class);
+        $this->expectExceptionMessage('Object of class Es could not be converted to string');
+        VmSettype::apply($var, 'string');
     }
 }
