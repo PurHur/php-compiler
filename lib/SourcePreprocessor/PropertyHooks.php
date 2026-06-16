@@ -443,6 +443,10 @@ final class PropertyHooks
                 $method = self::GET_METHOD_PREFIX.$prop;
                 $methods[] = $this->hookMethodDecl($isStatic, $method, '', $body);
                 $this->registerHook($lcClass, $prop, 'get', $method, $isStatic);
+                if (!isset($this->registry[$lcClass][$prop])) {
+                    $this->registry[$lcClass][$prop] = [];
+                }
+                $this->registry[$lcClass][$prop]['getArrow'] = true;
                 continue;
             }
             if (preg_match('/^get\s*\{/s', $rest)) {

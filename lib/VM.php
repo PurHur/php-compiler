@@ -583,6 +583,41 @@ class VM {
     }
 
     /**
+     * isset($obj->hooked) — Zend isset-style backing probe, no get hook (#8917, zend_property_hooks.c).
+     *
+     * @return bool|null null when virtual get-only must invoke the get hook (#4586)
+     */
+    private function issetHookedPropertyViaBacking(ObjectEntry $object, string $propName): ?bool
+    {
+        $lcClass = strtolower($object->class->name);
+        $propMeta = $this->context->propertyHookRegistry[$lcClass][$propName]
+            ?? $this->context->propertyHookRegistry[$lcClass][strtolower($propName)]
+            ?? null;
+        $meta = $this->classPropertyMeta($object, $propName);
+        if (null === $meta || null === $meta->getHookMethodLc) {
+            return null;
+        }
+
+        if (is_array($propMeta) && !empty($propMeta['getArrow'])) {
+            return null;
+        }
+
+        $backingName = is_array($propMeta)
+            ? ($propMeta['setBacking'] ?? $propMeta['getBacking'] ?? $propName)
+            : $propName;
+        if (null !== $backingName && $object->hasProperty($backingName)) {
+            $value = $object->getProperty($backingName)->resolveIndirect();
+            if ($value->isUndefined() || VM\TypedPropertyCheck::isUninitialized($value)) {
+                return false;
+            }
+
+            return Variable::TYPE_NULL !== $value->type;
+        }
+
+        return null;
+    }
+
+    /**
      * isset($obj->prop) — Zend zend_std_has_property / __isset parity (#3298, #4586).
      */
     public function objectPropertyIsSet(ObjectEntry $object, string $propName, ?Frame $frame = null): bool
@@ -592,13 +627,9 @@ class VM {
             $getLc = $meta?->getHookMethodLc
                 ?? strtolower(SourcePreprocessor\PropertyHooks::getHookMethodName($propName));
             if (isset($object->class->methods[$getLc])) {
-                // unset() clears backing storage; isset must not invoke get on uninitialized slot (#5191).
-                if (null !== $meta && null !== $meta->setHookMethodLc) {
-                    $props = $object->getRawProperties();
-                    if (isset($props[$propName])
-                        && VM\TypedPropertyCheck::isUninitialized($props[$propName])) {
-                        return false;
-                    }
+                $backingIsset = $this->issetHookedPropertyViaBacking($object, $propName);
+                if (null !== $backingIsset) {
+                    return $backingIsset;
                 }
                 $hookValue = $this->fetchPropertyWithHooks($object, $propName, $frame);
                 if (null !== $hookValue) {

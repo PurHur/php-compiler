@@ -99,7 +99,8 @@ final class PropertyHookDispatch
     }
 
     /**
-     * isset($obj->prop) on hooked properties — invoke get hook, then Zend isset rules (#4586).
+     * isset($obj->prop) on hooked properties — backing probe without get hook (#8917);
+     * virtual get-only falls back to get-hook isset (#4586).
      */
     public static function tryEmitPropertyIsSet(
         Context $context,
@@ -108,18 +109,44 @@ final class PropertyHookDispatch
         string $propertyName,
         ?Block $enclosingBlock
     ): ?Value {
-        $hookValue = self::tryEmitPropertyGet(
-            $context,
-            $receiver,
-            $declaringClass,
-            $propertyName,
-            $enclosingBlock
-        );
-        if (null === $hookValue) {
+        $hookLc = strtolower(PropertyHooks::getHookMethodName($propertyName));
+        if (null === self::resolveHookProxy($context, $declaringClass, $hookLc)) {
             return null;
         }
 
-        return self::compileIssetForHookValue($context, $hookValue);
+        $lcClass = strtolower(ltrim($declaringClass, '\\'));
+        $propLc = strtolower($propertyName);
+        $meta = $context->runtime->vmContext->propertyHookRegistry[$lcClass][$propertyName]
+            ?? $context->runtime->vmContext->propertyHookRegistry[$lcClass][$propLc]
+            ?? null;
+        $backingName = is_array($meta)
+            ? ($meta['setBacking'] ?? $meta['getBacking'] ?? $propertyName)
+            : $propertyName;
+
+        $objectType = $context->type->object;
+        assert($objectType instanceof Object_);
+        $classId = $objectType->lookup($declaringClass);
+        if (is_array($meta) && !empty($meta['getArrow'])) {
+            $hookValue = self::tryEmitPropertyGet(
+                $context,
+                $receiver,
+                $declaringClass,
+                $propertyName,
+                $enclosingBlock
+            );
+            if (null === $hookValue) {
+                return null;
+            }
+
+            return self::compileIssetForHookValue($context, $hookValue);
+        }
+        if ($objectType->hasProperty($classId, $backingName)) {
+            $backingVar = $objectType->propertyFetch($receiver, $declaringClass, $backingName);
+
+            return self::compileIssetForPropertyVariable($context, $backingVar);
+        }
+
+        return null;
     }
 
     /**
@@ -203,6 +230,25 @@ final class PropertyHookDispatch
     private static function compileIssetForHookValue(Context $context, Value $hookValue): Value
     {
         $valuePtr = JitValueBox::normalizeValuePtr($context, $hookValue);
+
+        return self::compileIssetForValuePtr($context, $valuePtr);
+    }
+
+    private static function compileIssetForPropertyVariable(Context $context, Variable $prop): Value
+    {
+        if (Variable::TYPE_VALUE === $prop->type) {
+            $valuePtr = JitValueBox::valuePtrFromVariable($context, $prop);
+
+            return self::compileIssetForValuePtr($context, $valuePtr);
+        }
+        $loaded = $context->helper->loadValue($prop);
+        $nullPtr = $context->getTypeFromString('void*')->constNull();
+
+        return $context->builder->icmp(Builder::INT_NE, $loaded, $nullPtr);
+    }
+
+    private static function compileIssetForValuePtr(Context $context, Value $valuePtr): Value
+    {
         $valueMap = $context->structFieldMap['__value__'];
         $typeByte = $context->builder->load(
             $context->builder->structGep($valuePtr, $valueMap['type'])
