@@ -900,6 +900,42 @@ ci_run_bootstrap_wave_check() {
   "$_CI_SCRIPT_DIR/bootstrap-wave-check.sh" --fail-fast
 }
 
+ci_prelinked_vendor_ready() {
+  local manifest="${_CI_REPO_ROOT}/prelinked/bootstrap-vendor/manifest.json"
+  local slug o ok=0
+  [[ -f "${manifest}" ]] || return 1
+  for slug in ircmaxell-php-cfg ircmaxell-php-types ircmaxell-php-llvm; do
+    o="${_CI_REPO_ROOT}/prelinked/bootstrap-vendor/${slug}.o"
+    [[ -f "${o}" ]] && ok=$((ok + 1))
+  done
+  [[ "${ok}" -eq 3 ]]
+}
+
+# M5 cold-boot: lib spine smoke with vendor/ renamed away (issue #8712, #3052).
+ci_run_bootstrap_wave_check_vendor_absent() {
+  if [[ "${BOOTSTRAP_WAVE_CHECK_VENDOR_ABSENT_GATE:-1}" != "1" ]]; then
+    return 0
+  fi
+  if [[ "${BOOTSTRAP_WAVE_CHECK_VENDOR_ABSENT:-1}" == "0" ]]; then
+    echo "bootstrap-wave-check-vendor-absent: skipped (BOOTSTRAP_WAVE_CHECK_VENDOR_ABSENT=0)"
+    return 0
+  fi
+  if ! ci_llvm_ready; then
+    echo "bootstrap-wave-check-vendor-absent: skipped (LLVM 9 not available)"
+    return 0
+  fi
+  echo "bootstrap-wave-check-vendor-absent (BOOTSTRAP_WAVE_CHECK_VENDOR_ABSENT_GATE=1, issue #8712)..."
+  set +e
+  "$_CI_SCRIPT_DIR/bootstrap-wave-check.sh" --vendor-absent --fail-fast
+  local code=$?
+  set -e
+  if [[ "${code}" -eq 2 ]]; then
+    echo "bootstrap-wave-check-vendor-absent: skipped (LLVM or prelinked vendor prerequisite — exit 2)"
+    return 0
+  fi
+  return "${code}"
+}
+
 # M3 compile-smoke partial probe (issue #1937): bundle link + Zend emit + native run; strict gate separate.
 ci_run_bootstrap_compile_smoke_probe() {
   if [[ "${BOOTSTRAP_M3_COMPILE_SMOKE_PROBE_GATE:-1}" != "1" ]]; then
