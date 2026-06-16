@@ -6,6 +6,8 @@ namespace PHPCompiler;
 
 use PHPUnit\Framework\TestCase;
 
+require_once __DIR__.'/../LlvmToolchain.php';
+
 /** get_class_methods() C runtime shrink (#6339). */
 final class GetClassMethodsRuntimeShrinkTest extends TestCase
 {
@@ -34,5 +36,25 @@ final class GetClassMethodsRuntimeShrinkTest extends TestCase
         $this->assertStringNotContainsString('invokeNativeForClassName', $source);
         $this->assertStringContainsString('invokeCompileTimeForClassName', $source);
         $this->assertStringContainsString('invokeForRuntimeClassNameString', $source);
+        $this->assertStringContainsString('invokeForEnumCaseValueBox', $source);
+    }
+
+    /**
+     * @group llvm
+     */
+    public function testEnumCaseOperandLoweringCompiles(): void
+    {
+        if (!LlvmToolchain::isReady($this->repoRoot)) {
+            $reason = LlvmToolchain::readyFailureReason() ?? 'LLVM 9 toolchain not available';
+            $this->markTestSkipped($reason.' — get_class_methods enum-case JIT compile test needs LLVM');
+        }
+        $target = $this->repoRoot.'/test/fixtures/aot/compile-only/get_class_methods_enum_case.php';
+        $this->assertFileExists($target);
+        $code = (string) file_get_contents($target);
+        $runtime = new Runtime();
+        $block = $runtime->parseAndCompile($code, 'get_class_methods_enum_case_jit_compile.php');
+        $runtime->jitCompileBlock($block);
+
+        $this->addToAssertionCount(1);
     }
 }
