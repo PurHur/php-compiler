@@ -3,5 +3,5 @@
     "binary": ".phpc/bin/app",
     "public": "public",
     "assets": "assets",
-    "includes": ["config.php", "src/Router.php"]
+    "includes": ["src/Router.php"]
 }
