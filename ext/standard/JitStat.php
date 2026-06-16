@@ -11,6 +11,7 @@ declare(strict_types=1);
 namespace PHPCompiler\ext\standard;
 
 use PHPCompiler\JIT\BasicBlockHelper;
+use PHPCompiler\JIT\Builtin\StatCacheRuntime;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitValueBox;
 use PHPLLVM\BasicBlock;
@@ -475,6 +476,8 @@ final class JitStat
             return $existing;
         }
 
+        StatCacheRuntime::ensureLinked($context);
+
         $strPtr = $context->getTypeFromString('__string__*');
         $i32 = $context->getTypeFromString('int32');
         $fn = $context->module->addFunction(
@@ -487,26 +490,13 @@ final class JitStat
         $context->builder->positionAtEnd($entry);
 
         $str = $fn->getParam(0);
-        $map = $context->structFieldMap['__string__'];
-        $pathPtr = $context->builder->structGep($str, $map['value']);
-        $i8 = $context->getTypeFromString('int8');
-        $bufType = $i8->arrayType(self::STAT_BUF_SIZE);
-        $buf = $context->builder->alloca($bufType, 1, $statFn.'_buf');
-        $i8p = $context->getTypeFromString('int8*');
-        $bufPtr = $context->builder->pointerCast($buf, $i8p);
-        $ret = $context->builder->call(
-            $context->lookupFunction($statFn),
-            $pathPtr,
-            $bufPtr
+        $isLstat = $i32->constInt('lstat' === $statFn ? 1 : 0, false);
+        $mode = $context->builder->call(
+            $context->lookupFunction(StatCacheRuntime::FN_MODE_CACHED),
+            $str,
+            $isLstat
         );
-        $i64 = $context->getTypeFromString('int64');
-        $zero = $i32->constInt(0, false);
-        $failed = $context->builder->icmp(Builder::INT_NE, $ret, $zero);
-        $bytePtr = $context->builder->gep($bufPtr, $i64->constInt(self::STAT_MODE_OFFSET, false));
-        $modePtr = $context->builder->pointerCast($bytePtr, $i32->pointerType(0));
-        $mode = $context->builder->load($modePtr);
-        $minusOne = $i32->constInt(-1, true);
-        $context->builder->returnValue($context->builder->select($failed, $minusOne, $mode));
+        $context->builder->returnValue($mode);
         $context->builder->clearInsertionPosition();
         $context->builder = $saved;
         $context->registerFunction($name, $fn);

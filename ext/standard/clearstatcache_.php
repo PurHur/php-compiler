@@ -7,12 +7,10 @@ namespace PHPCompiler\ext\standard;
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Context;
-use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\Variable as JITVariable;
-use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
 
-/** clearstatcache() — VM via VmStatCache; JIT/AOT no-op (libc stat has no cache). */
+/** clearstatcache() — VM via VmStatCache; JIT/AOT via StatCacheRuntime (#9110). */
 final class clearstatcache_ extends Internal
 {
     public function __construct()
@@ -29,18 +27,22 @@ final class clearstatcache_ extends Internal
         if (0 === $argc) {
             VmStatCache::clear();
         } elseif (1 === $argc) {
-            $clearRealpath = $frame->calledArgs[0]->resolveIndirect();
-            if (Variable::TYPE_BOOLEAN !== $clearRealpath->type) {
-                throw new \LogicException('clearstatcache() argument #1 must be a boolean in this compiler build');
-            }
-            VmStatCache::clear($clearRealpath->toBool());
+            $clearRealpath = VmMath::parseBoolBuiltinArg(
+                $frame->calledArgs[0],
+                'clearstatcache',
+                0,
+                'clear_realpath_cache'
+            );
+            VmStatCache::clear($clearRealpath);
         } else {
-            $clearRealpath = $frame->calledArgs[0]->resolveIndirect();
-            if (Variable::TYPE_BOOLEAN !== $clearRealpath->type) {
-                throw new \LogicException('clearstatcache() argument #1 must be a boolean in this compiler build');
-            }
+            $clearRealpath = VmMath::parseBoolBuiltinArg(
+                $frame->calledArgs[0],
+                'clearstatcache',
+                0,
+                'clear_realpath_cache'
+            );
             $filename = VmString::coerceStringBuiltinArg($frame->calledArgs[1], 'clearstatcache', 1, 'filename');
-            VmStatCache::clear($clearRealpath->toBool(), $filename);
+            VmStatCache::clear($clearRealpath, $filename);
         }
         if (null !== $frame->returnVar) {
             $frame->returnVar->null();
@@ -53,13 +55,7 @@ final class clearstatcache_ extends Internal
         if ($argc > 2) {
             throw new \LogicException('clearstatcache() accepts at most two arguments in this compiler build');
         }
-        if ($argc >= 1) {
-            $this->jitBool($context, $args[0], 'clearstatcache() argument #1');
-        }
-        if (2 === $argc) {
-            JitStringBuiltinArg::lower($context, $args[1], 'clearstatcache', 1, 'filename');
-        }
 
-        return JitClearstatcache::invoke($context);
+        return JitClearstatcache::invoke($context, $argc, ...$args);
     }
 }

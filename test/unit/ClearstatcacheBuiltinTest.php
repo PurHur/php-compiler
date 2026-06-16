@@ -37,8 +37,11 @@ PHP;
     private const VM_EXPECT = "n0\nn1\nfile";
 
     private const AOT_CODE = <<<'PHP'
-$r = clearstatcache(true);
-echo null === $r ? 'ok' : 'bad', "\n";
+clearstatcache();
+clearstatcache(true);
+$path = sys_get_temp_dir() . '/phpc_clearstatcache_aot_' . getmypid();
+clearstatcache(true, $path);
+echo "ok\n";
 PHP;
 
     private const AOT_EXPECT = 'ok';
