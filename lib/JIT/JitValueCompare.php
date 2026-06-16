@@ -11,6 +11,7 @@ namespace PHPCompiler\JIT;
 require_once __DIR__.'/../OpCodeNames.php';
 
 use PHPCompiler\OpCode;
+use PHPCompiler\VM\Variable as VmVariable;
 use function PHPCompiler\opcode_type_name;
 use PHPLLVM\Builder;
 use PHPLLVM\Value;
@@ -97,6 +98,13 @@ final class JitValueCompare
         $falseVal = $context->getTypeFromString('int1')->constInt(0, false);
         $__native = $context->builder->intCast($nativeLong, $i64);
 
+        // Zend: enum case loose == with backing scalar is false (#5798, #5819/#5835/#8880 switch labels).
+        $enumCaseTag = $i8->constInt(VmVariable::TYPE_ENUM_CASE, false);
+        $isEnumCase = $context->builder->icmp(Builder::INT_EQ, $typeByte, $enumCaseTag);
+        $objectTag = $i8->constInt(VmVariable::TYPE_OBJECT, false);
+        $isObject = $context->builder->icmp(Builder::INT_EQ, $typeByte, $objectTag);
+        $isEnumOrObject = $context->builder->or($isEnumCase, $isObject);
+
         $longTag = $i8->constInt(Variable::TYPE_NATIVE_LONG, false);
         $isLong = $context->builder->icmp(Builder::INT_EQ, $typeByte, $longTag);
         $stored = $context->builder->call(
@@ -118,7 +126,7 @@ final class JitValueCompare
         $isNull = $context->builder->icmp(Builder::INT_EQ, $typeByte, $nullTag);
         $nullMatches = $context->builder->icmp(Builder::INT_EQ, $__native, $i64->constInt(0, false));
 
-        return $context->builder->select(
+        $scalarMatches = $context->builder->select(
             $isLong,
             $context->builder->select($isResource, $falseVal, $longMatches),
             $context->builder->select(
@@ -127,6 +135,8 @@ final class JitValueCompare
                 $context->builder->select($isNull, $nullMatches, $falseVal)
             )
         );
+
+        return $context->builder->select($isEnumOrObject, $falseVal, $scalarMatches);
     }
 
     public static function looseEqualNativeLongToValue(
