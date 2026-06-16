@@ -1,7 +1,16 @@
 --TEST--
-empty() on property hooks checks separate backing without get hook (#8901, zend_property_hooks.c)
+empty() on property hooks checks backing without get hook (#8901, #8918, zend_property_hooks.c)
 --FILE--
 <?php
+class VirtualGetOnly {
+    public ?string $x {
+        get { throw new Exception('get must not run for empty()'); }
+    }
+}
+$v = new VirtualGetOnly();
+var_dump(empty($v->x));
+echo "virtual ok\n";
+
 class C {
     public string $x {
         get { throw new Exception('get must not run for empty()'); }
@@ -36,6 +45,8 @@ try {
     echo get_class($e), ': ', $e->getMessage(), "\n";
 }
 --EXPECT--
+bool(true)
+virtual ok
 bool(false)
 ok
 bool(true)
