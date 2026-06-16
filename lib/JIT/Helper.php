@@ -1408,6 +1408,8 @@ restart:
             } elseif (OpCode::TYPE_NOT_EQUAL === $opcode->type) {
                 $same = JitValueCompare::looseEqualHashtablePair($this->context, $lhs, $rhs);
                 $result = $this->context->builder->xor($same, $trueVal);
+            } elseif (OpCode::TYPE_PLUS === $opcode->type) {
+                return ArrayBuiltinHelper::arrayUnion($this->context, $left, $right);
             } else {
                 $type = opcode_type_name($opcode->type);
                 throw new \LogicException("Reached end of switch, can't handle binary operation yet: $type for hashtable pair");
