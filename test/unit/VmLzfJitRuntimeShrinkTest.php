@@ -48,4 +48,16 @@ final class VmLzfJitRuntimeShrinkTest extends TestCase
         $this->assertStringContainsString('VmLzfCore::decompress', $source);
         $this->assertStringNotContainsString('VmLzfNative', $source);
     }
+
+    /** Vendored liblzf C removed — VmLzfCore is sole implementation (#8852). */
+    public function testThirdPartyLiblzfHasNoCompiledSources(): void
+    {
+        $dir = __DIR__.'/../../third_party/liblzf';
+        $this->assertDirectoryExists($dir);
+        $this->assertFileExists($dir.'/LICENSE');
+        $this->assertFileDoesNotExist($dir.'/lzf_c.c');
+        $this->assertFileDoesNotExist($dir.'/lzf_d.c');
+        $this->assertFileDoesNotExist($dir.'/lzfP.h');
+        $this->assertFileDoesNotExist(__DIR__.'/../../script/build-liblzf.sh');
+    }
 }
