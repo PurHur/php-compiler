@@ -23,6 +23,9 @@ final class VmProcess
             ? VmGetrusageNative::getrusage($who)
             : false;
         if (false === $raw) {
+            $raw = VmGetrusagePure::getrusage($who);
+        }
+        if (false === $raw) {
             return false;
         }
 
