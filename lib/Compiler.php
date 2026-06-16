@@ -10231,27 +10231,39 @@ class Compiler {
         $preceding = $this->precedingClassConstFetchesBeforeCfgOp($children, $callOp);
         if (($preceding[$argIndex] ?? null) === $fetch) {
             $callArg = $callOp->args[$argIndex] ?? null;
-            if ($this->isUnrelatedScalarLiteralCallArg($callArg, $fetch)) {
+            if ($this->isUnrelatedEnumFetchCallArg($callArg, $fetch)) {
                 return false;
             }
 
             return true;
         }
         $hoisted = $this->classConstFetchForHoistedDeadPrelude($callOp, $argIndex, $block);
+        if ($hoisted !== $fetch) {
+            return false;
+        }
+        $callArg = $callOp->args[$argIndex] ?? null;
 
-        return $hoisted === $fetch;
+        return !$this->isUnrelatedEnumFetchCallArg($callArg, $fetch);
     }
 
     /**
-     * Hoisted enum fetches must not bind to unrelated literal slots (pack('i', E::A); #8816).
+     * Hoisted enum fetches must not bind to unrelated call-arg slots (pack('i', E::A); #8816, stream_set_timeout($fp, E::A); #6147).
      */
-    private function isUnrelatedScalarLiteralCallArg(?Operand $callArg, Op\Expr\ClassConstFetch $fetch): bool
+    private function isUnrelatedEnumFetchCallArg(?Operand $callArg, Op\Expr\ClassConstFetch $fetch): bool
     {
-        if (!$callArg instanceof Operand\Literal) {
+        if (null === $callArg) {
+            return true;
+        }
+        if ($this->operandsReferToSameVariable($fetch->result, $callArg)) {
             return false;
         }
+        $root = $this->unwrapOperandChain($callArg);
+        if ($root instanceof Op\Expr\ClassConstFetch) {
+            return $root !== $fetch
+                && !$this->operandsReferToSameVariable($fetch->result, $root->result);
+        }
 
-        return !$this->operandsReferToSameVariable($fetch->result, $callArg);
+        return true;
     }
 
     /**
