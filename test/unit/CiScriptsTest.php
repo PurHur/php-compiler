@@ -1735,16 +1735,33 @@ final class CiScriptsTest extends TestCase
         $local = (string) file_get_contents(dirname(__DIR__, 2).'/script/ci-local.sh');
         $this->assertStringContainsString('ci_run_bootstrap_wave_check', $local);
         $this->assertStringContainsString('BOOTSTRAP_WAVE_CHECK:-1', $local);
+        $this->assertStringContainsString('ci_run_bootstrap_wave_check_vendor_absent', $local);
 
         $common = (string) file_get_contents(dirname(__DIR__, 2).'/script/ci-common.sh');
         $this->assertStringContainsString('BOOTSTRAP_WAVE_CHECK', $common);
         $this->assertStringContainsString('BOOTSTRAP_WAVE_CHECK:-1', $common);
         $this->assertStringContainsString('bootstrap-wave-check.sh', $common);
         $this->assertStringContainsString('--fail-fast', $common);
+        $this->assertStringContainsString('ci_run_bootstrap_wave_check_vendor_absent', $common);
+        $this->assertStringContainsString('BOOTSTRAP_WAVE_CHECK_VENDOR_ABSENT_GATE:-1', $common);
+        $this->assertStringContainsString('BOOTSTRAP_WAVE_CHECK_VENDOR_ABSENT:-1', $common);
+        $this->assertStringContainsString('--vendor-absent', $common);
+
+        $wave = (string) file_get_contents(dirname(__DIR__, 2).'/script/bootstrap-wave-check.sh');
+        $this->assertStringContainsString('--vendor-absent', $wave);
+        $this->assertStringContainsString('VENDOR_TREE_ABSENT=1', $wave);
+        $this->assertStringContainsString('wave_check_restore_vendor', $wave);
 
         $fast = (string) file_get_contents(dirname(__DIR__, 2).'/script/ci-fast.sh');
         $this->assertStringContainsString('CI_FAST_BOOTSTRAP', $fast);
         $this->assertStringContainsString('ci_run_bootstrap_wave_check', $fast);
+        $this->assertStringContainsString('ci_run_bootstrap_wave_check_vendor_absent', $fast);
+
+        $defaults = (string) file_get_contents(dirname(__DIR__, 2).'/script/ci-defaults.env');
+        $this->assertStringContainsString(
+            'BOOTSTRAP_WAVE_CHECK_VENDOR_ABSENT_GATE="${BOOTSTRAP_WAVE_CHECK_VENDOR_ABSENT_GATE:-1}"',
+            $defaults
+        );
     }
 
     public function testCiLocalHonorsBootstrapM3StrictGate(): void
@@ -2302,6 +2319,8 @@ final class CiScriptsTest extends TestCase
     {
         $doc = (string) file_get_contents(dirname(__DIR__, 2).'/docs/local-ci-matrix.md');
         $this->assertStringContainsString('BOOTSTRAP_WAVE_CHECK', $doc);
+        $this->assertStringContainsString('BOOTSTRAP_WAVE_CHECK_VENDOR_ABSENT_GATE', $doc);
+        $this->assertStringContainsString('BOOTSTRAP_WAVE_CHECK_VENDOR_ABSENT', $doc);
         $this->assertStringContainsString('CI_FAST_BOOTSTRAP', $doc);
         $this->assertStringContainsString('test-fast-bootstrap', $doc);
     }
@@ -2313,6 +2332,7 @@ final class CiScriptsTest extends TestCase
         $this->assertStringContainsString('Wave gate in full CI', $doc);
         $this->assertStringContainsString('default-on when LLVM 9 present', $doc);
         $this->assertStringContainsString('BOOTSTRAP_WAVE_CHECK=0', $doc);
+        $this->assertStringContainsString('BOOTSTRAP_WAVE_CHECK_VENDOR_ABSENT=0', $doc);
     }
 
     public function testInstallLlvm14ScriptMirrorsLlvm9Layout(): void

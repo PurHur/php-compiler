@@ -145,6 +145,7 @@ if [[ "${CI_FAST_BOOTSTRAP:-0}" == "1" ]]; then
     echo "PHPUnit (fast+bootstrap): AOT lint (@group aot-lint)..."
     ci_run_phpunit --group aot-lint "$@"
     BOOTSTRAP_WAVE_CHECK="${BOOTSTRAP_WAVE_CHECK:-1}" ci_run_bootstrap_wave_check
+    ci_run_bootstrap_wave_check_vendor_absent
   else
     echo "CI_FAST_BOOTSTRAP=1: bootstrap tail skipped (LLVM 9 not available)"
   fi

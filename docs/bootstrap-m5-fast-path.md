@@ -154,6 +154,8 @@ Rebuild of vendor `.o` uses literal `vendor/{package}` sources (bundle `require_
 
 Presenter: **`make north-star5-verify-fast`** (default) / `./script/north-star5-verify.sh --fast` ([#1492](https://github.com/PurHur/php-compiler/issues/1492)). Full ladder: `make north-star5-verify ARGS=--strict` ([#1416](https://github.com/PurHur/php-compiler/issues/1416)).
 
+**Vendor-absent wave-check in full CI:** `./script/ci-local.sh` ends the LLVM phase with `./script/bootstrap-wave-check.sh --vendor-absent --fail-fast` (default-on `BOOTSTRAP_WAVE_CHECK_VENDOR_ABSENT_GATE=1`, issue [#8712](https://github.com/PurHur/php-compiler/issues/8712)). Same lib-spine cold-boot slice as north-star5 step 4c; set `BOOTSTRAP_WAVE_CHECK_VENDOR_ABSENT=0` to skip on dev machines without committed prelinked `.o`.
+
 `lib/AOT/Linker.php::prelinkedVendorObjectPaths()` reads `object_ok` entries from the manifest. CI: `BOOTSTRAP_VENDOR_PRELINK_SYNC_GATE=1` (bundles); `BOOTSTRAP_VENDOR_PRELINK_GATE=1` for compile probe in wave-check (opt-in).
 
 **Stub policy:** shrink `PHP_COMPILER_SELFHOST_AOT` stubs on the **compile spine first** (`parseAndCompile` → `standalone` → `Compiler::compile`), not whole-tree at once.

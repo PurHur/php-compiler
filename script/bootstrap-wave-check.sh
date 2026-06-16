@@ -6,11 +6,15 @@ set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 FAIL_FAST=0
+VENDOR_ABSENT=0
 WITH_COMPILE_SMOKE=0
 WITH_LIB_SPINE_SMOKE=0
 WITH_LIB_SPINE_VM_SMOKE=0
 WITH_HELLOWORLD=0
 WITH_DRIVER_SMOKE=0
+if [[ "${BOOTSTRAP_WAVE_CHECK_VENDOR_ABSENT:-0}" == "1" ]]; then
+  VENDOR_ABSENT=1
+fi
 if [[ "${BOOTSTRAP_LIB_SPINE_SMOKE:-0}" == "1" ]]; then
   WITH_LIB_SPINE_SMOKE=1
 fi
@@ -27,6 +31,9 @@ while [[ $# -gt 0 ]]; do
   case "$1" in
     --fail-fast)
       FAIL_FAST=1
+      ;;
+    --vendor-absent)
+      VENDOR_ABSENT=1
       ;;
     --with-compile-smoke)
       WITH_COMPILE_SMOKE=1
@@ -81,8 +88,64 @@ print_summary() {
   done
 }
 
+wave_check_prelinked_vendor_ready() {
+  local manifest="${ROOT}/prelinked/bootstrap-vendor/manifest.json"
+  local slug o ok=0
+  [[ -f "${manifest}" ]] || return 1
+  for slug in ircmaxell-php-cfg ircmaxell-php-types ircmaxell-php-llvm; do
+    o="${ROOT}/prelinked/bootstrap-vendor/${slug}.o"
+    [[ -f "${o}" ]] && ok=$((ok + 1))
+  done
+  [[ "${ok}" -eq 3 ]]
+}
+
+wave_check_restore_vendor() {
+  if [[ -n "${WAVE_CHECK_VENDOR_BAK:-}" && -d "${WAVE_CHECK_VENDOR_BAK}" ]]; then
+    mv "${WAVE_CHECK_VENDOR_BAK}" "${ROOT}/vendor"
+    WAVE_CHECK_VENDOR_BAK=""
+  fi
+}
+
+wave_check_cleanup() {
+  wave_check_restore_vendor
+  rm -f "${PROBE_OUT:-}"
+}
+
+run_vendor_absent_wave_slice() {
+  if [[ -z "${PHP_COMPILER_LLVM_PATH:-}" || ! -f "${PHP_COMPILER_LLVM_PATH}/libLLVM-9.so.1" ]]; then
+    echo "bootstrap-wave-check: vendor-absent slice skipped (LLVM 9 not available — exit 2)"
+    exit 2
+  fi
+  if ! wave_check_prelinked_vendor_ready; then
+    echo "bootstrap-wave-check: vendor-absent slice skipped (prelinked/bootstrap-vendor/*.o missing — exit 2)"
+    exit 2
+  fi
+  WAVE_CHECK_VENDOR_BAK=""
+  if [[ -d "${ROOT}/vendor" ]]; then
+    WAVE_CHECK_VENDOR_BAK="${ROOT}/.wave-check-vendor.bak"
+    rm -rf "${WAVE_CHECK_VENDOR_BAK}"
+    mv "${ROOT}/vendor" "${WAVE_CHECK_VENDOR_BAK}"
+  fi
+  run_step "selfhost-lib-spine-smoke (vendor absent)" \
+    env VENDOR_TREE_ABSENT=1 BOOTSTRAP_NO_ZEND_FALLBACK=1 \
+    ./script/bootstrap-selfhost-lib-spine-smoke-link.sh
+  print_summary
+  for code in "${STEP_CODES[@]}"; do
+    if [[ "${code}" -ne 0 && "${code}" -ne 2 ]]; then
+      exit "${code}"
+    fi
+  done
+  exit 0
+}
+
+if [[ "${VENDOR_ABSENT}" -eq 1 ]]; then
+  PROBE_OUT=""
+  trap wave_check_cleanup EXIT
+  run_vendor_absent_wave_slice
+fi
+
 PROBE_OUT="$(mktemp)"
-trap 'rm -f "${PROBE_OUT}"' EXIT
+trap wave_check_cleanup EXIT
 
 run_step "selfhost-lint" ./script/bootstrap-selfhost-lint.sh
 run_step "aot-lint" php script/bootstrap-aot-lint.php
