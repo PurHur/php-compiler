@@ -6,6 +6,7 @@ namespace PHPCompiler\JIT;
 
 use PHPLLVM\Builder;
 use PHPLLVM\Value;
+use PHPLLVM\Value\Function_ as LlvmFunction;
 
 /**
  * Native bin/vm.php run() for M2 VM driver execute gate (#2201, #8693).
@@ -169,7 +170,7 @@ final class VmDriverExecuteNative
     /**
      * @param \PHPLLVM\Function_ $func parent run() native (blocks must belong to this function).
      */
-    private static function emitRunProbeEcho(Context $context, \PHPLLVM\Function_ $func): void
+    private static function emitRunProbeEcho(Context $context, LlvmFunction $func): void
     {
         $i8p = $context->getTypeFromString('int8*');
         $charPtr = $context->getTypeFromString('char*');
@@ -199,7 +200,7 @@ final class VmDriverExecuteNative
 
     private static function envIsTruthyInFunction(
         Context $context,
-        \PHPLLVM\Function_ $func,
+        LlvmFunction $func,
         Value $env,
         $i8p
     ): Value {
