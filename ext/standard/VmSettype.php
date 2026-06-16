@@ -155,6 +155,7 @@ final class VmSettype
     private static function toString(Variable $result, Variable $value): void
     {
         $v = $value->resolveIndirect();
+        EnumCaseSupport::packRejectStringOperand($v);
         if (Variable::TYPE_NULL === $v->type) {
             $result->string('');
 

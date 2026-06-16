@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace PHPCompiler\ext\standard;
 
 use PHPCompiler\JIT\BasicBlockHelper;
+use PHPCompiler\JIT\Builtin\ErrorRaise;
 use PHPCompiler\JIT\Builtin\Type\Object_ as JitObjectType;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitValueBox;
@@ -66,6 +67,70 @@ final class JitScalarEnumCoerce
         BasicBlock $nonEnumTarget
     ): ?Value {
         return self::tryEmitObjectEnumCaseToScalar($context, $objPtr, $function, 'float', $nonEnumTarget, true);
+    }
+
+    /**
+     * Zend settype($x, 'string') on enum cases — Error, not backing coercion (#8861, ext/standard/type.c).
+     *
+     * @return bool true when enum matched and Error was emitted
+     */
+    public static function tryEmitObjectEnumCaseStringError(
+        Context $context,
+        Value $objPtr,
+        string $function,
+        BasicBlock $nonEnumTarget
+    ): bool {
+        $jitObject = $context->type->object;
+        if (!$jitObject instanceof JitObjectType) {
+            $context->builder->branch($nonEnumTarget);
+
+            return false;
+        }
+        $enumNames = $jitObject->allDeclaredEnumLowerNames();
+        if ([] === $enumNames) {
+            $context->builder->branch($nonEnumTarget);
+
+            return false;
+        }
+        $map = $context->structFieldMap['__object__'];
+        $runtimeClassId = $context->builder->load(
+            $context->builder->structGep($objPtr, $map['class_id'])
+        );
+        $i64 = $context->getTypeFromString('int64');
+        $fn = BasicBlockHelper::parentFunction($context);
+        $checkBlock = $context->builder->getInsertBlock();
+        $ids = [];
+        foreach ($enumNames as $lc) {
+            $ids[] = $jitObject->lookup($lc);
+        }
+        $lastIdx = \count($ids) - 1;
+        foreach ($ids as $idx => $enumId) {
+            $context->builder->positionAtEnd($checkBlock);
+            $match = $context->builder->icmp(
+                Builder::INT_EQ,
+                $runtimeClassId,
+                $i64->constInt($enumId, false)
+            );
+            $caseBlock = $fn->appendBasicBlock($function.'_enum_string_err_'.$enumId);
+            $nextBlock = $idx === $lastIdx
+                ? $nonEnumTarget
+                : $fn->appendBasicBlock($function.'_enum_string_try_'.($idx + 1));
+            $context->builder->branchIf($match, $caseBlock, $nextBlock);
+            $context->builder->positionAtEnd($caseBlock);
+            ErrorRaise::ensureLinked($context);
+            ErrorRaise::emitRaise(
+                $context,
+                'Object of class '.$jitObject->classNameForId($enumId).' could not be converted to string'
+            );
+
+            return true;
+        }
+        if ($checkBlock !== $nonEnumTarget) {
+            $context->builder->positionAtEnd($checkBlock);
+            $context->builder->branch($nonEnumTarget);
+        }
+
+        return false;
     }
 
     private static function tryEmitObjectEnumCaseToScalar(
