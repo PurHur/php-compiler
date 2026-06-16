@@ -249,6 +249,7 @@ class Module extends ModuleAbstract
             new strrchr(),
             new stripos(),
             new strrpos(),
+            new strripos(),
             new substr_count(),
             new count_chars(),
             new convert_uudecode(),
