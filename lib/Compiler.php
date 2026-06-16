@@ -54,6 +54,7 @@ use PHPCompiler\Compiler\AttributeTargetValidator;
 use PHPCompiler\Compiler\DeprecatedMetadata;
 use PHPCompiler\Compiler\NoDiscardMetadata;
 use PHPCompiler\Compiler\FinalClassConstCheck;
+use PHPCompiler\Compiler\TraitClassConstConflictCheck;
 use PHPCompiler\Compiler\FinalClassExtensionCheck;
 use PHPCompiler\Compiler\FinalMethodOverrideCheck;
 use PHPCompiler\Compiler\InterfaceImplementationCheck;
@@ -434,6 +435,7 @@ class Compiler {
         FinalClassExtensionCheck::validate($script);
         FinalMethodOverrideCheck::validate($script);
         FinalClassConstCheck::validate($script);
+        TraitClassConstConflictCheck::validate($script);
         NewWithoutParensCompileCheck::validate($script);
         ThrowInClassConstCompileCheck::validate($script);
         TypedClassConstInheritCheck::validate($script);
