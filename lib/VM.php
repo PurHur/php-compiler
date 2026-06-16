@@ -629,7 +629,7 @@ class VM {
     }
 
     /**
-     * ??= on property hooks — Zend checks backing null/uninit, not get-hook return (#6472).
+     * ?? / ??= on property hooks — Zend checks backing null/uninit, not get-hook return (#6472, #8902).
      */
     public function objectPropertyIsSetForCoalesceAssign(ObjectEntry $object, string $propName, ?Frame $frame = null): bool
     {
@@ -663,6 +663,38 @@ class VM {
         }
 
         return $this->objectPropertyIsSet($object, $propName, $frame);
+    }
+
+    /**
+     * ?? / ??= left branch on property hooks — read backing without get hook (#6472, #8902).
+     */
+    public function fetchObjectPropertyForCoalesce(ObjectEntry $object, string $propName, Variable $dst): void
+    {
+        $lcClass = strtolower($object->class->name);
+        $propMeta = $this->context->propertyHookRegistry[$lcClass][$propName]
+            ?? $this->context->propertyHookRegistry[$lcClass][strtolower($propName)]
+            ?? null;
+        if (is_array($propMeta)) {
+            $backingName = $propMeta['setBacking'] ?? $propMeta['getBacking'] ?? null;
+            if (null !== $backingName && $object->hasProperty($backingName)) {
+                $dst->copyFrom($object->getProperty($backingName));
+
+                return;
+            }
+        }
+        $meta = $this->classPropertyMeta($object, $propName);
+        if (null !== $meta && (null !== $meta->getHookMethodLc || null !== $meta->setHookMethodLc)) {
+            if ($object->hasProperty($propName)) {
+                $dst->copyFrom($object->getProperty($propName));
+
+                return;
+            }
+        }
+        if ($object->hasProperty($propName)) {
+            $dst->copyFrom($object->getProperty($propName));
+        } else {
+            $dst->undefined();
+        }
     }
 
     /**
@@ -4888,6 +4920,7 @@ restart:
                     }
                     $forWrite = $this->propertyFetchDestUsedAsAssignLvalue($frame, $op);
                     $magicGetForRead = !$forWrite
+                        && !$op->propertyHookCoalesceRead
                         && $this->propertyReadUsesMagicGet($propertyObject, $name, $frame);
                     if (!$magicGetForRead && !$forWrite) {
                         $catchFrame = $this->enforcePropertyVisibilityRead($propertyObject, $name, $frame);
@@ -4895,6 +4928,10 @@ restart:
                             $frame = $catchFrame;
                             goto restart;
                         }
+                    }
+                    if ($op->propertyHookCoalesceRead && !$forWrite) {
+                        $this->fetchObjectPropertyForCoalesce($propertyObject, $name, $result);
+                        break;
                     }
                     if ($propertyObject->hasProperty($name) && !$magicGetForRead) {
                         if (!$forWrite) {

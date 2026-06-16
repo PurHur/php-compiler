@@ -1468,6 +1468,38 @@ class Compiler {
                         /** @var Op\Expr\ArrayDimFetch $child */
                         $block = $this->compileNullsafeArrayDimFetch($child, $block);
                     } elseif (
+                        $child instanceof Op\Expr\PropertyFetch
+                        && $i + 1 < $opCount
+                        && ($ops[$i + 1] instanceof Op\Expr\FuncCall || $ops[$i + 1] instanceof Op\Expr\NsFuncCall)
+                        && $this->isPropertyFetchOnlyCoalesceFuncCallArg($child, $ops[$i + 1], $block)
+                    ) {
+                        break;
+                    } elseif (
+                        $child instanceof Op\Expr\PropertyFetch
+                        && null !== ($coalesceMatch = $this->findCoalesceUsingPropertyFetchLeft($child, $ops, $i))
+                    ) {
+                        /** @var Op\Expr\BinaryOp\Coalesce $coalesce */
+                        [$coalesce, $coalesceIndex] = $coalesceMatch;
+                        $resultOverride = null;
+                        if (
+                            $coalesceIndex + 1 < $opCount
+                            && $ops[$coalesceIndex + 1] instanceof Op\Expr\Assign
+                            && $this->isCoalesceAssignTail($ops[$coalesceIndex + 1], $coalesce)
+                            && $this->operandsChainEqual($ops[$coalesceIndex + 1]->var, $child->result)
+                        ) {
+                            /** @var Op\Expr\Assign $tailAssign */
+                            $tailAssign = $ops[$coalesceIndex + 1];
+                            $resultOverride = $tailAssign->var;
+                        }
+                        $block = null !== $resultOverride
+                            ? $this->compileCoalesceForAssign($coalesce, $block, $resultOverride)
+                            : $this->compileCoalesce($coalesce, $block);
+                        $i = $coalesceIndex;
+                        if (null !== $resultOverride) {
+                            ++$i;
+                        }
+                        break;
+                    } elseif (
                         $child instanceof Op\Expr\ArrayDimFetch
                         && null !== ($coalesceMatch = $this->findCoalesceUsingArrayDimFetchLeft($child, $ops, $i))
                     ) {
@@ -2038,6 +2070,80 @@ class Compiler {
         return $left === $fetch->result;
     }
 
+    private function isPropertyFetchOnlyCoalesceLeft(
+        Op\Expr\PropertyFetch $fetch,
+        Op $next
+    ): bool {
+        if (!$next instanceof Op\Expr\BinaryOp\Coalesce) {
+            return false;
+        }
+        $left = $next->left;
+        while ($left instanceof Temporary) {
+            if ($left === $fetch->result) {
+                return true;
+            }
+            if (null === $left->original) {
+                break;
+            }
+            $left = $left->original;
+        }
+
+        return $left === $fetch->result;
+    }
+
+    /**
+     * php-cfg may emit RHS expr stmts between PropertyFetch and Coalesce (#8902).
+     *
+     * @param Op[] $ops
+     *
+     * @return ?array{0: Op\Expr\BinaryOp\Coalesce, 1: int}
+     */
+    private function findCoalesceUsingPropertyFetchLeft(
+        Op\Expr\PropertyFetch $fetch,
+        array $ops,
+        int $index
+    ): ?array {
+        $count = count($ops);
+        for ($j = $index + 1; $j < $count; ++$j) {
+            $next = $ops[$j];
+            if ($next instanceof Op\Expr\BinaryOp\Coalesce) {
+                if (!$this->isPropertyFetchOnlyCoalesceLeft($fetch, $next)) {
+                    return null;
+                }
+
+                return [$next, $j];
+            }
+            if ($this->isLoweredByFollowingCoalesce($next, $ops, $j)) {
+                continue;
+            }
+
+            return null;
+        }
+
+        return null;
+    }
+
+    private function isPropertyFetchOnlyCoalesceFuncCallArg(
+        Op\Expr\PropertyFetch $fetch,
+        Op $call,
+        Block $block
+    ): bool {
+        if (!$call instanceof Op\Expr\FuncCall && !$call instanceof Op\Expr\NsFuncCall) {
+            return false;
+        }
+        if (!property_exists($call, 'args') || !is_array($call->args)) {
+            return false;
+        }
+        foreach ($call->args as $arg) {
+            $coalesce = $this->findCoalesceStmtForCallArg($arg, $block);
+            if (null !== $coalesce && $this->findCoalescePropertyFetch($coalesce->left, $block) === $fetch) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
     /**
      * php-cfg may emit RHS expr stmts (FuncCall, …) between ArrayDimFetch and Coalesce (#4416).
      *
@@ -2279,6 +2385,10 @@ class Compiler {
         $coalesce = $this->unwrapCoalesceExpr($operand);
         if (null !== $coalesce) {
             $found[] = $coalesce;
+        }
+        $root = $this->unwrapOperandChain($operand);
+        if ($root instanceof Op\Expr\BinaryOp\Coalesce) {
+            $found[] = $root;
         }
         $concat = $this->unwrapConcatListExpr($operand);
         if (null !== $concat) {
@@ -7086,8 +7196,6 @@ class Compiler {
             );
             if (
                 null !== $propFetch
-                && null !== $resultOverride
-                && $this->operandsChainEqual($resultOverride, $propFetch->result)
             ) {
                 $issetOp->issetForCoalesceAssign = true;
             }
@@ -7164,7 +7272,7 @@ class Compiler {
                     ));
                 }
             } elseif (null !== $propFetch) {
-                $this->compilePropertyFetchRead($propFetch, $leftBlock);
+                $this->compilePropertyFetchRead($propFetch, $leftBlock, true);
                 $leftSlot = $this->compileOperand($propFetch->result, $leftBlock, true);
                 if (!$this->operandsChainEqual($resultOperand, $expr->left)) {
                     $leftBlock->addOpCode(new OpCode(
@@ -7214,14 +7322,21 @@ class Compiler {
     /**
      * Emit a read fetch in $block (used by ?? left branch when the stmt fetch was skipped).
      */
-    private function compilePropertyFetchRead(Op\Expr\PropertyFetch $fetch, Block $block): void
-    {
-        $block->addOpCode(new OpCode(
+    private function compilePropertyFetchRead(
+        Op\Expr\PropertyFetch $fetch,
+        Block $block,
+        bool $propertyHookCoalesceRead = false
+    ): void {
+        $op = new OpCode(
             OpCode::TYPE_PROPERTY_FETCH,
             $this->compileOperand($fetch->result, $block, false),
             $this->compileOperand($fetch->var, $block, true),
             $this->compileOperand($fetch->name, $block, true)
-        ));
+        );
+        if ($propertyHookCoalesceRead) {
+            $op->propertyHookCoalesceRead = true;
+        }
+        $block->addOpCode($op);
     }
 
     /**
@@ -8715,6 +8830,123 @@ class Compiler {
         return null;
     }
 
+    /**
+     * @return ?Op\Expr\BinaryOp\Coalesce
+     */
+    private function findCoalesceStmtForCallArg(Operand $arg, Block $block): ?Op\Expr\BinaryOp\Coalesce
+    {
+        $coalesce = $this->unwrapCoalesceExpr($arg);
+        if (null !== $coalesce) {
+            return $coalesce;
+        }
+        if (null === $block->orig) {
+            return null;
+        }
+        foreach ($block->orig->children as $child) {
+            if (
+                $child instanceof Op\Expr\BinaryOp\Coalesce
+                && ($child->result === $arg || $this->operandsReferToSameVariable($child->result, $arg))
+            ) {
+                return $child;
+            }
+        }
+        // php-cfg clones call-arg temps from stmt Coalesce result (#8766, #8902).
+        foreach ($block->orig->children as $i => $child) {
+            if (
+                !($child instanceof Op\Expr\FuncCall || $child instanceof Op\Expr\NsFuncCall)
+                || !property_exists($child, 'args')
+                || !is_array($child->args)
+            ) {
+                continue;
+            }
+            $argMatches = false;
+            foreach ($child->args as $callArg) {
+                if ($callArg === $arg || $this->operandsReferToSameVariable($callArg, $arg)) {
+                    $argMatches = true;
+                    break;
+                }
+            }
+            if (!$argMatches) {
+                continue;
+            }
+            for ($j = $i - 1; $j >= 0; --$j) {
+                $prev = $block->orig->children[$j];
+                if ($prev instanceof Op\Expr\BinaryOp\Coalesce) {
+                    return $prev;
+                }
+                if (!$prev instanceof Op\Expr || !$this->isInlineExprCallArgProducer($prev)) {
+                    break;
+                }
+            }
+        }
+
+        return null;
+    }
+
+    private function slotForCoalesceResult(Block $block, Op\Expr\BinaryOp\Coalesce $coalesce): ?int
+    {
+        $slot = $block->slotForOperand($coalesce->result);
+        if (null !== $slot) {
+            return $slot;
+        }
+        $seen = [];
+        $queue = [$block];
+        while ([] !== $queue) {
+            $current = array_shift($queue);
+            $id = spl_object_id($current);
+            if (isset($seen[$id])) {
+                continue;
+            }
+            $seen[$id] = true;
+            foreach ($current->opCodes as $op) {
+                if (OpCode::TYPE_COALESCE === $op->type) {
+                    return $op->arg1;
+                }
+            }
+            foreach ($current->parents as $parent) {
+                $queue[] = $parent;
+            }
+        }
+
+        return null;
+    }
+
+    private function compileCallArgCoalesceSlot(Operand $arg, Block $block): ?int
+    {
+        $coalesce = $this->findCoalesceStmtForCallArg($arg, $block);
+        if (null === $coalesce) {
+            return null;
+        }
+        $coalesceSlot = $this->slotForCoalesceResult($block, $coalesce);
+        if (null === $coalesceSlot) {
+            $this->compileCoalesce($coalesce, $block);
+            $coalesceSlot = $this->slotForCoalesceResult($block, $coalesce);
+        }
+
+        return $coalesceSlot;
+    }
+
+    /**
+     * @param list<Operand> $args
+     */
+    private function lowerEmbeddedCoalesceCallArgs(array $args, Block $block): void
+    {
+        foreach ($args as $arg) {
+            foreach ($this->findEmbeddedCoalesces($arg) as $coalesce) {
+                if (null === $block->slotForOperand($coalesce->result)) {
+                    $this->compileCoalesce($coalesce, $block);
+                }
+            }
+            $stmtCoalesce = $this->findCoalesceStmtForCallArg($arg, $block);
+            if (
+                null !== $stmtCoalesce
+                && null === $block->slotForOperand($stmtCoalesce->result)
+            ) {
+                $this->compileCoalesce($stmtCoalesce, $block);
+            }
+        }
+    }
+
     private function findInlineExprCallArgProducerSlot(Operand $arg, Block $block): ?string
     {
         if (null === $block->orig) {
@@ -8727,6 +8959,13 @@ class Compiler {
         [$callOp, $argIndex] = $callSite;
         if (!property_exists($callOp, 'args') || !is_array($callOp->args)) {
             return null;
+        }
+        $coalesceArg = $this->findCoalesceStmtForCallArg($arg, $block);
+        if (null !== $coalesceArg) {
+            $coalesceSlot = $this->compileCallArgCoalesceSlot($arg, $block);
+            if (null !== $coalesceSlot) {
+                return $coalesceSlot;
+            }
         }
         $producers = $this->precedingInlineCallArgProducersBeforeCfgOp($block->orig->children, $callOp);
         $producer = $this->matchInlineCallArgProducer($producers, $callOp->args, $argIndex);
@@ -8813,6 +9052,17 @@ class Compiler {
             }
         }
         if ($producer instanceof Op\Expr\PropertyFetch || $producer instanceof Op\Expr\StaticPropertyFetch) {
+            $coalesceStmt = $this->findCoalesceStmtForCallArg($arg, $block);
+            if (
+                null !== $coalesceStmt
+                && $producer instanceof Op\Expr\PropertyFetch
+                && $this->findCoalescePropertyFetch($coalesceStmt->left, $block) === $producer
+            ) {
+                $coalesceSlot = $this->compileCallArgCoalesceSlot($arg, $block);
+                if (null !== $coalesceSlot) {
+                    return $coalesceSlot;
+                }
+            }
             $callIndex = null;
             $producerIndex = null;
             foreach ($block->orig->children as $i => $child) {
@@ -10986,7 +11236,10 @@ class Compiler {
                 if ([] !== $prefetchOps) {
                     $valueSlot = $prefetchOps[0]->arg1;
                 } else {
-                    $valueSlot = $this->findInlineExprCallArgProducerSlot($arg, $block);
+                    $valueSlot = $this->compileCallArgCoalesceSlot($arg, $block);
+                    if (null === $valueSlot) {
+                        $valueSlot = $this->findInlineExprCallArgProducerSlot($arg, $block);
+                    }
                     if (null === $valueSlot) {
                         if (
                             null === $calleeName
@@ -11337,6 +11590,8 @@ class Compiler {
         $callName = $this->tryFoldVariableFunctionName($name, $block) ?? $name;
         $calleeName = $this->resolveCompileTimeStringSlot($callName, $block)
             ?? ($name !== null ? $this->resolveCompileTimeStringSlot($name, $block) : null);
+
+        $this->lowerEmbeddedCoalesceCallArgs($args, $block);
 
         $return = [new OpCode(OpCode::TYPE_FUNCCALL_INIT, $callName)];
         foreach ($this->compileCallArgSends($args, $block, $calleeName) as $send) {
