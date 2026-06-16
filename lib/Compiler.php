@@ -11415,23 +11415,16 @@ class Compiler {
         Op\Expr\Array_ $arrayExpr,
         int $elementIndex
     ): ?int {
-        if (null !== $block->orig) {
-            foreach ($block->orig->children as $child) {
-                if (!$child instanceof Op\Expr\Array_
-                    || !$this->operandsReferToSameVariable($child->result, $arrayExpr->result)
-                ) {
-                    continue;
-                }
-                $fetches = $this->precedingClassConstFetchesBeforeCfgOp($block->orig->children, $child);
-                $fetch = $fetches[$elementIndex] ?? null;
-                if ($fetch instanceof Op\Expr\ClassConstFetch) {
-                    $vm = $this->tryFoldClassConstFetchDefault($fetch, $block, true);
-                    if (null !== $vm) {
-                        return $block->registerConstant($valueOperand, $vm);
-                    }
-                }
-
-                break;
+        $fetch = $this->findEnumCaseClassConstFetchForArrayElement(
+            $valueOperand,
+            $block,
+            $arrayExpr,
+            $elementIndex
+        );
+        if (null !== $fetch) {
+            $vm = $this->tryFoldClassConstFetchDefault($fetch, $block, true);
+            if (null !== $vm) {
+                return $block->registerConstant($valueOperand, $vm);
             }
         }
 
