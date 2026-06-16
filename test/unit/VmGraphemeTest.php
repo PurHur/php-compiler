@@ -34,6 +34,16 @@ final class VmGraphemeTest extends TestCase
         $this->assertTrue(VmGrapheme::strContains('café', 'é'));
     }
 
+    public function testStrContainsNfdHaystackPrecomposedNeedle(): void
+    {
+        $nfd = "cafe\u{0301}";
+        $nfc = "caf\u{00E9}";
+        $this->assertTrue(VmGrapheme::strContains($nfd, "\u{00E9}"));
+        $this->assertTrue(VmGrapheme::strContains($nfc, "e\u{0301}"));
+        $this->assertSame(4, VmGrapheme::strlen($nfd));
+        $this->assertSame(4, VmGrapheme::strlen($nfc));
+    }
+
     public function testLevenshteinGraphemeClusters(): void
     {
         $nfc = "caf\u{00E9}";
