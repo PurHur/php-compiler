@@ -34,7 +34,7 @@ final class ArrayAccessDimension
             $out
         );
         if (null !== $catchFrame) {
-            throw new \LogicException('ArrayAccess offset read escaped user catch handler');
+            throw new ArrayAccessOffsetSignal($catchFrame);
         }
 
         return $out;
@@ -42,15 +42,12 @@ final class ArrayAccessDimension
 
     public function write(Variable $value): void
     {
-        $catchFrame = $this->vm->invokeArrayAccessOffsetSet(
+        $this->vm->executeArrayAccessOffsetSet(
             $this->object,
             $this->key,
             $value,
             $this->callerFrame
         );
-        if (null !== $catchFrame) {
-            throw new \LogicException('ArrayAccess offset write escaped user catch handler');
-        }
     }
 
     public function declaringClassName(): string
