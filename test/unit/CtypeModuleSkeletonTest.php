@@ -84,4 +84,21 @@ PHP;
         $runtime->run($block);
         self::assertSame('1010', ob_get_clean());
     }
+
+    public function test_ctype_enum_case_operands_return_false(): void
+    {
+        $runtime = new Runtime();
+        $code = <<<'PHP'
+<?php
+enum E: string { case A = 'abc'; case B = '123'; }
+echo (int) ctype_alpha(E::A);
+echo (int) ctype_digit(E::B);
+echo (int) ctype_alnum(E::A);
+echo (int) ctype_alpha('abc');
+PHP;
+        $block = $runtime->parseAndCompile($code, 'ctype_enum_false.php');
+        ob_start();
+        $runtime->run($block);
+        self::assertSame('0001', ob_get_clean());
+    }
 }

@@ -34,10 +34,7 @@ final class VmCtype
     ): bool {
         $var = $var->resolveIndirect();
         if (EnumCaseSupport::isEnumCaseVariable($var)) {
-            throw new \TypeError(self::typeError(
-                $function,
-                EnumCaseSupport::typeNameForVariable($var)
-            ));
+            return false;
         }
 
         if (Variable::TYPE_STRING === $var->type) {
@@ -121,15 +118,6 @@ final class VmCtype
             'ctype_xdigit' => ['kind' => self::KIND_XDIGIT, 'allow_digits' => true, 'allow_minus' => false],
             default => throw new \LogicException('Unknown ctype function: '.$function),
         };
-    }
-
-    private static function typeError(string $function, string $given): string
-    {
-        return \sprintf(
-            '%s(): Argument #1 ($text) must be of type string|int, %s given',
-            $function,
-            $given
-        );
     }
 
     private static function isAlnum(int $byte): bool
