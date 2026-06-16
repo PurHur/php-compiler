@@ -68,6 +68,7 @@ use PHPCompiler\VM\Builtin\ReflectionClassGetTraitAliases;
 use PHPCompiler\VM\Builtin\ReflectionClassGetLazyInitializer;
 use PHPCompiler\VM\Builtin\ReflectionClassGetLazyInitializationException;
 use PHPCompiler\VM\Builtin\ReflectionClassGetLazyProxyFactory;
+use PHPCompiler\VM\Builtin\ReflectionClassInitializeLazyObject;
 use PHPCompiler\VM\Builtin\ReflectionClassGetMethod;
 use PHPCompiler\VM\Builtin\ReflectionClassGetMethods;
 use PHPCompiler\VM\Builtin\ReflectionClassHasConstant;
@@ -547,6 +548,8 @@ final class BuiltinClasses
         $rc->methodVisibility['getlazyproxyfactory'] = $pub;
         $rc->methods['isuninitializedlazyobject'] = new ReflectionClassIsUninitializedLazyObject();
         $rc->methodVisibility['isuninitializedlazyobject'] = $pub;
+        $rc->methods['initializelazyobject'] = new ReflectionClassInitializeLazyObject();
+        $rc->methodVisibility['initializelazyobject'] = $pub;
         $rc->methods['marklazyobjectasinitialized'] = new ReflectionClassMarkLazyObjectAsInitialized();
         $rc->methodVisibility['marklazyobjectasinitialized'] = $pub;
         $rc->methods['resetaslazyghost'] = new ReflectionClassResetAsLazyGhost();

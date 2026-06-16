@@ -2432,6 +2432,7 @@ require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionClassIsInternal.php';
 require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionClassIsStatic.php';
 require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionClassIsUninitializedLazyObject.php';
 require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionClassIsUserDefined.php';
+require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionClassInitializeLazyObject.php';
 require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionClassMarkLazyObjectAsInitialized.php';
 require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionClassNewLazyGhost.php';
 require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionClassNewLazyProxy.php';
