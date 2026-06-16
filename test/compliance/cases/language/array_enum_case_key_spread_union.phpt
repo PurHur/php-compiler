@@ -1,5 +1,5 @@
 --TEST--
-Language: array spread/union with enum case keys must TypeError (zend_hash.c, #8778)
+Language: array_enum_case_key_spread_union — spread/union enum case keys TypeError (zend_hash.c, #8778, #9014)
 --FILE--
 <?php
 enum E: int { case A = 1; case B = 2; }
