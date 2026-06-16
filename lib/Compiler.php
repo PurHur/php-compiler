@@ -8912,7 +8912,15 @@ class Compiler {
                 ($producers[0] instanceof Op\Expr\ConstFetch || $producers[0] instanceof Op\Expr\ClassConstFetch)
                 && $argCount - 1 === $argIndex
             ) {
-                return $producers[0];
+                $callArg = $callArgs[$argIndex] ?? null;
+                if (
+                    null !== $callArg
+                    && $this->operandsReferToSameVariable($producers[0]->result, $callArg)
+                ) {
+                    return $producers[0];
+                }
+
+                return null;
             }
             if (
                 $argCount - 1 === $argIndex
@@ -10871,17 +10879,8 @@ class Compiler {
             if (
                 property_exists($callOp, 'args')
                 && is_array($callOp->args)
-                && count($producers) === count($callOp->args)
             ) {
-                $producer = $producers[$argIndex] ?? null;
-            } elseif (
-                property_exists($callOp, 'args')
-                && is_array($callOp->args)
-                && 1 === count($producers)
-                && $producers[0] instanceof Op\Expr\ConstFetch
-                && $argIndex === count($callOp->args) - 1
-            ) {
-                $producer = $producers[0];
+                $producer = $this->matchInlineCallArgProducer($producers, $callOp->args, $argIndex);
             }
             if ($producer instanceof Op\Expr\ConstFetch) {
                 $vm = $this->tryFoldGlobalConstFetch($producer);
