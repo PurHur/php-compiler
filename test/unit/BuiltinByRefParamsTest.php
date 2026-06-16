@@ -20,4 +20,14 @@ final class BuiltinByRefParamsTest extends TestCase
         $this->assertSame([0], BuiltinByRefParams::forFunction('sort'));
         $this->assertSame([0], BuiltinByRefParams::forFunction('SORT'));
     }
+
+    public function testArrayWalkFirstArgument(): void
+    {
+        $this->assertSame([0], BuiltinByRefParams::forFunction('array_walk'));
+    }
+
+    public function testArrayMultisortVariadicByRef(): void
+    {
+        $this->assertSame(0, BuiltinByRefParams::variadicByRefFromIndex('array_multisort'));
+    }
 }

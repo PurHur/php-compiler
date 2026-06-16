@@ -9421,6 +9421,12 @@ class Compiler {
         if (null === $producerSlot) {
             return null;
         }
+        if (
+            ($producer instanceof Op\Expr\FuncCall || $producer instanceof Op\Expr\NsFuncCall)
+            && !$this->namedCallArgMayUseFuncCallProducerResult($producer, $arg)
+        ) {
+            return null;
+        }
         if ($producer instanceof Op\Expr\Empty_) {
             return $producerSlot;
         }
@@ -9456,6 +9462,10 @@ class Compiler {
             return $producerSlot;
         }
         if ($this->operandsReferToSameVariable($producer->result, $arg)) {
+            if ($this->funcCallExprByRefArgMatchesOperand($producer, $arg)) {
+                return null;
+            }
+
             return $producerSlot;
         }
         // php-cfg uses distinct result/arg temps for `$f($a[0])` (#8814, zend_compile.c).
@@ -9616,6 +9626,12 @@ class Compiler {
             if ($paired instanceof Op\Expr\FuncCall || $paired instanceof Op\Expr\NsFuncCall) {
                 $callArg = $callArgs[$argIndex] ?? null;
                 if (
+                    null !== $callArg
+                    && !$this->namedCallArgMayUseFuncCallProducerResult($paired, $callArg)
+                ) {
+                    return null;
+                }
+                if (
                     (null === $callArg || !$this->operandsReferToSameVariable($paired->result, $callArg))
                     && $argCount > 1
                 ) {
@@ -9676,6 +9692,22 @@ class Compiler {
                 && !($producers[0] instanceof Op\Expr\ClassConstFetch)
                 && !$this->isEmbeddedCallLiteralArg($callArgs[0] ?? null)
             ) {
+                $callArg = $callArgs[$argIndex] ?? null;
+                if (
+                    null !== $callArg
+                    && ($producers[0] instanceof Op\Expr\FuncCall || $producers[0] instanceof Op\Expr\NsFuncCall)
+                    && !$this->namedCallArgMayUseFuncCallProducerResult($producers[0], $callArg)
+                ) {
+                    return null;
+                }
+                if (
+                    null !== $callArg
+                    && ($producers[0] instanceof Op\Expr\FuncCall || $producers[0] instanceof Op\Expr\NsFuncCall)
+                    && $this->funcCallExprByRefArgMatchesOperand($producers[0], $callArg)
+                ) {
+                    return null;
+                }
+
                 return $producers[0];
             }
 
@@ -10122,6 +10154,24 @@ class Compiler {
             && '' !== $arg->name->value;
     }
 
+    /**
+     * Hoisted FuncCall producers may supply a dead temp slot — not an unrelated named local (#9074).
+     */
+    private function namedCallArgMayUseFuncCallProducerResult(Op\Expr $producer, Operand $callArg): bool
+    {
+        if (!$this->isNamedVariableOperand($callArg)) {
+            return true;
+        }
+        if ($this->operandsReferToSameVariable($producer->result, $callArg)) {
+            return true;
+        }
+        if ($producer instanceof Op\Expr\FuncCall || $producer instanceof Op\Expr\NsFuncCall) {
+            return $this->funcCallExprByRefArgMatchesOperand($producer, $callArg);
+        }
+
+        return false;
+    }
+
     /** True when a hoisted FuncCall temp is an operand of the consumer call (#8561). */
     private function inlineCallArgProducerFeedsConsumer(Op\Expr $producer, Op $consumer): bool
     {
@@ -10502,6 +10552,28 @@ class Compiler {
             $producers = $this->precedingInlineCallArgProducersBeforeCfgOp($block->orig->children, $child);
             foreach ($producers as $producer) {
                 if ($producer->result === $result || $this->operandsReferToSameVariable($producer->result, $result)) {
+                    $byRefMutatedArg = false;
+                    $unrelatedNamedArg = false;
+                    if (
+                        ($producer instanceof Op\Expr\FuncCall || $producer instanceof Op\Expr\NsFuncCall)
+                        && property_exists($child, 'args')
+                        && is_array($child->args)
+                    ) {
+                        foreach ($child->args as $consumerArg) {
+                            if ($this->funcCallExprByRefArgMatchesOperand($producer, $consumerArg)) {
+                                $byRefMutatedArg = true;
+                                break;
+                            }
+                            if (!$this->namedCallArgMayUseFuncCallProducerResult($producer, $consumerArg)) {
+                                $unrelatedNamedArg = true;
+                                break;
+                            }
+                        }
+                    }
+                    if ($byRefMutatedArg || $unrelatedNamedArg) {
+                        continue;
+                    }
+
                     return true;
                 }
             }
@@ -11961,6 +12033,7 @@ class Compiler {
                 if (null === $valueSlot && $arg instanceof Operand\NullOperand) {
                     $valueSlot = $this->registerNullConstantSlot($block, $arg);
                 }
+                $valueSlot = $this->preferNamedLocalCallArgSlot($arg, $block, $valueSlot);
             }
             $nameSlot = null;
             $argName = $this->callArgName($arg);
@@ -11981,6 +12054,32 @@ class Compiler {
         return $sends;
     }
 
+    /**
+     * php-cfg may wire a later named local read to a preceding call's dead result temp (#9074).
+     */
+    private function preferNamedLocalCallArgSlot(Operand $arg, Block $block, ?string $valueSlot): ?string
+    {
+        if (null === $valueSlot) {
+            return null;
+        }
+        $name = Block::resolveVariableName($arg);
+        if (null === $name || '' === $name) {
+            return $valueSlot;
+        }
+        $namedSlot = $block->slotIndexForVariableName($name);
+        if (null === $namedSlot) {
+            return $valueSlot;
+        }
+        if ((int) $namedSlot === (int) $valueSlot) {
+            return $valueSlot;
+        }
+        if ($block->isNamedVariableSlot((int) $valueSlot)) {
+            return $valueSlot;
+        }
+
+        return $namedSlot;
+    }
+
     private function callArgRequiresByRef(string $calleeName, int $argIndex): bool
     {
         if (\in_array($argIndex, BuiltinByRefParams::forFunction($calleeName), true)) {
@@ -11989,6 +12088,56 @@ class Compiler {
         $variadicFrom = BuiltinByRefParams::variadicByRefFromIndex($calleeName);
 
         return null !== $variadicFrom && $argIndex >= $variadicFrom;
+    }
+
+    /**
+     * Resolve a compile-time global function name from a php-cfg FuncCall/NsFuncCall expr.
+     */
+    private function funcCallExprCalleeName(Op\Expr $call): ?string
+    {
+        if ($call instanceof Op\Expr\FuncCall || $call instanceof Op\Expr\NsFuncCall) {
+            return $this->staticNameFromOperand($call->name);
+        }
+
+        return null;
+    }
+
+    /**
+     * True when $arg is passed by reference to a VM builtin in $call (issue #9074).
+     */
+    private function funcCallExprByRefArgMatchesOperand(Op\Expr $call, Operand $arg): bool
+    {
+        if (
+            !($call instanceof Op\Expr\FuncCall || $call instanceof Op\Expr\NsFuncCall)
+            || !property_exists($call, 'args')
+            || !is_array($call->args)
+        ) {
+            return false;
+        }
+        $calleeName = $this->funcCallExprCalleeName($call);
+        if (null === $calleeName) {
+            return false;
+        }
+        foreach (BuiltinByRefParams::forFunction($calleeName) as $idx) {
+            if (!isset($call->args[$idx])) {
+                continue;
+            }
+            if ($this->operandsReferToSameVariable($call->args[$idx], $arg)) {
+                return true;
+            }
+        }
+        $variadicFrom = BuiltinByRefParams::variadicByRefFromIndex($calleeName);
+        if (null === $variadicFrom) {
+            return false;
+        }
+        $n = \count($call->args);
+        for ($i = $variadicFrom; $i < $n; ++$i) {
+            if ($this->operandsReferToSameVariable($call->args[$i], $arg)) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     private function callArgUnpack(Operand $arg): bool
