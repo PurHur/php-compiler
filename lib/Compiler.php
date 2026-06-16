@@ -9014,6 +9014,26 @@ class Compiler {
         if (!property_exists($callOp, 'args') || !is_array($callOp->args)) {
             return null;
         }
+        $callIndex = null;
+        foreach ($block->orig->children as $i => $child) {
+            if ($child === $callOp) {
+                $callIndex = $i;
+                break;
+            }
+        }
+        if (null !== $callIndex) {
+            for ($i = $callIndex - 1; $i >= 0; --$i) {
+                $child = $block->orig->children[$i];
+                if ($child instanceof Op\Expr\FuncCall || $child instanceof Op\Expr\NsFuncCall) {
+                    break;
+                }
+                if ($child instanceof Op\Expr\Array_
+                    && $this->operandsReferToSameVariable($child->result, $arg)
+                ) {
+                    return $child;
+                }
+            }
+        }
         $producers = $this->precedingInlineCallArgProducersBeforeCfgOp($block->orig->children, $callOp);
         $producer = $this->matchInlineCallArgProducer($producers, $callOp->args, $argIndex);
         if ($producer instanceof Op\Expr\Array_) {
@@ -9476,7 +9496,15 @@ class Compiler {
                 $argCount - 1 === $argIndex
                 && $producers[0] instanceof Op\Expr\Array_
             ) {
-                return $producers[0];
+                $callArg = $callArgs[$argIndex] ?? null;
+                if (
+                    null !== $callArg
+                    && $this->operandsReferToSameVariable($producers[0]->result, $callArg)
+                ) {
+                    return $producers[0];
+                }
+
+                return null;
             }
             if ($argCount - 1 === $argIndex && $this->isEmbeddedCallLiteralArg($callArgs[0] ?? null)) {
                 return $producers[0];
@@ -10732,6 +10760,9 @@ class Compiler {
         if (null === $block->orig) {
             return [];
         }
+        if ($this->callArgOperandIsClosureValue($arg, $block)) {
+            return [];
+        }
         if (null !== $this->findInlineArrayProducerForCallArg($arg, $block)) {
             return [];
         }
@@ -10790,6 +10821,9 @@ class Compiler {
         Op\Expr\ClassConstFetch $fetch,
         Block $block
     ): bool {
+        if ($this->callArgOperandIsClosureValue($arg, $block)) {
+            return false;
+        }
         $root = $this->unwrapOperandChain($arg);
         // Compare/arithmetic on enum case — compile the full Expr_* producer, not bare fetch (#8766).
         if ($root instanceof Op\Expr\BinaryOp) {
@@ -11195,6 +11229,61 @@ class Compiler {
         $root = $this->unwrapOperandChain($operand);
 
         return $root instanceof Op\Expr\Closure || $root instanceof Op\Expr\ArrowFunction;
+    }
+
+    /** php-cfg assigns closure callbacks to temps before user-comparator calls (#8947, array_udiff). */
+    private function callArgOperandIsAssignedClosure(Operand $operand, Block $block): bool
+    {
+        if (null === $block->orig) {
+            return false;
+        }
+        $root = $this->unwrapOperandChain($operand);
+        foreach ($block->orig->children as $child) {
+            if (!$child instanceof Op\Expr\Assign) {
+                continue;
+            }
+            if (!$this->operandsReferToSameVariable($child->var, $root)) {
+                continue;
+            }
+
+            return $this->operandDerivesFromClosure($child->expr);
+        }
+
+        return false;
+    }
+
+    /** Inline or assigned closure comparators must not consume hoisted enum prelude slots (#8947). */
+    private function callArgOperandIsClosureValue(Operand $operand, Block $block): bool
+    {
+        if ($this->operandDerivesFromClosure($operand)) {
+            return true;
+        }
+        if ($this->callArgOperandIsAssignedClosure($operand, $block)) {
+            return true;
+        }
+        if (null === $block->orig) {
+            return false;
+        }
+        $callSite = $this->findCfgCallSiteForArg($block->orig->children, $operand);
+        if (null !== $callSite) {
+            [$callOp, $argIndex] = $callSite;
+            if (property_exists($callOp, 'args') && is_array($callOp->args)) {
+                $producers = $this->precedingInlineCallArgProducersBeforeCfgOp($block->orig->children, $callOp);
+                $producer = $this->matchInlineCallArgProducer($producers, $callOp->args, $argIndex);
+                if ($producer instanceof Op\Expr\ArrowFunction || $producer instanceof Op\Expr\Closure) {
+                    return true;
+                }
+            }
+        }
+        foreach ($block->orig->children as $child) {
+            if ($child instanceof Op\Expr\ArrowFunction || $child instanceof Op\Expr\Closure) {
+                if ($this->operandsReferToSameVariable($child->result, $operand)) {
+                    return true;
+                }
+            }
+        }
+
+        return false;
     }
 
     /**
