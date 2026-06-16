@@ -3,7 +3,7 @@
 declare(strict_types=1);
 
 /**
- * VM-runtime sprintf() subset (%s, %d, %f, %%, %n$ positional, issue #3631).
+ * VM-runtime sprintf() subset (%s, %d, %f, %%, %n$ positional, width/flags, #3631, #9069).
  */
 
 namespace PHPCompiler\ext\standard;
@@ -40,12 +40,38 @@ final class VmSprintf
                 $out .= '%';
                 continue;
             }
+
+            $width = $parsed['width'];
+            if ($parsed['widthFromArg']) {
+                $widthVarIdx = self::resolveArgIndex($parsed['positional'], $argIdx, $argCount);
+                $width = self::argToWidth($args[$widthVarIdx], $frame);
+                if (null !== $parsed['positional']) {
+                    $parsed['positional'] = null;
+                }
+            }
+
+            $precision = $parsed['precision'];
+            if ($parsed['precisionFromArg']) {
+                $precVarIdx = self::resolveArgIndex($parsed['positional'], $argIdx, $argCount);
+                $precision = self::argToPrecision($args[$precVarIdx], $frame);
+                if (null !== $parsed['positional']) {
+                    $parsed['positional'] = null;
+                }
+            }
+
             $varIdx = self::resolveArgIndex($parsed['positional'], $argIdx, $argCount);
-            $out .= self::applyConversion(
+            $converted = self::applyConversion(
                 $parsed['spec'],
                 $args[$varIdx],
                 $frame,
-                $parsed['precision']
+                $precision
+            );
+            $out .= self::applyWidth(
+                $converted,
+                $width,
+                $parsed['leftAdjust'],
+                $parsed['zeroPad'],
+                $parsed['spec']
             );
             if (VmString::byteLength($out) > self::MAX_OUTPUT) {
                 throw new \LogicException('sprintf() output exceeds maximum length in this compiler build');
@@ -56,14 +82,19 @@ final class VmSprintf
     }
 
     /**
-     * Parse a conversion after '%' (php-src ext/standard/sprintf.c — %n$ positional forms, #3631).
+     * Parse a conversion after '%' (php-src ext/standard/sprintf.c — positional, flags, width, precision).
      *
      * @return array{
      *     nextPos: int,
      *     literalPercent: bool,
      *     spec: string,
      *     positional: ?int,
-     *     precision: ?int
+     *     leftAdjust: bool,
+     *     zeroPad: bool,
+     *     width: ?int,
+     *     widthFromArg: bool,
+     *     precision: ?int,
+     *     precisionFromArg: bool
      * }
      */
     private static function parseConversionSpec(string $format, int $start, int $len): array
@@ -75,7 +106,12 @@ final class VmSprintf
                 'literalPercent' => true,
                 'spec' => '',
                 'positional' => null,
+                'leftAdjust' => false,
+                'zeroPad' => false,
+                'width' => null,
+                'widthFromArg' => false,
                 'precision' => null,
+                'precisionFromArg' => false,
             ];
         }
 
@@ -99,21 +135,55 @@ final class VmSprintf
             }
         }
 
-        if ($pos < $len && \ctype_digit($format[$pos])) {
+        $leftAdjust = false;
+        $zeroPad = false;
+        while ($pos < $len) {
+            $flag = $format[$pos];
+            if ('-' === $flag) {
+                $leftAdjust = true;
+                ++$pos;
+                continue;
+            }
+            if ('0' === $flag) {
+                $zeroPad = true;
+                ++$pos;
+                continue;
+            }
+            if (\in_array($flag, ['+', ' ', '#'], true)) {
+                ++$pos;
+                continue;
+            }
+            break;
+        }
+
+        $width = null;
+        $widthFromArg = false;
+        if ($pos < $len && '*' === $format[$pos]) {
+            $widthFromArg = true;
+            ++$pos;
+        } elseif ($pos < $len && \ctype_digit($format[$pos])) {
+            $widthStart = $pos;
             while ($pos < $len && \ctype_digit($format[$pos])) {
                 ++$pos;
             }
+            $width = (int) \substr($format, $widthStart, $pos - $widthStart);
         }
 
         $precision = null;
+        $precisionFromArg = false;
         if ($pos < $len && '.' === $format[$pos]) {
             ++$pos;
-            if ($pos < $len && \ctype_digit($format[$pos])) {
+            if ($pos < $len && '*' === $format[$pos]) {
+                $precisionFromArg = true;
+                ++$pos;
+            } elseif ($pos < $len && \ctype_digit($format[$pos])) {
                 $precStart = $pos;
                 while ($pos < $len && \ctype_digit($format[$pos])) {
                     ++$pos;
                 }
                 $precision = (int) \substr($format, $precStart, $pos - $precStart);
+            } else {
+                $precision = 0;
             }
         }
 
@@ -126,7 +196,12 @@ final class VmSprintf
             'literalPercent' => false,
             'spec' => $format[$pos],
             'positional' => $positional,
+            'leftAdjust' => $leftAdjust,
+            'zeroPad' => $zeroPad,
+            'width' => $width,
+            'widthFromArg' => $widthFromArg,
             'precision' => $precision,
+            'precisionFromArg' => $precisionFromArg,
         ];
     }
 
@@ -148,6 +223,51 @@ final class VmSprintf
         }
 
         return $sequentialIdx++;
+    }
+
+    private static function argToWidth(Variable $var, ?Frame $frame): int
+    {
+        $width = self::argToInt($var, $frame);
+        if ($width < 0) {
+            throw new \ValueError('Width must be greater than zero and less than 2147483647');
+        }
+
+        return $width;
+    }
+
+    private static function argToPrecision(Variable $var, ?Frame $frame): int
+    {
+        $precision = self::argToInt($var, $frame);
+        if ($precision < 0) {
+            throw new \ValueError('Precision must be greater than or equal to 0 and less than 2147483647');
+        }
+
+        return $precision;
+    }
+
+    private static function applyWidth(
+        string $value,
+        ?int $width,
+        bool $leftAdjust,
+        bool $zeroPad,
+        string $spec
+    ): string {
+        if (null === $width || $width <= VmString::byteLength($value)) {
+            return $value;
+        }
+        $padLen = $width - VmString::byteLength($value);
+        if ($leftAdjust) {
+            return $value.str_repeat(' ', $padLen);
+        }
+        if ($zeroPad && 's' !== $spec) {
+            if (str_starts_with($value, '-')) {
+                return '-'.str_repeat('0', $padLen).substr($value, 1);
+            }
+
+            return str_repeat('0', $padLen).$value;
+        }
+
+        return str_repeat(' ', $padLen).$value;
     }
 
     private static function applyConversion(
