@@ -24,6 +24,7 @@ final class GeneratorGetReturn implements Call
             throw new \LogicException('Generator::getReturn() called without $this');
         }
         $genVar = $args[0];
+        GeneratorHelper::ensureStarted($context, $genVar);
         $statePtr = GeneratorHelper::loadStateFromGeneratorObject($context, $genVar);
         $map = $context->structFieldMap['__generator_state__'];
         $i1 = $context->getTypeFromString('int1');
