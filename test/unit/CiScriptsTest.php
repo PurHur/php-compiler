@@ -3563,4 +3563,61 @@ final class CiScriptsTest extends TestCase
         $this->assertStringContainsString('check-init-apijson-parity.sh', $doc);
         $this->assertMatchesRegularExpression('/\| `APIJSON_INIT_PARITY_GATE` \| `1` \|/', $doc);
     }
+
+    public function testReleaseReadinessScriptExists(): void
+    {
+        $script = dirname(__DIR__, 2).'/script/release-readiness.sh';
+        $this->assertFileExists($script);
+        $this->assertTrue(is_executable($script));
+        $body = (string) file_get_contents($script);
+        $this->assertStringContainsString('bootstrap-inventory.php --check', $body);
+        $this->assertStringContainsString('check-selfhost-spine-coverage-sync.php', $body);
+        $this->assertStringContainsString('check-root-readme-sync.php', $body);
+        $this->assertStringContainsString('ci_run_examples_readme_sync_check', $body);
+        $this->assertStringContainsString('ci_run_development_status_sync_check', $body);
+        $this->assertStringContainsString('ExamplesCompileTest.php', $body);
+        $this->assertStringContainsString('examples-aot-smoke.sh', $body);
+        $this->assertStringContainsString('examples-web-smoke.sh', $body);
+        $this->assertStringContainsString('user_release_ready', $body);
+    }
+
+    public function testReleaseReadinessJsonSchemaQuickMode(): void
+    {
+        $script = dirname(__DIR__, 2).'/script/release-readiness.sh';
+        $env = 'RELEASE_READINESS_SKIP_EXAMPLES=1';
+        exec("{$env} bash ".escapeshellarg($script).' --json 2>/dev/null', $out, $code);
+        $text = implode("\n", $out);
+        $this->assertMatchesRegularExpression('/\{.*\}/s', $text, $text);
+        preg_match('/\{.*\}/s', $text, $matches);
+        $payload = json_decode($matches[0], true);
+        $this->assertIsArray($payload, $text);
+        $this->assertArrayHasKey('user_release_ready', $payload);
+        $this->assertContains($payload['user_release_ready'], ['yes', 'no']);
+        $this->assertArrayHasKey('gates', $payload);
+        $this->assertIsArray($payload['gates']);
+        foreach ($payload['gates'] as $gate) {
+            $this->assertArrayHasKey('name', $gate);
+            $this->assertArrayHasKey('status', $gate);
+            $this->assertArrayHasKey('message', $gate);
+        }
+        $names = array_column($payload['gates'], 'name');
+        $this->assertContains('bootstrap-inventory', $names);
+        $this->assertContains('spine-coverage-sync', $names);
+        $this->assertContains('root-readme-sync', $names);
+        $this->assertContains('docs-sync', $names);
+        $this->assertContains('examples-000-smoke', $names);
+        if ($payload['user_release_ready'] === 'yes') {
+            $this->assertSame(0, $code, $text);
+        } else {
+            $this->assertSame(1, $code, $text);
+        }
+    }
+
+    public function testLocalCiMatrixDocumentsReleaseReadiness(): void
+    {
+        $doc = (string) file_get_contents(dirname(__DIR__, 2).'/docs/local-ci-matrix.md');
+        $this->assertStringContainsString('release-readiness.sh', $doc);
+        $this->assertStringContainsString('user_release_ready', $doc);
+        $this->assertStringContainsString('RELEASE_READINESS_SKIP_EXAMPLES', $doc);
+    }
 }

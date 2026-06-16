@@ -32,6 +32,25 @@ Repository defaults live in [`script/ci-defaults.env`](../script/ci-defaults.env
 | Fast gate + JIT preflight (optional) | `JIT_PREFLIGHT_GATE=1 ./script/ci-fast.sh` | `make test-fast-jit-preflight` or `make test-docker-fast-jit-preflight` |
 | Explicit memory-capped Docker | — | `./script/ci-docker-safe.sh ci-local.sh` or `make test-docker-safe` |
 | Single PHPUnit filter | Append args: `./script/ci-fast.sh --filter VMTest` | Same inside Docker wrappers |
+| User-release readiness (quick) | `./script/release-readiness.sh --json` | `./script/docker-exec.sh -- bash -lc './script/release-readiness.sh --json'` |
+| User-release readiness (full) | `./script/release-readiness.sh --full --json` | `./script/docker-exec.sh -- bash -lc './script/release-readiness.sh --full --json'` |
+
+## Release readiness (#8737)
+
+[`script/release-readiness.sh`](../script/release-readiness.sh) aggregates user-release gates for v1.1.0 review ([#8737](https://github.com/PurHur/php-compiler/issues/8737), meta [#8739](https://github.com/PurHur/php-compiler/issues/8739), roadmap [#78](https://github.com/PurHur/php-compiler/issues/78)).
+
+| Mode | Gates | Target time |
+|------|-------|-------------|
+| Quick (default) | `bootstrap-inventory --check`, spine coverage sync, root README sync, docs sync, `examples/000` VM smoke | **<5 min** Docker |
+| Full (`--full`) | Quick + development-status sync, `capability-matrix --check`, `CHANGELOG.md` stub, `examples-aot-smoke.sh`, `examples-web-smoke.sh` | LLVM + loopback dependent |
+
+Machine output: `./script/release-readiness.sh --json` → `{"user_release_ready":"yes"|"no","gates":[...]}`.
+
+| Variable | Default | Role |
+|----------|---------|------|
+| `RELEASE_READINESS_SKIP_EXAMPLES` | unset | Test-only: skip `examples/000` smoke gate (`CiScriptsTest`) |
+| `RELEASE_READINESS_CI_FAST` | unset | Optional: run full `./script/ci-fast.sh` after quick bundle |
+| `PHP_COMPILER_SKIP_SERVE_TESTS` | unset | Skips HTTP checks in `examples-web-smoke.sh` (full mode) |
 
 ## Runforge / harness verification
 
