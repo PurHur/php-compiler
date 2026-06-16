@@ -25,11 +25,12 @@ final class VmRandomNativeRuntimeShrinkTest extends TestCase
         $this->assertStringNotContainsString('\\gettimeofday()', $source);
     }
 
-    public function testVmRandomNativeUsesLibcFfi(): void
+    public function testVmRandomNativeUsesLibcFfiWhenAvailable(): void
     {
         $source = (string) file_get_contents($this->repoRoot.'/ext/standard/VmRandomNative.php');
         $this->assertStringContainsString('getrandom', $source);
         $this->assertStringContainsString('/dev/urandom', $source);
+        $this->assertStringContainsString('VmRandomPure::randomBytes', $source);
         $this->assertStringNotContainsString('\\fopen', $source);
     }
 
