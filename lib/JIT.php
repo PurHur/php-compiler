@@ -13534,7 +13534,10 @@ class JIT {
         string $constNameLc,
         int $classId
     ): VM\Variable {
-        if (!isset($block->constants[$op->arg2])) {
+        if (
+            !isset($block->constants[$op->arg2])
+            || $block->constants[$op->arg2]->is(VM\Variable::TYPE_NULL)
+        ) {
             $vm = new VM($this->context->runtime->vmContext);
             $className = $this->context->type->object->classNameForId($classId);
             $value = VM\ClassConstMaterializer::materializeSlot($vm, $block, $op->arg2, $className);

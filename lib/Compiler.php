@@ -83,6 +83,8 @@ class Compiler {
     private SplObjectStorage $rewrittenNeNullReturnJumpIf;
 
     private ?string $debugLastPhaseInputFile = null;
+    /** Source text for the current compile() call — `new Foo()` paren detection (#9116). */
+    private ?string $compileSourceCode = null;
     private int $debugLastPhaseCounter = 0;
     private ?string $debugLastPhaseKey = null;
 
@@ -170,6 +172,11 @@ class Compiler {
     public function getDebugLastPhaseInputFile(): ?string
     {
         return $this->debugLastPhaseInputFile;
+    }
+
+    public function setCompileSourceCode(?string $code): void
+    {
+        $this->compileSourceCode = $code;
     }
 
     private function debugLastPhaseIsEnabled(): bool
@@ -447,7 +454,7 @@ class Compiler {
         FinalMethodOverrideCheck::validate($script);
         FinalClassConstCheck::validate($script);
         TraitClassConstConflictCheck::validate($script);
-        NewWithoutParensCompileCheck::validate($script);
+        NewWithoutParensCompileCheck::validate($script, $this->compileSourceCode);
         ThrowInClassConstCompileCheck::validate($script);
         TypedClassConstInheritCheck::validate($script);
         InterfaceConstVisibilityCheck::validate($script);
@@ -9845,6 +9852,18 @@ class Compiler {
         if ($expr instanceof Op\Expr\UnaryMinus || $expr instanceof Op\Expr\UnaryPlus) {
             return $expr->expr === $operand
                 || $this->operandsReferToSameVariable($expr->expr, $operand);
+        }
+        if ($expr instanceof Op\Expr\PropertyFetch) {
+            return $expr->var === $operand
+                || $this->operandsReferToSameVariable($expr->var, $operand);
+        }
+        if ($expr instanceof Op\Expr\StaticPropertyFetch) {
+            return $expr->class === $operand
+                || $this->operandsReferToSameVariable($expr->class, $operand);
+        }
+        if ($expr instanceof Op\Expr\ArrayDimFetch) {
+            return $expr->var === $operand
+                || $this->operandsReferToSameVariable($expr->var, $operand);
         }
 
         return false;

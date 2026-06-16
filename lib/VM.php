@@ -11621,17 +11621,39 @@ restart:
 
     private function resolveClassConstDefineValue(Frame $frame, Block $block, OpCode $op): Variable
     {
-        if (isset($block->constants[$op->arg2])) {
-            $value = new Variable();
-            $value->copyFrom($block->constants[$op->arg2]);
-        } elseif (isset($frame->scope[$op->arg2])) {
-            $value = new Variable();
-            $value->copyFrom($frame->scope[$op->arg2]);
-        } else {
-            throw new \LogicException('Class constant value must be a compile-time constant');
-        }
+        $value = $this->resolveClassConstInitializerValue($frame, $block, $op->arg2);
 
         return VM\EnumCaseSupport::materializeConstantValue($this->context, $value);
+    }
+
+    /**
+     * Runtime `new` class-const inits land in frame scope; folded scalars in block constants (#9116).
+     */
+    private function resolveClassConstInitializerValue(Frame $frame, Block $block, int $slot): Variable
+    {
+        if (isset($frame->scope[$slot])) {
+            $scoped = $frame->scope[$slot]->resolveIndirect();
+            if (!$scoped->is(Variable::TYPE_NULL)) {
+                $value = new Variable();
+                $value->copyFrom($scoped);
+
+                return $value;
+            }
+        }
+        if (isset($block->constants[$slot])) {
+            $value = new Variable();
+            $value->copyFrom($block->constants[$slot]);
+
+            return $value;
+        }
+        if (isset($frame->scope[$slot])) {
+            $value = new Variable();
+            $value->copyFrom($frame->scope[$slot]);
+
+            return $value;
+        }
+
+        throw new \LogicException('Class constant value must be a compile-time constant');
     }
 
     /**

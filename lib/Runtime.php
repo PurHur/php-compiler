@@ -807,6 +807,7 @@ class Runtime {
         \PHPCompiler\JIT\Progress::noteEntry($filename);
         try {
             $script = $this->parse($code, $filename);
+            $this->compiler->setCompileSourceCode($code);
             $block = $this->compile($script);
             if (null !== $block) {
                 $block->setScriptPath($filename);
@@ -845,6 +846,7 @@ class Runtime {
             \PHPCompiler\JIT\Progress::noteFunction('runtime_parseandcompilefile_read_done');
             $script = $this->parse($code, $filename);
             \PHPCompiler\JIT\Progress::noteFunction('runtime_parseandcompilefile_parse_done');
+            $this->compiler->setCompileSourceCode($code);
             $block = $this->compile($script);
             \PHPCompiler\JIT\Progress::noteFunction('runtime_parseandcompilefile_compile_done');
             if (null !== $block) {
