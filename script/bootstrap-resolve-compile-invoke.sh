@@ -21,6 +21,7 @@
 #   BOOTSTRAP_GEN0_ZEND_ONLY=1  — always php bin/compile.php (requires php on PATH)
 #   BOOTSTRAP_ALLOW_GEN0_ZEND=0 — refuse Zend when no native driver (empty build/)
 #   BOOTSTRAP_M5_NO_ZEND=1       — refuse Zend fallback (implies BOOTSTRAP_NO_ZEND_FALLBACK=1)
+#   BOOTSTRAP_NO_ZEND_FALLBACK=1 — refuse Zend on spine/M5 compile paths (#8716)
 #   BOOTSTRAP_USE_INVENTORY_DRIVER=1 — inventory argv driver only (#2894)
 set -euo pipefail
 
@@ -32,9 +33,31 @@ BOOTSTRAP_COMPILE_DRIVER=""
 # Inventory argv driver must be large enough to be real Compiler {main}, not a link sidecar stub (#3012, #3046).
 BOOTSTRAP_INVENTORY_ARGV_DRIVER_MIN_BYTES="${BOOTSTRAP_INVENTORY_ARGV_DRIVER_MIN_BYTES:-350000}"
 
+# Committed gen-0 manifest size_bytes_driver is the SSOT floor (#8713, #3046).
+bootstrap_gen0_manifest_driver_min_bytes() {
+  local root="${ROOT:-}"
+  local bytes=""
+  if [[ -z "${root}" || ! -f "${root}/prelinked/bootstrap-gen0/manifest.json" ]]; then
+    return 1
+  fi
+  bytes="$("${PHP_BIN:-php}" -r '
+    $m = json_decode(file_get_contents($argv[1]), true);
+    $n = (int)($m["size_bytes_driver"] ?? 0);
+    echo $n > 0 ? $n : "";
+  ' "${root}/prelinked/bootstrap-gen0/manifest.json" 2>/dev/null)" || return 1
+  [[ -n "${bytes}" && "${bytes}" =~ ^[0-9]+$ ]] || return 1
+  echo "${bytes}"
+}
+
 bootstrap_inventory_argv_driver_size_ok() {
   local driver=$1
   local min_bytes="${2:-${BOOTSTRAP_INVENTORY_ARGV_DRIVER_MIN_BYTES}}"
+  local manifest_min=""
+  if manifest_min="$(bootstrap_gen0_manifest_driver_min_bytes 2>/dev/null)"; then
+    if (( manifest_min > min_bytes )); then
+      min_bytes="${manifest_min}"
+    fi
+  fi
   local driver_bytes
   driver_bytes="$(wc -c <"${driver}" 2>/dev/null || echo 0)"
   [[ "${driver_bytes}" =~ ^[0-9]+$ ]] && (( driver_bytes >= min_bytes ))
@@ -45,13 +68,23 @@ bootstrap_native_compile_output_ok() {
   grep -qE 'helloworld_compile_smoke: compile OK|compile_smoke_m3_emit: compile OK|bootstrap_loop_compile_smoke: gen-2 compile OK' <<< "${compile_out}"
 }
 
-# Inventory argv emit must materialize a real AOT binary (not stdout-only phantom success — #3046).
+# Inventory argv emit must materialize a real AOT binary (not stdout-only phantom success — #3046, #8709).
 bootstrap_inventory_argv_emit_output_ok() {
   local out=$1
   local out_bytes
-  [[ -f "${out}" && -x "${out}" ]] || return 1
+  if [[ ! -f "${out}" ]]; then
+    echo "bootstrap-inventory-argv-emit: missing -o output file: ${out} (#8709)" >&2
+    return 1
+  fi
+  if [[ ! -x "${out}" ]]; then
+    echo "bootstrap-inventory-argv-emit: -o output is not executable: ${out} (#8709)" >&2
+    return 1
+  fi
   out_bytes="$(wc -c <"${out}" 2>/dev/null || echo 0)"
-  [[ "${out_bytes}" =~ ^[0-9]+$ ]] && (( out_bytes > 0 ))
+  if [[ ! "${out_bytes}" =~ ^[0-9]+$ ]] || (( out_bytes <= 0 )); then
+    echo "bootstrap-inventory-argv-emit: -o output is empty (${out_bytes} bytes): ${out} (#8709)" >&2
+    return 1
+  fi
 }
 
 # Prelinked gen-0 argv drivers bake absolute /compiler/build/.m3_* sidecar paths at link time.
@@ -99,6 +132,12 @@ bootstrap_gen0_sidecar_blob_for_entry() {
     build/.m3_compiler_minimal_aot_blob) prelinked="${root}/prelinked/bootstrap-gen0/compiler_minimal_aot_blob" ;;
     build/.m3_bin_compile_aot_blob) prelinked="${root}/prelinked/bootstrap-gen0/bin-compile-aot" ;;
     build/.m3_compiler_lib_aot_blob) prelinked="${root}/prelinked/bootstrap-gen0/compiler_lib_aot_blob" ;;
+    build/.m3_*)
+      local sidecar_name="${rel#build/}"
+      if [[ -f "${root}/prelinked/bootstrap-gen0/${sidecar_name}" ]]; then
+        prelinked="${root}/prelinked/bootstrap-gen0/${sidecar_name}"
+      fi
+      ;;
   esac
   if [[ -n "${prelinked}" && -f "${prelinked}" && -s "${prelinked}" ]]; then
     if [[ "${rel}" == "build/.m3_compiler_lib_aot_blob" ]] \
@@ -204,6 +243,14 @@ bootstrap_inventory_argv_driver_smoke() {
   return 1
 }
 
+bootstrap_inventory_argv_driver_accepts() {
+  local driver=$1
+  if ! bootstrap_inventory_argv_driver_smoke "${driver}"; then
+    return 1
+  fi
+  bootstrap_inventory_argv_driver_m4_smoke "${driver}"
+}
+
 # M4 full-revision: inventory driver must parse+compile bin/compile.php (stale prelinked gen-0 fails here — #2880).
 bootstrap_inventory_argv_driver_m4_smoke() {
   local driver=$1
@@ -262,8 +309,17 @@ bootstrap_inventory_argv_driver_m4_smoke() {
     return 1
   fi
   if [[ -f "${prelink}" ]] && cmp -s "${compile_out}" "${prelink}"; then
-    if grep -qE 'sidecar emit fallback|recovered via gen-0 sidecar|parseAndCompile returned null' <<< "${compile_log}"; then
+    if grep -qE 'sidecar emit fallback|recovered via gen-0 sidecar|parseAndCompile returned null|installed inventory argv driver from prelinked' <<< "${compile_log}"; then
       echo "bootstrap-inventory-argv-driver-m4-smoke: ${driver} bin/compile.php emit is prelinked gen-0 sidecar (not inventory Compiler — #1492)" >&2
+      rm -f "${compile_out}"
+      return 1
+    fi
+    if ! declare -F bootstrap_gen3_emit_matches_stale_prelinked_gen0 >/dev/null 2>&1; then
+      # shellcheck source=bootstrap-gen0-install-prelinked-driver.sh
+      source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/bootstrap-gen0-install-prelinked-driver.sh"
+    fi
+    if bootstrap_gen3_emit_matches_stale_prelinked_gen0 "${compile_out}"; then
+      echo "bootstrap-inventory-argv-driver-m4-smoke: ${driver} bin/compile.php emit matches stale prelinked/bootstrap-gen0/ (refresh gen-0 — #8710)" >&2
       rm -f "${compile_out}"
       return 1
     fi
@@ -287,8 +343,7 @@ bootstrap_ensure_inventory_argv_driver() {
     return 1
   fi
   if bootstrap_is_inventory_bin_compile_argv_driver "${out}" \
-    && bootstrap_inventory_argv_driver_smoke "${out}" \
-    && bootstrap_inventory_argv_driver_m4_smoke "${out}"; then
+    && bootstrap_inventory_argv_driver_accepts "${out}"; then
     return 0
   fi
   if [[ -x "${out}" ]]; then
@@ -308,13 +363,13 @@ bootstrap_ensure_inventory_argv_driver() {
     bootstrap_ensure_m3_compiler_lib_sidecar 2>/dev/null || true
     if bootstrap_gen0_copy_prelinked_inventory_driver "${out}" "" "${out}"; then
       if bootstrap_is_inventory_bin_compile_argv_driver "${out}" \
-        && bootstrap_inventory_argv_driver_smoke "${out}" \
-        && bootstrap_inventory_argv_driver_m4_smoke "${out}"; then
+        && bootstrap_inventory_argv_driver_accepts "${out}"; then
         return 0
       fi
     fi
-    if [[ "${BOOTSTRAP_M5_NO_ZEND:-0}" == "1" ]]; then
-      echo "bootstrap-ensure-inventory-argv-driver: BOOTSTRAP_M5_NO_ZEND=1 — prelinked inventory driver failed smoke (#3053)" >&2
+    if [[ "${BOOTSTRAP_M5_NO_ZEND:-0}" == "1" || "${BOOTSTRAP_NO_ZEND_FALLBACK:-0}" == "1" ]]; then
+      rm -f "${out}" "${root}/build/.m3_bin_compile_aot_blob"
+      echo "bootstrap-ensure-inventory-argv-driver: BOOTSTRAP_NO_ZEND_FALLBACK=1 — prelinked inventory driver failed smoke (#8716, #3053)" >&2
       return 1
     fi
   fi
@@ -332,8 +387,7 @@ bootstrap_ensure_inventory_argv_driver() {
       cp -f "${prelink}" "${out}"
       cp -f "${prelink}" "${root}/build/.m3_bin_compile_aot_blob"
       chmod +x "${out}" "${root}/build/.m3_bin_compile_aot_blob"
-      if bootstrap_inventory_argv_driver_smoke "${out}" \
-        && bootstrap_inventory_argv_driver_m4_smoke "${out}"; then
+      if bootstrap_inventory_argv_driver_accepts "${out}"; then
         bootstrap_ensure_m3_compiler_lib_sidecar 2>/dev/null || true
         return 0
       fi
@@ -350,8 +404,7 @@ bootstrap_ensure_inventory_argv_driver() {
     echo "bootstrap-ensure-inventory-argv-driver: ${out} is not a verified inventory argv driver" >&2
     return 1
   fi
-  if ! bootstrap_inventory_argv_driver_smoke "${out}" \
-    || ! bootstrap_inventory_argv_driver_m4_smoke "${out}"; then
+  if ! bootstrap_inventory_argv_driver_accepts "${out}"; then
     echo "bootstrap-ensure-inventory-argv-driver: ${out} failed post-build inventory smoke (phantom emit? rebuild via Zend — #3046)" >&2
     rm -f "${out}" "${root}/build/.m3_bin_compile_aot_blob"
     return 1
@@ -557,6 +610,11 @@ bootstrap_compile_invoke() {
   if ! command -v php >/dev/null 2>&1; then
     echo "bootstrap-compile-invoke: compiled driver(s) failed and php missing — cannot fall back (#2842)" >&2
     return "${last_code}"
+  fi
+
+  if bootstrap_gen0_sidecar_emit_fallback "${out}" "${entry}"; then
+    echo "bootstrap-compile-invoke: gen-0 sidecar emit after native driver sweep (#8711, #3046)" >&2
+    return 0
   fi
 
   echo "bootstrap-compile-invoke: compiled driver(s) failed — falling back to Zend gen-0 (#2842)" >&2

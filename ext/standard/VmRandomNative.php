@@ -22,7 +22,7 @@ final class VmRandomNative
 
     public static function available(): bool
     {
-        return null !== self::ffi();
+        return null !== self::ffi() || VmRandomPure::available();
     }
 
     /**
@@ -35,7 +35,7 @@ final class VmRandomNative
         }
         $ffi = self::ffi();
         if (null === $ffi) {
-            throw new \Exception('Could not gather sufficient random data');
+            return VmRandomPure::randomBytes($length);
         }
 
         $viaGetrandom = self::tryGetrandom($ffi, $length);

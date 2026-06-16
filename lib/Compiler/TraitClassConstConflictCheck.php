@@ -1,0 +1,316 @@
+<?php
+
+declare(strict_types=1);
+
+namespace PHPCompiler\Compiler;
+
+use PHPCfg\Op;
+use PHPCfg\Operand;
+use PHPCfg\Script;
+use PHPCompiler\VM\Variable;
+
+/**
+ * Compile-time check: incompatible trait/class constant composition (#8882, #7012, #5385).
+ *
+ * php-src: Zend/zend_traits.c — zend_traits_compile_role_constants
+ */
+final class TraitClassConstConflictCheck
+{
+    /**
+     * @var array<string, array{
+     *     display: string,
+     *     file: string,
+     *     line: int,
+     *     constants: array<string, array{display: string, value: ?Variable, file: string, line: int}>,
+     *     traitUses: list<string>
+     * }>
+     */
+    private array $types = [];
+
+    public static function validate(Script $script): void
+    {
+        $check = new self();
+        $check->collect($script);
+        $check->verify();
+    }
+
+    private function collect(Script $script): void
+    {
+        foreach ($script->main->cfg->children as $child) {
+            if ($child instanceof Op\Stmt\Class_) {
+                $this->collectClassLike($child);
+            } elseif ($child instanceof Op\Stmt\Trait_) {
+                $this->collectClassLike($child);
+            } elseif ($child instanceof Op\Stmt\Enum_) {
+                $this->collectClassLike($child);
+            }
+        }
+    }
+
+    private function collectClassLike(Op\Stmt\Class_|Op\Stmt\Trait_|Op\Stmt\Enum_ $type): void
+    {
+        $lc = $this->operandLcName($type->name);
+        if (null === $lc) {
+            return;
+        }
+        $this->types[$lc] = [
+            'display' => $this->operandDisplayName($type->name, $lc),
+            'file' => $type->getFile(),
+            'line' => max(1, $type->getLine()),
+            'constants' => $this->collectConstants($type->stmts->children),
+            'traitUses' => $this->collectTraitUses($type->stmts->children),
+        ];
+    }
+
+    /**
+     * @param list<Op> $members
+     *
+     * @return list<string>
+     */
+    private function collectTraitUses(array $members): array
+    {
+        $traits = [];
+        foreach ($members as $member) {
+            if (!$member instanceof Op\Stmt\TraitUse) {
+                continue;
+            }
+            foreach ($member->traits as $traitOperand) {
+                $traitLc = $this->operandLcName($traitOperand);
+                if (null !== $traitLc) {
+                    $traits[] = $traitLc;
+                }
+            }
+        }
+
+        return $traits;
+    }
+
+    /**
+     * @param list<Op> $members
+     *
+     * @return array<string, array{display: string, value: ?Variable, file: string, line: int}>
+     */
+    private function collectConstants(array $members): array
+    {
+        $constants = [];
+        foreach ($members as $member) {
+            if (!$member instanceof Op\Terminal\Const_) {
+                continue;
+            }
+            if (property_exists($member, 'isEnumCase') && $member->isEnumCase) {
+                continue;
+            }
+            $name = $this->staticNameFromOperand($member->name);
+            if (null === $name) {
+                continue;
+            }
+            $constants[strtolower($name)] = [
+                'display' => $name,
+                'value' => ClassConstValueFold::fold($member),
+                'file' => $member->getFile(),
+                'line' => max(1, $member->getLine()),
+            ];
+        }
+
+        return $constants;
+    }
+
+    private function verify(): void
+    {
+        foreach ($this->types as $lc => $type) {
+            $this->verifyTypeComposition($lc, $type);
+        }
+    }
+
+    /**
+     * @param array{
+     *     display: string,
+     *     file: string,
+     *     line: int,
+     *     constants: array<string, array{display: string, value: ?Variable, file: string, line: int}>,
+     *     traitUses: list<string>
+     * } $type
+     */
+    private function verifyTypeComposition(string $lc, array $type): void
+    {
+        /** @var array<string, array{display: string, value: Variable, sourceDisplay: string, file: string, line: int}> $merged */
+        $merged = [];
+        $applied = [];
+        foreach ($type['traitUses'] as $traitLc) {
+            if (isset($applied[$traitLc])) {
+                continue;
+            }
+            $applied[$traitLc] = true;
+            if (!isset($this->types[$traitLc])) {
+                continue;
+            }
+            foreach ($this->effectiveTraitConstants($traitLc) as $constLc => $traitConst) {
+                if (null === $traitConst['value']) {
+                    continue;
+                }
+                if (isset($merged[$constLc])) {
+                    if (ClassConstValueFold::identical($merged[$constLc]['value'], $traitConst['value'])) {
+                        continue;
+                    }
+                    $this->throwConflict(
+                        $type['file'],
+                        $type['line'],
+                        $merged[$constLc]['sourceDisplay'],
+                        $traitConst['sourceDisplay'],
+                        $traitConst['display'],
+                        $type['display']
+                    );
+                }
+                $merged[$constLc] = [
+                    'display' => $traitConst['display'],
+                    'value' => $traitConst['value'],
+                    'sourceDisplay' => $traitConst['sourceDisplay'],
+                    'file' => $traitConst['file'],
+                    'line' => $traitConst['line'],
+                ];
+            }
+        }
+
+        foreach ($type['constants'] as $constLc => $ownConst) {
+            if (null === $ownConst['value'] || !isset($merged[$constLc])) {
+                continue;
+            }
+            if (ClassConstValueFold::identical($merged[$constLc]['value'], $ownConst['value'])) {
+                continue;
+            }
+            $this->throwConflict(
+                $ownConst['file'],
+                $ownConst['line'],
+                $type['display'],
+                $merged[$constLc]['sourceDisplay'],
+                $ownConst['display'],
+                $type['display']
+            );
+        }
+    }
+
+    /**
+     * @return array<string, array{display: string, value: ?Variable, sourceDisplay: string, file: string, line: int}>
+     */
+    private function effectiveTraitConstants(string $traitLc): array
+    {
+        if (!isset($this->types[$traitLc])) {
+            return [];
+        }
+        $trait = $this->types[$traitLc];
+        /** @var array<string, array{display: string, value: ?Variable, sourceDisplay: string, file: string, line: int}> $merged */
+        $merged = [];
+        $applied = [];
+        foreach ($trait['traitUses'] as $usedTraitLc) {
+            if (isset($applied[$usedTraitLc])) {
+                continue;
+            }
+            $applied[$usedTraitLc] = true;
+            foreach ($this->effectiveTraitConstants($usedTraitLc) as $constLc => $usedConst) {
+                if (null === $usedConst['value']) {
+                    continue;
+                }
+                if (isset($merged[$constLc])) {
+                    if (ClassConstValueFold::identical($merged[$constLc]['value'], $usedConst['value'])) {
+                        continue;
+                    }
+                    $this->throwConflict(
+                        $trait['file'],
+                        $trait['line'],
+                        $merged[$constLc]['sourceDisplay'],
+                        $usedConst['sourceDisplay'],
+                        $usedConst['display'],
+                        $trait['display']
+                    );
+                }
+                $merged[$constLc] = $usedConst;
+            }
+        }
+        foreach ($trait['constants'] as $constLc => $constInfo) {
+            if (null === $constInfo['value']) {
+                continue;
+            }
+            if (isset($merged[$constLc])) {
+                if (ClassConstValueFold::identical($merged[$constLc]['value'], $constInfo['value'])) {
+                    continue;
+                }
+                $this->throwConflict(
+                    $constInfo['file'],
+                    $constInfo['line'],
+                    $trait['display'],
+                    $merged[$constLc]['sourceDisplay'],
+                    $constInfo['display'],
+                    $trait['display']
+                );
+            }
+            $merged[$constLc] = [
+                'display' => $constInfo['display'],
+                'value' => $constInfo['value'],
+                'sourceDisplay' => $trait['display'],
+                'file' => $constInfo['file'],
+                'line' => $constInfo['line'],
+            ];
+        }
+
+        return $merged;
+    }
+
+    private function throwConflict(
+        string $file,
+        int $line,
+        string $first,
+        string $second,
+        string $constDisplay,
+        string $classDisplay
+    ): void {
+        throw new CompileFatal(
+            $file,
+            $line,
+            sprintf(
+                '%s and %s define the same constant (%s) in the composition of %s. '
+                .'However, the definition differs and is considered incompatible. Class was composed',
+                $first,
+                $second,
+                $constDisplay,
+                $classDisplay
+            )
+        );
+    }
+
+    private function operandLcName(Operand $op): ?string
+    {
+        $name = $this->staticNameFromOperand($op);
+        if (null === $name) {
+            return null;
+        }
+
+        return strtolower(ltrim($name, '\\'));
+    }
+
+    private function operandDisplayName(Operand $op, string $fallbackLc): string
+    {
+        $name = $this->staticNameFromOperand($op);
+        if (null === $name) {
+            return $fallbackLc;
+        }
+        $short = $name;
+        if (str_contains($name, '\\')) {
+            $parts = explode('\\', ltrim($name, '\\'));
+            $short = end($parts) ?: $name;
+        }
+
+        return $short;
+    }
+
+    private function staticNameFromOperand(Operand $op): ?string
+    {
+        if ($op instanceof Operand\Literal && is_string($op->value)) {
+            return $op->value;
+        }
+        if ($op instanceof Operand\Variable) {
+            return $this->staticNameFromOperand($op->name);
+        }
+
+        return null;
+    }
+}

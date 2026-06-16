@@ -1,14 +1,16 @@
 #!/usr/bin/env bash
 # North Star 5 presenter verify — M5 vendor prelink + self-host cold-boot ladder (#1492, #1416).
 #
-#   ./script/north-star5-verify.sh
-#   make north-star5-verify
+#   ./script/north-star5-verify.sh --fast     # default development / PR gate (~1–2 min)
+#   make north-star5-verify-fast
+#   make north-star5-verify ARGS=--strict     # pre-merge bootstrap only (~1h)
 #
-# Order: inventory → spine (bootstrap-spine-count SSOT) → vendor bundles → selfhost link → vendor objects (partial OK)
+# Order (full path): inventory → spine → vendor bundles → selfhost link → vendor objects (partial OK)
 #        → optional north-star4 dry-run when LLVM present.
 #
 # Default exits 0 when vendor prelink is partial (php-types object_ok; cfg/llvm blocked on parse).
-# Use --strict to require all three vendor packages object_ok.
+# Use --strict to require all three vendor packages object_ok (full spine relink + vendor AOT; ~1h).
+# Use --fast for PR feedback (~1–2 min): inventory + spine + committed prelink blobs + VM probe (no relink).
 set -euo pipefail
 
 # shellcheck source=ci-common.sh
@@ -18,18 +20,23 @@ ci_cd_repo
 
 REQUIRE_LLVM=0
 STRICT_M5=0
+FAST_M5=0
 RUN_NS4=0
 # -1 = auto (no Zend when prelinked gen-0 seed exists), 0 = allow Zend, 1 = forbid Zend
 NS5_NO_ZEND=-1
+if [[ "${NORTH_STAR5_VERIFY_FAST:-0}" == "1" ]]; then
+  FAST_M5=1
+fi
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --require-llvm) REQUIRE_LLVM=1; shift ;;
     --strict) STRICT_M5=1; shift ;;
+    --fast) FAST_M5=1; shift ;;
     --with-ns4) RUN_NS4=1; shift ;;
     --zend-gen0) NS5_NO_ZEND=0; shift ;;
     -h|--help)
       cat <<'EOF'
-Usage: script/north-star5-verify.sh [--require-llvm] [--strict] [--with-ns4]
+Usage: script/north-star5-verify.sh [--fast] [--require-llvm] [--strict] [--with-ns4]
 
 M5 ladder presenter (#1416, #1492):
 
@@ -41,14 +48,25 @@ M5 ladder presenter (#1416, #1492):
   5. php script/bootstrap-vendor-objects.php --compile (partial OK unless --strict)
   6. Optional: ./script/north-star4-verify.sh --dry-run-only (--with-ns4)
 
+Fast path (--fast, ~1–2 min; for PRs / daily iteration):
+  Steps 1–3 + prelinked gen-0/vendor blobs + VM driver execute probe + spine bundle OK run.
+  No spine relink, no vendor --compile. ci-local already runs most of this via individual gates.
+
+Full path (--strict, ~1h; before merging bootstrap/M5 work):
+  All steps above including native driver build, spine relink, vendor AOT, cold boot without vendor/.
+
 Options:
+  --fast           PR feedback loop — committed prelink blobs + probes only (no relink/AOT)
   --require-llvm   fail if LLVM 9 missing (default: skip LLVM steps, exit 0)
-  --strict         fail unless all vendor packages reach object_ok
+  --strict         full ladder + fail unless all vendor packages reach object_ok
   --with-ns4       also run north-star4-verify --dry-run-only when LLVM present
   --zend-gen0      allow Zend gen-0 bootstrap (default: no Zend when seed present)
 
+Env:
+  NORTH_STAR5_VERIFY_FAST=1   same as --fast
+
 Docker:
-  ./script/docker-exec.sh -- bash -lc './script/north-star5-verify.sh'
+  ./script/docker-exec.sh -- bash -lc './script/north-star5-verify.sh --fast'
 EOF
       exit 0
       ;;
@@ -104,6 +122,32 @@ ns5_prelinked_vendor_ready() {
 ns5_has_gen0_seed() {
   [[ -x "${_CI_REPO_ROOT}/prelinked/bootstrap-gen0/bin-compile-aot" ]] \
     && [[ -f "${_CI_REPO_ROOT}/prelinked/bootstrap-gen0/manifest.json" ]]
+}
+
+ns5_vendor_object_ok_count() {
+  local manifest="${_CI_REPO_ROOT}/prelinked/bootstrap-vendor/manifest.json"
+  if [[ ! -f "${manifest}" ]]; then
+    echo 0
+    return 0
+  fi
+  "${PHP_BIN}" -r '
+    $m = json_decode(file_get_contents($argv[1]), true);
+    $n = 0;
+    foreach (($m["packages"] ?? []) as $p) {
+      if (($p["status"] ?? "") === "object_ok") { ++$n; }
+    }
+    echo $n;
+  ' "${manifest}"
+}
+
+ns5_fast_ensure_spine_binary() {
+  local bin="${_CI_REPO_ROOT}/build/selfhost-lib-spine-smoke"
+  if [[ -x "${bin}" ]]; then
+    return 0
+  fi
+  # shellcheck source=bootstrap-gen0-install-prelinked-driver.sh
+  source "${_CI_SCRIPT_DIR}/bootstrap-gen0-install-prelinked-driver.sh"
+  ROOT="${_CI_REPO_ROOT}" bootstrap_copy_prelinked_compiler_lib_spine_blob "${bin}"
 }
 
 ns5_print_summary() {
@@ -166,6 +210,64 @@ if ! "${PHP_BIN}" "${PHP_OPTS[@]}" "${_CI_REPO_ROOT}/script/bootstrap-vendor-obj
   "${PHP_BIN}" "${PHP_OPTS[@]}" "${_CI_REPO_ROOT}/script/bootstrap-vendor-objects.php" --check
 fi
 echo "north-star5-verify: step 3 ok"
+
+if [[ "${FAST_M5}" -eq 1 ]]; then
+  echo
+  echo "=== north-star5-verify: fast path (no spine relink / vendor AOT) ==="
+  if ! ns5_has_gen0_seed; then
+    echo "north-star5-verify: step 4f FAILED (prelinked/bootstrap-gen0 seed missing)" >&2
+    ns5_hint 4 >&2
+    exit 1
+  fi
+  echo "north-star5-verify: step 4f ok (prelinked gen-0 seed present)"
+  if ! "${PHP_BIN}" "${PHP_OPTS[@]}" "${_CI_REPO_ROOT}/script/check-bootstrap-gen0-manifest-sync.php"; then
+    echo "north-star5-verify: step 4f-m FAILED (gen-0 manifest/driver mismatch — #8713)" >&2
+    exit 1
+  fi
+  echo "north-star5-verify: step 4f-m ok (gen-0 manifest matches committed driver)"
+
+  if ! ns5_prelinked_vendor_ready; then
+    echo "north-star5-verify: step 4f-v FAILED (prelinked/bootstrap-vendor/*.o missing)" >&2
+    ns5_hint 3 >&2
+    exit 1
+  fi
+  echo "north-star5-verify: step 4f-v ok (prelinked vendor .o present)"
+
+  VENDOR_OK="$(ns5_vendor_object_ok_count)"
+  if [[ "${STRICT_M5}" -eq 1 && "${VENDOR_OK}" -lt 3 ]]; then
+    echo "north-star5-verify: step 5f FAILED (--strict requires 3/3 object_ok in manifest; have ${VENDOR_OK}/3)" >&2
+    ns5_hint 5 >&2
+    exit 1
+  fi
+  echo "north-star5-verify: step 5f ok (vendor manifest ${VENDOR_OK}/3 object_ok, no --compile)"
+
+  if ci_llvm_ready; then
+    ci_apply_llvm_memory_env
+    ns5_run 4f2 "VM driver execute probe (fast)" make -C "${_CI_REPO_ROOT}" bootstrap-selfhost-vm-driver-execute-probe
+    echo
+    echo "=== north-star5-verify step 4f3: spine bundle OK (prelinked blob, no relink) ==="
+    if ! ns5_fast_ensure_spine_binary; then
+      echo "north-star5-verify: step 4f3 FAILED (no spine binary and prelinked blob missing)" >&2
+      ns5_hint 4 >&2
+      exit 1
+    fi
+    if ! "${_CI_REPO_ROOT}/build/selfhost-lib-spine-smoke" | grep -q 'compiler_lib_spine_smoke bundle OK'; then
+      echo "north-star5-verify: step 4f3 FAILED (spine bundle OK run)" >&2
+      exit 1
+    fi
+    echo "north-star5-verify: step 4f3 ok"
+  else
+    if [[ "${REQUIRE_LLVM}" -eq 1 ]]; then
+      echo "north-star5-verify: LLVM 9 required (--require-llvm) but not found" >&2
+      exit 1
+    fi
+    echo "north-star5-verify: steps 4f2–4f3 skipped (LLVM 9 not available)"
+  fi
+
+  ns5_print_summary "${VENDOR_OK}"
+  echo "north-star5-verify: OK (fast — use --strict before merging bootstrap/M5 work)"
+  exit 0
+fi
 
 if ! ci_llvm_ready; then
   if [[ "${REQUIRE_LLVM}" -eq 1 ]]; then

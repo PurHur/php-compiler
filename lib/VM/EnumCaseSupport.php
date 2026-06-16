@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace PHPCompiler\VM;
 
 use PHPCompiler\Frame;
+use PHPCompiler\RuntimeStrictness;
 
 /**
  * Backed enum case singleton objects (#3518, Zend zend_enum.c parity).
@@ -221,29 +222,27 @@ final class EnumCaseSupport
     }
 
     /**
-     * Zend {@see zend_compare_enum()} (#4554).
+     * Zend {@see zend_compare_enum()} (#4554, #8897).
      *
      * Identical case singleton: 0. Different cases (same enum): 1. Different enums: 1.
+     * Relational <=> is not backed-scalar order — use {@see compareEnumCasesForSort()} only for sort().
      */
     public static function compareSpaceship(ObjectEntry $left, ObjectEntry $right): int
     {
         if (!$left->isEnumCase || !$right->isEnumCase) {
             throw new \LogicException('compareSpaceship requires enum case objects');
         }
-        if ($left === $right) {
-            return 0;
-        }
         if ($left->class !== $right->class) {
             return 1;
         }
-        if (0 === strcasecmp($left->enumCaseName ?? '', $right->enumCaseName ?? '')) {
+        if (($left->enumCaseName ?? '') === ($right->enumCaseName ?? '')) {
             return 0;
         }
 
         return 1;
     }
 
-    /** @see EnumCaseEntry spaceship for TYPE_ENUM_CASE operands (#4554). */
+    /** @see EnumCaseEntry spaceship for TYPE_ENUM_CASE operands (#4554, #8897). */
     public static function compareEnumCaseEntrySpaceship(EnumCaseEntry $left, EnumCaseEntry $right): int
     {
         if ($left->enumClass !== $right->enumClass) {
@@ -796,6 +795,34 @@ final class EnumCaseSupport
         }
 
         return null;
+    }
+
+    /**
+     * pack() numeric operand — TypeError under php-src-strict (#8816, #6267); else E_WARNING + backing scalar (#5713).
+     *
+     * @throws \TypeError when $value is an enum case and php-src-strict is active
+     */
+    public static function packRejectNumericOperand(
+        Variable $value,
+        int $valueArgIndexZeroBased,
+        string $expectedType
+    ): void {
+        if (!RuntimeStrictness::isPhpSrcStrict()) {
+            return;
+        }
+        $entry = self::enumCaseEntryForVariable($value);
+        if (null === $entry) {
+            return;
+        }
+        $argNum = $valueArgIndexZeroBased + 2;
+        $given = $entry->enumClass->name;
+
+        throw new \TypeError(sprintf(
+            'pack(): Argument #%d ($values) must be of type %s, %s given',
+            $argNum,
+            $expectedType,
+            $given
+        ));
     }
 
     /**

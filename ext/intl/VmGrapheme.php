@@ -287,7 +287,7 @@ final class VmGrapheme
                 if (!self::graphemesEqualInsensitive($hay[$index + $j], $need[$j])) {
                     return false;
                 }
-            } elseif ($hay[$index + $j] !== $need[$j]) {
+            } elseif (!self::graphemesEqual($hay[$index + $j], $need[$j])) {
                 return false;
             }
         }

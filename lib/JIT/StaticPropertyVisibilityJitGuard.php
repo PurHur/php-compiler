@@ -28,7 +28,8 @@ final class StaticPropertyVisibilityJitGuard
         if (null === $meta) {
             return;
         }
-        $readVis = PropertyVisibility::effectiveGetVisibility($meta['visibility'], 0);
+        $getVisibility = $meta['getVisibility'] ?? 0;
+        $readVis = PropertyVisibility::effectiveGetVisibility($meta['visibility'], $getVisibility);
         if (MethodVisibility::isPublic($readVis)) {
             return;
         }
@@ -46,7 +47,7 @@ final class StaticPropertyVisibilityJitGuard
                 $propName,
                 $callerLc ?? $declaringLc,
                 static fn (string $child, string $parent): bool => self::isSubclassOf($objectType, $child, $parent),
-                0
+                $getVisibility
             );
         } catch (\LogicException $e) {
             self::emitViolation($context, $jit, $e->getMessage());

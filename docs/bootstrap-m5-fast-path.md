@@ -1,5 +1,7 @@
 # M5 fast path — incremental native emit (M3 compile driver)
 
+**Primary development gate (Jun 2026):** use **`make north-star5-verify-fast`** (~1–2 min) and **`make bootstrap-selfhost-vm-driver-execute-probe`** (~20ms) for daily M5/LLVM iteration. Reserve **`north-star5-verify --strict`** (~1h) for pre-merge bootstrap PRs only. Cursor rule: `.cursor/rules/m5-fast-development.mdc`.
+
 **Project north star (full ladder):** [self-host-target.md](self-host-target.md)
 
 Issue [#1056](https://github.com/PurHur/php-compiler/issues/1056); link segfault fix [#1402](https://github.com/PurHur/php-compiler/issues/1402).
@@ -33,6 +35,7 @@ Supporting fixes from #1402:
 | `php_compiler_cli_dispatch` / `php_compiler_cli_should_run_entry_driver` | On M3 allowlist; CLI driver dispatch without Zend |
 | `Runtime::parseAndCompile` / `parseAndCompileEmitSmoke` | On M3 allowlist when `PHP_COMPILER_M3_COMPILE_DRIVER=1` |
 | `Runtime::parse` / `Runtime::compile` / `compileEmitSmoke` | On M3 allowlist; compile-driver link OK (#1496) |
+| `Runtime::parse` / `prepareSourceForParser` stub | **Retired** on executable argv drivers when `PHP_COMPILER_EMIT_HELPER_LINK=1` + inventory/M4 argv gates — `shouldStubInventoryEmitParseCompileSpine()` false (#8706); mirrors `standalone` prelower gate |
 | `Runtime::loadJitContext` | PHP CFG via `compileRuntimeLoadJitContextM3Native` (separate FUNCDEF from `loadJit` — #2846) |
 | `Runtime::__construct` | Slim ctor via `compileRuntimeConstructM3Native` → `compileBlockPhpLowering` (#1494) |
 | `Runtime::__destruct` | Void no-op via `compileRuntimeDestructM3Native` (#2867) |
@@ -150,10 +153,40 @@ Rebuild of vendor `.o` uses literal `vendor/{package}` sources (bundle `require_
 
 **Fresh-clone prerequisite:** `script/apply-patches.sh` must apply cleanly. The `php-types-magic-script-const` and `php-types-first-class-callable` overlay anchors include the `case 'Expr_YieldFrom':` line inserted by `php-types-yield-from.patch`; the overlays run after yield-from, so their anchors must match the post-yield-from `TypeReconstructor.php` (otherwise `set -e` aborts the whole patch run on a fresh `composer install`).
 
-Presenter: `make north-star5-verify` / `./script/north-star5-verify.sh` ([#1416](https://github.com/PurHur/php-compiler/issues/1416)).
+Presenter: **`make north-star5-verify-fast`** (default) / `./script/north-star5-verify.sh --fast` ([#1492](https://github.com/PurHur/php-compiler/issues/1492)). Full ladder: `make north-star5-verify ARGS=--strict` ([#1416](https://github.com/PurHur/php-compiler/issues/1416)).
+
+**Vendor-absent wave-check in full CI:** `./script/ci-local.sh` ends the LLVM phase with `./script/bootstrap-wave-check.sh --vendor-absent --fail-fast` (default-on `BOOTSTRAP_WAVE_CHECK_VENDOR_ABSENT_GATE=1`, issue [#8712](https://github.com/PurHur/php-compiler/issues/8712)). Same lib-spine cold-boot slice as north-star5 step 4c; set `BOOTSTRAP_WAVE_CHECK_VENDOR_ABSENT=0` to skip on dev machines without committed prelinked `.o`.
 
 `lib/AOT/Linker.php::prelinkedVendorObjectPaths()` reads `object_ok` entries from the manifest. CI: `BOOTSTRAP_VENDOR_PRELINK_SYNC_GATE=1` (bundles); `BOOTSTRAP_VENDOR_PRELINK_GATE=1` for compile probe in wave-check (opt-in).
 
 **Stub policy:** shrink `PHP_COMPILER_SELFHOST_AOT` stubs on the **compile spine first** (`parseAndCompile` → `standalone` → `Compiler::compile`), not whole-tree at once.
 
 **Related:** [self-host-target.md](self-host-target.md) · [bootstrap-selfhost.md](bootstrap-selfhost.md) · [#1056](https://github.com/PurHur/php-compiler/issues/1056) · vendor prelink [#1416](https://github.com/PurHur/php-compiler/issues/1416)
+
+---
+
+## Fast feedback loops (M5 green, Jun 2026)
+
+Use these during LLVM/JIT iteration — avoid full spine relink unless you changed `compiler_lib_spine_smoke/main.php` or need freshness.
+
+| Command | Typical time | Notes |
+|---------|--------------|-------|
+| `make bootstrap-selfhost-vm-driver-execute-probe` | **~20ms** | Native env gate only; seeds from `prelinked/bootstrap-gen0` if binary missing |
+| `make north-star5-verify-fast` | **~1–2 min** | PR M5 presenter — inventory + spine + prelinked blobs + VM probe (no relink) |
+| `make north-star5-verify --strict` | **~1h** | Full M5 ladder before merging bootstrap/M5 work (not every PR) |
+| `make bootstrap-selfhost-lib-spine-smoke` | minutes | Full spine link — run after spine entry edits or before refreshing gen-0 blobs |
+| `make bootstrap-gen0-refresh-sidecar` | minutes | Full spine link + copy `build/.m3_*` → `prelinked/bootstrap-gen0/` + manifest refresh ([#8704](https://github.com/PurHur/php-compiler/issues/8704)) |
+| `php script/bootstrap-inventory.php --check` | seconds | Inventory SSOT without LLVM |
+| `php script/check-selfhost-spine-coverage-sync.php` | seconds | Spine ↔ inventory coverage (**2643/2643**) |
+| `php script/check-selfhost-spine-sidecar-sync.php` | seconds | Prelinked gen-0 stamp ↔ spine entry SHA-1 ([#8703](https://github.com/PurHur/php-compiler/issues/8703)) |
+
+**Env flags**
+
+| Flag | When |
+|------|------|
+| `BOOTSTRAP_VM_DRIVER_EXECUTE_PROBE_FULL_LINK=1` | VM probe must rebuild spine (post-entry edit, refresh gen-0) |
+| `BOOTSTRAP_FORCE_COMPILER_LIB_SIDECAR_REGEN=1` | Regenerate `build/.m3_compiler_lib_aot_blob` via Zend (slow) |
+| `BOOTSTRAP_ALLOW_STALE_SIDECAR=1` | Waive `check-selfhost-spine-sidecar-sync.php` during intentional gen-0 blob batch PRs only ([#8703](https://github.com/PurHur/php-compiler/issues/8703)) |
+| `BOOTSTRAP_M5_NO_ZEND=1` | Cold boot from prelinked gen-0 only ([#3053](https://github.com/PurHur/php-compiler/issues/3053)) |
+| `PHP_COMPILER_EMIT_HELPER_LINK=1` + `PHP_COMPILER_M3_INVENTORY_EMIT_DRIVER=1` | Inventory argv emit-helper link; parse/CFG spine **real-lowers** (not stubbed) when `PHP_COMPILER_SELFHOST_AOT=1` or vendor-prelink executable emit ([#8706](https://github.com/PurHur/php-compiler/issues/8706)) |
+| `PHP_COMPILER_M4_BIN_COMPILE_DRIVER=1` | M4 `bin/compile.php` argv driver; parse spine real-lowers with emit-helper link ([#8706](https://github.com/PurHur/php-compiler/issues/8706)) |

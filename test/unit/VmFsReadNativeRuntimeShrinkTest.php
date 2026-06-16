@@ -78,6 +78,21 @@ final class VmFsReadNativeRuntimeShrinkTest extends TestCase
         @unlink($path);
     }
 
+    public function testReadProcUptimeStreamsWithoutLseek(): void
+    {
+        if (!VmFsReadNative::available()) {
+            $this->markTestSkipped('ext/ffi required for VmFsReadNative libc read');
+        }
+        if ('Linux' !== \PHP_OS_FAMILY || !\is_readable('/proc/uptime')) {
+            $this->markTestSkipped('/proc/uptime unavailable');
+        }
+
+        $raw = VmFsReadNative::read('/proc/uptime');
+        $this->assertIsString($raw);
+        $this->assertNotSame('', $raw);
+        $this->assertMatchesRegularExpression('/^\d+\.\d+ /', $raw);
+    }
+
     /** @return list<string> */
     private function vmNativeReadSites(): array
     {

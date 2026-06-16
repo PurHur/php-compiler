@@ -7,11 +7,11 @@ namespace PHPCompiler\JIT;
 use PHPLLVM\Value;
 
 /**
- * Native vm_run_smoke for M2 lib spine VM -r gate (#1846).
+ * Native vm_run_smoke for M2 lib spine VM -r gate (#1846, #8719).
  *
  * Full Runtime::parseAndCompile + VM::run in the spine AOT binary still segfaults under
- * PHP_COMPILER_SELFHOST_AOT stubs (#1960). This LLVM entry echoes the probe line for the
- * bundled vm_run_smoke() symbol; spine main.php may call echo directly until VM init is green.
+ * PHP_COMPILER_SELFHOST_AOT stubs (#1960). This LLVM entry echoes the -r fixture line for the
+ * bundled vm_run_smoke() symbol until honest VM init is green.
  */
 final class VmSpineSmokeNative
 {
@@ -48,7 +48,7 @@ final class VmSpineSmokeNative
         $saved = $context->builder;
         $context->builder = $context->context->builderCreate();
         $context->builder->positionAtEnd($bb);
-        ValueEchoHelper::echoLiteral($context, "vm-spine-ok\n");
+        ValueEchoHelper::echoLiteral($context, "1\n");
         $context->builder->returnValue(
             $context->builder->load($context->constantStringFromString('vm_run_smoke OK'))
         );

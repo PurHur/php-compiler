@@ -46,10 +46,9 @@ final class BootstrapSelfhostLinkTest extends TestCase
         $this->assertStringContainsString('bootstrap_ensure_prelinked_sidecar_path_symlink', $install);
         $this->assertStringContainsString('.m3_compiler_lib_aot_blob', $install);
         $this->assertStringContainsString('bootstrap_compiler_lib_spine_entry_sha', $install);
-        $this->assertStringContainsString('bootstrap_compiler_lib_honest_zend_compile', $install);
-        $this->assertStringContainsString('full-spine sidecar host-compile OOMs below 8GB (#8559)', $install);
-        $this->assertStringContainsString('local mem_limit="8192M"', $install);
-        $this->assertStringNotContainsString('PHP_COMPILER_M3_SIDECAR_HOST=1 \\', $install);
+        $this->assertStringContainsString('bootstrap_prelinked_gen0_compiler_lib_stamp_stale', $install);
+        $this->assertStringContainsString('bootstrap_gen3_emit_matches_stale_prelinked_gen0', $install);
+        $this->assertStringContainsString('PHP_COMPILER_M3_SIDECAR_HOST=1', $install);
         $this->assertStringNotContainsString('PHP_COMPILER_CLI_SPINE_BUNDLE=1', $install);
         $this->assertFileExists(self::$root.'/prelinked/bootstrap-gen0/bin-compile-aot');
         $this->assertFileExists(self::$root.'/prelinked/bootstrap-gen0/compiler_minimal_aot_blob');
@@ -113,10 +112,15 @@ final class BootstrapSelfhostLinkTest extends TestCase
         $this->assertStringContainsString('falling back to Zend gen-0', $body);
         $this->assertStringContainsString('BOOTSTRAP_M5_NO_ZEND', $body);
         $this->assertStringContainsString(
-            'BOOTSTRAP_M5_NO_ZEND=1 — prelinked inventory driver failed smoke',
+            'BOOTSTRAP_NO_ZEND_FALLBACK=1 — prelinked inventory driver failed smoke',
             $body,
-            'inventory argv driver refuses Zend rebuild under M5 no-Zend (#3053)'
+            'inventory argv driver refuses Zend rebuild when no-Zend fallback (#8716, #3053)'
         );
+
+        $spineLink = (string) file_get_contents(self::$root.'/script/bootstrap-selfhost-lib-spine-smoke-link.sh');
+        $this->assertStringContainsString('export BOOTSTRAP_NO_ZEND_FALLBACK=1', $spineLink);
+        $this->assertStringContainsString('inventory argv driver unavailable (no Zend — #8716)', $spineLink);
+        $this->assertStringContainsString('BOOTSTRAP_NO_ZEND_FALLBACK:-0}" != "1"', $spineLink);
 
         $coldBoot = self::$root.'/script/bootstrap-selfhost-cold-boot-probe.sh';
         $this->assertFileExists($coldBoot);

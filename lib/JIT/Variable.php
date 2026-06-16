@@ -129,6 +129,9 @@ final class Variable {
     /** i1 init flag for typed static properties without compile-time default (#5047). */
     public ?\PHPLLVM\Value $staticPropertyInitGlobal = null;
 
+    /** DNF declared-type arms for static property writes (#8726). */
+    public ?array $staticPropertyDnfArms = null;
+
     /** Declaring class lc for static property set-hook dispatch (#4807). */
     public ?string $staticPropertyHookClassLc = null;
 

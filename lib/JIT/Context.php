@@ -10,6 +10,7 @@
 namespace PHPCompiler\JIT;
 
 use PHPCfg\Operand;
+use PHPCompiler\AOT\Linker;
 use PHPCompiler\Runtime;
 use PHPCompiler\Block;
 use PHPCompiler\Module;
@@ -18,7 +19,6 @@ use PHPCompiler\VM\Variable as VMVariable;
 use PHPTypes\Type;
 
 use PHPLLVM;
-use PHPCompiler\AOT\Linker;
 use PHPCompiler\Func\Internal as FuncInternal;
 use PHPCompiler\JIT\SuperglobalInit;
 use PHPCompiler\Web\Superglobals;
@@ -308,6 +308,13 @@ class Context {
         if ('' !== $normalized) {
             $this->jitIncludedFiles[] = $normalized;
         }
+    }
+
+    public function isCompilerLibSpineSmokeEntry(): bool
+    {
+        $entry = str_replace('\\', '/', $this->jitAotEntryScriptPath);
+
+        return str_ends_with($entry, '/test/selfhost/compiler_lib_spine_smoke/main.php');
     }
 
     public function hasJitIncludedFileCompiled(string $path): bool
@@ -864,17 +871,14 @@ class Context {
         $machine->emitToFile($this->module, $objectFile, $machine::CODEGEN_FILE_TYPE_OBJECT);
         Progress::noteFunction('jit_context_emit_object_done');
         if ($keepingObjectOnly) {
+            Linker::assertNonEmptyOutputFile($objectFile);
+
             return;
         }
         Progress::noteFunction('jit_context_link_begin');
         Linker::link($objectFile, $file);
         Progress::noteFunction('jit_context_link_done');
-        if (!is_file($file)) {
-            throw new \LogicException(sprintf(
-                'Link succeeded but output file is missing: %s',
-                $file
-            ));
-        }
+        Linker::assertNonEmptyOutputFile($file);
         unlink($objectFile);
     }
 

@@ -30,6 +30,7 @@ final class MatchVMTest extends BaseTest
                 'match_enum_case.phpt',
                 'match_enum_case_scalar.phpt',
                 'match_switch_enum_unqualified.phpt',
+                'switch_match_enum_typed_subject.phpt',
                 'match_duplicate_default.phpt',
                 'match_default_not_last.phpt',
             ] as $file

@@ -111,6 +111,7 @@ if [[ ${#SYNC_BACK_PATHS[@]} -eq 0 ]]; then
     *north-star5-verify*|*north-star3-verify*|\
     *bootstrap-vendor-objects.php*|*bootstrap-vendor-prelink-*|\
     *bootstrap-selfhost-link*|*bootstrap-selfhost-driver-smoke*|\
+    *bootstrap-selfhost-helloworld-compile-bin*|\
     *bootstrap-selfhost-lib-spine-smoke*|*bootstrap-selfhost-full-revision-probe*|\
     *bootstrap-loop-*)
       _docker_exec_m5_sync_back_paths

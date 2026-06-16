@@ -28,7 +28,7 @@ final class BootstrapLibSpineVmSmokeTest extends TestCase
         $script = (string) file_get_contents(self::$root.'/script/bootstrap-selfhost-lib-spine-vm-smoke.sh');
         $this->assertStringContainsString('PHP_COMPILER_VM_SPINE_SMOKE=1', $script);
         $this->assertStringContainsString('selfhost-lib-spine-smoke', $script);
-        $this->assertStringContainsString('vm-spine-ok', $script);
+        $this->assertStringContainsString("grep -Fxq '1'", $script);
         $this->assertStringContainsString('bootstrap-selfhost-lib-spine-smoke-link.sh', $script);
     }
 
@@ -55,15 +55,16 @@ final class BootstrapLibSpineVmSmokeTest extends TestCase
         $this->assertStringContainsString('!$skipBundle', $compile);
     }
 
-    public function testLibSpineLinkScriptSeedsSidecarsAndGen0Fallback(): void
+    public function testLibSpineLinkScriptSeedsSidecarsAndRefusesZendFallback(): void
     {
         $script = (string) file_get_contents(self::$root.'/script/bootstrap-selfhost-lib-spine-smoke-link.sh');
         $this->assertStringContainsString('bootstrap-gen0-install-prelinked-driver.sh', $script);
         $this->assertStringContainsString('ci_ensure_vendor_patches', $script);
         $this->assertStringContainsString('bootstrap_ensure_m3_compiler_lib_sidecar', $script);
-        $this->assertStringContainsString('bootstrap_compiler_lib_honest_zend_compile', $script);
+        $this->assertStringContainsString('export BOOTSTRAP_NO_ZEND_FALLBACK=1', $script);
+        $this->assertStringContainsString('inventory argv driver unavailable (no Zend — #8716)', $script);
         $this->assertStringContainsString('BOOTSTRAP_LIB_SPINE_SMOKE_GEN0_FALLBACK', $script);
-        $this->assertStringContainsString('gen-0 Zend honest emit fallback', $script);
+        $this->assertStringContainsString('BOOTSTRAP_NO_ZEND_FALLBACK:-0}" != "1"', $script);
     }
 
     public function testSpineEntryBundlesBinVmPhp(): void
@@ -72,8 +73,39 @@ final class BootstrapLibSpineVmSmokeTest extends TestCase
         $this->assertStringContainsString('bin/vm.php', $entry);
         $this->assertStringContainsString('PHP_COMPILER_LIB_SPINE_SMOKE', $entry);
         $this->assertStringContainsString('PHP_COMPILER_VM_SPINE_SMOKE', $entry);
-        $this->assertStringContainsString('vm-spine-ok', $entry);
+        $this->assertStringContainsString("run('Standard input code', '<?php echo \"1\\n\";', [])", $entry);
+        $this->assertStringNotContainsString('vm-spine-ok', $entry);
         $this->assertStringContainsString('bootstrap-selfhost-lib-spine-vm-smoke', $entry);
+    }
+
+    public function testSpineEntryExercisesMbMimeheaderPaths(): void
+    {
+        $entry = (string) file_get_contents(self::$root.'/test/selfhost/compiler_lib_spine_smoke/main.php');
+        $this->assertStringContainsString('#8697', $entry);
+        $this->assertStringContainsString('VmMbstring::encodeMimeheader', $entry);
+        $this->assertStringContainsString('VmMbstring::decodeMimeheader', $entry);
+        $this->assertStringContainsString('JitMbMimeheader.php', $entry);
+        $this->assertStringContainsString('mb_encode_mimeheader.php', $entry);
+        $this->assertStringContainsString('mb_decode_mimeheader.php', $entry);
+    }
+
+    public function testSpineEntryExercisesSetcookieOptionsParseArgs(): void
+    {
+        $entry = (string) file_get_contents(self::$root.'/test/selfhost/compiler_lib_spine_smoke/main.php');
+        $this->assertStringContainsString('#8698', $entry);
+        $this->assertStringContainsString('SetcookieOptions::spineSmokeParse', $entry);
+        $this->assertStringContainsString('JitSetcookieOptions.php', $entry);
+        $this->assertStringContainsString('SetcookieOptions.php', $entry);
+        $options = (string) file_get_contents(self::$root.'/ext/standard/SetcookieOptions.php');
+        $this->assertStringContainsString('spineSmokeParse', $options);
+        $this->assertStringContainsString("self::parseArgs('setcookie'", $options);
+    }
+
+    public function testVmDriverExecuteNativeDoesNotStubVmSpineSmokeAtMainEntry(): void
+    {
+        $native = (string) file_get_contents(self::$root.'/lib/JIT/VmDriverExecuteNative.php');
+        $this->assertStringNotContainsString('vm-spine-ok', $native);
+        $this->assertStringContainsString('emitRunProbeEcho', $native);
     }
 
     public function testMakefileDefinesVmSpineSmokeTarget(): void
@@ -86,6 +118,16 @@ final class BootstrapLibSpineVmSmokeTest extends TestCase
     {
         $driver = (string) file_get_contents(self::$root.'/src/cli_driver.php');
         $this->assertStringContainsString('PHP_COMPILER_VM_SPINE_SMOKE', $driver);
+    }
+
+    public function testSpineSmokeRoutesThroughMainNotNativeEchoStub(): void
+    {
+        $native = (string) file_get_contents(self::$root.'/lib/JIT/VmDriverExecuteNative.php');
+        $this->assertStringContainsString('#8719', $native);
+        $this->assertStringContainsString('honest -r via main() → run()', $native);
+        $entry = (string) file_get_contents(self::$root.'/test/selfhost/compiler_lib_spine_smoke/main.php');
+        $this->assertStringContainsString("run('Standard input code', '<?php echo \"1\\n\";', [])", $entry);
+        $this->assertStringNotContainsString("echo \"vm-spine-ok\\n\";", $entry);
     }
 
     public function testWaveCheckDocumentsVmSpineSmokeFlag(): void

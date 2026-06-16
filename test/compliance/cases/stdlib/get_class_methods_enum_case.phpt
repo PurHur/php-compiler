@@ -12,8 +12,6 @@ enum Status {
 }
 $backed = get_class_methods(Color::Red);
 $unit = get_class_methods(Status::Active);
-sort($backed);
-sort($unit);
 echo count($backed), "\n";
 echo in_array('cases', $backed, true) ? '1' : '0';
 echo in_array('from', $backed, true) ? '1' : '0';

@@ -54,6 +54,8 @@ final class AotRuntimeInventoryTest extends TestCase
         $this->assertStringContainsString('runtimeCHostLibcIncludeFlags()', $linker);
         $this->assertStringContainsString('$hostFlags = self::runtimeCHostLibcIncludeFlags()', $linker);
         $this->assertStringContainsString("return \$flags.\$hostFlags", $linker);
+        $this->assertStringContainsString('runtimeCSysrootGccIncludeFlags(', $linker);
+        $this->assertStringContainsString("'/usr/lib/gcc/*/*/include'", $linker);
     }
 
     public function testNoJitBuiltinCRuntimeSources(): void

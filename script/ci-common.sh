@@ -296,6 +296,14 @@ ci_run_selfhost_spine_deferred_sync_check() {
   "$PHP_BIN" "${PHP_OPTS[@]}" script/check-selfhost-spine-deferred-sync.php
 }
 
+ci_run_selfhost_spine_sidecar_sync_check() {
+  if [[ "${SELFHOST_SPINE_SIDECAR_SYNC_GATE:-0}" != "1" ]]; then
+    return 0
+  fi
+  echo "Self-host spine sidecar sync (SELFHOST_SPINE_SIDECAR_SYNC_GATE=1, issue #8703)..."
+  "$PHP_BIN" "${PHP_OPTS[@]}" script/check-selfhost-spine-sidecar-sync.php
+}
+
 ci_run_bootstrap_spine_phpcfg_parse_check() {
   if [[ "${BOOTSTRAP_SPINE_PHPCFG_PARSE_GATE:-1}" != "1" ]]; then
     return 0
@@ -310,6 +318,14 @@ ci_run_m3_allowlist_sync_check() {
   fi
   echo "M3 allowlist snapshot sync (M3_ALLOWLIST_SYNC_GATE=1, issue #1905)..."
   "$PHP_BIN" "${PHP_OPTS[@]}" script/check-m3-allowlist-snapshot.php
+}
+
+ci_run_selfhost_aot_stub_audit_check() {
+  if [[ "${SELFHOST_AOT_STUB_AUDIT_GATE:-0}" != "1" ]]; then
+    return 0
+  fi
+  echo "Self-host AOT stub audit (SELFHOST_AOT_STUB_AUDIT_GATE=1, issue #8720)..."
+  "$PHP_BIN" "${PHP_OPTS[@]}" script/check-selfhost-aot-stub-audit.php
 }
 
 ci_run_bootstrap_m5_doc_sync_check() {
@@ -391,6 +407,14 @@ ci_run_bootstrap_vendor_prelink_sync_check() {
   fi
   echo "Bootstrap vendor prelink bundle sync (BOOTSTRAP_VENDOR_PRELINK_SYNC_GATE=1, issue #1416)..."
   "$PHP_BIN" "${PHP_OPTS[@]}" script/bootstrap-vendor-objects.php --check
+}
+
+ci_run_bootstrap_gen0_manifest_sync_check() {
+  if [[ "${BOOTSTRAP_GEN0_MANIFEST_SYNC_GATE:-0}" != "1" ]]; then
+    return 0
+  fi
+  echo "Bootstrap gen-0 manifest sync (BOOTSTRAP_GEN0_MANIFEST_SYNC_GATE=1, issue #8713)..."
+  "$PHP_BIN" "${PHP_OPTS[@]}" script/check-bootstrap-gen0-manifest-sync.php
 }
 
 ci_run_init_miniwebapp_parity_check() {
@@ -516,13 +540,16 @@ ci_run_inventory_checks() {
   ci_run_selfhost_spine_count_sync_check
   ci_run_selfhost_spine_coverage_sync_check
   ci_run_selfhost_spine_deferred_sync_check
+  ci_run_selfhost_spine_sidecar_sync_check
   ci_run_bootstrap_spine_phpcfg_parse_check
   ci_run_m3_allowlist_sync_check
+  ci_run_selfhost_aot_stub_audit_check
   ci_run_bootstrap_m5_doc_sync_check
   ci_run_selfhost_m4_gen2_sync_check
   ci_run_bootstrap_m3_strict_sync_check
   ci_run_bootstrap_vendor_inventory_sync_check
   ci_run_bootstrap_vendor_prelink_sync_check
+  ci_run_bootstrap_gen0_manifest_sync_check
   ci_run_bootstrap_inventory_lint_sync_check
   ci_run_bootstrap_inventory_triage_sync_check
   ci_run_stdlib_jit_deferred_sync_check
@@ -809,6 +836,22 @@ ci_run_north_star3_verify() {
   make -C "$_CI_REPO_ROOT" north-star3-verify
 }
 
+# M5 fast presenter in ci-fast (issue #1492); default on — opt-out with NORTH_STAR5_VERIFY_FAST_GATE=0.
+# PRs already get inventory + spine + VM driver probes via individual gates; this is the consolidated M5 presenter.
+ci_run_north_star5_verify_fast() {
+  if [[ "${NORTH_STAR5_VERIFY_FAST_GATE:-1}" != "1" ]]; then
+    echo "north-star5-verify: skipped (NORTH_STAR5_VERIFY_FAST_GATE=0 opt-out; issue #1492)"
+    return 0
+  fi
+  local ns5_script="$_CI_SCRIPT_DIR/north-star5-verify.sh"
+  if [[ ! -x "$ns5_script" ]]; then
+    echo "north-star5-verify: skipped (script missing — run from repo root)"
+    return 0
+  fi
+  echo "north-star5-verify --fast (NORTH_STAR5_VERIFY_FAST_GATE=1, issue #1492)..."
+  "$ns5_script" --fast
+}
+
 # M4 strict-loop presenter in ci-local LLVM tail (issue #2429, #2379); default off — opt-in with NORTH_STAR4_VERIFY_GATE=1.
 ci_run_north_star4_verify() {
   if [[ "${NORTH_STAR4_VERIFY_GATE:-0}" != "1" ]]; then
@@ -855,6 +898,42 @@ ci_run_bootstrap_wave_check() {
   fi
   echo "bootstrap-wave-check (BOOTSTRAP_WAVE_CHECK=1)..."
   "$_CI_SCRIPT_DIR/bootstrap-wave-check.sh" --fail-fast
+}
+
+ci_prelinked_vendor_ready() {
+  local manifest="${_CI_REPO_ROOT}/prelinked/bootstrap-vendor/manifest.json"
+  local slug o ok=0
+  [[ -f "${manifest}" ]] || return 1
+  for slug in ircmaxell-php-cfg ircmaxell-php-types ircmaxell-php-llvm; do
+    o="${_CI_REPO_ROOT}/prelinked/bootstrap-vendor/${slug}.o"
+    [[ -f "${o}" ]] && ok=$((ok + 1))
+  done
+  [[ "${ok}" -eq 3 ]]
+}
+
+# M5 cold-boot: lib spine smoke with vendor/ renamed away (issue #8712, #3052).
+ci_run_bootstrap_wave_check_vendor_absent() {
+  if [[ "${BOOTSTRAP_WAVE_CHECK_VENDOR_ABSENT_GATE:-1}" != "1" ]]; then
+    return 0
+  fi
+  if [[ "${BOOTSTRAP_WAVE_CHECK_VENDOR_ABSENT:-1}" == "0" ]]; then
+    echo "bootstrap-wave-check-vendor-absent: skipped (BOOTSTRAP_WAVE_CHECK_VENDOR_ABSENT=0)"
+    return 0
+  fi
+  if ! ci_llvm_ready; then
+    echo "bootstrap-wave-check-vendor-absent: skipped (LLVM 9 not available)"
+    return 0
+  fi
+  echo "bootstrap-wave-check-vendor-absent (BOOTSTRAP_WAVE_CHECK_VENDOR_ABSENT_GATE=1, issue #8712)..."
+  set +e
+  "$_CI_SCRIPT_DIR/bootstrap-wave-check.sh" --vendor-absent --fail-fast
+  local code=$?
+  set -e
+  if [[ "${code}" -eq 2 ]]; then
+    echo "bootstrap-wave-check-vendor-absent: skipped (LLVM or prelinked vendor prerequisite — exit 2)"
+    return 0
+  fi
+  return "${code}"
 }
 
 # M3 compile-smoke partial probe (issue #1937): bundle link + Zend emit + native run; strict gate separate.

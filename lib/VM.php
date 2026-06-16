@@ -584,28 +584,14 @@ class VM {
 
     /**
      * isset($obj->prop) — Zend zend_std_has_property / __isset parity (#3298, #4586).
+     * Hooked properties probe backing/uninit without get hook (#8917, zend_property_hooks.c).
      */
     public function objectPropertyIsSet(ObjectEntry $object, string $propName, ?Frame $frame = null): bool
     {
         if (null !== $frame) {
-            $meta = $this->classPropertyMeta($object, $propName);
-            $getLc = $meta?->getHookMethodLc
-                ?? strtolower(SourcePreprocessor\PropertyHooks::getHookMethodName($propName));
-            if (isset($object->class->methods[$getLc])) {
-                // unset() clears backing storage; isset must not invoke get on uninitialized slot (#5191).
-                if (null !== $meta && null !== $meta->setHookMethodLc) {
-                    $props = $object->getRawProperties();
-                    if (isset($props[$propName])
-                        && VM\TypedPropertyCheck::isUninitialized($props[$propName])) {
-                        return false;
-                    }
-                }
-                $hookValue = $this->fetchPropertyWithHooks($object, $propName, $frame);
-                if (null !== $hookValue) {
-                    $value = $hookValue->resolveIndirect();
-
-                    return !$value->isUndefined() && Variable::TYPE_NULL !== $value->type;
-                }
+            $hookedIsset = $this->issetHookedPropertyWithoutGetHook($object, $propName);
+            if (null !== $hookedIsset) {
+                return $hookedIsset;
             }
         }
         $props = $object->getRawProperties();
@@ -629,40 +615,52 @@ class VM {
     }
 
     /**
-     * ??= on property hooks — Zend checks backing null/uninit, not get-hook return (#6472).
+     * ?? / ??= on property hooks — Zend checks backing null/uninit, not get-hook return (#6472, #8902).
      */
     public function objectPropertyIsSetForCoalesceAssign(ObjectEntry $object, string $propName, ?Frame $frame = null): bool
     {
-        $lcClass = strtolower($object->class->name);
-        $propMeta = $this->context->propertyHookRegistry[$lcClass][$propName]
-            ?? $this->context->propertyHookRegistry[$lcClass][strtolower($propName)]
-            ?? null;
-        if (is_array($propMeta)) {
-            $backingName = $propMeta['setBacking'] ?? $propMeta['getBacking'] ?? null;
-            if (null !== $backingName && $object->hasProperty($backingName)) {
-                $value = $object->getProperty($backingName)->resolveIndirect();
-                if ($value->isUndefined()) {
-                    return false;
-                }
-
-                return Variable::TYPE_NULL !== $value->type;
-            }
+        $hookedIsset = $this->issetHookedPropertyWithoutGetHook($object, $propName);
+        if (null !== $hookedIsset) {
+            return $hookedIsset;
         }
-        $meta = $this->classPropertyMeta($object, $propName);
-        if (null !== $meta && (null !== $meta->getHookMethodLc || null !== $meta->setHookMethodLc)) {
-            if ($object->hasProperty($propName)) {
-                $value = $object->getProperty($propName)->resolveIndirect();
-                if ($value->isUndefined()) {
-                    return false;
-                }
 
-                return Variable::TYPE_NULL !== $value->type;
-            }
+        return $this->objectPropertyIsSet($object, $propName, null);
+    }
 
+    /**
+     * isset / ?? / ??= / empty on hooked properties — backing or declared slot probe, never get hook (#8902, #8917, #8918).
+     *
+     * @return bool|null null when the property is not hook-backed
+     */
+    private function issetHookedPropertyWithoutGetHook(ObjectEntry $object, string $propName): ?bool
+    {
+        $backing = $this->hookedPropertyBackingValue($object, $propName);
+        if (false === $backing) {
+            return null;
+        }
+        if ($backing->isUndefined() || VM\TypedPropertyCheck::isUninitialized($backing)) {
             return false;
         }
 
-        return $this->objectPropertyIsSet($object, $propName, $frame);
+        return Variable::TYPE_NULL !== $backing->type;
+    }
+
+    /**
+     * ?? / ??= left branch on property hooks — read backing without get hook (#6472, #8902).
+     */
+    public function fetchObjectPropertyForCoalesce(ObjectEntry $object, string $propName, Variable $dst): void
+    {
+        $backing = $this->hookedPropertyBackingValue($object, $propName);
+        if (false !== $backing) {
+            $dst->copyFrom($backing);
+
+            return;
+        }
+        if ($object->hasProperty($propName)) {
+            $dst->copyFrom($object->getProperty($propName));
+        } else {
+            $dst->undefined();
+        }
     }
 
     /**
@@ -675,19 +673,10 @@ class VM {
         if (null !== $catchFrame) {
             return $catchFrame;
         }
-        $meta = $this->classPropertyMeta($object, $propName);
-        if (null !== $meta && null !== $meta->getHookMethodLc) {
-            $catchFrame = $this->enforcePropertyVisibilityRead($object, $propName, $frame);
-            if (null !== $catchFrame) {
-                return $catchFrame;
-            }
-            $hookValue = $this->fetchPropertyWithHooks($object, $propName, $frame);
-            if (null !== $hookValue) {
-                $dst->bool(!ext\standard\boolval::isTruthy($hookValue));
-
-                return null;
-            }
+        if ($this->emptyHookedPropertyViaBackingProbe($object, $propName, $dst)) {
+            return null;
         }
+        $meta = $this->classPropertyMeta($object, $propName);
         if (null === $meta || !$meta->prototype->isUndefined()) {
             $dst->bool(!$this->objectPropertyIsSet($object, $propName, $frame));
 
@@ -701,12 +690,6 @@ class VM {
             $props = $object->getRawProperties();
             if (isset($props[$propName]) && VM\TypedPropertyCheck::isUninitialized($props[$propName])) {
                 $dst->bool(true);
-
-                return null;
-            }
-            $hookValue = $this->fetchPropertyWithHooks($object, $propName, $frame);
-            if (null !== $hookValue) {
-                $dst->bool(!ext\standard\boolval::isTruthy($hookValue));
 
                 return null;
             }
@@ -823,6 +806,74 @@ class VM {
         }
 
         return strcasecmp($backingName, $propName) !== 0 && $object->hasProperty($backingName);
+    }
+
+    /**
+     * isset/empty/?? backing probe — never invokes get hook (#6472, #8901, #8917, #8918).
+     *
+     * @return Variable|false false when the property is not hooked
+     */
+    private function hookedPropertyBackingValue(ObjectEntry $object, string $propName): Variable|false
+    {
+        if (!$this->instancePropertyHasHooks($object, $propName)) {
+            return false;
+        }
+        $lcClass = strtolower($object->class->name);
+        $propMeta = $this->context->propertyHookRegistry[$lcClass][$propName]
+            ?? $this->context->propertyHookRegistry[$lcClass][strtolower($propName)]
+            ?? null;
+        if (is_array($propMeta)) {
+            $backingName = $propMeta['setBacking'] ?? $propMeta['getBacking'] ?? null;
+            if (null !== $backingName && strcasecmp($backingName, $propName) !== 0) {
+                if ($object->hasProperty($backingName)) {
+                    return $object->getProperty($backingName)->resolveIndirect();
+                }
+                $uninit = new Variable();
+                $uninit->undefined();
+
+                return $uninit;
+            }
+        }
+        if ($object->hasProperty($propName)) {
+            return $object->getProperty($propName)->resolveIndirect();
+        }
+        $uninit = new Variable();
+        $uninit->undefined();
+
+        return $uninit;
+    }
+
+    private function instancePropertyHasHooks(ObjectEntry $object, string $propName): bool
+    {
+        $meta = $this->classPropertyMeta($object, $propName);
+        if (null !== $meta && (null !== $meta->getHookMethodLc || null !== $meta->setHookMethodLc)) {
+            return true;
+        }
+        $lcClass = strtolower($object->class->name);
+        $propMeta = $this->context->propertyHookRegistry[$lcClass][$propName]
+            ?? $this->context->propertyHookRegistry[$lcClass][strtolower($propName)]
+            ?? null;
+
+        return is_array($propMeta) && (isset($propMeta['get']) || isset($propMeta['set']));
+    }
+
+    /**
+     * empty($obj->hooked) — Zend isset-style backing probe, no get hook (#8901, #8918, zend_property_hooks.c).
+     */
+    private function emptyHookedPropertyViaBackingProbe(ObjectEntry $object, string $propName, Variable $dst): bool
+    {
+        $backing = $this->hookedPropertyBackingValue($object, $propName);
+        if (false === $backing) {
+            return false;
+        }
+        if ($backing->isUndefined() || VM\TypedPropertyCheck::isUninitialized($backing)) {
+            $dst->bool(true);
+
+            return true;
+        }
+        $dst->bool(!ext\standard\boolval::isTruthy($backing));
+
+        return true;
     }
 
     private function invokeInstancePropertyUnsetHook(ObjectEntry $object, string $propName, Frame $frame): bool
@@ -1969,12 +2020,20 @@ class VM {
     {
         $copy = new Variable();
         $copy->copyFrom($value);
+        $key = $key->resolveIndirect();
         if (Variable::TYPE_INTEGER === $key->type) {
-            $out->append($copy);
+            $out->updateIndex($key->toInt(), $copy);
 
             return;
         }
-        $out->add($key->toString(), $copy);
+        $keyStr = $key->toString();
+        $intKey = HashTable::tryIntFromNumericString($keyStr);
+        if (null !== $intKey) {
+            $out->updateIndex($intKey, $copy);
+
+            return;
+        }
+        $out->update($keyStr, $copy);
     }
 
     private function seedScriptPath(Frame $frame): void
@@ -2164,9 +2223,15 @@ restart:
                         $this->context->isGlobalStorage($writeTarget)
                         && !VM\EnumCaseSupport::arrayContainsRuntimeRefs($arg3)
                     ) {
-                        $stored = VM\EnumCaseSupport::materializeConstantValue($this->context, $arg3);
-                        $arg2->copyFrom($stored);
-                        $arg1->copyFrom($stored);
+                        $resolvedArg = $arg3->resolveIndirect();
+                        if (!$resolvedArg->isUndefined()) {
+                            $stored = VM\EnumCaseSupport::materializeConstantValue($this->context, $arg3);
+                            $arg2->copyFrom($stored);
+                            $arg1->copyFrom($stored);
+                        } else {
+                            $arg2->copyFrom($arg3);
+                            $arg1->copyFrom($arg3);
+                        }
                     } else {
                         $arg2->copyFrom($arg3);
                         $arg1->copyFrom($arg3);
@@ -3584,10 +3649,13 @@ restart:
                     }
                     $propNameRaw = $frame->scope[$op->arg3]->toString();
                     $propName = strtolower($propNameRaw);
-                    $visFrame = $this->enforceStaticPropertyReadVisibility($lcClass, $propNameRaw, $frame);
-                    if (null !== $visFrame) {
-                        $frame = $visFrame;
-                        goto restart;
+                    $forWrite = $this->propertyFetchDestUsedAsAssignLvalue($frame, $op);
+                    if (!$forWrite) {
+                        $visFrame = $this->enforceStaticPropertyReadVisibility($lcClass, $propNameRaw, $frame);
+                        if (null !== $visFrame) {
+                            $frame = $visFrame;
+                            goto restart;
+                        }
                     }
                     $storage = $this->resolveStaticPropertyStorage($lcClass, $propName);
                     if (null === $storage) {
@@ -3598,7 +3666,6 @@ restart:
                             $frame
                         );
                     }
-                    $forWrite = $this->propertyFetchDestUsedAsAssignLvalue($frame, $op);
                     if ($forWrite) {
                         $writeVisFrame = $this->enforceStaticPropertyWriteVisibility($lcClass, $propNameRaw, $frame);
                         if (null !== $writeVisFrame) {
@@ -3967,18 +4034,14 @@ restart:
                     }
                     goto return_void_complete;
                 case OpCode::TYPE_RETURN:
-                    if (isset($frame->scope[$op->arg1])) {
+                    if (null !== $op->arg1 && isset($frame->scope[$op->arg1])) {
                         $catchFrame = $this->guardUnboundThisRead($frame, (int) $op->arg1);
                         if (null !== $catchFrame) {
                             $frame = $catchFrame;
                             goto restart;
                         }
-                        $returnValue = $frame->scope[$op->arg1]->resolveIndirect();
-                    } elseif (isset($frame->block->constants[$op->arg1])) {
-                        $returnValue = $frame->block->constants[$op->arg1];
-                    } else {
-                        $returnValue = new Variable(Variable::TYPE_NULL);
                     }
+                    $returnValue = $this->resolveVmReturnValue($frame, $op);
                     $finallyFrame = $this->beginReturnFinallyUnwind($frame, $returnValue, false);
                     if (null !== $finallyFrame) {
                         $frame = $finallyFrame;
@@ -4113,9 +4176,12 @@ restart:
                     $this->warnUndefinedVariableForScopeRead($frame, $argSlot);
                     $value = $this->resolveOutgoingCallArgValue($frame, $argSlot);
                     if ($this->isUnboundLocalScopeRead($frame, $argSlot)) {
-                        $sent = new Variable();
-                        $sent->null();
-                        $value = $sent;
+                        $resolved = $value->resolveIndirect();
+                        if ($resolved->isUndefined()) {
+                            $sent = new Variable();
+                            $sent->null();
+                            $value = $sent;
+                        }
                     }
                     if (null !== $op->arg3) {
                         $frame->callArgEntries[] = ['u', $value];
@@ -4873,6 +4939,7 @@ restart:
                     }
                     $forWrite = $this->propertyFetchDestUsedAsAssignLvalue($frame, $op);
                     $magicGetForRead = !$forWrite
+                        && !$op->propertyHookCoalesceRead
                         && $this->propertyReadUsesMagicGet($propertyObject, $name, $frame);
                     if (!$magicGetForRead && !$forWrite) {
                         $catchFrame = $this->enforcePropertyVisibilityRead($propertyObject, $name, $frame);
@@ -4880,6 +4947,10 @@ restart:
                             $frame = $catchFrame;
                             goto restart;
                         }
+                    }
+                    if ($op->propertyHookCoalesceRead && !$forWrite) {
+                        $this->fetchObjectPropertyForCoalesce($propertyObject, $name, $result);
+                        break;
                     }
                     if ($propertyObject->hasProperty($name) && !$magicGetForRead) {
                         if (!$forWrite) {
@@ -8096,15 +8167,23 @@ restart:
      */
     private function resolvePropertyHookRefWriteLvalue(Variable $operand, Frame $frame): ?Variable
     {
-        if (null === $this->resolvePropertyWriteOwner($operand)) {
-            return null;
-        }
         $propName = $this->resolvePropertyWriteName($operand);
         if (null === $propName || $this->isPropertyHookRawWrite($frame, $propName)) {
             return null;
         }
+        if (null !== $this->resolvePropertyWriteOwner($operand)) {
+            return $operand;
+        }
+        $target = $operand->resolveIndirect();
+        $classLc = $operand->staticPropertyClassLc ?? $target->staticPropertyClassLc;
+        $staticPropName = $operand->objectPropertyName ?? $target->objectPropertyName;
+        if (is_string($classLc) && is_string($staticPropName) && '' !== $staticPropName) {
+            if (null !== $this->resolveStaticPropertyHooks($classLc, strtolower($staticPropName))) {
+                return $operand;
+            }
+        }
 
-        return $operand;
+        return null;
     }
 
     /** Live property storage cell for hooked ref bindings (#6426). */
@@ -8135,27 +8214,45 @@ restart:
     ): void {
         $owner = $this->resolvePropertyWriteOwner($writeLvalue);
         $propName = $this->resolvePropertyWriteName($writeLvalue);
-        if (null === $owner || null === $propName) {
-            $this->stablePropertyHookRefWriteLvalue($writeLvalue)->copyFrom($value->resolveIndirect());
+        if (null !== $owner && null !== $propName) {
+            $lcClass = strtolower($owner->class->name);
+            $propMeta = $this->context->propertyHookRegistry[$lcClass][$propName]
+                ?? $this->context->propertyHookRegistry[$lcClass][strtolower($propName)]
+                ?? null;
+            $backingName = is_array($propMeta)
+                ? ($propMeta['getBacking'] ?? $propMeta['setBacking'] ?? null)
+                : null;
+            if (null !== $backingName && $owner->hasProperty($backingName)) {
+                $owner->getProperty($backingName)->copyFrom($value->resolveIndirect());
 
-            return;
-        }
-        $lcClass = strtolower($owner->class->name);
-        $propMeta = $this->context->propertyHookRegistry[$lcClass][$propName]
-            ?? $this->context->propertyHookRegistry[$lcClass][strtolower($propName)]
-            ?? null;
-        $backingName = is_array($propMeta)
-            ? ($propMeta['getBacking'] ?? $propMeta['setBacking'] ?? null)
-            : null;
-        if (null !== $backingName && $owner->hasProperty($backingName)) {
-            $owner->getProperty($backingName)->copyFrom($value->resolveIndirect());
+                return;
+            }
+            if ($owner->hasProperty($propName)) {
+                $owner->getProperty($propName)->copyFrom($value->resolveIndirect());
 
-            return;
-        }
-        if ($owner->hasProperty($propName)) {
-            $owner->getProperty($propName)->copyFrom($value->resolveIndirect());
+                return;
+            }
+        } else {
+            $target = $writeLvalue->resolveIndirect();
+            $classLc = $writeLvalue->staticPropertyClassLc ?? $target->staticPropertyClassLc;
+            $staticPropName = $writeLvalue->objectPropertyName ?? $target->objectPropertyName;
+            if (is_string($classLc) && is_string($staticPropName) && '' !== $staticPropName) {
+                $propLc = strtolower($staticPropName);
+                $propMeta = $this->context->propertyHookRegistry[$classLc][$staticPropName]
+                    ?? $this->context->propertyHookRegistry[$classLc][$propLc]
+                    ?? null;
+                $backingName = is_array($propMeta)
+                    ? ($propMeta['getBacking'] ?? $propMeta['setBacking'] ?? null)
+                    : null;
+                if (null !== $backingName) {
+                    $backingStorage = $this->resolveStaticPropertyStorage($classLc, strtolower($backingName));
+                    if (null !== $backingStorage) {
+                        $backingStorage->copyFrom($value->resolveIndirect());
 
-            return;
+                        return;
+                    }
+                }
+            }
         }
         $this->stablePropertyHookRefWriteLvalue($writeLvalue)->copyFrom($value->resolveIndirect());
     }
@@ -9008,7 +9105,7 @@ restart:
         if (null === $meta) {
             return null;
         }
-        $readVis = PropertyVisibility::effectiveGetVisibility($meta['visibility'], 0);
+        $readVis = PropertyVisibility::effectiveGetVisibility($meta['visibility'], $meta['getVisibility']);
         if (MethodVisibility::isPublic($readVis)) {
             return null;
         }
@@ -9022,7 +9119,7 @@ restart:
                 $propNameRaw,
                 $callerLc ?? $meta['declaringClassLc'],
                 fn (string $classLcArg, string $ancestorLc): bool => $this->isClassSameOrSubclassOf($classLcArg, $ancestorLc),
-                0
+                $meta['getVisibility']
             );
         } catch (\LogicException $e) {
             return $this->dispatchVmError($e->getMessage(), $frame);
@@ -9645,18 +9742,25 @@ restart:
         }
         if (isset($frame->scope[$slot])) {
             $resolved = $frame->scope[$slot]->resolveIndirect();
-            if (Variable::TYPE_NULL !== $resolved->type && !$resolved->isUndefined()) {
-                if (null !== $const && $this->isImmortalEnumCaseBlockConstant($const)) {
-                    if (!VM\EnumCaseSupport::isEnumCaseVariable($resolved)) {
-                        $value = new Variable();
-                        $value->copyFrom($const);
-
-                        return $value;
-                    }
-
+            if (null !== $const && $this->isImmortalEnumCaseBlockConstant($const)) {
+                if (VM\EnumCaseSupport::isEnumCaseVariable($resolved)) {
                     return $frame->scope[$slot];
                 }
+                if ($resolved->isUndefined() || $this->isEnumSlotClobberCandidate($resolved)) {
+                    $value = new Variable();
+                    $value->copyFrom($const);
+
+                    return $value;
+                }
+
+                return $frame->scope[$slot];
+            }
+            if (Variable::TYPE_NULL !== $resolved->type && !$resolved->isUndefined()) {
                 if (null === $const || $resolved->type === $const->type) {
+                    return $frame->scope[$slot];
+                }
+                // Array dim fetch / spread temps hold live objects; do not substitute NULL block constants (#8814).
+                if (!$this->isEnumSlotClobberCandidate($resolved)) {
                     return $frame->scope[$slot];
                 }
             }
@@ -9679,6 +9783,27 @@ restart:
 
         return Variable::TYPE_OBJECT === $const->type
             && VM\EnumCaseSupport::isEnumCaseVariable($const);
+    }
+
+    /**
+     * Scalar types that may clobber an enum-case scope slot (#5636); not resources/objects/arrays (#6204).
+     */
+    private function isEnumSlotClobberCandidate(Variable $resolved): bool
+    {
+        if (VM\ResourceSupport::isVmResource($resolved)) {
+            return false;
+        }
+        if (VM\EnumCaseSupport::isEnumCaseVariable($resolved)) {
+            return false;
+        }
+
+        return \in_array($resolved->type, [
+            Variable::TYPE_NULL,
+            Variable::TYPE_BOOLEAN,
+            Variable::TYPE_INTEGER,
+            Variable::TYPE_FLOAT,
+            Variable::TYPE_STRING,
+        ], true);
     }
 
     /**
@@ -9868,7 +9993,14 @@ restart:
         if (null !== $closureState->boundThis) {
             $thisIdx = $closureState->func->block->slotIndexForVariableName('this');
             if (null !== $thisIdx) {
-                $callee->scope[$thisIdx] = $closureState->boundThis;
+                if (!isset($callee->scope[$thisIdx])) {
+                    $callee->scope[$thisIdx] = new Variable();
+                }
+                $boundThis = $closureState->boundThis;
+                if (EnumCaseSupport::isEnumCaseVariable($boundThis)) {
+                    $boundThis = EnumCaseSupport::materializeConstantValue($this->context, $boundThis);
+                }
+                $callee->scope[$thisIdx]->copyFrom($boundThis);
             }
         }
         if (null !== $closureState->boundScopeClass && '' !== $closureState->boundScopeClass) {
@@ -10522,6 +10654,7 @@ restart:
                     'deprecated' => $data['deprecated'],
                     'attributeEntries' => $data['attributeEntries'],
                     'parameterMetadata' => $data['parameterMetadata'],
+                    'sourceLocation' => $data['sourceLocation'] ?? null,
                 ];
             }
         }
@@ -10587,6 +10720,7 @@ restart:
                     'deprecated' => $orig['deprecated'],
                     'attributeEntries' => $orig['attributeEntries'],
                     'parameterMetadata' => $orig['parameterMetadata'],
+                    'sourceLocation' => $orig['sourceLocation'] ?? null,
                 ];
             } else {
                 if (isset($merged[$methodLc])) {
@@ -10645,19 +10779,19 @@ restart:
             $entry->methodVisibility[$methodLc] = $data['vis'];
             $entry->methodDeclaringClassLc[$methodLc] = strtolower(ltrim($data['traitName'], '\\'));
             $entry->methodNames[$methodLc] = $data['methodNames'];
-            if (null !== $data['attrs']) {
+            if (null !== ($data['attrs'] ?? null)) {
                 $entry->methodAttributeNames[$methodLc] = $data['attrs'];
             }
-            if (null !== $data['deprecated']) {
+            if (null !== ($data['deprecated'] ?? null)) {
                 $entry->methodDeprecated[$methodLc] = $data['deprecated'];
             }
-            if (null !== $data['attributeEntries']) {
+            if (null !== ($data['attributeEntries'] ?? null)) {
                 $entry->methodAttributeEntries[$methodLc] = $data['attributeEntries'];
             }
-            if (null !== $data['parameterMetadata']) {
+            if (null !== ($data['parameterMetadata'] ?? null)) {
                 $entry->methodParameterMetadata[$methodLc] = $data['parameterMetadata'];
             }
-            if (null !== $data['sourceLocation']) {
+            if (null !== ($data['sourceLocation'] ?? null)) {
                 $entry->methodSourceLocations[$methodLc] = $data['sourceLocation'];
             }
             if ('__construct' === $methodLc && null === $entry->constructor) {
@@ -11252,7 +11386,7 @@ restart:
                     $this->flushPendingTraitUses($entry, $pendingTraits, $ownMethods);
                     $pendingTraits = [];
                     $name = $frame->scope[$op->arg1];
-                    $default = is_null($op->arg2) ? null : $frame->scope[$op->arg2];
+                    $default = $this->resolveCompileTimePropertyDefaultSlot($frame, $block, $op->arg2);
                     $propLc = strtolower($name->toString());
                     $prop = new VM\ClassProperty(
                         $name->toString(),
@@ -11281,8 +11415,9 @@ restart:
                     $pendingTraits = [];
                     $name = strtolower($frame->scope[$op->arg1]->toString());
                     $storage = clone $frame->scope[$op->arg3];
-                    if (!is_null($op->arg2)) {
-                        $storage->copyFrom($frame->scope[$op->arg2]);
+                    $default = $this->resolveCompileTimePropertyDefaultSlot($frame, $block, $op->arg2);
+                    if (null !== $default) {
+                        $storage->copyFrom($default);
                     }
                     $this->linkStaticTypedPropertySlot(
                         $storage,
@@ -11417,6 +11552,24 @@ restart:
         }
 
         return VM\EnumCaseSupport::materializeConstantValue($this->context, $value);
+    }
+
+    /**
+     * Folded parameter/property/static defaults live in block constants (#3803, #7399).
+     */
+    private function resolveCompileTimePropertyDefaultSlot(Frame $frame, Block $block, ?int $slot): ?Variable
+    {
+        if (null === $slot) {
+            return null;
+        }
+        if (isset($block->constants[$slot])) {
+            return VM\ClassConstMaterializer::detachConstantValue($block->constants[$slot]);
+        }
+        if (isset($frame->scope[$slot])) {
+            return $frame->scope[$slot];
+        }
+
+        return null;
     }
 
     private function applyClassConstDeclaration(
@@ -12029,6 +12182,29 @@ restart:
 
         return null !== $decl
             && (($decl->flags ?? 0) & \PHPCfg\Func::FLAG_RETURNS_REF) !== 0;
+    }
+
+    private function resolveVmReturnValue(Frame $frame, OpCode $op): Variable
+    {
+        $slot = $op->arg1;
+        if (null === $slot) {
+            return new Variable(Variable::TYPE_NULL);
+        }
+        if (isset($frame->scope[$slot])) {
+            $resolved = $frame->scope[$slot]->resolveIndirect();
+            if (!$resolved->isUndefined()) {
+                return $resolved;
+            }
+        }
+        $operand = $frame->block->getOperand($slot);
+        if ($operand instanceof \PHPCfg\Operand\Literal && isset($frame->block->constants[$slot])) {
+            return $frame->block->constants[$slot];
+        }
+        if (isset($frame->block->constants[$slot])) {
+            return $frame->block->constants[$slot];
+        }
+
+        return new Variable(Variable::TYPE_NULL);
     }
 
     private function enforceReturnType(Frame $frame, ?Variable $value): void

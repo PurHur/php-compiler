@@ -99,6 +99,18 @@ final class BootstrapJitUnitProbeTest extends TestCase
         $this->assertFileExists(self::$root.'/test/selfhost/jit_unit_probe/compile_driver.php');
     }
 
+    /** Issue #8707: inventory emit-helper real-lowers JIT spine; deny-list only for LLVM crashers. */
+    public function testInventoryEmitJitSpineStubGateRetired(): void
+    {
+        $jit = (string) file_get_contents(self::$root.'/lib/JIT.php');
+        $this->assertStringContainsString('shouldStubM3InventoryEmitJitSpineMethods(): bool', $jit);
+        $this->assertStringContainsString('Retired (#8707)', $jit);
+        $this->assertMatchesRegularExpression(
+            '/private function shouldStubM3InventoryEmitJitSpineMethods\(\): bool\s*\{[^}]*return false;/s',
+            $jit
+        );
+    }
+
     public function testCompilePhpRecognizesInventoryJitUnitProbeCompileDriver(): void
     {
         $compile = (string) file_get_contents(self::$root.'/bin/compile.php');

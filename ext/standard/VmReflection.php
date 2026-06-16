@@ -1278,8 +1278,21 @@ final class VmReflection
     public static function getMangledObjectVars(Variable $object, Context $ctx): Variable
     {
         $object = $object->resolveIndirect();
+        if (EnumCaseSupport::isEnumCaseVariable($object)) {
+            $result = new Variable();
+            $result->newArray();
+            $ht = $result->toArray();
+            foreach (EnumCaseSupport::objectVarsForCaseVariable($object) as $name => $value) {
+                $ht->add($name, $value);
+            }
+
+            return $result;
+        }
         if (Variable::TYPE_OBJECT !== $object->type) {
-            throw new \LogicException('get_mangled_object_vars() argument must be an object in this compiler build');
+            throw new \TypeError(\sprintf(
+                'get_mangled_object_vars(): Argument #1 ($object) must be of type object, %s given',
+                EnumCaseSupport::typeNameForVariable($object)
+            ));
         }
         $obj = $object->toObject();
         $result = new Variable();

@@ -4,58 +4,77 @@ declare(strict_types=1);
 
 namespace PHPCompiler\JIT\Builtin;
 
+use PHPCompiler\JIT;
 use PHPCompiler\JIT\Context;
+use PHPLLVM\Value\Function_ as LlvmFunction;
 
 /**
- * JIT LLVM bodies for lzf_compress/lzf_decompress (#6384 phase 2).
- *
- * PHP lowering via {@see StringLzfJit}; links bundled liblzf at AOT link time.
+ * JIT/AOT link hook for lzf_* — compiles LzfJitHelper into the module (#8805).
  */
 final class StringLzf
 {
+    private const COMPRESS_HELPER = 'PHPCompiler\\ext\\lzf\\LzfJitHelper::compress';
+
+    private const DECOMPRESS_HELPER = 'PHPCompiler\\ext\\lzf\\LzfJitHelper::decompress';
+
     public static function ensureLinked(Context $context): void
     {
-        self::preloadLiblzf();
-        StringLzfJit::implement($context);
+        self::ensureJitHelperCompiled($context);
     }
 
     public static function ensureStandaloneBodies(Context $context): void
     {
-        self::preloadLiblzf();
-        StringLzfJit::implement($context);
+        self::ensureJitHelperCompiled($context);
     }
 
-    public static function preloadLiblzf(): void
+    public static function compressHelper(Context $context): LlvmFunction
     {
-        static $loaded = 0;
-        if ($loaded) {
-            return;
-        }
-        if (!\extension_loaded('FFI')) {
-            return;
-        }
-        $selfHost = getenv('PHP_COMPILER_SELFHOST_AOT');
-        if ('1' === $selfHost || 'true' === strtolower((string) $selfHost)) {
-            $loaded = 1;
+        return self::helperFunction($context, self::COMPRESS_HELPER);
+    }
 
+    public static function decompressHelper(Context $context): LlvmFunction
+    {
+        return self::helperFunction($context, self::DECOMPRESS_HELPER);
+    }
+
+    private static function helperFunction(Context $context, string $logical): LlvmFunction
+    {
+        self::ensureJitHelperCompiled($context);
+        $lc = \strtolower($logical);
+        $fn = $context->functions[$lc] ?? null;
+        if (null === $fn) {
+            throw new \LogicException($logical.' missing after compile (#8805)');
+        }
+
+        return $fn;
+    }
+
+    private static function ensureJitHelperCompiled(Context $context): void
+    {
+        $needed = [\strtolower(self::COMPRESS_HELPER), \strtolower(self::DECOMPRESS_HELPER)];
+        $missing = false;
+        foreach ($needed as $lc) {
+            if (!isset($context->functions[$lc])) {
+                $missing = true;
+                break;
+            }
+        }
+        if (!$missing) {
             return;
         }
-        $root = \dirname(__DIR__, 3);
-        $bundled = $root.'/.libs/liblzf.so';
-        try {
-            $dl = \FFI::cdef('void *dlopen(const char *filename, int flags);', 'libdl.so.2');
-            if (\is_file($bundled) && null !== $dl->dlopen($bundled, 0x101)) {
-                $loaded = 1;
 
-                return;
-            }
-            foreach (['liblzf.so', 'liblzf.so.0'] as $lib) {
-                if (null !== $dl->dlopen($lib, 0x101)) {
-                    break;
-                }
-            }
-        } catch (\Throwable) {
+        $runtime = $context->runtime;
+        $path = \dirname(__DIR__, 3).'/ext/lzf/LzfJitHelper.php';
+        $block = $runtime->parseAndCompile((string) \file_get_contents($path), 'LzfJitHelper.php');
+        if (null === $block) {
+            throw new \LogicException('LzfJitHelper.php parseAndCompile failed (#8805)');
         }
-        $loaded = 1;
+        $jit = new JIT($context);
+        $jit->compile($block);
+        foreach ($needed as $lc) {
+            if (!isset($context->functions[$lc])) {
+                throw new \LogicException($lc.' was not compiled for JIT (#8805)');
+            }
+        }
     }
 }

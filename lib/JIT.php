@@ -72,13 +72,7 @@ class JIT {
         $this->context->resetScriptLocalBindings();
         $mainPath = $block->scriptPath();
         if ('' !== $mainPath) {
-            $resolvedMain = realpath($mainPath);
-            $this->context->jitAotEntryScriptPath = \PHPCompiler\VM\ScriptStack::normalize(
-                false !== $resolvedMain ? $resolvedMain : $mainPath
-            );
             $this->context->recordJitIncludedFile($mainPath);
-        } else {
-            $this->context->jitAotEntryScriptPath = '';
         }
         $this->registeredGlobalConstDeclareOpcodes = new \SplObjectStorage();
         if ($this->shouldUseM3EmitTuNativeBridge() && $this->isM3EmitTuScriptMain($block)) {
@@ -622,13 +616,24 @@ class JIT {
     }
 
     /**
-     * Inventory emit-helper link stubs parse/compile for sidecar-only emit; self-host executable
-     * argv drivers must real-lower parse spine for native compile without sidecar (#2967, #3046).
+     * Inventory emit-helper link: parse/CFG spine stub retired on executable argv drivers (#8706).
+     * Mirror {@see shouldPrelowerRuntimeStandaloneForKeepObjectEmit} — gen-0/spine/inventory/M4
+     * argv links must real-lower Runtime::parse for honest native compile (#2967, #3046, #8708).
      */
     private function shouldStubInventoryEmitParseCompileSpine(): bool
     {
-        return $this->shouldStubInventoryEmitHelperBundledBodies()
-            && !$this->shouldUseSelfHostExecutableEmit();
+        if (!$this->shouldStubInventoryEmitHelperBundledBodies()) {
+            return false;
+        }
+        if ($this->shouldUseSelfHostExecutableEmit()
+            || $this->shouldUseVendorPrelinkExecutableEmit()
+            || $this->shouldUseM4BinCompileArgvMainNative()
+            || ($this->shouldUseM3CompileDriverMainNative() && $this->shouldUseEmitHelperLinkStubs())
+        ) {
+            return false;
+        }
+
+        return true;
     }
 
     /**
@@ -816,27 +821,6 @@ class JIT {
         $mainPath = str_replace('\\', '/', $mainBlock->scriptPath());
 
         return $mainPath === $norm || str_ends_with($mainPath, '/'.basename($norm));
-    }
-
-    /**
-     * Skip host-compiling a sidecar when the outer JIT TU is already that source (#8559).
-     *
-     * Inventory argv drivers compiling compiler_lib_spine_smoke/main.php otherwise subprocess-compile
-     * the same entry during finalize and corrupt or duplicate the in-flight module.
-     */
-    private function shouldSkipM3EmitTuSelfSidecarHostCompile(string $path): bool
-    {
-        $entry = $this->context->jitAotEntryScriptPath ?? '';
-        if ('' === $entry) {
-            return false;
-        }
-        $resolved = realpath($path);
-        if (false === $resolved) {
-            return false;
-        }
-        $normalized = \PHPCompiler\VM\ScriptStack::normalize($resolved);
-
-        return '' !== $normalized && $normalized === $entry;
     }
 
     private function isM3CompileDriverScriptMain(Block $block): bool
@@ -1689,12 +1673,12 @@ class JIT {
     }
 
     /**
-     * M3 compile-driver loadJit (#1402, #1495): outer orchestration; inner helpers are separate FUNCDEFs (#2846, #2847).
-     * Calls loadJitContext via jitContextForLoadJit — keep nested helpers out of loadJit to avoid LLVM 9 inlining crash.
+     * Retired (#8707): inventory emit-helper now real-lowers JIT spine methods; deny-list only via
+     * isM3CompileDriverSpineDenyName() for proven LLVM 9 crashers.
      */
     private function shouldStubM3InventoryEmitJitSpineMethods(): bool
     {
-        return $this->shouldUseM3InventoryEmitDriver() && $this->shouldUseEmitHelperLinkStubs();
+        return false;
     }
 
     private function compileRuntimeLoadJitM3Native(
@@ -2547,6 +2531,10 @@ class JIT {
         if (str_ends_with($emitLc, '\\runtime::loadjit')
             || str_ends_with($emitLc, '\\runtime::jitemitinplace')
         ) {
+            if ($this->shouldUseM3CompileDriverRealLowering()) {
+                return null;
+            }
+
             return $this->emitM3EmitTuRuntimeInitVoidStub($internalName, $logicalName, $block);
         }
         if ($this->shouldUseM3CompileDriverRealLowering()) {
@@ -4142,9 +4130,6 @@ class JIT {
         if ($this->shouldSkipM3InventoryEmitDriverSelfSidecar($path)) {
             return;
         }
-        if ($this->shouldSkipM3EmitTuSelfSidecarHostCompile($path)) {
-            return;
-        }
         if (!is_readable($path)) {
             return;
         }
@@ -4240,7 +4225,8 @@ class JIT {
                     $aotBytes,
                     $sidecarRel,
                     $sentinelLogical,
-                    true
+                    true,
+                    $this->m3EmitTuSidecarSourcePathNorm($path)
                 );
 
                 return;
@@ -4590,7 +4576,7 @@ class JIT {
             return $this->emitM3EmitTuRuntimeConstructNativeFunction($internalName, $logicalName, $block);
         }
         if (str_ends_with($lower, '\\runtime::initvmcontext')) {
-            return $this->emitM3EmitTuRuntimeInitVoidStub($internalName, $logicalName, $block);
+            return $this->compileRuntimeInitVmContextM3Native($internalName, $block, $logicalName);
         }
         if (
             str_ends_with($lower, '\\runtime::initparsepipeline')
@@ -6632,8 +6618,25 @@ class JIT {
                             $this->context,
                             $this->valueBoxPointer($result)
                         );
+                        if (null !== ($newVal->compileTimeString ?? null)) {
+                            $result->compileTimeString = $newVal->compileTimeString;
+                        }
                     } else {
                         $this->context->type->string->concat($result, $left, $right);
+                    }
+                    if (
+                        null !== ($left->compileTimeString ?? null)
+                        && null !== ($right->compileTimeString ?? null)
+                    ) {
+                        $result->compileTimeString = $left->compileTimeString.$right->compileTimeString;
+                    } else {
+                        $leftResolved = $left->compileTimeString
+                            ?? $this->resolveJitCompileTimeStringSlot($block, (int) $op->arg2);
+                        $rightResolved = $right->compileTimeString
+                            ?? $this->resolveJitCompileTimeStringSlot($block, (int) $op->arg3);
+                        if (null !== $leftResolved && null !== $rightResolved) {
+                            $result->compileTimeString = $leftResolved.$rightResolved;
+                        }
                     }
                     $this->maybeRefreshIncludeBindingsBeforeUse();
                     break;
@@ -7789,7 +7792,10 @@ class JIT {
                             if (!$this->context->functionIsRegistered($lcname)) {
                                 if (str_contains($nameVar->compileTimeString, '::')) {
                                     [$staticClass, $staticMethod] = explode('::', $nameVar->compileTimeString, 2);
-                                    if ($this->tryResolveSelfHostStubbedStaticCall($staticClass, $staticMethod)) {
+                                    if ($this->tryResolveSelfHostSuperglobalsStaticCall($staticClass, $staticMethod)) {
+                                        break;
+                                    }
+                                    if ($this->tryResolveProgressStaticCall($staticClass, $staticMethod)) {
                                         break;
                                     }
                                     throw new \LogicException("Call to undefined static method {$nameVar->compileTimeString}()");
@@ -8028,6 +8034,7 @@ class JIT {
                     ) {
                         $this->context->jitUnserializeOptionsOperand = $callOperands[1];
                     }
+                    $this->promoteCompileTimeStringOnCallArgs($block, $callOperands, $callArgs);
                     $result = $this->context->scope->toCall->call($this->context, ...$callArgs);
                     $this->context->jitUnserializeOptionsOperand = $savedUnserializeOptionsOperand;
                     $this->markNewObjectConstructedAfterCall($this->context->scope->toCall, $callArgs);
@@ -8520,6 +8527,16 @@ class JIT {
                             $name->value
                         )) {
                             break;
+                        }
+                        if (!$forWrite) {
+                            JIT\InstancePropertyVisibilityJitGuard::emitBeforeFetch(
+                                $this->context->type->object,
+                                $this,
+                                $block,
+                                $classId,
+                                $name->value,
+                                $declaringClass
+                            );
                         }
                         JIT\LazyObjectHelper::emitEnsureInitialized(
                             $this->context,
@@ -9434,6 +9451,7 @@ class JIT {
                         && Variable::TYPE_STRING !== $declaredJitType
                         && Variable::TYPE_NATIVE_BOOL !== $declaredJitType
                         && Variable::TYPE_NATIVE_DOUBLE !== $declaredJitType
+                        && Variable::TYPE_HASHTABLE !== $declaredJitType
                     ) {
                         $declaredJitType = $this->context->type->object->externalPropertyJitType(
                             $className,
@@ -9455,10 +9473,22 @@ class JIT {
                         false,
                         \PHPCompiler\MethodVisibility::mask($op->propertyVisibility)
                     );
+                    if (null !== $prototype && null !== $prototype->dnfArms) {
+                        $this->context->type->object->defineStaticPropertyDnfArms(
+                            $classId,
+                            $name->value,
+                            $prototype->dnfArms
+                        );
+                    }
                     $this->context->type->object->defineStaticPropertySetVisibility(
                         $classId,
                         $name->value,
                         (int) ($op->propertySetVisibility ?? 0)
+                    );
+                    $this->context->type->object->defineStaticPropertyGetVisibility(
+                        $classId,
+                        $name->value,
+                        (int) ($op->propertyGetVisibility ?? 0)
                     );
                     break;
                 case OpCode::TYPE_DECLARE_PROPERTY:
@@ -10495,6 +10525,13 @@ class JIT {
             )) {
                 return;
             }
+            if (null !== $result->staticPropertyDnfArms) {
+                JIT\DnfParamCheck::enforcePropertyWrite(
+                    $this->context,
+                    $value,
+                    $result->staticPropertyDnfArms
+                );
+            }
             $this->context->type->object->staticPropertyStore(
                 $result->staticPropertyGlobal,
                 $value,
@@ -11112,31 +11149,37 @@ class JIT {
             }
 
             return;
-        } elseif (
-            (Variable::TYPE_OBJECT === $result->type && Variable::TYPE_STRING === $value->type)
-            || (Variable::TYPE_STRING === $result->type && Variable::TYPE_OBJECT === $value->type)
-        ) {
+        } elseif (Variable::TYPE_OBJECT === $result->type && Variable::TYPE_STRING === $value->type) {
             $slot = JIT\JitValueBox::alloc($this->context);
-            JIT\JitValueBox::assignToPointer(
-                $this->context,
+            $str = JIT\JitStringArg::stringPtrFromVariable($this->context, $value);
+            $owned = $this->context->builder->call(
+                $this->context->lookupFunction('__string__separate'),
+                $str
+            );
+            $this->context->builder->call(
+                $this->context->lookupFunction('__value__writeString'),
                 JIT\JitValueBox::pointer($this->context, $slot),
-                $value
+                $owned
             );
-            $newResult = new Variable(
-                $this->context,
-                Variable::TYPE_VALUE,
-                Variable::KIND_VARIABLE,
-                $slot
-            );
-            $this->syncCompileTimeString($newResult, $value, $force);
-            $newResult->compileTimeEnumCase = $value->compileTimeEnumCase;
-            $newResult->addref();
             $result->free();
-            $this->context->setVariableOp($resultOp, $newResult);
-            $resolved = JIT\OperandName::resolve($resultOp);
-            if (null !== $resolved && '' !== $resolved) {
-                $this->context->bindVariableByName($resolved, $newResult);
-            }
+            $result->type = Variable::TYPE_VALUE;
+            $result->value = $slot;
+            $this->syncCompileTimeString($result, $value, $force);
+            $result->addref();
+
+            return;
+        } elseif (Variable::TYPE_STRING === $result->type && Variable::TYPE_OBJECT === $value->type) {
+            $slot = JIT\JitValueBox::alloc($this->context);
+            $this->context->builder->call(
+                $this->context->lookupFunction('__value__writeObject'),
+                JIT\JitValueBox::pointer($this->context, $slot),
+                $this->context->helper->loadValue($value)
+            );
+            $result->free();
+            $result->type = Variable::TYPE_VALUE;
+            $result->value = $slot;
+            $result->compileTimeEnumCase = $value->compileTimeEnumCase;
+            $result->addref();
 
             return;
         }
@@ -11927,12 +11970,20 @@ class JIT {
         $rightChar = $this->context->builder->structGep($rightVar, $map['value']);
         $this->context->intrinsic->memcpy($char, $rightChar, $rightSize, false);
 
-        return new Variable(
+        $var = new Variable(
             $this->context,
             Variable::TYPE_STRING,
             Variable::KIND_VALUE,
             $result
         );
+        if (
+            null !== ($left->compileTimeString ?? null)
+            && null !== ($right->compileTimeString ?? null)
+        ) {
+            $var->compileTimeString = $left->compileTimeString.$right->compileTimeString;
+        }
+
+        return $var;
     }
 
     /** ++/-- on static hooked properties: get hook read, set hook write (#6319). */
@@ -12685,37 +12736,28 @@ class JIT {
         return false;
     }
 
-    private function isSelfHostProgressClassLc(string $classLc): bool
+    /**
+     * Lower Progress::{noteFunction,notePhase,noteEntry} to __phpc_progress_note when the PHP
+     * method is not yet queued (self-host spine compile order — #8560, #6748).
+     */
+    private function tryResolveProgressStaticCall(string $className, string $methodName): bool
     {
-        $classLc = strtolower(ltrim($classLc, '\\'));
-
-        return 'progress' === $classLc || str_ends_with($classLc, '\\progress');
-    }
-
-    private function tryResolveSelfHostProgressStaticCall(string $className, string $methodName): bool
-    {
-        if (!$this->shouldUseSelfHostJitStubs()) {
-            return false;
-        }
         $declaringClassLc = strtolower(ltrim($className, '\\'));
-        if (!$this->isSelfHostProgressClassLc($declaringClassLc)) {
+        if ('phpcompiler\\jit\\progress' !== $declaringClassLc && 'jit\\progress' !== $declaringClassLc) {
             return false;
         }
         $methodLc = strtolower($methodName);
         if (!in_array($methodLc, ['notefunction', 'notephase', 'noteentry'], true)) {
             return false;
         }
-        $fullLower = ('progress' === $declaringClassLc ? 'phpcompiler\\jit\\progress' : $declaringClassLc)
-            .'::'.$methodLc;
-        $this->context->scope->toCall = $this->context->resolveFunctionProxy($fullLower);
+        JIT\Builtin\ProgressNoteRuntime::ensureLinked($this->context);
+        $proxy = 'phpcompiler\\jit\\progress::'.strtolower($methodName);
+        if (!$this->context->functionIsRegistered($proxy)) {
+            return false;
+        }
+        $this->context->scope->toCall = $this->context->resolveFunctionProxy($proxy);
 
         return true;
-    }
-
-    private function tryResolveSelfHostStubbedStaticCall(string $className, string $methodName): bool
-    {
-        return $this->tryResolveSelfHostSuperglobalsStaticCall($className, $methodName)
-            || $this->tryResolveSelfHostProgressStaticCall($className, $methodName);
     }
 
     private function resolveJitStaticMethodProxyName(string $classLc, string $methodLc): string
@@ -12882,7 +12924,12 @@ class JIT {
 
                 return;
             }
-            if ($this->tryResolveSelfHostStubbedStaticCall($className, $nameOp->value)) {
+            if ($this->tryResolveSelfHostSuperglobalsStaticCall($className, $nameOp->value)) {
+                $this->context->scope->args = [];
+
+                return;
+            }
+            if ($this->tryResolveProgressStaticCall($className, $nameOp->value)) {
                 $this->context->scope->args = [];
 
                 return;
@@ -13646,6 +13693,28 @@ class JIT {
     }
 
     /**
+     * @param list<Operand|null> $operands
+     * @param list<Variable> $args
+     */
+    private function promoteCompileTimeStringOnCallArgs(Block $block, array $operands, array $args): void
+    {
+        foreach ($args as $i => $arg) {
+            if (null !== $arg->compileTimeString) {
+                continue;
+            }
+            $operand = $operands[$i] ?? null;
+            if (!$operand instanceof \PHPCfg\Operand) {
+                continue;
+            }
+            $slot = $block->slotForOperand($operand);
+            if (null === $slot) {
+                continue;
+            }
+            $this->foldCompileTimeStringFromSlot($block, $slot, $arg);
+        }
+    }
+
+    /**
      * @param array<int, true> $visited
      */
     private function resolveJitCompileTimeStringSlot(Block $block, int $slot, array &$visited = []): ?string
@@ -13663,6 +13732,13 @@ class JIT {
             return $const->toString();
         }
         foreach ($block->opCodes as $prior) {
+            if (OpCode::TYPE_CONCAT === $prior->type && $prior->arg1 === $slot) {
+                $left = $this->resolveJitCompileTimeStringSlot($block, (int) $prior->arg2, $visited);
+                $right = $this->resolveJitCompileTimeStringSlot($block, (int) $prior->arg3, $visited);
+                if (null !== $left && null !== $right) {
+                    return $left.$right;
+                }
+            }
             if (OpCode::TYPE_ASSIGN !== $prior->type || $prior->arg2 !== $slot) {
                 continue;
             }
@@ -13978,7 +14054,7 @@ class JIT {
     private function initJitFunctionStaticValueGlobal(PHPLLVM\Value $global): void
     {
         $restore = $this->context->builder->getInsertBlock();
-        $this->context->positionBuilderAtInitEmission();
+        $this->context->builder->positionAtEnd($this->context->initBlock);
         $valueType = $this->context->getTypeFromString('__value__');
         $heapVal = $this->context->memory->malloc($valueType);
         $heapPtr = $this->context->builder->pointerCast(
@@ -13990,9 +14066,7 @@ class JIT {
             $heapPtr
         );
         $this->context->builder->store($heapPtr, $global);
-        if (null !== $restore) {
-            BasicBlockHelper::restoreInsertBlock($this->context, $restore);
-        }
+        $this->context->builder->positionAtEnd($restore);
     }
 
     private static function operandSlotRank(\PHPCfg\Operand $op): int

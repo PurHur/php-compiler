@@ -120,6 +120,32 @@ make north-star4-verify
 
 **Talking point:** Default `north-star4-verify` exits **0** on partial M4 (documented M3 strict / gen-2 / gen-3 blockers) so presenters can show the ladder without a red demo; `--strict` is for contributors chasing green M4. When LLVM is present and gen-1 link is green, step 6 runs `bootstrap-loop-gen2-recompile-spine` unless the full probe already passed gen-3.
 
+### 7b. (Optional) North Star 5 — M5 presenter
+
+**PR / daily iteration** (~1–2 min — no spine relink):
+
+```bash
+make north-star5-verify-fast
+# or: ./script/north-star5-verify.sh --fast
+```
+
+**Before merging bootstrap/M5 work** (~1h — full ladder; not every PR):
+
+```bash
+./script/north-star5-verify.sh --strict
+```
+
+Expect on `--strict`: inventory **2643/2643**, spine link + run, vendor prelink **3/3**, cold boot without `vendor/`. For LLVM hot loops use `make bootstrap-selfhost-vm-driver-execute-probe` (~**20ms**); see [bootstrap-m5-fast-path.md](bootstrap-m5-fast-path.md).
+
+After **spine entry** edits (`test/selfhost/compiler_lib_spine_smoke/main.php`), refresh committed gen-0 sidecars in one step:
+
+```bash
+make bootstrap-gen0-refresh-sidecar
+# or: ./script/bootstrap-refresh-gen0-sidecar.sh
+```
+
+This runs a full spine link (`BOOTSTRAP_VM_DRIVER_EXECUTE_PROBE_FULL_LINK=1`), copies `build/.m3_*` into `prelinked/bootstrap-gen0/`, updates `manifest.json`, and runs `check-bootstrap-gen0-manifest-sync.php` ([#8704](https://github.com/PurHur/php-compiler/issues/8704)).
+
 On Runforge / harness hosts (do **not** use raw `docker run -v "$(pwd):/compiler"`):
 
 ```bash
@@ -162,9 +188,11 @@ Needs LLVM + ~8 GiB RAM; includes JIT/AOT lint/link and example smokes.
 | `make north-star2-verify` | Self-host M0–M4 presenter bundle ([#1865](https://github.com/PurHur/php-compiler/issues/1865); listed in `phpc doctor --gates` when script exists) |
 | `make north-star3-verify` | M3 native unit probe bundle — 008 + compiler/JIT/VM/parser/PHPTypes probes ([#2360](https://github.com/PurHur/php-compiler/issues/2360); [#2216](https://github.com/PurHur/php-compiler/issues/2216) / [#2332](https://github.com/PurHur/php-compiler/issues/2332) / [#2354](https://github.com/PurHur/php-compiler/issues/2354) / [#2418](https://github.com/PurHur/php-compiler/issues/2418) / [#2434](https://github.com/PurHur/php-compiler/issues/2434)) |
 | `make north-star4-verify` | M4 strict bootstrap-loop presenter — inventory + M3 strict + gen-1 link + loop probe + gen-2→gen-3 ([#2379](https://github.com/PurHur/php-compiler/issues/2379)); `--dry-run-only` on partial M4; opt-in CI [#2429](https://github.com/PurHur/php-compiler/issues/2429) |
-| `make north-star5-verify` | M5 presenter — inventory + spine + vendor prelink **3/3** + committed `.o` cold boot without `vendor/` ([#1416](https://github.com/PurHur/php-compiler/issues/1416)); Zend still default for empty `build/` |
-| `make bootstrap-loop-gen2-recompile-spine` | Gen-2 native driver recompiles **726/726** spine → gen-3 without Zend on compile ([#2697](https://github.com/PurHur/php-compiler/pull/2697), [#2866](https://github.com/PurHur/php-compiler/issues/2866)) |
-| `make bootstrap-selfhost-full-revision-probe` | M4 full revision — gen-2 argv compile of `bin/compile.php` → gen-3 (still 🚧 `parseAndCompile` null — [#2633](https://github.com/PurHur/php-compiler/issues/2633), [#2880](https://github.com/PurHur/php-compiler/issues/2880)) |
+| `make north-star5-verify-fast` | M5 PR presenter (~**1–2 min**) — inventory + spine + committed prelink blobs + VM probe; no relink ([#1492](https://github.com/PurHur/php-compiler/issues/1492)) |
+| `make north-star5-verify --strict` | Full M5 ladder (~**1h**) — vendor **3/3** + cold boot without `vendor/`; before merging bootstrap work only ([#1416](https://github.com/PurHur/php-compiler/issues/1416)) |
+| `make bootstrap-selfhost-vm-driver-execute-probe` | Fast M2 smoke (~**20ms**) — native `PHP_COMPILER_VM_DRIVER_EXECUTE` gate; seeds from prelinked gen-0 ([#2201](https://github.com/PurHur/php-compiler/issues/2201)) |
+| `make bootstrap-loop-gen2-recompile-spine` | Gen-2 native driver recompiles full spine → gen-3 without Zend on compile ([#2697](https://github.com/PurHur/php-compiler/pull/2697), [#2866](https://github.com/PurHur/php-compiler/issues/2866)) |
+| `make bootstrap-selfhost-full-revision-probe` | M4 full revision — gen-2 inventory argv compiles `bin/compile.php` → gen-3 ✅ ([#2880](https://github.com/PurHur/php-compiler/issues/2880), [#3046](https://github.com/PurHur/php-compiler/issues/3046)) |
 | `make deploy-smoke-all` | Full `PHPC_DEPLOY_ROOT` deploy ladder 001–003 + opt-in 005/006; skip hints when gates `0` — see `./phpc doctor --gates` ([#2077](https://github.com/PurHur/php-compiler/issues/2077)) |
 
 Legacy entrypoints (`bin/vm.php`, `bin/jit.php`, `bin/compile.php`) still work.

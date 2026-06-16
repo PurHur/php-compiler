@@ -376,7 +376,10 @@ patch_already_applied() {
       ! grep -q "'is_resource' => 'resource'" "$ROOT/vendor/ircmaxell/php-cfg/lib/PHPCfg/Parser.php" 2>/dev/null
       ;;
     php-types-never-type.patch)
-      grep -q 'Op\\Type\\Never_' "$ROOT/vendor/ircmaxell/php-types/lib/PHPTypes/TypeReconstructor.php" 2>/dev/null
+      grep -q 'function never(): self' "$ROOT/vendor/ircmaxell/php-types/lib/PHPTypes/Type.php" 2>/dev/null \
+        && grep -q 'instanceof CfgType\\Never_' "$ROOT/vendor/ircmaxell/php-types/lib/PHPTypes/Type.php" 2>/dev/null \
+        && grep -q "case 'never':" "$ROOT/vendor/ircmaxell/php-types/lib/PHPTypes/Type.php" 2>/dev/null \
+        && grep -q 'Op\\Type\\Never_' "$ROOT/vendor/ircmaxell/php-types/lib/PHPTypes/TypeReconstructor.php" 2>/dev/null
       ;;
     php-types-intersection-type.patch)
       grep -q 'instanceof CfgType\\Intersection' "$ROOT/vendor/ircmaxell/php-types/lib/PHPTypes/Type.php" 2>/dev/null
@@ -827,6 +830,31 @@ sys.stderr.write("php-cfg-asymmetric-visibility: Param.php promotionSetVisibilit
 raise SystemExit(1)
 PY
       echo "Applied php-cfg-asymmetric-visibility.patch (Param getVisibility overlay #5059)"
+    fi
+    if ! grep -q 'promotionSetVisibility' "$param" 2>/dev/null; then
+      python3 - "$param" <<'PY'
+import sys
+from pathlib import Path
+
+path = Path(sys.argv[1])
+text = path.read_text()
+if 'promotionSetVisibility' in text:
+    raise SystemExit(0)
+set_vis_block = (
+    "\n    /** Constructor promotion: asymmetric set visibility (#3165). */\n"
+    "    public int $promotionSetVisibility = 0;\n"
+)
+for needle in (
+    "    public int $promotionGetVisibility = 0;\n",
+    "    public $promotionGetVisibility = 0;\n",
+):
+    if needle in text:
+        path.write_text(text.replace(needle, needle + set_vis_block, 1))
+        raise SystemExit(0)
+sys.stderr.write("php-cfg-asymmetric-visibility: Param.php promotionGetVisibility anchor missing for set overlay\n")
+raise SystemExit(1)
+PY
+      echo "Applied php-cfg-asymmetric-visibility.patch (Param setVisibility overlay #8760)"
     fi
     echo "Skip php-cfg-asymmetric-visibility.patch (already applied)"
     return 0
@@ -2819,21 +2847,37 @@ if 'function never(): self' not in text:
     changed = True
 
 if 'instanceof CfgType\\Never_' not in text:
-    anchor = """        if ($decl instanceof CfgType\\Literal) {
-            return self::fromDecl($decl->name);
-        }
-        if ($decl instanceof CfgType\\Mixed_) {"""
-    insert = """        if ($decl instanceof CfgType\\Literal) {
-            return self::fromDecl($decl->name);
-        }
-        if ($decl instanceof CfgType\\Never_) {
+    never_decl = """        if ($decl instanceof CfgType\\Never_) {
             return self::never();
         }
-        if ($decl instanceof CfgType\\Mixed_) {"""
-    if anchor not in text:
+"""
+    decl_anchors = [
+        ("""        if ($decl instanceof CfgType\\Literal) {
+            return self::fromDecl($decl->name);
+        }
+        if ($decl instanceof CfgType\\Mixed_) {""",
+         """        if ($decl instanceof CfgType\\Literal) {
+            return self::fromDecl($decl->name);
+        }
+""" + never_decl + """        if ($decl instanceof CfgType\\Mixed_) {"""),
+        ("""        if ($decl instanceof CfgType\\Literal) {
+            return self::fromDecl($decl->name);
+        }
+
+        throw new \\LogicException('Unsupported declaration type: '.get_class($decl));""",
+         """        if ($decl instanceof CfgType\\Literal) {
+            return self::fromDecl($decl->name);
+        }
+""" + never_decl + """
+        throw new \\LogicException('Unsupported declaration type: '.get_class($decl));"""),
+    ]
+    for anchor, insert in decl_anchors:
+        if anchor in text:
+            text = text.replace(anchor, insert, 1)
+            changed = True
+            break
+    else:
         raise SystemExit(2)
-    text = text.replace(anchor, insert, 1)
-    changed = True
 
 if "case 'never':" not in text:
     anchor = """            case 'null':
@@ -2863,7 +2907,57 @@ PY
   echo "Applied php-types-never-type.patch (never overlay): ${target}"
 }
 
-apply_php_types_never_method_overlay() {
+apply_php_types_never_type_reconstructor_overlay_to_target() {
+  local target="$1"
+  if [[ ! -f "$target" ]]; then
+    echo "Skip php-types-never-type.patch TypeReconstructor (target missing): ${target}"
+    return 0
+  fi
+  if grep -q 'instanceof Op\\Type\\Never_' "$target" 2>/dev/null; then
+    return 0
+  fi
+  if ! python3 - "$target" <<'PY'
+import sys
+from pathlib import Path
+
+path = Path(sys.argv[1])
+text = path.read_text()
+never_arm = """        } elseif ($type instanceof Op\\Type\\Never_) {
+            return Type::never();
+"""
+anchors = [
+    ("""        } elseif ($type instanceof Op\\Type\\Literal) {
+            return Type::fromDecl($type->name);
+        } elseif ($type instanceof Op\\Type\\Union_) {""",
+     """        } elseif ($type instanceof Op\\Type\\Literal) {
+            return Type::fromDecl($type->name);
+""" + never_arm + """        } elseif ($type instanceof Op\\Type\\Union_) {"""),
+    ("""        } elseif ($type instanceof Op\\Type\\Literal) {
+            return Type::fromDecl($type->name);
+        }
+
+        throw new \\LogicException('Unknown Op\\\\Type provided: '.get_class($type));""",
+     """        } elseif ($type instanceof Op\\Type\\Literal) {
+            return Type::fromDecl($type->name);
+""" + never_arm + """        }
+
+        throw new \\LogicException('Unknown Op\\\\Type provided: '.get_class($type));"""),
+]
+for old, new in anchors:
+    if old in text:
+        path.write_text(text.replace(old, new, 1))
+        raise SystemExit(0)
+sys.stderr.write("php-types-never-type: TypeReconstructor Never_ anchor not found\n")
+raise SystemExit(1)
+PY
+  then
+    echo "ERROR: php-types-never-type TypeReconstructor overlay failed for ${target} (#4137/#7329)" >&2
+    return 1
+  fi
+  echo "Applied php-types-never-type.patch (TypeReconstructor overlay): ${target}"
+}
+
+apply_php_types_never_type_overlay() {
   local rc=0
   if ! apply_php_types_never_method_overlay_to_target "$ROOT/vendor/ircmaxell/php-types/lib/PHPTypes/Type.php"; then
     rc=1
@@ -2871,10 +2965,20 @@ apply_php_types_never_method_overlay() {
   if ! apply_php_types_never_method_overlay_to_target "$ROOT/prelinked/bootstrap-vendor/sources/ircmaxell/php-types/lib/PHPTypes/Type.php"; then
     rc=1
   fi
+  if ! apply_php_types_never_type_reconstructor_overlay_to_target "$ROOT/vendor/ircmaxell/php-types/lib/PHPTypes/TypeReconstructor.php"; then
+    rc=1
+  fi
+  if ! apply_php_types_never_type_reconstructor_overlay_to_target "$ROOT/prelinked/bootstrap-vendor/sources/ircmaxell/php-types/lib/PHPTypes/TypeReconstructor.php"; then
+    rc=1
+  fi
   if [[ "$rc" -ne 0 ]]; then
     record_patch_failure "php-types-never-type.patch" "Type::never() missing — fix overlay anchors (#4137)"
   fi
-  return 0
+  return "$rc"
+}
+
+apply_php_types_never_method_overlay() {
+  apply_php_types_never_type_overlay
 }
 
 apply_php_types_hex2bin_strict_overlay() {
@@ -4819,7 +4923,10 @@ apply_patch() {
   fi
   if [[ "$(basename "$patch")" == "php-types-throw-expr.patch" ]]; then
     apply_php_types_throw_expr_overlay
-    apply_php_types_never_method_overlay
+    return $?
+  fi
+  if [[ "$(basename "$patch")" == "php-types-never-type.patch" ]]; then
+    apply_php_types_never_type_overlay
     return $?
   fi
   if [[ "$(basename "$patch")" == "php-types-anonymous-class-type.patch" ]]; then
@@ -5052,7 +5159,6 @@ if [[ -d "$ROOT/vendor/ircmaxell/php-cfg" ]]; then
   # Throw expressions must survive optional patch failures (#6746, #5151).
   apply_php_cfg_throw_expr_overlay
   apply_php_types_throw_expr_overlay
-  apply_php_types_never_method_overlay
   # Required for readonly property VM/JIT guards (#3149, #4518); apply before optional patches may fail.
   apply_php_cfg_property_readonly_overlay
   apply_patch "$PATCH_DIR/php-cfg-dollars-brace.patch"
@@ -5155,6 +5261,8 @@ if [[ -d "$ROOT/vendor/ircmaxell/php-types" ]]; then
   apply_patch "$PATCH_DIR/php-types-nullsafe.patch"
   apply_patch "$PATCH_DIR/php-types-static-var.patch"
   apply_patch "$PATCH_DIR/php-types-nullable-return.patch"
+  # Never type needs mixed-reserved + nullable-return fromTypeDecl arms (#8738).
+  apply_patch "$PATCH_DIR/php-types-never-type.patch"
   apply_patch "$PATCH_DIR/php-types-cfg-reference.patch"
   apply_patch "$PATCH_DIR/php-types-nullable-optype-return.patch"
   apply_patch "$PATCH_DIR/php-types-yield-from.patch"
@@ -5178,7 +5286,6 @@ if [[ -d "$ROOT/vendor/ircmaxell/php-types" ]]; then
   apply_patch "$PATCH_DIR/php-types-magic-script-const.patch"
   apply_patch "$PATCH_DIR/php-types-first-class-callable.patch"
   apply_patch "$PATCH_DIR/php-types-incdec-type.patch"
-  apply_patch "$PATCH_DIR/php-types-never-type.patch"
   apply_patch "$PATCH_DIR/php-types-intersection-type.patch"
   apply_patch "$PATCH_DIR/php-types-union-type.patch"
   apply_patch "$PATCH_DIR/php-types-throw-expr.patch"

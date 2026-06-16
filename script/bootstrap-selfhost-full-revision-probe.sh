@@ -10,6 +10,8 @@ cd "${ROOT}"
 source "$(dirname "$0")/php-env.sh"
 # shellcheck source=bootstrap-ensure-inventory-argv-driver.sh
 source "$(dirname "$0")/bootstrap-ensure-inventory-argv-driver.sh"
+# shellcheck source=bootstrap-gen0-install-prelinked-driver.sh
+source "$(dirname "$0")/bootstrap-gen0-install-prelinked-driver.sh"
 ci_apply_llvm_memory_env
 
 GEN2_INVENTORY="${ROOT}/build/bin-compile-aot-inventory"
@@ -71,8 +73,12 @@ if [[ "${gen3_bytes}" -lt 350000 ]]; then
 fi
 PRELINKED_GEN0="${ROOT}/prelinked/bootstrap-gen0/bin-compile-aot"
 if [[ -f "${PRELINKED_GEN0}" ]] && cmp -s "${GEN3}" "${PRELINKED_GEN0}"; then
-  if grep -qE 'sidecar emit fallback|recovered via gen-0 sidecar|parseAndCompile returned null' <<< "${gen3_link_out}"; then
+  if grep -qE 'sidecar emit fallback|recovered via gen-0 sidecar|parseAndCompile returned null|installed inventory argv driver from prelinked' <<< "${gen3_link_out}"; then
     echo "bootstrap-selfhost-full-revision-probe: gen-3 is prelinked gen-0 sidecar (inventory stale — rebuild via bootstrap-ensure-inventory-argv-driver #1492)" >&2
+    exit 1
+  fi
+  if bootstrap_gen3_emit_matches_stale_prelinked_gen0 "${GEN3}"; then
+    echo "bootstrap-selfhost-full-revision-probe: gen-3 matches stale prelinked/bootstrap-gen0/ (sidecar copy — refresh gen-0 or rebuild inventory argv driver #8710)" >&2
     exit 1
   fi
   # Self-host fixed point: gen-2 inventory argv emit reproduces refreshed gen-0 driver bytes.

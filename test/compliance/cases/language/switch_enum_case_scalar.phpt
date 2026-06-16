@@ -27,8 +27,17 @@ switch (E::A) {
     default:
         echo "identity-no\n";
 }
+
+switch (E::A) {
+    case 1:
+        echo "sym-match\n";
+        break;
+    default:
+        echo "sym-no\n";
+}
 ?>
 --EXPECT--
 no
 str-no
 identity
+sym-no

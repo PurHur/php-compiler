@@ -801,6 +801,9 @@ class Block {
                 $boundThis = self::resolveBoundClosureThis($frame);
                 if (null !== $boundThis) {
                     $scope[$pos] = self::initialVariableForOperand($op, $context, $pos, $this);
+                    if (VM\EnumCaseSupport::isEnumCaseVariable($boundThis)) {
+                        $boundThis = VM\EnumCaseSupport::materializeConstantValue($context, $boundThis);
+                    }
                     $scope[$pos]->copyFrom($boundThis);
                     continue;
                 }

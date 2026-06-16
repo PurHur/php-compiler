@@ -122,6 +122,27 @@ bootstrap_gen0_seed_prelinked_m3_sidecars() {
   return 0
 }
 
+# Copy committed gen-0 spine AOT blob (no Zend/inventory compile — feedback-loop fast path #2201).
+bootstrap_copy_prelinked_compiler_lib_spine_blob() {
+  local out=$1
+  local root="${ROOT:-}"
+  local prelinked="${root}/prelinked/bootstrap-gen0/compiler_lib_aot_blob"
+  local stamp_src="${root}/prelinked/bootstrap-gen0/.m3_compiler_lib_sidecar.sha"
+  local stamp_dst="${root}/build/.m3_compiler_lib_sidecar.sha"
+  if [[ -z "${root}" || -z "${out}" || ! -f "${prelinked}" || ! -s "${prelinked}" ]]; then
+    return 1
+  fi
+  mkdir -p "$(dirname "${out}")" "${root}/build"
+  cp -f "${prelinked}" "${out}"
+  chmod +x "${out}"
+  cp -f "${prelinked}" "${root}/build/.m3_compiler_lib_aot_blob"
+  chmod +x "${root}/build/.m3_compiler_lib_aot_blob"
+  if [[ -f "${stamp_src}" ]]; then
+    cp -f "${stamp_src}" "${stamp_dst}"
+  fi
+  return 0
+}
+
 # SHA-1 of M2 compiler_lib_spine_smoke entry (sidecar + inventory argv driver must match).
 bootstrap_compiler_lib_spine_entry_sha() {
   local root="${ROOT:-}"
@@ -165,6 +186,34 @@ bootstrap_compiler_lib_honest_zend_compile() {
     "${root}/bin/compile.php" -o "${out}" "${entry}"
 }
 
+# True when committed prelinked gen-0 compiler_lib stamp lags the live spine entry (#8710, #8559).
+bootstrap_prelinked_gen0_compiler_lib_stamp_stale() {
+  local root="${ROOT:-}"
+  if [[ -z "${root}" ]]; then
+    return 1
+  fi
+  local stamp="${root}/prelinked/bootstrap-gen0/.m3_compiler_lib_sidecar.sha"
+  if [[ ! -f "${stamp}" ]]; then
+    return 0
+  fi
+  local want_sha have_sha
+  want_sha="$(bootstrap_compiler_lib_spine_entry_sha)" || return 0
+  have_sha="$(tr -d '\n' <"${stamp}")"
+  [[ "${want_sha}" != "${have_sha}" ]]
+}
+
+# Gen-3 argv driver byte-matches stale prelinked gen-0 (sidecar copy, not inventory emit — #8710).
+bootstrap_gen3_emit_matches_stale_prelinked_gen0() {
+  local gen3=$1
+  local root="${ROOT:-}"
+  local prelinked="${root}/prelinked/bootstrap-gen0/bin-compile-aot"
+  if [[ -z "${root}" || ! -f "${gen3}" || ! -f "${prelinked}" ]]; then
+    return 1
+  fi
+  cmp -s "${gen3}" "${prelinked}" || return 1
+  bootstrap_prelinked_gen0_compiler_lib_stamp_stale
+}
+
 # Ensure build/.m3_compiler_lib_aot_blob matches current spine entry (#3012, #2967).
 bootstrap_ensure_m3_compiler_lib_sidecar() {
   local root="${ROOT:-}"
@@ -205,7 +254,7 @@ bootstrap_ensure_m3_compiler_lib_sidecar() {
   local regen_log regen_code=0
   set +e
   # Do not set PHP_COMPILER_CLI_SPINE_BUNDLE here — that skips bin/compile.php argv dispatch (#1492).
-  regen_log="$(bootstrap_compiler_lib_honest_zend_compile "${regen_tmp}" "${entry}" 2>&1)"
+  regen_log="$(bootstrap_compiler_lib_honest_zend_compile "${regen_tmp}" "${entry}" sidecar 2>&1)"
   regen_code=$?
   set -e
   if [[ "${regen_code}" -eq 0 && -f "${regen_tmp}" && -s "${regen_tmp}" ]]; then

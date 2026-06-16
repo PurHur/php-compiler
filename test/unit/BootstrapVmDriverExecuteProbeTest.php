@@ -30,8 +30,10 @@ final class BootstrapVmDriverExecuteProbeTest extends TestCase
         $this->assertStringContainsString('selfhost-lib-spine-smoke', $script);
         $this->assertStringContainsString('vm driver ok', $script);
         $this->assertStringContainsString('bootstrap-selfhost-lib-spine-smoke-link.sh', $script);
-        $this->assertStringContainsString('bootstrap_compiler_lib_spine_entry_sha', $script);
         $this->assertStringContainsString('.m3_compiler_lib_sidecar.sha', $script);
+        $this->assertStringContainsString('BOOTSTRAP_VM_DRIVER_EXECUTE_PROBE_FULL_LINK', $script);
+        $this->assertStringContainsString('bootstrap_copy_prelinked_compiler_lib_spine_blob', $script);
+        $this->assertStringContainsString('bootstrap_vm_driver_execute_probe_llvm_env', $script);
     }
 
     public function testSpineEntryDocumentsVmDriverExecutePath(): void
@@ -56,8 +58,20 @@ final class BootstrapVmDriverExecuteProbeTest extends TestCase
         $this->assertStringContainsString('8192M', $script);
         $this->assertStringContainsString('honest emit required (#8559)', $script);
         $this->assertStringContainsString('retrying honest Zend', $script);
-        $this->assertStringContainsString('refreshed prelinked', $script);
-        $this->assertStringContainsString('bootstrap_compiler_lib_honest_zend_compile', $script);
+        $this->assertStringContainsString('VM driver env probe OK', $script);
+    }
+
+    /** Issue #8692: default spine smoke must run PHP main(), not native bundle-OK echo stub. */
+    public function testSpineSmokeDefaultPathRunsPhpMainNotNativeBundleStub(): void
+    {
+        $native = (string) file_get_contents(self::$root.'/lib/JIT/VmDriverExecuteNative.php');
+        $this->assertStringNotContainsString('vm_probe_bundle_default', $native);
+        $this->assertStringContainsString('isCompilerLibSpineSmokeEntry', $native);
+        $this->assertStringContainsString('#8692', $native);
+        $this->assertStringContainsString('#8693', $native);
+        $entry = (string) file_get_contents(self::$root.'/test/selfhost/compiler_lib_spine_smoke/main.php');
+        $this->assertStringContainsString('compiler_lib_spine_smoke bundle OK', $entry);
+        $this->assertStringNotContainsString("echo \"vm driver ok\\n\";\n    exit", $entry);
     }
 
     public function testNativeMainEnvProbePrintsVmDriverOkWhenLlvmPresent(): void

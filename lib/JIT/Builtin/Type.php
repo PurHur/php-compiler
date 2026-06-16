@@ -1313,6 +1313,15 @@ class Type extends Builtin {
             $fntypeHttpBuildQuery
         );
         $this->context->registerFunction('__compiler_http_build_query', $fnHttpBuildQuery);
+        $fntypeIconv = $this->context->context->functionType(
+            $strPtr,
+            false,
+            $strPtr,
+            $strPtr,
+            $strPtr
+        );
+        $fnIconv = $this->context->module->addFunction('__compiler_iconv', $fntypeIconv);
+        $this->context->registerFunction('__compiler_iconv', $fnIconv);
         // $this->maskedarray->register();
         // $this->nativearray->register();
     }
@@ -1323,6 +1332,7 @@ class Type extends Builtin {
         StringStripTags::ensureLinked($this->context);
         HttpResponseCode::implement($this->context);
         ObOutput::registerExternals($this->context);
+        ObGzhandler::ensureLinked($this->context);
         ObOutputRuntime::ensureLinked($this->context);
         PendingHeadersRuntime::ensureLinked($this->context);
         PowIntRuntime::ensureLinked($this->context);

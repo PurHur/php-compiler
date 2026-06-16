@@ -12,6 +12,7 @@ final class RuntimeInitVmContext {
         foreach ([
             'functions',
             'classes',
+            'classAliases',
             'enums',
             'classAutoloaders',
             'splAutoloadCallbacks',
@@ -46,6 +47,20 @@ final class RuntimeInitVmContext {
         $stackVar = new Variable($context, Variable::TYPE_OBJECT, Variable::KIND_VALUE, $scriptStack);
         $stackSlot = $object->propertyFetch($ctx, 'PHPCompiler\\VM\\Context', 'scriptStack');
         $object->propertyStore($stackSlot->objectPropertySlot, $stackVar, Variable::TYPE_OBJECT);
+
+        $exceptionId = $object->lookup('PHPCompiler\\VM\\ExceptionHandlerStack');
+        $exceptionHandlers = $object->allocate($exceptionId);
+        $object->markObjectConstructed($exceptionHandlers);
+        $exceptionVar = new Variable($context, Variable::TYPE_OBJECT, Variable::KIND_VALUE, $exceptionHandlers);
+        $exceptionSlot = $object->propertyFetch($ctx, 'PHPCompiler\\VM\\Context', 'exceptionHandlers');
+        $object->propertyStore($exceptionSlot->objectPropertySlot, $exceptionVar, Variable::TYPE_OBJECT);
+
+        $limitsId = $object->lookup('PHPCompiler\\ext\\standard\\VmExecutionLimits');
+        $executionLimits = $object->allocate($limitsId);
+        $object->markObjectConstructed($executionLimits);
+        $limitsVar = new Variable($context, Variable::TYPE_OBJECT, Variable::KIND_VALUE, $executionLimits);
+        $limitsSlot = $object->propertyFetch($ctx, 'PHPCompiler\\VM\\Context', 'executionLimits');
+        $object->propertyStore($limitsSlot->objectPropertySlot, $limitsVar, Variable::TYPE_OBJECT);
 
         $runtimeVar = new Variable($context, Variable::TYPE_OBJECT, Variable::KIND_VALUE, $runtimeThis);
         $runtimeSlot = $object->propertyFetch($ctx, 'PHPCompiler\\VM\\Context', 'runtime');

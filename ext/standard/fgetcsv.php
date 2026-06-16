@@ -8,7 +8,7 @@ use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitLongArg;
-use PHPCompiler\JIT\JitStringArg;
+use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\EnumCaseSupport;
 use PHPCompiler\VM\Variable;
@@ -41,13 +41,13 @@ final class fgetcsv extends Internal
         $enclosure = '"';
         $escape = '\\';
         if ($argc >= 3) {
-            $separator = VmReflection::stringArg($frame->calledArgs[2], 'fgetcsv() separator', 2);
+            $separator = VmString::coerceStringBuiltinArg($frame->calledArgs[2], 'fgetcsv', 2, 'separator');
         }
         if ($argc >= 4) {
-            $enclosure = VmReflection::stringArg($frame->calledArgs[3], 'fgetcsv() enclosure', 3);
+            $enclosure = VmString::coerceStringBuiltinArg($frame->calledArgs[3], 'fgetcsv', 3, 'enclosure');
         }
         if ($argc >= 5) {
-            $escape = VmReflection::stringArg($frame->calledArgs[4], 'fgetcsv() escape', 4);
+            $escape = VmString::coerceStringBuiltinArg($frame->calledArgs[4], 'fgetcsv', 4, 'escape');
         }
         $row = VmFs::fgetcsv($handle, $length, $separator, $enclosure, $escape);
         if (false === $row) {
@@ -81,13 +81,13 @@ final class fgetcsv extends Internal
         $enclosure = $strPtr->constNull();
         $escape = $strPtr->constNull();
         if ($argc >= 3) {
-            $separator = JitStringArg::lower($context, $args[2], 'fgetcsv() separator');
+            $separator = JitStringBuiltinArg::lower($context, $args[2], 'fgetcsv', 2, 'separator');
         }
         if ($argc >= 4) {
-            $enclosure = JitStringArg::lower($context, $args[3], 'fgetcsv() enclosure');
+            $enclosure = JitStringBuiltinArg::lower($context, $args[3], 'fgetcsv', 3, 'enclosure');
         }
         if ($argc >= 5) {
-            $escape = JitStringArg::lower($context, $args[4], 'fgetcsv() escape');
+            $escape = JitStringBuiltinArg::lower($context, $args[4], 'fgetcsv', 4, 'escape');
         }
 
         return JitFgetcsv::invoke($context, $handle, $length, $separator, $enclosure, $escape);

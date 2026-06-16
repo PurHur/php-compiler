@@ -98,6 +98,9 @@ class Object_ extends Type {
     /** @var array<int, array<string, list<array{kind: string, interfaces?: list<string>, display?: string, name?: string}>>> */
     private array $propertyDnfArms = [];
 
+    /** @var array<int, array<string, list<array{kind: string, interfaces?: list<string>, display?: string, name?: string}>>> */
+    private array $staticPropertyDnfArms = [];
+
     /** @var array<int, array<int, true>> class id => property slot => true when declared type allows null (#5220) */
     private array $propertyAllowsNullSlots = [];
     /** @var array<int, array<string, string>> class id => method lc => declared casing (#3118) */
@@ -141,6 +144,8 @@ class Object_ extends Type {
     private array $staticPropertyVisibility = [];
     /** @var array<int, array<string, int>> class id => static prop lc => asymmetric set visibility (#6769) */
     private array $staticPropertySetVisibility = [];
+    /** @var array<int, array<string, int>> class id => static prop lc => asymmetric get visibility (#8751) */
+    private array $staticPropertyGetVisibility = [];
     /** @var array<int, array<string, int>> class id => static prop lc => declaring class id (#6785) */
     private array $staticPropertyDeclaringClassId = [];
     /** @var array<int, array<string, int>> class id => instance prop lc => declaring trait/class id (#7418) */
@@ -3225,9 +3230,21 @@ class Object_ extends Type {
         }
     }
 
+    public function defineStaticPropertyGetVisibility(int $classId, string $name, int $getVisibilityFlags): void
+    {
+        if (0 !== $getVisibilityFlags) {
+            $this->staticPropertyGetVisibility[$classId][strtolower($name)] = $getVisibilityFlags;
+        }
+    }
+
     public function staticPropertySetVisibility(int $classId, string $name): int
     {
         return $this->staticPropertySetVisibility[$classId][strtolower($name)] ?? 0;
+    }
+
+    public function staticPropertyGetVisibility(int $classId, string $name): int
+    {
+        return $this->staticPropertyGetVisibility[$classId][strtolower($name)] ?? 0;
     }
 
     public function methodVisibility(int $classId, string $methodLc): int
@@ -3316,12 +3333,28 @@ class Object_ extends Type {
         $this->propertyDnfArms[$classId][strtolower($name)] = $arms;
     }
 
+    public function defineStaticPropertyDnfArms(int $classId, string $name, array $arms): void
+    {
+        if ([] === $arms) {
+            return;
+        }
+        $this->staticPropertyDnfArms[$classId][strtolower($name)] = $arms;
+    }
+
     /**
      * @return list<array{kind: string, interfaces?: list<string>, display?: string, name?: string}>|null
      */
     public function dnfArmsForProperty(int $classId, string $name): ?array
     {
         return $this->propertyDnfArms[$classId][strtolower($name)] ?? null;
+    }
+
+    /**
+     * @return list<array{kind: string, interfaces?: list<string>, display?: string, name?: string}>|null
+     */
+    public function dnfArmsForStaticProperty(int $classId, string $name): ?array
+    {
+        return $this->staticPropertyDnfArms[$classId][strtolower($name)] ?? null;
     }
 
     public function definePropertyRuntimeNewDefault(int $classId, string $name, string $newClassName): void
@@ -3779,9 +3812,16 @@ class Object_ extends Type {
             if (isset($this->staticPropertySetVisibility[$traitId][$name])) {
                 $this->staticPropertySetVisibility[$classId][$name] = $this->staticPropertySetVisibility[$traitId][$name];
             }
+            if (isset($this->staticPropertyGetVisibility[$traitId][$name])) {
+                $this->staticPropertyGetVisibility[$classId][$name] = $this->staticPropertyGetVisibility[$traitId][$name];
+            }
             if (isset($this->staticPropertyDeclaringClassId[$traitId][$name])) {
                 $this->staticPropertyDeclaringClassId[$classId][$name]
                     = $this->staticPropertyDeclaringClassId[$traitId][$name];
+            }
+            $arms = $this->dnfArmsForStaticProperty($traitId, $name);
+            if (null !== $arms) {
+                $this->defineStaticPropertyDnfArms($classId, $name, $arms);
             }
         }
     }
@@ -3867,6 +3907,9 @@ class Object_ extends Type {
                 }
                 if (isset($this->staticPropertySetVisibility[$parentId][$name])) {
                     $this->staticPropertySetVisibility[$childId][$name] = $this->staticPropertySetVisibility[$parentId][$name];
+                }
+                if (isset($this->staticPropertyGetVisibility[$parentId][$name])) {
+                    $this->staticPropertyGetVisibility[$childId][$name] = $this->staticPropertyGetVisibility[$parentId][$name];
                 }
                 if (isset($this->staticPropertyDeclaringClassId[$parentId][$name])) {
                     $this->staticPropertyDeclaringClassId[$childId][$name]
@@ -4006,14 +4049,19 @@ class Object_ extends Type {
             && Variable::TYPE_NATIVE_BOOL !== $jitType
             && Variable::TYPE_NATIVE_DOUBLE !== $jitType
             && Variable::TYPE_VALUE !== $jitType
+            && Variable::TYPE_HASHTABLE !== $jitType
         ) {
             throw new \LogicException(
-                'JIT static property requires a scalar declared type (int, string, float, bool) or boxed value'
+                'JIT static property requires a scalar declared type (int, string, float, bool), hashtable, or boxed value'
             );
         }
         $globalName = 'sp_'.$classId.'_'.$key;
         if (Variable::TYPE_VALUE === $jitType) {
             $llvmType = $this->context->getTypeFromString('__value__*');
+            $global = $this->context->module->addGlobal($llvmType, $globalName);
+            $global->setInitializer($llvmType->constNull());
+        } elseif (Variable::TYPE_HASHTABLE === $jitType) {
+            $llvmType = $this->context->getTypeFromString('__hashtable__*');
             $global = $this->context->module->addGlobal($llvmType, $globalName);
             $global->setInitializer($llvmType->constNull());
         } elseif (Variable::TYPE_STRING === $jitType) {
@@ -4050,8 +4098,21 @@ class Object_ extends Type {
         if (Variable::TYPE_STRING === $jitType && null !== $default) {
             $this->initStaticStringPropertyDefault($global, $default);
         }
+        if (Variable::TYPE_HASHTABLE === $jitType) {
+            if (null === $default || VMVariable::TYPE_ARRAY === $default->type) {
+                $this->initStaticHashtablePropertyEmpty($global);
+            } else {
+                throw new \LogicException(
+                    'Static array property default must be an empty array literal for '.$this->classNameForId($classId).'::'.$name
+                );
+            }
+        }
         if (Variable::TYPE_VALUE === $jitType && null !== $default && EnumCaseSupport::isEnumCaseVariable($default)) {
             $this->initStaticValuePropertyEnumCase($global, $default);
+        } elseif (Variable::TYPE_VALUE === $jitType && null !== $default && VMVariable::TYPE_ARRAY === $default->type) {
+            $this->initStaticValuePropertyEmptyArray($global);
+        } elseif (Variable::TYPE_VALUE === $jitType && null !== $default && VMVariable::TYPE_NULL !== $default->type) {
+            $this->initStaticValuePropertyScalarDefault($global, $default);
         } elseif (Variable::TYPE_VALUE === $jitType && (null === $default || VMVariable::TYPE_NULL === $default->type)) {
             $this->initStaticValuePropertyNull($global);
         }
@@ -4115,6 +4176,99 @@ class Object_ extends Type {
             $this->context->lookupFunction('__value__writeNull'),
             $heapPtr
         );
+        $this->context->builder->store($heapPtr, $global);
+        if (null !== $restore) {
+            BasicBlockHelper::restoreInsertBlock($this->context, $restore);
+        }
+    }
+
+    /** Initialize a typed static array property with an empty hashtable (#8716). */
+    private function initStaticHashtablePropertyEmpty(\PHPLLVM\Value $global): void
+    {
+        $restore = $this->context->builder->getInsertBlock();
+        $this->context->positionBuilderAtInitEmission();
+        $ht = HashTableHelper::alloc($this->context);
+        $this->context->builder->store($ht, $global);
+        if (null !== $restore) {
+            BasicBlockHelper::restoreInsertBlock($this->context, $restore);
+        }
+    }
+
+    /** Box an empty compile-time array default into a union/DNF static {@see __value__} property (#8708, #8719, DomRegistry::$states #6140). */
+    private function initStaticValuePropertyEmptyArray(\PHPLLVM\Value $global): void
+    {
+        $restore = $this->context->builder->getInsertBlock();
+        $this->context->positionBuilderAtInitEmission();
+        $valueType = $this->context->getTypeFromString('__value__');
+        $heapVal = $this->context->memory->malloc($valueType);
+        $heapPtr = $this->context->builder->pointerCast(
+            $heapVal,
+            $this->context->getTypeFromString('__value__*')
+        );
+        $ht = HashTableHelper::alloc($this->context);
+        $this->context->builder->call(
+            $this->context->lookupFunction('__value__writeHashtable'),
+            $heapPtr,
+            $ht
+        );
+        $this->context->builder->store($heapPtr, $global);
+        if (null !== $restore) {
+            BasicBlockHelper::restoreInsertBlock($this->context, $restore);
+        }
+    }
+
+    /** Box a compile-time scalar default into a union/DNF static {@see __value__} property (#8726). */
+    private function initStaticValuePropertyScalarDefault(\PHPLLVM\Value $global, VMVariable $default): void
+    {
+        $restore = $this->context->builder->getInsertBlock();
+        $this->context->positionBuilderAtInitEmission();
+        $valueType = $this->context->getTypeFromString('__value__');
+        $heapVal = $this->context->memory->malloc($valueType);
+        $heapPtr = $this->context->builder->pointerCast(
+            $heapVal,
+            $this->context->getTypeFromString('__value__*')
+        );
+        $valueMap = $this->context->structFieldMap['__value__'];
+        $this->context->builder->store(
+            $this->context->getTypeFromString('int8')->constInt($default->type, false),
+            $this->context->builder->structGep($heapVal, $valueMap['type'])
+        );
+        if (VMVariable::TYPE_STRING === $default->type) {
+            $str = $this->context->builder->load(
+                $this->context->constantStringFromString($default->toString())
+            );
+            $owned = $this->context->builder->call(
+                $this->context->lookupFunction('__string__separate'),
+                $str
+            );
+            $this->context->builder->call(
+                $this->context->lookupFunction('__value__writeString'),
+                $heapPtr,
+                $owned
+            );
+        } elseif (VMVariable::TYPE_INTEGER === $default->type) {
+            $this->context->builder->call(
+                $this->context->lookupFunction('__value__writeLong'),
+                $heapPtr,
+                $this->context->getTypeFromString('int64')->constInt($default->toInt(), false)
+            );
+        } elseif (VMVariable::TYPE_FLOAT === $default->type) {
+            $this->context->builder->call(
+                $this->context->lookupFunction('__value__writeDouble'),
+                $heapPtr,
+                $this->context->getTypeFromString('double')->constReal($default->toFloat())
+            );
+        } elseif (VMVariable::TYPE_BOOLEAN === $default->type) {
+            $this->context->builder->call(
+                $this->context->lookupFunction('__value__writeLong'),
+                $heapPtr,
+                $this->context->getTypeFromString('int64')->constInt($default->toBool() ? 1 : 0, false)
+            );
+        } else {
+            throw new \LogicException(
+                'Static union/DNF property default must be a scalar compile-time constant'
+            );
+        }
         $this->context->builder->store($heapPtr, $global);
         if (null !== $restore) {
             BasicBlockHelper::restoreInsertBlock($this->context, $restore);
@@ -4212,7 +4366,13 @@ class Object_ extends Type {
     }
 
     /**
-     * @return array{visibility: int, declaringClassId: int, declaringClassName: string}|null
+     * @return array{
+     *     visibility: int,
+     *     setVisibility: int,
+     *     getVisibility: int,
+     *     declaringClassId: int,
+     *     declaringClassName: string
+     * }|null
      */
     public function staticPropertyVisibilityMeta(int $classId, string $name): ?array
     {
@@ -4232,8 +4392,59 @@ class Object_ extends Type {
             return [
                 'visibility' => $this->staticPropertyVisibility[$currentId][$key] ?? \PHPCfg\Func::FLAG_PUBLIC,
                 'setVisibility' => $this->staticPropertySetVisibility[$currentId][$key] ?? 0,
+                'getVisibility' => $this->staticPropertyGetVisibility[$currentId][$key] ?? 0,
                 'declaringClassId' => $declId,
                 'declaringClassName' => $this->classNameForId($declId),
+            ];
+        }
+
+        return null;
+    }
+
+    /**
+     * @return array{
+     *     visibility: int,
+     *     setVisibility: int,
+     *     getVisibility: int,
+     *     declaringClassId: int,
+     *     declaringClassName: string
+     * }|null
+     */
+    public function instancePropertyVisibilityMeta(int $classId, string $name): ?array
+    {
+        $key = strtolower($name);
+        $currentId = $classId;
+        for ($depth = 0; $depth < 64; ++$depth) {
+            if (!isset($this->properties[$currentId])) {
+                $parentLc = $this->parentClassLc($this->classNameForId($currentId));
+                if (null === $parentLc) {
+                    break;
+                }
+                $currentId = $this->lookup($parentLc);
+                continue;
+            }
+            $found = false;
+            foreach ($this->properties[$currentId] as $propset) {
+                if (strtolower($propset[1]) === $key) {
+                    $found = true;
+                    break;
+                }
+            }
+            if (!$found) {
+                $parentLc = $this->parentClassLc($this->classNameForId($currentId));
+                if (null === $parentLc) {
+                    break;
+                }
+                $currentId = $this->lookup($parentLc);
+                continue;
+            }
+
+            return [
+                'visibility' => $this->propertyVisibility($currentId, $name),
+                'setVisibility' => $this->propertySetVisibility($currentId, $name),
+                'getVisibility' => $this->propertyGetVisibility($currentId, $name),
+                'declaringClassId' => $currentId,
+                'declaringClassName' => $this->classNameForId($currentId),
             ];
         }
 
@@ -4266,6 +4477,7 @@ class Object_ extends Type {
             $var->staticPropertyGlobal = $entry['global'];
             $var->staticPropertyType = $entry['type'];
             $var->staticPropertyInitGlobal = $entry['initGlobal'] ?? null;
+            $var->staticPropertyDnfArms = $this->dnfArmsForStaticProperty($classId, $name);
 
             return $var;
         }
@@ -4278,6 +4490,7 @@ class Object_ extends Type {
         $var->staticPropertyGlobal = $entry['global'];
         $var->staticPropertyType = $entry['type'];
         $var->staticPropertyInitGlobal = $entry['initGlobal'] ?? null;
+        $var->staticPropertyDnfArms = $this->dnfArmsForStaticProperty($classId, $name);
 
         return $var;
     }

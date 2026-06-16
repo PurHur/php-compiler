@@ -12,6 +12,8 @@
 #   NORTH_STAR2_VERIFY_GATE=0 ./script/ci-fast.sh
 # M3 unit-probe presenter (opt-in; issue #2396, #2360):
 #   NORTH_STAR3_VERIFY_GATE=1 ./script/ci-fast.sh
+# M5 fast presenter (default on; issue #1492). Opt-out:
+#   NORTH_STAR5_VERIFY_FAST_GATE=0 ./script/ci-fast.sh
 # Development status page sync (default on; issue #2083). Opt-out:
 #   DEVELOPMENT_STATUS_SYNC_GATE=0 ./script/ci-fast.sh
 # Bootstrap test subset (opt-in; issue #2069):
@@ -131,6 +133,9 @@ ci_run_north_star2_verify
 # M3 unit-probe presenter when opt-in (issue #2396, #2360).
 ci_run_north_star3_verify
 
+# M5 fast presenter when opt-in (issue #1492; ~1–2 min — not --strict).
+ci_run_north_star5_verify_fast
+
 # Optional bootstrap tail when LLVM 9 present (aot-lint + probe + wave-check; issue #436).
 if [[ "${CI_FAST_BOOTSTRAP:-0}" == "1" ]]; then
   if ci_llvm_ready; then
@@ -140,6 +145,7 @@ if [[ "${CI_FAST_BOOTSTRAP:-0}" == "1" ]]; then
     echo "PHPUnit (fast+bootstrap): AOT lint (@group aot-lint)..."
     ci_run_phpunit --group aot-lint "$@"
     BOOTSTRAP_WAVE_CHECK="${BOOTSTRAP_WAVE_CHECK:-1}" ci_run_bootstrap_wave_check
+    ci_run_bootstrap_wave_check_vendor_absent
   else
     echo "CI_FAST_BOOTSTRAP=1: bootstrap tail skipped (LLVM 9 not available)"
   fi

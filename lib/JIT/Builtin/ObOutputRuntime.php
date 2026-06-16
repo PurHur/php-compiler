@@ -90,6 +90,10 @@ final class ObOutputRuntime
         $lenElem = self::lenElemPtr($context, $level);
         $context->builder->store($context->getTypeFromString('int64')->constInt(0, false), $lenElem);
         $context->builder->store($context->getTypeFromString('int8')->constInt(0, false), self::storageRowPtr($context, $level));
+        $context->builder->store(
+            $i32->constInt(ObGzhandlerJitRuntime::HANDLER_NONE, false),
+            ObGzhandlerJitRuntime::handlerElemPtr($context, $level)
+        );
         $context->builder->store($context->builder->add($level, $i32->constInt(1, false)), $levelPtr);
         $context->builder->returnVoid();
         $context->builder->positionAtEnd($skip);
@@ -597,9 +601,33 @@ final class ObOutputRuntime
         self::writeEmptyString($context, $out);
         $context->builder->branch($done);
         $context->builder->positionAtEnd($copy);
+        $plainStr = self::bufferIndexToString($context, $fn, $idx, $len);
+        $isGz = ObGzhandlerJitRuntime::isGzhandlerAt($context, $idx);
+        $plainBb = $fn->appendBasicBlock('wab_plain_'.self::$blockSuffix);
+        $gzBb = $fn->appendBasicBlock('wab_gz_'.self::$blockSuffix);
+        $writeBb = $fn->appendBasicBlock('wab_write_'.self::$blockSuffix);
+        $context->builder->branchIf($isGz, $gzBb, $plainBb);
+        $context->builder->positionAtEnd($plainBb);
+        $context->builder->branch($writeBb);
+        $context->builder->positionAtEnd($gzBb);
+        $gzStr = ObGzhandlerJitRuntime::emitApplyGzhandlerToString($context, $plainStr);
+        $context->builder->branch($writeBb);
+        $context->builder->positionAtEnd($writeBb);
+        $strPtr = $context->getTypeFromString('__string__*');
+        $final = $context->builder->phi($strPtr, 'wab_str');
+        $final->addIncoming($plainStr, $plainBb);
+        $final->addIncoming($gzStr, $gzBb);
+        $context->builder->call($context->lookupFunction('__value__writeString'), $out, $final);
+        $context->builder->branch($done);
+        $context->builder->positionAtEnd($done);
+    }
+
+    private static function bufferIndexToString(Context $context, LlvmFunction $fn, Value $idx, Value $len): Value
+    {
         $i8p = $context->getTypeFromString('int8*');
         $i64 = $context->getTypeFromString('int64');
         $i8 = $context->getTypeFromString('int8');
+        $sizeT = $context->getTypeFromString('size_t');
         $allocLen = $context->builder->add($len, $sizeT->constInt(1, false));
         $copyBuf = $context->builder->call($context->lookupFunction('malloc'), $allocLen);
         $row = self::storageRowPtr($context, $idx);
@@ -611,15 +639,12 @@ final class ObOutputRuntime
         );
         $term = $context->builder->inBoundsGEP($context->builder->pointerCast($copyBuf, $i8p), $len);
         $context->builder->store($i8->constInt(0, false), $term);
-        $str = $context->builder->call(
+
+        return $context->builder->call(
             $context->lookupFunction('__string__init'),
             $context->builder->sext($len, $i64),
             $context->builder->pointerCast($copyBuf, $i8p)
         );
-        $context->builder->call($context->lookupFunction('free'), $context->bytePtr($copyBuf));
-        $context->builder->call($context->lookupFunction('__value__writeString'), $out, $str);
-        $context->builder->branch($done);
-        $context->builder->positionAtEnd($done);
     }
 
     private static function writeEmptyString(Context $context, Value $out): void
@@ -701,15 +726,39 @@ final class ObOutputRuntime
         $hasLen = $context->builder->icmp(Builder::INT_UGT, $len, $sizeT->constInt(0, false));
         $context->builder->branchIf($hasLen, $work, $empty);
         $context->builder->positionAtEnd($work);
-        $context->builder->call(
-            $context->lookupFunction('__phpc_ob_append_bytes'),
-            self::storageRowPtr($context, $idx),
-            $len
-        );
+        $plainStr = self::bufferIndexToString($context, $fn, $idx, $len);
+        $isGz = ObGzhandlerJitRuntime::isGzhandlerAt($context, $idx);
+        $plainBb = $fn->appendBasicBlock('aba_plain_'.self::$blockSuffix);
+        $gzBb = $fn->appendBasicBlock('aba_gz_'.self::$blockSuffix);
+        $appendBb = $fn->appendBasicBlock('aba_append_'.self::$blockSuffix);
+        $context->builder->branchIf($isGz, $gzBb, $plainBb);
+        $context->builder->positionAtEnd($plainBb);
+        $context->builder->branch($appendBb);
+        $context->builder->positionAtEnd($gzBb);
+        $gzStr = ObGzhandlerJitRuntime::emitApplyGzhandlerToString($context, $plainStr);
+        $context->builder->branch($appendBb);
+        $context->builder->positionAtEnd($appendBb);
+        $strPtr = $context->getTypeFromString('__string__*');
+        $finalStr = $context->builder->phi($strPtr, 'aba_str');
+        $finalStr->addIncoming($plainStr, $plainBb);
+        $finalStr->addIncoming($gzStr, $gzBb);
+        self::emitAppendStringBytes($context, $finalStr);
         $context->builder->branch($done);
         $context->builder->positionAtEnd($empty);
         $context->builder->branch($done);
         $context->builder->positionAtEnd($done);
+    }
+
+    private static function emitAppendStringBytes(Context $context, Value $str): void
+    {
+        $map = $context->structFieldMap['__string__'];
+        $slen = $context->builder->load($context->builder->structGep($str, $map['length']));
+        $sptr = $context->builder->structGep($str, $map['value']);
+        $context->builder->call(
+            $context->lookupFunction('__phpc_ob_append_bytes'),
+            $context->builder->pointerCast($sptr, $context->getTypeFromString('int8*')),
+            $context->builder->trunc($slen, $context->getTypeFromString('size_t'))
+        );
     }
 
     private static function clearBufferAt(Context $context, Value $idx): void

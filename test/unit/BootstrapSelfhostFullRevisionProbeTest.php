@@ -29,6 +29,9 @@ final class BootstrapSelfhostFullRevisionProbeTest extends TestCase
         $this->assertStringContainsString('emit_path=native', $script);
         $this->assertStringContainsString('#2880', $script);
         $this->assertStringContainsString('compile_smoke_m3_emit:', $script);
+        $this->assertStringContainsString('bootstrap_gen3_emit_matches_stale_prelinked_gen0', $script);
+        $this->assertStringContainsString('stale prelinked/bootstrap-gen0/', $script);
+        $this->assertStringContainsString('#8710', $script);
     }
 
     public function testHelloworldCompileBinLinksInventoryBinCompile(): void
@@ -62,6 +65,15 @@ final class BootstrapSelfhostFullRevisionProbeTest extends TestCase
         $this->assertStringContainsString('bin/compile.php argv compile', $script);
         $this->assertStringContainsString('prelinked gen-0 sidecar', $script);
         $this->assertStringContainsString('#2880', $script);
+        $this->assertStringNotContainsString('bootstrap_inventory_argv_driver_spine_lint', $script);
+    }
+
+    public function testBinCompileSidecarPathNorm(): void
+    {
+        $norm = \PHPCompiler\JIT\M3EmitTuTrivialEchoAot::normalizeSidecarSourcePath(
+            self::$root.'/bin/compile.php'
+        );
+        $this->assertSame('bin/compile.php', $norm);
     }
 
     public function testJitRegistersM5DriverHostForBinCompileSidecar(): void

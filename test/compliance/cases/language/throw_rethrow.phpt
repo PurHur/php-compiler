@@ -2,7 +2,7 @@
 Language: bare throw; rethrows caught exception (#3508)
 --FILE--
 <?php
-class Ex {}
+class Ex extends Exception {}
 
 try {
     try {
