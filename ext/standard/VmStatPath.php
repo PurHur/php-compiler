@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace PHPCompiler\ext\standard;
 
 /**
- * VM path predicates via VmStatCache + libc access — mirrors {@see JitStat} (#8186).
+ * VM path predicates via VmStatCache + stat mode access — mirrors {@see JitStat} (#8186, #8990).
  *
  * php-src: ext/standard/filestat.c
  */
@@ -41,17 +41,17 @@ final class VmStatPath
 
     public static function isReadable(string $path): bool
     {
-        return VmFsAccessNative::access($path, VmFsAccessNative::R_OK);
+        return VmFsAccessPure::isReadable($path);
     }
 
     public static function isWritable(string $path): bool
     {
-        return VmFsAccessNative::access($path, VmFsAccessNative::W_OK);
+        return VmFsAccessPure::isWritable($path);
     }
 
     public static function isExecutable(string $path): bool
     {
-        return VmFsAccessNative::access($path, VmFsAccessNative::X_OK);
+        return VmFsAccessPure::isExecutable($path);
     }
 
     private static function modeMatches(string $path, int $expectedType, bool $lstat): bool

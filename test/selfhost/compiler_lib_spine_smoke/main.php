@@ -819,6 +819,7 @@ require_once __DIR__.'/../../../ext/standard/VmFnmatchPure.php';
 require_once __DIR__.'/../../../ext/standard/VmForwardStaticCall.php';
 require_once __DIR__.'/../../../ext/standard/VmFs.php';
 require_once __DIR__.'/../../../ext/standard/VmFsAccessNative.php';
+require_once __DIR__.'/../../../ext/standard/VmFsAccessPure.php';
 require_once __DIR__.'/../../../ext/standard/VmFsDirNative.php';
 require_once __DIR__.'/../../../ext/standard/VmFsDiskNative.php';
 require_once __DIR__.'/../../../ext/standard/VmFsGlob.php';
