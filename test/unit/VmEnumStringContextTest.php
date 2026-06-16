@@ -34,6 +34,22 @@ PHP;
         );
     }
 
+    public function testVarDumpInlineEnumIdenticalComparison(): void
+    {
+        $code = <<<'PHP'
+<?php
+enum Status: string { case Active = 'active'; }
+var_dump(Status::Active === Status::Active);
+PHP;
+        $runtime = new Runtime();
+        $block = $runtime->parseAndCompile($code, 'enum_var_dump_identical.php');
+        ob_start();
+        $runtime->run($block);
+        $output = ob_get_clean();
+
+        $this->assertSame("bool(true)\n", $output);
+    }
+
     public function testBackedEnumEchoThrowsError(): void
     {
         $code = <<<'PHP'

@@ -36,8 +36,12 @@ final class spl_autoload_functions extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        throw new \LogicException(
-            'spl_autoload_functions() is not implemented for JIT in this compiler build (#3534)'
-        );
+        if (0 !== \count($args)) {
+            throw new \LogicException(
+                'spl_autoload_functions() expects exactly 0 arguments, '.\count($args).' given'
+            );
+        }
+
+        return JitSplAutoload::callbackSnapshot($context);
     }
 }

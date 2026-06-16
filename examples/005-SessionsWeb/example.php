@@ -18,17 +18,20 @@ declare(strict_types=1);
  */
 session_start();
 
-$method = isset($_SERVER['REQUEST_METHOD']) ? (string) $_SERVER['REQUEST_METHOD'] : 'GET';
+$method = (string) ($_SERVER['REQUEST_METHOD'] ?? 'GET');
 if ('POST' === $method) {
-    $_SESSION['flash'] = isset($_POST['message']) ? (string) $_POST['message'] : 'saved';
+    if (isset($_POST['message'])) {
+        $_SESSION['flash'] = (string) $_POST['message'];
+    } else {
+        $_SESSION['flash'] = 'saved';
+    }
     session_write_close();
     header('Location: /example.php', true, 303);
     exit;
 }
 
-$flash = '';
-if (isset($_SESSION['flash'])) {
-    $flash = (string) $_SESSION['flash'];
+$flash = (string) ($_SESSION['flash'] ?? '');
+if ('' !== $flash) {
     unset($_SESSION['flash']);
 }
 

@@ -161,6 +161,7 @@ selfhost_apply_patches_if_needed() {
     export SELFHOST_APPLY_PATCHES_DONE=1
     return 0
   fi
-  "${root}/script/apply-patches.sh" >/dev/null
+  # Redirect stderr of the *invoking shell* too, so a crashing subprocess doesn't spam bootstrap logs.
+  { "${root}/script/apply-patches.sh" >/dev/null; } 2>/dev/null || true
   export SELFHOST_APPLY_PATCHES_DONE=1
 }

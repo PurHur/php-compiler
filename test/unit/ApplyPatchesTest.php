@@ -695,6 +695,58 @@ PHP;
         }
     }
 
+    public function testPhpCfgAsymmetricVisibilityOverlayAddsPromotionSetVisibilityWhenOnlyPromotionFlags(): void
+    {
+        $prop = self::$root.'/vendor/ircmaxell/php-cfg/lib/PHPCfg/Op/Stmt/Property.php';
+        $param = self::$root.'/vendor/ircmaxell/php-cfg/lib/PHPCfg/Op/Expr/Param.php';
+        if (!is_readable($prop) || !is_readable($param)) {
+            self::markTestSkipped('vendor/ircmaxell/php-cfg not installed');
+        }
+
+        $originalProp = (string) file_get_contents($prop);
+        $originalParam = (string) file_get_contents($param);
+        $setBlock = "\n    /** PHP 8.4 asymmetric set visibility (0 = same as read; issue #3165). */\n    public int \$setVisibility = 0;\n";
+        $getBlock = "\n    /** PHP 8.4 asymmetric get visibility (0 = same as write; issue #5059). */\n    public int \$getVisibility = 0;\n";
+        $promoSetBlock = "\n    /** Constructor promotion: asymmetric set visibility (#3165). */\n    public int \$promotionSetVisibility = 0;\n";
+        $promoGetBlock = "\n    /** Constructor promotion: asymmetric get visibility (#5059). */\n    public int \$promotionGetVisibility = 0;\n";
+        self::assertStringContainsString($setBlock, $originalProp, 'fixture must include Property setVisibility');
+        self::assertStringContainsString($getBlock, $originalProp, 'fixture must include Property getVisibility');
+        self::assertStringContainsString($promoSetBlock, $originalParam, 'fixture must include Param promotionSetVisibility');
+        self::assertStringContainsString($promoGetBlock, $originalParam, 'fixture must include Param promotionGetVisibility');
+        $simProp = str_replace([$setBlock, $getBlock], ['', ''], $originalProp);
+        $simParam = str_replace([$promoSetBlock, $promoGetBlock], ['', ''], $originalParam);
+        self::assertNotSame($originalProp, $simProp, 'fixture must drop Property asymmetric fields');
+        self::assertNotSame($originalParam, $simParam, 'fixture must drop Param asymmetric fields');
+        self::assertStringContainsString('promotionFlags', $simParam, 'fixture must keep promotionFlags (#9031)');
+        file_put_contents($prop, $simProp);
+        file_put_contents($param, $simParam);
+
+        try {
+            $output = [];
+            $exitCode = 0;
+            exec('bash '.escapeshellarg(self::$root.'/script/apply-patches.sh').' 2>&1', $output, $exitCode);
+            $joined = implode("\n", $output);
+            self::assertStringContainsString(
+                'Applied php-cfg-asymmetric-visibility.patch (Param overlay)',
+                $joined,
+                "asymmetric Param overlay must run on partial vendor (#9031):\n".$joined
+            );
+            self::assertStringContainsString(
+                'promotionSetVisibility',
+                (string) file_get_contents($param),
+                'overlay must add promotionSetVisibility when only promotionFlags remains (#9031)'
+            );
+            self::assertStringContainsString(
+                'public int $setVisibility',
+                (string) file_get_contents($prop),
+                'overlay must add Property setVisibility (#9031)'
+            );
+        } finally {
+            file_put_contents($prop, $originalProp);
+            file_put_contents($param, $originalParam);
+        }
+    }
+
     public function testPhpCfgCtorPromotionOverlayAddsFlagsForPartialVendorParam(): void
     {
         $param = self::$root.'/vendor/ircmaxell/php-cfg/lib/PHPCfg/Op/Expr/Param.php';

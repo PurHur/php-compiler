@@ -68,6 +68,44 @@ final class VmSessionRuntimeShrinkTest extends TestCase
         $this->assertStringNotContainsString("function_exists('ini_get')", $source);
     }
 
+    public function testSessionFileRoundTripAfterWriteClose(): void
+    {
+        $runtime = new Runtime();
+        $ctx = $runtime->vmContext;
+        $dir = sys_get_temp_dir().'/phpc_sess_roundtrip_'.getmypid();
+        @mkdir($dir, 0700, true);
+        putenv('PHP_COMPILER_SESSION_DIR='.$dir);
+
+        $code = <<<'PHP'
+<?php
+session_start();
+$_SESSION['flash'] = 'Saved';
+session_write_close();
+PHP;
+        $block = $runtime->parseAndCompile($code, 'sess_write.php');
+        $runtime->run($block);
+
+        $files = glob($dir.'/'.SessionFileStorage::PATH_PREFIX.'*');
+        $this->assertIsArray($files);
+        $this->assertCount(1, $files);
+        $id = substr(basename($files[0]), strlen(SessionFileStorage::PATH_PREFIX));
+
+        VmSession::reset();
+        putenv('HTTP_COOKIE=PHPSESSID='.$id);
+        \PHPCompiler\Web\Superglobals::populateFromEnvironment($runtime->vmContext, '', '');
+
+        $read = <<<'PHP'
+<?php
+session_start();
+echo (string) ($_SESSION['flash'] ?? ''), "\n";
+session_write_close();
+PHP;
+        $readBlock = $runtime->parseAndCompile($read, 'sess_read.php');
+        ob_start();
+        $runtime->run($readBlock);
+        $this->assertSame("Saved\n", ob_get_clean());
+    }
+
     public function testSessionGcMaxlifetimeIniAffectsPurgeThreshold(): void
     {
         $runtime = new Runtime();

@@ -4,17 +4,20 @@ declare(strict_types=1);
 
 namespace PHPCompiler\ext\standard;
 
+use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Builtin\SplAutoloadOutput;
 use PHPCompiler\JIT\Call;
 use PHPCompiler\JIT\Call\ClosureWithCaptures;
 use PHPCompiler\JIT\Call\ExternalMethod;
 use PHPCompiler\JIT\Call\Native;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\HashTableHelper;
 use PHPCompiler\JIT\JitLongArg;
 use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\SplAutoloadCallbackPolicy;
 use PHPCompiler\JIT\Variable as JITVariable;
+use PHPLLVM\Builder;
 use PHPLLVM\Value;
 
 /** LLVM lowering helpers for spl_autoload_register() / spl_autoload_unregister() (#1776, #2441, #5300, #4744, #3580, #3534). */
@@ -30,7 +33,58 @@ final class JitSplAutoload
     ): Value {
         SplAutoloadOutput::ensureLinked($context);
 
-        return self::applyRegister($context, self::resolveShim($context, $callback), $prependArg);
+        return self::applyRegister($context, self::resolveShim($context, $callback), $callback, $prependArg);
+    }
+
+    public static function callbackSnapshot(Context $context): Value
+    {
+        SplAutoloadOutput::ensureLinked($context);
+
+        $i32 = $context->getTypeFromString('int32');
+        $sizeT = $context->getTypeFromString('size_t');
+        $valuePtrTy = $context->getTypeFromString('__value__*');
+        $ht = HashTableHelper::alloc($context);
+        $depth = SplAutoloadOutput::loadDepth($context);
+
+        $zero = $sizeT->constInt(0, false);
+        $one = $sizeT->constInt(1, false);
+        $idxSlot = $context->builder->alloca($sizeT, 1, 'spl_funcs_idx');
+        $context->builder->store($zero, $idxSlot);
+
+        $done = BasicBlockHelper::append($context, 'spl_funcs_done');
+        $head = BasicBlockHelper::append($context, 'spl_funcs_head');
+        $body = BasicBlockHelper::append($context, 'spl_funcs_body');
+        $context->builder->branch($head);
+
+        $context->builder->positionAtEnd($head);
+        $idx = $context->builder->load($idxSlot);
+        $depthSize = $context->builder->zExt($depth, $sizeT);
+        $atEnd = $context->builder->icmp(Builder::INT_SGE, $idx, $depthSize);
+        $context->builder->branchIf($atEnd, $done, $body);
+
+        $context->builder->positionAtEnd($body);
+        $idxI32 = $context->builder->trunc($idx, $i32);
+        $metaOpaque = SplAutoloadOutput::loadMetaAt($context, $i32, $idxI32);
+        $metaPtr = $context->builder->pointerCast($metaOpaque, $valuePtrTy);
+        $elemSlot = JitValueBox::alloc($context);
+        $elemPtr = JitValueBox::pointer($context, $elemSlot);
+        JitValueBox::copyFromPointer($context, $elemPtr, $metaPtr);
+        $elem = new JITVariable($context, JITVariable::TYPE_VALUE, JITVariable::KIND_VALUE, $elemPtr);
+        HashTableHelper::setAtIndex($context, $ht, $idx, $elem);
+        $context->builder->store($context->builder->add($idx, $one), $idxSlot);
+        $context->builder->branch($head);
+
+        $context->builder->positionAtEnd($done);
+
+        $slot = JitValueBox::alloc($context);
+        $ptr = JitValueBox::pointer($context, $slot);
+        $context->builder->call(
+            $context->lookupFunction('__value__writeHashtable'),
+            $ptr,
+            $ht
+        );
+
+        return $ptr;
     }
 
     public static function unregister(Context $context, JITVariable $callback): Value
@@ -82,6 +136,7 @@ final class JitSplAutoload
     private static function applyRegister(
         Context $context,
         Value $shimFn,
+        JITVariable $callback,
         ?JITVariable $prependArg
     ): Value {
         $i32 = $context->getTypeFromString('int32');
@@ -95,10 +150,17 @@ final class JitSplAutoload
         }
 
         $i8p = $context->getTypeFromString('int8*');
+        $valueTy = $context->getTypeFromString('__value__');
+        $valuePtrTy = $context->getTypeFromString('__value__*');
+        $metaHeap = $context->memory->malloc($valueTy);
+        $metaPtr = $context->builder->pointerCast($metaHeap, $valuePtrTy);
+        JitValueBox::assignToPointer($context, $metaPtr, $callback);
+        $metaOpaque = $context->builder->pointerCast($metaPtr, $i8p);
         $fnPtr = $context->builder->pointerCast($shimFn, $i8p);
         $context->builder->call(
             $context->lookupFunction('__phpc_spl_autoload_register_apply'),
             $fnPtr,
+            $metaOpaque,
             $prepend
         );
 
