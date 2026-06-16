@@ -414,15 +414,19 @@ final class StringInfo
         } else {
             $extensions = array_keys($map);
             $count = \count($extensions);
-            $context->builder->branch($fn->appendBasicBlock('gef_try_0'));
+            $tryBlocks = [];
+            for ($i = 0; $i < $count; ++$i) {
+                $tryBlocks[] = $fn->appendBasicBlock('gef_try_'.$i);
+            }
+            $context->builder->branch($tryBlocks[0]);
             for ($i = 0; $i < $count; ++$i) {
                 $extension = $extensions[$i];
-                $tryBb = $fn->appendBasicBlock('gef_try_'.$i);
+                $tryBb = $tryBlocks[$i];
                 $context->builder->positionAtEnd($tryBb);
                 $matches = self::stringEqualsIgnoreCase($context, $fn, $name, $extension);
                 $fillBb = $fn->appendBasicBlock('gef_fill_'.$i);
                 $nextBb = $i + 1 < $count
-                    ? $fn->appendBasicBlock('gef_try_'.($i + 1))
+                    ? $tryBlocks[$i + 1]
                     : $missBb;
                 $context->builder->branchIf($matches, $fillBb, $nextBb);
 
