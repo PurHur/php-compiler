@@ -9,10 +9,18 @@ class Greeter {
     public static function greet() {
         return 'hello';
     }
+
+    public static function viaSelf(): string {
+        $f = self::greet(...);
+
+        return $f();
+    }
 }
 $call = Greeter::greet(...);
 echo $call(), "\n";
+echo Greeter::viaSelf(), "\n";
 
 --EXPECT--
 3
+hello
 hello
