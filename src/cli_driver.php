@@ -279,6 +279,12 @@ if (!function_exists('php_compiler_cli_dispatch')) {
                     if (false === $execCode) {
                         die("Could not open file {$opt}\n");
                     }
+                    if (str_ends_with(strtolower($scriptPath), '.phpt')) {
+                        $extracted = php_compiler_cli_extract_phpt_file_section($execCode);
+                        if (null !== $extracted) {
+                            $execCode = $extracted;
+                        }
+                    }
                     $execFile = realpath($scriptPath) ?: $scriptPath;
                     // Allow arbitrary user script args after the script path (Zend CLI parity, #4139).
                     $scriptArgv = array_merge([$execFile], array_slice($argv, $i));
@@ -316,5 +322,39 @@ if (!function_exists('php_compiler_cli_dispatch')) {
         } else {
             throw new \RuntimeException('Must define run before including cli.php');
         }
+    }
+}
+
+if (!function_exists('php_compiler_cli_extract_phpt_file_section')) {
+    /**
+     * Extract the `--FILE--` section from a `.phpt` compliance test.
+     *
+     * Returns null when the input does not look like a `.phpt` payload.
+     */
+    function php_compiler_cli_extract_phpt_file_section(string $src): ?string
+    {
+        $pos = strpos($src, "--FILE--");
+        if (false === $pos) {
+            return null;
+        }
+        $after = substr($src, $pos);
+        if (!is_string($after) || '' === $after) {
+            return null;
+        }
+        $fileStart = strpos($after, "\n");
+        if (false === $fileStart) {
+            return null;
+        }
+        $body = substr($after, $fileStart + 1);
+        if (!is_string($body)) {
+            return null;
+        }
+        if (preg_match('/\n--[A-Z0-9_]+--\s*\n/s', $body, $m, PREG_OFFSET_CAPTURE)) {
+            $end = (int) $m[0][1];
+
+            return substr($body, 0, $end);
+        }
+
+        return $body;
     }
 }

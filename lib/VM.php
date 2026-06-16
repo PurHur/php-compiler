@@ -3678,7 +3678,9 @@ restart:
                     $propNameRaw = $frame->scope[$op->arg3]->toString();
                     $propName = strtolower($propNameRaw);
                     $forWrite = $this->propertyFetchDestUsedAsAssignLvalue($frame, $op);
-                    if (!$forWrite) {
+                    $forIncDec = $this->propertyFetchDestUsedAsIncDec($frame, $op);
+                    $mutates = $forWrite || $forIncDec;
+                    if (!$mutates) {
                         $visFrame = $this->enforceStaticPropertyReadVisibility($lcClass, $propNameRaw, $frame);
                         if (null !== $visFrame) {
                             $frame = $visFrame;
@@ -3694,7 +3696,7 @@ restart:
                             $frame
                         );
                     }
-                    if ($forWrite) {
+                    if ($mutates) {
                         $writeVisFrame = $this->enforceStaticPropertyWriteVisibility($lcClass, $propNameRaw, $frame);
                         if (null !== $writeVisFrame) {
                             $frame = $writeVisFrame;
@@ -3712,7 +3714,7 @@ restart:
                     $readBeforeAssign = $forWrite && $this->propertyFetchDestUsedAsReadBeforeAssign($frame, $op);
                     $hooks = $this->resolveStaticPropertyHooks($lcClass, $propName);
                     if (
-                        !$forWrite
+                        !$mutates
                         && null !== $hooks
                         && isset($hooks['get'])
                         && !$this->isPropertyHookRawWrite($frame, $propNameRaw)
@@ -3767,7 +3769,7 @@ restart:
                     }
                     $dest = $frame->scope[$op->arg1];
                     if (
-                        !$forWrite
+                        !$mutates
                         && $this->propertyFetchDestUsedAsDimWriteContainer($frame, $op)
                     ) {
                         $writeMsg = $this->asymmetricStaticPropertyWriteMessage($lcClass, $propNameRaw, $frame);
@@ -3782,7 +3784,7 @@ restart:
                     $dest->indirect($storage);
                     $dest->staticPropertyClassLc = $lcClass;
                     $dest->objectPropertyName = $propNameRaw;
-                    if (!$forWrite) {
+                    if (!$mutates) {
                         $this->emitStaticPropertyAccessDeprecation($lcClass, $propNameRaw, $frame);
                     }
                     break;
