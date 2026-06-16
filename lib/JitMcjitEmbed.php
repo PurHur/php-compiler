@@ -16,6 +16,9 @@ final class JitMcjitEmbed
 {
     private const EMPTY_CLASS_PAD = 'private bool $__phpcMcjitClassPad = false;';
 
+    /** Readonly classes cannot declare properties with defaults (#8967, zend_compile.c). */
+    private const EMPTY_READONLY_CLASS_PAD = 'private bool $__phpcMcjitClassPad;';
+
     private const BOOTSTRAP_CLASS = 'class __phpc_mcjit_embed_bootstrap { public function __toString(): string { return ""; } } ';
 
     public static function prepareClassless(string $code): string
@@ -72,11 +75,12 @@ final class JitMcjitEmbed
                     return $match[0];
                 }
                 $trimmed = trim($body);
+                $pad = $isReadonlyClass ? self::EMPTY_READONLY_CLASS_PAD : self::EMPTY_CLASS_PAD;
                 if ('' === $trimmed) {
-                    return $match[1].'{ '.self::EMPTY_CLASS_PAD.' }';
+                    return $match[1].'{ '.$pad.' }';
                 }
 
-                return $match[1].'{ '.self::EMPTY_CLASS_PAD.' '.$trimmed.' }';
+                return $match[1].'{ '.$pad.' '.$trimmed.' }';
             },
             $code
         );
