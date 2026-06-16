@@ -200,7 +200,7 @@ if [[ "${BOOTSTRAP_LIB_SPINE_SMOKE_USE_COMPILE_INVOKE:-0}" != "1" ]]; then
           echo "bootstrap-selfhost-lib-spine-smoke-link: compile failed with vendor/ absent (no Zend fallback — #3052)" >&2
           exit 1
         fi
-        if [[ "${BOOTSTRAP_LIB_SPINE_SMOKE_GEN0_FALLBACK:-1}" == "1" ]] && command -v php >/dev/null 2>&1; then
+        if [[ "${BOOTSTRAP_NO_ZEND_FALLBACK:-0}" != "1" && "${BOOTSTRAP_LIB_SPINE_SMOKE_GEN0_FALLBACK:-1}" == "1" ]] && command -v php >/dev/null 2>&1; then
           echo "bootstrap-selfhost-lib-spine-smoke-link: gen-0 Zend honest emit fallback (native argv driver blocked; #8559)" >&2
           rm -f "${OUT}"
           bootstrap_compiler_lib_honest_zend_compile "${OUT}" "${ENTRY}" full 2>&1 || true
