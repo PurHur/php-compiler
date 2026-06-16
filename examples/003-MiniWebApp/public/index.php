@@ -14,7 +14,6 @@ declare(strict_types=1);
  */
 
 $config = require __DIR__ . '/../config.php';
-require __DIR__ . '/../src/Router.php';
 
 $route = 'home';
 $pathInfo = $_SERVER['PATH_INFO'] ?? '';
@@ -40,4 +39,4 @@ if (!$router instanceof Router) {
     echo "Router bootstrap failed\n";
     exit(1);
 }
-$router->dispatch($method, (string) $route);
+$router->dispatch($method, $route);

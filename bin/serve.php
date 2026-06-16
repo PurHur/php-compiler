@@ -34,6 +34,8 @@ $projectDir = ProjectManifest::resolveProjectDir($docrootArg);
 $manifest = null !== $projectDir ? ProjectManifest::loadManifest($projectDir) : null;
 $docroot = ProjectManifest::resolvePublicDir($docrootArg);
 
+ServeCompileCache::enable();
+
 DevServer::run($listen, $docroot, static function (string $script, array $cgiEnv): array {
     ResponseContext::reset();
     ResponseContext::enableHeaderQueue();
@@ -41,8 +43,7 @@ DevServer::run($listen, $docroot, static function (string $script, array $cgiEnv
     VmStatCache::reset();
     OutputBuffer::reset();
     ShutdownQueue::reset();
-    $code = file_get_contents($script);
-    if (false === $code) {
+    if (!is_readable($script)) {
         throw new \RuntimeException('Could not read script');
     }
 
@@ -52,11 +53,12 @@ DevServer::run($listen, $docroot, static function (string $script, array $cgiEnv
         Superglobals::populateFromEnvironment(
             $runtime->vmContext,
             $cgiEnv['QUERY_STRING'] ?? '',
-            $cgiEnv['REQUEST_BODY'] ?? ''
+            $cgiEnv['REQUEST_BODY'] ?? '',
+            $cgiEnv['SCRIPT_FILENAME'] ?? $script
         );
         [$bootProjectDir, $bootManifest] = ProjectBootstrap::resolveFromScript($script);
         ProjectBootstrap::prepare($runtime, $bootProjectDir, $bootManifest);
-        $block = ServeCompileCache::get($runtime, $script, $code);
+        $block = ServeCompileCache::getFile($runtime, $script);
         if (null === $block) {
             throw new \RuntimeException('Could not compile script');
         }

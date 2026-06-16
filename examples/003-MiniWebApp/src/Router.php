@@ -62,7 +62,8 @@ class Router
 
                         return;
                     }
-                    $this->renderContactThankYou((string) $_REQUEST['name']);
+                    $contactName = $_REQUEST['name'] ?? '';
+                    $this->renderContactThankYou($contactName);
 
                     return;
                 }
