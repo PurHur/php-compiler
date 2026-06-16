@@ -617,7 +617,12 @@ final class VmFs
             $data = implode('', $data);
         }
 
-        return VmFsWriteNative::write($path, $data, $flags);
+        $written = VmFsWriteNative::write($path, $data, $flags);
+        if (false !== $written) {
+            VmStatCache::invalidatePath($path);
+        }
+
+        return $written;
     }
 
     public static function fopen(string $path, string $mode, ?\PHPCompiler\VM\Context $ctx = null) {
