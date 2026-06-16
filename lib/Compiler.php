@@ -2724,27 +2724,48 @@ class Compiler {
         Op $next,
         Block $block
     ): bool {
-        if (!$next instanceof Op\Expr\Empty_) {
-            return false;
-        }
-        $target = $next->expr;
-        if ($target === $fetch || $target === $fetch->result) {
-            return true;
-        }
-        while ($target instanceof Temporary) {
+        if ($next instanceof Op\Expr\Empty_) {
+            $target = $next->expr;
+            if ($target === $fetch || $target === $fetch->result) {
+                return true;
+            }
+            while ($target instanceof Temporary) {
+                if ($target === $fetch->result) {
+                    return true;
+                }
+                if (null === $target->original) {
+                    break;
+                }
+                $target = $target->original;
+            }
             if ($target === $fetch->result) {
                 return true;
             }
-            if (null === $target->original) {
-                break;
-            }
-            $target = $target->original;
+
+            return $this->findCoalescePropertyFetch($target, $block) === $fetch;
         }
-        if ($target === $fetch->result) {
-            return true;
+        if ($this->isInlineExprCallArgConsumer($next)) {
+            return $this->funcCallHasEmptyArgUsingPropertyFetch($next, $fetch, $block);
         }
 
-        return $this->findCoalescePropertyFetch($target, $block) === $fetch;
+        return false;
+    }
+
+    private function funcCallHasEmptyArgUsingPropertyFetch(Op $call, Op\Expr\PropertyFetch $fetch, Block $block): bool
+    {
+        if (!property_exists($call, 'args') || !is_array($call->args)) {
+            return false;
+        }
+        foreach ($call->args as $arg) {
+            if (!$arg instanceof Operand\Temporary || !$arg->original instanceof Op\Expr\Empty_) {
+                continue;
+            }
+            if ($this->emptyExprDependsOnOperand($arg->original, $fetch->result, $block)) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     /**
@@ -8261,8 +8282,180 @@ class Compiler {
                 return $child->result;
             }
         }
+        $funcCallFetch = $this->recoverEmptyPropertyFetchForFuncCallArg($expr, $block);
+        if (null !== $funcCallFetch) {
+            return $funcCallFetch;
+        }
 
         return null;
+    }
+
+    /**
+     * PropertyFetch hoisted before FuncCall(empty($obj->prop)) when php-cfg omits Empty_ stmt (#8901).
+     */
+    private function recoverEmptyPropertyFetchForFuncCallArg(Op\Expr\Empty_ $expr, Block $block): ?Operand
+    {
+        if (null === $block->orig) {
+            return null;
+        }
+        $children = $block->orig->children;
+        foreach ($children as $i => $child) {
+            if (!$this->isInlineExprCallArgConsumer($child) || !$this->funcCallArgReferencesEmpty($child, $expr)) {
+                continue;
+            }
+            for ($j = $i - 1; $j >= 0; --$j) {
+                $prev = $children[$j];
+                if ($prev instanceof Op\Expr\PropertyFetch && $this->emptyExprDependsOnOperand($expr, $prev->result, $block)) {
+                    return $prev->result;
+                }
+                if ($prev === $expr) {
+                    continue;
+                }
+                if ($prev instanceof Op\Expr && $this->isInlineExprCallArgProducer($prev)) {
+                    continue;
+                }
+                break;
+            }
+        }
+
+        return null;
+    }
+
+    private function funcCallArgReferencesEmpty(Op $call, Op\Expr\Empty_ $empty): bool
+    {
+        if (!property_exists($call, 'args') || !is_array($call->args)) {
+            return false;
+        }
+        foreach ($call->args as $arg) {
+            if ($arg instanceof Operand\Temporary && $arg->original === $empty) {
+                return true;
+            }
+            if ($this->operandsReferToSameVariable($arg, $empty->result)) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private function emptyExprDependsOnOperand(Op\Expr\Empty_ $expr, Operand $operand, Block $block): bool
+    {
+        $target = $this->unaryExprOperandForRead($expr, $block) ?? $expr->expr;
+        if (null === $target) {
+            return false;
+        }
+        if ($target === $operand) {
+            return true;
+        }
+
+        return $this->operandsReferToSameVariable($target, $operand);
+    }
+
+    /**
+     * @return ?Op\Expr\Empty_
+     */
+    private function findEmptyExprForCallArg(Operand $arg, Block $block): ?Op\Expr\Empty_
+    {
+        $empty = $this->unwrapEmptyExpr($arg);
+        if (null !== $empty) {
+            return $empty;
+        }
+        if (null === $block->orig) {
+            return null;
+        }
+        foreach ($block->orig->children as $child) {
+            if ($child instanceof Op\Expr\Empty_ && $this->operandsReferToSameVariable($child->result, $arg)) {
+                return $child;
+            }
+        }
+        $callSite = $this->findCfgCallSiteForArg($block->orig->children, $arg);
+        if (null === $callSite) {
+            return null;
+        }
+        [$callOp, $argIndex] = $callSite;
+        if (!property_exists($callOp, 'args') || !is_array($callOp->args)) {
+            return null;
+        }
+        $callArg = $callOp->args[$argIndex] ?? null;
+        if (null === $callArg) {
+            return null;
+        }
+
+        return $this->unwrapEmptyExpr($callArg);
+    }
+
+    /**
+     * @return ?Op\Expr\Empty_
+     */
+    private function unwrapEmptyExpr(Operand $operand): ?Op\Expr\Empty_
+    {
+        if ($operand instanceof Op\Expr\Empty_) {
+            return $operand;
+        }
+        if ($operand instanceof Operand\Temporary) {
+            if ($operand->original instanceof Op\Expr\Empty_) {
+                return $operand->original;
+            }
+            if (null !== $operand->original) {
+                return $this->unwrapEmptyExpr($operand->original);
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * FuncCall(empty($obj->prop)) — compile hoisted Empty_ when php-cfg left the arg slot dead (#8901).
+     */
+    private function compileHoistedEmptyCallArg(Operand $arg, Block $block): ?int
+    {
+        $empty = $this->findEmptyExprForCallArg($arg, $block);
+        if (null === $empty) {
+            return null;
+        }
+        if (!$this->emptyExprLoweringEmitted($block, $empty)) {
+            foreach ($this->compileExpr($empty, $block) as $op) {
+                $block->addOpCode($op);
+            }
+        }
+
+        return $this->compileOperand($arg, $block, true);
+    }
+
+    private function emptyExprLoweringEmitted(Block $block, Op\Expr\Empty_ $empty): bool
+    {
+        $slot = $block->slotForOperand($empty->result);
+        if (null === $slot) {
+            return false;
+        }
+        foreach ($block->opCodes as $op) {
+            if ($op->arg1 !== $slot) {
+                continue;
+            }
+            if (OpCode::TYPE_EMPTY === $op->type || OpCode::TYPE_EMPTY_OBJECT_PROPERTY === $op->type) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private function issetExprLoweringEmitted(Block $block, Op\Expr\Isset_ $expr): bool
+    {
+        $slot = $block->slotForOperand($expr->result);
+        if (null === $slot) {
+            return false;
+        }
+        foreach ($block->opCodes as $op) {
+            if ($op->arg1 !== $slot) {
+                continue;
+            }
+            if (OpCode::TYPE_ISSET === $op->type) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     /**
@@ -8975,6 +9168,26 @@ class Compiler {
         $producerSlot = $block->slotForOperand($producer->result);
         if (
             null === $producerSlot
+            && $producer instanceof Op\Expr\Empty_
+            && !$this->emptyExprLoweringEmitted($block, $producer)
+        ) {
+            foreach ($this->compileExpr($producer, $block) as $op) {
+                $block->addOpCode($op);
+            }
+            $producerSlot = $block->slotForOperand($producer->result);
+        }
+        if (
+            null === $producerSlot
+            && $producer instanceof Op\Expr\Isset_
+            && !$this->issetExprLoweringEmitted($block, $producer)
+        ) {
+            foreach ($this->compileExpr($producer, $block) as $op) {
+                $block->addOpCode($op);
+            }
+            $producerSlot = $block->slotForOperand($producer->result);
+        }
+        if (
+            null === $producerSlot
             && ($producer instanceof Op\Expr\FuncCall
                 || $producer instanceof Op\Expr\NsFuncCall
                 || $producer instanceof Op\Expr\StaticCall
@@ -9003,6 +9216,12 @@ class Compiler {
         }
         if (null === $producerSlot) {
             return null;
+        }
+        if ($producer instanceof Op\Expr\Empty_) {
+            return $producerSlot;
+        }
+        if ($producer instanceof Op\Expr\Isset_) {
+            return $producerSlot;
         }
         // php-cfg uses distinct result/arg temps for hoisted inline producers (#8766, #8561).
         if (
@@ -9140,6 +9359,18 @@ class Compiler {
                 $filtered = $this->filterNestedNewInlineCallArgProducers($producers);
                 if (\count($filtered) === $argCount) {
                     return $filtered[$argIndex] ?? null;
+                }
+                // PropertyFetch prelude for empty($obj->prop) / isset($obj->prop) call args (#8901).
+                foreach ($producers as $producer) {
+                    if ($producer instanceof Op\Expr\Empty_ || $producer instanceof Op\Expr\Isset_) {
+                        if (1 === $argCount) {
+                            return $producer;
+                        }
+                        $callArg = $callArgs[$argIndex] ?? null;
+                        if (null !== $callArg && $this->operandsReferToSameVariable($producer->result, $callArg)) {
+                            return $producer;
+                        }
+                    }
                 }
 
                 return null;
@@ -9436,6 +9667,8 @@ class Compiler {
             || $op instanceof Op\Expr\MethodCall
             || $op instanceof Op\Expr\UnaryMinus
             || $op instanceof Op\Expr\UnaryPlus
+            || $op instanceof Op\Expr\Empty_
+            || $op instanceof Op\Expr\Isset_
             || $op instanceof Op\Expr\InstanceOf_;
     }
 
@@ -11237,6 +11470,9 @@ class Compiler {
                     $valueSlot = $prefetchOps[0]->arg1;
                 } else {
                     $valueSlot = $this->compileCallArgCoalesceSlot($arg, $block);
+                    if (null === $valueSlot) {
+                        $valueSlot = $this->compileHoistedEmptyCallArg($arg, $block);
+                    }
                     if (null === $valueSlot) {
                         $valueSlot = $this->findInlineExprCallArgProducerSlot($arg, $block);
                     }

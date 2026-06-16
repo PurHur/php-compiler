@@ -707,6 +707,9 @@ class VM {
         if (null !== $catchFrame) {
             return $catchFrame;
         }
+        if ($this->emptyHookedPropertyViaSeparateBacking($object, $propName, $dst)) {
+            return null;
+        }
         $meta = $this->classPropertyMeta($object, $propName);
         if (null !== $meta && null !== $meta->getHookMethodLc) {
             $catchFrame = $this->enforcePropertyVisibilityRead($object, $propName, $frame);
@@ -855,6 +858,36 @@ class VM {
         }
 
         return strcasecmp($backingName, $propName) !== 0 && $object->hasProperty($backingName);
+    }
+
+    /**
+     * empty($obj->hooked) with separate backing — Zend isset-style probe, no get hook (#8901, zend_property_hooks.c).
+     */
+    private function emptyHookedPropertyViaSeparateBacking(ObjectEntry $object, string $propName, Variable $dst): bool
+    {
+        if (!$this->hookedPropertyHasSeparateBacking($object, $propName)) {
+            return false;
+        }
+        $lcClass = strtolower($object->class->name);
+        $propMeta = $this->context->propertyHookRegistry[$lcClass][$propName]
+            ?? $this->context->propertyHookRegistry[$lcClass][strtolower($propName)]
+            ?? null;
+        if (!is_array($propMeta)) {
+            return false;
+        }
+        $backingName = $propMeta['setBacking'] ?? $propMeta['getBacking'] ?? null;
+        if (null === $backingName || !$object->hasProperty($backingName)) {
+            return false;
+        }
+        $value = $object->getProperty($backingName)->resolveIndirect();
+        if ($value->isUndefined() || VM\TypedPropertyCheck::isUninitialized($value)) {
+            $dst->bool(true);
+
+            return true;
+        }
+        $dst->bool(!ext\standard\boolval::isTruthy($value));
+
+        return true;
     }
 
     private function invokeInstancePropertyUnsetHook(ObjectEntry $object, string $propName, Frame $frame): bool
