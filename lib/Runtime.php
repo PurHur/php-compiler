@@ -51,6 +51,7 @@ use PHPCompiler\VM\OutputBuffer;
 use PHPCompiler\VM\ShutdownQueue;
 use PHPCompiler\ext\standard\VmObGzhandler;
 use PHPCompiler\VM\ClassEntry;
+use PHPCompiler\VM\Variable;
 
 class Runtime {
     const MODE_NORMAL   = 0b0001;
@@ -639,6 +640,7 @@ class Runtime {
     public function compile(Script $script): ?Block {
         $this->compiler->setPropertyHookRegistry($this->vmContext->propertyHookRegistry);
         $this->compiler->setKnownClassReadonly(self::knownClassReadonlyForCompileCheck($this->vmContext->classes));
+        $this->compiler->setRuntimeEnumCaseConsts(self::runtimeEnumCaseConstsForCompile($this->vmContext->classes));
         /** @var mixed $block */
         $block = $this->compiler->compile($script);
         if (!$block instanceof Block) {
@@ -975,6 +977,31 @@ class Runtime {
         }
 
         return $known;
+    }
+
+    /**
+     * @param array<string, ClassEntry> $classes
+     *
+     * @return array<string, array<string, Variable>>
+     */
+    private static function runtimeEnumCaseConstsForCompile(array $classes): array
+    {
+        $runtime = [];
+        foreach ($classes as $lc => $entry) {
+            if (!$entry instanceof ClassEntry || !$entry->isEnum || !$entry->isInternal) {
+                continue;
+            }
+            foreach ($entry->constants as $constLc => $value) {
+                if (!$value instanceof Variable) {
+                    continue;
+                }
+                $stored = new Variable();
+                $stored->copyFrom($value);
+                $runtime[$lc][$constLc] = $stored;
+            }
+        }
+
+        return $runtime;
     }
 
 }
