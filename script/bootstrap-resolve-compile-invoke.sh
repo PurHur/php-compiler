@@ -21,6 +21,7 @@
 #   BOOTSTRAP_GEN0_ZEND_ONLY=1  — always php bin/compile.php (requires php on PATH)
 #   BOOTSTRAP_ALLOW_GEN0_ZEND=0 — refuse Zend when no native driver (empty build/)
 #   BOOTSTRAP_M5_NO_ZEND=1       — refuse Zend fallback (implies BOOTSTRAP_NO_ZEND_FALLBACK=1)
+#   BOOTSTRAP_NO_ZEND_FALLBACK=1 — refuse Zend on spine/M5 compile paths (#8716)
 #   BOOTSTRAP_USE_INVENTORY_DRIVER=1 — inventory argv driver only (#2894)
 set -euo pipefail
 
@@ -366,8 +367,9 @@ bootstrap_ensure_inventory_argv_driver() {
         return 0
       fi
     fi
-    if [[ "${BOOTSTRAP_M5_NO_ZEND:-0}" == "1" ]]; then
-      echo "bootstrap-ensure-inventory-argv-driver: BOOTSTRAP_M5_NO_ZEND=1 — prelinked inventory driver failed smoke (#3053)" >&2
+    if [[ "${BOOTSTRAP_M5_NO_ZEND:-0}" == "1" || "${BOOTSTRAP_NO_ZEND_FALLBACK:-0}" == "1" ]]; then
+      rm -f "${out}" "${root}/build/.m3_bin_compile_aot_blob"
+      echo "bootstrap-ensure-inventory-argv-driver: BOOTSTRAP_NO_ZEND_FALLBACK=1 — prelinked inventory driver failed smoke (#8716, #3053)" >&2
       return 1
     fi
   fi

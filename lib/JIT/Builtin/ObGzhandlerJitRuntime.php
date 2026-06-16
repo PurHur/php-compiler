@@ -265,12 +265,13 @@ final class ObGzhandlerJitRuntime
         $context->builder->branch($doneBb);
         $context->builder->positionAtEnd($resolveBb);
         $resolved = self::emitReadAcceptEncoding($context, $fn);
+        $resolveDoneBb = $context->builder->getInsertBlock();
         $context->builder->store($resolved, $encPtr);
         $context->builder->branch($doneBb);
         $context->builder->positionAtEnd($doneBb);
         $phi = $context->builder->phi($i64, 'ogz_enc');
         $phi->addIncoming($cached, $cachedBb);
-        $phi->addIncoming($resolved, $resolveBb);
+        $phi->addIncoming($resolved, $resolveDoneBb);
 
         return $phi;
     }
