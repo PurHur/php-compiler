@@ -17,12 +17,8 @@ final class VmTmpfileNativeTest extends TestCase
         $this->assertStringNotContainsString('\\tmpfile()', $source);
     }
 
-    public function testLibcTmpfileReadWriteViaVmFs(): void
+    public function testTmpfileReadWriteViaVmFs(): void
     {
-        if (!\extension_loaded('ffi')) {
-            $this->markTestSkipped('FFI required for VmTmpfileNative');
-        }
-
         $handle = VmFs::tmpfile();
         $this->assertNotFalse($handle);
 
@@ -32,19 +28,15 @@ final class VmTmpfileNativeTest extends TestCase
         $this->assertTrue(VmFs::fclose($handle));
     }
 
-    public function testNativeOpenReturnsStreamResource(): void
+    public function testNativeOpenReturnsVmStreamHandle(): void
     {
-        if (!\extension_loaded('ffi')) {
-            $this->markTestSkipped('FFI required for VmTmpfileNative');
-        }
+        $handle = VmTmpfileNative::open();
+        $this->assertNotFalse($handle);
+        $this->assertIsInt($handle);
 
-        $fp = VmTmpfileNative::open();
-        $this->assertNotFalse($fp);
-        $this->assertTrue(\is_resource($fp));
-
-        $this->assertSame(5, @fwrite($fp, 'hello'));
-        $this->assertSame(0, @fseek($fp, 0, \SEEK_SET));
-        $this->assertSame('hello', @stream_get_contents($fp));
-        $this->assertTrue(@fclose($fp));
+        $this->assertSame(5, VmFs::fwrite($handle, 'hello'));
+        $this->assertTrue(VmFs::rewind($handle));
+        $this->assertSame('hello', VmFs::streamGetContents($handle));
+        $this->assertTrue(VmFs::fclose($handle));
     }
 }
