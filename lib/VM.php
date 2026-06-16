@@ -628,41 +628,21 @@ class VM {
     }
 
     /**
-     * isset / ?? / ??= on hooked properties — backing or declared slot probe, never get hook (#8902, #8917).
+     * isset / ?? / ??= / empty on hooked properties — backing or declared slot probe, never get hook (#8902, #8917, #8918).
      *
      * @return bool|null null when the property is not hook-backed
      */
     private function issetHookedPropertyWithoutGetHook(ObjectEntry $object, string $propName): ?bool
     {
-        $lcClass = strtolower($object->class->name);
-        $propMeta = $this->context->propertyHookRegistry[$lcClass][$propName]
-            ?? $this->context->propertyHookRegistry[$lcClass][strtolower($propName)]
-            ?? null;
-        if (is_array($propMeta)) {
-            $backingName = $propMeta['setBacking'] ?? $propMeta['getBacking'] ?? null;
-            if (null !== $backingName && $object->hasProperty($backingName)) {
-                $value = $object->getProperty($backingName)->resolveIndirect();
-                if ($value->isUndefined() || VM\TypedPropertyCheck::isUninitialized($value)) {
-                    return false;
-                }
-
-                return Variable::TYPE_NULL !== $value->type;
-            }
-        }
-        $meta = $this->classPropertyMeta($object, $propName);
-        if (null === $meta || (null === $meta->getHookMethodLc && null === $meta->setHookMethodLc)) {
+        $backing = $this->hookedPropertyBackingValue($object, $propName);
+        if (false === $backing) {
             return null;
         }
-        if ($object->hasProperty($propName)) {
-            $value = $object->getProperty($propName)->resolveIndirect();
-            if ($value->isUndefined() || VM\TypedPropertyCheck::isUninitialized($value)) {
-                return false;
-            }
-
-            return Variable::TYPE_NULL !== $value->type;
+        if ($backing->isUndefined() || VM\TypedPropertyCheck::isUninitialized($backing)) {
+            return false;
         }
 
-        return false;
+        return Variable::TYPE_NULL !== $backing->type;
     }
 
     /**
@@ -670,25 +650,11 @@ class VM {
      */
     public function fetchObjectPropertyForCoalesce(ObjectEntry $object, string $propName, Variable $dst): void
     {
-        $lcClass = strtolower($object->class->name);
-        $propMeta = $this->context->propertyHookRegistry[$lcClass][$propName]
-            ?? $this->context->propertyHookRegistry[$lcClass][strtolower($propName)]
-            ?? null;
-        if (is_array($propMeta)) {
-            $backingName = $propMeta['setBacking'] ?? $propMeta['getBacking'] ?? null;
-            if (null !== $backingName && $object->hasProperty($backingName)) {
-                $dst->copyFrom($object->getProperty($backingName));
+        $backing = $this->hookedPropertyBackingValue($object, $propName);
+        if (false !== $backing) {
+            $dst->copyFrom($backing);
 
-                return;
-            }
-        }
-        $meta = $this->classPropertyMeta($object, $propName);
-        if (null !== $meta && (null !== $meta->getHookMethodLc || null !== $meta->setHookMethodLc)) {
-            if ($object->hasProperty($propName)) {
-                $dst->copyFrom($object->getProperty($propName));
-
-                return;
-            }
+            return;
         }
         if ($object->hasProperty($propName)) {
             $dst->copyFrom($object->getProperty($propName));
@@ -707,22 +673,10 @@ class VM {
         if (null !== $catchFrame) {
             return $catchFrame;
         }
-        if ($this->emptyHookedPropertyViaSeparateBacking($object, $propName, $dst)) {
+        if ($this->emptyHookedPropertyViaBackingProbe($object, $propName, $dst)) {
             return null;
         }
         $meta = $this->classPropertyMeta($object, $propName);
-        if (null !== $meta && null !== $meta->getHookMethodLc) {
-            $catchFrame = $this->enforcePropertyVisibilityRead($object, $propName, $frame);
-            if (null !== $catchFrame) {
-                return $catchFrame;
-            }
-            $hookValue = $this->fetchPropertyWithHooks($object, $propName, $frame);
-            if (null !== $hookValue) {
-                $dst->bool(!ext\standard\boolval::isTruthy($hookValue));
-
-                return null;
-            }
-        }
         if (null === $meta || !$meta->prototype->isUndefined()) {
             $dst->bool(!$this->objectPropertyIsSet($object, $propName, $frame));
 
@@ -736,12 +690,6 @@ class VM {
             $props = $object->getRawProperties();
             if (isset($props[$propName]) && VM\TypedPropertyCheck::isUninitialized($props[$propName])) {
                 $dst->bool(true);
-
-                return null;
-            }
-            $hookValue = $this->fetchPropertyWithHooks($object, $propName, $frame);
-            if (null !== $hookValue) {
-                $dst->bool(!ext\standard\boolval::isTruthy($hookValue));
 
                 return null;
             }
@@ -861,31 +809,69 @@ class VM {
     }
 
     /**
-     * empty($obj->hooked) with separate backing — Zend isset-style probe, no get hook (#8901, zend_property_hooks.c).
+     * isset/empty/?? backing probe — never invokes get hook (#6472, #8901, #8917, #8918).
+     *
+     * @return Variable|false false when the property is not hooked
      */
-    private function emptyHookedPropertyViaSeparateBacking(ObjectEntry $object, string $propName, Variable $dst): bool
+    private function hookedPropertyBackingValue(ObjectEntry $object, string $propName): Variable|false
     {
-        if (!$this->hookedPropertyHasSeparateBacking($object, $propName)) {
+        if (!$this->instancePropertyHasHooks($object, $propName)) {
             return false;
         }
         $lcClass = strtolower($object->class->name);
         $propMeta = $this->context->propertyHookRegistry[$lcClass][$propName]
             ?? $this->context->propertyHookRegistry[$lcClass][strtolower($propName)]
             ?? null;
-        if (!is_array($propMeta)) {
+        if (is_array($propMeta)) {
+            $backingName = $propMeta['setBacking'] ?? $propMeta['getBacking'] ?? null;
+            if (null !== $backingName && strcasecmp($backingName, $propName) !== 0) {
+                if ($object->hasProperty($backingName)) {
+                    return $object->getProperty($backingName)->resolveIndirect();
+                }
+                $uninit = new Variable();
+                $uninit->undefined();
+
+                return $uninit;
+            }
+        }
+        if ($object->hasProperty($propName)) {
+            return $object->getProperty($propName)->resolveIndirect();
+        }
+        $uninit = new Variable();
+        $uninit->undefined();
+
+        return $uninit;
+    }
+
+    private function instancePropertyHasHooks(ObjectEntry $object, string $propName): bool
+    {
+        $meta = $this->classPropertyMeta($object, $propName);
+        if (null !== $meta && (null !== $meta->getHookMethodLc || null !== $meta->setHookMethodLc)) {
+            return true;
+        }
+        $lcClass = strtolower($object->class->name);
+        $propMeta = $this->context->propertyHookRegistry[$lcClass][$propName]
+            ?? $this->context->propertyHookRegistry[$lcClass][strtolower($propName)]
+            ?? null;
+
+        return is_array($propMeta) && (isset($propMeta['get']) || isset($propMeta['set']));
+    }
+
+    /**
+     * empty($obj->hooked) — Zend isset-style backing probe, no get hook (#8901, #8918, zend_property_hooks.c).
+     */
+    private function emptyHookedPropertyViaBackingProbe(ObjectEntry $object, string $propName, Variable $dst): bool
+    {
+        $backing = $this->hookedPropertyBackingValue($object, $propName);
+        if (false === $backing) {
             return false;
         }
-        $backingName = $propMeta['setBacking'] ?? $propMeta['getBacking'] ?? null;
-        if (null === $backingName || !$object->hasProperty($backingName)) {
-            return false;
-        }
-        $value = $object->getProperty($backingName)->resolveIndirect();
-        if ($value->isUndefined() || VM\TypedPropertyCheck::isUninitialized($value)) {
+        if ($backing->isUndefined() || VM\TypedPropertyCheck::isUninitialized($backing)) {
             $dst->bool(true);
 
             return true;
         }
-        $dst->bool(!ext\standard\boolval::isTruthy($value));
+        $dst->bool(!ext\standard\boolval::isTruthy($backing));
 
         return true;
     }

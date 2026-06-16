@@ -46,7 +46,7 @@ echo "ok\n";
 --EXPECT--
 true
 false
-false false
+false true
 false true
 bool(false)
 ok
