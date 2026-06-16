@@ -250,10 +250,7 @@ patch_already_applied() {
       ;;
     php-cfg-asymmetric-visibility.patch)
       grep -q 'public int \$setVisibility' "$ROOT/vendor/ircmaxell/php-cfg/lib/PHPCfg/Op/Stmt/Property.php" 2>/dev/null \
-        && (
-          grep -q 'promotionSetVisibility' "$ROOT/vendor/ircmaxell/php-cfg/lib/PHPCfg/Op/Expr/Param.php" 2>/dev/null \
-          || grep -q 'promotionFlags' "$ROOT/vendor/ircmaxell/php-cfg/lib/PHPCfg/Op/Expr/Param.php" 2>/dev/null
-        )
+        && grep -q 'promotionSetVisibility' "$ROOT/vendor/ircmaxell/php-cfg/lib/PHPCfg/Op/Expr/Param.php" 2>/dev/null
       ;;
     php-cfg-assertion-expr-property.patch)
       grep -q 'public \\$expr;' "$ROOT/vendor/ircmaxell/php-cfg/lib/PHPCfg/Op/Expr/Assertion.php" 2>/dev/null
@@ -772,14 +769,14 @@ apply_php_cfg_asymmetric_visibility_overlay() {
   if [[ ! -f "$prop" || ! -f "$param" ]]; then
     return 0
   fi
-  local has_prop=0 has_param=0
+  local has_prop=0 has_asym_param=0
   if grep -q 'public int \$setVisibility' "$prop" 2>/dev/null; then
     has_prop=1
   fi
-  if grep -q 'promotionSetVisibility' "$param" 2>/dev/null || grep -q 'promotionFlags' "$param" 2>/dev/null; then
-    has_param=1
+  if grep -q 'promotionSetVisibility' "$param" 2>/dev/null; then
+    has_asym_param=1
   fi
-  if [[ $has_prop -eq 1 && $has_param -eq 1 ]]; then
+  if [[ $has_prop -eq 1 && $has_asym_param -eq 1 ]]; then
     if ! grep -q 'public int \$getVisibility' "$prop" 2>/dev/null; then
       python3 - "$prop" <<'PY'
 import sys
@@ -847,11 +844,15 @@ set_vis_block = (
 for needle in (
     "    public int $promotionGetVisibility = 0;\n",
     "    public $promotionGetVisibility = 0;\n",
+    "    public bool $promotionReadonly = false;\n",
+    "    public $promotionReadonly = false;\n",
+    "    public int $promotionFlags = 0;\n",
+    "    public $promotionFlags = 0;\n",
 ):
     if needle in text:
         path.write_text(text.replace(needle, needle + set_vis_block, 1))
         raise SystemExit(0)
-sys.stderr.write("php-cfg-asymmetric-visibility: Param.php promotionGetVisibility anchor missing for set overlay\n")
+sys.stderr.write("php-cfg-asymmetric-visibility: Param.php promotionSetVisibility anchor missing for set overlay\n")
 raise SystemExit(1)
 PY
       echo "Applied php-cfg-asymmetric-visibility.patch (Param setVisibility overlay #8760)"
@@ -885,7 +886,7 @@ path.write_text(text.replace(needle, insert, 1))
 PY
     echo "Applied php-cfg-asymmetric-visibility.patch (Property overlay)"
   fi
-  if [[ $has_param -eq 0 ]]; then
+  if [[ $has_asym_param -eq 0 ]]; then
     python3 - "$param" <<'PY'
 import sys
 from pathlib import Path
