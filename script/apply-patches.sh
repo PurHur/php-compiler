@@ -1255,14 +1255,60 @@ apply_php_cfg_enum_class_method_parser_fix() {
 
 apply_php_cfg_enum_trait_use_parser_fix() {
   local parser="${1:-$ROOT/vendor/ircmaxell/php-cfg/lib/PHPCfg/Parser.php}"
-  if grep -A30 'function parseStmt_Enum' "$parser" 2>/dev/null | grep -q 'Stmt\\TraitUse'; then
+  if grep -A35 'function parseStmt_Enum' "$parser" 2>/dev/null | grep -q 'Stmt\\TraitUse'; then
     return 0
   fi
   if ! grep -q 'function parseStmt_Enum' "$parser" 2>/dev/null; then
     echo "Skip php-cfg-enum-trait-use.patch (parseStmt_Enum missing)" >&2
     return 1
   fi
-  apply_patch "$PATCH_DIR/php-cfg-enum-trait-use.patch"
+  python3 - "$parser" <<'PY'
+import sys
+from pathlib import Path
+
+parser_path = Path(sys.argv[1])
+text = parser_path.read_text()
+trait_branch = """            } elseif ($stmt instanceof Stmt\\TraitUse) {
+                $this->parseStmt_TraitUse($stmt);
+"""
+if "Stmt\\TraitUse" in text.split("function parseStmt_Enum", 1)[-1].split("function parseEnumCase", 1)[0]:
+    raise SystemExit(0)
+
+with_class_const = """            } elseif ($stmt instanceof Stmt\\ClassMethod) {
+                $this->parseStmt_ClassMethod($stmt);
+            } elseif ($stmt instanceof Stmt\\ClassConst) {
+                $this->parseStmt_ClassConst($stmt);
+            }"""
+with_class_const_trait = """            } elseif ($stmt instanceof Stmt\\ClassMethod) {
+                $this->parseStmt_ClassMethod($stmt);
+            } elseif ($stmt instanceof Stmt\\TraitUse) {
+                $this->parseStmt_TraitUse($stmt);
+            } elseif ($stmt instanceof Stmt\\ClassConst) {
+                $this->parseStmt_ClassConst($stmt);
+            }"""
+without_class_const = """            } elseif ($stmt instanceof Stmt\\ClassMethod) {
+                $this->parseStmt_ClassMethod($stmt);
+            }
+        }
+        $this->block = $savedBlock;"""
+without_class_const_trait = """            } elseif ($stmt instanceof Stmt\\ClassMethod) {
+                $this->parseStmt_ClassMethod($stmt);
+            } elseif ($stmt instanceof Stmt\\TraitUse) {
+                $this->parseStmt_TraitUse($stmt);
+            }
+        }
+        $this->block = $savedBlock;"""
+
+if with_class_const in text:
+    text = text.replace(with_class_const, with_class_const_trait, 1)
+elif without_class_const in text:
+    text = text.replace(without_class_const, without_class_const_trait, 1)
+else:
+    sys.stderr.write("php-cfg-enum-trait-use: parseStmt_Enum loop anchor not found\n")
+    raise SystemExit(1)
+parser_path.write_text(text)
+PY
+  echo "Applied php-cfg-enum-trait-use.patch (overlay)"
 }
 
 apply_php_cfg_enum_class_const_overlay() {
@@ -4923,6 +4969,56 @@ patch_marker_present() {
   grep -qF "$marker" "$ROOT/$old_path" 2>/dev/null
 }
 
+# Apply a patch file with git/patch(1) only — no overlay dispatch (avoids recursion).
+apply_patch_file_direct() {
+  local patch="$1"
+  local patch_name
+  patch_name="$(basename "$patch")"
+  if [[ ! -f "$patch" ]]; then
+    return 0
+  fi
+  if patch_already_applied "$patch"; then
+    echo "Skip ${patch_name} (already applied)"
+    return 0
+  fi
+  if git -C "$ROOT" apply --check -p0 "$patch" >/dev/null 2>&1; then
+    git -C "$ROOT" apply -p0 "$patch"
+    echo "Applied ${patch_name}"
+    return 0
+  fi
+  if git -C "$ROOT" apply --check -p1 "$patch" >/dev/null 2>&1; then
+    git -C "$ROOT" apply -p1 "$patch"
+    echo "Applied ${patch_name} (-p1)"
+    return 0
+  fi
+  if command -v patch >/dev/null 2>&1; then
+    if patch -p0 --dry-run -s -f < "$patch" >/dev/null 2>&1; then
+      patch -p0 -s -f < "$patch" >/dev/null 2>&1
+      echo "Applied ${patch_name} (patch(1))"
+      return 0
+    fi
+    if patch -p1 --dry-run -s -f < "$patch" >/dev/null 2>&1; then
+      patch -p1 -s -f < "$patch" >/dev/null 2>&1
+      echo "Applied ${patch_name} (patch(1), -p1)"
+      return 0
+    fi
+    if patch -p0 --reverse --dry-run -s -f < "$patch" >/dev/null 2>&1; then
+      echo "Skip ${patch_name} (already applied)"
+      return 0
+    fi
+    if patch -p1 --reverse --dry-run -s -f < "$patch" >/dev/null 2>&1; then
+      echo "Skip ${patch_name} (already applied, -p1)"
+      return 0
+    fi
+  fi
+  if patch_marker_present "$patch"; then
+    echo "Skip ${patch_name} (already applied)"
+    return 0
+  fi
+  record_patch_failure "${patch_name}"
+  return 1
+}
+
 apply_patch() {
   local patch="$1"
   local patch_name
@@ -5150,41 +5246,8 @@ apply_patch() {
     apply_php_cfg_asymmetric_visibility_overlay
     return $?
   fi
-  if patch_already_applied "$patch"; then
-    echo "Skip ${patch_name} (already applied)"
+  if apply_patch_file_direct "$patch"; then
     return 0
-  fi
-  if git -C "$ROOT" apply --check -p0 "$patch" >/dev/null 2>&1; then
-    git -C "$ROOT" apply -p0 "$patch"
-    echo "Applied ${patch_name}"
-    return 0
-  fi
-  # Some patches are stored with `a/` + `b/` prefixes (git diff default).
-  if git -C "$ROOT" apply --check -p1 "$patch" >/dev/null 2>&1; then
-    git -C "$ROOT" apply -p1 "$patch"
-    echo "Applied ${patch_name} (-p1)"
-    return 0
-  fi
-  if command -v patch >/dev/null 2>&1; then
-    if patch -p0 --dry-run -s -f < "$patch" >/dev/null 2>&1; then
-      patch -p0 -s -f < "$patch" >/dev/null 2>&1
-      echo "Applied ${patch_name} (patch(1))"
-      return 0
-    fi
-    # Some patches are stored with `a/` + `b/` prefixes (git diff default).
-    if patch -p1 --dry-run -s -f < "$patch" >/dev/null 2>&1; then
-      patch -p1 -s -f < "$patch" >/dev/null 2>&1
-      echo "Applied ${patch_name} (patch(1), -p1)"
-      return 0
-    fi
-    if patch -p0 --reverse --dry-run -s -f < "$patch" >/dev/null 2>&1; then
-      echo "Skip ${patch_name} (already applied)"
-      return 0
-    fi
-    if patch -p1 --reverse --dry-run -s -f < "$patch" >/dev/null 2>&1; then
-      echo "Skip ${patch_name} (already applied, -p1)"
-      return 0
-    fi
   fi
   case "${patch_name}" in
     php-cfg-match.patch)
