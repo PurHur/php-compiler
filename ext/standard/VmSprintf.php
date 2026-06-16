@@ -64,7 +64,9 @@ final class VmSprintf
                 $parsed['spec'],
                 $args[$varIdx],
                 $frame,
-                $precision
+                $precision,
+                $parsed['showSign'],
+                $parsed['altForm']
             );
             $out .= self::applyWidth(
                 $converted,
@@ -91,6 +93,8 @@ final class VmSprintf
      *     positional: ?int,
      *     leftAdjust: bool,
      *     zeroPad: bool,
+     *     showSign: ?string,
+     *     altForm: bool,
      *     width: ?int,
      *     widthFromArg: bool,
      *     precision: ?int,
@@ -108,6 +112,8 @@ final class VmSprintf
                 'positional' => null,
                 'leftAdjust' => false,
                 'zeroPad' => false,
+                'showSign' => null,
+                'altForm' => false,
                 'width' => null,
                 'widthFromArg' => false,
                 'precision' => null,
@@ -137,6 +143,8 @@ final class VmSprintf
 
         $leftAdjust = false;
         $zeroPad = false;
+        $showSign = null;
+        $altForm = false;
         while ($pos < $len) {
             $flag = $format[$pos];
             if ('-' === $flag) {
@@ -149,7 +157,20 @@ final class VmSprintf
                 ++$pos;
                 continue;
             }
-            if (\in_array($flag, ['+', ' ', '#'], true)) {
+            if ('+' === $flag) {
+                $showSign = '+';
+                ++$pos;
+                continue;
+            }
+            if (' ' === $flag) {
+                if (null === $showSign) {
+                    $showSign = ' ';
+                }
+                ++$pos;
+                continue;
+            }
+            if ('#' === $flag) {
+                $altForm = true;
                 ++$pos;
                 continue;
             }
@@ -198,6 +219,8 @@ final class VmSprintf
             'positional' => $positional,
             'leftAdjust' => $leftAdjust,
             'zeroPad' => $zeroPad,
+            'showSign' => $showSign,
+            'altForm' => $altForm,
             'width' => $width,
             'widthFromArg' => $widthFromArg,
             'precision' => $precision,
@@ -260,8 +283,12 @@ final class VmSprintf
             return $value.str_repeat(' ', $padLen);
         }
         if ($zeroPad && 's' !== $spec) {
-            if (str_starts_with($value, '-')) {
-                return '-'.str_repeat('0', $padLen).substr($value, 1);
+            if (
+                str_starts_with($value, '-')
+                || str_starts_with($value, '+')
+                || str_starts_with($value, ' ')
+            ) {
+                return $value[0].str_repeat('0', $padLen).substr($value, 1);
             }
 
             return str_repeat('0', $padLen).$value;
@@ -274,24 +301,26 @@ final class VmSprintf
         string $spec,
         Variable $var,
         ?Frame $frame,
-        ?int $precision
+        ?int $precision,
+        ?string $showSign = null,
+        bool $altForm = false
     ): string {
         $floatPrec = $precision ?? 6;
         switch ($spec) {
             case 's':
                 return self::argToString($var, $frame);
             case 'd':
-                return self::intToDecimal(self::argToInt($var, $frame));
+                return self::formatSignedDecimal(self::argToInt($var, $frame), $showSign);
             case 'f':
                 return VmNumberFormat::format(self::argToFloat($var, $frame), $floatPrec, '.', '');
             case 'b':
-                return self::intToBinary(self::argToInt($var, $frame));
+                return self::formatRadix(self::argToInt($var, $frame), 2, false, $altForm);
             case 'x':
-                return self::intToRadix(self::argToInt($var, $frame), 16, false);
+                return self::formatRadix(self::argToInt($var, $frame), 16, false, $altForm);
             case 'X':
-                return self::intToRadix(self::argToInt($var, $frame), 16, true);
+                return self::formatRadix(self::argToInt($var, $frame), 16, true, $altForm);
             case 'o':
-                return self::intToRadix(self::argToInt($var, $frame), 8, false);
+                return self::formatRadix(self::argToInt($var, $frame), 8, false, $altForm);
             case 'u':
                 return self::intToUnsignedDecimal(self::argToInt($var, $frame));
             case 'c':
@@ -397,6 +426,42 @@ final class VmSprintf
         }
 
         return $negative ? '-'.$digits : $digits;
+    }
+
+    /** php-src sprintf.c — SIGN flag for %d. */
+    private static function formatSignedDecimal(int $value, ?string $showSign): string
+    {
+        if ($value < 0) {
+            return '-'.self::intToDecimal(-$value);
+        }
+        $digits = self::intToDecimal($value);
+        if ('+' === $showSign) {
+            return '+'.$digits;
+        }
+        if (' ' === $showSign) {
+            return ' '.$digits;
+        }
+
+        return $digits;
+    }
+
+    /**
+     * @param 2|8|16 $base
+     */
+    private static function formatRadix(int $value, int $base, bool $upper, bool $altForm): string
+    {
+        $digits = self::intToRadix($value, $base, $upper);
+        if (!$altForm || 0 === $value) {
+            return $digits;
+        }
+        if (16 === $base) {
+            return ($upper ? '0X' : '0x').$digits;
+        }
+        if (8 === $base && isset($digits[0]) && '0' !== $digits[0]) {
+            return '0'.$digits;
+        }
+
+        return $digits;
     }
 
     /**
