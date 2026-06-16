@@ -909,6 +909,7 @@ require_once __DIR__.'/../../../ext/standard/VmProcessIdentity.php';
 require_once __DIR__.'/../../../ext/standard/VmProcessIdentityNative.php';
 require_once __DIR__.'/../../../ext/standard/VmRandom.php';
 require_once __DIR__.'/../../../ext/standard/VmRandomNative.php';
+require_once __DIR__.'/../../../ext/standard/VmRandomPure.php';
 require_once __DIR__.'/../../../ext/standard/VmReadline.php';
 require_once __DIR__.'/../../../ext/standard/VmRealpathCache.php';
 require_once __DIR__.'/../../../ext/standard/VmReduceCallback.php';
