@@ -55,15 +55,16 @@ final class BootstrapLibSpineVmSmokeTest extends TestCase
         $this->assertStringContainsString('!$skipBundle', $compile);
     }
 
-    public function testLibSpineLinkScriptSeedsSidecarsAndGen0Fallback(): void
+    public function testLibSpineLinkScriptSeedsSidecarsAndRefusesZendFallback(): void
     {
         $script = (string) file_get_contents(self::$root.'/script/bootstrap-selfhost-lib-spine-smoke-link.sh');
         $this->assertStringContainsString('bootstrap-gen0-install-prelinked-driver.sh', $script);
         $this->assertStringContainsString('ci_ensure_vendor_patches', $script);
         $this->assertStringContainsString('bootstrap_ensure_m3_compiler_lib_sidecar', $script);
-        $this->assertStringContainsString('PHP_COMPILER_M3_SIDECAR_HOST=1', $script);
+        $this->assertStringContainsString('export BOOTSTRAP_NO_ZEND_FALLBACK=1', $script);
+        $this->assertStringContainsString('inventory argv driver unavailable (no Zend — #8716)', $script);
         $this->assertStringContainsString('BOOTSTRAP_LIB_SPINE_SMOKE_GEN0_FALLBACK', $script);
-        $this->assertStringContainsString('gen-0 Zend fallback', $script);
+        $this->assertStringContainsString('BOOTSTRAP_NO_ZEND_FALLBACK:-0}" != "1"', $script);
     }
 
     public function testSpineEntryBundlesBinVmPhp(): void

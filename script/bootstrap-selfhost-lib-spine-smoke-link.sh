@@ -129,11 +129,24 @@ if [[ "${BOOTSTRAP_LIB_SPINE_SMOKE_USE_COMPILE_INVOKE:-0}" != "1" ]]; then
     echo "bootstrap-selfhost-lib-spine-smoke-link: compile invoker=${SPINE_COMPILE_DRIVER} (no vendor/ tree)" >&2
   else
     # Emit-helper build/bin-compile-aot (gen-2 spine) must not masquerade as inventory argv driver (#3012).
-    if ! bootstrap_ensure_inventory_argv_driver "${INVENTORY_ARGV_DRIVER}"; then
-      echo "bootstrap-selfhost-lib-spine-smoke-link: failed to ensure inventory argv driver ${INVENTORY_ARGV_DRIVER}" >&2
-      exit 1
+    if bootstrap_ensure_inventory_argv_driver "${INVENTORY_ARGV_DRIVER}"; then
+      SPINE_COMPILE_DRIVER="${INVENTORY_ARGV_DRIVER}"
+    else
+      echo "bootstrap-selfhost-lib-spine-smoke-link: inventory argv driver unavailable (no Zend — #8716); resolving native driver" >&2
+      if ! bootstrap_resolve_compile_driver || [[ "${BOOTSTRAP_COMPILE_DRIVER_MODE:-}" != "native" ]]; then
+        echo "bootstrap-selfhost-lib-spine-smoke-link: building compiled argv driver (bootstrap-selfhost-driver-smoke) to avoid Zend fallback" >&2
+        if ! ./script/bootstrap-selfhost-driver-smoke.sh >/dev/null; then
+          echo "bootstrap-selfhost-lib-spine-smoke-link: failed to build compiled driver (see stderr above)" >&2
+          exit 1
+        fi
+        if ! bootstrap_resolve_compile_driver || [[ "${BOOTSTRAP_COMPILE_DRIVER_MODE:-}" != "native" ]]; then
+          echo "bootstrap-selfhost-lib-spine-smoke-link: compiled driver still missing after driver-smoke (would require Zend fallback)" >&2
+          exit 1
+        fi
+      fi
+      SPINE_COMPILE_DRIVER="${BOOTSTRAP_COMPILE_DRIVER}"
+      echo "bootstrap-selfhost-lib-spine-smoke-link: compile invoker=${SPINE_COMPILE_DRIVER} (inventory prelinked smoke failed — #8716)" >&2
     fi
-    SPINE_COMPILE_DRIVER="${INVENTORY_ARGV_DRIVER}"
   fi
 
   # Best-effort segfault breadcrumbs (written before invoking the native driver).
