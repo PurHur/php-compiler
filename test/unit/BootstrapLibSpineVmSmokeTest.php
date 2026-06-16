@@ -78,6 +78,17 @@ final class BootstrapLibSpineVmSmokeTest extends TestCase
         $this->assertStringContainsString('bootstrap-selfhost-lib-spine-vm-smoke', $entry);
     }
 
+    public function testSpineEntryExercisesMbMimeheaderPaths(): void
+    {
+        $entry = (string) file_get_contents(self::$root.'/test/selfhost/compiler_lib_spine_smoke/main.php');
+        $this->assertStringContainsString('#8697', $entry);
+        $this->assertStringContainsString('VmMbstring::encodeMimeheader', $entry);
+        $this->assertStringContainsString('VmMbstring::decodeMimeheader', $entry);
+        $this->assertStringContainsString('JitMbMimeheader.php', $entry);
+        $this->assertStringContainsString('mb_encode_mimeheader.php', $entry);
+        $this->assertStringContainsString('mb_decode_mimeheader.php', $entry);
+    }
+
     public function testVmDriverExecuteNativeDoesNotStubVmSpineSmokeAtMainEntry(): void
     {
         $native = (string) file_get_contents(self::$root.'/lib/JIT/VmDriverExecuteNative.php');
