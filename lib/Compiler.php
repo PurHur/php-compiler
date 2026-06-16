@@ -12112,6 +12112,42 @@ class Compiler {
                             return $fetch;
                         }
                     }
+                    // php-cfg may drop the fetch result and leave a literal backing scalar element/key
+                    // (e.g. `E::A; [ E::A => 1 ]` lowered to key Literal(1)) — recover the enum case fetch (#9024).
+                    if ($valueOperand instanceof Operand\Literal
+                        && (\is_int($valueOperand->value) || \is_string($valueOperand->value))
+                    ) {
+                        $className = $this->staticNameFromOperand($fetch->class);
+                        $constName = $this->staticNameFromOperand($fetch->name);
+                        if (null !== $className && null !== $constName) {
+                            $lcClass = $this->resolveDefaultClassConstScope($className, $block);
+                            $lcConst = strtolower($constName);
+                            $stored = null !== $lcClass
+                                ? ($this->compileTimeClassConsts[$lcClass][$lcConst] ?? null)
+                                : null;
+                            if (null !== $stored) {
+                                $stored = $stored->resolveIndirect();
+                                $backing = null;
+                                if (Variable::TYPE_ENUM_CASE === $stored->type) {
+                                    $backing = $stored->toEnumCase()->backingValue->resolveIndirect();
+                                } elseif (Variable::TYPE_OBJECT === $stored->type && EnumCaseSupport::isEnumCase($stored->toObject())) {
+                                    $backing = $stored->toObject()->enumCaseValue?->resolveIndirect();
+                                }
+                                if (null !== $backing) {
+                                    if (\is_int($valueOperand->value) && Variable::TYPE_INTEGER === $backing->type
+                                        && $backing->toInt() === $valueOperand->value
+                                    ) {
+                                        return $fetch;
+                                    }
+                                    if (\is_string($valueOperand->value) && Variable::TYPE_STRING === $backing->type
+                                        && $backing->toString() === $valueOperand->value
+                                    ) {
+                                        return $fetch;
+                                    }
+                                }
+                            }
+                        }
+                    }
                 }
 
                 break;
@@ -12207,7 +12243,25 @@ class Compiler {
                     $valueSlot = $this->compileOperand($expr->values[$i], $block, true);
                 }
             }
-            $keySlot = $this->compileOperand($expr->keys[$i], $block, true);
+            $keyOperand = $expr->keys[$i];
+            $keyFetch = $this->findEnumCaseClassConstFetchForArrayElement(
+                $keyOperand,
+                $block,
+                $expr,
+                $i
+            );
+            if (null !== $keyFetch) {
+                $keyTemp = new Operand\Temporary();
+                $keySlot = $block->getVarSlot($keyTemp, false);
+                $return[] = new OpCode(
+                    OpCode::TYPE_CLASS_CONST_FETCH,
+                    $keySlot,
+                    $this->compileOperand($keyFetch->class, $block, true),
+                    $this->compileOperand($keyFetch->name, $block, true)
+                );
+            } else {
+                $keySlot = $this->compileOperand($keyOperand, $block, true);
+            }
             if (!empty($byRefFlags[$i])) {
                 if (!$started) {
                     $return[] = new OpCode(OpCode::TYPE_INIT_ARRAY, $result);
