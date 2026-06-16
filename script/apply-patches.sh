@@ -3266,6 +3266,51 @@ PY
   echo "Applied php-types-generic-null-tail.patch (overlay)"
 }
 
+apply_php_types_remove_type_empty_union_overlay_to_target() {
+  local target="$1"
+  if [[ ! -f "$target" ]]; then
+    return 0
+  fi
+  if ! grep -q "throw new \\\\LogicException('Unknown type encountered')" "$target" 2>/dev/null; then
+    return 0
+  fi
+  python3 - "$target" <<'PY'
+import sys
+from pathlib import Path
+
+path = Path(sys.argv[1])
+text = path.read_text()
+old = "            throw new \\LogicException('Unknown type encountered');"
+new = "            return self::mixed();"
+if old not in text:
+    raise SystemExit(0)
+path.write_text(text.replace(old, new, 1))
+PY
+  echo "Applied php-types-remove-type-empty-union.patch (Type.php overlay): ${target}"
+}
+
+apply_php_types_remove_type_empty_union_overlay() {
+  local rc=0
+  local vendor="$ROOT/vendor/ircmaxell/php-types/lib/PHPTypes/Type.php"
+  local prelinked="$ROOT/prelinked/bootstrap-vendor/sources/ircmaxell/php-types/lib/PHPTypes/Type.php"
+  local applied=0
+
+  if [[ -f "$vendor" ]] && grep -q "throw new \\\\LogicException('Unknown type encountered')" "$vendor" 2>/dev/null; then
+    apply_php_types_remove_type_empty_union_overlay_to_target "$vendor" || rc=1
+    applied=1
+  fi
+  if [[ -f "$prelinked" ]] && grep -q "throw new \\\\LogicException('Unknown type encountered')" "$prelinked" 2>/dev/null; then
+    apply_php_types_remove_type_empty_union_overlay_to_target "$prelinked" || rc=1
+    applied=1
+  fi
+  if [[ "$applied" -eq 0 ]]; then
+    echo "Skip php-types-remove-type-empty-union.patch (already applied)"
+  else
+    echo "Applied php-types-remove-type-empty-union.patch (overlay)"
+  fi
+  return "$rc"
+}
+
 apply_php_types_iterable_generic_overlay() {
   local target="$ROOT/vendor/ircmaxell/php-types/lib/PHPTypes/Type.php"
   if grep -qE "preg_match\('/\^\(list\|array\|iterable\)" "$target" 2>/dev/null; then
@@ -4914,6 +4959,10 @@ apply_patch() {
     apply_php_types_generic_null_tail_overlay
     return $?
   fi
+  if [[ "$(basename "$patch")" == "php-types-remove-type-empty-union.patch" ]]; then
+    apply_php_types_remove_type_empty_union_overlay
+    return $?
+  fi
   if [[ "$(basename "$patch")" == "php-types-incdec-type.patch" ]]; then
     apply_php_types_incdec_type_overlay
     return $?
@@ -5475,6 +5524,10 @@ verify_critical_language_patches() {
   fi
   if [[ -f "$prelinked_type" ]] && ! grep -q 'instanceof CfgType\\Intersection' "$prelinked_type" 2>/dev/null; then
     missing+=("php-types-intersection-type-Type-prelinked")
+  fi
+  if [[ -f "$prelinked_type" ]] \
+    && grep -q "throw new \\\\LogicException('Unknown type encountered')" "$prelinked_type" 2>/dev/null; then
+    missing+=("php-types-remove-type-empty-union-prelinked")
   fi
   if ((${#missing[@]} > 0)); then
     echo "apply-patches: critical language patch markers missing: ${missing[*]}" >&2
