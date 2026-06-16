@@ -5,9 +5,7 @@ declare(strict_types=1);
 namespace PHPCompiler\ext\ctype;
 
 use PHPCompiler\JIT\Builtin\CtypeJit;
-use PHPCompiler\JIT\Builtin\TypeErrorRaise;
 use PHPCompiler\JIT\Context;
-use PHPCompiler\JIT\JitOperandTypeLabel;
 use PHPCompiler\JIT\JitStringArg;
 use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\Variable as JITVariable;
@@ -78,18 +76,6 @@ final class JitCtype
             );
 
             return $context->builder->icmp(Builder::INT_NE, $result, $zero);
-        }
-
-        $enumClass = JitOperandTypeLabel::compileTimeEnumClassName($context, $arg);
-        if (null !== $enumClass) {
-            TypeErrorRaise::registerDeclarations($context);
-            TypeErrorRaise::ensureLinked($context);
-            TypeErrorRaise::emitRaise($context, \sprintf(
-                '%s(): Argument #1 ($text) must be of type string|int, %s given',
-                $function,
-                $enumClass
-            ));
-            $context->builder->call($context->lookupFunction('abort'));
         }
 
         return self::boolConst($context, false);
