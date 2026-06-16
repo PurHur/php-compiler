@@ -11286,7 +11286,7 @@ restart:
                     $this->flushPendingTraitUses($entry, $pendingTraits, $ownMethods);
                     $pendingTraits = [];
                     $name = $frame->scope[$op->arg1];
-                    $default = is_null($op->arg2) ? null : $frame->scope[$op->arg2];
+                    $default = $this->resolveCompileTimePropertyDefaultSlot($frame, $block, $op->arg2);
                     $propLc = strtolower($name->toString());
                     $prop = new VM\ClassProperty(
                         $name->toString(),
@@ -11315,8 +11315,9 @@ restart:
                     $pendingTraits = [];
                     $name = strtolower($frame->scope[$op->arg1]->toString());
                     $storage = clone $frame->scope[$op->arg3];
-                    if (!is_null($op->arg2)) {
-                        $storage->copyFrom($frame->scope[$op->arg2]);
+                    $default = $this->resolveCompileTimePropertyDefaultSlot($frame, $block, $op->arg2);
+                    if (null !== $default) {
+                        $storage->copyFrom($default);
                     }
                     $this->linkStaticTypedPropertySlot(
                         $storage,
@@ -11451,6 +11452,24 @@ restart:
         }
 
         return VM\EnumCaseSupport::materializeConstantValue($this->context, $value);
+    }
+
+    /**
+     * Folded parameter/property/static defaults live in block constants (#3803, #7399).
+     */
+    private function resolveCompileTimePropertyDefaultSlot(Frame $frame, Block $block, ?int $slot): ?Variable
+    {
+        if (null === $slot) {
+            return null;
+        }
+        if (isset($block->constants[$slot])) {
+            return VM\ClassConstMaterializer::detachConstantValue($block->constants[$slot]);
+        }
+        if (isset($frame->scope[$slot])) {
+            return $frame->scope[$slot];
+        }
+
+        return null;
     }
 
     private function applyClassConstDeclaration(
