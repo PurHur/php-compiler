@@ -139,11 +139,12 @@ final class StringZlibJit
             ['compress2', $i32, [$i8p, $i64p, $i8p, $i64, $i32]],
             ['uncompress', $i32, [$i8p, $i64p, $i8p, $i64]],
             ['compressBound', $i64, [$i64]],
-            ['deflateInit2', $i32, [$i8p, $i32, $i32, $i32, $i32, $i32]],
+            // libz exports deflateInit2_/inflateInit2_ (zlib.h macros), not the 6-arg names.
+            ['deflateInit2_', $i32, [$i8p, $i32, $i32, $i32, $i32, $i32, $i8p, $i32]],
             ['deflate', $i32, [$i8p, $i32]],
             ['deflateEnd', $i32, [$i8p]],
             ['deflateBound', $i64, [$i8p, $i64]],
-            ['inflateInit2', $i32, [$i8p, $i32]],
+            ['inflateInit2_', $i32, [$i8p, $i32, $i8p, $i32]],
             ['inflate', $i32, [$i8p, $i32]],
             ['inflateEnd', $i32, [$i8p]],
             ['malloc', $i8p, [$i64]],
@@ -208,14 +209,17 @@ final class StringZlibJit
         $nullBytes = $i8p->constNull();
 
         $zstrm = self::allocZeroedZStream($context);
+        $zlibVersion = $context->pointerFromStringConstant('1.2.11');
         $initRc = $context->builder->call(
-            $context->lookupFunction('deflateInit2'),
+            $context->lookupFunction('deflateInit2_'),
             $zstrm,
             $level,
             $i32->constInt(self::Z_DEFLATED, false),
             $windowBits,
             $i32->constInt(8, false),
-            $i32->constInt(self::Z_DEFAULT_STRATEGY, false)
+            $i32->constInt(self::Z_DEFAULT_STRATEGY, false),
+            $zlibVersion,
+            $i32->constInt(self::Z_STREAM_SIZE, false)
         );
         $initOk = $context->builder->icmp(Builder::INT_EQ, $initRc, $i32->constInt(self::Z_OK, false));
         $initFail = $fn->appendBasicBlock('zcd_init_fail');
@@ -312,7 +316,14 @@ final class StringZlibJit
         $nullBytes = $i8p->constNull();
 
         $zstrm = self::allocZeroedZStream($context);
-        $initRc = $context->builder->call($context->lookupFunction('inflateInit2'), $zstrm, $windowBits);
+        $zlibVersion = $context->pointerFromStringConstant('1.2.11');
+        $initRc = $context->builder->call(
+            $context->lookupFunction('inflateInit2_'),
+            $zstrm,
+            $windowBits,
+            $zlibVersion,
+            $i32->constInt(self::Z_STREAM_SIZE, false)
+        );
         $initOk = $context->builder->icmp(Builder::INT_EQ, $initRc, $i32->constInt(self::Z_OK, false));
         $initFail = $fn->appendBasicBlock('zci_init_fail');
         $calcCap = $fn->appendBasicBlock('zci_calc_cap');
