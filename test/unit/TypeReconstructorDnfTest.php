@@ -97,6 +97,27 @@ final class TypeReconstructorDnfTest extends TestCase
         );
     }
 
+    /** @dataProvider typePathsProvider */
+    public function testTypeRemoveTypeEmptyUnionReturnsMixed(string $rel): void
+    {
+        $path = self::$root.'/'.$rel;
+        if (!is_readable($path)) {
+            self::markTestSkipped($rel.' not present');
+        }
+
+        $body = (string) file_get_contents($path);
+        self::assertStringNotContainsString(
+            "throw new \\LogicException('Unknown type encountered')",
+            $body,
+            $rel.' must return mixed() when removeType empties union (#9068)'
+        );
+        self::assertStringContainsString(
+            'return self::mixed();',
+            $body,
+            $rel.' must tolerate empty union in removeType (#9068)'
+        );
+    }
+
     public function testApplyPatchesReappliesPrelinkedUnionHandlerAfterStrip(): void
     {
         $recon = self::$root.'/prelinked/bootstrap-vendor/sources/ircmaxell/php-types/lib/PHPTypes/TypeReconstructor.php';

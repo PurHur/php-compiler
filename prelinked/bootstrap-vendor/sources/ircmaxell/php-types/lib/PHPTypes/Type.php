@@ -528,7 +528,7 @@ class Type
             }
         }
         if (empty($new)) {
-            throw new \LogicException('Unknown type encountered');
+            return self::mixed();
         }
         if (count($new) === 1) {
             return $new[0];
