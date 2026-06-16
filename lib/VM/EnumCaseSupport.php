@@ -222,32 +222,37 @@ final class EnumCaseSupport
     }
 
     /**
-     * Zend {@see zend_compare_enum()} (#4554).
+     * Zend {@see zend_compare_enum()} (#4554, #8897).
      *
      * Identical case singleton: 0. Different cases (same enum): 1. Different enums: 1.
+     * Relational <=> is not backed-scalar order — use {@see compareEnumCasesForSort()} only for sort().
      */
     public static function compareSpaceship(ObjectEntry $left, ObjectEntry $right): int
     {
         if (!$left->isEnumCase || !$right->isEnumCase) {
             throw new \LogicException('compareSpaceship requires enum case objects');
         }
-        $leftVar = new Variable();
-        $leftVar->object($left);
-        $rightVar = new Variable();
-        $rightVar->object($right);
+        if ($left->class !== $right->class) {
+            return 1;
+        }
+        if (($left->enumCaseName ?? '') === ($right->enumCaseName ?? '')) {
+            return 0;
+        }
 
-        return self::compareEnumCasesForSort($leftVar, $rightVar);
+        return 1;
     }
 
-    /** @see EnumCaseEntry spaceship for TYPE_ENUM_CASE operands (#4554). */
+    /** @see EnumCaseEntry spaceship for TYPE_ENUM_CASE operands (#4554, #8897). */
     public static function compareEnumCaseEntrySpaceship(EnumCaseEntry $left, EnumCaseEntry $right): int
     {
-        $leftVar = new Variable();
-        $leftVar->enumCase($left);
-        $rightVar = new Variable();
-        $rightVar->enumCase($right);
+        if ($left->enumClass !== $right->enumClass) {
+            return 1;
+        }
+        if ($left->caseName === $right->caseName) {
+            return 0;
+        }
 
-        return self::compareEnumCasesForSort($leftVar, $rightVar);
+        return 1;
     }
 
     /**
