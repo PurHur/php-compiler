@@ -18,6 +18,8 @@ final class BuiltinParamNames
         switch ($lc) {
             case 'strlen':
                 return ['string'];
+            case 'substr':
+                return ['string', 'offset', 'length'];
             case 'parse_str':
                 return ['string', 'array'];
             case 'sort':
