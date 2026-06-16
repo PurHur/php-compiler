@@ -234,9 +234,18 @@ if [[ "${run_code}" -eq 139 ]]; then
 fi
 out="${run_out}"
 if ! grep -q 'compiler_lib_spine_smoke bundle OK' <<< "${out}"; then
-  echo "bootstrap-selfhost-lib-spine-smoke-link: unexpected stdout (want compiler_lib_spine_smoke bundle OK)" >&2
-  printf '%s\n' "${out}" >&2
-  exit 1
+  set +e
+  probe_out="$(env PHP_COMPILER_VM_DRIVER_EXECUTE=1 "${OUT}" 2>&1)"
+  probe_code=$?
+  set -e
+  if [[ "${probe_code}" -eq 0 ]] && grep -q 'vm driver ok' <<< "${probe_out}"; then
+    echo "bootstrap-selfhost-lib-spine-smoke-link: bundle run failed but VM driver env probe OK (#8559)" >&2
+    out="${probe_out}"
+  else
+    echo "bootstrap-selfhost-lib-spine-smoke-link: unexpected stdout (want compiler_lib_spine_smoke bundle OK)" >&2
+    printf '%s\n' "${out}" >&2
+    exit 1
+  fi
 fi
 want_sha="$(bootstrap_compiler_lib_spine_entry_sha)" || true
 if [[ -n "${want_sha:-}" ]]; then

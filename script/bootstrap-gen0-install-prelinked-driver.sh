@@ -150,15 +150,17 @@ bootstrap_compiler_lib_honest_zend_compile() {
   rm -f "${out}"
   # ci_apply_llvm_memory_env pins 4096M; full-spine sidecar host-compile OOMs below 8GB (#8559).
   local mem_limit="8192M"
-  local -a compile_env=(
-    PHP_COMPILER_SELFHOST_AOT=1
-    PHP_COMPILER_LIB_SPINE_BUNDLE=1
-    PHP_COMPILER_MEMORY_LIMIT="${mem_limit}"
-  )
   if [[ "${mode}" == "sidecar" ]]; then
-    compile_env+=(PHP_COMPILER_M3_EMIT_SIDECAR_RECURSION_GUARD=1)
+    env PHP_COMPILER_M3_EMIT_SIDECAR_RECURSION_GUARD=1 \
+      PHP_COMPILER_SELFHOST_AOT=1 \
+      PHP_COMPILER_LIB_SPINE_BUNDLE=1 \
+      PHP_COMPILER_MEMORY_LIMIT="${mem_limit}" \
+      php -d "memory_limit=${mem_limit}" \
+      "${root}/bin/compile.php" -o "${out}" "${entry}"
+    return $?
   fi
-  env "${compile_env[@]}" \
+  # Verified full-spine path: memory limit only (no SELFHOST_AOT / LIB_SPINE_BUNDLE — #8559).
+  env PHP_COMPILER_MEMORY_LIMIT="${mem_limit}" \
     php -d "memory_limit=${mem_limit}" \
     "${root}/bin/compile.php" -o "${out}" "${entry}"
 }
