@@ -2676,6 +2676,7 @@ require_once __DIR__.'/../../../lib/Web/ProjectBootstrap.php';
 require_once __DIR__.'/../../../lib/Web/ProjectDeploy.php';
 require_once __DIR__.'/../../../lib/Web/ProjectManifest.php';
 require_once __DIR__.'/../../../lib/Web/ResponseContext.php';
+require_once __DIR__.'/../../../lib/Web/ServeCompileCache.php';
 require_once __DIR__.'/../../../lib/Web/SourceBundler.php';
 require_once __DIR__.'/../../../lib/Web/Superglobals.php';
 require_once __DIR__.'/../../../lib/Web/UploadTemp.php';

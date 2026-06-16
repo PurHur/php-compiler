@@ -154,6 +154,8 @@ final class ProjectGraph
      */
     /**
      * Entry-level literal includes must be covered by phpc.json includes[] basenames (issue #452 bundle).
+     * `$var = require` targets (MiniWebApp config.php) are discovered from the entry and must not
+     * be duplicated in includes[] so return values stay arrays (#2059).
      *
      * @param list<string> $manifestIncludes
      *
@@ -168,15 +170,48 @@ final class ProjectGraph
 
         $runtime = new Runtime(Runtime::MODE_AOT);
         $entryOnly = LiteralIncludeDiscovery::discoverDirectAbsolutePaths($runtime, $entry);
+        $entryCode = is_file($entry) ? (string) file_get_contents($entry) : '';
+        $requireAssignBasenames = self::requireAssignmentBasenames($entryCode, $entryOnly);
         $errors = [];
         foreach ($entryOnly as $resolved) {
             $base = basename($resolved);
+            if (isset($requireAssignBasenames[$base])) {
+                continue;
+            }
             if (!isset($manifestBasenames[$base])) {
                 $errors[] = 'includes[] must list '.$resolved.' (literal include from entry requires this file in the manifest bundle)';
             }
         }
 
         return $errors;
+    }
+
+    /**
+     * @param list<string> $directIncludes absolute paths from the entry script
+     *
+     * @return array<string, true> basenames assigned from `$var = require`
+     */
+    private static function requireAssignmentBasenames(string $entryCode, array $directIncludes): array
+    {
+        $targets = [];
+        $lines = preg_split('/\r\n|\n|\r/', $entryCode) ?: [];
+        foreach ($directIncludes as $path) {
+            $base = basename($path);
+            foreach ($lines as $line) {
+                if (!str_contains($line, $base)) {
+                    continue;
+                }
+                if (preg_match(
+                    '/^\s*\$(\w+)\s*=\s*(?:require|include)(?:_once)?\b/i',
+                    $line
+                )) {
+                    $targets[$base] = true;
+                    break;
+                }
+            }
+        }
+
+        return $targets;
     }
 
     private static function duplicateIncludeErrors(array $manifestIncludes): array

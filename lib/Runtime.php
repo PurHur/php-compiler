@@ -44,6 +44,7 @@ use PHPCompiler\Ast\ReadonlyFunctionAnnotator;
 use PHPCompiler\Visitor\InOperatorResolver;
 use PHPCompiler\Visitor\ExitFunctionResolver;
 use PHPCompiler\Visitor\VoidCastResolver;
+use PHPCompiler\Web\ServeCompileCache;
 use PHPCompiler\Web\Superglobals;
 use PHPCompiler\Lint\LintCompiler;
 use PHPCompiler\Compiler\CompileFatal;
@@ -825,6 +826,9 @@ class Runtime {
     }
 
     public function parseAndCompileFile(string $filename): ?Block {
+        if (ServeCompileCache::isEnabled() && !ServeCompileCache::isLoading()) {
+            return ServeCompileCache::getFile($this, $filename);
+        }
         self::clearLastParseFailure();
         $this->compiler->resetCompileAbortDetail();
         try {

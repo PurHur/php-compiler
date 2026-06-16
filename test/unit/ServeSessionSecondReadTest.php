@@ -10,6 +10,7 @@ use PHPCompiler\ext\standard\VmStatCache;
 use PHPCompiler\VM\OutputBuffer;
 use PHPCompiler\VM\ScriptExit;
 use PHPCompiler\VM\ShutdownQueue;
+use PHPCompiler\Web\ProjectBootstrap;
 use PHPCompiler\Web\ResponseContext;
 use PHPCompiler\Web\ServeCompileCache;
 use PHPCompiler\Web\Superglobals;
@@ -26,6 +27,7 @@ final class ServeSessionSecondReadTest extends TestCase
         $this->savedSessionDir = false !== $dir ? $dir : null;
         VmSession::reset();
         ServeCompileCache::reset();
+        ServeCompileCache::enable();
     }
 
     protected function tearDown(): void
@@ -38,6 +40,18 @@ final class ServeSessionSecondReadTest extends TestCase
             putenv('PHP_COMPILER_SESSION_DIR='.$this->savedSessionDir);
         }
         parent::tearDown();
+    }
+
+    public function testMiniWebAppHomeTwiceWithRequireIncludes(): void
+    {
+        $repoRoot = dirname(__DIR__, 2);
+        $script = $repoRoot.'/examples/003-MiniWebApp/public/index.php';
+        $this->assertFileExists($script);
+
+        for ($i = 1; $i <= 2; ++$i) {
+            $out = $this->runServeStyleRequest($script, '', '');
+            $this->assertStringContainsString('MiniWebApp', $out, 'request '.$i);
+        }
     }
 
     public function testSessionsWebFlashRoundTripWithServeCompileCache(): void
@@ -87,7 +101,7 @@ PHP;
                 putenv('HTTP_CONTENT_TYPE');
             }
 
-            $output = $this->runServeStyleRequest($script, 'serve_sess.php', $query, $body);
+            $output = $this->runServeStyleRequest('serve_sess.php', $query, $body, $script);
             if (1 === $request) {
                 $files = glob($dir.'/'.SessionFileStorage::PATH_PREFIX.'*');
                 $this->assertIsArray($files);
@@ -105,8 +119,33 @@ PHP;
         }
     }
 
-    private function runServeStyleRequest(string $code, string $filename, string $queryString, string $body = ''): string
+    private function runServeStyleRequest(string $scriptPath, string $queryString, string $body = '', ?string $code = null): string
     {
+        if (!is_file($scriptPath)) {
+            $this->assertNotNull($code);
+            $scriptPath = sys_get_temp_dir().'/phpc_serve_test_'.md5($code).'.php';
+            file_put_contents($scriptPath, $code);
+        }
+
+        $scriptFilename = realpath($scriptPath);
+        if (false === $scriptFilename) {
+            $scriptFilename = $scriptPath;
+        }
+        $documentRoot = dirname($scriptFilename);
+        $scriptName = '/'.basename($scriptFilename);
+        $requestUri = $scriptName;
+        if ('' !== $queryString) {
+            $requestUri .= '?'.$queryString;
+        }
+
+        putenv('QUERY_STRING='.$queryString);
+        putenv('REQUEST_BODY='.$body);
+        putenv('SCRIPT_NAME='.$scriptName);
+        putenv('SCRIPT_FILENAME='.$scriptFilename);
+        putenv('REQUEST_URI='.$requestUri);
+        putenv('DOCUMENT_ROOT='.$documentRoot);
+        putenv('PATH_INFO');
+
         ResponseContext::reset();
         ResponseContext::enableHeaderQueue();
         VmSession::reset();
@@ -115,8 +154,10 @@ PHP;
         ShutdownQueue::reset();
 
         $runtime = new Runtime();
-        Superglobals::populateFromEnvironment($runtime->vmContext, $queryString, $body);
-        $block = ServeCompileCache::get($runtime, $filename, $code);
+        Superglobals::populateFromEnvironment($runtime->vmContext, $queryString, $body, $scriptFilename);
+        [$bootProjectDir, $bootManifest] = ProjectBootstrap::resolveFromScript($scriptFilename);
+        ProjectBootstrap::prepare($runtime, $bootProjectDir, $bootManifest);
+        $block = ServeCompileCache::getFile($runtime, $scriptFilename);
         $this->assertNotNull($block);
         OutputBuffer::reset();
         ob_start();
@@ -137,3 +178,4 @@ PHP;
         return $output;
     }
 }
+
