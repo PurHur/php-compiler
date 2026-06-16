@@ -493,10 +493,15 @@ final class CiScriptsTest extends TestCase
         $this->assertStringContainsString('bootstrap-inventory.php --check', $body);
         $this->assertStringContainsString('check-selfhost-spine-coverage-sync.php', $body);
         $this->assertStringContainsString('check-root-readme-sync.php', $body);
+        $this->assertStringContainsString('north-star5-verify-fast', $body);
+        $this->assertStringContainsString('bootstrap-selfhost-vm-driver-execute-probe', $body);
         $this->assertStringContainsString('examples-aot-smoke.sh', $body);
         $this->assertStringContainsString('examples-web-smoke.sh', $body);
         $this->assertStringContainsString('RELEASE_READINESS_CI_FAST', $body);
         $this->assertStringContainsString('#8737', $body);
+
+        $makefile = (string) file_get_contents($repoRoot.'/Makefile');
+        $this->assertStringContainsString('release-readiness:', $makefile);
 
         $doc = (string) file_get_contents($repoRoot.'/docs/local-ci-matrix.md');
         $this->assertStringContainsString('release-readiness.sh', $doc);

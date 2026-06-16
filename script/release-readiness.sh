@@ -20,6 +20,7 @@ set -euo pipefail
 source "$(dirname "$0")/ci-common.sh"
 
 ci_cd_repo
+ci_prepare_test_runtime
 
 FULL_MODE=0
 JSON_OUT=0
@@ -188,6 +189,14 @@ run_gate root-readme-sync "check-root-readme-sync (ROOT_README_SYNC_GATE=1)" \
   env ROOT_README_SYNC_GATE=1 "$PHP_BIN" "${PHP_OPTS[@]}" script/check-root-readme-sync.php \
   || FAILED=1
 
+run_gate_allow_skip north-star5-fast "north-star5-verify --fast (M5 daily gate)" \
+  make -C "${_CI_REPO_ROOT}" north-star5-verify-fast \
+  || FAILED=1
+
+run_gate_allow_skip vm-driver-probe "bootstrap-selfhost-vm-driver-execute-probe" \
+  make -C "${_CI_REPO_ROOT}" bootstrap-selfhost-vm-driver-execute-probe \
+  || FAILED=1
+
 if [[ "${RELEASE_READINESS_CI_FAST:-0}" == "1" ]]; then
   run_gate ci-fast-subset "ci-fast inventory/doc subset (RELEASE_READINESS_CI_FAST=1)" \
     release_readiness_ci_fast_subset \
@@ -216,6 +225,20 @@ fi
 USER_RELEASE_READY=no
 if [[ "${FAILED}" -eq 0 ]]; then
   USER_RELEASE_READY=yes
+fi
+
+# Full user release requires LLVM/HTTP smokes to run green, not skip.
+if [[ "${FULL_MODE}" -eq 1 && "${USER_RELEASE_READY}" == "yes" ]]; then
+  for i in "${!GATE_NAMES[@]}"; do
+    case "${GATE_NAMES[$i]}" in
+      examples-aot-smoke|examples-web-smoke)
+        if [[ "${GATE_STATUSES[$i]}" != "ok" ]]; then
+          USER_RELEASE_READY=no
+          break
+        fi
+        ;;
+    esac
+  done
 fi
 
 if [[ "${JSON_OUT}" -eq 1 ]]; then

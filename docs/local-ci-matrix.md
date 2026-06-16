@@ -41,7 +41,7 @@ Daily v1.1.0 release review presenter — aggregates user-facing gates without t
 
 | Mode | Gates | Target time |
 |------|-------|-------------|
-| Quick (default) | `bootstrap-inventory.php --check`, `check-selfhost-spine-coverage-sync.php`, `check-root-readme-sync.php` | <5 min Docker |
+| Quick (default) | `bootstrap-inventory.php --check`, `check-selfhost-spine-coverage-sync.php`, `north-star5-verify-fast`, VM driver probe, `check-root-readme-sync.php` | <5 min Docker |
 | Quick + CI doc slice | Set `RELEASE_READINESS_CI_FAST=1` — adds wave3/examples/development-status/spine-count/capability-matrix sync checks | ~minutes |
 | Full (`--full`) | Quick + `capability-matrix.php --check`, `examples-aot-smoke.sh`, `examples-web-smoke.sh`, `CHANGELOG.md` v1.1.0 stub | LLVM + HTTP when available |
 
