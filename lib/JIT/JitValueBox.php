@@ -691,6 +691,40 @@ final class JitValueBox
 
             return self::pointer($context, $slot);
         }
+        if ('__string__*' === $tyName) {
+            $slot = self::alloc($context);
+            $owned = $context->builder->call(
+                $context->lookupFunction('__string__separate'),
+                $raw
+            );
+            $context->builder->call(
+                $context->lookupFunction('__value__writeString'),
+                self::pointer($context, $slot),
+                $owned
+            );
+
+            return self::pointer($context, $slot);
+        }
+        if ('__object__*' === $tyName) {
+            $slot = self::alloc($context);
+            $context->builder->call(
+                $context->lookupFunction('__value__writeObject'),
+                self::pointer($context, $slot),
+                $raw
+            );
+
+            return self::pointer($context, $slot);
+        }
+        if ('__hashtable__*' === $tyName) {
+            $slot = self::alloc($context);
+            $context->builder->call(
+                $context->lookupFunction('__value__writeHashtable'),
+                self::pointer($context, $slot),
+                $raw
+            );
+
+            return self::pointer($context, $slot);
+        }
 
         return self::normalizeValuePtr($context, $raw);
     }
