@@ -133,10 +133,12 @@ bootstrap_compiler_lib_spine_entry_sha() {
 }
 
 # Honest Zend spine compile for compiler_lib sidecar refresh (#8559).
-# PHP_COMPILER_M3_SIDECAR_HOST=1 stubs non-literal includes and reproduces stale prelinked bytes.
+# mode=sidecar keeps PHP_COMPILER_M3_EMIT_SIDECAR_RECURSION_GUARD for blob regen;
+# mode=full omits it for selfhost-lib-spine-smoke link (LLVM verify path — #8559).
 bootstrap_compiler_lib_honest_zend_compile() {
   local out=$1
   local entry=$2
+  local mode="${3:-sidecar}"
   local root="${ROOT:-}"
   if [[ -z "${root}" || -z "${out}" || -z "${entry}" || ! -f "${entry}" ]]; then
     return 1
@@ -148,10 +150,15 @@ bootstrap_compiler_lib_honest_zend_compile() {
   rm -f "${out}"
   # ci_apply_llvm_memory_env pins 4096M; full-spine sidecar host-compile OOMs below 8GB (#8559).
   local mem_limit="8192M"
-  env PHP_COMPILER_M3_EMIT_SIDECAR_RECURSION_GUARD=1 \
-    PHP_COMPILER_SELFHOST_AOT=1 \
-    PHP_COMPILER_LIB_SPINE_BUNDLE=1 \
-    PHP_COMPILER_MEMORY_LIMIT="${mem_limit}" \
+  local -a compile_env=(
+    PHP_COMPILER_SELFHOST_AOT=1
+    PHP_COMPILER_LIB_SPINE_BUNDLE=1
+    PHP_COMPILER_MEMORY_LIMIT="${mem_limit}"
+  )
+  if [[ "${mode}" == "sidecar" ]]; then
+    compile_env+=(PHP_COMPILER_M3_EMIT_SIDECAR_RECURSION_GUARD=1)
+  fi
+  env "${compile_env[@]}" \
     php -d "memory_limit=${mem_limit}" \
     "${root}/bin/compile.php" -o "${out}" "${entry}"
 }
