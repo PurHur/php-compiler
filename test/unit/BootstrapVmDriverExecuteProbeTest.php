@@ -100,6 +100,9 @@ final class BootstrapVmDriverExecuteProbeTest extends TestCase
         ])).' 2>&1';
         exec($compileCmd, $compileLines, $compileCode);
         $compileOut = implode("\n", $compileLines);
+        if (0 !== $compileCode && str_contains($compileOut, 'deflateInit2')) {
+            $this->markTestSkipped('LLVM link needs libz (-lz) for compiler_minimal zlib paths: '.$compileOut);
+        }
         $this->assertSame(0, $compileCode, $compileOut);
         $this->assertTrue(is_executable($out), $out);
 
