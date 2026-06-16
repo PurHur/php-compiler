@@ -8284,6 +8284,12 @@ class Compiler {
         while ($operand instanceof Operand\Temporary && null !== $operand->original) {
             $operand = $operand->original;
         }
+        while ($operand instanceof Operand\Variable) {
+            $operand = $operand->name;
+            while ($operand instanceof Operand\Temporary && null !== $operand->original) {
+                $operand = $operand->original;
+            }
+        }
 
         return $operand instanceof Operand\Literal ? $operand : null;
     }
