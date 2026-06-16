@@ -22,6 +22,8 @@ final class ModuleRegistryTest extends TestCase
         $this->assertTrue(VmInfo::extension_loaded('spl'));
         $this->assertTrue(VmInfo::extension_loaded('json'));
         $this->assertTrue(VmInfo::extension_loaded('date'));
+        $this->assertTrue(VmInfo::extension_loaded('pcre'));
+        $this->assertTrue(VmInfo::extension_loaded('zlib'));
         $this->assertFalse(VmInfo::extension_loaded('nonexistent_xyz'));
 
         $this->assertNotFalse(VmInfo::phpversion('zip'));
@@ -70,6 +72,16 @@ final class ModuleRegistryTest extends TestCase
         $this->assertIsArray($date);
         $this->assertContains('date', $date);
         $this->assertNotContains('date', ModuleRegistry::getExtensionFunctions('standard') ?? []);
+
+        $pcre = ModuleRegistry::getExtensionFunctions('pcre');
+        $this->assertIsArray($pcre);
+        $this->assertContains('preg_match', $pcre);
+        $this->assertNotContains('preg_match', ModuleRegistry::getExtensionFunctions('standard') ?? []);
+
+        $zlib = ModuleRegistry::getExtensionFunctions('zlib');
+        $this->assertIsArray($zlib);
+        $this->assertContains('gzdeflate', $zlib);
+        $this->assertNotContains('gzdeflate', ModuleRegistry::getExtensionFunctions('standard') ?? []);
 
         $this->assertNull(ModuleRegistry::getExtensionFunctions('missing_ext'));
 

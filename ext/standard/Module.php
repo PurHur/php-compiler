@@ -21,7 +21,7 @@ class Module extends ModuleAbstract
 {
     public function getAdditionalExtensionNames(): array
     {
-        return ['json', 'date'];
+        return ['json', 'date', 'pcre', 'zlib'];
     }
 
     public function init(Runtime $runtime): void

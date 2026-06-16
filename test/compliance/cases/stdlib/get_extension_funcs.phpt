@@ -11,7 +11,7 @@ echo (int) in_array('json_encode', $json, true), "\n";
 echo (int) (get_extension_funcs('nonexistent_xyz_3433') === false), "\n";
 --EXPECT--
 1
-6
+8
 1
 1
 1

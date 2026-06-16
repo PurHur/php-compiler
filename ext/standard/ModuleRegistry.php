@@ -145,6 +145,10 @@ final class ModuleRegistry
             'date' => str_starts_with($functionName, 'date_')
                 || str_starts_with($functionName, 'timezone_')
                 || \in_array($functionName, self::DATE_EXTENSION_FUNCTIONS, true),
+            'pcre' => str_starts_with($functionName, 'preg_'),
+            'zlib' => str_starts_with($functionName, 'gz')
+                || str_starts_with($functionName, 'zlib_')
+                || 'readgzfile' === $functionName,
             default => false,
         };
     }
