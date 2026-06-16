@@ -3942,6 +3942,33 @@ final class VmString
         return false === $pos ? false : $pos;
     }
 
+    /**
+     * @return int|false
+     */
+    public static function strripos(string $haystack, string $needle, int $offset = 0)
+    {
+        $hayLen = self::byteLength($haystack);
+        $minStart = 0;
+        $maxStart = null;
+        $suffixEnd = $hayLen + $offset;
+        if ($suffixEnd < $hayLen) {
+            if ($suffixEnd < 0) {
+                throw new \ValueError(sprintf(
+                    'strripos(): Argument #3 ($offset) must be contained in argument #1 ($haystack)'
+                ));
+            }
+            $maxStart = $suffixEnd;
+        } else {
+            $minStart = $offset;
+        }
+        if ('' === $needle) {
+            return null !== $maxStart ? $maxStart : $hayLen;
+        }
+        $pos = self::findRSubstringCaseInsensitive($haystack, $needle, $minStart, $maxStart);
+
+        return false === $pos ? false : $pos;
+    }
+
     public static function startsWith(string $haystack, string $needle): bool
     {
         $nlen = self::byteLength($needle);
@@ -4112,6 +4139,40 @@ final class VmString
         $last = false;
         for ($i = $offset; $i <= $limit; ++$i) {
             if (self::compareBytes($haystack, $needle, $needleLen, $i)) {
+                $last = $i;
+            }
+        }
+
+        return $last;
+    }
+
+    /**
+     * @return int|false
+     */
+    private static function findRSubstringCaseInsensitive(
+        string $haystack,
+        string $needle,
+        int $offset,
+        ?int $maxStart = null
+    ) {
+        $hayLen = self::byteLength($haystack);
+        $needleLen = self::byteLength($needle);
+        if (0 === $needleLen) {
+            return false;
+        }
+        if ($offset >= $hayLen) {
+            return false;
+        }
+        $limit = $hayLen - $needleLen;
+        if (null !== $maxStart && $maxStart < $limit) {
+            $limit = $maxStart;
+        }
+        if ($limit < $offset) {
+            return false;
+        }
+        $last = false;
+        for ($i = $offset; $i <= $limit; ++$i) {
+            if (self::compareBytesCaseInsensitive($haystack, $needle, $needleLen, $i)) {
                 $last = $i;
             }
         }

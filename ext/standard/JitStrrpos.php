@@ -25,7 +25,8 @@ final class JitStrrpos
         Context $context,
         Value $haystack,
         Value $needle,
-        ?Value $offset = null
+        ?Value $offset = null,
+        bool $caseInsensitive = false
     ): Value {
         $map = $context->structFieldMap['__string__'];
         $hayLen = $context->builder->load(
@@ -79,8 +80,9 @@ final class JitStrrpos
         $context->builder->positionAtEnd($loopBody);
         $at = $context->builder->inBoundsGEP($hayPtr, $pos);
         $i32 = $context->getTypeFromString('int32');
+        $cmpFn = $caseInsensitive ? 'strncasecmp' : 'strncmp';
         $cmp = $context->builder->call(
-            $context->lookupFunction('strncmp'),
+            $context->lookupFunction($cmpFn),
             $at,
             $needlePtr,
             $context->builder->intCast($needleLen, $context->getTypeFromString('size_t'))
