@@ -116,6 +116,7 @@ final class AotRegressionFixtureCatalogTest extends TestCase
             'array_udiff_family.php' => ['array_udiff_family.php'],
             'array_slice_numeric_string.php' => ['array_slice_numeric_string.php'],
             'array_search_strict_mixed_haystack.php' => ['array_search_strict_mixed_haystack.php'],
+            'base_convert_enum_typeerror.php' => ['base_convert_enum_typeerror.php'],
             'trig_math_enum_case_typeerror.php' => ['trig_math_enum_case_typeerror.php'],
             'chop_pos_aliases.php' => ['chop_pos_aliases.php'],
             'strcoll_strxfrm.php' => ['strcoll_strxfrm.php'],
