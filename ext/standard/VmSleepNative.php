@@ -34,7 +34,7 @@ final class VmSleepNative
         }
         $ffi = self::ffi();
         if (null === $ffi) {
-            return false;
+            return VmSleepPure::sleep($seconds);
         }
 
         return (int) $ffi->sleep($seconds);
@@ -47,6 +47,8 @@ final class VmSleepNative
         }
         $ffi = self::ffi();
         if (null === $ffi) {
+            VmSleepPure::usleep($microseconds);
+
             return;
         }
         if (0 === $microseconds) {
@@ -68,7 +70,7 @@ final class VmSleepNative
     {
         $ffi = self::ffi();
         if (null === $ffi) {
-            return false;
+            return VmSleepPure::timeNanosleep($seconds, $nanoseconds);
         }
 
         $req = $ffi->new('struct timespec');
@@ -99,7 +101,7 @@ final class VmSleepNative
     {
         $ffi = self::ffi();
         if (null === $ffi) {
-            return false;
+            return VmSleepPure::timeSleepUntil($timestamp);
         }
 
         $tv = $ffi->new('struct timeval');

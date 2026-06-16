@@ -925,6 +925,7 @@ require_once __DIR__.'/../../../ext/standard/VmSettype.php';
 require_once __DIR__.'/../../../ext/standard/VmShellExecNative.php';
 require_once __DIR__.'/../../../ext/standard/VmSleep.php';
 require_once __DIR__.'/../../../ext/standard/VmSleepNative.php';
+require_once __DIR__.'/../../../ext/standard/VmSleepPure.php';
 require_once __DIR__.'/../../../ext/standard/VmSplAutoload.php';
 require_once __DIR__.'/../../../ext/standard/VmSprintf.php';
 require_once __DIR__.'/../../../ext/standard/VmSscanf.php';
