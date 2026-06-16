@@ -1924,7 +1924,10 @@ restart:
                 $this->int($leftCopy->object->compareSpaceship($rightCopy->object));
                 break;
             case TYPE_PAIR_ENUM_CASE_ENUM_CASE:
-                $this->int(EnumCaseSupport::compareEnumCasesForSort($leftCopy, $rightCopy));
+                $this->int(EnumCaseSupport::compareEnumCaseEntrySpaceship(
+                    $leftCopy->toEnumCase(),
+                    $rightCopy->toEnumCase()
+                ));
                 break;
             case TYPE_PAIR_ARRAY_ARRAY:
                 $this->int($leftCopy->array->compareSpaceship($rightCopy->array));
@@ -1938,7 +1941,20 @@ restart:
                     goto restart;
                 } elseif (self::isEnumCaseOperand($leftCopy) || self::isEnumCaseOperand($rightCopy)) {
                     if (self::isEnumCaseOperand($leftCopy) && self::isEnumCaseOperand($rightCopy)) {
-                        $this->int(EnumCaseSupport::compareEnumCasesForSort($leftCopy, $rightCopy));
+                        if (self::TYPE_ENUM_CASE === $leftCopy->type && self::TYPE_ENUM_CASE === $rightCopy->type) {
+                            $this->int(EnumCaseSupport::compareEnumCaseEntrySpaceship(
+                                $leftCopy->toEnumCase(),
+                                $rightCopy->toEnumCase()
+                            ));
+                        } else {
+                            $leftObj = self::TYPE_ENUM_CASE === $leftCopy->type
+                                ? EnumCaseSupport::receiverForInstanceMethod($leftCopy)->toObject()
+                                : $leftCopy->toObject();
+                            $rightObj = self::TYPE_ENUM_CASE === $rightCopy->type
+                                ? EnumCaseSupport::receiverForInstanceMethod($rightCopy)->toObject()
+                                : $rightCopy->toObject();
+                            $this->int(EnumCaseSupport::compareSpaceship($leftObj, $rightObj));
+                        }
                     } else {
                         // Zend compare_function: enum case vs non-case is always 1 (#4554).
                         $this->int(1);
