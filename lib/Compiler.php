@@ -9674,6 +9674,66 @@ class Compiler {
     }
 
     /**
+     * Call args that consume a hoisted ClassConstFetch slot skip embedded literals and inline enum fetches (#8933).
+     */
+    private function callArgUsesHoistedEnumPreludeSlot(?Operand $callArg): bool
+    {
+        if (null === $callArg || $this->isEmbeddedCallLiteralArg($callArg)) {
+            return false;
+        }
+        $root = $this->unwrapOperandChain($callArg);
+
+        return !($root instanceof Op\Expr\ClassConstFetch);
+    }
+
+    /**
+     * Map call arg index to hoisted ClassConstFetch when php-cfg inserts literal args first (#8796, #8933).
+     *
+     * @param list<Op\Expr\ClassConstFetch> $precedingFetches
+     */
+    private function precedingClassConstFetchForCallArgIndex(
+        Op $callOp,
+        int $argIndex,
+        array $precedingFetches
+    ): ?Op\Expr\ClassConstFetch {
+        if (!property_exists($callOp, 'args') || !is_array($callOp->args)) {
+            return null;
+        }
+        $fetchIndex = 0;
+        foreach ($callOp->args as $i => $callArg) {
+            if (!$this->callArgUsesHoistedEnumPreludeSlot($callArg)) {
+                continue;
+            }
+            if ($i === $argIndex) {
+                return $precedingFetches[$fetchIndex] ?? null;
+            }
+            ++$fetchIndex;
+        }
+
+        return null;
+    }
+
+    /** Ordinal among call args that use hoisted enum prelude slots (skips embedded literals, #8933). */
+    private function hoistedEnumPreludeSlotOrdinalForCallArg(Op $callOp, int $argIndex): ?int
+    {
+        if (!property_exists($callOp, 'args') || !is_array($callOp->args)) {
+            return null;
+        }
+        $fetchIndex = 0;
+        foreach ($callOp->args as $i => $callArg) {
+            if (!$this->callArgUsesHoistedEnumPreludeSlot($callArg)) {
+                continue;
+            }
+            if ($i === $argIndex) {
+                return $fetchIndex;
+            }
+            ++$fetchIndex;
+        }
+
+        return null;
+    }
+
+    /**
      * php-cfg emits one Expr_Array producer per nesting level for inline literal args (#4738).
      *
      * @param list<Op\Expr> $producers
@@ -10691,7 +10751,7 @@ class Compiler {
             if (null !== $callSite) {
                 [$callOp, $siteArgIndex] = $callSite;
                 $fetches = $this->precedingClassConstFetchesBeforeCfgOp($block->orig->children, $callOp);
-                $fetch = $fetches[$siteArgIndex] ?? null;
+                $fetch = $this->precedingClassConstFetchForCallArgIndex($callOp, $siteArgIndex, $fetches);
                 if (!$fetch instanceof Op\Expr\ClassConstFetch) {
                     $fetch = $this->classConstFetchForHoistedDeadPrelude($callOp, $siteArgIndex, $block);
                 }
@@ -10790,21 +10850,12 @@ class Compiler {
         }
         $children = $block->orig->children;
         $preceding = $this->precedingClassConstFetchesBeforeCfgOp($children, $callOp);
-        if (($preceding[$argIndex] ?? null) === $fetch) {
-            $callArg = $callOp->args[$argIndex] ?? null;
-            if ($this->isUnrelatedEnumFetchCallArg($callArg, $fetch)) {
-                return false;
-            }
-
+        if ($this->precedingClassConstFetchForCallArgIndex($callOp, $argIndex, $preceding) === $fetch) {
             return true;
         }
         $hoisted = $this->classConstFetchForHoistedDeadPrelude($callOp, $argIndex, $block);
-        if ($hoisted !== $fetch) {
-            return false;
-        }
-        $callArg = $callOp->args[$argIndex] ?? null;
 
-        return !$this->isUnrelatedEnumFetchCallArg($callArg, $fetch);
+        return $hoisted === $fetch;
     }
 
     /**
@@ -11315,7 +11366,11 @@ class Compiler {
                 ++$callsBefore;
             }
         }
-        $fetchIndex = $callsBefore + $argIndex;
+        $slotOrdinal = $this->hoistedEnumPreludeSlotOrdinalForCallArg($callOp, $argIndex);
+        if (null === $slotOrdinal) {
+            return null;
+        }
+        $fetchIndex = $callsBefore + $slotOrdinal;
 
         return $hoistedFetches[$fetchIndex] ?? null;
     }
@@ -11345,7 +11400,7 @@ class Compiler {
         }
         $fetches = $this->precedingClassConstFetchesBeforeCfgOp($children, $targetCall);
 
-        return $fetches[$argIndex] ?? null;
+        return $this->precedingClassConstFetchForCallArgIndex($targetCall, $argIndex, $fetches);
     }
 
     /**
@@ -11442,7 +11497,7 @@ class Compiler {
                 }
             }
             $fetches = $this->precedingClassConstFetchesBeforeCfgOp($block->orig->children, $callOp);
-            $fetch = $fetches[$argIndex] ?? null;
+            $fetch = $this->precedingClassConstFetchForCallArgIndex($callOp, $argIndex, $fetches);
             if (
                 $fetch instanceof Op\Expr\ClassConstFetch
                 && $this->callArgNeedsRuntimeEnumConstFetch($arg, $fetch, $block)
