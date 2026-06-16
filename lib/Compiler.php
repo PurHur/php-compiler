@@ -11656,36 +11656,37 @@ class Compiler {
                 }
                 $valueSlot = $this->compileOperand($inlineArray->result, $block, true);
             } else {
-                $prefetchOps = $this->compileCallArgRuntimeEnumConstFetchOps(
-                    $arg,
-                    $block,
-                    (int) $argIndex,
-                    $callOrdinal
-                );
-                if ([] !== $prefetchOps) {
-                    $valueSlot = $prefetchOps[0]->arg1;
-                } else {
-                    $valueSlot = $this->compileCallArgCoalesceSlot($arg, $block);
-                    if (null === $valueSlot) {
-                        $valueSlot = $this->compileHoistedEmptyCallArg($arg, $block);
+                $valueSlot = $this->compileCallArgCoalesceSlot($arg, $block);
+                if (null === $valueSlot) {
+                    $valueSlot = $this->compileHoistedEmptyCallArg($arg, $block);
+                }
+                if (null === $valueSlot) {
+                    $valueSlot = $this->findInlineExprCallArgProducerSlot($arg, $block);
+                }
+                if (null === $valueSlot) {
+                    $prefetchOps = $this->compileCallArgRuntimeEnumConstFetchOps(
+                        $arg,
+                        $block,
+                        (int) $argIndex,
+                        $callOrdinal
+                    );
+                    if ([] !== $prefetchOps) {
+                        $valueSlot = $prefetchOps[0]->arg1;
                     }
-                    if (null === $valueSlot) {
-                        $valueSlot = $this->findInlineExprCallArgProducerSlot($arg, $block);
+                }
+                if (null === $valueSlot) {
+                    if (
+                        null === $calleeName
+                        || !$this->callArgRequiresByRef($calleeName, (int) $argIndex)
+                    ) {
+                        $valueSlot = $this->tryFoldCallArgCompileTimeValue($arg, $block);
                     }
-                    if (null === $valueSlot) {
-                        if (
-                            null === $calleeName
-                            || !$this->callArgRequiresByRef($calleeName, (int) $argIndex)
-                        ) {
-                            $valueSlot = $this->tryFoldCallArgCompileTimeValue($arg, $block);
-                        }
-                    }
-                    if (null === $valueSlot) {
-                        $valueSlot = $this->compileOperand($arg, $block, true);
-                    }
-                    if (null === $valueSlot && $arg instanceof Operand\NullOperand) {
-                        $valueSlot = $this->registerNullConstantSlot($block, $arg);
-                    }
+                }
+                if (null === $valueSlot) {
+                    $valueSlot = $this->compileOperand($arg, $block, true);
+                }
+                if (null === $valueSlot && $arg instanceof Operand\NullOperand) {
+                    $valueSlot = $this->registerNullConstantSlot($block, $arg);
                 }
             }
             $nameSlot = null;
