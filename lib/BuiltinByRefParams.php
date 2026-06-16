@@ -14,10 +14,13 @@ final class BuiltinByRefParams
     public static function forFunction(string $name): array
     {
         switch (strtolower($name)) {
+            case 'array_multisort':
             case 'array_push':
             case 'array_pop':
             case 'array_shift':
             case 'array_unshift':
+            case 'array_walk':
+            case 'array_walk_recursive':
             case 'asort':
             case 'arsort':
             case 'ksort':
@@ -65,6 +68,9 @@ final class BuiltinByRefParams
     {
         if (\in_array(strtolower($name), ['sscanf', 'vfscanf', 'fscanf'], true)) {
             return 2;
+        }
+        if ('array_multisort' === strtolower($name)) {
+            return 0;
         }
 
         return null;

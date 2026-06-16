@@ -49,4 +49,32 @@ PHP;
 
         self::assertSame([$propSlot, $staticSlot, $fSlot], $sendSlots, 'fcall='.json_encode($fcallReturnSlots));
     }
+
+    /** Issue #9074 — by-ref builtin then read mutated named local after return capture. */
+    public function testByRefBuiltinThenVarDumpNamedLocalUsesArraySlot(): void
+    {
+        $code = <<<'PHP'
+<?php
+$a = [3, 1, 2];
+$r = sort($a);
+var_dump($r);
+var_dump($a);
+PHP;
+        $runtime = new Runtime();
+        $block = $runtime->parseAndCompile($code, 'byref_return.php');
+
+        $arraySlot = null;
+        $sendSlots = [];
+        foreach ($block->opCodes as $op) {
+            if (OpCode::TYPE_ASSIGN === $op->type && null === $arraySlot) {
+                $arraySlot = $op->arg2;
+            }
+            if (OpCode::TYPE_ARG_SEND === $op->type) {
+                $sendSlots[] = $op->arg1;
+            }
+        }
+
+        self::assertNotNull($arraySlot);
+        self::assertSame($arraySlot, $sendSlots[2] ?? null, 'arg sends='.json_encode($sendSlots));
+    }
 }
