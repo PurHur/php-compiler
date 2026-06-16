@@ -9,10 +9,11 @@ use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitLongArg;
 use PHPCompiler\JIT\JitOperandTypeLabel;
 use PHPCompiler\JIT\JitResourceArg;
+use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Value;
 
-/** LLVM lowering for get_resource_id() via __compiler_is_resource (#3180, #5845). */
+/** LLVM lowering for get_resource_id() via __compiler_is_resource (#3180, #5845, #8743). */
 final class JitGetResourceId
 {
     public static function invoke(Context $context, JITVariable $arg): Value
@@ -24,6 +25,43 @@ final class JitGetResourceId
             return $context->constantFromInteger(0, 'int64');
         }
 
+        if (JITVariable::TYPE_HASHTABLE === $arg->type || JITVariable::TYPE_VALUE === $arg->type) {
+            return self::invokeMaybeStreamContext($context, $arg);
+        }
+
+        return self::invokeHandle($context, $arg);
+    }
+
+    private static function invokeMaybeStreamContext(Context $context, JITVariable $arg): Value
+    {
+        $isCtx = JitStreamContextRepresentation::isRepresentationArg($context, $arg);
+        $ctxBlock = BasicBlockHelper::append($context, 'get_resource_id_stream_ctx');
+        $handleBlock = BasicBlockHelper::append($context, 'get_resource_id_handle_path');
+        $doneBlock = BasicBlockHelper::append($context, 'get_resource_id_done');
+        $context->builder->branchIf($isCtx, $ctxBlock, $handleBlock);
+
+        $context->builder->positionAtEnd($ctxBlock);
+        $ht = JitStreamContextRepresentation::hashtableFromArg($context, $arg);
+        $ctxId = JitStreamContextRepresentation::readMarkerId($context, $ht);
+        $ctxEnd = $context->builder->getInsertBlock();
+        $context->builder->branch($doneBlock);
+
+        $context->builder->positionAtEnd($handleBlock);
+        $handleId = self::invokeHandle($context, $arg);
+        $handleEnd = $context->builder->getInsertBlock();
+        $context->builder->branch($doneBlock);
+
+        $context->builder->positionAtEnd($doneBlock);
+        $i64 = $context->getTypeFromString('int64');
+        $phi = $context->builder->phi($i64, 'get_resource_id_phi');
+        $phi->addIncoming($ctxId, $ctxEnd);
+        $phi->addIncoming($handleId, $handleEnd);
+
+        return $phi;
+    }
+
+    private static function invokeHandle(Context $context, JITVariable $arg): Value
+    {
         $handle = $context->builder->truncOrBitCast(
             JitLongArg::lower($context, $arg, 'get_resource_id() argument #1 ($resource)'),
             $context->getTypeFromString('int64')

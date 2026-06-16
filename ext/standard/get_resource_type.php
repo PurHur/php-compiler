@@ -72,6 +72,11 @@ final class get_resource_type extends Internal
                 return;
             }
         }
+        if (\PHPCompiler\VM\ResourceSupport::isStreamContextResource($v)) {
+            $frame->returnVar->string('stream-context');
+
+            return;
+        }
         if (!is_resource_::isResource($v)) {
             throw new \TypeError(\sprintf(self::TYPE_ERROR, VmStreamArg::debugTypeName($v)));
         }

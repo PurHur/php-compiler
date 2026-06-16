@@ -79,7 +79,16 @@ final class gettype extends Internal
         }
         if ($args[0]->type & JITVariable::IS_NATIVE_ARRAY
             || JITVariable::TYPE_HASHTABLE === $args[0]->type) {
-            return $context->builder->load($context->constantStringFromString('array'));
+            if (0 !== ($args[0]->type & JITVariable::IS_NATIVE_ARRAY)) {
+                return $context->builder->load($context->constantStringFromString('array'));
+            }
+            $isCtx = JitStreamContextRepresentation::isRepresentationArg($context, $args[0]);
+
+            return $context->builder->select(
+                $isCtx,
+                $context->builder->load($context->constantStringFromString('resource')),
+                $context->builder->load($context->constantStringFromString('array'))
+            );
         }
         if (JITVariable::TYPE_OBJECT === $args[0]->type) {
             return $context->builder->load($context->constantStringFromString('object'));

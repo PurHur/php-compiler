@@ -85,7 +85,16 @@ final class get_debug_type extends Internal
         }
         if ($args[0]->type & JITVariable::IS_NATIVE_ARRAY
             || JITVariable::TYPE_HASHTABLE === $args[0]->type) {
-            return $context->builder->load($context->constantStringFromString('array'));
+            if (0 !== ($args[0]->type & JITVariable::IS_NATIVE_ARRAY)) {
+                return $context->builder->load($context->constantStringFromString('array'));
+            }
+            $isCtx = JitStreamContextRepresentation::isRepresentationArg($context, $args[0]);
+
+            return $context->builder->select(
+                $isCtx,
+                $context->builder->load($context->constantStringFromString('resource (stream-context)')),
+                $context->builder->load($context->constantStringFromString('array'))
+            );
         }
         if (JITVariable::TYPE_OBJECT === $args[0]->type) {
             return ReflectionBuiltinHelper::getClassName($context, $args[0]);
@@ -151,13 +160,29 @@ final class get_debug_type extends Internal
             JITVariable::TYPE_NATIVE_DOUBLE => 'float',
             JITVariable::TYPE_NATIVE_BOOL => 'bool',
             JITVariable::TYPE_STRING => 'string',
-            JITVariable::TYPE_HASHTABLE => 'array',
         ] as $jitType => $name) {
             $expected = $i8->constInt($jitType, false);
             $isType = $context->builder->icmp(Builder::INT_EQ, $typeByte, $expected);
             $candidate = $context->builder->load($context->constantStringFromString($name));
             $result = $context->builder->select($isType, $candidate, $result);
         }
+        $isHt = $context->builder->icmp(
+            Builder::INT_EQ,
+            $typeByte,
+            $i8->constInt(JITVariable::TYPE_HASHTABLE, false)
+        );
+        $htLabel = $context->builder->select(
+            JitStreamContextRepresentation::isRepresentation(
+                $context,
+                $context->builder->call(
+                    $context->lookupFunction('__value__readHashtable'),
+                    $loaded
+                )
+            ),
+            $context->builder->load($context->constantStringFromString('resource (stream-context)')),
+            $context->builder->load($context->constantStringFromString('array'))
+        );
+        $result = $context->builder->select($isHt, $htLabel, $result);
         $context->builder->branch($doneBb);
 
         $context->builder->positionAtEnd($doneBb);
