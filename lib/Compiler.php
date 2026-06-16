@@ -5135,8 +5135,8 @@ class Compiler {
                 return null;
             }
             $stored = $this->compileTimeClassConsts[$lcClass][$lcConst];
-            // Enum case fetches must materialize at runtime as TYPE_ENUM_CASE (#8767, zend_enum.c).
-            if ($this->isCompileTimeEnumCaseConstantMember($lcClass, $lcConst)) {
+            // Enum case fetches defer to runtime unless folding defaults/const-expr (#8767, #7399).
+            if ($this->isCompileTimeEnumCaseConstantMember($lcClass, $lcConst) && !$materializeEnumCase) {
                 return null;
             }
             if ($this->compileTimeStoredValueIsEnumCaseBackingScalar($lcClass, $lcConst, $stored)) {
@@ -8858,6 +8858,23 @@ class Compiler {
                 return $producerSlot;
             }
         }
+        if ($producer instanceof Op\Expr\PropertyFetch || $producer instanceof Op\Expr\StaticPropertyFetch) {
+            $callIndex = null;
+            $producerIndex = null;
+            foreach ($block->orig->children as $i => $child) {
+                if ($child === $callOp) {
+                    $callIndex = $i;
+                }
+                if ($child === $producer) {
+                    $producerIndex = $i;
+                }
+            }
+            if (null !== $callIndex && null !== $producerIndex && $producerIndex === $callIndex - 1) {
+                return $producerSlot;
+            }
+
+            return $producerSlot;
+        }
         // php-cfg `f(g())` uses distinct result/arg temporaries (#8561, #7075).
         if (
             $producer instanceof Op\Expr\FuncCall
@@ -8884,6 +8901,13 @@ class Compiler {
             }
         }
 
+        if (
+            ($producer instanceof Op\Expr\FuncCall || $producer instanceof Op\Expr\NsFuncCall)
+            && $this->inlineCallArgProducerFeedsConsumer($producer, $callOp)
+        ) {
+            return $producerSlot;
+        }
+
         return null;
     }
 
@@ -8899,6 +8923,7 @@ class Compiler {
     private function matchInlineCallArgProducer(array $producers, array $callArgs, int $argIndex): ?Op\Expr
     {
         $producers = $this->filterDeadClassConstFetchInlineProducers($producers);
+        $producers = $this->filterNestedNewInlineCallArgProducers($producers);
         $producerCount = count($producers);
         $argCount = count($callArgs);
         if (0 === $producerCount) {
@@ -8908,6 +8933,11 @@ class Compiler {
             $extra = $producerCount - $argCount;
             $tail = array_slice($producers, -$extra);
             if (!$this->producersAreNestedArrayLiteralChain($tail)) {
+                $filtered = $this->filterNestedNewInlineCallArgProducers($producers);
+                if (\count($filtered) === $argCount) {
+                    return $filtered[$argIndex] ?? null;
+                }
+
                 return null;
             }
             $mappedIndex = 1 === $argCount
@@ -9021,6 +9051,34 @@ class Compiler {
         }
 
         return null;
+    }
+
+    /**
+     * Drop `(new C())` preludes when php-cfg lowers `(new C())->prop` as separate inline producers (#8874).
+     *
+     * @param list<Op\Expr> $producers
+     *
+     * @return list<Op\Expr>
+     */
+    private function filterNestedNewInlineCallArgProducers(array $producers): array
+    {
+        $filtered = [];
+        $count = \count($producers);
+        for ($i = 0; $i < $count; ++$i) {
+            $producer = $producers[$i];
+            if ($producer instanceof Op\Expr\New_) {
+                $next = $producers[$i + 1] ?? null;
+                if (
+                    $next instanceof Op\Expr\PropertyFetch
+                    && $this->operandsReferToSameVariable($next->var, $producer->result)
+                ) {
+                    continue;
+                }
+            }
+            $filtered[] = $producer;
+        }
+
+        return $filtered;
     }
 
     /**
@@ -9152,6 +9210,8 @@ class Compiler {
     {
         return $op instanceof Op\Expr\Array_
             || $op instanceof Op\Expr\ArrayDimFetch
+            || $op instanceof Op\Expr\PropertyFetch
+            || $op instanceof Op\Expr\StaticPropertyFetch
             || $op instanceof Op\Expr\BinaryOp
             || $op instanceof Op\Expr\New_
             || $op instanceof Op\Expr\ConstFetch
@@ -9220,6 +9280,9 @@ class Compiler {
             if (
                 ($child instanceof Op\Expr\FuncCall || $child instanceof Op\Expr\NsFuncCall)
                 && $this->isNestedCallArgProducerForConsumer($child, $callOp, $i, $callIndex, $cfgChildren)
+                && property_exists($callOp, 'args')
+                && is_array($callOp->args)
+                && 1 === count($callOp->args)
             ) {
                 break;
             }
