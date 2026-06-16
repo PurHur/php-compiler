@@ -12017,9 +12017,18 @@ class Compiler {
                 $fetch = $fetches[$elementIndex] ?? null;
                 if ($fetch instanceof Op\Expr\ClassConstFetch
                     && $this->isCompileTimeEnumCaseClassConstFetch($fetch, $block)
-                    && $this->operandsReferToSameVariable($fetch->result, $valueOperand)
                 ) {
-                    return $fetch;
+                    if ($this->operandsReferToSameVariable($fetch->result, $valueOperand)) {
+                        return $fetch;
+                    }
+                    // php-cfg may drop the fetch result and leave a literal case-name element
+                    // (e.g. `E::A; [ "A", ... ]`) — still treat as enum case fetch (#9039).
+                    if ($valueOperand instanceof Operand\Literal && \is_string($valueOperand->value)) {
+                        $constName = $this->staticNameFromOperand($fetch->name);
+                        if (null !== $constName && $constName === $valueOperand->value) {
+                            return $fetch;
+                        }
+                    }
                 }
 
                 break;
