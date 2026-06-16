@@ -32,7 +32,6 @@ final class JitGettype
             JITVariable::TYPE_NATIVE_DOUBLE => 'double',
             JITVariable::TYPE_STRING => 'string',
             JITVariable::TYPE_OBJECT => 'object',
-            JITVariable::TYPE_HASHTABLE => 'array',
             VmVariable::TYPE_ENUM_CASE => 'object',
         ] as $jitType => $name) {
             $expected = $i8->constInt($jitType, false);
@@ -40,6 +39,23 @@ final class JitGettype
             $candidate = $context->builder->load($context->constantStringFromString($name));
             $result = $context->builder->select($isType, $candidate, $result);
         }
+        $isHt = $context->builder->icmp(
+            Builder::INT_EQ,
+            $typeByte,
+            $i8->constInt(JITVariable::TYPE_HASHTABLE, false)
+        );
+        $htLabel = $context->builder->select(
+            JitStreamContextRepresentation::isRepresentation(
+                $context,
+                $context->builder->call(
+                    $context->lookupFunction('__value__readHashtable'),
+                    $valuePtr
+                )
+            ),
+            $context->builder->load($context->constantStringFromString('resource')),
+            $context->builder->load($context->constantStringFromString('array'))
+        );
+        $result = $context->builder->select($isHt, $htLabel, $result);
         $isLong = $context->builder->icmp(
             Builder::INT_EQ,
             $typeByte,

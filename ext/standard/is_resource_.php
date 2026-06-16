@@ -49,6 +49,19 @@ final class is_resource_ extends Internal
         if (1 !== \count($args)) {
             throw new \LogicException('is_resource() requires exactly one argument');
         }
+        if (0 !== ($args[0]->type & JITVariable::IS_NATIVE_ARRAY)) {
+            return $context->constantFromBool(false);
+        }
+        if (JITVariable::TYPE_HASHTABLE === $args[0]->type) {
+            return JitStreamContextRepresentation::isRepresentationArg($context, $args[0]);
+        }
+        if (JITVariable::TYPE_VALUE === $args[0]->type) {
+            $streamCtx = JitStreamContextRepresentation::isRepresentationArg($context, $args[0]);
+            \PHPCompiler\JIT\Builtin\StringDir::ensureLinked($context);
+            $handleRes = JitResourceArg::lowerIsResource($context, $args[0]);
+
+            return $context->builder->or($streamCtx, $handleRes);
+        }
         \PHPCompiler\JIT\Builtin\StringDir::ensureLinked($context);
 
         return JitResourceArg::lowerIsResource($context, $args[0]);
@@ -85,6 +98,9 @@ final class is_resource_ extends Internal
             $handle = \PHPCompiler\VM\ResourceSupport::resolveHandle($v);
 
             return null !== $handle && VmProcess::isValidHandle($handle);
+        }
+        if (\PHPCompiler\VM\ResourceSupport::isStreamContextResource($v)) {
+            return true;
         }
 
         return false;

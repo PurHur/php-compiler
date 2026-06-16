@@ -4,10 +4,12 @@ declare(strict_types=1);
 
 namespace PHPCompiler;
 
+use PHPCompiler\ext\standard\is_resource_;
 use PHPCompiler\ext\standard\stream_context_get_default;
 use PHPCompiler\ext\standard\stream_context_get_options;
 use PHPCompiler\ext\standard\stream_context_set_default;
 use PHPCompiler\ext\standard\VmStreamContext;
+use PHPCompiler\VM\ResourceSupport;
 use PHPCompiler\VM\Variable as VMVariable;
 use PHPUnit\Framework\TestCase;
 
@@ -33,6 +35,8 @@ final class StreamContextGetDefaultBuiltinTest extends TestCase
         $this->assertNotNull($id1);
         $this->assertSame($id1, $id2);
         $this->assertTrue($frame1->returnVar->resolveIndirect()->toArray()->isResourceLikeHandle());
+        $this->assertTrue(is_resource_::isResource($frame1->returnVar));
+        $this->assertSame('resource (stream-context)', ResourceSupport::debugTypeName($frame1->returnVar));
     }
 
     public function testSetDefaultMergesOptionsIntoSingleton(): void

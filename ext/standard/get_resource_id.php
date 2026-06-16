@@ -37,6 +37,12 @@ final class get_resource_id extends Internal
         if (!is_resource_::isResource($v)) {
             throw new \TypeError(\sprintf(self::TYPE_ERROR, VmStreamArg::debugTypeName($v)));
         }
+        $contextId = VmStreamContext::idFrom($v);
+        if (null !== $contextId) {
+            $frame->returnVar->int($contextId);
+
+            return;
+        }
         $frame->returnVar->int($v->toInt());
     }
 

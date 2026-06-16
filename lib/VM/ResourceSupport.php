@@ -8,6 +8,7 @@ use PHPCompiler\ext\standard\VmDir;
 use PHPCompiler\ext\standard\VmFs;
 use PHPCompiler\ext\standard\VmProcess;
 use PHPCompiler\ext\standard\VmStreamBucket;
+use PHPCompiler\ext\standard\VmStreamContext;
 use PHPCompiler\ext\standard\VmStreamFilterChain;
 
 /**
@@ -128,6 +129,12 @@ final class ResourceSupport
         return $var->procResource && Variable::TYPE_INTEGER === $var->type;
     }
 
+    /** VM stream-context array handles (ext/standard/streams.c, #6367, #8743). */
+    public static function isStreamContextResource(Variable $var): bool
+    {
+        return VmStreamContext::isRepresentation($var);
+    }
+
     public static function isVmResource(Variable $var): bool
     {
         return self::isStreamResource($var)
@@ -135,7 +142,8 @@ final class ResourceSupport
             || self::isBrigadeResource($var)
             || self::isBucketResource($var)
             || self::isStreamFilterResource($var)
-            || self::isProcessResource($var);
+            || self::isProcessResource($var)
+            || self::isStreamContextResource($var);
     }
 
     /** php-src ext/standard/type.c — gettype()/get_debug_type() on stale resource zvals (#5147). */
@@ -226,6 +234,9 @@ final class ResourceSupport
         }
         if (self::isProcessResource($var)) {
             return 'resource (process)';
+        }
+        if (self::isStreamContextResource($var)) {
+            return 'resource (stream-context)';
         }
 
         return null;
