@@ -6408,16 +6408,28 @@ class Compiler {
                     $line > 0 ? $line : null
                 )];
             case Op\Expr\ArrayDimFetch::class:
+                $mergeEcho = $this->mergeEchoSlotForBranch($block);
+                if (null !== $mergeEcho && !$this->isArrayDimFetchForWrite($expr, $block)) {
+                    $block->forceFreshVarSlot($expr->result);
+                }
                 $dimSlot = null !== $expr->dim
                     ? $this->compileOperand($expr->dim, $block, true)
                     : null;
+                $resultSlot = $this->compileOperand($expr->result, $block, false);
+                if (null !== $mergeEcho && null !== $dimSlot && $dimSlot === $mergeEcho && null !== $expr->dim) {
+                    $dimSlot = $this->freshLiteralConstantSlot($expr->dim, $block);
+                }
+                if (null !== $dimSlot && $resultSlot === $dimSlot) {
+                    $block->forceFreshVarSlot($expr->result);
+                    $resultSlot = $this->compileOperand($expr->result, $block, false);
+                }
                 $fetchType = $this->isArrayDimFetchForWrite($expr, $block)
                     ? OpCode::TYPE_ARRAY_DIM_FETCH_WRITE
                     : OpCode::TYPE_ARRAY_DIM_FETCH;
 
                 return [new OpCode(
                     $fetchType,
-                    $this->compileOperand($expr->result, $block, false),
+                    $resultSlot,
                     $this->compileOperand($expr->var, $block, true),
                     $dimSlot
                 )];
