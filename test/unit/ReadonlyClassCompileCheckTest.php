@@ -162,6 +162,34 @@ PHP;
         $this->assertSame("ok\n", ob_get_clean());
     }
 
+    /** @covers issue #8967 */
+    public function testJitReadonlyExtendsNonReadonlyParentFailsWithInheritanceMessage(): void
+    {
+        $runtime = new Runtime();
+        $code = <<<'PHP'
+<?php
+class B {}
+readonly class R extends B {}
+PHP;
+        $this->expectException(\CompileError::class);
+        $this->expectExceptionMessage('Readonly class R cannot extend non-readonly class B');
+        $runtime->parseAndCompile(\PHPCompiler\JitMcjitEmbed::prepareClassless($code), 'jit_readonly_extends.php');
+    }
+
+    /** @covers issue #8967 */
+    public function testJitNonReadonlyExtendsReadonlyParentFailsWithInheritanceMessage(): void
+    {
+        $runtime = new Runtime();
+        $code = <<<'PHP'
+<?php
+readonly class R {}
+class C extends R {}
+PHP;
+        $this->expectException(\CompileError::class);
+        $this->expectExceptionMessage('Non-readonly class C cannot extend readonly class R');
+        $runtime->parseAndCompile(\PHPCompiler\JitMcjitEmbed::prepareClassless($code), 'jit_nonreadonly_extends.php');
+    }
+
     /** @covers issue #7170 */
     public function testEvalReadonlyExtendsKnownNonReadonlyParentFailsAtCompileTime(): void
     {

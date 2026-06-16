@@ -32,8 +32,10 @@ final class ReadonlyClassCompileCheck
     {
         $check = new self($knownClasses);
         $check->collect($script);
+        // Inheritance before per-property defaults so MCJIT readonly pads do not mask extends errors (#8967).
         $check->verifyInheritance();
         $check->verifyPropertyReadonlyOverrides();
+        $check->verifyAllPropertyDefaults();
     }
 
     /**
@@ -67,7 +69,6 @@ final class ReadonlyClassCompileCheck
             );
             $this->verifyReadonlyClassNoStaticProperties($class, $display);
         }
-        $this->verifyNoPropertyDefaults($class, $display, $readonly);
         $this->verifyNoStaticReadonlyProperties($class, $display);
         $parentLc = null;
         if (null !== $class->extends) {
@@ -79,6 +80,7 @@ final class ReadonlyClassCompileCheck
             'extends' => $parentLc,
             'properties' => $this->collectInstanceProperties($class, $readonly),
         ];
+        $this->scriptClasses[$lc][] = $class;
     }
 
     /**
@@ -129,6 +131,19 @@ final class ReadonlyClassCompileCheck
             );
         }
     }
+
+    private function verifyAllPropertyDefaults(): void
+    {
+        foreach ($this->classes as $lc => $meta) {
+            // Re-walk CFG for property default checks (deferred until after inheritance, #8967).
+            foreach ($this->scriptClasses[$lc] ?? [] as $class) {
+                $this->verifyNoPropertyDefaults($class, $meta['display'], $meta['readonly']);
+            }
+        }
+    }
+
+    /** @var array<string, list<Op\Stmt\Class_>> */
+    private array $scriptClasses = [];
 
     private function verifyNoPropertyDefaults(Op\Stmt\Class_ $class, string $classDisplay, bool $classReadonly): void
     {

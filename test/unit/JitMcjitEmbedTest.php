@@ -89,4 +89,17 @@ PHP;
         $this->assertStringContainsString('__phpc_mcjit_embed_bootstrap', $out);
         $this->assertStringNotContainsString('__phpcMcjitClassPad', $out);
     }
+
+    /** @covers issue #8967 */
+    public function testPadsEmptyReadonlyClassWithoutPropertyDefault(): void
+    {
+        $in = <<<'PHP'
+<?php
+readonly class R {}
+$o = new R();
+PHP;
+        $out = JitMcjitEmbed::prepareClassless($in);
+        $this->assertStringContainsString('private bool $__phpcMcjitClassPad;', $out);
+        $this->assertStringNotContainsString('__phpcMcjitClassPad = false', $out);
+    }
 }
