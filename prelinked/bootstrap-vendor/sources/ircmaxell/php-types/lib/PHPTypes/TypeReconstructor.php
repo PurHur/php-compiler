@@ -296,7 +296,8 @@ class TypeReconstructor
                 // TODO: we may be able to determine these...
                 return false;
             case 'Expr_MagicScriptConst':
-                if (\PHPCfg\Op\Expr\MagicScriptConst::KIND_LINE === $op->kind) {
+                if (\PHPCfg\Op\Expr\MagicScriptConst::KIND_LINE === $op->kind
+                    || \PHPCfg\Op\Expr\MagicScriptConst::KIND_HALT_OFFSET === $op->kind) {
                     return [Type::int()];
                 }
 
@@ -816,7 +817,6 @@ class TypeReconstructor
             return Type::fromDecl($type->name);
         } elseif ($type instanceof Op\Type\Never_) {
             return Type::never();
-
         } elseif ($type instanceof Op\Type\Union_) {
             $subs = [];
             foreach ($type->types as $sub) {

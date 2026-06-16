@@ -4314,33 +4314,80 @@ PY
 }
 
 apply_php_types_compiler_halt_offset_overlay() {
-  local target="$ROOT/vendor/ircmaxell/php-types/lib/PHPTypes/TypeReconstructor.php"
-  if grep -q 'KIND_HALT_OFFSET' "$target" 2>/dev/null; then
-    echo "Skip php-types-compiler-halt-offset overlay (already applied)"
-    return 0
+  local vendor_target="$ROOT/vendor/ircmaxell/php-types/lib/PHPTypes/TypeReconstructor.php"
+  local prelinked_target="$ROOT/prelinked/bootstrap-vendor/sources/ircmaxell/php-types/lib/PHPTypes/TypeReconstructor.php"
+  local -a targets=("$vendor_target")
+  if [[ -f "$prelinked_target" ]]; then
+    targets+=("$prelinked_target")
   fi
-  if ! grep -q 'MagicScriptConst::KIND_LINE' "$target" 2>/dev/null; then
-    return 0
-  fi
-  python3 - "$target" <<'PY'
+
+  python3 - "${targets[@]}" <<'PY'
 import sys
+import re
 from pathlib import Path
 
-path = Path(sys.argv[1])
-text = path.read_text()
-old = """                if (\\PHPCfg\\Op\\Expr\\MagicScriptConst::KIND_LINE === $op->kind) {
+def patch_one(path: Path) -> bool:
+    text = path.read_text()
+
+    if "KIND_HALT_OFFSET" in text:
+        return False
+    if "MagicScriptConst::KIND_LINE" not in text:
+        return False
+
+    # Try an exact-string replacement first (fast path).
+    old = """                if (\\PHPCfg\\Op\\Expr\\MagicScriptConst::KIND_LINE === $op->kind) {
                     return [Type::int()];
                 }"""
-new = """                if (\\PHPCfg\\Op\\Expr\\MagicScriptConst::KIND_LINE === $op->kind
+    new = """                if (\\PHPCfg\\Op\\Expr\\MagicScriptConst::KIND_LINE === $op->kind
                     || \\PHPCfg\\Op\\Expr\\MagicScriptConst::KIND_HALT_OFFSET === $op->kind) {
                     return [Type::int()];
                 }"""
-if old not in text:
-    sys.stderr.write("php-types-compiler-halt-offset: TypeReconstructor anchor not found\n")
-    raise SystemExit(1)
-path.write_text(text.replace(old, new, 1))
+    if old in text:
+        path.write_text(text.replace(old, new, 1))
+        return True
+
+    # Anchor drift: match the KIND_LINE guard even if formatting/spacing differs.
+    pattern = re.compile(
+        r"(?P<indent>[ \t]+)if\s*\(\s*\\PHPCfg\\Op\\Expr\\MagicScriptConst::KIND_LINE\s*===\s*\\$op->kind\s*\)\s*\{\s*\n"
+        r"(?P=indent)[ \t]+return\s*\\[Type::int\\(\\)\\];\s*\n"
+        r"(?P=indent)\\}",
+        re.MULTILINE,
+    )
+    m = pattern.search(text)
+    if not m:
+        raise RuntimeError("php-types-compiler-halt-offset: TypeReconstructor anchor not found")
+
+    indent = m.group("indent")
+    replacement = (
+        f"{indent}if (\\PHPCfg\\Op\\Expr\\MagicScriptConst::KIND_LINE === $op->kind\n"
+        f"{indent}    || \\PHPCfg\\Op\\Expr\\MagicScriptConst::KIND_HALT_OFFSET === $op->kind) {{\n"
+        f"{indent}    return [Type::int()];\n"
+        f"{indent}}}"
+    )
+    path.write_text(text[: m.start()] + replacement + text[m.end() :])
+    return True
+
+
+modified_any = False
+for arg in sys.argv[1:]:
+    p = Path(arg)
+    if not p.exists():
+        continue
+    try:
+        modified_any = patch_one(p) or modified_any
+    except RuntimeError as e:
+        sys.stderr.write(str(e) + "\n")
+        raise SystemExit(1)
+
+if modified_any:
+    sys.stderr.write("php-types-compiler-halt-offset: patched TypeReconstructor\n")
 PY
-  echo "Applied php-types-compiler-halt-offset overlay (#5455)"
+
+  if grep -q 'KIND_HALT_OFFSET' "$vendor_target" 2>/dev/null; then
+    echo "Applied php-types-compiler-halt-offset overlay (#5455)"
+  else
+    echo "Skip php-types-compiler-halt-offset overlay (already applied)"
+  fi
 }
 
 # Per-property MODIFIER_READONLY: Property.propertyFlags + Parser assignment (#3149, #4230).
