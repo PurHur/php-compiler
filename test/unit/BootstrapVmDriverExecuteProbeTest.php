@@ -68,9 +68,14 @@ final class BootstrapVmDriverExecuteProbeTest extends TestCase
         $out = self::$root.'/build/.bootstrap-vm-driver-execute-probe-minimal-aot';
         $entry = self::$root.'/test/selfhost/compiler_minimal/main.php';
         $prefix = LlvmToolchain::envPrefix(self::$root);
+        $memoryLimit = getenv('PHP_COMPILER_MEMORY_LIMIT') ?: '8192M';
         $compileCmd = implode(' ', array_map('escapeshellarg', [
             ...$prefix,
+            'env',
+            'PHP_COMPILER_MEMORY_LIMIT='.$memoryLimit,
             'php',
+            '-d',
+            'memory_limit='.$memoryLimit,
             self::$root.'/bin/compile.php',
             '-o',
             $out,
