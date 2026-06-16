@@ -1,12 +1,11 @@
 --- vendor/ircmaxell/php-cfg/lib/PHPCfg/Parser.php
 +++ vendor/ircmaxell/php-cfg/lib/PHPCfg/Parser.php
-@@ -376,6 +376,10 @@
+@@ -378,6 +378,8 @@
+                 $this->parseEnumCase($stmt);
              } elseif ($stmt instanceof Stmt\ClassMethod) {
                  $this->parseStmt_ClassMethod($stmt);
 +            } elseif ($stmt instanceof Stmt\TraitUse) {
 +                $this->parseStmt_TraitUse($stmt);
-+            } elseif ($stmt instanceof Stmt\ClassConst) {
-+                $this->parseStmt_ClassConst($stmt);
+             } elseif ($stmt instanceof Stmt\ClassConst) {
+                 $this->parseStmt_ClassConst($stmt);
              }
-         }
-         $this->block = $savedBlock;
