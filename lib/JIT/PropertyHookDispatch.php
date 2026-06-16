@@ -99,7 +99,8 @@ final class PropertyHookDispatch
     }
 
     /**
-     * isset($obj->prop) on hooked properties — invoke get hook, then Zend isset rules (#4586).
+     * isset($obj->prop) on hooked properties — probe backing slot via Object_::propertyIsSet,
+     * never invoke get hook (#8917, zend_property_hooks.c).
      */
     public static function tryEmitPropertyIsSet(
         Context $context,
@@ -108,18 +109,7 @@ final class PropertyHookDispatch
         string $propertyName,
         ?Block $enclosingBlock
     ): ?Value {
-        $hookValue = self::tryEmitPropertyGet(
-            $context,
-            $receiver,
-            $declaringClass,
-            $propertyName,
-            $enclosingBlock
-        );
-        if (null === $hookValue) {
-            return null;
-        }
-
-        return self::compileIssetForHookValue($context, $hookValue);
+        return null;
     }
 
     /**
@@ -198,22 +188,6 @@ final class PropertyHookDispatch
         $context->callerStrictTypes = $prevStrict;
 
         return true;
-    }
-
-    private static function compileIssetForHookValue(Context $context, Value $hookValue): Value
-    {
-        $valuePtr = JitValueBox::normalizeValuePtr($context, $hookValue);
-        $valueMap = $context->structFieldMap['__value__'];
-        $typeByte = $context->builder->load(
-            $context->builder->structGep($valuePtr, $valueMap['type'])
-        );
-        $i8 = $context->getTypeFromString('int8');
-        $nullType = $i8->constInt(\PHPCompiler\VM\Variable::TYPE_NULL, false);
-        $undefType = $i8->constInt(\PHPCompiler\VM\Variable::TYPE_UNDEFINED, false);
-        $notNull = $context->builder->icmp(Builder::INT_NE, $typeByte, $nullType);
-        $notUndef = $context->builder->icmp(Builder::INT_NE, $typeByte, $undefType);
-
-        return $context->builder->and($notNull, $notUndef);
     }
 
     private static function isRawHookWrite(Context $context, string $propertyName, ?Block $block): bool

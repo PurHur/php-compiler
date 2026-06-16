@@ -584,28 +584,14 @@ class VM {
 
     /**
      * isset($obj->prop) — Zend zend_std_has_property / __isset parity (#3298, #4586).
+     * Hooked properties probe backing/uninit without get hook (#8917, zend_property_hooks.c).
      */
     public function objectPropertyIsSet(ObjectEntry $object, string $propName, ?Frame $frame = null): bool
     {
         if (null !== $frame) {
-            $meta = $this->classPropertyMeta($object, $propName);
-            $getLc = $meta?->getHookMethodLc
-                ?? strtolower(SourcePreprocessor\PropertyHooks::getHookMethodName($propName));
-            if (isset($object->class->methods[$getLc])) {
-                // unset() clears backing storage; isset must not invoke get on uninitialized slot (#5191).
-                if (null !== $meta && null !== $meta->setHookMethodLc) {
-                    $props = $object->getRawProperties();
-                    if (isset($props[$propName])
-                        && VM\TypedPropertyCheck::isUninitialized($props[$propName])) {
-                        return false;
-                    }
-                }
-                $hookValue = $this->fetchPropertyWithHooks($object, $propName, $frame);
-                if (null !== $hookValue) {
-                    $value = $hookValue->resolveIndirect();
-
-                    return !$value->isUndefined() && Variable::TYPE_NULL !== $value->type;
-                }
+            $hookedIsset = $this->issetHookedPropertyWithoutGetHook($object, $propName);
+            if (null !== $hookedIsset) {
+                return $hookedIsset;
             }
         }
         $props = $object->getRawProperties();
@@ -633,6 +619,21 @@ class VM {
      */
     public function objectPropertyIsSetForCoalesceAssign(ObjectEntry $object, string $propName, ?Frame $frame = null): bool
     {
+        $hookedIsset = $this->issetHookedPropertyWithoutGetHook($object, $propName);
+        if (null !== $hookedIsset) {
+            return $hookedIsset;
+        }
+
+        return $this->objectPropertyIsSet($object, $propName, null);
+    }
+
+    /**
+     * isset / ?? / ??= on hooked properties — backing or declared slot probe, never get hook (#8902, #8917).
+     *
+     * @return bool|null null when the property is not hook-backed
+     */
+    private function issetHookedPropertyWithoutGetHook(ObjectEntry $object, string $propName): ?bool
+    {
         $lcClass = strtolower($object->class->name);
         $propMeta = $this->context->propertyHookRegistry[$lcClass][$propName]
             ?? $this->context->propertyHookRegistry[$lcClass][strtolower($propName)]
@@ -641,7 +642,7 @@ class VM {
             $backingName = $propMeta['setBacking'] ?? $propMeta['getBacking'] ?? null;
             if (null !== $backingName && $object->hasProperty($backingName)) {
                 $value = $object->getProperty($backingName)->resolveIndirect();
-                if ($value->isUndefined()) {
+                if ($value->isUndefined() || VM\TypedPropertyCheck::isUninitialized($value)) {
                     return false;
                 }
 
@@ -649,20 +650,19 @@ class VM {
             }
         }
         $meta = $this->classPropertyMeta($object, $propName);
-        if (null !== $meta && (null !== $meta->getHookMethodLc || null !== $meta->setHookMethodLc)) {
-            if ($object->hasProperty($propName)) {
-                $value = $object->getProperty($propName)->resolveIndirect();
-                if ($value->isUndefined()) {
-                    return false;
-                }
-
-                return Variable::TYPE_NULL !== $value->type;
+        if (null === $meta || (null === $meta->getHookMethodLc && null === $meta->setHookMethodLc)) {
+            return null;
+        }
+        if ($object->hasProperty($propName)) {
+            $value = $object->getProperty($propName)->resolveIndirect();
+            if ($value->isUndefined() || VM\TypedPropertyCheck::isUninitialized($value)) {
+                return false;
             }
 
-            return false;
+            return Variable::TYPE_NULL !== $value->type;
         }
 
-        return $this->objectPropertyIsSet($object, $propName, $frame);
+        return false;
     }
 
     /**

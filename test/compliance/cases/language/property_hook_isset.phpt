@@ -1,5 +1,5 @@
 --TEST--
-isset()/empty() on property-hook virtual properties invoke get hook (issue #4586, zend_object_handlers.c)
+isset()/empty() on property hooks — isset probes backing without get hook (#8901, #8917, zend_property_hooks.c)
 --FILE--
 <?php
 class Box {
@@ -34,8 +34,19 @@ var_export(isset($n->x));
 echo ' ';
 var_export(empty($n->x));
 echo "\n";
+
+class ThrowingGet {
+    public ?string $x {
+        get { throw new Exception('get must not run for isset'); }
+    }
+}
+$t = new ThrowingGet();
+var_dump(isset($t->x));
+echo "ok\n";
 --EXPECT--
 true
 false
-true false
+false false
 false true
+bool(false)
+ok
