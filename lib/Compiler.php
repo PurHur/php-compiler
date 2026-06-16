@@ -4160,8 +4160,31 @@ class Compiler {
         if (property_exists($child, 'declaredType') && null !== $child->declaredType) {
             return false;
         }
+        $flags = property_exists($child, 'flags') ? (int) $child->flags : 0;
+        // Enum cases cannot be protected/private/final; those must be user `const`.
+        if (0 !== ($flags & (\PHPCfg\Func::FLAG_PROTECTED | \PHPCfg\Func::FLAG_PRIVATE | \PHPCfg\Func::FLAG_FINAL))) {
+            return false;
+        }
 
-        return 0 === (property_exists($child, 'flags') ? (int) $child->flags : 0);
+        // When php-cfg omits isEnumCase (#5832), try to distinguish backed enum `case` from user `const`.
+        // Heuristic: backed enum cases must have a scalar literal backing value of the enum's backed type.
+        $backedType = $this->compileTimeEnumBackedTypes[$this->compilingClassLc] ?? null;
+        if (null === $backedType) {
+            // Unit enums: enum cases have no backing scalar; default to legacy heuristic.
+            return 0 === $flags;
+        }
+        $vm = $this->vmVariableFromCfgLiteralOperand($child->value);
+        if (null === $vm) {
+            return false;
+        }
+        if ('int' === $backedType) {
+            return Variable::TYPE_INTEGER === $vm->type;
+        }
+        if ('string' === $backedType) {
+            return Variable::TYPE_STRING === $vm->type;
+        }
+
+        return false;
     }
 
     /**
@@ -9280,6 +9303,37 @@ class Compiler {
         if (!property_exists($callOp, 'args') || !is_array($callOp->args)) {
             return null;
         }
+        // php-cfg may lower a boolean-producing inline Expr (e.g. `===`) to a distinct arg temp with
+        // no dataflow edge, leaving the arg slot empty. Prefer the immediately preceding binary op
+        // producer when its inferred type matches the arg (#9030).
+        $callIndex = null;
+        foreach ($block->orig->children as $i => $child) {
+            if ($child === $callOp) {
+                $callIndex = $i;
+                break;
+            }
+        }
+        if (null !== $callIndex && $callIndex > 0) {
+            $prev = $block->orig->children[$callIndex - 1] ?? null;
+            $argRoot = $this->unwrapOperandChain($arg);
+            if ($prev instanceof Op\Expr\BinaryOp
+                && null !== $prev->result
+                && null !== $argRoot->type
+                && null !== $prev->result->type
+                && $argRoot->type->type === $prev->result->type->type
+                && $argRoot->type->type === Type::TYPE_BOOLEAN
+            ) {
+                if (null === $block->slotForOperand($prev->result)) {
+                    foreach ($this->compileExpr($prev, $block) as $op) {
+                        $block->addOpCode($op);
+                    }
+                }
+                $slot = $block->slotForOperand($prev->result);
+                if (null !== $slot) {
+                    return $slot;
+                }
+            }
+        }
         $coalesceArg = $this->findCoalesceStmtForCallArg($arg, $block);
         if (null !== $coalesceArg) {
             $coalesceSlot = $this->compileCallArgCoalesceSlot($arg, $block);
@@ -10908,7 +10962,24 @@ class Compiler {
         if ($this->callArgOperandIsClosureValue($arg, $block)) {
             return false;
         }
-        $root = $this->unwrapOperandChain($arg);
+        $argRoot = $this->unwrapOperandChain($arg);
+        // Guard ordinal/hoisted binding: don't inject enum const fetch ops for scalar-typed call args.
+        // php-cfg may create an unrelated temp (e.g. identical/compare result) that happens to align
+        // with a dead enum ClassConstFetch statement (#9030).
+        if (!$argRoot instanceof Op\Expr\ClassConstFetch && null !== $argRoot->type) {
+            $kind = $argRoot->type->type;
+            if (
+                Type::TYPE_BOOLEAN === $kind
+                || Type::TYPE_LONG === $kind
+                || Type::TYPE_DOUBLE === $kind
+                || Type::TYPE_STRING === $kind
+                || Type::TYPE_ARRAY === $kind
+                || Type::TYPE_NULL === $kind
+            ) {
+                return false;
+            }
+        }
+        $root = $argRoot;
         // Compare/arithmetic on enum case — compile the full Expr_* producer, not bare fetch (#8766).
         if ($root instanceof Op\Expr\BinaryOp) {
             return false;
