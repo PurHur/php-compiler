@@ -184,6 +184,37 @@ final class SetcookieOptions
     }
 
     /**
+     * Self-host spine smoke (#8698): exercise options-array parseArgs on the compile spine.
+     *
+     * @return array{
+     *     name: string,
+     *     value: string,
+     *     expires: int,
+     *     path: string,
+     *     domain: string,
+     *     secure: bool,
+     *     httponly: bool,
+     *     samesite: string,
+     *     partitioned: bool,
+     * }
+     */
+    public static function spineSmokeParse(): array
+    {
+        $name = new Variable();
+        $name->string('spine');
+        $value = new Variable();
+        $value->string('ok');
+        $optsHt = new HashTable();
+        $pathVal = new Variable();
+        $pathVal->string('/');
+        $optsHt->addNew('path', $pathVal);
+        $opts = new Variable();
+        $opts->array($optsHt);
+
+        return self::parseArgs('setcookie', [$name, $value, $opts]);
+    }
+
+    /**
      * @return array{
      *     name: string,
      *     value: string,

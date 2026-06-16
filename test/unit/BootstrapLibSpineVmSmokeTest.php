@@ -89,6 +89,18 @@ final class BootstrapLibSpineVmSmokeTest extends TestCase
         $this->assertStringContainsString('mb_decode_mimeheader.php', $entry);
     }
 
+    public function testSpineEntryExercisesSetcookieOptionsParseArgs(): void
+    {
+        $entry = (string) file_get_contents(self::$root.'/test/selfhost/compiler_lib_spine_smoke/main.php');
+        $this->assertStringContainsString('#8698', $entry);
+        $this->assertStringContainsString('SetcookieOptions::spineSmokeParse', $entry);
+        $this->assertStringContainsString('JitSetcookieOptions.php', $entry);
+        $this->assertStringContainsString('SetcookieOptions.php', $entry);
+        $options = (string) file_get_contents(self::$root.'/ext/standard/SetcookieOptions.php');
+        $this->assertStringContainsString('spineSmokeParse', $options);
+        $this->assertStringContainsString("self::parseArgs('setcookie'", $options);
+    }
+
     public function testVmDriverExecuteNativeDoesNotStubVmSpineSmokeAtMainEntry(): void
     {
         $native = (string) file_get_contents(self::$root.'/lib/JIT/VmDriverExecuteNative.php');
