@@ -8964,10 +8964,7 @@ class Compiler {
                 if (null === $callArg || $this->isEmbeddedCallLiteralArg($callArg)) {
                     return null;
                 }
-                if (
-                    $callArg instanceof Operand\Temporary
-                    || $this->operandsReferToSameVariable($producers[0]->result, $callArg)
-                ) {
+                if ($this->operandsReferToSameVariable($producers[0]->result, $callArg)) {
                     return $producers[0];
                 }
             }
@@ -8983,8 +8980,44 @@ class Compiler {
 
             return null;
         }
+        if ($argCount > $producerCount) {
+            return $this->matchInlineCallArgProducerWithEmbeddedLiterals(
+                $producers,
+                $callArgs,
+                $argIndex
+            );
+        }
         if ($argIndex < $producerCount) {
             return $producers[$argIndex];
+        }
+
+        return null;
+    }
+
+    /**
+     * Map hoisted inline producers when php-cfg embeds literal call args (#8561, #8796).
+     *
+     * e.g. in_array(1, [1, 2, 3], true) — producers [Array_, ConstFetch] align to args 1 and 2, not 0.
+     *
+     * @param list<Op\Expr> $producers
+     * @param list<Operand> $callArgs
+     */
+    private function matchInlineCallArgProducerWithEmbeddedLiterals(
+        array $producers,
+        array $callArgs,
+        int $argIndex
+    ): ?Op\Expr {
+        if ($this->isEmbeddedCallLiteralArg($callArgs[$argIndex] ?? null)) {
+            return null;
+        }
+        $callArg = $callArgs[$argIndex] ?? null;
+        if (null === $callArg) {
+            return null;
+        }
+        foreach ($producers as $producer) {
+            if ($this->operandsReferToSameVariable($producer->result, $callArg)) {
+                return $producer;
+            }
         }
 
         return null;
