@@ -32,6 +32,22 @@ Repository defaults live in [`script/ci-defaults.env`](../script/ci-defaults.env
 | Fast gate + JIT preflight (optional) | `JIT_PREFLIGHT_GATE=1 ./script/ci-fast.sh` | `make test-fast-jit-preflight` or `make test-docker-fast-jit-preflight` |
 | Explicit memory-capped Docker | — | `./script/ci-docker-safe.sh ci-local.sh` or `make test-docker-safe` |
 | Single PHPUnit filter | Append args: `./script/ci-fast.sh --filter VMTest` | Same inside Docker wrappers |
+| User release readiness (quick) | `./script/release-readiness.sh --json` | `./script/docker-exec.sh -- bash -lc './script/release-readiness.sh --json'` |
+| User release readiness (full) | `./script/release-readiness.sh --full --json` | `./script/docker-exec.sh -- bash -lc './script/release-readiness.sh --full --json'` |
+
+### Release readiness (`release-readiness.sh`, #8737)
+
+Daily v1.1.0 release review presenter — aggregates user-facing gates without the ~1h `north-star5-verify --strict` ladder.
+
+| Mode | Gates | Target time |
+|------|-------|-------------|
+| Quick (default) | `bootstrap-inventory.php --check`, `check-selfhost-spine-coverage-sync.php`, `check-root-readme-sync.php` | <5 min Docker |
+| Quick + CI doc slice | Set `RELEASE_READINESS_CI_FAST=1` — adds wave3/examples/development-status/spine-count/capability-matrix sync checks | ~minutes |
+| Full (`--full`) | Quick + `capability-matrix.php --check`, `examples-aot-smoke.sh`, `examples-web-smoke.sh`, `CHANGELOG.md` v1.1.0 stub | LLVM + HTTP when available |
+
+Machine output: `./script/release-readiness.sh [--full] --json` → `{"user_release_ready":"yes"|"no","mode":"quick"|"full","gates":[...]}`.
+
+Parent: [#8739](https://github.com/PurHur/php-compiler/issues/8739) · [#78](https://github.com/PurHur/php-compiler/issues/78).
 
 ## Runforge / harness verification
 
@@ -168,6 +184,8 @@ Defaults are exported from [`script/ci-defaults.env`](../script/ci-defaults.env)
 | `BOOTSTRAP_M4_LOOP_PROBE` | `1` | `ci-local.sh` (LLVM tail, after M3 strict gates) | Full `bootstrap-loop-probe.sh` ladder (M0/M2/M3 + gen-1→gen-3); opt-out `=0` ([#2780](https://github.com/PurHur/php-compiler/issues/2780), [#2058](https://github.com/PurHur/php-compiler/issues/2058)) |
 | `BOOTSTRAP_M4_FULL_SPINE_PROBE_GATE` | `0` | `ci-local.sh` (LLVM tail) | Full M4 spine probe (bigger than the minimal spine smoke); opt-in during self-host ladder iteration ([#2380](https://github.com/PurHur/php-compiler/issues/2380)) |
 | `BOOTSTRAP_WAVE_CHECK` | unset → `1` in `ci-local.sh` llvm tail; set `0` to skip | `ci-local.sh`, `ci-fast.sh` (`CI_FAST_BOOTSTRAP=1`) | `./script/bootstrap-wave-check.sh --fail-fast` after `@group aot-lint` |
+| `BOOTSTRAP_WAVE_CHECK_VENDOR_ABSENT_GATE` | `1` | `ci-local.sh` (LLVM tail, last step) | `./script/bootstrap-wave-check.sh --vendor-absent --fail-fast` — lib spine link with `vendor/` renamed away ([#8712](https://github.com/PurHur/php-compiler/issues/8712), [#3052](https://github.com/PurHur/php-compiler/issues/3052)); skips with exit 2 when LLVM or prelinked `.o` missing |
+| `BOOTSTRAP_WAVE_CHECK_VENDOR_ABSENT` | unset → `1` when gate on; set `0` to skip vendor-absent slice | `ci-common.sh` (`ci_run_bootstrap_wave_check_vendor_absent`) | Dev escape hatch when prelinked blobs absent locally |
 | `BOOTSTRAP_M3_HELLOWORLD_STRICT_GATE` | `1` | `ci-local.sh` (LLVM tail, after wave-check) | `bootstrap-selfhost-helloworld-probe.sh` with strict native emit ([#1526](https://github.com/PurHur/php-compiler/issues/1526), default-on [#1866](https://github.com/PurHur/php-compiler/issues/1866)); opt-out `=0` |
 | `BOOTSTRAP_M4_GEN2_STRICT_GATE` | `1` | `ci-local.sh` (LLVM tail, after M3 strict gates) | `bootstrap-loop-gen1-link.sh` with `BOOTSTRAP_M4_GEN2_STRICT=1` — native gen-2 emit, no Zend fallback ([#2075](https://github.com/PurHur/php-compiler/issues/2075), default-on [#2112](https://github.com/PurHur/php-compiler/issues/2112)); opt-out `=0` |
 | `BOOTSTRAP_M5_DRIVER_GATE` | `0` | `ci-local.sh` (LLVM tail) | Build the M5 self-host native compile driver (pre-req for vendor object compilation); opt-in ([#2380](https://github.com/PurHur/php-compiler/issues/2380)) |
@@ -220,6 +238,7 @@ Defaults are exported from [`script/ci-defaults.env`](../script/ci-defaults.env)
 | `SELFHOST_SPINE_COUNT_SYNC_GATE` | `1` | `ci-fast.sh` (`ci_run_inventory_checks`) | `script/check-selfhost-spine-count-sync.php` (canonical `script/bootstrap-spine-count.php`, [#1834](https://github.com/PurHur/php-compiler/issues/1834), [#1872](https://github.com/PurHur/php-compiler/issues/1872)); set `0` for bulk spine PRs |
 | `SELFHOST_SPINE_COVERAGE_SYNC_GATE` | `1` | `ci-fast.sh` (`ci_run_inventory_checks`) | `script/check-selfhost-spine-coverage-sync.php` — inventory paths vs `compiler_lib_spine_smoke` ([#1955](https://github.com/PurHur/php-compiler/issues/1955), [#1945](https://github.com/PurHur/php-compiler/issues/1945)); set `0` for bulk spine path-only PRs |
 | `SELFHOST_SPINE_DEFERRED_SYNC_GATE` | `1` | `ci-fast.sh` (`ci_run_inventory_checks`) | `script/check-selfhost-spine-deferred-sync.php` — `bootstrap-spine-deferred-lib.php` vs M2 deferred footnotes ([#2202](https://github.com/PurHur/php-compiler/issues/2202)); set `0` for doc-only iteration; empty deferred when [#2134](https://github.com/PurHur/php-compiler/issues/2134) closes |
+| `SELFHOST_SPINE_SIDECAR_SYNC_GATE` | `1` | `ci-fast.sh` (`ci_run_inventory_checks`) | `script/check-selfhost-spine-sidecar-sync.php` — `prelinked/bootstrap-gen0/.m3_compiler_lib_sidecar.sha` vs spine entry SHA-1 ([#8703](https://github.com/PurHur/php-compiler/issues/8703)); waive with `BOOTSTRAP_ALLOW_STALE_SIDECAR=1` for intentional blob batch PRs |
 | `SELFHOST_M4_GEN2_SYNC_GATE` | `1` | `ci-fast.sh` (`ci_run_inventory_checks`) | `script/check-selfhost-m4-gen2-sync.php` — M4 gen-2 `emit_path=*` docs vs `bootstrap-loop-gen1-link.sh` ([#2115](https://github.com/PurHur/php-compiler/issues/2115), default-on [#2175](https://github.com/PurHur/php-compiler/issues/2175)); set `0` for doc-only iteration |
 | `BOOTSTRAP_M3_STRICT_SYNC_GATE` | `0` | `ci-fast.sh` (`ci_run_inventory_checks`) | `script/check-bootstrap-m3-strict-sync.php` — M3 compile-smoke `emit_path=*` docs vs `bootstrap-selfhost-compile-smoke-probe.sh` ([#2176](https://github.com/PurHur/php-compiler/issues/2176)); set `1` when editing M3 docs/scripts; flip default-on after [#2165](https://github.com/PurHur/php-compiler/issues/2165) |
 | `BOOTSTRAP_M5_DOC_SYNC_GATE` | `1` | `ci-fast.sh` (`ci_run_inventory_checks`) | `script/check-bootstrap-m5-doc-sync.php` — `docs/bootstrap-m5-fast-path.md` vs `script/m3-allowlist-snapshot.txt` ([#1984](https://github.com/PurHur/php-compiler/issues/1984)); set `0` for doc-only iteration |

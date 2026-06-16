@@ -41,6 +41,6 @@ final class ob_gzhandler extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        throw new \LogicException('ob_gzhandler() is not implemented for JIT in this compiler build');
+        return JitObGzhandler::invoke($context, ...$args);
     }
 }

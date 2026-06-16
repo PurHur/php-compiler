@@ -21,10 +21,14 @@ final class ObOutput
         $i8p = $context->getTypeFromString('int8*');
         $sizeT = $context->getTypeFromString('size_t');
         $valuePtr = $context->getTypeFromString('__value__*');
+        $strPtr = $context->getTypeFromString('__string__*');
         $doubleTy = $context->getTypeFromString('double');
 
         $decls = [
             '__phpc_ob_start' => [$void, false, []],
+            '__phpc_ob_start_with_gzhandler' => [$void, false, []],
+            '__compiler_ob_gzhandler' => [$strPtr, false, [$strPtr, $i64]],
+            '__phpc_ob_gzhandler_flush' => [$strPtr, false, [$strPtr]],
             '__phpc_ob_get_level' => [$i32, false, []],
             '__phpc_ob_buffer_used_at' => [$i64, false, [$i64]],
             '__phpc_ob_get_clean' => [$i32, false, [$valuePtr]],

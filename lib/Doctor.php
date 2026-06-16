@@ -175,6 +175,7 @@ final class Doctor
         $spineCountSyncDefault = $defaults['SELFHOST_SPINE_COUNT_SYNC_GATE'] ?? '1';
         $spineCoverageDefault = $defaults['SELFHOST_SPINE_COVERAGE_SYNC_GATE'] ?? '1';
         $spineDeferredDefault = $defaults['SELFHOST_SPINE_DEFERRED_SYNC_GATE'] ?? '1';
+        $spineSidecarDefault = $defaults['SELFHOST_SPINE_SIDECAR_SYNC_GATE'] ?? '1';
         $loopProbeDefault = $defaults['BOOTSTRAP_LOOP_PROBE_GATE'] ?? '0';
         $m4LoopProbeDefault = $defaults['BOOTSTRAP_M4_LOOP_PROBE'] ?? '0';
         $m4Gen2SyncDefault = $defaults['SELFHOST_M4_GEN2_SYNC_GATE'] ?? '1';
@@ -206,6 +207,8 @@ final class Doctor
         fwrite(STDOUT, "   SELFHOST_SPINE_COUNT_SYNC_GATE=".(self::gateEnabled('SELFHOST_SPINE_COUNT_SYNC_GATE', $spineCountSyncDefault) ? '1' : '0')." (default {$spineCountSyncDefault})\n");
         fwrite(STDOUT, "   SELFHOST_SPINE_COVERAGE_SYNC_GATE=".(self::gateEnabled('SELFHOST_SPINE_COVERAGE_SYNC_GATE', $spineCoverageDefault) ? '1' : '0')." (default {$spineCoverageDefault})\n");
         fwrite(STDOUT, "   SELFHOST_SPINE_DEFERRED_SYNC_GATE=".(self::gateEnabled('SELFHOST_SPINE_DEFERRED_SYNC_GATE', $spineDeferredDefault) ? '1' : '0')." (default {$spineDeferredDefault})\n");
+        fwrite(STDOUT, "   SELFHOST_SPINE_SIDECAR_SYNC_GATE=".(self::gateEnabled('SELFHOST_SPINE_SIDECAR_SYNC_GATE', $spineSidecarDefault) ? '1' : '0')." (default {$spineSidecarDefault})\n");
+        fwrite(STDOUT, "   php script/check-selfhost-spine-sidecar-sync.php\n");
         fwrite(STDOUT, "   BOOTSTRAP_LIB_SPINE_SMOKE=1 make bootstrap-selfhost-lib-spine-smoke\n");
         fwrite(STDOUT, "   BOOTSTRAP_LIB_SPINE_VM_SMOKE=1 make bootstrap-selfhost-lib-spine-vm-smoke\n");
         fwrite(STDOUT, "   make bootstrap-selfhost-vm-driver-execute-probe\n");

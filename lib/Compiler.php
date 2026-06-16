@@ -6713,12 +6713,34 @@ class Compiler {
         return false;
     }
 
+    private const ISSET_EXPRESSION_COMPILE_ERROR =
+        'Cannot use isset() on the result of an expression (you can use "null !== expression" instead)';
+
+    /**
+     * Zend zend_compile.c zend_is_variable(): isset() operands must be variables, dims, or properties (#8802).
+     */
+    protected function assertIssetVariableOperand(Operand $operand, Block $block): void
+    {
+        if (null !== $this->findCoalescePropertyFetch($operand, $block)) {
+            return;
+        }
+        if (null !== $this->findCoalesceArrayDimFetch($operand, $block)) {
+            return;
+        }
+        if (null !== $this->unwrapVariableOperand($operand)) {
+            return;
+        }
+
+        $this->throwCompileError(self::ISSET_EXPRESSION_COMPILE_ERROR);
+    }
+
     /**
      * @return OpCode[]
      */
     protected function compileIsset(Op\Expr\Isset_ $expr, Block $block): array
     {
         assert(1 === count($expr->vars));
+        $this->assertIssetVariableOperand($expr->vars[0], $block);
         $resultSlot = $this->compileOperand($expr->result, $block, false);
         $propFetch = $this->findCoalescePropertyFetch($expr->vars[0], $block);
         $dimFetch = null !== $propFetch ? null : $this->findCoalesceArrayDimFetch($expr->vars[0], $block);
@@ -8380,6 +8402,7 @@ class Compiler {
         $vars = $expr->vars;
         $last = count($vars) - 1;
         foreach ($vars as $i => $var) {
+            $this->assertIssetVariableOperand($var, $block);
             $propFetch = $this->findCoalescePropertyFetch($var, $block);
             $dimFetch = null !== $propFetch ? null : $this->findCoalesceArrayDimFetch($var, $block);
             [$containerSlot, $dimSlot] = null !== $propFetch
@@ -8794,7 +8817,7 @@ class Compiler {
             if (
                 null !== $callIndex
                 && null !== $producerIndex
-                && $this->isAdjacentNestedFuncCallProducer($producer, $callOp, $producerIndex, $callIndex)
+                && $this->isNestedCallArgProducerForConsumer($producer, $callOp, $producerIndex, $callIndex, $block->orig->children)
             ) {
                 foreach ($this->compileExpr($producer, $block) as $op) {
                     $block->addOpCode($op);
@@ -8819,6 +8842,22 @@ class Compiler {
         if ($this->operandsReferToSameVariable($producer->result, $arg)) {
             return $producerSlot;
         }
+        // php-cfg uses distinct result/arg temps for `$f($a[0])` (#8814, zend_compile.c).
+        if ($producer instanceof Op\Expr\ArrayDimFetch) {
+            $callIndex = null;
+            $producerIndex = null;
+            foreach ($block->orig->children as $i => $child) {
+                if ($child === $callOp) {
+                    $callIndex = $i;
+                }
+                if ($child === $producer) {
+                    $producerIndex = $i;
+                }
+            }
+            if (null !== $callIndex && null !== $producerIndex && $producerIndex === $callIndex - 1) {
+                return $producerSlot;
+            }
+        }
         // php-cfg `f(g())` uses distinct result/arg temporaries (#8561, #7075).
         if (
             $producer instanceof Op\Expr\FuncCall
@@ -8839,7 +8878,7 @@ class Compiler {
             if (
                 null !== $callIndex
                 && null !== $producerIndex
-                && $this->isAdjacentNestedFuncCallProducer($producer, $callOp, $producerIndex, $callIndex)
+                && $this->isNestedCallArgProducerForConsumer($producer, $callOp, $producerIndex, $callIndex, $block->orig->children)
             ) {
                 return $producerSlot;
             }
@@ -8925,10 +8964,7 @@ class Compiler {
                 if (null === $callArg || $this->isEmbeddedCallLiteralArg($callArg)) {
                     return null;
                 }
-                if (
-                    $callArg instanceof Operand\Temporary
-                    || $this->operandsReferToSameVariable($producers[0]->result, $callArg)
-                ) {
+                if ($this->operandsReferToSameVariable($producers[0]->result, $callArg)) {
                     return $producers[0];
                 }
             }
@@ -8944,8 +8980,44 @@ class Compiler {
 
             return null;
         }
+        if ($argCount > $producerCount) {
+            return $this->matchInlineCallArgProducerWithEmbeddedLiterals(
+                $producers,
+                $callArgs,
+                $argIndex
+            );
+        }
         if ($argIndex < $producerCount) {
             return $producers[$argIndex];
+        }
+
+        return null;
+    }
+
+    /**
+     * Map hoisted inline producers when php-cfg embeds literal call args (#8561, #8796).
+     *
+     * e.g. in_array(1, [1, 2, 3], true) — producers [Array_, ConstFetch] align to args 1 and 2, not 0.
+     *
+     * @param list<Op\Expr> $producers
+     * @param list<Operand> $callArgs
+     */
+    private function matchInlineCallArgProducerWithEmbeddedLiterals(
+        array $producers,
+        array $callArgs,
+        int $argIndex
+    ): ?Op\Expr {
+        if ($this->isEmbeddedCallLiteralArg($callArgs[$argIndex] ?? null)) {
+            return null;
+        }
+        $callArg = $callArgs[$argIndex] ?? null;
+        if (null === $callArg) {
+            return null;
+        }
+        foreach ($producers as $producer) {
+            if ($this->operandsReferToSameVariable($producer->result, $callArg)) {
+                return $producer;
+            }
         }
 
         return null;
@@ -9119,6 +9191,15 @@ class Compiler {
             if (!$child instanceof Op\Expr || !$this->isInlineExprCallArgProducer($child)) {
                 break;
             }
+            if (
+                ($child instanceof Op\Expr\ArrowFunction || $child instanceof Op\Expr\Closure)
+                && $callOp instanceof Op\Expr\FuncCall
+                && property_exists($callOp, 'name')
+                && ($callOp->name === $child->result
+                    || $this->operandsReferToSameVariable($callOp->name, $child->result))
+            ) {
+                continue;
+            }
             if ($child instanceof Op\Expr\ConstFetch) {
                 $next = $cfgChildren[$i + 1] ?? null;
                 if (
@@ -9131,11 +9212,17 @@ class Compiler {
             if (
                 ($child instanceof Op\Expr\FuncCall || $child instanceof Op\Expr\NsFuncCall)
                 && !$this->inlineCallArgProducerFeedsConsumer($child, $callOp)
-                && !$this->isAdjacentNestedFuncCallProducer($child, $callOp, $i, $callIndex)
+                && !$this->isNestedCallArgProducerForConsumer($child, $callOp, $i, $callIndex, $cfgChildren)
             ) {
                 break;
             }
             array_unshift($producers, $child);
+            if (
+                ($child instanceof Op\Expr\FuncCall || $child instanceof Op\Expr\NsFuncCall)
+                && $this->isNestedCallArgProducerForConsumer($child, $callOp, $i, $callIndex, $cfgChildren)
+            ) {
+                break;
+            }
             if ($child instanceof Op\Expr\Array_) {
                 break;
             }
@@ -9147,7 +9234,48 @@ class Compiler {
     /**
      * php-cfg `f(g())` may lower to adjacent FuncCalls with distinct result/arg temporaries
      * (`strlen(trim($s))` → trim #6, strlen arg #7) (#8561, bootstrap-aot trim).
+     *
+     * Also `(fn($x) => ...)(g())` where php-cfg inserts the closure callee between nested calls (#8836).
+     *
+     * @param list<Op> $cfgChildren
      */
+    private function isNestedCallArgProducerForConsumer(
+        Op\Expr $producer,
+        Op $consumer,
+        int $producerIndex,
+        int $consumerIndex,
+        array $cfgChildren
+    ): bool {
+        if ($this->isAdjacentNestedFuncCallProducer($producer, $consumer, $producerIndex, $consumerIndex)) {
+            return true;
+        }
+        if ($producerIndex + 2 !== $consumerIndex) {
+            return false;
+        }
+        if (
+            !$producer instanceof Op\Expr\FuncCall
+            && !$producer instanceof Op\Expr\NsFuncCall
+        ) {
+            return false;
+        }
+        if (
+            !$consumer instanceof Op\Expr\FuncCall
+            && !$consumer instanceof Op\Expr\NsFuncCall
+        ) {
+            return false;
+        }
+        $callee = $cfgChildren[$producerIndex + 1] ?? null;
+        if (!$callee instanceof Op\Expr\ArrowFunction && !$callee instanceof Op\Expr\Closure) {
+            return false;
+        }
+        if (!property_exists($consumer, 'name')) {
+            return false;
+        }
+
+        return $consumer->name === $callee->result
+            || $this->operandsReferToSameVariable($consumer->name, $callee->result);
+    }
+
     private function isAdjacentNestedFuncCallProducer(
         Op\Expr $producer,
         Op $consumer,
@@ -10102,11 +10230,40 @@ class Compiler {
         $children = $block->orig->children;
         $preceding = $this->precedingClassConstFetchesBeforeCfgOp($children, $callOp);
         if (($preceding[$argIndex] ?? null) === $fetch) {
+            $callArg = $callOp->args[$argIndex] ?? null;
+            if ($this->isUnrelatedEnumFetchCallArg($callArg, $fetch)) {
+                return false;
+            }
+
             return true;
         }
         $hoisted = $this->classConstFetchForHoistedDeadPrelude($callOp, $argIndex, $block);
+        if ($hoisted !== $fetch) {
+            return false;
+        }
+        $callArg = $callOp->args[$argIndex] ?? null;
 
-        return $hoisted === $fetch;
+        return !$this->isUnrelatedEnumFetchCallArg($callArg, $fetch);
+    }
+
+    /**
+     * Hoisted enum fetches must not bind to unrelated call-arg slots (pack('i', E::A); #8816, stream_set_timeout($fp, E::A); #6147).
+     */
+    private function isUnrelatedEnumFetchCallArg(?Operand $callArg, Op\Expr\ClassConstFetch $fetch): bool
+    {
+        if (null === $callArg) {
+            return true;
+        }
+        if ($this->operandsReferToSameVariable($fetch->result, $callArg)) {
+            return false;
+        }
+        $root = $this->unwrapOperandChain($callArg);
+        if ($root instanceof Op\Expr\ClassConstFetch) {
+            return $root !== $fetch
+                && !$this->operandsReferToSameVariable($fetch->result, $root->result);
+        }
+
+        return true;
     }
 
     /**

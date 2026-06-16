@@ -17,6 +17,10 @@ final class SettypeBackedEnumVMTest extends BaseTest
             __DIR__.'/cases/stdlib/settype_backed_enum.phpt',
             'settype_backed_enum.phpt'
         );
+        yield 'settype_backed_enum_int.phpt' => self::parsePHPT(
+            __DIR__.'/cases/stdlib/settype_backed_enum_int.phpt',
+            'settype_backed_enum_int.phpt'
+        );
     }
 
     public function setUp(): void

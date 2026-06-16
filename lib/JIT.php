@@ -4565,7 +4565,7 @@ class JIT {
             return $this->emitM3EmitTuRuntimeConstructNativeFunction($internalName, $logicalName, $block);
         }
         if (str_ends_with($lower, '\\runtime::initvmcontext')) {
-            return $this->emitM3EmitTuRuntimeInitVoidStub($internalName, $logicalName, $block);
+            return $this->compileRuntimeInitVmContextM3Native($internalName, $block, $logicalName);
         }
         if (
             str_ends_with($lower, '\\runtime::initparsepipeline')
@@ -9440,6 +9440,7 @@ class JIT {
                         && Variable::TYPE_STRING !== $declaredJitType
                         && Variable::TYPE_NATIVE_BOOL !== $declaredJitType
                         && Variable::TYPE_NATIVE_DOUBLE !== $declaredJitType
+                        && Variable::TYPE_HASHTABLE !== $declaredJitType
                     ) {
                         $declaredJitType = $this->context->type->object->externalPropertyJitType(
                             $className,

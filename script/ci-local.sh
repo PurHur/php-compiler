@@ -149,4 +149,5 @@ if ci_llvm_ready; then
   ci_run_examples_serve_jit_smoke
   ci_run_examples_aot_smoke
   ci_run_deploy_smoke
+  ci_run_bootstrap_wave_check_vendor_absent
 fi

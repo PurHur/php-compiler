@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace PHPCompiler\VM;
 
 use PHPCompiler\Frame;
+use PHPCompiler\RuntimeStrictness;
 
 /**
  * Backed enum case singleton objects (#3518, Zend zend_enum.c parity).
@@ -789,6 +790,34 @@ final class EnumCaseSupport
         }
 
         return null;
+    }
+
+    /**
+     * pack() numeric operand — TypeError under php-src-strict (#8816, #6267); else E_WARNING + backing scalar (#5713).
+     *
+     * @throws \TypeError when $value is an enum case and php-src-strict is active
+     */
+    public static function packRejectNumericOperand(
+        Variable $value,
+        int $valueArgIndexZeroBased,
+        string $expectedType
+    ): void {
+        if (!RuntimeStrictness::isPhpSrcStrict()) {
+            return;
+        }
+        $entry = self::enumCaseEntryForVariable($value);
+        if (null === $entry) {
+            return;
+        }
+        $argNum = $valueArgIndexZeroBased + 2;
+        $given = $entry->enumClass->name;
+
+        throw new \TypeError(sprintf(
+            'pack(): Argument #%d ($values) must be of type %s, %s given',
+            $argNum,
+            $expectedType,
+            $given
+        ));
     }
 
     /**

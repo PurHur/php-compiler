@@ -5,14 +5,17 @@ declare(strict_types=1);
 namespace PHPCompiler\Compiler;
 
 use PHPCfg\Op;
+use PHPCfg\Op\Expr\ArrowFunction;
+use PHPCfg\Op\Expr\Closure;
 use PHPCfg\Op\Expr\FuncCall;
 use PHPCfg\Op\Expr\MethodCall;
 use PHPCfg\Op\Expr\StaticCall;
 use PHPCfg\Op\Expr\Throw_;
 use PHPCfg\Script;
+use PHPCfg\Op\Terminal\Const_ as ConstTerminal;
 
 /**
- * Reject disallowed expressions in class/enum constant initializers (#6580, #6843).
+ * Reject disallowed expressions in constant initializers (#6580, #6843, #8809).
  *
  * php-src: Zend/zend_ast.c — zend_ast_validate(); Zend/zend_compile.c zend_compile_const_expr().
  * Distinct from runtime throw expressions (#3802) and property/param defaults (#3803).
@@ -25,6 +28,10 @@ final class ThrowInClassConstCompileCheck
     {
         $check = new self();
         foreach ($script->main->cfg->children as $child) {
+            if ($child instanceof ConstTerminal) {
+                $check->walkOps($child->valueBlock->children ?? []);
+                continue;
+            }
             if ($child instanceof Op\Stmt\Class_
                 || $child instanceof Op\Stmt\Interface_
                 || $child instanceof Op\Stmt\Trait_
@@ -51,6 +58,8 @@ final class ThrowInClassConstCompileCheck
     {
         foreach ($ops as $op) {
             if ($op instanceof Throw_
+                || $op instanceof Closure
+                || $op instanceof ArrowFunction
                 || $op instanceof FuncCall
                 || $op instanceof MethodCall
                 || $op instanceof StaticCall

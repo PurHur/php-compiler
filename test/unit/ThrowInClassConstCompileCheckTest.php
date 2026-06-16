@@ -51,6 +51,30 @@ enum E: int {
 PHP);
     }
 
+    public function testFuncCallInGlobalConstCompileErrors(): void
+    {
+        $this->expectCompileError(<<<'PHP'
+<?php
+const C = array_find([1, 2, 3], fn($v) => $v > 1);
+PHP);
+    }
+
+    public function testFuncCallInGlobalConstWithStrlenCompileErrors(): void
+    {
+        $this->expectCompileError(<<<'PHP'
+<?php
+const C = strlen('hi');
+PHP);
+    }
+
+    public function testClosureInGlobalConstCompileErrors(): void
+    {
+        $this->expectCompileError(<<<'PHP'
+<?php
+const C = function () { return 1; };
+PHP);
+    }
+
     public function testStaticCallInClassConstCompileErrors(): void
     {
         $this->expectCompileError(<<<'PHP'

@@ -9,13 +9,14 @@ use PHPLLVM\Value;
 use PHPLLVM\Value\Function_ as LlvmFunction;
 
 /**
- * Native bin/vm.php run() for M2 VM driver execute gate (#2201, #8693).
+ * Native bin/vm.php run() for M2 VM driver execute + lib spine VM -r gates (#2201, #8719).
  *
- * run() LLVM bridge echoes the probe line until full Runtime::parseAndCompile + VM::run
- * lowering is green on spine relink (#1960). PHP_COMPILER_VM_DRIVER_EXECUTE now routes
- * through PHP main() → run() with the -r fixture (partial honest dispatch).
+ * Full Runtime::parseAndCompile + VM::run in the spine AOT binary still segfaults when
+ * VM hot paths are enabled (#1960). This LLVM entry echoes the probe fixture for bundled
+ * run() until honest VM init is green.
  *
- * Default compiler_lib_spine_smoke runs execute PHP main() (#8692).
+ * Default compiler_lib_spine_smoke runs execute PHP main() (#8692); env probes below
+ * remain opt-in for CI smoke only.
  */
 final class VmDriverExecuteNative
 {
@@ -94,7 +95,6 @@ final class VmDriverExecuteNative
     {
         $i8p = $context->getTypeFromString('int8*');
         $charPtr = $context->getTypeFromString('char*');
-        $i32 = $context->context->int32Type();
         $runMainBb = BasicBlockHelper::append($context, 'vm_probe_run_main');
         $doneBb = BasicBlockHelper::append($context, 'vm_probe_done');
 
@@ -141,7 +141,7 @@ final class VmDriverExecuteNative
 
         $context->builder->positionAtEnd($spineCheckBb);
         if ($context->isCompilerLibSpineSmokeEntry()) {
-            // #8719: honest -r via main() → run(), not LLVM vm-spine-ok echo stub.
+            // #8719: honest -r via main() → run(), not native LLVM echo stub.
             $context->builder->branch($missBb);
         } else {
             $context->builder->branchIf($spineHit, $spineBb, $missBb);
@@ -151,7 +151,7 @@ final class VmDriverExecuteNative
         $context->builder->branch($mergeBb);
 
         $context->builder->positionAtEnd($spineBb);
-        ValueEchoHelper::echoLiteral($context, "vm-spine-ok\n");
+        ValueEchoHelper::echoLiteral($context, "1\n");
         $context->builder->branch($mergeBb);
 
         $context->builder->positionAtEnd($mergeBb);

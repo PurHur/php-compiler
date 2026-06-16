@@ -480,6 +480,50 @@ final class CiScriptsTest extends TestCase
         $this->assertStringContainsString('.phpc/smoke', $body);
     }
 
+    public function testReleaseReadinessScriptExistsAndJsonSchema(): void
+    {
+        $repoRoot = dirname(__DIR__, 2);
+        $script = $repoRoot.'/script/release-readiness.sh';
+        $this->assertFileExists($script);
+        $this->assertTrue(is_executable($script));
+        $body = (string) file_get_contents($script);
+        $this->assertStringContainsString('--full', $body);
+        $this->assertStringContainsString('--json', $body);
+        $this->assertStringContainsString('user_release_ready', $body);
+        $this->assertStringContainsString('bootstrap-inventory.php --check', $body);
+        $this->assertStringContainsString('check-selfhost-spine-coverage-sync.php', $body);
+        $this->assertStringContainsString('check-root-readme-sync.php', $body);
+        $this->assertStringContainsString('examples-aot-smoke.sh', $body);
+        $this->assertStringContainsString('examples-web-smoke.sh', $body);
+        $this->assertStringContainsString('RELEASE_READINESS_CI_FAST', $body);
+        $this->assertStringContainsString('#8737', $body);
+
+        $doc = (string) file_get_contents($repoRoot.'/docs/local-ci-matrix.md');
+        $this->assertStringContainsString('release-readiness.sh', $doc);
+        $this->assertStringContainsString('user_release_ready', $doc);
+
+        $this->assertFileExists($repoRoot.'/CHANGELOG.md');
+        $changelog = (string) file_get_contents($repoRoot.'/CHANGELOG.md');
+        $this->assertMatchesRegularExpression('/^## v1\.1\.0\b/m', $changelog);
+
+        $cmd = 'bash '.escapeshellarg($script).' --json --dry-run 2>/dev/null';
+        $raw = shell_exec($cmd);
+        $this->assertIsString($raw);
+        $payload = json_decode($raw, true);
+        $this->assertIsArray($payload);
+        $this->assertArrayHasKey('user_release_ready', $payload);
+        $this->assertContains($payload['user_release_ready'], ['yes', 'no']);
+        $this->assertSame('quick', $payload['mode'] ?? null);
+        $this->assertArrayHasKey('gates', $payload);
+        $this->assertIsArray($payload['gates']);
+        $this->assertNotEmpty($payload['gates']);
+        foreach ($payload['gates'] as $gate) {
+            $this->assertArrayHasKey('name', $gate);
+            $this->assertArrayHasKey('status', $gate);
+            $this->assertArrayHasKey('message', $gate);
+        }
+    }
+
     public function testDeploySmokeScriptExists(): void
     {
         $script = dirname(__DIR__, 2).'/script/deploy-smoke.sh';
@@ -1127,6 +1171,35 @@ final class CiScriptsTest extends TestCase
         $this->assertStringContainsString('#2202', $doc);
     }
 
+    public function testCiDefaultsEnvDefinesSelfhostSpineSidecarSyncGateOn(): void
+    {
+        $defaults = (string) file_get_contents(dirname(__DIR__, 2).'/script/ci-defaults.env');
+        $this->assertStringContainsString('SELFHOST_SPINE_SIDECAR_SYNC_GATE="${SELFHOST_SPINE_SIDECAR_SYNC_GATE:-1}"', $defaults);
+    }
+
+    public function testCiFastRunsSelfhostSpineSidecarSyncViaInventoryChecks(): void
+    {
+        $common = (string) file_get_contents(dirname(__DIR__, 2).'/script/ci-common.sh');
+        $this->assertStringContainsString('ci_run_selfhost_spine_sidecar_sync_check', $common);
+        $this->assertStringContainsString('check-selfhost-spine-sidecar-sync.php', $common);
+        $this->assertStringContainsString('SELFHOST_SPINE_SIDECAR_SYNC_GATE:-0', $common);
+    }
+
+    public function testCiDockerRunPassesSelfhostSpineSidecarSyncGateDefaultOn(): void
+    {
+        $body = (string) file_get_contents(dirname(__DIR__, 2).'/script/ci-docker-run.sh');
+        $this->assertStringContainsString('SELFHOST_SPINE_SIDECAR_SYNC_GATE=${SELFHOST_SPINE_SIDECAR_SYNC_GATE:-1}', $body);
+    }
+
+    public function testLocalCiMatrixDocumentsSelfhostSpineSidecarSyncGate(): void
+    {
+        $doc = (string) file_get_contents(dirname(__DIR__, 2).'/docs/local-ci-matrix.md');
+        $this->assertStringContainsString('SELFHOST_SPINE_SIDECAR_SYNC_GATE', $doc);
+        $this->assertStringContainsString('check-selfhost-spine-sidecar-sync.php', $doc);
+        $this->assertMatchesRegularExpression('/\| `SELFHOST_SPINE_SIDECAR_SYNC_GATE` \| `1` \|/', $doc);
+        $this->assertStringContainsString('#8703', $doc);
+    }
+
     public function testCiDefaultsEnvDefinesM3AllowlistSyncGateOn(): void
     {
         $defaults = (string) file_get_contents(dirname(__DIR__, 2).'/script/ci-defaults.env');
@@ -1706,16 +1779,33 @@ final class CiScriptsTest extends TestCase
         $local = (string) file_get_contents(dirname(__DIR__, 2).'/script/ci-local.sh');
         $this->assertStringContainsString('ci_run_bootstrap_wave_check', $local);
         $this->assertStringContainsString('BOOTSTRAP_WAVE_CHECK:-1', $local);
+        $this->assertStringContainsString('ci_run_bootstrap_wave_check_vendor_absent', $local);
 
         $common = (string) file_get_contents(dirname(__DIR__, 2).'/script/ci-common.sh');
         $this->assertStringContainsString('BOOTSTRAP_WAVE_CHECK', $common);
         $this->assertStringContainsString('BOOTSTRAP_WAVE_CHECK:-1', $common);
         $this->assertStringContainsString('bootstrap-wave-check.sh', $common);
         $this->assertStringContainsString('--fail-fast', $common);
+        $this->assertStringContainsString('ci_run_bootstrap_wave_check_vendor_absent', $common);
+        $this->assertStringContainsString('BOOTSTRAP_WAVE_CHECK_VENDOR_ABSENT_GATE:-1', $common);
+        $this->assertStringContainsString('BOOTSTRAP_WAVE_CHECK_VENDOR_ABSENT:-1', $common);
+        $this->assertStringContainsString('--vendor-absent', $common);
+
+        $wave = (string) file_get_contents(dirname(__DIR__, 2).'/script/bootstrap-wave-check.sh');
+        $this->assertStringContainsString('--vendor-absent', $wave);
+        $this->assertStringContainsString('VENDOR_TREE_ABSENT=1', $wave);
+        $this->assertStringContainsString('wave_check_restore_vendor', $wave);
 
         $fast = (string) file_get_contents(dirname(__DIR__, 2).'/script/ci-fast.sh');
         $this->assertStringContainsString('CI_FAST_BOOTSTRAP', $fast);
         $this->assertStringContainsString('ci_run_bootstrap_wave_check', $fast);
+        $this->assertStringContainsString('ci_run_bootstrap_wave_check_vendor_absent', $fast);
+
+        $defaults = (string) file_get_contents(dirname(__DIR__, 2).'/script/ci-defaults.env');
+        $this->assertStringContainsString(
+            'BOOTSTRAP_WAVE_CHECK_VENDOR_ABSENT_GATE="${BOOTSTRAP_WAVE_CHECK_VENDOR_ABSENT_GATE:-1}"',
+            $defaults
+        );
     }
 
     public function testCiLocalHonorsBootstrapM3StrictGate(): void
@@ -2273,6 +2363,8 @@ final class CiScriptsTest extends TestCase
     {
         $doc = (string) file_get_contents(dirname(__DIR__, 2).'/docs/local-ci-matrix.md');
         $this->assertStringContainsString('BOOTSTRAP_WAVE_CHECK', $doc);
+        $this->assertStringContainsString('BOOTSTRAP_WAVE_CHECK_VENDOR_ABSENT_GATE', $doc);
+        $this->assertStringContainsString('BOOTSTRAP_WAVE_CHECK_VENDOR_ABSENT', $doc);
         $this->assertStringContainsString('CI_FAST_BOOTSTRAP', $doc);
         $this->assertStringContainsString('test-fast-bootstrap', $doc);
     }
@@ -2284,6 +2376,7 @@ final class CiScriptsTest extends TestCase
         $this->assertStringContainsString('Wave gate in full CI', $doc);
         $this->assertStringContainsString('default-on when LLVM 9 present', $doc);
         $this->assertStringContainsString('BOOTSTRAP_WAVE_CHECK=0', $doc);
+        $this->assertStringContainsString('BOOTSTRAP_WAVE_CHECK_VENDOR_ABSENT=0', $doc);
     }
 
     public function testInstallLlvm14ScriptMirrorsLlvm9Layout(): void

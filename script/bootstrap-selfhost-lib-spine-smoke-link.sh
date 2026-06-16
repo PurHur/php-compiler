@@ -129,11 +129,24 @@ if [[ "${BOOTSTRAP_LIB_SPINE_SMOKE_USE_COMPILE_INVOKE:-0}" != "1" ]]; then
     echo "bootstrap-selfhost-lib-spine-smoke-link: compile invoker=${SPINE_COMPILE_DRIVER} (no vendor/ tree)" >&2
   else
     # Emit-helper build/bin-compile-aot (gen-2 spine) must not masquerade as inventory argv driver (#3012).
-    if ! bootstrap_ensure_inventory_argv_driver "${INVENTORY_ARGV_DRIVER}"; then
-      echo "bootstrap-selfhost-lib-spine-smoke-link: failed to ensure inventory argv driver ${INVENTORY_ARGV_DRIVER}" >&2
-      exit 1
+    if bootstrap_ensure_inventory_argv_driver "${INVENTORY_ARGV_DRIVER}"; then
+      SPINE_COMPILE_DRIVER="${INVENTORY_ARGV_DRIVER}"
+    else
+      echo "bootstrap-selfhost-lib-spine-smoke-link: inventory argv driver unavailable (no Zend — #8716); resolving native driver" >&2
+      if ! bootstrap_resolve_compile_driver || [[ "${BOOTSTRAP_COMPILE_DRIVER_MODE:-}" != "native" ]]; then
+        echo "bootstrap-selfhost-lib-spine-smoke-link: building compiled argv driver (bootstrap-selfhost-driver-smoke) to avoid Zend fallback" >&2
+        if ! ./script/bootstrap-selfhost-driver-smoke.sh >/dev/null; then
+          echo "bootstrap-selfhost-lib-spine-smoke-link: failed to build compiled driver (see stderr above)" >&2
+          exit 1
+        fi
+        if ! bootstrap_resolve_compile_driver || [[ "${BOOTSTRAP_COMPILE_DRIVER_MODE:-}" != "native" ]]; then
+          echo "bootstrap-selfhost-lib-spine-smoke-link: compiled driver still missing after driver-smoke (would require Zend fallback)" >&2
+          exit 1
+        fi
+      fi
+      SPINE_COMPILE_DRIVER="${BOOTSTRAP_COMPILE_DRIVER}"
+      echo "bootstrap-selfhost-lib-spine-smoke-link: compile invoker=${SPINE_COMPILE_DRIVER} (inventory prelinked smoke failed — #8716)" >&2
     fi
-    SPINE_COMPILE_DRIVER="${INVENTORY_ARGV_DRIVER}"
   fi
 
   # Best-effort segfault breadcrumbs (written before invoking the native driver).
@@ -186,7 +199,7 @@ if [[ "${BOOTSTRAP_LIB_SPINE_SMOKE_USE_COMPILE_INVOKE:-0}" != "1" ]]; then
         echo "bootstrap-selfhost-lib-spine-smoke-link: compile failed with vendor/ absent (no Zend fallback — #3052)" >&2
         exit 1
       fi
-      if [[ "${BOOTSTRAP_LIB_SPINE_SMOKE_GEN0_FALLBACK:-1}" == "1" ]] && command -v php >/dev/null 2>&1; then
+      if [[ "${BOOTSTRAP_NO_ZEND_FALLBACK:-0}" != "1" && "${BOOTSTRAP_LIB_SPINE_SMOKE_GEN0_FALLBACK:-1}" == "1" ]] && command -v php >/dev/null 2>&1; then
         echo "bootstrap-selfhost-lib-spine-smoke-link: gen-0 Zend fallback (native argv driver blocked; #2967)" >&2
         rm -f "${OUT}"
         env PHP_COMPILER_SELFHOST_AOT=1 PHP_COMPILER_LIB_SPINE_BUNDLE=1 PHP_COMPILER_M3_SIDECAR_HOST=1 \
@@ -264,8 +277,18 @@ if [[ -n "${want_sha:-}" ]]; then
   fi
   prelinked_lib="${ROOT}/prelinked/bootstrap-gen0/compiler_lib_aot_blob"
   if [[ -f "${prelinked_lib}" ]] && cmp -s "${OUT}" "${prelinked_lib}"; then
-    echo "bootstrap-selfhost-lib-spine-smoke-link: output still byte-matches stale prelinked ${prelinked_lib} — refresh prelinked after honest emit (#8559)" >&2
-    exit 1
+    if [[ "${refresh_sidecar}" == "1" ]]; then
+      echo "bootstrap-selfhost-lib-spine-smoke-link: honest native emit byte-matches prelinked — refresh sidecar stamp (#8559/#8716)" >&2
+      cp -f "${OUT}" "${prelinked_lib}"
+      cp -f "${OUT}" "${ROOT}/prelinked/bootstrap-gen0/.m3_compiler_lib_aot_blob"
+      chmod +x "${prelinked_lib}" "${ROOT}/prelinked/bootstrap-gen0/.m3_compiler_lib_aot_blob"
+      if [[ -f "${ROOT}/build/.m3_compiler_lib_sidecar.sha" ]]; then
+        cp -f "${ROOT}/build/.m3_compiler_lib_sidecar.sha" "${ROOT}/prelinked/bootstrap-gen0/.m3_compiler_lib_sidecar.sha"
+      fi
+    else
+      echo "bootstrap-selfhost-lib-spine-smoke-link: output still byte-matches stale prelinked ${prelinked_lib} — refresh prelinked after honest emit (#8559)" >&2
+      exit 1
+    fi
   fi
 fi
 echo "bootstrap-selfhost-lib-spine-smoke-link: OK ${OUT}"

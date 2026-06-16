@@ -154,6 +154,8 @@ Rebuild of vendor `.o` uses literal `vendor/{package}` sources (bundle `require_
 
 Presenter: **`make north-star5-verify-fast`** (default) / `./script/north-star5-verify.sh --fast` ([#1492](https://github.com/PurHur/php-compiler/issues/1492)). Full ladder: `make north-star5-verify ARGS=--strict` ([#1416](https://github.com/PurHur/php-compiler/issues/1416)).
 
+**Vendor-absent wave-check in full CI:** `./script/ci-local.sh` ends the LLVM phase with `./script/bootstrap-wave-check.sh --vendor-absent --fail-fast` (default-on `BOOTSTRAP_WAVE_CHECK_VENDOR_ABSENT_GATE=1`, issue [#8712](https://github.com/PurHur/php-compiler/issues/8712)). Same lib-spine cold-boot slice as north-star5 step 4c; set `BOOTSTRAP_WAVE_CHECK_VENDOR_ABSENT=0` to skip on dev machines without committed prelinked `.o`.
+
 `lib/AOT/Linker.php::prelinkedVendorObjectPaths()` reads `object_ok` entries from the manifest. CI: `BOOTSTRAP_VENDOR_PRELINK_SYNC_GATE=1` (bundles); `BOOTSTRAP_VENDOR_PRELINK_GATE=1` for compile probe in wave-check (opt-in).
 
 **Stub policy:** shrink `PHP_COMPILER_SELFHOST_AOT` stubs on the **compile spine first** (`parseAndCompile` → `standalone` → `Compiler::compile`), not whole-tree at once.
@@ -175,6 +177,7 @@ Use these during LLVM/JIT iteration — avoid full spine relink unless you chang
 | `make bootstrap-gen0-refresh-sidecar` | minutes | Full spine link + copy `build/.m3_*` → `prelinked/bootstrap-gen0/` + manifest refresh ([#8704](https://github.com/PurHur/php-compiler/issues/8704)) |
 | `php script/bootstrap-inventory.php --check` | seconds | Inventory SSOT without LLVM |
 | `php script/check-selfhost-spine-coverage-sync.php` | seconds | Spine ↔ inventory coverage (**2643/2643**) |
+| `php script/check-selfhost-spine-sidecar-sync.php` | seconds | Prelinked gen-0 stamp ↔ spine entry SHA-1 ([#8703](https://github.com/PurHur/php-compiler/issues/8703)) |
 
 **Env flags**
 
@@ -182,4 +185,5 @@ Use these during LLVM/JIT iteration — avoid full spine relink unless you chang
 |------|------|
 | `BOOTSTRAP_VM_DRIVER_EXECUTE_PROBE_FULL_LINK=1` | VM probe must rebuild spine (post-entry edit, refresh gen-0) |
 | `BOOTSTRAP_FORCE_COMPILER_LIB_SIDECAR_REGEN=1` | Regenerate `build/.m3_compiler_lib_aot_blob` via Zend (slow) |
+| `BOOTSTRAP_ALLOW_STALE_SIDECAR=1` | Waive `check-selfhost-spine-sidecar-sync.php` during intentional gen-0 blob batch PRs only ([#8703](https://github.com/PurHur/php-compiler/issues/8703)) |
 | `BOOTSTRAP_M5_NO_ZEND=1` | Cold boot from prelinked gen-0 only ([#3053](https://github.com/PurHur/php-compiler/issues/3053)) |

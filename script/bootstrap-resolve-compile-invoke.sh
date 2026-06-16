@@ -21,6 +21,7 @@
 #   BOOTSTRAP_GEN0_ZEND_ONLY=1  — always php bin/compile.php (requires php on PATH)
 #   BOOTSTRAP_ALLOW_GEN0_ZEND=0 — refuse Zend when no native driver (empty build/)
 #   BOOTSTRAP_M5_NO_ZEND=1       — refuse Zend fallback (implies BOOTSTRAP_NO_ZEND_FALLBACK=1)
+#   BOOTSTRAP_NO_ZEND_FALLBACK=1 — refuse Zend on spine/M5 compile paths (#8716)
 #   BOOTSTRAP_USE_INVENTORY_DRIVER=1 — inventory argv driver only (#2894)
 set -euo pipefail
 
@@ -67,13 +68,23 @@ bootstrap_native_compile_output_ok() {
   grep -qE 'helloworld_compile_smoke: compile OK|compile_smoke_m3_emit: compile OK|bootstrap_loop_compile_smoke: gen-2 compile OK' <<< "${compile_out}"
 }
 
-# Inventory argv emit must materialize a real AOT binary (not stdout-only phantom success — #3046).
+# Inventory argv emit must materialize a real AOT binary (not stdout-only phantom success — #3046, #8709).
 bootstrap_inventory_argv_emit_output_ok() {
   local out=$1
   local out_bytes
-  [[ -f "${out}" && -x "${out}" ]] || return 1
+  if [[ ! -f "${out}" ]]; then
+    echo "bootstrap-inventory-argv-emit: missing -o output file: ${out} (#8709)" >&2
+    return 1
+  fi
+  if [[ ! -x "${out}" ]]; then
+    echo "bootstrap-inventory-argv-emit: -o output is not executable: ${out} (#8709)" >&2
+    return 1
+  fi
   out_bytes="$(wc -c <"${out}" 2>/dev/null || echo 0)"
-  [[ "${out_bytes}" =~ ^[0-9]+$ ]] && (( out_bytes > 0 ))
+  if [[ ! "${out_bytes}" =~ ^[0-9]+$ ]] || (( out_bytes <= 0 )); then
+    echo "bootstrap-inventory-argv-emit: -o output is empty (${out_bytes} bytes): ${out} (#8709)" >&2
+    return 1
+  fi
 }
 
 # Prelinked gen-0 argv drivers bake absolute /compiler/build/.m3_* sidecar paths at link time.
@@ -356,8 +367,9 @@ bootstrap_ensure_inventory_argv_driver() {
         return 0
       fi
     fi
-    if [[ "${BOOTSTRAP_M5_NO_ZEND:-0}" == "1" ]]; then
-      echo "bootstrap-ensure-inventory-argv-driver: BOOTSTRAP_M5_NO_ZEND=1 — prelinked inventory driver failed smoke (#3053)" >&2
+    if [[ "${BOOTSTRAP_M5_NO_ZEND:-0}" == "1" || "${BOOTSTRAP_NO_ZEND_FALLBACK:-0}" == "1" ]]; then
+      rm -f "${out}" "${root}/build/.m3_bin_compile_aot_blob"
+      echo "bootstrap-ensure-inventory-argv-driver: BOOTSTRAP_NO_ZEND_FALLBACK=1 — prelinked inventory driver failed smoke (#8716, #3053)" >&2
       return 1
     fi
   fi

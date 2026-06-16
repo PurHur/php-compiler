@@ -6,7 +6,7 @@ namespace PHPCompiler;
 
 use PHPUnit\Framework\TestCase;
 
-/** lzf_* JIT lowering via StringLzfJit — no VM-only throw in call() (#6384 phase 2). */
+/** lzf_* JIT lowering via LzfJitHelper — no native liblzf (#6384, #8805). */
 final class VmLzfJitRuntimeShrinkTest extends TestCase
 {
     public function testLzfCompressCallUsesJitLzf(): void
@@ -23,29 +23,29 @@ final class VmLzfJitRuntimeShrinkTest extends TestCase
         $this->assertStringNotContainsString('not implemented for JIT', $source);
     }
 
-    public function testStringLzfJitDeclaresRuntimeHelpers(): void
+    public function testStringLzfCompilesLzfJitHelper(): void
     {
-        $source = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/StringLzfJit.php');
-        $this->assertStringContainsString('__compiler_lzf_compress', $source);
-        $this->assertStringContainsString('__compiler_lzf_decompress', $source);
-        $this->assertStringContainsString('lzf_compress', $source);
-        $this->assertStringContainsString('lzf_decompress', $source);
+        $source = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/StringLzf.php');
+        $this->assertStringContainsString('LzfJitHelper::compress', $source);
+        $this->assertStringContainsString('LzfJitHelper::decompress', $source);
+        $this->assertStringNotContainsString('NativeDlopen', $source);
+        $this->assertStringNotContainsString('liblzf', $source);
     }
 
-    /** AOT link embeds bundled liblzf.a (llvm ld cannot -Wl,-rpath; #6384 bootstrap-aot-link). */
-    public function testLinkerUsesBundledLiblzfStaticArchive(): void
+    /** AOT link no longer embeds bundled liblzf (#8805). */
+    public function testLinkerDoesNotUseBundledLiblzf(): void
     {
         $linker = (string) file_get_contents(__DIR__.'/../../lib/AOT/Linker.php');
-        $this->assertStringContainsString('ensureBundledLiblzf', $linker);
-        $this->assertStringContainsString('bundledLiblzfLinkArg', $linker);
-        $this->assertStringContainsString('liblzf.a', $linker);
-        $this->assertDoesNotMatchRegularExpression(
-            "/private const RUNTIME_LINK_LIBS = '[^']*-llzf/",
-            $linker
-        );
+        $this->assertStringNotContainsString('ensureBundledLiblzf', $linker);
+        $this->assertStringNotContainsString('bundledLiblzfLinkArg', $linker);
+        $this->assertStringNotContainsString('liblzf.a', $linker);
+    }
 
-        $build = (string) file_get_contents(__DIR__.'/../../script/build-liblzf.sh');
-        $this->assertStringContainsString('liblzf.a', $build);
-        $this->assertStringContainsString('liblzf.so', $build);
+    public function testVmLzfUsesPurePhpCore(): void
+    {
+        $source = (string) file_get_contents(__DIR__.'/../../ext/lzf/VmLzf.php');
+        $this->assertStringContainsString('VmLzfCore::compress', $source);
+        $this->assertStringContainsString('VmLzfCore::decompress', $source);
+        $this->assertStringNotContainsString('VmLzfNative', $source);
     }
 }

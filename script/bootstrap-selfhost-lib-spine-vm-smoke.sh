@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
-# M2 lib spine VM -r smoke: reuse build/selfhost-lib-spine-smoke, run bin/vm.php -r echo path (#1846).
+# M2 lib spine VM -r smoke: reuse build/selfhost-lib-spine-smoke, run bin/vm.php run() echo fixture (#1846, #8719).
+# Expected stdout with PHP_COMPILER_VM_SPINE_SMOKE=1: single line "1" from <?php echo "1\n"; ?> via native run() bridge.
 set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 OUT="${ROOT}/build/selfhost-lib-spine-smoke"
@@ -25,7 +26,7 @@ fi
 
 test -x "${OUT}"
 out="$({ PHP_COMPILER_VM_SPINE_SMOKE=1 "${OUT}"; })"
-if ! grep -q '^1$' <<< "${out}"; then
+if ! grep -Fxq '1' <<< "${out}"; then
   echo "bootstrap-selfhost-lib-spine-vm-smoke: unexpected stdout (want 1 from -r echo fixture)" >&2
   printf '%s\n' "${out}" >&2
   exit 1
