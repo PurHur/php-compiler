@@ -953,6 +953,7 @@ require_once __DIR__.'/../../../ext/standard/VmSys.php';
 require_once __DIR__.'/../../../ext/standard/VmSysGetTempDirNative.php';
 require_once __DIR__.'/../../../ext/standard/VmSysGetloadavgNative.php';
 require_once __DIR__.'/../../../ext/standard/VmSyslog.php';
+require_once __DIR__.'/../../../ext/standard/VmTmpfilePure.php';
 require_once __DIR__.'/../../../ext/standard/VmTmpfileNative.php';
 require_once __DIR__.'/../../../ext/standard/VmUnamePure.php';
 require_once __DIR__.'/../../../ext/standard/VmUnameNative.php';
