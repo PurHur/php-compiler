@@ -35,6 +35,7 @@ Supporting fixes from #1402:
 | `php_compiler_cli_dispatch` / `php_compiler_cli_should_run_entry_driver` | On M3 allowlist; CLI driver dispatch without Zend |
 | `Runtime::parseAndCompile` / `parseAndCompileEmitSmoke` | On M3 allowlist when `PHP_COMPILER_M3_COMPILE_DRIVER=1` |
 | `Runtime::parse` / `Runtime::compile` / `compileEmitSmoke` | On M3 allowlist; compile-driver link OK (#1496) |
+| `Runtime::parse` / `prepareSourceForParser` stub | **Retired** on executable argv drivers when `PHP_COMPILER_EMIT_HELPER_LINK=1` + inventory/M4 argv gates — `shouldStubInventoryEmitParseCompileSpine()` false (#8706); mirrors `standalone` prelower gate |
 | `Runtime::loadJitContext` | PHP CFG via `compileRuntimeLoadJitContextM3Native` (separate FUNCDEF from `loadJit` — #2846) |
 | `Runtime::__construct` | Slim ctor via `compileRuntimeConstructM3Native` → `compileBlockPhpLowering` (#1494) |
 | `Runtime::__destruct` | Void no-op via `compileRuntimeDestructM3Native` (#2867) |
@@ -187,3 +188,5 @@ Use these during LLVM/JIT iteration — avoid full spine relink unless you chang
 | `BOOTSTRAP_FORCE_COMPILER_LIB_SIDECAR_REGEN=1` | Regenerate `build/.m3_compiler_lib_aot_blob` via Zend (slow) |
 | `BOOTSTRAP_ALLOW_STALE_SIDECAR=1` | Waive `check-selfhost-spine-sidecar-sync.php` during intentional gen-0 blob batch PRs only ([#8703](https://github.com/PurHur/php-compiler/issues/8703)) |
 | `BOOTSTRAP_M5_NO_ZEND=1` | Cold boot from prelinked gen-0 only ([#3053](https://github.com/PurHur/php-compiler/issues/3053)) |
+| `PHP_COMPILER_EMIT_HELPER_LINK=1` + `PHP_COMPILER_M3_INVENTORY_EMIT_DRIVER=1` | Inventory argv emit-helper link; parse/CFG spine **real-lowers** (not stubbed) when `PHP_COMPILER_SELFHOST_AOT=1` or vendor-prelink executable emit ([#8706](https://github.com/PurHur/php-compiler/issues/8706)) |
+| `PHP_COMPILER_M4_BIN_COMPILE_DRIVER=1` | M4 `bin/compile.php` argv driver; parse spine real-lowers with emit-helper link ([#8706](https://github.com/PurHur/php-compiler/issues/8706)) |

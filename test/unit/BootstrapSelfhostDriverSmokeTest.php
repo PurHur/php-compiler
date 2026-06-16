@@ -142,4 +142,20 @@ final class BootstrapSelfhostDriverSmokeTest extends TestCase
         $this->assertStringContainsString('COMPILER_LIB_SIDECAR_REL', $branch);
         $this->assertStringContainsString('compilerLibSentinelBlock', $branch);
     }
+
+    /** Issue #8706: inventory emit-helper must not stub parse/CFG on executable argv drivers. */
+    public function testInventoryEmitParseSpineRetiredOnExecutableArgvDrivers(): void
+    {
+        $jit = (string) file_get_contents(self::$root.'/lib/JIT.php');
+        $this->assertStringContainsString('shouldStubInventoryEmitParseCompileSpine', $jit);
+        $this->assertStringContainsString('shouldUseVendorPrelinkExecutableEmit', $jit);
+        $this->assertStringContainsString(
+            'shouldUseM3CompileDriverMainNative() && $this->shouldUseEmitHelperLinkStubs()',
+            $jit
+        );
+        $this->assertStringNotContainsString(
+            '&& !$this->shouldUseSelfHostExecutableEmit()',
+            $jit
+        );
+    }
 }

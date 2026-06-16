@@ -616,13 +616,24 @@ class JIT {
     }
 
     /**
-     * Inventory emit-helper link stubs parse/compile for sidecar-only emit; self-host executable
-     * argv drivers must real-lower parse spine for native compile without sidecar (#2967, #3046).
+     * Inventory emit-helper link: parse/CFG spine stub retired on executable argv drivers (#8706).
+     * Mirror {@see shouldPrelowerRuntimeStandaloneForKeepObjectEmit} — gen-0/spine/inventory/M4
+     * argv links must real-lower Runtime::parse for honest native compile (#2967, #3046, #8708).
      */
     private function shouldStubInventoryEmitParseCompileSpine(): bool
     {
-        return $this->shouldStubInventoryEmitHelperBundledBodies()
-            && !$this->shouldUseSelfHostExecutableEmit();
+        if (!$this->shouldStubInventoryEmitHelperBundledBodies()) {
+            return false;
+        }
+        if ($this->shouldUseSelfHostExecutableEmit()
+            || $this->shouldUseVendorPrelinkExecutableEmit()
+            || $this->shouldUseM4BinCompileArgvMainNative()
+            || ($this->shouldUseM3CompileDriverMainNative() && $this->shouldUseEmitHelperLinkStubs())
+        ) {
+            return false;
+        }
+
+        return true;
     }
 
     /**
