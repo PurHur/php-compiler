@@ -26,4 +26,12 @@ final class VmHrtimeNativeTest extends TestCase
         [$sec, $nsec] = VmHrtimeNative::readMonotonic();
         $this->assertGreaterThan(0, $sec + $nsec);
     }
+
+    public function testParseUptimeRaw(): void
+    {
+        $this->assertSame([12, 345678901], VmHrtimeNative::parseUptimeRaw('12.345678901 4.56'));
+        $this->assertSame([1, 0], VmHrtimeNative::parseUptimeRaw('1.0 0.0'));
+        $this->assertNull(VmHrtimeNative::parseUptimeRaw(''));
+        $this->assertNull(VmHrtimeNative::parseUptimeRaw('nope'));
+    }
 }
