@@ -9028,8 +9028,7 @@ class Compiler {
      */
     private function findCoalesceStmtForCallArg(Operand $arg, Block $block): ?Op\Expr\BinaryOp\Coalesce
     {
-        $coalesce = $this->unwrapCoalesceExpr($arg);
-        if (null !== $coalesce) {
+        foreach ($this->findEmbeddedCoalesces($arg) as $coalesce) {
             return $coalesce;
         }
         if (null === $block->orig) {
@@ -9056,6 +9055,10 @@ class Compiler {
             foreach ($child->args as $callArg) {
                 if ($callArg === $arg || $this->operandsReferToSameVariable($callArg, $arg)) {
                     $argMatches = true;
+                    $root = $this->unwrapOperandChain($callArg);
+                    if ($root instanceof Op\Expr\BinaryOp\Coalesce) {
+                        return $root;
+                    }
                     break;
                 }
             }
@@ -9119,6 +9122,55 @@ class Compiler {
         return $coalesceSlot;
     }
 
+    private function resolvePropertyFetchCoalesceCallArgSlot(
+        Op\Expr\PropertyFetch $producer,
+        Op $callOp,
+        Operand $arg,
+        Block $block
+    ): ?int {
+        if (!property_exists($callOp, 'args') || !is_array($callOp->args)) {
+            return null;
+        }
+        foreach ($callOp->args as $callArg) {
+            foreach ($this->findEmbeddedCoalesces($callArg) as $coalesce) {
+                if ($this->findCoalescePropertyFetch($coalesce->left, $block) !== $producer) {
+                    continue;
+                }
+                $coalesceSlot = $this->slotForCoalesceResult($block, $coalesce);
+                if (null === $coalesceSlot) {
+                    $this->compileCoalesce($coalesce, $block);
+                    $coalesceSlot = $this->slotForCoalesceResult($block, $coalesce);
+                }
+                if (null !== $coalesceSlot) {
+                    return $coalesceSlot;
+                }
+            }
+            $root = $this->unwrapOperandChain($callArg);
+            if (
+                $root instanceof Op\Expr\BinaryOp\Coalesce
+                && $this->findCoalescePropertyFetch($root->left, $block) === $producer
+            ) {
+                $coalesceSlot = $this->slotForCoalesceResult($block, $root);
+                if (null === $coalesceSlot) {
+                    $this->compileCoalesce($root, $block);
+                    $coalesceSlot = $this->slotForCoalesceResult($block, $root);
+                }
+                if (null !== $coalesceSlot) {
+                    return $coalesceSlot;
+                }
+            }
+        }
+        $coalesceStmt = $this->findCoalesceStmtForCallArg($arg, $block);
+        if (
+            null !== $coalesceStmt
+            && $this->findCoalescePropertyFetch($coalesceStmt->left, $block) === $producer
+        ) {
+            return $this->compileCallArgCoalesceSlot($arg, $block);
+        }
+
+        return null;
+    }
+
     /**
      * @param list<Operand> $args
      */
@@ -9164,6 +9216,17 @@ class Compiler {
         $producer = $this->matchInlineCallArgProducer($producers, $callOp->args, $argIndex);
         if (null === $producer) {
             return null;
+        }
+        if ($producer instanceof Op\Expr\PropertyFetch) {
+            $coalesceSlot = $this->resolvePropertyFetchCoalesceCallArgSlot(
+                $producer,
+                $callOp,
+                $arg,
+                $block
+            );
+            if (null !== $coalesceSlot) {
+                return $coalesceSlot;
+            }
         }
         $producerSlot = $block->slotForOperand($producer->result);
         if (
@@ -9271,17 +9334,6 @@ class Compiler {
             }
         }
         if ($producer instanceof Op\Expr\PropertyFetch || $producer instanceof Op\Expr\StaticPropertyFetch) {
-            $coalesceStmt = $this->findCoalesceStmtForCallArg($arg, $block);
-            if (
-                null !== $coalesceStmt
-                && $producer instanceof Op\Expr\PropertyFetch
-                && $this->findCoalescePropertyFetch($coalesceStmt->left, $block) === $producer
-            ) {
-                $coalesceSlot = $this->compileCallArgCoalesceSlot($arg, $block);
-                if (null !== $coalesceSlot) {
-                    return $coalesceSlot;
-                }
-            }
             $callIndex = null;
             $producerIndex = null;
             foreach ($block->orig->children as $i => $child) {
