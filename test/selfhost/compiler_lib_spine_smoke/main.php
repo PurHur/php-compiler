@@ -1778,6 +1778,7 @@ require_once __DIR__.'/../../../lib/Compiler/AttributeMetadata.php';
 require_once __DIR__.'/../../../lib/Compiler/AttributeNames.php';
 require_once __DIR__.'/../../../lib/Compiler/AttributeTargetValidator.php';
 require_once __DIR__.'/../../../lib/Compiler/ClassCompileRegistry.php';
+require_once __DIR__.'/../../../lib/Compiler/ClassConstValueFold.php';
 require_once __DIR__.'/../../../lib/Compiler/CompileFatal.php';
 require_once __DIR__.'/../../../lib/Compiler/CompileTimeNew.php';
 require_once __DIR__.'/../../../lib/Compiler/DeprecatedMetadata.php';
@@ -1803,6 +1804,7 @@ require_once __DIR__.'/../../../lib/Compiler/ReadonlyClassCompileCheck.php';
 require_once __DIR__.'/../../../lib/Compiler/ReadonlyFunctionCompileCheck.php';
 require_once __DIR__.'/../../../lib/Compiler/SourceLocation.php';
 require_once __DIR__.'/../../../lib/Compiler/ThrowInClassConstCompileCheck.php';
+require_once __DIR__.'/../../../lib/Compiler/TraitClassConstConflictCheck.php';
 require_once __DIR__.'/../../../lib/Compiler/TraitCollisionCheck.php';
 require_once __DIR__.'/../../../lib/Compiler/TraitComposedMethodResolver.php';
 require_once __DIR__.'/../../../lib/Compiler/TypedClassConstInheritCheck.php';
@@ -2781,5 +2783,17 @@ if (is_string($vmSpineSmoke) && ('1' === $vmSpineSmoke || 'true' === strtolower(
     run('Standard input code', '<?php echo "1\n";', []);
     exit(0);
 }
+
+// M2 spine unit: mb_encode/decode_mimeheader Vm + JIT inventory (#8697).
+$__spineMimeSample = 'Hello 世界';
+$__spineMimeEnc = \PHPCompiler\ext\mbstring\VmMbstring::encodeMimeheader(
+    $__spineMimeSample,
+    'UTF-8',
+    true,
+    "\r\n",
+    0
+);
+$__spineMimeDec = \PHPCompiler\ext\mbstring\VmMbstring::decodeMimeheader($__spineMimeEnc);
+unset($__spineMimeSample, $__spineMimeEnc, $__spineMimeDec);
 
 echo "compiler_lib_spine_smoke bundle OK\n";
