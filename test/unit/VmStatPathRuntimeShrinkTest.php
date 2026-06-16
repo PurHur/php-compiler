@@ -56,11 +56,11 @@ final class VmStatPathRuntimeShrinkTest extends TestCase
         }
     }
 
-    public function testVmStatPathUsesStatCacheAndAccessNative(): void
+    public function testVmStatPathUsesStatCacheAndAccessPure(): void
     {
         $source = (string) file_get_contents(__DIR__.'/../../ext/standard/VmStatPath.php');
         $this->assertStringContainsString('VmStatCache::stat', $source);
-        $this->assertStringContainsString('VmFsAccessNative::access', $source);
+        $this->assertStringContainsString('VmFsAccessPure::', $source);
     }
 
     public function testVmStatPathMatchesSysTempDirWhenFfiAvailable(): void

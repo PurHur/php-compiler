@@ -79,6 +79,27 @@ final class JitStat
     /** X_OK for access(2) — execute permission (POSIX) */
     private const ACCESS_X_OK = 1;
 
+    private const S_IRUSR = 0x0100;
+
+    private const S_IWUSR = 0x0080;
+
+    private const S_IXUSR = 0x0040;
+
+    private const S_IRGRP = 0x0020;
+
+    private const S_IWGRP = 0x0010;
+
+    private const S_IXGRP = 0x0008;
+
+    private const S_IROTH = 0x0004;
+
+    private const S_IWOTH = 0x0002;
+
+    private const S_IXOTH = 0x0001;
+
+    /** php-src S_IXROOT */
+    private const S_IXROOT = self::S_IRUSR | self::S_IWUSR | self::S_IXUSR | self::S_IXGRP | self::S_IROTH | self::S_IXOTH;
+
     private static int $blockSerial = 0;
 
     public static function pathExists(Context $context, Value $str): Value
@@ -146,17 +167,10 @@ final class JitStat
 
     private static function pathAccessOk(Context $context, Value $str, int $mode): Value
     {
-        $map = $context->structFieldMap['__string__'];
-        $pathPtr = $context->builder->structGep($str, $map['value']);
+        $fn = self::ensurePathAccessStandalone($context);
         $i32 = $context->getTypeFromString('int32');
-        $ret = $context->builder->call(
-            $context->lookupFunction('access'),
-            $pathPtr,
-            $i32->constInt($mode, false)
-        );
-        $zero = $i32->constInt(0, false);
 
-        return $context->builder->icmp(Builder::INT_EQ, $ret, $zero);
+        return $context->builder->call($fn, $str, $i32->constInt($mode, false));
     }
 
     /** @return Value */
@@ -550,5 +564,343 @@ final class JitStat
             $str
         );
         $context->builder->branch($mergeBlock);
+    }
+
+    /** Stat mode + uid/gid access check — mirrors VmFsAccessPure (#8990). */
+    private static function ensurePathAccessStandalone(Context $context): Value
+    {
+        $name = '__phpc_jit_path_access_ok';
+        $existing = $context->module->getNamedFunction($name);
+        if (null !== $existing && $existing->countBasicBlocks() > 0) {
+            $context->registerFunction($name, $existing);
+
+            return $existing;
+        }
+
+        self::ensureLibcGetuid($context);
+        self::ensureLibcGetgid($context);
+        $gidInGroups = self::ensureGidInSupplementaryGroupsStandalone($context);
+
+        $strPtr = $context->getTypeFromString('__string__*');
+        $i32 = $context->getTypeFromString('int32');
+        $i1 = $context->getTypeFromString('int1');
+        $fn = $context->module->addFunction(
+            $name,
+            $context->context->functionType($i1, false, $strPtr, $i32)
+        );
+        $entry = $fn->appendBasicBlock('entry');
+        $saved = $context->builder;
+        $context->builder = $context->context->builderCreate();
+        $context->builder->positionAtEnd($entry);
+
+        $str = $fn->getParam(0);
+        $accessMode = $fn->getParam(1);
+        $map = $context->structFieldMap['__string__'];
+        $pathPtr = $context->builder->structGep($str, $map['value']);
+        $i8 = $context->getTypeFromString('int8');
+        $bufType = $i8->arrayType(self::STAT_BUF_SIZE);
+        $buf = $context->builder->alloca($bufType, 1, 'access_stat_buf');
+        $i8p = $context->getTypeFromString('int8*');
+        $bufPtr = $context->builder->pointerCast($buf, $i8p);
+        $statRet = $context->builder->call(
+            $context->lookupFunction('stat'),
+            $pathPtr,
+            $bufPtr
+        );
+        $i64 = $context->getTypeFromString('int64');
+        $zero = $i32->constInt(0, false);
+        $statFailed = $context->builder->icmp(Builder::INT_NE, $statRet, $zero);
+        $failBlock = $fn->appendBasicBlock('stat_fail');
+        $okBlock = $fn->appendBasicBlock('stat_ok');
+        $context->builder->branchIf($statFailed, $failBlock, $okBlock);
+
+        $context->builder->positionAtEnd($failBlock);
+        $context->builder->returnValue($i1->constInt(0, false));
+
+        $context->builder->positionAtEnd($okBlock);
+        $modePtr = $context->builder->pointerCast(
+            $context->builder->gep($bufPtr, $i64->constInt(self::STAT_MODE_OFFSET, false)),
+            $i32->pointerType(0)
+        );
+        $uidPtr = $context->builder->pointerCast(
+            $context->builder->gep($bufPtr, $i64->constInt(self::STAT_UID_OFFSET, false)),
+            $i32->pointerType(0)
+        );
+        $gidPtr = $context->builder->pointerCast(
+            $context->builder->gep($bufPtr, $i64->constInt(self::STAT_GID_OFFSET, false)),
+            $i32->pointerType(0)
+        );
+        $fileMode = $context->builder->load($modePtr);
+        $fileUid = $context->builder->load($uidPtr);
+        $fileGid = $context->builder->load($gidPtr);
+        $procUid = $context->builder->call($context->lookupFunction('getuid'));
+        $procGid = $context->builder->call($context->lookupFunction('getgid'));
+
+        $rmask = $i32->constInt(self::S_IROTH, false);
+        $wmask = $i32->constInt(self::S_IWOTH, false);
+        $xmask = $i32->constInt(self::S_IXOTH, false);
+
+        $isOwner = $context->builder->icmp(Builder::INT_EQ, $fileUid, $procUid);
+        $ownerBlock = $fn->appendBasicBlock('owner_masks');
+        $notOwnerBlock = $fn->appendBasicBlock('not_owner');
+        $context->builder->branchIf($isOwner, $ownerBlock, $notOwnerBlock);
+
+        $context->builder->positionAtEnd($ownerBlock);
+        $ownerRmask = $i32->constInt(self::S_IRUSR, false);
+        $ownerWmask = $i32->constInt(self::S_IWUSR, false);
+        $ownerXmask = $i32->constInt(self::S_IXUSR, false);
+        $afterOwnerBlock = $fn->appendBasicBlock('after_owner');
+        $context->builder->branch($afterOwnerBlock);
+
+        $context->builder->positionAtEnd($notOwnerBlock);
+        $isPrimaryGroup = $context->builder->icmp(Builder::INT_EQ, $fileGid, $procGid);
+        $inSupp = $context->builder->call($gidInGroups, $fileGid);
+        $isGroup = $context->builder->or($isPrimaryGroup, $inSupp);
+        $groupBlock = $fn->appendBasicBlock('group_masks');
+        $otherBlock = $fn->appendBasicBlock('other_masks');
+        $context->builder->branchIf($isGroup, $groupBlock, $otherBlock);
+
+        $context->builder->positionAtEnd($groupBlock);
+        $groupRmask = $i32->constInt(self::S_IRGRP, false);
+        $groupWmask = $i32->constInt(self::S_IWGRP, false);
+        $groupXmask = $i32->constInt(self::S_IXGRP, false);
+        $context->builder->branch($afterOwnerBlock);
+
+        $context->builder->positionAtEnd($otherBlock);
+        $context->builder->branch($afterOwnerBlock);
+
+        $context->builder->positionAtEnd($afterOwnerBlock);
+        $phiR = $context->builder->phi($i32);
+        $phiR->addIncoming($ownerRmask, $ownerBlock);
+        $phiR->addIncoming($groupRmask, $groupBlock);
+        $phiR->addIncoming($rmask, $otherBlock);
+        $phiW = $context->builder->phi($i32);
+        $phiW->addIncoming($ownerWmask, $ownerBlock);
+        $phiW->addIncoming($groupWmask, $groupBlock);
+        $phiW->addIncoming($wmask, $otherBlock);
+        $phiX = $context->builder->phi($i32);
+        $phiX->addIncoming($ownerXmask, $ownerBlock);
+        $phiX->addIncoming($groupXmask, $groupBlock);
+        $phiX->addIncoming($xmask, $otherBlock);
+
+        $rootUid = $i32->constInt(0, false);
+        $isRoot = $context->builder->icmp(Builder::INT_EQ, $procUid, $rootUid);
+        $rootBlock = $fn->appendBasicBlock('root');
+        $nonRootPermBlock = $fn->appendBasicBlock('non_root_perm');
+        $permBlock = $fn->appendBasicBlock('perm');
+        $context->builder->branchIf($isRoot, $rootBlock, $nonRootPermBlock);
+
+        $context->builder->positionAtEnd($rootBlock);
+        $isExecCheck = $context->builder->icmp(
+            Builder::INT_NE,
+            $context->builder->and($accessMode, $i32->constInt(self::ACCESS_X_OK, false)),
+            $zero
+        );
+        $rootTrueBlock = $fn->appendBasicBlock('root_true');
+        $rootExecBlock = $fn->appendBasicBlock('root_exec');
+        $context->builder->branchIf($isExecCheck, $rootExecBlock, $rootTrueBlock);
+        $context->builder->positionAtEnd($rootTrueBlock);
+        $context->builder->returnValue($i1->constInt(1, false));
+        $context->builder->positionAtEnd($rootExecBlock);
+        $isDir = $context->builder->icmp(
+            Builder::INT_EQ,
+            $context->builder->and($fileMode, $i32->constInt(self::S_IFMT, false)),
+            $i32->constInt(self::S_IFDIR, false)
+        );
+        $anyExecMask = $i32->constInt(self::S_IXUSR | self::S_IXGRP | self::S_IXOTH, false);
+        $hasExecBit = $context->builder->icmp(
+            Builder::INT_NE,
+            $context->builder->and($fileMode, $anyExecMask),
+            $zero
+        );
+        $rootExecAllowed = $context->builder->or($isDir, $hasExecBit);
+        $context->builder->returnValue($rootExecAllowed);
+
+        $context->builder->positionAtEnd($nonRootPermBlock);
+        $context->builder->branch($permBlock);
+
+        $context->builder->positionAtEnd($permBlock);
+        $isRead = $context->builder->icmp(
+            Builder::INT_NE,
+            $context->builder->and($accessMode, $i32->constInt(self::ACCESS_R_OK, false)),
+            $zero
+        );
+        $isWrite = $context->builder->icmp(
+            Builder::INT_NE,
+            $context->builder->and($accessMode, $i32->constInt(self::ACCESS_W_OK, false)),
+            $zero
+        );
+        $permMask = $context->builder->select($isRead, $phiR, $context->builder->select($isWrite, $phiW, $phiX));
+        $masked = $context->builder->and($fileMode, $permMask);
+        $allowed = $context->builder->icmp(Builder::INT_NE, $masked, $zero);
+        $context->builder->returnValue($allowed);
+
+        $context->builder->clearInsertionPosition();
+        $context->builder = $saved;
+        $context->registerFunction($name, $fn);
+
+        return $fn;
+    }
+
+    private static function ensureGidInSupplementaryGroupsStandalone(Context $context): Value
+    {
+        $name = '__phpc_jit_gid_in_supplementary_groups';
+        $existing = $context->module->getNamedFunction($name);
+        if (null !== $existing && $existing->countBasicBlocks() > 0) {
+            $context->registerFunction($name, $existing);
+
+            return $existing;
+        }
+
+        self::ensureLibcGetgroups($context);
+
+        $i32 = $context->getTypeFromString('int32');
+        $i1 = $context->getTypeFromString('int1');
+        $fn = $context->module->addFunction(
+            $name,
+            $context->context->functionType($i1, false, $i32)
+        );
+        $entry = $fn->appendBasicBlock('entry');
+        $saved = $context->builder;
+        $context->builder = $context->context->builderCreate();
+        $context->builder->positionAtEnd($entry);
+
+        $gid = $fn->getParam(0);
+        $count = $context->builder->call(
+            $context->lookupFunction('getgroups'),
+            $i32->constInt(0, false),
+            $context->getTypeFromString('int8*')->constNull()
+        );
+        $zero = $i32->constInt(0, false);
+        $noGroups = $context->builder->icmp(Builder::INT_SLE, $count, $zero);
+        $failBlock = $fn->appendBasicBlock('no_groups');
+        $allocBlock = $fn->appendBasicBlock('alloc');
+        $context->builder->branchIf($noGroups, $failBlock, $allocBlock);
+
+        $context->builder->positionAtEnd($failBlock);
+        $context->builder->returnValue($i1->constInt(0, false));
+
+        $context->builder->positionAtEnd($allocBlock);
+        $i8 = $context->getTypeFromString('int8');
+        $i64 = $context->getTypeFromString('int64');
+        $gidSize = $i64->constInt(4, false);
+        $bytes = $context->builder->mul(
+            $context->builder->zext($count, $i64),
+            $gidSize
+        );
+        $list = $context->builder->call(
+            $context->lookupFunction('malloc'),
+            $bytes
+        );
+        $ngroups = $context->builder->call(
+            $context->lookupFunction('getgroups'),
+            $count,
+            $list
+        );
+        $fetchFailed = $context->builder->icmp(Builder::INT_SLE, $ngroups, $zero);
+        $loopInitBlock = $fn->appendBasicBlock('loop_init');
+        $fetchFailBlock = $fn->appendBasicBlock('fetch_fail');
+        $context->builder->branchIf($fetchFailed, $fetchFailBlock, $loopInitBlock);
+
+        $context->builder->positionAtEnd($fetchFailBlock);
+        $context->builder->call($context->lookupFunction('free'), $list);
+        $context->builder->returnValue($i1->constInt(0, false));
+
+        $context->builder->positionAtEnd($loopInitBlock);
+        $loopBlock = $fn->appendBasicBlock('loop');
+        $doneBlock = $fn->appendBasicBlock('done');
+        $context->builder->branch($loopBlock);
+
+        $context->builder->positionAtEnd($loopBlock);
+        $idxPhi = $context->builder->phi($i32);
+        $idxPhi->addIncoming($zero, $loopInitBlock);
+        $idx = $idxPhi;
+        $done = $context->builder->icmp(Builder::INT_SGE, $idx, $ngroups);
+        $checkBlock = $fn->appendBasicBlock('check');
+        $context->builder->branchIf($done, $doneBlock, $checkBlock);
+
+        $context->builder->positionAtEnd($checkBlock);
+        $elemPtr = $context->builder->gep(
+            $list,
+            $context->builder->mul($context->builder->zext($idx, $i64), $gidSize)
+        );
+        $elem = $context->builder->load(
+            $context->builder->pointerCast($elemPtr, $i32->pointerType(0))
+        );
+        $match = $context->builder->icmp(Builder::INT_EQ, $elem, $gid);
+        $foundBlock = $fn->appendBasicBlock('found');
+        $nextBlock = $fn->appendBasicBlock('next');
+        $context->builder->branchIf($match, $foundBlock, $nextBlock);
+
+        $context->builder->positionAtEnd($foundBlock);
+        $context->builder->call($context->lookupFunction('free'), $list);
+        $context->builder->returnValue($i1->constInt(1, false));
+
+        $context->builder->positionAtEnd($nextBlock);
+        $nextIdx = $context->builder->add($idx, $i32->constInt(1, false));
+        $idxPhi->addIncoming($nextIdx, $nextBlock);
+        $context->builder->branch($loopBlock);
+
+        $context->builder->positionAtEnd($doneBlock);
+        $context->builder->call($context->lookupFunction('free'), $list);
+        $context->builder->returnValue($i1->constInt(0, false));
+
+        $context->builder->clearInsertionPosition();
+        $context->builder = $saved;
+        $context->registerFunction($name, $fn);
+
+        return $fn;
+    }
+
+    private static function ensureLibcGetuid(Context $context): void
+    {
+        $i32 = $context->getTypeFromString('int32');
+        try {
+            $context->lookupFunction('getuid');
+        } catch (\Throwable $e) {
+            $ft = $context->context->functionType($i32, false);
+            $fn = $context->module->addFunction('getuid', $ft);
+            $context->registerFunction('getuid', $fn);
+        }
+    }
+
+    private static function ensureLibcGetgid(Context $context): void
+    {
+        $i32 = $context->getTypeFromString('int32');
+        try {
+            $context->lookupFunction('getgid');
+        } catch (\Throwable $e) {
+            $ft = $context->context->functionType($i32, false);
+            $fn = $context->module->addFunction('getgid', $ft);
+            $context->registerFunction('getgid', $fn);
+        }
+    }
+
+    private static function ensureLibcGetgroups(Context $context): void
+    {
+        $i32 = $context->getTypeFromString('int32');
+        $i8p = $context->getTypeFromString('int8*');
+        try {
+            $context->lookupFunction('getgroups');
+        } catch (\Throwable $e) {
+            $ft = $context->context->functionType($i32, false, $i32, $i8p);
+            $fn = $context->module->addFunction('getgroups', $ft);
+            $context->registerFunction('getgroups', $fn);
+        }
+        try {
+            $context->lookupFunction('malloc');
+        } catch (\Throwable $e) {
+            $i64 = $context->getTypeFromString('int64');
+            $ft = $context->context->functionType($i8p, false, $i64);
+            $fn = $context->module->addFunction('malloc', $ft);
+            $context->registerFunction('malloc', $fn);
+        }
+        try {
+            $context->lookupFunction('free');
+        } catch (\Throwable $e) {
+            $ft = $context->context->functionType($context->getTypeFromString('void'), false, $i8p);
+            $fn = $context->module->addFunction('free', $ft);
+            $context->registerFunction('free', $fn);
+        }
     }
 }

@@ -12,7 +12,7 @@ use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
 
-/** is_executable() — VM via VmStatPath; JIT via libc access(2) X_OK (#8186). */
+/** is_executable() — VM via VmStatPath; JIT via stat mode access (#8186, #8990). */
 final class is_executable extends Internal
 {
     public function execute(Frame $frame): void
