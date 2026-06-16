@@ -7,7 +7,7 @@ namespace PHPCompiler\ext\lzf;
 /**
  * Pure PHP liblzf (Marc Lehmann) — php-src ext/lzf/lzf.c reference (#6384, #8805).
  *
- * Matches bundled third_party/liblzf with HLOG=16, VERY_FAST=1, INIT_HTAB=1.
+ * HLOG=16, VERY_FAST=1, INIT_HTAB=1 — sole LZF implementation for VM/JIT/AOT (#8852).
  */
 final class VmLzfCore
 {
