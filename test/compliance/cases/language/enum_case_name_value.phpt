@@ -5,9 +5,14 @@ Language: enum case ->name / ->value on backed enums (#3420)
 enum E: string { case A = 'a'; case B = 'bb'; }
 echo E::A->name, '|', E::A->value, "\n";
 echo E::B->name, '|', E::B->value, "\n";
-echo E::A;
-echo "\n";
+var_dump(E::A);
+try {
+    echo E::A;
+} catch (Error $e) {
+    echo $e->getMessage(), "\n";
+}
 --EXPECT--
 A|a
 B|bb
-a
+enum(E::A)
+Object of class E could not be converted to string
