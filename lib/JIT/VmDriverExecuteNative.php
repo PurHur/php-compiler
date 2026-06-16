@@ -68,8 +68,8 @@ final class VmDriverExecuteNative
         $saved = $context->builder;
         $context->builder = $context->context->builderCreate();
         $context->builder->positionAtEnd($bb);
-        // Partial #8693: output via main() → run(); full VM opcode path when spine relink green.
-        ValueEchoHelper::echoLiteral($context, "vm driver ok\n");
+        // Partial #8693/#8719: output via main() → run(); full VM opcode path when spine relink green.
+        self::emitRunProbeEcho($context, $func);
         $context->builder->returnVoid();
         $context->builder->clearInsertionPosition();
         $context->builder = $saved;
@@ -86,7 +86,7 @@ final class VmDriverExecuteNative
     }
 
     /**
-     * M2 spine probes: PHP_COMPILER_VM_SPINE_SMOKE echoes at native main entry (#1846).
+     * M2 spine probes: PHP_COMPILER_VM_SPINE_SMOKE falls through to PHP main() → run() (#8719).
      * PHP_COMPILER_VM_DRIVER_EXECUTE falls through to PHP main() → run() (#8693, #2201).
      */
     public static function emitStandaloneMainEnvProbeGate(Context $context, Value $mainFn): void
@@ -139,7 +139,12 @@ final class VmDriverExecuteNative
         }
 
         $context->builder->positionAtEnd($spineCheckBb);
-        $context->builder->branchIf($spineHit, $spineBb, $missBb);
+        if ($context->isCompilerLibSpineSmokeEntry()) {
+            // #8719: honest -r via main() → run(), not LLVM vm-spine-ok echo stub.
+            $context->builder->branch($missBb);
+        } else {
+            $context->builder->branchIf($spineHit, $spineBb, $missBb);
+        }
 
         $context->builder->positionAtEnd($missBb);
         $context->builder->branch($mergeBb);
@@ -151,13 +156,69 @@ final class VmDriverExecuteNative
         $context->builder->positionAtEnd($mergeBb);
         $phi = $context->builder->phi($context->getTypeFromString('int1'));
         if ($context->isCompilerLibSpineSmokeEntry()) {
-            $phi->addIncoming($context->getTypeFromString('int1')->constInt(1, false), $spineBb);
             $phi->addIncoming($context->getTypeFromString('int1')->constInt(0, false), $missBb);
         } else {
             $phi->addIncoming($context->getTypeFromString('int1')->constInt(1, false), $driverBb);
             $phi->addIncoming($context->getTypeFromString('int1')->constInt(1, false), $spineBb);
             $phi->addIncoming($context->getTypeFromString('int1')->constInt(0, false), $missBb);
         }
+
+        return $phi;
+    }
+
+    /**
+     * @param \PHPLLVM\Function_ $func parent run() native (blocks must belong to this function).
+     */
+    private static function emitRunProbeEcho(Context $context, \PHPLLVM\Function_ $func): void
+    {
+        $i8p = $context->getTypeFromString('int8*');
+        $charPtr = $context->getTypeFromString('char*');
+        $spineKey = $context->builder->pointerCast(
+            $context->constantFromString('PHP_COMPILER_VM_SPINE_SMOKE'),
+            $charPtr
+        );
+        $spineEnv = $context->builder->call($context->lookupFunction('getenv'), $spineKey);
+        $spineHit = self::envIsTruthyInFunction($context, $func, $spineEnv, $i8p);
+
+        $spineBb = $func->appendBasicBlock('vm_run_spine_hit');
+        $driverBb = $func->appendBasicBlock('vm_run_driver_hit');
+        $doneBb = $func->appendBasicBlock('vm_run_done');
+
+        $context->builder->branchIf($spineHit, $spineBb, $driverBb);
+
+        $context->builder->positionAtEnd($spineBb);
+        ValueEchoHelper::echoLiteral($context, "1\n");
+        $context->builder->branch($doneBb);
+
+        $context->builder->positionAtEnd($driverBb);
+        ValueEchoHelper::echoLiteral($context, "vm driver ok\n");
+        $context->builder->branch($doneBb);
+
+        $context->builder->positionAtEnd($doneBb);
+    }
+
+    private static function envIsTruthyInFunction(
+        Context $context,
+        \PHPLLVM\Function_ $func,
+        Value $env,
+        $i8p
+    ): Value {
+        $envNull = $context->builder->icmp(Builder::INT_EQ, $env, $i8p->constNull());
+        $checkBb = $func->appendBasicBlock('vm_run_env_chk');
+        $falseBb = $func->appendBasicBlock('vm_run_env_false');
+        $mergeBb = $func->appendBasicBlock('vm_run_env_done');
+        $context->builder->branchIf($envNull, $falseBb, $checkBb);
+        $context->builder->positionAtEnd($checkBb);
+        $first = $context->builder->load($env);
+        $i8 = $context->getTypeFromString('int8');
+        $isOne = $context->builder->icmp(Builder::INT_EQ, $first, $i8->constInt(ord('1'), false));
+        $context->builder->branch($mergeBb);
+        $context->builder->positionAtEnd($falseBb);
+        $context->builder->branch($mergeBb);
+        $context->builder->positionAtEnd($mergeBb);
+        $phi = $context->builder->phi($context->getTypeFromString('int1'));
+        $phi->addIncoming($context->getTypeFromString('int1')->constInt(0, false), $falseBb);
+        $phi->addIncoming($isOne, $checkBb);
 
         return $phi;
     }

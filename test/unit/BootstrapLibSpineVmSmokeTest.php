@@ -28,7 +28,7 @@ final class BootstrapLibSpineVmSmokeTest extends TestCase
         $script = (string) file_get_contents(self::$root.'/script/bootstrap-selfhost-lib-spine-vm-smoke.sh');
         $this->assertStringContainsString('PHP_COMPILER_VM_SPINE_SMOKE=1', $script);
         $this->assertStringContainsString('selfhost-lib-spine-smoke', $script);
-        $this->assertStringContainsString('vm-spine-ok', $script);
+        $this->assertStringContainsString('^1$', $script);
         $this->assertStringContainsString('bootstrap-selfhost-lib-spine-smoke-link.sh', $script);
     }
 
@@ -72,7 +72,7 @@ final class BootstrapLibSpineVmSmokeTest extends TestCase
         $this->assertStringContainsString('bin/vm.php', $entry);
         $this->assertStringContainsString('PHP_COMPILER_LIB_SPINE_SMOKE', $entry);
         $this->assertStringContainsString('PHP_COMPILER_VM_SPINE_SMOKE', $entry);
-        $this->assertStringContainsString('vm-spine-ok', $entry);
+        $this->assertStringContainsString('echo "1\\n"', $entry);
         $this->assertStringContainsString('bootstrap-selfhost-lib-spine-vm-smoke', $entry);
     }
 
@@ -86,6 +86,16 @@ final class BootstrapLibSpineVmSmokeTest extends TestCase
     {
         $driver = (string) file_get_contents(self::$root.'/src/cli_driver.php');
         $this->assertStringContainsString('PHP_COMPILER_VM_SPINE_SMOKE', $driver);
+    }
+
+    public function testSpineSmokeRoutesThroughMainNotNativeEchoStub(): void
+    {
+        $native = (string) file_get_contents(self::$root.'/lib/JIT/VmDriverExecuteNative.php');
+        $this->assertStringContainsString('#8719', $native);
+        $this->assertStringContainsString('honest -r via main() → run()', $native);
+        $entry = (string) file_get_contents(self::$root.'/test/selfhost/compiler_lib_spine_smoke/main.php');
+        $this->assertStringContainsString("run('Standard input code', '<?php echo \"1\\n\";', [])", $entry);
+        $this->assertStringNotContainsString("echo \"vm-spine-ok\\n\";", $entry);
     }
 
     public function testWaveCheckDocumentsVmSpineSmokeFlag(): void
