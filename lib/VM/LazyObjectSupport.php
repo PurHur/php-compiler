@@ -266,6 +266,12 @@ final class LazyObjectSupport
         return $object->lazyPending;
     }
 
+    /** Zend zend_lazy_object_get_instance — proxy real instance or ghost shell (#7054). */
+    public static function getLazyInstance(ObjectEntry $object): ObjectEntry
+    {
+        return $object;
+    }
+
     /**
      * ReflectionProperty::isLazy — IS_PROP_LAZY probe without triggering init (#6515).
      *
