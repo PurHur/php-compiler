@@ -150,6 +150,7 @@ bootstrap_compiler_lib_honest_zend_compile() {
   local mem_limit="8192M"
   env PHP_COMPILER_M3_EMIT_SIDECAR_RECURSION_GUARD=1 \
     PHP_COMPILER_SELFHOST_AOT=1 \
+    PHP_COMPILER_LIB_SPINE_BUNDLE=1 \
     PHP_COMPILER_MEMORY_LIMIT="${mem_limit}" \
     php -d "memory_limit=${mem_limit}" \
     "${root}/bin/compile.php" -o "${out}" "${entry}"
