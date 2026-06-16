@@ -1,4 +1,5 @@
 <?php
+// Maintainer repro for #9014 — array spread/union with enum case keys (zend_hash.c).
 declare(strict_types=1);
 
 enum E: int { case A = 1; case B = 2; }
