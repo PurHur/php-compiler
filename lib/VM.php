@@ -2172,9 +2172,15 @@ restart:
                         $this->context->isGlobalStorage($writeTarget)
                         && !VM\EnumCaseSupport::arrayContainsRuntimeRefs($arg3)
                     ) {
-                        $stored = VM\EnumCaseSupport::materializeConstantValue($this->context, $arg3);
-                        $arg2->copyFrom($stored);
-                        $arg1->copyFrom($stored);
+                        $resolvedArg = $arg3->resolveIndirect();
+                        if (!$resolvedArg->isUndefined()) {
+                            $stored = VM\EnumCaseSupport::materializeConstantValue($this->context, $arg3);
+                            $arg2->copyFrom($stored);
+                            $arg1->copyFrom($stored);
+                        } else {
+                            $arg2->copyFrom($arg3);
+                            $arg1->copyFrom($arg3);
+                        }
                     } else {
                         $arg2->copyFrom($arg3);
                         $arg1->copyFrom($arg3);
@@ -4119,9 +4125,12 @@ restart:
                     $this->warnUndefinedVariableForScopeRead($frame, $argSlot);
                     $value = $this->resolveOutgoingCallArgValue($frame, $argSlot);
                     if ($this->isUnboundLocalScopeRead($frame, $argSlot)) {
-                        $sent = new Variable();
-                        $sent->null();
-                        $value = $sent;
+                        $resolved = $value->resolveIndirect();
+                        if ($resolved->isUndefined()) {
+                            $sent = new Variable();
+                            $sent->null();
+                            $value = $sent;
+                        }
                     }
                     if (null !== $op->arg3) {
                         $frame->callArgEntries[] = ['u', $value];
@@ -9651,20 +9660,20 @@ restart:
         }
         if (isset($frame->scope[$slot])) {
             $resolved = $frame->scope[$slot]->resolveIndirect();
-            if (Variable::TYPE_NULL !== $resolved->type && !$resolved->isUndefined()) {
-                if (null !== $const && $this->isImmortalEnumCaseBlockConstant($const)) {
-                    if (VM\EnumCaseSupport::isEnumCaseVariable($resolved)) {
-                        return $frame->scope[$slot];
-                    }
-                    if ($this->isEnumSlotClobberCandidate($resolved)) {
-                        $value = new Variable();
-                        $value->copyFrom($const);
-
-                        return $value;
-                    }
-
+            if (null !== $const && $this->isImmortalEnumCaseBlockConstant($const)) {
+                if (VM\EnumCaseSupport::isEnumCaseVariable($resolved)) {
                     return $frame->scope[$slot];
                 }
+                if ($resolved->isUndefined() || $this->isEnumSlotClobberCandidate($resolved)) {
+                    $value = new Variable();
+                    $value->copyFrom($const);
+
+                    return $value;
+                }
+
+                return $frame->scope[$slot];
+            }
+            if (Variable::TYPE_NULL !== $resolved->type && !$resolved->isUndefined()) {
                 if (null === $const || $resolved->type === $const->type) {
                     return $frame->scope[$slot];
                 }
@@ -9902,7 +9911,14 @@ restart:
         if (null !== $closureState->boundThis) {
             $thisIdx = $closureState->func->block->slotIndexForVariableName('this');
             if (null !== $thisIdx) {
-                $callee->scope[$thisIdx] = $closureState->boundThis;
+                if (!isset($callee->scope[$thisIdx])) {
+                    $callee->scope[$thisIdx] = new Variable();
+                }
+                $boundThis = $closureState->boundThis;
+                if (EnumCaseSupport::isEnumCaseVariable($boundThis)) {
+                    $boundThis = EnumCaseSupport::materializeConstantValue($this->context, $boundThis);
+                }
+                $callee->scope[$thisIdx]->copyFrom($boundThis);
             }
         }
         if (null !== $closureState->boundScopeClass && '' !== $closureState->boundScopeClass) {
@@ -12092,12 +12108,15 @@ restart:
         if (null === $slot) {
             return new Variable(Variable::TYPE_NULL);
         }
+        if (isset($frame->scope[$slot])) {
+            $resolved = $frame->scope[$slot]->resolveIndirect();
+            if (!$resolved->isUndefined()) {
+                return $resolved;
+            }
+        }
         $operand = $frame->block->getOperand($slot);
         if ($operand instanceof \PHPCfg\Operand\Literal && isset($frame->block->constants[$slot])) {
             return $frame->block->constants[$slot];
-        }
-        if (isset($frame->scope[$slot])) {
-            return $frame->scope[$slot]->resolveIndirect();
         }
         if (isset($frame->block->constants[$slot])) {
             return $frame->block->constants[$slot];
