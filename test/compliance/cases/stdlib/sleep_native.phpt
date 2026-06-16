@@ -1,5 +1,5 @@
 --TEST--
-stdlib sleep()/usleep() via VmSleepNative libc FFI without host PHP (#4860)
+stdlib sleep()/usleep() via VmSleepPure without host PHP (#4860, #8971)
 --FILE--
 <?php
 $t0 = hrtime(true);

@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace PHPCompiler;
 
 use PHPCompiler\ext\standard\VmSleep;
-use PHPCompiler\ext\standard\VmSleepNative;
 use PHPUnit\Framework\TestCase;
 
 /** Issue #4860: VM sleep/usleep must not delegate to host \\sleep()/\\usleep(). */
@@ -22,21 +21,13 @@ final class VmSleepTest extends TestCase
         $this->assertStringContainsString('VmSleepNative', $source);
     }
 
-    public function testSleepZeroReturnsZeroWhenLibcAvailable(): void
+    public function testSleepZeroReturnsZero(): void
     {
-        if (!VmSleepNative::available()) {
-            $this->markTestSkipped('libc FFI unavailable on this host');
-        }
-
         $this->assertSame(0, VmSleep::sleep(0));
     }
 
-    public function testUsleepAdvancesClockWhenLibcAvailable(): void
+    public function testUsleepAdvancesClock(): void
     {
-        if (!VmSleepNative::available()) {
-            $this->markTestSkipped('libc FFI unavailable on this host');
-        }
-
         $t0 = hrtime(true);
         VmSleep::usleep(1000);
         $this->assertGreaterThan($t0, hrtime(true));

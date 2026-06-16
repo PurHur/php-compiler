@@ -9,16 +9,21 @@ use PHPCompiler\ext\standard\VmSleepNative;
 use PHPCompiler\ext\standard\VmSleepPure;
 use PHPUnit\Framework\TestCase;
 
-/** VmSleepPure — sleep/usleep without libc FFI (#8922). */
+/** VmSleepPure — sleep/usleep without libc FFI (#8922, #8971). */
 final class VmSleepPureRuntimeShrinkTest extends TestCase
 {
-    public function testVmSleepNativeRoutesToPureWhenFfiDisabled(): void
+    public function testVmSleepNativeDelegatesToPureOnly(): void
     {
         $source = (string) file_get_contents(__DIR__.'/../../ext/standard/VmSleepNative.php');
         $this->assertStringContainsString('VmSleepPure::sleep', $source);
         $this->assertStringContainsString('VmSleepPure::usleep', $source);
         $this->assertStringContainsString('VmSleepPure::timeNanosleep', $source);
         $this->assertStringContainsString('VmSleepPure::timeSleepUntil', $source);
+        $this->assertStringNotContainsString('ffi()->sleep', $source);
+        $this->assertStringNotContainsString('ffi()->usleep', $source);
+        $this->assertStringNotContainsString('$ffi->nanosleep', $source);
+        $this->assertStringNotContainsString('$ffi->gettimeofday', $source);
+        $this->assertStringNotContainsString('FFI::cdef', $source);
     }
 
     public function testVmSleepPureUsesHrtimeNotHostSleep(): void
@@ -30,12 +35,28 @@ final class VmSleepPureRuntimeShrinkTest extends TestCase
         $this->assertStringNotContainsString('\\usleep(', $source);
     }
 
+    public function testSleepZeroReturnsZeroWithFfiEnabled(): void
+    {
+        $this->assertTrue(VmSleepNative::available());
+        $this->assertSame(0, VmSleepPure::sleep(0));
+        $this->assertSame(0, VmSleep::sleep(0));
+        $this->assertSame(0, VmSleepNative::sleep(0));
+    }
+
+    public function testUsleepZeroCompletesWithFfiEnabled(): void
+    {
+        VmSleepPure::usleep(0);
+        VmSleep::usleep(0);
+        VmSleepNative::usleep(0);
+        $this->assertTrue(true);
+    }
+
     public function testSleepZeroReturnsZeroWithFfiDisabled(): void
     {
         $previous = getenv('PHP_COMPILER_DISABLE_FFI');
         putenv('PHP_COMPILER_DISABLE_FFI=1');
         try {
-            $this->assertFalse(VmSleepNative::available());
+            $this->assertTrue(VmSleepNative::available());
             $this->assertSame(0, VmSleepPure::sleep(0));
             $this->assertSame(0, VmSleep::sleep(0));
         } finally {
