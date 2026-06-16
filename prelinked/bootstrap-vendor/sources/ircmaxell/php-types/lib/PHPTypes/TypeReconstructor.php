@@ -816,6 +816,7 @@ class TypeReconstructor
             return Type::fromDecl($type->name);
         } elseif ($type instanceof Op\Type\Never_) {
             return Type::never();
+
         } elseif ($type instanceof Op\Type\Union_) {
             $subs = [];
             foreach ($type->types as $sub) {
