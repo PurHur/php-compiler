@@ -377,6 +377,10 @@ class Block {
         if ($this->blocksScriptGlobalInheritance()) {
             return false;
         }
+        // Try/catch/finally bodies inherit parent slots directly (#9114, Zend/zend_execute.c).
+        if ($this->inheritUndefinedLocals) {
+            return false;
+        }
 
         return true;
     }
