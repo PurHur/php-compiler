@@ -24,11 +24,16 @@ final class SplAutoloadOutput
 
     public const GLOBAL_DEPTH = '__phpc_spl_autoload_depth';
 
+    public const GLOBAL_META_STACK = '__phpc_spl_autoload_meta_stack';
+
   /** @var array<string, Value> */
     private static array $stackGlobalsByModule = [];
 
     /** @var array<string, Value> */
     private static array $depthGlobalsByModule = [];
+
+    /** @var array<string, Value> */
+    private static array $metaGlobalsByModule = [];
 
     public static function ensureLinked(Context $context): void
     {
@@ -64,10 +69,20 @@ final class SplAutoloadOutput
             }
         }
 
+        $metaGlobal = $context->module->getNamedGlobal(self::GLOBAL_META_STACK);
+        if (null === $metaGlobal) {
+            $metaTy = $i8p->arrayType(self::MAX);
+            $metaGlobal = $context->module->addGlobal($metaTy, self::GLOBAL_META_STACK);
+            $metaGlobal->setInitializer($metaTy->constNull());
+        }
+        self::$metaGlobalsByModule[$moduleKey] = $metaGlobal;
+
         $registerProbe = $context->module->getNamedFunction('__phpc_spl_autoload_register_apply');
         $unregisterProbe = $context->module->getNamedFunction('__phpc_spl_autoload_unregister_apply');
         $dispatchProbe = $context->module->getNamedFunction('__phpc_spl_autoload_dispatch');
-        $registerReady = null !== $registerProbe && $registerProbe->countBasicBlocks() > 0;
+        $registerReady = null !== $registerProbe
+            && $registerProbe->countBasicBlocks() > 0
+            && 3 === $registerProbe->countParams();
         $unregisterReady = null !== $unregisterProbe && $unregisterProbe->countBasicBlocks() > 0;
         $dispatchReady = null !== $dispatchProbe && $dispatchProbe->countBasicBlocks() > 0;
         if ($registerReady && $unregisterReady && $dispatchReady) {
@@ -111,6 +126,20 @@ final class SplAutoloadOutput
             ?? throw new \LogicException('spl_autoload depth global is not linked');
     }
 
+    public static function loadDepth(Context $context): Value
+    {
+        $moduleKey = spl_object_hash($context->module);
+
+        return $context->builder->load(self::depthGlobal($context, $moduleKey));
+    }
+
+    public static function loadMetaAt(Context $context, $i32, Value $index): Value
+    {
+        $moduleKey = spl_object_hash($context->module);
+
+        return $context->builder->load(self::metaStackEntryPtr($context, $moduleKey, $i32, $index));
+    }
+
     private static function emitRegisterApply(
         Context $context,
         string $moduleKey,
@@ -121,7 +150,7 @@ final class SplAutoloadOutput
     ): void {
         $fn = $context->module->addFunction(
             '__phpc_spl_autoload_register_apply',
-            $context->context->functionType($void, false, $i8p, $i32)
+            $context->context->functionType($void, false, $i8p, $i8p, $i32)
         );
         $context->registerFunction('__phpc_spl_autoload_register_apply', $fn);
 
@@ -136,7 +165,8 @@ final class SplAutoloadOutput
 
         $context->builder->positionAtEnd($entry);
         $fnOpaque = $fn->getParam(0);
-        $prepend = $fn->getParam(1);
+        $metaOpaque = $fn->getParam(1);
+        $prepend = $fn->getParam(2);
 
         $depth = $context->builder->load(self::depthGlobal($context, $moduleKey));
         $maxDepth = $context->builder->icmp(
@@ -163,6 +193,7 @@ final class SplAutoloadOutput
 
         $context->builder->positionAtEnd($bbAppend);
         self::storeStackEntry($context, $moduleKey, $i32, $depth, $fnOpaque);
+        self::storeMetaStackEntry($context, $moduleKey, $i32, $depth, $metaOpaque);
         $context->builder->store($context->builder->add($depth, $oneI32), self::depthGlobal($context, $moduleKey));
         $context->builder->branch($bbDone);
 
@@ -181,11 +212,15 @@ final class SplAutoloadOutput
         $curEntry = self::stackEntryPtr($context, $moduleKey, $i32, $iVal);
         $prevEntry = self::stackEntryPtr($context, $moduleKey, $i32, $prevIdx);
         $context->builder->store($context->builder->load($prevEntry), $curEntry);
+        $curMeta = self::metaStackEntryPtr($context, $moduleKey, $i32, $iVal);
+        $prevMeta = self::metaStackEntryPtr($context, $moduleKey, $i32, $prevIdx);
+        $context->builder->store($context->builder->load($prevMeta), $curMeta);
         $context->builder->store($prevIdx, $iSlot);
         $context->builder->branch($bbPrependShiftHead);
 
         $context->builder->positionAtEnd($bbPrependStore);
         self::storeStackEntry($context, $moduleKey, $i32, $zeroI32, $fnOpaque);
+        self::storeMetaStackEntry($context, $moduleKey, $i32, $zeroI32, $metaOpaque);
         $context->builder->store($context->builder->add($depth, $oneI32), self::depthGlobal($context, $moduleKey));
         $context->builder->branch($bbDone);
 
@@ -267,6 +302,9 @@ final class SplAutoloadOutput
         $curEntry = self::stackEntryPtr($context, $moduleKey, $i32, $jBody);
         $nextEntry = self::stackEntryPtr($context, $moduleKey, $i32, $nextIdx);
         $context->builder->store($context->builder->load($nextEntry), $curEntry);
+        $curMeta = self::metaStackEntryPtr($context, $moduleKey, $i32, $jBody);
+        $nextMeta = self::metaStackEntryPtr($context, $moduleKey, $i32, $nextIdx);
+        $context->builder->store($context->builder->load($nextMeta), $curMeta);
         $context->builder->store($nextIdx, $jSlot);
         $context->builder->branch($bbShiftHead);
 
@@ -359,6 +397,32 @@ final class SplAutoloadOutput
             $i32->constInt(0, false),
             $index
         );
+    }
+
+    private static function metaStackGlobal(Context $context, string $moduleKey): Value
+    {
+        return self::$metaGlobalsByModule[$moduleKey]
+            ?? $context->module->getNamedGlobal(self::GLOBAL_META_STACK)
+            ?? throw new \LogicException('spl_autoload meta stack global is not linked');
+    }
+
+    private static function metaStackEntryPtr(Context $context, string $moduleKey, $i32, Value $index): Value
+    {
+        return $context->builder->inBoundsGEP(
+            self::metaStackGlobal($context, $moduleKey),
+            $i32->constInt(0, false),
+            $index
+        );
+    }
+
+    private static function storeMetaStackEntry(
+        Context $context,
+        string $moduleKey,
+        $i32,
+        Value $index,
+        Value $metaOpaque
+    ): void {
+        $context->builder->store($metaOpaque, self::metaStackEntryPtr($context, $moduleKey, $i32, $index));
     }
 
     private static function storeStackEntry(
