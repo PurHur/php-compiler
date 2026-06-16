@@ -32,6 +32,22 @@ Repository defaults live in [`script/ci-defaults.env`](../script/ci-defaults.env
 | Fast gate + JIT preflight (optional) | `JIT_PREFLIGHT_GATE=1 ./script/ci-fast.sh` | `make test-fast-jit-preflight` or `make test-docker-fast-jit-preflight` |
 | Explicit memory-capped Docker | — | `./script/ci-docker-safe.sh ci-local.sh` or `make test-docker-safe` |
 | Single PHPUnit filter | Append args: `./script/ci-fast.sh --filter VMTest` | Same inside Docker wrappers |
+| User release readiness (quick) | `./script/release-readiness.sh --json` | `./script/docker-exec.sh -- bash -lc './script/release-readiness.sh --json'` |
+| User release readiness (full) | `./script/release-readiness.sh --full --json` | `./script/docker-exec.sh -- bash -lc './script/release-readiness.sh --full --json'` |
+
+### Release readiness (`release-readiness.sh`, #8737)
+
+Daily v1.1.0 release review presenter — aggregates user-facing gates without the ~1h `north-star5-verify --strict` ladder.
+
+| Mode | Gates | Target time |
+|------|-------|-------------|
+| Quick (default) | `bootstrap-inventory.php --check`, `check-selfhost-spine-coverage-sync.php`, `check-root-readme-sync.php` | <5 min Docker |
+| Quick + CI doc slice | Set `RELEASE_READINESS_CI_FAST=1` — adds wave3/examples/development-status/spine-count/capability-matrix sync checks | ~minutes |
+| Full (`--full`) | Quick + `capability-matrix.php --check`, `examples-aot-smoke.sh`, `examples-web-smoke.sh`, `CHANGELOG.md` v1.1.0 stub | LLVM + HTTP when available |
+
+Machine output: `./script/release-readiness.sh [--full] --json` → `{"user_release_ready":"yes"|"no","mode":"quick"|"full","gates":[...]}`.
+
+Parent: [#8739](https://github.com/PurHur/php-compiler/issues/8739) · [#78](https://github.com/PurHur/php-compiler/issues/78).
 
 ## Runforge / harness verification
 
