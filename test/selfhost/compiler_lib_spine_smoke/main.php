@@ -837,6 +837,7 @@ require_once __DIR__.'/../../../ext/standard/VmGcStatus.php';
 require_once __DIR__.'/../../../ext/standard/VmGeneratorArray.php';
 require_once __DIR__.'/../../../ext/standard/VmGetcwdNative.php';
 require_once __DIR__.'/../../../ext/standard/VmGetopt.php';
+require_once __DIR__.'/../../../ext/standard/VmGetrusagePure.php';
 require_once __DIR__.'/../../../ext/standard/VmGetrusageNative.php';
 require_once __DIR__.'/../../../ext/standard/VmGzStream.php';
 require_once __DIR__.'/../../../ext/standard/VmGzStreamNative.php';
