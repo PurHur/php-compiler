@@ -482,7 +482,7 @@ class Runtime {
     }
 
     /** php-parser NameResolver aliases persist across traversals on one PHPCfg Parser (#1416). */
-    private function resetParserNameResolverState(): void
+    public function resetParserNameResolverState(): void
     {
         $parserRef = new \ReflectionProperty(\PHPCfg\Parser::class, 'astTraverser');
         $parserRef->setAccessible(true);
