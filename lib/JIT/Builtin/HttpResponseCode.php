@@ -44,19 +44,11 @@ final class HttpResponseCode
         $i64 = $context->getTypeFromString('int64');
         $void = $context->context->voidType();
 
-        $probe = $context->module->getNamedGlobal(self::GLOBAL_NAME);
-        if (null === $probe) {
-            $probe = $context->module->addGlobal($i32, self::GLOBAL_NAME);
-            $probe->setInitializer($i32->constInt(0, false));
-        }
-        self::$global = $probe;
+        self::$global = $context->module->addGlobal($i32, self::GLOBAL_NAME);
+        self::$global->setInitializer($i32->constInt(0, false));
 
-        $explicitProbe = $context->module->getNamedGlobal(self::GLOBAL_EXPLICIT_NAME);
-        if (null === $explicitProbe) {
-            $explicitProbe = $context->module->addGlobal($i32, self::GLOBAL_EXPLICIT_NAME);
-            $explicitProbe->setInitializer($i32->constInt(0, false));
-        }
-        self::$explicitGlobal = $explicitProbe;
+        self::$explicitGlobal = $context->module->addGlobal($i32, self::GLOBAL_EXPLICIT_NAME);
+        self::$explicitGlobal->setInitializer($i32->constInt(0, false));
 
         $sig = $context->context->functionType(
             $void,
@@ -66,19 +58,11 @@ final class HttpResponseCode
             $context->getTypeFromString('__value__*'),
             $context->getTypeFromString('__value__*')
         );
-        $fn = $context->module->getNamedFunction('__phpc_http_response_code_apply');
-        if (null === $fn) {
-            $fn = $context->module->addFunction('__phpc_http_response_code_apply', $sig);
-        }
+        $fn = $context->module->addFunction('__phpc_http_response_code_apply', $sig);
         $context->registerFunction('__phpc_http_response_code_apply', $fn);
 
         $valMap = $context->structFieldMap['__value__'];
 
-        if ($fn->countBasicBlocks() > 0) {
-            $context->builder->clearInsertionPosition();
-
-            return;
-        }
         $entry = $fn->appendBasicBlock('hr_apply_entry');
         $bbGet = $fn->appendBasicBlock('hr_get');
         $bbAfterGet = $fn->appendBasicBlock('hr_after_get');
