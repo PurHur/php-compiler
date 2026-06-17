@@ -764,6 +764,15 @@ class Compiler {
         if (null !== $parent->func) {
             $child->func = $parent->func;
             $child->strictTypes = $parent->strictTypes;
+            // Merge blocks skip inheritScopeFrom when parents>=2 (#3790); still need
+            // return-type flags so :never epilogue checks run on implicit fall-off (#9240).
+            $child->returnTypeConstraint = $parent->returnTypeConstraint;
+            $child->returnDnfConstraints = $parent->returnDnfConstraints;
+            $child->returnTypeVoid = $parent->returnTypeVoid;
+            $child->returnTypeNever = $parent->returnTypeNever;
+            $child->returnTypeStatic = $parent->returnTypeStatic;
+            $child->returnDeclaredType = $parent->returnDeclaredType;
+            $child->returnLiteralBoolType = $parent->returnLiteralBoolType;
         }
     }
 
