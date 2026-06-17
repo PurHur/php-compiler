@@ -141,8 +141,6 @@ class Compiler {
     /** @var array<string, array<string, Variable>> runtime builtin enum constants by lowercase enum/const */
     private array $runtimeEnumCaseConsts = [];
 
-    /** @var array<string, array<int|string, string>> lowercase enum => backing scalar => first case name (#8687) */
-
     /** @var array<string, array<string, true>> lowercase class => declared static property names (#3814). */
     private array $compiledClassStaticProperties = [];
 

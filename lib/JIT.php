@@ -6728,6 +6728,14 @@ class JIT {
                                 $classId,
                                 $nameOp->value
                             );
+                            if ($this->context->type->object->isEnumClassId($classId)) {
+                                JIT\BackedEnumDuplicateJitGuard::emitBeforeEnumCaseFetch(
+                                    $this->context->type->object,
+                                    $this,
+                                    $block,
+                                    $classId
+                                );
+                            }
                             $value = $this->context->type->object->classConstFetch($classId, $nameOp->value);
                             $resultOp = $block->getOperand($op->arg1);
                             if ($this->context->type->object->isEnumClassId($classId)

@@ -129,4 +129,18 @@ PHP,
         );
         $this->assertNotNull($block);
     }
+
+    public function testDuplicateBackingErrorMessage(): void
+    {
+        $message = \PHPCompiler\Compiler\EnumBackedCaseCheck::duplicateBackingErrorMessage('E', [
+            ['name' => 'A', 'backing' => 1],
+            ['name' => 'B', 'backing' => 1],
+        ]);
+        $this->assertSame('Duplicate value in enum E for cases A and B', $message);
+
+        $this->assertNull(\PHPCompiler\Compiler\EnumBackedCaseCheck::duplicateBackingErrorMessage('F', [
+            ['name' => 'A', 'backing' => 1],
+            ['name' => 'B', 'backing' => 2],
+        ]));
+    }
 }

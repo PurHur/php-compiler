@@ -130,6 +130,9 @@ final class ClassConstFetchHelper
             } else {
                 if (null !== $jit) {
                     ClassConstVisibilityJitGuard::emitBeforeFetch($objectType, $jit, $block, $id, $constName);
+                    if ($objectType->isEnumClassId($id)) {
+                        BackedEnumDuplicateJitGuard::emitBeforeEnumCaseFetch($objectType, $jit, $block, $id);
+                    }
                 }
                 self::writeConstEntry($context, $resultSlot, $entryData);
                 $context->builder->branch($merge);
@@ -189,6 +192,9 @@ final class ClassConstFetchHelper
             }
             if (null !== $block && null !== $jit) {
                 ClassConstVisibilityJitGuard::emitBeforeFetch($objectType, $jit, $block, $classId, $literal);
+                if ($objectType->isEnumClassId($classId)) {
+                    BackedEnumDuplicateJitGuard::emitBeforeEnumCaseFetch($objectType, $jit, $block, $classId);
+                }
             }
 
             return $objectType->classConstFetch($classId, $literal);
