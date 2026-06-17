@@ -30,19 +30,38 @@ final class VmInetPure
 
     public static function ip2long(string $ip): int|false
     {
-        if (!\preg_match('/^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/', $ip, $m)) {
+        $octets = self::parseIpv4DottedQuadOctets($ip);
+        if (null === $octets) {
             return false;
         }
         $long = 0;
-        for ($i = 1; $i <= 4; ++$i) {
-            $octet = (int) $m[$i];
-            if ($octet > 255 || (string) $octet !== $m[$i]) {
-                return false;
-            }
+        foreach ($octets as $octet) {
             $long = ($long << 8) | $octet;
         }
 
         return $long;
+    }
+
+    /**
+     * php-src: php_ip2long() — dotted quad with no leading-zero octets (#9300).
+     *
+     * @return list<int>|null four octets 0..255 or null when invalid
+     */
+    public static function parseIpv4DottedQuadOctets(string $ip): ?array
+    {
+        if (!\preg_match('/^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/', $ip, $m)) {
+            return null;
+        }
+        $octets = [];
+        for ($i = 1; $i <= 4; ++$i) {
+            $octet = (int) $m[$i];
+            if ($octet > 255 || (string) $octet !== $m[$i]) {
+                return null;
+            }
+            $octets[] = $octet;
+        }
+
+        return $octets;
     }
 
     public static function inet_ntop(string $in_addr): string|false

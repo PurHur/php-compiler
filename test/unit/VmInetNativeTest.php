@@ -41,6 +41,8 @@ final class VmInetNativeTest extends TestCase
         $this->assertSame(2130706433, VmInetPure::ip2long('127.0.0.1'));
         $this->assertFalse(VmInetPure::long2ip(-1));
         $this->assertFalse(VmInetPure::ip2long('not-an-ip'));
+        $this->assertFalse(VmInetPure::ip2long('01.02.03.04'));
+        $this->assertSame(4294967295, VmInetPure::ip2long('255.255.255.255'));
 
         $v6 = VmInetPure::inet_pton('::1');
         $this->assertIsString($v6);
@@ -63,6 +65,7 @@ final class VmInetNativeTest extends TestCase
         $this->assertSame(2130706433, VmInetNative::ip2long('127.0.0.1'));
         $this->assertFalse(VmInetNative::long2ip(-1));
         $this->assertFalse(VmInetNative::ip2long('not-an-ip'));
+        $this->assertFalse(VmInetNative::ip2long('01.02.03.04'));
 
         $v6 = VmInetNative::inet_pton('::1');
         $this->assertIsString($v6);
@@ -82,6 +85,7 @@ final class VmInetNativeTest extends TestCase
         try {
             $this->assertSame('127.0.0.1', VmInet::long2ip(2130706433));
             $this->assertSame(2130706433, VmInet::ip2long('127.0.0.1'));
+            $this->assertFalse(VmInet::ip2long('01.02.03.04'));
             $bin6 = VmInet::inet_pton('::1');
             $this->assertIsString($bin6);
             $this->assertSame('::1', VmInet::inet_ntop((string) $bin6));
