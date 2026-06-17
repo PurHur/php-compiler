@@ -1033,6 +1033,10 @@ class JIT {
             }
         }
 
+        if (str_ends_with($lower, '\\compiler::compilefunc')) {
+            return true;
+        }
+
         return false;
     }
 
