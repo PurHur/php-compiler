@@ -19,6 +19,8 @@ class Scope {
     /** Call-site class id for standalone `new static()` / `: static` (#4792). */
     public ?int $lateStaticCallClassId = null;
     public \SplObjectStorage $blockStorage;
+    /** LLVM entry BB per CFG block; stable when includes retarget {@see $blockStorage} (#866, #878). */
+    public \SplObjectStorage $blockEntryStorage;
     public \SplObjectStorage $variables;
     public ?Call $toCall = null;
     public array $args = [];
@@ -37,6 +39,7 @@ class Scope {
 
     public function __construct() {
         $this->blockStorage = new \SplObjectStorage;
+        $this->blockEntryStorage = new \SplObjectStorage;
         $this->variables = new \SplObjectStorage;
     }
 }

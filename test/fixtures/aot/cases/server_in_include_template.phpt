@@ -5,7 +5,6 @@ SCRIPT_NAME=/index.php
 --RUNFILE--
 server_in_include_template/entry.php
 --EXPECT--
-Content-Type: text/html; charset=UTF-8
 /index.php
 --EXPECT_EXIT--
 0

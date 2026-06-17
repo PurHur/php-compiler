@@ -539,6 +539,16 @@ class JIT {
         }
     }
 
+    /** Branch targets must use CFG entry BBs, not include-updated resume slots (#866, #878). */
+    private function jitBranchEntryBlock(Block $branch): PHPLLVM\BasicBlock
+    {
+        if ($this->context->scope->blockEntryStorage->contains($branch)) {
+            return $this->context->scope->blockEntryStorage[$branch];
+        }
+
+        return $this->context->scope->blockStorage[$branch];
+    }
+
     /** Self-host AOT sets PHP_COMPILER_SELFHOST_AOT=1 (#816, #557). */
     private function shouldUseSelfHostJitStubs(): bool
     {
@@ -5656,6 +5666,9 @@ class JIT {
             $origBasicBlock = $basicBlock = $func->appendBasicBlock('block_' . self::$blockNumber);
         }
         $this->context->scope->blockStorage[$block] = $basicBlock;
+        if (!$this->context->scope->blockEntryStorage->contains($block)) {
+            $this->context->scope->blockEntryStorage[$block] = $basicBlock;
+        }
         $builder = $this->context->builder;
         $builder->positionAtEnd($basicBlock);
         $this->context->jitCurrentBlock = $block;
@@ -6034,7 +6047,7 @@ class JIT {
                     $builder->positionAtEnd($branchBlock);
                     $jumpKey = $block->constants[$op->arg2]->toString();
                     $this->compileBlockInternal($func, $op->block1, null, null, 0, false, ...$args);
-                    $skipEntry = $this->context->scope->blockStorage[$op->block1];
+                    $skipEntry = $this->jitBranchEntryBlock($op->block1);
                     $initPathBb = JIT\BasicBlockHelper::append($this->context, 'fn_static_init_path');
                     $builder->positionAtEnd($branchBlock);
                     $builder->branchIf(
@@ -7221,7 +7234,7 @@ class JIT {
                         $this->context->helper->loadValue($matchVar)
                     );
                     $this->compileBlockInternal($func, $op->block1, null, null, 0, false, ...$args);
-                    $caseEntry = $this->context->scope->blockStorage[$op->block1];
+                    $caseEntry = $this->jitBranchEntryBlock($op->block1);
                     $nextBb = JIT\BasicBlockHelper::append($this->context, 'switch_next_case');
                     $builder->positionAtEnd($branchBlock);
                     if ($this->shouldFreeDeadVariablesBeforeBranch()) {
@@ -7458,8 +7471,8 @@ class JIT {
                             $this->compileBlockInternal($func, $firstArm, null, null, 0, false, ...$args);
                             $this->compileBlockInternal($func, $secondArm, null, null, 0, false, ...$args);
                         }
-                        $ifEntry = $this->context->scope->blockStorage[$op->block1];
-                        $elseEntry = $this->context->scope->blockStorage[$op->block2];
+                        $ifEntry = $this->jitBranchEntryBlock($op->block1);
+                        $elseEntry = $this->jitBranchEntryBlock($op->block2);
                         $builder->positionAtEnd($branchBlock);
                         if ($this->shouldFreeDeadVariablesBeforeBranch()) {
                             $this->context->freeDeadVariables($func, $branchBlock, $block);
@@ -7479,8 +7492,8 @@ class JIT {
                             ?? $this->context->inlineIncludeExitBlock
                             ?? $savedIncludeExit;
                     }
-                    $ifEntry = $this->context->scope->blockStorage[$op->block1];
-                    $elseEntry = $this->context->scope->blockStorage[$op->block2];
+                    $ifEntry = $this->jitBranchEntryBlock($op->block1);
+                    $elseEntry = $this->jitBranchEntryBlock($op->block2);
                     $builder->positionAtEnd($branchBlock);
                     if ($this->shouldFreeDeadVariablesBeforeBranch()) {
                         $this->context->freeDeadVariables($func, $branchBlock, $block);
@@ -10609,7 +10622,7 @@ class JIT {
             return;
         }
         if ($result->kind !== Variable::KIND_VARIABLE) {
-            throw new \LogicException("Cannot assign to a value");
+            throw new \LogicException('Cannot assign to a value');
         }
         if (
             $branchMergeTarget
