@@ -27,10 +27,7 @@ final class password_needs_rehash extends Internal
             throw new \LogicException('password_needs_rehash() requires two or three arguments');
         }
         $hash = VmString::coerceStringBuiltinArg($frame->calledArgs[0], 'password_needs_rehash', 0, 'hash');
-        $algo = $frame->calledArgs[1]->resolveIndirect();
-        if (Variable::TYPE_INTEGER !== $algo->type) {
-            throw new \LogicException('password_needs_rehash() requires an integer algorithm in this compiler build');
-        }
+        $algo = VmPassword::resolveAlgo($frame->calledArgs[1], 'password_needs_rehash', 1, 'algo');
         $options = [];
         if (3 === $argc) {
             $optVar = $frame->calledArgs[2]->resolveIndirect();
@@ -47,7 +44,7 @@ final class password_needs_rehash extends Internal
             return;
         }
         $frame->returnVar->bool(
-            VmPassword::needsRehash($hash, $algo->toInt(), $options)
+            VmPassword::needsRehash($hash, $algo, $options)
         );
     }
 

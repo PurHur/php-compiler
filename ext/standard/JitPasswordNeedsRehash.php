@@ -6,7 +6,6 @@ namespace PHPCompiler\ext\standard;
 
 use PHPCompiler\JIT\Builtin\StringPasswordCrypto;
 use PHPCompiler\JIT\Context;
-use PHPCompiler\JIT\JitLongArg;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Builder;
 use PHPLLVM\Value;
@@ -24,9 +23,12 @@ final class JitPasswordNeedsRehash
 
         $i32 = $context->getTypeFromString('int32');
         $i64 = $context->getTypeFromString('int64');
-        $algoI64 = $context->builder->truncOrBitCast(
-            JitLongArg::lower($context, $algo, 'password_needs_rehash() algorithm'),
-            $i64
+        $algoI64 = JitPasswordAlgo::lower(
+            $context,
+            $algo,
+            'password_needs_rehash',
+            1,
+            'algo'
         );
         $newCost = JitPasswordBcryptCost::lowerFromOptions($context, $options, 'password_needs_rehash');
 

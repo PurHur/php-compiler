@@ -380,7 +380,6 @@ final class StdlibConstants
         'dns_all' => self::DNS_ALL,
         'dns_any' => self::DNS_ANY,
         'password_bcrypt' => self::PASSWORD_BCRYPT,
-        'password_default' => self::PASSWORD_DEFAULT,
         'password_argon2i' => self::PASSWORD_ARGON2I,
         'password_argon2id' => self::PASSWORD_ARGON2ID,
         'assert_active' => self::ASSERT_ACTIVE,

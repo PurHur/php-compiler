@@ -16,7 +16,8 @@ final class VmPassword
 {
     public const PASSWORD_BCRYPT = 1;
 
-    public const PASSWORD_DEFAULT = 1;
+    /** php-src REGISTER_STRING_CONSTANT("PASSWORD_DEFAULT", "2y", ...) */
+    public const PASSWORD_DEFAULT = '2y';
 
     /** php-src ext/standard/password.c — registered when Argon2 is available. */
     public const PASSWORD_ARGON2I = 2;
@@ -135,7 +136,7 @@ final class VmPassword
         }
         $info = self::getInfo($hash);
         $hashAlgo = $info['algo'];
-        if (self::PASSWORD_BCRYPT === $algo || self::PASSWORD_DEFAULT === $algo) {
+        if (self::PASSWORD_BCRYPT === $algo) {
             if ('2y' !== $hashAlgo) {
                 return true;
             }
@@ -169,7 +170,7 @@ final class VmPassword
 
     private static function algoSupported(int $algo): bool
     {
-        if (self::PASSWORD_BCRYPT === $algo || self::PASSWORD_DEFAULT === $algo) {
+        if (self::PASSWORD_BCRYPT === $algo) {
             return true;
         }
         if (!VmPasswordNative::argon2Available()) {
