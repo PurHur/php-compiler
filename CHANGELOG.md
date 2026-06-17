@@ -23,6 +23,8 @@ User release v1.1.0 ([#8739](https://github.com/PurHur/php-compiler/issues/8739)
 
 - `php-types-never-type.patch` on fresh `composer install` ([#8738](https://github.com/PurHur/php-compiler/issues/8738)).
 - Spine AOT/JIT blockers and inventory driver refresh ([#8559](https://github.com/PurHur/php-compiler/issues/8559), [#8683](https://github.com/PurHur/php-compiler/issues/8683)).
+- MiniWebApp AOT: nested layout `$_REQUEST` reads, POST body env in AOT harness, per-method include/script-global scope ([#878](https://github.com/PurHur/php-compiler/issues/878), [#764](https://github.com/PurHur/php-compiler/issues/764)).
+- AOT multipart file upload: LF header lines in `__phpc_multipart_find_header_value`, null-safe `Content-Type` in `__phpc_multipart_set_file_entry` ([#878](https://github.com/PurHur/php-compiler/issues/878), 006-FileUploadWeb).
 
 ### Release gates
 

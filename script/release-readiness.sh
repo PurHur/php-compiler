@@ -76,6 +76,11 @@ log() {
   fi
 }
 
+if [[ ! -f "${_CI_REPO_ROOT}/vendor/autoload.php" ]]; then
+  log "vendor/ missing — running composer install + apply-patches (#9224)"
+  ci_install_deps
+fi
+
 record_gate() {
   GATE_NAMES+=("$1")
   GATE_STATUSES+=("$2")

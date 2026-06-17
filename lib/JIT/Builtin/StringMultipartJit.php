@@ -173,6 +173,11 @@ final class StringMultipartJit
         ) {
             self::ensureExternal($context, $name, $context->context->functionType($ret, false, ...$params));
         }
+        self::ensureExternal(
+            $context,
+            'snprintf',
+            $context->context->functionType($i32, true, $i8p, $sizeT, $i8p)
+        );
     }
 
     private static function ensureRuntimeHelpers(Context $context): void
@@ -484,16 +489,33 @@ final class StringMultipartJit
             self::literalCstr($context, "\r\n")
         );
         $endNull = $context->builder->icmp(Builder::INT_EQ, $endFromStrstr, $nullPtr);
-        $useStrlen = $fn->appendBasicBlock('use_strlen');
+        $tryLf = $fn->appendBasicBlock('try_lf');
         $storeStrstrEnd = $fn->appendBasicBlock('store_strstr_end');
         $haveEnd = $fn->appendBasicBlock('have_end');
-        $context->builder->branchIf($endNull, $useStrlen, $storeStrstrEnd);
+        $context->builder->branchIf($endNull, $tryLf, $storeStrstrEnd);
 
         $context->builder->positionAtEnd($storeStrstrEnd);
         $context->builder->store($endFromStrstr, $endSlot);
         $context->builder->branch($haveEnd);
 
-        $context->builder->positionAtEnd($useStrlen);
+        $useFullLen = $fn->appendBasicBlock('use_full_len');
+        $storeLfEnd = $fn->appendBasicBlock('store_lf_end');
+
+        $context->builder->positionAtEnd($tryLf);
+        $line = $context->builder->load($lineSlot);
+        $endFromLf = $context->builder->call(
+            $context->lookupFunction('strchr'),
+            $line,
+            $i32->constInt(ord("\n"), false)
+        );
+        $lfNull = $context->builder->icmp(Builder::INT_EQ, $endFromLf, $nullPtr);
+        $context->builder->branchIf($lfNull, $useFullLen, $storeLfEnd);
+
+        $context->builder->positionAtEnd($storeLfEnd);
+        $context->builder->store($endFromLf, $endSlot);
+        $context->builder->branch($haveEnd);
+
+        $context->builder->positionAtEnd($useFullLen);
         $line = $context->builder->load($lineSlot);
         $context->builder->store(
             $context->builder->inBoundsGEP($line, $context->builder->call($context->lookupFunction('strlen'), $line)),
@@ -585,12 +607,28 @@ final class StringMultipartJit
         $context->builder->positionAtEnd($nextLine);
         $end = $context->builder->load($endSlot);
         $endNull2 = $context->builder->icmp(Builder::INT_EQ, $end, $nullPtr);
-        $endZero = $context->builder->icmp(Builder::INT_EQ, $context->builder->load($end), $i8->constInt(0, false));
+        $endCh = $context->builder->load($end);
+        $endZero = $context->builder->icmp(Builder::INT_EQ, $endCh, $i8->constInt(0, false));
         $breakLoop = $context->builder->or($endNull2, $endZero);
-        $advance = $fn->appendBasicBlock('advance');
-        $context->builder->branchIf($breakLoop, $fail, $advance);
-        $context->builder->positionAtEnd($advance);
-        $context->builder->store($context->builder->inBoundsGEP($end, $twoSize), $lineSlot);
+        $advanceStep = $fn->appendBasicBlock('advance_step');
+        $context->builder->branchIf($breakLoop, $fail, $advanceStep);
+        $context->builder->positionAtEnd($advanceStep);
+        $isCr = $context->builder->icmp(Builder::INT_EQ, $endCh, $i8->constInt(ord("\r"), false));
+        $nextAfterCr = $context->builder->inBoundsGEP($end, $oneSize);
+        $isCrLf = $context->builder->and(
+            $isCr,
+            $context->builder->icmp(
+                Builder::INT_EQ,
+                $context->builder->load($nextAfterCr),
+                $i8->constInt(ord("\n"), false)
+            )
+        );
+        $step = $context->builder->select(
+            $isCrLf,
+            $twoSize,
+            $oneSize
+        );
+        $context->builder->store($context->builder->inBoundsGEP($end, $step), $lineSlot);
         $context->builder->branch($loopHead);
 
         $context->builder->positionAtEnd($fail);
@@ -709,14 +747,28 @@ final class StringMultipartJit
             $filename
         );
 
+        $defaultType = self::literalCstr($context, 'application/octet-stream');
+        $checkType = $fn->appendBasicBlock('check_type');
+        $useDefaultType = $fn->appendBasicBlock('use_default_type');
+        $storeType = $fn->appendBasicBlock('store_type');
+        $afterType = $fn->appendBasicBlock('after_type');
         $typeNull = $context->builder->icmp(Builder::INT_EQ, $partType, $nullPtr);
+        $context->builder->branchIf($typeNull, $useDefaultType, $checkType);
+
+        $context->builder->positionAtEnd($checkType);
         $typeEmpty = $context->builder->icmp(Builder::INT_EQ, $context->builder->load($partType), $zeroI8);
-        $useDefault = $context->builder->or($typeNull, $typeEmpty);
-        $typeVal = $context->builder->select(
-            $useDefault,
-            self::literalCstr($context, 'application/octet-stream'),
-            $partType
-        );
+        $context->builder->branchIf($typeEmpty, $useDefaultType, $storeType);
+
+        $context->builder->positionAtEnd($useDefaultType);
+        $context->builder->branch($afterType);
+
+        $context->builder->positionAtEnd($storeType);
+        $context->builder->branch($afterType);
+
+        $context->builder->positionAtEnd($afterType);
+        $typeVal = $context->builder->phi($i8p, 'part_type');
+        $typeVal->addIncoming($defaultType, $useDefaultType);
+        $typeVal->addIncoming($partType, $storeType);
         $context->builder->call(
             $context->lookupFunction('__phpc_multipart_set_string_key'),
             $entryHt,
@@ -785,7 +837,7 @@ final class StringMultipartJit
         $writeFail = $context->builder->icmp(
             Builder::INT_NE,
             $written,
-            $sizeT->constInt(1, false)
+            $contentLen
         );
         $errWrite = $fn->appendBasicBlock('err_write');
         $writeOk = $fn->appendBasicBlock('write_ok');
@@ -910,7 +962,7 @@ final class StringMultipartJit
         );
         $skipLf = $fn->appendBasicBlock('skip_lf');
         $storeNl = $fn->appendBasicBlock('store_nl');
-        $context->builder->branchIf($hasLf, $skipLf, $storeNl);
+        $context->builder->branchIf($hasLf, $skipLf, $plain);
         $context->builder->positionAtEnd($skipLf);
         $context->builder->store($context->builder->add($next, $oneSize), $iSlot);
         $context->builder->branch($storeNl);
@@ -1167,7 +1219,10 @@ final class StringMultipartJit
             $context->builder->ptrToInt($partEnd, $i64),
             $context->builder->ptrToInt($headersEnd, $i64)
         );
-        $context->builder->store($contentLen, $contentLenSlot);
+        $context->builder->store(
+            $context->builder->trunc($contentLen, $sizeT),
+            $contentLenSlot
+        );
 
         $trimHead = $fn->appendBasicBlock('trim_head');
         $trimBody = $fn->appendBasicBlock('trim_body');
