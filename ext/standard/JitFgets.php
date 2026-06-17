@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace PHPCompiler\ext\standard;
 
 use PHPCompiler\JIT\BasicBlockHelper;
+use PHPCompiler\JIT\Builtin\TypeErrorRaise;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitValueBox;
 use PHPLLVM\Builder;
@@ -13,6 +14,25 @@ use PHPLLVM\Value;
 /** LLVM lowering for fgets() via __compiler_fgets (issue #1187). */
 final class JitFgets
 {
+    private const LENGTH_ERROR = 'fgets(): Argument #2 ($length) must be greater than 0';
+
+    /** Runtime guard for non-constant length (php-src ext/standard/streams.c, #9347). */
+    public static function emitRuntimeLengthGuard(Context $context, Value $length): void
+    {
+        $i64 = $context->getTypeFromString('int64');
+        $one = $i64->constInt(1, false);
+        $invalid = $context->builder->icmp(Builder::INT_SLT, $length, $one);
+        $okBlock = BasicBlockHelper::append($context, 'fgets_len_ok');
+        $errBlock = BasicBlockHelper::append($context, 'fgets_len_err');
+        $context->builder->branchIf($invalid, $errBlock, $okBlock);
+        $context->builder->positionAtEnd($errBlock);
+        TypeErrorRaise::registerDeclarations($context);
+        TypeErrorRaise::ensureLinked($context);
+        TypeErrorRaise::emitValueError($context, self::LENGTH_ERROR);
+        $context->builder->call($context->lookupFunction('abort'));
+        $context->builder->positionAtEnd($okBlock);
+    }
+
     /** @return Value
      * (line string, or boolean false on failure/EOF) */
     public static function invoke(Context $context, Value $handleLong, Value $lengthLong): Value
