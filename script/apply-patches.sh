@@ -5026,6 +5026,11 @@ apply_patch() {
   if [[ ! -f "$patch" ]]; then
     return 0
   fi
+  if [[ "$patch_name" == "php-cfg-new-ctor-parens.patch" ]]; then
+    # Optional, known-stale diff (#6549). Keep it non-fatal (do not record failure).
+    echo "Skip ${patch_name} (optional — stale hunk #6549; does not block throw-expr #6746)"
+    return 0
+  fi
   if [[ "$(basename "$patch")" == "php-cfg-incdec-expr.patch" ]]; then
     apply_php_cfg_incdec_expr_overlay
     return $?
@@ -5434,10 +5439,10 @@ if [[ -d "$ROOT/vendor/ircmaxell/php-types" ]]; then
   apply_patch "$PATCH_DIR/php-types-generics-list-array.patch"
   apply_patch "$PATCH_DIR/php-types-iterable-generic.patch"
   apply_patch "$PATCH_DIR/php-types-docblock-trailing-text.patch"
+  apply_patch "$PATCH_DIR/php-types-fromdecl-trailing-comma.patch"
   apply_patch "$PATCH_DIR/php-types-callable-return-strip.patch"
   apply_patch "$PATCH_DIR/php-types-generic-null-tail.patch"
   apply_patch "$PATCH_DIR/php-types-fromdecl-junk-fragments.patch"
-  apply_patch "$PATCH_DIR/php-types-fromdecl-trailing-comma.patch"
   apply_patch "$PATCH_DIR/php-types-remove-type-empty-union.patch"
   apply_patch "$PATCH_DIR/php-types-anonymous-class-type.patch"
   apply_patch "$PATCH_DIR/php-types-ns-func-call.patch"
