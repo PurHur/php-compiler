@@ -5095,6 +5095,82 @@ apply_patch() {
     apply_php_types_array_shape_overlay
     return $?
   fi
+  if [[ "$(basename "$patch")" == "php-types-generics-fallback.patch" ]]; then
+    local target="$ROOT/vendor/ircmaxell/php-types/lib/PHPTypes/Type.php"
+    if grep -q "non-empty-string" "$target" 2>/dev/null; then
+      echo "Skip php-types-generics-fallback.patch (already applied)"
+      return 0
+    fi
+    python3 - "$target" <<'PY'
+import sys
+from pathlib import Path
+
+path = Path(sys.argv[1])
+text = path.read_text()
+
+anchor = """        if (preg_match('/^(list|array)\\s*</i', trim($decl))) {
+            return new self(self::TYPE_ARRAY);
+        }
+        $regex = """
+
+insert = """        if (preg_match('/^(list|array)\\s*</i', trim($decl))) {
+            return new self(self::TYPE_ARRAY);
+        }
+        $pseudo = strtolower(trim($decl));
+        if (in_array($pseudo, [
+            'non-empty-string', 'literal-string', 'lowercase-string', 'uppercase-string',
+            'class-string', 'interface-string', 'trait-string', 'html-escaped-string',
+        ], true)) {
+            return new self(self::TYPE_STRING);
+        }
+        if (in_array($pseudo, ['non-empty-array'], true)) {
+            return new self(self::TYPE_ARRAY);
+        }
+        if (preg_match('/^(positive|negative|non-zero)-int$/', $pseudo)) {
+            return new self(self::TYPE_LONG);
+        }
+        $regex = """
+
+if anchor not in text:
+    sys.stderr.write("php-types-generics-fallback: anchor not found in Type.php\n")
+    sys.exit(1)
+
+path.write_text(text.replace(anchor, insert, 1))
+PY
+    echo "Applied php-types-generics-fallback.patch (overlay)"
+    return 0
+  fi
+  if [[ "$(basename "$patch")" == "php-types-fromdecl-trailing-comma.patch" ]]; then
+    local target="$ROOT/vendor/ircmaxell/php-types/lib/PHPTypes/Type.php"
+    if grep -q "lone \\\"string,\\\" fragment" "$target" 2>/dev/null; then
+      echo "Skip php-types-fromdecl-trailing-comma.patch (already applied)"
+      return 0
+    fi
+    python3 - "$target" <<'PY'
+import sys
+from pathlib import Path
+
+path = Path(sys.argv[1])
+text = path.read_text()
+
+needle = "        $decl = self::stripTrailingDocText($decl);\n"
+if needle not in text:
+    sys.stderr.write("php-types-fromdecl-trailing-comma: stripTrailingDocText anchor not found\n")
+    sys.exit(1)
+
+insertion = needle + (
+    "        // Docblock union splits may leave a lone \\\"string,\\\" fragment (M2 spine; #3012).\\n"
+    "        $trimmedDecl = trim($decl);\\n"
+    "        if (str_ends_with($trimmedDecl, ',') && !str_contains($trimmedDecl, '|') && !str_contains($trimmedDecl, '&')) {\\n"
+    "            return self::fromDecl(rtrim($trimmedDecl, ', '));\\n"
+    "        }\\n"
+)
+
+path.write_text(text.replace(needle, insertion, 1))
+PY
+    echo "Applied php-types-fromdecl-trailing-comma.patch (overlay)"
+    return 0
+  fi
   if [[ "$(basename "$patch")" == "php-types-docblock-trailing-text.patch" ]]; then
     apply_php_types_docblock_trailing_text_overlay
     return $?
