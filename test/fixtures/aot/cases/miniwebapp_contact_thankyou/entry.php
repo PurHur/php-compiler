@@ -11,7 +11,7 @@ function miniwebapp_contact_name_is_valid(): bool
     if ($name == '') {
         return false;
     }
-    if ($name != substr($name, 0, 200)) {
+    if (isset($name[200])) {
         return false;
     }
 

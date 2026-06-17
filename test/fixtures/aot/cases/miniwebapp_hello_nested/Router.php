@@ -13,7 +13,7 @@ class Router
     private array $config;
 
     /**
-     * Contact name guard for VM (issue #697): empty check + isset offset at max length.
+     * Contact name guard for VM (issue #697): use == and substr, not strlen compares.
      */
     private static function contactNameIsValid(): bool
     {
@@ -100,27 +100,27 @@ class Router
     {
         $appName = $this->resolveAppName();
         $title = 'Home';
-        include __DIR__ . '/../templates/layout.php';
+        include __DIR__ . '/layout.php';
     }
 
     private function renderHello(): void
     {
         $appName = $this->resolveAppName();
         $title = 'Hello';
-        include __DIR__ . '/../templates/layout.php';
+        include __DIR__ . '/layout.php';
     }
 
     private function renderContactForm(): void
     {
         $appName = $this->resolveAppName();
         $title = 'Contact';
-        include __DIR__ . '/../templates/layout.php';
+        include __DIR__ . '/layout.php';
     }
 
     private function renderContactThankYou($contactName): void
     {
         $name = (string) $contactName;
-        include __DIR__ . '/../templates/thankyou.php';
+        include __DIR__ . '/thankyou.php';
     }
 
     private function resolveAppName(): string

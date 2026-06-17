@@ -230,6 +230,12 @@ final class IncludeHelper
             $calleeSnapshot = $context->scope->variables->contains($operand)
                 ? $context->scope->variables[$operand]
                 : $context->getVariableFromOp($operand);
+            if (
+                null === $bindingName
+                || !self::callerDeclaresLocalName($bindingCaller, $bindingName)
+            ) {
+                continue;
+            }
             $context->inlineIncludeBindingRefreshStack[$bindingRefreshIndex][] = [
                 $operand,
                 $preparedBindings[$operand],
@@ -321,6 +327,9 @@ final class IncludeHelper
         foreach ($calleeOps as $operand) {
             $name = OperandName::resolve($operand);
             if (null === $name || Superglobals::isSuperglobalName($name)) {
+                continue;
+            }
+            if (!self::callerDeclaresLocalName($callerBlock, $name)) {
                 continue;
             }
             $callerVar = self::callerVariableForName($context, $callerBlock, $name);
@@ -789,6 +798,11 @@ final class IncludeHelper
         }
 
         return null;
+    }
+
+    private static function callerDeclaresLocalName(Block $callerBlock, string $name): bool
+    {
+        return null !== self::callerOperandByName($callerBlock, $name);
     }
 
     /**

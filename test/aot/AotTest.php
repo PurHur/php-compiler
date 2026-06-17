@@ -235,6 +235,13 @@ class AotTest extends BaseTest
         if (str_contains($caseName, 'headers_list')) {
             return;
         }
+        // Leave unset when a body is present so __phpc_sg_request_method_for infers POST (#878).
+        if (isset($env['REQUEST_BODY']) && '' !== $env['REQUEST_BODY']) {
+            return;
+        }
+        if (isset($env['REQUEST_BODY_FILE']) && '' !== $env['REQUEST_BODY_FILE']) {
+            return;
+        }
         $env['REQUEST_METHOD'] = 'GET';
     }
 

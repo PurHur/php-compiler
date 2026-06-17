@@ -337,8 +337,12 @@ class Context {
             $resolved = $path;
         }
         $normalized = \PHPCompiler\VM\ScriptStack::normalize($resolved);
+        if ('' === $normalized) {
+            return false;
+        }
+        $key = $this->jitIncludeCompileScopeKey($normalized);
 
-        return '' !== $normalized && isset($this->jitAotIncludedCompileDone[$normalized]);
+        return isset($this->jitAotIncludedCompileDone[$key]);
     }
 
     public function markJitIncludedFileCompiled(string $path): void
@@ -349,8 +353,14 @@ class Context {
         }
         $normalized = \PHPCompiler\VM\ScriptStack::normalize($resolved);
         if ('' !== $normalized) {
-            $this->jitAotIncludedCompileDone[$normalized] = true;
+            $this->jitAotIncludedCompileDone[$this->jitIncludeCompileScopeKey($normalized)] = true;
         }
+    }
+
+    /** Per-LLVM-function include dedupe (#878): same path in different methods must re-inline. */
+    private function jitIncludeCompileScopeKey(string $normalizedPath): string
+    {
+        return $this->activeFunction."\0".$normalizedPath;
     }
 
     /**
@@ -360,13 +370,17 @@ class Context {
      */
     public function ensureScriptGlobal(string $name): Variable
     {
-        if (!isset($this->jitGlobalVariables[$name])) {
+        $storageKey = $name;
+        if ($this->inlineIncludeDepth > 0 && '' !== $this->activeFunction) {
+            $storageKey = $this->activeFunction."\0".$name;
+        }
+        if (!isset($this->jitGlobalVariables[$storageKey])) {
             if ('argv' === $name && null !== CliArgvGlobalInit::$global) {
-                $this->jitGlobalVariables[$name] = CliArgvGlobalInit::load($this);
+                $this->jitGlobalVariables[$storageKey] = CliArgvGlobalInit::load($this);
             } elseif ('argc' === $name && null !== CliArgvGlobalInit::$argcGlobal) {
-                $this->jitGlobalVariables[$name] = CliArgvGlobalInit::loadArgc($this);
+                $this->jitGlobalVariables[$storageKey] = CliArgvGlobalInit::loadArgc($this);
             } else {
-                $globalName = 'phpc_script_global_'.substr(hash('sha256', 'script:'.$name), 0, 16);
+                $globalName = 'phpc_script_global_'.substr(hash('sha256', 'script:'.$storageKey), 0, 16);
                 $ptrTy = $this->getTypeFromString('__value__*');
                 $global = $this->module->addGlobal($ptrTy, $globalName);
                 $global->setInitializer($ptrTy->constNull());
@@ -377,12 +391,12 @@ class Context {
                     $global
                 );
                 $scriptVar->functionStaticGlobal = true;
-                $this->jitGlobalVariables[$name] = $scriptVar;
+                $this->jitGlobalVariables[$storageKey] = $scriptVar;
                 $this->initScriptGlobalHeapBox($global);
             }
         }
 
-        return $this->jitGlobalVariables[$name];
+        return $this->jitGlobalVariables[$storageKey];
     }
 
     private function initScriptGlobalHeapBox(PHPLLVM\Value $global): void
