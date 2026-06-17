@@ -84,7 +84,8 @@ patch_already_applied() {
       grep -q 'Malformed phpdoc fragments in vendor trees' "$ROOT/vendor/ircmaxell/php-types/lib/PHPTypes/Type.php" 2>/dev/null
       ;;
     php-types-fromdecl-trailing-comma.patch)
-      grep -q 'Docblock union splits may leave a lone' "$ROOT/vendor/ircmaxell/php-types/lib/PHPTypes/Type.php" 2>/dev/null
+      grep -q 'Docblock union splits may leave a lone' "$ROOT/vendor/ircmaxell/php-types/lib/PHPTypes/Type.php" 2>/dev/null \
+        && ! php_types_type_fromdecl_trailing_comma_corrupt "$ROOT/vendor/ircmaxell/php-types/lib/PHPTypes/Type.php"
       ;;
     php-types-remove-type-empty-union.patch)
       ! grep -q "throw new \\\\LogicException('Unknown type encountered')" "$ROOT/vendor/ircmaxell/php-types/lib/PHPTypes/Type.php" 2>/dev/null
@@ -3281,6 +3282,59 @@ PY
   echo "Applied php-types-docblock-first-token.patch (overlay)"
 }
 
+php_types_type_fromdecl_trailing_comma_corrupt() {
+  local target="$1"
+  [[ -f "$target" ]] || return 1
+  grep -q 'Docblock union splits.*\\n        \$trimmedDecl' "$target" 2>/dev/null
+}
+
+apply_php_types_fromdecl_trailing_comma_overlay() {
+  local target="$ROOT/vendor/ircmaxell/php-types/lib/PHPTypes/Type.php"
+  if patch_already_applied "$PATCH_DIR/php-types-fromdecl-trailing-comma.patch"; then
+    echo "Skip php-types-fromdecl-trailing-comma.patch (already applied)"
+    return 0
+  fi
+  if php_types_type_fromdecl_trailing_comma_corrupt "$target"; then
+    echo "Repair php-types-fromdecl-trailing-comma.patch (literal \\\\n corruption; #9261)"
+  fi
+  python3 - "$target" <<'PY'
+import re
+import sys
+from pathlib import Path
+
+path = Path(sys.argv[1])
+text = path.read_text()
+
+corrupt = re.compile(
+    r"\n        // Docblock union splits may leave a lone[^\n]*\\n[^\n]*$",
+    re.MULTILINE,
+)
+text, removed = corrupt.subn("\n", text, count=1)
+if removed:
+    path.write_text(text)
+
+needle = "        $decl = self::stripTrailingDocText($decl);\n"
+if needle not in text:
+    sys.stderr.write("php-types-fromdecl-trailing-comma: stripTrailingDocText anchor not found\n")
+    sys.exit(1)
+
+insertion = needle + (
+    "        // Docblock union splits may leave a lone \"string,\" fragment (M2 spine; #3012).\n"
+    "        $trimmedDecl = trim($decl);\n"
+    "        if (str_ends_with($trimmedDecl, ',') && !str_contains($trimmedDecl, '|') && !str_contains($trimmedDecl, '&')) {\n"
+    "            return self::fromDecl(rtrim($trimmedDecl, ', '));\n"
+    "        }\n"
+)
+
+if 'Docblock union splits may leave a lone' in text:
+    if re.search(r"if \(str_ends_with\(\$trimmedDecl, ','\)", text):
+        raise SystemExit(0)
+
+path.write_text(text.replace(needle, insertion, 1))
+PY
+  echo "Applied php-types-fromdecl-trailing-comma.patch (overlay)"
+}
+
 apply_php_types_generic_null_tail_overlay() {
   local target="$ROOT/vendor/ircmaxell/php-types/lib/PHPTypes/Type.php"
   if patch_already_applied "$PATCH_DIR/php-types-generic-null-tail.patch"; then
@@ -5206,35 +5260,8 @@ PY
     return 0
   fi
   if [[ "$(basename "$patch")" == "php-types-fromdecl-trailing-comma.patch" ]]; then
-    local target="$ROOT/vendor/ircmaxell/php-types/lib/PHPTypes/Type.php"
-    if grep -q "lone \\\"string,\\\" fragment" "$target" 2>/dev/null; then
-      echo "Skip php-types-fromdecl-trailing-comma.patch (already applied)"
-      return 0
-    fi
-    python3 - "$target" <<'PY'
-import sys
-from pathlib import Path
-
-path = Path(sys.argv[1])
-text = path.read_text()
-
-needle = "        $decl = self::stripTrailingDocText($decl);\n"
-if needle not in text:
-    sys.stderr.write("php-types-fromdecl-trailing-comma: stripTrailingDocText anchor not found\n")
-    sys.exit(1)
-
-insertion = needle + (
-    "        // Docblock union splits may leave a lone \\\"string,\\\" fragment (M2 spine; #3012).\\n"
-    "        $trimmedDecl = trim($decl);\\n"
-    "        if (str_ends_with($trimmedDecl, ',') && !str_contains($trimmedDecl, '|') && !str_contains($trimmedDecl, '&')) {\\n"
-    "            return self::fromDecl(rtrim($trimmedDecl, ', '));\\n"
-    "        }\\n"
-)
-
-path.write_text(text.replace(needle, insertion, 1))
-PY
-    echo "Applied php-types-fromdecl-trailing-comma.patch (overlay)"
-    return 0
+    apply_php_types_fromdecl_trailing_comma_overlay
+    return $?
   fi
   if [[ "$(basename "$patch")" == "php-types-docblock-trailing-text.patch" ]]; then
     apply_php_types_docblock_trailing_text_overlay
@@ -5658,6 +5685,9 @@ verify_critical_language_patches() {
     fi
   fi
   local vendor_type="$ROOT/vendor/ircmaxell/php-types/lib/PHPTypes/Type.php"
+  if [[ -f "$vendor_type" ]] && php_types_type_fromdecl_trailing_comma_corrupt "$vendor_type"; then
+    missing+=("php-types-fromdecl-trailing-comma-corrupt")
+  fi
   if ! grep -q 'instanceof Op\\Type\\Union_' "$recon" 2>/dev/null; then
     missing+=("php-types-union-type")
   elif ! php -l "$recon" >/dev/null 2>&1; then
