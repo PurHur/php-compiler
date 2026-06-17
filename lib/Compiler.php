@@ -4215,7 +4215,7 @@ class Compiler {
         $entry->backedType = $backedType;
         EnumSupport::ensureBuiltinEnumInterfaces($entry);
 
-        return EnumCaseSupport::createCase($entry, $caseName, $backing);
+        return EnumCaseSupport::compileTimeCaseVariable($entry, $caseName, $backing);
     }
 
     private function compileTimeStoredValueIsEnumCaseBackingScalar(
