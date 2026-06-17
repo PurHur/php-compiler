@@ -1141,7 +1141,7 @@ final class StringFormatJit
         $switch->addCase($i32->constInt(ord('s'), false), $caseS);
         $switch->addCase($i32->constInt(ord('d'), false), $caseD);
         $switch->addCase($i32->constInt(ord('f'), false), $caseF);
-        foreach (['b', 'x', 'X', 'o', 'u', 'c', 'e', 'E', 'g', 'G'] as $snprintfSpec) {
+        foreach (['b', 'x', 'X', 'o', 'u', 'c', 'e', 'E', 'g', 'G', 'a', 'A'] as $snprintfSpec) {
             $switch->addCase($i32->constInt(ord($snprintfSpec), false), $caseSnprintf);
         }
 
@@ -1337,7 +1337,13 @@ final class StringFormatJit
                 $context->builder->icmp(Builder::INT_EQ, $spec32, $i32->constInt(ord('E'), false)),
                 $context->builder->or(
                     $context->builder->icmp(Builder::INT_EQ, $spec32, $i32->constInt(ord('g'), false)),
-                    $context->builder->icmp(Builder::INT_EQ, $spec32, $i32->constInt(ord('G'), false))
+                    $context->builder->or(
+                        $context->builder->icmp(Builder::INT_EQ, $spec32, $i32->constInt(ord('G'), false)),
+                        $context->builder->or(
+                            $context->builder->icmp(Builder::INT_EQ, $spec32, $i32->constInt(ord('a'), false)),
+                            $context->builder->icmp(Builder::INT_EQ, $spec32, $i32->constInt(ord('A'), false))
+                        )
+                    )
                 )
             )
         );
@@ -1553,7 +1559,13 @@ final class StringFormatJit
                     $context->builder->icmp(Builder::INT_EQ, $spec32, $i32->constInt(ord('f'), false)),
                     $context->builder->or(
                         $context->builder->icmp(Builder::INT_EQ, $spec32, $i32->constInt(ord('g'), false)),
-                        $context->builder->icmp(Builder::INT_EQ, $spec32, $i32->constInt(ord('G'), false))
+                        $context->builder->or(
+                            $context->builder->icmp(Builder::INT_EQ, $spec32, $i32->constInt(ord('G'), false)),
+                            $context->builder->or(
+                                $context->builder->icmp(Builder::INT_EQ, $spec32, $i32->constInt(ord('a'), false)),
+                                $context->builder->icmp(Builder::INT_EQ, $spec32, $i32->constInt(ord('A'), false))
+                            )
+                        )
                     )
                 )
             )
