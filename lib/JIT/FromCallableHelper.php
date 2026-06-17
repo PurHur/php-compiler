@@ -78,14 +78,17 @@ final class FromCallableHelper
         string $methodLc,
         ?string $classHint = null
     ): Variable {
-        $className = $receiverOp->type?->userType
-            ?? $classHint
+        // Enum case FCC receivers often have userType '' while classHint is the enum FQCN (#6845, #9250).
+        $className = self::nonEmptyString($receiverOp->type?->userType)
+            ?? self::nonEmptyString($classHint)
             ?? ($context->scope->className !== '' ? $context->scope->className : 'object');
         $declaringClassLc = strtolower(ltrim((string) $className, '\\'));
         $proxyName = self::resolveInstanceProxyName($context, $declaringClassLc, $methodLc, $className);
         $inner = $context->resolveFunctionProxy($proxyName);
         $receiverVar = $context->getVariableFromOp($receiverOp);
-        $scopeName = $receiverOp->type?->userType ?? $classHint ?? $className;
+        $scopeName = self::nonEmptyString($receiverOp->type?->userType)
+            ?? self::nonEmptyString($classHint)
+            ?? $className;
         $scopeConst = $context->context->constString((string) $scopeName, true);
         $boundScope = new Variable(
             $context,
@@ -191,5 +194,10 @@ final class FromCallableHelper
         }
 
         return $proxyName;
+    }
+
+    private static function nonEmptyString(?string $value): ?string
+    {
+        return null !== $value && '' !== $value ? $value : null;
     }
 }
