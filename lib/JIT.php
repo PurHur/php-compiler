@@ -7595,6 +7595,15 @@ class JIT {
 
                         return $returnBlock;
                     }
+                    if ($block->returnTypeNever) {
+                        $neverFunc = null !== $block->func ? $block->func->name : null;
+                        JIT\Builtin\TypeErrorRaise::emitRaise(
+                            $this->context,
+                            null !== $neverFunc && '' !== $neverFunc
+                                ? "{$neverFunc}(): never-returning function must not implicitly return"
+                                : 'A never-returning function must not return'
+                        );
+                    }
                     if ($block->returnTypeVoid) {
                         JIT\Builtin\TypeErrorRaise::registerDeclarations($this->context);
                         JIT\Builtin\TypeErrorRaise::ensureLinked($this->context);
