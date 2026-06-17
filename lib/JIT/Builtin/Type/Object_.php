@@ -6050,9 +6050,14 @@ class Object_ extends Type {
         );
 
         if (Variable::TYPE_VALUE === $value->type) {
-            $valuePtr = Variable::KIND_VARIABLE === $value->kind
-                ? JitValueBox::pointer($this->context, $value->value)
-                : $value->value;
+            if (Variable::KIND_VALUE === $value->kind) {
+                $valuePtr = JitValueBox::normalizeValuePtr(
+                    $this->context,
+                    $this->context->helper->loadValue($value)
+                );
+            } else {
+                $valuePtr = JitValueBox::valuePtrFromVariable($this->context, $value);
+            }
             JitValueBox::copyFromPointer($this->context, $heapVal, $valuePtr);
             $value->addref();
 
