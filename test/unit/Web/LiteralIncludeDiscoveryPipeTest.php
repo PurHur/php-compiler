@@ -30,6 +30,24 @@ PHP
         }
     }
 
+    public function testDiscoverBundleSkipsMethodBodyIncludes(): void
+    {
+        $dir = dirname(__DIR__, 3).'/examples/003-MiniWebApp';
+        if (!is_file($dir.'/public/index.php')) {
+            $this->markTestSkipped('examples/003-MiniWebApp missing');
+        }
+        $runtime = new Runtime(Runtime::MODE_AOT);
+        $entry = realpath($dir.'/public/index.php');
+        $this->assertNotFalse($entry);
+        $bundle = LiteralIncludeDiscovery::discoverBundleAbsolutePaths($runtime, $entry);
+        $joined = implode("\n", $bundle);
+        $this->assertStringContainsString('config.php', $joined);
+        $this->assertStringContainsString('Router.php', $joined);
+        $this->assertStringNotContainsString('templates/layout.php', $joined);
+        $reachable = LiteralIncludeDiscovery::discoverAbsolutePaths($runtime, $entry);
+        $this->assertStringContainsString('templates/layout.php', implode("\n", $reachable));
+    }
+
     public function testDiscoverDirectResetsNameResolverBetweenFiles(): void
     {
         $dir = sys_get_temp_dir().'/phpc_use_reset_'.getmypid();

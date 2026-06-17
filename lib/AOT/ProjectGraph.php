@@ -40,7 +40,7 @@ final class ProjectGraph
         $errors = array_merge($errors, self::entryLiteralIncludeCoverageErrors($entry, $manifestIncludes));
 
         $runtime = new Runtime(Runtime::MODE_AOT);
-        $discovered = LiteralIncludeDiscovery::discoverAbsolutePaths($runtime, $entry);
+        $discovered = LiteralIncludeDiscovery::discoverBundleAbsolutePaths($runtime, $entry);
 
         $files = [];
         $seen = [];

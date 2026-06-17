@@ -320,13 +320,43 @@ class JIT {
         if (null === $ifMerge || $ifMerge !== $elseMerge) {
             return false;
         }
-        foreach ($ifMerge->opCodes as $mergeOp) {
-            if (OpCode::TYPE_RETURN === $mergeOp->type) {
-                return true;
+        $phi = $this->ternaryReturnPhiOperand($ifMerge);
+        if (null === $phi) {
+            return false;
+        }
+        if (!$this->branchIsTernaryReturnMergeArm($ifBlock) && !$this->branchIsTernaryReturnMergeArm($elseBlock)) {
+            return false;
+        }
+        // Switch-as-JUMPIF chains share a post-switch merge RETURN but do not assign into
+        // the ?: phi before breaking; require an arm assign (#878).
+        return null !== $this->ternaryPhiAssignSourceOperand($ifBlock, $ifMerge)
+            || null !== $this->ternaryPhiAssignSourceOperand($elseBlock, $ifMerge);
+    }
+
+    /**
+     * False when a JUMPIF arm has switch/call/echo side effects before its merge JUMP (#878).
+     */
+    private function branchIsTernaryReturnMergeArm(?Block $branch): bool
+    {
+        if (null === $branch) {
+            return false;
+        }
+        foreach ($branch->opCodes as $branchOp) {
+            if (OpCode::TYPE_JUMP === $branchOp->type) {
+                break;
+            }
+            if (
+                OpCode::TYPE_FUNCCALL_EXEC_NORETURN === $branchOp->type
+                || OpCode::TYPE_FUNCCALL_EXEC_RETURN === $branchOp->type
+                || OpCode::TYPE_METHODCALL_INIT === $branchOp->type
+                || OpCode::TYPE_STATICCALL_INIT === $branchOp->type
+                || OpCode::TYPE_ECHO === $branchOp->type
+            ) {
+                return false;
             }
         }
 
-        return false;
+        return true;
     }
 
     private function ternaryReturnPhiOperand(Block $mergeBlock): ?Operand
@@ -7445,12 +7475,15 @@ class JIT {
                     $ternaryMergeReturn = null;
                     $savedTernarySharedReturn = $this->context->ternarySharedReturnOperand;
                     $savedTernarySharedReturnSlot = $this->context->ternarySharedReturnSlot;
-                    $ternaryMergeReturn = $this->findJumpIfSharedReturnOperand($op->block1, $op->block2);
-                    if (null !== $ternaryMergeReturn) {
-                        $this->context->coalesceAssignTargets[$ternaryMergeReturn] = true;
-                        $this->context->ternarySharedReturnOperand = $ternaryMergeReturn;
-                        $mergeBlock = $this->jumpBlockTarget($op->block1);
-                        if (null !== $mergeBlock) {
+                    $isTernaryReturnMerge = 0 === $this->context->inlineIncludeDepth
+                        && $this->jumpIfTargetsReturnMerge($op->block1, $op->block2);
+                    if ($isTernaryReturnMerge) {
+                        $mergeBlock = $this->branchJumpMergeBlock($op->block1);
+                        assert(null !== $mergeBlock);
+                        $ternaryMergeReturn = $this->ternaryReturnPhiOperand($mergeBlock);
+                        if (null !== $ternaryMergeReturn) {
+                            $this->context->coalesceAssignTargets[$ternaryMergeReturn] = true;
+                            $this->context->ternarySharedReturnOperand = $ternaryMergeReturn;
                             foreach ($mergeBlock->opCodes as $mergeOp) {
                                 if (OpCode::TYPE_RETURN === $mergeOp->type && null !== $mergeOp->arg1) {
                                     $this->context->ternarySharedReturnSlot = (int) $mergeOp->arg1;
@@ -7472,10 +7505,7 @@ class JIT {
                         $savedIncludeExit = $this->context->inlineIncludeExitBlock;
                         $this->context->inlineIncludeExitBlock = null;
                     }
-                    if (
-                        0 === $this->context->inlineIncludeDepth
-                        && $this->jumpIfTargetsReturnMerge($op->block1, $op->block2)
-                    ) {
+                    if ($isTernaryReturnMerge) {
                         $mergeBlock = $this->branchJumpMergeBlock($op->block1);
                         assert(null !== $mergeBlock);
                         $ifString = $this->branchAssignsStringToTernaryPhi($op->block1, $mergeBlock)

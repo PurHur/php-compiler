@@ -46,6 +46,30 @@ final class LiteralIncludeDiscovery
 
     public static function discoverAbsolutePaths(Runtime $runtime, string $entryFile): array
     {
+        return self::discoverTransitiveAbsolutePaths($runtime, $entryFile, false);
+    }
+
+    /**
+     * Literal includes safe for AOT SourceBundler (main-scope require only, issue #739, #878).
+     *
+     * Skips method-body {@see include} targets (MiniWebApp templates): those are JIT-inlined and
+     * must not be prepended at file scope or have their include lines stripped from Router.
+     *
+     * @return list<string> absolute paths to bundle before the entry (dependency order)
+     */
+    public static function discoverBundleAbsolutePaths(Runtime $runtime, string $entryFile): array
+    {
+        return self::discoverTransitiveAbsolutePaths($runtime, $entryFile, true);
+    }
+
+    /**
+     * @return list<string>
+     */
+    private static function discoverTransitiveAbsolutePaths(
+        Runtime $runtime,
+        string $entryFile,
+        bool $bundleScopeOnly
+    ): array {
         $entryFile = realpath($entryFile) ?: $entryFile;
         if (!is_file($entryFile)) {
             return [];
@@ -54,7 +78,6 @@ final class LiteralIncludeDiscovery
         $script = $runtime->parseForIncludeDiscovery($code, $entryFile);
 
         $paths = [];
-        $seen = new \SplObjectStorage();
         $seenFiles = [];
         $queue = [$entryFile => $script];
 
@@ -63,7 +86,10 @@ final class LiteralIncludeDiscovery
             $currentScript = $queue[$currentFile];
             unset($queue[$currentFile]);
 
-            foreach (self::pathsFromScript($currentScript, $currentFile) as $includePath) {
+            $literalPaths = $bundleScopeOnly
+                ? self::pathsFromMainScopeForBundle($currentScript, $currentFile)
+                : self::pathsFromScript($currentScript, $currentFile);
+            foreach ($literalPaths as $includePath) {
                 $resolved = IncludePathResolver::resolve($includePath, $currentFile);
                 if (null === $resolved || isset($seenFiles[$resolved])) {
                     continue;

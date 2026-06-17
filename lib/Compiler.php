@@ -150,6 +150,9 @@ class Compiler {
     /** @var array<string, true> lowercase user function names declared `: never` (#4117). */
     private array $neverFunctionNames = [];
 
+    /** True while lowering switch to JUMPIF/EQUAL — skip ?: merge slot bridging (#878). */
+    private bool $compilingSwitchJumpIfChain = false;
+
     /** Script declares DNF-typed instance properties — MCJIT needs a try region (#4111). */
     private bool $scriptHasDnfTypedProperties = false;
 
@@ -726,8 +729,10 @@ class Compiler {
         if (!$this->seen->contains($block)) {
             $this->seen[$block] = $new = new Block($block);
             $new->inheritScopeFrom($parent);
-            $this->inheritCfgVarSlotsFromSiblingCfgBranches($block, $new);
-            $this->applyTernaryMergeVarSlots($block, $new);
+            if (!$this->compilingSwitchJumpIfChain) {
+                $this->inheritCfgVarSlotsFromSiblingCfgBranches($block, $new);
+                $this->applyTernaryMergeVarSlots($block, $new);
+            }
             $this->inheritFuncFromParent($new, $parent);
             // Match/ternary branch blocks reuse unnamed temporaries (subject slot) from the parent (#4274).
             $new->inheritUndefinedLocals = true;
@@ -735,7 +740,9 @@ class Compiler {
                 $new->addOpCode(new OpCode(OpCode::TYPE_BEGIN_SILENCE));
             }
             $this->compileBlock($new);
-            $this->recordTernaryMergeVarSlots($block, $new);
+            if (!$this->compilingSwitchJumpIfChain) {
+                $this->recordTernaryMergeVarSlots($block, $new);
+            }
         } else {
             $child = $this->seen[$block];
             // Merge blocks already mapped on first branch; sibling inheritScopeFrom
@@ -1137,6 +1144,9 @@ class Compiler {
     /** When merge block is already lowered, ?: branch assigns must use its ECHO slot (#3790). */
     private function branchMergeAssignSlot(Block $branch, Op\Expr\Assign $assign): ?int
     {
+        if ($this->compilingSwitchJumpIfChain) {
+            return null;
+        }
         if (null === $branch->orig) {
             return null;
         }
@@ -5984,6 +5994,8 @@ class Compiler {
         }
 
         $current = $block;
+        $savedSwitchJumpIfChain = $this->compilingSwitchJumpIfChain;
+        $this->compilingSwitchJumpIfChain = true;
         for ($i = 0; $i < $caseCount; ++$i) {
             $eqSlot = $this->requireOperandSlot(
                 $this->compileBoolTemporary($current),
@@ -6022,6 +6034,7 @@ class Compiler {
                 $current = $elseTarget;
             }
         }
+        $this->compilingSwitchJumpIfChain = $savedSwitchJumpIfChain;
     }
 
     /**

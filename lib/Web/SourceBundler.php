@@ -616,6 +616,11 @@ final class SourceBundler
         $kept = [];
         foreach ($lines as $line) {
             if (preg_match('/\b(require|include)(?:_once)?\s+/i', $line)) {
+                // Method-body includes are JIT-inlined; never strip even when the path is bundled (#878).
+                if (preg_match('/^\s+(include)(?:_once)?\s+/i', $line)) {
+                    $kept[] = $line;
+                    continue;
+                }
                 $remove = false;
                 foreach ($drop as $base => $_) {
                     if (str_contains($line, $base)) {

@@ -12,7 +12,7 @@ use PHPUnit\Framework\TestCase;
  */
 final class ProjectGraphTest extends TestCase
 {
-    public function testResolveMiniWebAppListsEntryManifestAndTemplates(): void
+    public function testResolveMiniWebAppListsEntryManifestAndConfig(): void
     {
         $dir = dirname(__DIR__, 2).'/examples/003-MiniWebApp';
         $result = ProjectGraph::resolve($dir);
@@ -21,8 +21,8 @@ final class ProjectGraphTest extends TestCase
         $this->assertStringContainsString('public/index.php', $joined);
         $this->assertStringContainsString('src/Router.php', $joined);
         $this->assertStringContainsString('config.php', $joined);
-        $this->assertStringContainsString('templates/layout.php', $joined);
-        $this->assertStringContainsString('templates/home.php', $joined);
+        // Method-body template includes are JIT-inlined, not AOT bundle units (#739, #878).
+        $this->assertStringNotContainsString('templates/layout.php', $joined);
     }
 
     public function testDryRunCliPrintsMiniWebAppFiles(): void
@@ -31,7 +31,8 @@ final class ProjectGraphTest extends TestCase
         $result = $this->runPhpcBuild(['--project', '--dry-run', $repoRoot.'/examples/003-MiniWebApp'], $repoRoot);
         $this->assertSame(0, $result['exit'], $result['stderr']);
         $this->assertStringContainsString('public/index.php', $result['stdout']);
-        $this->assertStringContainsString('templates/layout.php', $result['stdout']);
+        $this->assertStringContainsString('config.php', $result['stdout']);
+        $this->assertStringNotContainsString('templates/layout.php', $result['stdout']);
     }
 
     public function testRemovingManifestIncludeRequiredByEntryFails(): void
