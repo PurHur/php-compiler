@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace PHPCompiler\VM;
 
 use PHPCfg\Func as CfgFunc;
+use PHPCompiler\Compiler\EnumBackedCaseCheck;
 use PHPCompiler\VM\Builtin\EnumCases;
 
 /** Helpers for user enum runtime (#1356, #3308). */
@@ -58,8 +59,7 @@ final class EnumSupport
             return;
         }
         $backedType = $entry->backedType;
-        /** @var array<int, string>|array<string, string> */
-        $seen = [];
+        $cases = [];
         foreach ($entry->enumCases as $case) {
             $backing = BackedEnum::caseBackingScalar($backedType, $case['value'])->resolveIndirect();
             if ('int' === $backedType) {
@@ -73,15 +73,11 @@ final class EnumSupport
                 }
                 $key = $backing->toString();
             }
-            if (isset($seen[$key])) {
-                throw new \Error(sprintf(
-                    'Duplicate value in enum %s for cases %s and %s',
-                    $entry->name,
-                    $seen[$key],
-                    $case['name']
-                ));
-            }
-            $seen[$key] = $case['name'];
+            $cases[] = ['name' => $case['name'], 'backing' => $key];
+        }
+        $message = EnumBackedCaseCheck::duplicateBackingErrorMessage($entry->name, $cases);
+        if (null !== $message) {
+            throw new \Error($message);
         }
         $entry->backedEnumTableBuilt = true;
     }

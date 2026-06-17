@@ -1710,6 +1710,32 @@ class Object_ extends Type {
         return $this->enumCaseCanonicalNames[$classId][$caseKey] ?? $caseKey;
     }
 
+    /**
+     * Zend duplicate backing detection for JIT enum case fetch (#5773, #9255).
+     */
+    public function duplicateBackedEnumErrorMessage(int $classId): ?string
+    {
+        if (!$this->isEnumClassId($classId) || null === ($this->enumBackedType[$classId] ?? null)) {
+            return null;
+        }
+        $cases = [];
+        foreach ($this->enumCaseOrderForClass($classId) as $caseKey) {
+            $backing = $this->enumCaseBackingScalarForCase($classId, $caseKey);
+            if (!is_int($backing) && !is_string($backing)) {
+                return null;
+            }
+            $cases[] = [
+                'name' => $this->enumCaseCanonicalName($classId, $caseKey),
+                'backing' => $backing,
+            ];
+        }
+
+        return \PHPCompiler\Compiler\EnumBackedCaseCheck::duplicateBackingErrorMessage(
+            $this->classNameForId($classId),
+            $cases
+        );
+    }
+
     public function finishEnumClass(int $classId): void
     {
         if ($this->isEnumClassId($classId)) {
