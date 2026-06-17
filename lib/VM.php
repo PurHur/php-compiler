@@ -5242,6 +5242,26 @@ restart:
                     }
                     if (null !== $op->arg3) {
                         $container = $frame->scope[$op->arg2]->resolveIndirect();
+                        if (Variable::TYPE_ENUM_CASE === $container->type) {
+                            [$propName, $catchFrame] = $this->coerceRuntimeOperandToString(
+                                $frame->scope[$op->arg3],
+                                $frame
+                            );
+                            if (null !== $catchFrame) {
+                                $frame = $catchFrame;
+                                goto restart;
+                            }
+                            $catchFrame = $this->enforcePropertyName($propName, $frame);
+                            if (null !== $catchFrame) {
+                                $frame = $catchFrame;
+                                goto restart;
+                            }
+                            $dst->bool(EnumCaseSupport::propertyExistsOnCase(
+                                $container->toEnumCase()->enumClass,
+                                $propName
+                            ));
+                            break;
+                        }
                         if (Variable::TYPE_ARRAY === $container->type) {
                             if ($this->context->isGlobalsTable($container)) {
                                 $dst->bool($this->context->globalsTableOffsetIsSet($frame->scope[$op->arg3]));
@@ -5264,6 +5284,23 @@ restart:
                         }
                         if (Variable::TYPE_OBJECT === $container->type) {
                             $object = $container->toObject();
+                            if (EnumCaseSupport::isEnumCase($object)) {
+                                [$propName, $catchFrame] = $this->coerceRuntimeOperandToString(
+                                    $frame->scope[$op->arg3],
+                                    $frame
+                                );
+                                if (null !== $catchFrame) {
+                                    $frame = $catchFrame;
+                                    goto restart;
+                                }
+                                $catchFrame = $this->enforcePropertyName($propName, $frame);
+                                if (null !== $catchFrame) {
+                                    $frame = $catchFrame;
+                                    goto restart;
+                                }
+                                $dst->bool(EnumCaseSupport::propertyExistsOnCase($object->class, $propName));
+                                break;
+                            }
                             if ($this->objectImplementsArrayAccess($object)) {
                                 $existsOut = new Variable();
                                 $catchFrame = $this->invokeArrayAccessOffsetExists(
