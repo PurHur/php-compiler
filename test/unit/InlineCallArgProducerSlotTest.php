@@ -109,4 +109,38 @@ PHP;
         self::assertSame($arraySlot, $sendSlots[0] ?? null, 'arg sends='.json_encode($sendSlots));
         self::assertSame($closureSlot, $sendSlots[1] ?? null, 'arg sends='.json_encode($sendSlots));
     }
+
+    /** Issue #9351 — sibling MethodCall producers map to distinct var_dump arg slots. */
+    public function testVarDumpReceivesDistinctMethodCallProducerSlots(): void
+    {
+        $code = <<<'PHP'
+<?php
+class C {
+    public function f(): int {
+        static $n = 0;
+        return ++$n;
+    }
+}
+$c = new C();
+var_dump($c->f(), $c->f());
+PHP;
+        $runtime = new Runtime();
+        $block = $runtime->parseAndCompile($code, 'static_method_local.php');
+
+        $returnSlots = [];
+        $sendSlots = [];
+        foreach ($block->opCodes as $op) {
+            if (OpCode::TYPE_FUNCCALL_EXEC_RETURN === $op->type) {
+                $returnSlots[] = $op->arg1;
+            }
+            if (OpCode::TYPE_ARG_SEND === $op->type) {
+                $sendSlots[] = $op->arg1;
+            }
+        }
+
+        self::assertCount(2, $sendSlots);
+        self::assertNotSame($sendSlots[0], $sendSlots[1], 'arg sends='.json_encode($sendSlots));
+        self::assertContains($sendSlots[0], $returnSlots, 'fcall returns='.json_encode($returnSlots));
+        self::assertContains($sendSlots[1], $returnSlots, 'fcall returns='.json_encode($returnSlots));
+    }
 }

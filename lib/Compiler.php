@@ -8108,20 +8108,21 @@ class Compiler {
      */
     protected function tryFoldFunctionStaticDefaultSlot(Op\Terminal $terminal, Block $block): ?int
     {
-        if (null === $terminal->defaultBlock || null === $terminal->defaultVar) {
+        if (null === $terminal->defaultVar) {
             return null;
         }
-        $children = $terminal->defaultBlock->children;
-        if (1 !== \count($children) || !$children[0] instanceof Op\Expr\Array_) {
-            return null;
-        }
-        $vm = $this->tryBuildCompileTimeArrayFromExpr($children[0]);
-        if (null === $vm) {
-            return null;
-        }
-        $operand = new Operand\Temporary();
+        // Share param-default folding (scalar/array literals, const fetch, unary, …) — Zend
+        // zend_compile_static_variables() binds literals at compile time (#2286, #9351).
+        $pseudo = new Op\Expr\Param(
+            new Operand\Literal(''),
+            new Op\Type\Mixed_(),
+            false,
+            false,
+            $terminal->defaultVar,
+            $terminal->defaultBlock
+        );
 
-        return $block->registerConstant($operand, $vm);
+        return $this->tryFoldParamDefaultSlot($pseudo, $block);
     }
 
     protected function tryBuildCompileTimeArrayFromExpr(
@@ -9549,6 +9550,40 @@ class Compiler {
 
             return $producerSlot;
         }
+        // php-cfg `var_dump(f(), g())` / `var_dump($o->f(), $o->g())` — sibling call producers
+        // with distinct result/arg temps (#9351, zend_compile.c call-arg evaluation order).
+        if (
+            null !== $producerSlot
+            && ($producer instanceof Op\Expr\FuncCall
+                || $producer instanceof Op\Expr\NsFuncCall
+                || $producer instanceof Op\Expr\MethodCall
+                || $producer instanceof Op\Expr\StaticCall)
+        ) {
+            $callIndex = null;
+            $producerIndex = null;
+            foreach ($block->orig->children as $i => $child) {
+                if ($child === $callOp) {
+                    $callIndex = $i;
+                }
+                if ($child === $producer) {
+                    $producerIndex = $i;
+                }
+            }
+            if (
+                null !== $callIndex
+                && null !== $producerIndex
+                && $producerIndex < $callIndex
+                && !$this->isNestedCallArgProducerForConsumer(
+                    $producer,
+                    $callOp,
+                    $producerIndex,
+                    $callIndex,
+                    $block->orig->children
+                )
+            ) {
+                return $producerSlot;
+            }
+        }
         // php-cfg `f(g())` uses distinct result/arg temporaries (#8561, #7075).
         if (
             $producer instanceof Op\Expr\FuncCall
@@ -10665,34 +10700,54 @@ class Compiler {
             $producers = $this->precedingInlineCallArgProducersBeforeCfgOp($block->orig->children, $child);
             foreach ($producers as $producer) {
                 if ($producer->result === $result || $this->operandsReferToSameVariable($producer->result, $result)) {
-                    $byRefMutatedArg = false;
-                    $unrelatedNamedArg = false;
-                    if (
-                        ($producer instanceof Op\Expr\FuncCall || $producer instanceof Op\Expr\NsFuncCall)
-                        && property_exists($child, 'args')
-                        && is_array($child->args)
-                    ) {
-                        foreach ($child->args as $consumerArg) {
-                            if ($this->funcCallExprByRefArgMatchesOperand($producer, $consumerArg)) {
-                                $byRefMutatedArg = true;
-                                break;
-                            }
-                            if (!$this->namedCallArgMayUseFuncCallProducerResult($producer, $consumerArg)) {
-                                $unrelatedNamedArg = true;
-                                break;
-                            }
-                        }
+                    if ($this->inlineCallArgProducerPassesByRefGuards($producer, $child)) {
+                        return true;
                     }
-                    if ($byRefMutatedArg || $unrelatedNamedArg) {
-                        continue;
-                    }
-
+                }
+            }
+            // php-cfg distinct result/arg temps for multi-arg consumers (#9351).
+            if (!property_exists($child, 'args') || !is_array($child->args)) {
+                continue;
+            }
+            foreach ($child->args as $argIndex => $callArg) {
+                $matched = $this->matchInlineCallArgProducer($producers, $child->args, (int) $argIndex);
+                if (!$matched instanceof Op\Expr) {
+                    continue;
+                }
+                if (
+                    $matched->result !== $result
+                    && !$this->operandsReferToSameVariable($matched->result, $result)
+                ) {
+                    continue;
+                }
+                if ($this->inlineCallArgProducerPassesByRefGuards($matched, $child)) {
                     return true;
                 }
             }
         }
 
         return false;
+    }
+
+    private function inlineCallArgProducerPassesByRefGuards(Op\Expr $producer, Op $consumer): bool
+    {
+        if (
+            !($producer instanceof Op\Expr\FuncCall || $producer instanceof Op\Expr\NsFuncCall)
+            || !property_exists($consumer, 'args')
+            || !is_array($consumer->args)
+        ) {
+            return true;
+        }
+        foreach ($consumer->args as $consumerArg) {
+            if ($this->funcCallExprByRefArgMatchesOperand($producer, $consumerArg)) {
+                return false;
+            }
+            if (!$this->namedCallArgMayUseFuncCallProducerResult($producer, $consumerArg)) {
+                return false;
+            }
+        }
+
+        return true;
     }
 
     /**
