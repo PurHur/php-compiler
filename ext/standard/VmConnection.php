@@ -36,12 +36,7 @@ final class VmConnection
 
     public static function assignStatusResult(Variable $dest, ?Context $ctx): void
     {
-        $enum = self::enumCaseForStatus($ctx, self::connectionStatus());
-        if (null !== $enum) {
-            $dest->copyFrom($enum);
-
-            return;
-        }
+        // php-src ext/standard/basic_functions.c returns int bitmask, not ConnectionStatus enum (#9330).
         $dest->int(self::connectionStatus());
     }
 

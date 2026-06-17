@@ -6,12 +6,12 @@ var_export(function_exists('connection_status'));
 echo "\n";
 var_export(connection_status());
 echo "\n";
-echo connection_status()->value, "\n";
+echo connection_status(), "\n";
 echo CONNECTION_NORMAL, "\n";
-echo connection_status() === ConnectionStatus::Normal ? "match\n" : "bad\n";
+echo connection_status() === CONNECTION_NORMAL ? "match\n" : "bad\n";
 --EXPECT--
 true
-\ConnectionStatus::Normal
+0
 0
 0
 match

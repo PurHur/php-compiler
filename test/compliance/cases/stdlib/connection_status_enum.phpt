@@ -10,14 +10,14 @@ var_export(ConnectionStatus::Normal->value);
 echo "\n";
 var_export(connection_status());
 echo "\n";
-var_export(connection_status() === ConnectionStatus::Normal);
+var_export(connection_status() === CONNECTION_NORMAL);
 echo "\n";
-var_export(connection_status()->value === CONNECTION_NORMAL);
+var_export(connection_status() === ConnectionStatus::Normal);
 echo "\n";
 --EXPECT--
 true
 'Normal'
 0
-\ConnectionStatus::Normal
+0
 true
-true
+false

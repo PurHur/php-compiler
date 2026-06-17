@@ -10,22 +10,22 @@ var_export(SessionStatus::Active->value);
 echo "\n";
 var_export(session_status());
 echo "\n";
-var_export(session_status() === SessionStatus::None);
+var_export(session_status() === PHP_SESSION_NONE);
 echo "\n";
-var_export(session_status()->value === PHP_SESSION_NONE);
+var_export(session_status() === SessionStatus::None);
 echo "\n";
 session_start();
-var_export(session_status() === SessionStatus::Active);
+var_export(session_status() === PHP_SESSION_ACTIVE);
 echo "\n";
 session_write_close();
-var_export(session_status() === SessionStatus::None);
+var_export(session_status() === PHP_SESSION_NONE);
 echo "\n";
 --EXPECT--
 true
 'None'
 2
-\SessionStatus::None
+1
 true
-true
+false
 true
 true
