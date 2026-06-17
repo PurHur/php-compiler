@@ -9403,6 +9403,12 @@ class Compiler {
             }
             $producerSlot = $block->slotForOperand($producer->result);
         }
+        if (null === $producerSlot && $producer instanceof Op\Expr\MagicScriptConst) {
+            foreach ($this->compileExpr($producer, $block) as $op) {
+                $block->addOpCode($op);
+            }
+            $producerSlot = $block->slotForOperand($producer->result);
+        }
         if (
             null === $producerSlot
             && ($producer instanceof Op\Expr\FuncCall
@@ -9446,11 +9452,12 @@ class Compiler {
         if ($producer instanceof Op\Expr\Isset_) {
             return $producerSlot;
         }
-        // php-cfg uses distinct result/arg temps for hoisted inline producers (#8766, #8561).
+        // php-cfg uses distinct result/arg temps for hoisted inline producers (#8766, #8561, #9136).
         if (
             $producer instanceof Op\Expr\BinaryOp
             || $producer instanceof Op\Expr\ConstFetch
             || $producer instanceof Op\Expr\InstanceOf_
+            || $producer instanceof Op\Expr\MagicScriptConst
         ) {
             return $producerSlot;
         }
@@ -10014,7 +10021,8 @@ class Compiler {
             || $op instanceof Op\Expr\UnaryPlus
             || $op instanceof Op\Expr\Empty_
             || $op instanceof Op\Expr\Isset_
-            || $op instanceof Op\Expr\InstanceOf_;
+            || $op instanceof Op\Expr\InstanceOf_
+            || $op instanceof Op\Expr\MagicScriptConst;
     }
 
     /**
