@@ -154,13 +154,15 @@ final class StringInfo
         $context->builder->branchIf($noExt, $versionBb, $checkBb);
 
         $context->builder->positionAtEnd($checkBb);
+        $isCore = self::stringEqualsIgnoreCase($context, $fn, $extension, 'core');
         $loaded = $context->builder->call(
             $context->lookupFunction('__compiler_extension_loaded'),
             $extension
         );
         $i32 = $context->getTypeFromString('int32');
         $isLoaded = $context->builder->icmp(Builder::INT_NE, $loaded, $i32->constInt(0, false));
-        $context->builder->branchIf($isLoaded, $versionBb, $failBb);
+        $hasVersion = $context->builder->or($isCore, $isLoaded);
+        $context->builder->branchIf($hasVersion, $versionBb, $failBb);
 
         $context->builder->positionAtEnd($versionBb);
         $context->builder->returnValue(self::literalString($context, CompilerVersion::VERSION));

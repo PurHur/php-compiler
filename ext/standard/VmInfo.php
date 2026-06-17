@@ -55,9 +55,15 @@ final class VmInfo
     /** Zend engine version label for zend_version() (php-src Zend/zend.c ZEND_VERSION shape). */
     public const ZEND_VERSION = '4.4.0';
 
+    /** php-src maps the Zend engine module to extension name Core (ext/standard/info.c). */
+    public static function isEngineExtensionName(string $extension): bool
+    {
+        return 'core' === strtolower($extension);
+    }
+
     public static function phpversion(?string $extension = null): string|false
     {
-        if (null === $extension) {
+        if (null === $extension || self::isEngineExtensionName($extension)) {
             return CompilerVersion::VERSION;
         }
         if (!self::extension_loaded($extension)) {

@@ -21,6 +21,8 @@ echo is_array($zlibFuncs) && in_array('gzdeflate', $zlibFuncs, true) ? "zlib_fun
 echo get_extension_funcs('nonexistent_xyz_9050') === false ? "unknown_funcs_ok\n" : "bad\n";
 
 echo phpversion('spl') !== false ? "spl_ver\n" : "no_spl_ver\n";
+echo phpversion('Core') !== false ? "core_ver\n" : "no_core_ver\n";
+echo phpversion('core') !== false ? "core_lower_ver\n" : "no_core_lower_ver\n";
 echo phpversion('nonexistent_xyz_9050') === false ? "unknown_ver_ok\n" : "bad\n";
 --EXPECT--
 std_loaded
@@ -35,4 +37,6 @@ pcre_funcs
 zlib_funcs
 unknown_funcs_ok
 spl_ver
+core_ver
+core_lower_ver
 unknown_ver_ok
