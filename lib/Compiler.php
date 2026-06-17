@@ -9411,6 +9411,16 @@ class Compiler {
         }
         if (
             null === $producerSlot
+            && ($producer instanceof Op\Expr\NullsafePropertyFetch
+                || $producer instanceof Op\Expr\NullsafeMethodCall)
+        ) {
+            foreach ($this->compileExpr($producer, $block) as $op) {
+                $block->addOpCode($op);
+            }
+            $producerSlot = $block->slotForOperand($producer->result);
+        }
+        if (
+            null === $producerSlot
             && ($producer instanceof Op\Expr\FuncCall
                 || $producer instanceof Op\Expr\NsFuncCall
                 || $producer instanceof Op\Expr\StaticCall
@@ -9621,6 +9631,12 @@ class Compiler {
                         if (null !== $callArg && $this->operandsReferToSameVariable($producer->result, $callArg)) {
                             return $producer;
                         }
+                    }
+                }
+                if (1 === $argCount) {
+                    $last = $producers[$producerCount - 1] ?? null;
+                    if ($last instanceof Op\Expr\NullsafePropertyFetch || $last instanceof Op\Expr\NullsafeMethodCall) {
+                        return $last;
                     }
                 }
 
@@ -10034,6 +10050,8 @@ class Compiler {
             || $op instanceof Op\Expr\NsFuncCall
             || $op instanceof Op\Expr\StaticCall
             || $op instanceof Op\Expr\MethodCall
+            || $op instanceof Op\Expr\NullsafePropertyFetch
+            || $op instanceof Op\Expr\NullsafeMethodCall
             || $op instanceof Op\Expr\UnaryMinus
             || $op instanceof Op\Expr\UnaryPlus
             || $op instanceof Op\Expr\Empty_
@@ -12121,7 +12139,52 @@ class Compiler {
                 if (null === $valueSlot && $arg instanceof Operand\NullOperand) {
                     $valueSlot = $this->registerNullConstantSlot($block, $arg);
                 }
-                $valueSlot = $this->preferNamedLocalCallArgSlot($arg, $block, $valueSlot);
+                if (
+                    null !== $valueSlot
+                    && null !== $block->orig
+                    && ($arg instanceof Operand\Variable || $arg instanceof Operand\Temporary)
+                ) {
+                    $hasProducer = false;
+                    foreach ($block->orig->children as $child) {
+                        if (!($child instanceof Op\Expr) || null === $child->result) {
+                            continue;
+                        }
+                        if ($this->operandsReferToSameVariable($child->result, $arg)) {
+                            $hasProducer = true;
+                            break;
+                        }
+                    }
+                    if (!$hasProducer) {
+                        $producerSlot = $this->findInlineExprCallArgProducerSlot($arg, $block, $cfgCallOp);
+                        if (null !== $producerSlot) {
+                            $valueSlot = $producerSlot;
+                        } elseif (null !== $cfgCallOp) {
+                            $callIndex = null;
+                            foreach ($block->orig->children as $i => $child) {
+                                if ($child === $cfgCallOp) {
+                                    $callIndex = $i;
+                                    break;
+                                }
+                            }
+                            if (null !== $callIndex && $callIndex > 0) {
+                                $prev = $block->orig->children[$callIndex - 1] ?? null;
+                                if ($prev instanceof Op\Expr && null !== $prev->result && $this->isInlineExprCallArgProducer($prev)) {
+                                    $prevSlot = $block->slotForOperand($prev->result);
+                                    if (null === $prevSlot) {
+                                        foreach ($this->compileExpr($prev, $block) as $op) {
+                                            $block->addOpCode($op);
+                                        }
+                                        $prevSlot = $block->slotForOperand($prev->result);
+                                    }
+                                    if (null !== $prevSlot) {
+                                        $valueSlot = $prevSlot;
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+                $valueSlot = $this->preferNamedLocalCallArgSlot($arg, $block, $valueSlot, $calleeName);
             }
             $nameSlot = null;
             $argName = $this->callArgName($arg);
@@ -12145,7 +12208,12 @@ class Compiler {
     /**
      * php-cfg may wire a later named local read to a preceding call's dead result temp (#9074).
      */
-    private function preferNamedLocalCallArgSlot(Operand $arg, Block $block, ?string $valueSlot): ?string
+    private function preferNamedLocalCallArgSlot(
+        Operand $arg,
+        Block $block,
+        ?string $valueSlot,
+        ?string $calleeName = null
+    ): ?string
     {
         if (null === $valueSlot) {
             return null;
@@ -12154,8 +12222,14 @@ class Compiler {
         if (null === $name || '' === $name) {
             return $valueSlot;
         }
+        if (null !== $calleeName && $name === $calleeName) {
+            return $valueSlot;
+        }
         $namedSlot = $block->slotIndexForVariableName($name);
         if (null === $namedSlot) {
+            return $valueSlot;
+        }
+        if (!$block->isNamedVariableSlot((int) $namedSlot)) {
             return $valueSlot;
         }
         if ((int) $namedSlot === (int) $valueSlot) {
