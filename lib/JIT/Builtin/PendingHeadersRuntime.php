@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace PHPCompiler\JIT\Builtin;
 
 use PHPCompiler\JIT\Context;
+use PHPLLVM\BasicBlock;
 use PHPLLVM\Builder;
 use PHPLLVM\Value;
 use PHPLLVM\Value\Function_ as LlvmFunction;
@@ -274,17 +275,32 @@ final class PendingHeadersRuntime
         $loopHead = $fn->appendBasicBlock('ph_list_loop');
         $loopBody = $fn->appendBasicBlock('ph_list_body');
         $done = $fn->appendBasicBlock('ph_list_done');
+        $skipList = $fn->appendBasicBlock('ph_list_skip');
+        $checkEmpty = $fn->appendBasicBlock('ph_list_check_empty');
         $context->builder->positionAtEnd($entry);
 
         $i32 = $context->getTypeFromString('int32');
         $i64 = $context->getTypeFromString('int64');
+        $i8 = $context->getTypeFromString('int8');
+        $i8p = $context->getTypeFromString('int8*');
         $ht = $context->builder->call($context->lookupFunction('__hashtable__alloc'));
-        $queueOn = $context->builder->icmp(
-            Builder::INT_NE,
-            $context->builder->load(self::queueEnabledPtr($context)),
-            $i32->constInt(0, false)
+        $gateway = $context->builder->call(
+            $context->lookupFunction('getenv'),
+            self::literalCstr($context, 'GATEWAY_INTERFACE')
         );
-        $context->builder->branchIf($queueOn, $loopInit, $done);
+        $gatewayMissing = $context->builder->icmp(Builder::INT_EQ, $gateway, $i8p->constNull());
+        $context->builder->branchIf($gatewayMissing, $skipList, $checkEmpty);
+
+        $context->builder->positionAtEnd($checkEmpty);
+        $gatewayEmpty = $context->builder->icmp(
+            Builder::INT_EQ,
+            $context->builder->load($gateway),
+            $i8->constInt(0, false)
+        );
+        $context->builder->branchIf($gatewayEmpty, $skipList, $loopInit);
+
+        $context->builder->positionAtEnd($skipList);
+        $context->builder->branch($done);
 
         $context->builder->positionAtEnd($loopInit);
         $idxSlot = $context->builder->alloca($i32, 1);
@@ -321,6 +337,7 @@ final class PendingHeadersRuntime
         $fn = self::fn($context, '__phpc_response_headers_flush', $context->context->voidType(), false);
         $entry = $fn->appendBasicBlock('ph_flush_entry');
         $already = $fn->appendBasicBlock('ph_flush_already');
+        $skipEmit = $fn->appendBasicBlock('ph_flush_skip_emit');
         $work = $fn->appendBasicBlock('ph_flush_work');
         $statusBb = $fn->appendBasicBlock('ph_flush_status');
         $skipStatus = $fn->appendBasicBlock('ph_flush_skip_status');
@@ -335,9 +352,17 @@ final class PendingHeadersRuntime
         $sizeT = $context->getTypeFromString('size_t');
         $flushed = $context->builder->load(self::flushedPtr($context));
         $wasFlushed = $context->builder->icmp(Builder::INT_NE, $flushed, $i32->constInt(0, false));
-        $context->builder->branchIf($wasFlushed, $already, $work);
+        $envGate = $fn->appendBasicBlock('ph_flush_env_gate');
+        $context->builder->branchIf($wasFlushed, $already, $envGate);
 
         $context->builder->positionAtEnd($already);
+        $context->builder->returnVoid();
+
+        $context->builder->positionAtEnd($envGate);
+        self::branchIfWebResponseEnvPresent($context, $fn, $work, $skipEmit);
+
+        $context->builder->positionAtEnd($skipEmit);
+        $context->builder->store($i32->constInt(1, false), self::flushedPtr($context));
         $context->builder->returnVoid();
 
         $context->builder->positionAtEnd($work);
@@ -353,8 +378,16 @@ final class PendingHeadersRuntime
             $needStatus = $context->builder->not($isUnset);
             $context->builder->branchIf($needStatus, $statusBb, $skipStatus);
             $context->builder->positionAtEnd($statusBb);
-            $fmt = self::literalCstr($context, "Status: %d\r\n");
-            $context->builder->call($context->lookupFunction('printf'), $fmt, $status);
+            $statusBuf = $context->builder->alloca($context->getTypeFromString('int8')->arrayType(64), 1);
+            $statusBufPtr = $context->builder->pointerCast($statusBuf, $i8p);
+            $statusLen = $context->builder->call(
+                $context->lookupFunction('snprintf'),
+                $statusBufPtr,
+                $sizeT->constInt(64, false),
+                self::literalCstr($context, "Status: %d\r\n"),
+                $status
+            );
+            self::emitWriteStdout($context, $statusBufPtr, $statusLen);
             $context->builder->store($i32->constInt(1, false), $wroteSlot);
             $context->builder->branch($loopHead);
             $context->builder->positionAtEnd($skipStatus);
@@ -376,13 +409,8 @@ final class PendingHeadersRuntime
         $context->builder->positionAtEnd($printBb);
         $len = self::stringLen($context, $line);
         $data = self::stringData($context, $line);
-        $fmt = self::literalCstr($context, "%.*s\r\n");
-        $context->builder->call(
-            $context->lookupFunction('printf'),
-            $fmt,
-            $context->builder->trunc($len, $i32),
-            $data
-        );
+        self::emitWriteStdout($context, $data, $len);
+        self::emitWriteLiteral($context, "\r\n");
         $context->builder->store($i32->constInt(1, false), $wroteSlot);
         $context->builder->branch($skipPrintBb);
         $context->builder->positionAtEnd($skipPrintBb);
@@ -399,11 +427,73 @@ final class PendingHeadersRuntime
         $exit = $fn->appendBasicBlock('ph_flush_exit');
         $context->builder->branchIf($needCrLf, $emitCrLf, $exit);
         $context->builder->positionAtEnd($emitCrLf);
-        $context->builder->call($context->lookupFunction('printf'), self::literalCstr($context, "\r\n"));
+        self::emitWriteLiteral($context, "\r\n");
         $context->builder->branch($exit);
         $context->builder->positionAtEnd($exit);
         $context->builder->returnVoid();
         $context->builder->clearInsertionPosition();
+    }
+
+    /**
+     * Emit queued header lines only for simulated/real web requests (#634, #4037).
+     *
+     * CLI-style AOT runs (no REQUEST_METHOD / GATEWAY_INTERFACE / QUERY_STRING) still
+     * queue header() for headers_list gating but must not write CGI lines to stdout.
+     */
+    private static function branchIfWebResponseEnvPresent(
+        Context $context,
+        LlvmFunction $fn,
+        BasicBlock $whenPresent,
+        BasicBlock $whenAbsent
+    ): void {
+        $i8p = $context->getTypeFromString('int8*');
+        $i8 = $context->getTypeFromString('int8');
+        $keys = ['REQUEST_METHOD', 'GATEWAY_INTERFACE', 'QUERY_STRING'];
+        $cursor = $fn->getLastBasicBlock();
+        foreach ($keys as $idx => $key) {
+            $checkEmpty = $fn->appendBasicBlock('ph_flush_env_empty_'.++self::$blockSuffix);
+            $next = ($idx === \count($keys) - 1)
+                ? $whenAbsent
+                : $fn->appendBasicBlock('ph_flush_env_next_'.self::$blockSuffix);
+            $context->builder->positionAtEnd($cursor);
+            $env = $context->builder->call(
+                $context->lookupFunction('getenv'),
+                self::literalCstr($context, $key)
+            );
+            $isNull = $context->builder->icmp(Builder::INT_EQ, $env, $i8p->constNull());
+            $context->builder->branchIf($isNull, $next, $checkEmpty);
+            $context->builder->positionAtEnd($checkEmpty);
+            $isEmpty = $context->builder->icmp(
+                Builder::INT_EQ,
+                $context->builder->load($env),
+                $i8->constInt(0, false)
+            );
+            $context->builder->branchIf($isEmpty, $next, $whenPresent);
+            $cursor = $next;
+        }
+    }
+
+    private static function emitWriteStdout(Context $context, Value $data, Value $len): void
+    {
+        $i32 = $context->getTypeFromString('int32');
+        $i64 = $context->getTypeFromString('int64');
+        $i8p = $context->getTypeFromString('int8*');
+        $context->builder->call(
+            $context->lookupFunction('write'),
+            $i32->constInt(1, false),
+            $context->builder->pointerCast($data, $i8p),
+            $context->builder->zExt($len, $i64)
+        );
+    }
+
+    private static function emitWriteLiteral(Context $context, string $text): void
+    {
+        $i64 = $context->getTypeFromString('int64');
+        self::emitWriteStdout(
+            $context,
+            self::literalCstr($context, $text),
+            $i64->constInt(\strlen($text), false)
+        );
     }
 
     private static function implementSetcookieAdd(Context $context): void
@@ -1005,6 +1095,8 @@ final class PendingHeadersRuntime
             [
                 ['printf', $i32, true, [$charPtr]],
                 ['snprintf', $i32, true, [$charPtr, $sizeT, $charPtr]],
+                ['write', $i64, false, [$i32, $i8p, $i64]],
+                ['getenv', $i8p, false, [$charPtr]],
                 ['strlen', $sizeT, false, [$i8p]],
                 ['memcpy', $voidPtr, false, [$voidPtr, $voidPtr, $sizeT]],
                 ['strncasecmp', $i32, false, [$i8p, $i8p, $sizeT]],

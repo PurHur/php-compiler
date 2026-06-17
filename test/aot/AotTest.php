@@ -88,6 +88,7 @@ class AotTest extends BaseTest
         LlvmToolchain::applyProcessEnv($env, $repoRoot);
         self::applyEnvSection($env, $sections);
         PhptWebSections::applyToEnv($env, $sections);
+        self::applyDefaultAotWebEnv($env, $name);
         $bodyFile = null;
         if (isset($sections['POST']) && '' !== $sections['POST']) {
             $bodyFile = tempnam(sys_get_temp_dir(), 'phpc_post_');
@@ -218,6 +219,23 @@ class AotTest extends BaseTest
             $this->assertSame(0, $exitCode, "AOT run for {$name} stderr: {$runErrText}");
         }
         $this->assertExpect($result !== false ? $result : '', $sections);
+    }
+
+    /**
+     * Standalone AOT binaries defer-flush header() before body output (#634).
+     * Default GET unless a case explicitly tests CLI header_list() semantics.
+     *
+     * @param array<string, string> $env
+     */
+    private static function applyDefaultAotWebEnv(array &$env, string $caseName): void
+    {
+        if (isset($env['REQUEST_METHOD'])) {
+            return;
+        }
+        if (str_contains($caseName, 'headers_list')) {
+            return;
+        }
+        $env['REQUEST_METHOD'] = 'GET';
     }
 
 }
