@@ -25,6 +25,25 @@ PHP;
         );
     }
 
+    public function testRewriteProtectedSet(): void
+    {
+        $source = <<<'PHP'
+<?php
+class Demo {
+    protected(set) string $name = 'x';
+}
+PHP;
+        $rewritten = AsymmetricVisibilityRewriter::rewrite($source);
+        self::assertStringContainsString(
+            '/*phpc-asymmetric-set:protected*/ public string $name',
+            preg_replace('/\s+/', ' ', $rewritten)
+        );
+        self::assertSame(
+            \PHPCfg\Func::FLAG_PROTECTED,
+            AsymmetricVisibilityRewriter::visibilityFromMarker('/*phpc-asymmetric-set:protected*/')
+        );
+    }
+
     public function testPublicPrivateSetCompileErrors(): void
     {
         $source = <<<'PHP'
