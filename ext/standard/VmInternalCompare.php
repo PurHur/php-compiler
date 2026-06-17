@@ -4,10 +4,15 @@ declare(strict_types=1);
 
 namespace PHPCompiler\ext\standard;
 
+use PHPCompiler\Block;
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
+use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\Variable as JITVariable;
+use PHPCompiler\OpCode;
 use PHPCompiler\VM\EnumCaseSupport;
 use PHPCompiler\VM\Variable;
+use PHPCfg\Operand;
 
 /**
  * Invoke binary stdlib Internal comparators from other VM builtins (string callbacks).
@@ -80,6 +85,142 @@ final class VmInternalCompare
         }
 
         return $flagsArg->toInt();
+    }
+
+    /**
+     * Resolve sort_flags at JIT/AOT compile time (constant name, integer literal, or CFG trace).
+     *
+     * @throws \LogicException when flags are not compile-time known
+     */
+    public static function resolveJitSortFlags(
+        Context $context,
+        JITVariable $flagsArg,
+        string $function,
+        ?Block $block = null,
+        ?Operand $flagsOp = null
+    ): int {
+        $resolved = self::tryResolveJitSortFlags($context, $flagsArg);
+        if (null === $resolved && null !== $block && null !== $flagsOp) {
+            $resolved = self::tryResolveJitSortFlagsFromBlock($context, $block, $flagsOp);
+        }
+        if (null === $resolved) {
+            if (JITVariable::TYPE_NATIVE_LONG === $flagsArg->type) {
+                throw new \LogicException(
+                    $function.'() flags must be a predefined constant in JIT/AOT in this compiler build'
+                );
+            }
+            throw new \LogicException($function.'() flags must be an integer in this compiler build');
+        }
+
+        return $resolved;
+    }
+
+    public static function tryResolveJitSortFlags(Context $context, JITVariable $flagsArg): ?int
+    {
+        $constName = $flagsArg->compileTimeConstantName ?? null;
+        if (null !== $constName) {
+            $lookup = strtolower($constName);
+            if (isset(StdlibConstants::CORE_INT_BY_NAME[$lookup])) {
+                return StdlibConstants::CORE_INT_BY_NAME[$lookup];
+            }
+            if (null !== $context->runtime->vmContext) {
+                $phpVar = $context->runtime->vmContext->constantFetch($constName);
+                if (null !== $phpVar && Variable::TYPE_INTEGER === $phpVar->type) {
+                    return $phpVar->toInt();
+                }
+            }
+        }
+        if (JITVariable::TYPE_NATIVE_LONG === $flagsArg->type
+            && JITVariable::KIND_VALUE === $flagsArg->kind
+        ) {
+            $lib = $context->llvm->lib;
+            if (null !== $lib->LLVMIsAConstantInt($flagsArg->value->value)) {
+                return (int) $lib->LLVMConstIntGetZExtValue($flagsArg->value->value);
+            }
+        }
+
+        return null;
+    }
+
+    /** Resolve SORT_* flags from CFG when JIT operands are boxed (#9123). */
+    public static function tryResolveJitSortFlagsFromBlock(Context $context, Block $block, Operand $flagsOp): ?int
+    {
+        $slot = self::operandSlot($block, $flagsOp);
+        if (null === $slot) {
+            return null;
+        }
+
+        return self::slotSortFlags($context, $block, $slot, []);
+    }
+
+    /**
+     * @param array<int, true> $visited
+     */
+    private static function slotSortFlags(Context $context, Block $block, int $slot, array $visited): ?int
+    {
+        if (isset($visited[$slot])) {
+            return null;
+        }
+        $visited[$slot] = true;
+
+        if (isset($block->constants[$slot])) {
+            $const = $block->constants[$slot];
+            if (Variable::TYPE_INTEGER === $const->type) {
+                return $const->toInt();
+            }
+        }
+
+        foreach ($block->opCodes as $op) {
+            if ($op->arg1 !== $slot) {
+                continue;
+            }
+            if (OpCode::TYPE_CONST_FETCH === $op->type) {
+                return self::sortFlagsFromConstFetch($context, $block, $op);
+            }
+        }
+
+        return null;
+    }
+
+    private static function sortFlagsFromConstFetch(Context $context, Block $block, OpCode $op): ?int
+    {
+        $nameOp = null !== $op->arg3 ? $block->getOperand($op->arg3) : $block->getOperand($op->arg2);
+        if (!$nameOp instanceof Operand\Literal) {
+            return null;
+        }
+        $lookup = strtolower((string) $nameOp->value);
+        if (isset(StdlibConstants::CORE_INT_BY_NAME[$lookup])) {
+            return StdlibConstants::CORE_INT_BY_NAME[$lookup];
+        }
+        if (null === $context->runtime->vmContext) {
+            return null;
+        }
+        $phpVar = $context->runtime->vmContext->constantFetch((string) $nameOp->value);
+        if (null !== $phpVar && Variable::TYPE_INTEGER === $phpVar->type) {
+            return $phpVar->toInt();
+        }
+
+        return null;
+    }
+
+    private static function operandSlot(Block $block, Operand $op): ?int
+    {
+        foreach ($block->opCodes as $opcode) {
+            foreach ([$opcode->arg1, $opcode->arg2, $opcode->arg3] as $slot) {
+                if (null === $slot) {
+                    continue;
+                }
+                try {
+                    if ($block->getOperand($slot) === $op) {
+                        return $slot;
+                    }
+                } catch (\Throwable) {
+                    continue;
+                }
+            }
+        }
+
+        return null;
     }
 
     /** Compare array keys for ksort/krsort with php-src sort_type dispatch. */

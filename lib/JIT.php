@@ -7861,6 +7861,12 @@ class JIT {
                             $callArgs,
                             $callOperands
                         );
+                        $callArgs = $this->foldSortFamilyFlagsArg(
+                            $this->context->scope->toCall->getName(),
+                            $callArgs,
+                            $callOperands,
+                            $block
+                        );
                     }
                     if (null !== $block->func && '{main}' === $block->func->name) {
                         $toCall = $this->context->scope->toCall;
@@ -7923,6 +7929,12 @@ class JIT {
                             $this->context->scope->toCall->getName(),
                             $callArgs,
                             $callOperands
+                        );
+                        $callArgs = $this->foldSortFamilyFlagsArg(
+                            $this->context->scope->toCall->getName(),
+                            $callArgs,
+                            $callOperands,
+                            $block
                         );
                     }
                     if (
@@ -13451,6 +13463,34 @@ class JIT {
                 }
                 $args[$idx] = $this->ensureValueBoxLvalueForByRefPass($operand, $args[$idx]);
             }
+        }
+
+        return $args;
+    }
+
+    /**
+     * @param list<JIT\Variable>           $args
+     * @param list<Operand|null>           $operands
+     *
+     * @return list<JIT\Variable>
+     */
+    private function foldSortFamilyFlagsArg(string $name, array $args, array $operands, Block $block): array
+    {
+        $lc = strtolower($name);
+        if (!\in_array($lc, ['sort', 'rsort', 'asort', 'arsort', 'ksort', 'krsort'], true)) {
+            return $args;
+        }
+        if (2 !== \count($args) || !isset($operands[1])) {
+            return $args;
+        }
+        $resolved = \PHPCompiler\ext\standard\VmInternalCompare::tryResolveJitSortFlags($this->context, $args[1])
+            ?? \PHPCompiler\ext\standard\VmInternalCompare::tryResolveJitSortFlagsFromBlock(
+                $this->context,
+                $block,
+                $operands[1]
+            );
+        if (null !== $resolved) {
+            $args[1] = JIT\Variable::fromConstantInt($this->context, $resolved);
         }
 
         return $args;
