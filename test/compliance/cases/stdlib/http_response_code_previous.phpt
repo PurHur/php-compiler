@@ -12,6 +12,6 @@ var_export(http_response_code());
 echo "\n";
 --EXPECT--
 true
-\ResponseCode::NotFound
-\ResponseCode::NotFound
-\ResponseCode::InternalServerError
+404
+404
+500

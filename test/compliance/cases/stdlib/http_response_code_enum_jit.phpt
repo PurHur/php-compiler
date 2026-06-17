@@ -4,7 +4,7 @@ stdlib http_response_code() JIT with ResponseCode enum (#7322)
 <?php
 echo http_response_code() ? 'true' : 'false', "\n";
 echo http_response_code(ResponseCode::NotFound) ? 'true' : 'false', "\n";
-echo http_response_code()->value, "\n";
+echo http_response_code(), "\n";
 --EXPECT--
 false
 true
