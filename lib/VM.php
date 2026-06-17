@@ -4664,6 +4664,7 @@ restart:
                     }
                     $this->inheritFromInterfaces($ifaceEntry);
                     $this->context->classes[$lcname] = $ifaceEntry;
+                    $this->propagateInterfaceConstantsToImplementors($lcname);
                     break;
                 case OpCode::TYPE_DECLARE_TRAIT:
                     $name = $frame->scope[$op->arg1]->toString();
@@ -11065,6 +11066,47 @@ restart:
     }
 
     /**
+     * When an interface is declared after its implementors, merge its constants (#9302, zend_enum.c).
+     */
+    protected function propagateInterfaceConstantsToImplementors(string $ifaceLc): void
+    {
+        foreach ($this->context->classes as $entry) {
+            if (!in_array($ifaceLc, $entry->interfaces, true)) {
+                continue;
+            }
+            $this->inheritFromInterfaces($entry);
+        }
+    }
+
+    /**
+     * Resolve class constants inherited from interfaces (forward-referenced implements, #9302).
+     */
+    protected function resolveInheritedClassConstant(ClassEntry $entry, string $memberLc): ?Variable
+    {
+        foreach ($entry->interfaces as $ifaceLc) {
+            if (!isset($this->context->classes[$ifaceLc])) {
+                continue;
+            }
+            $iface = $this->context->classes[$ifaceLc];
+            if (isset($iface->constants[$memberLc])) {
+                return $iface->constants[$memberLc];
+            }
+            $fromParentIface = $this->resolveInheritedClassConstant($iface, $memberLc);
+            if (null !== $fromParentIface) {
+                return $fromParentIface;
+            }
+        }
+        if (null !== $entry->parentLc && isset($this->context->classes[$entry->parentLc])) {
+            $parent = $this->context->classes[$entry->parentLc];
+            if (isset($parent->constants[$memberLc])) {
+                return $parent->constants[$memberLc];
+            }
+        }
+
+        return null;
+    }
+
+    /**
      * Merge asymmetric set visibility and parent-interface property declares (#4876).
      */
     protected function inheritInterfacePropertyRules(ClassEntry $entry, ClassEntry $iface): void
@@ -12679,6 +12721,16 @@ restart:
             $dest->copyFrom(
                 EnumCaseSupport::materializeConstantValue($this->context, $classEntry->constants[$memberLc])
             );
+
+            return true;
+        }
+        $inheritedConst = $this->resolveInheritedClassConstant($classEntry, $memberLc);
+        if (null !== $inheritedConst) {
+            $this->emitClassConstFetchDeprecation($classEntry, $memberNameRaw, $memberLc, $frame);
+            if ($classEntry->isEnum && null !== $classEntry->backedType) {
+                VM\EnumSupport::ensureBackedEnumValuesUnique($classEntry);
+            }
+            $dest->copyFrom(EnumCaseSupport::materializeConstantValue($this->context, $inheritedConst));
 
             return true;
         }

@@ -3704,6 +3704,19 @@ class Object_ extends Type {
         }
     }
 
+    /** Merge a newly declared interface into prior implementors (#9302). */
+    public function propagateInterfaceConstantsToImplementors(string $ifaceName): void
+    {
+        $ifaceLc = strtolower(ltrim($ifaceName, '\\'));
+        foreach ($this->classInterfacesLc as $classLc => $ifaces) {
+            if (!in_array($ifaceLc, $ifaces, true)) {
+                continue;
+            }
+            $classId = $this->lookup($classLc);
+            $this->inheritInterfaceConstants($classId, $this->classNameForId($classId));
+        }
+    }
+
     /** Apply interface asymmetric set visibility to class properties (#4876). */
     public function inheritInterfacePropertySetVisibility(int $classId, string $className): void
     {
