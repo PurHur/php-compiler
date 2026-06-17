@@ -6,3 +6,10 @@ magic_const_filestat_run.php
 true
 true
 true
+true
+false
+true
+true
+true
+"dir"
+true
