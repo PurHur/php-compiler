@@ -148,6 +148,7 @@ class Analyzer
                 || $usage instanceof Op\Iterator\Next
                 || $usage instanceof Op\Terminal\Return_
                 || $usage instanceof Op\Terminal\Echo_
+                || $usage instanceof Op\Expr\Array_
                 || $usage instanceof Op\Expr\Cast\Array_
                 || $usage instanceof Op\Expr\Cast\Object_
                 || $usage instanceof Op\Expr\Cast\Unset_
