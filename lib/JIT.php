@@ -248,6 +248,9 @@ class JIT {
             $this->context->listUnpackSkipAssignPath = false;
             $this->context->listUnpackMergeLlvmBlocks = new \SplObjectStorage();
             $this->context->listUnpackMergeNullInitTargets = [];
+            $this->context->listUnpackAssignCallerBlock = null;
+            $this->context->listUnpackAssignRootBlock = null;
+            $this->context->listUnpackAssignSlots = [];
             $this->context->jitPropertyHookRawProperty = null;
             // Each queued CFG function gets a fresh try/catch stack — dispatch BBs are per-LLVM-function (#3012).
             $this->context->tryCatch->reset();
@@ -262,6 +265,21 @@ class JIT {
     private function shouldFreeDeadVariablesBeforeBranch(): bool
     {
         return 0 === $this->context->inlineIncludeDepth;
+    }
+
+    /** List-unpack merge that inlines an include still needs assign-block locals (#846). */
+    private function mergeBlockInheritsCallerLocals(?Block $mergeBlock): bool
+    {
+        if (null === $mergeBlock) {
+            return false;
+        }
+        foreach ($mergeBlock->opCodes as $op) {
+            if (OpCode::TYPE_INCLUDE === $op->type) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     private function branchJumpMergeBlock(?Block $branch): ?Block
@@ -5672,6 +5690,14 @@ class JIT {
         $builder = $this->context->builder;
         $builder->positionAtEnd($basicBlock);
         $this->context->jitCurrentBlock = $block;
+        if (null === $this->context->listUnpackAssignRootBlock) {
+            foreach ($block->opCodes as $scanOp) {
+                if (OpCode::TYPE_LIST_UNPACK_CHECK === $scanOp->type && null !== $scanOp->block1) {
+                    $this->context->listUnpackAssignRootBlock = $block;
+                    break;
+                }
+            }
+        }
         if (null !== $block->func && $block->orig === $block->func->cfg) {
             $this->context->jitFunctionRootBlock = $block;
             $this->emitJitDestructAllowDelref($block);
@@ -5892,6 +5918,14 @@ class JIT {
                     }
                     $forceAssign = $forceCoalesce
                         || $this->assignOperandsUsedByLiteralInclude($block, $op);
+                    $aliasName = JIT\OperandName::resolve($aliasOp);
+                    $needsNamedStorageAssign = $op->arg1 !== $op->arg2
+                        && null !== $aliasName
+                        && '' !== $aliasName
+                        && null === JIT\OperandName::resolve($destOp);
+                    if ($needsNamedStorageAssign && !$this->context->hasVariableOp($destOp)) {
+                        $this->context->makeVariableFromOp($func, $basicBlock, $block, $destOp);
+                    }
                     if (
                         $this->context->hasVariableOp($aliasOp)
                         && $this->context->hasVariableOp($block->getOperand($op->arg3))
@@ -5905,17 +5939,26 @@ class JIT {
                             break;
                         }
                     }
-                    $this->assignOperand($aliasOp, $value, $forceAssign);
-                    $destUsed = [] !== $destOp->usages;
-                    if ($destUsed || $forceAssign) {
-                        $this->assignOperand($destOp, $value, $forceAssign);
+                    if ($needsNamedStorageAssign) {
+                        if (!$this->context->hasVariableOp($aliasOp)) {
+                            $this->context->makeVariableFromOp($func, $basicBlock, $block, $aliasOp);
+                        }
+                        $this->assignOperand($aliasOp, $value, true);
+                        $this->recordListUnpackAssignSlot($aliasOp, $this->context->getVariableFromOp($aliasOp));
+                    } else {
+                        $this->assignOperand($aliasOp, $value, $forceAssign);
+                        $destUsed = [] !== $destOp->usages;
+                        if ($destUsed || $forceAssign) {
+                            $this->assignOperand($destOp, $value, $destUsed || $forceAssign);
+                        }
                     }
                     $srcOp = $block->getOperand($op->arg3);
                     if ($op->arg2 !== $op->arg3 && $block->assignTempSlotIsDead((int) $op->arg3)) {
                         $this->jitClearAssignTempOperand($srcOp);
                     }
                     if (
-                        $op->arg1 !== $op->arg2
+                        !$needsNamedStorageAssign
+                        && $op->arg1 !== $op->arg2
                         && $op->arg1 !== $op->arg3
                         && $block->assignTempSlotIsDead((int) $op->arg1)
                     ) {
@@ -6325,6 +6368,7 @@ class JIT {
                         } else {
                             $mergeBody = $this->context->listUnpackMergeLlvmBlocks[$op->block1];
                         }
+                        $this->context->listUnpackAssignRootBlock = $block;
                         $this->context->listUnpackSkipAssignPath = JIT\ListUnpackHelper::emitGuardedListUnpackCheck(
                             $this->context,
                             $array,
@@ -7264,14 +7308,19 @@ class JIT {
                                 = $this->listUnpackAssignTargetsInBlock($block);
                         }
                     }
+                    $this->context->listUnpackAssignCallerBlock = $block;
                     $this->compileBlockInternal($func, $op->block1, null, $mergeLlvm, 0, $allowRecompile, ...$args);
-                    $targetEntry = $this->context->scope->blockStorage[$op->block1];
+                    $this->context->listUnpackAssignCallerBlock = null;
+                    $targetEntry = $this->jitBranchEntryBlock($op->block1);
                     if ($this->context->inlineIncludeDepth > 0) {
                         // Use the merge block itself (not getInsertBlock — callee may be cached) (#846, #784).
                         $this->context->inlineIncludeExitBlock = $targetEntry;
                     }
                     $builder->positionAtEnd($branchBlock);
-                    if ($this->shouldFreeDeadVariablesBeforeBranch()) {
+                    if (
+                        $this->shouldFreeDeadVariablesBeforeBranch()
+                        && !$this->mergeBlockInheritsCallerLocals($op->block1)
+                    ) {
                         $this->context->freeDeadVariables($func, $branchBlock, $block);
                     }
                     $builder->branch($targetEntry);
@@ -10306,17 +10355,36 @@ class JIT {
         return OpCode::TYPE_ASSIGN === $prior->type && $prior === $assignOp;
     }
 
+    private function recordListUnpackAssignSlot(Operand $resultOp, Variable $slot): void
+    {
+        if (null === $this->context->listUnpackAssignRootBlock) {
+            return;
+        }
+        $name = JIT\OperandName::resolve($resultOp);
+        if (null === $name || '' === $name) {
+            return;
+        }
+        if (
+            Variable::KIND_VARIABLE !== $slot->kind
+            || (Variable::TYPE_VALUE !== $slot->type && Variable::TYPE_STRING !== $slot->type)
+        ) {
+            $lvalue = $this->resolveAssignLvalue($resultOp);
+            if (
+                Variable::KIND_VARIABLE !== $lvalue->kind
+                || (Variable::TYPE_VALUE !== $lvalue->type && Variable::TYPE_STRING !== $lvalue->type)
+            ) {
+                return;
+            }
+            $slot = $lvalue;
+        }
+        $this->context->listUnpackAssignSlots[
+            $this->context->resolveRefAliasName($name)
+        ] = $slot;
+    }
+
     private function assignOperand(Operand $resultOp, Variable $value, bool $force = false): void {
         $branchMergeTarget = $force && $this->context->coalesceAssignTargets->contains($resultOp);
         $resolvedName = JIT\OperandName::resolve($resultOp);
-        if (
-            !$force
-            && null === $resolvedName
-            && empty($resultOp->usages)
-            && !$this->context->scope->variables->contains($resultOp)
-        ) {
-            return;
-        }
         if (!$this->context->hasVariableOp($resultOp)) {
             if (
                 null !== $this->context->jitCurrentBlock
@@ -10396,6 +10464,7 @@ class JIT {
                 $result->valueBoxAliasPtr,
                 $value
             );
+            $this->recordListUnpackAssignSlot($resultOp, $result);
 
             return;
         }
@@ -10893,6 +10962,7 @@ class JIT {
                         $this->valueBoxPointer($value)
                     );
                     $this->copyValueBoxJitFlags($result, $value, $force);
+                    $this->recordListUnpackAssignSlot($resultOp, $result);
 
                     return;
                 default:
@@ -10968,6 +11038,7 @@ class JIT {
             $result->compileTimeConstantName = $value->compileTimeConstantName;
             $result->compileTimeEnumCase = $value->compileTimeEnumCase;
             $this->syncCompileTimeString($result, $value, $force);
+            $this->recordListUnpackAssignSlot($resultOp, $result);
 
             return;
         } elseif (Variable::TYPE_HASHTABLE === $result->type && Variable::TYPE_VALUE === $value->type) {

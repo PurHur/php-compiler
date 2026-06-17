@@ -211,6 +211,20 @@ final class ListUnpackHelper
                 )
             );
             $i8 = $context->getTypeFromString('int8');
+            if ($type === \PHPCompiler\VM\Variable::TYPE_ARRAY) {
+                $isVmArray = $builder->icmp(
+                    \PHPLLVM\Builder::INT_EQ,
+                    $typeByte,
+                    $i8->constInt($type, false)
+                );
+                $isHt = $builder->icmp(
+                    \PHPLLVM\Builder::INT_EQ,
+                    $typeByte,
+                    $i8->constInt(Variable::TYPE_HASHTABLE, false)
+                );
+
+                return $builder->or($isVmArray, $isHt);
+            }
 
             return $builder->icmp(
                 \PHPLLVM\Builder::INT_EQ,

@@ -206,6 +206,19 @@ class Context {
      */
     public array $listUnpackMergeNullInitTargets = [];
 
+    /** CFG block that assigned locals before a list-unpack merge include (#846). */
+    public ?Block $listUnpackAssignCallerBlock = null;
+
+    /** CFG block that began a guarded list-unpack assign region (#846). */
+    public ?Block $listUnpackAssignRootBlock = null;
+
+    /**
+     * Stable lvalue slots written during guarded list-unpack assign (#846).
+     *
+     * @var array<string, Variable>
+     */
+    public array $listUnpackAssignSlots = [];
+
     /** Nested compile-time include inlining depth (issue #568). */
     public int $inlineIncludeDepth = 0;
 

@@ -128,7 +128,9 @@ final class IncludeHelper
 
         $context->inlineIncludeCallerBlocks[] = $callerBlock;
         $bindingCaller = $callerBlock;
-        if (\count($context->inlineIncludeCallerBlocks) > 1) {
+        if (null !== $context->listUnpackAssignCallerBlock) {
+            $bindingCaller = $context->listUnpackAssignCallerBlock;
+        } elseif (\count($context->inlineIncludeCallerBlocks) > 1) {
             $bindingCaller = $context->inlineIncludeCallerBlocks[
                 \count($context->inlineIncludeCallerBlocks) - 2
             ];
@@ -166,12 +168,21 @@ final class IncludeHelper
         Progress::emitNativeNote($context, $progressNote);
         // Materialize inherited locals at include_entry so if/elseif arms that assign
         // from $_REQUEST before this include are visible (#764, #747).
-        self::syncLocalBindingsFromScope($context, $localBindings);
+        self::syncLocalBindingsFromScope($context, $localBindings, $bindingCaller);
         foreach ($localBindings as $operand) {
+            $bindingName = OperandName::resolve($operand);
+            $resolvedCaller = self::resolveIncludeCallerVar(
+                $context,
+                $bindingName,
+                $localBindings[$operand],
+                $bindingCaller
+            );
+            $localBindings[$operand] = $resolvedCaller;
             $preparedBindings[$operand] = self::prepareCallerBinding(
                 $context,
                 $entryBb,
-                $localBindings[$operand]
+                $resolvedCaller,
+                $bindingName
             );
         }
 
@@ -192,36 +203,37 @@ final class IncludeHelper
         }
         $context->builder->positionAtEnd($entryBb);
         foreach ($localBindings as $operand) {
+            $bindingName = OperandName::resolve($operand);
+            $resolvedCaller = $localBindings[$operand];
             self::emitCalleeLocalBinding(
                 $context,
                 $jit,
                 $operand,
-                $preparedBindings[$operand] ?? $localBindings[$operand]
+                $preparedBindings[$operand]
             );
-            $bindingName = OperandName::resolve($operand);
             $compileTimeString = null;
             if (
                 null !== $bindingName
                 && !self::hasMultipleAssignsInCaller($bindingCaller, $bindingName)
             ) {
                 $literal = self::variableFromCallerAssignConstant($context, $bindingCaller, $bindingName);
-                $callerVar = $localBindings[$operand];
                 if (
                     null !== $literal
                     && null !== $literal->compileTimeString
-                    && Variable::TYPE_STRING === $callerVar->type
-                    && null !== $callerVar->compileTimeString
-                    && $callerVar->compileTimeString === $literal->compileTimeString
+                    && Variable::TYPE_STRING === $resolvedCaller->type
+                    && null !== $resolvedCaller->compileTimeString
+                    && $resolvedCaller->compileTimeString === $literal->compileTimeString
                 ) {
                     $compileTimeString = $literal->compileTimeString;
                 }
             }
+            $calleeSnapshot = $context->scope->variables->contains($operand)
+                ? $context->scope->variables[$operand]
+                : $context->getVariableFromOp($operand);
             $context->inlineIncludeBindingRefreshStack[$bindingRefreshIndex][] = [
                 $operand,
-                $preparedBindings->contains($operand)
-                    ? $preparedBindings[$operand]
-                    : $localBindings[$operand],
-                $context->getVariableFromOp($operand),
+                $preparedBindings[$operand],
+                $calleeSnapshot,
                 $compileTimeString,
             ];
         }
@@ -321,13 +333,68 @@ final class IncludeHelper
     }
 
     /**
+     * {@see __value__*} for {@see __value__readString} without boxing ephemeral rvalues twice (#846).
+     */
+    private static function valueStringSourcePtr(Context $context, Variable $callerVar): \PHPLLVM\Value
+    {
+        if (Variable::TYPE_VALUE === $callerVar->type && Variable::KIND_VARIABLE === $callerVar->kind) {
+            $llvmType = $context->getStringFromType($callerVar->value->typeOf());
+            if ('__value__*' === $llvmType || '__value__' === $llvmType) {
+                return JitValueBox::normalizeValuePtr(
+                    $context,
+                    JitValueBox::pointer($context, $callerVar->value)
+                );
+            }
+        }
+
+        return JitValueBox::valuePtrFromVariable($context, $callerVar);
+    }
+
+    /**
      * Read boxed caller locals while preIncludeBb still dominates the caller alloca (#784).
      */
     private static function prepareCallerBinding(
         Context $context,
         BasicBlock $materializeBb,
-        Variable $callerVar
+        Variable $callerVar,
+        ?string $name = null
     ): Variable {
+        if (
+            null !== $name
+            && Variable::TYPE_VALUE === $callerVar->type
+            && Variable::KIND_VALUE === $callerVar->kind
+        ) {
+            $slotBlock = $context->listUnpackAssignRootBlock ?? $context->jitEnclosingBlock;
+            if (null !== $slotBlock) {
+                $stable = self::stableCallerValueSlot($context, $slotBlock, $name);
+                if (null !== $stable) {
+                    $callerVar = $stable;
+                }
+            }
+            if (Variable::KIND_VALUE === $callerVar->kind) {
+                $resolved = $context->resolveRefAliasName($name);
+                if (isset($context->listUnpackAssignSlots[$resolved])) {
+                    $slot = $context->listUnpackAssignSlots[$resolved];
+                    if (
+                        Variable::TYPE_VALUE === $slot->type
+                        && Variable::KIND_VARIABLE === $slot->kind
+                    ) {
+                        $callerVar = $slot;
+                    }
+                }
+            }
+            if (Variable::KIND_VALUE === $callerVar->kind) {
+                foreach (self::variablesForScopedNameInCallerScopes($context, $name) as $slot) {
+                    if (
+                        Variable::TYPE_VALUE === $slot->type
+                        && Variable::KIND_VARIABLE === $slot->kind
+                    ) {
+                        $callerVar = $slot;
+                        break;
+                    }
+                }
+            }
+        }
         if (
             Variable::TYPE_STRING !== $callerVar->type
             || Variable::KIND_VARIABLE !== $callerVar->kind
@@ -345,7 +412,7 @@ final class IncludeHelper
                 $slot
             );
             $stringVar->initialize();
-            $srcPtr = JitValueBox::valuePtrFromVariable($context, $callerVar);
+            $srcPtr = self::valueStringSourcePtr($context, $callerVar);
             $str = $context->builder->call(
                 $context->lookupFunction('__value__readString'),
                 $srcPtr
@@ -401,7 +468,9 @@ final class IncludeHelper
             return;
         }
 
-        $calleeVar = $context->getVariableFromOp($calleeOp);
+        $calleeVar = $context->scope->variables->contains($calleeOp)
+            ? $context->scope->variables[$calleeOp]
+            : $context->getVariableFromOp($calleeOp);
 
         if (
             Variable::TYPE_STRING === $callerVar->type
@@ -450,6 +519,149 @@ final class IncludeHelper
         return self::variableFromCallerAssignConstant($context, $callerBlock, $name);
     }
 
+    private static function stableCallerValueSlot(
+        Context $context,
+        Block $callerBlock,
+        string $name
+    ): ?Variable {
+        $resolved = $context->resolveRefAliasName($name);
+        foreach ($callerBlock->orig->hoistedOperands as $operand) {
+            $opName = OperandName::resolve($operand);
+            if (null === $opName || $resolved !== $context->resolveRefAliasName($opName)) {
+                continue;
+            }
+            if (!$context->hasVariableOpInScopes($operand)) {
+                continue;
+            }
+            $var = $context->getVariableFromOpInScopes($operand);
+            if (
+                Variable::TYPE_VALUE === $var->type
+                && Variable::KIND_VARIABLE === $var->kind
+            ) {
+                return $var;
+            }
+        }
+        foreach ($callerBlock->scopedOperands() as $operand) {
+            $opName = OperandName::resolve($operand);
+            if (null === $opName || $resolved !== $context->resolveRefAliasName($opName)) {
+                continue;
+            }
+            if (!$context->hasVariableOpInScopes($operand)) {
+                continue;
+            }
+            $var = $context->getVariableFromOpInScopes($operand);
+            if (
+                Variable::TYPE_VALUE === $var->type
+                && Variable::KIND_VARIABLE === $var->kind
+            ) {
+                return $var;
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * Prefer stable caller slots over ephemeral rvalues at include_entry (#846).
+     */
+    private static function resolveIncludeCallerVar(
+        Context $context,
+        ?string $name,
+        Variable $callerVar,
+        Block $callerBlock
+    ): Variable {
+        if (null === $name || '' === $name) {
+            return $callerVar;
+        }
+        $candidates = [$callerVar];
+        $slotBlock = $context->listUnpackAssignRootBlock ?? $callerBlock;
+        $stable = self::stableCallerValueSlot($context, $slotBlock, $name);
+        if (null !== $stable) {
+            $candidates[] = $stable;
+        }
+        foreach (self::variablesForScopedNameInCallerScopes($context, $name) as $scopedVar) {
+            $candidates[] = $scopedVar;
+        }
+        $resolved = $context->resolveRefAliasName($name);
+        if (isset($context->namedVariableBindings[$resolved])) {
+            $candidates[] = $context->namedVariableBindings[$resolved];
+        }
+        if (isset($context->listUnpackAssignSlots[$resolved])) {
+            $candidates[] = $context->listUnpackAssignSlots[$resolved];
+        }
+        $scoped = $context->variableForScopedName($name);
+        if (null !== $scoped) {
+            $candidates[] = $scoped;
+        }
+        $lastAssign = self::lastAssignVariableForName($context, $callerBlock, $name);
+        if (null !== $lastAssign) {
+            $candidates[] = $lastAssign;
+        }
+        if (null !== $context->listUnpackAssignRootBlock) {
+            $rootAssign = self::lastAssignVariableForName(
+                $context,
+                $context->listUnpackAssignRootBlock,
+                $name
+            );
+            if (null !== $rootAssign) {
+                $candidates[] = $rootAssign;
+            }
+        }
+        $best = null;
+        $bestScore = -1;
+        foreach ($candidates as $candidate) {
+            $score = self::includeCallerBindingScore($candidate);
+            if ($score > $bestScore) {
+                $best = $candidate;
+                $bestScore = $score;
+            }
+        }
+
+        return null !== $best && $bestScore > 0 ? $best : $callerVar;
+    }
+
+    private static function includeCallerBindingScore(Variable $candidate): int
+    {
+        if (Variable::TYPE_VALUE === $candidate->type) {
+            if (Variable::KIND_VARIABLE === $candidate->kind) {
+                return 4;
+            }
+            if (Variable::KIND_VALUE === $candidate->kind) {
+                return 1;
+            }
+        }
+        if (
+            Variable::TYPE_STRING === $candidate->type
+            && Variable::KIND_VARIABLE === $candidate->kind
+        ) {
+            return 2;
+        }
+
+        return 0;
+    }
+
+    /**
+     * @return list<Variable>
+     */
+    private static function variablesForScopedNameInCallerScopes(Context $context, string $name): array
+    {
+        $vars = [];
+        foreach ($context->scope->variables as $op) {
+            if (OperandName::resolve($op) === $name) {
+                $vars[] = $context->scope->variables[$op];
+            }
+        }
+        for ($i = \count($context->scopeStack) - 1; $i >= 0; --$i) {
+            foreach ($context->scopeStack[$i]->variables as $op) {
+                if (OperandName::resolve($op) === $name) {
+                    $vars[] = $context->scopeStack[$i]->variables[$op];
+                }
+            }
+        }
+
+        return $vars;
+    }
+
     private static function lastAssignVariableForName(
         Context $context,
         Block $block,
@@ -477,6 +689,26 @@ final class IncludeHelper
         $lastAssign = null;
         foreach ($block->opCodes as $op) {
             if (OpCode::TYPE_ASSIGN === $op->type) {
+                if (null !== $op->arg2) {
+                    $alias = $block->getOperand($op->arg2);
+                    $aliasName = OperandName::resolve($alias);
+                    if (
+                        null !== $aliasName
+                        && $name === $aliasName
+                        && $op->arg1 !== $op->arg2
+                    ) {
+                        $storage = $block->getOperand($op->arg1);
+                        if ($context->hasVariableOpInScopes($storage)) {
+                            $storageVar = $context->getVariableFromOpInScopes($storage);
+                            if (
+                                Variable::KIND_VARIABLE === $storageVar->kind
+                                && (Variable::TYPE_VALUE === $storageVar->type || Variable::TYPE_STRING === $storageVar->type)
+                            ) {
+                                $lastAssign = $storageVar;
+                            }
+                        }
+                    }
+                }
                 foreach ([$op->arg1, $op->arg2] as $slotIdx) {
                     $dest = $block->getOperand($slotIdx);
                     if (OperandName::resolve($dest) !== $name) {
@@ -484,7 +716,10 @@ final class IncludeHelper
                     }
                     if ($context->hasVariableOpInScopes($dest)) {
                         $var = $context->getVariableFromOpInScopes($dest);
-                        if (Variable::TYPE_VALUE === $var->type || Variable::TYPE_STRING === $var->type) {
+                        if (
+                            Variable::KIND_VARIABLE === $var->kind
+                            && (Variable::TYPE_VALUE === $var->type || Variable::TYPE_STRING === $var->type)
+                        ) {
                             $lastAssign = $var;
                         }
                     }
@@ -561,8 +796,11 @@ final class IncludeHelper
      *
      * @param \SplObjectStorage<Operand, Variable> $localBindings
      */
-    private static function syncLocalBindingsFromScope(Context $context, \SplObjectStorage $localBindings): void
-    {
+    private static function syncLocalBindingsFromScope(
+        Context $context,
+        \SplObjectStorage $localBindings,
+        Block $callerBlock
+    ): void {
         foreach ($localBindings as $operand) {
             $name = OperandName::resolve($operand);
             if (null === $name) {
@@ -573,7 +811,12 @@ final class IncludeHelper
                 null !== $live
                 && (Variable::TYPE_VALUE === $live->type || Variable::TYPE_STRING === $live->type)
             ) {
-                $localBindings[$operand] = $live;
+                $localBindings[$operand] = self::resolveIncludeCallerVar(
+                    $context,
+                    $name,
+                    $live,
+                    $callerBlock
+                );
             }
         }
     }
