@@ -203,6 +203,7 @@ final class Linter
     {
         [$code, $bareRethrowLines] = $this->runtime->prepareSourceForParser($code, $filename);
         $this->runtime->compiler->setBareRethrowLines($bareRethrowLines);
+        $this->runtime->resetParserNameResolverBeforeParse();
         $script = $this->runtime->parser->parse($code, $filename);
         $this->runtime->preprocessor->traverse($script);
         try {
@@ -258,7 +259,7 @@ final class Linter
             );
         } catch (\CompileError $e) {
             $compiler->issues[] = new Issue(
-                $script->main->cfg->getFile(),
+                $script->main->getFile(),
                 0,
                 $e->getMessage(),
                 $e->getMessage()
