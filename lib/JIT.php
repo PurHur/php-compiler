@@ -8167,6 +8167,7 @@ class JIT {
                         $this->context->scope->classId,
                         $nameOp->value
                     );
+                    $this->context->type->object->propagateInterfaceConstantsToImplementors($nameOp->value);
                     $this->context->popScope();
                     break;
                 case OpCode::TYPE_DECLARE_TRAIT:
