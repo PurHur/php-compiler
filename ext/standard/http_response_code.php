@@ -35,7 +35,10 @@ final class http_response_code extends Internal
             }
             $arg = $frame->calledArgs[0]->resolveIndirect();
             if (Variable::TYPE_NULL !== $arg->type) {
-                VmHttpResponse::writeHttpResponseCode(VmHttpResponse::resolveCodeArg($frame->calledArgs[0], 'http_response_code'));
+                $code = VmHttpResponse::resolveCodeArg($frame->calledArgs[0], 'http_response_code');
+                if (0 !== $code) {
+                    VmHttpResponse::writeHttpResponseCode($code);
+                }
             }
 
             return;
@@ -59,9 +62,20 @@ final class http_response_code extends Internal
 
             return;
         }
+        $code = VmHttpResponse::resolveCodeArg($frame->calledArgs[0], 'http_response_code');
+        // php-src head.c: response_code 0 is falsy — getter only, no status change (#9306).
+        if (0 === $code) {
+            VmHttpResponse::assignReadResult(
+                $frame->returnVar,
+                VmHttpResponse::readHttpResponseCode($ctx),
+                $ctx
+            );
+
+            return;
+        }
         VmHttpResponse::assignWriteResult(
             $frame->returnVar,
-            VmHttpResponse::writeHttpResponseCode(VmHttpResponse::resolveCodeArg($frame->calledArgs[0], 'http_response_code')),
+            VmHttpResponse::writeHttpResponseCode($code),
             $ctx
         );
     }

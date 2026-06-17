@@ -11,7 +11,7 @@ use PHPCompiler\VM\Variable;
 use PHPCompiler\Web\ResponseContext;
 
 /**
- * VM helpers for http_response_code() ResponseCode enum (#7322, ext/standard/head.c).
+ * VM helpers for http_response_code() (#7322, #9306; ext/standard/head.c).
  */
 final class VmHttpResponse
 {
@@ -60,12 +60,6 @@ final class VmHttpResponse
 
             return;
         }
-        $enum = self::enumCaseForStatusCode($ctx, (int) $value);
-        if (null !== $enum) {
-            $dest->copyFrom($enum);
-
-            return;
-        }
         $dest->int((int) $value);
     }
 
@@ -81,12 +75,6 @@ final class VmHttpResponse
         }
         if (true === $value) {
             $dest->bool(true);
-
-            return;
-        }
-        $enum = self::enumCaseForStatusCode($ctx, (int) $value);
-        if (null !== $enum) {
-            $dest->copyFrom($enum);
 
             return;
         }

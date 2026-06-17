@@ -28,7 +28,7 @@ true
 'NotFound'
 404
 true
-\ResponseCode::NotFound
-\ResponseCode::NotFound
-\ResponseCode::InternalServerError
+404
+404
+500
 http_response_code(): Argument #1 ($response_code) must be of type int|ResponseCode|null, Es given

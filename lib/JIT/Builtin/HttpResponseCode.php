@@ -262,6 +262,17 @@ final class HttpResponseCode
         $context->builder->branch($sMerge);
 
         $context->builder->positionAtEnd($sValid);
+        // php-src head.c: response_code 0 is falsy — getter only (#9306).
+        $isZero = $context->builder->icmp(Builder::INT_EQ, $code64, $i64->constInt(0, false));
+        $bbZeroGet = $fn->appendBasicBlock('hr_zero_get_'.$sid);
+        $bbSetStore = $fn->appendBasicBlock('hr_set_store_'.$sid);
+        $context->builder->branchIf($isZero, $bbZeroGet, $bbSetStore);
+
+        $context->builder->positionAtEnd($bbZeroGet);
+        self::emitWriteCurrentAsLong($context, $outPtr);
+        $context->builder->branch($sMerge);
+
+        $context->builder->positionAtEnd($bbSetStore);
         $code32 = $context->builder->trunc($code64, $i32);
         $prev = $context->builder->load(self::$global);
         $context->builder->store($code32, self::$global);
