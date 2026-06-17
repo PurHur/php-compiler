@@ -1,21 +1,21 @@
 --TEST--
-Language: asymmetric visibility — public private(set) combined read/set compiles (#7460, zend_compile.c)
+Language: asymmetric visibility — public private(set) combined read/set compile fatal (#9161, zend_compile.c)
 --FILE--
 <?php
 class C {
     public private(set) string $x = 'a';
 }
-echo (new C())->x, "\n";
---EXPECT--
-a
+echo "ok\n";
+--EXPECT_EXIT--
+255
 --FILE--
 <?php
 class C {
     public protected(set) string $x = 'b';
 }
-echo (new C())->x, "\n";
---EXPECT--
-b
+echo "ok\n";
+--EXPECT_EXIT--
+255
 --FILE--
 <?php
 class C {
@@ -23,6 +23,6 @@ class C {
         public private(set) string $name,
     ) {}
 }
-echo (new C('c'))->name, "\n";
---EXPECT--
-c
+echo "ok\n";
+--EXPECT_EXIT--
+255
