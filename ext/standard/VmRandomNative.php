@@ -7,7 +7,7 @@ namespace PHPCompiler\ext\standard;
 /**
  * CSPRNG via libc getrandom(2) with /dev/urandom open(2)/read(2) fallback — no host PHP I/O (#8402).
  *
- * Mirrors {@see \PHPCompiler\JIT\Builtin\StringRandomBytes} (getrandom(3) LLVM) and
+ * Mirrors {@see \PHPCompiler\JIT\Builtin\StringRandomBytes} (/dev/urandom LLVM read) and
  * {@see VmFsReadNative} FFI patterns. php-src: ext/standard/random.c — php_random_bytes()
  */
 final class VmRandomNative
