@@ -9452,6 +9452,17 @@ class Compiler {
         if ($producer instanceof Op\Expr\Isset_) {
             return $producerSlot;
         }
+        if ($producer instanceof Op\Expr\ArrowFunction || $producer instanceof Op\Expr\Closure) {
+            if (null === $producerSlot) {
+                foreach ($this->compileExpr($producer, $block) as $op) {
+                    $block->addOpCode($op);
+                }
+                $producerSlot = $block->slotForOperand($producer->result);
+            }
+            if (null !== $producerSlot) {
+                return $producerSlot;
+            }
+        }
         // php-cfg uses distinct result/arg temps for hoisted inline producers (#8766, #8561, #9136).
         if (
             $producer instanceof Op\Expr\BinaryOp
@@ -9710,6 +9721,8 @@ class Compiler {
                 && !($producers[0] instanceof Op\Expr\Array_)
                 && !($producers[0] instanceof Op\Expr\ConstFetch)
                 && !($producers[0] instanceof Op\Expr\ClassConstFetch)
+                && !($producers[0] instanceof Op\Expr\ArrowFunction)
+                && !($producers[0] instanceof Op\Expr\Closure)
                 && !$this->isEmbeddedCallLiteralArg($callArgs[0] ?? null)
             ) {
                 $callArg = $callArgs[$argIndex] ?? null;
@@ -9729,6 +9742,10 @@ class Compiler {
                 }
 
                 return $producers[0];
+            }
+            $closureMatch = $this->matchSingleClosureInlineProducer($producers[0], $callArgs, $argIndex);
+            if (null !== $closureMatch) {
+                return $closureMatch;
             }
 
             return null;
@@ -10185,6 +10202,44 @@ class Compiler {
             && $arg->name instanceof Operand\Literal
             && is_string($arg->name->value)
             && '' !== $arg->name->value;
+    }
+
+    /**
+     * Single hoisted ArrowFunction/Closure with extra named call args (#9154, array_any/find family).
+     *
+     * php-cfg may emit `array_any($arr, fn ($v) => …)` as one closure producer plus a named
+     * first argument — the closure must not be wired to arg 0.
+     */
+    private function matchSingleClosureInlineProducer(
+        Op\Expr $producer,
+        array $callArgs,
+        int $argIndex
+    ): ?Op\Expr {
+        if (
+            !($producer instanceof Op\Expr\ArrowFunction)
+            && !($producer instanceof Op\Expr\Closure)
+        ) {
+            return null;
+        }
+        $callArg = $callArgs[$argIndex] ?? null;
+        if (null !== $callArg && $this->operandsReferToSameVariable($producer->result, $callArg)) {
+            return $producer;
+        }
+        $closureSlots = [];
+        foreach ($callArgs as $idx => $arg) {
+            if (null === $arg || $this->isEmbeddedCallLiteralArg($arg)) {
+                continue;
+            }
+            if ($this->isNamedVariableOperand($arg)) {
+                continue;
+            }
+            $closureSlots[] = $idx;
+        }
+        if (1 === count($closureSlots) && $closureSlots[0] === $argIndex) {
+            return $producer;
+        }
+
+        return null;
     }
 
     /**

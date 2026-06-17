@@ -77,4 +77,36 @@ PHP;
         self::assertNotNull($arraySlot);
         self::assertSame($arraySlot, $sendSlots[2] ?? null, 'arg sends='.json_encode($sendSlots));
     }
+
+    /** Issue #9154 — inline arrow callback on array_any when array arg is a named local. */
+    public function testArrayAnyInlineClosureUsesSecondArgSlot(): void
+    {
+        $code = <<<'PHP'
+<?php
+$arr = [1, 2, 3];
+array_any($arr, fn ($v) => $v > 2);
+PHP;
+        $runtime = new Runtime();
+        $block = $runtime->parseAndCompile($code, 'array_any_closure.php');
+
+        $arraySlot = null;
+        $closureSlot = null;
+        $sendSlots = [];
+        foreach ($block->opCodes as $op) {
+            if (OpCode::TYPE_ASSIGN === $op->type && null === $arraySlot) {
+                $arraySlot = $op->arg2;
+            }
+            if (OpCode::TYPE_CLOSURE === $op->type) {
+                $closureSlot = $op->arg1;
+            }
+            if (OpCode::TYPE_ARG_SEND === $op->type) {
+                $sendSlots[] = $op->arg1;
+            }
+        }
+
+        self::assertNotNull($arraySlot);
+        self::assertNotNull($closureSlot);
+        self::assertSame($arraySlot, $sendSlots[0] ?? null, 'arg sends='.json_encode($sendSlots));
+        self::assertSame($closureSlot, $sendSlots[1] ?? null, 'arg sends='.json_encode($sendSlots));
+    }
 }
