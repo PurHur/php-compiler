@@ -195,8 +195,8 @@ class Context {
                 $var->int(\PHPCompiler\ext\standard\StdlibConstants::PASSWORD_BCRYPT);
                 return $var;
             case 'password_default':
-                $var = new Variable(Variable::TYPE_INTEGER);
-                $var->int(\PHPCompiler\ext\standard\StdlibConstants::PASSWORD_DEFAULT);
+                $var = new Variable(Variable::TYPE_STRING);
+                $var->string(\PHPCompiler\ext\standard\StdlibConstants::PASSWORD_DEFAULT);
                 return $var;
             case 'password_argon2i':
                 if (!\PHPCompiler\ext\standard\VmPasswordNative::argon2Available()) {
