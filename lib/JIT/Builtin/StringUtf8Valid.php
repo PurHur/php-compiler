@@ -8,13 +8,18 @@ use PHPCompiler\JIT\Context;
 use PHPLLVM\Value;
 
 /**
- * JIT/AOT link for mb_check_encoding() UTF-8 validation — LLVM from StringUtf8ValidJit (#4571).
+ * JIT/AOT link for mb_check_encoding() UTF-8 validation — Utf8JitHelper (#4571, #9246).
  */
 final class StringUtf8Valid
 {
     public static function ensureLinked(Context $context): void
     {
-        StringUtf8ValidJit::implement($context);
+        StringUtf8Runtime::ensureValidLinked($context);
+    }
+
+    public static function ensureStandaloneBodies(Context $context): void
+    {
+        StringUtf8Runtime::ensureValidLinked($context);
     }
 
     public static function validFromPtr(Context $context, Value $strPtr): Value
