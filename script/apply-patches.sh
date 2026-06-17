@@ -4209,11 +4209,76 @@ apply_php_cfg_magic_constants_overlay() {
 
 apply_php_cfg_anonymous_class_name_overlay() {
   local target="$ROOT/vendor/ircmaxell/php-cfg/lib/PHPCfg/Parser.php"
+  if [[ ! -f "$target" ]]; then
+    return 0
+  fi
   if grep -q 'magicStringResolver->beginCompilationUnit' "$target" 2>/dev/null; then
     echo "Skip php-cfg-anonymous-class-name.patch (already applied)"
     return 0
   fi
-  apply_patch "$PATCH_DIR/php-cfg-anonymous-class-name.patch"
+  python3 - "$target" <<'PY'
+import sys
+from pathlib import Path
+
+parser_path = Path(sys.argv[1])
+text = parser_path.read_text()
+original = text
+
+if 'magicStringResolver->beginCompilationUnit' in text:
+    print('Skip php-cfg-anonymous-class-name.patch (already applied)')
+    raise SystemExit(0)
+
+if 'protected $magicStringResolver' not in text:
+    anchor = "    protected $astTraverser;\n\n    protected $fileName;"
+    insert = (
+        "    protected $astTraverser;\n\n"
+        "    /** @var AstVisitor\\MagicStringResolver */\n"
+        "    protected $magicStringResolver;\n\n"
+        "    protected $fileName;"
+    )
+    if anchor in text:
+        text = text.replace(anchor, insert, 1)
+    else:
+        anchor2 = "    protected $astTraverser;\n"
+        if anchor2 not in text:
+            sys.stderr.write('php-cfg-anonymous-class-name: astTraverser anchor not found\n')
+            raise SystemExit(1)
+        text = text.replace(
+            anchor2,
+            anchor2
+            + "\n    /** @var AstVisitor\\MagicStringResolver */\n"
+            + "    protected $magicStringResolver;\n",
+            1,
+        )
+
+old_ctor = "        $this->astTraverser->addVisitor(new AstVisitor\\MagicStringResolver());"
+new_ctor = (
+    "        $this->magicStringResolver = new AstVisitor\\MagicStringResolver();\n"
+    "        $this->astTraverser->addVisitor($this->magicStringResolver);"
+)
+if old_ctor in text:
+    text = text.replace(old_ctor, new_ctor, 1)
+elif '$this->magicStringResolver = new AstVisitor\\MagicStringResolver()' not in text:
+    sys.stderr.write('php-cfg-anonymous-class-name: constructor anchor not found\n')
+    raise SystemExit(1)
+
+parse_ast_anchor = "        $this->fileName = $fileName;\n        $ast = $this->astTraverser->traverse($ast);"
+parse_ast_insert = (
+    "        $this->fileName = $fileName;\n"
+    "        $this->magicStringResolver->beginCompilationUnit($fileName);\n"
+    "        $ast = $this->astTraverser->traverse($ast);"
+)
+if parse_ast_anchor in text:
+    text = text.replace(parse_ast_anchor, parse_ast_insert, 1)
+else:
+    sys.stderr.write('php-cfg-anonymous-class-name: parseAst anchor not found\n')
+    raise SystemExit(1)
+
+if text != original:
+    parser_path.write_text(text)
+    print('Applied php-cfg-anonymous-class-name.patch (overlay)')
+raise SystemExit(0)
+PY
 }
 
 apply_php_cfg_halt_compiler_overlay() {
