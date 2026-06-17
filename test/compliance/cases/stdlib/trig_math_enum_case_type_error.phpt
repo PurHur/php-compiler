@@ -14,6 +14,9 @@ foreach ([
     ['sinh', $c],
     ['cosh', $c],
     ['tanh', $c],
+    ['acosh', $c],
+    ['asinh', $c],
+    ['atanh', $c],
     ['expm1', $c],
     ['log1p', $c],
     ['deg2rad', $c],
@@ -51,6 +54,9 @@ atan(): Argument #1 ($num) must be of type float, E given
 sinh(): Argument #1 ($num) must be of type float, E given
 cosh(): Argument #1 ($num) must be of type float, E given
 tanh(): Argument #1 ($num) must be of type float, E given
+acosh(): Argument #1 ($num) must be of type float, E given
+asinh(): Argument #1 ($num) must be of type float, E given
+atanh(): Argument #1 ($num) must be of type float, E given
 expm1(): Argument #1 ($num) must be of type float, E given
 log1p(): Argument #1 ($num) must be of type float, E given
 deg2rad(): Argument #1 ($num) must be of type float, E given
