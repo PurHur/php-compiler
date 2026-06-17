@@ -1772,9 +1772,13 @@ class VM {
         $this->bindClosureCallCaptures($child, $fiber->callback);
         $child->calledArgs = $startArgs;
         $child->fiberState = $fiber;
-        $returnSlot = new Variable();
+        if (null === $fiber->completionReturnSlot) {
+            $fiber->completionReturnSlot = new Variable();
+        }
+        $returnSlot = $fiber->completionReturnSlot;
         $child->returnVar = $returnSlot;
         $fiber->frame = $child;
+        $fiber->callbackFrame = $child;
         $fiber->status = FiberState::STATUS_RUNNING;
 
         return $this->runFiberExecution($fiber, $returnSlot);
@@ -1807,14 +1811,18 @@ class VM {
             throw new \LogicException('Fiber resume missing suspended frame');
         }
         $fiber->status = FiberState::STATUS_RUNNING;
-        $returnSlot = new Variable();
-        $savedReturn = $child->returnVar;
-        $child->returnVar = $returnSlot;
-        try {
-            return $this->runFiberExecution($fiber, $returnSlot);
-        } finally {
-            $child->returnVar = $savedReturn;
+        if (null === $fiber->completionReturnSlot) {
+            $fiber->completionReturnSlot = new Variable();
         }
+        $returnSlot = $fiber->completionReturnSlot;
+        $callbackFrame = $fiber->callbackFrame;
+        if (null !== $callbackFrame) {
+            $callbackFrame->returnVar = $returnSlot;
+        } else {
+            $child->returnVar = $returnSlot;
+        }
+
+        return $this->runFiberExecution($fiber, $returnSlot);
     }
 
     /**
@@ -1858,6 +1866,8 @@ class VM {
             } catch (\Throwable $e) {
                 $fiber->status = FiberState::STATUS_TERMINATED;
                 $fiber->frame = null;
+                $fiber->callbackFrame = null;
+                $fiber->completionReturnSlot = null;
                 $fiber->pendingSuspendReturnVar = null;
                 $fiber->hasReturnValue = false;
                 $fiber->threw = true;
@@ -1877,10 +1887,19 @@ class VM {
         if (self::SUCCESS === $result) {
             $fiber->status = FiberState::STATUS_TERMINATED;
             $fiber->frame = null;
-            $resolved = $returnSlot->resolveIndirect();
-            $fiber->returnValue->copyFrom($resolved);
-            $fiber->hasReturnValue = true;
+            $fiber->callbackFrame = null;
+            $resolved = $fiber->hasReturnValue
+                ? $fiber->returnValue->resolveIndirect()
+                : $returnSlot->resolveIndirect();
+            if (!$fiber->hasReturnValue) {
+                $fiber->returnValue->copyFrom($resolved);
+                $fiber->hasReturnValue = true;
+            }
+            $fiber->completionReturnSlot = null;
             $fiber->threw = false;
+            $callerReturn = new Variable();
+            $callerReturn->copyFrom($resolved);
+            $fiber->callerReturn = $callerReturn;
             $out = new Variable();
             $out->copyFrom($resolved);
 
@@ -1914,6 +1933,8 @@ class VM {
         $frame = $fiber->frame;
         if (null === $frame) {
             $fiber->status = FiberState::STATUS_TERMINATED;
+            $fiber->callbackFrame = null;
+            $fiber->completionReturnSlot = null;
             $fiber->hasReturnValue = false;
             $fiber->threw = true;
             $this->raiseUncaughtException($thrown);
@@ -1934,6 +1955,8 @@ class VM {
         $this->clearTryCatchUnwindState();
         $fiber->status = FiberState::STATUS_TERMINATED;
         $fiber->frame = null;
+        $fiber->callbackFrame = null;
+        $fiber->completionReturnSlot = null;
         $fiber->hasReturnValue = false;
         $fiber->threw = true;
         $this->raiseUncaughtException($thrown);
@@ -5969,6 +5992,17 @@ restart:
                 $frame->returnVar->copyFrom($returnValue);
             }
         }
+        $activeFiber = $this->context->currentFiber;
+        if (null !== $activeFiber) {
+            $activeFiber->returnValue->copyFrom($returnValue);
+            $activeFiber->hasReturnValue = true;
+            if (null !== $activeFiber->completionReturnSlot) {
+                $activeFiber->completionReturnSlot->copyFrom($returnValue);
+            }
+            $callerReturn = new Variable();
+            $callerReturn->copyFrom($returnValue);
+            $activeFiber->callerReturn = $callerReturn;
+        }
         $this->markObjectConstructedIfLeavingConstruct($frame);
         $callee = $frame;
         $caller = $this->context->pop();
@@ -7243,6 +7277,8 @@ restart:
             $this->clearTryCatchUnwindState();
             $fiber->status = FiberState::STATUS_TERMINATED;
             $fiber->frame = null;
+            $fiber->callbackFrame = null;
+            $fiber->completionReturnSlot = null;
             $fiber->hasReturnValue = false;
             $fiber->threw = true;
 

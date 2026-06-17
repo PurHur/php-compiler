@@ -6,6 +6,7 @@ namespace PHPCompiler\VM\Builtin;
 
 use PHPCompiler\Frame;
 use PHPCompiler\VM\Builtin\VmClassMethod;
+use PHPCompiler\VM\FiberState;
 use PHPCompiler\VM\FiberSupport;
 use PHPCompiler\VM\Variable;
 
@@ -35,7 +36,11 @@ final class FiberStart extends VmClassMethod
         }
         $result = $frame->vmContext->runtime->vm->startFiber($fiber, ...$startArgs);
         if (null !== $frame->returnVar) {
-            $frame->returnVar->copyFrom($result);
+            if (FiberState::STATUS_TERMINATED === $fiber->status && null !== $fiber->callerReturn) {
+                $frame->returnVar->copyFrom($fiber->callerReturn);
+            } else {
+                $frame->returnVar->copyFrom($result);
+            }
         }
     }
 }

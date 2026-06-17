@@ -26,6 +26,15 @@ final class FiberState
 
     public ?Frame $frame = null;
 
+    /** Root closure frame — keeps returnVar wired across suspend/resume (#9063). */
+    public ?Frame $callbackFrame = null;
+
+    /** Callback return slot reused across start/resume until termination (#9063). */
+    public ?Variable $completionReturnSlot = null;
+
+    /** Value surfaced to start()/resume() when the fiber terminates (#9066). */
+    public ?Variable $callerReturn = null;
+
     /** Value passed to {@see FiberSupport::suspend()} — returned from start()/resume(). */
     public Variable $suspendReturn;
 
