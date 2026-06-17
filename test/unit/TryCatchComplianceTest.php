@@ -325,6 +325,29 @@ try {
         );
     }
 
+    /** Issue #9209: throw expressions in return ?? and elvis ?: (Zend zend_compile.c). */
+    public function testThrowExpressionReturnAndElvis(): void
+    {
+        $this->assertVmOutput(
+            '<?php
+function f(?int $x): int {
+    return $x ?? throw new RuntimeException("x");
+}
+try {
+    f(null);
+} catch (RuntimeException $e) {
+    echo "caught:", $e->getMessage(), "\n";
+}
+try {
+    $y = 0 ?: throw new RuntimeException("y");
+} catch (RuntimeException $e) {
+    echo "caught:", $e->getMessage(), "\n";
+}
+',
+            "caught:x\ncaught:y\n"
+        );
+    }
+
     public function testUncaughtThrowNonZeroExit(): void
     {
         $bin = realpath(__DIR__ . '/../../bin/vm.php');
