@@ -26,13 +26,7 @@ final class VmInet
 
     public static function ip2long(string $ip): int|false
     {
-        if (VmInetNative::available()) {
-            $native = VmInetNative::ip2long($ip);
-            if (false !== $native) {
-                return $native;
-            }
-        }
-
+        // php-src php_ip2long() rejects leading-zero octets; libc inet_aton does not (#9300).
         return VmInetPure::ip2long($ip);
     }
 

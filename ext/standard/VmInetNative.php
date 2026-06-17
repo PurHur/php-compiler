@@ -52,21 +52,8 @@ final class VmInetNative
 
     public static function ip2long(string $ip): int|false
     {
-        $ffi = self::ffi();
-        if (null === $ffi) {
-            return VmInetPure::ip2long($ip);
-        }
-
-        try {
-            $in = $ffi->new('struct in_addr');
-            if (0 === (int) $ffi->inet_aton($ip, \FFI::addr($in))) {
-                return false;
-            }
-
-            return (int) $ffi->ntohl($in->s_addr);
-        } catch (\Throwable) {
-            return VmInetPure::ip2long($ip);
-        }
+        // php-src php_ip2long() rejects leading-zero octets; libc inet_aton does not (#9300).
+        return VmInetPure::ip2long($ip);
     }
 
     public static function inet_ntop(string $in_addr): string|false
