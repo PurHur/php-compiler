@@ -119,7 +119,8 @@ final class ClassConstFetchHelper
             $isId = $context->builder->icmp(Builder::INT_EQ, $classIdVal, $expectedId);
             $context->builder->branchIf($isId, $matchBlock, $nextCheck);
             $context->builder->positionAtEnd($matchBlock);
-            if ($objectType->isTraitClass(strtolower(ltrim($objectType->classNameForId($id), '\\')))) {
+            if ($objectType->isTraitClass(strtolower(ltrim($objectType->classNameForId($id), '\\')))
+                && !$objectType->isInTraitMethodScopeForTraitId($id, $block)) {
                 $classLabel = $objectType->classNameForId($id);
                 ErrorRaise::ensureLinked($context);
                 ErrorRaise::emitRaise(
@@ -174,7 +175,7 @@ final class ClassConstFetchHelper
     ): Variable {
         $classIdVal = self::emitResolveClassId($objectType, $block, $classVar, $classOp);
 
-        return self::fetchDynamicByClassIdValue($objectType, $classIdVal, $nameVar, $classOp);
+        return self::fetchDynamicByClassIdValue($objectType, $classIdVal, $nameVar, $classOp, $block);
     }
 
     public static function fetchDynamic(
@@ -197,13 +198,13 @@ final class ClassConstFetchHelper
                 }
             }
 
-            return $objectType->classConstFetch($classId, $literal);
+            return $objectType->classConstFetch($classId, $literal, $block);
         }
 
         $context = $objectType->jitContext();
         $classIdVal = $context->constantFromInteger($classId, 'int64');
 
-        return self::fetchDynamicByClassIdValue($objectType, $classIdVal, $nameVar, $classOp);
+        return self::fetchDynamicByClassIdValue($objectType, $classIdVal, $nameVar, $classOp, $block);
     }
 
     /**
@@ -263,7 +264,8 @@ final class ClassConstFetchHelper
         Object_ $objectType,
         Value $classIdVal,
         Variable $nameVar,
-        Operand $classOp
+        Operand $classOp,
+        ?Block $block = null
     ): Variable {
         $context = $objectType->jitContext();
         self::ensureStrCaseCmp($context);
@@ -322,7 +324,8 @@ final class ClassConstFetchHelper
                 $context->builder->branchIf($isMatch, $matchBlock, $nextCheck);
 
                 $context->builder->positionAtEnd($matchBlock);
-                if ($objectType->isTraitClass(strtolower(ltrim($objectType->classNameForId($id), '\\')))) {
+                if ($objectType->isTraitClass(strtolower(ltrim($objectType->classNameForId($id), '\\')))
+                    && !$objectType->isInTraitMethodScopeForTraitId($id, $block)) {
                     $classLabel = $objectType->classNameForId($id);
                     ErrorRaise::ensureLinked($context);
                     ErrorRaise::emitRaise(

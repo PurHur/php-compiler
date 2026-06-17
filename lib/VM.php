@@ -9055,11 +9055,41 @@ restart:
         if (!$classEntry->isTrait || 'class' === strtolower($constName)) {
             return null;
         }
+        if ($this->isInTraitMethodScopeForTrait($frame, $classEntry)) {
+            return null;
+        }
 
         return $this->dispatchVmError(
             "Cannot access trait constant {$classEntry->name}::{$constName} directly",
             $frame
         );
+    }
+
+    /** self::CONST inside trait methods lowers to T::CONST — allow in-trait scope (#9187, Zend/zend_traits.c). */
+    private function isInTraitMethodScopeForTrait(Frame $frame, ClassEntry $traitEntry): bool
+    {
+        if (!$traitEntry->isTrait) {
+            return false;
+        }
+        $traitLc = strtolower(ltrim($traitEntry->name, '\\'));
+        if (null !== $frame->block?->func?->class) {
+            $funcClassLc = strtolower($frame->block->func->class->value);
+            if ($funcClassLc === $traitLc) {
+                return true;
+            }
+        }
+        $declaringLc = null;
+        if (null !== $frame->block?->func?->class) {
+            $declaringLc = strtolower($frame->block->func->class->value);
+        } elseif (null !== $frame->calledClass && '' !== $frame->calledClass) {
+            $declaringLc = strtolower($frame->calledClass);
+        }
+        if (null === $declaringLc) {
+            return false;
+        }
+        $scopeTraitLc = $this->traitScopeLcForFrameMethod($frame, $declaringLc);
+
+        return null !== $scopeTraitLc && $scopeTraitLc === $traitLc;
     }
 
     private function enforceClassConstVisibility(ClassEntry $classEntry, string $constName, Frame $frame): ?Frame
