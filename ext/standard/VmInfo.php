@@ -80,8 +80,6 @@ final class VmInfo
 
     public static function php_uname(string $mode = 'a'): string
     {
-        self::validateUnameMode($mode);
-
         return VmUnameNative::php_uname($mode);
     }
 
@@ -432,18 +430,6 @@ final class VmInfo
         }
 
         return $found1 <=> $found2;
-    }
-
-    private static function validateUnameMode(string $mode): void
-    {
-        if ('' === $mode || !isset($mode[0])) {
-            return;
-        }
-        if (!\in_array($mode[0], ['a', 's', 'n', 'r', 'v', 'm'], true)) {
-            throw new \LogicException(
-                'php_uname(): Argument #1 ($mode) must be one of "a", "s", "n", "r", "v", or "m"'
-            );
-        }
     }
 
     private static function infoFlagSelected(int $flags, int $section): bool

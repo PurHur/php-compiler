@@ -17,6 +17,10 @@ final class PhpUnameNoFfiVMTest extends BaseTest
             __DIR__.'/cases/stdlib/php_uname_no_ffi.phpt',
             'php_uname_no_ffi.phpt'
         );
+        yield 'php_uname_invalid_mode.phpt' => self::parsePHPT(
+            __DIR__.'/cases/stdlib/php_uname_invalid_mode.phpt',
+            'php_uname_invalid_mode.phpt'
+        );
     }
 
     public function setUp(): void

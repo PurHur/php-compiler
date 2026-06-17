@@ -203,13 +203,8 @@ final class StringInfo
         $strPtr = $context->getTypeFromString('__string__*');
 
         $modeChar = self::unameModeChar($context, $mode);
-        $valid = self::isValidUnameMode($context, $modeChar);
-        $invalidBb = $fn->appendBasicBlock('pu_invalid');
         $bodyBb = $fn->appendBasicBlock('pu_body');
-        $context->builder->branchIf($valid, $bodyBb, $invalidBb);
-
-        $context->builder->positionAtEnd($invalidBb);
-        $context->builder->returnValue(self::literalString($context, ''));
+        $context->builder->branch($bodyBb);
 
         $context->builder->positionAtEnd($bodyBb);
         $uts = $context->builder->alloca($i8, self::UTSNAME_SIZE, 'pu_uts');
@@ -536,25 +531,18 @@ final class StringInfo
         );
     }
 
-    private static function isValidUnameMode(Context $context, Value $modeChar): Value
+    private static function modeIsAll(Context $context, Value $modeChar): Value
     {
         $i8 = $context->getTypeFromString('int8');
-        $valid = $context->getTypeFromString('int1')->constInt(0, false);
-        foreach (['a', 's', 'n', 'r', 'v', 'm'] as $letter) {
-            $valid = $context->builder->or(
-                $valid,
+        $isSingle = $context->getTypeFromString('int1')->constInt(0, false);
+        foreach (['s', 'n', 'r', 'v', 'm'] as $letter) {
+            $isSingle = $context->builder->or(
+                $isSingle,
                 $context->builder->icmp(Builder::INT_EQ, $modeChar, $i8->constInt(ord($letter), false))
             );
         }
 
-        return $valid;
-    }
-
-    private static function modeIsAll(Context $context, Value $modeChar): Value
-    {
-        $i8 = $context->getTypeFromString('int8');
-
-        return $context->builder->icmp(Builder::INT_EQ, $modeChar, $i8->constInt(ord('a'), false));
+        return $context->builder->not($isSingle);
     }
 
     private static function selectUnameField(Context $context, LlvmFunction $fn, Value $uts, Value $modeChar): Value
