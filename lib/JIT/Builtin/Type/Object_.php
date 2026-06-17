@@ -3983,9 +3983,9 @@ class Object_ extends Type {
         return $this->lookup($classOp->value);
     }
 
-    public function classConstFetch(int $classId, string $constName): Variable
+    public function classConstFetch(int $classId, string $constName, ?Block $block = null): Variable
     {
-        $this->emitDirectTraitConstAccessErrorIfNeeded($classId, $constName);
+        $this->emitDirectTraitConstAccessErrorIfNeeded($classId, $constName, $block);
         $key = strtolower($constName);
         if (!isset($this->classConstants[$classId][$key])) {
             throw new \LogicException("Undefined class constant: {$constName}");
@@ -4008,7 +4008,7 @@ class Object_ extends Type {
         return ClassConstFetchHelper::fetchDynamic($this, $classId, $nameVar, $classOp, $block, $jit);
     }
 
-    public function emitDirectTraitConstAccessErrorIfNeeded(int $classId, string $constName): void
+    public function emitDirectTraitConstAccessErrorIfNeeded(int $classId, string $constName, ?Block $block = null): void
     {
         if ('class' === strtolower($constName)) {
             return;
@@ -4017,11 +4017,42 @@ class Object_ extends Type {
         if (!$this->isTraitClass(strtolower(ltrim($classLabel, '\\')))) {
             return;
         }
+        if ($this->isInTraitMethodScopeForTraitId($classId, $block)) {
+            return;
+        }
         ErrorRaise::ensureLinked($this->context);
         ErrorRaise::emitRaise(
             $this->context,
             "Cannot access trait constant {$classLabel}::{$constName} directly"
         );
+    }
+
+    /** self::CONST inside trait methods lowers to T::CONST — allow in-trait scope (#9187, Zend/zend_traits.c). */
+    public function isInTraitMethodScopeForTraitId(int $traitId, ?Block $block): bool
+    {
+        $traitLc = strtolower(ltrim($this->classNameForId($traitId), '\\'));
+        if (null !== $block?->func?->class) {
+            $funcClassLc = strtolower(ltrim($block->func->class->value, '\\'));
+            if ($funcClassLc === $traitLc) {
+                return true;
+            }
+        }
+        $declaringLc = null;
+        if (null !== $block?->func?->class) {
+            $declaringLc = strtolower(ltrim($block->func->class->value, '\\'));
+        } elseif ('' !== $this->context->scope->className) {
+            $declaringLc = strtolower(ltrim($this->context->scope->className, '\\'));
+        }
+        if (null === $declaringLc || !$this->hasDeclaredClass($declaringLc)) {
+            return false;
+        }
+        $methodLc = strtolower((string) ($block?->func?->name ?? ''));
+        if ('' === $methodLc) {
+            return false;
+        }
+        $sourceTraitLc = $this->traitMethodSource($this->lookup($declaringLc), $methodLc);
+
+        return null !== $sourceTraitLc && $sourceTraitLc === $traitLc;
     }
 
     public function jitContext(): Context

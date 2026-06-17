@@ -50,13 +50,33 @@ final class ClassConstVisibilityJitGuard
     private static function callerClassLc(Context $context, ?Block $enclosingBlock): ?string
     {
         if (null !== $enclosingBlock?->func?->class) {
-            return strtolower(ltrim($enclosingBlock->func->class->value, '\\'));
+            $funcClassLc = strtolower(ltrim($enclosingBlock->func->class->value, '\\'));
+            if ($context->type->object->hasDeclaredClass($funcClassLc)
+                && $context->type->object->isTraitClass($funcClassLc)) {
+                return $funcClassLc;
+            }
         }
-        if ('' !== $context->scope->className) {
-            return strtolower(ltrim($context->scope->className, '\\'));
+        $declaringLc = null;
+        if (null !== $enclosingBlock?->func?->class) {
+            $declaringLc = strtolower(ltrim($enclosingBlock->func->class->value, '\\'));
+        } elseif ('' !== $context->scope->className) {
+            $declaringLc = strtolower(ltrim($context->scope->className, '\\'));
+        }
+        if (null === $declaringLc) {
+            return null;
+        }
+        $methodLc = strtolower((string) ($enclosingBlock?->func?->name ?? ''));
+        if ('' !== $methodLc && $context->type->object->hasDeclaredClass($declaringLc)) {
+            $traitLc = $context->type->object->traitMethodSource(
+                $context->type->object->lookup($declaringLc),
+                $methodLc
+            );
+            if (null !== $traitLc) {
+                return $traitLc;
+            }
         }
 
-        return null;
+        return $declaringLc;
     }
 
     private static function emitViolation(Context $context, \PHPCompiler\JIT $jit, string $message): void
