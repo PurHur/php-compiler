@@ -24,15 +24,15 @@ final class SessionStatusEnumTest extends TestCase
 <?php
 var_export(enum_exists('SessionStatus', false));
 echo "\n";
-echo session_status() === SessionStatus::None ? "none\n" : "bad\n";
-echo session_status()->value === PHP_SESSION_NONE ? "legacy\n" : "bad\n";
+echo session_status() === PHP_SESSION_NONE ? "none\n" : "bad\n";
+echo session_status() === SessionStatus::None ? "enum\n" : "int\n";
 session_start();
-echo session_status() === SessionStatus::Active ? "active\n" : "bad\n";
+echo session_status() === PHP_SESSION_ACTIVE ? "active\n" : "bad\n";
 session_write_close();
-echo session_status() === SessionStatus::None ? "closed\n" : "bad\n";
+echo session_status() === PHP_SESSION_NONE ? "closed\n" : "bad\n";
 PHP;
         ob_start();
         $runtime->run($runtime->parseAndCompile($code, 'session_status_enum.php'));
-        $this->assertSame("true\nnone\nlegacy\nactive\nclosed\n", ob_get_clean());
+        $this->assertSame("true\nnone\nint\nactive\nclosed\n", ob_get_clean());
     }
 }
