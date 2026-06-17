@@ -1,9 +1,9 @@
 --TEST--
-PHP 8.4 asymmetric visibility: promoted public private(set) outside read/write (#8760, zend_compile.c)
+PHP 8.4 asymmetric visibility: promoted private(set) outside read/write (#8760, #9161, zend_compile.c)
 --FILE--
 <?php
 class D {
-    public function __construct(public private(set) int $x = 1) {}
+    public function __construct(private(set) int $x = 1) {}
 }
 $d = new D();
 echo $d->x, "\n";
