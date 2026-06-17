@@ -254,7 +254,23 @@ class JIT {
             $this->context->jitPropertyHookRawProperty = null;
             // Each queued CFG function gets a fresh try/catch stack — dispatch BBs are per-LLVM-function (#3012).
             $this->context->tryCatch->reset();
-            $this->compileBlockInternal($run[0], $run[1], null, null, 0, false, ...$run[2]);
+            // Per-method locals must not reuse another LLVM function's slots (#878, MiniWebApp verify).
+            $this->context->namedVariableBindings = [];
+            $this->context->refAliasNames = [];
+            $this->context->foreachByRefLocalNames = [];
+            $llvmFunc = $run[0];
+            $cfgBlock = $run[1] ?? null;
+            if ($cfgBlock instanceof Block && null !== $cfgBlock->func) {
+                $this->context->activeFunction = strtolower($cfgBlock->func->getScopedName());
+            } else {
+                foreach ($this->context->functions as $name => $candidate) {
+                    if ($candidate === $llvmFunc) {
+                        $this->context->activeFunction = $name;
+                        break;
+                    }
+                }
+            }
+            $this->compileBlockInternal($llvmFunc, $cfgBlock, null, null, 0, false, ...$run[2]);
         }
     }
 

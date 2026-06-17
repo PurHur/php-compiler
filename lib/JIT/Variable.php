@@ -392,7 +392,7 @@ final class Variable {
                 $context,
                 self::TYPE_HASHTABLE,
                 self::KIND_VARIABLE,
-                BasicBlockHelper::entryAlloca($context, $context->getTypeFromString('__hashtable__*'))
+                BasicBlockHelper::entryAllocaForFunction($context, $func, $context->getTypeFromString('__hashtable__*'))
             );
         }
         $name = OperandName::resolve($op);
@@ -435,7 +435,7 @@ final class Variable {
             $context,
             $type,
             self::KIND_VARIABLE,
-            BasicBlockHelper::entryAlloca($context, $context->getTypeFromString($stringType))
+            BasicBlockHelper::entryAllocaForFunction($context, $func, $context->getTypeFromString($stringType))
         );
     }
 

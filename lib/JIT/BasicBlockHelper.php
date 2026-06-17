@@ -96,7 +96,14 @@ final class BasicBlockHelper
     public static function ensureOpenInsertBlock(Context $context, string $label): void
     {
         $insert = $context->builder->getInsertBlock();
-        if (null === $insert || null === $insert->getTerminator()) {
+        if (null === $insert) {
+            $fn = self::parentFunction($context);
+            $next = $fn->appendBasicBlock($label);
+            $context->builder->positionAtEnd($next);
+
+            return;
+        }
+        if (null === $insert->getTerminator()) {
             return;
         }
         $next = self::append($context, $label);
@@ -122,7 +129,22 @@ final class BasicBlockHelper
 
     public static function entryAlloca(Context $context, Type $type): Value
     {
-        $fn = self::parentFunction($context);
+        $restore = self::tryGetInsertBlock($context);
+        if (null !== $restore) {
+            $parent = $restore->getParent();
+            if (!$parent instanceof Function_) {
+                throw new \LogicException('entryAlloca insert block has no parent function');
+            }
+            $fn = $parent;
+        } else {
+            $fn = self::parentFunction($context);
+        }
+
+        return self::entryAllocaForFunction($context, $fn, $type);
+    }
+
+    public static function entryAllocaForFunction(Context $context, Function_ $fn, Type $type): Value
+    {
         $entry = $fn->getEntryBasicBlock();
         $restore = self::tryGetInsertBlock($context);
         try {
@@ -141,6 +163,7 @@ final class BasicBlockHelper
                 $context->builder->positionAtEnd($restore);
             }
         }
+
         return $slot;
     }
 

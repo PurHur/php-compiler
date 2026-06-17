@@ -6056,7 +6056,7 @@ class Object_ extends Type {
                     $this->context->helper->loadValue($value)
                 );
             } else {
-                $valuePtr = JitValueBox::valuePtrFromVariable($this->context, $value);
+                $valuePtr = JitValueBox::pointer($this->context, $value->value);
             }
             JitValueBox::copyFromPointer($this->context, $heapVal, $valuePtr);
             $value->addref();
