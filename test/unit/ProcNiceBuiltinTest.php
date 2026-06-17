@@ -30,6 +30,18 @@ final class ProcNiceBuiltinTest extends TestCase
         $this->assertSame(VMVariable::TYPE_BOOLEAN, $frame->returnVar->resolveIndirect()->type);
     }
 
+    public function testProcNiceArgumentCountErrorOnZeroArgs(): void
+    {
+        $runtime = new Runtime();
+        $fn = new proc_nice();
+        $frame = $fn->getFrame($runtime->vmContext);
+        $frame->returnVar = new VMVariable();
+        $frame->calledArgs = [];
+        $this->expectException(\ArgumentCountError::class);
+        $this->expectExceptionMessage('proc_nice() expects exactly 1 argument, 0 given');
+        $fn->execute($frame);
+    }
+
     public function testProcNiceTypeErrorOnArray(): void
     {
         $runtime = new Runtime();
