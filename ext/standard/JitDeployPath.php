@@ -7,7 +7,7 @@ namespace PHPCompiler\ext\standard;
 use PHPCompiler\JIT\Context;
 use PHPLLVM\Value;
 
-/** LLVM lowering for phpc_deploy_path() via {@see \PHPCompiler\JIT\Builtin\StringDeployPath}. */
+/** LLVM lowering for phpc_deploy_path() via DeployPathJitHelper / {@see \PHPCompiler\JIT\Builtin\StringDeployPath} (#9309). */
 final class JitDeployPath
 {
     /** @return Value */
