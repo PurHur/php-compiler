@@ -432,4 +432,53 @@ PHP;
         self::assertNotNull($constSlot, 'CAL_GREGORIAN const fetch must be lowered');
         self::assertSame($constSlot, $sendSlots[0] ?? null, 'arg sends='.json_encode($sendSlots));
     }
+
+    /** Issue #9152 — second call is_subclass_of must receive hoisted UnitEnum::class slot. */
+    public function testIsSubclassOfAfterIsAUsesClassConstFetchSlot(): void
+    {
+        $code = <<<'PHP'
+<?php
+enum E: int { case A = 1; }
+$child = 'E';
+var_export(is_a($child, UnitEnum::class, true));
+var_export(is_subclass_of($child, UnitEnum::class));
+PHP;
+        $runtime = new Runtime();
+        $block = $runtime->parseAndCompile($code, 'is_subclass_enum_class_string.php');
+
+        $classConstSlots = [];
+        $argSendGroups = [];
+        $currentSends = [];
+        foreach ($block->opCodes as $op) {
+            if (OpCode::TYPE_CLASS_CONST_FETCH === $op->type) {
+                $classConstSlots[] = $op->arg1;
+            }
+            if (OpCode::TYPE_FUNCCALL_INIT === $op->type) {
+                if ([] !== $currentSends) {
+                    $argSendGroups[] = $currentSends;
+                }
+                $currentSends = [];
+            }
+            if (OpCode::TYPE_ARG_SEND === $op->type) {
+                $currentSends[] = $op->arg1;
+            }
+            if (OpCode::TYPE_FUNCCALL_EXEC_RETURN === $op->type || OpCode::TYPE_FUNCCALL_EXEC_NORETURN === $op->type) {
+                if ([] !== $currentSends) {
+                    $argSendGroups[] = $currentSends;
+                }
+                $currentSends = [];
+            }
+        }
+
+        self::assertCount(2, $classConstSlots, 'UnitEnum::class fetches for is_a and is_subclass_of');
+        $isSubclassSends = null;
+        foreach ($argSendGroups as $group) {
+            if (2 === \count($group) && ($group[1] ?? null) === $classConstSlots[1]) {
+                $isSubclassSends = $group;
+                break;
+            }
+        }
+        self::assertNotNull($isSubclassSends, 'groups='.json_encode($argSendGroups));
+        self::assertSame($classConstSlots[1], $isSubclassSends[1]);
+    }
 }
