@@ -256,8 +256,8 @@ PHP;
         $this->assertSame('true', ob_get_clean());
     }
 
-    /** Issue #9170: FCC in parameter defaults (PHP 8.5 constant expressions). */
-    public function testVmFunctionFirstClassCallableDefaultParameter(): void
+    /** Issue #9697: FCC in parameter defaults is not a constant expression (Zend/zend_compile.c). */
+    public function testVmFunctionFirstClassCallableDefaultParameterCompileError(): void
     {
         $code = <<<'PHP'
 <?php
@@ -266,16 +266,14 @@ class C {
         return $c('abc');
     }
 }
-echo (new C)->f();
 PHP;
         $rt = new Runtime();
-        $block = $rt->parseAndCompile($code, 'test.php');
-        ob_start();
-        $rt->run($block);
-        $this->assertSame('3', ob_get_clean());
+        $this->expectException(\LogicException::class);
+        $this->expectExceptionMessage('Constant expression contains invalid operations');
+        $rt->parseAndCompile($code, 'test.php');
     }
 
-    public function testVmStaticMethodFirstClassCallableDefaultParameter(): void
+    public function testVmStaticMethodFirstClassCallableDefaultParameterCompileError(): void
     {
         $code = <<<'PHP'
 <?php
@@ -283,12 +281,25 @@ class S {
     public static function id(string $s): string { return $s; }
     public function g(Closure $c = S::id(...)): string { return $c('ok'); }
 }
-echo (new S)->g();
 PHP;
         $rt = new Runtime();
-        $block = $rt->parseAndCompile($code, 'test.php');
-        ob_start();
-        $rt->run($block);
-        $this->assertSame('ok', ob_get_clean());
+        $this->expectException(\LogicException::class);
+        $this->expectExceptionMessage('Constant expression contains invalid operations');
+        $rt->parseAndCompile($code, 'test.php');
+    }
+
+    public function testVmInstanceMethodFirstClassCallableDefaultParameterCompileError(): void
+    {
+        $code = <<<'PHP'
+<?php
+class C {
+    public function id(): string { return 'ok'; }
+    public function g(Closure $c = $this->id(...)): string { return $c(); }
+}
+PHP;
+        $rt = new Runtime();
+        $this->expectException(\LogicException::class);
+        $this->expectExceptionMessage('Constant expression contains invalid operations');
+        $rt->parseAndCompile($code, 'test.php');
     }
 }
