@@ -23,8 +23,21 @@ final class TimeSleepRuntime
 
     public static function ensureLinked(Context $context): void
     {
+        // Emit-helper link stubs skip ext/* method bodies — SleepJitHelper cannot JIT (#9068).
+        if (self::shouldUseLibcBridgeForEmitHelperLink()) {
+            TimeSleepRuntimeLibcBridge::ensureLinked($context);
+
+            return;
+        }
         self::implementNanosleepBridge($context);
         self::implementUntilBridge($context);
+    }
+
+    private static function shouldUseLibcBridgeForEmitHelperLink(): bool
+    {
+        $flag = \getenv('PHP_COMPILER_EMIT_HELPER_LINK');
+
+        return '1' === $flag || 'true' === \strtolower((string) $flag);
     }
 
     private static function implementNanosleepBridge(Context $context): void
