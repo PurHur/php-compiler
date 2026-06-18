@@ -6,7 +6,7 @@ namespace PHPCompiler;
 
 use PHPUnit\Framework\TestCase;
 
-/** Network service lookups C runtime shrink (#6218, #5333). */
+/** Network service lookups C runtime shrink (#6218, #5333, #9777). */
 final class NetworkServicesRuntimeShrinkTest extends TestCase
 {
     private string $repoRoot;
@@ -24,17 +24,21 @@ final class NetworkServicesRuntimeShrinkTest extends TestCase
         $this->assertFileDoesNotExist($this->repoRoot.'/lib/AOT/runtime/phpc_network_services.c');
     }
 
-    public function testJitLoweringUsesPhpNetworkServicesOnly(): void
+    public function testStringReturnUsesNetworkServicesJitHelper(): void
     {
-        $jit = file_get_contents($this->repoRoot.'/lib/JIT/Builtin/StringNetworkServicesJit.php');
-        $this->assertIsString($jit);
-        $this->assertStringContainsString('VmNetworkServices', $jit);
-        $this->assertStringNotContainsString('phpc_network_services', $jit);
+        $stringReturn = (string) file_get_contents($this->repoRoot.'/lib/JIT/Builtin/StringNetworkServicesStringReturn.php');
+        $this->assertStringContainsString('NetworkServicesJitHelper', $stringReturn);
+        $this->assertStringContainsString('buildJitTables', $stringReturn);
+        $this->assertStringContainsString('emitGetprotobynumberBody', $stringReturn);
+        $this->assertStringNotContainsString('ns_proto_num_match_', $stringReturn);
+    }
 
-        $runtime = file_get_contents($this->repoRoot.'/lib/JIT/Builtin/StringNetworkServices.php');
-        $this->assertIsString($runtime);
-        $this->assertStringContainsString('StringNetworkServicesJit', $runtime);
-        $this->assertStringContainsString('Replaces lib/AOT/runtime/phpc_network_services.c', $runtime);
+    public function testNameLookupJitShrunkToValueOutOnly(): void
+    {
+        $jit = (string) file_get_contents($this->repoRoot.'/lib/JIT/Builtin/StringNetworkServicesJit.php');
+        $this->assertStringContainsString('emitGetprotobyname', $jit);
+        $this->assertStringNotContainsString('emitGetprotobynumber', $jit);
+        $this->assertStringNotContainsString('emitGetservbyport', $jit);
     }
 
     public function testDeadVmNetworkHostDelegationRemoved(): void
@@ -47,5 +51,6 @@ final class NetworkServicesRuntimeShrinkTest extends TestCase
         $source = (string) file_get_contents($this->repoRoot.'/ext/standard/VmNetworkServices.php');
         $this->assertStringContainsString('VmFs::file', $source);
         $this->assertDoesNotMatchRegularExpression('/@\\\\file\\s*\\(/', $source);
+        $this->assertStringContainsString('buildJitTables', $source);
     }
 }

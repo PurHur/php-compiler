@@ -2064,6 +2064,8 @@ require_once __DIR__.'/../../../lib/JIT/Builtin/StringMultipart.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/StringMultipartJit.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/StringNaturalCompareJit.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/StringNetInterfacesJit.php';
+require_once __DIR__.'/../../../ext/standard/NetworkServicesJitHelper.php';
+require_once __DIR__.'/../../../lib/JIT/Builtin/StringNetworkServicesStringReturn.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/StringNetworkServices.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/StringNetworkServicesJit.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/StringNl2br.php';

@@ -101,7 +101,7 @@ final class VmNetworkServices
     }
 
     /**
-     * Lookup tables for LLVM JIT lowering (issue #5333).
+     * Lookup tables for JIT/AOT helper generation at link time (#9777).
      *
      * @return array{
      *     protoByNumber: list<array{number: int, name: string}>,
