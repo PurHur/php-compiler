@@ -25,6 +25,7 @@ use PHPCompiler\VM\Context as VMContext;
 use PHPCompiler\VM\ObjectRegistry;
 use PHPCompiler\JIT\Context as JITContext;
 use PHPCompiler\Ast\AsymmetricVisibilityRewriter;
+use PHPCompiler\Ast\DnfParenTypeRewriter;
 use PHPCompiler\Ast\GlobalTypedConstRewriter;
 use PHPCompiler\Ast\GroupUseStripper;
 use PHPCompiler\Ast\MultiBlockNameResolver;
@@ -442,6 +443,7 @@ class Runtime {
     public function rewriteSourceBeforeParser(string $code): string
     {
         $code = GlobalTypedConstRewriter::rewrite($code);
+        $code = DnfParenTypeRewriter::rewrite($code);
         $code = AsymmetricVisibilityRewriter::rewrite($code);
         $code = HexFloatLiteralDesugar::desugar($code);
         $code = NewDereferenceableDesugar::desugar($code);

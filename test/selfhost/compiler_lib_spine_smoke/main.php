@@ -1758,6 +1758,7 @@ require_once __DIR__.'/../../../lib/AOT/phpc_run_command_polyfill.php';
 require_once __DIR__.'/../../../lib/AbstractEnumSourceRewriter.php';
 require_once __DIR__.'/../../../lib/Ast/AbstractEnumMarker.php';
 require_once __DIR__.'/../../../lib/Ast/AsymmetricVisibilityRewriter.php';
+require_once __DIR__.'/../../../lib/Ast/DnfParenTypeRewriter.php';
 require_once __DIR__.'/../../../lib/Ast/CloneWithDesugar.php';
 require_once __DIR__.'/../../../lib/Ast/EnumCaseImportRewriter.php';
 require_once __DIR__.'/../../../lib/Ast/EnumCaseMatchSwitchRewriter.php';
