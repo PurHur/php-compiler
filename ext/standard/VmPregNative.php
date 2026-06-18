@@ -347,7 +347,6 @@ final class VmPregNative
                     null
                 );
                 if (-1 === $rc) {
-                    $out .= \substr($subject, $offset);
                     break;
                 }
                 if ($rc < 0) {
@@ -359,7 +358,12 @@ final class VmPregNative
                 $start = (int) $ovector[0];
                 $end = (int) $ovector[1];
                 $out .= \substr($subject, $offset, $start - $offset);
-                $out .= self::expandReplacement($replacement, $matchData, $subject);
+                $out .= PregReplacementExpand::expand(
+                    $replacement,
+                    self::$ffi->pcre2_get_ovector_pointer_8($matchData),
+                    (int) self::$ffi->pcre2_get_ovector_count_8($matchData),
+                    $subject
+                );
                 $offset = $end;
                 $replacements++;
                 if ($end === $start) {
@@ -381,64 +385,6 @@ final class VmPregNative
             self::$ffi->pcre2_match_data_free_8($matchData);
             self::$ffi->pcre2_code_free_8($code);
         }
-    }
-
-    /**
-     * @param mixed $matchData
-     */
-    private static function expandReplacement(string $replacement, mixed $matchData, string $subject): string
-    {
-        if (!str_contains($replacement, '$') && !str_contains($replacement, '\\')) {
-            return $replacement;
-        }
-
-        $ovector = self::$ffi->pcre2_get_ovector_pointer_8($matchData);
-        $count = (int) self::$ffi->pcre2_get_ovector_count_8($matchData);
-        $out = '';
-        $len = \strlen($replacement);
-        for ($i = 0; $i < $len; $i++) {
-            $ch = $replacement[$i];
-            if ('\\' === $ch && $i + 1 < $len) {
-                $next = $replacement[$i + 1];
-                if (\ctype_digit($next)) {
-                    $idx = (int) $next;
-                    if ($idx < $count) {
-                        $start = (int) $ovector[$idx * 2];
-                        $end = (int) $ovector[$idx * 2 + 1];
-                        if ($start >= 0 && $end >= 0) {
-                            $out .= \substr($subject, $start, $end - $start);
-                        }
-                    }
-                    $i++;
-                    continue;
-                }
-                $out .= match ($next) {
-                    'n' => "\n",
-                    'r' => "\r",
-                    't' => "\t",
-                    '$' => '$',
-                    '\\' => '\\',
-                    default => $next,
-                };
-                $i++;
-                continue;
-            }
-            if ('$' === $ch && $i + 1 < $len && \ctype_digit($replacement[$i + 1])) {
-                $idx = (int) $replacement[$i + 1];
-                if ($idx < $count) {
-                    $start = (int) $ovector[$idx * 2];
-                    $end = (int) $ovector[$idx * 2 + 1];
-                    if ($start >= 0 && $end >= 0) {
-                        $out .= \substr($subject, $start, $end - $start);
-                    }
-                }
-                $i++;
-                continue;
-            }
-            $out .= $ch;
-        }
-
-        return $out;
     }
 
     /**
