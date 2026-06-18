@@ -171,6 +171,7 @@ Use these during LLVM/JIT iteration — avoid full spine relink unless you chang
 
 | Command | Typical time | Notes |
 |---------|--------------|-------|
+| `make bootstrap-selfhost-helloworld` | **~30s–3 min** | M3 gate — prelinked emit-helper + HelloWorld sidecar when inventory `--check` green ([#9704](https://github.com/PurHur/php-compiler/issues/9704)); cold LLVM link opt-in `BOOTSTRAP_M3_FORCE_EMIT_HELPER_LINK=1` |
 | `make bootstrap-selfhost-vm-driver-execute-probe` | **~20ms** | Native env gate only; seeds from `prelinked/bootstrap-gen0` if binary missing |
 | `make north-star5-verify-fast` | **~1–2 min** | PR M5 presenter — inventory + spine + prelinked blobs + VM probe (no relink) |
 | `make north-star5-verify --strict` | **~1h** | Full M5 ladder before merging bootstrap/M5 work (not every PR) |
@@ -188,5 +189,6 @@ Use these during LLVM/JIT iteration — avoid full spine relink unless you chang
 | `BOOTSTRAP_FORCE_COMPILER_LIB_SIDECAR_REGEN=1` | Regenerate `build/.m3_compiler_lib_aot_blob` via Zend (slow) |
 | `BOOTSTRAP_ALLOW_STALE_SIDECAR=1` | Waive `check-selfhost-spine-sidecar-sync.php` during intentional gen-0 blob batch PRs only ([#8703](https://github.com/PurHur/php-compiler/issues/8703)) |
 | `BOOTSTRAP_M5_NO_ZEND=1` | Cold boot from prelinked gen-0 only ([#3053](https://github.com/PurHur/php-compiler/issues/3053)) |
+| `BOOTSTRAP_M3_FORCE_EMIT_HELPER_LINK=1` | M3 helloworld probe: force cold Zend LLVM inventory `compile_driver` link (default skips when `prelinked/bootstrap-gen0/.m3_compile_driver_aot_blob` valid — [#9704](https://github.com/PurHur/php-compiler/issues/9704)) |
 | `PHP_COMPILER_EMIT_HELPER_LINK=1` + `PHP_COMPILER_M3_INVENTORY_EMIT_DRIVER=1` | Inventory argv emit-helper link; parse/CFG spine **real-lowers** (not stubbed) when `PHP_COMPILER_SELFHOST_AOT=1` or vendor-prelink executable emit ([#8706](https://github.com/PurHur/php-compiler/issues/8706)) |
 | `PHP_COMPILER_M4_BIN_COMPILE_DRIVER=1` | M4 `bin/compile.php` argv driver; parse spine real-lowers with emit-helper link ([#8706](https://github.com/PurHur/php-compiler/issues/8706)) |
