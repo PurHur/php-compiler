@@ -4921,24 +4921,19 @@ class Compiler {
     }
 
     /**
-     * Parameter defaults evaluated when the argument is omitted: `new Class()` (#6652), FCC (#9170).
+     * Parameter defaults evaluated when the argument is omitted: `new Class()` (#6652).
+     * First-class callables are not constant expressions (Zend/zend_compile.c, #9697).
      */
     protected function paramDefaultUsesRuntimeInit(Op\Expr\Param $param): bool
     {
         if ($this->paramDefaultIsRuntimeNew($param)) {
             return true;
         }
-        $fcc = $this->paramDefaultFirstClassCallableExpr($param);
-        if (null === $fcc) {
-            return false;
-        }
-        if (Op\Expr\FirstClassCallable::KIND_METHOD === $fcc->kind) {
-            $this->throwCompileLogic(
-                'First-class callable on instance method cannot be used in constant expression'
-            );
+        if (null !== $this->paramDefaultFirstClassCallableExpr($param)) {
+            $this->throwCompileLogic(ThrowInClassConstCompileCheck::MESSAGE);
         }
 
-        return true;
+        return false;
     }
 
     /**
