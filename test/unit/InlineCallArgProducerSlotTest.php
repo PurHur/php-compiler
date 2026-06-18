@@ -110,6 +110,37 @@ PHP;
         self::assertSame($closureSlot, $sendSlots[1] ?? null, 'arg sends='.json_encode($sendSlots));
     }
 
+    /** Issue #9463 — sibling closure __invoke FuncCall producers map to distinct var_dump arg slots. */
+    public function testVarDumpReceivesDistinctClosureCallProducerSlots(): void
+    {
+        $code = <<<'PHP'
+<?php
+$g = function (): int {
+    static $n = 0;
+    return ++$n;
+};
+var_dump($g(), $g());
+PHP;
+        $runtime = new Runtime();
+        $block = $runtime->parseAndCompile($code, 'closure_static_multi_arg.php');
+
+        $returnSlots = [];
+        $sendSlots = [];
+        foreach ($block->opCodes as $op) {
+            if (OpCode::TYPE_FUNCCALL_EXEC_RETURN === $op->type) {
+                $returnSlots[] = $op->arg1;
+            }
+            if (OpCode::TYPE_ARG_SEND === $op->type) {
+                $sendSlots[] = $op->arg1;
+            }
+        }
+
+        self::assertCount(2, $sendSlots);
+        self::assertNotSame($sendSlots[0], $sendSlots[1], 'arg sends='.json_encode($sendSlots));
+        self::assertContains($sendSlots[0], $returnSlots, 'fcall returns='.json_encode($returnSlots));
+        self::assertContains($sendSlots[1], $returnSlots, 'fcall returns='.json_encode($returnSlots));
+    }
+
     /** Issue #9351 — sibling MethodCall producers map to distinct var_dump arg slots. */
     public function testVarDumpReceivesDistinctMethodCallProducerSlots(): void
     {
