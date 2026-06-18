@@ -457,6 +457,7 @@ class Compiler {
         TraitCollisionCheck::validate($script);
         FinalClassExtensionCheck::validate($script);
         FinalMethodOverrideCheck::validate($script);
+        OverrideValidator::validateScript($script);
         FinalClassConstCheck::validate($script);
         TraitClassConstConflictCheck::validate($script);
         NewWithoutParensCompileCheck::validate($script, $this->compileSourceCode);
@@ -3153,7 +3154,6 @@ class Compiler {
             $this->throwCompileError('Interface name must be a compile-time class reference');
         }
         $extends = $this->interfaceNamesFromOperands($iface->extends);
-        OverrideValidator::validateClassBody($iface->stmts, $name, null, $extends, $this->classCompileRegistry);
         $this->classCompileRegistry->registerInterface($name, $extends, $iface->stmts);
 
         $return = new OpCode(
@@ -3422,20 +3422,6 @@ class Compiler {
             $parentLc = strtolower(ltrim($parentName, '\\'));
         }
         $interfaceLcs = $this->interfaceNamesFromOperands($class->implements);
-        OverrideValidator::validateClassBody(
-            $class->stmts,
-            $className,
-            $parentLc,
-            $interfaceLcs,
-            $this->classCompileRegistry
-        );
-        OverrideValidator::validateTraitUsesInClass(
-            $class->stmts,
-            $className,
-            $parentLc,
-            $interfaceLcs,
-            $this->classCompileRegistry
-        );
         $parentSlot = null;
         if ($class instanceof Op\Stmt\Class_ && null !== $class->extends) {
             $parentSlot = $this->compileOperand($class->extends, $block, true);
