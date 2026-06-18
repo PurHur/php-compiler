@@ -2134,7 +2134,7 @@ class VM {
         }
 
         return $this->makeEngineError(
-            VM\ExceptionSupport::THROW_NON_THROWABLE_MESSAGE,
+            VM\ExceptionSupport::throwNormalizeErrorMessage($thrown),
             VM\ExceptionSupport::CLASS_ERROR
         );
     }
