@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace PHPCompiler\VM;
 
+use PHPCompiler\Frame;
+
 /**
  * Foreach iterator over user object / stdClass instance properties (Zend zend_foreach.c).
  */
@@ -16,6 +18,8 @@ final class ObjectPropertyIterator
 
     public function __construct(
         private readonly ObjectEntry $object,
+        private readonly \PHPCompiler\VM $vm,
+        private readonly Frame $frame,
     ) {
         $this->names = array_keys($object->propertiesWithNames());
     }
@@ -40,13 +44,11 @@ final class ObjectPropertyIterator
 
     public function currentValue(bool $byRef): Variable
     {
-        $prop = $this->object->getProperty($this->names[$this->pos]);
-        if ($byRef) {
-            return $prop;
-        }
-        $copy = new Variable();
-        $copy->copyFrom($prop->resolveIndirect());
-
-        return $copy;
+        return $this->vm->readObjectForeachProperty(
+            $this->object,
+            $this->names[$this->pos],
+            $this->frame,
+            $byRef
+        );
     }
 }
