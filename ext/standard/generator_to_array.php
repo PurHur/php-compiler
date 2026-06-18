@@ -14,8 +14,8 @@ namespace PHPCompiler\ext\standard;
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\JitBoolArg;
 use PHPCompiler\JIT\Variable as JITVariable;
-use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
 
 /**
@@ -42,11 +42,7 @@ final class generator_to_array extends Internal
         $generator = VmGeneratorArray::assertGenerator($frame->calledArgs[0], 'generator_to_array');
         $preserveKeys = false;
         if (2 === $argc) {
-            $flag = $frame->calledArgs[1]->resolveIndirect();
-            if (Variable::TYPE_BOOLEAN !== $flag->type) {
-                throw new \LogicException('generator_to_array() second argument must be bool in this compiler build');
-            }
-            $preserveKeys = $flag->toBool();
+            $preserveKeys = $frame->calledArgs[1]->resolveIndirect()->toBool();
         }
         $out = $frame->vmContext->runtime->vm->iteratorToArray($generator, $preserveKeys);
         if (null !== $frame->returnVar) {
@@ -60,16 +56,12 @@ final class generator_to_array extends Internal
         if ($argc < 1 || $argc > 2) {
             throw new \LogicException('generator_to_array() requires one or two arguments in this compiler build');
         }
-        $preserveKeys = false;
         if (2 === $argc) {
-            if (JITVariable::TYPE_NATIVE_BOOL !== $args[1]->type || !($args[1]->isConstant ?? false)) {
-                throw new \LogicException(
-                    'generator_to_array() second argument must be a compile-time bool in this compiler build'
-                );
-            }
-            $preserveKeys = (bool) $args[1]->value;
+            $preserveKeys = JitBoolArg::lower($context, $args[1], 'generator_to_array() preserve_keys');
+
+            return JitGeneratorToArray::invokeWithPreserveKeysFlag($context, $args[0], $preserveKeys);
         }
 
-        return JitGeneratorToArray::invoke($context, $args[0], $preserveKeys);
+        return JitGeneratorToArray::invoke($context, $args[0], false);
     }
 }

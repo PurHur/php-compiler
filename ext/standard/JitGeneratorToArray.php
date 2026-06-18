@@ -24,4 +24,15 @@ final class JitGeneratorToArray
 
         return JitIteratorToArray::invoke($context, $generator, $preserveKeys);
     }
+
+    public static function invokeWithPreserveKeysFlag(Context $context, Variable $generator, Value $preserveKeys): Value
+    {
+        if (!GeneratorHelper::isGeneratorVariable($generator)) {
+            throw new \LogicException(
+                'generator_to_array() argument must be a Generator in this compiler build'
+            );
+        }
+
+        return JitIteratorToArray::invokeWithPreserveKeysFlag($context, $generator, $preserveKeys);
+    }
 }

@@ -26,6 +26,31 @@ final class JitIteratorToArray
         return self::wrapHashTable($context, self::materializeHashtable($context, $iterator, $preserveKeys));
     }
 
+    public static function invokeWithPreserveKeysFlag(Context $context, Variable $iterator, Value $preserveKeys): Value
+    {
+        $preserveBlock = BasicBlockHelper::append($context, 'ita_preserve_keys');
+        $reindexBlock = BasicBlockHelper::append($context, 'ita_reindex_keys');
+        $doneBlock = BasicBlockHelper::append($context, 'ita_preserve_keys_done');
+        $context->builder->branchIf($preserveKeys, $preserveBlock, $reindexBlock);
+
+        $context->builder->positionAtEnd($preserveBlock);
+        $preserveResult = self::invoke($context, $iterator, true);
+        $preserveEnd = $context->builder->getInsertBlock();
+        $context->builder->branch($doneBlock);
+
+        $context->builder->positionAtEnd($reindexBlock);
+        $reindexResult = self::invoke($context, $iterator, false);
+        $reindexEnd = $context->builder->getInsertBlock();
+        $context->builder->branch($doneBlock);
+
+        $context->builder->positionAtEnd($doneBlock);
+        $phi = $context->builder->phi($preserveResult->typeOf());
+        $phi->addIncoming($preserveResult, $preserveEnd);
+        $phi->addIncoming($reindexResult, $reindexEnd);
+
+        return $phi;
+    }
+
     /**
      * Materialize Traversable/array operand into __hashtable__* (array spread / iterator_to_array, #4453).
      */
