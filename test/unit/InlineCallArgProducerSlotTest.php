@@ -481,4 +481,33 @@ PHP;
         self::assertNotNull($isSubclassSends, 'groups='.json_encode($argSendGroups));
         self::assertSame($classConstSlots[1], $isSubclassSends[1]);
     }
+
+    /** Issue #9575 — spaceship + from() call-arg must send int result, not dead enum-case temp (#9030). */
+    public function testVarDumpSpaceshipFromSendsSpaceshipResultSlot(): void
+    {
+        $code = <<<'PHP'
+<?php
+declare(strict_types=1);
+enum E: int { case A = 1; }
+var_dump(E::A <=> E::from(1));
+PHP;
+        $runtime = new Runtime();
+        $block = $runtime->parseAndCompile($code, 'enum_from_spaceship_var_dump.php');
+
+        $spaceshipSlot = null;
+        $varDumpSend = null;
+        $seenSpaceship = false;
+        foreach ($block->opCodes as $op) {
+            if (OpCode::TYPE_SPACESHIP === $op->type) {
+                $spaceshipSlot = $op->arg1;
+                $seenSpaceship = true;
+            }
+            if ($seenSpaceship && OpCode::TYPE_ARG_SEND === $op->type && null === $varDumpSend) {
+                $varDumpSend = $op->arg1;
+            }
+        }
+
+        self::assertNotNull($spaceshipSlot, 'spaceship result slot must be lowered');
+        self::assertSame($spaceshipSlot, $varDumpSend, 'var_dump arg send='.$varDumpSend);
+    }
 }

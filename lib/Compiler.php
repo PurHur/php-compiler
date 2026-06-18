@@ -9630,7 +9630,11 @@ class Compiler {
                 && null !== $argRoot->type
                 && null !== $prev->result->type
                 && $argRoot->type->type === $prev->result->type->type
-                && $argRoot->type->type === Type::TYPE_BOOLEAN
+                && in_array(
+                    $argRoot->type->type,
+                    [Type::TYPE_BOOLEAN, Type::TYPE_LONG],
+                    true
+                )
             ) {
                 if (null === $block->slotForOperand($prev->result)) {
                     foreach ($this->compileExpr($prev, $block) as $op) {
