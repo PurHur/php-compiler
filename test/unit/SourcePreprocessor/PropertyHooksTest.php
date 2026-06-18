@@ -243,8 +243,8 @@ class Box {
 PHP;
         [$out, $registry] = (new PropertyHooks())->process($src, 'static_hooks.php');
         self::assertStringContainsString('public static string $label;', $out);
-        self::assertStringContainsString('public static function __phpc_property_get_label()', $out);
-        self::assertStringContainsString('public static function __phpc_property_set_label($value)', $out);
+        self::assertStringContainsString('public static function __phpc_property_get_label(): string', $out);
+        self::assertStringContainsString('public static function __phpc_property_set_label(string $value): void', $out);
         self::assertTrue($registry['box']['label']['static'] ?? false);
     }
 
