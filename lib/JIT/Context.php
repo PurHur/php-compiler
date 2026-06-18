@@ -743,6 +743,7 @@ class Context {
             Builtin\StringGetenvAll::ensureStandaloneBodies($this);
             Builtin\StringTriggerError::ensureStandaloneBodies($this);
             Builtin\StringFormat::ensureStandaloneBodies($this);
+            Builtin\GcToggleRuntime::ensureStandaloneBodies($this);
             Builtin\GcCollectCyclesRuntime::ensureStandaloneBodies($this);
             Builtin\LastErrorRuntime::ensureStandaloneBodies($this);
             Builtin\SuperglobalRefreshRuntime::ensureStandaloneBodies($this);
