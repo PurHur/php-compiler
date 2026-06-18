@@ -6053,6 +6053,16 @@ restart:
                         }
                         break;
                     }
+                    if ($this->frameIsPropertyUnsetHook($frame)) {
+                        $catchFrame = $this->dispatchEngineThrow($frame, $thrown);
+                        if (null !== $catchFrame) {
+                            // Bubble to caller stack — do not finish unset (#9666, zend_property_hooks.c).
+                            $this->context->propertyHookExternalCatchFrame = $catchFrame;
+
+                            return self::FAILURE;
+                        }
+                        break;
+                    }
                     if ($this->frameIsPropertySetHook($frame)) {
                         $this->context->propertyHookSetAborted = true;
                     }
@@ -8089,6 +8099,17 @@ restart:
         $name = strtolower($func->name);
 
         return str_contains($name, '__phpc_property_get_');
+    }
+
+    private function frameIsPropertyUnsetHook(Frame $frame): bool
+    {
+        $func = $frame->block->func ?? null;
+        if (null === $func) {
+            return false;
+        }
+        $name = strtolower($func->name);
+
+        return str_contains($name, '__phpc_property_unset_');
     }
 
     private function isPropertyHookRawWrite(Frame $frame, string $propName): bool
