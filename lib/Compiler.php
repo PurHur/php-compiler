@@ -9764,6 +9764,10 @@ class Compiler {
             || $producer instanceof Op\Expr\Cast
             || $producer instanceof Op\Expr\MagicScriptConst
             || $producer instanceof Op\Expr\New_
+            || $producer instanceof Op\Expr\PostInc
+            || $producer instanceof Op\Expr\PreInc
+            || $producer instanceof Op\Expr\PostDec
+            || $producer instanceof Op\Expr\PreDec
         ) {
             return $producerSlot;
         }
@@ -10530,7 +10534,11 @@ class Compiler {
             || $op instanceof Op\Expr\InstanceOf_
             || $op instanceof Op\Expr\Cast
             || $op instanceof Op\Expr\MagicScriptConst
-            || $op instanceof Op\Expr\Assign;
+            || $op instanceof Op\Expr\Assign
+            || $op instanceof Op\Expr\PostInc
+            || $op instanceof Op\Expr\PreInc
+            || $op instanceof Op\Expr\PostDec
+            || $op instanceof Op\Expr\PreDec;
     }
 
     /**

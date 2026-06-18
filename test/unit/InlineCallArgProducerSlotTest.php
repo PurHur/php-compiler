@@ -236,6 +236,40 @@ PHP;
         self::assertCount(2, $akeSends, 'array_key_exists arg sends='.json_encode($akeSends));
     }
 
+    /** Issue #9483 — var_dump($s--) wires PostDec/PreDec producer result slots. */
+    public function testVarDumpEmptyStringDecrementUsesIncDecProducerSlots(): void
+    {
+        $code = <<<'PHP'
+<?php
+$s = '';
+var_dump($s--);
+$s = '';
+var_dump(--$s);
+PHP;
+        $runtime = new Runtime();
+        $block = $runtime->parseAndCompile($code, 'empty_string_decrement_call_arg.php');
+
+        $postDecSlot = null;
+        $preDecSlot = null;
+        $sendSlots = [];
+        foreach ($block->opCodes as $op) {
+            if (OpCode::TYPE_POST_DEC === $op->type) {
+                $postDecSlot = $op->arg1;
+            }
+            if (OpCode::TYPE_PRE_DEC === $op->type) {
+                $preDecSlot = $op->arg1;
+            }
+            if (OpCode::TYPE_ARG_SEND === $op->type) {
+                $sendSlots[] = $op->arg1;
+            }
+        }
+
+        self::assertNotNull($postDecSlot);
+        self::assertNotNull($preDecSlot);
+        self::assertSame($postDecSlot, $sendSlots[0] ?? null, 'arg sends='.json_encode($sendSlots));
+        self::assertSame($preDecSlot, $sendSlots[1] ?? null, 'arg sends='.json_encode($sendSlots));
+    }
+
     /** Issue #9479 — inline (int) enum cast producer maps to var_dump arg slot. */
     public function testVarDumpIntCastEnumCaseUsesCastProducerSlot(): void
     {
