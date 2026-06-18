@@ -10195,6 +10195,10 @@ restart:
             $const = $frame->block->constants[$slot];
         }
         if (isset($frame->scope[$slot])) {
+            // Named locals must stay tied to scope for by-ref outgoing calls (#9505, #9700).
+            if (null !== $frame->block && $frame->block->isNamedVariableSlot($slot)) {
+                return $frame->scope[$slot];
+            }
             $resolved = $frame->scope[$slot]->resolveIndirect();
             if (null !== $const && $this->isImmortalEnumCaseBlockConstant($const)) {
                 if (VM\EnumCaseSupport::isEnumCaseVariable($resolved)) {

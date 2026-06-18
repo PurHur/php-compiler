@@ -131,13 +131,8 @@ final class ReferencableCheck
             return false;
         }
         if (isset($caller->block->constants[$slot])) {
-            $const = $caller->block->constants[$slot];
-            // Enum-only array literals immortalize in constants but live in named locals;
-            // allow by-ref mutators with COW separation (#5593, #6689).
-            if (
-                Variable::TYPE_ARRAY === $const->type
-                && $caller->block->isNamedVariableSlot($slot)
-            ) {
+            // Named locals may share an initializer constant; still allow by-ref (#5593, #6689, #9700).
+            if ($caller->block->isNamedVariableSlot($slot)) {
                 return true;
             }
 
