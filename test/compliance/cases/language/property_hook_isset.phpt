@@ -1,5 +1,5 @@
 --TEST--
-isset()/empty() on property hooks — invoke get hook, !is_null / empty on result (#9107, zend_property_hooks.c)
+isset()/empty() on property hooks — backing probe only, get hook not invoked (#9671, zend_property_hooks.c)
 --FILE--
 <?php
 class Box {
@@ -46,8 +46,7 @@ echo "ok\n";
 --EXPECT--
 true
 false
-true false
 false true
-get runs for isset
+false true
 bool(false)
 ok

@@ -7,10 +7,10 @@ namespace PHPCompiler\Test\Unit;
 use PHPCompiler\Runtime;
 use PHPUnit\Framework\TestCase;
 
-/** isset() on property hooks invokes get hook (#9107). */
+/** isset() on property hooks probes backing without get hook (#9671). */
 final class PropertyHookIssetTest extends TestCase
 {
-    public function testVmIssetOnVirtualGetHookInvokesGet(): void
+    public function testVmIssetOnVirtualGetHookDoesNotInvokeGet(): void
     {
         $code = <<<'PHP'
 <?php
@@ -27,10 +27,10 @@ PHP;
         $block = $rt->parseAndCompile($code, 'test.php');
         ob_start();
         $rt->run($block);
-        self::assertSame("get runs for isset\nbool(false)\nok\n", ob_get_clean());
+        self::assertSame("bool(false)\nok\n", ob_get_clean());
     }
 
-    public function testVmIssetOnSeparateBackingInvokesGetHook(): void
+    public function testVmIssetOnSeparateBackingDoesNotInvokeGetHook(): void
     {
         $code = <<<'PHP'
 <?php
@@ -48,6 +48,6 @@ PHP;
         $block = $rt->parseAndCompile($code, 'test.php');
         ob_start();
         $rt->run($block);
-        self::assertSame("get runs for isset\nbool(true)\n", ob_get_clean());
+        self::assertSame("bool(true)\n", ob_get_clean());
     }
 }

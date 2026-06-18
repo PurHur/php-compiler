@@ -99,7 +99,7 @@ final class PropertyHookDispatch
     }
 
     /**
-     * isset($obj->prop) on hooked properties — invoke get hook, !is_null on return (#9107, zend_property_hooks.c).
+     * isset($obj->prop) on hooked properties — backing probe only, never get hook (#9671, zend_property_hooks.c).
      */
     public static function tryEmitPropertyIsSet(
         Context $context,
@@ -108,20 +108,17 @@ final class PropertyHookDispatch
         string $propertyName,
         ?Block $enclosingBlock
     ): ?Value {
-        $hookValue = self::tryEmitPropertyGet(
-            $context,
-            $receiver,
-            $declaringClass,
-            $propertyName,
-            $enclosingBlock
-        );
-        if (null === $hookValue) {
+        $backingName = self::hookedPropertyBackingName($context, $declaringClass, $propertyName);
+        if (null === $backingName) {
             return null;
         }
-        if (Variable::TYPE_VALUE === $hookValue->type) {
+        $object = $context->type->object;
+        assert($object instanceof Builtin\Type\Object_);
+        $fetched = $object->propertyFetch($receiver, $declaringClass, $backingName);
+        if (Variable::TYPE_VALUE === $fetched->type) {
             $valueMap = $context->structFieldMap['__value__'];
             $typeByte = $context->builder->load(
-                $context->builder->structGep($hookValue->value, $valueMap['type'])
+                $context->builder->structGep($fetched->value, $valueMap['type'])
             );
             $i8 = $context->getTypeFromString('int8');
             $nullType = $i8->constInt(\PHPCompiler\VM\Variable::TYPE_NULL, false);
@@ -131,10 +128,30 @@ final class PropertyHookDispatch
 
             return $context->builder->and($notNull, $notUndef);
         }
-        $loaded = $context->helper->loadValue($hookValue);
+        $loaded = $context->helper->loadValue($fetched);
         $nullPtr = $context->getTypeFromString('void*')->constNull();
 
         return $context->builder->icmp(Builder::INT_NE, $loaded, $nullPtr);
+    }
+
+    /**
+     * Backing field name for isset/empty on hooked properties, or null when not hooked.
+     */
+    public static function hookedPropertyBackingName(
+        Context $context,
+        string $declaringClass,
+        string $propertyName
+    ): ?string {
+        $lcClass = strtolower(ltrim($declaringClass, '\\'));
+        $propLc = strtolower($propertyName);
+        $meta = $context->runtime->vmContext->propertyHookRegistry[$lcClass][$propertyName]
+            ?? $context->runtime->vmContext->propertyHookRegistry[$lcClass][$propLc]
+            ?? null;
+        if (!is_array($meta) || (!isset($meta['get']) && !isset($meta['set']))) {
+            return null;
+        }
+
+        return $meta['setBacking'] ?? $meta['getBacking'] ?? $propertyName;
     }
 
     /**
