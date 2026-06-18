@@ -11782,10 +11782,6 @@ class JIT {
             return;
         }
 
-        if (!$prefix) {
-            $this->assignOperand($resultOp, $read, true);
-        }
-
         if (
             Variable::TYPE_VALUE === $read->type
             && (Variable::KIND_VARIABLE === $read->kind || $read->functionStaticGlobal)
@@ -11797,6 +11793,15 @@ class JIT {
             $newLong = $increment
                 ? $this->context->builder->add($cur, $one)
                 : $this->context->builder->sub($cur, $one);
+            if (!$prefix) {
+                $oldVar = new Variable(
+                    $this->context,
+                    Variable::TYPE_NATIVE_LONG,
+                    Variable::KIND_VALUE,
+                    $cur
+                );
+                $this->assignOperand($resultOp, $oldVar, true);
+            }
             $write = $this->context->getVariableFromOpInScopes($writeOp);
             $writePtr = JIT\JitValueBox::valuePtrFromVariable($this->context, $write);
             $this->context->builder->call(
@@ -11830,12 +11835,25 @@ class JIT {
                 Variable::KIND_VALUE,
                 $newLong
             );
+            if (!$prefix) {
+                $oldVar = new Variable(
+                    $this->context,
+                    Variable::TYPE_NATIVE_LONG,
+                    Variable::KIND_VALUE,
+                    $cur
+                );
+                $this->assignOperand($resultOp, $oldVar, true);
+            }
             $this->assignOperand($writeOp, $newVar, true);
             if ($prefix) {
                 $this->assignOperand($resultOp, $newVar, true);
             }
 
             return;
+        }
+
+        if (!$prefix) {
+            $this->assignOperand($resultOp, $read, true);
         }
 
         $arithOp = new OpCode($increment ? OpCode::TYPE_PLUS : OpCode::TYPE_MINUS);
