@@ -32,7 +32,7 @@ final class VmAssertState
         self::INI_ASSERT_EXCEPTION,
     ];
 
-    private static int $zendAssertions = 1;
+    private static int $zendAssertions = -1;
 
     private static bool $active = true;
 

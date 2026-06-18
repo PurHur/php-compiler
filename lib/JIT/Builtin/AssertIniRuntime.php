@@ -28,7 +28,7 @@ final class AssertIniRuntime
         $i32 = $context->getTypeFromString('int32');
         $i8p = $context->getTypeFromString('int8*');
         $defaults = [
-            self::G_ZEND_ASSERTIONS => 1,
+            self::G_ZEND_ASSERTIONS => -1,
             self::G_ASSERT_ACTIVE => 1,
             self::G_ASSERT_EXCEPTION => 1,
             self::G_ASSERT_BAIL => 0,
