@@ -326,4 +326,40 @@ PHP;
         self::assertNotNull($castSlot);
         self::assertSame([$castSlot], $sendSlots, 'arg sends='.json_encode($sendSlots));
     }
+
+    /** Issue #9428 — var_dump((new C())->m()) wires MethodCall return, not New_ object. */
+    public function testVarDumpNewMethodCallUsesMethodReturnSlot(): void
+    {
+        $code = <<<'PHP'
+<?php
+trait T { public function m(): int { return 1; } }
+class C { use T { m as private p; } public function call(): int { return $this->p(); } }
+var_dump((new C())->call());
+PHP;
+        $runtime = new Runtime();
+        $block = $runtime->parseAndCompile($code, 'new_method_call_call_arg.php');
+
+        $newSlot = null;
+        $methodReturnSlot = null;
+        $sendSlots = [];
+        foreach ($block->opCodes as $op) {
+            if (OpCode::TYPE_NEW === $op->type && null === $newSlot) {
+                $newSlot = $op->arg1;
+            }
+            if (OpCode::TYPE_METHODCALL_INIT === $op->type) {
+                $methodReturnSlot = null;
+            }
+            if (OpCode::TYPE_FUNCCALL_EXEC_RETURN === $op->type && null === $methodReturnSlot) {
+                $methodReturnSlot = $op->arg1;
+            }
+            if (OpCode::TYPE_ARG_SEND === $op->type) {
+                $sendSlots[] = $op->arg1;
+            }
+        }
+
+        self::assertNotNull($newSlot);
+        self::assertNotNull($methodReturnSlot);
+        self::assertSame($methodReturnSlot, $sendSlots[0] ?? null, 'arg sends='.json_encode($sendSlots));
+        self::assertNotSame($newSlot, $sendSlots[0] ?? null, 'must not pass New_ object to var_dump');
+    }
 }

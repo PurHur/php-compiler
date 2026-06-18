@@ -10057,6 +10057,10 @@ class Compiler {
                     if ($last instanceof Op\Expr\PropertyFetch || $last instanceof Op\Expr\ArrayDimFetch) {
                         return $last;
                     }
+                    // (new C())->m() inline call-arg (#9428, zend_traits.c alias visibility repro).
+                    if ($last instanceof Op\Expr\MethodCall || $last instanceof Op\Expr\StaticCall) {
+                        return $last;
+                    }
                 }
 
                 return null;
@@ -10263,7 +10267,10 @@ class Compiler {
             if ($producer instanceof Op\Expr\New_) {
                 $next = $producers[$i + 1] ?? null;
                 if (
-                    $next instanceof Op\Expr\PropertyFetch
+                    ($next instanceof Op\Expr\PropertyFetch
+                        || $next instanceof Op\Expr\MethodCall
+                        || $next instanceof Op\Expr\NullsafeMethodCall)
+                    && property_exists($next, 'var')
                     && $this->operandsReferToSameVariable($next->var, $producer->result)
                 ) {
                     continue;
