@@ -32,11 +32,15 @@ final class ReadonlyClassGuard
         if (null === $lvalue->objectPropertyReceiver) {
             return;
         }
+        $propName = $lvalue->objectPropertyName ?? 'property';
         if ('modify' === $violation && self::isConstructBlock($enclosingBlock)) {
+            if (self::emitReadonlyInitScopeViolationIfNeeded($context, $objectType, $enclosingBlock, $propName)) {
+                return;
+            }
+
             return;
         }
 
-        $propName = $lvalue->objectPropertyName ?? 'property';
         $guardClassIds = array_values(array_unique(array_merge(
             $objectType->readonlyClassIds(),
             $objectType->readonlyPropertyClassIdsForProperty($propName)
@@ -109,6 +113,47 @@ final class ReadonlyClassGuard
     }
 
     /**
+     * Reject child-scope initialization of inherited readonly properties during __construct (#9714).
+     *
+     * @return bool true when a violation was emitted and the store must be skipped
+     */
+    private static function emitReadonlyInitScopeViolationIfNeeded(
+        Context $context,
+        Object_ $objectType,
+        ?Block $enclosingBlock,
+        string $propName
+    ): bool {
+        $receiverClassId = self::receiverClassId($context, $enclosingBlock);
+        if (null === $receiverClassId) {
+            return false;
+        }
+        $meta = $objectType->instancePropertyVisibilityMeta($receiverClassId, $propName);
+        if (null === $meta || !$objectType->isPropertyReadonly($meta['declaringClassId'], $propName)) {
+            return false;
+        }
+        $callerClassId = self::callerClassId($context, $enclosingBlock);
+        if (null === $callerClassId || $callerClassId === $meta['declaringClassId']) {
+            return false;
+        }
+        $declaringClass = $meta['declaringClassName'];
+        $callerClass = $objectType->classNameForId($callerClassId);
+        $message = sprintf(
+            'Cannot initialize readonly property %s::$%s from %s',
+            $declaringClass,
+            $propName,
+            $callerClass
+        );
+        ReadonlyBridge::emitReadonlyViolation($context, $message);
+        $fn = $context->builder->getInsertBlock()->getParent();
+        assert($fn instanceof \PHPLLVM\Value\Function_);
+        $exitBlock = $fn->appendBasicBlock('readonly_init_scope_exit');
+        $context->builder->branch($exitBlock);
+        $context->builder->positionAtEnd($exitBlock);
+
+        return true;
+    }
+
+    /**
      * Run $emitStore only when no pending readonly Error was recorded (#4875, #5720).
      * Call immediately after {@see emitBeforePropertyStore()} and before propertyStore.
      */
@@ -156,6 +201,30 @@ final class ReadonlyClassGuard
         $name = strtolower($block->func->name);
 
         return '__construct' === $name || str_ends_with($name, '::__construct');
+    }
+
+    private static function callerClassId(Context $context, ?Block $enclosingBlock): ?int
+    {
+        if (null !== $enclosingBlock?->func?->class) {
+            return $context->type->object->lookup($enclosingBlock->func->class->value);
+        }
+        if ('' !== $context->scope->className) {
+            return $context->type->object->lookup($context->scope->className);
+        }
+
+        return null;
+    }
+
+    private static function receiverClassId(Context $context, ?Block $enclosingBlock): ?int
+    {
+        if (null !== $enclosingBlock?->func?->class) {
+            return $context->type->object->lookup($enclosingBlock->func->class->value);
+        }
+        if (0 !== $context->scope->classId) {
+            return $context->scope->classId;
+        }
+
+        return null;
     }
 
     private static function stringDataPtrFromLiteral(Context $context, string $message): \PHPLLVM\Value
