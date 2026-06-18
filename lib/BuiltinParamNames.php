@@ -20,6 +20,8 @@ final class BuiltinParamNames
                 return ['string'];
             case 'substr':
                 return ['string', 'offset', 'length'];
+            case 'str_pad':
+                return ['string', 'length', 'pad_string', 'pad_type'];
             case 'parse_str':
                 return ['string', 'array'];
             case 'sort':
