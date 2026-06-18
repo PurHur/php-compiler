@@ -1099,6 +1099,9 @@ class Compiler {
                 continue;
             }
             $phiOperand = $child->expr;
+            if (!$phiOperand instanceof Operand) {
+                continue;
+            }
             $matchedParents = 0;
             foreach ($merge->parents as $parent) {
                 $armVar = $this->mergeBranchAssignVarOperand($parent);

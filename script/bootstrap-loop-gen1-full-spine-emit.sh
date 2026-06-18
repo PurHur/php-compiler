@@ -36,10 +36,16 @@ mkdir -p build
 rm -f "${EMIT_HELPER}" "${GEN2_OUT}" "build/.last-jit-func-bootstrap-loop-gen1-full-spine-emit" "build/.last-jit-func-bootstrap-loop-gen1-full-spine-emit-helper"
 export PHP_COMPILER_SELFHOST_AOT=1
 
-# Link emit helper as a self-host M3 emit TU (requires compile-driver real lowering; #2571/#2610).
+# Link emit helper as inventory compile_driver (mirror bootstrap-loop-gen1-link.sh; #3032).
 export PHP_COMPILER_JIT_PROGRESS_FILE="build/.last-jit-func-bootstrap-loop-gen1-full-spine-emit-helper"
 echo "==> link gen-1 full-spine emit helper"
-if ! env PHP_COMPILER_SELFHOST_AOT=1 PHP_COMPILER_M3_COMPILE_DRIVER=1 PHP_COMPILER_EMIT_HELPER_LINK=1 \
+if ! env PHP_COMPILER_SELFHOST_AOT=1 \
+  PHP_COMPILER_M3_COMPILE_DRIVER=1 \
+  PHP_COMPILER_EMIT_HELPER_LINK=1 \
+  PHP_COMPILER_M3_COMPILE_DRIVER_MAIN=1 \
+  PHP_COMPILER_M3_INVENTORY_EMIT_DRIVER=1 \
+  BOOTSTRAP_M3_USE_INVENTORY_EMIT_DRIVER=1 \
+  PHP_COMPILER_M3_EMIT_LOG_PREFIX=helloworld_compile_smoke \
   php bin/compile.php -o "${EMIT_HELPER}" "${EMIT_ENTRY_ABS}" >/dev/null 2>&1; then
   echo "bootstrap-loop-gen1-full-spine-emit: emit helper link failed (see build/.last-jit-func-bootstrap-loop-gen1-full-spine-emit-helper)" >&2
   exit 1
@@ -50,7 +56,10 @@ export PHP_COMPILER_JIT_PROGRESS_FILE="build/.last-jit-func-bootstrap-loop-gen1-
 echo "==> gen-1 native emit full spine (compiler_lib_spine_smoke)"
 set +e
 compile_out="$(
-  env PHP_COMPILER_M3_EMIT_MINIMAL=1 \
+  env PHP_COMPILER_M3_COMPILE_MODE=compile \
+    PHP_COMPILER_M3_RUNTIME_COMPILE=1 \
+    PHP_COMPILER_M3_EMIT_MINIMAL=1 \
+    PHP_COMPILER_M3_INVENTORY_EMIT_DRIVER=1 \
     PHP_COMPILER_M3_SOURCE="${ROOT}/${FULL_SPINE_ENTRY}" \
     PHP_COMPILER_M3_OUT="${ROOT}/${GEN2_OUT}" \
     "./${EMIT_HELPER}" 2>&1
