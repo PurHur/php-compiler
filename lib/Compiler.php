@@ -9415,7 +9415,7 @@ class Compiler {
         $producers = $this->precedingInlineCallArgProducersBeforeCfgOp($block->orig->children, $callOp);
         $producer = $this->matchInlineCallArgProducer($producers, $callOp->args, $argIndex);
         if (null === $producer) {
-            return null;
+            return $this->slotForMatchResultDeadCallArg($arg, $block, $cfgCallOp);
         }
         if ($producer instanceof Op\Expr\PropertyFetch) {
             $coalesceSlot = $this->resolvePropertyFetchCoalesceCallArgSlot(
@@ -9672,7 +9672,105 @@ class Compiler {
             return $producerSlot;
         }
 
-        return null;
+        return $this->slotForMatchResultDeadCallArg($arg, $block, $cfgCallOp);
+    }
+
+    /**
+     * php-cfg match lowering seeds a shared var, arms assign to it, merge uses dead arg temp (#9374).
+     */
+    private function findMatchResultVarForDeadCallArg(
+        Operand $arg,
+        CfgBlock $cfgBlock,
+        Op $callOp
+    ): ?Operand {
+        if (!property_exists($callOp, 'args') || !is_array($callOp->args)) {
+            return null;
+        }
+        $isCallArg = false;
+        foreach ($callOp->args as $callArg) {
+            if ($callArg === $arg || $this->operandsReferToSameVariable($callArg, $arg)) {
+                $isCallArg = true;
+                break;
+            }
+        }
+        if (!$isCallArg) {
+            return null;
+        }
+        foreach ($cfgBlock->children as $child) {
+            if (
+                $child instanceof Op\Expr
+                && property_exists($child, 'result')
+                && null !== $child->result
+                && $this->operandsReferToSameVariable($child->result, $arg)
+            ) {
+                return null;
+            }
+        }
+        if (!isset($cfgBlock->parents) || [] === $cfgBlock->parents) {
+            return null;
+        }
+        $matchVar = null;
+        foreach ($cfgBlock->parents as $parent) {
+            if (!$this->cfgBlockJumpsToCfgBlock($parent, $cfgBlock)) {
+                continue;
+            }
+            foreach ($parent->children as $child) {
+                if (!$child instanceof Op\Expr\Assign) {
+                    continue;
+                }
+                if (!$child->var instanceof CfgVariable && !$child->var instanceof Temporary) {
+                    continue;
+                }
+                if (null === $matchVar) {
+                    $matchVar = $child->var;
+                    continue;
+                }
+                if (!$this->operandsReferToSameVariable($matchVar, $child->var)) {
+                    return null;
+                }
+            }
+        }
+
+        return $matchVar;
+    }
+
+    private function cfgBlockJumpsToCfgBlock(CfgBlock $from, CfgBlock $to): bool
+    {
+        foreach ($from->children as $child) {
+            if ($child instanceof Op\Stmt\Jump && $child->target === $to) {
+                return true;
+            }
+            if ($child instanceof Op\Stmt\JumpIf && ($child->if === $to || $child->else === $to)) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private function slotForMatchResultDeadCallArg(
+        Operand $arg,
+        Block $block,
+        ?Op $cfgCallOp
+    ): ?string {
+        if (null === $block->orig || null === $cfgCallOp) {
+            return null;
+        }
+        $callSite = $this->findCfgCallSiteForArg($block->orig->children, $arg, $cfgCallOp);
+        if (null === $callSite) {
+            return null;
+        }
+        [$callOp] = $callSite;
+        $matchVar = $this->findMatchResultVarForDeadCallArg($arg, $block->orig, $callOp);
+        if (null === $matchVar) {
+            return null;
+        }
+        $slot = $block->slotForOperand($matchVar);
+        if (null === $slot) {
+            $slot = $this->compileOperand($matchVar, $block, true);
+        }
+
+        return null !== $slot ? (string) $slot : null;
     }
 
     /**
