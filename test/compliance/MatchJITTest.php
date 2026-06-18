@@ -24,6 +24,7 @@ final class MatchJITTest extends BaseTest
                 'match_unhandled_jit.phpt',
                 'match_enum_unhandled_jit.phpt',
                 'match_scalar_enum_arm_jit.phpt',
+                'match_enum_subject_scalar_arm_jit.phpt',
                 'match_enum_default_jit.phpt',
                 'match_object_unhandled_jit.phpt',
                 'match_duplicate_default_jit.phpt',
