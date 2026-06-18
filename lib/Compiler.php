@@ -7283,6 +7283,10 @@ class Compiler {
     private function isUnreachableAfterThrow(Op $op, array $ops, int $index): bool
     {
         for ($j = $index - 1; $j >= 0; --$j) {
+            if ($ops[$j] instanceof Op\Expr\BinaryOp\Coalesce) {
+                // ?? RHS throw is lowered on the coalesce branch; following stmts stay reachable (#9447).
+                return false;
+            }
             if ($ops[$j] instanceof Op\Expr\Throw_) {
                 return true;
             }
