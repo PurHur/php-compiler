@@ -27,7 +27,7 @@ final class VmCallable
         $var = $var->resolveIndirect();
         $name = null;
         $ok = self::probeCallable($ctx, $var, $syntaxOnly, $name);
-        if ($ok && null !== $callableNameOut && null !== $name) {
+        if (null !== $callableNameOut && null !== $name) {
             self::writeCallableName($callableNameOut, $name);
         }
 
@@ -113,11 +113,30 @@ final class VmCallable
 
                 return true;
             }
+            $callableName = $object->class->name.'::__invoke';
             if ($ctx->runtime->vm->hasInstanceMethod($object->class, '__invoke')) {
-                $callableName = $object->class->name.'::__invoke';
-
                 return true;
             }
+
+            return false;
+        }
+        if (Variable::TYPE_INTEGER === $var->type) {
+            $callableName = (string) $var->toInt();
+
+            return false;
+        }
+        if (Variable::TYPE_FLOAT === $var->type) {
+            $callableName = (string) $var->toFloat();
+
+            return false;
+        }
+        if (Variable::TYPE_BOOLEAN === $var->type) {
+            $callableName = $var->toBool() ? '1' : '';
+
+            return false;
+        }
+        if (Variable::TYPE_NULL === $var->type) {
+            $callableName = '';
 
             return false;
         }
@@ -135,6 +154,8 @@ final class VmCallable
         ?string &$callableName
     ): bool {
         if ('' === $name) {
+            $callableName = '';
+
             return false;
         }
         if (str_contains($name, '::')) {
@@ -142,33 +163,22 @@ final class VmCallable
             if ('' === $class || '' === $method || !self::isValidMethodName($method)) {
                 return false;
             }
+            $callableName = $name;
             if ($syntaxOnly) {
-                $callableName = $name;
-
                 return true;
             }
 
-            if (!VmReflection::classMethExists($ctx, $class, $method)) {
-                return false;
-            }
-            $callableName = $name;
-
-            return true;
+            return VmReflection::classMethExists($ctx, $class, $method);
         }
+        $callableName = $name;
         if (!self::isValidFunctionName($name)) {
             return false;
         }
         if ($syntaxOnly) {
-            $callableName = $name;
-
             return true;
         }
-        if (!VmReflection::functionExists($ctx, $name)) {
-            return false;
-        }
-        $callableName = $name;
 
-        return true;
+        return VmReflection::functionExists($ctx, $name);
     }
 
     /**
@@ -186,6 +196,8 @@ final class VmCallable
         $idx1 = new Variable(Variable::TYPE_INTEGER);
         $idx1->int(1);
         if (!$table->keyExists($idx0) || !$table->keyExists($idx1)) {
+            $callableName = 'Array';
+
             return false;
         }
         $target = $table->findVariable($idx0, false)->resolveIndirect();
@@ -199,34 +211,24 @@ final class VmCallable
         }
         if (Variable::TYPE_OBJECT === $target->type) {
             $className = $target->toObject()->class->name;
+            $callableName = $className.'::'.$method;
             if ($syntaxOnly) {
-                $callableName = $className.'::'.$method;
-
                 return true;
             }
-            if (!$ctx->runtime->vm->hasInstanceMethod($target->toObject()->class, $method)) {
-                return false;
-            }
-            $callableName = $className.'::'.$method;
 
-            return true;
+            return $ctx->runtime->vm->hasInstanceMethod($target->toObject()->class, $method);
         }
         if (Variable::TYPE_STRING === $target->type) {
             $class = $target->toString();
             if ('' === $class) {
                 return false;
             }
+            $callableName = $class.'::'.$method;
             if ($syntaxOnly) {
-                $callableName = $class.'::'.$method;
-
                 return true;
             }
-            if (!VmReflection::classMethExists($ctx, $class, $method)) {
-                return false;
-            }
-            $callableName = $class.'::'.$method;
 
-            return true;
+            return VmReflection::classMethExists($ctx, $class, $method);
         }
 
         return false;
@@ -283,9 +285,6 @@ final class VmCallable
 
     private static function writeCallableName(Variable $ref, string $name): void
     {
-        if (!$ref->isReference()) {
-            throw new \Error('is_callable(): Argument #3 ($callable_name) could not be passed by reference');
-        }
         $ref->resolveIndirect()->string($name);
     }
 
