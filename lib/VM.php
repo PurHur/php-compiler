@@ -650,6 +650,44 @@ class VM {
     }
 
     /**
+     * ?? / ??= on static property hooks — read backing without get hook (#9683, zend_property_hooks.c).
+     */
+    public function fetchStaticPropertyForCoalesce(string $classLc, string $propNameRaw, Variable $dst): void
+    {
+        $backing = $this->hookedStaticPropertyBackingValue($classLc, $propNameRaw);
+        if (false !== $backing) {
+            $dst->copyFromForClone($backing);
+
+            return;
+        }
+        $storage = $this->resolveStaticPropertyStorage($classLc, strtolower($propNameRaw));
+        if (null !== $storage) {
+            $dst->copyFromForClone($storage);
+
+            return;
+        }
+        $dst->undefined();
+    }
+
+    /**
+     * ?? / ??= isset probe on static hooked properties — backing only, never get hook (#9683).
+     */
+    public function staticPropertyIsSetForCoalesceAssign(string $classLc, string $propNameRaw): bool
+    {
+        $hookedIsset = $this->issetHookedStaticPropertyWithoutGetHook($classLc, $propNameRaw);
+        if (null !== $hookedIsset) {
+            return $hookedIsset;
+        }
+        $storage = $this->resolveStaticPropertyStorage($classLc, strtolower($propNameRaw));
+        if (null === $storage) {
+            return false;
+        }
+        $value = $storage->resolveIndirect();
+
+        return !$value->isUndefined() && Variable::TYPE_NULL !== $value->type;
+    }
+
+    /**
      * isset / ?? / ??= / empty on hooked properties — backing or declared slot probe, never get hook (#8902, #8917, #8918).
      *
      * @return bool|null null when the property is not hook-backed
@@ -869,6 +907,59 @@ class VM {
         }
         if ($object->hasProperty($propName)) {
             return $object->getProperty($propName)->resolveIndirect();
+        }
+        $uninit = new Variable();
+        $uninit->undefined();
+
+        return $uninit;
+    }
+
+    /**
+     * isset/empty/?? backing probe for static hooked properties — never invokes get hook (#9683).
+     *
+     * @return bool|null null when the property is not hooked
+     */
+    private function issetHookedStaticPropertyWithoutGetHook(string $classLc, string $propNameRaw): ?bool
+    {
+        $backing = $this->hookedStaticPropertyBackingValue($classLc, $propNameRaw);
+        if (false === $backing) {
+            return null;
+        }
+        if ($backing->isUndefined() || VM\TypedPropertyCheck::isUninitialized($backing)) {
+            return false;
+        }
+
+        return Variable::TYPE_NULL !== $backing->type;
+    }
+
+    /**
+     * @return Variable|false false when the static property is not hooked
+     */
+    private function hookedStaticPropertyBackingValue(string $classLc, string $propNameRaw): Variable|false
+    {
+        $propLc = strtolower($propNameRaw);
+        if (null === $this->resolveStaticPropertyHooks($classLc, $propLc)) {
+            return false;
+        }
+        $propMeta = $this->context->propertyHookRegistry[$classLc][$propNameRaw]
+            ?? $this->context->propertyHookRegistry[$classLc][$propLc]
+            ?? null;
+        if (is_array($propMeta)) {
+            $backingName = $propMeta['setBacking'] ?? $propMeta['getBacking'] ?? null;
+            if (null !== $backingName && strcasecmp($backingName, $propNameRaw) !== 0) {
+                $backingStorage = $this->resolveStaticPropertyStorage($classLc, strtolower($backingName));
+                if (null !== $backingStorage) {
+                    return $backingStorage->resolveIndirect();
+                }
+                $uninit = new Variable();
+                $uninit->undefined();
+
+                return $uninit;
+            }
+        }
+        $storage = $this->resolveStaticPropertyStorage($classLc, $propLc);
+        if (null !== $storage) {
+            return $storage->resolveIndirect();
         }
         $uninit = new Variable();
         $uninit->undefined();
@@ -3769,6 +3860,11 @@ restart:
                     }
                     $readBeforeAssign = $forWrite && $this->propertyFetchDestUsedAsReadBeforeAssign($frame, $op);
                     $hooks = $this->resolveStaticPropertyHooks($lcClass, $propName);
+                    if ($op->propertyHookCoalesceRead && !$mutates) {
+                        $dest = $frame->scope[$op->arg1];
+                        $this->fetchStaticPropertyForCoalesce($lcClass, $propNameRaw, $dest);
+                        break;
+                    }
                     if (
                         !$mutates
                         && null !== $hooks
@@ -3824,6 +3920,18 @@ restart:
                         break;
                     }
                     $dest = $frame->scope[$op->arg1];
+                    if (
+                        !$mutates
+                        && $this->isPropertyHookRawWrite($frame, $propNameRaw)
+                    ) {
+                        $backing = $this->hookedStaticPropertyBackingValue($lcClass, $propNameRaw);
+                        if (false !== $backing) {
+                            $dest->copyFromForClone($backing);
+                        } else {
+                            $dest->copyFromForClone($storage);
+                        }
+                        break;
+                    }
                     if (
                         !$mutates
                         && $this->propertyFetchDestUsedAsDimWriteContainer($frame, $op)
@@ -5276,6 +5384,12 @@ restart:
                         break;
                     }
                     if (null !== $op->arg3) {
+                        if ($op->issetOnStaticProperty) {
+                            $lcClass = $this->resolveStaticPropertyClassLc($frame->scope[$op->arg2], $frame);
+                            $propNameRaw = $frame->scope[$op->arg3]->toString();
+                            $dst->bool($this->staticPropertyIsSetForCoalesceAssign($lcClass, $propNameRaw));
+                            break;
+                        }
                         $container = $frame->scope[$op->arg2]->resolveIndirect();
                         if (Variable::TYPE_ENUM_CASE === $container->type) {
                             [$propName, $catchFrame] = $this->coerceRuntimeOperandToString(
