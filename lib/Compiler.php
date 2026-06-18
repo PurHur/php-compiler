@@ -9678,6 +9678,12 @@ class Compiler {
             }
             $producerSlot = $block->slotForOperand($producer->result);
         }
+        if (null === $producerSlot && $producer instanceof Op\Expr\Cast) {
+            foreach ($this->compileExpr($producer, $block) as $op) {
+                $block->addOpCode($op);
+            }
+            $producerSlot = $block->slotForOperand($producer->result);
+        }
         if (null === $producerSlot && $producer instanceof Op\Expr\MagicScriptConst) {
             foreach ($this->compileExpr($producer, $block) as $op) {
                 $block->addOpCode($op);
@@ -9755,6 +9761,7 @@ class Compiler {
             || $producer instanceof Op\Expr\ConstFetch
             || $producer instanceof Op\Expr\ClassConstFetch
             || $producer instanceof Op\Expr\InstanceOf_
+            || $producer instanceof Op\Expr\Cast
             || $producer instanceof Op\Expr\MagicScriptConst
             || $producer instanceof Op\Expr\New_
         ) {
@@ -10335,6 +10342,10 @@ class Compiler {
             return $expr->var === $operand
                 || $this->operandsReferToSameVariable($expr->var, $operand);
         }
+        if ($expr instanceof Op\Expr\Cast) {
+            return $expr->expr === $operand
+                || $this->operandsReferToSameVariable($expr->expr, $operand);
+        }
 
         return false;
     }
@@ -10517,6 +10528,7 @@ class Compiler {
             || $op instanceof Op\Expr\Empty_
             || $op instanceof Op\Expr\Isset_
             || $op instanceof Op\Expr\InstanceOf_
+            || $op instanceof Op\Expr\Cast
             || $op instanceof Op\Expr\MagicScriptConst
             || $op instanceof Op\Expr\Assign;
     }

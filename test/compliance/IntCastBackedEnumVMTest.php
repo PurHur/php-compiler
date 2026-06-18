@@ -17,6 +17,10 @@ final class IntCastBackedEnumVMTest extends BaseTest
             __DIR__.'/cases/language/int_cast_backed_enum.phpt',
             'int_cast_backed_enum.phpt'
         );
+        yield 'enum_int_cast_warning.phpt' => self::parsePHPT(
+            __DIR__.'/cases/language/enum_int_cast_warning.phpt',
+            'enum_int_cast_warning.phpt'
+        );
     }
 
     public function setUp(): void
