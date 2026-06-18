@@ -265,6 +265,8 @@ class OpCode {
     public bool $isIncDec = false;
     /** isset()/empty() on PropertyFetch, not ArrayDimFetch (issue #5117, zend_hash.c). */
     public bool $issetOnProperty = false;
+    /** ?? / ??= on static hooked properties: probe backing storage, not get hook (#9683). */
+    public bool $issetOnStaticProperty = false;
     /** ?? / ??= on hooked properties: null-check backing storage, not get-hook value (#6472, #8902). */
     public bool $issetForCoalesceAssign = false;
     /** ?? / ??= left branch: read backing storage, not get-hook value (#6472, #8902). */

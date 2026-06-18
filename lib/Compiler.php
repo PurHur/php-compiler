@@ -7584,10 +7584,16 @@ class Compiler {
         }
         if (null === $expr->left) {
             $propFetch = null;
+            $staticPropFetch = null;
             $dimFetch = null;
         } else {
             $propFetch = $this->findCoalescePropertyFetch($expr->left, $block);
-            $dimFetch = null !== $propFetch ? null : $this->findCoalesceArrayDimFetch($expr->left, $block);
+            $staticPropFetch = null !== $propFetch
+                ? null
+                : $this->findCoalesceStaticPropertyFetch($expr->left, $block);
+            $dimFetch = null !== $propFetch || null !== $staticPropFetch
+                ? null
+                : $this->findCoalesceArrayDimFetch($expr->left, $block);
         }
         // ??= on $arr['key']: dim fetch temp is read on the left branch (#3792).
         if (
@@ -7602,11 +7608,13 @@ class Compiler {
         $checkSlot = $this->compileBoolTemporary($block);
         $issetTarget = null !== $propFetch
             ? $this->resolveIssetTargetFromPropertyFetch($propFetch, $block)
-            : (null !== $dimFetch
-                ? $this->resolveIssetTargetFromArrayDimFetch($dimFetch, $block)
-                : (null !== $expr->left
-                    ? $this->resolveCoalesceIssetTarget($expr->left, $block)
-                    : null));
+            : (null !== $staticPropFetch
+                ? $this->resolveIssetTargetFromStaticPropertyFetch($staticPropFetch, $block)
+                : (null !== $dimFetch
+                    ? $this->resolveIssetTargetFromArrayDimFetch($dimFetch, $block)
+                    : (null !== $expr->left
+                        ? $this->resolveCoalesceIssetTarget($expr->left, $block)
+                        : null)));
         $useContainerIsset = null !== $issetTarget;
         if ($useContainerIsset) {
             [$containerSlot, $dimSlot] = $issetTarget;
@@ -7626,19 +7634,17 @@ class Compiler {
             ) {
                 $issetOp->issetForCoalesceAssign = true;
             }
+            if (null !== $staticPropFetch) {
+                $issetOp->issetOnStaticProperty = true;
+                $issetOp->issetForCoalesceAssign = true;
+            }
             $block->addOpCode($issetOp);
         } elseif (null !== $expr->left) {
             $leftSlot = $this->compileOperand($expr->left, $block, true);
             $block->addOpCode(new OpCode(
-                OpCode::TYPE_ASSIGN,
-                $resultSlot,
-                $resultSlot,
-                $leftSlot
-            ));
-            $block->addOpCode(new OpCode(
                 OpCode::TYPE_ISSET,
                 $checkSlot,
-                $resultSlot,
+                $leftSlot,
                 null
             ));
         } else {
@@ -7672,6 +7678,12 @@ class Compiler {
         ) {
             $this->compilePropertyFetchWrite($propFetch, $rightEmitBlock);
         }
+        if (
+            null !== $staticPropFetch
+            && $this->operandsChainEqual($coalesceAssignTarget, $staticPropFetch->result)
+        ) {
+            $this->compileStaticPropertyFetchWrite($staticPropFetch, $rightEmitBlock);
+        }
         if (null !== $rightSlot) {
             $rightEmitBlock->addOpCode(new OpCode(
                 OpCode::TYPE_ASSIGN,
@@ -7701,6 +7713,17 @@ class Compiler {
             } elseif (null !== $propFetch) {
                 $this->compilePropertyFetchRead($propFetch, $leftBlock, true);
                 $leftSlot = $this->compileOperand($propFetch->result, $leftBlock, true);
+                if (!$this->operandsChainEqual($resultOperand, $expr->left)) {
+                    $leftBlock->addOpCode(new OpCode(
+                        OpCode::TYPE_ASSIGN,
+                        $resultSlot,
+                        $resultSlot,
+                        $leftSlot
+                    ));
+                }
+            } elseif (null !== $staticPropFetch) {
+                $this->compileStaticPropertyFetchRead($staticPropFetch, $leftBlock, true);
+                $leftSlot = $this->compileOperand($staticPropFetch->result, $leftBlock, true);
                 if (!$this->operandsChainEqual($resultOperand, $expr->left)) {
                     $leftBlock->addOpCode(new OpCode(
                         OpCode::TYPE_ASSIGN,
@@ -7766,6 +7789,23 @@ class Compiler {
         $block->addOpCode($op);
     }
 
+    private function compileStaticPropertyFetchRead(
+        Op\Expr\StaticPropertyFetch $fetch,
+        Block $block,
+        bool $propertyHookCoalesceRead = false
+    ): void {
+        $op = new OpCode(
+            OpCode::TYPE_STATIC_PROPERTY_FETCH,
+            $this->compileOperand($fetch->result, $block, false),
+            $this->compileOperand($fetch->class, $block, true),
+            $this->compileStaticPropertyNameSlot($fetch->name, $fetch->class, $block)
+        );
+        if ($propertyHookCoalesceRead) {
+            $op->propertyHookCoalesceRead = true;
+        }
+        $block->addOpCode($op);
+    }
+
     /**
      * Emit a write fetch in $block (used by ??= right branch when backing is null, #6472).
      */
@@ -7776,6 +7816,16 @@ class Compiler {
             $this->compileOperand($fetch->result, $block, false),
             $this->compileOperand($fetch->var, $block, true),
             $this->compileOperand($fetch->name, $block, true)
+        ));
+    }
+
+    private function compileStaticPropertyFetchWrite(Op\Expr\StaticPropertyFetch $fetch, Block $block): void
+    {
+        $block->addOpCode(new OpCode(
+            OpCode::TYPE_STATIC_PROPERTY_FETCH,
+            $this->compileOperand($fetch->result, $block, false),
+            $this->compileOperand($fetch->class, $block, true),
+            $this->compileStaticPropertyNameSlot($fetch->name, $fetch->class, $block)
         ));
     }
 
@@ -8669,6 +8719,10 @@ class Compiler {
         if (null !== $propFetch) {
             return $this->resolveIssetTargetFromPropertyFetch($propFetch, $block);
         }
+        $staticPropFetch = $this->findCoalesceStaticPropertyFetch($operand, $block);
+        if (null !== $staticPropFetch) {
+            return $this->resolveIssetTargetFromStaticPropertyFetch($staticPropFetch, $block);
+        }
         if (null !== $this->unwrapVariableOperand($operand)) {
             return $this->resolveIssetTarget($operand, $block);
         }
@@ -8980,6 +9034,39 @@ class Compiler {
     }
 
     /**
+     * @return ?Op\Expr\StaticPropertyFetch
+     */
+    protected function findCoalesceStaticPropertyFetch(?Operand $operand, Block $block): ?Op\Expr\StaticPropertyFetch
+    {
+        if (null === $operand) {
+            return null;
+        }
+        $direct = $this->unwrapStaticPropertyFetch($operand);
+        if (null !== $direct) {
+            return $direct;
+        }
+        $candidates = [$operand];
+        $seen = [];
+        while ([] !== $candidates) {
+            $current = array_shift($candidates);
+            if (isset($seen[spl_object_id($current)])) {
+                continue;
+            }
+            $seen[spl_object_id($current)] = true;
+            foreach ($block->orig->children as $child) {
+                if ($child instanceof Op\Expr\StaticPropertyFetch && $child->result === $current) {
+                    return $child;
+                }
+            }
+            if ($current instanceof Temporary && null !== $current->original) {
+                $candidates[] = $current->original;
+            }
+        }
+
+        return null;
+    }
+
+    /**
      * @return array{0: int, 1: ?int}
      */
     protected function resolveIssetTargetFromPropertyFetch(Op\Expr\PropertyFetch $fetch, Block $block): array
@@ -8987,6 +9074,19 @@ class Compiler {
         return [
             $this->compileOperand($fetch->var, $block, true),
             $this->compileOperand($fetch->name, $block, true),
+        ];
+    }
+
+    /**
+     * @return array{0: int, 1: ?int}
+     */
+    protected function resolveIssetTargetFromStaticPropertyFetch(
+        Op\Expr\StaticPropertyFetch $fetch,
+        Block $block
+    ): array {
+        return [
+            $this->compileOperand($fetch->class, $block, true),
+            $this->compileStaticPropertyNameSlot($fetch->name, $fetch->class, $block),
         ];
     }
 
