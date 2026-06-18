@@ -65,8 +65,7 @@ final class implode extends Internal
         }
         $parts = [];
         foreach ($ht->iterate(true) as $value) {
-            self::rejectEnumHaystackElement($value);
-            $parts[] = $value->resolveIndirect()->toString();
+            $parts[] = self::coerceHaystackElement($frame, $value);
         }
         $frame->returnVar->string(VmString::implode($glue, $parts));
     }
@@ -136,7 +135,28 @@ final class implode extends Internal
     }
 
     /**
-     * php-src php_implode: array elements must convert to string (#5581, ext/standard/string.c).
+     * php-src php_implode: array elements via zval_get_string (#5581, #9557, ext/standard/string.c).
+     */
+    private static function coerceHaystackElement(Frame $frame, Variable $value): string
+    {
+        self::rejectEnumHaystackElement($value);
+        $value = $value->resolveIndirect();
+        if (Variable::TYPE_OBJECT === $value->type) {
+            $vm = $frame->vmContext?->runtime->vm ?? null;
+            if (null === $vm) {
+                throw new \Error(
+                    'Object of class '.$value->toObject()->class->name.' could not be converted to string'
+                );
+            }
+
+            return $vm->castObjectToString($value->toObject());
+        }
+
+        return VmString::coerceOperand($value);
+    }
+
+    /**
+     * php-src php_implode: enum case elements must Error, not stringify (#5581, ext/standard/string.c).
      */
     private static function rejectEnumHaystackElement(Variable $value): void
     {
