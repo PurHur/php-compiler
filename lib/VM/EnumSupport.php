@@ -83,6 +83,35 @@ final class EnumSupport
     }
 
     /**
+     * Enum case names in declaration order — {@see ClassEntry::$enumCases} or constants fallback (#9682, #9603).
+     *
+     * @return list<string>
+     */
+    public static function enumCaseNamesInOrder(ClassEntry $entry): array
+    {
+        if ([] !== $entry->enumCases) {
+            $names = [];
+            foreach ($entry->enumCases as $case) {
+                $names[] = $case['name'];
+            }
+
+            return $names;
+        }
+        if ([] !== $entry->enumCaseCanonicalNames) {
+            return array_values($entry->enumCaseCanonicalNames);
+        }
+        $names = [];
+        foreach ($entry->constants as $memberLc => $_stored) {
+            $caseName = self::enumCaseNameForConstantMember($entry, $memberLc);
+            if (null !== $caseName) {
+                $names[] = $caseName;
+            }
+        }
+
+        return $names;
+    }
+
+    /**
      * Enum `case` member name for a constants-table key, or null for user `const` (#5832, #5054).
      */
     public static function enumCaseNameForConstantMember(ClassEntry $enum, string $memberLc): ?string

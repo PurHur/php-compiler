@@ -24,21 +24,30 @@ final class EnumCases extends VmClassMethod
 
     public function execute(Frame $frame): void
     {
-        EnumSupport::ensureBackedEnumValuesUnique($this->enumClass);
+        $enum = EnumSupport::resolveRuntimeEnumClass($frame->vmContext, $this->enumClass);
+        EnumSupport::ensureBackedEnumValuesUnique($enum);
         $result = new Variable();
         $result->newArray();
         $ht = $result->toArray();
-        foreach ($this->enumClass->enumCases as $index => $case) {
-            $canonical = BackedEnum::canonicalCaseVariable($this->enumClass, $case['name']);
+        foreach (EnumSupport::enumCaseNamesInOrder($enum) as $index => $caseName) {
+            $canonical = BackedEnum::canonicalCaseVariable($enum, $caseName);
             if (null !== $canonical) {
                 $caseVar = new Variable();
                 $caseVar->copyFrom($canonical->resolveIndirect());
                 $ht->addIndex($index, $caseVar);
                 continue;
             }
-            $backing = new Variable();
-            $backing->copyFrom($case['value']);
-            $caseVar = EnumCaseSupport::createCase($this->enumClass, $case['name'], $backing);
+            $backing = new Variable(Variable::TYPE_NULL);
+            $backing->null();
+            if (null !== $enum->backedType) {
+                $memberLc = strtolower($caseName);
+                if (isset($enum->constants[$memberLc])) {
+                    $backing->copyFrom(
+                        BackedEnum::caseBackingScalar($enum->backedType, $enum->constants[$memberLc])
+                    );
+                }
+            }
+            $caseVar = EnumCaseSupport::createCase($enum, $caseName, $backing);
             $ht->addIndex($index, $caseVar);
         }
         if (null !== $frame->returnVar) {
