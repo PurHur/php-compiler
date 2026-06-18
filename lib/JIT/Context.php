@@ -717,6 +717,7 @@ class Context {
             Builtin\StringTriggerError::ensureStandaloneBodies($this);
             Builtin\StringFormat::ensureStandaloneBodies($this);
             Builtin\GcCollectCyclesRuntime::ensureStandaloneBodies($this);
+            Builtin\LastErrorRuntime::ensureStandaloneBodies($this);
             Builtin\SuperglobalRefreshRuntime::ensureStandaloneBodies($this);
             Builtin\SuperglobalNameRuntime::ensureLinked($this);
             \PHPCompiler\ext\standard\JitStrspn::ensureStandaloneBodies($this);

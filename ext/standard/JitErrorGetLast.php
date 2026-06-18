@@ -23,7 +23,7 @@ final class JitErrorGetLast
         $active = $context->builder->call($context->lookupFunction('__phpc_last_error_is_active'));
         $hasError = $context->builder->icmp(
             Builder::INT_NE,
-            $context->builder->trunc($active, $i32),
+            $context->builder->zext($active, $i32),
             $i32->constInt(0, false)
         );
 
