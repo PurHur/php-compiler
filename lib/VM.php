@@ -2233,7 +2233,7 @@ restart:
             $this->executingFrame = $frame;
             $this->context->executionLimits->check($this->context, $frame);
             $op = $frame->block->opCodes[$frame->pos++];
-            $this->assertDeferredTraitUsesBeforeRuntime($op->type);
+            $this->assertDeferredDefinitionsBeforeRuntime($op->type);
             try {
                 switch ($op->type) {
                 case OpCode::TYPE_TYPE_ASSERT:
@@ -4710,6 +4710,7 @@ restart:
                     $this->context->classes[$lcname] = $ifaceEntry;
                     $this->propagateInterfaceConstantsToImplementors($lcname);
                     $this->flushDeferredTraitUses();
+                    $this->flushDeferredClassConstants();
                     break;
                 case OpCode::TYPE_DECLARE_TRAIT:
                     $name = $frame->scope[$op->arg1]->toString();
@@ -4724,6 +4725,7 @@ restart:
                     self::defineClass($traitEntry, $op->block1, $frame);
                     $this->context->classes[$lcname] = $traitEntry;
                     $this->flushDeferredTraitUses();
+                    $this->flushDeferredClassConstants();
                     break;
                 case OpCode::TYPE_DECLARE_GLOBAL_CONST:
                     $name = $frame->scope[$op->arg1]->toString();
@@ -4772,6 +4774,7 @@ restart:
                     $this->context->classes[$lcname] = $classEntry;
                     $this->context->enums[$lcname] = true;
                     $this->flushDeferredTraitUses();
+                    $this->flushDeferredClassConstants();
                     break;
                 case OpCode::TYPE_DECLARE_CLASS:
                     $name = $frame->scope[$op->arg1]->toString();
@@ -4824,6 +4827,7 @@ restart:
                     VM\ClassValidator::finalizeClassDefinition($classEntry, $this->context);
                     $this->context->classes[$lcname] = $classEntry;
                     $this->flushDeferredTraitUses();
+                    $this->flushDeferredClassConstants();
                     break;
                 case OpCode::TYPE_NEW:
                     $result = $frame->scope[$op->arg1];
@@ -6016,6 +6020,9 @@ restart:
         }
         if ([] !== $this->context->deferredTraitUses) {
             $this->finalizeDeferredTraitUses();
+        }
+        if ([] !== $this->context->deferredClassConstants) {
+            $this->finalizeAllDeferredClassConstants();
         }
 
         return self::SUCCESS;
@@ -10797,11 +10804,48 @@ restart:
         throw new \LogicException("Trait {$missing} not found");
     }
 
-    private function assertDeferredTraitUsesBeforeRuntime(int $opType): void
+    protected function flushDeferredClassConstants(): void
     {
-        if ([] === $this->context->deferredTraitUses) {
+        if ([] === $this->context->deferredClassConstants) {
             return;
         }
+        $remaining = [];
+        foreach ($this->context->deferredClassConstants as $deferred) {
+            $stillPending = $this->finalizeDeferredClassConstants(
+                $deferred['entry'],
+                $deferred['block'],
+                $deferred['frame'],
+                $deferred['classBodyOps'],
+                $deferred['segments']
+            );
+            if ([] !== $stillPending) {
+                $deferred['segments'] = $stillPending;
+                $remaining[] = $deferred;
+            }
+        }
+        $this->context->deferredClassConstants = $remaining;
+    }
+
+    protected function finalizeAllDeferredClassConstants(): void
+    {
+        $this->flushDeferredClassConstants();
+        if ([] === $this->context->deferredClassConstants) {
+            return;
+        }
+        $first = $this->context->deferredClassConstants[0];
+        $pendingName = array_key_first($first['segments']);
+        if (false === $pendingName) {
+            return;
+        }
+        $declareOp = $first['classBodyOps'][$first['segments'][$pendingName]['declareIndex']];
+        $canonical = $first['frame']->scope[$declareOp->arg1]->toString();
+        throw new \LogicException(
+            "Cannot resolve class constant {$first['entry']->name}::{$canonical}"
+        );
+    }
+
+    private function assertDeferredDefinitionsBeforeRuntime(int $opType): void
+    {
         static $declarationOpcodes = [
             OpCode::TYPE_DECLARE_CLASS => true,
             OpCode::TYPE_DECLARE_ENUM => true,
@@ -10810,10 +10854,10 @@ restart:
             OpCode::TYPE_FUNCDEF => true,
             OpCode::TYPE_DECLARE_GLOBAL_CONST => true,
         ];
-        if (isset($declarationOpcodes[$opType])) {
-            return;
+        if (!isset($declarationOpcodes[$opType])) {
+            $this->finalizeDeferredTraitUses();
+            $this->finalizeAllDeferredClassConstants();
         }
-        $this->finalizeDeferredTraitUses();
     }
 
     /**
@@ -11935,13 +11979,22 @@ restart:
             throw new \LogicException('Unterminated property default `new` initializer in class body');
         }
         if ([] !== $deferredClassConstSegments) {
-            $this->finalizeDeferredClassConstants(
+            $stillPending = $this->finalizeDeferredClassConstants(
                 $entry,
                 $block,
                 $frame,
                 $classBodyOps,
                 $deferredClassConstSegments
             );
+            if ([] !== $stillPending) {
+                $this->context->deferredClassConstants[] = [
+                    'entry' => $entry,
+                    'block' => $block,
+                    'frame' => $frame,
+                    'classBodyOps' => $classBodyOps,
+                    'segments' => $stillPending,
+                ];
+            }
         }
         foreach ($entry->properties as $prop) {
             $this->linkPropertyHooks($entry, $prop);
@@ -12158,6 +12211,7 @@ restart:
     /**
      * @param list<OpCode> $classBodyOps
      * @param array<string, array{initIndices: list<int>, declareIndex: int}> $segments
+     * @return array<string, array{initIndices: list<int>, declareIndex: int}>
      */
     private function finalizeDeferredClassConstants(
         ClassEntry $entry,
@@ -12165,7 +12219,7 @@ restart:
         Frame $frame,
         array $classBodyOps,
         array $segments
-    ): void {
+    ): array {
         /** @var list<string> $pending */
         $pending = array_keys($segments);
         $maxPasses = \count($pending) + 1;
@@ -12196,14 +12250,17 @@ restart:
             $pending = $stillPending;
         }
         if ([] !== $pending) {
-            $first = $pending[0];
-            $declareOp = $classBodyOps[$segments[$first]['declareIndex']];
-            $canonical = $frame->scope[$declareOp->arg1]->toString();
-            throw new \LogicException(
-                "Cannot declare self-referencing constant {$entry->name}::{$canonical}"
-            );
+            $entry->forwardDeclaredConstNames = array_fill_keys($pending, true);
+            $stillPending = [];
+            foreach ($pending as $lcName) {
+                $stillPending[$lcName] = $segments[$lcName];
+            }
+
+            return $stillPending;
         }
         $entry->forwardDeclaredConstNames = null;
+
+        return [];
     }
 
     /**

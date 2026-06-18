@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace PHPCompiler;
 
+use PHPCompiler\VM\Variable;
 use PHPUnit\Framework\TestCase;
 
 /**
@@ -77,5 +78,32 @@ PHP;
         $output = ob_get_clean();
 
         $this->assertSame('ok', $output);
+    }
+
+    public function testClassConstEnumCaseForwardReference(): void
+    {
+        $code = <<<'PHP'
+<?php
+class C {
+    public const ITEM = E::A;
+}
+enum E: int { case A = 1; }
+var_export(C::ITEM);
+echo "\n";
+PHP;
+        $runtime = new Runtime();
+        $block = $runtime->parseAndCompile($code, 'class_const_enum_forward_ref.php');
+        ob_start();
+        $runtime->run($block);
+        $output = ob_get_clean();
+
+        $this->assertSame("\\E::A\n", $output);
+        $entry = $runtime->vmContext->classes['c'];
+        $this->assertArrayHasKey('item', $entry->constants);
+        $stored = $entry->constants['item']->resolveIndirect();
+        $this->assertTrue(
+            Variable::TYPE_ENUM_CASE === $stored->type
+            || (Variable::TYPE_OBJECT === $stored->type && $stored->toObject()->isEnumCase)
+        );
     }
 }

@@ -165,6 +165,19 @@ class Context {
      */
     public array $deferredTraitUses = [];
 
+    /**
+     * Class constants deferred until a forward-referenced enum/class is declared (#9664).
+     *
+     * @var list<array{
+     *     entry: ClassEntry,
+     *     block: Block,
+     *     frame: Frame,
+     *     classBodyOps: list<OpCode>,
+     *     segments: array<string, array{initIndices: list<int>, declareIndex: int}>
+     * }>
+     */
+    public array $deferredClassConstants = [];
+
     /** Fiber executing on this VM stack (issue #3130). */
     public ?FiberState $currentFiber = null;
 
