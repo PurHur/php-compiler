@@ -4,6 +4,9 @@ declare(strict_types=1);
 
 namespace PHPCompiler\Web;
 
+use PHPCompiler\ext\standard\OutputRewriteVarsJitHelper;
+use PHPCompiler\ext\standard\VmOutputRewriteVars;
+
 /**
  * Request-scoped HTTP response state for VM scripts (issues #252, #311).
  *
@@ -18,9 +21,6 @@ final class ResponseContext
     /** @var list<string> */
     private static array $headers = [];
 
-    /** @var array<string, string> mod_rewrite-style name/value pairs (ext/standard/url.c, #6031) */
-    private static array $rewriteVars = [];
-
     /** When false (CLI), header() does not queue lines for headers_list() — php-src head.c SAPI gate (#4037). */
     private static bool $headerQueueEnabled = false;
 
@@ -28,7 +28,7 @@ final class ResponseContext
     {
         self::$status = 0;
         self::$headers = [];
-        self::$rewriteVars = [];
+        OutputRewriteVarsJitHelper::reset();
         self::$headerQueueEnabled = false;
     }
 
@@ -187,17 +187,13 @@ final class ResponseContext
     /** output_add_rewrite_var() — register mod_rewrite pair; same name replaces prior value (#6031). */
     public static function addRewriteVar(string $name, string $value): bool
     {
-        self::$rewriteVars[$name] = $value;
-
-        return true;
+        return OutputRewriteVarsJitHelper::add($name, $value);
     }
 
     /** output_reset_rewrite_vars() — clear rewrite var table (#6031). */
     public static function resetRewriteVars(): bool
     {
-        self::$rewriteVars = [];
-
-        return true;
+        return OutputRewriteVarsJitHelper::reset();
     }
 
     /**
@@ -205,6 +201,6 @@ final class ResponseContext
      */
     public static function listRewriteVars(): array
     {
-        return self::$rewriteVars;
+        return VmOutputRewriteVars::list();
     }
 }

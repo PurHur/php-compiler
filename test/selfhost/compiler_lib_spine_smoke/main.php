@@ -1415,6 +1415,8 @@ require_once __DIR__.'/../../../ext/standard/openlog.php';
 require_once __DIR__.'/../../../ext/standard/openssl_random_pseudo_bytes.php';
 require_once __DIR__.'/../../../ext/standard/ord.php';
 require_once __DIR__.'/../../../ext/standard/output_add_rewrite_var.php';
+require_once __DIR__.'/../../../ext/standard/OutputRewriteVarsJitHelper.php';
+require_once __DIR__.'/../../../ext/standard/VmOutputRewriteVars.php';
 require_once __DIR__.'/../../../ext/standard/output_reset_rewrite_vars.php';
 require_once __DIR__.'/../../../ext/standard/pack.php';
 require_once __DIR__.'/../../../ext/standard/parse_ini_file.php';
