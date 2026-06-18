@@ -102,6 +102,8 @@ final class BuiltinParamNames
                 return ['url', 'component'];
             case 'getopt':
                 return ['short_options', 'long_options', 'rest_index'];
+            case 'is_callable':
+                return ['value', 'syntax_only', 'callable_name'];
         }
 
         return null;

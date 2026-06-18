@@ -7,6 +7,7 @@ namespace PHPCompiler\ext\standard;
 use PHPCompiler\JIT\ClosureHelper;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitStringArg;
+use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\JIT\VariableFunctionCallHelper;
 use PHPLLVM\Builder;
@@ -22,13 +23,22 @@ final class JitIsCallable
         }
         $callback = $args[0];
         $syntaxOnly = false;
+        $nameOut = $args[2] ?? null;
 
         if (null !== ClosureHelper::resolveCall($context, $callback)) {
+            if (null !== $nameOut) {
+                self::jitWriteCallableNameLiteral($context, '{closure}', $nameOut);
+            }
+
             return $context->constantFromInteger(1, 'int1');
         }
 
         $literal = JitStringArg::compileTimeLiteral($callback);
-        if (null !== $literal && '' !== $literal) {
+        if (null !== $literal) {
+            if (null !== $nameOut) {
+                self::jitWriteCallableNameLiteral($context, $literal, $nameOut);
+            }
+
             return self::checkCompileTimeString($context, $literal, $syntaxOnly);
         }
 
@@ -36,6 +46,10 @@ final class JitIsCallable
             JITVariable::TYPE_STRING === $callback->type
             || JITVariable::TYPE_VALUE === $callback->type
         ) {
+            if (null !== $nameOut) {
+                self::jitWriteCallableNameFromVariable($context, $callback, $nameOut);
+            }
+
             return self::checkRuntimeString($context, $callback);
         }
 
@@ -45,11 +59,41 @@ final class JitIsCallable
         ) {
             $candidates = ClosureHelper::closureCandidates($context);
             if ([] !== $candidates) {
+                if (null !== $nameOut) {
+                    self::jitWriteCallableNameLiteral($context, '{closure}', $nameOut);
+                }
+
                 return $context->constantFromInteger(1, 'int1');
             }
         }
 
+        if (null !== $nameOut && JITVariable::TYPE_NULL === $callback->type) {
+            self::jitWriteCallableNameLiteral($context, '', $nameOut);
+        }
+
         return $context->constantFromInteger(0, 'int1');
+    }
+
+    private static function jitWriteCallableNameLiteral(Context $context, string $name, JITVariable $nameOut): void
+    {
+        $outPtr = JitValueBox::valuePtrFromVariable($context, $nameOut);
+        $str = $context->builder->load($context->constantStringFromString($name));
+        $context->builder->call(
+            $context->lookupFunction('__value__writeString'),
+            $outPtr,
+            $str
+        );
+    }
+
+    private static function jitWriteCallableNameFromVariable(Context $context, JITVariable $source, JITVariable $nameOut): void
+    {
+        $outPtr = JitValueBox::valuePtrFromVariable($context, $nameOut);
+        $str = JitStringArg::lower($context, $source, 'is_callable() callback');
+        $context->builder->call(
+            $context->lookupFunction('__value__writeString'),
+            $outPtr,
+            $str
+        );
     }
 
     private static function checkCompileTimeString(Context $context, string $name, bool $syntaxOnly): Value
