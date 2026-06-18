@@ -9905,6 +9905,10 @@ class Compiler {
         if (0 === $producerCount) {
             return null;
         }
+        // php-cfg hoists `$a = [...]` as Array_+Assign before `array_key_exists('k', $a)` (#9456).
+        if ($this->isEmbeddedCallLiteralArg($callArgs[$argIndex] ?? null)) {
+            return null;
+        }
         if ($argCount < $producerCount) {
             $extra = $producerCount - $argCount;
             $tail = array_slice($producers, -$extra);
