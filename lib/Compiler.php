@@ -9620,6 +9620,39 @@ class Compiler {
         return null;
     }
 
+    /**
+     * Nullsafe lowering splits CFG blocks; result slot lives on TYPE_NULLSAFE (#9732, #9171).
+     *
+     * @param Op\Expr\NullsafePropertyFetch|Op\Expr\NullsafeMethodCall $nullsafe
+     */
+    private function slotForNullsafeResult(Block $block, Op\Expr $nullsafe): ?int
+    {
+        $slot = $block->slotForOperand($nullsafe->result);
+        if (null !== $slot) {
+            return $slot;
+        }
+        $seen = [];
+        $queue = [$block];
+        while ([] !== $queue) {
+            $current = array_shift($queue);
+            $id = spl_object_id($current);
+            if (isset($seen[$id])) {
+                continue;
+            }
+            $seen[$id] = true;
+            foreach ($current->opCodes as $op) {
+                if (OpCode::TYPE_NULLSAFE === $op->type) {
+                    return $op->arg1;
+                }
+            }
+            foreach ($current->parents as $parent) {
+                $queue[] = $parent;
+            }
+        }
+
+        return null;
+    }
+
     private function slotForCoalesceResult(Block $block, Op\Expr\BinaryOp\Coalesce $coalesce): ?int
     {
         $slot = $block->slotForOperand($coalesce->result);
@@ -9877,10 +9910,17 @@ class Compiler {
             && ($producer instanceof Op\Expr\NullsafePropertyFetch
                 || $producer instanceof Op\Expr\NullsafeMethodCall)
         ) {
+            $producerSlot = $this->slotForNullsafeResult($block, $producer);
+        }
+        if (
+            null === $producerSlot
+            && ($producer instanceof Op\Expr\NullsafePropertyFetch
+                || $producer instanceof Op\Expr\NullsafeMethodCall)
+        ) {
             foreach ($this->compileExpr($producer, $block) as $op) {
                 $block->addOpCode($op);
             }
-            $producerSlot = $block->slotForOperand($producer->result);
+            $producerSlot = $this->slotForNullsafeResult($block, $producer);
         }
         if (
             null === $producerSlot
@@ -9990,7 +10030,12 @@ class Compiler {
                 return $producerSlot;
             }
         }
-        if ($producer instanceof Op\Expr\PropertyFetch || $producer instanceof Op\Expr\StaticPropertyFetch) {
+        if (
+            $producer instanceof Op\Expr\PropertyFetch
+            || $producer instanceof Op\Expr\StaticPropertyFetch
+            || $producer instanceof Op\Expr\NullsafePropertyFetch
+            || $producer instanceof Op\Expr\NullsafeMethodCall
+        ) {
             $callIndex = null;
             $producerIndex = null;
             foreach ($block->orig->children as $i => $child) {
