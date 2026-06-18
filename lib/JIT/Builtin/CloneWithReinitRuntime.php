@@ -4,27 +4,56 @@ declare(strict_types=1);
 
 namespace PHPCompiler\JIT\Builtin;
 
+use PHPCompiler\JIT;
 use PHPCompiler\JIT\Builtin;
 use PHPCompiler\JIT\Context;
-use PHPLLVM\Builder;
 use PHPLLVM\Value;
+use PHPLLVM\Value\Function_ as LlvmFunction;
 
 /**
- * JIT clone-with readonly reinit window (#7250) — mirrors VM {@see \PHPCompiler\VM\CloneWithSupport}.
+ * JIT/AOT link for clone-with readonly reinit via CloneWithJitHelper PHP (#9498).
+ *
+ * JIT embed uses compiled {@see CloneWithJitHelper}; AOT standalone keeps
+ * {@see CloneWithReinitRuntimeLlvm} until native link can rely on compiled helpers.
+ * VM SSOT: {@see \PHPCompiler\VM\CloneWithSupport}
+ * php-src: Zend/zend_objects.c — IS_PROP_REINITABLE during clone-with
  */
 final class CloneWithReinitRuntime
 {
     private const MAX_PROPS = 16;
 
-    private const NAME_MAX = 64;
+    private const HELPER_PATH = '/ext/standard/CloneWithJitHelper.php';
+
+    private const BEGIN_HELPER = 'PHPCompiler\\ext\\standard\\CloneWithJitHelper::begin';
+
+    private const ADD_PROPERTY_HELPER = 'PHPCompiler\\ext\\standard\\CloneWithJitHelper::addProperty';
+
+    private const END_HELPER = 'PHPCompiler\\ext\\standard\\CloneWithJitHelper::end';
+
+    private const TRY_CONSUME_HELPER = 'PHPCompiler\\ext\\standard\\CloneWithJitHelper::tryConsume';
+
+    /** @var list<string> */
+    private const COMPILED_HELPERS = [
+        self::BEGIN_HELPER,
+        self::ADD_PROPERTY_HELPER,
+        self::END_HELPER,
+        self::TRY_CONSUME_HELPER,
+    ];
+
+    /** @var list<string> */
+    private const ABI_FUNCTIONS = [
+        'phpc_clone_with_end_runtime',
+        'phpc_clone_with_try_consume_literal',
+    ];
 
     public static function ensureLinked(Context $context): void
     {
-        self::registerGlobals($context);
-        self::registerDeclarations($context);
-        if (Builtin::LOAD_TYPE_STANDALONE !== $context->loadType) {
-            self::implementBodies($context);
-        }
+        self::implement($context);
+    }
+
+    public static function ensureStandaloneBodies(Context $context): void
+    {
+        self::implement($context);
     }
 
     /** @param list<string> $names */
@@ -35,86 +64,78 @@ final class CloneWithReinitRuntime
         if ($count > self::MAX_PROPS) {
             throw new \LogicException('phpc_clone_with_begin() supports at most '.self::MAX_PROPS.' properties');
         }
-        $i32 = $context->getTypeFromString('int32');
-        $objPtrTy = $context->getTypeFromString('__object__*');
-        $active = $context->module->getNamedGlobal('phpc_clone_with_active_obj');
-        $context->builder->store($obj, $context->builder->pointerCast($active, $objPtrTy));
-        $countGlobal = $context->module->getNamedGlobal('phpc_clone_with_prop_count');
-        $context->builder->store(
-            $i32->constInt($count, false),
-            $context->builder->pointerCast($countGlobal, $i32->pointerType(0))
-        );
-        $i8 = $context->getTypeFromString('int8');
-        $i8p = $context->getTypeFromString('int8*');
-        foreach ($names as $i => $name) {
-            $len = \strlen($name);
-            if ($len >= self::NAME_MAX) {
+
+        if (Builtin::LOAD_TYPE_STANDALONE === $context->loadType) {
+            CloneWithReinitRuntimeLlvm::emitBegin($context, $obj, $names);
+
+            return;
+        }
+
+        $i64 = $context->getTypeFromString('int64');
+        $objAddr = $context->builder->ptrToInt($obj, $i64);
+        $context->builder->call(self::helperFunction($context, self::BEGIN_HELPER), $objAddr);
+        foreach ($names as $name) {
+            if (\strlen($name) >= 64) {
                 throw new \LogicException('clone-with property name too long for JIT reinit window');
             }
-            $slotGlobal = $context->module->getNamedGlobal('phpc_clone_with_prop_'.$i);
-            $lenGlobal = $context->module->getNamedGlobal('phpc_clone_with_prop_len_'.$i);
-            $namePtr = $context->pointerFromStringConstant($name);
-            $slotPtr = $context->builder->pointerCast($slotGlobal, $i8p);
-            $context->intrinsic->memcpy(
-                $slotPtr,
-                $namePtr,
-                $context->constantFromInteger($len, 'size_t'),
-                false
-            );
-            $term = $context->builder->inBoundsGEP($slotPtr, $context->constantFromInteger($len, 'size_t'));
-            $context->builder->store($i8->constInt(0, false), $term);
-            $context->builder->store(
-                $i32->constInt($len, false),
-                $context->builder->pointerCast($lenGlobal, $i32->pointerType(0))
-            );
+            $nameStr = self::literalToString($context, $name);
+            $context->builder->call(self::helperFunction($context, self::ADD_PROPERTY_HELPER), $nameStr);
         }
     }
 
     public static function emitEnd(Context $context, Value $obj): void
     {
         self::ensureLinked($context);
+        if (Builtin::LOAD_TYPE_STANDALONE === $context->loadType) {
+            CloneWithReinitRuntimeLlvm::emitEnd($context, $obj);
+
+            return;
+        }
+
         $context->builder->call($context->lookupFunction('phpc_clone_with_end_runtime'), $obj);
     }
 
     public static function emitTryConsumePropertyName(Context $context, Value $obj, string $propName): Value
     {
         self::ensureLinked($context);
-        $namePtr = $context->constantFromString($propName);
-        $len = \strlen($propName);
+        if (Builtin::LOAD_TYPE_STANDALONE === $context->loadType) {
+            return CloneWithReinitRuntimeLlvm::emitTryConsumePropertyName($context, $obj, $propName);
+        }
+
+        $i64 = $context->getTypeFromString('int64');
+        $objAddr = $context->builder->ptrToInt($obj, $i64);
+        $nameStr = self::literalToString($context, $propName);
 
         return $context->builder->call(
-            $context->lookupFunction('phpc_clone_with_try_consume_literal'),
-            $obj,
-            $context->builder->pointerCast($namePtr, $context->getTypeFromString('int8*')),
-            $context->getTypeFromString('int32')->constInt($len, false)
+            self::helperFunction($context, self::TRY_CONSUME_HELPER),
+            $objAddr,
+            $nameStr
         );
     }
 
-    private static function registerGlobals(Context $context): void
+    public static function implement(Context $context): void
     {
-        $i32 = $context->getTypeFromString('int32');
-        $i8 = $context->getTypeFromString('int8');
-        $objPtrTy = $context->getTypeFromString('__object__*');
-        if (null === $context->module->getNamedGlobal('phpc_clone_with_active_obj')) {
-            $active = $context->module->addGlobal($objPtrTy, 'phpc_clone_with_active_obj');
-            $active->setInitializer($objPtrTy->constNull());
+        $probe = $context->module->getNamedFunction('phpc_clone_with_end_runtime');
+        if (null !== $probe && $probe->countBasicBlocks() > 0) {
+            self::registerLinkedRuntime($context);
+
+            return;
         }
-        if (null === $context->module->getNamedGlobal('phpc_clone_with_prop_count')) {
-            $count = $context->module->addGlobal($i32, 'phpc_clone_with_prop_count');
-            $count->setInitializer($i32->constInt(0, false));
+
+        if (Builtin::LOAD_TYPE_STANDALONE === $context->loadType) {
+            CloneWithReinitRuntimeLlvm::ensureLinked($context);
+            self::registerLinkedRuntime($context);
+
+            return;
         }
-        for ($i = 0; $i < self::MAX_PROPS; ++$i) {
-            $slotName = 'phpc_clone_with_prop_'.$i;
-            if (null === $context->module->getNamedGlobal($slotName)) {
-                $slot = $context->module->addGlobal($i8->arrayType(self::NAME_MAX), $slotName);
-                $slot->setInitializer($i8->arrayType(self::NAME_MAX)->constNull());
-            }
-            $lenName = 'phpc_clone_with_prop_len_'.$i;
-            if (null === $context->module->getNamedGlobal($lenName)) {
-                $len = $context->module->addGlobal($i32, $lenName);
-                $len->setInitializer($i32->constInt(0, false));
-            }
-        }
+
+        self::ensureJitHelperCompiled($context);
+        self::ensureValueStringHelpers($context);
+        self::registerDeclarations($context);
+        self::implementEndBridge($context);
+        self::implementTryConsumeLiteralBridge($context);
+        self::registerLinkedRuntime($context);
+        $context->builder->clearInsertionPosition();
     }
 
     private static function registerDeclarations(Context $context): void
@@ -139,183 +160,183 @@ final class CloneWithReinitRuntime
         $context->registerFunction($name, $fn);
     }
 
-    private static function implementBodies(Context $context): void
+    private static function implementEndBridge(Context $context): void
     {
-        self::implementEnd($context);
-        self::implementTryConsumeLiteral($context);
-    }
+        $abiName = 'phpc_clone_with_end_runtime';
+        $probe = $context->module->getNamedFunction($abiName);
+        if (null !== $probe && $probe->countBasicBlocks() > 0) {
+            $context->registerFunction($abiName, $probe);
 
-    private static function implementEnd(Context $context): void
-    {
-        $fn = $context->module->getNamedFunction('phpc_clone_with_end_runtime');
-        if (null === $fn || $fn->countBasicBlocks() > 0) {
             return;
         }
-        $entry = $fn->appendBasicBlock('entry');
+
+        $objPtr = $context->getTypeFromString('__object__*');
+        $i64 = $context->getTypeFromString('int64');
+        $voidTy = $context->getTypeFromString('void');
+        $ft = $context->context->functionType($voidTy, false, $objPtr);
+        $fn = null !== $probe
+            ? $probe
+            : $context->module->addFunction($abiName, $ft);
+
+        $entry = $fn->appendBasicBlock('cwr_end_bridge_entry');
         $context->builder->positionAtEnd($entry);
         $obj = $fn->getParam(0);
-        $objPtrTy = $context->getTypeFromString('__object__*');
-        $i32 = $context->getTypeFromString('int32');
-        $active = $context->module->getNamedGlobal('phpc_clone_with_active_obj');
-        $activePtr = $context->builder->pointerCast($active, $objPtrTy->pointerType(0));
-        $loaded = $context->builder->load($activePtr);
-        $same = $context->builder->icmp(Builder::INT_EQ, $loaded, $obj);
-        $clearBlock = $fn->appendBasicBlock('clear');
-        $done = $fn->appendBasicBlock('done');
-        $context->builder->branchIf($same, $clearBlock, $done);
-        $context->builder->positionAtEnd($clearBlock);
-        $context->builder->store($objPtrTy->constNull(), $activePtr);
-        $countGlobal = $context->module->getNamedGlobal('phpc_clone_with_prop_count');
-        $context->builder->store(
-            $i32->constInt(0, false),
-            $context->builder->pointerCast($countGlobal, $i32->pointerType(0))
+        $context->builder->call(
+            self::helperFunction($context, self::END_HELPER),
+            $context->builder->ptrToInt($obj, $i64)
         );
-        $context->builder->branch($done);
-        $context->builder->positionAtEnd($done);
         $context->builder->returnVoid();
-        $context->builder->clearInsertionPosition();
+        $context->registerFunction($abiName, $fn);
     }
 
-    private static function implementTryConsumeLiteral(Context $context): void
+    private static function implementTryConsumeLiteralBridge(Context $context): void
     {
-        $fn = $context->module->getNamedFunction('phpc_clone_with_try_consume_literal');
-        if (null === $fn || $fn->countBasicBlocks() > 0) {
+        $abiName = 'phpc_clone_with_try_consume_literal';
+        $probe = $context->module->getNamedFunction($abiName);
+        if (null !== $probe && $probe->countBasicBlocks() > 0) {
+            $context->registerFunction($abiName, $probe);
+
             return;
         }
-        $entry = $fn->appendBasicBlock('entry');
+
+        $objPtr = $context->getTypeFromString('__object__*');
+        $i8p = $context->getTypeFromString('int8*');
+        $i32 = $context->getTypeFromString('int32');
+        $i64 = $context->getTypeFromString('int64');
+        $i1 = $context->getTypeFromString('int1');
+        $ft = $context->context->functionType($i1, false, $objPtr, $i8p, $i32);
+        $fn = null !== $probe
+            ? $probe
+            : $context->module->addFunction($abiName, $ft);
+
+        $entry = $fn->appendBasicBlock('cwr_try_bridge_entry');
         $context->builder->positionAtEnd($entry);
         $obj = $fn->getParam(0);
         $name = $fn->getParam(1);
         $len = $fn->getParam(2);
-
-        $objPtrTy = $context->getTypeFromString('__object__*');
-        $i32 = $context->getTypeFromString('int32');
-        $i1 = $context->getTypeFromString('int1');
-        $i8 = $context->getTypeFromString('int8');
-        $i8p = $context->getTypeFromString('int8*');
-        $sizeT = $context->getTypeFromString('size_t');
-
-        $active = $context->module->getNamedGlobal('phpc_clone_with_active_obj');
-        $activePtr = $context->builder->pointerCast($active, $objPtrTy->pointerType(0));
-        $loadedObj = $context->builder->load($activePtr);
-        $sameObj = $context->builder->icmp(Builder::INT_EQ, $loadedObj, $obj);
-        $fail = $fn->appendBasicBlock('fail');
-        $loopInit = $fn->appendBasicBlock('loop_init');
-        $loopHeader = $fn->appendBasicBlock('loop_header');
-        $context->builder->branchIf($sameObj, $loopInit, $fail);
-
-        $countGlobal = $context->module->getNamedGlobal('phpc_clone_with_prop_count');
-        $countPtr = $context->builder->pointerCast($countGlobal, $i32->pointerType(0));
-
-        $context->builder->positionAtEnd($loopInit);
-        $context->builder->branch($loopHeader);
-
-        $context->builder->positionAtEnd($loopHeader);
-        $idxPhi = $context->builder->phi($i32);
-        $idxPhi->addIncoming($i32->constInt(0, false), $loopInit);
-        $loopBody = $fn->appendBasicBlock('loop_body');
-        $loopDone = $fn->appendBasicBlock('loop_done');
-        $count = $context->builder->load($countPtr);
-        $continueLoop = $context->builder->icmp(Builder::INT_SLT, $idxPhi, $count);
-        $context->builder->branchIf($continueLoop, $loopBody, $loopDone);
-
-        $context->builder->positionAtEnd($loopBody);
-        $idx = $idxPhi;
-        $slotLenPtr = self::indexedLenPtr($context, $idx);
-        $slotLen = $context->builder->load($slotLenPtr);
-        $lenEq = $context->builder->icmp(Builder::INT_EQ, $slotLen, $len);
-        $cmpBlock = $fn->appendBasicBlock('cmp_name');
-        $next = $fn->appendBasicBlock('next');
-        $context->builder->branchIf($lenEq, $cmpBlock, $next);
-
-        $context->builder->positionAtEnd($cmpBlock);
-        $slotNamePtr = self::indexedNamePtr($context, $idx);
-        $memcmp = $context->builder->call(
-            $context->lookupFunction('memcmp'),
-            $slotNamePtr,
-            $name,
-            $context->builder->zext($len, $sizeT)
+        $nameStr = self::cstrToStringWithLength($context, $name, $context->builder->zExt($len, $i64));
+        $ok = $context->builder->call(
+            self::helperFunction($context, self::TRY_CONSUME_HELPER),
+            $context->builder->ptrToInt($obj, $i64),
+            $nameStr
         );
-        $eq = $context->builder->icmp(Builder::INT_EQ, $memcmp, $i32->constInt(0, false));
-        $consume = $fn->appendBasicBlock('consume');
-        $context->builder->branchIf($eq, $consume, $next);
+        $context->builder->returnValue($ok);
+        $context->registerFunction($abiName, $fn);
+    }
 
-        $context->builder->positionAtEnd($consume);
-        $lastIdx = $context->builder->sub($count, $i32->constInt(1, false));
-        $lastLenPtr = self::indexedLenPtr($context, $lastIdx);
-        $lastNamePtr = self::indexedNamePtr($context, $lastIdx);
-        $lastLen = $context->builder->load($lastLenPtr);
-        $context->builder->store($lastLen, $slotLenPtr);
-        $context->intrinsic->memcpy(
-            $slotNamePtr,
-            $lastNamePtr,
-            $context->builder->zext($lastLen, $sizeT),
-            false
+    private static function literalToString(Context $context, string $literal): Value
+    {
+        $i64 = $context->getTypeFromString('int64');
+        $charPtr = $context->getTypeFromString('char*');
+        $len = \strlen($literal);
+        $namePtr = $context->constantFromString($literal);
+
+        return $context->builder->call(
+            $context->lookupFunction('__string__init'),
+            $i64->constInt($len, false),
+            $context->builder->pointerCast($namePtr, $charPtr)
         );
-        $term = $context->builder->inBoundsGEP($slotNamePtr, $context->builder->zext($lastLen, $sizeT));
-        $context->builder->store($i8->constInt(0, false), $term);
-        $context->builder->store($context->builder->sub($count, $i32->constInt(1, false)), $countPtr);
-        $ok = $fn->appendBasicBlock('ok');
-        $context->builder->branch($ok);
-        $context->builder->positionAtEnd($ok);
-        $context->builder->returnValue($i1->constInt(1, false));
-
-        $context->builder->positionAtEnd($next);
-        $nextIdx = $context->builder->add($idx, $i32->constInt(1, false));
-        $idxPhi->addIncoming($nextIdx, $next);
-        $context->builder->branch($loopHeader);
-
-        $context->builder->positionAtEnd($loopDone);
-        $context->builder->branch($fail);
-
-        $context->builder->positionAtEnd($fail);
-        $context->builder->returnValue($i1->constInt(0, false));
-        $context->builder->clearInsertionPosition();
     }
 
-    private static function indexedNamePtr(Context $context, Value $idx): Value
+    private static function cstrToStringWithLength(Context $context, Value $cstr, Value $lenI64): Value
     {
-        return self::indexedPtr($context, $idx, 'phpc_clone_with_prop_', $context->getTypeFromString('int8*'));
+        $charPtr = $context->getTypeFromString('char*');
+
+        return $context->builder->call(
+            $context->lookupFunction('__string__init'),
+            $lenI64,
+            $context->builder->pointerCast($cstr, $charPtr)
+        );
     }
 
-    private static function indexedLenPtr(Context $context, Value $idx): Value
+    private static function helperFunction(Context $context, string $logical): LlvmFunction
     {
-        $i32 = $context->getTypeFromString('int32');
-
-        return self::indexedPtr($context, $idx, 'phpc_clone_with_prop_len_', $i32->pointerType(0));
-    }
-
-    private static function indexedPtr(Context $context, Value $idx, string $prefix, $ptrTy): Value
-    {
-        $fn = $context->builder->getInsertBlock()->getParent();
-        assert($fn instanceof Value\Function_);
-        $done = $fn->appendBasicBlock($prefix.'sel_done');
-        $default = $fn->appendBasicBlock($prefix.'sel_default');
-        $i32 = $context->getTypeFromString('int32');
-        $switch = $context->builder->branchSwitch($idx, $default, self::MAX_PROPS);
-        $incoming = [];
-        for ($i = 0; $i < self::MAX_PROPS; ++$i) {
-            $case = $fn->appendBasicBlock($prefix.'sel_'.$i);
-            $switch->addCase($i32->constInt($i, false), $case);
-            $context->builder->positionAtEnd($case);
-            $global = $context->module->getNamedGlobal($prefix.$i);
-            $ptr = $context->builder->pointerCast($global, $ptrTy);
-            $incoming[] = [$ptr, $case];
-            $context->builder->branch($done);
+        self::ensureJitHelperCompiled($context);
+        $lc = \strtolower($logical);
+        $fn = $context->functions[$lc] ?? null;
+        if (null === $fn) {
+            throw new \LogicException($logical.' missing after CloneWithJitHelper compile (#9498)');
         }
-        $context->builder->positionAtEnd($default);
-        $fallback = $context->builder->pointerCast(
-            $context->module->getNamedGlobal($prefix.'0'),
-            $ptrTy
-        );
-        $context->builder->branch($done);
-        $context->builder->positionAtEnd($done);
-        $phi = $context->builder->phi($ptrTy);
-        foreach ($incoming as [$ptr, $block]) {
-            $phi->addIncoming($ptr, $block);
-        }
-        $phi->addIncoming($fallback, $default);
 
-        return $phi;
+        return $fn;
+    }
+
+    private static function ensureJitHelperCompiled(Context $context): void
+    {
+        $missing = false;
+        foreach (self::COMPILED_HELPERS as $logical) {
+            if (!isset($context->functions[\strtolower($logical)])) {
+                $missing = true;
+                break;
+            }
+        }
+        if (!$missing) {
+            return;
+        }
+
+        self::ensureValueStringHelpers($context);
+
+        $runtime = $context->runtime;
+        $path = \dirname(__DIR__, 3).self::HELPER_PATH;
+        $prevSelfHostAot = \getenv('PHP_COMPILER_SELFHOST_AOT');
+        if (\function_exists('putenv')) {
+            \putenv('PHP_COMPILER_SELFHOST_AOT=0');
+        }
+        try {
+            $block = $runtime->parseAndCompile((string) \file_get_contents($path), 'CloneWithJitHelper.php');
+            if (null === $block) {
+                throw new \LogicException('CloneWithJitHelper.php parseAndCompile failed (#9498)');
+            }
+            $jit = new JIT($context);
+            $jit->compile($block);
+        } finally {
+            if (\function_exists('putenv')) {
+                if (false === $prevSelfHostAot || null === $prevSelfHostAot) {
+                    \putenv('PHP_COMPILER_SELFHOST_AOT=');
+                } else {
+                    \putenv('PHP_COMPILER_SELFHOST_AOT='.$prevSelfHostAot);
+                }
+            }
+        }
+        foreach (self::COMPILED_HELPERS as $logical) {
+            $lc = \strtolower($logical);
+            if (!isset($context->functions[$lc])) {
+                throw new \LogicException($lc.' was not compiled for JIT (#9498)');
+            }
+        }
+    }
+
+    private static function ensureValueStringHelpers(Context $context): void
+    {
+        $strPtr = $context->getTypeFromString('__string__*');
+        $i64 = $context->getTypeFromString('int64');
+        $charPtr = $context->getTypeFromString('char*');
+
+        self::ensureExternal(
+            $context,
+            '__string__init',
+            $context->context->functionType($strPtr, false, $i64, $charPtr)
+        );
+    }
+
+    private static function ensureExternal(Context $context, string $name, $ft): void
+    {
+        try {
+            $context->lookupFunction($name);
+        } catch (\Throwable) {
+            $fn = $context->module->addFunction($name, $ft);
+            $context->registerFunction($name, $fn);
+        }
+    }
+
+    private static function registerLinkedRuntime(Context $context): void
+    {
+        foreach (self::ABI_FUNCTIONS as $name) {
+            $fn = $context->module->getNamedFunction($name);
+            if (null === $fn) {
+                throw new \LogicException($name.' missing after CloneWithReinitRuntime bridge (#9498)');
+            }
+            $context->registerFunction($name, $fn);
+        }
     }
 }
