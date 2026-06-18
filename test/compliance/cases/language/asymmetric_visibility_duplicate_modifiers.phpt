@@ -1,17 +1,9 @@
 --TEST--
-Language: asymmetric visibility — public private(set) combined read/set compile fatal (#9161, zend_compile.c)
+Language: asymmetric visibility — duplicate public public(set) compile fatal (#6774, zend_compile.c)
 --FILE--
 <?php
 class C {
-    public private(set) string $x = 'a';
-}
-echo "ok\n";
---EXPECT_EXIT--
-255
---FILE--
-<?php
-class C {
-    public protected(set) string $x = 'b';
+    public public(set) string $x = 'a';
 }
 echo "ok\n";
 --EXPECT_EXIT--
@@ -20,7 +12,7 @@ echo "ok\n";
 <?php
 class C {
     public function __construct(
-        public private(set) string $name,
+        public public(set) string $name,
     ) {}
 }
 echo "ok\n";
