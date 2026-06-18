@@ -10,7 +10,7 @@ enum Status: string {
 }
 echo Status::Active->label();
 echo "\n";
-echo Status::Active;
+echo Status::Active->value;
 --EXPECT--
 Active
 active

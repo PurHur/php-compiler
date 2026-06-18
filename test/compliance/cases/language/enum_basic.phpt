@@ -6,9 +6,9 @@ enum Status: string {
     case Active = 'active';
     case Done = 'done';
 }
-echo Status::Active;
+echo Status::Active->value;
 echo "\n";
-echo Status::Done;
+echo Status::Done->value;
 echo "\n";
 echo enum_exists('Status') ? '1' : '0';
 echo "\n";

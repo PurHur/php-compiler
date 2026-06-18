@@ -11,7 +11,7 @@ enum Status: string {
 }
 echo Status::tag();
 echo "\n";
-echo Status::Active;
+echo Status::Active->value;
 --EXPECT--
 enum-static-ok
 active

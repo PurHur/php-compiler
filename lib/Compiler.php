@@ -8400,6 +8400,8 @@ class Compiler {
                 Variable::TYPE_BOOLEAN,
                 Variable::TYPE_FLOAT,
                 Variable::TYPE_NULL,
+                Variable::TYPE_ENUM_CASE,
+                Variable::TYPE_OBJECT,
             ],
             true
         );
@@ -9670,15 +9672,20 @@ class Compiler {
                 }
             }
             $argRoot = $this->unwrapOperandChain($arg);
-            if (($prev instanceof Op\Expr\BinaryOp || $prev instanceof Op\Expr\InstanceOf_)
+            if (($prev instanceof Op\Expr\BinaryOp || $prev instanceof Op\Expr\InstanceOf_ || $prev instanceof Op\Expr\In_)
                 && null !== $prev->result
-                && null !== $argRoot->type
-                && null !== $prev->result->type
-                && $argRoot->type->type === $prev->result->type->type
-                && in_array(
-                    $argRoot->type->type,
-                    [Type::TYPE_BOOLEAN, Type::TYPE_LONG],
-                    true
+                && (
+                    $prev instanceof Op\Expr\In_
+                    || (
+                        null !== $argRoot->type
+                        && null !== $prev->result->type
+                        && $argRoot->type->type === $prev->result->type->type
+                        && in_array(
+                            $argRoot->type->type,
+                            [Type::TYPE_BOOLEAN, Type::TYPE_LONG],
+                            true
+                        )
+                    )
                 )
             ) {
                 if (null === $block->slotForOperand($prev->result)) {
@@ -10835,6 +10842,7 @@ class Compiler {
             || $op instanceof Op\Expr\Empty_
             || $op instanceof Op\Expr\Isset_
             || $op instanceof Op\Expr\InstanceOf_
+            || $op instanceof Op\Expr\In_
             || $op instanceof Op\Expr\Cast
             || $op instanceof Op\Expr\MagicScriptConst
             || $op instanceof Op\Expr\Assign
@@ -11881,9 +11889,109 @@ class Compiler {
         return [new OpCode(
             OpCode::TYPE_IN,
             $this->compileOperand($expr->result, $block, false),
-            $this->compileOperand($expr->expr, $block, true),
-            $this->compileOperand($expr->haystack, $block, true),
+            $this->compileInOperandSlot($expr->expr, $expr, 'needle', $block),
+            $this->compileInOperandSlot($expr->haystack, $expr, 'haystack', $block),
         )];
+    }
+
+    /**
+     * php-cfg may assign In_ needle/haystack operands to fresh temps disconnected from
+     * preceding Array_/ClassConstFetch producers (#9676, #4682).
+     */
+    private function compileInOperandSlot(
+        Operand $operand,
+        Op\Expr\In_ $inExpr,
+        string $role,
+        Block $block
+    ): int|string|null {
+        if ('needle' === $role) {
+            $varOperand = $this->unwrapVariableOperand($operand);
+            if (null !== $varOperand) {
+                return $this->compileOperand($varOperand, $block, true);
+            }
+        }
+        $producer = $this->findInOperandProducer($operand, $inExpr, $role, $block);
+        if (null !== $producer && null !== $producer->result) {
+            return $this->compileOperand($producer->result, $block, true);
+        }
+
+        return $this->compileOperand($operand, $block, true);
+    }
+
+    private function findInOperandProducer(
+        Operand $operand,
+        Op\Expr\In_ $inExpr,
+        string $role,
+        Block $block
+    ): ?Op\Expr {
+        if (null === $block->orig) {
+            return null;
+        }
+        $inIndex = null;
+        foreach ($block->orig->children as $i => $child) {
+            if ($child === $inExpr) {
+                $inIndex = $i;
+                break;
+            }
+        }
+        if (null === $inIndex) {
+            return null;
+        }
+        for ($i = $inIndex - 1; $i >= 0; --$i) {
+            $child = $block->orig->children[$i];
+            if ($child instanceof Op\Expr && null !== $child->result
+                && $this->operandsReferToSameVariable($child->result, $operand)) {
+                return $child;
+            }
+        }
+        if ('haystack' === $role) {
+            for ($i = $inIndex - 1; $i >= 0; --$i) {
+                $child = $block->orig->children[$i];
+                if ($child instanceof Op\Expr\Array_) {
+                    return $child;
+                }
+            }
+
+            return null;
+        }
+        if ($operand instanceof Operand\Variable || null !== $this->unwrapVariableOperand($operand)) {
+            return null;
+        }
+        $arrayIndex = null;
+        for ($i = $inIndex - 1; $i >= 0; --$i) {
+            if ($block->orig->children[$i] instanceof Op\Expr\Array_) {
+                $arrayIndex = $i;
+                break;
+            }
+        }
+        $arrayValueVars = [];
+        if (null !== $arrayIndex) {
+            /** @var Op\Expr\Array_ $arrayExpr */
+            $arrayExpr = $block->orig->children[$arrayIndex];
+            foreach ($arrayExpr->values as $valueOperand) {
+                if ($valueOperand instanceof Operand\Temporary) {
+                    $arrayValueVars[spl_object_id($valueOperand)] = true;
+                }
+            }
+            for ($i = $arrayIndex - 1; $i >= 0; --$i) {
+                $child = $block->orig->children[$i];
+                if ($child instanceof Op\Expr\ClassConstFetch && null !== $child->result) {
+                    if (!isset($arrayValueVars[spl_object_id($child->result)])) {
+                        return $child;
+                    }
+                }
+            }
+
+            return null;
+        }
+        for ($i = $inIndex - 1; $i >= 0; --$i) {
+            $child = $block->orig->children[$i];
+            if ($child instanceof Op\Expr\ClassConstFetch) {
+                return $child;
+            }
+        }
+
+        return null;
     }
 
     /**
