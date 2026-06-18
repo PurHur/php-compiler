@@ -327,6 +327,36 @@ PHP;
         self::assertSame([$castSlot], $sendSlots, 'arg sends='.json_encode($sendSlots));
     }
 
+    /** Issue #9504 — var_export((string) new C()) wires Cast producer, not dead arg temp. */
+    public function testStringCastNewObjectUsesCastProducerSlot(): void
+    {
+        $code = <<<'PHP'
+<?php
+class C implements Stringable {
+    public function __toString(): string {
+        return 'x';
+    }
+}
+var_export((string) new C());
+PHP;
+        $runtime = new Runtime();
+        $block = $runtime->parseAndCompile($code, 'string_cast_new_call_arg.php');
+
+        $castSlot = null;
+        $sendSlots = [];
+        foreach ($block->opCodes as $op) {
+            if (OpCode::TYPE_CAST_STRING === $op->type) {
+                $castSlot = $op->arg1;
+            }
+            if (OpCode::TYPE_ARG_SEND === $op->type) {
+                $sendSlots[] = $op->arg1;
+            }
+        }
+
+        self::assertNotNull($castSlot);
+        self::assertSame([$castSlot], $sendSlots, 'arg sends='.json_encode($sendSlots));
+    }
+
     /** Issue #9428 — var_dump((new C())->m()) wires MethodCall return, not New_ object. */
     public function testVarDumpNewMethodCallUsesMethodReturnSlot(): void
     {

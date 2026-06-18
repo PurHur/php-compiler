@@ -10275,6 +10275,14 @@ class Compiler {
                 ) {
                     continue;
                 }
+                // f((string) new C()) — php-cfg dead arg temp; Cast consumes New_ (#9504).
+                if (
+                    $next instanceof Op\Expr\Cast
+                    && property_exists($next, 'expr')
+                    && $this->operandsReferToSameVariable($next->expr, $producer->result)
+                ) {
+                    continue;
+                }
             }
             $filtered[] = $producer;
         }
