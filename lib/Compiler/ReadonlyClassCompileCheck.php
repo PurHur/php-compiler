@@ -137,7 +137,7 @@ final class ReadonlyClassCompileCheck
         foreach ($this->classes as $lc => $meta) {
             // Re-walk CFG for property default checks (deferred until after inheritance, #8967).
             foreach ($this->scriptClasses[$lc] ?? [] as $class) {
-                $this->verifyNoPropertyDefaults($class, $meta['display'], $meta['readonly']);
+                $this->verifyNoPropertyDefaults($class, $meta['display']);
             }
         }
     }
@@ -145,7 +145,7 @@ final class ReadonlyClassCompileCheck
     /** @var array<string, list<Op\Stmt\Class_>> */
     private array $scriptClasses = [];
 
-    private function verifyNoPropertyDefaults(Op\Stmt\Class_ $class, string $classDisplay, bool $classReadonly): void
+    private function verifyNoPropertyDefaults(Op\Stmt\Class_ $class, string $classDisplay): void
     {
         // php-src ZEND_ACC_ANON_READONLY: per-property readonly on anonymous classes (#6724).
         if ($this->isAnonymousClass($class->name)) {
@@ -156,8 +156,8 @@ final class ReadonlyClassCompileCheck
             if (!$member instanceof Op\Stmt\Property) {
                 continue;
             }
-            $propertyReadonly = $classReadonly || $this->isCfgPropertyReadonly($member);
-            if (!$propertyReadonly) {
+            // php-src: per-property MODIFIER_READONLY forbids defaults; ZEND_ACC_READONLY on the class does not (#9355).
+            if (!$this->isCfgPropertyReadonly($member)) {
                 continue;
             }
             if (null === $member->defaultVar && null === $member->defaultBlock) {
