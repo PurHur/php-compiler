@@ -6,7 +6,7 @@ namespace PHPCompiler\Test\Unit;
 
 use PHPUnit\Framework\TestCase;
 
-/** GcToggleRuntime must route through GcToggleJitHelper PHP, not LLVM phpc_gc_enabled global (#9577). */
+/** GcToggleRuntime must route through GcToggleJitHelper PHP, not LLVM phpc_gc_enabled global (#9577, #9687). */
 final class GcToggleRuntimeShrinkTest extends TestCase
 {
     public function testGcToggleRuntimeUsesGcToggleJitHelperNotLlvmGlobals(): void
@@ -14,6 +14,8 @@ final class GcToggleRuntimeShrinkTest extends TestCase
         $source = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/GcToggleRuntime.php');
         $this->assertStringContainsString('GcToggleJitHelper', $source);
         $this->assertStringNotContainsString("addGlobal(\$i32, 'phpc_gc_enabled')", $source);
+        $this->assertStringNotContainsString('GcToggleStandaloneLlvm', $source);
+        $this->assertFileDoesNotExist(__DIR__.'/../../lib/JIT/Builtin/GcToggleStandaloneLlvm.php');
     }
 
     public function testGcCollectCyclesRuntimeDroppedEnabledGlobal(): void
