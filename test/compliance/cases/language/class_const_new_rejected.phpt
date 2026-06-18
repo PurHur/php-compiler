@@ -1,5 +1,5 @@
 --TEST--
-Language: new in class constant initializer rejected (#9517, Zend/zend_compile.c)
+Language: class constant expression must reject `new` (#9517, Zend/zend_compile.c)
 --FILE--
 <?php
 class C {

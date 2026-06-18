@@ -46,10 +46,9 @@ PHP, 'new_with_parens.php');
         $this->assertNotNull($block);
     }
 
-    public function testClassConstNewWithParensCompiles(): void
+    public function testClassConstNewWithParensCompileErrors(): void
     {
-        if (!\PHPCompiler\CompilerVersion::supportsNewInClassConstantExpr()) {
-            $this->expectCompileError(<<<'PHP'
+        $this->expectCompileError(<<<'PHP'
 <?php
 class C {
     public function __construct(public int $n = 0) {}
@@ -58,33 +57,16 @@ class Holder {
     public const X = new C(1);
 }
 PHP);
-
-            return;
-        }
-
-        $runtime = new Runtime();
-        $block = $runtime->parseAndCompile(<<<'PHP'
-<?php
-class C {
-    public function __construct(public int $n = 0) {}
-}
-class Holder {
-    public const X = new C(1);
-}
-PHP, 'new_with_parens_const.php');
-        $this->assertNotNull($block);
     }
 
-    public function testClassConstNewEmptyArgsWithParensCompiles(): void
+    public function testClassConstNewEmptyArgsWithParensCompileErrors(): void
     {
-        $runtime = new Runtime();
-        $block = $runtime->parseAndCompile(<<<'PHP'
+        $this->expectCompileError(<<<'PHP'
 <?php
 class C {
     public const X = new stdClass();
 }
-PHP, 'new_empty_parens_const.php');
-        $this->assertNotNull($block);
+PHP);
     }
 
     private function expectCompileError(string $code): void

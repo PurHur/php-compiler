@@ -1,12 +1,10 @@
 --TEST--
-Language: class constants with object expressions — var_export + ctor args (#5169)
---RUNFILE--
-class_const_new_object_run.php
---EXPECT--
-(object) array (
-)
-1
-Foo::__set_state(array (
-  'x' => 7,
-))
-1
+Language: class constants with object expressions rejected at compile (#9517, Zend/zend_compile.c)
+--FILE--
+<?php
+class C {
+    public const X = new stdClass();
+}
+var_export(C::X);
+--EXPECT_EXIT--
+255
