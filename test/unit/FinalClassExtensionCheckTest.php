@@ -67,4 +67,24 @@ PHP;
         $this->expectExceptionMessage('Class Mid cannot extend final class F');
         $runtime->parseAndCompile($code, 'chain.php');
     }
+
+    /** @covers issue #9722 */
+    public function testExtendFinalClassAfterRuntimeStatementsFailsAtCompileTime(): void
+    {
+        $runtime = new Runtime();
+        $code = <<<'PHP'
+<?php
+final class C {}
+try {
+    new C;
+    echo "ok\n";
+} catch (Throwable $e) {
+    echo get_class($e), "\n";
+}
+class D extends C {}
+PHP;
+        $this->expectException(\CompileError::class);
+        $this->expectExceptionMessage('Class D cannot extend final class C');
+        $runtime->parseAndCompile($code, 'final_after_runtime.php');
+    }
 }

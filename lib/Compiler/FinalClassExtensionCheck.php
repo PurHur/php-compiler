@@ -7,6 +7,8 @@ namespace PHPCompiler\Compiler;
 use PHPCfg\Op;
 use PHPCfg\Operand;
 use PHPCfg\Script;
+use PHPCfg\Traverser;
+use PHPCfg\Visitor\DeclarationFinder;
 use PhpParser\Node\Stmt\Class_;
 
 /**
@@ -29,10 +31,13 @@ final class FinalClassExtensionCheck
 
     private function collect(Script $script): void
     {
-        foreach ($script->main->cfg->children as $child) {
-            if ($child instanceof Op\Stmt\Class_) {
-                $this->collectClass($child);
-            }
+        // php-cfg nests declarations after try/catch merge blocks — not only main->cfg children (#9722).
+        $finder = new DeclarationFinder();
+        $traverser = new Traverser();
+        $traverser->addVisitor($finder);
+        $traverser->traverse($script);
+        foreach ($finder->getClasses() as $class) {
+            $this->collectClass($class);
         }
     }
 
