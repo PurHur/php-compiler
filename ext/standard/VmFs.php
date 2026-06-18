@@ -875,6 +875,9 @@ final class VmFs
     }
 
     public static function fwrite(int $handle, string $data, ?int $length = null) {
+        if (null !== $length && $length < 0) {
+            return 0;
+        }
         if (VmPhpMemoryStream::isValidHandle($handle)) {
             $data = VmStreamFilterChain::applyWriteFilters($handle, $data);
 

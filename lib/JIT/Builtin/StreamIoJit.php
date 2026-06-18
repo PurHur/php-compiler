@@ -443,14 +443,24 @@ final class StreamIoJit
         $fp = $context->builder->call($context->lookupFunction('__phpc_resolve_stream'), $handle);
         $dataLenI64 = $context->builder->call($context->lookupFunction('__string__strlen'), $data);
         $dataLen = $context->builder->trunc($dataLenI64, $sizeT);
-        $writeLen = $dataLen;
-        $lenNonNeg = $context->builder->icmp(Builder::INT_SGE, $length, $zeroI64);
-        $lenLtData = $context->builder->icmp(Builder::INT_SLT, $length, $dataLenI64);
-        $useLen = $context->builder->and($lenNonNeg, $lenLtData);
-        $writeLen = $context->builder->select($useLen, $context->builder->trunc($length, $sizeT), $writeLen);
         $zeroSize = $sizeT->constInt(0, false);
         $zeroLenBb = $fn->appendBasicBlock('fwrite_zero');
         $doWriteBb = $fn->appendBasicBlock('fwrite_do');
+        $lenNegBb = $fn->appendBasicBlock('fwrite_len_neg');
+        $lenPosBb = $fn->appendBasicBlock('fwrite_len_pos');
+        $lenNeg = $context->builder->icmp(Builder::INT_SLT, $length, $zeroI64);
+        $context->builder->branchIf($lenNeg, $lenNegBb, $lenPosBb);
+
+        $context->builder->positionAtEnd($lenNegBb);
+        $context->builder->branch($zeroLenBb);
+
+        $context->builder->positionAtEnd($lenPosBb);
+        $lenLtData = $context->builder->icmp(Builder::INT_SLT, $length, $dataLenI64);
+        $writeLen = $context->builder->select(
+            $lenLtData,
+            $context->builder->trunc($length, $sizeT),
+            $dataLen
+        );
         $isZero = $context->builder->icmp(Builder::INT_EQ, $writeLen, $zeroSize);
         $context->builder->branchIf($isZero, $zeroLenBb, $doWriteBb);
 

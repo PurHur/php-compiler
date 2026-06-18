@@ -25,14 +25,14 @@ final class JitVfprintf
         if ($args->type & JITVariable::IS_NATIVE_ARRAY) {
             $formatted = JitSprintf::format($context, $fmtVar, ...self::nativeArrayElements($context, $args));
 
-            return JitFwrite::invoke($context, $handleLong, $formatted, $i64->constInt(-1, true));
+            return JitFwrite::invoke($context, $handleLong, $formatted, JitFwrite::lengthWriteAll($context, $formatted));
         }
 
         $htVar = HashTableHelper::coerceToPackedHashtable($context, $args);
         $ht = $context->helper->loadValue($htVar);
         $formatted = self::formatFromHashtable($context, $fmt, $ht);
 
-        return JitFwrite::invoke($context, $handleLong, $formatted, $i64->constInt(-1, true));
+        return JitFwrite::invoke($context, $handleLong, $formatted, JitFwrite::lengthWriteAll($context, $formatted));
     }
 
     /** @return list<JITVariable> */
