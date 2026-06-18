@@ -13642,6 +13642,11 @@ class JIT {
             if (null === $operand) {
                 continue;
             }
+            if (!JIT\JitReferencableCheck::isOperandReferenceable($operand, $args[$idx])) {
+                JIT\JitReferencableCheck::emitByRefError($this->context, $name, $idx);
+
+                continue;
+            }
             $args[$idx] = $this->ensureValueBoxLvalueForByRefPass($operand, $args[$idx]);
         }
         $variadicFrom = BuiltinByRefParams::variadicByRefFromIndex($name);
