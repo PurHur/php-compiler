@@ -14,7 +14,7 @@ use PHPLLVM\Builder;
 use PHPLLVM\Value;
 
 /**
- * LLVM JIT/AOT helpers for strip_tags() (mirrors VmString::stripTags).
+ * JIT/AOT helpers for strip_tags() — runtime via StripTagsJitHelper (#9196); array allowed-tags markup here.
  */
 final class JitStripTags
 {
