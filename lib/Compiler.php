@@ -3372,6 +3372,8 @@ class Compiler {
         );
         $this->currentClassStaticPropertyCompile = $prevClassStaticCompile;
         $this->mergeTraitStaticPropertiesIntoClass($class->stmts, $classLc);
+        $this->mergeTraitCompileTimeClassConstsIntoClass($class->stmts, $classLc);
+        $this->mergeInterfaceCompileTimeClassConstsIntoClass($classLc, $interfaceLcs);
         if ($class instanceof Op\Stmt\Class_ && null !== $class->extends && null !== $parentLc) {
             foreach ($this->compiledClassStaticProperties[$parentLc] ?? [] as $prop => $_) {
                 $this->compiledClassStaticProperties[$classLc][$prop] = true;
@@ -3398,6 +3400,97 @@ class Compiler {
                 foreach ($this->compiledClassStaticProperties[$traitLc] ?? [] as $prop => $_) {
                     $this->compiledClassStaticProperties[$classLc][$prop] = true;
                 }
+            }
+        }
+    }
+
+    /**
+     * Copy trait class constants into the composing class compile-time table (#9430, zend_traits.c).
+     */
+    protected function mergeTraitCompileTimeClassConstsIntoClass(CfgBlock $stmts, string $classLc): void
+    {
+        foreach ($stmts->children as $child) {
+            if (!$child instanceof Op\Stmt\TraitUse) {
+                continue;
+            }
+            foreach ($child->traits as $traitOperand) {
+                $traitName = $this->staticNameFromOperand($traitOperand);
+                if (null === $traitName) {
+                    continue;
+                }
+                $this->inheritCompileTimeClassConstsFromTrait(
+                    $classLc,
+                    strtolower(ltrim($traitName, '\\'))
+                );
+            }
+        }
+    }
+
+    /**
+     * Copy interface class constants into implementor compile-time table (#9430, zend_constants.c).
+     *
+     * @param list<string> $interfaceLcs
+     */
+    protected function mergeInterfaceCompileTimeClassConstsIntoClass(string $classLc, array $interfaceLcs): void
+    {
+        foreach ($interfaceLcs as $ifaceLc) {
+            $this->inheritCompileTimeClassConstsFromInterface($classLc, $ifaceLc);
+        }
+    }
+
+    protected function inheritCompileTimeClassConstsFromTrait(string $classLc, string $traitLc): void
+    {
+        if (!isset($this->compileTimeClassConsts[$traitLc])) {
+            return;
+        }
+        if (!isset($this->compileTimeClassConsts[$classLc])) {
+            $this->compileTimeClassConsts[$classLc] = [];
+        }
+        if (!isset($this->compileTimeClassConstVisibility[$classLc])) {
+            $this->compileTimeClassConstVisibility[$classLc] = [];
+        }
+        if (!isset($this->compileTimeClassConstDeprecated[$classLc])) {
+            $this->compileTimeClassConstDeprecated[$classLc] = [];
+        }
+        foreach ($this->compileTimeClassConsts[$traitLc] as $constLc => $value) {
+            if (isset($this->compileTimeClassConsts[$classLc][$constLc])) {
+                continue;
+            }
+            $stored = new Variable();
+            $stored->copyFrom($value);
+            $this->compileTimeClassConsts[$classLc][$constLc] = $stored;
+            if (isset($this->compileTimeClassConstVisibility[$traitLc][$constLc])) {
+                $this->compileTimeClassConstVisibility[$classLc][$constLc]
+                    = $this->compileTimeClassConstVisibility[$traitLc][$constLc];
+            }
+            if (isset($this->compileTimeClassConstDeprecated[$traitLc][$constLc])) {
+                $this->compileTimeClassConstDeprecated[$classLc][$constLc]
+                    = $this->compileTimeClassConstDeprecated[$traitLc][$constLc];
+            }
+        }
+    }
+
+    protected function inheritCompileTimeClassConstsFromInterface(string $classLc, string $ifaceLc): void
+    {
+        if (!isset($this->compileTimeClassConsts[$ifaceLc])) {
+            return;
+        }
+        if (!isset($this->compileTimeClassConsts[$classLc])) {
+            $this->compileTimeClassConsts[$classLc] = [];
+        }
+        if (!isset($this->compileTimeClassConstVisibility[$classLc])) {
+            $this->compileTimeClassConstVisibility[$classLc] = [];
+        }
+        foreach ($this->compileTimeClassConsts[$ifaceLc] as $constLc => $value) {
+            if (isset($this->compileTimeClassConsts[$classLc][$constLc])) {
+                continue;
+            }
+            $stored = new Variable();
+            $stored->copyFrom($value);
+            $this->compileTimeClassConsts[$classLc][$constLc] = $stored;
+            if (isset($this->compileTimeClassConstVisibility[$ifaceLc][$constLc])) {
+                $this->compileTimeClassConstVisibility[$classLc][$constLc]
+                    = $this->compileTimeClassConstVisibility[$ifaceLc][$constLc];
             }
         }
     }
@@ -9530,23 +9623,11 @@ class Compiler {
             $producer instanceof Op\Expr\Assign
             || $producer instanceof Op\Expr\BinaryOp
             || $producer instanceof Op\Expr\ConstFetch
+            || $producer instanceof Op\Expr\ClassConstFetch
             || $producer instanceof Op\Expr\InstanceOf_
             || $producer instanceof Op\Expr\MagicScriptConst
         ) {
             return $producerSlot;
-        }
-        if ($producer instanceof Op\Expr\ClassConstFetch) {
-            $constName = $this->staticNameFromOperand($producer->name);
-            $className = $this->staticNameFromOperand($producer->class);
-            if (null !== $constName && null !== $className) {
-                $lcClass = $this->resolveDefaultClassConstScope($className, $block);
-                if (
-                    null !== $lcClass
-                    && $this->isCompileTimeEnumCaseConstantMember($lcClass, strtolower($constName))
-                ) {
-                    return $producerSlot;
-                }
-            }
         }
         $argSlot = $this->compileOperand($arg, $block, false);
         if (null === $argSlot) {
@@ -12221,6 +12302,12 @@ class Compiler {
             }
             if ($producer instanceof Op\Expr\ConstFetch) {
                 $vm = $this->tryFoldGlobalConstFetch($producer);
+                if (null !== $vm) {
+                    return $block->registerConstant($arg, $vm);
+                }
+            }
+            if ($producer instanceof Op\Expr\ClassConstFetch) {
+                $vm = $this->tryFoldClassConstFetchDefault($producer, $block, true);
                 if (null !== $vm) {
                     return $block->registerConstant($arg, $vm);
                 }
