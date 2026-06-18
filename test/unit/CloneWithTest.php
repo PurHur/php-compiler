@@ -37,6 +37,38 @@ PHP;
         $this->assertSame("2\n", ob_get_clean());
     }
 
+    public function testJitCloneWithReadonlyReinit(): void
+    {
+        if (!\getenv('PHP_COMPILER_LLVM_PATH') && !\is_dir(__DIR__.'/../../.llvm')) {
+            $this->markTestSkipped('LLVM not available');
+        }
+        $code = <<<'PHP'
+class C {
+    public readonly int $x;
+    public function __construct(int $x) { $this->x = $x; }
+}
+$c = new C(1);
+$d = clone $c with { x: 2 };
+echo $d->x, "\n";
+PHP;
+        $jitBin = __DIR__.'/../../bin/jit.php';
+        $proc = \proc_open(
+            ['php', $jitBin, '-r', $code],
+            [1 => ['pipe', 'w'], 2 => ['pipe', 'w']],
+            $pipes,
+            __DIR__.'/../..'
+        );
+        $this->assertIsResource($proc);
+        $stdout = (string) stream_get_contents($pipes[1]);
+        $stderr = (string) stream_get_contents($pipes[2]);
+        foreach ($pipes as $pipe) {
+            fclose($pipe);
+        }
+        $exit = proc_close($proc);
+        $this->assertSame(0, $exit, $stderr);
+        $this->assertSame("2\n", $stdout);
+    }
+
     public function testVmCloneWithMatchesZend(): void
     {
         $code = <<<'PHP'
