@@ -3103,6 +3103,7 @@ restart:
                         }
                         break;
                     }
+                    $this->markScopeSlotInitializedIfNamedLocal($frame, (int) $op->arg1);
                     break;
                 case OpCode::TYPE_BITWISE_AND:
                 case OpCode::TYPE_BITWISE_OR:
@@ -6345,6 +6346,15 @@ restart:
         if (null !== $globalName) {
             $this->context->markGlobalEverAssigned($globalName);
         }
+    }
+
+    /** Mark CV init when a binary op writes directly into a named local slot (#9063). */
+    private function markScopeSlotInitializedIfNamedLocal(Frame $frame, int $slot): void
+    {
+        if (null === $this->resolveScopeSlotVariableName($frame, $slot)) {
+            return;
+        }
+        $this->markScopeSlotInitialized($frame, $slot);
     }
 
     private function resolveScopeSlotVariableName(Frame $frame, int $slot): ?string
