@@ -57,7 +57,7 @@ final class BuiltinParamNames
             case 'ldexp':
                 return ['num', 'exp'];
             case 'touch':
-                return ['filename', 'time', 'atime'];
+                return ['filename', 'mtime', 'atime'];
             case 'getenv':
                 return ['name', 'local_only'];
             case 'define':

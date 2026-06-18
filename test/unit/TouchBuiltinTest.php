@@ -112,6 +112,20 @@ PHP;
         $this->assertSame(self::EXPECT_VM, $this->runBin('bin/vm.php', self::CODE_VM));
     }
 
+    public function testVmNamedMtimeAtimeParams(): void
+    {
+        $code = <<<'PHP'
+$f = sys_get_temp_dir() . '/phpc_touch_named_' . getmypid();
+$mtime = 1000000100;
+$atime = 1000000200;
+touch($f, mtime: $mtime, atime: $atime);
+$s = stat($f);
+var_export($s['mtime'] === $mtime && $s['atime'] === $atime);
+@unlink($f);
+PHP;
+        $this->assertSame('true', trim($this->runBin('bin/vm.php', $code)));
+    }
+
     /**
      * @group llvm
      * @group jit
