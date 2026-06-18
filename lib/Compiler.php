@@ -9587,9 +9587,11 @@ class Compiler {
                 continue;
             }
             $argMatches = false;
+            $matchedCallArg = null;
             foreach ($child->args as $callArg) {
                 if ($callArg === $arg || $this->operandsReferToSameVariable($callArg, $arg)) {
                     $argMatches = true;
+                    $matchedCallArg = $callArg;
                     $root = $this->unwrapOperandChain($callArg);
                     if ($root instanceof Op\Expr\BinaryOp\Coalesce) {
                         return $root;
@@ -9598,6 +9600,14 @@ class Compiler {
                 }
             }
             if (!$argMatches) {
+                continue;
+            }
+            // Literal / unrelated call args must not pick up a prior stmt-level ?? (#9225, 009-FastCGIWeb).
+            if (
+                null !== $matchedCallArg
+                && ($matchedCallArg instanceof Operand\Literal
+                    || $this->isEmbeddedCallLiteralArg($matchedCallArg))
+            ) {
                 continue;
             }
             for ($j = $i - 1; $j >= 0; --$j) {
@@ -9713,14 +9723,14 @@ class Compiler {
     {
         foreach ($args as $arg) {
             foreach ($this->findEmbeddedCoalesces($arg) as $coalesce) {
-                if (null === $block->slotForOperand($coalesce->result)) {
+                if (null === $this->slotForCoalesceResult($block, $coalesce)) {
                     $this->compileCoalesce($coalesce, $block);
                 }
             }
             $stmtCoalesce = $this->findCoalesceStmtForCallArg($arg, $block);
             if (
                 null !== $stmtCoalesce
-                && null === $block->slotForOperand($stmtCoalesce->result)
+                && null === $this->slotForCoalesceResult($block, $stmtCoalesce)
             ) {
                 $this->compileCoalesce($stmtCoalesce, $block);
             }
