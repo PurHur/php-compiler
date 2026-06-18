@@ -9659,6 +9659,11 @@ class Compiler {
         $producers = $this->precedingInlineCallArgProducersBeforeCfgOp($block->orig->children, $callOp);
         $producer = $this->matchInlineCallArgProducer($producers, $callOp->args, $argIndex);
         if (null === $producer) {
+            $classConstSlot = $this->slotForHoistedClassConstFetchCallArg($arg, $block, $callOp, $argIndex);
+            if (null !== $classConstSlot) {
+                return $classConstSlot;
+            }
+
             return $this->slotForMatchResultDeadCallArg($arg, $block, $cfgCallOp);
         }
         if ($producer instanceof Op\Expr\PropertyFetch) {
@@ -9979,6 +9984,62 @@ class Compiler {
         }
 
         return $matchVar;
+    }
+
+    /**
+     * php-cfg dead call-arg temps for hoisted ClassConstFetch (e.g. UnitEnum::class) must not
+     * fall through to match-result slot reuse (#9152, is_subclass_of after is_a).
+     */
+    private function slotForHoistedClassConstFetchCallArg(
+        Operand $arg,
+        Block $block,
+        Op $callOp,
+        int $argIndex
+    ): ?string {
+        if (null === $block->orig) {
+            return null;
+        }
+        if (!property_exists($callOp, 'args') || !is_array($callOp->args)) {
+            return null;
+        }
+        $callArg = $callOp->args[$argIndex] ?? null;
+        if (!$this->callArgUsesHoistedEnumPreludeSlot($callArg)) {
+            return null;
+        }
+        $fetch = $this->precedingClassConstFetchForCallArgIndex(
+            $callOp,
+            $argIndex,
+            $this->precedingCallArgClassConstFetchesBeforeCfgOp($block->orig->children, $callOp, $block)
+        );
+        if (!$fetch instanceof Op\Expr\ClassConstFetch) {
+            $fetch = $this->classConstFetchForHoistedDeadPrelude($callOp, $argIndex, $block);
+        }
+        if (!$fetch instanceof Op\Expr\ClassConstFetch) {
+            foreach ($block->orig->children as $i => $child) {
+                if ($child !== $callOp) {
+                    continue;
+                }
+                if ($i > 0) {
+                    $prev = $block->orig->children[$i - 1];
+                    if ($prev instanceof Op\Expr\ClassConstFetch) {
+                        $fetch = $prev;
+                    }
+                }
+                break;
+            }
+        }
+        if (!$fetch instanceof Op\Expr\ClassConstFetch) {
+            return null;
+        }
+        $slot = $block->slotForOperand($fetch->result);
+        if (null === $slot) {
+            foreach ($this->compileExpr($fetch, $block) as $op) {
+                $block->addOpCode($op);
+            }
+            $slot = $block->slotForOperand($fetch->result);
+        }
+
+        return null !== $slot ? (string) $slot : null;
     }
 
     private function cfgBlockJumpsToCfgBlock(CfgBlock $from, CfgBlock $to): bool

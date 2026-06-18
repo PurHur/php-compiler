@@ -29,7 +29,7 @@ final class is_subclass_of_ extends Internal
             throw new \LogicException('is_subclass_of() requires two or three arguments');
         }
         $ctx = VmReflection::requireContext($frame);
-        $parentName = VmReflection::stringArg($frame->calledArgs[1], 'is_subclass_of() parent class', 1);
+        $parentName = VmReflection::stringArg($frame->calledArgs[1], 'is_subclass_of() class_name', 1);
         $allowString = true;
         if (3 === \count($frame->calledArgs)) {
             $allowString = $frame->calledArgs[2]->resolveIndirect()->toBool();
