@@ -13,6 +13,12 @@ use PHPLLVM\Value;
 /** LLVM lowering for fwrite() via __compiler_fwrite (native FILE* writes). */
 final class JitFwrite
 {
+    /** Omitted fwrite() length: write the full string (not -1, which means zero bytes per php-src). */
+    public static function lengthWriteAll(Context $context, Value $dataStr): Value
+    {
+        return $context->builder->call($context->lookupFunction('__string__strlen'), $dataStr);
+    }
+
     /** @return Value */
     public static function invoke(Context $context, Value $handleLong, Value $dataStr, Value $lengthLong): Value
     {

@@ -184,7 +184,10 @@ final class VmPhpFdStream
         if (null === $state || !$state->canWrite) {
             return false;
         }
-        if (null !== $length && $length >= 0 && $length < \strlen($data)) {
+        if (null !== $length && $length < 0) {
+            return 0;
+        }
+        if (null !== $length && $length < \strlen($data)) {
             $data = \substr($data, 0, $length);
         }
         if ('' === $data) {
