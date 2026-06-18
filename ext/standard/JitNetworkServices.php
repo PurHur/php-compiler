@@ -21,7 +21,7 @@ final class JitNetworkServices
 
     public static function getprotobynumber(Context $context, JITVariable $number): Value
     {
-        StringNetworkServices::ensureLinked($context);
+        StringNetworkServices::ensureStringReturnLinked($context);
 
         return self::boxedString(
             $context,
@@ -49,7 +49,7 @@ final class JitNetworkServices
 
     public static function getservbyport(Context $context, JITVariable $port, JITVariable $protocol): Value
     {
-        StringNetworkServices::ensureLinked($context);
+        StringNetworkServices::ensureStringReturnLinked($context);
 
         return self::boxedString(
             $context,

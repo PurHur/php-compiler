@@ -23,7 +23,7 @@ final class StringNetworkServicesJit
     {
         $restore = self::captureInsertBlock($context);
 
-        $probe = $context->module->getNamedFunction('__compiler_getprotobynumber');
+        $probe = $context->module->getNamedFunction('__phpc_getprotobyname');
         if (null !== $probe && $probe->countBasicBlocks() > 0) {
             self::registerFunctions($context);
             self::restoreInsertBlock($context, $restore);
@@ -34,8 +34,6 @@ final class StringNetworkServicesJit
         self::ensureLibc($context);
         $tables = VmNetworkServices::buildJitTables();
 
-        self::implementIfMissing($context, '__compiler_getprotobynumber', self::emitGetprotobynumber(...), $tables['protoByNumber']);
-        self::implementIfMissing($context, '__compiler_getservbyport', self::emitGetservbyport(...), $tables['serviceByPort']);
         self::implementIfMissing($context, '__phpc_getprotobyname', self::emitGetprotobyname(...), $tables['protoByName']);
         self::implementIfMissing($context, '__phpc_getservbyname', self::emitGetservbyname(...), $tables['serviceByName']);
 
@@ -64,8 +62,6 @@ final class StringNetworkServicesJit
     private static function registerFunctions(Context $context): void
     {
         foreach ([
-            '__compiler_getprotobynumber',
-            '__compiler_getservbyport',
             '__phpc_getprotobyname',
             '__phpc_getservbyname',
         ] as $name) {
@@ -74,104 +70,6 @@ final class StringNetworkServicesJit
                 $context->registerFunction($name, $fn);
             }
         }
-    }
-
-    /**
-     * @param list<array{number: int, name: string}> $rows
-     */
-    private static function emitGetprotobynumber(Context $context, LlvmFunction $fn, array $rows): void
-    {
-        $entry = $fn->appendBasicBlock('entry');
-        $context->builder->positionAtEnd($entry);
-
-        $want = $fn->getParam(0);
-        $strPtr = $context->getTypeFromString('__string__*');
-        $i64 = $context->getTypeFromString('int64');
-        $nullStr = $strPtr->constNull();
-
-        if ([] === $rows) {
-            $context->builder->returnValue($nullStr);
-
-            return;
-        }
-
-        $done = $fn->appendBasicBlock('ns_proto_num_done');
-        $resultSlot = BasicBlockHelper::entryAlloca($context, $strPtr);
-        $context->builder->store($nullStr, $resultSlot);
-
-        foreach ($rows as $idx => $row) {
-            $matchBb = $fn->appendBasicBlock('ns_proto_num_match_'.$idx);
-            $nextBb = $fn->appendBasicBlock('ns_proto_num_next_'.$idx);
-            $isMatch = $context->builder->icmp(Builder::INT_EQ, $want, $i64->constInt($row['number'], false));
-            $context->builder->branchIf($isMatch, $matchBb, $nextBb);
-
-            $context->builder->positionAtEnd($matchBb);
-            $context->builder->store(
-                $context->builder->load($context->constantStringFromString($row['name'])),
-                $resultSlot
-            );
-            $context->builder->branch($done);
-
-            $context->builder->positionAtEnd($nextBb);
-        }
-
-        $context->builder->branch($done);
-        $context->builder->positionAtEnd($done);
-        $context->builder->returnValue($context->builder->load($resultSlot));
-    }
-
-    /**
-     * @param list<array{port: int, protocol: string, name: string}> $rows
-     */
-    private static function emitGetservbyport(Context $context, LlvmFunction $fn, array $rows): void
-    {
-        $entry = $fn->appendBasicBlock('entry');
-        $context->builder->positionAtEnd($entry);
-
-        $wantPort = $fn->getParam(0);
-        $wantProto = $fn->getParam(1);
-        $strPtr = $context->getTypeFromString('__string__*');
-        $i64 = $context->getTypeFromString('int64');
-        $i32 = $context->getTypeFromString('int32');
-        $nullStr = $strPtr->constNull();
-        $strcasecmpFn = $context->lookupFunction('strcasecmp');
-        $protoData = self::stringDataPtr($context, $wantProto);
-
-        if ([] === $rows) {
-            $context->builder->returnValue($nullStr);
-
-            return;
-        }
-
-        $done = $fn->appendBasicBlock('ns_svc_port_done');
-        $resultSlot = BasicBlockHelper::entryAlloca($context, $strPtr);
-        $context->builder->store($nullStr, $resultSlot);
-
-        foreach ($rows as $idx => $row) {
-            $matchBb = $fn->appendBasicBlock('ns_svc_port_match_'.$idx);
-            $nextBb = $fn->appendBasicBlock('ns_svc_port_next_'.$idx);
-            $portOk = $context->builder->icmp(Builder::INT_EQ, $wantPort, $i64->constInt($row['port'], false));
-            $protoOk = $context->builder->icmp(
-                Builder::INT_EQ,
-                $context->builder->call($strcasecmpFn, $protoData, self::cstrPtrFromLiteral($context, $row['protocol'])),
-                $i32->constInt(0, false)
-            );
-            $isMatch = $context->builder->and($portOk, $protoOk);
-            $context->builder->branchIf($isMatch, $matchBb, $nextBb);
-
-            $context->builder->positionAtEnd($matchBb);
-            $context->builder->store(
-                $context->builder->load($context->constantStringFromString($row['name'])),
-                $resultSlot
-            );
-            $context->builder->branch($done);
-
-            $context->builder->positionAtEnd($nextBb);
-        }
-
-        $context->builder->branch($done);
-        $context->builder->positionAtEnd($done);
-        $context->builder->returnValue($context->builder->load($resultSlot));
     }
 
     /**
