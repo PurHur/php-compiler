@@ -184,6 +184,43 @@ PHP;
         $this->assertSame('3', ob_get_clean());
     }
 
+    /** Issue #9605: invokable object first-class callable (new C)(...). */
+    public function testVmInvokableObjectFirstClassCallable(): void
+    {
+        $code = <<<'PHP'
+<?php
+class C {
+    public function __invoke(): void {
+        echo "ok\n";
+    }
+}
+$fn = (new C)(...);
+$fn();
+PHP;
+        $rt = new Runtime();
+        $block = $rt->parseAndCompile($code, 'test.php');
+        ob_start();
+        $rt->run($block);
+        $this->assertSame("ok\n", ob_get_clean());
+    }
+
+    public function testVmInvokableObjectFirstClassCallableIsClosureObject(): void
+    {
+        $code = <<<'PHP'
+<?php
+class C {
+    public function __invoke(): void {}
+}
+$fn = (new C)(...);
+var_export($fn instanceof Closure);
+PHP;
+        $rt = new Runtime();
+        $block = $rt->parseAndCompile($code, 'test.php');
+        ob_start();
+        $rt->run($block);
+        $this->assertSame('true', ob_get_clean());
+    }
+
     /** Issue #9170: FCC in parameter defaults (PHP 8.5 constant expressions). */
     public function testVmFunctionFirstClassCallableDefaultParameter(): void
     {

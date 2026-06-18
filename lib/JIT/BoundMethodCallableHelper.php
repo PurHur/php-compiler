@@ -239,6 +239,27 @@ final class BoundMethodCallableHelper
     /**
      * Follow TYPE_ASSIGN chains from a call-site slot to the INIT_ARRAY root (#4040).
      */
+    /**
+     * Invokable-object FCC `(new C)(...)` — callee slot holds object, not `[obj, method]` (#9605).
+     */
+    public static function resolveInvokableObjectReceiverOperand(Block $block, int $slot): ?Operand
+    {
+        if (null !== self::resolveBoundMethodArrayRootSlot($block, $slot)) {
+            return null;
+        }
+
+        return self::resolveObjectOperandRoot($block, self::operandForInvokableObjectSlot($block, $slot));
+    }
+
+    public static function resolveInvokableObjectClassName(Block $block, int $slot): ?string
+    {
+        if (null !== self::resolveBoundMethodArrayRootSlot($block, $slot)) {
+            return null;
+        }
+
+        return self::classNameFromObjectSlot($block, $slot);
+    }
+
     public static function resolveBoundMethodArrayRootSlot(
         Block $block,
         int $slot,
@@ -270,6 +291,86 @@ final class BoundMethodCallableHelper
                 continue;
             }
             $resolved = self::resolveBoundMethodArrayRootSlot($parent, $slot, $visited);
+            if (null !== $resolved) {
+                return $resolved;
+            }
+        }
+
+        return null;
+    }
+
+    private static function operandForInvokableObjectSlot(
+        Block $block,
+        int $slot,
+        array &$visited = []
+    ): Operand {
+        if (isset($visited[$slot])) {
+            return $block->getOperand($slot);
+        }
+        $visited[$slot] = true;
+        foreach ($block->opCodes as $op) {
+            if (OpCode::TYPE_NEW === $op->type && $op->arg1 === $slot) {
+                return $block->getOperand($op->arg1);
+            }
+        }
+        foreach ($block->opCodes as $op) {
+            if (OpCode::TYPE_ASSIGN !== $op->type) {
+                continue;
+            }
+            if ($op->arg2 !== $slot && $op->arg1 !== $slot) {
+                continue;
+            }
+
+            return self::operandForInvokableObjectSlot($block, (int) $op->arg3, $visited);
+        }
+        foreach ($block->parents as $parent) {
+            if (!$parent instanceof Block) {
+                continue;
+            }
+            $resolved = self::operandForInvokableObjectSlot($parent, $slot, $visited);
+            if ($resolved instanceof Operand\Temporary || $resolved instanceof Operand\Variable) {
+                return $resolved;
+            }
+        }
+
+        return $block->getOperand($slot);
+    }
+
+    private static function classNameFromObjectSlot(
+        Block $block,
+        int $slot,
+        array &$visited = []
+    ): ?string {
+        if (isset($visited[$slot])) {
+            return null;
+        }
+        $visited[$slot] = true;
+        foreach ($block->opCodes as $op) {
+            if (OpCode::TYPE_NEW !== $op->type || $op->arg1 !== $slot) {
+                continue;
+            }
+            $classOp = $block->getOperand($op->arg2);
+            if ($classOp instanceof Operand\Literal) {
+                return (string) $classOp->value;
+            }
+        }
+        foreach ($block->opCodes as $op) {
+            if (OpCode::TYPE_ASSIGN !== $op->type) {
+                continue;
+            }
+            if ($op->arg2 !== $slot && $op->arg1 !== $slot) {
+                continue;
+            }
+            $resolved = self::classNameFromObjectSlot($block, (int) $op->arg3, $visited);
+            if (null !== $resolved) {
+                return $resolved;
+            }
+        }
+        foreach ($block->parents as $parent) {
+            if (!$parent instanceof Block) {
+                continue;
+            }
+            $resolved = self::classNameFromObjectSlot($parent, $slot, $visited);
             if (null !== $resolved) {
                 return $resolved;
             }
