@@ -1542,6 +1542,7 @@ require_once __DIR__.'/../../../ext/standard/sha1_file.php';
 require_once __DIR__.'/../../../ext/standard/shell_exec.php';
 require_once __DIR__.'/../../../ext/standard/show_source.php';
 require_once __DIR__.'/../../../ext/standard/shuffle_.php';
+require_once __DIR__.'/../../../ext/standard/SimilarTextJitHelper.php';
 require_once __DIR__.'/../../../ext/standard/similar_text.php';
 require_once __DIR__.'/../../../ext/standard/sin.php';
 require_once __DIR__.'/../../../ext/standard/sinh.php';
