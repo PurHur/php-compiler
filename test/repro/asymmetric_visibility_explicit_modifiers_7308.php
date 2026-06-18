@@ -8,4 +8,3 @@ class B {
 class C {
     protected private(set) string $z = 'c';
 }
-echo "compiled\n";

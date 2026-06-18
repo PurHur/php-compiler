@@ -91,6 +91,7 @@ final class AsymmetricVisibilityRewriter
             return $source;
         }
 
+        self::rejectExplicitReadBeforeSetModifier($source);
         self::rejectExplicitPublicBeforeSetModifier($source);
         self::rejectExplicitPublicAfterSetModifier($source);
         self::rejectAsymmetricSetOnStaticProperty($source);
@@ -135,6 +136,31 @@ final class AsymmetricVisibilityRewriter
             },
             $source
         );
+    }
+
+    /**
+     * Explicit read modifier before a set modifier is a compile fatal (#9161, #9461).
+     *
+     * php-src: Zend/zend_compile.c — zend_add_member_modifier(); RFC asymmetric-visibility-v2 —
+     * `private(set)` replaces the read token; `public private(set)` is not valid syntax.
+     */
+    private static function rejectExplicitReadBeforeSetModifier(string $source): void
+    {
+        $modifier = '(?:public|protected|private)';
+        $setModifier = $modifier.'\s*\(\s*set\s*\)';
+        $parenthesizedSet = '\(\s*'.$modifier.'\s*\(\s*set\s*\)\s*\)';
+        $patterns = [
+            '/(?<![a-zA-Z0-9_])'.$modifier.'\s+'.$setModifier.'/i',
+            '/(?<![a-zA-Z0-9_])'.$modifier.'\s+'.$parenthesizedSet.'/i',
+        ];
+
+        self::eachPropertyDeclarationLine($source, static function (string $line) use ($patterns): void {
+            foreach ($patterns as $pattern) {
+                if (preg_match($pattern, $line)) {
+                    throw new \CompileError(self::MULTIPLE_MODIFIERS_MESSAGE);
+                }
+            }
+        });
     }
 
     /**
