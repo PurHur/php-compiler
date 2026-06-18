@@ -7,12 +7,13 @@ namespace PHPCompiler\Compiler;
 use PHPCfg\Op;
 use PHPCfg\Op\Expr\New_;
 use PHPCfg\Script;
+use PHPCompiler\CompilerVersion;
 
 /**
- * Reject `new` in class **constant** initializers (#6549, #9484, #9517).
+ * Reject bare `new` (no ctor parens) in class **constant** initializers (#6549, #9484).
  *
- * php-src: zend_const_expr_to_zval(..., allow_dynamic=false) for class constants —
- * any `new` is a compile fatal ("New expressions are not supported in this context").
+ * PHP 8.3+ allows `new Class()` with explicit parentheses in class constants (#9695);
+ * pre-8.3 and bare `new Class` without `()` remain compile fatals (#9517).
  * Property/param defaults may use `new` with or without `()` per PHP 8.1+ (#3391, #5362).
  *
  * @see Zend/zend_compile.c — zend_compile_const_expr()
@@ -23,6 +24,7 @@ final class NewWithoutParensCompileCheck
 
     public static function validate(Script $script, ?string $sourceCode = null): void
     {
+        NewCtorParens::resetMatchCursor();
         $check = new self($sourceCode);
         foreach ($script->main->cfg->children as $child) {
             if ($child instanceof Op\Stmt\Class_
@@ -57,6 +59,10 @@ final class NewWithoutParensCompileCheck
     {
         foreach ($ops as $op) {
             if ($op instanceof New_) {
+                if (CompilerVersion::supportsNewInClassConstantExpr()
+                    && NewCtorParens::hasCtorParens($op, $this->sourceCode)) {
+                    continue;
+                }
                 throw new \CompileError(self::MESSAGE);
             }
             foreach ($op->getSubBlocks() as $sub) {

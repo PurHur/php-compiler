@@ -38,13 +38,13 @@ final class CompilerVersion
     }
 
     /**
-     * `new` in class constant initializers (Zend/zend_compile.c zend_const_expr_to_zval allow_dynamic=false).
+     * `new` with explicit `()` in class constant initializers (PHP 8.3+, Zend/zend_compile.c).
      *
-     * php-src rejects all `new` in class constants (#9517); allowed only in global const / param defaults.
+     * Bare `new Class` without ctor parens stays rejected in constants (#6549, #9517).
      */
     public static function supportsNewInClassConstantExpr(): bool
     {
-        return false;
+        return version_compare(self::VERSION, '8.3', '>=');
     }
 
     /** PHP 8.3+ #[\Override] builtin attribute class (Zend/zend_attributes.c, issue #6303). */
