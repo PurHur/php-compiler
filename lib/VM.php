@@ -5660,7 +5660,7 @@ restart:
                                 $this->context->weakMapIterators[$op->arg1] = $iter;
                                 break;
                             }
-                            $iter = new ObjectPropertyIterator($container->toObject());
+                            $iter = new ObjectPropertyIterator($container->toObject(), $this, $frame);
                             $iter->reset();
                             $this->context->objectPropertyIterators[$op->arg1] = $iter;
                             break;
@@ -5802,14 +5802,24 @@ restart:
                             break;
                         }
                         if ($byRef) {
-                            $frame->scope[$op->arg1]->indirect(
-                                $this->objectForeachIterator($op->arg2)->currentValue(true)
-                            );
+                            try {
+                                $frame->scope[$op->arg1]->indirect(
+                                    $this->objectForeachIterator($op->arg2)->currentValue(true)
+                                );
+                            } catch (VM\PropertyHookRefWriteSignal $signal) {
+                                $frame = $signal->catchFrame;
+                                goto restart;
+                            }
                             $this->markScopeSlotInitialized($frame, (int) $op->arg1);
                         } else {
-                            $frame->scope[$op->arg1]->assignForeachByValue(
-                                $this->objectForeachIterator($op->arg2)->currentValue(false)
-                            );
+                            try {
+                                $frame->scope[$op->arg1]->assignForeachByValue(
+                                    $this->objectForeachIterator($op->arg2)->currentValue(false)
+                                );
+                            } catch (VM\PropertyHookRefWriteSignal $signal) {
+                                $frame = $signal->catchFrame;
+                                goto restart;
+                            }
                         }
                         break;
                     }
@@ -8478,6 +8488,35 @@ restart:
         }
 
         return true;
+    }
+
+    /**
+     * Object foreach value read — invoke get hooks like get_object_vars() (#9470, zend_property_hooks.c).
+     */
+    public function readObjectForeachProperty(
+        ObjectEntry $object,
+        string $name,
+        Frame $frame,
+        bool $byRef
+    ): Variable {
+        $meta = $this->classPropertyMeta($object, $name);
+        if (!$byRef && null !== $meta?->getHookMethodLc) {
+            $hookValue = $this->fetchPropertyWithHooks($object, $name, $frame);
+            if (null !== $hookValue) {
+                $copy = new Variable();
+                $copy->copyFrom($hookValue->resolveIndirect());
+
+                return $copy;
+            }
+        }
+        $prop = $object->getProperty($name);
+        if ($byRef) {
+            return $prop;
+        }
+        $copy = new Variable();
+        $copy->copyFrom($prop->resolveIndirect());
+
+        return $copy;
     }
 
     private function fetchPropertyWithHooks(ObjectEntry $object, string $name, Frame $frame): ?Variable
