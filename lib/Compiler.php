@@ -10271,6 +10271,7 @@ class Compiler {
                         || $next instanceof Op\Expr\MethodCall
                         || $next instanceof Op\Expr\NullsafeMethodCall)
                     && property_exists($next, 'var')
+                    && $next->var instanceof Operand
                     && $this->operandsReferToSameVariable($next->var, $producer->result)
                 ) {
                     continue;
