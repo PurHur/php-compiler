@@ -1347,7 +1347,6 @@ class Type extends Builtin {
         ProcessRuntime::ensureLinked($this->context);
         ProcessOpen::ensureLinked($this->context);
         StreamSocketPair::ensureLinked($this->context);
-        StringHrtime::ensureLinked($this->context);
         StringMicrotime::ensureLinked($this->context);
         StringGettimeofday::ensureLinked($this->context);
         StringGetrusage::ensureLinked($this->context);

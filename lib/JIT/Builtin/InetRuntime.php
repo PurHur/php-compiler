@@ -239,6 +239,7 @@ final class InetRuntime
             'strcmp',
             $context->context->functionType($i32, false, $i8p, $i8p)
         );
+    }
 
     private static function implementLong2ip(Context $context): void
     {

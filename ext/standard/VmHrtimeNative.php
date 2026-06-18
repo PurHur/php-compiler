@@ -8,7 +8,7 @@ namespace PHPCompiler\ext\standard;
  * Monotonic clock for VM without host ext/ffi (issue #7315, #5174, #9018).
  *
  * php-src: ext/standard/hrtime.c — clock_gettime(CLOCK_MONOTONIC).
- * JIT/AOT: lib/JIT/Builtin/StringHrtime.php (__compiler_hrtime_* via /proc/uptime).
+ * JIT/AOT: ext/standard/HrtimeJitHelper.php via StringHrtimeRuntime (#9182).
  */
 final class VmHrtimeNative
 {
@@ -27,7 +27,7 @@ final class VmHrtimeNative
     }
 
     /**
-     * Parse first field of /proc/uptime into [sec, nsec] (shared with JIT StringHrtime LLVM).
+     * Parse first field of /proc/uptime into [sec, nsec] (shared with JIT HrtimeJitHelper).
      *
      * @return array{0: int, 1: int}|null
      */

@@ -26,6 +26,10 @@ final class HrtimeJITTest extends BaseTest
             __DIR__.'/cases/stdlib/hrtime_4583.phpt',
             'hrtime_4583.phpt'
         );
+        yield 'hrtime_jit_vm.phpt' => self::parsePHPT(
+            __DIR__.'/cases/stdlib/hrtime_jit_vm.phpt',
+            'hrtime_jit_vm.phpt'
+        );
     }
 
     public function setUp(): void
