@@ -143,4 +143,35 @@ PHP;
         self::assertContains($sendSlots[0], $returnSlots, 'fcall returns='.json_encode($returnSlots));
         self::assertContains($sendSlots[1], $returnSlots, 'fcall returns='.json_encode($returnSlots));
     }
+
+    /** Issue #9324 — hoisted Array_/ConstFetch producers map to dead call-arg temps. */
+    public function testArraySliceBoolLiteralSendsArrayThenTrue(): void
+    {
+        $code = <<<'PHP'
+<?php
+array_slice([0, 1, 2, 3], 1, 2, true);
+PHP;
+        $runtime = new Runtime();
+        $block = $runtime->parseAndCompile($code, 'bool_literal_builtin.php');
+
+        $arraySlot = null;
+        $boolSlot = null;
+        $sendSlots = [];
+        foreach ($block->opCodes as $op) {
+            if (OpCode::TYPE_INIT_ARRAY === $op->type && null === $arraySlot) {
+                $arraySlot = $op->arg1;
+            }
+            if (OpCode::TYPE_CONST_FETCH === $op->type) {
+                $boolSlot = $op->arg1;
+            }
+            if (OpCode::TYPE_ARG_SEND === $op->type) {
+                $sendSlots[] = $op->arg1;
+            }
+        }
+
+        self::assertNotNull($arraySlot);
+        self::assertNotNull($boolSlot);
+        self::assertSame($arraySlot, $sendSlots[0] ?? null, 'arg sends='.json_encode($sendSlots));
+        self::assertSame($boolSlot, $sendSlots[3] ?? null, 'arg sends='.json_encode($sendSlots));
+    }
 }

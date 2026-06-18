@@ -9886,7 +9886,25 @@ class Compiler {
             }
         }
 
-        return null;
+        // php-cfg dead call-arg temps: hoisted producers align to non-embedded arg slots (#9324).
+        $nonEmbeddedArgIndices = [];
+        foreach ($callArgs as $i => $arg) {
+            if (null !== $arg && !$this->isEmbeddedCallLiteralArg($arg)) {
+                $nonEmbeddedArgIndices[] = $i;
+            }
+        }
+        if (\count($producers) !== \count($nonEmbeddedArgIndices)) {
+            return null;
+        }
+        if ($this->isNamedVariableOperand($callArg)) {
+            return null;
+        }
+        $producerOrdinal = array_search($argIndex, $nonEmbeddedArgIndices, true);
+        if (false === $producerOrdinal) {
+            return null;
+        }
+
+        return $producers[$producerOrdinal] ?? null;
     }
 
     /**
