@@ -29,6 +29,10 @@ final class SimilarTextVMTest extends BaseTest
             __DIR__.'/cases/stdlib/similar_text_type_error.phpt',
             'similar_text_type_error.phpt'
         );
+        yield 'similar_text_strict_types.phpt' => self::parsePHPT(
+            __DIR__.'/cases/stdlib/similar_text_strict_types.phpt',
+            'similar_text_strict_types.phpt'
+        );
     }
 
     public function setUp(): void

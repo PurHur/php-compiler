@@ -8,9 +8,11 @@ use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Builtin\StringSimilarText;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\InternalStrictArg as JitInternalStrictArg;
 use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\Variable as JITVariable;
+use PHPCompiler\VM\InternalStrictArg;
 use PHPLLVM\Builder;
 use PHPLLVM\Value;
 
@@ -30,8 +32,8 @@ final class similar_text extends Internal
         if ($argc < 2 || $argc > 3) {
             throw new \LogicException('similar_text() accepts two or three arguments in this compiler build');
         }
-        $s1 = VmString::coerceStringBuiltinArg($frame->calledArgs[0], 'similar_text', 0, 'string1');
-        $s2 = VmString::coerceStringBuiltinArg($frame->calledArgs[1], 'similar_text', 1, 'string2');
+        $s1 = self::vmStringArg($frame, 0, 'string1');
+        $s2 = self::vmStringArg($frame, 1, 'string2');
         if (3 === $argc) {
             $percent = 0.0;
             $sim = VmString::similar_text($s1, $s2, $percent);
@@ -55,8 +57,8 @@ final class similar_text extends Internal
             throw new \LogicException('similar_text() accepts two or three arguments in this compiler build');
         }
         StringSimilarText::ensureLinked($context);
-        $str0 = JitStringBuiltinArg::lower($context, $args[0], 'similar_text', 0, 'string1');
-        $str1 = JitStringBuiltinArg::lower($context, $args[1], 'similar_text', 1, 'string2');
+        $str0 = self::jitStringArg($context, $args[0], 1, 'string1');
+        $str1 = self::jitStringArg($context, $args[1], 2, 'string2');
         $p0 = $this->stringDataPtr($context, $str0);
         $p1 = $this->stringDataPtr($context, $str1);
         $fn = $context->lookupFunction('phpc_similar_text');
@@ -69,6 +71,37 @@ final class similar_text extends Internal
         }
 
         return $sim;
+    }
+
+    private static function vmStringArg(Frame $frame, int $argIndex, string $paramName): string
+    {
+        if (null !== $frame->parent && $frame->parent->block->strictTypes) {
+            return InternalStrictArg::requireString($frame, $argIndex, 'similar_text', $paramName)->toString();
+        }
+
+        return VmString::coerceStringBuiltinArg(
+            $frame->calledArgs[$argIndex],
+            'similar_text',
+            $argIndex,
+            $paramName
+        );
+    }
+
+    private static function jitStringArg(
+        Context $context,
+        JITVariable $arg,
+        int $argNumber,
+        string $paramName
+    ): Value {
+        JitInternalStrictArg::requireString($context, $arg, 'similar_text', $paramName, $argNumber);
+
+        return JitStringBuiltinArg::lower(
+            $context,
+            $arg,
+            'similar_text',
+            $argNumber - 1,
+            $paramName
+        );
     }
 
     private function jitWriteSimilarityPercent(

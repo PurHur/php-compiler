@@ -1,10 +1,8 @@
 <?php
 declare(strict_types=1);
-// Zend coerces scalars to string
-echo similar_text(123, '123'), "\n";
-
+// Zend TypeErrors on int operands when strict_types=1 is in effect at the call site
 try {
-    similar_text([], 'x');
+    similar_text(123, '123');
 } catch (Throwable $e) {
     echo get_class($e), "\n";
 }
