@@ -12425,7 +12425,15 @@ class Compiler {
                             }
                             if (null !== $callIndex && $callIndex > 0) {
                                 $prev = $block->orig->children[$callIndex - 1] ?? null;
-                                if ($prev instanceof Op\Expr && null !== $prev->result && $this->isInlineExprCallArgProducer($prev)) {
+                                if (
+                                    $prev instanceof Op\Expr
+                                    && null !== $prev->result
+                                    && $this->isInlineExprCallArgProducer($prev)
+                                    && (
+                                        $this->operandsReferToSameVariable($prev->result, $arg)
+                                        || $this->inlineCallArgProducerFeedsConsumer($prev, $cfgCallOp)
+                                    )
+                                ) {
                                     $prevSlot = $block->slotForOperand($prev->result);
                                     if (null === $prevSlot) {
                                         foreach ($this->compileExpr($prev, $block) as $op) {

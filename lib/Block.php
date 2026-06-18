@@ -639,7 +639,10 @@ class Block {
     {
         $afterProducer = false;
         for ($i = 0; $i < $this->nOpCodes; ++$i) {
-            $op = $this->opCodes[$i];
+            $op = $this->opCodes[$i] ?? null;
+            if (null === $op) {
+                continue;
+            }
             if (OpCode::TYPE_ASSIGN === $op->type && (int) $op->arg1 === $slot) {
                 $afterProducer = true;
                 continue;
