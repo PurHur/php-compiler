@@ -183,4 +183,40 @@ PHP;
         $rt->run($block);
         $this->assertSame('3', ob_get_clean());
     }
+
+    /** Issue #9170: FCC in parameter defaults (PHP 8.5 constant expressions). */
+    public function testVmFunctionFirstClassCallableDefaultParameter(): void
+    {
+        $code = <<<'PHP'
+<?php
+class C {
+    public function f(Closure $c = strlen(...)): int {
+        return $c('abc');
+    }
+}
+echo (new C)->f();
+PHP;
+        $rt = new Runtime();
+        $block = $rt->parseAndCompile($code, 'test.php');
+        ob_start();
+        $rt->run($block);
+        $this->assertSame('3', ob_get_clean());
+    }
+
+    public function testVmStaticMethodFirstClassCallableDefaultParameter(): void
+    {
+        $code = <<<'PHP'
+<?php
+class S {
+    public static function id(string $s): string { return $s; }
+    public function g(Closure $c = S::id(...)): string { return $c('ok'); }
+}
+echo (new S)->g();
+PHP;
+        $rt = new Runtime();
+        $block = $rt->parseAndCompile($code, 'test.php');
+        ob_start();
+        $rt->run($block);
+        $this->assertSame('ok', ob_get_clean());
+    }
 }

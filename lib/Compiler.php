@@ -4682,7 +4682,7 @@ class Compiler {
         if (null !== $folded) {
             return $folded;
         }
-        if ($this->paramDefaultIsRuntimeNew($param)) {
+        if ($this->paramDefaultUsesRuntimeInit($param)) {
             if (null === $paramIdx) {
                 // Promoted property metadata: default applied via constructor param (#6652).
                 return null;
@@ -4718,6 +4718,27 @@ class Compiler {
     }
 
     /**
+     * Parameter defaults evaluated when the argument is omitted: `new Class()` (#6652), FCC (#9170).
+     */
+    protected function paramDefaultUsesRuntimeInit(Op\Expr\Param $param): bool
+    {
+        if ($this->paramDefaultIsRuntimeNew($param)) {
+            return true;
+        }
+        $fcc = $this->paramDefaultFirstClassCallableExpr($param);
+        if (null === $fcc) {
+            return false;
+        }
+        if (Op\Expr\FirstClassCallable::KIND_METHOD === $fcc->kind) {
+            $this->throwCompileLogic(
+                'First-class callable on instance method cannot be used in constant expression'
+            );
+        }
+
+        return true;
+    }
+
+    /**
      * Parameter default `new Class()` — evaluated when the argument is omitted (#6652).
      */
     protected function paramDefaultIsRuntimeNew(Op\Expr\Param $param): bool
@@ -4733,6 +4754,23 @@ class Compiler {
         }
 
         return $this->unwrapOperandChain($param->defaultVar) instanceof Op\Expr\New_;
+    }
+
+    protected function paramDefaultFirstClassCallableExpr(Op\Expr\Param $param): ?Op\Expr\FirstClassCallable
+    {
+        if (null === $param->defaultVar) {
+            return null;
+        }
+        if (null !== $param->defaultBlock && [] !== $param->defaultBlock->children) {
+            $last = $param->defaultBlock->children[\count($param->defaultBlock->children) - 1];
+            if ($last instanceof Op\Expr\FirstClassCallable) {
+                return $last;
+            }
+        }
+
+        $unwrapped = $this->unwrapOperandChain($param->defaultVar);
+
+        return $unwrapped instanceof Op\Expr\FirstClassCallable ? $unwrapped : null;
     }
 
     /**
