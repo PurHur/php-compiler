@@ -137,7 +137,7 @@ final class array_unique extends Internal
             return 0 === self::compareNumericOperandsForUnique($a, $b);
         }
 
-        return $a->identicalTo($b);
+        return $a->equals($b);
     }
 
     /** numeric_compare_function equality for array_unique SORT_NUMERIC (ext/standard/array.c). */
