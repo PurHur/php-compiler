@@ -10459,6 +10459,24 @@ class Compiler {
                     continue;
                 }
             }
+            if ($child instanceof Op\Expr\Assign) {
+                if (!property_exists($callOp, 'args') || !is_array($callOp->args)) {
+                    break;
+                }
+                $assignFeedsCallArg = false;
+                foreach ($callOp->args as $callArg) {
+                    if (
+                        $this->operandsReferToSameVariable($child->var, $callArg)
+                        || $this->operandsReferToSameVariable($child->result, $callArg)
+                    ) {
+                        $assignFeedsCallArg = true;
+                        break;
+                    }
+                }
+                if (!$assignFeedsCallArg) {
+                    break;
+                }
+            }
             if (
                 ($child instanceof Op\Expr\FuncCall || $child instanceof Op\Expr\NsFuncCall)
                 && !$this->inlineCallArgProducerFeedsConsumer($child, $callOp)
