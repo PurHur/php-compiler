@@ -158,6 +158,13 @@ class Context {
     /** @var array<int, true> foreach warned on non-traversable operand; loop body skipped (#4879). */
     public array $foreachInvalidSlots = [];
 
+    /**
+     * Trait `use` bindings deferred until a forward-referenced trait is declared (#9395).
+     *
+     * @var list<array{entry: ClassEntry, traitNames: list<string>, adaptations: list<array<string, mixed>>, ownMethods: array<string, true>}>
+     */
+    public array $deferredTraitUses = [];
+
     /** Fiber executing on this VM stack (issue #3130). */
     public ?FiberState $currentFiber = null;
 

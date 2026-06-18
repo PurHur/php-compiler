@@ -2195,6 +2195,7 @@ restart:
             $this->executingFrame = $frame;
             $this->context->executionLimits->check($this->context, $frame);
             $op = $frame->block->opCodes[$frame->pos++];
+            $this->assertDeferredTraitUsesBeforeRuntime($op->type);
             try {
                 switch ($op->type) {
                 case OpCode::TYPE_TYPE_ASSERT:
@@ -4665,6 +4666,7 @@ restart:
                     $this->inheritFromInterfaces($ifaceEntry);
                     $this->context->classes[$lcname] = $ifaceEntry;
                     $this->propagateInterfaceConstantsToImplementors($lcname);
+                    $this->flushDeferredTraitUses();
                     break;
                 case OpCode::TYPE_DECLARE_TRAIT:
                     $name = $frame->scope[$op->arg1]->toString();
@@ -4678,6 +4680,7 @@ restart:
                     $traitEntry->attributeEntries = $op->attributeEntries;
                     self::defineClass($traitEntry, $op->block1, $frame);
                     $this->context->classes[$lcname] = $traitEntry;
+                    $this->flushDeferredTraitUses();
                     break;
                 case OpCode::TYPE_DECLARE_GLOBAL_CONST:
                     $name = $frame->scope[$op->arg1]->toString();
@@ -4725,6 +4728,7 @@ restart:
                     VM\EnumSupport::ensureBuiltinEnumInterfaces($classEntry);
                     $this->context->classes[$lcname] = $classEntry;
                     $this->context->enums[$lcname] = true;
+                    $this->flushDeferredTraitUses();
                     break;
                 case OpCode::TYPE_DECLARE_CLASS:
                     $name = $frame->scope[$op->arg1]->toString();
@@ -4776,6 +4780,7 @@ restart:
                     }
                     VM\ClassValidator::finalizeClassDefinition($classEntry, $this->context);
                     $this->context->classes[$lcname] = $classEntry;
+                    $this->flushDeferredTraitUses();
                     break;
                 case OpCode::TYPE_NEW:
                     $result = $frame->scope[$op->arg1];
@@ -5945,6 +5950,9 @@ restart:
             }
             $this->releaseFrameObjectRefs($frame);
             goto nextframe;
+        }
+        if ([] !== $this->context->deferredTraitUses) {
+            $this->finalizeDeferredTraitUses();
         }
 
         return self::SUCCESS;
@@ -10597,6 +10605,98 @@ restart:
 
     /**
      * @param list<string> $traitNames
+     */
+    protected function canResolveAllTraitEntries(array $traitNames): bool
+    {
+        foreach ($traitNames as $traitName) {
+            $traitLc = strtolower(ltrim($traitName, '\\'));
+            if (!isset($this->context->classes[$traitLc])) {
+                $this->context->autoloadClass($traitName);
+            }
+            if (!isset($this->context->classes[$traitLc])) {
+                return false;
+            }
+            if (!$this->context->classes[$traitLc]->isTrait) {
+                throw new \LogicException("{$traitName} is not a trait");
+            }
+        }
+
+        return true;
+    }
+
+    /**
+     * @param list<string> $traitNames
+     * @param list<array<string, mixed>> $adaptations
+     * @param array<string, true> $ownMethods
+     */
+    protected function queueDeferredTraitUse(
+        ClassEntry $entry,
+        array $traitNames,
+        array $adaptations,
+        array $ownMethods
+    ): void {
+        $this->context->deferredTraitUses[] = [
+            'entry' => $entry,
+            'traitNames' => $traitNames,
+            'adaptations' => $adaptations,
+            'ownMethods' => $ownMethods,
+        ];
+    }
+
+    protected function flushDeferredTraitUses(): void
+    {
+        if ([] === $this->context->deferredTraitUses) {
+            return;
+        }
+        $remaining = [];
+        foreach ($this->context->deferredTraitUses as $deferred) {
+            if (!$this->canResolveAllTraitEntries($deferred['traitNames'])) {
+                $remaining[] = $deferred;
+
+                continue;
+            }
+            $this->applyTraitUsesWithAdaptations(
+                $deferred['entry'],
+                $deferred['traitNames'],
+                $deferred['adaptations'],
+                $deferred['ownMethods']
+            );
+        }
+        $this->context->deferredTraitUses = $remaining;
+    }
+
+    protected function finalizeDeferredTraitUses(): void
+    {
+        $this->flushDeferredTraitUses();
+        if ([] === $this->context->deferredTraitUses) {
+            return;
+        }
+        $missing = $this->context->deferredTraitUses[0]['traitNames'][0] ?? 'unknown';
+
+        throw new \LogicException("Trait {$missing} not found");
+    }
+
+    private function assertDeferredTraitUsesBeforeRuntime(int $opType): void
+    {
+        if ([] === $this->context->deferredTraitUses) {
+            return;
+        }
+        static $declarationOpcodes = [
+            OpCode::TYPE_DECLARE_CLASS => true,
+            OpCode::TYPE_DECLARE_ENUM => true,
+            OpCode::TYPE_DECLARE_TRAIT => true,
+            OpCode::TYPE_DECLARE_INTERFACE => true,
+            OpCode::TYPE_FUNCDEF => true,
+            OpCode::TYPE_DECLARE_GLOBAL_CONST => true,
+        ];
+        if (isset($declarationOpcodes[$opType])) {
+            return;
+        }
+        $this->finalizeDeferredTraitUses();
+    }
+
+    /**
+     * @param list<string> $traitNames
      * @param list<array<string, mixed>> $adaptations
      * @param array<string, true> $ownMethods
      */
@@ -10607,6 +10707,12 @@ restart:
         array $ownMethods = []
     ): void {
         if ([] === $traitNames) {
+            return;
+        }
+
+        if (!$this->canResolveAllTraitEntries($traitNames)) {
+            $this->queueDeferredTraitUse($entry, $traitNames, $adaptations, $ownMethods);
+
             return;
         }
 
