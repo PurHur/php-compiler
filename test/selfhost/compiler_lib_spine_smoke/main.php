@@ -1461,6 +1461,7 @@ require_once __DIR__.'/../../../ext/standard/preg_split.php';
 require_once __DIR__.'/../../../ext/standard/prev.php';
 require_once __DIR__.'/../../../ext/standard/print_r.php';
 require_once __DIR__.'/../../../ext/standard/printf_.php';
+require_once __DIR__.'/../../../ext/standard/PregReplacementExpand.php';
 require_once __DIR__.'/../../../ext/standard/ProgressJitHelper.php';
 require_once __DIR__.'/../../../ext/standard/proc_close.php';
 require_once __DIR__.'/../../../ext/standard/proc_get_status.php';
