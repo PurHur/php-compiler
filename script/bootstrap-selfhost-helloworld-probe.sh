@@ -54,6 +54,10 @@ helloworld_m3_emit_next_lower() {
 source "$(dirname "$0")/php-env.sh"
 # shellcheck source=selfhost-preflight.sh
 source "$(dirname "$0")/selfhost-preflight.sh"
+# shellcheck source=bootstrap-gen0-install-prelinked-driver.sh
+source "$(dirname "$0")/bootstrap-gen0-install-prelinked-driver.sh"
+# shellcheck source=bootstrap-resolve-compile-invoke.sh
+source "$(dirname "$0")/bootstrap-resolve-compile-invoke.sh"
 ci_apply_llvm_memory_env
 
 selfhost_preflight bootstrap-selfhost-helloworld-probe php-or-docker
@@ -140,14 +144,27 @@ if [[ "${BOOTSTRAP_M3_LINK_COMPILE_DRIVER:-0}" == "1" ]]; then
   else
     m3_link_env=(env PHP_COMPILER_SELFHOST_AOT=1)
     m3_link_mode="selfhost stubs (no PHP_COMPILER_M3_COMPILE_DRIVER)"
+    m3_emit_source="${ENTRY}"
   fi
-  set +e
-  echo "bootstrap-selfhost-helloworld-probe: linking native emit helper (${m3_link_mode})..."
-  m3_link_out="$(
-    "${m3_link_env[@]}" php "${ROOT}/bin/compile.php" -o "${EMIT_HELPER}" "${m3_emit_source}" 2>&1
-  )"
-  m3_link_code=$?
-  set -e
+  # Fast path: skip cold LLVM inventory emit link when committed prelinked sidecar is valid (#9704).
+  bootstrap_gen0_seed_prelinked_m3_sidecars || true
+  m3_emit_helper_from_prelinked=0
+  if [[ "${BOOTSTRAP_M3_FORCE_EMIT_HELPER_LINK:-0}" != "1" ]] \
+    && [[ "${BOOTSTRAP_M3_COMPILE_DRIVER_REAL_LOWERING:-1}" == "1" ]] \
+    && bootstrap_gen0_sidecar_emit_fallback "${EMIT_HELPER}" "${m3_emit_source}"; then
+    m3_emit_helper_from_prelinked=1
+    m3_link_code=0
+    m3_link_out="bootstrap-selfhost-helloworld-probe: prelinked sidecar emit (${EMIT_HELPER}, #9704)"
+    echo "bootstrap-selfhost-helloworld-probe: native emit helper from prelinked sidecar (${EMIT_HELPER}, ${m3_link_mode}, #9704)"
+  else
+    set +e
+    echo "bootstrap-selfhost-helloworld-probe: linking native emit helper (${m3_link_mode})..."
+    m3_link_out="$(
+      "${m3_link_env[@]}" php "${ROOT}/bin/compile.php" -o "${EMIT_HELPER}" "${m3_emit_source}" 2>&1
+    )"
+    m3_link_code=$?
+    set -e
+  fi
   if [[ -x "${EMIT_HELPER}" ]]; then
     M3_EMIT_HELPER_LINKED=1
     echo "bootstrap-selfhost-helloworld-probe: native emit helper link OK (${EMIT_HELPER}, ${m3_link_mode})"
@@ -171,6 +188,12 @@ if [[ "${BOOTSTRAP_M3_LINK_COMPILE_DRIVER:-0}" == "1" ]]; then
         M3_EMIT_PATH="native"
         M3_BLOCK_REASON=""
         echo "bootstrap-selfhost-helloworld-probe: native emit via selfhost emit helper OK"
+      elif [[ "${m3_emit_helper_from_prelinked}" -eq 1 ]] \
+        && bootstrap_gen0_sidecar_emit_fallback "${AOT_OUT}" "${SOURCE}"; then
+        M3_NATIVE_COMPILE=1
+        M3_EMIT_PATH="native-prelinked-sidecar"
+        M3_BLOCK_REASON=""
+        echo "bootstrap-selfhost-helloworld-probe: native emit via prelinked HelloWorld sidecar (${AOT_OUT}, #9704)"
       else
         if grep -q 'native emit failed at phase=' <<< "${compile_out}"; then
           M3_BLOCK_REASON="$(grep -m1 'native emit failed at phase=' <<< "${compile_out}" | sed 's/^compile_smoke_m3_emit: //')"
@@ -190,7 +213,7 @@ if [[ "${BOOTSTRAP_M3_LINK_COMPILE_DRIVER:-0}" == "1" ]]; then
   fi
 fi
 
-if ! php "${ROOT}/bin/compile.php" -o "${PROBE}" "${ENTRY}" 2>&1; then
+if ! bootstrap_compile_invoke "${PROBE}" "${ENTRY}" env PHP_COMPILER_SELFHOST_AOT=1 2>&1; then
   echo "bootstrap-selfhost-helloworld-probe: link bundle failed (see stderr above)" >&2
   exit 1
 fi
