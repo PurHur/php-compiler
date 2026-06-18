@@ -6,7 +6,6 @@ namespace PHPCompiler\JIT\Builtin;
 
 use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Context;
-use PHPCompiler\JIT\JitFloatCompare;
 use PHPCompiler\JIT\Variable;
 use PHPLLVM\BasicBlock;
 use PHPLLVM\Builder;
@@ -14,9 +13,10 @@ use PHPLLVM\Value;
 use PHPLLVM\Value\Function_ as LlvmFunction;
 
 /**
- * LLVM spaceship (<=>) for boxed values, objects, and hashtables (#5185).
+ * LLVM spaceship (<=>) dispatch for boxed values, objects, and hashtables (#5185, #9381).
  *
- * Mirrors former lib/AOT/runtime/phpc_spaceship.c; semantics SSOT {@see \PHPCompiler\VM\Variable}.
+ * Scalar compare semantics route through compiled {@see \PHPCompiler\VM\CompareJitHelper};
+ * object/hashtable walks remain LLVM until ObjectEntry/HashTable JIT calls land.
  */
 final class SpaceshipCompareJit
 {
@@ -227,7 +227,7 @@ final class SpaceshipCompareJit
                 $context->builder->call($context->lookupFunction('__value__readLong'), $left),
                 $context->builder->call($context->lookupFunction('__value__readLong'), $right)
             ),
-            self::TYPE_DOUBLE => fn () => JitFloatCompare::spaceship(
+            self::TYPE_DOUBLE => fn () => self::doubleSpaceship(
                 $context,
                 $context->builder->call($context->lookupFunction('__value__readDouble'), $left),
                 $context->builder->call($context->lookupFunction('__value__readDouble'), $right)
@@ -424,7 +424,7 @@ final class SpaceshipCompareJit
             $rMatch = $context->builder->icmp(Builder::INT_EQ, $rkind, $i32->constInt($rk, false));
             $context->builder->branchIf($context->builder->and($lMatch, $rMatch), $match, $next);
             $context->builder->positionAtEnd($match);
-            $context->builder->returnValue(JitFloatCompare::spaceship($context, $zeroDbl, $readRightNum()));
+            $context->builder->returnValue(self::doubleSpaceship($context, $zeroDbl, $readRightNum()));
             $check = $next;
         }
 
@@ -443,12 +443,12 @@ final class SpaceshipCompareJit
             $rMatch = $context->builder->icmp(Builder::INT_EQ, $rkind, $i32->constInt(self::TYPE_NULL, false));
             $context->builder->branchIf($context->builder->and($lMatch, $rMatch), $match, $next);
             $context->builder->positionAtEnd($match);
-            $context->builder->returnValue(JitFloatCompare::spaceship($context, $readLeftNum(), $zeroDbl));
+            $context->builder->returnValue(self::doubleSpaceship($context, $readLeftNum(), $zeroDbl));
             $check = $next;
         }
 
         $longDoubleCases = [
-            [self::TYPE_LONG, self::TYPE_DOUBLE, fn () => JitFloatCompare::spaceship(
+            [self::TYPE_LONG, self::TYPE_DOUBLE, fn () => self::doubleSpaceship(
                 $context,
                 $context->builder->sitofp(
                     $context->builder->call($context->lookupFunction('__value__readLong'), $left),
@@ -456,7 +456,7 @@ final class SpaceshipCompareJit
                 ),
                 $context->builder->call($context->lookupFunction('__value__readDouble'), $right)
             )],
-            [self::TYPE_DOUBLE, self::TYPE_LONG, fn () => JitFloatCompare::spaceship(
+            [self::TYPE_DOUBLE, self::TYPE_LONG, fn () => self::doubleSpaceship(
                 $context,
                 $context->builder->call($context->lookupFunction('__value__readDouble'), $left),
                 $context->builder->sitofp(
@@ -495,7 +495,11 @@ final class SpaceshipCompareJit
 
         $context->builder->positionAtEnd($check);
         $context->builder->returnValue(
-            self::longSpaceship($context, self::i64FromI32($context, $lkind), self::i64FromI32($context, $rkind))
+            self::kindSpaceship(
+                $context,
+                self::i64FromI32($context, $lkind),
+                self::i64FromI32($context, $rkind)
+            )
         );
     }
 
@@ -948,21 +952,13 @@ final class SpaceshipCompareJit
 
     private static function stringSpaceship(Context $context, Value $left, Value $right): Value
     {
-        $cmp = $context->builder->call(
-            $context->lookupFunction('strcmp'),
-            self::stringData($context, $left),
-            self::stringData($context, $right)
+        $fn = SpaceshipRuntime::compareHelper(
+            $context,
+            'PHPCompiler\\VM\\CompareJitHelper::stringSpaceship'
         );
-        $i32 = $context->getTypeFromString('int32');
-        $zero = $i32->constInt(0, false);
-        $lt = $context->builder->icmp(Builder::INT_SLT, $cmp, $zero);
-        $gt = $context->builder->icmp(Builder::INT_SGT, $cmp, $zero);
+        $cmp = $context->builder->call($fn, $left, $right);
 
-        return $context->builder->select(
-            $gt,
-            $i32->constInt(1, false),
-            $context->builder->select($lt, $i32->constInt(-1, false), $zero)
-        );
+        return $context->builder->trunc($cmp, $context->getTypeFromString('int32'));
     }
 
     private static function stringToBool(Context $context, Value $str): Value
@@ -982,84 +978,57 @@ final class SpaceshipCompareJit
         return $context->builder->select($falseVal, $i32->constInt(0, false), $i32->constInt(1, false));
     }
 
-    private static function stringIsNumeric(Context $context, Value $str): Value
-    {
-        $i8p = $context->getTypeFromString('int8*');
-        $i1 = $context->getTypeFromString('int1');
-        $i64 = $context->getTypeFromString('int64');
-        $len = self::stringLen($context, $str);
-        $empty = $context->builder->icmp(Builder::INT_EQ, $len, $len->typeOf()->constInt(0, false));
-        $endSlot = $context->builder->alloca($i8p, 1);
-        $context->builder->store($i8p->constNull(), $endSlot);
-        $data = self::stringData($context, $str);
-        $context->builder->call($context->lookupFunction('strtod'), $data, $endSlot);
-        $endPtr = $context->builder->load($endSlot);
-        $notParsed = $context->builder->icmp(Builder::INT_EQ, $endPtr, $data);
-        $consumed = $context->builder->sub(
-            $context->builder->ptrToInt($endPtr, $i64),
-            $context->builder->ptrToInt($data, $i64)
-        );
-        $full = $context->builder->icmp(Builder::INT_EQ, $consumed, $len);
-
-        return $context->builder->and(
-            $context->builder->select($empty, $i1->constInt(0, false), $full),
-            $context->builder->select($notParsed, $i1->constInt(0, false), $full)
-        );
-    }
-
-    private static function stringToNumeric(Context $context, Value $str): Value
-    {
-        $isNum = self::stringIsNumeric($context, $str);
-        $dbl = $context->getTypeFromString('double');
-        $zero = $dbl->constFloat(0.0);
-        $endSlot = $context->builder->alloca($context->getTypeFromString('int8*'), 1);
-        $context->builder->store($context->getTypeFromString('int8*')->constNull(), $endSlot);
-        $parsed = $context->builder->call(
-            $context->lookupFunction('strtod'),
-            self::stringData($context, $str),
-            $endSlot
-        );
-
-        return $context->builder->select($isNum, $parsed, $zero);
-    }
-
     private static function spaceshipNumberString(
         Context $context,
         Value $num,
         Value $str,
         bool $numOnLeft
     ): Value {
-        $i64 = $context->getTypeFromString('int64');
-        $len = self::stringLen($context, $str);
-        $empty = $context->builder->icmp(Builder::INT_EQ, $len, $len->typeOf()->constInt(0, false));
-        $emptyResult = $numOnLeft ? $i64->constInt(1, true) : $i64->constInt(-1, true);
-        $isNum = self::stringIsNumeric($context, $str);
-        $numCmp = JitFloatCompare::spaceship(
+        $fn = SpaceshipRuntime::compareHelper(
             $context,
+            'PHPCompiler\\VM\\CompareJitHelper::spaceshipNumberString'
+        );
+        $cmp = $context->builder->call(
+            $fn,
             $num,
-            self::stringToNumeric($context, $str)
+            $str,
+            $context->getTypeFromString('int32')->constInt($numOnLeft ? 1 : 0, false)
         );
-        $numericResult = $numOnLeft ? $numCmp : self::negateI64($context, $numCmp);
-        $fallback = $numOnLeft ? $i64->constInt(-1, true) : $i64->constInt(1, true);
 
-        return $context->builder->select(
-            $empty,
-            $emptyResult,
-            $context->builder->select($isNum, $numericResult, $fallback)
-        );
+        return $context->builder->sext($cmp, $context->getTypeFromString('int64'));
     }
 
     private static function longSpaceship(Context $context, Value $left, Value $right): Value
     {
-        $i64 = $context->getTypeFromString('int64');
-        $lt = $context->builder->icmp(Builder::INT_SLT, $left, $right);
-        $gt = $context->builder->icmp(Builder::INT_SGT, $left, $right);
-
-        return $context->builder->select(
-            $gt,
-            $i64->constInt(1, true),
-            $context->builder->select($lt, $i64->constInt(-1, true), $i64->constInt(0, false))
+        $fn = SpaceshipRuntime::compareHelper(
+            $context,
+            'PHPCompiler\\VM\\CompareJitHelper::longSpaceship'
         );
+        $cmp = $context->builder->call($fn, $left, $right);
+
+        return $context->builder->sext($cmp, $context->getTypeFromString('int64'));
+    }
+
+    private static function kindSpaceship(Context $context, Value $left, Value $right): Value
+    {
+        $fn = SpaceshipRuntime::compareHelper(
+            $context,
+            'PHPCompiler\\VM\\CompareJitHelper::kindSpaceship'
+        );
+        $cmp = $context->builder->call($fn, $left, $right);
+
+        return $context->builder->sext($cmp, $context->getTypeFromString('int64'));
+    }
+
+    private static function doubleSpaceship(Context $context, Value $left, Value $right): Value
+    {
+        $fn = SpaceshipRuntime::compareHelper(
+            $context,
+            'PHPCompiler\\VM\\CompareJitHelper::doubleSpaceship'
+        );
+        $cmp = $context->builder->call($fn, $left, $right);
+
+        return $context->builder->sext($cmp, $context->getTypeFromString('int64'));
     }
 
     private static function doubleToLong(Context $context, Value $num): Value
