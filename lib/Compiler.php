@@ -9532,6 +9532,7 @@ class Compiler {
             || $producer instanceof Op\Expr\ConstFetch
             || $producer instanceof Op\Expr\InstanceOf_
             || $producer instanceof Op\Expr\MagicScriptConst
+            || $producer instanceof Op\Expr\New_
         ) {
             return $producerSlot;
         }
