@@ -35,6 +35,18 @@ PHP;
         $this->assertSame('30', $this->runVm($code));
     }
 
+    public function testInlineArrayLiteralSubscriptInClassConst(): void
+    {
+        $code = <<<'PHP'
+<?php
+class C {
+    public const X = [1, 2][0];
+}
+echo C::X;
+PHP;
+        $this->assertSame('1', $this->runVm($code));
+    }
+
     private function runVm(string $code): string
     {
         $rt = new Runtime();

@@ -11665,7 +11665,7 @@ restart:
                 continue;
             }
             if (VM\ClassConstExpr::isSupportedOpcode($op->type)) {
-                VM\ClassConstExpr::execute($this->context, $frame, $op, $entry);
+                VM\ClassConstExpr::execute($this->context, $frame, $block, $op, $entry);
 
                 continue;
             }
@@ -12114,7 +12114,7 @@ restart:
         } else {
             foreach ($initOps as $op) {
                 if (VM\ClassConstExpr::isSupportedOpcode($op->type)) {
-                    VM\ClassConstExpr::execute($this->context, $frame, $op, $entry);
+                    VM\ClassConstExpr::execute($this->context, $frame, $block, $op, $entry);
                 } elseif ($this->isClassBodyConstInitOpcode($op->type)) {
                     $this->executeClassBodyConstInitOpcode($frame, $op);
                 } else {
