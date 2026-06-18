@@ -12,9 +12,12 @@ use PHPLLVM\Value;
 use PHPLLVM\Value\Function_ as LlvmFunction;
 
 /**
- * LLVM body for __compiler_strip_tags and st_* helper parity from superglobals_refresh.c.
+ * LLVM body for __compiler_strip_tags — AOT standalone only (#9196).
+ *
+ * JIT uses {@see StripTagsJitHelper} PHP; keep this until compiled PHP static storage is
+ * reliable in native standalone link (same pattern as {@see LastErrorRuntimeLlvm}).
  */
-final class StringStripTagsJit
+final class StringStripTagsStandaloneLlvm
 {
     private const ALLOWED_TAG_CAP = 32;
 
