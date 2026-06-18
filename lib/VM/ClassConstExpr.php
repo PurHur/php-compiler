@@ -170,7 +170,7 @@ final class ClassConstExpr
                     return;
                 }
             }
-            throw new \LogicException("Unknown class for constant fetch: {$className}");
+            throw new ClassConstForwardReferenceException($className, $constName);
         }
 
         $classEntry = $context->classes[$lcClass];
