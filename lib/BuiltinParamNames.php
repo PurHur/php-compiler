@@ -108,6 +108,8 @@ final class BuiltinParamNames
                 return ['short_options', 'long_options', 'rest_index'];
             case 'is_callable':
                 return ['value', 'syntax_only', 'callable_name'];
+            case 'iterator_to_array':
+                return ['iterator', 'preserve_keys'];
         }
 
         return null;
