@@ -58,6 +58,7 @@ final class IniRuntime
 
         $restoreBlock = self::captureInsertBlock($context);
         self::ensureGlobals($context);
+        AssertIniRuntime::ensureGlobals($context);
         self::ensureLibc($context);
         self::ensureValueWriters($context);
 
@@ -142,10 +143,16 @@ final class IniRuntime
         $deBb = $fn->appendBasicBlock('ig_de');
         $mlBb = $fn->appendBasicBlock('ig_ml');
         $spBb = $fn->appendBasicBlock('ig_sp');
+        $zaBb = $fn->appendBasicBlock('ig_za');
+        $aaBb = $fn->appendBasicBlock('ig_aa');
+        $aeBb = $fn->appendBasicBlock('ig_ae');
         $testEr = $fn->appendBasicBlock('ig_test_er');
         $testDe = $fn->appendBasicBlock('ig_test_de');
         $testMl = $fn->appendBasicBlock('ig_test_ml');
         $testSp = $fn->appendBasicBlock('ig_test_sp');
+        $testZa = $fn->appendBasicBlock('ig_test_za');
+        $testAa = $fn->appendBasicBlock('ig_test_aa');
+        $testAe = $fn->appendBasicBlock('ig_test_ae');
 
         $context->builder->positionAtEnd($entry);
         self::ensureMemoryLimitBuffer($context, $fn);
@@ -162,7 +169,10 @@ final class IniRuntime
         self::branchIfKey($context, $testEr, $optCstr, 'error_reporting', $erBb, $testDe);
         self::branchIfKey($context, $testDe, $optCstr, 'display_errors', $deBb, $testMl);
         self::branchIfKey($context, $testMl, $optCstr, 'memory_limit', $mlBb, $testSp);
-        self::branchIfKey($context, $testSp, $optCstr, 'serialize_precision', $spBb, $failBb);
+        self::branchIfKey($context, $testSp, $optCstr, 'serialize_precision', $spBb, $testZa);
+        self::branchIfKey($context, $testZa, $optCstr, 'zend.assertions', $zaBb, $testAa);
+        self::branchIfKey($context, $testAa, $optCstr, 'assert.active', $aaBb, $testAe);
+        self::branchIfKey($context, $testAe, $optCstr, 'assert.exception', $aeBb, $failBb);
 
         $context->builder->positionAtEnd($erBb);
         self::writeValueStringFromErGlobal($context, $out);
@@ -181,6 +191,21 @@ final class IniRuntime
 
         $context->builder->positionAtEnd($spBb);
         self::writeValueStringFromSerializePrecisionGlobal($context, $out);
+        self::freeCstr($context, $fn, $optCstr);
+        $context->builder->returnVoid();
+
+        $context->builder->positionAtEnd($zaBb);
+        self::writeValueStringFromAssertIntGlobal($context, $out, AssertIniRuntime::G_ZEND_ASSERTIONS);
+        self::freeCstr($context, $fn, $optCstr);
+        $context->builder->returnVoid();
+
+        $context->builder->positionAtEnd($aaBb);
+        self::writeValueStringFromAssertBoolGlobal($context, $fn, $out, AssertIniRuntime::G_ASSERT_ACTIVE);
+        self::freeCstr($context, $fn, $optCstr);
+        $context->builder->returnVoid();
+
+        $context->builder->positionAtEnd($aeBb);
+        self::writeValueStringFromAssertBoolGlobal($context, $fn, $out, AssertIniRuntime::G_ASSERT_EXCEPTION);
         self::freeCstr($context, $fn, $optCstr);
         $context->builder->returnVoid();
 
@@ -276,11 +301,17 @@ final class IniRuntime
         $deBb = $fn->appendBasicBlock('is_de');
         $mlBb = $fn->appendBasicBlock('is_ml');
         $spBb = $fn->appendBasicBlock('is_sp');
+        $zaBb = $fn->appendBasicBlock('is_za');
+        $aaBb = $fn->appendBasicBlock('is_aa');
+        $aeBb = $fn->appendBasicBlock('is_ae');
         $mlApplyBb = $fn->appendBasicBlock('is_ml_apply');
         $testEr = $fn->appendBasicBlock('is_test_er');
         $testDe = $fn->appendBasicBlock('is_test_de');
         $testMl = $fn->appendBasicBlock('is_test_ml');
         $testSp = $fn->appendBasicBlock('is_test_sp');
+        $testZa = $fn->appendBasicBlock('is_test_za');
+        $testAa = $fn->appendBasicBlock('is_test_aa');
+        $testAe = $fn->appendBasicBlock('is_test_ae');
 
         $context->builder->positionAtEnd($entry);
         self::ensureMemoryLimitBuffer($context, $fn);
@@ -299,7 +330,10 @@ final class IniRuntime
         self::branchIfKey($context, $testEr, $optCstr, 'error_reporting', $erBb, $testDe);
         self::branchIfKey($context, $testDe, $optCstr, 'display_errors', $deBb, $testMl);
         self::branchIfKey($context, $testMl, $optCstr, 'memory_limit', $mlBb, $testSp);
-        self::branchIfKey($context, $testSp, $optCstr, 'serialize_precision', $spBb, $failBb);
+        self::branchIfKey($context, $testSp, $optCstr, 'serialize_precision', $spBb, $testZa);
+        self::branchIfKey($context, $testZa, $optCstr, 'zend.assertions', $zaBb, $testAa);
+        self::branchIfKey($context, $testAa, $optCstr, 'assert.active', $aaBb, $testAe);
+        self::branchIfKey($context, $testAe, $optCstr, 'assert.exception', $aeBb, $failBb);
 
         $i32 = $context->getTypeFromString('int32');
 
@@ -355,6 +389,43 @@ final class IniRuntime
                 $i32
             ),
             self::globalPtr($context, self::G_SERIALIZE_PRECISION, $i32)
+        );
+        self::freeCstrPair($context, $fn, $optCstr, $valCstr);
+        $context->builder->returnVoid();
+
+        $context->builder->positionAtEnd($zaBb);
+        self::writeValueStringFromAssertIntGlobal($context, $out, AssertIniRuntime::G_ZEND_ASSERTIONS);
+        $endPtrSlot = $context->builder->alloca($i8p, 1, 'ini_za_strtol_end');
+        $context->builder->store($i8p->constNull(), $endPtrSlot);
+        $context->builder->store(
+            $context->builder->trunc(
+                $context->builder->call(
+                    $context->lookupFunction('strtol'),
+                    $valCstr,
+                    $endPtrSlot,
+                    $i32->constInt(10, false)
+                ),
+                $i32
+            ),
+            AssertIniRuntime::globalPtr($context, AssertIniRuntime::G_ZEND_ASSERTIONS)
+        );
+        self::freeCstrPair($context, $fn, $optCstr, $valCstr);
+        $context->builder->returnVoid();
+
+        $context->builder->positionAtEnd($aaBb);
+        self::writeValueStringFromAssertBoolGlobal($context, $fn, $out, AssertIniRuntime::G_ASSERT_ACTIVE);
+        $context->builder->store(
+            self::emitParseBoolIni($context, $fn, $valCstr),
+            AssertIniRuntime::globalPtr($context, AssertIniRuntime::G_ASSERT_ACTIVE)
+        );
+        self::freeCstrPair($context, $fn, $optCstr, $valCstr);
+        $context->builder->returnVoid();
+
+        $context->builder->positionAtEnd($aeBb);
+        self::writeValueStringFromAssertBoolGlobal($context, $fn, $out, AssertIniRuntime::G_ASSERT_EXCEPTION);
+        $context->builder->store(
+            self::emitParseBoolIni($context, $fn, $valCstr),
+            AssertIniRuntime::globalPtr($context, AssertIniRuntime::G_ASSERT_EXCEPTION)
         );
         self::freeCstrPair($context, $fn, $optCstr, $valCstr);
         $context->builder->returnVoid();
@@ -701,6 +772,44 @@ final class IniRuntime
         $oneBb = $fn->appendBasicBlock('ig_de_one');
         $zeroBb = $fn->appendBasicBlock('ig_de_zero');
         $doneBb = $fn->appendBasicBlock('ig_de_done');
+        $context->builder->branchIf($isOn, $oneBb, $zeroBb);
+        $context->builder->positionAtEnd($oneBb);
+        $onePtr = $context->builder->pointerCast($context->constantFromString('1'), $i8p);
+        $context->builder->branch($doneBb);
+        $context->builder->positionAtEnd($zeroBb);
+        $zeroPtr = $context->builder->pointerCast($context->constantFromString('0'), $i8p);
+        $context->builder->branch($doneBb);
+        $context->builder->positionAtEnd($doneBb);
+        $phi = $context->builder->phi($i8p);
+        $phi->addIncoming($onePtr, $oneBb);
+        $phi->addIncoming($zeroPtr, $zeroBb);
+        self::writeValueStringFromCstr($context, $out, $phi);
+    }
+
+    private static function writeValueStringFromAssertIntGlobal(Context $context, Value $out, string $globalName): void
+    {
+        $i32 = $context->getTypeFromString('int32');
+        $buf = self::snprintfAlloca(
+            $context,
+            '%d',
+            [$context->builder->load(AssertIniRuntime::globalPtr($context, $globalName))]
+        );
+        self::writeValueStringFromCstr($context, $out, $buf);
+    }
+
+    private static function writeValueStringFromAssertBoolGlobal(
+        Context $context,
+        Value $fn,
+        Value $out,
+        string $globalName
+    ): void {
+        $i32 = $context->getTypeFromString('int32');
+        $i8p = $context->getTypeFromString('int8*');
+        $flag = $context->builder->load(AssertIniRuntime::globalPtr($context, $globalName));
+        $isOn = $context->builder->icmp(Builder::INT_NE, $flag, $i32->constInt(0, false));
+        $oneBb = $fn->appendBasicBlock('ig_assert_bool_one');
+        $zeroBb = $fn->appendBasicBlock('ig_assert_bool_zero');
+        $doneBb = $fn->appendBasicBlock('ig_assert_bool_done');
         $context->builder->branchIf($isOn, $oneBb, $zeroBb);
         $context->builder->positionAtEnd($oneBb);
         $onePtr = $context->builder->pointerCast($context->constantFromString('1'), $i8p);
