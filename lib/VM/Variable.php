@@ -1572,11 +1572,23 @@ restart:
 
                 return $value;
             case self::TYPE_OBJECT:
+                if (self::isEnumCaseOperand($this)) {
+                    throw new \TypeError(sprintf(
+                        'Unsupported operand types: %s',
+                        self::operandZendTypeName($this)
+                    ));
+                }
+
                 return self::toNumericForArithmeticFromVariable(
                     $this->objectToScalarString($vm, 'int'),
                     $vm,
                     $frame
                 );
+            case self::TYPE_ENUM_CASE:
+                throw new \TypeError(sprintf(
+                    'Unsupported operand types: %s',
+                    self::operandZendTypeName($this)
+                ));
         }
         throw new \TypeError(sprintf(
             'Unsupported operand types: %s',
