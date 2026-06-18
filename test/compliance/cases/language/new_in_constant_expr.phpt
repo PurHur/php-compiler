@@ -1,5 +1,5 @@
 --TEST--
-Language: new in class constant initializer must compile-error (#9373, Zend/zend_compile.c)
+Language: new in class constant initializer with ctor parens (#9431, PHP 8.3, Zend/zend_compile.c)
 --FILE--
 <?php
 class C {
@@ -8,5 +8,6 @@ class C {
 class Holder {
     public const X = new C(1);
 }
---EXPECT_EXIT--
-255
+var_dump(Holder::X->n);
+--EXPECT--
+int(1)

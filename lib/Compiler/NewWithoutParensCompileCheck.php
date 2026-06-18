@@ -9,13 +9,12 @@ use PHPCfg\Op\Expr\New_;
 use PHPCfg\Script;
 
 /**
- * Reject `new` in class **constant** initializers (#6549, #9373).
+ * Reject bare `new Class` (no ctor parens) in class **constant** initializers (#6549).
  *
- * php-src (8.2 reference): zend_compile_const_expr() rejects all `new` with
- * "New expressions are not supported in this context". PHP 8.3+ may allow
- * `new Class()` in constants (#9116); gate there when the language level rises.
- *
+ * PHP 8.3+ allows `new Class()` with explicit `()` in constants (#9116, #9431).
  * Property defaults may use `new` with or without `()` per PHP 8.1+ (#3391, #5362).
+ *
+ * @see Zend/zend_compile.c — zend_compile_const_expr()
  */
 final class NewWithoutParensCompileCheck
 {
@@ -23,7 +22,8 @@ final class NewWithoutParensCompileCheck
 
     public static function validate(Script $script, ?string $sourceCode = null): void
     {
-        $check = new self();
+        NewCtorParens::resetMatchCursor();
+        $check = new self($sourceCode);
         foreach ($script->main->cfg->children as $child) {
             if ($child instanceof Op\Stmt\Class_
                 || $child instanceof Op\Stmt\Interface_
@@ -33,6 +33,11 @@ final class NewWithoutParensCompileCheck
                 $check->walkClassLike($child);
             }
         }
+    }
+
+    public function __construct(
+        private readonly ?string $sourceCode = null
+    ) {
     }
 
     private function walkClassLike(
@@ -51,7 +56,7 @@ final class NewWithoutParensCompileCheck
     private function walkOps(array $ops): void
     {
         foreach ($ops as $op) {
-            if ($op instanceof New_) {
+            if ($op instanceof New_ && !NewCtorParens::hasCtorParens($op, $this->sourceCode)) {
                 throw new \CompileError(self::MESSAGE);
             }
             foreach ($op->getSubBlocks() as $sub) {

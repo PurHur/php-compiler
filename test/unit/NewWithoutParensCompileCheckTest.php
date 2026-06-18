@@ -46,9 +46,10 @@ PHP, 'new_with_parens.php');
         $this->assertNotNull($block);
     }
 
-    public function testClassConstNewWithParensCompileErrors(): void
+    public function testClassConstNewWithParensCompiles(): void
     {
-        $this->expectCompileError(<<<'PHP'
+        $runtime = new Runtime();
+        $block = $runtime->parseAndCompile(<<<'PHP'
 <?php
 class C {
     public function __construct(public int $n = 0) {}
@@ -56,17 +57,20 @@ class C {
 class Holder {
     public const X = new C(1);
 }
-PHP);
+PHP, 'new_with_parens_const.php');
+        $this->assertNotNull($block);
     }
 
-    public function testClassConstNewEmptyArgsWithParensCompileErrors(): void
+    public function testClassConstNewEmptyArgsWithParensCompiles(): void
     {
-        $this->expectCompileError(<<<'PHP'
+        $runtime = new Runtime();
+        $block = $runtime->parseAndCompile(<<<'PHP'
 <?php
 class C {
     public const X = new stdClass();
 }
-PHP);
+PHP, 'new_empty_parens_const.php');
+        $this->assertNotNull($block);
     }
 
     private function expectCompileError(string $code): void
