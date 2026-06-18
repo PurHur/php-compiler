@@ -14,9 +14,9 @@ namespace PHPCompiler\ext\standard;
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\ArrayBuiltinHelper;
+use PHPCompiler\JIT\Builtin\TypeErrorRaise;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\Variable as JITVariable;
-use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
 
 /**
@@ -35,24 +35,21 @@ final class array_replace_recursive extends Internal
         if (null === $frame->returnVar) {
             return;
         }
-        $first = $frame->calledArgs[0]->resolveIndirect();
-        if (Variable::TYPE_ARRAY !== $first->type) {
-            throw new \LogicException('array_replace_recursive() first argument must be an array in this compiler build');
-        }
+        $first = VmArray::requireArrayArgNum($frame->calledArgs[0]->resolveIndirect(), 'array_replace_recursive', 1);
         if (1 === $argc) {
-            $frame->returnVar->array($first->toArray()->replaceRecursiveCopy());
+            $frame->returnVar->array($first->replaceRecursiveCopy());
 
             return;
         }
         $others = [];
         for ($i = 1, $n = $argc; $i < $n; ++$i) {
-            $arg = $frame->calledArgs[$i]->resolveIndirect();
-            if (Variable::TYPE_ARRAY !== $arg->type) {
-                throw new \LogicException('array_replace_recursive() arguments must be arrays in this compiler build');
-            }
-            $others[] = $arg->toArray();
+            $others[] = VmArray::requireArrayArgNum(
+                $frame->calledArgs[$i]->resolveIndirect(),
+                'array_replace_recursive',
+                $i + 1
+            );
         }
-        $frame->returnVar->array($first->toArray()->replaceRecursiveCopy(...$others));
+        $frame->returnVar->array($first->replaceRecursiveCopy(...$others));
     }
 
     public Context $context;
@@ -61,6 +58,10 @@ final class array_replace_recursive extends Internal
     {
         if (\count($args) < 1) {
             throw new \ArgumentCountError('array_replace_recursive() expects at least 1 argument, 0 given');
+        }
+        TypeErrorRaise::ensureLinked($context);
+        foreach ($args as $i => $arg) {
+            JitArrayElem::requireArrayArgNum($context, $arg, 'array_replace_recursive', $i + 1);
         }
 
         return ArrayBuiltinHelper::arrayReplaceRecursive($context, $args[0], ...\array_slice($args, 1));
