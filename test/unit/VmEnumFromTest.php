@@ -141,4 +141,33 @@ PHP;
         $this->expectExceptionMessage('Level::from(): Argument #1 ($value) must be of type int, string given');
         $runtime->run($block);
     }
+
+    /** Issue #9603 — exact maintainer repro: valid backing values resolve to enum cases. */
+    public function testIssue9603EnumFromTryFromRepro(): void
+    {
+        $code = <<<'PHP'
+<?php
+enum E: string {
+    case A = 'a';
+}
+
+var_export(E::tryFrom('b') === null);
+echo "\n";
+var_export(E::tryFrom('a')->name);
+echo "\n";
+try {
+    E::from('a');
+    echo "from ok\n";
+} catch (ValueError $e) {
+    echo 'from fail: ', $e->getMessage(), "\n";
+}
+PHP;
+        $runtime = new Runtime();
+        $block = $runtime->parseAndCompile($code, 'issue_9603_enum_from.php');
+        ob_start();
+        $runtime->run($block);
+        $output = ob_get_clean();
+
+        $this->assertSame("true\n'A'\nfrom ok\n", $output);
+    }
 }
