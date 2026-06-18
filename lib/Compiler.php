@@ -3226,6 +3226,7 @@ class Compiler {
         AttributeNames::assertCompileTimeConstTargetOnly($return->attributeNames, 'class');
         $enumName = $this->staticNameFromOperand($enum->name);
         if (null !== $enumName) {
+            AttributeNames::assertAllowDynamicPropertiesNotOnEnum($return->attributeNames, $enumName);
             $this->registerAttributeClassFromEntries($enumName, $return->attributeEntries);
         }
         $return->classImplements = $this->interfaceNamesFromOperands($enum->implements);
