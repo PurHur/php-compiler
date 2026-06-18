@@ -26,6 +26,10 @@ final class EnumRelationalOperatorsJitTest extends BaseTest
             __DIR__.'/cases/language/enum_relational_scalar.phpt',
             'enum_relational_scalar.phpt'
         );
+        yield 'enum_scalar_compare.phpt' => self::parsePHPT(
+            __DIR__.'/cases/language/enum_scalar_compare.phpt',
+            'enum_scalar_compare.phpt'
+        );
     }
 
     public function setUp(): void
