@@ -6438,9 +6438,6 @@ class Compiler {
             if ($expr instanceof Op\Expr\Cast\Unset_) {
                 $this->throwCompileError('The (unset) cast is no longer supported');
             }
-            if ($expr instanceof Op\Expr\Cast\Void_ && !CompilerVersion::supportsNoDiscardAttribute()) {
-                $this->throwCompileError('The (void) cast is not supported for this language target');
-            }
             $line = $expr->getLine();
             return [new OpCode(
                 $this->getOpCodeTypeFromCastOp($expr),
@@ -6805,7 +6802,8 @@ class Compiler {
                 $return[] = $this->compileFuncCallExecOpcode(
                     $expr->result,
                     $block,
-                    max(0, $expr->getLine())
+                    max(0, $expr->getLine()),
+                    $expr
                 );
                 return $return;
             case Op\Expr\New_::class:
@@ -6866,7 +6864,8 @@ class Compiler {
                         $expr->args,
                         $expr->result,
                         $block,
-                        max(0, $expr->getLine())
+                        max(0, $expr->getLine()),
+                        $expr
                     )
                 );
             case Op\Expr\PropertyFetch::class:
@@ -13964,7 +13963,8 @@ class Compiler {
         array $args,
         Operand $result,
         Block $block,
-        int $startLine = 0
+        int $startLine = 0,
+        ?Op $cfgCallOp = null
     ): array {
         $return = [
             new OpCode(
@@ -13976,15 +13976,22 @@ class Compiler {
         foreach ($this->compileCallArgSends($args, $block) as $send) {
             $return[] = $send;
         }
-        $return[] = $this->compileFuncCallExecOpcode($result, $block, $startLine);
+        $return[] = $this->compileFuncCallExecOpcode($result, $block, $startLine, $cfgCallOp);
 
         return $return;
     }
 
-    protected function compileFuncCallExecOpcode(Operand $result, Block $block, int $startLine = 0): OpCode
-    {
+    protected function compileFuncCallExecOpcode(
+        Operand $result,
+        Block $block,
+        int $startLine = 0,
+        ?Op $cfgCallOp = null
+    ): OpCode {
         $line = $startLine > 0 ? $startLine : null;
-        if ($this->callNeedsReturnSlot($result, $block)) {
+        if (
+            $this->callNeedsReturnSlot($result, $block)
+            || $this->cfgCallOpImmediatelyVoidDiscarded($cfgCallOp, $block)
+        ) {
             return new OpCode(
                 OpCode::TYPE_FUNCCALL_EXEC_RETURN,
                 $this->compileOperand($result, $block, false),
@@ -13996,6 +14003,28 @@ class Compiler {
             OpCode::TYPE_FUNCCALL_EXEC_NORETURN,
             $line
         );
+    }
+
+    /**
+     * php-cfg splits `(void) f()` into adjacent FuncCall + Cast_Void with distinct SSA temps (#9779).
+     * Use EXEC_RETURN so #[\NoDiscard] sees an intentional discard (Zend zend_execute.c).
+     */
+    private function cfgCallOpImmediatelyVoidDiscarded(?Op $cfgCallOp, Block $block): bool
+    {
+        if (null === $cfgCallOp || null === $block->orig) {
+            return false;
+        }
+        $ops = $block->orig->children;
+        $count = \count($ops);
+        for ($i = 0; $i < $count - 1; ++$i) {
+            if ($ops[$i] !== $cfgCallOp) {
+                continue;
+            }
+
+            return $ops[$i + 1] instanceof Op\Expr\Cast\Void_;
+        }
+
+        return false;
     }
 
     protected function compileFuncCall(
@@ -14022,7 +14051,7 @@ class Compiler {
         foreach ($this->compileCallArgSends($args, $block, $calleeName, $cfgCallOp) as $send) {
             $return[] = $send;
         }
-        $return[] = $this->compileFuncCallExecOpcode($result, $block, $startLine);
+        $return[] = $this->compileFuncCallExecOpcode($result, $block, $startLine, $cfgCallOp);
         return $return;
     }
 
