@@ -54,6 +54,16 @@ final class AttributeNamesDuplicateTest extends TestCase
         AttributeNames::assertAllowDynamicPropertiesNotOnReadonlyClass(['AllowDynamicProperties'], 'R');
     }
 
+    public function testRejectsAllowDynamicPropertiesOnEnum(): void
+    {
+        $this->expectException(\CompileError::class);
+        $this->expectExceptionMessage(
+            'Cannot apply #[AllowDynamicProperties] to enum Bad'
+        );
+
+        AttributeNames::assertAllowDynamicPropertiesNotOnEnum(['AllowDynamicProperties'], 'Bad');
+    }
+
     public function testRejectsOverrideOnClass(): void
     {
         $this->expectException(\CompileError::class);

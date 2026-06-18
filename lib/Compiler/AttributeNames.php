@@ -120,6 +120,23 @@ final class AttributeNames
         );
     }
 
+    /**
+     * Zend compile-time guard (zend_compile.c, php-src GH-15731, issue #9734).
+     * `#[\AllowDynamicProperties]` has no meaning on enums.
+     *
+     * @param list<string> $names
+     */
+    public static function assertAllowDynamicPropertiesNotOnEnum(array $names, string $enumDisplay): void
+    {
+        if (!self::hasAllowDynamicProperties($names)) {
+            return;
+        }
+
+        throw new \CompileError(
+            'Cannot apply #[AllowDynamicProperties] to enum '.$enumDisplay
+        );
+    }
+
     /** PHP 8.2 #[\SensitiveParameter] on parameters (issue #3351, Zend zend_attributes.c). */
     public static function isSensitiveParameter(array $names): bool
     {
