@@ -1,0 +1,10 @@
+--- vendor/ircmaxell/php-cfg/lib/PHPCfg/Parser.php
++++ vendor/ircmaxell/php-cfg/lib/PHPCfg/Parser.php
+@@ -1558,6 +1558,7 @@
+         $excludedKeys = [];
+         foreach ($expr->items as $i => $item) {
+             if (null === $item) {
++                ++$logicalIndex;
+                 continue;
+             }
+ 
