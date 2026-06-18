@@ -608,23 +608,13 @@ class VM {
 
     /**
      * isset($obj->prop) — Zend zend_std_has_property / __isset parity (#3298, #4586).
-     * Hooked properties with get hooks invoke the hook; result is !is_null (#9107, zend_property_hooks.c).
+     * Hooked properties probe backing storage only — get hook is not invoked (#9671, zend_property_hooks.c).
      */
     public function objectPropertyIsSet(ObjectEntry $object, string $propName, ?Frame $frame = null): bool
     {
-        if (null !== $frame && $this->instancePropertyHasGetHook($object, $propName)) {
-            $hookValue = $this->fetchPropertyWithHooks($object, $propName, $frame);
-            if (null !== $hookValue) {
-                $value = $hookValue->resolveIndirect();
-
-                return !$value->isUndefined() && Variable::TYPE_NULL !== $value->type;
-            }
-        }
-        if (null !== $frame) {
-            $hookedIsset = $this->issetHookedPropertyWithoutGetHook($object, $propName);
-            if (null !== $hookedIsset) {
-                return $hookedIsset;
-            }
+        $hookedIsset = $this->issetHookedPropertyWithoutGetHook($object, $propName);
+        if (null !== $hookedIsset) {
+            return $hookedIsset;
         }
         $props = $object->getRawProperties();
         if (isset($props[$propName])) {
@@ -704,14 +694,6 @@ class VM {
         $catchFrame = $this->enforceWriteOnlyVirtualPropertyRead($object, $propName, $frame);
         if (null !== $catchFrame) {
             return $catchFrame;
-        }
-        if ($this->instancePropertyHasGetHook($object, $propName)) {
-            $hookValue = $this->fetchPropertyWithHooks($object, $propName, $frame);
-            if (null !== $hookValue) {
-                $dst->bool(!ext\standard\boolval::isTruthy($hookValue));
-
-                return null;
-            }
         }
         if ($this->emptyHookedPropertyViaBackingProbe($object, $propName, $dst)) {
             return null;
