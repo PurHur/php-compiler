@@ -49,12 +49,14 @@ final class CtypeRuntime
 
         $entry = $fn->appendBasicBlock('ctype_string_bridge_entry');
         $context->builder->positionAtEnd($entry);
+        $i64 = $context->getTypeFromString('int64');
         $result = $context->builder->call(
             self::helperFunction($context, self::CHECK_STRING),
             $fn->getParam(0),
-            $fn->getParam(1)
+            $context->builder->sext($fn->getParam(1), $i64)
         );
-        $context->builder->returnValue($result);
+        $i32 = $context->getTypeFromString('int32');
+        $context->builder->returnValue($context->builder->zExt($result, $i32));
         $context->registerFunction($abiName, $fn);
         $context->builder->clearInsertionPosition();
     }
@@ -107,12 +109,17 @@ final class CtypeRuntime
         $entry = $fn->appendBasicBlock('ctype_bridge_entry');
         $context->builder->positionAtEnd($entry);
 
+        $i64 = $context->getTypeFromString('int64');
         $args = [];
         for ($i = 0; $i < $paramCount; ++$i) {
-            $args[] = $fn->getParam($i);
+            $param = $fn->getParam($i);
+            $args[] = 0 === $i
+                ? $param
+                : $context->builder->sext($param, $i64);
         }
         $result = $context->builder->call(self::helperFunction($context, $helperLogical), ...$args);
-        $context->builder->returnValue($result);
+        $i32 = $context->getTypeFromString('int32');
+        $context->builder->returnValue($context->builder->zExt($result, $i32));
         $context->registerFunction($abiName, $fn);
         $context->builder->clearInsertionPosition();
     }
@@ -257,12 +264,37 @@ final class CtypeRuntime
 
         $runtime = $context->runtime;
         $path = \dirname(__DIR__, 3).self::HELPER_PATH;
-        $block = $runtime->parseAndCompile((string) \file_get_contents($path), 'CtypeJitHelper.php');
-        if (null === $block) {
-            throw new \LogicException('CtypeJitHelper.php parseAndCompile failed (#9234)');
+        $envKeys = [
+            'PHP_COMPILER_SELFHOST_AOT',
+            'PHP_COMPILER_EMIT_HELPER_LINK',
+            'PHP_COMPILER_M3_EMIT_TU',
+            'PHP_COMPILER_M3_COMPILE_DRIVER',
+        ];
+        $prevEnv = [];
+        if (\function_exists('putenv')) {
+            foreach ($envKeys as $key) {
+                $prevEnv[$key] = \getenv($key);
+                \putenv($key.'=0');
+            }
         }
-        $jit = new JIT($context);
-        $jit->compile($block);
+        try {
+            $block = $runtime->parseAndCompile((string) \file_get_contents($path), 'CtypeJitHelper.php');
+            if (null === $block) {
+                throw new \LogicException('CtypeJitHelper.php parseAndCompile failed (#9234)');
+            }
+            $jit = new JIT($context);
+            $jit->compile($block);
+        } finally {
+            if (\function_exists('putenv')) {
+                foreach ($prevEnv as $key => $val) {
+                    if (false === $val || null === $val) {
+                        \putenv($key.'=');
+                    } else {
+                        \putenv($key.'='.$val);
+                    }
+                }
+            }
+        }
         foreach ($needed as $lc) {
             if (!isset($context->functions[$lc])) {
                 throw new \LogicException($lc.' was not compiled for JIT (#9234)');

@@ -29,6 +29,6 @@ final class SleepJitRuntimeShrinkTest extends TestCase
 
     public function testTimeNanosleepZeroSleepReturnsTrue(): void
     {
-        $this->assertSame(1, \PHPCompiler\ext\standard\SleepJitHelper::timeNanosleep(0, 0));
+        $this->assertTrue(\PHPCompiler\ext\standard\SleepJitHelper::timeNanosleep(0, 0));
     }
 }

@@ -12,20 +12,20 @@ namespace PHPCompiler\ext\ctype;
  */
 final class CtypeJitHelper
 {
-    /** @return int 1 when all bytes match, 0 otherwise (LLVM i32 ABI) */
-    public static function checkString(string $text, int $kind): int
+    /** @return bool LLVM i1 ABI; bridge zext to i32 for __phpc_ctype_* */
+    public static function checkString(string $text, int $kind): bool
     {
-        return VmCtype::checkString($text, $kind) ? 1 : 0;
+        return VmCtype::checkString($text, $kind);
     }
 
-    /** @return int 1 when the code point matches, 0 otherwise (LLVM i32 ABI) */
-    public static function checkInt(int $value, int $kind, int $allowDigits, int $allowMinus): int
+    /** @return bool LLVM i1 ABI; bridge zext to i32 for __phpc_ctype_* */
+    public static function checkInt(int $value, int $kind, int $allowDigits, int $allowMinus): bool
     {
         return VmCtype::checkInt(
             $value,
             $kind,
             0 !== $allowDigits,
             0 !== $allowMinus
-        ) ? 1 : 0;
+        );
     }
 }

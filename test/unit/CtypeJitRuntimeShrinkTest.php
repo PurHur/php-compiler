@@ -33,8 +33,8 @@ final class CtypeJitRuntimeShrinkTest extends TestCase
 
     public function testCtypeJitHelperSemanticsMatchVmCtype(): void
     {
-        $this->assertSame(1, \PHPCompiler\ext\ctype\CtypeJitHelper::checkString('A', \PHPCompiler\ext\ctype\VmCtype::KIND_ALPHA));
-        $this->assertSame(0, \PHPCompiler\ext\ctype\CtypeJitHelper::checkString('5', \PHPCompiler\ext\ctype\VmCtype::KIND_ALPHA));
-        $this->assertSame(1, \PHPCompiler\ext\ctype\CtypeJitHelper::checkInt(97, \PHPCompiler\ext\ctype\VmCtype::KIND_LOWER, 0, 0));
+        $this->assertTrue(\PHPCompiler\ext\ctype\CtypeJitHelper::checkString('A', \PHPCompiler\ext\ctype\VmCtype::KIND_ALPHA));
+        $this->assertFalse(\PHPCompiler\ext\ctype\CtypeJitHelper::checkString('5', \PHPCompiler\ext\ctype\VmCtype::KIND_ALPHA));
+        $this->assertTrue(\PHPCompiler\ext\ctype\CtypeJitHelper::checkInt(97, \PHPCompiler\ext\ctype\VmCtype::KIND_LOWER, 0, 0));
     }
 }

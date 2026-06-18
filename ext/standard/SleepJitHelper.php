@@ -12,17 +12,17 @@ namespace PHPCompiler\ext\standard;
  */
 final class SleepJitHelper
 {
-    /** @return int 1 on success, 0 on failure (LLVM i32 ABI) */
-    public static function timeNanosleep(int $seconds, int $nanoseconds): int
+    /** @return bool LLVM i1 ABI; bridge zext to i32 for __compiler_time_* */
+    public static function timeNanosleep(int $seconds, int $nanoseconds): bool
     {
         $result = VmSleepPure::timeNanosleep($seconds, $nanoseconds);
 
-        return true === $result ? 1 : 0;
+        return true === $result;
     }
 
-    /** @return int 1 on success, 0 on failure (LLVM i32 ABI) */
-    public static function timeSleepUntil(float $timestamp): int
+    /** @return bool LLVM i1 ABI; bridge zext to i32 for __compiler_time_* */
+    public static function timeSleepUntil(float $timestamp): bool
     {
-        return VmSleepPure::timeSleepUntil($timestamp) ? 1 : 0;
+        return VmSleepPure::timeSleepUntil($timestamp);
     }
 }
