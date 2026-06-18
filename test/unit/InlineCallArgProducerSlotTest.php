@@ -510,4 +510,36 @@ PHP;
         self::assertNotNull($spaceshipSlot, 'spaceship result slot must be lowered');
         self::assertSame($spaceshipSlot, $varDumpSend, 'var_dump arg send='.$varDumpSend);
     }
+
+    /** Issue #9660 — var_export(enum === scalar, true) wires Identical producer, not hoisted true literal. */
+    public function testVarExportEnumIdenticalScalarUsesIdenticalProducerSlot(): void
+    {
+        $code = <<<'PHP'
+<?php
+enum E: int { case A = 1; }
+echo var_export(E::A === 1, true);
+PHP;
+        $runtime = new Runtime();
+        $block = $runtime->parseAndCompile($code, 'enum_identical_var_export.php');
+
+        $identSlot = null;
+        $constSlot = null;
+        $sendSlots = [];
+        foreach ($block->opCodes as $op) {
+            if (OpCode::TYPE_IDENTICAL === $op->type) {
+                $identSlot = $op->arg1;
+            }
+            if (OpCode::TYPE_CONST_FETCH === $op->type) {
+                $constSlot = $op->arg1;
+            }
+            if (OpCode::TYPE_ARG_SEND === $op->type) {
+                $sendSlots[] = $op->arg1;
+            }
+        }
+
+        self::assertNotNull($identSlot);
+        self::assertCount(2, $sendSlots);
+        self::assertSame($identSlot, $sendSlots[0], 'arg sends='.json_encode($sendSlots));
+        self::assertNotSame($identSlot, $sendSlots[1], 'arg sends='.json_encode($sendSlots));
+    }
 }
