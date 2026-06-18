@@ -10100,6 +10100,7 @@ class Compiler {
                 if (
                     (null === $callArg || !$this->operandsReferToSameVariable($paired->result, $callArg))
                     && $argCount > 1
+                    && !$this->callArgsAreDistinctInlineTemporaries($callArgs)
                 ) {
                     return null;
                 }
@@ -10606,6 +10607,7 @@ class Compiler {
                 ($child instanceof Op\Expr\FuncCall || $child instanceof Op\Expr\NsFuncCall)
                 && !$this->inlineCallArgProducerFeedsConsumer($child, $callOp)
                 && !$this->isNestedCallArgProducerForConsumer($child, $callOp, $i, $callIndex, $cfgChildren)
+                && !$this->isSiblingMultiArgFuncCallProducer($child, $callOp, $i, $callIndex, $cfgChildren)
             ) {
                 break;
             }
@@ -10672,6 +10674,59 @@ class Compiler {
             || $this->operandsReferToSameVariable($consumer->name, $callee->result);
     }
 
+    /**
+     * php-cfg `var_dump($g(), $g())` hoists sibling FuncCall producers with dead arg temps (#9463).
+     *
+     * @param list<Op> $cfgChildren
+     */
+    private function isSiblingMultiArgFuncCallProducer(
+        Op\Expr $producer,
+        Op $consumer,
+        int $producerIndex,
+        int $consumerIndex,
+        array $cfgChildren
+    ): bool {
+        if (
+            !$producer instanceof Op\Expr\FuncCall
+            && !$producer instanceof Op\Expr\NsFuncCall
+        ) {
+            return false;
+        }
+        if (
+            !$consumer instanceof Op\Expr\FuncCall
+            && !$consumer instanceof Op\Expr\NsFuncCall
+        ) {
+            return false;
+        }
+        if (!property_exists($consumer, 'args') || !is_array($consumer->args)) {
+            return false;
+        }
+        $argCount = count($consumer->args);
+        if ($argCount < 2) {
+            return false;
+        }
+        foreach ($consumer->args as $callArg) {
+            if (!$callArg instanceof Operand\Temporary) {
+                return false;
+            }
+        }
+        $distance = $consumerIndex - $producerIndex;
+        if ($distance < 1 || $distance > $argCount) {
+            return false;
+        }
+        for ($j = $producerIndex + 1; $j < $consumerIndex; ++$j) {
+            $mid = $cfgChildren[$j] ?? null;
+            if (
+                !$mid instanceof Op\Expr\FuncCall
+                && !$mid instanceof Op\Expr\NsFuncCall
+            ) {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
     private function isAdjacentNestedFuncCallProducer(
         Op\Expr $producer,
         Op $consumer,
@@ -10719,6 +10774,25 @@ class Compiler {
             && $arg->name instanceof Operand\Literal
             && is_string($arg->name->value)
             && '' !== $arg->name->value;
+    }
+
+    /**
+     * php-cfg dead multi-arg temps with no dataflow to hoisted producers (#9463, #9351).
+     *
+     * @param list<Operand> $callArgs
+     */
+    private function callArgsAreDistinctInlineTemporaries(array $callArgs): bool
+    {
+        if (count($callArgs) < 2) {
+            return false;
+        }
+        foreach ($callArgs as $callArg) {
+            if (!$callArg instanceof Operand\Temporary) {
+                return false;
+            }
+        }
+
+        return true;
     }
 
     /**
