@@ -711,6 +711,9 @@ class JIT {
             return true;
         }
         $className = strtolower($this->context->type->object->classNameForId($classId));
+        if ('' !== $className && str_ends_with($className, 'jithelper')) {
+            return false;
+        }
         if ('' === $className) {
             return $this->shouldUseSelfHostJitStubs()
                 || $this->shouldUseEmitHelperLinkStubs()

@@ -87,7 +87,7 @@ final class TimeSleepRuntime
         $result = $context->builder->call($helper, ...$args);
 
         $i32 = $context->getTypeFromString('int32');
-        $context->builder->returnValue($context->builder->trunc($result, $i32));
+        $context->builder->returnValue($context->builder->zExt($result, $i32));
     }
 
     private static function helperFunction(Context $context, string $logical): LlvmFunction
