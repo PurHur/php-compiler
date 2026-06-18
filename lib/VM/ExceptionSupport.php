@@ -65,8 +65,24 @@ final class ExceptionSupport
     /** Zend zend_exceptions.c — captured stack on throw (#3351, #7159). */
     public const PROP_TRACE = 'trace';
 
-    /** Zend zend_exceptions.c — throw non-Throwable raises Error (#5223, #5727). */
+    /** Zend zend_exceptions.c — throw non-Throwable object raises Error (#5223, #5727). */
     public const THROW_NON_THROWABLE_MESSAGE = 'Cannot throw objects that do not implement Throwable';
+
+    /** Zend zend_execute.c — throw scalar/array raises Error (#5727, re-#9488). */
+    public const THROW_ONLY_OBJECTS_MESSAGE = 'Can only throw objects';
+
+    /**
+     * Zend zend_throw_non_object — message depends on operand kind (#5727, #9488).
+     */
+    public static function throwNormalizeErrorMessage(Variable $var): string
+    {
+        $var = $var->resolveIndirect();
+        if (Variable::TYPE_OBJECT === $var->type || Variable::TYPE_ENUM_CASE === $var->type) {
+            return self::THROW_NON_THROWABLE_MESSAGE;
+        }
+
+        return self::THROW_ONLY_OBJECTS_MESSAGE;
+    }
 
     public static function requireThrowableObject(Variable $var, string $label, ?Context $ctx = null): ObjectEntry
     {

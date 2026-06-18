@@ -396,7 +396,7 @@ final class TryCatchHelper
                 self::emitCatchableClassError(
                     $context,
                     \PHPCompiler\VM\ExceptionSupport::CLASS_ERROR,
-                    \PHPCompiler\VM\ExceptionSupport::THROW_NON_THROWABLE_MESSAGE,
+                    \PHPCompiler\VM\ExceptionSupport::THROW_ONLY_OBJECTS_MESSAGE,
                     $jit
                 );
 
@@ -417,7 +417,7 @@ final class TryCatchHelper
             self::emitCatchableClassError(
                 $context,
                 \PHPCompiler\VM\ExceptionSupport::CLASS_ERROR,
-                \PHPCompiler\VM\ExceptionSupport::THROW_NON_THROWABLE_MESSAGE,
+                \PHPCompiler\VM\ExceptionSupport::THROW_ONLY_OBJECTS_MESSAGE,
                 $jit
             );
 

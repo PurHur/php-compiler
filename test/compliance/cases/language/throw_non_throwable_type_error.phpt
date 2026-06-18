@@ -34,7 +34,7 @@ try {
     echo 'object: Error: ', $e->getMessage(), "\n";
 }
 --EXPECT--
-string: Error: Cannot throw objects that do not implement Throwable
-int: Error: Cannot throw objects that do not implement Throwable
-array: Error: Cannot throw objects that do not implement Throwable
+string: Error: Can only throw objects
+int: Error: Can only throw objects
+array: Error: Can only throw objects
 object: Error: Cannot throw objects that do not implement Throwable
