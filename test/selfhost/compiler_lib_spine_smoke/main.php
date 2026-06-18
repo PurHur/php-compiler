@@ -758,6 +758,8 @@ require_once __DIR__.'/../../../ext/standard/JitZlib.php';
 require_once __DIR__.'/../../../ext/standard/Module.php';
 require_once __DIR__.'/../../../ext/standard/ModuleRegistry.php';
 require_once __DIR__.'/../../../ext/standard/NativeLastError.php';
+require_once __DIR__.'/../../../ext/standard/ErrorLastJitHelper.php';
+require_once __DIR__.'/../../../ext/standard/ErrorLastJitHelper.php';
 require_once __DIR__.'/../../../ext/standard/NativeObStorage.php';
 require_once __DIR__.'/../../../ext/standard/PackEngine.php';
 require_once __DIR__.'/../../../ext/standard/ParseIniEngine.php';

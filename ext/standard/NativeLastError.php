@@ -8,56 +8,59 @@ use PHPCompiler\VM\HashTable;
 use PHPCompiler\VM\Variable;
 
 /**
- * Zend-style last-error state for VM (ext/standard/basic_functions.c; issue #5534).
+ * Zend-style last-error state for VM + JIT/AOT (ext/standard/basic_functions.c; issue #5534, #9454).
  *
- * JIT/AOT use {@see \PHPCompiler\JIT\Builtin\LastErrorRuntime} LLVM globals with the same semantics.
+ * VM delegates to {@see ErrorLastJitHelper}; JIT/AOT compile that helper into the module.
  */
 final class NativeLastError
 {
-    /** @var array{type: int, message: string, file: string, line: int}|null */
-    private static ?array $lastError = null;
-
     public static function clear(): void
     {
-        self::$lastError = null;
+        ErrorLastJitHelper::clear();
     }
 
     public static function isActive(): bool
     {
-        return null !== self::$lastError;
+        return ErrorLastJitHelper::isActive();
     }
 
     public static function record(int $type, string $message, ?string $file, int $line): void
     {
-        self::$lastError = [
-            'type' => $type,
-            'message' => $message,
-            'file' => null !== $file ? $file : '',
-            'line' => $line,
-        ];
+        ErrorLastJitHelper::record($type, $message, null !== $file ? $file : '', $line);
+    }
+
+    public static function toHashTable(): ?HashTable
+    {
+        if (!ErrorLastJitHelper::isActive()) {
+            return null;
+        }
+
+        $ht = new HashTable();
+        $typeVar = new Variable(Variable::TYPE_INTEGER);
+        $typeVar->int(ErrorLastJitHelper::getType());
+        $ht->add('type', $typeVar);
+        $messageVar = new Variable(Variable::TYPE_STRING);
+        $messageVar->string(ErrorLastJitHelper::getMessage());
+        $ht->add('message', $messageVar);
+        $fileVar = new Variable(Variable::TYPE_STRING);
+        $fileVar->string(ErrorLastJitHelper::getFile());
+        $ht->add('file', $fileVar);
+        $lineVar = new Variable(Variable::TYPE_INTEGER);
+        $lineVar->int(ErrorLastJitHelper::getLine());
+        $ht->add('line', $lineVar);
+
+        return $ht;
     }
 
     public static function getLastErrorVariable(): Variable
     {
         $out = new Variable();
-        if (null === self::$lastError) {
+        $ht = self::toHashTable();
+        if (null === $ht) {
             $out->null();
 
             return $out;
         }
-        $ht = new HashTable();
-        $typeVar = new Variable(Variable::TYPE_INTEGER);
-        $typeVar->int(self::$lastError['type']);
-        $ht->add('type', $typeVar);
-        $messageVar = new Variable(Variable::TYPE_STRING);
-        $messageVar->string(self::$lastError['message']);
-        $ht->add('message', $messageVar);
-        $fileVar = new Variable(Variable::TYPE_STRING);
-        $fileVar->string(self::$lastError['file']);
-        $ht->add('file', $fileVar);
-        $lineVar = new Variable(Variable::TYPE_INTEGER);
-        $lineVar->int(self::$lastError['line']);
-        $ht->add('line', $lineVar);
         $out->array($ht);
 
         return $out;
