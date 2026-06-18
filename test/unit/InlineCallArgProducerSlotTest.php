@@ -357,6 +357,21 @@ PHP;
         self::assertSame([$castSlot], $sendSlots, 'arg sends='.json_encode($sendSlots));
     }
 
+    /** Bootstrap helloworld — New_ then static MethodCall (null var) must not TypeError in producer filter. */
+    public function testNewStaticMethodCallCompilesWithoutOperandNullTypeError(): void
+    {
+        $code = <<<'PHP'
+<?php
+class C {
+    public static function m(): int { return 1; }
+}
+var_dump((new C())::m());
+PHP;
+        $runtime = new Runtime();
+        $block = $runtime->parseAndCompile($code, 'new_static_method_call_arg.php');
+        self::assertNotEmpty($block->opCodes);
+    }
+
     /** Issue #9428 — var_dump((new C())->m()) wires MethodCall return, not New_ object. */
     public function testVarDumpNewMethodCallUsesMethodReturnSlot(): void
     {
