@@ -625,8 +625,48 @@ class Block {
         if (null === $operand) {
             return true;
         }
+        if ([] !== $operand->usages) {
+            return false;
+        }
 
-        return [] === $operand->usages;
+        return !$this->assignResultSlotConsumedByLaterOp($slot);
+    }
+
+    /**
+     * php-cfg may leave assign-expression result temps without usages when the value feeds a call arg (#6758, #9405).
+     */
+    private function assignResultSlotConsumedByLaterOp(int $slot): bool
+    {
+        $afterProducer = false;
+        for ($i = 0; $i < $this->nOpCodes; ++$i) {
+            $op = $this->opCodes[$i];
+            if (OpCode::TYPE_ASSIGN === $op->type && (int) $op->arg1 === $slot) {
+                $afterProducer = true;
+                continue;
+            }
+            if (!$afterProducer) {
+                continue;
+            }
+            if ($this->opCodeReadsScopeSlot($op, $slot)) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private function opCodeReadsScopeSlot(OpCode $op, int $slot): bool
+    {
+        if (OpCode::TYPE_ASSIGN === $op->type) {
+            return (int) $op->arg2 === $slot || (int) $op->arg3 === $slot;
+        }
+        foreach ([$op->arg1, $op->arg2, $op->arg3] as $arg) {
+            if (null !== $arg && (int) $arg === $slot) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     /** Yields [variable name, scope slot] pairs. */
