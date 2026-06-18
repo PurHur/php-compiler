@@ -31,8 +31,6 @@ final class GcCollectCyclesRuntime
 
     private const G_TOTAL_COLLECTED = 'phpc_gc_total_collected';
 
-    private const G_ENABLED = 'phpc_gc_enabled';
-
     private const G_ALLOW_DELREF = 'phpc_destruct_allow_delref';
 
     private const G_OBJECTS = 'phpc_gc_objects';
@@ -69,6 +67,7 @@ final class GcCollectCyclesRuntime
 
         self::$blockSuffix = 0;
         WeakRefRegistryRuntime::ensureLinked($context);
+        GcToggleRuntime::ensureLinked($context);
         self::ensureGlobals($context);
         self::ensureExternals($context);
         self::ensureInternalDeclarations($context);
@@ -78,10 +77,7 @@ final class GcCollectCyclesRuntime
         $i64 = $context->getTypeFromString('int64');
         $i8p = $context->getTypeFromString('int8*');
 
-        self::implementToggle($context, 'phpc_gc_enable', 1);
-        self::implementToggle($context, 'phpc_gc_disable', 0);
-        self::implementGcIsEnabled($context);
-        self::implementToggle($context, 'phpc_destruct_set_allow_delref', null, true);
+        self::implementAllowDelrefToggle($context);
         self::implementDestructDelrefAllowed($context);
         self::implementGcRegister($context);
         self::implementGcUnregister($context);
@@ -92,52 +88,28 @@ final class GcCollectCyclesRuntime
         self::registerLinkedRuntime($context);
     }
 
-    private static function implementToggle(Context $context, string $name, ?int $enabledValue, bool $useAllowDelrefGlobal = false): void
+    private static function implementAllowDelrefToggle(Context $context): void
     {
+        $name = 'phpc_destruct_set_allow_delref';
         $voidTy = $context->getTypeFromString('void');
         $i32 = $context->getTypeFromString('int32');
-        $i8p = $context->getTypeFromString('int8*');
-        $ft = $useAllowDelrefGlobal
-            ? $context->context->functionType($voidTy, false, $i32)
-            : $context->context->functionType($voidTy, false);
+        $ft = $context->context->functionType($voidTy, false, $i32);
         $fn = self::functionOrCreate($context, $name, $ft);
         if ($fn->countBasicBlocks() > 0) {
             return;
         }
         $entry = $fn->appendBasicBlock($name.'_entry');
         $context->builder->positionAtEnd($entry);
-        $globalName = $useAllowDelrefGlobal ? self::G_ALLOW_DELREF : self::G_ENABLED;
-        $globalPtr = self::globalPtr($context, $globalName, $i32);
-        if ($useAllowDelrefGlobal) {
-            $allow = $fn->getParam(0);
-            $isNonZero = $context->builder->icmp(Builder::INT_NE, $allow, $i32->constInt(0, false));
-            $one = $i32->constInt(1, false);
-            $zero = $i32->constInt(0, false);
-            $val = $context->builder->select($isNonZero, $one, $zero);
-            $context->builder->store($val, $globalPtr);
-        } else {
-            $context->builder->store($i32->constInt((int) $enabledValue, false), $globalPtr);
-        }
+        $globalPtr = self::globalPtr($context, self::G_ALLOW_DELREF, $i32);
+        $allow = $fn->getParam(0);
+        $isNonZero = $context->builder->icmp(Builder::INT_NE, $allow, $i32->constInt(0, false));
+        $one = $i32->constInt(1, false);
+        $zero = $i32->constInt(0, false);
+        $val = $context->builder->select($isNonZero, $one, $zero);
+        $context->builder->store($val, $globalPtr);
         $context->builder->returnVoid();
         $context->builder->clearInsertionPosition();
         $context->registerFunction($name, $fn);
-    }
-
-    private static function implementGcIsEnabled(Context $context): void
-    {
-        $i32 = $context->getTypeFromString('int32');
-        $ft = $context->context->functionType($i32, false);
-        $fn = self::functionOrCreate($context, 'phpc_gc_is_enabled', $ft);
-        if ($fn->countBasicBlocks() > 0) {
-            return;
-        }
-        $entry = $fn->appendBasicBlock('gc_is_enabled_entry');
-        $context->builder->positionAtEnd($entry);
-        $loaded = $context->builder->load(self::globalPtr($context, self::G_ENABLED, $i32));
-        $isOn = $context->builder->icmp(Builder::INT_NE, $loaded, $i32->constInt(0, false));
-        $context->builder->returnValue($context->builder->zext($isOn, $i32));
-        $context->builder->clearInsertionPosition();
-        $context->registerFunction('phpc_gc_is_enabled', $fn);
     }
 
     private static function implementDestructDelrefAllowed(Context $context): void
@@ -398,7 +370,7 @@ final class GcCollectCyclesRuntime
         $context->builder->positionAtEnd($entry);
 
         $i32 = $context->getTypeFromString('int32');
-        $enabled = $context->builder->load(self::globalPtr($context, self::G_ENABLED, $i32));
+        $enabled = $context->builder->call($context->lookupFunction('phpc_gc_is_enabled'));
         $isOff = $context->builder->icmp(Builder::INT_EQ, $enabled, $i32->constInt(0, false));
         $context->builder->branchIf($isOff, $early, $work);
 
@@ -881,7 +853,7 @@ final class GcCollectCyclesRuntime
         $collectedSlot = $context->builder->alloca($i32, 1, 'collect_n');
         $context->builder->store($i32->constInt(0, false), $collectedSlot);
 
-        $enabled = $context->builder->load(self::globalPtr($context, self::G_ENABLED, $i32));
+        $enabled = $context->builder->call($context->lookupFunction('phpc_gc_is_enabled'));
         $countPtr = self::globalPtr($context, self::G_COUNT, $i32);
         $count = $context->builder->load($countPtr);
         $disabled = $context->builder->icmp(Builder::INT_EQ, $enabled, $i32->constInt(0, false));
@@ -1188,10 +1160,6 @@ final class GcCollectCyclesRuntime
         if (null === $context->module->getNamedGlobal(self::G_TOTAL_COLLECTED)) {
             $g = $context->module->addGlobal($i32, self::G_TOTAL_COLLECTED);
             $g->setInitializer($i32->constInt(0, false));
-        }
-        if (null === $context->module->getNamedGlobal(self::G_ENABLED)) {
-            $g = $context->module->addGlobal($i32, self::G_ENABLED);
-            $g->setInitializer($i32->constInt(1, false));
         }
         if (null === $context->module->getNamedGlobal(self::G_ALLOW_DELREF)) {
             $g = $context->module->addGlobal($i32, self::G_ALLOW_DELREF);

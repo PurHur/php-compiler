@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace PHPCompiler\VM;
 
+use PHPCompiler\ext\standard\GcToggleJitHelper;
 use PHPCompiler\Frame;
 
 /**
@@ -16,25 +17,23 @@ final class CycleCollector
     /** Zend GC root-buffer threshold (zend_gc.c default). */
     public const ROOT_THRESHOLD = 10001;
 
-    private static bool $enabled = true;
-
     private static int $runs = 0;
 
     private static int $totalCollected = 0;
 
     public static function isEnabled(): bool
     {
-        return self::$enabled;
+        return GcToggleJitHelper::isEnabled();
     }
 
     public static function enable(): void
     {
-        self::$enabled = true;
+        GcToggleJitHelper::enable();
     }
 
     public static function disable(): void
     {
-        self::$enabled = false;
+        GcToggleJitHelper::disable();
     }
 
     /**
@@ -64,7 +63,7 @@ final class CycleCollector
 
     public static function collect(Context $ctx): int
     {
-        if (!self::$enabled) {
+        if (!GcToggleJitHelper::isEnabled()) {
             return 0;
         }
         ++self::$runs;
