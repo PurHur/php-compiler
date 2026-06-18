@@ -245,9 +245,8 @@ final class LanguageScanner
             }
             ++$this->pos;
         }
-        if (0 === ($this->flags & self::TOKEN_PARSE)) {
-            $this->pushToken($this->id('T_WHITESPACE'), \substr($this->source, $start, $this->pos - $start), $startLine);
-        }
+        // php-src ext/tokenizer/tokenizer.c: T_WHITESPACE is omitted only with TOKEN_SKIP_WHITESPACE (#9775).
+        $this->pushToken($this->id('T_WHITESPACE'), \substr($this->source, $start, $this->pos - $start), $startLine);
     }
 
     private function scanLineComment(): void
