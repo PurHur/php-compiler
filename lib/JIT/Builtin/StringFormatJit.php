@@ -2194,12 +2194,14 @@ final class StringFormatJit
         $context->builder->branchIf($noSignYet, $flagSpaceApply, $flagApply);
 
         $context->builder->positionAtEnd($flagSpaceApply);
-        $context->builder->store($i8->constInt(ord(' '), false), $signFlagSlot);
         $context->builder->branch($flagApply);
 
         $context->builder->positionAtEnd($flagHash);
-        $context->builder->store($context->getTypeFromString('int1')->constInt(1, false), $altFormSlot);
-        $context->builder->branch($flagApply);
+        TypeErrorRaise::registerDeclarations($context);
+        TypeErrorRaise::ensureLinked($context);
+        TypeErrorRaise::emitValueError($context, 'Unknown format specifier "#"');
+        $context->builder->call($context->lookupFunction('abort'));
+        $context->llvm->lib->LLVMBuildUnreachable($context->builder->builder);
 
         $context->builder->positionAtEnd($flagApply);
         $advanceParse();

@@ -65,14 +65,13 @@ final class VmSprintf
                 $args[$varIdx],
                 $frame,
                 $precision,
-                $parsed['showSign'],
-                $parsed['altForm']
+                $parsed['showSign']
             );
             $out .= self::applyWidth(
                 $converted,
                 $width,
                 $parsed['leftAdjust'],
-                $parsed['zeroPad'],
+                $parsed['padding'],
                 $parsed['spec']
             );
             if (VmString::byteLength($out) > self::MAX_OUTPUT) {
@@ -92,9 +91,8 @@ final class VmSprintf
      *     spec: string,
      *     positional: ?int,
      *     leftAdjust: bool,
-     *     zeroPad: bool,
+     *     padding: string,
      *     showSign: ?string,
-     *     altForm: bool,
      *     width: ?int,
      *     widthFromArg: bool,
      *     precision: ?int,
@@ -111,9 +109,8 @@ final class VmSprintf
                 'spec' => '',
                 'positional' => null,
                 'leftAdjust' => false,
-                'zeroPad' => false,
+                'padding' => ' ',
                 'showSign' => null,
-                'altForm' => false,
                 'width' => null,
                 'widthFromArg' => false,
                 'precision' => null,
@@ -142,9 +139,8 @@ final class VmSprintf
         }
 
         $leftAdjust = false;
-        $zeroPad = false;
+        $padding = ' ';
         $showSign = null;
-        $altForm = false;
         while ($pos < $len) {
             $flag = $format[$pos];
             if ('-' === $flag) {
@@ -152,8 +148,8 @@ final class VmSprintf
                 ++$pos;
                 continue;
             }
-            if ('0' === $flag) {
-                $zeroPad = true;
+            if (' ' === $flag || '0' === $flag) {
+                $padding = $flag;
                 ++$pos;
                 continue;
             }
@@ -162,17 +158,8 @@ final class VmSprintf
                 ++$pos;
                 continue;
             }
-            if (' ' === $flag) {
-                if (null === $showSign) {
-                    $showSign = ' ';
-                }
-                ++$pos;
-                continue;
-            }
             if ('#' === $flag) {
-                $altForm = true;
-                ++$pos;
-                continue;
+                throw new \ValueError('Unknown format specifier "#"');
             }
             break;
         }
@@ -218,9 +205,8 @@ final class VmSprintf
             'spec' => $format[$pos],
             'positional' => $positional,
             'leftAdjust' => $leftAdjust,
-            'zeroPad' => $zeroPad,
+            'padding' => $padding,
             'showSign' => $showSign,
-            'altForm' => $altForm,
             'width' => $width,
             'widthFromArg' => $widthFromArg,
             'precision' => $precision,
@@ -272,7 +258,7 @@ final class VmSprintf
         string $value,
         ?int $width,
         bool $leftAdjust,
-        bool $zeroPad,
+        string $padding,
         string $spec
     ): string {
         if (null === $width || $width <= VmString::byteLength($value)) {
@@ -280,13 +266,12 @@ final class VmSprintf
         }
         $padLen = $width - VmString::byteLength($value);
         if ($leftAdjust) {
-            return $value.str_repeat(' ', $padLen);
+            return $value.str_repeat($padding, $padLen);
         }
-        if ($zeroPad && 's' !== $spec) {
+        if ('0' === $padding && 's' !== $spec) {
             if (
                 str_starts_with($value, '-')
                 || str_starts_with($value, '+')
-                || str_starts_with($value, ' ')
             ) {
                 return $value[0].str_repeat('0', $padLen).substr($value, 1);
             }
@@ -294,7 +279,7 @@ final class VmSprintf
             return str_repeat('0', $padLen).$value;
         }
 
-        return str_repeat(' ', $padLen).$value;
+        return str_repeat($padding, $padLen).$value;
     }
 
     private static function applyConversion(
@@ -302,8 +287,7 @@ final class VmSprintf
         Variable $var,
         ?Frame $frame,
         ?int $precision,
-        ?string $showSign = null,
-        bool $altForm = false
+        ?string $showSign = null
     ): string {
         $floatPrec = $precision ?? 6;
         switch ($spec) {
@@ -314,13 +298,13 @@ final class VmSprintf
             case 'f':
                 return VmNumberFormat::format(self::argToFloat($var, $frame), $floatPrec, '.', '');
             case 'b':
-                return self::formatRadix(self::argToInt($var, $frame), 2, false, $altForm);
+                return self::formatRadix(self::argToInt($var, $frame), 2, false);
             case 'x':
-                return self::formatRadix(self::argToInt($var, $frame), 16, false, $altForm);
+                return self::formatRadix(self::argToInt($var, $frame), 16, false);
             case 'X':
-                return self::formatRadix(self::argToInt($var, $frame), 16, true, $altForm);
+                return self::formatRadix(self::argToInt($var, $frame), 16, true);
             case 'o':
-                return self::formatRadix(self::argToInt($var, $frame), 8, false, $altForm);
+                return self::formatRadix(self::argToInt($var, $frame), 8, false);
             case 'u':
                 return self::intToUnsignedDecimal(self::argToInt($var, $frame));
             case 'c':
@@ -442,9 +426,6 @@ final class VmSprintf
         if ('+' === $showSign) {
             return '+'.$digits;
         }
-        if (' ' === $showSign) {
-            return ' '.$digits;
-        }
 
         return $digits;
     }
@@ -452,20 +433,9 @@ final class VmSprintf
     /**
      * @param 2|8|16 $base
      */
-    private static function formatRadix(int $value, int $base, bool $upper, bool $altForm): string
+    private static function formatRadix(int $value, int $base, bool $upper): string
     {
-        $digits = self::intToRadix($value, $base, $upper);
-        if (!$altForm || 0 === $value) {
-            return $digits;
-        }
-        if (16 === $base) {
-            return ($upper ? '0X' : '0x').$digits;
-        }
-        if (8 === $base && isset($digits[0]) && '0' !== $digits[0]) {
-            return '0'.$digits;
-        }
-
-        return $digits;
+        return self::intToRadix($value, $base, $upper);
     }
 
     /**
