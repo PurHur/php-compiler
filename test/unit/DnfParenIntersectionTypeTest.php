@@ -39,6 +39,21 @@ final class DnfParenIntersectionTypeTest extends TestCase
         $this->assertSame('<?php function f(A|B $x): void {}', $rewritten);
     }
 
+    /** Issue #9766: non-capturing union catch must keep parens for php-parser. */
+    public function testRewriterKeepsParenthesizedUnionCatchType(): void
+    {
+        $source = '<?php try {} catch (LogicException|TypeError) {}';
+        $rewritten = DnfParenTypeRewriter::rewrite($source);
+        $this->assertSame($source, $rewritten);
+    }
+
+    public function testRewriterKeepsParenthesizedUnionCatchTypeWithVariable(): void
+    {
+        $source = '<?php try {} catch (LogicException|TypeError $e) {}';
+        $rewritten = DnfParenTypeRewriter::rewrite($source);
+        $this->assertSame($source, $rewritten);
+    }
+
     public function testParenthesizedIntersectionParamAndReturnCompileAndRun(): void
     {
         $runtime = new Runtime();
