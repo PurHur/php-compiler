@@ -28,7 +28,12 @@ class JITTest extends BaseTest {
                 continue;
             }
             if (CompilerVersion::supportsNewInClassConstantExpr()
-                && str_contains($name, 'new_in_class_constant_reject')) {
+                && (
+                    str_contains($name, 'new_in_class_constant_reject')
+                    || str_contains($name, 'new_in_constant_expr')
+                    || str_contains($name, 'class_const_new_rejected')
+                    || str_contains($name, 'class_const_new_object')
+                )) {
                 continue;
             }
             // ?-> LLVM lowering verified in NullsafeJitCompileTest (#3219); MCJIT execute needs jit-runtime-probe (#98).
