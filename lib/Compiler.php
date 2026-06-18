@@ -9624,6 +9624,21 @@ class Compiler {
         }
         if (null !== $callIndex && $callIndex > 0) {
             $prev = $block->orig->children[$callIndex - 1] ?? null;
+            if ($prev instanceof Op\Expr\ConstFetch) {
+                $name = $this->staticNameFromOperand($prev->name);
+                if (null !== $name && \in_array(strtolower($name), ['true', 'false', 'null'], true)) {
+                    $callArg = $callOp->args[$argIndex] ?? null;
+                    if (
+                        null !== $callArg
+                        && !$this->operandsReferToSameVariable($prev->result, $callArg)
+                    ) {
+                        $vm = $this->tryFoldGlobalConstFetch($prev);
+                        if (null !== $vm) {
+                            return (string) $block->registerConstant($arg, $vm);
+                        }
+                    }
+                }
+            }
             $argRoot = $this->unwrapOperandChain($arg);
             if (($prev instanceof Op\Expr\BinaryOp || $prev instanceof Op\Expr\InstanceOf_)
                 && null !== $prev->result
@@ -10206,8 +10221,7 @@ class Compiler {
                 ) {
                     return $producers[0];
                 }
-
-                return null;
+                // Fall through — php-cfg dead call-arg temp (#9140, #9260, #9324).
             }
             if (
                 $argCount - 1 === $argIndex
@@ -12654,6 +12668,62 @@ class Compiler {
     }
 
     /**
+     * php-cfg hoists `true`/`false`/`null` as a ConstFetch stmt before FuncCall with a dead arg temp (#9140, #9260).
+     */
+    private function tryFoldHoistedBoolNullLiteralCallArg(
+        Operand $arg,
+        Block $block,
+        ?Op $cfgCallOp,
+        int $argIndex
+    ): ?int {
+        if (null === $block->orig || null === $cfgCallOp || !property_exists($cfgCallOp, 'args')) {
+            return null;
+        }
+        $callArgs = $cfgCallOp->args;
+        if (!is_array($callArgs) || [] === $callArgs || $argIndex !== \count($callArgs) - 1) {
+            return null;
+        }
+        $children = $block->orig->children;
+        $callIndex = null;
+        foreach ($children as $i => $child) {
+            if ($child === $cfgCallOp) {
+                $callIndex = $i;
+                break;
+            }
+        }
+        if (null === $callIndex) {
+            return null;
+        }
+        for ($i = $callIndex - 1; $i >= 0 && $callIndex - $i <= 4; --$i) {
+            $prev = $children[$i] ?? null;
+            if (!$prev instanceof Op\Expr\ConstFetch) {
+                if ($prev instanceof Op\Expr\Assign || $prev instanceof Op\Expr\BinaryOp\Concat) {
+                    continue;
+                }
+                break;
+            }
+            $name = $this->staticNameFromOperand($prev->name);
+            if (null === $name || !\in_array(strtolower($name), ['true', 'false', 'null'], true)) {
+                break;
+            }
+            $callArg = $callArgs[$argIndex] ?? null;
+            if (
+                null !== $callArg
+                && !$this->operandsReferToSameVariable($prev->result, $callArg)
+                && !$this->isEmbeddedCallLiteralArg($callArg)
+            ) {
+                $vm = $this->tryFoldGlobalConstFetch($prev);
+                if (null !== $vm) {
+                    return $block->registerConstant($arg, $vm);
+                }
+            }
+            break;
+        }
+
+        return null;
+    }
+
+    /**
      * Fold compile-time call arguments, including php-cfg dead ClassConstFetch preludes (#5933).
      */
     protected function tryFoldCallArgCompileTimeValue(
@@ -12921,7 +12991,15 @@ class Compiler {
                         null === $calleeName
                         || !$this->callArgRequiresByRef($calleeName, (int) $argIndex)
                     ) {
-                        $valueSlot = $this->tryFoldCallArgCompileTimeValue($arg, $block, $calleeName, $cfgCallOp);
+                        $valueSlot = $this->tryFoldHoistedBoolNullLiteralCallArg(
+                            $arg,
+                            $block,
+                            $cfgCallOp,
+                            (int) $argIndex
+                        );
+                        if (null === $valueSlot) {
+                            $valueSlot = $this->tryFoldCallArgCompileTimeValue($arg, $block, $calleeName, $cfgCallOp);
+                        }
                     }
                 }
                 if (null === $valueSlot) {

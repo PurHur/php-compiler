@@ -32,11 +32,7 @@ final class highlight_string extends Internal
         );
         $return = false;
         if ($argc >= 2) {
-            $retVar = $frame->calledArgs[1]->resolveIndirect();
-            if (Variable::TYPE_BOOLEAN !== $retVar->type) {
-                throw new \LogicException('highlight_string() expects bool for argument 2 in this compiler build');
-            }
-            $return = $retVar->toBool();
+            $return = VmHighlight::resolveReturnFlag($frame->calledArgs[1], $this->getName());
         }
         $result = VmHighlight::highlightString($code, $return);
         if (null === $frame->returnVar) {
