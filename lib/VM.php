@@ -2923,6 +2923,10 @@ restart:
                         $dst->copyFrom($src);
                         break;
                     }
+                    if (Variable::TYPE_ENUM_CASE === $src->type) {
+                        $dst->copyFrom(VM\EnumCaseSupport::receiverForInstanceMethod($src));
+                        break;
+                    }
                     if (!isset($this->context->classes['stdclass'])) {
                         throw new \LogicException('stdClass is not registered');
                     }

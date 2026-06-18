@@ -115,14 +115,7 @@ final class CastHelper
             return self::emitHashtableToStdClass($context, $src, $block, $op);
         }
         if (Variable::TYPE_VALUE === $src->type) {
-            $htVar = new Variable(
-                $context,
-                Variable::TYPE_HASHTABLE,
-                Variable::KIND_VALUE,
-                HashTableHelper::readHashtableFromValueBox($context, $src)
-            );
-
-            return self::emitHashtableToStdClass($context, $htVar, $block, $op);
+            return self::emitObjectCastFromValueBox($context, $src, $block, $op);
         }
 
         throw new \LogicException(
@@ -145,6 +138,91 @@ final class CastHelper
         );
 
         return new Variable($context, Variable::TYPE_VALUE, Variable::KIND_VARIABLE, $slot);
+    }
+
+    private static function emitObjectCastFromValueBox(
+        Context $context,
+        Variable $src,
+        Block $block,
+        OpCode $op
+    ): Variable {
+        $valuePtr = JitValueBox::valuePtrFromVariable($context, $src);
+        $map = $context->structFieldMap['__value__'];
+        $typeByte = $context->builder->load(
+            $context->builder->structGep($valuePtr, $map['type'])
+        );
+        $i8 = $context->getTypeFromString('int8');
+
+        $isObject = $context->builder->icmp(
+            Builder::INT_EQ,
+            $typeByte,
+            $i8->constInt(VmVariable::TYPE_OBJECT, false)
+        );
+        $isEnumCase = $context->builder->icmp(
+            Builder::INT_EQ,
+            $typeByte,
+            $i8->constInt(VmVariable::TYPE_ENUM_CASE, false)
+        );
+        $isArray = $context->builder->icmp(
+            Builder::INT_EQ,
+            $typeByte,
+            $i8->constInt(VmVariable::TYPE_ARRAY, false)
+        );
+
+        $objectBlock = BasicBlockHelper::append($context, 'cast_object_vb_obj');
+        $arrayBlock = BasicBlockHelper::append($context, 'cast_object_vb_ht');
+        $emptyBlock = BasicBlockHelper::append($context, 'cast_object_vb_empty');
+        $mergeBlock = BasicBlockHelper::append($context, 'cast_object_vb_merge');
+        $doneBlock = BasicBlockHelper::append($context, 'cast_object_vb_done');
+
+        $checkEnum = BasicBlockHelper::append($context, 'cast_object_vb_chk_enum');
+        $context->builder->branchIf($isObject, $objectBlock, $checkEnum);
+        $context->builder->positionAtEnd($checkEnum);
+        $context->builder->branchIf($isEnumCase, $objectBlock, $checkArray = BasicBlockHelper::append($context, 'cast_object_vb_chk_ht'));
+        $context->builder->positionAtEnd($checkArray);
+        $context->builder->branchIf($isArray, $arrayBlock, $emptyBlock);
+
+        $context->builder->positionAtEnd($objectBlock);
+        $obj = $context->builder->call($context->lookupFunction('__value__readObject'), $valuePtr);
+        $objectResult = new Variable($context, Variable::TYPE_OBJECT, Variable::KIND_VALUE, $obj);
+        $context->builder->branch($mergeBlock);
+
+        $context->builder->positionAtEnd($arrayBlock);
+        $htVar = new Variable(
+            $context,
+            Variable::TYPE_HASHTABLE,
+            Variable::KIND_VALUE,
+            $context->builder->call($context->lookupFunction('__value__readHashtable'), $valuePtr)
+        );
+        $arrayResult = self::emitHashtableToStdClass($context, $htVar, $block, $op);
+        $context->builder->branch($mergeBlock);
+
+        $context->builder->positionAtEnd($emptyBlock);
+        $emptyResult = self::emitEmptyStdClass($context);
+        $context->builder->branch($mergeBlock);
+
+        $context->builder->positionAtEnd($mergeBlock);
+        $phi = $context->builder->phi($objectResult->value->typeOf());
+        $phi->addIncoming($objectResult->value, $objectBlock);
+        $phi->addIncoming($arrayResult->value, $arrayBlock);
+        $phi->addIncoming($emptyResult->value, $emptyBlock);
+        $context->builder->branch($doneBlock);
+        $context->builder->positionAtEnd($doneBlock);
+        $result = new Variable($context, Variable::TYPE_OBJECT, Variable::KIND_VALUE, $phi);
+
+        return $result;
+    }
+
+    private static function emitEmptyStdClass(Context $context): Variable
+    {
+        self::ensureInsertBlock($context, 'cast_object_empty_stdclass');
+        /** @var ObjectBuiltin $object */
+        $object = $context->type->object;
+        $classId = $object->lookup('stdClass');
+        $objVal = $object->allocate($classId);
+        $object->markObjectConstructed($objVal);
+
+        return new Variable($context, Variable::TYPE_OBJECT, Variable::KIND_VALUE, $objVal);
     }
 
     private static function emitArrayCastFromValueBox(Context $context, Variable $src): Variable

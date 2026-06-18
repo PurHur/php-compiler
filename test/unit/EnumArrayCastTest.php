@@ -26,5 +26,9 @@ final class EnumArrayCastTest extends BaseTest
             __DIR__.'/../compliance/cases/language/enum_array_cast_backed.phpt',
             'enum_array_cast_backed.phpt'
         );
+        yield 'enum_object_cast.phpt' => self::parsePHPT(
+            __DIR__.'/../compliance/cases/language/enum_object_cast.phpt',
+            'enum_object_cast.phpt'
+        );
     }
 }
