@@ -5,17 +5,15 @@ declare(strict_types=1);
 namespace PHPCompiler\JIT\Builtin;
 
 use PHPCompiler\JIT;
-use PHPCompiler\JIT\Builtin;
 use PHPCompiler\JIT\Context;
 use PHPLLVM\Builder;
 use PHPLLVM\Value;
 use PHPLLVM\Value\Function_ as LlvmFunction;
 
 /**
- * JIT/AOT link for phpc_gc_enable/disable/is_enabled via GcToggleJitHelper PHP (#9577).
+ * JIT/AOT link for phpc_gc_enable/disable/is_enabled via GcToggleJitHelper PHP (#9577, #9687).
  *
- * JIT embed uses compiled {@see GcToggleJitHelper}; AOT standalone keeps {@see GcToggleStandaloneLlvm}
- * until compiled PHP static storage is reliable in native link (same pattern as #9454 LastError).
+ * JIT embed and AOT standalone both call compiled {@see GcToggleJitHelper} static storage.
  * php-src: ext/standard/php_gc.c
  */
 final class GcToggleRuntime
@@ -56,13 +54,6 @@ final class GcToggleRuntime
     {
         $probe = $context->module->getNamedFunction('phpc_gc_is_enabled');
         if (null !== $probe && $probe->countBasicBlocks() > 0) {
-            self::registerLinkedRuntime($context);
-
-            return;
-        }
-
-        if (Builtin::LOAD_TYPE_STANDALONE === $context->loadType) {
-            GcToggleStandaloneLlvm::implement($context);
             self::registerLinkedRuntime($context);
 
             return;
