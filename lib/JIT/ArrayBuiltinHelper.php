@@ -10625,6 +10625,310 @@ final class ArrayBuiltinHelper
         $context->builder->positionAtEnd($done);
     }
 
+    /**
+     * natsort()/natcasesort() on packed lists — rebuild with original keys preserved (#9600).
+     */
+    public static function sortListNaturalPreserveKeys(Context $context, Variable $array, string $compareFn): void
+    {
+        if (self::isNativeArray($array->type)) {
+            throw new \LogicException(
+                'natsort() cannot compile fixed-size literal arrays in JIT/AOT yet; use bin/vm.php or bin/serve.php'
+            );
+        }
+        $src = self::loadHashTable($context, $array);
+        self::rebuildListNaturalSortedPreserveKeysInPlace($context, $src, $compareFn);
+        HashTableHelper::storeHashtableInArrayVariable($context, $array, $src);
+    }
+
+    private static function rebuildListNaturalSortedPreserveKeysInPlace(
+        Context $context,
+        Value $src,
+        string $compareFn
+    ): void {
+        $dest = self::buildListNaturalSortedHashtable($context, $src, $compareFn);
+        self::copyHashtablePayload($context, $dest, $src);
+    }
+
+    private static function buildListNaturalSortedHashtable(
+        Context $context,
+        Value $src,
+        string $compareFn
+    ): Value {
+        $map = $context->structFieldMap['__hashtable__'];
+        $valueMap = $context->structFieldMap['__value__'];
+        $sizeT = $context->getTypeFromString('size_t');
+        $zero = $sizeT->constInt(0, false);
+        $one = $sizeT->constInt(1, false);
+        $two = $sizeT->constInt(2, false);
+        $num = $context->builder->load(
+            $context->builder->structGep($src, $map['nextFreeElement'])
+        );
+        $tooSmall = $context->builder->icmp(Builder::INT_ULT, $num, $two);
+        $doneSmall = BasicBlockHelper::append($context, 'natsort_preserve_small');
+        $work = BasicBlockHelper::append($context, 'natsort_preserve_work');
+        $doneAll = BasicBlockHelper::append($context, 'natsort_preserve_done');
+        $context->builder->branchIf($tooSmall, $doneSmall, $work);
+
+        $context->builder->positionAtEnd($doneSmall);
+        $smallBlock = $context->builder->getInsertBlock();
+        $context->builder->branch($doneAll);
+
+        $context->builder->positionAtEnd($work);
+        $ptrSize = $sizeT->constInt(8, false);
+        $permBytes = $context->builder->mulNoSignedWrap($num, $ptrSize);
+        $permRaw = $context->builder->call($context->lookupFunction('malloc'), $permBytes);
+        $perm = $context->builder->pointerCast($permRaw, $sizeT->pointerType(0));
+
+        $initIdxSlot = $context->builder->alloca($sizeT, 1, 'natsort_perm_init');
+        $context->builder->store($zero, $initIdxSlot);
+        $initHead = BasicBlockHelper::append($context, 'natsort_perm_init_head');
+        $initBody = BasicBlockHelper::append($context, 'natsort_perm_init_body');
+        $initDone = BasicBlockHelper::append($context, 'natsort_perm_init_done');
+        $context->builder->branch($initHead);
+
+        $context->builder->positionAtEnd($initHead);
+        $initIdx = $context->builder->load($initIdxSlot);
+        $initAtEnd = $context->builder->icmp(Builder::INT_SGE, $initIdx, $num);
+        $context->builder->branchIf($initAtEnd, $initDone, $initBody);
+
+        $context->builder->positionAtEnd($initBody);
+        $context->builder->store($initIdx, $context->builder->inBoundsGEP($perm, $initIdx));
+        $context->builder->store($context->builder->addNoSignedWrap($initIdx, $one), $initIdxSlot);
+        $context->builder->branch($initHead);
+
+        $context->builder->positionAtEnd($initDone);
+        $firstEntry = self::listEntryAt($context, $src, $zero);
+        $i8 = $context->getTypeFromString('int8');
+        $firstType = $context->builder->load(
+            $context->builder->structGep($firstEntry, $valueMap['type'])
+        );
+        $stringTag = $i8->constInt(Variable::TYPE_STRING, false);
+        $isString = $context->builder->icmp(Builder::INT_EQ, $firstType, $stringTag);
+        $sortStrings = BasicBlockHelper::append($context, 'natsort_preserve_sort_str');
+        $sortLongs = BasicBlockHelper::append($context, 'natsort_preserve_sort_long');
+        $afterSort = BasicBlockHelper::append($context, 'natsort_preserve_after_sort');
+        $context->builder->branchIf($isString, $sortStrings, $sortLongs);
+
+        $context->builder->positionAtEnd($sortStrings);
+        self::emitPermBubbleSortStrings($context, $src, $perm, $num, $compareFn);
+        $context->builder->branch($afterSort);
+
+        $context->builder->positionAtEnd($sortLongs);
+        self::emitPermBubbleSortLongs($context, $src, $perm, $num);
+        $context->builder->branch($afterSort);
+
+        $context->builder->positionAtEnd($afterSort);
+        $dest = HashTableHelper::alloc($context);
+        $writeIdxSlot = $context->builder->alloca($sizeT, 1, 'natsort_preserve_write');
+        $context->builder->store($zero, $writeIdxSlot);
+        $writeHead = BasicBlockHelper::append($context, 'natsort_preserve_write_head');
+        $writeBody = BasicBlockHelper::append($context, 'natsort_preserve_write_body');
+        $writeDone = BasicBlockHelper::append($context, 'natsort_preserve_write_done');
+        $context->builder->branch($writeHead);
+
+        $context->builder->positionAtEnd($writeHead);
+        $writeIdx = $context->builder->load($writeIdxSlot);
+        $writeAtEnd = $context->builder->icmp(Builder::INT_SGE, $writeIdx, $num);
+        $context->builder->branchIf($writeAtEnd, $writeDone, $writeBody);
+
+        $context->builder->positionAtEnd($writeBody);
+        $key = $context->builder->load($context->builder->inBoundsGEP($perm, $writeIdx));
+        self::copyPackedListEntry($context, $src, $key, $dest, $key);
+        $context->builder->store($context->builder->addNoSignedWrap($writeIdx, $one), $writeIdxSlot);
+        $context->builder->branch($writeHead);
+
+        $context->builder->positionAtEnd($writeDone);
+        $workEndBlock = $context->builder->getInsertBlock();
+        $context->builder->call(
+            $context->lookupFunction('free'),
+            $context->builder->pointerCast($permRaw, $context->getTypeFromString('int8*'))
+        );
+        $context->builder->branch($doneAll);
+
+        $context->builder->positionAtEnd($doneAll);
+        $resultPhi = $context->builder->phi($src->typeOf());
+        $resultPhi->addIncoming($src, $smallBlock);
+        $resultPhi->addIncoming($dest, $workEndBlock);
+
+        return $resultPhi;
+    }
+
+    private static function copyHashtablePayload(Context $context, Value $from, Value $to): void
+    {
+        $map = $context->structFieldMap['__hashtable__'];
+        foreach (['values', 'numElements', 'nextFreeElement', 'capacity', 'strKeys', 'objKeys', 'internalPointer'] as $field) {
+            $slot = $context->builder->structGep($to, $map[$field]);
+            $loaded = $context->builder->load($context->builder->structGep($from, $map[$field]));
+            $context->builder->store($loaded, $slot);
+        }
+    }
+
+    private static function emitPermBubbleSortStrings(
+        Context $context,
+        Value $src,
+        Value $perm,
+        Value $num,
+        string $compareFn
+    ): void {
+        $sizeT = $context->getTypeFromString('size_t');
+        $one = $sizeT->constInt(1, false);
+        $zero = $sizeT->constInt(0, false);
+        $strMap = $context->structFieldMap['__string__'];
+        $i32 = $context->getTypeFromString('int32');
+        $outerSlot = $context->builder->alloca($sizeT, 1, 'natsort_perm_str_outer');
+        $context->builder->store($zero, $outerSlot);
+        $outerHead = BasicBlockHelper::append($context, 'natsort_perm_str_outer_head');
+        $outerBody = BasicBlockHelper::append($context, 'natsort_perm_str_outer_body');
+        $outerDone = BasicBlockHelper::append($context, 'natsort_perm_str_outer_done');
+        $context->builder->branch($outerHead);
+
+        $context->builder->positionAtEnd($outerHead);
+        $outer = $context->builder->load($outerSlot);
+        $outerEnd = $context->builder->sub($num, $one);
+        $outerAtEnd = $context->builder->icmp(Builder::INT_SGE, $outer, $outerEnd);
+        $context->builder->branchIf($outerAtEnd, $outerDone, $outerBody);
+
+        $context->builder->positionAtEnd($outerBody);
+        $innerSlot = $context->builder->alloca($sizeT, 1, 'natsort_perm_str_inner');
+        $context->builder->store($zero, $innerSlot);
+        $limit = $context->builder->sub($num, $outer);
+        $limit = $context->builder->sub($limit, $one);
+        $innerHead = BasicBlockHelper::append($context, 'natsort_perm_str_inner_head');
+        $innerBody = BasicBlockHelper::append($context, 'natsort_perm_str_inner_body');
+        $innerDone = BasicBlockHelper::append($context, 'natsort_perm_str_inner_done');
+        $context->builder->branch($innerHead);
+
+        $context->builder->positionAtEnd($innerHead);
+        $inner = $context->builder->load($innerSlot);
+        $innerAtEnd = $context->builder->icmp(Builder::INT_SGE, $inner, $limit);
+        $context->builder->branchIf($innerAtEnd, $innerDone, $innerBody);
+
+        $context->builder->positionAtEnd($innerBody);
+        $nextInner = $context->builder->addNoSignedWrap($inner, $one);
+        $idxA = $context->builder->load($context->builder->inBoundsGEP($perm, $inner));
+        $idxB = $context->builder->load($context->builder->inBoundsGEP($perm, $nextInner));
+        $strA = $context->builder->call(
+            $context->lookupFunction('__hashtable__readStringAt'),
+            $src,
+            $idxA
+        );
+        $strB = $context->builder->call(
+            $context->lookupFunction('__hashtable__readStringAt'),
+            $src,
+            $idxB
+        );
+        $cmp = $context->builder->call(
+            $context->lookupFunction($compareFn),
+            $context->builder->structGep($strA, $strMap['value']),
+            $context->builder->structGep($strB, $strMap['value'])
+        );
+        $needsSwap = $context->builder->icmp(Builder::INT_SGT, $cmp, $i32->constInt(0, false));
+        $swapBlock = BasicBlockHelper::append($context, 'natsort_perm_str_swap');
+        $noSwap = BasicBlockHelper::append($context, 'natsort_perm_str_no_swap');
+        $afterSwap = BasicBlockHelper::append($context, 'natsort_perm_str_after_swap');
+        $context->builder->branchIf($needsSwap, $swapBlock, $noSwap);
+
+        $context->builder->positionAtEnd($swapBlock);
+        $permInner = $context->builder->inBoundsGEP($perm, $inner);
+        $permNext = $context->builder->inBoundsGEP($perm, $nextInner);
+        $tmp = $context->builder->load($permInner);
+        $context->builder->store($context->builder->load($permNext), $permInner);
+        $context->builder->store($tmp, $permNext);
+        $context->builder->branch($afterSwap);
+
+        $context->builder->positionAtEnd($noSwap);
+        $context->builder->branch($afterSwap);
+
+        $context->builder->positionAtEnd($afterSwap);
+        $context->builder->store($nextInner, $innerSlot);
+        $context->builder->branch($innerHead);
+
+        $context->builder->positionAtEnd($innerDone);
+        $context->builder->store($context->builder->addNoSignedWrap($outer, $one), $outerSlot);
+        $context->builder->branch($outerHead);
+
+        $context->builder->positionAtEnd($outerDone);
+    }
+
+    private static function emitPermBubbleSortLongs(
+        Context $context,
+        Value $src,
+        Value $perm,
+        Value $num
+    ): void {
+        $sizeT = $context->getTypeFromString('size_t');
+        $one = $sizeT->constInt(1, false);
+        $zero = $sizeT->constInt(0, false);
+        $outerSlot = $context->builder->alloca($sizeT, 1, 'natsort_perm_long_outer');
+        $context->builder->store($zero, $outerSlot);
+        $outerHead = BasicBlockHelper::append($context, 'natsort_perm_long_outer_head');
+        $outerBody = BasicBlockHelper::append($context, 'natsort_perm_long_outer_body');
+        $outerDone = BasicBlockHelper::append($context, 'natsort_perm_long_outer_done');
+        $context->builder->branch($outerHead);
+
+        $context->builder->positionAtEnd($outerHead);
+        $outer = $context->builder->load($outerSlot);
+        $outerEnd = $context->builder->sub($num, $one);
+        $outerAtEnd = $context->builder->icmp(Builder::INT_SGE, $outer, $outerEnd);
+        $context->builder->branchIf($outerAtEnd, $outerDone, $outerBody);
+
+        $context->builder->positionAtEnd($outerBody);
+        $innerSlot = $context->builder->alloca($sizeT, 1, 'natsort_perm_long_inner');
+        $context->builder->store($zero, $innerSlot);
+        $limit = $context->builder->sub($num, $outer);
+        $limit = $context->builder->sub($limit, $one);
+        $innerHead = BasicBlockHelper::append($context, 'natsort_perm_long_inner_head');
+        $innerBody = BasicBlockHelper::append($context, 'natsort_perm_long_inner_body');
+        $innerDone = BasicBlockHelper::append($context, 'natsort_perm_long_inner_done');
+        $context->builder->branch($innerHead);
+
+        $context->builder->positionAtEnd($innerHead);
+        $inner = $context->builder->load($innerSlot);
+        $innerAtEnd = $context->builder->icmp(Builder::INT_SGE, $inner, $limit);
+        $context->builder->branchIf($innerAtEnd, $innerDone, $innerBody);
+
+        $context->builder->positionAtEnd($innerBody);
+        $nextInner = $context->builder->addNoSignedWrap($inner, $one);
+        $idxA = $context->builder->load($context->builder->inBoundsGEP($perm, $inner));
+        $idxB = $context->builder->load($context->builder->inBoundsGEP($perm, $nextInner));
+        $longA = $context->builder->call(
+            $context->lookupFunction('__hashtable__readLongAt'),
+            $src,
+            $idxA
+        );
+        $longB = $context->builder->call(
+            $context->lookupFunction('__hashtable__readLongAt'),
+            $src,
+            $idxB
+        );
+        $needsSwap = $context->builder->icmp(Builder::INT_SGT, $longA, $longB);
+        $swapBlock = BasicBlockHelper::append($context, 'natsort_perm_long_swap');
+        $noSwap = BasicBlockHelper::append($context, 'natsort_perm_long_no_swap');
+        $afterSwap = BasicBlockHelper::append($context, 'natsort_perm_long_after_swap');
+        $context->builder->branchIf($needsSwap, $swapBlock, $noSwap);
+
+        $context->builder->positionAtEnd($swapBlock);
+        $permInner = $context->builder->inBoundsGEP($perm, $inner);
+        $permNext = $context->builder->inBoundsGEP($perm, $nextInner);
+        $tmp = $context->builder->load($permInner);
+        $context->builder->store($context->builder->load($permNext), $permInner);
+        $context->builder->store($tmp, $permNext);
+        $context->builder->branch($afterSwap);
+
+        $context->builder->positionAtEnd($noSwap);
+        $context->builder->branch($afterSwap);
+
+        $context->builder->positionAtEnd($afterSwap);
+        $context->builder->store($nextInner, $innerSlot);
+        $context->builder->branch($innerHead);
+
+        $context->builder->positionAtEnd($innerDone);
+        $context->builder->store($context->builder->addNoSignedWrap($outer, $one), $outerSlot);
+        $context->builder->branch($outerHead);
+
+        $context->builder->positionAtEnd($outerDone);
+    }
+
     public static function natsortByValue(Context $context, Variable $array): void
     {
         if (self::isNativeArray($array->type)) {
@@ -10639,7 +10943,7 @@ final class ArrayBuiltinHelper
         $context->builder->branchIf($isList, $sortList, $sortAssoc);
 
         $context->builder->positionAtEnd($sortList);
-        self::sortPackedNatural($context, $array);
+        self::sortListNaturalPreserveKeys($context, $array, 'strnatcmp');
         $context->builder->branch($done);
 
         $context->builder->positionAtEnd($sortAssoc);
@@ -10682,7 +10986,7 @@ final class ArrayBuiltinHelper
         $context->builder->branchIf($isList, $sortList, $sortAssoc);
 
         $context->builder->positionAtEnd($sortList);
-        self::sortPackedNaturalCase($context, $array);
+        self::sortListNaturalPreserveKeys($context, $array, 'strnatcasecmp');
         $context->builder->branch($done);
 
         $context->builder->positionAtEnd($sortAssoc);
