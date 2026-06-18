@@ -9654,8 +9654,12 @@ class Compiler {
                 $name = $this->staticNameFromOperand($prev->name);
                 if (null !== $name && \in_array(strtolower($name), ['true', 'false', 'null'], true)) {
                     $callArg = $callOp->args[$argIndex] ?? null;
+                    $callArgs = $callOp->args;
+                    $isLastArg = \is_array($callArgs) && $argIndex === \count($callArgs) - 1;
+                    // Hoisted true/false/null only feeds the trailing call arg (#9140, #9660).
                     if (
                         null !== $callArg
+                        && $isLastArg
                         && !$this->operandsReferToSameVariable($prev->result, $callArg)
                     ) {
                         $vm = $this->tryFoldGlobalConstFetch($prev);
