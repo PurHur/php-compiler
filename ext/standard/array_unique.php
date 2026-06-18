@@ -41,7 +41,7 @@ final class array_unique extends Internal
         $out = new HashTable();
         $seen = [];
         foreach ($ht->iterateKeyed(true) as [$key, $value]) {
-            self::assertUniqueElement($frame, $value);
+            self::assertUniqueElement($frame, $value, $flags);
             if (self::isDuplicate($value, $seen, $flags)) {
                 continue;
             }
@@ -65,7 +65,7 @@ final class array_unique extends Internal
     private static function resolveVmFlags(Frame $frame, int $argc): int
     {
         if (1 === $argc) {
-            return StdlibConstants::SORT_REGULAR;
+            return StdlibConstants::SORT_STRING;
         }
         $flagsArg = $frame->calledArgs[1]->resolveIndirect();
         if (Variable::TYPE_INTEGER !== $flagsArg->type) {
@@ -76,10 +76,14 @@ final class array_unique extends Internal
     }
 
     /**
-     * Objects and enum cases without __toString must throw (ext/standard/array.c php_array_unique, #4698, #5531).
+     * SORT_STRING: objects and enum cases without __toString must throw (ext/standard/array.c, #4698, #5531).
+     * SORT_REGULAR compares objects by zend compare rules — no string cast (#9318).
      */
-    private static function assertUniqueElement(Frame $frame, Variable $value): void
+    private static function assertUniqueElement(Frame $frame, Variable $value, int $flags): void
     {
+        if (StdlibConstants::SORT_STRING !== ($flags & ~StdlibConstants::SORT_FLAG_CASE)) {
+            return;
+        }
         $value = $value->resolveIndirect();
         if (EnumCaseSupport::isEnumCaseVariable($value)) {
             throw new \Error(
@@ -208,7 +212,7 @@ final class array_unique extends Internal
                 $this->jitString($context, $arg, 'array_unique() argument #'.((int) $i + 1));
             }
         }
-        $flags = StdlibConstants::SORT_REGULAR;
+        $flags = StdlibConstants::SORT_STRING;
         if (2 === $argc) {
             $flags = self::resolveJitFlags($context, $args[1]);
         }
@@ -218,22 +222,8 @@ final class array_unique extends Internal
 
     private static function resolveJitFlags(Context $context, JITVariable $flagsArg): int
     {
-        if (null !== $flagsArg->compileTimeConstantName) {
-            $phpVar = $context->runtime->vmContext->constantFetch($flagsArg->compileTimeConstantName);
-            if (null !== $phpVar && Variable::TYPE_INTEGER === $phpVar->type) {
-                return self::normalizeFlags($phpVar->toInt());
-            }
-        }
-        if (JITVariable::TYPE_NATIVE_LONG === $flagsArg->type
-            && JITVariable::KIND_VALUE === $flagsArg->kind
-        ) {
-            $lib = $context->llvm->lib;
-            if (null !== $lib->LLVMIsAConstantInt($flagsArg->value->value)) {
-                return self::normalizeFlags((int) $lib->LLVMConstIntGetZExtValue($flagsArg->value->value));
-            }
-        }
-        throw new \LogicException(
-            'array_unique() flags must be a predefined constant or integer literal in JIT/AOT in this compiler build'
+        return self::normalizeFlags(
+            VmInternalCompare::resolveJitSortFlags($context, $flagsArg, 'array_unique')
         );
     }
 }
