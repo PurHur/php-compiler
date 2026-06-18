@@ -79,6 +79,25 @@ PHP;
         self::assertStringNotContainsString('Module verification failed', $stderr);
     }
 
+    /** Issue #9605: invokable object (new C)(...) FCC must JIT-compile. */
+    public function testInvokableObjectCallableCompiles(): void
+    {
+        $this->skipUnlessLlvmReady();
+        $code = <<<'PHP'
+<?php
+class C {
+    public function __invoke(): void {
+        echo "ok\n";
+    }
+}
+$fn = (new C)(...);
+$fn();
+PHP;
+        $stderr = $this->runJitProbeInSubprocess($code);
+        self::assertStringNotContainsString('TYPE_FROM_CALLABLE: unsupported callable form', $stderr);
+        self::assertStringNotContainsString('Module verification failed', $stderr);
+    }
+
     public function testCompilerLowersFirstClassCallableToFromCallableOpcode(): void
     {
         $code = <<<'PHP'

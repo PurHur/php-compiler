@@ -35,6 +35,13 @@ final class FromCallableHelper
             }
         }
 
+        $receiverOp = BoundMethodCallableHelper::resolveInvokableObjectReceiverOperand($block, $callableSlot);
+        if (null !== $receiverOp) {
+            $classHint = BoundMethodCallableHelper::resolveInvokableObjectClassName($block, $callableSlot);
+
+            return self::fromBoundMethodCallable($context, $block, $receiverOp, '__invoke', $classHint);
+        }
+
         throw new \LogicException('TYPE_FROM_CALLABLE: unsupported callable form in JIT');
     }
 
