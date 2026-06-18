@@ -4874,6 +4874,7 @@ restart:
                     }
                     $classEntry = new ClassEntry($name);
                     $classEntry->interfaces = $op->classImplements;
+                    $parentPending = false;
                     if (null !== $op->arg2) {
                         $parentName = $frame->scope[$op->arg2]->toString();
                         $parentLc = strtolower($parentName);
@@ -4881,7 +4882,7 @@ restart:
                             $this->context->autoloadClass($parentName);
                         }
                         if (!isset($this->context->classes[$parentLc])) {
-                            throw new \LogicException("Class {$name} extends unknown class {$parentName}");
+                            $parentPending = true;
                         }
                         $classEntry->parentLc = $parentLc;
                     }
@@ -4905,17 +4906,28 @@ restart:
                     $classEntry->classDeprecated = $op->deprecatedMetadata;
                     $classEntry->sourceLocation = $op->sourceLocation;
                     self::defineClass($classEntry, $op->block1, $frame);
-                    if (null !== $classEntry->parentLc) {
+                    if (!$parentPending && null !== $classEntry->parentLc) {
                         $this->inheritFromParent($classEntry);
                     }
                     // Inherited static properties arrive after defineClass(); relink hooks (#6566).
-                    $this->linkStaticPropertyHooks($classEntry);
+                    if (!$parentPending) {
+                        $this->linkStaticPropertyHooks($classEntry);
+                    }
                     $this->inheritFromInterfaces($classEntry);
                     if (VM\LazyGhostTraitSupport::classUsesLazyGhostTrait($classEntry, $this->context)) {
                         VM\LazyGhostTraitSupport::ensureBuiltinLazyGhostMethods($classEntry);
                     }
-                    VM\ClassValidator::finalizeClassDefinition($classEntry, $this->context);
+                    if (!$parentPending) {
+                        VM\ClassValidator::finalizeClassDefinition($classEntry, $this->context);
+                    }
                     $this->context->classes[$lcname] = $classEntry;
+                    if ($parentPending) {
+                        $this->context->deferredParentInheritance[] = [
+                            'childLc' => $lcname,
+                            'parentName' => $parentName,
+                        ];
+                    }
+                    $this->flushDeferredParentInheritance();
                     $this->flushDeferredTraitUses();
                     $this->flushDeferredClassConstants();
                     break;
@@ -6140,6 +6152,9 @@ restart:
         }
         if ([] !== $this->context->deferredClassConstants) {
             $this->finalizeAllDeferredClassConstants();
+        }
+        if ([] !== $this->context->deferredParentInheritance) {
+            $this->finalizeDeferredParentInheritance();
         }
 
         return self::SUCCESS;
@@ -10967,6 +10982,46 @@ restart:
         $this->context->deferredTraitUses = $remaining;
     }
 
+    protected function flushDeferredParentInheritance(): void
+    {
+        if ([] === $this->context->deferredParentInheritance) {
+            return;
+        }
+        $remaining = [];
+        foreach ($this->context->deferredParentInheritance as $deferred) {
+            $childLc = $deferred['childLc'];
+            if (!isset($this->context->classes[$childLc])) {
+                $remaining[] = $deferred;
+
+                continue;
+            }
+            $entry = $this->context->classes[$childLc];
+            if (null === $entry->parentLc || !isset($this->context->classes[$entry->parentLc])) {
+                $remaining[] = $deferred;
+
+                continue;
+            }
+            $this->assertAllowedBySealedParents($entry->name, $entry->parentLc, $entry->interfaces);
+            $this->inheritFromParent($entry);
+            $this->linkStaticPropertyHooks($entry);
+            VM\ClassValidator::finalizeClassDefinition($entry, $this->context);
+        }
+        $this->context->deferredParentInheritance = $remaining;
+    }
+
+    protected function finalizeDeferredParentInheritance(): void
+    {
+        $this->flushDeferredParentInheritance();
+        if ([] === $this->context->deferredParentInheritance) {
+            return;
+        }
+        $deferred = $this->context->deferredParentInheritance[0];
+        $childName = $this->context->classes[$deferred['childLc']]->name ?? $deferred['childLc'];
+        throw new \LogicException(
+            "Class {$childName} extends unknown class {$deferred['parentName']}"
+        );
+    }
+
     protected function finalizeDeferredTraitUses(): void
     {
         $this->flushDeferredTraitUses();
@@ -11031,6 +11086,7 @@ restart:
         if (!isset($declarationOpcodes[$opType])) {
             $this->finalizeDeferredTraitUses();
             $this->finalizeAllDeferredClassConstants();
+            $this->finalizeDeferredParentInheritance();
         }
     }
 

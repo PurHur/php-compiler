@@ -178,6 +178,13 @@ class Context {
      */
     public array $deferredClassConstants = [];
 
+    /**
+     * Parent inheritance deferred until a forward-referenced parent class is declared (#9721).
+     *
+     * @var list<array{childLc: string, parentName: string}>
+     */
+    public array $deferredParentInheritance = [];
+
     /** Fiber executing on this VM stack (issue #3130). */
     public ?FiberState $currentFiber = null;
 

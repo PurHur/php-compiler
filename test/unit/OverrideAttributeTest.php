@@ -239,4 +239,23 @@ PHP;
         $runtime->run($runtime->parseAndCompile($code, 'override_trait_alias_original.php'));
         $this->assertSame("c\n", ob_get_clean());
     }
+
+    public function testOverrideWithParentDeclaredLaterInFileCompiles(): void
+    {
+        $runtime = new Runtime();
+        $code = <<<'PHP'
+<?php
+class B extends A {
+    #[\Override]
+    public function f(): void {}
+}
+class A {
+    public function f(): void {}
+}
+echo "ok\n";
+PHP;
+        ob_start();
+        $runtime->run($runtime->parseAndCompile($code, 'override_forward_ref.php'));
+        $this->assertSame("ok\n", ob_get_clean());
+    }
 }
