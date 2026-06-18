@@ -770,6 +770,11 @@ class VM {
      */
     private function dispatchHookedInstancePropertyUnset(ObjectEntry $object, string $propName, Frame $frame): ?Frame
     {
+        if ($this->isPropertyHookRawWrite($frame, $propName)) {
+            $this->unsetHookedInstancePropertyRaw($object, $propName);
+
+            return null;
+        }
         if ($this->invokeInstancePropertyUnsetHook($object, $propName, $frame)) {
             return null;
         }
@@ -802,6 +807,12 @@ class VM {
         Variable $storage,
         Frame $frame
     ): ?Frame {
+        if ($this->isPropertyHookRawWrite($frame, $propNameRaw)) {
+            $storage->reset();
+            $storage->type = Variable::TYPE_UNDEFINED;
+
+            return null;
+        }
         if ($this->invokeStaticPropertyUnsetHook($classLc, $propLc, $propNameRaw, $frame)) {
             return null;
         }
@@ -981,6 +992,33 @@ class VM {
     {
         $this->resetHookedPropertyBackingField($object, $propName);
         $this->unsetObjectProperty($object, $propName);
+    }
+
+    /**
+     * unset($this->hooked) inside a property hook — backing storage only, no hook re-entry (#9625).
+     */
+    private function unsetHookedInstancePropertyRaw(ObjectEntry $object, string $propName): void
+    {
+        $lcClass = strtolower($object->class->name);
+        $propMeta = $this->context->propertyHookRegistry[$lcClass][$propName]
+            ?? $this->context->propertyHookRegistry[$lcClass][strtolower($propName)]
+            ?? null;
+        $backingName = $propName;
+        if (is_array($propMeta)) {
+            $backingName = $propMeta['setBacking'] ?? $propMeta['getBacking'] ?? $propName;
+        }
+        if ($object->hasProperty($backingName)) {
+            $slot = $object->getProperty($backingName);
+            if (VM\TypedPropertyCheck::propertyAllowsNull($slot)) {
+                $slot->null();
+            } else {
+                $slot->reset();
+                $slot->type = Variable::TYPE_UNDEFINED;
+            }
+        }
+        if (0 !== strcasecmp($backingName, $propName)) {
+            $this->unsetObjectProperty($object, $propName);
+        }
     }
 
     /** Clear registry-recorded get/set backing field after hooked-property unset (#6471, #5191). */
@@ -7969,11 +8007,14 @@ restart:
         }
         $wantSet = strtolower(SourcePreprocessor\PropertyHooks::setHookMethodName($propName));
         $wantGet = strtolower(SourcePreprocessor\PropertyHooks::getHookMethodName($propName));
+        $wantUnset = strtolower(SourcePreprocessor\PropertyHooks::unsetHookMethodName($propName));
 
         return $methodLc === $wantSet
             || $methodLc === $wantGet
+            || $methodLc === $wantUnset
             || $methodLc === strtolower($className.'::'.$wantSet)
-            || $methodLc === strtolower($className.'::'.$wantGet);
+            || $methodLc === strtolower($className.'::'.$wantGet)
+            || $methodLc === strtolower($className.'::'.$wantUnset);
     }
 
     private function linkStaticTypedPropertySlot(Variable $storage, ClassEntry $entry, string $propDisplayName): void
@@ -8692,6 +8733,9 @@ restart:
         }
         $hasSet = null !== $meta->setHookMethodLc;
         $hasGet = null !== $meta->getHookMethodLc;
+        if (null !== $meta->unsetHookMethodLc) {
+            return null;
+        }
         if ($hasSet && $hasGet) {
             return null;
         }
@@ -8740,6 +8784,9 @@ restart:
         }
         $hasSet = !empty($hooks['set']);
         $hasGet = !empty($hooks['get']);
+        if (!empty($hooks['unset'])) {
+            return null;
+        }
         if ($hasSet && $hasGet) {
             return null;
         }
