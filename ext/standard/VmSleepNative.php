@@ -10,7 +10,7 @@ namespace PHPCompiler\ext\standard;
  * Delegates to {@see VmSleepPure} (VmHrtimeNative monotonic poll). No libc sleep/usleep/nanosleep FFI
  * on the default path — shrinks native link surface for self-host/M5 (#1492).
  *
- * Mirrors {@see \PHPCompiler\JIT\Builtin\TimeSleepRuntime} and {@see JitSleep} — no host
+ * Mirrors {@see SleepJitHelper} via {@see \PHPCompiler\JIT\Builtin\TimeSleepRuntime} and {@see JitSleep} — no host
  * \\sleep()/\\usleep()/\\time_nanosleep() delegation on VM.
  *
  * php-src: ext/standard/basic_functions.c — PHP_FUNCTION(sleep), usleep, time_nanosleep, time_sleep_until

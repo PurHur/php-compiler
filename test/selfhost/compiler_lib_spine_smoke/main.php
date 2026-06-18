@@ -2028,6 +2028,7 @@ require_once __DIR__.'/../../../lib/JIT/Builtin/StringHashCryptoNativeJit.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/StringHashEquals.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/StringHashHmacAlgos.php';
 require_once __DIR__.'/../../../ext/standard/HrtimeJitHelper.php';
+require_once __DIR__.'/../../../ext/standard/SleepJitHelper.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/StringHrtimeRuntime.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/StringHrtime.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/StringHtmlspecialchars.php';
