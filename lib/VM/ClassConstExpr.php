@@ -42,7 +42,7 @@ final class ClassConstExpr
         };
     }
 
-    public static function execute(Context $context, Frame $frame, OpCode $op, ClassEntry $entry): void
+    public static function execute(Context $context, Frame $frame, Block $block, OpCode $op, ClassEntry $entry): void
     {
         switch ($op->type) {
             case OpCode::TYPE_PLUS:

@@ -33,7 +33,7 @@ final class ClassConstMaterializer
                 continue;
             }
             if (null !== $entry && ClassConstExpr::isSupportedOpcode($op->type)) {
-                ClassConstExpr::execute($vm->context, $frame, $op, $entry);
+                ClassConstExpr::execute($vm->context, $frame, $bodyBlock, $op, $entry);
                 continue;
             }
             if (null !== $entry && OpCode::TYPE_DECLARE_CLASS_CONST === $op->type) {
