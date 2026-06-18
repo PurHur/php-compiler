@@ -247,6 +247,8 @@ final class StringPregMatchJit
     {
         $voidTy = $context->getTypeFromString('void');
         $sizeT = $context->getTypeFromString('size_t');
+        $sizeTp = $sizeT->pointerType(0);
+        $i32 = $context->getTypeFromString('int32');
         $i8p = $context->getTypeFromString('int8*');
 
         foreach (
@@ -256,6 +258,7 @@ final class StringPregMatchJit
                 ['free', $voidTy, [$i8p]],
                 ['memcpy', $i8p, [$i8p, $i8p, $sizeT]],
                 ['strlen', $sizeT, [$i8p]],
+                ['phpc_preg_expand_replacement', $sizeT, [$i8p, $sizeT, $sizeTp, $i32, $i8p, $i8p, $sizeT]],
             ] as [$name, $ret, $params]
         ) {
             self::ensureExternal($context, $name, $context->context->functionType($ret, false, ...$params));
@@ -1000,12 +1003,37 @@ final class StringPregMatchJit
         );
         $context->builder->branch($afterPrefixBb);
         $context->builder->positionAtEnd($afterPrefixBb);
-        $hasRepl = $context->builder->icmp(Builder::INT_UGT, $replLen, $sizeT->constInt(0, false));
+        $needsExpand = self::replacementNeedsExpand($context, $fn, $repl, $replLen);
+        $expandedBb = $fn->appendBasicBlock('pr_expand_repl');
+        $literalReplBb = $fn->appendBasicBlock('pr_literal_repl');
         $afterReplBb = $fn->appendBasicBlock('pr_after_repl');
-        $copyReplBb = $fn->appendBasicBlock('pr_copy_repl');
-        $context->builder->branchIf($hasRepl, $copyReplBb, $afterReplBb);
-        $context->builder->positionAtEnd($copyReplBb);
+        $context->builder->branchIf($needsExpand, $expandedBb, $literalReplBb);
+
+        $context->builder->positionAtEnd($literalReplBb);
+        $hasRepl = $context->builder->icmp(Builder::INT_UGT, $replLen, $sizeT->constInt(0, false));
+        $copyLiteralBb = $fn->appendBasicBlock('pr_copy_literal_repl');
+        $context->builder->branchIf($hasRepl, $copyLiteralBb, $afterReplBb);
+        $context->builder->positionAtEnd($copyLiteralBb);
         self::appendToBuffer($context, $fn, $bufSlot, $bufLenSlot, $bufCapSlot, $repl, $replLen);
+        $context->builder->branch($afterReplBb);
+
+        $context->builder->positionAtEnd($expandedBb);
+        self::appendExpandedReplacement(
+            $context,
+            $fn,
+            $bufSlot,
+            $bufLenSlot,
+            $bufCapSlot,
+            $code,
+            $matchData,
+            $subj,
+            $subjLen,
+            $offset,
+            $end,
+            $repl,
+            $replLen,
+            $afterReplBb
+        );
         $context->builder->branch($afterReplBb);
         $context->builder->positionAtEnd($afterReplBb);
         $samePos = $context->builder->icmp(Builder::INT_EQ, $end, $start);
@@ -1143,6 +1171,133 @@ final class StringPregMatchJit
             $len
         );
         $context->builder->store($context->builder->add($bufLen, $len), $bufLenSlot);
+    }
+
+    private static function replacementNeedsExpand(
+        Context $context,
+        LlvmFunction $fn,
+        Value $repl,
+        Value $replLen
+    ): Value {
+        $sizeT = $context->getTypeFromString('size_t');
+        $i8 = $context->getTypeFromString('int8');
+        $i32 = $context->getTypeFromString('int32');
+        $i1 = $context->getTypeFromString('int1');
+
+        $idxSlot = BasicBlockHelper::entryAlloca($context, $sizeT);
+        $foundSlot = BasicBlockHelper::entryAlloca($context, $i1);
+        $context->builder->store($sizeT->constInt(0, false), $idxSlot);
+        $context->builder->store($i1->constInt(0, false), $foundSlot);
+
+        $loopHead = $fn->appendBasicBlock('pr_ne_head_'.(++self::$blockSuffix));
+        $loopBody = $fn->appendBasicBlock('pr_ne_body_'.self::$blockSuffix);
+        $loopDone = $fn->appendBasicBlock('pr_ne_done_'.self::$blockSuffix);
+        $context->builder->branch($loopHead);
+
+        $context->builder->positionAtEnd($loopHead);
+        $idx = $context->builder->load($idxSlot);
+        $continueLoop = $context->builder->icmp(Builder::INT_ULT, $idx, $replLen);
+        $context->builder->branchIf($continueLoop, $loopBody, $loopDone);
+
+        $context->builder->positionAtEnd($loopBody);
+        $ch = $context->builder->load($context->builder->gep($repl, $idx));
+        $isDollar = $context->builder->icmp(Builder::INT_EQ, $ch, $i8->constInt(36, false));
+        $isSlash = $context->builder->icmp(Builder::INT_EQ, $ch, $i8->constInt(92, false));
+        $isSpecial = $context->builder->or($isDollar, $isSlash);
+        $found = $context->builder->load($foundSlot);
+        $context->builder->store($context->builder->or($found, $isSpecial), $foundSlot);
+        $context->builder->store(
+            $context->builder->add($idx, $sizeT->constInt(1, false)),
+            $idxSlot
+        );
+        $context->builder->branch($loopHead);
+
+        $context->builder->positionAtEnd($loopDone);
+
+        return $context->builder->load($foundSlot);
+    }
+
+    private static function appendExpandedReplacement(
+        Context $context,
+        LlvmFunction $fn,
+        Value $bufSlot,
+        Value $bufLenSlot,
+        Value $bufCapSlot,
+        Value $code,
+        Value $matchData,
+        Value $subj,
+        Value $subjLen,
+        Value $matchOffset,
+        Value $matchEnd,
+        Value $repl,
+        Value $replLen,
+        BasicBlock $continueBb
+    ): void {
+        unset($code, $matchOffset, $matchEnd);
+        $sizeT = $context->getTypeFromString('size_t');
+        $i32 = $context->getTypeFromString('int32');
+        $i8p = $context->getTypeFromString('int8*');
+
+        $ovector = $context->builder->call(
+            $context->lookupFunction('pcre2_get_ovector_pointer_8'),
+            $matchData
+        );
+        $ovectorCount = $context->builder->call(
+            $context->lookupFunction('pcre2_get_ovector_count_8'),
+            $matchData
+        );
+        $tmpCap = $context->builder->add(
+            $context->builder->add($replLen, $subjLen),
+            $sizeT->constInt(16, false)
+        );
+        $tmpBuf = $context->builder->call($context->lookupFunction('malloc'), $tmpCap);
+        $allocFailBb = $fn->appendBasicBlock('pr_expand_alloc_fail_'.(++self::$blockSuffix));
+        $expandBb = $fn->appendBasicBlock('pr_expand_call_'.self::$blockSuffix);
+        $context->builder->branchIf(
+            self::isNullI8Ptr($context, $tmpBuf),
+            $allocFailBb,
+            $expandBb
+        );
+
+        $context->builder->positionAtEnd($allocFailBb);
+        self::appendToBuffer($context, $fn, $bufSlot, $bufLenSlot, $bufCapSlot, $repl, $replLen);
+        $context->builder->branch($continueBb);
+
+        $context->builder->positionAtEnd($expandBb);
+        $expandedLen = $context->builder->call(
+            $context->lookupFunction('phpc_preg_expand_replacement'),
+            $repl,
+            $replLen,
+            $ovector,
+            $ovectorCount,
+            $subj,
+            $context->builder->pointerCast($tmpBuf, $i8p),
+            $tmpCap
+        );
+        $hasExpanded = $context->builder->icmp(Builder::INT_UGT, $expandedLen, $sizeT->constInt(0, false));
+        $copyExpandedBb = $fn->appendBasicBlock('pr_copy_expanded_'.self::$blockSuffix);
+        $literalFallbackBb = $fn->appendBasicBlock('pr_expand_literal_fb_'.self::$blockSuffix);
+        $afterExpandedBb = $fn->appendBasicBlock('pr_after_expanded_'.self::$blockSuffix);
+        $context->builder->branchIf($hasExpanded, $copyExpandedBb, $literalFallbackBb);
+
+        $context->builder->positionAtEnd($literalFallbackBb);
+        self::appendToBuffer($context, $fn, $bufSlot, $bufLenSlot, $bufCapSlot, $repl, $replLen);
+        $context->builder->branch($afterExpandedBb);
+
+        $context->builder->positionAtEnd($copyExpandedBb);
+        self::appendToBuffer(
+            $context,
+            $fn,
+            $bufSlot,
+            $bufLenSlot,
+            $bufCapSlot,
+            $context->builder->pointerCast($tmpBuf, $i8p),
+            $expandedLen
+        );
+        $context->builder->branch($afterExpandedBb);
+
+        $context->builder->positionAtEnd($afterExpandedBb);
+        $context->builder->call($context->lookupFunction('free'), $context->builder->pointerCast($tmpBuf, $i8p));
     }
 
     private static function emitLastError(Context $context, LlvmFunction $fn): void

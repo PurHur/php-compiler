@@ -23,6 +23,7 @@ final class Linker
      */
     private const RUNTIME_C_SOURCES = [
         __DIR__.'/runtime/phpc_progress.c',
+        __DIR__.'/runtime/phpc_preg_expand.c',
     ];
 
     /** libz.so symlink is often absent without zlib1g-dev; link the versioned .so directly. */
@@ -34,6 +35,7 @@ final class Linker
     /** Runtime units that need host libc headers layered on the LLVM sysroot (incomplete headers). */
     private const RUNTIME_HOST_LIBC_BASENAMES = [
         'phpc_progress.c',
+        'phpc_preg_expand.c',
     ];
 
     private static function which(string $binary): ?string

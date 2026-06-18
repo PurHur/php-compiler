@@ -31,6 +31,24 @@ final class NatsortBuiltinTest extends TestCase
         $this->assertSame(['img1', 'img2', 'img10', 'img12'], $vals);
     }
 
+    public function testNaturalSortPreservesPackedListKeys(): void
+    {
+        $runtime = new Runtime();
+        $fn = new natsort_();
+        $ht = new HashTable();
+        foreach (['b', 'a10', 'a2'] as $i => $v) {
+            $val = new VMVariable();
+            $val->string($v);
+            $ht->addIndex($i, $val);
+        }
+        $sorted = $this->runNatsort($fn, $runtime, $ht);
+        $out = [];
+        foreach ($sorted->iterateKeyed(true) as [$key, $value]) {
+            $out[$key->toInt()] = $value->toString();
+        }
+        $this->assertSame([2 => 'a2', 1 => 'a10', 0 => 'b'], $out);
+    }
+
     public function testNaturalSortsPackedIntegersWithSharedRefcount(): void
     {
         $runtime = new Runtime();

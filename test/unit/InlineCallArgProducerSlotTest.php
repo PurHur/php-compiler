@@ -407,4 +407,107 @@ PHP;
         self::assertSame($methodReturnSlot, $sendSlots[0] ?? null, 'arg sends='.json_encode($sendSlots));
         self::assertNotSame($newSlot, $sendSlots[0] ?? null, 'must not pass New_ object to var_dump');
     }
+
+    /** Issue #9548 — hoisted CAL_GREGORIAN (0) maps to first cal_to_jd arg, not a dead temp. */
+    public function testZeroValuedConstFetchFirstBuiltinArg(): void
+    {
+        $code = <<<'PHP'
+<?php
+cal_to_jd(CAL_GREGORIAN, 6, 6, 2026);
+PHP;
+        $runtime = new Runtime();
+        $block = $runtime->parseAndCompile($code, 'cal_to_jd_zero_const.php');
+
+        $constSlot = null;
+        $sendSlots = [];
+        foreach ($block->opCodes as $op) {
+            if (OpCode::TYPE_CONST_FETCH === $op->type) {
+                $constSlot = $op->arg1;
+            }
+            if (OpCode::TYPE_ARG_SEND === $op->type) {
+                $sendSlots[] = $op->arg1;
+            }
+        }
+
+        self::assertNotNull($constSlot, 'CAL_GREGORIAN const fetch must be lowered');
+        self::assertSame($constSlot, $sendSlots[0] ?? null, 'arg sends='.json_encode($sendSlots));
+    }
+
+    /** Issue #9152 — second call is_subclass_of must receive hoisted UnitEnum::class slot. */
+    public function testIsSubclassOfAfterIsAUsesClassConstFetchSlot(): void
+    {
+        $code = <<<'PHP'
+<?php
+enum E: int { case A = 1; }
+$child = 'E';
+var_export(is_a($child, UnitEnum::class, true));
+var_export(is_subclass_of($child, UnitEnum::class));
+PHP;
+        $runtime = new Runtime();
+        $block = $runtime->parseAndCompile($code, 'is_subclass_enum_class_string.php');
+
+        $classConstSlots = [];
+        $argSendGroups = [];
+        $currentSends = [];
+        foreach ($block->opCodes as $op) {
+            if (OpCode::TYPE_CLASS_CONST_FETCH === $op->type) {
+                $classConstSlots[] = $op->arg1;
+            }
+            if (OpCode::TYPE_FUNCCALL_INIT === $op->type) {
+                if ([] !== $currentSends) {
+                    $argSendGroups[] = $currentSends;
+                }
+                $currentSends = [];
+            }
+            if (OpCode::TYPE_ARG_SEND === $op->type) {
+                $currentSends[] = $op->arg1;
+            }
+            if (OpCode::TYPE_FUNCCALL_EXEC_RETURN === $op->type || OpCode::TYPE_FUNCCALL_EXEC_NORETURN === $op->type) {
+                if ([] !== $currentSends) {
+                    $argSendGroups[] = $currentSends;
+                }
+                $currentSends = [];
+            }
+        }
+
+        self::assertCount(2, $classConstSlots, 'UnitEnum::class fetches for is_a and is_subclass_of');
+        $isSubclassSends = null;
+        foreach ($argSendGroups as $group) {
+            if (2 === \count($group) && ($group[1] ?? null) === $classConstSlots[1]) {
+                $isSubclassSends = $group;
+                break;
+            }
+        }
+        self::assertNotNull($isSubclassSends, 'groups='.json_encode($argSendGroups));
+        self::assertSame($classConstSlots[1], $isSubclassSends[1]);
+    }
+
+    /** Issue #9575 — spaceship + from() call-arg must send int result, not dead enum-case temp (#9030). */
+    public function testVarDumpSpaceshipFromSendsSpaceshipResultSlot(): void
+    {
+        $code = <<<'PHP'
+<?php
+declare(strict_types=1);
+enum E: int { case A = 1; }
+var_dump(E::A <=> E::from(1));
+PHP;
+        $runtime = new Runtime();
+        $block = $runtime->parseAndCompile($code, 'enum_from_spaceship_var_dump.php');
+
+        $spaceshipSlot = null;
+        $varDumpSend = null;
+        $seenSpaceship = false;
+        foreach ($block->opCodes as $op) {
+            if (OpCode::TYPE_SPACESHIP === $op->type) {
+                $spaceshipSlot = $op->arg1;
+                $seenSpaceship = true;
+            }
+            if ($seenSpaceship && OpCode::TYPE_ARG_SEND === $op->type && null === $varDumpSend) {
+                $varDumpSend = $op->arg1;
+            }
+        }
+
+        self::assertNotNull($spaceshipSlot, 'spaceship result slot must be lowered');
+        self::assertSame($spaceshipSlot, $varDumpSend, 'var_dump arg send='.$varDumpSend);
+    }
 }

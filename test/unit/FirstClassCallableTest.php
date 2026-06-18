@@ -184,6 +184,78 @@ PHP;
         $this->assertSame('3', ob_get_clean());
     }
 
+    /** Issue #9604: (new C)->f(...) without extra parens on new. */
+    public function testVmInstanceMethodFirstClassCallableOnNewWithoutParens(): void
+    {
+        $code = <<<'PHP'
+<?php
+class C {
+    public function f(): void { echo "ok\n"; }
+}
+$fn = (new C)->f(...);
+$fn();
+PHP;
+        $rt = new Runtime();
+        $block = $rt->parseAndCompile($code, 'test.php');
+        ob_start();
+        $rt->run($block);
+        $this->assertSame("ok\n", ob_get_clean());
+    }
+
+    /** Issue #9604: trait-used instance method first-class callable. */
+    public function testVmTraitMethodFirstClassCallable(): void
+    {
+        $code = <<<'PHP'
+<?php
+trait T { public function f(): void { echo "ok\n"; } }
+class C { use T; }
+$fn = (new C)->f(...);
+$fn();
+PHP;
+        $rt = new Runtime();
+        $block = $rt->parseAndCompile($code, 'test.php');
+        ob_start();
+        $rt->run($block);
+        $this->assertSame("ok\n", ob_get_clean());
+    }
+
+    /** Issue #9605: invokable object first-class callable (new C)(...). */
+    public function testVmInvokableObjectFirstClassCallable(): void
+    {
+        $code = <<<'PHP'
+<?php
+class C {
+    public function __invoke(): void {
+        echo "ok\n";
+    }
+}
+$fn = (new C)(...);
+$fn();
+PHP;
+        $rt = new Runtime();
+        $block = $rt->parseAndCompile($code, 'test.php');
+        ob_start();
+        $rt->run($block);
+        $this->assertSame("ok\n", ob_get_clean());
+    }
+
+    public function testVmInvokableObjectFirstClassCallableIsClosureObject(): void
+    {
+        $code = <<<'PHP'
+<?php
+class C {
+    public function __invoke(): void {}
+}
+$fn = (new C)(...);
+var_export($fn instanceof Closure);
+PHP;
+        $rt = new Runtime();
+        $block = $rt->parseAndCompile($code, 'test.php');
+        ob_start();
+        $rt->run($block);
+        $this->assertSame('true', ob_get_clean());
+    }
+
     /** Issue #9170: FCC in parameter defaults (PHP 8.5 constant expressions). */
     public function testVmFunctionFirstClassCallableDefaultParameter(): void
     {

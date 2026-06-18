@@ -9,14 +9,13 @@ use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\ArrayBuiltinHelper;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\Variable as JITVariable;
-use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
 
 /**
  * natsort() — sort by value using natural order, preserve keys (subset of PHP; issue #2358).
  *
- * VM: homogeneous string or integer values; packed lists sort values in place.
- * JIT/AOT: packed list via __hashtable__sortPackedNatural; string-key via __hashtable__sortStringKeyValuesNatural.
+ * VM: homogeneous string or integer values; keys preserved on packed and assoc arrays (#9600).
+ * JIT/AOT: packed list via rebuild preserve-keys; string-key via __hashtable__sortStringKeyValuesNatural.
  */
 final class natsort_ extends Internal
 {
@@ -39,54 +38,7 @@ final class natsort_ extends Internal
 
             return;
         }
-        if (VmArray::isList($ht)) {
-            $values = [];
-            foreach ($ht->iterate(true) as $value) {
-                $copy = new Variable();
-                $copy->copyFrom($value);
-                $values[] = $copy;
-            }
-            $first = $values[0]->resolveIndirect();
-            if (Variable::TYPE_STRING === $first->type) {
-                VmInternalCompare::sortVariableValues(
-                    $values,
-                    VmInternalCompare::resolveStringCallback('strnatcmp')
-                );
-            } elseif (Variable::TYPE_INTEGER === $first->type) {
-                $n = \count($values);
-                for ($i = 1; $i < $n; ++$i) {
-                    $j = $i;
-                    while ($j > 0) {
-                        $a = $values[$j - 1]->resolveIndirect();
-                        $b = $values[$j]->resolveIndirect();
-                        if (Variable::TYPE_INTEGER !== $a->type || Variable::TYPE_INTEGER !== $b->type) {
-                            VmArray::rejectEnumCaseNaturalSortValue(
-                                Variable::TYPE_INTEGER !== $a->type ? $a : $b
-                            );
-                            throw new \LogicException(
-                                'natsort() only supports homogeneous string or integer values in this compiler build'
-                            );
-                        }
-                        if ($a->toInt() <= $b->toInt()) {
-                            break;
-                        }
-                        $tmp = $values[$j - 1];
-                        $values[$j - 1] = $values[$j];
-                        $values[$j] = $tmp;
-                        --$j;
-                    }
-                }
-            } else {
-                VmArray::rejectEnumCaseNaturalSortValue($first);
-                throw new \LogicException(
-                    'natsort() only supports homogeneous string or integer values in this compiler build'
-                );
-            }
-            $array->separateArrayForWrite();
-            $array->resolveIndirect()->toArray()->replacePackedValues($values);
-        } else {
-            $array->array(VmArray::natsortCopy($ht));
-        }
+        $array->array(VmArray::natsortCopy($ht));
         if (null !== $frame->returnVar) {
             $frame->returnVar->bool(true);
         }

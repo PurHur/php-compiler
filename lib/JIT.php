@@ -8013,6 +8013,9 @@ class JIT {
                     $prevStrict = $this->context->callerStrictTypes;
                     $this->context->callerStrictTypes = $block->strictTypes;
                     $this->emitJitLateStaticCallSiteBinding($callArgs);
+                    if ($this->context->scope->toCall instanceof CoreFunc\Internal) {
+                        $callArgs = $this->densifyInternalCallArgs($this->context->scope->toCall, $callArgs);
+                    }
                     $this->context->scope->toCall->call($this->context, ...$callArgs);
                     JIT\NoDiscardCallGuard::emitAfterDiscardedReturn($this->context, $this->context->scope->toCall);
                     $this->markNewObjectConstructedAfterCall($this->context->scope->toCall, $callArgs);
@@ -8179,6 +8182,9 @@ class JIT {
                         $this->context->jitUnserializeOptionsOperand = $callOperands[1];
                     }
                     $this->promoteCompileTimeStringOnCallArgs($block, $callOperands, $callArgs);
+                    if ($this->context->scope->toCall instanceof CoreFunc\Internal) {
+                        $callArgs = $this->densifyInternalCallArgs($this->context->scope->toCall, $callArgs);
+                    }
                     $result = $this->context->scope->toCall->call($this->context, ...$callArgs);
                     $this->context->jitUnserializeOptionsOperand = $savedUnserializeOptionsOperand;
                     $this->markNewObjectConstructedAfterCall($this->context->scope->toCall, $callArgs);
@@ -13173,6 +13179,21 @@ class JIT {
      *
      * @return array<int, Variable>
      */
+    /**
+     * @param array<int, JIT\Variable> $callArgs
+     *
+     * @return list<JIT\Variable>
+     */
+    private function densifyInternalCallArgs(CoreFunc\Internal $call, array $callArgs): array
+    {
+        [$paramNames] = $this->jitCalleeParamMetadata($call);
+        if ([] === $paramNames) {
+            return $callArgs;
+        }
+
+        return JIT\NamedOptionalCallArgs::densifyForSpread($this->context, $callArgs, \count($paramNames));
+    }
+
     /**
      * Flatten ARG_SEND list; unpack entries merge into one packed list (issue #1361).
      *

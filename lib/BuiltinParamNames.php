@@ -20,6 +20,8 @@ final class BuiltinParamNames
                 return ['string'];
             case 'substr':
                 return ['string', 'offset', 'length'];
+            case 'str_pad':
+                return ['string', 'length', 'pad_string', 'pad_type'];
             case 'parse_str':
                 return ['string', 'array'];
             case 'sort':
@@ -50,6 +52,8 @@ final class BuiltinParamNames
                 return ['callback'];
             case 'headers_sent':
                 return ['filename', 'line'];
+            case 'number_format':
+                return ['num', 'decimals', 'decimal_separator', 'thousands_separator'];
             case 'modf':
                 return ['num', 'num2'];
             case 'frexp':
@@ -104,6 +108,8 @@ final class BuiltinParamNames
                 return ['short_options', 'long_options', 'rest_index'];
             case 'is_callable':
                 return ['value', 'syntax_only', 'callable_name'];
+            case 'iterator_to_array':
+                return ['iterator', 'preserve_keys'];
         }
 
         return null;

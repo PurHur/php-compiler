@@ -63,7 +63,7 @@ final class ProgressNoteRuntimeStandaloneTest extends TestCase
         $this->assertLessThanOrEqual(40, $lines, 'phpc_progress.c must remain a thin ABI (handler + extern decls)');
 
         foreach (['sprintf', 'snprintf', 'strcpy', 'strncpy', 'memcpy', 'malloc', 'fopen', 'fprintf'] as $forbidden) {
-            $this->assertStringNotContainsString($forbidden.'(', $source, 'progress formatting belongs in ProgressNoteRuntime.php');
+            $this->assertStringNotContainsString($forbidden.'(', $source, 'progress formatting belongs in ProgressJitHelper / ProgressNoteRuntime bridge');
         }
 
         $this->assertStringContainsString('phpc_segv_handler', $source);

@@ -32,6 +32,20 @@ final class VmPregNativeTest extends TestCase
         $this->assertSame($expected, $actual);
     }
 
+    public function testPregReplaceNumericBackreferencesMatchZend(): void
+    {
+        $cases = [
+            ['/([0-9]+)/', '[$1]', 'x12y'],
+            ['/(\d)/', '${1}x', 'a9b'],
+            ['/(.) (.)/', '$2$1', 'ab'],
+        ];
+        foreach ($cases as [$pattern, $replacement, $subject]) {
+            $expected = \preg_replace($pattern, $replacement, $subject);
+            $actual = VmPregNative::pregReplace($pattern, $replacement, $subject);
+            $this->assertSame($expected, $actual, $pattern.' / '.$replacement);
+        }
+    }
+
     public function testVmPregDoesNotCallHostPreg(): void
     {
         $root = \dirname(__DIR__, 2);

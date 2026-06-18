@@ -108,6 +108,9 @@ final class Variable {
     /** Set when this variable is the PHP {@code null} constant (const-fetch). */
     public bool $isNullConstant = false;
 
+    /** Placeholder for a skipped optional parameter after named-arg densification (#9525). */
+    public bool $isOptionalOmittedNamedArg = false;
+
     /** {@see __value__} slot holds a nested {@see __hashtable__} (e.g. $_FILES['field']). */
     public bool $valueBoxHashtable = false;
 

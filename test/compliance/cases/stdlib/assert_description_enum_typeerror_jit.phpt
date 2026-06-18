@@ -2,6 +2,7 @@
 Stdlib: assert() — enum case description TypeError on failure (JIT, #7171, ext/standard/assert.c)
 --FILE--
 <?php
+ini_set('zend.assertions', '1');
 enum E: string { case A = 'x'; }
 try {
     assert(false, E::A);

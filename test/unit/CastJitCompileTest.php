@@ -72,4 +72,21 @@ PHP,
         $runtime->jitCompileBlock($block);
         $this->addToAssertionCount(1);
     }
+
+    public function testObjectCastOnEnumCaseCompiles(): void
+    {
+        $runtime = new Runtime();
+        $block = $runtime->parseAndCompile(
+            <<<'PHP'
+<?php
+enum E: int { case A = 1; }
+$o = (object) E::A;
+echo $o === E::A ? "1\n" : "0\n";
+PHP,
+            'cast_object_enum_case.php'
+        );
+        $this->assertNotNull($block);
+        $runtime->jitCompileBlock($block);
+        $this->addToAssertionCount(1);
+    }
 }

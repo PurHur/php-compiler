@@ -20,6 +20,10 @@ final class NatsortJITTest extends BaseTest
             __DIR__.'/cases/stdlib/natsort_jit.phpt',
             'natsort_jit.phpt'
         );
+        yield 'natsort_preserve_keys_jit.phpt' => self::parsePHPT(
+            __DIR__.'/cases/stdlib/natsort_preserve_keys_jit.phpt',
+            'natsort_preserve_keys_jit.phpt'
+        );
     }
 
     public function setUp(): void

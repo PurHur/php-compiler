@@ -12,5 +12,5 @@ var_dump((int) E::A);
 ?>
 --EXPECT--
 1
-'Object of class E could not be converted to int'
+'no warning'
 int(1)

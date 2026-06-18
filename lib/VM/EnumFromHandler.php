@@ -24,17 +24,18 @@ final class EnumFromHandler extends Internal
 
     public function execute(Frame $frame): void
     {
-        EnumSupport::ensureBackedEnumValuesUnique($this->enum);
+        $enum = EnumSupport::resolveRuntimeEnumClass($frame->vmContext, $this->enum);
+        EnumSupport::ensureBackedEnumValuesUnique($enum);
         if (\count($frame->calledArgs) < 1) {
             throw new \LogicException(
                 $this->getName().'() requires exactly 1 argument in this compiler build'
             );
         }
         $arg = $frame->calledArgs[0];
-        $match = BackedEnum::caseForValue($this->enum, $arg);
+        $match = BackedEnum::caseForValue($enum, $arg);
         if (null === $match) {
             if (!$this->try) {
-                throw new \ValueError(BackedEnum::valueErrorMessage($this->enum, $arg));
+                throw new \ValueError(BackedEnum::valueErrorMessage($enum, $arg));
             }
             if (null !== $frame->returnVar) {
                 $frame->returnVar->null();
@@ -43,7 +44,7 @@ final class EnumFromHandler extends Internal
             return;
         }
         if (null !== $frame->returnVar) {
-            $canonical = BackedEnum::canonicalCaseVariable($this->enum, $match->caseName);
+            $canonical = BackedEnum::canonicalCaseVariable($enum, $match->caseName);
             if (null !== $canonical && EnumCaseSupport::isEnumCaseVariable($canonical)) {
                 $frame->returnVar->copyFrom($canonical);
             } else {

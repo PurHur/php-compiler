@@ -76,6 +76,10 @@ final class ClosureSupport
             if (null !== $state) {
                 return $callable->toObject();
             }
+            $invokeState = self::tryFromInvokableObject($ctx, $frame, $callable);
+            if (null !== $invokeState) {
+                return self::wrapState($ctx, $invokeState);
+            }
 
             throw new \Error(
                 'Object of type '.self::valueTypeName($callable).' is not callable'
@@ -357,6 +361,26 @@ final class ClosureSupport
         throw new \LogicException(
             'Closure::fromCallable(): Argument #1 ($callback) must be a valid callback'
         );
+    }
+
+    /** `(new C)(...)` / Closure::fromCallable($obj) when $obj defines __invoke (zend_closures.c, #9605). */
+    private static function tryFromInvokableObject(
+        Context $ctx,
+        Frame $frame,
+        Variable $callable
+    ): ?ClosureState {
+        if (Variable::TYPE_OBJECT !== $callable->type) {
+            return null;
+        }
+        $object = $callable->toObject();
+        if (null !== $object->closureState) {
+            return null;
+        }
+        if (!$ctx->runtime->vm->hasInstanceMethod($object->class, '__invoke')) {
+            return null;
+        }
+
+        return self::fromInstanceMethodCallable($ctx, $frame, $callable, '__invoke');
     }
 
     private static function fromInstanceMethodCallable(

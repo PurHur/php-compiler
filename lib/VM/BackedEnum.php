@@ -30,6 +30,16 @@ final class BackedEnum
         }
         EnumSupport::ensureBackedEnumValuesUnique($enum);
         $normalized = self::normalizeBackingArgument($enum, $value->resolveIndirect());
+        $match = self::matchCaseForBackingValue($enum, $normalized);
+        if (null !== $match) {
+            return $match;
+        }
+
+        return self::matchCaseForBackingValueFromConstants($enum, $normalized);
+    }
+
+    private static function matchCaseForBackingValue(ClassEntry $enum, Variable $normalized): ?EnumCaseEntry
+    {
         foreach ($enum->enumCases as $case) {
             $backing = self::caseBackingScalar($enum->backedType, $case['value']);
             if (!self::backingValuesMatch($enum->backedType, $backing, $normalized)) {
@@ -37,6 +47,31 @@ final class BackedEnum
             }
 
             return new EnumCaseEntry($enum, $case['name'], clone $backing);
+        }
+
+        return null;
+    }
+
+    /**
+     * Fallback when {@see ClassEntry::$enumCases} is empty or stale but case constants remain (#9603).
+     *
+     * @see Zend/zend_enum.c — zend_enum_from_case() backed-value hash
+     */
+    private static function matchCaseForBackingValueFromConstants(
+        ClassEntry $enum,
+        Variable $normalized
+    ): ?EnumCaseEntry {
+        foreach ($enum->constants as $memberLc => $stored) {
+            $caseName = EnumSupport::enumCaseNameForConstantMember($enum, $memberLc);
+            if (null === $caseName) {
+                continue;
+            }
+            $backing = self::caseBackingScalar($enum->backedType, $stored);
+            if (!self::backingValuesMatch($enum->backedType, $backing, $normalized)) {
+                continue;
+            }
+
+            return new EnumCaseEntry($enum, $caseName, clone $backing);
         }
 
         return null;

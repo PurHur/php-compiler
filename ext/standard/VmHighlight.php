@@ -14,6 +14,25 @@ use PHPCompiler\VM\OutputBuffer;
 final class VmHighlight
 {
     /**
+     * Resolve highlight_string()/highlight_file() $return flag (php-src zend_parse_parameters "b", #9140).
+     */
+    public static function resolveReturnFlag(\PHPCompiler\VM\Variable $var, string $functionName): bool
+    {
+        $var = $var->resolveIndirect();
+        if (\PHPCompiler\VM\Variable::TYPE_BOOLEAN === $var->type) {
+            return $var->toBool();
+        }
+        if (\PHPCompiler\VM\Variable::TYPE_INTEGER === $var->type) {
+            $iv = $var->toInt();
+            if (0 === $iv || 1 === $iv) {
+                return 0 !== $iv;
+            }
+        }
+
+        throw new \LogicException($functionName.'() expects bool for argument 2 in this compiler build');
+    }
+
+    /**
      * @return string|bool HTML when $return is true, otherwise bool success
      */
     public static function highlightString(string $code, bool $return): string|bool

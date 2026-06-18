@@ -6630,6 +6630,18 @@ class Compiler {
                 return $this->compileIncDecExpr($expr, $block, OpCode::TYPE_PRE_DEC);
             case Op\Expr\UnaryMinus::class:
             case Op\Expr\UnaryPlus::class:
+                $foldedUnaryLiteral = $this->tryFoldUnaryLiteralDefault($expr);
+                if (null !== $foldedUnaryLiteral) {
+                    $block->registerConstant($expr->result, $foldedUnaryLiteral);
+
+                    return [];
+                }
+
+                return [new OpCode(
+                    $this->getOpCodeTypeFromUnaryOp($expr),
+                    $this->compileOperand($expr->result, $block, false),
+                    $this->compileUnaryExprReadOperand($expr, $block)
+                )];
             case Op\Expr\BitwiseNot::class:
             case Op\Expr\BooleanNot::class:
             case Op\Expr\Clone_::class:
@@ -9625,13 +9637,32 @@ class Compiler {
         }
         if (null !== $callIndex && $callIndex > 0) {
             $prev = $block->orig->children[$callIndex - 1] ?? null;
+            if ($prev instanceof Op\Expr\ConstFetch) {
+                $name = $this->staticNameFromOperand($prev->name);
+                if (null !== $name && \in_array(strtolower($name), ['true', 'false', 'null'], true)) {
+                    $callArg = $callOp->args[$argIndex] ?? null;
+                    if (
+                        null !== $callArg
+                        && !$this->operandsReferToSameVariable($prev->result, $callArg)
+                    ) {
+                        $vm = $this->tryFoldGlobalConstFetch($prev);
+                        if (null !== $vm) {
+                            return (string) $block->registerConstant($arg, $vm);
+                        }
+                    }
+                }
+            }
             $argRoot = $this->unwrapOperandChain($arg);
             if (($prev instanceof Op\Expr\BinaryOp || $prev instanceof Op\Expr\InstanceOf_)
                 && null !== $prev->result
                 && null !== $argRoot->type
                 && null !== $prev->result->type
                 && $argRoot->type->type === $prev->result->type->type
-                && $argRoot->type->type === Type::TYPE_BOOLEAN
+                && in_array(
+                    $argRoot->type->type,
+                    [Type::TYPE_BOOLEAN, Type::TYPE_LONG],
+                    true
+                )
             ) {
                 if (null === $block->slotForOperand($prev->result)) {
                     foreach ($this->compileExpr($prev, $block) as $op) {
@@ -9660,6 +9691,11 @@ class Compiler {
         $producers = $this->precedingInlineCallArgProducersBeforeCfgOp($block->orig->children, $callOp);
         $producer = $this->matchInlineCallArgProducer($producers, $callOp->args, $argIndex);
         if (null === $producer) {
+            $classConstSlot = $this->slotForHoistedClassConstFetchCallArg($arg, $block, $callOp, $argIndex);
+            if (null !== $classConstSlot) {
+                return $classConstSlot;
+            }
+
             return $this->slotForMatchResultDeadCallArg($arg, $block, $cfgCallOp);
         }
         if ($producer instanceof Op\Expr\PropertyFetch) {
@@ -9780,6 +9816,8 @@ class Compiler {
             || $producer instanceof Op\Expr\Cast
             || $producer instanceof Op\Expr\MagicScriptConst
             || $producer instanceof Op\Expr\New_
+            || $producer instanceof Op\Expr\UnaryMinus
+            || $producer instanceof Op\Expr\UnaryPlus
             || $producer instanceof Op\Expr\PostInc
             || $producer instanceof Op\Expr\PreInc
             || $producer instanceof Op\Expr\PostDec
@@ -9980,6 +10018,62 @@ class Compiler {
         return $matchVar;
     }
 
+    /**
+     * php-cfg dead call-arg temps for hoisted ClassConstFetch (e.g. UnitEnum::class) must not
+     * fall through to match-result slot reuse (#9152, is_subclass_of after is_a).
+     */
+    private function slotForHoistedClassConstFetchCallArg(
+        Operand $arg,
+        Block $block,
+        Op $callOp,
+        int $argIndex
+    ): ?string {
+        if (null === $block->orig) {
+            return null;
+        }
+        if (!property_exists($callOp, 'args') || !is_array($callOp->args)) {
+            return null;
+        }
+        $callArg = $callOp->args[$argIndex] ?? null;
+        if (!$this->callArgUsesHoistedEnumPreludeSlot($callArg)) {
+            return null;
+        }
+        $fetch = $this->precedingClassConstFetchForCallArgIndex(
+            $callOp,
+            $argIndex,
+            $this->precedingCallArgClassConstFetchesBeforeCfgOp($block->orig->children, $callOp, $block)
+        );
+        if (!$fetch instanceof Op\Expr\ClassConstFetch) {
+            $fetch = $this->classConstFetchForHoistedDeadPrelude($callOp, $argIndex, $block);
+        }
+        if (!$fetch instanceof Op\Expr\ClassConstFetch) {
+            foreach ($block->orig->children as $i => $child) {
+                if ($child !== $callOp) {
+                    continue;
+                }
+                if ($i > 0) {
+                    $prev = $block->orig->children[$i - 1];
+                    if ($prev instanceof Op\Expr\ClassConstFetch) {
+                        $fetch = $prev;
+                    }
+                }
+                break;
+            }
+        }
+        if (!$fetch instanceof Op\Expr\ClassConstFetch) {
+            return null;
+        }
+        $slot = $block->slotForOperand($fetch->result);
+        if (null === $slot) {
+            foreach ($this->compileExpr($fetch, $block) as $op) {
+                $block->addOpCode($op);
+            }
+            $slot = $block->slotForOperand($fetch->result);
+        }
+
+        return null !== $slot ? (string) $slot : null;
+    }
+
     private function cfgBlockJumpsToCfgBlock(CfgBlock $from, CfgBlock $to): bool
     {
         foreach ($from->children as $child) {
@@ -10140,8 +10234,7 @@ class Compiler {
                 ) {
                     return $producers[0];
                 }
-
-                return null;
+                // Fall through — php-cfg dead call-arg temp (#9140, #9260, #9324).
             }
             if (
                 $argCount - 1 === $argIndex
@@ -10202,6 +10295,14 @@ class Compiler {
             $closureMatch = $this->matchSingleClosureInlineProducer($producers[0], $callArgs, $argIndex);
             if (null !== $closureMatch) {
                 return $closureMatch;
+            }
+
+            if ($argCount > $producerCount) {
+                return $this->matchInlineCallArgProducerWithEmbeddedLiterals(
+                    $producers,
+                    $callArgs,
+                    $argIndex
+                );
             }
 
             return null;
@@ -12580,6 +12681,62 @@ class Compiler {
     }
 
     /**
+     * php-cfg hoists `true`/`false`/`null` as a ConstFetch stmt before FuncCall with a dead arg temp (#9140, #9260).
+     */
+    private function tryFoldHoistedBoolNullLiteralCallArg(
+        Operand $arg,
+        Block $block,
+        ?Op $cfgCallOp,
+        int $argIndex
+    ): ?int {
+        if (null === $block->orig || null === $cfgCallOp || !property_exists($cfgCallOp, 'args')) {
+            return null;
+        }
+        $callArgs = $cfgCallOp->args;
+        if (!is_array($callArgs) || [] === $callArgs || $argIndex !== \count($callArgs) - 1) {
+            return null;
+        }
+        $children = $block->orig->children;
+        $callIndex = null;
+        foreach ($children as $i => $child) {
+            if ($child === $cfgCallOp) {
+                $callIndex = $i;
+                break;
+            }
+        }
+        if (null === $callIndex) {
+            return null;
+        }
+        for ($i = $callIndex - 1; $i >= 0 && $callIndex - $i <= 4; --$i) {
+            $prev = $children[$i] ?? null;
+            if (!$prev instanceof Op\Expr\ConstFetch) {
+                if ($prev instanceof Op\Expr\Assign || $prev instanceof Op\Expr\BinaryOp\Concat) {
+                    continue;
+                }
+                break;
+            }
+            $name = $this->staticNameFromOperand($prev->name);
+            if (null === $name || !\in_array(strtolower($name), ['true', 'false', 'null'], true)) {
+                break;
+            }
+            $callArg = $callArgs[$argIndex] ?? null;
+            if (
+                null !== $callArg
+                && !$this->operandsReferToSameVariable($prev->result, $callArg)
+                && !$this->isEmbeddedCallLiteralArg($callArg)
+            ) {
+                $vm = $this->tryFoldGlobalConstFetch($prev);
+                if (null !== $vm) {
+                    return $block->registerConstant($arg, $vm);
+                }
+            }
+            break;
+        }
+
+        return null;
+    }
+
+    /**
      * Fold compile-time call arguments, including php-cfg dead ClassConstFetch preludes (#5933).
      */
     protected function tryFoldCallArgCompileTimeValue(
@@ -12676,6 +12833,12 @@ class Compiler {
                     }
                 }
                 $vm = $this->tryFoldClassConstFetchDefault($producer, $block, true);
+                if (null !== $vm) {
+                    return $block->registerConstant($arg, $vm);
+                }
+            }
+            if ($producer instanceof Op\Expr\UnaryMinus || $producer instanceof Op\Expr\UnaryPlus) {
+                $vm = $this->tryFoldUnaryLiteralDefault($producer);
                 if (null !== $vm) {
                     return $block->registerConstant($arg, $vm);
                 }
@@ -12841,7 +13004,15 @@ class Compiler {
                         null === $calleeName
                         || !$this->callArgRequiresByRef($calleeName, (int) $argIndex)
                     ) {
-                        $valueSlot = $this->tryFoldCallArgCompileTimeValue($arg, $block, $calleeName, $cfgCallOp);
+                        $valueSlot = $this->tryFoldHoistedBoolNullLiteralCallArg(
+                            $arg,
+                            $block,
+                            $cfgCallOp,
+                            (int) $argIndex
+                        );
+                        if (null === $valueSlot) {
+                            $valueSlot = $this->tryFoldCallArgCompileTimeValue($arg, $block, $calleeName, $cfgCallOp);
+                        }
                     }
                 }
                 if (null === $valueSlot) {

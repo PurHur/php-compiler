@@ -29,6 +29,7 @@ final class MatchVMTest extends BaseTest
                 'match_strict_arms_4371.phpt',
                 'match_enum_case.phpt',
                 'match_enum_case_scalar.phpt',
+                'match_scalar_enum_arm.phpt',
                 'match_nested_call_arg.phpt',
                 'match_switch_enum_unqualified.phpt',
                 'switch_match_enum_typed_subject.phpt',

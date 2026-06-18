@@ -9,7 +9,7 @@ use PHPCompiler\Runtime;
 use PHPUnit\Framework\TestCase;
 
 /**
- * AOT standalone must define strip_tags runtime in LLVM, not superglobals_refresh.c.
+ * Issue #9196: standalone AOT keeps LLVM strip_tags; JIT path uses StripTagsJitHelper.
  *
  * @group aot-lint
  */

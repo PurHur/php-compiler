@@ -280,6 +280,10 @@ patch_already_applied() {
       grep -q 'isEmptyListExpr' "$ROOT/vendor/ircmaxell/php-cfg/lib/PHPCfg/Parser.php" 2>/dev/null \
         && grep -q "Cannot use empty list" "$ROOT/vendor/ircmaxell/php-cfg/lib/PHPCfg/Parser.php" 2>/dev/null
       ;;
+    php-cfg-list-skip-slot.patch)
+      grep -A3 'null === $item' "$ROOT/vendor/ircmaxell/php-cfg/lib/PHPCfg/Parser.php" 2>/dev/null \
+        | grep -q '++$logicalIndex'
+      ;;
     php-cfg-list-spread.patch)
       grep -q 'listSpreadRhs' "$ROOT/vendor/ircmaxell/php-cfg/lib/PHPCfg/Op/Expr/Assign.php" 2>/dev/null \
         && grep -q '\$item->unpack' "$ROOT/vendor/ircmaxell/php-cfg/lib/PHPCfg/Parser.php" 2>/dev/null
@@ -5532,6 +5536,7 @@ if [[ -d "$ROOT/vendor/ircmaxell/php-cfg" ]]; then
   apply_patch "$PATCH_DIR/php-cfg-assignop-coalesce.patch"
   apply_patch "$PATCH_DIR/php-cfg-list-destruct-byref.patch"
   apply_patch "$PATCH_DIR/php-cfg-empty-list-assignment.patch" || true
+  apply_patch "$PATCH_DIR/php-cfg-list-skip-slot.patch" || true
   apply_patch "$PATCH_DIR/php-cfg-list-spread.patch"
   apply_patch "$PATCH_DIR/php-cfg-first-class-callable.patch"
   apply_patch "$PATCH_DIR/php-cfg-arrow-function.patch"
