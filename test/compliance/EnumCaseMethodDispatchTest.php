@@ -17,6 +17,10 @@ final class EnumCaseMethodDispatchTest extends BaseTest
             __DIR__.'/cases/language/enum_case_method_dispatch.phpt',
             'enum_case_method_dispatch.phpt'
         );
+        yield 'enum_case_method_call.phpt #9720' => self::parsePHPT(
+            __DIR__.'/cases/language/enum_case_method_call.phpt',
+            'enum_case_method_call.phpt'
+        );
     }
 
     public function setUp(): void
