@@ -42,6 +42,7 @@ final class BootstrapSelfhostBundleTest extends TestCase
         'ext/mbstring/JitMbStrlen.php',
         'ext/standard/Utf8JitHelper.php',
         'ext/standard/HrtimeJitHelper.php',
+        'ext/standard/SleepJitHelper.php',
         'lib/JIT/Builtin/StringUtf8Runtime.php',
         'lib/JIT/Builtin/StringHrtimeRuntime.php',
         'lib/JIT/Builtin/StringUtf8Strlen.php',

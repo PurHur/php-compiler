@@ -7,7 +7,7 @@ namespace PHPCompiler\ext\standard;
 /**
  * VM sleep/usleep/time_nanosleep/time_sleep_until (#4860).
  *
- * JIT/AOT: {@see JitSleep} + {@see \PHPCompiler\JIT\Builtin\TimeSleepRuntime}.
+ * JIT/AOT: {@see JitSleep} + {@see SleepJitHelper} via {@see \PHPCompiler\JIT\Builtin\TimeSleepRuntime}.
  */
 final class VmSleep
 {
