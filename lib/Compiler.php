@@ -1695,6 +1695,12 @@ class Compiler {
                         break;
                     } elseif ($this->isUnreachableAfterNeverCall($child, $ops, $i)) {
                         break;
+                    } elseif (
+                        $child instanceof Op\Expr\ClassConstFetch
+                        && $this->isHoistedEnumCaseFetchOnlyForCaseClassPseudoConst($child, $ops, $i, $block)
+                    ) {
+                        // Lowered via following `Case::class` fold / call-arg compile-time value (#9426, #9518).
+                        break;
                     } elseif ($this->isForeachLoopVarAssignRefFusion($ops, $i)) {
                         /** @var Op\Iterator\Value $iter */
                         $iter = $ops[$i];
@@ -10261,6 +10267,13 @@ class Compiler {
                     if ($last instanceof Op\Expr\MethodCall || $last instanceof Op\Expr\StaticCall) {
                         return $last;
                     }
+                    // php-cfg dead temp for `var_dump(E::A::class)` — last producer is Case::class (#9426, #9518).
+                    if ($last instanceof Op\Expr\ClassConstFetch) {
+                        $pseudoName = $this->staticNameFromOperand($last->name);
+                        if (null !== $pseudoName && 'class' === strtolower($pseudoName)) {
+                            return $last;
+                        }
+                    }
                 }
 
                 return null;
@@ -10323,6 +10336,12 @@ class Compiler {
                     && $this->operandsReferToSameVariable($producers[0]->result, $callArg)
                 ) {
                     return $producers[0];
+                }
+                if ($producers[0] instanceof Op\Expr\ClassConstFetch) {
+                    $pseudoName = $this->staticNameFromOperand($producers[0]->name);
+                    if (null !== $pseudoName && 'class' === strtolower($pseudoName)) {
+                        return $producers[0];
+                    }
                 }
                 // Fall through — php-cfg dead call-arg temp (#9140, #9260, #9324).
             }
@@ -10574,6 +10593,10 @@ class Compiler {
             return $expr->expr === $operand
                 || $this->operandsReferToSameVariable($expr->expr, $operand);
         }
+        if ($expr instanceof Op\Expr\ClassConstFetch) {
+            return $expr->class === $operand
+                || $this->operandsReferToSameVariable($expr->class, $operand);
+        }
 
         return false;
     }
@@ -10598,6 +10621,37 @@ class Compiler {
                 continue;
             }
             if ($child instanceof Op\Expr && $this->cfgExprUsesOperand($child, $fetch->result)) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /**
+     * php-cfg hoists `E::A` before `E::A::class` when the case fetch only feeds `::class` (#9426, #9518).
+     *
+     * @param list<Op> $ops
+     */
+    private function isHoistedEnumCaseFetchOnlyForCaseClassPseudoConst(
+        Op\Expr\ClassConstFetch $fetch,
+        array $ops,
+        int $index,
+        Block $block
+    ): bool {
+        if (!$this->isCompileTimeEnumCaseClassConstFetch($fetch, $block)) {
+            return false;
+        }
+        for ($j = $index + 1, $n = \count($ops); $j < $n; ++$j) {
+            $later = $ops[$j];
+            if (!$later instanceof Op\Expr\ClassConstFetch) {
+                continue;
+            }
+            $pseudo = $this->staticNameFromOperand($later->name);
+            if (null === $pseudo || 'class' !== strtolower($pseudo)) {
+                continue;
+            }
+            if ($this->operandsReferToSameVariable($later->class, $fetch->result)) {
                 return true;
             }
         }
