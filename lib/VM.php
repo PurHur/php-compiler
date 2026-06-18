@@ -6064,7 +6064,15 @@ restart:
                         break;
                     }
                     if ($this->frameIsPropertySetHook($frame)) {
-                        $this->context->propertyHookSetAborted = true;
+                        $catchFrame = $this->dispatchEngineThrow($frame, $thrown);
+                        if (null !== $catchFrame) {
+                            // Bubble to caller stack — do not finish assignment (#9670, zend_property_hooks.c).
+                            $this->context->propertyHookExternalCatchFrame = $catchFrame;
+                            $this->context->propertyHookSetAborted = true;
+
+                            return self::FAILURE;
+                        }
+                        break;
                     }
                     $catchFrame = $this->dispatchEngineThrow($frame, $thrown);
                     if (null !== $catchFrame) {
@@ -6100,6 +6108,9 @@ restart:
             } catch (VM\ArrayAccessOffsetSignal $signal) {
                 $frame = $signal->catchFrame;
                 goto restart;
+            }
+            if ($this->shouldAbortPropertyHookInvocation($frame)) {
+                return self::FAILURE;
             }
             if ($frame->generatorYield) {
                 $frame->generatorYield = false;
@@ -7109,6 +7120,10 @@ restart:
         );
         $catchFrame = $this->findCatchFrameForThrow($frame, $thrown);
         if (null !== $catchFrame) {
+            if ($this->stashPropertyHookSetExternalCatch($frame, $catchFrame)) {
+                return null;
+            }
+
             return $catchFrame;
         }
         $this->raiseUncaughtException($thrown);
@@ -7256,6 +7271,10 @@ restart:
         $thrown = VM\BuiltinExceptionSupport::materializeError($this->context, $message, $file, $line);
         $catchFrame = $this->findCatchFrameForThrow($frame, $thrown);
         if (null !== $catchFrame) {
+            if ($this->stashPropertyHookSetExternalCatch($frame, $catchFrame)) {
+                return null;
+            }
+
             return $catchFrame;
         }
         $this->raiseUncaughtException($thrown);
@@ -8088,6 +8107,32 @@ restart:
         $name = strtolower($func->name);
 
         return str_contains($name, '__phpc_property_set_');
+    }
+
+    /**
+     * Route catchable set-hook failures to the caller stack (#9670, zend_property_hooks.c).
+     */
+    private function stashPropertyHookSetExternalCatch(Frame $frame, Frame $catchFrame): bool
+    {
+        if (null === $frame->propertyHookRawProperty && !$this->frameIsPropertySetHook($frame)) {
+            return false;
+        }
+        $this->context->propertyHookExternalCatchFrame = $catchFrame;
+
+        return true;
+    }
+
+    private function shouldAbortPropertyHookInvocation(Frame $frame): bool
+    {
+        if (null === $this->context->propertyHookExternalCatchFrame) {
+            return false;
+        }
+        if (null === $frame->propertyHookRawProperty && !$this->frameIsPropertySetHook($frame)) {
+            return false;
+        }
+        $this->context->propertyHookSetAborted = true;
+
+        return true;
     }
 
     private function frameIsPropertyGetHook(Frame $frame): bool
@@ -9127,6 +9172,10 @@ restart:
             );
             $catchFrame = $this->findCatchFrameForThrow($frame, $thrown);
             if (null !== $catchFrame) {
+                if ($this->stashPropertyHookSetExternalCatch($frame, $catchFrame)) {
+                    return null;
+                }
+
                 return $catchFrame;
             }
             $this->raiseUncaughtException($thrown);
@@ -9152,6 +9201,10 @@ restart:
         );
         $catchFrame = $this->findCatchFrameForThrow($frame, $thrown);
         if (null !== $catchFrame) {
+            if ($this->stashPropertyHookSetExternalCatch($frame, $catchFrame)) {
+                return null;
+            }
+
             return $catchFrame;
         }
         $this->raiseUncaughtException($thrown);
