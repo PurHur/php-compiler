@@ -144,6 +144,33 @@ PHP;
         self::assertContains($sendSlots[1], $returnSlots, 'fcall returns='.json_encode($returnSlots));
     }
 
+    /** Issue #9335 — var_dump(instanceof) wires boolean InstanceOf producer slot. */
+    public function testVarDumpInstanceOfUsesProducerSlot(): void
+    {
+        $code = <<<'PHP'
+<?php
+enum E: int { case A = 1; }
+var_dump(E::A instanceof UnitEnum);
+var_dump(E::A instanceof BackedEnum);
+var_dump(E::A instanceof E);
+PHP;
+        $runtime = new Runtime();
+        $block = $runtime->parseAndCompile($code, 'enum_instanceof.php');
+
+        $instanceofSlots = [];
+        $sendSlots = [];
+        foreach ($block->opCodes as $op) {
+            if (OpCode::TYPE_INSTANCEOF === $op->type) {
+                $instanceofSlots[] = $op->arg1;
+            }
+            if (OpCode::TYPE_ARG_SEND === $op->type) {
+                $sendSlots[] = $op->arg1;
+            }
+        }
+
+        self::assertSame($instanceofSlots, $sendSlots, 'arg sends='.json_encode($sendSlots));
+    }
+
     /** Issue #9324 — hoisted Array_/ConstFetch producers map to dead call-arg temps. */
     public function testArraySliceBoolLiteralSendsArrayThenTrue(): void
     {

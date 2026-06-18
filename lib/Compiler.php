@@ -9387,7 +9387,7 @@ class Compiler {
         if (null !== $callIndex && $callIndex > 0) {
             $prev = $block->orig->children[$callIndex - 1] ?? null;
             $argRoot = $this->unwrapOperandChain($arg);
-            if ($prev instanceof Op\Expr\BinaryOp
+            if (($prev instanceof Op\Expr\BinaryOp || $prev instanceof Op\Expr\InstanceOf_)
                 && null !== $prev->result
                 && null !== $argRoot->type
                 && null !== $prev->result->type
@@ -10098,6 +10098,10 @@ class Compiler {
                 || $expr->right === $operand
                 || $this->operandsReferToSameVariable($expr->left, $operand)
                 || $this->operandsReferToSameVariable($expr->right, $operand);
+        }
+        if ($expr instanceof Op\Expr\InstanceOf_) {
+            return $expr->expr === $operand
+                || $this->operandsReferToSameVariable($expr->expr, $operand);
         }
         if ($expr instanceof Op\Expr\UnaryMinus || $expr instanceof Op\Expr\UnaryPlus) {
             return $expr->expr === $operand
