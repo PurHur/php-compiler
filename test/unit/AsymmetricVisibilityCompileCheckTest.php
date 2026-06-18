@@ -79,6 +79,19 @@ PHP,
         );
     }
 
+    public function testPromotedSingleLinePublicPrivateSetCompileErrors(): void
+    {
+        $this->expectCompileError(
+            <<<'PHP'
+<?php
+class D {
+    public function __construct(public private(set) int $x = 1) {}
+}
+PHP,
+            AsymmetricVisibilityCompileCheck::MULTIPLE_MODIFIERS_MESSAGE
+        );
+    }
+
     public function testValidPrivateSetStillCompiles(): void
     {
         $runtime = new Runtime();
