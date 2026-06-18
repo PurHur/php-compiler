@@ -407,4 +407,29 @@ PHP;
         self::assertSame($methodReturnSlot, $sendSlots[0] ?? null, 'arg sends='.json_encode($sendSlots));
         self::assertNotSame($newSlot, $sendSlots[0] ?? null, 'must not pass New_ object to var_dump');
     }
+
+    /** Issue #9548 — hoisted CAL_GREGORIAN (0) maps to first cal_to_jd arg, not a dead temp. */
+    public function testZeroValuedConstFetchFirstBuiltinArg(): void
+    {
+        $code = <<<'PHP'
+<?php
+cal_to_jd(CAL_GREGORIAN, 6, 6, 2026);
+PHP;
+        $runtime = new Runtime();
+        $block = $runtime->parseAndCompile($code, 'cal_to_jd_zero_const.php');
+
+        $constSlot = null;
+        $sendSlots = [];
+        foreach ($block->opCodes as $op) {
+            if (OpCode::TYPE_CONST_FETCH === $op->type) {
+                $constSlot = $op->arg1;
+            }
+            if (OpCode::TYPE_ARG_SEND === $op->type) {
+                $sendSlots[] = $op->arg1;
+            }
+        }
+
+        self::assertNotNull($constSlot, 'CAL_GREGORIAN const fetch must be lowered');
+        self::assertSame($constSlot, $sendSlots[0] ?? null, 'arg sends='.json_encode($sendSlots));
+    }
 }

@@ -10188,6 +10188,14 @@ class Compiler {
                 return $closureMatch;
             }
 
+            if ($argCount > $producerCount) {
+                return $this->matchInlineCallArgProducerWithEmbeddedLiterals(
+                    $producers,
+                    $callArgs,
+                    $argIndex
+                );
+            }
+
             return null;
         }
         if ($argCount > $producerCount) {
