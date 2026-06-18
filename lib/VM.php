@@ -2000,10 +2000,10 @@ class VM {
     public function throwFiber(FiberState $fiber, Variable $exception): Variable
     {
         if (FiberState::STATUS_TERMINATED === $fiber->status) {
-            throw new VM\NativeFiberError('Cannot throw into a fiber that is terminated');
+            throw new VM\NativeFiberError('Cannot resume a fiber that is not suspended');
         }
         if (FiberState::STATUS_SUSPENDED !== $fiber->status) {
-            throw new VM\NativeFiberError('Cannot throw into a fiber that is not suspended');
+            throw new VM\NativeFiberError('Cannot resume a fiber that is not suspended');
         }
         $fiber->pendingThrow->copyFrom($exception->resolveIndirect());
         $fiber->hasPendingThrow = true;
@@ -2032,6 +2032,13 @@ class VM {
             $this->context->push($child);
             try {
                 $result = $this->runFrames();
+            } catch (VM\FiberUncaughtThrow $e) {
+                $fiber->status = FiberState::STATUS_TERMINATED;
+                $fiber->frame = null;
+                $fiber->pendingSuspendReturnVar = null;
+                $fiber->hasReturnValue = false;
+                $fiber->threw = true;
+                throw $e;
             } catch (\Throwable $e) {
                 $fiber->status = FiberState::STATUS_TERMINATED;
                 $fiber->frame = null;
@@ -2093,7 +2100,7 @@ class VM {
             $fiber->status = FiberState::STATUS_TERMINATED;
             $fiber->hasReturnValue = false;
             $fiber->threw = true;
-            $this->raiseUncaughtException($thrown);
+            throw new VM\FiberUncaughtThrow($thrown);
         }
         $this->context->pendingException = $thrown;
         for ($handler = $frame; null !== $handler; $handler = $handler->parent) {
@@ -2109,11 +2116,12 @@ class VM {
             }
         }
         $this->clearTryCatchUnwindState();
+        $this->context->pendingException = null;
         $fiber->status = FiberState::STATUS_TERMINATED;
         $fiber->frame = null;
         $fiber->hasReturnValue = false;
         $fiber->threw = true;
-        $this->raiseUncaughtException($thrown);
+        throw new VM\FiberUncaughtThrow($thrown);
     }
 
     /**
@@ -7117,6 +7125,8 @@ restart:
         } catch (\Error $e) {
             return $this->dispatchVmError($e->getMessage(), $callerFrame);
         } catch (VM\GeneratorUncaughtThrow $e) {
+            return $this->dispatchUncaughtGeneratorThrow($e->thrown, $callerFrame);
+        } catch (VM\FiberUncaughtThrow $e) {
             return $this->dispatchUncaughtGeneratorThrow($e->thrown, $callerFrame);
         } catch (TypedPropertyReadSignal $signal) {
             $catchFrame = $this->findCatchFrameForThrow($callerFrame, $signal->errorObject);
