@@ -986,10 +986,6 @@ class VM {
     /** Clear registry-recorded get/set backing field after hooked-property unset (#6471, #5191). */
     private function resetHookedPropertyBackingField(ObjectEntry $object, string $propName): void
     {
-        $meta = $this->classPropertyMeta($object, $propName);
-        if (null === $meta || null === $meta->setHookMethodLc) {
-            return;
-        }
         $lcClass = strtolower($object->class->name);
         $propMeta = $this->context->propertyHookRegistry[$lcClass][$propName]
             ?? $this->context->propertyHookRegistry[$lcClass][strtolower($propName)]
@@ -3853,6 +3849,11 @@ restart:
                             $frame
                         );
                     }
+                    if ($this->isPropertyHookRawWrite($frame, $propNameRaw)) {
+                        $storage->reset();
+                        $storage->type = Variable::TYPE_UNDEFINED;
+                        break;
+                    }
                     $catchFrame = $this->enforceVirtualStaticPropertyHookUnset($lcClass, $propName, $propNameRaw, $frame);
                     if (null !== $catchFrame) {
                         $frame = $catchFrame;
@@ -3989,6 +3990,10 @@ restart:
                         if (null !== $catchFrame) {
                             $frame = $catchFrame;
                             goto restart;
+                        }
+                        if ($this->isPropertyHookRawWrite($frame, $propName)) {
+                            $this->unsetHookedPropertyRawBacking($object, $propName);
+                            break;
                         }
                         $catchFrame = $this->enforceVirtualPropertyHookUnset($object, $propName, $frame);
                         if (null !== $catchFrame) {
@@ -7969,11 +7974,31 @@ restart:
         }
         $wantSet = strtolower(SourcePreprocessor\PropertyHooks::setHookMethodName($propName));
         $wantGet = strtolower(SourcePreprocessor\PropertyHooks::getHookMethodName($propName));
+        $wantUnset = strtolower(SourcePreprocessor\PropertyHooks::unsetHookMethodName($propName));
 
         return $methodLc === $wantSet
             || $methodLc === $wantGet
+            || $methodLc === $wantUnset
             || $methodLc === strtolower($className.'::'.$wantSet)
-            || $methodLc === strtolower($className.'::'.$wantGet);
+            || $methodLc === strtolower($className.'::'.$wantGet)
+            || $methodLc === strtolower($className.'::'.$wantUnset);
+    }
+
+    /**
+     * unset($this->hooked) inside a property hook body — clear backing without re-dispatch (#9625).
+     */
+    private function unsetHookedPropertyRawBacking(ObjectEntry $object, string $propName): void
+    {
+        $lcClass = strtolower($object->class->name);
+        $propMeta = $this->context->propertyHookRegistry[$lcClass][$propName]
+            ?? $this->context->propertyHookRegistry[$lcClass][strtolower($propName)]
+            ?? null;
+        if (is_array($propMeta) && (isset($propMeta['get']) || isset($propMeta['set']) || isset($propMeta['unset']))) {
+            $this->resetHookedPropertyBackingField($object, $propName);
+
+            return;
+        }
+        $this->unsetObjectProperty($object, $propName);
     }
 
     private function linkStaticTypedPropertySlot(Variable $storage, ClassEntry $entry, string $propDisplayName): void
