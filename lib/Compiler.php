@@ -6617,6 +6617,18 @@ class Compiler {
                 return $this->compileIncDecExpr($expr, $block, OpCode::TYPE_PRE_DEC);
             case Op\Expr\UnaryMinus::class:
             case Op\Expr\UnaryPlus::class:
+                $foldedUnaryLiteral = $this->tryFoldUnaryLiteralDefault($expr);
+                if (null !== $foldedUnaryLiteral) {
+                    $block->registerConstant($expr->result, $foldedUnaryLiteral);
+
+                    return [];
+                }
+
+                return [new OpCode(
+                    $this->getOpCodeTypeFromUnaryOp($expr),
+                    $this->compileOperand($expr->result, $block, false),
+                    $this->compileUnaryExprReadOperand($expr, $block)
+                )];
             case Op\Expr\BitwiseNot::class:
             case Op\Expr\BooleanNot::class:
             case Op\Expr\Clone_::class:
@@ -9767,6 +9779,8 @@ class Compiler {
             || $producer instanceof Op\Expr\Cast
             || $producer instanceof Op\Expr\MagicScriptConst
             || $producer instanceof Op\Expr\New_
+            || $producer instanceof Op\Expr\UnaryMinus
+            || $producer instanceof Op\Expr\UnaryPlus
             || $producer instanceof Op\Expr\PostInc
             || $producer instanceof Op\Expr\PreInc
             || $producer instanceof Op\Expr\PostDec
@@ -12671,6 +12685,12 @@ class Compiler {
                     }
                 }
                 $vm = $this->tryFoldClassConstFetchDefault($producer, $block, true);
+                if (null !== $vm) {
+                    return $block->registerConstant($arg, $vm);
+                }
+            }
+            if ($producer instanceof Op\Expr\UnaryMinus || $producer instanceof Op\Expr\UnaryPlus) {
+                $vm = $this->tryFoldUnaryLiteralDefault($producer);
                 if (null !== $vm) {
                     return $block->registerConstant($arg, $vm);
                 }
