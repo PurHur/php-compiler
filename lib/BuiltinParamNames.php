@@ -52,6 +52,8 @@ final class BuiltinParamNames
                 return ['callback'];
             case 'headers_sent':
                 return ['filename', 'line'];
+            case 'number_format':
+                return ['num', 'decimals', 'decimal_separator', 'thousands_separator'];
             case 'modf':
                 return ['num', 'num2'];
             case 'frexp':
