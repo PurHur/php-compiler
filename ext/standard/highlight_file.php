@@ -37,11 +37,7 @@ final class highlight_file extends Internal
         );
         $return = false;
         if ($argc >= 2) {
-            $retVar = $frame->calledArgs[1]->resolveIndirect();
-            if (Variable::TYPE_BOOLEAN !== $retVar->type) {
-                throw new \LogicException($functionName.'() expects bool for argument 2 in this compiler build');
-            }
-            $return = $retVar->toBool();
+            $return = VmHighlight::resolveReturnFlag($frame->calledArgs[1], $functionName);
         }
         $result = VmHighlight::highlightFile($path, $return);
         if (null === $frame->returnVar) {
