@@ -58,6 +58,8 @@ final class BuiltinByRefParams
                 return [2];
             case 'getopt':
                 return [2];
+            case 'openssl_random_pseudo_bytes':
+                return [1];
         }
 
         return [];
