@@ -22,6 +22,10 @@ class VMTest extends BaseTest {
                 && str_contains($name, 'trait_typed_const_reject')) {
                 continue;
             }
+            if (CompilerVersion::supportsNewInClassConstantExpr()
+                && str_contains($name, 'new_in_class_constant_reject')) {
+                continue;
+            }
             if (str_contains(strtolower($case[0]), 'splobjectstorage')) {
                 continue;
             }

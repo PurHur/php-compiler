@@ -8,7 +8,7 @@ use PHPCompiler\Compiler\NewWithoutParensCompileCheck;
 use PHPCompiler\Runtime;
 use PHPUnit\Framework\TestCase;
 
-/** Bare `new Class` in class constant initializers (#6549); property defaults allowed (#5362). */
+/** `new` in class constant initializers (#6549, #9484); property defaults allowed (#5362). */
 final class NewWithoutParensCompileCheckTest extends TestCase
 {
     public function testClassConstNewWithoutParensCompileErrors(): void
@@ -48,6 +48,20 @@ PHP, 'new_with_parens.php');
 
     public function testClassConstNewWithParensCompiles(): void
     {
+        if (!\PHPCompiler\CompilerVersion::supportsNewInClassConstantExpr()) {
+            $this->expectCompileError(<<<'PHP'
+<?php
+class C {
+    public function __construct(public int $n = 0) {}
+}
+class Holder {
+    public const X = new C(1);
+}
+PHP);
+
+            return;
+        }
+
         $runtime = new Runtime();
         $block = $runtime->parseAndCompile(<<<'PHP'
 <?php

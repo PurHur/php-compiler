@@ -4,14 +4,16 @@ declare(strict_types=1);
 
 namespace PHPCompiler\Compiler;
 
+use PHPCompiler\CompilerVersion;
 use PHPCfg\Op;
 use PHPCfg\Op\Expr\New_;
 use PHPCfg\Script;
 
 /**
- * Reject bare `new Class` (no ctor parens) in class **constant** initializers (#6549).
+ * Reject disallowed `new` in class **constant** initializers (#6549, #9484).
  *
- * PHP 8.3+ allows `new Class()` with explicit `()` in constants (#9116, #9431).
+ * PHP 8.2 and earlier: any `new` is a compile fatal. PHP 8.3+ allows `new Class()`
+ * with explicit `()` in constants (#9116, #9431); bare `new Class` stays invalid.
  * Property defaults may use `new` with or without `()` per PHP 8.1+ (#3391, #5362).
  *
  * @see Zend/zend_compile.c — zend_compile_const_expr()
@@ -56,8 +58,13 @@ final class NewWithoutParensCompileCheck
     private function walkOps(array $ops): void
     {
         foreach ($ops as $op) {
-            if ($op instanceof New_ && !NewCtorParens::hasCtorParens($op, $this->sourceCode)) {
-                throw new \CompileError(self::MESSAGE);
+            if ($op instanceof New_) {
+                if (!CompilerVersion::supportsNewInClassConstantExpr()) {
+                    throw new \CompileError(self::MESSAGE);
+                }
+                if (!NewCtorParens::hasCtorParens($op, $this->sourceCode)) {
+                    throw new \CompileError(self::MESSAGE);
+                }
             }
             foreach ($op->getSubBlocks() as $sub) {
                 if (null !== $sub && property_exists($sub, 'children') && is_array($sub->children)) {
