@@ -73,5 +73,6 @@ final class StaticPropertyFetchJITTest extends BaseTest
         yield 'static_property_untyped' => ['static_property_untyped.phpt'];
         yield 'static_property_dynamic' => ['static_property_dynamic.phpt'];
         yield 'static_property_array' => ['static_property_array.phpt'];
+        yield 'static_typed_property_write_9458' => ['static_typed_property_write_9458.phpt'];
     }
 }

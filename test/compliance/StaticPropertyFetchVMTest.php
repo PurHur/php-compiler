@@ -19,5 +19,7 @@ class StaticPropertyFetchVMTest extends VMTest
         yield 'static_property_dynamic' => self::parsePHPT($dynamic, 'static_property_dynamic.phpt');
         $selfRef = __DIR__.'/cases/language/static_prop_self_ref.phpt';
         yield 'static_prop_self_ref' => self::parsePHPT($selfRef, 'static_prop_self_ref.phpt');
+        $write9458 = __DIR__.'/cases/language/static_typed_property_write_9458.phpt';
+        yield 'static_typed_property_write_9458' => self::parsePHPT($write9458, 'static_typed_property_write_9458.phpt');
     }
 }
