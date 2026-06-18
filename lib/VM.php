@@ -12939,6 +12939,9 @@ restart:
             if (null === $slot || isset($keep[$slot]) || !isset($frame->scope[$slot])) {
                 continue;
             }
+            if (isset($frame->block->constants[$slot])) {
+                continue;
+            }
             if ($frame->block->isNamedVariableSlot($slot)) {
                 continue;
             }

@@ -832,6 +832,10 @@ class Block {
             // php-cfg may register the same slot under multiple Operand keys (#1885).
             // Variable reads in args must still resolve (#3787 merge + literal arm).
             if (isset($scope[$pos]) && !$this->args->contains($op)) {
+                if (isset($this->constants[$pos])) {
+                    $scope[$pos] = $this->constants[$pos];
+                }
+
                 continue;
             }
             if (null !== $frame && 'this' === self::resolveVariableName($op)) {
@@ -1006,6 +1010,10 @@ class Block {
         }
         for ($i = 0; $i <= $max; ++$i) {
             if (isset($scope[$i])) {
+                if (isset($this->constants[$i])) {
+                    $scope[$i] = $this->constants[$i];
+                }
+
                 continue;
             }
             if (isset($this->constants[$i])) {
