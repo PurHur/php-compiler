@@ -9826,6 +9826,10 @@ class Compiler {
                     if ($last instanceof Op\Expr\NullsafePropertyFetch || $last instanceof Op\Expr\NullsafeMethodCall) {
                         return $last;
                     }
+                    // Clone/assign prelude before property read (#9114, var_dump($c->n) in try).
+                    if ($last instanceof Op\Expr\PropertyFetch || $last instanceof Op\Expr\ArrayDimFetch) {
+                        return $last;
+                    }
                 }
 
                 return null;
