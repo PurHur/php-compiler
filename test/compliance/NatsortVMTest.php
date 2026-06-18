@@ -17,6 +17,10 @@ final class NatsortVMTest extends BaseTest
             __DIR__.'/cases/stdlib/natsort.phpt',
             'natsort.phpt'
         );
+        yield 'natsort_preserve_keys.phpt' => self::parsePHPT(
+            __DIR__.'/cases/stdlib/natsort_preserve_keys.phpt',
+            'natsort_preserve_keys.phpt'
+        );
     }
 
     public function setUp(): void

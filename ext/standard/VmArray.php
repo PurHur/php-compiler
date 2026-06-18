@@ -541,10 +541,10 @@ final class VmArray
         return self::hashTableFromSortedPairs($pairs);
     }
 
-    /** natsort() — return array sorted by value using natural order; packed lists unchanged (in-place). */
+    /** natsort() — return array sorted by value using natural order; preserves keys (#9600). */
     public static function natsortCopy(HashTable $ht): HashTable
     {
-        if ($ht->getNumElements() < 2 || self::isList($ht)) {
+        if ($ht->getNumElements() < 2) {
             return $ht;
         }
         $pairs = self::copyKeyedPairs($ht);
@@ -563,10 +563,10 @@ final class VmArray
         return self::hashTableFromSortedPairs($pairs);
     }
 
-    /** natcasesort() — return array sorted by value using natural case-insensitive order (#2372). */
+    /** natcasesort() — return array sorted by value using natural case-insensitive order (#2372, #9600). */
     public static function natcasesortCopy(HashTable $ht): HashTable
     {
-        if ($ht->getNumElements() < 2 || self::isList($ht)) {
+        if ($ht->getNumElements() < 2) {
             return $ht;
         }
         $pairs = self::copyKeyedPairs($ht);
