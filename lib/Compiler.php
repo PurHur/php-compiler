@@ -5507,9 +5507,25 @@ class Compiler {
     protected function tryFoldEnumCaseClassPseudoConstFqcn(Operand $classOperand, Block $block): ?string
     {
         if ($classOperand instanceof Op\Expr\ClassConstFetch) {
-            $inner = $this->tryFoldClassConstFetchDefault($classOperand, $block);
+            $inner = $this->tryFoldClassConstFetchDefault($classOperand, $block, true);
+            if (null !== $inner) {
+                $fqcn = $this->enumFqcnFromEnumCaseVariable($inner);
+                if (null !== $fqcn) {
+                    return $fqcn;
+                }
+            }
+            $className = $this->staticNameFromOperand($classOperand->class);
+            $caseName = $this->staticNameFromOperand($classOperand->name);
+            if (null !== $className && null !== $caseName) {
+                $lcClass = $this->resolveDefaultClassConstScope($className, $block);
+                if (null !== $lcClass
+                    && $this->isCompileTimeEnumCaseConstantMember($lcClass, strtolower($caseName))
+                ) {
+                    return ltrim($className, '\\');
+                }
+            }
 
-            return null !== $inner ? $this->enumFqcnFromEnumCaseVariable($inner) : null;
+            return null;
         }
         if (!$classOperand instanceof Operand\Variable && !$classOperand instanceof Temporary) {
             return null;
@@ -5518,7 +5534,9 @@ class Compiler {
             return null;
         }
         foreach ($block->orig->children as $child) {
-            if (!$child instanceof Op\Expr\ClassConstFetch || $child->result !== $classOperand) {
+            if (!$child instanceof Op\Expr\ClassConstFetch
+                || !$this->operandsReferToSameVariable($child->result, $classOperand)
+            ) {
                 continue;
             }
             $className = $this->staticNameFromOperand($child->class);
@@ -5527,14 +5545,21 @@ class Compiler {
                 continue;
             }
             $lcClass = $this->resolveDefaultClassConstScope($className, $block);
-            if (null === $lcClass || !isset($this->compileTimeClassConsts[$lcClass][strtolower($caseName)])) {
+            $lcConst = strtolower($caseName);
+            if (null === $lcClass || !$this->isCompileTimeEnumCaseConstantMember($lcClass, $lcConst)) {
                 continue;
             }
-            $stored = $this->compileTimeClassConsts[$lcClass][strtolower($caseName)];
-            $fqcn = $this->enumFqcnFromEnumCaseVariable($stored);
-            if (null !== $fqcn) {
-                return $fqcn;
+            $stored = $this->compileTimeClassConsts[$lcClass][$lcConst]
+                ?? $this->runtimeEnumCaseConsts[$lcClass][$lcConst]
+                ?? null;
+            if (null !== $stored) {
+                $fqcn = $this->enumFqcnFromEnumCaseVariable($stored);
+                if (null !== $fqcn) {
+                    return $fqcn;
+                }
             }
+
+            return ltrim($className, '\\');
         }
 
         return null;
@@ -10251,8 +10276,12 @@ class Compiler {
             return false;
         }
         $root = $this->unwrapOperandChain($callArg);
+        if ($root instanceof Temporary) {
+            return true;
+        }
 
-        return $root instanceof Temporary;
+        // php-cfg dead call-arg Variable temps (e.g. var_dump(E::A::class); #9426).
+        return $root instanceof Operand\Variable && !$this->isNamedVariableOperand($callArg);
     }
 
     /**
@@ -11451,7 +11480,7 @@ class Compiler {
             $callSite = $this->findCfgCallSiteForArg($block->orig->children, $arg, $cfgCallOp);
             if (null !== $callSite) {
                 [$callOp, $siteArgIndex] = $callSite;
-                $fetches = $this->precedingClassConstFetchesBeforeCfgOp($block->orig->children, $callOp);
+                $fetches = $this->precedingCallArgClassConstFetchesBeforeCfgOp($block->orig->children, $callOp, $block);
                 $fetch = $this->precedingClassConstFetchForCallArgIndex($callOp, $siteArgIndex, $fetches);
                 if (!$fetch instanceof Op\Expr\ClassConstFetch) {
                     $fetch = $this->classConstFetchForHoistedDeadPrelude($callOp, $siteArgIndex, $block);
@@ -11571,7 +11600,7 @@ class Compiler {
             return false;
         }
         $children = $block->orig->children;
-        $preceding = $this->precedingClassConstFetchesBeforeCfgOp($children, $callOp);
+        $preceding = $this->precedingCallArgClassConstFetchesBeforeCfgOp($children, $callOp, $block);
         if ($this->precedingClassConstFetchForCallArgIndex($callOp, $argIndex, $preceding) === $fetch) {
             return true;
         }
@@ -12091,6 +12120,75 @@ class Compiler {
     }
 
     /**
+     * Call-arg slot mapping must skip enum case fetches that only feed `Case::class` (#9426).
+     *
+     * @param list<Op\Expr\ClassConstFetch> $fetches
+     * @param list<Op> $cfgChildren
+     *
+     * @return list<Op\Expr\ClassConstFetch>
+     */
+    private function dropEnumCaseFetchesConsumedByCaseClassPseudoConst(
+        array $fetches,
+        array $cfgChildren,
+        Op $beforeOp,
+        Block $block
+    ): array {
+        if ([] === $fetches) {
+            return $fetches;
+        }
+        $stopIndex = null;
+        foreach ($cfgChildren as $i => $child) {
+            if ($child === $beforeOp) {
+                $stopIndex = $i;
+                break;
+            }
+        }
+        if (null === $stopIndex) {
+            return $fetches;
+        }
+        $filtered = [];
+        foreach ($fetches as $fetch) {
+            if (!$this->isCompileTimeEnumCaseClassConstFetch($fetch, $block)) {
+                $filtered[] = $fetch;
+                continue;
+            }
+            $consumed = false;
+            for ($i = 0; $i < $stopIndex; ++$i) {
+                $child = $cfgChildren[$i];
+                if (!$child instanceof Op\Expr\ClassConstFetch) {
+                    continue;
+                }
+                $pseudoName = $this->staticNameFromOperand($child->name);
+                if (null === $pseudoName || 'class' !== strtolower($pseudoName)) {
+                    continue;
+                }
+                if ($this->operandsReferToSameVariable($child->class, $fetch->result)) {
+                    $consumed = true;
+                    break;
+                }
+            }
+            if (!$consumed) {
+                $filtered[] = $fetch;
+            }
+        }
+
+        return $filtered;
+    }
+
+    /**
+     * @return list<Op\Expr\ClassConstFetch>
+     */
+    private function precedingCallArgClassConstFetchesBeforeCfgOp(
+        array $cfgChildren,
+        Op $callOp,
+        Block $block
+    ): array {
+        $fetches = $this->precedingClassConstFetchesBeforeCfgOp($cfgChildren, $callOp);
+
+        return $this->dropEnumCaseFetchesConsumedByCaseClassPseudoConst($fetches, $cfgChildren, $callOp, $block);
+    }
+
+    /**
      * php-cfg may hoist `E::A; E::B; f(E::A); g(E::B)` to dead ClassConstFetch stmts before the
      * first call; later calls then lack a preceding fetch (#4260, #5933, ext/standard/type.c).
      */
@@ -12175,7 +12273,7 @@ class Compiler {
         if (null === $targetCall) {
             return null;
         }
-        $fetches = $this->precedingClassConstFetchesBeforeCfgOp($children, $targetCall);
+        $fetches = $this->precedingCallArgClassConstFetchesBeforeCfgOp($children, $targetCall, $block);
 
         return $this->precedingClassConstFetchForCallArgIndex($targetCall, $argIndex, $fetches);
     }
@@ -12308,32 +12406,58 @@ class Compiler {
                 }
             }
             if ($producer instanceof Op\Expr\ClassConstFetch) {
+                $producerConst = $this->staticNameFromOperand($producer->name);
+                if (null !== $producerConst && 'class' !== strtolower($producerConst)) {
+                    foreach ($producers as $later) {
+                        if (!$later instanceof Op\Expr\ClassConstFetch) {
+                            continue;
+                        }
+                        $pseudo = $this->staticNameFromOperand($later->name);
+                        if (null === $pseudo || 'class' !== strtolower($pseudo)) {
+                            continue;
+                        }
+                        if ($this->operandsReferToSameVariable($later->class, $producer->result)) {
+                            $producer = $later;
+                            break;
+                        }
+                    }
+                }
                 $vm = $this->tryFoldClassConstFetchDefault($producer, $block, true);
                 if (null !== $vm) {
                     return $block->registerConstant($arg, $vm);
                 }
             }
-            $fetches = $this->precedingClassConstFetchesBeforeCfgOp($block->orig->children, $callOp);
+            $fetches = $this->precedingCallArgClassConstFetchesBeforeCfgOp($block->orig->children, $callOp, $block);
             $fetch = $this->precedingClassConstFetchForCallArgIndex($callOp, $argIndex, $fetches);
-            if (
-                $this->callArgUsesHoistedEnumPreludeSlot($callArg)
-                && $fetch instanceof Op\Expr\ClassConstFetch
-                && $this->callArgNeedsRuntimeEnumConstFetch($arg, $fetch, $block, $cfgCallOp)
-            ) {
-                $vm = $this->tryFoldClassConstFetchDefault($fetch, $block, true);
-                if (null !== $vm) {
-                    return $block->registerConstant($arg, $vm);
+            if ($this->callArgUsesHoistedEnumPreludeSlot($callArg) && $fetch instanceof Op\Expr\ClassConstFetch) {
+                $pseudoName = $this->staticNameFromOperand($fetch->name);
+                if (null !== $pseudoName && 'class' === strtolower($pseudoName)) {
+                    $vm = $this->tryFoldClassConstFetchDefault($fetch, $block, true);
+                    if (null !== $vm) {
+                        return $block->registerConstant($arg, $vm);
+                    }
+                }
+                if ($this->callArgNeedsRuntimeEnumConstFetch($arg, $fetch, $block, $cfgCallOp)) {
+                    $vm = $this->tryFoldClassConstFetchDefault($fetch, $block, true);
+                    if (null !== $vm) {
+                        return $block->registerConstant($arg, $vm);
+                    }
                 }
             }
             $fetch = $this->classConstFetchForHoistedDeadPrelude($callOp, $argIndex, $block);
-            if (
-                $this->callArgUsesHoistedEnumPreludeSlot($callArg)
-                && $fetch instanceof Op\Expr\ClassConstFetch
-                && $this->callArgNeedsRuntimeEnumConstFetch($arg, $fetch, $block, $cfgCallOp)
-            ) {
-                $vm = $this->tryFoldClassConstFetchDefault($fetch, $block, true);
-                if (null !== $vm) {
-                    return $block->registerConstant($arg, $vm);
+            if ($this->callArgUsesHoistedEnumPreludeSlot($callArg) && $fetch instanceof Op\Expr\ClassConstFetch) {
+                $pseudoName = $this->staticNameFromOperand($fetch->name);
+                if (null !== $pseudoName && 'class' === strtolower($pseudoName)) {
+                    $vm = $this->tryFoldClassConstFetchDefault($fetch, $block, true);
+                    if (null !== $vm) {
+                        return $block->registerConstant($arg, $vm);
+                    }
+                }
+                if ($this->callArgNeedsRuntimeEnumConstFetch($arg, $fetch, $block, $cfgCallOp)) {
+                    $vm = $this->tryFoldClassConstFetchDefault($fetch, $block, true);
+                    if (null !== $vm) {
+                        return $block->registerConstant($arg, $vm);
+                    }
                 }
             }
         }
@@ -12460,6 +12584,14 @@ class Compiler {
                     }
                 }
                 if (null === $valueSlot) {
+                    if (
+                        null === $calleeName
+                        || !$this->callArgRequiresByRef($calleeName, (int) $argIndex)
+                    ) {
+                        $valueSlot = $this->tryFoldCallArgCompileTimeValue($arg, $block, $calleeName, $cfgCallOp);
+                    }
+                }
+                if (null === $valueSlot) {
                     $prefetchOps = $this->compileCallArgRuntimeEnumConstFetchOps(
                         $arg,
                         $block,
@@ -12473,14 +12605,6 @@ class Compiler {
                 }
                 if (null === $valueSlot) {
                     $valueSlot = $this->findInlineExprCallArgProducerSlot($arg, $block, $cfgCallOp);
-                }
-                if (null === $valueSlot) {
-                    if (
-                        null === $calleeName
-                        || !$this->callArgRequiresByRef($calleeName, (int) $argIndex)
-                    ) {
-                        $valueSlot = $this->tryFoldCallArgCompileTimeValue($arg, $block, $calleeName, $cfgCallOp);
-                    }
                 }
                 if (null === $valueSlot) {
                     $valueSlot = $this->compileOperand($arg, $block, true);
