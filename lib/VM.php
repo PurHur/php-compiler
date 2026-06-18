@@ -9198,15 +9198,43 @@ restart:
             return null;
         }
 
-        if (null === $owner || !$owner->constructed) {
+        if (null === $owner) {
             return null;
         }
         $prop = $this->resolvePropertyWriteName($lvalue) ?? 'property';
-        if (VM\CloneWithSupport::consumeReinit($owner, $prop)) {
-            return null;
-        }
         $declaringClass = $this->readonlyPropertyDeclaringClass($owner, $prop);
         if (null === $declaringClass) {
+            return null;
+        }
+        if (!$owner->constructed) {
+            $declaringClassLc = $this->readonlyPropertyDeclaringClassLc($owner, $prop);
+            $callerClassLc = $this->callerClassLc($frame);
+            if (null !== $declaringClassLc && null !== $callerClassLc && $callerClassLc !== $declaringClassLc) {
+                $thrown = VM\BuiltinExceptionSupport::materializeError(
+                    $this->context,
+                    sprintf(
+                        'Cannot initialize readonly property %s::$%s from %s',
+                        $declaringClass,
+                        $prop,
+                        $this->propertyWriteScopeLabel($frame)
+                    )
+                );
+                $catchFrame = $this->findCatchFrameForThrow($frame, $thrown);
+                if (null !== $catchFrame) {
+                    if ($this->stashPropertyHookSetExternalCatch($frame, $catchFrame)) {
+                        return null;
+                    }
+
+                    return $catchFrame;
+                }
+                $this->raiseUncaughtException($thrown);
+
+                return null;
+            }
+
+            return null;
+        }
+        if (VM\CloneWithSupport::consumeReinit($owner, $prop)) {
             return null;
         }
 
@@ -9720,6 +9748,19 @@ restart:
         }
 
         return $meta->declaringClassLc !== '' ? $meta->declaringClassLc : $object->class->name;
+    }
+
+    private function readonlyPropertyDeclaringClassLc(ObjectEntry $object, string $propName): ?string
+    {
+        if ($object->class->readonly) {
+            return strtolower($object->class->name);
+        }
+        $meta = $this->classPropertyMeta($object, $propName);
+        if (null === $meta || !$meta->readonly) {
+            return null;
+        }
+
+        return '' !== $meta->declaringClassLc ? $meta->declaringClassLc : strtolower($object->class->name);
     }
 
     /** Reject asymmetric set visibility violations (#3165, #6898); returns catch frame or null. */
