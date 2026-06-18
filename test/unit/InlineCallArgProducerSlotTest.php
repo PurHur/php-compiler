@@ -201,4 +201,38 @@ PHP;
         self::assertSame($arraySlot, $sendSlots[0] ?? null, 'arg sends='.json_encode($sendSlots));
         self::assertSame($boolSlot, $sendSlots[3] ?? null, 'arg sends='.json_encode($sendSlots));
     }
+
+    /** Issue #9456 — literal string key must not consume hoisted Array_+Assign producer slot. */
+    public function testArrayKeyExistsLiteralKeyUsesStringNotHoistedArray(): void
+    {
+        $code = <<<'PHP'
+<?php
+$a = ['k' => 1, '' => 2];
+var_dump(array_key_exists('k', $a));
+PHP;
+        $runtime = new Runtime();
+        $block = $runtime->parseAndCompile($code, 'array_key_exists_string_key.php');
+
+        $arraySlot = null;
+        $akeSends = [];
+        $fcallOrdinal = 0;
+        foreach ($block->opCodes as $op) {
+            if (OpCode::TYPE_INIT_ARRAY === $op->type && null === $arraySlot) {
+                $arraySlot = $op->arg1;
+            }
+            if (OpCode::TYPE_FUNCCALL_INIT === $op->type) {
+                ++$fcallOrdinal;
+                if (1 === $fcallOrdinal) {
+                    $akeSends = [];
+                }
+            }
+            if (1 === $fcallOrdinal && OpCode::TYPE_ARG_SEND === $op->type) {
+                $akeSends[] = $op->arg1;
+            }
+        }
+
+        self::assertNotNull($arraySlot);
+        self::assertNotSame($arraySlot, $akeSends[0] ?? null, 'literal key must not reuse hoisted array slot');
+        self::assertCount(2, $akeSends, 'array_key_exists arg sends='.json_encode($akeSends));
+    }
 }
