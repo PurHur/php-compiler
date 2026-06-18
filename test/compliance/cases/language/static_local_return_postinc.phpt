@@ -1,5 +1,5 @@
 --TEST--
-Function/closure static local return $n++ returns pre-increment value (issue #9375, Zend/zend_execute.c)
+Function/closure static local return $n++ returns pre-increment value (#9418, #9375, Zend/zend_execute.c)
 --FILE--
 <?php
 function f(): int
