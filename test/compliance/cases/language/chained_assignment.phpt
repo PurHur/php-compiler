@@ -1,5 +1,5 @@
 --TEST--
-Language: chained assignment expression value ($x = $y = 1) (#6758, Zend zend_execute.c)
+Language: chained assignment expression value ($x = $y = 1) (#6758, #9405, Zend zend_execute.c)
 --FILE--
 <?php
 $x = $y = 1;

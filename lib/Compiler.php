@@ -9404,6 +9404,12 @@ class Compiler {
                     return $slot;
                 }
             }
+            if ($prev instanceof Op\Expr\Assign && null !== $prev->result) {
+                $slot = $block->slotForOperand($prev->result);
+                if (null !== $slot) {
+                    return $slot;
+                }
+            }
         }
         $coalesceArg = $this->findCoalesceStmtForCallArg($arg, $block);
         if (null !== $coalesceArg) {
@@ -9521,7 +9527,8 @@ class Compiler {
         }
         // php-cfg uses distinct result/arg temps for hoisted inline producers (#8766, #8561, #9136).
         if (
-            $producer instanceof Op\Expr\BinaryOp
+            $producer instanceof Op\Expr\Assign
+            || $producer instanceof Op\Expr\BinaryOp
             || $producer instanceof Op\Expr\ConstFetch
             || $producer instanceof Op\Expr\InstanceOf_
             || $producer instanceof Op\Expr\MagicScriptConst
@@ -9794,7 +9801,10 @@ class Compiler {
         if ($argCount < $producerCount) {
             $extra = $producerCount - $argCount;
             $tail = array_slice($producers, -$extra);
-            if (!$this->producersAreNestedArrayLiteralChain($tail)) {
+            if (
+                !$this->producersAreNestedArrayLiteralChain($tail)
+                && !$this->producersAreChainedAssignChain($producers)
+            ) {
                 $filtered = $this->filterNestedNewInlineCallArgProducers($producers);
                 if (\count($filtered) === $argCount) {
                     return $filtered[$argIndex] ?? null;
@@ -10221,6 +10231,32 @@ class Compiler {
         return true;
     }
 
+    /**
+     * php-cfg hoists chained assignment before a call with a dead arg temp (#6758, #9405).
+     *
+     * @param list<Op\Expr> $producers
+     */
+    private function producersAreChainedAssignChain(array $producers): bool
+    {
+        if ([] === $producers) {
+            return false;
+        }
+        foreach ($producers as $producer) {
+            if (!$producer instanceof Op\Expr\Assign) {
+                return false;
+            }
+        }
+        for ($i = 1, $n = count($producers); $i < $n; ++$i) {
+            $inner = $producers[$i - 1];
+            $outer = $producers[$i];
+            if (!$this->operandsReferToSameVariable($inner->result, $outer->expr)) {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
     private function isInlineExprCallArgConsumer(Op $op): bool
     {
         return $op instanceof Op\Expr\FuncCall
@@ -10253,7 +10289,8 @@ class Compiler {
             || $op instanceof Op\Expr\Empty_
             || $op instanceof Op\Expr\Isset_
             || $op instanceof Op\Expr\InstanceOf_
-            || $op instanceof Op\Expr\MagicScriptConst;
+            || $op instanceof Op\Expr\MagicScriptConst
+            || $op instanceof Op\Expr\Assign;
     }
 
     /**
