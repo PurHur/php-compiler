@@ -1,13 +1,19 @@
 --TEST--
-stdlib sprintf() + sign and # alternate flags JIT/AOT (#9058)
+stdlib sprintf() sign flag and # rejected JIT/AOT (#9058, #9701)
 --FILE--
 <?php
 echo sprintf('%+d', 5), "\n";
-echo sprintf('%#x', 255), "\n";
-echo sprintf('%#X', 255), "\n";
-echo sprintf('%#o', 8), "\n";
+try {
+    echo sprintf('%#x', 255), "\n";
+} catch (ValueError $e) {
+    echo "ValueError\n";
+    echo $e->getMessage(), "\n";
+}
+echo sprintf('% d', 5), "\n";
+echo sprintf('%+d', -5), "\n";
 --EXPECT--
 +5
-0xff
-0XFF
-010
+ValueError
+Unknown format specifier "#"
+5
+-5
