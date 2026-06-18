@@ -36,6 +36,10 @@ final class BuiltinParamNames
                 return ['array', 'flags'];
             case 'array_push':
                 return ['array'];
+            case 'array_slice':
+                return ['array', 'offset', 'length', 'preserve_keys'];
+            case 'array_chunk':
+                return ['array', 'length', 'preserve_keys'];
             case 'similar_text':
                 return ['string1', 'string2', 'percent'];
             case 'settype':
