@@ -28,4 +28,21 @@ final class ClosureCompileTest extends TestCase
         $this->assertSame(0, $code, implode("\n", $out));
         $this->assertStringContainsString('6', implode("\n", $out));
     }
+
+    /** Regression: Closure::bind(inline closure, ...) must send closure not hoisted C::class (#3673). */
+    public function testVmClosureBindStaticInlineClosure(): void
+    {
+        $code = <<<'PHP'
+<?php
+class C { private function sec(): string { return 'ok'; } }
+$c = new C;
+$f = Closure::bind(function (): string { return $this->sec(); }, $c, C::class);
+echo $f(), "\n";
+PHP;
+        $rt = new PHPCompiler\Runtime();
+        $block = $rt->parseAndCompile($code, 'test.php');
+        ob_start();
+        $rt->run($block);
+        $this->assertSame("ok\n", ob_get_clean());
+    }
 }

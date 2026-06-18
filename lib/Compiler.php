@@ -6804,7 +6804,14 @@ class Compiler {
                 );
                 $init->staticCallParentScope = $parentScope;
                 $return = [$init];
-                foreach ($this->compileCallArgSends($expr->args, $block) as $send) {
+                $className = $this->literalScopeClassName($expr->class)
+                    ?? $this->staticNameFromOperand($expr->class);
+                $methodName = $this->staticNameFromOperand($expr->name);
+                $calleeName = null;
+                if (null !== $className && null !== $methodName) {
+                    $calleeName = ltrim($className, '\\').'::'.$methodName;
+                }
+                foreach ($this->compileCallArgSends($expr->args, $block, $calleeName, $expr) as $send) {
                     $return[] = $send;
                 }
                 $return[] = $this->compileFuncCallExecOpcode(
@@ -9781,7 +9788,12 @@ class Compiler {
             }
         }
         if (null === $producerSlot) {
-            return null;
+            if ($producer instanceof Op\Expr\Closure || $producer instanceof Op\Expr\ArrowFunction) {
+                $producerSlot = $this->slotForInlineClosureProducer($producer, $block);
+            }
+            if (null === $producerSlot) {
+                return null;
+            }
         }
         if (
             ($producer instanceof Op\Expr\FuncCall || $producer instanceof Op\Expr\NsFuncCall)
@@ -10031,6 +10043,9 @@ class Compiler {
         if (null === $block->orig) {
             return null;
         }
+        if ($this->callArgOperandIsClosureValue($arg, $block)) {
+            return null;
+        }
         if (!property_exists($callOp, 'args') || !is_array($callOp->args)) {
             return null;
         }
@@ -10053,7 +10068,12 @@ class Compiler {
                 }
                 if ($i > 0) {
                     $prev = $block->orig->children[$i - 1];
-                    if ($prev instanceof Op\Expr\ClassConstFetch) {
+                    $callArg = $callOp->args[$argIndex] ?? null;
+                    if (
+                        $prev instanceof Op\Expr\ClassConstFetch
+                        && null !== $callArg
+                        && $this->operandsReferToSameVariable($prev->result, $callArg)
+                    ) {
                         $fetch = $prev;
                     }
                 }
@@ -10072,6 +10092,76 @@ class Compiler {
         }
 
         return null !== $slot ? (string) $slot : null;
+    }
+
+    /** Resolve VM slot for a hoisted inline Closure/ArrowFunction call-arg producer (#3673). */
+    private function slotForInlineClosureProducer(Op\Expr $producer, Block $block): ?int
+    {
+        if (null === $producer->result) {
+            return null;
+        }
+        $slot = $block->slotForOperand($producer->result);
+        if (null !== $slot) {
+            return $slot;
+        }
+        foreach ($block->opCodes as $op) {
+            if (OpCode::TYPE_CLOSURE !== $op->type) {
+                continue;
+            }
+            $destSlot = (int) $op->arg1;
+            $destOperand = $block->operandForScopeSlot($destSlot);
+            if (
+                null !== $destOperand
+                && $this->operandsReferToSameVariable($destOperand, $producer->result)
+            ) {
+                return $destSlot;
+            }
+        }
+        for ($i = \count($block->opCodes) - 1; $i >= 0; --$i) {
+            $op = $block->opCodes[$i];
+            if (
+                OpCode::TYPE_STATICCALL_INIT === $op->type
+                || OpCode::TYPE_FUNCCALL_INIT === $op->type
+            ) {
+                break;
+            }
+            if (OpCode::TYPE_CLOSURE === $op->type) {
+                return (int) $op->arg1;
+            }
+        }
+
+        return null;
+    }
+
+    /** StaticCall inline closure first arg — match hoisted Closure producer to TYPE_CLOSURE slot (#3673). */
+    private function resolveInlineClosureCallArgSlot(Operand $arg, Block $block, ?Op $cfgCallOp): ?int
+    {
+        if (null === $block->orig || null === $cfgCallOp) {
+            return null;
+        }
+        $callSite = $this->findCfgCallSiteForArg($block->orig->children, $arg, $cfgCallOp);
+        if (null === $callSite) {
+            return null;
+        }
+        [$callOp, $argIndex] = $callSite;
+        if (!property_exists($callOp, 'args') || !is_array($callOp->args)) {
+            return null;
+        }
+        $producers = $this->precedingInlineCallArgProducersBeforeCfgOp($block->orig->children, $callOp);
+        $producer = $this->matchInlineCallArgProducer($producers, $callOp->args, $argIndex);
+        if ($producer instanceof Op\Expr\Closure || $producer instanceof Op\Expr\ArrowFunction) {
+            return $this->slotForInlineClosureProducer($producer, $block);
+        }
+        foreach ($producers as $candidate) {
+            if (!$candidate instanceof Op\Expr\Closure && !$candidate instanceof Op\Expr\ArrowFunction) {
+                continue;
+            }
+            if (null !== $this->matchSingleClosureInlineProducer($candidate, $callOp->args, $argIndex)) {
+                return $this->slotForInlineClosureProducer($candidate, $block);
+            }
+        }
+
+        return null;
     }
 
     private function cfgBlockJumpsToCfgBlock(CfgBlock $from, CfgBlock $to): bool
@@ -10521,8 +10611,18 @@ class Compiler {
         if (null === $arg) {
             return false;
         }
+        if (null !== $this->unwrapCfgLiteralOperand($arg)) {
+            return true;
+        }
+        $root = $this->unwrapOperandChain($arg);
+        if ($root instanceof Op\Expr\ClassConstFetch) {
+            $name = $this->staticNameFromOperand($root->name);
+            if (null !== $name && 'class' === strtolower($name)) {
+                return true;
+            }
+        }
 
-        return null !== $this->unwrapCfgLiteralOperand($arg);
+        return false;
     }
 
     /**
@@ -10561,7 +10661,18 @@ class Compiler {
                 continue;
             }
             if ($i === $argIndex) {
-                return $precedingFetches[$fetchIndex] ?? null;
+                $fetch = $precedingFetches[$fetchIndex] ?? null;
+                if ($fetch instanceof Op\Expr\ClassConstFetch) {
+                    $callArg = $callOp->args[$argIndex] ?? null;
+                    if (
+                        null !== $callArg
+                        && !$this->operandsReferToSameVariable($fetch->result, $callArg)
+                    ) {
+                        return null;
+                    }
+                }
+
+                return $fetch;
             }
             ++$fetchIndex;
         }
@@ -12837,11 +12948,17 @@ class Compiler {
                     return $block->registerConstant($arg, $vm);
                 }
             }
+            if ($producer instanceof Op\Expr\Closure || $producer instanceof Op\Expr\ArrowFunction) {
+                return null;
+            }
             if ($producer instanceof Op\Expr\UnaryMinus || $producer instanceof Op\Expr\UnaryPlus) {
                 $vm = $this->tryFoldUnaryLiteralDefault($producer);
                 if (null !== $vm) {
                     return $block->registerConstant($arg, $vm);
                 }
+            }
+            if ($this->callArgOperandIsClosureValue($arg, $block)) {
+                return null;
             }
             $fetches = $this->precedingCallArgClassConstFetchesBeforeCfgOp($block->orig->children, $callOp, $block);
             $fetch = $this->precedingClassConstFetchForCallArgIndex($callOp, $argIndex, $fetches);
@@ -13029,6 +13146,26 @@ class Compiler {
                 }
                 if (null === $valueSlot) {
                     $valueSlot = $this->findInlineExprCallArgProducerSlot($arg, $block, $cfgCallOp);
+                }
+                if (null === $valueSlot) {
+                    $valueSlot = $this->resolveInlineClosureCallArgSlot($arg, $block, $cfgCallOp);
+                }
+                if (
+                    null === $valueSlot
+                    && 0 === $argIndex
+                    && null !== $calleeName
+                    && 'Closure::bind' === $calleeName
+                ) {
+                    for ($i = \count($block->opCodes) - 1; $i >= 0; --$i) {
+                        $scanOp = $block->opCodes[$i];
+                        if (OpCode::TYPE_STATICCALL_INIT === $scanOp->type) {
+                            break;
+                        }
+                        if (OpCode::TYPE_CLOSURE === $scanOp->type) {
+                            $valueSlot = $scanOp->arg1;
+                            break;
+                        }
+                    }
                 }
                 if (null === $valueSlot) {
                     $valueSlot = $this->compileOperand($arg, $block, true);
