@@ -15,6 +15,8 @@ use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\ArrayBuiltinHelper;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\JitReferencableCheck;
+use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
@@ -61,6 +63,9 @@ final class array_unshift extends Internal
     {
         if (\count($args) < 1) {
             throw new \LogicException('array_unshift() requires at least one argument');
+        }
+        if (!JitReferencableCheck::guardArrayMutatorByRefArg($context, 'array_unshift', $args[0])) {
+            return $context->constantFromInteger(0, 'int64');
         }
         $array = $args[0];
         $values = \array_slice($args, 1);

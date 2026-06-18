@@ -40,6 +40,9 @@ final class BuiltinParamNames
             case 'uksort':
                 return ['array', 'flags'];
             case 'array_push':
+            case 'array_pop':
+            case 'array_shift':
+            case 'array_unshift':
                 return ['array'];
             case 'array_slice':
                 return ['array', 'offset', 'length', 'preserve_keys'];

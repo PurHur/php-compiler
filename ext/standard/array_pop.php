@@ -15,6 +15,8 @@ use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\ArrayBuiltinHelper;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\JitReferencableCheck;
+use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\ErrorReporter;
 use PHPCompiler\VM\Variable;
@@ -62,6 +64,9 @@ final class array_pop extends Internal
     {
         if (1 !== \count($args)) {
             throw new \LogicException('array_pop() requires exactly one argument');
+        }
+        if (!JitReferencableCheck::guardArrayMutatorByRefArg($context, 'array_pop', $args[0])) {
+            return JitValueBox::pointer($context, JitValueBox::alloc($context));
         }
 
         foreach ($args as $i => $arg) {
