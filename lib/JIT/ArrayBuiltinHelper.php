@@ -12280,7 +12280,7 @@ final class ArrayBuiltinHelper
     /**
      * array_unique() for arrays of scalar values (ext/standard/array.c subset).
      *
-     * @param int $flags SORT_REGULAR (identical), SORT_STRING (string cast), or SORT_NUMERIC
+     * @param int $flags SORT_REGULAR (loose ==), SORT_STRING (string cast), or SORT_NUMERIC
      */
     public static function arrayUnique(Context $context, Variable $array, int $flags = 0): Value
     {
@@ -12391,7 +12391,7 @@ final class ArrayBuiltinHelper
     /**
      * Duplicate check against values already stored in $dest.
      *
-     * @param int $flags SORT_REGULAR (identical), SORT_STRING (string cast), or SORT_NUMERIC
+     * @param int $flags SORT_REGULAR (loose ==), SORT_STRING (string cast), or SORT_NUMERIC
      */
     private static function destContainsPackedEntry(Context $context, Value $dest, Value $entry, int $flags): Value
     {
@@ -12409,7 +12409,7 @@ final class ArrayBuiltinHelper
         );
         $i8 = $context->getTypeFromString('int8');
         $i1 = $context->getTypeFromString('int1');
-        $strict = $i1->constInt(1, false);
+        $strict = $i1->constInt(0, false);
         $falseVal = $i1->constInt(0, false);
         $destVar = new Variable($context, Variable::TYPE_HASHTABLE, Variable::KIND_VALUE, $dest);
 
@@ -12426,9 +12426,15 @@ final class ArrayBuiltinHelper
             $typeByte,
             $i8->constInt(Variable::TYPE_NATIVE_LONG, false)
         );
+        $isDouble = $context->builder->icmp(
+            Builder::INT_EQ,
+            $typeByte,
+            $i8->constInt(Variable::TYPE_NATIVE_DOUBLE, false)
+        );
 
         $stringBlock = BasicBlockHelper::append($context, 'array_unique_dup_string');
         $longBlock = BasicBlockHelper::append($context, 'array_unique_dup_long');
+        $doubleBlock = BasicBlockHelper::append($context, 'array_unique_dup_double');
         $falseBlock = BasicBlockHelper::append($context, 'array_unique_dup_false');
         $mergeBlock = BasicBlockHelper::append($context, 'array_unique_dup_merge');
 
@@ -12449,7 +12455,8 @@ final class ArrayBuiltinHelper
         $context->builder->branch($mergeBlock);
 
         $context->builder->positionAtEnd($afterString);
-        $context->builder->branchIf($isLong, $longBlock, $falseBlock);
+        $afterLong = BasicBlockHelper::append($context, 'array_unique_dup_after_long');
+        $context->builder->branchIf($isLong, $longBlock, $afterLong);
 
         $context->builder->positionAtEnd($longBlock);
         $needle = new Variable(
@@ -12457,6 +12464,22 @@ final class ArrayBuiltinHelper
             Variable::TYPE_NATIVE_LONG,
             Variable::KIND_VALUE,
             $context->builder->call($context->lookupFunction('__value__readLong'), $entry)
+        );
+        $context->builder->store(
+            self::inArray($context, $needle, $destVar, $strict),
+            $dupSlot
+        );
+        $context->builder->branch($mergeBlock);
+
+        $context->builder->positionAtEnd($afterLong);
+        $context->builder->branchIf($isDouble, $doubleBlock, $falseBlock);
+
+        $context->builder->positionAtEnd($doubleBlock);
+        $needle = new Variable(
+            $context,
+            Variable::TYPE_NATIVE_DOUBLE,
+            Variable::KIND_VALUE,
+            $context->builder->call($context->lookupFunction('__value__readDouble'), $entry)
         );
         $context->builder->store(
             self::inArray($context, $needle, $destVar, $strict),
