@@ -66,6 +66,13 @@ final class DnfParenTypeRewriter
                 continue;
             }
 
+            // catch (A|B) requires parens for php-parser; unwrap breaks non-capturing union (#9766).
+            if (self::isCatchTypeParenContext($tokens, $i)) {
+                $out .= self::tokenText($tok);
+                ++$i;
+                continue;
+            }
+
             foreach ($inner as $innerTok) {
                 $out .= self::tokenText($innerTok);
             }
@@ -73,6 +80,23 @@ final class DnfParenTypeRewriter
         }
 
         return $out;
+    }
+
+    /**
+     * @param list<array{0: int, 1: string, 2: int}|string> $tokens
+     */
+    private static function isCatchTypeParenContext(array $tokens, int $open): bool
+    {
+        for ($i = $open - 1; $i >= 0; --$i) {
+            $tok = $tokens[$i];
+            if (\is_array($tok) && self::isIgnorable($tok[0])) {
+                continue;
+            }
+
+            return \is_array($tok) && T_CATCH === $tok[0];
+        }
+
+        return false;
     }
 
     /**
