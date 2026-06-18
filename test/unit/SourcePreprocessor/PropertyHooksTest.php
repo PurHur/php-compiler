@@ -453,4 +453,32 @@ PHP;
         self::assertStringNotContainsString('private string $name', $out);
         self::assertSame('__phpc_property_set_name', $registry['evaled']['name']['set'] ?? null);
     }
+
+    /** @covers issue #9673 — same-name backing field after other properties merges with hooked decl */
+    public function testMergesDetachedSameNameBackingFieldDeclaration(): void
+    {
+        $src = <<<'PHP'
+<?php
+class C {
+    public int $x {
+        get => $this->x;
+        set => $this->x = $value;
+    }
+    public string $y = 'a';
+    private int $x = 1;
+}
+$c = new C();
+echo 'compile-ok x=' . $c->x . ' y=' . $c->y . "\n";
+PHP;
+        [$out, $registry] = (new PropertyHooks())->process($src);
+        self::assertStringContainsString('public int $x = 1;', $out);
+        self::assertStringNotContainsString('private int $x', $out);
+        self::assertSame('__phpc_property_set_x', $registry['c']['x']['set'] ?? null);
+
+        $runtime = new Runtime();
+        $block = $runtime->parseAndCompile($src, 'property_hook_multi_property_redeclare.php');
+        ob_start();
+        $runtime->run($block);
+        self::assertSame("compile-ok x=1 y=a\n", ob_get_clean());
+    }
 }

@@ -284,6 +284,8 @@ final class PropertyHooks
         string $declKind = 'class'
     ): string {
         $injections = [];
+        /** @var list<array{0: int, 1: int}> */
+        $removeSpans = [];
         $offset = 0;
         $out = '';
         while (preg_match('/\$(\w+)\s*\{/', $body, $m, PREG_OFFSET_CAPTURE, $offset)) {
@@ -338,21 +340,26 @@ final class PropertyHooks
             }
             $sameNameBacking = $usesBacking && $this->hookTouchesBacking($hookSource, $prop, $isStatic);
             $nextOffset = $close + 1;
+            $initializer = '';
             if ($sameNameBacking) {
                 $backingDecl = $this->consumeSameNameBackingFieldDecl($body, $nextOffset, $prop);
                 if (null !== $backingDecl) {
                     [$nextOffset, $initializer] = $backingDecl;
-                    $mergedDecl = rtrim($propDeclHead);
-                    if ('' !== $initializer) {
-                        $mergedDecl .= ' '.$initializer;
-                    }
-                    if (!$isPromotedCtorParam && !str_ends_with($mergedDecl, ';')) {
-                        $mergedDecl .= ';';
-                    }
-                    $out .= $declPrefix.$mergedDecl;
                 } else {
-                    $out .= $declPrefix.$propDecl;
+                    $foundBacking = $this->findSameNameBackingFieldDecl($body, $prop);
+                    if (null !== $foundBacking) {
+                        [$backingStart, $backingEnd, $initializer] = $foundBacking;
+                        $removeSpans[] = [$backingStart, $backingEnd];
+                    }
                 }
+                $mergedDecl = rtrim($propDeclHead);
+                if ('' !== $initializer) {
+                    $mergedDecl .= ' '.$initializer;
+                }
+                if (!$isPromotedCtorParam && !str_ends_with($mergedDecl, ';')) {
+                    $mergedDecl .= ';';
+                }
+                $out .= $declPrefix.$mergedDecl;
             } else {
                 $out .= $declPrefix.$propDecl;
             }
@@ -375,7 +382,7 @@ final class PropertyHooks
             $injections = array_merge($injections, $methods);
             $offset = $nextOffset;
         }
-        $out .= substr($body, $offset);
+        $out .= $this->copyBodySegment($body, $offset, strlen($body), $removeSpans);
         if ([] !== $injections) {
             $out .= "\n".implode("\n", $injections)."\n";
         }
@@ -652,6 +659,57 @@ final class PropertyHooks
         $initializer = isset($m[1]) ? trim($m[1]) : '';
 
         return [$offset + strlen($m[0]), $initializer];
+    }
+
+    /**
+     * Find a same-name backing field declaration anywhere in the class body (#9673).
+     *
+     * @return array{0: int, 1: int, 2: string}|null [start, end, initializer including `=`]
+     */
+    private function findSameNameBackingFieldDecl(string $body, string $prop): ?array
+    {
+        $pattern = '/\s*(?:(?:public|protected|private|static|readonly)\s+)*'
+            .'(?:[\w\\\\|]+(?:\s*\[\s*\])?\s+)+'
+            .'\$'.preg_quote($prop, '/').'\s*(=\s*[^;]+)?;/';
+        if (!preg_match($pattern, $body, $m, PREG_OFFSET_CAPTURE)) {
+            return null;
+        }
+        $start = $m[0][1];
+        $end = $start + strlen($m[0][0]);
+        $initializer = (isset($m[1]) && -1 !== $m[1][1]) ? trim($m[1][0]) : '';
+
+        return [$start, $end, $initializer];
+    }
+
+    /**
+     * @param list<array{0: int, 1: int}> $removeSpans
+     */
+    private function copyBodySegment(string $body, int $from, int $to, array $removeSpans): string
+    {
+        if ($from >= $to) {
+            return '';
+        }
+        if ([] === $removeSpans) {
+            return substr($body, $from, $to - $from);
+        }
+        $result = '';
+        $pos = $from;
+        foreach ($removeSpans as [$start, $end]) {
+            if ($end <= $from || $start >= $to) {
+                continue;
+            }
+            $clipStart = max($start, $from);
+            $clipEnd = min($end, $to);
+            if ($pos < $clipStart) {
+                $result .= substr($body, $pos, $clipStart - $pos);
+            }
+            $pos = max($pos, $clipEnd);
+        }
+        if ($pos < $to) {
+            $result .= substr($body, $pos, $to - $pos);
+        }
+
+        return $result;
     }
 
     private function hookTouchesBacking(string $source, string $prop, bool $isStatic): bool
