@@ -5900,6 +5900,16 @@ restart:
                     if (null !== $op->arg2) {
                         VM\ExceptionSupport::stampThrowLine($thrown, (int) $op->arg2);
                     }
+                    if ($this->frameIsPropertyGetHook($frame)) {
+                        $catchFrame = $this->dispatchEngineThrow($frame, $thrown);
+                        if (null !== $catchFrame) {
+                            // Bubble to caller stack — do not finish property read (#9503, zend_property_hooks.c).
+                            $this->context->propertyHookExternalCatchFrame = $catchFrame;
+
+                            return self::FAILURE;
+                        }
+                        break;
+                    }
                     if ($this->frameIsPropertySetHook($frame)) {
                         $this->context->propertyHookSetAborted = true;
                     }
@@ -7913,6 +7923,17 @@ restart:
         $name = strtolower($func->name);
 
         return str_contains($name, '__phpc_property_set_');
+    }
+
+    private function frameIsPropertyGetHook(Frame $frame): bool
+    {
+        $func = $frame->block->func ?? null;
+        if (null === $func) {
+            return false;
+        }
+        $name = strtolower($func->name);
+
+        return str_contains($name, '__phpc_property_get_');
     }
 
     private function isPropertyHookRawWrite(Frame $frame, string $propName): bool
