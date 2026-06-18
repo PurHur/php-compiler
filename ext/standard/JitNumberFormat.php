@@ -6,6 +6,7 @@ namespace PHPCompiler\ext\standard;
 
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitStringBuiltinArg;
+use PHPCompiler\JIT\NamedOptionalCallArgs;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Value;
 
@@ -24,14 +25,15 @@ final class JitNumberFormat
         }
 
         $number = JitFdiv::lowerSingleOperand($context, $args[0], 1, 'num', 'number_format', 'float');
-        $decimals = $argc >= 2
+        $i64 = $context->getTypeFromString('int64');
+        $decimals = ($argc >= 2 && !NamedOptionalCallArgs::isOmittedOptional($args[1]))
             ? JitIntdiv::lowerIntBuiltinArg($context, $args[1], 'number_format', 2, 'decimals')
-            : $context->getTypeFromString('int64')->constInt(0, false);
-        $decSep = $argc >= 3
-            ? JitStringBuiltinArg::lower($context, $args[2], 'number_format', 2, 'decimal_separator', '?string')
+            : $i64->constInt(0, false);
+        $decSep = ($argc >= 3 && !NamedOptionalCallArgs::isOmittedOptional($args[2]))
+            ? JitStringBuiltinArg::lower($context, $args[2], 'number_format', 3, 'decimal_separator', '?string')
             : $context->builder->load($context->constantStringFromString('.'));
-        $thouSep = 4 === $argc
-            ? JitStringBuiltinArg::lower($context, $args[3], 'number_format', 3, 'thousands_separator', '?string')
+        $thouSep = (4 === $argc && !NamedOptionalCallArgs::isOmittedOptional($args[3]))
+            ? JitStringBuiltinArg::lower($context, $args[3], 'number_format', 4, 'thousands_separator', '?string')
             : $context->builder->load($context->constantStringFromString(','));
 
         return $context->builder->call(

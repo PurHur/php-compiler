@@ -27,42 +27,43 @@ final class number_format extends Internal
 {
     public function execute(Frame $frame): void
     {
-        $argc = \count($frame->calledArgs);
-        if ($argc < 1 || $argc > 4) {
-            throw new \LogicException('number_format() requires one to four arguments');
+        if (!isset($frame->calledArgs[0])) {
+            throw new \LogicException('number_format() requires at least one argument');
+        }
+        foreach (array_keys($frame->calledArgs) as $idx) {
+            if ($idx < 0 || $idx > 3) {
+                throw new \LogicException('number_format() requires one to four arguments');
+            }
         }
         if (null === $frame->returnVar) {
             return;
         }
         $numVar = $frame->calledArgs[0]->resolveIndirect();
         $num = VmNumberFormat::coerceFloat($numVar);
-        $decimals = 0;
-        if ($argc >= 2) {
-            $decimals = VmMath::parseIntBuiltinArg(
+        $decimals = isset($frame->calledArgs[1])
+            ? VmMath::parseIntBuiltinArg(
                 $frame->calledArgs[1],
                 'number_format',
                 2,
                 'decimals'
-            );
-        }
-        $decimalSeparator = '.';
-        if ($argc >= 3) {
-            $decimalSeparator = VmString::coerceNullableStringBuiltinArg(
+            )
+            : 0;
+        $decimalSeparator = isset($frame->calledArgs[2])
+            ? VmString::coerceNullableStringBuiltinArg(
                 $frame->calledArgs[2],
                 'number_format',
-                2,
+                3,
                 'decimal_separator'
-            ) ?? '.';
-        }
-        $thousandsSeparator = ',';
-        if (4 === $argc) {
-            $thousandsSeparator = VmString::coerceNullableStringBuiltinArg(
+            ) ?? '.'
+            : '.';
+        $thousandsSeparator = isset($frame->calledArgs[3])
+            ? VmString::coerceNullableStringBuiltinArg(
                 $frame->calledArgs[3],
                 'number_format',
-                3,
+                4,
                 'thousands_separator'
-            ) ?? ',';
-        }
+            ) ?? ','
+            : ',';
         $frame->returnVar->string(VmNumberFormat::format(
             $num,
             $decimals,
