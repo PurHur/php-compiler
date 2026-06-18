@@ -131,6 +131,7 @@ use PHPCompiler\VM\Builtin\ReflectionFunctionGetClosureThis;
 use PHPCompiler\VM\Builtin\ReflectionFunctionGetClosureUsedVariables;
 use PHPCompiler\VM\Builtin\ReflectionFunctionGetExtensionName;
 use PHPCompiler\VM\Builtin\ReflectionFunctionGetName;
+use PHPCompiler\VM\Builtin\ReflectionFunctionGetNumberOfParameters;
 use PHPCompiler\VM\Builtin\ReflectionFunctionGetParameters;
 use PHPCompiler\VM\Builtin\ReflectionFunctionGetReturnType;
 use PHPCompiler\VM\Builtin\ReflectionFunctionHasReturnType;
@@ -145,6 +146,7 @@ use PHPCompiler\VM\Builtin\ReflectionMethodCreateFromMethodName;
 use PHPCompiler\VM\Builtin\ReflectionMethodGetAttributes;
 use PHPCompiler\VM\Builtin\ReflectionMethodGetClosure;
 use PHPCompiler\VM\Builtin\ReflectionMethodGetName;
+use PHPCompiler\VM\Builtin\ReflectionMethodGetNumberOfParameters;
 use PHPCompiler\VM\Builtin\ReflectionMethodGetParameters;
 use PHPCompiler\VM\Builtin\ReflectionMethodGetPrototype;
 use PHPCompiler\VM\Builtin\ReflectionMethodHasPrototype;
@@ -437,6 +439,8 @@ final class BuiltinClasses
         $rm->methodVisibility['getattributes'] = $pub;
         $rm->methods['getparameters'] = new ReflectionMethodGetParameters();
         $rm->methodVisibility['getparameters'] = $pub;
+        $rm->methods['getnumberofparameters'] = new ReflectionMethodGetNumberOfParameters();
+        $rm->methodVisibility['getnumberofparameters'] = $pub;
         $rm->methods['getname'] = new ReflectionMethodGetName();
         $rm->methodVisibility['getname'] = $pub;
         $rm->methods['isdeprecated'] = new ReflectionMethodIsDeprecated();
@@ -641,6 +645,7 @@ final class BuiltinClasses
             [
                 'getname' => new ReflectionFunctionGetName(),
                 'getparameters' => new ReflectionFunctionGetParameters(),
+                'getnumberofparameters' => new ReflectionFunctionGetNumberOfParameters(),
                 'getreturntype' => new ReflectionFunctionGetReturnType(),
                 'hasreturntype' => new ReflectionFunctionHasReturnType(),
                 'isanonymous' => new ReflectionFunctionIsAnonymous(),

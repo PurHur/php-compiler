@@ -2492,6 +2492,7 @@ require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionFunctionGetClosureUsedV
 require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionFunctionGetExtensionName.php';
 require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionFunctionGetName.php';
 require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionFunctionGetParameters.php';
+require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionFunctionGetNumberOfParameters.php';
 require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionFunctionGetReturnType.php';
 require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionFunctionHasReturnType.php';
 require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionFunctionInvoke.php';
@@ -2513,6 +2514,7 @@ require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionMethodGetFileName.php';
 require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionMethodGetModifiers.php';
 require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionMethodGetName.php';
 require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionMethodGetParameters.php';
+require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionMethodGetNumberOfParameters.php';
 require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionMethodGetPrototype.php';
 require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionMethodGetReturnType.php';
 require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionMethodGetStartLine.php';
