@@ -273,11 +273,12 @@ final class ErrorReporter
         int $line = 0
     ): void {
         [$file, $line] = $this->resolveDisplayLocation($frame, $file, $line);
-        $this->recordLastError(self::E_NOTICE, $message, $file, $line);
-        if (0 === ($this->errorReporting & self::E_NOTICE)) {
+        if (0 !== ($this->errorReporting & self::E_NOTICE)
+            && $this->dispatchUserHandler($context, $frame, self::E_NOTICE, $message, $file, $line)) {
             return;
         }
-        if ($this->dispatchUserHandler($context, $frame, self::E_NOTICE, $message, $file, $line)) {
+        $this->recordLastError(self::E_NOTICE, $message, $file, $line);
+        if (0 === ($this->errorReporting & self::E_NOTICE)) {
             return;
         }
         if ($this->displayErrors) {
@@ -293,11 +294,12 @@ final class ErrorReporter
         int $line = 0
     ): void {
         [$file, $line] = $this->resolveDisplayLocation($frame, $file, $line);
-        $this->recordLastError(self::E_WARNING, $message, $file, $line);
-        if (0 === ($this->errorReporting & self::E_WARNING)) {
+        if (0 !== ($this->errorReporting & self::E_WARNING)
+            && $this->dispatchUserHandler($context, $frame, self::E_WARNING, $message, $file, $line)) {
             return;
         }
-        if ($this->dispatchUserHandler($context, $frame, self::E_WARNING, $message, $file, $line)) {
+        $this->recordLastError(self::E_WARNING, $message, $file, $line);
+        if (0 === ($this->errorReporting & self::E_WARNING)) {
             return;
         }
         if ($this->displayErrors) {
@@ -317,11 +319,12 @@ final class ErrorReporter
             $className,
             $propertyName
         );
-        $this->recordLastError(self::E_DEPRECATED, $message, $file, 0);
-        if (0 === ($this->errorReporting & self::E_DEPRECATED)) {
+        if (0 !== ($this->errorReporting & self::E_DEPRECATED)
+            && $this->dispatchUserHandler($context, $frame, self::E_DEPRECATED, $message, $file, 0)) {
             return;
         }
-        if ($this->dispatchUserHandler($context, $frame, self::E_DEPRECATED, $message, $file, 0)) {
+        $this->recordLastError(self::E_DEPRECATED, $message, $file, 0);
+        if (0 === ($this->errorReporting & self::E_DEPRECATED)) {
             return;
         }
         if ($this->displayErrors) {
@@ -338,15 +341,16 @@ final class ErrorReporter
         int $line = 0
     ): void {
         [$file, $line] = $this->resolveDisplayLocation($frame, $file, $line);
-        $this->recordLastError($level, $message, $file, $line);
-        if (0 === ($this->errorReporting & $level)) {
-            return;
-        }
-        if ($this->dispatchUserHandler($context, $frame, $level, $message, $file, $line)) {
+        if (0 !== ($this->errorReporting & $level)
+            && $this->dispatchUserHandler($context, $frame, $level, $message, $file, $line)) {
             if (self::E_USER_ERROR === $level) {
                 throw new \LogicException("Fatal error: {$message}");
             }
 
+            return;
+        }
+        $this->recordLastError($level, $message, $file, $line);
+        if (0 === ($this->errorReporting & $level)) {
             return;
         }
         $formatted = $this->formatCliError($level, $message, $file, $line);
