@@ -37,8 +37,14 @@ final class JitThrow
 
     public static function implement(Context $context): void
     {
-        self::registerPendingGlobals($context);
-        self::implementPendingHelpers($context);
+        if (Builtin::LOAD_TYPE_STANDALONE === $context->loadType) {
+            self::registerPendingGlobals($context);
+            self::implementPendingHelpers($context);
+
+            return;
+        }
+
+        ExceptionThrowRuntime::implement($context);
     }
 
     public static function registerDeclarations(Context $context): void
