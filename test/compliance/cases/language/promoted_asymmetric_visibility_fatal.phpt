@@ -1,5 +1,5 @@
 --TEST--
-Language: promoted asymmetric visibility public private(set) compile fatal (#9161, zend_compile.c)
+Language: promoted asymmetric visibility public private(set) (#9622, PHP 8.4 zend_compile.c)
 --FILE--
 <?php
 class C {
@@ -7,6 +7,13 @@ class C {
         public private(set) string $name,
     ) {}
 }
-echo "ok\n";
---EXPECT_EXIT--
-255
+$c = new C('C');
+echo $c->name, "\n";
+try {
+    $c->name = 'nope';
+} catch (Error $e) {
+    echo get_class($e), ': ', $e->getMessage(), "\n";
+}
+--EXPECT--
+C
+Error: Cannot modify private(set) property C::$name from global scope
