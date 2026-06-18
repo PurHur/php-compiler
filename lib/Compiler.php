@@ -5425,7 +5425,7 @@ class Compiler {
             if (!$child instanceof Op\Expr || !$this->operandsReferToSameVariable($child->result, $root)) {
                 continue;
             }
-            $vm = $this->tryFoldCompileTimeExprDefault($child, $block, [$child]);
+            $vm = $this->tryFoldCompileTimeExprDefault($child, $block, [$child], true);
             if (null !== $vm) {
                 return $vm;
             }
@@ -12548,13 +12548,13 @@ class Compiler {
         if (null !== $terminal->valueBlock && [] !== $terminal->valueBlock->children) {
             $children = $terminal->valueBlock->children;
             if (1 === \count($children) && $children[0] instanceof Op\Expr\Array_) {
-                $vm = $this->tryBuildCompileTimeArrayFromExpr($children[0]);
+                $vm = $this->tryBuildCompileTimeArrayFromExpr($children[0], $block, $children, true);
                 if (null !== $vm) {
                     return $block->registerConstant(new Operand\Temporary(), $vm);
                 }
             }
             if (1 === \count($children) && $children[0] instanceof Op\Expr\ClassConstFetch) {
-                $vm = $this->tryFoldClassConstFetchDefault($children[0], $block);
+                $vm = $this->tryFoldClassConstFetchDefault($children[0], $block, true);
                 if (null !== $vm) {
                     return $block->registerConstant(new Operand\Temporary(), $vm);
                 }
@@ -12566,7 +12566,7 @@ class Compiler {
                 }
             }
             if (1 === \count($children) && $children[0] instanceof Op\Expr) {
-                $vm = $this->tryFoldCompileTimeExprDefault($children[0], $block, $children);
+                $vm = $this->tryFoldCompileTimeExprDefault($children[0], $block, $children, true);
                 if (null !== $vm) {
                     return $block->registerConstant(new Operand\Temporary(), $vm);
                 }
