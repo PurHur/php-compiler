@@ -17,6 +17,33 @@ use PHPCfg\Script;
  */
 final class EnumBackedCaseCheck
 {
+    /**
+     * Zend duplicate backing detection message, or null when values are unique (#5773, zend_enum.c).
+     *
+     * @param iterable<array{name: string, backing: int|string}> $cases declaration order
+     */
+    public static function duplicateBackingErrorMessage(
+        string $enumName,
+        iterable $cases
+    ): ?string {
+        /** @var array<int|string, string> $seen */
+        $seen = [];
+        foreach ($cases as $case) {
+            $key = $case['backing'];
+            if (isset($seen[$key])) {
+                return sprintf(
+                    'Duplicate value in enum %s for cases %s and %s',
+                    $enumName,
+                    $seen[$key],
+                    $case['name']
+                );
+            }
+            $seen[$key] = $case['name'];
+        }
+
+        return null;
+    }
+
     public static function validate(Script $script): void
     {
         $check = new self();

@@ -778,6 +778,9 @@ final class VmFs
     }
 
     public static function fread(int $handle, int $length) {
+        if ($length <= 0) {
+            throw new \ValueError('fread(): Argument #2 ($length) must be greater than 0');
+        }
         if (VmUserStream::isValidHandle($handle)) {
             return VmUserStream::read($handle, $length);
         }
@@ -802,9 +805,6 @@ final class VmFs
         }
         $fp = self::lookup($handle);
         if (null === $fp) {
-            return false;
-        }
-        if ($length < 0) {
             return false;
         }
 
@@ -875,6 +875,9 @@ final class VmFs
     }
 
     public static function fwrite(int $handle, string $data, ?int $length = null) {
+        if (null !== $length && $length < 0) {
+            return 0;
+        }
         if (VmPhpMemoryStream::isValidHandle($handle)) {
             $data = VmStreamFilterChain::applyWriteFilters($handle, $data);
 

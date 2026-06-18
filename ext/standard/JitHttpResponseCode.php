@@ -47,6 +47,17 @@ final class JitHttpResponseCode
         $arg = $args[0];
         $compileTimeCode = HttpResponseCodeJit::compileTimeCodeLong($context, $arg);
         if (null !== $compileTimeCode) {
+            if (0 === $compileTimeCode) {
+                $context->builder->call(
+                    $context->lookupFunction('__phpc_http_response_code_apply'),
+                    $i8->constInt(Hrc::APPLY_GET, false),
+                    $i64->constInt(0, false),
+                    $nullBoxed,
+                    $ptr
+                );
+
+                return $ptr;
+            }
             $context->builder->call(
                 $context->lookupFunction('__phpc_http_response_code_apply'),
                 $i8->constInt(Hrc::APPLY_SET_LONG, false),

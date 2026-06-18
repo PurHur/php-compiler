@@ -115,29 +115,130 @@ final class InetRuntime
         );
         $context->builder->store($i8->constInt(0, false), $context->builder->gep($ipbuf, $len32));
 
-        $inAddr = $context->builder->alloca($i8, self::IN_ADDR_SIZE, 'ip2long_inaddr');
-        $atonRc = $context->builder->call(
-            $context->lookupFunction('inet_aton'),
+        self::ensureIp2longScanf($context);
+        $octets = $context->builder->alloca($i32, 4, 'ip2long_octets');
+        $consumed = $context->builder->alloca($i32, 1, 'ip2long_consumed');
+        $scanFmt = $context->builder->globalStringPointer('%u.%u.%u.%u%n');
+        $scanRc = $context->builder->call(
+            $context->lookupFunction('sscanf'),
             $context->bytePtr($ipbuf),
-            $context->bytePtr($inAddr)
+            $context->bytePtr($scanFmt),
+            $context->builder->gep($octets, $i32->constInt(0, false)),
+            $context->builder->gep($octets, $i32->constInt(1, false)),
+            $context->builder->gep($octets, $i32->constInt(2, false)),
+            $context->builder->gep($octets, $i32->constInt(3, false)),
+            $context->bytePtr($consumed)
         );
-        $atonOk = $context->builder->icmp(Builder::INT_NE, $atonRc, $zeroI32);
-        $atonFailBb = $fn->appendBasicBlock('ip2long_aton_fail');
-        $atonOkBb = $fn->appendBasicBlock('ip2long_aton_ok');
-        $context->builder->branchIf($atonOk, $atonOkBb, $atonFailBb);
+        $scanOk = $context->builder->icmp(Builder::INT_EQ, $scanRc, $i32->constInt(4, false));
+        $scanFailBb = $fn->appendBasicBlock('ip2long_scan_fail');
+        $scanOkBb = $fn->appendBasicBlock('ip2long_scan_ok');
+        $context->builder->branchIf($scanOk, $scanOkBb, $scanFailBb);
 
-        $context->builder->positionAtEnd($atonFailBb);
+        $context->builder->positionAtEnd($scanFailBb);
         $context->builder->call($context->lookupFunction('__value__writeBool'), $out, $i32->constInt(0, false));
         $context->builder->returnVoid();
         $context->builder->clearInsertionPosition();
 
-        $context->builder->positionAtEnd($atonOkBb);
-        $addrI32 = $context->builder->load($context->builder->bitcast($inAddr, $i32->pointerType(0)));
-        $hostLong = $context->builder->call($context->lookupFunction('ntohl'), $addrI32);
-        $signedLong = $context->builder->sext($hostLong, $i64);
-        $context->builder->call($context->lookupFunction('__value__writeLong'), $out, $signedLong);
+        $context->builder->positionAtEnd($scanOkBb);
+        $consumedVal = $context->builder->load($consumed);
+        $ipLen = $context->builder->call($context->lookupFunction('strlen'), $context->bytePtr($ipbuf));
+        $consumedLen = $context->builder->sext($consumedVal, $sizeT);
+        $lenMatch = $context->builder->icmp(Builder::INT_EQ, $consumedLen, $ipLen);
+        $lenMismatchBb = $fn->appendBasicBlock('ip2long_consumed_fail');
+        $roundtripBb = $fn->appendBasicBlock('ip2long_roundtrip');
+        $context->builder->branchIf($lenMatch, $roundtripBb, $lenMismatchBb);
+
+        $context->builder->positionAtEnd($lenMismatchBb);
+        $context->builder->call($context->lookupFunction('__value__writeBool'), $out, $i32->constInt(0, false));
         $context->builder->returnVoid();
         $context->builder->clearInsertionPosition();
+
+        $context->builder->positionAtEnd($roundtripBb);
+        $roundBuf = $context->builder->alloca($i8, self::IPBUF_LEN, 'ip2long_round');
+        $roundFmt = $context->builder->globalStringPointer('%u.%u.%u.%u');
+        $o0 = $context->builder->load($context->builder->gep($octets, $i32->constInt(0, false)));
+        $o1 = $context->builder->load($context->builder->gep($octets, $i32->constInt(1, false)));
+        $o2 = $context->builder->load($context->builder->gep($octets, $i32->constInt(2, false)));
+        $o3 = $context->builder->load($context->builder->gep($octets, $i32->constInt(3, false)));
+        $context->builder->call(
+            $context->lookupFunction('snprintf'),
+            $context->bytePtr($roundBuf),
+            $sizeT->constInt(self::IPBUF_LEN, false),
+            $context->bytePtr($roundFmt),
+            $o0,
+            $o1,
+            $o2,
+            $o3
+        );
+        $cmpRc = $context->builder->call(
+            $context->lookupFunction('strcmp'),
+            $context->bytePtr($ipbuf),
+            $context->bytePtr($roundBuf)
+        );
+        $roundOk = $context->builder->icmp(Builder::INT_EQ, $cmpRc, $zeroI32);
+        $roundFailBb = $fn->appendBasicBlock('ip2long_round_fail');
+        $rangeBb = $fn->appendBasicBlock('ip2long_range');
+        $context->builder->branchIf($roundOk, $rangeBb, $roundFailBb);
+
+        $context->builder->positionAtEnd($roundFailBb);
+        $context->builder->call($context->lookupFunction('__value__writeBool'), $out, $i32->constInt(0, false));
+        $context->builder->returnVoid();
+        $context->builder->clearInsertionPosition();
+
+        $context->builder->positionAtEnd($rangeBb);
+        $maxOctet = $i32->constInt(255, false);
+        $inRange = $context->builder->and(
+            $context->builder->and(
+                $context->builder->icmp(Builder::INT_ULE, $o0, $maxOctet),
+                $context->builder->icmp(Builder::INT_ULE, $o1, $maxOctet)
+            ),
+            $context->builder->and(
+                $context->builder->icmp(Builder::INT_ULE, $o2, $maxOctet),
+                $context->builder->icmp(Builder::INT_ULE, $o3, $maxOctet)
+            )
+        );
+        $rangeFailBb = $fn->appendBasicBlock('ip2long_range_fail');
+        $packBb = $fn->appendBasicBlock('ip2long_pack');
+        $context->builder->branchIf($inRange, $packBb, $rangeFailBb);
+
+        $context->builder->positionAtEnd($rangeFailBb);
+        $context->builder->call($context->lookupFunction('__value__writeBool'), $out, $i32->constInt(0, false));
+        $context->builder->returnVoid();
+        $context->builder->clearInsertionPosition();
+
+        $context->builder->positionAtEnd($packBb);
+        $shift24 = $context->builder->shl($context->builder->zExt($o0, $i64), $i64->constInt(24, false));
+        $shift16 = $context->builder->shl($context->builder->zExt($o1, $i64), $i64->constInt(16, false));
+        $shift8 = $context->builder->shl($context->builder->zExt($o2, $i64), $i64->constInt(8, false));
+        $packed = $context->builder->or(
+            $context->builder->or($shift24, $shift16),
+            $context->builder->or($shift8, $context->builder->zExt($o3, $i64))
+        );
+        $context->builder->call($context->lookupFunction('__value__writeLong'), $out, $packed);
+        $context->builder->returnVoid();
+        $context->builder->clearInsertionPosition();
+    }
+
+    private static function ensureIp2longScanf(Context $context): void
+    {
+        $i32 = $context->getTypeFromString('int32');
+        $i8p = $context->getTypeFromString('int8*');
+        $sizeT = $context->getTypeFromString('size_t');
+        self::ensureExternal(
+            $context,
+            'sscanf',
+            $context->context->functionType($i32, true, $i8p, $i8p, $i32->pointerType(0), $i32->pointerType(0), $i32->pointerType(0), $i32->pointerType(0), $i32->pointerType(0))
+        );
+        self::ensureExternal(
+            $context,
+            'snprintf',
+            $context->context->functionType($i32, true, $i8p, $sizeT, $i8p, $i32, $i32, $i32, $i32)
+        );
+        self::ensureExternal(
+            $context,
+            'strcmp',
+            $context->context->functionType($i32, false, $i8p, $i8p)
+        );
     }
 
     private static function implementLong2ip(Context $context): void

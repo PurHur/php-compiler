@@ -42,11 +42,7 @@ final class sort_ extends Internal
         $ht = VmArray::requireArray($frame->calledArgs[0], 'sort');
         $flags = StdlibConstants::SORT_REGULAR;
         if (2 === $argc) {
-            $flagsArg = $frame->calledArgs[1]->resolveIndirect();
-            if (Variable::TYPE_INTEGER !== $flagsArg->type) {
-                throw new \LogicException('sort() flags must be an integer in this compiler build');
-            }
-            $flags = $flagsArg->toInt();
+            $flags = VmInternalCompare::resolveFrameSortFlags($frame, 'sort');
         }
         if ($ht->getNumElements() < 2) {
             if (null !== $frame->returnVar) {
@@ -126,26 +122,10 @@ final class sort_ extends Internal
         if (1 === $argc) {
             ArrayBuiltinHelper::sortPacked($context, $args[0]);
         } else {
-            self::jitSortWithFlags($context, $args[0], self::resolveJitSortFlags($context, $args[1]));
+            self::jitSortWithFlags($context, $args[0], VmInternalCompare::resolveJitSortFlags($context, $args[1], 'sort'));
         }
 
         return $context->getTypeFromString('int1')->constInt(1, false);
-    }
-
-    private static function resolveJitSortFlags(Context $context, JITVariable $flagsArg): int
-    {
-        if (null !== $flagsArg->compileTimeConstantName) {
-            $phpVar = $context->runtime->vmContext->constantFetch($flagsArg->compileTimeConstantName);
-            if (null !== $phpVar && Variable::TYPE_INTEGER === $phpVar->type) {
-                return $phpVar->toInt();
-            }
-        }
-        if (JITVariable::TYPE_NATIVE_LONG === $flagsArg->type) {
-            throw new \LogicException(
-                'sort() flags must be a predefined constant in JIT/AOT in this compiler build'
-            );
-        }
-        throw new \LogicException('sort() flags must be an integer in this compiler build');
     }
 
     private static function jitSortWithFlags(Context $context, JITVariable $array, int $flags): void

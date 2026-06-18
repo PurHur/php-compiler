@@ -65,12 +65,7 @@ final class VmSession
 
     public static function assignStatusResult(Variable $dest, ?Context $ctx): void
     {
-        $enum = self::enumCaseForStatus($ctx, self::sessionStatus());
-        if (null !== $enum) {
-            $dest->copyFrom($enum);
-
-            return;
-        }
+        // php-src ext/session/session.c returns zend_long (PHP_SESSION_*), not SessionStatus enum (#9262).
         $dest->int(self::sessionStatus());
     }
 

@@ -1,11 +1,11 @@
 {
     "compiler_skip_patterns": 48,
-    "m3_allow": 26,
+    "m3_allow": 27,
     "m3_deny": 1,
     "spine": {
-        "m3_real": 29,
+        "m3_real": 30,
         "m3_deny": 4,
-        "entry_stub": 1,
+        "entry_stub": 0,
         "compiler_stub": 0,
         "other": 0
     }

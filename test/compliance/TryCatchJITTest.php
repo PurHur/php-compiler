@@ -34,6 +34,10 @@ final class TryCatchJITTest extends BaseTest
             __DIR__.'/cases/language/throw_expression.phpt',
             'throw_expression.phpt'
         );
+        yield 'throw_expression_return_elvis.phpt' => self::parsePHPT(
+            __DIR__.'/cases/language/throw_expression_return_elvis.phpt',
+            'throw_expression_return_elvis.phpt'
+        );
         yield 'throws_user_empty_class_jit.phpt' => self::parsePHPT(
             __DIR__.'/cases/language/throws_user_empty_class_jit.phpt',
             'throws_user_empty_class_jit.phpt'

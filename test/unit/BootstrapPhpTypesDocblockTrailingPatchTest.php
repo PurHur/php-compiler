@@ -46,4 +46,18 @@ final class BootstrapPhpTypesDocblockTrailingPatchTest extends TestCase
         $this->assertSame(Type::TYPE_NULL, $type->subTypes[0]->type);
         $this->assertSame(Type::TYPE_CALLABLE, $type->subTypes[1]->type);
     }
+
+    /** Issue #9261: overlay must emit real newlines, not literal \\n inside a // comment. */
+    public function testFromDeclTrailingCommaOverlayNotCorrupt(): void
+    {
+        $typeFile = dirname(__DIR__, 2).'/vendor/ircmaxell/php-types/lib/PHPTypes/Type.php';
+        $content = (string) file_get_contents($typeFile);
+        $this->assertDoesNotMatchRegularExpression(
+            '/Docblock union splits.*\\\\n\s+\$trimmedDecl/',
+            $content,
+            'Run script/apply-patches.sh — php-types-fromdecl-trailing-comma overlay must not write literal \\n'
+        );
+        $type = Type::fromDecl('string,');
+        $this->assertSame(Type::TYPE_STRING, $type->type);
+    }
 }

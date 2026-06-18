@@ -800,7 +800,7 @@ final class VmMbstring
     {
         $canonical = CharsetEngine::canonicalize($encoding) ?? $encoding;
         if ('UTF-8' === $canonical) {
-            return self::isValidUtf8($value);
+            return VmString::isValidUtf8($value);
         }
         if ('ASCII' === $canonical || '8BIT' === $canonical) {
             return true;

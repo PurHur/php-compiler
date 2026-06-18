@@ -10,6 +10,7 @@ use PHPUnit\Framework\TestCase;
 
 /**
  * Issue #5406: AOT standalone must define time sleep helpers without phpc_time_sleep.c.
+ * Issue #9378: JIT sleep routes through SleepJitHelper + VmSleepPure PHP.
  *
  * @group aot-lint
  */
@@ -26,5 +27,41 @@ final class TimeSleepRuntimeStandaloneTest extends TestCase
             $this->assertNotNull($fn);
             $this->assertGreaterThan(0, $fn->countBasicBlocks());
         }
+    }
+
+    public function testEnsureLinkedUsesLibcBridgeWhenEmitHelperLinkStubsActive(): void
+    {
+        $prevEmit = \getenv('PHP_COMPILER_EMIT_HELPER_LINK');
+        \putenv('PHP_COMPILER_EMIT_HELPER_LINK=1');
+        try {
+            $runtime = new Runtime(Runtime::MODE_AOT);
+            $ctx = new Context($runtime, Builtin::LOAD_TYPE_STANDALONE);
+            foreach (['__compiler_time_nanosleep', '__compiler_time_sleep_until'] as $name) {
+                $fn = $ctx->lookupFunction($name);
+                $this->assertNotNull($fn, $name);
+                $this->assertGreaterThan(0, $fn->countBasicBlocks(), $name);
+            }
+        } finally {
+            if (false === $prevEmit || null === $prevEmit) {
+                \putenv('PHP_COMPILER_EMIT_HELPER_LINK=');
+            } else {
+                \putenv('PHP_COMPILER_EMIT_HELPER_LINK='.$prevEmit);
+            }
+        }
+    }
+
+    public function testTimeSleepRuntimeRoutesThroughSleepJitHelper(): void
+    {
+        $source = (string) \file_get_contents(__DIR__.'/../../../ext/standard/JitSleep.php');
+        $this->assertStringContainsString('TimeSleepRuntime::ensureLinked', $source);
+
+        $runtimeSource = (string) \file_get_contents(__DIR__.'/../../../lib/JIT/Builtin/TimeSleepRuntime.php');
+        $this->assertStringContainsString('SleepJitHelper', $runtimeSource);
+        $this->assertStringNotContainsString('lookupFunction(\'nanosleep\')', $runtimeSource);
+        $this->assertStringNotContainsString('lookupFunction(\'gettimeofday\')', $runtimeSource);
+
+        $helperSource = (string) \file_get_contents(__DIR__.'/../../../ext/standard/SleepJitHelper.php');
+        $this->assertStringContainsString('VmSleepPure::timeNanosleep', $helperSource);
+        $this->assertStringContainsString('VmSleepPure::timeSleepUntil', $helperSource);
     }
 }

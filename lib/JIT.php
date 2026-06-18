@@ -785,6 +785,9 @@ class JIT {
             return true;
         }
         $className = strtolower($this->context->type->object->classNameForId($classId));
+        if ('' !== $className && str_ends_with($className, 'jithelper')) {
+            return false;
+        }
         if ('' === $className) {
             return $this->shouldUseSelfHostJitStubs()
                 || $this->shouldUseEmitHelperLinkStubs()
@@ -1105,6 +1108,10 @@ class JIT {
             ) {
                 return true;
             }
+        }
+
+        if (str_ends_with($lower, '\\compiler::compilefunc')) {
+            return true;
         }
 
         return false;
@@ -6827,7 +6834,15 @@ class JIT {
                                 $classId,
                                 $nameOp->value
                             );
-                            $value = $this->context->type->object->classConstFetch($classId, $nameOp->value);
+                            if ($this->context->type->object->isEnumClassId($classId)) {
+                                JIT\BackedEnumDuplicateJitGuard::emitBeforeEnumCaseFetch(
+                                    $this->context->type->object,
+                                    $this,
+                                    $block,
+                                    $classId
+                                );
+                            }
+                            $value = $this->context->type->object->classConstFetch($classId, $nameOp->value, $block);
                             $resultOp = $block->getOperand($op->arg1);
                             if ($this->context->type->object->isEnumClassId($classId)
                                 && $classOp instanceof Operand\Literal) {
@@ -7699,6 +7714,15 @@ class JIT {
 
                         return $returnBlock;
                     }
+                    if ($block->returnTypeNever) {
+                        $neverFunc = null !== $block->func ? $block->func->name : null;
+                        JIT\Builtin\TypeErrorRaise::emitRaise(
+                            $this->context,
+                            null !== $neverFunc && '' !== $neverFunc
+                                ? "{$neverFunc}(): never-returning function must not implicitly return"
+                                : 'A never-returning function must not return'
+                        );
+                    }
                     if ($block->returnTypeVoid) {
                         JIT\Builtin\TypeErrorRaise::registerDeclarations($this->context);
                         JIT\Builtin\TypeErrorRaise::ensureLinked($this->context);
@@ -7969,6 +7993,12 @@ class JIT {
                             $callArgs,
                             $callOperands
                         );
+                        $callArgs = $this->foldSortFamilyFlagsArg(
+                            $this->context->scope->toCall->getName(),
+                            $callArgs,
+                            $callOperands,
+                            $block
+                        );
                     }
                     if (null !== $block->func && '{main}' === $block->func->name) {
                         $toCall = $this->context->scope->toCall;
@@ -8031,6 +8061,12 @@ class JIT {
                             $this->context->scope->toCall->getName(),
                             $callArgs,
                             $callOperands
+                        );
+                        $callArgs = $this->foldSortFamilyFlagsArg(
+                            $this->context->scope->toCall->getName(),
+                            $callArgs,
+                            $callOperands,
+                            $block
                         );
                     }
                     if (
@@ -8242,6 +8278,7 @@ class JIT {
                         $this->context->scope->classId,
                         $nameOp->value
                     );
+                    $this->context->type->object->propagateInterfaceConstantsToImplementors($nameOp->value);
                     $this->context->popScope();
                     break;
                 case OpCode::TYPE_DECLARE_TRAIT:
@@ -11878,10 +11915,6 @@ class JIT {
             return;
         }
 
-        if (!$prefix) {
-            $this->assignOperand($resultOp, $read, true);
-        }
-
         if (
             Variable::TYPE_VALUE === $read->type
             && (Variable::KIND_VARIABLE === $read->kind || $read->functionStaticGlobal)
@@ -11893,6 +11926,15 @@ class JIT {
             $newLong = $increment
                 ? $this->context->builder->add($cur, $one)
                 : $this->context->builder->sub($cur, $one);
+            if (!$prefix) {
+                $oldVar = new Variable(
+                    $this->context,
+                    Variable::TYPE_NATIVE_LONG,
+                    Variable::KIND_VALUE,
+                    $cur
+                );
+                $this->assignOperand($resultOp, $oldVar, true);
+            }
             $write = $this->context->getVariableFromOpInScopes($writeOp);
             $writePtr = JIT\JitValueBox::valuePtrFromVariable($this->context, $write);
             $this->context->builder->call(
@@ -11926,12 +11968,25 @@ class JIT {
                 Variable::KIND_VALUE,
                 $newLong
             );
+            if (!$prefix) {
+                $oldVar = new Variable(
+                    $this->context,
+                    Variable::TYPE_NATIVE_LONG,
+                    Variable::KIND_VALUE,
+                    $cur
+                );
+                $this->assignOperand($resultOp, $oldVar, true);
+            }
             $this->assignOperand($writeOp, $newVar, true);
             if ($prefix) {
                 $this->assignOperand($resultOp, $newVar, true);
             }
 
             return;
+        }
+
+        if (!$prefix) {
+            $this->assignOperand($resultOp, $read, true);
         }
 
         $arithOp = new OpCode($increment ? OpCode::TYPE_PLUS : OpCode::TYPE_MINUS);
@@ -13586,6 +13641,34 @@ class JIT {
         return $args;
     }
 
+    /**
+     * @param list<JIT\Variable>           $args
+     * @param list<Operand|null>           $operands
+     *
+     * @return list<JIT\Variable>
+     */
+    private function foldSortFamilyFlagsArg(string $name, array $args, array $operands, Block $block): array
+    {
+        $lc = strtolower($name);
+        if (!\in_array($lc, ['sort', 'rsort', 'asort', 'arsort', 'ksort', 'krsort'], true)) {
+            return $args;
+        }
+        if (2 !== \count($args) || !isset($operands[1])) {
+            return $args;
+        }
+        $resolved = \PHPCompiler\ext\standard\VmInternalCompare::tryResolveJitSortFlags($this->context, $args[1])
+            ?? \PHPCompiler\ext\standard\VmInternalCompare::tryResolveJitSortFlagsFromBlock(
+                $this->context,
+                $block,
+                $operands[1]
+            );
+        if (null !== $resolved) {
+            $args[1] = JIT\Variable::fromConstantInt($this->context, $resolved);
+        }
+
+        return $args;
+    }
+
     private function ensureValueBoxLvalueForByRefPass(Operand $op, Variable $var): Variable
     {
         if (Variable::TYPE_VALUE === $var->type || null !== $var->valueBoxAliasPtr) {
@@ -13664,7 +13747,10 @@ class JIT {
         string $constNameLc,
         int $classId
     ): VM\Variable {
-        if (!isset($block->constants[$op->arg2])) {
+        if (
+            !isset($block->constants[$op->arg2])
+            || $block->constants[$op->arg2]->is(VM\Variable::TYPE_NULL)
+        ) {
             $vm = new VM($this->context->runtime->vmContext);
             $className = $this->context->type->object->classNameForId($classId);
             $value = VM\ClassConstMaterializer::materializeSlot($vm, $block, $op->arg2, $className);

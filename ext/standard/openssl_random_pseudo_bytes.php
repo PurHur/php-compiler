@@ -16,7 +16,7 @@ use PHPLLVM\Value;
  * openssl_random_pseudo_bytes() — OS CSPRNG with optional $crypto_strong out-param (#4994).
  *
  * php-src: ext/standard/random.c — delegates to php_random_bytes(); sets *cstrong = 1 on success.
- * VM: {@see VmRandomNative::randomBytes()} (getrandom/urandom FFI). JIT/AOT: {@see JitRandomBytes} / getrandom(3).
+ * VM: {@see VmRandomNative::randomBytes()} (getrandom/urandom FFI). JIT/AOT: {@see JitRandomBytes} / /dev/urandom read.
  */
 final class openssl_random_pseudo_bytes extends Internal
 {

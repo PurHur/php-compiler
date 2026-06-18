@@ -7,16 +7,16 @@ namespace PHPCompiler\Test\Unit;
 use PHPCompiler\Runtime;
 use PHPUnit\Framework\TestCase;
 
-/** isset() on property hooks must not invoke get hook (#8917). */
+/** isset() on property hooks invokes get hook (#9107). */
 final class PropertyHookIssetTest extends TestCase
 {
-    public function testVmIssetOnVirtualGetHookDoesNotInvokeGet(): void
+    public function testVmIssetOnVirtualGetHookInvokesGet(): void
     {
         $code = <<<'PHP'
 <?php
 class C {
     public ?string $x {
-        get { throw new Exception('get must not run for isset'); }
+        get { echo "get runs for isset\n"; return null; }
     }
 }
 $c = new C();
@@ -27,16 +27,16 @@ PHP;
         $block = $rt->parseAndCompile($code, 'test.php');
         ob_start();
         $rt->run($block);
-        self::assertSame("bool(false)\nok\n", ob_get_clean());
+        self::assertSame("get runs for isset\nbool(false)\nok\n", ob_get_clean());
     }
 
-    public function testVmIssetOnSeparateBackingWithoutGetHook(): void
+    public function testVmIssetOnSeparateBackingInvokesGetHook(): void
     {
         $code = <<<'PHP'
 <?php
 class C {
     public string $x {
-        get { throw new Exception('get must not run for isset'); }
+        get { echo "get runs for isset\n"; return $this->backing; }
         set => $this->backing = $value;
     }
     private string $backing = 'a';
@@ -48,6 +48,6 @@ PHP;
         $block = $rt->parseAndCompile($code, 'test.php');
         ob_start();
         $rt->run($block);
-        self::assertSame("bool(true)\n", ob_get_clean());
+        self::assertSame("get runs for isset\nbool(true)\n", ob_get_clean());
     }
 }

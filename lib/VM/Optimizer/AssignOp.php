@@ -72,6 +72,7 @@ class AssignOp extends Optimizer
                 unset($block->opCodes[$key]);
             }
             $block->opCodes = array_values($block->opCodes);
+            $block->nOpCodes = \count($block->opCodes);
         }
     }
 }

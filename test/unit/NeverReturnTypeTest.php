@@ -65,6 +65,29 @@ PHP;
         $this->assertSame(\PHPTypes\Type::TYPE_NULL, $type->type);
     }
 
+    public function testNeverImplicitReturnAfterEchoRaisesTypeError(): void
+    {
+        $runtime = new Runtime();
+        $code = <<<'PHP'
+<?php
+function g(): never {
+    echo "bad\n";
+}
+try {
+    g();
+    echo "continued\n";
+} catch (Throwable $e) {
+    echo get_class($e), ': ', $e->getMessage(), "\n";
+}
+PHP;
+        ob_start();
+        $runtime->run($runtime->parseAndCompile($code, 'never_implicit_echo.php'));
+        $this->assertSame(
+            "bad\nTypeError: g(): never-returning function must not implicitly return\n",
+            ob_get_clean()
+        );
+    }
+
     public function testNeverCallSiteDoesNotFallThroughAfterThrowInTry(): void
     {
         $runtime = new Runtime();

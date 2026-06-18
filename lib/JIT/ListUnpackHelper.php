@@ -226,6 +226,22 @@ final class ListUnpackHelper
                 return $builder->or($isVmArray, $isHt);
             }
 
+            if (\PHPCompiler\VM\Variable::TYPE_ARRAY === $type) {
+                // __value__::type stores JIT Variable::TYPE_HASHTABLE (7|IS_REFCOUNTED), not VM TYPE_ARRAY (#9248).
+                $isVmArray = $builder->icmp(
+                    \PHPLLVM\Builder::INT_EQ,
+                    $typeByte,
+                    $i8->constInt(\PHPCompiler\VM\Variable::TYPE_ARRAY, false)
+                );
+                $isJitHashtable = $builder->icmp(
+                    \PHPLLVM\Builder::INT_EQ,
+                    $typeByte,
+                    $i8->constInt(Variable::TYPE_HASHTABLE, false)
+                );
+
+                return $builder->or($isVmArray, $isJitHashtable);
+            }
+
             return $builder->icmp(
                 \PHPLLVM\Builder::INT_EQ,
                 $typeByte,

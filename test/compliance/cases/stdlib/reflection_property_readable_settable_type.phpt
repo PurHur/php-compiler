@@ -5,7 +5,7 @@ ReflectionProperty::getReadableType()/getSettableType() asymmetric typed propert
 declare(strict_types=1);
 
 class C {
-    public private(set) int $x = 1;
+    private(set) int $x = 1;
     private(set) string $p = 'x';
     public int $plain = 0;
 }

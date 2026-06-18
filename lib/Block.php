@@ -377,6 +377,10 @@ class Block {
         if ($this->blocksScriptGlobalInheritance()) {
             return false;
         }
+        // Try/catch/finally bodies inherit parent slots directly (#9114, Zend/zend_execute.c).
+        if ($this->inheritUndefinedLocals) {
+            return false;
+        }
 
         return true;
     }
@@ -621,8 +625,51 @@ class Block {
         if (null === $operand) {
             return true;
         }
+        if ([] !== $operand->usages) {
+            return false;
+        }
 
-        return [] === $operand->usages;
+        return !$this->assignResultSlotConsumedByLaterOp($slot);
+    }
+
+    /**
+     * php-cfg may leave assign-expression result temps without usages when the value feeds a call arg (#6758, #9405).
+     */
+    private function assignResultSlotConsumedByLaterOp(int $slot): bool
+    {
+        $afterProducer = false;
+        for ($i = 0; $i < $this->nOpCodes; ++$i) {
+            $op = $this->opCodes[$i] ?? null;
+            if (null === $op) {
+                continue;
+            }
+            if (OpCode::TYPE_ASSIGN === $op->type && (int) $op->arg1 === $slot) {
+                $afterProducer = true;
+                continue;
+            }
+            if (!$afterProducer) {
+                continue;
+            }
+            if ($this->opCodeReadsScopeSlot($op, $slot)) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private function opCodeReadsScopeSlot(OpCode $op, int $slot): bool
+    {
+        if (OpCode::TYPE_ASSIGN === $op->type) {
+            return (int) $op->arg2 === $slot || (int) $op->arg3 === $slot;
+        }
+        foreach ([$op->arg1, $op->arg2, $op->arg3] as $arg) {
+            if (null !== $arg && (int) $arg === $slot) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     /** Yields [variable name, scope slot] pairs. */
@@ -785,6 +832,10 @@ class Block {
             // php-cfg may register the same slot under multiple Operand keys (#1885).
             // Variable reads in args must still resolve (#3787 merge + literal arm).
             if (isset($scope[$pos]) && !$this->args->contains($op)) {
+                if (isset($this->constants[$pos])) {
+                    $scope[$pos] = $this->constants[$pos];
+                }
+
                 continue;
             }
             if (null !== $frame && 'this' === self::resolveVariableName($op)) {
@@ -959,6 +1010,10 @@ class Block {
         }
         for ($i = 0; $i <= $max; ++$i) {
             if (isset($scope[$i])) {
+                if (isset($this->constants[$i])) {
+                    $scope[$i] = $this->constants[$i];
+                }
+
                 continue;
             }
             if (isset($this->constants[$i])) {

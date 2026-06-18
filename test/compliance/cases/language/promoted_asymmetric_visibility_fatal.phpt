@@ -1,5 +1,5 @@
 --TEST--
-Language: promoted asymmetric visibility public private(set) compiles (#7460, zend_compile.c)
+Language: promoted asymmetric visibility public private(set) compile fatal (#9161, zend_compile.c)
 --FILE--
 <?php
 class C {
@@ -7,6 +7,6 @@ class C {
         public private(set) string $name,
     ) {}
 }
-echo (new C('ok'))->name, "\n";
---EXPECT--
-ok
+echo "ok\n";
+--EXPECT_EXIT--
+255

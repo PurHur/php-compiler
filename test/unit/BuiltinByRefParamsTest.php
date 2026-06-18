@@ -30,4 +30,15 @@ final class BuiltinByRefParamsTest extends TestCase
     {
         $this->assertSame(0, BuiltinByRefParams::variadicByRefFromIndex('array_multisort'));
     }
+
+    public function testOpensslRandomPseudoBytesSecondArgument(): void
+    {
+        $this->assertSame([1], BuiltinByRefParams::forFunction('openssl_random_pseudo_bytes'));
+    }
+
+    public function testIsCallableThirdArgument(): void
+    {
+        $this->assertSame([2], BuiltinByRefParams::forFunction('is_callable'));
+        $this->assertSame([2], BuiltinByRefParams::forFunction('IS_CALLABLE'));
+    }
 }

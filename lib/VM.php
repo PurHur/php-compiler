@@ -608,10 +608,18 @@ class VM {
 
     /**
      * isset($obj->prop) — Zend zend_std_has_property / __isset parity (#3298, #4586).
-     * Hooked properties probe backing/uninit without get hook (#8917, zend_property_hooks.c).
+     * Hooked properties with get hooks invoke the hook; result is !is_null (#9107, zend_property_hooks.c).
      */
     public function objectPropertyIsSet(ObjectEntry $object, string $propName, ?Frame $frame = null): bool
     {
+        if (null !== $frame && $this->instancePropertyHasGetHook($object, $propName)) {
+            $hookValue = $this->fetchPropertyWithHooks($object, $propName, $frame);
+            if (null !== $hookValue) {
+                $value = $hookValue->resolveIndirect();
+
+                return !$value->isUndefined() && Variable::TYPE_NULL !== $value->type;
+            }
+        }
         if (null !== $frame) {
             $hookedIsset = $this->issetHookedPropertyWithoutGetHook($object, $propName);
             if (null !== $hookedIsset) {
@@ -696,6 +704,14 @@ class VM {
         $catchFrame = $this->enforceWriteOnlyVirtualPropertyRead($object, $propName, $frame);
         if (null !== $catchFrame) {
             return $catchFrame;
+        }
+        if ($this->instancePropertyHasGetHook($object, $propName)) {
+            $hookValue = $this->fetchPropertyWithHooks($object, $propName, $frame);
+            if (null !== $hookValue) {
+                $dst->bool(!ext\standard\boolval::isTruthy($hookValue));
+
+                return null;
+            }
         }
         if ($this->emptyHookedPropertyViaBackingProbe($object, $propName, $dst)) {
             return null;
@@ -879,6 +895,20 @@ class VM {
             ?? null;
 
         return is_array($propMeta) && (isset($propMeta['get']) || isset($propMeta['set']));
+    }
+
+    private function instancePropertyHasGetHook(ObjectEntry $object, string $propName): bool
+    {
+        $meta = $this->classPropertyMeta($object, $propName);
+        if (null !== $meta && null !== $meta->getHookMethodLc) {
+            return true;
+        }
+        $lcClass = strtolower($object->class->name);
+        $propMeta = $this->context->propertyHookRegistry[$lcClass][$propName]
+            ?? $this->context->propertyHookRegistry[$lcClass][strtolower($propName)]
+            ?? null;
+
+        return is_array($propMeta) && isset($propMeta['get']);
     }
 
     /**
@@ -2104,7 +2134,7 @@ class VM {
         }
 
         return $this->makeEngineError(
-            VM\ExceptionSupport::THROW_NON_THROWABLE_MESSAGE,
+            VM\ExceptionSupport::throwNormalizeErrorMessage($thrown),
             VM\ExceptionSupport::CLASS_ERROR
         );
     }
@@ -2165,6 +2195,7 @@ restart:
             $this->executingFrame = $frame;
             $this->context->executionLimits->check($this->context, $frame);
             $op = $frame->block->opCodes[$frame->pos++];
+            $this->assertDeferredTraitUsesBeforeRuntime($op->type);
             try {
                 switch ($op->type) {
                 case OpCode::TYPE_TYPE_ASSERT:
@@ -4634,6 +4665,8 @@ restart:
                     }
                     $this->inheritFromInterfaces($ifaceEntry);
                     $this->context->classes[$lcname] = $ifaceEntry;
+                    $this->propagateInterfaceConstantsToImplementors($lcname);
+                    $this->flushDeferredTraitUses();
                     break;
                 case OpCode::TYPE_DECLARE_TRAIT:
                     $name = $frame->scope[$op->arg1]->toString();
@@ -4647,6 +4680,7 @@ restart:
                     $traitEntry->attributeEntries = $op->attributeEntries;
                     self::defineClass($traitEntry, $op->block1, $frame);
                     $this->context->classes[$lcname] = $traitEntry;
+                    $this->flushDeferredTraitUses();
                     break;
                 case OpCode::TYPE_DECLARE_GLOBAL_CONST:
                     $name = $frame->scope[$op->arg1]->toString();
@@ -4694,6 +4728,7 @@ restart:
                     VM\EnumSupport::ensureBuiltinEnumInterfaces($classEntry);
                     $this->context->classes[$lcname] = $classEntry;
                     $this->context->enums[$lcname] = true;
+                    $this->flushDeferredTraitUses();
                     break;
                 case OpCode::TYPE_DECLARE_CLASS:
                     $name = $frame->scope[$op->arg1]->toString();
@@ -4745,6 +4780,7 @@ restart:
                     }
                     VM\ClassValidator::finalizeClassDefinition($classEntry, $this->context);
                     $this->context->classes[$lcname] = $classEntry;
+                    $this->flushDeferredTraitUses();
                     break;
                 case OpCode::TYPE_NEW:
                     $result = $frame->scope[$op->arg1];
@@ -5212,6 +5248,26 @@ restart:
                     }
                     if (null !== $op->arg3) {
                         $container = $frame->scope[$op->arg2]->resolveIndirect();
+                        if (Variable::TYPE_ENUM_CASE === $container->type) {
+                            [$propName, $catchFrame] = $this->coerceRuntimeOperandToString(
+                                $frame->scope[$op->arg3],
+                                $frame
+                            );
+                            if (null !== $catchFrame) {
+                                $frame = $catchFrame;
+                                goto restart;
+                            }
+                            $catchFrame = $this->enforcePropertyName($propName, $frame);
+                            if (null !== $catchFrame) {
+                                $frame = $catchFrame;
+                                goto restart;
+                            }
+                            $dst->bool(EnumCaseSupport::propertyExistsOnCase(
+                                $container->toEnumCase()->enumClass,
+                                $propName
+                            ));
+                            break;
+                        }
                         if (Variable::TYPE_ARRAY === $container->type) {
                             if ($this->context->isGlobalsTable($container)) {
                                 $dst->bool($this->context->globalsTableOffsetIsSet($frame->scope[$op->arg3]));
@@ -5234,6 +5290,23 @@ restart:
                         }
                         if (Variable::TYPE_OBJECT === $container->type) {
                             $object = $container->toObject();
+                            if (EnumCaseSupport::isEnumCase($object)) {
+                                [$propName, $catchFrame] = $this->coerceRuntimeOperandToString(
+                                    $frame->scope[$op->arg3],
+                                    $frame
+                                );
+                                if (null !== $catchFrame) {
+                                    $frame = $catchFrame;
+                                    goto restart;
+                                }
+                                $catchFrame = $this->enforcePropertyName($propName, $frame);
+                                if (null !== $catchFrame) {
+                                    $frame = $catchFrame;
+                                    goto restart;
+                                }
+                                $dst->bool(EnumCaseSupport::propertyExistsOnCase($object->class, $propName));
+                                break;
+                            }
                             if ($this->objectImplementsArrayAccess($object)) {
                                 $existsOut = new Variable();
                                 $catchFrame = $this->invokeArrayAccessOffsetExists(
@@ -5587,7 +5660,7 @@ restart:
                                 $this->context->weakMapIterators[$op->arg1] = $iter;
                                 break;
                             }
-                            $iter = new ObjectPropertyIterator($container->toObject());
+                            $iter = new ObjectPropertyIterator($container->toObject(), $this, $frame);
                             $iter->reset();
                             $this->context->objectPropertyIterators[$op->arg1] = $iter;
                             break;
@@ -5729,14 +5802,24 @@ restart:
                             break;
                         }
                         if ($byRef) {
-                            $frame->scope[$op->arg1]->indirect(
-                                $this->objectForeachIterator($op->arg2)->currentValue(true)
-                            );
+                            try {
+                                $frame->scope[$op->arg1]->indirect(
+                                    $this->objectForeachIterator($op->arg2)->currentValue(true)
+                                );
+                            } catch (VM\PropertyHookRefWriteSignal $signal) {
+                                $frame = $signal->catchFrame;
+                                goto restart;
+                            }
                             $this->markScopeSlotInitialized($frame, (int) $op->arg1);
                         } else {
-                            $frame->scope[$op->arg1]->assignForeachByValue(
-                                $this->objectForeachIterator($op->arg2)->currentValue(false)
-                            );
+                            try {
+                                $frame->scope[$op->arg1]->assignForeachByValue(
+                                    $this->objectForeachIterator($op->arg2)->currentValue(false)
+                                );
+                            } catch (VM\PropertyHookRefWriteSignal $signal) {
+                                $frame = $signal->catchFrame;
+                                goto restart;
+                            }
                         }
                         break;
                     }
@@ -5817,6 +5900,16 @@ restart:
                     if (null !== $op->arg2) {
                         VM\ExceptionSupport::stampThrowLine($thrown, (int) $op->arg2);
                     }
+                    if ($this->frameIsPropertyGetHook($frame)) {
+                        $catchFrame = $this->dispatchEngineThrow($frame, $thrown);
+                        if (null !== $catchFrame) {
+                            // Bubble to caller stack — do not finish property read (#9503, zend_property_hooks.c).
+                            $this->context->propertyHookExternalCatchFrame = $catchFrame;
+
+                            return self::FAILURE;
+                        }
+                        break;
+                    }
                     if ($this->frameIsPropertySetHook($frame)) {
                         $this->context->propertyHookSetAborted = true;
                     }
@@ -5877,6 +5970,9 @@ restart:
             }
             $this->releaseFrameObjectRefs($frame);
             goto nextframe;
+        }
+        if ([] !== $this->context->deferredTraitUses) {
+            $this->finalizeDeferredTraitUses();
         }
 
         return self::SUCCESS;
@@ -7829,6 +7925,17 @@ restart:
         return str_contains($name, '__phpc_property_set_');
     }
 
+    private function frameIsPropertyGetHook(Frame $frame): bool
+    {
+        $func = $frame->block->func ?? null;
+        if (null === $func) {
+            return false;
+        }
+        $name = strtolower($func->name);
+
+        return str_contains($name, '__phpc_property_get_');
+    }
+
     private function isPropertyHookRawWrite(Frame $frame, string $propName): bool
     {
         if ($propName === $frame->propertyHookRawProperty) {
@@ -8402,6 +8509,35 @@ restart:
         }
 
         return true;
+    }
+
+    /**
+     * Object foreach value read — invoke get hooks like get_object_vars() (#9470, zend_property_hooks.c).
+     */
+    public function readObjectForeachProperty(
+        ObjectEntry $object,
+        string $name,
+        Frame $frame,
+        bool $byRef
+    ): Variable {
+        $meta = $this->classPropertyMeta($object, $name);
+        if (!$byRef && null !== $meta?->getHookMethodLc) {
+            $hookValue = $this->fetchPropertyWithHooks($object, $name, $frame);
+            if (null !== $hookValue) {
+                $copy = new Variable();
+                $copy->copyFrom($hookValue->resolveIndirect());
+
+                return $copy;
+            }
+        }
+        $prop = $object->getProperty($name);
+        if ($byRef) {
+            return $prop;
+        }
+        $copy = new Variable();
+        $copy->copyFrom($prop->resolveIndirect());
+
+        return $copy;
     }
 
     private function fetchPropertyWithHooks(ObjectEntry $object, string $name, Frame $frame): ?Variable
@@ -8988,11 +9124,41 @@ restart:
         if (!$classEntry->isTrait || 'class' === strtolower($constName)) {
             return null;
         }
+        if ($this->isInTraitMethodScopeForTrait($frame, $classEntry)) {
+            return null;
+        }
 
         return $this->dispatchVmError(
             "Cannot access trait constant {$classEntry->name}::{$constName} directly",
             $frame
         );
+    }
+
+    /** self::CONST inside trait methods lowers to T::CONST — allow in-trait scope (#9187, Zend/zend_traits.c). */
+    private function isInTraitMethodScopeForTrait(Frame $frame, ClassEntry $traitEntry): bool
+    {
+        if (!$traitEntry->isTrait) {
+            return false;
+        }
+        $traitLc = strtolower(ltrim($traitEntry->name, '\\'));
+        if (null !== $frame->block?->func?->class) {
+            $funcClassLc = strtolower($frame->block->func->class->value);
+            if ($funcClassLc === $traitLc) {
+                return true;
+            }
+        }
+        $declaringLc = null;
+        if (null !== $frame->block?->func?->class) {
+            $declaringLc = strtolower($frame->block->func->class->value);
+        } elseif (null !== $frame->calledClass && '' !== $frame->calledClass) {
+            $declaringLc = strtolower($frame->calledClass);
+        }
+        if (null === $declaringLc) {
+            return false;
+        }
+        $scopeTraitLc = $this->traitScopeLcForFrameMethod($frame, $declaringLc);
+
+        return null !== $scopeTraitLc && $scopeTraitLc === $traitLc;
     }
 
     private function enforceClassConstVisibility(ClassEntry $classEntry, string $constName, Frame $frame): ?Frame
@@ -10499,6 +10665,98 @@ restart:
 
     /**
      * @param list<string> $traitNames
+     */
+    protected function canResolveAllTraitEntries(array $traitNames): bool
+    {
+        foreach ($traitNames as $traitName) {
+            $traitLc = strtolower(ltrim($traitName, '\\'));
+            if (!isset($this->context->classes[$traitLc])) {
+                $this->context->autoloadClass($traitName);
+            }
+            if (!isset($this->context->classes[$traitLc])) {
+                return false;
+            }
+            if (!$this->context->classes[$traitLc]->isTrait) {
+                throw new \LogicException("{$traitName} is not a trait");
+            }
+        }
+
+        return true;
+    }
+
+    /**
+     * @param list<string> $traitNames
+     * @param list<array<string, mixed>> $adaptations
+     * @param array<string, true> $ownMethods
+     */
+    protected function queueDeferredTraitUse(
+        ClassEntry $entry,
+        array $traitNames,
+        array $adaptations,
+        array $ownMethods
+    ): void {
+        $this->context->deferredTraitUses[] = [
+            'entry' => $entry,
+            'traitNames' => $traitNames,
+            'adaptations' => $adaptations,
+            'ownMethods' => $ownMethods,
+        ];
+    }
+
+    protected function flushDeferredTraitUses(): void
+    {
+        if ([] === $this->context->deferredTraitUses) {
+            return;
+        }
+        $remaining = [];
+        foreach ($this->context->deferredTraitUses as $deferred) {
+            if (!$this->canResolveAllTraitEntries($deferred['traitNames'])) {
+                $remaining[] = $deferred;
+
+                continue;
+            }
+            $this->applyTraitUsesWithAdaptations(
+                $deferred['entry'],
+                $deferred['traitNames'],
+                $deferred['adaptations'],
+                $deferred['ownMethods']
+            );
+        }
+        $this->context->deferredTraitUses = $remaining;
+    }
+
+    protected function finalizeDeferredTraitUses(): void
+    {
+        $this->flushDeferredTraitUses();
+        if ([] === $this->context->deferredTraitUses) {
+            return;
+        }
+        $missing = $this->context->deferredTraitUses[0]['traitNames'][0] ?? 'unknown';
+
+        throw new \LogicException("Trait {$missing} not found");
+    }
+
+    private function assertDeferredTraitUsesBeforeRuntime(int $opType): void
+    {
+        if ([] === $this->context->deferredTraitUses) {
+            return;
+        }
+        static $declarationOpcodes = [
+            OpCode::TYPE_DECLARE_CLASS => true,
+            OpCode::TYPE_DECLARE_ENUM => true,
+            OpCode::TYPE_DECLARE_TRAIT => true,
+            OpCode::TYPE_DECLARE_INTERFACE => true,
+            OpCode::TYPE_FUNCDEF => true,
+            OpCode::TYPE_DECLARE_GLOBAL_CONST => true,
+        ];
+        if (isset($declarationOpcodes[$opType])) {
+            return;
+        }
+        $this->finalizeDeferredTraitUses();
+    }
+
+    /**
+     * @param list<string> $traitNames
      * @param list<array<string, mixed>> $adaptations
      * @param array<string, true> $ownMethods
      */
@@ -10509,6 +10767,12 @@ restart:
         array $ownMethods = []
     ): void {
         if ([] === $traitNames) {
+            return;
+        }
+
+        if (!$this->canResolveAllTraitEntries($traitNames)) {
+            $this->queueDeferredTraitUse($entry, $traitNames, $adaptations, $ownMethods);
+
             return;
         }
 
@@ -10968,6 +11232,47 @@ restart:
     }
 
     /**
+     * When an interface is declared after its implementors, merge its constants (#9302, zend_enum.c).
+     */
+    protected function propagateInterfaceConstantsToImplementors(string $ifaceLc): void
+    {
+        foreach ($this->context->classes as $entry) {
+            if (!in_array($ifaceLc, $entry->interfaces, true)) {
+                continue;
+            }
+            $this->inheritFromInterfaces($entry);
+        }
+    }
+
+    /**
+     * Resolve class constants inherited from interfaces (forward-referenced implements, #9302).
+     */
+    protected function resolveInheritedClassConstant(ClassEntry $entry, string $memberLc): ?Variable
+    {
+        foreach ($entry->interfaces as $ifaceLc) {
+            if (!isset($this->context->classes[$ifaceLc])) {
+                continue;
+            }
+            $iface = $this->context->classes[$ifaceLc];
+            if (isset($iface->constants[$memberLc])) {
+                return $iface->constants[$memberLc];
+            }
+            $fromParentIface = $this->resolveInheritedClassConstant($iface, $memberLc);
+            if (null !== $fromParentIface) {
+                return $fromParentIface;
+            }
+        }
+        if (null !== $entry->parentLc && isset($this->context->classes[$entry->parentLc])) {
+            $parent = $this->context->classes[$entry->parentLc];
+            if (isset($parent->constants[$memberLc])) {
+                return $parent->constants[$memberLc];
+            }
+        }
+
+        return null;
+    }
+
+    /**
      * Merge asymmetric set visibility and parent-interface property declares (#4876).
      */
     protected function inheritInterfacePropertyRules(ClassEntry $entry, ClassEntry $iface): void
@@ -11420,7 +11725,7 @@ restart:
                 continue;
             }
             if (VM\ClassConstExpr::isSupportedOpcode($op->type)) {
-                VM\ClassConstExpr::execute($this->context, $frame, $op, $entry);
+                VM\ClassConstExpr::execute($this->context, $frame, $block, $op, $entry);
 
                 continue;
             }
@@ -11591,17 +11896,39 @@ restart:
 
     private function resolveClassConstDefineValue(Frame $frame, Block $block, OpCode $op): Variable
     {
-        if (isset($block->constants[$op->arg2])) {
-            $value = new Variable();
-            $value->copyFrom($block->constants[$op->arg2]);
-        } elseif (isset($frame->scope[$op->arg2])) {
-            $value = new Variable();
-            $value->copyFrom($frame->scope[$op->arg2]);
-        } else {
-            throw new \LogicException('Class constant value must be a compile-time constant');
-        }
+        $value = $this->resolveClassConstInitializerValue($frame, $block, $op->arg2);
 
         return VM\EnumCaseSupport::materializeConstantValue($this->context, $value);
+    }
+
+    /**
+     * Runtime `new` class-const inits land in frame scope; folded scalars in block constants (#9116).
+     */
+    private function resolveClassConstInitializerValue(Frame $frame, Block $block, int $slot): Variable
+    {
+        if (isset($frame->scope[$slot])) {
+            $scoped = $frame->scope[$slot]->resolveIndirect();
+            if (!$scoped->is(Variable::TYPE_NULL)) {
+                $value = new Variable();
+                $value->copyFrom($scoped);
+
+                return $value;
+            }
+        }
+        if (isset($block->constants[$slot])) {
+            $value = new Variable();
+            $value->copyFrom($block->constants[$slot]);
+
+            return $value;
+        }
+        if (isset($frame->scope[$slot])) {
+            $value = new Variable();
+            $value->copyFrom($frame->scope[$slot]);
+
+            return $value;
+        }
+
+        throw new \LogicException('Class constant value must be a compile-time constant');
     }
 
     /**
@@ -11847,7 +12174,7 @@ restart:
         } else {
             foreach ($initOps as $op) {
                 if (VM\ClassConstExpr::isSupportedOpcode($op->type)) {
-                    VM\ClassConstExpr::execute($this->context, $frame, $op, $entry);
+                    VM\ClassConstExpr::execute($this->context, $frame, $block, $op, $entry);
                 } elseif ($this->isClassBodyConstInitOpcode($op->type)) {
                     $this->executeClassBodyConstInitOpcode($frame, $op);
                 } else {
@@ -12563,6 +12890,16 @@ restart:
 
             return true;
         }
+        $inheritedConst = $this->resolveInheritedClassConstant($classEntry, $memberLc);
+        if (null !== $inheritedConst) {
+            $this->emitClassConstFetchDeprecation($classEntry, $memberNameRaw, $memberLc, $frame);
+            if ($classEntry->isEnum && null !== $classEntry->backedType) {
+                VM\EnumSupport::ensureBackedEnumValuesUnique($classEntry);
+            }
+            $dest->copyFrom(EnumCaseSupport::materializeConstantValue($this->context, $inheritedConst));
+
+            return true;
+        }
         if (isset($classEntry->staticProperties[$memberLc])) {
             $dest->indirect($classEntry->staticProperties[$memberLc]);
 
@@ -12660,6 +12997,9 @@ restart:
         foreach ($cfg->deadOperands as $op) {
             $slot = $frame->block->slotForOperand($op);
             if (null === $slot || isset($keep[$slot]) || !isset($frame->scope[$slot])) {
+                continue;
+            }
+            if (isset($frame->block->constants[$slot])) {
                 continue;
             }
             if ($frame->block->isNamedVariableSlot($slot)) {

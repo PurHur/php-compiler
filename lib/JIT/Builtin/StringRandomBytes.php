@@ -3,7 +3,10 @@
 declare(strict_types=1);
 
 /**
- * LLVM implementation of __compiler_random_bytes — fill a new __string__ via getrandom(3).
+ * LLVM implementation of __compiler_random_bytes — fill a new __string__ via /dev/urandom.
+ *
+ * Mirrors {@see \PHPCompiler\ext\standard\VmRandomPure} (open/read, not getrandom(3)).
+ * php-src: ext/standard/random.c — php_random_bytes()
  */
 
 namespace PHPCompiler\JIT\Builtin;
@@ -14,6 +17,10 @@ use PHPLLVM\LLVMAbstract\Builder as LLVMBuilderImpl;
 
 final class StringRandomBytes
 {
+    private const URANDOM = '/dev/urandom';
+
+    private const O_RDONLY = 0;
+
     private static function buildUnreachable(Context $context): void
     {
         $b = $context->builder;
@@ -35,19 +42,40 @@ final class StringRandomBytes
         $sizeT = $context->getTypeFromString('size_t');
         $i8p = $context->getTypeFromString('int8*');
         $one = $i64->constInt(1, false);
-        $zeroI32 = $i32->constInt(0, false);
         $oneI32 = $i32->constInt(1, false);
+        $zeroI32 = $i32->constInt(0, false);
+        $oRdonly = $i32->constInt(self::O_RDONLY, false);
+        $urandomPath = $context->builder->pointerCast(
+            $context->constantFromString(self::URANDOM),
+            $i8p
+        );
 
         $badLen = $context->builder->icmp(Builder::INT_SLT, $len, $one);
         $bbBadLen = $fn->appendBasicBlock('rb_bad_len');
-        $bbOk = $fn->appendBasicBlock('rb_ok');
-        $context->builder->branchIf($badLen, $bbBadLen, $bbOk);
+        $bbOpen = $fn->appendBasicBlock('rb_open');
+        $context->builder->branchIf($badLen, $bbBadLen, $bbOpen);
 
         $context->builder->positionAtEnd($bbBadLen);
         $context->builder->call($context->lookupFunction('exit'), $oneI32);
         self::buildUnreachable($context);
 
-        $context->builder->positionAtEnd($bbOk);
+        $context->builder->positionAtEnd($bbOpen);
+        $fd = $context->builder->call(
+            $context->lookupFunction('open'),
+            $urandomPath,
+            $oRdonly,
+            $zeroI32
+        );
+        $openFail = $context->builder->icmp(Builder::INT_SLT, $fd, $zeroI32);
+        $bbOpenFail = $fn->appendBasicBlock('rb_open_fail');
+        $bbAlloc = $fn->appendBasicBlock('rb_alloc');
+        $context->builder->branchIf($openFail, $bbOpenFail, $bbAlloc);
+
+        $context->builder->positionAtEnd($bbOpenFail);
+        $context->builder->call($context->lookupFunction('exit'), $oneI32);
+        self::buildUnreachable($context);
+
+        $context->builder->positionAtEnd($bbAlloc);
         $str = $context->builder->call($context->lookupFunction('__string__alloc'), $len);
         $strMap = $context->structFieldMap['__string__'];
         $dataField = $context->builder->structGep($str, $strMap['value']);
@@ -72,28 +100,19 @@ final class StringRandomBytes
         $remainSizeT = $context->builder->truncOrBitCast($remain, $sizeT);
 
         $ret = $context->builder->call(
-            $context->lookupFunction('getrandom'),
+            $context->lookupFunction('read'),
+            $fd,
             $at,
-            $remainSizeT,
-            $zeroI32
+            $remainSizeT
         );
 
-        $retNeg = $context->builder->icmp(Builder::INT_SLT, $ret, $i64->constInt(0, false));
+        $retNonPos = $context->builder->icmp(Builder::INT_SLE, $ret, $i64->constInt(0, false));
         $bbRetBad = $fn->appendBasicBlock('rb_ret_bad');
-        $bbRetNonNeg = $fn->appendBasicBlock('rb_ret_nonneg');
-        $context->builder->branchIf($retNeg, $bbRetBad, $bbRetNonNeg);
+        $bbRetPos = $fn->appendBasicBlock('rb_ret_pos');
+        $context->builder->branchIf($retNonPos, $bbRetBad, $bbRetPos);
 
         $context->builder->positionAtEnd($bbRetBad);
-        $context->builder->call($context->lookupFunction('exit'), $oneI32);
-        self::buildUnreachable($context);
-
-        $context->builder->positionAtEnd($bbRetNonNeg);
-        $retZero = $context->builder->icmp(Builder::INT_EQ, $ret, $i64->constInt(0, false));
-        $bbRetZero = $fn->appendBasicBlock('rb_ret_zero');
-        $bbRetPos = $fn->appendBasicBlock('rb_ret_pos');
-        $context->builder->branchIf($retZero, $bbRetZero, $bbRetPos);
-
-        $context->builder->positionAtEnd($bbRetZero);
+        $context->builder->call($context->lookupFunction('close'), $fd);
         $context->builder->call($context->lookupFunction('exit'), $oneI32);
         self::buildUnreachable($context);
 
@@ -104,6 +123,7 @@ final class StringRandomBytes
         $context->builder->branchIf($tooBig, $bbRetHuge, $bbAdvance);
 
         $context->builder->positionAtEnd($bbRetHuge);
+        $context->builder->call($context->lookupFunction('close'), $fd);
         $context->builder->call($context->lookupFunction('exit'), $oneI32);
         self::buildUnreachable($context);
 
@@ -113,6 +133,7 @@ final class StringRandomBytes
         $context->builder->branch($loopHead);
 
         $context->builder->positionAtEnd($loopEnd);
+        $context->builder->call($context->lookupFunction('close'), $fd);
         $context->builder->returnValue($str);
         $context->builder->clearInsertionPosition();
     }

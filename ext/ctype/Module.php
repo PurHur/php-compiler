@@ -9,7 +9,7 @@ use PHPCompiler\ModuleAbstract;
 /**
  * ctype extension module entry (php-src ext/ctype/ctype.c; issue #6837).
  *
- * Character-classification handlers (VmCtype + CtypeJit; #7253).
+ * Character-classification handlers (VmCtype + CtypeJitHelper; #7253, #9234).
  */
 class Module extends ModuleAbstract
 {

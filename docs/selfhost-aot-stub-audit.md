@@ -7,15 +7,15 @@ Path: `parseAndCompile` → `standalone` → `Compiler::compile` under `PHP_COMP
 | Metric | Count |
 |--------|------:|
 | Compiler hot-path skip patterns (`isSkippedCompilerHotPathName`) | 48 |
-| M3 real-lowering allowlist (`isM3CompileDriverRealLoweringName`) | 26 |
+| M3 real-lowering allowlist (`isM3CompileDriverRealLoweringName`) | 27 |
 | M3 spine deny fragments (`m3CompileDriverSpineDenyNames`) | 1 |
-| Compile-spine symbols — M3 real lowering | 29 |
-| Compile-spine symbols — entry stub | 1 |
+| Compile-spine symbols — M3 real lowering | 30 |
+| Compile-spine symbols — entry stub | 0 |
 | Compile-spine symbols — compiler hot-path stub | 0 |
 | Compile-spine symbols — M3 deny | 4 |
 | Compile-spine symbols — other (VM/native) | 0 |
-| Compile-spine symbols — stubbed total | 5 |
-| Compile-spine symbols — honest total | 29 |
+| Compile-spine symbols — stubbed total | 4 |
+| Compile-spine symbols — honest total | 30 |
 
 ## M3 real lowering (compile spine)
 
@@ -41,6 +41,7 @@ Path: `parseAndCompile` → `standalone` → `Compiler::compile` under `PHP_COMP
 - `PHPCompiler\Block::slotIndexForVariableName` (runtime_spine)
 - `PHPCompiler\Block::slotForOperand` (runtime_spine)
 - `PHPCompiler\Compiler::compile` (compiler_spine)
+- `PHPCompiler\Compiler::compileFunc` (compiler_spine)
 - `PHPCompiler\Compiler::compileBlock` (compiler_spine)
 - `PHPCompiler\Compiler::compileExpr` (compiler_spine)
 - `PHPCompiler\Compiler::compileCfgBranch` (compiler_spine)
@@ -51,7 +52,7 @@ Path: `parseAndCompile` → `standalone` → `Compiler::compile` under `PHP_COMP
 
 ## Self-host entry stubs (`isSkippedSelfHostEntryName`)
 
-- `PHPCompiler\Compiler::compileFunc` (compiler_spine)
+_None._
 
 ## Compiler hot-path stubs (`isSkippedCompilerHotPathName`)
 

@@ -50,6 +50,6 @@ final class JitFputcsv
         );
         $i64 = $context->getTypeFromString('int64');
 
-        return JitFwrite::invoke($context, $handleLong, $lineWithNl, $i64->constInt(-1, true));
+        return JitFwrite::invoke($context, $handleLong, $lineWithNl, JitFwrite::lengthWriteAll($context, $lineWithNl));
     }
 }

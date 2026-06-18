@@ -9,12 +9,13 @@ use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitLongArg;
 use PHPCompiler\JIT\Variable as JITVariable;
-use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
 
 /** fgets() — VM via VmFs; JIT/AOT via __compiler_fgets (issue #1187). */
 final class fgets extends Internal
 {
+    private const LENGTH_ERROR = 'fgets(): Argument #2 ($length) must be greater than 0';
+
     public function __construct()
     {
         parent::__construct('fgets');
@@ -34,10 +35,10 @@ final class fgets extends Internal
         $length = null;
         if (2 === $argc) {
             $lenVar = $frame->calledArgs[1]->resolveIndirect();
-            if (Variable::TYPE_INTEGER !== $lenVar->type) {
-                throw new \LogicException('fgets() length must be an integer in this compiler build');
+            $length = VmMath::parseIntBuiltinArg($lenVar, 'fgets', 2, 'length');
+            if ($length <= 0) {
+                throw new \ValueError(self::LENGTH_ERROR);
             }
-            $length = $lenVar->toInt();
         }
         $line = VmFs::fgets($handle, $length);
         if (false === $line) {
@@ -60,10 +61,8 @@ final class fgets extends Internal
             $i64
         );
         if (2 === $argc) {
-            $length = $context->builder->truncOrBitCast(
-                JitLongArg::lower($context, $args[1], 'fgets() length'),
-                $i64
-            );
+            $length = JitIntdiv::lowerIntBuiltinArg($context, $args[1], 'fgets', 2, 'length');
+            JitFgets::emitRuntimeLengthGuard($context, $length);
         } else {
             $length = $i64->constInt(-1, true);
         }

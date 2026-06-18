@@ -9,18 +9,21 @@ use PHPCfg\Op\Expr\New_;
 use PHPCfg\Script;
 
 /**
- * Reject bare `new Class` (no constructor parentheses) in class **constant** initializers (#6549).
+ * Reject `new` in class **constant** initializers (#6549, #9484, #9517).
  *
- * php-src: Zend/zend_compile.c — zend_compile_const_expr(); Zend/zend_ast.c validation.
- * Property defaults may use `new` with or without `()` per PHP 8.1+ (#3391, #5362).
+ * php-src: zend_const_expr_to_zval(..., allow_dynamic=false) for class constants —
+ * any `new` is a compile fatal ("New expressions are not supported in this context").
+ * Property/param defaults may use `new` with or without `()` per PHP 8.1+ (#3391, #5362).
+ *
+ * @see Zend/zend_compile.c — zend_compile_const_expr()
  */
 final class NewWithoutParensCompileCheck
 {
     public const MESSAGE = 'New expressions are not supported in this context';
 
-    public static function validate(Script $script): void
+    public static function validate(Script $script, ?string $sourceCode = null): void
     {
-        $check = new self();
+        $check = new self($sourceCode);
         foreach ($script->main->cfg->children as $child) {
             if ($child instanceof Op\Stmt\Class_
                 || $child instanceof Op\Stmt\Interface_
@@ -32,8 +35,14 @@ final class NewWithoutParensCompileCheck
         }
     }
 
-    private function walkClassLike(Op\Stmt\Class_|Op\Stmt\Interface_|Op\Stmt\Trait_|Op\Stmt\Enum_ $class): void
-    {
+    public function __construct(
+        private readonly ?string $sourceCode = null
+    ) {
+    }
+
+    private function walkClassLike(
+        Op\Stmt\Class_|Op\Stmt\Interface_|Op\Stmt\Trait_|Op\Stmt\Enum_ $class
+    ): void {
         foreach ($class->stmts->children as $stmt) {
             if ($stmt instanceof Op\Terminal\Const_) {
                 $this->walkOps($stmt->valueBlock->children ?? []);
@@ -47,7 +56,7 @@ final class NewWithoutParensCompileCheck
     private function walkOps(array $ops): void
     {
         foreach ($ops as $op) {
-            if ($op instanceof New_ && !$this->newHasCtorParens($op)) {
+            if ($op instanceof New_) {
                 throw new \CompileError(self::MESSAGE);
             }
             foreach ($op->getSubBlocks() as $sub) {
@@ -56,16 +65,5 @@ final class NewWithoutParensCompileCheck
                 }
             }
         }
-    }
-
-    private function newHasCtorParens(New_ $op): bool
-    {
-        if ($op->hasAttribute('newHasCtorParens')) {
-            return (bool) $op->getAttribute('newHasCtorParens');
-        }
-
-        // Without php-cfg #6549 patch, empty-arg `new Foo()` is indistinguishable from bare `new Foo`.
-        // Class constants cannot use `new` at all; treat missing attribute as rejection.
-        return false;
     }
 }

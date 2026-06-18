@@ -33,6 +33,8 @@ class Context {
     public ?PHPLLVM\BasicBlock $initLinearBlock = null;
     /** Nesting depth for {@see emitInInit()} / class-const hashtable linear emission (#8559). */
     private int $initLinearEmissionDepth = 0;
+    /** True after {@see ensureInitShutdownBlocks()} creates __init__/__shutdown__ skeletons (#9223). */
+    private bool $initShutdownBlocksReady = false;
     public PHPLLVM\BasicBlock $shutdownBlock;
     public PHPLLVM\BasicBlock $headerPreFlushBlock;
     public PHPLLVM\Builder $builder;
@@ -478,6 +480,7 @@ class Context {
         $this->vararg = new Builtin\VarArg($this, $loadType);
         $this->error = new Builtin\ErrorHandler($this, $loadType);
 
+        $this->ensureInitShutdownBlocks();
         $this->defineBuiltins($loadType);
     }
 
@@ -708,19 +711,7 @@ class Context {
             $builtin->implement();
         }
         McjitEmbedRuntime::finalizeModule($this);
-        $signature = $this->context->functionType(
-            $this->context->voidType(),
-            false
-        );
-        $this->initFunc = $this->module->addFunction('__init__', $signature);
-        $this->initBlock = $this->initFunc->appendBasicBlock('main');
-        $this->initLinearBlock = $this->initBlock;
-
-        $this->shutdownFunc = $this->module->addFunction('__shutdown__', $signature);
-        $this->shutdownBlock = $this->shutdownFunc->appendBasicBlock('main');
-
-        $this->headerPreFlushFunc = $this->module->addFunction('__header_pre_flush__', $signature);
-        $this->headerPreFlushBlock = $this->headerPreFlushFunc->appendBasicBlock('main');
+        $this->ensureInitShutdownBlocks();
 
         foreach ($this->builtins as $builtin) {
             $builtin->initialize();
@@ -753,6 +744,7 @@ class Context {
             Builtin\StringTriggerError::ensureStandaloneBodies($this);
             Builtin\StringFormat::ensureStandaloneBodies($this);
             Builtin\GcCollectCyclesRuntime::ensureStandaloneBodies($this);
+            Builtin\LastErrorRuntime::ensureStandaloneBodies($this);
             Builtin\SuperglobalRefreshRuntime::ensureStandaloneBodies($this);
             Builtin\SuperglobalNameRuntime::ensureLinked($this);
             \PHPCompiler\ext\standard\JitStrspn::ensureStandaloneBodies($this);
@@ -997,8 +989,31 @@ class Context {
         return $this->initLinearEmissionDepth > 0;
     }
 
+    private function ensureInitShutdownBlocks(): void
+    {
+        if ($this->initShutdownBlocksReady) {
+            return;
+        }
+        $signature = $this->context->functionType(
+            $this->context->voidType(),
+            false
+        );
+        $this->initFunc = $this->module->addFunction('__init__', $signature);
+        $this->initBlock = $this->initFunc->appendBasicBlock('main');
+        $this->initLinearBlock = $this->initBlock;
+
+        $this->shutdownFunc = $this->module->addFunction('__shutdown__', $signature);
+        $this->shutdownBlock = $this->shutdownFunc->appendBasicBlock('main');
+
+        $this->headerPreFlushFunc = $this->module->addFunction('__header_pre_flush__', $signature);
+        $this->headerPreFlushBlock = $this->headerPreFlushFunc->appendBasicBlock('main');
+
+        $this->initShutdownBlocksReady = true;
+    }
+
     public function positionBuilderAtInitEmission(): void
     {
+        $this->ensureInitShutdownBlocks();
         $initParent = $this->initBlock->getParent();
         if ($initParent instanceof \PHPLLVM\Value\Function_) {
             $this->initFunc = $initParent;

@@ -1,10 +1,10 @@
 --TEST--
-empty() on property hooks checks backing without get hook (#8901, #8918, zend_property_hooks.c)
+empty() on property hooks invokes get hook (#9107, zend_property_hooks.c)
 --FILE--
 <?php
 class VirtualGetOnly {
     public ?string $x {
-        get { throw new Exception('get must not run for empty()'); }
+        get { echo "get runs for empty()\n"; return null; }
     }
 }
 $v = new VirtualGetOnly();
@@ -13,7 +13,7 @@ echo "virtual ok\n";
 
 class C {
     public string $x {
-        get { throw new Exception('get must not run for empty()'); }
+        get { echo "get runs for empty()\n"; return $this->backing; }
         set => $this->backing = $value;
     }
     private string $backing = 'a';
@@ -24,7 +24,7 @@ echo "ok\n";
 
 class NullBacking {
     public ?string $x {
-        get { throw new Exception('get must not run'); }
+        get => null;
         set => $this->backing = $value;
     }
     private ?string $backing = null;
@@ -45,8 +45,10 @@ try {
     echo get_class($e), ': ', $e->getMessage(), "\n";
 }
 --EXPECT--
+get runs for empty()
 bool(true)
 virtual ok
+get runs for empty()
 bool(false)
 ok
 bool(true)

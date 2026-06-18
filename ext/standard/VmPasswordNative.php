@@ -49,7 +49,7 @@ final class VmPasswordNative
         if (self::PASSWORD_ARGON2I === $algo || self::PASSWORD_ARGON2ID === $algo) {
             return self::hostPasswordHash($password, $algo, $options);
         }
-        if ($algo !== self::PASSWORD_BCRYPT && $algo !== VmPassword::PASSWORD_DEFAULT) {
+        if ($algo !== self::PASSWORD_BCRYPT) {
             return false;
         }
 

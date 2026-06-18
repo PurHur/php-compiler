@@ -7,8 +7,8 @@ if (!enum_exists('SessionStatus', false)) {
     exit(1);
 }
 
-echo session_status() === SessionStatus::None ? "none\n" : "bad\n";
+echo session_status() === PHP_SESSION_NONE ? "none\n" : "bad\n";
 session_start();
-echo session_status() === SessionStatus::Active ? "active\n" : "bad\n";
+echo session_status() === PHP_SESSION_ACTIVE ? "active\n" : "bad\n";
 session_write_close();
-echo session_status() === SessionStatus::None ? "closed\n" : "bad\n";
+echo session_status() === PHP_SESSION_NONE ? "closed\n" : "bad\n";

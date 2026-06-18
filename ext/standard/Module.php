@@ -156,6 +156,9 @@ class Module extends ModuleAbstract
             new sinh(),
             new cosh(),
             new tanh(),
+            new acosh(),
+            new asinh(),
+            new atanh(),
             new is_nan(),
             new is_finite(),
             new is_infinite(),
@@ -1224,7 +1227,7 @@ class Module extends ModuleAbstract
             $fn = $context->module->addFunction('fabs', $ft);
             $context->registerFunction('fabs', $fn);
         }
-        foreach (['ceil', 'floor', 'round', 'sqrt', 'log', 'log10', 'exp', 'expm1', 'log1p', 'sin', 'cos', 'tan', 'acos', 'asin', 'atan', 'sinh', 'cosh', 'tanh', 'pow', 'hypot', 'atan2', 'fmod'] as $name) {
+        foreach (['ceil', 'floor', 'round', 'sqrt', 'log', 'log10', 'exp', 'expm1', 'log1p', 'sin', 'cos', 'tan', 'acos', 'asin', 'atan', 'sinh', 'cosh', 'tanh', 'acosh', 'asinh', 'atanh', 'pow', 'hypot', 'atan2', 'fmod'] as $name) {
             try {
                 $context->lookupFunction($name);
             } catch (\Throwable $e) {

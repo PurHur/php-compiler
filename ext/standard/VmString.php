@@ -282,6 +282,63 @@ final class VmString
         return 1;
     }
 
+    /** Whether $string is well-formed UTF-8 (php-src ext/mbstring; mb_check_encoding UTF-8 path). */
+    public static function isValidUtf8(string $string): bool
+    {
+        $len = self::byteLength($string);
+        for ($i = 0; $i < $len; ) {
+            if (!self::utf8SequenceValidAt($string, $len, $i, $need)) {
+                return false;
+            }
+            $i += $need + 1;
+        }
+
+        return true;
+    }
+
+    /**
+     * @param-out int $need continuation byte count when lead byte is multi-byte
+     */
+    private static function utf8SequenceValidAt(string $string, int $len, int $i, ?int &$need = null): bool
+    {
+        $byte = \ord($string[$i]);
+        if ($byte < 0x80) {
+            $need = 0;
+
+            return true;
+        }
+        if (($byte & 0xE0) === 0xC0) {
+            $need = 1;
+            $min = 0x80;
+        } elseif (($byte & 0xF0) === 0xE0) {
+            $need = 2;
+            $min = 0x800;
+        } elseif (($byte & 0xF8) === 0xF0) {
+            $need = 3;
+            $min = 0x10000;
+        } else {
+            $need = 0;
+
+            return false;
+        }
+        if ($i + $need >= $len) {
+            return false;
+        }
+        $cp = $byte & (0xFF >> (2 + $need));
+        for ($j = 1; $j <= $need; ++$j) {
+            $next = \ord($string[$i + $j]);
+            if (($next & 0xC0) !== 0x80) {
+                return false;
+            }
+            $cp = ($cp << 6) | ($next & 0x3F);
+        }
+        if ($cp < $min || ($cp >= 0xD800 && $cp <= 0xDFFF)) {
+            return false;
+        }
+
+        return true;
+    }
+
     /**
      * UTF-8 substring measured in codepoints (php-src ext/mbstring mb_get_substr; #7044).
      */

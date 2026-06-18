@@ -44,6 +44,7 @@ final class StringFormatJit
         '__phpc_fmt_append_spec',
         '__phpc_fmt_append_spec_f_prec',
         '__phpc_fmt_append_spec_snprintf',
+        '__phpc_fmt_append_spec_flagged',
         '__compiler_sprintf',
         '__compiler_printf',
         '__compiler_number_format',
@@ -108,6 +109,7 @@ final class StringFormatJit
         self::implementIfMissing($context, '__phpc_fmt_append_spec', self::emitAppendSpec(...));
         self::implementIfMissing($context, '__phpc_fmt_append_spec_f_prec', self::emitAppendSpecFloatPrec(...));
         self::implementIfMissing($context, '__phpc_fmt_append_spec_snprintf', self::emitAppendSpecSnprintf(...));
+        self::implementIfMissing($context, '__phpc_fmt_append_spec_flagged', self::emitAppendSpecFlagged(...));
         self::implementIfMissing($context, '__compiler_sprintf', self::emitCompilerSprintf(...));
         self::implementIfMissing($context, '__compiler_printf', self::emitCompilerPrintf(...));
         self::implementIfMissing($context, '__compiler_number_format', self::emitCompilerNumberFormat(...));
@@ -204,6 +206,10 @@ final class StringFormatJit
             '__phpc_fmt_append_spec_snprintf' => $context->module->addFunction(
                 $name,
                 $context->context->functionType($void, false, $i8p, $sizeTp, $sizeT, $valuePtr, $i8)
+            ),
+            '__phpc_fmt_append_spec_flagged' => $context->module->addFunction(
+                $name,
+                $context->context->functionType($void, false, $i8p, $sizeTp, $sizeT, $valuePtr, $i8, $context->getTypeFromString('int1'), $i8)
             ),
             '__compiler_sprintf' => $context->module->addFunction(
                 $name,
@@ -1135,7 +1141,7 @@ final class StringFormatJit
         $switch->addCase($i32->constInt(ord('s'), false), $caseS);
         $switch->addCase($i32->constInt(ord('d'), false), $caseD);
         $switch->addCase($i32->constInt(ord('f'), false), $caseF);
-        foreach (['b', 'x', 'X', 'o', 'u', 'c', 'e', 'E', 'g', 'G'] as $snprintfSpec) {
+        foreach (['b', 'x', 'X', 'o', 'u', 'c', 'e', 'E', 'g', 'G', 'a', 'A'] as $snprintfSpec) {
             $switch->addCase($i32->constInt(ord($snprintfSpec), false), $caseSnprintf);
         }
 
@@ -1331,7 +1337,13 @@ final class StringFormatJit
                 $context->builder->icmp(Builder::INT_EQ, $spec32, $i32->constInt(ord('E'), false)),
                 $context->builder->or(
                     $context->builder->icmp(Builder::INT_EQ, $spec32, $i32->constInt(ord('g'), false)),
-                    $context->builder->icmp(Builder::INT_EQ, $spec32, $i32->constInt(ord('G'), false))
+                    $context->builder->or(
+                        $context->builder->icmp(Builder::INT_EQ, $spec32, $i32->constInt(ord('G'), false)),
+                        $context->builder->or(
+                            $context->builder->icmp(Builder::INT_EQ, $spec32, $i32->constInt(ord('a'), false)),
+                            $context->builder->icmp(Builder::INT_EQ, $spec32, $i32->constInt(ord('A'), false))
+                        )
+                    )
                 )
             )
         );
@@ -1461,6 +1473,217 @@ final class StringFormatJit
             $tmp,
             $tmpCap,
             $fmtPtrF,
+            $context->builder->load($floatValSlot)
+        );
+        $context->builder->branch($done);
+
+        $context->builder->positionAtEnd($done);
+        $outLen = $context->builder->call($strlenFn, $tmp);
+        $context->builder->call($appendStr, $buf, $posPtr, $cap, $tmp, $outLen);
+        $context->builder->returnVoid();
+    }
+
+    /**
+     * snprintf with SIGN/ALTFORM flags (php-src sprintf.c; issue #9058).
+     */
+    private static function emitAppendSpecFlagged(Context $context, LlvmFunction $fn): void
+    {
+        $entry = $fn->appendBasicBlock('entry');
+        $context->builder->positionAtEnd($entry);
+
+        $i8 = $context->getTypeFromString('int8');
+        $i32 = $context->getTypeFromString('int32');
+        $i64 = $context->getTypeFromString('int64');
+        $dbl = $context->getTypeFromString('double');
+        $i8p = $context->getTypeFromString('int8*');
+        $i8pp = $i8p->pointerType(0);
+        $sizeT = $context->getTypeFromString('size_t');
+
+        $buf = $fn->getParam(0);
+        $posPtr = $fn->getParam(1);
+        $cap = $fn->getParam(2);
+        $valuePtr = $fn->getParam(3);
+        $signFlag = $fn->getParam(4);
+        $altForm = $fn->getParam(5);
+        $spec = $fn->getParam(6);
+
+        $appendStr = $context->lookupFunction('__phpc_fmt_append_str');
+        $snprintfFn = $context->lookupFunction('snprintf');
+        $strlenFn = $context->lookupFunction('strlen');
+        $readLong = $context->lookupFunction('__value__readLong');
+        $readDouble = $context->lookupFunction('__value__readDouble');
+        $strtollFn = $context->lookupFunction('strtoll');
+        $strtodFn = $context->lookupFunction('strtod');
+        $nullPtr = $i8pp->constNull();
+        $tmpCap = $sizeT->constInt(64, false);
+        $tmpSlot = $context->builder->alloca($i8->arrayType(64), 1, 'spec_flagged_tmp');
+        $tmp = $context->builder->pointerCast($tmpSlot, $i8p);
+        $fmtBufSlot = $context->builder->alloca($i8->arrayType(8), 1, 'spec_flagged_fmt');
+        $fmtPtr = $context->builder->pointerCast($fmtBufSlot, $i8p);
+        $fmtIdxSlot = BasicBlockHelper::entryAlloca($context, $i64);
+        $zeroI64 = $i64->constInt(0, false);
+        $oneI64 = $i64->constInt(1, false);
+        $context->builder->store($zeroI64, $fmtIdxSlot);
+
+        $storeFmtChar = static function (Value $ch) use ($context, $fmtPtr, $fmtIdxSlot, $oneI64): void {
+            $idx = $context->builder->load($fmtIdxSlot);
+            $context->builder->store($ch, $context->builder->inBoundsGEP($fmtPtr, $idx));
+            $context->builder->store($context->builder->add($idx, $oneI64), $fmtIdxSlot);
+        };
+
+        $storeFmtChar($i8->constInt(ord('%'), false));
+        $hasAlt = $fn->appendBasicBlock('spec_flagged_alt');
+        $afterAlt = $fn->appendBasicBlock('spec_flagged_after_alt');
+        $context->builder->branchIf($altForm, $hasAlt, $afterAlt);
+        $context->builder->positionAtEnd($hasAlt);
+        $storeFmtChar($i8->constInt(ord('#'), false));
+        $context->builder->branch($afterAlt);
+        $context->builder->positionAtEnd($afterAlt);
+        $hasSign = $context->builder->icmp(Builder::INT_NE, $signFlag, $i8->constInt(0, false));
+        $signBb = $fn->appendBasicBlock('spec_flagged_sign');
+        $afterSign = $fn->appendBasicBlock('spec_flagged_after_sign');
+        $context->builder->branchIf($hasSign, $signBb, $afterSign);
+        $context->builder->positionAtEnd($signBb);
+        $storeFmtChar($signFlag);
+        $context->builder->branch($afterSign);
+        $context->builder->positionAtEnd($afterSign);
+        $storeFmtChar($spec);
+        $storeFmtChar($i8->constInt(0, false));
+
+        $spec32 = $context->builder->zExt($spec, $i32);
+        $isFloatSpec = $context->builder->or(
+            $context->builder->icmp(Builder::INT_EQ, $spec32, $i32->constInt(ord('e'), false)),
+            $context->builder->or(
+                $context->builder->icmp(Builder::INT_EQ, $spec32, $i32->constInt(ord('E'), false)),
+                $context->builder->or(
+                    $context->builder->icmp(Builder::INT_EQ, $spec32, $i32->constInt(ord('f'), false)),
+                    $context->builder->or(
+                        $context->builder->icmp(Builder::INT_EQ, $spec32, $i32->constInt(ord('g'), false)),
+                        $context->builder->or(
+                            $context->builder->icmp(Builder::INT_EQ, $spec32, $i32->constInt(ord('G'), false)),
+                            $context->builder->or(
+                                $context->builder->icmp(Builder::INT_EQ, $spec32, $i32->constInt(ord('a'), false)),
+                                $context->builder->icmp(Builder::INT_EQ, $spec32, $i32->constInt(ord('A'), false))
+                            )
+                        )
+                    )
+                )
+            )
+        );
+
+        $kind = self::valueTypeKind($context, $valuePtr);
+        $intValSlot = BasicBlockHelper::entryAlloca($context, $i64);
+        $floatValSlot = BasicBlockHelper::entryAlloca($context, $dbl);
+        $zeroDbl = $dbl->constReal(0.0);
+
+        $intPath = $fn->appendBasicBlock('spec_flagged_int');
+        $floatPath = $fn->appendBasicBlock('spec_flagged_float');
+        $done = $fn->appendBasicBlock('spec_flagged_done');
+        $context->builder->branchIf($isFloatSpec, $floatPath, $intPath);
+
+        $context->builder->positionAtEnd($intPath);
+        $iDefault = $fn->appendBasicBlock('spec_flagged_i_default');
+        $iLong = $fn->appendBasicBlock('spec_flagged_i_long');
+        $iDouble = $fn->appendBasicBlock('spec_flagged_i_double');
+        $iNull = $fn->appendBasicBlock('spec_flagged_i_null');
+        $iString = $fn->appendBasicBlock('spec_flagged_i_string');
+        $iEmit = $fn->appendBasicBlock('spec_flagged_i_emit');
+        $iSwitch = $context->builder->branchSwitch($kind, $iDefault, 5);
+        $iSwitch->addCase($i32->constInt(self::PHPC_TYPE_LONG, false), $iLong);
+        $iSwitch->addCase($i32->constInt(self::PHPC_TYPE_BOOL, false), $iLong);
+        $iSwitch->addCase($i32->constInt(self::PHPC_TYPE_DOUBLE, false), $iDouble);
+        $iSwitch->addCase($i32->constInt(self::PHPC_TYPE_NULL, false), $iNull);
+        $iSwitch->addCase($i32->constInt(self::PHPC_TYPE_STRING, false), $iString);
+
+        $context->builder->positionAtEnd($iLong);
+        $context->builder->store($context->builder->call($readLong, $valuePtr), $intValSlot);
+        $context->builder->branch($iEmit);
+
+        $context->builder->positionAtEnd($iDouble);
+        $context->builder->store(
+            $context->builder->fptosi($context->builder->call($readDouble, $valuePtr), $i64),
+            $intValSlot
+        );
+        $context->builder->branch($iEmit);
+
+        $context->builder->positionAtEnd($iNull);
+        $context->builder->store($zeroI64, $intValSlot);
+        $context->builder->branch($iEmit);
+
+        $context->builder->positionAtEnd($iString);
+        $iStr = $context->builder->call($context->lookupFunction('__value__readString'), $valuePtr);
+        $parsed = $context->builder->call(
+            $strtollFn,
+            self::stringData($context, $iStr),
+            $nullPtr,
+            $i32->constInt(10, false)
+        );
+        $context->builder->store($parsed, $intValSlot);
+        $context->builder->branch($iEmit);
+
+        $context->builder->positionAtEnd($iDefault);
+        $context->builder->store($zeroI64, $intValSlot);
+        $context->builder->branch($iEmit);
+
+        $context->builder->positionAtEnd($iEmit);
+        $context->builder->call(
+            $snprintfFn,
+            $tmp,
+            $tmpCap,
+            $fmtPtr,
+            $context->builder->load($intValSlot)
+        );
+        $context->builder->branch($done);
+
+        $context->builder->positionAtEnd($floatPath);
+        $fDefault = $fn->appendBasicBlock('spec_flagged_f_default');
+        $fDouble = $fn->appendBasicBlock('spec_flagged_f_double');
+        $fLong = $fn->appendBasicBlock('spec_flagged_f_long');
+        $fNull = $fn->appendBasicBlock('spec_flagged_f_null');
+        $fString = $fn->appendBasicBlock('spec_flagged_f_string');
+        $fEmit = $fn->appendBasicBlock('spec_flagged_f_emit');
+        $fSwitch = $context->builder->branchSwitch($kind, $fDefault, 5);
+        $fSwitch->addCase($i32->constInt(self::PHPC_TYPE_DOUBLE, false), $fDouble);
+        $fSwitch->addCase($i32->constInt(self::PHPC_TYPE_LONG, false), $fLong);
+        $fSwitch->addCase($i32->constInt(self::PHPC_TYPE_BOOL, false), $fLong);
+        $fSwitch->addCase($i32->constInt(self::PHPC_TYPE_NULL, false), $fNull);
+        $fSwitch->addCase($i32->constInt(self::PHPC_TYPE_STRING, false), $fString);
+
+        $context->builder->positionAtEnd($fDouble);
+        $context->builder->store($context->builder->call($readDouble, $valuePtr), $floatValSlot);
+        $context->builder->branch($fEmit);
+
+        $context->builder->positionAtEnd($fLong);
+        $context->builder->store(
+            $context->builder->sitofp($context->builder->call($readLong, $valuePtr), $dbl),
+            $floatValSlot
+        );
+        $context->builder->branch($fEmit);
+
+        $context->builder->positionAtEnd($fNull);
+        $context->builder->store($zeroDbl, $floatValSlot);
+        $context->builder->branch($fEmit);
+
+        $context->builder->positionAtEnd($fString);
+        $fStr = $context->builder->call($context->lookupFunction('__value__readString'), $valuePtr);
+        $parsedF = $context->builder->call(
+            $strtodFn,
+            self::stringData($context, $fStr),
+            $nullPtr
+        );
+        $context->builder->store($parsedF, $floatValSlot);
+        $context->builder->branch($fEmit);
+
+        $context->builder->positionAtEnd($fDefault);
+        $context->builder->store($zeroDbl, $floatValSlot);
+        $context->builder->branch($fEmit);
+
+        $context->builder->positionAtEnd($fEmit);
+        $context->builder->call(
+            $snprintfFn,
+            $tmp,
+            $tmpCap,
+            $fmtPtr,
             $context->builder->load($floatValSlot)
         );
         $context->builder->branch($done);
@@ -1815,10 +2038,14 @@ final class StringFormatJit
         $precSlot = BasicBlockHelper::entryAlloca($context, $i32);
         $numSlot = BasicBlockHelper::entryAlloca($context, $sizeT);
         $resolvedIdxSlot = BasicBlockHelper::entryAlloca($context, $sizeT);
+        $signFlagSlot = BasicBlockHelper::entryAlloca($context, $i8);
+        $altFormSlot = BasicBlockHelper::entryAlloca($context, $context->getTypeFromString('int1'));
         $context->builder->store($nextI, $parsePosSlot);
         $context->builder->store($context->getTypeFromString('int1')->constInt(0, false), $usePosSlot);
         $context->builder->store($zeroSize, $posNumSlot);
         $context->builder->store($precUnset, $precSlot);
+        $context->builder->store($i8->constInt(0, false), $signFlagSlot);
+        $context->builder->store($context->getTypeFromString('int1')->constInt(0, false), $altFormSlot);
 
         $loadParsePos = static fn () => $context->builder->load($parsePosSlot);
         $loadParseCh = static fn () => $context->builder->load(
@@ -1900,10 +2127,86 @@ final class StringFormatJit
         $context->builder->branch($noPosDollar);
 
         $context->builder->positionAtEnd($noPosDollar);
-        $skipWidth = $fn->appendBasicBlock('sprintf_skip_width');
-        $context->builder->branch($skipWidth);
+        $parseFlags = $fn->appendBasicBlock('sprintf_parse_flags');
+        $context->builder->branch($parseFlags);
 
         $context->builder->positionAtEnd($notDigit);
+        $context->builder->branch($parseFlags);
+
+        $flagsHead = $fn->appendBasicBlock('sprintf_flags_head');
+        $flagsBody = $fn->appendBasicBlock('sprintf_flags_body');
+        $afterFlags = $fn->appendBasicBlock('sprintf_after_flags');
+        $context->builder->positionAtEnd($parseFlags);
+        $context->builder->branch($flagsHead);
+
+        $context->builder->positionAtEnd($flagsHead);
+        $flagsCont = $context->builder->and(
+            $context->builder->icmp(Builder::INT_ULT, $loadParsePos(), $fmtLen),
+            $context->builder->icmp(Builder::INT_NE, $loadParseCh(), $i8->constInt(0, false))
+        );
+        $context->builder->branchIf($flagsCont, $flagsBody, $afterFlags);
+
+        $context->builder->positionAtEnd($flagsBody);
+        $flagCh = $loadParseCh();
+        $isMinus = $context->builder->icmp(Builder::INT_EQ, $flagCh, $i8->constInt(ord('-'), false));
+        $isZero = $context->builder->icmp(Builder::INT_EQ, $flagCh, $i8->constInt(ord('0'), false));
+        $isPlus = $context->builder->icmp(Builder::INT_EQ, $flagCh, $i8->constInt(ord('+'), false));
+        $isSpace = $context->builder->icmp(Builder::INT_EQ, $flagCh, $i8->constInt(ord(' '), false));
+        $isHash = $context->builder->icmp(Builder::INT_EQ, $flagCh, $i8->constInt(ord('#'), false));
+        $isKnownFlag = $context->builder->or(
+            $isMinus,
+            $context->builder->or(
+                $isZero,
+                $context->builder->or($isPlus, $context->builder->or($isSpace, $isHash))
+            )
+        );
+        $flagKnown = $fn->appendBasicBlock('sprintf_flag_known');
+        $flagUnknown = $fn->appendBasicBlock('sprintf_flag_unknown');
+        $context->builder->branchIf($isKnownFlag, $flagKnown, $flagUnknown);
+
+        $context->builder->positionAtEnd($flagUnknown);
+        $context->builder->branch($afterFlags);
+
+        $flagApply = $fn->appendBasicBlock('sprintf_flag_apply');
+        $flagPlus = $fn->appendBasicBlock('sprintf_flag_plus');
+        $flagSpace = $fn->appendBasicBlock('sprintf_flag_space');
+        $flagSpaceApply = $fn->appendBasicBlock('sprintf_flag_space_apply');
+        $flagHash = $fn->appendBasicBlock('sprintf_flag_hash');
+        $context->builder->positionAtEnd($flagKnown);
+        $flagCh32 = $context->builder->zExt($flagCh, $i32);
+        $flagSwitch = $context->builder->branchSwitch($flagCh32, $flagApply, 5);
+        $flagSwitch->addCase($i32->constInt(ord('-'), false), $flagApply);
+        $flagSwitch->addCase($i32->constInt(ord('0'), false), $flagApply);
+        $flagSwitch->addCase($i32->constInt(ord('+'), false), $flagPlus);
+        $flagSwitch->addCase($i32->constInt(ord(' '), false), $flagSpace);
+        $flagSwitch->addCase($i32->constInt(ord('#'), false), $flagHash);
+
+        $context->builder->positionAtEnd($flagPlus);
+        $context->builder->store($i8->constInt(ord('+'), false), $signFlagSlot);
+        $context->builder->branch($flagApply);
+
+        $context->builder->positionAtEnd($flagSpace);
+        $noSignYet = $context->builder->icmp(
+            Builder::INT_EQ,
+            $context->builder->load($signFlagSlot),
+            $i8->constInt(0, false)
+        );
+        $context->builder->branchIf($noSignYet, $flagSpaceApply, $flagApply);
+
+        $context->builder->positionAtEnd($flagSpaceApply);
+        $context->builder->store($i8->constInt(ord(' '), false), $signFlagSlot);
+        $context->builder->branch($flagApply);
+
+        $context->builder->positionAtEnd($flagHash);
+        $context->builder->store($context->getTypeFromString('int1')->constInt(1, false), $altFormSlot);
+        $context->builder->branch($flagApply);
+
+        $context->builder->positionAtEnd($flagApply);
+        $advanceParse();
+        $context->builder->branch($flagsHead);
+
+        $context->builder->positionAtEnd($afterFlags);
+        $skipWidth = $fn->appendBasicBlock('sprintf_skip_width');
         $context->builder->branch($skipWidth);
 
         $widthHead = $fn->appendBasicBlock('sprintf_width_head');
@@ -1993,9 +2296,12 @@ final class StringFormatJit
         $doAppend = $fn->appendBasicBlock('sprintf_do_append');
         $skipArg = $fn->appendBasicBlock('sprintf_skip_arg');
         $emitArg = $fn->appendBasicBlock('sprintf_emit_arg');
+        $checkFlags = $fn->appendBasicBlock('sprintf_check_flags');
         $plainEmit = $fn->appendBasicBlock('sprintf_plain_emit');
+        $flaggedEmit = $fn->appendBasicBlock('sprintf_flagged_emit');
         $precEmit = $fn->appendBasicBlock('sprintf_prec_emit');
         $afterArg = $fn->appendBasicBlock('sprintf_after_arg');
+        $appendSpecFlagged = $context->lookupFunction('__phpc_fmt_append_spec_flagged');
         $context->builder->branchIf($usePos, $resolvePos, $resolveSeq);
 
         $context->builder->positionAtEnd($resolveSeq);
@@ -2034,7 +2340,30 @@ final class StringFormatJit
         $context->builder->branchIf($context->builder->icmp(Builder::INT_EQ, $argv, $valuePtr->constNull()), $skipArg, $emitArg);
 
         $context->builder->positionAtEnd($emitArg);
-        $context->builder->branchIf($usePrecFloat, $precEmit, $plainEmit);
+        $context->builder->branchIf($usePrecFloat, $precEmit, $checkFlags);
+
+        $context->builder->positionAtEnd($checkFlags);
+        $hasSignFlag = $context->builder->icmp(
+            Builder::INT_NE,
+            $context->builder->load($signFlagSlot),
+            $i8->constInt(0, false)
+        );
+        $hasFlags = $context->builder->or($hasSignFlag, $context->builder->load($altFormSlot));
+        $context->builder->branchIf($hasFlags, $flaggedEmit, $plainEmit);
+
+        $context->builder->positionAtEnd($flaggedEmit);
+        $argValFlagged = $context->builder->inBoundsGEP($argv, $context->builder->zExt($resolvedIdx, $i64));
+        $context->builder->call(
+            $appendSpecFlagged,
+            $out,
+            $posSlot,
+            $outCap,
+            $argValFlagged,
+            $context->builder->load($signFlagSlot),
+            $context->builder->load($altFormSlot),
+            $specCh
+        );
+        $context->builder->branch($afterArg);
 
         $context->builder->positionAtEnd($plainEmit);
         $argVal = $context->builder->inBoundsGEP($argv, $context->builder->zExt($resolvedIdx, $i64));

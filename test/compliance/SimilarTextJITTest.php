@@ -25,6 +25,10 @@ final class SimilarTextJITTest extends BaseTest
             __DIR__.'/cases/stdlib/similar_text_coerce_jit.phpt',
             'similar_text_coerce_jit.phpt'
         );
+        yield 'similar_text_strict_types_jit.phpt' => self::parsePHPT(
+            __DIR__.'/cases/stdlib/similar_text_strict_types_jit.phpt',
+            'similar_text_strict_types_jit.phpt'
+        );
     }
 
     public function setUp(): void

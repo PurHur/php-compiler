@@ -73,6 +73,8 @@ final class VmPhpMemoryStream
 
         $remaining = \strlen($state->buffer) - $state->position;
         if ($remaining <= 0) {
+            $state->atEof = true;
+
             return '';
         }
         $take = \min($length, $remaining);
@@ -88,7 +90,10 @@ final class VmPhpMemoryStream
         if (null === $state || !$state->canWrite) {
             return false;
         }
-        if (null !== $length && $length >= 0 && $length < \strlen($data)) {
+        if (null !== $length && $length < 0) {
+            return 0;
+        }
+        if (null !== $length && $length < \strlen($data)) {
             $data = \substr($data, 0, $length);
         }
         if ('' === $data) {
@@ -108,6 +113,7 @@ final class VmPhpMemoryStream
         $written = \strlen($data);
         $state->buffer = \substr($state->buffer, 0, $pos).$data.\substr($state->buffer, $pos + $written);
         $state->position = $pos + $written;
+        $state->atEof = false;
 
         return $written;
     }
@@ -130,6 +136,7 @@ final class VmPhpMemoryStream
             return -1;
         }
         $state->position = $pos;
+        $state->atEof = false;
 
         return 0;
     }
@@ -151,7 +158,7 @@ final class VmPhpMemoryStream
             return true;
         }
 
-        return $state->position >= \strlen($state->buffer);
+        return $state->atEof;
     }
 
     public static function bufferLength(int $handle): int|false
@@ -336,6 +343,9 @@ final class PhpMemoryStreamState
     public string $buffer = '';
 
     public int $position = 0;
+
+    /** Set after a read returns no data at end-of-file (php_stream_memory.c). */
+    public bool $atEof = false;
 
     public bool $canRead;
 

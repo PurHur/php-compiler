@@ -11,6 +11,7 @@ use PHPCompiler\JIT\JitBoolArg;
 use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\BuiltinExecute;
+use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
 
 /** hash() — sha256, sha1, md5, crc32*, adler32, fnv*, xxh3/xxh128 (VM + JIT/AOT via __compiler_hash). */

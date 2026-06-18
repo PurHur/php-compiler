@@ -55,9 +55,15 @@ final class VmInfo
     /** Zend engine version label for zend_version() (php-src Zend/zend.c ZEND_VERSION shape). */
     public const ZEND_VERSION = '4.4.0';
 
+    /** php-src maps the Zend engine module to extension name Core (ext/standard/info.c). */
+    public static function isEngineExtensionName(string $extension): bool
+    {
+        return 'core' === strtolower($extension);
+    }
+
     public static function phpversion(?string $extension = null): string|false
     {
-        if (null === $extension) {
+        if (null === $extension || self::isEngineExtensionName($extension)) {
             return CompilerVersion::VERSION;
         }
         if (!self::extension_loaded($extension)) {
@@ -74,8 +80,6 @@ final class VmInfo
 
     public static function php_uname(string $mode = 'a'): string
     {
-        self::validateUnameMode($mode);
-
         return VmUnameNative::php_uname($mode);
     }
 
@@ -426,18 +430,6 @@ final class VmInfo
         }
 
         return $found1 <=> $found2;
-    }
-
-    private static function validateUnameMode(string $mode): void
-    {
-        if ('' === $mode || !isset($mode[0])) {
-            return;
-        }
-        if (!\in_array($mode[0], ['a', 's', 'n', 'r', 'v', 'm'], true)) {
-            throw new \LogicException(
-                'php_uname(): Argument #1 ($mode) must be one of "a", "s", "n", "r", "v", or "m"'
-            );
-        }
     }
 
     private static function infoFlagSelected(int $flags, int $section): bool

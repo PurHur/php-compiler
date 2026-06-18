@@ -1347,7 +1347,6 @@ class Type extends Builtin {
         ProcessRuntime::ensureLinked($this->context);
         ProcessOpen::ensureLinked($this->context);
         StreamSocketPair::ensureLinked($this->context);
-        StringHrtime::ensureLinked($this->context);
         StringMicrotime::ensureLinked($this->context);
         StringGettimeofday::ensureLinked($this->context);
         StringGetrusage::ensureLinked($this->context);
@@ -1358,6 +1357,7 @@ class Type extends Builtin {
         StringDir::ensureLinked($this->context);
         StringFsGlob::ensureLinked($this->context);
         StringFsDir::ensureLinked($this->context);
+        StatCache::ensureLinked($this->context);
         StreamSync::ensureLinked($this->context);
         StreamCaps::ensureLinked($this->context);
         Stats::ensureLinked($this->context);

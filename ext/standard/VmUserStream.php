@@ -90,7 +90,8 @@ final class VmUserStream
     public static function readAll(int $handle): string|false
     {
         $chunks = [];
-        while (!self::feof($handle)) {
+        // php-src userspace.c: stream_read then stream_eof; eof after data ends the read (#9162).
+        while (true) {
             $chunk = self::read($handle, 8192);
             if (false === $chunk) {
                 return false;
@@ -99,6 +100,9 @@ final class VmUserStream
                 break;
             }
             $chunks[] = $chunk;
+            if (self::feof($handle)) {
+                break;
+            }
         }
 
         return \implode('', $chunks);

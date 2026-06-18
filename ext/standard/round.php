@@ -14,7 +14,9 @@ namespace PHPCompiler\ext\standard;
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\InternalStrictArg as JitInternalStrictArg;
 use PHPCompiler\JIT\Variable as JITVariable;
+use PHPCompiler\VM\InternalStrictArg;
 use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
 
@@ -45,12 +47,7 @@ final class round extends Internal
 
         $precision = 0;
         if ($argc >= 2) {
-            $precision = VmMath::parseIntBuiltinArg(
-                $frame->calledArgs[1]->resolveIndirect(),
-                'round',
-                2,
-                'precision'
-            );
+            $precision = self::vmPrecisionArg($frame);
         }
 
         $mode = StdlibConstants::PHP_ROUND_HALF_UP;
@@ -75,5 +72,19 @@ final class round extends Internal
         $this->context = $context;
 
         return JitRound::round($context, ...$args);
+    }
+
+    private static function vmPrecisionArg(Frame $frame): int
+    {
+        if (null !== $frame->parent && $frame->parent->block->strictTypes) {
+            return InternalStrictArg::requireInt($frame, 1, 'round', 'precision')->toInt();
+        }
+
+        return VmMath::parseIntBuiltinArg(
+            $frame->calledArgs[1]->resolveIndirect(),
+            'round',
+            2,
+            'precision'
+        );
     }
 }

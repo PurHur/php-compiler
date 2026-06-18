@@ -867,6 +867,65 @@ PHP;
             $script,
             'patch_already_applied must probe php-cfg-enum-trait-use.patch (#6625)'
         );
+        self::assertStringContainsString(
+            'apply_patch_file_direct',
+            $script,
+            'apply-patches must expose direct patch helper (#9097)'
+        );
+        self::assertStringNotContainsString(
+            'apply_patch "$PATCH_DIR/php-cfg-enum-trait-use.patch"',
+            $script,
+            'enum trait-use overlay must not recurse through apply_patch (#9097)'
+        );
+        self::assertStringContainsString(
+            'Applied php-cfg-enum-trait-use.patch (overlay)',
+            $script,
+            'enum trait-use must use python overlay (#9097)'
+        );
+    }
+
+    public function testEnumTraitUseOverlayDoesNotRecurse(): void
+    {
+        $parser = self::$root.'/vendor/ircmaxell/php-cfg/lib/PHPCfg/Parser.php';
+        if (!is_readable($parser)) {
+            self::markTestSkipped('vendor/ircmaxell/php-cfg not installed');
+        }
+
+        $parserBody = (string) file_get_contents($parser);
+        if (!preg_match('/function parseStmt_Enum.*?foreach \\(\\$node->stmts as \\$stmt\\).*?function parseEnumCase/s', $parserBody)) {
+            self::markTestSkipped('parseStmt_Enum loop not present');
+        }
+
+        $stripped = str_replace(
+            "} elseif (\$stmt instanceof Stmt\\TraitUse) {\n"
+            ."                \$this->parseStmt_TraitUse(\$stmt);\n"
+            ."            }\n",
+            '',
+            $parserBody
+        );
+        if ($stripped === $parserBody) {
+            self::markTestSkipped('TraitUse branch not present to strip');
+        }
+
+        $tmp = tempnam(sys_get_temp_dir(), 'phpc-parser-');
+        self::assertNotFalse($tmp);
+        file_put_contents($tmp, $stripped);
+
+        $cmd = 'bash -c '.escapeshellarg(
+            'set -euo pipefail; ROOT='.escapeshellarg(self::$root).'; PATCH_DIR="$ROOT/patches"; '
+            .'source <(sed -n "/^patch_already_applied()/,/^apply_patch_file_direct()/p" '.escapeshellarg(self::$root.'/script/apply-patches.sh').' | head -n -1); '
+            .'source <(sed -n "/^apply_patch_file_direct()/,/^apply_patch()/p" '.escapeshellarg(self::$root.'/script/apply-patches.sh').' | head -n -1); '
+            .'source <(sed -n "/^apply_php_cfg_enum_trait_use_parser_fix()/,/^apply_php_cfg_enum_class_const_overlay()/p" '.escapeshellarg(self::$root.'/script/apply-patches.sh').' | head -n -1); '
+            .'apply_php_cfg_enum_trait_use_parser_fix '.escapeshellarg($tmp)
+        );
+        $output = [];
+        $exitCode = 0;
+        exec('timeout 3 '.$cmd.' 2>&1', $output, $exitCode);
+
+        self::assertSame(0, $exitCode, "enum trait-use overlay must finish without recursion:\n".implode("\n", $output));
+        $repaired = (string) file_get_contents($tmp);
+        @unlink($tmp);
+        self::assertStringContainsString('Stmt\\TraitUse', $repaired, 'overlay must insert TraitUse branch (#9097)');
     }
 
     public function testApplyPatchesLeavesEnumBodyOverlaysOnVendorParser(): void

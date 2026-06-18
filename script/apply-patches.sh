@@ -84,7 +84,8 @@ patch_already_applied() {
       grep -q 'Malformed phpdoc fragments in vendor trees' "$ROOT/vendor/ircmaxell/php-types/lib/PHPTypes/Type.php" 2>/dev/null
       ;;
     php-types-fromdecl-trailing-comma.patch)
-      grep -q 'Docblock union splits may leave a lone' "$ROOT/vendor/ircmaxell/php-types/lib/PHPTypes/Type.php" 2>/dev/null
+      grep -q 'Docblock union splits may leave a lone' "$ROOT/vendor/ircmaxell/php-types/lib/PHPTypes/Type.php" 2>/dev/null \
+        && ! php_types_type_fromdecl_trailing_comma_corrupt "$ROOT/vendor/ircmaxell/php-types/lib/PHPTypes/Type.php"
       ;;
     php-types-remove-type-empty-union.patch)
       ! grep -q "throw new \\\\LogicException('Unknown type encountered')" "$ROOT/vendor/ircmaxell/php-types/lib/PHPTypes/Type.php" 2>/dev/null
@@ -1255,14 +1256,60 @@ apply_php_cfg_enum_class_method_parser_fix() {
 
 apply_php_cfg_enum_trait_use_parser_fix() {
   local parser="${1:-$ROOT/vendor/ircmaxell/php-cfg/lib/PHPCfg/Parser.php}"
-  if grep -A30 'function parseStmt_Enum' "$parser" 2>/dev/null | grep -q 'Stmt\\TraitUse'; then
+  if grep -A35 'function parseStmt_Enum' "$parser" 2>/dev/null | grep -q 'Stmt\\TraitUse'; then
     return 0
   fi
   if ! grep -q 'function parseStmt_Enum' "$parser" 2>/dev/null; then
     echo "Skip php-cfg-enum-trait-use.patch (parseStmt_Enum missing)" >&2
     return 1
   fi
-  apply_patch "$PATCH_DIR/php-cfg-enum-trait-use.patch"
+  python3 - "$parser" <<'PY'
+import sys
+from pathlib import Path
+
+parser_path = Path(sys.argv[1])
+text = parser_path.read_text()
+trait_branch = """            } elseif ($stmt instanceof Stmt\\TraitUse) {
+                $this->parseStmt_TraitUse($stmt);
+"""
+if "Stmt\\TraitUse" in text.split("function parseStmt_Enum", 1)[-1].split("function parseEnumCase", 1)[0]:
+    raise SystemExit(0)
+
+with_class_const = """            } elseif ($stmt instanceof Stmt\\ClassMethod) {
+                $this->parseStmt_ClassMethod($stmt);
+            } elseif ($stmt instanceof Stmt\\ClassConst) {
+                $this->parseStmt_ClassConst($stmt);
+            }"""
+with_class_const_trait = """            } elseif ($stmt instanceof Stmt\\ClassMethod) {
+                $this->parseStmt_ClassMethod($stmt);
+            } elseif ($stmt instanceof Stmt\\TraitUse) {
+                $this->parseStmt_TraitUse($stmt);
+            } elseif ($stmt instanceof Stmt\\ClassConst) {
+                $this->parseStmt_ClassConst($stmt);
+            }"""
+without_class_const = """            } elseif ($stmt instanceof Stmt\\ClassMethod) {
+                $this->parseStmt_ClassMethod($stmt);
+            }
+        }
+        $this->block = $savedBlock;"""
+without_class_const_trait = """            } elseif ($stmt instanceof Stmt\\ClassMethod) {
+                $this->parseStmt_ClassMethod($stmt);
+            } elseif ($stmt instanceof Stmt\\TraitUse) {
+                $this->parseStmt_TraitUse($stmt);
+            }
+        }
+        $this->block = $savedBlock;"""
+
+if with_class_const in text:
+    text = text.replace(with_class_const, with_class_const_trait, 1)
+elif without_class_const in text:
+    text = text.replace(without_class_const, without_class_const_trait, 1)
+else:
+    sys.stderr.write("php-cfg-enum-trait-use: parseStmt_Enum loop anchor not found\n")
+    raise SystemExit(1)
+parser_path.write_text(text)
+PY
+  echo "Applied php-cfg-enum-trait-use.patch (overlay)"
 }
 
 apply_php_cfg_enum_class_const_overlay() {
@@ -3235,6 +3282,59 @@ PY
   echo "Applied php-types-docblock-first-token.patch (overlay)"
 }
 
+php_types_type_fromdecl_trailing_comma_corrupt() {
+  local target="$1"
+  [[ -f "$target" ]] || return 1
+  grep -q 'Docblock union splits.*\\n        \$trimmedDecl' "$target" 2>/dev/null
+}
+
+apply_php_types_fromdecl_trailing_comma_overlay() {
+  local target="$ROOT/vendor/ircmaxell/php-types/lib/PHPTypes/Type.php"
+  if patch_already_applied "$PATCH_DIR/php-types-fromdecl-trailing-comma.patch"; then
+    echo "Skip php-types-fromdecl-trailing-comma.patch (already applied)"
+    return 0
+  fi
+  if php_types_type_fromdecl_trailing_comma_corrupt "$target"; then
+    echo "Repair php-types-fromdecl-trailing-comma.patch (literal \\\\n corruption; #9261)"
+  fi
+  python3 - "$target" <<'PY'
+import re
+import sys
+from pathlib import Path
+
+path = Path(sys.argv[1])
+text = path.read_text()
+
+corrupt = re.compile(
+    r"\n        // Docblock union splits may leave a lone[^\n]*\\n[^\n]*$",
+    re.MULTILINE,
+)
+text, removed = corrupt.subn("\n", text, count=1)
+if removed:
+    path.write_text(text)
+
+needle = "        $decl = self::stripTrailingDocText($decl);\n"
+if needle not in text:
+    sys.stderr.write("php-types-fromdecl-trailing-comma: stripTrailingDocText anchor not found\n")
+    sys.exit(1)
+
+insertion = needle + (
+    "        // Docblock union splits may leave a lone \"string,\" fragment (M2 spine; #3012).\n"
+    "        $trimmedDecl = trim($decl);\n"
+    "        if (str_ends_with($trimmedDecl, ',') && !str_contains($trimmedDecl, '|') && !str_contains($trimmedDecl, '&')) {\n"
+    "            return self::fromDecl(rtrim($trimmedDecl, ', '));\n"
+    "        }\n"
+)
+
+if 'Docblock union splits may leave a lone' in text:
+    if re.search(r"if \(str_ends_with\(\$trimmedDecl, ','\)", text):
+        raise SystemExit(0)
+
+path.write_text(text.replace(needle, insertion, 1))
+PY
+  echo "Applied php-types-fromdecl-trailing-comma.patch (overlay)"
+}
+
 apply_php_types_generic_null_tail_overlay() {
   local target="$ROOT/vendor/ircmaxell/php-types/lib/PHPTypes/Type.php"
   if patch_already_applied "$PATCH_DIR/php-types-generic-null-tail.patch"; then
@@ -4163,11 +4263,76 @@ apply_php_cfg_magic_constants_overlay() {
 
 apply_php_cfg_anonymous_class_name_overlay() {
   local target="$ROOT/vendor/ircmaxell/php-cfg/lib/PHPCfg/Parser.php"
+  if [[ ! -f "$target" ]]; then
+    return 0
+  fi
   if grep -q 'magicStringResolver->beginCompilationUnit' "$target" 2>/dev/null; then
     echo "Skip php-cfg-anonymous-class-name.patch (already applied)"
     return 0
   fi
-  apply_patch "$PATCH_DIR/php-cfg-anonymous-class-name.patch"
+  python3 - "$target" <<'PY'
+import sys
+from pathlib import Path
+
+parser_path = Path(sys.argv[1])
+text = parser_path.read_text()
+original = text
+
+if 'magicStringResolver->beginCompilationUnit' in text:
+    print('Skip php-cfg-anonymous-class-name.patch (already applied)')
+    raise SystemExit(0)
+
+if 'protected $magicStringResolver' not in text:
+    anchor = "    protected $astTraverser;\n\n    protected $fileName;"
+    insert = (
+        "    protected $astTraverser;\n\n"
+        "    /** @var AstVisitor\\MagicStringResolver */\n"
+        "    protected $magicStringResolver;\n\n"
+        "    protected $fileName;"
+    )
+    if anchor in text:
+        text = text.replace(anchor, insert, 1)
+    else:
+        anchor2 = "    protected $astTraverser;\n"
+        if anchor2 not in text:
+            sys.stderr.write('php-cfg-anonymous-class-name: astTraverser anchor not found\n')
+            raise SystemExit(1)
+        text = text.replace(
+            anchor2,
+            anchor2
+            + "\n    /** @var AstVisitor\\MagicStringResolver */\n"
+            + "    protected $magicStringResolver;\n",
+            1,
+        )
+
+old_ctor = "        $this->astTraverser->addVisitor(new AstVisitor\\MagicStringResolver());"
+new_ctor = (
+    "        $this->magicStringResolver = new AstVisitor\\MagicStringResolver();\n"
+    "        $this->astTraverser->addVisitor($this->magicStringResolver);"
+)
+if old_ctor in text:
+    text = text.replace(old_ctor, new_ctor, 1)
+elif '$this->magicStringResolver = new AstVisitor\\MagicStringResolver()' not in text:
+    sys.stderr.write('php-cfg-anonymous-class-name: constructor anchor not found\n')
+    raise SystemExit(1)
+
+parse_ast_anchor = "        $this->fileName = $fileName;\n        $ast = $this->astTraverser->traverse($ast);"
+parse_ast_insert = (
+    "        $this->fileName = $fileName;\n"
+    "        $this->magicStringResolver->beginCompilationUnit($fileName);\n"
+    "        $ast = $this->astTraverser->traverse($ast);"
+)
+if parse_ast_anchor in text:
+    text = text.replace(parse_ast_anchor, parse_ast_insert, 1)
+else:
+    sys.stderr.write('php-cfg-anonymous-class-name: parseAst anchor not found\n')
+    raise SystemExit(1)
+
+if text != original:
+    parser_path.write_text(text)
+    print('Applied php-cfg-anonymous-class-name.patch (overlay)')
+raise SystemExit(0)
+PY
 }
 
 apply_php_cfg_halt_compiler_overlay() {
@@ -4923,11 +5088,66 @@ patch_marker_present() {
   grep -qF "$marker" "$ROOT/$old_path" 2>/dev/null
 }
 
+# Apply a patch file with git/patch(1) only — no overlay dispatch (avoids recursion).
+apply_patch_file_direct() {
+  local patch="$1"
+  local patch_name
+  patch_name="$(basename "$patch")"
+  if [[ ! -f "$patch" ]]; then
+    return 0
+  fi
+  if patch_already_applied "$patch"; then
+    echo "Skip ${patch_name} (already applied)"
+    return 0
+  fi
+  if git -C "$ROOT" apply --check -p0 "$patch" >/dev/null 2>&1; then
+    git -C "$ROOT" apply -p0 "$patch"
+    echo "Applied ${patch_name}"
+    return 0
+  fi
+  if git -C "$ROOT" apply --check -p1 "$patch" >/dev/null 2>&1; then
+    git -C "$ROOT" apply -p1 "$patch"
+    echo "Applied ${patch_name} (-p1)"
+    return 0
+  fi
+  if command -v patch >/dev/null 2>&1; then
+    if patch -p0 --dry-run -s -f < "$patch" >/dev/null 2>&1; then
+      patch -p0 -s -f < "$patch" >/dev/null 2>&1
+      echo "Applied ${patch_name} (patch(1))"
+      return 0
+    fi
+    if patch -p1 --dry-run -s -f < "$patch" >/dev/null 2>&1; then
+      patch -p1 -s -f < "$patch" >/dev/null 2>&1
+      echo "Applied ${patch_name} (patch(1), -p1)"
+      return 0
+    fi
+    if patch -p0 --reverse --dry-run -s -f < "$patch" >/dev/null 2>&1; then
+      echo "Skip ${patch_name} (already applied)"
+      return 0
+    fi
+    if patch -p1 --reverse --dry-run -s -f < "$patch" >/dev/null 2>&1; then
+      echo "Skip ${patch_name} (already applied, -p1)"
+      return 0
+    fi
+  fi
+  if patch_marker_present "$patch"; then
+    echo "Skip ${patch_name} (already applied)"
+    return 0
+  fi
+  record_patch_failure "${patch_name}"
+  return 1
+}
+
 apply_patch() {
   local patch="$1"
   local patch_name
   patch_name="$(basename "$patch")"
   if [[ ! -f "$patch" ]]; then
+    return 0
+  fi
+  if [[ "$patch_name" == "php-cfg-new-ctor-parens.patch" ]]; then
+    # Optional, known-stale diff (#6549). Keep it non-fatal (do not record failure).
+    echo "Skip ${patch_name} (optional — stale hunk #6549; does not block throw-expr #6746)"
     return 0
   fi
   if [[ "$(basename "$patch")" == "php-cfg-incdec-expr.patch" ]]; then
@@ -4992,6 +5212,55 @@ apply_patch() {
   fi
   if [[ "$(basename "$patch")" == "php-types-array-shape.patch" ]]; then
     apply_php_types_array_shape_overlay
+    return $?
+  fi
+  if [[ "$(basename "$patch")" == "php-types-generics-fallback.patch" ]]; then
+    local target="$ROOT/vendor/ircmaxell/php-types/lib/PHPTypes/Type.php"
+    if grep -q "non-empty-string" "$target" 2>/dev/null; then
+      echo "Skip php-types-generics-fallback.patch (already applied)"
+      return 0
+    fi
+    python3 - "$target" <<'PY'
+import sys
+from pathlib import Path
+
+path = Path(sys.argv[1])
+text = path.read_text()
+
+anchor = """        if (preg_match('/^(list|array)\\s*</i', trim($decl))) {
+            return new self(self::TYPE_ARRAY);
+        }
+        $regex = """
+
+insert = """        if (preg_match('/^(list|array)\\s*</i', trim($decl))) {
+            return new self(self::TYPE_ARRAY);
+        }
+        $pseudo = strtolower(trim($decl));
+        if (in_array($pseudo, [
+            'non-empty-string', 'literal-string', 'lowercase-string', 'uppercase-string',
+            'class-string', 'interface-string', 'trait-string', 'html-escaped-string',
+        ], true)) {
+            return new self(self::TYPE_STRING);
+        }
+        if (in_array($pseudo, ['non-empty-array'], true)) {
+            return new self(self::TYPE_ARRAY);
+        }
+        if (preg_match('/^(positive|negative|non-zero)-int$/', $pseudo)) {
+            return new self(self::TYPE_LONG);
+        }
+        $regex = """
+
+if anchor not in text:
+    sys.stderr.write("php-types-generics-fallback: anchor not found in Type.php\n")
+    sys.exit(1)
+
+path.write_text(text.replace(anchor, insert, 1))
+PY
+    echo "Applied php-types-generics-fallback.patch (overlay)"
+    return 0
+  fi
+  if [[ "$(basename "$patch")" == "php-types-fromdecl-trailing-comma.patch" ]]; then
+    apply_php_types_fromdecl_trailing_comma_overlay
     return $?
   fi
   if [[ "$(basename "$patch")" == "php-types-docblock-trailing-text.patch" ]]; then
@@ -5150,41 +5419,8 @@ apply_patch() {
     apply_php_cfg_asymmetric_visibility_overlay
     return $?
   fi
-  if patch_already_applied "$patch"; then
-    echo "Skip ${patch_name} (already applied)"
+  if apply_patch_file_direct "$patch"; then
     return 0
-  fi
-  if git -C "$ROOT" apply --check -p0 "$patch" >/dev/null 2>&1; then
-    git -C "$ROOT" apply -p0 "$patch"
-    echo "Applied ${patch_name}"
-    return 0
-  fi
-  # Some patches are stored with `a/` + `b/` prefixes (git diff default).
-  if git -C "$ROOT" apply --check -p1 "$patch" >/dev/null 2>&1; then
-    git -C "$ROOT" apply -p1 "$patch"
-    echo "Applied ${patch_name} (-p1)"
-    return 0
-  fi
-  if command -v patch >/dev/null 2>&1; then
-    if patch -p0 --dry-run -s -f < "$patch" >/dev/null 2>&1; then
-      patch -p0 -s -f < "$patch" >/dev/null 2>&1
-      echo "Applied ${patch_name} (patch(1))"
-      return 0
-    fi
-    # Some patches are stored with `a/` + `b/` prefixes (git diff default).
-    if patch -p1 --dry-run -s -f < "$patch" >/dev/null 2>&1; then
-      patch -p1 -s -f < "$patch" >/dev/null 2>&1
-      echo "Applied ${patch_name} (patch(1), -p1)"
-      return 0
-    fi
-    if patch -p0 --reverse --dry-run -s -f < "$patch" >/dev/null 2>&1; then
-      echo "Skip ${patch_name} (already applied)"
-      return 0
-    fi
-    if patch -p1 --reverse --dry-run -s -f < "$patch" >/dev/null 2>&1; then
-      echo "Skip ${patch_name} (already applied, -p1)"
-      return 0
-    fi
   fi
   case "${patch_name}" in
     php-cfg-match.patch)
@@ -5371,10 +5607,10 @@ if [[ -d "$ROOT/vendor/ircmaxell/php-types" ]]; then
   apply_patch "$PATCH_DIR/php-types-generics-list-array.patch"
   apply_patch "$PATCH_DIR/php-types-iterable-generic.patch"
   apply_patch "$PATCH_DIR/php-types-docblock-trailing-text.patch"
+  apply_patch "$PATCH_DIR/php-types-fromdecl-trailing-comma.patch"
   apply_patch "$PATCH_DIR/php-types-callable-return-strip.patch"
   apply_patch "$PATCH_DIR/php-types-generic-null-tail.patch"
   apply_patch "$PATCH_DIR/php-types-fromdecl-junk-fragments.patch"
-  apply_patch "$PATCH_DIR/php-types-fromdecl-trailing-comma.patch"
   apply_patch "$PATCH_DIR/php-types-remove-type-empty-union.patch"
   apply_patch "$PATCH_DIR/php-types-anonymous-class-type.patch"
   apply_patch "$PATCH_DIR/php-types-ns-func-call.patch"
@@ -5449,6 +5685,9 @@ verify_critical_language_patches() {
     fi
   fi
   local vendor_type="$ROOT/vendor/ircmaxell/php-types/lib/PHPTypes/Type.php"
+  if [[ -f "$vendor_type" ]] && php_types_type_fromdecl_trailing_comma_corrupt "$vendor_type"; then
+    missing+=("php-types-fromdecl-trailing-comma-corrupt")
+  fi
   if ! grep -q 'instanceof Op\\Type\\Union_' "$recon" 2>/dev/null; then
     missing+=("php-types-union-type")
   elif ! php -l "$recon" >/dev/null 2>&1; then

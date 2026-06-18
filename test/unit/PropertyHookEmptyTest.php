@@ -7,16 +7,16 @@ namespace PHPCompiler\Test\Unit;
 use PHPCompiler\Runtime;
 use PHPUnit\Framework\TestCase;
 
-/** empty() on property hooks must not invoke get hook (#8918). */
+/** empty() on property hooks invokes get hook (#9107). */
 final class PropertyHookEmptyTest extends TestCase
 {
-    public function testVmEmptyOnVirtualGetHookDoesNotInvokeGet(): void
+    public function testVmEmptyOnVirtualGetHookInvokesGet(): void
     {
         $code = <<<'PHP'
 <?php
 class C {
     public ?string $x {
-        get { throw new Exception('get must not run for empty'); }
+        get { echo "get runs for empty\n"; return null; }
     }
 }
 $c = new C();
@@ -27,16 +27,16 @@ PHP;
         $block = $rt->parseAndCompile($code, 'test.php');
         ob_start();
         $rt->run($block);
-        self::assertSame("bool(true)\nok\n", ob_get_clean());
+        self::assertSame("get runs for empty\nbool(true)\nok\n", ob_get_clean());
     }
 
-    public function testVmEmptyOnSeparateBackingWithoutGetHook(): void
+    public function testVmEmptyOnSeparateBackingInvokesGetHook(): void
     {
         $code = <<<'PHP'
 <?php
 class C {
     public string $x {
-        get { throw new Exception('get must not run for empty'); }
+        get { echo "get runs for empty\n"; return $this->backing; }
         set => $this->backing = $value;
     }
     private string $backing = 'a';
@@ -48,6 +48,6 @@ PHP;
         $block = $rt->parseAndCompile($code, 'test.php');
         ob_start();
         $rt->run($block);
-        self::assertSame("bool(false)\n", ob_get_clean());
+        self::assertSame("get runs for empty\nbool(false)\n", ob_get_clean());
     }
 }

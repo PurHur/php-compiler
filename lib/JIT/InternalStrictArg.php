@@ -168,7 +168,7 @@ final class InternalStrictArg
             $failBlock
         );
         $context->builder->positionAtEnd($failBlock);
-        TypeErrorRaise::emitRaise(
+        ExceptionBridge::emitTypeErrorAndAbort(
             $context,
             sprintf(
                 '%s(): Argument #%d ($%s) must be of type %s, %s given',
@@ -179,16 +179,12 @@ final class InternalStrictArg
                 'mixed'
             )
         );
-        $context->builder->call($context->lookupFunction('abort'));
         $context->builder->positionAtEnd($okBlock);
     }
 
     private static function raiseTypeErrorAndAbort(Context $context, string $message): void
     {
-        TypeErrorRaise::registerDeclarations($context);
-        TypeErrorRaise::ensureLinked($context);
-        TypeErrorRaise::emitRaise($context, $message);
-        $context->builder->call($context->lookupFunction('abort'));
+        ExceptionBridge::emitTypeErrorAndAbort($context, $message);
     }
 
     private static function message(

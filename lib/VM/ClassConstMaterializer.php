@@ -33,7 +33,7 @@ final class ClassConstMaterializer
                 continue;
             }
             if (null !== $entry && ClassConstExpr::isSupportedOpcode($op->type)) {
-                ClassConstExpr::execute($vm->context, $frame, $op, $entry);
+                ClassConstExpr::execute($vm->context, $frame, $bodyBlock, $op, $entry);
                 continue;
             }
             if (null !== $entry && OpCode::TYPE_DECLARE_CLASS_CONST === $op->type) {
@@ -72,10 +72,16 @@ final class ClassConstMaterializer
     ): void {
         $name = strtolower($frame->scope[$op->arg1]->toString());
         if (isset($bodyBlock->constants[$op->arg2])) {
-            $value = new Variable();
-            $value->copyFrom($bodyBlock->constants[$op->arg2]);
-            $entry->constants[$name] = EnumCaseSupport::materializeConstantValue($context, $value);
-        } elseif (isset($frame->scope[$op->arg2])) {
+            $const = $bodyBlock->constants[$op->arg2];
+            if (!$const->is(Variable::TYPE_NULL)) {
+                $value = new Variable();
+                $value->copyFrom($const);
+                $entry->constants[$name] = EnumCaseSupport::materializeConstantValue($context, $value);
+
+                return;
+            }
+        }
+        if (isset($frame->scope[$op->arg2])) {
             $entry->constants[$name] = EnumCaseSupport::materializeConstantValue(
                 $context,
                 $frame->scope[$op->arg2]

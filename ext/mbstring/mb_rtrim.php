@@ -27,6 +27,6 @@ final class mb_rtrim extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        throw new \LogicException('mb_rtrim() is not lowered for JIT/AOT in this compiler build');
+        return JitMbTrim::invoke($context, VmMbstring::MB_RTRIM, 'mb_rtrim', $args);
     }
 }

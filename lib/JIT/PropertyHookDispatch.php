@@ -99,8 +99,7 @@ final class PropertyHookDispatch
     }
 
     /**
-     * isset($obj->prop) on hooked properties — probe backing slot via Object_::propertyIsSet,
-     * never invoke get hook (#8917, zend_property_hooks.c).
+     * isset($obj->prop) on hooked properties — invoke get hook, !is_null on return (#9107, zend_property_hooks.c).
      */
     public static function tryEmitPropertyIsSet(
         Context $context,
@@ -109,7 +108,33 @@ final class PropertyHookDispatch
         string $propertyName,
         ?Block $enclosingBlock
     ): ?Value {
-        return null;
+        $hookValue = self::tryEmitPropertyGet(
+            $context,
+            $receiver,
+            $declaringClass,
+            $propertyName,
+            $enclosingBlock
+        );
+        if (null === $hookValue) {
+            return null;
+        }
+        if (Variable::TYPE_VALUE === $hookValue->type) {
+            $valueMap = $context->structFieldMap['__value__'];
+            $typeByte = $context->builder->load(
+                $context->builder->structGep($hookValue->value, $valueMap['type'])
+            );
+            $i8 = $context->getTypeFromString('int8');
+            $nullType = $i8->constInt(\PHPCompiler\VM\Variable::TYPE_NULL, false);
+            $undefType = $i8->constInt(\PHPCompiler\VM\Variable::TYPE_UNDEFINED, false);
+            $notNull = $context->builder->icmp(Builder::INT_NE, $typeByte, $nullType);
+            $notUndef = $context->builder->icmp(Builder::INT_NE, $typeByte, $undefType);
+
+            return $context->builder->and($notNull, $notUndef);
+        }
+        $loaded = $context->helper->loadValue($hookValue);
+        $nullPtr = $context->getTypeFromString('void*')->constNull();
+
+        return $context->builder->icmp(Builder::INT_NE, $loaded, $nullPtr);
     }
 
     /**

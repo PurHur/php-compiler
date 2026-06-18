@@ -40,8 +40,14 @@ final class BootstrapSelfhostBundleTest extends TestCase
         'ext/mbstring/Module.php',
         'ext/mbstring/mb_strlen.php',
         'ext/mbstring/JitMbStrlen.php',
+        'ext/standard/Utf8JitHelper.php',
+        'ext/standard/HrtimeJitHelper.php',
+        'ext/standard/SleepJitHelper.php',
+        'ext/ctype/CtypeJitHelper.php',
+        'lib/JIT/Builtin/CtypeRuntime.php',
+        'lib/JIT/Builtin/StringUtf8Runtime.php',
+        'lib/JIT/Builtin/StringHrtimeRuntime.php',
         'lib/JIT/Builtin/StringUtf8Strlen.php',
-        'lib/JIT/Builtin/StringUtf8StrlenJit.php',
         'ext/types/Module.php',
         'lib/Cli/PhpcInit.php',
         'lib/Cli/PhpcRun.php',
@@ -397,7 +403,7 @@ final class BootstrapSelfhostBundleTest extends TestCase
         $this->assertFileExists($entry);
         $contents = (string) file_get_contents($entry);
         $count = substr_count($contents, 'require_once __DIR__');
-        $this->assertSame(2644, $count, 'M2 spine 2643/2643 Phase A inventory require_once units (#8559)');
+        $this->assertSame(2773, $count, 'M2 spine require_once units track Phase A inventory (#8559, #9234)');
         foreach (self::LIB_SPINE_SMOKE_NEW_UNITS as $unit) {
             $this->assertStringContainsString(
                 "require_once __DIR__.'/../../../{$unit}';",

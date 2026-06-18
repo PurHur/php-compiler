@@ -73,6 +73,22 @@ final class EnumCaseSupport
     }
 
     /**
+     * Compile-time enum case operand — TYPE_ENUM_CASE matches runtime const-fetch materialization (#9233).
+     */
+    public static function compileTimeCaseVariable(
+        ClassEntry $enum,
+        string $caseName,
+        Variable $backing
+    ): Variable {
+        $backingCopy = new Variable();
+        $backingCopy->copyFrom($backing);
+        $var = new Variable(Variable::TYPE_ENUM_CASE);
+        $var->enumCase(new EnumCaseEntry($enum, $caseName, $backingCopy));
+
+        return $var;
+    }
+
+    /**
      * Enum case fetches use TYPE_ENUM_CASE; instance method dispatch needs an object receiver (#5781, #5676).
      */
     public static function receiverForInstanceMethod(Variable $receiver): Variable

@@ -11,7 +11,7 @@ use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
 
-/** time_sleep_until() — sleep until absolute timestamp (VM via VmSleepPure; JIT/AOT via TimeSleepRuntime). */
+/** time_sleep_until() — sleep until absolute timestamp (VM via VmSleepPure; JIT/AOT via SleepJitHelper, #9378). */
 final class time_sleep_until extends Internal
 {
     public function __construct()

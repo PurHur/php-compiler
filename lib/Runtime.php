@@ -481,6 +481,17 @@ class Runtime {
         return $script;
     }
 
+    /**
+     * Reset php-parser NameResolver aliases before parsing another compilation unit (#1416, #9252).
+     *
+     * Required for bootstrap-inventory lint sweeps and any path that calls Parser::parse() without
+     * going through {@see parse()}.
+     */
+    public function resetParserNameResolverBeforeParse(): void
+    {
+        $this->resetParserNameResolverState();
+    }
+
     /** php-parser NameResolver aliases persist across traversals on one PHPCfg Parser (#1416). */
     private function resetParserNameResolverState(): void
     {
@@ -807,6 +818,7 @@ class Runtime {
         \PHPCompiler\JIT\Progress::noteEntry($filename);
         try {
             $script = $this->parse($code, $filename);
+            $this->compiler->setCompileSourceCode($code);
             $block = $this->compile($script);
             if (null !== $block) {
                 $block->setScriptPath($filename);
@@ -845,6 +857,7 @@ class Runtime {
             \PHPCompiler\JIT\Progress::noteFunction('runtime_parseandcompilefile_read_done');
             $script = $this->parse($code, $filename);
             \PHPCompiler\JIT\Progress::noteFunction('runtime_parseandcompilefile_parse_done');
+            $this->compiler->setCompileSourceCode($code);
             $block = $this->compile($script);
             \PHPCompiler\JIT\Progress::noteFunction('runtime_parseandcompilefile_compile_done');
             if (null !== $block) {

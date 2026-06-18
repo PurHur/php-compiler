@@ -67,7 +67,7 @@ final class fwrite extends Internal
         if (3 === $argc) {
             $length = JitIntdiv::lowerIntBuiltinArg($context, $args[2], $fn, 3, 'length');
         } else {
-            $length = $i64->constInt(-1, true);
+            $length = JitFwrite::lengthWriteAll($context, $dataStr);
         }
 
         return JitFwrite::invoke($context, $handle, $dataStr, $length);

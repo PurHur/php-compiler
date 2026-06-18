@@ -1294,7 +1294,7 @@
         "lib/JIT/Builtin/CallArgv.php",
         "lib/JIT/Builtin/CliArgvRuntime.php",
         "lib/JIT/Builtin/CloneWithReinitRuntime.php",
-        "lib/JIT/Builtin/CtypeJit.php",
+        "lib/JIT/Builtin/CtypeRuntime.php",
         "lib/JIT/Builtin/EmbedObOutput.php",
         "lib/JIT/Builtin/ErrorHandler.php",
         "lib/JIT/Builtin/ErrorHandlerJitRuntime.php",

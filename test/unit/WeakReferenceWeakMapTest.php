@@ -178,6 +178,24 @@ PHP;
         $this->assertSame('421', ob_get_clean());
     }
 
+    public function testWeakMapUnitEnumCaseKey(): void
+    {
+        $runtime = new Runtime();
+        $code = <<<'PHP'
+<?php
+enum U { case C; }
+$m = new WeakMap();
+$m[U::C] = 'unit';
+echo $m[U::C];
+echo isset($m[U::C]) ? '1' : '0';
+unset($m[U::C]);
+echo isset($m[U::C]) ? '1' : '0';
+PHP;
+        ob_start();
+        $runtime->run($runtime->parseAndCompile($code, 'weakmap_unit_enum.php'));
+        $this->assertSame('unit10', ob_get_clean());
+    }
+
     public function testWeakMapNonObjectKeyWriteCatchable(): void
     {
         $runtime = new Runtime();

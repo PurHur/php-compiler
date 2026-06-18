@@ -39,7 +39,7 @@ final class JitFprintf
                 )
             );
 
-            return JitFwrite::invoke($context, $handle, $formatted, $i64->constInt(-1, true));
+            return JitFwrite::invoke($context, $handle, $formatted, JitFwrite::lengthWriteAll($context, $formatted));
         }
 
         $valueTy = $context->getTypeFromString('__value__');
@@ -80,6 +80,6 @@ final class JitFprintf
         );
         $context->builder->call($context->lookupFunction('__mm__free'), $argvRaw);
 
-        return JitFwrite::invoke($context, $handle, $formatted, $i64->constInt(-1, true));
+        return JitFwrite::invoke($context, $handle, $formatted, JitFwrite::lengthWriteAll($context, $formatted));
     }
 }

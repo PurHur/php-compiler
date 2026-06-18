@@ -25,6 +25,10 @@ final class EnumTraitMethodTest extends BaseTest
             __DIR__.'/cases/language/enum_case_dynamic_trait_method.phpt',
             'enum_case_dynamic_trait_method.phpt'
         );
+        yield 'enum_trait_forward_ref.phpt' => self::parsePHPT(
+            __DIR__.'/cases/language/enum_trait_forward_ref.phpt',
+            'enum_trait_forward_ref.phpt'
+        );
     }
 
     public function setUp(): void

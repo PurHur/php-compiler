@@ -13,7 +13,7 @@ use PHPCompiler\VM\HashTable;
 use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
 
-/** hrtime() — monotonic clock (VM + JIT/AOT via VmHrtimeNative /proc/uptime, #5634/#7315/#9018). */
+/** hrtime() — monotonic clock (VM + JIT/AOT via VmHrtimeNative / HrtimeJitHelper, #5634/#7315/#9182). */
 final class hrtime extends Internal
 {
     public function __construct()

@@ -111,9 +111,9 @@ final class JitPasswordAlgo
 
         $context->builder->positionAtEnd($strBlock);
         $isStr = $context->builder->icmp(Builder::INT_EQ, $typeByte, $strTy);
-        $context->builder->branchIf($isStr, $strBlock.'_body', $enumBlock);
-
         $strBody = BasicBlockHelper::append($context, 'pw_algo_box_str_body');
+        $context->builder->branchIf($isStr, $strBody, $enumBlock);
+
         $context->builder->positionAtEnd($strBody);
         $strPtr = $context->builder->call(
             $context->lookupFunction('__value__readString'),
@@ -141,8 +141,8 @@ final class JitPasswordAlgo
 
         $context->builder->positionAtEnd($enumBlock);
         $isEnum = $context->builder->icmp(Builder::INT_EQ, $typeByte, $enumTy);
-        $context->builder->branchIf($isEnum, $enumBlock.'_err', $badBlock);
         $enumErr = BasicBlockHelper::append($context, 'pw_algo_box_enum_err');
+        $context->builder->branchIf($isEnum, $enumErr, $badBlock);
         $context->builder->positionAtEnd($enumErr);
         self::emitTypeErrorAndAbort(
             $context,

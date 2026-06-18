@@ -71,7 +71,7 @@ class Context {
     /** Set when a property set hook throws (even if caught); suppresses outer assign (#3145). */
     public bool $propertyHookSetAborted = false;
 
-    /** Catch frame for TypeError during nested property-hook invoke; bubble to caller (#7301). */
+    /** Catch frame for throw/TypeError during nested property-hook invoke; bubble to caller (#7301, #9503). */
     public ?Frame $propertyHookExternalCatchFrame = null;
 
     /** Active object-to-string coercion via __toString (issue #4284). */
@@ -158,6 +158,13 @@ class Context {
     /** @var array<int, true> foreach warned on non-traversable operand; loop body skipped (#4879). */
     public array $foreachInvalidSlots = [];
 
+    /**
+     * Trait `use` bindings deferred until a forward-referenced trait is declared (#9395).
+     *
+     * @var list<array{entry: ClassEntry, traitNames: list<string>, adaptations: list<array<string, mixed>>, ownMethods: array<string, true>}>
+     */
+    public array $deferredTraitUses = [];
+
     /** Fiber executing on this VM stack (issue #3130). */
     public ?FiberState $currentFiber = null;
 
@@ -195,8 +202,8 @@ class Context {
                 $var->int(\PHPCompiler\ext\standard\StdlibConstants::PASSWORD_BCRYPT);
                 return $var;
             case 'password_default':
-                $var = new Variable(Variable::TYPE_INTEGER);
-                $var->int(\PHPCompiler\ext\standard\StdlibConstants::PASSWORD_DEFAULT);
+                $var = new Variable(Variable::TYPE_STRING);
+                $var->string(\PHPCompiler\ext\standard\StdlibConstants::PASSWORD_DEFAULT);
                 return $var;
             case 'password_argon2i':
                 if (!\PHPCompiler\ext\standard\VmPasswordNative::argon2Available()) {

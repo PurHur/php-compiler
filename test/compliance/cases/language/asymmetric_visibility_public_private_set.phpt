@@ -1,9 +1,9 @@
 --TEST--
-Language: public private(set) parses and enforces set visibility (#7460, zend_compile.c)
+Language: private(set) parses and enforces set visibility (#7460, #9161, zend_compile.c)
 --FILE--
 <?php
 class A {
-    public private(set) string $x = 'hi';
+    private(set) string $x = 'hi';
 }
 $a = new A();
 echo $a->x, "\n";

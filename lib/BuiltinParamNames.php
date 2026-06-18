@@ -18,6 +18,8 @@ final class BuiltinParamNames
         switch ($lc) {
             case 'strlen':
                 return ['string'];
+            case 'substr':
+                return ['string', 'offset', 'length'];
             case 'parse_str':
                 return ['string', 'array'];
             case 'sort':
@@ -34,6 +36,10 @@ final class BuiltinParamNames
                 return ['array', 'flags'];
             case 'array_push':
                 return ['array'];
+            case 'array_slice':
+                return ['array', 'offset', 'length', 'preserve_keys'];
+            case 'array_chunk':
+                return ['array', 'length', 'preserve_keys'];
             case 'similar_text':
                 return ['string1', 'string2', 'percent'];
             case 'settype':
@@ -51,7 +57,7 @@ final class BuiltinParamNames
             case 'ldexp':
                 return ['num', 'exp'];
             case 'touch':
-                return ['filename', 'time', 'atime'];
+                return ['filename', 'mtime', 'atime'];
             case 'getenv':
                 return ['name', 'local_only'];
             case 'define':
@@ -96,6 +102,8 @@ final class BuiltinParamNames
                 return ['url', 'component'];
             case 'getopt':
                 return ['short_options', 'long_options', 'rest_index'];
+            case 'is_callable':
+                return ['value', 'syntax_only', 'callable_name'];
         }
 
         return null;

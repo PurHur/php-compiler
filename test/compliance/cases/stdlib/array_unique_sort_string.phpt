@@ -17,4 +17,4 @@ echo count(array_unique($c)), "\n";
 1
 2
 2
-3
+2

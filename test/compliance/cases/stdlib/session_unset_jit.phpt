@@ -8,7 +8,7 @@ $before = session_status();
 session_unset();
 $after = session_status();
 if (enum_exists('SessionStatus')) {
-    echo ($before === SessionStatus::Active && $after === SessionStatus::Active) ? "active\n" : "inactive\n";
+    echo ($before === PHP_SESSION_ACTIVE && $after === PHP_SESSION_ACTIVE) ? "active\n" : "inactive\n";
 } else {
     echo ($before === PHP_SESSION_ACTIVE && $after === PHP_SESSION_ACTIVE) ? "active\n" : "inactive\n";
 }

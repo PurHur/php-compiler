@@ -3,7 +3,7 @@
 declare(strict_types=1);
 
 /**
- * VM-runtime sprintf() subset (%s, %d, %f, %%, %n$ positional, width/flags, #3631, #9069).
+ * VM-runtime sprintf() subset (%s, %d, %f, %a, %A, %%, %n$ positional, width/flags, #3631, #9069).
  */
 
 namespace PHPCompiler\ext\standard;
@@ -64,7 +64,9 @@ final class VmSprintf
                 $parsed['spec'],
                 $args[$varIdx],
                 $frame,
-                $precision
+                $precision,
+                $parsed['showSign'],
+                $parsed['altForm']
             );
             $out .= self::applyWidth(
                 $converted,
@@ -91,6 +93,8 @@ final class VmSprintf
      *     positional: ?int,
      *     leftAdjust: bool,
      *     zeroPad: bool,
+     *     showSign: ?string,
+     *     altForm: bool,
      *     width: ?int,
      *     widthFromArg: bool,
      *     precision: ?int,
@@ -108,6 +112,8 @@ final class VmSprintf
                 'positional' => null,
                 'leftAdjust' => false,
                 'zeroPad' => false,
+                'showSign' => null,
+                'altForm' => false,
                 'width' => null,
                 'widthFromArg' => false,
                 'precision' => null,
@@ -137,6 +143,8 @@ final class VmSprintf
 
         $leftAdjust = false;
         $zeroPad = false;
+        $showSign = null;
+        $altForm = false;
         while ($pos < $len) {
             $flag = $format[$pos];
             if ('-' === $flag) {
@@ -149,7 +157,20 @@ final class VmSprintf
                 ++$pos;
                 continue;
             }
-            if (\in_array($flag, ['+', ' ', '#'], true)) {
+            if ('+' === $flag) {
+                $showSign = '+';
+                ++$pos;
+                continue;
+            }
+            if (' ' === $flag) {
+                if (null === $showSign) {
+                    $showSign = ' ';
+                }
+                ++$pos;
+                continue;
+            }
+            if ('#' === $flag) {
+                $altForm = true;
                 ++$pos;
                 continue;
             }
@@ -198,6 +219,8 @@ final class VmSprintf
             'positional' => $positional,
             'leftAdjust' => $leftAdjust,
             'zeroPad' => $zeroPad,
+            'showSign' => $showSign,
+            'altForm' => $altForm,
             'width' => $width,
             'widthFromArg' => $widthFromArg,
             'precision' => $precision,
@@ -260,8 +283,12 @@ final class VmSprintf
             return $value.str_repeat(' ', $padLen);
         }
         if ($zeroPad && 's' !== $spec) {
-            if (str_starts_with($value, '-')) {
-                return '-'.str_repeat('0', $padLen).substr($value, 1);
+            if (
+                str_starts_with($value, '-')
+                || str_starts_with($value, '+')
+                || str_starts_with($value, ' ')
+            ) {
+                return $value[0].str_repeat('0', $padLen).substr($value, 1);
             }
 
             return str_repeat('0', $padLen).$value;
@@ -274,24 +301,26 @@ final class VmSprintf
         string $spec,
         Variable $var,
         ?Frame $frame,
-        ?int $precision
+        ?int $precision,
+        ?string $showSign = null,
+        bool $altForm = false
     ): string {
         $floatPrec = $precision ?? 6;
         switch ($spec) {
             case 's':
                 return self::argToString($var, $frame);
             case 'd':
-                return self::intToDecimal(self::argToInt($var, $frame));
+                return self::formatSignedDecimal(self::argToInt($var, $frame), $showSign);
             case 'f':
                 return VmNumberFormat::format(self::argToFloat($var, $frame), $floatPrec, '.', '');
             case 'b':
-                return self::intToBinary(self::argToInt($var, $frame));
+                return self::formatRadix(self::argToInt($var, $frame), 2, false, $altForm);
             case 'x':
-                return self::intToRadix(self::argToInt($var, $frame), 16, false);
+                return self::formatRadix(self::argToInt($var, $frame), 16, false, $altForm);
             case 'X':
-                return self::intToRadix(self::argToInt($var, $frame), 16, true);
+                return self::formatRadix(self::argToInt($var, $frame), 16, true, $altForm);
             case 'o':
-                return self::intToRadix(self::argToInt($var, $frame), 8, false);
+                return self::formatRadix(self::argToInt($var, $frame), 8, false, $altForm);
             case 'u':
                 return self::intToUnsignedDecimal(self::argToInt($var, $frame));
             case 'c':
@@ -304,6 +333,10 @@ final class VmSprintf
                 return self::formatGeneral(self::argToFloat($var, $frame), false, $floatPrec);
             case 'G':
                 return self::formatGeneral(self::argToFloat($var, $frame), true, $floatPrec);
+            case 'a':
+                return self::formatHexFloat(self::argToFloat($var, $frame), false, $precision, $showSign);
+            case 'A':
+                return self::formatHexFloat(self::argToFloat($var, $frame), true, $precision, $showSign);
             default:
                 throw new \LogicException(
                     'sprintf() unsupported conversion specifier %'.$spec.' in this compiler build'
@@ -397,6 +430,42 @@ final class VmSprintf
         }
 
         return $negative ? '-'.$digits : $digits;
+    }
+
+    /** php-src sprintf.c — SIGN flag for %d. */
+    private static function formatSignedDecimal(int $value, ?string $showSign): string
+    {
+        if ($value < 0) {
+            return '-'.self::intToDecimal(-$value);
+        }
+        $digits = self::intToDecimal($value);
+        if ('+' === $showSign) {
+            return '+'.$digits;
+        }
+        if (' ' === $showSign) {
+            return ' '.$digits;
+        }
+
+        return $digits;
+    }
+
+    /**
+     * @param 2|8|16 $base
+     */
+    private static function formatRadix(int $value, int $base, bool $upper, bool $altForm): string
+    {
+        $digits = self::intToRadix($value, $base, $upper);
+        if (!$altForm || 0 === $value) {
+            return $digits;
+        }
+        if (16 === $base) {
+            return ($upper ? '0X' : '0x').$digits;
+        }
+        if (8 === $base && isset($digits[0]) && '0' !== $digits[0]) {
+            return '0'.$digits;
+        }
+
+        return $digits;
     }
 
     /**
@@ -528,5 +597,94 @@ final class VmSprintf
         }
 
         return $m[1].$mantissa.$m[3].$m[4];
+    }
+
+    /**
+     * php-src ext/standard/sprintf.c — %a / %A (C99 hex float, issue #9059).
+     */
+    private static function formatHexFloat(
+        float $value,
+        bool $upper,
+        ?int $precision,
+        ?string $showSign = null
+    ): string {
+        if (\is_nan($value)) {
+            return $upper ? 'NAN' : 'nan';
+        }
+        if (\is_infinite($value)) {
+            return ($value < 0 ? '-' : '').($upper ? 'INF' : 'inf');
+        }
+
+        $prec = $precision ?? 13;
+        [$hi, $lo] = Ieee754::float64ToBits($value);
+        $signBit = ($hi >> 31) & 1;
+        $expField = ($hi >> 20) & 0x7FF;
+        $frac = (($hi & 0xFFFFF) << 32) | ($lo & 0xFFFFFFFF);
+
+        $pfx = $upper ? '0X' : '0x';
+        $pSep = $upper ? 'P' : 'p';
+        $hex = $upper ? '0123456789ABCDEF' : '0123456789abcdef';
+
+        $sign = '';
+        if (1 === $signBit) {
+            $sign = '-';
+        } elseif ('+' === $showSign) {
+            $sign = '+';
+        } elseif (' ' === $showSign) {
+            $sign = ' ';
+        }
+
+        if (0 === $expField && 0 === $frac) {
+            return $sign.$pfx.'0'.$pSep.'+0';
+        }
+
+        if ($expField > 0 && $expField < 0x7FF) {
+            $binExp = $expField - 1023;
+            $leadDigit = 1;
+        } else {
+            $binExp = -1022;
+            $leadDigit = 0;
+        }
+
+        $fracHex = '';
+        for ($i = 12; $i >= 0; --$i) {
+            $fracHex .= $hex[($frac >> ($i * 4)) & 0xF];
+        }
+        $fracHex = self::roundHexFraction($fracHex, $prec, $hex);
+        if (null === $precision) {
+            $fracHex = \rtrim($fracHex, '0');
+        }
+
+        $expSign = $binExp >= 0 ? '+' : '-';
+        $expDigits = self::intToDecimal(\abs($binExp));
+
+        if ('' === $fracHex) {
+            return $sign.$pfx.$leadDigit.$pSep.$expSign.$expDigits;
+        }
+
+        return $sign.$pfx.$leadDigit.'.'.$fracHex.$pSep.$expSign.$expDigits;
+    }
+
+    /** Round hex mantissa digits after the decimal point (php-src / libc %a precision). */
+    private static function roundHexFraction(string $digits, int $precision, string $hex): string
+    {
+        if ($precision <= 0) {
+            return '';
+        }
+        if (\strlen($digits) <= $precision) {
+            return \str_pad($digits, $precision, '0');
+        }
+        $out = \substr($digits, 0, $precision);
+        $next = \hexdec($digits[$precision]);
+        if ($next >= 8) {
+            $carry = 1;
+            for ($i = $precision - 1; $i >= 0 && $carry > 0; --$i) {
+                $n = \hexdec($out[$i]) + $carry;
+                $carry = intdiv($n, 16);
+                $out[$i] = $hex[$n % 16];
+            }
+        }
+
+        return $out;
     }
 }

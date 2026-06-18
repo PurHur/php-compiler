@@ -61,6 +61,24 @@ PHP;
         self::assertStringNotContainsString('Variable function calls not yet supported', $stderr);
     }
 
+    /** Issue #6845 / #9250: enum case E::A->f(...) FCC must JIT-compile (empty userType + classHint). */
+    public function testEnumCaseMethodCallableCompiles(): void
+    {
+        $this->skipUnlessLlvmReady();
+        $code = <<<'PHP'
+<?php
+enum E: int {
+    case A = 1;
+    public function f(): int { return 42; }
+}
+$c = E::A->f(...);
+echo $c(), "\n";
+PHP;
+        $stderr = $this->runJitProbeInSubprocess($code);
+        self::assertStringNotContainsString('Call to undefined method', $stderr);
+        self::assertStringNotContainsString('Module verification failed', $stderr);
+    }
+
     public function testCompilerLowersFirstClassCallableToFromCallableOpcode(): void
     {
         $code = <<<'PHP'
