@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace PHPCompiler\ext\ctype;
 
-use PHPCompiler\JIT\Builtin\CtypeJit;
+use PHPCompiler\JIT\Builtin\CtypeRuntime;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitStringArg;
 use PHPCompiler\JIT\JitValueBox;
@@ -12,7 +12,7 @@ use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Builder;
 use PHPLLVM\Value;
 
-/** LLVM JIT helper for ctype_* (php-src ext/ctype/ctype.c; #7253). */
+/** LLVM JIT helper for ctype_* (php-src ext/ctype/ctype.c; #7253, #9234). */
 final class JitCtype
 {
     public static function invoke(Context $context, JITVariable $arg, string $function): Value
@@ -37,7 +37,7 @@ final class JitCtype
             );
         }
 
-        CtypeJit::implement($context);
+        CtypeRuntime::ensureLinked($context);
         $i8 = $context->getTypeFromString('int8');
         $i32 = $context->getTypeFromString('int32');
         $zero = $i32->constInt(0, false);
@@ -48,8 +48,7 @@ final class JitCtype
         if (JITVariable::TYPE_STRING === $arg->type) {
             $result = $context->builder->call(
                 $context->lookupFunction('__phpc_ctype_check_string'),
-                self::stringDataPtr($context, $arg->value),
-                $context->builder->call($context->lookupFunction('__string__strlen'), $arg->value),
+                $arg->value,
                 $kindConst
             );
 
@@ -84,12 +83,5 @@ final class JitCtype
     private static function boolConst(Context $context, bool $value): Value
     {
         return $context->getTypeFromString('int1')->constInt($value ? 1 : 0, false);
-    }
-
-    private static function stringDataPtr(Context $context, Value $strPtr): Value
-    {
-        $off = $context->structFieldMap[$context->structNameForValue($strPtr)]['value'];
-
-        return $context->builder->structGep($strPtr, $off);
     }
 }
