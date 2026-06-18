@@ -113,6 +113,8 @@ final class BuiltinParamNames
                 return ['value', 'syntax_only', 'callable_name'];
             case 'iterator_to_array':
                 return ['iterator', 'preserve_keys'];
+            case 'hrtime':
+                return ['as_number'];
         }
 
         return null;
