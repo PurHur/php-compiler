@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace PHPCompiler\JIT\Builtin;
 
+use PHPCompiler\JIT;
 use PHPCompiler\JIT\Builtin;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\Variable as JITVariable;
@@ -11,14 +12,49 @@ use PHPCompiler\VM\Variable as VmVariable;
 use PHPLLVM\BasicBlock;
 use PHPLLVM\Builder;
 use PHPLLVM\Value;
+use PHPLLVM\Value\Function_ as LlvmFunction;
 
 /**
- * assert_options() LLVM runtime (ext/standard/assert.c; issue #3316 phase 2).
+ * assert_options() JIT/AOT bridge via AssertOptionsJitHelper PHP (#9513).
  *
  * php-src: ext/standard/assert.c — PHP_FUNCTION(assert_options)
  */
 final class AssertOptionsRuntime
 {
+    private const HELPER_PATH = '/ext/standard/AssertOptionsJitHelper.php';
+
+    public const IS_ENABLED = 'PHPCompiler\\ext\\standard\\AssertOptionsJitHelper::isEnabled';
+
+    public const EXCEPTION_MODE = 'PHPCompiler\\ext\\standard\\AssertOptionsJitHelper::shouldThrowOnFailure';
+
+    private const GET_ACTIVE = 'PHPCompiler\\ext\\standard\\AssertOptionsJitHelper::getActiveInt';
+
+    private const SET_ACTIVE = 'PHPCompiler\\ext\\standard\\AssertOptionsJitHelper::setActiveBool';
+
+    private const GET_BAIL = 'PHPCompiler\\ext\\standard\\AssertOptionsJitHelper::getBailInt';
+
+    private const SET_BAIL = 'PHPCompiler\\ext\\standard\\AssertOptionsJitHelper::setBailBool';
+
+    private const GET_EXCEPTION = 'PHPCompiler\\ext\\standard\\AssertOptionsJitHelper::getExceptionInt';
+
+    private const SET_EXCEPTION = 'PHPCompiler\\ext\\standard\\AssertOptionsJitHelper::setExceptionBool';
+
+    private const GET_CALLBACK = 'PHPCompiler\\ext\\standard\\AssertOptionsJitHelper::getCallbackString';
+
+    private const SET_CALLBACK = 'PHPCompiler\\ext\\standard\\AssertOptionsJitHelper::setCallbackString';
+
+    public const INI_GET_ZEND_ASSERTIONS = 'PHPCompiler\\ext\\standard\\AssertOptionsJitHelper::iniGetZendAssertions';
+
+    public const INI_SET_ZEND_ASSERTIONS = 'PHPCompiler\\ext\\standard\\AssertOptionsJitHelper::iniSetZendAssertionsFromString';
+
+    public const INI_GET_ACTIVE = 'PHPCompiler\\ext\\standard\\AssertOptionsJitHelper::iniGetActive';
+
+    public const INI_SET_ACTIVE = 'PHPCompiler\\ext\\standard\\AssertOptionsJitHelper::iniSetActiveFromString';
+
+    public const INI_GET_EXCEPTION = 'PHPCompiler\\ext\\standard\\AssertOptionsJitHelper::iniGetException';
+
+    public const INI_SET_EXCEPTION = 'PHPCompiler\\ext\\standard\\AssertOptionsJitHelper::iniSetExceptionFromString';
+
     private const ASSERT_ACTIVE = 1;
 
     private const ASSERT_CALLBACK = 2;
@@ -29,9 +65,28 @@ final class AssertOptionsRuntime
 
     private const ASSERT_EXCEPTION = 5;
 
+    /** @var list<string> */
+    private const COMPILED_HELPERS = [
+        self::IS_ENABLED,
+        self::EXCEPTION_MODE,
+        self::GET_ACTIVE,
+        self::SET_ACTIVE,
+        self::GET_BAIL,
+        self::SET_BAIL,
+        self::GET_EXCEPTION,
+        self::SET_EXCEPTION,
+        self::GET_CALLBACK,
+        self::SET_CALLBACK,
+        self::INI_GET_ZEND_ASSERTIONS,
+        self::INI_SET_ZEND_ASSERTIONS,
+        self::INI_GET_ACTIVE,
+        self::INI_SET_ACTIVE,
+        self::INI_GET_EXCEPTION,
+        self::INI_SET_EXCEPTION,
+    ];
+
     public static function ensureLinked(Context $context): void
     {
-        AssertIniRuntime::ensureGlobals($context);
         if (Builtin::LOAD_TYPE_STANDALONE !== $context->loadType) {
             self::implement($context);
         }
@@ -42,6 +97,18 @@ final class AssertOptionsRuntime
         self::implement($context);
     }
 
+    public static function lookupHelper(Context $context, string $logical): LlvmFunction
+    {
+        self::ensureJitHelperCompiled($context);
+        $lc = \strtolower($logical);
+        $fn = $context->functions[$lc] ?? null;
+        if (null === $fn) {
+            throw new \LogicException($logical.' missing after AssertOptionsJitHelper compile (#9513)');
+        }
+
+        return $fn;
+    }
+
     private static function implement(Context $context): void
     {
         $probe = $context->module->getNamedFunction('__compiler_assert_options');
@@ -49,9 +116,102 @@ final class AssertOptionsRuntime
             return;
         }
 
-        self::ensureLibc($context);
+        self::ensureJitHelperCompiled($context);
         self::ensureValueHelpers($context);
+        self::implementAbiBridges($context);
         self::implementAssertOptions($context, $probe);
+    }
+
+    private static function implementAbiBridges(Context $context): void
+    {
+        self::implementBoolAbiBridge($context, AssertIniRuntime::ABI_ENABLED, self::IS_ENABLED);
+        self::implementBoolAbiBridge($context, AssertIniRuntime::ABI_EXCEPTION_MODE, self::EXCEPTION_MODE);
+        self::implementIniGetAbiBridge($context, AssertIniRuntime::ABI_INI_GET_ZEND_ASSERTIONS, self::INI_GET_ZEND_ASSERTIONS);
+        self::implementIniGetAbiBridge($context, AssertIniRuntime::ABI_INI_GET_ACTIVE, self::INI_GET_ACTIVE);
+        self::implementIniGetAbiBridge($context, AssertIniRuntime::ABI_INI_GET_EXCEPTION, self::INI_GET_EXCEPTION);
+        self::implementIniSetAbiBridge($context, AssertIniRuntime::ABI_INI_SET_ZEND_ASSERTIONS, self::INI_SET_ZEND_ASSERTIONS);
+        self::implementIniSetAbiBridge($context, AssertIniRuntime::ABI_INI_SET_ACTIVE, self::INI_SET_ACTIVE);
+        self::implementIniSetAbiBridge($context, AssertIniRuntime::ABI_INI_SET_EXCEPTION, self::INI_SET_EXCEPTION);
+    }
+
+    private static function implementBoolAbiBridge(Context $context, string $abiName, string $helperLogical): void
+    {
+        $probe = $context->module->getNamedFunction($abiName);
+        if (null !== $probe && $probe->countBasicBlocks() > 0) {
+            $context->registerFunction($abiName, $probe);
+
+            return;
+        }
+
+        $i1 = $context->getTypeFromString('int1');
+        $ft = $context->context->functionType($i1, false);
+        $fn = null !== $probe
+            ? $probe
+            : $context->module->addFunction($abiName, $ft);
+
+        $entry = $fn->appendBasicBlock('assert_abi_entry');
+        $context->builder->positionAtEnd($entry);
+        $enabled = $context->builder->call(self::lookupHelper($context, $helperLogical));
+        $context->builder->returnValue($enabled);
+        $context->registerFunction($abiName, $fn);
+    }
+
+    private static function implementIniGetAbiBridge(Context $context, string $abiName, string $helperLogical): void
+    {
+        $probe = $context->module->getNamedFunction($abiName);
+        if (null !== $probe && $probe->countBasicBlocks() > 0) {
+            $context->registerFunction($abiName, $probe);
+
+            return;
+        }
+
+        $valPtr = $context->getTypeFromString('__value__*');
+        $voidTy = $context->getTypeFromString('void');
+        $ft = $context->context->functionType($voidTy, false, $valPtr);
+        $fn = null !== $probe
+            ? $probe
+            : $context->module->addFunction($abiName, $ft);
+
+        $entry = $fn->appendBasicBlock('assert_ini_get_entry');
+        $context->builder->positionAtEnd($entry);
+        $out = $fn->getParam(0);
+        $str = $context->builder->call(self::lookupHelper($context, $helperLogical));
+        $context->builder->call($context->lookupFunction('__value__writeString'), $out, $str);
+        $context->builder->returnVoid();
+        $context->registerFunction($abiName, $fn);
+    }
+
+    private static function implementIniSetAbiBridge(Context $context, string $abiName, string $helperLogical): void
+    {
+        $probe = $context->module->getNamedFunction($abiName);
+        if (null !== $probe && $probe->countBasicBlocks() > 0) {
+            $context->registerFunction($abiName, $probe);
+
+            return;
+        }
+
+        $i8p = $context->getTypeFromString('int8*');
+        $i64 = $context->getTypeFromString('int64');
+        $sizeT = $context->getTypeFromString('size_t');
+        $voidTy = $context->getTypeFromString('void');
+        $ft = $context->context->functionType($voidTy, false, $i8p);
+        $fn = null !== $probe
+            ? $probe
+            : $context->module->addFunction($abiName, $ft);
+
+        $entry = $fn->appendBasicBlock('assert_ini_set_entry');
+        $context->builder->positionAtEnd($entry);
+        $cstr = $fn->getParam(0);
+        $len = $context->builder->call($context->lookupFunction('strlen'), $cstr);
+        $valStr = $context->builder->call(
+            $context->lookupFunction('__string__init'),
+            $context->builder->sext($len, $i64),
+            $context->builder->pointerCast($cstr, $context->getTypeFromString('char*'))
+        );
+        $context->builder->call(self::lookupHelper($context, $helperLogical), $valStr);
+        $context->builder->returnVoid();
+        $context->registerFunction($abiName, $fn);
+        self::ensureExternal($context, 'strlen', $context->context->functionType($sizeT, false, $i8p));
     }
 
     private static function implementAssertOptions(Context $context, Value $fn): void
@@ -75,7 +235,6 @@ final class AssertOptionsRuntime
         $valueIn = $fn->getParam(2);
         $out = $fn->getParam(3);
 
-        $i32 = $context->getTypeFromString('int32');
         $i64 = $context->getTypeFromString('int64');
 
         $isActive = $context->builder->icmp(
@@ -117,25 +276,17 @@ final class AssertOptionsRuntime
         );
         $context->builder->branchIf($isException, $exceptionBb, $failBb);
 
-        self::implementIntOption($context, $fn, $activeBb, AssertIniRuntime::G_ASSERT_ACTIVE, $hasValue, $valueIn, $out);
-        self::implementIntOption($context, $fn, $bailBb, AssertIniRuntime::G_ASSERT_BAIL, $hasValue, $valueIn, $out);
-        self::implementIntOption($context, $fn, $exceptionBb, AssertIniRuntime::G_ASSERT_EXCEPTION, $hasValue, $valueIn, $out);
+        self::implementIntOption($context, $fn, $activeBb, self::GET_ACTIVE, self::SET_ACTIVE, $hasValue, $valueIn, $out);
+        self::implementIntOption($context, $fn, $bailBb, self::GET_BAIL, self::SET_BAIL, $hasValue, $valueIn, $out);
+        self::implementIntOption($context, $fn, $exceptionBb, self::GET_EXCEPTION, self::SET_EXCEPTION, $hasValue, $valueIn, $out);
         self::implementCallbackOption($context, $fn, $callbackBb, $hasValue, $valueIn, $out);
 
         $context->builder->positionAtEnd($warningBb);
-        $context->builder->call(
-            $context->lookupFunction('__value__writeBool'),
-            $out,
-            $i32->constInt(0, false)
-        );
+        self::writeBoolFalse($context, $out);
         $context->builder->returnVoid();
 
         $context->builder->positionAtEnd($failBb);
-        $context->builder->call(
-            $context->lookupFunction('__value__writeBool'),
-            $out,
-            $i32->constInt(0, false)
-        );
+        self::writeBoolFalse($context, $out);
         $context->builder->returnVoid();
         $context->builder->clearInsertionPosition();
     }
@@ -144,7 +295,8 @@ final class AssertOptionsRuntime
         Context $context,
         Value $fn,
         BasicBlock $block,
-        string $globalName,
+        string $getHelper,
+        string $setHelper,
         Value $hasValue,
         Value $valueIn,
         Value $out
@@ -152,22 +304,22 @@ final class AssertOptionsRuntime
         $context->builder->positionAtEnd($block);
         $i32 = $context->getTypeFromString('int32');
         $i64 = $context->getTypeFromString('int64');
-        $globalPtr = AssertIniRuntime::globalPtr($context, $globalName);
-        $old = $context->builder->load($globalPtr);
+
+        $old = $context->builder->call(self::lookupHelper($context, $getHelper));
         $context->builder->call(
             $context->lookupFunction('__value__writeLong'),
             $out,
             $context->builder->sext($old, $i64)
         );
 
-        $applyBb = $fn->appendBasicBlock('aopt_'.$globalName.'_apply');
-        $doneBb = $fn->appendBasicBlock('aopt_'.$globalName.'_done');
+        $applyBb = $fn->appendBasicBlock('aopt_apply_'.(string) ++self::$blockSeq);
+        $doneBb = $fn->appendBasicBlock('aopt_done_'.(string) self::$blockSeq);
         $shouldApply = $context->builder->icmp(Builder::INT_NE, $hasValue, $i32->constInt(0, false));
         $context->builder->branchIf($shouldApply, $applyBb, $doneBb);
 
         $context->builder->positionAtEnd($applyBb);
-        $truthy = self::loadTruthyFromValue($context, $fn, $valueIn);
-        $context->builder->store($truthy, $globalPtr);
+        $truthy = self::coerceTruthyFromValue($context, $fn, $valueIn);
+        $context->builder->call(self::lookupHelper($context, $setHelper), $truthy);
         $context->builder->branch($doneBb);
 
         $context->builder->positionAtEnd($doneBb);
@@ -184,32 +336,13 @@ final class AssertOptionsRuntime
     ): void {
         $context->builder->positionAtEnd($block);
         $i32 = $context->getTypeFromString('int32');
-        $i8p = $context->getTypeFromString('int8*');
-        $sizeT = $context->getTypeFromString('size_t');
-        $globalPtr = AssertIniRuntime::callbackGlobalPtr($context);
-        $oldPtr = $context->builder->load($globalPtr);
+        $i8 = $context->getTypeFromString('int8');
 
-        $emptyBb = $fn->appendBasicBlock('aopt_cb_empty');
-        $copyBb = $fn->appendBasicBlock('aopt_cb_copy');
-        $afterReadBb = $fn->appendBasicBlock('aopt_cb_after_read');
-        $isNull = $context->builder->icmp(Builder::INT_EQ, $oldPtr, $i8p->constNull());
-        $context->builder->branchIf($isNull, $emptyBb, $copyBb);
+        $oldStr = $context->builder->call(self::lookupHelper($context, self::GET_CALLBACK));
+        $context->builder->call($context->lookupFunction('__value__writeString'), $out, $oldStr);
 
-        $context->builder->positionAtEnd($emptyBb);
-        self::writeValueStringFromCstr(
-            $context,
-            $out,
-            $context->builder->pointerCast($context->constantFromString(''), $i8p)
-        );
-        $context->builder->branch($afterReadBb);
-
-        $context->builder->positionAtEnd($copyBb);
-        self::writeValueStringFromCstr($context, $out, $oldPtr);
-        $context->builder->branch($afterReadBb);
-
-        $applyBb = $fn->appendBasicBlock('aopt_cb_apply');
-        $doneBb = $fn->appendBasicBlock('aopt_cb_done');
-        $context->builder->positionAtEnd($afterReadBb);
+        $applyBb = $fn->appendBasicBlock('aopt_cb_apply_'.(string) ++self::$blockSeq);
+        $doneBb = $fn->appendBasicBlock('aopt_cb_done_'.(string) self::$blockSeq);
         $shouldApply = $context->builder->icmp(Builder::INT_NE, $hasValue, $i32->constInt(0, false));
         $context->builder->branchIf($shouldApply, $applyBb, $doneBb);
 
@@ -218,87 +351,53 @@ final class AssertOptionsRuntime
         $typeByte = $context->builder->load(
             $context->builder->structGep($valueIn, $map['type'])
         );
-        $stringTy = $context->getTypeFromString('int8')->constInt(VmVariable::TYPE_STRING, false);
+        $stringTy = $i8->constInt(VmVariable::TYPE_STRING, false);
         $isString = $context->builder->icmp(Builder::INT_EQ, $typeByte, $stringTy);
-        $rejectBb = $fn->appendBasicBlock('aopt_cb_reject');
-        $storeBb = $fn->appendBasicBlock('aopt_cb_store');
+        $rejectBb = $fn->appendBasicBlock('aopt_cb_reject_'.(string) self::$blockSeq);
+        $storeBb = $fn->appendBasicBlock('aopt_cb_store_'.(string) self::$blockSeq);
         $context->builder->branchIf($isString, $storeBb, $rejectBb);
 
         $context->builder->positionAtEnd($rejectBb);
-        $context->builder->call(
-            $context->lookupFunction('__value__writeBool'),
-            $out,
-            $i32->constInt(0, false)
-        );
+        self::writeBoolFalse($context, $out);
         $context->builder->branch($doneBb);
 
         $context->builder->positionAtEnd($storeBb);
-        $strPtr = $context->builder->call(
-            $context->lookupFunction('__value__readString'),
-            $valueIn
-        );
+        $strPtr = $context->builder->call($context->lookupFunction('__value__readString'), $valueIn);
         $strMap = $context->structFieldMap['__string__'];
         $strLen = $context->builder->load(
             $context->builder->structGep($strPtr, $strMap['length'])
         );
-        $strData = $context->builder->pointerCast(
-            $context->builder->structGep($strPtr, $strMap['value']),
-            $i8p
-        );
         $i64 = $context->getTypeFromString('int64');
         $isEmpty = $context->builder->icmp(Builder::INT_EQ, $strLen, $i64->constInt(0, false));
-        $freeOldBb = $fn->appendBasicBlock('aopt_cb_free_old');
-        $setNullBb = $fn->appendBasicBlock('aopt_cb_set_null');
-        $dupBb = $fn->appendBasicBlock('aopt_cb_dup');
-        $context->builder->branchIf($isEmpty, $freeOldBb, $dupBb);
+        $emptyBb = $fn->appendBasicBlock('aopt_cb_empty_'.(string) self::$blockSeq);
+        $copyBb = $fn->appendBasicBlock('aopt_cb_copy_'.(string) self::$blockSeq);
+        $afterSetBb = $fn->appendBasicBlock('aopt_cb_after_set_'.(string) self::$blockSeq);
+        $context->builder->branchIf($isEmpty, $emptyBb, $copyBb);
 
-        $context->builder->positionAtEnd($freeOldBb);
-        $notNull = $context->builder->icmp(Builder::INT_NE, $oldPtr, $i8p->constNull());
-        $freeBb = $fn->appendBasicBlock('aopt_cb_do_free');
-        $afterFreeBb = $fn->appendBasicBlock('aopt_cb_after_free');
-        $context->builder->branchIf($notNull, $freeBb, $afterFreeBb);
-        $context->builder->positionAtEnd($freeBb);
-        $context->builder->call($context->lookupFunction('free'), $oldPtr);
-        $context->builder->branch($afterFreeBb);
-        $context->builder->positionAtEnd($afterFreeBb);
-        $context->builder->store($i8p->constNull(), $globalPtr);
-        $context->builder->branch($doneBb);
+        $emptyStr = self::literalEmptyString($context);
+        $context->builder->positionAtEnd($emptyBb);
+        $context->builder->call(self::lookupHelper($context, self::SET_CALLBACK), $emptyStr);
+        $context->builder->branch($afterSetBb);
 
-        $context->builder->positionAtEnd($dupBb);
-        $allocLen = $context->builder->add($strLen, $i64->constInt(1, false));
-        $allocSize = $context->builder->trunc($allocLen, $sizeT);
-        $newPtr = $context->builder->pointerCast(
-            $context->builder->call($context->lookupFunction('malloc'), $allocSize),
-            $i8p
-        );
-        $context->builder->call(
-            $context->lookupFunction('memcpy'),
-            $newPtr,
-            $strData,
-            $context->builder->trunc($strLen, $sizeT)
-        );
-        $term = $context->builder->inBoundsGEP($newPtr, $context->builder->trunc($strLen, $sizeT));
-        $context->builder->store($context->getTypeFromString('int8')->constInt(0, false), $term);
-        $hadOld = $context->builder->icmp(Builder::INT_NE, $oldPtr, $i8p->constNull());
-        $freeOld2Bb = $fn->appendBasicBlock('aopt_cb_free_old2');
-        $afterDupBb = $fn->appendBasicBlock('aopt_cb_after_dup');
-        $context->builder->branchIf($hadOld, $freeOld2Bb, $afterDupBb);
-        $context->builder->positionAtEnd($freeOld2Bb);
-        $context->builder->call($context->lookupFunction('free'), $oldPtr);
-        $context->builder->branch($afterDupBb);
-        $context->builder->positionAtEnd($afterDupBb);
-        $context->builder->store($newPtr, $globalPtr);
+        $context->builder->positionAtEnd($copyBb);
+        $context->builder->call(self::lookupHelper($context, self::SET_CALLBACK), $strPtr);
+        $context->builder->branch($afterSetBb);
+
+        $context->builder->positionAtEnd($afterSetBb);
         $context->builder->branch($doneBb);
 
         $context->builder->positionAtEnd($doneBb);
         $context->builder->returnVoid();
     }
 
-    private static function loadTruthyFromValue(Context $context, Value $fn, Value $valueIn): Value
+    private static int $blockSeq = 0;
+
+    private static function coerceTruthyFromValue(Context $context, Value $fn, Value $valueIn): Value
     {
         $i32 = $context->getTypeFromString('int32');
         $i64 = $context->getTypeFromString('int64');
         $i8 = $context->getTypeFromString('int8');
+        $i1 = $context->getTypeFromString('int1');
         $map = $context->structFieldMap['__value__'];
         $typeByte = $context->builder->load(
             $context->builder->structGep($valueIn, $map['type'])
@@ -311,32 +410,38 @@ final class AssertOptionsRuntime
         $floatTy = $i8->constInt(VmVariable::TYPE_FLOAT, false);
         $stringTy = $i8->constInt(VmVariable::TYPE_STRING, false);
 
-        $falseBb = $fn->appendBasicBlock('aopt_truthy_false');
-        $boolBodyBb = $fn->appendBasicBlock('aopt_truthy_bool_body');
-        $boolSetBb = $fn->appendBasicBlock('aopt_truthy_bool_set');
-        $intBb = $fn->appendBasicBlock('aopt_truthy_int');
-        $floatBodyBb = $fn->appendBasicBlock('aopt_truthy_float_body');
-        $stringBb = $fn->appendBasicBlock('aopt_truthy_string');
-        $defaultBb = $fn->appendBasicBlock('aopt_truthy_default');
-        $doneBb = $fn->appendBasicBlock('aopt_truthy_done');
-        $testIntBb = $fn->appendBasicBlock('aopt_truthy_test_int');
-        $testFloatBb = $fn->appendBasicBlock('aopt_truthy_test_float');
-        $testStringBb = $fn->appendBasicBlock('aopt_truthy_test_string');
+        $falseBb = $fn->appendBasicBlock('aopt_truthy_false_'.(string) ++self::$blockSeq);
+        $boolBb = $fn->appendBasicBlock('aopt_truthy_bool_'.(string) self::$blockSeq);
+        $intBb = $fn->appendBasicBlock('aopt_truthy_int_'.(string) self::$blockSeq);
+        $floatBb = $fn->appendBasicBlock('aopt_truthy_float_'.(string) self::$blockSeq);
+        $stringBb = $fn->appendBasicBlock('aopt_truthy_string_'.(string) self::$blockSeq);
+        $defaultBb = $fn->appendBasicBlock('aopt_truthy_default_'.(string) self::$blockSeq);
+        $doneBb = $fn->appendBasicBlock('aopt_truthy_done_'.(string) self::$blockSeq);
+        $testBool = $fn->appendBasicBlock('aopt_truthy_test_bool_'.(string) self::$blockSeq);
+        $testInt = $fn->appendBasicBlock('aopt_truthy_test_int_'.(string) self::$blockSeq);
+        $testFloat = $fn->appendBasicBlock('aopt_truthy_test_float_'.(string) self::$blockSeq);
+        $testString = $fn->appendBasicBlock('aopt_truthy_test_string_'.(string) self::$blockSeq);
 
         $isNull = $context->builder->icmp(Builder::INT_EQ, $typeByte, $nullTy);
         $isUndef = $context->builder->icmp(Builder::INT_EQ, $typeByte, $undefTy);
-        $falsy = $context->builder->or($isNull, $isUndef);
-        $context->builder->branchIf($falsy, $falseBb, $boolBodyBb);
+        $context->builder->branchIf(
+            $context->builder->or($isNull, $isUndef),
+            $falseBb,
+            $testBool
+        );
 
         $context->builder->positionAtEnd($falseBb);
-        $falseVal = $i32->constInt(0, false);
+        $falseVal = $i1->constInt(0, false);
         $context->builder->branch($doneBb);
 
-        $context->builder->positionAtEnd($boolBodyBb);
-        $isBool = $context->builder->icmp(Builder::INT_EQ, $typeByte, $boolTy);
-        $context->builder->branchIf($isBool, $boolSetBb, $testIntBb);
+        $context->builder->positionAtEnd($testBool);
+        $context->builder->branchIf(
+            $context->builder->icmp(Builder::INT_EQ, $typeByte, $boolTy),
+            $boolBb,
+            $testInt
+        );
 
-        $context->builder->positionAtEnd($boolSetBb);
+        $context->builder->positionAtEnd($boolBb);
         $valueField = $context->builder->structGep($valueIn, $map['value']);
         $boolByte = $context->builder->load(
             $context->builder->inBoundsGEP(
@@ -345,39 +450,39 @@ final class AssertOptionsRuntime
                 $i64->constInt(0, false)
             )
         );
-        $boolVal = $context->builder->zext(
-            $context->builder->icmp(Builder::INT_NE, $boolByte, $i8->constInt(0, false)),
-            $i32
-        );
+        $boolVal = $context->builder->icmp(Builder::INT_NE, $boolByte, $i8->constInt(0, false));
         $context->builder->branch($doneBb);
 
-        $context->builder->positionAtEnd($testIntBb);
-        $isInt = $context->builder->icmp(Builder::INT_EQ, $typeByte, $intTy);
-        $context->builder->branchIf($isInt, $intBb, $testFloatBb);
+        $context->builder->positionAtEnd($testInt);
+        $context->builder->branchIf(
+            $context->builder->icmp(Builder::INT_EQ, $typeByte, $intTy),
+            $intBb,
+            $testFloat
+        );
 
         $context->builder->positionAtEnd($intBb);
         $num = $context->builder->call($context->lookupFunction('__value__readLong'), $valueIn);
-        $intVal = $context->builder->zext(
-            $context->builder->icmp(Builder::INT_NE, $num, $i64->constInt(0, false)),
-            $i32
-        );
+        $intVal = $context->builder->icmp(Builder::INT_NE, $num, $i64->constInt(0, false));
         $context->builder->branch($doneBb);
 
-        $context->builder->positionAtEnd($testFloatBb);
-        $isFloat = $context->builder->icmp(Builder::INT_EQ, $typeByte, $floatTy);
-        $context->builder->branchIf($isFloat, $floatBodyBb, $testStringBb);
+        $context->builder->positionAtEnd($testFloat);
+        $context->builder->branchIf(
+            $context->builder->icmp(Builder::INT_EQ, $typeByte, $floatTy),
+            $floatBb,
+            $testString
+        );
 
-        $context->builder->positionAtEnd($floatBodyBb);
+        $context->builder->positionAtEnd($floatBb);
         $dbl = $context->builder->call($context->lookupFunction('__value__readDouble'), $valueIn);
-        $floatVal = $context->builder->zext(
-            $context->builder->fcmp(Builder::REAL_ONE, $dbl, $dbl->typeOf()->constReal(0.0)),
-            $i32
-        );
+        $floatVal = $context->builder->fcmp(Builder::REAL_ONE, $dbl, $dbl->typeOf()->constReal(0.0));
         $context->builder->branch($doneBb);
 
-        $context->builder->positionAtEnd($testStringBb);
-        $isStr = $context->builder->icmp(Builder::INT_EQ, $typeByte, $stringTy);
-        $context->builder->branchIf($isStr, $stringBb, $defaultBb);
+        $context->builder->positionAtEnd($testString);
+        $context->builder->branchIf(
+            $context->builder->icmp(Builder::INT_EQ, $typeByte, $stringTy),
+            $stringBb,
+            $defaultBb
+        );
 
         $context->builder->positionAtEnd($stringBb);
         $strPtr = $context->builder->call($context->lookupFunction('__value__readString'), $valueIn);
@@ -385,56 +490,44 @@ final class AssertOptionsRuntime
         $strLen = $context->builder->load(
             $context->builder->structGep($strPtr, $strMap['length'])
         );
-        $strVal = $context->builder->zext(
-            $context->builder->icmp(Builder::INT_NE, $strLen, $i64->constInt(0, false)),
-            $i32
-        );
+        $strVal = $context->builder->icmp(Builder::INT_NE, $strLen, $i64->constInt(0, false));
         $context->builder->branch($doneBb);
 
         $context->builder->positionAtEnd($defaultBb);
-        $defaultVal = $i32->constInt(1, false);
+        $defaultVal = $i1->constInt(1, false);
         $context->builder->branch($doneBb);
 
         $context->builder->positionAtEnd($doneBb);
-        $result = $context->builder->phi($i32);
-        $result->addIncoming($falseVal, $falseBb);
-        $result->addIncoming($boolVal, $boolSetBb);
-        $result->addIncoming($intVal, $intBb);
-        $result->addIncoming($floatVal, $floatBodyBb);
-        $result->addIncoming($strVal, $stringBb);
-        $result->addIncoming($defaultVal, $defaultBb);
+        $phi = $context->builder->phi($i1);
+        $phi->addIncoming($falseVal, $falseBb);
+        $phi->addIncoming($boolVal, $boolBb);
+        $phi->addIncoming($intVal, $intBb);
+        $phi->addIncoming($floatVal, $floatBb);
+        $phi->addIncoming($strVal, $stringBb);
+        $phi->addIncoming($defaultVal, $defaultBb);
 
-        return $result;
+        return $phi;
     }
 
-    private static function writeValueStringFromCstr(Context $context, Value $out, Value $cstr): void
+    private static function literalEmptyString(Context $context): Value
     {
         $i64 = $context->getTypeFromString('int64');
-        $sizeT = $context->getTypeFromString('size_t');
-        $len = $context->builder->call($context->lookupFunction('strlen'), $cstr);
-        $str = $context->builder->call(
+        $charPtr = $context->getTypeFromString('char*');
+
+        return $context->builder->call(
             $context->lookupFunction('__string__init'),
-            $context->builder->sext($len, $i64),
-            $cstr
+            $i64->constInt(0, false),
+            $context->builder->pointerCast($context->constantFromString(''), $charPtr)
         );
-        $context->builder->call($context->lookupFunction('__value__writeString'), $out, $str);
     }
 
-    private static function ensureLibc(Context $context): void
+    private static function writeBoolFalse(Context $context, Value $out): void
     {
-        $voidPtr = $context->getTypeFromString('void*');
-        $voidTy = $context->getTypeFromString('void');
-        $sizeT = $context->getTypeFromString('size_t');
-        $i8p = $context->getTypeFromString('int8*');
-
-        self::ensureExternal($context, 'malloc', $context->context->functionType($voidPtr, false, $sizeT));
-        self::ensureExternal($context, 'free', $context->context->functionType($voidTy, false, $i8p));
-        self::ensureExternal(
-            $context,
-            'memcpy',
-            $context->context->functionType($voidPtr, false, $voidPtr, $voidPtr, $sizeT)
+        $context->builder->call(
+            $context->lookupFunction('__value__writeBool'),
+            $out,
+            $context->getTypeFromString('int32')->constInt(0, false)
         );
-        self::ensureExternal($context, 'strlen', $context->context->functionType($sizeT, false, $i8p));
     }
 
     private static function ensureValueHelpers(Context $context): void
@@ -444,13 +537,12 @@ final class AssertOptionsRuntime
         $i64 = $context->getTypeFromString('int64');
         $dbl = $context->getTypeFromString('double');
         $i32 = $context->getTypeFromString('int32');
-        $i8p = $context->getTypeFromString('int8*');
         $voidTy = $context->getTypeFromString('void');
 
         self::ensureExternal(
             $context,
             '__string__init',
-            $context->context->functionType($strPtr, false, $i64, $i8p)
+            $context->context->functionType($strPtr, false, $i64, $context->getTypeFromString('char*'))
         );
         foreach ([
             ['__value__readLong', $i64, [$valPtr]],
@@ -471,6 +563,57 @@ final class AssertOptionsRuntime
         } catch (\Throwable) {
             $fn = $context->module->addFunction($name, $ft);
             $context->registerFunction($name, $fn);
+        }
+    }
+
+    private static bool $compilingHelper = false;
+
+    private static function ensureJitHelperCompiled(Context $context): void
+    {
+        if (self::$compilingHelper) {
+            return;
+        }
+
+        $missing = false;
+        foreach (self::COMPILED_HELPERS as $logical) {
+            if (!isset($context->functions[\strtolower($logical)])) {
+                $missing = true;
+                break;
+            }
+        }
+        if (!$missing) {
+            return;
+        }
+
+        self::$compilingHelper = true;
+        $runtime = $context->runtime;
+        $path = \dirname(__DIR__, 3).self::HELPER_PATH;
+        $prevSelfHostAot = \getenv('PHP_COMPILER_SELFHOST_AOT');
+        if (\function_exists('putenv')) {
+            \putenv('PHP_COMPILER_SELFHOST_AOT=0');
+        }
+        try {
+            $block = $runtime->parseAndCompile((string) \file_get_contents($path), 'AssertOptionsJitHelper.php');
+            if (null === $block) {
+                throw new \LogicException('AssertOptionsJitHelper.php parseAndCompile failed (#9513)');
+            }
+            $jit = new JIT($context);
+            $jit->compile($block);
+        } finally {
+            self::$compilingHelper = false;
+            if (\function_exists('putenv')) {
+                if (false === $prevSelfHostAot || null === $prevSelfHostAot) {
+                    \putenv('PHP_COMPILER_SELFHOST_AOT=');
+                } else {
+                    \putenv('PHP_COMPILER_SELFHOST_AOT='.$prevSelfHostAot);
+                }
+            }
+        }
+        foreach (self::COMPILED_HELPERS as $logical) {
+            $lc = \strtolower($logical);
+            if (!isset($context->functions[$lc])) {
+                throw new \LogicException($lc.' was not compiled for JIT (#9513)');
+            }
         }
     }
 }

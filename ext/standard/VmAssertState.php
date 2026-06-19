@@ -32,29 +32,19 @@ final class VmAssertState
         self::INI_ASSERT_EXCEPTION,
     ];
 
-    private static int $zendAssertions = -1;
-
-    private static bool $active = true;
-
-    private static bool $exception = true;
-
-    private static bool $bail = false;
-
-    private static ?string $callback = null;
-
     public static function isEnabled(): bool
     {
-        return self::$zendAssertions > 0 && self::$active;
+        return AssertOptionsJitHelper::isEnabled();
     }
 
     public static function shouldThrowOnFailure(): bool
     {
-        return self::$exception;
+        return AssertOptionsJitHelper::shouldThrowOnFailure();
     }
 
     public static function shouldBailOnFailure(): bool
     {
-        return self::$bail;
+        return AssertOptionsJitHelper::shouldBailOnFailure();
     }
 
     /** @return string|false */
@@ -66,11 +56,11 @@ final class VmAssertState
         }
 
         return match ($key) {
-            self::INI_ZEND_ASSERTIONS => (string) self::$zendAssertions,
-            self::INI_ASSERT_ACTIVE => self::$active ? '1' : '0',
-            self::INI_ASSERT_BAIL => self::$bail ? '1' : '0',
-            self::INI_ASSERT_EXCEPTION => self::$exception ? '1' : '0',
-            self::INI_ASSERT_CALLBACK => self::$callback ?? '',
+            self::INI_ZEND_ASSERTIONS => AssertOptionsJitHelper::iniGetZendAssertions(),
+            self::INI_ASSERT_ACTIVE => AssertOptionsJitHelper::iniGetActive(),
+            self::INI_ASSERT_BAIL => AssertOptionsJitHelper::getBailInt() ? '1' : '0',
+            self::INI_ASSERT_EXCEPTION => AssertOptionsJitHelper::iniGetException(),
+            self::INI_ASSERT_CALLBACK => AssertOptionsJitHelper::getCallbackString(),
             default => false,
         };
     }
@@ -90,19 +80,19 @@ final class VmAssertState
 
         switch ($key) {
             case self::INI_ZEND_ASSERTIONS:
-                self::$zendAssertions = (int) $value;
+                AssertOptionsJitHelper::iniSetZendAssertionsFromString($value);
                 break;
             case self::INI_ASSERT_ACTIVE:
-                self::$active = VmIni::parseBoolIni($value);
+                AssertOptionsJitHelper::iniSetActiveFromString($value);
                 break;
             case self::INI_ASSERT_BAIL:
-                self::$bail = VmIni::parseBoolIni($value);
+                AssertOptionsJitHelper::setBailBool(VmIni::parseBoolIni($value));
                 break;
             case self::INI_ASSERT_EXCEPTION:
-                self::$exception = VmIni::parseBoolIni($value);
+                AssertOptionsJitHelper::iniSetExceptionFromString($value);
                 break;
             case self::INI_ASSERT_CALLBACK:
-                self::$callback = '' === trim($value) ? null : $value;
+                AssertOptionsJitHelper::setCallbackString('' === trim($value) ? '' : $value);
                 break;
         }
 
@@ -115,11 +105,11 @@ final class VmAssertState
     public static function getOption(int $what)
     {
         return match ($what) {
-            StdlibConstants::ASSERT_ACTIVE => self::$active ? 1 : 0,
-            StdlibConstants::ASSERT_CALLBACK => self::$callback ?? '',
-            StdlibConstants::ASSERT_BAIL => self::$bail ? 1 : 0,
+            StdlibConstants::ASSERT_ACTIVE => AssertOptionsJitHelper::getActiveInt(),
+            StdlibConstants::ASSERT_CALLBACK => AssertOptionsJitHelper::getCallbackString(),
+            StdlibConstants::ASSERT_BAIL => AssertOptionsJitHelper::getBailInt(),
             StdlibConstants::ASSERT_WARNING => false,
-            StdlibConstants::ASSERT_EXCEPTION => self::$exception ? 1 : 0,
+            StdlibConstants::ASSERT_EXCEPTION => AssertOptionsJitHelper::getExceptionInt(),
             default => false,
         };
     }
@@ -136,20 +126,20 @@ final class VmAssertState
 
         switch ($what) {
             case StdlibConstants::ASSERT_ACTIVE:
-                self::$active = boolval::isTruthy($value);
+                AssertOptionsJitHelper::setActiveBool(boolval::isTruthy($value));
                 break;
             case StdlibConstants::ASSERT_BAIL:
-                self::$bail = boolval::isTruthy($value);
+                AssertOptionsJitHelper::setBailBool(boolval::isTruthy($value));
                 break;
             case StdlibConstants::ASSERT_EXCEPTION:
-                self::$exception = boolval::isTruthy($value);
+                AssertOptionsJitHelper::setExceptionBool(boolval::isTruthy($value));
                 break;
             case StdlibConstants::ASSERT_CALLBACK:
                 if (Variable::TYPE_STRING !== $value->resolveIndirect()->type) {
                     return false;
                 }
                 $str = $value->resolveIndirect()->toString();
-                self::$callback = '' === $str ? null : $str;
+                AssertOptionsJitHelper::setCallbackString('' === $str ? '' : $str);
                 break;
             case StdlibConstants::ASSERT_WARNING:
                 return false;
