@@ -294,6 +294,15 @@ final class PropertyHooks
             $prop = $m[1][0];
             $varStart = $m[0][1];
             $afterVar = $varStart + strlen($m[0][0]);
+            $declLookback = $varStart - 1;
+            while ($declLookback >= 0 && ctype_space($body[$declLookback])) {
+                --$declLookback;
+            }
+            // Assignment inside a condition/paren expr, not a property hook (`($dot = …) {`).
+            if ($declLookback >= 0 && '(' === $body[$declLookback]) {
+                $offset = $afterVar + 1;
+                continue;
+            }
             $i = $afterVar;
             while ($i < $len && ctype_space($body[$i])) {
                 ++$i;
@@ -302,9 +311,26 @@ final class PropertyHooks
                 return null;
             }
             if ('=' === $body[$i]) {
+                // Comparisons, fat arrows, and compound assigns are not hook defaults.
+                if (
+                    ($i > 0 && '=' === $body[$i - 1])
+                    || ($i + 1 < $len && '=' === $body[$i + 1])
+                    || ($i > 0 && '>' === $body[$i - 1])
+                    || ($i + 1 < $len && '>' === $body[$i + 1])
+                    || ($i > 0 && '!' === $body[$i - 1])
+                    || ($i > 0 && '<' === $body[$i - 1])
+                ) {
+                    $offset = $afterVar + 1;
+                    continue;
+                }
                 $hookOpen = $this->scanToHookOpenBrace($body, $i + 1);
                 if (null !== $hookOpen) {
-                    if ($this->isConstructorBodyBraceAfterParamDefault($body, $hookOpen)) {
+                    $assignSlice = substr($body, $i + 1, $hookOpen - $i - 1);
+                    if (preg_match('/\b(match|function)\b/', $assignSlice)) {
+                        $offset = $afterVar + 1;
+                        continue;
+                    }
+                    if ($this->isFunctionBodyBraceAfterParamDefault($body, $hookOpen)) {
                         $offset = $afterVar + 1;
                         continue;
                     }
@@ -324,31 +350,49 @@ final class PropertyHooks
     }
 
     /**
-     * Promoted ctor params with defaults look like `$x = 1) {` — the `{` is the method body (#9729).
+     * Param defaults before a function/closure body look like `$x = 1) {` or `$x = 's'): string {` (#9729, bootstrap spine).
      */
-    private function isConstructorBodyBraceAfterParamDefault(string $body, int $hookOpenPos): bool
+    private function isFunctionBodyBraceAfterParamDefault(string $body, int $hookOpenPos): bool
     {
+        if ($hookOpenPos <= 0 || '{' !== $body[$hookOpenPos]) {
+            return false;
+        }
         $i = $hookOpenPos - 1;
         while ($i >= 0 && ctype_space($body[$i])) {
             --$i;
         }
-        if ($i < 0 || ')' !== $body[$i]) {
+        if ($i < 0) {
             return false;
         }
-        $prefix = substr($body, 0, $i);
-        if (!preg_match('/\bfunction\s+__construct\s*\(/s', $prefix, $m, PREG_OFFSET_CAPTURE)) {
-            return false;
+        if (')' !== $body[$i]) {
+            while ($i >= 0 && ':' !== $body[$i]) {
+                if (!preg_match('/[a-zA-Z0-9_\\\\|&?<>,()\\s]/', $body[$i])) {
+                    return false;
+                }
+                --$i;
+            }
+            if ($i < 0 || ':' !== $body[$i]) {
+                return false;
+            }
+            --$i;
+            while ($i >= 0 && ctype_space($body[$i])) {
+                --$i;
+            }
+            if ($i < 0 || ')' !== $body[$i]) {
+                return false;
+            }
         }
-        $openPos = $m[0][1] + strlen($m[0][0]) - 1;
         $depth = 0;
-        for ($j = $openPos; $j <= $i; ++$j) {
+        for ($j = $i; $j >= 0; --$j) {
             $ch = $body[$j];
-            if ('(' === $ch) {
+            if (')' === $ch) {
                 ++$depth;
-            } elseif (')' === $ch) {
+            } elseif ('(' === $ch) {
                 --$depth;
                 if (0 === $depth) {
-                    return $j === $i;
+                    $before = rtrim(substr($body, 0, $j));
+
+                    return (bool) preg_match('/\bfunction\s*(?:&\s*)?[\w\\\\]*\s*$/s', $before);
                 }
             }
         }

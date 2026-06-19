@@ -600,4 +600,68 @@ PHP;
         $runtime->run($block);
         self::assertSame("1\n", ob_get_clean());
     }
+
+    /** @covers bootstrap spine — method param defaults before typed body must not match hook scanner */
+    public function testSkipsMethodParamDefaultBeforeTypedFunctionBody(): void
+    {
+        $src = <<<'PHP'
+<?php
+class VmString {
+    public static function coerceStringBuiltinArg(
+        $var,
+        string $function,
+        int $argIndex = 0,
+        string $paramName = 'string'
+    ): string {
+        return (string) $var;
+    }
+}
+PHP;
+        [$out] = (new PropertyHooks())->process($src);
+        self::assertSame($src, $out);
+        self::assertStringNotContainsString('__phpc_property_', $out);
+    }
+
+    public function testVmStringSpineFileUnchangedByPropertyHooksPreprocessor(): void
+    {
+        $path = dirname(__DIR__, 3).'/ext/standard/VmString.php';
+        $src = (string) file_get_contents($path);
+        [$out] = (new PropertyHooks())->process($src, $path);
+        self::assertSame($src, $out);
+    }
+
+    /** @covers bootstrap spine — comparison operators and foreach arrows must not match hook default scanner */
+    public function testSkipsComparisonOperatorsAndForeachArrowsBeforeControlFlowBrace(): void
+    {
+        $src = <<<'PHP'
+<?php
+class C {
+    private static function percentEncode(string $data, bool $formEncoding): string
+    {
+        $out = '';
+        for ($i = 0; $i < 1; ++$i) {
+            $ch = $data[$i];
+            if ($ch === '-' || $ch === '_') {
+                $out .= $ch;
+            } elseif ($formEncoding && $ch === ' ') {
+                $out .= '+';
+            }
+        }
+        return $out;
+    }
+
+    private static function map(array $psr4Map): bool
+    {
+        foreach ($psr4Map as $prefix => $_base) {
+            if (str_starts_with('Foo', $prefix)) {
+                return true;
+            }
+        }
+        return false;
+    }
+}
+PHP;
+        [$out] = (new PropertyHooks())->process($src);
+        self::assertSame($src, $out);
+    }
 }
