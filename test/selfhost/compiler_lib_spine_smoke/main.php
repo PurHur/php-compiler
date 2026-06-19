@@ -1813,6 +1813,7 @@ require_once __DIR__.'/../../../lib/Compiler/ClassCompileRegistry.php';
 require_once __DIR__.'/../../../lib/Compiler/ClassConstValueFold.php';
 require_once __DIR__.'/../../../lib/Compiler/CompileFatal.php';
 require_once __DIR__.'/../../../lib/Compiler/CompileTimeNew.php';
+require_once __DIR__.'/../../../lib/Compiler/CompileTimeEnumCase.php';
 require_once __DIR__.'/../../../lib/Compiler/DeprecatedMetadata.php';
 require_once __DIR__.'/../../../lib/Compiler/EnumAbstractMethodCompileCheck.php';
 require_once __DIR__.'/../../../lib/Compiler/EnumBackedCaseCheck.php';
