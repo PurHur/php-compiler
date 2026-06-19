@@ -8,6 +8,7 @@ use PHPCfg\Block as CfgBlock;
 use PHPCfg\Op;
 use PHPCfg\Operand;
 use PHPCfg\Script;
+use PHPCompiler\Cfg\OpSubBlockAccess;
 
 /**
  * Compile-time check: parent:: when current class scope has no parent (#5410, #7381).
@@ -73,17 +74,7 @@ final class EnumParentCompileCheck
                         self::MESSAGE
                     );
                 }
-                foreach ($op->getSubBlocks() as $name) {
-                    $sub = $op->{$name};
-                    if (null === $sub) {
-                        continue;
-                    }
-                    foreach (is_array($sub) ? $sub : [$sub] as $subBlock) {
-                        if ($subBlock instanceof CfgBlock) {
-                            $queue[] = $subBlock;
-                        }
-                    }
-                }
+                OpSubBlockAccess::enqueueSubBlocks($op, $queue);
             }
         }
     }

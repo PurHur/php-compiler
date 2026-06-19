@@ -9,6 +9,7 @@ use PHPCfg\Func as CfgFunc;
 use PHPCfg\Op;
 use PHPCfg\Operand;
 use PHPCfg\Script;
+use PHPCompiler\Cfg\OpSubBlockAccess;
 use PHPCompiler\Runtime;
 
 /**
@@ -224,12 +225,9 @@ final class LiteralIncludeDiscovery
             if ($mainScopeOnly && self::isBundleScopeBoundary($child)) {
                 continue;
             }
-            foreach ($child->getSubBlocks() as $name) {
-                $sub = $child->{$name} ?? null;
-                if ($sub instanceof CfgBlock) {
-                    self::walkCfgBlockInternal($sub, $fromFile, $paths, $seen, $mainScopeOnly);
-                }
-            }
+            OpSubBlockAccess::walkSubBlocks($child, static function (CfgBlock $sub) use ($fromFile, &$paths, $seen, $mainScopeOnly): void {
+                self::walkCfgBlockInternal($sub, $fromFile, $paths, $seen, $mainScopeOnly);
+            });
         }
     }
 
