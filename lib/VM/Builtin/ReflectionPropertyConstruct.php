@@ -33,8 +33,10 @@ final class ReflectionPropertyConstruct extends VmClassMethod
             );
         }
         $receiver = ReflectionSupport::requireReflectionProperty($frame, $frame->calledArgs[0]);
+        $declaringClassName = VmReflection::declaringClassNameForPropertyLookup($entry, $property, $ctx);
         $receiver->getProperty(ReflectionSupport::PROP_CLASS_NAME)->string($entry->name);
         $receiver->getProperty(ReflectionSupport::PROP_PROPERTY_NAME)->string($property);
+        $receiver->getProperty(ReflectionSupport::PROP_DECLARING_CLASS_NAME)->string($declaringClassName);
         $receiver->constructed = true;
         // Do not touch returnVar: it may alias the `new ReflectionProperty()` result slot (#6983).
     }
