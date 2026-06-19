@@ -7,6 +7,8 @@ namespace PHPCompiler\JIT;
 use PHPCompiler\Block;
 use PHPCompiler\JIT\Builtin\ErrorRaise;
 use PHPCompiler\JIT\Builtin\Type\Object_;
+use PHPCompiler\MethodVisibility;
+use PHPCompiler\PropertyVisibility;
 use PHPCompiler\SourcePreprocessor\PropertyHooks;
 use PHPLLVM\Builder;
 use PHPLLVM\Value;
@@ -344,6 +346,9 @@ final class PropertyHookDispatch
         if (!is_array($meta) || empty($meta['virtual']) || isset($meta['set'])) {
             return false;
         }
+        if (self::propertyHasDistinctAsymmetricSetVisibility($context, $className, $propertyName, $staticProperty)) {
+            return false;
+        }
         $getLc = strtolower(PropertyHooks::getHookMethodName($propertyName));
         $getProxy = $staticProperty
             ? self::resolveStaticHookProxy($context, $className, $getLc)
@@ -360,6 +365,30 @@ final class PropertyHookDispatch
         }
 
         return true;
+    }
+
+    private static function propertyHasDistinctAsymmetricSetVisibility(
+        Context $context,
+        string $className,
+        string $propertyName,
+        bool $staticProperty
+    ): bool {
+        $objectType = $context->type->object;
+        if (!$objectType instanceof Object_) {
+            return false;
+        }
+        $classId = $objectType->lookup($className);
+        $readVis = $staticProperty
+            ? $objectType->staticPropertyVisibility($classId, $propertyName)
+            : $objectType->propertyVisibility($classId, $propertyName);
+        $setVis = PropertyVisibility::effectiveSetVisibility(
+            $readVis,
+            $staticProperty
+                ? $objectType->staticPropertySetVisibility($classId, $propertyName)
+                : $objectType->propertySetVisibility($classId, $propertyName)
+        );
+
+        return $setVis !== MethodVisibility::mask($readVis);
     }
 
     /**
