@@ -51,6 +51,9 @@ final class PropertyHooks
             }
             [$bodyStart, $bodyEnd] = $span;
             $body = substr($code, $bodyStart + 1, $bodyEnd - $bodyStart - 1);
+            $header = substr($code, $declPos, $braceOpen - $declPos);
+            $isAbstractClass = 'class' === $declKind
+                && (bool) preg_match('/\babstract\s+(?:readonly\s+)?class\b/i', $header);
             $processedBody = $this->processClassBody(
                 $body,
                 strtolower($declName),
@@ -58,7 +61,8 @@ final class PropertyHooks
                 $filename,
                 $bodyStart + 1,
                 $code,
-                $declKind
+                $declKind,
+                $isAbstractClass
             );
             $code = substr($code, 0, $bodyStart + 1).$processedBody.substr($code, $bodyEnd);
             $offset = $bodyStart + 1 + strlen($processedBody);
@@ -458,8 +462,10 @@ final class PropertyHooks
         string $filename,
         int $bodyOffsetInFile,
         string $fullCode,
-        string $declKind = 'class'
+        string $declKind = 'class',
+        bool $isAbstractClass = false
     ): string {
+        $isConcreteClass = 'class' === $declKind && !$isAbstractClass;
         $injections = [];
         /** @var list<array{0: int, 1: int}> */
         $removeSpans = [];
@@ -496,14 +502,15 @@ final class PropertyHooks
                 $propDecl .= ';';
             }
             $isTraitDecl = 'trait' === $declKind;
-            $registerRequiredHooks = $isAbstractHook || $isInterfaceHook || $isTraitDecl;
+            $skipSemicolonRequiredHooks = $isConcreteClass
+                && $this->isImplicitAsymmetricBackingHookSource($hookSource);
             $propertyType = $this->propertyTypeFromDeclHead($declPrefix.$propDeclHead);
             [$methods, $usesBacking, $trailing, $asymmetricSetVis] = $this->lowerHooks(
                 $hookSource,
                 $prop,
                 $lcClass,
                 $isStatic,
-                $registerRequiredHooks,
+                $skipSemicolonRequiredHooks,
                 $propertyType
             );
             if (null !== $asymmetricSetVis) {
@@ -547,14 +554,19 @@ final class PropertyHooks
                 $out .= "\n    ".$trailing;
             }
             $isTraitAbstractHook = $isTraitDecl && [] === $methods;
-            if (([] !== $methods && !$usesBacking) || $isAbstractHook || $isInterfaceHook || $isTraitAbstractHook) {
+            $propMeta = $this->registry[$lcClass][$prop] ?? [];
+            $hasSemicolonRequirements = !empty($propMeta['requiresGet'])
+                || !empty($propMeta['requiresSet'])
+                || !empty($propMeta['requiresUnset']);
+            $isSemicolonOnlyHook = [] === $methods && $hasSemicolonRequirements;
+            if (([] !== $methods && !$usesBacking) || $isAbstractHook || $isInterfaceHook || $isTraitAbstractHook || $isSemicolonOnlyHook) {
                 if (!isset($this->registry[$lcClass][$prop])) {
                     $this->registry[$lcClass][$prop] = [];
                 }
-                if ($isAbstractHook || $isInterfaceHook || $isTraitAbstractHook) {
+                if ($isAbstractHook || $isInterfaceHook || $isTraitAbstractHook || $isSemicolonOnlyHook) {
                     $this->registry[$lcClass][$prop]['abstract'] = true;
                 }
-                if ([] === $methods || !$usesBacking || $isInterfaceHook) {
+                if ([] === $methods || !$usesBacking || $isInterfaceHook || $isSemicolonOnlyHook) {
                     $this->registry[$lcClass][$prop]['virtual'] = true;
                 }
             }
@@ -572,12 +584,32 @@ final class PropertyHooks
     /**
      * @return array{0: list<string>, 1: bool, 2: string, 3: ?string} method source chunks, backing use, trailing decls, asymmetric set visibility
      */
+    /**
+     * Concrete `{ get; private set; }` uses implicit backing field — not abstract obligations (#7148).
+     */
+    private function isImplicitAsymmetricBackingHookSource(string $hookSource): bool
+    {
+        $rest = trim($hookSource);
+        if (!preg_match('/^get\s*;/', $rest)) {
+            return false;
+        }
+        $rest = trim(preg_replace('/^get\s*;/', '', $rest, 1) ?? $rest);
+        if ('' === $rest) {
+            return false;
+        }
+
+        return (bool) preg_match(
+            '/^(?:(public|protected|private)\s+set\s*;|set\s*\(\s*(public|protected|private)\s*\)\s*;|(?:public|protected|private)\s*\(\s*set\s*\)\s*;)\s*$/s',
+            $rest
+        );
+    }
+
     private function lowerHooks(
         string $hookSource,
         string $prop,
         string $lcClass,
         bool $isStatic = false,
-        bool $registerRequiredHooks = true,
+        bool $skipSemicolonRequiredHooks = false,
         ?string $propertyType = null
     ): array {
         $methods = [];
@@ -587,7 +619,7 @@ final class PropertyHooks
         while ('' !== $rest) {
             $rest = ltrim($rest);
             if (preg_match('/^get\s*;/s', $rest)) {
-                if ($registerRequiredHooks) {
+                if (!$skipSemicolonRequiredHooks) {
                     $this->registerRequiredHook($lcClass, $prop, 'requiresGet');
                 }
                 $rest = preg_replace('/^get\s*;/', '', $rest, 1) ?? $rest;
@@ -595,7 +627,7 @@ final class PropertyHooks
             }
             if (preg_match('/^(public|protected|private)\s+set\s*;/s', $rest, $asymM)) {
                 $asymmetricSetVisibility = strtolower($asymM[1]);
-                if ($registerRequiredHooks) {
+                if (!$skipSemicolonRequiredHooks) {
                     $this->registerRequiredHook($lcClass, $prop, 'requiresSet');
                 }
                 $rest = preg_replace('/^(public|protected|private)\s+set\s*;/i', '', $rest, 1) ?? $rest;
@@ -604,14 +636,14 @@ final class PropertyHooks
             // php-src: Zend/zend_compile.c — `private(set);` in hook block (#9872, PHP 8.4 asymmetric visibility).
             if (preg_match('/^(public|protected|private)\s*\(\s*set\s*\)\s*;/s', $rest, $asymM)) {
                 $asymmetricSetVisibility = strtolower($asymM[1]);
-                if ($registerRequiredHooks) {
+                if (!$skipSemicolonRequiredHooks) {
                     $this->registerRequiredHook($lcClass, $prop, 'requiresSet');
                 }
                 $rest = preg_replace('/^(public|protected|private)\s*\(\s*set\s*\)\s*;/i', '', $rest, 1) ?? $rest;
                 continue;
             }
             if (preg_match('/^set\s*;/s', $rest)) {
-                if ($registerRequiredHooks) {
+                if (!$skipSemicolonRequiredHooks) {
                     $this->registerRequiredHook($lcClass, $prop, 'requiresSet');
                 }
                 $rest = preg_replace('/^set\s*;/', '', $rest, 1) ?? $rest;
@@ -619,14 +651,14 @@ final class PropertyHooks
             }
             if (preg_match('/^set\s*\(\s*(public|protected|private)\s*\)\s*;/s', $rest, $asymM)) {
                 $asymmetricSetVisibility = strtolower($asymM[1]);
-                if ($registerRequiredHooks) {
+                if (!$skipSemicolonRequiredHooks) {
                     $this->registerRequiredHook($lcClass, $prop, 'requiresSet');
                 }
                 $rest = preg_replace('/^set\s*\(\s*(public|protected|private)\s*\)\s*;/i', '', $rest, 1) ?? $rest;
                 continue;
             }
             if (preg_match('/^unset\s*;/s', $rest)) {
-                if ($registerRequiredHooks) {
+                if (!$skipSemicolonRequiredHooks) {
                     $this->registerRequiredHook($lcClass, $prop, 'requiresUnset');
                 }
                 $rest = preg_replace('/^unset\s*;/', '', $rest, 1) ?? $rest;

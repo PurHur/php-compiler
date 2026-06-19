@@ -191,10 +191,22 @@ final class AbstractPropertyHookCheck
         $meta = $context->propertyHookRegistry[$classLc][$prop->name]
             ?? $context->propertyHookRegistry[$classLc][$propLc]
             ?? null;
-        if (is_array($meta) && !empty($meta['abstract']) && empty($meta['get']) && empty($meta['set'])) {
+        if (is_array($meta) && self::metaHasUnimplementedRequiredHooks($meta)) {
             return;
         }
         $provided[$propLc]['get'] = true;
         $provided[$propLc]['set'] = true;
+    }
+
+    /**
+     * @param array<string, mixed> $meta
+     */
+    private static function metaHasUnimplementedRequiredHooks(array $meta): bool
+    {
+        if (!empty($meta['get']) || !empty($meta['set']) || !empty($meta['unset'])) {
+            return false;
+        }
+
+        return !empty($meta['requiresGet']) || !empty($meta['requiresSet']) || !empty($meta['requiresUnset']);
     }
 }
