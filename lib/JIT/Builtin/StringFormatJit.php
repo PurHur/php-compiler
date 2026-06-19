@@ -855,6 +855,87 @@ final class StringFormatJit
         $context->builder->returnVoid();
     }
 
+    /**
+     * php-src sprintf.c — %f non-finite prints NaN / INF / -INF (#10151).
+     * Positions the builder at the returned block when the value is finite.
+     */
+    private static function branchUnlessSprintfNonfiniteFloat(
+        Context $context,
+        LlvmFunction $fn,
+        Value $buf,
+        Value $posPtr,
+        Value $cap,
+        Value $num,
+        string $prefix
+    ): void {
+        $i8 = $context->getTypeFromString('int8');
+        $i32 = $context->getTypeFromString('int32');
+        $dbl = $context->getTypeFromString('double');
+        $sizeT = $context->getTypeFromString('size_t');
+
+        $appendStr = $context->lookupFunction('__phpc_fmt_append_str');
+
+        $isNan = $context->builder->icmp(
+            Builder::INT_NE,
+            $context->builder->call($context->lookupFunction('isnan'), $num),
+            $i32->constInt(0, false)
+        );
+        $nanBb = $fn->appendBasicBlock($prefix.'_nan');
+        $checkInf = $fn->appendBasicBlock($prefix.'_check_inf');
+        $context->builder->branchIf($isNan, $nanBb, $checkInf);
+
+        $context->builder->positionAtEnd($nanBb);
+        $context->builder->call(
+            $appendStr,
+            $buf,
+            $posPtr,
+            $cap,
+            self::literalCstr($context, 'NaN'),
+            $sizeT->constInt(3, false)
+        );
+        $context->builder->returnVoid();
+
+        $context->builder->positionAtEnd($checkInf);
+        $isInf = $context->builder->icmp(
+            Builder::INT_NE,
+            $context->builder->call($context->lookupFunction('isinf'), $num),
+            $i32->constInt(0, false)
+        );
+        $infBb = $fn->appendBasicBlock($prefix.'_inf');
+        $work = $fn->appendBasicBlock($prefix.'_finite');
+        $context->builder->branchIf($isInf, $infBb, $work);
+
+        $context->builder->positionAtEnd($infBb);
+        $negInf = $context->builder->fcmp(Builder::REAL_OLT, $num, $dbl->constReal(0.0));
+        $negBb = $fn->appendBasicBlock($prefix.'_neg_inf');
+        $posInfBb = $fn->appendBasicBlock($prefix.'_pos_inf');
+        $context->builder->branchIf($negInf, $negBb, $posInfBb);
+
+        $context->builder->positionAtEnd($negBb);
+        $context->builder->call(
+            $appendStr,
+            $buf,
+            $posPtr,
+            $cap,
+            self::literalCstr($context, '-INF'),
+            $sizeT->constInt(4, false)
+        );
+        $context->builder->returnVoid();
+
+        $context->builder->positionAtEnd($posInfBb);
+        $context->builder->call(
+            $appendStr,
+            $buf,
+            $posPtr,
+            $cap,
+            self::literalCstr($context, 'INF'),
+            $sizeT->constInt(3, false)
+        );
+        $context->builder->returnVoid();
+
+        $context->builder->positionAtEnd($work);
+    }
+
     private static function emitAppendFloat(Context $context, LlvmFunction $fn): void
     {
         $entry = $fn->appendBasicBlock('entry');
@@ -870,6 +951,8 @@ final class StringFormatJit
         $posPtr = $fn->getParam(1);
         $cap = $fn->getParam(2);
         $num = $fn->getParam(3);
+
+        self::branchUnlessSprintfNonfiniteFloat($context, $fn, $buf, $posPtr, $cap, $num, 'flt');
 
         $appendChar = $context->lookupFunction('__phpc_fmt_append_char');
         $appendStr = $context->lookupFunction('__phpc_fmt_append_str');
@@ -948,6 +1031,8 @@ final class StringFormatJit
         $cap = $fn->getParam(2);
         $num = $fn->getParam(3);
         $prec = $fn->getParam(4);
+
+        self::branchUnlessSprintfNonfiniteFloat($context, $fn, $buf, $posPtr, $cap, $num, 'flt_prec');
 
         $appendChar = $context->lookupFunction('__phpc_fmt_append_char');
         $appendStr = $context->lookupFunction('__phpc_fmt_append_str');
