@@ -70,6 +70,13 @@ class JIT {
     public function compile(Block $block): PHPLLVM\Value {
         JIT\Progress::noteFunction('jit_compile_begin');
         $this->context->resetScriptLocalBindings();
+        if (
+            is_string($this->context->aotSourceFilename ?? null)
+            && '' !== $this->context->aotSourceFilename
+            && '' === $block->scriptPath()
+        ) {
+            $block->setScriptPath($this->context->aotSourceFilename);
+        }
         $mainPath = $block->scriptPath();
         if ('' !== $mainPath) {
             $this->context->recordJitIncludedFile($mainPath);
@@ -153,7 +160,18 @@ class JIT {
         $return = $this->compileBlock($block);
         JIT\Progress::noteFunction('jit_compile_compile_block_done');
         JIT\Progress::noteFunction('jit_compile_run_queue_begin');
-        $this->runQueue();
+        if (
+            $this->isM4BinCompileScriptMain($block)
+            && (
+                $this->shouldUseM4BinCompileArgvMainNative()
+                || $this->shouldUseHelloworldBinCompileInventoryArgvLink()
+            )
+        ) {
+            $this->filterM4InventoryArgvMainFromQueue();
+        }
+        if (!$this->shouldUseM4InventoryArgvNativeEmitRebuild($block)) {
+            $this->runQueue();
+        }
         JIT\Progress::noteFunction('jit_compile_run_queue_done');
         JIT\Progress::noteFunction('jit_compile_finalize_m3_emit_tu_spine_begin');
         $this->finalizeM3EmitTuRuntimeSpineAfterQueue();
@@ -165,6 +183,18 @@ class JIT {
 
     public function compileFunc(CoreFunc $func): void {
         if ($func instanceof CoreFunc\PHP) {
+            $block = $func->block;
+            if (
+                null !== $block->func
+                && '{main}' === $block->func->name
+                && $this->isM4BinCompileScriptMain($block)
+                && (
+                    $this->shouldUseM4BinCompileArgvMainNative()
+                    || $this->shouldUseHelloworldBinCompileInventoryArgvLink()
+                )
+            ) {
+                return;
+            }
             $name = $func->getName();
             // Large switch crashes LLVM during JIT (issue #540); VM uses host PHP for this helper.
             if ('opcode_type_name' === $name || str_ends_with($name, '\\opcode_type_name')) {
@@ -966,6 +996,36 @@ class JIT {
         }
 
         return str_ends_with($path, '/bin/compile.php');
+    }
+
+    /** True when lowering targets script {main}, not spine stubs that reuse the compile-driver CFG block. */
+    private function isM4BinCompileNativeMainLogicalName(?string $logicalName): bool
+    {
+        if (null === $logicalName) {
+            return true;
+        }
+
+        return '{main}' === strtolower($logicalName);
+    }
+
+    /** Drop queued bin/compile.php {main} PHP lowering when native argv rebuild owns {main} (#2930). */
+    private function filterM4InventoryArgvMainFromQueue(): void
+    {
+        $this->queue = array_values(array_filter(
+            $this->queue,
+            function (array $item): bool {
+                $cfg = $item[1] ?? null;
+                if (!$cfg instanceof Block) {
+                    return true;
+                }
+
+                return !$this->isM4BinCompileScriptMain($cfg)
+                    || !(
+                        $this->shouldUseM4BinCompileArgvMainNative()
+                        || $this->shouldUseHelloworldBinCompileInventoryArgvLink()
+                    );
+            }
+        ));
     }
 
     /**
@@ -3413,7 +3473,7 @@ class JIT {
     /** Native {main} for M3 compile_driver bundles — avoids LLVM 9 crash lowering Runtime ctor in PHP CFG (#1768). */
     private function compileM3CompileDriverMainNative(string $internalName, Block $block, ?string $logicalName): PHPLLVM\Value
     {
-        $lcname = strtolower($logicalName ?? '{main}');
+        $lcname = strtolower($logicalName ?? $internalName);
         if ($this->isM4BinCompileScriptMain($block)
             && ($this->shouldUseM4BinCompileArgvMainNative() || $this->shouldUseHelloworldBinCompileInventoryArgvLink())
         ) {
@@ -3426,6 +3486,11 @@ class JIT {
         if (isset($this->context->functions[$lcname])) {
             return $this->context->functions[$lcname];
         }
+        if ($this->isM4BinCompileScriptMain($block)
+            && ($this->shouldUseM4BinCompileArgvMainNative() || $this->shouldUseHelloworldBinCompileInventoryArgvLink())
+        ) {
+            $internalName = 'm4_inventory_argv_main';
+        }
         $i64 = $this->context->getTypeFromString('int64');
         $func = $this->context->module->addFunction(
             $this->llvmInternalName($internalName),
@@ -3433,12 +3498,38 @@ class JIT {
         );
         $bb = $func->appendBasicBlock('entry');
         $saved = $this->context->builder;
-        $this->context->builder = $this->context->context->builderCreate();
-        $this->context->builder->positionAtEnd($bb);
         $m4BinCompileArgv = $this->isM4BinCompileScriptMain($block) && $this->shouldUseM4BinCompileArgvMainNative();
+        $m4NativeRebuild = $m4BinCompileArgv && $this->shouldUseM4InventoryArgvNativeEmitRebuild($block);
+        $logPrefix = getenv('PHP_COMPILER_M3_EMIT_LOG_PREFIX');
+        if (!is_string($logPrefix) || '' === $logPrefix) {
+            $logPrefix = 'helloworld_compile_smoke';
+        }
+        if ($m4NativeRebuild) {
+            $this->context->builder = $this->context->context->builderCreate();
+            $this->context->builder->positionAtEnd($bb);
+            \PHPCompiler\JIT\BootstrapCompileSmokeM3Emit::emitMainEntry($this->context, $logPrefix);
+            $this->context->builder->clearInsertionPosition();
+            $this->context->builder = $saved;
+            $this->context->functions[$lcname] = $func;
+            $this->context->functionReturnType[$lcname] = 'int64';
+            $this->m3CompileDriverRuntimeSpineLowered = true;
+            $this->filterM4InventoryArgvMainFromQueue();
+            $this->ensureM3EmitTuEmitBridgeSpineSymbols();
+            $this->compileM3EmitTuRuntimeParseAndCompileNativeDecl([
+                'parseandcompile' => true,
+                'parseandcompileemitsmoke' => true,
+            ]);
+            $this->context->functionProxies[$lcname] = new JIT\Call\Native($func, $logicalName ?? '{main}', [], []);
+
+            return $func;
+        }
         if ($this->shouldUseM3InventoryEmitForCompileDriverBlock($block) || $m4BinCompileArgv) {
+            $this->context->functions[$lcname] = $func;
+            $this->context->functionReturnType[$lcname] = 'int64';
             if (!$this->m3CompileDriverRuntimeSpineLowered) {
                 $this->m3CompileDriverRuntimeSpineLowered = true;
+                $this->context->builder->clearInsertionPosition();
+                $this->filterM4InventoryArgvMainFromQueue();
                 $this->compileM3EmitTuRuntimeSpineDecls($this->m3CompileDriverMainBlock);
                 $sidecar = $this->isM3EmitTuTrivialEchoSidecarActive();
                 $inventoryEmit = $this->shouldUseM3InventoryEmitForCompileDriverBlock($block);
@@ -3448,11 +3539,9 @@ class JIT {
                     }
                     $this->compileM3EmitTuRuntimeMethodFromQueue($methodLc);
                 }
-                $this->runQueue();
-            }
-            $logPrefix = getenv('PHP_COMPILER_M3_EMIT_LOG_PREFIX');
-            if (!is_string($logPrefix) || '' === $logPrefix) {
-                $logPrefix = 'helloworld_compile_smoke';
+                if (!$m4BinCompileArgv) {
+                    $this->runQueue();
+                }
             }
             if (null !== $this->m3CompileDriverMainBlock) {
                 $standaloneLc = strtolower('PHPCompiler\\Runtime::standalone');
@@ -3470,16 +3559,22 @@ class JIT {
                     );
                 }
             }
+            $this->context->builder = $this->context->context->builderCreate();
+            $this->context->builder->positionAtEnd($bb);
             \PHPCompiler\JIT\BootstrapCompileSmokeM3Emit::emitMainEntry($this->context, $logPrefix);
         } else {
+            $this->context->builder = $this->context->context->builderCreate();
+            $this->context->builder->positionAtEnd($bb);
             \PHPCompiler\JIT\ValueEchoHelper::echoLiteral($this->context, "compiler_helloworld_compile_driver ready\n");
             $this->context->builder->returnValue($i64->constInt(0, false));
         }
 
         $this->context->builder->clearInsertionPosition();
         $this->context->builder = $saved;
-        $this->context->functions[$lcname] = $func;
-        $this->context->functionReturnType[$lcname] = 'int64';
+        if (!isset($this->context->functions[$lcname])) {
+            $this->context->functions[$lcname] = $func;
+            $this->context->functionReturnType[$lcname] = 'int64';
+        }
         $this->context->functionProxies[$lcname] = new JIT\Call\Native($func, $logicalName ?? '{main}', [], []);
 
         return $func;
@@ -3526,7 +3621,9 @@ class JIT {
             } else {
                 $this->compileM3EmitTuCompilerMethodFromRuntimeModules('compileemitsmoke');
             }
-            $this->runQueue();
+            if (!$this->shouldUseM4InventoryArgvNativeEmitRebuild($compileDriverStubBlock)) {
+                $this->runQueue();
+            }
             if (null !== $stubBlock && ($emitTu || $compileDriver)) {
                 $this->ensureM3EmitTuRuntimeInitSpineSymbols($stubBlock);
                 $this->ensureM3EmitTuEmitBridgeSpineSymbols();
@@ -3671,7 +3768,9 @@ class JIT {
                 }
             }
         }
-        $this->runQueue();
+        if (!$this->shouldUseM4InventoryArgvNativeEmitRebuild()) {
+            $this->runQueue();
+        }
         $stubBlock = $this->m3EmitTuMainBlock ?? $this->m3CompileDriverMainBlock;
         foreach (['parse', 'compileemitsmoke'] as $spineLc) {
             $spineLogical = 'PHPCompiler\\Runtime::'.$spineLc;
@@ -3756,7 +3855,9 @@ class JIT {
                 $this->m3EmitTuMainBlock
             );
         }
-        $this->runQueue();
+        if (!$this->shouldUseM4InventoryArgvNativeEmitRebuild()) {
+            $this->runQueue();
+        }
     }
 
     /**
@@ -6008,6 +6109,26 @@ class JIT {
         bool $allowRecompile = false,
         Variable ...$args
     ): PHPLLVM\BasicBlock {
+        if (
+            null !== $block->func
+            && '{main}' === $block->func->name
+            && $this->isM4BinCompileScriptMain($block)
+            && (
+                $this->shouldUseM4BinCompileArgvMainNative()
+                || $this->shouldUseHelloworldBinCompileInventoryArgvLink()
+            )
+            && $this->shouldUseM4InventoryArgvNativeEmitRebuild($block)
+        ) {
+            if (null !== $entryBlock) {
+                return $entryBlock;
+            }
+            $existing = $func->getBasicBlocks();
+            if ([] !== $existing) {
+                return $existing[0];
+            }
+
+            return $func->appendBasicBlock('entry');
+        }
         if (!$allowRecompile && $this->context->scope->blockStorage->contains($block)) {
             return $this->context->scope->blockStorage[$block];
         }
