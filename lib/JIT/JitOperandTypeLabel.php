@@ -139,6 +139,9 @@ final class JitOperandTypeLabel
         if (!method_exists($classIdVal, 'isConstant') || !$classIdVal->isConstant()) {
             return null;
         }
+        if (!method_exists($classIdVal, 'getConstantValue')) {
+            return null;
+        }
 
         return (int) $classIdVal->getConstantValue();
     }

@@ -80,6 +80,45 @@ final class VmString
     }
 
     /**
+     * Coerce a Z_PARAM_STR operand without object/__toString coercion (#10166, ext/standard/string.c).
+     *
+     * @throws \TypeError when the operand is array, object, enum case, or otherwise incompatible
+     */
+    public static function coerceStringBuiltinArgNoObject(
+        Variable $var,
+        string $function,
+        int $argIndex = 0,
+        string $paramName = 'string'
+    ): string {
+        $var = $var->resolveIndirect();
+        if (Variable::TYPE_ARRAY === $var->type) {
+            throw new \TypeError(self::stringBuiltinTypeError($function, $argIndex, $paramName, 'array'));
+        }
+        if (RuntimeStrictness::enforceStringBuiltinParityGuards() && EnumCaseSupport::isEnumCaseVariable($var)) {
+            throw new \TypeError(
+                self::stringBuiltinTypeError(
+                    $function,
+                    $argIndex,
+                    $paramName,
+                    EnumCaseSupport::typeNameForVariable($var)
+                )
+            );
+        }
+        if (Variable::TYPE_OBJECT === $var->type) {
+            throw new \TypeError(
+                self::stringBuiltinTypeError(
+                    $function,
+                    $argIndex,
+                    $paramName,
+                    $var->toObject()->class->name
+                )
+            );
+        }
+
+        return self::coerceOperand($var);
+    }
+
+    /**
      * Require a string builtin operand (php-src Z_PARAM_STR; string type only, #5018).
      *
      * @throws \TypeError when the operand is not a string like Zend PHP 8.x

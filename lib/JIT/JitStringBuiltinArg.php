@@ -54,6 +54,27 @@ final class JitStringBuiltinArg
     }
 
     /**
+     * Emit a Z_PARAM_STR TypeError for a runtime object operand (#10166, ext/standard/string.c).
+     */
+    public static function emitObjectTypeErrorReject(
+        Context $context,
+        Variable $arg,
+        string $function,
+        int $argIndex = 0,
+        string $paramName = 'string',
+        string $expectedType = 'string'
+    ): void {
+        TypeErrorRaise::registerDeclarations($context);
+        TypeErrorRaise::ensureLinked($context);
+        if (Variable::TYPE_OBJECT === $arg->type) {
+            self::emitRuntimeObjectReject($context, $arg, $function, $argIndex, $paramName, $expectedType);
+
+            return;
+        }
+        self::emitTypeErrorAndAbort($context, $function, $argIndex, $paramName, 'object', $expectedType);
+    }
+
+    /**
      * Lower string builtin operands with strict Z_PARAM_STR parity (#5018, ext/standard/string.c).
      *
      * Rejects int/float/bool operands that {@see lower()} would coerce via JitStringArg.
@@ -307,6 +328,23 @@ final class JitStringBuiltinArg
             $context->builder->structGep($valuePtr, $enumMap['class_id'])
         );
         self::emitRuntimeEnumClassIdReject($context, $classId, $function, $argIndex, $paramName, $expectedType);
+    }
+
+    /**
+     * Boxed enum-case vs object reject for strlen() Z_PARAM_STR parity (#10166).
+     */
+    public static function emitRuntimeBoxedRejectForStrlen(
+        Context $context,
+        Value $valuePtr,
+        Value $isEnumCase
+    ): void {
+        $enumRejectBlock = BasicBlockHelper::append($context, 'strlen_enum_reject');
+        $objectRejectBlock = BasicBlockHelper::append($context, 'strlen_object_reject');
+        $context->builder->branchIf($isEnumCase, $enumRejectBlock, $objectRejectBlock);
+        $context->builder->positionAtEnd($enumRejectBlock);
+        self::emitRuntimeBoxedEnumCaseReject($context, $valuePtr, 'strlen', 0, 'string', 'string');
+        $context->builder->positionAtEnd($objectRejectBlock);
+        self::emitRuntimeBoxedObjectReject($context, $valuePtr, 'strlen', 0, 'string', 'string');
     }
 
     private static function emitRuntimeBoxedObjectReject(

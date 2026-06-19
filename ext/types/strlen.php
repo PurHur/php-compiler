@@ -16,15 +16,11 @@ use PHPCompiler\ext\standard\VmString;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\Frame;
 
-use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Context;
-use PHPCompiler\JIT\JitStringArg;
-use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\Variable;
 
 use PHPCompiler\VM\ErrorReporter;
 use PHPCompiler\VM\Variable as VmVariable;
-use PHPLLVM\Builder;
 use PHPLLVM\Value;
 
 
@@ -54,7 +50,7 @@ class strlen extends Internal {
 
             return;
         }
-        $string = VmString::coerceStringBuiltinArg($var, 'strlen', 0, 'string');
+        $string = VmString::coerceStringBuiltinArgNoObject($var, 'strlen', 0, 'string');
         if (!is_null($frame->returnVar)) {
             $frame->returnVar->int(VmString::byteLength($string));
         }
@@ -64,102 +60,8 @@ class strlen extends Internal {
         if (count($args) !== 1) {
             throw new \LogicException('Too few args passed to strlen()');
         }
-        $arg = $args[0];
-        if (Variable::TYPE_NULL === $arg->type || $arg->isNullConstant) {
-            self::emitNullDeprecation($context);
 
-            return $context->getTypeFromString('int64')->constInt(0, false);
-        }
-        if (Variable::TYPE_VALUE === $arg->type) {
-            return self::strlenFromValueBox($context, $arg);
-        }
-        $argValue = JitStrlen::lowerStringOperand($context, $arg);
-        $offset = $context->structFieldMap[$argValue->typeOf()->getElementType()->getName()]['length'];
-
-        return $context->builder->load(
-            $context->builder->structGep($argValue, $offset)
-        );
-    }
-
-    /** @return Value int64 length */
-    private static function strlenFromValueBox(Context $context, Variable $arg): Value
-    {
-        $valuePtr = JitValueBox::valuePtrFromVariable($context, $arg);
-        $map = $context->structFieldMap['__value__'];
-        $typeByte = $context->builder->load(
-            $context->builder->structGep($valuePtr, $map['type'])
-        );
-        $i8 = $context->getTypeFromString('int8');
-        $typeKind = $context->builder->and($typeByte, $i8->constInt(0x7f, false));
-        $i64 = $context->getTypeFromString('int64');
-        $nullBlock = BasicBlockHelper::append($context, 'strlen_null_deprec');
-        $okBlock = BasicBlockHelper::append($context, 'strlen_value_ok');
-        $mergeBlock = BasicBlockHelper::append($context, 'strlen_value_merge');
-        $context->builder->branchIf(
-            $context->builder->icmp(
-                Builder::INT_EQ,
-                $typeKind,
-                $i8->constInt(VmVariable::TYPE_NULL, false)
-            ),
-            $nullBlock,
-            $okBlock
-        );
-        $context->builder->positionAtEnd($nullBlock);
-        self::emitNullDeprecation($context);
-        $context->builder->branch($mergeBlock);
-        $context->builder->positionAtEnd($okBlock);
-        $arrayTy = $i8->constInt(Variable::TYPE_HASHTABLE & 0x7f, false);
-        $objectTy = $i8->constInt(Variable::TYPE_OBJECT & 0x7f, false);
-        $enumCaseTy = $i8->constInt(VmVariable::TYPE_ENUM_CASE, false);
-        $arrayBlock = BasicBlockHelper::append($context, 'strlen_value_array');
-        $objectBlock = BasicBlockHelper::append($context, 'strlen_value_object');
-        $coerceBlock = BasicBlockHelper::append($context, 'strlen_value_coerce');
-        $checkBlock = BasicBlockHelper::append($context, 'strlen_value_check');
-        $isArray = $context->builder->icmp(Builder::INT_EQ, $typeKind, $arrayTy);
-        $context->builder->branchIf($isArray, $arrayBlock, $checkBlock);
-        $context->builder->positionAtEnd($arrayBlock);
-        JitStrlen::emitTypeErrorAndAbort($context, 'array');
-        $context->builder->positionAtEnd($checkBlock);
-        $isObject = $context->builder->icmp(Builder::INT_EQ, $typeKind, $objectTy);
-        $isEnumCase = $context->builder->icmp(Builder::INT_EQ, $typeKind, $enumCaseTy);
-        $isObjOrEnum = $context->builder->or($isObject, $isEnumCase);
-        $context->builder->branchIf($isObjOrEnum, $objectBlock, $coerceBlock);
-        $context->builder->positionAtEnd($objectBlock);
-        JitStrlen::emitTypeErrorAndAbort($context, 'object');
-        $context->builder->positionAtEnd($coerceBlock);
-        $argValue = JitStringArg::lower($context, $arg, 'strlen() string');
-        $offset = $context->structFieldMap[$argValue->typeOf()->getElementType()->getName()]['length'];
-        $len = $context->builder->load(
-            $context->builder->structGep($argValue, $offset)
-        );
-        $context->builder->branch($mergeBlock);
-        $context->builder->positionAtEnd($mergeBlock);
-        $phi = $context->builder->phi($i64);
-        $phi->addIncoming($i64->constInt(0, false), $nullBlock);
-        $phi->addIncoming($len, $coerceBlock);
-
-        return $phi;
-    }
-
-    private static function emitNullDeprecation(Context $context): void
-    {
-        $i8p = $context->getTypeFromString('int8*');
-        $sizeT = $context->getTypeFromString('size_t');
-        $i32 = $context->getTypeFromString('int32');
-        $msgPtr = $context->builder->pointerCast(
-            $context->constantFromString(self::NULL_DEPRECATION),
-            $i8p
-        );
-        $msgLen = $sizeT->constInt(\strlen(self::NULL_DEPRECATION), false);
-        $emptyFile = $context->builder->pointerCast($context->constantFromString(''), $i8p);
-        $context->builder->call(
-            $context->lookupFunction('__compiler_trigger_error'),
-            $msgPtr,
-            $msgLen,
-            $i32->constInt(ErrorReporter::E_DEPRECATED, false),
-            $emptyFile,
-            $i32->constInt(0, false)
-        );
+        return JitStrlen::lowerLength($context, $args[0]);
     }
 
 }
