@@ -1,5 +1,5 @@
 --TEST--
-Language: readonly closure mutable use() capture — compile-time fatal (#7428)
+Language: readonly closure rejected — php-src parse error (#10012, was #7428)
 --FILE--
 <?php
 $x = 1;

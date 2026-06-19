@@ -4491,9 +4491,6 @@
         "lib/Ast/PipeOperatorDesugar.php": [
             "Cannot use PhpParser\\Error as ParserError because the name is already in use on line 7"
         ],
-        "lib/Ast/ReadonlyFunctionAnnotator.php": [
-            "Cannot use PhpParser\\Node as Node because the name is already in use on line 7"
-        ],
         "lib/Ast/SealedClassAnnotator.php": [
             "Cannot use PhpParser\\Node as Node because the name is already in use on line 7"
         ],
@@ -4583,9 +4580,6 @@
         ],
         "lib/Compiler/ReadonlyClassCompileCheck.php": [
             "Cannot use PHPCfg\\Op as Op because the name is already in use on line 7"
-        ],
-        "lib/Compiler/ReadonlyFunctionCompileCheck.php": [
-            "Cannot use PHPCfg\\Func as CfgFunc because the name is already in use on line 7"
         ],
         "lib/Compiler/SourceLocation.php": [
             "Cannot use PHPCfg\\Op as Op because the name is already in use on line 7"
@@ -5966,6 +5960,9 @@
         ],
         "lib/PropertyVisibility.php": [
             "Cannot use PHPCfg\\Func as CfgFunc because the name is already in use on line 7"
+        ],
+        "lib/ReadonlyFunctionRejector.php": [
+            "Cannot use PHPCompiler\\Compiler\\CompileFatal as CompileFatal because the name is already in use on line 7"
         ],
         "lib/ReadonlyMethodModifierRejector.php": [
             "Cannot use PHPCompiler\\Compiler\\CompileFatal as CompileFatal because the name is already in use on line 7"

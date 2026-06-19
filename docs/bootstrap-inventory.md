@@ -8,8 +8,8 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 2807 |
-| Phase A inventory files (M2 ratio SSOT) | 2807 |
+| PHP files on vm.php path | 2805 |
+| Phase A inventory files (M2 ratio SSOT) | 2805 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 1 |
 | Source constructs flagged (warnings) | 7588 |
@@ -1807,8 +1807,6 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/Ast/MultiBlockNameResolver.php` | 0 | 3 |
 | `lib/Ast/NewDereferenceableDesugar.php` | 0 | 2 |
 | `lib/Ast/PipeOperatorDesugar.php` | 0 | 2 |
-| `lib/Ast/ReadonlyFunctionAnnotator.php` | 0 | 1 |
-| `lib/Ast/ReadonlyFunctionDesugar.php` | 0 | 2 |
 | `lib/Ast/SealedClassAnnotator.php` | 0 | 1 |
 | `lib/Ast/SealedClassPreprocessor.php` | 0 | 1 |
 | `lib/Ast/StaticClassAnnotator.php` | 0 | 1 |
@@ -1855,7 +1853,6 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/Compiler/NoDiscardMetadata.php` | 0 | 2 |
 | `lib/Compiler/OverrideValidator.php` | 0 | 7 |
 | `lib/Compiler/ReadonlyClassCompileCheck.php` | 0 | 9 |
-| `lib/Compiler/ReadonlyFunctionCompileCheck.php` | 0 | 3 |
 | `lib/Compiler/SourceLocation.php` | 0 | 2 |
 | `lib/Compiler/ThrowInClassConstCompileCheck.php` | 0 | 3 |
 | `lib/Compiler/TraitClassConstConflictCheck.php` | 0 | 3 |
@@ -2376,6 +2373,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/Printer.php` | 0 | 1 |
 | `lib/PropertyVisibility.php` | 0 | 1 |
 | `lib/PseudoClassScope.php` | 0 | 1 |
+| `lib/ReadonlyFunctionRejector.php` | 0 | 2 |
 | `lib/ReadonlyMethodModifierRejector.php` | 0 | 2 |
 | `lib/Runtime.php` | 0 | 67 |
 | `lib/RuntimeStrictness.php` | 0 | 1 |
@@ -14198,17 +14196,6 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new ParserError (line 266)
 - 21 class method(s)
 
-### `lib/Ast/ReadonlyFunctionAnnotator.php`
-
-**Warnings** (review for bootstrap subset):
-- 5 class method(s)
-
-### `lib/Ast/ReadonlyFunctionDesugar.php`
-
-**Warnings** (review for bootstrap subset):
-- 6 class method(s)
-- 1 closure(s)
-
 ### `lib/Ast/SealedClassAnnotator.php`
 
 **Warnings** (review for bootstrap subset):
@@ -14879,13 +14866,6 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new CompileError (line 210)
 - new CompileError (line 219)
 - 17 class method(s)
-
-### `lib/Compiler/ReadonlyFunctionCompileCheck.php`
-
-**Warnings** (review for bootstrap subset):
-- new CompileError (line 53)
-- new CompileError (line 55)
-- 3 class method(s)
 
 ### `lib/Compiler/SourceLocation.php`
 
@@ -18194,6 +18174,12 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - 2 class method(s)
 
+### `lib/ReadonlyFunctionRejector.php`
+
+**Warnings** (review for bootstrap subset):
+- new CompileFatal (line 85)
+- 4 class method(s)
+
 ### `lib/ReadonlyMethodModifierRejector.php`
 
 **Warnings** (review for bootstrap subset):
@@ -18211,8 +18197,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new Ast\AbstractEnumMarker (line 127)
 - new SealedClassAnnotator (line 129)
 - new StaticClassAnnotator (line 131)
-- new ReadonlyFunctionAnnotator (line 133)
-- new Ast\EnumPropertyCompileCheck (line 135)
+- new Ast\EnumPropertyCompileCheck (line 133)
 - new Parser (line 136)
 - new ParserFactory (line 137)
 - new Traverser (line 141)

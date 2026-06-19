@@ -40,8 +40,6 @@ use PHPCompiler\Ast\NewDereferenceableDesugar;
 use PHPCompiler\Ast\CloneWithDesugar;
 use PHPCompiler\Ast\PipeOperatorDesugar;
 use PHPCompiler\Ast\VoidCastDesugar;
-use PHPCompiler\Ast\ReadonlyFunctionDesugar;
-use PHPCompiler\Ast\ReadonlyFunctionAnnotator;
 use PHPCompiler\Visitor\InOperatorResolver;
 use PHPCompiler\Visitor\ExitFunctionResolver;
 use PHPCompiler\Visitor\VoidCastResolver;
@@ -76,7 +74,6 @@ class Runtime {
     public int $mode;
     private SealedClassAnnotator $sealedClassAnnotator;
     private StaticClassAnnotator $staticClassAnnotator;
-    private ReadonlyFunctionAnnotator $readonlyFunctionAnnotator;
     public ?string $debugFile = null;
 
     public TypeReconstructor $typeReconstructor;
@@ -130,8 +127,6 @@ class Runtime {
         $astTraverser->addVisitor($this->sealedClassAnnotator);
         $this->staticClassAnnotator = new StaticClassAnnotator();
         $astTraverser->addVisitor($this->staticClassAnnotator);
-        $this->readonlyFunctionAnnotator = new ReadonlyFunctionAnnotator();
-        $astTraverser->addVisitor($this->readonlyFunctionAnnotator);
         $astTraverser->addVisitor(new Ast\EnumPropertyCompileCheck());
         $this->parser = new Parser(
             (new ParserFactory)->create(ParserFactory::ONLY_PHP7),
@@ -366,6 +361,7 @@ class Runtime {
         }
         CurlyBraceOffsetRejector::reject($code, $filename);
         ReadonlyMethodModifierRejector::reject($code, $filename);
+        ReadonlyFunctionRejector::reject($code, $filename);
         $code = EnumCaseListRewriter::rewrite($code);
         $code = SwitchCommaCaseRewriter::rewrite($code);
         $code = GenericArrayTypeSourceRewriter::rewrite($code);
@@ -453,9 +449,6 @@ class Runtime {
         $code = CloneWithDesugar::desugar($code);
         $code = VoidCastDesugar::desugar($code);
         $code = PipeOperatorDesugar::desugar($code);
-        [$code, $readonlyFunctionLines] = ReadonlyFunctionDesugar::desugar($code);
-        $this->readonlyFunctionAnnotator->setReadonlyLines($readonlyFunctionLines);
-
         return $code;
     }
 

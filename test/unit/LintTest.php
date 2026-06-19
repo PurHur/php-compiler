@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace PHPCompiler;
 
+use PHPCompiler\ReadonlyFunctionRejector;
 use PHPUnit\Framework\TestCase;
 
 /**
@@ -23,7 +24,7 @@ PHP;
         $this->assertSame(0, $exit['code']);
     }
 
-    public function testLintReadonlyFunctionAccepted(): void
+    public function testLintReadonlyFunctionRejected(): void
     {
         $code = <<<'PHP'
 <?php
@@ -31,7 +32,8 @@ readonly function f(): void {}
 f();
 PHP;
         $exit = $this->runLint(['-r', $code]);
-        $this->assertSame(0, $exit['code'], $exit['stdout']);
+        $this->assertSame(1, $exit['code'], $exit['stdout']);
+        $this->assertStringContainsString(ReadonlyFunctionRejector::MESSAGE, $exit['stdout']);
     }
 
     public function testLintCoalesceAccepted(): void

@@ -4,41 +4,38 @@ declare(strict_types=1);
 
 namespace PHPCompiler\Test\Unit;
 
-use PHPCompiler\Compiler\ReadonlyFunctionCompileCheck;
+use PHPCompiler\Compiler\CompileFatal;
+use PHPCompiler\ReadonlyFunctionRejector;
 use PHPCompiler\Runtime;
 use PHPUnit\Framework\TestCase;
 
-/** @covers issue #7428 */
+/** @covers issue #10012 */
 final class ReadonlyFunctionCompileCheckTest extends TestCase
 {
-    public function testReadonlyFunctionCompilesAndRuns(): void
+    public function testTopLevelReadonlyFunctionFailsAtCompileTime(): void
     {
         $runtime = new Runtime();
-        $code = <<<'PHP'
+        $this->expectException(CompileFatal::class);
+        $this->expectExceptionMessage(ReadonlyFunctionRejector::MESSAGE);
+        $runtime->parseAndCompile(<<<'PHP'
 <?php
 readonly function f(): void {
     echo "ok\n";
 }
 f();
-PHP;
-        $block = $runtime->parseAndCompile($code, 'readonly_function_decl.php');
-        $this->assertNotNull($block);
-        ob_start();
-        $runtime->run($block);
-        $this->assertSame("ok\n", ob_get_clean());
+PHP, 'readonly_function_decl.php');
     }
 
-    public function testMutableCaptureFailsAtCompileTime(): void
+    public function testReadonlyClosureFailsAtCompileTime(): void
     {
         $runtime = new Runtime();
-        $code = <<<'PHP'
+        $this->expectException(CompileFatal::class);
+        $this->expectExceptionMessage(ReadonlyFunctionRejector::MESSAGE);
+        $runtime->parseAndCompile(<<<'PHP'
 <?php
 $x = 1;
 readonly function () use ($x) {};
-PHP;
-        $this->expectException(\CompileError::class);
-        $this->expectExceptionMessage('Cannot bind non-readonly variable $x in readonly closure');
-        $runtime->parseAndCompile($code, 'readonly_function_capture.php');
+PHP, 'readonly_function_capture.php');
     }
 
     public function testReadonlyClassMethodStillAllowed(): void
