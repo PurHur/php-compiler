@@ -264,7 +264,7 @@ final class WeakRefSupport
         if (3 !== \count($parts) || 'e' !== $parts[0] || '' === $parts[1] || '' === $parts[2]) {
             return null;
         }
-        $vm = VM::running();
+        $vm = \PHPCompiler\VM::running();
         if (null === $vm) {
             return null;
         }
