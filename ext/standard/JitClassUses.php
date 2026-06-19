@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace PHPCompiler\ext\standard;
 
 use PHPCompiler\JIT\BasicBlockHelper;
+use PHPCompiler\JIT\Builtin\Type\Object_ as ObjectBuiltin;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\HashTableHelper;
 use PHPCompiler\JIT\JitStringArg;
@@ -21,8 +22,16 @@ final class JitClassUses
 
     public static function invoke(Context $context, JITVariable $whatArg, bool $autoload): Value
     {
-        if (null !== $whatArg->compileTimeEnumCase) {
-            return self::returnEmptyArray($context);
+        $compileTimeEnum = $whatArg->compileTimeEnumCase ?? null;
+        if (\is_array($compileTimeEnum) && isset($compileTimeEnum['classId'])) {
+            $object = $context->type->object;
+            if ($object instanceof ObjectBuiltin) {
+                return self::invokeForClassName(
+                    $context,
+                    $object->classNameForId((int) $compileTimeEnum['classId']),
+                    $autoload
+                );
+            }
         }
 
         if (JITVariable::TYPE_OBJECT === $whatArg->type) {
@@ -88,7 +97,8 @@ final class JitClassUses
         $context->builder->branchIf($isEnumCase, $enumCaseBlock, $afterEnumCheck);
 
         $context->builder->positionAtEnd($enumCaseBlock);
-        $emptyPtr = self::returnEmptyArray($context);
+        $enumCaseResult = self::invokeForEnumCaseValueBox($context, $valuePtr, $autoload);
+        $enumCaseEndBlock = $context->builder->getInsertBlock();
         $context->builder->branch($doneBlock);
 
         $context->builder->positionAtEnd($afterEnumCheck);
@@ -128,7 +138,7 @@ final class JitClassUses
         $context->builder->positionAtEnd($doneBlock);
         $valuePtrTy = $context->getTypeFromString('__value__*');
         $result = $context->builder->phi($valuePtrTy);
-        $result->addIncoming($emptyPtr, $enumCaseBlock);
+        $result->addIncoming($enumCaseResult, $enumCaseEndBlock);
         $result->addIncoming($stringResult, $stringEndBlock);
         $result->addIncoming($objectResult, $objectEndBlock);
         $result->addIncoming($falsePtr, $falseBlock);
@@ -273,7 +283,10 @@ final class JitClassUses
             return self::returnFalse($context);
         }
         if ($object->hasUserDeclaredEnum($className)) {
-            return self::returnEmptyArray($context);
+            return self::buildTraitMapFromNames(
+                $context,
+                self::traitNamesForClass($context, $className, $lc)
+            );
         }
         if ($object->isTraitClass($lc) || $object->hasUserDeclaredClass($className)) {
             return self::buildTraitMapFromNames(
@@ -289,7 +302,10 @@ final class JitClassUses
                 return self::returnFalse($context);
             }
             if ($entry->isEnum) {
-                return self::returnEmptyArray($context);
+                return self::buildTraitMapFromNames(
+                    $context,
+                    array_values(VmReflection::traitUsesMap($entry))
+                );
             }
 
             return self::buildTraitMapFromNames(
@@ -312,7 +328,8 @@ final class JitClassUses
     {
         $object = $context->type->object;
         if (!$object->hasUserDeclaredClass($className)
-            && !$object->isTraitClass($classLc)) {
+            && !$object->isTraitClass($classLc)
+            && !$object->hasUserDeclaredEnum($className)) {
             return [];
         }
 
@@ -345,6 +362,30 @@ final class JitClassUses
         );
 
         return $ptr;
+    }
+
+    private static function invokeForEnumCaseValueBox(Context $context, Value $enumCasePtr, bool $autoload): Value
+    {
+        $object = $context->type->object;
+        if (!$object instanceof ObjectBuiltin) {
+            return self::returnFalse($context);
+        }
+        $enumMap = $context->structFieldMap['__enum_case__'] ?? null;
+        if (null === $enumMap || !isset($enumMap['class_id'])) {
+            return self::returnFalse($context);
+        }
+        $classIdVal = $context->builder->load(
+            $context->builder->structGep($enumCasePtr, $enumMap['class_id'])
+        );
+        if (!method_exists($classIdVal, 'isConstant') || !$classIdVal->isConstant()) {
+            return self::returnFalse($context);
+        }
+
+        return self::invokeForClassName(
+            $context,
+            $object->classNameForId((int) $classIdVal->getConstantValue()),
+            $autoload
+        );
     }
 
     private static function returnFalse(Context $context): Value
