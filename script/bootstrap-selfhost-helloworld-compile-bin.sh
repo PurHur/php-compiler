@@ -54,12 +54,21 @@ if [[ "${SOURCE_NORM}" == "${ROOT}/bin/compile.php" ]]; then
   _inventory_zend_ok=0
   if [[ "${BOOTSTRAP_INVENTORY_DRIVER_USE_PRELINKED:-0}" != "1" ]]; then
     bootstrap_gen0_seed_prelinked_m3_sidecars || true
+    _inventory_minimal=0
+    _inventory_full=0
+    if [[ "${BOOTSTRAP_INVENTORY_DRIVER_FULL:-0}" == "1" ]]; then
+      _inventory_full=1
+    elif [[ "${BOOTSTRAP_INVENTORY_MINIMAL_SIDECARS:-1}" == "1" ]]; then
+      _inventory_minimal=1
+    fi
     set +e
     _inventory_zend_out="$(
       env -u PHP_COMPILER_EMIT_HELPER_LINK PHP_COMPILER_SELFHOST_AOT=1 PHP_COMPILER_M3_COMPILE_DRIVER=1 \
         PHP_COMPILER_M3_COMPILE_DRIVER_MAIN=1 PHP_COMPILER_M4_BIN_COMPILE_DRIVER=1 \
         PHP_COMPILER_M3_INVENTORY_EMIT_DRIVER=1 BOOTSTRAP_M3_USE_INVENTORY_EMIT_DRIVER=1 \
         PHP_COMPILER_M3_EMIT_LOG_PREFIX=helloworld_compile_smoke \
+        PHP_COMPILER_M3_INVENTORY_MINIMAL_SIDECARS="${_inventory_minimal}" \
+        PHP_COMPILER_M3_REUSE_STALE_COMPILER_LIB_SIDECAR="${_inventory_minimal}" \
         php "${ROOT}/bin/compile.php" -o "${AOT_OUT}" "${ROOT}/bin/compile.php" 2>&1
     )"
     _inventory_zend_code=$?

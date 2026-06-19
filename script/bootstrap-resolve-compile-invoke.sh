@@ -116,9 +116,11 @@ bootstrap_gen0_sidecar_blob_for_entry() {
       if [[ -f "${stamp}" ]]; then
         have_sha="$(tr -d '\n' <"${stamp}")"
       fi
-      if [[ "${want_sha}" != "${have_sha}" ]]; then
-        :
-      else
+      if [[ "${want_sha}" == "${have_sha}" ]] \
+        || [[ "${BOOTSTRAP_ALLOW_STALE_SIDECAR:-0}" == "1" ]]; then
+        if [[ "${want_sha}" != "${have_sha}" ]]; then
+          echo "bootstrap-gen0-sidecar-fallback: using stale build sidecar (want ${want_sha}, have ${have_sha:-<none>}; BOOTSTRAP_ALLOW_STALE_SIDECAR=1 — #8703)" >&2
+        fi
         printf '%s\n' "${build_blob}"
         return 0
       fi
@@ -151,8 +153,12 @@ bootstrap_gen0_sidecar_blob_for_entry() {
         have_sha="$(tr -d '\n' <"${root}/prelinked/bootstrap-gen0/.m3_compiler_lib_sidecar.sha")"
       fi
       if [[ "${want_sha}" != "${have_sha}" ]]; then
-        echo "bootstrap-gen0-sidecar-fallback: stale compiler_lib sidecar (want ${want_sha}, have ${have_sha:-<none>}) — refusing (#2201)" >&2
-        return 1
+        if [[ "${BOOTSTRAP_ALLOW_STALE_SIDECAR:-0}" == "1" ]]; then
+          echo "bootstrap-gen0-sidecar-fallback: using stale prelinked sidecar (want ${want_sha}, have ${have_sha:-<none>}; BOOTSTRAP_ALLOW_STALE_SIDECAR=1 — #8703)" >&2
+        else
+          echo "bootstrap-gen0-sidecar-fallback: stale compiler_lib sidecar (want ${want_sha}, have ${have_sha:-<none>}) — refusing (#2201)" >&2
+          return 1
+        fi
       fi
     fi
     printf '%s\n' "${prelinked}"
@@ -319,9 +325,13 @@ bootstrap_inventory_argv_driver_m4_smoke() {
       source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/bootstrap-gen0-install-prelinked-driver.sh"
     fi
     if bootstrap_gen3_emit_matches_stale_prelinked_gen0 "${compile_out}"; then
-      echo "bootstrap-inventory-argv-driver-m4-smoke: ${driver} bin/compile.php emit matches stale prelinked/bootstrap-gen0/ (refresh gen-0 — #8710)" >&2
-      rm -f "${compile_out}"
-      return 1
+      if [[ "${BOOTSTRAP_ALLOW_STALE_SIDECAR:-0}" == "1" ]]; then
+        echo "bootstrap-inventory-argv-driver-m4-smoke: ${driver} bin/compile.php emit matches stale prelinked (BOOTSTRAP_ALLOW_STALE_SIDECAR=1 — #8703)" >&2
+      else
+        echo "bootstrap-inventory-argv-driver-m4-smoke: ${driver} bin/compile.php emit matches stale prelinked/bootstrap-gen0/ (refresh gen-0 — #8710)" >&2
+        rm -f "${compile_out}"
+        return 1
+      fi
     fi
     # Self-host fixed point: honest inventory emit reproduces refreshed gen-0 driver bytes.
   fi
@@ -353,6 +363,26 @@ bootstrap_ensure_inventory_argv_driver() {
   if [[ ! -f "${root}/bin/compile.php" ]]; then
     echo "bootstrap-ensure-inventory-argv-driver: missing ${root}/bin/compile.php" >&2
     return 1
+  fi
+  if [[ "${BOOTSTRAP_ALLOW_STALE_SIDECAR:-0}" == "1" ]]; then
+    local prelink="${root}/prelinked/bootstrap-gen0/bin-compile-aot"
+    if [[ -x "${prelink}" ]]; then
+      mkdir -p "${root}/build"
+      cp -f "${prelink}" "${out}"
+      cp -f "${prelink}" "${root}/build/.m3_bin_compile_aot_blob"
+      chmod +x "${out}" "${root}/build/.m3_bin_compile_aot_blob"
+      if ! declare -F bootstrap_gen0_seed_prelinked_m3_sidecars >/dev/null 2>&1; then
+        # shellcheck source=bootstrap-gen0-install-prelinked-driver.sh
+        source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/bootstrap-gen0-install-prelinked-driver.sh"
+      fi
+      bootstrap_gen0_seed_prelinked_m3_sidecars 2>/dev/null || true
+      if bootstrap_is_inventory_bin_compile_argv_driver "${out}" \
+        && bootstrap_inventory_argv_driver_accepts "${out}"; then
+        echo "bootstrap-ensure-inventory-argv-driver: using prelinked gen-0 (BOOTSTRAP_ALLOW_STALE_SIDECAR=1 — #8703)" >&2
+        return 0
+      fi
+      rm -f "${out}" "${root}/build/.m3_bin_compile_aot_blob"
+    fi
   fi
   if ! declare -F bootstrap_gen0_seed_prelinked_m3_sidecars >/dev/null 2>&1; then
     # shellcheck source=bootstrap-gen0-install-prelinked-driver.sh

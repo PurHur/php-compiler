@@ -270,6 +270,9 @@ final class BootstrapSelfhostHelloWorldTest extends TestCase
             '/registerM3EmitTuSidecarFromPath\(\s*\$repoRoot\.\'\/test\/selfhost\/compiler_lib_spine_smoke\/main\.php\'[\s\S]*?true\s*\)/',
             $jit
         );
+        $this->assertStringContainsString('shouldUseM3InventoryMinimalSidecars', $jit);
+        $this->assertStringContainsString('PHP_COMPILER_M3_INVENTORY_MINIMAL_SIDECARS', $jit);
+        $this->assertStringContainsString('m3EmitTuReuseStaleCompilerLibSidecar', $jit);
         $this->assertStringContainsString('m3EmitTuRuntimeRepoRoot', $jit);
         $this->assertStringContainsString('m3EmitTuPrelinkedSidecarLooksStale', $jit);
     }

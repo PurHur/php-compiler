@@ -25,4 +25,12 @@ final class StripTagsRuntimeShrinkTest extends TestCase
         $this->assertStringNotContainsString('return VmString::', $source);
         $this->assertStringNotContainsString('ctype_alpha', $source);
     }
+
+    /** Issue #9196: spine must not require deleted StringStripTagsJit.php. */
+    public function testSpineBundleOmitsDeletedStringStripTagsJit(): void
+    {
+        $spine = (string) file_get_contents(__DIR__.'/../../test/selfhost/compiler_lib_spine_smoke/main.php');
+        $this->assertStringNotContainsString('StringStripTagsJit.php', $spine);
+        $this->assertStringContainsString('StripTagsJitHelper.php', $spine);
+    }
 }

@@ -78,8 +78,12 @@ if [[ -f "${PRELINKED_GEN0}" ]] && cmp -s "${GEN3}" "${PRELINKED_GEN0}"; then
     exit 1
   fi
   if bootstrap_gen3_emit_matches_stale_prelinked_gen0 "${GEN3}"; then
-    echo "bootstrap-selfhost-full-revision-probe: gen-3 matches stale prelinked/bootstrap-gen0/ (sidecar copy — refresh gen-0 or rebuild inventory argv driver #8710)" >&2
-    exit 1
+    if [[ "${BOOTSTRAP_ALLOW_STALE_SIDECAR:-0}" == "1" ]]; then
+      echo "bootstrap-selfhost-full-revision-probe: gen-3 matches stale prelinked (BOOTSTRAP_ALLOW_STALE_SIDECAR=1 — #8703)" >&2
+    else
+      echo "bootstrap-selfhost-full-revision-probe: gen-3 matches stale prelinked/bootstrap-gen0/ (sidecar copy — refresh gen-0 or rebuild inventory argv driver #8710)" >&2
+      exit 1
+    fi
   fi
   # Self-host fixed point: gen-2 inventory argv emit reproduces refreshed gen-0 driver bytes.
 fi

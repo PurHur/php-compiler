@@ -3959,6 +3959,81 @@ class JIT {
     }
 
     /** Host-compile emit-helper probe source and cache linked AOT bytes at link time (#2559, #2567, #2618). */
+    private function shouldUseM3InventoryMinimalSidecars(): bool
+    {
+        foreach (['PHP_COMPILER_M3_INVENTORY_MINIMAL_SIDECARS', 'BOOTSTRAP_INVENTORY_MINIMAL_SIDECARS'] as $envKey) {
+            $v = getenv($envKey);
+            if ('1' === $v || 'true' === strtolower((string) $v)) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /** Reuse committed compiler_lib sidecar without honest stamp match (skip multi-hour host-compile — #8703). */
+    private function m3EmitTuReuseStaleCompilerLibSidecar(): bool
+    {
+        if ($this->shouldUseM3InventoryMinimalSidecars()) {
+            return true;
+        }
+        foreach (['PHP_COMPILER_M3_REUSE_STALE_COMPILER_LIB_SIDECAR', 'BOOTSTRAP_ALLOW_STALE_SIDECAR'] as $envKey) {
+            $v = getenv($envKey);
+            if ('1' === $v || 'true' === strtolower((string) $v)) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /**
+     * @return list<string> repo-relative sidecar paths to try for stale compiler_lib reuse
+     */
+    private function m3EmitTuCompilerLibSidecarFallbackPaths(string $repoRoot): array
+    {
+        return [
+            $repoRoot.'/build/.m3_compiler_lib_aot_blob',
+            $repoRoot.'/prelinked/bootstrap-gen0/compiler_lib_aot_blob',
+        ];
+    }
+
+    private function m3EmitTuTryRegisterStaleCompilerLibSidecar(
+        string $path,
+        string $sidecarRel,
+        string $sentinelLogical,
+        string $code,
+        string $repoRoot
+    ): bool {
+        if (\PHPCompiler\JIT\M3EmitTuTrivialEchoAot::COMPILER_LIB_SIDECAR_REL !== $sidecarRel
+            || !$this->m3EmitTuReuseStaleCompilerLibSidecar()) {
+            return false;
+        }
+        foreach ($this->m3EmitTuCompilerLibSidecarFallbackPaths($repoRoot) as $blobPath) {
+            if (!is_readable($blobPath)) {
+                continue;
+            }
+            $aotBytes = file_get_contents($blobPath);
+            if (!is_string($aotBytes) || '' === $aotBytes) {
+                continue;
+            }
+            \PHPCompiler\JIT\M3EmitTuTrivialEchoAot::registerLinktime(
+                $this->context,
+                $repoRoot,
+                $code,
+                $aotBytes,
+                $sidecarRel,
+                $sentinelLogical,
+                true,
+                $this->m3EmitTuSidecarSourcePathNorm($path)
+            );
+
+            return true;
+        }
+
+        return false;
+    }
+
     private function cacheM3EmitTuTrivialEchoAtLinkTime(): void
     {
         if ($this->m3EmitTuSidecarsCached) {
@@ -3968,6 +4043,7 @@ class JIT {
         $repoRoot = $this->m3EmitTuRuntimeRepoRoot();
         $logPrefix = getenv('PHP_COMPILER_M3_EMIT_LOG_PREFIX');
         if ('helloworld_compile_smoke' === $logPrefix) {
+            $minimalSidecars = $this->shouldUseM3InventoryMinimalSidecars();
             $this->registerM3EmitTuSidecarFromPath(
                 $repoRoot.'/examples/000-HelloWorld/example.php',
                 \PHPCompiler\JIT\M3EmitTuTrivialEchoAot::HELLOWORLD_SIDECAR_REL,
@@ -3978,69 +4054,75 @@ class JIT {
                 \PHPCompiler\JIT\M3EmitTuTrivialEchoAot::COMPILE_SMOKE_SIDECAR_REL,
                 'PHPCompiler\\JIT\\M3EmitTuTrivialEchoAot::compileSmokeSentinelBlock'
             );
-            // M2 lib spine smoke via inventory argv driver (#2967): same sidecar as compile_smoke_m3_emit branch.
-            $this->registerM3EmitTuSidecarFromPath(
-                $repoRoot.'/test/selfhost/compiler_lib_spine_smoke/main.php',
-                \PHPCompiler\JIT\M3EmitTuTrivialEchoAot::COMPILER_LIB_SIDECAR_REL,
-                'PHPCompiler\\JIT\\M3EmitTuTrivialEchoAot::compilerLibSentinelBlock',
-                true
-            );
-            // Gen-3 argv driver (full revision) must be able to emit non-smoke fixtures (eg compiler unit probe)
-            // without falling back to compile_smoke_m3_emit helpers (#2900, #2925).
-            $this->registerM3EmitTuSidecarFromPath(
-                $repoRoot.'/test/selfhost/compiler_unit_probe/compiler_unit_probe_compile.php',
-                \PHPCompiler\JIT\M3EmitTuTrivialEchoAot::COMPILER_UNIT_PROBE_SIDECAR_REL,
-                'PHPCompiler\\JIT\\M3EmitTuTrivialEchoAot::compilerUnitProbeSentinelBlock'
-            );
-            $this->registerM3EmitTuSidecarFromPath(
-                $repoRoot.'/test/selfhost/compiler_helloworld_smoke/compile_driver.php',
-                \PHPCompiler\JIT\M3EmitTuTrivialEchoAot::COMPILE_DRIVER_SIDECAR_REL,
-                'PHPCompiler\\JIT\\M3EmitTuTrivialEchoAot::compileDriverSentinelBlock'
-            );
-            $this->registerM3EmitTuSidecarFromPath(
-                $repoRoot.'/test/selfhost/compiler_helloworld_smoke/main.php',
-                \PHPCompiler\JIT\M3EmitTuTrivialEchoAot::HELLOWORLD_SMOKE_MAIN_SIDECAR_REL,
-                'PHPCompiler\\JIT\\M3EmitTuTrivialEchoAot::helloworldSmokeMainSentinelBlock'
-            );
-            $this->registerM3EmitTuSidecarFromPath(
-                $repoRoot.'/test/selfhost/bootstrap_loop_smoke/main.php',
-                \PHPCompiler\JIT\M3EmitTuTrivialEchoAot::BOOTSTRAP_LOOP_SMOKE_MAIN_SIDECAR_REL,
-                'PHPCompiler\\JIT\\M3EmitTuTrivialEchoAot::bootstrapLoopSmokeMainSentinelBlock'
-            );
+            if (!$minimalSidecars) {
+                // M2 lib spine smoke via inventory argv driver (#2967): same sidecar as compile_smoke_m3_emit branch.
+                $this->registerM3EmitTuSidecarFromPath(
+                    $repoRoot.'/test/selfhost/compiler_lib_spine_smoke/main.php',
+                    \PHPCompiler\JIT\M3EmitTuTrivialEchoAot::COMPILER_LIB_SIDECAR_REL,
+                    'PHPCompiler\\JIT\\M3EmitTuTrivialEchoAot::compilerLibSentinelBlock',
+                    true
+                );
+                // Gen-3 argv driver (full revision) must be able to emit non-smoke fixtures (eg compiler unit probe)
+                // without falling back to compile_smoke_m3_emit helpers (#2900, #2925).
+                $this->registerM3EmitTuSidecarFromPath(
+                    $repoRoot.'/test/selfhost/compiler_unit_probe/compiler_unit_probe_compile.php',
+                    \PHPCompiler\JIT\M3EmitTuTrivialEchoAot::COMPILER_UNIT_PROBE_SIDECAR_REL,
+                    'PHPCompiler\\JIT\\M3EmitTuTrivialEchoAot::compilerUnitProbeSentinelBlock'
+                );
+                $this->registerM3EmitTuSidecarFromPath(
+                    $repoRoot.'/test/selfhost/compiler_helloworld_smoke/compile_driver.php',
+                    \PHPCompiler\JIT\M3EmitTuTrivialEchoAot::COMPILE_DRIVER_SIDECAR_REL,
+                    'PHPCompiler\\JIT\\M3EmitTuTrivialEchoAot::compileDriverSentinelBlock'
+                );
+                $this->registerM3EmitTuSidecarFromPath(
+                    $repoRoot.'/test/selfhost/compiler_helloworld_smoke/main.php',
+                    \PHPCompiler\JIT\M3EmitTuTrivialEchoAot::HELLOWORLD_SMOKE_MAIN_SIDECAR_REL,
+                    'PHPCompiler\\JIT\\M3EmitTuTrivialEchoAot::helloworldSmokeMainSentinelBlock'
+                );
+                $this->registerM3EmitTuSidecarFromPath(
+                    $repoRoot.'/test/selfhost/bootstrap_loop_smoke/main.php',
+                    \PHPCompiler\JIT\M3EmitTuTrivialEchoAot::BOOTSTRAP_LOOP_SMOKE_MAIN_SIDECAR_REL,
+                    'PHPCompiler\\JIT\\M3EmitTuTrivialEchoAot::bootstrapLoopSmokeMainSentinelBlock'
+                );
+            }
             $this->registerM3EmitTuSidecarFromPath(
                 $repoRoot.'/test/selfhost/compiler_minimal/main.php',
                 \PHPCompiler\JIT\M3EmitTuTrivialEchoAot::COMPILER_MINIMAL_SIDECAR_REL,
                 'PHPCompiler\\JIT\\M3EmitTuTrivialEchoAot::compilerMinimalSentinelBlock'
             );
-            // Inventory argv driver (helloworld prefix) compiles spine smoke — register sidecar (#3012).
-            $this->registerM3EmitTuSidecarFromPath(
-                $repoRoot.'/test/selfhost/compiler_lib_spine_smoke/main.php',
-                \PHPCompiler\JIT\M3EmitTuTrivialEchoAot::COMPILER_LIB_SIDECAR_REL,
-                'PHPCompiler\\JIT\\M3EmitTuTrivialEchoAot::compilerLibSentinelBlock',
-                true
-            );
-            $this->registerM3EmitTuSidecarFromPath(
-                $repoRoot.'/lib/Compiler.php',
-                \PHPCompiler\JIT\M3EmitTuTrivialEchoAot::COMPILER_PHP_SIDECAR_REL,
-                'PHPCompiler\\JIT\\M3EmitTuTrivialEchoAot::compilerPhpSentinelBlock'
-            );
+            if (!$minimalSidecars) {
+                // Inventory argv driver (helloworld prefix) compiles spine smoke — register sidecar (#3012).
+                $this->registerM3EmitTuSidecarFromPath(
+                    $repoRoot.'/test/selfhost/compiler_lib_spine_smoke/main.php',
+                    \PHPCompiler\JIT\M3EmitTuTrivialEchoAot::COMPILER_LIB_SIDECAR_REL,
+                    'PHPCompiler\\JIT\\M3EmitTuTrivialEchoAot::compilerLibSentinelBlock',
+                    true
+                );
+                $this->registerM3EmitTuSidecarFromPath(
+                    $repoRoot.'/lib/Compiler.php',
+                    \PHPCompiler\JIT\M3EmitTuTrivialEchoAot::COMPILER_PHP_SIDECAR_REL,
+                    'PHPCompiler\\JIT\\M3EmitTuTrivialEchoAot::compilerPhpSentinelBlock'
+                );
+            }
             $this->registerM3EmitTuSidecarFromPath(
                 $repoRoot.'/bin/compile.php',
                 \PHPCompiler\JIT\M3EmitTuTrivialEchoAot::BIN_COMPILE_SIDECAR_REL,
                 'PHPCompiler\\JIT\\M3EmitTuTrivialEchoAot::binCompileSentinelBlock'
             );
-            $this->registerM3EmitTuSidecarFromPath(
-                $repoRoot.'/bin/vm.php',
-                \PHPCompiler\JIT\M3EmitTuTrivialEchoAot::BIN_VM_SIDECAR_REL,
-                'PHPCompiler\\JIT\\M3EmitTuTrivialEchoAot::binVmSentinelBlock',
-                true
-            );
-            $this->registerM3EmitTuSidecarFromPath(
-                $repoRoot.'/src/cli_driver.php',
-                \PHPCompiler\JIT\M3EmitTuTrivialEchoAot::CLI_DRIVER_SIDECAR_REL,
-                'PHPCompiler\\JIT\\M3EmitTuTrivialEchoAot::cliDriverSentinelBlock',
-                true
-            );
+            if (!$minimalSidecars) {
+                $this->registerM3EmitTuSidecarFromPath(
+                    $repoRoot.'/bin/vm.php',
+                    \PHPCompiler\JIT\M3EmitTuTrivialEchoAot::BIN_VM_SIDECAR_REL,
+                    'PHPCompiler\\JIT\\M3EmitTuTrivialEchoAot::binVmSentinelBlock',
+                    true
+                );
+                $this->registerM3EmitTuSidecarFromPath(
+                    $repoRoot.'/src/cli_driver.php',
+                    \PHPCompiler\JIT\M3EmitTuTrivialEchoAot::CLI_DRIVER_SIDECAR_REL,
+                    'PHPCompiler\\JIT\\M3EmitTuTrivialEchoAot::cliDriverSentinelBlock',
+                    true
+                );
+            }
             // M5 vendor prelink bundles: Zend host-compile at emit-helper link (#3028, #3030, #3031).
             $this->registerM3EmitTuSidecarFromPath(
                 $repoRoot.'/test/bootstrap-vendor-prelink/generated/ircmaxell-php-cfg_bundle.php',
@@ -4058,6 +4140,7 @@ class JIT {
                 'PHPCompiler\\JIT\\M3EmitTuTrivialEchoAot::vendorPhpLlvmSentinelBlock'
             );
         } elseif ('compile_smoke_m3_emit' === $logPrefix || $this->shouldUseM3InventoryEmitDriver()) {
+            $minimalSidecars = $this->shouldUseM3InventoryMinimalSidecars();
             $this->registerM3EmitTuSidecarFromPath(
                 $repoRoot.'/examples/000-HelloWorld/example.php',
                 \PHPCompiler\JIT\M3EmitTuTrivialEchoAot::HELLOWORLD_SIDECAR_REL,
@@ -4068,70 +4151,76 @@ class JIT {
                 \PHPCompiler\JIT\M3EmitTuTrivialEchoAot::COMPILE_SMOKE_SIDECAR_REL,
                 'PHPCompiler\\JIT\\M3EmitTuTrivialEchoAot::compileSmokeSentinelBlock'
             );
-            $this->registerM3EmitTuSidecarFromPath(
-                $repoRoot.'/test/selfhost/compiler_lib_spine_smoke/main.php',
-                \PHPCompiler\JIT\M3EmitTuTrivialEchoAot::COMPILER_LIB_SIDECAR_REL,
-                'PHPCompiler\\JIT\\M3EmitTuTrivialEchoAot::compilerLibSentinelBlock',
-                true
-            );
+            if (!$minimalSidecars) {
+                $this->registerM3EmitTuSidecarFromPath(
+                    $repoRoot.'/test/selfhost/compiler_lib_spine_smoke/main.php',
+                    \PHPCompiler\JIT\M3EmitTuTrivialEchoAot::COMPILER_LIB_SIDECAR_REL,
+                    'PHPCompiler\\JIT\\M3EmitTuTrivialEchoAot::compilerLibSentinelBlock',
+                    true
+                );
+            }
             $this->registerM3EmitTuSidecarFromPath(
                 $repoRoot.'/test/selfhost/compiler_minimal/main.php',
                 \PHPCompiler\JIT\M3EmitTuTrivialEchoAot::COMPILER_MINIMAL_SIDECAR_REL,
                 'PHPCompiler\\JIT\\M3EmitTuTrivialEchoAot::compilerMinimalSentinelBlock'
             );
-            $this->registerM3EmitTuSidecarFromPath(
-                $repoRoot.'/test/selfhost/compiler_unit_probe/compiler_unit_probe_compile.php',
-                \PHPCompiler\JIT\M3EmitTuTrivialEchoAot::COMPILER_UNIT_PROBE_SIDECAR_REL,
-                'PHPCompiler\\JIT\\M3EmitTuTrivialEchoAot::compilerUnitProbeSentinelBlock'
-            );
-            $this->registerM3EmitTuSidecarFromPath(
-                $repoRoot.'/test/selfhost/jit_unit_probe/jit_unit_probe_compile.php',
-                \PHPCompiler\JIT\M3EmitTuTrivialEchoAot::JIT_UNIT_PROBE_SIDECAR_REL,
-                'PHPCompiler\\JIT\\M3EmitTuTrivialEchoAot::jitUnitProbeSentinelBlock'
-            );
-            $this->registerM3EmitTuSidecarFromPath(
-                $repoRoot.'/test/selfhost/jit_unit_probe/compile_driver.php',
-                \PHPCompiler\JIT\M3EmitTuTrivialEchoAot::JIT_UNIT_PROBE_COMPILE_DRIVER_SIDECAR_REL,
-                'PHPCompiler\\JIT\\M3EmitTuTrivialEchoAot::jitUnitProbeCompileDriverSentinelBlock'
-            );
-            $this->registerM3EmitTuSidecarFromPath(
-                $repoRoot.'/test/selfhost/compiler_helloworld_smoke/compile_driver.php',
-                \PHPCompiler\JIT\M3EmitTuTrivialEchoAot::COMPILE_DRIVER_SIDECAR_REL,
-                'PHPCompiler\\JIT\\M3EmitTuTrivialEchoAot::compileDriverSentinelBlock'
-            );
-            $this->registerM3EmitTuSidecarFromPath(
-                $repoRoot.'/test/selfhost/compiler_helloworld_smoke/main.php',
-                \PHPCompiler\JIT\M3EmitTuTrivialEchoAot::HELLOWORLD_SMOKE_MAIN_SIDECAR_REL,
-                'PHPCompiler\\JIT\\M3EmitTuTrivialEchoAot::helloworldSmokeMainSentinelBlock'
-            );
-            $this->registerM3EmitTuSidecarFromPath(
-                $repoRoot.'/test/selfhost/bootstrap_loop_smoke/main.php',
-                \PHPCompiler\JIT\M3EmitTuTrivialEchoAot::BOOTSTRAP_LOOP_SMOKE_MAIN_SIDECAR_REL,
-                'PHPCompiler\\JIT\\M3EmitTuTrivialEchoAot::bootstrapLoopSmokeMainSentinelBlock'
-            );
-            // M5 inventory emit via selfhost-helloworld-emit (#2666, #2681): mirror helloworld_compile_smoke branch.
-            $this->registerM3EmitTuSidecarFromPath(
-                $repoRoot.'/lib/Compiler.php',
-                \PHPCompiler\JIT\M3EmitTuTrivialEchoAot::COMPILER_PHP_SIDECAR_REL,
-                'PHPCompiler\\JIT\\M3EmitTuTrivialEchoAot::compilerPhpSentinelBlock'
-            );
+            if (!$minimalSidecars) {
+                $this->registerM3EmitTuSidecarFromPath(
+                    $repoRoot.'/test/selfhost/compiler_unit_probe/compiler_unit_probe_compile.php',
+                    \PHPCompiler\JIT\M3EmitTuTrivialEchoAot::COMPILER_UNIT_PROBE_SIDECAR_REL,
+                    'PHPCompiler\\JIT\\M3EmitTuTrivialEchoAot::compilerUnitProbeSentinelBlock'
+                );
+                $this->registerM3EmitTuSidecarFromPath(
+                    $repoRoot.'/test/selfhost/jit_unit_probe/jit_unit_probe_compile.php',
+                    \PHPCompiler\JIT\M3EmitTuTrivialEchoAot::JIT_UNIT_PROBE_SIDECAR_REL,
+                    'PHPCompiler\\JIT\\M3EmitTuTrivialEchoAot::jitUnitProbeSentinelBlock'
+                );
+                $this->registerM3EmitTuSidecarFromPath(
+                    $repoRoot.'/test/selfhost/jit_unit_probe/compile_driver.php',
+                    \PHPCompiler\JIT\M3EmitTuTrivialEchoAot::JIT_UNIT_PROBE_COMPILE_DRIVER_SIDECAR_REL,
+                    'PHPCompiler\\JIT\\M3EmitTuTrivialEchoAot::jitUnitProbeCompileDriverSentinelBlock'
+                );
+                $this->registerM3EmitTuSidecarFromPath(
+                    $repoRoot.'/test/selfhost/compiler_helloworld_smoke/compile_driver.php',
+                    \PHPCompiler\JIT\M3EmitTuTrivialEchoAot::COMPILE_DRIVER_SIDECAR_REL,
+                    'PHPCompiler\\JIT\\M3EmitTuTrivialEchoAot::compileDriverSentinelBlock'
+                );
+                $this->registerM3EmitTuSidecarFromPath(
+                    $repoRoot.'/test/selfhost/compiler_helloworld_smoke/main.php',
+                    \PHPCompiler\JIT\M3EmitTuTrivialEchoAot::HELLOWORLD_SMOKE_MAIN_SIDECAR_REL,
+                    'PHPCompiler\\JIT\\M3EmitTuTrivialEchoAot::helloworldSmokeMainSentinelBlock'
+                );
+                $this->registerM3EmitTuSidecarFromPath(
+                    $repoRoot.'/test/selfhost/bootstrap_loop_smoke/main.php',
+                    \PHPCompiler\JIT\M3EmitTuTrivialEchoAot::BOOTSTRAP_LOOP_SMOKE_MAIN_SIDECAR_REL,
+                    'PHPCompiler\\JIT\\M3EmitTuTrivialEchoAot::bootstrapLoopSmokeMainSentinelBlock'
+                );
+                // M5 inventory emit via selfhost-helloworld-emit (#2666, #2681): mirror helloworld_compile_smoke branch.
+                $this->registerM3EmitTuSidecarFromPath(
+                    $repoRoot.'/lib/Compiler.php',
+                    \PHPCompiler\JIT\M3EmitTuTrivialEchoAot::COMPILER_PHP_SIDECAR_REL,
+                    'PHPCompiler\\JIT\\M3EmitTuTrivialEchoAot::compilerPhpSentinelBlock'
+                );
+            }
             $this->registerM3EmitTuSidecarFromPath(
                 $repoRoot.'/bin/compile.php',
                 \PHPCompiler\JIT\M3EmitTuTrivialEchoAot::BIN_COMPILE_SIDECAR_REL,
                 'PHPCompiler\\JIT\\M3EmitTuTrivialEchoAot::binCompileSentinelBlock'
             );
-            $this->registerM3EmitTuSidecarFromPath(
-                $repoRoot.'/bin/vm.php',
-                \PHPCompiler\JIT\M3EmitTuTrivialEchoAot::BIN_VM_SIDECAR_REL,
-                'PHPCompiler\\JIT\\M3EmitTuTrivialEchoAot::binVmSentinelBlock',
-                true
-            );
-            $this->registerM3EmitTuSidecarFromPath(
-                $repoRoot.'/src/cli_driver.php',
-                \PHPCompiler\JIT\M3EmitTuTrivialEchoAot::CLI_DRIVER_SIDECAR_REL,
-                'PHPCompiler\\JIT\\M3EmitTuTrivialEchoAot::cliDriverSentinelBlock',
-                true
-            );
+            if (!$minimalSidecars) {
+                $this->registerM3EmitTuSidecarFromPath(
+                    $repoRoot.'/bin/vm.php',
+                    \PHPCompiler\JIT\M3EmitTuTrivialEchoAot::BIN_VM_SIDECAR_REL,
+                    'PHPCompiler\\JIT\\M3EmitTuTrivialEchoAot::binVmSentinelBlock',
+                    true
+                );
+                $this->registerM3EmitTuSidecarFromPath(
+                    $repoRoot.'/src/cli_driver.php',
+                    \PHPCompiler\JIT\M3EmitTuTrivialEchoAot::CLI_DRIVER_SIDECAR_REL,
+                    'PHPCompiler\\JIT\\M3EmitTuTrivialEchoAot::cliDriverSentinelBlock',
+                    true
+                );
+            }
             $this->registerM3EmitTuSidecarFromPath(
                 $repoRoot.'/test/bootstrap-aot/runtime_trivial_echo.php',
                 \PHPCompiler\JIT\M3EmitTuTrivialEchoAot::TRIVIAL_ECHO_SIDECAR_REL,
@@ -4356,6 +4445,9 @@ class JIT {
                     return;
                 }
             }
+            if ($this->m3EmitTuTryRegisterStaleCompilerLibSidecar($path, $sidecarRel, $sentinelLogical, $code, $repoRoot)) {
+                return;
+            }
         }
         $hostCompilePath = $path;
         if (str_ends_with($pathNorm, '/bin/compile.php')) {
@@ -4468,6 +4560,9 @@ class JIT {
             }
             @unlink($tmpOut);
             @unlink($tmpOut.'.o');
+            if ($this->m3EmitTuTryRegisterStaleCompilerLibSidecar($path, $sidecarRel, $sentinelLogical, $code, $repoRoot)) {
+                return;
+            }
             // Gen-2 native argv driver cannot always spawn Zend during link; reuse blobs from an
             // earlier Zend host-compile in the same workspace (#3004).
             $repoSidecar = $repoRoot.'/'.ltrim($sidecarRel, '/');
