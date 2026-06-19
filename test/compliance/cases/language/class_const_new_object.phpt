@@ -1,14 +1,5 @@
 --TEST--
-Language: class constants with object expressions — PHP 8.3+ (#3196, #9850, Zend/zend_constants.c)
---SKIPIF--
-<?php
-if (!class_exists('PHPCompiler\\CompilerVersion')) {
-    require __DIR__ . '/../../../../vendor/autoload.php';
-}
-if (!PHPCompiler\CompilerVersion::supportsClassConstObjectExpressions()) {
-    die('skip class const object expressions require CompilerVersion 8.3+');
-}
-?>
+Language: class constant object `new` expression rejected (#9974, Zend/zend_compile.c)
 --FILE--
 <?php
 class C {
@@ -29,11 +20,5 @@ class D {
 var_export(D::Y);
 echo "\n";
 echo D::Y->x === 7 ? "1\n" : "0\n";
---EXPECT--
-(object) array (
-)
-1
-Foo::__set_state(array (
-   'x' => 7,
-))
-1
+--EXPECT_EXIT--
+255

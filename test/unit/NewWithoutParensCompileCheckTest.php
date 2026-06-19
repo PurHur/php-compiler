@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace PHPCompiler\Test\Unit;
 
 use PHPCompiler\Compiler\NewWithoutParensCompileCheck;
-use PHPCompiler\CompilerVersion;
 use PHPCompiler\Runtime;
 use PHPUnit\Framework\TestCase;
 
@@ -47,13 +46,9 @@ PHP, 'new_with_parens.php');
         $this->assertNotNull($block);
     }
 
-    public function testClassConstNewWithParensCompilesOn83Target(): void
+    public function testClassConstNewWithParensCompileErrors(): void
     {
-        if (!CompilerVersion::supportsClassConstObjectExpressions()) {
-            $this->markTestSkipped('class const object expressions require CompilerVersion 8.3+');
-        }
-        $runtime = new Runtime();
-        $block = $runtime->parseAndCompile(<<<'PHP'
+        $this->expectCompileError(<<<'PHP'
 <?php
 class C {
     public function __construct(public int $n = 0) {}
@@ -61,23 +56,17 @@ class C {
 class Holder {
     public const X = new C(1);
 }
-PHP, 'class_const_new_with_parens.php');
-        $this->assertNotNull($block);
+PHP);
     }
 
-    public function testClassConstNewEmptyArgsWithParensCompilesOn83Target(): void
+    public function testClassConstNewEmptyArgsWithParensCompileErrors(): void
     {
-        if (!CompilerVersion::supportsClassConstObjectExpressions()) {
-            $this->markTestSkipped('class const object expressions require CompilerVersion 8.3+');
-        }
-        $runtime = new Runtime();
-        $block = $runtime->parseAndCompile(<<<'PHP'
+        $this->expectCompileError(<<<'PHP'
 <?php
 class C {
     public const X = new stdClass();
 }
-PHP, 'class_const_new_empty_args.php');
-        $this->assertNotNull($block);
+PHP);
     }
 
     public function testClassConstArrayWithNewCompileErrors(): void
