@@ -1,5 +1,5 @@
 --TEST--
-Language: backed enum case loose == / != with backing scalar is false (#9727, re-#9660/#9583, zend_operators.c)
+Language: backed enum loose == / != JIT execute parity (#9727, re-#9660, zend_operators.c)
 --FILE--
 <?php
 enum E: int { case A = 1; }
