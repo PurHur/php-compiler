@@ -2835,6 +2835,7 @@ require_once __DIR__.'/../../../ext/standard/CloneWithJitHelper.php';
 require_once __DIR__.'/../../../ext/standard/DateMutationJitHelper.php';
 require_once __DIR__.'/../../../ext/standard/ExceptionJitHelper.php';
 require_once __DIR__.'/../../../ext/standard/ErrorSilenceJitHelper.php';
+require_once __DIR__.'/../../../ext/standard/GcStatusJitHelper.php';
 require_once __DIR__.'/../../../ext/standard/GcToggleJitHelper.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/ExceptionThrowRuntime.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/GcToggleRuntime.php';
