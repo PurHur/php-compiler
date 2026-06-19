@@ -6,7 +6,8 @@ namespace PHPCompiler\Ast;
 
 /**
  * Desugar PHP 8.3+ `clone $obj with { prop: $value, ... }` and PHP 8.4+
- * `clone($obj, ['prop' => $value, ...])` before nikic/php-parser (#4513, #9743).
+ * `clone($obj, ['prop' => $value, ...])` / `clone $obj with ['prop', ...]`
+ * before nikic/php-parser (#4513, #9743, #9995).
  *
  * Rewrites to an IIFE that clones then assigns properties — matches Zend/zend_compile.c lowering.
  * php-src: Zend/zend_language_parser.y clone_expr / with clause; zend_clones.c.
@@ -43,7 +44,9 @@ final class CloneWithDesugar
                 break;
             }
 
-            $assignments = self::parsePropertyAssignments($span['blockText']);
+            $assignments = isset($span['arrayText'])
+                ? self::parseCloneWithArrayAssignments($span['arrayText'])
+                : self::parsePropertyAssignments($span['blockText']);
             if ([] === $assignments) {
                 break;
             }
@@ -484,7 +487,7 @@ final class CloneWithDesugar
     /**
      * @param array<int, array{0: int, 1: string, 2: int}|string> $tokens
      *
-     * @return array{start: int, end: int, exprText: string, blockText: string}|null
+     * @return array{start: int, end: int, exprText: string, blockText?: string, arrayText?: string}|null
      */
     private static function findCloneWithSpan(string $code, array $tokens): ?array
     {
@@ -511,37 +514,62 @@ final class CloneWithDesugar
                 continue;
             }
 
-            $braceIdx = $withIdx + 1;
-            self::skipForwardIgnorable($tokens, $braceIdx);
-            if ($braceIdx >= $c || '{' !== $tokens[$braceIdx]) {
+            $listIdx = $withIdx + 1;
+            self::skipForwardIgnorable($tokens, $listIdx);
+            if ($listIdx >= $c) {
                 continue;
             }
 
-            $blockEndIdx = self::skipBalancedBraces($tokens, $braceIdx);
-            if (null === $blockEndIdx) {
+            $listEndIdx = null;
+            $arrayText = null;
+            $blockText = null;
+
+            if ('[' === $tokens[$listIdx]) {
+                $listEndIdx = self::skipBalancedForward($tokens, $listIdx, '[', ']');
+                if (null === $listEndIdx) {
+                    continue;
+                }
+                $arrayTextStart = self::tokenByteOffset($tokens, $listIdx);
+                $arrayTextEnd = self::tokenByteEnd($tokens, $listEndIdx);
+                if (null === $arrayTextStart || null === $arrayTextEnd) {
+                    continue;
+                }
+                $arrayText = trim(substr($code, $arrayTextStart, $arrayTextEnd - $arrayTextStart));
+            } elseif ('{' === $tokens[$listIdx]) {
+                $listEndIdx = self::skipBalancedBraces($tokens, $listIdx);
+                if (null === $listEndIdx) {
+                    continue;
+                }
+                $blockOpen = self::tokenByteEnd($tokens, $listIdx);
+                $blockClose = self::tokenByteOffset($tokens, $listEndIdx);
+                if (null === $blockOpen || null === $blockClose) {
+                    continue;
+                }
+                $blockText = trim(substr($code, $blockOpen, $blockClose - $blockOpen));
+            } else {
                 continue;
             }
 
             $start = self::tokenByteOffset($tokens, $i);
-            $end = self::tokenByteEnd($tokens, $blockEndIdx);
+            $end = self::tokenByteEnd($tokens, $listEndIdx);
             $exprTextStart = self::tokenByteOffset($tokens, $exprStart);
             $exprTextEnd = self::tokenByteEnd($tokens, $exprEnd);
             if (null === $start || null === $end || null === $exprTextStart || null === $exprTextEnd) {
                 continue;
             }
 
-            $blockOpen = self::tokenByteEnd($tokens, $braceIdx);
-            $blockClose = self::tokenByteOffset($tokens, $blockEndIdx);
-            if (null === $blockOpen || null === $blockClose) {
-                continue;
-            }
-
-            return [
+            $span = [
                 'start' => $start,
                 'end' => $end,
                 'exprText' => trim(substr($code, $exprTextStart, $exprTextEnd - $exprTextStart)),
-                'blockText' => trim(substr($code, $blockOpen, $blockClose - $blockOpen)),
             ];
+            if (null !== $arrayText) {
+                $span['arrayText'] = $arrayText;
+            } else {
+                $span['blockText'] = $blockText;
+            }
+
+            return $span;
         }
 
         return null;
