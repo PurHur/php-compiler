@@ -2172,7 +2172,8 @@ class VM {
             $fiber->hasReturnValue = true;
             $fiber->threw = false;
             $out = new Variable();
-            $out->copyFrom($resolved);
+            // Zend/zend_fibers.c: resume()/start() return NULL when fiber is dead (#10149).
+            $out->null();
 
             return $out;
         }
