@@ -10302,6 +10302,9 @@ class Compiler {
         if (!$fetch instanceof Op\Expr\ClassConstFetch) {
             return null;
         }
+        if ($this->callArgIsNewExpression($callArg)) {
+            return null;
+        }
         $slot = $block->slotForOperand($fetch->result);
         if (null === $slot) {
             foreach ($this->compileExpr($fetch, $block) as $op) {
@@ -10442,6 +10445,16 @@ class Compiler {
         }
         // php-cfg hoists `$a = [...]` as Array_+Assign before `array_key_exists('k', $a)` (#9456).
         if ($this->isEmbeddedCallLiteralArg($callArgs[$argIndex] ?? null)) {
+            return null;
+        }
+        $callArg = $callArgs[$argIndex] ?? null;
+        if ($this->callArgIsNewExpression($callArg)) {
+            foreach ($producers as $producer) {
+                if ($producer instanceof Op\Expr\New_) {
+                    return $producer;
+                }
+            }
+
             return null;
         }
         if ($argCount < $producerCount) {
@@ -11160,7 +11173,6 @@ class Compiler {
             ) {
                 break;
             }
-            array_unshift($producers, $child);
             if (
                 ($child instanceof Op\Expr\FuncCall || $child instanceof Op\Expr\NsFuncCall)
                 && $this->isNestedCallArgProducerForConsumer($child, $callOp, $i, $callIndex, $cfgChildren)
@@ -11168,11 +11180,19 @@ class Compiler {
                 && is_array($callOp->args)
                 && 1 === count($callOp->args)
             ) {
+                array_unshift($producers, $child);
                 break;
             }
             if ($child instanceof Op\Expr\Array_) {
+                array_unshift($producers, $child);
+                $prev = $cfgChildren[$i - 1] ?? null;
+                // php-cfg: `invokeArgs(new C(), [...])` — New_ immediately precedes Array_ (#9904).
+                if ($prev instanceof Op\Expr\New_) {
+                    array_unshift($producers, $prev);
+                }
                 break;
             }
+            array_unshift($producers, $child);
         }
 
         return $producers;
@@ -11417,6 +11437,58 @@ class Compiler {
             if (null !== $producerRoot && Block::cfgVarRoot($callArg) === $producerRoot) {
                 return true;
             }
+        }
+
+        return false;
+    }
+
+    /** True when a call operand is `new ClassName(...)` (#9904). */
+    private function callArgIsNewExpression(?Operand $callArg): bool
+    {
+        if (null === $callArg) {
+            return false;
+        }
+
+        return $this->unwrapOperandChain($callArg) instanceof Op\Expr\New_;
+    }
+
+    /** True when php-cfg hoisted an inline `new` producer for this call arg (#9904). */
+    private function callArgInlineProducerIsNew(?Op $cfgCallOp, int $argIndex, Block $block): bool
+    {
+        if (null === $cfgCallOp || null === $block->orig) {
+            return false;
+        }
+        if (!property_exists($cfgCallOp, 'args') || !is_array($cfgCallOp->args)) {
+            return false;
+        }
+        $callArg = $cfgCallOp->args[$argIndex] ?? null;
+        if ($this->callArgIsNewExpression($callArg)) {
+            return true;
+        }
+        $producers = $this->precedingInlineCallArgProducersBeforeCfgOp($block->orig->children, $cfgCallOp);
+        $argCount = \count($cfgCallOp->args);
+        if (\count($producers) === $argCount && isset($producers[$argIndex])) {
+            return $producers[$argIndex] instanceof Op\Expr\New_;
+        }
+
+        return false;
+    }
+
+    /** True when $producer supplies the specific $callArg operand (#9456, #9904). */
+    private function inlineCallArgProducerFeedsCallArgOp(Op\Expr $producer, Op $consumer, Operand $callArg): bool
+    {
+        if (!property_exists($producer, 'result') || !property_exists($consumer, 'args') || !is_array($consumer->args)) {
+            return false;
+        }
+        $producerRoot = Block::cfgVarRoot($producer->result);
+        if ($callArg === $producer->result) {
+            return true;
+        }
+        if ($this->operandsReferToSameVariable($callArg, $producer->result)) {
+            return true;
+        }
+        if (null !== $producerRoot && Block::cfgVarRoot($callArg) === $producerRoot) {
+            return true;
         }
 
         return false;
@@ -13286,6 +13358,9 @@ class Compiler {
         if ($this->isEmbeddedCallLiteralArg($arg)) {
             return null;
         }
+        if ($this->callArgIsNewExpression($arg)) {
+            return null;
+        }
         $vm = $this->vmVariableFromCfgLiteralOperand($arg);
         if (null !== $vm) {
             if (Variable::TYPE_STRING === $vm->type) {
@@ -13374,6 +13449,9 @@ class Compiler {
             if ($producer instanceof Op\Expr\Closure || $producer instanceof Op\Expr\ArrowFunction) {
                 return null;
             }
+            if ($producer instanceof Op\Expr\New_) {
+                return null;
+            }
             if ($producer instanceof Op\Expr\UnaryMinus || $producer instanceof Op\Expr\UnaryPlus) {
                 $vm = $this->tryFoldUnaryLiteralDefault($producer);
                 if (null !== $vm) {
@@ -13381,6 +13459,9 @@ class Compiler {
                 }
             }
             if ($this->callArgOperandIsClosureValue($arg, $block)) {
+                return null;
+            }
+            if ($this->callArgInlineProducerIsNew($callOp, $argIndex, $block)) {
                 return null;
             }
             $fetches = $this->precedingCallArgClassConstFetchesBeforeCfgOp($block->orig->children, $callOp, $block);
@@ -13535,7 +13616,35 @@ class Compiler {
                     $valueSlot = $this->compileOperand($inlineArray->result, $block, true);
                 }
             } else {
-                $valueSlot = $this->compileCallArgCoalesceSlot($arg, $block);
+                $valueSlot = null;
+                if (
+                    null !== $cfgCallOp
+                    && $this->callArgInlineProducerIsNew($cfgCallOp, (int) $argIndex, $block)
+                ) {
+                    $producers = $this->precedingInlineCallArgProducersBeforeCfgOp(
+                        $block->orig->children ?? [],
+                        $cfgCallOp
+                    );
+                    $newProducer = $this->matchInlineCallArgProducer(
+                        $producers,
+                        $cfgCallOp->args ?? [],
+                        (int) $argIndex
+                    );
+                    if ($newProducer instanceof Op\Expr\New_) {
+                        if (null === $block->slotForOperand($newProducer->result)) {
+                            foreach ($this->compileExpr($newProducer, $block) as $op) {
+                                $sends[] = $op;
+                            }
+                        }
+                        $valueSlot = $block->slotForOperand($newProducer->result);
+                    }
+                    if (null === $valueSlot) {
+                        $valueSlot = $this->compileOperand($arg, $block, true);
+                    }
+                }
+                if (null === $valueSlot) {
+                    $valueSlot = $this->compileCallArgCoalesceSlot($arg, $block);
+                }
                 if (null === $valueSlot) {
                     $valueSlot = $this->compileHoistedEmptyCallArg($arg, $block);
                 }
@@ -13605,6 +13714,10 @@ class Compiler {
                     null !== $valueSlot
                     && null !== $block->orig
                     && ($arg instanceof Operand\Variable || $arg instanceof Operand\Temporary)
+                    && !(
+                        null !== $cfgCallOp
+                        && $this->callArgInlineProducerIsNew($cfgCallOp, (int) $argIndex, $block)
+                    )
                 ) {
                     $hasProducer = false;
                     foreach ($block->orig->children as $child) {
@@ -13636,7 +13749,10 @@ class Compiler {
                                     && $this->isInlineExprCallArgProducer($prev)
                                     && (
                                         $this->operandsReferToSameVariable($prev->result, $arg)
-                                        || $this->inlineCallArgProducerFeedsConsumer($prev, $cfgCallOp)
+                                        || (
+                                            null !== $cfgCallOp
+                                            && $this->inlineCallArgProducerFeedsCallArgOp($prev, $cfgCallOp, $arg)
+                                        )
                                     )
                                 ) {
                                     $prevSlot = $block->slotForOperand($prev->result);
@@ -13654,7 +13770,15 @@ class Compiler {
                         }
                     }
                 }
-                $valueSlot = $this->preferNamedLocalCallArgSlot($arg, $block, $valueSlot, $calleeName);
+                $valueSlot = $this->preferNamedLocalCallArgSlot(
+                    $arg,
+                    $block,
+                    $valueSlot,
+                    (
+                        null !== $cfgCallOp
+                        && $this->callArgInlineProducerIsNew($cfgCallOp, (int) $argIndex, $block)
+                    ) ? null : $calleeName
+                );
             }
             $nameSlot = null;
             $argName = $this->callArgName($arg);

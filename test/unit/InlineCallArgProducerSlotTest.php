@@ -583,4 +583,62 @@ PHP;
         self::assertSame($arraySlot, $inArraySends[1], 'inline haystack slot');
         self::assertNotSame($inArraySends[0], $inArraySends[1], 'needle and haystack must differ');
     }
+
+    /** Issue #9904 — invokeArgs(new C(), [...]) must send New_ object slot, not sibling Array_ producer. */
+    public function testInvokeArgsNewObjectThenArrayUsesDistinctProducerSlots(): void
+    {
+        $code = <<<'PHP'
+<?php
+class Greeter {
+    public function hello(string $name): string {
+        return "hi {$name}";
+    }
+}
+$rm = new ReflectionMethod(Greeter::class, 'hello');
+$rm->invokeArgs(new Greeter(), ['world']);
+PHP;
+        $runtime = new Runtime();
+        $block = $runtime->parseAndCompile($code, 'reflection_invoke_args_new_array.php');
+
+        $newSlots = [];
+        $arraySlot = null;
+        $sendSlots = [];
+        foreach ($block->opCodes as $op) {
+            if (OpCode::TYPE_NEW === $op->type) {
+                $newSlots[] = $op->arg1;
+            }
+            if (OpCode::TYPE_INIT_ARRAY === $op->type) {
+                $arraySlot = $op->arg1;
+            }
+            if (OpCode::TYPE_ARG_SEND === $op->type) {
+                $sendSlots[] = $op->arg1;
+            }
+        }
+        $invokeArgsSends = \array_slice($sendSlots, -2);
+
+        self::assertCount(2, $invokeArgsSends);
+        self::assertContains($invokeArgsSends[0], $newSlots, 'invokeArgs object arg must use New_ slot');
+        self::assertSame($arraySlot, $invokeArgsSends[1], 'invokeArgs array arg must use Array_ slot');
+        self::assertNotSame($invokeArgsSends[0], $invokeArgsSends[1]);
+    }
+
+    /** Issue #9904 — invokeArgs(new C(), [...]) runtime parity with Zend. */
+    public function testInvokeArgsNewObjectThenArrayRuntime(): void
+    {
+        $code = <<<'PHP'
+<?php
+class Greeter {
+    public function hello(string $name): string {
+        return "hi {$name}";
+    }
+}
+$rm = new ReflectionMethod(Greeter::class, 'hello');
+echo $rm->invokeArgs(new Greeter(), ['world']), "\n";
+PHP;
+        $runtime = new Runtime();
+        $block = $runtime->parseAndCompile($code, 'reflection_invoke_args_new_array_runtime.php');
+        ob_start();
+        $runtime->run($block);
+        self::assertSame("hi world\n", ob_get_clean());
+    }
 }
