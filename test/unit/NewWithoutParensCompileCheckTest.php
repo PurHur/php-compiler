@@ -5,10 +5,11 @@ declare(strict_types=1);
 namespace PHPCompiler\Test\Unit;
 
 use PHPCompiler\Compiler\NewWithoutParensCompileCheck;
+use PHPCompiler\CompilerVersion;
 use PHPCompiler\Runtime;
 use PHPUnit\Framework\TestCase;
 
-/** `new` in class constant initializers (#6549, #9484, #9804); property defaults allowed (#5362). */
+/** `new` in class constant initializers (#6549, #9484, #9804, #9850); property defaults allowed (#5362). */
 final class NewWithoutParensCompileCheckTest extends TestCase
 {
     public function testClassConstNewWithoutParensCompileErrors(): void
@@ -46,9 +47,13 @@ PHP, 'new_with_parens.php');
         $this->assertNotNull($block);
     }
 
-    public function testClassConstNewWithParensCompileErrors(): void
+    public function testClassConstNewWithParensCompilesOn83Target(): void
     {
-        $this->expectCompileError(<<<'PHP'
+        if (!CompilerVersion::supportsClassConstObjectExpressions()) {
+            $this->markTestSkipped('class const object expressions require CompilerVersion 8.3+');
+        }
+        $runtime = new Runtime();
+        $block = $runtime->parseAndCompile(<<<'PHP'
 <?php
 class C {
     public function __construct(public int $n = 0) {}
@@ -56,17 +61,23 @@ class C {
 class Holder {
     public const X = new C(1);
 }
-PHP);
+PHP, 'class_const_new_with_parens.php');
+        $this->assertNotNull($block);
     }
 
-    public function testClassConstNewEmptyArgsWithParensCompileErrors(): void
+    public function testClassConstNewEmptyArgsWithParensCompilesOn83Target(): void
     {
-        $this->expectCompileError(<<<'PHP'
+        if (!CompilerVersion::supportsClassConstObjectExpressions()) {
+            $this->markTestSkipped('class const object expressions require CompilerVersion 8.3+');
+        }
+        $runtime = new Runtime();
+        $block = $runtime->parseAndCompile(<<<'PHP'
 <?php
 class C {
     public const X = new stdClass();
 }
-PHP);
+PHP, 'class_const_new_empty_args.php');
+        $this->assertNotNull($block);
     }
 
     public function testClassConstArrayWithNewCompileErrors(): void

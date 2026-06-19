@@ -43,6 +43,12 @@ final class CompilerVersion
         return version_compare(self::VERSION, '8.3', '>=');
     }
 
+    /** PHP 8.3+ `new` in class constant expressions (Zend/zend_compile.c, issue #9850). */
+    public static function supportsClassConstObjectExpressions(): bool
+    {
+        return version_compare(self::VERSION, '8.3', '>=');
+    }
+
     /** PHP 8.4+ hexadecimal floating-point literals (Zend/zend_language_scanner.l, issue #7041). */
     public static function supportsHexFloatLiterals(): bool
     {

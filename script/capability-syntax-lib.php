@@ -331,14 +331,14 @@ function syntaxRowDefinitions(): array
         ],
         [
             'id' => 'class_const_object',
-            'construct' => 'Class constants with `new` object expressions — compile-error (php-src)',
-            'opcodes' => ['TYPE_DECLARE_CLASS_CONST'],
-            'issue' => 9804,
+            'construct' => 'Class constants with `new` object expressions (PHP 8.3+)',
+            'opcodes' => ['TYPE_DECLARE_CLASS_CONST', 'TYPE_NEW'],
+            'issue' => 9850,
             'notes' => [
-                'Zend zend_compile_const_expr rejects `new` in class constants; RFC new-in-initializers excludes class constants (#9804)',
-                'NewWithoutParensCompileCheck::validate at compile time; global `const` with `new` remains valid (#3196)',
+                'Zend zend_compile_const_expr allows top-level `new Class(...)` in class constants on 8.3+ (#9850)',
+                'NewWithoutParensCompileCheck rejects bare `new` without `()` and `new` nested in arrays; VM ClassConstMaterializer + JIT immortal singleton (#3196)',
             ],
-            'probe' => 'class C { public const X = new stdClass(); }',
+            'probe' => 'class C { public const X = new stdClass(); } var_export(C::X);',
         ],
         [
             'id' => 'late_static_binding',

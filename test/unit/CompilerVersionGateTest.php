@@ -24,6 +24,11 @@ final class CompilerVersionGateTest extends TestCase
         $this->assertTrue(CompilerVersion::supportsTypedTraitConstants());
     }
 
+    public function testSupportsClassConstObjectExpressionsTrueOn83Target(): void
+    {
+        $this->assertTrue(CompilerVersion::supportsClassConstObjectExpressions());
+    }
+
     public function testSupportsInterfaceTypedConstantsTrueOn83Target(): void
     {
         $this->assertTrue(CompilerVersion::supportsInterfaceTypedConstants());

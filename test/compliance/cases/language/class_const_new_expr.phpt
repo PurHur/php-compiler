@@ -1,5 +1,5 @@
 --TEST--
-Language: class constants with object expressions — AOT (#3196, #9850, Zend/zend_constants.c)
+Language: PHP 8.3+ constant-expression new in class constants (#9850, Zend/zend_compile.c)
 --SKIPIF--
 <?php
 if (!class_exists('PHPCompiler\\CompilerVersion')) {
@@ -12,8 +12,11 @@ if (!PHPCompiler\CompilerVersion::supportsClassConstObjectExpressions()) {
 --FILE--
 <?php
 class C {
-    public const X = new stdClass();
+    public function __construct(public int $n = 0) {}
 }
-echo (C::X instanceof stdClass) ? "1\n" : "0\n";
+class Holder {
+    public const X = new C(1);
+}
+var_dump(Holder::X->n);
 --EXPECT--
-1
+int(1)
