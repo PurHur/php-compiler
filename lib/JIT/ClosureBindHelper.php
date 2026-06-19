@@ -311,7 +311,8 @@ final class ClosureBindHelper
             return self::defaultScopeString($context, $newThis);
         }
         if (Variable::TYPE_NULL === $newScope->type) {
-            return self::defaultScopeString($context, $newThis);
+            // bindTo($obj, null) — unbound scope; do not inherit $newThis class (#10097).
+            return self::emptyScopeString($context);
         }
         if (Variable::TYPE_STRING === $newScope->type) {
             $scope = $newScope->compileTimeString ?? '';
