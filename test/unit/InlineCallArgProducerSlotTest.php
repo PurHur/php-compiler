@@ -584,6 +584,60 @@ PHP;
         self::assertNotSame($inArraySends[0], $inArraySends[1], 'needle and haystack must differ');
     }
 
+    /** Issue #9462 — array_unique($local, SORT_REGULAR) wires hoisted zero-valued SORT_* slot. */
+    public function testArrayUniqueNamedLocalSortRegularUsesConstFetchSlot(): void
+    {
+        $code = <<<'PHP'
+<?php
+$in = [1, 1, 2];
+var_dump(array_unique($in, SORT_REGULAR));
+PHP;
+        $runtime = new Runtime();
+        $block = $runtime->parseAndCompile($code, 'array_unique_sort_regular_local.php');
+
+        $arraySlot = null;
+        $sortSlot = null;
+        $sendSlots = [];
+        foreach ($block->opCodes as $op) {
+            if (OpCode::TYPE_ASSIGN === $op->type && null === $arraySlot) {
+                $arraySlot = $op->arg2;
+            }
+            if (OpCode::TYPE_CONST_FETCH === $op->type) {
+                $sortSlot = $op->arg1;
+            }
+            if (OpCode::TYPE_ARG_SEND === $op->type) {
+                $sendSlots[] = $op->arg1;
+            }
+        }
+
+        self::assertNotNull($arraySlot);
+        self::assertNotNull($sortSlot);
+        self::assertSame($arraySlot, $sendSlots[0] ?? null, 'arg sends='.json_encode($sendSlots));
+        self::assertSame($sortSlot, $sendSlots[1] ?? null, 'arg sends='.json_encode($sendSlots));
+    }
+
+    /** Issue #9462 — array_unique($local, SORT_REGULAR) runtime parity with Zend. */
+    public function testArrayUniqueNamedLocalSortRegularRuntime(): void
+    {
+        $code = <<<'PHP'
+<?php
+class C {
+    public function __construct(public int $v) {}
+}
+$in = [new C(1), new C(1), new C(2)];
+$out = array_unique($in, SORT_REGULAR);
+echo count($out), "\n";
+foreach ($out as $o) {
+    echo $o->v, "\n";
+}
+PHP;
+        $runtime = new Runtime();
+        $block = $runtime->parseAndCompile($code, 'array_unique_sort_regular_object_runtime.php');
+        ob_start();
+        $runtime->run($block);
+        self::assertSame("2\n1\n2\n", ob_get_clean());
+    }
+
     /** Issue #9904 — invokeArgs(new C(), [...]) must send New_ object slot, not sibling Array_ producer. */
     public function testInvokeArgsNewObjectThenArrayUsesDistinctProducerSlots(): void
     {
