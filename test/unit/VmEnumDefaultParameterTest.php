@@ -11,6 +11,9 @@ use PHPUnit\Framework\TestCase;
  */
 final class VmEnumDefaultParameterTest extends TestCase
 {
+    /**
+     * @group static_enum_property_default
+     */
     public function testBackedEnumStaticPropertyDefaultIsCaseSingleton(): void
     {
         $code = <<<'PHP'
