@@ -9709,11 +9709,11 @@ restart:
         if (null === $callerClassLc) {
             return 'global scope';
         }
-        if (isset($this->context->classes[$callerClassLc])) {
-            return $this->context->classes[$callerClassLc]->name;
-        }
+        $className = isset($this->context->classes[$callerClassLc])
+            ? $this->context->classes[$callerClassLc]->name
+            : $callerClassLc;
 
-        return $callerClassLc;
+        return 'scope ' . $className;
     }
 
     private function enforcePropertyVisibilityWrite(Variable $lvalue, Frame $frame): ?Frame

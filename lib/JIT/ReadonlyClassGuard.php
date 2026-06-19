@@ -138,7 +138,7 @@ final class ReadonlyClassGuard
         $declaringClass = $meta['declaringClassName'];
         $callerClass = $objectType->classNameForId($callerClassId);
         $message = sprintf(
-            'Cannot initialize readonly property %s::$%s from %s',
+            'Cannot initialize readonly property %s::$%s from scope %s',
             $declaringClass,
             $propName,
             $callerClass

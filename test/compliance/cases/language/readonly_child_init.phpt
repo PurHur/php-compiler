@@ -33,6 +33,6 @@ echo $p->x, "\n";
 $via = new ChildViaParent('c');
 echo $via->x, "\n";
 --EXPECT--
-child: Error: Cannot initialize readonly property Parent_::$x from Child
+child: Error: Cannot initialize readonly property Parent_::$x from scope Child
 b
 c
