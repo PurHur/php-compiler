@@ -1,5 +1,5 @@
 --TEST--
-Language: duplicate backed enum values — compile-time fatal (#9193, #9677, zend_enum.c)
+Language: duplicate backed enum values — compile-time fatal (#9677, zend_enum.c)
 --FILE--
 <?php
 enum E: int {

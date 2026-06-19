@@ -6,10 +6,6 @@ enum E: int {
     case A = 1;
     case B = 1;
 }
-try {
-    echo E::A->name, "\n";
-} catch (Error $e) {
-    echo $e->getMessage(), "\n";
-}
---EXPECT--
-Duplicate value in enum E for cases A and B
+echo "run\n";
+--EXPECT_EXIT--
+255

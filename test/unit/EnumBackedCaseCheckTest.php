@@ -100,10 +100,12 @@ PHP,
         $this->assertNotNull($block);
     }
 
-    public function testIntBackedDuplicateBackingValueCompiles(): void
+    public function testIntBackedDuplicateBackingValueFailsAtCompileTime(): void
     {
         $runtime = new Runtime();
-        $block = $runtime->parseAndCompile(<<<'PHP'
+        $this->expectException(\CompileError::class);
+        $this->expectExceptionMessage('Duplicate value in enum E for cases A and B');
+        $runtime->parseAndCompile(<<<'PHP'
 <?php
 enum E: int {
     case A = 1;
@@ -112,13 +114,14 @@ enum E: int {
 PHP,
             'enum_dup_int.php'
         );
-        $this->assertNotNull($block);
     }
 
-    public function testStringBackedDuplicateBackingValueCompiles(): void
+    public function testStringBackedDuplicateBackingValueFailsAtCompileTime(): void
     {
         $runtime = new Runtime();
-        $block = $runtime->parseAndCompile(<<<'PHP'
+        $this->expectException(\CompileError::class);
+        $this->expectExceptionMessage('Duplicate value in enum E for cases A and B');
+        $runtime->parseAndCompile(<<<'PHP'
 <?php
 enum E: string {
     case A = 'x';
@@ -127,7 +130,6 @@ enum E: string {
 PHP,
             'enum_dup_string.php'
         );
-        $this->assertNotNull($block);
     }
 
     public function testDuplicateBackingErrorMessage(): void
