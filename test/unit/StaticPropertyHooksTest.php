@@ -72,4 +72,29 @@ PHP;
             @unlink($path);
         }
     }
+
+    public function testSelfReferentialStaticHookDispatchOnVm(): void
+    {
+        $src = <<<'PHP'
+<?php
+class C {
+    public static int $x {
+        get => self::$x + 1;
+        set => self::$x = $value - 1;
+    }
+}
+C::$x = 10;
+echo C::$x;
+PHP;
+        $path = sys_get_temp_dir().'/static_property_hooks_self_ref_'.bin2hex(random_bytes(4)).'.php';
+        file_put_contents($path, $src);
+        try {
+            $rt = new Runtime();
+            ob_start();
+            $rt->run($rt->parseAndCompile($src, $path));
+            self::assertSame('10', ob_get_clean());
+        } finally {
+            @unlink($path);
+        }
+    }
 }
