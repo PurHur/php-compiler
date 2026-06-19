@@ -304,6 +304,11 @@ final class PropertyHooks
             if ('=' === $body[$i]) {
                 $hookOpen = $this->scanToHookOpenBrace($body, $i + 1);
                 if (null !== $hookOpen) {
+                    if ($this->isConstructorBodyBraceAfterParamDefault($body, $hookOpen)) {
+                        $offset = $afterVar + 1;
+                        continue;
+                    }
+
                     return [$prop, $varStart, $hookOpen];
                 }
                 $offset = $afterVar + 1;
@@ -316,6 +321,39 @@ final class PropertyHooks
         }
 
         return null;
+    }
+
+    /**
+     * Promoted ctor params with defaults look like `$x = 1) {` — the `{` is the method body (#9729).
+     */
+    private function isConstructorBodyBraceAfterParamDefault(string $body, int $hookOpenPos): bool
+    {
+        $i = $hookOpenPos - 1;
+        while ($i >= 0 && ctype_space($body[$i])) {
+            --$i;
+        }
+        if ($i < 0 || ')' !== $body[$i]) {
+            return false;
+        }
+        $prefix = substr($body, 0, $i);
+        if (!preg_match('/\bfunction\s+__construct\s*\(/s', $prefix, $m, PREG_OFFSET_CAPTURE)) {
+            return false;
+        }
+        $openPos = $m[0][1] + strlen($m[0][0]) - 1;
+        $depth = 0;
+        for ($j = $openPos; $j <= $i; ++$j) {
+            $ch = $body[$j];
+            if ('(' === $ch) {
+                ++$depth;
+            } elseif (')' === $ch) {
+                --$depth;
+                if (0 === $depth) {
+                    return $j === $i;
+                }
+            }
+        }
+
+        return false;
     }
 
     /**
