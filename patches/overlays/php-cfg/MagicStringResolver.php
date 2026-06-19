@@ -146,6 +146,9 @@ class MagicStringResolver extends NodeVisitorAbstract
             if (! empty($this->functionStack)) {
                 return new Node\Scalar\String_($this->shortFunctionName(end($this->functionStack)), $node->getAttributes());
             }
+
+            // Class/trait const and other non-function contexts — Zend resolves to '' (#10125).
+            return new Node\Scalar\String_('', $node->getAttributes());
         } elseif ($node instanceof Node\Scalar\MagicConst\Method) {
             if (! empty($this->methodStack)) {
                 return new Node\Scalar\String_(end($this->methodStack), $node->getAttributes());
@@ -153,6 +156,8 @@ class MagicStringResolver extends NodeVisitorAbstract
             if (! empty($this->functionStack)) {
                 return new Node\Scalar\String_(end($this->functionStack), $node->getAttributes());
             }
+
+            return new Node\Scalar\String_('', $node->getAttributes());
         }
     }
 
