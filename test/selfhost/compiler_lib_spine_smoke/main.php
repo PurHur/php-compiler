@@ -2425,6 +2425,7 @@ require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionClassConstantGetDepreca
 require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionClassConstantGetDeprecatedVersion.php';
 require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionClassConstantGetType.php';
 require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionClassConstantIsDeprecated.php';
+require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionClassConstantIsEnumCase.php';
 require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionClassConstantIsFinal.php';
 require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionClassConstruct.php';
 require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionClassCreateLazyGhost.php';

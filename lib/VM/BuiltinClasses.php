@@ -59,6 +59,7 @@ use PHPCompiler\VM\Builtin\ReflectionClassConstantGetDeprecatedMessage;
 use PHPCompiler\VM\Builtin\ReflectionClassConstantGetDeprecatedVersion;
 use PHPCompiler\VM\Builtin\ReflectionClassConstantGetType;
 use PHPCompiler\VM\Builtin\ReflectionClassConstantIsDeprecated;
+use PHPCompiler\VM\Builtin\ReflectionClassConstantIsEnumCase;
 use PHPCompiler\VM\Builtin\ReflectionClassConstantIsFinal;
 use PHPCompiler\VM\Builtin\ReflectionClassConstruct;
 use PHPCompiler\VM\Builtin\ReflectionClassGetAttributes;
@@ -691,6 +692,8 @@ final class BuiltinClasses
         $rconst->methodVisibility['getdeprecatedversion'] = $pub;
         $rconst->methods['isfinal'] = new ReflectionClassConstantIsFinal();
         $rconst->methodVisibility['isfinal'] = $pub;
+        $rconst->methods['isenumcase'] = new ReflectionClassConstantIsEnumCase();
+        $rconst->methodVisibility['isenumcase'] = $pub;
         $ctx->classes[ReflectionSupport::REFLECTION_CONSTANT] = $rconst;
 
         $rcc = new ClassEntry('ReflectionClassConstant');
@@ -715,6 +718,8 @@ final class BuiltinClasses
         $rcc->methodVisibility['getdeprecatedversion'] = $pub;
         $rcc->methods['isfinal'] = new ReflectionClassConstantIsFinal();
         $rcc->methodVisibility['isfinal'] = $pub;
+        $rcc->methods['isenumcase'] = new ReflectionClassConstantIsEnumCase();
+        $rcc->methodVisibility['isenumcase'] = $pub;
         $ctx->classes[ReflectionSupport::REFLECTION_CLASS_CONSTANT] = $rcc;
 
         $ctx->classes[ReflectionSupport::REFLECTION_CLASS] = $rc;
