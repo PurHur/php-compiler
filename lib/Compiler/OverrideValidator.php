@@ -11,6 +11,7 @@ use PHPCfg\Operand\Variable;
 use PHPCfg\Op;
 use PHPCfg\Op\Stmt\ClassMethod;
 use PHPCfg\Op\Stmt\TraitUse;
+use PHPCfg\Op\Terminal\Const_ as ClassConstDecl;
 use PHPCfg\Script;
 
 /**
@@ -79,14 +80,26 @@ final class OverrideValidator
         ClassCompileRegistry $registry
     ): void {
         foreach ($stmts->children as $child) {
-            if (!$child instanceof ClassMethod) {
+            if ($child instanceof ClassMethod) {
+                $attributeNames = AttributeNames::fromOp($child);
+                if (!self::hasOverrideAttribute($attributeNames)) {
+                    continue;
+                }
+                self::validateOverrideMethod($className, $child, $parentLc, $interfaceLcs, $registry, $className, $stmts);
+
+                continue;
+            }
+            if (!$child instanceof ClassConstDecl) {
+                continue;
+            }
+            if (property_exists($child, 'isEnumCase') && $child->isEnumCase) {
                 continue;
             }
             $attributeNames = AttributeNames::fromOp($child);
             if (!self::hasOverrideAttribute($attributeNames)) {
                 continue;
             }
-            self::validateOverrideMethod($className, $child, $parentLc, $interfaceLcs, $registry, $className, $stmts);
+            self::validateOverrideConstant($className, $child, $parentLc, $interfaceLcs, $registry, $className, $stmts);
         }
     }
 
@@ -121,6 +134,46 @@ final class OverrideValidator
                 }
                 self::validateOverrideMethod($traitDisplay, $child, $parentLc, $interfaceLcs, $registry, $className);
             }
+        }
+    }
+
+    /**
+     * @throws \CompileError
+     */
+    private static function validateOverrideConstant(
+        string $ownerDisplay,
+        ClassConstDecl $constDecl,
+        ?string $parentLc,
+        array $interfaceLcs,
+        ClassCompileRegistry $registry,
+        string $childClassName,
+        ?CfgBlock $classStmts = null
+    ): void {
+        $constName = self::staticNameFromOperand($constDecl->name);
+        if (null === $constName) {
+            return;
+        }
+        $constLc = strtolower($constName);
+        $childClassLc = strtolower(ltrim($childClassName, '\\'));
+        $hasTraitParent = false;
+        if (null !== $classStmts) {
+            $visited = [];
+            foreach (self::collectTraitLcs($classStmts, $registry, $visited) as $traitLc) {
+                if ($registry->hasConstantInTrait($traitLc, $constLc)) {
+                    $hasTraitParent = true;
+                    break;
+                }
+            }
+        }
+        if (
+            !$registry->hasOverridableConstant($parentLc, $interfaceLcs, $constLc, $childClassLc)
+            && !$hasTraitParent
+        ) {
+            throw new \CompileError(sprintf(
+                '%s::%s has #[\Override] attribute, but no matching parent constant exists',
+                ltrim($ownerDisplay, '\\'),
+                $constName
+            ));
         }
     }
 

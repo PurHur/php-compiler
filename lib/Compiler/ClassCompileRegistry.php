@@ -5,7 +5,10 @@ declare(strict_types=1);
 namespace PHPCompiler\Compiler;
 
 use PHPCfg\Block as CfgBlock;
+use PHPCfg\Operand;
 use PHPCfg\Op\Stmt\ClassMethod;
+use PHPCfg\Op\Terminal\Const_ as CfgConst;
+use PhpParser\Node\Stmt\Class_ as ClassNode;
 
 /**
  * Compile-time map of declared class/interface/trait methods (#3211, #4529).
@@ -14,6 +17,9 @@ final class ClassCompileRegistry
 {
     /** @var array<string, array<string, MethodSig>> lcName => method lc => signature */
     private array $methods = [];
+
+    /** @var array<string, array<string, array{private: bool, ownerLc: string}>> lcName => const lc => visibility */
+    private array $constants = [];
 
     /** @var array<string, string> lcName => display name */
     private array $displayNames = [];
@@ -49,6 +55,7 @@ final class ClassCompileRegistry
             $merged[$methodLc] = $sig;
         }
         $this->methods[$lc] = $merged;
+        $this->constants[$lc] = self::constInfoFromStmts($stmts, $lc);
     }
 
     public function registerInterface(string $name, array $extendsLcs, CfgBlock $stmts): void
@@ -59,6 +66,7 @@ final class ClassCompileRegistry
         $this->interfaces[$lc] = $extendsLcs;
         $this->registeredInterfaces[$lc] = true;
         $this->methods[$lc] = self::methodSigsFromStmts($stmts, $lc);
+        $this->constants[$lc] = self::constInfoFromStmts($stmts, $lc);
     }
 
     public function registerTrait(string $name, CfgBlock $stmts): void
@@ -70,6 +78,7 @@ final class ClassCompileRegistry
         $this->traits[$lc] = true;
         $this->traitStmts[$lc] = $stmts;
         $this->methods[$lc] = self::methodSigsFromStmts($stmts, $lc);
+        $this->constants[$lc] = self::constInfoFromStmts($stmts, $lc);
     }
 
     public function getTraitStmts(string $lcName): ?CfgBlock
@@ -139,6 +148,30 @@ final class ClassCompileRegistry
         }
 
         return null;
+    }
+
+    public function hasOverridableConstant(
+        ?string $parentLc,
+        array $interfaceLcs,
+        string $constLc,
+        string $childClassLc
+    ): bool {
+        if (null !== $parentLc && '' !== $parentLc && $this->hasConstantInClassChain($parentLc, $constLc, $childClassLc)) {
+            return true;
+        }
+
+        foreach ($interfaceLcs as $ifaceLc) {
+            if ($this->hasConstantInInterfaceChain($ifaceLc, $constLc)) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    public function hasConstantInTrait(string $traitLc, string $constLc): bool
+    {
+        return isset($this->constants[self::lc($traitLc)][$constLc]);
     }
 
     public function isClassSubtypeOf(string $subtypeLc, string $supertypeLc): bool
@@ -268,6 +301,131 @@ final class ClassCompileRegistry
             foreach ($this->interfaces[$current] ?? [] as $parentIface) {
                 $queue[] = $parentIface;
             }
+        }
+
+        return null;
+    }
+
+    private function hasConstantInClassChain(string $classLc, string $constLc, string $childClassLc): bool
+    {
+        return null !== $this->findConstantInClassChain($classLc, $constLc, $childClassLc);
+    }
+
+    private function hasConstantInInterfaceChain(string $ifaceLc, string $constLc): bool
+    {
+        return null !== $this->findConstantInInterfaceChain($ifaceLc, $constLc);
+    }
+
+    /**
+     * @return array{private: bool, ownerLc: string}|null
+     */
+    private function findConstantInClassChain(string $classLc, string $constLc, string $childClassLc): ?array
+    {
+        $visited = [];
+        while ('' !== $classLc && !isset($visited[$classLc])) {
+            $visited[$classLc] = true;
+            if (isset($this->constants[$classLc][$constLc])) {
+                $info = $this->constants[$classLc][$constLc];
+                if (!$this->isConstantVisibleForOverride($info, $childClassLc)) {
+                    $parent = $this->parents[$classLc] ?? null;
+                    if (null === $parent || '' === $parent) {
+                        break;
+                    }
+                    $classLc = $parent;
+
+                    continue;
+                }
+
+                return $info;
+            }
+            foreach ($this->interfaces[$classLc] ?? [] as $ifaceLc) {
+                $found = $this->findConstantInInterfaceChain($ifaceLc, $constLc);
+                if (null !== $found) {
+                    return $found;
+                }
+            }
+            $parent = $this->parents[$classLc] ?? null;
+            if (null === $parent || '' === $parent) {
+                break;
+            }
+            $classLc = $parent;
+        }
+
+        return null;
+    }
+
+    /**
+     * @return array{private: bool, ownerLc: string}|null
+     */
+    private function findConstantInInterfaceChain(string $ifaceLc, string $constLc): ?array
+    {
+        $visited = [];
+        $queue = [$ifaceLc];
+        while ([] !== $queue) {
+            $current = array_shift($queue);
+            if ('' === $current || isset($visited[$current])) {
+                continue;
+            }
+            $visited[$current] = true;
+            if (isset($this->constants[$current][$constLc])) {
+                return $this->constants[$current][$constLc];
+            }
+            foreach ($this->interfaces[$current] ?? [] as $parentIface) {
+                $queue[] = $parentIface;
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * @param array{private: bool, ownerLc: string} $info
+     */
+    private function isConstantVisibleForOverride(array $info, string $childClassLc): bool
+    {
+        if ($info['private']) {
+            return $info['ownerLc'] === $childClassLc;
+        }
+
+        return true;
+    }
+
+    /**
+     * @return array<string, array{private: bool, ownerLc: string}>
+     */
+    private static function constInfoFromStmts(CfgBlock $stmts, string $ownerLc): array
+    {
+        $constants = [];
+        foreach ($stmts->children as $child) {
+            if (!$child instanceof CfgConst) {
+                continue;
+            }
+            if (property_exists($child, 'isEnumCase') && $child->isEnumCase) {
+                continue;
+            }
+            $name = self::constNameFromOperand($child->name);
+            if (null === $name) {
+                continue;
+            }
+            $flags = property_exists($child, 'flags')
+                ? (int) $child->flags
+                : ClassNode::MODIFIER_PUBLIC;
+            $constants[strtolower($name)] = [
+                'private' => 0 !== ($flags & ClassNode::MODIFIER_PRIVATE),
+                'ownerLc' => $ownerLc,
+            ];
+        }
+
+        return $constants;
+    }
+
+    private static function constNameFromOperand(Operand $op): ?string
+    {
+        if ($op instanceof Operand\Literal && is_string($op->value)) {
+            return $op->value;
+        }
+        if ($op instanceof Operand\Variable) {
+            return self::constNameFromOperand($op->name);
         }
 
         return null;

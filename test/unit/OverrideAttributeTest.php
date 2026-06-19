@@ -168,7 +168,7 @@ class Child extends Base {
 }
 PHP;
         $this->expectException(\CompileError::class);
-        $this->expectExceptionMessage('Attribute "Override" cannot target class (allowed targets: method)');
+        $this->expectExceptionMessage('Attribute "Override" cannot target class (allowed targets: method, class constant)');
         $runtime->parseAndCompile($code, 'override_on_class.php');
     }
 
@@ -181,7 +181,7 @@ PHP;
 trait T {}
 PHP;
         $this->expectException(\CompileError::class);
-        $this->expectExceptionMessage('Attribute "Override" cannot target class (allowed targets: method)');
+        $this->expectExceptionMessage('Attribute "Override" cannot target class (allowed targets: method, class constant)');
         $runtime->parseAndCompile($code, 'override_on_trait.php');
     }
 
@@ -257,5 +257,45 @@ PHP;
         ob_start();
         $runtime->run($runtime->parseAndCompile($code, 'override_forward_ref.php'));
         $this->assertSame("ok\n", ob_get_clean());
+    }
+
+    public function testOverrideOnInterfaceClassConstantCompiles(): void
+    {
+        $runtime = new Runtime();
+        $code = <<<'PHP'
+<?php
+interface I { public const X = 1; }
+class C implements I { #[\Override] public const X = 2; }
+echo C::X, "\n";
+PHP;
+        ob_start();
+        $runtime->run($runtime->parseAndCompile($code, 'override_const_iface.php'));
+        $this->assertSame("2\n", ob_get_clean());
+    }
+
+    public function testOverrideOnExtendsClassConstantCompiles(): void
+    {
+        $runtime = new Runtime();
+        $code = <<<'PHP'
+<?php
+class Base { public const X = 1; }
+class Child extends Base { #[\Override] public const X = 2; }
+echo Child::X, "\n";
+PHP;
+        ob_start();
+        $runtime->run($runtime->parseAndCompile($code, 'override_const_extends.php'));
+        $this->assertSame("2\n", ob_get_clean());
+    }
+
+    public function testInvalidOverrideOnClassConstantFailsAtCompileTime(): void
+    {
+        $runtime = new Runtime();
+        $code = <<<'PHP'
+<?php
+class C { #[\Override] public const X = 1; }
+PHP;
+        $this->expectException(\CompileError::class);
+        $this->expectExceptionMessage('C::X has #[\Override] attribute, but no matching parent constant exists');
+        $runtime->parseAndCompile($code, 'override_const_invalid.php');
     }
 }

@@ -68,7 +68,7 @@ final class AttributeNamesDuplicateTest extends TestCase
     {
         $this->expectException(\CompileError::class);
         $this->expectExceptionMessage(
-            'Attribute "Override" cannot target class (allowed targets: method)'
+            'Attribute "Override" cannot target class (allowed targets: method, class constant)'
         );
 
         AttributeNames::assertOverrideMethodTargetOnly(['Override'], 'class');
@@ -78,7 +78,7 @@ final class AttributeNamesDuplicateTest extends TestCase
     {
         $this->expectException(\CompileError::class);
         $this->expectExceptionMessage(
-            'Attribute "Override" cannot target parameter (allowed targets: method)'
+            'Attribute "Override" cannot target parameter (allowed targets: method, class constant)'
         );
 
         AttributeNames::assertOverrideMethodTargetOnly(['\\Override'], 'parameter');

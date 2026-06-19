@@ -4310,7 +4310,6 @@ class Compiler {
         }
         $constOp->deprecatedMetadata = DeprecatedMetadata::fromOp($child);
         $this->assignAttributeMetadata($constOp, $child);
-        AttributeNames::assertOverrideMethodTargetOnly($constOp->attributeNames, 'class constant');
         AttributeNames::assertCompileTimeConstTargetOnly($constOp->attributeNames, 'class constant');
         $result->addOpCode($constOp);
         if (null !== $this->compilingClassLc && isset($result->constants[$valueSlot])) {
