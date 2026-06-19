@@ -9,6 +9,8 @@ var_dump(Color::Red <=> Color::Red);
 
 enum Size: int { case S = 1; case M = 2; }
 var_dump(Size::S <=> Size::M);
+var_dump(Size::S <=> 1);
+var_dump(Size::S <=> 'x');
 
 enum Unit { case A; case B; case C; }
 var_dump(Unit::A <=> Unit::B);
@@ -16,5 +18,7 @@ var_dump(Unit::A <=> Unit::B);
 int(1)
 int(1)
 int(0)
+int(1)
+int(1)
 int(1)
 int(1)
