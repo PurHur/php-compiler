@@ -374,8 +374,8 @@ final class AssertOptionsRuntime
         $afterSetBb = $fn->appendBasicBlock('aopt_cb_after_set_'.(string) self::$blockSeq);
         $context->builder->branchIf($isEmpty, $emptyBb, $copyBb);
 
-        $emptyStr = self::literalEmptyString($context);
         $context->builder->positionAtEnd($emptyBb);
+        $emptyStr = self::literalEmptyString($context);
         $context->builder->call(self::lookupHelper($context, self::SET_CALLBACK), $emptyStr);
         $context->builder->branch($afterSetBb);
 
