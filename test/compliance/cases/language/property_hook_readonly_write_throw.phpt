@@ -1,5 +1,5 @@
 --TEST--
-Language: readonly hooked property write throw must abort assignment (#9670, zend_property_hooks.c)
+Language: readonly hooked property — compile fatal (#9805, zend_compile.c)
 --FILE--
 <?php
 class C {
@@ -11,12 +11,6 @@ class C {
         $this->x = 0;
     }
 }
-$c = new C();
-try {
-    $c->x = 1;
-    echo "no-resume\n";
-} catch (Throwable $e) {
-    echo 'caught: ', get_class($e), "\n";
-}
---EXPECT--
-caught: Error
+echo "ok\n";
+--EXPECT_EXIT--
+255

@@ -435,8 +435,8 @@ PHP;
         self::assertSame('ABC', ob_get_clean());
     }
 
-    /** @covers issue #7031 — same-name backing field must merge with hooked property decl */
-    public function testMergesSameNameBackingFieldDeclaration(): void
+    /** @covers issue #9805 — same-name backing field must compile-error (php-src duplicate property) */
+    public function testSameNameBackingFieldCompileErrors(): void
     {
         $src = <<<'PHP'
 <?php
@@ -448,14 +448,13 @@ class Evaled {
     private string $name = "x";
 }
 PHP;
-        [$out, $registry] = (new PropertyHooks())->process($src);
-        self::assertStringContainsString('public string $name = "x";', $out);
-        self::assertStringNotContainsString('private string $name', $out);
-        self::assertSame('__phpc_property_set_name', $registry['evaled']['name']['set'] ?? null);
+        $this->expectException(\CompileError::class);
+        $this->expectExceptionMessage('Cannot redeclare Evaled::$name');
+        (new PropertyHooks())->process($src);
     }
 
-    /** @covers issue #9673 — same-name backing field after other properties merges with hooked decl */
-    public function testMergesDetachedSameNameBackingFieldDeclaration(): void
+    /** @covers issue #9805 — detached same-name backing field must compile-error */
+    public function testDetachedSameNameBackingFieldCompileErrors(): void
     {
         $src = <<<'PHP'
 <?php
@@ -467,18 +466,26 @@ class C {
     public string $y = 'a';
     private int $x = 1;
 }
-$c = new C();
-echo 'compile-ok x=' . $c->x . ' y=' . $c->y . "\n";
 PHP;
-        [$out, $registry] = (new PropertyHooks())->process($src);
-        self::assertStringContainsString('public int $x = 1;', $out);
-        self::assertStringNotContainsString('private int $x', $out);
-        self::assertSame('__phpc_property_set_x', $registry['c']['x']['set'] ?? null);
+        $this->expectException(\CompileError::class);
+        $this->expectExceptionMessage('Cannot redeclare C::$x');
+        (new PropertyHooks())->process($src);
+    }
 
-        $runtime = new Runtime();
-        $block = $runtime->parseAndCompile($src, 'property_hook_multi_property_redeclare.php');
-        ob_start();
-        $runtime->run($block);
-        self::assertSame("compile-ok x=1 y=a\n", ob_get_clean());
+    /** @covers issue #9805 — readonly hooked property must compile-error */
+    public function testReadonlyHookedPropertyCompileErrors(): void
+    {
+        $src = <<<'PHP'
+<?php
+class C {
+    public readonly int $x {
+        get => $this->x;
+        set { $this->x = $value; }
+    }
+}
+PHP;
+        $this->expectException(\CompileError::class);
+        $this->expectExceptionMessage(PropertyHooks::READONLY_HOOK_COMPILE_ERROR);
+        (new PropertyHooks())->process($src);
     }
 }

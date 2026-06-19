@@ -16,6 +16,9 @@ final class PropertyHooks
     /** Legacy message retained for tests/docs; static hooks compile since #6931 (PHP 8.4, zend_property_hooks.c). */
     public const STATIC_HOOK_COMPILE_ERROR = 'Cannot declare hooks for static property';
 
+    /** php-src: Zend/zend_compile.c — zend_compile_property_hooks() (#9805). */
+    public const READONLY_HOOK_COMPILE_ERROR = 'Hooked properties cannot be readonly';
+
     private const SET_METHOD_PREFIX = '__phpc_property_set_';
     private const GET_METHOD_PREFIX = '__phpc_property_get_';
     private const UNSET_METHOD_PREFIX = '__phpc_property_unset_';
@@ -51,6 +54,7 @@ final class PropertyHooks
             $processedBody = $this->processClassBody(
                 $body,
                 strtolower($declName),
+                $declName,
                 $filename,
                 $bodyStart + 1,
                 $code,
@@ -278,6 +282,7 @@ final class PropertyHooks
     private function processClassBody(
         string $body,
         string $lcClass,
+        string $classDisplay,
         string $filename,
         int $bodyOffsetInFile,
         string $fullCode,
@@ -308,6 +313,7 @@ final class PropertyHooks
                 $propDeclHead = preg_replace('/\babstract\s+/', '', $propDeclHead) ?? $propDeclHead;
             }
             $isStatic = (bool) preg_match('/\bstatic\b/', $declPrefix.$propDeclHead);
+            $this->rejectReadonlyHookedProperty($declPrefix.$propDeclHead);
             $isPromotedCtorParam = $this->isPromotedConstructorParam(
                 $body,
                 $declStart,
@@ -340,29 +346,16 @@ final class PropertyHooks
             }
             $sameNameBacking = $usesBacking && $this->hookTouchesBacking($hookSource, $prop, $isStatic);
             $nextOffset = $close + 1;
-            $initializer = '';
             if ($sameNameBacking) {
                 $backingDecl = $this->consumeSameNameBackingFieldDecl($body, $nextOffset, $prop);
                 if (null !== $backingDecl) {
-                    [$nextOffset, $initializer] = $backingDecl;
-                } else {
-                    $foundBacking = $this->findSameNameBackingFieldDecl($body, $prop);
-                    if (null !== $foundBacking) {
-                        [$backingStart, $backingEnd, $initializer] = $foundBacking;
-                        $removeSpans[] = [$backingStart, $backingEnd];
-                    }
+                    $this->rejectSameNameBackingField($classDisplay, $prop);
                 }
-                $mergedDecl = rtrim($propDeclHead);
-                if ('' !== $initializer) {
-                    $mergedDecl .= ' '.$initializer;
+                if (null !== $this->findSameNameBackingFieldDecl($body, $prop)) {
+                    $this->rejectSameNameBackingField($classDisplay, $prop);
                 }
-                if (!$isPromotedCtorParam && !str_ends_with($mergedDecl, ';')) {
-                    $mergedDecl .= ';';
-                }
-                $out .= $declPrefix.$mergedDecl;
-            } else {
-                $out .= $declPrefix.$propDecl;
             }
+            $out .= $declPrefix.$propDecl;
             $trailing = trim($trailing);
             if ('' !== $trailing) {
                 $out .= "\n    ".$trailing;
@@ -636,6 +629,24 @@ final class PropertyHooks
         $this->registerHook($lcClass, $prop, 'set', $method, $isStatic);
 
         return [$this->hookMethodDecl($isStatic, $method, $params, $body, $propertyType)];
+    }
+
+    /**
+     * php-src: Zend/zend_compile.c — zend_compile_property_hooks(); readonly + hooks (#9805).
+     */
+    private function rejectReadonlyHookedProperty(string $declHead): void
+    {
+        if (preg_match('/\breadonly\b/', $declHead)) {
+            throw new \CompileError(self::READONLY_HOOK_COMPILE_ERROR);
+        }
+    }
+
+    /**
+     * php-src: Zend/zend_compile.c — duplicate property name when hooks + separate field (#9805).
+     */
+    private function rejectSameNameBackingField(string $classDisplay, string $prop): never
+    {
+        throw new \CompileError(sprintf('Cannot redeclare %s::$%s', $classDisplay, $prop));
     }
 
     /**
