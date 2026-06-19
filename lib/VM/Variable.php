@@ -791,7 +791,7 @@ final class Variable {
 
                 return (string) $var->integer;
             case self::TYPE_FLOAT:
-                return (string) $var->float;
+                return \PHPCompiler\ext\standard\VmZendDoubleString::format($var->float);
             case self::TYPE_BOOLEAN:
                 return $var->bool ? '1' : '';
             case self::TYPE_STRING_OFFSET:

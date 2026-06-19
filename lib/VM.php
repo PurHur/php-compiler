@@ -2053,7 +2053,7 @@ class VM {
     public function resumeFiber(FiberState $fiber, Variable ...$resumeArgs): Variable
     {
         if (FiberState::STATUS_TERMINATED === $fiber->status) {
-            throw new VM\NativeFiberError('Cannot resume a fiber that is terminated');
+            throw new VM\NativeFiberError('Cannot resume a fiber that is not suspended');
         }
         if (FiberState::STATUS_SUSPENDED !== $fiber->status) {
             throw new VM\NativeFiberError('Cannot resume a fiber that is not suspended');
@@ -2172,7 +2172,8 @@ class VM {
             $fiber->hasReturnValue = true;
             $fiber->threw = false;
             $out = new Variable();
-            $out->copyFrom($resolved);
+            // Zend/zend_fibers.c: resume()/start() return NULL when fiber is dead (#10149).
+            $out->null();
 
             return $out;
         }

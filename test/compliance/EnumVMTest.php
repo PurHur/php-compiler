@@ -76,6 +76,7 @@ final class EnumVMTest extends BaseTest
                 'enum_in_operator.phpt',
                 'foreach_enum_case_by_value.phpt',
                 'foreach_enum_case_by_ref.phpt',
+                'foreach_byref_enum.phpt',
                 'enum_destructure_static.phpt',
                 'list_destructure_enum_case.phpt',
                 'list_destructure_enum_key.phpt',

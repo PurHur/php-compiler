@@ -357,6 +357,31 @@ PHP;
         self::assertSame([$castSlot], $sendSlots, 'arg sends='.json_encode($sendSlots));
     }
 
+    /** Issue #10143 — var_export((string) NAN) wires Cast producer, not dead arg temp. */
+    public function testStringCastNanConstantUsesCastProducerSlot(): void
+    {
+        $code = <<<'PHP'
+<?php
+var_export((string) NAN);
+PHP;
+        $runtime = new Runtime();
+        $block = $runtime->parseAndCompile($code, 'string_cast_nan_call_arg.php');
+
+        $castSlot = null;
+        $sendSlots = [];
+        foreach ($block->opCodes as $op) {
+            if (OpCode::TYPE_CAST_STRING === $op->type) {
+                $castSlot = $op->arg1;
+            }
+            if (OpCode::TYPE_ARG_SEND === $op->type) {
+                $sendSlots[] = $op->arg1;
+            }
+        }
+
+        self::assertNotNull($castSlot);
+        self::assertSame([$castSlot], $sendSlots, 'arg sends='.json_encode($sendSlots));
+    }
+
     /** Bootstrap helloworld — New_ then static MethodCall (null var) must not TypeError in producer filter. */
     public function testNewStaticMethodCallCompilesWithoutOperandNullTypeError(): void
     {

@@ -296,7 +296,7 @@ final class VmSprintf
             case 'd':
                 return self::formatSignedDecimal(self::argToInt($var, $frame), $showSign);
             case 'f':
-                return VmNumberFormat::format(self::argToFloat($var, $frame), $floatPrec, '.', '');
+                return self::formatFixed(self::argToFloat($var, $frame), $floatPrec);
             case 'b':
                 return self::formatRadix(self::argToInt($var, $frame), 2, false);
             case 'x':
@@ -505,6 +505,19 @@ final class VmSprintf
     private static function intToChar(int $value): string
     {
         return \chr($value & 0xFF);
+    }
+
+    /** php-src sprintf.c — %f (default precision 6; issue #10151). */
+    private static function formatFixed(float $value, int $precision = 6): string
+    {
+        if (\is_nan($value)) {
+            return 'NaN';
+        }
+        if (\is_infinite($value)) {
+            return $value > 0 ? 'INF' : '-INF';
+        }
+
+        return VmNumberFormat::format($value, $precision, '.', '');
     }
 
     /** php-src sprintf.c — %e / %E (default precision 6). */

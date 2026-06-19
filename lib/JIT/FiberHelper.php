@@ -511,21 +511,21 @@ final class FiberHelper
             $context->builder->structGep($statePtr, $map['suspended'])
         );
         $suspendSlot = JitValueBox::alloc($context);
-        $doneSlot = JitValueBox::alloc($context);
+        $terminatedSlot = JitValueBox::alloc($context);
         JitValueBox::copyFromPointer(
             $context,
             $suspendSlot,
             $context->builder->structGep($statePtr, $map['suspend_return'])
         );
-        JitValueBox::copyFromPointer(
-            $context,
-            $doneSlot,
-            $context->builder->structGep($statePtr, $map['fiber_return'])
+        // Zend/zend_fibers.c: start()/resume() return NULL when fiber terminates (#10149).
+        $context->builder->call(
+            $context->lookupFunction('__value__writeNull'),
+            JitValueBox::pointer($context, $terminatedSlot)
         );
         $resultPtr = $context->builder->select(
             $suspended,
             JitValueBox::pointer($context, $suspendSlot),
-            JitValueBox::pointer($context, $doneSlot)
+            JitValueBox::pointer($context, $terminatedSlot)
         );
 
         return new Variable($context, Variable::TYPE_VALUE, Variable::KIND_VARIABLE, $resultPtr);

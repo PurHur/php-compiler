@@ -5463,6 +5463,11 @@ apply_patch() {
       echo "Skip php-types-generics-fallback.patch (already applied)"
       return 0
     fi
+    if patch -p0 --forward --dry-run < "$PATCH_DIR/php-types-generics-fallback.patch" >/dev/null 2>&1; then
+      patch -p0 --forward < "$PATCH_DIR/php-types-generics-fallback.patch"
+      echo "Applied php-types-generics-fallback.patch"
+      return 0
+    fi
     python3 - "$target" <<'PY'
 import sys
 from pathlib import Path
@@ -5470,11 +5475,18 @@ from pathlib import Path
 path = Path(sys.argv[1])
 text = path.read_text()
 
-anchor = """        if (preg_match('/^(list|array)\\s*</i', trim($decl))) {
+anchors = [
+    """        if (preg_match('/^(list|array)\\s*</i', trim($decl))) {
             return new self(self::TYPE_ARRAY);
         }
-        $regex = """
+        $regex = """,
+    """        if (substr($decl, -2) === '[]') {
+            $type = self::fromDecl(substr($decl, 0, -2));
 
+            return new self(self::TYPE_ARRAY, [$type]);
+        }
+        $regex = """,
+]
 insert = """        if (preg_match('/^(list|array)\\s*</i', trim($decl))) {
             return new self(self::TYPE_ARRAY);
         }
@@ -5493,11 +5505,13 @@ insert = """        if (preg_match('/^(list|array)\\s*</i', trim($decl))) {
         }
         $regex = """
 
-if anchor not in text:
+for anchor in anchors:
+    if anchor in text:
+        path.write_text(text.replace(anchor, insert, 1))
+        break
+else:
     sys.stderr.write("php-types-generics-fallback: anchor not found in Type.php\n")
     sys.exit(1)
-
-path.write_text(text.replace(anchor, insert, 1))
 PY
     echo "Applied php-types-generics-fallback.patch (overlay)"
     return 0
