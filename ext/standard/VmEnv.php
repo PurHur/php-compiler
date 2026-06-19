@@ -70,6 +70,14 @@ final class VmEnv
     }
 
     /**
+     * @return array<string, string> getenv() zero-arg assoc map (#5075, #9092).
+     */
+    public static function exportAllEnvironmentMap(): array
+    {
+        return self::getAllEnvironmentMap();
+    }
+
+    /**
      * getenv() with no arguments — assoc array of all variables (#5075, php-src zif_getenv argc==0).
      */
     public static function getAllEnvironmentTable(): HashTable
