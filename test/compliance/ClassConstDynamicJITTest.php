@@ -88,5 +88,6 @@ final class ClassConstDynamicJITTest extends BaseTest
         yield 'class_const_dynamic_jit' => ['class_const_dynamic_jit.phpt'];
         yield 'class_const_variable_class_jit' => ['class_const_variable_class_jit.phpt'];
         yield 'dynamic_class_constant' => ['dynamic_class_constant.phpt'];
+        yield 'enum_dynamic_case_fetch' => ['enum_dynamic_case_fetch.phpt'];
     }
 }

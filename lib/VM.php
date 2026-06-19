@@ -13602,9 +13602,7 @@ restart:
             if ($classEntry->isEnum && null !== $classEntry->backedType) {
                 VM\EnumSupport::ensureBackedEnumValuesUnique($classEntry);
             }
-            if (EnumCaseSupport::tryMaterializeEnumCaseConstantFetch($classEntry, $memberLc, $dest)) {
-                $dest->copyFrom(EnumCaseSupport::materializeConstantValue($this->context, $dest));
-
+            if (EnumCaseSupport::fetchCaseByMemberName($classEntry, $memberLc, $dest, $this->context)) {
                 return true;
             }
             $dest->copyFrom(

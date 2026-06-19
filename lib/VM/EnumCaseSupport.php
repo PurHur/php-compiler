@@ -20,6 +20,23 @@ final class EnumCaseSupport
     /**
      * Class const fetch on enum cases — upgrade legacy backing scalars to TYPE_ENUM_CASE (#5832, #5798).
      */
+    /**
+     * Runtime E::{$name} lookup — resolve declared case name to enum singleton (#9937, Zend/zend_enum.c).
+     */
+    public static function fetchCaseByMemberName(
+        ClassEntry $enum,
+        string $memberLc,
+        Variable $dest,
+        Context $context
+    ): bool {
+        if (!self::tryMaterializeEnumCaseConstantFetch($enum, $memberLc, $dest)) {
+            return false;
+        }
+        $dest->copyFrom(self::materializeConstantValue($context, $dest));
+
+        return true;
+    }
+
     public static function tryMaterializeEnumCaseConstantFetch(
         ClassEntry $enum,
         string $memberLc,
