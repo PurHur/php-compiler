@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace PHPCompiler\ext\standard;
 
 use PHPCompiler\Frame;
+use PHPCompiler\VM\CastSupport;
 use PHPCompiler\VM\EnumCaseSupport;
 use PHPCompiler\VM\HashTable;
 use PHPCompiler\VM\ObjectEntry;
@@ -42,8 +43,7 @@ final class VmSettype
                 }
                 break;
             case 'array':
-                $enumArray = VmScalarType::enumCaseToSettypeArray($value);
-                $result->array(null !== $enumArray ? $enumArray : self::toArray($value));
+                $result->array(self::toArray($value, $frame));
                 break;
             case 'null':
                 $result->null();
@@ -169,21 +169,14 @@ final class VmSettype
         $result->string($v->toString());
     }
 
-    private static function toArray(Variable $value): HashTable
+    /**
+     * Zend convert_to_array / php_settype array branch (ext/standard/type.c, #9963).
+     */
+    private static function toArray(Variable $value, ?Frame $frame = null): HashTable
     {
-        $v = $value->resolveIndirect();
-        if (Variable::TYPE_ARRAY === $v->type) {
-            return $v->toArray()->replaceCopy();
-        }
-        if (Variable::TYPE_NULL === $v->type) {
-            return new HashTable();
-        }
-        $ht = new HashTable();
-        $elem = new Variable();
-        $elem->copyFrom($v);
-        $ht->addIndex(0, $elem);
+        $classes = $frame?->vmContext?->classes ?? [];
 
-        return $ht;
+        return CastSupport::toArray($value, $classes)->toArray();
     }
 
     /** Zend convert_to_object / php_settype object branch (ext/standard/type.c, #4254). */

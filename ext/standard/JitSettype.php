@@ -600,6 +600,16 @@ final class JitSettype
             return;
         }
 
+        if ('array' === $target) {
+            $objVar = new JITVariable($context, JITVariable::TYPE_OBJECT, JITVariable::KIND_VALUE, $objPtr);
+            $boxed = JitGetObjectVars::invoke($context, $objVar, true);
+            $ht = $context->builder->call($context->lookupFunction('__value__readHashtable'), $boxed);
+            $context->builder->call($context->lookupFunction('__value__writeHashtable'), $dest, $ht);
+            $context->builder->branch($done);
+
+            return;
+        }
+
         $context->builder->branch($nonEnumTarget);
     }
 
