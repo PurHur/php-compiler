@@ -33,6 +33,61 @@ final class CloneWithTest extends TestCase
         $this->assertSame($expected, CloneWithDesugar::desugar($input));
     }
 
+    /** Issue #9995 — PHP 8.4+ `clone $obj with ['prop']` keyword array syntax. */
+    public function testDesugarRewritesCloneWithKeywordArray(): void
+    {
+        $input = '<?php $d = clone $c with [\'a\'];';
+        $expected = '<?php $d = (function ($__phpc_o) { $__phpc_r = clone $__phpc_o;phpc_clone_with_begin($__phpc_r, \'a\');$__phpc_r->a = $__phpc_o->a;phpc_clone_with_end($__phpc_r);return $__phpc_r; })($c);';
+        $this->assertSame($expected, CloneWithDesugar::desugar($input));
+    }
+
+    public function testDesugarRewritesCloneWithKeywordAssociativeArray(): void
+    {
+        $input = '<?php $d = clone $c with [\'x\' => 2];';
+        $expected = '<?php $d = (function ($__phpc_o) { $__phpc_r = clone $__phpc_o;phpc_clone_with_begin($__phpc_r, \'x\');$__phpc_r->x = 2;phpc_clone_with_end($__phpc_r);return $__phpc_r; })($c);';
+        $this->assertSame($expected, CloneWithDesugar::desugar($input));
+    }
+
+    public function testVmCloneWithKeywordArrayReadonlyReinit(): void
+    {
+        $code = <<<'PHP'
+<?php
+class W {
+    public int $a = 1;
+    public readonly int $b;
+    public function __construct() { $this->b = 2; }
+}
+$w = new W();
+$w2 = clone $w with ['a'];
+echo $w2->a, ',', $w2->b, "\n";
+PHP;
+        $rt = new Runtime();
+        $block = $rt->parseAndCompile($code, 'test.php');
+        ob_start();
+        $rt->run($block);
+        $this->assertSame("1,2\n", ob_get_clean());
+    }
+
+    public function testVmCloneWithKeywordArrayValueOverrides(): void
+    {
+        $code = <<<'PHP'
+<?php
+class C {
+    public int $x = 1;
+    public readonly int $y;
+    public function __construct() { $this->y = 9; }
+}
+$c = new C();
+$d = clone $c with ['x' => 2, 'y' => 3];
+echo $d->x, ',', $d->y, "\n";
+PHP;
+        $rt = new Runtime();
+        $block = $rt->parseAndCompile($code, 'test.php');
+        ob_start();
+        $rt->run($block);
+        $this->assertSame("2,3\n", ob_get_clean());
+    }
+
     public function testVmCloneCallSyntaxReadonlyReinit(): void
     {
         $code = <<<'PHP'
