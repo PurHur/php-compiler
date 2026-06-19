@@ -95,7 +95,7 @@ final class BasicBlockHelper
      */
     public static function ensureOpenInsertBlock(Context $context, string $label): void
     {
-        $insert = $context->builder->getInsertBlock();
+        $insert = self::tryGetInsertBlock($context);
         if (null === $insert) {
             $fn = self::parentFunction($context);
             $next = $fn->appendBasicBlock($label);
