@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace PHPCompiler\JIT\Builtin;
 
 use PHPCompiler\JIT;
-use PHPCompiler\JIT\Builtin;
 use PHPCompiler\JIT\Call;
 use PHPCompiler\JIT\Context;
 use PHPLLVM\BasicBlock;
@@ -91,19 +90,11 @@ final class ProgressNoteRuntime
             return;
         }
 
-        if (Builtin::LOAD_TYPE_STANDALONE === $context->loadType) {
-            ProgressNoteRuntimeLlvm::implement($context);
-            self::registerLinkedRuntime($context);
-
-            return;
-        }
-
         self::$blockSuffix = 0;
         self::$bufGlobal = null;
         self::$lenGlobal = null;
         self::ensureProgressGlobals($context);
         self::ensureBufferExternals($context);
-        self::ensureJitHelperCompiled($context);
         self::implementNoteBridge($context);
         self::implementStaticBridges($context);
         self::registerLinkedRuntime($context);
@@ -113,12 +104,6 @@ final class ProgressNoteRuntime
     /** Register Progress::{noteFunction,notePhase,noteEntry} before spine callees compile (#8560). */
     private static function registerStaticProxies(Context $context): void
     {
-        if (Builtin::LOAD_TYPE_STANDALONE === $context->loadType) {
-            ProgressNoteRuntimeLlvm::registerStaticProxies($context);
-
-            return;
-        }
-
         $voidTy = $context->getTypeFromString('void');
         $strPtr = $context->getTypeFromString('__string__*');
         $ft = $context->context->functionType($voidTy, false, $strPtr);
@@ -131,7 +116,6 @@ final class ProgressNoteRuntime
             if ($context->functionIsRegistered($proxy)) {
                 continue;
             }
-            self::ensureJitHelperCompiled($context);
             $probe = $context->module->getNamedFunction($internal);
             $fn = null !== $probe && $probe->countBasicBlocks() > 0
                 ? $probe
@@ -277,6 +261,9 @@ final class ProgressNoteRuntime
         $savedBuilder = $context->builder;
         $savedActive = $context->activeFunction;
         $restoreBlock = self::captureInsertBlock($context);
+        if (null === $restoreBlock) {
+            throw new \LogicException('ProgressJitHelper compile requires an active LLVM insert block (#9521)');
+        }
         $prevSelfHostAot = \getenv('PHP_COMPILER_SELFHOST_AOT');
         if (\function_exists('putenv')) {
             \putenv('PHP_COMPILER_SELFHOST_AOT=0');
