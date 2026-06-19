@@ -5,16 +5,13 @@ declare(strict_types=1);
 namespace PHPCompiler\JIT\Builtin;
 
 use PHPCompiler\JIT;
-use PHPCompiler\JIT\Builtin;
 use PHPCompiler\JIT\Context;
 use PHPLLVM\Value;
 use PHPLLVM\Value\Function_ as LlvmFunction;
 
 /**
- * JIT/AOT link for clone-with readonly reinit via CloneWithJitHelper PHP (#9498).
+ * JIT/AOT link for clone-with readonly reinit via CloneWithJitHelper PHP (#9498, #9717).
  *
- * JIT embed uses compiled {@see CloneWithJitHelper}; AOT standalone keeps
- * {@see CloneWithReinitRuntimeLlvm} until native link can rely on compiled helpers.
  * VM SSOT: {@see \PHPCompiler\VM\CloneWithSupport}
  * php-src: Zend/zend_objects.c — IS_PROP_REINITABLE during clone-with
  */
@@ -65,12 +62,6 @@ final class CloneWithReinitRuntime
             throw new \LogicException('phpc_clone_with_begin() supports at most '.self::MAX_PROPS.' properties');
         }
 
-        if (Builtin::LOAD_TYPE_STANDALONE === $context->loadType) {
-            CloneWithReinitRuntimeLlvm::emitBegin($context, $obj, $names);
-
-            return;
-        }
-
         $i64 = $context->getTypeFromString('int64');
         $objAddr = $context->builder->ptrToInt($obj, $i64);
         $context->builder->call(self::helperFunction($context, self::BEGIN_HELPER), $objAddr);
@@ -86,22 +77,12 @@ final class CloneWithReinitRuntime
     public static function emitEnd(Context $context, Value $obj): void
     {
         self::ensureLinked($context);
-        if (Builtin::LOAD_TYPE_STANDALONE === $context->loadType) {
-            CloneWithReinitRuntimeLlvm::emitEnd($context, $obj);
-
-            return;
-        }
-
         $context->builder->call($context->lookupFunction('phpc_clone_with_end_runtime'), $obj);
     }
 
     public static function emitTryConsumePropertyName(Context $context, Value $obj, string $propName): Value
     {
         self::ensureLinked($context);
-        if (Builtin::LOAD_TYPE_STANDALONE === $context->loadType) {
-            return CloneWithReinitRuntimeLlvm::emitTryConsumePropertyName($context, $obj, $propName);
-        }
-
         $i64 = $context->getTypeFromString('int64');
         $objAddr = $context->builder->ptrToInt($obj, $i64);
         $nameStr = self::literalToString($context, $propName);
@@ -117,13 +98,6 @@ final class CloneWithReinitRuntime
     {
         $probe = $context->module->getNamedFunction('phpc_clone_with_end_runtime');
         if (null !== $probe && $probe->countBasicBlocks() > 0) {
-            self::registerLinkedRuntime($context);
-
-            return;
-        }
-
-        if (Builtin::LOAD_TYPE_STANDALONE === $context->loadType) {
-            CloneWithReinitRuntimeLlvm::ensureLinked($context);
             self::registerLinkedRuntime($context);
 
             return;
