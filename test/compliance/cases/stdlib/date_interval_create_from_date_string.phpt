@@ -23,6 +23,12 @@ try {
 
 $combo = date_interval_create_from_date_string('1 day 2 hours');
 echo $combo->d, ':', $combo->h, "\n";
+
+$plus = date_interval_create_from_date_string('1 day + 2 hours');
+echo $plus->d, ':', $plus->h, "\n";
+
+$minus = date_interval_create_from_date_string('1 day - 2 hours');
+echo $minus->d, ':', $minus->h, "\n";
 ?>
 --EXPECT--
 PHP Warning:  date_interval_create_from_date_string(): Unknown or bad format (not an interval) at position 0 (n): The timezone could not be found in the database
@@ -32,3 +38,5 @@ true
 false
 TypeError: date_interval_create_from_date_string(): Argument #1 ($datetime) must be of type string, array given
 1:2
+1:2
+1:-2

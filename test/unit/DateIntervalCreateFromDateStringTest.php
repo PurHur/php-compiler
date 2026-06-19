@@ -16,6 +16,10 @@ echo ($iv instanceof DateInterval) ? 'ok' : 'bad', "\n";
 echo $iv->format('%d'), "\n";
 $combo = date_interval_create_from_date_string('1 day 2 hours');
 echo $combo->d, ':', $combo->h, "\n";
+$plus = date_interval_create_from_date_string('1 day + 2 hours');
+echo $plus->d, ':', $plus->h, "\n";
+$minus = date_interval_create_from_date_string('1 day - 2 hours');
+echo $minus->d, ':', $minus->h, "\n";
 PHP;
 
     /**
@@ -48,7 +52,7 @@ PHP;
 
     public function testVmRelativeIntervalParsing(): void
     {
-        $this->assertSame("ok\n1\n1:2\n", $this->runBin('bin/vm.php', self::CODE_VM));
+        $this->assertSame("ok\n1\n1:2\n1:2\n1:-2\n", $this->runBin('bin/vm.php', self::CODE_VM));
     }
 
     private function runBin(string $bin, string $code): string

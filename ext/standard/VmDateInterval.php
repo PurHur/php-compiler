@@ -279,6 +279,9 @@ final class VmDateInterval
                     $sign = -1;
                 }
                 ++$pos;
+                while ($pos < $len && \ctype_space($spec[$pos])) {
+                    ++$pos;
+                }
             }
             if ($pos >= $len || !\ctype_digit($spec[$pos])) {
                 $warning = self::fromDateStringWarning(
