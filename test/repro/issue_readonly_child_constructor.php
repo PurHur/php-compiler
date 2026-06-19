@@ -1,6 +1,3 @@
---TEST--
-Language: child constructor cannot initialize parent readonly promoted property JIT (#9714)
---FILE--
 <?php
 declare(strict_types=1);
 
@@ -20,5 +17,3 @@ try {
 } catch (Throwable $e) {
     echo get_class($e), ': ', $e->getMessage(), "\n";
 }
---EXPECT--
-Error: Cannot initialize readonly property Parent_::$x from scope Child
