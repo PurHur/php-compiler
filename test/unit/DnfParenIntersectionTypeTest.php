@@ -32,11 +32,30 @@ final class DnfParenIntersectionTypeTest extends TestCase
         $this->assertSame($source, $rewritten);
     }
 
-    public function testRewriterUnwrapsParenthesizedUnionParamType(): void
+    /** Issue #9968: union-only parenthesized leaves are a Zend parse error — do not unwrap. */
+    public function testRewriterDoesNotUnwrapParenthesizedUnionOnlyParamType(): void
     {
         $source = '<?php function f((A|B) $x): void {}';
         $rewritten = DnfParenTypeRewriter::rewrite($source);
-        $this->assertSame('<?php function f(A|B $x): void {}', $rewritten);
+        $this->assertSame($source, $rewritten);
+    }
+
+    public function testRewriterKeepsParenthesizedUnionBeforeIntersection(): void
+    {
+        $source = '<?php function f((A|B)&C $x): void {}';
+        $rewritten = DnfParenTypeRewriter::rewrite($source);
+        $this->assertSame($source, $rewritten);
+    }
+
+    public function testParenthesizedUnionOnlyParamTypeFailsParse(): void
+    {
+        $runtime = new Runtime();
+        $code = <<<'PHP'
+<?php
+function acceptsUnion((string|int) $x): void { echo $x, "\n"; }
+PHP;
+        $this->expectException(\PhpParser\Error::class);
+        $runtime->parseAndCompile($code, 'dnf_paren_union_only.php');
     }
 
     /** Issue #9766: non-capturing union catch must keep parens for php-parser. */
