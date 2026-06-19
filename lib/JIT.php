@@ -97,7 +97,11 @@ class JIT {
             $path = $block->scriptPath();
             // bootstrap_loop_smoke/compile_driver.php delegates to helloworld; use that {main} (#2893).
             if (!str_contains($path, 'bootstrap_loop_smoke/compile_driver.php')) {
-                $this->m3CompileDriverMainBlock = $block;
+                // M4 bin/compile.php argv driver must keep honest {main}; do not replace with compile_driver (#2930).
+                if (null === $this->m3CompileDriverMainBlock
+                    || !$this->isM4BinCompileScriptMain($this->m3CompileDriverMainBlock)) {
+                    $this->m3CompileDriverMainBlock = $block;
+                }
             }
         }
         if (
@@ -873,6 +877,10 @@ class JIT {
 
     private function shouldUseM3InventoryEmitForCompileDriverBlock(Block $block): bool
     {
+        // M4 bin/compile.php argv driver uses emitMainEntry argv bridge, not compile_driver emit TU (#2930).
+        if ($this->isM4BinCompileScriptMain($block) && $this->shouldUseM4BinCompileArgvMainNative()) {
+            return false;
+        }
         if ($this->shouldUseM3InventoryEmitDriver()) {
             return true;
         }
@@ -3372,7 +3380,8 @@ class JIT {
         $saved = $this->context->builder;
         $this->context->builder = $this->context->context->builderCreate();
         $this->context->builder->positionAtEnd($bb);
-        if ($this->shouldUseM3InventoryEmitForCompileDriverBlock($block)) {
+        $m4BinCompileArgv = $this->isM4BinCompileScriptMain($block) && $this->shouldUseM4BinCompileArgvMainNative();
+        if ($this->shouldUseM3InventoryEmitForCompileDriverBlock($block) || $m4BinCompileArgv) {
             if (!$this->m3CompileDriverRuntimeSpineLowered) {
                 $this->m3CompileDriverRuntimeSpineLowered = true;
                 $this->compileM3EmitTuRuntimeSpineDecls($this->m3CompileDriverMainBlock);
