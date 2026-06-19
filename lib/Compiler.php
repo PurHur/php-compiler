@@ -10050,23 +10050,54 @@ class Compiler {
             $prev = $block->orig->children[$callIndex - 1] ?? null;
             if ($prev instanceof Op\Expr\ConstFetch) {
                 $name = $this->staticNameFromOperand($prev->name);
-                if (null !== $name && \in_array(strtolower($name), ['true', 'false', 'null'], true)) {
-                    $callArg = $callOp->args[$argIndex] ?? null;
-                    $callArgs = $callOp->args;
-                    $isLastArg = \is_array($callArgs) && $argIndex === \count($callArgs) - 1;
-                    // Hoisted true/false/null only feeds the trailing call arg (#9140, #9660).
-                    if (
-                        null !== $callArg
-                        && $isLastArg
-                        && !$this->operandsReferToSameVariable($prev->result, $callArg)
-                    ) {
-                        $slot = $block->slotForOperand($prev->result);
-                        if (null !== $slot) {
-                            return (string) $slot;
+                if (null !== $name) {
+                    $lookup = strtolower($name);
+                    $isHoistedScalar = \in_array($lookup, ['true', 'false', 'null'], true)
+                        || isset(\PHPCompiler\ext\standard\StdlibConstants::CORE_INT_BY_NAME[$lookup]);
+                    if ($isHoistedScalar) {
+                        $callArg = $callOp->args[$argIndex] ?? null;
+                        $callArgs = $callOp->args;
+                        $isLastArg = \is_array($callArgs) && $argIndex === \count($callArgs) - 1;
+                        if (null !== $callArg && $this->operandsReferToSameVariable($prev->result, $callArg)) {
+                            $slot = $block->slotForOperand($prev->result);
+                            if (null !== $slot) {
+                                return (string) $slot;
+                            }
+                            $vm = $this->tryFoldGlobalConstFetch($prev);
+                            if (null !== $vm) {
+                                return (string) $block->registerConstant($arg, $vm);
+                            }
                         }
-                        $vm = $this->tryFoldGlobalConstFetch($prev);
-                        if (null !== $vm) {
-                            return (string) $block->registerConstant($arg, $vm);
+                        // Hoisted true/false/null only feeds the trailing call arg (#9140, #9660).
+                        if (
+                            null !== $callArg
+                            && $isLastArg
+                            && !$this->operandsReferToSameVariable($prev->result, $callArg)
+                            && \in_array($lookup, ['true', 'false', 'null'], true)
+                        ) {
+                            $slot = $block->slotForOperand($prev->result);
+                            if (null !== $slot) {
+                                return (string) $slot;
+                            }
+                            $vm = $this->tryFoldGlobalConstFetch($prev);
+                            if (null !== $vm) {
+                                return (string) $block->registerConstant($arg, $vm);
+                            }
+                        }
+                        // Hoisted SORT_* / PHP_* int constants (incl. zero-valued SORT_REGULAR) (#9462, #9548).
+                        if (
+                            null !== $callArg
+                            && $isLastArg
+                            && isset(\PHPCompiler\ext\standard\StdlibConstants::CORE_INT_BY_NAME[$lookup])
+                        ) {
+                            $slot = $block->slotForOperand($prev->result);
+                            if (null !== $slot) {
+                                return (string) $slot;
+                            }
+                            $vm = $this->tryFoldGlobalConstFetch($prev);
+                            if (null !== $vm) {
+                                return (string) $block->registerConstant($arg, $vm);
+                            }
                         }
                     }
                 }
@@ -10099,9 +10130,16 @@ class Compiler {
                 }
             }
             if ($prev instanceof Op\Expr\Assign && null !== $prev->result) {
-                $slot = $block->slotForOperand($prev->result);
-                if (null !== $slot) {
-                    return $slot;
+                $callArg = $callOp->args[$argIndex] ?? null;
+                if (
+                    null !== $callArg
+                    && null !== $prev->var
+                    && $this->operandsReferToSameVariable($prev->var, $callArg)
+                ) {
+                    $slot = $block->slotForOperand($prev->result);
+                    if (null !== $slot) {
+                        return $slot;
+                    }
                 }
             }
         }
@@ -10765,6 +10803,16 @@ class Compiler {
                 }
             }
             $paired = $producers[$argIndex] ?? null;
+            if ($paired instanceof Op\Expr\Assign) {
+                $callArg = $callArgs[$argIndex] ?? null;
+                if (
+                    null === $callArg
+                    || null === $paired->var
+                    || !$this->operandsReferToSameVariable($paired->var, $callArg)
+                ) {
+                    return null;
+                }
+            }
             if ($paired instanceof Op\Expr\FuncCall || $paired instanceof Op\Expr\NsFuncCall) {
                 $callArg = $callArgs[$argIndex] ?? null;
                 if (
