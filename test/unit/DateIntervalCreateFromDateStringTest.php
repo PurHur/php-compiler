@@ -7,10 +7,10 @@ namespace PHPCompiler\Test\Unit;
 use PHPCompiler\LlvmToolchain;
 use PHPUnit\Framework\TestCase;
 
-/** date_interval_create_from_date_string() VM + AOT compile smoke (#4606). */
+/** date_interval_create_from_date_string() + DateInterval::createFromDateString() VM + AOT (#4606, #9993). */
 final class DateIntervalCreateFromDateStringTest extends TestCase
 {
-    private const CODE_VM = <<<'PHP'
+    private const CODE_VM_PROCEDURAL = <<<'PHP'
 $iv = date_interval_create_from_date_string('1 day');
 echo ($iv instanceof DateInterval) ? 'ok' : 'bad', "\n";
 echo $iv->format('%d'), "\n";
@@ -22,17 +22,53 @@ $minus = date_interval_create_from_date_string('1 day - 2 hours');
 echo $minus->d, ':', $minus->h, "\n";
 PHP;
 
+    private const CODE_VM_STATIC = <<<'PHP'
+$iv = DateInterval::createFromDateString('1 day');
+echo ($iv instanceof DateInterval) ? 'ok' : 'bad', "\n";
+echo $iv->format('%d'), "\n";
+$combo = DateInterval::createFromDateString('1 day 2 hours');
+echo $combo->d, ':', $combo->h, "\n";
+$plus = DateInterval::createFromDateString('1 day + 2 hours');
+echo $plus->d, ':', $plus->h, "\n";
+$minus = DateInterval::createFromDateString('1 day - 2 hours');
+echo $minus->d, ':', $minus->h, "\n";
+PHP;
+
     /**
      * @group llvm
      * @group jit
      */
-    public function testAotCompileLowering(): void
+    public function testAotCompileLoweringProcedural(): void
+    {
+        $this->assertAotCompileOk('test/fixtures/aot/compile-only/date_interval_create_from_date_string.php');
+    }
+
+    /**
+     * @group llvm
+     * @group jit
+     */
+    public function testAotCompileLoweringStaticMethod(): void
+    {
+        $this->assertAotCompileOk('test/fixtures/aot/compile-only/dateinterval_create_from_date_string_static.php');
+    }
+
+    public function testVmRelativeIntervalParsingProcedural(): void
+    {
+        $this->assertSame("ok\n1\n1:2\n1:2\n1:-2\n", $this->runBin('bin/vm.php', self::CODE_VM_PROCEDURAL));
+    }
+
+    public function testVmRelativeIntervalParsingStaticMethod(): void
+    {
+        $this->assertSame("ok\n1\n1:2\n1:2\n1:-2\n", $this->runBin('bin/vm.php', self::CODE_VM_STATIC));
+    }
+
+    private function assertAotCompileOk(string $relativeTarget): void
     {
         $repo = dirname(__DIR__, 2);
         if (!LlvmToolchain::isReady($repo)) {
             $this->markTestSkipped('LLVM 9 toolchain not available');
         }
-        $target = $repo.'/test/fixtures/aot/compile-only/date_interval_create_from_date_string.php';
+        $target = $repo.'/'.$relativeTarget;
         $env = $_ENV;
         LlvmToolchain::applyProcessEnv($env, $repo);
         $compile = proc_open(
@@ -48,11 +84,6 @@ PHP;
         $compileErr = stream_get_contents($pipes[2]);
         fclose($pipes[2]);
         $this->assertSame(0, proc_close($compile), trim((string) $compileErr));
-    }
-
-    public function testVmRelativeIntervalParsing(): void
-    {
-        $this->assertSame("ok\n1\n1:2\n1:2\n1:-2\n", $this->runBin('bin/vm.php', self::CODE_VM));
     }
 
     private function runBin(string $bin, string $code): string

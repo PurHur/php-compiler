@@ -6,6 +6,7 @@ namespace PHPCompiler\VM;
 
 use PHPCfg\Func as CfgFunc;
 use PHPCompiler\VM\Builtin\DateIntervalConstruct;
+use PHPCompiler\VM\Builtin\DateIntervalCreateFromDateString;
 use PHPCompiler\VM\Builtin\DateIntervalFormat;
 use PHPCompiler\VM\Builtin\DateTimeConstruct;
 use PHPCompiler\VM\Builtin\DateTimeDiff;
@@ -947,6 +948,8 @@ final class BuiltinClasses
         $di->methodVisibility['__construct'] = $pub;
         $di->methods['format'] = new DateIntervalFormat();
         $di->methodVisibility['format'] = $pub;
+        $di->methods['createfromdatestring'] = new DateIntervalCreateFromDateString();
+        $di->methodVisibility['createfromdatestring'] = $pubStatic;
         $ctx->classes[DateIntervalSupport::CLASS_DATEINTERVAL] = $di;
     }
 
