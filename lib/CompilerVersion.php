@@ -90,4 +90,10 @@ final class CompilerVersion
     {
         return version_compare(self::VERSION, '8.4', '>=');
     }
+
+    /** PHP 8.4+ class_has_method/property/constant() (ext/standard/basic_functions.c; issue #9989). */
+    public static function supportsClassHasFunctions(): bool
+    {
+        return version_compare(self::VERSION, '8.4', '>=');
+    }
 }

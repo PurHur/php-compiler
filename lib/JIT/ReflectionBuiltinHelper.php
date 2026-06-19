@@ -137,6 +137,54 @@ final class ReflectionBuiltinHelper
         return $i1->constInt($exists ? 1 : 0, false);
     }
 
+    /** class_has_method() — ReflectionClass::hasMethod semantics (#9989). */
+    public static function classHasMethodLiteral(Context $context, string $className, string $method): Value
+    {
+        $ctx = $context->runtime->vmContext;
+        $exists = false;
+        if (null !== $ctx) {
+            $lc = strtolower(ltrim($className, '\\'));
+            $entry = $ctx->classes[$lc] ?? null;
+            $exists = null !== $entry
+                && \PHPCompiler\ext\standard\VmReflection::classHasMethodForReflection($entry, $ctx, $method);
+        }
+        $i1 = $context->getTypeFromString('int1');
+
+        return $i1->constInt($exists ? 1 : 0, false);
+    }
+
+    /** class_has_property() — ReflectionClass::hasProperty semantics (#9989). */
+    public static function classHasPropertyLiteral(Context $context, string $className, string $property): Value
+    {
+        $ctx = $context->runtime->vmContext;
+        $exists = false;
+        if (null !== $ctx) {
+            $lc = strtolower(ltrim($className, '\\'));
+            $entry = $ctx->classes[$lc] ?? null;
+            $exists = null !== $entry
+                && \PHPCompiler\ext\standard\VmReflection::classHasPropertyForReflection($entry, $ctx, $property);
+        }
+        $i1 = $context->getTypeFromString('int1');
+
+        return $i1->constInt($exists ? 1 : 0, false);
+    }
+
+    /** class_has_constant() — ReflectionClass::hasConstant semantics (#9989). */
+    public static function classHasConstantLiteral(Context $context, string $className, string $constant): Value
+    {
+        $ctx = $context->runtime->vmContext;
+        $exists = false;
+        if (null !== $ctx) {
+            $lc = strtolower(ltrim($className, '\\'));
+            $entry = $ctx->classes[$lc] ?? null;
+            $exists = null !== $entry
+                && \PHPCompiler\ext\standard\VmReflection::classHasConstantForReflection($entry, $ctx, $constant);
+        }
+        $i1 = $context->getTypeFromString('int1');
+
+        return $i1->constInt($exists ? 1 : 0, false);
+    }
+
     public static function propertyExistsLiteral(Context $context, string $className, string $property): Value
     {
         $ctx = $context->runtime->vmContext;
