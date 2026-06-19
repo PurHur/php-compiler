@@ -1,17 +1,14 @@
 --TEST--
-Property default new expressions — instance per-object and static shared (issues #3391, #5362)
+Property default new expressions — instance per-object (issues #3391, #5362; static rejected #10095)
 --FILE--
 <?php
 class Box {
     public stdClass $inner = new stdClass();
-    public static stdClass $shared = new stdClass();
 }
 $a = new Box();
 $b = new Box();
 echo ($a->inner instanceof stdClass) ? "1\n" : "0\n";
 echo ($a->inner !== $b->inner) ? "1\n" : "0\n";
-echo (Box::$shared instanceof stdClass) ? "1\n" : "0\n";
-echo (Box::$shared === Box::$shared) ? "1\n" : "0\n";
 class Holder {
     public function __construct(public array $items = []) {}
 }
@@ -26,8 +23,6 @@ class WithDateTime {
 $dt = new WithDateTime();
 echo $dt->d->format('Y'), "\n";
 --EXPECT--
-1
-1
 1
 1
 1

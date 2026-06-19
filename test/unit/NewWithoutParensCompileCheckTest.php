@@ -8,7 +8,7 @@ use PHPCompiler\Compiler\NewWithoutParensCompileCheck;
 use PHPCompiler\Runtime;
 use PHPUnit\Framework\TestCase;
 
-/** `new` in class constant initializers (#6549, #9484, #9804, #9850); property defaults allowed (#5362). */
+/** `new` in class constant + static property initializers (#6549, #9484, #9804, #9850, #10095); instance defaults allowed (#5362). */
 final class NewWithoutParensCompileCheckTest extends TestCase
 {
     public function testClassConstNewWithoutParensCompileErrors(): void
@@ -21,13 +21,32 @@ class C {
 PHP);
     }
 
-    public function testPropertyDefaultNewWithoutParensCompiles(): void
+    public function testStaticPropertyDefaultNewWithoutParensCompileErrors(): void
+    {
+        $this->expectCompileError(<<<'PHP'
+<?php
+class C {
+    public static $s = new stdClass;
+}
+PHP);
+    }
+
+    public function testStaticTypedPropertyDefaultNewCompileErrors(): void
+    {
+        $this->expectCompileError(<<<'PHP'
+<?php
+class C {
+    public static DateTime $d = new DateTime('2020-01-01');
+}
+PHP);
+    }
+
+    public function testInstancePropertyDefaultNewWithoutParensCompiles(): void
     {
         $runtime = new Runtime();
         $block = $runtime->parseAndCompile(<<<'PHP'
 <?php
 class C {
-    public static $s = new stdClass;
     public $p = new stdClass;
 }
 PHP, 'new_without_parens_property.php');

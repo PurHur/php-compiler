@@ -46,7 +46,7 @@ function assertCompileSucceeds(string $label, string $code): void
 }
 
 assertCompileFails('class const', '<?php class C { const X = new stdClass; }');
-assertCompileSucceeds('static property', '<?php class C { public static $s = new stdClass; }');
+assertCompileFails('static property', '<?php class C { public static $s = new stdClass; }');
 assertCompileSucceeds('instance property', '<?php class C { public $p = new stdClass; }');
 
 echo "ok\n";

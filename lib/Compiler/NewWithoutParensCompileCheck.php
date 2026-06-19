@@ -6,16 +6,18 @@ namespace PHPCompiler\Compiler;
 
 use PHPCfg\Op;
 use PHPCfg\Op\Expr\New_;
+use PHPCfg\Op\Stmt\Property;
 use PHPCfg\Script;
 
 /**
- * Reject invalid `new` in class **constant** initializers (#6549, #9484, #9804, #9974).
+ * Reject invalid `new` in class **constant** and **static property** initializers (#6549, #9484, #9804, #9974, #10095).
  *
  * php-src rejects all `new` in class constant expressions with
  * "New expressions are not supported in this context" (zend_compile_const_expr).
- * Property/param defaults may use `new` with or without `()` per PHP 8.1+ (#3391, #5362).
+ * Static property defaults remain forbidden; instance property/param defaults may use
+ * `new` with or without `()` per PHP 8.1+ (#3391, #5362).
  *
- * @see Zend/zend_compile.c — zend_compile_const_expr()
+ * @see Zend/zend_compile.c — zend_compile_const_expr(), zend_compile_property()
  */
 final class NewWithoutParensCompileCheck
 {
@@ -43,7 +45,25 @@ final class NewWithoutParensCompileCheck
             if ($stmt instanceof Op\Terminal\Const_) {
                 $ops = $stmt->valueBlock->children ?? [];
                 $this->walkOpsRejectAllNew($ops);
+                continue;
             }
+            if ($stmt instanceof Property && $stmt->static) {
+                $this->rejectStaticPropertyDefaultNew($stmt);
+            }
+        }
+    }
+
+    private function rejectStaticPropertyDefaultNew(Property $prop): void
+    {
+        if (null === $prop->defaultVar && null === $prop->defaultBlock) {
+            return;
+        }
+        if (null !== $prop->defaultBlock && [] !== ($prop->defaultBlock->children ?? [])) {
+            $this->walkOpsRejectAllNew($prop->defaultBlock->children);
+            return;
+        }
+        if ($prop->defaultVar instanceof New_) {
+            throw new \CompileError(self::MESSAGE);
         }
     }
 

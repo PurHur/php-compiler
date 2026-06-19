@@ -24,18 +24,17 @@ echo ($a->inner !== $b->inner) ? "1\n" : "0\n";
 PHP, "1\n1\n");
     }
 
-    public function testStaticPropertyDefaultNewIsShared(): void
+    public function testStaticPropertyDefaultNewCompileErrors(): void
     {
-        $this->assertOutput(<<<'PHP'
+        $runtime = new Runtime();
+        $this->expectException(\CompileError::class);
+        $this->expectExceptionMessage('New expressions are not supported in this context');
+        $runtime->parseAndCompile(<<<'PHP'
 <?php
 class C {
     public static $x = new stdClass();
 }
-echo (C::$x instanceof stdClass) ? "1\n" : "0\n";
-$a = C::$x;
-$b = C::$x;
-echo ($a === $b) ? "same\n" : "diff\n";
-PHP, "1\nsame\n");
+PHP, 'property_default_new_static.php');
     }
 
     public function testPropertyDefaultNewWithConstructorArgs(): void
@@ -51,18 +50,6 @@ class C {
 $c = new C();
 echo ($c->y instanceof Box && $c->y->items === []) ? "1\n" : "0\n";
 PHP, "1\n");
-    }
-
-    public function testVarExportStaticPropertyDefaultNew(): void
-    {
-        $this->assertOutput(<<<'PHP'
-<?php
-class C {
-    public static $x = new stdClass();
-}
-var_export(C::$x);
-echo "\n";
-PHP, "(object) array (\n)\n");
     }
 
     private function assertOutput(string $code, string $expected): void
