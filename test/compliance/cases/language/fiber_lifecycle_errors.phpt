@@ -26,7 +26,7 @@ try {
 }
 --EXPECT--
 int(11)
-int(42)
+NULL
 bool(true)
 bool(true)
 bool(true)
