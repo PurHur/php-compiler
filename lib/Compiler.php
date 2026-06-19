@@ -12956,18 +12956,8 @@ class Compiler {
             ];
         }
 
-        if (4 === $expr->kind) {
-            $classOperand = $expr->class ?? $expr->name;
-            if (!$classOperand instanceof Operand\Literal) {
-                $this->throwCompileLogic('First-class new callable requires a literal class name');
-            }
-            $callableSlot = $this->compileStringLiteralSlot('new '.$classOperand->value, $block);
-
-            return [new OpCode(
-                OpCode::TYPE_FROM_CALLABLE,
-                $result,
-                $callableSlot
-            )];
+        if (Op\Expr\FirstClassCallable::KIND_NEW === $expr->kind) {
+            $this->throwCompileError('Cannot create Closure for new expression');
         }
 
         if (1 === $expr->kind) {
