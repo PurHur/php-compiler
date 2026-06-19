@@ -1358,9 +1358,16 @@ class Compiler {
     private function mergeAssignPhiRhsSlot(Block $merge): ?int
     {
         foreach ($merge->opCodes as $op) {
-            if (OpCode::TYPE_ASSIGN === $op->type && null !== $op->arg3) {
-                return (int) $op->arg3;
+            if (OpCode::TYPE_ASSIGN !== $op->type || null === $op->arg3) {
+                continue;
             }
+            // Consecutive match() in one merge block seeds later results with literal `''`;
+            // constant RHS is not a phi temp slot (#9856).
+            if (isset($merge->constants[$op->arg3])) {
+                continue;
+            }
+
+            return (int) $op->arg3;
         }
 
         return null;
