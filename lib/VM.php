@@ -10169,31 +10169,32 @@ restart:
 
     private function readonlyPropertyDeclaringClass(ObjectEntry $object, string $propName): ?string
     {
+        $meta = $this->classPropertyMeta($object, $propName);
+        if (null !== $meta && ($meta->readonly || $object->class->readonly)) {
+            if ('' !== $meta->declaringClassLc && isset($this->context->classes[$meta->declaringClassLc])) {
+                return $this->context->classes[$meta->declaringClassLc]->name;
+            }
+
+            return $meta->declaringClassLc !== '' ? $meta->declaringClassLc : $object->class->name;
+        }
         if ($object->class->readonly) {
             return $object->class->name;
         }
-        $meta = $this->classPropertyMeta($object, $propName);
-        if (null === $meta || !$meta->readonly) {
-            return null;
-        }
-        if ('' !== $meta->declaringClassLc && isset($this->context->classes[$meta->declaringClassLc])) {
-            return $this->context->classes[$meta->declaringClassLc]->name;
-        }
 
-        return $meta->declaringClassLc !== '' ? $meta->declaringClassLc : $object->class->name;
+        return null;
     }
 
     private function readonlyPropertyDeclaringClassLc(ObjectEntry $object, string $propName): ?string
     {
+        $meta = $this->classPropertyMeta($object, $propName);
+        if (null !== $meta && ($meta->readonly || $object->class->readonly)) {
+            return '' !== $meta->declaringClassLc ? $meta->declaringClassLc : strtolower($object->class->name);
+        }
         if ($object->class->readonly) {
             return strtolower($object->class->name);
         }
-        $meta = $this->classPropertyMeta($object, $propName);
-        if (null === $meta || !$meta->readonly) {
-            return null;
-        }
 
-        return '' !== $meta->declaringClassLc ? $meta->declaringClassLc : strtolower($object->class->name);
+        return null;
     }
 
     /** Reject asymmetric set visibility violations (#3165, #6898); returns catch frame or null. */
