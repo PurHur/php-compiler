@@ -698,21 +698,51 @@ final class VmArray
         return $j;
     }
 
+    private const COUNT_RECURSIVE_WARNING = 'count(): Recursion detected';
+
     /**
-     * count($array, COUNT_RECURSIVE) — php-src ext/standard/array.c (#3511).
+     * count($array, COUNT_RECURSIVE) — php-src ext/standard/array.c (#3511, #10083).
      *
      * Top-level element count plus recursive counts of nested arrays (PHP 8.2+).
+     * Cyclic arrays emit E_WARNING and return a bounded count (php_count_recursive).
      */
-    public static function countRecursive(HashTable $ht): int
+    public static function countRecursive(HashTable $ht, ?Frame $frame = null, ?\SplObjectStorage $visited = null): int
     {
-        $count = $ht->getNumElements();
-        foreach ($ht->iterate(true) as $value) {
-            if (Variable::TYPE_ARRAY === $value->type) {
-                $count += self::countRecursive($value->toArray());
-            }
+        if (null === $visited) {
+            $visited = new \SplObjectStorage();
         }
+        if ($visited->contains($ht)) {
+            self::countRecursiveWarning($frame);
 
-        return $count;
+            return 0;
+        }
+        $visited->attach($ht);
+        try {
+            $count = $ht->getNumElements();
+            foreach ($ht->iterate(true) as $value) {
+                if (Variable::TYPE_ARRAY === $value->type) {
+                    $count += self::countRecursive($value->toArray(), $frame, $visited);
+                }
+            }
+
+            return $count;
+        } finally {
+            $visited->detach($ht);
+        }
+    }
+
+    private static function countRecursiveWarning(?Frame $frame): void
+    {
+        if (null === $frame?->vmContext) {
+            return;
+        }
+        $frame->vmContext->errors->triggerError(
+            self::COUNT_RECURSIVE_WARNING,
+            ErrorReporter::E_WARNING,
+            '' !== $frame->scriptPath ? $frame->scriptPath : null,
+            $frame->vmContext,
+            $frame
+        );
     }
 
     private const COUNT_VALUES_SKIP_WARNING =

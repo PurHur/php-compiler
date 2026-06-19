@@ -58,7 +58,7 @@ final class array_count extends Internal
         if (Variable::TYPE_ARRAY === $v->type) {
             $ht = $v->toArray();
             $result = VmArray::COUNT_RECURSIVE === $mode
-                ? VmArray::countRecursive($ht)
+                ? VmArray::countRecursive($ht, $frame)
                 : $ht->getNumElements();
         } else {
             $result = VmArray::countValue($frame->vmContext, $v);

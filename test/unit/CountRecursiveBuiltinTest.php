@@ -26,6 +26,16 @@ final class CountRecursiveBuiltinTest extends TestCase
         $this->assertSame(4, VmArray::countRecursive($outer));
     }
 
+    public function testCountRecursiveSelfReferenceReturnsZeroBranch(): void
+    {
+        $a = new HashTable();
+        $ref = new Variable(Variable::TYPE_ARRAY);
+        $ref->array($a);
+        $a->addIndex(0, $ref);
+
+        $this->assertSame(1, VmArray::countRecursive($a));
+    }
+
     public function testCountModeConstantsMatchZend(): void
     {
         $this->assertSame(0, VmArray::COUNT_NORMAL);
