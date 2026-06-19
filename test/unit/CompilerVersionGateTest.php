@@ -29,11 +29,6 @@ final class CompilerVersionGateTest extends TestCase
         $this->assertTrue(CompilerVersion::supportsInterfaceTypedConstants());
     }
 
-    public function testSupportsNewInClassConstantExprTrueOn83Target(): void
-    {
-        $this->assertTrue(CompilerVersion::supportsNewInClassConstantExpr());
-    }
-
     public function testVmRegistersStrIncrementOn83Target(): void
     {
         $runtime = new Runtime();

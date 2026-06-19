@@ -1,7 +1,10 @@
 --TEST--
-Language: class constants with object expressions — JIT execute (#3196, #4028)
---RUNFILE--
-class_const_object_run.php
---EXPECT--
-1
-1
+Language: class constants with object expressions rejected at compile — JIT (#9804, Zend/zend_compile.c)
+--FILE--
+<?php
+class C {
+    public const X = new stdClass();
+}
+var_export(C::X);
+--EXPECT_EXIT--
+255

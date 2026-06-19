@@ -1,7 +1,10 @@
 --TEST--
-Language: class constants with object expressions PHP 8.3 (#3196)
---RUNFILE--
-class_const_object_run.php
---EXPECT--
-1
-1
+Language: class constants with object expressions rejected at compile (#9804, Zend/zend_compile.c)
+--FILE--
+<?php
+class C {
+    public const X = new stdClass();
+}
+var_export(C::X);
+--EXPECT_EXIT--
+255

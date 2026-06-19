@@ -331,16 +331,15 @@ function syntaxRowDefinitions(): array
         ],
         [
             'id' => 'class_const_object',
-            'construct' => 'Class constants with `new` object expressions (PHP 8.3)',
-            'opcodes' => ['TYPE_DECLARE_CLASS_CONST', 'TYPE_CLASS_CONST_FETCH', 'TYPE_NEW'],
-            'issue' => 3196,
-            'jit' => true,
-            'aot' => true,
+            'construct' => 'Class constants with `new` object expressions — compile-error (php-src)',
+            'opcodes' => ['TYPE_DECLARE_CLASS_CONST'],
+            'issue' => 9804,
             'notes' => [
-                'Zend zend_compile_const_expr / zend_constants.c — materialize at class definition; shared identity on fetch',
-                'VM: ClassConstMaterializer; JIT/AOT: module-global singleton in __init__ (#4021, #4028); MCJIT: ClassConstObjectJitCompileTest + ClassConstObjectJitExecuteTest',
+                'Zend zend_compile_const_expr rejects `new` in class constants; RFC new-in-initializers excludes class constants (#9804)',
+                'NewWithoutParensCompileCheck::validate at compile time; global `const` with `new` remains valid (#3196)',
             ],
-            'probe' => 'class C { public const X = new stdClass(); } echo (C::X instanceof stdClass && C::X === C::X) ? "1" : "0";',
+            'probe' => 'class C { public const X = new stdClass(); }',
+            'expect_compile_error' => true,
         ],
         [
             'id' => 'late_static_binding',
