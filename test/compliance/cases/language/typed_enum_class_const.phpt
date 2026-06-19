@@ -1,24 +1,18 @@
 --TEST--
-Language: typed class constant with enum type preserves enum case (#9790, Zend/zend_compile.c)
+Language: typed class constant with enum type preserves enum case (Zend/zend_compile.c, #9790)
 --FILE--
 <?php
-enum Color: string {
-    case Red = 'r';
-    case Blue = 'b';
-}
+enum Color: string { case Red = 'r'; case Blue = 'b'; }
 class Palette {
     public const Color PRIMARY = Color::Red;
 }
-echo get_debug_type(Palette::PRIMARY), "\n";
-echo (Palette::PRIMARY === Color::Red) ? "same\n" : "diff\n";
+var_export(Palette::PRIMARY);
+echo "\n";
 echo Palette::PRIMARY->name, "\n";
 $rc = new ReflectionClassConstant(Palette::class, 'PRIMARY');
-$v = $rc->getValue();
-echo get_debug_type($v), "\n";
-echo $v->name, "\n";
+var_export($rc->getValue());
+echo "\n";
 --EXPECT--
-Color
-same
+\Color::Red
 Red
-Color
-Red
+\Color::Red

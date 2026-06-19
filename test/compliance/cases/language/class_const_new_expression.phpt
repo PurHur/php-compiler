@@ -1,5 +1,5 @@
 --TEST--
-Language: new in class constant initializer rejected (#9804, Zend/zend_compile.c)
+Language: class constant object expression const X = new C() — compile-error (#9804, Zend/zend_compile.c)
 --FILE--
 <?php
 class C {

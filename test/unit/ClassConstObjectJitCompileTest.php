@@ -4,14 +4,13 @@ declare(strict_types=1);
 
 namespace PHPCompiler;
 
+use PHPCompiler\Compiler\NewWithoutParensCompileCheck;
 use PHPUnit\Framework\TestCase;
 
 require_once __DIR__.'/../LlvmToolchain.php';
 
 /**
- * LLVM compile-only verify for class constants with object expressions (#3196, #4021, #4028).
- *
- * php-src: Zend/zend_compile.c — zend_compile_const_expr; immortal singleton at class init.
+ * Class constants with `new` must compile-error per php-src (#9804).
  *
  * @group llvm
  */
@@ -24,30 +23,21 @@ final class ClassConstObjectJitCompileTest extends TestCase
         $this->repoRoot = dirname(__DIR__, 2);
         if (!LlvmToolchain::isReady($this->repoRoot)) {
             $reason = LlvmToolchain::readyFailureReason() ?? 'LLVM 9 toolchain not available';
-            $this->markTestSkipped($reason.' — class const object JIT compile test needs LLVM (#4021)');
+            $this->markTestSkipped($reason.' — class const object JIT compile test needs LLVM');
         }
     }
 
-    public function testClassConstObjectModuleVerify(): void
+    public function testClassConstObjectCompileErrors(): void
     {
         $runtime = new Runtime();
-        $path = $this->repoRoot.'/test/compliance/cases/language/class_const_object_run.php';
-        $code = file_get_contents($path);
-        $this->assertNotFalse($code);
-        $block = $runtime->parseAndCompile($code, $path);
-        $this->assertNotNull($block);
-        $runtime->jitCompileBlock($block);
-
-        $context = $runtime->loadJitContext();
-        $bc = $context->module->printToString();
-        $this->assertStringContainsString(
-            'php_compiler_class_const_obj_',
-            $bc,
-            'Expected immortal class-const object global in LLVM module'
-        );
-        $verify = new \ReflectionMethod($context, 'compileCommon');
-        $verify->setAccessible(true);
-        $verify->invoke($context);
-        $this->addToAssertionCount(1);
+        $code = <<<'PHP'
+<?php
+class C {
+    public const X = new stdClass();
+}
+PHP;
+        $this->expectException(\CompileError::class);
+        $this->expectExceptionMessage(NewWithoutParensCompileCheck::MESSAGE);
+        $runtime->parseAndCompile($code, 'class_const_object.php');
     }
 }

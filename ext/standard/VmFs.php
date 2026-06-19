@@ -1153,11 +1153,20 @@ final class VmFs
      */
     public static function streamGetMetaData(int $handle)
     {
-        $fp = self::lookup($handle);
-        if (null === $fp) {
+        if (!self::isValidHandle($handle)) {
             return false;
         }
-        $meta = VmStreamMeta::buildMetaArray(self::handleUri($handle), $fp);
+        $uri = self::handleUri($handle);
+        $fp = self::lookup($handle);
+        if (null !== $fp) {
+            $meta = VmStreamMeta::buildMetaArray($uri, $fp);
+        } else {
+            $meta = VmStreamMeta::buildMetaArray(
+                $uri,
+                null,
+                VmStreamMeta::eofForNativeHandle($handle)
+            );
+        }
 
         return self::streamMetaArrayToHashTable($meta);
     }
