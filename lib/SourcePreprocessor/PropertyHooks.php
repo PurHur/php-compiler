@@ -279,6 +279,96 @@ final class PropertyHooks
         return null;
     }
 
+    /**
+     * Find `$prop` optionally followed by `= <expr>` then property-hook `{` (#9945, Zend/zend_compile.c).
+     *
+     * @return array{0: string, 1: int, 2: int}|null [prop name, `$` offset, hook `{` offset]
+     */
+    private function findNextPropertyHookDecl(string $body, int $offset): ?array
+    {
+        $len = strlen($body);
+        while ($offset < $len) {
+            if (!preg_match('/\$(\w+)/', $body, $m, PREG_OFFSET_CAPTURE, $offset)) {
+                return null;
+            }
+            $prop = $m[1][0];
+            $varStart = $m[0][1];
+            $afterVar = $varStart + strlen($m[0][0]);
+            $i = $afterVar;
+            while ($i < $len && ctype_space($body[$i])) {
+                ++$i;
+            }
+            if ($i >= $len) {
+                return null;
+            }
+            if ('=' === $body[$i]) {
+                $hookOpen = $this->scanToHookOpenBrace($body, $i + 1);
+                if (null !== $hookOpen) {
+                    return [$prop, $varStart, $hookOpen];
+                }
+                $offset = $afterVar + 1;
+                continue;
+            }
+            if ('{' === $body[$i]) {
+                return [$prop, $varStart, $i];
+            }
+            $offset = $afterVar + 1;
+        }
+
+        return null;
+    }
+
+    /**
+     * Scan from $start through an optional default initializer to the hook-block `{`.
+     */
+    private function scanToHookOpenBrace(string $body, int $start): ?int
+    {
+        $len = strlen($body);
+        $depthParen = 0;
+        $depthBrace = 0;
+        $depthBracket = 0;
+        $inString = false;
+        $stringChar = '';
+        for ($i = $start; $i < $len; ++$i) {
+            $ch = $body[$i];
+            if ($inString) {
+                if ('\\' === $ch) {
+                    ++$i;
+                    continue;
+                }
+                if ($ch === $stringChar) {
+                    $inString = false;
+                }
+                continue;
+            }
+            if ('"' === $ch || '\'' === $ch) {
+                $inString = true;
+                $stringChar = $ch;
+                continue;
+            }
+            if ('(' === $ch) {
+                ++$depthParen;
+            } elseif (')' === $ch && $depthParen > 0) {
+                --$depthParen;
+            } elseif (';' === $ch && 0 === $depthParen && 0 === $depthBrace && 0 === $depthBracket) {
+                return null;
+            } elseif ('{' === $ch) {
+                if (0 === $depthParen && 0 === $depthBrace && 0 === $depthBracket) {
+                    return $i;
+                }
+                ++$depthBrace;
+            } elseif ('}' === $ch && $depthBrace > 0) {
+                --$depthBrace;
+            } elseif ('[' === $ch) {
+                ++$depthBracket;
+            } elseif (']' === $ch && $depthBracket > 0) {
+                --$depthBracket;
+            }
+        }
+
+        return null;
+    }
+
     private function processClassBody(
         string $body,
         string $lcClass,
@@ -293,9 +383,8 @@ final class PropertyHooks
         $removeSpans = [];
         $offset = 0;
         $out = '';
-        while (preg_match('/\$(\w+)\s*\{/', $body, $m, PREG_OFFSET_CAPTURE, $offset)) {
-            $prop = $m[1][0];
-            $hookOpen = $m[0][1] + strlen($m[0][0]) - 1;
+        while (null !== ($hookDecl = $this->findNextPropertyHookDecl($body, $offset))) {
+            [$prop, $declStart, $hookOpen] = $hookDecl;
             $span = $this->matchingBraceSpan($body, $hookOpen);
             if (null === $span) {
                 $out .= substr($body, $offset);
@@ -303,7 +392,6 @@ final class PropertyHooks
             }
             [$open, $close] = $span;
             $hookSource = substr($body, $open + 1, $close - $open - 1);
-            $declStart = $m[0][1];
             $declPrefix = substr($body, $offset, $declStart - $offset);
             $propDeclHead = rtrim(substr($body, $declStart, $hookOpen - $declStart));
             $isAbstractHook = (bool) preg_match('/\babstract\b/', $declPrefix.$propDeclHead);
@@ -347,15 +435,18 @@ final class PropertyHooks
             $sameNameBacking = $usesBacking && $this->hookTouchesBacking($hookSource, $prop, $isStatic);
             $nextOffset = $close + 1;
             $initializer = '';
+            $hasInlineInitializer = $this->propertyDeclHeadHasInlineInitializer($propDeclHead);
             if ($sameNameBacking) {
-                $backingDecl = $this->consumeSameNameBackingFieldDecl($body, $nextOffset, $prop);
-                if (null !== $backingDecl) {
-                    [$nextOffset, $initializer] = $backingDecl;
-                } else {
-                    $foundBacking = $this->findSameNameBackingFieldDecl($body, $prop);
-                    if (null !== $foundBacking) {
-                        [$backingStart, $backingEnd, $initializer] = $foundBacking;
-                        $removeSpans[] = [$backingStart, $backingEnd];
+                if (!$hasInlineInitializer) {
+                    $backingDecl = $this->consumeSameNameBackingFieldDecl($body, $nextOffset, $prop);
+                    if (null !== $backingDecl) {
+                        [$nextOffset, $initializer] = $backingDecl;
+                    } else {
+                        $foundBacking = $this->findSameNameBackingFieldDecl($body, $prop);
+                        if (null !== $foundBacking) {
+                            [$backingStart, $backingEnd, $initializer] = $foundBacking;
+                            $removeSpans[] = [$backingStart, $backingEnd];
+                        }
                     }
                 }
                 $mergedDecl = rtrim($propDeclHead);
@@ -661,6 +752,14 @@ final class PropertyHooks
         if (preg_match('/\breadonly\b/', $declHead)) {
             throw new \CompileError(self::READONLY_HOOK_COMPILE_ERROR);
         }
+    }
+
+    /**
+     * True when the hooked property decl already carries `= <expr>` before the hook block (#9945).
+     */
+    private function propertyDeclHeadHasInlineInitializer(string $propDeclHead): bool
+    {
+        return (bool) preg_match('/=\s*\S/', $propDeclHead);
     }
 
     /**
