@@ -78,4 +78,23 @@ PHP;
         $rt->run($block);
         $this->assertSame('11', ob_get_clean());
     }
+
+    public function testVmClassUsesEnumCaseTraitMap(): void
+    {
+        $code = <<<'PHP'
+<?php
+trait T {}
+enum E { case A; use T; }
+$byClass = class_uses(E::class);
+$byCase = class_uses(E::A);
+echo isset($byClass['T']) ? '1' : '0';
+echo isset($byCase['T']) ? '1' : '0';
+echo $byClass === $byCase ? '1' : '0';
+PHP;
+        $rt = new Runtime();
+        $block = $rt->parseAndCompile($code, 'class_uses_enum_case_traits.php');
+        ob_start();
+        $rt->run($block);
+        $this->assertSame('111', ob_get_clean());
+    }
 }

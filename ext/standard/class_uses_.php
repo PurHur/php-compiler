@@ -8,8 +8,6 @@ use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\Variable as JITVariable;
-use PHPCompiler\VM\EnumCaseSupport;
-use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
 
 /**
@@ -42,17 +40,6 @@ final class class_uses_ extends Internal
                 2,
                 'autoload'
             );
-        }
-        $arg = $frame->calledArgs[0]->resolveIndirect();
-        if (Variable::TYPE_ENUM_CASE === $arg->type) {
-            $frame->returnVar->copyFrom(VmReflection::emptyArray());
-
-            return;
-        }
-        if (Variable::TYPE_OBJECT === $arg->type && EnumCaseSupport::isEnumCase($arg->toObject())) {
-            $frame->returnVar->copyFrom(VmReflection::emptyArray());
-
-            return;
         }
         $entry = VmReflection::resolveClassForClassUses($ctx, $frame->calledArgs[0], $autoload);
         if (null === $entry) {
