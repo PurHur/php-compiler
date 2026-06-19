@@ -1375,6 +1375,32 @@ class VM {
     }
 
     /**
+     * Lowercase names of separate hook backing fields — hidden from debug/var_export (#8854, zend_property_hooks.c).
+     *
+     * @return array<string, true>
+     */
+    private function separatePropertyHookBackingNameSet(ObjectEntry $object): array
+    {
+        /** @var array<string, true> $set */
+        $set = [];
+        foreach (array_reverse(\PHPCompiler\ext\standard\VmReflection::classHierarchyChain($object->class, $this->context)) as $class) {
+            $lcClass = strtolower($class->name);
+            foreach ($this->context->propertyHookRegistry[$lcClass] ?? [] as $hookProp => $meta) {
+                if (!is_array($meta)) {
+                    continue;
+                }
+                $backingName = $meta['setBacking'] ?? $meta['getBacking'] ?? null;
+                if (null === $backingName || 0 === strcasecmp($backingName, $hookProp)) {
+                    continue;
+                }
+                $set[strtolower($backingName)] = true;
+            }
+        }
+
+        return $set;
+    }
+
+    /**
      * var_dump()/print_r() property list — mangled keys, get hooks invoked (#6604).
      *
      * php-src: zend_get_properties_for(..., ZEND_PROP_PURPOSE_DEBUG) + zend_read_property_ex
@@ -1391,6 +1417,7 @@ class VM {
         if (null === $scopeFrame) {
             $scopeFrame = $frame;
         }
+        $hookBackingLc = $this->separatePropertyHookBackingNameSet($object);
         /** @var array<string, Variable> $result */
         $result = [];
         /** @var array<string, true> $seenLc */
@@ -1398,7 +1425,7 @@ class VM {
         foreach (array_reverse(\PHPCompiler\ext\standard\VmReflection::classHierarchyChain($object->class, $ctx)) as $class) {
             foreach ($class->properties as $meta) {
                 $lc = strtolower($meta->name);
-                if (isset($seenLc[$lc])) {
+                if (isset($seenLc[$lc]) || isset($hookBackingLc[$lc])) {
                     continue;
                 }
                 $seenLc[$lc] = true;
@@ -1435,7 +1462,8 @@ class VM {
             }
         }
         foreach ($object->getRawProperties() as $name => $prop) {
-            if (isset($seenLc[strtolower($name)])) {
+            $nameLc = strtolower($name);
+            if (isset($seenLc[$nameLc]) || isset($hookBackingLc[$nameLc])) {
                 continue;
             }
             $value = $prop->resolveIndirect();
@@ -1488,6 +1516,7 @@ class VM {
             $scopeFrame = $frame;
         }
         $callerClassLc = $forVarExport ? null : $this->callerClassLc($scopeFrame);
+        $hookBackingLc = $forVarExport ? $this->separatePropertyHookBackingNameSet($object) : [];
         /** @var array<string, Variable> $result */
         $result = [];
         /** @var array<string, true> $seenLc */
@@ -1495,7 +1524,7 @@ class VM {
         foreach (array_reverse(\PHPCompiler\ext\standard\VmReflection::classHierarchyChain($object->class, $ctx)) as $class) {
             foreach ($class->properties as $meta) {
                 $lc = strtolower($meta->name);
-                if (isset($seenLc[$lc])) {
+                if (isset($seenLc[$lc]) || isset($hookBackingLc[$lc])) {
                     continue;
                 }
                 $seenLc[$lc] = true;
@@ -1533,7 +1562,8 @@ class VM {
             }
         }
         foreach ($object->getRawProperties() as $name => $prop) {
-            if (isset($seenLc[strtolower($name)])) {
+            $nameLc = strtolower($name);
+            if (isset($seenLc[$nameLc]) || isset($hookBackingLc[$nameLc])) {
                 continue;
             }
             $value = $prop->resolveIndirect();
