@@ -8,6 +8,7 @@ use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Builtin\Highlight;
 use PHPCompiler\JIT\Builtin\StringFileGetContents;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\JitNativeString;
 use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\ValueEchoHelper;
@@ -46,6 +47,7 @@ final class JitHighlight
 
         $pathStr = JitStringBuiltinArg::lower($context, $args[0], $functionName, 0, 'filename');
         StringFileGetContents::implement($context);
+        JitNativeString::ensureInsertBlock($context);
         $contents = $context->builder->call(
             $context->lookupFunction('__compiler_file_get_contents'),
             $pathStr
