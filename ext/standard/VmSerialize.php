@@ -38,6 +38,9 @@ final class VmSerialize
             return self::encodeEnumCaseLiteral($enumRef->className, $enumRef->caseName);
         }
         if (Variable::TYPE_OBJECT === $value->type) {
+            if (VmClosureCall::isClosure($value)) {
+                throw new \Exception("Serialization of 'Closure' is not allowed");
+            }
             $entry = $value->toObject();
             if (self::hasInstanceMethod($entry->class, '__serialize')) {
                 $data = self::invokeSerialize($ctx, $entry);
@@ -125,6 +128,9 @@ final class VmSerialize
                 return false;
             }
             [$className, $data] = $parsed;
+            if (0 === strcasecmp($className, 'Closure')) {
+                throw new \Exception("Unserialization of 'Closure' is not allowed");
+            }
             if (!self::isClassAllowedForUnserialize($className, $options)) {
                 if (!\is_array($data)) {
                     return false;
@@ -417,6 +423,9 @@ final class VmSerialize
     private static function exportForSerialize(Context $ctx, Variable $value): mixed
     {
         $value = $value->resolveIndirect();
+        if (VmClosureCall::isClosure($value)) {
+            throw new \Exception("Serialization of 'Closure' is not allowed");
+        }
         $enumRef = self::enumCaseRefFromVariable($value);
         if (null !== $enumRef) {
             return $enumRef;
