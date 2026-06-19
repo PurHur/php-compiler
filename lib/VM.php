@@ -2053,7 +2053,7 @@ class VM {
     public function resumeFiber(FiberState $fiber, Variable ...$resumeArgs): Variable
     {
         if (FiberState::STATUS_TERMINATED === $fiber->status) {
-            throw new VM\NativeFiberError('Cannot resume a fiber that is terminated');
+            throw new VM\NativeFiberError('Cannot resume a fiber that is not suspended');
         }
         if (FiberState::STATUS_SUSPENDED !== $fiber->status) {
             throw new VM\NativeFiberError('Cannot resume a fiber that is not suspended');
