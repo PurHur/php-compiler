@@ -54,6 +54,30 @@ PHP;
         $this->assertSame('', $this->runVm($code));
     }
 
+    public function testFunctionMagicConstInClassConst(): void
+    {
+        $code = <<<'PHP'
+<?php
+class C {
+    public const X = __CLASS__ . '::' . __FUNCTION__;
+}
+echo C::X;
+PHP;
+        $this->assertSame('C::', $this->runVm($code));
+    }
+
+    public function testMethodMagicConstInClassConst(): void
+    {
+        $code = <<<'PHP'
+<?php
+class C {
+    public const X = __METHOD__;
+}
+echo C::X;
+PHP;
+        $this->assertSame('', $this->runVm($code));
+    }
+
     public function testScriptDirAndFileMagicConstantsCompileAndRun(): void
     {
         $code = <<<'PHP'
