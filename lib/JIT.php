@@ -582,7 +582,6 @@ class JIT {
         if (!$this->context->type->object->hasUserDestructors()) {
             return;
         }
-        \PHPCompiler\JIT\Builtin\GcCollectCyclesNative::registerDeclarations($this->context);
         \PHPCompiler\JIT\Builtin\GcCollectCyclesRuntime::ensureLinked($this->context);
         $deferDelref = true;
         if (null !== $block->func) {
@@ -14345,7 +14344,6 @@ class JIT {
     private function jitWriteNullForUnset(\PHPLLVM\Value $valueBoxPtr): void
     {
         if ($this->context->type->object->hasUserDestructors()) {
-            \PHPCompiler\JIT\Builtin\GcCollectCyclesNative::registerDeclarations($this->context);
             \PHPCompiler\JIT\Builtin\GcCollectCyclesRuntime::ensureLinked($this->context);
             $map = $this->context->structFieldMap['__value__'];
             $i8 = $this->context->getTypeFromString('int8');

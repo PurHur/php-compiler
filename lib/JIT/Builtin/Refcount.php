@@ -174,7 +174,7 @@ class Refcount extends Builtin {
     public function implement(): void {
         \PHPCompiler\JIT\Builtin\WeakRefRuntime::ensureLinked($this->context);
         \PHPCompiler\JIT\Builtin\WeakRefNative::registerDeclarations($this->context);
-        \PHPCompiler\JIT\Builtin\GcCollectCyclesNative::registerDeclarations($this->context);
+        \PHPCompiler\JIT\Builtin\GcCollectCyclesRuntime::ensureDeclarations($this->context);
         $this->implementInit();
         $this->implementAddref();
         $this->implementDelref();
