@@ -38,6 +38,7 @@ final class EnumVMTest extends BaseTest
                 'enum_instanceof.phpt',
                 'instanceof_enum_case.phpt',
                 'enum_case_class_const.phpt',
+                'enum_case_class_pseudo.phpt',
                 'enum_class_constant.phpt',
                 'enum_type_constant.phpt',
                 'enum_bare_const.phpt',
