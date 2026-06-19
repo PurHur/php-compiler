@@ -21,10 +21,16 @@ enum E3 {
     use T;
 }
 
+function f(E $e): void {
+    echo get_debug_type($e), "\n";
+}
+
 echo E::A->m(), "\n";
 E2::A->foo();
 echo E3::A->id(), "\n";
+f(E::A);
 --EXPECT--
 x
 ok
 E3
+E
