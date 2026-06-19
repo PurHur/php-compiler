@@ -20,7 +20,10 @@ final class StringVersionCompareStandaloneTest extends TestCase
         $linker = (string) file_get_contents(__DIR__.'/../../../lib/AOT/Linker.php');
         $this->assertStringNotContainsString('phpc_info.c', $linker);
         $this->assertStringNotContainsString('phpc_version_compare.c', $linker);
-        $jit = (string) file_get_contents(__DIR__.'/../../../lib/JIT/Builtin/StringVersionCompareJit.php');
-        $this->assertStringContainsString('__compiler_version_compare', $jit);
+        $bridge = (string) file_get_contents(__DIR__.'/../../../lib/JIT/Builtin/StringVersionCompare.php');
+        $this->assertStringContainsString('VersionCompareJitHelper', $bridge);
+        $this->assertStringContainsString('__compiler_version_compare', $bridge);
+        $jitShim = (string) file_get_contents(__DIR__.'/../../../lib/JIT/Builtin/StringVersionCompareJit.php');
+        $this->assertLessThan(20, substr_count($jitShim, "\n"), 'StringVersionCompareJit must be a thin shim');
     }
 }
