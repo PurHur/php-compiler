@@ -728,6 +728,15 @@ class VM {
             return Variable::TYPE_NULL !== $backing->type;
         }
         if ($uninit) {
+            if (null !== $frame && $this->hookedPropertyUsesVirtualIssetEmptySemantics($object, $propName)) {
+                $hookValue = $this->fetchVirtualGetOnlyHookForIssetEmpty($object, $propName, $frame);
+                if (null !== $hookValue) {
+                    $value = $hookValue->resolveIndirect();
+
+                    return Variable::TYPE_NULL !== $value->type;
+                }
+            }
+
             return false;
         }
         if (null === $frame) {
@@ -744,6 +753,46 @@ class VM {
         $value = $hookValue->resolveIndirect();
 
         return Variable::TYPE_NULL !== $value->type;
+    }
+
+    /**
+     * Virtual hooked properties route isset/empty through get (#9832, zend_property_hooks.c).
+     */
+    private function hookedPropertyUsesVirtualIssetEmptySemantics(ObjectEntry $object, string $propName): bool
+    {
+        if (!$this->instancePropertyHasGetHook($object, $propName)) {
+            return false;
+        }
+        $meta = $this->classPropertyMeta($object, $propName);
+        if (null !== $meta && $meta->propertyHookVirtual) {
+            return true;
+        }
+        $lcClass = strtolower($object->class->name);
+        $propMeta = $this->context->propertyHookRegistry[$lcClass][$propName]
+            ?? $this->context->propertyHookRegistry[$lcClass][strtolower($propName)]
+            ?? null;
+
+        return is_array($propMeta) && !empty($propMeta['virtual']);
+    }
+
+    /**
+     * Virtual get-only hooked properties invoke get for isset/empty (#9832, zend_property_hooks.c).
+     *
+     * @return Variable|null null when get hook must not run
+     */
+    private function fetchVirtualGetOnlyHookForIssetEmpty(
+        ObjectEntry $object,
+        string $propName,
+        Frame $frame
+    ): ?Variable {
+        if (!$this->hookedPropertyUsesVirtualIssetEmptySemantics($object, $propName)) {
+            return null;
+        }
+        try {
+            return $this->fetchPropertyWithHooks($object, $propName, $frame);
+        } catch (VM\PropertyHookRefWriteSignal) {
+            return null;
+        }
     }
 
     /**
@@ -1063,10 +1112,19 @@ class VM {
 
             return true;
         }
-        if ($uninit) {
-            $dst->bool(true);
+        if ($uninit || $this->hookedPropertyUsesVirtualIssetEmptySemantics($object, $propName)) {
+            $hookValue = $this->fetchVirtualGetOnlyHookForIssetEmpty($object, $propName, $frame);
+            if (null !== $hookValue) {
+                $value = $hookValue->resolveIndirect();
+                $dst->bool(!ext\standard\boolval::isTruthy($value));
 
-            return true;
+                return true;
+            }
+            if ($uninit) {
+                $dst->bool(true);
+
+                return true;
+            }
         }
         $hookValue = $this->fetchPropertyWithHooks($object, $propName, $frame);
         if (null === $hookValue) {
