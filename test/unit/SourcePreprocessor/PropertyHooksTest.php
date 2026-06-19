@@ -519,4 +519,49 @@ PHP;
         $this->expectExceptionMessage(PropertyHooks::READONLY_HOOK_COMPILE_ERROR);
         (new PropertyHooks())->process($src);
     }
+
+    /** @covers issue #9945 — inline default initializer before property hook block */
+    public function testLowersPropertyHookWithInlineDefaultInitializer(): void
+    {
+        $src = <<<'PHP'
+<?php
+class C {
+    public string $label = 'default' {
+        get => $this->label;
+    }
+}
+trait T {
+    public string $label = 'from-trait' {
+        get => $this->label;
+    }
+}
+PHP;
+        [$out, $registry] = (new PropertyHooks())->process($src);
+        self::assertStringNotContainsString('$label {', $out);
+        self::assertStringContainsString("public string \$label = 'default';", $out);
+        self::assertStringContainsString("public string \$label = 'from-trait';", $out);
+        self::assertStringContainsString('function __phpc_property_get_label', $out);
+        self::assertSame('__phpc_property_get_label', $registry['c']['label']['get'] ?? null);
+        self::assertSame('__phpc_property_get_label', $registry['t']['label']['get'] ?? null);
+    }
+
+    /** @covers issue #9945 — end-to-end via Runtime preprocess */
+    public function testPropertyHookInlineDefaultInitializerSurvivesRuntimePreprocess(): void
+    {
+        $src = <<<'PHP'
+<?php
+class C {
+    public string $label = 'default' {
+        get => $this->label;
+    }
+}
+$c = new C();
+echo $c->label;
+PHP;
+        $runtime = new Runtime();
+        $block = $runtime->parseAndCompile($src, 'property_hook_default_initializer.php');
+        ob_start();
+        $runtime->run($block);
+        self::assertSame('default', ob_get_clean());
+    }
 }
