@@ -513,7 +513,7 @@ final class InterfaceImplementationCheck
     private function markImplicitBackingFieldHooks(array &$provided, string $classLc, string $propLc): void
     {
         $meta = $this->propertyHookRegistry[$classLc][$propLc] ?? null;
-        if (is_array($meta) && !empty($meta['abstract']) && empty($meta['get']) && empty($meta['set'])) {
+        if (is_array($meta) && self::metaHasUnimplementedRequiredHooks($meta)) {
             return;
         }
         if (is_array($meta) && (!empty($meta['get']) || !empty($meta['set']) || !empty($meta['unset']))) {
@@ -524,6 +524,18 @@ final class InterfaceImplementationCheck
         }
         $provided[$propLc]['get'] = true;
         $provided[$propLc]['set'] = true;
+    }
+
+    /**
+     * @param array<string, mixed> $meta
+     */
+    private static function metaHasUnimplementedRequiredHooks(array $meta): bool
+    {
+        if (!empty($meta['get']) || !empty($meta['set']) || !empty($meta['unset'])) {
+            return false;
+        }
+
+        return !empty($meta['requiresGet']) || !empty($meta['requiresSet']) || !empty($meta['requiresUnset']);
     }
 
     /**

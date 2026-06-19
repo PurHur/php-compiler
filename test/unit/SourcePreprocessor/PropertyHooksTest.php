@@ -159,6 +159,37 @@ PHP;
         self::assertSame('__phpc_property_get_label', $registry['c']['label']['get'] ?? null);
     }
 
+    public function testRegistersSemicolonGetHookOnConcreteClass(): void
+    {
+        $src = <<<'PHP'
+<?php
+class C {
+    public string $p {
+        get;
+    }
+}
+PHP;
+        [, $registry] = (new PropertyHooks())->process($src);
+        self::assertTrue($registry['c']['p']['requiresGet'] ?? false);
+        self::assertTrue($registry['c']['p']['abstract'] ?? false);
+    }
+
+    public function testRegistersSemicolonHooksOnAbstractClassWithoutAbstractProperty(): void
+    {
+        $src = <<<'PHP'
+<?php
+abstract class A {
+    public string $p {
+        get;
+        set;
+    }
+}
+PHP;
+        [, $registry] = (new PropertyHooks())->process($src);
+        self::assertTrue($registry['a']['p']['requiresGet'] ?? false);
+        self::assertTrue($registry['a']['p']['requiresSet'] ?? false);
+    }
+
     public function testLowersTraitPropertyHooks(): void
     {
         $src = <<<'PHP'
