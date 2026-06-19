@@ -109,6 +109,7 @@ class Runtime {
         ObjectRegistry::reset();
         ext\standard\ModuleRegistry::reset();
         self::clearLastParseFailure();
+        ext\standard\VmIniIntrospection::seedHostIniEnvFromZend();
         $this->mode = $mode;
         $this->initParsePipeline();
         $this->initCompiler();

@@ -12,19 +12,25 @@ final class IniIntrospectionBuiltinTest extends TestCase
     private const CODE = <<<'PHP'
 echo function_exists('php_ini_loaded_file') ? "loaded_fn\n" : "missing_loaded\n";
 echo function_exists('php_ini_scanned_files') ? "scanned_fn\n" : "missing_scanned\n";
-echo php_ini_loaded_file() === false ? "loaded_false\n" : "loaded_bad\n";
-echo php_ini_scanned_files() === false ? "scanned_false\n" : "scanned_bad\n";
+$loaded = php_ini_loaded_file();
+echo is_string($loaded) && '' !== $loaded ? "loaded_path\n" : (false === $loaded ? "loaded_false\n" : "loaded_bad\n");
+$scanned = php_ini_scanned_files();
+echo is_string($scanned) && '' !== $scanned ? "scanned_path\n" : (false === $scanned ? "scanned_false\n" : "scanned_bad\n");
 putenv('PHP_COMPILER_INI_LOADED_FILE=/tmp/test.ini');
 putenv('PHP_COMPILER_INI_SCANNED_FILES=/tmp/a.ini,');
-echo php_ini_loaded_file() === '/tmp/test.ini' ? "loaded_path\n" : "loaded_path_bad\n";
-echo php_ini_scanned_files() === '/tmp/a.ini,' ? "scanned_path\n" : "scanned_path_bad\n";
+echo php_ini_loaded_file() === '/tmp/test.ini' ? "loaded_override\n" : "loaded_override_bad\n";
+echo php_ini_scanned_files() === '/tmp/a.ini,' ? "scanned_override\n" : "scanned_override_bad\n";
 PHP;
-
-    private const EXPECT = "loaded_fn\nscanned_fn\nloaded_false\nscanned_false\nloaded_path\nscanned_path\n";
 
     public function testVmIniIntrospection(): void
     {
-        $this->assertSame(self::EXPECT, $this->runBin('bin/vm.php', self::CODE));
+        $out = $this->runBin('bin/vm.php', self::CODE);
+        $this->assertStringStartsWith("loaded_fn\nscanned_fn\n", $out);
+        $this->assertStringContainsString("loaded_override\nscanned_override\n", $out);
+        $this->assertMatchesRegularExpression(
+            '/loaded_fn\nscanned_fn\nloaded_(path|false)\nscanned_(path|false)\n/',
+            $out
+        );
     }
 
     public function testVmIniLoadedFileArgumentCountError(): void
