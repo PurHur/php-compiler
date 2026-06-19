@@ -1,10 +1,10 @@
 --TEST--
-Language: readonly function declaration compiles and runs (#7428)
+Language: readonly function declaration rejected — php-src parse error (#10012, was #7428)
 --FILE--
 <?php
 readonly function f(): void {
     echo "ok\n";
 }
 f();
---EXPECT--
-ok
+--EXPECT_EXIT--
+255

@@ -2,30 +2,30 @@
 
 declare(strict_types=1);
 
-namespace PHPCompiler\Ast;
+namespace PHPCompiler;
+
+use PHPCompiler\Compiler\CompileFatal;
 
 /**
- * Strip top-level / expression `readonly function` for nikic/php-parser 4.x (#7428).
+ * Reject `readonly function` outside class/property contexts (#10012).
  *
- * php-src: Zend/zend_language_parser.y — T_READONLY T_FUNCTION (readonly closures RFC).
+ * php-src: Zend/zend_language_parser.y — `readonly` is valid on classes and typed
+ * properties only, not on functions or closures.
  */
-final class ReadonlyFunctionDesugar
+final class ReadonlyFunctionRejector
 {
-    /**
-     * @return array{0: string, 1: list<int>} rewritten source, function/closure start lines
-     */
-    public static function desugar(string $code): array
+    public const MESSAGE = 'syntax error, unexpected token "function", expecting "abstract" or "final" or "readonly" or "class"';
+
+    public static function reject(string $code, string $filename = 'unknown'): string
     {
         if (!str_contains($code, 'readonly') || !str_contains($code, 'function')) {
-            return [$code, []];
+            return $code;
         }
         if (!\function_exists('token_get_all')) {
-            return [$code, []];
+            return $code;
         }
 
         $tokens = token_get_all($code);
-        $readonlyLines = [];
-        $replacements = [];
         $braceDepth = 0;
         $classBodyDepth = null;
         $methodBodyDepth = null;
@@ -80,21 +80,8 @@ final class ReadonlyFunctionDesugar
             }
 
             if (T_FUNCTION === $id && !self::isClassMemberContext($classBodyDepth, $methodBodyDepth, $braceDepth)) {
-                $readonlyIdx = self::findPrecedingReadonlyIndex($tokens, $i);
-                if (null !== $readonlyIdx) {
-                    $start = self::tokenByteOffset($tokens, $readonlyIdx);
-                    $funcLine = $token[2];
-                    $end = $start + \strlen(self::tokenText($tokens[$readonlyIdx]));
-                    while ($end < \strlen($code) && ctype_space($code[$end])) {
-                        ++$end;
-                    }
-                    if (null !== $start) {
-                        $replacements[] = ['start' => $start, 'end' => $end, 'line' => $funcLine];
-                    }
-                }
-                if (self::isClassMemberContext($classBodyDepth, $methodBodyDepth, $braceDepth)) {
-                    $methodBodyDepth = self::findFunctionBodyBraceDepth($tokens, $i, $braceDepth);
-                    $atMemberStart = false;
+                if (null !== self::findPrecedingReadonlyIndex($tokens, $i)) {
+                    throw new CompileFatal($filename, $token[2], self::MESSAGE);
                 }
                 continue;
             }
@@ -120,17 +107,7 @@ final class ReadonlyFunctionDesugar
             $atMemberStart = false;
         }
 
-        if ([] === $replacements) {
-            return [$code, []];
-        }
-
-        usort($replacements, static fn (array $a, array $b): int => $b['start'] <=> $a['start']);
-        foreach ($replacements as $replacement) {
-            $readonlyLines[] = $replacement['line'];
-            $code = substr($code, 0, $replacement['start']).substr($code, $replacement['end']);
-        }
-
-        return [$code, array_values(array_unique($readonlyLines))];
+        return $code;
     }
 
     private static function isClassMemberContext(?int $classBodyDepth, ?int $methodBodyDepth, int $braceDepth): bool
@@ -201,29 +178,5 @@ final class ReadonlyFunctionDesugar
         }
 
         return null;
-    }
-
-    /**
-     * @param list<array{0: int, 1: string, 2: int}|string> $tokens
-     */
-    private static function tokenByteOffset(array $tokens, int $index): ?int
-    {
-        if (!isset($tokens[$index])) {
-            return null;
-        }
-        $offset = 0;
-        for ($i = 0; $i < $index; ++$i) {
-            $offset += \strlen(self::tokenText($tokens[$i]));
-        }
-
-        return $offset;
-    }
-
-    /**
-     * @param array{0: int, 1: string, 2: int}|string $token
-     */
-    private static function tokenText($token): string
-    {
-        return \is_array($token) ? $token[1] : $token;
     }
 }
