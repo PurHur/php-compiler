@@ -1,5 +1,5 @@
 --TEST--
-JIT: match() enum-case subject must not match scalar int arms (issue #9716, Zend/zend_execute.c)
+JIT: match() enum-case subject must not match scalar int arms (#9716, #10030 re-#10007, Zend/zend_execute.c)
 --FILE--
 <?php
 declare(strict_types=1);
