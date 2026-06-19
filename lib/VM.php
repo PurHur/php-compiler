@@ -2830,9 +2830,19 @@ restart:
                     if (!$this->isFunctionStaticInitializedForFrame($frame, $storageKey)) {
                         if (null !== $op->arg3 && isset($frame->block->constants[$op->arg3])) {
                             $storage->copyFrom($frame->block->constants[$op->arg3]);
+                            $catchFrame = $this->enforceFunctionStaticWrite(
+                                $storage,
+                                $frame,
+                                $op->functionStaticVarName
+                            );
+                            if (null !== $catchFrame) {
+                                $frame = $catchFrame;
+                                goto restart;
+                            }
                             $this->markFunctionStaticInitializedForFrame($frame, $storageKey);
                         }
                     }
+                    $this->applyFunctionStaticTypeMetadata($storage, $frame, $op);
                     $frame->scope[$op->arg1]->indirect($storage);
                     $this->markScopeSlotInitialized($frame, (int) $op->arg1);
                     break;
@@ -2855,7 +2865,17 @@ restart:
                     }
                     $storeKey = $frame->block->constants[$op->arg2]->toString();
                     $store = $this->ensureFunctionStaticForFrame($frame, $storeKey);
+                    $this->applyFunctionStaticTypeMetadata($store, $frame, $op);
                     $store->copyFrom($frame->scope[$op->arg3]->resolveIndirect());
+                    $catchFrame = $this->enforceFunctionStaticWrite(
+                        $store,
+                        $frame,
+                        $op->functionStaticVarName
+                    );
+                    if (null !== $catchFrame) {
+                        $frame = $catchFrame;
+                        goto restart;
+                    }
                     $this->markFunctionStaticInitializedForFrame($frame, $storeKey);
                     break;
                 case OpCode::TYPE_LIST_UNPACK_CHECK:
@@ -10862,6 +10882,50 @@ restart:
             return;
         }
         $this->context->markFunctionStaticInitialized($storageKey);
+    }
+
+    protected function applyFunctionStaticTypeMetadata(Variable $storage, Frame $frame, OpCode $op): void
+    {
+        if (null === $op->functionStaticTypeSlot || !isset($frame->block->constants[$op->functionStaticTypeSlot])) {
+            return;
+        }
+        $proto = $frame->block->constants[$op->functionStaticTypeSlot];
+        $resolved = $storage->resolveIndirect();
+        $resolved->typeConstraint = $proto->typeConstraint;
+        $resolved->classConstraint = $proto->classConstraint;
+        $resolved->literalBoolType = $proto->literalBoolType;
+        $resolved->unionTypeConstraints = $proto->unionTypeConstraints;
+        $resolved->declaredTypeLabel = $proto->declaredTypeLabel;
+        $resolved->genericArrayTypeSpec = $proto->genericArrayTypeSpec;
+        $resolved->dnfArms = $proto->dnfArms;
+        if (null !== $op->functionStaticVarName && '' !== $op->functionStaticVarName) {
+            $resolved->functionStaticVarName = $op->functionStaticVarName;
+        }
+    }
+
+    protected function enforceFunctionStaticWrite(
+        Variable $storage,
+        Frame $frame,
+        ?string $varName
+    ): ?Frame {
+        if (null === $storage->resolveIndirect()->typeConstraint && null === $storage->resolveIndirect()->dnfArms) {
+            return null;
+        }
+        if (null !== $varName && '' !== $varName) {
+            $storage->resolveIndirect()->functionStaticVarName = $varName;
+        }
+        $strict = null !== $frame->parent
+            ? $frame->parent->block->strictTypes
+            : $frame->block->strictTypes;
+        $probe = new Variable();
+        $probe->indirect($storage);
+        try {
+            TypeCheck::coerceFunctionStaticWrite($probe, $strict);
+        } catch (\TypeError $e) {
+            return $this->dispatchVmTypeError($e, $frame);
+        }
+
+        return null;
     }
 
     protected function bindClosureCallCaptures(Frame $callee, ?ClosureState $closureState): void

@@ -110,11 +110,17 @@ final class TypeCheck
 
             return;
         }
-        self::coerceTypedSlot($dest, $strict, 'Property', null, true);
+        $kind = null !== $target->functionStaticVarName ? 'Static variable' : 'Property';
+        self::coerceTypedSlot($dest, $strict, $kind, null, true);
         $resolved = $dest->resolveIndirect();
         if (null !== $resolved->genericArrayTypeSpec) {
-            self::assertGenericArrayShape($resolved, $resolved->genericArrayTypeSpec, 'Property');
+            self::assertGenericArrayShape($resolved, $resolved->genericArrayTypeSpec, $kind);
         }
+    }
+
+    public static function coerceFunctionStaticWrite(Variable $dest, bool $strict): void
+    {
+        self::coercePropertyWrite($dest, $strict);
     }
 
     /**
@@ -362,7 +368,7 @@ final class TypeCheck
                 return;
             }
             $expected = $target->declaredTypeLabel ?? self::normalizeClassLabel($target->classConstraint);
-            if ($propertyWrite && 'Property' === $kind) {
+            if ($propertyWrite && ('Property' === $kind || 'Static variable' === $kind)) {
                 throw self::propertyTypeError($target, $expected, $value);
             }
 
@@ -681,7 +687,7 @@ final class TypeCheck
             ?? (null !== $literalBoolType
                 ? $literalBoolType
                 : ($target->declaredTypeLabel ?? self::typeName($constraint)));
-        if ($propertyWrite && 'Property' === $kind) {
+        if ($propertyWrite && ('Property' === $kind || 'Static variable' === $kind)) {
             return self::propertyTypeError($target, $expected, $value);
         }
 
@@ -693,6 +699,14 @@ final class TypeCheck
         string $expectedType,
         Variable $value
     ): \TypeError {
+        if (null !== $target->functionStaticVarName && '' !== $target->functionStaticVarName) {
+            return new \TypeError(sprintf(
+                'Cannot assign %s to static variable $%s of type %s',
+                self::valueTypeLabel($value),
+                $target->functionStaticVarName,
+                $expectedType
+            ));
+        }
         $owner = $target->objectPropertyOwner;
         $propName = $target->objectPropertyName ?? 'property';
         if (null !== $owner) {

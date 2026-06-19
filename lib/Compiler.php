@@ -8498,13 +8498,19 @@ class Compiler {
         $keyOperand->type = Type::string();
         $keySlot = $block->registerConstant($keyOperand, $keyVar);
         $localSlot = $this->compileOperand($terminal->var, $block, false);
+        $typeSlot = null;
+        if (null !== $terminal->declaredType) {
+            $declType = $this->typeFromStaticVarDecl($terminal);
+            $typeSlot = $this->compileTypeConstrainedVariable($block, $declType, $terminal->declaredType);
+        }
 
         if (null === $terminal->defaultVar) {
-            return [[new OpCode(
-                OpCode::TYPE_DECLARE_FUNCTION_STATIC,
+            return [[$this->makeDeclareFunctionStaticOp(
                 $localSlot,
                 $keySlot,
-                null
+                null,
+                $typeSlot,
+                $varName
             )], $block];
         }
 
@@ -8517,11 +8523,12 @@ class Compiler {
                 );
             }
 
-            return [[new OpCode(
-                OpCode::TYPE_DECLARE_FUNCTION_STATIC,
+            return [[$this->makeDeclareFunctionStaticOp(
                 $localSlot,
                 $keySlot,
-                $defaultSlot
+                $defaultSlot,
+                $typeSlot,
+                $varName
             )], $block];
         }
 
@@ -8549,18 +8556,52 @@ class Compiler {
             $keySlot,
             $initSlot
         );
+        $storeOp->functionStaticTypeSlot = $typeSlot;
+        $storeOp->functionStaticVarName = $varName;
         $jumpOp = new OpCode(OpCode::TYPE_JUMP);
         $jumpOp->block1 = $continueBlock;
 
-        $continueBlock->addOpCode(new OpCode(
-            OpCode::TYPE_DECLARE_FUNCTION_STATIC,
+        $continueBlock->addOpCode($this->makeDeclareFunctionStaticOp(
             $localSlot,
             $keySlot,
-            null
+            null,
+            $typeSlot,
+            $varName
         ));
         $continueBlock->parents[] = $block;
 
         return [[$skipOp, $storeOp, $jumpOp], $continueBlock];
+    }
+
+    protected function typeFromStaticVarDecl(Op\Terminal\StaticVar $terminal): Type
+    {
+        if ($terminal->declaredType instanceof Op\Type\Literal) {
+            return Type::fromDecl($terminal->declaredType->name);
+        }
+        if (null !== $terminal->declaredType) {
+            return Type::fromTypeDecl($terminal->declaredType);
+        }
+
+        return Type::mixed();
+    }
+
+    protected function makeDeclareFunctionStaticOp(
+        int $localSlot,
+        int $keySlot,
+        ?int $defaultSlot,
+        ?int $typeSlot,
+        string $varName
+    ): OpCode {
+        $op = new OpCode(
+            OpCode::TYPE_DECLARE_FUNCTION_STATIC,
+            $localSlot,
+            $keySlot,
+            $defaultSlot
+        );
+        $op->functionStaticTypeSlot = $typeSlot;
+        $op->functionStaticVarName = $varName;
+
+        return $op;
     }
 
     /**

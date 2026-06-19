@@ -502,8 +502,19 @@ function syntaxRowDefinitions(): array
             'notes' => [
                 'Compile-time literal init (int/string/array) plus runtime constant init (`new`, etc.) — VM + JIT + AOT (#4352, #4027)',
                 'Uninitialized `static $x;` with isset guard — Zend parity (#3533); `static &$x` is not valid PHP syntax (php-src `static_var` grammar)',
+                'PHP 8.3+ typed function-local static (`static int $n = 0`) — marker rewrite + runtime TypeCheck (#9998)',
             ],
             'probe' => 'function f(){static $n=0; $n++; return $n;} echo f().f().f();',
+        ],
+        [
+            'id' => 'typed_function_static',
+            'construct' => 'PHP 8.3+ typed function-local static (`static T $var`)',
+            'opcodes' => ['TYPE_DECLARE_FUNCTION_STATIC', 'TYPE_ASSIGN'],
+            'issue' => 9998,
+            'notes' => [
+                'Source marker rewrite for php-parser 4.x; VM enforces declared type on writes (#9998)',
+            ],
+            'probe' => 'function f(): void { static int $n = 0; $n++; echo $n; } f(); f();',
         ],
         [
             'id' => 'keyed_list_destruct',
