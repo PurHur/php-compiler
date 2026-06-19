@@ -542,4 +542,45 @@ PHP;
         self::assertSame($identSlot, $sendSlots[0], 'arg sends='.json_encode($sendSlots));
         self::assertNotSame($identSlot, $sendSlots[1], 'arg sends='.json_encode($sendSlots));
     }
+
+    /** Issue #9888 / #8796 — in_array(enum, [enum, ...], true) wires enum needle + inline haystack slots. */
+    public function testInArrayEnumNeedleInlineHaystackStrictUsesEnumAndArraySlots(): void
+    {
+        $code = <<<'PHP'
+<?php
+enum E: int { case A = 1; case B = 2; }
+var_export(in_array(E::A, [E::A, E::B], true));
+PHP;
+        $runtime = new Runtime();
+        $block = $runtime->parseAndCompile($code, 'in_array_enum_strict.php');
+
+        $enumFetchSlots = [];
+        $arraySlot = null;
+        $inArraySends = [];
+        $fcallOrdinal = 0;
+        foreach ($block->opCodes as $op) {
+            if (OpCode::TYPE_CLASS_CONST_FETCH === $op->type) {
+                $enumFetchSlots[] = $op->arg1;
+            }
+            if (OpCode::TYPE_INIT_ARRAY === $op->type && null === $arraySlot) {
+                $arraySlot = $op->arg1;
+            }
+            if (OpCode::TYPE_FUNCCALL_INIT === $op->type) {
+                ++$fcallOrdinal;
+                if (1 === $fcallOrdinal) {
+                    $inArraySends = [];
+                }
+            }
+            if (1 === $fcallOrdinal && OpCode::TYPE_ARG_SEND === $op->type) {
+                $inArraySends[] = $op->arg1;
+            }
+        }
+
+        self::assertNotEmpty($enumFetchSlots);
+        self::assertNotNull($arraySlot);
+        self::assertCount(3, $inArraySends, 'in_array arg sends='.json_encode($inArraySends));
+        self::assertSame($enumFetchSlots[0], $inArraySends[0], 'enum needle slot');
+        self::assertSame($arraySlot, $inArraySends[1], 'inline haystack slot');
+        self::assertNotSame($inArraySends[0], $inArraySends[1], 'needle and haystack must differ');
+    }
 }

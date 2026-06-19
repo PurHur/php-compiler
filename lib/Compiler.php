@@ -9813,6 +9813,10 @@ class Compiler {
                         && $isLastArg
                         && !$this->operandsReferToSameVariable($prev->result, $callArg)
                     ) {
+                        $slot = $block->slotForOperand($prev->result);
+                        if (null !== $slot) {
+                            return (string) $slot;
+                        }
                         $vm = $this->tryFoldGlobalConstFetch($prev);
                         if (null !== $vm) {
                             return (string) $block->registerConstant($arg, $vm);
@@ -9898,6 +9902,12 @@ class Compiler {
             && $producer instanceof Op\Expr\Isset_
             && !$this->issetExprLoweringEmitted($block, $producer)
         ) {
+            foreach ($this->compileExpr($producer, $block) as $op) {
+                $block->addOpCode($op);
+            }
+            $producerSlot = $block->slotForOperand($producer->result);
+        }
+        if (null === $producerSlot && $producer instanceof Op\Expr\ConstFetch) {
             foreach ($this->compileExpr($producer, $block) as $op) {
                 $block->addOpCode($op);
             }
@@ -10528,8 +10538,7 @@ class Compiler {
                 ) {
                     return $producers[0];
                 }
-
-                return null;
+                // Fall through — dead haystack temp (#9888).
             }
             if ($argCount - 1 === $argIndex && $this->isEmbeddedCallLiteralArg($callArgs[0] ?? null)) {
                 return $producers[0];
@@ -10539,12 +10548,13 @@ class Compiler {
                     return $producers[0];
                 }
                 $callArg = $callArgs[$argIndex] ?? null;
-                if (null === $callArg || $this->isEmbeddedCallLiteralArg($callArg)) {
+                if (null === $callArg) {
                     return null;
                 }
                 if ($this->operandsReferToSameVariable($producers[0]->result, $callArg)) {
                     return $producers[0];
                 }
+                // Fall through — inline haystack may use a dead temp (#9888).
             }
             if (
                 0 === $argIndex
@@ -10634,6 +10644,41 @@ class Compiler {
             if (null !== $arg && !$this->isEmbeddedCallLiteralArg($arg)) {
                 $nonEmbeddedArgIndices[] = $i;
             }
+        }
+        // in_array(E::A, [E::A, E::B], true) — Array_ + trailing ConstFetch map to haystack/strict slots (#8796, #9888).
+        if (\count($producers) >= 2) {
+            $arrayProducerIndex = null;
+            $constFetchIndices = [];
+            foreach ($producers as $pi => $producer) {
+                if ($producer instanceof Op\Expr\Array_) {
+                    $arrayProducerIndex = $pi;
+                } elseif ($producer instanceof Op\Expr\ConstFetch) {
+                    $constFetchIndices[] = $pi;
+                }
+            }
+            if (null !== $arrayProducerIndex && 1 === \count($constFetchIndices) && \count($nonEmbeddedArgIndices) >= 3) {
+                $arrayArgIndex = $nonEmbeddedArgIndices[1] ?? null;
+                $literalArgIndex = $nonEmbeddedArgIndices[\count($nonEmbeddedArgIndices) - 1] ?? null;
+                if ($argIndex === $arrayArgIndex) {
+                    return $producers[$arrayProducerIndex];
+                }
+                if ($argIndex === $literalArgIndex) {
+                    return $producers[$constFetchIndices[0]];
+                }
+
+                return null;
+            }
+        }
+        // in_array(E::A, [E::A, E::B]) — lone Array_ maps to haystack slot, not enum needle (#8796, #9888).
+        if (
+            1 === \count($producers)
+            && $producers[0] instanceof Op\Expr\Array_
+            && \count($nonEmbeddedArgIndices) >= 2
+            && \count($producers) < \count($nonEmbeddedArgIndices)
+        ) {
+            $arrayArgIndex = $nonEmbeddedArgIndices[\count($producers)];
+
+            return $argIndex === $arrayArgIndex ? $producers[0] : null;
         }
         if (\count($producers) !== \count($nonEmbeddedArgIndices)) {
             return null;
@@ -10890,9 +10935,11 @@ class Compiler {
                 $fetch = $precedingFetches[$fetchIndex] ?? null;
                 if ($fetch instanceof Op\Expr\ClassConstFetch) {
                     $callArg = $callOp->args[$argIndex] ?? null;
+                    // php-cfg dead call-arg temps: ordinal mapping is authoritative (#8796, #9888).
                     if (
                         null !== $callArg
                         && !$this->operandsReferToSameVariable($fetch->result, $callArg)
+                        && !$this->callArgUsesHoistedEnumPreludeSlot($callArg)
                     ) {
                         return null;
                     }
@@ -13177,6 +13224,10 @@ class Compiler {
                 && !$this->operandsReferToSameVariable($prev->result, $callArg)
                 && !$this->isEmbeddedCallLiteralArg($callArg)
             ) {
+                $slot = $block->slotForOperand($prev->result);
+                if (null !== $slot) {
+                    return $slot;
+                }
                 $vm = $this->tryFoldGlobalConstFetch($prev);
                 if (null !== $vm) {
                     return $block->registerConstant($arg, $vm);
@@ -13442,11 +13493,16 @@ class Compiler {
             $inlineArray = $this->findInlineArrayProducerForCallArg($arg, $block, $cfgCallOp);
             $prefetchOps = [];
             if (null !== $inlineArray) {
-                $arrayOps = $this->compileArrayLiteral($inlineArray, $block);
-                if ([] !== $arrayOps) {
-                    $sends = array_merge($sends, $arrayOps);
+                $existingArraySlot = $block->slotForOperand($inlineArray->result);
+                if (null !== $existingArraySlot) {
+                    $valueSlot = $existingArraySlot;
+                } else {
+                    $arrayOps = $this->compileArrayLiteral($inlineArray, $block);
+                    if ([] !== $arrayOps) {
+                        $sends = array_merge($sends, $arrayOps);
+                    }
+                    $valueSlot = $this->compileOperand($inlineArray->result, $block, true);
                 }
-                $valueSlot = $this->compileOperand($inlineArray->result, $block, true);
             } else {
                 $valueSlot = $this->compileCallArgCoalesceSlot($arg, $block);
                 if (null === $valueSlot) {
@@ -13791,6 +13847,7 @@ class Compiler {
                     continue;
                 }
                 $fetches = $this->precedingClassConstFetchesBeforeCfgOp($block->orig->children, $child);
+                $fetches = $this->dropCallArgEnumFetchesBeforeInlineArray($fetches, $child, $block);
                 $fetch = $fetches[$elementIndex] ?? null;
                 if ($fetch instanceof Op\Expr\ClassConstFetch
                     && $this->isCompileTimeEnumCaseClassConstFetch($fetch, $block)
@@ -13849,6 +13906,60 @@ class Compiler {
         }
 
         return null;
+    }
+
+    /**
+     * in_array(E::A, [1, 2], true) — hoisted needle fetch must not poison int haystack elements (#9888).
+     *
+     * @param list<Op\Expr\ClassConstFetch> $fetches
+     *
+     * @return list<Op\Expr\ClassConstFetch>
+     */
+    private function dropCallArgEnumFetchesBeforeInlineArray(
+        array $fetches,
+        Op\Expr\Array_ $arrayExpr,
+        Block $block
+    ): array {
+        if ([] === $fetches || null === $block->orig) {
+            return $fetches;
+        }
+        $children = $block->orig->children;
+        $arrayIndex = null;
+        foreach ($children as $i => $child) {
+            if ($child === $arrayExpr) {
+                $arrayIndex = $i;
+                break;
+            }
+        }
+        if (null === $arrayIndex || $arrayIndex <= 0) {
+            return $fetches;
+        }
+        $preArray = $children[$arrayIndex - 1] ?? null;
+        if (!$preArray instanceof Op\Expr\ClassConstFetch) {
+            return $fetches;
+        }
+        for ($i = $arrayIndex + 1, $n = \count($children); $i < $n; ++$i) {
+            $next = $children[$i];
+            if ($next instanceof Op\Expr\ConstFetch) {
+                continue;
+            }
+            if (!($next instanceof Op\Expr\FuncCall || $next instanceof Op\Expr\NsFuncCall)) {
+                return $fetches;
+            }
+            $callArg0 = $next->args[0] ?? null;
+            if ($preArray === ($fetches[0] ?? null)
+                && $this->callArgUsesHoistedEnumPreludeSlot($callArg0)
+            ) {
+                return \array_values(\array_filter(
+                    $fetches,
+                    static fn (Op\Expr $fetch): bool => $fetch !== $preArray
+                ));
+            }
+
+            return $fetches;
+        }
+
+        return $fetches;
     }
 
     private function isCompileTimeEnumCaseClassConstFetch(
