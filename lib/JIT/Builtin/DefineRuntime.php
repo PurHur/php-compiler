@@ -4,31 +4,47 @@ declare(strict_types=1);
 
 namespace PHPCompiler\JIT\Builtin;
 
+use PHPCompiler\JIT;
 use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\HashTableHelper;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Builder;
 use PHPLLVM\Value;
+use PHPLLVM\Value\Function_ as LlvmFunction;
 
 /**
- * Runtime user constants for define()/defined()/constant() (issue #4435).
+ * JIT/AOT link for define()/defined()/constant() via DefineJitHelper PHP (#4435, #9410).
  *
- * PHP SSOT: {@see \PHPCompiler\VM\Context::defineConstant}. MCJIT/AOT store dynamic
- * registrations in {@see GLOBAL} instead of FUNCCALL VM fallback.
+ * php-src: ext/standard/basic_functions.c — define, defined, constant
  */
 final class DefineRuntime
 {
-    public const GLOBAL = 'phpc_user_constants';
+    private const HELPER_PATH = '/ext/standard/DefineJitHelper.php';
+
+    private const CREATE_TABLE = 'PHPCompiler\\ext\\standard\\DefineJitHelper::createTable';
+
+    private const TABLE_GLOBAL = 'phpc_define_jit_table';
+
+    private const SEEDED_GLOBAL = 'phpc_user_constants_seeded';
+
+    /** @var list<string> */
+    private const COMPILED_HELPERS = [
+        self::CREATE_TABLE,
+    ];
 
     private static int $blockSeq = 0;
 
     public static function ensureLinked(Context $context): void
     {
-        $htPtrTy = $context->getTypeFromString('__hashtable__*');
-        if (null === $context->module->getNamedGlobal(self::GLOBAL)) {
-            $context->module->addGlobal($htPtrTy, self::GLOBAL)->setInitializer($htPtrTy->constNull());
-        }
+        self::ensureTableGlobal($context);
+        self::ensureSeedGlobal($context);
+    }
+
+    public static function ensureStandaloneBodies(Context $context): void
+    {
+        self::ensureTableGlobal($context);
+        self::ensureSeedGlobal($context);
     }
 
     public static function emitDefine(Context $context, Value $nameStr, JITVariable $value): Value
@@ -86,10 +102,10 @@ final class DefineRuntime
     private static function loadUserConstantsTable(Context $context): Value
     {
         $htPtrTy = $context->getTypeFromString('__hashtable__*');
-        $global = $context->module->getNamedGlobal(self::GLOBAL);
+        $global = $context->module->getNamedGlobal(self::TABLE_GLOBAL);
         if (null === $global) {
-            self::ensureLinked($context);
-            $global = $context->module->getNamedGlobal(self::GLOBAL);
+            self::ensureTableGlobal($context);
+            $global = $context->module->getNamedGlobal(self::TABLE_GLOBAL);
         }
         $cur = $context->builder->load($global);
         $isNull = $context->builder->icmp(Builder::INT_EQ, $cur, $htPtrTy->constNull());
@@ -100,8 +116,8 @@ final class DefineRuntime
         $context->builder->branchIf($isNull, $init, $ready);
 
         $context->builder->positionAtEnd($init);
-        $ht = HashTableHelper::alloc($context);
-        self::seedCompileTimeUserConstants($context, $ht);
+        self::ensureJitHelperCompiled($context);
+        $ht = $context->builder->call(self::helperFunction($context, self::CREATE_TABLE));
         $context->builder->store($ht, $global);
         $initEnd = $context->builder->getInsertBlock();
         $context->builder->branch($ready);
@@ -110,8 +126,47 @@ final class DefineRuntime
         $phi = $context->builder->phi($htPtrTy);
         $phi->addIncoming($ht, $initEnd);
         $phi->addIncoming($cur, $entry);
+        self::emitSeedOnce($context, $phi);
 
         return $phi;
+    }
+
+    private static function ensureTableGlobal(Context $context): void
+    {
+        $htPtrTy = $context->getTypeFromString('__hashtable__*');
+        if (null === $context->module->getNamedGlobal(self::TABLE_GLOBAL)) {
+            $context->module->addGlobal($htPtrTy, self::TABLE_GLOBAL)->setInitializer($htPtrTy->constNull());
+        }
+    }
+
+    private static function ensureSeedGlobal(Context $context): void
+    {
+        if (null === $context->module->getNamedGlobal(self::SEEDED_GLOBAL)) {
+            $i1 = $context->getTypeFromString('int1');
+            $context->module->addGlobal($i1, self::SEEDED_GLOBAL)->setInitializer($i1->constInt(0, false));
+        }
+    }
+
+    private static function emitSeedOnce(Context $context, Value $ht): void
+    {
+        $global = $context->module->getNamedGlobal(self::SEEDED_GLOBAL);
+        if (null === $global) {
+            self::ensureSeedGlobal($context);
+            $global = $context->module->getNamedGlobal(self::SEEDED_GLOBAL);
+        }
+        $cur = $context->builder->load($global);
+        $i1 = $context->getTypeFromString('int1');
+        $tag = 'seed'.(string) ++self::$blockSeq;
+        $seed = BasicBlockHelper::append($context, 'user_const_seed_'.$tag);
+        $ready = BasicBlockHelper::append($context, 'user_const_ready_'.$tag);
+        $context->builder->branchIf($cur, $ready, $seed);
+
+        $context->builder->positionAtEnd($seed);
+        self::seedCompileTimeUserConstants($context, $ht);
+        $context->builder->store($i1->constInt(1, false), $global);
+        $context->builder->branch($ready);
+
+        $context->builder->positionAtEnd($ready);
     }
 
     private static function seedCompileTimeUserConstants(Context $context, Value $ht): void
@@ -177,6 +232,61 @@ final class DefineRuntime
                 );
             default:
                 return null;
+        }
+    }
+
+    private static function helperFunction(Context $context, string $logical): LlvmFunction
+    {
+        self::ensureJitHelperCompiled($context);
+        $lc = \strtolower($logical);
+        $fn = $context->functions[$lc] ?? null;
+        if (null === $fn) {
+            throw new \LogicException($logical.' missing after DefineJitHelper compile (#9410)');
+        }
+
+        return $fn;
+    }
+
+    private static function ensureJitHelperCompiled(Context $context): void
+    {
+        $missing = false;
+        foreach (self::COMPILED_HELPERS as $logical) {
+            if (!isset($context->functions[\strtolower($logical)])) {
+                $missing = true;
+                break;
+            }
+        }
+        if (!$missing) {
+            return;
+        }
+
+        $runtime = $context->runtime;
+        $path = \dirname(__DIR__, 3).self::HELPER_PATH;
+        $prevSelfHostAot = \getenv('PHP_COMPILER_SELFHOST_AOT');
+        if (\function_exists('putenv')) {
+            \putenv('PHP_COMPILER_SELFHOST_AOT=0');
+        }
+        try {
+            $block = $runtime->parseAndCompile((string) \file_get_contents($path), 'DefineJitHelper.php');
+            if (null === $block) {
+                throw new \LogicException('DefineJitHelper.php parseAndCompile failed (#9410)');
+            }
+            $jit = new JIT($context);
+            $jit->compile($block);
+        } finally {
+            if (\function_exists('putenv')) {
+                if (false === $prevSelfHostAot || null === $prevSelfHostAot) {
+                    \putenv('PHP_COMPILER_SELFHOST_AOT=');
+                } else {
+                    \putenv('PHP_COMPILER_SELFHOST_AOT='.$prevSelfHostAot);
+                }
+            }
+        }
+        foreach (self::COMPILED_HELPERS as $logical) {
+            $lc = \strtolower($logical);
+            if (!isset($context->functions[$lc])) {
+                throw new \LogicException($lc.' was not compiled for JIT (#9410)');
+            }
         }
     }
 }

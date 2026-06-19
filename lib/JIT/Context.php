@@ -748,6 +748,7 @@ class Context {
             Builtin\ProgressNoteRuntime::ensureStandaloneBodies($this);
             Builtin\LastErrorRuntime::ensureStandaloneBodies($this);
             Builtin\RewriteVarsRuntime::ensureStandaloneBodies($this);
+            Builtin\DefineRuntime::ensureStandaloneBodies($this);
             Builtin\SuperglobalRefreshRuntime::ensureStandaloneBodies($this);
             Builtin\SuperglobalNameRuntime::ensureLinked($this);
             \PHPCompiler\ext\standard\JitStrspn::ensureStandaloneBodies($this);
