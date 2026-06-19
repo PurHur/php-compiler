@@ -5398,6 +5398,19 @@ restart:
                                 }
                                 $this->tagReadonlyPropertyDimWriteContainer($result, $propertyObject, $name);
                             }
+                            $catchFrame = $this->enforceVirtualPropertyHookRawAccess(
+                                $propertyObject,
+                                $name,
+                                true,
+                                $frame
+                            );
+                            if (null !== $this->context->propertyHookExternalCatchFrame) {
+                                return self::FAILURE;
+                            }
+                            if (null !== $catchFrame) {
+                                $frame = $catchFrame;
+                                goto restart;
+                            }
                             $propSlot = $propertyObject->getProperty($name);
                             if ($op->nullsafeFetchPropertyRead) {
                                 VM\TypedPropertyCheck::assertReadable($propSlot);
@@ -8344,11 +8357,15 @@ restart:
     }
 
     /**
-     * Route catchable set-hook failures to the caller stack (#9670, zend_property_hooks.c).
+     * Route catchable hook failures to the caller stack (#9670, #10005, zend_property_hooks.c).
      */
     private function stashPropertyHookSetExternalCatch(Frame $frame, Frame $catchFrame): bool
     {
-        if (null === $frame->propertyHookRawProperty && !$this->frameIsPropertySetHook($frame)) {
+        if (
+            null === $frame->propertyHookRawProperty
+            && !$this->frameIsPropertySetHook($frame)
+            && !$this->frameIsPropertyGetHook($frame)
+        ) {
             return false;
         }
         $this->context->propertyHookExternalCatchFrame = $catchFrame;
@@ -9022,6 +9039,14 @@ restart:
             return $result;
         }
         if ($this->isPropertyHookRawWrite($frame, $name)) {
+            $catchFrame = $this->enforceVirtualPropertyHookRawAccess($object, $name, true, $frame);
+            if (null !== $this->context->propertyHookExternalCatchFrame) {
+                throw new VM\PropertyHookRefWriteSignal($this->context->propertyHookExternalCatchFrame);
+            }
+            if (null !== $catchFrame) {
+                throw new VM\PropertyHookRefWriteSignal($catchFrame);
+            }
+
             return null;
         }
         $meta = $this->classPropertyMeta($object, $name);
@@ -9312,6 +9337,102 @@ restart:
     }
 
     /**
+     * Inside a property hook, $this->prop reads/writes backing — virtual hooks have none (#10005, zend_object_handlers.c).
+     */
+    private function enforceVirtualPropertyHookRawAccess(
+        ObjectEntry $object,
+        string $propName,
+        bool $isRead,
+        Frame $frame
+    ): ?Frame {
+        if (!$this->isPropertyHookRawWrite($frame, $propName)) {
+            return null;
+        }
+        if ($isRead && !$this->frameIsPropertyGetHook($frame)) {
+            return null;
+        }
+        if (!$isRead && !$this->frameIsPropertySetHook($frame)) {
+            return null;
+        }
+        $className = $this->resolveHookedPropertyClassName($object, $propName);
+        if ($this->instancePropertyIsVirtualHook($object, $propName)) {
+            return $this->raiseVirtualPropertyHookRawAccessError($className, $propName, $isRead, $frame);
+        }
+        if (!$isRead) {
+            return null;
+        }
+        $meta = $this->classPropertyMeta($object, $propName);
+        if (null === $meta?->getHookMethodLc) {
+            return null;
+        }
+        if ($this->hookedPropertyUsesDistinctBacking($object, $propName)) {
+            return null;
+        }
+        $backing = $this->hookedPropertyBackingValue($object, $propName);
+        if (false !== $backing && ($backing->isUndefined() || VM\TypedPropertyCheck::isUninitialized($backing))) {
+            return $this->raiseVirtualPropertyHookRawAccessError($className, $propName, true, $frame);
+        }
+
+        return null;
+    }
+
+    private function resolveHookedPropertyClassName(ObjectEntry $object, string $propName): string
+    {
+        $meta = $this->classPropertyMeta($object, $propName);
+        $className = $object->class->name;
+        if (null !== $meta && '' !== $meta->declaringClassLc && isset($this->context->classes[$meta->declaringClassLc])) {
+            $className = $this->context->classes[$meta->declaringClassLc]->name;
+        }
+
+        return $className;
+    }
+
+    private function hookedPropertyUsesDistinctBacking(ObjectEntry $object, string $propName): bool
+    {
+        $lcClass = strtolower($object->class->name);
+        $propMeta = $this->context->propertyHookRegistry[$lcClass][$propName]
+            ?? $this->context->propertyHookRegistry[$lcClass][strtolower($propName)]
+            ?? null;
+        if (!is_array($propMeta)) {
+            return false;
+        }
+        $backingName = $propMeta['setBacking'] ?? $propMeta['getBacking'] ?? null;
+
+        return null !== $backingName && 0 !== strcasecmp($backingName, $propName);
+    }
+
+    private function instancePropertyIsVirtualHook(ObjectEntry $object, string $propName): bool
+    {
+        $meta = $this->classPropertyMeta($object, $propName);
+        if (null !== $meta && $meta->propertyHookVirtual) {
+            return true;
+        }
+        $lcClass = strtolower($object->class->name);
+        $propMeta = $this->context->propertyHookRegistry[$lcClass][$propName]
+            ?? $this->context->propertyHookRegistry[$lcClass][strtolower($propName)]
+            ?? null;
+
+        return is_array($propMeta) && !empty($propMeta['virtual']);
+    }
+
+    private function raiseVirtualPropertyHookRawAccessError(
+        string $className,
+        string $propName,
+        bool $isRead,
+        Frame $frame
+    ): ?Frame {
+        return $this->dispatchVmError(
+            sprintf(
+                'Must not %s virtual property %s::$%s',
+                $isRead ? 'read from' : 'write to',
+                $className,
+                $propName
+            ),
+            $frame
+        );
+    }
+
+    /**
      * Compound assignment ($obj->prop += 1) reuses one operand slot (arg1 === arg2).
      * Reject when the lvalue is a readonly instance property after construction (#3149).
      */
@@ -9335,7 +9456,15 @@ restart:
     {
         $target = $lvalue->resolveIndirect();
         $propName = $target->objectPropertyName;
-        if (null === $propName || $this->isPropertyHookRawWrite($frame, $propName)) {
+        if (null === $propName) {
+            return null;
+        }
+        if ($this->isPropertyHookRawWrite($frame, $propName)) {
+            $owner = $this->resolvePropertyWriteOwner($lvalue);
+            if (null !== $owner) {
+                return $this->enforceVirtualPropertyHookRawAccess($owner, $propName, false, $frame);
+            }
+
             return null;
         }
         $className = null;
