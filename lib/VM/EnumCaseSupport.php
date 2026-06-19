@@ -141,6 +141,23 @@ final class EnumCaseSupport
     }
 
     /**
+     * empty($case->name) / empty($case->value) — fetch magic read then apply Zend empty() (#9890, zend_enum.c).
+     */
+    public static function emptyPropertyOnCase(
+        EnumCaseEntry $entry,
+        string $property,
+        ?Context $context = null,
+        ?Frame $frame = null
+    ): bool {
+        if (!self::propertyExistsOnCase($entry->enumClass, $property)) {
+            return true;
+        }
+        $value = $entry->fetchProperty($property, $context, $frame);
+
+        return !ext\standard\boolval::isTruthy($value);
+    }
+
+    /**
      * Zend zend_enum_get_property_ptr_ptr — name/value are readonly pseudo-properties (#7155).
      */
     public static function isReadonlyPseudoProperty(ClassEntry $enum, string $property): bool

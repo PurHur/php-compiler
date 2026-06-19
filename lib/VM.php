@@ -5534,10 +5534,6 @@ restart:
                 case OpCode::TYPE_EMPTY_OBJECT_PROPERTY:
                     $dst = $frame->scope[$op->arg1];
                     $container = $frame->scope[$op->arg2]->resolveIndirect();
-                    if (Variable::TYPE_OBJECT !== $container->type) {
-                        $dst->bool(true);
-                        break;
-                    }
                     [$propName, $catchFrame] = $this->coerceRuntimeOperandToString($frame->scope[$op->arg3], $frame);
                     if (null !== $catchFrame) {
                         $frame = $catchFrame;
@@ -5548,9 +5544,33 @@ restart:
                         $frame = $catchFrame;
                         goto restart;
                     }
-                    VM\LazyObjectSupport::ensureInitialized($this, $container->toObject());
+                    if (Variable::TYPE_ENUM_CASE === $container->type) {
+                        $dst->bool(VM\EnumCaseSupport::emptyPropertyOnCase(
+                            $container->toEnumCase(),
+                            $propName,
+                            $this->context,
+                            $frame
+                        ));
+                        break;
+                    }
+                    if (Variable::TYPE_OBJECT !== $container->type) {
+                        $dst->bool(true);
+                        break;
+                    }
+                    $object = $container->toObject();
+                    if (VM\EnumCaseSupport::isEnumCase($object)) {
+                        $enum = $object->class;
+                        if (!VM\EnumCaseSupport::propertyExistsOnCase($enum, $propName)) {
+                            $dst->bool(true);
+                            break;
+                        }
+                        $prop = VM\EnumCaseSupport::getProperty($object, $propName, $this->context, $frame);
+                        $dst->bool(!ext\standard\boolval::isTruthy($prop));
+                        break;
+                    }
+                    VM\LazyObjectSupport::ensureInitialized($this, $object);
                     $catchFrame = $this->emptyObjectProperty(
-                        $container->toObject(),
+                        $object,
                         $propName,
                         $frame,
                         $dst
