@@ -1,5 +1,14 @@
 --TEST--
-Language: new in class constant initializer rejected (#9484, #9517, Zend/zend_compile.c)
+Language: new in class constant initializer rejected on 8.2 target (#9484, #9517, Zend/zend_compile.c)
+--SKIPIF--
+<?php
+if (!class_exists('PHPCompiler\\CompilerVersion')) {
+    require __DIR__ . '/../../../../vendor/autoload.php';
+}
+if (PHPCompiler\CompilerVersion::supportsClassConstObjectExpressions()) {
+    die('skip class const object expressions enabled on 8.3+ target');
+}
+?>
 --FILE--
 <?php
 class C {

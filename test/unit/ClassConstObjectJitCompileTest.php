@@ -4,13 +4,12 @@ declare(strict_types=1);
 
 namespace PHPCompiler;
 
-use PHPCompiler\Compiler\NewWithoutParensCompileCheck;
 use PHPUnit\Framework\TestCase;
 
 require_once __DIR__.'/../LlvmToolchain.php';
 
 /**
- * Class constants with `new` must compile-error per php-src (#9804).
+ * Class constants with `new` compile and JIT on PHP 8.3+ target (#9850, #3196).
  *
  * @group llvm
  */
@@ -27,8 +26,11 @@ final class ClassConstObjectJitCompileTest extends TestCase
         }
     }
 
-    public function testClassConstObjectCompileErrors(): void
+    public function testClassConstObjectCompilesOn83Target(): void
     {
+        if (!CompilerVersion::supportsClassConstObjectExpressions()) {
+            $this->markTestSkipped('class const object expressions require CompilerVersion 8.3+');
+        }
         $runtime = new Runtime();
         $code = <<<'PHP'
 <?php
@@ -36,8 +38,7 @@ class C {
     public const X = new stdClass();
 }
 PHP;
-        $this->expectException(\CompileError::class);
-        $this->expectExceptionMessage(NewWithoutParensCompileCheck::MESSAGE);
-        $runtime->parseAndCompile($code, 'class_const_object.php');
+        $block = $runtime->parseAndCompile($code, 'class_const_object.php');
+        $this->assertNotNull($block);
     }
 }

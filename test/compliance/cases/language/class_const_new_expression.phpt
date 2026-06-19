@@ -1,5 +1,14 @@
 --TEST--
-Language: class constant object expression const X = new C() — compile-error (#9804, Zend/zend_compile.c)
+Language: class constant object expression const X = new C() — compile-error on 8.2 target (#9804, Zend/zend_compile.c)
+--SKIPIF--
+<?php
+if (!class_exists('PHPCompiler\\CompilerVersion')) {
+    require __DIR__ . '/../../../../vendor/autoload.php';
+}
+if (PHPCompiler\CompilerVersion::supportsClassConstObjectExpressions()) {
+    die('skip class const object expressions enabled on 8.3+ target');
+}
+?>
 --FILE--
 <?php
 class C {
