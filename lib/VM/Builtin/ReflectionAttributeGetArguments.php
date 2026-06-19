@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace PHPCompiler\VM\Builtin;
 
+use PHPCompiler\ext\standard\VmReflection;
 use PHPCompiler\Frame;
 use PHPCompiler\VM\ReflectionSupport;
 
@@ -18,9 +19,10 @@ final class ReflectionAttributeGetArguments extends VmClassMethod
     public function execute(Frame $frame): void
     {
         $receiver = ReflectionSupport::requireReflectionAttribute($frame, $frame->calledArgs[0]);
+        $ctx = VmReflection::requireContext($frame);
         $args = ReflectionSupport::argsFromReflectionObject($receiver);
         if (null !== $frame->returnVar) {
-            $frame->returnVar->copyFrom(ReflectionSupport::argumentsArray($args));
+            $frame->returnVar->copyFrom(ReflectionSupport::argumentsArray($args, $ctx));
         }
     }
 }

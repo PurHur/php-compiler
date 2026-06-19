@@ -61,7 +61,7 @@ final class AttributeConstantEvaluator
             return self::evalNew($expr);
         }
         if ($expr instanceof Expr\ClassConstFetch) {
-            return self::evalClassConstFetch($expr);
+            return self::evalClassConstFetch($expr); // int|CompileTimeEnumCase
         }
         if ($expr instanceof BinaryOp\BitwiseOr) {
             return self::evalIntBinary($expr, '|');
@@ -78,7 +78,7 @@ final class AttributeConstantEvaluator
         );
     }
 
-    private static function evalClassConstFetch(Expr\ClassConstFetch $expr): int
+    private static function evalClassConstFetch(Expr\ClassConstFetch $expr): int|CompileTimeEnumCase
     {
         if (!$expr->class instanceof Node\Name) {
             throw new \LogicException(
@@ -92,21 +92,26 @@ final class AttributeConstantEvaluator
         }
 
         $className = ltrim($expr->class->toString(), '\\');
-        if ('attribute' !== strtolower($className)) {
+        $constName = $expr->name->toString();
+        if ('attribute' === strtolower($className)) {
+            $value = self::attributeBuiltinConstValue(strtolower($constName));
+            if (null === $value) {
+                throw new \LogicException(
+                    'Attribute constructor arguments must be compile-time constant expressions in this compiler build'
+                );
+            }
+
+            return $value;
+        }
+
+        // php-src: backed/unit enum case fetches are valid attribute const exprs (#9988, zend_compile.c).
+        if ('class' === strtolower($constName)) {
             throw new \LogicException(
                 'Attribute constructor arguments must be compile-time constant expressions in this compiler build'
             );
         }
 
-        $constName = strtolower($expr->name->toString());
-        $value = self::attributeBuiltinConstValue($constName);
-        if (null === $value) {
-            throw new \LogicException(
-                'Attribute constructor arguments must be compile-time constant expressions in this compiler build'
-            );
-        }
-
-        return $value;
+        return new CompileTimeEnumCase($className, $constName);
     }
 
     private static function attributeBuiltinConstValue(string $lcConst): ?int

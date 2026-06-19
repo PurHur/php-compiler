@@ -6,6 +6,7 @@ namespace PHPCompiler\VM;
 
 use PHPCompiler\Compiler\AttributeEntry;
 use PHPCompiler\Compiler\AttributeNames;
+use PHPCompiler\Compiler\CompileTimeEnumCase;
 use PHPCompiler\Compiler\CompileTimeNew;
 use PHPCompiler\Compiler\SourceLocation;
 use PHPCompiler\ext\standard\VmClosureCall;
@@ -236,6 +237,15 @@ final class ReflectionSupport
 
             return self::materializeCompileTimeNew($ctx, $value);
         }
+        if ($value instanceof CompileTimeEnumCase) {
+            if (null === $ctx) {
+                throw new \LogicException(
+                    'Compile-time enum case in attribute args requires VM context to materialize'
+                );
+            }
+
+            return self::materializeCompileTimeEnumCase($ctx, $value);
+        }
         if ($value instanceof Variable) {
             $copy = new Variable();
             $copy->copyFrom($value);
@@ -298,6 +308,34 @@ final class ReflectionSupport
         self::invokeAttributeConstructor($vm, $ctx, $classEntry->constructor, $thisVar, $invokeArgs);
         self::applyConstructorPropertyArgs($object, $classEntry->constructor, $spec->args, $ctx);
         $object->constructed = true;
+
+        return $result;
+    }
+
+    public static function materializeCompileTimeEnumCase(Context $ctx, CompileTimeEnumCase $spec): Variable
+    {
+        $enumName = $spec->enumName;
+        $lc = strtolower(ltrim($enumName, '\\'));
+        if (!isset($ctx->classes[$lc])) {
+            $ctx->autoloadClass($enumName);
+        }
+        if (!isset($ctx->classes[$lc])) {
+            throw new \Error('Class "'.$enumName.'" not found');
+        }
+        $enum = $ctx->classes[$lc];
+        if (!$enum->isEnum) {
+            throw new \Error(
+                'Cannot access enum case '.$spec->caseName.' on non-enum class '.$enum->name
+            );
+        }
+        $result = new Variable();
+        if (!EnumCaseSupport::tryMaterializeEnumCaseConstantFetch(
+            $enum,
+            strtolower($spec->caseName),
+            $result
+        )) {
+            throw new \Error(self::enumCaseNotFoundMessage($enum->name, $spec->caseName));
+        }
 
         return $result;
     }
@@ -452,7 +490,7 @@ final class ReflectionSupport
                     $name = Variable::TYPE_NULL === $resolved->type ? null : $resolved->toString();
                 } elseif ('value' === $key->toString()) {
                     $value = match ($resolved->type) {
-                        Variable::TYPE_OBJECT => $resolved,
+                        Variable::TYPE_OBJECT, Variable::TYPE_ENUM_CASE => $resolved,
                         default => self::variableToScalar($resolved),
                     };
                 }
