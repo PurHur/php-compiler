@@ -144,7 +144,9 @@ final class TraitComposedMethodResolver
             $newName = null !== $adaptation->newName
                 ? strtolower($adaptation->newName->name)
                 : $methodLc;
-            unset($merged[$methodLc]);
+            if (null === $traitLcFilter) {
+                unset($merged[$methodLc]);
+            }
             $merged[$newName] = $source;
             if ($newName !== $methodLc) {
                 $aliasedOrigins[$methodLc] = $source;
