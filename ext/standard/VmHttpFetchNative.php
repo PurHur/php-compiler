@@ -7,8 +7,8 @@ namespace PHPCompiler\ext\standard;
 /**
  * libc TCP HTTP/1.0 GET for file_get_contents(http://…) without host PHP wrapper (#8552).
  *
- * Populates {@see VmHttpLastResponseHeaders} for http_get_last_response_headers() (#7236).
- * https:// URLs return false until TLS stream support lands (matches ssl:// rejection in VmStreamSocketNative).
+ * Populates {@see VmHttpLastResponseHeaders} for http_get_last_response_headers() (#7236, #9752).
+ * https:// via {@see VmHttpTlsNative} libssl FFI (php-src main/streams/xp_ssl.c).
  *
  * php-src: ext/standard/streams.c — http wrapper
  */
@@ -44,9 +44,13 @@ final class VmHttpFetchNative
     /**
      * @return string|false response body; false on transport/parse failure
      */
-    public static function fetch(string $url): string|false
+    /**
+     * @param array<string, mixed> $httpOptions stream_context http wrapper options
+     */
+    public static function fetch(string $url, array $httpOptions = []): string|false
     {
-        $response = self::request($url, 'GET');
+        $method = self::httpOptionMethod($httpOptions);
+        $response = self::request($url, $method, $httpOptions);
         if (null === $response) {
             return false;
         }
@@ -55,7 +59,8 @@ final class VmHttpFetchNative
         VmHttpLastResponseHeaders::store($headers);
 
         $statusCode = self::statusCodeFromStatusLine($headers[0]);
-        if (null === $statusCode || $statusCode < 200 || $statusCode >= 300) {
+        $ignoreErrors = self::httpOptionIgnoreErrors($httpOptions);
+        if (!$ignoreErrors && (null === $statusCode || $statusCode < 200 || $statusCode >= 300)) {
             return false;
         }
 
@@ -76,9 +81,13 @@ final class VmHttpFetchNative
      *
      * @return list<string>|false
      */
-    public static function fetchHeaders(string $url): array|false
+    /**
+     * @param array<string, mixed> $httpOptions
+     */
+    public static function fetchHeaders(string $url, array $httpOptions = []): array|false
     {
-        $response = self::request($url, 'HEAD');
+        $method = self::httpOptionMethod($httpOptions, 'HEAD');
+        $response = self::request($url, $method, $httpOptions);
         if (null === $response) {
             return false;
         }
@@ -90,9 +99,11 @@ final class VmHttpFetchNative
     }
 
     /**
+     * @param array<string, mixed> $httpOptions
+     *
      * @return array{headers: list<string>, body: string}|null
      */
-    private static function request(string $url, string $method): ?array
+    private static function request(string $url, string $method, array $httpOptions = []): ?array
     {
         VmHttpLastResponseHeaders::clear();
 
@@ -106,7 +117,7 @@ final class VmHttpFetchNative
         }
 
         $scheme = \strtolower((string) $parts['scheme']);
-        if ('http' !== $scheme) {
+        if ('http' !== $scheme && 'https' !== $scheme) {
             return null;
         }
 
@@ -115,7 +126,12 @@ final class VmHttpFetchNative
             return null;
         }
 
-        $port = isset($parts['port']) ? (int) $parts['port'] : 80;
+        $useTls = 'https' === $scheme;
+        if ($useTls && !VmHttpTlsNative::available()) {
+            return null;
+        }
+
+        $port = isset($parts['port']) ? (int) $parts['port'] : ($useTls ? 443 : 80);
         $path = isset($parts['path']) && '' !== $parts['path'] ? (string) $parts['path'] : '/';
         if (isset($parts['query']) && '' !== $parts['query']) {
             $path .= '?'.$parts['query'];
@@ -123,7 +139,8 @@ final class VmHttpFetchNative
 
         $request = $method.' '.$path." HTTP/1.0\r\n";
         $request .= "Host: {$host}";
-        if (80 !== $port) {
+        $defaultPort = $useTls ? 443 : 80;
+        if ($port !== $defaultPort) {
             $request .= ":{$port}";
         }
         $request .= "\r\nConnection: close\r\n";
@@ -144,14 +161,25 @@ final class VmHttpFetchNative
             return null;
         }
 
+        $tls = null;
         try {
             self::applySocketTimeout($ffi, $sock, (float) self::DEFAULT_TIMEOUT_SEC);
 
-            if (!self::sendAll($ffi, $sock, $request)) {
-                return null;
+            if ($useTls) {
+                $tls = VmHttpTlsNative::connect($sock, $host);
+                if (null === $tls) {
+                    return null;
+                }
+                if (!VmHttpTlsNative::sendAll($tls, $request)) {
+                    return null;
+                }
+                $raw = VmHttpTlsNative::recvAll($tls);
+            } else {
+                if (!self::sendAll($ffi, $sock, $request)) {
+                    return null;
+                }
+                $raw = self::recvAll($ffi, $sock);
             }
-
-            $raw = self::recvAll($ffi, $sock);
             if ('' === $raw) {
                 return null;
             }
@@ -171,8 +199,37 @@ final class VmHttpFetchNative
 
             return ['headers' => $headers, 'body' => $body];
         } finally {
+            if (null !== $tls) {
+                VmHttpTlsNative::close($tls);
+            }
             $ffi->close($sock);
         }
+    }
+
+    /**
+     * @param array<string, mixed> $httpOptions
+     */
+    private static function httpOptionMethod(array $httpOptions, string $default = 'GET'): string
+    {
+        if (!isset($httpOptions['method'])) {
+            return $default;
+        }
+        $method = \strtoupper((string) $httpOptions['method']);
+
+        return '' !== $method ? $method : $default;
+    }
+
+    /**
+     * @param array<string, mixed> $httpOptions
+     */
+    private static function httpOptionIgnoreErrors(array $httpOptions): bool
+    {
+        if (!isset($httpOptions['ignore_errors'])) {
+            return false;
+        }
+        $v = $httpOptions['ignore_errors'];
+
+        return true === $v || 1 === $v || '1' === $v;
     }
 
     private static function connect(\FFI $ffi, string $host, string $port): int
