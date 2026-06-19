@@ -583,6 +583,43 @@ final class VmDate
     }
 
     /**
+     * DateTime/DateTimeImmutable::getLastErrors() — warning/error subset (#4660, #9920).
+     *
+     * php-src: ext/date/php_datetime.c — PHP_METHOD(DateTime, getLastErrors)
+     *
+     * @param array{
+     *   warning_count: int,
+     *   warnings: array<int, string>,
+     *   error_count: int,
+     *   errors: array<int, string>
+     * } $result
+     */
+    public static function lastErrorsToHashTable(array $result): HashTable
+    {
+        $ht = new HashTable();
+        self::hashSetLong($ht, 'warning_count', $result['warning_count']);
+        self::hashSetLong($ht, 'error_count', $result['error_count']);
+
+        $warnings = new HashTable();
+        foreach ($result['warnings'] as $pos => $message) {
+            self::hashSetString($warnings, (string) $pos, $message);
+        }
+        $warningsVar = new Variable();
+        $warningsVar->array($warnings);
+        $ht->add('warnings', $warningsVar);
+
+        $errors = new HashTable();
+        foreach ($result['errors'] as $pos => $message) {
+            self::hashSetString($errors, (string) $pos, $message);
+        }
+        $errorsVar = new Variable();
+        $errorsVar->array($errors);
+        $ht->add('errors', $errorsVar);
+
+        return $ht;
+    }
+
+    /**
      * gmgetdate() — UTC getdate() breakdown (php-src userland pattern; pairs #6706, #7001).
      */
     public static function gmgetdate(?int $timestamp = null): HashTable

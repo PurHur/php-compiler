@@ -14,6 +14,7 @@ use PHPCompiler\VM\Builtin\DateTimeCreateFromInterface;
 use PHPCompiler\VM\Builtin\DateTimeCreateFromTimestamp;
 use PHPCompiler\VM\Builtin\DateTimeImmutableCreateFromTimestamp;
 use PHPCompiler\VM\Builtin\DateTimeFormat;
+use PHPCompiler\VM\Builtin\DateTimeGetLastErrors;
 use PHPCompiler\VM\Builtin\DateTimeGetMicrosecond;
 use PHPCompiler\VM\Builtin\DateTimeGetTimestamp;
 use PHPCompiler\VM\Builtin\DateTimeImmutableConstruct;
@@ -898,6 +899,8 @@ final class BuiltinClasses
         $dt->methodVisibility['createfrominterface'] = $pubStatic;
         $dt->methods['createfromtimestamp'] = new DateTimeCreateFromTimestamp();
         $dt->methodVisibility['createfromtimestamp'] = $pubStatic;
+        $dt->methods['getlasterrors'] = new DateTimeGetLastErrors();
+        $dt->methodVisibility['getlasterrors'] = $pubStatic;
         $ctx->classes[DateTimeSupport::CLASS_DATETIME] = $dt;
 
         $dti = new ClassEntry('DateTimeImmutable');
@@ -920,6 +923,8 @@ final class BuiltinClasses
         $dti->methodVisibility['createfrominterface'] = $pubStatic;
         $dti->methods['createfromtimestamp'] = new DateTimeImmutableCreateFromTimestamp();
         $dti->methodVisibility['createfromtimestamp'] = $pubStatic;
+        $dti->methods['getlasterrors'] = new DateTimeGetLastErrors();
+        $dti->methodVisibility['getlasterrors'] = $pubStatic;
         $ctx->classes[DateTimeSupport::CLASS_DATETIMEIMMUTABLE] = $dti;
 
         $floatProto = new Variable(Variable::TYPE_FLOAT);

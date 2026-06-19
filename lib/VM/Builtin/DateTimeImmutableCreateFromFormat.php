@@ -6,11 +6,12 @@ namespace PHPCompiler\VM\Builtin;
 
 use PHPCompiler\ext\standard\VmReflection;
 use PHPCompiler\Frame;
+use PHPCompiler\VM\BuiltinExecute;
 use PHPCompiler\VM\DateTimeSupport;
-use PHPCompiler\VM\ObjectEntry;
+use PHPCompiler\VM\ErrorReporter;
 use PHPCompiler\VM\Variable;
 
-/** DateTimeImmutable::createFromFormat() — VM (#7082). */
+/** DateTimeImmutable::createFromFormat() — VM (#7082, #9920). */
 final class DateTimeImmutableCreateFromFormat extends VmClassMethod
 {
     public function __construct()
@@ -39,15 +40,30 @@ final class DateTimeImmutableCreateFromFormat extends VmClassMethod
                 );
             }
         }
-        $class = $frame->vmContext->classes[DateTimeSupport::CLASS_DATETIMEIMMUTABLE] ?? null;
-        if (null === $class) {
-            throw new \LogicException('DateTimeImmutable is not registered in this compiler build');
-        }
-        $entry = new ObjectEntry($class);
-        DateTimeSupport::initDateTimeFromFormat($entry, $format, $time, $timezone);
-        if (null === $frame->returnVar) {
+
+        $created = DateTimeSupport::tryNewDateTimeImmutableFromFormatVariable(
+            $frame->vmContext,
+            $format,
+            $time,
+            $timezone
+        );
+        if (null === $created) {
+            $frame->vmContext->errors->triggerError(
+                'DateTimeImmutable::createFromFormat(): Failed to parse time string ('.$time.')',
+                ErrorReporter::E_WARNING,
+                '' !== $frame->scriptPath ? $frame->scriptPath : null,
+                $frame->vmContext,
+                $frame
+            );
+            BuiltinExecute::writeReturn($frame, static function (Variable $ret): void {
+                $ret->bool(false);
+            });
+
             return;
         }
-        $frame->returnVar->object($entry);
+
+        BuiltinExecute::writeReturn($frame, static function (Variable $ret) use ($created): void {
+            $ret->copyFrom($created);
+        });
     }
 }
