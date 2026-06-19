@@ -222,6 +222,47 @@ PHP;
         $this->assertSame("1\n", ob_get_clean());
     }
 
+    public function testMissingInterfaceStaticPropertyHookFailsAtCompileTime(): void
+    {
+        $runtime = new Runtime();
+        $code = <<<'PHP'
+<?php
+interface I {
+    public static string $p { get; set; }
+}
+class Bad implements I {}
+PHP;
+        $this->expectException(\CompileError::class);
+        $this->expectExceptionMessage('Class Bad must implement 1 interface property');
+        $this->expectExceptionMessage('I::$p');
+        $this->expectExceptionMessage('{ get; set; }');
+        $runtime->parseAndCompile($code, 'missing_iface_static_property.php');
+    }
+
+    public function testImplementedInterfaceStaticPropertyHookCompiles(): void
+    {
+        $runtime = new Runtime();
+        $code = <<<'PHP'
+<?php
+interface I {
+    public static string $p { get; set; }
+}
+class Good implements I {
+    private static string $_p = 'a';
+    public static string $p {
+        get => self::$_p;
+        set { self::$_p = $value; }
+    }
+}
+echo Good::$p, "\n";
+PHP;
+        $block = $runtime->parseAndCompile($code, 'iface_static_property_ok.php');
+        $this->assertNotNull($block);
+        ob_start();
+        $runtime->run($block);
+        $this->assertSame("a\n", ob_get_clean());
+    }
+
     public function testConcreteClassAbstractPropertyHookFailsAtCompileTime(): void
     {
         $runtime = new Runtime();

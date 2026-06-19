@@ -3626,6 +3626,21 @@ class Compiler {
         return null;
     }
 
+    /**
+     * PHP 8.4: interfaces may declare static properties only with hook syntax (#9754, zend_compile.c).
+     */
+    protected function interfaceStaticPropertyHookAllowed(Operand $nameOperand): bool
+    {
+        $propName = $this->staticNameFromOperand($nameOperand);
+        $classLc = $this->compilingClassLc;
+        if (null === $propName || null === $classLc || '' === $classLc) {
+            return false;
+        }
+
+        return isset($this->propertyHookRegistry[$classLc][$propName])
+            || isset($this->propertyHookRegistry[$classLc][strtolower($propName)]);
+    }
+
     protected function literalScopeClassName(Operand $class): ?string
     {
         if ($class instanceof Operand\Literal && is_string($class->value)) {
@@ -4080,7 +4095,7 @@ class Compiler {
                         $this->throwCompileLogic('Properties are only supported on classes, interfaces, and traits for now');
                     }
                     if (OpCode::TYPE_DECLARE_INTERFACE === $type) {
-                        if ($child->static) {
+                        if ($child->static && !$this->interfaceStaticPropertyHookAllowed($child->name)) {
                             $this->throwCompileLogic('Interfaces cannot declare static properties');
                         }
                         if (!is_null($child->defaultBlock) || null !== $child->defaultVar) {
