@@ -2457,7 +2457,10 @@ restart:
                     }
                     $this->emitPropertyWriteDeprecation($arg2, $frame);
                     try {
-                        if ($this->dispatchPropertySetHookAssign($arg2, $arg3, $frame)) {
+                        if (
+                            !$this->assignDefersHookedPropertyDimWriteBack($arg2)
+                            && $this->dispatchPropertySetHookAssign($arg2, $arg3, $frame)
+                        ) {
                             $this->deliverPropertySetHookAssignResult($arg1, $arg3);
                             break;
                         }
@@ -2918,7 +2921,8 @@ restart:
                             }
                             throw new \LogicException('[] is only supported for arrays');
                         }
-                        $arg1->indirect($container->toArray()->append(new Variable));
+                        $appendCell = $container->toArray()->append(new Variable);
+                        $arg1->indirect($appendCell);
                         $this->tagHookedPropertyDimWriteLvalue($arg1, $containerSlot);
                         break;
                     }
@@ -7004,6 +7008,20 @@ restart:
             return;
         }
         $dimLvalue->hookedPropertyDimWriteBackContainer = $containerSlot;
+    }
+
+    /** Skip eager set-hook dispatch on $prop[] = / $prop[$k] = element writes (#6775, #9875). */
+    private function assignDefersHookedPropertyDimWriteBack(Variable $lvalue): bool
+    {
+        if (null !== $lvalue->hookedPropertyDimWriteBackContainer) {
+            return true;
+        }
+        $target = $lvalue->resolveIndirect();
+        if ($target !== $lvalue && null !== $target->hookedPropertyDimWriteBackContainer) {
+            return true;
+        }
+
+        return false;
     }
 
     /**
