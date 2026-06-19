@@ -9,7 +9,7 @@ use PHPCompiler\Runtime;
 use PHPUnit\Framework\TestCase;
 
 /**
- * Issue #6748 / #6777 / #7360: AOT standalone defines progress notes in LLVM globals + optional C SIGSEGV ABI.
+ * Issue #6748 / #6777 / #7360 / #9795: AOT standalone uses ProgressJitHelper PHP + LLVM SIGSEGV buffer globals.
  *
  * @group aot-lint
  */

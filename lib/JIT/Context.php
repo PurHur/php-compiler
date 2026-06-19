@@ -745,6 +745,7 @@ class Context {
             Builtin\StringFormat::ensureStandaloneBodies($this);
             Builtin\GcToggleRuntime::ensureStandaloneBodies($this);
             Builtin\GcCollectCyclesRuntime::ensureStandaloneBodies($this);
+            Builtin\ProgressNoteRuntime::ensureStandaloneBodies($this);
             Builtin\LastErrorRuntime::ensureStandaloneBodies($this);
             Builtin\RewriteVarsRuntime::ensureStandaloneBodies($this);
             Builtin\SuperglobalRefreshRuntime::ensureStandaloneBodies($this);

@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace PHPCompiler\JIT\Builtin;
 
 use PHPCompiler\JIT;
-use PHPCompiler\JIT\Builtin;
 use PHPCompiler\JIT\Call;
 use PHPCompiler\JIT\Context;
 use PHPLLVM\Builder;
@@ -13,10 +12,10 @@ use PHPLLVM\Value;
 use PHPLLVM\Value\Function_ as LlvmFunction;
 
 /**
- * JIT/AOT link for __phpc_progress_note via ProgressJitHelper PHP (#9521).
+ * JIT/AOT link for __phpc_progress_note via ProgressJitHelper PHP (#9521, #9795).
  *
- * SIGSEGV breadcrumb buffer (phpc_last_progress) stays in thin LLVM; env-file writes delegate to PHP.
- * AOT standalone keeps {@see ProgressNoteRuntimeLlvm} until native link can rely on compiled helpers.
+ * SIGSEGV breadcrumb buffer (phpc_last_progress) stays in thin LLVM + phpc_progress.c ABI;
+ * env-file writes delegate to compiled {@see ProgressJitHelper} on JIT embed and AOT standalone.
  */
 final class ProgressNoteRuntime
 {
@@ -59,6 +58,11 @@ final class ProgressNoteRuntime
         self::registerStaticProxies($context);
     }
 
+    public static function ensureStandaloneBodies(Context $context): void
+    {
+        self::ensureLinked($context);
+    }
+
     public static function emitCall(Context $context, string $message): void
     {
         if ('' === $message) {
@@ -85,14 +89,9 @@ final class ProgressNoteRuntime
             return;
         }
 
-        if (Builtin::LOAD_TYPE_STANDALONE === $context->loadType) {
-            ProgressNoteRuntimeLlvm::implement($context);
-            self::registerLinkedRuntime($context);
-
-            return;
-        }
-
         self::$blockSuffix = 0;
+        self::$bufGlobal = null;
+        self::$lenGlobal = null;
         self::ensureProgressGlobals($context);
         self::ensureBufferExternals($context);
         self::ensureJitHelperCompiled($context);
@@ -105,12 +104,6 @@ final class ProgressNoteRuntime
     /** Register Progress::{noteFunction,notePhase,noteEntry} before spine callees compile (#8560). */
     private static function registerStaticProxies(Context $context): void
     {
-        if (Builtin::LOAD_TYPE_STANDALONE === $context->loadType) {
-            ProgressNoteRuntimeLlvm::registerStaticProxies($context);
-
-            return;
-        }
-
         $voidTy = $context->getTypeFromString('void');
         $strPtr = $context->getTypeFromString('__string__*');
         $ft = $context->context->functionType($voidTy, false, $strPtr);
