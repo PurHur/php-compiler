@@ -87,7 +87,7 @@ final class BuiltinAttributes
             $ctx,
             'Override',
             AttributeSupport::CLASS_OVERRIDE,
-            AttributeSupport::TARGET_METHOD
+            AttributeSupport::TARGET_METHOD | AttributeSupport::TARGET_CLASS_CONSTANT
         );
     }
 
