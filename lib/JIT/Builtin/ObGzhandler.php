@@ -9,7 +9,7 @@ use PHPCompiler\JIT\Context;
 /**
  * JIT LLVM bodies for ob_gzhandler() (issue #4655, #8818).
  *
- * PHP lowering via {@see ObGzhandlerJitRuntime}; gzip via {@see StringZlibJit}.
+ * PHP lowering via {@see ObGzhandlerJitRuntime} + {@see \PHPCompiler\ext\standard\ObGzhandlerJitHelper}.
  */
 final class ObGzhandler
 {
