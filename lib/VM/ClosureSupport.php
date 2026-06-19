@@ -468,10 +468,7 @@ final class ClosureSupport
         }
         $newScope = $newScope->resolveIndirect();
         if (Variable::TYPE_NULL === $newScope->type) {
-            if (Variable::TYPE_OBJECT === $newThis->type) {
-                return $newThis->toObject()->class->name;
-            }
-
+            // bindTo($obj, null) — unbound scope; visibility must not widen (#10097, zend_closures.c).
             return null;
         }
         if (Variable::TYPE_OBJECT === $newScope->type) {
