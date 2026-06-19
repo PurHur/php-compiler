@@ -55,6 +55,7 @@ final class JitTypedClassConstCompileTest extends TestCase
                 'typed_class_const.phpt',
                 'typed_class_const_float_int.phpt',
                 'typed_class_constant.phpt',
+                'typed_enum_class_const.phpt',
                 'interface_typed_const.phpt',
             ] as $fixture
         ) {

@@ -232,6 +232,13 @@ final class TypeCheck
             return;
         }
         if (null !== $typeMeta->typeConstraint) {
+            if (
+                Variable::TYPE_OBJECT === $typeMeta->typeConstraint
+                && null !== $typeMeta->classConstraint
+                && self::matchesClassTypeHint($value, $typeMeta->classConstraint)
+            ) {
+                return;
+            }
             self::assertClassConstantValue($value, $typeMeta->typeConstraint, $constName);
         }
     }
