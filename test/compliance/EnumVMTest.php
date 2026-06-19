@@ -96,6 +96,7 @@ final class EnumVMTest extends BaseTest
                 'enum_default_parameter.phpt',
                 'enum_default_param_property.phpt',
                 'enum_property_default.phpt',
+                'static_enum_property_default.phpt',
                 'abstract_enum.phpt',
                 'duplicate_enum_backing_value.phpt',
                 'enum_duplicate_backing_value.phpt',
