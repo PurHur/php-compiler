@@ -734,6 +734,34 @@ class Compiler {
     }
 
     /**
+     * @param list<Op\Expr\Param> $params
+     */
+    protected function compileEmptyConcreteMethodBlock(array $params, ?CfgFunc $func): Block
+    {
+        $block = new Block(null);
+        if (null !== $func) {
+            $block->func = $func;
+            $block->strictTypes = isset($func->strictTypes) ? (bool) $func->strictTypes : false;
+            $this->applyReturnTypeFromFunc($block, $func);
+        }
+        if ([] !== $params) {
+            $this->assertNoDuplicateParameterNames($params);
+            $this->assertNoDuplicateParameterAttributes($params);
+            $this->assertReadonlyParamOnlyInConstructor($params, $func);
+        }
+        $paramIdx = 0;
+        foreach ($params as $param) {
+            $block->addOpCode($this->compileParam($param, $block, $paramIdx++));
+        }
+        if (null !== $func && '__construct' === $func->name && null !== $func->class) {
+            $this->compileCtorPromotionAssignments($block, $params);
+        }
+        $block->addOpCode(new OpCode(OpCode::TYPE_RETURN_VOID));
+
+        return $block;
+    }
+
+    /**
      * CFG branch target within the current function: inherit parent locals ($this, params).
      */
     protected function compileCfgBranch(CfgBlock $block, Block $parent): Block {
@@ -3351,6 +3379,9 @@ class Compiler {
             $methodBlock = $this->compileCfgBlock($child->func->cfg, $child->func->params, $child->func);
             NoDiscardMetadata::applyToBlock($methodBlock, $child);
             $declare->block1 = $methodBlock;
+        } elseif (0 === ($child->func->flags & CfgFunc::FLAG_ABSTRACT)) {
+            // php-cfg omits cfg for `{}` method bodies; concrete methods still need block1 (#4758).
+            $declare->block1 = $this->compileEmptyConcreteMethodBlock($child->func->params, $child->func);
         }
         $this->assignAttributeMetadata($declare, $child);
         $this->assignSourceMetadata($declare, $child);
