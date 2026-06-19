@@ -24,7 +24,15 @@ final class BootstrapPhpTypesMagicScriptConstPatchTest extends TestCase
         $this->assertStringContainsString(
             'return [Type::string()]',
             $content,
-            'TypeReconstructor must resolve __DIR__/__FILE__ as string (#9833)'
+            'TypeReconstructor must resolve __DIR__/__FILE__ as string (#9833, #9848)'
+        );
+        $parserFile = dirname(__DIR__, 2).'/vendor/ircmaxell/php-cfg/lib/PHPCfg/Parser.php';
+        $this->assertFileExists($parserFile);
+        $parser = (string) file_get_contents($parserFile);
+        $this->assertStringContainsString(
+            'MagicScriptConst::KIND_DIR',
+            $parser,
+            'Run script/apply-patches.sh (php-cfg-magic-script-const.patch) before CI'
         );
         $this->assertStringContainsString(
             'FirstClassCallable::KIND_METHOD',
