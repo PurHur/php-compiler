@@ -45,6 +45,13 @@ final class UnpackEngineTest extends TestCase
         }
     }
 
+    public function testSlashRepeatFormatsMatchZend(): void
+    {
+        $this->assertSame(\unpack('C2/C', 'abc'), UnpackEngine::unpack('C2/C', 'abc'));
+        $this->assertSame(\unpack('H2/H', 'abcd'), UnpackEngine::unpack('H2/H', 'abcd'));
+        $this->assertSame(\unpack('C2/C2', 'abcd'), UnpackEngine::unpack('C2/C2', 'abcd'));
+    }
+
     public function testUnpackEngineDoesNotUseHostFloatUnpack(): void
     {
         $source = (string) file_get_contents(__DIR__.'/../../ext/standard/UnpackEngine.php');

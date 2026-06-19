@@ -46,7 +46,6 @@ final class UnpackEngine
         }
         $pos = $offset;
         $result = [];
-        $autoIdx = 1;
 
         foreach ($specs as $spec) {
             $code = $spec['code'];
@@ -80,7 +79,7 @@ final class UnpackEngine
             }
 
             if ($isStar && \in_array($code, ['a', 'A', 'Z', 'h', 'H'], true)) {
-                if (!self::unpackStarString($result, $spec, $autoIdx, $code, $data, $pos, $remaining)) {
+                if (!self::unpackStarString($result, $spec, $code, $data, $pos, $remaining)) {
                     return false;
                 }
                 continue;
@@ -93,10 +92,12 @@ final class UnpackEngine
 
                     return false;
                 }
+                $repIdx = 0;
                 while ($pos + $unit <= $len) {
-                    if (!self::unpackOne($result, $spec, $autoIdx, $code, $data, $pos)) {
+                    if (!self::unpackOne($result, $spec, $repIdx, $code, $data, $pos)) {
                         return false;
                     }
+                    ++$repIdx;
                 }
                 continue;
             }
@@ -119,7 +120,7 @@ final class UnpackEngine
                 return false;
             }
 
-            if (!self::unpackFixed($result, $spec, $autoIdx, $code, $arg, $data, $pos, $need)) {
+            if (!self::unpackFixed($result, $spec, $code, $arg, $data, $pos, $need)) {
                 return false;
             }
         }
@@ -216,13 +217,19 @@ final class UnpackEngine
      * @param array<int|string, int|float|string> $result
      * @param array{code: string, arg: int, name: string, has_name: bool} $spec
      */
-    private static function store(array &$result, array $spec, int &$autoIdx, int|float|string $val): void
+    private static function store(array &$result, array $spec, int $repIdx, int|float|string $val): void
     {
         if ($spec['has_name']) {
-            $result[$spec['name']] = $val;
-        } else {
-            $result[$autoIdx++] = $val;
+            $key = $spec['name'];
+            if ($spec['arg'] > 1) {
+                $key .= (string) ($repIdx + 1);
+            }
+            $result[$key] = $val;
+
+            return;
         }
+        // php-src: unnamed keys are 1-based per format segment; later segments overwrite.
+        $result[$repIdx + 1] = $val;
     }
 
     private static function unitBytes(string $code): ?int
@@ -246,7 +253,6 @@ final class UnpackEngine
     private static function unpackStarString(
         array &$result,
         array $spec,
-        int &$autoIdx,
         string $code,
         string $data,
         int &$pos,
@@ -255,7 +261,7 @@ final class UnpackEngine
         switch ($code) {
             case 'a':
                 $val = \substr($data, $pos, $remaining);
-                self::store($result, $spec, $autoIdx, $val);
+                self::store($result, $spec, 0, $val);
                 $pos += $remaining;
                 break;
             case 'A':
@@ -263,7 +269,7 @@ final class UnpackEngine
                 while ('' !== $val && \in_array($val[-1], ["\0", ' ', "\t", "\r", "\n"], true)) {
                     $val = \substr($val, 0, -1);
                 }
-                self::store($result, $spec, $autoIdx, $val);
+                self::store($result, $spec, 0, $val);
                 $pos += $remaining;
                 break;
             case 'Z':
@@ -274,7 +280,7 @@ final class UnpackEngine
                         break;
                     }
                 }
-                self::store($result, $spec, $autoIdx, \substr($data, $pos, $zlen));
+                self::store($result, $spec, 0, \substr($data, $pos, $zlen));
                 $pos += $remaining;
                 break;
             case 'h':
@@ -283,7 +289,7 @@ final class UnpackEngine
                 self::store(
                     $result,
                     $spec,
-                    $autoIdx,
+                    0,
                     self::unpackHex($data, $pos, $hexArg, 'H' === $code)
                 );
                 $pos += $remaining;
@@ -302,7 +308,7 @@ final class UnpackEngine
     private static function unpackOne(
         array &$result,
         array $spec,
-        int &$autoIdx,
+        int $repIdx,
         string $code,
         string $data,
         int &$pos
@@ -315,7 +321,7 @@ final class UnpackEngine
         }
 
         if (self::isIeeeCode($code)) {
-            self::store($result, $spec, $autoIdx, self::readIeee($data, $pos, $code));
+            self::store($result, $spec, $repIdx, self::readIeee($data, $pos, $code));
             $pos += $unit;
 
             return true;
@@ -323,7 +329,7 @@ final class UnpackEngine
 
         [$le, $signed] = self::endianSigned($code);
         $val = self::readLong($data, $pos, $unit, $le, $signed);
-        self::store($result, $spec, $autoIdx, $val);
+        self::store($result, $spec, $repIdx, $val);
         $pos += $unit;
 
         return true;
@@ -336,7 +342,6 @@ final class UnpackEngine
     private static function unpackFixed(
         array &$result,
         array $spec,
-        int &$autoIdx,
         string $code,
         int $arg,
         string $data,
@@ -347,7 +352,7 @@ final class UnpackEngine
             case 'a':
             case 'A':
                 $val = \substr($data, $pos, $arg);
-                self::store($result, $spec, $autoIdx, $val);
+                self::store($result, $spec, 0, $val);
                 $pos += $arg;
                 break;
             case 'Z':
@@ -358,7 +363,7 @@ final class UnpackEngine
                         break;
                     }
                 }
-                self::store($result, $spec, $autoIdx, \substr($data, $pos, $zlen));
+                self::store($result, $spec, 0, \substr($data, $pos, $zlen));
                 $pos += $arg;
                 break;
             case 'h':
@@ -366,7 +371,7 @@ final class UnpackEngine
                 self::store(
                     $result,
                     $spec,
-                    $autoIdx,
+                    0,
                     self::unpackHex($data, $pos, $arg, 'H' === $code)
                 );
                 $pos += $need;
@@ -374,7 +379,7 @@ final class UnpackEngine
             case 'c':
             case 'C':
                 for ($r = 0; $r < $arg; ++$r) {
-                    if (!self::unpackOne($result, $spec, $autoIdx, $code, $data, $pos)) {
+                    if (!self::unpackOne($result, $spec, $r, $code, $data, $pos)) {
                         return false;
                     }
                 }
@@ -394,7 +399,7 @@ final class UnpackEngine
             case 'J':
             case 'P':
                 for ($r = 0; $r < $arg; ++$r) {
-                    if (!self::unpackOne($result, $spec, $autoIdx, $code, $data, $pos)) {
+                    if (!self::unpackOne($result, $spec, $r, $code, $data, $pos)) {
                         return false;
                     }
                 }
@@ -406,7 +411,7 @@ final class UnpackEngine
             case 'e':
             case 'E':
                 for ($r = 0; $r < $arg; ++$r) {
-                    if (!self::unpackOne($result, $spec, $autoIdx, $code, $data, $pos)) {
+                    if (!self::unpackOne($result, $spec, $r, $code, $data, $pos)) {
                         return false;
                     }
                 }
