@@ -80,6 +80,34 @@ PHP;
         $this->assertSame('ok', $output);
     }
 
+    public function testTypedClassConstWithEnumType(): void
+    {
+        $code = <<<'PHP'
+<?php
+enum Color: string { case Red = 'r'; case Blue = 'b'; }
+class Palette {
+    public const Color PRIMARY = Color::Red;
+}
+var_export(Palette::PRIMARY);
+echo "\n";
+echo Palette::PRIMARY->name, "\n";
+PHP;
+        $runtime = new Runtime();
+        $block = $runtime->parseAndCompile($code, 'typed_enum_class_const.php');
+        ob_start();
+        $runtime->run($block);
+        $output = ob_get_clean();
+
+        $this->assertSame("\\Color::Red\nRed\n", $output);
+        $entry = $runtime->vmContext->classes['palette'];
+        $this->assertArrayHasKey('primary', $entry->constants);
+        $stored = $entry->constants['primary']->resolveIndirect();
+        $this->assertTrue(
+            Variable::TYPE_ENUM_CASE === $stored->type
+            || (Variable::TYPE_OBJECT === $stored->type && $stored->toObject()->isEnumCase)
+        );
+    }
+
     public function testClassConstEnumCaseForwardReference(): void
     {
         $code = <<<'PHP'

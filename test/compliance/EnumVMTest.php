@@ -46,6 +46,7 @@ final class EnumVMTest extends BaseTest
                 'class_const_enum_forward_ref.phpt',
                 'enum_typed_class_constant.phpt',
                 'enum_typed_class_const.phpt',
+                'typed_enum_class_const.phpt',
                 'enum_illegal_array_offset_write.phpt',
                 'enum_illegal_array_offset.phpt',
                 'enum_array_illegal_offset.phpt',
