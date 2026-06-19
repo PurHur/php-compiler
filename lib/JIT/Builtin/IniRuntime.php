@@ -20,17 +20,11 @@ final class IniRuntime
 {
     private static int $blockSuffix = 0;
 
-    private const G_ERROR_REPORTING = 'phpc_ini_error_reporting';
-
     private const G_DISPLAY_ERRORS = 'phpc_ini_display_errors';
 
     private const G_MEMORY_LIMIT = 'phpc_ini_memory_limit';
 
     private const G_SERIALIZE_PRECISION = 'phpc_ini_serialize_precision';
-
-    private const G_SILENCE_DEPTH = 'phpc_ini_silence_depth';
-
-    private const G_SILENCE_SAVED_ER = 'phpc_ini_silence_saved_error_reporting';
 
     private const MEMORY_LIMIT_CAP = 64;
 
@@ -50,6 +44,7 @@ final class IniRuntime
         $cfgProbe = $context->module->getNamedFunction('__compiler_ini_cfg_get');
         if (null !== $probe && $probe->countBasicBlocks() > 0
             && null !== $cfgProbe && $cfgProbe->countBasicBlocks() > 0) {
+            SilenceRuntime::ensureLinked($context);
             self::ensureIniRestore($context);
             self::registerLinkedRuntime($context);
 
@@ -68,12 +63,7 @@ final class IniRuntime
         $valPtr = $context->getTypeFromString('__value__*');
         $voidTy = $context->getTypeFromString('void');
 
-        $levelProbe = $context->module->getNamedFunction('__compiler_phpc_error_level_enabled');
-        $ftLevel = $context->context->functionType($i32, false, $i32);
-        $fnLevel = null !== $levelProbe
-            ? $levelProbe
-            : $context->module->addFunction('__compiler_phpc_error_level_enabled', $ftLevel);
-        self::implementErrorLevelEnabled($context, $fnLevel);
+        SilenceRuntime::ensureLinked($context);
 
         $getProbe = $context->module->getNamedFunction('__compiler_ini_get');
         $ftGet = $context->context->functionType($voidTy, false, $strPtr, $valPtr);
@@ -97,42 +87,8 @@ final class IniRuntime
 
         self::ensureIniRestore($context);
 
-        $erProbe = $context->module->getNamedFunction('__compiler_error_reporting');
-        $ftEr = $context->context->functionType($voidTy, false, $i32, $i64, $valPtr);
-        $fnEr = null !== $erProbe
-            ? $erProbe
-            : $context->module->addFunction('__compiler_error_reporting', $ftEr);
-        self::implementErrorReporting($context, $fnEr);
-
-        $beginProbe = $context->module->getNamedFunction('__compiler_begin_silence');
-        $ftSilence = $context->context->functionType($voidTy, false);
-        $fnBegin = null !== $beginProbe
-            ? $beginProbe
-            : $context->module->addFunction('__compiler_begin_silence', $ftSilence);
-        self::implementBeginSilence($context, $fnBegin);
-
-        $endProbe = $context->module->getNamedFunction('__compiler_end_silence');
-        $fnEnd = null !== $endProbe
-            ? $endProbe
-            : $context->module->addFunction('__compiler_end_silence', $ftSilence);
-        self::implementEndSilence($context, $fnEnd);
-
         self::registerLinkedRuntime($context);
         self::restoreInsertBlock($context, $restoreBlock);
-    }
-
-    private static function implementErrorLevelEnabled(Context $context, Value $fn): void
-    {
-        $entry = $fn->appendBasicBlock('iel_entry');
-        $context->builder->positionAtEnd($entry);
-
-        $level = $fn->getParam(0);
-        $i32 = $context->getTypeFromString('int32');
-        $er = $context->builder->load(self::globalPtr($context, self::G_ERROR_REPORTING, $i32));
-        $masked = $context->builder->and($er, $level);
-        $enabled = $context->builder->icmp(Builder::INT_NE, $masked, $i32->constInt(0, false));
-        $context->builder->returnValue($context->builder->zext($enabled, $i32));
-        $context->builder->clearInsertionPosition();
     }
 
     private static function implementIniGet(Context $context, Value $fn): void
@@ -175,7 +131,7 @@ final class IniRuntime
         self::branchIfKey($context, $testAe, $optCstr, 'assert.exception', $aeBb, $failBb);
 
         $context->builder->positionAtEnd($erBb);
-        self::writeValueStringFromErGlobal($context, $out);
+        SilenceRuntime::emitIniGetErrorReporting($context, $out);
         self::freeCstr($context, $fn, $optCstr);
         $context->builder->returnVoid();
 
@@ -338,10 +294,11 @@ final class IniRuntime
         $i32 = $context->getTypeFromString('int32');
 
         $context->builder->positionAtEnd($erBb);
-        self::writeValueStringFromErGlobal($context, $out);
+        SilenceRuntime::emitIniGetErrorReporting($context, $out);
         $endPtrSlot = $context->builder->alloca($i8p, 1, 'ini_strtol_end');
         $context->builder->store($i8p->constNull(), $endPtrSlot);
-        $context->builder->store(
+        SilenceRuntime::emitSetErrorReporting(
+            $context,
             $context->builder->trunc(
                 $context->builder->call(
                     $context->lookupFunction('strtol'),
@@ -350,8 +307,7 @@ final class IniRuntime
                     $i32->constInt(10, false)
                 ),
                 $i32
-            ),
-            self::globalPtr($context, self::G_ERROR_REPORTING, $i32)
+            )
         );
         self::freeCstrPair($context, $fn, $optCstr, $valCstr);
         $context->builder->returnVoid();
@@ -474,10 +430,7 @@ final class IniRuntime
         $i32 = $context->getTypeFromString('int32');
 
         $context->builder->positionAtEnd($erBb);
-        $context->builder->store(
-            $i32->constInt(ErrorReporter::DEFAULT_STARTUP_REPORTING, false),
-            self::globalPtr($context, self::G_ERROR_REPORTING, $i32)
-        );
+        SilenceRuntime::emitIniRestoreErrorReporting($context);
         self::freeCstr($context, $fn, $optCstr);
         $context->builder->returnVoid();
 
@@ -508,101 +461,6 @@ final class IniRuntime
 
         $context->builder->positionAtEnd($failBb);
         self::freeCstr($context, $fn, $optCstr);
-        $context->builder->returnVoid();
-        $context->builder->clearInsertionPosition();
-    }
-
-    private static function implementErrorReporting(Context $context, Value $fn): void
-    {
-        $entry = $fn->appendBasicBlock('ier_entry');
-        $applyBb = $fn->appendBasicBlock('ier_apply');
-        $doneBb = $fn->appendBasicBlock('ier_done');
-        $context->builder->positionAtEnd($entry);
-
-        $hasNew = $fn->getParam(0);
-        $newLevel = $fn->getParam(1);
-        $out = $fn->getParam(2);
-        $i32 = $context->getTypeFromString('int32');
-        $i64 = $context->getTypeFromString('int64');
-
-        $old = $context->builder->load(self::globalPtr($context, self::G_ERROR_REPORTING, $i32));
-        $apply = $context->builder->icmp(Builder::INT_NE, $hasNew, $i32->constInt(0, false));
-        $context->builder->branchIf($apply, $applyBb, $doneBb);
-
-        $context->builder->positionAtEnd($applyBb);
-        $context->builder->store(
-            $context->builder->trunc($newLevel, $i32),
-            self::globalPtr($context, self::G_ERROR_REPORTING, $i32)
-        );
-        $context->builder->branch($doneBb);
-
-        $context->builder->positionAtEnd($doneBb);
-        $context->builder->call(
-            $context->lookupFunction('__value__writeLong'),
-            $out,
-            $context->builder->sext($old, $i64)
-        );
-        $context->builder->returnVoid();
-        $context->builder->clearInsertionPosition();
-    }
-
-    private static function implementBeginSilence(Context $context, Value $fn): void
-    {
-        $entry = $fn->appendBasicBlock('ibs_entry');
-        $saveBb = $fn->appendBasicBlock('ibs_save');
-        $incBb = $fn->appendBasicBlock('ibs_inc');
-        $context->builder->positionAtEnd($entry);
-
-        $i32 = $context->getTypeFromString('int32');
-        $depthPtr = self::globalPtr($context, self::G_SILENCE_DEPTH, $i32);
-        $depth = $context->builder->load($depthPtr);
-        $isZero = $context->builder->icmp(Builder::INT_EQ, $depth, $i32->constInt(0, false));
-        $context->builder->branchIf($isZero, $saveBb, $incBb);
-
-        $context->builder->positionAtEnd($saveBb);
-        $er = $context->builder->load(self::globalPtr($context, self::G_ERROR_REPORTING, $i32));
-        $context->builder->store($er, self::globalPtr($context, self::G_SILENCE_SAVED_ER, $i32));
-        $context->builder->store($i32->constInt(0, false), self::globalPtr($context, self::G_ERROR_REPORTING, $i32));
-        $context->builder->branch($incBb);
-
-        $context->builder->positionAtEnd($incBb);
-        $context->builder->store(
-            $context->builder->add($depth, $i32->constInt(1, false)),
-            $depthPtr
-        );
-        $context->builder->returnVoid();
-        $context->builder->clearInsertionPosition();
-    }
-
-    private static function implementEndSilence(Context $context, Value $fn): void
-    {
-        $entry = $fn->appendBasicBlock('ies_entry');
-        $skipBb = $fn->appendBasicBlock('ies_skip');
-        $decBb = $fn->appendBasicBlock('ies_dec');
-        $restoreBb = $fn->appendBasicBlock('ies_restore');
-        $doneBb = $fn->appendBasicBlock('ies_done');
-        $context->builder->positionAtEnd($entry);
-
-        $i32 = $context->getTypeFromString('int32');
-        $depthPtr = self::globalPtr($context, self::G_SILENCE_DEPTH, $i32);
-        $depth = $context->builder->load($depthPtr);
-        $positive = $context->builder->icmp(Builder::INT_SGT, $depth, $i32->constInt(0, false));
-        $context->builder->branchIf($positive, $decBb, $skipBb);
-
-        $context->builder->positionAtEnd($decBb);
-        $newDepth = $context->builder->sub($depth, $i32->constInt(1, false));
-        $context->builder->store($newDepth, $depthPtr);
-        $isZero = $context->builder->icmp(Builder::INT_EQ, $newDepth, $i32->constInt(0, false));
-        $context->builder->branchIf($isZero, $restoreBb, $doneBb);
-
-        $context->builder->positionAtEnd($restoreBb);
-        $saved = $context->builder->load(self::globalPtr($context, self::G_SILENCE_SAVED_ER, $i32));
-        $context->builder->store($saved, self::globalPtr($context, self::G_ERROR_REPORTING, $i32));
-        $context->builder->branch($doneBb);
-
-        $context->builder->positionAtEnd($skipBb);
-        $context->builder->branch($doneBb);
-        $context->builder->positionAtEnd($doneBb);
         $context->builder->returnVoid();
         $context->builder->clearInsertionPosition();
     }
@@ -720,17 +578,6 @@ final class IniRuntime
             $cstr
         );
         $context->builder->call($context->lookupFunction('__value__writeString'), $out, $str);
-    }
-
-    private static function writeValueStringFromErGlobal(Context $context, Value $out): void
-    {
-        $i32 = $context->getTypeFromString('int32');
-        $buf = self::snprintfAlloca(
-            $context,
-            '%d',
-            [$context->builder->load(self::globalPtr($context, self::G_ERROR_REPORTING, $i32))]
-        );
-        self::writeValueStringFromCstr($context, $out, $buf);
     }
 
     private static function writeValueStringFromSerializePrecisionGlobal(Context $context, Value $out): void
@@ -943,10 +790,6 @@ final class IniRuntime
         $i32 = $context->getTypeFromString('int32');
         $i8p = $context->getTypeFromString('int8*');
 
-        if (null === $context->module->getNamedGlobal(self::G_ERROR_REPORTING)) {
-            $g = $context->module->addGlobal($i32, self::G_ERROR_REPORTING);
-            $g->setInitializer($i32->constInt(ErrorReporter::DEFAULT_STARTUP_REPORTING, false));
-        }
         if (null === $context->module->getNamedGlobal(self::G_DISPLAY_ERRORS)) {
             $g = $context->module->addGlobal($i32, self::G_DISPLAY_ERRORS);
             $g->setInitializer($i32->constInt(1, false));
@@ -958,14 +801,6 @@ final class IniRuntime
         if (null === $context->module->getNamedGlobal(self::G_SERIALIZE_PRECISION)) {
             $g = $context->module->addGlobal($i32, self::G_SERIALIZE_PRECISION);
             $g->setInitializer($i32->constInt(-1, true));
-        }
-        if (null === $context->module->getNamedGlobal(self::G_SILENCE_DEPTH)) {
-            $g = $context->module->addGlobal($i32, self::G_SILENCE_DEPTH);
-            $g->setInitializer($i32->constInt(0, false));
-        }
-        if (null === $context->module->getNamedGlobal(self::G_SILENCE_SAVED_ER)) {
-            $g = $context->module->addGlobal($i32, self::G_SILENCE_SAVED_ER);
-            $g->setInitializer($i32->constInt(0, false));
         }
     }
 

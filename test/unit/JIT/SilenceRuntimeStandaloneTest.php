@@ -4,32 +4,29 @@ declare(strict_types=1);
 
 namespace PHPCompiler\JIT;
 
-use PHPCompiler\JIT\Builtin\IniRuntime;
+use PHPCompiler\JIT\Builtin\SilenceRuntime;
 use PHPCompiler\Runtime;
 use PHPUnit\Framework\TestCase;
 
 /**
- * Issue #5736: AOT standalone must define ini helpers without phpc_ini_set.c.
+ * Issue #9197: AOT standalone @ silence must use ErrorSilenceJitHelper PHP, not LLVM globals.
  *
  * @group aot-lint
  */
-final class IniRuntimeStandaloneTest extends TestCase
+final class SilenceRuntimeStandaloneTest extends TestCase
 {
-    public function testEnsureLinkedDefinesIniRuntimeForStandalone(): void
+    public function testEnsureLinkedDefinesSilenceRuntimeForStandalone(): void
     {
         $runtime = new Runtime(Runtime::MODE_AOT);
         $ctx = new Context($runtime, Builtin::LOAD_TYPE_STANDALONE);
-        IniRuntime::ensureLinked($ctx);
+        SilenceRuntime::ensureLinked($ctx);
 
         foreach (
             [
-                '__compiler_phpc_error_level_enabled',
-                '__compiler_ini_get',
-                '__compiler_ini_set',
-                '__compiler_ini_restore',
-                '__compiler_error_reporting',
                 '__compiler_begin_silence',
                 '__compiler_end_silence',
+                '__compiler_phpc_error_level_enabled',
+                '__compiler_error_reporting',
             ] as $name
         ) {
             $fn = $ctx->lookupFunction($name);
@@ -37,8 +34,8 @@ final class IniRuntimeStandaloneTest extends TestCase
             $this->assertGreaterThan(0, $fn->countBasicBlocks(), $name);
         }
 
-        $this->assertNotNull($ctx->module->getNamedGlobal('phpc_ini_memory_limit'));
-        $this->assertNull($ctx->module->getNamedGlobal('phpc_ini_error_reporting'));
         $this->assertNull($ctx->module->getNamedGlobal('phpc_ini_silence_depth'));
+        $this->assertNull($ctx->module->getNamedGlobal('phpc_ini_silence_saved_error_reporting'));
+        $this->assertNull($ctx->module->getNamedGlobal('phpc_ini_error_reporting'));
     }
 }
