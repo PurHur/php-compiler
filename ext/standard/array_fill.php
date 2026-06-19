@@ -15,8 +15,10 @@ use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\HashTableHelper;
+use PHPCompiler\JIT\InternalStrictArg as JitInternalStrictArg;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\HashTable;
+use PHPCompiler\VM\InternalStrictArg;
 use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
 
@@ -30,13 +32,12 @@ final class array_fill extends Internal
         if (3 !== \count($frame->calledArgs)) {
             throw new \LogicException('array_fill() requires exactly three arguments');
         }
-        $start = $frame->calledArgs[0]->resolveIndirect();
         $count = $frame->calledArgs[1]->resolveIndirect();
         $value = $frame->calledArgs[2]->resolveIndirect();
         if (null === $frame->returnVar) {
             return;
         }
-        $startIndex = VmMath::parseIntBuiltinArg($start, 'array_fill', 1, 'start_index');
+        $startIndex = self::vmStartIndexArg($frame);
         $num = VmMath::parseIntBuiltinArg($count, 'array_fill', 2, 'count');
         if ($num < 0) {
             throw new \ValueError('array_fill(): Argument #2 ($count) must be greater than or equal to 0');
@@ -58,6 +59,7 @@ final class array_fill extends Internal
         if (3 !== \count($args)) {
             throw new \LogicException('array_fill() requires exactly three arguments');
         }
+        JitInternalStrictArg::requireInt($context, $args[0], 'array_fill', 'start_index', 1);
         $startIndex = JitIntdiv::lowerIntBuiltinArg($context, $args[0], 'array_fill', 1, 'start_index');
         $count = JitIntdiv::lowerIntBuiltinArg($context, $args[1], 'array_fill', 2, 'count');
         JitArrayFill::emitRuntimeCountGuard($context, $count);
@@ -66,5 +68,19 @@ final class array_fill extends Internal
         $startSized = $context->builder->truncOrBitCast($startIndex, $sizeT);
 
         return HashTableHelper::buildArrayFill($context, $startSized, $countSized, $args[2]);
+    }
+
+    private static function vmStartIndexArg(Frame $frame): int
+    {
+        if (null !== $frame->parent && $frame->parent->block->strictTypes) {
+            return InternalStrictArg::requireInt($frame, 0, 'array_fill', 'start_index')->toInt();
+        }
+
+        return VmMath::parseIntBuiltinArg(
+            $frame->calledArgs[0]->resolveIndirect(),
+            'array_fill',
+            1,
+            'start_index'
+        );
     }
 }

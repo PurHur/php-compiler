@@ -1,7 +1,5 @@
 <?php
 
-declare(strict_types=1);
-
 var_export(array_fill('0', '2', 'x'));
 echo "\n";
 

@@ -2,7 +2,6 @@
 stdlib array_fill() numeric-string coercion and ValueError for negative count
 --FILE--
 <?php
-declare(strict_types=1);
 
 var_export(array_fill('0', '2', 'x'));
 echo "\n";
