@@ -13449,13 +13449,15 @@ class JIT {
 
         if ($this->jitCallArgsHaveUnpack($argEntries)) {
             [$paramNames, $variadicIndex] = $this->jitCalleeParamMetadata($toCall);
+            $functionName = $this->jitInternalBuiltinFunctionName($toCall);
             $namedUnpack = JIT\CallUnpackHelper::tryResolveCompileTimeNamedUnpack(
                 $this->context->jitEnclosingBlock,
                 $argEntries,
                 $argOperands,
                 $paramNames,
                 $variadicIndex,
-                $this
+                $this,
+                $functionName
             );
             if (null !== $namedUnpack) {
                 return $namedUnpack;
@@ -13470,7 +13472,13 @@ class JIT {
         if ($this->jitCallArgsHaveNamed($argEntries)) {
             [$paramNames, $variadicIndex] = $this->jitCalleeParamMetadata($toCall);
             if ([] !== $paramNames) {
-                return JIT\NamedArgs::resolveOutgoing($argEntries, $argOperands, $paramNames, $variadicIndex);
+                return JIT\NamedArgs::resolveOutgoing(
+                    $argEntries,
+                    $argOperands,
+                    $paramNames,
+                    $variadicIndex,
+                    $this->jitInternalBuiltinFunctionName($toCall)
+                );
             }
         }
 
@@ -13532,6 +13540,18 @@ class JIT {
         }
 
         return [[], null];
+    }
+
+    private function jitInternalBuiltinFunctionName(JIT\Call $toCall): ?string
+    {
+        if ($toCall instanceof JIT\Call\Native) {
+            return $toCall->name;
+        }
+        if ($toCall instanceof CoreFunc\Internal) {
+            return $toCall->getName();
+        }
+
+        return null;
     }
 
     /**

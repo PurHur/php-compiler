@@ -30,7 +30,8 @@ final class CallUnpackHelper
         array $argOperands,
         array $paramNames,
         ?int $variadicIndex,
-        JIT $jit
+        JIT $jit,
+        ?string $functionName = null
     ): ?array {
         if (null === $block || [] === $paramNames) {
             return null;
@@ -54,7 +55,8 @@ final class CallUnpackHelper
                     CallUnpack::expandArrayEntries(
                         $vmArray,
                         $paramNames,
-                        $variadicIndex
+                        $variadicIndex,
+                        $functionName
                     ) as $expanded
                 ) {
                     $vmEntries[] = $expanded;
@@ -84,7 +86,7 @@ final class CallUnpackHelper
         $jitEntries = self::jitEntriesFromVmEntries($vmEntries, $jit);
         $jitOperands = array_fill(0, \count($jitEntries), null);
 
-        return NamedArgs::resolveOutgoing($jitEntries, $jitOperands, $paramNames, $variadicIndex);
+        return NamedArgs::resolveOutgoing($jitEntries, $jitOperands, $paramNames, $variadicIndex, $functionName);
     }
 
     public static function tryCompileTimeArrayFromOperand(Block $block, Operand $operand): ?VmVariable

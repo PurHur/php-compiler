@@ -10641,7 +10641,12 @@ restart:
             $methodName = $frame->magicCallMethodName;
             $frame->magicCallMethodName = null;
             [$paramNames, $variadicIndex] = $this->calleeParamMetadata($frame->call);
-            $userArgs = $this->resolveUserCallArgs($frame, $paramNames, $variadicIndex);
+            $userArgs = $this->resolveUserCallArgs(
+                $frame,
+                $paramNames,
+                $variadicIndex,
+                $this->internalBuiltinFunctionName($frame->call)
+            );
             $nameVar = new Variable(Variable::TYPE_STRING);
             $nameVar->string($methodName);
             $argsVar = new Variable();
@@ -10661,7 +10666,12 @@ restart:
 
         [$paramNames, $variadicIndex] = $this->calleeParamMetadata($frame->call);
 
-        $userArgs = $this->resolveUserCallArgs($frame, $paramNames, $variadicIndex);
+        $userArgs = $this->resolveUserCallArgs(
+            $frame,
+            $paramNames,
+            $variadicIndex,
+            $this->internalBuiltinFunctionName($frame->call)
+        );
         if ([] === $frame->callArgs) {
             $this->separateInternalByRefArgsForWrite($frame->call, $userArgs);
 
@@ -10786,7 +10796,7 @@ restart:
      *
      * @return list<Variable>
      */
-    private function resolveUserCallArgs(Frame $frame, array $paramNames, ?int $variadicIndex): array
+    private function resolveUserCallArgs(Frame $frame, array $paramNames, ?int $variadicIndex, ?string $functionName = null): array
     {
         if ([] === $frame->callArgEntries) {
             return [];
@@ -10801,7 +10811,8 @@ restart:
                         $frame,
                         $entry[1],
                         $paramNames,
-                        $variadicIndex
+                        $variadicIndex,
+                        $functionName
                     ) as $expanded
                 ) {
                     $entries[] = $expanded;
@@ -10811,7 +10822,7 @@ restart:
             $entries[] = $entry;
         }
 
-        return NamedArgs::resolve($entries, $paramNames, $variadicIndex);
+        return NamedArgs::resolve($entries, $paramNames, $variadicIndex, $functionName);
     }
 
     /**
@@ -10827,6 +10838,11 @@ restart:
         }
 
         return [[], null];
+    }
+
+    private function internalBuiltinFunctionName(Func $call): ?string
+    {
+        return $call instanceof Func\Internal ? $call->getName() : null;
     }
 
     protected function scopeSlot(Frame $frame, int $slot): Variable
