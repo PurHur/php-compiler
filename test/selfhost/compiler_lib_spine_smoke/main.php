@@ -2816,6 +2816,17 @@ require_once __DIR__.'/../../../ext/standard/spl_autoload_extensions.php';
 require_once __DIR__.'/../../../ext/standard/spl_autoload_functions.php';
 require_once __DIR__.'/../../../ext/standard/spl_autoload_unregister.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/DateMutationRuntime.php';
+require_once __DIR__.'/../../../ext/standard/CloneWithJitHelper.php';
+require_once __DIR__.'/../../../ext/standard/DateMutationJitHelper.php';
+require_once __DIR__.'/../../../ext/standard/ExceptionJitHelper.php';
+require_once __DIR__.'/../../../ext/standard/GcToggleJitHelper.php';
+require_once __DIR__.'/../../../lib/JIT/Builtin/CloneWithReinitRuntimeLlvm.php';
+require_once __DIR__.'/../../../lib/JIT/Builtin/ExceptionThrowRuntime.php';
+require_once __DIR__.'/../../../lib/JIT/Builtin/GcToggleRuntime.php';
+require_once __DIR__.'/../../../lib/JIT/JitReferencableCheck.php';
+require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionClassGetName.php';
+require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionPropertyGetDeclaringClass.php';
+require_once __DIR__.'/../../../lib/VM/NewCallableHandler.php';
 // VM -r smoke: bootstrap-selfhost-lib-spine-vm-smoke.sh (#1846).
 // VM driver execute: bootstrap-selfhost-vm-driver-execute-probe.sh (#2201).
 
