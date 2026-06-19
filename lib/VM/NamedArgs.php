@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace PHPCompiler\VM;
 
+use PHPCompiler\BuiltinParamNames;
 use PHPCompiler\VM\Variable;
 
 /**
@@ -17,7 +18,7 @@ final class NamedArgs
      *
      * @return array<int, Variable>
      */
-    public static function resolve(array $entries, array $paramNames, ?int $variadicParamIndex): array
+    public static function resolve(array $entries, array $paramNames, ?int $variadicParamIndex, ?string $functionName = null): array
     {
         if ([] === $entries) {
             return [];
@@ -25,7 +26,7 @@ final class NamedArgs
 
         foreach ($entries as $entry) {
             if ('n' === $entry[0]) {
-                return self::resolveMixed($entries, $paramNames, $variadicParamIndex);
+                return self::resolveMixed($entries, $paramNames, $variadicParamIndex, $functionName);
             }
         }
 
@@ -43,10 +44,9 @@ final class NamedArgs
      *
      * @return array<int, Variable>
      */
-    private static function resolveMixed(array $entries, array $paramNames, ?int $variadicParamIndex): array
+    private static function resolveMixed(array $entries, array $paramNames, ?int $variadicParamIndex, ?string $functionName = null): array
     {
         $paramCount = count($paramNames);
-        $lowerNames = array_map('strtolower', $paramNames);
         /** @var array<int, Variable> $result */
         $result = [];
         $filled = [];
@@ -87,10 +87,10 @@ final class NamedArgs
                 throw new \LogicException('Too many arguments to function call');
             }
 
-            $name = strtolower((string) $entry[1]);
+            $name = (string) $entry[1];
             /** @var Variable $value */
             $value = $entry[2];
-            $idx = array_search($name, $lowerNames, true);
+            $idx = BuiltinParamNames::lookupNamedParamIndex($paramNames, $name, $functionName);
             if (false === $idx) {
                 if (null !== $variadicParamIndex) {
                     $key = (string) $entry[1];

@@ -130,4 +130,43 @@ final class BuiltinParamNames
 
         return null;
     }
+
+    /**
+     * PHP 8.4+ named-parameter aliases (php-src arginfo alias tables).
+     *
+     * @return array<string, int> lowercase alias => parameter index
+     */
+    public static function aliasesForFunction(string $name): array
+    {
+        switch (strtolower($name)) {
+            case 'number_format':
+                return [
+                    'dec_point' => 2,
+                    'thousands_sep' => 3,
+                ];
+            default:
+                return [];
+        }
+    }
+
+    /**
+     * @param list<string> $paramNames
+     */
+    public static function lookupNamedParamIndex(array $paramNames, string $namedParam, ?string $function = null): int|false
+    {
+        $lc = strtolower($namedParam);
+        $lowerNames = array_map('strtolower', $paramNames);
+        $idx = array_search($lc, $lowerNames, true);
+        if (false !== $idx) {
+            return $idx;
+        }
+        if (null !== $function) {
+            $aliases = self::aliasesForFunction($function);
+            if (isset($aliases[$lc])) {
+                return $aliases[$lc];
+            }
+        }
+
+        return false;
+    }
 }

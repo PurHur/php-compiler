@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace PHPCompiler\VM;
 
+use PHPCompiler\BuiltinParamNames;
 use PHPCompiler\Frame;
 use PHPCompiler\VM;
 use PHPCompiler\ext\standard\VmArray;
@@ -32,14 +33,15 @@ final class CallUnpack
     public static function expandArrayEntries(
         Variable $spread,
         array $paramNames,
-        ?int $variadicParamIndex
+        ?int $variadicParamIndex,
+        ?string $functionName = null
     ): array {
         $spread = $spread->resolveIndirect();
         if (Variable::TYPE_ARRAY !== $spread->type) {
             throw new \LogicException('Expected array for call-time unpack');
         }
 
-        return self::fromArray($spread, $paramNames, $variadicParamIndex);
+        return self::fromArray($spread, $paramNames, $variadicParamIndex, $functionName);
     }
 
     public static function expandToEntries(
@@ -47,17 +49,18 @@ final class CallUnpack
         Frame $frame,
         Variable $spread,
         array $paramNames,
-        ?int $variadicParamIndex
+        ?int $variadicParamIndex,
+        ?string $functionName = null
     ): array {
         $spread = $spread->resolveIndirect();
 
         if (Variable::TYPE_ARRAY === $spread->type) {
-            return self::fromArray($spread, $paramNames, $variadicParamIndex);
+            return self::fromArray($spread, $paramNames, $variadicParamIndex, $functionName);
         }
 
         if (Variable::TYPE_OBJECT === $spread->type) {
             if (null !== $spread->toObject()->generatorState) {
-                return self::fromGenerator($vm, $spread, $paramNames, $variadicParamIndex);
+                return self::fromGenerator($vm, $spread, $paramNames, $variadicParamIndex, $functionName);
             }
             try {
                 $iterable = ForeachIterator::resolveTraversableObject($vm, $frame, $spread);
@@ -65,10 +68,10 @@ final class CallUnpack
                 throw new \TypeError(self::NON_ARRAY_MESSAGE);
             }
             if (null !== $iterable->toObject()->generatorState) {
-                return self::fromGenerator($vm, $iterable, $paramNames, $variadicParamIndex);
+                return self::fromGenerator($vm, $iterable, $paramNames, $variadicParamIndex, $functionName);
             }
 
-            return self::fromIteratorObject($vm, $frame, $iterable, $paramNames, $variadicParamIndex);
+            return self::fromIteratorObject($vm, $frame, $iterable, $paramNames, $variadicParamIndex, $functionName);
         }
 
         throw new \TypeError(self::NON_ARRAY_MESSAGE);
@@ -79,7 +82,7 @@ final class CallUnpack
      *
      * @return list<array{0: string, 1?: mixed, 2?: Variable}>
      */
-    private static function fromArray(Variable $array, array $paramNames, ?int $variadicParamIndex): array
+    private static function fromArray(Variable $array, array $paramNames, ?int $variadicParamIndex, ?string $functionName = null): array
     {
         $ht = $array->toArray();
         if (VmArray::isList($ht)) {
@@ -91,7 +94,7 @@ final class CallUnpack
             return $out;
         }
 
-        return self::entriesFromKeyedPairs($ht->iterateKeyed(true), $paramNames, $variadicParamIndex);
+        return self::entriesFromKeyedPairs($ht->iterateKeyed(true), $paramNames, $variadicParamIndex, $functionName);
     }
 
     /**
@@ -103,7 +106,8 @@ final class CallUnpack
         VM $vm,
         Variable $genVar,
         array $paramNames,
-        ?int $variadicParamIndex
+        ?int $variadicParamIndex,
+        ?string $functionName = null
     ): array {
         $gen = $genVar->toObject()->generatorState;
         $gen->rewind();
@@ -116,7 +120,7 @@ final class CallUnpack
             $pairs[] = [$keyCopy, $value];
         }
 
-        return self::entriesFromKeyedPairs($pairs, $paramNames, $variadicParamIndex);
+        return self::entriesFromKeyedPairs($pairs, $paramNames, $variadicParamIndex, $functionName);
     }
 
     /**
@@ -129,7 +133,8 @@ final class CallUnpack
         Frame $frame,
         Variable $iterable,
         array $paramNames,
-        ?int $variadicParamIndex
+        ?int $variadicParamIndex,
+        ?string $functionName = null
     ): array {
         $vm->invokeForeachInstanceMethod($frame, $iterable, 'rewind');
         $pairs = [];
@@ -142,7 +147,7 @@ final class CallUnpack
             $vm->invokeForeachInstanceMethod($frame, $iterable, 'next');
         }
 
-        return self::entriesFromKeyedPairs($pairs, $paramNames, $variadicParamIndex);
+        return self::entriesFromKeyedPairs($pairs, $paramNames, $variadicParamIndex, $functionName);
     }
 
     /**
@@ -154,10 +159,10 @@ final class CallUnpack
     private static function entriesFromKeyedPairs(
         iterable $pairs,
         array $paramNames,
-        ?int $variadicParamIndex
+        ?int $variadicParamIndex,
+        ?string $functionName = null
     ): array {
         $paramCount = \count($paramNames);
-        $lowerNames = array_map('strtolower', $paramNames);
         $entries = [];
         $hadNamed = false;
         $nextPositional = 0;
@@ -187,7 +192,7 @@ final class CallUnpack
             }
             $hadNamed = true;
             $name = $key->toString();
-            $idx = array_search(strtolower($name), $lowerNames, true);
+            $idx = BuiltinParamNames::lookupNamedParamIndex($paramNames, $name, $functionName);
             if (false === $idx) {
                 if (null !== $variadicParamIndex) {
                     $entries[] = ['n', $name, $value];

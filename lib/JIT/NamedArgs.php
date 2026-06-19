@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace PHPCompiler\JIT;
 
+use PHPCompiler\BuiltinParamNames;
 use PHPCfg\Operand;
 
 /**
@@ -22,7 +23,8 @@ final class NamedArgs
         array $entries,
         array $operands,
         array $paramNames,
-        ?int $variadicParamIndex
+        ?int $variadicParamIndex,
+        ?string $functionName = null
     ): array {
         if ([] === $entries) {
             return [[], []];
@@ -31,7 +33,7 @@ final class NamedArgs
         $normalized = self::normalizeEntries($entries, $operands);
         foreach ($normalized as $entry) {
             if ('n' === $entry['kind']) {
-                return self::resolveMixed($normalized, $paramNames, $variadicParamIndex);
+                return self::resolveMixed($normalized, $paramNames, $variadicParamIndex, $functionName);
             }
         }
 
@@ -83,10 +85,9 @@ final class NamedArgs
      *
      * @return array{0: list<Variable>, 1: list<Operand|null>}
      */
-    private static function resolveMixed(array $entries, array $paramNames, ?int $variadicParamIndex): array
+    private static function resolveMixed(array $entries, array $paramNames, ?int $variadicParamIndex, ?string $functionName = null): array
     {
         $paramCount = \count($paramNames);
-        $lowerNames = array_map('strtolower', $paramNames);
         /** @var array<int, Variable> $result */
         $result = [];
         /** @var array<int, Operand|null> $resultOperands */
@@ -116,9 +117,9 @@ final class NamedArgs
                 throw new \LogicException('Too many arguments to function call');
             }
 
-            $name = strtolower((string) $entry['name']);
+            $name = (string) $entry['name'];
             $value = $entry['value'];
-            $idx = array_search($name, $lowerNames, true);
+            $idx = BuiltinParamNames::lookupNamedParamIndex($paramNames, $name, $functionName);
             if (false === $idx) {
                 throw new \Error("Unknown named parameter \${$entry['name']}");
             }
