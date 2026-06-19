@@ -45,6 +45,7 @@ try {
     echo get_class($e), ': ', $e->getMessage(), "\n";
 }
 --EXPECT--
+get runs for empty()
 bool(true)
 virtual ok
 get runs for empty()

@@ -46,7 +46,8 @@ echo "ok\n";
 --EXPECT--
 true
 false
+true false
 false true
-false true
+get runs for isset
 bool(false)
 ok
