@@ -92,7 +92,7 @@ final class GcCollectCyclesRuntime
         self::implementGcUnregister($context);
         self::implementDestructTryInvoke($context);
         self::implementRunShutdownDestructors($context);
-        self::implementCollectCycles($context);
+        GcCollectCyclesCollectRuntime::implementCollectBridge($context);
 
         self::registerLinkedRuntime($context);
     }
@@ -362,64 +362,6 @@ final class GcCollectCyclesRuntime
         $context->builder->returnVoid();
         $context->builder->clearInsertionPosition();
         $context->registerFunction('phpc_gc_run_shutdown_destructors', $fn);
-    }
-
-    private static function implementCollectCycles(Context $context): void
-    {
-        $i64 = $context->getTypeFromString('int64');
-        $ft = $context->context->functionType($i64, false);
-        $fn = self::functionOrCreate($context, '__compiler_gc_collect_cycles', $ft);
-        if ($fn->countBasicBlocks() > 0) {
-            return;
-        }
-        $entry = $fn->appendBasicBlock('gc_collect_entry');
-        $early = $fn->appendBasicBlock('gc_collect_early');
-        $done = $fn->appendBasicBlock('gc_collect_done');
-        $work = $fn->appendBasicBlock('gc_collect_work');
-        $context->builder->positionAtEnd($entry);
-
-        $i32 = $context->getTypeFromString('int32');
-        $enabled = $context->builder->call($context->lookupFunction('phpc_gc_is_enabled'));
-        $isOff = $context->builder->icmp(Builder::INT_EQ, $enabled, $i32->constInt(0, false));
-        $context->builder->branchIf($isOff, $early, $work);
-
-        $context->builder->positionAtEnd($early);
-        $context->builder->branch($done);
-
-        $context->builder->positionAtEnd($work);
-        $one = $i32->constInt(1, false);
-        $zero = $i32->constInt(0, false);
-        $runningPtr = self::globalPtr($context, self::G_RUNNING, $i32);
-        $protectedPtr = self::globalPtr($context, self::G_PROTECTED, $i32);
-        $context->builder->store($one, $runningPtr);
-        $context->builder->store($one, $protectedPtr);
-        $runsPtr = self::globalPtr($context, self::G_RUNS, $i32);
-        $context->builder->store(
-            $context->builder->add(
-                $context->builder->load($runsPtr),
-                $one
-            ),
-            $runsPtr
-        );
-        $result = $context->builder->call($context->lookupFunction('phpc_gc_collect_cycles_impl'));
-        $totalPtr = self::globalPtr($context, self::G_TOTAL_COLLECTED, $i32);
-        $context->builder->store(
-            $context->builder->add($context->builder->load($totalPtr), $result),
-            $totalPtr
-        );
-        $context->builder->store($zero, $runningPtr);
-        $context->builder->store($zero, $protectedPtr);
-        $resultI64 = $context->builder->sextOrBitCast($result, $i64);
-        $context->builder->branch($done);
-
-        $context->builder->positionAtEnd($done);
-        $zero = $i64->constInt(0, false);
-        $retPhi = $context->builder->phi($i64);
-        $retPhi->addIncoming($zero, $early);
-        $retPhi->addIncoming($resultI64, $work);
-        $context->builder->returnValue($retPhi);
-        $context->builder->clearInsertionPosition();
-        $context->registerFunction('__compiler_gc_collect_cycles', $fn);
     }
 
     private static function ensureInternalDeclarations(Context $context): void
