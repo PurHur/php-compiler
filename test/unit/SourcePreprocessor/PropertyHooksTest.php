@@ -564,4 +564,40 @@ PHP;
         $runtime->run($block);
         self::assertSame('default', ob_get_clean());
     }
+
+    /** @covers issue #9729 — promoted ctor defaults must not match property-hook `{` scanner */
+    public function testSkipsPromotedConstructorParamDefaultBeforeMethodBody(): void
+    {
+        $src = <<<'PHP'
+<?php
+class D {
+    public function __construct(private(get) int $x = 1) {}
+}
+class E {
+    public function __construct(public int $y = 2) {}
+}
+PHP;
+        [$out] = (new PropertyHooks())->process($src);
+        self::assertStringContainsString('__construct(private(get) int $x = 1) {}', preg_replace('/\s+/', ' ', $out));
+        self::assertStringContainsString('__construct(public int $y = 2) {}', preg_replace('/\s+/', ' ', $out));
+        self::assertStringNotContainsString('__phpc_property_', $out);
+    }
+
+    /** @covers issue #9729 — promoted asymmetric visibility with defaults end-to-end */
+    public function testPromotedAsymmetricVisibilityWithDefaultSurvivesRuntimePreprocess(): void
+    {
+        $src = <<<'PHP'
+<?php
+class D {
+    public function __construct(private(set) int $x = 1) {}
+}
+$d = new D();
+echo $d->x, "\n";
+PHP;
+        $runtime = new Runtime();
+        $block = $runtime->parseAndCompile($src, 'promoted_asymmetric_default.php');
+        ob_start();
+        $runtime->run($block);
+        self::assertSame("1\n", ob_get_clean());
+    }
 }
