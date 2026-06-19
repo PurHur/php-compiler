@@ -49,10 +49,10 @@ final class CompilerVersion
         return version_compare(self::VERSION, '8.3', '>=');
     }
 
-    /** PHP 8.3+ `new` in class constant expressions (Zend/zend_compile.c, issue #9850). */
+    /** @deprecated Zend rejects `new` in class constants at compile time (#9974); always false. */
     public static function supportsClassConstObjectExpressions(): bool
     {
-        return version_compare(self::VERSION, '8.3', '>=');
+        return false;
     }
 
     /** PHP 8.4+ hexadecimal floating-point literals (Zend/zend_language_scanner.l, issue #7041). */

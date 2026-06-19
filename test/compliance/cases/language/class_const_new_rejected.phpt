@@ -1,14 +1,5 @@
 --TEST--
-Language: class constant expression must reject `new` on 8.2 target (#9517, Zend/zend_compile.c)
---SKIPIF--
-<?php
-if (!class_exists('PHPCompiler\\CompilerVersion')) {
-    require __DIR__ . '/../../../../vendor/autoload.php';
-}
-if (PHPCompiler\CompilerVersion::supportsClassConstObjectExpressions()) {
-    die('skip class const object expressions enabled on 8.3+ target');
-}
-?>
+Language: class constant expression must reject `new` (#9517, #9974, Zend/zend_compile.c)
 --FILE--
 <?php
 class C {
