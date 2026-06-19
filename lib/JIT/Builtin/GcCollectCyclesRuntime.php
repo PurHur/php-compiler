@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace PHPCompiler\JIT\Builtin;
 
 use PHPCompiler\JIT\Context;
+use PHPCompiler\VM\CycleCollector;
 use PHPLLVM\Builder;
 use PHPLLVM\Value;
 use PHPLLVM\Value\Function_ as LlvmFunction;
@@ -42,6 +43,14 @@ final class GcCollectCyclesRuntime
     private const G_MARKED = 'phpc_gc_marked';
 
     private const G_INBOUND = 'phpc_gc_inbound';
+
+    private const G_RUNNING = 'phpc_gc_running';
+
+    private const G_PROTECTED = 'phpc_gc_protected';
+
+    private const G_FULL = 'phpc_gc_full';
+
+    private const G_BUFFER_SIZE = 'phpc_gc_buffer_size';
 
     private static int $blockSuffix = 0;
 
@@ -378,11 +387,17 @@ final class GcCollectCyclesRuntime
         $context->builder->branch($done);
 
         $context->builder->positionAtEnd($work);
+        $one = $i32->constInt(1, false);
+        $zero = $i32->constInt(0, false);
+        $runningPtr = self::globalPtr($context, self::G_RUNNING, $i32);
+        $protectedPtr = self::globalPtr($context, self::G_PROTECTED, $i32);
+        $context->builder->store($one, $runningPtr);
+        $context->builder->store($one, $protectedPtr);
         $runsPtr = self::globalPtr($context, self::G_RUNS, $i32);
         $context->builder->store(
             $context->builder->add(
                 $context->builder->load($runsPtr),
-                $i32->constInt(1, false)
+                $one
             ),
             $runsPtr
         );
@@ -392,6 +407,8 @@ final class GcCollectCyclesRuntime
             $context->builder->add($context->builder->load($totalPtr), $result),
             $totalPtr
         );
+        $context->builder->store($zero, $runningPtr);
+        $context->builder->store($zero, $protectedPtr);
         $resultI64 = $context->builder->sextOrBitCast($result, $i64);
         $context->builder->branch($done);
 
@@ -1189,6 +1206,22 @@ final class GcCollectCyclesRuntime
             $ty = $i32->arrayType(self::MAX_OBJECTS);
             $g = $context->module->addGlobal($ty, self::G_INBOUND);
             $g->setInitializer($ty->constNull());
+        }
+        if (null === $context->module->getNamedGlobal(self::G_RUNNING)) {
+            $g = $context->module->addGlobal($i32, self::G_RUNNING);
+            $g->setInitializer($i32->constInt(0, false));
+        }
+        if (null === $context->module->getNamedGlobal(self::G_PROTECTED)) {
+            $g = $context->module->addGlobal($i32, self::G_PROTECTED);
+            $g->setInitializer($i32->constInt(0, false));
+        }
+        if (null === $context->module->getNamedGlobal(self::G_FULL)) {
+            $g = $context->module->addGlobal($i32, self::G_FULL);
+            $g->setInitializer($i32->constInt(0, false));
+        }
+        if (null === $context->module->getNamedGlobal(self::G_BUFFER_SIZE)) {
+            $g = $context->module->addGlobal($i32, self::G_BUFFER_SIZE);
+            $g->setInitializer($i32->constInt(CycleCollector::DEFAULT_BUFFER_SIZE, false));
         }
     }
 

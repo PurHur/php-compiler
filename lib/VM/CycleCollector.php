@@ -17,9 +17,19 @@ final class CycleCollector
     /** Zend GC root-buffer threshold (zend_gc.c default). */
     public const ROOT_THRESHOLD = 10001;
 
+    /** Zend GC_MAX_BUF_SIZE — zend_gc.c */
+    public const MAX_BUFFER_SIZE = 0x40000000;
+
+    /** Zend initial root-buffer capacity (zend_gc.c GC_ROOT_BUFFER_DEFAULT). */
+    public const DEFAULT_BUFFER_SIZE = 131072;
+
     private static int $runs = 0;
 
     private static int $totalCollected = 0;
+
+    private static bool $running = false;
+
+    private static bool $protected = false;
 
     public static function isEnabled(): bool
     {
@@ -37,17 +47,33 @@ final class CycleCollector
     }
 
     /**
-     * @return array{runs: int, collected: int, threshold: int, roots: int}
+     * @return array{
+     *     running: bool,
+     *     protected: bool,
+     *     full: bool,
+     *     runs: int,
+     *     collected: int,
+     *     threshold: int,
+     *     buffer_size: int,
+     *     roots: int
+     * }
      *
      * @see https://github.com/php/php-src/blob/master/ext/standard/php_gc.c PHP_FUNCTION(gc_status)
      */
     public static function status(Context $ctx): array
     {
+        $bufferSize = self::DEFAULT_BUFFER_SIZE;
+        $roots = self::countBufferedRoots($ctx);
+
         return [
+            'running' => self::$running,
+            'protected' => self::$protected,
+            'full' => $bufferSize > self::MAX_BUFFER_SIZE,
             'runs' => self::$runs,
             'collected' => self::$totalCollected,
             'threshold' => self::ROOT_THRESHOLD,
-            'roots' => self::countBufferedRoots($ctx),
+            'buffer_size' => $bufferSize,
+            'roots' => $roots,
         ];
     }
 
@@ -66,6 +92,8 @@ final class CycleCollector
         if (!GcToggleJitHelper::isEnabled()) {
             return 0;
         }
+        self::$running = true;
+        self::$protected = true;
         ++self::$runs;
         /** @var array<int, true> $marked */
         $marked = [];
@@ -93,6 +121,8 @@ final class CycleCollector
         }
 
         self::$totalCollected += $collected;
+        self::$running = false;
+        self::$protected = false;
 
         return $collected;
     }
