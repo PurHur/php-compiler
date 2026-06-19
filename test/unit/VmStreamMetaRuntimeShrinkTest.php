@@ -46,15 +46,33 @@ final class VmStreamMetaRuntimeShrinkTest extends TestCase
         $this->assertNotFalse($handle);
         $meta = VmFs::streamGetMetaData($handle);
         $this->assertInstanceOf(\PHPCompiler\VM\HashTable::class, $meta);
-        $foundUri = false;
+        $found = [
+            'uri' => false,
+            'unread_bytes' => false,
+            'seekable' => false,
+        ];
         foreach ($meta->iterateKeyed(false) as [$keyVar, $value]) {
-            if (Variable::TYPE_STRING === $keyVar->type && 'uri' === $keyVar->toString()) {
+            if (Variable::TYPE_STRING !== $keyVar->type) {
+                continue;
+            }
+            $key = $keyVar->toString();
+            if ('uri' === $key) {
                 $this->assertSame(Variable::TYPE_STRING, $value->type);
                 $this->assertSame('php://memory', $value->toString());
-                $foundUri = true;
+                $found['uri'] = true;
+            } elseif ('unread_bytes' === $key) {
+                $this->assertSame(Variable::TYPE_INTEGER, $value->type);
+                $this->assertSame(0, $value->toInt());
+                $found['unread_bytes'] = true;
+            } elseif ('seekable' === $key) {
+                $this->assertSame(Variable::TYPE_BOOLEAN, $value->type);
+                $this->assertTrue($value->toBool());
+                $found['seekable'] = true;
             }
         }
-        $this->assertTrue($foundUri);
+        $this->assertTrue($found['uri']);
+        $this->assertTrue($found['unread_bytes']);
+        $this->assertTrue($found['seekable']);
         VmFs::fclose($handle);
     }
 

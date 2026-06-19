@@ -12,8 +12,10 @@ namespace PHPCompiler\ext\standard;
  */
 final class VmStreamMeta
 {
-    /** @param resource $fp */
-    public static function buildMetaArray(string $uri, $fp): array
+    /**
+     * @param resource|null $fp host FILE* for plainfile streams; null for VmPhpMemoryStream et al.
+     */
+    public static function buildMetaArray(string $uri, $fp = null, ?bool $eofOverride = null): array
     {
         $isPhp = \str_starts_with($uri, 'php://');
         $isPhpMemory = \str_starts_with($uri, 'php://memory')
@@ -21,11 +23,12 @@ final class VmStreamMeta
             || \str_starts_with($uri, 'php://fd/');
 
         $socketType = self::streamTypeForUri($uri);
+        $eof = null !== $eofOverride ? $eofOverride : \feof($fp);
 
         return [
             'timed_out' => false,
             'blocked' => true,
-            'eof' => \feof($fp),
+            'eof' => $eof,
             'unread_bytes' => 0,
             'stream_type' => $socketType ?? ($isPhpMemory ? 'MEMORY' : ($isPhp ? 'STDIO' : 'STDIO')),
             'mode' => $isPhpMemory ? 'w+b' : 'r+b',
@@ -33,6 +36,25 @@ final class VmStreamMeta
             'uri' => $uri,
             'wrapper_type' => $isPhp ? 'PHP' : 'plainfile',
         ];
+    }
+
+    /** EOF for VM-native stream handles without host FILE* (php://memory, php://input, user streams). */
+    public static function eofForNativeHandle(int $handle): bool
+    {
+        if (VmPhpMemoryStream::isValidHandle($handle)) {
+            return VmPhpMemoryStream::eof($handle);
+        }
+        if (VmPhpInputOutputStream::isValidHandle($handle)) {
+            return VmPhpInputOutputStream::eof($handle);
+        }
+        if (VmPhpFdStream::isValidHandle($handle)) {
+            return VmPhpFdStream::eof($handle);
+        }
+        if (VmUserStream::isValidHandle($handle)) {
+            return VmUserStream::feof($handle);
+        }
+
+        return true;
     }
 
     public static function isLocalUri(string $uri): bool
