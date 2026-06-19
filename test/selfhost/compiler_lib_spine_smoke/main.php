@@ -388,6 +388,7 @@ require_once __DIR__.'/../../../ext/standard/JitDateTimestampArg.php';
 require_once __DIR__.'/../../../ext/standard/JitDebugBacktrace.php';
 require_once __DIR__.'/../../../ext/standard/JitDebugPrintBacktrace.php';
 require_once __DIR__.'/../../../ext/standard/JitDebugZvalDump.php';
+require_once __DIR__.'/../../../ext/standard/DefineJitHelper.php';
 require_once __DIR__.'/../../../ext/standard/JitDefine.php';
 require_once __DIR__.'/../../../ext/standard/JitDeployPath.php';
 require_once __DIR__.'/../../../ext/standard/JitDirname.php';
