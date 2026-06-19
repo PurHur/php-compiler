@@ -7,15 +7,15 @@ namespace PHPCompiler\Test\Unit;
 use PHPCompiler\ext\standard\CloneWithJitHelper;
 use PHPUnit\Framework\TestCase;
 
-/** Clone-with reinit JIT bridge uses PHP SSOT (#9498). */
+/** Clone-with reinit JIT/AOT bridge uses PHP SSOT (#9498, #9717). */
 final class CloneWithReinitRuntimeShrinkTest extends TestCase
 {
-    public function testCloneWithReinitRuntimeDelegatesToJitHelperOnJitPath(): void
+    public function testCloneWithReinitRuntimeUsesJitHelperOnly(): void
     {
         $source = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/CloneWithReinitRuntime.php');
         $this->assertStringContainsString('CloneWithJitHelper', $source);
-        $this->assertStringContainsString('CloneWithReinitRuntimeLlvm', $source);
-        $this->assertStringContainsString('LOAD_TYPE_STANDALONE', $source);
+        $this->assertStringNotContainsString('CloneWithReinitRuntimeLlvm', $source);
+        $this->assertFileDoesNotExist(__DIR__.'/../../lib/JIT/Builtin/CloneWithReinitRuntimeLlvm.php');
     }
 
     public function testCloneWithJitHelperReinitLifecycle(): void
