@@ -8498,10 +8498,11 @@ class Compiler {
         $keyOperand->type = Type::string();
         $keySlot = $block->registerConstant($keyOperand, $keyVar);
         $localSlot = $this->compileOperand($terminal->var, $block, false);
+        $declaredType = $this->staticVarDeclaredType($terminal);
         $typeSlot = null;
-        if (null !== $terminal->declaredType) {
-            $declType = $this->typeFromStaticVarDecl($terminal);
-            $typeSlot = $this->compileTypeConstrainedVariable($block, $declType, $terminal->declaredType);
+        if (null !== $declaredType) {
+            $declType = $this->typeFromStaticVarDecl($terminal, $declaredType);
+            $typeSlot = $this->compileTypeConstrainedVariable($block, $declType, $declaredType);
         }
 
         if (null === $terminal->defaultVar) {
@@ -8520,6 +8521,16 @@ class Compiler {
             if (!$this->isAllowedFunctionStaticDefaultType($defaultVm->type)) {
                 $this->throwCompileLogic(
                     'Function-local static initializer must be a compile-time literal in v1 (#2286)'
+                );
+            }
+            if (null !== $declaredType) {
+                $this->assertCompileTimeDefaultMatchesDeclaredType(
+                    $defaultVm,
+                    $declaredType,
+                    'static variable',
+                    '$'.$varName,
+                    $block,
+                    $defaultSlot
                 );
             }
 
@@ -8573,16 +8584,26 @@ class Compiler {
         return [[$skipOp, $storeOp, $jumpOp], $continueBlock];
     }
 
-    protected function typeFromStaticVarDecl(Op\Terminal\StaticVar $terminal): Type
+    protected function staticVarDeclaredType(Op\Terminal\StaticVar $terminal): ?Op\Type
     {
-        if ($terminal->declaredType instanceof Op\Type\Literal) {
-            return Type::fromDecl($terminal->declaredType->name);
-        }
-        if (null !== $terminal->declaredType) {
-            return Type::fromTypeDecl($terminal->declaredType);
+        if (!property_exists($terminal, 'declaredType')) {
+            return null;
         }
 
-        return Type::mixed();
+        return $terminal->declaredType;
+    }
+
+    protected function typeFromStaticVarDecl(Op\Terminal\StaticVar $terminal, ?Op\Type $declaredType = null): Type
+    {
+        $declaredType ??= $this->staticVarDeclaredType($terminal);
+        if (null === $declaredType) {
+            return Type::mixed();
+        }
+        if ($declaredType instanceof Op\Type\Literal) {
+            return Type::fromDecl($declaredType->name);
+        }
+
+        return Type::fromTypeDecl($declaredType);
     }
 
     protected function makeDeclareFunctionStaticOp(
