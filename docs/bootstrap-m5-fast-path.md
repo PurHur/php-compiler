@@ -187,6 +187,7 @@ Use these during LLVM/JIT iteration — avoid full spine relink unless you chang
 |------|------|
 | `BOOTSTRAP_VM_DRIVER_EXECUTE_PROBE_FULL_LINK=1` | VM probe must rebuild spine (post-entry edit, refresh gen-0) |
 | `BOOTSTRAP_ALLOW_STALE_SIDECAR=1` | Waive `check-selfhost-spine-sidecar-sync.php` during intentional gen-0 blob batch PRs only ([#8703](https://github.com/PurHur/php-compiler/issues/8703)) |
+| `BOOTSTRAP_INVENTORY_COMPILED_FIRST=1` | **Default-on** — inventory argv link tries native gen-0 drivers before Zend (#3053) |
 | `BOOTSTRAP_INVENTORY_MINIMAL_SIDECARS=1` | **Default-on** in `ci-defaults.env` — inventory argv link skips 2787-file spine sidecar host-compile (~20s) |
 | `BOOTSTRAP_INVENTORY_DRIVER_FULL=1` | Opt-in M4 full-revision inventory link (all 16 sidecars; slow) |
 | `BOOTSTRAP_FORCE_COMPILER_LIB_SIDECAR_REGEN=1` | Force honest full-spine sidecar host-compile (multi-hour) |

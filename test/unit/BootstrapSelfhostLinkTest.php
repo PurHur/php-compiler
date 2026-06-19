@@ -105,6 +105,8 @@ final class BootstrapSelfhostLinkTest extends TestCase
             .'    "${root}/build/selfhost-compile-driver"',
             $body
         );
+        $this->assertStringContainsString('bootstrap_inventory_argv_link', $body);
+        $this->assertStringContainsString('compiled-first', $body);
         $this->assertStringContainsString('(gen-0 compiled)', $body);
         $this->assertStringContainsString('(gen-0 Zend)', $body);
         $this->assertStringContainsString('BOOTSTRAP_ALLOW_GEN0_ZEND', $body);

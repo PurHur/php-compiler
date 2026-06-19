@@ -76,14 +76,27 @@ print_segfault_context() {
 bootstrap_ensure_m3_compiler_lib_sidecar 2>/dev/null || true
 export PHP_COMPILER_SELFHOST_AOT=1
 
-# Prefer committed prelinked gen-0 when unset — avoids Zend inventory emit SIGSEGV on bin/compile.php (#2930).
+# Compiled-first: seed gen-0 only when no working native driver under build/ (#2930, #3053).
 PRELINKED_GEN0="${ROOT}/prelinked/bootstrap-gen0/bin-compile-aot"
-if [[ "${BOOTSTRAP_LOOP_USE_EXISTING_BIN_COMPILE_AOT:-}" == "" && -x "${PRELINKED_GEN0}" ]]; then
-  BOOTSTRAP_LOOP_USE_EXISTING_BIN_COMPILE_AOT=1
+INVENTORY_DRIVER="${ROOT}/build/bin-compile-aot-inventory"
+if [[ "${BOOTSTRAP_LOOP_USE_EXISTING_BIN_COMPILE_AOT:-}" == "" ]]; then
+  if [[ -x "${INVENTORY_DRIVER}" ]] \
+    && bootstrap_inventory_argv_driver_smoke "${INVENTORY_DRIVER}" 2>/dev/null; then
+    BOOTSTRAP_LOOP_USE_EXISTING_BIN_COMPILE_AOT=1
+  elif [[ -x "${DRIVER}" ]] \
+    && bootstrap_inventory_argv_driver_smoke "${DRIVER}" 2>/dev/null; then
+    BOOTSTRAP_LOOP_USE_EXISTING_BIN_COMPILE_AOT=1
+  fi
 fi
-if [[ "${BOOTSTRAP_LOOP_USE_EXISTING_BIN_COMPILE_AOT:-0}" == "1" && -x "${PRELINKED_GEN0}" ]]; then
-  cp -f "${PRELINKED_GEN0}" "${DRIVER}"
-  chmod +x "${DRIVER}"
+if [[ "${BOOTSTRAP_LOOP_USE_EXISTING_BIN_COMPILE_AOT:-0}" == "1" ]]; then
+  if [[ -x "${INVENTORY_DRIVER}" ]] \
+    && bootstrap_inventory_argv_driver_smoke "${INVENTORY_DRIVER}" 2>/dev/null; then
+    cp -f "${INVENTORY_DRIVER}" "${DRIVER}"
+    chmod +x "${DRIVER}"
+  elif [[ -x "${PRELINKED_GEN0}" && ! -x "${DRIVER}" ]]; then
+    cp -f "${PRELINKED_GEN0}" "${DRIVER}"
+    chmod +x "${DRIVER}"
+  fi
 fi
 
 rm -f "${GEN3}"

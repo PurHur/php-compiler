@@ -248,10 +248,41 @@ bootstrap_ensure_m3_compiler_lib_sidecar() {
   fi
   local prelinked_lib="${root}/prelinked/bootstrap-gen0/compiler_lib_aot_blob"
   local regen_tmp="${blob}.regen.$$"
-  echo "bootstrap-ensure-m3-compiler-lib-sidecar: honest Zend host-compile spine entry -> ${blob} (#8559)" >&2
+  echo "bootstrap-ensure-m3-compiler-lib-sidecar: compiled-first spine sidecar -> ${blob} (#8559)" >&2
   mkdir -p "${root}/build"
   rm -f "${regen_tmp}"
   local regen_log regen_code=0
+  if ! declare -F bootstrap_compile_invoke >/dev/null 2>&1; then
+    # shellcheck source=bootstrap-resolve-compile-invoke.sh
+    source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/bootstrap-resolve-compile-invoke.sh"
+  fi
+  bootstrap_inventory_argv_link_sidecar_prep 2>/dev/null || true
+  set +e
+  regen_log="$(
+    bootstrap_compile_invoke "${regen_tmp}" "${entry}" env \
+      PHP_COMPILER_M3_EMIT_SIDECAR_RECURSION_GUARD=1 \
+      PHP_COMPILER_SELFHOST_AOT=1 \
+      PHP_COMPILER_LIB_SPINE_BUNDLE=1 \
+      PHP_COMPILER_MEMORY_LIMIT="${mem_limit}" 2>&1
+  )"
+  regen_code=$?
+  set -e
+  if [[ "${regen_code}" -eq 0 && -f "${regen_tmp}" && -s "${regen_tmp}" ]]; then
+    mv -f "${regen_tmp}" "${blob}"
+    chmod +x "${blob}"
+    printf '%s' "${want_sha}" >"${stamp}"
+    if [[ -f "${prelinked_lib}" ]] && ! cmp -s "${blob}" "${prelinked_lib}"; then
+      cp -f "${blob}" "${prelinked_lib}"
+      chmod +x "${prelinked_lib}"
+      printf '%s' "${want_sha}" >"${root}/prelinked/bootstrap-gen0/.m3_compiler_lib_sidecar.sha"
+      echo "bootstrap-ensure-m3-compiler-lib-sidecar: refreshed prelinked ${prelinked_lib} (#8559)" >&2
+    fi
+    return 0
+  fi
+  rm -f "${regen_tmp}"
+  printf '%s\n' "${regen_log}" >&2
+  echo "bootstrap-ensure-m3-compiler-lib-sidecar: compiled-first host-compile failed (exit ${regen_code}); trying Zend (#8559)" >&2
+  rm -f "${regen_tmp}"
   set +e
   # Do not set PHP_COMPILER_CLI_SPINE_BUNDLE here — that skips bin/compile.php argv dispatch (#1492).
   regen_log="$(bootstrap_compiler_lib_honest_zend_compile "${regen_tmp}" "${entry}" sidecar 2>&1)"

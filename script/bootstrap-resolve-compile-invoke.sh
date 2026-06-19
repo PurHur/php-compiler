@@ -344,6 +344,102 @@ bootstrap_inventory_argv_driver_m4_smoke() {
   return 0
 }
 
+# Seed build/bin-compile-aot from prelinked when empty so compiled-first has a gen-0 driver (#3053).
+bootstrap_ensure_gen0_seed_driver() {
+  local root="${ROOT:-}"
+  if [[ -z "${root}" ]]; then
+    return 1
+  fi
+  if [[ -x "${root}/build/bin-compile-aot" ]]; then
+    return 0
+  fi
+  if ! declare -F bootstrap_gen0_install_prelinked_driver >/dev/null 2>&1; then
+    # shellcheck source=bootstrap-gen0-install-prelinked-driver.sh
+    source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/bootstrap-gen0-install-prelinked-driver.sh"
+  fi
+  bootstrap_gen0_install_prelinked_driver
+}
+
+# Sidecar + gen-0 seed prep before inventory argv link (compiled-first or Zend bisect).
+bootstrap_inventory_argv_link_sidecar_prep() {
+  local root="${ROOT:-}"
+  if [[ -z "${root}" ]]; then
+    return 1
+  fi
+  if ! declare -F bootstrap_gen0_seed_prelinked_m3_sidecars >/dev/null 2>&1; then
+    # shellcheck source=bootstrap-gen0-install-prelinked-driver.sh
+    source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/bootstrap-gen0-install-prelinked-driver.sh"
+  fi
+  bootstrap_gen0_seed_prelinked_m3_sidecars 2>/dev/null || true
+  bootstrap_ensure_m3_compiler_lib_sidecar 2>/dev/null || true
+  bootstrap_ensure_gen0_seed_driver 2>/dev/null || true
+}
+
+# Inventory argv env for bin/compile.php link (minimal sidecars default-on — #1492).
+bootstrap_inventory_argv_link_minimal_flags() {
+  if [[ "${BOOTSTRAP_INVENTORY_DRIVER_FULL:-0}" == "1" ]]; then
+    echo 0
+  elif [[ "${BOOTSTRAP_INVENTORY_MINIMAL_SIDECARS:-1}" == "1" ]]; then
+    echo 1
+  else
+    echo 0
+  fi
+}
+
+# Link inventory argv driver: compiled drivers first, prelinked fallback, Zend bisect last (#2930, #3053).
+bootstrap_inventory_argv_link() {
+  local out=$1
+  local root="${ROOT:-}"
+  local entry="${root}/bin/compile.php"
+  if [[ -z "${root}" || -z "${out}" ]]; then
+    echo "bootstrap-inventory-argv-link: ROOT/out unset" >&2
+    return 1
+  fi
+  if [[ ! -f "${entry}" ]]; then
+    echo "bootstrap-inventory-argv-link: missing ${entry}" >&2
+    return 1
+  fi
+  if ! declare -F bootstrap_gen0_copy_prelinked_inventory_driver >/dev/null 2>&1; then
+    # shellcheck source=bootstrap-gen0-install-prelinked-driver.sh
+    source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/bootstrap-gen0-install-prelinked-driver.sh"
+  fi
+  if [[ "${BOOTSTRAP_INVENTORY_DRIVER_USE_PRELINKED:-0}" == "1" ]]; then
+    if bootstrap_gen0_copy_prelinked_inventory_driver "${out}" "" "${out}"; then
+      echo "bootstrap-inventory-argv-link: OK ${out} (prelinked only; BOOTSTRAP_INVENTORY_DRIVER_USE_PRELINKED=1)" >&2
+      return 0
+    fi
+    return 1
+  fi
+  bootstrap_inventory_argv_link_sidecar_prep
+  local _inventory_minimal
+  _inventory_minimal="$(bootstrap_inventory_argv_link_minimal_flags)"
+  rm -f "${out}"
+  if bootstrap_compile_invoke "${out}" "${entry}" env \
+    -u PHP_COMPILER_EMIT_HELPER_LINK \
+    PHP_COMPILER_SELFHOST_AOT=1 \
+    PHP_COMPILER_M3_COMPILE_DRIVER=1 \
+    PHP_COMPILER_M3_COMPILE_DRIVER_MAIN=1 \
+    PHP_COMPILER_M4_BIN_COMPILE_DRIVER=1 \
+    PHP_COMPILER_M3_INVENTORY_EMIT_DRIVER=1 \
+    BOOTSTRAP_M3_USE_INVENTORY_EMIT_DRIVER=1 \
+    PHP_COMPILER_M3_EMIT_LOG_PREFIX=helloworld_compile_smoke \
+    PHP_COMPILER_M3_INVENTORY_MINIMAL_SIDECARS="${_inventory_minimal}" \
+    PHP_COMPILER_M3_REUSE_STALE_COMPILER_LIB_SIDECAR="${_inventory_minimal}"; then
+    if [[ -x "${out}" && -s "${out}" ]]; then
+      cp -f "${out}" "${root}/build/.m3_bin_compile_aot_blob"
+      chmod +x "${root}/build/.m3_bin_compile_aot_blob"
+    fi
+    echo "bootstrap-inventory-argv-link: OK ${out} (gen-0 compiled; emit_path=${BOOTSTRAP_COMPILE_DRIVER_MODE:-native})" >&2
+    return 0
+  fi
+  echo "bootstrap-inventory-argv-link: compiled-first inventory emit failed; trying prelinked gen-0 (#2930)" >&2
+  if bootstrap_gen0_copy_prelinked_inventory_driver "${out}" "" "${out}"; then
+    echo "bootstrap-inventory-argv-link: OK ${out} (prelinked fallback)" >&2
+    return 0
+  fi
+  return 1
+}
+
 # Build or refresh build/bin-compile-aot-inventory for M4 full-revision / spine argv paths (#3012).
 bootstrap_ensure_inventory_argv_driver() {
   local root="${ROOT:-}"
@@ -403,33 +499,12 @@ bootstrap_ensure_inventory_argv_driver() {
       return 1
     fi
   fi
-  echo "bootstrap-ensure-inventory-argv-driver: building inventory argv driver ${out} (#3012)" >&2
-  bootstrap_gen0_seed_prelinked_m3_sidecars 2>/dev/null || true
-  bootstrap_ensure_m3_compiler_lib_sidecar 2>/dev/null || true
-  # Prefer Zend inventory emit; stale prelinked gen-0 can print compile OK without writing -o (#3046).
-  if ! env BOOTSTRAP_INVENTORY_DRIVER_USE_PRELINKED=0 \
-    PHP_COMPILER_M3_SOURCE="${root}/bin/compile.php" PHP_COMPILER_M3_OUT="${out}" \
-    "${root}/script/bootstrap-selfhost-helloworld-compile-bin.sh"; then
-    local prelink="${root}/prelinked/bootstrap-gen0/bin-compile-aot"
-    if [[ -x "${prelink}" ]]; then
-      echo "bootstrap-ensure-inventory-argv-driver: helloworld-compile-bin failed; trying prelinked gen-0 (#3053)" >&2
-      mkdir -p "${root}/build"
-      cp -f "${prelink}" "${out}"
-      cp -f "${prelink}" "${root}/build/.m3_bin_compile_aot_blob"
-      chmod +x "${out}" "${root}/build/.m3_bin_compile_aot_blob"
-      if bootstrap_inventory_argv_driver_accepts "${out}"; then
-        bootstrap_ensure_m3_compiler_lib_sidecar 2>/dev/null || true
-        return 0
-      fi
-    fi
-    echo "bootstrap-ensure-inventory-argv-driver: helloworld-compile-bin failed" >&2
+  echo "bootstrap-ensure-inventory-argv-driver: building inventory argv driver ${out} (#3012, compiled-first)" >&2
+  if ! bootstrap_inventory_argv_link "${out}"; then
+    echo "bootstrap-ensure-inventory-argv-driver: inventory argv link failed" >&2
     return 1
   fi
   bootstrap_ensure_m3_compiler_lib_sidecar 2>/dev/null || true
-  if [[ -x "${out}" && -s "${out}" ]]; then
-    cp -f "${out}" "${root}/build/.m3_bin_compile_aot_blob"
-    chmod +x "${root}/build/.m3_bin_compile_aot_blob"
-  fi
   if ! bootstrap_is_inventory_bin_compile_argv_driver "${out}"; then
     echo "bootstrap-ensure-inventory-argv-driver: ${out} is not a verified inventory argv driver" >&2
     return 1
