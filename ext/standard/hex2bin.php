@@ -39,7 +39,7 @@ final class hex2bin extends Internal
         $len = VmString::byteLength($data);
         if ($len > 0 && 0 !== ($len & 1)) {
             if ($strict) {
-                throw new \ValueError(self::MSG_ODD_LENGTH);
+                throw new \Error(self::MSG_ODD_LENGTH);
             }
             if (null !== $frame->vmContext) {
                 $frame->vmContext->errors->triggerError(
@@ -56,14 +56,10 @@ final class hex2bin extends Internal
 
             return;
         }
-        try {
-            $result = VmString::hex2bin($data, $strict);
-        } catch (\ValueError $e) {
-            throw $e;
-        }
+        $result = VmString::hex2bin($data, $strict);
         if (false === $result) {
             if ($strict) {
-                throw new \ValueError(self::MSG_INVALID_HEX);
+                throw new \Error(self::MSG_INVALID_HEX);
             }
             if ($len > 0 && null !== $frame->vmContext) {
                 $frame->vmContext->errors->triggerError(

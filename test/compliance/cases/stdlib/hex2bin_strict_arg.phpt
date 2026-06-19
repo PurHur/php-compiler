@@ -1,5 +1,5 @@
 --TEST--
-stdlib hex2bin() — $strict throws ValueError (issue #4966)
+stdlib hex2bin() — $strict throws Error (issue #4966, #10072)
 --FILE--
 <?php
 var_export(hex2bin('4142'));
@@ -16,13 +16,13 @@ echo "\n";
 try {
     hex2bin('41zz', true);
     echo "no throw\n";
-} catch (ValueError $e) {
+} catch (Error $e) {
     echo 'strict ok:', $e->getMessage(), "\n";
 }
 try {
     hex2bin('abc', true);
     echo "odd no throw\n";
-} catch (ValueError $e) {
+} catch (Error $e) {
     echo 'odd strict:', $e->getMessage(), "\n";
 }
 --EXPECT--

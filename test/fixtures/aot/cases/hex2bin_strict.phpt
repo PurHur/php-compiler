@@ -1,5 +1,5 @@
 --TEST--
-AOT: hex2bin() $strict on valid input (issue #4966; ValueError in VM/JIT compliance)
+AOT: hex2bin() $strict on valid input (issue #4966)
 --FILE--
 <?php
 echo bin2hex(hex2bin('4142')), "\n";
