@@ -1695,6 +1695,7 @@ require_once __DIR__.'/../../../ext/standard/utf8_encode.php';
 require_once __DIR__.'/../../../ext/standard/var_dump.php';
 require_once __DIR__.'/../../../ext/standard/var_dump_.php';
 require_once __DIR__.'/../../../ext/standard/var_export.php';
+require_once __DIR__.'/../../../ext/standard/VersionCompareJitHelper.php';
 require_once __DIR__.'/../../../ext/standard/version_compare.php';
 require_once __DIR__.'/../../../ext/standard/vfprintf_.php';
 require_once __DIR__.'/../../../ext/standard/vfscanf.php';
