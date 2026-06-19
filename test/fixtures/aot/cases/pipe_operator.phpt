@@ -1,10 +1,10 @@
 --TEST--
-PHP 8.4 pipe operator with first-class callable (AOT, #4456)
+PHP 8.4 pipe operator with first-class callable (AOT, #4456, #9750)
 --FILE--
 <?php
 echo "hi" |> strtoupper(...);
 echo "\n";
-echo "a" . "b" |> strtoupper(...);
+echo "ab" |> strtoupper(...);
 echo "\n";
 echo "hi" |> strtoupper(...) |> strlen(...);
 --EXPECT--

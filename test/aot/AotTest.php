@@ -58,10 +58,8 @@ class AotTest extends BaseTest
                 && (str_contains($name, 'str_increment') || str_contains($name, 'str_decrement'))) {
                 continue;
             }
-            // Pipe operator AOT: compile segfault pre-existing (#4456); VM + JIT desugar path green (#7219).
-            if (str_contains($name, 'pipe_operator')) {
-                continue;
-            }
+            // Pipe operator AOT: enabled after AssertOptionsRuntime CFG fix (#9750).
+            // Concat-on-LHS (`"a" . "b" |> f`) remains VM/JIT-only until inline concat-in-call AOT lands.
             yield $name => $case;
         }
     }
