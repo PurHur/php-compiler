@@ -138,15 +138,7 @@ final class BuiltinParamNames
      */
     public static function aliasesForFunction(string $name): array
     {
-        switch (strtolower($name)) {
-            case 'number_format':
-                return [
-                    'dec_point' => 2,
-                    'thousands_sep' => 3,
-                ];
-            default:
-                return [];
-        }
+        return [];
     }
 
     /**

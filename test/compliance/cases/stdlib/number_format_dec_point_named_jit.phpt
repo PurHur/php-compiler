@@ -1,8 +1,12 @@
 --TEST--
-stdlib number_format() dec_point:/thousands_sep: PHP 8.4 named aliases (JIT/AOT, #10015)
+stdlib number_format() dec_point:/thousands_sep: unknown named params Error (JIT/AOT, #10132)
 --FILE--
 <?php
-echo number_format(1234.5, 2, dec_point: ',', thousands_sep: '.'), "\n";
+try {
+    number_format(1234.5, 2, dec_point: ',', thousands_sep: '.');
+} catch (\Error $e) {
+    echo $e->getMessage(), "\n";
+}
 ?>
 --EXPECT--
-1.234,50
+Unknown named parameter $dec_point
