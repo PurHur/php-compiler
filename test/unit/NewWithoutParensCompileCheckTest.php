@@ -8,7 +8,7 @@ use PHPCompiler\Compiler\NewWithoutParensCompileCheck;
 use PHPCompiler\Runtime;
 use PHPUnit\Framework\TestCase;
 
-/** `new` in class constant initializers (#6549, #9484); property defaults allowed (#5362). */
+/** `new` in class constant initializers (#6549, #9484, #9804); property defaults allowed (#5362). */
 final class NewWithoutParensCompileCheckTest extends TestCase
 {
     public function testClassConstNewWithoutParensCompileErrors(): void
@@ -46,44 +46,8 @@ PHP, 'new_with_parens.php');
         $this->assertNotNull($block);
     }
 
-    public function testClassConstNewWithParensCompilesOn83Target(): void
+    public function testClassConstNewWithParensCompileErrors(): void
     {
-        if (!\PHPCompiler\CompilerVersion::supportsNewInClassConstantExpr()) {
-            $this->markTestSkipped('PHP 8.3+ class constant new expressions not enabled');
-        }
-        $runtime = new Runtime();
-        $block = $runtime->parseAndCompile(<<<'PHP'
-<?php
-class C {
-    public function __construct(public int $n = 0) {}
-}
-class Holder {
-    public const X = new C(1);
-}
-PHP, 'new_in_class_const.php');
-        $this->assertNotNull($block);
-    }
-
-    public function testClassConstNewEmptyArgsWithParensCompilesOn83Target(): void
-    {
-        if (!\PHPCompiler\CompilerVersion::supportsNewInClassConstantExpr()) {
-            $this->markTestSkipped('PHP 8.3+ class constant new expressions not enabled');
-        }
-        $runtime = new Runtime();
-        $block = $runtime->parseAndCompile(<<<'PHP'
-<?php
-class C {
-    public const X = new stdClass();
-}
-PHP, 'new_stdclass_class_const.php');
-        $this->assertNotNull($block);
-    }
-
-    public function testClassConstNewWithParensCompileErrorsWhenDisabled(): void
-    {
-        if (\PHPCompiler\CompilerVersion::supportsNewInClassConstantExpr()) {
-            $this->markTestSkipped('new in class constants enabled on this target');
-        }
         $this->expectCompileError(<<<'PHP'
 <?php
 class C {
@@ -95,11 +59,8 @@ class Holder {
 PHP);
     }
 
-    public function testClassConstNewEmptyArgsWithParensCompileErrorsWhenDisabled(): void
+    public function testClassConstNewEmptyArgsWithParensCompileErrors(): void
     {
-        if (\PHPCompiler\CompilerVersion::supportsNewInClassConstantExpr()) {
-            $this->markTestSkipped('new in class constants enabled on this target');
-        }
         $this->expectCompileError(<<<'PHP'
 <?php
 class C {
@@ -108,25 +69,17 @@ class C {
 PHP);
     }
 
-    public function testVmNewInClassConstantMaterializesObject(): void
+    public function testClassConstArrayWithNewCompileErrors(): void
     {
-        if (!\PHPCompiler\CompilerVersion::supportsNewInClassConstantExpr()) {
-            $this->markTestSkipped('PHP 8.3+ class constant new expressions not enabled');
-        }
-        $runtime = new Runtime();
-        $code = <<<'PHP'
+        $this->expectCompileError(<<<'PHP'
 <?php
 class C {
     public function __construct(public int $n = 0) {}
 }
 class Holder {
-    public const X = new C(1);
+    public const X = [new C()];
 }
-var_dump(Holder::X->n);
-PHP;
-        ob_start();
-        $runtime->run($runtime->parseAndCompile($code, 'new_in_constant.php'));
-        self::assertSame("int(1)\n", ob_get_clean());
+PHP);
     }
 
     private function expectCompileError(string $code): void
