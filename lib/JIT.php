@@ -700,6 +700,10 @@ class JIT {
      */
     private function shouldStubInventoryEmitParseCompileSpine(): bool
     {
+        if ($this->shouldUseM4InventoryArgvNativeEmitRebuild()) {
+            // M4 bin/compile.php without inventory emit keeps stub spine (#2930); inventory emit needs sidecars + parse (#2967).
+            return !$this->shouldUseM3InventoryEmitDriver();
+        }
         if (!$this->shouldStubInventoryEmitHelperBundledBodies()) {
             return false;
         }
@@ -888,6 +892,14 @@ class JIT {
         return $this->isM4BinCompileScriptMain($block) && $this->shouldUseHelloworldBinCompileInventoryArgvLink();
     }
 
+    /**
+     * Inventory argv drivers must real-lower Runtime::parse when not on the M4 stub-spine rebuild path (#2967, #3028).
+     */
+    private function shouldRealLowerInventoryArgvParseSpine(): bool
+    {
+        return $this->shouldUseM3InventoryEmitDriver() && $this->shouldUseM3CompileDriverRealLowering();
+    }
+
     /** Inventory emit TU is compile_driver.php — do not host-compile it again as a link sidecar (#2843). */
     private function shouldSkipM3InventoryEmitDriverSelfSidecar(string $path): bool
     {
@@ -948,8 +960,30 @@ class JIT {
         if (!$this->isM3CompileDriverScriptMain($block)) {
             return false;
         }
+        $path = str_replace('\\', '/', $block->scriptPath());
+        if ('' === $path) {
+            $fromCtx = $this->context->aotSourceFilename ?? '';
+            $path = str_replace('\\', '/', is_string($fromCtx) ? $fromCtx : '');
+        }
 
-        return str_ends_with(str_replace('\\', '/', $block->scriptPath()), '/bin/compile.php');
+        return str_ends_with($path, '/bin/compile.php');
+    }
+
+    /**
+     * M4 inventory argv rebuild of bin/compile.php — native emitMainEntry {main}, stub parse spine,
+     * no BIN_COMPILE sidecar copy on standalone (#2930).
+     */
+    private function shouldUseM4InventoryArgvNativeEmitRebuild(?Block $block = null): bool
+    {
+        if (!$this->shouldUseM4BinCompileArgvMainNative() || $this->shouldUseM5DriverHostCompile()) {
+            return false;
+        }
+        $main = $block ?? $this->m3CompileDriverMainBlock;
+        if (null === $main || !$this->isM4BinCompileScriptMain($main)) {
+            return false;
+        }
+
+        return !$this->shouldUseM3InventoryEmitForCompileDriverBlock($main);
     }
 
     /** M5 emit sidecar host-compile targets — stub {main} under self-host AOT (#2697, #2699). */
@@ -2838,6 +2872,19 @@ class JIT {
         if ($this->isM3EmitTuRuntimeSpineLoweringName($lower)) {
             return false;
         }
+        // M4 inventory argv rebuild: {main} is native emitMainEntry — skip PHP argv driver bodies (#2930).
+        if ($this->shouldUseM4InventoryArgvNativeEmitRebuild()) {
+            if ('run' === $lower
+                || str_ends_with($lower, '\\php_compiler_cli_dispatch')
+                || str_ends_with($lower, '\\php_compiler_cli_should_run_entry_driver')
+                || str_ends_with($lower, '\\php_compiler_cli_should_skip_entry_driver')
+                || str_ends_with($lower, '\\php_compiler_cli_note_progress')
+                || str_ends_with($lower, '\\php_compiler_cli_note_invocation_cwd')
+                || str_ends_with($lower, '\\php_compiler_cli_minimal_autoload')
+            ) {
+                return true;
+            }
+        }
         // Inventory emit-helper bundles compile_driver.php; PHP CFG for argv driver crashes at {main} (#2540).
         if ($this->shouldStubInventoryEmitHelperBundledBodies()) {
             if ($this->isBootstrapHelloWorldSmokeName($lower)
@@ -3368,6 +3415,15 @@ class JIT {
     private function compileM3CompileDriverMainNative(string $internalName, Block $block, ?string $logicalName): PHPLLVM\Value
     {
         $lcname = strtolower($logicalName ?? '{main}');
+        if ($this->isM4BinCompileScriptMain($block)
+            && ($this->shouldUseM4BinCompileArgvMainNative() || $this->shouldUseHelloworldBinCompileInventoryArgvLink())
+        ) {
+            unset(
+                $this->context->functions[$lcname],
+                $this->context->functionReturnType[$lcname],
+                $this->context->functionProxies[$lcname]
+            );
+        }
         if (isset($this->context->functions[$lcname])) {
             return $this->context->functions[$lcname];
         }
@@ -3406,11 +3462,14 @@ class JIT {
                     $this->context->functionReturnType[$standaloneLc],
                     $this->context->functionProxies[$standaloneLc]
                 );
-                $this->emitM3EmitTuRuntimeStandaloneStubNative(
-                    $this->llvmInternalName('PHPCompiler\\Runtime::standalone'),
-                    'PHPCompiler\\Runtime::standalone',
-                    $this->m3CompileDriverMainBlock
-                );
+                if (!$this->shouldUseM4InventoryArgvNativeEmitRebuild($this->m3CompileDriverMainBlock)
+                    || \PHPCompiler\JIT\M3EmitTuTrivialEchoAot::isRegistered($this->context)) {
+                    $this->emitM3EmitTuRuntimeStandaloneStubNative(
+                        $this->llvmInternalName('PHPCompiler\\Runtime::standalone'),
+                        'PHPCompiler\\Runtime::standalone',
+                        $this->m3CompileDriverMainBlock
+                    );
+                }
             }
             \PHPCompiler\JIT\BootstrapCompileSmokeM3Emit::emitMainEntry($this->context, $logPrefix);
         } else {
@@ -3547,7 +3606,10 @@ class JIT {
         }
         if (
             null !== $this->m3CompileDriverMainBlock
-            && $this->shouldUseM3InventoryEmitForCompileDriverBlock($this->m3CompileDriverMainBlock)
+            && (
+                $this->shouldUseM3InventoryEmitForCompileDriverBlock($this->m3CompileDriverMainBlock)
+                || $this->shouldUseM4InventoryArgvNativeEmitRebuild($this->m3CompileDriverMainBlock)
+            )
         ) {
             $this->compileM3EmitTuRuntimeParseAndCompileNativeDecl([
                 'parseandcompile' => true,
@@ -3581,20 +3643,33 @@ class JIT {
         $savedClassName = $this->context->scope->className;
         $this->context->scope->classId = $this->context->type->object->lookup('PHPCompiler\\Runtime');
         $this->context->scope->className = 'phpcompiler\\runtime';
-        foreach ([
-            'preprocesssourceforparse',
-            'rewritesourcebeforeparser',
-            'preparesourceforparser',
-            'parse',
-            'compileemitsmoke',
-        ] as $spineLc) {
-            $spineLcKey = strtolower('PHPCompiler\\Runtime::'.$spineLc);
-            if (isset($this->context->functions[$spineLcKey])) {
-                continue;
+        $forceRealParseSpine = $this->shouldRealLowerInventoryArgvParseSpine();
+        if ($forceRealParseSpine) {
+            foreach (['preprocesssourceforparse', 'rewritesourcebeforeparser', 'preparesourceforparser', 'parse', 'compileemitsmoke'] as $spineLc) {
+                $spineLcKey = strtolower('PHPCompiler\\Runtime::'.$spineLc);
+                unset(
+                    $this->context->functions[$spineLcKey],
+                    $this->context->functionReturnType[$spineLcKey],
+                    $this->context->functionProxies[$spineLcKey]
+                );
             }
-            $this->compileM3EmitTuRuntimeMethodFromQueue($spineLc);
-            if (!isset($this->context->functions[$spineLcKey])) {
-                $this->compileM3EmitTuRuntimeMethodFromModules($spineLc);
+        }
+        if (!$this->shouldUseM4InventoryArgvNativeEmitRebuild()) {
+            foreach ([
+                'preprocesssourceforparse',
+                'rewritesourcebeforeparser',
+                'preparesourceforparser',
+                'parse',
+                'compileemitsmoke',
+            ] as $spineLc) {
+                $spineLcKey = strtolower('PHPCompiler\\Runtime::'.$spineLc);
+                if (isset($this->context->functions[$spineLcKey])) {
+                    continue;
+                }
+                $this->compileM3EmitTuRuntimeMethodFromQueue($spineLc);
+                if (!isset($this->context->functions[$spineLcKey])) {
+                    $this->compileM3EmitTuRuntimeMethodFromModules($spineLc);
+                }
             }
         }
         $this->runQueue();
@@ -4153,13 +4228,6 @@ class JIT {
                 'PHPCompiler\\JIT\\M3EmitTuTrivialEchoAot::compileSmokeSentinelBlock'
             );
             if (!$minimalSidecars) {
-                // M2 lib spine smoke via inventory argv driver (#2967): same sidecar as compile_smoke_m3_emit branch.
-                $this->registerM3EmitTuSidecarFromPath(
-                    $repoRoot.'/test/selfhost/compiler_lib_spine_smoke/main.php',
-                    \PHPCompiler\JIT\M3EmitTuTrivialEchoAot::COMPILER_LIB_SIDECAR_REL,
-                    'PHPCompiler\\JIT\\M3EmitTuTrivialEchoAot::compilerLibSentinelBlock',
-                    true
-                );
                 // Gen-3 argv driver (full revision) must be able to emit non-smoke fixtures (eg compiler unit probe)
                 // without falling back to compile_smoke_m3_emit helpers (#2900, #2925).
                 $this->registerM3EmitTuSidecarFromPath(
@@ -4188,25 +4256,27 @@ class JIT {
                 \PHPCompiler\JIT\M3EmitTuTrivialEchoAot::COMPILER_MINIMAL_SIDECAR_REL,
                 'PHPCompiler\\JIT\\M3EmitTuTrivialEchoAot::compilerMinimalSentinelBlock'
             );
+            // Minimal inventory argv links still compile spine smoke — reuse committed/stale sidecar (#3012, #2967).
+            $this->registerM3EmitTuSidecarFromPath(
+                $repoRoot.'/test/selfhost/compiler_lib_spine_smoke/main.php',
+                \PHPCompiler\JIT\M3EmitTuTrivialEchoAot::COMPILER_LIB_SIDECAR_REL,
+                'PHPCompiler\\JIT\\M3EmitTuTrivialEchoAot::compilerLibSentinelBlock',
+                true
+            );
             if (!$minimalSidecars) {
-                // Inventory argv driver (helloworld prefix) compiles spine smoke — register sidecar (#3012).
-                $this->registerM3EmitTuSidecarFromPath(
-                    $repoRoot.'/test/selfhost/compiler_lib_spine_smoke/main.php',
-                    \PHPCompiler\JIT\M3EmitTuTrivialEchoAot::COMPILER_LIB_SIDECAR_REL,
-                    'PHPCompiler\\JIT\\M3EmitTuTrivialEchoAot::compilerLibSentinelBlock',
-                    true
-                );
                 $this->registerM3EmitTuSidecarFromPath(
                     $repoRoot.'/lib/Compiler.php',
                     \PHPCompiler\JIT\M3EmitTuTrivialEchoAot::COMPILER_PHP_SIDECAR_REL,
                     'PHPCompiler\\JIT\\M3EmitTuTrivialEchoAot::compilerPhpSentinelBlock'
                 );
             }
-            $this->registerM3EmitTuSidecarFromPath(
-                $repoRoot.'/bin/compile.php',
-                \PHPCompiler\JIT\M3EmitTuTrivialEchoAot::BIN_COMPILE_SIDECAR_REL,
-                'PHPCompiler\\JIT\\M3EmitTuTrivialEchoAot::binCompileSentinelBlock'
-            );
+            if (!$this->shouldUseM4InventoryArgvNativeEmitRebuild()) {
+                $this->registerM3EmitTuSidecarFromPath(
+                    $repoRoot.'/bin/compile.php',
+                    \PHPCompiler\JIT\M3EmitTuTrivialEchoAot::BIN_COMPILE_SIDECAR_REL,
+                    'PHPCompiler\\JIT\\M3EmitTuTrivialEchoAot::binCompileSentinelBlock'
+                );
+            }
             if (!$minimalSidecars) {
                 $this->registerM3EmitTuSidecarFromPath(
                     $repoRoot.'/bin/vm.php',
@@ -4249,18 +4319,16 @@ class JIT {
                 \PHPCompiler\JIT\M3EmitTuTrivialEchoAot::COMPILE_SMOKE_SIDECAR_REL,
                 'PHPCompiler\\JIT\\M3EmitTuTrivialEchoAot::compileSmokeSentinelBlock'
             );
-            if (!$minimalSidecars) {
-                $this->registerM3EmitTuSidecarFromPath(
-                    $repoRoot.'/test/selfhost/compiler_lib_spine_smoke/main.php',
-                    \PHPCompiler\JIT\M3EmitTuTrivialEchoAot::COMPILER_LIB_SIDECAR_REL,
-                    'PHPCompiler\\JIT\\M3EmitTuTrivialEchoAot::compilerLibSentinelBlock',
-                    true
-                );
-            }
             $this->registerM3EmitTuSidecarFromPath(
                 $repoRoot.'/test/selfhost/compiler_minimal/main.php',
                 \PHPCompiler\JIT\M3EmitTuTrivialEchoAot::COMPILER_MINIMAL_SIDECAR_REL,
                 'PHPCompiler\\JIT\\M3EmitTuTrivialEchoAot::compilerMinimalSentinelBlock'
+            );
+            $this->registerM3EmitTuSidecarFromPath(
+                $repoRoot.'/test/selfhost/compiler_lib_spine_smoke/main.php',
+                \PHPCompiler\JIT\M3EmitTuTrivialEchoAot::COMPILER_LIB_SIDECAR_REL,
+                'PHPCompiler\\JIT\\M3EmitTuTrivialEchoAot::compilerLibSentinelBlock',
+                true
             );
             if (!$minimalSidecars) {
                 $this->registerM3EmitTuSidecarFromPath(
@@ -4300,11 +4368,13 @@ class JIT {
                     'PHPCompiler\\JIT\\M3EmitTuTrivialEchoAot::compilerPhpSentinelBlock'
                 );
             }
-            $this->registerM3EmitTuSidecarFromPath(
-                $repoRoot.'/bin/compile.php',
-                \PHPCompiler\JIT\M3EmitTuTrivialEchoAot::BIN_COMPILE_SIDECAR_REL,
-                'PHPCompiler\\JIT\\M3EmitTuTrivialEchoAot::binCompileSentinelBlock'
-            );
+            if (!$this->shouldUseM4InventoryArgvNativeEmitRebuild()) {
+                $this->registerM3EmitTuSidecarFromPath(
+                    $repoRoot.'/bin/compile.php',
+                    \PHPCompiler\JIT\M3EmitTuTrivialEchoAot::BIN_COMPILE_SIDECAR_REL,
+                    'PHPCompiler\\JIT\\M3EmitTuTrivialEchoAot::binCompileSentinelBlock'
+                );
+            }
             if (!$minimalSidecars) {
                 $this->registerM3EmitTuSidecarFromPath(
                     $repoRoot.'/bin/vm.php',
@@ -4396,6 +4466,10 @@ class JIT {
             return;
         }
         if ($this->shouldSkipM3InventoryEmitDriverSelfSidecar($path)) {
+            return;
+        }
+        if (\PHPCompiler\JIT\M3EmitTuTrivialEchoAot::BIN_COMPILE_SIDECAR_REL === $sidecarRel
+            && $this->shouldUseM4InventoryArgvNativeEmitRebuild()) {
             return;
         }
         if (!is_readable($path)) {
@@ -5292,12 +5366,17 @@ class JIT {
             // Never scan O(modules×funcs) on inventory argv links (#2967). parse/compileEmitSmoke from
             // Runtime.php; ctor/init* use native M3 via compileBlock / ensureM3EmitTuRuntimeInitSpineSymbols.
             if (in_array($methodLc, ['parse', 'preparesourceforparser', 'compileemitsmoke', 'peeklastparsefailure', 'noteparsecompilenullforscript'], true)) {
-                unset(
-                    $this->context->functions[$lc],
-                    $this->context->functionReturnType[$lc],
-                    $this->context->functionProxies[$lc]
-                );
+                if ($this->shouldRealLowerInventoryArgvParseSpine()) {
+                    unset(
+                        $this->context->functions[$lc],
+                        $this->context->functionReturnType[$lc],
+                        $this->context->functionProxies[$lc]
+                    );
+                }
                 $this->compileM3EmitTuRuntimeMethodFromRuntimePhpFile($methodLc, $logical, $lc);
+                if (!isset($this->context->functions[$lc])) {
+                    $this->compileM3EmitTuRuntimeMethodFromDeclareClassBlocks([$methodLc]);
+                }
             }
 
             return;
@@ -5433,11 +5512,17 @@ class JIT {
      */
     private function compileM3EmitTuRuntimeMethodFromDeclareClassBlocks(array $methodLcs): void
     {
-        if (!$this->shouldUseM3EmitTuNativeBridge()) {
+        if (
+            !$this->shouldUseM3EmitTuNativeBridge()
+            && !$this->shouldRealLowerInventoryArgvParseSpine()
+        ) {
             return;
         }
         $allowed = array_fill_keys($methodLcs, true);
         $blocks = [];
+        if (null !== $this->m3CompileDriverMainBlock) {
+            $blocks[] = $this->m3CompileDriverMainBlock;
+        }
         if (null !== $this->m3EmitTuMainBlock) {
             $blocks[] = $this->m3EmitTuMainBlock;
         }
