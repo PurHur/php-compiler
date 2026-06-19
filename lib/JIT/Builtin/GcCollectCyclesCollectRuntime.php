@@ -5,7 +5,9 @@ declare(strict_types=1);
 namespace PHPCompiler\JIT\Builtin;
 
 use PHPCompiler\JIT;
+use PHPCompiler\JIT\Builtin;
 use PHPCompiler\JIT\Context;
+use PHPLLVM\BasicBlock;
 use PHPLLVM\Builder;
 use PHPLLVM\Value\Function_ as LlvmFunction;
 
@@ -55,8 +57,6 @@ final class GcCollectCyclesCollectRuntime
             ? $probe
             : $context->module->addFunction($abiName, $ft);
 
-        self::ensureJitHelperCompiled($context);
-
         $entry = $fn->appendBasicBlock('gc_collect_bridge_entry');
         $early = $fn->appendBasicBlock('gc_collect_early');
         $work = $fn->appendBasicBlock('gc_collect_work');
@@ -72,13 +72,19 @@ final class GcCollectCyclesCollectRuntime
 
         $context->builder->positionAtEnd($work);
         $implResult = $context->builder->call($context->lookupFunction('phpc_gc_collect_cycles_impl'));
-        $collected = $context->builder->call(
-            self::helperFunction($context, self::RECORD_COLLECT),
-            $implResult
-        );
-        self::syncGlobalsFromHelper($context);
-        $resultI64 = $context->builder->sextOrBitCast($collected, $i64);
-        $context->builder->branch($done);
+        if (Builtin::LOAD_TYPE_STANDALONE === $context->loadType) {
+            $resultI64 = $context->builder->sext($implResult, $i64);
+            $context->builder->branch($done);
+        } else {
+            self::ensureJitHelperCompiled($context);
+            $collected = $context->builder->call(
+                self::helperFunction($context, self::RECORD_COLLECT),
+                $context->builder->sext($implResult, $i64)
+            );
+            self::syncGlobalsFromHelper($context);
+            $resultI64 = $context->builder->sextOrBitCast($collected, $i64);
+            $context->builder->branch($done);
+        }
 
         $context->builder->positionAtEnd($done);
         $zero = $i64->constInt(0, false);
@@ -168,6 +174,9 @@ final class GcCollectCyclesCollectRuntime
 
         $runtime = $context->runtime;
         $path = \dirname(__DIR__, 3).self::HELPER_PATH;
+        $savedBuilder = $context->builder;
+        $savedActive = $context->activeFunction;
+        $restoreBlock = self::captureInsertBlock($context);
         $prevSelfHostAot = \getenv('PHP_COMPILER_SELFHOST_AOT');
         if (\function_exists('putenv')) {
             \putenv('PHP_COMPILER_SELFHOST_AOT=0');
@@ -180,6 +189,9 @@ final class GcCollectCyclesCollectRuntime
             $jit = new JIT($context);
             $jit->compile($block);
         } finally {
+            $context->builder = $savedBuilder;
+            self::restoreInsertBlock($context, $restoreBlock);
+            $context->activeFunction = $savedActive;
             if (\function_exists('putenv')) {
                 if (false === $prevSelfHostAot || null === $prevSelfHostAot) {
                     \putenv('PHP_COMPILER_SELFHOST_AOT=');
@@ -193,6 +205,24 @@ final class GcCollectCyclesCollectRuntime
             if (!isset($context->functions[$lc])) {
                 throw new \LogicException($lc.' was not compiled for JIT (#9183)');
             }
+        }
+    }
+
+    private static function captureInsertBlock(Context $context): ?BasicBlock
+    {
+        try {
+            return $context->builder->getInsertBlock();
+        } catch (\Throwable) {
+            return null;
+        }
+    }
+
+    private static function restoreInsertBlock(Context $context, ?BasicBlock $block): void
+    {
+        if (null !== $block) {
+            $context->builder->positionAtEnd($block);
+        } else {
+            $context->builder->clearInsertionPosition();
         }
     }
 }

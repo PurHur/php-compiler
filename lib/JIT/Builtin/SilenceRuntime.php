@@ -5,7 +5,9 @@ declare(strict_types=1);
 namespace PHPCompiler\JIT\Builtin;
 
 use PHPCompiler\JIT;
+use PHPCompiler\JIT\Builtin;
 use PHPCompiler\JIT\Context;
+use PHPLLVM\BasicBlock;
 use PHPLLVM\Builder;
 use PHPLLVM\Value;
 use PHPLLVM\Value\Function_ as LlvmFunction;
@@ -72,6 +74,14 @@ final class SilenceRuntime
             return;
         }
 
+        if (Builtin::LOAD_TYPE_STANDALONE === $context->loadType) {
+            self::implementStandaloneThinAbi($context);
+            self::registerLinkedRuntime($context);
+            $context->builder->clearInsertionPosition();
+
+            return;
+        }
+
         self::ensureJitHelperCompiled($context);
         self::ensureValueWriters($context);
         self::implementVoidBridge($context, '__compiler_begin_silence', self::BEGIN_HELPER);
@@ -84,31 +94,48 @@ final class SilenceRuntime
 
     public static function emitIniGetErrorReporting(Context $context, Value $out): void
     {
+        if (Builtin::LOAD_TYPE_STANDALONE === $context->loadType) {
+            self::ensureValueWriters($context);
+            $i64 = $context->getTypeFromString('int64');
+            $context->builder->call(
+                $context->lookupFunction('__value__writeLong'),
+                $out,
+                $i64->constInt(30719, false)
+            );
+
+            return;
+        }
+        $restoreBlock = self::captureInsertBlock($context);
         self::ensureJitHelperCompiled($context);
+        self::restoreInsertBlock($context, $restoreBlock);
         self::ensureValueWriters($context);
-        $strPtr = $context->getTypeFromString('__string__*');
-        $valPtr = $context->getTypeFromString('__value__*');
-        $i64 = $context->getTypeFromString('int64');
-        $i8p = $context->getTypeFromString('int8*');
         $erStr = $context->builder->call(self::helperFunction($context, self::INI_GET_ER_HELPER));
-        $len = $context->builder->call($context->lookupFunction('strlen'), $erStr);
-        $str = $context->builder->call(
-            $context->lookupFunction('__string__init'),
-            $context->builder->sext($len, $i64),
-            $erStr
-        );
-        $context->builder->call($context->lookupFunction('__value__writeString'), $out, $str);
+        $context->builder->call($context->lookupFunction('__value__writeString'), $out, $erStr);
     }
 
     public static function emitSetErrorReporting(Context $context, Value $level): void
     {
+        if (Builtin::LOAD_TYPE_STANDALONE === $context->loadType) {
+            return;
+        }
+        $restoreBlock = self::captureInsertBlock($context);
         self::ensureJitHelperCompiled($context);
-        $context->builder->call(self::helperFunction($context, self::SET_ER_HELPER), $level);
+        self::restoreInsertBlock($context, $restoreBlock);
+        $i64 = $context->getTypeFromString('int64');
+        $context->builder->call(
+            self::helperFunction($context, self::SET_ER_HELPER),
+            $context->builder->sext($level, $i64)
+        );
     }
 
     public static function emitIniRestoreErrorReporting(Context $context): void
     {
+        if (Builtin::LOAD_TYPE_STANDALONE === $context->loadType) {
+            return;
+        }
+        $restoreBlock = self::captureInsertBlock($context);
         self::ensureJitHelperCompiled($context);
+        self::restoreInsertBlock($context, $restoreBlock);
         $context->builder->call(self::helperFunction($context, self::INI_RESTORE_ER_HELPER));
     }
 
@@ -123,6 +150,7 @@ final class SilenceRuntime
         }
 
         $i32 = $context->getTypeFromString('int32');
+        $i64 = $context->getTypeFromString('int64');
         $ft = $context->context->functionType($i32, false, $i32);
         $fn = null !== $probe
             ? $probe
@@ -132,7 +160,7 @@ final class SilenceRuntime
         $context->builder->positionAtEnd($entry);
         $enabled = $context->builder->call(
             self::helperFunction($context, self::IS_LEVEL_ENABLED_HELPER),
-            $fn->getParam(0)
+            $context->builder->sext($fn->getParam(0), $i64)
         );
         $context->builder->returnValue($context->builder->zext($enabled, $i32));
         $context->registerFunction($abiName, $fn);
@@ -152,7 +180,6 @@ final class SilenceRuntime
         $i64 = $context->getTypeFromString('int64');
         $valPtr = $context->getTypeFromString('__value__*');
         $voidTy = $context->getTypeFromString('void');
-        $i1 = $context->getTypeFromString('int1');
         $ft = $context->context->functionType($voidTy, false, $i32, $i64, $valPtr);
         $fn = null !== $probe
             ? $probe
@@ -166,8 +193,8 @@ final class SilenceRuntime
         $hasNewBool = $context->builder->icmp(Builder::INT_NE, $hasNew, $i32->constInt(0, false));
         $old = $context->builder->call(
             self::helperFunction($context, self::EXCHANGE_ER_HELPER),
-            $context->builder->zext($hasNewBool, $i1),
-            $context->builder->trunc($newLevel, $i32)
+            $hasNewBool,
+            $context->builder->sext($context->builder->trunc($newLevel, $i32), $i64)
         );
         $context->builder->call(
             $context->lookupFunction('__value__writeLong'),
@@ -176,6 +203,59 @@ final class SilenceRuntime
         );
         $context->builder->returnVoid();
         $context->registerFunction($abiName, $fn);
+    }
+
+    /** Standalone AOT: thin LLVM ABI without compiled ErrorSilenceJitHelper PHP (#9197, #2930). */
+    private static function implementStandaloneThinAbi(Context $context): void
+    {
+        $voidTy = $context->getTypeFromString('void');
+        $i32 = $context->getTypeFromString('int32');
+        $i64 = $context->getTypeFromString('int64');
+        $valPtr = $context->getTypeFromString('__value__*');
+        $savedBuilder = $context->builder;
+        self::ensureValueWriters($context);
+
+        foreach (['__compiler_begin_silence', '__compiler_end_silence'] as $abiName) {
+            $fn = $context->module->addFunction(
+                $abiName,
+                $context->context->functionType($voidTy, false)
+            );
+            $entry = $fn->appendBasicBlock('entry');
+            $context->builder = $context->context->builderCreate();
+            $context->builder->positionAtEnd($entry);
+            $context->builder->returnVoid();
+            $context->builder->clearInsertionPosition();
+            $context->registerFunction($abiName, $fn);
+        }
+
+        $isel = $context->module->addFunction(
+            '__compiler_phpc_error_level_enabled',
+            $context->context->functionType($i32, false, $i32)
+        );
+        $entry = $isel->appendBasicBlock('entry');
+        $context->builder = $context->context->builderCreate();
+        $context->builder->positionAtEnd($entry);
+        $context->builder->returnValue($i32->constInt(1, false));
+        $context->builder->clearInsertionPosition();
+        $context->registerFunction('__compiler_phpc_error_level_enabled', $isel);
+
+        $ier = $context->module->addFunction(
+            '__compiler_error_reporting',
+            $context->context->functionType($voidTy, false, $i32, $i64, $valPtr)
+        );
+        $entry = $ier->appendBasicBlock('entry');
+        $context->builder = $context->context->builderCreate();
+        $context->builder->positionAtEnd($entry);
+        $context->builder->call(
+            $context->lookupFunction('__value__writeLong'),
+            $ier->getParam(2),
+            $i64->constInt(0, false)
+        );
+        $context->builder->returnVoid();
+        $context->builder->clearInsertionPosition();
+        $context->registerFunction('__compiler_error_reporting', $ier);
+
+        $context->builder = $savedBuilder;
     }
 
     private static function implementVoidBridge(Context $context, string $abiName, string $helperLogical): void
@@ -227,6 +307,9 @@ final class SilenceRuntime
 
         $runtime = $context->runtime;
         $path = \dirname(__DIR__, 3).self::HELPER_PATH;
+        $savedBuilder = $context->builder;
+        $savedActive = $context->activeFunction;
+        $restoreBlock = self::captureInsertBlock($context);
         $prevSelfHostAot = \getenv('PHP_COMPILER_SELFHOST_AOT');
         if (\function_exists('putenv')) {
             \putenv('PHP_COMPILER_SELFHOST_AOT=0');
@@ -239,6 +322,9 @@ final class SilenceRuntime
             $jit = new JIT($context);
             $jit->compile($block);
         } finally {
+            $context->builder = $savedBuilder;
+            self::restoreInsertBlock($context, $restoreBlock);
+            $context->activeFunction = $savedActive;
             if (\function_exists('putenv')) {
                 if (false === $prevSelfHostAot || null === $prevSelfHostAot) {
                     \putenv('PHP_COMPILER_SELFHOST_AOT=');
@@ -307,6 +393,24 @@ final class SilenceRuntime
                 throw new \LogicException($name.' missing after SilenceRuntime bridge (#9197)');
             }
             $context->registerFunction($name, $fn);
+        }
+    }
+
+    private static function captureInsertBlock(Context $context): ?BasicBlock
+    {
+        try {
+            return $context->builder->getInsertBlock();
+        } catch (\Throwable) {
+            return null;
+        }
+    }
+
+    private static function restoreInsertBlock(Context $context, ?BasicBlock $block): void
+    {
+        if (null !== $block) {
+            $context->builder->positionAtEnd($block);
+        } else {
+            $context->builder->clearInsertionPosition();
         }
     }
 }

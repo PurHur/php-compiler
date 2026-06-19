@@ -83,7 +83,7 @@ final class ObGzhandlerJitHelper
         if ($len > $hlen) {
             return false;
         }
-        for ($i = 0; $i <= $hlen - $len; ++$i) {
+        for ($i = 0; $i <= $hlen - $len; $i = $i + 1) {
             if (\substr($haystack, $i, $len) === $needle) {
                 return true;
             }
@@ -96,7 +96,7 @@ final class ObGzhandlerJitHelper
     {
         $out = '';
         $len = \strlen($text);
-        for ($i = 0; $i < $len; ++$i) {
+        for ($i = 0; $i < $len; $i = $i + 1) {
             $ord = \ord($text[$i]);
             if ($ord >= 65 && $ord <= 90) {
                 $out .= \chr($ord + 32);

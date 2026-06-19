@@ -12275,8 +12275,10 @@ class JIT {
         }
         JIT\Builtin\StringDir::ensureLinked($this->context);
         $isRes = JIT\JitValueCompare::nativeLongIsResource($this->context, $longVal);
-        $okBlock = JIT\BasicBlockHelper::append($this->context, 'incdec_res_ok');
-        $errBlock = JIT\BasicBlockHelper::append($this->context, 'incdec_res_err');
+        ++self::$blockNumber;
+        $suffix = (string) self::$blockNumber;
+        $okBlock = JIT\BasicBlockHelper::append($this->context, 'incdec_res_ok_'.$suffix);
+        $errBlock = JIT\BasicBlockHelper::append($this->context, 'incdec_res_err_'.$suffix);
         $this->context->builder->branchIf($isRes, $errBlock, $okBlock);
         $this->context->builder->positionAtEnd($errBlock);
         JIT\Builtin\TypeErrorRaise::registerDeclarations($this->context);
