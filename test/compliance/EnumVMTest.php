@@ -66,6 +66,7 @@ final class EnumVMTest extends BaseTest
                 'enum_scalar_compare.phpt',
                 'enum_loose_compare.phpt',
                 'enum_const_fetch_object.phpt',
+                'enum_dynamic_case_fetch.phpt',
                 'switch_enum_case_scalar.phpt',
                 'switch_enum_scalar_no_match.phpt',
                 'switch_enum_scalar_case.phpt',

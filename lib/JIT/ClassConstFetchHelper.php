@@ -175,7 +175,7 @@ final class ClassConstFetchHelper
     ): Variable {
         $classIdVal = self::emitResolveClassId($objectType, $block, $classVar, $classOp);
 
-        return self::fetchDynamicByClassIdValue($objectType, $classIdVal, $nameVar, $classOp, $block);
+        return self::fetchDynamicByClassIdValue($objectType, $classIdVal, $nameVar, $classOp, $block, null);
     }
 
     public static function fetchDynamic(
@@ -204,7 +204,7 @@ final class ClassConstFetchHelper
         $context = $objectType->jitContext();
         $classIdVal = $context->constantFromInteger($classId, 'int64');
 
-        return self::fetchDynamicByClassIdValue($objectType, $classIdVal, $nameVar, $classOp, $block);
+        return self::fetchDynamicByClassIdValue($objectType, $classIdVal, $nameVar, $classOp, $block, $jit);
     }
 
     /**
@@ -265,7 +265,8 @@ final class ClassConstFetchHelper
         Value $classIdVal,
         Variable $nameVar,
         Operand $classOp,
-        ?Block $block = null
+        ?Block $block = null,
+        ?\PHPCompiler\JIT $jit = null
     ): Variable {
         $context = $objectType->jitContext();
         self::ensureStrCaseCmp($context);
@@ -334,7 +335,23 @@ final class ClassConstFetchHelper
                     );
                     $context->builder->branch($merge);
                 } else {
-                    self::writeConstEntry($context, $resultSlot, $entry);
+                    if (null !== $jit) {
+                        ClassConstVisibilityJitGuard::emitBeforeFetch(
+                            $objectType,
+                            $jit,
+                            $block,
+                            $id,
+                            $objectType->classConstDisplayName($id, $constKey)
+                        );
+                        if ($objectType->isEnumClassId($id)) {
+                            BackedEnumDuplicateJitGuard::emitBeforeEnumCaseFetch($objectType, $jit, $block, $id);
+                        }
+                    }
+                    if ($objectType->isEnumClassId($id)) {
+                        self::writeEnumCaseConstEntry($objectType, $context, $resultSlot, $id, $constKey);
+                    } else {
+                        self::writeConstEntry($context, $resultSlot, $entry);
+                    }
                     $context->builder->branch($merge);
                 }
                 $checkBlock = $nextCheck;
@@ -590,6 +607,30 @@ final class ClassConstFetchHelper
         $context->builder->positionAtEnd($merge);
 
         return $result;
+    }
+
+    private static function writeEnumCaseConstEntry(
+        Object_ $objectType,
+        Context $context,
+        Value $slot,
+        int $classId,
+        string $caseKey
+    ): void {
+        $globalName = $objectType->ensureEnumCaseSingletonGlobal($classId, $caseKey);
+        $global = $context->module->getNamedGlobal($globalName);
+        if (null === $global) {
+            throw new \LogicException("Missing enum case singleton global: {$globalName}");
+        }
+        $context->builder->call(
+            $context->lookupFunction('__value__writeNull'),
+            JitValueBox::pointer($context, $slot)
+        );
+        $obj = $context->builder->load($global);
+        $context->builder->call(
+            $context->lookupFunction('__value__writeObject'),
+            JitValueBox::pointer($context, $slot),
+            $obj
+        );
     }
 
     /**
