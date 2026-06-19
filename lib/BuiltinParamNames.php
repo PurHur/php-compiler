@@ -102,6 +102,8 @@ final class BuiltinParamNames
                 return ['data', 'numeric_prefix', 'arg_separator', 'encoding_type'];
             case 'json_decode':
                 return ['json', 'associative', 'depth', 'flags'];
+            case 'explode':
+                return ['separator', 'string', 'limit'];
             case 'str_contains':
                 return ['haystack', 'needle'];
             case 'preg_match':
