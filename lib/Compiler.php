@@ -937,7 +937,7 @@ class Compiler {
     private function branchCfgAssignsNullConst(CfgBlock $branchCfg): bool
     {
         foreach ($branchCfg->children as $child) {
-            if ($child instanceof Op\Expr\Assign && $this->operandIsNull($child->expr)) {
+            if ($child instanceof Op\Expr\Assign && null !== $child->expr && $this->operandIsNull($child->expr)) {
                 return true;
             }
         }
@@ -1036,7 +1036,7 @@ class Compiler {
         }
         $valueBranch = $ifNull ? $stmt->else : $stmt->if;
         foreach ($valueBranch->children as $child) {
-            if (!$child instanceof Op\Expr\Assign || $this->exprIsNullConst($child->expr)) {
+            if (!$child instanceof Op\Expr\Assign || null === $child->expr || $this->exprIsNullConst($child->expr)) {
                 continue;
             }
             $src = $child->expr;
@@ -4276,8 +4276,8 @@ class Compiler {
         if (null !== $constName && null !== $this->compilingClassLc) {
             $lc = strtolower($constName);
             if (isset($this->compileTimeClassConsts[$this->compilingClassLc][$lc])) {
-                $class = $this->compilingClassDisplayName ?? 'class';
-                $this->throwCompileError(sprintf('Cannot redefine class constant %s::%s', $class, $constName));
+                // Idempotent re-parse when a JIT helper was already inlined from require_once (#9753, #1492).
+                return;
             }
         }
         $valueSlot = $this->tryFoldClassConstValueSlot($child, $result);

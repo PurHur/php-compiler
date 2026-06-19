@@ -26,6 +26,8 @@ use PHPLLVM\Value;
  */
 final class htmlspecialchars extends Internal
 {
+    private const DEFAULT_FLAGS = ENT_QUOTES | ENT_SUBSTITUTE;
+
     public function execute(Frame $frame): void
     {
         $argc = count($frame->calledArgs);
@@ -38,7 +40,7 @@ final class htmlspecialchars extends Internal
             0,
             'string'
         );
-        $flags = ENT_QUOTES | ENT_SUBSTITUTE;
+        $flags = self::DEFAULT_FLAGS;
         $encoding = 'UTF-8';
         $doubleEncode = true;
         if ($argc >= 2) {
@@ -97,13 +99,13 @@ final class htmlspecialchars extends Internal
         if (null !== $literal && 1 === $effectiveArgc) {
             return $context->builder->load(
                 $context->constantStringFromString(
-                    VmString::htmlspecialchars($literal, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8', true)
+                    VmString::htmlspecialchars($literal, self::DEFAULT_FLAGS, 'UTF-8', true)
                 )
             );
         }
 
         $str = JitStringBuiltinArg::lower($context, $args[0], 'htmlspecialchars', 0, 'string');
-        $flags = $context->getTypeFromString('int64')->constInt(ENT_QUOTES | ENT_SUBSTITUTE, false);
+        $flags = $context->getTypeFromString('int64')->constInt(self::DEFAULT_FLAGS, false);
         if ($effectiveArgc >= 2) {
             $flags = JitLongArg::lower($context, $args[1], 'htmlspecialchars() flags');
         }
@@ -167,7 +169,7 @@ final class htmlspecialchars extends Internal
             return null;
         }
 
-        $flags = ENT_QUOTES | ENT_SUBSTITUTE;
+        $flags = self::DEFAULT_FLAGS;
         if ($argc >= 2) {
             $flagsVal = self::compileTimeLong($context, $args[1]);
             if (null === $flagsVal) {
