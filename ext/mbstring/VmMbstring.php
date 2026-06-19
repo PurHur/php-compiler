@@ -985,13 +985,21 @@ final class VmMbstring
 
     public static function runTrimBuiltin(Frame $frame, string $function, int $mode): void
     {
-        $argc = \count($frame->calledArgs);
-        if ($argc < 1 || $argc > 3) {
+        if (!isset($frame->calledArgs[0])) {
             throw new \ArgumentCountError(sprintf(
                 '%s() expects at least 1 argument, %d given',
                 $function,
-                $argc
+                \count($frame->calledArgs)
             ));
+        }
+        foreach (array_keys($frame->calledArgs) as $idx) {
+            if ($idx < 0 || $idx > 2) {
+                throw new \ArgumentCountError(sprintf(
+                    '%s() expects at most 3 arguments, %d given',
+                    $function,
+                    \count($frame->calledArgs)
+                ));
+            }
         }
         $source = VmString::coerceStringBuiltinArg(
             $frame->calledArgs[0],
@@ -1003,7 +1011,7 @@ final class VmMbstring
             return;
         }
         $what = null;
-        if ($argc >= 2) {
+        if (isset($frame->calledArgs[1])) {
             $whatVar = $frame->calledArgs[1]->resolveIndirect();
             if (Variable::TYPE_NULL !== $whatVar->type) {
                 $what = VmString::coerceStringBuiltinArg(
@@ -1014,7 +1022,7 @@ final class VmMbstring
                 );
             }
         }
-        $encoding = $argc >= 3
+        $encoding = isset($frame->calledArgs[2])
             ? self::coerceEncodingArg($frame->calledArgs[2], $function, 2)
             : 'UTF-8';
         $frame->returnVar->string(self::trimString($source, $what, $encoding, $mode));

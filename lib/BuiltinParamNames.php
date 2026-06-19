@@ -118,6 +118,10 @@ final class BuiltinParamNames
                 return ['iterator', 'preserve_keys'];
             case 'hrtime':
                 return ['as_number'];
+            case 'mb_trim':
+            case 'mb_ltrim':
+            case 'mb_rtrim':
+                return ['string', 'characters', 'encoding'];
         }
 
         return null;
