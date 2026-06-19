@@ -723,6 +723,11 @@ class Module extends ModuleAbstract
             new func_num_args(),
             new method_exists_(),
             new class_meth_exists_(),
+            ...(CompilerVersion::supportsClassHasFunctions() ? [
+                new class_has_method_(),
+                new class_has_property_(),
+                new class_has_constant_(),
+            ] : []),
             new property_exists_(),
             new attribute_exists_(),
             new get_object_vars_(),
