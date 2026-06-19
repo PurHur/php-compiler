@@ -1,5 +1,5 @@
 --TEST--
-Language: readonly property set hook rejects post-construct backing write (issue #4518, zend_compile.c)
+Language: readonly property with hooks — compile fatal (#9805, zend_compile.c)
 --FILE--
 <?php
 class C {
@@ -12,12 +12,6 @@ class C {
         $this->name = $v;
     }
 }
-
-$c = new C('hi');
-try {
-    $c->name = 'no';
-} catch (Error $e) {
-    echo get_class($e), ': ', $e->getMessage(), "\n";
-}
---EXPECT--
-Error: Cannot modify readonly property C::$name
+echo "compiled\n";
+--EXPECT_EXIT--
+255

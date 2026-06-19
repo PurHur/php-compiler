@@ -7,7 +7,7 @@ $ok = eval('class Evaled {
         get => strtoupper($this->name ?? "");
         set => $this->name = strtolower($value);
     }
-    private string $name = "x";
+    function __construct() { $this->name = "x"; }
 }');
 if ($ok === false) {
     echo "eval-failed\n";
