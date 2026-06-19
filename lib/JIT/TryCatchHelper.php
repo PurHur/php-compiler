@@ -389,6 +389,16 @@ final class TryCatchHelper
             }
             $context->freeDeadVariables($func, $throwBlock, $block);
             $thrown = $context->getVariableFromOp($block->getOperand($op->arg1));
+            if (Variable::TYPE_ENUM_CASE === $thrown->type) {
+                self::emitCatchableClassError(
+                    $context,
+                    \PHPCompiler\VM\ExceptionSupport::CLASS_ERROR,
+                    \PHPCompiler\VM\ExceptionSupport::THROW_NON_THROWABLE_MESSAGE,
+                    $jit
+                );
+
+                return;
+            }
             if (
                 Variable::TYPE_OBJECT !== $thrown->type
                 && Variable::TYPE_VALUE !== $thrown->type
@@ -413,6 +423,7 @@ final class TryCatchHelper
         if (
             Variable::TYPE_OBJECT !== $thrown->type
             && Variable::TYPE_VALUE !== $thrown->type
+            && Variable::TYPE_ENUM_CASE !== $thrown->type
         ) {
             self::emitCatchableClassError(
                 $context,
