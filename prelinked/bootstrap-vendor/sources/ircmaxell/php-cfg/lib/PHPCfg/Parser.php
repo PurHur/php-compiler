@@ -1880,7 +1880,13 @@ class Parser
                 $this->block->children[] = $op;
                 return $op->result;
             case 'Scalar_MagicConst_File':
-                return new Literal($this->fileName);
+                $op = new Op\Expr\MagicScriptConst(Op\Expr\MagicScriptConst::KIND_FILE, $this->mapAttributes($scalar));
+                $this->block->children[] = $op;
+                return $op->result;
+            case 'Scalar_MagicConst_Line':
+                $op = new Op\Expr\MagicScriptConst(Op\Expr\MagicScriptConst::KIND_LINE, $this->mapAttributes($scalar));
+                $this->block->children[] = $op;
+                return $op->result;
             case 'Scalar_MagicConst_Namespace':
                 // TODO
                 return new Literal('__NAMESPACE__');

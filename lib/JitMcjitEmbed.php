@@ -47,7 +47,7 @@ final class JitMcjitEmbed
     {
         return preg_replace(
             '/^<\?php\s*/',
-            '<?php '.self::BOOTSTRAP_CLASS,
+            '<?php '.self::BOOTSTRAP_CLASS."\n",
             $code,
             1
         ) ?? $code;

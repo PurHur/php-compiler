@@ -4183,7 +4183,7 @@ apply_php_cfg_magic_script_const_overlay() {
   local op="$ROOT/vendor/ircmaxell/php-cfg/lib/PHPCfg/Op/Expr/MagicScriptConst.php"
   local parser="$ROOT/vendor/ircmaxell/php-cfg/lib/PHPCfg/Parser.php"
   local overlay_op="$PATCH_DIR/overlays/php-cfg/Op/Expr/MagicScriptConst.php"
-  if grep -q 'MagicScriptConst::KIND_DIR' "$parser" 2>/dev/null; then
+  if grep -q 'MagicScriptConst::KIND_LINE' "$parser" 2>/dev/null; then
     echo "Skip php-cfg-magic-script-const.patch (already applied)"
     return 0
   fi
@@ -4233,14 +4233,16 @@ replacements = [
         "            case 'Scalar_MagicConst_Namespace':",
     ),
 ]
+applied = False
 for old, new in replacements:
     if old in text:
         text = text.replace(old, new, 1)
-        parser_path.write_text(text)
-        print("Applied php-cfg-magic-script-const.patch (overlay)")
-        raise SystemExit(0)
-sys.stderr.write("php-cfg-magic-script-const: Parser.php anchor not found\n")
-raise SystemExit(1)
+        applied = True
+if not applied:
+    sys.stderr.write("php-cfg-magic-script-const: Parser.php anchor not found\n")
+    raise SystemExit(1)
+parser_path.write_text(text)
+print("Applied php-cfg-magic-script-const.patch (overlay)")
 PY
 }
 
