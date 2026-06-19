@@ -202,10 +202,13 @@ PHP;
         $this->assertSame("ok\n", ob_get_clean());
     }
 
-    /** Issue #9767: new Class(...) first-class callable (PHP 8.4+). */
-    public function testVmNewExpressionFirstClassCallable(): void
+    /** Issue #10130: new Class(...) first-class callable must compile-fatal (Zend/zend_compile.c). */
+    public function testVmNewExpressionFirstClassCallableCompileErrors(): void
     {
-        $code = <<<'PHP'
+        $rt = new Runtime();
+        $this->expectException(\CompileError::class);
+        $this->expectExceptionMessage('Cannot create Closure for new expression');
+        $rt->parseAndCompile(<<<'PHP'
 <?php
 declare(strict_types=1);
 class Box {
@@ -213,12 +216,7 @@ class Box {
 }
 $maker = new Box(...);
 echo $maker(42)->v, "\n";
-PHP;
-        $rt = new Runtime();
-        $block = $rt->parseAndCompile($code, 'test.php');
-        ob_start();
-        $rt->run($block);
-        $this->assertSame("42\n", ob_get_clean());
+PHP, 'test.php');
     }
 
     /** Issue #9604: trait-used instance method first-class callable. */

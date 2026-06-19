@@ -47,6 +47,10 @@ final class FromCallableHelper
 
     private static function fromStringCallable(Context $context, Block $block, string $name): Variable
     {
+        if (str_starts_with($name, 'new ')) {
+            throw new \LogicException('Cannot create Closure for new expression');
+        }
+
         if (str_contains($name, '::')) {
             [$className, $methodName] = explode('::', $name, 2);
             $declaringClassLc = strtolower($className);
