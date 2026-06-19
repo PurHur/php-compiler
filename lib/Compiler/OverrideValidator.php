@@ -10,6 +10,7 @@ use PHPCfg\Operand\Literal;
 use PHPCfg\Operand\Variable;
 use PHPCfg\Op;
 use PHPCfg\Op\Stmt\ClassMethod;
+use PHPCfg\Op\Stmt\Property as CfgProperty;
 use PHPCfg\Op\Stmt\TraitUse;
 use PHPCfg\Op\Terminal\Const_ as ClassConstDecl;
 use PHPCfg\Script;
@@ -89,6 +90,15 @@ final class OverrideValidator
 
                 continue;
             }
+            if ($child instanceof CfgProperty) {
+                $attributeNames = AttributeNames::fromOp($child);
+                if (!self::hasOverrideAttribute($attributeNames)) {
+                    continue;
+                }
+                self::validateOverrideProperty($className, $child, $parentLc, $interfaceLcs, $registry, $className, $stmts);
+
+                continue;
+            }
             if (!$child instanceof ClassConstDecl) {
                 continue;
             }
@@ -134,6 +144,46 @@ final class OverrideValidator
                 }
                 self::validateOverrideMethod($traitDisplay, $child, $parentLc, $interfaceLcs, $registry, $className);
             }
+        }
+    }
+
+    /**
+     * @throws \CompileError
+     */
+    private static function validateOverrideProperty(
+        string $ownerDisplay,
+        CfgProperty $property,
+        ?string $parentLc,
+        array $interfaceLcs,
+        ClassCompileRegistry $registry,
+        string $childClassName,
+        ?CfgBlock $classStmts = null
+    ): void {
+        $propertyName = self::staticNameFromOperand($property->name);
+        if (null === $propertyName) {
+            return;
+        }
+        $propertyLc = strtolower($propertyName);
+        $childClassLc = strtolower(ltrim($childClassName, '\\'));
+        $hasTraitParent = false;
+        if (null !== $classStmts) {
+            $visited = [];
+            foreach (self::collectTraitLcs($classStmts, $registry, $visited) as $traitLc) {
+                if ($registry->hasPropertyInTrait($traitLc, $propertyLc)) {
+                    $hasTraitParent = true;
+                    break;
+                }
+            }
+        }
+        if (
+            !$registry->hasOverridableProperty($parentLc, $interfaceLcs, $propertyLc, $childClassLc)
+            && !$hasTraitParent
+        ) {
+            throw new \CompileError(sprintf(
+                '%s::$%s has #[\Override] attribute, but no matching parent property exists',
+                ltrim($ownerDisplay, '\\'),
+                $propertyName
+            ));
         }
     }
 

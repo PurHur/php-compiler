@@ -7,6 +7,7 @@ namespace PHPCompiler\Compiler;
 use PHPCfg\Block as CfgBlock;
 use PHPCfg\Operand;
 use PHPCfg\Op\Stmt\ClassMethod;
+use PHPCfg\Op\Stmt\Property as CfgProperty;
 use PHPCfg\Op\Terminal\Const_ as CfgConst;
 use PhpParser\Node\Stmt\Class_ as ClassNode;
 
@@ -20,6 +21,9 @@ final class ClassCompileRegistry
 
     /** @var array<string, array<string, array{private: bool, ownerLc: string}>> lcName => const lc => visibility */
     private array $constants = [];
+
+    /** @var array<string, array<string, array{private: bool, ownerLc: string}>> lcName => property lc => visibility */
+    private array $properties = [];
 
     /** @var array<string, string> lcName => display name */
     private array $displayNames = [];
@@ -56,6 +60,7 @@ final class ClassCompileRegistry
         }
         $this->methods[$lc] = $merged;
         $this->constants[$lc] = self::constInfoFromStmts($stmts, $lc);
+        $this->properties[$lc] = self::propertyInfoFromStmts($stmts, $lc);
     }
 
     public function registerInterface(string $name, array $extendsLcs, CfgBlock $stmts): void
@@ -67,6 +72,7 @@ final class ClassCompileRegistry
         $this->registeredInterfaces[$lc] = true;
         $this->methods[$lc] = self::methodSigsFromStmts($stmts, $lc);
         $this->constants[$lc] = self::constInfoFromStmts($stmts, $lc);
+        $this->properties[$lc] = self::propertyInfoFromStmts($stmts, $lc);
     }
 
     public function registerTrait(string $name, CfgBlock $stmts): void
@@ -79,6 +85,7 @@ final class ClassCompileRegistry
         $this->traitStmts[$lc] = $stmts;
         $this->methods[$lc] = self::methodSigsFromStmts($stmts, $lc);
         $this->constants[$lc] = self::constInfoFromStmts($stmts, $lc);
+        $this->properties[$lc] = self::propertyInfoFromStmts($stmts, $lc);
     }
 
     public function getTraitStmts(string $lcName): ?CfgBlock
@@ -172,6 +179,30 @@ final class ClassCompileRegistry
     public function hasConstantInTrait(string $traitLc, string $constLc): bool
     {
         return isset($this->constants[self::lc($traitLc)][$constLc]);
+    }
+
+    public function hasOverridableProperty(
+        ?string $parentLc,
+        array $interfaceLcs,
+        string $propertyLc,
+        string $childClassLc
+    ): bool {
+        if (null !== $parentLc && '' !== $parentLc && $this->hasPropertyInClassChain($parentLc, $propertyLc, $childClassLc)) {
+            return true;
+        }
+
+        foreach ($interfaceLcs as $ifaceLc) {
+            if ($this->hasPropertyInInterfaceChain($ifaceLc, $propertyLc)) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    public function hasPropertyInTrait(string $traitLc, string $propertyLc): bool
+    {
+        return isset($this->properties[self::lc($traitLc)][$propertyLc]);
     }
 
     public function isClassSubtypeOf(string $subtypeLc, string $supertypeLc): bool
@@ -316,6 +347,16 @@ final class ClassCompileRegistry
         return null !== $this->findConstantInInterfaceChain($ifaceLc, $constLc);
     }
 
+    private function hasPropertyInClassChain(string $classLc, string $propertyLc, string $childClassLc): bool
+    {
+        return null !== $this->findPropertyInClassChain($classLc, $propertyLc, $childClassLc);
+    }
+
+    private function hasPropertyInInterfaceChain(string $ifaceLc, string $propertyLc): bool
+    {
+        return null !== $this->findPropertyInInterfaceChain($ifaceLc, $propertyLc);
+    }
+
     /**
      * @return array{private: bool, ownerLc: string}|null
      */
@@ -357,6 +398,68 @@ final class ClassCompileRegistry
     /**
      * @return array{private: bool, ownerLc: string}|null
      */
+    private function findPropertyInClassChain(string $classLc, string $propertyLc, string $childClassLc): ?array
+    {
+        $visited = [];
+        while ('' !== $classLc && !isset($visited[$classLc])) {
+            $visited[$classLc] = true;
+            if (isset($this->properties[$classLc][$propertyLc])) {
+                $info = $this->properties[$classLc][$propertyLc];
+                if (!$this->isPropertyVisibleForOverride($info, $childClassLc)) {
+                    $parent = $this->parents[$classLc] ?? null;
+                    if (null === $parent || '' === $parent) {
+                        break;
+                    }
+                    $classLc = $parent;
+
+                    continue;
+                }
+
+                return $info;
+            }
+            foreach ($this->interfaces[$classLc] ?? [] as $ifaceLc) {
+                $found = $this->findPropertyInInterfaceChain($ifaceLc, $propertyLc);
+                if (null !== $found) {
+                    return $found;
+                }
+            }
+            $parent = $this->parents[$classLc] ?? null;
+            if (null === $parent || '' === $parent) {
+                break;
+            }
+            $classLc = $parent;
+        }
+
+        return null;
+    }
+
+    /**
+     * @return array{private: bool, ownerLc: string}|null
+     */
+    private function findPropertyInInterfaceChain(string $ifaceLc, string $propertyLc): ?array
+    {
+        $visited = [];
+        $queue = [$ifaceLc];
+        while ([] !== $queue) {
+            $current = array_shift($queue);
+            if ('' === $current || isset($visited[$current])) {
+                continue;
+            }
+            $visited[$current] = true;
+            if (isset($this->properties[$current][$propertyLc])) {
+                return $this->properties[$current][$propertyLc];
+            }
+            foreach ($this->interfaces[$current] ?? [] as $parentIface) {
+                $queue[] = $parentIface;
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * @return array{private: bool, ownerLc: string}|null
+     */
     private function findConstantInInterfaceChain(string $ifaceLc, string $constLc): ?array
     {
         $visited = [];
@@ -382,6 +485,18 @@ final class ClassCompileRegistry
      * @param array{private: bool, ownerLc: string} $info
      */
     private function isConstantVisibleForOverride(array $info, string $childClassLc): bool
+    {
+        if ($info['private']) {
+            return $info['ownerLc'] === $childClassLc;
+        }
+
+        return true;
+    }
+
+    /**
+     * @param array{private: bool, ownerLc: string} $info
+     */
+    private function isPropertyVisibleForOverride(array $info, string $childClassLc): bool
     {
         if ($info['private']) {
             return $info['ownerLc'] === $childClassLc;
@@ -426,6 +541,42 @@ final class ClassCompileRegistry
         }
         if ($op instanceof Operand\Variable) {
             return self::constNameFromOperand($op->name);
+        }
+
+        return null;
+    }
+
+    /**
+     * @return array<string, array{private: bool, ownerLc: string}>
+     */
+    private static function propertyInfoFromStmts(CfgBlock $stmts, string $ownerLc): array
+    {
+        $properties = [];
+        foreach ($stmts->children as $child) {
+            if (!$child instanceof CfgProperty) {
+                continue;
+            }
+            $name = self::propertyNameFromOperand($child->name);
+            if (null === $name) {
+                continue;
+            }
+            $flags = (int) $child->visibility;
+            $properties[strtolower($name)] = [
+                'private' => 0 !== ($flags & ClassNode::MODIFIER_PRIVATE),
+                'ownerLc' => $ownerLc,
+            ];
+        }
+
+        return $properties;
+    }
+
+    private static function propertyNameFromOperand(Operand $op): ?string
+    {
+        if ($op instanceof Operand\Literal && is_string($op->value)) {
+            return $op->value;
+        }
+        if ($op instanceof Operand\Variable) {
+            return self::propertyNameFromOperand($op->name);
         }
 
         return null;
