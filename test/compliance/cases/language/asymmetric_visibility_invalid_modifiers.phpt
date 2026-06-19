@@ -16,3 +16,19 @@ class B {
 echo "compiled\n";
 --EXPECT_EXIT--
 255
+--FILE--
+<?php
+class C {
+    public private(set) int $x = 1;
+}
+echo "compiled\n";
+--EXPECT_EXIT--
+255
+--FILE--
+<?php
+class D {
+    public function __construct(public private(set) int $x = 1) {}
+}
+echo "compiled\n";
+--EXPECT_EXIT--
+255
