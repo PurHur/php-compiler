@@ -6,11 +6,12 @@ namespace PHPCompiler\JIT\Builtin;
 
 use PHPCompiler\JIT;
 use PHPCompiler\JIT\Context;
+use PHPLLVM\BasicBlock;
 use PHPLLVM\Value;
 use PHPLLVM\Value\Function_ as LlvmFunction;
 
 /**
- * JIT/AOT link for clone-with readonly reinit via CloneWithJitHelper PHP (#9498, #9717).
+ * JIT/AOT link for clone-with readonly reinit via CloneWithJitHelper PHP (#9498, #9717, #10108).
  *
  * VM SSOT: {@see \PHPCompiler\VM\CloneWithSupport}
  * php-src: Zend/zend_objects.c — IS_PROP_REINITABLE during clone-with
@@ -35,12 +36,6 @@ final class CloneWithReinitRuntime
         self::ADD_PROPERTY_HELPER,
         self::END_HELPER,
         self::TRY_CONSUME_HELPER,
-    ];
-
-    /** @var list<string> */
-    private const ABI_FUNCTIONS = [
-        'phpc_clone_with_end_runtime',
-        'phpc_clone_with_try_consume_literal',
     ];
 
     public static function ensureLinked(Context $context): void
@@ -77,7 +72,11 @@ final class CloneWithReinitRuntime
     public static function emitEnd(Context $context, Value $obj): void
     {
         self::ensureLinked($context);
-        $context->builder->call($context->lookupFunction('phpc_clone_with_end_runtime'), $obj);
+        $i64 = $context->getTypeFromString('int64');
+        $context->builder->call(
+            self::helperFunction($context, self::END_HELPER),
+            $context->builder->ptrToInt($obj, $i64)
+        );
     }
 
     public static function emitTryConsumePropertyName(Context $context, Value $obj, string $propName): Value
@@ -96,106 +95,8 @@ final class CloneWithReinitRuntime
 
     public static function implement(Context $context): void
     {
-        $probe = $context->module->getNamedFunction('phpc_clone_with_end_runtime');
-        if (null !== $probe && $probe->countBasicBlocks() > 0) {
-            self::registerLinkedRuntime($context);
-
-            return;
-        }
-
-        self::ensureJitHelperCompiled($context);
         self::ensureValueStringHelpers($context);
-        self::registerDeclarations($context);
-        self::implementEndBridge($context);
-        self::implementTryConsumeLiteralBridge($context);
-        self::registerLinkedRuntime($context);
-        $context->builder->clearInsertionPosition();
-    }
-
-    private static function registerDeclarations(Context $context): void
-    {
-        $void = $context->getTypeFromString('void');
-        $objPtr = $context->getTypeFromString('__object__*');
-        $i8p = $context->getTypeFromString('int8*');
-        $i32 = $context->getTypeFromString('int32');
-        $i1 = $context->getTypeFromString('int1');
-
-        self::declareIfMissing($context, 'phpc_clone_with_end_runtime', $void, [$objPtr]);
-        self::declareIfMissing($context, 'phpc_clone_with_try_consume_literal', $i1, [$objPtr, $i8p, $i32]);
-    }
-
-    private static function declareIfMissing(Context $context, string $name, $ret, array $params): void
-    {
-        if (null !== $context->module->getNamedFunction($name)) {
-            return;
-        }
-        $ft = $context->context->functionType($ret, false, ...$params);
-        $fn = $context->module->addFunction($name, $ft);
-        $context->registerFunction($name, $fn);
-    }
-
-    private static function implementEndBridge(Context $context): void
-    {
-        $abiName = 'phpc_clone_with_end_runtime';
-        $probe = $context->module->getNamedFunction($abiName);
-        if (null !== $probe && $probe->countBasicBlocks() > 0) {
-            $context->registerFunction($abiName, $probe);
-
-            return;
-        }
-
-        $objPtr = $context->getTypeFromString('__object__*');
-        $i64 = $context->getTypeFromString('int64');
-        $voidTy = $context->getTypeFromString('void');
-        $ft = $context->context->functionType($voidTy, false, $objPtr);
-        $fn = null !== $probe
-            ? $probe
-            : $context->module->addFunction($abiName, $ft);
-
-        $entry = $fn->appendBasicBlock('cwr_end_bridge_entry');
-        $context->builder->positionAtEnd($entry);
-        $obj = $fn->getParam(0);
-        $context->builder->call(
-            self::helperFunction($context, self::END_HELPER),
-            $context->builder->ptrToInt($obj, $i64)
-        );
-        $context->builder->returnVoid();
-        $context->registerFunction($abiName, $fn);
-    }
-
-    private static function implementTryConsumeLiteralBridge(Context $context): void
-    {
-        $abiName = 'phpc_clone_with_try_consume_literal';
-        $probe = $context->module->getNamedFunction($abiName);
-        if (null !== $probe && $probe->countBasicBlocks() > 0) {
-            $context->registerFunction($abiName, $probe);
-
-            return;
-        }
-
-        $objPtr = $context->getTypeFromString('__object__*');
-        $i8p = $context->getTypeFromString('int8*');
-        $i32 = $context->getTypeFromString('int32');
-        $i64 = $context->getTypeFromString('int64');
-        $i1 = $context->getTypeFromString('int1');
-        $ft = $context->context->functionType($i1, false, $objPtr, $i8p, $i32);
-        $fn = null !== $probe
-            ? $probe
-            : $context->module->addFunction($abiName, $ft);
-
-        $entry = $fn->appendBasicBlock('cwr_try_bridge_entry');
-        $context->builder->positionAtEnd($entry);
-        $obj = $fn->getParam(0);
-        $name = $fn->getParam(1);
-        $len = $fn->getParam(2);
-        $nameStr = self::cstrToStringWithLength($context, $name, $context->builder->zExt($len, $i64));
-        $ok = $context->builder->call(
-            self::helperFunction($context, self::TRY_CONSUME_HELPER),
-            $context->builder->ptrToInt($obj, $i64),
-            $nameStr
-        );
-        $context->builder->returnValue($ok);
-        $context->registerFunction($abiName, $fn);
+        self::ensureJitHelperCompiled($context);
     }
 
     private static function literalToString(Context $context, string $literal): Value
@@ -209,17 +110,6 @@ final class CloneWithReinitRuntime
             $context->lookupFunction('__string__init'),
             $i64->constInt($len, false),
             $context->builder->pointerCast($namePtr, $charPtr)
-        );
-    }
-
-    private static function cstrToStringWithLength(Context $context, Value $cstr, Value $lenI64): Value
-    {
-        $charPtr = $context->getTypeFromString('char*');
-
-        return $context->builder->call(
-            $context->lookupFunction('__string__init'),
-            $lenI64,
-            $context->builder->pointerCast($cstr, $charPtr)
         );
     }
 
@@ -252,6 +142,10 @@ final class CloneWithReinitRuntime
 
         $runtime = $context->runtime;
         $path = \dirname(__DIR__, 3).self::HELPER_PATH;
+        $realPath = \realpath($path) ?: $path;
+        $savedBuilder = $context->builder;
+        $savedActive = $context->activeFunction;
+        $restoreBlock = self::captureInsertBlock($context);
         $prevSelfHostAot = \getenv('PHP_COMPILER_SELFHOST_AOT');
         if (\function_exists('putenv')) {
             \putenv('PHP_COMPILER_SELFHOST_AOT=0');
@@ -263,7 +157,11 @@ final class CloneWithReinitRuntime
             }
             $jit = new JIT($context);
             $jit->compile($block);
+            $context->markJitIncludedFileCompiled($realPath);
         } finally {
+            $context->builder = $savedBuilder;
+            self::restoreInsertBlock($context, $restoreBlock);
+            $context->activeFunction = $savedActive;
             if (\function_exists('putenv')) {
                 if (false === $prevSelfHostAot || null === $prevSelfHostAot) {
                     \putenv('PHP_COMPILER_SELFHOST_AOT=');
@@ -303,14 +201,21 @@ final class CloneWithReinitRuntime
         }
     }
 
-    private static function registerLinkedRuntime(Context $context): void
+    private static function captureInsertBlock(Context $context): ?BasicBlock
     {
-        foreach (self::ABI_FUNCTIONS as $name) {
-            $fn = $context->module->getNamedFunction($name);
-            if (null === $fn) {
-                throw new \LogicException($name.' missing after CloneWithReinitRuntime bridge (#9498)');
-            }
-            $context->registerFunction($name, $fn);
+        try {
+            return $context->builder->getInsertBlock();
+        } catch (\Throwable) {
+            return null;
+        }
+    }
+
+    private static function restoreInsertBlock(Context $context, ?BasicBlock $block): void
+    {
+        if (null !== $block) {
+            $context->builder->positionAtEnd($block);
+        } else {
+            $context->builder->clearInsertionPosition();
         }
     }
 }
