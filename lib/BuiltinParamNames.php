@@ -104,6 +104,8 @@ final class BuiltinParamNames
                 return ['json', 'associative', 'depth', 'flags'];
             case 'explode':
                 return ['separator', 'string', 'limit'];
+            case 'nl2br':
+                return ['string', 'use_xhtml'];
             case 'str_contains':
                 return ['haystack', 'needle'];
             case 'preg_match':
