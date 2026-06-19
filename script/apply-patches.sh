@@ -3746,7 +3746,7 @@ apply_php_cfg_global_typed_const_overlay() {
   if [[ ! -f "$parser" || ! -f "$overlay" ]]; then
     return 0
   fi
-  if grep -q 'function extractGlobalTypedConstDeclaredTypeFromAttributes' "$parser" 2>/dev/null; then
+  if grep -q 'function applyGlobalTypedConstMarkerAttributes' "$parser" 2>/dev/null; then
     return 0
   fi
   python3 - "$parser" "$overlay" <<'PY'
@@ -3756,7 +3756,7 @@ from pathlib import Path
 parser_path = Path(sys.argv[1])
 method_path = Path(sys.argv[2])
 text = parser_path.read_text()
-if 'function extractGlobalTypedConstDeclaredTypeFromAttributes' in text:
+if 'function applyGlobalTypedConstMarkerAttributes' in text:
     raise SystemExit(0)
 
 anchor = """    protected function parseExpr_Yield(Expr\\Yield_ $expr)
@@ -3766,27 +3766,73 @@ if anchor not in text:
     raise SystemExit(1)
 
 insert = method_path.read_text().rstrip("\n") + "\n\n"
-text = text.replace(anchor, insert + anchor, 1)
+if 'function extractGlobalTypedConstDeclaredTypeFromAttributes' in text:
+    old_methods = """    /**
+     * Recover phpc-global-typed-const:* marker from comment attributes (#7081).
+     */
+    private function extractGlobalTypedConstDeclaredTypeFromAttributes(array $attributes): ?Op\\Type
+    {
+        $chunks = [];
+        if (isset($attributes['comments']) && is_array($attributes['comments'])) {
+            foreach ($attributes['comments'] as $comment) {
+                if (is_object($comment) && method_exists($comment, 'getText')) {
+                    $chunks[] = $comment->getText();
+                } elseif (is_string($comment)) {
+                    $chunks[] = $comment;
+                }
+            }
+        }
+        if (isset($attributes['docComment']) && is_object($attributes['docComment'])
+            && method_exists($attributes['docComment'], 'getText')) {
+            $chunks[] = $attributes['docComment']->getText();
+        }
+        foreach ($chunks as $chunk) {
+            if (!preg_match(\\PHPCompiler\\Ast\\GlobalTypedConstRewriter::MARKER_PATTERN, $chunk, $m)) {
+                continue;
+            }
+            $typeExpr = trim($m[1]);
+            if ('' === $typeExpr) {
+                continue;
+            }
 
-old = """            $this->block->children[] = new Op\\Terminal\\Const_(
+            return $this->parseGlobalTypedConstTypeFromMarker($typeExpr);
+        }
+
+        return null;
+    }
+
+    """
+    if old_methods not in text:
+        sys.stderr.write("php-cfg-global-typed-const: upgrade anchor missing (#9909)\n")
+        raise SystemExit(1)
+    text = text.replace(old_methods, insert, 1)
+    text = text.replace(
+        "$constOp->declaredType = $this->extractGlobalTypedConstDeclaredTypeFromAttributes($node->getAttributes());",
+        "$this->applyGlobalTypedConstMarkerAttributes($constOp, $node->getAttributes());",
+        1,
+    )
+else:
+    text = text.replace(anchor, insert + anchor, 1)
+    old = """            $this->block->children[] = new Op\\Terminal\\Const_(
                 $this->parseExprNode($const->namespacedName),
                 $value, $valueBlock,
                 $this->mapAttributes($node)
             );"""
-new = """            $constOp = new Op\\Terminal\\Const_(
+    new = """            $constOp = new Op\\Terminal\\Const_(
                 $this->parseExprNode($const->namespacedName),
                 $value, $valueBlock,
                 $this->mapAttributes($node)
             );
-            $constOp->declaredType = $this->extractGlobalTypedConstDeclaredTypeFromAttributes($node->getAttributes());
+            $this->applyGlobalTypedConstMarkerAttributes($constOp, $node->getAttributes());
             $this->block->children[] = $constOp;"""
-if old not in text:
-    sys.stderr.write("php-cfg-global-typed-const: parseStmt_Const anchor missing\n")
-    raise SystemExit(1)
-text = text.replace(old, new, 1)
+    if old not in text:
+        sys.stderr.write("php-cfg-global-typed-const: parseStmt_Const anchor missing\n")
+        raise SystemExit(1)
+    text = text.replace(old, new, 1)
+
 parser_path.write_text(text)
 PY
-  echo "Applied php-cfg-global-typed-const overlay (#7081)"
+  echo "Applied php-cfg-global-typed-const overlay (#7081, #9909)"
 }
 
 apply_php_cfg_list_spread_overlay() {

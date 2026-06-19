@@ -31,6 +31,12 @@ final class CompilerVersion
         return version_compare(self::VERSION, '8.3', '>=');
     }
 
+    /** PHP 8.4+ `final const` at compile-unit scope (Zend/zend_compile.c, issue #9909). */
+    public static function supportsFinalGlobalTypedConstants(): bool
+    {
+        return version_compare(self::VERSION, '8.4', '>=');
+    }
+
     /** PHP 8.3+ str_increment() / str_decrement() (ext/standard/string.c, issue #5697). */
     public static function supportsStrIncrement(): bool
     {
