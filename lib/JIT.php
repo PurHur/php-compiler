@@ -10228,7 +10228,9 @@ class JIT {
             }
             $data['sourceMethodLc'] = $methodLc;
             $data['methodLc'] = $newNameLc;
-            unset($merged[$methodLc]);
+            if (null === $traitLcFilter) {
+                unset($merged[$methodLc]);
+            }
             $merged[$newNameLc] = $data;
         }
 

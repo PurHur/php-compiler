@@ -34,6 +34,24 @@ PHP;
         $this->assertSame('12', $this->runVm($code));
     }
 
+    public function testTraitInsteadofWithTraitQualifiedAlias(): void
+    {
+        $code = <<<'PHP'
+<?php
+trait TA { public function f(): string { return 'A'; } }
+trait TB { public function f(): string { return 'B'; } }
+final class C {
+    use TA, TB {
+        TA::f insteadof TB;
+        TB::f as g;
+    }
+}
+$c = new C();
+echo $c->f(), $c->g();
+PHP;
+        $this->assertSame('AB', $this->runVm($code));
+    }
+
     public function testTraitConflictWithoutAdaptationIsFatal(): void
     {
         $code = <<<'PHP'
