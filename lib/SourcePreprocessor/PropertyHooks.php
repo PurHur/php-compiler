@@ -346,16 +346,29 @@ final class PropertyHooks
             }
             $sameNameBacking = $usesBacking && $this->hookTouchesBacking($hookSource, $prop, $isStatic);
             $nextOffset = $close + 1;
+            $initializer = '';
             if ($sameNameBacking) {
                 $backingDecl = $this->consumeSameNameBackingFieldDecl($body, $nextOffset, $prop);
                 if (null !== $backingDecl) {
-                    $this->rejectSameNameBackingField($classDisplay, $prop);
+                    [$nextOffset, $initializer] = $backingDecl;
+                } else {
+                    $foundBacking = $this->findSameNameBackingFieldDecl($body, $prop);
+                    if (null !== $foundBacking) {
+                        [$backingStart, $backingEnd, $initializer] = $foundBacking;
+                        $removeSpans[] = [$backingStart, $backingEnd];
+                    }
                 }
-                if (null !== $this->findSameNameBackingFieldDecl($body, $prop)) {
-                    $this->rejectSameNameBackingField($classDisplay, $prop);
+                $mergedDecl = rtrim($propDeclHead);
+                if ('' !== $initializer) {
+                    $mergedDecl .= ' '.$initializer;
                 }
+                if (!$isPromotedCtorParam && !str_ends_with($mergedDecl, ';')) {
+                    $mergedDecl .= ';';
+                }
+                $out .= $declPrefix.$mergedDecl;
+            } else {
+                $out .= $declPrefix.$propDecl;
             }
-            $out .= $declPrefix.$propDecl;
             $trailing = trim($trailing);
             if ('' !== $trailing) {
                 $out .= "\n    ".$trailing;
@@ -642,15 +655,7 @@ final class PropertyHooks
     }
 
     /**
-     * php-src: Zend/zend_compile.c — duplicate property name when hooks + separate field (#9805).
-     */
-    private function rejectSameNameBackingField(string $classDisplay, string $prop): never
-    {
-        throw new \CompileError(sprintf('Cannot redeclare %s::$%s', $classDisplay, $prop));
-    }
-
-    /**
-     * When hooks read/write `$this->prop`, merge the following same-name field decl (#7031).
+     * When hooks read/write `$this->prop`, merge the following same-name field decl (#7031, #9831).
      *
      * @return array{0: int, 1: string}|null [offset after decl, initializer including `=`]
      */
