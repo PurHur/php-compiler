@@ -3747,6 +3747,23 @@ apply_php_cfg_global_typed_const_overlay() {
     return 0
   fi
   if grep -q 'function applyGlobalTypedConstMarkerAttributes' "$parser" 2>/dev/null; then
+    python3 - "$parser" <<'PY'
+import re
+import sys
+from pathlib import Path
+
+parser_path = Path(sys.argv[1])
+text = parser_path.read_text()
+pattern = re.compile(
+    r"/\*\*\n(?:     )?\* Parse a type expression embedded in a global typed-const marker via php-parser \(#7081\)\.\n(?:     )?\*/\n    private function parseGlobalTypedConstTypeFromMarker\(string \$typeExpr\): Op\\Type\n    \{.*?\n        return \$this->parseTypeNode\(\$class->stmts\[0\]->type\);\n    \}\n",
+    re.S,
+)
+matches = list(pattern.finditer(text))
+if len(matches) <= 1:
+    raise SystemExit(0)
+text = text[: matches[1].start()] + text[matches[1].end() :]
+parser_path.write_text(text)
+PY
     return 0
   fi
   python3 - "$parser" "$overlay" <<'PY'
@@ -3811,6 +3828,35 @@ if 'function extractGlobalTypedConstDeclaredTypeFromAttributes' in text:
         "$this->applyGlobalTypedConstMarkerAttributes($constOp, $node->getAttributes());",
         1,
     )
+    trailing_method = """    /**
+     * Parse a type expression embedded in a global typed-const marker via php-parser (#7081).
+     */
+    private function parseGlobalTypedConstTypeFromMarker(string $typeExpr): Op\\Type
+    {
+        static $parser = null;
+        if (null === $parser) {
+            $parser = (new \\PhpParser\\ParserFactory())->create(\\PhpParser\\ParserFactory::PREFER_PHP7);
+        }
+        $probe = '<?php class __PhpcGlobalTypedConstProbe { public '.$typeExpr.' $p; }';
+        try {
+            $ast = $parser->parse($probe);
+        } catch (\\PhpParser\\Error $e) {
+            throw new \\RuntimeException('Invalid typed global constant type: '.$typeExpr, 0, $e);
+        }
+        if (!is_array($ast) || !isset($ast[0]) || !($ast[0] instanceof \\PhpParser\\Node\\Stmt\\Class_)) {
+            throw new \\RuntimeException('Invalid typed global constant type probe: '.$typeExpr);
+        }
+        $class = $ast[0];
+        if (!isset($class->stmts[0]) || !($class->stmts[0] instanceof \\PhpParser\\Node\\Stmt\\Property)) {
+            throw new \\RuntimeException('Invalid typed global constant type probe property: '.$typeExpr);
+        }
+
+        return $this->parseTypeNode($class->stmts[0]->type);
+    }
+
+"""
+    if text.count('function parseGlobalTypedConstTypeFromMarker') > 1 and trailing_method in text:
+        text = text.replace(trailing_method, '', 1)
 else:
     text = text.replace(anchor, insert + anchor, 1)
     old = """            $this->block->children[] = new Op\\Terminal\\Const_(
