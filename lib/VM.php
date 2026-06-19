@@ -9268,6 +9268,9 @@ restart:
         if (!$virtual || $hasSetHook) {
             return null;
         }
+        if ($this->propertyHasDistinctAsymmetricSetVisibility($classLc, $propName, $lvalue)) {
+            return null;
+        }
 
         $thrown = VM\BuiltinExceptionSupport::materializeError(
             $this->context,
@@ -9924,6 +9927,34 @@ restart:
         }
 
         return $this->dispatchVmError($msg, $frame);
+    }
+
+    /**
+     * Hook-block `private(set);` is not get-only read-only — defer to asymmetric write guard (#9872).
+     */
+    private function propertyHasDistinctAsymmetricSetVisibility(
+        ?string $staticClassLc,
+        string $propName,
+        Variable $lvalue
+    ): bool {
+        if (is_string($staticClassLc) && isset($this->context->classes[$staticClassLc])) {
+            $visMeta = $this->resolveStaticPropertyVisibilityMeta($staticClassLc, strtolower($propName));
+
+            return null !== $visMeta
+                && PropertyVisibility::effectiveSetVisibility($visMeta['visibility'], $visMeta['setVisibility'])
+                    !== MethodVisibility::mask($visMeta['visibility']);
+        }
+        $owner = $this->resolvePropertyWriteOwner($lvalue);
+        if (null === $owner) {
+            return false;
+        }
+        $meta = $this->classPropertyMeta($owner, $propName);
+        if (null === $meta) {
+            return false;
+        }
+
+        return PropertyVisibility::effectiveSetVisibility($meta->visibility, $meta->setVisibility)
+            !== MethodVisibility::mask($meta->visibility);
     }
 
     /** Reject asymmetric set visibility violations (#3165); returns message or null. */

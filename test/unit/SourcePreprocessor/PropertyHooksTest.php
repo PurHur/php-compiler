@@ -360,6 +360,27 @@ PHP;
         self::assertArrayNotHasKey('requiresSet', $registry['user']['email'] ?? []);
     }
 
+    /** @covers issue #9872 — PHP 8.4 `private(set);` inside property hook block */
+    public function testLowersHookBlockPrivateSetParenModifier(): void
+    {
+        $src = <<<'PHP'
+<?php
+class C {
+    public string $x {
+        get => 'g';
+        private(set);
+    }
+}
+PHP;
+        [$out, $registry] = (new PropertyHooks())->process($src);
+        self::assertStringNotContainsString('$x {', $out);
+        self::assertStringNotContainsString('private(set)', $out);
+        self::assertStringContainsString('/*phpc-asymmetric-set:private*/ public string $x;', $out);
+        self::assertStringContainsString('function __phpc_property_get_x', $out);
+        self::assertArrayNotHasKey('set', $registry['c']['x'] ?? []);
+        self::assertTrue($registry['c']['x']['virtual'] ?? false);
+    }
+
     public function testLowersBraceHookPrivateSetArrowHook(): void
     {
         $src = <<<'PHP'

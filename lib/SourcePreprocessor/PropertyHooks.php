@@ -428,6 +428,15 @@ final class PropertyHooks
                 $rest = preg_replace('/^(public|protected|private)\s+set\s*;/i', '', $rest, 1) ?? $rest;
                 continue;
             }
+            // php-src: Zend/zend_compile.c — `private(set);` in hook block (#9872, PHP 8.4 asymmetric visibility).
+            if (preg_match('/^(public|protected|private)\s*\(\s*set\s*\)\s*;/s', $rest, $asymM)) {
+                $asymmetricSetVisibility = strtolower($asymM[1]);
+                if ($registerRequiredHooks) {
+                    $this->registerRequiredHook($lcClass, $prop, 'requiresSet');
+                }
+                $rest = preg_replace('/^(public|protected|private)\s*\(\s*set\s*\)\s*;/i', '', $rest, 1) ?? $rest;
+                continue;
+            }
             if (preg_match('/^set\s*;/s', $rest)) {
                 if ($registerRequiredHooks) {
                     $this->registerRequiredHook($lcClass, $prop, 'requiresSet');
