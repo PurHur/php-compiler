@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 2821 |
-| Phase A inventory files (M2 ratio SSOT) | 2821 |
+| PHP files on vm.php path | 2827 |
+| Phase A inventory files (M2 ratio SSOT) | 2827 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 1 |
-| Source constructs flagged (warnings) | 7638 |
+| Source constructs flagged (warnings) | 7644 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -1832,7 +1832,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/Cli/PhpcFcgi.php` | 0 | 1 |
 | `lib/Cli/PhpcInit.php` | 0 | 1 |
 | `lib/Cli/PhpcRun.php` | 0 | 1 |
-| `lib/Compiler.php` | 0 | 345 |
+| `lib/Compiler.php` | 0 | 344 |
 | `lib/Compiler/AbstractMethodVisibilityCheck.php` | 0 | 3 |
 | `lib/Compiler/AsymmetricVisibilityCompileCheck.php` | 0 | 4 |
 | `lib/Compiler/AttributeClassRegistry.php` | 0 | 1 |
@@ -1910,6 +1910,10 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/Builtin/Bcmath.php` | 0 | 1 |
 | `lib/JIT/Builtin/BcmathJit.php` | 0 | 1 |
 | `lib/JIT/Builtin/CallArgv.php` | 0 | 1 |
+| `lib/JIT/Builtin/CastArrayRuntime.php` | 0 | 2 |
+| `lib/JIT/Builtin/CastArrayValueBoxJit.php` | 0 | 1 |
+| `lib/JIT/Builtin/CastObjectFromHashtableJit.php` | 0 | 3 |
+| `lib/JIT/Builtin/CastObjectValueBoxJit.php` | 0 | 4 |
 | `lib/JIT/Builtin/CheckdateRuntime.php` | 0 | 1 |
 | `lib/JIT/Builtin/CheckdnsrrRuntime.php` | 0 | 1 |
 | `lib/JIT/Builtin/CliArgvRuntime.php` | 0 | 1 |
@@ -2252,7 +2256,8 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/Call/WeakReferenceCreate.php` | 0 | 1 |
 | `lib/JIT/Call/WeakReferenceGet.php` | 0 | 1 |
 | `lib/JIT/CallUnpackHelper.php` | 0 | 8 |
-| `lib/JIT/CastHelper.php` | 0 | 10 |
+| `lib/JIT/CastArrayShared.php` | 0 | 2 |
+| `lib/JIT/CastHelper.php` | 0 | 4 |
 | `lib/JIT/ClassConstFetchHelper.php` | 0 | 4 |
 | `lib/JIT/ClassConstVisibilityJitGuard.php` | 0 | 2 |
 | `lib/JIT/ClassParamCheck.php` | 0 | 1 |
@@ -2645,6 +2650,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/VM/BuiltinExceptionSupport.php` | 0 | 5 |
 | `lib/VM/BuiltinExecute.php` | 0 | 1 |
 | `lib/VM/CallUnpack.php` | 0 | 7 |
+| `lib/VM/CastJitHelper.php` | 0 | 1 |
 | `lib/VM/CastSupport.php` | 0 | 9 |
 | `lib/VM/ClassAbstract.php` | 0 | 1 |
 | `lib/VM/ClassConstExpr.php` | 0 | 15 |
@@ -14668,50 +14674,49 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new OpCode (line 12939)
 - new OpCode (line 12945)
 - new OpCode (line 12951)
-- new OpCode (line 12966)
-- new OpCode (line 12986)
+- new OpCode (line 12976)
+- new Variable (line 13003)
+- new Temporary (line 13005)
 - new Variable (line 13013)
 - new Temporary (line 13015)
-- new Variable (line 13023)
-- new Temporary (line 13025)
-- new OpCode (line 13058)
-- new Operand\Temporary (line 13077)
-- new Operand\Temporary (line 13083)
-- new Operand\Temporary (line 13089)
-- new Operand\Temporary (line 13095)
-- new Operand\Temporary (line 13104)
-- new Variable (line 13719)
-- new Variable (line 13723)
-- new Variable (line 13731)
-- new Variable (line 13735)
-- new Variable (line 13932)
-- new Operand\Literal (line 14136)
-- new Variable (line 14138)
-- new OpCode (line 14146)
-- new OpCode (line 14326)
+- new OpCode (line 13048)
+- new Operand\Temporary (line 13067)
+- new Operand\Temporary (line 13073)
+- new Operand\Temporary (line 13079)
+- new Operand\Temporary (line 13085)
+- new Operand\Temporary (line 13094)
+- new Variable (line 13709)
+- new Variable (line 13713)
+- new Variable (line 13721)
+- new Variable (line 13725)
+- new Variable (line 13922)
+- new Operand\Literal (line 14126)
+- new Variable (line 14128)
+- new OpCode (line 14136)
+- new OpCode (line 14316)
+- new OpCode (line 14509)
 - new OpCode (line 14519)
-- new OpCode (line 14529)
-- new OpCode (line 14532)
-- new Operand\Temporary (line 14564)
-- new OpCode (line 14566)
-- new OpCode (line 14577)
-- new Operand\Temporary (line 14580)
-- new OpCode (line 14582)
-- new OpCode (line 14590)
-- new OpCode (line 14597)
-- new OpCode (line 14605)
-- new OpCode (line 14608)
-- new OpCode (line 14625)
-- new OpCode (line 14650)
-- new OpCode (line 14657)
-- new OpCode (line 14705)
-- new Literal (line 14727)
-- new OpCode (line 14826)
-- new Variable (line 14833)
-- new Temporary (line 14835)
-- new OpCode (line 14838)
-- new CompileFatal (line 15136)
-- new CompileFatal (line 15175)
+- new OpCode (line 14522)
+- new Operand\Temporary (line 14554)
+- new OpCode (line 14556)
+- new OpCode (line 14567)
+- new Operand\Temporary (line 14570)
+- new OpCode (line 14572)
+- new OpCode (line 14580)
+- new OpCode (line 14587)
+- new OpCode (line 14595)
+- new OpCode (line 14598)
+- new OpCode (line 14615)
+- new OpCode (line 14640)
+- new OpCode (line 14647)
+- new OpCode (line 14695)
+- new Literal (line 14717)
+- new OpCode (line 14816)
+- new Variable (line 14823)
+- new Temporary (line 14825)
+- new OpCode (line 14828)
+- new CompileFatal (line 15126)
+- new CompileFatal (line 15165)
 - 491 class method(s)
 - 16 closure(s)
 
@@ -15412,6 +15417,32 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - 3 class method(s)
 
+### `lib/JIT/Builtin/CastArrayRuntime.php`
+
+**Warnings** (review for bootstrap subset):
+- new JIT (line 120)
+- 6 class method(s)
+
+### `lib/JIT/Builtin/CastArrayValueBoxJit.php`
+
+**Warnings** (review for bootstrap subset):
+- 1 class method(s)
+
+### `lib/JIT/Builtin/CastObjectFromHashtableJit.php`
+
+**Warnings** (review for bootstrap subset):
+- new Variable (line 70)
+- new Variable (line 82)
+- 8 class method(s)
+
+### `lib/JIT/Builtin/CastObjectValueBoxJit.php`
+
+**Warnings** (review for bootstrap subset):
+- new Variable (line 67)
+- new Variable (line 71)
+- new Variable (line 91)
+- 1 class method(s)
+
 ### `lib/JIT/Builtin/CheckdateRuntime.php`
 
 **Warnings** (review for bootstrap subset):
@@ -15863,8 +15894,8 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/Builtin/ProgressNoteRuntime.php`
 
 **Warnings** (review for bootstrap subset):
-- new Call\Native (line 130)
-- new JIT (line 275)
+- new Call\Native (line 128)
+- new JIT (line 276)
 - 21 class method(s)
 
 ### `lib/JIT/Builtin/ReadonlyRaise.php`
@@ -17255,19 +17286,19 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new VmVariable (line 238)
 - 8 class method(s)
 
+### `lib/JIT/CastArrayShared.php`
+
+**Warnings** (review for bootstrap subset):
+- new Variable (line 30)
+- 2 class method(s)
+
 ### `lib/JIT/CastHelper.php`
 
 **Warnings** (review for bootstrap subset):
-- new Variable (line 47)
-- new Variable (line 107)
-- new Variable (line 140)
-- new Variable (line 187)
-- new Variable (line 191)
-- new Variable (line 211)
-- new Variable (line 225)
-- new Variable (line 306)
-- new Variable (line 359)
-- 15 class method(s)
+- new Variable (line 32)
+- new Variable (line 90)
+- new Variable (line 123)
+- 3 class method(s)
 
 ### `lib/JIT/ClassConstFetchHelper.php`
 
@@ -17520,10 +17551,10 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/FromCallableHelper.php`
 
 **Warnings** (review for bootstrap subset):
-- new Variable (line 75)
-- new Variable (line 100)
-- new ClosureWithBinding (line 107)
-- new Error (line 135)
+- new Variable (line 79)
+- new Variable (line 104)
+- new ClosureWithBinding (line 111)
+- new Error (line 139)
 - 8 class method(s)
 
 ### `lib/JIT/FunctionStaticHelper.php`
@@ -20300,6 +20331,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new Error (line 201)
 - new Error (line 204)
 - 7 class method(s)
+
+### `lib/VM/CastJitHelper.php`
+
+**Warnings** (review for bootstrap subset):
+- 1 class method(s)
 
 ### `lib/VM/CastSupport.php`
 
