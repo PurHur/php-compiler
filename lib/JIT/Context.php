@@ -790,6 +790,13 @@ class Context {
         $this->functionProxies['reflectionmethod::getattributes'] = new Call\ReflectionMethodGetAttributes();
         $this->functionProxies['reflectionattribute::getname'] = new Call\ReflectionAttributeGetName();
         $this->functionProxies['reflectionattribute::newinstance'] = new Call\ReflectionAttributeNewInstance();
+        $this->functionProxies['reflectionenum::__construct'] = new Call\ReflectionEnumConstruct();
+        $this->functionProxies['reflectionenum::getname'] = new Call\ReflectionEnumGetName();
+        $this->functionProxies['reflectionenum::hascase'] = new Call\ReflectionEnumHasCase();
+        $this->functionProxies['reflectionenum::getcase'] = new Call\ReflectionEnumGetCase();
+        $this->functionProxies['reflectionenum::isbacked'] = new Call\ReflectionEnumIsBacked();
+        $this->functionProxies['reflectionenumunitcase::getname'] = new Call\ReflectionEnumUnitCaseGetName();
+        $this->functionProxies['reflectionenumbackedcase::getname'] = new Call\ReflectionEnumUnitCaseGetName();
         $this->functionProxies['exception::getmessage'] = new Call\ExceptionGetMessage();
 
         FiberHelper::registerJitMethods($this);

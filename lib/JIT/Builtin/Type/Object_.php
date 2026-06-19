@@ -2826,6 +2826,18 @@ class Object_ extends Type {
             $this->defineProperty($id, 'name', Variable::TYPE_STRING);
             $this->defineProperty($id, 'constant', Variable::TYPE_STRING);
         }
+        if ('reflectionenum' === $lcname) {
+            $this->defineProperty($id, 'name', Variable::TYPE_STRING);
+        }
+        if ('reflectionenumunitcase' === $lcname) {
+            $this->defineProperty($id, 'name', Variable::TYPE_STRING);
+            $this->defineProperty($id, 'case', Variable::TYPE_STRING);
+        }
+        if ('reflectionenumbackedcase' === $lcname) {
+            $this->setClassParentName('ReflectionEnumBackedCase', 'ReflectionEnumUnitCase');
+            $this->defineProperty($id, 'name', Variable::TYPE_STRING);
+            $this->defineProperty($id, 'case', Variable::TYPE_STRING);
+        }
         if ('phpcompiler\vm\context' === $lcname) {
             $this->defineProperty($id, 'runtime', Variable::TYPE_OBJECT);
             $this->defineProperty($id, 'errors', Variable::TYPE_OBJECT);
