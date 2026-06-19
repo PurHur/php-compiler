@@ -6,6 +6,7 @@ namespace PHPCompiler\JIT;
 
 use PHPCompiler\Block;
 use PHPCompiler\JIT\Builtin\ErrorRaise;
+use PHPCompiler\VM\Variable as VMVariable;
 use PHPCompiler\JIT\Builtin\ExceptionHandlerJitRuntime;
 use PHPCompiler\JIT\Builtin\JitReturnPending;
 use PHPCompiler\JIT\Builtin\JitThrow;
@@ -389,7 +390,7 @@ final class TryCatchHelper
             }
             $context->freeDeadVariables($func, $throwBlock, $block);
             $thrown = $context->getVariableFromOp($block->getOperand($op->arg1));
-            if (Variable::TYPE_ENUM_CASE === $thrown->type) {
+            if (VMVariable::TYPE_ENUM_CASE === $thrown->type) {
                 self::emitCatchableClassError(
                     $context,
                     \PHPCompiler\VM\ExceptionSupport::CLASS_ERROR,
@@ -423,7 +424,7 @@ final class TryCatchHelper
         if (
             Variable::TYPE_OBJECT !== $thrown->type
             && Variable::TYPE_VALUE !== $thrown->type
-            && Variable::TYPE_ENUM_CASE !== $thrown->type
+            && VMVariable::TYPE_ENUM_CASE !== $thrown->type
         ) {
             self::emitCatchableClassError(
                 $context,

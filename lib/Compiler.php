@@ -7656,7 +7656,7 @@ class Compiler {
      */
     private function compileThrowExpression(Op\Expr\Throw_ $expr, Block $block, Block ...$extraSearchBlocks): array
     {
-        if ($this->isBareRethrowLine($expr->getLine())) {
+        if ($this->isBareRethrowExpression($expr, $block, ...$extraSearchBlocks)) {
             return [new OpCode(OpCode::TYPE_RETHROW)];
         }
 
@@ -12265,7 +12265,7 @@ class Compiler {
                     $this->compileOperand($terminal->var, $block, true)
                 )];
             case 'Terminal_Throw':
-                if ($this->isBareRethrowThrow($terminal)) {
+                if ($this->isBareRethrowThrow($terminal, $block)) {
                     return [new OpCode(OpCode::TYPE_RETHROW)];
                 }
 
@@ -12330,14 +12330,52 @@ class Compiler {
 
 
 
-    private function isBareRethrowThrow(Op\Terminal\Throw_ $terminal): bool
+    private function isBareRethrowThrow(Op\Terminal\Throw_ $terminal, Block $block): bool
     {
-        return $this->isBareRethrowLine($terminal->getLine());
+        if (!$this->isBareRethrowLine($terminal->getLine())) {
+            return false;
+        }
+
+        return $this->throwOperandIsBareRethrowSentinel($terminal->expr, $block);
+    }
+
+    private function isBareRethrowExpression(Op\Expr\Throw_ $expr, Block $block, Block ...$extraSearchBlocks): bool
+    {
+        if (!$this->isBareRethrowLine($expr->getLine())) {
+            return false;
+        }
+
+        return $this->throwOperandIsBareRethrowSentinel($expr->expr, $block, ...$extraSearchBlocks);
     }
 
     private function isBareRethrowLine(int $line): bool
     {
         return $line >= 1 && isset($this->bareRethrowLines[$line]);
+    }
+
+    /**
+     * SourceBareThrowRewriter lowers bare `throw;` to `throw null`; only that sentinel is a rethrow (#3508, #10016).
+     */
+    private function throwOperandIsBareRethrowSentinel(?Operand $expr, Block $block, Block ...$extraSearchBlocks): bool
+    {
+        if (!$expr instanceof Operand) {
+            return false;
+        }
+        $innerOp = $this->findOrigExprOpForOperand($expr, $block);
+        if (null === $innerOp) {
+            foreach ($extraSearchBlocks as $searchBlock) {
+                $innerOp = $this->findOrigExprOpForOperand($expr, $searchBlock);
+                if (null !== $innerOp) {
+                    break;
+                }
+            }
+        }
+        if (!$innerOp instanceof Op\Expr\ConstFetch) {
+            return false;
+        }
+        $name = $this->staticNameFromOperand($innerOp->name);
+
+        return 'null' === strtolower((string) $name);
     }
 
     /**
