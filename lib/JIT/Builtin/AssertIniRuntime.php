@@ -5,84 +5,111 @@ declare(strict_types=1);
 namespace PHPCompiler\JIT\Builtin;
 
 use PHPCompiler\JIT\Context;
-use PHPLLVM\Builder;
 use PHPLLVM\Value;
 
 /**
- * assert() INI globals for JIT/AOT (ext/standard/assert.c; issue #3316).
+ * assert() INI accessors for JIT/AOT via AssertOptionsJitHelper PHP (#9513).
+ *
+ * IniRuntime and JitAssert call thin ABI symbols; bodies live in {@see AssertOptionsRuntime}.
+ * php-src: ext/standard/assert.c
  */
 final class AssertIniRuntime
 {
-    public const G_ZEND_ASSERTIONS = 'phpc_assert_zend_assertions';
+    public const ABI_ENABLED = '__phpc_assert_enabled';
 
-    public const G_ASSERT_ACTIVE = 'phpc_assert_active';
+    public const ABI_EXCEPTION_MODE = '__phpc_assert_exception_mode';
 
-    public const G_ASSERT_EXCEPTION = 'phpc_assert_exception';
+    public const ABI_INI_GET_ZEND_ASSERTIONS = '__phpc_assert_ini_get_zend_assertions';
 
-    public const G_ASSERT_BAIL = 'phpc_assert_bail';
+    public const ABI_INI_GET_ACTIVE = '__phpc_assert_ini_get_active';
 
-    public const G_ASSERT_CALLBACK = 'phpc_assert_callback';
+    public const ABI_INI_GET_EXCEPTION = '__phpc_assert_ini_get_exception';
+
+    public const ABI_INI_SET_ZEND_ASSERTIONS = '__phpc_assert_ini_set_zend_assertions';
+
+    public const ABI_INI_SET_ACTIVE = '__phpc_assert_ini_set_active';
+
+    public const ABI_INI_SET_EXCEPTION = '__phpc_assert_ini_set_exception';
+
+    /** @var list<string> */
+    public const ABI_FUNCTIONS = [
+        self::ABI_ENABLED,
+        self::ABI_EXCEPTION_MODE,
+        self::ABI_INI_GET_ZEND_ASSERTIONS,
+        self::ABI_INI_GET_ACTIVE,
+        self::ABI_INI_GET_EXCEPTION,
+        self::ABI_INI_SET_ZEND_ASSERTIONS,
+        self::ABI_INI_SET_ACTIVE,
+        self::ABI_INI_SET_EXCEPTION,
+    ];
 
     public static function ensureGlobals(Context $context): void
     {
-        $i32 = $context->getTypeFromString('int32');
-        $i8p = $context->getTypeFromString('int8*');
-        $defaults = [
-            self::G_ZEND_ASSERTIONS => -1,
-            self::G_ASSERT_ACTIVE => 1,
-            self::G_ASSERT_EXCEPTION => 1,
-            self::G_ASSERT_BAIL => 0,
-        ];
-        foreach ($defaults as $name => $value) {
-            if (null === $context->module->getNamedGlobal($name)) {
-                $global = $context->module->addGlobal($i32, $name);
-                $global->setInitializer($i32->constInt($value, false));
-            }
-        }
-        if (null === $context->module->getNamedGlobal(self::G_ASSERT_CALLBACK)) {
-            $cb = $context->module->addGlobal($i8p, self::G_ASSERT_CALLBACK);
-            $cb->setInitializer($i8p->constNull());
-        }
-    }
-
-    public static function globalPtr(Context $context, string $name): Value
-    {
-        $i32 = $context->getTypeFromString('int32');
-        $global = $context->module->getNamedGlobal($name);
-        if (null === $global) {
-            throw new \LogicException("Missing assert ini global {$name}");
-        }
-
-        return $context->builder->pointerCast($global, $i32->pointerType(0));
-    }
-
-    public static function callbackGlobalPtr(Context $context): Value
-    {
-        $i8p = $context->getTypeFromString('int8*');
-        $global = $context->module->getNamedGlobal(self::G_ASSERT_CALLBACK);
-        if (null === $global) {
-            throw new \LogicException('Missing assert ini global '.self::G_ASSERT_CALLBACK);
-        }
-
-        return $context->builder->pointerCast($global, $i8p->pointerType(0));
+        self::ensureAbiDeclarations($context);
     }
 
     public static function loadAssertionsEnabled(Context $context): Value
     {
-        $i32 = $context->getTypeFromString('int32');
-        $zend = $context->builder->load(self::globalPtr($context, self::G_ZEND_ASSERTIONS));
-        $active = $context->builder->load(self::globalPtr($context, self::G_ASSERT_ACTIVE));
-        $zendOn = $context->builder->icmp(Builder::INT_SGT, $zend, $i32->constInt(0, false));
-        $activeOn = $context->builder->icmp(Builder::INT_NE, $active, $i32->constInt(0, false));
-
-        return $context->builder->and($zendOn, $activeOn);
+        return $context->builder->call($context->lookupFunction(self::ABI_ENABLED));
     }
 
     public static function loadExceptionMode(Context $context): Value
     {
-        $i32 = $context->getTypeFromString('int32');
-        $mode = $context->builder->load(self::globalPtr($context, self::G_ASSERT_EXCEPTION));
+        return $context->builder->call($context->lookupFunction(self::ABI_EXCEPTION_MODE));
+    }
 
-        return $context->builder->icmp(Builder::INT_NE, $mode, $i32->constInt(0, false));
+    public static function writeIniGetZendAssertions(Context $context, Value $out): void
+    {
+        $context->builder->call($context->lookupFunction(self::ABI_INI_GET_ZEND_ASSERTIONS), $out);
+    }
+
+    public static function writeIniGetActive(Context $context, Value $out): void
+    {
+        $context->builder->call($context->lookupFunction(self::ABI_INI_GET_ACTIVE), $out);
+    }
+
+    public static function writeIniGetException(Context $context, Value $out): void
+    {
+        $context->builder->call($context->lookupFunction(self::ABI_INI_GET_EXCEPTION), $out);
+    }
+
+    public static function applyIniSetZendAssertions(Context $context, Value $fn, Value $valCstr): void
+    {
+        $context->builder->call($context->lookupFunction(self::ABI_INI_SET_ZEND_ASSERTIONS), $valCstr);
+    }
+
+    public static function applyIniSetActive(Context $context, Value $fn, Value $valCstr): void
+    {
+        $context->builder->call($context->lookupFunction(self::ABI_INI_SET_ACTIVE), $valCstr);
+    }
+
+    public static function applyIniSetException(Context $context, Value $fn, Value $valCstr): void
+    {
+        $context->builder->call($context->lookupFunction(self::ABI_INI_SET_EXCEPTION), $valCstr);
+    }
+
+    private static function ensureAbiDeclarations(Context $context): void
+    {
+        $i1 = $context->getTypeFromString('int1');
+        $i8p = $context->getTypeFromString('int8*');
+        $valPtr = $context->getTypeFromString('__value__*');
+        $voidTy = $context->getTypeFromString('void');
+
+        foreach ([
+            [self::ABI_ENABLED, $context->context->functionType($i1, false)],
+            [self::ABI_EXCEPTION_MODE, $context->context->functionType($i1, false)],
+            [self::ABI_INI_GET_ZEND_ASSERTIONS, $context->context->functionType($voidTy, false, $valPtr)],
+            [self::ABI_INI_GET_ACTIVE, $context->context->functionType($voidTy, false, $valPtr)],
+            [self::ABI_INI_GET_EXCEPTION, $context->context->functionType($voidTy, false, $valPtr)],
+            [self::ABI_INI_SET_ZEND_ASSERTIONS, $context->context->functionType($voidTy, false, $i8p)],
+            [self::ABI_INI_SET_ACTIVE, $context->context->functionType($voidTy, false, $i8p)],
+            [self::ABI_INI_SET_EXCEPTION, $context->context->functionType($voidTy, false, $i8p)],
+        ] as [$name, $ft]) {
+            if (null !== $context->module->getNamedFunction($name)) {
+                continue;
+            }
+            $fn = $context->module->addFunction($name, $ft);
+            $context->registerFunction($name, $fn);
+        }
     }
 }

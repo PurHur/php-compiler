@@ -779,6 +779,7 @@ require_once __DIR__.'/../../../ext/standard/VmArraySort.php';
 require_once __DIR__.'/../../../ext/standard/VmArrayUserSetOps.php';
 require_once __DIR__.'/../../../ext/standard/VmArrayValueCallback.php';
 require_once __DIR__.'/../../../ext/standard/VmAssert.php';
+require_once __DIR__.'/../../../ext/standard/AssertOptionsJitHelper.php';
 require_once __DIR__.'/../../../ext/standard/VmAssertState.php';
 require_once __DIR__.'/../../../ext/standard/VmCallable.php';
 require_once __DIR__.'/../../../ext/standard/VmCallableInvoke.php';
