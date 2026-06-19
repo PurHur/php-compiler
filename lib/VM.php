@@ -5339,6 +5339,7 @@ restart:
                     if (!VM\LazyObjectSupport::skipLazyInitForPropertyRead($propertyObject, $name)) {
                         VM\LazyObjectSupport::ensureInitialized($this, $propertyObject);
                     }
+                    $propertyObject = VM\LazyObjectSupport::getLazyInstance($propertyObject);
                     if (EnumCaseSupport::isEnumCase($propertyObject)) {
                         $forWrite = $this->propertyFetchDestUsedAsAssignLvalue($frame, $op);
                         $readonlyMsg = EnumCaseSupport::readonlyPseudoPropertyViolationMessage(
@@ -5632,6 +5633,7 @@ restart:
                         break;
                     }
                     VM\LazyObjectSupport::ensureInitialized($this, $object);
+                    $object = VM\LazyObjectSupport::getLazyInstance($object);
                     $catchFrame = $this->emptyObjectProperty(
                         $object,
                         $propName,
@@ -5742,6 +5744,7 @@ restart:
                                 goto restart;
                             }
                             VM\LazyObjectSupport::ensureInitialized($this, $object);
+                            $object = VM\LazyObjectSupport::getLazyInstance($object);
                             if (!$op->issetForCoalesceAssign) {
                                 $catchFrame = $this->enforceWriteOnlyVirtualPropertyRead($object, $propName, $frame);
                                 if (null !== $catchFrame) {
@@ -11150,6 +11153,11 @@ restart:
         $object = $receiver->toObject();
         if ($object->lazyPending && 'marklazyobjectasinitialized' !== $methodLc) {
             VM\LazyObjectSupport::ensureInitialized($this, $object);
+        }
+        $object = VM\LazyObjectSupport::getLazyInstance($object);
+        if ($object !== $receiver->toObject()) {
+            $receiver = new Variable(Variable::TYPE_OBJECT);
+            $receiver->object($object);
         }
         if (null !== $object->closureState && '__invoke' === $methodLc) {
             $this->initClosureCall($frame, $object->closureState);

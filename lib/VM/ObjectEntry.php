@@ -58,6 +58,9 @@ class ObjectEntry {
     /** Pending initializer failure for ReflectionClass::getLazyInitializationException() (#6514). */
     public ?ObjectEntry $lazyInitException = null;
 
+    /** Concrete instance behind an interface lazy proxy after factory runs (#9999). */
+    public ?ObjectEntry $lazyInterfaceProxyTarget = null;
+
     /**
      * Instance properties written via ReflectionProperty::setRawValueWithoutLazyInitialization() (#7095).
      *
@@ -132,6 +135,7 @@ class ObjectEntry {
         $this->lazyPending = false;
         $this->lazyGhost = false;
         $this->lazyResetInitializer = null;
+        $this->lazyInterfaceProxyTarget = null;
         $this->lazyRawInitializedProperties = [];
         $this->fiberState = null;
     }

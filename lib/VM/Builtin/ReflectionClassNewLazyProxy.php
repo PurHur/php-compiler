@@ -29,7 +29,7 @@ final class ReflectionClassNewLazyProxy extends VmClassMethod
         if (null === $entry) {
             throw new \LogicException('ReflectionClass refers to unknown class in this compiler build');
         }
-        if ($entry->isInterface || $entry->isTrait || $entry->isEnum) {
+        if ($entry->isTrait || $entry->isEnum) {
             throw new \LogicException('Cannot create lazy proxy of '.$className);
         }
         $initVar = $frame->calledArgs[1]->resolveIndirect();
