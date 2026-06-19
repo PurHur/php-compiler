@@ -21,6 +21,19 @@ class C {
 PHP);
     }
 
+    public function testThrowInClassConstErrorsBeforeNewWithoutParensCheck(): void
+    {
+        $runtime = new Runtime();
+        $this->expectException(\CompileError::class);
+        $this->expectExceptionMessage(ThrowInClassConstCompileCheck::MESSAGE);
+        $runtime->parseAndCompile(<<<'PHP'
+<?php
+class C {
+    public const X = throw new Exception('x');
+}
+PHP, 'throw_before_new.php');
+    }
+
     public function testThrowInInterfaceConstCompileErrors(): void
     {
         $this->expectCompileError(<<<'PHP'

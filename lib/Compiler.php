@@ -435,6 +435,10 @@ class Compiler {
             }
         );
 
+        // Const-expr context checks before compileCfgBlock / PHPTypes folding (#10106, #6549, #6580).
+        ThrowInClassConstCompileCheck::validate($script);
+        NewWithoutParensCompileCheck::validate($script, $this->compileSourceCode);
+
         /** @var mixed $main */
         $main = $this->compileCfgBlock($script->main->cfg, $script->main->params, $script->main);
         if (!$main instanceof Block) {
@@ -460,8 +464,6 @@ class Compiler {
         OverrideValidator::validateScript($script);
         FinalClassConstCheck::validate($script);
         TraitClassConstConflictCheck::validate($script);
-        NewWithoutParensCompileCheck::validate($script, $this->compileSourceCode);
-        ThrowInClassConstCompileCheck::validate($script);
         TypedClassConstInheritCheck::validate($script);
         InterfaceConstVisibilityCheck::validate($script);
         InterfaceMethodVisibilityCheck::validate($script);
