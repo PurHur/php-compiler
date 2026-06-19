@@ -49,6 +49,29 @@ PHP;
         $in = '<?php echo 1;';
         $out = JitMcjitEmbed::prepareClassless($in);
         $this->assertStringContainsString('__phpc_mcjit_embed_bootstrap', $out);
+        $this->assertStringContainsString("} \n", $out);
+    }
+
+    public function testBootstrapPrependPreservesUserLineNumbers(): void
+    {
+        $in = <<<'PHP'
+<?php
+echo __LINE__, "\n";
+PHP;
+        $out = JitMcjitEmbed::prepareClassless($in);
+        $this->assertStringContainsString("} \necho __LINE__", $out);
+        $runtime = new Runtime(Runtime::MODE_NORMAL);
+        $block = $runtime->parseAndCompile($out, 'jit-line-probe.php');
+        $this->assertNotNull($block);
+        foreach ($block->opCodes as $op) {
+            if ($op->type === \PHPCompiler\OpCode::TYPE_SCRIPT_MAGIC
+                && $op->arg3 === \PHPCompiler\OpCode::SCRIPT_MAGIC_LINE) {
+                $this->assertSame(2, $op->arg2);
+
+                return;
+            }
+        }
+        $this->fail('Missing TYPE_SCRIPT_MAGIC LINE opcode');
     }
 
     public function testInjectsBootstrapForEnumOnlyScript(): void
