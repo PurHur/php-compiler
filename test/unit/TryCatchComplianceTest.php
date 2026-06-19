@@ -9,6 +9,40 @@ use PHPUnit\Framework\TestCase;
 /** Issue #2084 / #57: try/catch/throw VM compliance slice for ci-fast. */
 final class TryCatchComplianceTest extends TestCase
 {
+    /** Issue #10016 / #3508: bare `throw;` rethrows active catch exception to outer handler. */
+    public function testBareThrowRethrowNestedCatchPrintsMessage(): void
+    {
+        $this->assertVmOutput(
+            <<<'PHP'
+<?php
+try {
+    try {
+        throw new Exception('inner');
+    } catch (Exception $e) {
+        throw;
+    }
+} catch (Exception $e) {
+    echo $e->getMessage(), "\n";
+}
+PHP
+            ,
+            "inner\n"
+        );
+    }
+
+    /** Issue #10016: same-line throw expr + bare rethrow must not treat `throw new` as rethrow. */
+    public function testBareThrowRethrowSameLineAsThrowExpression(): void
+    {
+        $this->assertVmOutput(
+            <<<'PHP'
+<?php
+try { try { throw new Exception('inner'); } catch (Exception $e) { throw; } } catch (Exception $e) { echo $e->getMessage(), "\n"; }
+PHP
+            ,
+            "inner\n"
+        );
+    }
+
     public function testCatchRunsAfterThrow(): void
     {
         $this->assertVmOutput(
