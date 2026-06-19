@@ -90,6 +90,9 @@ final class Variable {
     /** Declaring class (lowercase) for static property hook set dispatch (#4751). */
     public ?string $staticPropertyClassLc = null;
 
+    /** Function-local typed static variable name for TypeError messages (#9998). */
+    public ?string $functionStaticVarName = null;
+
     /** Stream handle from fopen()/similar; distinguishes handle ints from plain integers (#3519). */
     public bool $streamResource = false;
 

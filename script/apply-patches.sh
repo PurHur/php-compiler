@@ -3973,6 +3973,59 @@ PY
   echo "Applied php-cfg-global-typed-const overlay (#7081, #9909)"
 }
 
+apply_php_cfg_typed_function_static_overlay() {
+  local parser="$ROOT/vendor/ircmaxell/php-cfg/lib/PHPCfg/Parser.php"
+  local overlay="$PATCH_DIR/overlays/php-cfg/typed-function-static-parser-methods.php"
+  if [[ ! -f "$parser" || ! -f "$overlay" ]]; then
+    return 0
+  fi
+  if grep -q 'function applyTypedFunctionStaticMarkerAttributes' "$parser" 2>/dev/null; then
+    return 0
+  fi
+  python3 - "$parser" "$overlay" <<'PY'
+import sys
+from pathlib import Path
+
+parser_path = Path(sys.argv[1])
+method_path = Path(sys.argv[2])
+text = parser_path.read_text()
+if 'function applyTypedFunctionStaticMarkerAttributes' in text:
+    raise SystemExit(0)
+
+anchor = """    protected function parseStmt_Static(Stmt\\Static_ $node)
+    {"""
+if anchor not in text:
+    sys.stderr.write("php-cfg-typed-function-static: parseStmt_Static anchor not found in Parser.php\n")
+    raise SystemExit(1)
+
+insert = method_path.read_text().rstrip("\n") + "\n\n"
+text = text.replace(anchor, insert + anchor, 1)
+old = """            $this->block->children[] = new Op\\Terminal\\StaticVar(
+                $this->writeVariable(new Operand\\BoundVariable($this->parseExprNode($var->var->name), true, Operand\\BoundVariable::SCOPE_FUNCTION)),
+                $defaultBlock,
+                $defaultVar,
+                $this->mapAttributes($node)
+            );"""
+new = """            $staticOp = new Op\\Terminal\\StaticVar(
+                $this->writeVariable(new Operand\\BoundVariable($this->parseExprNode($var->var->name), true, Operand\\BoundVariable::SCOPE_FUNCTION)),
+                $defaultBlock,
+                $defaultVar,
+                $this->mapAttributes($node)
+            );
+            $this->applyTypedFunctionStaticMarkerAttributes(
+                $staticOp,
+                array_merge($node->getAttributes(), $var->getAttributes())
+            );
+            $this->block->children[] = $staticOp;"""
+if old not in text:
+    sys.stderr.write("php-cfg-typed-function-static: parseStmt_Static body anchor missing\n")
+    raise SystemExit(1)
+text = text.replace(old, new, 1)
+parser_path.write_text(text)
+PY
+  echo "Applied php-cfg-typed-function-static overlay (#9998)"
+}
+
 apply_php_cfg_list_spread_overlay() {
   local assign="$ROOT/vendor/ircmaxell/php-cfg/lib/PHPCfg/Op/Expr/Assign.php"
   local parser="$ROOT/vendor/ircmaxell/php-cfg/lib/PHPCfg/Parser.php"
@@ -5753,6 +5806,8 @@ if [[ -d "$ROOT/vendor/ircmaxell/php-cfg" ]]; then
   apply_php_cfg_asymmetric_set_visibility_parser_overlay
   apply_php_cfg_asymmetric_get_visibility_parser_overlay
   apply_php_cfg_global_typed_const_overlay
+  apply_php_cfg_typed_function_static_overlay
+  apply_patch "$PATCH_DIR/php-cfg-typed-function-static.patch"
   apply_patch "$PATCH_DIR/php-cfg-attribute-groups.patch"
   apply_patch "$PATCH_DIR/php-cfg-trait-use.patch"
   apply_php_cfg_trait_use_overlay

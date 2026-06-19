@@ -1,0 +1,21 @@
+diff --git vendor/ircmaxell/php-cfg/lib/PHPCfg/Op/Terminal/StaticVar.php vendor/ircmaxell/php-cfg/lib/PHPCfg/Op/Terminal/StaticVar.php
+--- vendor/ircmaxell/php-cfg/lib/PHPCfg/Op/Terminal/StaticVar.php
++++ vendor/ircmaxell/php-cfg/lib/PHPCfg/Op/Terminal/StaticVar.php
+@@ -12,6 +12,7 @@ namespace PHPCfg\Op\Terminal;
+ use PHPCfg\Block;
+ use PHPCfg\Op\Terminal;
+ use PHPCfg\Operand;
++use PHPCfg\Op\Type;
+ 
+ class StaticVar extends Terminal
+ {
+@@ -21,6 +22,9 @@ class StaticVar extends Terminal
+ 
+     public $defaultVar;
+ 
++    /** Declared type from typed function-local static (#9998). */
++    public ?Type $declaredType = null;
++
+     public function __construct(Operand $var, Block $defaultBlock = null, Operand $defaultVar = null, array $attributes = [])
+     {
+         parent::__construct($attributes);
