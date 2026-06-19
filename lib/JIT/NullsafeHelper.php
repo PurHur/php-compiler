@@ -8,10 +8,13 @@ use PHPLLVM\BasicBlock;
 use PHPLLVM\Value\Function_;
 use PHPCompiler\Block;
 use PHPCompiler\JIT;
+use PHPCompiler\JIT\Builtin\NullsafeRuntime;
 use PHPCompiler\JIT\Builtin\Type\Object_;
 
 /**
- * LLVM lowering helpers for ?-> nullsafe branch targets (issues #308, #3219).
+ * LLVM lowering helpers for ?-> nullsafe branch targets (issues #308, #3219, #10154).
+ *
+ * SSOT: {@see \PHPCompiler\VM\TypedPropertyCheck}, {@see \PHPCompiler\VM\NullsafeJitHelper}
  */
 final class NullsafeHelper
 {
@@ -42,6 +45,7 @@ final class NullsafeHelper
         if (Variable::TYPE_VALUE !== $receiver->type) {
             throw new \LogicException('nullsafe receiver must be object or value box');
         }
+        NullsafeRuntime::ensureLinked($context);
         $valuePtr = JitValueBox::valuePtrFromVariable($context, $receiver);
         $typeByte = $builder->load(
             $builder->structGep(
@@ -49,48 +53,27 @@ final class NullsafeHelper
                 $context->structFieldMap['__value__']['type']
             )
         );
-        $i8 = $context->getTypeFromString('int8');
-        $isNull = $builder->icmp(
-            \PHPLLVM\Builder::INT_EQ,
-            $typeByte,
-            $i8->constInt(\PHPCompiler\VM\Variable::TYPE_NULL, false)
-        );
-        $nullableUninit = self::isNullableUninitializedProperty($context, $receiver, $valuePtr, $typeByte, $i8);
-        if (null === $nullableUninit) {
-            return $isNull;
-        }
+        $i1 = $context->getTypeFromString('int1');
+        $nullableSlot = $i1->constInt(self::nullablePropertySlot($context, $receiver) ? 1 : 0, false);
 
-        return $builder->or($isNull, $nullableUninit);
+        return NullsafeRuntime::callValueBoxShortCircuits($context, $typeByte, $nullableSlot);
     }
 
-    private static function isNullableUninitializedProperty(
-        Context $context,
-        Variable $receiver,
-        \PHPLLVM\Value $valuePtr,
-        \PHPLLVM\Value $typeByte,
-        \PHPLLVM\Type $i8
-    ): ?\PHPLLVM\Value {
+    private static function nullablePropertySlot(Context $context, Variable $receiver): bool
+    {
         if (null === $receiver->objectPropertyClassName || null === $receiver->objectPropertyName) {
-            return null;
+            return false;
         }
         $object = $context->type->object;
         if (!$object instanceof Object_) {
-            return null;
+            return false;
         }
         $resolved = $object->resolvePropertySlot($receiver->objectPropertyClassName, $receiver->objectPropertyName);
         if (null === $resolved) {
-            return null;
+            return false;
         }
         [$classId, $slotIndex] = $resolved;
-        if (!$object->propertySlotAllowsNull($classId, $slotIndex)) {
-            return null;
-        }
-        $builder = $context->builder;
 
-        return $builder->icmp(
-            \PHPLLVM\Builder::INT_EQ,
-            $typeByte,
-            $i8->constInt(\PHPCompiler\VM\Variable::TYPE_UNDEFINED, false)
-        );
+        return $object->propertySlotAllowsNull($classId, $slotIndex);
     }
 }
