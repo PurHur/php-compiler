@@ -37,10 +37,13 @@ final class LazyObjectSupport
                 .var_export($className, true).' given'
             );
         }
-        if ($entry->isInterface || $entry->isTrait || $entry->isEnum) {
+        if ($entry->isTrait || $entry->isEnum) {
             $kind = $proxy ? 'proxy' : 'ghost';
 
             throw new \LogicException('Cannot create lazy '.$kind.' of '.$className);
+        }
+        if ($entry->isInterface && !$proxy) {
+            throw new \LogicException('Cannot create lazy ghost of '.$className);
         }
 
         return $entry;
@@ -219,18 +222,31 @@ final class LazyObjectSupport
             throw new \LogicException('Lazy object initializer must return an object');
         }
         $real = $result->toObject();
-        if (strtolower($real->class->name) !== strtolower($object->class->name)) {
-            throw new \LogicException(
-                sprintf(
-                    'Lazy object initializer returned %s, expected instance of %s',
-                    $real->class->name,
-                    $object->class->name
-                )
-            );
-        }
+        if ($object->class->isInterface) {
+            if (!InterfaceCheck::entryImplements($real->class, strtolower($object->class->name), $vm->context)) {
+                throw new \LogicException(
+                    sprintf(
+                        'Lazy object initializer returned %s, expected instance of %s',
+                        $real->class->name,
+                        $object->class->name
+                    )
+                );
+            }
+            $object->lazyInterfaceProxyTarget = $real;
+        } else {
+            if (strtolower($real->class->name) !== strtolower($object->class->name)) {
+                throw new \LogicException(
+                    sprintf(
+                        'Lazy object initializer returned %s, expected instance of %s',
+                        $real->class->name,
+                        $object->class->name
+                    )
+                );
+            }
 
-        foreach ($real->getRawProperties() as $name => $value) {
-            $object->getProperty($name)->copyFrom($value);
+            foreach ($real->getRawProperties() as $name => $value) {
+                $object->getProperty($name)->copyFrom($value);
+            }
         }
         $object->constructed = true;
         $object->lazyPending = false;
@@ -266,10 +282,10 @@ final class LazyObjectSupport
         return $object->lazyPending;
     }
 
-    /** Zend zend_lazy_object_get_instance — proxy real instance or ghost shell (#7054). */
+    /** Zend zend_lazy_object_get_instance — proxy real instance or ghost shell (#7054, #9999). */
     public static function getLazyInstance(ObjectEntry $object): ObjectEntry
     {
-        return $object;
+        return $object->lazyInterfaceProxyTarget ?? $object;
     }
 
     /**
