@@ -47,6 +47,16 @@ final class GlobalTypedConstRewriter
                     $pendingClassLike = false;
                 } elseif ('}' === $text && $classLikeDepth > 0) {
                     --$classLikeDepth;
+                } elseif (T_FINAL === $tok[0] && 0 === $classLikeDepth
+                    && CompilerVersion::supportsFinalGlobalTypedConstants()) {
+                    $typed = self::tryParseFinalTypedConst($tokens, $i + 1);
+                    if (null !== $typed) {
+                        [$typeExpr, $end] = $typed;
+                        self::rejectDisallowedGlobalConstType($typeExpr, $tok[2] ?? 1);
+                        $out .= '/*'.self::MARKER_PREFIX.'final:'.$typeExpr.'*/ const ';
+                        $i = $end - 1;
+                        continue;
+                    }
                 } elseif (T_CONST === $tok[0] && 0 === $classLikeDepth) {
                     $typed = self::tryParseTypedConst($tokens, $i + 1);
                     if (null !== $typed) {
@@ -68,6 +78,43 @@ final class GlobalTypedConstRewriter
         }
 
         return $source === $out ? $source : $out;
+    }
+
+    /**
+     * @return array{0: string, 1: bool}|null [type expression, isFinal]
+     */
+    public static function parseMarkerPayload(string $payload): ?array
+    {
+        $payload = trim($payload);
+        if ('' === $payload) {
+            return null;
+        }
+        $isFinal = false;
+        if (str_starts_with($payload, 'final:')) {
+            $isFinal = true;
+            $payload = substr($payload, 6);
+        }
+        $payload = trim($payload);
+        if ('' === $payload) {
+            return null;
+        }
+
+        return [$payload, $isFinal];
+    }
+
+    /**
+     * @param list<array{0: int, 1: string, 2: int}|string> $tokens
+     *
+     * @return array{0: string, 1: int}|null [type expression, index of const name token]
+     */
+    private static function tryParseFinalTypedConst(array $tokens, int $start): ?array
+    {
+        $j = self::skipIgnorable($tokens, $start, \count($tokens));
+        if ($j >= \count($tokens) || !\is_array($tokens[$j]) || T_CONST !== $tokens[$j][0]) {
+            return null;
+        }
+
+        return self::tryParseTypedConst($tokens, $j + 1);
     }
 
     /**

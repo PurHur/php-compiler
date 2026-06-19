@@ -1,7 +1,27 @@
     /**
-     * Recover phpc-global-typed-const:* marker from comment attributes (#7081).
+     * Recover phpc-global-typed-const:* marker from comment attributes (#7081, #9909).
      */
-    private function extractGlobalTypedConstDeclaredTypeFromAttributes(array $attributes): ?Op\Type
+    private function applyGlobalTypedConstMarkerAttributes(Op\Terminal\Const_ $constOp, array $attributes): void
+    {
+        $payload = $this->extractGlobalTypedConstMarkerPayloadFromAttributes($attributes);
+        if (null === $payload) {
+            return;
+        }
+        $parsed = \PHPCompiler\Ast\GlobalTypedConstRewriter::parseMarkerPayload($payload);
+        if (null === $parsed) {
+            return;
+        }
+        [$typeExpr, $isFinal] = $parsed;
+        $constOp->declaredType = $this->parseGlobalTypedConstTypeFromMarker($typeExpr);
+        if ($isFinal) {
+            $constOp->flags |= \PhpParser\Node\Stmt\Class_::MODIFIER_FINAL;
+        }
+    }
+
+    /**
+     * @return string|null Raw marker payload (type or final:type).
+     */
+    private function extractGlobalTypedConstMarkerPayloadFromAttributes(array $attributes): ?string
     {
         $chunks = [];
         if (isset($attributes['comments']) && is_array($attributes['comments'])) {
@@ -21,12 +41,10 @@
             if (!preg_match(\PHPCompiler\Ast\GlobalTypedConstRewriter::MARKER_PATTERN, $chunk, $m)) {
                 continue;
             }
-            $typeExpr = trim($m[1]);
-            if ('' === $typeExpr) {
-                continue;
+            $payload = trim($m[1]);
+            if ('' !== $payload) {
+                return $payload;
             }
-
-            return $this->parseGlobalTypedConstTypeFromMarker($typeExpr);
         }
 
         return null;
