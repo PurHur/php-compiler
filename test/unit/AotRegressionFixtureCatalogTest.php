@@ -43,6 +43,7 @@ final class AotRegressionFixtureCatalogTest extends TestCase
         'late_static_binding.phpt',
         'new_static.phpt',
         'match_guard_falsy.phpt',
+        'fcc_new_instance.phpt',
     ];
 
     /**

@@ -61,6 +61,23 @@ PHP;
         self::assertStringNotContainsString('Variable function calls not yet supported', $stderr);
     }
 
+    /** Issue #10168: (new MC())->m(...) instance-method FCC must JIT-compile. */
+    public function testInstanceMethodCallableOnNewExpressionCompiles(): void
+    {
+        $this->skipUnlessLlvmReady();
+        $code = <<<'PHP'
+<?php
+declare(strict_types=1);
+class MC { public function m(): int { return 7; } }
+$c = (new MC())->m(...);
+echo $c(), "\n";
+PHP;
+        $stderr = $this->runJitProbeInSubprocess($code);
+        self::assertStringNotContainsString('Call to undefined method PHPTypes\\Type::array()', $stderr);
+        self::assertStringNotContainsString('Module verification failed', $stderr);
+        self::assertStringNotContainsString('Variable function calls not yet supported', $stderr);
+    }
+
     /** Issue #6845 / #9250: enum case E::A->f(...) FCC must JIT-compile (empty userType + classHint). */
     public function testEnumCaseMethodCallableCompiles(): void
     {
