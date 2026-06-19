@@ -14,7 +14,7 @@ use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
 
 /**
- * getenv() — read process environment (VM; JIT/AOT via __compiler_getenv / __compiler_getenv_all, #3710, #5075).
+ * getenv() — read process environment (VM; JIT/AOT via GetenvJitHelper / VmEnv, #3710, #5075, #9092).
  *
  * php-src: ext/standard/basic_functions.c — zif_getenv
  */

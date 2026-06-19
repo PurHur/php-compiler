@@ -4,18 +4,34 @@ declare(strict_types=1);
 
 namespace PHPCompiler\JIT\Builtin;
 
+use PHPCompiler\JIT;
+use PHPCompiler\JIT\Builtin;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\Variable;
 use PHPLLVM\Builder;
-use PHPLLVM\Value;
+use PHPLLVM\Value\Function_ as LlvmFunction;
 
 /**
- * LLVM implementation of __compiler_getenv — libc getenv into a __value__ out-parameter.
+ * JIT/AOT link for __compiler_getenv via GetenvJitHelper PHP overlay (#9092).
  *
- * VM/JIT/AOT/standalone share this path; superglobals_refresh.c no longer duplicates it (#5330).
+ * PHP overlay via compiled helper; libc getenv on miss (thin trampoline).
+ * php-src: ext/standard/basic_functions.c — zif_getenv
  */
 final class StringGetenv
 {
+    private const HELPER_PATH = '/ext/standard/GetenvJitHelper.php';
+
+    private const GETENV_HELPER = 'PHPCompiler\\ext\\standard\\GetenvJitHelper::getenv';
+
+    private const PUTENV_HELPER = 'PHPCompiler\\ext\\standard\\GetenvJitHelper::putenv';
+
+    /** @var list<string> */
+    private const COMPILED_HELPERS = [
+        self::GETENV_HELPER,
+        self::PUTENV_HELPER,
+    ];
+
     public static function ensureLinked(Context $context): void
     {
         self::implement($context);
@@ -35,27 +51,124 @@ final class StringGetenv
             return;
         }
 
+        if (Builtin::LOAD_TYPE_STANDALONE === $context->loadType) {
+            StringGetenvLibcBridge::implement($context);
+
+            return;
+        }
+
+        self::ensureJitHelperCompiled($context);
+        self::implementGetenvBridge($context);
+        $context->builder->clearInsertionPosition();
+    }
+
+    public static function ensurePutenvLinked(Context $context): void
+    {
+        if (Builtin::LOAD_TYPE_STANDALONE === $context->loadType) {
+            StringGetenvLibcBridge::ensureLinked($context);
+
+            return;
+        }
+        self::ensureJitHelperCompiled($context);
+    }
+
+    public static function helperFunction(Context $context, string $logical): LlvmFunction
+    {
+        self::ensureJitHelperCompiled($context);
+        $lc = \strtolower($logical);
+        $fn = $context->functions[$lc] ?? null;
+        if (null === $fn) {
+            throw new \LogicException($logical.' missing after GetenvJitHelper compile (#9092)');
+        }
+
+        return $fn;
+    }
+
+    public static function ensureJitHelperCompiled(Context $context): void
+    {
+        $missing = false;
+        foreach (self::COMPILED_HELPERS as $logical) {
+            if (!isset($context->functions[\strtolower($logical)])) {
+                $missing = true;
+                break;
+            }
+        }
+        if (!$missing) {
+            return;
+        }
+
+        $runtime = $context->runtime;
+        $path = \dirname(__DIR__, 3).self::HELPER_PATH;
+        $prevSelfHostAot = \getenv('PHP_COMPILER_SELFHOST_AOT');
+        if (\function_exists('putenv')) {
+            \putenv('PHP_COMPILER_SELFHOST_AOT=0');
+        }
+        try {
+            $block = $runtime->parseAndCompile((string) \file_get_contents($path), 'GetenvJitHelper.php');
+            if (null === $block) {
+                throw new \LogicException('GetenvJitHelper.php parseAndCompile failed (#9092)');
+            }
+            $jit = new JIT($context);
+            $jit->compile($block);
+        } finally {
+            if (\function_exists('putenv')) {
+                if (false === $prevSelfHostAot || null === $prevSelfHostAot) {
+                    \putenv('PHP_COMPILER_SELFHOST_AOT=');
+                } else {
+                    \putenv('PHP_COMPILER_SELFHOST_AOT='.$prevSelfHostAot);
+                }
+            }
+        }
+        foreach (self::COMPILED_HELPERS as $logical) {
+            if (!isset($context->functions[\strtolower($logical)])) {
+                throw new \LogicException($logical.' was not compiled for JIT (#9092)');
+            }
+        }
+    }
+
+    private static function implementGetenvBridge(Context $context): void
+    {
         $fn = $context->lookupFunction('__compiler_getenv');
-
-        StringEnvLocal::ensureLinked($context);
-
-        $entry = $fn->appendBasicBlock('main');
+        $entry = $fn->appendBasicBlock('getenv_bridge_entry');
         $context->builder->positionAtEnd($entry);
 
-        $name = $fn->getParam(0);
+        $nameStr = $fn->getParam(0);
         $localOnly = $fn->getParam(1);
         $out = $fn->getParam(2);
-        $strMap = $context->structFieldMap['__string__'];
         $valMap = $context->structFieldMap['__value__'];
-        $i8p = $context->getTypeFromString('int8*');
-        $i64 = $context->getTypeFromString('int64');
         $i8 = $context->getTypeFromString('int8');
+        $i64 = $context->getTypeFromString('int64');
+        $i8p = $context->getTypeFromString('int8*');
         $zero = $i64->constInt(0, false);
 
-        $nameLen = $context->builder->load(
-            $context->builder->structGep($name, $strMap['length'])
+        $overlayPtr = $context->builder->call(
+            self::helperFunction($context, self::GETENV_HELPER),
+            $nameStr,
+            $localOnly
         );
-        $nameBytes = $context->builder->structGep($name, $strMap['value']);
+        $overlayType = $context->builder->load(
+            $context->builder->structGep($overlayPtr, $valMap['type'])
+        );
+        $isFalse = $context->builder->icmp(
+            Builder::INT_EQ,
+            $overlayType,
+            $i8->constInt(Variable::TYPE_NATIVE_BOOL, false)
+        );
+
+        $overlayHit = $fn->appendBasicBlock('getenv_overlay_hit');
+        $libcBb = $fn->appendBasicBlock('getenv_libc');
+        $done = $fn->appendBasicBlock('getenv_done');
+        $context->builder->branchIf($isFalse, $libcBb, $overlayHit);
+
+        $context->builder->positionAtEnd($overlayHit);
+        JitValueBox::copyIntoPointer($context, $out, $overlayPtr);
+        $context->builder->branch($done);
+
+        $context->builder->positionAtEnd($libcBb);
+        $nameLen = $context->builder->load(
+            $context->builder->structGep($nameStr, $context->structFieldMap['__string__']['length'])
+        );
+        $nameBytes = $context->builder->structGep($nameStr, $context->structFieldMap['__string__']['value']);
         $bufLen = $context->builder->add($nameLen, $i64->constInt(1, false));
         $nameBuf = $context->builder->alloca($i8, $bufLen, 'getenv_name');
         $nameCStr = $context->builder->pointerCast($nameBuf, $i8p);
@@ -64,51 +177,11 @@ final class StringGetenv
             $i8->constInt(0, false),
             $context->builder->inBoundsGEP($nameCStr, $nameLen)
         );
-
-        $routeLocal = $fn->appendBasicBlock('getenv_route_local');
-        $useLibcOnly = $fn->appendBasicBlock('getenv_use_libc_only');
-        $tryLocal = $fn->appendBasicBlock('getenv_try_local');
-        $localMiss = $fn->appendBasicBlock('getenv_local_miss');
-        $localHit = $fn->appendBasicBlock('getenv_local_hit');
-        $mergeEnv = $fn->appendBasicBlock('getenv_merge_env');
-        $isLocal = $context->builder->icmp(Builder::INT_NE, $localOnly, $i8->constInt(0, false));
-        $context->builder->branchIf($isLocal, $routeLocal, $useLibcOnly);
-
-        $context->builder->positionAtEnd($routeLocal);
-        $context->builder->branch($tryLocal);
-
-        $context->builder->positionAtEnd($tryLocal);
-        $envLocal = $context->builder->call(
-            $context->lookupFunction('__compiler_env_local_lookup'),
-            $nameCStr
-        );
-        $localNull = $context->builder->icmp(Builder::INT_EQ, $envLocal, $i8p->constNull());
-        $context->builder->branchIf($localNull, $localMiss, $localHit);
-
-        $context->builder->positionAtEnd($localMiss);
-        $envAfterMiss = $context->builder->call($context->lookupFunction('getenv'), $nameCStr);
-        $context->builder->branch($mergeEnv);
-
-        $context->builder->positionAtEnd($localHit);
-        $context->builder->branch($mergeEnv);
-
-        $context->builder->positionAtEnd($useLibcOnly);
-        $envLibcOnly = $context->builder->call($context->lookupFunction('getenv'), $nameCStr);
-        $context->builder->branch($mergeEnv);
-
-        $context->builder->positionAtEnd($mergeEnv);
-        $phi = $context->builder->phi($i8p, 'getenv_result');
-        $phi->addIncoming($envAfterMiss, $localMiss);
-        $phi->addIncoming($envLocal, $localHit);
-        $phi->addIncoming($envLibcOnly, $useLibcOnly);
-        $env = $phi;
-
-        $isNull = $context->builder->icmp(Builder::INT_EQ, $env, $i8p->constNull());
-
+        $env = $context->builder->call($context->lookupFunction('getenv'), $nameCStr);
+        $envNull = $context->builder->icmp(Builder::INT_EQ, $env, $i8p->constNull());
         $missing = $fn->appendBasicBlock('getenv_missing');
         $found = $fn->appendBasicBlock('getenv_found');
-        $done = $fn->appendBasicBlock('getenv_done');
-        $context->builder->branchIf($isNull, $missing, $found);
+        $context->builder->branchIf($envNull, $missing, $found);
 
         $context->builder->positionAtEnd($missing);
         $context->builder->store(
@@ -143,8 +216,6 @@ final class StringGetenv
 
         $context->builder->positionAtEnd($done);
         $context->builder->returnVoid();
-        $context->builder->clearInsertionPosition();
-
         $context->registerFunction('__compiler_getenv', $fn);
     }
 }
