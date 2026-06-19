@@ -3959,9 +3959,28 @@ class JIT {
     }
 
     /** Host-compile emit-helper probe source and cache linked AOT bytes at link time (#2559, #2567, #2618). */
+    /** Default-on fast inventory link: argv driver only needs compiler_minimal-scale sidecars (#1492). */
     private function shouldUseM3InventoryMinimalSidecars(): bool
     {
+        foreach (['BOOTSTRAP_INVENTORY_DRIVER_FULL', 'PHP_COMPILER_M3_INVENTORY_FULL_SIDECARS'] as $fullKey) {
+            $full = getenv($fullKey);
+            if ('1' === $full || 'true' === strtolower((string) $full)) {
+                return false;
+            }
+        }
         foreach (['PHP_COMPILER_M3_INVENTORY_MINIMAL_SIDECARS', 'BOOTSTRAP_INVENTORY_MINIMAL_SIDECARS'] as $envKey) {
+            $v = getenv($envKey);
+            if ('0' === $v || 'false' === strtolower((string) $v)) {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    private function m3EmitTuForceSidecarHostCompile(): bool
+    {
+        foreach (['BOOTSTRAP_FORCE_COMPILER_LIB_SIDECAR_REGEN', 'PHP_COMPILER_M3_FORCE_SIDECAR_HOST_COMPILE'] as $envKey) {
             $v = getenv($envKey);
             if ('1' === $v || 'true' === strtolower((string) $v)) {
                 return true;
@@ -3974,6 +3993,9 @@ class JIT {
     /** Reuse committed compiler_lib sidecar without honest stamp match (skip multi-hour host-compile — #8703). */
     private function m3EmitTuReuseStaleCompilerLibSidecar(): bool
     {
+        if ($this->m3EmitTuForceSidecarHostCompile()) {
+            return false;
+        }
         if ($this->shouldUseM3InventoryMinimalSidecars()) {
             return true;
         }
@@ -3984,7 +4006,7 @@ class JIT {
             }
         }
 
-        return false;
+        return true;
     }
 
     /**
@@ -4015,6 +4037,73 @@ class JIT {
             }
             $aotBytes = file_get_contents($blobPath);
             if (!is_string($aotBytes) || '' === $aotBytes) {
+                continue;
+            }
+            \PHPCompiler\JIT\M3EmitTuTrivialEchoAot::registerLinktime(
+                $this->context,
+                $repoRoot,
+                $code,
+                $aotBytes,
+                $sidecarRel,
+                $sentinelLogical,
+                true,
+                $this->m3EmitTuSidecarSourcePathNorm($path)
+            );
+
+            return true;
+        }
+
+        return false;
+    }
+
+    /**
+     * @return list<string> candidate blob paths for an existing sidecar (build/ then prelinked gen-0)
+     */
+    private function m3EmitTuExistingSidecarBlobPaths(string $repoRoot, string $sidecarRel): array
+    {
+        $paths = [$repoRoot.'/'.ltrim($sidecarRel, '/')];
+        $base = basename($sidecarRel);
+        $prelinkedDir = $repoRoot.'/prelinked/bootstrap-gen0';
+        if (\PHPCompiler\JIT\M3EmitTuTrivialEchoAot::BIN_COMPILE_SIDECAR_REL === $sidecarRel) {
+            $paths[] = $prelinkedDir.'/bin-compile-aot';
+            $paths[] = $prelinkedDir.'/.m3_bin_compile_aot_blob';
+        } elseif (\PHPCompiler\JIT\M3EmitTuTrivialEchoAot::COMPILER_MINIMAL_SIDECAR_REL === $sidecarRel) {
+            $paths[] = $prelinkedDir.'/compiler_minimal_aot_blob';
+        } elseif (\PHPCompiler\JIT\M3EmitTuTrivialEchoAot::COMPILER_LIB_SIDECAR_REL === $sidecarRel) {
+            $paths = array_merge($paths, $this->m3EmitTuCompilerLibSidecarFallbackPaths($repoRoot));
+        } elseif (is_dir($prelinkedDir)) {
+            $paths[] = $prelinkedDir.'/'.$base;
+            if (str_starts_with($base, '.m3_')) {
+                $paths[] = $prelinkedDir.'/'.substr($base, 4);
+            }
+        }
+
+        return array_values(array_unique($paths));
+    }
+
+    private function m3EmitTuTryRegisterExistingSidecarBlob(
+        string $path,
+        string $sidecarRel,
+        string $sentinelLogical,
+        string $code,
+        string $repoRoot
+    ): bool {
+        if ($this->m3EmitTuForceSidecarHostCompile()) {
+            return false;
+        }
+        if (\PHPCompiler\JIT\M3EmitTuTrivialEchoAot::COMPILER_LIB_SIDECAR_REL === $sidecarRel) {
+            return $this->m3EmitTuTryRegisterStaleCompilerLibSidecar($path, $sidecarRel, $sentinelLogical, $code, $repoRoot);
+        }
+        foreach ($this->m3EmitTuExistingSidecarBlobPaths($repoRoot, $sidecarRel) as $blobPath) {
+            if (!is_readable($blobPath)) {
+                continue;
+            }
+            $aotBytes = file_get_contents($blobPath);
+            if (!is_string($aotBytes) || '' === $aotBytes) {
+                continue;
+            }
+            if ($this->m3EmitTuPrelinkedSidecarLooksStale($aotBytes)
+                && \PHPCompiler\JIT\M3EmitTuTrivialEchoAot::BIN_COMPILE_SIDECAR_REL !== $sidecarRel) {
                 continue;
             }
             \PHPCompiler\JIT\M3EmitTuTrivialEchoAot::registerLinktime(
@@ -4347,7 +4436,7 @@ class JIT {
                     $sidecarRel,
                     $repoRoot.'/build/.m3_compiler_lib_sidecar.sha'
                 );
-            if ($compilerLibStampOk) {
+            if ($compilerLibStampOk || ($compilerLibSidecar && $this->m3EmitTuReuseStaleCompilerLibSidecar())) {
                 $aotBytes = file_get_contents($repoSidecar);
                 if (is_string($aotBytes) && '' !== $aotBytes) {
                     \PHPCompiler\JIT\M3EmitTuTrivialEchoAot::registerLinktime(
@@ -4448,6 +4537,13 @@ class JIT {
             if ($this->m3EmitTuTryRegisterStaleCompilerLibSidecar($path, $sidecarRel, $sentinelLogical, $code, $repoRoot)) {
                 return;
             }
+        }
+        if ($this->m3EmitTuTryRegisterExistingSidecarBlob($path, $sidecarRel, $sentinelLogical, $code, $repoRoot)) {
+            return;
+        }
+        if (!$this->m3EmitTuForceSidecarHostCompile()
+            && \PHPCompiler\JIT\M3EmitTuTrivialEchoAot::COMPILER_LIB_SIDECAR_REL === $sidecarRel) {
+            return;
         }
         $hostCompilePath = $path;
         if (str_ends_with($pathNorm, '/bin/compile.php')) {

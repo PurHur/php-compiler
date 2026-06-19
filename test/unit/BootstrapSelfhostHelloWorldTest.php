@@ -271,7 +271,7 @@ final class BootstrapSelfhostHelloWorldTest extends TestCase
             $jit
         );
         $this->assertStringContainsString('shouldUseM3InventoryMinimalSidecars', $jit);
-        $this->assertStringContainsString('PHP_COMPILER_M3_INVENTORY_MINIMAL_SIDECARS', $jit);
+        $this->assertStringContainsString('m3EmitTuTryRegisterExistingSidecarBlob', $jit);
         $this->assertStringContainsString('m3EmitTuReuseStaleCompilerLibSidecar', $jit);
         $this->assertStringContainsString('m3EmitTuRuntimeRepoRoot', $jit);
         $this->assertStringContainsString('m3EmitTuPrelinkedSidecarLooksStale', $jit);
