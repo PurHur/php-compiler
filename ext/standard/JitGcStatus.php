@@ -10,7 +10,7 @@ use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitValueBox;
 use PHPLLVM\Value;
 
-/** LLVM lowering for gc_status() (issue #3280, #5109). */
+/** LLVM lowering for gc_status() via GcStatusRuntime PHP bridge (issues #3280, #5109, #9150). */
 final class JitGcStatus
 {
     public static function invoke(Context $context): Value

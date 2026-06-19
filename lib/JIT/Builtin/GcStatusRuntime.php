@@ -4,14 +4,17 @@ declare(strict_types=1);
 
 namespace PHPCompiler\JIT\Builtin;
 
+use PHPCompiler\JIT;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\VM\CycleCollector;
 use PHPLLVM\Builder;
 use PHPLLVM\Value;
+use PHPLLVM\Value\Function_ as LlvmFunction;
 
 /**
- * LLVM gc_status() hashtable builder (issues #3280, #5109).
+ * JIT/AOT link for gc_status() via GcStatusJitHelper PHP (#9150).
  *
+ * VM SSOT: {@see \PHPCompiler\ext\standard\VmGcStatus}
  * php-src: ext/standard/php_gc.c — PHP_FUNCTION(gc_status)
  */
 final class GcStatusRuntime
@@ -30,7 +33,16 @@ final class GcStatusRuntime
 
     public const G_BUFFER_SIZE = 'phpc_gc_buffer_size';
 
+    private const HELPER_PATH = '/ext/standard/GcStatusJitHelper.php';
+
+    private const BUILD_TABLE = 'PHPCompiler\\ext\\standard\\GcStatusJitHelper::buildTable';
+
     private const FN_STATUS = '__phpc_gc_status_ht';
+
+    /** @var list<string> */
+    private const COMPILED_HELPERS = [
+        self::BUILD_TABLE,
+    ];
 
     public static function ensureLinked(Context $context): void
     {
@@ -47,124 +59,152 @@ final class GcStatusRuntime
         }
 
         GcCollectCyclesRuntime::ensureLinked($context);
-        self::ensureHashtableHelpers($context);
-
-        $htPtr = $context->getTypeFromString('__hashtable__*');
-        $ft = $context->context->functionType($htPtr, false);
-        $fn = null !== $probe
-            ? $probe
-            : $context->module->addFunction(self::FN_STATUS, $ft);
-        self::implementStatusHt($context, $fn);
+        self::ensureJitHelperCompiled($context);
+        self::registerDeclarations($context);
+        self::implementStatusBridge($context);
         self::registerLinkedRuntime($context);
     }
 
-    private static function implementStatusHt(Context $context, Value $fn): void
+    private static function registerDeclarations(Context $context): void
     {
-        $entry = $fn->appendBasicBlock('gc_status_entry');
-        $context->builder->positionAtEnd($entry);
+        $htPtr = $context->getTypeFromString('__hashtable__*');
+        self::declareIfMissing(
+            $context,
+            self::FN_STATUS,
+            $context->context->functionType($htPtr, false)
+        );
+    }
 
-        $ht = $context->builder->call($context->lookupFunction('__hashtable__alloc'));
-        $setLong = $context->lookupFunction('__hashtable__setStringKeyLong');
-        $setBool = $context->lookupFunction('__hashtable__setStringKeyBool');
+    private static function declareIfMissing(Context $context, string $name, $ft): void
+    {
+        if (null !== $context->module->getNamedFunction($name)) {
+            return;
+        }
+        $fn = $context->module->addFunction($name, $ft);
+        $context->registerFunction($name, $fn);
+    }
+
+    private static function implementStatusBridge(Context $context): void
+    {
+        $abiName = self::FN_STATUS;
+        $probe = $context->module->getNamedFunction($abiName);
+        if (null !== $probe && $probe->countBasicBlocks() > 0) {
+            $context->registerFunction($abiName, $probe);
+
+            return;
+        }
+
+        $htPtr = $context->getTypeFromString('__hashtable__*');
         $i32 = $context->getTypeFromString('int32');
         $i64 = $context->getTypeFromString('int64');
+        $i1 = $context->getTypeFromString('int1');
+        $ft = $context->context->functionType($htPtr, false);
+        $fn = null !== $probe
+            ? $probe
+            : $context->module->addFunction($abiName, $ft);
 
-        $boolKeys = [
-            'running' => self::G_RUNNING,
-            'protected' => self::G_PROTECTED,
-            'full' => self::G_FULL,
-        ];
-        foreach ($boolKeys as $key => $globalName) {
-            $global = $context->module->getNamedGlobal($globalName);
-            if (null === $global) {
-                throw new \LogicException('GcStatusRuntime: '.$globalName.' missing');
-            }
-            $loaded = $context->builder->load($context->builder->pointerCast($global, $i32->pointerType(0)));
-            $context->builder->call(
-                $setBool,
-                $ht,
-                self::literalKeyString($context, $key),
-                $context->builder->icmp(Builder::INT_NE, $loaded, $i32->constInt(0, false))
-            );
-        }
+        $entry = $fn->appendBasicBlock('gc_status_bridge_entry');
+        $context->builder->positionAtEnd($entry);
 
-        $intKeys = ['runs', 'collected', 'threshold', 'buffer_size', 'roots'];
-        $globals = [self::G_RUNS, self::G_TOTAL_COLLECTED, null, self::G_BUFFER_SIZE, self::G_ROOT_COUNT];
-        foreach ($intKeys as $idx => $key) {
-            $globalName = $globals[$idx];
-            if (null === $globalName) {
-                $value = $i64->constInt(CycleCollector::ROOT_THRESHOLD, false);
-            } else {
-                $global = $context->module->getNamedGlobal($globalName);
-                if (null === $global) {
-                    throw new \LogicException('GcStatusRuntime: '.$globalName.' missing');
-                }
-                $value = $context->builder->sext(
-                    $context->builder->load($context->builder->pointerCast($global, $i32->pointerType(0))),
-                    $i64
-                );
-            }
-            $context->builder->call(
-                $setLong,
-                $ht,
-                self::literalKeyString($context, $key),
-                $value
-            );
-        }
+        $running = self::loadGlobalBool($context, self::G_RUNNING, $i32);
+        $protected = self::loadGlobalBool($context, self::G_PROTECTED, $i32);
+        $full = self::loadGlobalBool($context, self::G_FULL, $i32);
+        $runs = self::loadGlobalInt($context, self::G_RUNS, $i32, $i64);
+        $collected = self::loadGlobalInt($context, self::G_TOTAL_COLLECTED, $i32, $i64);
+        $threshold = $i64->constInt(CycleCollector::ROOT_THRESHOLD, false);
+        $bufferSize = self::loadGlobalInt($context, self::G_BUFFER_SIZE, $i32, $i64);
+        $roots = self::loadGlobalInt($context, self::G_ROOT_COUNT, $i32, $i64);
 
+        $ht = $context->builder->call(
+            self::helperFunction($context, self::BUILD_TABLE),
+            $running,
+            $protected,
+            $full,
+            $runs,
+            $collected,
+            $threshold,
+            $bufferSize,
+            $roots
+        );
         $context->builder->returnValue($ht);
+        $context->registerFunction($abiName, $fn);
         $context->builder->clearInsertionPosition();
     }
 
-    private static function literalKeyString(Context $context, string $text): Value
+    private static function loadGlobalBool(Context $context, string $globalName, $i32): Value
     {
-        $i64 = $context->getTypeFromString('int64');
-        $i8p = $context->getTypeFromString('int8*');
-        $cstr = $context->builder->pointerCast($context->constantFromString($text), $i8p);
+        $global = $context->module->getNamedGlobal($globalName);
+        if (null === $global) {
+            throw new \LogicException('GcStatusRuntime: '.$globalName.' missing');
+        }
+        $loaded = $context->builder->load($context->builder->pointerCast($global, $i32->pointerType(0)));
 
-        return $context->builder->call(
-            $context->lookupFunction('__string__init'),
-            $i64->constInt(\strlen($text), false),
-            $cstr
-        );
+        return $context->builder->icmp(Builder::INT_NE, $loaded, $i32->constInt(0, false));
     }
 
-    private static function ensureHashtableHelpers(Context $context): void
+    private static function loadGlobalInt(Context $context, string $globalName, $i32, $i64): Value
     {
-        $htPtr = $context->getTypeFromString('__hashtable__*');
-        $strPtr = $context->getTypeFromString('__string__*');
-        $i64 = $context->getTypeFromString('int64');
-        $voidTy = $context->getTypeFromString('void');
+        $global = $context->module->getNamedGlobal($globalName);
+        if (null === $global) {
+            throw new \LogicException('GcStatusRuntime: '.$globalName.' missing');
+        }
+        $loaded = $context->builder->load($context->builder->pointerCast($global, $i32->pointerType(0)));
 
-        self::ensureExternal(
-            $context,
-            '__hashtable__alloc',
-            $context->context->functionType($htPtr, false)
-        );
-        self::ensureExternal(
-            $context,
-            '__hashtable__setStringKeyLong',
-            $context->context->functionType($voidTy, false, $htPtr, $strPtr, $i64)
-        );
-        self::ensureExternal(
-            $context,
-            '__hashtable__setStringKeyBool',
-            $context->context->functionType($voidTy, false, $htPtr, $strPtr, $context->getTypeFromString('int1'))
-        );
-        self::ensureExternal(
-            $context,
-            '__string__init',
-            $context->context->functionType($strPtr, false, $i64, $context->getTypeFromString('int8*'))
-        );
+        return $context->builder->sext($loaded, $i64);
     }
 
-    private static function ensureExternal(Context $context, string $name, $ft): void
+    private static function helperFunction(Context $context, string $logical): LlvmFunction
     {
+        self::ensureJitHelperCompiled($context);
+        $lc = \strtolower($logical);
+        $fn = $context->functions[$lc] ?? null;
+        if (null === $fn) {
+            throw new \LogicException($logical.' missing after GcStatusJitHelper compile (#9150)');
+        }
+
+        return $fn;
+    }
+
+    private static function ensureJitHelperCompiled(Context $context): void
+    {
+        $missing = false;
+        foreach (self::COMPILED_HELPERS as $logical) {
+            if (!isset($context->functions[\strtolower($logical)])) {
+                $missing = true;
+                break;
+            }
+        }
+        if (!$missing) {
+            return;
+        }
+
+        $runtime = $context->runtime;
+        $path = \dirname(__DIR__, 3).self::HELPER_PATH;
+        $prevSelfHostAot = \getenv('PHP_COMPILER_SELFHOST_AOT');
+        if (\function_exists('putenv')) {
+            \putenv('PHP_COMPILER_SELFHOST_AOT=0');
+        }
         try {
-            $context->lookupFunction($name);
-        } catch (\Throwable $e) {
-            $fn = $context->module->addFunction($name, $ft);
-            $context->registerFunction($name, $fn);
+            $block = $runtime->parseAndCompile((string) \file_get_contents($path), 'GcStatusJitHelper.php');
+            if (null === $block) {
+                throw new \LogicException('GcStatusJitHelper.php parseAndCompile failed (#9150)');
+            }
+            $jit = new JIT($context);
+            $jit->compile($block);
+        } finally {
+            if (\function_exists('putenv')) {
+                if (false === $prevSelfHostAot || null === $prevSelfHostAot) {
+                    \putenv('PHP_COMPILER_SELFHOST_AOT=');
+                } else {
+                    \putenv('PHP_COMPILER_SELFHOST_AOT='.$prevSelfHostAot);
+                }
+            }
+        }
+        foreach (self::COMPILED_HELPERS as $logical) {
+            $lc = \strtolower($logical);
+            if (!isset($context->functions[$lc])) {
+                throw new \LogicException($lc.' was not compiled for JIT (#9150)');
+            }
         }
     }
 
@@ -172,7 +212,7 @@ final class GcStatusRuntime
     {
         $fn = $context->module->getNamedFunction(self::FN_STATUS);
         if (null === $fn || 0 === $fn->countBasicBlocks()) {
-            throw new \LogicException(self::FN_STATUS.' missing after GcStatusRuntime LLVM implement');
+            throw new \LogicException(self::FN_STATUS.' missing after GcStatusRuntime bridge (#9150)');
         }
         $context->registerFunction(self::FN_STATUS, $fn);
     }
