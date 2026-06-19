@@ -7024,6 +7024,9 @@ class Compiler {
             case Op\Expr\FirstClassCallable::class:
                 return $this->compileFirstClassCallable($expr, $block);
             case Op\Expr\FuncCall::class:
+                if ($this->parensNewCallSkippedWithoutInvoke($expr->name, $block)) {
+                    return [];
+                }
                 if ($this->operandIsInvokableReceiver($expr->name, $block)) {
                     return $this->compileMethodCallOpcodes(
                         $this->compileOperand($expr->name, $block, true),
@@ -7043,6 +7046,9 @@ class Compiler {
                     $expr
                 );
             case Op\Expr\NsFuncCall::class:
+                if ($this->parensNewCallSkippedWithoutInvoke($expr->nsName, $block)) {
+                    return [];
+                }
                 if ($this->operandIsInvokableReceiver($expr->nsName, $block)) {
                     return $this->compileMethodCallOpcodes(
                         $this->compileOperand($expr->nsName, $block, true),
@@ -13405,20 +13411,71 @@ class Compiler {
 
     protected function operandDerivesFromNew(?Operand $operand, Block $block): bool
     {
-        if (null === $operand) {
+        return null !== $this->findNewExprForCalleeOperand($operand, $block);
+    }
+
+    /**
+     * Zend: `(new C)(...)` applies outer args only when `__invoke` exists (#10176, zend_compile.c).
+     */
+    protected function parensNewCallSkippedWithoutInvoke(Operand $callee, Block $block): bool
+    {
+        $new = $this->findNewExprForCalleeOperand($callee, $block);
+        if (null === $new) {
             return false;
         }
-        if (null === $block->orig) {
-            return false;
+
+        return !$this->newExprHasInvokeMethod($new, $block);
+    }
+
+    protected function findNewExprForCalleeOperand(?Operand $operand, Block $block): ?Op\Expr\New_
+    {
+        if (null === $operand || null === $block->orig) {
+            return null;
         }
         $root = $this->unwrapOperandChain($operand);
         foreach ($block->orig->children as $child) {
-            if (!$child instanceof Op\Expr\New_) {
+            if ($child instanceof Op\Expr\New_ && $this->unwrapOperandChain($child->result) === $root) {
+                return $child;
+            }
+        }
+        foreach ($block->orig->children as $child) {
+            if (!$child instanceof Op\Expr\Assign) {
                 continue;
             }
-            if ($this->unwrapOperandChain($child->result) === $root) {
-                return true;
+            if (!$this->operandsReferToSameVariable($child->var, $root)) {
+                continue;
             }
+            if ($child->expr instanceof Op\Expr\New_) {
+                return $child->expr;
+            }
+        }
+
+        return null;
+    }
+
+    protected function newExprHasInvokeMethod(Op\Expr\New_ $new, Block $block): bool
+    {
+        $className = $this->literalScopeClassName($new->class);
+        if (null === $className || null === $block->orig) {
+            return false;
+        }
+        foreach ($block->orig->children as $child) {
+            if (!$child instanceof Op\Stmt\Class_) {
+                continue;
+            }
+            if ($className !== $this->literalScopeClassName($child->name)) {
+                continue;
+            }
+            foreach ($child->stmts->children as $stmt) {
+                if (!$stmt instanceof Op\Stmt\ClassMethod) {
+                    continue;
+                }
+                if ('__invoke' === strtolower($stmt->func->name)) {
+                    return true;
+                }
+            }
+
+            return false;
         }
 
         return false;

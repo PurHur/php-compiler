@@ -4946,7 +4946,13 @@ restart:
                         $value = $this->executePropertyDefaultInitBlock($initBlock, $resultSlot);
                         $arg1->copyFrom($value);
                     } else {
-                        throw new \LogicException('Missing required argument ' . $op->arg2);
+                        $error = VM\ParamArgumentCountError::forTooFewAtReceive($frame, (int) $op->arg2);
+                        $catchFrame = $this->dispatchVmArgumentCountError($error, $frame);
+                        if (null !== $catchFrame) {
+                            $frame = $catchFrame;
+                            goto restart;
+                        }
+                        break;
                     }
                     $strict = null !== $frame->parent
                         ? $frame->parent->block->strictTypes
