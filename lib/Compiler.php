@@ -7617,6 +7617,7 @@ class Compiler {
                 $useContainerIsset = false;
             }
         }
+        $evaluatedLeftSlot = null;
         if ($useContainerIsset) {
             $issetOp = $this->makeIssetOpCode(
                 $checkSlot,
@@ -7635,11 +7636,11 @@ class Compiler {
             }
             $block->addOpCode($issetOp);
         } elseif (null !== $expr->left) {
-            $leftSlot = $this->compileOperand($expr->left, $block, true);
+            $evaluatedLeftSlot = $this->compileOperand($expr->left, $block, true);
             $block->addOpCode(new OpCode(
                 OpCode::TYPE_ISSET,
                 $checkSlot,
-                $leftSlot,
+                $evaluatedLeftSlot,
                 null
             ));
         } else {
@@ -7737,6 +7738,16 @@ class Compiler {
                         $leftSlot
                     ));
                 }
+            }
+        } elseif (null !== $evaluatedLeftSlot) {
+            // Nullsafe and other pre-evaluated ?? left operands: reuse entry-block temp (#9744).
+            if (!$this->operandsChainEqual($resultOperand, $expr->left)) {
+                $leftBlock->addOpCode(new OpCode(
+                    OpCode::TYPE_ASSIGN,
+                    $resultSlot,
+                    $resultSlot,
+                    $evaluatedLeftSlot
+                ));
             }
         }
 
