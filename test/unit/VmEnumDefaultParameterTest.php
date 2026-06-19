@@ -7,10 +7,35 @@ namespace PHPCompiler;
 use PHPUnit\Framework\TestCase;
 
 /**
- * Enum case as function parameter default must compile and materialize singleton (#5885).
+ * Enum case as function parameter / property default must compile and materialize singleton (#5885, #9715).
  */
 final class VmEnumDefaultParameterTest extends TestCase
 {
+    public function testBackedEnumDefaultPropertyIsCaseSingleton(): void
+    {
+        $code = <<<'PHP'
+<?php
+enum E: int {
+    case A = 1;
+    case B = 2;
+}
+class P {
+    public E $e = E::A;
+}
+$p = new P();
+var_export($p->e);
+echo ($p->e === E::A) ? "same\n" : "diff\n";
+PHP;
+        $runtime = new Runtime();
+        $block = $runtime->parseAndCompile($code, 'enum_default_property.php');
+        ob_start();
+        $runtime->run($block);
+        $output = ob_get_clean();
+
+        $this->assertStringContainsString('\\E::A', $output);
+        $this->assertStringContainsString('same', $output);
+    }
+
     public function testBackedEnumDefaultParameterIsCaseSingleton(): void
     {
         $code = <<<'PHP'
