@@ -68,6 +68,28 @@ final class ClosureSupport
         return null;
     }
 
+    /**
+     * Closure::fromStatic() — static method callable string to closure (#9992, Zend/zend_closures.c).
+     */
+    public static function fromStatic(Context $ctx, Frame $frame, Variable $callable): ObjectEntry
+    {
+        $callable = $callable->resolveIndirect();
+        if (Variable::TYPE_STRING !== $callable->type) {
+            throw new \TypeError(
+                'Closure::fromStatic(): Argument #1 ($callable) must be of type string, '
+                .self::valueTypeName($callable).' given'
+            );
+        }
+        $name = $callable->toString();
+        if (!str_contains($name, '::')) {
+            throw new \TypeError(
+                'Closure::fromStatic(): Argument #1 ($callable) must be a valid callback'
+            );
+        }
+
+        return self::wrapState($ctx, self::fromStaticStringCallable($ctx, $frame, $name));
+    }
+
     public static function fromCallable(Context $ctx, Frame $frame, Variable $callable): ObjectEntry
     {
         $callable = $callable->resolveIndirect();
