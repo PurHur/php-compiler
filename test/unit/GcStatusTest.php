@@ -34,6 +34,34 @@ PHP;
         $this->assertStringContainsString('threshold=10001', $output);
     }
 
+    public function testGcStatusPhp84Fields(): void
+    {
+        $code = <<<'PHP'
+<?php
+$s = gc_status();
+foreach (['running', 'protected', 'full', 'buffer_size'] as $key) {
+    echo $key, '=', array_key_exists($key, $s) ? 'yes' : 'no', "\n";
+    if (array_key_exists($key, $s)) {
+        echo $key, '_type=', is_bool($s[$key]) ? 'bool' : (is_int($s[$key]) ? 'int' : 'other'), "\n";
+    }
+}
+PHP;
+
+        $rt = new Runtime();
+        $block = $rt->parseAndCompile($code, 'gc_status_php84.php');
+        ob_start();
+        $rt->run($block);
+        $output = ob_get_clean();
+
+        foreach (['running', 'protected', 'full', 'buffer_size'] as $key) {
+            $this->assertStringContainsString($key.'=yes', $output);
+        }
+        $this->assertStringContainsString('running_type=bool', $output);
+        $this->assertStringContainsString('protected_type=bool', $output);
+        $this->assertStringContainsString('full_type=bool', $output);
+        $this->assertStringContainsString('buffer_size_type=int', $output);
+    }
+
     public function testGcCollectCyclesUpdatesStatus(): void
     {
         $code = <<<'PHP'

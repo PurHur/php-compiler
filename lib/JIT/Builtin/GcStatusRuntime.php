@@ -6,6 +6,7 @@ namespace PHPCompiler\JIT\Builtin;
 
 use PHPCompiler\JIT\Context;
 use PHPCompiler\VM\CycleCollector;
+use PHPLLVM\Builder;
 use PHPLLVM\Value;
 
 /**
@@ -20,6 +21,14 @@ final class GcStatusRuntime
     public const G_TOTAL_COLLECTED = 'phpc_gc_total_collected';
 
     public const G_ROOT_COUNT = 'phpc_gc_count';
+
+    public const G_RUNNING = 'phpc_gc_running';
+
+    public const G_PROTECTED = 'phpc_gc_protected';
+
+    public const G_FULL = 'phpc_gc_full';
+
+    public const G_BUFFER_SIZE = 'phpc_gc_buffer_size';
 
     private const FN_STATUS = '__phpc_gc_status_ht';
 
@@ -56,12 +65,32 @@ final class GcStatusRuntime
 
         $ht = $context->builder->call($context->lookupFunction('__hashtable__alloc'));
         $setLong = $context->lookupFunction('__hashtable__setStringKeyLong');
+        $setBool = $context->lookupFunction('__hashtable__setStringKeyBool');
         $i32 = $context->getTypeFromString('int32');
         $i64 = $context->getTypeFromString('int64');
 
-        $keys = ['runs', 'collected', 'threshold', 'roots'];
-        $globals = [self::G_RUNS, self::G_TOTAL_COLLECTED, null, self::G_ROOT_COUNT];
-        foreach ($keys as $idx => $key) {
+        $boolKeys = [
+            'running' => self::G_RUNNING,
+            'protected' => self::G_PROTECTED,
+            'full' => self::G_FULL,
+        ];
+        foreach ($boolKeys as $key => $globalName) {
+            $global = $context->module->getNamedGlobal($globalName);
+            if (null === $global) {
+                throw new \LogicException('GcStatusRuntime: '.$globalName.' missing');
+            }
+            $loaded = $context->builder->load($context->builder->pointerCast($global, $i32->pointerType(0)));
+            $context->builder->call(
+                $setBool,
+                $ht,
+                self::literalKeyString($context, $key),
+                $context->builder->icmp(Builder::INT_NE, $loaded, $i32->constInt(0, false))
+            );
+        }
+
+        $intKeys = ['runs', 'collected', 'threshold', 'buffer_size', 'roots'];
+        $globals = [self::G_RUNS, self::G_TOTAL_COLLECTED, null, self::G_BUFFER_SIZE, self::G_ROOT_COUNT];
+        foreach ($intKeys as $idx => $key) {
             $globalName = $globals[$idx];
             if (null === $globalName) {
                 $value = $i64->constInt(CycleCollector::ROOT_THRESHOLD, false);
@@ -116,6 +145,11 @@ final class GcStatusRuntime
             $context,
             '__hashtable__setStringKeyLong',
             $context->context->functionType($voidTy, false, $htPtr, $strPtr, $i64)
+        );
+        self::ensureExternal(
+            $context,
+            '__hashtable__setStringKeyBool',
+            $context->context->functionType($voidTy, false, $htPtr, $strPtr, $context->getTypeFromString('int1'))
         );
         self::ensureExternal(
             $context,

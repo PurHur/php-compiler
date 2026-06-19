@@ -19,7 +19,11 @@ final class VmGcStatus
         $ht = new HashTable();
         foreach (CycleCollector::status($ctx) as $key => $value) {
             $slot = new Variable();
-            $slot->int((int) $value);
+            if (\is_bool($value)) {
+                $slot->bool($value);
+            } else {
+                $slot->int((int) $value);
+            }
             $ht->add((string) $key, $slot);
         }
 
