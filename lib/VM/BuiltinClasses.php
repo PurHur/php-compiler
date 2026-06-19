@@ -9,6 +9,7 @@ use PHPCompiler\VM\Builtin\DateIntervalConstruct;
 use PHPCompiler\VM\Builtin\DateIntervalFormat;
 use PHPCompiler\VM\Builtin\DateTimeConstruct;
 use PHPCompiler\VM\Builtin\DateTimeDiff;
+use PHPCompiler\VM\Builtin\DateTimeCreateFromFormat;
 use PHPCompiler\VM\Builtin\DateTimeCreateFromImmutable;
 use PHPCompiler\VM\Builtin\DateTimeCreateFromInterface;
 use PHPCompiler\VM\Builtin\DateTimeCreateFromTimestamp;
@@ -893,6 +894,8 @@ final class BuiltinClasses
             $dt->methods[$name] = $method;
             $dt->methodVisibility[$name] = $pub;
         }
+        $dt->methods['createfromformat'] = new DateTimeCreateFromFormat();
+        $dt->methodVisibility['createfromformat'] = $pubStatic;
         $dt->methods['createfromimmutable'] = new DateTimeCreateFromImmutable();
         $dt->methodVisibility['createfromimmutable'] = $pubStatic;
         $dt->methods['createfrominterface'] = new DateTimeCreateFromInterface();

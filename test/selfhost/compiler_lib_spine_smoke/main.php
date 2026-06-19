@@ -2374,6 +2374,7 @@ require_once __DIR__.'/../../../lib/VM/Builtin/DateIntervalFormat.php';
 require_once __DIR__.'/../../../lib/VM/Builtin/DateTimeConstruct.php';
 require_once __DIR__.'/../../../lib/VM/Builtin/DateTimeCreateFromImmutable.php';
 require_once __DIR__.'/../../../lib/VM/Builtin/DateTimeCreateFromInterface.php';
+require_once __DIR__.'/../../../lib/VM/Builtin/DateTimeCreateFromFormat.php';
 require_once __DIR__.'/../../../lib/VM/Builtin/DateTimeCreateFromTimestamp.php';
 require_once __DIR__.'/../../../lib/VM/Builtin/DateTimeDiff.php';
 require_once __DIR__.'/../../../lib/VM/Builtin/DateTimeFormat.php';
