@@ -12771,6 +12771,58 @@ restart:
         }
     }
 
+    /**
+     * `new Class(...)` first-class callable invoke (#9767, zend_compile.c).
+     *
+     * @param list<Variable> $ctorArgs
+     */
+    public function instantiateFromNewCallable(ClassEntry $class, Frame $frame, Variable ...$ctorArgs): ObjectEntry
+    {
+        if ($class->isEnum) {
+            throw new \Error("Cannot instantiate enum {$class->name}");
+        }
+        if ($class->isAbstract) {
+            throw new \Error("Cannot instantiate abstract class {$class->name}");
+        }
+        if ($class->isInterface) {
+            throw new \Error("Cannot instantiate interface {$class->name}");
+        }
+        VM\ClassValidator::assertInstantiable($class);
+        if (null !== $class->constructor || $this->hasInstanceMethod($class, '__construct')) {
+            try {
+                [$declaringClass, $methodLc] = $this->resolveInstanceMethod($class, '__construct');
+                $vis = $declaringClass->methodVisibility[$methodLc] ?? \PHPCfg\Func::FLAG_PUBLIC;
+                $callerClassLc = $this->callerClassLc($frame);
+                $callerDisplay = null;
+                if (null !== $callerClassLc && isset($this->context->classes[$callerClassLc])) {
+                    $callerDisplay = $this->context->classes[$callerClassLc]->name;
+                }
+                MethodVisibility::assertConstructorCallable(
+                    $vis,
+                    $callerClassLc,
+                    strtolower($declaringClass->name),
+                    $declaringClass->name,
+                    false,
+                    fn (string $classLc, string $ancestorLc): bool => $this->isClassSameOrSubclassOf($classLc, $ancestorLc),
+                    $callerDisplay
+                );
+            } catch (\LogicException $e) {
+                throw new \Error($e->getMessage());
+            }
+        }
+        $this->emitClassInstantiationDeprecation($class, $frame);
+        $object = new ObjectEntry($class);
+        $this->initInstancePropertyDefaults($object);
+        $thisVar = new Variable(Variable::TYPE_OBJECT);
+        $thisVar->object($object);
+        if (null !== $object->constructor) {
+            $this->invokePhpFunction($object->constructor, $thisVar, ...$ctorArgs);
+        }
+        $object->constructed = true;
+
+        return $object;
+    }
+
     private function executePropertyDefaultInitBlock(Block $initBlock, int $resultSlot): Variable
     {
         $initFrame = $initBlock->getFrame($this->context);

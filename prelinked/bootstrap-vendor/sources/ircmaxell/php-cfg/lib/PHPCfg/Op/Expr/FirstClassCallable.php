@@ -7,12 +7,13 @@ namespace PHPCfg\Op\Expr;
 use PHPCfg\Op\Expr;
 use PHPCfg\Operand;
 
-/** PHP 8.1+ first-class callable: `foo(...)`, `Class::m(...)`, `$obj->m(...)` (#1230). */
+/** PHP 8.1+ first-class callable: `foo(...)`, `Class::m(...)`, `$obj->m(...)`, `new C(...)` (#1230, #9767). */
 class FirstClassCallable extends Expr
 {
     public const KIND_FUNCTION = 1;
     public const KIND_STATIC = 2;
     public const KIND_METHOD = 3;
+    public const KIND_NEW = 4;
 
     public int $kind;
 

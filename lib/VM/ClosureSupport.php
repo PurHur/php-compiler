@@ -92,6 +92,9 @@ final class ClosureSupport
         }
         if (Variable::TYPE_STRING === $callable->type) {
             $name = $callable->toString();
+            if (str_starts_with($name, 'new ')) {
+                return self::wrapState($ctx, self::fromNewClassCallable($ctx, $frame, substr($name, 4)));
+            }
             if (str_contains($name, '::')) {
                 return self::wrapState($ctx, self::fromStaticStringCallable($ctx, $frame, $name));
             }
@@ -283,6 +286,21 @@ final class ClosureSupport
         }
 
         return ClosureState::fromWrappedFunc($ctx->functions[$lc]);
+    }
+
+    private static function fromNewClassCallable(Context $ctx, Frame $frame, string $className): ClosureState
+    {
+        $lcClass = self::resolveClassScopeName($className, $frame, $ctx);
+        if (!isset($ctx->classes[$lcClass])) {
+            $ctx->autoloadClass($className);
+        }
+        if (!isset($ctx->classes[$lcClass])) {
+            throw new \LogicException(
+                "Closure::fromCallable(): Class '{$className}' not found"
+            );
+        }
+
+        return ClosureState::fromWrappedFunc(new NewCallableHandler($ctx->classes[$lcClass]));
     }
 
     private static function fromStaticStringCallable(Context $ctx, Frame $frame, string $callable): ClosureState

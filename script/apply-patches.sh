@@ -5539,6 +5539,7 @@ if [[ -d "$ROOT/vendor/ircmaxell/php-cfg" ]]; then
   apply_patch "$PATCH_DIR/php-cfg-list-skip-slot.patch" || true
   apply_patch "$PATCH_DIR/php-cfg-list-spread.patch"
   apply_patch "$PATCH_DIR/php-cfg-first-class-callable.patch"
+  apply_patch "$PATCH_DIR/php-cfg-new-first-class-callable.patch"
   apply_patch "$PATCH_DIR/php-cfg-arrow-function.patch"
   apply_patch "$PATCH_DIR/php-cfg-anonymous-class.patch"
   apply_patch "$PATCH_DIR/php-cfg-new-ctor-parens.patch"

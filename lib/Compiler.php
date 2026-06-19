@@ -12431,6 +12431,20 @@ class Compiler {
             ];
         }
 
+        if (4 === $expr->kind) {
+            $classOperand = $expr->class ?? $expr->name;
+            if (!$classOperand instanceof Operand\Literal) {
+                $this->throwCompileLogic('First-class new callable requires a literal class name');
+            }
+            $callableSlot = $this->compileStringLiteralSlot('new '.$classOperand->value, $block);
+
+            return [new OpCode(
+                OpCode::TYPE_FROM_CALLABLE,
+                $result,
+                $callableSlot
+            )];
+        }
+
         if (1 === $expr->kind) {
             if ($expr->name instanceof Operand\Literal) {
                 $callableSlot = $this->compileFirstClassFunctionNameSlot($expr->name, $block);

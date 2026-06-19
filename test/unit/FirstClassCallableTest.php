@@ -202,6 +202,25 @@ PHP;
         $this->assertSame("ok\n", ob_get_clean());
     }
 
+    /** Issue #9767: new Class(...) first-class callable (PHP 8.4+). */
+    public function testVmNewExpressionFirstClassCallable(): void
+    {
+        $code = <<<'PHP'
+<?php
+declare(strict_types=1);
+class Box {
+    public function __construct(public int $v) {}
+}
+$maker = new Box(...);
+echo $maker(42)->v, "\n";
+PHP;
+        $rt = new Runtime();
+        $block = $rt->parseAndCompile($code, 'test.php');
+        ob_start();
+        $rt->run($block);
+        $this->assertSame("42\n", ob_get_clean());
+    }
+
     /** Issue #9604: trait-used instance method first-class callable. */
     public function testVmTraitMethodFirstClassCallable(): void
     {
