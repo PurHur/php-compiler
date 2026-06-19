@@ -16,10 +16,6 @@ final class OutputRewriteVarsJitHelper
 {
     private static string $blob = '';
 
-    private const RECORD_SEP = "\x1D";
-
-    private const FIELD_SEP = "\x1E";
-
     public static function exportBlob(): string
     {
         return self::$blob;
@@ -27,11 +23,11 @@ final class OutputRewriteVarsJitHelper
 
     public static function add(string $name, string $value): bool
     {
-        $record = $name.self::FIELD_SEP.$value;
+        $record = $name."\x1E".$value;
         if ('' === self::$blob) {
             self::$blob = $record;
         } else {
-            self::$blob = self::$blob.self::RECORD_SEP.$record;
+            self::$blob = self::$blob."\x1D".$record;
         }
 
         return true;

@@ -89,6 +89,7 @@ final class RewriteVarsRuntime
 
         $runtime = $context->runtime;
         $path = \dirname(__DIR__, 3).self::HELPER_PATH;
+        $realPath = \realpath($path) ?: $path;
         $prevSelfHostAot = \getenv('PHP_COMPILER_SELFHOST_AOT');
         if (\function_exists('putenv')) {
             \putenv('PHP_COMPILER_SELFHOST_AOT=0');
@@ -100,6 +101,7 @@ final class RewriteVarsRuntime
             }
             $jit = new JIT($context);
             $jit->compile($block);
+            $context->markJitIncludedFileCompiled($realPath);
         } finally {
             if (\function_exists('putenv')) {
                 if (false === $prevSelfHostAot || null === $prevSelfHostAot) {

@@ -98,6 +98,9 @@ final class JitStat
 
     private const S_IXOTH = 0x0001;
 
+    /** Any execute bit in st_mode (owner/group/other). */
+    private const S_IXANY = self::S_IXUSR | self::S_IXGRP | self::S_IXOTH;
+
     /** php-src S_IXROOT */
     private const S_IXROOT = self::S_IRUSR | self::S_IWUSR | self::S_IXUSR | self::S_IXGRP | self::S_IROTH | self::S_IXOTH;
 
@@ -697,7 +700,7 @@ final class JitStat
             $context->builder->and($fileMode, $i32->constInt(self::S_IFMT, false)),
             $i32->constInt(self::S_IFDIR, false)
         );
-        $anyExecMask = $i32->constInt(self::S_IXUSR | self::S_IXGRP | self::S_IXOTH, false);
+        $anyExecMask = $i32->constInt(self::S_IXANY, false);
         $hasExecBit = $context->builder->icmp(
             Builder::INT_NE,
             $context->builder->and($fileMode, $anyExecMask),
