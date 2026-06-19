@@ -110,6 +110,7 @@ require_once __DIR__.'/../../../ext/filter/JitFilterId.php';
 require_once __DIR__.'/../../../ext/filter/JitFilterList.php';
 require_once __DIR__.'/../../../ext/filter/Module.php';
 require_once __DIR__.'/../../../ext/filter/VmFilter.php';
+require_once __DIR__.'/../../../ext/filter/FilterBooleanJitHelper.php';
 require_once __DIR__.'/../../../ext/filter/filter_id.php';
 require_once __DIR__.'/../../../ext/filter/filter_input.php';
 require_once __DIR__.'/../../../ext/filter/filter_list.php';
