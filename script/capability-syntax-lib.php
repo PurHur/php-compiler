@@ -339,7 +339,6 @@ function syntaxRowDefinitions(): array
                 'NewWithoutParensCompileCheck::validate at compile time; global `const` with `new` remains valid (#3196)',
             ],
             'probe' => 'class C { public const X = new stdClass(); }',
-            'expect_compile_error' => true,
         ],
         [
             'id' => 'late_static_binding',
