@@ -7,10 +7,11 @@
         $endBlock = $this->block->create();
         $result = new Temporary();
         $entryBlock = $this->block;
-        // Seed $result so arm blocks share one compile slot (#143).
+        // Seed $result so arm blocks share one compile slot (#143). Use null, not '' — an empty-string
+        // block constant collides with the match subject temp on shared slots (#5448).
         $entryBlock->children[] = new Op\Expr\Assign(
             $result,
-            $this->readVariable(new Literal('')),
+            $this->readVariable(new Literal(null)),
             $attrs
         );
         $cond = $this->matchPatternOperand($expr->cond, $attrs);

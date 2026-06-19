@@ -10437,6 +10437,23 @@ class Compiler {
                 return null;
             }
         }
+        // Match subject may be produced in the jump parent (ClassConstFetch) while this block
+        // only calls phpc_match_unhandled_operand_is_object($cond) — do not reuse result slot (#5448).
+        foreach ($cfgBlock->parents as $parent) {
+            if (!$this->cfgBlockJumpsToCfgBlock($parent, $cfgBlock)) {
+                continue;
+            }
+            foreach ($parent->children as $child) {
+                if (
+                    $child instanceof Op\Expr
+                    && property_exists($child, 'result')
+                    && null !== $child->result
+                    && $this->operandsReferToSameVariable($child->result, $arg)
+                ) {
+                    return null;
+                }
+            }
+        }
         if (!isset($cfgBlock->parents) || [] === $cfgBlock->parents) {
             return null;
         }
