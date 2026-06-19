@@ -38,10 +38,36 @@ final class VmHttpFetchNativeRuntimeShrinkTest extends TestCase
         $this->assertStringContainsString('VmHttpLastResponseHeaders::store', $source);
     }
 
-    public function testHttpsUrlReturnsFalseWithoutHostDelegation(): void
+    public function testHttpsFetchPopulatesLastResponseHeadersWhenTlsAvailable(): void
     {
         if (!VmHttpFetchNative::available()) {
             $this->markTestSkipped('ext/ffi required for VmHttpFetchNative');
+        }
+        if (!\PHPCompiler\ext\standard\VmHttpTlsNative::available()) {
+            $this->markTestSkipped('libssl FFI required for https fetch');
+        }
+
+        VmHttpLastResponseHeaders::clear();
+        $body = VmFs::fileGetContents('https://example.com');
+        if (false === $body) {
+            $this->markTestSkipped('network unavailable for https://example.com fetch');
+        }
+
+        $headers = VmHttpLastResponseHeaders::get();
+        $this->assertIsArray($headers);
+        $this->assertNotEmpty($headers);
+        $this->assertStringStartsWith('HTTP/', (string) $headers[0]);
+        $this->assertIsString($body);
+        $this->assertNotSame('', $body);
+    }
+
+    public function testHttpsUrlReturnsFalseWhenTlsUnavailable(): void
+    {
+        if (!VmHttpFetchNative::available()) {
+            $this->markTestSkipped('ext/ffi required for VmHttpFetchNative');
+        }
+        if (\PHPCompiler\ext\standard\VmHttpTlsNative::available()) {
+            $this->markTestSkipped('libssl available — use testHttpsFetchPopulatesLastResponseHeadersWhenTlsAvailable');
         }
 
         VmHttpLastResponseHeaders::clear();

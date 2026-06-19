@@ -447,7 +447,7 @@ final class VmFs
     }
 
     /**
-     * @param mixed $streamContext accepted for Zend arity; stream context wiring deferred
+     * @param mixed $streamContext accepted for Zend arity; http wrapper options wired (#9752)
      *
      * @return string|false
      */
@@ -459,7 +459,10 @@ final class VmFs
         ?int $length = null,
         ?\PHPCompiler\VM\Context $ctx = null
     ) {
-        unset($streamContext);
+        $httpOptions = [];
+        if ($streamContext instanceof \PHPCompiler\VM\Variable) {
+            $httpOptions = VmStreamContext::httpWrapperOptions($streamContext);
+        }
         if ('php://input' === $path) {
             $body = Superglobals::readRequestBody();
             if (0 === $offset && null === $length) {
@@ -494,7 +497,7 @@ final class VmFs
             return $data;
         }
         if (VmHttpLastResponseHeaders::isHttpUrl($path)) {
-            $data = VmHttpFetchNative::fetch($path);
+            $data = VmHttpFetchNative::fetch($path, $httpOptions);
             if (false === $data) {
                 return false;
             }

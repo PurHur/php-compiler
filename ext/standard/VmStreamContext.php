@@ -281,6 +281,30 @@ final class VmStreamContext
     }
 
     /**
+     * HTTP/HTTPS wrapper options from a stream context (ext/standard/streams.c, #9752).
+     *
+     * @return array<string, mixed>
+     */
+    public static function httpWrapperOptions(Variable $context, string $wrapper = 'http'): array
+    {
+        $resolved = $context->resolveIndirect();
+        if (!self::isRepresentation($resolved)) {
+            return [];
+        }
+
+        $exported = VmHttpBuildQuery::export($resolved);
+        if (!\is_array($exported)) {
+            return [];
+        }
+        unset($exported[self::MARKER_KEY], $exported[self::PARAMS_MARKER_KEY]);
+        if (!isset($exported[$wrapper]) || !\is_array($exported[$wrapper])) {
+            return [];
+        }
+
+        return $exported[$wrapper];
+    }
+
+    /**
      * Return stream wrapper options without the internal marker key (issue #6517).
      */
     public static function getOptionsHashTable(Variable $context): HashTable
