@@ -27,6 +27,18 @@ final class DateTimeSupport
     /** @var array<int, true> DateTime/DateTimeImmutable instances initialized via initDateTime* (#7276). */
     private static array $dateTimeLikeInitialized = [];
 
+    /**
+     * php-src ext/date/php_datetime.c — shared createFromFormat last-errors slot (#4660, #9920).
+     *
+     * @var array{
+     *   warning_count: int,
+     *   warnings: array<int, string>,
+     *   error_count: int,
+     *   errors: array<int, string>
+     * }|false
+     */
+    private static array|false $createFromFormatLastErrors = false;
+
     public static function requireDateTimeZone(Variable $var, string $label): ObjectEntry
     {
         $var = $var->resolveIndirect();
@@ -317,8 +329,11 @@ final class DateTimeSupport
         }
         $parsed = VmDateTimeNative::parseFromFormat($format, $time, $tzName);
         if (false === $parsed) {
+            self::recordCreateFromFormatFailure($format, $time);
+
             return null;
         }
+        self::clearCreateFromFormatLastErrors();
         $entry = new ObjectEntry($class);
         self::applyParsedState($entry, $parsed, $tzName);
         $entry->constructed = true;
@@ -327,6 +342,33 @@ final class DateTimeSupport
         $var->object($entry);
 
         return $var;
+    }
+
+    /** php-src PHP_METHOD(DateTime, getLastErrors) — false when no recorded errors (#4660). */
+    public static function writeCreateFromFormatLastErrors(Variable $returnVar): void
+    {
+        if (false === self::$createFromFormatLastErrors) {
+            $returnVar->bool(false);
+
+            return;
+        }
+        $returnVar->array(VmDate::lastErrorsToHashTable(self::$createFromFormatLastErrors));
+    }
+
+    private static function recordCreateFromFormatFailure(string $format, string $time): void
+    {
+        $components = VmDateTimeNative::parseFromFormatComponents($format, $time);
+        self::$createFromFormatLastErrors = [
+            'warning_count' => $components['warning_count'],
+            'warnings' => $components['warnings'],
+            'error_count' => $components['error_count'],
+            'errors' => $components['errors'],
+        ];
+    }
+
+    private static function clearCreateFromFormatLastErrors(): void
+    {
+        self::$createFromFormatLastErrors = false;
     }
 
     private static function tryNewDateTimeLikeVariable(
