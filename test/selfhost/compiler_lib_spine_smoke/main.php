@@ -1643,6 +1643,7 @@ require_once __DIR__.'/../../../ext/standard/strrpos.php';
 require_once __DIR__.'/../../../ext/standard/strripos.php';
 require_once __DIR__.'/../../../ext/standard/strspn.php';
 require_once __DIR__.'/../../../ext/standard/strstr.php';
+require_once __DIR__.'/../../../ext/standard/StrtokJitHelper.php';
 require_once __DIR__.'/../../../ext/standard/strtok.php';
 require_once __DIR__.'/../../../ext/standard/strtolower.php';
 require_once __DIR__.'/../../../ext/standard/strtoupper.php';
