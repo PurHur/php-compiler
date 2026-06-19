@@ -1207,7 +1207,7 @@ final class VmString
      *
      * @return string|false decoded bytes, or false when input is invalid (non-strict)
      *
-     * @throws \ValueError when $strict is true and input has odd length or invalid hex
+     * @throws \Error when $strict is true and input has odd length or invalid hex
      */
     public static function hex2bin(string $data, bool $strict = false)
     {
@@ -1217,7 +1217,7 @@ final class VmString
         }
         if (0 !== ($len & 1)) {
             if ($strict) {
-                throw new \ValueError('Hexadecimal input string must have an even length');
+                throw new \Error('Hexadecimal input string must have an even length');
             }
 
             return false;
@@ -1228,7 +1228,7 @@ final class VmString
             $lo = self::hexDigit(self::byteOrd($data[$i + 1]));
             if (null === $hi || null === $lo) {
                 if ($strict) {
-                    throw new \ValueError('Input string must be hexadecimal string');
+                    throw new \Error('Input string must be hexadecimal string');
                 }
 
                 return false;

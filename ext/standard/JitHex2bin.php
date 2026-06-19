@@ -6,14 +6,14 @@ declare(strict_types=1);
  * LLVM JIT helper for hex2bin() — hex string to binary (PHP-compatible subset).
  *
  * Non-strict: invalid input (odd length or non-hex) emits E_WARNING and returns boolean false.
- * Strict: throws ValueError (php-src ext/standard/string.c — PHP_FUNCTION(hex2bin)).
+ * Strict: throws Error (php-src ext/standard/string.c — PHP_FUNCTION(hex2bin)).
  */
 
 namespace PHPCompiler\ext\standard;
 
 use PHPCompiler\JIT\BasicBlockHelper;
+use PHPCompiler\JIT\Builtin\ErrorRaise;
 use PHPCompiler\JIT\Builtin\StringTriggerError;
-use PHPCompiler\JIT\Builtin\TypeErrorRaise;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\VM\ErrorReporter;
@@ -192,9 +192,9 @@ final class JitHex2bin
         $context->builder->branchIf($isStrict, $strictErr, $warnFail);
 
         $context->builder->positionAtEnd($strictErr);
-        TypeErrorRaise::registerDeclarations($context);
-        TypeErrorRaise::ensureLinked($context);
-        TypeErrorRaise::emitValueError($context, $message);
+        ErrorRaise::registerDeclarations($context);
+        ErrorRaise::ensureLinked($context);
+        ErrorRaise::emitRaise($context, $message);
         $context->builder->call($context->lookupFunction('abort'));
 
         $context->builder->positionAtEnd($warnFail);
