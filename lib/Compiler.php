@@ -10774,6 +10774,14 @@ class Compiler {
                 }
                 if (1 === $argCount) {
                     $last = $producers[$producerCount - 1] ?? null;
+                    // PropertyFetch/StaticPropertyFetch prelude before ++/-- (#10123, zend_execute.c).
+                    if ($last instanceof Op\Expr\PostInc
+                        || $last instanceof Op\Expr\PreInc
+                        || $last instanceof Op\Expr\PostDec
+                        || $last instanceof Op\Expr\PreDec
+                    ) {
+                        return $last;
+                    }
                     if ($last instanceof Op\Expr\NullsafePropertyFetch || $last instanceof Op\Expr\NullsafeMethodCall) {
                         return $last;
                     }
