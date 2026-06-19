@@ -47,4 +47,25 @@ PHP;
 
         $this->assertSame("E\n", $output);
     }
+
+    public function testParenthesizedAndVariableEnumCaseClassReturnsFqcn(): void
+    {
+        $code = <<<'PHP'
+<?php
+enum E: int { case A = 1; case B = 2; }
+echo E::A::class, "\n";
+echo (E::B)::class, "\n";
+$a = E::A;
+echo $a::class, "\n";
+enum U { case C; }
+echo U::C::class, "\n";
+PHP;
+        $runtime = new Runtime();
+        $block = $runtime->parseAndCompile($code, 'enum_case_class_pseudo.php');
+        ob_start();
+        $runtime->run($block);
+        $output = ob_get_clean();
+
+        $this->assertSame("E\nE\nE\nU\n", $output);
+    }
 }
