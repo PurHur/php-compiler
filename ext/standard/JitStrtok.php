@@ -11,7 +11,7 @@ use PHPLLVM\Builder;
 use PHPLLVM\Value;
 
 /**
- * LLVM lowering for strtok() via StringStrtokJit (issue #6111; VmString parity).
+ * LLVM lowering for strtok() via StringStrtok / StrtokJitHelper PHP (issue #6111, #9812).
  */
 final class JitStrtok
 {

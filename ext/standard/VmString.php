@@ -4606,6 +4606,19 @@ final class VmString
         return false;
     }
 
+    /** @internal JIT/AOT StrtokJitHelper bridge (#9812) */
+    public static function strtokResetState(): void
+    {
+        self::strtokReset();
+    }
+
+    /** @internal JIT/AOT StrtokJitHelper bridge (#9812) */
+    public static function strtokInitState(string $str): void
+    {
+        self::$strtokString = $str;
+        self::$strtokLast = 0;
+    }
+
     private static function strtokReset(): void
     {
         self::$strtokString = null;
