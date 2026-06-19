@@ -291,6 +291,10 @@ patch_already_applied() {
     php-cfg-first-class-callable.patch)
       grep -q 'isFirstClassCallable' "$ROOT/vendor/ircmaxell/php-cfg/lib/PHPCfg/Parser.php" 2>/dev/null
       ;;
+    php-cfg-new-first-class-callable.patch)
+      grep -q 'KIND_NEW' "$ROOT/vendor/ircmaxell/php-cfg/lib/PHPCfg/Op/Expr/FirstClassCallable.php" 2>/dev/null \
+        && grep -q 'FirstClassCallable::KIND_NEW' "$ROOT/vendor/ircmaxell/php-cfg/lib/PHPCfg/Parser.php" 2>/dev/null
+      ;;
     php-cfg-arrow-function.patch)
       grep -q 'function parseExpr_ArrowFunction' "$ROOT/vendor/ircmaxell/php-cfg/lib/PHPCfg/Parser.php" 2>/dev/null
       ;;
@@ -1180,6 +1184,94 @@ PY
     return 1
   fi
   echo "Applied php-cfg-incdec-expr.patch (overlay)"
+}
+
+apply_php_cfg_new_first_class_callable_overlay() {
+  local fcc="$ROOT/vendor/ircmaxell/php-cfg/lib/PHPCfg/Op/Expr/FirstClassCallable.php"
+  local parser="$ROOT/vendor/ircmaxell/php-cfg/lib/PHPCfg/Parser.php"
+  if grep -q 'KIND_NEW' "$fcc" 2>/dev/null \
+    && grep -q 'FirstClassCallable::KIND_NEW' "$parser" 2>/dev/null; then
+    echo "Skip php-cfg-new-first-class-callable.patch (already applied)"
+    return 0
+  fi
+  if ! grep -q 'isFirstClassCallable' "$parser" 2>/dev/null; then
+    echo "ERROR: php-cfg-new-first-class-callable requires php-cfg-first-class-callable (#9767)" >&2
+    record_patch_failure "php-cfg-new-first-class-callable.patch" "isFirstClassCallable missing"
+    return 1
+  fi
+  if ! python3 - "$fcc" "$parser" <<'PY'
+import sys
+from pathlib import Path
+
+fcc_path = Path(sys.argv[1])
+parser_path = Path(sys.argv[2])
+fcc_text = fcc_path.read_text()
+parser_text = parser_path.read_text()
+
+if 'KIND_NEW' in fcc_text and 'FirstClassCallable::KIND_NEW' in parser_text:
+    raise SystemExit(0)
+
+fcc_old_comment = "/** PHP 8.1+ first-class callable: `foo(...)`, `Class::m(...)`, `$obj->m(...)` (#1230). */"
+fcc_new_comment = "/** PHP 8.1+ first-class callable: `foo(...)`, `Class::m(...)`, `$obj->m(...)`, `new C(...)` (#1230, #9767). */"
+if fcc_old_comment in fcc_text:
+    fcc_text = fcc_text.replace(fcc_old_comment, fcc_new_comment, 1)
+elif fcc_new_comment not in fcc_text:
+    sys.stderr.write("php-cfg-new-first-class-callable: FirstClassCallable.php comment anchor not found\n")
+    raise SystemExit(1)
+
+kind_method = "    public const KIND_METHOD = 3;"
+kind_new = """    public const KIND_METHOD = 3;
+    public const KIND_NEW = 4;"""
+if kind_new not in fcc_text:
+    if kind_method not in fcc_text:
+        sys.stderr.write("php-cfg-new-first-class-callable: KIND_METHOD anchor not found\n")
+        raise SystemExit(1)
+    fcc_text = fcc_text.replace(kind_method, kind_new, 1)
+
+fcc_block = """        if ($this->isFirstClassCallable($expr->args)) {
+            if ($expr->class instanceof Stmt\\Class_) {
+                $this->parseStmt_Class($expr->class);
+                $class = $this->readVariable($this->parseExprNode($expr->class->namespacedName));
+            } else {
+                $class = $this->readVariable($this->parseExprNode($expr->class));
+            }
+
+            return new Op\\Expr\\FirstClassCallable(
+                Op\\Expr\\FirstClassCallable::KIND_NEW,
+                $class,
+                $class,
+                null,
+                $this->mapAttributes($expr)
+            );
+        }
+
+"""
+
+if 'FirstClassCallable::KIND_NEW' in parser_text:
+    fcc_path.write_text(fcc_text)
+    raise SystemExit(0)
+
+anchors = [
+    """    protected function parseExpr_New(Expr\\New_ $expr)
+    {
+""",
+]
+for anchor in anchors:
+    if anchor in parser_text and 'FirstClassCallable::KIND_NEW' not in parser_text:
+        parser_text = parser_text.replace(anchor, anchor + fcc_block, 1)
+        fcc_path.write_text(fcc_text)
+        parser_path.write_text(parser_text)
+        raise SystemExit(0)
+
+sys.stderr.write("php-cfg-new-first-class-callable: parseExpr_New anchor not found\n")
+raise SystemExit(1)
+PY
+  then
+    echo "ERROR: php-cfg-new-first-class-callable overlay failed (#9931, #9767)" >&2
+    record_patch_failure "php-cfg-new-first-class-callable.patch" "parseExpr_New anchor missing"
+    return 1
+  fi
+  echo "Applied php-cfg-new-first-class-callable.patch (overlay)"
 }
 
 apply_php_cfg_yield_keyed_overlay() {
@@ -5433,6 +5525,10 @@ PY
     apply_php_cfg_list_spread_overlay
     return $?
   fi
+  if [[ "$(basename "$patch")" == "php-cfg-new-first-class-callable.patch" ]]; then
+    apply_php_cfg_new_first_class_callable_overlay
+    return $?
+  fi
   if [[ "$(basename "$patch")" == "php-cfg-empty-list-assignment.patch" ]]; then
     apply_php_cfg_empty_list_assignment_overlay
     return $?
@@ -5633,9 +5729,9 @@ if [[ -d "$ROOT/vendor/ircmaxell/php-cfg" ]]; then
   apply_patch "$PATCH_DIR/php-cfg-list-skip-slot.patch" || true
   apply_patch "$PATCH_DIR/php-cfg-list-spread.patch"
   apply_patch "$PATCH_DIR/php-cfg-first-class-callable.patch"
+  apply_patch "$PATCH_DIR/php-cfg-anonymous-class.patch"
   apply_patch "$PATCH_DIR/php-cfg-new-first-class-callable.patch"
   apply_patch "$PATCH_DIR/php-cfg-arrow-function.patch"
-  apply_patch "$PATCH_DIR/php-cfg-anonymous-class.patch"
   apply_patch "$PATCH_DIR/php-cfg-new-ctor-parens.patch"
   apply_php_cfg_anonymous_class_name_overlay || true
   apply_patch "$PATCH_DIR/php-cfg-enum.patch"
