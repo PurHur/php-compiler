@@ -1,0 +1,42 @@
+--- vendor/ircmaxell/php-cfg/lib/PHPCfg/Op/Expr/FirstClassCallable.php
++++ vendor/ircmaxell/php-cfg/lib/PHPCfg/Op/Expr/FirstClassCallable.php
+@@ -7,11 +7,12 @@
+ use PHPCfg\Op\Expr;
+ use PHPCfg\Operand;
+ 
+-/** PHP 8.1+ first-class callable: `foo(...)`, `Class::m(...)`, `$obj->m(...)` (#1230). */
++/** PHP 8.1+ first-class callable: `foo(...)`, `Class::m(...)`, `$obj->m(...)`, `new C(...)` (#1230, #9767). */
+ class FirstClassCallable extends Expr
+ {
+     public const KIND_FUNCTION = 1;
+     public const KIND_STATIC = 2;
+     public const KIND_METHOD = 3;
++    public const KIND_NEW = 4;
+ 
+     public int $kind;
+--- vendor/ircmaxell/php-cfg/lib/PHPCfg/Parser.php
++++ vendor/ircmaxell/php-cfg/lib/PHPCfg/Parser.php
+@@ -1625,6 +1625,23 @@
+ 
+     protected function parseExpr_New(Expr\New_ $expr)
+     {
++        if ($this->isFirstClassCallable($expr->args)) {
++            if ($expr->class instanceof Stmt\Class_) {
++                $this->parseStmt_Class($expr->class);
++                $class = $this->readVariable($this->parseExprNode($expr->class->namespacedName));
++            } else {
++                $class = $this->readVariable($this->parseExprNode($expr->class));
++            }
++
++            return new Op\Expr\FirstClassCallable(
++                Op\Expr\FirstClassCallable::KIND_NEW,
++                $class,
++                $class,
++                null,
++                $this->mapAttributes($expr)
++            );
++        }
++
+         if ($expr->class instanceof Stmt\Class_) {
+             $this->parseStmt_Class($expr->class);
+             $class = $this->readVariable($this->parseExprNode($expr->class->namespacedName));

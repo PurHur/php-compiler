@@ -1458,6 +1458,23 @@ class Parser
 
     protected function parseExpr_New(Expr\New_ $expr)
     {
+        if ($this->isFirstClassCallable($expr->args)) {
+            if ($expr->class instanceof Stmt\Class_) {
+                $this->parseStmt_Class($expr->class);
+                $class = $this->readVariable($this->parseExprNode($expr->class->namespacedName));
+            } else {
+                $class = $this->readVariable($this->parseExprNode($expr->class));
+            }
+
+            return new Op\Expr\FirstClassCallable(
+                Op\Expr\FirstClassCallable::KIND_NEW,
+                $class,
+                $class,
+                null,
+                $this->mapAttributes($expr)
+            );
+        }
+
         return new Op\Expr\New_(
             $this->readVariable($this->parseExprNode($expr->class)),
             $this->parseExprList($expr->args, self::MODE_READ),
