@@ -54,6 +54,26 @@ PHP;
         $this->assertSame('', $this->runVm($code));
     }
 
+    public function testScriptDirAndFileMagicConstantsCompileAndRun(): void
+    {
+        $code = <<<'PHP'
+<?php
+$dir = __DIR__;
+$file = __FILE__;
+echo $dir, "\n", $file, "\n";
+PHP;
+        $runtime = new Runtime(Runtime::MODE_NORMAL);
+        $script = '/tmp/example/magic_dir_file_probe.php';
+        $block = $runtime->parseAndCompile($code, $script);
+        $this->assertNotNull($block);
+
+        ob_start();
+        $runtime->run($block);
+        $out = ob_get_clean();
+
+        $this->assertSame("/tmp/example\n/tmp/example/magic_dir_file_probe.php\n", is_string($out) ? $out : '');
+    }
+
     public function testNamespaceAndClass(): void
     {
         $code = <<<'PHP'

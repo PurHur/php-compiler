@@ -22,6 +22,11 @@ final class BootstrapPhpTypesMagicScriptConstPatchTest extends TestCase
             'Run script/apply-patches.sh (php-types-magic-script-const.patch) before CI'
         );
         $this->assertStringContainsString(
+            'return [Type::string()]',
+            $content,
+            'TypeReconstructor must resolve __DIR__/__FILE__ as string (#9833)'
+        );
+        $this->assertStringContainsString(
             'FirstClassCallable::KIND_METHOD',
             $content,
             'Run script/apply-patches.sh (php-types-first-class-callable.patch) before CI'
