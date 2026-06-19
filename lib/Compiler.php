@@ -4430,7 +4430,7 @@ class Compiler {
                 }
             }
             if (1 === \count($children) && $children[0] instanceof Op\Expr\ClassConstFetch) {
-                $vm = $this->tryFoldClassConstFetchDefault($children[0], $block);
+                $vm = $this->tryFoldClassConstFetchDefault($children[0], $block, true);
                 if (null !== $vm) {
                     return $block->registerConstant(new Operand\Temporary(), $vm);
                 }
@@ -4450,7 +4450,7 @@ class Compiler {
                 }
             }
             if (1 === \count($children) && $children[0] instanceof Op\Expr) {
-                $vm = $this->tryFoldCompileTimeExprDefault($children[0], $block, $children);
+                $vm = $this->tryFoldCompileTimeExprDefault($children[0], $block, $children, true);
                 if (null !== $vm) {
                     return $block->registerConstant(new Operand\Temporary(), $vm);
                 }
