@@ -168,7 +168,7 @@ class Child extends Base {
 }
 PHP;
         $this->expectException(\CompileError::class);
-        $this->expectExceptionMessage('Attribute "Override" cannot target class (allowed targets: method, class constant)');
+        $this->expectExceptionMessage('Attribute "Override" cannot target class (allowed targets: method, class constant, property)');
         $runtime->parseAndCompile($code, 'override_on_class.php');
     }
 
@@ -181,7 +181,7 @@ PHP;
 trait T {}
 PHP;
         $this->expectException(\CompileError::class);
-        $this->expectExceptionMessage('Attribute "Override" cannot target class (allowed targets: method, class constant)');
+        $this->expectExceptionMessage('Attribute "Override" cannot target class (allowed targets: method, class constant, property)');
         $runtime->parseAndCompile($code, 'override_on_trait.php');
     }
 
@@ -297,5 +297,31 @@ PHP;
         $this->expectException(\CompileError::class);
         $this->expectExceptionMessage('C::X has #[\Override] attribute, but no matching parent constant exists');
         $runtime->parseAndCompile($code, 'override_const_invalid.php');
+    }
+
+    public function testOverrideOnExtendsPropertyCompiles(): void
+    {
+        $runtime = new Runtime();
+        $code = <<<'PHP'
+<?php
+class Base { public int $x = 1; }
+class Child extends Base { #[\Override] public int $x = 2; }
+echo (new Child())->x, "\n";
+PHP;
+        ob_start();
+        $runtime->run($runtime->parseAndCompile($code, 'override_prop_extends.php'));
+        $this->assertSame("2\n", ob_get_clean());
+    }
+
+    public function testInvalidOverrideOnPropertyFailsAtCompileTime(): void
+    {
+        $runtime = new Runtime();
+        $code = <<<'PHP'
+<?php
+class C { #[\Override] public int $x = 1; }
+PHP;
+        $this->expectException(\CompileError::class);
+        $this->expectExceptionMessage('C::$x has #[\Override] attribute, but no matching parent property exists');
+        $runtime->parseAndCompile($code, 'override_prop_invalid.php');
     }
 }
