@@ -21,6 +21,9 @@ final class LateStaticBindingHelper
 {
     private static ?Value $classIdGlobal = null;
 
+    /** @var object|null LLVM module identity — static Value must not leak across Context instances */
+    private static $classIdModule = null;
+
     public static function useRuntimeLateStatic(Context $context): bool
     {
         return Builtin::LOAD_TYPE_STANDALONE === $context->loadType;
@@ -28,11 +31,23 @@ final class LateStaticBindingHelper
 
     public static function ensureClassIdGlobal(Context $context): Value
     {
-        if (null === self::$classIdGlobal) {
-            $i64 = $context->getTypeFromString('int64');
-            self::$classIdGlobal = $context->module->addGlobal($i64, 'phpc_late_static_class_id');
-            self::$classIdGlobal->setInitializer($i64->constInt(0, false));
+        $module = $context->module;
+        if (null !== self::$classIdGlobal && self::$classIdModule === $module) {
+            return self::$classIdGlobal;
         }
+
+        $existing = $module->getNamedGlobal('phpc_late_static_class_id');
+        if (null !== $existing) {
+            self::$classIdGlobal = $existing;
+            self::$classIdModule = $module;
+
+            return self::$classIdGlobal;
+        }
+
+        $i64 = $context->getTypeFromString('int64');
+        self::$classIdGlobal = $module->addGlobal($i64, 'phpc_late_static_class_id');
+        self::$classIdGlobal->setInitializer($i64->constInt(0, false));
+        self::$classIdModule = $module;
 
         return self::$classIdGlobal;
     }
