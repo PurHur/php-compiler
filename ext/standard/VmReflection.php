@@ -523,10 +523,61 @@ final class VmReflection
         }
         $obj = new \PHPCompiler\VM\ObjectEntry($rpClass);
         $obj->constructed = true;
-        $obj->getProperty(ReflectionSupport::PROP_CLASS_NAME)->string($reflectedClassName);
-        $obj->getProperty(ReflectionSupport::PROP_PROPERTY_NAME)->string($prop->name);
+        self::attachReflectionPropertyState(
+            $obj,
+            $reflectedClassName,
+            $prop->name,
+            self::declaringClassDisplay($prop, $ctx)
+        );
 
         return $obj;
+    }
+
+    /**
+     * Declaring class display name for an instance/static property lookup (#9878).
+     */
+    public static function declaringClassNameForPropertyLookup(
+        ClassEntry $class,
+        string $property,
+        Context $ctx
+    ): string {
+        $meta = self::findClassProperty($class, $property, $ctx);
+        if (null !== $meta) {
+            return self::declaringClassDisplay($meta, $ctx);
+        }
+        $lc = strtolower($property);
+        $current = $class;
+        while (true) {
+            if (isset($current->staticProperties[$lc])) {
+                $declLc = $current->staticPropertyDeclaringClassLc[$lc]
+                    ?? strtolower(ltrim($current->name, '\\'));
+                if (isset($ctx->classes[$declLc])) {
+                    return $ctx->classes[$declLc]->name;
+                }
+
+                return $declLc;
+            }
+            if (null === $current->parentLc || !isset($ctx->classes[$current->parentLc])) {
+                break;
+            }
+            $current = $ctx->classes[$current->parentLc];
+        }
+        if (self::isEnumReflectionPseudoProperty($class, $property)) {
+            return $class->name;
+        }
+
+        return $class->name;
+    }
+
+    private static function attachReflectionPropertyState(
+        \PHPCompiler\VM\ObjectEntry $obj,
+        string $reflectedClassName,
+        string $propertyName,
+        string $declaringClassName
+    ): void {
+        $obj->getProperty(ReflectionSupport::PROP_CLASS_NAME)->string($reflectedClassName);
+        $obj->getProperty(ReflectionSupport::PROP_PROPERTY_NAME)->string($propertyName);
+        $obj->getProperty(ReflectionSupport::PROP_DECLARING_CLASS_NAME)->string($declaringClassName);
     }
 
     /** Static property storage key on $class or an ancestor, or null. */
@@ -1742,8 +1793,12 @@ final class VmReflection
         foreach (self::collectClassPropertiesForReflection($entry, $ctx, $filter) as $prop) {
             $obj = new \PHPCompiler\VM\ObjectEntry($rpClass);
             $obj->constructed = true;
-            $obj->getProperty(\PHPCompiler\VM\ReflectionSupport::PROP_CLASS_NAME)->string($reflectedClassName);
-            $obj->getProperty(\PHPCompiler\VM\ReflectionSupport::PROP_PROPERTY_NAME)->string($prop->name);
+            self::attachReflectionPropertyState(
+                $obj,
+                $reflectedClassName,
+                $prop->name,
+                self::declaringClassDisplay($prop, $ctx)
+            );
             $slot = new Variable(Variable::TYPE_OBJECT);
             $slot->object($obj);
             $ht->append($slot);

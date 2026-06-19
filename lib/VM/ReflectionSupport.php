@@ -59,6 +59,9 @@ final class ReflectionSupport
 
     public const PROP_PROPERTY_NAME = 'property';
 
+    /** Declaring class name on ReflectionProperty instances (#9878). */
+    public const PROP_DECLARING_CLASS_NAME = 'declaringClass';
+
     public const PROP_FUNCTION_NAME = 'function';
 
     public const PROP_CONSTANT_NAME = 'constant';
@@ -721,6 +724,25 @@ final class ReflectionSupport
         }
 
         return $nameVar->toString();
+    }
+
+    /**
+     * Declaring class for a ReflectionProperty — stored at construction or resolved from metadata (#9878).
+     */
+    public static function declaringClassNameFromReflectionProperty(ObjectEntry $reflection, Context $ctx): string
+    {
+        $declVar = $reflection->getProperty(self::PROP_DECLARING_CLASS_NAME)->resolveIndirect();
+        if (Variable::TYPE_STRING === $declVar->type && '' !== $declVar->toString()) {
+            return $declVar->toString();
+        }
+        $className = self::classNameFromReflection($reflection);
+        $property = self::propertyNameFromReflection($reflection);
+        $entry = VmReflection::resolveClassEntry($ctx, $className);
+        if (null === $entry) {
+            throw new \LogicException('ReflectionProperty refers to unknown class in this compiler build');
+        }
+
+        return VmReflection::declaringClassNameForPropertyLookup($entry, $property, $ctx);
     }
 
     public static function functionNameFromReflection(ObjectEntry $reflection): string
