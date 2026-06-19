@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 2830 |
-| Phase A inventory files (M2 ratio SSOT) | 2830 |
+| PHP files on vm.php path | 2831 |
+| Phase A inventory files (M2 ratio SSOT) | 2831 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 1 |
-| Source constructs flagged (warnings) | 7651 |
+| Source constructs flagged (warnings) | 7653 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -2000,6 +2000,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/Builtin/ProcessOpenJit.php` | 0 | 1 |
 | `lib/JIT/Builtin/ProcessRuntime.php` | 0 | 1 |
 | `lib/JIT/Builtin/ProgressNoteRuntime.php` | 0 | 3 |
+| `lib/JIT/Builtin/ProgressNoteRuntimeLlvm.php` | 0 | 2 |
 | `lib/JIT/Builtin/ReadonlyRaise.php` | 0 | 2 |
 | `lib/JIT/Builtin/Refcount.php` | 0 | 1 |
 | `lib/JIT/Builtin/ReflectionEnumJitHelper.php` | 0 | 3 |
@@ -15911,9 +15912,15 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/Builtin/ProgressNoteRuntime.php`
 
 **Warnings** (review for bootstrap subset):
-- new Call\Native (line 128)
-- new JIT (line 276)
+- new Call\Native (line 144)
+- new JIT (line 284)
 - 21 class method(s)
+
+### `lib/JIT/Builtin/ProgressNoteRuntimeLlvm.php`
+
+**Warnings** (review for bootstrap subset):
+- new Call\Native (line 76)
+- 13 class method(s)
 
 ### `lib/JIT/Builtin/ReadonlyRaise.php`
 
