@@ -177,4 +177,24 @@ PHP;
         $rt->run($block);
         $this->assertSame("10\n10\n", ob_get_clean());
     }
+
+    /** @covers issue #10110 */
+    public function testVmPipePreservesBackedEnumCaseIdentity(): void
+    {
+        $code = <<<'PHP'
+<?php
+enum E: int {
+    case A = 1;
+}
+var_export(E::A |> (fn($x) => $x)());
+echo "\n";
+var_export(E::A |> (fn($x) => $x->name)());
+echo "\n";
+PHP;
+        $rt = new Runtime();
+        $block = $rt->parseAndCompile($code, 'test.php');
+        ob_start();
+        $rt->run($block);
+        $this->assertSame("\\E::A\n'A'\n", ob_get_clean());
+    }
 }
