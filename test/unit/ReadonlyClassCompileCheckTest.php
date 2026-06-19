@@ -84,6 +84,21 @@ PHP;
         $runtime->parseAndCompile($code, 'readonly_prop_default.php');
     }
 
+    /** @covers issue #10099 */
+    public function testUntypedReadonlyPropertyFailsWithMustHaveTypeMessage(): void
+    {
+        $runtime = new Runtime();
+        $code = <<<'PHP'
+<?php
+class C {
+    public readonly $x = 1;
+}
+PHP;
+        $this->expectException(\CompileError::class);
+        $this->expectExceptionMessage('Readonly property C::$x must have type');
+        $runtime->parseAndCompile($code, 'readonly_untyped.php');
+    }
+
     /** @covers issue #6862 */
     public function testReadonlyClassStaticPropertyFailsAtCompileTime(): void
     {

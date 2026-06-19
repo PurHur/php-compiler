@@ -35,6 +35,7 @@ final class ReadonlyClassCompileCheck
         // Inheritance before per-property defaults so MCJIT readonly pads do not mask extends errors (#8967).
         $check->verifyInheritance();
         $check->verifyPropertyReadonlyOverrides();
+        $check->verifyReadonlyPropertyRequiresType();
         $check->verifyAllPropertyDefaults();
     }
 
@@ -130,6 +131,42 @@ final class ReadonlyClassCompileCheck
                 "Static property {$classDisplay}::\${$propName} cannot be readonly"
             );
         }
+    }
+
+      private function verifyReadonlyPropertyRequiresType(): void
+    {
+        foreach ($this->classes as $lc => $meta) {
+            foreach ($this->scriptClasses[$lc] ?? [] as $class) {
+                $this->verifyReadonlyPropertiesHaveType($class, $meta['display'], $meta['readonly']);
+            }
+        }
+    }
+
+    private function verifyReadonlyPropertiesHaveType(
+        Op\Stmt\Class_ $class,
+        string $classDisplay,
+        bool $classReadonly
+    ): void {
+        foreach ($class->stmts->children as $member) {
+            if (!$member instanceof Op\Stmt\Property || $member->static) {
+                continue;
+            }
+            if (!$classReadonly && !$this->isCfgPropertyReadonly($member)) {
+                continue;
+            }
+            if ($this->propertyHasDeclaredType($member->declaredType ?? null)) {
+                continue;
+            }
+            $propName = $this->propertyDisplayName($member->name);
+            throw new \CompileError(
+                "Readonly property {$classDisplay}::\${$propName} must have type"
+            );
+        }
+    }
+
+    private function propertyHasDeclaredType(?Op\Type $declaredType): bool
+    {
+        return null !== $declaredType && !$declaredType instanceof Op\Type\Mixed_;
     }
 
     private function verifyAllPropertyDefaults(): void
