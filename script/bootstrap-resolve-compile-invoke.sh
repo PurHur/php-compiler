@@ -23,6 +23,7 @@
 #   BOOTSTRAP_M5_NO_ZEND=1       — refuse Zend fallback (implies BOOTSTRAP_NO_ZEND_FALLBACK=1)
 #   BOOTSTRAP_NO_ZEND_FALLBACK=1 — refuse Zend on spine/M5 compile paths (#8716)
 #   BOOTSTRAP_USE_INVENTORY_DRIVER=1 — inventory argv driver only (#2894)
+#   BOOTSTRAP_ALLOW_SIDECAR_EMIT_FALLBACK=1 — opt-in when native driver SIGSEGV (exit 139) and only sidecar copy succeeds
 set -euo pipefail
 
 BOOTSTRAP_COMPILE_DRIVER_MODE=""
@@ -181,6 +182,37 @@ bootstrap_gen0_sidecar_emit_fallback() {
   chmod +x "${out}" 2>/dev/null || true
   echo "bootstrap-compile-invoke: gen-0 sidecar emit fallback ${sidecar} -> ${out} (#3046)" >&2
   return 0
+}
+
+# Sidecar copy is not honest native emit — gate on M5 no-Zend, SIGSEGV, and opt-in (#8711).
+bootstrap_sidecar_emit_fallback_allowed() {
+  local last_code=${1:-0}
+  if [[ "${BOOTSTRAP_M5_NO_ZEND:-0}" == "1" ]]; then
+    echo "bootstrap-compile-invoke: BOOTSTRAP_M5_NO_ZEND=1 — refusing sidecar emit fallback (#3053)" >&2
+    return 1
+  fi
+  if [[ "${BOOTSTRAP_NO_ZEND_FALLBACK:-0}" == "1" ]]; then
+    return 1
+  fi
+  if [[ "${last_code}" -eq 139 && "${BOOTSTRAP_ALLOW_SIDECAR_EMIT_FALLBACK:-0}" != "1" ]]; then
+    echo "bootstrap-compile-invoke: native driver segfault (exit 139) — refusing sidecar emit fallback (set BOOTSTRAP_ALLOW_SIDECAR_EMIT_FALLBACK=1 to opt in — #8711)" >&2
+    return 1
+  fi
+  return 0
+}
+
+bootstrap_try_sidecar_emit_fallback() {
+  local out=$1
+  local entry=$2
+  local last_code=${3:-0}
+  if ! bootstrap_sidecar_emit_fallback_allowed "${last_code}"; then
+    return 1
+  fi
+  if bootstrap_gen0_sidecar_emit_fallback "${out}" "${entry}"; then
+    BOOTSTRAP_COMPILE_DRIVER_MODE=sidecar_fallback
+    return 0
+  fi
+  return 1
 }
 
 bootstrap_is_gen0_prelinked_seed_driver() {
@@ -650,28 +682,28 @@ bootstrap_compile_invoke() {
           last_code=1
           rm -f "${out}"
         else
+          BOOTSTRAP_COMPILE_DRIVER_MODE=native
           return 0
         fi
       else
+        BOOTSTRAP_COMPILE_DRIVER_MODE=native
         return 0
       fi
     fi
     if [[ "${last_code}" -eq 0 && ! -x "${out}" ]]; then
       if bootstrap_native_compile_output_ok "${invoke_out}" \
-        && bootstrap_gen0_sidecar_emit_fallback "${out}" "${entry}"; then
+        && bootstrap_try_sidecar_emit_fallback "${out}" "${entry}" "${last_code}"; then
         return 0
       fi
       echo "bootstrap-compile-invoke: compiled driver ${BOOTSTRAP_COMPILE_DRIVER} exited 0 but missing ${out} (#3046)" >&2
       last_code=1
-    elif [[ "${no_zend_fallback}" -eq 0 ]] \
-      && grep -qE 'parseAndCompile returned null|native emit failed at phase=parseAndCompile' <<< "${invoke_out}" \
-      && bootstrap_gen0_sidecar_emit_fallback "${out}" "${entry}"; then
+    elif grep -qE 'parseAndCompile returned null|native emit failed at phase=parseAndCompile' <<< "${invoke_out}" \
+      && bootstrap_try_sidecar_emit_fallback "${out}" "${entry}" "${last_code}"; then
       echo "bootstrap-compile-invoke: native parse spine null — recovered via gen-0 sidecar (#1492)" >&2
       return 0
-    elif [[ "${no_zend_fallback}" -eq 0 ]] \
-      && [[ "${last_code}" -ne 0 ]] \
+    elif [[ "${last_code}" -ne 0 ]] \
       && bootstrap_is_gen0_prelinked_seed_driver "${BOOTSTRAP_COMPILE_DRIVER}" \
-      && bootstrap_gen0_sidecar_emit_fallback "${out}" "${entry}"; then
+      && bootstrap_try_sidecar_emit_fallback "${out}" "${entry}" "${last_code}"; then
       echo "bootstrap-compile-invoke: gen-0 native emit failed — recovered via sidecar (#1492, #3046)" >&2
       return 0
     else
@@ -717,7 +749,7 @@ bootstrap_compile_invoke() {
     return "${last_code}"
   fi
 
-  if bootstrap_gen0_sidecar_emit_fallback "${out}" "${entry}"; then
+  if bootstrap_try_sidecar_emit_fallback "${out}" "${entry}" "${last_code}"; then
     echo "bootstrap-compile-invoke: gen-0 sidecar emit after native driver sweep (#8711, #3046)" >&2
     return 0
   fi

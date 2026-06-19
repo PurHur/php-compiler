@@ -68,6 +68,13 @@ final class BootstrapSelfhostLinkTest extends TestCase
         $this->assertStringContainsString('build/bin-compile-aot-inventory', $body);
         $this->assertStringContainsString('exited 0 but missing', $body);
         $this->assertStringContainsString('bootstrap_gen0_sidecar_emit_fallback', $body);
+        $this->assertStringContainsString('bootstrap_try_sidecar_emit_fallback', $body);
+        $this->assertStringContainsString('bootstrap_sidecar_emit_fallback_allowed', $body);
+        $this->assertStringContainsString('BOOTSTRAP_ALLOW_SIDECAR_EMIT_FALLBACK', $body);
+        $this->assertStringContainsString('sidecar_fallback', $body);
+        $this->assertStringContainsString('exit 139', $body);
+        $this->assertStringContainsString('refusing sidecar emit fallback', $body);
+        $this->assertStringContainsString('BOOTSTRAP_M5_NO_ZEND=1 — refusing sidecar emit fallback', $body);
         $this->assertStringContainsString('bootstrap_loop_smoke/main.php', $body);
         $this->assertStringContainsString('.m3_bootstrap_loop_smoke_main_aot_blob', $body);
         $this->assertStringContainsString('gen-0 sidecar emit fallback', $body);

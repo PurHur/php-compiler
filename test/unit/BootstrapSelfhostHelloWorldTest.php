@@ -158,6 +158,9 @@ final class BootstrapSelfhostHelloWorldTest extends TestCase
         $this->assertStringContainsString('BOOTSTRAP_INVENTORY_DRIVER_USE_PRELINKED', $resolve);
         $this->assertStringContainsString('PHP_COMPILER_M4_BIN_COMPILE_DRIVER=1', $resolve);
         $this->assertStringContainsString('bootstrap_inventory_argv_link', $resolve);
+        $this->assertStringContainsString('BOOTSTRAP_ALLOW_SIDECAR_EMIT_FALLBACK', $resolve);
+        $this->assertStringContainsString('emit_path=${BOOTSTRAP_COMPILE_DRIVER_MODE:-native}', $resolve);
+        $this->assertStringContainsString('sidecar_fallback', $resolve);
         $this->assertStringContainsString('BOOTSTRAP_INVENTORY_COMPILED_FIRST', (string) file_get_contents(self::$root.'/script/ci-defaults.env'));
         $jit = (string) file_get_contents(self::$root.'/lib/JIT.php');
         $this->assertStringContainsString('m3EmitSidecarHostCompileEnv', $jit);
