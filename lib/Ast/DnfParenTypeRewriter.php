@@ -8,9 +8,11 @@ namespace PHPCompiler\Ast;
  * Unwrap parenthesized DNF type leaves for nikic/php-parser 4.x (#9733, #3094).
  *
  * php-src accepts `(I1&I2) $param` and `function f(): (I1&I2)`; php-parser 4.x rejects
- * parenthesized intersection-only (and union-only) leaves unless followed by `|`.
- * `(I1&I2)|null` must keep its parens — only unwrap when the closing `)` is not part of
- * a union continuation.
+ * parenthesized intersection-only leaves unless followed by `|` or `&`.
+ * Parenthesized union-only leaves such as `(A|B) $param` are a Zend parse error (#9968) —
+ * do not unwrap them into `A|B`.
+ * `(I1&I2)|null` and `(A|B)&C` must keep their parens — only unwrap bare intersection-only
+ * leaves when the closing `)` is not part of a larger DNF type.
  *
  * php-src: Zend/zend_compile.c — zend_compile_type / DNF normalization.
  */
@@ -53,14 +55,14 @@ final class DnfParenTypeRewriter
             }
 
             $inner = \array_slice($tokens, $i + 1, $close - $i - 1);
-            if (!self::isTypeExpressionTokens($inner) || !self::hasTopLevelUnionOrIntersection($inner)) {
+            if (!self::isTypeExpressionTokens($inner) || !self::hasTopLevelIntersection($inner)) {
                 $out .= self::tokenText($tok);
                 ++$i;
                 continue;
             }
 
             $after = self::skipIgnorable($tokens, $close + 1, $n);
-            if ($after < $n && '|' === self::tokenText($tokens[$after])) {
+            if ($after < $n && ('|' === self::tokenText($tokens[$after]) || '&' === self::tokenText($tokens[$after]))) {
                 $out .= self::tokenText($tok);
                 ++$i;
                 continue;
@@ -164,11 +166,12 @@ final class DnfParenTypeRewriter
     }
 
     /**
-     * DNF parenthesized leaves always contain a top-level `&` or `|` (#9733).
+     * Intersection-only parenthesized leaves contain a top-level `&` (#9733).
+     * Union-only `(A|B)` leaves are rejected by php-parser when left unwrapped (#9968).
      *
      * @param list<array{0: int, 1: string, 2: int}|string> $tokens
      */
-    private static function hasTopLevelUnionOrIntersection(array $tokens): bool
+    private static function hasTopLevelIntersection(array $tokens): bool
     {
         $depth = 0;
         foreach ($tokens as $tok) {
@@ -181,7 +184,7 @@ final class DnfParenTypeRewriter
                 --$depth;
                 continue;
             }
-            if (0 === $depth && ('|' === $text || '&' === $text)) {
+            if (0 === $depth && '&' === $text) {
                 return true;
             }
         }
