@@ -9,6 +9,7 @@ use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitStringArg;
 use PHPCompiler\JIT\JitStringBuiltinArg;
+use PHPCompiler\JIT\NamedOptionalCallArgs;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
@@ -27,15 +28,16 @@ final class json_decode extends Internal
 
     public function execute(Frame $frame): void
     {
-        $argc = \count($frame->calledArgs);
-        if ($argc < 1) {
+        if (!isset($frame->calledArgs[0])) {
             throw new \LogicException('json_decode() requires at least one argument');
         }
-        if ($argc > 4) {
-            throw new \ArgumentCountError(\sprintf(
-                'json_decode() expects at most 4 arguments, %d given',
-                $argc
-            ));
+        foreach (\array_keys($frame->calledArgs) as $idx) {
+            if ($idx < 0 || $idx > 3) {
+                throw new \ArgumentCountError(\sprintf(
+                    'json_decode() expects at most 4 arguments, %d given',
+                    $idx + 1
+                ));
+            }
         }
         $json = VmString::coerceStringBuiltinArg(
             $frame->calledArgs[0],
@@ -44,7 +46,7 @@ final class json_decode extends Internal
             'json'
         );
         $assoc = false;
-        if ($argc > 1) {
+        if (isset($frame->calledArgs[1])) {
             $assocVar = $frame->calledArgs[1]->resolveIndirect();
             if (Variable::TYPE_BOOLEAN !== $assocVar->type) {
                 throw new \TypeError('json_decode(): Argument #2 ($assoc) must be of type bool');
@@ -52,7 +54,7 @@ final class json_decode extends Internal
             $assoc = $assocVar->toBool();
         }
         $depth = 512;
-        if ($argc > 2) {
+        if (isset($frame->calledArgs[2])) {
             $depth = VmMath::parseIntBuiltinArg(
                 $frame->calledArgs[2]->resolveIndirect(),
                 'json_decode',
@@ -64,7 +66,7 @@ final class json_decode extends Internal
             }
         }
         $flags = 0;
-        if ($argc > 3) {
+        if (isset($frame->calledArgs[3])) {
             $flags = VmMath::parseIntBuiltinArg(
                 $frame->calledArgs[3]->resolveIndirect(),
                 'json_decode',
@@ -94,8 +96,8 @@ final class json_decode extends Internal
         }
 
         $assoc = self::resolveAssocFlag($context, $args);
-        $depth = self::resolveDepthJit($context, $args, $argc);
-        $flags = self::resolveFlagsJit($context, $args, $argc);
+        $depth = self::resolveDepthJit($context, $args);
+        $flags = self::resolveFlagsJit($context, $args);
         $literal = JitStringArg::compileTimeLiteral($args[0]);
         if (null !== $literal) {
             $decoded = VmJsonFormat::decode($literal, $assoc, $depth, $flags);
@@ -122,7 +124,7 @@ final class json_decode extends Internal
      */
     private static function resolveAssocFlag(Context $context, array $args): bool
     {
-        if (\count($args) < 2) {
+        if (!isset($args[1]) || NamedOptionalCallArgs::isOmittedOptional($args[1])) {
             return false;
         }
         $assoc = self::compileTimeBool($context, $args[1]);
@@ -136,9 +138,9 @@ final class json_decode extends Internal
     /**
      * @param list<JITVariable> $args
      */
-    private static function resolveDepthJit(Context $context, array $args, int $argc): int
+    private static function resolveDepthJit(Context $context, array $args): int
     {
-        if ($argc <= 2) {
+        if (!isset($args[2]) || NamedOptionalCallArgs::isOmittedOptional($args[2])) {
             return 512;
         }
         $depth = self::compileTimeInt($context, $args[2]);
@@ -155,9 +157,9 @@ final class json_decode extends Internal
     /**
      * @param list<JITVariable> $args
      */
-    private static function resolveFlagsJit(Context $context, array $args, int $argc): int
+    private static function resolveFlagsJit(Context $context, array $args): int
     {
-        if ($argc <= 3) {
+        if (!isset($args[3]) || NamedOptionalCallArgs::isOmittedOptional($args[3])) {
             return 0;
         }
         $flags = self::compileTimeInt($context, $args[3]);
