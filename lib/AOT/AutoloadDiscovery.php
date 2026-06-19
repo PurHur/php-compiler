@@ -9,6 +9,7 @@ use PHPCfg\Func as CfgFunc;
 use PHPCfg\Operand;
 use PHPCfg\Op;
 use PHPCfg\Script;
+use PHPCompiler\Cfg\OpSubBlockAccess;
 use PHPCompiler\Runtime;
 use PHPCompiler\Web\ProjectAutoload;
 use PHPCompiler\Web\ProjectManifest;
@@ -202,12 +203,9 @@ final class StaticClassReferenceScanner
                 }
             }
 
-            foreach ($child->getSubBlocks() as $name) {
-                $sub = $child->{$name} ?? null;
-                if ($sub instanceof CfgBlock) {
-                    self::walkBlock($sub, $names, $seen);
-                }
-            }
+            OpSubBlockAccess::walkSubBlocks($child, static function (CfgBlock $sub) use (&$names, $seen): void {
+                self::walkBlock($sub, $names, $seen);
+            });
         }
     }
 

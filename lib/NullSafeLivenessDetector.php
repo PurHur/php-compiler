@@ -9,6 +9,7 @@ use PHPCfg\Func;
 use PHPCfg\LivenessDetector;
 use PHPCfg\Operand;
 use PHPCfg\Op;
+use PHPCompiler\Cfg\OpSubBlockAccess;
 
 /**
  * Skip liveness for declaration-only functions (interfaces, abstract stubs) with no CFG.
@@ -43,7 +44,7 @@ final class NullSafeLivenessDetector extends LivenessDetector
                 $endBlocks[] = $block;
             }
             foreach ($lastOp->getSubBlocks() as $name) {
-                $tmp = $lastOp->{$name};
+                $tmp = OpSubBlockAccess::propertyValue($lastOp, $name);
                 if (is_array($tmp)) {
                     foreach ($tmp as $obj) {
                         $queue[] = $obj;

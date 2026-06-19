@@ -9,6 +9,7 @@ use PHPCfg\Func;
 use PHPCfg\Op;
 use PHPCfg\Operand;
 use PHPCfg\Script;
+use PHPCompiler\Cfg\OpSubBlockAccess;
 
 /**
  * Compile-time check: generators (yield / :Generator) in static methods (#4938).
@@ -110,17 +111,7 @@ final class GeneratorStaticMethodCompileCheck
                 if ($op instanceof Op\Expr\Yield_ || $op instanceof Op\Expr\YieldFrom) {
                     return true;
                 }
-                foreach ($op->getSubBlocks() as $name) {
-                    $sub = $op->{$name};
-                    if (null === $sub) {
-                        continue;
-                    }
-                    foreach (is_array($sub) ? $sub : [$sub] as $subBlock) {
-                        if ($subBlock instanceof CfgBlock) {
-                            $queue[] = $subBlock;
-                        }
-                    }
-                }
+                OpSubBlockAccess::enqueueSubBlocks($op, $queue);
             }
         }
 

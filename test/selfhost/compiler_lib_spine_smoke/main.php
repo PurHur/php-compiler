@@ -1799,6 +1799,7 @@ require_once __DIR__.'/../../../lib/Cli/PhpcBuild.php';
 require_once __DIR__.'/../../../lib/Cli/PhpcFcgi.php';
 require_once __DIR__.'/../../../lib/Cli/PhpcInit.php';
 require_once __DIR__.'/../../../lib/Cli/PhpcRun.php';
+require_once __DIR__.'/../../../lib/Cfg/OpSubBlockAccess.php';
 require_once __DIR__.'/../../../lib/Compiler.php';
 require_once __DIR__.'/../../../lib/Compiler/AbstractMethodVisibilityCheck.php';
 require_once __DIR__.'/../../../lib/Compiler/AsymmetricVisibilityCompileCheck.php';

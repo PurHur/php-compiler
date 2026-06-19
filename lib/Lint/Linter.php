@@ -13,6 +13,7 @@ use PHPTypes\State;
 use PHPCompiler\Compiler\CompileFatal;
 use PHPCompiler\AOT\ProjectGraph;
 use PHPCompiler\Runtime;
+use PHPCompiler\Cfg\OpSubBlockAccess;
 use PHPCompiler\Web\ConstStringFolder;
 use PHPCompiler\Web\IncludePathResolver;
 use PHPCompiler\Web\ProjectAutoload;
@@ -331,12 +332,9 @@ final class Linter
                     $this->dynamicIncludeWarnings[] = "{$child->getFile()}: {$where}: dynamic include/require (not followed)";
                 }
             }
-            foreach ($child->getSubBlocks() as $name) {
-                $sub = $child->{$name} ?? null;
-                if ($sub instanceof CfgBlock) {
-                    $this->walkCfgBlock($sub, $paths, $seen);
-                }
-            }
+            OpSubBlockAccess::walkSubBlocks($child, function (CfgBlock $sub) use ($paths, $seen): void {
+                $this->walkCfgBlock($sub, $paths, $seen);
+            });
         }
     }
 
