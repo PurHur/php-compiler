@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace PHPCompiler\JIT\Builtin;
 
+use PHPCompiler\JIT;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\VM\ObStackLimits;
 use PHPLLVM\Builder;
@@ -11,9 +12,9 @@ use PHPLLVM\Value;
 use PHPLLVM\Value\Function_ as LlvmFunction;
 
 /**
- * LLVM lowering for ob_gzhandler() gzip output-buffer handler (issue #4655, #8818).
+ * JIT/AOT link for ob_gzhandler() via ObGzhandlerJitHelper PHP (#4655, #8818, #9091).
  *
- * Mirrors {@see \PHPCompiler\ext\standard\VmObGzhandler}; gzip via {@see StringZlibJit}.
+ * VM SSOT: {@see \PHPCompiler\ext\standard\VmObGzhandler}
  * php-src: ext/zlib/zlib.c — php_ob_gzhandler
  */
 final class ObGzhandlerJitRuntime
@@ -22,19 +23,22 @@ final class ObGzhandlerJitRuntime
 
     public const HANDLER_GZHANDLER = 1;
 
-    private const GLOBAL_ENCODING = '__phpc_ob_gz_encoding';
-
     private const GLOBAL_HANDLER = '__phpc_ob_handler';
 
-    private const ZLIB_ENCODING_GZIP = 31;
+    private const HELPER_PATH = '/ext/standard/ObGzhandlerJitHelper.php';
 
-    private const ZLIB_ENCODING_DEFLATE = 65535;
+    private const RESOLVE_ENCODING_HELPER = 'PHPCompiler\\ext\\standard\\ObGzhandlerJitHelper::resolveEncodingFromAcceptHeader';
 
-    private const PHP_OUTPUT_HANDLER_START = 1;
+    private const HANDLE_HELPER = 'PHPCompiler\\ext\\standard\\ObGzhandlerJitHelper::handle';
 
-    private const PHP_OUTPUT_HANDLER_END = 8;
+    private const FLUSH_HELPER = 'PHPCompiler\\ext\\standard\\ObGzhandlerJitHelper::flushBuffer';
 
-    private const PHP_OUTPUT_HANDLER_FINAL = 4;
+    /** @var list<string> */
+    private const COMPILED_HELPERS = [
+        self::RESOLVE_ENCODING_HELPER,
+        self::HANDLE_HELPER,
+        self::FLUSH_HELPER,
+    ];
 
     /** @var list<string> */
     private const RUNTIME_FUNCTIONS = [
@@ -56,16 +60,13 @@ final class ObGzhandlerJitRuntime
 
         self::$blockSuffix = 0;
         self::ensureGlobals($context);
-        self::ensureLibc($context);
-        self::ensureHashtableHelpers($context);
-        self::ensureStringHelpers($context);
-        StringZlib::ensureLinked($context);
-
-        self::implementObGzhandler($context);
-        self::implementGzhandlerFlush($context);
+        self::ensureServerReadHelpers($context);
+        self::ensureJitHelperCompiled($context);
+        self::implementObGzhandlerBridge($context);
+        self::implementGzhandlerFlushBridge($context);
         self::implementObStartWithGzhandler($context);
-
         self::registerLinkedRuntime($context);
+        $context->builder->clearInsertionPosition();
     }
 
     public static function handlerElemPtr(Context $context, Value $idx): Value
@@ -97,50 +98,138 @@ final class ObGzhandlerJitRuntime
         );
     }
 
-    private static function implementObGzhandler(Context $context): void
+    private static function implementObGzhandlerBridge(Context $context): void
     {
-        $i64 = $context->getTypeFromString('int64');
+        $abiName = '__compiler_ob_gzhandler';
+        $probe = $context->module->getNamedFunction($abiName);
+        if (null !== $probe && $probe->countBasicBlocks() > 0) {
+            $context->registerFunction($abiName, $probe);
+
+            return;
+        }
+
         $strPtr = $context->getTypeFromString('__string__*');
-        $fn = self::fn($context, '__compiler_ob_gzhandler', $strPtr, false, $strPtr, $i64);
-        $entry = $fn->appendBasicBlock('ogz_entry');
+        $i64 = $context->getTypeFromString('int64');
+        $ft = $context->context->functionType($strPtr, false, $strPtr, $i64);
+        $fn = null !== $probe
+            ? $probe
+            : $context->module->addFunction($abiName, $ft);
+
+        $entry = $fn->appendBasicBlock('ogz_bridge_entry');
         $context->builder->positionAtEnd($entry);
-        self::emitHandleBody($context, $fn, $fn->getParam(0), $fn->getParam(1));
-        $context->builder->clearInsertionPosition();
+        $accept = self::emitReadAcceptEncodingString($context, $fn);
+        $encoding = $context->builder->call(
+            self::helperFunction($context, self::RESOLVE_ENCODING_HELPER),
+            $accept
+        );
+        $result = $context->builder->call(
+            self::helperFunction($context, self::HANDLE_HELPER),
+            $fn->getParam(0),
+            $fn->getParam(1),
+            $encoding
+        );
+        $context->builder->returnValue($result);
+        $context->registerFunction($abiName, $fn);
     }
 
-    private static function implementGzhandlerFlush(Context $context): void
+    private static function implementGzhandlerFlushBridge(Context $context): void
+    {
+        $abiName = '__phpc_ob_gzhandler_flush';
+        $probe = $context->module->getNamedFunction($abiName);
+        if (null !== $probe && $probe->countBasicBlocks() > 0) {
+            $context->registerFunction($abiName, $probe);
+
+            return;
+        }
+
+        $strPtr = $context->getTypeFromString('__string__*');
+        $ft = $context->context->functionType($strPtr, false, $strPtr);
+        $fn = null !== $probe
+            ? $probe
+            : $context->module->addFunction($abiName, $ft);
+
+        $entry = $fn->appendBasicBlock('ogf_bridge_entry');
+        $context->builder->positionAtEnd($entry);
+        $accept = self::emitReadAcceptEncodingString($context, $fn);
+        $encoding = $context->builder->call(
+            self::helperFunction($context, self::RESOLVE_ENCODING_HELPER),
+            $accept
+        );
+        $result = $context->builder->call(
+            self::helperFunction($context, self::FLUSH_HELPER),
+            $fn->getParam(0),
+            $encoding
+        );
+        $context->builder->returnValue($result);
+        $context->registerFunction($abiName, $fn);
+    }
+
+    private static function emitReadAcceptEncodingString(Context $context, LlvmFunction $fn): Value
     {
         $i64 = $context->getTypeFromString('int64');
+        $i8p = $context->getTypeFromString('int8*');
+        $htPtr = $context->getTypeFromString('__hashtable__*');
         $strPtr = $context->getTypeFromString('__string__*');
-        $fn = self::fn($context, '__phpc_ob_gzhandler_flush', $strPtr, false, $strPtr);
-        $entry = $fn->appendBasicBlock('ogf_entry');
-        $context->builder->positionAtEnd($entry);
-        $content = $fn->getParam(0);
+        $valPtr = $context->getTypeFromString('__value__*');
         $empty = self::emptyString($context);
-        $context->builder->call(
-            $context->lookupFunction('__compiler_ob_gzhandler'),
-            $empty,
-            $i64->constInt(self::PHP_OUTPUT_HANDLER_START, false)
+
+        $serverGlobal = $context->module->getNamedGlobal('sg_SERVER');
+        if (null === $serverGlobal) {
+            return $empty;
+        }
+        $serverHt = $context->builder->load($serverGlobal);
+        $noServer = $context->builder->icmp(Builder::INT_EQ, $serverHt, $htPtr->constNull());
+        $doneBb = $fn->appendBasicBlock('ogz_ae_done_'.++self::$blockSuffix);
+        $noServerBb = $fn->appendBasicBlock('ogz_ae_noserver_'.self::$blockSuffix);
+        $readBb = $fn->appendBasicBlock('ogz_ae_read_'.self::$blockSuffix);
+        $context->builder->branchIf($noServer, $noServerBb, $readBb);
+        $context->builder->positionAtEnd($noServerBb);
+        $context->builder->branch($doneBb);
+        $context->builder->positionAtEnd($readBb);
+        $keyStr = $context->builder->call(
+            $context->lookupFunction('__string__init'),
+            $i64->constInt(21, false),
+            $context->builder->pointerCast($context->constantFromString('HTTP_ACCEPT_ENCODING'), $i8p)
         );
-        $processed = $context->builder->call(
-            $context->lookupFunction('__compiler_ob_gzhandler'),
-            $content,
-            $i64->constInt(self::PHP_OUTPUT_HANDLER_END, false)
+        $valPtrVar = $context->builder->call(
+            $context->lookupFunction('__hashtable__peekStringKeyValue'),
+            $serverHt,
+            $keyStr
         );
-        $hasProcessed = $context->builder->icmp(Builder::INT_NE, $processed, $empty);
-        $useProcessed = $fn->appendBasicBlock('ogf_use_'.++self::$blockSuffix);
-        $useRaw = $fn->appendBasicBlock('ogf_raw_'.self::$blockSuffix);
-        $context->builder->branchIf($hasProcessed, $useProcessed, $useRaw);
-        $context->builder->positionAtEnd($useProcessed);
-        $context->builder->returnValue($processed);
-        $context->builder->positionAtEnd($useRaw);
-        $context->builder->returnValue($content);
-        $context->builder->clearInsertionPosition();
+        $noVal = $context->builder->icmp(Builder::INT_EQ, $valPtrVar, $valPtr->constNull());
+        $noValBb = $fn->appendBasicBlock('ogz_ae_noval_'.self::$blockSuffix);
+        $hasValBb = $fn->appendBasicBlock('ogz_ae_hasval_'.self::$blockSuffix);
+        $context->builder->branchIf($noVal, $noValBb, $hasValBb);
+        $context->builder->positionAtEnd($noValBb);
+        $context->builder->branch($doneBb);
+        $context->builder->positionAtEnd($hasValBb);
+        $acceptStr = $context->builder->call($context->lookupFunction('__value__readString'), $valPtrVar);
+        $context->builder->branch($doneBb);
+        $context->builder->positionAtEnd($doneBb);
+        $phi = $context->builder->phi($strPtr, 'ogz_accept');
+        $phi->addIncoming($empty, $noServerBb);
+        $phi->addIncoming($empty, $noValBb);
+        $phi->addIncoming($acceptStr, $hasValBb);
+
+        return $phi;
     }
 
     private static function implementObStartWithGzhandler(Context $context): void
     {
-        $fn = self::fn($context, '__phpc_ob_start_with_gzhandler', $context->context->voidType(), false);
+        $abiName = '__phpc_ob_start_with_gzhandler';
+        $probe = $context->module->getNamedFunction($abiName);
+        if (null !== $probe && $probe->countBasicBlocks() > 0) {
+            $context->registerFunction($abiName, $probe);
+
+            return;
+        }
+
+        $voidTy = $context->context->voidType();
+        $ft = $context->context->functionType($voidTy, false);
+        $fn = null !== $probe
+            ? $probe
+            : $context->module->addFunction($abiName, $ft);
+
         $entry = $fn->appendBasicBlock('osg_entry');
         $skip = $fn->appendBasicBlock('osg_skip');
         $work = $fn->appendBasicBlock('osg_work');
@@ -168,194 +257,7 @@ final class ObGzhandlerJitRuntime
         $context->builder->returnVoid();
         $context->builder->positionAtEnd($skip);
         $context->builder->returnVoid();
-        $context->builder->clearInsertionPosition();
-    }
-
-    private static function emitHandleBody(Context $context, LlvmFunction $fn, Value $data, Value $mode): void
-    {
-        $strPtr = $context->getTypeFromString('__string__*');
-        $i64 = $context->getTypeFromString('int64');
-        $encoding = self::emitResolveEncoding($context, $fn);
-        $noEnc = $fn->appendBasicBlock('ogz_noenc_'.++self::$blockSuffix);
-        $hasEnc = $fn->appendBasicBlock('ogz_hasenc_'.self::$blockSuffix);
-        $isZero = $context->builder->icmp(Builder::INT_EQ, $encoding, $i64->constInt(0, false));
-        $context->builder->branchIf($isZero, $noEnc, $hasEnc);
-        $context->builder->positionAtEnd($noEnc);
-        self::emitPassthroughBody($context, $fn, $data, $mode);
-        $context->builder->positionAtEnd($hasEnc);
-        $startBit = $context->builder->and($mode, $i64->constInt(self::PHP_OUTPUT_HANDLER_START, false));
-        $isStart = $context->builder->icmp(Builder::INT_NE, $startBit, $i64->constInt(0, false));
-        $endBit = $context->builder->or(
-            $context->builder->and($mode, $i64->constInt(self::PHP_OUTPUT_HANDLER_END, false)),
-            $context->builder->and($mode, $i64->constInt(self::PHP_OUTPUT_HANDLER_FINAL, false))
-        );
-        $isEnd = $context->builder->icmp(Builder::INT_NE, $endBit, $i64->constInt(0, false));
-        $startBb = $fn->appendBasicBlock('ogz_start_'.self::$blockSuffix);
-        $endBb = $fn->appendBasicBlock('ogz_end_'.self::$blockSuffix);
-        $contBb = $fn->appendBasicBlock('ogz_cont_'.self::$blockSuffix);
-        $context->builder->branchIf($isStart, $startBb, $endBb);
-        $context->builder->positionAtEnd($startBb);
-        $context->builder->returnValue(self::emptyString($context));
-        $context->builder->positionAtEnd($endBb);
-        $endWork = $fn->appendBasicBlock('ogz_endwork_'.self::$blockSuffix);
-        $context->builder->branchIf($isEnd, $endWork, $contBb);
-        $context->builder->positionAtEnd($endWork);
-        $emptyData = $context->builder->icmp(Builder::INT_EQ, $data, $strPtr->constNull());
-        $endEmpty = $fn->appendBasicBlock('ogz_endempty_'.self::$blockSuffix);
-        $endGzip = $fn->appendBasicBlock('ogz_endgzip_'.self::$blockSuffix);
-        $context->builder->branchIf($emptyData, $endEmpty, $endGzip);
-        $context->builder->positionAtEnd($endEmpty);
-        $context->builder->returnValue(self::emptyString($context));
-        $context->builder->positionAtEnd($endGzip);
-        $compressed = $context->builder->call(
-            $context->lookupFunction('__compiler_gzencode'),
-            $data,
-            $i64->constInt(-1, true),
-            $encoding
-        );
-        $gzipFail = $context->builder->icmp(Builder::INT_EQ, $compressed, $strPtr->constNull());
-        $failBb = $fn->appendBasicBlock('ogz_gzfail_'.self::$blockSuffix);
-        $okBb = $fn->appendBasicBlock('ogz_gzok_'.self::$blockSuffix);
-        $context->builder->branchIf($gzipFail, $failBb, $okBb);
-        $context->builder->positionAtEnd($failBb);
-        $context->builder->returnValue($data);
-        $context->builder->positionAtEnd($okBb);
-        $context->builder->returnValue($compressed);
-        $context->builder->positionAtEnd($contBb);
-        $context->builder->returnValue(self::emptyString($context));
-    }
-
-    private static function emitPassthroughBody(Context $context, LlvmFunction $fn, Value $data, Value $mode): void
-    {
-        $i64 = $context->getTypeFromString('int64');
-        $startBit = $context->builder->and($mode, $i64->constInt(self::PHP_OUTPUT_HANDLER_START, false));
-        $isStart = $context->builder->icmp(Builder::INT_NE, $startBit, $i64->constInt(0, false));
-        $endBit = $context->builder->or(
-            $context->builder->and($mode, $i64->constInt(self::PHP_OUTPUT_HANDLER_END, false)),
-            $context->builder->and($mode, $i64->constInt(self::PHP_OUTPUT_HANDLER_FINAL, false))
-        );
-        $isEnd = $context->builder->icmp(Builder::INT_NE, $endBit, $i64->constInt(0, false));
-        $startBb = $fn->appendBasicBlock('ogz_ptstart_'.++self::$blockSuffix);
-        $endBb = $fn->appendBasicBlock('ogz_ptend_'.self::$blockSuffix);
-        $contBb = $fn->appendBasicBlock('ogz_ptcont_'.self::$blockSuffix);
-        $context->builder->branchIf($isStart, $startBb, $endBb);
-        $context->builder->positionAtEnd($startBb);
-        $context->builder->returnValue(self::emptyString($context));
-        $context->builder->positionAtEnd($endBb);
-        $endRet = $fn->appendBasicBlock('ogz_ptendret_'.self::$blockSuffix);
-        $context->builder->branchIf($isEnd, $endRet, $contBb);
-        $context->builder->positionAtEnd($endRet);
-        $context->builder->returnValue($data);
-        $context->builder->positionAtEnd($contBb);
-        $context->builder->returnValue(self::emptyString($context));
-    }
-
-    private static function emitResolveEncoding(Context $context, LlvmFunction $fn): Value
-    {
-        $i64 = $context->getTypeFromString('int64');
-        $encGlobal = $context->module->getNamedGlobal(self::GLOBAL_ENCODING);
-        $encPtr = $context->builder->pointerCast($encGlobal, $i64->pointerType(0));
-        $cached = $context->builder->load($encPtr);
-        $cachedBb = $fn->appendBasicBlock('ogz_cached_'.++self::$blockSuffix);
-        $resolveBb = $fn->appendBasicBlock('ogz_resolve_'.self::$blockSuffix);
-        $doneBb = $fn->appendBasicBlock('ogz_encdone_'.self::$blockSuffix);
-        $hasCached = $context->builder->icmp(Builder::INT_NE, $cached, $i64->constInt(0, false));
-        $context->builder->branchIf($hasCached, $cachedBb, $resolveBb);
-        $context->builder->positionAtEnd($cachedBb);
-        $context->builder->branch($doneBb);
-        $context->builder->positionAtEnd($resolveBb);
-        $resolved = self::emitReadAcceptEncoding($context, $fn);
-        $resolveDoneBb = $context->builder->getInsertBlock();
-        $context->builder->store($resolved, $encPtr);
-        $context->builder->branch($doneBb);
-        $context->builder->positionAtEnd($doneBb);
-        $phi = $context->builder->phi($i64, 'ogz_enc');
-        $phi->addIncoming($cached, $cachedBb);
-        $phi->addIncoming($resolved, $resolveDoneBb);
-
-        return $phi;
-    }
-
-    private static function emitReadAcceptEncoding(Context $context, LlvmFunction $fn): Value
-    {
-        $i64 = $context->getTypeFromString('int64');
-        $i8p = $context->getTypeFromString('int8*');
-        $htPtr = $context->getTypeFromString('__hashtable__*');
-        $zero = $i64->constInt(0, false);
-        $serverGlobal = $context->module->getNamedGlobal('sg_SERVER');
-        if (null === $serverGlobal) {
-            return $zero;
-        }
-        $serverHt = $context->builder->load($serverGlobal);
-        $noServer = $context->builder->icmp(Builder::INT_EQ, $serverHt, $htPtr->constNull());
-        $doneBb = $fn->appendBasicBlock('ogz_ae_done_'.++self::$blockSuffix);
-        $noServerBb = $fn->appendBasicBlock('ogz_ae_noserver_'.self::$blockSuffix);
-        $readBb = $fn->appendBasicBlock('ogz_ae_read_'.self::$blockSuffix);
-        $context->builder->branchIf($noServer, $noServerBb, $readBb);
-        $context->builder->positionAtEnd($noServerBb);
-        $context->builder->branch($doneBb);
-        $context->builder->positionAtEnd($readBb);
-        $keyStr = $context->builder->call(
-            $context->lookupFunction('__string__init'),
-            $i64->constInt(21, false),
-            $context->builder->pointerCast($context->constantFromString('HTTP_ACCEPT_ENCODING'), $i8p)
-        );
-        $valPtr = $context->builder->call(
-            $context->lookupFunction('__hashtable__peekStringKeyValue'),
-            $serverHt,
-            $keyStr
-        );
-        $valPtrTy = $context->getTypeFromString('__value__*');
-        $noVal = $context->builder->icmp(Builder::INT_EQ, $valPtr, $valPtrTy->constNull());
-        $noValBb = $fn->appendBasicBlock('ogz_ae_noval_'.self::$blockSuffix);
-        $hasValBb = $fn->appendBasicBlock('ogz_ae_hasval_'.self::$blockSuffix);
-        $context->builder->branchIf($noVal, $noValBb, $hasValBb);
-        $context->builder->positionAtEnd($noValBb);
-        $context->builder->branch($doneBb);
-        $context->builder->positionAtEnd($hasValBb);
-        $acceptStr = $context->builder->call($context->lookupFunction('__value__readString'), $valPtr);
-        $gzipBb = $fn->appendBasicBlock('ogz_ae_gzip_'.self::$blockSuffix);
-        $deflateBb = $fn->appendBasicBlock('ogz_ae_deflate_'.self::$blockSuffix);
-        $noneBb = $fn->appendBasicBlock('ogz_ae_none_'.self::$blockSuffix);
-        $hasGzip = $context->builder->icmp(
-            Builder::INT_NE,
-            $context->builder->call(
-                $context->lookupFunction('strstr'),
-                $context->builder->pointerCast($acceptStr, $i8p),
-                $context->builder->pointerCast($context->constantFromString('gzip'), $i8p)
-            ),
-            $i8p->constNull()
-        );
-        $context->builder->branchIf($hasGzip, $gzipBb, $deflateBb);
-        $context->builder->positionAtEnd($gzipBb);
-        $gzipEnc = $i64->constInt(self::ZLIB_ENCODING_GZIP, false);
-        $context->builder->branch($doneBb);
-        $context->builder->positionAtEnd($deflateBb);
-        $hasDeflate = $context->builder->icmp(
-            Builder::INT_NE,
-            $context->builder->call(
-                $context->lookupFunction('strstr'),
-                $context->builder->pointerCast($acceptStr, $i8p),
-                $context->builder->pointerCast($context->constantFromString('deflate'), $i8p)
-            ),
-            $i8p->constNull()
-        );
-        $deflateRet = $fn->appendBasicBlock('ogz_ae_deflateret_'.self::$blockSuffix);
-        $context->builder->branchIf($hasDeflate, $deflateRet, $noneBb);
-        $context->builder->positionAtEnd($deflateRet);
-        $deflateEnc = $i64->constInt(self::ZLIB_ENCODING_DEFLATE, false);
-        $context->builder->branch($doneBb);
-        $context->builder->positionAtEnd($noneBb);
-        $context->builder->branch($doneBb);
-        $context->builder->positionAtEnd($doneBb);
-        $phi = $context->builder->phi($i64, 'ogz_ae');
-        $phi->addIncoming($zero, $noServerBb);
-        $phi->addIncoming($zero, $noValBb);
-        $phi->addIncoming($gzipEnc, $gzipBb);
-        $phi->addIncoming($deflateEnc, $deflateRet);
-        $phi->addIncoming($zero, $noneBb);
-
-        return $phi;
+        $context->registerFunction($abiName, $fn);
     }
 
     private static function emptyString(Context $context): Value
@@ -404,13 +306,8 @@ final class ObGzhandlerJitRuntime
     {
         ObStorageGlobals::ensureGlobals($context);
         $i32 = $context->getTypeFromString('int32');
-        $i64 = $context->getTypeFromString('int64');
         $depth = ObStackLimits::MAX_DEPTH;
-
-        if (null === $context->module->getNamedGlobal(self::GLOBAL_ENCODING)) {
-            $enc = $context->module->addGlobal($i64, self::GLOBAL_ENCODING);
-            $enc->setInitializer($i64->constInt(0, false));
-        }
+        $htPtr = $context->getTypeFromString('__hashtable__*');
 
         if (null === $context->module->getNamedGlobal(self::GLOBAL_HANDLER)) {
             $handlerTy = $i32->arrayType($depth);
@@ -418,28 +315,20 @@ final class ObGzhandlerJitRuntime
             $handler->setInitializer($handlerTy->constNull());
         }
 
-        $htPtr = $context->getTypeFromString('__hashtable__*');
         if (null === $context->module->getNamedGlobal('sg_SERVER')) {
             $server = $context->module->addGlobal($htPtr, 'sg_SERVER');
             $server->setInitializer($htPtr->constNull());
         }
     }
 
-    private static function ensureLibc(Context $context): void
-    {
-        $i8p = $context->getTypeFromString('int8*');
-        self::ensureExternal(
-            $context,
-            'strstr',
-            $context->context->functionType($i8p, false, $i8p, $i8p)
-        );
-    }
-
-    private static function ensureHashtableHelpers(Context $context): void
+    private static function ensureServerReadHelpers(Context $context): void
     {
         $htPtr = $context->getTypeFromString('__hashtable__*');
         $strPtr = $context->getTypeFromString('__string__*');
         $valPtr = $context->getTypeFromString('__value__*');
+        $i64 = $context->getTypeFromString('int64');
+        $i8p = $context->getTypeFromString('int8*');
+
         self::ensureExternal(
             $context,
             '__hashtable__peekStringKeyValue',
@@ -450,31 +339,11 @@ final class ObGzhandlerJitRuntime
             '__value__readString',
             $context->context->functionType($strPtr, false, $valPtr)
         );
-    }
-
-    private static function ensureStringHelpers(Context $context): void
-    {
-        $i64 = $context->getTypeFromString('int64');
-        $i8p = $context->getTypeFromString('int8*');
-        $strPtr = $context->getTypeFromString('__string__*');
         self::ensureExternal(
             $context,
             '__string__init',
             $context->context->functionType($strPtr, false, $i64, $i8p)
         );
-    }
-
-    private static function fn(Context $context, string $name, $ret, bool $vararg, ...$params): LlvmFunction
-    {
-        $probe = $context->module->getNamedFunction($name);
-        if (null !== $probe) {
-            return $probe;
-        }
-        $ft = $context->context->functionType($ret, $vararg, ...$params);
-        $fn = $context->module->addFunction($name, $ft);
-        $context->registerFunction($name, $fn);
-
-        return $fn;
     }
 
     private static function ensureExternal(Context $context, string $name, $ft): void
@@ -487,12 +356,70 @@ final class ObGzhandlerJitRuntime
         }
     }
 
+    private static function helperFunction(Context $context, string $logical): LlvmFunction
+    {
+        self::ensureJitHelperCompiled($context);
+        $lc = \strtolower($logical);
+        $fn = $context->functions[$lc] ?? null;
+        if (null === $fn) {
+            throw new \LogicException($logical.' missing after ObGzhandlerJitHelper compile (#9091)');
+        }
+
+        return $fn;
+    }
+
+    private static function ensureJitHelperCompiled(Context $context): void
+    {
+        $missing = false;
+        foreach (self::COMPILED_HELPERS as $logical) {
+            if (!isset($context->functions[\strtolower($logical)])) {
+                $missing = true;
+                break;
+            }
+        }
+        if (!$missing) {
+            return;
+        }
+
+        CallArgv::implement($context);
+        StringZlib::ensureLinked($context);
+
+        $runtime = $context->runtime;
+        $path = \dirname(__DIR__, 3).self::HELPER_PATH;
+        $prevSelfHostAot = \getenv('PHP_COMPILER_SELFHOST_AOT');
+        if (\function_exists('putenv')) {
+            \putenv('PHP_COMPILER_SELFHOST_AOT=0');
+        }
+        try {
+            $block = $runtime->parseAndCompile((string) \file_get_contents($path), 'ObGzhandlerJitHelper.php');
+            if (null === $block) {
+                throw new \LogicException('ObGzhandlerJitHelper.php parseAndCompile failed (#9091)');
+            }
+            $jit = new JIT($context);
+            $jit->compile($block);
+        } finally {
+            if (\function_exists('putenv')) {
+                if (false === $prevSelfHostAot || null === $prevSelfHostAot) {
+                    \putenv('PHP_COMPILER_SELFHOST_AOT=');
+                } else {
+                    \putenv('PHP_COMPILER_SELFHOST_AOT='.$prevSelfHostAot);
+                }
+            }
+        }
+        foreach (self::COMPILED_HELPERS as $logical) {
+            $lc = \strtolower($logical);
+            if (!isset($context->functions[$lc])) {
+                throw new \LogicException($lc.' was not compiled for JIT (#9091)');
+            }
+        }
+    }
+
     private static function registerLinkedRuntime(Context $context): void
     {
         foreach (self::RUNTIME_FUNCTIONS as $name) {
             $fn = $context->module->getNamedFunction($name);
             if (null === $fn || 0 === $fn->countBasicBlocks()) {
-                throw new \LogicException($name.' missing after ObGzhandlerJitRuntime LLVM implement');
+                throw new \LogicException($name.' missing after ObGzhandlerJitRuntime bridge (#9091)');
             }
             $context->registerFunction($name, $fn);
         }
