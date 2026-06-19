@@ -4507,6 +4507,15 @@ class Compiler {
                     return $block->registerConstant(new Operand\Temporary(), $vm);
                 }
             }
+            $vm = $this->tryFoldClassConstMatchValueBlock(
+                $terminal->valueBlock,
+                $terminal->value,
+                $block,
+                $children
+            );
+            if (null !== $vm) {
+                return $block->registerConstant(new Operand\Temporary(), $vm);
+            }
         }
         $vm = $this->vmVariableFromCfgLiteralOperand($terminal->value);
         if (null === $vm) {
@@ -4514,6 +4523,166 @@ class Compiler {
         }
 
         return $block->registerConstant(new Operand\Temporary(), $vm);
+    }
+
+    /**
+     * Fold lowered match() in class constant initializers (#9987, zend_const_expr_to_zval).
+     *
+     * @param list<Op> $defaultBlockChildren
+     */
+    protected function tryFoldClassConstMatchValueBlock(
+        CfgBlock $entry,
+        Operand $result,
+        Block $block,
+        array $defaultBlockChildren
+    ): ?Variable {
+        $subject = $this->extractClassConstMatchSubject($entry, $result, $block, $defaultBlockChildren);
+        if (null === $subject) {
+            return null;
+        }
+
+        return $this->evaluateClassConstMatchCfgBlock(
+            $entry,
+            $subject,
+            $result,
+            $block,
+            $defaultBlockChildren,
+            0
+        );
+    }
+
+    private function extractClassConstMatchSubject(
+        CfgBlock $entry,
+        Operand $result,
+        Block $block,
+        array $defaultBlockChildren
+    ): ?Variable {
+        $start = 0;
+        if (isset($entry->children[0]) && $this->isMatchSeedAssign($entry->children[0], $result)) {
+            $start = 1;
+        }
+        $count = \count($entry->children);
+        for ($i = $start; $i < $count; ++$i) {
+            $child = $entry->children[$i];
+            if (!$child instanceof Op\Expr\BinaryOp\Identical) {
+                continue;
+            }
+
+            return $this->tryFoldCompileTimeOperandDefault(
+                $child->left,
+                $block,
+                $defaultBlockChildren,
+                true
+            );
+        }
+
+        return null;
+    }
+
+    /**
+     * @param list<Op> $defaultBlockChildren
+     */
+    private function evaluateClassConstMatchCfgBlock(
+        CfgBlock $cfgBlock,
+        Variable $subject,
+        Operand $result,
+        Block $block,
+        array $defaultBlockChildren,
+        int $startIndex
+    ): ?Variable {
+        $children = $cfgBlock->children;
+        if (0 === $startIndex && isset($children[0]) && $this->isMatchSeedAssign($children[0], $result)) {
+            $startIndex = 1;
+        }
+        $count = \count($children);
+        for ($i = $startIndex; $i < $count; ++$i) {
+            $child = $children[$i];
+            if (
+                $child instanceof Op\Expr\BinaryOp\Identical
+                && isset($children[$i + 1])
+                && $children[$i + 1] instanceof Op\Stmt\JumpIf
+            ) {
+                $jumpIf = $children[$i + 1];
+                $pattern = $this->tryFoldCompileTimeOperandDefault(
+                    $child->right,
+                    $block,
+                    $defaultBlockChildren,
+                    true
+                );
+                if (null === $pattern) {
+                    return null;
+                }
+                if ($subject->identicalTo($pattern)) {
+                    return $this->evaluateClassConstMatchArmBlock(
+                        $jumpIf->if,
+                        $result,
+                        $block,
+                        $defaultBlockChildren
+                    );
+                }
+
+                return $this->evaluateClassConstMatchCfgBlock(
+                    $jumpIf->else,
+                    $subject,
+                    $result,
+                    $block,
+                    $defaultBlockChildren,
+                    0
+                );
+            }
+            if ($child instanceof Op\Terminal\Throw_) {
+                return null;
+            }
+            if ($child instanceof Op\Expr\Assign && $this->operandsReferToSameVariable($child->var, $result)) {
+                return $this->tryFoldCompileTimeOperandDefault(
+                    $child->expr,
+                    $block,
+                    $defaultBlockChildren,
+                    true
+                );
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * @param list<Op> $defaultBlockChildren
+     */
+    private function evaluateClassConstMatchArmBlock(
+        CfgBlock $armBlock,
+        Operand $result,
+        Block $block,
+        array $defaultBlockChildren
+    ): ?Variable {
+        foreach ($armBlock->children as $child) {
+            if ($child instanceof Op\Terminal\Throw_) {
+                return null;
+            }
+            if ($child instanceof Op\Expr\Assign && $this->operandsReferToSameVariable($child->var, $result)) {
+                return $this->tryFoldCompileTimeOperandDefault(
+                    $child->expr,
+                    $block,
+                    $defaultBlockChildren,
+                    true
+                );
+            }
+        }
+
+        return null;
+    }
+
+    private function isMatchSeedAssign(Op $op, Operand $result): bool
+    {
+        if (!$op instanceof Op\Expr\Assign) {
+            return false;
+        }
+        if (!$this->operandsReferToSameVariable($op->var, $result)) {
+            return false;
+        }
+        $lit = $this->vmVariableFromCfgLiteralOperand($op->expr);
+
+        return null !== $lit && Variable::TYPE_STRING === $lit->type && '' === $lit->toString();
     }
 
     /**
