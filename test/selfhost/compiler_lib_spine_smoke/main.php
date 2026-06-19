@@ -1905,7 +1905,6 @@ require_once __DIR__.'/../../../lib/JIT/Builtin/ExecutionLimitsRuntime.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/FilterInputTypeJit.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/FunctionExistsRuntime.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/GcCollectCyclesCollectRuntime.php';
-require_once __DIR__.'/../../../lib/JIT/Builtin/GcCollectCyclesNative.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/GcCollectCyclesRuntime.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/GcStatusRuntime.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/GethostbyaddrRuntime.php';

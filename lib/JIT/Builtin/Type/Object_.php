@@ -257,7 +257,6 @@ class Object_ extends Type {
         if (!$this->hasUserDestructors()) {
             return;
         }
-        \PHPCompiler\JIT\Builtin\GcCollectCyclesNative::registerDeclarations($this->context);
         \PHPCompiler\JIT\Builtin\GcCollectCyclesRuntime::ensureLinked($this->context);
         $this->context->builder->call(
             $this->context->lookupFunction('phpc_gc_run_shutdown_destructors')
@@ -631,7 +630,6 @@ class Object_ extends Type {
             $savedInsert = $this->context->builder->getInsertBlock();
         } catch (\Throwable) {
         }
-        \PHPCompiler\JIT\Builtin\GcCollectCyclesNative::registerDeclarations($this->context);
         \PHPCompiler\JIT\Builtin\GcCollectCyclesRuntime::ensureLinked($this->context);
         if (null !== $savedInsert) {
             $this->context->builder->positionAtEnd($savedInsert);
@@ -1831,7 +1829,6 @@ class Object_ extends Type {
                 Variable::TYPE_VALUE
             );
         }
-        \PHPCompiler\JIT\Builtin\GcCollectCyclesNative::registerDeclarations($this->context);
         \PHPCompiler\JIT\Builtin\GcCollectCyclesRuntime::ensureLinked($this->context);
         $this->context->builder->call(
             $this->context->lookupFunction('phpc_gc_register'),
