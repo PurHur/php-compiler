@@ -28,6 +28,17 @@ final class EmptyObjectPropertyHelper
         ?Operand $containerOp
     ): Value {
         $propName = self::literalStringKey($dimOp);
+        if (null !== $propName) {
+            $enumEmpty = self::tryCompileEnumCasePropertyEmpty(
+                $context,
+                $container,
+                $containerOp,
+                $propName
+            );
+            if (null !== $enumEmpty) {
+                return $enumEmpty;
+            }
+        }
         if (
             null !== $propName
             && Variable::TYPE_OBJECT === $container->type
@@ -100,6 +111,71 @@ final class EmptyObjectPropertyHelper
             $context->constantFromBool(true),
             $valueEmpty
         );
+    }
+
+    /**
+     * empty($enumCase->name) / empty($enumCase->value) — fetch magic read then falsy test (#9890).
+     */
+    private static function tryCompileEnumCasePropertyEmpty(
+        Context $context,
+        Variable $container,
+        ?Operand $containerOp,
+        string $propName
+    ): ?Value {
+        $object = $context->type->object;
+        if (!$object instanceof Object_) {
+            return null;
+        }
+        $nameLc = strtolower($propName);
+        if (Variable::TYPE_OBJECT === $container->type) {
+            $class = '';
+            if (null !== $containerOp && null !== $containerOp->type) {
+                $class = $containerOp->type->userType ?? '';
+            }
+            if ('' === $class) {
+                return null;
+            }
+            $classId = $object->lookup($class);
+            if (!$object->isEnumClassId($classId)) {
+                return null;
+            }
+            if ('name' !== $nameLc && ('value' !== $nameLc || !$object->enumHasBacking($classId))) {
+                return $context->constantFromBool(true);
+            }
+            $objPtr = Variable::KIND_VALUE === $container->kind
+                ? $container->value
+                : $context->builder->load($container->value);
+            $fetched = $object->propertyFetch($objPtr, $class, $propName);
+
+            return self::compileEmptyFromFetchedValue($context, $fetched);
+        }
+        if (Variable::TYPE_VALUE !== $container->type || Variable::KIND_VALUE !== $container->kind) {
+            return null;
+        }
+        $valuePtr = JitValueBox::valuePtrFromVariable($context, $container);
+        $map = $context->structFieldMap['__value__'];
+        if (null === $map || !isset($map['type'])) {
+            return null;
+        }
+        $typeByte = $context->builder->load(
+            $context->builder->structGep($valuePtr, $map['type'])
+        );
+        if (!method_exists($typeByte, 'isConstant') || !$typeByte->isConstant()) {
+            return null;
+        }
+        if ((int) $typeByte->getConstantValue() !== VmVariable::TYPE_ENUM_CASE) {
+            return null;
+        }
+        if ('name' !== $nameLc && 'value' !== $nameLc) {
+            return $context->constantFromBool(true);
+        }
+        $objPtr = $context->builder->call(
+            $context->lookupFunction('__value__readObject'),
+            $valuePtr
+        );
+        $fetched = $object->propertyFetch($objPtr, '', $propName);
+
+        return self::compileEmptyFromFetchedValue($context, $fetched);
     }
 
     private static function literalStringKey(?Operand $dimOp): ?string
