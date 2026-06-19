@@ -55,6 +55,12 @@ final class FiberState
      */
     public ?Variable $pendingSuspendReturnVar = null;
 
+    /** Get/set hook frame suspended by Fiber::suspend() — resume on next hooked read (#9862). */
+    public ?Frame $propertyHookSuspendFrame = null;
+
+    /** Completed hook read waiting for the fiber callback property fetch (#9862). */
+    public ?Variable $propertyHookResumeRead = null;
+
     public function __construct(
         public readonly ClosureState $callback,
         public readonly ObjectEntry $object,

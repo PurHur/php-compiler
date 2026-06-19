@@ -2016,15 +2016,41 @@ class VM {
 
     private function runFiberExecution(FiberState $fiber, Variable $returnSlot): Variable
     {
-        $child = $fiber->frame;
-        if (null === $child) {
-            throw new \LogicException('Fiber execution missing frame');
-        }
         $savedFiber = $this->context->currentFiber;
         $this->context->currentFiber = $fiber;
         $savedStack = $this->context->swapRunStack(null);
         try {
             $this->applyFiberPendingThrow($fiber);
+            if (null !== $fiber->propertyHookSuspendFrame) {
+                $hookFrame = $fiber->propertyHookSuspendFrame;
+                $fiber->propertyHookSuspendFrame = null;
+                $this->context->push($hookFrame);
+                try {
+                    $hookStatus = $this->runFrames();
+                } catch (VM\FiberUncaughtThrow $e) {
+                    $this->terminateFiberAfterThrow($fiber);
+                    throw $e;
+                } catch (\Throwable $e) {
+                    $this->terminateFiberAfterThrow($fiber);
+                    throw $e;
+                }
+                if (self::FIBER_SUSPEND === $hookStatus) {
+                    $fiber->propertyHookSuspendFrame = $hookFrame;
+                    $fiber->status = FiberState::STATUS_SUSPENDED;
+                    $out = new Variable();
+                    $out->copyFrom($fiber->suspendReturn);
+
+                    return $out;
+                }
+                if (self::SUCCESS !== $hookStatus) {
+                    throw new \LogicException('Property hook fiber resume failed in this compiler build');
+                }
+                if (null === $hookFrame->returnVar) {
+                    throw new \LogicException('Property hook fiber resume missing return slot');
+                }
+                $fiber->propertyHookResumeRead = new Variable();
+                $fiber->propertyHookResumeRead->copyFrom($hookFrame->returnVar->resolveIndirect());
+            }
             $child = $fiber->frame;
             if (null === $child) {
                 throw new \LogicException('Fiber execution missing frame after throw dispatch');
@@ -2033,18 +2059,10 @@ class VM {
             try {
                 $result = $this->runFrames();
             } catch (VM\FiberUncaughtThrow $e) {
-                $fiber->status = FiberState::STATUS_TERMINATED;
-                $fiber->frame = null;
-                $fiber->pendingSuspendReturnVar = null;
-                $fiber->hasReturnValue = false;
-                $fiber->threw = true;
+                $this->terminateFiberAfterThrow($fiber);
                 throw $e;
             } catch (\Throwable $e) {
-                $fiber->status = FiberState::STATUS_TERMINATED;
-                $fiber->frame = null;
-                $fiber->pendingSuspendReturnVar = null;
-                $fiber->hasReturnValue = false;
-                $fiber->threw = true;
+                $this->terminateFiberAfterThrow($fiber);
                 throw $e;
             }
         } finally {
@@ -2072,6 +2090,17 @@ class VM {
         }
 
         throw new \LogicException('Fiber execution failed in this compiler build');
+    }
+
+    private function terminateFiberAfterThrow(FiberState $fiber): void
+    {
+        $fiber->status = FiberState::STATUS_TERMINATED;
+        $fiber->frame = null;
+        $fiber->pendingSuspendReturnVar = null;
+        $fiber->propertyHookSuspendFrame = null;
+        $fiber->propertyHookResumeRead = null;
+        $fiber->hasReturnValue = false;
+        $fiber->threw = true;
     }
 
     private function findFiberState(Frame $frame): ?FiberState
@@ -5091,6 +5120,12 @@ restart:
                     break;
                 case OpCode::TYPE_PROPERTY_FETCH:
                     $result = $frame->scope[$op->arg1];
+                    $fiber = $this->context->currentFiber;
+                    if (null !== $fiber?->propertyHookResumeRead) {
+                        $result->copyFrom($fiber->propertyHookResumeRead->resolveIndirect());
+                        $fiber->propertyHookResumeRead = null;
+                        break;
+                    }
                     $catchFrame = $this->guardUnboundThisRead($frame, (int) $op->arg2);
                     if (null !== $catchFrame) {
                         $frame = $catchFrame;
@@ -6191,6 +6226,18 @@ restart:
             } catch (VM\PropertyHookRefWriteSignal $signal) {
                 $frame = $signal->catchFrame;
                 goto restart;
+            } catch (VM\PropertyHookFiberSuspendSignal $signal) {
+                $fiber = $this->context->currentFiber;
+                if (null !== $fiber) {
+                    $fiber->propertyHookSuspendFrame = $fiber->frame;
+                    $fiber->frame = $signal->resumeFrame;
+                }
+                // pos is pre-incremented at loop head; re-run the property fetch on resume (#9862).
+                if ($signal->resumeFrame->pos > 0) {
+                    --$signal->resumeFrame->pos;
+                }
+
+                return self::FIBER_SUSPEND;
             } catch (VM\ArrayAccessOffsetSignal $signal) {
                 $frame = $signal->catchFrame;
                 goto restart;
@@ -8434,7 +8481,10 @@ restart:
         Frame $parentFrame,
         Variable ...$args
     ): Variable {
-        $savedStack = $this->context->swapRunStack(null);
+        // Keep hook frames on the fiber run stack so Fiber::suspend() can resume (#9862).
+        $savedStack = null !== $this->context->currentFiber
+            ? null
+            : $this->context->swapRunStack(null);
         $savedExternalCatch = $this->context->propertyHookExternalCatchFrame;
         $this->context->propertyHookExternalCatchFrame = null;
         try {
@@ -8449,6 +8499,9 @@ restart:
             if (null !== $this->context->propertyHookExternalCatchFrame) {
                 throw new VM\PropertyHookRefWriteSignal($this->context->propertyHookExternalCatchFrame);
             }
+            if (self::FIBER_SUSPEND === $result) {
+                throw new VM\PropertyHookFiberSuspendSignal($parentFrame);
+            }
             if (self::SUCCESS !== $result) {
                 throw new \LogicException('Static property hook invocation failed in this compiler build');
             }
@@ -8456,7 +8509,9 @@ restart:
             return $out->resolveIndirect();
         } finally {
             $this->context->propertyHookExternalCatchFrame = $savedExternalCatch;
-            $this->context->swapRunStack($savedStack);
+            if (null !== $savedStack) {
+                $this->context->swapRunStack($savedStack);
+            }
         }
     }
 
@@ -8857,6 +8912,19 @@ restart:
 
     private function fetchPropertyWithHooks(ObjectEntry $object, string $name, Frame $frame): ?Variable
     {
+        $fiber = $this->context->currentFiber;
+        if (null !== $fiber?->propertyHookResumeRead) {
+            $result = new Variable();
+            $result->copyFrom($fiber->propertyHookResumeRead->resolveIndirect());
+            $fiber->propertyHookResumeRead = null;
+            $meta = $this->classPropertyMeta($object, $name);
+            $catchFrame = $this->enforcePropertyHookGetReturn($object, $name, $meta, $result, $frame);
+            if (null !== $catchFrame) {
+                throw new VM\PropertyHookRefWriteSignal($catchFrame);
+            }
+
+            return $result;
+        }
         if ($this->isPropertyHookRawWrite($frame, $name)) {
             return null;
         }
@@ -8884,7 +8952,10 @@ restart:
 
     private function invokePhpFunctionWithPropertyHookRaw(Func\PHP $func, string $rawProperty, Frame $parentFrame, Variable ...$args): Variable
     {
-        $savedStack = $this->context->swapRunStack(null);
+        // Keep hook frames on the fiber run stack so Fiber::suspend() can resume (#9862).
+        $savedStack = null !== $this->context->currentFiber
+            ? null
+            : $this->context->swapRunStack(null);
         $savedExternalCatch = $this->context->propertyHookExternalCatchFrame;
         $this->context->propertyHookExternalCatchFrame = null;
         try {
@@ -8908,6 +8979,9 @@ restart:
             if (null !== $this->context->propertyHookExternalCatchFrame) {
                 throw new VM\PropertyHookRefWriteSignal($this->context->propertyHookExternalCatchFrame);
             }
+            if (self::FIBER_SUSPEND === $result) {
+                throw new VM\PropertyHookFiberSuspendSignal($parentFrame);
+            }
             if (self::SUCCESS !== $result) {
                 throw new \LogicException('Property hook invocation failed in this compiler build');
             }
@@ -8915,7 +8989,9 @@ restart:
             return $out->resolveIndirect();
         } finally {
             $this->context->propertyHookExternalCatchFrame = $savedExternalCatch;
-            $this->context->swapRunStack($savedStack);
+            if (null !== $savedStack) {
+                $this->context->swapRunStack($savedStack);
+            }
         }
     }
 
