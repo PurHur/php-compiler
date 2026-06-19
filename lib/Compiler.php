@@ -5315,8 +5315,57 @@ class Compiler {
         if ($expr instanceof Op\Expr\PropertyFetch) {
             return $this->tryFoldEnumCasePropertyFetchDefault($expr, $block, $defaultBlockChildren);
         }
+        if ($expr instanceof Op\Expr\Cast) {
+            return $this->tryFoldCompileTimeCastDefault(
+                $expr,
+                $block,
+                $defaultBlockChildren,
+                $materializeEnumCase
+            );
+        }
 
         return null;
+    }
+
+    /**
+     * Fold compile-time scalar casts, including (string) NAN/INF (#10143, zend_operators.c).
+     *
+     * @param list<Op> $defaultBlockChildren
+     */
+    protected function tryFoldCompileTimeCastDefault(
+        Op\Expr\Cast $expr,
+        Block $block,
+        array $defaultBlockChildren = [],
+        bool $materializeEnumCase = false
+    ): ?Variable {
+        $operand = $this->tryFoldCompileTimeOperandDefault(
+            $expr->expr,
+            $block,
+            $defaultBlockChildren,
+            $materializeEnumCase
+        );
+        if (null === $operand) {
+            return null;
+        }
+        $castOpcode = $this->getOpCodeTypeFromCastOp($expr);
+        $targetType = match ($castOpcode) {
+            OpCode::TYPE_CAST_STRING => Variable::TYPE_STRING,
+            OpCode::TYPE_CAST_INT => Variable::TYPE_INTEGER,
+            OpCode::TYPE_CAST_FLOAT => Variable::TYPE_FLOAT,
+            OpCode::TYPE_CAST_BOOL => Variable::TYPE_BOOLEAN,
+            default => null,
+        };
+        if (null === $targetType) {
+            return null;
+        }
+        $result = new Variable();
+        try {
+            $result->castFrom($targetType, $operand);
+        } catch (\Throwable) {
+            return null;
+        }
+
+        return $result;
     }
 
     /**
@@ -5463,7 +5512,7 @@ class Compiler {
             if (!$child instanceof Op\Expr) {
                 continue;
             }
-            if (!property_exists($child, 'result') || $child->result !== $operand) {
+            if (!property_exists($child, 'result') || !$this->operandsReferToSameVariable($child->result, $operand)) {
                 continue;
             }
             $vm = $this->tryFoldCompileTimeExprDefault(
@@ -5543,6 +5592,18 @@ class Compiler {
             return $v;
         }
         $lc = strtolower($name);
+        if ('inf' === $lc) {
+            $v = new Variable(Variable::TYPE_FLOAT);
+            $v->float(INF);
+
+            return $v;
+        }
+        if ('nan' === $lc) {
+            $v = new Variable(Variable::TYPE_FLOAT);
+            $v->float(NAN);
+
+            return $v;
+        }
         if (isset($this->compileTimeGlobalConsts[$lc])) {
             $value = new Variable();
             $value->copyFrom($this->compileTimeGlobalConsts[$lc]);
@@ -10802,6 +10863,10 @@ class Compiler {
                             return $last;
                         }
                     }
+                    // Hoisted ConstFetch prelude before inline scalar cast (#10143, #9479).
+                    if ($last instanceof Op\Expr\Cast) {
+                        return $last;
+                    }
                 }
 
                 return null;
@@ -13764,6 +13829,17 @@ class Compiler {
                     return $block->registerConstant($arg, $vm);
                 }
             }
+            if ($producer instanceof Op\Expr\Cast) {
+                $vm = $this->tryFoldCompileTimeCastDefault(
+                    $producer,
+                    $block,
+                    $block->orig->children,
+                    true
+                );
+                if (null !== $vm) {
+                    return $block->registerConstant($arg, $vm);
+                }
+            }
             if ($producer instanceof Op\Expr\ClassConstFetch) {
                 $producerConst = $this->staticNameFromOperand($producer->name);
                 if (null !== $producerConst && 'class' !== strtolower($producerConst)) {
@@ -14157,6 +14233,10 @@ class Compiler {
             return $valueSlot;
         }
         if (null !== $calleeName && $name === $calleeName) {
+            return $valueSlot;
+        }
+        // php-cfg dead temps for hoisted scalar ConstFetch / Cast preludes (#9140, #10143).
+        if (\in_array(strtolower($name), ['true', 'false', 'null', 'nan', 'inf'], true)) {
             return $valueSlot;
         }
         $namedSlot = $block->slotIndexForVariableName($name);
