@@ -47,7 +47,7 @@ final class usort_ extends Internal
         $values = [];
         foreach ($ht->iterate(true) as $value) {
             $copy = new Variable();
-            $copy->copyFrom($value);
+            $copy->duplicateFrom($value);
             $values[] = $copy;
         }
         if (VmClosureCall::isClosure($callback)) {

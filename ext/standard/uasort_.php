@@ -48,9 +48,9 @@ final class uasort_ extends Internal
         $pairs = [];
         foreach ($ht->iterateKeyed(true) as [$key, $value]) {
             $keyCopy = new Variable();
-            $keyCopy->copyFrom($key);
+            $keyCopy->duplicateFrom($key);
             $valCopy = new Variable();
-            $valCopy->copyFrom($value);
+            $valCopy->duplicateFrom($value);
             $pairs[] = [$keyCopy, $valCopy];
         }
         if (VmClosureCall::isClosure($callback)) {

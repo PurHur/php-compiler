@@ -4631,6 +4631,12 @@ restart:
                             $value = $sent;
                         }
                     }
+                    $argIndex = \count($frame->callArgEntries);
+                    if (!$this->outgoingCallArgNeedsReference($frame, $argIndex)) {
+                        $snapshot = new Variable();
+                        $snapshot->duplicateFrom($value);
+                        $value = $snapshot;
+                    }
                     if (null !== $op->arg3) {
                         $frame->callArgEntries[] = ['u', $value];
                         break;
@@ -10801,6 +10807,44 @@ restart:
         }
 
         return $frame->scope[$slot];
+    }
+
+    /**
+     * Whether an outgoing call argument binds by reference (Zend ZEND_SEND_REF).
+     */
+    private function outgoingCallArgNeedsReference(Frame $frame, int $argIndex): bool
+    {
+        if (null === $frame->call) {
+            return false;
+        }
+        if ($frame->call instanceof Func\Internal) {
+            $name = $frame->call->getName();
+            if (\in_array($argIndex, BuiltinByRefParams::forFunction($name), true)) {
+                return true;
+            }
+            $variadicFrom = BuiltinByRefParams::variadicByRefFromIndex($name);
+
+            return null !== $variadicFrom && $argIndex >= $variadicFrom;
+        }
+        if ($frame->call instanceof Func\PHP) {
+            $block = $frame->call->block;
+            if ([] === $block->paramByRef) {
+                return false;
+            }
+            $thisArgOffset = 0;
+            if (
+                null !== $block->func
+                && null !== $block->func->class
+                && !(($block->func->flags ?? 0) & \PHPCfg\Func::FLAG_STATIC)
+            ) {
+                $thisArgOffset = 1;
+            }
+            $paramIdx = $argIndex - $thisArgOffset;
+
+            return isset($block->paramByRef[$paramIdx]);
+        }
+
+        return false;
     }
 
     private function isImmortalEnumCaseBlockConstant(Variable $const): bool
