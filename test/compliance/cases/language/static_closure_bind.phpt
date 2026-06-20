@@ -1,5 +1,7 @@
 --TEST--
 language: static closure bindTo/bind must Error (issue #4613, Zend/zend_closures.c)
+--SKIPIF--
+<?php die('skip — compiler VM compliance via ClosureVMTest/VMTest/JITTest, not Zend CLI'); ?>
 --FILE--
 <?php
 declare(strict_types=1);
