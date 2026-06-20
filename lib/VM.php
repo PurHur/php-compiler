@@ -1526,6 +1526,9 @@ class VM {
                 if (isset($seenLc[$lc]) || isset($hookBackingLc[$lc])) {
                     continue;
                 }
+                if (JitMcjitEmbed::isEmbedClassPadProperty($meta->name)) {
+                    continue;
+                }
                 $seenLc[$lc] = true;
                 if (!$forVarExport && !$this->isPropertyAccessibleForObjectVars($meta, $callerClassLc)) {
                     continue;
@@ -1563,6 +1566,9 @@ class VM {
         foreach ($object->getRawProperties() as $name => $prop) {
             $nameLc = strtolower($name);
             if (isset($seenLc[$nameLc]) || isset($hookBackingLc[$nameLc])) {
+                continue;
+            }
+            if (JitMcjitEmbed::isEmbedClassPadProperty($name)) {
                 continue;
             }
             $value = $prop->resolveIndirect();

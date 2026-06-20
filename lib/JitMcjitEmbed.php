@@ -14,6 +14,9 @@ namespace PHPCompiler;
  */
 final class JitMcjitEmbed
 {
+    /** MCJIT-only pad property name — hidden from var_export/get_object_vars (#10312). */
+    public const CLASS_PAD_PROPERTY = '__phpcMcjitClassPad';
+
     private const EMPTY_CLASS_PAD = 'private bool $__phpcMcjitClassPad = false;';
 
     /** Readonly classes cannot declare properties with defaults (#8967, zend_compile.c). */
@@ -108,5 +111,12 @@ final class JitMcjitEmbed
             '/function\s+__construct\s*\([^)]*(?:public|protected|private|readonly)\s+[^)]*\$/',
             $body
         );
+    }
+
+    /** Internal MCJIT embed slot — not user-visible in debug/var_export (#10312). */
+    public static function isEmbedClassPadProperty(string $name): bool
+    {
+        return self::CLASS_PAD_PROPERTY === $name
+            || strtolower(self::CLASS_PAD_PROPERTY) === strtolower($name);
     }
 }
