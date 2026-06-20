@@ -7,6 +7,8 @@ namespace PHPCompiler\ext\standard;
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\JitArrayUserSetOps;
+use PHPCompiler\JIT\UsortCallbackPolicy;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Value;
 
@@ -20,6 +22,19 @@ final class array_uintersect extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        throw new \LogicException('array_uintersect() is VM-only in this compiler build');
+        $argc = \count($args);
+        if ($argc < 3) {
+            throw new \ArgumentCountError(
+                'array_uintersect() expects at least 3 arguments, '.$argc.' given'
+            );
+        }
+        $callback = $args[$argc - 1];
+        if (!UsortCallbackPolicy::isJitLowerable($callback)) {
+            throw new \LogicException(UsortCallbackPolicy::jitRejectionMessage());
+        }
+        $first = $args[0];
+        $others = \array_slice($args, 1, -1);
+
+        return JitArrayUserSetOps::arrayUintersect($context, $callback, $first, ...$others);
     }
 }
