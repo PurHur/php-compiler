@@ -3167,6 +3167,50 @@ class Object_ extends Type {
                 return Variable::TYPE_NATIVE_LONG;
             }
         }
+        if (str_starts_with($lcClass, 'phpcompiler\\vm\\context')) {
+            if (in_array($lcName, [
+                'functions',
+                'classes',
+                'classaliases',
+                'enums',
+                'classautoloaders',
+                'splautoloadcallbacks',
+                'loadedcompileunits',
+                'constants',
+                'superglobalvars',
+                'globalvars',
+                'functionstaticvars',
+                'functionstaticinitialized',
+                'foreachiterators',
+                'objectpropertyiterators',
+                'weakmapiterators',
+                'activetryhandlerframes',
+                'trymergeblockids',
+                'foreachobjectadvance',
+                'foreachinvalidslots',
+                'deferredtraituses',
+                'deferredclassconstants',
+                'completedfinallyhandlers',
+                'clirequestargv',
+                'propertyhookregistry',
+            ], true)) {
+                return Variable::TYPE_HASHTABLE;
+            }
+            if (in_array($lcName, [
+                'runtime',
+                'errors',
+                'scriptstack',
+                'exceptionhandlers',
+                'executionlimits',
+            ], true)) {
+                return Variable::TYPE_OBJECT;
+            }
+        }
+        if (str_starts_with($lcClass, 'phpcompiler\\compiler')) {
+            if (in_array($lcName, ['modules', 'compilequeue'], true)) {
+                return Variable::TYPE_HASHTABLE;
+            }
+        }
 
         if (
             (str_starts_with($lcClass, 'phpcfg\\') || str_starts_with($lcClass, 'phpcompiler\\'))

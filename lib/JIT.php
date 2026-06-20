@@ -1029,12 +1029,14 @@ class JIT {
     }
 
     /**
-     * M4 inventory argv rebuild of bin/compile.php — native emitMainEntry {main}, stub parse spine,
-     * no BIN_COMPILE sidecar copy on standalone (#2930).
+     * Inventory argv link real-lowers parse/init spine; stub rebuild is M4-only without emit driver (#8708).
      */
     private function shouldUseM4InventoryArgvNativeEmitRebuild(?Block $block = null): bool
     {
         if (!$this->shouldUseM4BinCompileArgvMainNative() || $this->shouldUseM5DriverHostCompile()) {
+            return false;
+        }
+        if ($this->shouldUseM3InventoryEmitDriver()) {
             return false;
         }
         $main = $block ?? $this->m3CompileDriverMainBlock;
@@ -5533,7 +5535,7 @@ class JIT {
     /** Lower Runtime::parse / compileEmitSmoke from lib/Runtime.php for inventory argv driver (#2967). */
     private function compileM3EmitTuRuntimeMethodFromRuntimePhpFile(string $methodLc, string $logical, string $lc): void
     {
-        $runtimePath = dirname(__DIR__).'/Runtime.php';
+        $runtimePath = __DIR__.'/Runtime.php';
         if (!is_file($runtimePath)) {
             return;
         }
