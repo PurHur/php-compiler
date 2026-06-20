@@ -11827,7 +11827,12 @@ class Compiler {
                     break;
                 }
                 // Sibling inline Array_ call args: `array_replace([...], [...])` (#10231).
+                // Nested element literals (`array_column([[...], [...]], ...)`) are not call-arg producers (#9305).
                 if ($prev instanceof Op\Expr\Array_) {
+                    if ($this->cfgExprUsesOperand($child, $prev->result)) {
+                        break;
+                    }
+
                     continue;
                 }
                 break;
