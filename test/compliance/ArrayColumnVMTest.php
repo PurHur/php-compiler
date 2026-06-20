@@ -21,6 +21,10 @@ final class ArrayColumnVMTest extends BaseTest
             __DIR__.'/cases/stdlib/array_column_null_column.phpt',
             'array_column_null_column.phpt'
         );
+        yield 'array_column_inline_null_index.phpt' => self::parsePHPT(
+            __DIR__.'/cases/stdlib/array_column_inline_null_index.phpt',
+            'array_column_inline_null_index.phpt'
+        );
     }
 
     public function setUp(): void
