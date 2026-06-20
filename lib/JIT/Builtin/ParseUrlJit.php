@@ -886,12 +886,12 @@ final class ParseUrlJit
 
         $context->builder->positionAtEnd($blocks[5]);
         $pathPtr = $context->builder->load(self::partsStrField($context, $parts, self::OFF_PATH));
-        $pathEmpty = $context->builder->or(
-            $context->builder->icmp(Builder::INT_EQ, $pathPtr, $i8p->constNull()),
-            $context->builder->icmp(Builder::INT_EQ, $context->builder->load($pathPtr), $i8->constInt(0, false))
-        );
         $pathWriteBb = $fn->appendBasicBlock('wc_path_write');
-        $context->builder->branchIf($pathEmpty, $defaultBb, $pathWriteBb);
+        $context->builder->branchIf(
+            $context->builder->icmp(Builder::INT_EQ, $pathPtr, $i8p->constNull()),
+            $defaultBb,
+            $pathWriteBb
+        );
         $context->builder->positionAtEnd($pathWriteBb);
         $context->builder->call($writeString, $out, $context->builder->call($cstr, $pathPtr));
         $context->builder->branch($doneBb);
@@ -1031,6 +1031,37 @@ final class ParseUrlJit
             $ptr = $context->builder->load(self::partsStrField($context, $parts, $off));
             $context->builder->call($maybe, $ht, self::cstrLiteral($context, $key), $ptr);
         }
+        $i8p = $context->getTypeFromString('int8*');
+        $cstr = $context->lookupFunction('__phpc_parse_url_cstr');
+        $sizeT = $context->getTypeFromString('size_t');
+        $urlEmptyPathBb = $fn->appendBasicBlock('pua_url_empty_path');
+        $urlEmptyPathSkipBb = $fn->appendBasicBlock('pua_url_empty_path_skip');
+        $context->builder->branchIf(
+            $context->builder->icmp(
+                Builder::INT_EQ,
+                $context->builder->call($context->lookupFunction('strlen'), $url),
+                $sizeT->constInt(0, false)
+            ),
+            $urlEmptyPathBb,
+            $urlEmptyPathSkipBb
+        );
+        $context->builder->positionAtEnd($urlEmptyPathBb);
+        $pathPtr = $context->builder->load(self::partsStrField($context, $parts, self::OFF_PATH));
+        $pathPresentBb = $fn->appendBasicBlock('pua_path_present');
+        $context->builder->branchIf(
+            $context->builder->icmp(Builder::INT_EQ, $pathPtr, $i8p->constNull()),
+            $urlEmptyPathSkipBb,
+            $pathPresentBb
+        );
+        $context->builder->positionAtEnd($pathPresentBb);
+        $context->builder->call(
+            $context->lookupFunction('__hashtable__setStringKeyString'),
+            $ht,
+            $context->builder->call($cstr, self::cstrLiteral($context, 'path')),
+            $context->builder->call($cstr, $pathPtr)
+        );
+        $context->builder->branch($urlEmptyPathSkipBb);
+        $context->builder->positionAtEnd($urlEmptyPathSkipBb);
         $port = $context->builder->load(self::partsPortField($context, $parts));
         $hasPort = $context->builder->load(self::partsHasPortField($context, $parts));
         $portPos = $fn->appendBasicBlock('pua_port');
