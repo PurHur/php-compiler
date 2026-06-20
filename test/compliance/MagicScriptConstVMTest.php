@@ -84,4 +84,38 @@ final class MagicScriptConstVMTest extends TestCase
         $this->assertSame(realpath($script), $lines[3] ?? '');
         $this->assertGreaterThanOrEqual(1, (int) ($lines[4] ?? 0));
     }
+
+    public function test_magic_script_const_in_closure_compile_and_run(): void
+    {
+        $root = dirname(__DIR__, 2);
+        $script = __DIR__.'/cases/language/closure_magic_dir/run.php';
+        $this->assertFileExists($script);
+
+        $cmd = [
+            PHP_BINARY,
+            '-d', 'display_errors=0',
+            '-d', 'error_reporting=0',
+            $root.'/bin/vm.php',
+            $script,
+        ];
+        $proc = proc_open(
+            $cmd,
+            [1 => ['pipe', 'w'], 2 => ['pipe', 'w']],
+            $pipes,
+            dirname($script)
+        );
+        $this->assertIsResource($proc);
+        $stdout = stream_get_contents($pipes[1]);
+        $stderr = stream_get_contents($pipes[2]);
+        fclose($pipes[1]);
+        fclose($pipes[2]);
+        $exit = proc_close($proc);
+
+        $this->assertSame(0, $exit, trim((string) $stderr));
+        $this->assertStringNotContainsString('Expr_MagicScriptConst', (string) $stderr);
+        $lines = explode("\n", rtrim((string) $stdout, "\n"));
+        $this->assertSame(dirname($script), $lines[0] ?? '');
+        $this->assertSame(realpath($script), $lines[1] ?? '');
+        $this->assertGreaterThanOrEqual(1, (int) ($lines[2] ?? 0));
+    }
 }
