@@ -3655,8 +3655,7 @@ restart:
                     if (Variable::TYPE_BOOLEAN === $check->type) {
                         $takeLeft = $check->toBool($this);
                     } else {
-                        $takeLeft = !$check->isUndefined()
-                            && Variable::TYPE_NULL !== $check->type;
+                        $takeLeft = VM\CoalesceJitHelper::takeLeftBranchFromTypeByte($check->type);
                     }
                     $frame = ($takeLeft ? $op->block1 : $op->block2)->getFrame(
                         $this->context,

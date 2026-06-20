@@ -5,13 +5,17 @@ declare(strict_types=1);
 namespace PHPCompiler\JIT;
 
 use PHPLLVM\BasicBlock;
+use PHPLLVM\Value;
 use PHPLLVM\Value\Function_;
 use PHPCompiler\Block;
 use PHPCompiler\JIT;
+use PHPCompiler\JIT\Builtin\CoalesceRuntime;
 use PHPCompiler\OpCode;
 
 /**
- * LLVM lowering helpers for ?? (null coalescing) branch targets (issue #99).
+ * LLVM lowering helpers for ?? (null coalescing) branch targets (issue #99, #10171).
+ *
+ * SSOT: {@see \PHPCompiler\VM\CoalesceJitHelper}
  */
 final class CoalesceHelper
 {
@@ -21,6 +25,31 @@ final class CoalesceHelper
         Block $branchBlock
     ): BasicBlock {
         return $jit->compileSubBlock($func, $branchBlock);
+    }
+
+    /**
+     * i1: take ?? left branch (ISSET bool or value-box type byte via CoalesceJitHelper PHP).
+     */
+    public static function isTakeLeftBranch(JIT $jit, Variable $check): Value
+    {
+        $context = $jit->context;
+        if (Variable::TYPE_NATIVE_BOOL === $check->type) {
+            return $context->helper->loadValue($check);
+        }
+        if (Variable::TYPE_VALUE === $check->type) {
+            CoalesceRuntime::ensureLinked($context);
+            $valuePtr = JitValueBox::valuePtrFromVariable($context, $check);
+            $typeByte = $context->builder->load(
+                $context->builder->structGep(
+                    $valuePtr,
+                    $context->structFieldMap['__value__']['type']
+                )
+            );
+
+            return CoalesceRuntime::callTakeLeftBranch($context, $typeByte);
+        }
+
+        return $context->castToBool($context->helper->loadValue($check));
     }
 
     /**
