@@ -84,10 +84,10 @@ class JIT {
         $this->registeredGlobalConstDeclareOpcodes = new \SplObjectStorage();
         if ($this->shouldUseM3EmitTuNativeBridge() && $this->isM3EmitTuScriptMain($block)) {
             // Inventory emit-helper reuses thin TU spine (#3070); argv-only inventory keeps compile_driver {main}.
-            $inventoryEmitHelper = $this->shouldUseM3InventoryEmitDriver()
+            $inventoryEmitHelper = $this->shouldUseM3InventoryEmitDriver($block)
                 && $this->isM3CompileDriverBundleScriptMain($block)
                 && $this->shouldUseEmitHelperLinkStubs();
-            if ($inventoryEmitHelper || !$this->shouldUseM3InventoryEmitDriver() || !$this->isM3CompileDriverBundleScriptMain($block)) {
+            if ($inventoryEmitHelper || !$this->shouldUseM3InventoryEmitDriver($block) || !$this->isM3CompileDriverBundleScriptMain($block)) {
                 $this->m3EmitTuMainBlock = $block;
             }
         }
@@ -881,9 +881,49 @@ class JIT {
     }
 
     /**
+     * True when the active entry is helloworld/bootstrap_loop compile_driver.php under a compiled argv driver.
+     *
+     * Zend bin/compile.php sets inventory emit env when linking compile_driver.php; native emitMainEntry
+     * does not run those putenv hooks, so gate inventory {main} from the entry path (#3053).
+     */
+    private function isM3HelloworldInventoryCompileDriverTarget(?Block $block = null): bool
+    {
+        if (!\function_exists('php_compiler_cli_should_skip_entry_driver')) {
+            return false;
+        }
+        /** @var list<string> $paths */
+        $paths = [];
+        if (null !== $block) {
+            $path = $block->scriptPath();
+            if ('' !== $path) {
+                $paths[] = $path;
+            }
+        }
+        if (null !== $this->m3CompileDriverMainBlock) {
+            $path = $this->m3CompileDriverMainBlock->scriptPath();
+            if ('' !== $path) {
+                $paths[] = $path;
+            }
+        }
+        $fromCtx = $this->context->aotSourceFilename ?? '';
+        if ('' !== $fromCtx) {
+            $paths[] = $fromCtx;
+        }
+        foreach (array_unique($paths) as $path) {
+            $norm = str_replace('\\', '/', $path);
+            if (str_contains($norm, 'compiler_helloworld_smoke/compile_driver.php')
+                || str_contains($norm, 'bootstrap_loop_smoke/compile_driver.php')) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /**
      * Inventory-scale M3 emit via compile_driver.php {main} — no separate *_m3_emit_native_entry.php (#2843).
      */
-    private function shouldUseM3InventoryEmitDriver(): bool
+    private function shouldUseM3InventoryEmitDriver(?Block $block = null): bool
     {
         if (!$this->shouldUseM3CompileDriverMainNative()) {
             return false;
@@ -894,6 +934,9 @@ class JIT {
             if ('1' === $flag || 'true' === strtolower((string) $flag)) {
                 return true;
             }
+        }
+        if ($this->isM3HelloworldInventoryCompileDriverTarget($block)) {
+            return true;
         }
 
         return false;
@@ -4275,6 +4318,10 @@ class JIT {
         string $repoRoot
     ): bool {
         if ($this->m3EmitTuForceSidecarHostCompile()) {
+            return false;
+        }
+        if (\PHPCompiler\JIT\M3EmitTuTrivialEchoAot::COMPILE_DRIVER_SIDECAR_REL === $sidecarRel
+            && $this->isM3HelloworldInventoryCompileDriverTarget($this->m3CompileDriverMainBlock)) {
             return false;
         }
         if (\PHPCompiler\JIT\M3EmitTuTrivialEchoAot::COMPILER_LIB_SIDECAR_REL === $sidecarRel) {

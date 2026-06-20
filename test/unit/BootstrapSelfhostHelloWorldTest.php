@@ -149,7 +149,8 @@ final class BootstrapSelfhostHelloWorldTest extends TestCase
         $source = (string) file_get_contents($script);
         $this->assertStringContainsString('selfhost-helloworld-compile', $source);
         $this->assertStringContainsString('helloworld_compile_smoke:', $source);
-        $this->assertStringContainsString('PHP_COMPILER_M3_COMPILE_MODE=compile', $source);
+        $this->assertStringContainsString('PHP_COMPILER_M3_SOURCE', $source);
+        $this->assertStringContainsString('bin-compile-aot-inventory', $source);
         $this->assertStringContainsString('.m3_bin_compile_aot_blob', $source);
         $this->assertStringContainsString('bootstrap_inventory_argv_link', $source);
         $this->assertStringContainsString('bootstrap_compile_invoke', $source);
@@ -164,6 +165,7 @@ final class BootstrapSelfhostHelloWorldTest extends TestCase
         $this->assertStringContainsString('BOOTSTRAP_INVENTORY_COMPILED_FIRST', (string) file_get_contents(self::$root.'/script/ci-defaults.env'));
         $jit = (string) file_get_contents(self::$root.'/lib/JIT.php');
         $this->assertStringContainsString('m3EmitSidecarHostCompileEnv', $jit);
+        $this->assertStringContainsString('isM3HelloworldInventoryCompileDriverTarget', $jit);
         $this->assertStringContainsString('PHP_COMPILER_MEMORY_LIMIT', $jit);
     }
 

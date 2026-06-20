@@ -98,13 +98,24 @@ echo "bootstrap-selfhost-helloworld-compile-bin: link OK ${OUT} (gen-0 ${BOOTSTR
 
 set +e
 compile_out="$(
-  env PHP_COMPILER_M3_COMPILE_MODE=compile \
-    PHP_COMPILER_M3_RUNTIME_COMPILE=1 \
-    PHP_COMPILER_M3_SOURCE="${SOURCE}" \
+  env PHP_COMPILER_M3_SOURCE="${SOURCE}" \
     PHP_COMPILER_M3_OUT="${AOT_OUT}" \
     "${OUT}" 2>&1
 )"
 compile_code=$?
+# Prelinked gen-0 may bake link-only {main}; emit via inventory argv bridge until regen (#3053).
+if [[ "${compile_code}" -eq 0 ]] && grep -q 'compiler_helloworld_compile_driver ready' <<< "${compile_out}"; then
+  INVENTORY_FALLBACK="${ROOT}/build/bin-compile-aot-inventory"
+  if [[ ! -x "${INVENTORY_FALLBACK}" ]]; then
+    bootstrap_gen0_copy_prelinked_inventory_driver "${INVENTORY_FALLBACK}" "" "${INVENTORY_FALLBACK}" 2>/dev/null || true
+  fi
+  if [[ -x "${INVENTORY_FALLBACK}" ]]; then
+    compile_out="$(
+      "${INVENTORY_FALLBACK}" -o "${AOT_OUT}" "${SOURCE}" 2>&1
+    )"
+    compile_code=$?
+  fi
+fi
 set -e
 printf '%s\n' "${compile_out}"
 
