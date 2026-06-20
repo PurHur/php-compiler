@@ -14,12 +14,14 @@ final class BootstrapSelfhostBundleTest extends TestCase
     /** @var list<string> */
     private const LIB_SPINE_SMOKE_NEW_UNITS = [
         'lib/JIT/Builtin/CastArrayRuntime.php',
+        'lib/JIT/Builtin/VarFetchRuntime.php',
         'lib/JIT/Builtin/CastArrayValueBoxJit.php',
         'lib/JIT/Builtin/CastObjectFromHashtableJit.php',
         'lib/JIT/Builtin/CastObjectValueBoxJit.php',
         'lib/JIT/CastArrayShared.php',
         'lib/VM/CastJitHelper.php',
         'lib/VM/InOperatorJitHelper.php',
+        'lib/VM/VmVarFetch.php',
         'lib/JIT/Builtin/IniGet.php',
         'lib/JIT/Builtin/Type.php',
         'lib/JIT/Builtin/Type/String_.php',
