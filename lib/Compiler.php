@@ -159,6 +159,12 @@ class Compiler {
     /** True while lowering switch to JUMPIF/EQUAL — skip ?: merge slot bridging (#878). */
     private bool $compilingSwitchJumpIfChain = false;
 
+    /** Catch variable name (lc) => scope slot while lowering catch bodies (#9887). */
+    private array $activeCatchVarSlotsByName = [];
+
+    /** Catch variable cfg roots while lowering catch bodies (#9887). */
+    private array $activeCatchVarRoots = [];
+
     /** Script declares DNF-typed instance properties — MCJIT needs a try region (#4111). */
     private bool $scriptHasDnfTypedProperties = false;
 
@@ -6489,17 +6495,43 @@ class Compiler {
             }
             $block->addOpCode($op);
         } elseif ($stmt instanceof Op\Stmt\TryCatch) {
+            // Reserve catch \$e slots before merge lowering allocates sibling temps (#9887).
+            $reservedCatchVarSlots = [];
+            foreach ($stmt->catches as $i => $catchBlock) {
+                $catchVar = $stmt->catchVars[$i] ?? null;
+                if (null !== $catchVar && null !== $this->resolveCatchVariableName($catchVar)) {
+                    $reservedCatchVarSlots[$i] = $block->getVarSlot($catchVar, false);
+                }
+            }
             $merge = $this->compileCfgBranch($stmt->end, $block);
             $merge = $this->splitMergeBeforeNestedTry($merge);
             // Merge block is entered via TYPE_CATCH before catch locals exist (#195, #2084).
             $merge->inheritUndefinedLocals = true;
             // Lower catch bodies before try so sibling ?: merge prebind cannot clobber try locals (#6411).
             $compiledCatches = [];
+            $savedCatchVarSlots = $this->activeCatchVarSlotsByName;
+            $savedCatchVarRoots = $this->activeCatchVarRoots;
+            $this->activeCatchVarSlotsByName = [];
+            $this->activeCatchVarRoots = [];
+            foreach ($stmt->catches as $i => $catchBlock) {
+                $catchVar = $stmt->catchVars[$i] ?? null;
+                $catchName = $this->resolveCatchVariableName($catchVar);
+                if (null !== $catchName && isset($reservedCatchVarSlots[$i])) {
+                    $lc = strtolower($catchName);
+                    $this->activeCatchVarSlotsByName[$lc] = $reservedCatchVarSlots[$i];
+                    $root = Block::cfgVarRoot($catchVar);
+                    if (null !== $root) {
+                        $this->activeCatchVarRoots[] = $root;
+                    }
+                }
+            }
             foreach ($stmt->catches as $i => $catchBlock) {
                 $compiledCatch = $this->compileCfgBranch($catchBlock, $block);
                 $compiledCatch->inheritUndefinedLocals = true;
                 $compiledCatches[] = $compiledCatch;
             }
+            $this->activeCatchVarSlotsByName = $savedCatchVarSlots;
+            $this->activeCatchVarRoots = $savedCatchVarRoots;
             $try = $this->compileCfgBranch($stmt->try, $block);
             $try->inheritUndefinedLocals = true;
             $tryOp = new OpCode(OpCode::TYPE_TRY);
@@ -6514,7 +6546,7 @@ class Compiler {
                 $catchOp->arg3 = $this->resolveCatchVarSlot(
                     $compiledCatch,
                     $stmt->catchVars[$i] ?? null
-                );
+                ) ?? ($reservedCatchVarSlots[$i] ?? null);
                 $block->addOpCode($catchOp);
             }
             if (null !== $stmt->finally) {
@@ -7178,13 +7210,16 @@ class Compiler {
                 return $return;
             case Op\Expr\MethodCall::class:
                 $mergeEcho = $this->mergeEchoSlotForBranch($block);
-                $receiverSlot = $this->compileOperand($expr->var, $block, true);
+                $catchReceiverSlot = $this->slotForActiveCatchVariable($expr->var);
+                $receiverSlot = null !== $catchReceiverSlot
+                    ? $catchReceiverSlot
+                    : $this->compileOperand($expr->var, $block, true);
                 $nameSlot = $this->compileOperand($expr->name, $block, true);
                 $prefix = [];
                 if (null !== $mergeEcho && $nameSlot === $mergeEcho) {
                     $nameSlot = $this->freshLiteralConstantSlot($expr->name, $block);
                 }
-                if (null !== $mergeEcho) {
+                if (null !== $mergeEcho && null === $catchReceiverSlot) {
                     $resultSlot = $this->compileOperand($expr->result, $block, false);
                     if ($resultSlot === $mergeEcho) {
                         $block->forceFreshVarSlot($expr->result);
@@ -9746,6 +9781,36 @@ class Compiler {
         return null;
     }
 
+    private function slotForActiveCatchVariable(?Operand $operand): ?int
+    {
+        if ([] === $this->activeCatchVarSlotsByName || null === $operand) {
+            return null;
+        }
+        $name = $this->resolveCatchVariableName($operand);
+        if (null !== $name) {
+            $slot = $this->activeCatchVarSlotsByName[strtolower($name)] ?? null;
+            if (null !== $slot) {
+                return $slot;
+            }
+        }
+        $root = Block::cfgVarRoot($operand);
+        if (null === $root) {
+            return null;
+        }
+        foreach ($this->activeCatchVarRoots as $catchRoot) {
+            if ($catchRoot === $root) {
+                $catchName = $this->resolveCatchVariableName($catchRoot);
+                if (null === $catchName) {
+                    return null;
+                }
+
+                return $this->activeCatchVarSlotsByName[strtolower($catchName)] ?? null;
+            }
+        }
+
+        return null;
+    }
+
     /**
      * @param Op\Expr|Operand $expr
      *
@@ -12212,6 +12277,12 @@ class Compiler {
     protected function compileOperand(?Operand $operand, Block $block, bool $isRead): ?int {
         if (null === $operand) {
             return null;
+        }
+        if ($isRead) {
+            $catchSlot = $this->slotForActiveCatchVariable($operand);
+            if (null !== $catchSlot) {
+                return $catchSlot;
+            }
         }
         if ($operand instanceof Operand\NullOperand) {
             return null;
