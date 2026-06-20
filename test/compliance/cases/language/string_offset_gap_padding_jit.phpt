@@ -1,5 +1,5 @@
 --TEST--
-String offset assignment beyond length NUL-pads gap under JIT (#7430, zend_operators.c)
+String offset assignment beyond length space-pads gap under JIT (#10380, zend_operators.c)
 --FILE--
 <?php
 $a = 'abc';
@@ -10,5 +10,5 @@ $a = 'abc';
 $a[3] = 'd';
 echo bin2hex($a), "\n";
 --EXPECT--
-616263000078
+616263202078
 61626364
