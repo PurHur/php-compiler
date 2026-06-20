@@ -1,5 +1,5 @@
 --TEST--
-Language: read property on null — E_WARNING + null; inc/dec still Error (#10381; zend_fetch.c)
+Language: read property on null — E_WARNING + null, not Error (#10381; zend_fetch.c)
 --FILE--
 <?php
 set_error_handler(static function (int $errno, string $message): bool {

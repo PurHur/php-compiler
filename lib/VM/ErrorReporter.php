@@ -226,7 +226,7 @@ final class ErrorReporter
     }
 
     /**
-     * Zend E_WARNING for property read on non-object except null (zend_execute.c, #5276, #7431).
+     * Zend E_WARNING for property read on non-object including null (zend_fetch.c, #5276, #10381).
      */
     public function propertyReadOnNonObject(
         string $propertyName,

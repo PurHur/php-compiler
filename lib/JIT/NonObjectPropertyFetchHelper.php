@@ -8,8 +8,8 @@ use PHPCfg\Operand;
 use PHPCompiler\VM\ErrorReporter;
 
 /**
- * ZEND_FETCH_PROPERTY_R on non-object receivers — E_WARNING + null for scalars;
- * null read throws Error since PHP 8.0 (zend_execute.c, #5276, #7431).
+ * ZEND_FETCH_PROPERTY_R on non-object receivers — E_WARNING + null (zend_fetch.c, #5276, #10381).
+ * Increment/decrement on null still throws Error (zend_execute.c, #7431).
  */
 final class NonObjectPropertyFetchHelper
 {
