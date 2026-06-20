@@ -1452,6 +1452,7 @@ require_once __DIR__.'/../../../ext/standard/php_strip_whitespace.php';
 require_once __DIR__.'/../../../ext/standard/php_uname.php';
 require_once __DIR__.'/../../../ext/standard/phpc_clone_with_begin.php';
 require_once __DIR__.'/../../../ext/standard/phpc_clone_with_end.php';
+require_once __DIR__.'/../../../ext/standard/phpc_clone_with_reinit.php';
 require_once __DIR__.'/../../../ext/standard/phpc_deploy_path.php';
 require_once __DIR__.'/../../../ext/standard/phpc_match_unhandled_operand_is_object.php';
 require_once __DIR__.'/../../../ext/standard/phpc_run_command.php';
