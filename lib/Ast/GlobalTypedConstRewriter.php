@@ -20,6 +20,9 @@ final class GlobalTypedConstRewriter
     /** @internal Marker embedded in source for PHPCfg to recover declared type. */
     public const MARKER_PATTERN = '/\/\*\s*phpc-global-typed-const:([^*]+?)\s*\*\//';
 
+    /** Zend PHP ≤8.3: `final const` at compile-unit scope is invalid (#10324, zend_compile.c). */
+    public const FINAL_GLOBAL_CONST_REJECT_MESSAGE = 'syntax error, unexpected token "const", expecting "abstract" or "final" or "readonly" or "class"';
+
     public static function rewrite(string $source): string
     {
         if (!CompilerVersion::supportsGlobalTypedConstants()) {
@@ -47,8 +50,10 @@ final class GlobalTypedConstRewriter
                     $pendingClassLike = false;
                 } elseif ('}' === $text && $classLikeDepth > 0) {
                     --$classLikeDepth;
-                } elseif (T_FINAL === $tok[0] && 0 === $classLikeDepth
-                    && CompilerVersion::supportsFinalGlobalTypedConstants()) {
+                } elseif (T_FINAL === $tok[0] && 0 === $classLikeDepth) {
+                    if (!CompilerVersion::supportsFinalGlobalTypedConstants()) {
+                        self::rejectFinalGlobalConstIfPresent($tokens, $i + 1);
+                    }
                     $typed = self::tryParseFinalTypedConst($tokens, $i + 1);
                     if (null !== $typed) {
                         [$typeExpr, $end] = $typed;
@@ -303,6 +308,21 @@ final class GlobalTypedConstRewriter
     private static function collapseWhitespace(string $typeExpr): string
     {
         return trim((string) preg_replace('/\s+/', ' ', $typeExpr));
+    }
+
+    /**
+     * @param list<array{0: int, 1: string, 2: int}|string> $tokens
+     */
+    private static function rejectFinalGlobalConstIfPresent(array $tokens, int $start): void
+    {
+        $j = self::skipIgnorable($tokens, $start, \count($tokens));
+        if ($j >= \count($tokens) || !\is_array($tokens[$j]) || T_CONST !== $tokens[$j][0]) {
+            return;
+        }
+        throw new ParserError(
+            self::FINAL_GLOBAL_CONST_REJECT_MESSAGE,
+            ['startLine' => $tokens[$j][2] ?? 1, 'endLine' => $tokens[$j][2] ?? 1]
+        );
     }
 
     private static function rejectDisallowedGlobalConstType(string $typeExpr, int $line): void

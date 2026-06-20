@@ -22,6 +22,16 @@ class VMTest extends BaseTest {
                 && str_contains($name, 'trait_typed_const_reject')) {
                 continue;
             }
+            // 8.4-target reject gate; skipped when CompilerVersion 8.4.0+ enables final global typed constants (#10324).
+            if (CompilerVersion::supportsFinalGlobalTypedConstants()
+                && str_contains($name, 'final_global_typed_constant_reject')) {
+                continue;
+            }
+            if (!CompilerVersion::supportsFinalGlobalTypedConstants()
+                && str_contains($name, 'final_global_typed_constant')
+                && !str_contains($name, 'final_global_typed_constant_reject')) {
+                continue;
+            }
             if (str_contains(strtolower($case[0]), 'splobjectstorage')) {
                 continue;
             }
