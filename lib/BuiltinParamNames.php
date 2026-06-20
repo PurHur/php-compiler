@@ -117,6 +117,9 @@ final class BuiltinParamNames
                 return ['pattern', 'subject', 'matches', 'flags', 'offset'];
             case 'fopen':
                 return ['filename', 'mode', 'use_include_path', 'context'];
+            case 'fgets':
+            case 'fgetss':
+                return ['stream', 'length'];
             case 'parse_url':
                 return ['url', 'component'];
             case 'getopt':
