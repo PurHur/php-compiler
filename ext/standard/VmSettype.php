@@ -32,7 +32,7 @@ final class VmSettype
                 self::toFloat($result, $value, $frame);
                 break;
             case 'string':
-                self::toString($result, $value);
+                self::toString($result, $value, $frame);
                 break;
             case 'bool':
             case 'boolean':
@@ -152,7 +152,7 @@ final class VmSettype
         throw new \LogicException('settype() to float does not support this value type in this compiler build');
     }
 
-    private static function toString(Variable $result, Variable $value): void
+    private static function toString(Variable $result, Variable $value, ?Frame $frame = null): void
     {
         $v = $value->resolveIndirect();
         EnumCaseSupport::packRejectStringOperand($v);
@@ -166,7 +166,19 @@ final class VmSettype
 
             return;
         }
-        $result->string($v->toString());
+        if (Variable::TYPE_OBJECT === $v->type) {
+            $vm = $frame?->vmContext?->runtime?->vm;
+            if (null === $vm) {
+                throw new \Error(
+                    'Object of class '.$v->toObject()->class->name.' could not be converted to string'
+                );
+            }
+            $result->string($vm->castObjectToString($v->toObject()));
+
+            return;
+        }
+        $vm = $frame?->vmContext?->runtime?->vm;
+        $result->string($v->toString($vm, $frame));
     }
 
     /**
