@@ -4,29 +4,20 @@ declare(strict_types=1);
 
 namespace PHPCompiler\JIT\Builtin;
 
-use PHPCompiler\JIT;
+use PHPCompiler\ext\standard\SuperglobalNames;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\VM\VmVarFetch;
+use PHPLLVM\Builder;
 use PHPLLVM\Value;
-use PHPLLVM\Value\Function_ as LlvmFunction;
 
 /**
- * JIT/AOT link for $$name guards via VmVarFetchJitHelper PHP (#10289, #8708).
+ * JIT/AOT link for $$name guards via VmVarFetch PHP (#10289, #8708).
  *
  * php-src: Zend/zend_execute.c — ZEND_FETCH_R/W superglobal branch
- * SSOT: {@see \PHPCompiler\VM\VmVarFetch}; nested JIT uses {@see \PHPCompiler\VM\VmVarFetchJitHelper}
+ * SSOT: {@see \PHPCompiler\VM\VmVarFetch}
  */
 final class VarFetchRuntime
 {
-    private const HELPER_PATH = '/lib/VM/VmVarFetchJitHelper.php';
-
-    private const SUPERGLOBAL_HELPER = 'PHPCompiler\\VM\\VmVarFetchJitHelper::isSuperglobalName';
-
-    /** @var list<string> */
-    private const COMPILED_HELPERS = [
-        self::SUPERGLOBAL_HELPER,
-    ];
-
     public static function ensureLinked(Context $context): void
     {
         self::implement($context);
@@ -41,7 +32,6 @@ final class VarFetchRuntime
             return;
         }
 
-        self::ensureJitHelperCompiled($context);
         self::implementSuperglobalBridge($context);
         $context->builder->clearInsertionPosition();
     }
@@ -69,7 +59,9 @@ final class VarFetchRuntime
             return;
         }
 
-        $strPtr = $context->getTypeFromString('__string__*');
+        self::ensureStrcmp($context);
+
+        $strPtr = $context->getTypeFromString('string*');
         $i1 = $context->getTypeFromString('int1');
         $ft = $context->context->functionType($i1, false, $strPtr);
         $fn = null !== $probe
@@ -78,66 +70,47 @@ final class VarFetchRuntime
 
         $entry = $fn->appendBasicBlock('var_fetch_superglobal_bridge_entry');
         $context->builder->positionAtEnd($entry);
-        $result = $context->builder->call(
-            self::helperFunction($context, self::SUPERGLOBAL_HELPER),
-            $fn->getParam(0)
-        );
-        $context->builder->returnValue($result);
+        $name = $fn->getParam(0);
+        $falseVal = $i1->constInt(0, false);
+        $nullName = $context->builder->icmp(Builder::INT_EQ, $name, $name->typeOf()->constNull());
+        $nullBb = $fn->appendBasicBlock('var_fetch_sg_null');
+        $checkBb = $fn->appendBasicBlock('var_fetch_sg_check');
+        $context->builder->branchIf($nullName, $nullBb, $checkBb);
+
+        $context->builder->positionAtEnd($nullBb);
+        $context->builder->returnValue($falseVal);
+
+        $context->builder->positionAtEnd($checkBb);
+        $hit = $falseVal;
+        foreach (SuperglobalNames::ALL as $literal) {
+            $litGlobal = $context->constantFromString($literal);
+            $litPtr = $context->builder->pointerCast($litGlobal, $strPtr);
+            $cmp = $context->builder->call(
+                $context->lookupFunction('strcmp'),
+                $name,
+                $litPtr
+            );
+            $match = $context->builder->icmp(
+                Builder::INT_EQ,
+                $cmp,
+                $cmp->typeOf()->constInt(0, false)
+            );
+            $hit = $context->builder->or($hit, $match);
+        }
+        $context->builder->returnValue($hit);
         $context->registerFunction($abiName, $fn);
     }
 
-    private static function helperFunction(Context $context, string $logical): LlvmFunction
+    private static function ensureStrcmp(Context $context): void
     {
-        self::ensureJitHelperCompiled($context);
-        $lc = \strtolower($logical);
-        $fn = $context->functions[$lc] ?? null;
-        if (null === $fn) {
-            throw new \LogicException($logical.' missing after VmVarFetchJitHelper compile (#10289, #8708)');
-        }
-
-        return $fn;
-    }
-
-    private static function ensureJitHelperCompiled(Context $context): void
-    {
-        $missing = false;
-        foreach (self::COMPILED_HELPERS as $logical) {
-            if (!isset($context->functions[\strtolower($logical)])) {
-                $missing = true;
-                break;
-            }
-        }
-        if (!$missing) {
-            return;
-        }
-
-        $runtime = $context->runtime;
-        $path = \dirname(__DIR__, 3).self::HELPER_PATH;
-        $prevSelfHostAot = \getenv('PHP_COMPILER_SELFHOST_AOT');
-        if (\function_exists('putenv')) {
-            \putenv('PHP_COMPILER_SELFHOST_AOT=0');
-        }
         try {
-            $block = $runtime->parseAndCompile((string) \file_get_contents($path), 'VmVarFetchJitHelper.php');
-            if (null === $block) {
-                throw new \LogicException('VmVarFetchJitHelper.php parseAndCompile failed (#10289, #8708)');
-            }
-            $jit = new JIT($context);
-            $jit->compile($block);
-        } finally {
-            if (\function_exists('putenv')) {
-                if (false === $prevSelfHostAot || null === $prevSelfHostAot) {
-                    \putenv('PHP_COMPILER_SELFHOST_AOT=');
-                } else {
-                    \putenv('PHP_COMPILER_SELFHOST_AOT='.$prevSelfHostAot);
-                }
-            }
-        }
-        foreach (self::COMPILED_HELPERS as $logical) {
-            $lc = \strtolower($logical);
-            if (!isset($context->functions[$lc])) {
-                throw new \LogicException($lc.' was not compiled for JIT (#10289, #8708)');
-            }
+            $context->lookupFunction('strcmp');
+        } catch (\Throwable) {
+            $strPtr = $context->getTypeFromString('string*');
+            $i32 = $context->getTypeFromString('int32');
+            $ft = $context->context->functionType($i32, false, $strPtr, $strPtr);
+            $fn = $context->module->addFunction('strcmp', $ft);
+            $context->registerFunction('strcmp', $fn);
         }
     }
 }
