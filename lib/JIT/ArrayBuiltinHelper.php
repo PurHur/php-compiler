@@ -290,7 +290,6 @@ final class ArrayBuiltinHelper
         $context->builder->branchIf($isEmpty, $emptyBlock, $popBlock);
 
         $context->builder->positionAtEnd($emptyBlock);
-        self::emitArrayPopEmptyWarning($context);
         $context->builder->call(
             $context->lookupFunction('__value__writeNull'),
             $resultPtr
@@ -2763,11 +2762,6 @@ final class ArrayBuiltinHelper
             $context->builder->pointerCast($context->constantFromString(''), $i8p),
             $i32->constInt(0, false)
         );
-    }
-
-    private static function emitArrayPopEmptyWarning(Context $context): void
-    {
-        self::emitBuiltinWarning($context, 'array_pop(): Trying to pop an empty array');
     }
 
     private static function emitArrayShiftEmptyWarning(Context $context): void

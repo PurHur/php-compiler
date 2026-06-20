@@ -18,7 +18,6 @@ use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitReferencableCheck;
 use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\Variable as JITVariable;
-use PHPCompiler\VM\ErrorReporter;
 use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
 
@@ -37,15 +36,6 @@ final class array_pop extends Internal
             throw new \LogicException('array_pop() argument must be an array in this compiler build');
         }
         $ht = $array->toArray();
-        if (0 === $ht->getNumElements() && null !== $frame->vmContext) {
-            $frame->vmContext->errors->triggerError(
-                'array_pop(): Trying to pop an empty array',
-                ErrorReporter::E_WARNING,
-                '' !== $frame->scriptPath ? $frame->scriptPath : null,
-                $frame->vmContext,
-                $frame
-            );
-        }
         $popped = $ht->popLast();
         if (null === $frame->returnVar) {
             return;
