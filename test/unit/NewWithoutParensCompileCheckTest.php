@@ -8,17 +8,19 @@ use PHPCompiler\Compiler\NewWithoutParensCompileCheck;
 use PHPCompiler\Runtime;
 use PHPUnit\Framework\TestCase;
 
-/** `new` in class constant + static property initializers (#6549, #9484, #9804, #9850, #10095); instance defaults allowed (#5362). */
+/** `new` in static property initializers rejected; class constants allowed PHP 8.3+ (#10198). */
 final class NewWithoutParensCompileCheckTest extends TestCase
 {
-    public function testClassConstNewWithoutParensCompileErrors(): void
+    public function testClassConstNewWithoutParensCompiles(): void
     {
-        $this->expectCompileError(<<<'PHP'
+        $runtime = new Runtime();
+        $block = $runtime->parseAndCompile(<<<'PHP'
 <?php
 class C {
     const X = new stdClass;
 }
-PHP);
+PHP, 'new_without_parens_class_const.php');
+        $this->assertNotNull($block);
     }
 
     public function testStaticPropertyDefaultNewWithoutParensCompileErrors(): void
@@ -65,9 +67,10 @@ PHP, 'new_with_parens.php');
         $this->assertNotNull($block);
     }
 
-    public function testClassConstNewWithParensCompileErrors(): void
+    public function testClassConstNewWithParensCompiles(): void
     {
-        $this->expectCompileError(<<<'PHP'
+        $runtime = new Runtime();
+        $block = $runtime->parseAndCompile(<<<'PHP'
 <?php
 class C {
     public function __construct(public int $n = 0) {}
@@ -75,22 +78,26 @@ class C {
 class Holder {
     public const X = new C(1);
 }
-PHP);
+PHP, 'class_const_new_with_parens.php');
+        $this->assertNotNull($block);
     }
 
-    public function testClassConstNewEmptyArgsWithParensCompileErrors(): void
+    public function testClassConstNewEmptyArgsWithParensCompiles(): void
     {
-        $this->expectCompileError(<<<'PHP'
+        $runtime = new Runtime();
+        $block = $runtime->parseAndCompile(<<<'PHP'
 <?php
 class C {
     public const X = new stdClass();
 }
-PHP);
+PHP, 'class_const_new_empty_args.php');
+        $this->assertNotNull($block);
     }
 
-    public function testClassConstArrayWithNewCompileErrors(): void
+    public function testClassConstArrayWithNewCompiles(): void
     {
-        $this->expectCompileError(<<<'PHP'
+        $runtime = new Runtime();
+        $block = $runtime->parseAndCompile(<<<'PHP'
 <?php
 class C {
     public function __construct(public int $n = 0) {}
@@ -98,7 +105,8 @@ class C {
 class Holder {
     public const X = [new C()];
 }
-PHP);
+PHP, 'class_const_array_with_new.php');
+        $this->assertNotNull($block);
     }
 
     private function expectCompileError(string $code): void

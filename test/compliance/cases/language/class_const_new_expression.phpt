@@ -1,5 +1,5 @@
 --TEST--
-Language: class constant object expression const X = new C() — compile-error (#9804, #9974, Zend/zend_compile.c)
+Language: class constant `new` expression — PHP 8.3+ (#10198, Zend/zend_compile.c)
 --FILE--
 <?php
 class C {
@@ -9,5 +9,7 @@ class Holder {
     public const X = new C(1);
 }
 var_dump(Holder::X->n);
---EXPECT_EXIT--
-255
+echo Holder::X === Holder::X ? "1\n" : "0\n";
+--EXPECT--
+int(1)
+1

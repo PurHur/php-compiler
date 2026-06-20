@@ -1,5 +1,5 @@
 --TEST--
-Language: class constant object `new` expression rejected (#9974, Zend/zend_compile.c)
+Language: class constant object `new` expression (#10198, Zend/zend_compile.c)
 --FILE--
 <?php
 class C {
@@ -20,5 +20,11 @@ class D {
 var_export(D::Y);
 echo "\n";
 echo D::Y->x === 7 ? "1\n" : "0\n";
---EXPECT_EXIT--
-255
+--EXPECT--
+(object) array (
+)
+1
+Foo::__set_state(array (
+  'x' => 7,
+))
+1

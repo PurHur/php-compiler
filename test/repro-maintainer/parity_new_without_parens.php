@@ -3,8 +3,8 @@
 declare(strict_types=1);
 
 /**
- * Issue #6549 — `new` without `()` in class constant initializers must compile-error.
- * Property defaults may use bare `new` per PHP 8.1+ (#5362).
+ * Issue #6549 — `new` without `()` in static property initializers must compile-error.
+ * Class constants and property defaults may use bare `new` per PHP 8.1+/8.3+ (#10198).
  *
  * Zend reference: Zend/zend_compile.c, Zend/zend_ast.c
  */
@@ -45,7 +45,7 @@ function assertCompileSucceeds(string $label, string $code): void
     }
 }
 
-assertCompileFails('class const', '<?php class C { const X = new stdClass; }');
+assertCompileSucceeds('class const', '<?php class C { const X = new stdClass; }');
 assertCompileFails('static property', '<?php class C { public static $s = new stdClass; }');
 assertCompileSucceeds('instance property', '<?php class C { public $p = new stdClass; }');
 

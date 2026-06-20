@@ -1,5 +1,5 @@
 --TEST--
-Language: class constant expression must reject `new` (#9517, #9974, Zend/zend_compile.c)
+Language: class constant `new` expression — shared object identity (#10198, Zend/zend_constants.c)
 --FILE--
 <?php
 class C {
@@ -9,5 +9,7 @@ class Holder {
     public const X = new C(1);
 }
 var_dump(Holder::X->n);
---EXPECT_EXIT--
-255
+echo Holder::X === Holder::X ? "same\n" : "diff\n";
+--EXPECT--
+int(1)
+same
