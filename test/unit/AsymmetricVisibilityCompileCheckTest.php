@@ -63,10 +63,11 @@ PHP, 'asymmetric_ok.php');
         $this->assertNotNull($block);
     }
 
-    public function testPromotedPublicPrivateSetCompiles(): void
+    public function testPromotedPublicPrivateSetCompileErrors(): void
     {
         $runtime = new Runtime();
-        $block = $runtime->parseAndCompile(<<<'PHP'
+        try {
+            $runtime->parseAndCompile(<<<'PHP'
 <?php
 class User {
     public function __construct(
@@ -74,19 +75,32 @@ class User {
     ) {}
 }
 PHP, 'promoted_asymmetric.php');
-        $this->assertNotNull($block);
+            $this->fail('Expected compile failure');
+        } catch (\Throwable $e) {
+            $this->assertStringContainsString(
+                AsymmetricVisibilityCompileCheck::MULTIPLE_MODIFIERS_MESSAGE,
+                $e->getMessage()
+            );
+        }
     }
 
-    public function testPromotedSingleLinePublicPrivateSetCompiles(): void
+    public function testPromotedSingleLinePublicPrivateSetCompileErrors(): void
     {
         $runtime = new Runtime();
-        $block = $runtime->parseAndCompile(<<<'PHP'
+        try {
+            $runtime->parseAndCompile(<<<'PHP'
 <?php
 class D {
     public function __construct(public private(set) int $x = 1) {}
 }
 PHP, 'promoted_single_line.php');
-        $this->assertNotNull($block);
+            $this->fail('Expected compile failure');
+        } catch (\Throwable $e) {
+            $this->assertStringContainsString(
+                AsymmetricVisibilityCompileCheck::MULTIPLE_MODIFIERS_MESSAGE,
+                $e->getMessage()
+            );
+        }
     }
 
     public function testValidPrivateSetStillCompiles(): void
