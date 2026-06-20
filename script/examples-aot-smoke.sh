@@ -558,5 +558,7 @@ echo "examples-aot-smoke: 004-ApiJson: ok"
 smoke_003_miniwebapp
 smoke_005_sessionsweb
 smoke_006_fileuploadweb
+smoke_008_selfhostprobe
+smoke_009_fastcgiweb
 
 echo "examples-aot-smoke: ok"
