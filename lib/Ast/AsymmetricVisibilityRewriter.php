@@ -93,6 +93,7 @@ final class AsymmetricVisibilityRewriter
 
         self::rejectExplicitPublicBeforeSetModifier($source);
         self::rejectExplicitPublicAfterSetModifier($source);
+        self::rejectPromotedParamMultipleAccessModifiers($source);
         self::rejectAsymmetricSetOnStaticProperty($source);
 
         $source = (string) preg_replace_callback(
@@ -172,6 +173,70 @@ final class AsymmetricVisibilityRewriter
                 throw new \CompileError(self::MULTIPLE_MODIFIERS_MESSAGE);
             }
         });
+    }
+
+    /**
+     * Promoted constructor parameters reject explicit read + asymmetric set (#10237, PHP 8.4 zend_compile.c).
+     *
+     * php-src: `public private(set) int $x` in `__construct` is fatal
+     * (`Multiple access type modifiers are not allowed`). `private(set) int $x` without a leading read
+     * modifier remains valid (#9877).
+     */
+    private static function rejectPromotedParamMultipleAccessModifiers(string $source): void
+    {
+        if (!preg_match('/\b__construct\b/i', $source) || !preg_match('/\(\s*set\s*\)/i', $source)) {
+            return;
+        }
+
+        $offset = 0;
+        while (preg_match('/\bfunction\s+__construct\s*\(/i', $source, $m, PREG_OFFSET_CAPTURE, $offset)) {
+            $openPos = $m[0][1] + strlen($m[0][0]) - 1;
+            $paramsText = self::extractBalancedParenContent($source, $openPos);
+            if (null !== $paramsText) {
+                self::rejectDoubleVisibilityInPromotedParams($paramsText);
+            }
+            $offset = $openPos + 1;
+        }
+    }
+
+    private static function extractBalancedParenContent(string $source, int $openPos): ?string
+    {
+        if (!isset($source[$openPos]) || '(' !== $source[$openPos]) {
+            return null;
+        }
+
+        $depth = 0;
+        $len = strlen($source);
+        for ($i = $openPos; $i < $len; ++$i) {
+            $char = $source[$i];
+            if ('(' === $char) {
+                ++$depth;
+            } elseif (')' === $char) {
+                --$depth;
+                if (0 === $depth) {
+                    return substr($source, $openPos + 1, $i - $openPos - 1);
+                }
+            }
+        }
+
+        return null;
+    }
+
+    private static function rejectDoubleVisibilityInPromotedParams(string $paramsText): void
+    {
+        $modifier = '(?:public|protected|private)';
+        $setModifier = $modifier.'\s*\(\s*set\s*\)';
+        $parenthesizedSet = '\(\s*'.$modifier.'\s*\(\s*set\s*\)\s*\)';
+        $patterns = [
+            '/(?<![a-zA-Z0-9_])'.$modifier.'\s+'.$setModifier.'/i',
+            '/(?<![a-zA-Z0-9_])'.$modifier.'\s+'.$parenthesizedSet.'/i',
+        ];
+
+        foreach ($patterns as $pattern) {
+            if (preg_match($pattern, $paramsText)) {
+                throw new \CompileError(self::MULTIPLE_MODIFIERS_MESSAGE);
+            }
+        }
     }
 
     /**
