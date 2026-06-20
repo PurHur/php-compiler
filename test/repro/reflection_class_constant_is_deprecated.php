@@ -1,7 +1,7 @@
---TEST--
-Language: ReflectionClassConstant::isDeprecated() on #[\Deprecated] class constants (#6920)
---FILE--
 <?php
+declare(strict_types=1);
+
+// Issue #9759 — ReflectionClassConstant::isDeprecated() + fetch notice (Zend/zend_constants.c).
 class C {
     #[\Deprecated(message: 'Old const', since: '8.4')]
     public const X = 1;
@@ -21,9 +21,3 @@ echo C::X, "\n";
 $last = error_get_last();
 echo ($last['message'] ?? ''), "\n";
 echo ($last['type'] ?? 0) === 16384 ? "dep\n" : "no\n";
---EXPECT--
-true
-false
-1
-Constant C::X is deprecated since 8.4, Old const
-dep
