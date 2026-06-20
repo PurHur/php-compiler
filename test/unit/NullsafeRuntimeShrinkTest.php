@@ -6,22 +6,21 @@ namespace PHPCompiler;
 
 use PHPUnit\Framework\TestCase;
 
-/** Nullsafe JIT routes value-box short-circuit through NullsafeJitHelper PHP (#10154). */
+/** Nullsafe JIT routes value-box short-circuit through NullsafeJitHelper PHP (#10154, #10311). */
 final class NullsafeRuntimeShrinkTest extends TestCase
 {
-    public function testNullsafeRuntimeUsesNullsafeJitHelper(): void
-    {
-        $source = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/NullsafeRuntime.php');
-        $this->assertStringContainsString('NullsafeJitHelper', $source);
-        $this->assertStringContainsString('valueBoxShortCircuits', $source);
-    }
-
-    public function testNullsafeHelperRoutesValueBoxThroughNullsafeRuntime(): void
+    public function testNullsafeHelperRoutesValueBoxThroughNullsafeJitHelper(): void
     {
         $source = (string) file_get_contents(__DIR__.'/../../lib/JIT/NullsafeHelper.php');
-        $this->assertStringContainsString('NullsafeRuntime', $source);
-        $this->assertStringNotContainsString('isNullableUninitializedProperty', $source);
-        $this->assertLessThanOrEqual(85, substr_count($source, "\n") + 1);
+        $this->assertStringContainsString('NullsafeJitHelper', $source);
+        $this->assertStringContainsString('valueBoxShortCircuits', $source);
+        $this->assertStringContainsString('JitVmHelperLink', $source);
+        $this->assertStringNotContainsString('NullsafeRuntime', $source);
+    }
+
+    public function testNullsafeRuntimeBridgeRemoved(): void
+    {
+        $this->assertFileDoesNotExist(__DIR__.'/../../lib/JIT/Builtin/NullsafeRuntime.php');
     }
 
     public function testNullsafeJitHelperAlignsWithTypedPropertyCheck(): void

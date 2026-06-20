@@ -6,22 +6,21 @@ namespace PHPCompiler;
 
 use PHPUnit\Framework\TestCase;
 
-/** Coalesce JIT routes value-box branch tests through CoalesceJitHelper PHP (#10171). */
+/** Coalesce JIT routes value-box branch tests through CoalesceJitHelper PHP (#10171, #10311). */
 final class CoalesceRuntimeShrinkTest extends TestCase
 {
-    public function testCoalesceRuntimeUsesCoalesceJitHelper(): void
-    {
-        $source = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/CoalesceRuntime.php');
-        $this->assertStringContainsString('CoalesceJitHelper', $source);
-        $this->assertStringContainsString('takeLeftBranchFromTypeByte', $source);
-    }
-
-    public function testCoalesceHelperRoutesValueBoxThroughCoalesceRuntime(): void
+    public function testCoalesceHelperRoutesValueBoxThroughCoalesceJitHelper(): void
     {
         $source = (string) file_get_contents(__DIR__.'/../../lib/JIT/CoalesceHelper.php');
-        $this->assertStringContainsString('CoalesceRuntime', $source);
-        $this->assertStringContainsString('isTakeLeftBranch', $source);
-        $this->assertLessThanOrEqual(80, substr_count($source, "\n") + 1);
+        $this->assertStringContainsString('CoalesceJitHelper', $source);
+        $this->assertStringContainsString('takeLeftBranchFromTypeByte', $source);
+        $this->assertStringContainsString('JitVmHelperLink', $source);
+        $this->assertStringNotContainsString('CoalesceRuntime', $source);
+    }
+
+    public function testCoalesceRuntimeBridgeRemoved(): void
+    {
+        $this->assertFileDoesNotExist(__DIR__.'/../../lib/JIT/Builtin/CoalesceRuntime.php');
     }
 
     public function testCoalesceJitHelperMatchesVmCoalesceSemantics(): void

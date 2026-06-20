@@ -9,16 +9,24 @@ use PHPLLVM\Value;
 use PHPLLVM\Value\Function_;
 use PHPCompiler\Block;
 use PHPCompiler\JIT;
-use PHPCompiler\JIT\Builtin\CoalesceRuntime;
 use PHPCompiler\OpCode;
 
 /**
- * LLVM lowering helpers for ?? (null coalescing) branch targets (issue #99, #10171).
+ * LLVM lowering helpers for ?? (null coalescing) branch targets (issue #99, #10171, #10311).
  *
  * SSOT: {@see \PHPCompiler\VM\CoalesceJitHelper}
  */
 final class CoalesceHelper
 {
+    private const HELPER_PATH = '/VM/CoalesceJitHelper.php';
+
+    private const TAKE_LEFT_HELPER = 'PHPCompiler\\VM\\CoalesceJitHelper::takeLeftBranchFromTypeByte';
+
+    /** @var list<string> */
+    private const COMPILED_HELPERS = [
+        self::TAKE_LEFT_HELPER,
+    ];
+
     public static function compileBranch(
         JIT $jit,
         Function_ $func,
@@ -37,7 +45,7 @@ final class CoalesceHelper
             return $context->helper->loadValue($check);
         }
         if (Variable::TYPE_VALUE === $check->type) {
-            CoalesceRuntime::ensureLinked($context);
+            self::ensureLinked($context);
             $valuePtr = JitValueBox::valuePtrFromVariable($context, $check);
             $typeByte = $context->builder->load(
                 $context->builder->structGep(
@@ -46,7 +54,7 @@ final class CoalesceHelper
                 )
             );
 
-            return CoalesceRuntime::callTakeLeftBranch($context, $typeByte);
+            return self::callTakeLeftBranch($context, $typeByte);
         }
 
         return $context->castToBool($context->helper->loadValue($check));
@@ -71,5 +79,43 @@ final class CoalesceHelper
         }
 
         return $limit > 0 ? $limit : null;
+    }
+
+    private static function ensureLinked(Context $context): void
+    {
+        $abiName = '__coalesce__takeLeftBranch';
+        $probe = $context->module->getNamedFunction($abiName);
+        if (null !== $probe && $probe->countBasicBlocks() > 0) {
+            $context->registerFunction($abiName, $probe);
+
+            return;
+        }
+
+        $i8 = $context->getTypeFromString('int8');
+        $i1 = $context->getTypeFromString('int1');
+        JitVmHelperLink::ensureBridge(
+            $context,
+            $abiName,
+            'coalesce_take_left_bridge_entry',
+            [$i8],
+            $i1,
+            self::TAKE_LEFT_HELPER,
+            self::HELPER_PATH,
+            self::COMPILED_HELPERS,
+            '#10311'
+        );
+        $context->builder->clearInsertionPosition();
+    }
+
+    private static function callTakeLeftBranch(Context $context, Value $typeByte): Value
+    {
+        self::ensureLinked($context);
+        $fn = $context->lookupFunction('__coalesce__takeLeftBranch');
+        $i8 = $context->getTypeFromString('int8');
+
+        return $context->builder->call(
+            $fn,
+            $context->builder->trunc($typeByte, $i8)
+        );
     }
 }
