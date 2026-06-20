@@ -695,4 +695,34 @@ PHP;
         [$out] = (new PropertyHooks())->process($src);
         self::assertSame($src, $out);
     }
+
+    /** @covers bootstrap M4 — for-loop increment `$handler = $handler->parent) {` must not match hook scanner (lib/VM.php) */
+    public function testSkipsForLoopIncrementAssignmentBeforeControlFlowBrace(): void
+    {
+        $src = <<<'PHP'
+<?php
+class C {
+    private function walk(Frame $frame): ?Frame
+    {
+        for ($handler = $frame; null !== $handler; $handler = $handler->parent) {
+            if ($handler->fiberState !== null) {
+                break;
+            }
+        }
+        return null;
+    }
+}
+PHP;
+        [$out] = (new PropertyHooks())->process($src);
+        self::assertSame($src, $out);
+    }
+
+    public function testVmSpineFileUnchangedByPropertyHooksPreprocessor(): void
+    {
+        $path = dirname(__DIR__, 3).'/lib/VM.php';
+        $src = (string) file_get_contents($path);
+        [$out] = (new PropertyHooks())->process($src, $path);
+        self::assertSame($src, $out);
+    }
+
 }
