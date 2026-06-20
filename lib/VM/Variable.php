@@ -2732,7 +2732,7 @@ restart:
         }
         $byte = self::byteFromAssignValue($value);
         if ($index > $len) {
-            $str .= str_repeat("\0", $index - $len);
+            $str .= str_repeat(' ', $index - $len);
         }
         if ($index >= $len) {
             if ($index === strlen($str)) {
