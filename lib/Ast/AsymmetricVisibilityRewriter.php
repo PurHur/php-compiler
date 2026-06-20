@@ -138,22 +138,16 @@ final class AsymmetricVisibilityRewriter
     }
 
     /**
-     * Explicit read visibility before an asymmetric set modifier is a compile fatal (#6774, #9806).
+     * Duplicate access-type modifier before set is a compile fatal (#6774, #9806).
      *
-     * php-src: Zend/zend_compile.c — zend_add_member_modifier(); `public private(set)` combines two
-     * access-type modifiers. Parenthesized `public (private(set))` remains valid (#6589).
+     * php-src: Zend/zend_compile.c — zend_add_member_modifier(); `public public(set)` is fatal.
+     * `public private(set)` is valid PHP 8.4 asymmetric visibility (#10199).
      */
     private static function rejectExplicitPublicBeforeSetModifier(string $source): void
     {
         self::eachPropertyDeclarationLine($source, static function (string $line): void {
             if (preg_match(
                 '/(?<![a-zA-Z0-9_])(public|protected|private)\s+\1\s*\(\s*set\s*\)/i',
-                $line
-            )) {
-                throw new \CompileError(self::MULTIPLE_MODIFIERS_MESSAGE);
-            }
-            if (preg_match(
-                '/(?<![a-zA-Z0-9_])(public|protected|private)\s+(?!\()(public|protected|private)\s*\(\s*set\s*\)/i',
                 $line
             )) {
                 throw new \CompileError(self::MULTIPLE_MODIFIERS_MESSAGE);
