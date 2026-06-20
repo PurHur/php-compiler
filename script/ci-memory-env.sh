@@ -28,6 +28,10 @@ ci_ensure_vendor_patches() {
   local root
   root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
   if [[ -x "${root}/script/apply-patches.sh" && -d "${root}/vendor/ircmaxell/php-cfg" ]]; then
+    # Fast path: grep-only marker check (~ms). Full apply-patches is ~17s even when already applied.
+    if "${root}/script/apply-patches.sh" --verify-only >/dev/null 2>&1; then
+      return 0
+    fi
     # Redirect stderr of the *invoking shell* too, so a crashing subprocess doesn't spam CI logs.
     { "${root}/script/apply-patches.sh" >/dev/null; } 2>/dev/null || true
   fi
