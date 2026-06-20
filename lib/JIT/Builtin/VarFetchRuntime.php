@@ -11,16 +11,16 @@ use PHPLLVM\Value;
 use PHPLLVM\Value\Function_ as LlvmFunction;
 
 /**
- * JIT/AOT link for $$name guards via VmVarFetch PHP (#10289).
+ * JIT/AOT link for $$name guards via VmVarFetchJitHelper PHP (#10289, #8708).
  *
  * php-src: Zend/zend_execute.c — ZEND_FETCH_R/W superglobal branch
- * SSOT: {@see \PHPCompiler\VM\VmVarFetch}
+ * SSOT: {@see \PHPCompiler\VM\VmVarFetch}; nested JIT uses {@see \PHPCompiler\VM\VmVarFetchJitHelper}
  */
 final class VarFetchRuntime
 {
-    private const HELPER_PATH = '/lib/VM/VmVarFetch.php';
+    private const HELPER_PATH = '/lib/VM/VmVarFetchJitHelper.php';
 
-    private const SUPERGLOBAL_HELPER = 'PHPCompiler\\VM\\VmVarFetch::isSuperglobalName';
+    private const SUPERGLOBAL_HELPER = 'PHPCompiler\\VM\\VmVarFetchJitHelper::isSuperglobalName';
 
     /** @var list<string> */
     private const COMPILED_HELPERS = [
@@ -69,7 +69,7 @@ final class VarFetchRuntime
             return;
         }
 
-        $strPtr = $context->getTypeFromString('string*');
+        $strPtr = $context->getTypeFromString('__string__*');
         $i1 = $context->getTypeFromString('int1');
         $ft = $context->context->functionType($i1, false, $strPtr);
         $fn = null !== $probe
@@ -92,7 +92,7 @@ final class VarFetchRuntime
         $lc = \strtolower($logical);
         $fn = $context->functions[$lc] ?? null;
         if (null === $fn) {
-            throw new \LogicException($logical.' missing after VmVarFetch compile (#10289)');
+            throw new \LogicException($logical.' missing after VmVarFetchJitHelper compile (#10289, #8708)');
         }
 
         return $fn;
@@ -118,9 +118,9 @@ final class VarFetchRuntime
             \putenv('PHP_COMPILER_SELFHOST_AOT=0');
         }
         try {
-            $block = $runtime->parseAndCompile((string) \file_get_contents($path), 'VmVarFetch.php');
+            $block = $runtime->parseAndCompile((string) \file_get_contents($path), 'VmVarFetchJitHelper.php');
             if (null === $block) {
-                throw new \LogicException('VmVarFetch.php parseAndCompile failed (#10289)');
+                throw new \LogicException('VmVarFetchJitHelper.php parseAndCompile failed (#10289, #8708)');
             }
             $jit = new JIT($context);
             $jit->compile($block);
@@ -136,7 +136,7 @@ final class VarFetchRuntime
         foreach (self::COMPILED_HELPERS as $logical) {
             $lc = \strtolower($logical);
             if (!isset($context->functions[$lc])) {
-                throw new \LogicException($lc.' was not compiled for JIT (#10289)');
+                throw new \LogicException($lc.' was not compiled for JIT (#10289, #8708)');
             }
         }
     }

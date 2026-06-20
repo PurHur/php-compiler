@@ -10,11 +10,21 @@ use PHPUnit\Framework\TestCase;
 /** VarFetch JIT routes binding resolution through VmVarFetch PHP (#10289). */
 final class VarFetchRuntimeShrinkTest extends TestCase
 {
-    public function testVarFetchRuntimeUsesVmVarFetch(): void
+    public function testVarFetchRuntimeUsesVmVarFetchJitHelper(): void
     {
         $source = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/VarFetchRuntime.php');
-        $this->assertStringContainsString('VmVarFetch', $source);
+        $this->assertStringContainsString('VmVarFetchJitHelper', $source);
         $this->assertStringContainsString('isSuperglobalName', $source);
+        $this->assertStringNotContainsString('operandBindingRank', $source);
+        $this->assertFileExists(__DIR__.'/../../lib/VM/VmVarFetchJitHelper.php');
+    }
+
+    public function testVarFetchRuntimeLazyLinkedFromHelper(): void
+    {
+        $type = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/Type.php');
+        $this->assertStringNotContainsString('VarFetchRuntime::ensureLinked', $type);
+        $helper = (string) file_get_contents(__DIR__.'/../../lib/JIT/VarFetchHelper.php');
+        $this->assertStringContainsString('VarFetchRuntime::ensureLinked', $helper);
     }
 
     public function testVarFetchHelperRoutesThroughVmVarFetch(): void

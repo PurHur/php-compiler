@@ -2152,12 +2152,29 @@ class JIT {
         Block $block,
         string $logicalName
     ): PHPLLVM\Value {
-        // No dedicated C-floor 1-arg emitter exists for this method (unlike initVmContext/initCompiler).
-        // Its PHP-CFG lowering drops the implicit $this and emits a 0-arg no-op body (the parser-pipeline
-        // construction is elided in the self-host spine), which mismatches the 1-arg `void(__object__*)`
-        // call emitted by RuntimeEmitTuInit and breaks LLVM verification of the full driver (#2967).
-        // Emit the 1-arg void stub in every mode so call/definition signatures agree.
-        return $this->emitM3EmitTuRuntimeInitVoidStub($internalName, $logicalName, $block);
+        if ($this->shouldUseM3EmitTuRuntimeMethodStub('initparsepipeline')) {
+            return $this->emitM3EmitTuRuntimeInitVoidStub($internalName, $logicalName, $block);
+        }
+        $lcname = strtolower($logicalName);
+        if (isset($this->context->functions[$lcname])) {
+            return $this->context->functions[$lcname];
+        }
+        if ($this->shouldUseM3EmitTuNativeBridge()
+            || $this->shouldUseM3CompileDriverRealLowering()
+            || $this->shouldRealLowerInventoryArgvParseSpine()
+        ) {
+            $this->compileM3EmitTuRuntimeMethodFromDeclareClassBlocks(['initparsepipeline']);
+            if (!isset($this->context->functions[$lcname])) {
+                $this->compileM3EmitTuRuntimeMethodFromRuntimePhpFile('initparsepipeline', $logicalName, $lcname);
+            }
+            if (isset($this->context->functions[$lcname])) {
+                return $this->context->functions[$lcname];
+            }
+
+            return $this->emitM3EmitTuRuntimeInitVoidStub($internalName, $logicalName, $block);
+        }
+
+        return $this->compileRuntimeSpinePhpLowering($internalName, $block, $logicalName);
     }
 
     private function compileRuntimeInitCompilerM3Native(
@@ -3869,6 +3886,7 @@ class JIT {
             return;
         }
         $this->ensureM3EmitTuCompilerRuntimeCompileDeps();
+        $this->ensureM3EmitTuRuntimeParseSpineDeps();
         $emitHelperStubMethods = $this->shouldStubInventoryEmitParseCompileSpine()
             ? ['parse', 'preparesourceforparser', 'preprocesssourceforparse', 'rewritesourcebeforeparser', 'compileemitsmoke']
             : [];
@@ -4014,6 +4032,25 @@ class JIT {
         return $func;
     }
 
+    /** Private Runtime helpers required before lowering parse() on inventory argv links (#2967). */
+    private function ensureM3EmitTuRuntimeParseSpineDeps(): void
+    {
+        if (!$this->shouldRealLowerInventoryArgvParseSpine()) {
+            return;
+        }
+        foreach (['detectfilestricttypes', 'resetparsernameresolverstate'] as $methodLc) {
+            $logical = 'PHPCompiler\\Runtime::'.$methodLc;
+            $lc = strtolower($logical);
+            if (isset($this->context->functions[$lc])) {
+                continue;
+            }
+            $this->compileM3EmitTuRuntimeMethodFromRuntimePhpFile($methodLc, $logical, $lc);
+            if (!isset($this->context->functions[$lc])) {
+                $this->compileM3EmitTuRuntimeMethodFromDeclareClassBlocks([$methodLc]);
+            }
+        }
+    }
+
     /** Ensure parse + Compiler::compileEmitSmoke exist before emit-bridge LLVM (#2666). */
     private function ensureM3EmitTuEmitBridgeSpineSymbols(): void
     {
@@ -4024,6 +4061,7 @@ class JIT {
             return;
         }
         $this->ensureM3EmitTuCompilerRuntimeCompileDeps();
+        $this->ensureM3EmitTuRuntimeParseSpineDeps();
         $stubBlock = $this->m3CompileDriverMainBlock ?? $this->m3EmitTuMainBlock;
         if ($this->shouldStubInventoryEmitParseCompileSpine() && null !== $stubBlock) {
             $parseLc = strtolower('PHPCompiler\\Runtime::parse');
@@ -11809,6 +11847,20 @@ class JIT {
             $result->type = Variable::TYPE_VALUE;
             $result->value = $slot;
             $result->compileTimeEnumCase = $value->compileTimeEnumCase;
+            $result->addref();
+
+            return;
+        } elseif (Variable::TYPE_OBJECT === $result->type && Variable::TYPE_NATIVE_BOOL === $value->type) {
+            // Self-host inventory spine: bool assigned into object-typed operand (#2967, #8708).
+            $slot = JIT\JitValueBox::alloc($this->context);
+            JIT\JitValueBox::writeBool(
+                $this->context,
+                $slot,
+                $this->context->helper->loadValue($value)
+            );
+            $result->free();
+            $result->type = Variable::TYPE_VALUE;
+            $result->value = $slot;
             $result->addref();
 
             return;
