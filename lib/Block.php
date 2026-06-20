@@ -125,6 +125,12 @@ class Block {
     /** Declared scalar return type for this function (issue #205), or null when untyped. */
     public ?int $returnTypeConstraint = null;
 
+    /** Declared object return class name (issue #10333), or null when untyped / non-class. */
+    public ?string $returnClassConstraint = null;
+
+    /** Declared object return type label for errors (#10333), or null. */
+    public ?string $returnDeclaredTypeLabel = null;
+
     /** Standalone `: true` / `: false` return type (#4784), or null. */
     public ?string $returnLiteralBoolType = null;
 
@@ -521,6 +527,8 @@ class Block {
             $this->func = $parent->func;
             $this->strictTypes = $parent->strictTypes;
             $this->returnTypeConstraint = $parent->returnTypeConstraint;
+            $this->returnClassConstraint = $parent->returnClassConstraint;
+            $this->returnDeclaredTypeLabel = $parent->returnDeclaredTypeLabel;
             $this->returnDnfConstraints = $parent->returnDnfConstraints;
             $this->returnTypeVoid = $parent->returnTypeVoid;
             $this->returnTypeNever = $parent->returnTypeNever;

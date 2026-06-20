@@ -129,6 +129,7 @@ class Runtime {
         $this->staticClassAnnotator = new StaticClassAnnotator();
         $astTraverser->addVisitor($this->staticClassAnnotator);
         $astTraverser->addVisitor(new Ast\EnumPropertyCompileCheck());
+        $astTraverser->addVisitor(new Ast\GeneratorYieldSourceMarker());
         $this->parser = new Parser(
             (new ParserFactory)->create(ParserFactory::ONLY_PHP7),
             $astTraverser

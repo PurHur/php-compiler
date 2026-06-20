@@ -320,6 +320,25 @@ final class TypeCheck
         }
     }
 
+    public static function assertObjectReturn(
+        Variable $value,
+        string $classConstraint,
+        string $declaredLabel,
+        ?string $callableName = null
+    ): void {
+        if (self::matchesClassTypeHint($value, $classConstraint)) {
+            return;
+        }
+        $expected = ltrim($declaredLabel, '\\');
+        $given = self::valueTypeLabel($value);
+        $message = "Return value must be of type {$expected}, {$given} returned";
+        if (null !== $callableName && '' !== $callableName) {
+            $message = "{$callableName}(): {$message}";
+        }
+
+        throw new \TypeError($message);
+    }
+
     private static function coerceUnionPropertyWrite(Variable $target, bool $strict): void
     {
         $constraints = $target->unionTypeConstraints ?? [];
