@@ -1956,7 +1956,6 @@ require_once __DIR__.'/../../../lib/JIT/Builtin/MemoryRuntime.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/MemoryUsageJit.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/MetaTagsRuntime.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/MimeContentTypeRuntime.php';
-require_once __DIR__.'/../../../lib/JIT/Builtin/InOperatorRuntime.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/VarFetchRuntime.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/ListUnpackRuntime.php';
 require_once __DIR__.'/../../../lib/JIT/JitVmHelperLink.php';
