@@ -9,11 +9,14 @@ use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\Variable as JITVariable;
+use PHPCompiler\VM\ErrorReporter;
 use PHPLLVM\Value;
 
-/** linkinfo() — st_dev from lstat(2) on the link (php-src ext/standard/link.c, #6083). */
+/** linkinfo() — st_dev from lstat(2) on the link (php-src ext/standard/link.c, #6083, #10294). */
 final class linkinfo extends Internal
 {
+    private const MISSING_PATH_WARNING = 'linkinfo(): No such file or directory';
+
     public function execute(Frame $frame): void
     {
         if (1 !== \count($frame->calledArgs)) {
@@ -24,11 +27,16 @@ final class linkinfo extends Internal
             return;
         }
         $dev = VmFs::linkinfo($path);
-        if (false === $dev) {
-            $frame->returnVar->bool(false);
-        } else {
-            $frame->returnVar->int($dev);
+        if (-1 === $dev && null !== $frame->vmContext) {
+            $frame->vmContext->errors->triggerError(
+                self::MISSING_PATH_WARNING,
+                ErrorReporter::E_WARNING,
+                '' !== $frame->scriptPath ? $frame->scriptPath : null,
+                $frame->vmContext,
+                $frame
+            );
         }
+        $frame->returnVar->int($dev);
     }
 
     public function call(Context $context, JITVariable ...$args): Value
