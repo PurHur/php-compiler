@@ -14,6 +14,9 @@ namespace PHPCompiler\Ast;
  */
 final class CloneWithDesugar
 {
+    /** Marker for clone-with property list entries without an explicit value (#10310). */
+    public const REINIT_SENTINEL = '__phpc_reinit__';
+
     public static function desugar(string $code): string
     {
         if (!preg_match('/\bclone\b/i', $code)) {
@@ -271,7 +274,7 @@ final class CloneWithDesugar
                     $valueStart = $i;
                     self::skipForwardIgnorable($tokens, $valueStart);
                 } else {
-                    $assignments[] = [$key, '$__phpc_o->'.$key];
+                    $assignments[] = [$key, CloneWithDesugar::REINIT_SENTINEL];
 
                     if ($i < $c && \is_string($tokens[$i]) && ',' === $tokens[$i]) {
                         ++$i;
@@ -354,6 +357,10 @@ final class CloneWithDesugar
                 $body .= 'foreach ('.$value.' as $__phpc_k => $__phpc_v) { '
                     .'if (is_int($__phpc_k)) { $__phpc_k = (string) $__phpc_k; } '
                     .'$__phpc_r->{$__phpc_k} = $__phpc_v; }';
+                continue;
+            }
+            if (self::REINIT_SENTINEL === $value) {
+                $body .= 'phpc_clone_with_reinit($__phpc_r, '.var_export($name, true).');';
                 continue;
             }
             $body .= '$__phpc_r->'.$name.' = '.$value.';';

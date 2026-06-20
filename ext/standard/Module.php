@@ -760,6 +760,7 @@ class Module extends ModuleAbstract
             new phpc_match_unhandled_operand_is_object(),
             new phpc_clone_with_begin(),
             new phpc_clone_with_end(),
+            new phpc_clone_with_reinit(),
             new extract_(),
             new compact_(),
             new scandir(),

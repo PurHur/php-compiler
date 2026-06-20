@@ -48,6 +48,24 @@ final class JitCloneWithReinit
         return JitValueBox::pointer($context, JitValueBox::alloc($context));
     }
 
+    public static function reinit(Context $context, JITVariable ...$args): Value
+    {
+        if (2 !== \count($args)) {
+            throw new \LogicException('phpc_clone_with_reinit() requires exactly two arguments');
+        }
+        $literal = JitStringArg::compileTimeLiteral($args[1]);
+        if (null === $literal) {
+            throw new \LogicException(
+                'phpc_clone_with_reinit() property name must be a compile-time string in this compiler build'
+            );
+        }
+        $obj = self::readObject($context, $args[0]);
+        $classId = $context->type->object->readRuntimeClassId($obj);
+        $context->type->object->reinitCloneWithPropertyDefault($obj, $classId, $literal);
+
+        return JitValueBox::pointer($context, JitValueBox::alloc($context));
+    }
+
     private static function readObject(Context $context, JITVariable $arg): Value
     {
         if (JITVariable::TYPE_VALUE !== $arg->type) {

@@ -13312,6 +13312,36 @@ restart:
     }
 
     /**
+     * Reapply a declared property default during clone-with property list (#10310, Zend/zend_clones.c).
+     */
+    public function reinitCloneWithProperty(ObjectEntry $object, string $propName): void
+    {
+        $meta = $this->classPropertyMeta($object, $propName);
+        if (null === $meta) {
+            throw new \Error(sprintf(
+                'Cannot reinitialize property %s::$%s',
+                $object->class->name,
+                $propName
+            ));
+        }
+        $slot = $object->getProperty($propName);
+        if ($meta->hasRuntimeDefaultInit()) {
+            assert(null !== $meta->defaultInitBlock);
+            assert(null !== $meta->defaultInitResultSlot);
+            $value = $this->executePropertyDefaultInitBlock(
+                $meta->defaultInitBlock,
+                $meta->defaultInitResultSlot
+            );
+            $slot->copyFrom($value);
+        } elseif (null !== $meta->default) {
+            $slot->copyFrom($meta->default);
+        } else {
+            $slot->copyFrom($meta->getVariable());
+        }
+        TypeCheck::coercePropertyWrite($slot, false);
+    }
+
+    /**
      * `new Class(...)` first-class callable invoke (#9767, zend_compile.c).
      *
      * @param list<Variable> $ctorArgs

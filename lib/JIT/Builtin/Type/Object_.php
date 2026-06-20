@@ -2267,6 +2267,96 @@ class Object_ extends Type {
         }, 'lazy_defaults');
     }
 
+    public function readRuntimeClassId(PHPLLVM\Value $obj): PHPLLVM\Value
+    {
+        $objMap = $this->context->structFieldMap['__object__'];
+
+        return $this->context->builder->load(
+            $this->context->builder->structGep($obj, $objMap['class_id'])
+        );
+    }
+
+    /** Reinitialize one clone-with listed property to its compile-time default (#10310). */
+    public function reinitCloneWithPropertyDefault(PHPLLVM\Value $obj, PHPLLVM\Value $classIdVal, string $propName): void
+    {
+        $this->dispatchByRuntimeClassId($classIdVal, function (int $id) use ($obj, $propName): void {
+            $slotIndex = null;
+            $propertyType = null;
+            foreach ($this->properties[$id] ?? [] as $propset) {
+                if ($propset[1] === $propName) {
+                    $slotIndex = $propset[3];
+                    $propertyType = $propset[2];
+                    break;
+                }
+            }
+            if (null === $slotIndex) {
+                throw new \LogicException("clone-with reinit: property {$propName} not on class {$id}");
+            }
+            $slot = $this->propertySlotPtr($obj, $slotIndex);
+            $entry = $this->propertyDefaults[$id][$slotIndex] ?? null;
+            if (null !== $entry) {
+                if (!empty($entry['emptyArray'])) {
+                    $ht = HashTableHelper::alloc($this->context);
+                    $emptyHt = new Variable(
+                        $this->context,
+                        Variable::TYPE_HASHTABLE,
+                        Variable::KIND_VALUE,
+                        $ht
+                    );
+                    $this->propertyStore($slot, $emptyHt, $entry['propertyType']);
+
+                    return;
+                }
+                $constEntry = isset($entry['global'])
+                    ? ['type' => $entry['type'], 'global' => $entry['global']]
+                    : ['type' => $entry['type'], 'value' => $entry['value']];
+                $var = $this->jitConstantFromEntry($constEntry);
+                $this->propertyStore($slot, $var, $entry['propertyType']);
+
+                return;
+            }
+            if (isset($this->runtimePropertyNewDefaults[$id][$slotIndex])) {
+                $newClassId = $this->runtimePropertyNewDefaults[$id][$slotIndex];
+                $child = $this->allocate($newClassId);
+                if (!$this->hasConstructor($newClassId)) {
+                    $this->markObjectConstructed($child);
+                }
+                $jitVar = new Variable(
+                    $this->context,
+                    Variable::TYPE_OBJECT,
+                    Variable::KIND_VALUE,
+                    $child
+                );
+                $this->propertyStore($slot, $jitVar, $propertyType ?? Variable::TYPE_OBJECT);
+
+                return;
+            }
+            if (Variable::TYPE_HASHTABLE === $propertyType) {
+                $ht = HashTableHelper::alloc($this->context);
+                $emptyHt = new Variable(
+                    $this->context,
+                    Variable::TYPE_HASHTABLE,
+                    Variable::KIND_VALUE,
+                    $ht
+                );
+                $this->propertyStore($slot, $emptyHt, $propertyType);
+
+                return;
+            }
+            if (Variable::TYPE_VALUE === $propertyType) {
+                $valueType = $this->context->getTypeFromString('__value__');
+                $heapVal = $this->context->memory->malloc($valueType);
+                $nullVar = new Variable(
+                    $this->context,
+                    Variable::TYPE_NULL,
+                    Variable::KIND_VALUE,
+                    $this->context->builder->pointerCast($heapVal, $this->context->getTypeFromString('__value__*'))
+                );
+                $this->propertyStore($slot, $nullVar, $propertyType);
+            }
+        }, 'clone_with_reinit_'.$propName);
+    }
+
     /** Copy instance properties from initializer result object (lazy proxy, #4940). */
     public function copyInstancePropertiesFrom(PHPLLVM\Value $dest, PHPLLVM\Value $src, PHPLLVM\Value $classIdVal): void
     {

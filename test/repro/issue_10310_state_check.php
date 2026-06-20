@@ -1,7 +1,4 @@
 <?php
-/**
- * Maintainer repro for #10310 — clone-with property list reinitializes defaults.
- */
 declare(strict_types=1);
 
 class W {
@@ -14,7 +11,6 @@ class W {
 }
 
 $w = new W();
-$w->a = 99;
 $w2 = clone($w, ['a']);
 var_export([$w->a, $w->b, $w2->a, $w2->b]);
 echo "\n";

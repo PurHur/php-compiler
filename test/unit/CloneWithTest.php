@@ -22,7 +22,7 @@ final class CloneWithTest extends TestCase
     public function testDesugarRewritesCloneCallWithPropertyList(): void
     {
         $input = '<?php $d = clone($c, [\'a\']);';
-        $expected = '<?php $d = (function ($__phpc_o) { $__phpc_r = clone $__phpc_o;phpc_clone_with_begin($__phpc_r, \'a\');$__phpc_r->a = $__phpc_o->a;phpc_clone_with_end($__phpc_r);return $__phpc_r; })($c);';
+        $expected = '<?php $d = (function ($__phpc_o) { $__phpc_r = clone $__phpc_o;phpc_clone_with_begin($__phpc_r, \'a\');phpc_clone_with_reinit($__phpc_r, \'a\');phpc_clone_with_end($__phpc_r);return $__phpc_r; })($c);';
         $this->assertSame($expected, CloneWithDesugar::desugar($input));
     }
 
@@ -37,7 +37,7 @@ final class CloneWithTest extends TestCase
     public function testDesugarRewritesCloneWithKeywordArray(): void
     {
         $input = '<?php $d = clone $c with [\'a\'];';
-        $expected = '<?php $d = (function ($__phpc_o) { $__phpc_r = clone $__phpc_o;phpc_clone_with_begin($__phpc_r, \'a\');$__phpc_r->a = $__phpc_o->a;phpc_clone_with_end($__phpc_r);return $__phpc_r; })($c);';
+        $expected = '<?php $d = (function ($__phpc_o) { $__phpc_r = clone $__phpc_o;phpc_clone_with_begin($__phpc_r, \'a\');phpc_clone_with_reinit($__phpc_r, \'a\');phpc_clone_with_end($__phpc_r);return $__phpc_r; })($c);';
         $this->assertSame($expected, CloneWithDesugar::desugar($input));
     }
 
@@ -196,6 +196,34 @@ PHP;
         ob_start();
         $rt->run($block);
         $this->assertSame("array (\n  0 => 2,\n  1 => 'b',\n)", ob_get_clean());
+    }
+
+    /** Issue #10310 — property list without value reinitializes defaults, not source values. */
+    public function testVmCloneWithPropertyListReinitializesDefault(): void
+    {
+        $code = <<<'PHP'
+<?php
+declare(strict_types=1);
+
+class W {
+    public int $a = 1;
+    public readonly int $b;
+
+    public function __construct() {
+        $this->b = 2;
+    }
+}
+
+$w = new W();
+$w->a = 99;
+$w2 = clone($w, ['a']);
+var_export([$w->a, $w->b, $w2->a, $w2->b]);
+PHP;
+        $rt = new Runtime();
+        $block = $rt->parseAndCompile($code, 'test.php');
+        ob_start();
+        $rt->run($block);
+        $this->assertSame("array (\n  0 => 99,\n  1 => 2,\n  2 => 1,\n  3 => 2,\n)", ob_get_clean());
     }
 
     /** Issue #10165 — clone-with overrides apply after __clone(); closure IIFE must receive object. */
