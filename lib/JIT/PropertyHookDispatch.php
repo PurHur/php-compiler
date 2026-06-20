@@ -416,9 +416,7 @@ final class PropertyHookDispatch
             return false;
         }
 
-        $message = $hasSet
-            ? sprintf('Cannot unset hooked property %s::$%s', $className, $propertyName)
-            : sprintf('Cannot unset read-only property %s::$%s', $className, $propertyName);
+        $message = sprintf('Cannot unset hooked property %s::$%s', $className, $propertyName);
         if (null !== $jit && [] !== $context->tryCatch->handlerStack) {
             TryCatchHelper::emitCatchableErrorMessage($context, $jit, $message);
         } else {

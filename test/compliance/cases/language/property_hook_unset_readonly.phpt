@@ -16,4 +16,4 @@ try {
     echo $e->getMessage(), "\n";
 }
 --EXPECT--
-Cannot unset read-only property RO::$x
+Cannot unset hooked property RO::$x

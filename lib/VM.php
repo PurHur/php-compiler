@@ -904,8 +904,7 @@ class VM {
                 return $this->raiseVirtualPropertyHookUnsetError(
                     $className,
                     $propName,
-                    $frame,
-                    null !== $meta->setHookMethodLc
+                    $frame
                 );
             }
         }
@@ -946,8 +945,7 @@ class VM {
                 return $this->raiseVirtualPropertyHookUnsetError(
                     $className,
                     $propNameRaw,
-                    $frame,
-                    !empty($hooks['set'])
+                    $frame
                 );
             }
         }
@@ -9295,7 +9293,7 @@ restart:
             $className = $this->context->classes[$meta->declaringClassLc]->name;
         }
 
-        return $this->raiseVirtualPropertyHookUnsetError($className, $propName, $frame, $hasSet);
+        return $this->raiseVirtualPropertyHookUnsetError($className, $propName, $frame);
     }
 
     /** Reject unset() on typed static properties (Zend zend_object_handlers.c, #6648). */
@@ -9343,18 +9341,15 @@ restart:
         }
         $className = $this->context->classes[$classLc]->name ?? $classLc;
 
-        return $this->raiseVirtualPropertyHookUnsetError($className, $propNameRaw, $frame, $hasSet);
+        return $this->raiseVirtualPropertyHookUnsetError($className, $propNameRaw, $frame);
     }
 
     private function raiseVirtualPropertyHookUnsetError(
         string $className,
         string $propName,
-        Frame $frame,
-        bool $hasSetHook
+        Frame $frame
     ): ?Frame {
-        $message = $hasSetHook
-            ? sprintf('Cannot unset hooked property %s::$%s', $className, $propName)
-            : sprintf('Cannot unset read-only property %s::$%s', $className, $propName);
+        $message = sprintf('Cannot unset hooked property %s::$%s', $className, $propName);
         $thrown = VM\BuiltinExceptionSupport::materializeError(
             $this->context,
             $message
