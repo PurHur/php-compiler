@@ -30,6 +30,8 @@
             <file>./test/compliance/VMTest.php</file>
             <file>./test/compliance/GeneratorVMTest.php</file>
             <file>./test/compliance/EnumVMTest.php</file>
+            <file>./test/compliance/SwitchEnumTest.php</file>
+            <file>./test/compliance/SwitchEnumScalarSubjectJITTest.php</file>
             <file>./test/compliance/EnumTypedParamJITTest.php</file>
             <file>./test/compliance/EnumTraitConstTest.php</file>
             <file>./test/compliance/EnumTraitMethodJitTest.php</file>

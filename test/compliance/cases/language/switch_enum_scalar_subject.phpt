@@ -1,5 +1,5 @@
 --TEST--
-Language: switch() scalar subject must not match enum case label (#8880, zend_operators.c, re-#5835)
+Language: switch() scalar subject must not match enum case label (#8880, #9857, zend_operators.c, re-#5835)
 --FILE--
 <?php
 enum E: int { case A = 1; }

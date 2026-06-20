@@ -1,5 +1,5 @@
 --TEST--
-Language: switch on backed enum must not match scalar case labels (#9580, #9857, zend_compile.c)
+Language: switch enum↔scalar case labels must not match via backing compare (#9857, zend_execute.c)
 --FILE--
 <?php
 enum E: int { case A = 1; }
@@ -16,6 +16,16 @@ switch ($e) {
     default: echo "def\n";
 }
 
+switch (1) {
+    case E::A: echo "rev-int\n"; break;
+    default: echo "rev-def\n";
+}
+
+switch ('a') {
+    case S::A: echo "rev-str\n"; break;
+    default: echo "rev-str-def\n";
+}
+
 switch (E::A) {
     case E::A: echo "identity\n"; break;
     default: echo "identity-no\n";
@@ -24,4 +34,6 @@ switch (E::A) {
 --EXPECT--
 def
 def
+rev-def
+rev-str-def
 identity
