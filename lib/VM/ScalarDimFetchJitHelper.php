@@ -7,7 +7,7 @@ namespace PHPCompiler\VM;
 use PHPCompiler\JIT\Variable as JitVariable;
 
 /**
- * Lowered into JIT/AOT modules for ZEND_FETCH_DIM_R on scalar containers (#10271, php-in-PHP).
+ * Lowered into JIT/AOT modules for ZEND_FETCH_DIM_R on scalar containers (#10271, #10343, php-in-PHP).
  *
  * php-src: Zend/zend_execute.c — ZEND_FETCH_DIM_R on non-array/object
  * SSOT: {@see ErrorReporter::arrayOffsetOnNonContainer}
@@ -28,5 +28,13 @@ final class ScalarDimFetchJitHelper
     public static function warningMessageForJitType(int $jitTypeByte): string
     {
         return ErrorReporter::arrayOffsetOnNonContainerMessage(self::jitTypeLabel($jitTypeByte));
+    }
+
+    /**
+     * Emit Zend E_WARNING for scalar dim read; compiled into JIT/AOT via ScalarDimFetchRuntime bridge.
+     */
+    public static function emitWarningForJitType(int $jitTypeByte): void
+    {
+        compiler_language_warning(self::warningMessageForJitType($jitTypeByte));
     }
 }
