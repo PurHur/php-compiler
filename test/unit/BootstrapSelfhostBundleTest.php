@@ -69,6 +69,7 @@ final class BootstrapSelfhostBundleTest extends TestCase
         'lib/Web/ProjectDeploy.php',
         'lib/AOT/ProjectGraph.php',
         'lib/Ast/GroupUseStripper.php',
+        'lib/Ast/GeneratorYieldSourceMarker.php',
         'lib/Web/DevServer.php',
         'lib/Web/ManifestValidator.php',
         'lib/Web/Params.php',
