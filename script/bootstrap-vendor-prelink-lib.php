@@ -430,6 +430,8 @@ function bootstrapVendorPrelinkExtractCompileFailureDetail(array $output): ?stri
 /**
  * AOT-compile vendor prelink bundles → prelinked .o (shared by warm and cold boot).
  *
+ * Independent packages compile in parallel when PHP_COMPILER_COMPILE_JOBS>1.
+ *
  * @param array{version: int, generated_at: string, packages: array<string, array<string, mixed>>} $manifest
  *
  * @return int number of failures
@@ -447,7 +449,9 @@ function bootstrapVendorPrelinkCompilePackages(
     ?array $onlyPackages = null,
     ?array $invoker = null
 ): int {
-    $failures = 0;
+    require_once __DIR__.'/compile-jobs-lib.php';
+
+    $packages = [];
     foreach (BOOTSTRAP_VENDOR_PRELINK_PACKAGES as $package => $role) {
         if (null !== $onlyPackages && !in_array($package, $onlyPackages, true)) {
             continue;
@@ -455,106 +459,320 @@ function bootstrapVendorPrelinkCompilePackages(
         if (null !== $one && $one !== $package && $one !== bootstrapVendorPrelinkSlug($package)) {
             continue;
         }
-        $slug = bootstrapVendorPrelinkSlug($package);
-        $bundleRel = $manifest['packages'][$package]['bundle'] ?? '';
-        $bundleAbs = $root.'/'.$bundleRel;
-        $objectRel = $manifest['packages'][$package]['object'] ?? '';
-        $objectAbs = $root.'/'.$objectRel;
-        $buildBase = $root.'/build/bootstrap-vendor/'.$slug;
+        $packages[] = $package;
+    }
 
-        if (!is_string($bundleRel) || '' === $bundleRel || !is_file($bundleAbs)) {
-            $manifest['packages'][$package]['status'] = 'missing_bundle';
-            ++$failures;
+    if ([] === $packages) {
+        return 0;
+    }
+
+    $jobs = php_compiler_compile_jobs();
+    if ($jobs > 1 && count($packages) > 1) {
+        fwrite(
+            STDERR,
+            'bootstrap-vendor-prelink: PHP_COMPILER_COMPILE_JOBS='.$jobs.' ('.count($packages)." packages)\n"
+        );
+    }
+
+    if ($jobs <= 1 || count($packages) <= 1) {
+        $failures = 0;
+        foreach ($packages as $package) {
+            $result = bootstrapVendorPrelinkCompileOnePackage($root, $package, $manifest, $invoker);
+            bootstrapVendorPrelinkApplyCompileResult($manifest, $result, $failures);
+        }
+
+        return $failures;
+    }
+
+    $tasks = [];
+    /** @var array<string, array{cmd: string}> $prepByPackage */
+    $prepByPackage = [];
+    $failures = 0;
+    foreach ($packages as $package) {
+        $prep = bootstrapVendorPrelinkPrepareCompileOnePackage($root, $package, $manifest, $invoker);
+        if (null !== $prep['skip']) {
+            bootstrapVendorPrelinkApplyCompileResult($manifest, $prep['skip'], $failures);
             continue;
         }
-        if (!is_string($objectRel) || '' === $objectRel) {
-            ++$failures;
-            continue;
-        }
+        $prepByPackage[$package] = ['cmd' => $prep['cmd']];
+        $tasks[] = [
+            'id' => $package,
+            'cmd' => $prep['cmd'],
+            'cwd' => $root,
+        ];
+    }
 
-        if (!is_dir(dirname($buildBase))) {
-            mkdir(dirname($buildBase), 0775, true);
-        }
-        if (!is_dir(dirname($objectAbs))) {
-            mkdir(dirname($objectAbs), 0775, true);
-        }
+    if ([] === $tasks) {
+        return $failures;
+    }
 
-        @unlink($buildBase);
-        @unlink($buildBase.'.o');
-        // Keep committed prelinked .o until we have a replacement (fallback copies from it; #3028).
-
-        $cmd = bootstrapVendorPrelinkBuildCompileCommand($root, $buildBase, $bundleAbs, $invoker);
-        $output = [];
-        exec($cmd, $output, $code);
-        $compileOut = $buildBase.'.o';
-        $objectCandidate = $compileOut;
-
-        if (0 === $code && is_file($objectCandidate)) {
-            copy($objectCandidate, $objectAbs);
-            $manifest['packages'][$package]['status'] = 'object_ok';
-            $manifest['packages'][$package]['blocker'] = null;
-            fwrite(STDOUT, "OK {$package} → {$objectRel}\n");
-            continue;
-        }
-        // Legacy emit wrote $compileOut.o when -o already ended in .o (#3054).
-        if (0 === $code && !is_file($objectCandidate) && is_file($compileOut.'.o')) {
-            copy($compileOut.'.o', $objectAbs);
-            $manifest['packages'][$package]['status'] = 'object_ok';
-            $manifest['packages'][$package]['blocker'] = null;
-            fwrite(STDOUT, "OK {$package} → {$objectRel} (native compile, legacy .o.o)\n");
-            continue;
-        }
-        // Native argv / emit-helper may write object bytes to -o without separate .o suffix (#3036).
-        if (0 === $code && !is_file($objectCandidate) && is_file($buildBase)) {
-            copy($buildBase, $objectAbs);
-            $manifest['packages'][$package]['status'] = 'object_ok';
-            $manifest['packages'][$package]['blocker'] = null;
-            fwrite(STDOUT, "OK {$package} → {$objectRel} (native compile)\n");
-            continue;
-        }
-
-        $sidecarSource = bootstrapVendorPrelinkCopySidecarFallback($root, $slug, $objectAbs);
-        if (null !== $sidecarSource) {
-            $manifest['packages'][$package]['status'] = 'object_ok';
-            $manifest['packages'][$package]['blocker'] = null;
-            $via = 'link-time' === $sidecarSource ? 'link-time vendor sidecar' : 'committed prelink';
-            fwrite(STDOUT, "OK {$package} → {$objectRel} ({$via})\n");
-            continue;
-        }
-
-        $blocker = 0 !== $code
-            ? 'compile exit '.$code.' (vendor bundle AOT — #1416, #2849)'
-            : 'missing object file after compile';
-
-        $logPath = $buildBase.'.log';
-        file_put_contents($logPath, implode("\n", array_map('strval', $output))."\n");
-        $firstActionable = bootstrapVendorPrelinkExtractCompileFailureDetail($output);
-        if (null === $firstActionable && is_file($logPath)) {
-            $logLines = file($logPath, FILE_IGNORE_NEW_LINES) ?: [];
-            $firstActionable = bootstrapVendorPrelinkExtractCompileFailureDetail($logLines);
-        }
-        if (null !== $firstActionable && str_contains($firstActionable, 'Missing vendor autoload')) {
-            $blocker = 'vendor prelink must not require composer autoload (#2849)';
-        }
-        if (null !== $firstActionable) {
-            $blocker .= ' — '.$firstActionable;
-        }
-        $manifest['packages'][$package]['status'] = 139 === $code ? 'compile_segfault' : 'compile_failed';
-        $manifest['packages'][$package]['blocker'] = $blocker;
-        fwrite(STDERR, "FAIL {$package}: {$blocker}\n");
-        fwrite(STDERR, "  cmd: {$cmd}\n");
-        fwrite(STDERR, "  log: {$logPath}\n");
-        if ([] !== $output) {
-            $tail = array_slice($output, -60);
-            fwrite(STDERR, "  tail:\n");
-            foreach ($tail as $line) {
-                fwrite(STDERR, "    ".(string) $line."\n");
-            }
-        }
-        ++$failures;
+    $results = php_compiler_run_parallel_commands($tasks, $jobs);
+    foreach ($tasks as $task) {
+        $package = $task['id'];
+        $run = $results[$package] ?? ['exit' => 127, 'output' => 'missing parallel result'];
+        $output = array_values(array_filter(explode("\n", str_replace("\r", '', $run['output']))));
+        $result = bootstrapVendorPrelinkFinalizeCompileOnePackage(
+            $root,
+            $package,
+            $manifest,
+            (int) $run['exit'],
+            $output,
+            $prepByPackage[$package]['cmd'] ?? $task['cmd']
+        );
+        bootstrapVendorPrelinkApplyCompileResult($manifest, $result, $failures);
     }
 
     return $failures;
+}
+
+/**
+ * @param array{version: int, generated_at: string, packages: array<string, array<string, mixed>>} $manifest
+ *
+ * @return array<string, mixed>
+ */
+function bootstrapVendorPrelinkPrepareCompileOnePackage(
+    string $root,
+    string $package,
+    array $manifest,
+    ?array $invoker = null
+): array {
+    $slug = bootstrapVendorPrelinkSlug($package);
+    $bundleRel = $manifest['packages'][$package]['bundle'] ?? '';
+    $bundleAbs = $root.'/'.$bundleRel;
+    $objectRel = $manifest['packages'][$package]['object'] ?? '';
+    $objectAbs = $root.'/'.$objectRel;
+    $buildBase = $root.'/build/bootstrap-vendor/'.$slug;
+
+    if (!is_string($bundleRel) || '' === $bundleRel || !is_file($bundleAbs)) {
+        return [
+            'skip' => [
+                'package' => $package,
+                'failed' => true,
+                'status' => 'missing_bundle',
+                'blocker' => null,
+                'objectRel' => $objectRel,
+                'buildBase' => $buildBase,
+                'cmd' => '',
+                'output' => [],
+            ],
+        ];
+    }
+    if (!is_string($objectRel) || '' === $objectRel) {
+        return [
+            'skip' => [
+                'package' => $package,
+                'failed' => true,
+                'status' => 'compile_failed',
+                'blocker' => 'missing object path in manifest',
+                'objectRel' => $objectRel,
+                'buildBase' => $buildBase,
+                'cmd' => '',
+                'output' => [],
+            ],
+        ];
+    }
+
+    if (!is_dir(dirname($buildBase))) {
+        mkdir(dirname($buildBase), 0775, true);
+    }
+    if (!is_dir(dirname($objectAbs))) {
+        mkdir(dirname($objectAbs), 0775, true);
+    }
+
+    @unlink($buildBase);
+    @unlink($buildBase.'.o');
+
+    return [
+        'skip' => null,
+        'cmd' => bootstrapVendorPrelinkBuildCompileCommand($root, $buildBase, $bundleAbs, $invoker),
+        'buildBase' => $buildBase,
+        'objectRel' => $objectRel,
+        'objectAbs' => $objectAbs,
+        'slug' => $slug,
+    ];
+}
+
+/**
+ * @param array{version: int, generated_at: string, packages: array<string, array<string, mixed>>} $manifest
+ * @param list<string> $output
+ *
+ * @return array<string, mixed>
+ */
+function bootstrapVendorPrelinkFinalizeCompileOnePackage(
+    string $root,
+    string $package,
+    array $manifest,
+    int $code,
+    array $output,
+    string $cmd
+): array {
+    $slug = bootstrapVendorPrelinkSlug($package);
+    $objectRel = $manifest['packages'][$package]['object'] ?? '';
+    $objectAbs = $root.'/'.$objectRel;
+    $buildBase = $root.'/build/bootstrap-vendor/'.$slug;
+    $compileOut = $buildBase.'.o';
+    $objectCandidate = $compileOut;
+
+    if (0 === $code && is_file($objectCandidate)) {
+        copy($objectCandidate, $objectAbs);
+
+        return [
+            'package' => $package,
+            'failed' => false,
+            'status' => 'object_ok',
+            'blocker' => null,
+            'objectRel' => $objectRel,
+            'buildBase' => $buildBase,
+            'cmd' => $cmd,
+            'output' => $output,
+            'message' => "OK {$package} → {$objectRel}",
+        ];
+    }
+    if (0 === $code && !is_file($objectCandidate) && is_file($compileOut.'.o')) {
+        copy($compileOut.'.o', $objectAbs);
+
+        return [
+            'package' => $package,
+            'failed' => false,
+            'status' => 'object_ok',
+            'blocker' => null,
+            'objectRel' => $objectRel,
+            'buildBase' => $buildBase,
+            'cmd' => $cmd,
+            'output' => $output,
+            'message' => "OK {$package} → {$objectRel} (native compile, legacy .o.o)",
+        ];
+    }
+    if (0 === $code && !is_file($objectCandidate) && is_file($buildBase)) {
+        copy($buildBase, $objectAbs);
+
+        return [
+            'package' => $package,
+            'failed' => false,
+            'status' => 'object_ok',
+            'blocker' => null,
+            'objectRel' => $objectRel,
+            'buildBase' => $buildBase,
+            'cmd' => $cmd,
+            'output' => $output,
+            'message' => "OK {$package} → {$objectRel} (native compile)",
+        ];
+    }
+
+    $sidecarSource = bootstrapVendorPrelinkCopySidecarFallback($root, $slug, $objectAbs);
+    if (null !== $sidecarSource) {
+        $via = 'link-time' === $sidecarSource ? 'link-time vendor sidecar' : 'committed prelink';
+
+        return [
+            'package' => $package,
+            'failed' => false,
+            'status' => 'object_ok',
+            'blocker' => null,
+            'objectRel' => $objectRel,
+            'buildBase' => $buildBase,
+            'cmd' => $cmd,
+            'output' => $output,
+            'message' => "OK {$package} → {$objectRel} ({$via})",
+        ];
+    }
+
+    $blocker = 0 !== $code
+        ? 'compile exit '.$code.' (vendor bundle AOT — #1416, #2849)'
+        : 'missing object file after compile';
+
+    $logPath = $buildBase.'.log';
+    file_put_contents($logPath, implode("\n", array_map('strval', $output))."\n");
+    $firstActionable = bootstrapVendorPrelinkExtractCompileFailureDetail($output);
+    if (null === $firstActionable && is_file($logPath)) {
+        $logLines = file($logPath, FILE_IGNORE_NEW_LINES) ?: [];
+        $firstActionable = bootstrapVendorPrelinkExtractCompileFailureDetail($logLines);
+    }
+    if (null !== $firstActionable && str_contains($firstActionable, 'Missing vendor autoload')) {
+        $blocker = 'vendor prelink must not require composer autoload (#2849)';
+    }
+    if (null !== $firstActionable) {
+        $blocker .= ' — '.$firstActionable;
+    }
+
+    return [
+        'package' => $package,
+        'failed' => true,
+        'status' => 139 === $code ? 'compile_segfault' : 'compile_failed',
+        'blocker' => $blocker,
+        'objectRel' => $objectRel,
+        'buildBase' => $buildBase,
+        'cmd' => $cmd,
+        'output' => $output,
+        'logPath' => $logPath,
+    ];
+}
+
+/**
+ * @param array{version: int, generated_at: string, packages: array<string, array<string, mixed>>} $manifest
+ *
+ * @return array<string, mixed>
+ */
+function bootstrapVendorPrelinkCompileOnePackage(
+    string $root,
+    string $package,
+    array $manifest,
+    ?array $invoker = null
+): array {
+    $prep = bootstrapVendorPrelinkPrepareCompileOnePackage($root, $package, $manifest, $invoker);
+    if (null !== $prep['skip']) {
+        return $prep['skip'];
+    }
+
+    $output = [];
+    exec($prep['cmd'], $output, $code);
+
+    return bootstrapVendorPrelinkFinalizeCompileOnePackage(
+        $root,
+        $package,
+        $manifest,
+        (int) $code,
+        $output,
+        $prep['cmd']
+    );
+}
+
+/**
+ * @param array{version: int, generated_at: string, packages: array<string, array<string, mixed>>} $manifest
+ * @param array<string, mixed> $result
+ */
+function bootstrapVendorPrelinkApplyCompileResult(array &$manifest, array $result, int &$failures): void
+{
+    $package = (string) ($result['package'] ?? '');
+    if ('' === $package) {
+        return;
+    }
+    $manifest['packages'][$package]['status'] = (string) ($result['status'] ?? 'compile_failed');
+    $manifest['packages'][$package]['blocker'] = $result['blocker'] ?? null;
+
+    if (!empty($result['failed'])) {
+        ++$failures;
+        $blocker = (string) ($result['blocker'] ?? 'compile failed');
+        fwrite(STDERR, "FAIL {$package}: {$blocker}\n");
+        if ('' !== (string) ($result['cmd'] ?? '')) {
+            fwrite(STDERR, '  cmd: '.(string) $result['cmd']."\n");
+        }
+        if (isset($result['logPath'])) {
+            fwrite(STDERR, '  log: '.(string) $result['logPath']."\n");
+        }
+        $output = $result['output'] ?? [];
+        if (is_array($output) && [] !== $output) {
+            $tail = array_slice($output, -60);
+            fwrite(STDERR, "  tail:\n");
+            foreach ($tail as $line) {
+                fwrite(STDERR, '    '.(string) $line."\n");
+            }
+        }
+
+        return;
+    }
+
+    $message = (string) ($result['message'] ?? ('OK '.$package));
+    fwrite(STDOUT, $message."\n");
 }
 
 /**

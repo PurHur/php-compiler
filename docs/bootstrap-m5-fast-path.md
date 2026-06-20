@@ -178,6 +178,7 @@ Use these during LLVM/JIT iteration — avoid full spine relink unless you chang
 | `make north-star5-verify-fast` | **~1–2 min** | PR M5 presenter — inventory + spine + prelinked blobs + VM probe (no relink) |
 | `make north-star5-verify --strict` | **~1h** | Full M5 ladder before merging bootstrap/M5 work (not every PR) |
 | `make bootstrap-selfhost-lib-spine-smoke` | minutes | Full spine link — run after spine entry edits or before refreshing gen-0 blobs |
+| `make bootstrap-warm-m3-sidecars` | seconds–minutes | Pre-build independent M3 sidecars (parallel when `PHP_COMPILER_COMPILE_JOBS>1`) before slow emit/link |
 | `make bootstrap-gen0-refresh-sidecar` | minutes | Full spine link + copy `build/.m3_*` → `prelinked/bootstrap-gen0/` + manifest refresh ([#8704](https://github.com/PurHur/php-compiler/issues/8704)) |
 | `php script/bootstrap-inventory.php --check` | seconds | Inventory SSOT without LLVM |
 | `php script/check-selfhost-spine-coverage-sync.php` | seconds | Spine ↔ inventory coverage (**2643/2643**) |
@@ -197,3 +198,4 @@ Use these during LLVM/JIT iteration — avoid full spine relink unless you chang
 | `BOOTSTRAP_M3_FORCE_EMIT_HELPER_LINK=1` | M3 helloworld probe: force cold Zend LLVM inventory `compile_driver` link (default skips when `prelinked/bootstrap-gen0/.m3_compile_driver_aot_blob` valid — [#9704](https://github.com/PurHur/php-compiler/issues/9704)) |
 | `PHP_COMPILER_EMIT_HELPER_LINK=1` + `PHP_COMPILER_M3_INVENTORY_EMIT_DRIVER=1` | Inventory argv emit-helper link; parse/CFG spine **real-lowers** (not stubbed) when `PHP_COMPILER_SELFHOST_AOT=1` or vendor-prelink executable emit ([#8706](https://github.com/PurHur/php-compiler/issues/8706)) |
 | `PHP_COMPILER_M4_BIN_COMPILE_DRIVER=1` | M4 `bin/compile.php` argv driver; parse spine real-lowers with emit-helper link ([#8706](https://github.com/PurHur/php-compiler/issues/8706)) |
+| `PHP_COMPILER_COMPILE_JOBS=N` | Fan out independent `bin/compile.php` subprocesses for vendor prelink (`make bootstrap-vendor-objects`) and optional sidecar warmup (`make bootstrap-warm-m3-sidecars`). Default `1`. RAM ≈ jobs × `PHP_COMPILER_MEMORY_LIMIT`. |
