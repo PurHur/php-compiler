@@ -1826,6 +1826,10 @@ final class VmString
             return false;
         }
 
+        if ('' === $url) {
+            $path = '';
+        }
+
         if (str_contains($rest, '#')) {
             [$rest, $fragment] = explode('#', $rest, 2);
         }
@@ -1852,7 +1856,7 @@ final class VmString
             if (null !== $pass && '' !== $pass) {
                 $filtered['pass'] = $pass;
             }
-            if (null !== $path && '' !== $path) {
+            if (null !== $path && ('' !== $path || '' === $url)) {
                 $filtered['path'] = $path;
             }
             if (null !== $query && '' !== $query) {
@@ -1877,7 +1881,7 @@ final class VmString
             case VmParseUrl::PHP_URL_PASS:
                 return null !== $pass && '' !== $pass ? $pass : null;
             case VmParseUrl::PHP_URL_PATH:
-                return null !== $path && '' !== $path ? $path : null;
+                return null !== $path && ('' !== $path || '' === $url) ? $path : null;
             case VmParseUrl::PHP_URL_QUERY:
                 return null !== $query && '' !== $query ? $query : null;
             case VmParseUrl::PHP_URL_FRAGMENT:
