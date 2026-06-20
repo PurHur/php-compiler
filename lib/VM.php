@@ -2562,7 +2562,7 @@ restart:
                     $arg2 = $frame->scope[$op->arg2];
                     $arg3 = isset($frame->block->constants[$op->arg3])
                         ? $frame->block->constants[$op->arg3]
-                        : $frame->scope[$op->arg3];
+                        : $this->readScopeOperandForRuntimeRead($frame, (int) $op->arg3);
                     $catchFrame = $this->enforcePropertyVisibilityWrite($arg2, $frame);
                     if (null !== $catchFrame) {
                         $frame = $catchFrame;
@@ -3215,7 +3215,11 @@ restart:
                     break;
                 case OpCode::TYPE_CAST_BOOL:
                     try {
-                        $frame->scope[$op->arg1]->castFrom(Variable::TYPE_BOOLEAN, $frame->scope[$op->arg2], $this);
+                        $frame->scope[$op->arg1]->castFrom(
+                            Variable::TYPE_BOOLEAN,
+                            $this->readScopeOperandForRuntimeRead($frame, (int) $op->arg2),
+                            $this
+                        );
                     } catch (\TypeError $e) {
                         $catchFrame = $this->dispatchVmTypeError($e, $frame);
                         if (null !== $catchFrame) {
@@ -3226,7 +3230,12 @@ restart:
                     break;
                 case OpCode::TYPE_CAST_INT:
                     try {
-                        $frame->scope[$op->arg1]->castFrom(Variable::TYPE_INTEGER, $frame->scope[$op->arg2], $this, $frame);
+                        $frame->scope[$op->arg1]->castFrom(
+                            Variable::TYPE_INTEGER,
+                            $this->readScopeOperandForRuntimeRead($frame, (int) $op->arg2),
+                            $this,
+                            $frame
+                        );
                     } catch (\TypeError $e) {
                         $catchFrame = $this->dispatchVmTypeError($e, $frame);
                         if (null !== $catchFrame) {
@@ -3237,7 +3246,12 @@ restart:
                     break;
                 case OpCode::TYPE_CAST_FLOAT:
                     try {
-                        $frame->scope[$op->arg1]->castFrom(Variable::TYPE_FLOAT, $frame->scope[$op->arg2], $this, $frame);
+                        $frame->scope[$op->arg1]->castFrom(
+                            Variable::TYPE_FLOAT,
+                            $this->readScopeOperandForRuntimeRead($frame, (int) $op->arg2),
+                            $this,
+                            $frame
+                        );
                     } catch (\TypeError $e) {
                         $catchFrame = $this->dispatchVmTypeError($e, $frame);
                         if (null !== $catchFrame) {
@@ -3251,8 +3265,14 @@ restart:
                     if (null !== $op->arg3 && $op->arg3 > 0) {
                         $frame->callSiteLine = $op->arg3;
                     }
+                    $castStringSrc = $this->readScopeOperandForRuntimeRead($frame, (int) $op->arg2);
                     try {
-                        $frame->scope[$op->arg1]->castFrom(Variable::TYPE_STRING, $frame->scope[$op->arg2], $this, $frame);
+                        $frame->scope[$op->arg1]->castFrom(
+                            Variable::TYPE_STRING,
+                            $castStringSrc,
+                            $this,
+                            $frame
+                        );
                     } catch (\Error $e) {
                         $frame->callSiteLine = $savedCallSiteLine;
                         $catchFrame = $this->dispatchVmError($e->getMessage(), $frame);
@@ -3279,12 +3299,15 @@ restart:
                     break;
                 case OpCode::TYPE_CAST_ARRAY:
                     $frame->scope[$op->arg1]->copyFrom(
-                        CastSupport::toArray($frame->scope[$op->arg2], $this->context->classes)
+                        CastSupport::toArray(
+                            $this->readScopeOperandForRuntimeRead($frame, (int) $op->arg2),
+                            $this->context->classes
+                        )
                     );
                     break;
                 case OpCode::TYPE_CAST_OBJECT:
+                    $src = $this->readScopeOperandForRuntimeRead($frame, (int) $op->arg2)->resolveIndirect();
                     $dst = $frame->scope[$op->arg1];
-                    $src = $frame->scope[$op->arg2]->resolveIndirect();
                     if (Variable::TYPE_OBJECT === $src->type) {
                         $dst->copyFrom($src);
                         break;
@@ -3419,6 +3442,8 @@ restart:
                     $arg1 = $frame->scope[$op->arg1];
                     $arg2 = $frame->scope[$op->arg2];
                     $arg3 = $frame->scope[$op->arg3];
+                    $readArg2 = $this->readScopeOperandForRuntimeRead($frame, (int) $op->arg2);
+                    $readArg3 = $this->readScopeOperandForRuntimeRead($frame, (int) $op->arg3);
                     $catchFrame = $this->enforceReadonlyForCompoundAssign($frame, $op, $arg2);
                     if (null !== $catchFrame) {
                         $frame = $catchFrame;
@@ -3436,13 +3461,15 @@ restart:
                         }
                     }
                     try {
+                        $numericArg2 = $op->arg1 !== $op->arg2 ? $readArg2 : $arg2;
+                        $numericArg3 = $readArg3;
                         if (
                             $op->isIncDec
                             && (OpCode::TYPE_PLUS === $op->type || OpCode::TYPE_MINUS === $op->type)
                         ) {
-                            $arg1->incDecOp($op->type, $arg2, $arg3);
+                            $arg1->incDecOp($op->type, $numericArg2, $numericArg3);
                         } else {
-                            $arg1->numericOp($op->type, $arg2, $arg3, $this, $frame);
+                            $arg1->numericOp($op->type, $numericArg2, $numericArg3, $this, $frame);
                         }
                     } catch (\TypeError $e) {
                         $catchFrame = $this->dispatchVmTypeError($e, $frame);
@@ -3515,7 +3542,7 @@ restart:
                 case OpCode::TYPE_UNARY_PLUS:
                 case OpCode::TYPE_BITWISE_NOT:
                     $arg1 = $frame->scope[$op->arg1];
-                    $arg2 = $frame->scope[$op->arg2];
+                    $arg2 = $this->readScopeOperandForRuntimeRead($frame, (int) $op->arg2);
                     try {
                         $arg1->unaryOp($op->type, $arg2, $this, $frame);
                     } catch (\TypeError $e) {
@@ -3579,7 +3606,10 @@ restart:
                         if (!VM\SapiOutput::headersSent()) {
                             VM\HeaderCallbackQueue::runBeforeOutput($this->context);
                         }
-                        $printed = $this->valueToPrintString($frame->scope[$op->arg1], $frame);
+                        $printed = $this->valueToPrintString(
+                            $this->readScopeOperandForRuntimeRead($frame, (int) $op->arg1),
+                            $frame
+                        );
                     } catch (\Error $e) {
                         $catchFrame = $this->dispatchVmError($e->getMessage(), $frame);
                         if (null !== $catchFrame) {
@@ -6810,26 +6840,60 @@ restart:
         );
     }
 
+    /** Zend ZEND_CHECK_UNDEFINED_VAR on scope slot reads (casts/unary/binary/?? RHS, #10358). */
+    private function guardUndefinedVariableScopeReadSlot(Frame $frame, int $slot): void
+    {
+        if (isset($frame->block->constants[$slot])) {
+            return;
+        }
+        $this->warnUndefinedVariableForScopeRead($frame, $slot);
+    }
+
+    /**
+     * Scope operand for value reads — warn then treat unbound TYPE_UNDEFINED as null (Zend, #10358).
+     */
+    private function readScopeOperandForRuntimeRead(Frame $frame, int $slot): Variable
+    {
+        $this->guardUndefinedVariableScopeReadSlot($frame, $slot);
+        $operand = $frame->scope[$slot];
+        if ($this->isUnboundLocalScopeRead($frame, $slot)) {
+            $resolved = $operand->resolveIndirect();
+            if ($resolved->isUndefined()) {
+                $null = new Variable();
+                $null->null();
+
+                return $null;
+            }
+        }
+
+        return $operand;
+    }
+
     private function isUnboundLocalScopeRead(Frame $frame, int $slot): bool
     {
         if (!isset($frame->scope[$slot])) {
-            return false;
-        }
-        if (null === $frame->block || $frame->block->isMainScript() || $frame->block->inheritUndefinedLocals) {
             return false;
         }
         $name = $this->resolveScopeSlotVariableName($frame, $slot);
         if (null === $name || 'this' === $name) {
             return false;
         }
-        if (null !== $name && $frame->block->declaresGlobalName($name)) {
-            return false;
-        }
         $resolved = $frame->scope[$slot]->resolveIndirect();
         if ($resolved->isUndefined()) {
             return true;
         }
-        if (null !== $this->context->globalNameForStorage($resolved)) {
+        $globalName = $this->context->globalNameForStorage($resolved);
+        if (null !== $globalName) {
+            return !$this->context->isGlobalEverAssigned($globalName);
+        }
+        $staticKey = $this->context->functionStaticKeyForStorage($resolved);
+        if (null !== $staticKey) {
+            return !$this->isFunctionStaticInitializedForFrame($frame, $staticKey);
+        }
+        if (null === $frame->block || $frame->block->inheritUndefinedLocals) {
+            return false;
+        }
+        if (null !== $name && $frame->block->declaresGlobalName($name)) {
             return false;
         }
 
