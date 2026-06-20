@@ -1,5 +1,5 @@
 --TEST--
-foreach by-reference on property hooks — iteration assign + in-loop inc/dec (#6435, #9761, zend_property_hooks.c)
+foreach by-reference on property hooks — iteration assign + in-loop inc/dec (JIT) (#9761, zend_property_hooks.c)
 --FILE--
 <?php
 class Acc {

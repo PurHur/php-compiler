@@ -1,7 +1,7 @@
---TEST--
-foreach by-reference on property hooks — iteration assign + in-loop inc/dec (#6435, #9761, zend_property_hooks.c)
---FILE--
 <?php
+
+// Maintainer repro for #9761 / #6435 — foreach by-ref on property hooks (zend_property_hooks.c).
+
 class Acc {
     private int $_n = 0;
     public int $total {
@@ -29,6 +29,3 @@ try {
 } catch (Throwable $e) {
     echo get_class($e), "\n";
 }
---EXPECT--
-40
-Error
