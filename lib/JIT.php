@@ -6710,7 +6710,7 @@ class JIT {
                             JIT\ScalarDimFetchHelper::lowerScalarDimRead(
                                 $this->context,
                                 $resultOp,
-                                $bracketLabel
+                                $value->type
                             );
                             break;
                         }

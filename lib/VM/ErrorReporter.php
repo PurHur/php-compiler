@@ -201,6 +201,14 @@ final class ErrorReporter
     }
 
     /**
+     * Zend E_WARNING text for ZEND_FETCH_DIM_R on scalars (zend_execute.c, #4867).
+     */
+    public static function arrayOffsetOnNonContainerMessage(string $typeName): string
+    {
+        return "Trying to access array offset on value of type {$typeName}";
+    }
+
+    /**
      * Zend E_WARNING for ZEND_FETCH_DIM_R on scalars (zend_execute.c, #4867).
      */
     public function arrayOffsetOnNonContainer(
@@ -210,7 +218,7 @@ final class ErrorReporter
         ?string $file = null
     ): void {
         $this->emitWarning(
-            "Trying to access array offset on value of type {$typeName}",
+            self::arrayOffsetOnNonContainerMessage($typeName),
             $context,
             $frame,
             $file
