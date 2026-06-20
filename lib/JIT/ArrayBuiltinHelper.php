@@ -536,7 +536,6 @@ final class ArrayBuiltinHelper
         $context->builder->branchIf($isEmpty, $emptyBlock, $shiftBlock);
 
         $context->builder->positionAtEnd($emptyBlock);
-        self::emitArrayShiftEmptyWarning($context);
         $context->builder->call(
             $context->lookupFunction('__value__writeNull'),
             $resultPtr
@@ -2762,11 +2761,6 @@ final class ArrayBuiltinHelper
             $context->builder->pointerCast($context->constantFromString(''), $i8p),
             $i32->constInt(0, false)
         );
-    }
-
-    private static function emitArrayShiftEmptyWarning(Context $context): void
-    {
-        self::emitBuiltinWarning($context, 'array_shift(): Trying to shift an empty array');
     }
 
     private static function emitBuiltinWarning(Context $context, string $message): void

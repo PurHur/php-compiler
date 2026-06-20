@@ -1,5 +1,5 @@
 --TEST--
-stdlib array_pop()/array_shift() JIT — empty array_pop silent, array_shift warns (#4791, #10194)
+stdlib array_pop()/array_shift() JIT — empty arrays silent like Zend PHP 8.2+ (#4791, #10194, #10322)
 --FILE--
 <?php
 $a = [];
@@ -9,6 +9,5 @@ $b = [];
 var_export(array_shift($b));
 echo "\n";
 --EXPECT--
-PHP Warning:  array_shift(): Trying to shift an empty array
 NULL
 NULL
