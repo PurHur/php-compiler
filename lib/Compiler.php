@@ -10941,6 +10941,10 @@ class Compiler {
                 ) {
                     return $paired;
                 }
+                // php-cfg dead call-arg temps for sibling inline Array_ producers (#8561, #10231).
+                if ($paired instanceof Op\Expr\Array_) {
+                    return $paired;
+                }
                 if ($argIndex < $argCount - 1) {
                     return null;
                 }
@@ -11616,6 +11620,11 @@ class Compiler {
                 // php-cfg: `invokeArgs(new C(), [...])` — New_ immediately precedes Array_ (#9904).
                 if ($prev instanceof Op\Expr\New_) {
                     array_unshift($producers, $prev);
+                    break;
+                }
+                // Sibling inline Array_ call args: `array_replace([...], [...])` (#10231).
+                if ($prev instanceof Op\Expr\Array_) {
+                    continue;
                 }
                 break;
             }

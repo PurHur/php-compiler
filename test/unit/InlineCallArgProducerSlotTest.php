@@ -382,6 +382,48 @@ PHP;
         self::assertSame([$castSlot], $sendSlots, 'arg sends='.json_encode($sendSlots));
     }
 
+    /** Issue #10231 — sibling inline Array_ producers map to distinct array_replace arg slots. */
+    public function testArrayReplaceDualInlineArrayLiteralsUseBothArraySlots(): void
+    {
+        $code = <<<'PHP'
+<?php
+array_replace(['a' => 1], ['a' => 2, 'b' => 3]);
+PHP;
+        $runtime = new Runtime();
+        $block = $runtime->parseAndCompile($code, 'array_replace_inline_literals.php');
+
+        $arraySlots = [];
+        $sendSlots = [];
+        foreach ($block->opCodes as $op) {
+            if (OpCode::TYPE_INIT_ARRAY === $op->type) {
+                $arraySlots[] = $op->arg1;
+            }
+            if (OpCode::TYPE_ARG_SEND === $op->type) {
+                $sendSlots[] = $op->arg1;
+            }
+        }
+
+        self::assertCount(2, $arraySlots, 'array inits='.json_encode($arraySlots));
+        self::assertCount(2, $sendSlots, 'arg sends='.json_encode($sendSlots));
+        self::assertSame($arraySlots[0], $sendSlots[0], 'first inline array must feed arg #1');
+        self::assertSame($arraySlots[1], $sendSlots[1], 'second inline array must feed arg #2');
+    }
+
+    /** Issue #10231 — array_replace inline literal first arg runtime parity with Zend. */
+    public function testArrayReplaceInlineLiteralFirstArgRuntime(): void
+    {
+        $code = <<<'PHP'
+<?php
+var_export(array_replace(['a' => 1], ['a' => 2, 'b' => 3]));
+echo "\n";
+PHP;
+        $runtime = new Runtime();
+        $block = $runtime->parseAndCompile($code, 'array_replace_inline_runtime.php');
+        ob_start();
+        $runtime->run($block);
+        self::assertSame("array (\n  'a' => 2,\n  'b' => 3,\n)\n", ob_get_clean());
+    }
+
     /** Bootstrap helloworld — New_ then static MethodCall (null var) must not TypeError in producer filter. */
     public function testNewStaticMethodCallCompilesWithoutOperandNullTypeError(): void
     {
