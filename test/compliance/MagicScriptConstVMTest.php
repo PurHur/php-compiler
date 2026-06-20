@@ -11,6 +11,36 @@ use PHPUnit\Framework\TestCase;
  */
 final class MagicScriptConstVMTest extends TestCase
 {
+    public function test_magic_script_const_eval_repro(): void
+    {
+        $root = dirname(__DIR__, 2);
+        foreach (['echo __FILE__;', 'echo __DIR__;'] as $code) {
+            $cmd = [
+                PHP_BINARY,
+                '-d', 'display_errors=0',
+                '-d', 'error_reporting=0',
+                $root.'/bin/vm.php',
+                '-r', $code,
+            ];
+            $proc = proc_open(
+                $cmd,
+                [1 => ['pipe', 'w'], 2 => ['pipe', 'w']],
+                $pipes,
+                $root
+            );
+            $this->assertIsResource($proc);
+            $stdout = stream_get_contents($pipes[1]);
+            $stderr = stream_get_contents($pipes[2]);
+            fclose($pipes[1]);
+            fclose($pipes[2]);
+            $exit = proc_close($proc);
+
+            $this->assertSame(0, $exit, trim((string) $stderr));
+            $this->assertStringNotContainsString('Expr_MagicScriptConst', (string) $stderr);
+            $this->assertNotSame('', trim((string) $stdout));
+        }
+    }
+
     public function test_magic_script_const_compile_and_run(): void
     {
         $root = dirname(__DIR__, 2);

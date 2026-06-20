@@ -27,6 +27,7 @@
             <file>./test/compliance/JITTest.php</file>
             <file>./test/compliance/VariableFunctionDynamicJITTest.php</file>
             <file>./test/compliance/MagicDirFileVMTest.php</file>
+            <file>./test/compliance/MagicScriptConstVMTest.php</file>
             <file>./test/compliance/VMTest.php</file>
             <file>./test/compliance/GeneratorVMTest.php</file>
             <file>./test/compliance/EnumVMTest.php</file>
