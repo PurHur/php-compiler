@@ -96,6 +96,7 @@ final class StringPregMatchJit
 
         self::$blockSuffix = 0;
         self::ensureGlobals($context);
+        PregExpandRuntime::ensureLinked($context);
         self::ensureLibc($context);
         self::ensurePcre2($context);
         self::ensureRuntimeHelpers($context);
@@ -258,7 +259,6 @@ final class StringPregMatchJit
                 ['free', $voidTy, [$i8p]],
                 ['memcpy', $i8p, [$i8p, $i8p, $sizeT]],
                 ['strlen', $sizeT, [$i8p]],
-                ['phpc_preg_expand_replacement', $sizeT, [$i8p, $sizeT, $sizeTp, $i32, $i8p, $i8p, $sizeT]],
             ] as [$name, $ret, $params]
         ) {
             self::ensureExternal($context, $name, $context->context->functionType($ret, false, ...$params));
