@@ -46,4 +46,11 @@ final class GetenvJitRuntimeShrinkTest extends TestCase
         $this->assertTrue(\PHPCompiler\ext\standard\GetenvJitHelper::putenv($key));
         $this->assertFalse(\PHPCompiler\ext\standard\GetenvJitHelper::getenv($key, 0));
     }
+
+    public function testGetenvJitHelperRejectsInvalidPutenvSyntax(): void
+    {
+        $this->expectException(\ValueError::class);
+        $this->expectExceptionMessage(\PHPCompiler\ext\standard\VmEnv::PUTENV_INVALID_SYNTAX_ERROR);
+        \PHPCompiler\ext\standard\GetenvJitHelper::putenv('=invalid');
+    }
 }
