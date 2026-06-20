@@ -13227,8 +13227,23 @@ class Compiler {
         return $block->registerConstant($operand, $var);
     }
 
+    /**
+     * Zend ≤8.3 rejects `final const` at compile-unit scope; enable at 8.4+ (#10324, #9909).
+     */
+    protected function rejectFinalGlobalTypedConstantIfUnsupported(Op\Terminal\Const_ $const): void
+    {
+        if (CompilerVersion::supportsFinalGlobalTypedConstants()) {
+            return;
+        }
+        if (0 === ($const->flags & \PhpParser\Node\Stmt\Class_::MODIFIER_FINAL)) {
+            return;
+        }
+        $this->throwCompileError(\PHPCompiler\Ast\GlobalTypedConstRewriter::FINAL_GLOBAL_CONST_REJECT_MESSAGE);
+    }
+
     protected function compileGlobalConst(Op\Terminal\Const_ $const, Block $block): OpCode
     {
+        $this->rejectFinalGlobalTypedConstantIfUnsupported($const);
         $valueSlot = $this->tryFoldGlobalConstValueSlot($const, $block);
         if (null === $valueSlot) {
             $this->compileOps($const->valueBlock->children, $block);

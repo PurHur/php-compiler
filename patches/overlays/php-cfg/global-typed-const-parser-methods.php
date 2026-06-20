@@ -12,6 +12,12 @@
             return;
         }
         [$typeExpr, $isFinal] = $parsed;
+        if ($isFinal && !\PHPCompiler\CompilerVersion::supportsFinalGlobalTypedConstants()) {
+            throw new \PhpParser\Error(
+                \PHPCompiler\Ast\GlobalTypedConstRewriter::FINAL_GLOBAL_CONST_REJECT_MESSAGE,
+                ['startLine' => 1, 'endLine' => 1]
+            );
+        }
         $constOp->declaredType = $this->parseGlobalTypedConstTypeFromMarker($typeExpr);
         if ($isFinal) {
             $constOp->flags |= \PhpParser\Node\Stmt\Class_::MODIFIER_FINAL;

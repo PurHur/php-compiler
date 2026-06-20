@@ -44,6 +44,9 @@ PHP;
 
     public function testRewritesFinalFileScopeTypedConst(): void
     {
+        if (!\PHPCompiler\CompilerVersion::supportsFinalGlobalTypedConstants()) {
+            self::markTestSkipped('final global typed constants require PHP 8.4.0+ target');
+        }
         $src = <<<'PHP'
 <?php
 final const string APP_NAME = 'alpha';
@@ -54,6 +57,9 @@ PHP;
 
     public function testRewritesFinalNamespaceBlockTypedConst(): void
     {
+        if (!\PHPCompiler\CompilerVersion::supportsFinalGlobalTypedConstants()) {
+            self::markTestSkipped('final global typed constants require PHP 8.4.0+ target');
+        }
         $src = <<<'PHP'
 <?php
 namespace FinalTyped {
@@ -68,5 +74,35 @@ PHP;
     {
         self::assertSame(['string', true], GlobalTypedConstRewriter::parseMarkerPayload('final:string'));
         self::assertSame(['int', false], GlobalTypedConstRewriter::parseMarkerPayload('int'));
+    }
+
+    public function testRejectsFinalGlobalTypedConstWhenGateOff(): void
+    {
+        if (\PHPCompiler\CompilerVersion::supportsFinalGlobalTypedConstants()) {
+            self::markTestSkipped('final global typed constants enabled on PHP 8.4+ target');
+        }
+        $src = <<<'PHP'
+<?php
+final const string APP_NAME = 'alpha';
+PHP;
+        $this->expectException(\PhpParser\Error::class);
+        $this->expectExceptionMessage(GlobalTypedConstRewriter::FINAL_GLOBAL_CONST_REJECT_MESSAGE);
+        GlobalTypedConstRewriter::rewrite($src);
+    }
+
+    public function testRejectsFinalNamespaceTypedConstWhenGateOff(): void
+    {
+        if (\PHPCompiler\CompilerVersion::supportsFinalGlobalTypedConstants()) {
+            self::markTestSkipped('final global typed constants enabled on PHP 8.4+ target');
+        }
+        $src = <<<'PHP'
+<?php
+namespace N {
+    final const string NS_NAME = 'beta';
+}
+PHP;
+        $this->expectException(\PhpParser\Error::class);
+        $this->expectExceptionMessage(GlobalTypedConstRewriter::FINAL_GLOBAL_CONST_REJECT_MESSAGE);
+        GlobalTypedConstRewriter::rewrite($src);
     }
 }

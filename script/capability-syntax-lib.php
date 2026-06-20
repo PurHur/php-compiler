@@ -316,6 +316,7 @@ function syntaxRowDefinitions(): array
             'issue' => 7081,
             'notes' => [
                 'GlobalTypedConstRewriter + PHPCfg marker for nikic/php-parser 4.x; compile-time type check reuses class-const path',
+                'PHP 8.4 `final const` at file scope enabled on 8.4+ target (#9909); rejected below 8.4 like Zend parse error (#10324)',
             ],
             'probe' => 'const string X = "a"; echo X;',
         ],

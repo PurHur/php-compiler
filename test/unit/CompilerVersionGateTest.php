@@ -34,6 +34,11 @@ final class CompilerVersionGateTest extends TestCase
         $this->assertTrue(CompilerVersion::supportsInterfaceTypedConstants());
     }
 
+    public function testSupportsFinalGlobalTypedConstantsFalseOn84DevTarget(): void
+    {
+        $this->assertFalse(CompilerVersion::supportsFinalGlobalTypedConstants());
+    }
+
     public function testVmRegistersStrIncrementOn83Target(): void
     {
         $runtime = new Runtime();
