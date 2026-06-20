@@ -258,7 +258,9 @@ final class VmLocale
                     $out[] = null;
                     continue;
                 }
-                $out[] = VmString::coerceStringBuiltinArg($v, 'setlocale', 2, 'locales');
+                $out[] = self::normalizeLocaleArg(
+                    VmString::coerceStringBuiltinArg($v, 'setlocale', 2, 'locales')
+                );
             }
 
             return $out;
@@ -271,10 +273,20 @@ final class VmLocale
                 $out[] = null;
                 continue;
             }
-            $out[] = VmString::coerceStringBuiltinArg($v, 'setlocale', $i + 2, 'locales');
+            $out[] = self::normalizeLocaleArg(
+                VmString::coerceStringBuiltinArg($v, 'setlocale', $i + 2, 'locales')
+            );
         }
 
         return $out;
+    }
+
+    /**
+     * php-src ext/standard/locale.c — single-char "0" is the query-current-locale idiom.
+     */
+    private static function normalizeLocaleArg(string $locale): ?string
+    {
+        return '0' === $locale ? null : $locale;
     }
 
     private static function writeEmptyLocaleconv(HashTable $ht): void
