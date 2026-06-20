@@ -1,5 +1,5 @@
 --TEST--
-Language: new in class constant initializer rejected (#9517, Zend/zend_compile.c)
+Language: new in class constant initializer — PHP 8.3+ (#10198, Zend/zend_compile.c)
 --FILE--
 <?php
 class C {
@@ -9,5 +9,5 @@ class Holder {
     public const X = new C(1);
 }
 var_dump(Holder::X->n);
---EXPECT_EXIT--
-255
+--EXPECT--
+int(1)

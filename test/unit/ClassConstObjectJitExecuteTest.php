@@ -4,13 +4,12 @@ declare(strict_types=1);
 
 namespace PHPCompiler;
 
-use PHPCompiler\Compiler\NewWithoutParensCompileCheck;
 use PHPUnit\Framework\TestCase;
 
 require_once __DIR__.'/../LlvmToolchain.php';
 
 /**
- * Class constants with `new` are rejected at compile time (#9974, Zend/zend_compile.c).
+ * Class constants with `new` execute on VM before JIT lowering (#10198, Zend/zend_constants.c).
  *
  * @group llvm
  */
@@ -28,13 +27,15 @@ final class ClassConstObjectJitExecuteTest extends TestCase
         }
     }
 
-    public function testClassConstObjectCompileErrorsBeforeJit(): void
+    public function testClassConstObjectVmExecutesBeforeJit(): void
     {
         $code = file_get_contents($this->repoRoot.'/test/compliance/cases/language/class_const_new_object_run.php');
         $this->assertNotFalse($code);
         $runtime = new Runtime();
-        $this->expectException(\CompileError::class);
-        $this->expectExceptionMessage(NewWithoutParensCompileCheck::MESSAGE);
-        $runtime->parseAndCompile($code, 'class_const_new_object_run.php');
+        $block = $runtime->parseAndCompile($code, 'class_const_new_object_run.php');
+        ob_start();
+        $runtime->run($block);
+        $output = ob_get_clean();
+        $this->assertStringContainsString('1', $output);
     }
 }

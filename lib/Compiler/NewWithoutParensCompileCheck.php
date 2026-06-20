@@ -10,10 +10,10 @@ use PHPCfg\Op\Stmt\Property;
 use PHPCfg\Script;
 
 /**
- * Reject invalid `new` in class **constant** and **static property** initializers (#6549, #9484, #9804, #9974, #10095).
+ * Reject invalid `new` in **static property** initializers (#6549, #9484, #10095).
  *
- * php-src rejects all `new` in class constant expressions with
- * "New expressions are not supported in this context" (zend_compile_const_expr).
+ * PHP 8.3+ allows `new` in class constant initializers (#10198, RFC new_in_initializers);
+ * those are lowered by the compiler and materialized at TYPE_DECLARE_CLASS_CONST (#3196).
  * Static property defaults remain forbidden; instance property/param defaults may use
  * `new` with or without `()` per PHP 8.1+ (#3391, #5362).
  *
@@ -42,11 +42,6 @@ final class NewWithoutParensCompileCheck
         Op\Stmt\Class_|Op\Stmt\Interface_|Op\Stmt\Trait_|Op\Stmt\Enum_ $class
     ): void {
         foreach ($class->stmts->children as $stmt) {
-            if ($stmt instanceof Op\Terminal\Const_) {
-                $ops = $stmt->valueBlock->children ?? [];
-                $this->walkOpsRejectAllNew($ops);
-                continue;
-            }
             if ($stmt instanceof Property && $stmt->static) {
                 $this->rejectStaticPropertyDefaultNew($stmt);
             }
