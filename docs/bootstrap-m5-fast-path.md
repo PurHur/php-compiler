@@ -35,6 +35,7 @@ Supporting fixes from #1402:
 | `php_compiler_cli_dispatch` / `php_compiler_cli_should_run_entry_driver` | On M3 allowlist; CLI driver dispatch without Zend |
 | `Runtime::parseAndCompile` / `parseAndCompileEmitSmoke` | On M3 allowlist when `PHP_COMPILER_M3_COMPILE_DRIVER=1` |
 | `Runtime::parse` / `Runtime::compile` / `compileEmitSmoke` | On M3 allowlist; compile-driver link OK (#1496) |
+| `Runtime::prepareSourceForParser` / `preprocessSourceForParse` / `rewriteSourceBeforeParser` | On M3 allowlist; parse spine real-lowers with compile driver (#1496, #8706) |
 | `Runtime::parse` / `prepareSourceForParser` stub | **Retired** on executable argv drivers when `PHP_COMPILER_EMIT_HELPER_LINK=1` + inventory/M4 argv gates — `shouldStubInventoryEmitParseCompileSpine()` false (#8706); mirrors `standalone` prelower gate |
 | `Runtime::loadJitContext` | PHP CFG via `compileRuntimeLoadJitContextM3Native` (separate FUNCDEF from `loadJit` — #2846) |
 | `Runtime::__construct` | Slim ctor via `compileRuntimeConstructM3Native` → `compileBlockPhpLowering` (#1494) |
@@ -46,6 +47,7 @@ Supporting fixes from #1402:
 | `Runtime::createJit` / `jitContextForLoadJit` / `loadJitCompileModuleFuncs` | Separate FUNCDEFs via `compileRuntime*M3Native` → PHP CFG (#2847) |
 | `Runtime::noteParseCompileNullForScript` / `peekLastParseFailure` | On M3 allowlist; compile-driver diagnostics + last failure peek |
 | `Block::slotIndexForVariableName` / `Block::slotForOperand` | PHP CFG via `isM3CompileDriverBlockPhpLoweringName` (#2848) |
+| `Compiler::compileFunc` | On M3 allowlist; CFG entry real-lowers on compile-driver link (#9228, #1402) |
 | `Runtime::standalone` | Compile-driver link OK (#1402, #1056) |
 | `helloworld_compile_smoke` | Deny-listed for link (LLVM 9); compile_driver bundle keeps stub; runtime emit via `compiler_helloworld_smoke/compile_driver.php` / `compiler_compile_smoke/compile_driver.php` + `PHP_COMPILER_EMIT_HELPER_LINK=1` (#1768, #1983) |
 | Native emit runtime | `BOOTSTRAP_M3_RUNTIME_COMPILE=1` + `PHP_COMPILER_M3_EMIT_MINIMAL=1` skips eager `loadJitCompileModuleFuncs` during smoke emit |

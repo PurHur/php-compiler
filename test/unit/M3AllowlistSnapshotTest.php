@@ -42,6 +42,14 @@ final class M3AllowlistSnapshotTest extends TestCase
         $this->assertContains('\\runtime::__construct', $lists['allow']);
     }
 
+    public function testCompilerCompileFuncOnAllowlist(): void
+    {
+        require_once self::$root.'/script/bootstrap-m3-allowlist.php';
+
+        $lists = bootstrap_m3_allowlist_from_jit(self::$root.'/lib/JIT.php');
+        $this->assertContains('\\compiler::compilefunc', $lists['allow']);
+    }
+
     /** JIT VarFetch / compile spine: operand slot lookup (#2848 follow-on). */
     public function testBlockSlotForOperandOnAllowlist(): void
     {
