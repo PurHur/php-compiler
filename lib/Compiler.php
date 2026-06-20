@@ -10507,6 +10507,8 @@ class Compiler {
         if (null === $producerSlot) {
             if ($producer instanceof Op\Expr\Closure || $producer instanceof Op\Expr\ArrowFunction) {
                 $producerSlot = $this->slotForInlineClosureProducer($producer, $block);
+            } elseif ($producer instanceof Op\Expr\FirstClassCallable) {
+                $producerSlot = $this->slotForInlineFirstClassCallableProducer($producer, $block);
             }
             if (null === $producerSlot) {
                 return null;
@@ -10535,6 +10537,12 @@ class Compiler {
                 return $producerSlot;
             }
         }
+        if ($producer instanceof Op\Expr\FirstClassCallable) {
+            $producerSlot = $this->slotForInlineFirstClassCallableProducer($producer, $block);
+            if (null !== $producerSlot) {
+                return $producerSlot;
+            }
+        }
         // php-cfg uses distinct result/arg temps for hoisted inline producers (#8766, #8561, #9136).
         if (
             $producer instanceof Op\Expr\Assign
@@ -10544,6 +10552,7 @@ class Compiler {
             || $producer instanceof Op\Expr\InstanceOf_
             || $producer instanceof Op\Expr\Cast
             || $producer instanceof Op\Expr\MagicScriptConst
+            || $producer instanceof Op\Expr\FirstClassCallable
             || $producer instanceof Op\Expr\New_
             || $producer instanceof Op\Expr\UnaryMinus
             || $producer instanceof Op\Expr\UnaryPlus
@@ -10875,6 +10884,70 @@ class Compiler {
         return null;
     }
 
+    /** Resolve VM slot for a hoisted inline first-class callable call-arg producer (#9769, zend_compile.c). */
+    private function slotForInlineFirstClassCallableProducer(
+        Op\Expr\FirstClassCallable $producer,
+        Block $block
+    ): ?int {
+        if (null === $producer->result) {
+            return null;
+        }
+        $slot = $block->slotForOperand($producer->result);
+        if (null !== $slot) {
+            return $slot;
+        }
+        foreach ($block->opCodes as $op) {
+            if (OpCode::TYPE_FROM_CALLABLE !== $op->type) {
+                continue;
+            }
+            $destSlot = (int) $op->arg1;
+            $destOperand = $block->operandForScopeSlot($destSlot);
+            if (
+                null !== $destOperand
+                && $this->operandsReferToSameVariable($destOperand, $producer->result)
+            ) {
+                return $destSlot;
+            }
+        }
+        foreach ($this->compileFirstClassCallable($producer, $block) as $op) {
+            $block->addOpCode($op);
+        }
+
+        return $block->slotForOperand($producer->result);
+    }
+
+    /** Inline `E::A->m(...)` call args must send the Closure result, not enum-case prefetch slots (#9769). */
+    private function resolveInlineFirstClassCallableCallArgSlot(
+        Operand $arg,
+        Block $block,
+        ?Op $cfgCallOp
+    ): ?int {
+        if (null === $block->orig || null === $cfgCallOp) {
+            return null;
+        }
+        $callSite = $this->findCfgCallSiteForArg($block->orig->children, $arg, $cfgCallOp);
+        if (null === $callSite) {
+            return null;
+        }
+        [$callOp, $argIndex] = $callSite;
+        if (!property_exists($callOp, 'args') || !is_array($callOp->args)) {
+            return null;
+        }
+        $producers = $this->precedingInlineCallArgProducersBeforeCfgOp($block->orig->children, $callOp);
+        $producer = $this->matchInlineCallArgProducer($producers, $callOp->args, $argIndex);
+        if ($producer instanceof Op\Expr\FirstClassCallable) {
+            return $this->slotForInlineFirstClassCallableProducer($producer, $block);
+        }
+        if (1 === count($callOp->args)) {
+            $last = $producers[\count($producers) - 1] ?? null;
+            if ($last instanceof Op\Expr\FirstClassCallable) {
+                return $this->slotForInlineFirstClassCallableProducer($last, $block);
+            }
+        }
+
+        return null;
+    }
+
     /** StaticCall inline closure first arg — match hoisted Closure producer to TYPE_CLOSURE slot (#3673). */
     private function resolveInlineClosureCallArgSlot(Operand $arg, Block $block, ?Op $cfgCallOp): ?int
     {
@@ -10894,12 +10967,23 @@ class Compiler {
         if ($producer instanceof Op\Expr\Closure || $producer instanceof Op\Expr\ArrowFunction) {
             return $this->slotForInlineClosureProducer($producer, $block);
         }
+        if ($producer instanceof Op\Expr\FirstClassCallable) {
+            return $this->slotForInlineFirstClassCallableProducer($producer, $block);
+        }
         foreach ($producers as $candidate) {
             if (!$candidate instanceof Op\Expr\Closure && !$candidate instanceof Op\Expr\ArrowFunction) {
                 continue;
             }
             if (null !== $this->matchSingleClosureInlineProducer($candidate, $callOp->args, $argIndex)) {
                 return $this->slotForInlineClosureProducer($candidate, $block);
+            }
+        }
+        foreach ($producers as $candidate) {
+            if (!$candidate instanceof Op\Expr\FirstClassCallable) {
+                continue;
+            }
+            if (null !== $this->matchInlineCallArgProducer([$candidate], $callOp->args, $argIndex)) {
+                return $this->slotForInlineFirstClassCallableProducer($candidate, $block);
             }
         }
 
@@ -11019,6 +11103,10 @@ class Compiler {
                     }
                     // (new C())->m() inline call-arg (#9428, zend_traits.c alias visibility repro).
                     if ($last instanceof Op\Expr\MethodCall || $last instanceof Op\Expr\StaticCall) {
+                        return $last;
+                    }
+                    // Inline first-class callable call arg (#9769, zend_closures.c).
+                    if ($last instanceof Op\Expr\FirstClassCallable) {
                         return $last;
                     }
                     // php-cfg dead temp for `var_dump(E::A::class)` — last producer is Case::class (#9426, #9518).
@@ -11629,6 +11717,7 @@ class Compiler {
             || $op instanceof Op\Expr\ClassConstFetch
             || $op instanceof Op\Expr\Closure
             || $op instanceof Op\Expr\ArrowFunction
+            || $op instanceof Op\Expr\FirstClassCallable
             || $op instanceof Op\Expr\FuncCall
             || $op instanceof Op\Expr\NsFuncCall
             || $op instanceof Op\Expr\StaticCall
@@ -11738,7 +11827,12 @@ class Compiler {
                     break;
                 }
                 // Sibling inline Array_ call args: `array_replace([...], [...])` (#10231).
+                // Nested element literals (`array_column([[...], [...]], ...)`) are not call-arg producers (#9305).
                 if ($prev instanceof Op\Expr\Array_) {
+                    if ($this->cfgExprUsesOperand($child, $prev->result)) {
+                        break;
+                    }
+
                     continue;
                 }
                 break;
@@ -14333,10 +14427,10 @@ class Compiler {
                     $valueSlot = $this->compileOperand($inlineArray->result, $block, true);
                 }
             } else {
-                $valueSlot = null;
-                if ($this->isCallArgDirectArrayDimFetch($arg)) {
+                $valueSlot = $this->resolveInlineFirstClassCallableCallArgSlot($arg, $block, $cfgCallOp);
+                if (null === $valueSlot && $this->isCallArgDirectArrayDimFetch($arg)) {
                     $valueSlot = $this->compileOperand($arg, $block, true);
-                } else {
+                } elseif (null === $valueSlot) {
                     $valueSlot = $this->resolvePrecedingArrayDimFetchCallArgSlot(
                         $arg,
                         $block,
@@ -14419,11 +14513,15 @@ class Compiler {
                     null === $valueSlot
                     && 0 === $argIndex
                     && null !== $calleeName
-                    && 'Closure::bind' === $calleeName
+                    && ('Closure::bind' === $calleeName || 'Closure::fromCallable' === $calleeName)
                 ) {
                     for ($i = \count($block->opCodes) - 1; $i >= 0; --$i) {
                         $scanOp = $block->opCodes[$i];
                         if (OpCode::TYPE_STATICCALL_INIT === $scanOp->type) {
+                            break;
+                        }
+                        if (OpCode::TYPE_FROM_CALLABLE === $scanOp->type) {
+                            $valueSlot = $scanOp->arg1;
                             break;
                         }
                         if (OpCode::TYPE_CLOSURE === $scanOp->type) {

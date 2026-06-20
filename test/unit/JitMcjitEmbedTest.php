@@ -125,4 +125,22 @@ PHP;
         $this->assertStringContainsString('private bool $__phpcMcjitClassPad;', $out);
         $this->assertStringNotContainsString('__phpcMcjitClassPad = false', $out);
     }
+
+    /** @covers issue #10312 */
+    public function testEmbedClassPadHiddenFromVarExport(): void
+    {
+        $code = JitMcjitEmbed::prepareClassless(<<<'PHP'
+<?php
+class Foo { public function __construct(public int $x = 0) {} }
+class D { public const Y = new Foo(7); }
+var_export(D::Y);
+PHP);
+        $runtime = new Runtime();
+        $block = $runtime->parseAndCompile($code, 'class_const_pad_var_export.php');
+        ob_start();
+        $runtime->run($block);
+        $out = ob_get_clean();
+        $this->assertStringContainsString("'x' => 7", $out);
+        $this->assertStringNotContainsString('__phpcMcjitClassPad', $out);
+    }
 }

@@ -298,6 +298,10 @@ final class PropertyHooks
             $prop = $m[1][0];
             $varStart = $m[0][1];
             $afterVar = $varStart + strlen($m[0][0]);
+            if ($this->isOffsetInComment($body, $varStart)) {
+                $offset = $afterVar + 1;
+                continue;
+            }
             $declLookback = $varStart - 1;
             while ($declLookback >= 0 && ctype_space($body[$declLookback])) {
                 --$declLookback;
@@ -338,6 +342,10 @@ final class PropertyHooks
                         $offset = $afterVar + 1;
                         continue;
                     }
+                    if ($this->isForLoopHeaderBraceAfterAssignment($body, $hookOpen)) {
+                        $offset = $afterVar + 1;
+                        continue;
+                    }
 
                     return [$prop, $varStart, $hookOpen];
                 }
@@ -351,6 +359,91 @@ final class PropertyHooks
         }
 
         return null;
+    }
+
+
+    private function isOffsetInComment(string $body, int $offset): bool
+    {
+        $len = strlen($body);
+        $inString = false;
+        $stringChar = '';
+        $inBlockComment = false;
+        for ($i = 0; $i < $offset && $i < $len; ++$i) {
+            $ch = $body[$i];
+            $next = $i + 1 < $len ? $body[$i + 1] : '';
+            if ($inBlockComment) {
+                if ('*' === $ch && '/' === $next) {
+                    $inBlockComment = false;
+                    ++$i;
+                }
+                continue;
+            }
+            if ($inString) {
+                if ('\\' === $ch) {
+                    ++$i;
+                    continue;
+                }
+                if ($ch === $stringChar) {
+                    $inString = false;
+                }
+                continue;
+            }
+            if ('"' === $ch || '\'' === $ch) {
+                $inString = true;
+                $stringChar = $ch;
+                continue;
+            }
+            if ('/' === $ch && '/' === $next) {
+                $lineEnd = strpos($body, "\n", $i);
+                if (false === $lineEnd) {
+                    $lineEnd = $len;
+                }
+                if ($offset < $lineEnd) {
+                    return true;
+                }
+                $i = $lineEnd;
+                continue;
+            }
+            if ('/' === $ch && '*' === $next) {
+                $inBlockComment = true;
+                ++$i;
+            }
+        }
+
+        return $inBlockComment;
+    }
+
+    /**
+     * For-loop increment clauses look like `$handler = $handler->parent) {` (#1492 bootstrap M4).
+     */
+    private function isForLoopHeaderBraceAfterAssignment(string $body, int $hookOpenPos): bool
+    {
+        if ($hookOpenPos <= 0 || '{' !== $body[$hookOpenPos]) {
+            return false;
+        }
+        $i = $hookOpenPos - 1;
+        while ($i >= 0 && ctype_space($body[$i])) {
+            --$i;
+        }
+        if ($i < 0 || ')' !== $body[$i]) {
+            return false;
+        }
+        $depth = 0;
+        for ($j = $i; $j >= 0; --$j) {
+            $ch = $body[$j];
+            if (')' === $ch) {
+                ++$depth;
+            } elseif ('(' === $ch) {
+                --$depth;
+                if (0 === $depth) {
+                    $before = rtrim(substr($body, 0, $j));
+
+                    return (bool) preg_match('/\bfor\s*$/s', $before);
+                }
+            }
+        }
+
+        return false;
     }
 
     /**

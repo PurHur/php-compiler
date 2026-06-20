@@ -51,10 +51,8 @@ final class GetenvJitHelper
         if (null === $assignment) {
             return false;
         }
+        VmEnv::assertValidPutenvSyntax($assignment);
         [$name, $value] = self::parseAssignment($assignment);
-        if ('' === $name) {
-            return false;
-        }
         if (null === $value) {
             unset(self::$local[$name]);
         } else {
