@@ -54,6 +54,8 @@ final class BuiltinParamNames
                 return ['var', 'type'];
             case 'register_shutdown_function':
                 return ['function', 'parameter'];
+            case 'header':
+                return ['header', 'replace', 'response_code'];
             case 'header_register_callback':
                 return ['callback'];
             case 'headers_sent':
