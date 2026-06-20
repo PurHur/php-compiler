@@ -742,6 +742,7 @@ class Context {
             Builtin\StringGetenv::ensureStandaloneBodies($this);
             Builtin\StringGetenvAll::ensureStandaloneBodies($this);
             Builtin\StringTriggerError::ensureStandaloneBodies($this);
+            Builtin\ScalarDimFetchRuntime::ensureStandaloneBodies($this);
             Builtin\StringFormat::ensureStandaloneBodies($this);
             Builtin\GcToggleRuntime::ensureStandaloneBodies($this);
             Builtin\GcCollectCyclesRuntime::ensureStandaloneBodies($this);
