@@ -6,9 +6,15 @@ namespace PHPCompiler\JIT;
 
 use PHPCfg\Operand;
 use PHPCompiler\ext\standard\JitArrayIsList;
+use PHPCompiler\JIT\Builtin\ListUnpackRuntime;
 use PHPCompiler\JIT\Builtin\TypeErrorRaise;
 
-/** Runtime guard for `list()` / `[]` destructuring on non-array RHS (#4325, #4308, #7461); spread uses isList (#4298, #4841). */
+/**
+ * Runtime guard for `list()` / `[]` destructuring on non-array RHS (#4325, #4308, #7461);
+ * spread uses isList (#4298, #4841).
+ *
+ * SSOT: {@see \PHPCompiler\VM\ListUnpackJitHelper}
+ */
 final class ListUnpackHelper
 {
     public const TYPE_ERROR_MESSAGE = 'Cannot unpack array with string keys';
@@ -135,20 +141,27 @@ final class ListUnpackHelper
         Variable $var,
         ?Operand $varOp = null
     ): \PHPLLVM\Value {
-        $isArray = self::isArrayValue($context, $var);
         if (ArrayAccessHelper::containerImplementsArrayAccess($context, $var, $varOp)) {
             $i1 = $context->getTypeFromString('int1');
 
-            return $context->builder->or(
-                $isArray,
-                $i1->constInt(1, false)
-            );
+            return $i1->constInt(1, false);
         }
         if (ArrayAccessHelper::isKnownNonArrayAccessObject($context, $var, $varOp)) {
-            return $isArray;
+            return self::isArrayValue($context, $var);
+        }
+        if (Variable::TYPE_VALUE === $var->type) {
+            ListUnpackRuntime::ensureLinked($context);
+            $typeByte = ListUnpackRuntime::loadValueBoxTypeByte($context, $var);
+            $i1 = $context->getTypeFromString('int1');
+
+            return ListUnpackRuntime::callValueBoxIsListDestructUnpackable(
+                $context,
+                $typeByte,
+                $i1->constInt(0, false)
+            );
         }
 
-        return $isArray;
+        return self::isArrayValue($context, $var);
     }
 
     public static function isDefinitelyArrayAtCompileTime(Variable $array): bool
@@ -177,7 +190,22 @@ final class ListUnpackHelper
 
     public static function isArrayValue(Context $context, Variable $var): \PHPLLVM\Value
     {
-        return self::isRuntimeTypeValue($context, $var, \PHPCompiler\VM\Variable::TYPE_ARRAY);
+        if (Variable::TYPE_HASHTABLE === $var->type || ($var->type & Variable::IS_NATIVE_ARRAY)) {
+            $i1 = $context->getTypeFromString('int1');
+
+            return $i1->constInt(1, false);
+        }
+        if (Variable::TYPE_VALUE === $var->type) {
+            ListUnpackRuntime::ensureLinked($context);
+
+            return ListUnpackRuntime::callValueBoxIsArray(
+                $context,
+                ListUnpackRuntime::loadValueBoxTypeByte($context, $var)
+            );
+        }
+        $i1 = $context->getTypeFromString('int1');
+
+        return $i1->constInt(0, false);
     }
 
     public static function isStringValue(Context $context, Variable $var): \PHPLLVM\Value
@@ -187,67 +215,15 @@ final class ListUnpackHelper
 
             return $i1->constInt(1, false);
         }
-
-        return self::isRuntimeTypeValue($context, $var, \PHPCompiler\VM\Variable::TYPE_STRING);
-    }
-
-    private static function isRuntimeTypeValue(Context $context, Variable $var, int $type): \PHPLLVM\Value
-    {
-        $builder = $context->builder;
-        $i1 = $context->getTypeFromString('int1');
-
-        if (Variable::TYPE_HASHTABLE === $var->type || ($var->type & Variable::IS_NATIVE_ARRAY)) {
-            return $i1->constInt($type === \PHPCompiler\VM\Variable::TYPE_ARRAY ? 1 : 0, false);
-        }
-        if (Variable::TYPE_STRING === $var->type) {
-            return $i1->constInt($type === \PHPCompiler\VM\Variable::TYPE_STRING ? 1 : 0, false);
-        }
         if (Variable::TYPE_VALUE === $var->type) {
-            $valuePtr = JitValueBox::valuePtrFromVariable($context, $var);
-            $typeByte = $builder->load(
-                $builder->structGep(
-                    $valuePtr,
-                    $context->structFieldMap['__value__']['type']
-                )
-            );
-            $i8 = $context->getTypeFromString('int8');
-            if ($type === \PHPCompiler\VM\Variable::TYPE_ARRAY) {
-                $isVmArray = $builder->icmp(
-                    \PHPLLVM\Builder::INT_EQ,
-                    $typeByte,
-                    $i8->constInt($type, false)
-                );
-                $isHt = $builder->icmp(
-                    \PHPLLVM\Builder::INT_EQ,
-                    $typeByte,
-                    $i8->constInt(Variable::TYPE_HASHTABLE, false)
-                );
+            ListUnpackRuntime::ensureLinked($context);
 
-                return $builder->or($isVmArray, $isHt);
-            }
-
-            if (\PHPCompiler\VM\Variable::TYPE_ARRAY === $type) {
-                // __value__::type stores JIT Variable::TYPE_HASHTABLE (7|IS_REFCOUNTED), not VM TYPE_ARRAY (#9248).
-                $isVmArray = $builder->icmp(
-                    \PHPLLVM\Builder::INT_EQ,
-                    $typeByte,
-                    $i8->constInt(\PHPCompiler\VM\Variable::TYPE_ARRAY, false)
-                );
-                $isJitHashtable = $builder->icmp(
-                    \PHPLLVM\Builder::INT_EQ,
-                    $typeByte,
-                    $i8->constInt(Variable::TYPE_HASHTABLE, false)
-                );
-
-                return $builder->or($isVmArray, $isJitHashtable);
-            }
-
-            return $builder->icmp(
-                \PHPLLVM\Builder::INT_EQ,
-                $typeByte,
-                $i8->constInt($type, false)
+            return ListUnpackRuntime::callValueBoxIsString(
+                $context,
+                ListUnpackRuntime::loadValueBoxTypeByte($context, $var)
             );
         }
+        $i1 = $context->getTypeFromString('int1');
 
         return $i1->constInt(0, false);
     }
