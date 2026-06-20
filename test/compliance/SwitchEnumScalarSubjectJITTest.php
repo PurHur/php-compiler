@@ -24,6 +24,10 @@ final class SwitchEnumScalarSubjectJITTest extends BaseTest
             __DIR__.'/cases/language/switch_enum_scalar_case.phpt',
             'switch_enum_scalar_case.phpt'
         );
+        yield 'switch_enum_case_scalar_jit.phpt' => self::parsePHPT(
+            __DIR__.'/cases/language/switch_enum_case_scalar_jit.phpt',
+            'switch_enum_case_scalar_jit.phpt'
+        );
     }
 
     public function setUp(): void
