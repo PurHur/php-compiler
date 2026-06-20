@@ -1795,16 +1795,50 @@ class VM {
 
     /**
      * Zend zend_std_clone_object: shallow copy then user __clone() when defined (#3170).
+     *
+     * Must run on an isolated run stack with parent frame linkage — nested runFrames() from
+     * invokePhpFunctionOnStack would pop the clone opcode caller off the shared stack (#10165).
      */
-    protected function invokeCloneMagicMethod(ObjectEntry $object): void
+    protected function invokeCloneMagicMethod(ObjectEntry $object, Frame $parentFrame): void
     {
         $class = $object->class;
         if (!isset($class->methods['__clone'])) {
             return;
         }
+        $func = $class->methods['__clone'];
         $thisVar = new Variable(Variable::TYPE_OBJECT);
         $thisVar->object($object);
-        $this->invokePhpFunction($class->methods['__clone'], $thisVar);
+        $savedStack = null !== $this->context->currentFiber
+            ? null
+            : $this->context->swapRunStack(null);
+        try {
+            $child = $func->getFrame($this->context, $parentFrame);
+            $child->calledArgs = [$thisVar];
+            if (null !== $func->block->func && null !== $func->block->func->class
+                && !(($func->block->func->flags ?? 0) & \PHPCfg\Func::FLAG_STATIC)) {
+                $thisIdx = $func->block->slotIndexForVariableName('this');
+                if (null !== $thisIdx) {
+                    if (!isset($child->scope[$thisIdx])) {
+                        $child->scope[$thisIdx] = new Variable();
+                    }
+                    $child->scope[$thisIdx]->copyFrom($thisVar);
+                }
+            }
+            $out = new Variable();
+            $child->returnVar = $out;
+            $this->context->push($child);
+            $result = $this->runFrames();
+            if (self::FIBER_SUSPEND === $result) {
+                throw new \LogicException('Fiber suspend during __clone() is not supported in this compiler build');
+            }
+            if (self::SUCCESS !== $result) {
+                throw new \LogicException('__clone() invocation failed in this compiler build');
+            }
+        } finally {
+            if (null !== $savedStack) {
+                $this->context->swapRunStack($savedStack);
+            }
+        }
     }
 
     /**
@@ -5583,7 +5617,7 @@ restart:
                     }
                     $cloned = $srcObject->cloneShallow();
                     $result->object($cloned);
-                    $this->invokeCloneMagicMethod($cloned);
+                    $this->invokeCloneMagicMethod($cloned, $frame);
                     break;
                 case OpCode::TYPE_BOOLEAN_NOT:
                     $value = !($frame->scope[$op->arg2]->toBool());
