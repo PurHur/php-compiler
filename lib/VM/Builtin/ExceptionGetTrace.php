@@ -6,6 +6,7 @@ namespace PHPCompiler\VM\Builtin;
 
 use PHPCompiler\Frame;
 use PHPCompiler\VM\ExceptionSupport;
+use PHPCompiler\VM\ExceptionTrace;
 use PHPCompiler\VM\Variable;
 
 /** Throwable::getTrace() — VM (#7159). */
@@ -25,7 +26,7 @@ final class ExceptionGetTrace extends VmClassMethod
         if (null === $frame->returnVar) {
             return;
         }
-        $trace = $receiver->getProperty(ExceptionSupport::PROP_TRACE)->resolveIndirect();
+        $trace = ExceptionTrace::resolveTraceVariable($receiver);
         if (Variable::TYPE_ARRAY !== $trace->type) {
             $frame->returnVar->newArray();
 

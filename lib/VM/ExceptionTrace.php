@@ -12,6 +12,21 @@ use PHPCompiler\ext\standard\VmDebugBacktrace;
  */
 final class ExceptionTrace
 {
+    /**
+     * Snapshot caller frame for manual `new Throwable()` (not thrown) — Zend object_init_ex (#9905).
+     */
+    public static function captureOnManualConstruct(Context $ctx, Frame $constructFrame, ObjectEntry $object): void
+    {
+        if (!self::classHasInstanceProperty($object->class, ExceptionSupport::PROP_TRACE, $ctx)) {
+            return;
+        }
+        $caller = $constructFrame->parent;
+        if (null === $caller) {
+            return;
+        }
+        $object->manualConstructTrace = self::sanitizeCapturedTrace(VmDebugBacktrace::build($caller));
+    }
+
     public static function captureOnThrow(Context $ctx, Frame $frame, Variable $thrown): void
     {
         $thrown = $thrown->resolveIndirect();
@@ -19,6 +34,7 @@ final class ExceptionTrace
             return;
         }
         $object = $thrown->toObject();
+        $object->manualConstructTrace = null;
         if (!self::classHasInstanceProperty($object->class, ExceptionSupport::PROP_TRACE, $ctx)) {
             return;
         }
@@ -28,6 +44,19 @@ final class ExceptionTrace
             return;
         }
         $traceProp->duplicateFrom(self::sanitizeCapturedTrace(VmDebugBacktrace::build($frame)));
+    }
+
+    public static function resolveTraceVariable(ObjectEntry $object): Variable
+    {
+        $trace = $object->getProperty(ExceptionSupport::PROP_TRACE)->resolveIndirect();
+        if (Variable::TYPE_ARRAY === $trace->type && $trace->toArray()->getNumElements() > 0) {
+            return $trace;
+        }
+        if (null !== $object->manualConstructTrace) {
+            return $object->manualConstructTrace->resolveIndirect();
+        }
+
+        return $trace;
     }
 
     /** Zend stores throw-site frames only; `{main}` is synthesized in getTraceAsString(). */
