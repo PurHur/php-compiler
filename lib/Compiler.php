@@ -34,6 +34,7 @@ use PHPCompiler\VM\Variable;
 use PHPCompiler\VM\ClassReadonly;
 use PHPCompiler\JIT\OperandName;
 use PHPCompiler\Ast\AsymmetricVisibilityRewriter;
+use PHPCompiler\Ast\GeneratorYieldSourceMarker;
 use PHPCompiler\Compiler\AbstractMethodVisibilityCheck;
 use PHPCompiler\Compiler\InterfaceConstVisibilityCheck;
 use PHPCompiler\Compiler\InterfaceMethodVisibilityCheck;
@@ -579,6 +580,13 @@ class Compiler {
 
                 return;
             }
+            if (null !== $refName && '' !== $refName) {
+                $block->returnTypeConstraint = Variable::TYPE_OBJECT;
+                $block->returnClassConstraint = $refName;
+                $block->returnDeclaredTypeLabel = ltrim($refName, '\\');
+
+                return;
+            }
         }
         if ($this->cfgTypeUsesDnfShape($returnType)) {
             $dnfArms = DnfType::armsFromCfgType(
@@ -619,7 +627,16 @@ class Compiler {
 
                 return;
             }
-            $mapped = Variable::mapFromType(Type::fromDecl($returnType->name));
+            $declType = Type::fromDecl($returnType->name);
+            $mapped = Variable::mapFromType($declType);
+            if (Variable::TYPE_OBJECT === $mapped) {
+                $className = '' !== (string) $declType->userType ? $declType->userType : $returnType->name;
+                $block->returnTypeConstraint = Variable::TYPE_OBJECT;
+                $block->returnClassConstraint = $className;
+                $block->returnDeclaredTypeLabel = ltrim($className, '\\');
+
+                return;
+            }
             if (Variable::TYPE_UNDEFINED !== $mapped) {
                 $block->returnTypeConstraint = $mapped;
             }
@@ -820,6 +837,8 @@ class Compiler {
             // Merge blocks skip inheritScopeFrom when parents>=2 (#3790); still need
             // return-type flags so :never epilogue checks run on implicit fall-off (#9240).
             $child->returnTypeConstraint = $parent->returnTypeConstraint;
+            $child->returnClassConstraint = $parent->returnClassConstraint;
+            $child->returnDeclaredTypeLabel = $parent->returnDeclaredTypeLabel;
             $child->returnDnfConstraints = $parent->returnDnfConstraints;
             $child->returnTypeVoid = $parent->returnTypeVoid;
             $child->returnTypeNever = $parent->returnTypeNever;
@@ -3399,6 +3418,7 @@ class Compiler {
         if (null !== $child->func->cfg) {
             $methodBlock = $this->compileCfgBlock($child->func->cfg, $child->func->params, $child->func);
             NoDiscardMetadata::applyToBlock($methodBlock, $child);
+            $this->markGeneratorIfNeeded($child, $methodBlock);
             $declare->block1 = $methodBlock;
         } elseif (0 === ($child->func->flags & CfgFunc::FLAG_ABSTRACT)) {
             // php-cfg omits cfg for `{}` method bodies; concrete methods still need block1 (#4758).
@@ -6385,10 +6405,7 @@ class Compiler {
     protected function compileFunction(Op\Stmt\Function_ $function, Block $block): OpCode {
         $funcBlock = $this->compileCfgBlock($function->func->cfg, $function->func->params, $function->func);
         NoDiscardMetadata::applyToBlock($funcBlock, $function);
-        // php-cfg may DCE unreachable yield after return; :Generator still implies generator (#3350).
-        if ($this->funcDeclReturnTypeIsGenerator($function->func)) {
-            $this->markFunctionGenerator($funcBlock);
-        }
+        $this->markGeneratorIfNeeded($function, $funcBlock);
         if ($this->funcDeclReturnTypeIsNever($function->func)) {
             $this->neverFunctionNames[strtolower($function->func->name)] = true;
         }
@@ -7395,6 +7412,7 @@ class Compiler {
         } finally {
             $this->compilingArrowAutoCapture = $wasArrowAutoCapture;
         }
+        $this->markGeneratorIfNeeded($expr, $funcBlock);
         $op = new OpCode(
             OpCode::TYPE_CLOSURE,
             $this->compileOperand($expr->result, $block, false),
@@ -7479,6 +7497,24 @@ class Compiler {
                 $compiled->isGenerator = true;
             }
         }
+    }
+
+    protected function markGeneratorIfNeeded(Op\CallableOp $callable, Block $funcBlock): void
+    {
+        if (Block::containsGeneratorOpcodes($funcBlock) || $this->callableOpHasSourceYield($callable)) {
+            $this->markFunctionGenerator($funcBlock);
+        }
+    }
+
+    protected function callableOpHasSourceYield(Op\CallableOp $callable): bool
+    {
+        if (!$callable instanceof Op) {
+            return false;
+        }
+        $attrs = $callable->getAttributes();
+
+        return isset($attrs[GeneratorYieldSourceMarker::ATTRIBUTE])
+            && $attrs[GeneratorYieldSourceMarker::ATTRIBUTE];
     }
 
     protected function funcDeclReturnTypeIsGenerator(CfgFunc $func): bool

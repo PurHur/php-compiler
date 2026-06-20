@@ -13633,6 +13633,19 @@ restart:
 
             return;
         }
+        if (null !== $block->returnClassConstraint && null !== $value) {
+            $returnLabel = ltrim($block->returnDeclaredTypeLabel ?? $block->returnClassConstraint, '\\');
+            if (!($block->isGenerator && 'Generator' === $returnLabel)) {
+                TypeCheck::assertObjectReturn(
+                    $value,
+                    $block->returnClassConstraint,
+                    $block->returnDeclaredTypeLabel ?? $block->returnClassConstraint,
+                    $this->returnTypeCallableName($block->func)
+                );
+            }
+
+            return;
+        }
         if (null === $block->returnTypeConstraint || null === $value) {
             return;
         }
@@ -13643,6 +13656,18 @@ restart:
             $block->returnTypeConstraint,
             $block->returnLiteralBoolType
         );
+    }
+
+    private function returnTypeCallableName(?\PHPCfg\Func $func): ?string
+    {
+        if (null === $func) {
+            return null;
+        }
+        if (null !== $func->class && '' !== $func->class) {
+            return $func->class.'::'.$func->name;
+        }
+
+        return $func->name;
     }
 
     private function emitCallDeprecationNotice(Frame $frame): void
