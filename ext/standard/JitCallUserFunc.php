@@ -4,16 +4,21 @@ declare(strict_types=1);
 
 namespace PHPCompiler\ext\standard;
 
+use PHPCompiler\Block;
 use PHPCompiler\JIT\Call;
 use PHPCompiler\JIT\Call\ExternalMethod;
 use PHPCompiler\JIT\Call\RuntimeIndirectClosureCall;
 use PHPCompiler\JIT\Call\RuntimeVariableFunction;
+use PHPCompiler\JIT\CallUnpackHelper;
 use PHPCompiler\JIT\ClosureHelper;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitStringArg;
 use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\JIT\VariableFunctionCallHelper;
+use PHPCompiler\VM\Variable as VmVariable;
+use PHPCfg\Operand;
+use PHPTypes\Type;
 use PHPLLVM\Value;
 
 /** LLVM lowering for call_user_func() / call_user_func_array() (issue #3132). */
@@ -65,8 +70,20 @@ final class JitCallUserFunc
         );
     }
 
-    public static function invokeArray(Context $context, JITVariable $callback, JITVariable $params): Value
-    {
+    public static function invokeArray(
+        Context $context,
+        JITVariable $callback,
+        JITVariable $params,
+        ?Block $block = null,
+        ?Operand $paramsOperand = null
+    ): Value {
+        if (null !== $block && null !== $paramsOperand) {
+            $extraArgs = self::compileTimeArrayArgs($context, $block, $paramsOperand);
+            if (null !== $extraArgs) {
+                return self::invoke($context, $callback, $extraArgs);
+            }
+        }
+
         if (
             JITVariable::TYPE_HASHTABLE !== $params->type
             && !($params->type & JITVariable::IS_NATIVE_ARRAY)
@@ -79,6 +96,60 @@ final class JitCallUserFunc
         throw new \LogicException(
             'call_user_func_array() is VM-only in this compiler build; use call_user_func() for JIT/AOT (#3132)'
         );
+    }
+
+    /**
+     * @return list<JITVariable>|null
+     */
+    private static function compileTimeArrayArgs(Context $context, Block $block, Operand $operand): ?array
+    {
+        $vmArray = CallUnpackHelper::tryCompileTimeArrayFromOperand($block, $operand);
+        if (null === $vmArray) {
+            return null;
+        }
+        $extraArgs = [];
+        foreach ($vmArray->toArray()->iterate(true) as $value) {
+            $extraArgs[] = self::jitArgFromVmConstant($context, $value);
+        }
+
+        return $extraArgs;
+    }
+
+    private static function jitArgFromVmConstant(Context $context, VmVariable $vm): JITVariable
+    {
+        switch ($vm->type) {
+            case VmVariable::TYPE_INTEGER:
+                return JITVariable::fromConstantInt($context, $vm->toInt());
+            case VmVariable::TYPE_STRING:
+                $lit = new Operand\Literal($vm->toString());
+                $lit->type = Type::string();
+
+                return JITVariable::fromLiteral($context, $lit);
+            case VmVariable::TYPE_FLOAT:
+                $lit = new Operand\Literal($vm->toFloat());
+                $lit->type = Type::float();
+
+                return JITVariable::fromLiteral($context, $lit);
+            case VmVariable::TYPE_BOOLEAN:
+                $lit = new Operand\Literal($vm->toBool());
+                $lit->type = Type::bool();
+
+                return JITVariable::fromLiteral($context, $lit);
+            case VmVariable::TYPE_NULL:
+                $nullVar = new JITVariable(
+                    $context,
+                    JITVariable::TYPE_NULL,
+                    JITVariable::KIND_VALUE,
+                    $context->getTypeFromString('__value__*')->constNull()
+                );
+                $nullVar->isNullConstant = true;
+
+                return $nullVar;
+            default:
+                throw new \LogicException(
+                    'call_user_func_array() compile-time args must be scalar constants in this compiler build'
+                );
+        }
     }
 
     /**
@@ -98,7 +169,7 @@ final class JitCallUserFunc
         $proxy = $context->resolveFunctionProxy($lc);
         if ($proxy instanceof ExternalMethod) {
             throw new \LogicException(
-                "call_user_func() callback '{$name}' must be a user-defined function in this compile unit"
+                "call_user_func() callback '{$name}' is not a defined function in this compile unit"
             );
         }
 

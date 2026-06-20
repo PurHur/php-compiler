@@ -8674,12 +8674,21 @@ class JIT {
                     ) {
                         $this->context->jitUnserializeOptionsOperand = $callOperands[1];
                     }
+                    $savedCallUserFuncArrayOperand = $this->context->jitCallUserFuncArrayParamsOperand;
+                    if (
+                        $this->context->scope->toCall instanceof CoreFunc\Internal
+                        && 'call_user_func_array' === strtolower($this->context->scope->toCall->getName())
+                        && isset($callOperands[1])
+                    ) {
+                        $this->context->jitCallUserFuncArrayParamsOperand = $callOperands[1];
+                    }
                     $this->promoteCompileTimeStringOnCallArgs($block, $callOperands, $callArgs);
                     if ($this->context->scope->toCall instanceof CoreFunc\Internal) {
                         $callArgs = $this->densifyInternalCallArgs($this->context->scope->toCall, $callArgs);
                     }
                     $result = $this->context->scope->toCall->call($this->context, ...$callArgs);
                     $this->context->jitUnserializeOptionsOperand = $savedUnserializeOptionsOperand;
+                    $this->context->jitCallUserFuncArrayParamsOperand = $savedCallUserFuncArrayOperand;
                     $this->markNewObjectConstructedAfterCall($this->context->scope->toCall, $callArgs);
                     $this->context->callerStrictTypes = $prevStrict;
                     $this->assignCallResultOperand(

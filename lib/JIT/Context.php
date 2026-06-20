@@ -71,6 +71,9 @@ class Context {
     /** Operand for unserialize() options arg during FUNCCALL lowering (#3300). */
     public ?Operand $jitUnserializeOptionsOperand = null;
 
+    /** Operand for call_user_func_array() $args during FUNCCALL lowering (#10359). */
+    public ?Operand $jitCallUserFuncArrayParamsOperand = null;
+
     /**
      * Backing property name for raw writes inside a lowering set-hook method (#4025).
      *

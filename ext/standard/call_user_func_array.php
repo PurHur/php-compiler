@@ -54,7 +54,13 @@ final class call_user_func_array extends Internal
             throw new \LogicException('call_user_func_array() requires exactly two arguments');
         }
 
-        return JitCallUserFunc::invokeArray($context, $args[0], $args[1]);
+        return JitCallUserFunc::invokeArray(
+            $context,
+            $args[0],
+            $args[1],
+            $context->jitCurrentBlock ?? $context->jitEnclosingBlock,
+            $context->jitCallUserFuncArrayParamsOperand
+        );
     }
 
     private static function typeLabel(Variable $var): string

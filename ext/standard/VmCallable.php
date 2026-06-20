@@ -245,6 +245,13 @@ final class VmCallable
             return $ctx->runtime->vm->invokeStaticWithCalledScope($class, $method, ...$args);
         }
         try {
+            $internal = VmInternalCall::resolveStringCallback($name);
+
+            return VmInternalCall::invoke($internal, ...$args);
+        } catch (\LogicException) {
+            // Not a registered string builtin — try a user-defined function.
+        }
+        try {
             $fn = VmUserCall::resolveStringCallback($ctx, $name);
         } catch (\LogicException) {
             throw new \TypeError(self::invalidStringCallbackTypeError($name));
