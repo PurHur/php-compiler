@@ -742,7 +742,7 @@ class String_ extends Type {
                             $diff = $this->context->builder->subNoSignedWrap($newSize, $__right);
     $this->context->intrinsic->memset(
                     $char, 
-                    $this->context->context->int8Type()->constInt(0, false),
+                    $this->context->context->int8Type()->constInt(0x20, false),
                     $diff, 
                     false
                 );
