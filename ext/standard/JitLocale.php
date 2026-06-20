@@ -63,6 +63,12 @@ final class JitLocale
                 continue;
             }
             if (null !== ($arg->compileTimeString ?? null)) {
+                if ('0' === $arg->compileTimeString) {
+                    $var = new VMVariable();
+                    $var->null();
+                    $out[] = $var;
+                    continue;
+                }
                 $var = new VMVariable();
                 $var->string($arg->compileTimeString);
                 $out[] = $var;
