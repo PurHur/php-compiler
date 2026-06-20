@@ -188,6 +188,10 @@ final class ExceptionSupport
             }
         }
         $receiver->constructed = true;
+        $ctx = $frame->vmContext ?? $frame->parent?->vmContext;
+        if (null !== $ctx) {
+            ExceptionTrace::captureOnManualConstruct($ctx, $frame, $receiver);
+        }
         if (null !== $frame->returnVar) {
             $ret = $frame->returnVar->resolveIndirect();
             // void __construct must not wipe the `new Exception()` temp when returnVar
@@ -278,6 +282,10 @@ final class ExceptionSupport
             }
         }
         $receiver->constructed = true;
+        $ctx = $frame->vmContext ?? $frame->parent?->vmContext;
+        if (null !== $ctx) {
+            ExceptionTrace::captureOnManualConstruct($ctx, $frame, $receiver);
+        }
         if (null !== $frame->returnVar) {
             $ret = $frame->returnVar->resolveIndirect();
             if (

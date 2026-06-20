@@ -86,6 +86,9 @@ class ObjectEntry {
     /** True after readonly($object) marks this instance immutable (#6485). */
     public bool $dynamicReadonly = false;
 
+    /** Manual `new Throwable()` stack before throw overwrites trace (#9905, zend_exceptions.c). */
+    public ?Variable $manualConstructTrace = null;
+
     /**
      * Readonly property names allowed one write during clone-with (#7250, IS_PROP_REINITABLE).
      *
