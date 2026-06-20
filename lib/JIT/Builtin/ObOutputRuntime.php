@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace PHPCompiler\JIT\Builtin;
 
+use PHPCompiler\ext\standard\ob_end_clean;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\VM\ObStackLimits;
 use PHPLLVM\Builder;
@@ -46,6 +47,7 @@ final class ObOutputRuntime
         self::ensureExtraGlobals($context);
         self::ensureLibc($context);
         self::ensureValueHelpers($context);
+        StringTriggerErrorJit::implement($context);
         self::implementAppendBytes($context);
         self::implementObStart($context);
         self::implementObGetLevel($context);
@@ -326,7 +328,13 @@ final class ObOutputRuntime
 
     private static function implementObEndClean(Context $context): void
     {
-        self::implementPopBuffer($context, '__phpc_ob_end_clean', false, false);
+        self::implementPopBuffer(
+            $context,
+            '__phpc_ob_end_clean',
+            false,
+            false,
+            ob_end_clean::NO_BUFFER_NOTICE
+        );
     }
 
     private static function implementObGetClean(Context $context): void
@@ -450,7 +458,8 @@ final class ObOutputRuntime
         Context $context,
         string $name,
         bool $returnString,
-        bool $flush
+        bool $flush,
+        ?string $emptyBufferNotice = null
     ): void {
         $i32 = $context->getTypeFromString('int32');
         $valuePtr = $context->getTypeFromString('__value__*');
@@ -462,6 +471,9 @@ final class ObOutputRuntime
         $out = $fn->getParam(0);
         if (self::branchNoActiveBuffer($context, $fn, $out, $fail, $work)) {
             $context->builder->positionAtEnd($fail);
+            if (null !== $emptyBufferNotice) {
+                self::emitObNoBufferNotice($context, $emptyBufferNotice);
+            }
             $context->builder->call($context->lookupFunction('__value__writeBool'), $out, $i32->constInt(0, false));
             $context->builder->returnValue($i32->constInt(0, false));
             $context->builder->positionAtEnd($work);
@@ -547,6 +559,23 @@ final class ObOutputRuntime
         $context->builder->store($storeVal, self::globalPtr($context, self::G_IMPLICIT_FLUSH, $i32));
         $context->builder->returnVoid();
         $context->builder->clearInsertionPosition();
+    }
+
+    private static function emitObNoBufferNotice(Context $context, string $message): void
+    {
+        $i8p = $context->getTypeFromString('int8*');
+        $i32 = $context->getTypeFromString('int32');
+        $msgPtr = $context->builder->pointerCast($context->constantFromString($message), $i8p);
+        $msgLen = $context->builder->call($context->lookupFunction('strlen'), $msgPtr);
+        $emptyFile = $context->builder->pointerCast($context->constantFromString(''), $i8p);
+        $context->builder->call(
+            $context->lookupFunction('__compiler_trigger_error'),
+            $msgPtr,
+            $msgLen,
+            $i32->constInt(8, false),
+            $emptyFile,
+            $i32->constInt(0, false)
+        );
     }
 
     private static function branchNoActiveBuffer(
