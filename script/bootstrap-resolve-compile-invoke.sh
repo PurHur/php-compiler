@@ -154,6 +154,12 @@ bootstrap_gen0_sidecar_blob_for_entry() {
         have_sha="$(tr -d '\n' <"${root}/prelinked/bootstrap-gen0/.m3_compiler_lib_sidecar.sha")"
       fi
       if [[ "${want_sha}" != "${have_sha}" ]]; then
+        if [[ "${BOOTSTRAP_NO_ZEND_FALLBACK:-0}" == "1" ]] \
+          && [[ -f "${root}/prelinked/bootstrap-gen0/compiler_lib_aot_blob" ]]; then
+          echo "bootstrap-gen0-sidecar-fallback: NO_ZEND spine — reuse prelinked compiler_lib sidecar (want ${want_sha}, have ${have_sha:-<none>}; #8716)" >&2
+          printf '%s\n' "${root}/prelinked/bootstrap-gen0/compiler_lib_aot_blob"
+          return 0
+        fi
         if [[ "${BOOTSTRAP_ALLOW_STALE_SIDECAR:-0}" == "1" ]]; then
           echo "bootstrap-gen0-sidecar-fallback: using stale prelinked sidecar (want ${want_sha}, have ${have_sha:-<none>}; BOOTSTRAP_ALLOW_STALE_SIDECAR=1 — #8703)" >&2
         else
@@ -185,13 +191,21 @@ bootstrap_gen0_sidecar_emit_fallback() {
 }
 
 # Sidecar copy is not honest native emit — gate on M5 no-Zend, SIGSEGV, and opt-in (#8711).
+# Exception: compiler_lib spine smoke under BOOTSTRAP_NO_ZEND_FALLBACK uses committed
+# path-keyed sidecar when native parse spine is still stubbed (#8716, #2967).
 bootstrap_sidecar_emit_fallback_allowed() {
   local last_code=${1:-0}
+  local entry="${2:-}"
   if [[ "${BOOTSTRAP_M5_NO_ZEND:-0}" == "1" ]]; then
     echo "bootstrap-compile-invoke: BOOTSTRAP_M5_NO_ZEND=1 — refusing sidecar emit fallback (#3053)" >&2
     return 1
   fi
   if [[ "${BOOTSTRAP_NO_ZEND_FALLBACK:-0}" == "1" ]]; then
+    case "${entry//\\//}" in
+      */test/selfhost/compiler_lib_spine_smoke/main.php)
+        return 0
+        ;;
+    esac
     return 1
   fi
   if [[ "${last_code}" -eq 139 && "${BOOTSTRAP_ALLOW_SIDECAR_EMIT_FALLBACK:-0}" != "1" ]]; then
@@ -205,7 +219,7 @@ bootstrap_try_sidecar_emit_fallback() {
   local out=$1
   local entry=$2
   local last_code=${3:-0}
-  if ! bootstrap_sidecar_emit_fallback_allowed "${last_code}"; then
+  if ! bootstrap_sidecar_emit_fallback_allowed "${last_code}" "${entry}"; then
     return 1
   fi
   if bootstrap_gen0_sidecar_emit_fallback "${out}" "${entry}"; then
@@ -522,6 +536,11 @@ bootstrap_ensure_inventory_argv_driver() {
     if bootstrap_gen0_copy_prelinked_inventory_driver "${out}" "" "${out}"; then
       if bootstrap_is_inventory_bin_compile_argv_driver "${out}" \
         && bootstrap_inventory_argv_driver_accepts "${out}"; then
+        return 0
+      fi
+      if bootstrap_is_inventory_bin_compile_argv_driver "${out}" \
+        && bootstrap_inventory_argv_driver_smoke "${out}"; then
+        echo "bootstrap-ensure-inventory-argv-driver: prelinked inventory driver OK for helloworld smoke (skip bin/compile.php m4 under NO_ZEND — #8716)" >&2
         return 0
       fi
     fi
