@@ -104,6 +104,9 @@ final class BuiltinParamNames
                 return ['json', 'associative', 'depth', 'flags'];
             case 'explode':
                 return ['separator', 'string', 'limit'];
+            case 'implode':
+            case 'join':
+                return ['separator', 'array'];
             case 'nl2br':
                 return ['string', 'use_xhtml'];
             case 'str_contains':
@@ -138,6 +141,15 @@ final class BuiltinParamNames
      */
     public static function aliasesForFunction(string $name): array
     {
+        $lc = strtolower($name);
+        if ('implode' === $lc || 'join' === $lc) {
+            // php-src InternalArgInfo glue/pieces; public stub names separator/array (#9985).
+            return [
+                'glue' => 0,
+                'pieces' => 1,
+            ];
+        }
+
         return [];
     }
 
