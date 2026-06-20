@@ -56,6 +56,42 @@ PHP;
         $runtime->parseAndCompile($code, 'never_intersection.php');
     }
 
+    public function testNullableNeverParamRejectedAtCompileTime(): void
+    {
+        $runtime = new Runtime();
+        $code = <<<'PHP'
+<?php
+function f(?never $x = null): void {}
+PHP;
+        $this->expectException(\CompileError::class);
+        $this->expectExceptionMessage('never can only be used as a standalone type');
+        $runtime->parseAndCompile($code, 'never_nullable_param.php');
+    }
+
+    public function testNullableNeverReturnRejectedAtCompileTime(): void
+    {
+        $runtime = new Runtime();
+        $code = <<<'PHP'
+<?php
+function f(): ?never {}
+PHP;
+        $this->expectException(\CompileError::class);
+        $this->expectExceptionMessage('never can only be used as a standalone type');
+        $runtime->parseAndCompile($code, 'never_nullable_return.php');
+    }
+
+    public function testNeverNullUnionParamRejectedAtCompileTime(): void
+    {
+        $runtime = new Runtime();
+        $code = <<<'PHP'
+<?php
+function f(never|null $x): void {}
+PHP;
+        $this->expectException(\CompileError::class);
+        $this->expectExceptionMessage('never can only be used as a standalone type');
+        $runtime->parseAndCompile($code, 'never_null_union_param.php');
+    }
+
     public function testStandaloneNeverReturnTypeStillCompiles(): void
     {
         $runtime = new Runtime();

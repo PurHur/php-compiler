@@ -3913,12 +3913,56 @@ class Compiler {
         return false;
     }
 
+    protected function cfgTypeIsNullLiteral(?Op\Type $type): bool
+    {
+        return $type instanceof Op\Type\Literal && 'null' === strtolower($type->name);
+    }
+
+    protected function cfgTypeContainsNull(?Op\Type $type): bool
+    {
+        if (null === $type) {
+            return false;
+        }
+        if ($this->cfgTypeIsNullLiteral($type)) {
+            return true;
+        }
+        if ($type instanceof Op\Type\Union_) {
+            foreach ($type->types as $member) {
+                if ($this->cfgTypeContainsNull($member)) {
+                    return true;
+                }
+            }
+        }
+        if ($type instanceof Op\Type\Intersection) {
+            foreach ($type->types as $member) {
+                if ($this->cfgTypeContainsNull($member)) {
+                    return true;
+                }
+            }
+        }
+        if ($type instanceof Op\Type\Nullable) {
+            return $this->cfgTypeContainsNull($type->subtype);
+        }
+
+        return false;
+    }
+
     /**
      * Zend zend_handle_never_type — PHP 8.2+ allows never in parameter/return unions (#7414).
      */
     protected function assertFunctionSignatureNeverType(?Op\Type $type): void
     {
         if ($this->cfgTypeContainsNeverInIntersection($type)) {
+            $this->throwCompileError('never can only be used as a standalone type');
+        }
+        if ($type instanceof Op\Type\Nullable && $this->cfgTypeContainsNever($type->subtype)) {
+            $this->throwCompileError('never can only be used as a standalone type');
+        }
+        if (
+            $type instanceof Op\Type\Union_
+            && $this->cfgTypeContainsNever($type)
+            && $this->cfgTypeContainsNull($type)
+        ) {
             $this->throwCompileError('never can only be used as a standalone type');
         }
     }
