@@ -16,6 +16,8 @@ use PHPCompiler\VM\Variable;
  */
 final class VmEnv
 {
+    public const PUTENV_INVALID_SYNTAX_ERROR = 'putenv(): Argument #1 ($assignment) must have a valid syntax';
+
     /** @var array<string, string> Variables set or overridden via putenv() in this process */
     private static array $local = [];
 
@@ -32,12 +34,21 @@ final class VmEnv
         return [substr($setting, 0, $eq), substr($setting, $eq + 1)];
     }
 
+    /**
+     * @throws \ValueError when assignment has empty name or other invalid syntax (#10335, php-src zif_putenv)
+     */
+    public static function assertValidPutenvSyntax(string $setting): void
+    {
+        [$name] = self::parsePutenvAssignment($setting);
+        if ('' === $name) {
+            throw new \ValueError(self::PUTENV_INVALID_SYNTAX_ERROR);
+        }
+    }
+
     public static function putenv(string $setting): bool
     {
+        self::assertValidPutenvSyntax($setting);
         [$name, $value] = self::parsePutenvAssignment($setting);
-        if ('' === $name) {
-            return false;
-        }
         if (null === $value) {
             unset(self::$local[$name]);
         } else {

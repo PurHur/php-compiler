@@ -181,7 +181,7 @@ Use these during LLVM/JIT iteration — avoid full spine relink unless you chang
 | `make bootstrap-warm-m3-sidecars` | seconds–minutes | Pre-build independent M3 sidecars (parallel when `PHP_COMPILER_COMPILE_JOBS>1`) before slow emit/link |
 | `make bootstrap-gen0-refresh-sidecar` | minutes | Full spine link + copy `build/.m3_*` → `prelinked/bootstrap-gen0/` + manifest refresh ([#8704](https://github.com/PurHur/php-compiler/issues/8704)) |
 | `php script/bootstrap-inventory.php --check` | seconds | Inventory SSOT without LLVM |
-| `php script/check-selfhost-spine-coverage-sync.php` | seconds | Spine ↔ inventory coverage (**2869/2848**) |
+| `php script/check-selfhost-spine-coverage-sync.php` | seconds | Spine ↔ inventory coverage (**2868/2847**) |
 | `php script/check-selfhost-spine-sidecar-sync.php` | seconds | Prelinked gen-0 stamp ↔ spine entry SHA-1 ([#8703](https://github.com/PurHur/php-compiler/issues/8703)) |
 
 **Env flags**

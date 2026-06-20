@@ -8,8 +8,10 @@ declare(strict_types=1);
 
 namespace PHPCompiler\ext\standard;
 
+use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Builtin\StringGetenv;
 use PHPCompiler\JIT\Builtin\StringGetenvAll;
+use PHPCompiler\JIT\Builtin\TypeErrorRaise;
 use PHPCompiler\JIT\Builtin;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitValueBox;
@@ -54,6 +56,7 @@ final class JitEnv
     public static function putenv(Context $context, Value $assignmentStr): Value
     {
         StringGetenv::ensurePutenvLinked($context);
+        self::emitPutenvSyntaxGuard($context, $assignmentStr);
 
         $overlayOk = null;
         if (Builtin::LOAD_TYPE_STANDALONE !== $context->loadType) {
@@ -102,6 +105,36 @@ final class JitEnv
         }
 
         return $context->builder->and($overlayOk, $libcOk);
+    }
+
+    private static function emitPutenvSyntaxGuard(Context $context, Value $assignmentStr): void
+    {
+        TypeErrorRaise::ensureLinked($context);
+
+        $map = $context->structFieldMap['__string__'];
+        $len = $context->builder->load(
+            $context->builder->structGep($assignmentStr, $map['length'])
+        );
+        $bytes = $context->builder->structGep($assignmentStr, $map['value']);
+        $i8 = $context->getTypeFromString('int8');
+        $i64 = $context->getTypeFromString('int64');
+        $zero = $i64->constInt(0, false);
+        $empty = $context->builder->icmp(Builder::INT_EQ, $len, $zero);
+        $firstByte = $context->builder->load($bytes);
+        $isEq = $context->builder->icmp(
+            Builder::INT_EQ,
+            $firstByte,
+            $i8->constInt(ord('='), false)
+        );
+        $invalid = $context->builder->or($empty, $isEq);
+
+        $ok = BasicBlockHelper::append($context, 'putenv_syntax_ok');
+        $bad = BasicBlockHelper::append($context, 'putenv_syntax_bad');
+        $context->builder->branchIf($invalid, $bad, $ok);
+        $context->builder->positionAtEnd($bad);
+        TypeErrorRaise::emitValueError($context, VmEnv::PUTENV_INVALID_SYNTAX_ERROR);
+        $context->builder->call($context->lookupFunction('abort'));
+        $context->builder->positionAtEnd($ok);
     }
 
     private static function lookupMalloc(Context $context): Value

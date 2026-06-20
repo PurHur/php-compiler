@@ -9,22 +9,21 @@ use PHPCompiler\VM\InOperatorJitHelper;
 use PHPCompiler\VM\Variable as VmVariable;
 use PHPUnit\Framework\TestCase;
 
-/** InOperator JIT routes value-box guard through InOperatorJitHelper PHP (#10172). */
+/** InOperator JIT routes value-box guard through InOperatorJitHelper PHP (#10172, #10342). */
 final class InOperatorRuntimeShrinkTest extends TestCase
 {
-    public function testInOperatorRuntimeUsesInOperatorJitHelper(): void
-    {
-        $source = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/InOperatorRuntime.php');
-        $this->assertStringContainsString('InOperatorJitHelper', $source);
-        $this->assertStringContainsString('valueBoxHaystackIsArray', $source);
-    }
-
-    public function testInOperatorHelperRoutesValueBoxGuardThroughInOperatorRuntime(): void
+    public function testInOperatorHelperRoutesValueBoxThroughInOperatorJitHelper(): void
     {
         $source = (string) file_get_contents(__DIR__.'/../../lib/JIT/InOperatorHelper.php');
-        $this->assertStringContainsString('InOperatorRuntime', $source);
-        $this->assertStringNotContainsString('guardHaystackIsArray', $source);
-        $this->assertLessThanOrEqual(35, substr_count($source, "\n") + 1);
+        $this->assertStringContainsString('InOperatorJitHelper', $source);
+        $this->assertStringContainsString('valueBoxHaystackIsArray', $source);
+        $this->assertStringContainsString('JitVmHelperLink', $source);
+        $this->assertStringNotContainsString('InOperatorRuntime', $source);
+    }
+
+    public function testInOperatorRuntimeBridgeRemoved(): void
+    {
+        $this->assertFileDoesNotExist(__DIR__.'/../../lib/JIT/Builtin/InOperatorRuntime.php');
     }
 
     public function testInOperatorJitHelperValueBoxHaystackIsArray(): void
