@@ -118,6 +118,7 @@ final class HashTable {
                 $out->insertDuplicatedKey($key->toString(), $value);
             }
         }
+        $out->internalPointer = $this->internalPointer;
 
         return $out;
     }
@@ -1750,16 +1751,20 @@ final class HashTable {
         }
         $this->assertSeparatedForWrite();
         $bucket = null;
+        $bucketIndex = self::INVALID_INDEX;
         $index = self::normalizeIndexKey($index);
         switch ($index->type) {
             case Variable::TYPE_INTEGER:
-                $bucket = $this->findBucket($index->toInt(), null);
+                $bucketIndex = $this->findBucketIndex($index->toInt(), null);
+                $bucket = self::INVALID_INDEX !== $bucketIndex ? $this->buckets->read($bucketIndex) : null;
                 break;
             case Variable::TYPE_FLOAT:
-                $bucket = $this->findBucket($index->toInt(), null);
+                $bucketIndex = $this->findBucketIndex($index->toInt(), null);
+                $bucket = self::INVALID_INDEX !== $bucketIndex ? $this->buckets->read($bucketIndex) : null;
                 break;
             case Variable::TYPE_STRING:
-                $bucket = $this->findBucketByStringKey($index->toString());
+                $bucketIndex = $this->findBucketIndexByStringKey($index->toString());
+                $bucket = self::INVALID_INDEX !== $bucketIndex ? $this->buckets->read($bucketIndex) : null;
                 break;
             default:
                 throw new \LogicException("Unknown index type {$index->type}");
@@ -1774,19 +1779,54 @@ final class HashTable {
         $bucket->value->reset();
         $bucket->value->type = Variable::TYPE_UNDEFINED;
         --$this->numElements;
+        if ($this->internalPointer === $bucketIndex) {
+            $this->updateInternalPointerAfterUnsetCurrent($bucketIndex);
+        }
+    }
+
+    /**
+     * Zend zend_hash_internal_pointer_update() after unset at nInternalPointer (Zend/zend_hash.c; #10349).
+     */
+    private function updateInternalPointerAfterUnsetCurrent(int $fromIndex): void
+    {
+        if (0 === $this->numElements) {
+            $this->internalPointer = self::INVALID_INDEX;
+
+            return;
+        }
+        $idx = $fromIndex;
+        while ($idx < $this->numUsed) {
+            if (!$this->buckets->read($idx)->value->isUndefined()) {
+                $this->internalPointer = $idx;
+
+                return;
+            }
+            ++$idx;
+        }
+        $this->internalPointer = self::INVALID_INDEX;
     }
 
     private function findBucketByStringKey(string $key): ?HashTableBucket
     {
+        $idx = $this->findBucketIndexByStringKey($key);
+        if (self::INVALID_INDEX === $idx) {
+            return null;
+        }
+
+        return $this->buckets->read($idx);
+    }
+
+    private function findBucketIndexByStringKey(string $key): int
+    {
         $intKey = self::tryIntFromNumericString($key);
         if (null !== $intKey) {
-            $bucket = $this->findBucket($intKey, null);
-            if (null !== $bucket) {
-                return $bucket;
+            $idx = $this->findBucketIndex($intKey, null);
+            if (self::INVALID_INDEX !== $idx) {
+                return $idx;
             }
         }
 
-        return $this->findBucket($this->hash($key), $key);
+        return $this->findBucketIndex($this->hash($key), $key);
     }
 
     public function append(Variable $data): ?Variable {
@@ -1947,15 +1987,26 @@ final class HashTable {
         return $bucket->value;
     }
 
-    private function findBucket(int $hash, ?string $key): ?HashTableBucket {
+    private function findBucket(int $hash, ?string $key): ?HashTableBucket
+    {
+        $idx = $this->findBucketIndex($hash, $key);
+        if (self::INVALID_INDEX === $idx) {
+            return null;
+        }
+
+        return $this->buckets->read($idx);
+    }
+
+    private function findBucketIndex(int $hash, ?string $key): int
+    {
         $idx = $this->indexes->read($hash);
         do {
             if ($idx === self::INVALID_INDEX) {
-                return null;
+                return self::INVALID_INDEX;
             }
             $bucket = $this->buckets->read($idx);
             if ($bucket->key === $key && (null !== $key || $bucket->hash === $hash)) {
-                return $bucket;
+                return $idx;
             }
             $idx = $bucket->value->next;
         } while (true);

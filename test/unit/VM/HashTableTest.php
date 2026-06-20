@@ -197,6 +197,45 @@ class HashTableTest extends TestCase
         $this->assertSame('extra', $ht->find('k_extra')->resolveIndirect()->toString());
     }
 
+    /** Regression: internal pointer advances after unset at current slot (#10349). */
+    public function testPointerAdvancesAfterUnsetCurrent(): void
+    {
+        $ht = new HashTable();
+        $x = new Variable();
+        $x->int(1);
+        $ht->add('x', $x);
+        $y = new Variable();
+        $y->int(2);
+        $ht->add('y', $y);
+
+        $removeX = new Variable();
+        $removeX->string('x');
+        $ht->offsetUnset($removeX);
+
+        $key = $ht->pointerKey();
+        $this->assertNotNull($key);
+        $this->assertSame('y', $key->toString());
+    }
+
+    public function testPointerUnchangedAfterUnsetNonCurrent(): void
+    {
+        $ht = new HashTable();
+        $x = new Variable();
+        $x->int(1);
+        $ht->add('x', $x);
+        $y = new Variable();
+        $y->int(2);
+        $ht->add('y', $y);
+
+        $removeY = new Variable();
+        $removeY->string('y');
+        $ht->offsetUnset($removeY);
+
+        $key = $ht->pointerKey();
+        $this->assertNotNull($key);
+        $this->assertSame('x', $key->toString());
+    }
+
     private function int(int $value): Variable
     {
         $var = new Variable();
