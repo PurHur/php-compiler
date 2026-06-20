@@ -197,4 +197,30 @@ PHP;
         $rt->run($block);
         $this->assertSame("array (\n  0 => 2,\n  1 => 'b',\n)", ob_get_clean());
     }
+
+    /** Issue #10165 — clone-with overrides apply after __clone(); closure IIFE must receive object. */
+    public function testVmCloneWithOverrideAfterCloneMagic(): void
+    {
+        $code = <<<'PHP'
+<?php
+declare(strict_types=1);
+
+class C {
+    public int $x = 1;
+
+    public function __clone(): void {
+        $this->x = 99;
+    }
+}
+
+$c = new C();
+$d = clone $c with ['x' => 2];
+var_export([$c->x, $d->x]);
+PHP;
+        $rt = new Runtime();
+        $block = $rt->parseAndCompile($code, 'test.php');
+        ob_start();
+        $rt->run($block);
+        $this->assertSame("array (\n  0 => 1,\n  1 => 2,\n)", ob_get_clean());
+    }
 }
