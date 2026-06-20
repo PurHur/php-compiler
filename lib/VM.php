@@ -5365,16 +5365,15 @@ restart:
                             break;
                         }
                         if (Variable::TYPE_NULL === $resolved->type) {
-                            $catchFrame = $this->dispatchVmError(
-                                sprintf('Attempt to read property "%s" on null', $name),
-                                $frame
+                            $this->context->errors->propertyReadOnNonObject(
+                                $name,
+                                'null',
+                                $this->context,
+                                $frame,
+                                $scriptFile
                             );
-                            if (null !== $catchFrame) {
-                                $frame = $catchFrame;
-                                goto restart;
-                            }
-
-                            return self::EXCEPTION;
+                            $result->null();
+                            break;
                         }
                         $this->context->errors->propertyReadOnNonObject(
                             $name,

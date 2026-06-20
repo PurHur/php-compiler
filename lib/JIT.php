@@ -9044,15 +9044,12 @@ class JIT {
                             break;
                         }
                         if ('null' === $nonObjectLabel) {
-                            $message = sprintf('Attempt to read property "%s" on null', $propName);
-                            if ([] !== $this->context->tryCatch->handlerStack) {
-                                JIT\NonObjectPropertyFetchHelper::lowerNullPropertyDest($this->context, $result);
-                                JIT\TryCatchHelper::emitCatchableErrorMessage($this->context, $this, $message);
-                            } else {
-                                JIT\Builtin\ErrorRaise::emitRaise($this->context, $message);
-                                $this->context->builder->call($this->context->lookupFunction('abort'));
-                                $this->context->builder->clearInsertionPosition();
-                            }
+                            JIT\NonObjectPropertyFetchHelper::lowerNonObjectPropertyRead(
+                                $this->context,
+                                $result,
+                                $propName,
+                                'null'
+                            );
                             break;
                         }
                         JIT\NonObjectPropertyFetchHelper::lowerNonObjectPropertyRead(
