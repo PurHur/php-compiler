@@ -180,33 +180,46 @@ final class VmInfo
 
     public static function phpinfo(int $flags = self::INFO_ALL): bool
     {
-        OutputBuffer::append('<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "DTD/xhtml1-transitional.dtd">');
-        OutputBuffer::append('<html><head><meta http-equiv="Content-Type" content="text/html; charset=utf-8" />');
-        OutputBuffer::append('<title>phpinfo()</title><style type="text/css">.h{background-color:#9999cc;font-weight:bold;color:#000000;}');
-        OutputBuffer::append('.v{background-color:#cccccc;color:#000000;}</style></head><body><div class="center">');
-        if (self::infoFlagSelected($flags, self::INFO_GENERAL)) {
-            self::printInfoGeneralSection();
-        }
-        if (self::infoFlagSelected($flags, self::INFO_MODULES)) {
-            self::printInfoModulesSection();
-        }
-        if (self::infoFlagSelected($flags, self::INFO_CONFIGURATION)) {
-            self::printInfoConfigurationSection();
-        }
-        if (self::infoFlagSelected($flags, self::INFO_LICENSE)) {
-            self::printInfoLicenseSection();
-        }
-        if (self::infoFlagSelected($flags, self::INFO_CREDITS)) {
-            self::printCreditsSection(self::CREDITS_GENERAL);
-        }
-        OutputBuffer::append('</div></body></html>');
+        OutputBuffer::append(self::renderPhpinfoHtml($flags));
 
         return true;
     }
 
     public static function phpcredits(int $flags = self::CREDITS_ALL): void
     {
-        self::printCreditsSection($flags);
+        OutputBuffer::append(self::renderPhpcreditsHtml($flags));
+    }
+
+    /** Shared phpinfo() HTML for VM + JIT ({@see PhpinfoJitHelper}, issue #9256). */
+    public static function renderPhpinfoHtml(int $flags): string
+    {
+        $html = '<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "DTD/xhtml1-transitional.dtd">';
+        $html .= '<html><head><meta http-equiv="Content-Type" content="text/html; charset=utf-8" />';
+        $html .= '<title>phpinfo()</title><style type="text/css">.h{background-color:#9999cc;font-weight:bold;color:#000000;}';
+        $html .= '.v{background-color:#cccccc;color:#000000;}</style></head><body><div class="center">';
+        if (self::infoFlagSelected($flags, self::INFO_GENERAL)) {
+            $html .= self::generalSectionHtml();
+        }
+        if (self::infoFlagSelected($flags, self::INFO_MODULES)) {
+            $html .= self::modulesSectionHtml();
+        }
+        if (self::infoFlagSelected($flags, self::INFO_CONFIGURATION)) {
+            $html .= self::configurationSectionHtml();
+        }
+        if (self::infoFlagSelected($flags, self::INFO_LICENSE)) {
+            $html .= self::licenseSectionHtml();
+        }
+        if (self::infoFlagSelected($flags, self::INFO_CREDITS)) {
+            $html .= self::creditsSectionHtml(self::CREDITS_GENERAL);
+        }
+        $html .= '</div></body></html>';
+
+        return $html;
+    }
+
+    public static function renderPhpcreditsHtml(int $flags): string
+    {
+        return self::creditsSectionHtml($flags);
     }
 
     public static function version_compare(string $ver1, string $ver2, ?string $operator = null): int|bool
@@ -450,7 +463,7 @@ final class VmInfo
         return 0 !== ($flags & $section);
     }
 
-    private static function printInfoGeneralSection(): void
+    private static function generalSectionHtml(): string
     {
         $version = CompilerVersion::VERSION;
         $sapi = self::php_sapi_name();
@@ -459,48 +472,58 @@ final class VmInfo
         $release = self::php_uname('r');
         $versionStr = self::php_uname('v');
         $machine = self::php_uname('m');
-        OutputBuffer::append('<table><tr class="h"><td colspan="2"><h1>PHP Version '.$version.'</h1></td></tr>');
-        OutputBuffer::append('<tr><td class="e">System </td><td class="v">'.$system.' '.$host.' '.$release.' '.$versionStr.' '.$machine.' </td></tr>');
-        OutputBuffer::append('<tr><td class="e">Build System </td><td class="v">'.$system.' '.$machine.' </td></tr>');
-        OutputBuffer::append('<tr><td class="e">Server API </td><td class="v">'.$sapi.' </td></tr>');
-        OutputBuffer::append('<tr><td class="e">PHP Version </td><td class="v">'.$version.' </td></tr>');
-        OutputBuffer::append('<tr><td class="e">Zend Engine Version </td><td class="v">'.self::ZEND_VERSION.' </td></tr>');
-        OutputBuffer::append('</table><br />');
+        $html = '<table><tr class="h"><td colspan="2"><h1>PHP Version '.$version.'</h1></td></tr>';
+        $html .= '<tr><td class="e">System </td><td class="v">'.$system.' '.$host.' '.$release.' '.$versionStr.' '.$machine.' </td></tr>';
+        $html .= '<tr><td class="e">Build System </td><td class="v">'.$system.' '.$machine.' </td></tr>';
+        $html .= '<tr><td class="e">Server API </td><td class="v">'.$sapi.' </td></tr>';
+        $html .= '<tr><td class="e">PHP Version </td><td class="v">'.$version.' </td></tr>';
+        $html .= '<tr><td class="e">Zend Engine Version </td><td class="v">'.self::ZEND_VERSION.' </td></tr>';
+        $html .= '</table><br />';
+
+        return $html;
     }
 
-    private static function printInfoModulesSection(): void
+    private static function modulesSectionHtml(): string
     {
         $extensions = ModuleRegistry::getLoadedExtensions();
         sort($extensions, SORT_STRING);
-        OutputBuffer::append('<table><tr class="h"><td colspan="2"><h2>PHP Modules</h2></td></tr>');
-        OutputBuffer::append('<tr><td class="e">Module Name </td><td class="v">Enabled </td></tr>');
+        $html = '<table><tr class="h"><td colspan="2"><h2>PHP Modules</h2></td></tr>';
+        $html .= '<tr><td class="e">Module Name </td><td class="v">Enabled </td></tr>';
         foreach ($extensions as $name) {
-            OutputBuffer::append('<tr><td class="e">'.$name.' </td><td class="v">enabled </td></tr>');
+            $html .= '<tr><td class="e">'.$name.' </td><td class="v">enabled </td></tr>';
         }
-        OutputBuffer::append('</table><br />');
+        $html .= '</table><br />';
+
+        return $html;
     }
 
-    private static function printInfoConfigurationSection(): void
+    private static function configurationSectionHtml(): string
     {
-        OutputBuffer::append('<table><tr class="h"><td colspan="2"><h2>Configuration</h2></td></tr>');
-        OutputBuffer::append('<tr><td class="e">Compiler </td><td class="v">PurHur/php-compiler </td></tr>');
-        OutputBuffer::append('</table><br />');
+        $html = '<table><tr class="h"><td colspan="2"><h2>Configuration</h2></td></tr>';
+        $html .= '<tr><td class="e">Compiler </td><td class="v">PurHur/php-compiler </td></tr>';
+        $html .= '</table><br />';
+
+        return $html;
     }
 
-    private static function printInfoLicenseSection(): void
+    private static function licenseSectionHtml(): string
     {
-        OutputBuffer::append('<table><tr class="h"><td colspan="2"><h2>PHP License</h2></td></tr>');
-        OutputBuffer::append('<tr><td class="v" colspan="2">This program is free software; you can redistribute it and/or modify it under the terms of the PHP License.</td></tr>');
-        OutputBuffer::append('</table><br />');
+        $html = '<table><tr class="h"><td colspan="2"><h2>PHP License</h2></td></tr>';
+        $html .= '<tr><td class="v" colspan="2">This program is free software; you can redistribute it and/or modify it under the terms of the PHP License.</td></tr>';
+        $html .= '</table><br />';
+
+        return $html;
     }
 
-    private static function printCreditsSection(int $flags): void
+    private static function creditsSectionHtml(int $flags): string
     {
         if (!self::creditsFlagSelected($flags, self::CREDITS_GENERAL)) {
-            return;
+            return '';
         }
-        OutputBuffer::append('<table><tr class="h"><td colspan="2"><h2>PHP Credits</h2></td></tr>');
-        OutputBuffer::append('<tr><td class="v" colspan="2">PurHur/php-compiler — PHP-in-PHP compiler runtime</td></tr>');
-        OutputBuffer::append('</table><br />');
+        $html = '<table><tr class="h"><td colspan="2"><h2>PHP Credits</h2></td></tr>';
+        $html .= '<tr><td class="v" colspan="2">PurHur/php-compiler — PHP-in-PHP compiler runtime</td></tr>';
+        $html .= '</table><br />';
+
+        return $html;
     }
 }

@@ -9,7 +9,7 @@ use PHPCompiler\Runtime;
 use PHPUnit\Framework\TestCase;
 
 /**
- * Issue #5304 phase 2: phpinfo()/phpcredits() LLVM from PHP, not VM-only throws.
+ * Issue #5304 phase 2 / #9256: phpinfo()/phpcredits() via PhpinfoJitHelper PHP, not LLVM HTML tables.
  *
  * @group aot-lint
  */
@@ -26,6 +26,14 @@ final class StringPhpinfoRuntimeStandaloneTest extends TestCase
             $this->assertNotNull($fn);
             $this->assertGreaterThan(0, $fn->countBasicBlocks());
         }
+    }
+
+    public function testStringPhpinfoRuntimeRoutesThroughPhpinfoJitHelper(): void
+    {
+        $source = (string) file_get_contents(__DIR__.'/../../../lib/JIT/Builtin/StringPhpinfoRuntime.php');
+        $this->assertStringContainsString('PhpinfoJitHelper', $source);
+        $this->assertStringNotContainsString('emitPhpinfoHtmlHeader', $source);
+        $this->assertStringNotContainsString('emitObEchoCstr', $source);
     }
 
     public function testPhpinfoBuiltinNoLongerVmOnly(): void
