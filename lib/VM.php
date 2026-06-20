@@ -42,6 +42,7 @@ use PHPCompiler\VM\ScriptExit;
 use PHPCompiler\VM\TypeCheck;
 use PHPCompiler\VM\TraitCompositionConflictMessage;
 use PHPCompiler\VM\TypedPropertyReadSignal;
+use PHPCompiler\VM\VmVarFetch;
 use PHPCompiler\VM\WeakRefRegistry;
 use PHPCompiler\VM\Variable;
 use PHPCompiler\Web\Superglobals;
@@ -2861,7 +2862,7 @@ restart:
                         $dest->indirect(new Variable());
                         break;
                     }
-                    if (Superglobals::isSuperglobalName($name)) {
+                    if (VmVarFetch::isSuperglobalName($name)) {
                         $target = $this->context->ensureSuperglobal($name);
                     } elseif ($forWrite) {
                         $target = $frame->block->ensureVariableByRuntimeName($name, $frame);
