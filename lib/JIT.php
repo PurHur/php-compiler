@@ -7796,8 +7796,9 @@ class JIT {
                     $builder->positionAtEnd($branchBlock);
                     $coalesceResult = $block->getOperand($op->arg1);
                     $this->context->coalesceAssignTargets[$coalesceResult] = true;
-                    $condition = $this->context->castToBool(
-                        $this->context->helper->loadValue($this->context->getVariableFromOp($block->getOperand($op->arg2)))
+                    $condition = JIT\CoalesceHelper::isTakeLeftBranch(
+                        $this,
+                        $this->context->getVariableFromOp($block->getOperand($op->arg2))
                     );
                     // Branch from the block that defined $condition (e.g. sg_sk_done after $_SERVER['key']).
                     // Repositioning to $branchBlock caused invalid LLVM when ?? left uses multi-block reads (#866).

@@ -96,6 +96,7 @@ final class CompilerSelfhostLintTest extends TestCase
             'lib/JIT/Call/Native.php',
             'lib/JIT/Call/SplObjectStorageMethod.php',
             'lib/JIT/Call/Vararg.php',
+            'lib/JIT/Builtin/CoalesceRuntime.php',
             'lib/JIT/CoalesceHelper.php',
             'lib/JIT/Context.php',
             'lib/JIT/HashTableHelper.php',
