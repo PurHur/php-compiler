@@ -61,4 +61,25 @@ final class SettypeBuiltinTest extends TestCase
         $this->expectExceptionMessage('Object of class Es could not be converted to string');
         VmSettype::apply($var, 'string');
     }
+
+    public function testSettypeToStringInvokesToString(): void
+    {
+        $ctx = new Context(new Runtime());
+        BuiltinClasses::register($ctx);
+        $frame = $this->getMockBuilder(Frame::class)->disableOriginalConstructor()->getMock();
+        $frame->vmContext = $ctx;
+        $vm = $this->getMockBuilder(VM::class)->disableOriginalConstructor()->getMock();
+        $vm->method('castObjectToString')->willReturn('ok');
+        $ctx->runtime->vm = $vm;
+
+        $class = new \PHPCompiler\VM\ClassEntry('WithToString');
+        $object = new \PHPCompiler\VM\ObjectEntry($class);
+        $object->constructed = true;
+        $var = new VMVariable();
+        $var->object($object);
+
+        VmSettype::apply($var, 'string', $frame);
+
+        $this->assertSame('ok', $var->resolveIndirect()->toString());
+    }
 }

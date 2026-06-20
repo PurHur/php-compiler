@@ -5,10 +5,12 @@ declare(strict_types=1);
 namespace PHPCompiler\ext\standard;
 
 use PHPCompiler\JIT\BasicBlockHelper;
+use PHPCompiler\JIT\Builtin\ErrorRaise;
 use PHPCompiler\JIT\Builtin\Type\Object_ as ObjectBuiltin;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitStringArg;
 use PHPCompiler\JIT\JitValueBox;
+use PHPCompiler\JIT\MagicMethodDispatch;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\BasicBlock;
 use PHPLLVM\Builder;
@@ -595,7 +597,7 @@ final class JitSettype
                 return;
             }
             $context->builder->positionAtEnd($afterEnum);
-            $context->builder->branch($nonEnumTarget);
+            self::emitObjectCastToString($context, $dest, $objPtr, $done);
 
             return;
         }
@@ -753,6 +755,96 @@ final class JitSettype
             $dest,
             $objVal
         );
+    }
+
+    /**
+     * Zend settype($obj, 'string') — invoke __toString or Error (ext/standard/type.c, #10211).
+     */
+    private static function emitObjectCastToString(
+        Context $context,
+        Value $dest,
+        Value $objPtr,
+        BasicBlock $done
+    ): void {
+        /** @var ObjectBuiltin $objectBuiltin */
+        $objectBuiltin = $context->type->object;
+        $map = $context->structFieldMap['__object__'];
+        $classId = $context->builder->load(
+            $context->builder->structGep($objPtr, $map['class_id'])
+        );
+        $i64 = $context->getTypeFromString('int64');
+        $tag = 'st_ocs_'.(string) spl_object_id($context);
+
+        $entries = [];
+        foreach ($objectBuiltin->allClassNamesById() as $id => $name) {
+            $lc = strtolower(ltrim($name, '\\'));
+            if ($objectBuiltin->isEnumClassLc($lc)) {
+                continue;
+            }
+            $entries[(int) $id] = $name;
+        }
+
+        if ([] === $entries) {
+            ErrorRaise::ensureLinked($context);
+            ErrorRaise::emitRaise($context, 'Object of class stdClass could not be converted to string');
+
+            return;
+        }
+
+        $ids = array_keys($entries);
+        $lastIdx = \count($ids) - 1;
+        $fallbackBlock = BasicBlockHelper::append($context, $tag.'_fallback');
+        foreach ($ids as $idx => $id) {
+            $matchBlock = BasicBlockHelper::append($context, $tag.'_match_'.$id);
+            $nextBlock = $idx === $lastIdx
+                ? $fallbackBlock
+                : BasicBlockHelper::append($context, $tag.'_next_'.$id);
+            $context->builder->branchIf(
+                $context->builder->icmp(
+                    Builder::INT_EQ,
+                    $classId,
+                    $i64->constInt($id, false)
+                ),
+                $matchBlock,
+                $nextBlock
+            );
+            $context->builder->positionAtEnd($matchBlock);
+            $name = $entries[$id];
+            $proxy = null;
+            if (MagicMethodDispatch::hasInstanceMethod($objectBuiltin, $id, '__tostring')) {
+                $proxy = MagicMethodDispatch::resolveInstanceMethodProxy($context, $name, '__tostring');
+            }
+            if (null !== $proxy) {
+                $objVar = new JITVariable(
+                    $context,
+                    JITVariable::TYPE_OBJECT,
+                    JITVariable::KIND_VALUE,
+                    $objPtr
+                );
+                $raw = $context->resolveFunctionProxy($proxy)->call($context, $objVar);
+                $strPtr = (new strval())->valueToString(
+                    $context,
+                    JitValueBox::coerceToValuePtrForStore($context, $raw)
+                );
+                $context->builder->call(
+                    $context->lookupFunction('__value__writeString'),
+                    $dest,
+                    $strPtr
+                );
+                $context->builder->branch($done);
+            } else {
+                ErrorRaise::ensureLinked($context);
+                ErrorRaise::emitRaise(
+                    $context,
+                    'Object of class '.$name.' could not be converted to string'
+                );
+            }
+            $context->builder->positionAtEnd($nextBlock);
+        }
+
+        $context->builder->positionAtEnd($fallbackBlock);
+        ErrorRaise::ensureLinked($context);
+        ErrorRaise::emitRaise($context, 'Object of class stdClass could not be converted to string');
     }
 
 }
