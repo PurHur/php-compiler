@@ -4313,7 +4313,7 @@ final class VmString
     {
         $len = self::byteLength($path);
         if (0 === $len) {
-            return '.';
+            return '';
         }
         // php-src zend_dirname(): wrapper URLs like php://memory have no path segment
         // after "://", so dirname is scheme + ":" (not "php:/").

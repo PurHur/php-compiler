@@ -36,7 +36,7 @@ final class JitPath
         );
 
         $context->builder->positionAtEnd($emptyInput);
-        $emptyDot = self::loadLiteral($context, '.');
+        $emptyStr = self::loadLiteral($context, '');
         $context->builder->branch($done);
 
         $context->builder->positionAtEnd($nonEmpty);
@@ -92,7 +92,7 @@ final class JitPath
 
         $context->builder->positionAtEnd($done);
         $phi = $context->builder->phi($str->typeOf());
-        $phi->addIncoming($emptyDot, $emptyInput);
+        $phi->addIncoming($emptyStr, $emptyInput);
         $phi->addIncoming($rootFromTrim, $trimmedEmpty);
         $phi->addIncoming($dotResult, $noSep);
         $phi->addIncoming($sliceResult, $sliceDoneBlock);
