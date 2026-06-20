@@ -68,7 +68,13 @@ final class VmClosureCall
 
     public static function invokeTwo(Context $context, ClosureState $closure, Variable $a, Variable $b): int
     {
-        $result = self::invoke($context, $closure, $a, $b);
+        // Deep-copy compare operands so usort/uasort/uksort callbacks cannot mutate bucket
+        // storage (php-src php_array_u*sort; issues #10212, #10213).
+        $copyA = new Variable();
+        $copyA->duplicateFrom($a);
+        $copyB = new Variable();
+        $copyB->duplicateFrom($b);
+        $result = self::invoke($context, $closure, $copyA, $copyB);
 
         return $result->toInt();
     }

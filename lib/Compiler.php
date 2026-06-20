@@ -13679,6 +13679,61 @@ class Compiler {
         return $operand;
     }
 
+    /** Call args rooted at array dim fetch must use their own producer slot (#10212). */
+    private function isCallArgDirectArrayDimFetch(Operand $arg): bool
+    {
+        return $this->unwrapOperandChain($arg) instanceof Op\Expr\ArrayDimFetch;
+    }
+
+    /**
+     * php-cfg may wire FuncCall args to dead temps while dim-fetch producers sit immediately
+     * before the call (#10212, ext/standard/array.c usort comparators).
+     */
+    private function resolvePrecedingArrayDimFetchCallArgSlot(
+        Operand $arg,
+        Block $block,
+        ?Op $cfgCallOp,
+        int $argIndex
+    ): ?string {
+        if (null === $block->orig || null === $cfgCallOp) {
+            return null;
+        }
+        $children = $block->orig->children;
+        $callIndex = null;
+        foreach ($children as $i => $child) {
+            if ($child === $cfgCallOp) {
+                $callIndex = $i;
+                break;
+            }
+        }
+        if (null === $callIndex) {
+            return null;
+        }
+        /** @var list<Op\Expr\ArrayDimFetch> $dimFetches */
+        $dimFetches = [];
+        for ($i = $callIndex - 1; $i >= 0; --$i) {
+            $child = $children[$i];
+            if ($child instanceof Op\Expr\ArrayDimFetch) {
+                array_unshift($dimFetches, $child);
+                continue;
+            }
+            break;
+        }
+        if (!isset($dimFetches[$argIndex])) {
+            return null;
+        }
+        $fetch = $dimFetches[$argIndex];
+        $slot = $block->slotForOperand($fetch->result);
+        if (null === $slot) {
+            foreach ($this->compileExpr($fetch, $block) as $op) {
+                $block->addOpCode($op);
+            }
+            $slot = $block->slotForOperand($fetch->result);
+        }
+
+        return null !== $slot ? (string) $slot : null;
+    }
+
     protected function operandHasObjectType(Operand $operand): bool
     {
         $operand = $this->unwrapOperandChain($operand);
@@ -14279,8 +14334,19 @@ class Compiler {
                 }
             } else {
                 $valueSlot = null;
+                if ($this->isCallArgDirectArrayDimFetch($arg)) {
+                    $valueSlot = $this->compileOperand($arg, $block, true);
+                } else {
+                    $valueSlot = $this->resolvePrecedingArrayDimFetchCallArgSlot(
+                        $arg,
+                        $block,
+                        $cfgCallOp,
+                        (int) $argIndex
+                    );
+                }
                 if (
-                    null !== $cfgCallOp
+                    null === $valueSlot
+                    && null !== $cfgCallOp
                     && $this->callArgInlineProducerIsNew($cfgCallOp, (int) $argIndex, $block)
                 ) {
                     $producers = $this->precedingInlineCallArgProducersBeforeCfgOp(
@@ -14304,7 +14370,7 @@ class Compiler {
                         $valueSlot = $this->compileOperand($arg, $block, true);
                     }
                 }
-                if (null === $valueSlot) {
+                if (null === $valueSlot && !$this->isCallArgDirectArrayDimFetch($arg)) {
                     $valueSlot = $this->compileCallArgCoalesceSlot($arg, $block);
                 }
                 if (null === $valueSlot) {
@@ -14374,6 +14440,7 @@ class Compiler {
                 }
                 if (
                     null !== $valueSlot
+                    && !$this->isCallArgDirectArrayDimFetch($arg)
                     && null !== $block->orig
                     && ($arg instanceof Operand\Variable || $arg instanceof Operand\Temporary)
                     && !(
