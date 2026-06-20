@@ -1,4 +1,5 @@
 # M3 compile-driver allowlist/denylist — regenerate: php script/bootstrap-m3-allowlist-snapshot.php --write
+allow:\compiler::compilefunc
 allow:\php_compiler_cli_dispatch
 allow:\php_compiler_cli_should_run_entry_driver
 allow:\runtime::__construct
@@ -19,8 +20,8 @@ allow:\runtime::parse
 allow:\runtime::parseandcompile
 allow:\runtime::parseandcompileemitsmoke
 allow:\runtime::peeklastparsefailure
-allow:\runtime::preprocesssourceforparse
 allow:\runtime::preparesourceforparser
+allow:\runtime::preprocesssourceforparse
 allow:\runtime::rewritesourcebeforeparser
 allow:\runtime::standalone
 allow:slotforoperand

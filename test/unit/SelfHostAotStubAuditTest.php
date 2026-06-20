@@ -65,7 +65,7 @@ final class SelfHostAotStubAuditTest extends TestCase
         $this->assertSame('m3_deny', $statusBySymbol['BootstrapAot\\helloworld_compile_smoke'] ?? null);
     }
 
-    public function testCompilerCompileFuncIsEntryStub(): void
+    public function testCompilerCompileFuncOnM3RealLowering(): void
     {
         require_once self::$root.'/script/selfhost-aot-stub-audit-lib.php';
 
@@ -74,7 +74,7 @@ final class SelfHostAotStubAuditTest extends TestCase
         foreach ($metrics['spine_symbols'] as $row) {
             $statusBySymbol[$row['symbol']] = $row['status'];
         }
-        $this->assertSame('entry_stub', $statusBySymbol['PHPCompiler\\Compiler::compileFunc'] ?? null);
+        $this->assertSame('m3_real', $statusBySymbol['PHPCompiler\\Compiler::compileFunc'] ?? null);
         $this->assertSame('m3_real', $statusBySymbol['PHPCompiler\\Compiler::compile'] ?? null);
     }
 }

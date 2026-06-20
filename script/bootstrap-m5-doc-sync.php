@@ -75,6 +75,9 @@ function bootstrap_m5_doc_symbol_to_key(string $symbol): string
         if ('runtime' === $classLower) {
             return '\\runtime::'.$methodLower;
         }
+        if ('compiler' === $classLower) {
+            return '\\compiler::'.$methodLower;
+        }
 
         return '\\'.strtolower(str_replace('::', '\\', $symbol));
     }
