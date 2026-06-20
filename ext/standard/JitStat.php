@@ -14,6 +14,7 @@ use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Builtin\StatCacheRuntime;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitValueBox;
+use PHPCompiler\VM\ErrorReporter;
 use PHPLLVM\BasicBlock;
 use PHPLLVM\Builder;
 use PHPLLVM\Value;
@@ -280,7 +281,16 @@ final class JitStat
     /** @return Value */
     public static function pathLinkinfoBoxed(Context $context, Value $str): Value
     {
-        return self::pathStatFieldBoxed($context, $str, self::STAT_DEV_OFFSET, 'linkinfo', true, 'lstat');
+        return self::pathStatFieldBoxed(
+            $context,
+            $str,
+            self::STAT_DEV_OFFSET,
+            'linkinfo',
+            true,
+            'lstat',
+            -1,
+            'linkinfo(): No such file or directory'
+        );
     }
 
     /** @return Value */
@@ -302,7 +312,9 @@ final class JitStat
         int $offset,
         string $tag,
         bool $fieldIsI64,
-        string $statFn = 'stat'
+        string $statFn = 'stat',
+        ?int $failureLong = null,
+        ?string $failureWarning = null
     ): Value {
         $map = $context->structFieldMap['__string__'];
         $pathPtr = $context->builder->structGep($str, $map['value']);
@@ -330,8 +342,15 @@ final class JitStat
         $context->builder->branchIf($failed, $failBlock, $okBlock);
 
         $context->builder->positionAtEnd($failBlock);
-        $i1 = $context->getTypeFromString('int1');
-        JitValueBox::writeBool($context, $slot, $i1->constInt(0, false));
+        if (null !== $failureWarning) {
+            self::emitStatWarning($context, $failureWarning);
+        }
+        if (null !== $failureLong) {
+            JitValueBox::writeLong($context, $slot, $i64->constInt($failureLong, true));
+        } else {
+            $i1 = $context->getTypeFromString('int1');
+            JitValueBox::writeBool($context, $slot, $i1->constInt(0, false));
+        }
         $context->builder->branch($doneBlock);
 
         $context->builder->positionAtEnd($okBlock);
@@ -349,6 +368,24 @@ final class JitStat
         $context->builder->positionAtEnd($doneBlock);
 
         return $ptr;
+    }
+
+    private static function emitStatWarning(Context $context, string $message): void
+    {
+        $i8p = $context->getTypeFromString('int8*');
+        $sizeT = $context->getTypeFromString('size_t');
+        $i32 = $context->getTypeFromString('int32');
+        $msgPtr = $context->builder->pointerCast($context->constantFromString($message), $i8p);
+        $msgLen = $sizeT->constInt(\strlen($message), false);
+        $emptyFile = $context->builder->pointerCast($context->constantFromString(''), $i8p);
+        $context->builder->call(
+            $context->lookupFunction('__compiler_trigger_error'),
+            $msgPtr,
+            $msgLen,
+            $i32->constInt(ErrorReporter::E_WARNING, false),
+            $emptyFile,
+            $i32->constInt(0, false)
+        );
     }
 
     /** @return Value */

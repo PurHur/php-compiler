@@ -117,11 +117,12 @@ final class VmFs
         return (int) $stat['ino'];
     }
 
-    /** linkinfo() — st_dev from lstat(2) on the link itself (php-src ext/standard/link.c, #6083). */
-    public static function linkinfo(string $path) {
+    /** linkinfo() — st_dev from lstat(2) on the link itself (php-src ext/standard/link.c, #6083, #10294). */
+    public static function linkinfo(string $path): int
+    {
         $stat = VmStatCache::lstat($path);
         if (false === $stat) {
-            return false;
+            return -1;
         }
 
         return (int) $stat['dev'];
