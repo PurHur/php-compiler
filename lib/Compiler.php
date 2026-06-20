@@ -94,6 +94,9 @@ class Compiler {
     /** Set from the first compile-time abort (#2642, self-host diagnostics). */
     private ?string $compileAbortDetail = null;
 
+    /** While compiling an arrow function CFG for implicit outer captures (#10304). */
+    private bool $compilingArrowAutoCapture = false;
+
     /** @var array<string, true> lowercase abstract class names seen during compile (#3385). */
     private array $abstractClasses = [];
 
@@ -702,6 +705,9 @@ class Compiler {
         }
         if (!$this->seen->contains($block)) {
             $this->seen[$block] = $new = new Block($block);
+            if ($this->compilingArrowAutoCapture) {
+                $new->arrowAutoCapture = true;
+            }
             if (null !== $func) {
                 $new->func = $func;
                 $new->strictTypes = isset($func->strictTypes) ? (bool) $func->strictTypes : false;
@@ -7345,7 +7351,15 @@ class Compiler {
             )];
         }
         $func = $expr->func;
-        $funcBlock = $this->compileCfgBlock($func->cfg, $func->params, $func);
+        $wasArrowAutoCapture = $this->compilingArrowAutoCapture;
+        if ($expr instanceof Op\Expr\ArrowFunction) {
+            $this->compilingArrowAutoCapture = true;
+        }
+        try {
+            $funcBlock = $this->compileCfgBlock($func->cfg, $func->params, $func);
+        } finally {
+            $this->compilingArrowAutoCapture = $wasArrowAutoCapture;
+        }
         $op = new OpCode(
             OpCode::TYPE_CLOSURE,
             $this->compileOperand($expr->result, $block, false),

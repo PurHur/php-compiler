@@ -173,6 +173,9 @@ class Block {
     /** Closure `use (&$var)` slots that alias enclosing storage at call (issue #72). */
     public array $closureCaptureByRef = [];
 
+    /** Arrow function body: register outer lexical reads for auto-capture (#4944, #4952, #10304). */
+    public bool $arrowAutoCapture = false;
+
     /** Resolved absolute paths for TYPE_INCLUDE opcodes (arg3 index, issue #54). */
     public array $literalIncludePaths = [];
 
@@ -374,7 +377,7 @@ class Block {
         if ($this->isLocallyWritten($operand)) {
             return false;
         }
-        if ($this->blocksScriptGlobalInheritance()) {
+        if ($this->blocksScriptGlobalInheritance() && !$this->arrowAutoCapture) {
             return false;
         }
         // Try/catch/finally bodies inherit parent slots directly (#9114, Zend/zend_execute.c).
@@ -545,6 +548,7 @@ class Block {
             $this->noDiscard = $parent->noDiscard;
             $this->noDiscardMessage = $parent->noDiscardMessage;
         }
+        $this->arrowAutoCapture = $parent->arrowAutoCapture;
     }
 
     public function addOpCode(OpCode ...$ops): void {
