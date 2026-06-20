@@ -1831,7 +1831,11 @@ restart:
                     $right = $right->indirect;
                     goto restart;
                 } else {
-                    $this->bool($this->_compareOp($opCode, $left->toNumeric(), $right->toNumeric()));
+                    // Zend compare_function: unlike scalars use spaceship parity (#4681, #10243).
+                    $this->bool($this->_compareFromSpaceship(
+                        $opCode,
+                        self::spaceshipMixedScalars($left, $right)
+                    ));
                 }
         }
     }
