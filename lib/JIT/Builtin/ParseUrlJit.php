@@ -215,6 +215,7 @@ final class ParseUrlJit
         foreach (
             [
                 ['__string__init', $strPtr, [$i64, $i8p]],
+                ['__string__strlen', $i64, [$strPtr]],
                 ['__hashtable__alloc', $htPtr, []],
                 ['__hashtable__setStringKeyString', $void, [$htPtr, $strPtr, $strPtr]],
                 ['__hashtable__setStringKeyLong', $void, [$htPtr, $strPtr, $i64]],
@@ -1033,14 +1034,13 @@ final class ParseUrlJit
         }
         $i8p = $context->getTypeFromString('int8*');
         $cstr = $context->lookupFunction('__phpc_parse_url_cstr');
-        $sizeT = $context->getTypeFromString('size_t');
         $urlEmptyPathBb = $fn->appendBasicBlock('pua_url_empty_path');
         $urlEmptyPathSkipBb = $fn->appendBasicBlock('pua_url_empty_path_skip');
         $context->builder->branchIf(
             $context->builder->icmp(
                 Builder::INT_EQ,
-                $context->builder->call($context->lookupFunction('strlen'), $url),
-                $sizeT->constInt(0, false)
+                $context->builder->call($context->lookupFunction('__string__strlen'), $url),
+                $i64->constInt(0, false)
             ),
             $urlEmptyPathBb,
             $urlEmptyPathSkipBb
