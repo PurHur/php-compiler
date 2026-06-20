@@ -14,6 +14,8 @@ declare(strict_types=1);
  *   php script/check-wave3-roadmap-sync.php
  */
 
+require __DIR__.'/bootstrap-spine-count.php';
+
 $root = dirname(__DIR__);
 $roadmap = $root.'/docs/roadmap-wave3.md';
 $spineMain = $root.'/test/selfhost/compiler_lib_spine_smoke/main.php';
@@ -85,19 +87,16 @@ if (isset($stdlibDone, $stdlibOpen)) {
 }
 
 $spineCount = 0;
+$inventoryTotal = 0;
 if (is_readable($spineMain)) {
-    $spineLines = file($spineMain, FILE_IGNORE_NEW_LINES);
-    foreach ($spineLines as $line) {
-        if (str_starts_with($line, 'require_once')) {
-            ++$spineCount;
-        }
-    }
+    $counts = bootstrap_spine_counts($root);
+    $spineCount = $counts['spine'];
+    $inventoryTotal = $counts['inventory'];
 } else {
     $errors[] = "missing spine bundle: {$spineMain}";
 }
 
-$inventoryTotal = 0;
-if (is_readable($inventoryDoc)
+if ($inventoryTotal <= 0 && is_readable($inventoryDoc)
     && preg_match('/\| PHP files on vm\.php path \| (\d+) \|/', (string) file_get_contents($inventoryDoc), $invMatch)) {
     $inventoryTotal = (int) $invMatch[1];
 }
