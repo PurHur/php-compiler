@@ -1783,6 +1783,7 @@ require_once __DIR__.'/../../../lib/Ast/EnumCaseMatchSwitchRewriter.php';
 require_once __DIR__.'/../../../lib/Ast/EnumPropertyCompileCheck.php';
 require_once __DIR__.'/../../../lib/Ast/ExitFunctionDesugar.php';
 require_once __DIR__.'/../../../lib/Ast/GlobalTypedConstRewriter.php';
+require_once __DIR__.'/../../../lib/Ast/GeneratorYieldSourceMarker.php';
 require_once __DIR__.'/../../../lib/Ast/GroupUseStripper.php';
 require_once __DIR__.'/../../../lib/Ast/HexFloatLiteralDesugar.php';
 require_once __DIR__.'/../../../lib/Ast/InOperatorDesugar.php';
