@@ -27,4 +27,11 @@ final class ScalarDimFetchJitHelperTest extends TestCase
             );
         }
     }
+
+    public function testScalarDimFetchJitHelperDefinesEmitWarning(): void
+    {
+        $source = (string) file_get_contents(__DIR__.'/../../lib/VM/ScalarDimFetchJitHelper.php');
+        $this->assertStringContainsString('emitWarningForJitType', $source);
+        $this->assertStringContainsString('compiler_language_warning', $source);
+    }
 }
