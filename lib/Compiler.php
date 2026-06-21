@@ -10061,6 +10061,39 @@ class Compiler {
     }
 
     /**
+     * Stmt-level ?? must not supply slots for literal / hoisted scalar call args (#9225, #10380).
+     */
+    private function isCallArgUnrelatedToPriorStmtCoalesce(Operand $callArg): bool
+    {
+        if ($callArg instanceof Operand\Literal || $this->isEmbeddedCallLiteralArg($callArg)) {
+            return true;
+        }
+        $vm = $this->vmVariableFromCfgLiteralOperand($callArg);
+        if (null !== $vm && \in_array($vm->type, [
+            Variable::TYPE_BOOLEAN,
+            Variable::TYPE_INTEGER,
+            Variable::TYPE_NULL,
+        ], true)) {
+            return true;
+        }
+        $root = $this->unwrapOperandChain($callArg);
+        if ($root instanceof Op\Expr\ConstFetch) {
+            $name = $this->staticNameFromOperand($root->name);
+            if (null !== $name) {
+                $lookup = strtolower($name);
+                if (\in_array($lookup, ['true', 'false', 'null'], true)) {
+                    return true;
+                }
+                if (isset(\PHPCompiler\ext\standard\StdlibConstants::CORE_INT_BY_NAME[$lookup])) {
+                    return true;
+                }
+            }
+        }
+
+        return false;
+    }
+
+    /**
      * @return ?Op\Expr\BinaryOp\Coalesce
      */
     private function findCoalesceStmtForCallArg(Operand $arg, Block $block): ?Op\Expr\BinaryOp\Coalesce
@@ -10076,7 +10109,9 @@ class Compiler {
                 $child instanceof Op\Expr\BinaryOp\Coalesce
                 && ($child->result === $arg || $this->operandsReferToSameVariable($child->result, $arg))
             ) {
-                return $child;
+                if (!$this->isCallArgUnrelatedToPriorStmtCoalesce($arg)) {
+                    return $child;
+                }
             }
         }
         // php-cfg clones call-arg temps from stmt Coalesce result (#8766, #8902).
@@ -10105,17 +10140,22 @@ class Compiler {
                 continue;
             }
             // Literal / unrelated call args must not pick up a prior stmt-level ?? (#9225, 009-FastCGIWeb).
-            if (
-                null !== $matchedCallArg
-                && ($matchedCallArg instanceof Operand\Literal
-                    || $this->isEmbeddedCallLiteralArg($matchedCallArg))
-            ) {
+            if (null !== $matchedCallArg && $this->isCallArgUnrelatedToPriorStmtCoalesce($matchedCallArg)) {
                 continue;
             }
             for ($j = $i - 1; $j >= 0; --$j) {
                 $prev = $block->orig->children[$j];
                 if ($prev instanceof Op\Expr\BinaryOp\Coalesce) {
-                    return $prev;
+                    if (
+                        null !== $matchedCallArg
+                        && (
+                            $prev->result === $matchedCallArg
+                            || $this->operandsReferToSameVariable($prev->result, $matchedCallArg)
+                        )
+                    ) {
+                        return $prev;
+                    }
+                    break;
                 }
                 if (!$prev instanceof Op\Expr || !$this->isInlineExprCallArgProducer($prev)) {
                     break;
@@ -10187,8 +10227,24 @@ class Compiler {
         return null;
     }
 
-    private function compileCallArgCoalesceSlot(Operand $arg, Block $block): ?int
-    {
+    private function compileCallArgCoalesceSlot(
+        Operand $arg,
+        Block $block,
+        ?Op $cfgCallOp = null,
+        ?int $argIndex = null
+    ): ?int {
+        if ($this->isCallArgUnrelatedToPriorStmtCoalesce($arg)) {
+            return null;
+        }
+        if (
+            null !== $cfgCallOp
+            && null !== $argIndex
+            && is_array($cfgCallOp->args ?? null)
+            && isset($cfgCallOp->args[$argIndex])
+            && $this->isCallArgUnrelatedToPriorStmtCoalesce($cfgCallOp->args[$argIndex])
+        ) {
+            return null;
+        }
         $coalesce = $this->findCoalesceStmtForCallArg($arg, $block);
         if (null === $coalesce) {
             return null;
@@ -10245,7 +10301,7 @@ class Compiler {
             null !== $coalesceStmt
             && $this->findCoalescePropertyFetch($coalesceStmt->left, $block) === $producer
         ) {
-            return $this->compileCallArgCoalesceSlot($arg, $block);
+            return $this->compileCallArgCoalesceSlot($arg, $block, $callOp, $argIndex);
         }
 
         return null;
@@ -10394,7 +10450,7 @@ class Compiler {
         }
         $coalesceArg = $this->findCoalesceStmtForCallArg($arg, $block);
         if (null !== $coalesceArg) {
-            $coalesceSlot = $this->compileCallArgCoalesceSlot($arg, $block);
+            $coalesceSlot = $this->compileCallArgCoalesceSlot($arg, $block, $callOp, $argIndex);
             if (null !== $coalesceSlot) {
                 return $coalesceSlot;
             }
@@ -14531,9 +14587,6 @@ class Compiler {
                     }
                 }
                 if (null === $valueSlot && !$this->isCallArgDirectArrayDimFetch($arg)) {
-                    $valueSlot = $this->compileCallArgCoalesceSlot($arg, $block);
-                }
-                if (null === $valueSlot) {
                     $valueSlot = $this->compileHoistedEmptyCallArg($arg, $block);
                 }
                 if (null === $valueSlot) {
@@ -14555,7 +14608,24 @@ class Compiler {
                         if (null === $valueSlot) {
                             $valueSlot = $this->tryFoldCallArgCompileTimeValue($arg, $block, $calleeName, $cfgCallOp);
                         }
+                        if (
+                            null === $valueSlot
+                            && null !== $cfgCallOp
+                            && is_array($cfgCallOp->args ?? null)
+                            && isset($cfgCallOp->args[(int) $argIndex])
+                            && $cfgCallOp->args[(int) $argIndex] !== $arg
+                        ) {
+                            $valueSlot = $this->tryFoldCallArgCompileTimeValue(
+                                $cfgCallOp->args[(int) $argIndex],
+                                $block,
+                                $calleeName,
+                                $cfgCallOp
+                            );
+                        }
                     }
+                }
+                if (null === $valueSlot && !$this->isCallArgDirectArrayDimFetch($arg)) {
+                    $valueSlot = $this->compileCallArgCoalesceSlot($arg, $block, $cfgCallOp, (int) $argIndex);
                 }
                 if (null === $valueSlot) {
                     $prefetchOps = $this->compileCallArgRuntimeEnumConstFetchOps(

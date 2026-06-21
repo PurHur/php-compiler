@@ -106,7 +106,8 @@ echo $m[1];
 
 wait_for_serve() {
   local port="$1"
-  local deadline=$((SECONDS + 10))
+  # phpc serve -> php-local.sh may run apply-patches on cold vendor trees (~17s); keep headroom (#298).
+  local deadline=$((SECONDS + 25))
   while ((SECONDS < deadline)); do
     if (exec 3<>/dev/tcp/127.0.0.1/"${port}") 2>/dev/null; then
       exec 3<&-
