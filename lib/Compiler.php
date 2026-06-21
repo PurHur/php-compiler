@@ -2196,7 +2196,7 @@ class Compiler {
     }
 
     /**
-     * Guard list destructuring: skip slot assignments when RHS is not an array (#4325); string RHS TypeError (#7461).
+     * Guard list destructuring: skip slot assignments when RHS is not an array (#4325, #10486).
      *
      * @param Op[] $ops
      *
@@ -2215,10 +2215,17 @@ class Compiler {
             $this->compileOperand($rhs, $block, true),
         );
         $block->addOpCode($checkOp);
+        $assignOpsStart = count($block->opCodes);
 
         for ($j = $start; $j <= $end; ++$j) {
             $this->compileOp($ops[$j], $block);
         }
+
+        $checkOp->listUnpackNullInitSlots = $this->listUnpackNullInitSlotsFromCompiledOps(
+            $block,
+            $assignOpsStart,
+            count($block->opCodes)
+        );
 
         $mergeBlock = new Block($block->orig);
         $mergeBlock->inheritUndefinedLocals = true;
@@ -2232,6 +2239,31 @@ class Compiler {
         $mergeBlock->parents[] = $block;
 
         return [$mergeBlock, $end];
+    }
+
+    /**
+     * Dest scope slots for guarded list destruct skip path — null-init like Zend (#4325, #10486).
+     */
+    private function listUnpackNullInitSlotsFromCompiledOps(Block $block, int $start, int $end): array
+    {
+        $slots = [];
+        $seen = [];
+        for ($i = $start; $i < $end; ++$i) {
+            $compiled = $block->opCodes[$i];
+            $destSlot = null;
+            if (OpCode::TYPE_ASSIGN === $compiled->type && null !== $compiled->arg2) {
+                $destSlot = (int) $compiled->arg2;
+            } elseif (OpCode::TYPE_ASSIGN_REF === $compiled->type && null !== $compiled->arg1) {
+                $destSlot = (int) $compiled->arg1;
+            }
+            if (null === $destSlot || isset($seen[$destSlot])) {
+                continue;
+            }
+            $seen[$destSlot] = true;
+            $slots[] = $destSlot;
+        }
+
+        return $slots;
     }
 
     private function splitCfgBlockAfterStringKeyedArray(Block $block): Block

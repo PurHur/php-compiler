@@ -2992,17 +2992,12 @@ restart:
                     $unpack = $unpackSlot->resolveIndirect();
                     if (null !== $op->block1) {
                         if (!$this->variableIsListDestructUnpackable($unpack)) {
-                            if (Variable::TYPE_STRING === $unpack->type) {
-                                $catchFrame = $this->dispatchVmTypeError(
-                                    new \TypeError(JIT\ListUnpackHelper::LIST_DESTRUCT_STRING_MESSAGE),
-                                    $frame
-                                );
-                                if (null !== $catchFrame) {
-                                    $frame = $catchFrame;
-                                    goto restart;
-                                }
-                                break;
+                            foreach ($op->listUnpackNullInitSlots as $destSlot) {
+                                $dest = $frame->scope[(int) $destSlot];
+                                $dest->resolveIndirect()->null();
+                                $this->markScopeSlotInitialized($frame, (int) $destSlot);
                             }
+                            // String and other non-array RHS: skip slot binds, targets read as NULL (#4325, #10486).
                             $frame = $this->frameForBranch($frame, $op->block1);
                             goto restart;
                         }
