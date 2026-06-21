@@ -22,9 +22,11 @@ final class SleepJitRuntimeShrinkTest extends TestCase
     {
         $source = (string) \file_get_contents(__DIR__.'/../../lib/JIT/Builtin/TimeSleepRuntime.php');
         $this->assertStringContainsString('SleepJitHelper', $source);
+        $this->assertStringNotContainsString('TimeSleepRuntimeLibcBridge', $source);
         $this->assertStringNotContainsString('nanosleepLoop', $source);
         $this->assertStringNotContainsString('ensureLibcTime', $source);
         $this->assertStringNotContainsString('lookupFunction(\'nanosleep\')', $source);
+        $this->assertFileDoesNotExist(__DIR__.'/../../lib/JIT/Builtin/TimeSleepRuntimeLibcBridge.php');
     }
 
     public function testTimeNanosleepZeroSleepReturnsTrue(): void
