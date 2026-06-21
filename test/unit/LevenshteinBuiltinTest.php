@@ -49,6 +49,24 @@ final class LevenshteinBuiltinTest extends TestCase
         $this->assertSame(1, $this->runLevenshtein('abc', 'ab', 0, 1, 1));
     }
 
+    public function testTooManyArgumentsThrowsArgumentCountError(): void
+    {
+        $this->expectException(\ArgumentCountError::class);
+        $this->expectExceptionMessage('levenshtein() expects at most 5 arguments, 6 given');
+        $runtime = new Runtime();
+        $fn = new levenshtein();
+        $frame = $fn->getFrame($runtime->vmContext);
+        $args = [];
+        foreach ([1, 2, 3, 4, 5, 6] as $i) {
+            $v = new VMVariable();
+            $v->int($i);
+            $args[] = $v;
+        }
+        $frame->calledArgs = $args;
+        $frame->returnVar = new VMVariable();
+        $fn->execute($frame);
+    }
+
     private function runLevenshtein(
         string $a,
         string $b,
