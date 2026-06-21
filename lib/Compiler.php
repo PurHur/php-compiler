@@ -107,6 +107,8 @@ class Compiler {
     private array $abstractEnums = [];
     /** 1-based source lines lowered from bare `throw;` (#3508). */
     private array $bareRethrowLines = [];
+    /** spl_object_id(Coalesce expr) => scope slot for ?? result (stmt ?? before call args, #9479). */
+    private array $coalesceResultSlots = [];
     /** Trailing source bytes after __halt_compiler(); (issue #3479). */
     private ?string $haltCompilerRemaining = null;
     /** {@see OpCode::ASSIGN_REF_FOREACH_PROPERTY_HOOK} for the next AssignRef compile (#6435). */
@@ -421,6 +423,7 @@ class Compiler {
         $this->resetCompileAbortDetail();
         $this->abstractClasses = [];
         $this->abstractEnums = [];
+        $this->coalesceResultSlots = [];
         $this->compileTimeEnumBackedTypes = [];
         $this->compileTimeEnumCaseConstNames = [];
         $this->compileTimeGlobalConsts = [];
@@ -501,6 +504,7 @@ class Compiler {
         $this->resetCompileAbortDetail();
         $this->abstractClasses = [];
         $this->abstractEnums = [];
+        $this->coalesceResultSlots = [];
         $this->classCompileRegistry = new ClassCompileRegistry();
         $this->attributeClassRegistry = new AttributeClassRegistry();
         // Inventory-scale sources declare user functions and/or class-like units; emit-smoke only needs {main}
@@ -2628,7 +2632,59 @@ class Compiler {
             ));
         }
 
+        $this->syncCoalesceResultToDistinctFuncCallArg($coalesce, $block, $resultOverride);
+
         return $block;
+    }
+
+    /**
+     * php-cfg may allocate a distinct temp for FuncCall args vs Coalesce->result (#9479, enum_int_cast_warning.phpt).
+     */
+    private function syncCoalesceResultToDistinctFuncCallArg(
+        Op\Expr\BinaryOp\Coalesce $coalesce,
+        Block $block,
+        ?Operand $resultOverride
+    ): void {
+        if (null === $block->orig) {
+            return;
+        }
+        $ops = $block->orig->children;
+        $coalesceIdx = null;
+        foreach ($ops as $idx => $op) {
+            if ($op === $coalesce) {
+                $coalesceIdx = $idx;
+                break;
+            }
+        }
+        if (null === $coalesceIdx) {
+            return;
+        }
+        for ($j = $coalesceIdx + 1, $count = count($ops); $j < $count; ++$j) {
+            $next = $ops[$j];
+            if ($this->isLoweredByFollowingCoalesce($next, $ops, $j)) {
+                continue;
+            }
+            if (!$next instanceof Op\Expr\FuncCall && !$next instanceof Op\Expr\NsFuncCall) {
+                return;
+            }
+            if (1 !== count($next->args)) {
+                return;
+            }
+            $arg = $next->args[0];
+            if ($this->operandsChainEqual($arg, $coalesce->result)) {
+                return;
+            }
+            $sourceSlot = $this->compileOperand($resultOverride ?? $coalesce->result, $block, true);
+            $destSlot = $this->compileOperand($arg, $block, false);
+            $block->addOpCode(new OpCode(
+                OpCode::TYPE_ASSIGN,
+                $destSlot,
+                $destSlot,
+                $sourceSlot
+            ));
+
+            return;
+        }
     }
 
     /**
@@ -8166,6 +8222,8 @@ class Compiler {
         $endBlock->inheritScopeFrom($leftBlock);
         $endBlock->inheritScopeFrom($rightEmitBlock);
 
+        $this->coalesceResultSlots[spl_object_id($expr)] = $resultSlot;
+
         $coalesceOp = new OpCode(
             OpCode::TYPE_COALESCE,
             $resultSlot,
@@ -10061,6 +10119,49 @@ class Compiler {
     }
 
     /**
+     * Stmt-level ?? must not supply slots for literal / hoisted scalar call args (#9225, #10380).
+     */
+    private function isCallArgUnrelatedToPriorStmtCoalesce(Operand $callArg): bool
+    {
+        if ($callArg instanceof Operand\Literal || $this->isEmbeddedCallLiteralArg($callArg)) {
+            return true;
+        }
+        $vm = $this->vmVariableFromCfgLiteralOperand($callArg);
+        if (null !== $vm && \in_array($vm->type, [
+            Variable::TYPE_BOOLEAN,
+            Variable::TYPE_INTEGER,
+            Variable::TYPE_NULL,
+        ], true)) {
+            return true;
+        }
+        $root = $this->unwrapOperandChain($callArg);
+        if ($root instanceof Op\Expr\ConstFetch) {
+            $name = $this->staticNameFromOperand($root->name);
+            if (null !== $name) {
+                $lookup = strtolower($name);
+                if (\in_array($lookup, ['true', 'false', 'null'], true)) {
+                    return true;
+                }
+                if (isset(\PHPCompiler\ext\standard\StdlibConstants::CORE_INT_BY_NAME[$lookup])) {
+                    return true;
+                }
+            }
+        }
+
+        return false;
+    }
+
+    /** header() replace/response_code must not reuse stmt-level ?? slots (#1887, 005-SessionsWeb). */
+    private function headerScalarCallArgMustUseDirectOperand(?string $calleeName, int $argIndex): bool
+    {
+        if (null === $calleeName || $argIndex < 1) {
+            return false;
+        }
+
+        return 'header' === strtolower(ltrim($calleeName, '\\'));
+    }
+
+    /**
      * @return ?Op\Expr\BinaryOp\Coalesce
      */
     private function findCoalesceStmtForCallArg(Operand $arg, Block $block): ?Op\Expr\BinaryOp\Coalesce
@@ -10076,7 +10177,9 @@ class Compiler {
                 $child instanceof Op\Expr\BinaryOp\Coalesce
                 && ($child->result === $arg || $this->operandsReferToSameVariable($child->result, $arg))
             ) {
-                return $child;
+                if (!$this->isCallArgUnrelatedToPriorStmtCoalesce($arg)) {
+                    return $child;
+                }
             }
         }
         // php-cfg clones call-arg temps from stmt Coalesce result (#8766, #8902).
@@ -10105,17 +10208,29 @@ class Compiler {
                 continue;
             }
             // Literal / unrelated call args must not pick up a prior stmt-level ?? (#9225, 009-FastCGIWeb).
-            if (
-                null !== $matchedCallArg
-                && ($matchedCallArg instanceof Operand\Literal
-                    || $this->isEmbeddedCallLiteralArg($matchedCallArg))
-            ) {
+            if (null !== $matchedCallArg && $this->isCallArgUnrelatedToPriorStmtCoalesce($matchedCallArg)) {
                 continue;
             }
             for ($j = $i - 1; $j >= 0; --$j) {
                 $prev = $block->orig->children[$j];
                 if ($prev instanceof Op\Expr\BinaryOp\Coalesce) {
-                    return $prev;
+                    // php-cfg clones call-arg temps from stmt Coalesce.result (#8766, #8902, #9479).
+                    if ($j === $i - 1) {
+                        return $prev;
+                    }
+                    if (
+                        null !== $matchedCallArg
+                        && (
+                            $prev->result === $matchedCallArg
+                            || $this->operandsReferToSameVariable($prev->result, $matchedCallArg)
+                        )
+                    ) {
+                        return $prev;
+                    }
+                    break;
+                }
+                if ($prev instanceof Op\Expr\FuncCall || $prev instanceof Op\Expr\NsFuncCall) {
+                    break;
                 }
                 if (!$prev instanceof Op\Expr || !$this->isInlineExprCallArgProducer($prev)) {
                     break;
@@ -10161,6 +10276,10 @@ class Compiler {
 
     private function slotForCoalesceResult(Block $block, Op\Expr\BinaryOp\Coalesce $coalesce): ?int
     {
+        $coalesceId = spl_object_id($coalesce);
+        if (isset($this->coalesceResultSlots[$coalesceId])) {
+            return $this->coalesceResultSlots[$coalesceId];
+        }
         $slot = $block->slotForOperand($coalesce->result);
         if (null !== $slot) {
             return $slot;
@@ -10187,8 +10306,34 @@ class Compiler {
         return null;
     }
 
-    private function compileCallArgCoalesceSlot(Operand $arg, Block $block): ?int
-    {
+    private function compileCallArgCoalesceSlot(
+        Operand $arg,
+        Block $block,
+        ?Op $cfgCallOp = null,
+        ?int $argIndex = null
+    ): ?int {
+        if ($this->isCallArgUnrelatedToPriorStmtCoalesce($arg)) {
+            return null;
+        }
+        if (
+            null !== $cfgCallOp
+            && null !== $argIndex
+            && $this->headerScalarCallArgMustUseDirectOperand(
+                $this->funcCallExprCalleeName($cfgCallOp),
+                $argIndex
+            )
+        ) {
+            return null;
+        }
+        if (
+            null !== $cfgCallOp
+            && null !== $argIndex
+            && is_array($cfgCallOp->args ?? null)
+            && isset($cfgCallOp->args[$argIndex])
+            && $this->isCallArgUnrelatedToPriorStmtCoalesce($cfgCallOp->args[$argIndex])
+        ) {
+            return null;
+        }
         $coalesce = $this->findCoalesceStmtForCallArg($arg, $block);
         if (null === $coalesce) {
             return null;
@@ -10245,7 +10390,7 @@ class Compiler {
             null !== $coalesceStmt
             && $this->findCoalescePropertyFetch($coalesceStmt->left, $block) === $producer
         ) {
-            return $this->compileCallArgCoalesceSlot($arg, $block);
+            return $this->compileCallArgCoalesceSlot($arg, $block, $callOp, $argIndex);
         }
 
         return null;
@@ -10283,6 +10428,9 @@ class Compiler {
         }
         [$callOp, $argIndex] = $callSite;
         if (!property_exists($callOp, 'args') || !is_array($callOp->args)) {
+            return null;
+        }
+        if ($this->headerScalarCallArgMustUseDirectOperand($this->funcCallExprCalleeName($callOp), $argIndex)) {
             return null;
         }
         // php-cfg may lower a boolean-producing inline Expr (e.g. `===`) to a distinct arg temp with
@@ -10394,7 +10542,7 @@ class Compiler {
         }
         $coalesceArg = $this->findCoalesceStmtForCallArg($arg, $block);
         if (null !== $coalesceArg) {
-            $coalesceSlot = $this->compileCallArgCoalesceSlot($arg, $block);
+            $coalesceSlot = $this->compileCallArgCoalesceSlot($arg, $block, $callOp, $argIndex);
             if (null !== $coalesceSlot) {
                 return $coalesceSlot;
             }
@@ -10496,7 +10644,22 @@ class Compiler {
             if (
                 null !== $callIndex
                 && null !== $producerIndex
-                && $this->isNestedCallArgProducerForConsumer($producer, $callOp, $producerIndex, $callIndex, $block->orig->children)
+                && (
+                    $this->isNestedCallArgProducerForConsumer(
+                        $producer,
+                        $callOp,
+                        $producerIndex,
+                        $callIndex,
+                        $block->orig->children
+                    )
+                    || $this->isSiblingMultiArgFuncCallProducer(
+                        $producer,
+                        $callOp,
+                        $producerIndex,
+                        $callIndex,
+                        $block->orig->children
+                    )
+                )
             ) {
                 foreach ($this->compileExpr($producer, $block) as $op) {
                     $block->addOpCode($op);
@@ -10645,6 +10808,13 @@ class Compiler {
                     $callIndex,
                     $block->orig->children
                 )
+                && !$this->isSiblingMultiArgFuncCallProducer(
+                    $producer,
+                    $callOp,
+                    $producerIndex,
+                    $callIndex,
+                    $block->orig->children
+                )
             ) {
                 return $producerSlot;
             }
@@ -10669,7 +10839,16 @@ class Compiler {
             if (
                 null !== $callIndex
                 && null !== $producerIndex
-                && $this->isNestedCallArgProducerForConsumer($producer, $callOp, $producerIndex, $callIndex, $block->orig->children)
+                && (
+                    $this->isNestedCallArgProducerForConsumer($producer, $callOp, $producerIndex, $callIndex, $block->orig->children)
+                    || $this->isSiblingMultiArgFuncCallProducer(
+                        $producer,
+                        $callOp,
+                        $producerIndex,
+                        $callIndex,
+                        $block->orig->children
+                    )
+                )
             ) {
                 return $producerSlot;
             }
@@ -10682,6 +10861,13 @@ class Compiler {
                     || null === $producerIndex
                     || (
                         !$this->isNestedCallArgProducerForConsumer($producer, $callOp, $producerIndex, $callIndex, $block->orig->children)
+                        && !$this->isSiblingMultiArgFuncCallProducer(
+                            $producer,
+                            $callOp,
+                            $producerIndex,
+                            $callIndex,
+                            $block->orig->children
+                        )
                         && !$this->operandsReferToSameVariable($producer->result, $arg)
                     )
                 ) {
@@ -10880,8 +11066,11 @@ class Compiler {
                 return (int) $op->arg1;
             }
         }
+        foreach ($this->compileExpr($producer, $block) as $op) {
+            $block->addOpCode($op);
+        }
 
-        return null;
+        return $block->slotForOperand($producer->result);
     }
 
     /** Resolve VM slot for a hoisted inline first-class callable call-arg producer (#9769, zend_compile.c). */
@@ -10956,11 +11145,26 @@ class Compiler {
         }
         $callSite = $this->findCfgCallSiteForArg($block->orig->children, $arg, $cfgCallOp);
         if (null === $callSite) {
+            $argRoot = $this->unwrapOperandChain($arg);
+            if ($argRoot instanceof Op\Expr\ArrowFunction || $argRoot instanceof Op\Expr\Closure) {
+                return $this->slotForInlineClosureProducer($argRoot, $block);
+            }
+
             return null;
         }
         [$callOp, $argIndex] = $callSite;
         if (!property_exists($callOp, 'args') || !is_array($callOp->args)) {
             return null;
+        }
+        $callArg = $callOp->args[$argIndex] ?? null;
+        if (null !== $callArg) {
+            $callArgRoot = $this->unwrapOperandChain($callArg);
+            if ($callArgRoot instanceof Op\Expr\ArrowFunction || $callArgRoot instanceof Op\Expr\Closure) {
+                $directSlot = $this->slotForInlineClosureProducer($callArgRoot, $block);
+                if (null !== $directSlot) {
+                    return $directSlot;
+                }
+            }
         }
         $producers = $this->precedingInlineCallArgProducersBeforeCfgOp($block->orig->children, $callOp);
         $producer = $this->matchInlineCallArgProducer($producers, $callOp->args, $argIndex);
@@ -10984,6 +11188,53 @@ class Compiler {
             }
             if (null !== $this->matchInlineCallArgProducer([$candidate], $callOp->args, $argIndex)) {
                 return $this->slotForInlineFirstClassCallableProducer($candidate, $block);
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * Inline fn()/function() callback args with trailing literal flags (#10232, #9154).
+     */
+    private function resolvePrecedingClosureCallArgSlot(Op $cfgCallOp, int $argIndex, Block $block): ?int
+    {
+        if (null === $block->orig || !property_exists($cfgCallOp, 'args') || !is_array($cfgCallOp->args)) {
+            return null;
+        }
+        $callArgs = $cfgCallOp->args;
+        if (\count($callArgs) < 2) {
+            return null;
+        }
+        $producers = $this->precedingInlineCallArgProducersBeforeCfgOp($block->orig->children, $cfgCallOp);
+        $closureProducer = null;
+        foreach ($producers as $candidate) {
+            if ($candidate instanceof Op\Expr\ArrowFunction || $candidate instanceof Op\Expr\Closure) {
+                $closureProducer = $candidate;
+                break;
+            }
+        }
+        if (null === $closureProducer) {
+            return null;
+        }
+        $matched = $this->matchSingleClosureInlineProducer($closureProducer, $callArgs, $argIndex);
+        if (null === $matched) {
+            $matched = $this->matchInlineCallArgProducer($producers, $callArgs, $argIndex);
+            if ($matched !== $closureProducer) {
+                return null;
+            }
+        }
+        $slot = $this->slotForInlineClosureProducer($closureProducer, $block);
+        if (null !== $slot) {
+            return $slot;
+        }
+        for ($i = \count($block->opCodes) - 1; $i >= 0; --$i) {
+            $scanOp = $block->opCodes[$i];
+            if (OpCode::TYPE_FUNCCALL_INIT === $scanOp->type) {
+                break;
+            }
+            if (OpCode::TYPE_CLOSURE === $scanOp->type) {
+                return (int) $scanOp->arg1;
             }
         }
 
@@ -11341,6 +11592,32 @@ class Compiler {
                     return $producers[$arrayProducerIndex];
                 }
                 if ($argIndex === $literalArgIndex) {
+                    return $producers[$constFetchIndices[0]];
+                }
+
+                return null;
+            }
+            $closureProducerIndex = null;
+            foreach ($producers as $pi => $producer) {
+                if ($producer instanceof Op\Expr\ArrowFunction || $producer instanceof Op\Expr\Closure) {
+                    $closureProducerIndex = $pi;
+                    break;
+                }
+            }
+            // array_filter($arr, fn(...) => ..., ARRAY_FILTER_USE_BOTH) — hoisted closure + trailing mode const (#10232, #9154).
+            if (null !== $closureProducerIndex && 1 === \count($constFetchIndices) && \count($callArgs) >= 3) {
+                $callbackArgIndex = null;
+                foreach ($nonEmbeddedArgIndices as $idx) {
+                    if ($idx > 0) {
+                        $callbackArgIndex = $idx;
+                        break;
+                    }
+                }
+                $trailingArgIndex = \count($callArgs) - 1;
+                if ($argIndex === $callbackArgIndex) {
+                    return $producers[$closureProducerIndex];
+                }
+                if ($argIndex === $trailingArgIndex) {
                     return $producers[$constFetchIndices[0]];
                 }
 
@@ -11782,6 +12059,20 @@ class Compiler {
                     continue;
                 }
             }
+            // php-cfg `var_export(substr(..., -2), true)` — UnaryMinus feeds sibling FuncCall arg, not consumer (#10373).
+            if ($child instanceof Op\Expr\UnaryMinus || $child instanceof Op\Expr\UnaryPlus) {
+                $next = $cfgChildren[$i + 1] ?? null;
+                if (
+                    ($next instanceof Op\Expr\FuncCall || $next instanceof Op\Expr\NsFuncCall)
+                    && (
+                        $this->isSiblingMultiArgFuncCallProducer($next, $callOp, $i + 1, $callIndex, $cfgChildren)
+                        || $this->isNestedCallArgProducerForConsumer($next, $callOp, $i + 1, $callIndex, $cfgChildren)
+                        || $this->isAdjacentNestedFuncCallProducer($next, $callOp, $i + 1, $callIndex)
+                    )
+                ) {
+                    continue;
+                }
+            }
             if ($child instanceof Op\Expr\Assign) {
                 if (!property_exists($callOp, 'args') || !is_array($callOp->args)) {
                     break;
@@ -11819,6 +12110,28 @@ class Compiler {
                 break;
             }
             if ($child instanceof Op\Expr\Array_) {
+                $next = $cfgChildren[$i + 1] ?? null;
+                // php-cfg `var_export(array_keys([...]), true)` — Array_ feeds sibling FuncCall arg (#10373).
+                if (
+                    ($next instanceof Op\Expr\FuncCall || $next instanceof Op\Expr\NsFuncCall)
+                    && $this->isSiblingMultiArgFuncCallProducer($next, $callOp, $i + 1, $callIndex, $cfgChildren)
+                ) {
+                    continue;
+                }
+                // php-cfg `var_export(array_pad([...], -3, 0), true)` — Array_ + UnaryMinus feed nested sibling FuncCall (#10351).
+                if ($next instanceof Op\Expr\UnaryMinus || $next instanceof Op\Expr\UnaryPlus) {
+                    $afterUnary = $cfgChildren[$i + 2] ?? null;
+                    if (
+                        ($afterUnary instanceof Op\Expr\FuncCall || $afterUnary instanceof Op\Expr\NsFuncCall)
+                        && (
+                            $this->isSiblingMultiArgFuncCallProducer($afterUnary, $callOp, $i + 2, $callIndex, $cfgChildren)
+                            || $this->isNestedCallArgProducerForConsumer($afterUnary, $callOp, $i + 2, $callIndex, $cfgChildren)
+                            || $this->isAdjacentNestedFuncCallProducer($afterUnary, $callOp, $i + 2, $callIndex)
+                        )
+                    ) {
+                        continue;
+                    }
+                }
                 array_unshift($producers, $child);
                 $prev = $cfgChildren[$i - 1] ?? null;
                 // php-cfg: `invokeArgs(new C(), [...])` — New_ immediately precedes Array_ (#9904).
@@ -11919,17 +12232,23 @@ class Compiler {
         if ($argCount < 2) {
             return false;
         }
-        foreach ($consumer->args as $callArg) {
-            if (!$callArg instanceof Operand\Temporary) {
-                return false;
-            }
-        }
         $distance = $consumerIndex - $producerIndex;
         if ($distance < 1 || $distance > $argCount) {
             return false;
         }
+        // Producer at distance d supplies consumer arg d-1; literals may follow (#10402).
+        $targetArg = $consumer->args[$distance - 1] ?? null;
+        if (!$targetArg instanceof Operand\Temporary) {
+            return false;
+        }
         for ($j = $producerIndex + 1; $j < $consumerIndex; ++$j) {
             $mid = $cfgChildren[$j] ?? null;
+            if (
+                $mid instanceof Op\Expr\ConstFetch
+                || $mid instanceof Op\Expr\ClassConstFetch
+            ) {
+                continue;
+            }
             if (
                 !$mid instanceof Op\Expr\FuncCall
                 && !$mid instanceof Op\Expr\NsFuncCall
@@ -11976,6 +12295,11 @@ class Compiler {
 
             return $arg instanceof Operand\Temporary
                 || ($arg instanceof Operand\Variable && !$this->isNamedVariableOperand($arg));
+        }
+        // php-cfg `f(g(), literal)` — adjacent producer feeds arg0 (#10402, levenshtein(str_repeat(...), 'b')).
+        $firstArg = $args[0] ?? null;
+        if ($firstArg instanceof Operand\Temporary) {
+            return true;
         }
         $lastArg = $args[count($args) - 1];
 
@@ -12041,6 +12365,10 @@ class Compiler {
             $closureSlots[] = $idx;
         }
         if (1 === count($closureSlots) && $closureSlots[0] === $argIndex) {
+            return $producer;
+        }
+        // array_filter($a, fn(...), ARRAY_FILTER_USE_*) — callback is first dead-temp slot (#10232, #9154).
+        if (\count($callArgs) >= 3 && \count($closureSlots) >= 1 && $argIndex === $closureSlots[0]) {
             return $producer;
         }
 
@@ -13093,6 +13421,19 @@ class Compiler {
         if ($this->callArgOperandIsClosureValue($arg, $block)) {
             return [];
         }
+        if (null !== $cfgCallOp && is_array($cfgCallOp->args ?? null)) {
+            $callArg = $cfgCallOp->args[$argIndex] ?? null;
+            if (null !== $callArg) {
+                $callArgRoot = $this->unwrapOperandChain($callArg);
+                if ($callArgRoot instanceof Op\Expr\ArrowFunction || $callArgRoot instanceof Op\Expr\Closure) {
+                    return [];
+                }
+            }
+        }
+        $argRoot = $this->unwrapOperandChain($arg);
+        if ($argRoot instanceof Op\Expr\ArrowFunction || $argRoot instanceof Op\Expr\Closure) {
+            return [];
+        }
         if (null !== $this->findInlineArrayProducerForCallArg($arg, $block, $cfgCallOp)) {
             return [];
         }
@@ -13636,6 +13977,14 @@ class Compiler {
             [$callOp, $argIndex] = $callSite;
             if (property_exists($callOp, 'args') && is_array($callOp->args)) {
                 $producers = $this->precedingInlineCallArgProducersBeforeCfgOp($block->orig->children, $callOp);
+                foreach ($producers as $candidate) {
+                    if (
+                        ($candidate instanceof Op\Expr\ArrowFunction || $candidate instanceof Op\Expr\Closure)
+                        && null !== $this->matchSingleClosureInlineProducer($candidate, $callOp->args, $argIndex)
+                    ) {
+                        return true;
+                    }
+                }
                 $producer = $this->matchInlineCallArgProducer($producers, $callOp->args, $argIndex);
                 if ($producer instanceof Op\Expr\ArrowFunction || $producer instanceof Op\Expr\Closure) {
                     return true;
@@ -13792,6 +14141,10 @@ class Compiler {
         if (null === $block->orig || null === $cfgCallOp) {
             return null;
         }
+        // Embedded literals are not dim-fetch producers (#10401, zend_execute.c).
+        if ($this->isEmbeddedCallLiteralArg($arg)) {
+            return null;
+        }
         $children = $block->orig->children;
         $callIndex = null;
         foreach ($children as $i => $child) {
@@ -13813,10 +14166,30 @@ class Compiler {
             }
             break;
         }
-        if (!isset($dimFetches[$argIndex])) {
+        if ([] === $dimFetches) {
             return null;
         }
-        $fetch = $dimFetches[$argIndex];
+        $callArgs = property_exists($cfgCallOp, 'args') && is_array($cfgCallOp->args)
+            ? $cfgCallOp->args
+            : [];
+        $dimIndex = $argIndex;
+        if (\count($dimFetches) < \count($callArgs)) {
+            $nonEmbeddedArgIndices = [];
+            foreach ($callArgs as $i => $callArg) {
+                if (null !== $callArg && !$this->isEmbeddedCallLiteralArg($callArg)) {
+                    $nonEmbeddedArgIndices[] = $i;
+                }
+            }
+            $mapped = array_search($argIndex, $nonEmbeddedArgIndices, true);
+            if (false === $mapped) {
+                return null;
+            }
+            $dimIndex = (int) $mapped;
+        }
+        if (!isset($dimFetches[$dimIndex])) {
+            return null;
+        }
+        $fetch = $dimFetches[$dimIndex];
         $slot = $block->slotForOperand($fetch->result);
         if (null === $slot) {
             foreach ($this->compileExpr($fetch, $block) as $op) {
@@ -14465,9 +14838,6 @@ class Compiler {
                     }
                 }
                 if (null === $valueSlot && !$this->isCallArgDirectArrayDimFetch($arg)) {
-                    $valueSlot = $this->compileCallArgCoalesceSlot($arg, $block);
-                }
-                if (null === $valueSlot) {
                     $valueSlot = $this->compileHoistedEmptyCallArg($arg, $block);
                 }
                 if (null === $valueSlot) {
@@ -14489,7 +14859,24 @@ class Compiler {
                         if (null === $valueSlot) {
                             $valueSlot = $this->tryFoldCallArgCompileTimeValue($arg, $block, $calleeName, $cfgCallOp);
                         }
+                        if (
+                            null === $valueSlot
+                            && null !== $cfgCallOp
+                            && is_array($cfgCallOp->args ?? null)
+                            && isset($cfgCallOp->args[(int) $argIndex])
+                            && $cfgCallOp->args[(int) $argIndex] !== $arg
+                        ) {
+                            $valueSlot = $this->tryFoldCallArgCompileTimeValue(
+                                $cfgCallOp->args[(int) $argIndex],
+                                $block,
+                                $calleeName,
+                                $cfgCallOp
+                            );
+                        }
                     }
+                }
+                if (null === $valueSlot && !$this->isCallArgDirectArrayDimFetch($arg)) {
+                    $valueSlot = $this->compileCallArgCoalesceSlot($arg, $block, $cfgCallOp, (int) $argIndex);
                 }
                 if (null === $valueSlot) {
                     $prefetchOps = $this->compileCallArgRuntimeEnumConstFetchOps(
@@ -14499,15 +14886,19 @@ class Compiler {
                         $callOrdinal,
                         $cfgCallOp
                     );
-                    if ([] !== $prefetchOps) {
+                    if ([] !== $prefetchOps && !$this->callArgOperandIsClosureValue($arg, $block)) {
                         $valueSlot = $prefetchOps[0]->arg1;
                     }
                 }
                 if (null === $valueSlot) {
                     $valueSlot = $this->findInlineExprCallArgProducerSlot($arg, $block, $cfgCallOp);
                 }
-                if (null === $valueSlot) {
-                    $valueSlot = $this->resolveInlineClosureCallArgSlot($arg, $block, $cfgCallOp);
+                $closureSlot = $this->resolveInlineClosureCallArgSlot($arg, $block, $cfgCallOp);
+                if (null === $closureSlot && null !== $cfgCallOp) {
+                    $closureSlot = $this->resolvePrecedingClosureCallArgSlot($cfgCallOp, (int) $argIndex, $block);
+                }
+                if (null !== $closureSlot) {
+                    $valueSlot = $closureSlot;
                 }
                 if (
                     null === $valueSlot
@@ -14556,7 +14947,7 @@ class Compiler {
                             break;
                         }
                     }
-                    if (!$hasProducer) {
+                    if (!$hasProducer && null === $this->findCoalesceStmtForCallArg($arg, $block)) {
                         $producerSlot = $this->findInlineExprCallArgProducerSlot($arg, $block, $cfgCallOp);
                         if (null !== $producerSlot) {
                             $valueSlot = $producerSlot;
@@ -14638,6 +15029,9 @@ class Compiler {
     {
         if (null === $valueSlot) {
             return null;
+        }
+        if ($this->callArgOperandIsClosureValue($arg, $block)) {
+            return $valueSlot;
         }
         $name = Block::resolveVariableName($arg);
         if (null === $name || '' === $name) {
