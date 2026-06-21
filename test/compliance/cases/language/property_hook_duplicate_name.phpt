@@ -1,5 +1,5 @@
 --TEST--
-Language: property hook + same-name private backing field merges (#9831, zend_compile.c)
+Language: property hook duplicate backing property name — compile fatal (#10393, zend_compile.c)
 --FILE--
 <?php
 class C {
@@ -10,7 +10,6 @@ class C {
     public string $y = 'a';
     private int $x = 1;
 }
-$c = new C();
-echo 'x=' . $c->x . ' y=' . $c->y . "\n";
---EXPECT--
-x=1 y=a
+echo "ok\n";
+--EXPECT_EXIT--
+255
