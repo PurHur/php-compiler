@@ -762,4 +762,46 @@ PHP;
         $runtime->run($block);
         self::assertSame("hi world\n", ob_get_clean());
     }
+
+    /** Issue #10373 — var_export(substr(...), true) wires nested FuncCall + ConstFetch producer slots. */
+    public function testVarExportNestedBuiltinReturnTrueUsesFuncCallProducerSlot(): void
+    {
+        $code = <<<'PHP'
+<?php
+echo var_export(substr('hello', 0, -2), true);
+echo "\n";
+echo var_export(array_keys(['a' => 1, 'b' => 2]), true);
+PHP;
+        $runtime = new Runtime();
+        $block = $runtime->parseAndCompile($code, 'var_export_nested_builtin_return_true.php');
+
+        $substrReturnSlot = null;
+        $varExportSends = [];
+        $fcallOrdinal = 0;
+        foreach ($block->opCodes as $op) {
+            if (OpCode::TYPE_FUNCCALL_INIT === $op->type) {
+                ++$fcallOrdinal;
+                if (2 === $fcallOrdinal) {
+                    $varExportSends = [];
+                }
+            }
+            if (1 === $fcallOrdinal && OpCode::TYPE_FUNCCALL_EXEC_RETURN === $op->type) {
+                $substrReturnSlot = $op->arg1;
+            }
+            if (2 === $fcallOrdinal && OpCode::TYPE_ARG_SEND === $op->type) {
+                $varExportSends[] = $op->arg1;
+            }
+        }
+
+        self::assertNotNull($substrReturnSlot);
+        self::assertCount(2, $varExportSends);
+        self::assertSame($substrReturnSlot, $varExportSends[0], 'arg sends='.json_encode($varExportSends));
+
+        ob_start();
+        $runtime->run($block);
+        $out = ob_get_clean();
+        self::assertStringContainsString("'hel'", $out);
+        self::assertStringContainsString("'a'", $out);
+        self::assertStringContainsString("'b'", $out);
+    }
 }

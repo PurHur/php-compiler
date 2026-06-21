@@ -10496,7 +10496,22 @@ class Compiler {
             if (
                 null !== $callIndex
                 && null !== $producerIndex
-                && $this->isNestedCallArgProducerForConsumer($producer, $callOp, $producerIndex, $callIndex, $block->orig->children)
+                && (
+                    $this->isNestedCallArgProducerForConsumer(
+                        $producer,
+                        $callOp,
+                        $producerIndex,
+                        $callIndex,
+                        $block->orig->children
+                    )
+                    || $this->isSiblingMultiArgFuncCallProducer(
+                        $producer,
+                        $callOp,
+                        $producerIndex,
+                        $callIndex,
+                        $block->orig->children
+                    )
+                )
             ) {
                 foreach ($this->compileExpr($producer, $block) as $op) {
                     $block->addOpCode($op);
@@ -10645,6 +10660,13 @@ class Compiler {
                     $callIndex,
                     $block->orig->children
                 )
+                && !$this->isSiblingMultiArgFuncCallProducer(
+                    $producer,
+                    $callOp,
+                    $producerIndex,
+                    $callIndex,
+                    $block->orig->children
+                )
             ) {
                 return $producerSlot;
             }
@@ -10669,7 +10691,16 @@ class Compiler {
             if (
                 null !== $callIndex
                 && null !== $producerIndex
-                && $this->isNestedCallArgProducerForConsumer($producer, $callOp, $producerIndex, $callIndex, $block->orig->children)
+                && (
+                    $this->isNestedCallArgProducerForConsumer($producer, $callOp, $producerIndex, $callIndex, $block->orig->children)
+                    || $this->isSiblingMultiArgFuncCallProducer(
+                        $producer,
+                        $callOp,
+                        $producerIndex,
+                        $callIndex,
+                        $block->orig->children
+                    )
+                )
             ) {
                 return $producerSlot;
             }
@@ -10682,6 +10713,13 @@ class Compiler {
                     || null === $producerIndex
                     || (
                         !$this->isNestedCallArgProducerForConsumer($producer, $callOp, $producerIndex, $callIndex, $block->orig->children)
+                        && !$this->isSiblingMultiArgFuncCallProducer(
+                            $producer,
+                            $callOp,
+                            $producerIndex,
+                            $callIndex,
+                            $block->orig->children
+                        )
                         && !$this->operandsReferToSameVariable($producer->result, $arg)
                     )
                 ) {
@@ -11782,6 +11820,20 @@ class Compiler {
                     continue;
                 }
             }
+            // php-cfg `var_export(substr(..., -2), true)` — UnaryMinus feeds sibling FuncCall arg, not consumer (#10373).
+            if ($child instanceof Op\Expr\UnaryMinus || $child instanceof Op\Expr\UnaryPlus) {
+                $next = $cfgChildren[$i + 1] ?? null;
+                if (
+                    ($next instanceof Op\Expr\FuncCall || $next instanceof Op\Expr\NsFuncCall)
+                    && (
+                        $this->isSiblingMultiArgFuncCallProducer($next, $callOp, $i + 1, $callIndex, $cfgChildren)
+                        || $this->isNestedCallArgProducerForConsumer($next, $callOp, $i + 1, $callIndex, $cfgChildren)
+                        || $this->isAdjacentNestedFuncCallProducer($next, $callOp, $i + 1, $callIndex)
+                    )
+                ) {
+                    continue;
+                }
+            }
             if ($child instanceof Op\Expr\Assign) {
                 if (!property_exists($callOp, 'args') || !is_array($callOp->args)) {
                     break;
@@ -11819,6 +11871,14 @@ class Compiler {
                 break;
             }
             if ($child instanceof Op\Expr\Array_) {
+                $next = $cfgChildren[$i + 1] ?? null;
+                // php-cfg `var_export(array_keys([...]), true)` — Array_ feeds sibling FuncCall arg (#10373).
+                if (
+                    ($next instanceof Op\Expr\FuncCall || $next instanceof Op\Expr\NsFuncCall)
+                    && $this->isSiblingMultiArgFuncCallProducer($next, $callOp, $i + 1, $callIndex, $cfgChildren)
+                ) {
+                    continue;
+                }
                 array_unshift($producers, $child);
                 $prev = $cfgChildren[$i - 1] ?? null;
                 // php-cfg: `invokeArgs(new C(), [...])` — New_ immediately precedes Array_ (#9904).
@@ -11930,6 +11990,12 @@ class Compiler {
         }
         for ($j = $producerIndex + 1; $j < $consumerIndex; ++$j) {
             $mid = $cfgChildren[$j] ?? null;
+            if (
+                $mid instanceof Op\Expr\ConstFetch
+                || $mid instanceof Op\Expr\ClassConstFetch
+            ) {
+                continue;
+            }
             if (
                 !$mid instanceof Op\Expr\FuncCall
                 && !$mid instanceof Op\Expr\NsFuncCall
