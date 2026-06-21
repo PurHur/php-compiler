@@ -55,7 +55,12 @@ final class VmSscanf
             if ($fpos + 1 >= $fmtLen) {
                 return [$assigned, $inPos];
             }
-            $spec = $format[++$fpos];
+            ++$fpos;
+            [$width, $fpos] = self::parseFieldWidth($format, $fpos, $fmtLen);
+            if ($fpos >= $fmtLen) {
+                return [$assigned, $inPos];
+            }
+            $spec = $format[$fpos];
             if ('%' === $spec) {
                 if ($inPos >= $inLen || $input[$inPos] !== '%') {
                     return [$assigned, $inPos];
@@ -68,7 +73,7 @@ final class VmSscanf
             }
             switch ($spec) {
                 case 'd':
-                    [$val, $consumed] = self::scanInt($input, $inPos, $inLen);
+                    [$val, $consumed] = self::scanInt($input, $inPos, $inLen, $width);
                     if (null === $val) {
                         return [$assigned, $inPos];
                     }
@@ -78,7 +83,7 @@ final class VmSscanf
                     ++$assigned;
                     break;
                 case 'u':
-                    [$val, $consumed, $asString] = self::scanUnsigned($input, $inPos, $inLen);
+                    [$val, $consumed, $asString] = self::scanUnsigned($input, $inPos, $inLen, $width);
                     if (null === $val && null === $asString) {
                         return [$assigned, $inPos];
                     }
@@ -93,7 +98,7 @@ final class VmSscanf
                     break;
                 case 'x':
                 case 'X':
-                    [$val, $consumed] = self::scanHex($input, $inPos, $inLen);
+                    [$val, $consumed] = self::scanHex($input, $inPos, $inLen, $width);
                     if (null === $val) {
                         return [$assigned, $inPos];
                     }
@@ -103,7 +108,7 @@ final class VmSscanf
                     ++$assigned;
                     break;
                 case 'o':
-                    [$val, $consumed] = self::scanOct($input, $inPos, $inLen);
+                    [$val, $consumed] = self::scanOct($input, $inPos, $inLen, $width);
                     if (null === $val) {
                         return [$assigned, $inPos];
                     }
@@ -113,7 +118,7 @@ final class VmSscanf
                     ++$assigned;
                     break;
                 case 'c':
-                    [$str, $consumed] = self::scanChar($input, $inPos, $inLen);
+                    [$str, $consumed] = self::scanChar($input, $inPos, $inLen, $width);
                     if (null === $str) {
                         return [$assigned, $inPos];
                     }
@@ -123,7 +128,7 @@ final class VmSscanf
                     ++$assigned;
                     break;
                 case 's':
-                    [$str, $consumed] = self::scanString($input, $inPos, $inLen);
+                    [$str, $consumed] = self::scanString($input, $inPos, $inLen, $width);
                     if (null === $str) {
                         return [$assigned, $inPos];
                     }
@@ -133,7 +138,7 @@ final class VmSscanf
                     ++$assigned;
                     break;
                 case 'f':
-                    [$flt, $consumed] = self::scanFloat($input, $inPos, $inLen);
+                    [$flt, $consumed] = self::scanFloat($input, $inPos, $inLen, $width);
                     if (null === $flt) {
                         return [$assigned, $inPos];
                     }
@@ -199,7 +204,12 @@ final class VmSscanf
             if ($fpos + 1 >= $len) {
                 break;
             }
-            $spec = $format[++$fpos];
+            ++$fpos;
+            $fpos = self::skipOptionalFieldWidth($format, $fpos, $len);
+            if ($fpos >= $len) {
+                break;
+            }
+            $spec = $format[$fpos];
             if ('%' !== $spec) {
                 ++$count;
             }
@@ -219,7 +229,12 @@ final class VmSscanf
             if ($fpos + 1 >= $len) {
                 break;
             }
-            $spec = $format[++$fpos];
+            ++$fpos;
+            $fpos = self::skipOptionalFieldWidth($format, $fpos, $len);
+            if ($fpos >= $len) {
+                break;
+            }
+            $spec = $format[$fpos];
             if ('%' === $spec) {
                 continue;
             }
@@ -227,6 +242,34 @@ final class VmSscanf
                 throw new \ValueError('Bad scan conversion character "'.$spec.'"');
             }
         }
+    }
+
+    /**
+     * Optional decimal field width after '%' (php-src ext/standard/formatted_io.c).
+     *
+     * @return array{0: ?int, 1: int} width (null = unlimited) and index of conversion specifier
+     */
+    private static function parseFieldWidth(string $format, int $fpos, int $fmtLen): array
+    {
+        if ($fpos >= $fmtLen || $format[$fpos] < '0' || $format[$fpos] > '9') {
+            return [null, $fpos];
+        }
+        $width = 0;
+        while ($fpos < $fmtLen && $format[$fpos] >= '0' && $format[$fpos] <= '9') {
+            $width = $width * 10 + (ord($format[$fpos]) - 48);
+            ++$fpos;
+        }
+
+        return [$width, $fpos];
+    }
+
+    private static function skipOptionalFieldWidth(string $format, int $fpos, int $fmtLen): int
+    {
+        while ($fpos < $fmtLen && $format[$fpos] >= '0' && $format[$fpos] <= '9') {
+            ++$fpos;
+        }
+
+        return $fpos;
     }
 
     private static function isSupportedConversionSpec(string $spec): bool
@@ -237,7 +280,7 @@ final class VmSscanf
     /**
      * @return array{0: ?int, 1: int}
      */
-    private static function scanInt(string $input, int $pos, int $len): array
+    private static function scanInt(string $input, int $pos, int $len, ?int $maxWidth = null): array
     {
         $orig = $pos;
         $pos = self::skipSpace($input, $pos, $len);
@@ -253,10 +296,15 @@ final class VmSscanf
         }
         $value = 0;
         $any = false;
+        $digitsRead = 0;
         while ($pos < $len && $input[$pos] >= '0' && $input[$pos] <= '9') {
+            if (null !== $maxWidth && $digitsRead >= $maxWidth) {
+                break;
+            }
             $any = true;
             $value = $value * 10 + (ord($input[$pos]) - 48);
             ++$pos;
+            ++$digitsRead;
         }
         if (!$any) {
             return [null, 0];
@@ -271,7 +319,7 @@ final class VmSscanf
     /**
      * @return array{0: ?string, 1: int}
      */
-    private static function scanString(string $input, int $pos, int $len): array
+    private static function scanString(string $input, int $pos, int $len, ?int $maxWidth = null): array
     {
         $orig = $pos;
         $pos = self::skipSpace($input, $pos, $len);
@@ -279,8 +327,13 @@ final class VmSscanf
             return [null, 0];
         }
         $start = $pos;
+        $read = 0;
         while ($pos < $len && !self::isSpace($input[$pos])) {
+            if (null !== $maxWidth && $read >= $maxWidth) {
+                break;
+            }
             ++$pos;
+            ++$read;
         }
         if ($start === $pos) {
             return [null, 0];
@@ -292,7 +345,7 @@ final class VmSscanf
     /**
      * @return array{0: ?int, 1: int}
      */
-    private static function scanHex(string $input, int $pos, int $len): array
+    private static function scanHex(string $input, int $pos, int $len, ?int $maxWidth = null): array
     {
         $orig = $pos;
         $pos = self::skipSpace($input, $pos, $len);
@@ -308,7 +361,11 @@ final class VmSscanf
         }
         $value = 0;
         $any = false;
+        $digitsRead = 0;
         while ($pos < $len) {
+            if (null !== $maxWidth && $digitsRead >= $maxWidth) {
+                break;
+            }
             $ch = $input[$pos];
             $digit = null;
             if ($ch >= '0' && $ch <= '9') {
@@ -324,6 +381,7 @@ final class VmSscanf
             $any = true;
             $value = ($value << 4) + $digit;
             ++$pos;
+            ++$digitsRead;
         }
         if (!$any) {
             return [null, 0];
@@ -335,7 +393,7 @@ final class VmSscanf
     /**
      * @return array{0: ?int, 1: int}
      */
-    private static function scanOct(string $input, int $pos, int $len): array
+    private static function scanOct(string $input, int $pos, int $len, ?int $maxWidth = null): array
     {
         $orig = $pos;
         $pos = self::skipSpace($input, $pos, $len);
@@ -344,10 +402,15 @@ final class VmSscanf
         }
         $value = 0;
         $any = false;
+        $digitsRead = 0;
         while ($pos < $len && $input[$pos] >= '0' && $input[$pos] <= '7') {
+            if (null !== $maxWidth && $digitsRead >= $maxWidth) {
+                break;
+            }
             $any = true;
             $value = ($value << 3) + (ord($input[$pos]) - 48);
             ++$pos;
+            ++$digitsRead;
         }
         if (!$any) {
             return [null, 0];
@@ -359,7 +422,7 @@ final class VmSscanf
     /**
      * @return array{0: ?int, 1: int, 2: ?string}
      */
-    private static function scanUnsigned(string $input, int $pos, int $len): array
+    private static function scanUnsigned(string $input, int $pos, int $len, ?int $maxWidth = null): array
     {
         $orig = $pos;
         $pos = self::skipSpace($input, $pos, $len);
@@ -375,10 +438,15 @@ final class VmSscanf
         }
         $value = 0;
         $any = false;
+        $digitsRead = 0;
         while ($pos < $len && $input[$pos] >= '0' && $input[$pos] <= '9') {
+            if (null !== $maxWidth && $digitsRead >= $maxWidth) {
+                break;
+            }
             $any = true;
             $value = $value * 10 + (ord($input[$pos]) - 48);
             ++$pos;
+            ++$digitsRead;
         }
         if (!$any) {
             return [null, 0, null];
@@ -393,21 +461,31 @@ final class VmSscanf
     /**
      * @return array{0: ?string, 1: int}
      */
-    private static function scanChar(string $input, int $pos, int $len): array
+    private static function scanChar(string $input, int $pos, int $len, ?int $maxWidth = null): array
     {
         if ($pos >= $len) {
             return [null, 0];
         }
-        $ch = $input[$pos];
-        $value = self::isSpace($ch) ? '' : $ch;
+        $width = $maxWidth ?? 1;
+        if ($width <= 0) {
+            return [null, 0];
+        }
+        if (1 === $width) {
+            $ch = $input[$pos];
+            $value = self::isSpace($ch) ? '' : $ch;
 
-        return [$value, 1];
+            return [$value, 1];
+        }
+        $end = min($pos + $width, $len);
+        $value = substr($input, $pos, $end - $pos);
+
+        return [$value, $end - $pos];
     }
 
     /**
      * @return array{0: ?float, 1: int}
      */
-    private static function scanFloat(string $input, int $pos, int $len): array
+    private static function scanFloat(string $input, int $pos, int $len, ?int $maxWidth = null): array
     {
         $orig = $pos;
         $pos = self::skipSpace($input, $pos, $len);
@@ -419,23 +497,36 @@ final class VmSscanf
             ++$pos;
         }
         $any = false;
+        $read = 0;
         while ($pos < $len && $input[$pos] >= '0' && $input[$pos] <= '9') {
+            if (null !== $maxWidth && $read >= $maxWidth) {
+                break;
+            }
             $any = true;
             ++$pos;
+            ++$read;
         }
         if ($pos < $len && '.' === $input[$pos]) {
-            ++$pos;
-            while ($pos < $len && $input[$pos] >= '0' && $input[$pos] <= '9') {
-                $any = true;
+            if (null === $maxWidth || $read < $maxWidth) {
                 ++$pos;
+                ++$read;
+                while ($pos < $len && $input[$pos] >= '0' && $input[$pos] <= '9') {
+                    if (null !== $maxWidth && $read >= $maxWidth) {
+                        break;
+                    }
+                    $any = true;
+                    ++$pos;
+                    ++$read;
+                }
             }
         }
         if (!$any) {
             return [null, 0];
         }
-        $slice = substr($input, $start, $pos - $start);
+        $sliceLen = null !== $maxWidth ? min($pos - $start, $maxWidth) : $pos - $start;
+        $slice = substr($input, $start, $sliceLen);
 
-        return [(float) $slice, $pos - $orig];
+        return [(float) $slice, ($start - $orig) + $sliceLen];
     }
 
     private static function skipSpace(string $input, int $pos, int $len): int
