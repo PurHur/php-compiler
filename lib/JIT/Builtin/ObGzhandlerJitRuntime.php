@@ -399,14 +399,9 @@ final class ObGzhandlerJitRuntime
             \putenv('PHP_COMPILER_SELFHOST_AOT=0');
         }
         try {
-            // Nested helper compile must not inherit bridge CFG block maps (#8559, #9091).
+            // Nested helper compile must not inherit a half-built bridge CFG (#8559, #9225).
             $context->builder->clearInsertionPosition();
-            $block = $runtime->parseAndCompile((string) \file_get_contents($path), 'ObGzhandlerJitHelper.php');
-            if (null === $block) {
-                throw new \LogicException('ObGzhandlerJitHelper.php parseAndCompile failed (#9091)');
-            }
-            $jit = new JIT($context);
-            $jit->compile($block);
+            self::compileHelperFileIfMissing($context, $runtime, $path, 'ObGzhandlerJitHelper.php');
         } finally {
             $context->scope->blockStorage = $savedBlockStorage;
             $context->scope->blockEntryStorage = $savedBlockEntryStorage;
@@ -427,6 +422,20 @@ final class ObGzhandlerJitRuntime
                 throw new \LogicException($lc.' was not compiled for JIT (#9091)');
             }
         }
+    }
+
+    private static function compileHelperFileIfMissing(
+        Context $context,
+        \PHPCompiler\Runtime $runtime,
+        string $path,
+        string $label
+    ): void {
+        $block = $runtime->parseAndCompile((string) \file_get_contents($path), $label);
+        if (null === $block) {
+            throw new \LogicException($label.' parseAndCompile failed (#9091)');
+        }
+        $jit = new JIT($context);
+        $jit->compile($block);
     }
 
     private static function registerLinkedRuntime(Context $context): void
