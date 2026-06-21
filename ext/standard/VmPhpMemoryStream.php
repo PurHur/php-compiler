@@ -370,7 +370,7 @@ final class VmPhpMemoryStream
 
 final class PhpMemoryStreamState
 {
-    public int $chunkSize = VmPhpMemoryStream::DEFAULT_CHUNK_SIZE;
+    public int $chunkSize = 8192;
 
     public string $buffer = '';
 
