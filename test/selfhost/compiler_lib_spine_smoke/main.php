@@ -2273,6 +2273,7 @@ require_once __DIR__.'/../../../lib/JIT/EvalHelper.php';
 require_once __DIR__.'/../../../lib/JIT/ExceptionBridge.php';
 require_once __DIR__.'/../../../lib/JIT/ExceptionHandlerCallbackPolicy.php';
 require_once __DIR__.'/../../../lib/JIT/FiberHelper.php';
+require_once __DIR__.'/../../../lib/VM/VmFromCallable.php';
 require_once __DIR__.'/../../../lib/JIT/FromCallableHelper.php';
 require_once __DIR__.'/../../../lib/JIT/FunctionStaticHelper.php';
 require_once __DIR__.'/../../../lib/JIT/GeneratorHelper.php';
