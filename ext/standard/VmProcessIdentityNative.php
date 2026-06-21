@@ -89,7 +89,7 @@ final class VmProcessIdentityNative
             if (null === $pw) {
                 return null;
             }
-            $name = (string) $pw->pw_name;
+            $name = \FFI::string($pw->pw_name);
             if ('' === $name) {
                 return null;
             }

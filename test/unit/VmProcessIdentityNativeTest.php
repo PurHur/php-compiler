@@ -71,9 +71,8 @@ final class VmProcessIdentityNativeTest extends TestCase
         $this->assertGreaterThanOrEqual(0, $gid);
 
         $name = VmProcessIdentityNative::getpwuidName($euid);
-        if (null !== $name) {
-            $this->assertNotSame('', $name);
-        }
+        $this->assertNotNull($name, 'getpwuidName must resolve passwd entry when FFI is available');
+        $this->assertNotSame('', $name);
 
         $this->assertSame($uid, VmProcessIdentity::getmyuid());
         $this->assertSame($gid, VmProcessIdentity::getmygid());
@@ -83,7 +82,7 @@ final class VmProcessIdentityNativeTest extends TestCase
             $this->assertSame($pid, VmDate::getmypid());
         }
         $user = VmProcessIdentity::getCurrentUser();
-        $this->assertIsString($user);
-        $this->assertNotSame('', $user);
+        $this->assertSame($name, $user);
+        $this->assertNotSame('Unknown', $user);
     }
 }
