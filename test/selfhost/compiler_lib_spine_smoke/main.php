@@ -1338,6 +1338,7 @@ require_once __DIR__.'/../../../ext/standard/inet_pton.php';
 require_once __DIR__.'/../../../ext/standard/ini_get_.php';
 require_once __DIR__.'/../../../ext/standard/ini_get_all.php';
 require_once __DIR__.'/../../../ext/standard/ini_parse_quantity.php';
+require_once __DIR__.'/../../../ext/standard/IniParseQuantityJitHelper.php';
 require_once __DIR__.'/../../../ext/standard/ini_restore.php';
 require_once __DIR__.'/../../../ext/standard/ini_set_.php';
 require_once __DIR__.'/../../../ext/standard/int_max.php';
