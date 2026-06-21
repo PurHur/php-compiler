@@ -947,6 +947,7 @@ require_once __DIR__.'/../../../ext/standard/VmSprintf.php';
 require_once __DIR__.'/../../../ext/standard/VmZendDoubleString.php';
 require_once __DIR__.'/../../../ext/standard/VmSscanf.php';
 require_once __DIR__.'/../../../ext/standard/VmStatCache.php';
+require_once __DIR__.'/../../../ext/standard/VmStatPure.php';
 require_once __DIR__.'/../../../ext/standard/VmStatNative.php';
 require_once __DIR__.'/../../../ext/standard/VmStatPath.php';
 require_once __DIR__.'/../../../ext/standard/VmStreamArg.php';
