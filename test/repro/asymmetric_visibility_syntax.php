@@ -2,6 +2,6 @@
 declare(strict_types=1);
 
 class Asym {
-    public private(set) string $name = 'x';
+    private(set) string $name = 'x';
 }
 echo (new Asym())->name, "\n";

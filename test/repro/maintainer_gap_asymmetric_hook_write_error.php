@@ -2,7 +2,7 @@
 declare(strict_types=1);
 
 class C {
-    public private(set) string $x {
+    private(set) string $x {
         get => 'hi';
     }
 }

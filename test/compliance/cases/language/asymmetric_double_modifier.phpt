@@ -1,9 +1,9 @@
 --TEST--
-Language: public protected(set) rejected at compile (#10334, PHP 8.4 zend_compile.c)
+Language: public private(set) double modifier rejected at compile (#10334, PHP 8.4 zend_compile.c)
 --FILE--
 <?php
-class A {
-    public protected(set) string $x = 'ok';
+class C {
+    public private(set) int $x = 1;
 }
 echo "compiled\n";
 --EXPECT_EXIT--

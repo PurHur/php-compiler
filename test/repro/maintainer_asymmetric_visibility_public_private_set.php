@@ -1,6 +1,6 @@
 <?php
 class C {
-    public private(set) int $x = 1;
+    private(set) int $x = 1;
 }
 $c = new C();
 echo $c->x, "\n";
@@ -11,7 +11,7 @@ try {
 }
 
 class D {
-    public protected(set) int $y = 3;
+    protected(set) int $y = 3;
 }
 $d = new D();
 echo $d->y, "\n";

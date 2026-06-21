@@ -3,7 +3,7 @@ Language: asymmetric visibility compile — property (#10199, PHP 8.4 zend_compi
 --FILE--
 <?php
 class C {
-    public private(set) int $x = 1;
+    private(set) int $x = 1;
 }
 $c = new C();
 echo $c->x, "\n";

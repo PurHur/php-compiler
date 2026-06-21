@@ -3,7 +3,7 @@
 declare(strict_types=1);
 
 class C {
-    public private(set) int $x = 1;
+    private(set) int $x = 1;
 }
 
 $p = new ReflectionProperty(C::class, 'x');

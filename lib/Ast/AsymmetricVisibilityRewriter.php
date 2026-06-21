@@ -139,19 +139,28 @@ final class AsymmetricVisibilityRewriter
     }
 
     /**
-     * Duplicate access-type modifier before set is a compile fatal (#6774, #9806).
+     * Explicit read visibility before asymmetric set is a compile fatal (#6774, #9806, #10334).
      *
-     * php-src: Zend/zend_compile.c — zend_add_member_modifier(); `public public(set)` is fatal.
-     * `public private(set)` is valid PHP 8.4 asymmetric visibility (#10199).
+     * php-src: Zend/zend_compile.c — zend_add_member_modifier(); `public private(set)` and
+     * `public public(set)` are fatal (`Multiple access type modifiers are not allowed`).
+     * Valid forms use set-only or set-before-read order, e.g. `private(set) protected int $x`.
      */
     private static function rejectExplicitPublicBeforeSetModifier(string $source): void
     {
-        self::eachPropertyDeclarationLine($source, static function (string $line): void {
-            if (preg_match(
-                '/(?<![a-zA-Z0-9_])(public|protected|private)\s+\1\s*\(\s*set\s*\)/i',
-                $line
-            )) {
-                throw new \CompileError(self::MULTIPLE_MODIFIERS_MESSAGE);
+        $modifier = '(?:public|protected|private)';
+        $setModifier = $modifier.'\s*\(\s*set\s*\)';
+        $parenthesizedSet = '\(\s*'.$modifier.'\s*\(\s*set\s*\)\s*\)';
+        $patterns = [
+            '/(?<![a-zA-Z0-9_])(public|protected|private)\s+\1\s*\(\s*set\s*\)/i',
+            '/(?<![a-zA-Z0-9_])'.$modifier.'\s+(?!\()'.$setModifier.'/i',
+            '/(?<![a-zA-Z0-9_])'.$modifier.'\s+'.$parenthesizedSet.'/i',
+        ];
+
+        self::eachPropertyDeclarationLine($source, static function (string $line) use ($patterns): void {
+            foreach ($patterns as $pattern) {
+                if (preg_match($pattern, $line)) {
+                    throw new \CompileError(self::MULTIPLE_MODIFIERS_MESSAGE);
+                }
             }
         });
     }
