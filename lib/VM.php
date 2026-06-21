@@ -11209,12 +11209,15 @@ restart:
             return;
         }
         foreach ($closureState->captures as $capture) {
-            $dest = $this->scopeSlot($callee, $capture['slot']);
+            $slot = (int) $capture['slot'];
+            $dest = $this->scopeSlot($callee, $slot);
             if ($capture['byRef']) {
                 $dest->indirect($capture['var']->resolveIndirect());
             } else {
                 $dest->copyFrom($capture['var']);
             }
+            // Captured CVs are bound at closure entry — not undefined locals (#10304, #10358).
+            $this->markScopeSlotInitialized($callee, $slot);
         }
     }
 
