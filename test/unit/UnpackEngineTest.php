@@ -52,6 +52,15 @@ final class UnpackEngineTest extends TestCase
         $this->assertSame(\unpack('C2/C2', 'abcd'), UnpackEngine::unpack('C2/C2', 'abcd'));
     }
 
+    public function testRepeatedFormatEmbeddedNameKeysMatchZend(): void
+    {
+        $this->assertSame(\unpack('a2a2', 'abcd'), UnpackEngine::unpack('a2a2', 'abcd'));
+        $this->assertSame(\unpack('A2A2', 'abcd'), UnpackEngine::unpack('A2A2', 'abcd'));
+        $this->assertSame(\unpack('Z2Z2', "a\x00b\x00"), UnpackEngine::unpack('Z2Z2', "a\x00b\x00"));
+        $this->assertSame(\unpack('h2h2', 'abcd'), UnpackEngine::unpack('h2h2', 'abcd'));
+        $this->assertSame(\unpack('C2foo', 'AB'), UnpackEngine::unpack('C2foo', 'AB'));
+    }
+
     public function testUnpackEngineDoesNotUseHostFloatUnpack(): void
     {
         $source = (string) file_get_contents(__DIR__.'/../../ext/standard/UnpackEngine.php');
