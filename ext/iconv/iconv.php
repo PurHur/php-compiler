@@ -39,7 +39,7 @@ final class iconv extends Internal
         if (null === $frame->returnVar) {
             return;
         }
-        $result = VmIconv::iconv($from, $to, $input);
+        $result = VmIconv::iconv($from, $to, $input, $frame);
         BuiltinExecute::writeReturn($frame, static function (Variable $ret) use ($result): void {
             if (false === $result) {
                 $ret->bool(false);

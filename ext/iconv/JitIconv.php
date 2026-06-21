@@ -25,7 +25,13 @@ final class JitIconv
         $fromLit = JitStringBuiltinArg::compileTimeLiteral($args[0]);
         $toLit = JitStringBuiltinArg::compileTimeLiteral($args[1]);
         $inputLit = JitStringBuiltinArg::compileTimeLiteral($args[2]);
-        if (null !== $fromLit && null !== $toLit && null !== $inputLit) {
+        if (
+            null !== $fromLit
+            && null !== $toLit
+            && null !== $inputLit
+            && null !== CharsetEngine::parseEncodingSpec($fromLit)
+            && null !== CharsetEngine::parseEncodingSpec($toLit)
+        ) {
             return self::foldCompileTime($context, $fromLit, $toLit, $inputLit);
         }
 
@@ -47,18 +53,6 @@ final class JitIconv
 
     private static function foldCompileTime(Context $context, string $from, string $to, string $input): Value
     {
-        if (null === CharsetEngine::parseEncodingSpec($from)) {
-            throw new \ValueError(sprintf(
-                'iconv(): Argument #1 ($from_encoding) is not a supported encoding, "%s" given',
-                $from
-            ));
-        }
-        if (null === CharsetEngine::parseEncodingSpec($to)) {
-            throw new \ValueError(sprintf(
-                'iconv(): Argument #2 ($to_encoding) is not a supported encoding, "%s" given',
-                $to
-            ));
-        }
         $converted = VmIconv::iconv($from, $to, $input);
         if (false === $converted) {
             return $context->getTypeFromString('bool')->constInt(0, false);
