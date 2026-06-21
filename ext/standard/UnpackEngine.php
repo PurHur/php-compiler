@@ -214,6 +214,14 @@ final class UnpackEngine
     }
 
     /**
+     * php-src pack.c: $arg is a repeat count for numeric/ieee types, byte/nibble length for a/A/Z/h/H.
+     */
+    private static function argIsRepeatCount(string $code): bool
+    {
+        return !\in_array($code, ['a', 'A', 'Z', 'h', 'H'], true);
+    }
+
+    /**
      * @param array<int|string, int|float|string> $result
      * @param array{code: string, arg: int, name: string, has_name: bool} $spec
      */
@@ -221,7 +229,7 @@ final class UnpackEngine
     {
         if ($spec['has_name']) {
             $key = $spec['name'];
-            if ($spec['arg'] > 1) {
+            if ($spec['arg'] > 1 && self::argIsRepeatCount($spec['code'])) {
                 $key .= (string) ($repIdx + 1);
             }
             $result[$key] = $val;
