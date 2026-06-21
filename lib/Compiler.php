@@ -13914,6 +13914,10 @@ class Compiler {
         if (null === $block->orig || null === $cfgCallOp) {
             return null;
         }
+        // Embedded literals are not dim-fetch producers (#10401, zend_execute.c).
+        if ($this->isEmbeddedCallLiteralArg($arg)) {
+            return null;
+        }
         $children = $block->orig->children;
         $callIndex = null;
         foreach ($children as $i => $child) {
@@ -13935,10 +13939,30 @@ class Compiler {
             }
             break;
         }
-        if (!isset($dimFetches[$argIndex])) {
+        if ([] === $dimFetches) {
             return null;
         }
-        $fetch = $dimFetches[$argIndex];
+        $callArgs = property_exists($cfgCallOp, 'args') && is_array($cfgCallOp->args)
+            ? $cfgCallOp->args
+            : [];
+        $dimIndex = $argIndex;
+        if (\count($dimFetches) < \count($callArgs)) {
+            $nonEmbeddedArgIndices = [];
+            foreach ($callArgs as $i => $callArg) {
+                if (null !== $callArg && !$this->isEmbeddedCallLiteralArg($callArg)) {
+                    $nonEmbeddedArgIndices[] = $i;
+                }
+            }
+            $mapped = array_search($argIndex, $nonEmbeddedArgIndices, true);
+            if (false === $mapped) {
+                return null;
+            }
+            $dimIndex = (int) $mapped;
+        }
+        if (!isset($dimFetches[$dimIndex])) {
+            return null;
+        }
+        $fetch = $dimFetches[$dimIndex];
         $slot = $block->slotForOperand($fetch->result);
         if (null === $slot) {
             foreach ($this->compileExpr($fetch, $block) as $op) {
