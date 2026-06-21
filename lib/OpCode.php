@@ -215,6 +215,9 @@ class OpCode {
     /** `['k' => $v, ...$tail] = $arr` string keys already assigned; empty = numeric spread only (#4889). */
     public array $listSpreadExcludedKeys = [];
 
+    /** Guarded list destruct: scope slots to null when RHS is not unpackable (#4325, #10486). */
+    public array $listUnpackNullInitSlots = [];
+
     public int $type;
     public ?int $arg1;
     public ?int $arg2;
