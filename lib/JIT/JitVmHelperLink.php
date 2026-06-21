@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace PHPCompiler\JIT;
 
+use PHPCompiler\JIT;
 use PHPLLVM\Type;
 use PHPLLVM\Value\Function_ as LlvmFunction;
 
