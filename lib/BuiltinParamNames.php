@@ -134,6 +134,9 @@ final class BuiltinParamNames
             case 'mb_ltrim':
             case 'mb_rtrim':
                 return ['string', 'characters', 'encoding'];
+            case 'htmlspecialchars':
+            case 'htmlentities':
+                return ['string', 'flags', 'encoding', 'double_encode'];
         }
 
         return null;
