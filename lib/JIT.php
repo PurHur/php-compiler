@@ -7281,14 +7281,10 @@ class JIT {
                         $value = $this->context->constantFetch($block->getOperand($op->arg2));
                     }
                     if (is_null($value)) {
-                        $name = $block->getOperand($op->arg2);
+                        $name = null !== $op->arg3
+                            ? $block->getOperand($op->arg3)
+                            : $block->getOperand($op->arg2);
                         $label = $name instanceof Operand\Literal ? (string) $name->value : get_class($name);
-                        if (null !== $op->arg3) {
-                            $ns = $block->getOperand($op->arg3);
-                            if ($ns instanceof Operand\Literal) {
-                                $label = (string) $ns->value.'\\'.$label;
-                            }
-                        }
                         $bundleConst = $this->jitFoldPhpCompilerBundleConstant($label);
                         if (null !== $bundleConst) {
                             $this->assignOperand($block->getOperand($op->arg1), $bundleConst);
