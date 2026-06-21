@@ -1342,7 +1342,7 @@ class VM {
         $var = $var->resolveIndirect();
         if (Variable::TYPE_ENUM_CASE === $var->type) {
             throw new \Error(
-                'Object of class '.$var->toEnumCase()->enumClass->name.' could not be converted to string'
+                VM\ValueEchoSupport::objectToStringErrorMessage($var->toEnumCase()->enumClass->name)
             );
         }
         if (Variable::TYPE_OBJECT !== $var->type) {
@@ -1350,10 +1350,10 @@ class VM {
         }
         $object = $var->toObject();
         if (EnumCaseSupport::isEnumCase($object)) {
-            throw new \Error("Object of class {$object->class->name} could not be converted to string");
+            throw new \Error(VM\ValueEchoSupport::objectToStringErrorMessage($object->class->name));
         }
         if (!$this->hasInstanceMethod($object->class, '__tostring')) {
-            throw new \Error("Object of class {$object->class->name} could not be converted to string");
+            throw new \Error(VM\ValueEchoSupport::objectToStringErrorMessage($object->class->name));
         }
         $this->context->coercingObjectToString = true;
         try {
