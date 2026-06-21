@@ -9,9 +9,9 @@
 [![LLVM](https://img.shields.io/badge/LLVM-9-orange)](https://llvm.org/)
 [![Status](https://img.shields.io/badge/docs-status%20site-4F5B93)](https://purhur.github.io/php-compiler/docs/pages/index.html)
 
-> **Stable line (2026)** — First maintained **stable** release of this fork: demo-ready VM + AOT for a **web-capable PHP subset**, reference examples **000–009**, and an experimental **self-host** path (compiler compiling its own `lib/`). Not full Zend PHP compatibility — see [what’s missing](https://purhur.github.io/php-compiler/docs/pages/missing-implementation.html).
+> **Stable line (2026)** — First maintained **stable** release **[v1.0.0](https://github.com/PurHur/php-compiler/releases/tag/v1.0.0)**; **v1.1.0** prep adds M5 fast-path stability, enum/property-hook parity, `preg_match` JIT, `spl_autoload*`, and php-in-PHP JIT helpers. Demo-ready VM + AOT for a **web-capable PHP subset**, reference examples **000–009**, and an experimental **self-host** path. Not full Zend PHP compatibility — see [what’s missing](https://purhur.github.io/php-compiler/docs/pages/missing-implementation.html).
 
-**Snapshot (Jun 2026, `master`):** VM + AOT for shipped examples ✅ · self-host spine **2868**/**2848** · M5 fast + strict ✅ · VM probe ~**20ms**
+**Snapshot (Jun 2026, `master` — v1.1.0 prep):** VM + AOT for shipped examples ✅ · examples web smoke ✅ · self-host spine **2869**/**2850** · **852** builtins · M5 fast + strict ✅ · VM probe ~**20ms**
 
 ---
 
@@ -23,7 +23,7 @@
 | **AOT (`phpc build`)** | ✅ For curated subset | Standalone binaries for examples **000–009** and small CGI apps; not arbitrary Composer stacks |
 | **JIT (`bin/jit.php`)** | 🚧 Partial | LLVM IR for many constructs; **MCJIT execute** still flaky ([#98](https://github.com/PurHur/php-compiler/issues/98)); EH scripts VM-fallback ([#2114](https://github.com/PurHur/php-compiler/issues/2114)) |
 | **Language wave 3** | ✅ Closed batch | **12/12** language + **13/13** stdlib tracker items ([#1380](https://github.com/PurHur/php-compiler/issues/1380)); closures, try/catch, generators (VM), `parent::class`, backed enums (VM), intersection AOT checks |
-| **Self-host north star** | ✅ ~90% | M5 fast gate green; spine ****2868**/**2848****; vendor prelink **3/3** ([#1492](https://github.com/PurHur/php-compiler/issues/1492)) |
+| **Self-host north star** | ✅ ~90% | M5 fast gate green; spine **2869**/**2850**; vendor prelink **3/3** ([#1492](https://github.com/PurHur/php-compiler/issues/1492)) |
 
 ### What you can rely on today
 
@@ -40,7 +40,7 @@ Counts from `php script/bootstrap-spine-count.php` (literal `require_once` in `c
 | Milestone | Status | What it means |
 |-----------|--------|----------------|
 | **M0–M1** | ✅ | `compiler_minimal` + compile-smoke bundles link and run natively |
-| **M2** | ✅ **2868**/**2848** | Full Phase A inventory in spine smoke; native link + lint ✅ |
+| **M2** | ✅ **2869**/**2850** | Full Phase A inventory in spine smoke; native link + lint ✅ |
 | **M3** | ✅ | HelloWorld strict native ✅; inventory argv `bin/compile.php` ✅ |
 | **M4** | ✅ | `make bootstrap-loop-probe` full ladder ✅ (gen-1→gen-2→gen-3 + full-revision) |
 | **M5** | ✅ | `make north-star5-verify-fast` (daily); `--strict` pre-merge ✅; vendor **3/3** ✅; gen-0 sidecars refreshed |
@@ -197,18 +197,19 @@ php-compiler is **not** a drop-in Zend PHP replacement. It implements a **web-ca
 
 Full matrices (auto-generated): [`docs/capabilities.md`](docs/capabilities.md) (builtins) · [`docs/capabilities-syntax.md`](docs/capabilities-syntax.md) (language) · public [gap tables](https://purhur.github.io/php-compiler/docs/pages/missing-implementation.html) · [PHP vs us](https://purhur.github.io/php-compiler/docs/pages/capability-comparison.html).
 
-### What v1.0 supports well
+### What v1.0+ supports well
 
 **Language & OOP (typical app code)**
 
 - Classes, `new`, interfaces, `instanceof`, constructors, visibility, promoted properties, `readonly` classes
+- **Property hooks** (PHP 8.4) — get/set hooks on VM with backing storage, `??`/`unset` semantics ([#6426](https://github.com/PurHur/php-compiler/issues/6426), [#8902](https://github.com/PurHur/php-compiler/issues/8902))
 - Instance and static methods, `parent::class` / `parent::$prop`, late static binding, magic constants
 - Namespaces, `use function` / `use const`, group `use`
 - `match`, scalar `declare(strict_types=1)`, union types; intersection types with AOT call-site checks ([#3103](https://github.com/PurHur/php-compiler/pull/3103))
 - **Closures** and **arrow functions** on VM and JIT (LLVM IR): `use ($var)` by-value and by-ref ([#3108](https://github.com/PurHur/php-compiler/pull/3108)), indirect `$arr[0]()` invoke ([#3092](https://github.com/PurHur/php-compiler/pull/3092))
 - **`try` / `catch` / `finally`** on VM including return-through-finally ([#3106](https://github.com/PurHur/php-compiler/pull/3106)); JIT EH IR verified ([#3107](https://github.com/PurHur/php-compiler/pull/3107)) — `bin/jit.php` still VM-fallback for EH scripts
 - **Generators** (`yield`, keyed yield, `yield from`) on VM; JIT/AOT use VM fallback ([#3085](https://github.com/PurHur/php-compiler/pull/3085))
-- Backed enums on VM (php-cfg patch + compliance) ([#3091](https://github.com/PurHur/php-compiler/pull/3091)); traits — simple `use Trait;`
+- **Backed enums** on VM — `from`/`tryFrom`, case methods, strict builtins ([#3091](https://github.com/PurHur/php-compiler/pull/3091)); traits — simple `use Trait;`
 - Attributes — reflection read path (`getAttributes()`, name only)
 
 **Web & deployment**
@@ -219,12 +220,13 @@ Full matrices (auto-generated): [`docs/capabilities.md`](docs/capabilities.md) (
 - `phpc build`, `phpc deploy`, `phpc.json` project manifests — see [deploy-production.md](docs/deploy-production.md)
 - Reference **003-MiniWebApp**: router, templates, forms, native AOT execute on supported routes
 
-**Standard library (May 2026 wave)**
+**Standard library (v1.1.0 prep — Jun 2026)**
 
-- **321** builtins in the auto-generated matrix — strings, arrays, JSON, `preg_*`, filesystem, streams
-- Recent VM additions: `class_uses`, `class_alias`, `get_debug_type`, `iterator_to_array`, `array_chunk` (preserve keys), `settype`, `array_replace_recursive`, `json_validate`, `preg_last_error_msg`, `fdiv`, **DateTime** / **DateTimeZone** OOP ([#3104](https://github.com/PurHur/php-compiler/pull/3104))
+- **852** builtins in the auto-generated matrix — strings, arrays, JSON, `preg_*`, filesystem, streams, bcmath, mbstring
+- v1.1.0 batch: **`preg_match` / `preg_match_all` JIT**, **`spl_autoload*`** stack, enum-aware strict builtins, php-in-PHP `proc_open` paths
+- Core VM additions: `class_uses`, `class_alias`, `get_debug_type`, `iterator_to_array`, `array_chunk` (preserve keys), `settype`, `array_replace_recursive`, `json_validate`, `preg_last_error_msg`, `fdiv`, **DateTime** / **DateTimeZone** OOP ([#3104](https://github.com/PurHur/php-compiler/pull/3104))
 - **`array_map` / `array_filter` / `usort`** accept **closure** callbacks on VM ([#3086](https://github.com/PurHur/php-compiler/pull/3086))
-- Wave 3 tracked batch: **12/12** language + **13/13** stdlib items closed; ongoing stdlib work in [#1380](https://github.com/PurHur/php-compiler/issues/1380) follow-ups
+- Wave 3 tracked batch: **12/12** language + **13/13** stdlib items closed; ongoing parity work tracked in [#1380](https://github.com/PurHur/php-compiler/issues/1380) follow-ups
 
 **Tooling**
 
@@ -257,9 +259,9 @@ Full matrices (auto-generated): [`docs/capabilities.md`](docs/capabilities.md) (
 
 **Self-host (experimental, not “stable app” scope)**
 
-See [Current implementation status](#current-implementation-status-june-2026) for the full M0–M5 ladder. Summary: M0–M5 bootstrap gates ✅; spine ****2868**/**2848****; M3 strict native + inventory argv ✅; M4 full `bootstrap-loop-probe` ✅; M5 **`north-star5-verify-fast`** (daily) + **`--strict`** pre-merge ✅ ([#1492](https://github.com/PurHur/php-compiler/issues/1492), [#8559](https://github.com/PurHur/php-compiler/issues/8559)). Recent: native spine bundle probe, fast VM execute smoke ([#2201](https://github.com/PurHur/php-compiler/issues/2201)), lzf/chroot/stream_context spine units.
+See [Current implementation status](#current-implementation-status-june-2026) for the full M0–M5 ladder. Summary: M0–M5 bootstrap gates ✅; spine **2869**/**2850**; M3 strict native + inventory argv ✅; M4 full `bootstrap-loop-probe` ✅; M5 **`north-star5-verify-fast`** (daily) + **`--strict`** pre-merge ✅ ([#1492](https://github.com/PurHur/php-compiler/issues/1492), [#8559](https://github.com/PurHur/php-compiler/issues/8559)). Recent: native spine bundle probe, fast VM execute smoke ([#2201](https://github.com/PurHur/php-compiler/issues/2201)), `GeneratorYieldSourceMarker` spine unit ([#10356](https://github.com/PurHur/php-compiler/pull/10356)).
 
-**What we do not target in v1.0**
+**What we do not target in v1.x**
 
 - Running arbitrary Composer packages unmodified
 - WordPress, Laravel, Symfony, or full framework stacks
