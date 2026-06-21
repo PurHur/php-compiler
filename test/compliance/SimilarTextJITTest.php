@@ -21,6 +21,10 @@ final class SimilarTextJITTest extends BaseTest
             __DIR__.'/cases/stdlib/similar_text_percent.phpt',
             'similar_text_percent.phpt'
         );
+        yield 'similar_text_percent_undefined.phpt' => self::parsePHPT(
+            __DIR__.'/cases/stdlib/similar_text_percent_undefined.phpt',
+            'similar_text_percent_undefined.phpt'
+        );
         yield 'similar_text_coerce_jit.phpt' => self::parsePHPT(
             __DIR__.'/cases/stdlib/similar_text_coerce_jit.phpt',
             'similar_text_coerce_jit.phpt'

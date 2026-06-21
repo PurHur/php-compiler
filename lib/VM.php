@@ -4651,18 +4651,27 @@ restart:
                         goto restart;
                     }
                     $argSlot = (int) $op->arg1;
-                    $this->warnUndefinedVariableForScopeRead($frame, $argSlot);
+                    $argIndex = \count($frame->callArgEntries);
+                    $needsRef = $this->outgoingCallArgNeedsReference($frame, $argIndex);
+                    if (!$needsRef) {
+                        $this->warnUndefinedVariableForScopeRead($frame, $argSlot);
+                    }
                     $value = $this->resolveOutgoingCallArgValue($frame, $argSlot);
-                    if ($this->isUnboundLocalScopeRead($frame, $argSlot)) {
+                    if (
+                        !$needsRef
+                        && $this->isUnboundLocalScopeRead($frame, $argSlot)
+                    ) {
                         $resolved = $value->resolveIndirect();
                         if ($resolved->isUndefined()) {
                             $sent = new Variable();
                             $sent->null();
                             $value = $sent;
                         }
+                    } elseif ($needsRef && $this->isUnboundLocalScopeRead($frame, $argSlot)) {
+                        // Zend creates CV on ZEND_SEND_REF; no E_WARNING on later reads (#10403).
+                        $this->markScopeSlotInitialized($frame, $argSlot);
                     }
-                    $argIndex = \count($frame->callArgEntries);
-                    if (!$this->outgoingCallArgNeedsReference($frame, $argIndex)) {
+                    if (!$needsRef) {
                         $snapshot = new Variable();
                         $snapshot->duplicateFrom($value);
                         $value = $snapshot;
