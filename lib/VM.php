@@ -4460,9 +4460,17 @@ restart:
                             $this->context->unsetGlobalsTableKey($keyResolved->toString());
                             break;
                         }
-                        $container->separateArrayForWrite();
-                        $container = $containerSlot->resolveIndirect();
-                        $container->toArray()->offsetUnset($key);
+                        try {
+                            $container->separateArrayForWrite();
+                            $container = $containerSlot->resolveIndirect();
+                            $container->toArray()->offsetUnset($key);
+                        } catch (\TypeError $e) {
+                            $catchFrame = $this->dispatchVmTypeError($e, $frame);
+                            if (null !== $catchFrame) {
+                                $frame = $catchFrame;
+                                goto restart;
+                            }
+                        }
                         break;
                     }
                     $unsetDimMsg = Variable::TYPE_STRING === $container->type

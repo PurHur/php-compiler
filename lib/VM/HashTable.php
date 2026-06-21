@@ -1752,7 +1752,7 @@ final class HashTable {
         $this->assertSeparatedForWrite();
         $bucket = null;
         $bucketIndex = self::INVALID_INDEX;
-        $index = self::normalizeIndexKey($index);
+        $index = self::normalizeIndexKey($index, 'Illegal offset type in unset');
         switch ($index->type) {
             case Variable::TYPE_INTEGER:
                 $bucketIndex = $this->findBucketIndex($index->toInt(), null);

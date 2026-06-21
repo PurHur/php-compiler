@@ -600,6 +600,11 @@ final class HashTableHelper
 
             return;
         }
+        if (Variable::TYPE_OBJECT === $dim->type) {
+            self::emitIllegalOffsetType($context, 'Illegal offset type in unset');
+
+            return;
+        }
         throw new \LogicException('unset() array offset requires int or string index in this compiler build');
     }
 
@@ -887,8 +892,10 @@ final class HashTableHelper
         $fn = $context->builder->getInsertBlock()->getParent();
         $stringBlock = $fn->appendBasicBlock('ht_unset_vk_str');
         $longBlock = $fn->appendBasicBlock('ht_unset_vk_long');
+        $illegalBlock = $fn->appendBasicBlock('ht_unset_vk_illegal');
         $done = $fn->appendBasicBlock('ht_unset_vk_done');
         $afterString = $fn->appendBasicBlock('ht_unset_vk_after_str');
+        $afterLong = $fn->appendBasicBlock('ht_unset_vk_after_long');
         $context->builder->branchIf(
             $context->builder->icmp(
                 Builder::INT_EQ,
@@ -914,7 +921,7 @@ final class HashTableHelper
                 $i8->constInt(Variable::TYPE_NATIVE_LONG, false)
             ),
             $longBlock,
-            $done
+            $afterLong
         );
         $context->builder->positionAtEnd($longBlock);
         $context->builder->call(
@@ -925,6 +932,32 @@ final class HashTableHelper
                 $context->getTypeFromString('size_t')
             )
         );
+        $context->builder->branch($done);
+        $context->builder->positionAtEnd($afterLong);
+        $isObject = $context->builder->icmp(
+            Builder::INT_EQ,
+            $typeByte,
+            $i8->constInt(Variable::TYPE_OBJECT, false)
+        );
+        $afterObject = $fn->appendBasicBlock('ht_unset_vk_after_obj');
+        $context->builder->branchIf($isObject, $illegalBlock, $afterObject);
+        $context->builder->positionAtEnd($afterObject);
+        $isEnumCase = $context->builder->icmp(
+            Builder::INT_EQ,
+            $typeByte,
+            $i8->constInt(\PHPCompiler\VM\Variable::TYPE_ENUM_CASE, false)
+        );
+        $afterEnumCase = $fn->appendBasicBlock('ht_unset_vk_after_enum');
+        $context->builder->branchIf($isEnumCase, $illegalBlock, $afterEnumCase);
+        $context->builder->positionAtEnd($afterEnumCase);
+        $isArray = $context->builder->icmp(
+            Builder::INT_EQ,
+            $typeByte,
+            $i8->constInt(Variable::TYPE_HASHTABLE, false)
+        );
+        $context->builder->branchIf($isArray, $illegalBlock, $done);
+        $context->builder->positionAtEnd($illegalBlock);
+        self::emitIllegalOffsetType($context, 'Illegal offset type in unset');
         $context->builder->branch($done);
         $context->builder->positionAtEnd($done);
     }
