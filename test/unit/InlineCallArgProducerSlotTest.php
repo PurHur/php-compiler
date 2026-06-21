@@ -327,6 +327,34 @@ PHP;
         self::assertSame([$castSlot], $sendSlots, 'arg sends='.json_encode($sendSlots));
     }
 
+    /** Issue #9684 — enum case ->name/->value in direct call args use property-fetch slot. */
+    public function testVarDumpEnumCaseMagicPropertyUsesPropertyFetchSlot(): void
+    {
+        $code = <<<'PHP'
+<?php
+enum E: int { case A = 1; }
+var_dump(E::A->name);
+var_dump(E::A->value);
+enum S { case A; }
+var_dump(S::A->name);
+PHP;
+        $runtime = new Runtime();
+        $block = $runtime->parseAndCompile($code, 'enum_case_magic_call_arg.php');
+
+        $propSlots = [];
+        $sendSlots = [];
+        foreach ($block->opCodes as $op) {
+            if (OpCode::TYPE_PROPERTY_FETCH === $op->type) {
+                $propSlots[] = $op->arg1;
+            }
+            if (OpCode::TYPE_ARG_SEND === $op->type) {
+                $sendSlots[] = $op->arg1;
+            }
+        }
+
+        self::assertSame($propSlots, $sendSlots, 'prop='.json_encode($propSlots).' sends='.json_encode($sendSlots));
+    }
+
     /** Issue #9504 — var_export((string) new C()) wires Cast producer, not dead arg temp. */
     public function testStringCastNewObjectUsesCastProducerSlot(): void
     {

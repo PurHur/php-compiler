@@ -10643,6 +10643,18 @@ class Compiler {
             }
             $producerSlot = $block->slotForOperand($producer->result);
         }
+        if (null === $producerSlot && $producer instanceof Op\Expr\PropertyFetch) {
+            foreach ($this->compileExpr($producer, $block) as $op) {
+                $block->addOpCode($op);
+            }
+            $producerSlot = $block->slotForOperand($producer->result);
+        }
+        if (null === $producerSlot && $producer instanceof Op\Expr\StaticPropertyFetch) {
+            foreach ($this->compileExpr($producer, $block) as $op) {
+                $block->addOpCode($op);
+            }
+            $producerSlot = $block->slotForOperand($producer->result);
+        }
         if (null === $producerSlot && $producer instanceof Op\Expr\MagicScriptConst) {
             foreach ($this->compileExpr($producer, $block) as $op) {
                 $block->addOpCode($op);
@@ -10756,6 +10768,8 @@ class Compiler {
             || $producer instanceof Op\Expr\ClassConstFetch
             || $producer instanceof Op\Expr\InstanceOf_
             || $producer instanceof Op\Expr\Cast
+            || $producer instanceof Op\Expr\PropertyFetch
+            || $producer instanceof Op\Expr\StaticPropertyFetch
             || $producer instanceof Op\Expr\MagicScriptConst
             || $producer instanceof Op\Expr\FirstClassCallable
             || $producer instanceof Op\Expr\New_
@@ -11397,6 +11411,15 @@ class Compiler {
                     }
                 }
                 if (1 === $argCount) {
+                    // Enum case ->name/->value: hoisted ClassConstFetch prelude before PropertyFetch (#9684).
+                    foreach ($producers as $candidate) {
+                        if (
+                            $candidate instanceof Op\Expr\PropertyFetch
+                            || $candidate instanceof Op\Expr\StaticPropertyFetch
+                        ) {
+                            return $candidate;
+                        }
+                    }
                     $last = $producers[$producerCount - 1] ?? null;
                     // PropertyFetch/StaticPropertyFetch prelude before ++/-- (#10123, zend_execute.c).
                     if ($last instanceof Op\Expr\PostInc
@@ -14816,6 +14839,12 @@ class Compiler {
             ) {
                 $producer = $this->matchInlineCallArgProducer($producers, $callOp->args, $argIndex);
             }
+            if (
+                $producer instanceof Op\Expr\PropertyFetch
+                || $producer instanceof Op\Expr\StaticPropertyFetch
+            ) {
+                return null;
+            }
             if ($producer instanceof Op\Expr\ConstFetch) {
                 $vm = $this->tryFoldGlobalConstFetch($producer);
                 if (null !== $vm) {
@@ -15024,6 +15053,16 @@ class Compiler {
                     $vm = $this->tryFoldUnaryLiteralDefault($producer);
                     if (null !== $vm) {
                         $sends[] = new OpCode(OpCode::TYPE_ARG_SEND, $block->registerConstant($arg, $vm));
+                        continue;
+                    }
+                }
+                if (
+                    $producer instanceof Op\Expr\PropertyFetch
+                    || $producer instanceof Op\Expr\StaticPropertyFetch
+                ) {
+                    $propertySlot = $block->slotForOperand($producer->result);
+                    if (null !== $propertySlot) {
+                        $sends[] = new OpCode(OpCode::TYPE_ARG_SEND, $propertySlot);
                         continue;
                     }
                 }

@@ -10926,7 +10926,9 @@ restart:
                 if (VM\EnumCaseSupport::isEnumCaseVariable($resolved)) {
                     return $frame->scope[$slot];
                 }
-                if ($resolved->isUndefined() || $this->isEnumSlotClobberCandidate($resolved)) {
+                // Enum case ->name/->value in call args reuse the case slot; prefer the
+                // property-fetch runtime value over immortal enum const (#9684, zend_enum.c).
+                if ($resolved->isUndefined() || Variable::TYPE_NULL === $resolved->type) {
                     $value = new Variable();
                     $value->copyFrom($const);
 
