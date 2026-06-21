@@ -624,7 +624,7 @@ final class PhpFdStreamState
 {
     public bool $eof = false;
 
-    public int $chunkSize = VmPhpMemoryStream::DEFAULT_CHUNK_SIZE;
+    public int $chunkSize = 8192;
 
     public function __construct(
         public readonly int $fd,
