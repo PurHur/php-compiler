@@ -11084,6 +11084,53 @@ class Compiler {
         return null;
     }
 
+    /**
+     * Inline fn()/function() callback args with trailing literal flags (#10232, #9154).
+     */
+    private function resolvePrecedingClosureCallArgSlot(Op $cfgCallOp, int $argIndex, Block $block): ?int
+    {
+        if (null === $block->orig || !property_exists($cfgCallOp, 'args') || !is_array($cfgCallOp->args)) {
+            return null;
+        }
+        $callArgs = $cfgCallOp->args;
+        if (\count($callArgs) < 2) {
+            return null;
+        }
+        $producers = $this->precedingInlineCallArgProducersBeforeCfgOp($block->orig->children, $cfgCallOp);
+        $closureProducer = null;
+        foreach ($producers as $candidate) {
+            if ($candidate instanceof Op\Expr\ArrowFunction || $candidate instanceof Op\Expr\Closure) {
+                $closureProducer = $candidate;
+                break;
+            }
+        }
+        if (null === $closureProducer) {
+            return null;
+        }
+        $matched = $this->matchSingleClosureInlineProducer($closureProducer, $callArgs, $argIndex);
+        if (null === $matched) {
+            $matched = $this->matchInlineCallArgProducer($producers, $callArgs, $argIndex);
+            if ($matched !== $closureProducer) {
+                return null;
+            }
+        }
+        $slot = $this->slotForInlineClosureProducer($closureProducer, $block);
+        if (null !== $slot) {
+            return $slot;
+        }
+        for ($i = \count($block->opCodes) - 1; $i >= 0; --$i) {
+            $scanOp = $block->opCodes[$i];
+            if (OpCode::TYPE_FUNCCALL_INIT === $scanOp->type) {
+                break;
+            }
+            if (OpCode::TYPE_CLOSURE === $scanOp->type) {
+                return (int) $scanOp->arg1;
+            }
+        }
+
+        return null;
+    }
+
     private function cfgBlockJumpsToCfgBlock(CfgBlock $from, CfgBlock $to): bool
     {
         foreach ($from->children as $child) {
@@ -11435,6 +11482,32 @@ class Compiler {
                     return $producers[$arrayProducerIndex];
                 }
                 if ($argIndex === $literalArgIndex) {
+                    return $producers[$constFetchIndices[0]];
+                }
+
+                return null;
+            }
+            $closureProducerIndex = null;
+            foreach ($producers as $pi => $producer) {
+                if ($producer instanceof Op\Expr\ArrowFunction || $producer instanceof Op\Expr\Closure) {
+                    $closureProducerIndex = $pi;
+                    break;
+                }
+            }
+            // array_filter($arr, fn(...) => ..., ARRAY_FILTER_USE_BOTH) — hoisted closure + trailing mode const (#10232, #9154).
+            if (null !== $closureProducerIndex && 1 === \count($constFetchIndices) && \count($callArgs) >= 3) {
+                $callbackArgIndex = null;
+                foreach ($nonEmbeddedArgIndices as $idx) {
+                    if ($idx > 0) {
+                        $callbackArgIndex = $idx;
+                        break;
+                    }
+                }
+                $trailingArgIndex = \count($callArgs) - 1;
+                if ($argIndex === $callbackArgIndex) {
+                    return $producers[$closureProducerIndex];
+                }
+                if ($argIndex === $trailingArgIndex) {
                     return $producers[$constFetchIndices[0]];
                 }
 
@@ -12182,6 +12255,10 @@ class Compiler {
             $closureSlots[] = $idx;
         }
         if (1 === count($closureSlots) && $closureSlots[0] === $argIndex) {
+            return $producer;
+        }
+        // array_filter($a, fn(...), ARRAY_FILTER_USE_*) — callback is first dead-temp slot (#10232, #9154).
+        if (\count($callArgs) >= 3 && \count($closureSlots) >= 1 && $argIndex === $closureSlots[0]) {
             return $producer;
         }
 
@@ -14687,6 +14764,12 @@ class Compiler {
                 }
                 if (null === $valueSlot) {
                     $valueSlot = $this->resolveInlineClosureCallArgSlot($arg, $block, $cfgCallOp);
+                }
+                if (null !== $valueSlot && null !== $cfgCallOp) {
+                    $closureSlot = $this->resolvePrecedingClosureCallArgSlot($cfgCallOp, (int) $argIndex, $block);
+                    if (null !== $closureSlot) {
+                        $valueSlot = $closureSlot;
+                    }
                 }
                 if (
                     null === $valueSlot
