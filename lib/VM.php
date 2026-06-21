@@ -10657,7 +10657,10 @@ restart:
     public function throwGenerator(GeneratorState $gen, Variable $exception): bool
     {
         if ($gen->done) {
-            throw new \Exception('Cannot throw to a closed generator');
+            // Zend Generator::throw(): closed generator throws in caller context (#10414).
+            $thrown = new Variable();
+            $thrown->copyFrom($exception);
+            throw new VM\GeneratorUncaughtThrow($thrown);
         }
         if (null === $gen->frame) {
             throw new \Exception('Cannot throw to an uninitialized generator');
