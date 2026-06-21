@@ -35,26 +35,14 @@ final class JitVmHelperLink
         $runtime = $context->runtime;
         $path = \dirname(__DIR__).$relativeHelperPath;
         $basename = \basename($path);
-        $prevSelfHostAot = \getenv('PHP_COMPILER_SELFHOST_AOT');
-        if (\function_exists('putenv')) {
-            \putenv('PHP_COMPILER_SELFHOST_AOT=0');
-        }
-        try {
+        NestedJitCompileScope::run($context, static function () use ($context, $runtime, $path, $basename, $compileLabel): void {
             $block = $runtime->parseAndCompile((string) \file_get_contents($path), $basename);
             if (null === $block) {
                 throw new \LogicException($basename.' parseAndCompile failed ('.$compileLabel.')');
             }
             $jit = new JIT($context);
             $jit->compile($block);
-        } finally {
-            if (\function_exists('putenv')) {
-                if (false === $prevSelfHostAot || null === $prevSelfHostAot) {
-                    \putenv('PHP_COMPILER_SELFHOST_AOT=');
-                } else {
-                    \putenv('PHP_COMPILER_SELFHOST_AOT='.$prevSelfHostAot);
-                }
-            }
-        }
+        });
         foreach ($compiledHelpers as $logical) {
             $lc = \strtolower($logical);
             if (!isset($context->functions[$lc])) {

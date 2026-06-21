@@ -6,6 +6,7 @@ namespace PHPCompiler\JIT\Builtin;
 
 use PHPCompiler\JIT;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\NestedJitCompileScope;
 use PHPLLVM\Value;
 use PHPLLVM\Value\Function_ as LlvmFunction;
 
@@ -81,10 +82,11 @@ final class ScalarDimFetchRuntime
             : $context->module->addFunction($abiName, $ft);
 
         $entry = $fn->appendBasicBlock('scalar_dim_fetch_warn_bridge_entry');
+        $i64 = $context->getTypeFromString('int64');
         $context->builder->positionAtEnd($entry);
         $context->builder->call(
             self::helperFunction($context, self::EMIT_WARNING_HELPER),
-            $fn->getParam(0)
+            $context->builder->zext($fn->getParam(0), $i64)
         );
         $context->builder->returnVoid();
         $context->registerFunction($abiName, $fn);
@@ -117,26 +119,14 @@ final class ScalarDimFetchRuntime
 
         $runtime = $context->runtime;
         $path = \dirname(__DIR__, 3).self::HELPER_PATH;
-        $prevSelfHostAot = \getenv('PHP_COMPILER_SELFHOST_AOT');
-        if (\function_exists('putenv')) {
-            \putenv('PHP_COMPILER_SELFHOST_AOT=0');
-        }
-        try {
+        NestedJitCompileScope::run($context, static function () use ($context, $runtime, $path): void {
             $block = $runtime->parseAndCompile((string) \file_get_contents($path), 'ScalarDimFetchJitHelper.php');
             if (null === $block) {
                 throw new \LogicException('ScalarDimFetchJitHelper.php parseAndCompile failed (#10343)');
             }
             $jit = new JIT($context);
             $jit->compile($block);
-        } finally {
-            if (\function_exists('putenv')) {
-                if (false === $prevSelfHostAot || null === $prevSelfHostAot) {
-                    \putenv('PHP_COMPILER_SELFHOST_AOT=');
-                } else {
-                    \putenv('PHP_COMPILER_SELFHOST_AOT='.$prevSelfHostAot);
-                }
-            }
-        }
+        });
         foreach (self::COMPILED_HELPERS as $logical) {
             $lc = \strtolower($logical);
             if (!isset($context->functions[$lc])) {

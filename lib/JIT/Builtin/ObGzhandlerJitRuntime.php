@@ -6,6 +6,7 @@ namespace PHPCompiler\JIT\Builtin;
 
 use PHPCompiler\JIT;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\NestedJitCompileScope;
 use PHPCompiler\VM\ObStackLimits;
 use PHPLLVM\BasicBlock;
 use PHPLLVM\Builder;
@@ -387,32 +388,14 @@ final class ObGzhandlerJitRuntime
 
         $runtime = $context->runtime;
         $path = \dirname(__DIR__, 3).self::HELPER_PATH;
-        $savedBuilder = $context->builder;
-        $savedActive = $context->activeFunction;
-        $restoreBlock = self::captureInsertBlock($context);
-        $prevSelfHostAot = \getenv('PHP_COMPILER_SELFHOST_AOT');
-        if (\function_exists('putenv')) {
-            \putenv('PHP_COMPILER_SELFHOST_AOT=0');
-        }
-        try {
+        NestedJitCompileScope::run($context, static function () use ($context, $runtime, $path): void {
             $block = $runtime->parseAndCompile((string) \file_get_contents($path), 'ObGzhandlerJitHelper.php');
             if (null === $block) {
                 throw new \LogicException('ObGzhandlerJitHelper.php parseAndCompile failed (#9091)');
             }
             $jit = new JIT($context);
             $jit->compile($block);
-        } finally {
-            $context->builder = $savedBuilder;
-            self::restoreInsertBlock($context, $restoreBlock);
-            $context->activeFunction = $savedActive;
-            if (\function_exists('putenv')) {
-                if (false === $prevSelfHostAot || null === $prevSelfHostAot) {
-                    \putenv('PHP_COMPILER_SELFHOST_AOT=');
-                } else {
-                    \putenv('PHP_COMPILER_SELFHOST_AOT='.$prevSelfHostAot);
-                }
-            }
-        }
+        });
         foreach (self::COMPILED_HELPERS as $logical) {
             $lc = \strtolower($logical);
             if (!isset($context->functions[$lc])) {
@@ -429,24 +412,6 @@ final class ObGzhandlerJitRuntime
                 throw new \LogicException($name.' missing after ObGzhandlerJitRuntime bridge (#9091)');
             }
             $context->registerFunction($name, $fn);
-        }
-    }
-
-    private static function captureInsertBlock(Context $context): ?BasicBlock
-    {
-        try {
-            return $context->builder->getInsertBlock();
-        } catch (\Throwable) {
-            return null;
-        }
-    }
-
-    private static function restoreInsertBlock(Context $context, ?BasicBlock $block): void
-    {
-        if (null !== $block) {
-            $context->builder->positionAtEnd($block);
-        } else {
-            $context->builder->clearInsertionPosition();
         }
     }
 }
