@@ -10151,6 +10151,16 @@ class Compiler {
         return false;
     }
 
+    /** header() replace/response_code must not reuse stmt-level ?? slots (#1887, 005-SessionsWeb). */
+    private function headerScalarCallArgMustUseDirectOperand(?string $calleeName, int $argIndex): bool
+    {
+        if (null === $calleeName || $argIndex < 1) {
+            return false;
+        }
+
+        return 'header' === strtolower(ltrim($calleeName, '\\'));
+    }
+
     /**
      * @return ?Op\Expr\BinaryOp\Coalesce
      */
@@ -10217,6 +10227,9 @@ class Compiler {
                     ) {
                         return $prev;
                     }
+                    break;
+                }
+                if ($prev instanceof Op\Expr\FuncCall || $prev instanceof Op\Expr\NsFuncCall) {
                     break;
                 }
                 if (!$prev instanceof Op\Expr || !$this->isInlineExprCallArgProducer($prev)) {
@@ -10300,6 +10313,16 @@ class Compiler {
         ?int $argIndex = null
     ): ?int {
         if ($this->isCallArgUnrelatedToPriorStmtCoalesce($arg)) {
+            return null;
+        }
+        if (
+            null !== $cfgCallOp
+            && null !== $argIndex
+            && $this->headerScalarCallArgMustUseDirectOperand(
+                $this->funcCallExprCalleeName($cfgCallOp),
+                $argIndex
+            )
+        ) {
             return null;
         }
         if (
@@ -10405,6 +10428,9 @@ class Compiler {
         }
         [$callOp, $argIndex] = $callSite;
         if (!property_exists($callOp, 'args') || !is_array($callOp->args)) {
+            return null;
+        }
+        if ($this->headerScalarCallArgMustUseDirectOperand($this->funcCallExprCalleeName($callOp), $argIndex)) {
             return null;
         }
         // php-cfg may lower a boolean-producing inline Expr (e.g. `===`) to a distinct arg temp with
