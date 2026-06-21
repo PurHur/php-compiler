@@ -139,6 +139,12 @@ final class BuiltinParamNames
             case 'htmlspecialchars':
             case 'htmlentities':
                 return ['string', 'flags', 'encoding', 'double_encode'];
+            case 'version_compare':
+                return ['version1', 'version2', 'operator'];
+            case 'in_array':
+                return ['needle', 'haystack', 'strict'];
+            case 'array_search':
+                return ['needle', 'haystack', 'strict'];
         }
 
         return null;

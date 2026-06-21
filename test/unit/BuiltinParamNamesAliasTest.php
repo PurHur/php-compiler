@@ -55,4 +55,28 @@ final class BuiltinParamNamesAliasTest extends TestCase
         self::assertSame(3, BuiltinParamNames::lookupNamedParamIndex($names, 'replacement_cost', 'levenshtein'));
         self::assertSame(4, BuiltinParamNames::lookupNamedParamIndex($names, 'deletion_cost', 'levenshtein'));
     }
+
+    /** @covers issue #10319 */
+    public function testVersionCompareOperatorNamedParamResolves(): void
+    {
+        $names = BuiltinParamNames::forFunction('version_compare');
+        self::assertSame(['version1', 'version2', 'operator'], $names);
+        self::assertSame(2, BuiltinParamNames::lookupNamedParamIndex($names, 'operator', 'version_compare'));
+    }
+
+    /** @covers issue #10321 */
+    public function testInArrayStrictNamedParamResolves(): void
+    {
+        $names = BuiltinParamNames::forFunction('in_array');
+        self::assertSame(['needle', 'haystack', 'strict'], $names);
+        self::assertSame(2, BuiltinParamNames::lookupNamedParamIndex($names, 'strict', 'in_array'));
+    }
+
+    /** @covers issue #10321 */
+    public function testArraySearchStrictNamedParamResolves(): void
+    {
+        $names = BuiltinParamNames::forFunction('array_search');
+        self::assertSame(['needle', 'haystack', 'strict'], $names);
+        self::assertSame(2, BuiltinParamNames::lookupNamedParamIndex($names, 'strict', 'array_search'));
+    }
 }
