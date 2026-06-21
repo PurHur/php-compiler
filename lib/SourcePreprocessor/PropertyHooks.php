@@ -623,13 +623,9 @@ final class PropertyHooks
                     $backingDecl = $this->consumeSameNameBackingFieldDecl($body, $nextOffset, $prop);
                     if (null !== $backingDecl) {
                         [$nextOffset, $initializer] = $backingDecl;
-                    } else {
-                        $foundBacking = $this->findSameNameBackingFieldDecl($body, $prop);
-                        if (null !== $foundBacking) {
-                            [$backingStart, $backingEnd, $initializer] = $foundBacking;
-                            $removeSpans[] = [$backingStart, $backingEnd];
-                        }
                     }
+                    // Detached same-name fields are duplicate declarations — only adjacent
+                    // backing merges (#7031). Non-adjacent must fail compile (#10393, zend_compile.c).
                 }
                 $mergedDecl = rtrim($propDeclHead);
                 if ('' !== $initializer) {
@@ -970,7 +966,8 @@ final class PropertyHooks
     }
 
     /**
-     * When hooks read/write `$this->prop`, merge the following same-name field decl (#7031, #9831).
+     * When hooks read/write `$this->prop`, merge only the immediately following same-name
+     * field decl (#7031). Detached duplicates fail at compile (#10393, zend_compile.c).
      *
      * @return array{0: int, 1: string}|null [offset after decl, initializer including `=`]
      */
@@ -990,26 +987,6 @@ final class PropertyHooks
         $initializer = isset($m[1]) ? trim($m[1]) : '';
 
         return [$offset + strlen($m[0]), $initializer];
-    }
-
-    /**
-     * Find a same-name backing field declaration anywhere in the class body (#9673).
-     *
-     * @return array{0: int, 1: int, 2: string}|null [start, end, initializer including `=`]
-     */
-    private function findSameNameBackingFieldDecl(string $body, string $prop): ?array
-    {
-        $pattern = '/\s*(?:(?:public|protected|private|static|readonly)\s+)*'
-            .'(?:[\w\\\\|]+(?:\s*\[\s*\])?\s+)+'
-            .'\$'.preg_quote($prop, '/').'\s*(=\s*[^;]+)?;/';
-        if (!preg_match($pattern, $body, $m, PREG_OFFSET_CAPTURE)) {
-            return null;
-        }
-        $start = $m[0][1];
-        $end = $start + strlen($m[0][0]);
-        $initializer = (isset($m[1]) && -1 !== $m[1][1]) ? trim($m[1][0]) : '';
-
-        return [$start, $end, $initializer];
     }
 
     /**
