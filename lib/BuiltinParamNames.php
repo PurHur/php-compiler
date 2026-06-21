@@ -50,6 +50,8 @@ final class BuiltinParamNames
                 return ['array', 'length', 'preserve_keys'];
             case 'similar_text':
                 return ['string1', 'string2', 'percent'];
+            case 'levenshtein':
+                return ['string1', 'string2', 'insertion_cost', 'replacement_cost', 'deletion_cost'];
             case 'settype':
                 return ['var', 'type'];
             case 'register_shutdown_function':

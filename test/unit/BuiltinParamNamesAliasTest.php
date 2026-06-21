@@ -43,4 +43,16 @@ final class BuiltinParamNamesAliasTest extends TestCase
         $entities = BuiltinParamNames::forFunction('htmlentities');
         self::assertSame(3, BuiltinParamNames::lookupNamedParamIndex($entities, 'double_encode', 'htmlentities'));
     }
+
+    public function testLevenshteinNamedCostParamsResolve(): void
+    {
+        $names = BuiltinParamNames::forFunction('levenshtein');
+        self::assertSame(
+            ['string1', 'string2', 'insertion_cost', 'replacement_cost', 'deletion_cost'],
+            $names
+        );
+        self::assertSame(2, BuiltinParamNames::lookupNamedParamIndex($names, 'insertion_cost', 'levenshtein'));
+        self::assertSame(3, BuiltinParamNames::lookupNamedParamIndex($names, 'replacement_cost', 'levenshtein'));
+        self::assertSame(4, BuiltinParamNames::lookupNamedParamIndex($names, 'deletion_cost', 'levenshtein'));
+    }
 }
