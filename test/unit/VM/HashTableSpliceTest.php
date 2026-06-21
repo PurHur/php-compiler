@@ -99,6 +99,31 @@ final class HashTableSpliceTest extends TestCase
         $this->assertNull($ht->find('z'));
     }
 
+    public function testSliceCopyNegativeLength(): void
+    {
+        $ht = $this->packedList([10, 20, 30, 40, 50]);
+        $slice = $ht->sliceCopy(1, -2);
+
+        $this->assertSame(2, $slice->getNumElements());
+        $this->assertSame(20, $slice->findIndex(0)?->toInt());
+        $this->assertSame(30, $slice->findIndex(1)?->toInt());
+    }
+
+    public function testSliceCopyPreserveKeysNegativeOffset(): void
+    {
+        $ht = new HashTable();
+        foreach (['a', 'b', 'c', 'd'] as $i => $value) {
+            $var = new Variable();
+            $var->string($value);
+            $ht->addIndex($i, $var);
+        }
+        $slice = $ht->sliceCopy(-2, 2, true);
+
+        $this->assertSame(2, $slice->getNumElements());
+        $this->assertSame('c', $slice->findIndex(2)?->toString());
+        $this->assertSame('d', $slice->findIndex(3)?->toString());
+    }
+
     /** @param list<int> $values */
     private function packedList(array $values): HashTable
     {
