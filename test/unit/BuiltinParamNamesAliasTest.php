@@ -34,4 +34,13 @@ final class BuiltinParamNamesAliasTest extends TestCase
         self::assertSame(0, BuiltinParamNames::lookupNamedParamIndex($names, 'glue', 'implode'));
         self::assertSame(1, BuiltinParamNames::lookupNamedParamIndex($names, 'pieces', 'implode'));
     }
+
+    public function testHtmlspecialcharsDoubleEncodeNamedParamResolves(): void
+    {
+        $names = BuiltinParamNames::forFunction('htmlspecialchars');
+        self::assertSame(['string', 'flags', 'encoding', 'double_encode'], $names);
+        self::assertSame(3, BuiltinParamNames::lookupNamedParamIndex($names, 'double_encode', 'htmlspecialchars'));
+        $entities = BuiltinParamNames::forFunction('htmlentities');
+        self::assertSame(3, BuiltinParamNames::lookupNamedParamIndex($entities, 'double_encode', 'htmlentities'));
+    }
 }
