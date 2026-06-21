@@ -30,9 +30,8 @@ final class get_mangled_object_vars_ extends Internal
         if (null === $frame->returnVar) {
             return;
         }
-        $ctx = VmReflection::requireContext($frame);
         $frame->returnVar->copyFrom(
-            VmReflection::getMangledObjectVars($frame->calledArgs[0], $ctx)
+            VmReflection::getMangledObjectVars($frame->calledArgs[0], $frame)
         );
     }
 

@@ -1326,7 +1326,7 @@ final class VmReflection
      *
      * php-src: ext/standard/var.c — PHP_FUNCTION(get_mangled_object_vars)
      */
-    public static function getMangledObjectVars(Variable $object, Context $ctx): Variable
+    public static function getMangledObjectVars(Variable $object, Frame $frame): Variable
     {
         $object = $object->resolveIndirect();
         if (EnumCaseSupport::isEnumCaseVariable($object)) {
@@ -1345,22 +1345,12 @@ final class VmReflection
                 EnumCaseSupport::typeNameForVariable($object)
             ));
         }
-        $obj = $object->toObject();
+        $ctx = self::requireContext($frame);
         $result = new Variable();
         $result->newArray();
         $ht = $result->toArray();
-        foreach ($obj->class->properties as $meta) {
-            if (!$obj->hasProperty($meta->name)) {
-                continue;
-            }
-            $value = $obj->getProperty($meta->name)->resolveIndirect();
-            if (TypedPropertyCheck::omitFromPropertyEnumeration($value)) {
-                continue;
-            }
-            $key = self::manglePropertyKey($meta, $ctx);
-            $copy = new Variable();
-            $copy->copyFrom($value);
-            $ht->add($key, $copy);
+        foreach ($ctx->runtime->vm()->collectMangledObjectVarsForBuiltin($object->toObject(), $frame) as $name => $value) {
+            $ht->add($name, $value);
         }
 
         return $result;

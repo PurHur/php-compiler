@@ -21,6 +21,8 @@ final class GetMangledObjectVarsBuiltinTest extends BaseTest
         foreach ([
             'get_mangled_object_vars.phpt',
             'get_mangled_object_vars_jit.phpt',
+            'get_mangled_object_vars_stdclass.phpt',
+            'get_mangled_object_vars_stdclass_jit.phpt',
         ] as $file) {
             $path = __DIR__.'/../compliance/cases/stdlib/'.$file;
             yield $file => self::parsePHPT($path, $file);
