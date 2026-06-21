@@ -21,7 +21,7 @@ final class OutputRewriteVarsJitHelper
         return self::$blob;
     }
 
-    public static function add(string $name, string $value): void
+    public static function add(string $name, string $value): bool
     {
         $record = $name."\x1E".$value;
         if ('' === self::$blob) {
@@ -29,10 +29,14 @@ final class OutputRewriteVarsJitHelper
         } else {
             self::$blob = self::$blob."\x1D".$record;
         }
+
+        return true;
     }
 
-    public static function reset(): void
+    public static function reset(): bool
     {
         self::$blob = '';
+
+        return true;
     }
 }
