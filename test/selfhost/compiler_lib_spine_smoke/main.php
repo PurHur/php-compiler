@@ -2699,6 +2699,7 @@ require_once __DIR__.'/../../../lib/VM/NativeDateRangeError.php';
 require_once __DIR__.'/../../../lib/VM/NativeFiberError.php';
 require_once __DIR__.'/../../../lib/VM/NativeFiberStackOverflow.php';
 require_once __DIR__.'/../../../lib/VM/CoalesceJitHelper.php';
+require_once __DIR__.'/../../../lib/VM/EnumCasesJitHelper.php';
 require_once __DIR__.'/../../../lib/VM/NullsafeJitHelper.php';
 require_once __DIR__.'/../../../lib/VM/ScalarDimFetchJitHelper.php';
 require_once __DIR__.'/../../../lib/VM/ObStackLimits.php';
