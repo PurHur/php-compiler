@@ -34,7 +34,7 @@ final class JitVmHelperLink
         }
 
         $runtime = $context->runtime;
-        $path = \dirname(__DIR__).$relativeHelperPath;
+        $path = self::resolveHelperPath($relativeHelperPath);
         $basename = \basename($path);
         $savedActive = $context->activeFunction;
         $restoreBlock = BasicBlockHelper::tryGetInsertBlock($context);
@@ -131,5 +131,14 @@ final class JitVmHelperLink
         );
         $context->builder->returnValue($result);
         $context->registerFunction($abiName, $fn);
+    }
+
+    private static function resolveHelperPath(string $relativeHelperPath): string
+    {
+        $base = \str_starts_with($relativeHelperPath, '/ext/')
+            ? \dirname(__DIR__, 2)
+            : \dirname(__DIR__);
+
+        return $base.$relativeHelperPath;
     }
 }

@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace PHPCompiler\JIT\Builtin;
 
 use PHPCompiler\JIT;
+use PHPCompiler\JIT\Builtin;
 use PHPCompiler\JIT\Context;
 use PHPLLVM\Value\Function_ as LlvmFunction;
 
@@ -23,14 +24,22 @@ final class TimeSleepRuntime
 
     public static function ensureLinked(Context $context): void
     {
-        // Emit-helper link stubs skip ext/* method bodies — SleepJitHelper cannot JIT (#9068).
-        if (self::shouldUseLibcBridgeForEmitHelperLink()) {
+        if (self::shouldUseLibcBridge($context)) {
             TimeSleepRuntimeLibcBridge::ensureLinked($context);
 
             return;
         }
         self::implementNanosleepBridge($context);
         self::implementUntilBridge($context);
+    }
+
+    private static function shouldUseLibcBridge(Context $context): bool
+    {
+        if (Builtin::LOAD_TYPE_STANDALONE === $context->loadType) {
+            return true;
+        }
+
+        return self::shouldUseLibcBridgeForEmitHelperLink();
     }
 
     private static function shouldUseLibcBridgeForEmitHelperLink(): bool

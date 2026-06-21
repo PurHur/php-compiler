@@ -5,9 +5,11 @@ declare(strict_types=1);
 namespace PHPCompiler\JIT\Builtin;
 
 use PHPCompiler\JIT\BasicBlockHelper;
+use PHPCompiler\JIT\Builtin;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitVmHelperLink;
 use PHPCompiler\JIT\ValueEchoHelper;
+use PHPCompiler\JIT\Variable as JitVariable;
 use PHPCompiler\JIT\Variable;
 use PHPCompiler\VM\ValueEchoSupport;
 use PHPLLVM\Builder;
@@ -59,6 +61,17 @@ final class ValueEchoRuntime
         self::TYPE_IS_OBJECT => '__value_echo__typeIsObject',
     ];
 
+    /** @var array<string, int> */
+    private const STANDALONE_TYPE_CONST_MAP = [
+        self::TYPE_IS_NULL => JitVariable::TYPE_NULL,
+        self::TYPE_IS_NATIVE_LONG => JitVariable::TYPE_NATIVE_LONG,
+        self::TYPE_IS_NATIVE_BOOL => JitVariable::TYPE_NATIVE_BOOL,
+        self::TYPE_IS_NATIVE_DOUBLE => JitVariable::TYPE_NATIVE_DOUBLE,
+        self::TYPE_IS_STRING => JitVariable::TYPE_STRING,
+        self::TYPE_IS_HASHTABLE => JitVariable::TYPE_HASHTABLE,
+        self::TYPE_IS_OBJECT => JitVariable::TYPE_OBJECT,
+    ];
+
     private static int $seq = 0;
 
     public static function ensureLinked(Context $context): void
@@ -76,9 +89,19 @@ final class ValueEchoRuntime
         }
 
         $restoreBlock = BasicBlockHelper::tryGetInsertBlock($context);
-        self::ensureJitHelperCompiled($context);
-        foreach (self::TYPE_BRIDGE_MAP as $helperLogical => $abiName) {
-            self::implementTypeBridge($context, $abiName, $helperLogical);
+        if (Builtin::LOAD_TYPE_STANDALONE === $context->loadType) {
+            foreach (self::TYPE_BRIDGE_MAP as $helperLogical => $abiName) {
+                self::implementStandaloneTypeBridge(
+                    $context,
+                    $abiName,
+                    self::STANDALONE_TYPE_CONST_MAP[$helperLogical]
+                );
+            }
+        } else {
+            self::ensureJitHelperCompiled($context);
+            foreach (self::TYPE_BRIDGE_MAP as $helperLogical => $abiName) {
+                self::implementTypeBridge($context, $abiName, $helperLogical);
+            }
         }
         self::registerLinkedRuntime($context);
         if (null !== $restoreBlock) {
@@ -91,7 +114,7 @@ final class ValueEchoRuntime
     public static function emitValue(Context $context, Value $valuePtr): void
     {
         self::ensureLinked($context);
-        ObOutput::ensureLinked($context);
+        ObOutputRuntime::ensureLinked($context);
 
         $tag = 'ev'.(string) ++self::$seq;
         $map = $context->structFieldMap['__value__'];
@@ -262,6 +285,33 @@ final class ValueEchoRuntime
             $fn,
             $context->builder->trunc($typeByte, $i8)
         );
+    }
+
+    private static function implementStandaloneTypeBridge(Context $context, string $abiName, int $expectedType): void
+    {
+        $probe = $context->module->getNamedFunction($abiName);
+        if (null !== $probe && $probe->countBasicBlocks() > 0) {
+            $context->registerFunction($abiName, $probe);
+
+            return;
+        }
+
+        $i8 = $context->getTypeFromString('int8');
+        $i1 = $context->getTypeFromString('int1');
+        $ft = $context->context->functionType($i1, false, $i8);
+        $fn = null !== $probe
+            ? $probe
+            : $context->module->addFunction($abiName, $ft);
+
+        $entry = $fn->appendBasicBlock('value_echo_type_standalone_entry');
+        $context->builder->positionAtEnd($entry);
+        $matches = $context->builder->icmp(
+            Builder::INT_EQ,
+            $fn->getParam(0),
+            $i8->constInt($expectedType, false)
+        );
+        $context->builder->returnValue($matches);
+        $context->registerFunction($abiName, $fn);
     }
 
     private static function implementTypeBridge(Context $context, string $abiName, string $helperLogical): void
