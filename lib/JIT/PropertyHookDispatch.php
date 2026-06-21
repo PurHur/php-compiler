@@ -347,7 +347,13 @@ final class PropertyHookDispatch
             return false;
         }
         if (self::propertyHasDistinctAsymmetricSetVisibility($context, $className, $propertyName, $staticProperty)) {
-            return false;
+            return self::emitAsymmetricSetVisibilityWriteGuard(
+                $context,
+                $jit,
+                $className,
+                $propertyName,
+                $staticProperty
+            );
         }
         $getLc = strtolower(PropertyHooks::getHookMethodName($propertyName));
         $getProxy = $staticProperty
@@ -389,6 +395,86 @@ final class PropertyHookDispatch
         );
 
         return $setVis !== MethodVisibility::mask($readVis);
+    }
+
+    /**
+     * Get-only virtual hook write on asymmetric property — private(set) message not read-only (#9842).
+     *
+     * @return bool true when the store was blocked
+     */
+    private static function emitAsymmetricSetVisibilityWriteGuard(
+        Context $context,
+        ?\PHPCompiler\JIT $jit,
+        string $className,
+        string $propertyName,
+        bool $staticProperty
+    ): bool {
+        $objectType = $context->type->object;
+        if (!$objectType instanceof Object_) {
+            return false;
+        }
+        $classId = $objectType->lookup($className);
+        $readVis = $staticProperty
+            ? $objectType->staticPropertyVisibility($classId, $propertyName)
+            : $objectType->propertyVisibility($classId, $propertyName);
+        $setVis = PropertyVisibility::effectiveSetVisibility(
+            $readVis,
+            $staticProperty
+                ? $objectType->staticPropertySetVisibility($classId, $propertyName)
+                : $objectType->propertySetVisibility($classId, $propertyName)
+        );
+        if ($setVis === MethodVisibility::mask($readVis)) {
+            return false;
+        }
+        $declaringLc = strtolower(ltrim($className, '\\'));
+        $callerLc = '' !== $context->scope->className
+            ? strtolower(ltrim($context->scope->className, '\\'))
+            : null;
+        try {
+            PropertyVisibility::assertWritable(
+                $setVis,
+                $callerLc,
+                $declaringLc,
+                $className,
+                $propertyName,
+                static fn (string $child, string $parent): bool => self::isSubclassOfForAsymmetricGuard(
+                    $objectType,
+                    $child,
+                    $parent
+                )
+            );
+        } catch (\LogicException $e) {
+            $message = $e->getMessage();
+            if (null !== $jit && [] !== $context->tryCatch->handlerStack) {
+                TryCatchHelper::emitCatchableErrorMessage($context, $jit, $message);
+            } else {
+                ErrorRaise::emitRaise($context, $message);
+            }
+
+            return true;
+        }
+
+        return false;
+    }
+
+    private static function isSubclassOfForAsymmetricGuard(
+        Object_ $objectType,
+        string $childLc,
+        string $parentLc
+    ): bool {
+        $current = $childLc;
+        for ($depth = 0; $depth < 64; ++$depth) {
+            if ($current === $parentLc) {
+                return true;
+            }
+            $parent = $objectType->parentClassLc($current);
+            if (null === $parent) {
+                return false;
+            }
+            $current = $parent;
+        }
+
+        return false;
     }
 
     /**

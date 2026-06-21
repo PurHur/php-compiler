@@ -6763,6 +6763,10 @@ restart:
         if (null !== $catchFrame) {
             return $catchFrame;
         }
+        $catchFrame = $this->enforceAsymmetricPropertyWrite($write, $frame);
+        if (null !== $catchFrame) {
+            return $catchFrame;
+        }
         $catchFrame = $this->enforceVirtualPropertyHookWrite($write, $frame);
         if (null !== $catchFrame) {
             return $catchFrame;
@@ -9670,6 +9674,10 @@ restart:
         if ($op->arg1 !== $op->arg2) {
             return null;
         }
+        $catchFrame = $this->enforceAsymmetricPropertyWrite($lvalue, $frame);
+        if (null !== $catchFrame) {
+            return $catchFrame;
+        }
         $catchFrame = $this->enforceVirtualPropertyHookWrite($lvalue, $frame);
         if (null !== $catchFrame) {
             return $catchFrame;
@@ -9723,7 +9731,7 @@ restart:
             return null;
         }
         if ($this->propertyHasDistinctAsymmetricSetVisibility($classLc, $propName, $lvalue)) {
-            return null;
+            return $this->enforceAsymmetricPropertyWrite($lvalue, $frame);
         }
 
         $thrown = VM\BuiltinExceptionSupport::materializeError(
