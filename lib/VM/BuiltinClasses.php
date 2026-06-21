@@ -194,6 +194,7 @@ use PHPCompiler\VM\Builtin\ReflectionPropertyIsDynamic;
 use PHPCompiler\VM\Builtin\ReflectionPropertyIsVirtual;
 use PHPCompiler\VM\Builtin\ReflectionPropertyGetReadableType;
 use PHPCompiler\VM\Builtin\ReflectionPropertyGetSettableType;
+use PHPCompiler\VM\Builtin\ReflectionPropertyGetType;
 use PHPCompiler\VM\Builtin\ReflectionPropertyGetValue;
 use PHPCompiler\VM\Builtin\ReflectionPropertyAsymmetricProbe;
 use PHPCompiler\VM\Builtin\ReflectionPropertyIsAbstract;
@@ -614,6 +615,8 @@ final class BuiltinClasses
         $rp->methodVisibility['getvalue'] = $pub;
         $rp->methods['getattributes'] = new ReflectionPropertyGetAttributes();
         $rp->methodVisibility['getattributes'] = $pub;
+        $rp->methods['gettype'] = new ReflectionPropertyGetType();
+        $rp->methodVisibility['gettype'] = $pub;
         foreach (
             [
                 'ispublic' => new ReflectionPropertyIsPublic(),
