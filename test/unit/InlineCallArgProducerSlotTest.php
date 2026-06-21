@@ -804,4 +804,43 @@ PHP;
         self::assertStringContainsString("'a'", $out);
         self::assertStringContainsString("'b'", $out);
     }
+
+    /** Issue #10351 — var_export(array_pad([...], -N, 0), true) wires nested FuncCall + Array_ + UnaryMinus. */
+    public function testVarExportArrayPadNegativeLengthUsesNestedFuncCallProducerSlot(): void
+    {
+        $code = <<<'PHP'
+<?php
+echo var_export(array_pad([1], -3, 0), true);
+PHP;
+        $runtime = new Runtime();
+        $block = $runtime->parseAndCompile($code, 'var_export_array_pad_negative.php');
+
+        $padReturnSlot = null;
+        $varExportSends = [];
+        $fcallOrdinal = 0;
+        foreach ($block->opCodes as $op) {
+            if (OpCode::TYPE_FUNCCALL_INIT === $op->type) {
+                ++$fcallOrdinal;
+                if (2 === $fcallOrdinal) {
+                    $varExportSends = [];
+                }
+            }
+            if (1 === $fcallOrdinal && OpCode::TYPE_FUNCCALL_EXEC_RETURN === $op->type) {
+                $padReturnSlot = $op->arg1;
+            }
+            if (2 === $fcallOrdinal && OpCode::TYPE_ARG_SEND === $op->type) {
+                $varExportSends[] = $op->arg1;
+            }
+        }
+
+        self::assertNotNull($padReturnSlot);
+        self::assertCount(2, $varExportSends);
+        self::assertSame($padReturnSlot, $varExportSends[0], 'arg sends='.json_encode($varExportSends));
+
+        ob_start();
+        $runtime->run($block);
+        $out = ob_get_clean();
+        self::assertStringContainsString('0', $out);
+        self::assertStringContainsString('1', $out);
+    }
 }

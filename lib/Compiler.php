@@ -11935,6 +11935,20 @@ class Compiler {
                 ) {
                     continue;
                 }
+                // php-cfg `var_export(array_pad([...], -3, 0), true)` — Array_ + UnaryMinus feed nested sibling FuncCall (#10351).
+                if ($next instanceof Op\Expr\UnaryMinus || $next instanceof Op\Expr\UnaryPlus) {
+                    $afterUnary = $cfgChildren[$i + 2] ?? null;
+                    if (
+                        ($afterUnary instanceof Op\Expr\FuncCall || $afterUnary instanceof Op\Expr\NsFuncCall)
+                        && (
+                            $this->isSiblingMultiArgFuncCallProducer($afterUnary, $callOp, $i + 2, $callIndex, $cfgChildren)
+                            || $this->isNestedCallArgProducerForConsumer($afterUnary, $callOp, $i + 2, $callIndex, $cfgChildren)
+                            || $this->isAdjacentNestedFuncCallProducer($afterUnary, $callOp, $i + 2, $callIndex)
+                        )
+                    ) {
+                        continue;
+                    }
+                }
                 array_unshift($producers, $child);
                 $prev = $cfgChildren[$i - 1] ?? null;
                 // php-cfg: `invokeArgs(new C(), [...])` — New_ immediately precedes Array_ (#9904).
