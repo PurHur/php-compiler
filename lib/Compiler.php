@@ -12035,13 +12035,13 @@ class Compiler {
         if ($argCount < 2) {
             return false;
         }
-        foreach ($consumer->args as $callArg) {
-            if (!$callArg instanceof Operand\Temporary) {
-                return false;
-            }
-        }
         $distance = $consumerIndex - $producerIndex;
         if ($distance < 1 || $distance > $argCount) {
+            return false;
+        }
+        // Producer at distance d supplies consumer arg d-1; literals may follow (#10402).
+        $targetArg = $consumer->args[$distance - 1] ?? null;
+        if (!$targetArg instanceof Operand\Temporary) {
             return false;
         }
         for ($j = $producerIndex + 1; $j < $consumerIndex; ++$j) {
@@ -12098,6 +12098,11 @@ class Compiler {
 
             return $arg instanceof Operand\Temporary
                 || ($arg instanceof Operand\Variable && !$this->isNamedVariableOperand($arg));
+        }
+        // php-cfg `f(g(), literal)` — adjacent producer feeds arg0 (#10402, levenshtein(str_repeat(...), 'b')).
+        $firstArg = $args[0] ?? null;
+        if ($firstArg instanceof Operand\Temporary) {
+            return true;
         }
         $lastArg = $args[count($args) - 1];
 
