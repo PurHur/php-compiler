@@ -601,7 +601,11 @@ final class SscanfJit
         $context->builder->branchIf($hasSpec, $specBody, $specMissing);
 
         $context->builder->positionAtEnd($specBody);
-        $spec = $context->builder->load($context->builder->inBoundsGEP($format, $nextSpec));
+        $specPosSlot = BasicBlockHelper::entryAlloca($context, $sizeT);
+        $context->builder->store($nextSpec, $specPosSlot);
+        self::emitSkipOptionalFieldWidth($context, $fn, $format, $fmtLen, $specPosSlot);
+        $specPos = $context->builder->load($specPosSlot);
+        $spec = $context->builder->load($context->builder->inBoundsGEP($format, $specPos));
         $pctLit = $fn->appendBasicBlock('sscanf_pct_lit');
         $conv = $fn->appendBasicBlock('sscanf_conv');
         $context->builder->branchIf(
@@ -624,7 +628,7 @@ final class SscanfJit
         $context->builder->branchIf($badPct, $literalFail, $pctOk);
         $context->builder->positionAtEnd($pctOk);
         $context->builder->store($context->builder->add($inPos, $oneSize), $inPosSlot);
-        $context->builder->store($context->builder->add($nextSpec, $oneSize), $fposSlot);
+        $context->builder->store($context->builder->add($specPos, $oneSize), $fposSlot);
         $context->builder->branch($loopHead);
 
         $context->builder->positionAtEnd($conv);
@@ -665,7 +669,7 @@ final class SscanfJit
         $context->builder->call($writeLong, $outVarPtr, $context->builder->load($valSlot));
         $context->builder->store($context->builder->add($outIdx, $one64), $outIdxSlot);
         $context->builder->store($context->builder->add($context->builder->load($assignedSlot), $one64), $assignedSlot);
-        $context->builder->store($context->builder->add($nextSpec, $oneSize), $fposSlot);
+        $context->builder->store($context->builder->add($specPos, $oneSize), $fposSlot);
         $context->builder->branch($loopHead);
 
         $context->builder->positionAtEnd($caseS);
@@ -695,7 +699,7 @@ final class SscanfJit
         $context->builder->call($writeString, $outVarPtr, $newStr);
         $context->builder->store($context->builder->add($outIdx, $one64), $outIdxSlot);
         $context->builder->store($context->builder->add($context->builder->load($assignedSlot), $one64), $assignedSlot);
-        $context->builder->store($context->builder->add($nextSpec, $oneSize), $fposSlot);
+        $context->builder->store($context->builder->add($specPos, $oneSize), $fposSlot);
         $context->builder->branch($loopHead);
 
         $context->builder->positionAtEnd($caseF);
@@ -711,7 +715,7 @@ final class SscanfJit
         $context->builder->call($writeDouble, $outVarPtr, $context->builder->load($fltSlot));
         $context->builder->store($context->builder->add($outIdx, $one64), $outIdxSlot);
         $context->builder->store($context->builder->add($context->builder->load($assignedSlot), $one64), $assignedSlot);
-        $context->builder->store($context->builder->add($nextSpec, $oneSize), $fposSlot);
+        $context->builder->store($context->builder->add($specPos, $oneSize), $fposSlot);
         $context->builder->branch($loopHead);
 
         $context->builder->positionAtEnd($defaultBb);
@@ -880,7 +884,11 @@ final class SscanfJit
         $context->builder->branchIf($hasSpec, $specBody, $retHt);
 
         $context->builder->positionAtEnd($specBody);
-        $spec = $context->builder->load($context->builder->inBoundsGEP($format, $nextSpec));
+        $specPosSlot = BasicBlockHelper::entryAlloca($context, $sizeT);
+        $context->builder->store($nextSpec, $specPosSlot);
+        self::emitSkipOptionalFieldWidth($context, $fn, $format, $fmtLen, $specPosSlot);
+        $specPos = $context->builder->load($specPosSlot);
+        $spec = $context->builder->load($context->builder->inBoundsGEP($format, $specPos));
         $pctLit = $fn->appendBasicBlock('sscanf_arr_pct_lit');
         $conv = $fn->appendBasicBlock('sscanf_arr_conv');
         $context->builder->branchIf(
@@ -903,7 +911,7 @@ final class SscanfJit
         $context->builder->branchIf($badPct, $retHt, $pctOk);
         $context->builder->positionAtEnd($pctOk);
         $context->builder->store($context->builder->add($inPos, $oneSize), $inPosSlot);
-        $context->builder->store($context->builder->add($nextSpec, $oneSize), $fposSlot);
+        $context->builder->store($context->builder->add($specPos, $oneSize), $fposSlot);
         $context->builder->branch($loopHead);
 
         $context->builder->positionAtEnd($conv);
@@ -930,7 +938,7 @@ final class SscanfJit
         $context->builder->positionAtEnd($afterD);
         $context->builder->call($setLong, $ht, $outIdx, $context->builder->load($valSlot));
         $context->builder->store($context->builder->add($outIdx, $oneSize), $outIdxSlot);
-        $context->builder->store($context->builder->add($nextSpec, $oneSize), $fposSlot);
+        $context->builder->store($context->builder->add($specPos, $oneSize), $fposSlot);
         $context->builder->branch($loopHead);
 
         $context->builder->positionAtEnd($caseS);
@@ -959,7 +967,7 @@ final class SscanfJit
         );
         $context->builder->call($setString, $ht, $outIdx, $newStr);
         $context->builder->store($context->builder->add($outIdx, $oneSize), $outIdxSlot);
-        $context->builder->store($context->builder->add($nextSpec, $oneSize), $fposSlot);
+        $context->builder->store($context->builder->add($specPos, $oneSize), $fposSlot);
         $context->builder->branch($loopHead);
 
         $context->builder->positionAtEnd($caseF);
@@ -974,7 +982,7 @@ final class SscanfJit
         $context->builder->positionAtEnd($afterF);
         $context->builder->call($setDouble, $ht, $outIdx, $context->builder->load($fltSlot));
         $context->builder->store($context->builder->add($outIdx, $oneSize), $outIdxSlot);
-        $context->builder->store($context->builder->add($nextSpec, $oneSize), $fposSlot);
+        $context->builder->store($context->builder->add($specPos, $oneSize), $fposSlot);
         $context->builder->branch($loopHead);
 
         $context->builder->positionAtEnd($defaultBb);
@@ -1038,7 +1046,11 @@ final class SscanfJit
         $context->builder->branchIf($hasSpec, $specBody, $specEnd);
 
         $context->builder->positionAtEnd($specBody);
-        $spec = $context->builder->load($context->builder->inBoundsGEP($format, $nextSpec));
+        $specPos = BasicBlockHelper::entryAlloca($context, $sizeT);
+        $context->builder->store($nextSpec, $specPos);
+        self::emitSkipOptionalFieldWidth($context, $fn, $format, $fmtLen, $specPos);
+        $specPosVal = $context->builder->load($specPos);
+        $spec = $context->builder->load($context->builder->inBoundsGEP($format, $specPosVal));
         $isLitPct = $context->builder->icmp(Builder::INT_EQ, $spec, $i8->constInt(37, false));
         $incCount = $fn->appendBasicBlock('count_inc');
         $afterSpec = $fn->appendBasicBlock('count_after_spec');
@@ -1052,7 +1064,7 @@ final class SscanfJit
         $context->builder->branch($afterSpec);
 
         $context->builder->positionAtEnd($afterSpec);
-        $context->builder->store($context->builder->add($nextSpec, $oneSize), $fposSlot);
+        $context->builder->store($context->builder->add($specPosVal, $oneSize), $fposSlot);
         $context->builder->branch($loopHead);
 
         $context->builder->positionAtEnd($specEnd);
@@ -1293,6 +1305,47 @@ final class SscanfJit
         $context->builder->positionAtEnd($loopDone);
 
         return $loopDone;
+    }
+
+    private static function emitSkipOptionalFieldWidth(
+        Context $context,
+        LlvmFunction $fn,
+        Value $format,
+        Value $fmtLen,
+        Value $posSlot
+    ): void {
+        $i8 = $context->getTypeFromString('int8');
+        $sizeT = $context->getTypeFromString('size_t');
+        $oneSize = $sizeT->constInt(1, false);
+
+        $loopHead = $fn->appendBasicBlock('sscanf_width_head');
+        $loopDone = $fn->appendBasicBlock('sscanf_width_done');
+        $context->builder->branch($loopHead);
+
+        $context->builder->positionAtEnd($loopHead);
+        $pos = $context->builder->load($posSlot);
+        $atEnd = $context->builder->icmp(Builder::INT_UGE, $pos, $fmtLen);
+        $loopBody = $fn->appendBasicBlock('sscanf_width_body');
+        $context->builder->branchIf($atEnd, $loopDone, $loopBody);
+
+        $context->builder->positionAtEnd($loopBody);
+        $ch = $context->builder->load($context->builder->inBoundsGEP($format, $pos));
+        $isDigit = $context->builder->and(
+            $context->builder->icmp(Builder::INT_SGE, $ch, $i8->constInt(48, false)),
+            $context->builder->icmp(Builder::INT_SLE, $ch, $i8->constInt(57, false))
+        );
+        $cont = $fn->appendBasicBlock('sscanf_width_cont');
+        $exit = $fn->appendBasicBlock('sscanf_width_exit');
+        $context->builder->branchIf($isDigit, $cont, $exit);
+
+        $context->builder->positionAtEnd($cont);
+        $context->builder->store($context->builder->add($pos, $oneSize), $posSlot);
+        $context->builder->branch($loopHead);
+
+        $context->builder->positionAtEnd($exit);
+        $context->builder->branch($loopDone);
+
+        $context->builder->positionAtEnd($loopDone);
     }
 
     private static function isSpaceChar(Context $context, Value $ch): Value
