@@ -45,6 +45,8 @@ final class EnumVMTest extends BaseTest
                 'enum_interface_const.phpt',
                 'enum_forward_interface_const.phpt',
                 'class_const_enum_forward_ref.phpt',
+                'class_const_enum_case.phpt',
+                'compile_unit_const_enum_case.phpt',
                 'enum_typed_class_constant.phpt',
                 'enum_typed_class_const.phpt',
                 'typed_enum_class_const.phpt',
