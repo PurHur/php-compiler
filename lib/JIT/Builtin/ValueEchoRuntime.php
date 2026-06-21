@@ -4,10 +4,12 @@ declare(strict_types=1);
 
 namespace PHPCompiler\JIT\Builtin;
 
-use PHPCompiler\JIT;
 use PHPCompiler\JIT\BasicBlockHelper;
+use PHPCompiler\JIT\Builtin;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\JitVmHelperLink;
 use PHPCompiler\JIT\ValueEchoHelper;
+use PHPCompiler\JIT\Variable as JitVariable;
 use PHPCompiler\JIT\Variable;
 use PHPCompiler\VM\ValueEchoSupport;
 use PHPLLVM\Builder;
@@ -21,7 +23,7 @@ use PHPLLVM\Value\Function_ as LlvmFunction;
  */
 final class ValueEchoRuntime
 {
-    private const HELPER_PATH = '/lib/VM/ValueEchoJitHelper.php';
+    private const HELPER_PATH = '/VM/ValueEchoJitHelper.php';
 
     private const TYPE_IS_NULL = 'PHPCompiler\\VM\\ValueEchoJitHelper::typeIsNull';
 
@@ -59,6 +61,17 @@ final class ValueEchoRuntime
         self::TYPE_IS_OBJECT => '__value_echo__typeIsObject',
     ];
 
+    /** @var array<string, int> */
+    private const STANDALONE_TYPE_CONST_MAP = [
+        self::TYPE_IS_NULL => JitVariable::TYPE_NULL,
+        self::TYPE_IS_NATIVE_LONG => JitVariable::TYPE_NATIVE_LONG,
+        self::TYPE_IS_NATIVE_BOOL => JitVariable::TYPE_NATIVE_BOOL,
+        self::TYPE_IS_NATIVE_DOUBLE => JitVariable::TYPE_NATIVE_DOUBLE,
+        self::TYPE_IS_STRING => JitVariable::TYPE_STRING,
+        self::TYPE_IS_HASHTABLE => JitVariable::TYPE_HASHTABLE,
+        self::TYPE_IS_OBJECT => JitVariable::TYPE_OBJECT,
+    ];
+
     private static int $seq = 0;
 
     public static function ensureLinked(Context $context): void
@@ -75,18 +88,33 @@ final class ValueEchoRuntime
             return;
         }
 
-        self::ensureJitHelperCompiled($context);
-        foreach (self::TYPE_BRIDGE_MAP as $helperLogical => $abiName) {
-            self::implementTypeBridge($context, $abiName, $helperLogical);
+        $restoreBlock = BasicBlockHelper::tryGetInsertBlock($context);
+        if (Builtin::LOAD_TYPE_STANDALONE === $context->loadType) {
+            foreach (self::TYPE_BRIDGE_MAP as $helperLogical => $abiName) {
+                self::implementStandaloneTypeBridge(
+                    $context,
+                    $abiName,
+                    self::STANDALONE_TYPE_CONST_MAP[$helperLogical]
+                );
+            }
+        } else {
+            self::ensureJitHelperCompiled($context);
+            foreach (self::TYPE_BRIDGE_MAP as $helperLogical => $abiName) {
+                self::implementTypeBridge($context, $abiName, $helperLogical);
+            }
         }
         self::registerLinkedRuntime($context);
-        $context->builder->clearInsertionPosition();
+        if (null !== $restoreBlock) {
+            BasicBlockHelper::restoreInsertBlock($context, $restoreBlock);
+        } else {
+            $context->builder->clearInsertionPosition();
+        }
     }
 
     public static function emitValue(Context $context, Value $valuePtr): void
     {
         self::ensureLinked($context);
-        ObOutput::ensureLinked($context);
+        ObOutputRuntime::ensureLinked($context);
 
         $tag = 'ev'.(string) ++self::$seq;
         $map = $context->structFieldMap['__value__'];
@@ -259,6 +287,33 @@ final class ValueEchoRuntime
         );
     }
 
+    private static function implementStandaloneTypeBridge(Context $context, string $abiName, int $expectedType): void
+    {
+        $probe = $context->module->getNamedFunction($abiName);
+        if (null !== $probe && $probe->countBasicBlocks() > 0) {
+            $context->registerFunction($abiName, $probe);
+
+            return;
+        }
+
+        $i8 = $context->getTypeFromString('int8');
+        $i1 = $context->getTypeFromString('int1');
+        $ft = $context->context->functionType($i1, false, $i8);
+        $fn = null !== $probe
+            ? $probe
+            : $context->module->addFunction($abiName, $ft);
+
+        $entry = $fn->appendBasicBlock('value_echo_type_standalone_entry');
+        $context->builder->positionAtEnd($entry);
+        $matches = $context->builder->icmp(
+            Builder::INT_EQ,
+            $fn->getParam(0),
+            $i8->constInt($expectedType, false)
+        );
+        $context->builder->returnValue($matches);
+        $context->registerFunction($abiName, $fn);
+    }
+
     private static function implementTypeBridge(Context $context, string $abiName, string $helperLogical): void
     {
         $probe = $context->module->getNamedFunction($abiName);
@@ -288,56 +343,18 @@ final class ValueEchoRuntime
     private static function helperFunction(Context $context, string $logical): LlvmFunction
     {
         self::ensureJitHelperCompiled($context);
-        $lc = \strtolower($logical);
-        $fn = $context->functions[$lc] ?? null;
-        if (null === $fn) {
-            throw new \LogicException($logical.' missing after ValueEchoJitHelper compile (#10204)');
-        }
 
-        return $fn;
+        return JitVmHelperLink::lookupCompiled($context, $logical, '#10204');
     }
 
     private static function ensureJitHelperCompiled(Context $context): void
     {
-        $missing = false;
-        foreach (self::COMPILED_HELPERS as $logical) {
-            if (!isset($context->functions[\strtolower($logical)])) {
-                $missing = true;
-                break;
-            }
-        }
-        if (!$missing) {
-            return;
-        }
-
-        $runtime = $context->runtime;
-        $path = \dirname(__DIR__, 3).self::HELPER_PATH;
-        $prevSelfHostAot = \getenv('PHP_COMPILER_SELFHOST_AOT');
-        if (\function_exists('putenv')) {
-            \putenv('PHP_COMPILER_SELFHOST_AOT=0');
-        }
-        try {
-            $block = $runtime->parseAndCompile((string) \file_get_contents($path), 'ValueEchoJitHelper.php');
-            if (null === $block) {
-                throw new \LogicException('ValueEchoJitHelper.php parseAndCompile failed (#10204)');
-            }
-            $jit = new JIT($context);
-            $jit->compile($block);
-        } finally {
-            if (\function_exists('putenv')) {
-                if (false === $prevSelfHostAot || null === $prevSelfHostAot) {
-                    \putenv('PHP_COMPILER_SELFHOST_AOT=');
-                } else {
-                    \putenv('PHP_COMPILER_SELFHOST_AOT='.$prevSelfHostAot);
-                }
-            }
-        }
-        foreach (self::COMPILED_HELPERS as $logical) {
-            $lc = \strtolower($logical);
-            if (!isset($context->functions[$lc])) {
-                throw new \LogicException($lc.' was not compiled for JIT (#10204)');
-            }
-        }
+        JitVmHelperLink::ensureCompiled(
+            $context,
+            self::HELPER_PATH,
+            self::COMPILED_HELPERS,
+            '#10204'
+        );
     }
 
     private static function registerLinkedRuntime(Context $context): void

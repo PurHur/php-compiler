@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace PHPCompiler\JIT\Builtin;
 
 use PHPCompiler\JIT;
+use PHPCompiler\JIT\Builtin;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\VM\ObStackLimits;
 use PHPLLVM\BasicBlock;
@@ -61,6 +62,13 @@ final class ObGzhandlerJitRuntime
 
         self::$blockSuffix = 0;
         self::ensureGlobals($context);
+        if (Builtin::LOAD_TYPE_STANDALONE === $context->loadType) {
+            self::implementStandalonePassthrough($context);
+            self::registerLinkedRuntime($context);
+            $context->builder->clearInsertionPosition();
+
+            return;
+        }
         self::ensureServerReadHelpers($context);
         self::ensureJitHelperCompiled($context);
         self::implementObGzhandlerBridge($context);
@@ -97,6 +105,45 @@ final class ObGzhandlerJitRuntime
             $context->lookupFunction('__phpc_ob_gzhandler_flush'),
             $content
         );
+    }
+
+    private static function implementStandalonePassthrough(Context $context): void
+    {
+        $strPtr = $context->getTypeFromString('__string__*');
+        $i64 = $context->getTypeFromString('int64');
+
+        $ogzName = '__compiler_ob_gzhandler';
+        $ogzProbe = $context->module->getNamedFunction($ogzName);
+        if (null === $ogzProbe || 0 === $ogzProbe->countBasicBlocks()) {
+            $ogzFn = null !== $ogzProbe
+                ? $ogzProbe
+                : $context->module->addFunction(
+                    $ogzName,
+                    $context->context->functionType($strPtr, false, $strPtr, $i64)
+                );
+            $entry = $ogzFn->appendBasicBlock('ogz_standalone_entry');
+            $context->builder->positionAtEnd($entry);
+            $context->builder->returnValue($ogzFn->getParam(0));
+            $context->registerFunction($ogzName, $ogzFn);
+        }
+
+        $flushName = '__phpc_ob_gzhandler_flush';
+        $flushProbe = $context->module->getNamedFunction($flushName);
+        if (null === $flushProbe || 0 === $flushProbe->countBasicBlocks()) {
+            $flushFn = null !== $flushProbe
+                ? $flushProbe
+                : $context->module->addFunction(
+                    $flushName,
+                    $context->context->functionType($strPtr, false, $strPtr)
+                );
+            $entry = $flushFn->appendBasicBlock('ogf_standalone_entry');
+            $context->builder->positionAtEnd($entry);
+            $context->builder->returnValue($flushFn->getParam(0));
+            $context->registerFunction($flushName, $flushFn);
+        }
+
+        self::implementObStartWithGzhandler($context);
+        $context->builder->clearInsertionPosition();
     }
 
     private static function implementObGzhandlerBridge(Context $context): void
@@ -399,14 +446,9 @@ final class ObGzhandlerJitRuntime
             \putenv('PHP_COMPILER_SELFHOST_AOT=0');
         }
         try {
-            // Nested helper compile must not inherit bridge CFG block maps (#8559, #9091).
+            // Nested helper compile must not inherit a half-built bridge CFG (#8559, #9225).
             $context->builder->clearInsertionPosition();
-            $block = $runtime->parseAndCompile((string) \file_get_contents($path), 'ObGzhandlerJitHelper.php');
-            if (null === $block) {
-                throw new \LogicException('ObGzhandlerJitHelper.php parseAndCompile failed (#9091)');
-            }
-            $jit = new JIT($context);
-            $jit->compile($block);
+            self::compileHelperFileIfMissing($context, $runtime, $path, 'ObGzhandlerJitHelper.php');
         } finally {
             $context->scope->blockStorage = $savedBlockStorage;
             $context->scope->blockEntryStorage = $savedBlockEntryStorage;
@@ -427,6 +469,20 @@ final class ObGzhandlerJitRuntime
                 throw new \LogicException($lc.' was not compiled for JIT (#9091)');
             }
         }
+    }
+
+    private static function compileHelperFileIfMissing(
+        Context $context,
+        \PHPCompiler\Runtime $runtime,
+        string $path,
+        string $label
+    ): void {
+        $block = $runtime->parseAndCompile((string) \file_get_contents($path), $label);
+        if (null === $block) {
+            throw new \LogicException($label.' parseAndCompile failed (#9091)');
+        }
+        $jit = new JIT($context);
+        $jit->compile($block);
     }
 
     private static function registerLinkedRuntime(Context $context): void

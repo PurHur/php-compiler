@@ -272,11 +272,16 @@ class JIT {
             $classId = $this->context->scope->classId;
             $className = $this->context->scope->className;
             $calledClassName = $this->context->scope->calledClassName;
-            $this->context->scope = new JIT\Scope();
+            $savedActiveFunction = $this->context->activeFunction;
+            $savedInsertBlock = null;
+            try {
+                $savedInsertBlock = $this->context->builder->getInsertBlock();
+            } catch (\Throwable) {
+            }
+            $this->context->pushScope();
             $this->context->scope->classId = $classId;
             $this->context->scope->className = $className;
             $this->context->scope->calledClassName = $calledClassName;
-            $this->context->scopeStack = [];
             $this->context->inlineIncludeReturnOperands = [];
             $this->context->coalesceAssignTargets = new \SplObjectStorage();
             $this->context->listUnpackSkipAssignPath = false;
@@ -305,6 +310,13 @@ class JIT {
                 }
             }
             $this->compileBlockInternal($llvmFunc, $cfgBlock, null, null, 0, false, ...$run[2]);
+            $this->context->popScope();
+            $this->context->activeFunction = $savedActiveFunction;
+            if (null !== $savedInsertBlock) {
+                $this->context->builder->positionAtEnd($savedInsertBlock);
+            } else {
+                $this->context->builder->clearInsertionPosition();
+            }
         }
     }
 

@@ -36,6 +36,9 @@ final class UndefinedVariableHelper
         if (null === $name) {
             return;
         }
+        if (null === BasicBlockHelper::tryGetInsertBlock($context)) {
+            return;
+        }
         ScopeVariableAssignedFlags::markAssigned(
             $context,
             ScopeVariableAssignedFlags::flagKey($context, $name)
@@ -49,11 +52,11 @@ final class UndefinedVariableHelper
             return;
         }
         UndefinedVariableRuntime::ensureLinked($context);
-        $key = ScopeVariableAssignedFlags::flagKey($context, $name);
-        $isAssigned = ScopeVariableAssignedFlags::isAssignedCondition($context, $key);
         if (null === BasicBlockHelper::tryGetInsertBlock($context)) {
             return;
         }
+        $key = ScopeVariableAssignedFlags::flagKey($context, $name);
+        $isAssigned = ScopeVariableAssignedFlags::isAssignedCondition($context, $key);
         try {
             $fn = BasicBlockHelper::parentFunction($context);
         } catch (\LogicException) {
