@@ -41,4 +41,10 @@ final class BuiltinByRefParamsTest extends TestCase
         $this->assertSame([2], BuiltinByRefParams::forFunction('is_callable'));
         $this->assertSame([2], BuiltinByRefParams::forFunction('IS_CALLABLE'));
     }
+
+    public function testPregMatchMatchesArgument(): void
+    {
+        $this->assertSame([2], BuiltinByRefParams::forFunction('preg_match'));
+        $this->assertSame([2], BuiltinByRefParams::forFunction('PREG_MATCH_ALL'));
+    }
 }
