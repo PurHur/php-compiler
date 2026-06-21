@@ -1439,6 +1439,18 @@ class VM {
     }
 
     /**
+     * get_mangled_object_vars() — mangled keys, dynamic props, get hooks (#3497, #10491).
+     *
+     * php-src: zend_get_mangled_object_vars / ZEND_PROP_PURPOSE_DEBUG
+     *
+     * @return array<string, Variable>
+     */
+    public function collectMangledObjectVarsForBuiltin(ObjectEntry $object, Frame $frame): array
+    {
+        return $this->collectDebugPropertiesForBuiltin($object, $frame);
+    }
+
+    /**
      * var_dump()/print_r() property list — mangled keys, get hooks invoked (#6604).
      *
      * php-src: zend_get_properties_for(..., ZEND_PROP_PURPOSE_DEBUG) + zend_read_property_ex
