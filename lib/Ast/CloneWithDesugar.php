@@ -498,6 +498,11 @@ final class CloneWithDesugar
      */
     private static function findCloneWithSpan(string $code, array $tokens): ?array
     {
+        $parenSpan = self::findParenCloneWithSpan($code, $tokens);
+        if (null !== $parenSpan) {
+            return $parenSpan;
+        }
+
         for ($i = 0, $c = \count($tokens); $i < $c; ++$i) {
             $token = $tokens[$i];
             if (!\is_array($token) || \T_CLONE !== $token[0]) {
@@ -516,6 +521,110 @@ final class CloneWithDesugar
             }
 
             $withIdx = $exprEnd + 1;
+            self::skipForwardIgnorable($tokens, $withIdx);
+            if (!self::isWithKeyword($tokens, $withIdx)) {
+                continue;
+            }
+
+            $listIdx = $withIdx + 1;
+            self::skipForwardIgnorable($tokens, $listIdx);
+            if ($listIdx >= $c) {
+                continue;
+            }
+
+            $listEndIdx = null;
+            $arrayText = null;
+            $blockText = null;
+
+            if ('[' === $tokens[$listIdx]) {
+                $listEndIdx = self::skipBalancedForward($tokens, $listIdx, '[', ']');
+                if (null === $listEndIdx) {
+                    continue;
+                }
+                $arrayTextStart = self::tokenByteOffset($tokens, $listIdx);
+                $arrayTextEnd = self::tokenByteEnd($tokens, $listEndIdx);
+                if (null === $arrayTextStart || null === $arrayTextEnd) {
+                    continue;
+                }
+                $arrayText = trim(substr($code, $arrayTextStart, $arrayTextEnd - $arrayTextStart));
+            } elseif ('{' === $tokens[$listIdx]) {
+                $listEndIdx = self::skipBalancedBraces($tokens, $listIdx);
+                if (null === $listEndIdx) {
+                    continue;
+                }
+                $blockOpen = self::tokenByteEnd($tokens, $listIdx);
+                $blockClose = self::tokenByteOffset($tokens, $listEndIdx);
+                if (null === $blockOpen || null === $blockClose) {
+                    continue;
+                }
+                $blockText = trim(substr($code, $blockOpen, $blockClose - $blockOpen));
+            } else {
+                continue;
+            }
+
+            $start = self::tokenByteOffset($tokens, $i);
+            $end = self::tokenByteEnd($tokens, $listEndIdx);
+            $exprTextStart = self::tokenByteOffset($tokens, $exprStart);
+            $exprTextEnd = self::tokenByteEnd($tokens, $exprEnd);
+            if (null === $start || null === $end || null === $exprTextStart || null === $exprTextEnd) {
+                continue;
+            }
+
+            $span = [
+                'start' => $start,
+                'end' => $end,
+                'exprText' => trim(substr($code, $exprTextStart, $exprTextEnd - $exprTextStart)),
+            ];
+            if (null !== $arrayText) {
+                $span['arrayText'] = $arrayText;
+            } else {
+                $span['blockText'] = $blockText;
+            }
+
+            return $span;
+        }
+
+        return null;
+    }
+
+    /**
+     * PHP 8.4+ `(clone $obj) with ['prop' => $val]` — parenthesized clone operand (#10496).
+     *
+     * @param array<int, array{0: int, 1: string, 2: int}|string> $tokens
+     *
+     * @return array{start: int, end: int, exprText: string, blockText?: string, arrayText?: string}|null
+     */
+    private static function findParenCloneWithSpan(string $code, array $tokens): ?array
+    {
+        for ($i = 0, $c = \count($tokens); $i < $c; ++$i) {
+            if (!\is_string($tokens[$i]) || '(' !== $tokens[$i]) {
+                continue;
+            }
+
+            $cloneIdx = $i + 1;
+            self::skipForwardIgnorable($tokens, $cloneIdx);
+            if ($cloneIdx >= $c || !\is_array($tokens[$cloneIdx]) || \T_CLONE !== $tokens[$cloneIdx][0]) {
+                continue;
+            }
+
+            $exprStart = $cloneIdx + 1;
+            self::skipForwardIgnorable($tokens, $exprStart);
+            if ($exprStart >= $c) {
+                continue;
+            }
+
+            $exprEnd = self::scanCloneOperandEnd($tokens, $exprStart);
+            if (null === $exprEnd) {
+                continue;
+            }
+
+            $closeIdx = $exprEnd + 1;
+            self::skipForwardIgnorable($tokens, $closeIdx);
+            if ($closeIdx >= $c || ')' !== $tokens[$closeIdx]) {
+                continue;
+            }
+
+            $withIdx = $closeIdx + 1;
             self::skipForwardIgnorable($tokens, $withIdx);
             if (!self::isWithKeyword($tokens, $withIdx)) {
                 continue;
