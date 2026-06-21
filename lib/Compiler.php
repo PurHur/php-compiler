@@ -11390,6 +11390,10 @@ class Compiler {
                     if ($last instanceof Op\Expr\Cast) {
                         return $last;
                     }
+                    // Inline binary op call arg ([1=>'a']+[2=>'b'], concat, etc.) (#10490, zend_operators.c).
+                    if ($last instanceof Op\Expr\BinaryOp) {
+                        return $last;
+                    }
                 }
 
                 return null;
