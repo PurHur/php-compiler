@@ -145,6 +145,8 @@ final class BuiltinParamNames
                 return ['needle', 'haystack', 'strict'];
             case 'array_search':
                 return ['needle', 'haystack', 'strict'];
+            case 'array_rand':
+                return ['array', 'num'];
         }
 
         return null;
