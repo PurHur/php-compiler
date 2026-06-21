@@ -79,4 +79,12 @@ final class BuiltinParamNamesAliasTest extends TestCase
         self::assertSame(['needle', 'haystack', 'strict'], $names);
         self::assertSame(2, BuiltinParamNames::lookupNamedParamIndex($names, 'strict', 'array_search'));
     }
+
+    /** @covers issue #10469 */
+    public function testArrayRandNumNamedParamResolves(): void
+    {
+        $names = BuiltinParamNames::forFunction('array_rand');
+        self::assertSame(['array', 'num'], $names);
+        self::assertSame(1, BuiltinParamNames::lookupNamedParamIndex($names, 'num', 'array_rand'));
+    }
 }
