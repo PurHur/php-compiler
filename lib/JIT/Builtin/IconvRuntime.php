@@ -97,20 +97,10 @@ final class IconvRuntime
         $context->builder->branchIf($toOk, $convertBb, $toErrBb);
 
         $context->builder->positionAtEnd($fromErrBb);
-        TypeErrorRaise::registerDeclarations($context);
-        TypeErrorRaise::ensureLinked($context);
-        TypeErrorRaise::emitValueError(
-            $context,
-            'iconv(): Argument #1 ($from_encoding) is not a supported encoding'
-        );
-        $context->builder->call($context->lookupFunction('abort'));
+        $context->builder->returnValue($nullStr);
 
         $context->builder->positionAtEnd($toErrBb);
-        TypeErrorRaise::emitValueError(
-            $context,
-            'iconv(): Argument #2 ($to_encoding) is not a supported encoding'
-        );
-        $context->builder->call($context->lookupFunction('abort'));
+        $context->builder->returnValue($nullStr);
 
         $context->builder->positionAtEnd($convertBb);
         $sameEnc = $context->builder->icmp(Builder::INT_EQ, $fromId, $toId);
