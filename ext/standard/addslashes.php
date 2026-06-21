@@ -7,9 +7,11 @@ namespace PHPCompiler\ext\standard;
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\InternalStrictArg as JitInternalStrictArg;
 use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\BuiltinExecute;
+use PHPCompiler\VM\InternalStrictArg;
 use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
 
@@ -21,6 +23,7 @@ final class addslashes extends Internal
         if (1 !== \count($frame->calledArgs)) {
             throw new \LogicException('addslashes() requires exactly one argument in this compiler build');
         }
+        InternalStrictArg::rejectNullString($frame->calledArgs[0], 'addslashes', 'string', 0);
         $subject = VmString::coerceStringBuiltinArg(
             $frame->calledArgs[0],
             'addslashes',
@@ -38,6 +41,7 @@ final class addslashes extends Internal
         if (1 !== \count($args)) {
             throw new \LogicException('addslashes() requires exactly one argument in this compiler build');
         }
+        JitInternalStrictArg::rejectNullString($context, $args[0], 'addslashes', 'string', 1);
 
         return JitAddslashes::escape(
             $context,
