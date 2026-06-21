@@ -107,6 +107,8 @@ class Compiler {
     private array $abstractEnums = [];
     /** 1-based source lines lowered from bare `throw;` (#3508). */
     private array $bareRethrowLines = [];
+    /** spl_object_id(Coalesce expr) => scope slot for ?? result (stmt ?? before call args, #9479). */
+    private array $coalesceResultSlots = [];
     /** Trailing source bytes after __halt_compiler(); (issue #3479). */
     private ?string $haltCompilerRemaining = null;
     /** {@see OpCode::ASSIGN_REF_FOREACH_PROPERTY_HOOK} for the next AssignRef compile (#6435). */
@@ -421,6 +423,7 @@ class Compiler {
         $this->resetCompileAbortDetail();
         $this->abstractClasses = [];
         $this->abstractEnums = [];
+        $this->coalesceResultSlots = [];
         $this->compileTimeEnumBackedTypes = [];
         $this->compileTimeEnumCaseConstNames = [];
         $this->compileTimeGlobalConsts = [];
@@ -501,6 +504,7 @@ class Compiler {
         $this->resetCompileAbortDetail();
         $this->abstractClasses = [];
         $this->abstractEnums = [];
+        $this->coalesceResultSlots = [];
         $this->classCompileRegistry = new ClassCompileRegistry();
         $this->attributeClassRegistry = new AttributeClassRegistry();
         // Inventory-scale sources declare user functions and/or class-like units; emit-smoke only needs {main}
@@ -8166,6 +8170,8 @@ class Compiler {
         $endBlock->inheritScopeFrom($leftBlock);
         $endBlock->inheritScopeFrom($rightEmitBlock);
 
+        $this->coalesceResultSlots[spl_object_id($expr)] = $resultSlot;
+
         $coalesceOp = new OpCode(
             OpCode::TYPE_COALESCE,
             $resultSlot,
@@ -10146,6 +10152,10 @@ class Compiler {
             for ($j = $i - 1; $j >= 0; --$j) {
                 $prev = $block->orig->children[$j];
                 if ($prev instanceof Op\Expr\BinaryOp\Coalesce) {
+                    // php-cfg clones call-arg temps from stmt Coalesce.result (#8766, #8902, #9479).
+                    if ($j === $i - 1) {
+                        return $prev;
+                    }
                     if (
                         null !== $matchedCallArg
                         && (
@@ -10201,6 +10211,10 @@ class Compiler {
 
     private function slotForCoalesceResult(Block $block, Op\Expr\BinaryOp\Coalesce $coalesce): ?int
     {
+        $coalesceId = spl_object_id($coalesce);
+        if (isset($this->coalesceResultSlots[$coalesceId])) {
+            return $this->coalesceResultSlots[$coalesceId];
+        }
         $slot = $block->slotForOperand($coalesce->result);
         if (null !== $slot) {
             return $slot;
@@ -14818,7 +14832,7 @@ class Compiler {
                             break;
                         }
                     }
-                    if (!$hasProducer) {
+                    if (!$hasProducer && null === $this->findCoalesceStmtForCallArg($arg, $block)) {
                         $producerSlot = $this->findInlineExprCallArgProducerSlot($arg, $block, $cfgCallOp);
                         if (null !== $producerSlot) {
                             $valueSlot = $producerSlot;
