@@ -6415,13 +6415,7 @@ restart:
                                 $frame->scope[$op->arg3]->copyFrom($caught);
                             }
                             $frame = $op->block1->getFrame($this->context, $frame);
-                            if (null !== $op->arg3) {
-                                if (!isset($frame->scope[$op->arg3])) {
-                                    $frame->scope[$op->arg3] = new Variable();
-                                }
-                                $frame->scope[$op->arg3]->copyFrom($caught);
-                            }
-                            $frame->activeCatchException = $caught;
+                            $this->bindCatchVariableToFrame($frame, $op->arg3, $caught);
                             goto restart;
                         }
                         break;
@@ -6925,6 +6919,9 @@ restart:
     private function isUnboundLocalScopeRead(Frame $frame, int $slot): bool
     {
         if (!isset($frame->scope[$slot])) {
+            return false;
+        }
+        if (null !== $frame->catchVarSlot && $slot === $frame->catchVarSlot) {
             return false;
         }
         $name = $this->resolveScopeSlotVariableName($frame, $slot);
@@ -8134,13 +8131,7 @@ restart:
                 $handler->scope[$op->arg3]->copyFrom($caught);
             }
             $catchFrame = $op->block1->getFrame($this->context, $handler);
-            if (null !== $op->arg3) {
-                if (!isset($catchFrame->scope[$op->arg3])) {
-                    $catchFrame->scope[$op->arg3] = new Variable();
-                }
-                $catchFrame->scope[$op->arg3]->copyFrom($caught);
-            }
-            $catchFrame->activeCatchException = $caught;
+            $this->bindCatchVariableToFrame($catchFrame, $op->arg3, $caught);
             $gen = $this->findGeneratorState($handler);
             if (null !== $gen) {
                 $catchFrame->generatorState = $gen;
@@ -8213,8 +8204,26 @@ restart:
         $this->context->pendingMergeAfterFinally = null;
         $this->context->activeCatchHandlerFrame = null;
         $frame->activeCatchException = null;
+        $frame->catchVarSlot = null;
 
         return $merge->getFrame($this->context, $frame);
+    }
+
+    /** Bind catch `$e` and mark initialized — avoid #10358 false undefined warnings on catch reads. */
+    private function bindCatchVariableToFrame(Frame $frame, ?int $catchVarSlot, Variable $caught): void
+    {
+        $frame->activeCatchException = $caught;
+        if (null === $catchVarSlot) {
+            $frame->catchVarSlot = null;
+
+            return;
+        }
+        $frame->catchVarSlot = $catchVarSlot;
+        if (!isset($frame->scope[$catchVarSlot])) {
+            $frame->scope[$catchVarSlot] = new Variable();
+        }
+        $frame->scope[$catchVarSlot]->copyFrom($caught);
+        $this->markScopeSlotInitialized($frame, $catchVarSlot);
     }
 
     private function resumeGotoAfterFinally(Frame $frame): ?Frame
