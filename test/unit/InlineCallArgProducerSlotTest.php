@@ -424,6 +424,48 @@ PHP;
         self::assertSame("array (\n  'a' => 2,\n  'b' => 3,\n)\n", ob_get_clean());
     }
 
+    /** Issue #10196 — nested inline array literals map to outermost Array_ per arg slot. */
+    public function testArrayReplaceRecursiveNestedInlineLiteralsUseRootArraySlots(): void
+    {
+        $code = <<<'PHP'
+<?php
+array_replace_recursive(['a' => ['b' => 1]], ['a' => ['b' => 2, 'c' => 3]]);
+PHP;
+        $runtime = new Runtime();
+        $block = $runtime->parseAndCompile($code, 'array_replace_recursive_nested_inline.php');
+
+        $arraySlots = [];
+        $sendSlots = [];
+        foreach ($block->opCodes as $op) {
+            if (OpCode::TYPE_INIT_ARRAY === $op->type) {
+                $arraySlots[] = $op->arg1;
+            }
+            if (OpCode::TYPE_ARG_SEND === $op->type) {
+                $sendSlots[] = $op->arg1;
+            }
+        }
+
+        self::assertCount(4, $arraySlots, 'array inits='.json_encode($arraySlots));
+        self::assertCount(2, $sendSlots, 'arg sends='.json_encode($sendSlots));
+        self::assertSame($arraySlots[1], $sendSlots[0], 'first nested inline array root must feed arg #1');
+        self::assertSame($arraySlots[3], $sendSlots[1], 'second nested inline array root must feed arg #2');
+    }
+
+    /** Issue #10196 — array_replace_recursive nested inline literal runtime parity with Zend. */
+    public function testArrayReplaceRecursiveNestedInlineLiteralRuntime(): void
+    {
+        $code = <<<'PHP'
+<?php
+var_export(array_replace_recursive(['a' => ['b' => 1]], ['a' => ['b' => 2, 'c' => 3]]));
+echo "\n";
+PHP;
+        $runtime = new Runtime();
+        $block = $runtime->parseAndCompile($code, 'array_replace_recursive_nested_inline_runtime.php');
+        ob_start();
+        $runtime->run($block);
+        self::assertSame("array (\n  'a' => array (\n    'b' => 2,\n    'c' => 3,\n  ),\n)\n", ob_get_clean());
+    }
+
     /** Issue #10490 — inline array union + must wire Plus result slot, not dead array temps. */
     public function testArrayUnionInlineLiteralUsesPlusResultSlot(): void
     {

@@ -11430,6 +11430,12 @@ class Compiler {
 
                 return null;
             }
+            if ($this->producersAreNestedArrayLiteralChain($producers)) {
+                $roots = $this->rootNestedArrayInlineCallArgProducers($producers);
+                if (\count($roots) === $argCount) {
+                    return $roots[$argIndex] ?? null;
+                }
+            }
             $mappedIndex = 1 === $argCount
                 ? $producerCount - 1
                 : ($argIndex + ($argIndex > 0 ? $extra : 0));
@@ -12003,6 +12009,52 @@ class Compiler {
     }
 
     /**
+     * Outermost Array_ producers for inline nested literal call args (#4738, #10196).
+     *
+     * php-cfg emits inner-then-outer Expr_Array nodes per embedded literal; only the root
+     * Array_ for each argument should be wired to TYPE_ARG_SEND.
+     *
+     * @param list<Op\Expr> $producers
+     *
+     * @return list<Op\Expr\Array_>
+     */
+    private function rootNestedArrayInlineCallArgProducers(array $producers): array
+    {
+        if (!$this->producersAreNestedArrayLiteralChain($producers)) {
+            return [];
+        }
+        $consumed = [];
+        foreach ($producers as $i => $producer) {
+            if (!property_exists($producer, 'values') || !\is_array($producer->values)) {
+                continue;
+            }
+            foreach ($producer->values as $value) {
+                if (!$value instanceof Operand) {
+                    continue;
+                }
+                foreach ($producers as $j => $inner) {
+                    if (
+                        $j < $i
+                        && $inner instanceof Op\Expr\Array_
+                        && null !== $inner->result
+                        && $this->operandsReferToSameVariable($value, $inner->result)
+                    ) {
+                        $consumed[$j] = true;
+                    }
+                }
+            }
+        }
+        $roots = [];
+        foreach ($producers as $i => $producer) {
+            if ($producer instanceof Op\Expr\Array_ && !isset($consumed[$i])) {
+                $roots[] = $producer;
+            }
+        }
+
+        return $roots;
+    }
+
+    /**
      * php-cfg hoists chained assignment before a call with a dead arg temp (#6758, #9405).
      *
      * @param list<Op\Expr> $producers
@@ -12207,7 +12259,8 @@ class Compiler {
                 // Nested element literals (`array_column([[...], [...]], ...)`) are not call-arg producers (#9305).
                 if ($prev instanceof Op\Expr\Array_) {
                     if ($this->cfgExprUsesOperand($child, $prev->result)) {
-                        break;
+                        // Nested inline literal per arg (`[['b'=>1]]`) — keep walking for sibling arg roots (#10196).
+                        continue;
                     }
 
                     continue;
