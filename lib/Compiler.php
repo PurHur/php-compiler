@@ -2632,7 +2632,59 @@ class Compiler {
             ));
         }
 
+        $this->syncCoalesceResultToDistinctFuncCallArg($coalesce, $block, $resultOverride);
+
         return $block;
+    }
+
+    /**
+     * php-cfg may allocate a distinct temp for FuncCall args vs Coalesce->result (#9479, enum_int_cast_warning.phpt).
+     */
+    private function syncCoalesceResultToDistinctFuncCallArg(
+        Op\Expr\BinaryOp\Coalesce $coalesce,
+        Block $block,
+        ?Operand $resultOverride
+    ): void {
+        if (null === $block->orig) {
+            return;
+        }
+        $ops = $block->orig->children;
+        $coalesceIdx = null;
+        foreach ($ops as $idx => $op) {
+            if ($op === $coalesce) {
+                $coalesceIdx = $idx;
+                break;
+            }
+        }
+        if (null === $coalesceIdx) {
+            return;
+        }
+        for ($j = $coalesceIdx + 1, $count = count($ops); $j < $count; ++$j) {
+            $next = $ops[$j];
+            if ($this->isLoweredByFollowingCoalesce($next, $ops, $j)) {
+                continue;
+            }
+            if (!$next instanceof Op\Expr\FuncCall && !$next instanceof Op\Expr\NsFuncCall) {
+                return;
+            }
+            if (1 !== count($next->args)) {
+                return;
+            }
+            $arg = $next->args[0];
+            if ($this->operandsChainEqual($arg, $coalesce->result)) {
+                return;
+            }
+            $sourceSlot = $this->compileOperand($resultOverride ?? $coalesce->result, $block, true);
+            $destSlot = $this->compileOperand($arg, $block, false);
+            $block->addOpCode(new OpCode(
+                OpCode::TYPE_ASSIGN,
+                $destSlot,
+                $destSlot,
+                $sourceSlot
+            ));
+
+            return;
+        }
     }
 
     /**
