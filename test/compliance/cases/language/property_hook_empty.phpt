@@ -1,5 +1,5 @@
 --TEST--
-empty() on property hooks — uninitialized probes backing; initialized invokes get (#9696, zend_std_has_property)
+empty() on property hooks — get+set probes backing; get-only virtual invokes get (#10392, #9832)
 --FILE--
 <?php
 class VirtualGetOnly {
@@ -48,7 +48,6 @@ try {
 get runs for empty()
 bool(true)
 virtual ok
-get runs for empty()
 bool(false)
 ok
 bool(true)
