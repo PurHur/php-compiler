@@ -1154,8 +1154,7 @@ final class VmFs
      */
     public static function streamIsLocal(int $handle): bool
     {
-        $fp = self::lookup($handle);
-        if (null === $fp) {
+        if (!self::isValidHandle($handle)) {
             return false;
         }
 

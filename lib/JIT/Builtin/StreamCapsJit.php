@@ -248,12 +248,14 @@ final class StreamCapsJit
 
         $context->builder->positionAtEnd($openBb);
         $fp = self::loadTableSlot($context, self::GLOBAL_HANDLES, $handle);
-        $notOpen = $context->builder->icmp(Builder::INT_EQ, $fp, $nullPtr);
+        $path = self::loadTableSlot($context, self::GLOBAL_PATHS, $handle);
+        $fpNull = $context->builder->icmp(Builder::INT_EQ, $fp, $nullPtr);
+        $pathNull = $context->builder->icmp(Builder::INT_EQ, $path, $nullPtr);
+        $notOpen = $context->builder->and($fpNull, $pathNull);
         $pathBb = $fn->appendBasicBlock('caps_islocal_path');
         $context->builder->branchIf($notOpen, $failBb, $pathBb);
 
         $context->builder->positionAtEnd($pathBb);
-        $path = self::loadTableSlot($context, self::GLOBAL_PATHS, $handle);
         $urlBb = $fn->appendBasicBlock('caps_islocal_url');
         $localBb = $fn->appendBasicBlock('caps_islocal_local');
         self::branchIfUrlPath($context, $fn, $path, $urlBb, $localBb);
