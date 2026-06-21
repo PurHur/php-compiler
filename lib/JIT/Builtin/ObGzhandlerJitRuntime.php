@@ -390,11 +390,17 @@ final class ObGzhandlerJitRuntime
         $savedBuilder = $context->builder;
         $savedActive = $context->activeFunction;
         $restoreBlock = self::captureInsertBlock($context);
+        $savedBlockStorage = $context->scope->blockStorage;
+        $savedBlockEntryStorage = $context->scope->blockEntryStorage;
+        $context->scope->blockStorage = new \SplObjectStorage();
+        $context->scope->blockEntryStorage = new \SplObjectStorage();
         $prevSelfHostAot = \getenv('PHP_COMPILER_SELFHOST_AOT');
         if (\function_exists('putenv')) {
             \putenv('PHP_COMPILER_SELFHOST_AOT=0');
         }
         try {
+            // Nested helper compile must not inherit bridge CFG block maps (#8559, #9091).
+            $context->builder->clearInsertionPosition();
             $block = $runtime->parseAndCompile((string) \file_get_contents($path), 'ObGzhandlerJitHelper.php');
             if (null === $block) {
                 throw new \LogicException('ObGzhandlerJitHelper.php parseAndCompile failed (#9091)');
@@ -402,6 +408,8 @@ final class ObGzhandlerJitRuntime
             $jit = new JIT($context);
             $jit->compile($block);
         } finally {
+            $context->scope->blockStorage = $savedBlockStorage;
+            $context->scope->blockEntryStorage = $savedBlockEntryStorage;
             $context->builder = $savedBuilder;
             self::restoreInsertBlock($context, $restoreBlock);
             $context->activeFunction = $savedActive;

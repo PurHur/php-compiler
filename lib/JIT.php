@@ -643,7 +643,24 @@ class JIT {
             return $this->context->scope->blockEntryStorage[$branch];
         }
 
-        return $this->context->scope->blockStorage[$branch];
+        if ($this->context->scope->blockStorage->contains($branch)) {
+            $entry = $this->context->scope->blockStorage[$branch];
+            $this->context->scope->blockEntryStorage[$branch] = $entry;
+
+            return $entry;
+        }
+
+        throw new \UnexpectedValueException('Object not found');
+    }
+
+    /** Ensure CFG branch targets are compiled before JUMPIF wiring (#9091, ObGzhandlerJitHelper). */
+    private function resolveJitBranchEntryBlock(PHPLLVM\Value $func, Block $branch, Variable ...$args): PHPLLVM\BasicBlock
+    {
+        if (!$this->context->scope->blockStorage->contains($branch)) {
+            $this->compileBlockInternal($func, $branch, null, null, 0, true, ...$args);
+        }
+
+        return $this->jitBranchEntryBlock($branch);
     }
 
     /** Self-host AOT sets PHP_COMPILER_SELFHOST_AOT=1 (#816, #557). */
@@ -8074,8 +8091,8 @@ class JIT {
                             $this->compileBlockInternal($func, $firstArm, null, null, 0, false, ...$args);
                             $this->compileBlockInternal($func, $secondArm, null, null, 0, false, ...$args);
                         }
-                        $ifEntry = $this->jitBranchEntryBlock($op->block1);
-                        $elseEntry = $this->jitBranchEntryBlock($op->block2);
+                        $ifEntry = $this->resolveJitBranchEntryBlock($func, $op->block1, ...$args);
+                        $elseEntry = $this->resolveJitBranchEntryBlock($func, $op->block2, ...$args);
                         $builder->positionAtEnd($branchBlock);
                         if ($this->shouldFreeDeadVariablesBeforeBranch()) {
                             $this->context->freeDeadVariables($func, $branchBlock, $block);
@@ -8095,8 +8112,8 @@ class JIT {
                             ?? $this->context->inlineIncludeExitBlock
                             ?? $savedIncludeExit;
                     }
-                    $ifEntry = $this->jitBranchEntryBlock($op->block1);
-                    $elseEntry = $this->jitBranchEntryBlock($op->block2);
+                    $ifEntry = $this->resolveJitBranchEntryBlock($func, $op->block1, ...$args);
+                    $elseEntry = $this->resolveJitBranchEntryBlock($func, $op->block2, ...$args);
                     $builder->positionAtEnd($branchBlock);
                     if ($this->shouldFreeDeadVariablesBeforeBranch()) {
                         $this->context->freeDeadVariables($func, $branchBlock, $block);
