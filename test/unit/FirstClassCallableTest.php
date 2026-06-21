@@ -349,6 +349,27 @@ PHP;
         $this->assertSame('A', ob_get_clean());
     }
 
+    /** Issue #10473: inline builtin FCC as HOF callback must materialize Closure before outer call. */
+    public function testVmInlineBuiltinFirstClassCallableHigherOrderCallback(): void
+    {
+        $code = <<<'PHP'
+<?php
+var_export(array_map(strtoupper(...), ['a', 'b']));
+echo "\n";
+var_export(array_filter(['a', '', 'c'], strlen(...)));
+echo "\n";
+echo call_user_func_array(strtoupper(...), ['b']), "\n";
+PHP;
+        $rt = new Runtime();
+        $block = $rt->parseAndCompile($code, 'test.php');
+        ob_start();
+        $rt->run($block);
+        $this->assertSame(
+            "array (\n  0 => 'A',\n  1 => 'B',\n)\narray (\n  0 => 'a',\n  2 => 'c',\n)\nB\n",
+            ob_get_clean()
+        );
+    }
+
     public function testVmInstanceMethodFirstClassCallableDefaultParameterCompileError(): void
     {
         $code = <<<'PHP'

@@ -12158,6 +12158,15 @@ class Compiler {
                     array_unshift($producers, $prev);
                     break;
                 }
+                // php-cfg: `array_map(strtoupper(...), [...])` — FCC precedes Array_ (#10473).
+                if (
+                    $prev instanceof Op\Expr\FirstClassCallable
+                    || $prev instanceof Op\Expr\Closure
+                    || $prev instanceof Op\Expr\ArrowFunction
+                ) {
+                    array_unshift($producers, $prev);
+                    break;
+                }
                 // Sibling inline Array_ call args: `array_replace([...], [...])` (#10231).
                 // Nested element literals (`array_column([[...], [...]], ...)`) are not call-arg producers (#9305).
                 if ($prev instanceof Op\Expr\Array_) {
