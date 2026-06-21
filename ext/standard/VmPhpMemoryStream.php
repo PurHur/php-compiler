@@ -216,9 +216,17 @@ final class VmPhpMemoryStream
         if (null === $state || !$state->canRead) {
             return false;
         }
-        $maxLen = null === $length ? 8192 : $length;
-        if ($maxLen <= 0) {
-            return false;
+        if (null === $length) {
+            $maxLen = 8192;
+        } else {
+            if ($length <= 0) {
+                return false;
+            }
+            // php-src php_stream_fgets: at most $length - 1 bytes before newline/EOF.
+            $maxLen = $length - 1;
+            if ($maxLen <= 0) {
+                return false;
+            }
         }
 
         $line = '';
