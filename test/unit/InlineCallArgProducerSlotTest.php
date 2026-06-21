@@ -424,6 +424,53 @@ PHP;
         self::assertSame("array (\n  'a' => 2,\n  'b' => 3,\n)\n", ob_get_clean());
     }
 
+    /** Issue #10490 — inline array union + must wire Plus result slot, not dead array temps. */
+    public function testArrayUnionInlineLiteralUsesPlusResultSlot(): void
+    {
+        $code = <<<'PHP'
+<?php
+var_export([1 => 'a'] + [2 => 'b']);
+PHP;
+        $runtime = new Runtime();
+        $block = $runtime->parseAndCompile($code, 'array_union_inline_literals.php');
+
+        $plusSlot = null;
+        $sendSlots = [];
+        foreach ($block->opCodes as $op) {
+            if (OpCode::TYPE_PLUS === $op->type) {
+                $plusSlot = $op->arg1;
+            }
+            if (OpCode::TYPE_ARG_SEND === $op->type) {
+                $sendSlots[] = $op->arg1;
+            }
+        }
+
+        self::assertNotNull($plusSlot);
+        self::assertSame([$plusSlot], $sendSlots, 'arg sends='.json_encode($sendSlots));
+    }
+
+    /** Issue #10490 — array union inline literal runtime parity with Zend. */
+    public function testArrayUnionInlineLiteralRuntime(): void
+    {
+        $code = <<<'PHP'
+<?php
+var_export([1 => 'a'] + [2 => 'b']);
+echo "\n";
+var_export(['a' => 1] + ['a' => 2]);
+echo "\n";
+var_export([] + [1]);
+echo "\n";
+PHP;
+        $runtime = new Runtime();
+        $block = $runtime->parseAndCompile($code, 'array_union_inline_runtime.php');
+        ob_start();
+        $runtime->run($block);
+        self::assertSame(
+            "array (\n  1 => 'a',\n  2 => 'b',\n)\narray (\n  'a' => 1,\n)\narray (\n  0 => 1,\n)\n",
+            ob_get_clean()
+        );
+    }
+
     /** Bootstrap helloworld — New_ then static MethodCall (null var) must not TypeError in producer filter. */
     public function testNewStaticMethodCallCompilesWithoutOperandNullTypeError(): void
     {
