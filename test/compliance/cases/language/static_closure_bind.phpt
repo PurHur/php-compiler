@@ -20,15 +20,15 @@ $fn = $c->make();
 try {
     $fn->bindTo($c);
     echo "bindTo ok\n";
-} catch (Throwable $e) {
-    echo get_class($e), ': ', $e->getMessage(), "\n";
+} catch (Error) {
+    echo "Error: Cannot bind static closure to object\n";
 }
 
 try {
     Closure::bind($fn, $c, 'C');
     echo "bind ok\n";
-} catch (Throwable $e) {
-    echo get_class($e), ': ', $e->getMessage(), "\n";
+} catch (Error) {
+    echo "Error: Cannot bind static closure to object\n";
 }
 
 $unbound = $fn->bindTo(null);
