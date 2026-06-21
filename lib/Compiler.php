@@ -2215,16 +2215,16 @@ class Compiler {
             $this->compileOperand($rhs, $block, true),
         );
         $block->addOpCode($checkOp);
-        $assignOpsStart = count($block->opCodes);
 
         for ($j = $start; $j <= $end; ++$j) {
             $this->compileOp($ops[$j], $block);
         }
 
-        $checkOp->listUnpackNullInitSlots = $this->listUnpackNullInitSlotsFromCompiledOps(
-            $block,
-            $assignOpsStart,
-            count($block->opCodes)
+        $checkOp->listUnpackNullInitSlots = $this->listUnpackNullInitSlotsFromDestructOps(
+            $ops,
+            $start,
+            $end,
+            $block
         );
 
         $mergeBlock = new Block($block->orig);
@@ -2242,28 +2242,54 @@ class Compiler {
     }
 
     /**
-     * Dest scope slots for guarded list destruct skip path — null-init like Zend (#4325, #10486).
+     * Dest scope slots for guarded list destruct skip path — null-init like Zend (#4325, #10486, #10507).
+     *
+     * @param Op[] $ops
      */
-    private function listUnpackNullInitSlotsFromCompiledOps(Block $block, int $start, int $end): array
+    private function listUnpackNullInitSlotsFromDestructOps(array $ops, int $start, int $end, Block $block): array
     {
         $slots = [];
         $seen = [];
-        for ($i = $start; $i < $end; ++$i) {
-            $compiled = $block->opCodes[$i];
-            $destSlot = null;
-            if (OpCode::TYPE_ASSIGN === $compiled->type && null !== $compiled->arg2) {
-                $destSlot = (int) $compiled->arg2;
-            } elseif (OpCode::TYPE_ASSIGN_REF === $compiled->type && null !== $compiled->arg1) {
-                $destSlot = (int) $compiled->arg1;
-            }
-            if (null === $destSlot || isset($seen[$destSlot])) {
+        $j = $start;
+        while ($j <= $end) {
+            if ($this->isListSpreadAssignOp($ops[$j])) {
+                /** @var Op\Expr\Assign $spread */
+                $spread = $ops[$j];
+                $this->appendListDestructNullInitSlot($block, $spread->var, $slots, $seen);
+                ++$j;
                 continue;
             }
-            $seen[$destSlot] = true;
-            $slots[] = $destSlot;
+            if (
+                $this->isPlainListDestructDimFetch($ops, $j)
+                || $this->isKeyedListDestructDimFetch($ops, $j)
+            ) {
+                $assignIndex = $this->listDestructSlotAssignIndex($ops, $j);
+                if (null !== $assignIndex) {
+                    /** @var Op\Expr\Assign|Op\Expr\AssignRef $assign */
+                    $assign = $ops[$assignIndex];
+                    $this->appendListDestructNullInitSlot($block, $assign->var, $slots, $seen);
+                    $j = $assignIndex + 1;
+                    continue;
+                }
+            }
+            ++$j;
         }
 
         return $slots;
+    }
+
+    private function appendListDestructNullInitSlot(
+        Block $block,
+        Operand $writeTarget,
+        array &$slots,
+        array &$seen
+    ): void {
+        $slot = $block->getVarSlot($writeTarget, false);
+        if (isset($seen[$slot])) {
+            return;
+        }
+        $seen[$slot] = true;
+        $slots[] = $slot;
     }
 
     private function splitCfgBlockAfterStringKeyedArray(Block $block): Block

@@ -3009,6 +3009,11 @@ restart:
                                 $dest->resolveIndirect()->null();
                                 $this->markScopeSlotInitialized($frame, (int) $destSlot);
                             }
+                            if (null !== $op->block1) {
+                                foreach ($op->listUnpackNullInitSlots as $destSlot) {
+                                    unset($op->block1->constants[(int) $destSlot]);
+                                }
+                            }
                             // String and other non-array RHS: skip slot binds, targets read as NULL (#4325, #10486).
                             $frame = $this->frameForBranch($frame, $op->block1);
                             goto restart;
@@ -10917,6 +10922,10 @@ restart:
             $const = $frame->block->constants[$slot];
         }
         if (isset($frame->scope[$slot])) {
+            // Zend CV init: explicit NULL must not lose to block constants from skipped list dim temps (#10507).
+            if (isset($frame->initializedSlots[$slot])) {
+                return $frame->scope[$slot];
+            }
             // Named locals must stay tied to scope for by-ref outgoing calls (#9505, #9700).
             if (null !== $frame->block && $frame->block->isNamedVariableSlot($slot)) {
                 return $frame->scope[$slot];
