@@ -5869,8 +5869,7 @@ final class ArrayBuiltinHelper
         $context->builder->branch($rowDone);
 
         $context->builder->positionAtEnd($columnMissing);
-        self::appendNullAtIndex($context, $dest, $destIdx);
-        $context->builder->branch($rowDone);
+        $context->builder->branch($advance);
 
         $context->builder->positionAtEnd($rowNullBlock);
         self::appendNullAtIndex($context, $dest, $destIdx);
@@ -5974,9 +5973,22 @@ final class ArrayBuiltinHelper
             $context->lookupFunction('__value__readHashtable'),
             $rowEntry
         );
+        $columnIsSet = $context->builder->call(
+            $context->lookupFunction('__hashtable__offsetIsSetStringKey'),
+            $rowHt,
+            $columnKeyStr
+        );
+        $columnPresent = BasicBlockHelper::append($context, 'array_column_col_present_'.$tag);
+        $columnMissing = BasicBlockHelper::append($context, 'array_column_col_missing_'.$tag);
+        $context->builder->branchIf($columnIsSet, $columnPresent, $columnMissing);
+
+        $context->builder->positionAtEnd($columnPresent);
         $cell = HashTableHelper::readStringKeyToValueBox($context, $rowHt, $columnKeyStr);
         HashTableHelper::setAtIndex($context, $dest, $destIdx, $cell);
         $context->builder->branch($rowDone);
+
+        $context->builder->positionAtEnd($columnMissing);
+        $context->builder->branch($advance);
 
         $context->builder->positionAtEnd($rowNullBlock);
         self::appendNullAtIndex($context, $dest, $destIdx);
