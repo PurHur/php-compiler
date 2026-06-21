@@ -16,6 +16,7 @@ use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\Variable as JITVariable;
+use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
 
 /**
@@ -34,6 +35,10 @@ final class str_repeat extends Internal
             0,
             'string'
         );
+        $timesArg = $frame->calledArgs[1]->resolveIndirect();
+        if (Variable::TYPE_FLOAT === $timesArg->type && null !== $frame->vmContext) {
+            VmMath::warnFloatToIntPrecisionLoss($timesArg->toFloat(), $frame->vmContext, $frame);
+        }
         $times = VmMath::parseIntBuiltinArg(
             $frame->calledArgs[1],
             'str_repeat',
@@ -55,7 +60,7 @@ final class str_repeat extends Internal
         if (2 !== count($args)) {
             throw new \LogicException('str_repeat() requires exactly two arguments');
         }
-        $multiplier = JitIntdiv::lowerIntBuiltinArg($context, $args[1], 'str_repeat', 2, 'times');
+        $multiplier = JitIntdiv::lowerIntBuiltinArg($context, $args[1], 'str_repeat', 2, 'times', true);
         JitStrRepeat::emitRuntimeTimesGuard($context, $multiplier);
 
         return JitStrRepeat::repeat(
