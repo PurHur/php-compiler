@@ -126,10 +126,9 @@ final class ClassConstExpr
             $value = $context->constantFetch($frame->scope[$op->arg2]->toString());
         }
         if (null === $value) {
-            $constName = $frame->scope[$op->arg2]->toString();
-            if (null !== $op->arg3) {
-                $constName = $frame->scope[$op->arg3]->toString().'\\'.$constName;
-            }
+            $constName = null !== $op->arg3
+                ? $frame->scope[$op->arg3]->toString()
+                : $frame->scope[$op->arg2]->toString();
             throw new \Error(sprintf('Undefined constant "%s"', $constName));
         }
         $frame->scope[$op->arg1]->copyFrom($value);

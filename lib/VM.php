@@ -3848,10 +3848,10 @@ restart:
                         $value = $this->context->constantFetch($frame->scope[$op->arg2]->toString());
                     }
                     if (is_null($value)) {
-                        $constName = $frame->scope[$op->arg2]->toString();
-                        if (null !== $op->arg3) {
-                            $constName = $frame->scope[$op->arg3]->toString().'\\'.$constName;
-                        }
+                        // php-cfg nsName is already namespace\NAME for unqualified bare constants (#10510).
+                        $constName = null !== $op->arg3
+                            ? $frame->scope[$op->arg3]->toString()
+                            : $frame->scope[$op->arg2]->toString();
                         $catchFrame = $this->dispatchVmError(
                             sprintf('Undefined constant "%s"', $constName),
                             $frame

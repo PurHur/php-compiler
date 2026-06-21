@@ -7286,7 +7286,8 @@ class JIT {
                         if (null !== $op->arg3) {
                             $ns = $block->getOperand($op->arg3);
                             if ($ns instanceof Operand\Literal) {
-                                $label = (string) $ns->value.'\\'.$label;
+                                // php-cfg nsName is already namespace\NAME for unqualified bare constants (#10510).
+                                $label = (string) $ns->value;
                             }
                         }
                         $bundleConst = $this->jitFoldPhpCompilerBundleConstant($label);
