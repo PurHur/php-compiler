@@ -83,6 +83,51 @@ final class EnumSupport
     }
 
     /**
+     * Enum::cases() / UnitEnum::cases() result — declaration-order dense list (#3308, #10395).
+     *
+     * php-src: Zend/zend_enum.c — zend_enum_list_cases
+     */
+    public static function casesList(ClassEntry $enum, ?Context $context): Variable
+    {
+        $enum = self::resolveRuntimeEnumClass($context, $enum);
+        self::ensureBackedEnumValuesUnique($enum);
+        $result = new Variable();
+        $result->newArray();
+        $ht = $result->toArray();
+        foreach (self::enumCaseNamesInOrder($enum) as $index => $caseName) {
+            $ht->addIndex($index, self::materializeCaseForCasesList($enum, $caseName));
+        }
+
+        return $result;
+    }
+
+    /**
+     * Single enum case object for cases() list entries — shared with {@see Builtin\EnumCases}.
+     */
+    public static function materializeCaseForCasesList(ClassEntry $enum, string $caseName): Variable
+    {
+        $canonical = BackedEnum::canonicalCaseVariable($enum, $caseName);
+        if (null !== $canonical) {
+            $caseVar = new Variable();
+            $caseVar->copyFrom($canonical->resolveIndirect());
+
+            return $caseVar;
+        }
+        $backing = new Variable(Variable::TYPE_NULL);
+        $backing->null();
+        if (null !== $enum->backedType) {
+            $memberLc = strtolower($caseName);
+            if (isset($enum->constants[$memberLc])) {
+                $backing->copyFrom(
+                    BackedEnum::caseBackingScalar($enum->backedType, $enum->constants[$memberLc])
+                );
+            }
+        }
+
+        return EnumCaseSupport::createCase($enum, $caseName, $backing);
+    }
+
+    /**
      * Enum case names in declaration order — {@see ClassEntry::$enumCases} or constants fallback (#9682, #9603).
      *
      * @return list<string>
