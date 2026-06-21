@@ -67,6 +67,7 @@ final class StreamIoJit
 
         self::implementIfMissing($context, '__compiler_fwrite', self::emitFwrite(...));
         self::implementIfMissing($context, '__phpc_try_fopen_stdio', self::emitTryFopenStdio(...));
+        self::implementIfMissing($context, '__phpc_try_fopen_php_memory', self::emitTryFopenPhpMemory(...));
         self::implementIfMissing($context, '__compiler_fopen', self::emitFopen(...));
         self::implementIfMissing($context, '__compiler_popen', self::emitPopen(...));
         self::implementIfMissing($context, '__compiler_tmpfile', self::emitTmpfile(...));
@@ -108,6 +109,7 @@ final class StreamIoJit
         self::implementBinaryI64Stub($context, '__compiler_popen', $minusOne);
         self::implementBinaryStrStub($context, '__compiler_fread', $nullStr);
         self::implementBinaryPtrStub($context, '__phpc_try_fopen_stdio', $nullPtr);
+        self::implementBinaryPtrStub($context, '__phpc_try_fopen_php_memory', $nullPtr);
     }
 
     private static function implementNullaryI64Stub(Context $context, string $name, Value $ret): void
@@ -254,6 +256,10 @@ final class StreamIoJit
                 $name,
                 $context->context->functionType($i8p, false, $i8p, $i8p)
             ),
+            '__phpc_try_fopen_php_memory' => $context->module->addFunction(
+                $name,
+                $context->context->functionType($i8p, false, $i8p, $i8p)
+            ),
             default => throw new \LogicException('StreamIoJit: unknown '.$name),
         };
         $context->registerFunction($name, $fn);
@@ -286,6 +292,7 @@ final class StreamIoJit
             ['fread', $sizeT, [$i8p, $sizeT, $sizeT, $i8p]],
             ['ferror', $i32, [$i8p]],
             ['strcmp', $i32, [$i8p, $i8p]],
+            ['strncmp', $i32, [$i8p, $i8p, $sizeT]],
             ['dup', $i32, [$i32]],
             ['fdopen', $i8p, [$i32, $i8p]],
             ['close', $i32, [$i32]],
@@ -543,6 +550,60 @@ final class StreamIoJit
         $context->builder->returnValue($nullPtr);
     }
 
+    /**
+     * __phpc_try_fopen_php_memory(path, mode) — tmpfile() for php://memory|temp (#10487, ext/standard/streams.c).
+     */
+    private static function emitTryFopenPhpMemory(Context $context, LlvmFunction $fn): void
+    {
+        $entry = $fn->appendBasicBlock('php_mem_try_entry');
+        $context->builder->positionAtEnd($entry);
+
+        $path = $fn->getParam(0);
+        $i32 = $context->getTypeFromString('int32');
+        $i8p = $context->getTypeFromString('int8*');
+        $sizeT = $context->getTypeFromString('size_t');
+        $nullPtr = $i8p->constNull();
+        $zero = $i32->constInt(0, false);
+
+        $missBb = $fn->appendBasicBlock('php_mem_try_miss');
+        $tempCheckBb = $fn->appendBasicBlock('php_mem_try_temp_check');
+        $openBb = $fn->appendBasicBlock('php_mem_try_open');
+        $failBb = $fn->appendBasicBlock('php_mem_try_fail');
+        $okBb = $fn->appendBasicBlock('php_mem_try_ok');
+
+        $isMemory = $context->builder->call(
+            $context->lookupFunction('strcmp'),
+            $path,
+            self::literalCstr($context, 'php://memory')
+        );
+        $memoryMatch = $context->builder->icmp(Builder::INT_EQ, $isMemory, $zero);
+        $context->builder->branchIf($memoryMatch, $openBb, $tempCheckBb);
+
+        $context->builder->positionAtEnd($tempCheckBb);
+        $isTemp = $context->builder->call(
+            $context->lookupFunction('strncmp'),
+            $path,
+            self::literalCstr($context, 'php://temp'),
+            $sizeT->constInt(10, false)
+        );
+        $tempMatch = $context->builder->icmp(Builder::INT_EQ, $isTemp, $zero);
+        $context->builder->branchIf($tempMatch, $openBb, $missBb);
+
+        $context->builder->positionAtEnd($openBb);
+        $fp = $context->builder->call($context->lookupFunction('tmpfile'));
+        $fpNull = $context->builder->icmp(Builder::INT_EQ, $fp, $nullPtr);
+        $context->builder->branchIf($fpNull, $failBb, $okBb);
+
+        $context->builder->positionAtEnd($okBb);
+        $context->builder->returnValue($fp);
+
+        $context->builder->positionAtEnd($missBb);
+        $context->builder->returnValue($nullPtr);
+
+        $context->builder->positionAtEnd($failBb);
+        $context->builder->returnValue($nullPtr);
+    }
+
     private static function fdopenDupStdio(
         Context $context,
         LlvmFunction $fn,
@@ -711,10 +772,25 @@ final class StreamIoJit
                 self::stringData($context, $path),
                 self::stringData($context, $mode)
             );
+            $phpMemBb = $fn->appendBasicBlock($prefix.'_php_mem');
             $plainBb = $fn->appendBasicBlock($prefix.'_plain');
             $mergeBb = $fn->appendBasicBlock($prefix.'_fp_merge');
             $stdioNull = $context->builder->icmp(Builder::INT_EQ, $stdioFp, $nullPtr);
-            $context->builder->branchIf($stdioNull, $plainBb, $mergeBb);
+            $context->builder->branchIf($stdioNull, $phpMemBb, $mergeBb);
+
+            $context->builder->positionAtEnd($phpMemBb);
+            $phpMemFp = $context->builder->call(
+                $context->lookupFunction('__phpc_try_fopen_php_memory'),
+                self::stringData($context, $path),
+                self::stringData($context, $mode)
+            );
+            $phpMemOkBb = $fn->appendBasicBlock($prefix.'_php_mem_ok');
+            $phpMemNull = $context->builder->icmp(Builder::INT_EQ, $phpMemFp, $nullPtr);
+            $context->builder->branchIf($phpMemNull, $plainBb, $phpMemOkBb);
+
+            $context->builder->positionAtEnd($phpMemOkBb);
+            $phpMemTail = $context->builder->getInsertBlock();
+            $context->builder->branch($mergeBb);
 
             $context->builder->positionAtEnd($plainBb);
             $plainFp = $context->builder->call(
@@ -728,6 +804,7 @@ final class StreamIoJit
             $context->builder->positionAtEnd($mergeBb);
             $fpPhi = $context->builder->phi($i8p, $prefix.'_fp');
             $fpPhi->addIncoming($stdioFp, $openBb);
+            $fpPhi->addIncoming($phpMemFp, $phpMemOkBb);
             $fpPhi->addIncoming($plainFp, $plainTail);
             $fp = $fpPhi;
         } else {
