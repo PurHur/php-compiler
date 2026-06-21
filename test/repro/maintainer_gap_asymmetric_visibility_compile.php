@@ -1,4 +1,4 @@
 <?php
 class C {
-    public private(set) int $x = 1;
+    private(set) int $x = 1;
 }

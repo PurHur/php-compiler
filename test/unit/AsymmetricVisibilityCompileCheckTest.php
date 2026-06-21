@@ -51,16 +51,17 @@ PHP,
         );
     }
 
-    public function testPublicPrivateSetCompiles(): void
+    public function testPublicPrivateSetCompileErrors(): void
     {
-        $runtime = new Runtime();
-        $block = $runtime->parseAndCompile(<<<'PHP'
+        $this->expectCompileError(
+            <<<'PHP'
 <?php
 class Demo {
     public private(set) string $name = 'a';
 }
-PHP, 'asymmetric_ok.php');
-        $this->assertNotNull($block);
+PHP,
+            AsymmetricVisibilityCompileCheck::MULTIPLE_MODIFIERS_MESSAGE
+        );
     }
 
     public function testPromotedPublicPrivateSetCompileErrors(): void
