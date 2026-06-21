@@ -1,8 +1,5 @@
 <?php
 namespace N;
-try {
-    var_export(empty(UNDEF_CONST));
-} catch (Throwable $e) {
-    echo get_class($e), "\n";
-    echo $e->getMessage(), "\n";
-}
+var_export(empty(UNDEF_CONST));
+// Zend fatal: Undefined constant "N\UNDEF_CONST"
+// VM fatal:    Undefined constant "N\UNDEF_CONST\UNDEF_CONST"

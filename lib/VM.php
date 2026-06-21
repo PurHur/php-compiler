@@ -3848,7 +3848,7 @@ restart:
                         $value = $this->context->constantFetch($frame->scope[$op->arg2]->toString());
                     }
                     if (is_null($value)) {
-                        // php-cfg nsName is already namespace\NAME for unqualified bare constants (#10510).
+                        // arg3 is php-cfg's namespace-qualified name (N\NAME), not bare namespace (#10510).
                         $constName = null !== $op->arg3
                             ? $frame->scope[$op->arg3]->toString()
                             : $frame->scope[$op->arg2]->toString();
