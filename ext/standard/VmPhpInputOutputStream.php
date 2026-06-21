@@ -154,6 +154,22 @@ final class VmPhpInputOutputStream
         return true;
     }
 
+    /** @return int|false previous chunk size */
+    public static function setChunkSize(int $handle, int $chunkSize): int|false
+    {
+        $state = self::$streams[$handle] ?? null;
+        if (null === $state) {
+            return false;
+        }
+        if ($chunkSize <= 0) {
+            throw new \ValueError('stream_set_chunk_size(): Argument #2 ($size) must be greater than 0');
+        }
+        $previous = $state->chunkSize;
+        $state->chunkSize = $chunkSize;
+
+        return $previous;
+    }
+
     public static function streamGetContents(int $handle, int $maxlength = -1, int $offset = -1): string|false
     {
         $state = self::$streams[$handle] ?? null;
@@ -235,6 +251,8 @@ final class VmPhpInputOutputStream
 
 final class PhpInputOutputStreamState
 {
+    public int $chunkSize = VmPhpMemoryStream::DEFAULT_CHUNK_SIZE;
+
     public string $buffer;
 
     public int $position = 0;
