@@ -4,26 +4,36 @@ declare(strict_types=1);
 
 namespace PHPCompiler\JIT\Builtin;
 
+use PHPCompiler\JIT;
 use PHPCompiler\JIT\Builtin;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\VM\ObStackLimits;
 use PHPLLVM\Builder;
 use PHPLLVM\Value;
+use PHPLLVM\Value\Function_ as LlvmFunction;
 
 /**
- * LLVM ob_get_status() metadata from OB stack globals (issue #5609, #3647).
+ * JIT/AOT link for ob_get_status() / ob_list_handlers() via ObStatusJitHelper PHP (#9497).
  *
+ * VM SSOT: {@see \PHPCompiler\ext\standard\VmOb}
  * php-src: ext/standard/output.c — PHP_FUNCTION(ob_get_status)
  */
 final class ObStatusRuntime
 {
     private const HANDLER_NAME = 'default output handler';
 
-    private const HANDLER_TYPE = 0;
+    private const HELPER_PATH = '/ext/standard/ObStatusJitHelper.php';
 
-    private const HANDLER_FLAGS = 112;
+    private const BUILD_STATUS_PARTIAL = 'PHPCompiler\\ext\\standard\\ObStatusJitHelper::buildStatusEntryPartial';
 
-    private const DEFAULT_BUFFER_SIZE = 16384;
+    private const FN_GET_STATUS = '__phpc_ob_get_status_ht';
+
+    private const FN_LIST_HANDLERS = '__phpc_ob_list_handlers_ht';
+
+    /** @var list<string> */
+    private const COMPILED_HELPERS = [
+        self::BUILD_STATUS_PARTIAL,
+    ];
 
     public static function ensureLinked(Context $context): void
     {
@@ -32,9 +42,9 @@ final class ObStatusRuntime
 
     public static function implement(Context $context): void
     {
-        $probe = $context->module->getNamedFunction('__phpc_ob_get_status_ht');
+        $probe = $context->module->getNamedFunction(self::FN_GET_STATUS);
         if (null !== $probe && $probe->countBasicBlocks() > 0) {
-            $listProbe = $context->module->getNamedFunction('__phpc_ob_list_handlers_ht');
+            $listProbe = $context->module->getNamedFunction(self::FN_LIST_HANDLERS);
             if (null !== $listProbe && $listProbe->countBasicBlocks() > 0) {
                 self::registerLinkedRuntime($context);
 
@@ -45,108 +55,66 @@ final class ObStatusRuntime
         ObOutput::registerExternals($context);
         self::ensureBufferUsedDecl($context);
         self::ensureHashtableHelpers($context);
-
-        $i32 = $context->getTypeFromString('int32');
-        $htPtr = $context->getTypeFromString('__hashtable__*');
-
-        $entryProbe = $context->module->getNamedFunction('__phpc_ob_status_entry');
-        $ftEntry = $context->context->functionType($htPtr, false, $i32);
-        $fnEntry = null !== $entryProbe
-            ? $entryProbe
-            : $context->module->addFunction('__phpc_ob_status_entry', $ftEntry);
-        self::implementStatusEntry($context, $fnEntry);
-
-        $statusProbe = $context->module->getNamedFunction('__phpc_ob_get_status_ht');
-        $ftStatus = $context->context->functionType($htPtr, false, $i32);
-        $fnStatus = null !== $statusProbe
-            ? $statusProbe
-            : $context->module->addFunction('__phpc_ob_get_status_ht', $ftStatus);
-        self::implementGetStatus($context, $fnStatus, $fnEntry);
-
-        $listProbe = $context->module->getNamedFunction('__phpc_ob_list_handlers_ht');
-        $ftList = $context->context->functionType($htPtr, false);
-        $fnList = null !== $listProbe
-            ? $listProbe
-            : $context->module->addFunction('__phpc_ob_list_handlers_ht', $ftList);
-        self::implementListHandlers($context, $fnList);
-
+        self::ensureJitHelperCompiled($context);
+        self::registerDeclarations($context);
+        self::implementGetStatusBridge($context);
+        self::implementListHandlers($context);
         self::registerLinkedRuntime($context);
-    }
-
-    private static function implementStatusEntry(Context $context, Value $fn): void
-    {
-        $entry = $fn->appendBasicBlock('ose_entry');
-        $context->builder->positionAtEnd($entry);
-
-        $levelIdx = $fn->getParam(0);
-        $ht = $context->builder->call($context->lookupFunction('__hashtable__alloc'));
-        $used = self::emitBufferUsed($context, $levelIdx);
-
-        $setLong = $context->lookupFunction('__hashtable__setStringKeyLong');
-        $setString = $context->lookupFunction('__hashtable__setStringKeyString');
-        $i64 = $context->getTypeFromString('int64');
-
-        $context->builder->call(
-            $setString,
-            $ht,
-            self::literalKeyString($context, 'name'),
-            self::literalValueString($context, self::HANDLER_NAME)
-        );
-        $context->builder->call(
-            $setLong,
-            $ht,
-            self::literalKeyString($context, 'type'),
-            $i64->constInt(self::HANDLER_TYPE, false)
-        );
-        $context->builder->call(
-            $setLong,
-            $ht,
-            self::literalKeyString($context, 'flags'),
-            $i64->constInt(self::HANDLER_FLAGS, false)
-        );
-        $context->builder->call(
-            $setLong,
-            $ht,
-            self::literalKeyString($context, 'level'),
-            $context->builder->sext($levelIdx, $i64)
-        );
-        $context->builder->call(
-            $setLong,
-            $ht,
-            self::literalKeyString($context, 'chunk_size'),
-            $i64->constInt(0, false)
-        );
-        $context->builder->call(
-            $setLong,
-            $ht,
-            self::literalKeyString($context, 'buffer_size'),
-            $i64->constInt(self::DEFAULT_BUFFER_SIZE, false)
-        );
-        $context->builder->call(
-            $setLong,
-            $ht,
-            self::literalKeyString($context, 'buffer_used'),
-            $used
-        );
-
-        $context->builder->returnValue($ht);
         $context->builder->clearInsertionPosition();
     }
 
-    private static function implementGetStatus(Context $context, Value $fn, Value $fnEntry): void
+    private static function registerDeclarations(Context $context): void
     {
-        $entry = $fn->appendBasicBlock('ogs_entry');
+        $htPtr = $context->getTypeFromString('__hashtable__*');
+        $i32 = $context->getTypeFromString('int32');
+        self::declareIfMissing(
+            $context,
+            self::FN_GET_STATUS,
+            $context->context->functionType($htPtr, false, $i32)
+        );
+        self::declareIfMissing(
+            $context,
+            self::FN_LIST_HANDLERS,
+            $context->context->functionType($htPtr, false)
+        );
+    }
+
+    private static function declareIfMissing(Context $context, string $name, $ft): void
+    {
+        if (null !== $context->module->getNamedFunction($name)) {
+            return;
+        }
+        $fn = $context->module->addFunction($name, $ft);
+        $context->registerFunction($name, $fn);
+    }
+
+    private static function implementGetStatusBridge(Context $context): void
+    {
+        $abiName = self::FN_GET_STATUS;
+        $probe = $context->module->getNamedFunction($abiName);
+        if (null !== $probe && $probe->countBasicBlocks() > 0) {
+            $context->registerFunction($abiName, $probe);
+
+            return;
+        }
+
+        $htPtr = $context->getTypeFromString('__hashtable__*');
+        $i32 = $context->getTypeFromString('int32');
+        $i64 = $context->getTypeFromString('int64');
+        $sizeT = $context->getTypeFromString('size_t');
+        $ft = $context->context->functionType($htPtr, false, $i32);
+        $fn = null !== $probe
+            ? $probe
+            : $context->module->addFunction($abiName, $ft);
+
+        $entry = $fn->appendBasicBlock('ogs_bridge_entry');
         $emptyBb = $fn->appendBasicBlock('ogs_empty');
         $routeBb = $fn->appendBasicBlock('ogs_route');
         $topBb = $fn->appendBasicBlock('ogs_top');
         $fullBb = $fn->appendBasicBlock('ogs_full');
         $context->builder->positionAtEnd($entry);
 
-        $full = $fn->getParam(0);
-        $i32 = $context->getTypeFromString('int32');
-        $i64 = $context->getTypeFromString('int64');
-        $sizeT = $context->getTypeFromString('size_t');
-
+        $fullArg = $fn->getParam(0);
         $level = $context->builder->call($context->lookupFunction('__phpc_ob_get_level'));
         $hasBuffers = $context->builder->icmp(
             Builder::INT_NE,
@@ -157,31 +125,31 @@ final class ObStatusRuntime
 
         $context->builder->positionAtEnd($emptyBb);
         $context->builder->returnValue($context->builder->call($context->lookupFunction('__hashtable__alloc')));
-        $context->builder->positionAtEnd($routeBb);
 
+        $context->builder->positionAtEnd($routeBb);
         $wantFull = $context->builder->icmp(
             Builder::INT_NE,
-            $context->builder->trunc($full, $i32),
+            $context->builder->trunc($fullArg, $i32),
             $i32->constInt(0, false)
         );
         $context->builder->branchIf($wantFull, $fullBb, $topBb);
 
         $context->builder->positionAtEnd($topBb);
         $activeIdx = $context->builder->sub($level, $i32->constInt(1, false));
-        $topHt = $context->builder->call($fnEntry, $activeIdx);
+        $used = self::emitBufferUsed($context, $activeIdx);
+        $topHt = self::emitStatusEntryWithName($context, $activeIdx, $used);
         $context->builder->returnValue($topHt);
 
         $context->builder->positionAtEnd($fullBb);
         $list = $context->builder->call($context->lookupFunction('__hashtable__alloc'));
         $setAt = $context->lookupFunction('__hashtable__setHashtableAt');
-
         $loopInit = $fn->appendBasicBlock('ogs_loop_init');
         $loopCond = $fn->appendBasicBlock('ogs_loop_cond');
         $loopBody = $fn->appendBasicBlock('ogs_loop_body');
         $loopInc = $fn->appendBasicBlock('ogs_loop_inc');
         $loopDone = $fn->appendBasicBlock('ogs_loop_done');
-
         $context->builder->branch($loopInit);
+
         $context->builder->positionAtEnd($loopInit);
         $iVar = $context->builder->alloca($i32, 'ogs_i');
         $context->builder->store($i32->constInt(0, false), $iVar);
@@ -193,7 +161,8 @@ final class ObStatusRuntime
         $context->builder->branchIf($continueLoop, $loopBody, $loopDone);
 
         $context->builder->positionAtEnd($loopBody);
-        $entryHt = $context->builder->call($fnEntry, $iLoad);
+        $used = self::emitBufferUsed($context, $iLoad);
+        $entryHt = self::emitStatusEntryWithName($context, $iLoad, $used);
         $context->builder->call(
             $setAt,
             $list,
@@ -211,11 +180,47 @@ final class ObStatusRuntime
 
         $context->builder->positionAtEnd($loopDone);
         $context->builder->returnValue($list);
-        $context->builder->clearInsertionPosition();
+        $context->registerFunction($abiName, $fn);
     }
 
-    private static function implementListHandlers(Context $context, Value $fn): void
+    private static function emitStatusEntryWithName(Context $context, Value $levelIdx, Value $bufferUsed): Value
     {
+        $ht = $context->builder->call(
+            self::helperFunction($context, self::BUILD_STATUS_PARTIAL),
+            $context->builder->sext($levelIdx, $context->getTypeFromString('int64')),
+            $bufferUsed
+        );
+        self::attachHandlerName($context, $ht);
+
+        return $ht;
+    }
+
+    private static function attachHandlerName(Context $context, Value $ht): void
+    {
+        $context->builder->call(
+            $context->lookupFunction('__hashtable__setStringKeyString'),
+            $ht,
+            self::literalKeyString($context, 'name'),
+            self::literalValueString($context, self::HANDLER_NAME)
+        );
+    }
+
+    private static function implementListHandlers(Context $context): void
+    {
+        $abiName = self::FN_LIST_HANDLERS;
+        $probe = $context->module->getNamedFunction($abiName);
+        if (null !== $probe && $probe->countBasicBlocks() > 0) {
+            $context->registerFunction($abiName, $probe);
+
+            return;
+        }
+
+        $htPtr = $context->getTypeFromString('__hashtable__*');
+        $ft = $context->context->functionType($htPtr, false);
+        $fn = null !== $probe
+            ? $probe
+            : $context->module->addFunction($abiName, $ft);
+
         $entry = $fn->appendBasicBlock('olh_entry');
         $emptyBb = $fn->appendBasicBlock('olh_empty');
         $loopInit = $fn->appendBasicBlock('olh_loop_init');
@@ -270,7 +275,25 @@ final class ObStatusRuntime
 
         $context->builder->positionAtEnd($loopDone);
         $context->builder->returnValue($list);
-        $context->builder->clearInsertionPosition();
+        $context->registerFunction($abiName, $fn);
+    }
+
+    private static function literalKeyString(Context $context, string $text): Value
+    {
+        return self::literalValueString($context, $text);
+    }
+
+    private static function literalValueString(Context $context, string $text): Value
+    {
+        $i64 = $context->getTypeFromString('int64');
+        $i8p = $context->getTypeFromString('int8*');
+        $cstr = $context->builder->pointerCast($context->constantFromString($text), $i8p);
+
+        return $context->builder->call(
+            $context->lookupFunction('__string__init'),
+            $i64->constInt(\strlen($text), false),
+            $cstr
+        );
     }
 
     private static function emitBufferUsed(Context $context, Value $levelIdx): Value
@@ -315,24 +338,6 @@ final class ObStatusRuntime
         );
     }
 
-    private static function literalKeyString(Context $context, string $text): Value
-    {
-        return self::literalValueString($context, $text);
-    }
-
-    private static function literalValueString(Context $context, string $text): Value
-    {
-        $i64 = $context->getTypeFromString('int64');
-        $i8p = $context->getTypeFromString('int8*');
-        $cstr = $context->builder->pointerCast($context->constantFromString($text), $i8p);
-
-        return $context->builder->call(
-            $context->lookupFunction('__string__init'),
-            $i64->constInt(\strlen($text), false),
-            $cstr
-        );
-    }
-
     private static function ensureHashtableHelpers(Context $context): void
     {
         $htPtr = $context->getTypeFromString('__hashtable__*');
@@ -340,21 +345,12 @@ final class ObStatusRuntime
         $i64 = $context->getTypeFromString('int64');
         $sizeT = $context->getTypeFromString('size_t');
         $voidTy = $context->getTypeFromString('void');
+        $i8p = $context->getTypeFromString('int8*');
 
         self::ensureExternal(
             $context,
             '__hashtable__alloc',
             $context->context->functionType($htPtr, false)
-        );
-        self::ensureExternal(
-            $context,
-            '__hashtable__setStringKeyLong',
-            $context->context->functionType($voidTy, false, $htPtr, $strPtr, $i64)
-        );
-        self::ensureExternal(
-            $context,
-            '__hashtable__setStringKeyString',
-            $context->context->functionType($voidTy, false, $htPtr, $strPtr, $strPtr)
         );
         self::ensureExternal(
             $context,
@@ -368,8 +364,13 @@ final class ObStatusRuntime
         );
         self::ensureExternal(
             $context,
+            '__hashtable__setStringKeyString',
+            $context->context->functionType($voidTy, false, $htPtr, $strPtr, $strPtr)
+        );
+        self::ensureExternal(
+            $context,
             '__string__init',
-            $context->context->functionType($strPtr, false, $i64, $context->getTypeFromString('int8*'))
+            $context->context->functionType($strPtr, false, $i64, $i8p)
         );
     }
 
@@ -377,18 +378,73 @@ final class ObStatusRuntime
     {
         try {
             $context->lookupFunction($name);
-        } catch (\Throwable $e) {
+        } catch (\Throwable) {
             $fn = $context->module->addFunction($name, $ft);
             $context->registerFunction($name, $fn);
         }
     }
 
+    private static function helperFunction(Context $context, string $logical): LlvmFunction
+    {
+        self::ensureJitHelperCompiled($context);
+        $lc = \strtolower($logical);
+        $fn = $context->functions[$lc] ?? null;
+        if (null === $fn) {
+            throw new \LogicException($logical.' missing after ObStatusJitHelper compile (#9497)');
+        }
+
+        return $fn;
+    }
+
+    private static function ensureJitHelperCompiled(Context $context): void
+    {
+        $missing = false;
+        foreach (self::COMPILED_HELPERS as $logical) {
+            if (!isset($context->functions[\strtolower($logical)])) {
+                $missing = true;
+                break;
+            }
+        }
+        if (!$missing) {
+            return;
+        }
+
+        $runtime = $context->runtime;
+        $path = \dirname(__DIR__, 3).self::HELPER_PATH;
+        $prevSelfHostAot = \getenv('PHP_COMPILER_SELFHOST_AOT');
+        if (\function_exists('putenv')) {
+            \putenv('PHP_COMPILER_SELFHOST_AOT=0');
+        }
+        try {
+            $block = $runtime->parseAndCompile((string) \file_get_contents($path), 'ObStatusJitHelper.php');
+            if (null === $block) {
+                throw new \LogicException('ObStatusJitHelper.php parseAndCompile failed (#9497)');
+            }
+            $jit = new JIT($context);
+            $jit->compile($block);
+        } finally {
+            if (\function_exists('putenv')) {
+                if (false === $prevSelfHostAot || null === $prevSelfHostAot) {
+                    \putenv('PHP_COMPILER_SELFHOST_AOT=');
+                } else {
+                    \putenv('PHP_COMPILER_SELFHOST_AOT='.$prevSelfHostAot);
+                }
+            }
+        }
+        foreach (self::COMPILED_HELPERS as $logical) {
+            $lc = \strtolower($logical);
+            if (!isset($context->functions[$lc])) {
+                throw new \LogicException($lc.' was not compiled for JIT (#9497)');
+            }
+        }
+    }
+
     private static function registerLinkedRuntime(Context $context): void
     {
-        foreach (['__phpc_ob_status_entry', '__phpc_ob_get_status_ht', '__phpc_ob_list_handlers_ht'] as $name) {
+        foreach ([self::FN_GET_STATUS, self::FN_LIST_HANDLERS] as $name) {
             $fn = $context->module->getNamedFunction($name);
-            if (null === $fn) {
-                throw new \LogicException($name.' missing after ObStatusRuntime LLVM implement');
+            if (null === $fn || 0 === $fn->countBasicBlocks()) {
+                throw new \LogicException($name.' missing after ObStatusRuntime bridge (#9497)');
             }
             $context->registerFunction($name, $fn);
         }
