@@ -51,8 +51,12 @@ final class UndefinedVariableHelper
         UndefinedVariableRuntime::ensureLinked($context);
         $key = ScopeVariableAssignedFlags::flagKey($context, $name);
         $isAssigned = ScopeVariableAssignedFlags::isAssignedCondition($context, $key);
-        $fn = $context->builder->getInsertBlock()?->getParent();
-        if (null === $fn) {
+        if (null === BasicBlockHelper::tryGetInsertBlock($context)) {
+            return;
+        }
+        try {
+            $fn = BasicBlockHelper::parentFunction($context);
+        } catch (\LogicException) {
             return;
         }
         $warnBlock = $fn->appendBasicBlock('undef_var_warn');

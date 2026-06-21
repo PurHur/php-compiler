@@ -143,6 +143,18 @@ run_gate_allow_skip() {
   fi
   rm -f "${err_file}"
   if [[ "${rc}" -eq 0 ]]; then
+    # examples-*-smoke print opt-in slice skips (SESSIONS_WEB_AOT_SMOKE_GATE=0, etc.)
+    # but still end with "examples-*-smoke: ok" — treat that as green (#8739, #78).
+    if grep -qE '^(examples-aot-smoke|examples-web-smoke): ok$' <<<"${body}"; then
+      record_gate "${name}" ok ""
+      log "  ok: ${label}"
+      return 0
+    fi
+    if grep -qiE '^(examples-aot-smoke|examples-web-smoke): skipped \(' <<<"${body}"; then
+      record_gate "${name}" skip "$(printf '%s' "${body}" | tail -n 1 | tr -d '\n' | head -c 240)"
+      log "  skip: ${label}"
+      return 0
+    fi
     if grep -qiE 'skipped \(|: skip' <<<"${body}"; then
       record_gate "${name}" skip "$(printf '%s' "${body}" | tail -n 1 | tr -d '\n' | head -c 240)"
       log "  skip: ${label}"

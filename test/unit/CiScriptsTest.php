@@ -497,6 +497,8 @@ final class CiScriptsTest extends TestCase
         $this->assertStringContainsString('bootstrap-selfhost-vm-driver-execute-probe', $body);
         $this->assertStringContainsString('examples-aot-smoke.sh', $body);
         $this->assertStringContainsString('examples-web-smoke.sh', $body);
+        $this->assertStringContainsString('examples-aot-smoke: ok$', $body);
+        $this->assertStringContainsString('examples-web-smoke: ok$', $body);
         $this->assertStringContainsString('RELEASE_READINESS_CI_FAST', $body);
         $this->assertStringContainsString('#8737', $body);
 

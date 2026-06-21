@@ -937,6 +937,11 @@ class Block {
                     throw new \LogicException("Could not resolve argument");
                 }
             } else {
+                $name = self::resolveVariableName($op);
+                if (null !== $name && Superglobals::isSuperglobalName($name)) {
+                    $scope[$pos] = self::initialVariableForOperand($op, $context, $pos, $this);
+                    continue;
+                }
                 if (null !== $frame && !$this->blocksScriptGlobalInheritance()) {
                     $inherited = self::findVariableInParentFrames($op, $frame);
                     if (null !== $inherited) {
@@ -958,10 +963,7 @@ class Block {
                 ) {
                     $scope[$pos] = $frame->scope[$pos];
                 } else {
-                    $name = self::resolveVariableName($op);
-                    if (null !== $name && Superglobals::isSuperglobalName($name)) {
-                        $scope[$pos] = self::initialVariableForOperand($op, $context, $pos, $this);
-                    } elseif (null !== $name && $this->declaresGlobalName($name)) {
+                    if (null !== $name && $this->declaresGlobalName($name)) {
                         $local = new Variable(Variable::TYPE_NULL);
                         $local->indirect($context->ensureGlobal($name));
                         $scope[$pos] = $local;
