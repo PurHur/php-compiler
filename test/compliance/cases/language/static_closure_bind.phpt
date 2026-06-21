@@ -1,5 +1,5 @@
 --TEST--
-language: static closure bindTo/bind must Error (issue #4613, Zend/zend_closures.c)
+language: static closure bindTo/bind warn and no-op (issue #10432, Zend/zend_closures.c)
 --SKIPIF--
 <?php die('skip — compiler VM compliance via ClosureVMTest/VMTest/JITTest, not Zend CLI'); ?>
 --FILE--
@@ -17,23 +17,17 @@ class C {
 
 $c = new C();
 $fn = $c->make();
-try {
-    $fn->bindTo($c);
-    echo "bindTo ok\n";
-} catch (Error) {
-    echo "Error: Cannot bind static closure to object\n";
-}
+$fn->bindTo($c);
+echo "bindTo ok\n";
 
-try {
-    Closure::bind($fn, $c, 'C');
-    echo "bind ok\n";
-} catch (Error) {
-    echo "Error: Cannot bind static closure to object\n";
-}
+Closure::bind($fn, $c, 'C');
+echo "bind ok\n";
 
 $unbound = $fn->bindTo(null);
 echo $unbound === null ? "null\n" : "object\n";
 --EXPECT--
-Error: Cannot bind static closure to object
-Error: Cannot bind static closure to object
+PHP Warning:  Cannot bind an instance to a static closure
+PHP Warning:  Cannot bind an instance to a static closure
+bindTo ok
+bind ok
 object
