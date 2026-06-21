@@ -1,5 +1,5 @@
 --TEST--
-Language: isset()/empty() on property hooks — get+set probes backing without get hook (#10392, zend_property_hooks.c)
+Language: isset()/empty() on get+set property hooks must not invoke get hook (#10392, zend_property_hooks.c)
 --FILE--
 <?php
 class C {
