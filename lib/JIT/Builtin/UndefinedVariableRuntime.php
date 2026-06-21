@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace PHPCompiler\JIT\Builtin;
 
 use PHPCompiler\JIT\Context;
-use PHPCompiler\JIT\JitVmHelperLink;
 use PHPCompiler\VM\ErrorReporter;
 use PHPLLVM\Value\Function_ as LlvmFunction;
 
@@ -17,15 +16,6 @@ use PHPLLVM\Value\Function_ as LlvmFunction;
 final class UndefinedVariableRuntime
 {
     private const ABI_EMIT_WARNING = '__undefined_var__emitWarning';
-
-    private const HELPER_PATH = '/VM/UndefinedVariableJitHelper.php';
-
-    private const EMIT_WARNING_HELPER = 'PHPCompiler\\VM\\UndefinedVariableJitHelper::emitWarning';
-
-    /** @var list<string> */
-    private const COMPILED_HELPERS = [
-        self::EMIT_WARNING_HELPER,
-    ];
 
     public static function ensureLinked(Context $context): void
     {
@@ -77,13 +67,6 @@ final class UndefinedVariableRuntime
 
     private static function implementEmitWarningBridge(Context $context): void
     {
-        JitVmHelperLink::ensureCompiled(
-            $context,
-            self::HELPER_PATH,
-            self::COMPILED_HELPERS,
-            '#10360'
-        );
-
         $abiName = self::ABI_EMIT_WARNING;
         $probe = $context->module->getNamedFunction($abiName);
         if (null !== $probe && $probe->countBasicBlocks() > 0) {
@@ -141,11 +124,28 @@ final class UndefinedVariableRuntime
             $i8->constInt(0, false),
             $context->builder->inBoundsGEP($bufPtr, $copyLen)
         );
-        $helper = JitVmHelperLink::lookupCompiled($context, self::EMIT_WARNING_HELPER, '#10360');
+        $msgBufSize = 256;
+        $msgBuf = $context->builder->alloca($i8->arrayType($msgBufSize), 1, 'undef_var_msg');
+        $msgBufPtr = $context->builder->pointerCast($msgBuf, $i8p);
+        $fmtPtr = $context->builder->pointerCast(
+            $context->constantFromString('Undefined variable $%s'),
+            $i8p
+        );
+        $written = $context->builder->call(
+            $context->lookupFunction('snprintf'),
+            $msgBufPtr,
+            $sizeT->constInt($msgBufSize, false),
+            $fmtPtr,
+            $bufPtr
+        );
+        $emptyFile = $context->builder->pointerCast($context->constantFromString(''), $i8p);
         $context->builder->call(
-            $helper,
-            $bufPtr,
-            $context->builder->trunc($copyLen, $i32)
+            $context->lookupFunction('__compiler_trigger_error'),
+            $msgBufPtr,
+            $context->builder->zext($written, $sizeT),
+            $i32->constInt(ErrorReporter::E_WARNING, false),
+            $emptyFile,
+            $i32->constInt(0, false)
         );
     }
 

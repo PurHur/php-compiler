@@ -14,7 +14,7 @@ final class UndefinedVariableRuntimeShrinkTest extends TestCase
         $source = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/UndefinedVariableRuntime.php');
         $this->assertStringContainsString('UndefinedVariableJitHelper', $source);
         $this->assertStringContainsString('emitWarning', $source);
-        $this->assertStringContainsString('JitVmHelperLink', $source);
+        $this->assertStringContainsString('warningMessage', $source);
     }
 
     public function testUndefinedVariableJitHelperDefinesEmitWarning(): void

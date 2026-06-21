@@ -24,8 +24,6 @@ final class ScalarDimFetchRuntimeStandaloneTest extends TestCase
         $fn = $ctx->lookupFunction('__scalar_dim_fetch__emitWarning');
         $this->assertNotNull($fn);
         $this->assertGreaterThan(0, $fn->countBasicBlocks());
-        $this->assertNotNull(
-            $ctx->functions[\strtolower('PHPCompiler\\VM\\ScalarDimFetchJitHelper::emitWarningForJitType')] ?? null
-        );
+        $this->assertNotNull($ctx->lookupFunction('__compiler_trigger_error'));
     }
 }

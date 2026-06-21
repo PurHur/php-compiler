@@ -36,18 +36,34 @@ final class JitVmHelperLink
         $runtime = $context->runtime;
         $path = \dirname(__DIR__).$relativeHelperPath;
         $basename = \basename($path);
+        $savedActive = $context->activeFunction;
+        $restoreBlock = BasicBlockHelper::tryGetInsertBlock($context);
         $prevSelfHostAot = \getenv('PHP_COMPILER_SELFHOST_AOT');
         if (\function_exists('putenv')) {
             \putenv('PHP_COMPILER_SELFHOST_AOT=0');
         }
         try {
-            $block = $runtime->parseAndCompile((string) \file_get_contents($path), $basename);
-            if (null === $block) {
-                throw new \LogicException($basename.' parseAndCompile failed ('.$compileLabel.')');
+            // Nested helper compile must not inherit a half-built parent CFG (#8559, #9225).
+            $context->builder->clearInsertionPosition();
+            $context->activeFunction = '';
+            $context->pushScope();
+            try {
+                $block = $runtime->parseAndCompile((string) \file_get_contents($path), $basename);
+                if (null === $block) {
+                    throw new \LogicException($basename.' parseAndCompile failed ('.$compileLabel.')');
+                }
+                $jit = new JIT($context);
+                $jit->compile($block);
+            } finally {
+                $context->popScope();
             }
-            $jit = new JIT($context);
-            $jit->compile($block);
         } finally {
+            if (null !== $restoreBlock) {
+                BasicBlockHelper::restoreInsertBlock($context, $restoreBlock);
+            } else {
+                $context->builder->clearInsertionPosition();
+            }
+            $context->activeFunction = $savedActive;
             if (\function_exists('putenv')) {
                 if (false === $prevSelfHostAot || null === $prevSelfHostAot) {
                     \putenv('PHP_COMPILER_SELFHOST_AOT=');
