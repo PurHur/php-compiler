@@ -1382,6 +1382,9 @@ class VM {
     {
         if ($this->hasInstanceMethod($object->class, '__debuginfo')) {
             $result = $this->invokeInstanceMethod($object, '__debugInfo')->resolveIndirect();
+            if (Variable::TYPE_NULL === $result->type) {
+                return [];
+            }
             if (Variable::TYPE_ARRAY !== $result->type) {
                 $given = Variable::TYPE_OBJECT === $result->type
                     ? $result->toObject()->class->name
