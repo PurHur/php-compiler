@@ -13854,8 +13854,11 @@ restart:
         if (null === $func) {
             return null;
         }
-        if (null !== $func->class && '' !== $func->class) {
-            return $func->class.'::'.$func->name;
+        if (null !== $func->class) {
+            $className = $func->class->value ?? null;
+            if (is_string($className) && '' !== $className) {
+                return $className.'::'.$func->name;
+            }
         }
 
         return $func->name;
