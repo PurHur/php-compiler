@@ -11040,8 +11040,11 @@ class Compiler {
                 return (int) $op->arg1;
             }
         }
+        foreach ($this->compileExpr($producer, $block) as $op) {
+            $block->addOpCode($op);
+        }
 
-        return null;
+        return $block->slotForOperand($producer->result);
     }
 
     /** Resolve VM slot for a hoisted inline first-class callable call-arg producer (#9769, zend_compile.c). */
@@ -11116,11 +11119,26 @@ class Compiler {
         }
         $callSite = $this->findCfgCallSiteForArg($block->orig->children, $arg, $cfgCallOp);
         if (null === $callSite) {
+            $argRoot = $this->unwrapOperandChain($arg);
+            if ($argRoot instanceof Op\Expr\ArrowFunction || $argRoot instanceof Op\Expr\Closure) {
+                return $this->slotForInlineClosureProducer($argRoot, $block);
+            }
+
             return null;
         }
         [$callOp, $argIndex] = $callSite;
         if (!property_exists($callOp, 'args') || !is_array($callOp->args)) {
             return null;
+        }
+        $callArg = $callOp->args[$argIndex] ?? null;
+        if (null !== $callArg) {
+            $callArgRoot = $this->unwrapOperandChain($callArg);
+            if ($callArgRoot instanceof Op\Expr\ArrowFunction || $callArgRoot instanceof Op\Expr\Closure) {
+                $directSlot = $this->slotForInlineClosureProducer($callArgRoot, $block);
+                if (null !== $directSlot) {
+                    return $directSlot;
+                }
+            }
         }
         $producers = $this->precedingInlineCallArgProducersBeforeCfgOp($block->orig->children, $callOp);
         $producer = $this->matchInlineCallArgProducer($producers, $callOp->args, $argIndex);
@@ -13377,6 +13395,19 @@ class Compiler {
         if ($this->callArgOperandIsClosureValue($arg, $block)) {
             return [];
         }
+        if (null !== $cfgCallOp && is_array($cfgCallOp->args ?? null)) {
+            $callArg = $cfgCallOp->args[$argIndex] ?? null;
+            if (null !== $callArg) {
+                $callArgRoot = $this->unwrapOperandChain($callArg);
+                if ($callArgRoot instanceof Op\Expr\ArrowFunction || $callArgRoot instanceof Op\Expr\Closure) {
+                    return [];
+                }
+            }
+        }
+        $argRoot = $this->unwrapOperandChain($arg);
+        if ($argRoot instanceof Op\Expr\ArrowFunction || $argRoot instanceof Op\Expr\Closure) {
+            return [];
+        }
         if (null !== $this->findInlineArrayProducerForCallArg($arg, $block, $cfgCallOp)) {
             return [];
         }
@@ -13920,6 +13951,14 @@ class Compiler {
             [$callOp, $argIndex] = $callSite;
             if (property_exists($callOp, 'args') && is_array($callOp->args)) {
                 $producers = $this->precedingInlineCallArgProducersBeforeCfgOp($block->orig->children, $callOp);
+                foreach ($producers as $candidate) {
+                    if (
+                        ($candidate instanceof Op\Expr\ArrowFunction || $candidate instanceof Op\Expr\Closure)
+                        && null !== $this->matchSingleClosureInlineProducer($candidate, $callOp->args, $argIndex)
+                    ) {
+                        return true;
+                    }
+                }
                 $producer = $this->matchInlineCallArgProducer($producers, $callOp->args, $argIndex);
                 if ($producer instanceof Op\Expr\ArrowFunction || $producer instanceof Op\Expr\Closure) {
                     return true;
@@ -14821,21 +14860,19 @@ class Compiler {
                         $callOrdinal,
                         $cfgCallOp
                     );
-                    if ([] !== $prefetchOps) {
+                    if ([] !== $prefetchOps && !$this->callArgOperandIsClosureValue($arg, $block)) {
                         $valueSlot = $prefetchOps[0]->arg1;
                     }
                 }
                 if (null === $valueSlot) {
                     $valueSlot = $this->findInlineExprCallArgProducerSlot($arg, $block, $cfgCallOp);
                 }
-                if (null === $valueSlot) {
-                    $valueSlot = $this->resolveInlineClosureCallArgSlot($arg, $block, $cfgCallOp);
-                }
-                if (null !== $valueSlot && null !== $cfgCallOp) {
+                $closureSlot = $this->resolveInlineClosureCallArgSlot($arg, $block, $cfgCallOp);
+                if (null === $closureSlot && null !== $cfgCallOp) {
                     $closureSlot = $this->resolvePrecedingClosureCallArgSlot($cfgCallOp, (int) $argIndex, $block);
-                    if (null !== $closureSlot) {
-                        $valueSlot = $closureSlot;
-                    }
+                }
+                if (null !== $closureSlot) {
+                    $valueSlot = $closureSlot;
                 }
                 if (
                     null === $valueSlot
@@ -14966,6 +15003,9 @@ class Compiler {
     {
         if (null === $valueSlot) {
             return null;
+        }
+        if ($this->callArgOperandIsClosureValue($arg, $block)) {
+            return $valueSlot;
         }
         $name = Block::resolveVariableName($arg);
         if (null === $name || '' === $name) {
