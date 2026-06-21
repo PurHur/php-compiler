@@ -1,8 +1,10 @@
 <?php
-// Repro for #10486 — list/array destructuring from string yields NULL slots (Zend/zend_execute.c).
 list($a, $b) = 'ab';
 var_export([$a, $b]);
 echo "\n";
 [$x, $y] = 'xy';
 var_export([$x, $y]);
+echo "\n";
+[[ $z ]] = 'x';
+var_export($z);
 echo "\n";

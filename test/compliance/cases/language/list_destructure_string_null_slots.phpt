@@ -8,6 +8,9 @@ echo "\n";
 [$x, $y] = 'xy';
 var_export([$x, $y]);
 echo "\n";
+[[ $z ]] = 'x';
+var_export($z);
+echo "\n";
 --EXPECT--
 array (
   0 => NULL,
@@ -17,3 +20,4 @@ array (
   0 => NULL,
   1 => NULL,
 )
+NULL

@@ -9,7 +9,7 @@ use PHPUnit\Framework\TestCase;
 require_once __DIR__.'/../LlvmToolchain.php';
 
 /**
- * MCJIT execute for list destructuring from string RHS — TypeError (#7461, #4531).
+ * MCJIT execute for list destructuring from string RHS — NULL slots (#10486, #4531).
  *
  * Spawns bin/jit.php in a child process (issue #98 — no in-process LLVM preload).
  *
@@ -28,28 +28,22 @@ final class ListDestructStringJitExecuteTest extends TestCase
         }
     }
 
-    public function testStringRhsThrowsTypeError(): void
+    public function testStringRhsLeavesSlotsUnset(): void
     {
         $script = $this->writeProbeScript('list-destruct-string-jit-exec', <<<'PHP'
 <?php
-try {
-    [$a] = 'ab';
-    echo "no-exception\n";
-} catch (TypeError $e) {
-    echo 'TypeError: ', $e->getMessage(), "\n";
-}
-try {
-    [$b, $c] = 'xy';
-    echo "no-exception\n";
-} catch (TypeError $e) {
-    echo 'TypeError: ', $e->getMessage(), "\n";
-}
+[$a] = 'ab';
+var_export($a);
+echo "\n";
+[$b, $c] = 'xy';
+var_export([$b, $c]);
+echo "\n";
 PHP
         );
         $output = $this->runJitScript($script);
         @unlink($script);
         $this->assertSame(
-            "TypeError: Cannot use string as array\nTypeError: Cannot use string as array\n",
+            "NULL\narray (\n  0 => NULL,\n  1 => NULL,\n)\n",
             $output
         );
     }

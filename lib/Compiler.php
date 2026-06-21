@@ -2196,7 +2196,7 @@ class Compiler {
     }
 
     /**
-     * Guard list destructuring: skip slot assignments when RHS is not an array (#4325); string RHS TypeError (#7461).
+     * Guard list destructuring: skip slot assignments when RHS is not an array (#4325, #10486).
      *
      * @param Op[] $ops
      *

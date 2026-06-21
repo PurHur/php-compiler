@@ -6,23 +6,20 @@ namespace PHPCompiler;
 
 use PHPUnit\Framework\TestCase;
 
-/** list() / [] destructuring from string RHS must TypeError (#7461). */
+/** list() / [] destructuring from string RHS yields unset slots (#10486). */
 final class ListDestructStringTest extends TestCase
 {
-    public function testVmThrowsTypeErrorForStringRhs(): void
+    public function testVmLeavesSlotsUnsetForStringRhs(): void
     {
         $runtime = new Runtime();
         $code = <<<'PHP'
 <?php
-try {
-    [$a] = 'ab';
-    echo 'no-exception';
-} catch (TypeError $e) {
-    echo $e->getMessage();
-}
+[$a, $b] = 'ab';
+echo (int) isset($a), (int) isset($b), "\n";
+var_export([$a, $b]);
 PHP;
         ob_start();
         $runtime->run($runtime->parseAndCompile($code, 'list_destructure_string.php'));
-        self::assertSame('Cannot use string as array', ob_get_clean());
+        $this->assertSame("00\narray (\n  0 => NULL,\n  1 => NULL,\n)", ob_get_clean());
     }
 }
