@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace PHPCompiler\JIT\Call;
 
+use PHPCompiler\JIT\Builtin\JitThrow;
 use PHPCompiler\JIT\Call;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\GeneratorHelper;
@@ -35,15 +36,17 @@ final class GeneratorThrow implements Call
         $hasCurrent = $context->builder->load($context->builder->structGep($statePtr, $map['has_current']));
         $fn = $context->builder->getInsertBlock()->getParent();
         $okBlock = $fn->appendBasicBlock('gen_throw_ok');
-        $closedFail = $fn->appendBasicBlock('gen_throw_closed');
+        $closedBlock = $fn->appendBasicBlock('gen_throw_closed');
         $uninitFail = $fn->appendBasicBlock('gen_throw_uninit');
         $context->builder->branchIf(
             $context->builder->icmp(Builder::INT_EQ, $done, $i1->constInt(0, false)),
             $okBlock,
-            $closedFail
+            $closedBlock
         );
-        $context->builder->positionAtEnd($closedFail);
-        TryCatchHelper::emitCatchableClassError($context, 'Exception', 'Cannot throw to a closed generator');
+        $exception = $args[1];
+        $excObj = $this->resolveThrowableObject($context, $exception);
+        $context->builder->positionAtEnd($closedBlock);
+        $this->emitClosedGeneratorThrowInCallerContext($context, $excObj);
         $context->builder->positionAtEnd($okBlock);
         $started = $context->builder->or(
             $context->builder->icmp(Builder::INT_NE, $resumeIp, $zero),
@@ -54,24 +57,6 @@ final class GeneratorThrow implements Call
         $context->builder->positionAtEnd($uninitFail);
         TryCatchHelper::emitCatchableClassError($context, 'Exception', 'Cannot throw to an uninitialized generator');
         $context->builder->positionAtEnd($throwOk);
-        $exception = $args[1];
-        $excObj = $exception->value;
-        if (Variable::TYPE_OBJECT !== $exception->type) {
-            if (Variable::TYPE_VALUE === $exception->type) {
-                $excObj = $context->builder->call(
-                    $context->lookupFunction('__value__readObject'),
-                    JitValueBox::valuePtrFromVariable($context, $exception)
-                );
-            } else {
-                TryCatchHelper::emitCatchableClassError(
-                    $context,
-                    'TypeError',
-                    'Generator::throw(): Argument #1 ($exception) must be of type Throwable, '
-                    .Variable::getStringType($exception->type).' given'
-                );
-                $excObj = $context->getTypeFromString('__object__*')->constNull();
-            }
-        }
         $pendingField = $context->builder->structGep($statePtr, $map['pending_throw']);
         $context->builder->call(
             $context->lookupFunction('__value__writeObject'),
@@ -81,5 +66,41 @@ final class GeneratorThrow implements Call
         $context->builder->store($i1->constInt(1, false), $context->builder->structGep($statePtr, $map['has_pending_throw']));
 
         return GeneratorHelper::resumeAndBoxYield($context, $genVar);
+    }
+
+    /** Zend Generator::throw() else branch: closed generator throws in caller context (#10414). */
+    private function emitClosedGeneratorThrowInCallerContext(Context $context, Value $excObj): void
+    {
+        JitThrow::registerDeclarations($context);
+        JitThrow::ensureLinked($context);
+        $context->builder->call($context->lookupFunction('phpc_jit_set_throw_pending'), $excObj);
+        $handler = $context->tryCatch->handlerStack[array_key_last($context->tryCatch->handlerStack)] ?? null;
+        if (null !== $handler && null !== $handler->dispatchBb) {
+            $context->builder->branch($handler->dispatchBb);
+
+            return;
+        }
+        $context->builder->call($context->lookupFunction('abort'));
+    }
+
+    private function resolveThrowableObject(Context $context, Variable $exception): Value
+    {
+        if (Variable::TYPE_OBJECT === $exception->type) {
+            return $exception->value;
+        }
+        if (Variable::TYPE_VALUE === $exception->type) {
+            return $context->builder->call(
+                $context->lookupFunction('__value__readObject'),
+                JitValueBox::valuePtrFromVariable($context, $exception)
+            );
+        }
+        TryCatchHelper::emitCatchableClassError(
+            $context,
+            'TypeError',
+            'Generator::throw(): Argument #1 ($exception) must be of type Throwable, '
+            .Variable::getStringType($exception->type).' given'
+        );
+
+        return $context->getTypeFromString('__object__*')->constNull();
     }
 }
