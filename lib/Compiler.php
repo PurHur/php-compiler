@@ -11124,17 +11124,36 @@ class Compiler {
         }
         $producers = $this->precedingInlineCallArgProducersBeforeCfgOp($block->orig->children, $callOp);
         $producer = $this->matchInlineCallArgProducer($producers, $callOp->args, $argIndex);
-        if ($producer instanceof Op\Expr\FirstClassCallable) {
+        if (
+            $producer instanceof Op\Expr\FirstClassCallable
+            && !$this->firstClassCallableIsInlineInvokeCallee($producer, $callOp)
+        ) {
             return $this->slotForInlineFirstClassCallableProducer($producer, $block);
         }
         if (1 === count($callOp->args)) {
             $last = $producers[\count($producers) - 1] ?? null;
-            if ($last instanceof Op\Expr\FirstClassCallable) {
+            if (
+                $last instanceof Op\Expr\FirstClassCallable
+                && !$this->firstClassCallableIsInlineInvokeCallee($last, $callOp)
+            ) {
                 return $this->slotForInlineFirstClassCallableProducer($last, $block);
             }
         }
 
         return null;
+    }
+
+    /** True when `(strlen(...))('hi')` — hoisted FCC is the FuncCall callee, not an argument (#10472). */
+    private function firstClassCallableIsInlineInvokeCallee(
+        Op\Expr\FirstClassCallable $fcc,
+        Op $callOp
+    ): bool {
+        if (!$callOp instanceof Op\Expr\FuncCall && !$callOp instanceof Op\Expr\NsFuncCall) {
+            return false;
+        }
+        $callee = $callOp instanceof Op\Expr\FuncCall ? $callOp->name : $callOp->nsName;
+
+        return $this->operandsReferToSameVariable($fcc->result, $callee);
     }
 
     /** StaticCall inline closure first arg — match hoisted Closure producer to TYPE_CLOSURE slot (#3673). */

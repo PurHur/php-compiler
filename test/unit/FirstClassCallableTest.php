@@ -305,6 +305,50 @@ PHP;
         $rt->parseAndCompile($code, 'test.php');
     }
 
+    /** Issue #10472: inline parenthesized builtin FCC invoke `(strlen(...))($arg)`. */
+    public function testVmInlineBuiltinFirstClassCallableInvoke(): void
+    {
+        $code = <<<'PHP'
+<?php
+echo (strlen(...))('abc');
+PHP;
+        $rt = new Runtime();
+        $block = $rt->parseAndCompile($code, 'test.php');
+        ob_start();
+        $rt->run($block);
+        $this->assertSame('3', ob_get_clean());
+    }
+
+    /** Issue #10472: inline parenthesized user-function FCC invoke remains green (#4437). */
+    public function testVmInlineUserFunctionFirstClassCallableInvoke(): void
+    {
+        $code = <<<'PHP'
+<?php
+function add(int $a, int $b): int { return $a + $b; }
+echo (add(...))(2, 3);
+PHP;
+        $rt = new Runtime();
+        $block = $rt->parseAndCompile($code, 'test.php');
+        ob_start();
+        $rt->run($block);
+        $this->assertSame('5', ob_get_clean());
+    }
+
+    /** Issue #10472: inline parenthesized enum static FCC `(E::from(...))($value)`. */
+    public function testVmInlineBackedEnumFromFirstClassCallableInvoke(): void
+    {
+        $code = <<<'PHP'
+<?php
+enum E: string { case A = 'a'; }
+echo (E::from(...))('a')->name;
+PHP;
+        $rt = new Runtime();
+        $block = $rt->parseAndCompile($code, 'test.php');
+        ob_start();
+        $rt->run($block);
+        $this->assertSame('A', ob_get_clean());
+    }
+
     public function testVmInstanceMethodFirstClassCallableDefaultParameterCompileError(): void
     {
         $code = <<<'PHP'
