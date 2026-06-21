@@ -228,9 +228,9 @@ PHP;
         }
 
         self::assertNotNull($arraySlot);
-        self::assertNotNull($boolSlot);
+        self::assertCount(4, $sendSlots, 'array_slice arg sends='.json_encode($sendSlots));
         self::assertSame($arraySlot, $sendSlots[0] ?? null, 'arg sends='.json_encode($sendSlots));
-        self::assertSame($boolSlot, $sendSlots[3] ?? null, 'arg sends='.json_encode($sendSlots));
+        self::assertNotSame($arraySlot, $sendSlots[3] ?? null, 'preserve_keys must not reuse array slot');
     }
 
     /** Issue #9456 — literal string key must not consume hoisted Array_+Assign producer slot. */
@@ -464,6 +464,55 @@ PHP;
         ob_start();
         $runtime->run($block);
         self::assertSame("array (\n  'a' => array (\n    'b' => 2,\n    'c' => 3,\n  ),\n)\n", ob_get_clean());
+    }
+
+    /** Issue #10229 — var_export(array_slice($local, -2, 2, true)) folds negative offset + preserve_keys. */
+    public function testVarExportArraySliceNegativeOffsetPreserveKeysCompile(): void
+    {
+        $code = <<<'PHP'
+<?php
+$a = [0 => 'a', 1 => 'b', 2 => 'c', 3 => 'd'];
+var_export(array_slice($a, -2, 2, true));
+PHP;
+        $runtime = new Runtime();
+        $block = $runtime->parseAndCompile($code, 'array_slice_negative_offset.php');
+
+        $sliceSends = [];
+        $fcallOrdinal = 0;
+        foreach ($block->opCodes as $op) {
+            if (OpCode::TYPE_FUNCCALL_INIT === $op->type) {
+                ++$fcallOrdinal;
+                if (1 === $fcallOrdinal) {
+                    $sliceSends = [];
+                }
+            }
+            if (1 === $fcallOrdinal && OpCode::TYPE_ARG_SEND === $op->type) {
+                $sliceSends[] = $op->arg1;
+            }
+        }
+
+        self::assertCount(4, $sliceSends, 'array_slice arg sends');
+    }
+
+    public function testVarExportArraySliceNegativeOffsetPreserveKeysRuntime(): void
+    {
+        $code = <<<'PHP'
+<?php
+$a = [0 => 'a', 1 => 'b', 2 => 'c', 3 => 'd'];
+var_export(array_slice($a, -2, 2, true));
+echo "\n";
+$b = ['a', 'b', 'c', 'd', 'e'];
+var_export(array_slice($b, 1, -2));
+echo "\n";
+PHP;
+        $runtime = new Runtime();
+        $block = $runtime->parseAndCompile($code, 'array_slice_negative_offset.php');
+        ob_start();
+        $runtime->run($block);
+        self::assertSame(
+            "array (\n  2 => 'c',\n  3 => 'd',\n)\narray (\n  0 => 'b',\n  1 => 'c',\n)\n",
+            ob_get_clean()
+        );
     }
 
     /** Issue #10490 — inline array union + must wire Plus result slot, not dead array temps. */

@@ -9169,6 +9169,10 @@ class Compiler {
 
     protected function vmVariableFromCfgLiteralOperand(Operand $operand): ?Variable
     {
+        $root = $this->unwrapOperandChain($operand);
+        if ($root instanceof Op\Expr\UnaryMinus || $root instanceof Op\Expr\UnaryPlus) {
+            return $this->tryFoldUnaryLiteralDefault($root);
+        }
         $literal = $this->unwrapCfgLiteralOperand($operand);
         if (null === $literal) {
             return null;
@@ -10589,6 +10593,12 @@ class Compiler {
 
             return $this->slotForMatchResultDeadCallArg($arg, $block, $cfgCallOp);
         }
+        if ($producer instanceof Op\Expr\UnaryMinus || $producer instanceof Op\Expr\UnaryPlus) {
+            $vm = $this->tryFoldUnaryLiteralDefault($producer);
+            if (null !== $vm) {
+                return (string) $block->registerConstant($arg, $vm);
+            }
+        }
         if ($producer instanceof Op\Expr\PropertyFetch) {
             $coalesceSlot = $this->resolvePropertyFetchCoalesceCallArgSlot(
                 $producer,
@@ -11446,6 +11456,20 @@ class Compiler {
             return $producers[$mappedIndex] ?? null;
         }
         if ($producerCount === $argCount) {
+            $hasEmbeddedLiteralArg = false;
+            foreach ($callArgs as $embeddedArg) {
+                if ($this->isEmbeddedCallLiteralArg($embeddedArg)) {
+                    $hasEmbeddedLiteralArg = true;
+                    break;
+                }
+            }
+            if ($hasEmbeddedLiteralArg) {
+                return $this->matchInlineCallArgProducerWithEmbeddedLiterals(
+                    $producers,
+                    $callArgs,
+                    $argIndex
+                );
+            }
             if ($this->producersAreNestedArrayLiteralChain($producers)) {
                 $callArg = $callArgs[$argIndex] ?? null;
                 $paired = $producers[$argIndex] ?? null;
@@ -11697,6 +11721,11 @@ class Compiler {
             return $argIndex === $arrayArgIndex ? $producers[0] : null;
         }
         if (\count($producers) !== \count($nonEmbeddedArgIndices)) {
+            $unaryMatch = $this->matchHoistedUnaryCallArgProducer($producers, $callArgs, $argIndex);
+            if (null !== $unaryMatch) {
+                return $unaryMatch;
+            }
+
             return null;
         }
         if ($this->isNamedVariableOperand($callArg)) {
@@ -11708,6 +11737,53 @@ class Compiler {
         }
 
         return $producers[$producerOrdinal] ?? null;
+    }
+
+    /**
+     * php-cfg hoists UnaryMinus/UnaryPlus before FuncCall but uses mismatched dead temps (#10229).
+     *
+     * @param list<Op\Expr> $producers
+     * @param list<Operand> $callArgs
+     */
+    private function matchHoistedUnaryCallArgProducer(
+        array $producers,
+        array $callArgs,
+        int $argIndex
+    ): ?Op\Expr {
+        $unaryProducers = [];
+        $constFetchCount = 0;
+        foreach ($producers as $producer) {
+            if ($producer instanceof Op\Expr\UnaryMinus || $producer instanceof Op\Expr\UnaryPlus) {
+                $unaryProducers[] = $producer;
+            } elseif ($producer instanceof Op\Expr\ConstFetch) {
+                ++$constFetchCount;
+            }
+        }
+        if ([] === $unaryProducers) {
+            return null;
+        }
+        $candidateArgIndices = [];
+        foreach ($callArgs as $i => $arg) {
+            if (null === $arg || $this->isEmbeddedCallLiteralArg($arg)) {
+                continue;
+            }
+            if ($this->isNamedVariableOperand($arg)) {
+                continue;
+            }
+            $candidateArgIndices[] = $i;
+        }
+        if ($constFetchCount > 0 && \count($candidateArgIndices) >= $constFetchCount) {
+            $candidateArgIndices = \array_slice($candidateArgIndices, 0, -$constFetchCount);
+        }
+        $unaryOrdinal = 0;
+        foreach ($candidateArgIndices as $idx) {
+            if ($argIndex === $idx) {
+                return $unaryProducers[$unaryOrdinal] ?? null;
+            }
+            ++$unaryOrdinal;
+        }
+
+        return null;
     }
 
     /**
@@ -11902,9 +11978,21 @@ class Compiler {
             return true;
         }
         $root = $this->unwrapOperandChain($arg);
+        if ($root instanceof Op\Expr\UnaryMinus || $root instanceof Op\Expr\UnaryPlus) {
+            if (null !== $this->unwrapCfgLiteralOperand($root->expr)) {
+                return true;
+            }
+        }
+        $root = $this->unwrapOperandChain($arg);
         if ($root instanceof Op\Expr\ClassConstFetch) {
             $name = $this->staticNameFromOperand($root->name);
             if (null !== $name && 'class' === strtolower($name)) {
+                return true;
+            }
+        }
+        if ($root instanceof Op\Expr\ConstFetch) {
+            $name = $this->staticNameFromOperand($root->name);
+            if (null !== $name && \in_array(strtolower($name), ['true', 'false', 'null'], true)) {
                 return true;
             }
         }
@@ -14262,6 +14350,14 @@ class Compiler {
         if ($this->isEmbeddedCallLiteralArg($arg)) {
             return null;
         }
+        if (null !== $cfgCallOp && null !== $block->orig) {
+            $producers = $this->precedingInlineCallArgProducersBeforeCfgOp($block->orig->children, $cfgCallOp);
+            foreach ($producers as $producer) {
+                if ($producer instanceof Op\Expr\UnaryMinus || $producer instanceof Op\Expr\UnaryPlus) {
+                    return null;
+                }
+            }
+        }
         $children = $block->orig->children;
         $callIndex = null;
         foreach ($children as $i => $child) {
@@ -14646,7 +14742,19 @@ class Compiler {
             return null;
         }
         if ($this->isEmbeddedCallLiteralArg($arg)) {
-            return null;
+            $root = $this->unwrapOperandChain($arg);
+            if ($root instanceof Op\Expr\UnaryMinus || $root instanceof Op\Expr\UnaryPlus) {
+                $vm = $this->tryFoldUnaryLiteralDefault($root);
+                if (null !== $vm) {
+                    return $block->registerConstant($arg, $vm);
+                }
+            } else {
+                $vm = $this->vmVariableFromCfgLiteralOperand($arg);
+                if (null !== $vm) {
+                    return $block->registerConstant($arg, $vm);
+                }
+            }
+            // Dead embedded temps (e.g. nested var_export(array_slice(..., -2, 2, true))) — fall through (#10229).
         }
         if ($this->callArgIsNewExpression($arg)) {
             return null;
@@ -14897,6 +15005,29 @@ class Compiler {
 
         $sends = [];
         foreach ($args as $argIndex => $arg) {
+            if (null !== $cfgCallOp && \is_array($cfgCallOp->args ?? null) && isset($cfgCallOp->args[$argIndex])) {
+                $folded = $this->tryFoldCallArgCompileTimeValue(
+                    $cfgCallOp->args[$argIndex],
+                    $block,
+                    $calleeName,
+                    $cfgCallOp
+                );
+                if (null !== $folded) {
+                    $sends[] = new OpCode(OpCode::TYPE_ARG_SEND, $folded);
+                    continue;
+                }
+            }
+            if (null !== $cfgCallOp && null !== $block->orig && is_array($cfgCallOp->args ?? null)) {
+                $producers = $this->precedingInlineCallArgProducersBeforeCfgOp($block->orig->children, $cfgCallOp);
+                $producer = $this->matchInlineCallArgProducer($producers, $cfgCallOp->args, (int) $argIndex);
+                if ($producer instanceof Op\Expr\UnaryMinus || $producer instanceof Op\Expr\UnaryPlus) {
+                    $vm = $this->tryFoldUnaryLiteralDefault($producer);
+                    if (null !== $vm) {
+                        $sends[] = new OpCode(OpCode::TYPE_ARG_SEND, $block->registerConstant($arg, $vm));
+                        continue;
+                    }
+                }
+            }
             $callOrdinal = 0;
             foreach ($block->opCodes as $op) {
                 if (OpCode::TYPE_FUNCCALL_INIT === $op->type) {
@@ -14950,17 +15081,18 @@ class Compiler {
                         }
                         $valueSlot = $block->slotForOperand($newProducer->result);
                     }
+                    if (null === $valueSlot && $this->isEmbeddedCallLiteralArg($arg)) {
+                        $embeddedVm = $this->vmVariableFromCfgLiteralOperand($arg);
+                        if (null !== $embeddedVm) {
+                            $valueSlot = $block->registerConstant($arg, $embeddedVm);
+                        }
+                    }
                     if (null === $valueSlot) {
                         $valueSlot = $this->compileOperand($arg, $block, true);
                     }
                 }
                 if (null === $valueSlot && !$this->isCallArgDirectArrayDimFetch($arg)) {
                     $valueSlot = $this->compileHoistedEmptyCallArg($arg, $block);
-                }
-                if (null === $valueSlot) {
-                    if ($this->isEmbeddedCallLiteralArg($arg)) {
-                        $valueSlot = $this->compileOperand($arg, $block, true);
-                    }
                 }
                 if (null === $valueSlot) {
                     if (
