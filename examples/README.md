@@ -2,6 +2,16 @@
 
 Shipped demos live under `examples/00x-*/` with an `example.php` entry script. Use the unified **`phpc`** CLI from the repo root (wrapper around `bin/vm.php`, `bin/compile.php`, `bin/lint.php`, and `bin/serve.php`).
 
+## Smoke status (v1.1.0 prep, Jun 2026)
+
+| Gate | Status | Command / tracker |
+|------|--------|-------------------|
+| VM lint + run (000–009) | ✅ default | `./phpc test --fast`, `make web-smoke` |
+| Web serve + curls | ✅ default | `./script/examples-web-smoke.sh` ([#9226](https://github.com/PurHur/php-compiler/issues/9226)) |
+| AOT link + execute | 🚧 partial | `./script/examples-aot-smoke.sh` ([#9225](https://github.com/PurHur/php-compiler/issues/9225)); 000–004 + 006–009 green when LLVM ready; 007 execute under investigation |
+
+See roadmap [#78](https://github.com/PurHur/php-compiler/issues/78) for v1.1.0 release gates.
+
 ## Quick start (all examples)
 
 ```console
