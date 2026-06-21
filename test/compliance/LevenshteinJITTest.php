@@ -36,6 +36,10 @@ final class LevenshteinJITTest extends BaseTest
             __DIR__.'/cases/stdlib/levenshtein_inline_str_repeat.phpt',
             'levenshtein_inline_str_repeat.phpt'
         );
+        yield 'levenshtein_argcount_jit.phpt' => self::parsePHPT(
+            __DIR__.'/cases/stdlib/levenshtein_argcount_jit.phpt',
+            'levenshtein_argcount_jit.phpt'
+        );
     }
 
     public function setUp(): void

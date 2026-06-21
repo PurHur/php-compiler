@@ -37,6 +37,10 @@ final class LevenshteinVMTest extends BaseTest
             __DIR__.'/cases/stdlib/levenshtein_named_cost_params.phpt',
             'levenshtein_named_cost_params.phpt'
         );
+        yield 'levenshtein_argcount.phpt' => self::parsePHPT(
+            __DIR__.'/cases/stdlib/levenshtein_argcount.phpt',
+            'levenshtein_argcount.phpt'
+        );
     }
 
     public function setUp(): void
