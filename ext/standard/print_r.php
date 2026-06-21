@@ -125,14 +125,10 @@ final class print_r extends Internal
         return implode('', $lines);
     }
 
+    /** php-src ext/standard/var.c — zend_print_zval double branch (#10470). */
     private static function formatFloat(float $value): string
     {
-        $s = (string) $value;
-        if (false !== strpos($s, '.')) {
-            return $s;
-        }
-
-        return $s.'.0';
+        return VmVarExportFloat::format($value);
     }
 
     private static function formatArray(VM $vm, VM\HashTable $table, int $level, ?Frame $frame = null): string

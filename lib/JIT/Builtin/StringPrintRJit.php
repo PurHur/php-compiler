@@ -174,6 +174,8 @@ final class StringPrintRJit
         $i8p = $context->getTypeFromString('int8*');
         $charPtr = $context->getTypeFromString('char*');
 
+        $dbl = $context->getTypeFromString('double');
+
         foreach ([
             ['malloc', $voidPtr, [$sizeT]],
             ['free', $voidTy, [$i8p]],
@@ -181,6 +183,9 @@ final class StringPrintRJit
             ['memcpy', $voidPtr, [$voidPtr, $voidPtr, $sizeT]],
             ['strlen', $sizeT, [$i8p]],
             ['snprintf', $i32, [$charPtr, $sizeT, $charPtr], true],
+            ['isnan', $i32, [$dbl]],
+            ['isinf', $i32, [$dbl]],
+            ['signbit', $i32, [$dbl]],
         ] as $spec) {
             $name = $spec[0];
             $ret = $spec[1];
@@ -458,20 +463,101 @@ final class StringPrintRJit
     {
         $entry = $fn->appendBasicBlock('entry');
         $context->builder->positionAtEnd($entry);
-        $tmp = $context->builder->alloca($context->getTypeFromString('int8'), 128, 've_dbl_tmp');
-        $tmpPtr = $context->builder->pointerCast($tmp, $context->getTypeFromString('char*'));
+
+        $buf = $fn->getParam(0);
+        $num = $fn->getParam(1);
+        $i32 = $context->getTypeFromString('int32');
+        $i8p = $context->getTypeFromString('int8*');
+        $charPtr = $context->getTypeFromString('char*');
+        $sizeT = $context->getTypeFromString('size_t');
+        $dbl = $context->getTypeFromString('double');
+        $zeroI32 = $i32->constInt(0, false);
+        $appendCstr = $context->lookupFunction('__phpc_pr_buf_append_cstr');
+
+        $isNan = $context->builder->icmp(
+            Builder::INT_NE,
+            $context->builder->call($context->lookupFunction('isnan'), $num),
+            $zeroI32
+        );
+        $nanBb = $fn->appendBasicBlock('pr_dbl_nan');
+        $checkInf = $fn->appendBasicBlock('pr_dbl_check_inf');
+        $context->builder->branchIf($isNan, $nanBb, $checkInf);
+
+        $context->builder->positionAtEnd($nanBb);
+        $nanNeg = $context->builder->icmp(
+            Builder::INT_NE,
+            $context->builder->call($context->lookupFunction('signbit'), $num),
+            $zeroI32
+        );
+        $nanNegBb = $fn->appendBasicBlock('pr_dbl_nan_neg');
+        $nanPosBb = $fn->appendBasicBlock('pr_dbl_nan_pos');
+        $nanDone = $fn->appendBasicBlock('pr_dbl_nan_done');
+        $context->builder->branchIf($nanNeg, $nanNegBb, $nanPosBb);
+        $context->builder->positionAtEnd($nanNegBb);
+        $context->builder->call(
+            $appendCstr,
+            $buf,
+            $context->builder->pointerCast($context->constantFromString('-NAN'), $i8p)
+        );
+        $context->builder->branch($nanDone);
+        $context->builder->positionAtEnd($nanPosBb);
+        $context->builder->call(
+            $appendCstr,
+            $buf,
+            $context->builder->pointerCast($context->constantFromString('NAN'), $i8p)
+        );
+        $context->builder->branch($nanDone);
+        $context->builder->positionAtEnd($nanDone);
+        $context->builder->returnVoid();
+
+        $context->builder->positionAtEnd($checkInf);
+        $isInf = $context->builder->icmp(
+            Builder::INT_NE,
+            $context->builder->call($context->lookupFunction('isinf'), $num),
+            $zeroI32
+        );
+        $infBb = $fn->appendBasicBlock('pr_dbl_inf');
+        $finiteBb = $fn->appendBasicBlock('pr_dbl_finite');
+        $context->builder->branchIf($isInf, $infBb, $finiteBb);
+
+        $context->builder->positionAtEnd($infBb);
+        $negInf = $context->builder->fcmp(Builder::REAL_OLT, $num, $dbl->constReal(0.0));
+        $infNegBb = $fn->appendBasicBlock('pr_dbl_inf_neg');
+        $infPosBb = $fn->appendBasicBlock('pr_dbl_inf_pos');
+        $infDone = $fn->appendBasicBlock('pr_dbl_inf_done');
+        $context->builder->branchIf($negInf, $infNegBb, $infPosBb);
+        $context->builder->positionAtEnd($infNegBb);
+        $context->builder->call(
+            $appendCstr,
+            $buf,
+            $context->builder->pointerCast($context->constantFromString('-INF'), $i8p)
+        );
+        $context->builder->branch($infDone);
+        $context->builder->positionAtEnd($infPosBb);
+        $context->builder->call(
+            $appendCstr,
+            $buf,
+            $context->builder->pointerCast($context->constantFromString('INF'), $i8p)
+        );
+        $context->builder->branch($infDone);
+        $context->builder->positionAtEnd($infDone);
+        $context->builder->returnVoid();
+
+        $context->builder->positionAtEnd($finiteBb);
+        $tmp = $context->builder->alloca($context->getTypeFromString('int8'), 128, 'pr_dbl_tmp');
+        $tmpPtr = $context->builder->pointerCast($tmp, $charPtr);
         $n = $context->builder->call(
             $context->lookupFunction('snprintf'),
             $tmpPtr,
-            $context->getTypeFromString('size_t')->constInt(128, false),
-            $context->builder->pointerCast($context->constantFromString('%G'), $context->getTypeFromString('char*')),
-            $fn->getParam(1)
+            $sizeT->constInt(128, false),
+            $context->builder->pointerCast($context->constantFromString('%G'), $charPtr),
+            $num
         );
-        $pos = $context->builder->zExt($n, $context->getTypeFromString('size_t'));
+        $pos = $context->builder->zExt($n, $sizeT);
         $context->builder->call(
             $context->lookupFunction('__phpc_pr_buf_append_bytes'),
-            $fn->getParam(0),
-            $context->builder->pointerCast($tmp, $context->getTypeFromString('int8*')),
+            $buf,
+            $context->builder->pointerCast($tmp, $i8p),
             $pos
         );
         $context->builder->returnVoid();
