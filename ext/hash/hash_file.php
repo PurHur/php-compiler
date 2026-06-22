@@ -8,6 +8,7 @@ use PHPCompiler\ext\standard\JitBoolArg;
 use PHPCompiler\ext\standard\JitHashFile;
 use PHPCompiler\ext\standard\JitStringBuiltinArg;
 use PHPCompiler\ext\standard\VmHashFile;
+use PHPCompiler\ext\standard\VmStreamOpenFailure;
 use PHPCompiler\ext\standard\VmString;
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
@@ -45,6 +46,7 @@ final class hash_file extends Internal
         }
         $result = VmHashFile::hashFile($algo, $path, $raw);
         if (false === $result) {
+            VmStreamOpenFailure::warnFailedToOpen($frame, 'hash_file', $path);
             $frame->returnVar->bool(false);
 
             return;

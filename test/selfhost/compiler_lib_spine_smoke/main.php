@@ -828,6 +828,7 @@ require_once __DIR__.'/../../../ext/standard/VmExif.php';
 require_once __DIR__.'/../../../ext/standard/VmExit.php';
 require_once __DIR__.'/../../../ext/standard/VmFilestatArg.php';
 require_once __DIR__.'/../../../ext/standard/VmFilestatFailure.php';
+require_once __DIR__.'/../../../ext/standard/VmStreamOpenFailure.php';
 require_once __DIR__.'/../../../ext/standard/VmFnmatch.php';
 require_once __DIR__.'/../../../ext/standard/VmFnmatchPure.php';
 require_once __DIR__.'/../../../ext/standard/VmForwardStaticCall.php';
