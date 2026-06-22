@@ -26,6 +26,7 @@ final class EvalJitTest extends BaseTest
             'eval_basic.phpt',
             'eval_parse_error.phpt',
             'eval_return_value.phpt',
+            'eval_dynamic_fn.phpt',
         ] as $file) {
             $path = __DIR__.'/../compliance/cases/language/'.$file;
             yield $file => self::parsePHPT($path, $file);

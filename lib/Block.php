@@ -2323,6 +2323,40 @@ class Block {
     /**
      * ReflectionAttribute::newInstance() MCJIT execute segfaults (#4598); VM path matches Zend.
      */
+    /**
+     * eval($variable) must run on VM — JIT inline path is compile-time literal only (#10248).
+     */
+    public static function containsNonLiteralEvalOpcodes(?self $root): bool
+    {
+        if (null === $root) {
+            return false;
+        }
+        $seen = new \SplObjectStorage();
+        $stack = [$root];
+        while ([] !== $stack) {
+            $block = array_pop($stack);
+            if (!$block instanceof self || $seen->contains($block)) {
+                continue;
+            }
+            $seen->attach($block);
+            foreach ($block->opCodes as $op) {
+                if (OpCode::TYPE_EVAL === $op->type) {
+                    $codeOp = $block->getOperand($op->arg2);
+                    if (!$codeOp instanceof Operand\Literal) {
+                        return true;
+                    }
+                }
+                foreach ([$op->block1, $op->block2, $op->block3] as $sub) {
+                    if ($sub instanceof self) {
+                        $stack[] = $sub;
+                    }
+                }
+            }
+        }
+
+        return false;
+    }
+
     public static function containsReflectionAttributeNewInstanceOpcodes(?self $root): bool
     {
         if (null === $root) {
@@ -2365,6 +2399,7 @@ class Block {
             || self::containsFiberSuspendOpcodesInScriptScope($root)
             || self::containsEmptyTraitBodyMcjitDeferral($root)
             || self::containsReflectionAttributeNewInstanceOpcodes($root)
+            || self::containsNonLiteralEvalOpcodes($root)
             || self::containsInterfaceAbstractStaticMcjitDeferral($root)
             || self::containsNonStaticStaticCallOpcodes($root)
             || self::containsParamRuntimeNewDefaultOpcodes($root);
