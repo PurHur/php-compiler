@@ -30,10 +30,10 @@ final class JitNumberFormat
             ? JitIntdiv::lowerIntBuiltinArg($context, $args[1], 'number_format', 2, 'decimals')
             : $i64->constInt(0, false);
         $decSep = ($argc >= 3 && !NamedOptionalCallArgs::isOmittedOptional($args[2]))
-            ? JitStringBuiltinArg::lower($context, $args[2], 'number_format', 3, 'decimal_separator', '?string')
+            ? JitStringBuiltinArg::lower($context, $args[2], 'number_format', 2, 'decimal_separator', '?string')
             : $context->builder->load($context->constantStringFromString('.'));
         $thouSep = (4 === $argc && !NamedOptionalCallArgs::isOmittedOptional($args[3]))
-            ? JitStringBuiltinArg::lower($context, $args[3], 'number_format', 4, 'thousands_separator', '?string')
+            ? JitStringBuiltinArg::lower($context, $args[3], 'number_format', 3, 'thousands_separator', '?string')
             : $context->builder->load($context->constantStringFromString(','));
 
         return $context->builder->call(
