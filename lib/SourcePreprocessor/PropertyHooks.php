@@ -19,6 +19,9 @@ final class PropertyHooks
     /** php-src: Zend/zend_compile.c — zend_compile_property_hooks() (#9805). */
     public const READONLY_HOOK_COMPILE_ERROR = 'Hooked properties cannot be readonly';
 
+    /** php-src: Zend/zend_compile.c — property default initializer + hook block (#10592). */
+    public const DEFAULT_INITIALIZER_HOOK_PARSE_ERROR = 'syntax error, unexpected token "=>"';
+
     private const SET_METHOD_PREFIX = '__phpc_property_set_';
     private const GET_METHOD_PREFIX = '__phpc_property_get_';
     private const UNSET_METHOD_PREFIX = '__phpc_property_unset_';
@@ -583,6 +586,7 @@ final class PropertyHooks
             }
             $isStatic = (bool) preg_match('/\bstatic\b/', $declPrefix.$propDeclHead);
             $this->rejectReadonlyHookedProperty($declPrefix.$propDeclHead);
+            $this->rejectDefaultInitializerWithPropertyHooks($propDeclHead);
             $isPromotedCtorParam = $this->isPromotedConstructorParam(
                 $body,
                 $declStart,
@@ -954,6 +958,16 @@ final class PropertyHooks
     {
         if (preg_match('/\breadonly\b/', $declHead)) {
             throw new \CompileError(self::READONLY_HOOK_COMPILE_ERROR);
+        }
+    }
+
+    /**
+     * php-src: Zend/zend_compile.c — `$prop = <expr> { get => … }` is a parse error (#10592).
+     */
+    private function rejectDefaultInitializerWithPropertyHooks(string $propDeclHead): void
+    {
+        if ($this->propertyDeclHeadHasInlineInitializer($propDeclHead)) {
+            throw new \CompileError(self::DEFAULT_INITIALIZER_HOOK_PARSE_ERROR);
         }
     }
 
