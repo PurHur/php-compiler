@@ -4485,8 +4485,13 @@ final class VmString
     {
         $dirname = self::dirname($path);
         $basename = self::basename($path);
-        $extension = self::pathExtension($path);
-        $filename = self::pathFilename($path);
+        $lastDot = self::pathLastDotInBasename($basename);
+        $extension = -1 === $lastDot
+            ? ''
+            : self::byteSlice($basename, $lastDot + 1, self::byteLength($basename) - $lastDot - 1);
+        $filename = -1 === $lastDot
+            ? $basename
+            : self::byteSlice($basename, 0, $lastDot);
 
         $mask = $flags & 15;
         if (0 === $mask) {
@@ -4495,13 +4500,25 @@ final class VmString
 
         $parts = [];
         if ($mask & 1) {
-            $parts['dirname'] = $dirname;
+            if (15 === $mask) {
+                if ('' !== $dirname) {
+                    $parts['dirname'] = $dirname;
+                }
+            } else {
+                $parts['dirname'] = $dirname;
+            }
         }
         if ($mask & 2) {
             $parts['basename'] = $basename;
         }
         if ($mask & 4) {
-            $parts['extension'] = $extension;
+            if (15 === $mask) {
+                if (-1 !== $lastDot) {
+                    $parts['extension'] = $extension;
+                }
+            } else {
+                $parts['extension'] = $extension;
+            }
         }
         if ($mask & 8) {
             $parts['filename'] = $filename;
@@ -4529,42 +4546,39 @@ final class VmString
         return $parts;
     }
 
+    /** Last dot index in basename (php-src zend_memrchr); -1 when absent. */
+    private static function pathLastDotInBasename(string $basename): int
+    {
+        $len = self::byteLength($basename);
+        for ($i = $len - 1; $i >= 0; --$i) {
+            if ('.' === $basename[$i]) {
+                return $i;
+            }
+        }
+
+        return -1;
+    }
+
     public static function pathExtension(string $path): string
     {
         $base = self::basename($path);
-        $len = self::byteLength($base);
-        if (0 === $len) {
-            return '';
-        }
-        $start = '.' === $base[0] ? 1 : 0;
-        $lastDot = -1;
-        for ($i = $len - 1; $i >= $start; --$i) {
-            if ('.' === $base[$i]) {
-                $lastDot = $i;
-                break;
-            }
-        }
-        if (-1 === $lastDot || $lastDot >= $len - 1) {
+        $lastDot = self::pathLastDotInBasename($base);
+        if (-1 === $lastDot) {
             return '';
         }
 
-        return self::byteSlice($base, $lastDot + 1, $len - $lastDot - 1);
+        return self::byteSlice($base, $lastDot + 1, self::byteLength($base) - $lastDot - 1);
     }
 
     public static function pathFilename(string $path): string
     {
         $base = self::basename($path);
-        $ext = self::pathExtension($path);
-        if ('' === $ext) {
+        $lastDot = self::pathLastDotInBasename($base);
+        if (-1 === $lastDot) {
             return $base;
         }
-        $extLen = self::byteLength($ext);
-        $baseLen = self::byteLength($base);
-        if ($baseLen <= $extLen + 1) {
-            return '';
-        }
 
-        return self::byteSlice($base, 0, $baseLen - $extLen - 1);
+        return self::byteSlice($base, 0, $lastDot);
     }
 
     /** Source string for strtok() continuation (ext/standard/string.c; issue #3201). */
