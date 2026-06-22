@@ -39,6 +39,7 @@ final class sha1_file extends Internal
         }
         $result = VmHashFile::hashFile('sha1', $path, $raw);
         if (false === $result) {
+            VmStreamOpenFailure::warnFailedToOpen($frame, 'sha1_file', $path);
             $frame->returnVar->bool(false);
 
             return;

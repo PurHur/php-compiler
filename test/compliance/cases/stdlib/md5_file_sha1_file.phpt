@@ -9,11 +9,13 @@ echo function_exists('sha1_file') ? '1' : '0', "\n";
 echo md5_file($abc), "\n";
 echo sha1_file($abc), "\n";
 echo md5_file($empty), "\n";
+set_error_handler(static fn () => true);
 if (md5_file('/no/such/phpc-md5-file-path') === false) {
     echo 'gone', "\n";
 } else {
     echo 'bad', "\n";
 }
+restore_error_handler();
 --EXPECT--
 1
 1

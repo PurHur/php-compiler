@@ -39,6 +39,7 @@ final class md5_file extends Internal
         }
         $result = VmHashFile::hashFile('md5', $path, $raw);
         if (false === $result) {
+            VmStreamOpenFailure::warnFailedToOpen($frame, 'md5_file', $path);
             $frame->returnVar->bool(false);
 
             return;
