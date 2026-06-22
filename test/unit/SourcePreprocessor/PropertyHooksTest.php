@@ -531,8 +531,8 @@ PHP;
         $runtime->parseAndCompile($src, 'property_hook_multi_property_redeclare.php');
     }
 
-    /** @covers issue #9805 — readonly hooked property must compile-error */
-    public function testReadonlyHookedPropertyCompileErrors(): void
+    /** @covers issue #9835 — readonly hooked property compiles; runtime enforces post-construct writes */
+    public function testReadonlyHookedPropertyLowers(): void
     {
         $src = <<<'PHP'
 <?php
@@ -543,9 +543,10 @@ class C {
     }
 }
 PHP;
-        $this->expectException(\CompileError::class);
-        $this->expectExceptionMessage(PropertyHooks::READONLY_HOOK_COMPILE_ERROR);
-        (new PropertyHooks())->process($src);
+        [$out, $registry] = (new PropertyHooks())->process($src);
+        self::assertStringContainsString('public readonly int $x;', $out);
+        self::assertStringContainsString('__phpc_property_set_x', $out);
+        self::assertSame('__phpc_property_set_x', $registry['c']['x']['set'] ?? null);
     }
 
     /** @covers issue #10592 — inline default initializer before property hook block */

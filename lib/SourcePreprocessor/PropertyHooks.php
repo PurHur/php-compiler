@@ -16,9 +16,6 @@ final class PropertyHooks
     /** Legacy message retained for tests/docs; static hooks compile since #6931 (PHP 8.4, zend_property_hooks.c). */
     public const STATIC_HOOK_COMPILE_ERROR = 'Cannot declare hooks for static property';
 
-    /** php-src: Zend/zend_compile.c — zend_compile_property_hooks() (#9805). */
-    public const READONLY_HOOK_COMPILE_ERROR = 'Hooked properties cannot be readonly';
-
     /** php-src: Zend/zend_compile.c — property default initializer + hook block (#10592). */
     public const DEFAULT_INITIALIZER_HOOK_PARSE_ERROR = 'syntax error, unexpected token "=>"';
 
@@ -585,7 +582,6 @@ final class PropertyHooks
                 $propDeclHead = preg_replace('/\babstract\s+/', '', $propDeclHead) ?? $propDeclHead;
             }
             $isStatic = (bool) preg_match('/\bstatic\b/', $declPrefix.$propDeclHead);
-            $this->rejectReadonlyHookedProperty($declPrefix.$propDeclHead);
             $this->rejectDefaultInitializerWithPropertyHooks($propDeclHead);
             $isPromotedCtorParam = $this->isPromotedConstructorParam(
                 $body,
@@ -949,16 +945,6 @@ final class PropertyHooks
         $this->registerHook($lcClass, $prop, 'set', $method, $isStatic);
 
         return [$this->hookMethodDecl($isStatic, $method, $params, $body, $propertyType)];
-    }
-
-    /**
-     * php-src: Zend/zend_compile.c — zend_compile_property_hooks(); readonly + hooks (#9805).
-     */
-    private function rejectReadonlyHookedProperty(string $declHead): void
-    {
-        if (preg_match('/\breadonly\b/', $declHead)) {
-            throw new \CompileError(self::READONLY_HOOK_COMPILE_ERROR);
-        }
     }
 
     /**
