@@ -9,7 +9,7 @@ use PHPCompiler\Runtime;
 use PHPUnit\Framework\TestCase;
 
 /**
- * Issue #5390: AOT standalone must define function_exists helpers without function_exists.c.
+ * Issue #9239: AOT standalone must route function_exists builtin lookup through FunctionExistsJitHelper PHP.
  *
  * @group aot-lint
  */
@@ -24,5 +24,6 @@ final class FunctionExistsRuntimeStandaloneTest extends TestCase
         $fn = $ctx->lookupFunction('__compiler_builtin_function_exists');
         $this->assertNotNull($fn);
         $this->assertGreaterThan(0, $fn->countBasicBlocks());
+        $this->assertNotNull($ctx->functions['phpcompiler\\ext\\standard\\functionexistsjithelper::builtinexists'] ?? null);
     }
 }

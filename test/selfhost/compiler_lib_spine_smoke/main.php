@@ -1216,6 +1216,7 @@ require_once __DIR__.'/../../../ext/standard/ftok.php';
 require_once __DIR__.'/../../../ext/standard/ftruncate_.php';
 require_once __DIR__.'/../../../ext/standard/func_get_args.php';
 require_once __DIR__.'/../../../ext/standard/func_num_args.php';
+require_once __DIR__.'/../../../ext/standard/FunctionExistsJitHelper.php';
 require_once __DIR__.'/../../../ext/standard/function_exists.php';
 require_once __DIR__.'/../../../ext/standard/fwrite.php';
 require_once __DIR__.'/../../../ext/standard/gc_collect_cycles.php';
