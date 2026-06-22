@@ -6,7 +6,7 @@ namespace PHPCompiler;
 
 use PHPUnit\Framework\TestCase;
 
-/** Issue #9002: backed enum instance method dispatch on case objects (Zend/zend_enum.c). */
+/** Issues #9002, #10341: enum case instance method dispatch (Zend/zend_enum.c). */
 final class EnumInstanceMethodGapTest extends TestCase
 {
     public function testBackedEnumCaseInstanceMethodReturnsName(): void
@@ -42,5 +42,22 @@ PHP;
         $output = ob_get_clean();
 
         $this->assertSame('A', $output);
+    }
+
+    /** Issue #10341: interface method on enum case must dispatch, not "Method call on non-object". */
+    public function testEnumCaseInterfaceMethodDispatch(): void
+    {
+        $code = file_get_contents(
+            dirname(__DIR__).'/repro/maintainer_gap_enum_case_method_dispatch.php'
+        );
+        $this->assertNotFalse($code);
+
+        $runtime = new Runtime();
+        $block = $runtime->parseAndCompile($code, 'maintainer_gap_enum_case_method_dispatch.php');
+        ob_start();
+        $runtime->run($block);
+        $output = ob_get_clean();
+
+        $this->assertSame("x\nok\n", $output);
     }
 }
