@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace PHPCompiler;
 
 use PHPCompiler\ext\standard\str_ireplace;
+use PHPCompiler\VM\HashTable;
 use PHPCompiler\VM\Variable as VMVariable;
 use PHPUnit\Framework\TestCase;
 
@@ -38,6 +39,37 @@ TXT;
         $frame->returnVar = new VMVariable();
         $fn->execute($frame);
         $this->assertSame('cX XC', $frame->returnVar->resolveIndirect()->toString());
+    }
+
+    public function testArraySearchReplacesAllNeedles(): void
+    {
+        $runtime = new Runtime();
+        $fn = new str_ireplace();
+        $frame = $fn->getFrame($runtime->vmContext);
+        $search = new VMVariable();
+        $searchHt = new HashTable();
+        $searchHt->append($this->stringVar('a'));
+        $searchHt->append($this->stringVar('b'));
+        $search->array($searchHt);
+        $replace = new VMVariable();
+        $replace->string('X');
+        $subject = new VMVariable();
+        $subject->string('AbBa');
+        $count = new VMVariable();
+        $count->int(0);
+        $frame->calledArgs = [$search, $replace, $subject, $count];
+        $frame->returnVar = new VMVariable();
+        $fn->execute($frame);
+        $this->assertSame('XXXX', $frame->returnVar->resolveIndirect()->toString());
+        $this->assertSame(4, $count->resolveIndirect()->toInt());
+    }
+
+    private function stringVar(string $value): VMVariable
+    {
+        $var = new VMVariable();
+        $var->string($value);
+
+        return $var;
     }
 
     public function testEmptySearchThrows(): void
