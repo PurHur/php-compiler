@@ -6,6 +6,7 @@ namespace PHPCompiler\JIT\Builtin;
 
 use PHPCompiler\JIT;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\NestedJitCompileScope;
 
 /** JIT/AOT link hook for highlight_string() — compiles HighlightJitHelper into the module (#3164, #3447). */
 final class Highlight
@@ -43,12 +44,14 @@ final class Highlight
 
         $runtime = $context->runtime;
         $path = dirname(__DIR__, 3).'/ext/standard/HighlightJitHelper.php';
-        $block = $runtime->parseAndCompile((string) file_get_contents($path), 'HighlightJitHelper.php');
-        if (null === $block) {
-            throw new \LogicException('HighlightJitHelper.php parseAndCompile failed (#3164)');
-        }
-        $jit = new JIT($context);
-        $jit->compile($block);
+        NestedJitCompileScope::run($context, static function () use ($context, $runtime, $path): void {
+            $block = $runtime->parseAndCompile((string) file_get_contents($path), 'HighlightJitHelper.php');
+            if (null === $block) {
+                throw new \LogicException('HighlightJitHelper.php parseAndCompile failed (#3164)');
+            }
+            $jit = new JIT($context);
+            $jit->compile($block);
+        });
         if (!isset($context->functions[$lc])) {
             throw new \LogicException('HighlightJitHelper::renderString was not compiled for JIT (#3164)');
         }
