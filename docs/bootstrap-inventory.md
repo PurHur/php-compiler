@@ -16110,8 +16110,8 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/Builtin/ScalarDimFetchRuntime.php`
 
 **Warnings** (review for bootstrap subset):
-- new JIT (line 127)
-- 8 class method(s)
+- new JIT (line 220)
+- 10 class method(s)
 - 1 closure(s)
 
 ### `lib/JIT/Builtin/ScriptExit.php`
