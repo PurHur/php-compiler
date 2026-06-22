@@ -52,7 +52,7 @@ final class number_format extends Internal
             ? VmString::coerceNullableStringBuiltinArg(
                 $frame->calledArgs[2],
                 'number_format',
-                3,
+                2,
                 'decimal_separator'
             ) ?? '.'
             : '.';
@@ -60,7 +60,7 @@ final class number_format extends Internal
             ? VmString::coerceNullableStringBuiltinArg(
                 $frame->calledArgs[3],
                 'number_format',
-                4,
+                3,
                 'thousands_separator'
             ) ?? ','
             : ',';
