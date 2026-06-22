@@ -490,15 +490,16 @@ final class CiScriptsTest extends TestCase
         $this->assertStringContainsString('--full', $body);
         $this->assertStringContainsString('--json', $body);
         $this->assertStringContainsString('user_release_ready', $body);
-        $this->assertStringContainsString('bootstrap-inventory.php --check', $body);
+        $this->assertStringContainsString('ci_ensure_generated_doc', $body);
+        $this->assertStringContainsString('script/bootstrap-inventory.php', $body);
+        $this->assertStringContainsString('release-readiness-json-emit.php', $body);
         $this->assertStringContainsString('check-selfhost-spine-coverage-sync.php', $body);
         $this->assertStringContainsString('check-root-readme-sync.php', $body);
         $this->assertStringContainsString('north-star5-verify-fast', $body);
         $this->assertStringContainsString('bootstrap-selfhost-vm-driver-execute-probe', $body);
         $this->assertStringContainsString('examples-aot-smoke.sh', $body);
         $this->assertStringContainsString('examples-web-smoke.sh', $body);
-        $this->assertStringContainsString('examples-aot-smoke: ok$', $body);
-        $this->assertStringContainsString('examples-web-smoke: ok$', $body);
+        $this->assertStringContainsString('(examples-aot-smoke|examples-web-smoke): ok$', $body);
         $this->assertStringContainsString('RELEASE_READINESS_CI_FAST', $body);
         $this->assertStringContainsString('#8737', $body);
 
@@ -513,10 +514,14 @@ final class CiScriptsTest extends TestCase
         $changelog = (string) file_get_contents($repoRoot.'/CHANGELOG.md');
         $this->assertMatchesRegularExpression('/^## v1\.1\.0\b/m', $changelog);
 
-        $cmd = 'bash '.escapeshellarg($script).' --json --dry-run 2>/dev/null';
+        $cmd = 'env PHP_COMPILER_ALLOW_PARALLEL_CI=1 bash '.escapeshellarg($script).' --json --dry-run 2>/dev/null';
         $raw = shell_exec($cmd);
         $this->assertIsString($raw);
-        $payload = json_decode($raw, true);
+        $this->assertNotSame('', trim($raw));
+        if (!preg_match('/\{.*\}/s', $raw, $jsonMatch)) {
+            $this->fail('release-readiness --json --dry-run did not emit JSON object');
+        }
+        $payload = json_decode($jsonMatch[0], true);
         $this->assertIsArray($payload);
         $this->assertArrayHasKey('user_release_ready', $payload);
         $this->assertContains($payload['user_release_ready'], ['yes', 'no']);
@@ -529,6 +534,44 @@ final class CiScriptsTest extends TestCase
             $this->assertArrayHasKey('status', $gate);
             $this->assertArrayHasKey('message', $gate);
         }
+    }
+
+    public function testReleaseReadinessJsonPreservesEmptyGateMessages(): void
+    {
+        $repoRoot = dirname(__DIR__, 2);
+        $emit = $repoRoot.'/script/release-readiness-json-emit.php';
+        $this->assertFileExists($emit);
+
+        $env = [
+            '_RR_MODE' => 'quick',
+            '_RR_READY' => 'no',
+            '_RR_GATE_COUNT' => '3',
+            '_RR_GATE_NAME_0' => 'bootstrap-inventory',
+            '_RR_GATE_STATUS_0' => 'ok',
+            '_RR_GATE_MESSAGE_0' => 'OK 2867/2867',
+            '_RR_GATE_NAME_1' => 'north-star5-fast',
+            '_RR_GATE_STATUS_1' => 'ok',
+            '_RR_GATE_MESSAGE_1' => '',
+            '_RR_GATE_NAME_2' => 'capability-matrix',
+            '_RR_GATE_STATUS_2' => 'fail',
+            '_RR_GATE_MESSAGE_2' => 'docs/capabilities.md is out of date',
+        ];
+        $prefix = '';
+        foreach ($env as $key => $value) {
+            $prefix .= $key.'='.escapeshellarg($value).' ';
+        }
+        $raw = shell_exec($prefix.'php '.escapeshellarg($emit).' 2>/dev/null');
+        $this->assertIsString($raw);
+        $payload = json_decode($raw, true);
+        $this->assertIsArray($payload);
+        $this->assertCount(3, $payload['gates']);
+        $this->assertSame('bootstrap-inventory', $payload['gates'][0]['name']);
+        $this->assertSame('OK 2867/2867', $payload['gates'][0]['message']);
+        $this->assertSame('north-star5-fast', $payload['gates'][1]['name']);
+        $this->assertSame('', $payload['gates'][1]['message']);
+        $this->assertSame('capability-matrix', $payload['gates'][2]['name']);
+        $this->assertSame('fail', $payload['gates'][2]['status']);
+        $this->assertSame('docs/capabilities.md is out of date', $payload['gates'][2]['message']);
     }
 
     public function testDeploySmokeScriptExists(): void
