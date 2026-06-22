@@ -1,5 +1,5 @@
 --TEST--
-Language: readonly hooked property — compile fatal (#9805, zend_compile.c)
+Language: readonly property with hooks — post-construct write Error (#9835, zend_property_hooks.c)
 --FILE--
 <?php
 class C {
@@ -11,6 +11,12 @@ class C {
         $this->x = 0;
     }
 }
-echo "ok\n";
---EXPECT_EXIT--
-255
+$c = new C();
+try {
+    $c->x = 1;
+    echo "no-resume\n";
+} catch (Error $e) {
+    echo 'caught: ', get_class($e), "\n";
+}
+--EXPECT--
+caught: Error

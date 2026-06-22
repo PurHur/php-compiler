@@ -1,17 +1,26 @@
 --TEST--
-Language: readonly property with hooks — compile fatal (#9805, zend_compile.c)
+Language: readonly property with hooks — constructor init via set hook (#9835, zend_property_hooks.c)
 --FILE--
 <?php
 class C {
     public readonly string $name {
+        get => $this->name;
         set (string $value) {
             $this->name = strtoupper($value);
         }
     }
-    public function __construct(string $v) {
-        $this->name = $v;
+    public function __construct() {
+        $this->name = 'hello';
     }
 }
-echo "compiled\n";
---EXPECT_EXIT--
-255
+$c = new C();
+echo $c->name, "\n";
+try {
+    $c->name = 'after';
+    echo "no-resume\n";
+} catch (Error $e) {
+    echo 'caught: ', get_class($e), "\n";
+}
+--EXPECT--
+HELLO
+caught: Error
