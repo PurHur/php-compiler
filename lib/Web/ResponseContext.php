@@ -187,13 +187,17 @@ final class ResponseContext
     /** output_add_rewrite_var() — register mod_rewrite pair; same name replaces prior value (#6031). */
     public static function addRewriteVar(string $name, string $value): bool
     {
-        return OutputRewriteVarsJitHelper::add($name, $value);
+        OutputRewriteVarsJitHelper::add($name, $value);
+
+        return true;
     }
 
     /** output_reset_rewrite_vars() — clear rewrite var table (#6031). */
     public static function resetRewriteVars(): bool
     {
-        return OutputRewriteVarsJitHelper::reset();
+        OutputRewriteVarsJitHelper::reset();
+
+        return true;
     }
 
     /**
