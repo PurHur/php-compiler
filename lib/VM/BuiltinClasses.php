@@ -69,6 +69,7 @@ use PHPCompiler\VM\Builtin\ReflectionClassGetAttributes;
 use PHPCompiler\VM\Builtin\ReflectionClassGetConstant;
 use PHPCompiler\VM\Builtin\ReflectionClassGetConstants;
 use PHPCompiler\VM\Builtin\ReflectionClassGetTraitAliases;
+use PHPCompiler\VM\Builtin\ReflectionClassGetTraitNames;
 use PHPCompiler\VM\Builtin\ReflectionClassGetLazyInitializer;
 use PHPCompiler\VM\Builtin\ReflectionClassGetLazyInitializationException;
 use PHPCompiler\VM\Builtin\ReflectionClassGetLazyProxyFactory;
@@ -540,6 +541,8 @@ final class BuiltinClasses
         $rc->methodVisibility['getconstants'] = $pub;
         $rc->methods['gettraitaliases'] = new ReflectionClassGetTraitAliases();
         $rc->methodVisibility['gettraitaliases'] = $pub;
+        $rc->methods['gettraitnames'] = new ReflectionClassGetTraitNames();
+        $rc->methodVisibility['gettraitnames'] = $pub;
         $rc->methods['getconstant'] = new ReflectionClassGetConstant();
         $rc->methodVisibility['getconstant'] = $pub;
         $rc->methods['hasconstant'] = new ReflectionClassHasConstant();
@@ -752,6 +755,8 @@ final class BuiltinClasses
         $renum->methodVisibility['getcase'] = $pub;
         $renum->methods['hascase'] = new ReflectionEnumHasCase();
         $renum->methodVisibility['hascase'] = $pub;
+        $renum->methods['gettraitnames'] = new ReflectionClassGetTraitNames();
+        $renum->methodVisibility['gettraitnames'] = $pub;
         $ctx->classes[ReflectionSupport::REFLECTION_ENUM] = $renum;
 
         $reuc = new ClassEntry('ReflectionEnumUnitCase');
