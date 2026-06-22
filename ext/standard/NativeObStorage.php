@@ -10,7 +10,7 @@ use PHPCompiler\VM\OutputBuffer;
 /**
  * VM output-buffer stack (php-src ext/standard/head.c; issue #5582).
  *
- * JIT embed uses {@see \PHPCompiler\JIT\Builtin\EmbedObOutput}; AOT/JIT standalone
+ * JIT embed uses {@see \PHPCompiler\JIT\Builtin\EmbedObOutput} + {@see EmbedObJitHelper}; AOT/JIT standalone
  * use {@see \PHPCompiler\JIT\Builtin\ObOutputRuntime}. Limits: {@see ObStackLimits}.
  */
 final class NativeObStorage
