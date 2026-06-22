@@ -166,21 +166,34 @@ final class StringSubstrCompareJit
 
         $context->builder->positionAtEnd($tailCheck);
         $zero32 = $i32->constInt(0, false);
+        $one32 = $i32->constInt(1, false);
+        $negOne32 = $i32->constInt(-1, false);
         $isZero = $context->builder->icmp(Builder::INT_EQ, $cmpResult, $zero32);
         $lenOmittedFlag = $context->builder->icmp(Builder::INT_SLT, $lengthArgIn, $zero64);
         $remainDiff = $context->builder->icmp(Builder::INT_NE, $compareRemain, $needleLen);
-        $needTail = $context->builder->and($isZero, $context->builder->and($lenOmittedFlag, $remainDiff));
-        $tailBody = $fn->appendBasicBlock('sc_tail_body');
-        $context->builder->branchIf($needTail, $tailBody, $done);
-
-        $context->builder->positionAtEnd($tailBody);
-        $shorter = $context->builder->icmp(Builder::INT_ULT, $compareRemain, $needleLen);
-        $tailRet = $context->builder->select(
-            $shorter,
-            $i32->constInt(-1, false),
-            $i32->constInt(1, false)
+        $needOmittedTail = $context->builder->and($isZero, $context->builder->and($lenOmittedFlag, $remainDiff));
+        $explicitLonger = $context->builder->and(
+            $isZero,
+            $context->builder->and(
+                $context->builder->not($lenOmittedFlag),
+                $context->builder->icmp(Builder::INT_UGT, $compareRemain, $needleLen)
+            )
         );
+        $omittedTailBody = $fn->appendBasicBlock('sc_omitted_tail_body');
+        $checkExplicit = $fn->appendBasicBlock('sc_check_explicit');
+        $context->builder->branchIf($needOmittedTail, $omittedTailBody, $checkExplicit);
+
+        $context->builder->positionAtEnd($omittedTailBody);
+        $shorter = $context->builder->icmp(Builder::INT_ULT, $compareRemain, $needleLen);
+        $tailRet = $context->builder->select($shorter, $negOne32, $one32);
         $context->builder->returnValue($tailRet);
+
+        $context->builder->positionAtEnd($checkExplicit);
+        $explicitLongerRet = $fn->appendBasicBlock('sc_explicit_longer_ret');
+        $context->builder->branchIf($explicitLonger, $explicitLongerRet, $done);
+
+        $context->builder->positionAtEnd($explicitLongerRet);
+        $context->builder->returnValue($one32);
 
         $context->builder->positionAtEnd($done);
         $context->builder->returnValue($cmpResult);

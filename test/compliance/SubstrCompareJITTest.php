@@ -24,6 +24,10 @@ final class SubstrCompareJITTest extends BaseTest
             __DIR__.'/cases/stdlib/substr_compare_typeerror_jit.phpt',
             'substr_compare_typeerror_jit.phpt'
         );
+        yield 'substr_compare_explicit_length_jit.phpt' => self::parsePHPT(
+            __DIR__.'/cases/stdlib/substr_compare_explicit_length_jit.phpt',
+            'substr_compare_explicit_length_jit.phpt'
+        );
     }
 
     public function setUp(): void

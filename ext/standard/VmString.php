@@ -915,8 +915,13 @@ final class VmString
         if (0 !== $cmp) {
             return $cmp;
         }
-        if ($lengthOmitted && $compareLen !== $needleLen) {
-            return $compareLen < $needleLen ? -1 : 1;
+        if ($compareLen !== $needleLen) {
+            if ($lengthOmitted) {
+                return $compareLen < $needleLen ? -1 : 1;
+            }
+            if ($compareLen > $needleLen) {
+                return 1;
+            }
         }
 
         return 0;
