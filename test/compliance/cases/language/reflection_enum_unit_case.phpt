@@ -16,13 +16,15 @@ enum E: int {
 $ref = new ReflectionEnumUnitCase(E::class, "One");
 echo $ref->getAttributes()[0]->newInstance()->v, "\n";
 echo $ref->getName(), "\n";
-echo $ref->getValue(), "\n";
+var_export($ref->getValue());
+echo "\n";
 $two = new ReflectionEnumUnitCase(E::class, "Two");
 echo $two->getName(), "\n";
-echo $two->getValue(), "\n";
+var_export($two->getValue());
+echo "\n";
 --EXPECT--
 marker
 One
-1
+\E::One
 Two
-2
+\E::Two

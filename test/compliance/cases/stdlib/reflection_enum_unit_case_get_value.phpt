@@ -19,7 +19,8 @@ enum Backed: string {
 }
 
 $rb = new ReflectionEnumUnitCase(Backed::class, 'A');
-echo $rb->getValue(), "\n";
+var_export($rb->getValue());
+echo "\n";
 --EXPECT--
 Error: Cannot get value of a pure enum case
-x
+\Backed::A

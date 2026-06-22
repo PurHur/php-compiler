@@ -29,13 +29,14 @@ foreach ($r->getCases() as $case) {
 }
 $hearts = $r->getCase('Hearts');
 echo $hearts->getName(), "\n";
-echo $hearts->getValue(), "\n";
+var_export($hearts->getValue());
+echo "\n";
 echo class_exists('ReflectionEnum') ? "exists\n" : "missing\n";
 PHP;
         ob_start();
         $runtime->run($runtime->parseAndCompile($code, 'reflection_enum.php'));
         $this->assertSame(
-            "Suit\nbacked\nHearts\nSpades\nHearts\nH\nexists\n",
+            "Suit\nbacked\nHearts\nSpades\nHearts\n\\Suit::Hearts\nexists\n",
             ob_get_clean()
         );
     }

@@ -14,11 +14,12 @@ foreach ($r->getCases() as $case) {
 }
 $hearts = $r->getCase('Hearts');
 echo $hearts->getName(), "\n";
-echo $hearts->getValue(), "\n";
+var_export($hearts->getValue());
+echo "\n";
 --EXPECT--
 Suit
 backed
 Hearts
 Spades
 Hearts
-H
+\Suit::Hearts
