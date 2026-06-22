@@ -2324,6 +2324,7 @@ require_once __DIR__.'/../../../lib/JIT/MagicMethodDispatch.php';
 require_once __DIR__.'/../../../lib/JIT/McjitEmbedRuntime.php';
 require_once __DIR__.'/../../../lib/JIT/NamedArgs.php';
 require_once __DIR__.'/../../../lib/JIT/NamedOptionalCallArgs.php';
+require_once __DIR__.'/../../../lib/JIT/NestedJitCompileScope.php';
 require_once __DIR__.'/../../../lib/JIT/NoDiscardCallGuard.php';
 require_once __DIR__.'/../../../lib/JIT/NonObjectPropertyFetchHelper.php';
 require_once __DIR__.'/../../../lib/JIT/NullsafeHelper.php';
