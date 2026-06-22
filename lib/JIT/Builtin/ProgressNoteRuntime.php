@@ -8,6 +8,7 @@ use PHPCompiler\JIT;
 use PHPCompiler\JIT\Builtin;
 use PHPCompiler\JIT\Call;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\NestedJitCompileScope;
 use PHPLLVM\BasicBlock;
 use PHPLLVM\Builder;
 use PHPLLVM\Value;
@@ -277,16 +278,7 @@ final class ProgressNoteRuntime
         $runtime = $context->runtime;
         $path = \dirname(__DIR__, 3).self::HELPER_PATH;
         $realPath = \realpath($path) ?: $path;
-        $savedBuilder = $context->builder;
-        $savedActive = $context->activeFunction;
-        $restoreBlock = self::captureInsertBlock($context);
-        $prevSelfHostAot = \getenv('PHP_COMPILER_SELFHOST_AOT');
-        if (\function_exists('putenv')) {
-            \putenv('PHP_COMPILER_SELFHOST_AOT=0');
-        }
-        try {
-            // Nested helper compile must not inherit a half-built bridge CFG (#8559).
-            $context->builder->clearInsertionPosition();
+        NestedJitCompileScope::run($context, static function () use ($context, $runtime, $path, $realPath): void {
             $block = $runtime->parseAndCompile((string) \file_get_contents($path), 'ProgressJitHelper.php');
             if (null === $block) {
                 throw new \LogicException('ProgressJitHelper.php parseAndCompile failed (#9521)');
@@ -294,18 +286,7 @@ final class ProgressNoteRuntime
             $jit = new JIT($context);
             $jit->compile($block);
             $context->markJitIncludedFileCompiled($realPath);
-        } finally {
-            $context->builder = $savedBuilder;
-            self::restoreInsertBlock($context, $restoreBlock);
-            $context->activeFunction = $savedActive;
-            if (\function_exists('putenv')) {
-                if (false === $prevSelfHostAot || null === $prevSelfHostAot) {
-                    \putenv('PHP_COMPILER_SELFHOST_AOT=');
-                } else {
-                    \putenv('PHP_COMPILER_SELFHOST_AOT='.$prevSelfHostAot);
-                }
-            }
-        }
+        });
         foreach (self::COMPILED_HELPERS as $logical) {
             $lc = \strtolower($logical);
             if (!isset($context->functions[$lc])) {
@@ -454,23 +435,5 @@ final class ProgressNoteRuntime
             throw new \LogicException('__phpc_progress_note missing after ProgressNoteRuntime bridge (#9521)');
         }
         $context->registerFunction('__phpc_progress_note', $fn);
-    }
-
-    private static function captureInsertBlock(Context $context): ?BasicBlock
-    {
-        try {
-            return $context->builder->getInsertBlock();
-        } catch (\Throwable) {
-            return null;
-        }
-    }
-
-    private static function restoreInsertBlock(Context $context, ?BasicBlock $block): void
-    {
-        if (null !== $block) {
-            $context->builder->positionAtEnd($block);
-        } else {
-            $context->builder->clearInsertionPosition();
-        }
     }
 }

@@ -6,6 +6,7 @@ namespace PHPCompiler\JIT\Builtin;
 
 use PHPCompiler\JIT;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\NestedJitCompileScope;
 
 /** JIT/AOT link hook for token_get_all() — compiles TokenGetAllJitHelper into the module (#3171). */
 final class TokenGetAll
@@ -43,12 +44,14 @@ final class TokenGetAll
 
         $runtime = $context->runtime;
         $path = dirname(__DIR__, 3).'/ext/tokenizer/TokenGetAllJitHelper.php';
-        $block = $runtime->parseAndCompile((string) file_get_contents($path), 'TokenGetAllJitHelper.php');
-        if (null === $block) {
-            throw new \LogicException('TokenGetAllJitHelper.php parseAndCompile failed (#3171)');
-        }
-        $jit = new JIT($context);
-        $jit->compile($block);
+        NestedJitCompileScope::run($context, static function () use ($context, $runtime, $path, $lc): void {
+            $block = $runtime->parseAndCompile((string) file_get_contents($path), 'TokenGetAllJitHelper.php');
+            if (null === $block) {
+                throw new \LogicException('TokenGetAllJitHelper.php parseAndCompile failed (#3171)');
+            }
+            $jit = new JIT($context);
+            $jit->compile($block);
+        });
         if (!isset($context->functions[$lc])) {
             throw new \LogicException('TokenGetAllJitHelper::tokenizeToHashTable was not compiled for JIT (#3171)');
         }
