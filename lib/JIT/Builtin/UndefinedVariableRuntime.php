@@ -9,9 +9,12 @@ use PHPCompiler\VM\ErrorReporter;
 use PHPLLVM\Value\Function_ as LlvmFunction;
 
 /**
- * JIT/AOT link for undefined-variable E_WARNING via UndefinedVariableJitHelper PHP (#10360).
+ * JIT/AOT link for undefined-variable E_WARNING via UndefinedVariableJitHelper PHP (#10360, #10524).
  *
  * SSOT: {@see \PHPCompiler\VM\UndefinedVariableJitHelper}, {@see \PHPCompiler\VM\ErrorReporter}
+ *
+ * Standalone/AOT: guards call {@see emitWarningForName()} → warningMessage SSOT + __compiler_trigger_error.
+ * Do not compile UndefinedVariableJitHelper.php into the standalone module (bridge ABI mismatch).
  */
 final class UndefinedVariableRuntime
 {
@@ -36,7 +39,10 @@ final class UndefinedVariableRuntime
             return;
         }
 
-        StringTriggerErrorJit::implement($context);
+        $triggerProbe = $context->module->getNamedFunction('__compiler_trigger_error');
+        if (null === $triggerProbe || 0 === $triggerProbe->countBasicBlocks()) {
+            StringTriggerErrorJit::implement($context);
+        }
         self::implementEmitWarningBridge($context);
         self::registerLinkedRuntime($context);
         $context->builder->clearInsertionPosition();
