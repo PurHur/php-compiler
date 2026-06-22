@@ -89,6 +89,25 @@ final class ReflectionPropertyGetValue extends VmClassMethod
         if (null === $frame->returnVar) {
             return;
         }
+        $meta = VmReflection::findClassProperty($entry, $property, $ctx);
+        if (null !== $meta?->getHookMethodLc) {
+            $scopeFrame = $frame;
+            while (null !== $scopeFrame && null !== $scopeFrame->handler) {
+                $scopeFrame = $scopeFrame->parent;
+            }
+            if (null === $scopeFrame) {
+                $scopeFrame = $frame;
+            }
+            $hookValue = $ctx->runtime->vm()->readObjectForeachProperty(
+                $object->toObject(),
+                $instanceName,
+                $scopeFrame,
+                false
+            );
+            $frame->returnVar->copyFrom($hookValue->resolveIndirect());
+
+            return;
+        }
         $frame->returnVar->copyFrom($object->toObject()->getProperty($instanceName)->resolveIndirect());
     }
 }
