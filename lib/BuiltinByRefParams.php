@@ -19,6 +19,12 @@ final class BuiltinByRefParams
             case 'array_pop':
             case 'array_shift':
             case 'array_unshift':
+            case 'current':
+            case 'end':
+            case 'key':
+            case 'next':
+            case 'prev':
+            case 'reset':
             case 'array_walk':
             case 'array_walk_recursive':
             case 'asort':
