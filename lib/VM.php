@@ -4657,9 +4657,9 @@ restart:
                         }
                         break;
                     }
-                    $lcname = strtolower($name);
-                    if (!isset($this->context->functions[$lcname])) {
-                        throw new \LogicException("Call to undefined function $lcname()");
+                    $lcname = $this->context->resolveFunctionCallLc($name);
+                    if (null === $lcname) {
+                        throw new \LogicException('Call to undefined function '.strtolower($name).'()');
                     }
                     $frame->call = $this->context->functions[$lcname];
                     $frame->callArgs = [];

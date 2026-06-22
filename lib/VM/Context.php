@@ -407,6 +407,26 @@ class Context {
     }
 
     /**
+     * Resolve a function call target; namespaced unqualified calls fall back to global builtins (#10534).
+     */
+    public function resolveFunctionCallLc(string $name): ?string
+    {
+        $lcname = strtolower($name);
+        if (isset($this->functions[$lcname])) {
+            return $lcname;
+        }
+        if (str_contains($name, '\\') && !str_contains($name, '::')) {
+            $globalFn = substr($name, strrpos($name, '\\') + 1);
+            $globalLc = strtolower($globalFn);
+            if (isset($this->functions[$globalLc])) {
+                return $globalLc;
+            }
+        }
+
+        return null;
+    }
+
+    /**
      * Register an alternate name for a user-defined class (ext/standard class_alias, #3095).
      *
      * php-src: zend_register_class_alias_ex — user classes/interfaces/traits/enums; no alias chains.
