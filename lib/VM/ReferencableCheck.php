@@ -9,6 +9,7 @@ use PHPCompiler\BuiltinByRefParams;
 use PHPCompiler\BuiltinParamNames;
 use PHPCompiler\Frame;
 use PHPCompiler\Func;
+use PHPCompiler\VM\Builtin\VmClassMethod;
 
 /**
  * Whether a call argument may bind to an &-parameter (Zend zend_execute.c ZEND_SEND_REF).
@@ -26,6 +27,11 @@ final class ReferencableCheck
             return;
         }
         if ($call instanceof Func\Internal) {
+            // VmClassMethod handlers share names with global builtins (e.g. Generator::current)
+            // but arg0 is $this, not a by-ref array parameter (#10610).
+            if ($call instanceof VmClassMethod) {
+                return;
+            }
             self::assertInternalFunctionArgs($call->getName(), $calledArgs, $caller);
         }
     }
