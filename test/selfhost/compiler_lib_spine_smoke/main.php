@@ -2515,6 +2515,7 @@ require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionClassGetStartLine.php';
 require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionClassGetStaticProperties.php';
 require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionClassGetStaticPropertyValue.php';
 require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionClassGetTraitAliases.php';
+require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionClassGetTraitNames.php';
 require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionClassHasConstant.php';
 require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionClassHasMethod.php';
 require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionClassHasProperty.php';
