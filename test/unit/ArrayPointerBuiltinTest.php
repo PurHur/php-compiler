@@ -26,5 +26,9 @@ final class ArrayPointerBuiltinTest extends BaseTest
             __DIR__.'/../compliance/cases/stdlib/key_after_unset.phpt',
             'key_after_unset.phpt'
         );
+        yield 'array_pointer_end.phpt' => self::parsePHPT(
+            __DIR__.'/../compliance/cases/stdlib/array_pointer_end.phpt',
+            'array_pointer_end.phpt'
+        );
     }
 }
