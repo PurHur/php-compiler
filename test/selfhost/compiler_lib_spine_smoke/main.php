@@ -676,6 +676,7 @@ require_once __DIR__.'/../../../ext/standard/JitStatArray.php';
 require_once __DIR__.'/../../../ext/standard/JitStrGetcsv.php';
 require_once __DIR__.'/../../../ext/standard/JitStrIncdec.php';
 require_once __DIR__.'/../../../ext/standard/JitStrIreplace.php';
+require_once __DIR__.'/../../../ext/standard/JitStrIreplaceMulti.php';
 require_once __DIR__.'/../../../ext/standard/JitStrPad.php';
 require_once __DIR__.'/../../../ext/standard/JitStrRepeat.php';
 require_once __DIR__.'/../../../ext/standard/JitStrReplace.php';
