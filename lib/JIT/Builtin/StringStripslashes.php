@@ -14,7 +14,8 @@ use PHPLLVM\Value;
 final class StringStripslashes
 {
     /** @var list<int> */
-    private const UNESCAPE_ORDS = [92, 39, 34, 0];
+    /** @var list<int> chars unescaped after backslash; '0' (48) maps to NUL in write loop */
+    private const UNESCAPE_ORDS = [92, 39, 34, 48];
 
     public static function implement(Context $context): void
     {
@@ -31,6 +32,8 @@ final class StringStripslashes
         $one = $i64->constInt(1, false);
         $two = $i64->constInt(2, false);
         $backslash = $i8->constInt(92, false);
+        $zeroDigit = $i8->constInt(48, false);
+        $nulByte = $i8->constInt(0, false);
 
         $src = $context->builder->call($context->lookupFunction('__string__separate'), $string);
         $len = $context->builder->load($context->builder->structGep($src, $map['length']));
@@ -64,7 +67,9 @@ final class StringStripslashes
             $zero,
             $one,
             $two,
-            $backslash
+            $backslash,
+            $zeroDigit,
+            $nulByte
         );
 
         $context->builder->returnValue($dest);
@@ -142,7 +147,9 @@ final class StringStripslashes
         Value $zero,
         Value $one,
         Value $two,
-        Value $backslash
+        Value $backslash,
+        Value $zeroDigit,
+        Value $nulByte
     ): void {
         $head = $fn->appendBasicBlock('stripslashes_write_head');
         $body = $fn->appendBasicBlock('stripslashes_write_body');
@@ -178,7 +185,9 @@ final class StringStripslashes
         $context->builder->branchIf($special, $doUnescape, $writePlainFromUnescape);
 
         $context->builder->positionAtEnd($doUnescape);
-        $context->builder->store($nextCh, $destAt);
+        $isZeroDigit = $context->builder->icmp(Builder::INT_EQ, $nextCh, $zeroDigit);
+        $unescapedByte = $context->builder->select($isZeroDigit, $nulByte, $nextCh);
+        $context->builder->store($unescapedByte, $destAt);
         $context->builder->store($context->builder->addNoSignedWrap($pos, $one), $posSlot);
         $context->builder->store($context->builder->addNoSignedWrap($i, $two), $iSlot);
         $context->builder->branch($afterBlock);
