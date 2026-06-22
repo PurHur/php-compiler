@@ -6738,7 +6738,15 @@ restart:
             return false;
         }
         $func = $frame->block->func;
-        if (null === $func || null === $func->class) {
+        if (null === $func) {
+            return false;
+        }
+        if (null === $func->class) {
+            // Top-level / global arrow fn `fn() => $this` — no lexical $this (#10558, zend_closures.c).
+            if (((int) ($func->flags ?? 0) & \PHPCfg\Func::FLAG_CLOSURE) !== 0) {
+                return !$this->closureFrameHasBoundThis($frame, $thisIdx);
+            }
+
             return false;
         }
         if ((($func->flags ?? 0) & \PHPCfg\Func::FLAG_STATIC) !== 0) {
@@ -6746,6 +6754,23 @@ restart:
         }
 
         return !isset($frame->scope[$thisIdx]);
+    }
+
+    /** True when a closure invoke has a bound object for $this (auto-bind / bindTo). */
+    private function closureFrameHasBoundThis(Frame $frame, int $thisIdx): bool
+    {
+        if (isset($frame->scope[$thisIdx])) {
+            $var = $frame->scope[$thisIdx]->resolveIndirect();
+            if (Variable::TYPE_OBJECT === $var->type) {
+                return true;
+            }
+        }
+        $closureState = $frame->closureCall ?? $frame->pendingClosureInvoke;
+        if (null !== $closureState && null !== $closureState->boundThis) {
+            return true;
+        }
+
+        return false;
     }
 
     /** Runtime Error when $this is evaluated outside object context (not isset/empty). */
