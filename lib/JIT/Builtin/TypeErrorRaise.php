@@ -207,7 +207,7 @@ final class TypeErrorRaise
         $entry = $fn->appendBasicBlock('ter_kind_bridge_entry');
         $context->builder->positionAtEnd($entry);
         $kind = $context->builder->call(self::helperFunction($context, self::KIND_HELPER));
-        $context->builder->returnValue($kind);
+        $context->builder->returnValue($context->builder->trunc($kind, $i32));
         $context->registerFunction($abiName, $fn);
     }
 
