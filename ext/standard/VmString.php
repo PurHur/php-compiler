@@ -3547,6 +3547,58 @@ final class VmString
     }
 
     /**
+     * Case-insensitive str_replace() with array $search and array|string $replace (php-src string.c).
+     *
+     * @param list<string>        $search
+     * @param list<string>|string $replace
+     */
+    public static function strIreplaceMulti(array $search, array|string $replace, string $subject, ?int &$count = null): string
+    {
+        if ([] === $search) {
+            if (null !== $count) {
+                $count = 0;
+            }
+
+            return $subject;
+        }
+        $replaceIsArray = \is_array($replace);
+        $replacementCount = 0;
+        $out = '';
+        $offset = 0;
+        $len = self::byteLength($subject);
+        $numSearch = \count($search);
+        while ($offset < $len) {
+            $bestPos = false;
+            $bestIdx = -1;
+            for ($i = 0; $i < $numSearch; ++$i) {
+                $needle = $search[$i];
+                if ('' === $needle) {
+                    continue;
+                }
+                $pos = self::findSubstringCaseInsensitive($subject, $needle, $offset);
+                if (false !== $pos && (false === $bestPos || $pos < $bestPos)) {
+                    $bestPos = $pos;
+                    $bestIdx = $i;
+                }
+            }
+            if (false === $bestPos) {
+                $out .= self::byteSlice($subject, $offset);
+                break;
+            }
+            $needle = $search[$bestIdx];
+            $out .= self::byteSlice($subject, $offset, $bestPos - $offset);
+            $out .= $replaceIsArray ? ($replace[$bestIdx] ?? '') : $replace;
+            $offset = $bestPos + self::byteLength($needle);
+            ++$replacementCount;
+        }
+        if (null !== $count) {
+            $count = $replacementCount;
+        }
+
+        return $out;
+    }
+
+    /**
      * strtr() two-string form — byte translation table (subset of PHP).
      */
     public static function strtr(string $string, string $from, string $to): string
