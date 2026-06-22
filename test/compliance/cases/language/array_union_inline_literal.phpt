@@ -1,5 +1,5 @@
 --TEST--
-language array union + on inline array literals (#10490, Zend/zend_operators.c)
+language array union + on inline array literals (#10490, #10578, Zend/zend_operators.c)
 --FILE--
 <?php
 var_export([1 => 'a'] + [2 => 'b']);

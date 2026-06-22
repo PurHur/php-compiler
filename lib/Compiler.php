@@ -10510,7 +10510,7 @@ class Compiler {
                         && $argRoot->type->type === $prev->result->type->type
                         && in_array(
                             $argRoot->type->type,
-                            [Type::TYPE_BOOLEAN, Type::TYPE_LONG],
+                            [Type::TYPE_BOOLEAN, Type::TYPE_LONG, Type::TYPE_ARRAY],
                             true
                         )
                     )
@@ -11371,6 +11371,10 @@ class Compiler {
                     }
                     // Hoisted ConstFetch prelude before inline scalar cast (#10143, #9479).
                     if ($last instanceof Op\Expr\Cast) {
+                        return $last;
+                    }
+                    // Inline array union `var_export([...] + [...])` — Plus after Array_ preludes (#10490, #10578).
+                    if ($last instanceof Op\Expr\BinaryOp\Plus) {
                         return $last;
                     }
                 }
