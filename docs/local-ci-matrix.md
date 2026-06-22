@@ -21,6 +21,7 @@ Repository defaults live in [`script/ci-defaults.env`](../script/ci-defaults.env
 | `PHP_COMPILER_DOCKER_MEM` | `10g` | Docker cgroup RAM cap |
 | `PHP_COMPILER_VM_PEAK_RSS_MB` | `2048` | Kill VM subprocess if RSS exceeds this (when guard enabled) |
 | `PHP_COMPILER_VM_RSS_GUARD` | `1` in CI | Wrap PHPT `vm.php` spawns with `run-vm-guarded.sh` |
+| `PHP_COMPILER_SERVE_READY_TIMEOUT` | `30` | Seconds `examples-web-smoke.sh` / `examples-serve-jit-smoke.sh` wait for `phpc serve` to bind ([#10530](https://github.com/PurHur/php-compiler/issues/10530)); Docker cold start is often ~17–20s — raise if `serve did not become ready` flakes |
 
 ## Entry points
 
@@ -48,6 +49,8 @@ Daily v1.1.0 release review presenter — aggregates user-facing gates without t
 Machine output: `./script/release-readiness.sh [--full] --json` → `{"user_release_ready":"yes"|"no","mode":"quick"|"full","gates":[...]}`.
 
 **bootstrap-inventory gate (#10531):** `release-readiness.sh` requires `vendor/` (runs `composer install` if missing) and treats `--check` as green only when stdout contains `OK N/N`. A bare `php script/bootstrap-inventory.php --check` without `vendor/` exits **1** — do not rely on a silent skip. File-list drift: `php script/bootstrap-inventory.php`. Optional construct-flag refresh after a self-host probe only: `docs/bootstrap-inventory-live-probe.md` (not required for new vm.php-path files; see #10368).
+
+**Web smoke serve startup (#10530):** `examples-web-smoke.sh` probes `phpc serve` readiness with `PHP_COMPILER_SERVE_READY_TIMEOUT` (default **30**). On a cold Docker harness the first `serve` can take ~17–20s; the old 10s default caused false `server did not become ready` failures during `release-readiness --full`.
 
 Parent: [#8739](https://github.com/PurHur/php-compiler/issues/8739) · [#78](https://github.com/PurHur/php-compiler/issues/78).
 

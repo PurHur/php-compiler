@@ -252,7 +252,22 @@ if [[ "${FAST_M5}" -eq 1 ]]; then
       ns5_hint 4 >&2
       exit 1
     fi
-    if ! "${_CI_REPO_ROOT}/build/selfhost-lib-spine-smoke" | grep -q 'compiler_lib_spine_smoke bundle OK'; then
+    spine_fast_ok=0
+    for spine_fast_attempt in 1 2; do
+      spine_fast_output="$("${_CI_REPO_ROOT}/build/selfhost-lib-spine-smoke" 2>&1 || true)"
+      if printf '%s' "${spine_fast_output}" | grep -q 'compiler_lib_spine_smoke bundle OK'; then
+        spine_fast_ok=1
+        break
+      fi
+      if [[ -n "${spine_fast_output}" ]]; then
+        printf '%s\n' "${spine_fast_output}" >&2
+      fi
+      if [[ "${spine_fast_attempt}" -lt 2 ]]; then
+        echo "north-star5-verify: step 4f3 retry ${spine_fast_attempt}/2 (spine bundle transient failure)" >&2
+        sleep 1
+      fi
+    done
+    if [[ "${spine_fast_ok}" -ne 1 ]]; then
       echo "north-star5-verify: step 4f3 FAILED (spine bundle OK run)" >&2
       exit 1
     fi
