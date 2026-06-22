@@ -44,7 +44,7 @@ final class VmJsonFormat
         VmJson::setLastError(0);
         $parser = new VmJsonParser($json, $maxDepth, $assoc);
         $value = $parser->parseTop();
-        if (null === $value && VmJson::lastError() !== 0) {
+        if (VmJson::lastError() !== 0) {
             if (VmJsonFlags::throwsOnError($flags)) {
                 throw new \JsonException(VmJson::lastErrorMsg(), VmJson::lastError());
             }

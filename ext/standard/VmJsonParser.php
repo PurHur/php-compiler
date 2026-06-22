@@ -164,14 +164,14 @@ final class VmJsonParser
     }
 
     /**
-     * @return list<mixed>
+     * @return list<mixed>|null
      */
-    private function parseArrayValue(): array
+    private function parseArrayValue(): ?array
     {
         if (!$this->expect('[')) {
             VmJson::setLastError(4);
 
-            return [];
+            return null;
         }
         $this->skipWs();
         if ($this->expect(']')) {
@@ -181,14 +181,14 @@ final class VmJsonParser
         for (;;) {
             $value = $this->parseValue();
             if (null === $value && VmJson::lastError() !== 0) {
-                return [];
+                return null;
             }
             $out[] = $value;
             $this->skipWs();
             if ($this->pos >= $this->len) {
                 VmJson::setLastError(4);
 
-                return [];
+                return null;
             }
             if (']' === $this->json[$this->pos]) {
                 $this->pos++;
@@ -198,7 +198,7 @@ final class VmJsonParser
             if (',' !== $this->json[$this->pos]) {
                 VmJson::setLastError(4);
 
-                return [];
+                return null;
             }
             $this->pos++;
         }
