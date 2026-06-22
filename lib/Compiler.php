@@ -11603,6 +11603,26 @@ class Compiler {
 
                 return null;
             }
+            $unaryProducerIndex = null;
+            foreach ($producers as $pi => $producer) {
+                if ($producer instanceof Op\Expr\UnaryMinus || $producer instanceof Op\Expr\UnaryPlus) {
+                    $unaryProducerIndex = $pi;
+                    break;
+                }
+            }
+            // array_slice($a, -2, 2, true) — UnaryMinus + trailing ConstFetch map to offset/preserve_keys (#10579).
+            if (null !== $unaryProducerIndex && 1 === \count($constFetchIndices) && \count($nonEmbeddedArgIndices) >= 3) {
+                $offsetArgIndex = $nonEmbeddedArgIndices[1] ?? null;
+                $trailingArgIndex = $nonEmbeddedArgIndices[\count($nonEmbeddedArgIndices) - 1] ?? null;
+                if ($argIndex === $offsetArgIndex) {
+                    return $producers[$unaryProducerIndex];
+                }
+                if ($argIndex === $trailingArgIndex) {
+                    return $producers[$constFetchIndices[0]];
+                }
+
+                return null;
+            }
             $closureProducerIndex = null;
             foreach ($producers as $pi => $producer) {
                 if ($producer instanceof Op\Expr\ArrowFunction || $producer instanceof Op\Expr\Closure) {
@@ -11640,6 +11660,16 @@ class Compiler {
             $arrayArgIndex = $nonEmbeddedArgIndices[\count($producers)];
 
             return $argIndex === $arrayArgIndex ? $producers[0] : null;
+        }
+        // array_slice($b, 1, -2) — lone UnaryMinus maps to trailing non-embedded arg (#10579).
+        if (
+            1 === \count($producers)
+            && ($producers[0] instanceof Op\Expr\UnaryMinus || $producers[0] instanceof Op\Expr\UnaryPlus)
+            && \count($nonEmbeddedArgIndices) >= 2
+        ) {
+            $unaryArgIndex = $nonEmbeddedArgIndices[\count($nonEmbeddedArgIndices) - 1];
+
+            return $argIndex === $unaryArgIndex ? $producers[0] : null;
         }
         if (\count($producers) !== \count($nonEmbeddedArgIndices)) {
             return null;
@@ -12100,6 +12130,10 @@ class Compiler {
                     }
                 }
                 if (!$assignFeedsCallArg) {
+                    break;
+                }
+                // Prior `$a = [...]; f($a, …)` — not an inline producer for this call (#10579).
+                if ($i < $callIndex - 1) {
                     break;
                 }
             }
