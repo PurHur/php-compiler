@@ -81,6 +81,10 @@ final class ValueEchoRuntime
 
     public static function implement(Context $context): void
     {
+        if (Builtin::LOAD_TYPE_STANDALONE === $context->loadType) {
+            return;
+        }
+
         $probe = $context->module->getNamedFunction('__value_echo__typeIsNull');
         if (null !== $probe && $probe->countBasicBlocks() > 0) {
             self::registerLinkedRuntime($context);
