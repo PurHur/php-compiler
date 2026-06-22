@@ -756,6 +756,25 @@ final class VmReflection
     }
 
     /**
+     * ReflectionClass::getTraitNames() / ReflectionEnum::getTraitNames() result array (#9693).
+     *
+     * @return Variable list<string> indexed trait names in declaration order
+     */
+    public static function reflectionClassTraitNamesArray(ClassEntry $entry): Variable
+    {
+        $result = new Variable();
+        $result->newArray();
+        $ht = $result->toArray();
+        foreach (array_values(self::traitUsesMap($entry)) as $traitName) {
+            $slot = new Variable();
+            $slot->string((string) $traitName);
+            $ht->append($slot);
+        }
+
+        return $result;
+    }
+
+    /**
      * ReflectionClass::getTraitAliases() result array (#6661).
      */
     public static function reflectionClassTraitAliasesMap(ClassEntry $entry): Variable
