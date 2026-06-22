@@ -6,10 +6,11 @@ namespace PHPCompiler\VM\Builtin;
 
 use PHPCompiler\ext\standard\VmReflection;
 use PHPCompiler\Frame;
+use PHPCompiler\VM\EnumSupport;
 use PHPCompiler\VM\ReflectionSupport;
 use PHPCompiler\VM\Variable;
 
-/** ReflectionEnumUnitCase::getValue() — VM backed enum case value (#3800). */
+/** ReflectionEnumUnitCase::getValue() — enum case object for backed enums (#3800, #9537, php_reflection.c). */
 final class ReflectionEnumUnitCaseGetValue extends VmClassMethod
 {
     public function __construct()
@@ -30,16 +31,11 @@ final class ReflectionEnumUnitCaseGetValue extends VmClassMethod
         if (null === $entry->backedType) {
             throw new \Error('Cannot get value of a pure enum case');
         }
-        $caseLc = strtolower($caseName);
-        foreach ($entry->enumCases as $case) {
-            if (strtolower($case['name']) === $caseLc) {
-                if (null !== $frame->returnVar) {
-                    $frame->returnVar->copyFrom($case['value']);
-                }
-
-                return;
-            }
+        $enum = EnumSupport::resolveRuntimeEnumClass($ctx, $entry);
+        EnumSupport::ensureBackedEnumValuesUnique($enum);
+        $caseVar = EnumSupport::materializeCaseForCasesList($enum, $caseName);
+        if (null !== $frame->returnVar) {
+            $frame->returnVar->copyFrom($caseVar);
         }
-        throw new \LogicException('Enum '.$entry->name.' has no case named '.$caseName);
     }
 }

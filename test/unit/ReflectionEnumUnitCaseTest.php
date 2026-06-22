@@ -28,11 +28,12 @@ enum E: int {
 $ref = new ReflectionEnumUnitCase(E::class, "One");
 echo $ref->getAttributes()[0]->newInstance()->v, "\n";
 echo $ref->getName(), "\n";
-echo $ref->getValue(), "\n";
+var_export($ref->getValue());
+echo "\n";
 PHP;
         ob_start();
         $runtime->run($runtime->parseAndCompile($code, 'reflection_enum_unit_case.php'));
-        $this->assertSame("marker\nOne\n1\n", ob_get_clean());
+        $this->assertSame("marker\nOne\n\\E::One\n", ob_get_clean());
     }
 
     public function testEnumCaseAttributeMetadataAtCompileTime(): void
