@@ -1009,4 +1009,50 @@ PHP;
         self::assertStringContainsString('0', $out);
         self::assertStringContainsString('1', $out);
     }
+
+    /** Issue #10495 — var_export(get_debug_type(null), true) wires nested scalar-return FuncCall producer. */
+    public function testVarExportNestedScalarBuiltinUsesFuncCallProducerSlot(): void
+    {
+        $code = <<<'PHP'
+<?php
+echo var_export(get_debug_type(null), true);
+echo "\n";
+echo var_export(gettype(null), true);
+echo "\n";
+echo var_export(json_encode(null), true);
+echo "\n";
+echo var_export(get_class(new stdClass()), true);
+PHP;
+        $runtime = new Runtime();
+        $block = $runtime->parseAndCompile($code, 'nested_string_builtin_call_arg.php');
+
+        $debugTypeReturnSlot = null;
+        $varExportSends = [];
+        $fcallOrdinal = 0;
+        foreach ($block->opCodes as $op) {
+            if (OpCode::TYPE_FUNCCALL_INIT === $op->type) {
+                ++$fcallOrdinal;
+                if (2 === $fcallOrdinal) {
+                    $varExportSends = [];
+                }
+            }
+            if (1 === $fcallOrdinal && OpCode::TYPE_FUNCCALL_EXEC_RETURN === $op->type) {
+                $debugTypeReturnSlot = $op->arg1;
+            }
+            if (2 === $fcallOrdinal && OpCode::TYPE_ARG_SEND === $op->type) {
+                $varExportSends[] = $op->arg1;
+            }
+        }
+
+        self::assertNotNull($debugTypeReturnSlot);
+        self::assertCount(2, $varExportSends);
+        self::assertSame($debugTypeReturnSlot, $varExportSends[0], 'arg sends='.json_encode($varExportSends));
+
+        ob_start();
+        $runtime->run($block);
+        $out = ob_get_clean();
+        self::assertStringContainsString("'null'", $out);
+        self::assertStringContainsString("'NULL'", $out);
+        self::assertStringContainsString("'stdClass'", $out);
+    }
 }
