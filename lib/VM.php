@@ -671,6 +671,37 @@ class VM {
     }
 
     /**
+     * ReflectionClass::getStaticPropertyValue / ReflectionProperty::getValue on static props.
+     * Invokes get hook when present instead of reading uninitialized backing (#9863, php_reflection.c).
+     */
+    public function readStaticPropertyForReflection(
+        string $classLc,
+        string $propertyName,
+        Variable $backingStorage,
+        ?Variable $default,
+        Frame $frame
+    ): Variable {
+        $propLc = strtolower($propertyName);
+        $hooks = $this->resolveStaticPropertyHooks($classLc, $propLc);
+        if (null !== $hooks && isset($hooks['get'])) {
+            return $this->fetchStaticPropertyWithHooks($classLc, $propertyName, $hooks['get'], $frame);
+        }
+        if (VM\TypedPropertyCheck::isUninitialized($backingStorage)) {
+            if (null !== $default) {
+                $out = new Variable();
+                $out->copyFrom($default);
+
+                return $out;
+            }
+            throw new \Error(VM\TypedPropertyCheck::errorMessage($backingStorage));
+        }
+        $out = new Variable();
+        $out->copyFrom($backingStorage->resolveIndirect());
+
+        return $out;
+    }
+
+    /**
      * ?? / ??= isset probe on static hooked properties — backing only, never get hook (#9683).
      */
     public function staticPropertyIsSetForCoalesceAssign(string $classLc, string $propNameRaw): bool
