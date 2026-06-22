@@ -22,8 +22,6 @@ use PHPCfg\Operand\Literal;
 use PHPCfg\Operand\Temporary;
 use PHPCfg\Operand\Variable as CfgVariable;
 use PHPCfg\Script;
-use PHPCfg\Traverser;
-use PHPCfg\Visitor\DeclarationFinder;
 use PHPTypes\Type;
 use PHPCompiler\VM\AttributeSupport;
 use PHPCompiler\VM\ClassConstExpr;
@@ -160,9 +158,6 @@ class Compiler {
 
     /** @var array<string, true> lowercase user function names declared `: never` (#4117). */
     private array $neverFunctionNames = [];
-
-    /** @var array<string, true> lowercase user function names in the current Script (#10534). */
-    private array $scriptUserFunctionNames = [];
 
     /** True while lowering switch to JUMPIF/EQUAL — skip ?: merge slot bridging (#878). */
     private bool $compilingSwitchJumpIfChain = false;
@@ -437,7 +432,6 @@ class Compiler {
         $this->compiledClassStaticProperties = [];
         $this->currentClassStaticPropertyCompile = null;
         $this->neverFunctionNames = [];
-        $this->scriptUserFunctionNames = $this->collectScriptUserFunctionNames($script);
         $this->scriptHasDnfTypedProperties = false;
         $this->classCompileRegistry = new ClassCompileRegistry();
         $this->attributeClassRegistry = new AttributeClassRegistry();
@@ -7207,13 +7201,12 @@ class Compiler {
                     $expr
                 );
             case Op\Expr\NsFuncCall::class:
-                $nsCallee = $this->resolveNsFuncCallCalleeOperand($expr);
-                if ($this->parensNewCallSkippedWithoutInvoke($nsCallee, $block)) {
+                if ($this->parensNewCallSkippedWithoutInvoke($expr->nsName, $block)) {
                     return [];
                 }
-                if ($this->operandIsInvokableReceiver($nsCallee, $block)) {
+                if ($this->operandIsInvokableReceiver($expr->nsName, $block)) {
                     return $this->compileMethodCallOpcodes(
-                        $this->compileOperand($nsCallee, $block, true),
+                        $this->compileOperand($expr->nsName, $block, true),
                         $this->compileOperand(new Operand\Literal('__invoke'), $block, true),
                         $expr->args,
                         $expr->result,
@@ -7222,7 +7215,7 @@ class Compiler {
                 }
 
                 return $this->compileFuncCall(
-                    $this->compileOperand($nsCallee, $block, true),
+                    $this->compileOperand($expr->nsName, $block, true),
                     $expr->args,
                     $expr->result,
                     $block,
@@ -15562,41 +15555,6 @@ class Compiler {
         }
 
         return false;
-    }
-
-    /**
-     * Zend zend_compile.c: unqualified calls in a namespace resolve to N\func when declared, else global (#10534).
-     *
-     * @return array<string, true>
-     */
-    private function collectScriptUserFunctionNames(Script $script): array
-    {
-        $names = [];
-        foreach ($script->functions as $func) {
-            $names[strtolower($func->name)] = true;
-        }
-        $finder = new DeclarationFinder();
-        $traverser = new Traverser();
-        $traverser->addVisitor($finder);
-        $traverser->traverse($script);
-        foreach ($finder->getFunctions() as $function) {
-            $names[strtolower($function->func->name)] = true;
-        }
-
-        return $names;
-    }
-
-    /**
-     * php-cfg NsFuncCall carries both unqualified `name` and namespaced `nsName`; pick the Zend target (#10534).
-     */
-    protected function resolveNsFuncCallCalleeOperand(Op\Expr\NsFuncCall $expr): Operand
-    {
-        $nsName = $this->staticNameFromOperand($expr->nsName);
-        if (null !== $nsName && isset($this->scriptUserFunctionNames[strtolower($nsName)])) {
-            return $expr->nsName;
-        }
-
-        return $expr->name;
     }
 
     protected function compileFuncCall(
