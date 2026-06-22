@@ -52,8 +52,8 @@ $outFile = $root.'/docs/bootstrap-inventory.md';
 
 if (!class_exists(\PhpParser\ParserFactory::class)) {
     if ($check) {
-        fwrite(STDERR, "bootstrap-inventory: nikic/php-parser missing (vendor/ absent); skipping --check\n");
-        exit(0);
+        fwrite(STDERR, "bootstrap-inventory: nikic/php-parser missing (vendor/ absent); --check requires composer install (#10531)\n");
+        exit(1);
     }
     fwrite(STDERR, "bootstrap-inventory: nikic/php-parser missing (vendor/ absent); cannot regenerate {$outFile}\n");
     fwrite(STDERR, "Hint: run via a dev env with vendor installed, or use docker scripts on a host with network access.\n");
@@ -87,9 +87,10 @@ if ($check) {
                 fwrite(STDERR, $line."\n");
             }
         }
-        fwrite(STDERR, "\nLive probe sidecar (optional): docs/bootstrap-inventory-live-probe.md\n");
-        fwrite(STDERR, "  php script/bootstrap-selfhost-compile-probe.php --update-inventory\n");
+        fwrite(STDERR, "\nFile-list drift: regenerate committed doc with:\n");
         fwrite(STDERR, "  php script/bootstrap-inventory.php\n");
+        fwrite(STDERR, "Optional construct-flag refresh (after self-host probe only — not required for new vm.php-path files): docs/bootstrap-inventory-live-probe.md\n");
+        fwrite(STDERR, "  php script/bootstrap-selfhost-compile-probe.php --update-inventory && php script/bootstrap-inventory.php\n");
         exit(1);
     }
     $phaseA = (int) ($report['phase_a']['phase_a_inventory_files'] ?? 0);

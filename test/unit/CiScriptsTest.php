@@ -491,6 +491,8 @@ final class CiScriptsTest extends TestCase
         $this->assertStringContainsString('--json', $body);
         $this->assertStringContainsString('user_release_ready', $body);
         $this->assertStringContainsString('bootstrap-inventory.php --check', $body);
+        $this->assertStringContainsString('run_gate_bootstrap_inventory', $body);
+        $this->assertStringContainsString('^OK [0-9]+/[0-9]+$', $body);
         $this->assertStringContainsString('check-selfhost-spine-coverage-sync.php', $body);
         $this->assertStringContainsString('check-root-readme-sync.php', $body);
         $this->assertStringContainsString('north-star5-verify-fast', $body);
