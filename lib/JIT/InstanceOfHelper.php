@@ -5,17 +5,30 @@ declare(strict_types=1);
 namespace PHPCompiler\JIT;
 
 use PHPCompiler\JIT\Builtin\ErrorRaise;
+use PHPCompiler\VM\InstanceOfClassName;
+use PHPCompiler\VM\InstanceOfJitHelper;
 use PHPCfg\Operand;
 use PHPCfg\Operand\Literal;
 use PHPLLVM\Builder;
 use PHPLLVM\Value;
 
 /**
- * instanceof lowering for literal and dynamic class operands (#4339).
+ * instanceof lowering for literal and dynamic class operands (#4339, #10078).
+ *
+ * SSOT: {@see \PHPCompiler\VM\InstanceOfClassName}, {@see \PHPCompiler\VM\InstanceOfJitHelper}
  */
 final class InstanceOfHelper
 {
-    public const ERROR_MESSAGE = 'Class name must be a valid object or a string';
+    public const ERROR_MESSAGE = InstanceOfClassName::ERROR_MESSAGE;
+
+    private const HELPER_PATH = '/VM/InstanceOfJitHelper.php';
+
+    private const VALUE_BOX_RHS_KIND_HELPER = 'PHPCompiler\\VM\\InstanceOfJitHelper::valueBoxRhsKind';
+
+    /** @var list<string> */
+    private const COMPILED_HELPERS = [
+        self::VALUE_BOX_RHS_KIND_HELPER,
+    ];
 
     public static function emit(Context $context, Variable $expr, Operand $classOp): Variable
     {
@@ -28,14 +41,7 @@ final class InstanceOfHelper
 
     private static function emitDynamic(Context $context, Variable $expr, Variable $classVar): Variable
     {
-        if (\in_array($classVar->type, [
-            Variable::TYPE_NATIVE_LONG,
-            Variable::TYPE_NATIVE_DOUBLE,
-            Variable::TYPE_NATIVE_BOOL,
-            Variable::TYPE_NULL,
-            Variable::TYPE_ARRAY,
-            Variable::TYPE_HASHTABLE,
-        ], true)) {
+        if (InstanceOfJitHelper::jitRhsTypeIsInvalidClass($classVar->type)) {
             self::emitInvalidClassRhsError($context);
 
             $i1 = $context->getTypeFromString('int1');
@@ -86,7 +92,8 @@ final class InstanceOfHelper
         $typeByte = $context->builder->load(
             $context->builder->structGep($valuePtr, $map['type'])
         );
-        $i8 = $context->getTypeFromString('int8');
+        $rhsKind = self::callValueBoxRhsKind($context, $typeByte);
+        $i32 = $context->getTypeFromString('int32');
 
         $stringBlock = BasicBlockHelper::append($context, 'instanceof_rhs_str');
         $afterString = BasicBlockHelper::append($context, 'instanceof_rhs_after_str');
@@ -96,8 +103,8 @@ final class InstanceOfHelper
 
         $isString = $context->builder->icmp(
             Builder::INT_EQ,
-            $typeByte,
-            $i8->constInt(Variable::TYPE_STRING, false)
+            $rhsKind,
+            $i32->constInt(InstanceOfJitHelper::RHS_KIND_STRING, false)
         );
         $context->builder->branchIf($isString, $stringBlock, $afterString);
 
@@ -114,8 +121,8 @@ final class InstanceOfHelper
         $context->builder->positionAtEnd($afterString);
         $isObject = $context->builder->icmp(
             Builder::INT_EQ,
-            $typeByte,
-            $i8->constInt(Variable::TYPE_OBJECT, false)
+            $rhsKind,
+            $i32->constInt(InstanceOfJitHelper::RHS_KIND_OBJECT, false)
         );
         $context->builder->branchIf($isObject, $objectBlock, $invalidBlock);
 
@@ -213,5 +220,43 @@ final class InstanceOfHelper
             $fn = $context->module->addFunction('strcasecmp', $ft);
             $context->registerFunction('strcasecmp', $fn);
         }
+    }
+
+    private static function ensureValueBoxBridgeLinked(Context $context): void
+    {
+        $abiName = '__instanceof__valueBoxRhsKind';
+        $probe = $context->module->getNamedFunction($abiName);
+        if (null !== $probe && $probe->countBasicBlocks() > 0) {
+            $context->registerFunction($abiName, $probe);
+
+            return;
+        }
+
+        $i8 = $context->getTypeFromString('int8');
+        $i32 = $context->getTypeFromString('int32');
+        JitVmHelperLink::ensureBridge(
+            $context,
+            $abiName,
+            'instanceof_value_box_rhs_kind_entry',
+            [$i8],
+            $i32,
+            self::VALUE_BOX_RHS_KIND_HELPER,
+            self::HELPER_PATH,
+            self::COMPILED_HELPERS,
+            '#10078'
+        );
+        $context->builder->clearInsertionPosition();
+    }
+
+    private static function callValueBoxRhsKind(Context $context, Value $typeByte): Value
+    {
+        self::ensureValueBoxBridgeLinked($context);
+        $fn = $context->lookupFunction('__instanceof__valueBoxRhsKind');
+        $i8 = $context->getTypeFromString('int8');
+
+        return $context->builder->call(
+            $fn,
+            $context->builder->trunc($typeByte, $i8)
+        );
     }
 }
