@@ -50,6 +50,8 @@ final class BuiltinParamNames
                 return ['array', 'length', 'preserve_keys'];
             case 'similar_text':
                 return ['string1', 'string2', 'percent'];
+            case 'levenshtein':
+                return ['string1', 'string2', 'insertion_cost', 'replacement_cost', 'deletion_cost'];
             case 'settype':
                 return ['var', 'type'];
             case 'register_shutdown_function':
@@ -134,6 +136,17 @@ final class BuiltinParamNames
             case 'mb_ltrim':
             case 'mb_rtrim':
                 return ['string', 'characters', 'encoding'];
+            case 'htmlspecialchars':
+            case 'htmlentities':
+                return ['string', 'flags', 'encoding', 'double_encode'];
+            case 'version_compare':
+                return ['version1', 'version2', 'operator'];
+            case 'in_array':
+                return ['needle', 'haystack', 'strict'];
+            case 'array_search':
+                return ['needle', 'haystack', 'strict'];
+            case 'array_rand':
+                return ['array', 'num'];
         }
 
         return null;

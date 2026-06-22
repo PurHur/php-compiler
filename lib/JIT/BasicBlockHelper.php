@@ -145,7 +145,9 @@ final class BasicBlockHelper
 
     public static function entryAllocaForFunction(Context $context, Function_ $fn, Type $type): Value
     {
-        $entry = $fn->getEntryBasicBlock();
+        $entry = $fn->countBasicBlocks() > 0
+            ? $fn->getEntryBasicBlock()
+            : $fn->appendBasicBlock('entry');
         $restore = self::tryGetInsertBlock($context);
         try {
             $first = $entry->getFirstInstruction();
@@ -162,6 +164,8 @@ final class BasicBlockHelper
             } else {
                 $context->builder->positionAtEnd($restore);
             }
+        } else {
+            $context->builder->clearInsertionPosition();
         }
 
         return $slot;

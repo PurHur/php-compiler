@@ -29,7 +29,10 @@ final class TimeSleepRuntimeStandaloneTest extends TestCase
         }
     }
 
-    public function testEnsureLinkedUsesLibcBridgeWhenEmitHelperLinkStubsActive(): void
+    /**
+     * @runInSeparateProcess
+     */
+    public function testEnsureLinkedUsesSleepJitHelperWhenEmitHelperLinkStubsActive(): void
     {
         $prevEmit = \getenv('PHP_COMPILER_EMIT_HELPER_LINK');
         \putenv('PHP_COMPILER_EMIT_HELPER_LINK=1');
@@ -41,6 +44,8 @@ final class TimeSleepRuntimeStandaloneTest extends TestCase
                 $this->assertNotNull($fn, $name);
                 $this->assertGreaterThan(0, $fn->countBasicBlocks(), $name);
             }
+            $runtimeSource = (string) \file_get_contents(__DIR__.'/../../../lib/JIT/Builtin/TimeSleepRuntime.php');
+            $this->assertStringNotContainsString('TimeSleepRuntimeLibcBridge', $runtimeSource);
         } finally {
             if (false === $prevEmit || null === $prevEmit) {
                 \putenv('PHP_COMPILER_EMIT_HELPER_LINK=');

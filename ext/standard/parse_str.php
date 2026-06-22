@@ -10,6 +10,7 @@ use PHPCompiler\JIT\Builtin\StringParseStr;
 use PHPCompiler\JIT\Builtin\TypeErrorRaise;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitStringArg;
+use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
@@ -57,7 +58,7 @@ final class parse_str extends Internal
         $resultArg->copyFrom($replacement);
 
         if (null !== $frame->returnVar) {
-            $frame->returnVar->bool(true);
+            $frame->returnVar->null();
         }
     }
 
@@ -79,6 +80,10 @@ final class parse_str extends Internal
         }
         JitParseStr::parse($context, $args[0], $args[1]);
 
-        return $context->getTypeFromString('int64')->constInt(1, false);
+        $nullSlot = JitValueBox::alloc($context);
+        $nullPtr = JitValueBox::pointer($context, $nullSlot);
+        $context->builder->call($context->lookupFunction('__value__writeNull'), $nullPtr);
+
+        return $nullPtr;
     }
 }

@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace PHPCompiler\ext\standard;
 
 /**
- * libc stat(2)/lstat(2) for VM without host PHP \\stat()/\\lstat() (#7844, #6265 phase 2).
+ * stat(2)/lstat(2) for VM — libc FFI when enabled, else {@see VmStatPure} (#7844, #8903).
  *
  * php-src: Zend/zend_stat.c — php_stat / php_lstat array layout
  * JIT/AOT: JitStatArray LLVM lowering (unchanged).
@@ -18,7 +18,7 @@ final class VmStatNative
 
     public static function available(): bool
     {
-        return null !== self::ffi();
+        return null !== self::ffi() || VmStatPure::available();
     }
 
     /**
@@ -71,7 +71,7 @@ final class VmStatNative
         }
         $ffi = self::ffi();
         if (null === $ffi) {
-            return false;
+            return $lstat ? VmStatPure::lstat($path) : VmStatPure::stat($path);
         }
 
         try {
@@ -94,7 +94,7 @@ final class VmStatNative
      */
     private static function toPhpStatArray(\FFI\CData $buf): array
     {
-        $fields = [
+        return VmStatPure::normalize([
             'dev' => (int) $buf->st_dev,
             'ino' => (int) $buf->st_ino,
             'mode' => (int) $buf->st_mode,
@@ -108,16 +108,7 @@ final class VmStatNative
             'ctime' => (int) $buf->st_ctime,
             'blksize' => (int) $buf->st_blksize,
             'blocks' => (int) $buf->st_blocks,
-        ];
-        $out = [];
-        $i = 0;
-        foreach ($fields as $key => $value) {
-            $out[$key] = $value;
-            $out[$i] = $value;
-            ++$i;
-        }
-
-        return $out;
+        ]);
     }
 
     private static function ffi(): ?\FFI

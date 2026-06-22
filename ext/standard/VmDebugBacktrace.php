@@ -25,6 +25,9 @@ final class VmDebugBacktrace
 
         $result = new Variable();
         $result->newArray();
+        if (self::isTopLevelBacktraceCall($frame)) {
+            return $result;
+        }
         $ht = $result->toArray();
 
         $framesAdded = 0;
@@ -52,6 +55,9 @@ final class VmDebugBacktrace
     public static function printFlat(Frame $frame, int $options = 0, int $limit = 0): void
     {
         $includeArgs = 0 === ($options & self::IGNORE_ARGS);
+        if (self::isTopLevelBacktraceCall($frame)) {
+            return;
+        }
         $index = 0;
         $printed = 0;
         foreach (self::collectFrames($frame) as $f) {
@@ -100,6 +106,29 @@ final class VmDebugBacktrace
         }
 
         return $result;
+    }
+
+    /**
+     * Zend returns an empty trace when debug_backtrace() is invoked from file-level {main}
+     * (skip_last leaves no user frames). See zend_fetch_debug_backtrace() / #10484.
+     */
+    private static function isTopLevelBacktraceCall(Frame $frame): bool
+    {
+        $caller = self::callerFrame($frame);
+        if (null === $caller) {
+            return true;
+        }
+
+        return null !== $caller->block && $caller->block->isMainScript();
+    }
+
+    private static function callerFrame(Frame $frame): ?Frame
+    {
+        if ($frame->hasHandler() && null !== $frame->parent) {
+            return $frame->parent;
+        }
+
+        return $frame->parent;
     }
 
     /**

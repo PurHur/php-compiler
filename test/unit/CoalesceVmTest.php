@@ -212,6 +212,19 @@ echo $hit, "\n";
         );
     }
 
+    /** Issue #9479: null container dim ?? default in func-call arg must not leave dead temp (#10390 audit). */
+    public function testNullCoalesceNullOffsetFuncCallArg(): void
+    {
+        $this->assertVmOutput(
+            '<?php
+$x = null;
+var_export($x["message"] ?? "no warning");
+echo "\n";
+',
+            "'no warning'\n"
+        );
+    }
+
     private function assertVmOutput(string $code, string $expected): void
     {
         $runtime = new Runtime();

@@ -6,6 +6,7 @@ namespace PHPCompiler\JIT\Builtin;
 
 use PHPCompiler\JIT;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\NestedJitCompileScope;
 
 /** JIT/AOT link hook for hebrev() — compiles HebrevJitHelper into the module (#3450). */
 final class Hebrev
@@ -43,12 +44,14 @@ final class Hebrev
 
         $runtime = $context->runtime;
         $path = dirname(__DIR__, 3).'/ext/standard/HebrevJitHelper.php';
-        $block = $runtime->parseAndCompile((string) file_get_contents($path), 'HebrevJitHelper.php');
-        if (null === $block) {
-            throw new \LogicException('HebrevJitHelper.php parseAndCompile failed (#3450)');
-        }
-        $jit = new JIT($context);
-        $jit->compile($block);
+        NestedJitCompileScope::run($context, static function () use ($context, $runtime, $path): void {
+            $block = $runtime->parseAndCompile((string) file_get_contents($path), 'HebrevJitHelper.php');
+            if (null === $block) {
+                throw new \LogicException('HebrevJitHelper.php parseAndCompile failed (#3450)');
+            }
+            $jit = new JIT($context);
+            $jit->compile($block);
+        });
         if (!isset($context->functions[$lc])) {
             throw new \LogicException('HebrevJitHelper::convert was not compiled for JIT (#3450)');
         }

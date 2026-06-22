@@ -1323,28 +1323,16 @@ final class HashTable {
         if (!$this->isWithoutHoles()) {
             throw new \LogicException('sliceCopy() only supports packed list arrays without holes');
         }
-        if ($offset < 0) {
-            $offset = $this->numElements + $offset;
-            if ($offset < 0) {
-                $offset = 0;
-            }
-        }
+        [$offset, $takeLen] = $this->normalizeSpliceRange($offset, $length, $this->numElements);
         $out = new self();
-        $index = 0;
-        $taken = 0;
-        foreach ($this->iterate(true) as $value) {
-            if ($index < $offset) {
-                ++$index;
-                continue;
-            }
-            if (null !== $length && $taken >= $length) {
+        $values = iterator_to_array($this->iterate(true), false);
+        for ($i = $offset; $i < $offset + $takeLen; ++$i) {
+            if (!isset($values[$i])) {
                 break;
             }
             $copy = new Variable();
-            $copy->copyFrom($value);
+            $copy->copyFrom($values[$i]);
             $out->append($copy);
-            ++$index;
-            ++$taken;
         }
 
         return $out;
@@ -1752,7 +1740,7 @@ final class HashTable {
         $this->assertSeparatedForWrite();
         $bucket = null;
         $bucketIndex = self::INVALID_INDEX;
-        $index = self::normalizeIndexKey($index);
+        $index = self::normalizeIndexKey($index, 'Illegal offset type in unset');
         switch ($index->type) {
             case Variable::TYPE_INTEGER:
                 $bucketIndex = $this->findBucketIndex($index->toInt(), null);

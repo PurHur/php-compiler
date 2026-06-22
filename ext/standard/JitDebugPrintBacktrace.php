@@ -101,8 +101,8 @@ final class JitDebugPrintBacktrace
         $sensitive = $block->paramSensitive;
         foreach ($block->paramNames as $paramIdx => $name) {
             unset($name);
-            if (isset($sensitive[$paramIdx])) {
-                $parts[] = \PHPCompiler\VM\SensitiveParamSupport::TRACE_ARG_LABEL;
+            if (\PHPCompiler\VM\SensitiveParamSupport::compileTimeParamIsSensitive($sensitive, $paramIdx)) {
+                $parts[] = \PHPCompiler\VM\SensitiveParamJitHelper::traceArgLabel();
 
                 continue;
             }

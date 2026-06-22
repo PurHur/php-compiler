@@ -76,6 +76,9 @@ class Frame {
     /** Exception object bound for bare `throw;` in this catch body (#3508). */
     public ?Variable $activeCatchException = null;
 
+    /** Scope slot for `catch (Throwable $e)` — suppress false undefined-var reads (#10358). */
+    public ?int $catchVarSlot = null;
+
     /** Set when Fiber::suspend() suspends; runFrames returns FIBER_SUSPEND. */
     public bool $fiberSuspend = false;
 

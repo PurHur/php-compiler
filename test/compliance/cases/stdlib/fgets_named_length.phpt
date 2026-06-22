@@ -1,5 +1,5 @@
 --TEST--
-stdlib fgets() length: named parameter binds optional $length (#10318, ext/standard/streamsfuncs.c)
+stdlib fgets() length: named parameter + N-1 byte cap (#10318, #10340, ext/standard/file.c)
 --SKIPIF--
 <?php die('skip — compiler VM/JIT compliance via VMTest/JITTest, not Zend CLI'); ?>
 --FILE--
@@ -20,4 +20,4 @@ fclose($h);
 ?>
 --EXPECT--
 true
-'hel'
+'he'

@@ -152,7 +152,9 @@ final class ClosureSupport
             return null;
         }
         if (Variable::TYPE_OBJECT === $newThis->type && $state->isStaticClosure()) {
-            throw new \Error('Cannot bind static closure to object');
+            self::warnCannotBindInstanceToStaticClosure($ctx, $frame);
+
+            return self::wrapState($ctx, $state);
         }
         $bound = $state->cloneForBind();
         if (Variable::TYPE_NULL === $newThis->type) {
@@ -238,6 +240,19 @@ final class ClosureSupport
         }
         $ctx->errors->triggerError(
             "Cannot bind closure to scope of internal class {$display}",
+            ErrorReporter::E_WARNING,
+            null,
+            $ctx,
+            $frame
+        );
+    }
+
+    private static function warnCannotBindInstanceToStaticClosure(
+        Context $ctx,
+        ?Frame $frame
+    ): void {
+        $ctx->errors->triggerError(
+            'Cannot bind an instance to a static closure',
             ErrorReporter::E_WARNING,
             null,
             $ctx,

@@ -40,7 +40,7 @@ final class json_encode extends Internal
         $ctx = $frame->vmContext;
         $vm = null !== $ctx ? $ctx->runtime->vm : null;
         try {
-            $value = VmJson::export($frame->calledArgs[0]->resolveIndirect(), $ctx, $vm);
+            $value = VmJson::export($frame->calledArgs[0]->resolveIndirect(), $ctx, $vm, $frame);
         } catch (VmJsonExportException $e) {
             VmJson::setLastError($e->errorCode);
             if (VmJsonFlags::throwsOnError($flags)) {

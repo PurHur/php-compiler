@@ -3,14 +3,15 @@ Language: (int) cast on backed enum case — E_WARNING + backing int (#9479, Zen
 --FILE--
 <?php
 enum E: int { case A = 1; }
-set_error_handler(static fn (): bool => true);
+$msgs = [];
+set_error_handler(static function ($n, $m) use (&$msgs): bool { $msgs[] = $m; return true; });
 var_export((int) E::A);
 echo "\n";
-var_export(error_get_last()['message'] ?? 'no warning');
+var_export($msgs[0] ?? 'no warning');
 echo "\n";
 var_dump((int) E::A);
 ?>
 --EXPECT--
 1
-'no warning'
+'Object of class E could not be converted to int'
 int(1)

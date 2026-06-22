@@ -75,36 +75,15 @@ final class ObGzhandlerJitHelper
 
     private static function containsSubstring(string $haystack, string $needle): bool
     {
-        $len = \strlen($needle);
-        if (0 === $len) {
+        if ('' === $needle) {
             return true;
         }
-        $hlen = \strlen($haystack);
-        if ($len > $hlen) {
-            return false;
-        }
-        for ($i = 0; $i <= $hlen - $len; $i = $i + 1) {
-            if (\substr($haystack, $i, $len) === $needle) {
-                return true;
-            }
-        }
 
-        return false;
+        return \strpos($haystack, $needle) !== false;
     }
 
     private static function asciiLower(string $text): string
     {
-        $out = '';
-        $len = \strlen($text);
-        for ($i = 0; $i < $len; $i = $i + 1) {
-            $ord = \ord($text[$i]);
-            if ($ord >= 65 && $ord <= 90) {
-                $out .= \chr($ord + 32);
-            } else {
-                $out .= $text[$i];
-            }
-        }
-
-        return $out;
+        return \strtolower($text);
     }
 }

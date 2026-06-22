@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace PHPCompiler\JIT\Builtin;
 
 use PHPCompiler\ext\standard\ob_end_clean;
+use PHPCompiler\ext\standard\ob_end_flush;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\VM\ObStackLimits;
 use PHPLLVM\Builder;
@@ -344,7 +345,13 @@ final class ObOutputRuntime
 
     private static function implementObEndFlush(Context $context): void
     {
-        self::implementPopBuffer($context, '__phpc_ob_end_flush', false, true);
+        self::implementPopBuffer(
+            $context,
+            '__phpc_ob_end_flush',
+            false,
+            true,
+            ob_end_flush::NO_BUFFER_NOTICE
+        );
     }
 
     private static function implementObGetFlush(Context $context): void

@@ -29,8 +29,17 @@ final class levenshtein extends Internal
     public function execute(Frame $frame): void
     {
         $argc = \count($frame->calledArgs);
-        if ($argc < 2 || $argc > 5) {
-            throw new \LogicException('levenshtein() accepts two to five arguments in this compiler build');
+        if ($argc < 2) {
+            throw new \ArgumentCountError(\sprintf(
+                'levenshtein() expects at least 2 arguments, %d given',
+                $argc
+            ));
+        }
+        if ($argc > 5) {
+            throw new \ArgumentCountError(\sprintf(
+                'levenshtein() expects at most 5 arguments, %d given',
+                $argc
+            ));
         }
         $a = self::vmStringArg($frame, 0, 'string1');
         $b = self::vmStringArg($frame, 1, 'string2');
@@ -58,8 +67,17 @@ final class levenshtein extends Internal
     {
         $this->context = $context;
         $argc = \count($args);
-        if ($argc < 2 || $argc > 5) {
-            throw new \LogicException('levenshtein() accepts two to five arguments in this compiler build');
+        if ($argc < 2) {
+            throw new \ArgumentCountError(\sprintf(
+                'levenshtein() expects at least 2 arguments, %d given',
+                $argc
+            ));
+        }
+        if ($argc > 5) {
+            throw new \ArgumentCountError(\sprintf(
+                'levenshtein() expects at most 5 arguments, %d given',
+                $argc
+            ));
         }
         $i64 = $context->getTypeFromString('int64');
         $ins = $i64->constInt(1, false);

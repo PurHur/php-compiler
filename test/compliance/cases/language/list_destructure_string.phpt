@@ -1,19 +1,16 @@
 --TEST--
-list() destructuring from string — TypeError (#7461, supersedes #4308 silent null)
+list() destructuring from string — NULL slots (#10486, supersedes #7461 TypeError)
 --FILE--
 <?php
-try {
-    [$a] = 'ab';
-    echo "no-exception\n";
-} catch (TypeError $e) {
-    echo 'TypeError: ', $e->getMessage(), "\n";
-}
-try {
-    [$b, $c] = 'xy';
-    echo "no-exception\n";
-} catch (TypeError $e) {
-    echo 'TypeError: ', $e->getMessage(), "\n";
-}
+[$a] = 'ab';
+var_export($a);
+echo "\n";
+[$b, $c] = 'xy';
+var_export([$b, $c]);
+echo "\n";
 --EXPECT--
-TypeError: Cannot use string as array
-TypeError: Cannot use string as array
+NULL
+array (
+  0 => NULL,
+  1 => NULL,
+)

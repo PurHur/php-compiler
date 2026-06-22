@@ -1,5 +1,5 @@
 --TEST--
-isset()/empty() on property hooks — uninitialized probes backing; initialized invokes get (#9696, zend_std_has_property)
+isset()/empty() on property hooks — get+set probes backing; get-only virtual invokes get (#10392, #9832)
 --FILE--
 <?php
 class Box {

@@ -34,4 +34,57 @@ final class BuiltinParamNamesAliasTest extends TestCase
         self::assertSame(0, BuiltinParamNames::lookupNamedParamIndex($names, 'glue', 'implode'));
         self::assertSame(1, BuiltinParamNames::lookupNamedParamIndex($names, 'pieces', 'implode'));
     }
+
+    public function testHtmlspecialcharsDoubleEncodeNamedParamResolves(): void
+    {
+        $names = BuiltinParamNames::forFunction('htmlspecialchars');
+        self::assertSame(['string', 'flags', 'encoding', 'double_encode'], $names);
+        self::assertSame(3, BuiltinParamNames::lookupNamedParamIndex($names, 'double_encode', 'htmlspecialchars'));
+        $entities = BuiltinParamNames::forFunction('htmlentities');
+        self::assertSame(3, BuiltinParamNames::lookupNamedParamIndex($entities, 'double_encode', 'htmlentities'));
+    }
+
+    public function testLevenshteinNamedCostParamsResolve(): void
+    {
+        $names = BuiltinParamNames::forFunction('levenshtein');
+        self::assertSame(
+            ['string1', 'string2', 'insertion_cost', 'replacement_cost', 'deletion_cost'],
+            $names
+        );
+        self::assertSame(2, BuiltinParamNames::lookupNamedParamIndex($names, 'insertion_cost', 'levenshtein'));
+        self::assertSame(3, BuiltinParamNames::lookupNamedParamIndex($names, 'replacement_cost', 'levenshtein'));
+        self::assertSame(4, BuiltinParamNames::lookupNamedParamIndex($names, 'deletion_cost', 'levenshtein'));
+    }
+
+    /** @covers issue #10319 */
+    public function testVersionCompareOperatorNamedParamResolves(): void
+    {
+        $names = BuiltinParamNames::forFunction('version_compare');
+        self::assertSame(['version1', 'version2', 'operator'], $names);
+        self::assertSame(2, BuiltinParamNames::lookupNamedParamIndex($names, 'operator', 'version_compare'));
+    }
+
+    /** @covers issue #10321 */
+    public function testInArrayStrictNamedParamResolves(): void
+    {
+        $names = BuiltinParamNames::forFunction('in_array');
+        self::assertSame(['needle', 'haystack', 'strict'], $names);
+        self::assertSame(2, BuiltinParamNames::lookupNamedParamIndex($names, 'strict', 'in_array'));
+    }
+
+    /** @covers issue #10321 */
+    public function testArraySearchStrictNamedParamResolves(): void
+    {
+        $names = BuiltinParamNames::forFunction('array_search');
+        self::assertSame(['needle', 'haystack', 'strict'], $names);
+        self::assertSame(2, BuiltinParamNames::lookupNamedParamIndex($names, 'strict', 'array_search'));
+    }
+
+    /** @covers issue #10469 */
+    public function testArrayRandNumNamedParamResolves(): void
+    {
+        $names = BuiltinParamNames::forFunction('array_rand');
+        self::assertSame(['array', 'num'], $names);
+        self::assertSame(1, BuiltinParamNames::lookupNamedParamIndex($names, 'num', 'array_rand'));
+    }
 }

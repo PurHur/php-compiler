@@ -7,6 +7,7 @@ namespace PHPCompiler\JIT\Builtin;
 use PHPCompiler\JIT;
 use PHPCompiler\JIT\Builtin;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\NestedJitCompileScope;
 use PHPLLVM\Value\Function_ as LlvmFunction;
 
 /**
@@ -111,12 +112,14 @@ final class StringStripTags
 
         $runtime = $context->runtime;
         $path = \dirname(__DIR__, 3).self::HELPER_PATH;
-        $block = $runtime->parseAndCompile((string) \file_get_contents($path), 'StripTagsJitHelper.php');
-        if (null === $block) {
-            throw new \LogicException('StripTagsJitHelper.php parseAndCompile failed (#9196)');
-        }
-        $jit = new JIT($context);
-        $jit->compile($block);
+        NestedJitCompileScope::run($context, static function () use ($context, $runtime, $path): void {
+            $block = $runtime->parseAndCompile((string) \file_get_contents($path), 'StripTagsJitHelper.php');
+            if (null === $block) {
+                throw new \LogicException('StripTagsJitHelper.php parseAndCompile failed (#9196)');
+            }
+            $jit = new JIT($context);
+            $jit->compile($block);
+        });
         foreach (self::COMPILED_HELPERS as $logical) {
             if (!isset($context->functions[\strtolower($logical)])) {
                 throw new \LogicException($logical.' was not compiled for JIT (#9196)');

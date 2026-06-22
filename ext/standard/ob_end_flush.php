@@ -8,6 +8,7 @@ use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\Variable as JITVariable;
+use PHPCompiler\VM\ErrorReporter;
 use PHPCompiler\VM\OutputBuffer;
 use PHPLLVM\Value;
 
@@ -16,6 +17,8 @@ use PHPLLVM\Value;
  */
 final class ob_end_flush extends Internal
 {
+    public const NO_BUFFER_NOTICE = 'ob_end_flush(): Failed to delete and flush buffer. No buffer to delete or flush';
+
     public function __construct()
     {
         parent::__construct('ob_end_flush');
@@ -27,6 +30,7 @@ final class ob_end_flush extends Internal
             throw new \LogicException('ob_end_flush() takes no arguments');
         }
         if (0 === OutputBuffer::getLevel()) {
+            self::emitNoBufferNotice($frame);
             if (null !== $frame->returnVar) {
                 $frame->returnVar->bool(false);
             }
@@ -37,6 +41,21 @@ final class ob_end_flush extends Internal
         if (null !== $frame->returnVar) {
             $frame->returnVar->bool(true);
         }
+    }
+
+    private static function emitNoBufferNotice(Frame $frame): void
+    {
+        if (null === $frame->vmContext) {
+            return;
+        }
+        $frame->vmContext->errors->triggerError(
+            self::NO_BUFFER_NOTICE,
+            ErrorReporter::E_NOTICE,
+            '' !== $frame->scriptPath ? $frame->scriptPath : null,
+            $frame->vmContext,
+            $frame,
+            $frame->callSiteLine
+        );
     }
 
     public function call(Context $context, JITVariable ...$args): Value

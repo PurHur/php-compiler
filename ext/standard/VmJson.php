@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace PHPCompiler\ext\standard;
 
+use PHPCompiler\Frame;
 use PHPCompiler\MethodVisibility;
 use PHPCompiler\VM;
 use PHPCompiler\VM\Context;
@@ -202,7 +203,7 @@ final class VmJson
         );
     }
 
-    public static function export(Variable $v, ?Context $ctx = null, ?VM $vm = null): mixed
+    public static function export(Variable $v, ?Context $ctx = null, ?VM $vm = null, ?Frame $frame = null): mixed
     {
         $v = $v->resolveIndirect();
         if (is_resource_::isResource($v)) {
@@ -224,9 +225,9 @@ final class VmJson
                 foreach ($v->toArray()->iterateKeyed(true) as [$key, $value]) {
                     $k = $key->resolveIndirect();
                     if (Variable::TYPE_STRING === $k->type) {
-                        $out[$k->toString()] = self::export($value, $ctx, $vm);
+                        $out[$k->toString()] = self::export($value, $ctx, $vm, $frame);
                     } elseif (Variable::TYPE_INTEGER === $k->type) {
-                        $out[$k->toInt()] = self::export($value, $ctx, $vm);
+                        $out[$k->toInt()] = self::export($value, $ctx, $vm, $frame);
                     } else {
                         throw new \LogicException(
                             'json_encode() only supports string or integer keys in this compiler build'
@@ -236,7 +237,7 @@ final class VmJson
 
                 return $out;
             case Variable::TYPE_ENUM_CASE:
-                return self::exportEnumCase($v->toEnumCase(), $ctx, $vm);
+                return self::exportEnumCase($v->toEnumCase(), $ctx, $vm, $frame);
             case Variable::TYPE_OBJECT:
                 if (null === $ctx || null === $vm) {
                     throw new \LogicException(
@@ -263,7 +264,7 @@ final class VmJson
                     );
                 }
                 if (!InterfaceCheck::entryImplements($object->class, 'jsonserializable', $ctx)) {
-                    return self::exportObjectPublicProperties($object, $ctx, $vm);
+                    return self::exportObjectPublicProperties($object, $ctx, $vm, $frame);
                 }
                 if (!$vm->hasInstanceMethod($object->class, 'jsonserialize')) {
                     throw new \Error(
@@ -272,7 +273,7 @@ final class VmJson
                 }
                 $serialized = $vm->invokeInstanceMethod($object, 'jsonSerialize')->resolveIndirect();
 
-                return self::export($serialized, $ctx, $vm);
+                return self::export($serialized, $ctx, $vm, $frame);
             default:
                 throw new VmJsonExportException(self::ERROR_UNSUPPORTED_TYPE);
         }
@@ -283,9 +284,20 @@ final class VmJson
      *
      * Stringable/__toString() is not consulted; objects with no public props become {}.
      */
-    private static function exportObjectPublicProperties(ObjectEntry $object, Context $ctx, VM $vm): \stdClass
-    {
+    private static function exportObjectPublicProperties(
+        ObjectEntry $object,
+        Context $ctx,
+        VM $vm,
+        ?Frame $frame = null
+    ): \stdClass {
         $out = new \stdClass();
+        if (null !== $frame) {
+            foreach ($vm->collectPublicPropertiesForSerialize($object, $frame) as $name => $prop) {
+                $out->$name = self::export($prop, $ctx, $vm, $frame);
+            }
+
+            return $out;
+        }
         /** @var array<string, true> $seenLc */
         $seenLc = [];
         foreach (array_reverse(VmReflection::classHierarchyChain($object->class, $ctx)) as $class) {
@@ -311,7 +323,7 @@ final class VmJson
                 $copy = new Variable();
                 $copy->copyFrom($value);
                 $name = $meta->name;
-                $out->$name = self::export($copy, $ctx, $vm);
+                $out->$name = self::export($copy, $ctx, $vm, $frame);
             }
         }
         foreach ($object->getRawProperties() as $name => $prop) {
@@ -324,7 +336,7 @@ final class VmJson
             }
             $copy = new Variable();
             $copy->copyFrom($prop);
-            $out->$name = self::export($copy, $ctx, $vm);
+            $out->$name = self::export($copy, $ctx, $vm, $frame);
         }
 
         return $out;
@@ -333,7 +345,7 @@ final class VmJson
     /**
      * Zend ext/json/php_json.c — JsonSerializable hook before default enum scalar encoding (#6880).
      */
-    private static function exportEnumCase(EnumCaseEntry $case, ?Context $ctx, ?VM $vm): mixed
+    private static function exportEnumCase(EnumCaseEntry $case, ?Context $ctx, ?VM $vm, ?Frame $frame = null): mixed
     {
         if (null !== $ctx && null !== $vm
             && InterfaceCheck::entryImplements($case->enumClass, 'jsonserializable', $ctx)) {
@@ -347,7 +359,7 @@ final class VmJson
             }
             $serialized = $vm->invokeInstanceMethod($object, 'jsonSerialize')->resolveIndirect();
 
-            return self::export($serialized, $ctx, $vm);
+            return self::export($serialized, $ctx, $vm, $frame);
         }
 
         if (null === $case->enumClass->backedType) {

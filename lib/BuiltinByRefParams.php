@@ -49,6 +49,9 @@ final class BuiltinByRefParams
                 return [0];
             case 'similar_text':
                 return [2];
+            case 'preg_match':
+            case 'preg_match_all':
+                return [2];
             case 'str_replace':
             case 'str_ireplace':
                 return [3];

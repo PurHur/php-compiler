@@ -1,5 +1,5 @@
 --TEST--
-Language: isset()/empty() on property hooks — uninitialized probes backing; initialized invokes get (#9696, zend_std_has_property)
+Language: isset()/empty() on property hooks — get+set probes backing without get hook (#10392, zend_property_hooks.c)
 --FILE--
 <?php
 class C {
@@ -36,7 +36,5 @@ var_export(isset($e->x));
 echo "\n";
 --EXPECT--
 false
-GET
 true
-GET
 true

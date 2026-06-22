@@ -87,12 +87,11 @@ final class array_column extends Internal
                 $this->storeAtKey($out, $this->readRowField($rowHt, $indexField), $stored);
                 continue;
             }
-            $stored = new Variable();
             if (!$this->rowHasField($rowHt, $columnField)) {
-                $stored->null();
-            } else {
-                $stored->copyFrom($this->readRowField($rowHt, $columnField));
+                continue;
             }
+            $stored = new Variable();
+            $stored->copyFrom($this->readRowField($rowHt, $columnField));
             $out->append($stored);
         }
         $frame->returnVar->array($out);

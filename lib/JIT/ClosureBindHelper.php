@@ -4,12 +4,12 @@ declare(strict_types=1);
 
 namespace PHPCompiler\JIT;
 
-use PHPCompiler\JIT\Builtin\ErrorRaise;
 use PHPCompiler\JIT\Builtin\TypeErrorRaise;
 use PHPCompiler\JIT\Call;
 use PHPCompiler\JIT\Call\ClosureWithBinding;
 use PHPCompiler\JIT\Call\ClosureWithCaptures;
 use PHPCompiler\JIT\Call\Native;
+use PHPCompiler\VM\ErrorReporter;
 use PHPLLVM\Builder;
 use PHPLLVM\Value;
 
@@ -62,7 +62,9 @@ final class ClosureBindHelper
         }
 
         $inner = self::resolveInnerCall($context, $closure);
-        self::assertNotBindingStaticClosureToObject($context, $closure, $inner, $newThis);
+        if (self::emitStaticClosureInstanceBindNoOp($context, $closure, $inner, $newThis)) {
+            return $closure;
+        }
         if (null === $inner) {
             return self::nullResult($context);
         }
@@ -606,102 +608,45 @@ final class ClosureBindHelper
         };
     }
 
-    private static function assertNotBindingStaticClosureToObject(
+    /**
+     * Zend zend_closure_bind(): binding an instance to a static closure warns and is a no-op.
+     *
+     * @return bool true when bind() should return $closure unchanged
+     */
+    private static function emitStaticClosureInstanceBindNoOp(
         Context $context,
         Variable $closure,
         ?Call $inner,
         Variable $newThis
-    ): void {
-        if ($closure->closureIsStatic) {
-            self::assertNotBindingObjectToStaticClosure($context, $newThis);
-
-            return;
-        }
-        if (Variable::TYPE_OBJECT === $closure->type || Variable::TYPE_VALUE === $closure->type) {
-            self::emitClosureObjectStaticBindGuard($context, $closure, $newThis);
-        }
-    }
-
-    private static function assertNotBindingObjectToStaticClosure(Context $context, Variable $newThis): void
-    {
+    ): bool {
         if (Variable::TYPE_NULL === $newThis->type || ($newThis->isNullConstant ?? false)) {
-            return;
+            return false;
         }
-        if (Variable::TYPE_OBJECT === $newThis->type) {
-            self::raiseStaticBindError($context);
+        if (Variable::TYPE_OBJECT !== $newThis->type || !$closure->closureIsStatic) {
+            return false;
+        }
+        self::emitStaticClosureInstanceBindWarning($context);
 
-            return;
-        }
-        if (Variable::TYPE_VALUE === $newThis->type) {
-            self::emitValueBoxStaticBindGuard($context, $newThis);
-        }
+        return true;
     }
 
-    private static function emitClosureObjectStaticBindGuard(
-        Context $context,
-        Variable $closure,
-        Variable $newThis
-    ): void {
-        self::ensureClosureBindingProperties($context);
-        $obj = self::loadClosureObject($context, $closure);
-        $flag = $context->type->object->propertyFetch(
-            $obj,
-            'Closure',
-            self::IS_STATIC_PROPERTY
-        );
-        if (Variable::TYPE_NATIVE_BOOL !== $flag->type || Variable::KIND_VALUE !== $flag->kind) {
-            return;
-        }
-        $i1 = $context->getTypeFromString('int1');
-        $isStatic = $context->builder->icmp(
-            Builder::INT_NE,
-            $context->helper->loadValue($flag),
-            $i1->constInt(0, false)
-        );
-        $skipBlock = BasicBlockHelper::append($context, 'closure_bind_not_static');
-        $checkBlock = BasicBlockHelper::append($context, 'closure_bind_static_check');
-        $context->builder->branchIf($isStatic, $checkBlock, $skipBlock);
-        $context->builder->positionAtEnd($checkBlock);
-        self::assertNotBindingObjectToStaticClosure($context, $newThis);
-        $context->builder->positionAtEnd($skipBlock);
-    }
-
-    private static function raiseStaticBindError(Context $context): void
+    private static function emitStaticClosureInstanceBindWarning(Context $context): void
     {
-        ErrorRaise::registerDeclarations($context);
-        ErrorRaise::ensureLinked($context);
-        ErrorRaise::emitRaise($context, 'Cannot bind static closure to object');
-        $context->builder->call($context->lookupFunction('abort'));
-    }
-
-    private static function emitValueBoxStaticBindGuard(Context $context, Variable $newThis): void
-    {
-        $ptr = JitValueBox::valuePtrFromVariable($context, $newThis);
-        $typeByte = self::loadValueTypeByte($context, $ptr);
-        $i8 = $context->getTypeFromString('int8');
-        $nullBlock = BasicBlockHelper::append($context, 'closure_bind_static_null');
-        $objBlock = BasicBlockHelper::append($context, 'closure_bind_static_obj');
-        $mergeBlock = BasicBlockHelper::append($context, 'closure_bind_static_merge');
-        $isNull = $context->builder->icmp(
-            Builder::INT_EQ,
-            $typeByte,
-            $i8->constInt(Variable::TYPE_NULL, false)
+        $message = 'Cannot bind an instance to a static closure';
+        $i8p = $context->getTypeFromString('int8*');
+        $sizeT = $context->getTypeFromString('size_t');
+        $i32 = $context->getTypeFromString('int32');
+        $msgPtr = $context->builder->pointerCast($context->constantFromString($message), $i8p);
+        $msgLen = $sizeT->constInt(\strlen($message), false);
+        $emptyFile = $context->builder->pointerCast($context->constantFromString(''), $i8p);
+        $context->builder->call(
+            $context->lookupFunction('__compiler_trigger_error'),
+            $msgPtr,
+            $msgLen,
+            $i32->constInt(ErrorReporter::E_WARNING, false),
+            $emptyFile,
+            $i32->constInt(max(0, $context->callSiteLine), false)
         );
-        $context->builder->branchIf($isNull, $nullBlock, $objBlock);
-        $context->builder->positionAtEnd($nullBlock);
-        $context->builder->branch($mergeBlock);
-        $context->builder->positionAtEnd($objBlock);
-        $isObj = $context->builder->icmp(
-            Builder::INT_EQ,
-            $typeByte,
-            $i8->constInt(Variable::TYPE_OBJECT, false)
-        );
-        $okBlock = BasicBlockHelper::append($context, 'closure_bind_static_ok');
-        $context->builder->branchIf($isObj, $okBlock, $mergeBlock);
-        $context->builder->positionAtEnd($okBlock);
-        self::raiseStaticBindError($context);
-        $context->builder->branch($mergeBlock);
-        $context->builder->positionAtEnd($mergeBlock);
     }
 
     private static function thisArgLabel(string $context): string
