@@ -40,7 +40,7 @@ final class ReflectionClassGetStaticPropertyValue extends VmClassMethod
             return;
         }
         $frame->returnVar->copyFrom(
-            VmReflection::getStaticPropertyValueForReflection($entry, $ctx, $name, $default)
+            VmReflection::getStaticPropertyValueForReflection($entry, $ctx, $name, $default, $frame)
         );
     }
 }

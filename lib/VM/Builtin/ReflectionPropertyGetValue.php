@@ -20,7 +20,7 @@ final class ReflectionPropertyGetValue extends VmClassMethod
 
     public function execute(Frame $frame): void
     {
-        if (\count($frame->calledArgs) < 2) {
+        if (\count($frame->calledArgs) < 1) {
             throw new \LogicException('ReflectionProperty::getValue() expects an object');
         }
         $receiver = ReflectionSupport::requireReflectionProperty($frame, $frame->calledArgs[0]);
@@ -36,9 +36,21 @@ final class ReflectionPropertyGetValue extends VmClassMethod
             if (null === $frame->returnVar) {
                 return;
             }
-            $frame->returnVar->copyFrom($entry->staticProperties[$staticKey]);
+            $classLc = strtolower(ltrim($entry->name, '\\'));
+            $frame->returnVar->copyFrom(
+                $ctx->runtime->vm()->readStaticPropertyForReflection(
+                    $classLc,
+                    $property,
+                    $entry->staticProperties[$staticKey],
+                    null,
+                    VmReflection::reflectionCallerFrame($frame)
+                )
+            );
 
             return;
+        }
+        if (\count($frame->calledArgs) < 2) {
+            throw new \LogicException('ReflectionProperty::getValue() expects an object');
         }
         if (VmReflection::isEnumReflectionPseudoProperty($entry, $property)) {
             $object = $frame->calledArgs[1]->resolveIndirect();

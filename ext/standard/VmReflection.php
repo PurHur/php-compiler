@@ -1854,7 +1854,8 @@ final class VmReflection
         ClassEntry $entry,
         Context $ctx,
         string $propertyName,
-        ?Variable $default
+        ?Variable $default,
+        Frame $frame
     ): Variable {
         $staticKey = self::findStaticPropertyKey($entry, $propertyName, $ctx);
         if (null === $staticKey) {
@@ -1865,19 +1866,26 @@ final class VmReflection
             ));
         }
         $storage = $entry->staticProperties[$staticKey];
-        if (TypedPropertyCheck::isUninitialized($storage)) {
-            if (null !== $default) {
-                $out = new Variable();
-                $out->copyFrom($default);
+        $classLc = strtolower(ltrim($entry->name, '\\'));
 
-                return $out;
-            }
-            throw new \Error(TypedPropertyCheck::errorMessage($storage));
+        return $ctx->runtime->vm()->readStaticPropertyForReflection(
+            $classLc,
+            $propertyName,
+            $storage,
+            $default,
+            $frame
+        );
+    }
+
+    /** Outermost user frame for reflection hook dispatch (matches ReflectionProperty::getValue). */
+    public static function reflectionCallerFrame(Frame $frame): Frame
+    {
+        $scopeFrame = $frame;
+        while (null !== $scopeFrame && null !== $scopeFrame->handler) {
+            $scopeFrame = $scopeFrame->parent;
         }
-        $out = new Variable();
-        $out->copyFrom($storage->resolveIndirect());
 
-        return $out;
+        return $scopeFrame ?? $frame;
     }
 
     /**
