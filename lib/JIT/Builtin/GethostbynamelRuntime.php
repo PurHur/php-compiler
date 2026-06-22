@@ -4,41 +4,34 @@ declare(strict_types=1);
 
 namespace PHPCompiler\JIT\Builtin;
 
+use PHPCompiler\JIT;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\NestedJitCompileScope;
 use PHPLLVM\Builder;
 use PHPLLVM\Value;
+use PHPLLVM\Value\Function_ as LlvmFunction;
 
 /**
- * LLVM implementation of __compiler_gethostbynamel (issue #5299, #3707).
+ * JIT/AOT link for gethostbynamel() via GethostbynamelJitHelper PHP (#9382).
  *
- * Mirrors ext/standard/VmDns::resolveViaGetaddrinfo() and phpc_gethostbynamel.c.
+ * Replaces glibc struct addrinfo LLVM. SSOT: {@see \PHPCompiler\ext\standard\VmDns}.
  * php-src: ext/standard/dns.c — PHP_FUNCTION(gethostbynamel)
  */
 final class GethostbynamelRuntime
 {
-    private const AF_INET = 2;
+    private const HELPER_PATH = '/ext/standard/GethostbynamelJitHelper.php';
 
-    private const SOCK_STREAM = 1;
+    private const IP_COUNT_HELPER = 'PHPCompiler\\ext\\standard\\GethostbynamelJitHelper::ipCount';
 
-    private const MAX_ADDRS = 64;
+    private const IP_AT_HELPER = 'PHPCompiler\\ext\\standard\\GethostbynamelJitHelper::ipAt';
 
-    private const HOSTBUF_LEN = 256;
+    private const ABI_NAME = '__compiler_gethostbynamel';
 
-    private const IPBUF_LEN = 16;
-
-    /** Linux x86_64 glibc struct addrinfo size and field offsets. */
-    private const ADDRINFO_SIZE = 48;
-
-    private const ADDRINFO_OFF_FAMILY = 4;
-
-    private const ADDRINFO_OFF_SOCKTYPE = 8;
-
-    private const ADDRINFO_OFF_ADDR = 24;
-
-    private const ADDRINFO_OFF_NEXT = 40;
-
-    /** struct sockaddr_in::sin_addr offset. */
-    private const SOCKADDR_IN_OFF_SIN_ADDR = 4;
+    /** @var list<string> */
+    private const COMPILED_HELPERS = [
+        self::IP_COUNT_HELPER,
+        self::IP_AT_HELPER,
+    ];
 
     public static function ensureLinked(Context $context): void
     {
@@ -47,368 +40,176 @@ final class GethostbynamelRuntime
 
     public static function implement(Context $context): void
     {
-        $probe = $context->module->getNamedFunction('__compiler_gethostbynamel');
+        $probe = $context->module->getNamedFunction(self::ABI_NAME);
         if (null !== $probe && $probe->countBasicBlocks() > 0) {
             self::registerLinkedRuntime($context);
 
             return;
         }
 
+        self::ensureLibc($context);
+        self::ensureJitHelperCompiled($context);
+        self::implementResolveBridge($context);
+        self::registerLinkedRuntime($context);
+        $context->builder->clearInsertionPosition();
+    }
+
+    private static function implementResolveBridge(Context $context): void
+    {
+        $probe = $context->module->getNamedFunction(self::ABI_NAME);
+        if (null !== $probe && $probe->countBasicBlocks() > 0) {
+            $context->registerFunction(self::ABI_NAME, $probe);
+
+            return;
+        }
+
         $strPtr = $context->getTypeFromString('__string__*');
         $htPtr = $context->getTypeFromString('__hashtable__*');
+        $sizeT = $context->getTypeFromString('size_t');
+        $i32 = $context->getTypeFromString('int32');
+        $i64 = $context->getTypeFromString('int64');
         $ft = $context->context->functionType($htPtr, false, $strPtr);
         $fn = null !== $probe
             ? $probe
-            : $context->module->addFunction('__compiler_gethostbynamel', $ft);
-        self::implementGethostbynamel($context, $fn);
-        self::registerLinkedRuntime($context);
-    }
+            : $context->module->addFunction(self::ABI_NAME, $ft);
 
-    private static function implementGethostbynamel(Context $context, Value $fn): void
-    {
-        self::ensureLibcDns($context);
-
-        $entry = $fn->appendBasicBlock('ghbl_entry');
+        $entry = $fn->appendBasicBlock('ghbl_bridge_entry');
+        $emptyBb = $fn->appendBasicBlock('ghbl_bridge_empty');
+        $buildInitBb = $fn->appendBasicBlock('ghbl_bridge_build_init');
         $context->builder->positionAtEnd($entry);
-
         $hostname = $fn->getParam(0);
-        $i64 = $context->getTypeFromString('int64');
-        $i32 = $context->getTypeFromString('int32');
-        $i8 = $context->getTypeFromString('int8');
-        $i8p = $context->getTypeFromString('int8*');
-        $voidPtr = $context->getTypeFromString('void*');
-        $sizeT = $context->getTypeFromString('size_t');
-        $htPtr = $context->getTypeFromString('__hashtable__*');
-        $zeroI64 = $i64->constInt(0, false);
-        $zeroI32 = $i32->constInt(0, false);
-
-        $nullHost = $context->builder->icmp(Builder::INT_EQ, $hostname, $hostname->typeOf()->constNull());
-        $invalidBb = $fn->appendBasicBlock('ghbl_invalid');
-        $copyBb = $fn->appendBasicBlock('ghbl_copy');
-        $context->builder->branchIf($nullHost, $invalidBb, $copyBb);
-
-        $context->builder->positionAtEnd($invalidBb);
-        $context->builder->returnValue($htPtr->constNull());
-        $context->builder->clearInsertionPosition();
-
-        $context->builder->positionAtEnd($copyBb);
-        $map = $context->structFieldMap['__string__'];
-        $len = $context->builder->load($context->builder->structGep($hostname, $map['length']));
-        $lenOk = $context->builder->and(
-            $context->builder->icmp(Builder::INT_SGT, $len, $zeroI64),
-            $context->builder->icmp(Builder::INT_SLT, $len, $i64->constInt(self::HOSTBUF_LEN, false))
+        $countI64 = $context->builder->call(
+            self::helperFunction($context, self::IP_COUNT_HELPER),
+            $hostname
         );
-        $lenFailBb = $fn->appendBasicBlock('ghbl_len_fail');
-        $lenOkBb = $fn->appendBasicBlock('ghbl_len_ok');
-        $context->builder->branchIf($lenOk, $lenOkBb, $lenFailBb);
-
-        $context->builder->positionAtEnd($lenFailBb);
-        $context->builder->returnValue($htPtr->constNull());
-        $context->builder->clearInsertionPosition();
-
-        $context->builder->positionAtEnd($lenOkBb);
-        $hostbuf = $context->builder->alloca($i8, self::HOSTBUF_LEN, 'ghbl_host');
-        $valPtr = $context->builder->structGep($hostname, $map['value']);
-        $src = $context->builder->pointerCast($valPtr, $i8p);
-        $len32 = $context->builder->trunc($len, $i32);
-        $hostbufVoid = $context->bytePtr($hostbuf);
-        $srcVoid = $context->bytePtr($src);
-        $context->builder->call(
-            $context->lookupFunction('memcpy'),
-            $hostbufVoid,
-            $srcVoid,
-            $context->builder->zExt($len32, $sizeT)
-        );
-        $nulIdx = $context->builder->gep($hostbuf, $len32);
-        $context->builder->store($i8->constInt(0, false), $nulIdx);
-
-        $hints = $context->builder->alloca($i8, self::ADDRINFO_SIZE, 'ghbl_hints');
-        $context->builder->call(
-            $context->lookupFunction('memset'),
-            $context->bytePtr($hints),
-            $i32->constInt(0, false),
-            $sizeT->constInt(self::ADDRINFO_SIZE, false)
-        );
-        $hintsI32 = $context->builder->pointerCast($hints, $i32->pointerType(0));
-        $familyPtr = $context->builder->gep($hintsI32, $i32->constInt(self::ADDRINFO_OFF_FAMILY / 4, false));
-        $sockPtr = $context->builder->gep($hintsI32, $i32->constInt(self::ADDRINFO_OFF_SOCKTYPE / 4, false));
-        $context->builder->store($i32->constInt(self::AF_INET, false), $familyPtr);
-        $context->builder->store($i32->constInt(self::SOCK_STREAM, false), $sockPtr);
-
-        $resSlot = $context->builder->alloca($voidPtr, 1, 'ghbl_res');
-        $context->builder->store($voidPtr->constNull(), $resSlot);
-        $hintsPtr = $context->builder->pointerCast($hints, $i8p);
-        $rc = $context->builder->call(
-            $context->lookupFunction('getaddrinfo'),
-            $hostbuf,
-            $i8p->constNull(),
-            $hintsPtr,
-            $resSlot
-        );
-        $gaFailBb = $fn->appendBasicBlock('ghbl_ga_fail');
-        $loopInitBb = $fn->appendBasicBlock('ghbl_loop_init');
-        $gaOk = $context->builder->icmp(Builder::INT_EQ, $rc, $zeroI32);
-        $context->builder->branchIf($gaOk, $loopInitBb, $gaFailBb);
-
-        $context->builder->positionAtEnd($gaFailBb);
-        $context->builder->returnValue($htPtr->constNull());
-        $context->builder->clearInsertionPosition();
-
-        $context->builder->positionAtEnd($loopInitBb);
-        $countSlot = $context->builder->alloca($sizeT, 1, 'ghbl_count');
-        $context->builder->store($sizeT->constInt(0, false), $countSlot);
-        $storedBase = $context->builder->alloca(
-            $i8,
-            self::MAX_ADDRS * self::IPBUF_LEN,
-            'ghbl_stored'
-        );
-        $rpSlot = $context->builder->alloca($voidPtr, 1, 'ghbl_rp');
-        $context->builder->store($context->builder->load($resSlot), $rpSlot);
-        $loopHeadBb = $fn->appendBasicBlock('ghbl_loop_head');
-        $context->builder->branch($loopHeadBb);
-
-        $context->builder->positionAtEnd($loopHeadBb);
-        $rp = $context->builder->load($rpSlot);
-        $rpDone = $context->builder->icmp(Builder::INT_EQ, $rp, $voidPtr->constNull());
-        $loopDoneBb = $fn->appendBasicBlock('ghbl_loop_done');
-        $loopBodyBb = $fn->appendBasicBlock('ghbl_loop_body');
-        $context->builder->branchIf($rpDone, $loopDoneBb, $loopBodyBb);
-
-        $context->builder->positionAtEnd($loopBodyBb);
-        $rpBytes = $context->builder->pointerCast($rp, $i8p);
-        $rpI32 = $context->builder->pointerCast($rp, $i32->pointerType(0));
-        $famPtr = $context->builder->gep($rpI32, $i32->constInt(self::ADDRINFO_OFF_FAMILY / 4, false));
-        $family = $context->builder->load($famPtr);
-        $famInet = $context->builder->icmp(Builder::INT_EQ, $family, $i32->constInt(self::AF_INET, false));
-        $nextRpBb = $fn->appendBasicBlock('ghbl_next_rp');
-        $hasAddrBb = $fn->appendBasicBlock('ghbl_has_addr');
-        $context->builder->branchIf($famInet, $hasAddrBb, $nextRpBb);
-
-        $context->builder->positionAtEnd($hasAddrBb);
-        $addrFieldPtr = $context->builder->gep($rpBytes, $sizeT->constInt(self::ADDRINFO_OFF_ADDR, false));
-        $aiAddr = $context->builder->load(
-            $context->builder->pointerCast($addrFieldPtr, $voidPtr->pointerType(0))
-        );
-        $noAddrBb = $fn->appendBasicBlock('ghbl_no_addr');
-        $inetBb = $fn->appendBasicBlock('ghbl_inet');
-        $hasAddr = $context->builder->icmp(Builder::INT_NE, $aiAddr, $voidPtr->constNull());
-        $context->builder->branchIf($hasAddr, $inetBb, $noAddrBb);
-
-        $context->builder->positionAtEnd($noAddrBb);
-        $context->builder->branch($nextRpBb);
-        $context->builder->clearInsertionPosition();
-
-        $context->builder->positionAtEnd($inetBb);
-        $ipbuf = $context->builder->alloca($i8, self::IPBUF_LEN, 'ghbl_ip');
-        $sinAddr = $context->builder->gep(
-            $context->builder->pointerCast($aiAddr, $i8p),
-            $i32->constInt(self::SOCKADDR_IN_OFF_SIN_ADDR, false)
-        );
-        $ntop = $context->builder->call(
-            $context->lookupFunction('inet_ntop'),
-            $i32->constInt(self::AF_INET, false),
-            $context->bytePtr($sinAddr),
-            $ipbuf,
-            $sizeT->constInt(self::IPBUF_LEN, false)
-        );
-        $ntopFailBb = $fn->appendBasicBlock('ghbl_ntop_fail');
-        $dupBb = $fn->appendBasicBlock('ghbl_dup');
-        $ntopOk = $context->builder->icmp(Builder::INT_NE, $ntop, $i8p->constNull());
-        $context->builder->branchIf($ntopOk, $dupBb, $ntopFailBb);
-
-        $context->builder->positionAtEnd($ntopFailBb);
-        $context->builder->branch($nextRpBb);
-        $context->builder->clearInsertionPosition();
-
-        $context->builder->positionAtEnd($dupBb);
-        $count = $context->builder->load($countSlot);
-        $dupLoopBb = $fn->appendBasicBlock('ghbl_dup_loop');
-        $dupDoneBb = $fn->appendBasicBlock('ghbl_dup_done');
-        $storeBb = $fn->appendBasicBlock('ghbl_store');
-        $context->builder->branch($dupLoopBb);
-
-        $context->builder->positionAtEnd($dupLoopBb);
-        $iSlot = $context->builder->alloca($sizeT, 1, 'ghbl_i');
-        $context->builder->store($sizeT->constInt(0, false), $iSlot);
-        $dupHeadBb = $fn->appendBasicBlock('ghbl_dup_head');
-        $context->builder->branch($dupHeadBb);
-
-        $context->builder->positionAtEnd($dupHeadBb);
-        $i = $context->builder->load($iSlot);
-        $iDone = $context->builder->icmp(Builder::INT_EQ, $i, $count);
-        $dupCmpBb = $fn->appendBasicBlock('ghbl_dup_cmp');
-        $context->builder->branchIf($iDone, $dupDoneBb, $dupCmpBb);
-
-        $context->builder->positionAtEnd($dupCmpBb);
-        $existing = $context->builder->gep(
-            $storedBase,
-            $context->builder->mul($i, $sizeT->constInt(self::IPBUF_LEN, false))
-        );
-        $cmp = $context->builder->call($context->lookupFunction('strcmp'), $existing, $ipbuf);
-        $isDupBb = $fn->appendBasicBlock('ghbl_is_dup');
-        $dupIncBb = $fn->appendBasicBlock('ghbl_dup_inc');
-        $isDup = $context->builder->icmp(Builder::INT_EQ, $cmp, $zeroI32);
-        $context->builder->branchIf($isDup, $isDupBb, $dupIncBb);
-
-        $context->builder->positionAtEnd($isDupBb);
-        $context->builder->branch($nextRpBb);
-        $context->builder->clearInsertionPosition();
-
-        $context->builder->positionAtEnd($dupIncBb);
-        $context->builder->store(
-            $context->builder->add($i, $sizeT->constInt(1, false)),
-            $iSlot
-        );
-        $context->builder->branch($dupHeadBb);
-        $context->builder->clearInsertionPosition();
-
-        $context->builder->positionAtEnd($dupDoneBb);
-        $fullBb = $fn->appendBasicBlock('ghbl_full');
-        $atMax = $context->builder->icmp(
-            Builder::INT_EQ,
+        $count = $countI64->typeOf() === $sizeT
+            ? $countI64
+            : $context->builder->zExt($countI64, $sizeT);
+        $hasAny = $context->builder->icmp(
+            Builder::INT_SGT,
             $count,
-            $sizeT->constInt(self::MAX_ADDRS, false)
+            $sizeT->constInt(0, false)
         );
-        $context->builder->branchIf($atMax, $fullBb, $storeBb);
-
-        $context->builder->positionAtEnd($fullBb);
-        $context->builder->branch($loopDoneBb);
-        $context->builder->clearInsertionPosition();
-
-        $context->builder->positionAtEnd($storeBb);
-        $dest = $context->builder->gep(
-            $storedBase,
-            $context->builder->mul($count, $sizeT->constInt(self::IPBUF_LEN, false))
-        );
-        $context->builder->call(
-            $context->lookupFunction('memcpy'),
-            $context->bytePtr($dest),
-            $context->bytePtr($ipbuf),
-            $sizeT->constInt(self::IPBUF_LEN, false)
-        );
-        $context->builder->store(
-            $context->builder->add($count, $sizeT->constInt(1, false)),
-            $countSlot
-        );
-        $context->builder->branch($nextRpBb);
-        $context->builder->clearInsertionPosition();
-
-        $context->builder->positionAtEnd($nextRpBb);
-        $rpNext = $context->builder->load($rpSlot);
-        $rpBytesNext = $context->builder->pointerCast($rpNext, $i8p);
-        $nextFieldPtr = $context->builder->gep($rpBytesNext, $sizeT->constInt(self::ADDRINFO_OFF_NEXT, false));
-        $context->builder->store(
-            $context->builder->load(
-                $context->builder->pointerCast($nextFieldPtr, $voidPtr->pointerType(0))
-            ),
-            $rpSlot
-        );
-        $context->builder->branch($loopHeadBb);
-        $context->builder->clearInsertionPosition();
-
-        $context->builder->positionAtEnd($loopDoneBb);
-        $resHead = $context->builder->load($resSlot);
-        $context->builder->call($context->lookupFunction('freeaddrinfo'), $resHead);
-        $countFinal = $context->builder->load($countSlot);
-        $emptyBb = $fn->appendBasicBlock('ghbl_empty');
-        $buildBb = $fn->appendBasicBlock('ghbl_build');
-        $hasAny = $context->builder->icmp(Builder::INT_SGT, $countFinal, $sizeT->constInt(0, false));
-        $context->builder->branchIf($hasAny, $buildBb, $emptyBb);
+        $context->builder->branchIf($hasAny, $buildInitBb, $emptyBb);
 
         $context->builder->positionAtEnd($emptyBb);
         $context->builder->returnValue($htPtr->constNull());
-        $context->builder->clearInsertionPosition();
 
-        $context->builder->positionAtEnd($buildBb);
+        $context->builder->positionAtEnd($buildInitBb);
         $ht = $context->builder->call($context->lookupFunction('__hashtable__alloc'));
-        $buildLoopInitBb = $fn->appendBasicBlock('ghbl_build_init');
-        $context->builder->branch($buildLoopInitBb);
+        $iSlot = $context->builder->alloca($sizeT, 1, 'ghbl_i');
+        $context->builder->store($sizeT->constInt(0, false), $iSlot);
+        $loopHead = $fn->appendBasicBlock('ghbl_bridge_loop_head');
+        $context->builder->branch($loopHead);
 
-        $context->builder->positionAtEnd($buildLoopInitBb);
-        $biSlot = $context->builder->alloca($sizeT, 1, 'ghbl_bi');
-        $context->builder->store($sizeT->constInt(0, false), $biSlot);
-        $buildHeadBb = $fn->appendBasicBlock('ghbl_build_head');
-        $context->builder->branch($buildHeadBb);
+        $context->builder->positionAtEnd($loopHead);
+        $i = $context->builder->load($iSlot);
+        $loopDone = $context->builder->icmp(Builder::INT_EQ, $i, $count);
+        $loopDoneBb = $fn->appendBasicBlock('ghbl_bridge_loop_done');
+        $loopBodyBb = $fn->appendBasicBlock('ghbl_bridge_loop_body');
+        $context->builder->branchIf($loopDone, $loopDoneBb, $loopBodyBb);
 
-        $context->builder->positionAtEnd($buildHeadBb);
-        $bi = $context->builder->load($biSlot);
-        $buildDone = $context->builder->icmp(Builder::INT_EQ, $bi, $countFinal);
-        $buildDoneBb = $fn->appendBasicBlock('ghbl_build_done');
-        $buildBodyBb = $fn->appendBasicBlock('ghbl_build_body');
-        $context->builder->branchIf($buildDone, $buildDoneBb, $buildBodyBb);
-
-        $context->builder->positionAtEnd($buildBodyBb);
-        $ipSrc = $context->builder->gep(
-            $storedBase,
-            $context->builder->mul($bi, $sizeT->constInt(self::IPBUF_LEN, false))
-        );
-        $ipLen = $context->builder->call($context->lookupFunction('strlen'), $ipSrc);
+        $context->builder->positionAtEnd($loopBodyBb);
+        $indexI64 = $i->typeOf() === $i64 ? $i : $context->builder->zExt($i, $i64);
         $ipStr = $context->builder->call(
-            $context->lookupFunction('__string__init'),
-            $context->builder->zExt($ipLen, $i64),
-            $ipSrc
+            self::helperFunction($context, self::IP_AT_HELPER),
+            $hostname,
+            $indexI64
         );
         $context->builder->call(
             $context->lookupFunction('__hashtable__setStringAt'),
             $ht,
-            $bi,
+            $indexI64,
             $ipStr
         );
         $context->builder->store(
-            $context->builder->add($bi, $sizeT->constInt(1, false)),
-            $biSlot
+            $context->builder->add($i, $sizeT->constInt(1, false)),
+            $iSlot
         );
-        $context->builder->branch($buildHeadBb);
-        $context->builder->clearInsertionPosition();
+        $context->builder->branch($loopHead);
 
-        $context->builder->positionAtEnd($buildDoneBb);
+        $context->builder->positionAtEnd($loopDoneBb);
         $context->builder->returnValue($ht);
+        $context->registerFunction(self::ABI_NAME, $fn);
         $context->builder->clearInsertionPosition();
     }
 
-    private static function ensureLibcDns(Context $context): void
+    private static function helperFunction(Context $context, string $logical): LlvmFunction
     {
-        $i8p = $context->getTypeFromString('int8*');
-        $i32 = $context->getTypeFromString('int32');
-        $voidPtr = $context->getTypeFromString('void*');
-        $voidTy = $context->getTypeFromString('void');
+        self::ensureJitHelperCompiled($context);
+        $lc = \strtolower($logical);
+        $fn = $context->functions[$lc] ?? null;
+        if (null === $fn) {
+            throw new \LogicException($logical.' missing after GethostbynamelJitHelper compile (#9382)');
+        }
+
+        return $fn;
+    }
+
+    private static function ensureJitHelperCompiled(Context $context): void
+    {
+        $missing = false;
+        foreach (self::COMPILED_HELPERS as $logical) {
+            if (!isset($context->functions[\strtolower($logical)])) {
+                $missing = true;
+                break;
+            }
+        }
+        if (!$missing) {
+            return;
+        }
+
+        $runtime = $context->runtime;
+        $path = \dirname(__DIR__, 3).self::HELPER_PATH;
+        $realPath = \realpath($path) ?: $path;
+        $prevSelfHostAot = \getenv('PHP_COMPILER_SELFHOST_AOT');
+        if (\function_exists('putenv')) {
+            \putenv('PHP_COMPILER_SELFHOST_AOT=0');
+        }
+        try {
+            NestedJitCompileScope::run($context, static function () use ($context, $runtime, $path, $realPath): void {
+                $block = $runtime->parseAndCompile((string) \file_get_contents($path), 'GethostbynamelJitHelper.php');
+                if (null === $block) {
+                    throw new \LogicException('GethostbynamelJitHelper.php parseAndCompile failed (#9382)');
+                }
+                $jit = new JIT($context);
+                $jit->compile($block);
+                $context->markJitIncludedFileCompiled($realPath);
+            });
+        } finally {
+            if (\function_exists('putenv')) {
+                if (false === $prevSelfHostAot || null === $prevSelfHostAot) {
+                    \putenv('PHP_COMPILER_SELFHOST_AOT=');
+                } else {
+                    \putenv('PHP_COMPILER_SELFHOST_AOT='.$prevSelfHostAot);
+                }
+            }
+        }
+        foreach (self::COMPILED_HELPERS as $logical) {
+            $lc = \strtolower($logical);
+            if (!isset($context->functions[$lc])) {
+                throw new \LogicException($lc.' was not compiled for JIT (#9382)');
+            }
+        }
+    }
+
+    private static function ensureLibc(Context $context): void
+    {
         $sizeT = $context->getTypeFromString('size_t');
-        $addrinfoResPtr = $voidPtr->pointerType(0);
+        $htPtr = $context->getTypeFromString('__hashtable__*');
+        $voidTy = $context->getTypeFromString('void');
+        $i64 = $context->getTypeFromString('int64');
+        $strPtr = $context->getTypeFromString('__string__*');
 
         self::ensureExternal(
             $context,
-            'getaddrinfo',
-            $context->context->functionType($i32, false, $i8p, $i8p, $i8p, $addrinfoResPtr)
+            '__hashtable__alloc',
+            $context->context->functionType($htPtr, false)
         );
         self::ensureExternal(
             $context,
-            'freeaddrinfo',
-            $context->context->functionType($voidTy, false, $voidPtr)
-        );
-        self::ensureExternal(
-            $context,
-            'inet_ntop',
-            $context->context->functionType($i8p, false, $i32, $i8p, $i8p, $sizeT)
-        );
-        self::ensureExternal(
-            $context,
-            'memset',
-            $context->context->functionType($i8p, false, $i8p, $i32, $sizeT)
-        );
-        self::ensureExternal(
-            $context,
-            'memcpy',
-            $context->context->functionType($voidPtr, false, $voidPtr, $voidPtr, $sizeT)
-        );
-        self::ensureExternal(
-            $context,
-            'strlen',
-            $context->context->functionType($sizeT, false, $i8p)
-        );
-        self::ensureExternal(
-            $context,
-            'strcmp',
-            $context->context->functionType($i32, false, $i8p, $i8p)
+            '__hashtable__setStringAt',
+            $context->context->functionType($voidTy, false, $htPtr, $i64, $strPtr)
         );
     }
 
@@ -424,10 +225,10 @@ final class GethostbynamelRuntime
 
     private static function registerLinkedRuntime(Context $context): void
     {
-        $fn = $context->module->getNamedFunction('__compiler_gethostbynamel');
-        if (null === $fn) {
-            throw new \LogicException('__compiler_gethostbynamel missing after GethostbynamelRuntime LLVM implement');
+        $fn = $context->module->getNamedFunction(self::ABI_NAME);
+        if (null === $fn || 0 === $fn->countBasicBlocks()) {
+            throw new \LogicException(self::ABI_NAME.' missing after GethostbynamelRuntime bridge (#9382)');
         }
-        $context->registerFunction('__compiler_gethostbynamel', $fn);
+        $context->registerFunction(self::ABI_NAME, $fn);
     }
 }

@@ -11,7 +11,7 @@ use PHPCompiler\JIT\JitValueBox;
 use PHPLLVM\Builder;
 use PHPLLVM\Value;
 
-/** LLVM lowering for gethostbynamel() via GethostbynamelRuntime (JIT/AOT, #3707, #5299). */
+/** LLVM lowering for gethostbynamel() via GethostbynamelRuntime PHP bridge (JIT/AOT, #9382). */
 final class JitGethostbynamel
 {
     private static int $blockSerial = 0;
