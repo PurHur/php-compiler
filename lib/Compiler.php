@@ -12117,6 +12117,22 @@ class Compiler {
                 array_unshift($producers, $child);
                 break;
             }
+            if (
+                ($child instanceof Op\Expr\FuncCall || $child instanceof Op\Expr\NsFuncCall)
+                && property_exists($callOp, 'args')
+                && is_array($callOp->args)
+                && count($callOp->args) >= 2
+                && $this->isNestedCallArgProducerSeparatedByConsumerLiteralPreludes(
+                    $child,
+                    $callOp,
+                    $i,
+                    $callIndex,
+                    $cfgChildren
+                )
+            ) {
+                array_unshift($producers, $child);
+                break;
+            }
             if ($child instanceof Op\Expr\Array_) {
                 $next = $cfgChildren[$i + 1] ?? null;
                 // php-cfg `var_export(array_keys([...]), true)` — Array_ feeds sibling FuncCall arg (#10373).
@@ -12182,6 +12198,15 @@ class Compiler {
         if ($this->isAdjacentNestedFuncCallProducer($producer, $consumer, $producerIndex, $consumerIndex)) {
             return true;
         }
+        if ($this->isNestedCallArgProducerSeparatedByConsumerLiteralPreludes(
+            $producer,
+            $consumer,
+            $producerIndex,
+            $consumerIndex,
+            $cfgChildren
+        )) {
+            return true;
+        }
         if ($producerIndex + 2 !== $consumerIndex) {
             return false;
         }
@@ -12207,6 +12232,65 @@ class Compiler {
 
         return $consumer->name === $callee->result
             || $this->operandsReferToSameVariable($consumer->name, $callee->result);
+    }
+
+    /**
+     * php-cfg `var_export(g(), true)` hoists trailing literal ConstFetch between nested calls (#10495).
+     *
+     * @param list<Op> $cfgChildren
+     */
+    private function isNestedCallArgProducerSeparatedByConsumerLiteralPreludes(
+        Op\Expr $producer,
+        Op $consumer,
+        int $producerIndex,
+        int $consumerIndex,
+        array $cfgChildren
+    ): bool {
+        if ($producerIndex >= $consumerIndex - 1) {
+            return false;
+        }
+        if (
+            !$producer instanceof Op\Expr\FuncCall
+            && !$producer instanceof Op\Expr\NsFuncCall
+            && !$producer instanceof Op\Expr\StaticCall
+            && !$producer instanceof Op\Expr\MethodCall
+        ) {
+            return false;
+        }
+        if (
+            !$consumer instanceof Op\Expr\FuncCall
+            && !$consumer instanceof Op\Expr\NsFuncCall
+            && !$consumer instanceof Op\Expr\MethodCall
+            && !$consumer instanceof Op\Expr\StaticCall
+            && !$consumer instanceof Op\Expr\New_
+        ) {
+            return false;
+        }
+        if (!property_exists($consumer, 'args') || !is_array($consumer->args) || count($consumer->args) < 2) {
+            return false;
+        }
+        $firstArg = $consumer->args[0] ?? null;
+        if (!$firstArg instanceof Operand\Temporary) {
+            return false;
+        }
+        for ($j = $producerIndex + 1; $j < $consumerIndex; ++$j) {
+            $mid = $cfgChildren[$j] ?? null;
+            if ($mid instanceof Op\Expr\ConstFetch || $mid instanceof Op\Expr\ClassConstFetch) {
+                continue;
+            }
+            if (
+                $mid instanceof Op\Expr\FuncCall
+                || $mid instanceof Op\Expr\NsFuncCall
+                || $mid instanceof Op\Expr\StaticCall
+                || $mid instanceof Op\Expr\MethodCall
+            ) {
+                return false;
+            }
+
+            return false;
+        }
+
+        return true;
     }
 
     /**
