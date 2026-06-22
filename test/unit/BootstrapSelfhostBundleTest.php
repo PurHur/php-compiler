@@ -24,6 +24,7 @@ final class BootstrapSelfhostBundleTest extends TestCase
         'lib/JIT/CastArrayShared.php',
         'lib/VM/CastJitHelper.php',
         'lib/VM/InOperatorJitHelper.php',
+        'lib/VM/InstanceOfJitHelper.php',
         'lib/VM/VmVarFetch.php',
         'lib/VM/VmVarFetchJitHelper.php',
         'lib/VM/VmFromCallable.php',
