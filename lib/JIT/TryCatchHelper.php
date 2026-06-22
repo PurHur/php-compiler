@@ -562,6 +562,10 @@ final class TryCatchHelper
 
             $builder->positionAtEnd($catchSetupBb);
             $builder->call($context->lookupFunction('phpc_jit_set_active_catch'), $pendingObj);
+            // Detach only while lowering the catch arm so throws inside the arm use outer
+            // handlers; restore before returning so try-body throw lowering still sees this try
+            // (#4886, #10527 — buildDispatch runs before compileSubBlock in beginTry).
+            $savedThrowHandlerStack = $context->tryCatch->handlerStack;
             self::detachHandlerFromThrowStack($context, $handler);
             if (null !== $catchOp->arg3) {
                 $operand = $catchOp->block1->getOperand((int) $catchOp->arg3);
@@ -575,6 +579,7 @@ final class TryCatchHelper
                     $catchResume = $context->generatorCatchDispatchEntry[spl_object_id($catchOp->block1)] ?? null;
                     if (null !== $catchResume) {
                         $builder->branch($catchResume);
+                        $context->tryCatch->handlerStack = $savedThrowHandlerStack;
                         $nextCatch = $noMatchBb;
                         $builder->positionAtEnd($nextCatch);
 
@@ -585,6 +590,7 @@ final class TryCatchHelper
                     $catchResume = $context->fiberCatchDispatchEntry[spl_object_id($catchOp->block1)] ?? null;
                     if (null !== $catchResume) {
                         $builder->branch($catchResume);
+                        $context->tryCatch->handlerStack = $savedThrowHandlerStack;
                         $nextCatch = $noMatchBb;
                         $builder->positionAtEnd($nextCatch);
 
@@ -604,6 +610,7 @@ final class TryCatchHelper
                     }
                 }
             }
+            $context->tryCatch->handlerStack = $savedThrowHandlerStack;
 
             $nextCatch = $noMatchBb;
             $builder->positionAtEnd($nextCatch);
