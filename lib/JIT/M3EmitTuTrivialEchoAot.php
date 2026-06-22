@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace PHPCompiler\JIT;
 
+use PHPCompiler\JIT\Builtin\StringFsDir;
 use PHPLLVM\Builder;
 use PHPLLVM\Value;
 
@@ -398,6 +399,8 @@ final class M3EmitTuTrivialEchoAot
 
             return;
         }
+        // Sidecar copy lowering calls __compiler_resolve_sidecar_source_path + __compiler_copy (#6982).
+        StringFsDir::ensureLinked($context);
         $objPtr = $context->getTypeFromString('__object__*');
         $strPtr = $context->getTypeFromString('__string__*');
         $i64 = $context->getTypeFromString('int64');
