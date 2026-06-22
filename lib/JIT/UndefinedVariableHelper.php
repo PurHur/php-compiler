@@ -32,6 +32,9 @@ final class UndefinedVariableHelper
 
     public static function markAssigned(Context $context, Operand $op, Variable $var): void
     {
+        if (self::shouldSkipGuards()) {
+            return;
+        }
         $name = self::resolveTrackableName($op, $var);
         if (null === $name) {
             return;
@@ -47,6 +50,9 @@ final class UndefinedVariableHelper
 
     public static function guardBeforeRuntimeRead(Context $context, Operand $op, Variable $var): void
     {
+        if (self::shouldSkipGuards()) {
+            return;
+        }
         $name = self::resolveTrackableName($op, $var);
         if (null === $name) {
             return;
@@ -69,5 +75,13 @@ final class UndefinedVariableHelper
         UndefinedVariableRuntime::emitWarningForName($context, $name);
         $context->builder->branch($doneBlock);
         $context->builder->positionAtEnd($doneBlock);
+    }
+
+    /** Nested php-in-PHP helper compiles set PHP_COMPILER_SELFHOST_AOT=0 (#10524). */
+    private static function shouldSkipGuards(): bool
+    {
+        $flag = \getenv('PHP_COMPILER_SELFHOST_AOT');
+
+        return '0' === $flag;
     }
 }

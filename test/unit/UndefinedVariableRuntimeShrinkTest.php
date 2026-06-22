@@ -32,5 +32,14 @@ final class UndefinedVariableRuntimeShrinkTest extends TestCase
         $this->assertStringContainsString('BasicBlockHelper::tryGetInsertBlock', $source);
         $this->assertStringContainsString('markAssigned', $source);
         $this->assertStringContainsString('ScopeVariableAssignedFlags', $source);
+        $this->assertStringContainsString('shouldSkipGuards', $source);
+        $this->assertStringContainsString('PHP_COMPILER_SELFHOST_AOT', $source);
+    }
+
+    public function testUndefinedVariableRuntimeSkipsDuplicateStringTriggerError(): void
+    {
+        $source = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/UndefinedVariableRuntime.php');
+        $this->assertStringContainsString('$triggerProbe = $context->module->getNamedFunction(\'__compiler_trigger_error\')', $source);
+        $this->assertStringContainsString('Do not compile UndefinedVariableJitHelper.php', $source);
     }
 }
