@@ -3158,7 +3158,10 @@ final class VmString
         $len = self::byteLength($string);
         for ($i = 0; $i < $len; ++$i) {
             $ch = $string[$i];
-            if (self::needsAddslashesEscape($ch)) {
+            if ("\0" === $ch) {
+                // php-src string.c php_addslashes: NUL -> backslash + ASCII '0'
+                $out .= '\\0';
+            } elseif (self::needsAddslashesEscape($ch)) {
                 $out .= '\\'.$ch;
             } else {
                 $out .= $ch;
@@ -3176,6 +3179,11 @@ final class VmString
             $ch = $string[$i];
             if ('\\' === $ch && $i + 1 < $len) {
                 $next = $string[$i + 1];
+                if ('0' === $next) {
+                    $out .= "\0";
+                    ++$i;
+                    continue;
+                }
                 if (self::needsAddslashesEscape($next)) {
                     $out .= $next;
                     ++$i;
@@ -3190,7 +3198,7 @@ final class VmString
 
     private static function needsAddslashesEscape(string $ch): bool
     {
-        return '\\' === $ch || "'" === $ch || '"' === $ch || "\0" === $ch;
+        return '\\' === $ch || "'" === $ch || '"' === $ch;
     }
 
     /**

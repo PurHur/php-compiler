@@ -31,6 +31,8 @@ final class StringAddslashes
         $one = $i64->constInt(1, false);
         $two = $i64->constInt(2, false);
         $backslash = $i8->constInt(92, false);
+        $zeroDigit = $i8->constInt(48, false);
+        $nulByte = $i8->constInt(0, false);
 
         $src = $context->builder->call($context->lookupFunction('__string__separate'), $string);
         $len = $context->builder->load($context->builder->structGep($src, $map['length']));
@@ -64,7 +66,9 @@ final class StringAddslashes
             $zero,
             $one,
             $two,
-            $backslash
+            $backslash,
+            $zeroDigit,
+            $nulByte
         );
 
         $context->builder->returnValue($dest);
@@ -119,7 +123,9 @@ final class StringAddslashes
         Value $zero,
         Value $one,
         Value $two,
-        Value $backslash
+        Value $backslash,
+        Value $zeroDigit,
+        Value $nulByte
     ): void {
         $head = $fn->appendBasicBlock('addslashes_write_head');
         $body = $fn->appendBasicBlock('addslashes_write_body');
@@ -145,8 +151,10 @@ final class StringAddslashes
         $context->builder->branchIf($escape, $escapedBlock, $plainBlock);
 
         $context->builder->positionAtEnd($escapedBlock);
+        $isNul = $context->builder->icmp(Builder::INT_EQ, $ch, $nulByte);
+        $escapedByte = $context->builder->select($isNul, $zeroDigit, $ch);
         $context->builder->store($backslash, $destAt);
-        $context->builder->store($ch, $context->builder->gep($destChars, $context->builder->addNoSignedWrap($pos, $one)));
+        $context->builder->store($escapedByte, $context->builder->gep($destChars, $context->builder->addNoSignedWrap($pos, $one)));
         $context->builder->store($context->builder->addNoSignedWrap($pos, $two), $posSlot);
         $context->builder->branch($afterBlock);
 
