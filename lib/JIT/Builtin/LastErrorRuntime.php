@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace PHPCompiler\JIT\Builtin;
 
 use PHPCompiler\JIT;
-use PHPCompiler\JIT\Builtin;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\NestedJitCompileScope;
 use PHPLLVM\Builder;
@@ -13,11 +12,10 @@ use PHPLLVM\Value;
 use PHPLLVM\Value\Function_ as LlvmFunction;
 
 /**
- * JIT/AOT link for __phpc_last_error_* via ErrorLastJitHelper PHP (#9454).
+ * JIT/AOT link for __phpc_last_error_* via ErrorLastJitHelper PHP (#9454, #9607).
  *
- * JIT uses compiled {@see ErrorLastJitHelper}; AOT standalone keeps {@see LastErrorRuntimeLlvm} until
- * compiled PHP static string storage is reliable in native link (same module, no malloc globals on JIT path).
- * php-src: ext/standard/basic_functions.c
+ * JIT embed and AOT standalone compile {@see ErrorLastJitHelper} into the module; thin LLVM bridges
+ * forward the __phpc_last_error_* ABI. php-src: ext/standard/basic_functions.c
  */
 final class LastErrorRuntime
 {
@@ -70,13 +68,6 @@ final class LastErrorRuntime
     {
         $probe = $context->module->getNamedFunction('__phpc_last_error_is_active');
         if (null !== $probe && $probe->countBasicBlocks() > 0) {
-            self::registerLinkedRuntime($context);
-
-            return;
-        }
-
-        if (Builtin::LOAD_TYPE_STANDALONE === $context->loadType) {
-            LastErrorRuntimeLlvm::implement($context);
             self::registerLinkedRuntime($context);
 
             return;
