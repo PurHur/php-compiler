@@ -4,12 +4,13 @@ declare(strict_types=1);
 
 namespace PHPCompiler;
 
+use PHPCompiler\Compiler\NewWithoutParensCompileCheck;
 use PHPUnit\Framework\TestCase;
 
 require_once __DIR__.'/../LlvmToolchain.php';
 
 /**
- * Class constants with `new` compile and materialize at define time (#10198, Zend/zend_compile.c).
+ * Class constants with `new` are rejected at compile time (#10391, Zend/zend_compile.c).
  *
  * @group llvm
  */
@@ -26,15 +27,16 @@ final class ClassConstObjectJitCompileTest extends TestCase
         }
     }
 
-    public function testClassConstObjectCompiles(): void
+    public function testClassConstObjectCompileErrors(): void
     {
         $runtime = new Runtime();
-        $block = $runtime->parseAndCompile(<<<'PHP'
+        $this->expectException(\CompileError::class);
+        $this->expectExceptionMessage(NewWithoutParensCompileCheck::MESSAGE);
+        $runtime->parseAndCompile(<<<'PHP'
 <?php
 class C {
     public const X = new stdClass();
 }
 PHP, 'class_const_object.php');
-        $this->assertNotNull($block);
     }
 }

@@ -1,5 +1,5 @@
 --TEST--
-Language: class constant `new` expression with ctor args (#10198, Zend/zend_compile.c)
+Language: class constant `new` expression with ctor args rejected (#10391, Zend/zend_compile.c)
 --FILE--
 <?php
 class C {
@@ -9,5 +9,5 @@ class Holder {
     public const X = new C(1);
 }
 var_dump(Holder::X->n);
---EXPECT--
-int(1)
+--EXPECT_EXIT--
+255
