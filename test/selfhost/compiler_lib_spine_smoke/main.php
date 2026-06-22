@@ -777,6 +777,7 @@ require_once __DIR__.'/../../../ext/standard/StripWhitespaceJitHelper.php';
 require_once __DIR__.'/../../../ext/standard/SuperglobalNames.php';
 require_once __DIR__.'/../../../ext/standard/ThrowableManifest.php';
 require_once __DIR__.'/../../../ext/standard/UnpackEngine.php';
+require_once __DIR__.'/../../../ext/standard/UnserializeJitHelper.php';
 require_once __DIR__.'/../../../ext/standard/VmArray.php';
 require_once __DIR__.'/../../../ext/standard/VmArrayAssocSetOps.php';
 require_once __DIR__.'/../../../ext/standard/VmArrayColumnArg.php';

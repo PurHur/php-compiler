@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 2868 |
-| Phase A inventory files (M2 ratio SSOT) | 2868 |
+| PHP files on vm.php path | 2869 |
+| Phase A inventory files (M2 ratio SSOT) | 2869 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 1 |
-| Source constructs flagged (warnings) | 7755 |
+| Source constructs flagged (warnings) | 7758 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -791,6 +791,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/standard/ThrowableManifest.php` | 0 | 1 |
 | `ext/standard/TypeErrorRaiseJitHelper.php` | 0 | 1 |
 | `ext/standard/UnpackEngine.php` | 0 | 1 |
+| `ext/standard/UnserializeJitHelper.php` | 0 | 1 |
 | `ext/standard/Utf8JitHelper.php` | 0 | 1 |
 | `ext/standard/VersionCompareJitHelper.php` | 0 | 1 |
 | `ext/standard/VmArray.php` | 0 | 30 |
@@ -2181,7 +2182,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/Builtin/StringTrimModeJit.php` | 0 | 1 |
 | `lib/JIT/Builtin/StringUcwords.php` | 0 | 1 |
 | `lib/JIT/Builtin/StringUnpackJit.php` | 0 | 2 |
-| `lib/JIT/Builtin/StringUnserialize.php` | 0 | 1 |
+| `lib/JIT/Builtin/StringUnserialize.php` | 0 | 3 |
 | `lib/JIT/Builtin/StringUnserializeJit.php` | 0 | 1 |
 | `lib/JIT/Builtin/StringUrldecode.php` | 0 | 1 |
 | `lib/JIT/Builtin/StringUrlencode.php` | 0 | 1 |
@@ -8114,6 +8115,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 
 **Warnings** (review for bootstrap subset):
 - 18 class method(s)
+
+### `ext/standard/UnserializeJitHelper.php`
+
+**Warnings** (review for bootstrap subset):
+- 2 class method(s)
 
 ### `ext/standard/Utf8JitHelper.php`
 
@@ -16936,7 +16942,9 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/Builtin/StringUnserialize.php`
 
 **Warnings** (review for bootstrap subset):
-- 2 class method(s)
+- new JIT (line 207)
+- 9 class method(s)
+- 1 closure(s)
 
 ### `lib/JIT/Builtin/StringUnserializeJit.php`
 
