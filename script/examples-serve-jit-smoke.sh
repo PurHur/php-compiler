@@ -95,7 +95,8 @@ echo $m[1];
 
 wait_for_serve() {
   local port="$1"
-  local deadline=$((SECONDS + 15))
+  local timeout="${PHP_COMPILER_SERVE_READY_TIMEOUT:-30}"
+  local deadline=$((SECONDS + timeout))
   while ((SECONDS < deadline)); do
     if (exec 3<>/dev/tcp/127.0.0.1/"${port}") 2>/dev/null; then
       exec 3<&-

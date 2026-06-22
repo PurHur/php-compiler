@@ -272,16 +272,11 @@ class JIT {
             $classId = $this->context->scope->classId;
             $className = $this->context->scope->className;
             $calledClassName = $this->context->scope->calledClassName;
-            $savedActiveFunction = $this->context->activeFunction;
-            $savedInsertBlock = null;
-            try {
-                $savedInsertBlock = $this->context->builder->getInsertBlock();
-            } catch (\Throwable) {
-            }
-            $this->context->pushScope();
+            $this->context->scope = new JIT\Scope();
             $this->context->scope->classId = $classId;
             $this->context->scope->className = $className;
             $this->context->scope->calledClassName = $calledClassName;
+            $this->context->scopeStack = [];
             $this->context->inlineIncludeReturnOperands = [];
             $this->context->coalesceAssignTargets = new \SplObjectStorage();
             $this->context->listUnpackSkipAssignPath = false;
@@ -310,13 +305,6 @@ class JIT {
                 }
             }
             $this->compileBlockInternal($llvmFunc, $cfgBlock, null, null, 0, false, ...$run[2]);
-            $this->context->popScope();
-            $this->context->activeFunction = $savedActiveFunction;
-            if (null !== $savedInsertBlock) {
-                $this->context->builder->positionAtEnd($savedInsertBlock);
-            } else {
-                $this->context->builder->clearInsertionPosition();
-            }
         }
     }
 
@@ -655,24 +643,7 @@ class JIT {
             return $this->context->scope->blockEntryStorage[$branch];
         }
 
-        if ($this->context->scope->blockStorage->contains($branch)) {
-            $entry = $this->context->scope->blockStorage[$branch];
-            $this->context->scope->blockEntryStorage[$branch] = $entry;
-
-            return $entry;
-        }
-
-        throw new \UnexpectedValueException('Object not found');
-    }
-
-    /** Ensure CFG branch targets are compiled before JUMPIF wiring (#9091, ObGzhandlerJitHelper). */
-    private function resolveJitBranchEntryBlock(PHPLLVM\Value $func, Block $branch, Variable ...$args): PHPLLVM\BasicBlock
-    {
-        if (!$this->context->scope->blockStorage->contains($branch)) {
-            $this->compileBlockInternal($func, $branch, null, null, 0, true, ...$args);
-        }
-
-        return $this->jitBranchEntryBlock($branch);
+        return $this->context->scope->blockStorage[$branch];
     }
 
     /** Self-host AOT sets PHP_COMPILER_SELFHOST_AOT=1 (#816, #557). */
@@ -6421,7 +6392,7 @@ class JIT {
                     }
                     break;
                 case OpCode::TYPE_ASSIGN:
-                    $value = $this->variableFromOpForRuntimeRead($block->getOperand($op->arg3));
+                    $value = $this->context->getVariableFromOp($block->getOperand($op->arg3));
                     $destOp = $block->getOperand($op->arg1);
                     $aliasOp = $block->getOperand($op->arg2);
                     if (null !== $this->context->ternarySharedReturnSlot && $this->isTernaryBranchMergeAssign($block, $op)) {
@@ -7281,10 +7252,14 @@ class JIT {
                         $value = $this->context->constantFetch($block->getOperand($op->arg2));
                     }
                     if (is_null($value)) {
-                        $name = null !== $op->arg3
-                            ? $block->getOperand($op->arg3)
-                            : $block->getOperand($op->arg2);
+                        $name = $block->getOperand($op->arg2);
                         $label = $name instanceof Operand\Literal ? (string) $name->value : get_class($name);
+                        if (null !== $op->arg3) {
+                            $ns = $block->getOperand($op->arg3);
+                            if ($ns instanceof Operand\Literal) {
+                                $label = (string) $ns->value.'\\'.$label;
+                            }
+                        }
                         $bundleConst = $this->jitFoldPhpCompilerBundleConstant($label);
                         if (null !== $bundleConst) {
                             $this->assignOperand($block->getOperand($op->arg1), $bundleConst);
@@ -7538,21 +7513,21 @@ class JIT {
                     }
                     break;
                 case OpCode::TYPE_CAST_BOOL:
-                    $value = $this->variableFromOpForRuntimeRead($block->getOperand($op->arg2));
+                    $value = $this->context->getVariableFromOp($block->getOperand($op->arg2));
                     $this->assignOperand($block->getOperand($op->arg1), $value->castTo(Variable::TYPE_NATIVE_BOOL));
                     break;
                 case OpCode::TYPE_CAST_INT:
-                    $value = $this->variableFromOpForRuntimeRead($block->getOperand($op->arg2));
+                    $value = $this->context->getVariableFromOp($block->getOperand($op->arg2));
                     $long = ext\standard\JitZendScalarCast::emitIntCast($this->context, $value);
                     $this->assignOperandValue($block->getOperand($op->arg1), $long);
                     break;
                 case OpCode::TYPE_CAST_FLOAT:
-                    $value = $this->variableFromOpForRuntimeRead($block->getOperand($op->arg2));
+                    $value = $this->context->getVariableFromOp($block->getOperand($op->arg2));
                     $double = ext\standard\JitZendScalarCast::emitFloatCast($this->context, $value);
                     $this->assignOperandValue($block->getOperand($op->arg1), $double);
                     break;
                 case OpCode::TYPE_CAST_STRING:
-                    $value = $this->variableFromOpForRuntimeRead($block->getOperand($op->arg2));
+                    $value = $this->context->getVariableFromOp($block->getOperand($op->arg2));
                     $this->assignOperand(
                         $block->getOperand($op->arg1),
                         JIT\JitNativeString::coerce($this->context, $value)
@@ -7562,21 +7537,21 @@ class JIT {
                     $this->assignOperand($block->getOperand($op->arg1), $this->jitNullVariable());
                     break;
                 case OpCode::TYPE_CAST_ARRAY:
-                    $value = $this->variableFromOpForRuntimeRead($block->getOperand($op->arg2));
+                    $value = $this->context->getVariableFromOp($block->getOperand($op->arg2));
                     $this->assignOperand(
                         $block->getOperand($op->arg1),
                         JIT\CastHelper::emitArrayCast($this->context, $value)
                     );
                     break;
                 case OpCode::TYPE_CAST_OBJECT:
-                    $value = $this->variableFromOpForRuntimeRead($block->getOperand($op->arg2));
+                    $value = $this->context->getVariableFromOp($block->getOperand($op->arg2));
                     $this->assignOperand(
                         $block->getOperand($op->arg1),
                         JIT\CastHelper::emitObjectCast($this->context, $value, $block, $op)
                     );
                     break;
                 case OpCode::TYPE_CAST_UNSET:
-                    $value = $this->variableFromOpForRuntimeRead($block->getOperand($op->arg2));
+                    $value = $this->context->getVariableFromOp($block->getOperand($op->arg2));
                     $this->assignOperand(
                         $block->getOperand($op->arg1),
                         JIT\CastHelper::emitUnsetCast($this->context, $value)
@@ -7802,8 +7777,8 @@ class JIT {
                         $this->operandAt($block, $op->arg1, opcode_type_name($op->type).' result'),
                         $this->compileBinaryOp(
                             $op,
-                            $this->variableFromOpForRuntimeRead($this->operandAt($block, $op->arg2, opcode_type_name($op->type).' left')),
-                            $this->variableFromOpForRuntimeRead($this->operandAt($block, $op->arg3, opcode_type_name($op->type).' right'))
+                            $this->context->getVariableFromOp($this->operandAt($block, $op->arg2, opcode_type_name($op->type).' left')),
+                            $this->context->getVariableFromOp($this->operandAt($block, $op->arg3, opcode_type_name($op->type).' right'))
                         )
                     );
                     break;
@@ -7816,8 +7791,8 @@ class JIT {
                         $this->operandAt($block, $op->arg1, opcode_type_name($op->type).' result'),
                         $this->compileBinaryOp(
                             $op,
-                            $this->variableFromOpForRuntimeRead($this->operandAt($block, $op->arg2, opcode_type_name($op->type).' left')),
-                            $this->variableFromOpForRuntimeRead($this->operandAt($block, $op->arg3, opcode_type_name($op->type).' right'))
+                            $this->context->getVariableFromOp($this->operandAt($block, $op->arg2, opcode_type_name($op->type).' left')),
+                            $this->context->getVariableFromOp($this->operandAt($block, $op->arg3, opcode_type_name($op->type).' right'))
                         )
                     );
                     break;
@@ -7830,17 +7805,17 @@ class JIT {
                             ? JIT\JitUnaryPlus::lower(
                                 $this->context,
                                 $op,
-                                $this->variableFromOpForRuntimeRead($block->getOperand($op->arg2)),
+                                $this->context->getVariableFromOp($block->getOperand($op->arg2)),
                             )
                             : (OpCode::TYPE_UNARY_MINUS === $op->type
                                 ? JIT\JitUnaryMinus::lower(
                                     $this->context,
                                     $op,
-                                    $this->variableFromOpForRuntimeRead($block->getOperand($op->arg2)),
+                                    $this->context->getVariableFromOp($block->getOperand($op->arg2)),
                                 )
                                 : $this->context->helper->unaryOp(
                                     $op,
-                                    $this->variableFromOpForRuntimeRead($block->getOperand($op->arg2)),
+                                    $this->context->getVariableFromOp($block->getOperand($op->arg2)),
                                 ))
                     );
                     break;
@@ -8099,8 +8074,8 @@ class JIT {
                             $this->compileBlockInternal($func, $firstArm, null, null, 0, false, ...$args);
                             $this->compileBlockInternal($func, $secondArm, null, null, 0, false, ...$args);
                         }
-                        $ifEntry = $this->resolveJitBranchEntryBlock($func, $op->block1, ...$args);
-                        $elseEntry = $this->resolveJitBranchEntryBlock($func, $op->block2, ...$args);
+                        $ifEntry = $this->jitBranchEntryBlock($op->block1);
+                        $elseEntry = $this->jitBranchEntryBlock($op->block2);
                         $builder->positionAtEnd($branchBlock);
                         if ($this->shouldFreeDeadVariablesBeforeBranch()) {
                             $this->context->freeDeadVariables($func, $branchBlock, $block);
@@ -8120,8 +8095,8 @@ class JIT {
                             ?? $this->context->inlineIncludeExitBlock
                             ?? $savedIncludeExit;
                     }
-                    $ifEntry = $this->resolveJitBranchEntryBlock($func, $op->block1, ...$args);
-                    $elseEntry = $this->resolveJitBranchEntryBlock($func, $op->block2, ...$args);
+                    $ifEntry = $this->jitBranchEntryBlock($op->block1);
+                    $elseEntry = $this->jitBranchEntryBlock($op->block2);
                     $builder->positionAtEnd($branchBlock);
                     if ($this->shouldFreeDeadVariablesBeforeBranch()) {
                         $this->context->freeDeadVariables($func, $branchBlock, $block);
@@ -9069,12 +9044,15 @@ class JIT {
                             break;
                         }
                         if ('null' === $nonObjectLabel) {
-                            JIT\NonObjectPropertyFetchHelper::lowerNonObjectPropertyRead(
-                                $this->context,
-                                $result,
-                                $propName,
-                                'null'
-                            );
+                            $message = sprintf('Attempt to read property "%s" on null', $propName);
+                            if ([] !== $this->context->tryCatch->handlerStack) {
+                                JIT\NonObjectPropertyFetchHelper::lowerNullPropertyDest($this->context, $result);
+                                JIT\TryCatchHelper::emitCatchableErrorMessage($this->context, $this, $message);
+                            } else {
+                                JIT\Builtin\ErrorRaise::emitRaise($this->context, $message);
+                                $this->context->builder->call($this->context->lookupFunction('abort'));
+                                $this->context->builder->clearInsertionPosition();
+                            }
                             break;
                         }
                         JIT\NonObjectPropertyFetchHelper::lowerNonObjectPropertyRead(
@@ -10856,23 +10834,8 @@ class JIT {
             $value
         );
         $this->context->bindVariableByName($this->context->resolveRefAliasName($name), $globalVar);
-        $this->markScopeVariableAssignedIfTracked($resultOp, $globalVar);
 
         return true;
-    }
-
-    /** Scope operand for value reads that may emit undefined-variable E_WARNING (#10358, #10360). */
-    private function variableFromOpForRuntimeRead(Operand $op): JIT\Variable
-    {
-        $var = $this->context->getVariableFromOp($op);
-        JIT\UndefinedVariableHelper::guardBeforeRuntimeRead($this->context, $op, $var);
-
-        return $var;
-    }
-
-    private function markScopeVariableAssignedIfTracked(Operand $resultOp, JIT\Variable $result): void
-    {
-        JIT\UndefinedVariableHelper::markAssigned($this->context, $resultOp, $result);
     }
 
     /**
@@ -11266,7 +11229,6 @@ class JIT {
                     $result
                 );
             }
-            $this->markScopeVariableAssignedIfTracked($resultOp, $result);
 
             return;
         }
@@ -11351,7 +11313,6 @@ class JIT {
             if (null !== $resolved && '' !== $resolved) {
                 $this->context->bindVariableByName($resolved, $result);
             }
-            $this->markScopeVariableAssignedIfTracked($resultOp, $result);
 
             return;
         }
@@ -11398,7 +11359,6 @@ class JIT {
                     $result->compileTimeEnumCase = $value->compileTimeEnumCase;
                     $this->syncCompileTimeString($result, $value, $force);
                     $this->syncCompileTimeFloat($result, $value, $force);
-                    $this->markScopeVariableAssignedIfTracked($resultOp, $result);
 
                     return;
                 }
@@ -11423,7 +11383,6 @@ class JIT {
                     $this->context->bindVariableByName($resolved, $result);
                 }
             }
-            $this->markScopeVariableAssignedIfTracked($resultOp, $result);
 
             return;
         } elseif ($result->type === Variable::TYPE_VALUE) {

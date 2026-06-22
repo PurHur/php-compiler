@@ -36,6 +36,7 @@ Usage: script/examples-web-smoke.sh [--aot] [--jit] [--miniwebapp-only] [--sessi
 
 Environment:
   PHP_COMPILER_SKIP_SERVE_TESTS=1  exit 0 without running HTTP checks
+  PHP_COMPILER_SERVE_READY_TIMEOUT   seconds to wait for phpc serve bind (default 30; Docker cold start ~20s)
   PHP_COMPILER_MAX_BODY            optional; 003 oversized POST check uses 1024 when unset (#705)
   MINIWEBAPP_AOT_EXECUTE_GATE=1    fail instead of skip when 003 AOT probe empty (#747, #676)
   MINIWEBAPP_WEB_SMOKE_AOT_GATE=1  require 003 --aot curls to pass (#833)
@@ -106,8 +107,8 @@ echo $m[1];
 
 wait_for_serve() {
   local port="$1"
-  # phpc serve -> php-local.sh may run apply-patches on cold vendor trees (~17s); keep headroom (#298).
-  local deadline=$((SECONDS + 25))
+  local timeout="${PHP_COMPILER_SERVE_READY_TIMEOUT:-30}"
+  local deadline=$((SECONDS + timeout))
   while ((SECONDS < deadline)); do
     if (exec 3<>/dev/tcp/127.0.0.1/"${port}") 2>/dev/null; then
       exec 3<&-

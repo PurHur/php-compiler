@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace PHPCompiler\JIT;
 
-use PHPCompiler\JIT;
 use PHPLLVM\Type;
 use PHPLLVM\Value\Function_ as LlvmFunction;
 
@@ -34,44 +33,16 @@ final class JitVmHelperLink
         }
 
         $runtime = $context->runtime;
-        $path = self::resolveHelperPath($relativeHelperPath);
+        $path = \dirname(__DIR__).$relativeHelperPath;
         $basename = \basename($path);
-        $savedActive = $context->activeFunction;
-        $restoreBlock = BasicBlockHelper::tryGetInsertBlock($context);
-        $prevSelfHostAot = \getenv('PHP_COMPILER_SELFHOST_AOT');
-        if (\function_exists('putenv')) {
-            \putenv('PHP_COMPILER_SELFHOST_AOT=0');
-        }
-        try {
-            // Nested helper compile must not inherit a half-built parent CFG (#8559, #9225).
-            $context->builder->clearInsertionPosition();
-            $context->activeFunction = '';
-            $context->pushScope();
-            try {
-                $block = $runtime->parseAndCompile((string) \file_get_contents($path), $basename);
-                if (null === $block) {
-                    throw new \LogicException($basename.' parseAndCompile failed ('.$compileLabel.')');
-                }
-                $jit = new JIT($context);
-                $jit->compile($block);
-            } finally {
-                $context->popScope();
+        NestedJitCompileScope::run($context, static function () use ($context, $runtime, $path, $basename, $compileLabel): void {
+            $block = $runtime->parseAndCompile((string) \file_get_contents($path), $basename);
+            if (null === $block) {
+                throw new \LogicException($basename.' parseAndCompile failed ('.$compileLabel.')');
             }
-        } finally {
-            if (null !== $restoreBlock) {
-                BasicBlockHelper::restoreInsertBlock($context, $restoreBlock);
-            } else {
-                $context->builder->clearInsertionPosition();
-            }
-            $context->activeFunction = $savedActive;
-            if (\function_exists('putenv')) {
-                if (false === $prevSelfHostAot || null === $prevSelfHostAot) {
-                    \putenv('PHP_COMPILER_SELFHOST_AOT=');
-                } else {
-                    \putenv('PHP_COMPILER_SELFHOST_AOT='.$prevSelfHostAot);
-                }
-            }
-        }
+            $jit = new JIT($context);
+            $jit->compile($block);
+        });
         foreach ($compiledHelpers as $logical) {
             $lc = \strtolower($logical);
             if (!isset($context->functions[$lc])) {
@@ -131,14 +102,5 @@ final class JitVmHelperLink
         );
         $context->builder->returnValue($result);
         $context->registerFunction($abiName, $fn);
-    }
-
-    private static function resolveHelperPath(string $relativeHelperPath): string
-    {
-        $base = \str_starts_with($relativeHelperPath, '/ext/')
-            ? \dirname(__DIR__, 2)
-            : \dirname(__DIR__);
-
-        return $base.$relativeHelperPath;
     }
 }

@@ -5,8 +5,8 @@ declare(strict_types=1);
 namespace PHPCompiler\JIT\Builtin;
 
 use PHPCompiler\JIT;
-use PHPCompiler\JIT\Builtin;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\NestedJitCompileScope;
 use PHPCompiler\VM\ObStackLimits;
 use PHPLLVM\BasicBlock;
 use PHPLLVM\Builder;
@@ -62,13 +62,6 @@ final class ObGzhandlerJitRuntime
 
         self::$blockSuffix = 0;
         self::ensureGlobals($context);
-        if (Builtin::LOAD_TYPE_STANDALONE === $context->loadType) {
-            self::implementStandalonePassthrough($context);
-            self::registerLinkedRuntime($context);
-            $context->builder->clearInsertionPosition();
-
-            return;
-        }
         self::ensureServerReadHelpers($context);
         self::ensureJitHelperCompiled($context);
         self::implementObGzhandlerBridge($context);
@@ -105,45 +98,6 @@ final class ObGzhandlerJitRuntime
             $context->lookupFunction('__phpc_ob_gzhandler_flush'),
             $content
         );
-    }
-
-    private static function implementStandalonePassthrough(Context $context): void
-    {
-        $strPtr = $context->getTypeFromString('__string__*');
-        $i64 = $context->getTypeFromString('int64');
-
-        $ogzName = '__compiler_ob_gzhandler';
-        $ogzProbe = $context->module->getNamedFunction($ogzName);
-        if (null === $ogzProbe || 0 === $ogzProbe->countBasicBlocks()) {
-            $ogzFn = null !== $ogzProbe
-                ? $ogzProbe
-                : $context->module->addFunction(
-                    $ogzName,
-                    $context->context->functionType($strPtr, false, $strPtr, $i64)
-                );
-            $entry = $ogzFn->appendBasicBlock('ogz_standalone_entry');
-            $context->builder->positionAtEnd($entry);
-            $context->builder->returnValue($ogzFn->getParam(0));
-            $context->registerFunction($ogzName, $ogzFn);
-        }
-
-        $flushName = '__phpc_ob_gzhandler_flush';
-        $flushProbe = $context->module->getNamedFunction($flushName);
-        if (null === $flushProbe || 0 === $flushProbe->countBasicBlocks()) {
-            $flushFn = null !== $flushProbe
-                ? $flushProbe
-                : $context->module->addFunction(
-                    $flushName,
-                    $context->context->functionType($strPtr, false, $strPtr)
-                );
-            $entry = $flushFn->appendBasicBlock('ogf_standalone_entry');
-            $context->builder->positionAtEnd($entry);
-            $context->builder->returnValue($flushFn->getParam(0));
-            $context->registerFunction($flushName, $flushFn);
-        }
-
-        self::implementObStartWithGzhandler($context);
-        $context->builder->clearInsertionPosition();
     }
 
     private static function implementObGzhandlerBridge(Context $context): void
@@ -434,55 +388,20 @@ final class ObGzhandlerJitRuntime
 
         $runtime = $context->runtime;
         $path = \dirname(__DIR__, 3).self::HELPER_PATH;
-        $savedBuilder = $context->builder;
-        $savedActive = $context->activeFunction;
-        $restoreBlock = self::captureInsertBlock($context);
-        $savedBlockStorage = $context->scope->blockStorage;
-        $savedBlockEntryStorage = $context->scope->blockEntryStorage;
-        $context->scope->blockStorage = new \SplObjectStorage();
-        $context->scope->blockEntryStorage = new \SplObjectStorage();
-        $prevSelfHostAot = \getenv('PHP_COMPILER_SELFHOST_AOT');
-        if (\function_exists('putenv')) {
-            \putenv('PHP_COMPILER_SELFHOST_AOT=0');
-        }
-        try {
-            // Nested helper compile must not inherit a half-built bridge CFG (#8559, #9225).
-            $context->builder->clearInsertionPosition();
-            self::compileHelperFileIfMissing($context, $runtime, $path, 'ObGzhandlerJitHelper.php');
-        } finally {
-            $context->scope->blockStorage = $savedBlockStorage;
-            $context->scope->blockEntryStorage = $savedBlockEntryStorage;
-            $context->builder = $savedBuilder;
-            self::restoreInsertBlock($context, $restoreBlock);
-            $context->activeFunction = $savedActive;
-            if (\function_exists('putenv')) {
-                if (false === $prevSelfHostAot || null === $prevSelfHostAot) {
-                    \putenv('PHP_COMPILER_SELFHOST_AOT=');
-                } else {
-                    \putenv('PHP_COMPILER_SELFHOST_AOT='.$prevSelfHostAot);
-                }
+        NestedJitCompileScope::run($context, static function () use ($context, $runtime, $path): void {
+            $block = $runtime->parseAndCompile((string) \file_get_contents($path), 'ObGzhandlerJitHelper.php');
+            if (null === $block) {
+                throw new \LogicException('ObGzhandlerJitHelper.php parseAndCompile failed (#9091)');
             }
-        }
+            $jit = new JIT($context);
+            $jit->compile($block);
+        });
         foreach (self::COMPILED_HELPERS as $logical) {
             $lc = \strtolower($logical);
             if (!isset($context->functions[$lc])) {
                 throw new \LogicException($lc.' was not compiled for JIT (#9091)');
             }
         }
-    }
-
-    private static function compileHelperFileIfMissing(
-        Context $context,
-        \PHPCompiler\Runtime $runtime,
-        string $path,
-        string $label
-    ): void {
-        $block = $runtime->parseAndCompile((string) \file_get_contents($path), $label);
-        if (null === $block) {
-            throw new \LogicException($label.' parseAndCompile failed (#9091)');
-        }
-        $jit = new JIT($context);
-        $jit->compile($block);
     }
 
     private static function registerLinkedRuntime(Context $context): void
@@ -493,24 +412,6 @@ final class ObGzhandlerJitRuntime
                 throw new \LogicException($name.' missing after ObGzhandlerJitRuntime bridge (#9091)');
             }
             $context->registerFunction($name, $fn);
-        }
-    }
-
-    private static function captureInsertBlock(Context $context): ?BasicBlock
-    {
-        try {
-            return $context->builder->getInsertBlock();
-        } catch (\Throwable) {
-            return null;
-        }
-    }
-
-    private static function restoreInsertBlock(Context $context, ?BasicBlock $block): void
-    {
-        if (null !== $block) {
-            $context->builder->positionAtEnd($block);
-        } else {
-            $context->builder->clearInsertionPosition();
         }
     }
 }

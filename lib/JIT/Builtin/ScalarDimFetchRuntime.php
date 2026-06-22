@@ -4,10 +4,10 @@ declare(strict_types=1);
 
 namespace PHPCompiler\JIT\Builtin;
 
+use PHPCompiler\JIT;
 use PHPCompiler\JIT\Context;
-use PHPCompiler\JIT\Variable as JitVariable;
-use PHPCompiler\VM\ErrorReporter;
-use PHPCompiler\VM\ScalarDimFetchJitHelper;
+use PHPCompiler\JIT\NestedJitCompileScope;
+use PHPLLVM\Value;
 use PHPLLVM\Value\Function_ as LlvmFunction;
 
 /**
@@ -18,6 +18,15 @@ use PHPLLVM\Value\Function_ as LlvmFunction;
 final class ScalarDimFetchRuntime
 {
     private const ABI_EMIT_WARNING = '__scalar_dim_fetch__emitWarning';
+
+    private const HELPER_PATH = '/lib/VM/ScalarDimFetchJitHelper.php';
+
+    private const EMIT_WARNING_HELPER = 'PHPCompiler\\VM\\ScalarDimFetchJitHelper::emitWarningForJitType';
+
+    /** @var list<string> */
+    private const COMPILED_HELPERS = [
+        self::EMIT_WARNING_HELPER,
+    ];
 
     public static function ensureLinked(Context $context): void
     {
@@ -38,6 +47,7 @@ final class ScalarDimFetchRuntime
             return;
         }
 
+        self::ensureJitHelperCompiled($context);
         self::implementEmitWarningBridge($context);
         self::registerLinkedRuntime($context);
         $context->builder->clearInsertionPosition();
@@ -72,70 +82,57 @@ final class ScalarDimFetchRuntime
             : $context->module->addFunction($abiName, $ft);
 
         $entry = $fn->appendBasicBlock('scalar_dim_fetch_warn_bridge_entry');
+        $i64 = $context->getTypeFromString('int64');
         $context->builder->positionAtEnd($entry);
-        self::emitWarningForJitTypeParam($context, $fn->getParam(0));
+        $context->builder->call(
+            self::helperFunction($context, self::EMIT_WARNING_HELPER),
+            $context->builder->zext($fn->getParam(0), $i64)
+        );
         $context->builder->returnVoid();
         $context->registerFunction($abiName, $fn);
     }
 
-    private static function emitWarningForJitTypeParam(Context $context, \PHPLLVM\Value $jitTypeParam): void
+    private static function helperFunction(Context $context, string $logical): LlvmFunction
     {
-        $i8 = $context->getTypeFromString('int8');
-        $fn = $context->builder->getInsertBlock()->getParent();
-        if (!$fn instanceof LlvmFunction) {
-            throw new \LogicException('scalar dim fetch bridge missing parent function (#10343)');
+        self::ensureJitHelperCompiled($context);
+        $lc = \strtolower($logical);
+        $fn = $context->functions[$lc] ?? null;
+        if (null === $fn) {
+            throw new \LogicException($logical.' missing after ScalarDimFetchJitHelper compile (#10343)');
         }
 
-        $done = $fn->appendBasicBlock('scalar_dim_fetch_warn_done');
-        foreach ([
-            JitVariable::TYPE_NULL,
-            JitVariable::TYPE_NATIVE_BOOL,
-            JitVariable::TYPE_NATIVE_LONG,
-            JitVariable::TYPE_NATIVE_DOUBLE,
-        ] as $jitType) {
-            $matchBlock = $fn->appendBasicBlock('scalar_dim_fetch_warn_t'.$jitType);
-            $nextCheck = $fn->appendBasicBlock('scalar_dim_fetch_warn_after_t'.$jitType);
-            $context->builder->branchIf(
-                $context->builder->icmp(
-                    \PHPLLVM\Builder::INT_EQ,
-                    $jitTypeParam,
-                    $i8->constInt($jitType, false)
-                ),
-                $matchBlock,
-                $nextCheck
-            );
-            $context->builder->positionAtEnd($matchBlock);
-            self::emitTriggerErrorMessage(
-                $context,
-                ScalarDimFetchJitHelper::warningMessageForJitType($jitType)
-            );
-            $context->builder->branch($done);
-            $context->builder->positionAtEnd($nextCheck);
-        }
-
-        self::emitTriggerErrorMessage(
-            $context,
-            ScalarDimFetchJitHelper::warningMessageForJitType(0)
-        );
-        $context->builder->branch($done);
-        $context->builder->positionAtEnd($done);
+        return $fn;
     }
 
-    private static function emitTriggerErrorMessage(Context $context, string $message): void
+    private static function ensureJitHelperCompiled(Context $context): void
     {
-        $i8p = $context->getTypeFromString('int8*');
-        $sizeT = $context->getTypeFromString('size_t');
-        $i32 = $context->getTypeFromString('int32');
-        $msgPtr = $context->builder->pointerCast($context->constantFromString($message), $i8p);
-        $emptyFile = $context->builder->pointerCast($context->constantFromString(''), $i8p);
-        $context->builder->call(
-            $context->lookupFunction('__compiler_trigger_error'),
-            $msgPtr,
-            $sizeT->constInt(\strlen($message), false),
-            $i32->constInt(ErrorReporter::E_WARNING, false),
-            $emptyFile,
-            $i32->constInt(0, false)
-        );
+        $missing = false;
+        foreach (self::COMPILED_HELPERS as $logical) {
+            if (!isset($context->functions[\strtolower($logical)])) {
+                $missing = true;
+                break;
+            }
+        }
+        if (!$missing) {
+            return;
+        }
+
+        $runtime = $context->runtime;
+        $path = \dirname(__DIR__, 3).self::HELPER_PATH;
+        NestedJitCompileScope::run($context, static function () use ($context, $runtime, $path): void {
+            $block = $runtime->parseAndCompile((string) \file_get_contents($path), 'ScalarDimFetchJitHelper.php');
+            if (null === $block) {
+                throw new \LogicException('ScalarDimFetchJitHelper.php parseAndCompile failed (#10343)');
+            }
+            $jit = new JIT($context);
+            $jit->compile($block);
+        });
+        foreach (self::COMPILED_HELPERS as $logical) {
+            $lc = \strtolower($logical);
+            if (!isset($context->functions[$lc])) {
+                throw new \LogicException($lc.' was not compiled for JIT (#10343)');
+            }
+        }
     }
 
     private static function registerLinkedRuntime(Context $context): void
