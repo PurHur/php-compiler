@@ -25,6 +25,7 @@ final class filetype extends Internal
         }
         $type = VmFs::fileType($path);
         if (false === $type) {
+            VmFilestatFailure::warnPathStatFailed($frame, 'filetype', $path, true);
             $frame->returnVar->bool(false);
         } else {
             $frame->returnVar->string($type);

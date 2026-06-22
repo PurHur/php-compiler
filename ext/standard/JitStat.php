@@ -12,6 +12,7 @@ namespace PHPCompiler\ext\standard;
 
 use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Builtin\StatCacheRuntime;
+use PHPCompiler\JIT\Builtin\StringTriggerErrorJit;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\VM\ErrorReporter;
@@ -145,6 +146,7 @@ final class JitStat
     /** @return Value */
     public static function pathFiletypeBoxed(Context $context, Value $str): Value
     {
+        StringTriggerErrorJit::implement($context);
         $mode = self::loadModeOrFail($context, $str, 'lstat');
         $i32 = $context->getTypeFromString('int32');
         $failed = $context->builder->icmp(Builder::INT_SLT, $mode, $i32->constInt(0, true));
@@ -158,6 +160,7 @@ final class JitStat
         $context->builder->branchIf($failed, $failBlock, $okBlock);
 
         $context->builder->positionAtEnd($failBlock);
+        self::emitPathStatFailureWarning($context, $str, 'filetype', true);
         $i1 = $context->getTypeFromString('int1');
         JitValueBox::writeBool($context, $slot, $i1->constInt(0, false));
         $context->builder->branch($doneBlock);
@@ -181,6 +184,7 @@ final class JitStat
     /** @return Value */
     public static function pathFileSizeBoxed(Context $context, Value $str): Value
     {
+        StringTriggerErrorJit::implement($context);
         $map = $context->structFieldMap['__string__'];
         $pathPtr = $context->builder->structGep($str, $map['value']);
         $i8 = $context->getTypeFromString('int8');
@@ -207,6 +211,7 @@ final class JitStat
         $context->builder->branchIf($failed, $failBlock, $okBlock);
 
         $context->builder->positionAtEnd($failBlock);
+        self::emitPathStatFailureWarning($context, $str, 'filesize', false);
         $i1 = $context->getTypeFromString('int1');
         JitValueBox::writeBool($context, $slot, $i1->constInt(0, false));
         $context->builder->branch($doneBlock);
@@ -386,6 +391,47 @@ final class JitStat
             $emptyFile,
             $i32->constInt(0, false)
         );
+    }
+
+    private static function emitPathStatFailureWarning(
+        Context $context,
+        Value $pathStr,
+        string $function,
+        bool $lstat
+    ): void {
+        $map = $context->structFieldMap['__string__'];
+        $pathPtr = $context->builder->structGep($pathStr, $map['value']);
+        $op = $lstat ? 'Lstat' : 'stat';
+        $sizeT = $context->getTypeFromString('size_t');
+        $charPtr = $context->getTypeFromString('char*');
+        $i8p = $context->getTypeFromString('int8*');
+        $i32 = $context->getTypeFromString('int32');
+        $bufSize = $sizeT->constInt(512, false);
+        $buf = $context->builder->call($context->lookupFunction('__mm__malloc'), $bufSize);
+        $bufChar = $context->builder->pointerCast($buf, $charPtr);
+        $fmt = $context->builder->pointerCast($context->constantFromString('%s(): %s failed for %s'), $charPtr);
+        $fnPtr = $context->builder->pointerCast($context->constantFromString($function), $charPtr);
+        $opPtr = $context->builder->pointerCast($context->constantFromString($op), $charPtr);
+        $written = $context->builder->call(
+            $context->lookupFunction('snprintf'),
+            $bufChar,
+            $bufSize,
+            $fmt,
+            $fnPtr,
+            $opPtr,
+            $pathPtr
+        );
+        $msgPtr = $context->builder->pointerCast($bufChar, $i8p);
+        $emptyFile = $context->builder->pointerCast($context->constantFromString(''), $i8p);
+        $context->builder->call(
+            $context->lookupFunction('__compiler_trigger_error'),
+            $msgPtr,
+            $context->builder->zExt($written, $sizeT),
+            $i32->constInt(ErrorReporter::E_WARNING, false),
+            $emptyFile,
+            $i32->constInt(0, false)
+        );
+        $context->builder->call($context->lookupFunction('__mm__free'), $buf);
     }
 
     /** @return Value */
