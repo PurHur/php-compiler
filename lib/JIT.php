@@ -39,6 +39,8 @@ class JIT {
 
     private static int $functionNumber = 0;
     private static int $blockNumber = 0;
+    /** Nested php-in-PHP helper compiles during an outer JIT::compile() (#10528). */
+    private static int $compileDepth = 0;
 
     public int $optimizationLevel = 3;
 
@@ -68,6 +70,21 @@ class JIT {
     }
 
     public function compile(Block $block): PHPLLVM\Value {
+        ++self::$compileDepth;
+        try {
+            if (self::$compileDepth > 1) {
+                return JIT\NestedJitCompileScope::run($this->context, function () use ($block): PHPLLVM\Value {
+                    return $this->compileUnscoped($block);
+                });
+            }
+
+            return $this->compileUnscoped($block);
+        } finally {
+            --self::$compileDepth;
+        }
+    }
+
+    private function compileUnscoped(Block $block): PHPLLVM\Value {
         JIT\Progress::noteFunction('jit_compile_begin');
         $this->context->resetScriptLocalBindings();
         if (
