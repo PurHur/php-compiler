@@ -1,5 +1,5 @@
 --TEST--
-Language: class constant `new` expression — PHP 8.3+ (#10198, Zend/zend_compile.c)
+Language: class constant `new` expression — compile-error (#10391, Zend/zend_compile.c)
 --FILE--
 <?php
 class C {
@@ -10,6 +10,5 @@ class Holder {
 }
 var_dump(Holder::X->n);
 echo Holder::X === Holder::X ? "1\n" : "0\n";
---EXPECT--
-int(1)
-1
+--EXPECT_EXIT--
+255

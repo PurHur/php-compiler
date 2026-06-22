@@ -1,12 +1,12 @@
 --TEST--
-Language: class constants with object expressions — AOT (#3196, #9850, Zend/zend_constants.c)
+Language: class constants with object expressions — AOT rejected (#10391, Zend/zend_constants.c)
 --SKIPIF--
 <?php
 if (!class_exists('PHPCompiler\\CompilerVersion')) {
     require __DIR__ . '/../../../../vendor/autoload.php';
 }
-if (!PHPCompiler\CompilerVersion::supportsClassConstObjectExpressions()) {
-    die('skip class const object expressions require CompilerVersion 8.3+');
+if (PHPCompiler\CompilerVersion::supportsClassConstObjectExpressions()) {
+    die('skip class const object expressions enabled on this target');
 }
 ?>
 --FILE--
@@ -15,5 +15,5 @@ class C {
     public const X = new stdClass();
 }
 echo (C::X instanceof stdClass) ? "1\n" : "0\n";
---EXPECT--
-1
+--EXPECT_EXIT--
+255
