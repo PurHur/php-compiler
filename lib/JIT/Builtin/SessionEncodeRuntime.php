@@ -38,7 +38,7 @@ final class SessionEncodeRuntime
     public static function ensureLinked(Context $context): void
     {
         StringSerialize::implement($context);
-        StringUnserializeJit::implement($context);
+        StringUnserialize::ensureLinked($context);
         SessionStorageGlobals::ensureGlobals($context);
 
         self::implementIfMissing($context, 'phpc_session_encode_wire', self::emitEncodeWire(...));
