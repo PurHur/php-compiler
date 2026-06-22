@@ -1193,7 +1193,8 @@ class Type extends Builtin {
         $fntypeJsonEncodeValue = $this->context->context->functionType(
             $this->context->getTypeFromString('__string__*'),
             false,
-            $valuePtr
+            $valuePtr,
+            $this->context->getTypeFromString('int64')
         );
         $fnJsonEncodeValue = $this->context->module->addFunction(
             '__compiler_json_encode_value',
@@ -1203,7 +1204,8 @@ class Type extends Builtin {
         $fntypeJsonEncodeArray = $this->context->context->functionType(
             $this->context->getTypeFromString('__string__*'),
             false,
-            $this->context->getTypeFromString('__hashtable__*')
+            $this->context->getTypeFromString('__hashtable__*'),
+            $this->context->getTypeFromString('int64')
         );
         $fnJsonEncodeArray = $this->context->module->addFunction(
             '__compiler_json_encode_array',

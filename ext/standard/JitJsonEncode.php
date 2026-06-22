@@ -20,7 +20,7 @@ final class JitJsonEncode
 {
     private static int $blockSerial = 0;
 
-    public static function encode(Context $context, JITVariable $arg): Value
+    public static function encode(Context $context, JITVariable $arg, Value $flags): Value
     {
         StringJsonEncode::ensureLinked($context);
 
@@ -33,7 +33,8 @@ final class JitJsonEncode
                 $context,
                 $context->builder->call(
                     $context->lookupFunction('__compiler_json_encode_array'),
-                    $ht
+                    $ht,
+                    $flags
                 )
             );
         }
@@ -42,7 +43,8 @@ final class JitJsonEncode
                 $context,
                 $context->builder->call(
                     $context->lookupFunction('__compiler_json_encode_value'),
-                    JitValueBox::valuePtrFromVariable($context, $arg)
+                    JitValueBox::valuePtrFromVariable($context, $arg),
+                    $flags
                 )
             );
         }
@@ -55,7 +57,8 @@ final class JitJsonEncode
             $context,
             $context->builder->call(
                 $context->lookupFunction('__compiler_json_encode_value'),
-                $ptr
+                $ptr,
+                $flags
             )
         );
     }
