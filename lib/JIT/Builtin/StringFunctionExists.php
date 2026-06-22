@@ -7,7 +7,7 @@ namespace PHPCompiler\JIT\Builtin;
 use PHPCompiler\JIT\Context;
 
 /**
- * JIT/AOT link hook for __compiler_builtin_function_exists (issue #5390, #1216).
+ * JIT/AOT link hook for __compiler_builtin_function_exists (#5390, #9239).
  */
 final class StringFunctionExists
 {

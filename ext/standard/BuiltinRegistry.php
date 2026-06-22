@@ -9,7 +9,7 @@ use PHPCompiler\Func\Internal;
 /**
  * Authoritative sorted builtin function name list (issues #5390, #1216, #6400).
  *
- * SSOT for function_exists() LLVM lowering (FunctionExistsRuntime) and AOT/JIT
+ * SSOT for function_exists() JIT helper (FunctionExistsJitHelper) and AOT/JIT
  * symbol resolution — replaces lib/AOT/runtime/builtin_function_names.inc.
  *
  * php-src: ext/standard/basic_functions.c — function_exists() registry
