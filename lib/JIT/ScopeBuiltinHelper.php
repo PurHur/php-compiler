@@ -668,7 +668,7 @@ final class ScopeBuiltinHelper
     {
         $i64 = $context->getTypeFromString('int64');
         if (null === $flagsArg) {
-            return $i64->constInt(VmScope::EXTR_SKIP, false);
+            return $i64->constInt(VmScope::EXTR_OVERWRITE, false);
         }
 
         return JitLongArg::lower($context, $flagsArg, 'extract() flags');
