@@ -7,6 +7,7 @@ namespace PHPCompiler\ext\standard;
 use PHPCompiler\JIT\Builtin\Sscanf;
 use PHPCompiler\JIT\Builtin\StreamRead;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\HashTableHelper;
 use PHPCompiler\JIT\JitLongArg;
 use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\JitValueBox;
@@ -31,7 +32,7 @@ final class JitVfscanf
 
         $handleLit = $args[0]->compileTimeLong ?? null;
         $fmtLit = $args[1]->compileTimeString ?? null;
-        if (null !== $handleLit && null !== $fmtLit) {
+        if (null !== $handleLit && null !== $fmtLit && self::canFoldCompileTime($fmtLit, $argc - 2)) {
             return self::parseCompileTime($context, (int) $handleLit, $fmtLit, \array_slice($args, 2));
         }
 
@@ -43,7 +44,7 @@ final class JitVfscanf
         $fmt = JitStringBuiltinArg::lower($context, $args[1], 'vfscanf', 1, 'format');
         $outCount = $argc - 2;
         if (0 === $outCount) {
-            throw new \LogicException('vfscanf() requires at least one output variable in this compiler build');
+            throw new \LogicException('vfscanf() without by-ref targets requires compile-time stream/format in this compiler build');
         }
         $ptrTy = $context->getTypeFromString('__value__*');
         $i32 = $context->getTypeFromString('int32');
@@ -77,12 +78,41 @@ final class JitVfscanf
         return $context->builder->intCast($count, $i64);
     }
 
+    /** Compile-time fold only when arity is valid — mismatches use runtime LLVM (#4064). */
+    private static function canFoldCompileTime(string $format, int $outCount): bool
+    {
+        if (0 === $outCount) {
+            return true;
+        }
+        try {
+            VmSscanf::validateOutVarArity($format, $outCount);
+
+            return true;
+        } catch (\ValueError) {
+            return false;
+        }
+    }
+
     /**
      * @param list<JITVariable> $outArgs
      */
     private static function parseCompileTime(Context $context, int $handle, string $format, array $outArgs): Value
     {
         $i64 = $context->getTypeFromString('int64');
+        if ([] === $outArgs) {
+            $ht = VmVfscanf::parseToArray($handle, $format);
+            $htVar = JitSscanf::materializeVmHashTable($context, $ht);
+            $slot = JitValueBox::alloc($context);
+            $ptr = JitValueBox::pointer($context, $slot);
+            $context->builder->call(
+                $context->lookupFunction('__value__writeHashtable'),
+                $ptr,
+                HashTableHelper::loadHashtablePointer($context, $htVar)
+            );
+
+            return $ptr;
+        }
+
         $temps = [];
         foreach ($outArgs as $_) {
             $temps[] = new VMVariable();

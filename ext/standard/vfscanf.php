@@ -43,6 +43,11 @@ final class vfscanf extends Internal
 
             return;
         }
+        if ([] === $outVars) {
+            $frame->returnVar->array(VmVfscanf::parseToArray($handle, $format));
+
+            return;
+        }
         $frame->returnVar->int(VmVfscanf::parse($handle, $format, $outVars));
     }
 

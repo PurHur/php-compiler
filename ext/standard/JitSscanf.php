@@ -163,7 +163,7 @@ final class JitSscanf
         }
     }
 
-    private static function materializeVmHashTable(Context $context, \PHPCompiler\VM\HashTable $table): JITVariable
+    public static function materializeVmHashTable(Context $context, \PHPCompiler\VM\HashTable $table): JITVariable
     {
         $ht = HashTableHelper::alloc($context);
         $setLong = $context->lookupFunction('__hashtable__setLongAt');
