@@ -1,13 +1,7 @@
 <?php
-try {
-    [$a] = 'ab';
-    echo "no-exception\n";
-} catch (TypeError $e) {
-    echo 'TypeError: ', $e->getMessage(), "\n";
-}
-try {
-    [$b, $c] = 'xy';
-    echo "no-exception\n";
-} catch (TypeError $e) {
-    echo 'TypeError: ', $e->getMessage(), "\n";
-}
+list($a, $b) = 'ab';
+var_export([$a, $b]);
+echo "\n";
+[$x, $y] = 'xy';
+var_export([$x, $y]);
+echo "\n";

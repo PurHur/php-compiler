@@ -13,6 +13,7 @@ use PHPCompiler\JIT\JitOperandTypeLabel;
 use PHPCompiler\JIT\JitStringArg;
 use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\Variable as JITVariable;
+use PHPCompiler\VM\ErrorReporter;
 use PHPCompiler\VM\Variable as VmVariable;
 use PHPLLVM\Builder;
 use PHPLLVM\Value;
@@ -36,9 +37,10 @@ final class JitIntdiv
         JITVariable $arg,
         string $function,
         int $argIndex,
-        string $paramName
+        string $paramName,
+        bool $warnFloatPrecision = false
     ): Value {
-        return self::lowerIntOperand($context, $arg, $argIndex, $paramName, $function, false);
+        return self::lowerIntOperand($context, $arg, $argIndex, $paramName, $function, false, $warnFloatPrecision);
     }
 
     /** Z_PARAM_LONG_OR_NULL lowering with ?int TypeError messages (#5917 error_reporting). */
@@ -58,7 +60,8 @@ final class JitIntdiv
         int $argIndex,
         string $paramName,
         string $function,
-        bool $nullable = false
+        bool $nullable = false,
+        bool $warnFloatPrecision = false
     ): Value {
         if (JITVariable::TYPE_NULL === $arg->type) {
             return $context->getTypeFromString('int64')->constInt(0, false);
@@ -80,13 +83,13 @@ final class JitIntdiv
             return $context->getTypeFromString('int64')->constInt(0, false);
         }
         if (JITVariable::TYPE_NATIVE_DOUBLE === $arg->type) {
-            return self::lowerNativeDoubleOperand($context, $arg, $argIndex, $paramName, $function, $nullable);
+            return self::lowerNativeDoubleOperand($context, $arg, $argIndex, $paramName, $function, $nullable, $warnFloatPrecision);
         }
         if (JITVariable::TYPE_STRING === $arg->type) {
             return self::lowerStringOperand($context, $arg, $argIndex, $paramName, $function, $nullable);
         }
         if (JITVariable::TYPE_VALUE === $arg->type) {
-            return self::lowerBoxedOperand($context, $arg, $argIndex, $paramName, $function, $nullable);
+            return self::lowerBoxedOperand($context, $arg, $argIndex, $paramName, $function, $nullable, $warnFloatPrecision);
         }
 
         return JitLongArg::lower($context, $arg, sprintf('%s() argument #%d', $function, $argIndex));
@@ -118,7 +121,8 @@ final class JitIntdiv
         int $argIndex,
         string $paramName,
         string $function,
-        bool $nullable = false
+        bool $nullable = false,
+        bool $warnFloatPrecision = false
     ): Value {
         TypeErrorRaise::registerDeclarations($context);
         TypeErrorRaise::ensureLinked($context);
@@ -190,7 +194,7 @@ final class JitIntdiv
 
         $context->builder->positionAtEnd($doubleBlock);
         $doubleVal = $context->builder->call($context->lookupFunction('__value__readDouble'), $valuePtr);
-        $truncated = self::lowerFiniteDoubleToLong($context, $doubleVal, $function, $argIndex, $paramName, $nullable);
+        $truncated = self::lowerFiniteDoubleToLong($context, $doubleVal, $function, $argIndex, $paramName, $nullable, $warnFloatPrecision);
         $doubleEnd = $context->builder->getInsertBlock();
         $context->builder->branch($mergeBlock);
 
@@ -226,11 +230,12 @@ final class JitIntdiv
         int $argIndex,
         string $paramName,
         string $function,
-        bool $nullable = false
+        bool $nullable = false,
+        bool $warnFloatPrecision = false
     ): Value {
         $doubleVal = $context->helper->loadValue($arg);
 
-        return self::lowerFiniteDoubleToLong($context, $doubleVal, $function, $argIndex, $paramName, $nullable);
+        return self::lowerFiniteDoubleToLong($context, $doubleVal, $function, $argIndex, $paramName, $nullable, $warnFloatPrecision);
     }
 
     private static function lowerFiniteDoubleToLong(
@@ -239,7 +244,8 @@ final class JitIntdiv
         string $function,
         int $argIndex,
         string $paramName,
-        bool $nullable = false
+        bool $nullable = false,
+        bool $warnFloatPrecision = false
     ): Value {
         $isFinite = JitIsFinite::lower($context, $doubleVal);
         $okBlock = BasicBlockHelper::append($context, 'intdiv_dbl_ok');
@@ -249,7 +255,62 @@ final class JitIntdiv
         self::emitIntTypeErrorAndAbort($context, $function, $argIndex, $paramName, 'float', $nullable);
         $context->builder->positionAtEnd($okBlock);
 
-        return $context->builder->fptosi($doubleVal, $context->getTypeFromString('int64'));
+        $truncated = $context->builder->fptosi($doubleVal, $context->getTypeFromString('int64'));
+        if ($warnFloatPrecision) {
+            self::maybeEmitFloatToIntPrecisionWarning($context, $doubleVal, $truncated);
+        }
+
+        return $truncated;
+    }
+
+    private static function maybeEmitFloatToIntPrecisionWarning(
+        Context $context,
+        Value $doubleVal,
+        Value $truncatedLong
+    ): void {
+        \PHPCompiler\JIT\Builtin\StringTriggerErrorJit::implement($context);
+        $roundtrip = $context->builder->sitofp($truncatedLong, $doubleVal->typeOf());
+        $loses = $context->builder->fcmp(Builder::REAL_UNE, $doubleVal, $roundtrip);
+        $warnBlock = BasicBlockHelper::append($context, 'intdiv_float_prec_warn');
+        $afterWarn = BasicBlockHelper::append($context, 'intdiv_float_prec_after');
+        $context->builder->branchIf($loses, $warnBlock, $afterWarn);
+
+        $context->builder->positionAtEnd($warnBlock);
+        $sizeT = $context->getTypeFromString('size_t');
+        $charPtr = $context->getTypeFromString('char*');
+        $i8p = $context->getTypeFromString('int8*');
+        $i32 = $context->getTypeFromString('int32');
+        $bufSize = $sizeT->constInt(128, false);
+        $buf = $context->builder->call($context->lookupFunction('__mm__malloc'), $bufSize);
+        $bufChar = $context->builder->pointerCast($buf, $charPtr);
+        $prefix = 'Implicit conversion from float ';
+        $suffix = ' to int loses precision';
+        $fmt = $context->builder->pointerCast($context->constantFromString('%s%g%s'), $charPtr);
+        $prefixPtr = $context->builder->pointerCast($context->constantFromString($prefix), $charPtr);
+        $suffixPtr = $context->builder->pointerCast($context->constantFromString($suffix), $charPtr);
+        $written = $context->builder->call(
+            $context->lookupFunction('snprintf'),
+            $bufChar,
+            $bufSize,
+            $fmt,
+            $prefixPtr,
+            $doubleVal,
+            $suffixPtr
+        );
+        $msgPtr = $context->builder->pointerCast($bufChar, $i8p);
+        $emptyFile = $context->builder->pointerCast($context->constantFromString(''), $i8p);
+        $context->builder->call(
+            $context->lookupFunction('__compiler_trigger_error'),
+            $msgPtr,
+            $context->builder->zExt($written, $sizeT),
+            $i32->constInt(ErrorReporter::E_DEPRECATED, false),
+            $emptyFile,
+            $i32->constInt(0, false)
+        );
+        $context->builder->call($context->lookupFunction('__mm__free'), $buf);
+        $context->builder->branch($afterWarn);
+
+        $context->builder->positionAtEnd($afterWarn);
     }
 
     private static function lowerStringOperandFromPtr(

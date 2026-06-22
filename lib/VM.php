@@ -609,7 +609,7 @@ class VM {
 
     /**
      * isset($obj->prop) — Zend zend_std_has_property / __isset parity (#3298, #4586).
-     * Hooked properties with get hook invoke get when backing is initialized (#9696, zend_property_hooks.c).
+     * Get+set hooked properties probe backing only; get-only virtual hooks invoke get (#10392, #9832).
      */
     public function objectPropertyIsSet(ObjectEntry $object, string $propName, ?Frame $frame = null): bool
     {
@@ -707,7 +707,7 @@ class VM {
     }
 
     /**
-     * isset($obj->hooked) — uninitialized backing probes without get; initialized invokes get (#9696, zend_std_has_property).
+     * isset($obj->hooked) — get+set probes backing without get; get-only virtual invokes get (#10392, #9832).
      *
      * @return bool|null null when the property is not hook-backed
      */
@@ -715,6 +715,9 @@ class VM {
     {
         if (!$this->instancePropertyHasHooks($object, $propName)) {
             return null;
+        }
+        if ($this->hookedPropertyIssetEmptyUsesBackingOnly($object, $propName)) {
+            return $this->issetHookedPropertyWithoutGetHook($object, $propName);
         }
         $backing = $this->hookedPropertyBackingValue($object, $propName);
         if (false === $backing) {
@@ -754,6 +757,15 @@ class VM {
         $value = $hookValue->resolveIndirect();
 
         return Variable::TYPE_NULL !== $value->type;
+    }
+
+    /**
+     * Get+set or separate backing: isset/empty inspect storage, never get hook (#10392, zend_property_hooks.c).
+     */
+    private function hookedPropertyIssetEmptyUsesBackingOnly(ObjectEntry $object, string $propName): bool
+    {
+        return $this->instancePropertyHasSetHook($object, $propName)
+            || $this->hookedPropertyHasSeparateBacking($object, $propName);
     }
 
     /**
@@ -1088,8 +1100,22 @@ class VM {
         return is_array($propMeta) && isset($propMeta['get']);
     }
 
+    private function instancePropertyHasSetHook(ObjectEntry $object, string $propName): bool
+    {
+        $meta = $this->classPropertyMeta($object, $propName);
+        if (null !== $meta && null !== $meta->setHookMethodLc) {
+            return true;
+        }
+        $lcClass = strtolower($object->class->name);
+        $propMeta = $this->context->propertyHookRegistry[$lcClass][$propName]
+            ?? $this->context->propertyHookRegistry[$lcClass][strtolower($propName)]
+            ?? null;
+
+        return is_array($propMeta) && isset($propMeta['set']);
+    }
+
     /**
-     * empty($obj->hooked) — uninitialized backing probes without get; initialized invokes get (#9696, zend_std_has_property).
+     * empty($obj->hooked) — get+set probes backing without get; get-only virtual invokes get (#10392, #9832).
      */
     private function emptyHookedProperty(ObjectEntry $object, string $propName, Frame $frame, Variable $dst): bool
     {
@@ -1101,6 +1127,16 @@ class VM {
             return false;
         }
         $uninit = $backing->isUndefined() || VM\TypedPropertyCheck::isUninitialized($backing);
+        if ($this->hookedPropertyIssetEmptyUsesBackingOnly($object, $propName)) {
+            if ($uninit) {
+                $dst->bool(true);
+
+                return true;
+            }
+            $dst->bool(!ext\standard\boolval::isTruthy($backing));
+
+            return true;
+        }
         if (!$this->instancePropertyHasGetHook($object, $propName)) {
             if ($uninit) {
                 $dst->bool(true);
@@ -1306,7 +1342,7 @@ class VM {
         $var = $var->resolveIndirect();
         if (Variable::TYPE_ENUM_CASE === $var->type) {
             throw new \Error(
-                'Object of class '.$var->toEnumCase()->enumClass->name.' could not be converted to string'
+                VM\ValueEchoSupport::objectToStringErrorMessage($var->toEnumCase()->enumClass->name)
             );
         }
         if (Variable::TYPE_OBJECT !== $var->type) {
@@ -1314,10 +1350,10 @@ class VM {
         }
         $object = $var->toObject();
         if (EnumCaseSupport::isEnumCase($object)) {
-            throw new \Error("Object of class {$object->class->name} could not be converted to string");
+            throw new \Error(VM\ValueEchoSupport::objectToStringErrorMessage($object->class->name));
         }
         if (!$this->hasInstanceMethod($object->class, '__tostring')) {
-            throw new \Error("Object of class {$object->class->name} could not be converted to string");
+            throw new \Error(VM\ValueEchoSupport::objectToStringErrorMessage($object->class->name));
         }
         $this->context->coercingObjectToString = true;
         try {
@@ -1346,6 +1382,9 @@ class VM {
     {
         if ($this->hasInstanceMethod($object->class, '__debuginfo')) {
             $result = $this->invokeInstanceMethod($object, '__debugInfo')->resolveIndirect();
+            if (Variable::TYPE_NULL === $result->type) {
+                return [];
+            }
             if (Variable::TYPE_ARRAY !== $result->type) {
                 $given = Variable::TYPE_OBJECT === $result->type
                     ? $result->toObject()->class->name
@@ -1397,6 +1436,18 @@ class VM {
         }
 
         return $set;
+    }
+
+    /**
+     * get_mangled_object_vars() — mangled keys, dynamic props, get hooks (#3497, #10491).
+     *
+     * php-src: zend_get_mangled_object_vars / ZEND_PROP_PURPOSE_DEBUG
+     *
+     * @return array<string, Variable>
+     */
+    public function collectMangledObjectVarsForBuiltin(ObjectEntry $object, Frame $frame): array
+    {
+        return $this->collectDebugPropertiesForBuiltin($object, $frame);
     }
 
     /**
@@ -2562,7 +2613,7 @@ restart:
                     $arg2 = $frame->scope[$op->arg2];
                     $arg3 = isset($frame->block->constants[$op->arg3])
                         ? $frame->block->constants[$op->arg3]
-                        : $frame->scope[$op->arg3];
+                        : $this->readScopeOperandForRuntimeRead($frame, (int) $op->arg3);
                     $catchFrame = $this->enforcePropertyVisibilityWrite($arg2, $frame);
                     if (null !== $catchFrame) {
                         $frame = $catchFrame;
@@ -2953,17 +3004,17 @@ restart:
                     $unpack = $unpackSlot->resolveIndirect();
                     if (null !== $op->block1) {
                         if (!$this->variableIsListDestructUnpackable($unpack)) {
-                            if (Variable::TYPE_STRING === $unpack->type) {
-                                $catchFrame = $this->dispatchVmTypeError(
-                                    new \TypeError(JIT\ListUnpackHelper::LIST_DESTRUCT_STRING_MESSAGE),
-                                    $frame
-                                );
-                                if (null !== $catchFrame) {
-                                    $frame = $catchFrame;
-                                    goto restart;
-                                }
-                                break;
+                            foreach ($op->listUnpackNullInitSlots as $destSlot) {
+                                $dest = $frame->scope[(int) $destSlot];
+                                $dest->resolveIndirect()->null();
+                                $this->markScopeSlotInitialized($frame, (int) $destSlot);
                             }
+                            if (null !== $op->block1) {
+                                foreach ($op->listUnpackNullInitSlots as $destSlot) {
+                                    unset($op->block1->constants[(int) $destSlot]);
+                                }
+                            }
+                            // String and other non-array RHS: skip slot binds, targets read as NULL (#4325, #10486).
                             $frame = $this->frameForBranch($frame, $op->block1);
                             goto restart;
                         }
@@ -3215,7 +3266,11 @@ restart:
                     break;
                 case OpCode::TYPE_CAST_BOOL:
                     try {
-                        $frame->scope[$op->arg1]->castFrom(Variable::TYPE_BOOLEAN, $frame->scope[$op->arg2], $this);
+                        $frame->scope[$op->arg1]->castFrom(
+                            Variable::TYPE_BOOLEAN,
+                            $this->readScopeOperandForRuntimeRead($frame, (int) $op->arg2),
+                            $this
+                        );
                     } catch (\TypeError $e) {
                         $catchFrame = $this->dispatchVmTypeError($e, $frame);
                         if (null !== $catchFrame) {
@@ -3226,7 +3281,12 @@ restart:
                     break;
                 case OpCode::TYPE_CAST_INT:
                     try {
-                        $frame->scope[$op->arg1]->castFrom(Variable::TYPE_INTEGER, $frame->scope[$op->arg2], $this, $frame);
+                        $frame->scope[$op->arg1]->castFrom(
+                            Variable::TYPE_INTEGER,
+                            $this->readScopeOperandForRuntimeRead($frame, (int) $op->arg2),
+                            $this,
+                            $frame
+                        );
                     } catch (\TypeError $e) {
                         $catchFrame = $this->dispatchVmTypeError($e, $frame);
                         if (null !== $catchFrame) {
@@ -3237,7 +3297,12 @@ restart:
                     break;
                 case OpCode::TYPE_CAST_FLOAT:
                     try {
-                        $frame->scope[$op->arg1]->castFrom(Variable::TYPE_FLOAT, $frame->scope[$op->arg2], $this, $frame);
+                        $frame->scope[$op->arg1]->castFrom(
+                            Variable::TYPE_FLOAT,
+                            $this->readScopeOperandForRuntimeRead($frame, (int) $op->arg2),
+                            $this,
+                            $frame
+                        );
                     } catch (\TypeError $e) {
                         $catchFrame = $this->dispatchVmTypeError($e, $frame);
                         if (null !== $catchFrame) {
@@ -3251,8 +3316,14 @@ restart:
                     if (null !== $op->arg3 && $op->arg3 > 0) {
                         $frame->callSiteLine = $op->arg3;
                     }
+                    $castStringSrc = $this->readScopeOperandForRuntimeRead($frame, (int) $op->arg2);
                     try {
-                        $frame->scope[$op->arg1]->castFrom(Variable::TYPE_STRING, $frame->scope[$op->arg2], $this, $frame);
+                        $frame->scope[$op->arg1]->castFrom(
+                            Variable::TYPE_STRING,
+                            $castStringSrc,
+                            $this,
+                            $frame
+                        );
                     } catch (\Error $e) {
                         $frame->callSiteLine = $savedCallSiteLine;
                         $catchFrame = $this->dispatchVmError($e->getMessage(), $frame);
@@ -3279,12 +3350,15 @@ restart:
                     break;
                 case OpCode::TYPE_CAST_ARRAY:
                     $frame->scope[$op->arg1]->copyFrom(
-                        CastSupport::toArray($frame->scope[$op->arg2], $this->context->classes)
+                        CastSupport::toArray(
+                            $this->readScopeOperandForRuntimeRead($frame, (int) $op->arg2),
+                            $this->context->classes
+                        )
                     );
                     break;
                 case OpCode::TYPE_CAST_OBJECT:
+                    $src = $this->readScopeOperandForRuntimeRead($frame, (int) $op->arg2)->resolveIndirect();
                     $dst = $frame->scope[$op->arg1];
-                    $src = $frame->scope[$op->arg2]->resolveIndirect();
                     if (Variable::TYPE_OBJECT === $src->type) {
                         $dst->copyFrom($src);
                         break;
@@ -3419,6 +3493,8 @@ restart:
                     $arg1 = $frame->scope[$op->arg1];
                     $arg2 = $frame->scope[$op->arg2];
                     $arg3 = $frame->scope[$op->arg3];
+                    $readArg2 = $this->readScopeOperandForRuntimeRead($frame, (int) $op->arg2);
+                    $readArg3 = $this->readScopeOperandForRuntimeRead($frame, (int) $op->arg3);
                     $catchFrame = $this->enforceReadonlyForCompoundAssign($frame, $op, $arg2);
                     if (null !== $catchFrame) {
                         $frame = $catchFrame;
@@ -3436,13 +3512,15 @@ restart:
                         }
                     }
                     try {
+                        $numericArg2 = $op->arg1 !== $op->arg2 ? $readArg2 : $arg2;
+                        $numericArg3 = $readArg3;
                         if (
                             $op->isIncDec
                             && (OpCode::TYPE_PLUS === $op->type || OpCode::TYPE_MINUS === $op->type)
                         ) {
-                            $arg1->incDecOp($op->type, $arg2, $arg3);
+                            $arg1->incDecOp($op->type, $numericArg2, $numericArg3);
                         } else {
-                            $arg1->numericOp($op->type, $arg2, $arg3, $this, $frame);
+                            $arg1->numericOp($op->type, $numericArg2, $numericArg3, $this, $frame);
                         }
                     } catch (\TypeError $e) {
                         $catchFrame = $this->dispatchVmTypeError($e, $frame);
@@ -3515,7 +3593,7 @@ restart:
                 case OpCode::TYPE_UNARY_PLUS:
                 case OpCode::TYPE_BITWISE_NOT:
                     $arg1 = $frame->scope[$op->arg1];
-                    $arg2 = $frame->scope[$op->arg2];
+                    $arg2 = $this->readScopeOperandForRuntimeRead($frame, (int) $op->arg2);
                     try {
                         $arg1->unaryOp($op->type, $arg2, $this, $frame);
                     } catch (\TypeError $e) {
@@ -3579,7 +3657,10 @@ restart:
                         if (!VM\SapiOutput::headersSent()) {
                             VM\HeaderCallbackQueue::runBeforeOutput($this->context);
                         }
-                        $printed = $this->valueToPrintString($frame->scope[$op->arg1], $frame);
+                        $printed = $this->valueToPrintString(
+                            $this->readScopeOperandForRuntimeRead($frame, (int) $op->arg1),
+                            $frame
+                        );
                     } catch (\Error $e) {
                         $catchFrame = $this->dispatchVmError($e->getMessage(), $frame);
                         if (null !== $catchFrame) {
@@ -3772,10 +3853,10 @@ restart:
                         $value = $this->context->constantFetch($frame->scope[$op->arg2]->toString());
                     }
                     if (is_null($value)) {
-                        $constName = $frame->scope[$op->arg2]->toString();
-                        if (null !== $op->arg3) {
-                            $constName = $frame->scope[$op->arg3]->toString().'\\'.$constName;
-                        }
+                        // arg3 is php-cfg's namespace-qualified name (N\NAME), not bare namespace (#10510).
+                        $constName = null !== $op->arg3
+                            ? $frame->scope[$op->arg3]->toString()
+                            : $frame->scope[$op->arg2]->toString();
                         $catchFrame = $this->dispatchVmError(
                             sprintf('Undefined constant "%s"', $constName),
                             $frame
@@ -4394,9 +4475,17 @@ restart:
                             $this->context->unsetGlobalsTableKey($keyResolved->toString());
                             break;
                         }
-                        $container->separateArrayForWrite();
-                        $container = $containerSlot->resolveIndirect();
-                        $container->toArray()->offsetUnset($key);
+                        try {
+                            $container->separateArrayForWrite();
+                            $container = $containerSlot->resolveIndirect();
+                            $container->toArray()->offsetUnset($key);
+                        } catch (\TypeError $e) {
+                            $catchFrame = $this->dispatchVmTypeError($e, $frame);
+                            if (null !== $catchFrame) {
+                                $frame = $catchFrame;
+                                goto restart;
+                            }
+                        }
                         break;
                     }
                     $unsetDimMsg = Variable::TYPE_STRING === $container->type
@@ -4621,18 +4710,27 @@ restart:
                         goto restart;
                     }
                     $argSlot = (int) $op->arg1;
-                    $this->warnUndefinedVariableForScopeRead($frame, $argSlot);
+                    $argIndex = \count($frame->callArgEntries);
+                    $needsRef = $this->outgoingCallArgNeedsReference($frame, $argIndex);
+                    if (!$needsRef) {
+                        $this->warnUndefinedVariableForScopeRead($frame, $argSlot);
+                    }
                     $value = $this->resolveOutgoingCallArgValue($frame, $argSlot);
-                    if ($this->isUnboundLocalScopeRead($frame, $argSlot)) {
+                    if (
+                        !$needsRef
+                        && $this->isUnboundLocalScopeRead($frame, $argSlot)
+                    ) {
                         $resolved = $value->resolveIndirect();
                         if ($resolved->isUndefined()) {
                             $sent = new Variable();
                             $sent->null();
                             $value = $sent;
                         }
+                    } elseif ($needsRef && $this->isUnboundLocalScopeRead($frame, $argSlot)) {
+                        // Zend creates CV on ZEND_SEND_REF; no E_WARNING on later reads (#10403).
+                        $this->markScopeSlotInitialized($frame, $argSlot);
                     }
-                    $argIndex = \count($frame->callArgEntries);
-                    if (!$this->outgoingCallArgNeedsReference($frame, $argIndex)) {
+                    if (!$needsRef) {
                         $snapshot = new Variable();
                         $snapshot->duplicateFrom($value);
                         $value = $snapshot;
@@ -5365,16 +5463,15 @@ restart:
                             break;
                         }
                         if (Variable::TYPE_NULL === $resolved->type) {
-                            $catchFrame = $this->dispatchVmError(
-                                sprintf('Attempt to read property "%s" on null', $name),
-                                $frame
+                            $this->context->errors->propertyReadOnNonObject(
+                                $name,
+                                'null',
+                                $this->context,
+                                $frame,
+                                $scriptFile
                             );
-                            if (null !== $catchFrame) {
-                                $frame = $catchFrame;
-                                goto restart;
-                            }
-
-                            return self::EXCEPTION;
+                            $result->null();
+                            break;
                         }
                         $this->context->errors->propertyReadOnNonObject(
                             $name,
@@ -6333,13 +6430,7 @@ restart:
                                 $frame->scope[$op->arg3]->copyFrom($caught);
                             }
                             $frame = $op->block1->getFrame($this->context, $frame);
-                            if (null !== $op->arg3) {
-                                if (!isset($frame->scope[$op->arg3])) {
-                                    $frame->scope[$op->arg3] = new Variable();
-                                }
-                                $frame->scope[$op->arg3]->copyFrom($caught);
-                            }
-                            $frame->activeCatchException = $caught;
+                            $this->bindCatchVariableToFrame($frame, $op->arg3, $caught);
                             goto restart;
                         }
                         break;
@@ -6684,6 +6775,10 @@ restart:
         if (null !== $catchFrame) {
             return $catchFrame;
         }
+        $catchFrame = $this->enforceAsymmetricPropertyWrite($write, $frame);
+        if (null !== $catchFrame) {
+            return $catchFrame;
+        }
         $catchFrame = $this->enforceVirtualPropertyHookWrite($write, $frame);
         if (null !== $catchFrame) {
             return $catchFrame;
@@ -6811,26 +6906,63 @@ restart:
         );
     }
 
+    /** Zend ZEND_CHECK_UNDEFINED_VAR on scope slot reads (casts/unary/binary/?? RHS, #10358). */
+    private function guardUndefinedVariableScopeReadSlot(Frame $frame, int $slot): void
+    {
+        if (isset($frame->block->constants[$slot])) {
+            return;
+        }
+        $this->warnUndefinedVariableForScopeRead($frame, $slot);
+    }
+
+    /**
+     * Scope operand for value reads — warn then treat unbound TYPE_UNDEFINED as null (Zend, #10358).
+     */
+    private function readScopeOperandForRuntimeRead(Frame $frame, int $slot): Variable
+    {
+        $this->guardUndefinedVariableScopeReadSlot($frame, $slot);
+        $operand = $frame->scope[$slot];
+        if ($this->isUnboundLocalScopeRead($frame, $slot)) {
+            $resolved = $operand->resolveIndirect();
+            if ($resolved->isUndefined()) {
+                $null = new Variable();
+                $null->null();
+
+                return $null;
+            }
+        }
+
+        return $operand;
+    }
+
     private function isUnboundLocalScopeRead(Frame $frame, int $slot): bool
     {
         if (!isset($frame->scope[$slot])) {
             return false;
         }
-        if (null === $frame->block || $frame->block->isMainScript() || $frame->block->inheritUndefinedLocals) {
+        if (null !== $frame->catchVarSlot && $slot === $frame->catchVarSlot) {
             return false;
         }
         $name = $this->resolveScopeSlotVariableName($frame, $slot);
         if (null === $name || 'this' === $name) {
             return false;
         }
-        if (null !== $name && $frame->block->declaresGlobalName($name)) {
-            return false;
-        }
         $resolved = $frame->scope[$slot]->resolveIndirect();
         if ($resolved->isUndefined()) {
             return true;
         }
-        if (null !== $this->context->globalNameForStorage($resolved)) {
+        $globalName = $this->context->globalNameForStorage($resolved);
+        if (null !== $globalName) {
+            return !$this->context->isGlobalEverAssigned($globalName);
+        }
+        $staticKey = $this->context->functionStaticKeyForStorage($resolved);
+        if (null !== $staticKey) {
+            return !$this->isFunctionStaticInitializedForFrame($frame, $staticKey);
+        }
+        if (null === $frame->block || $frame->block->inheritUndefinedLocals) {
+            return false;
+        }
+        if (null !== $name && $frame->block->declaresGlobalName($name)) {
             return false;
         }
 
@@ -8018,13 +8150,7 @@ restart:
                 $handler->scope[$op->arg3]->copyFrom($caught);
             }
             $catchFrame = $op->block1->getFrame($this->context, $handler);
-            if (null !== $op->arg3) {
-                if (!isset($catchFrame->scope[$op->arg3])) {
-                    $catchFrame->scope[$op->arg3] = new Variable();
-                }
-                $catchFrame->scope[$op->arg3]->copyFrom($caught);
-            }
-            $catchFrame->activeCatchException = $caught;
+            $this->bindCatchVariableToFrame($catchFrame, $op->arg3, $caught);
             $gen = $this->findGeneratorState($handler);
             if (null !== $gen) {
                 $catchFrame->generatorState = $gen;
@@ -8097,8 +8223,26 @@ restart:
         $this->context->pendingMergeAfterFinally = null;
         $this->context->activeCatchHandlerFrame = null;
         $frame->activeCatchException = null;
+        $frame->catchVarSlot = null;
 
         return $merge->getFrame($this->context, $frame);
+    }
+
+    /** Bind catch `$e` and mark initialized — avoid #10358 false undefined warnings on catch reads. */
+    private function bindCatchVariableToFrame(Frame $frame, ?int $catchVarSlot, Variable $caught): void
+    {
+        $frame->activeCatchException = $caught;
+        if (null === $catchVarSlot) {
+            $frame->catchVarSlot = null;
+
+            return;
+        }
+        $frame->catchVarSlot = $catchVarSlot;
+        if (!isset($frame->scope[$catchVarSlot])) {
+            $frame->scope[$catchVarSlot] = new Variable();
+        }
+        $frame->scope[$catchVarSlot]->copyFrom($caught);
+        $this->markScopeSlotInitialized($frame, $catchVarSlot);
     }
 
     private function resumeGotoAfterFinally(Frame $frame): ?Frame
@@ -9542,6 +9686,10 @@ restart:
         if ($op->arg1 !== $op->arg2) {
             return null;
         }
+        $catchFrame = $this->enforceAsymmetricPropertyWrite($lvalue, $frame);
+        if (null !== $catchFrame) {
+            return $catchFrame;
+        }
         $catchFrame = $this->enforceVirtualPropertyHookWrite($lvalue, $frame);
         if (null !== $catchFrame) {
             return $catchFrame;
@@ -9595,7 +9743,7 @@ restart:
             return null;
         }
         if ($this->propertyHasDistinctAsymmetricSetVisibility($classLc, $propName, $lvalue)) {
-            return null;
+            return $this->enforceAsymmetricPropertyWrite($lvalue, $frame);
         }
 
         $thrown = VM\BuiltinExceptionSupport::materializeError(
@@ -10549,7 +10697,10 @@ restart:
     public function throwGenerator(GeneratorState $gen, Variable $exception): bool
     {
         if ($gen->done) {
-            throw new \Exception('Cannot throw to a closed generator');
+            // Zend Generator::throw(): closed generator throws in caller context (#10414).
+            $thrown = new Variable();
+            $thrown->copyFrom($exception);
+            throw new VM\GeneratorUncaughtThrow($thrown);
         }
         if (null === $gen->frame) {
             throw new \Exception('Cannot throw to an uninitialized generator');
@@ -10771,6 +10922,10 @@ restart:
             $const = $frame->block->constants[$slot];
         }
         if (isset($frame->scope[$slot])) {
+            // Zend CV init: explicit NULL must not lose to block constants from skipped list dim temps (#10507).
+            if (isset($frame->initializedSlots[$slot])) {
+                return $frame->scope[$slot];
+            }
             // Named locals must stay tied to scope for by-ref outgoing calls (#9505, #9700).
             if (null !== $frame->block && $frame->block->isNamedVariableSlot($slot)) {
                 return $frame->scope[$slot];
@@ -10780,7 +10935,9 @@ restart:
                 if (VM\EnumCaseSupport::isEnumCaseVariable($resolved)) {
                     return $frame->scope[$slot];
                 }
-                if ($resolved->isUndefined() || $this->isEnumSlotClobberCandidate($resolved)) {
+                // Enum case ->name/->value in call args reuse the case slot; prefer the
+                // property-fetch runtime value over immortal enum const (#9684, zend_enum.c).
+                if ($resolved->isUndefined() || Variable::TYPE_NULL === $resolved->type) {
                     $value = new Variable();
                     $value->copyFrom($const);
 
@@ -11070,12 +11227,15 @@ restart:
             return;
         }
         foreach ($closureState->captures as $capture) {
-            $dest = $this->scopeSlot($callee, $capture['slot']);
+            $slot = (int) $capture['slot'];
+            $dest = $this->scopeSlot($callee, $slot);
             if ($capture['byRef']) {
                 $dest->indirect($capture['var']->resolveIndirect());
             } else {
                 $dest->copyFrom($capture['var']);
             }
+            // Captured CVs are bound at closure entry — not undefined locals (#10304, #10358).
+            $this->markScopeSlotInitialized($callee, $slot);
         }
     }
 
@@ -13743,8 +13903,11 @@ restart:
         if (null === $func) {
             return null;
         }
-        if (null !== $func->class && '' !== $func->class) {
-            return $func->class.'::'.$func->name;
+        if (null !== $func->class) {
+            $className = $func->class->value ?? null;
+            if (is_string($className) && '' !== $className) {
+                return $className.'::'.$func->name;
+            }
         }
 
         return $func->name;

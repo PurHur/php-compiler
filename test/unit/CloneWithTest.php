@@ -48,6 +48,48 @@ final class CloneWithTest extends TestCase
         $this->assertSame($expected, CloneWithDesugar::desugar($input));
     }
 
+    /** Issue #10496 — PHP 8.4+ `(clone $obj) with [...]` parenthesized operand. */
+    public function testDesugarRewritesParenCloneWithKeywordArray(): void
+    {
+        $input = '<?php $d = (clone $c) with [\'a\'];';
+        $expected = '<?php $d = (function ($__phpc_o) { $__phpc_r = clone $__phpc_o;phpc_clone_with_begin($__phpc_r, \'a\');phpc_clone_with_reinit($__phpc_r, \'a\');phpc_clone_with_end($__phpc_r);return $__phpc_r; })($c);';
+        $this->assertSame($expected, CloneWithDesugar::desugar($input));
+    }
+
+    public function testDesugarRewritesParenCloneWithAssociativeArray(): void
+    {
+        $input = '<?php $d = (clone $c) with [\'x\' => 2];';
+        $expected = '<?php $d = (function ($__phpc_o) { $__phpc_r = clone $__phpc_o;phpc_clone_with_begin($__phpc_r, \'x\');$__phpc_r->x = 2;phpc_clone_with_end($__phpc_r);return $__phpc_r; })($c);';
+        $this->assertSame($expected, CloneWithDesugar::desugar($input));
+    }
+
+    public function testDesugarRewritesParenCloneWithBlock(): void
+    {
+        $input = '<?php $d = (clone $c) with { x: 2 };';
+        $expected = '<?php $d = (function ($__phpc_o) { $__phpc_r = clone $__phpc_o;phpc_clone_with_begin($__phpc_r, \'x\');$__phpc_r->x = 2;phpc_clone_with_end($__phpc_r);return $__phpc_r; })($c);';
+        $this->assertSame($expected, CloneWithDesugar::desugar($input));
+    }
+
+    public function testVmParenCloneWithKeywordArrayValueOverrides(): void
+    {
+        $code = <<<'PHP'
+<?php
+class C {
+    public int $x = 1;
+    public readonly int $y;
+    public function __construct() { $this->y = 9; }
+}
+$c = new C();
+$d = (clone $c) with ['x' => 2, 'y' => 3];
+echo $d->x, ',', $d->y, "\n";
+PHP;
+        $rt = new Runtime();
+        $block = $rt->parseAndCompile($code, 'test.php');
+        ob_start();
+        $rt->run($block);
+        $this->assertSame("2,3\n", ob_get_clean());
+    }
+
     public function testVmCloneWithKeywordArrayReadonlyReinit(): void
     {
         $code = <<<'PHP'

@@ -4,7 +4,9 @@ declare(strict_types=1);
 
 namespace PHPCompiler\ext\standard;
 
+use PHPCompiler\Frame;
 use PHPCompiler\VM\EnumCaseSupport;
+use PHPCompiler\VM\ErrorReporter;
 use PHPCompiler\VM\Variable;
 
 /** Shared math coercion helpers for ext/standard (issue #3578) and base_convert (#3173). */
@@ -44,6 +46,38 @@ final class VmMath
         }
 
         return (int) ceil($value);
+    }
+
+    /** php-src zend_operators.c — float→long precision loss (issue #10440). */
+    public static function floatLosesIntPrecision(float $value): bool
+    {
+        if (!\is_finite($value)) {
+            return false;
+        }
+
+        return $value !== (float) self::floatToZendLong($value);
+    }
+
+    public static function floatToIntPrecisionWarningMessage(float $value): string
+    {
+        return \sprintf('Implicit conversion from float %s to int loses precision', $value);
+    }
+
+    public static function warnFloatToIntPrecisionLoss(
+        float $value,
+        \PHPCompiler\VM\Context $vmContext,
+        ?Frame $frame = null
+    ): void {
+        if (!self::floatLosesIntPrecision($value)) {
+            return;
+        }
+        $vmContext->errors->triggerErrorWithHandlerFirst(
+            self::floatToIntPrecisionWarningMessage($value),
+            ErrorReporter::E_DEPRECATED,
+            null !== $frame && '' !== $frame->scriptPath ? $frame->scriptPath : null,
+            $vmContext,
+            $frame
+        );
     }
 
     /**

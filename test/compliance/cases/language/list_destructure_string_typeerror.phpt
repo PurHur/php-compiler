@@ -1,19 +1,27 @@
 --TEST--
-Language: list/array destructuring from string — TypeError (#7461, zend_execute.c)
+Language: list/array destructuring from string — NULL slots (#10486, zend_execute.c)
 --FILE--
 <?php
-try {
-    list($a, $b) = 'ab';
-    echo "no-exception\n";
-} catch (TypeError $e) {
-    echo 'TypeError: ', $e->getMessage(), "\n";
-}
-try {
-    [$x, $y] = 'xy';
-    echo "no-exception\n";
-} catch (TypeError $e) {
-    echo 'TypeError: ', $e->getMessage(), "\n";
-}
+list($a, $b) = 'ab';
+var_export([$a, $b]);
+echo "\n";
+[$x, $y] = 'xy';
+var_export([$x, $y]);
+echo "\n";
+list($z) = $s = 'x';
+var_export($z);
+echo "\n";
+[[ $w ]] = 'x';
+var_export($w);
+echo "\n";
 --EXPECT--
-TypeError: Cannot use string as array
-TypeError: Cannot use string as array
+array (
+  0 => NULL,
+  1 => NULL,
+)
+array (
+  0 => NULL,
+  1 => NULL,
+)
+NULL
+NULL

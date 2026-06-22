@@ -65,6 +65,17 @@ PHP;
         $this->assertSame("no_args\n", $this->runInline($code));
     }
 
+    /** Issue #10484 — file-level {main} debug_backtrace(…, 0) is empty on Zend. */
+    public function testVmDebugBacktraceLimitZeroAtMain(): void
+    {
+        $code = <<<'PHP'
+declare(strict_types=1);
+echo count(debug_backtrace(0, 0)), "\n";
+echo count(debug_backtrace(DEBUG_BACKTRACE_IGNORE_ARGS, 0)), "\n";
+PHP;
+        $this->assertSame("0\n0\n", $this->runInline($code));
+    }
+
     private function runInline(string $code, string $bin = 'vm'): string
     {
         $repo = dirname(__DIR__, 2);

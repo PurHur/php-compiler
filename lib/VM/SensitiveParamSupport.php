@@ -22,6 +22,9 @@ final class SensitiveParamSupport
 
     public const TRACE_ARG_LABEL = '[Sensitive Parameter]';
 
+    /** Mirrors {@see \PHPCompiler\ext\standard\VmDebugBacktrace::IGNORE_ARGS}. */
+    public const BACKTRACE_IGNORE_ARGS = 2;
+
     public static function register(Context $ctx): void
     {
         $mixedProto = new Variable();
@@ -107,6 +110,12 @@ final class SensitiveParamSupport
         return strtolower($value->toObject()->class->name) === strtolower(self::CLASS_NAME);
     }
 
+    /** @param array<int, true> $sensitive compile-time #[\SensitiveParameter] map from Block::paramSensitive */
+    public static function compileTimeParamIsSensitive(array $sensitive, int $paramIdx): bool
+    {
+        return isset($sensitive[$paramIdx]);
+    }
+
     /**
      * Packed list of call arguments for debug_backtrace / getTrace frames.
      */
@@ -131,7 +140,7 @@ final class SensitiveParamSupport
             if (!array_key_exists($argIdx, $frame->calledArgs)) {
                 continue;
             }
-            if (isset($sensitive[$paramIdx])) {
+            if (self::compileTimeParamIsSensitive($sensitive, $paramIdx)) {
                 $ht->append(self::createMarker());
 
                 continue;

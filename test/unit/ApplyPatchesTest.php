@@ -33,6 +33,21 @@ final class ApplyPatchesTest extends TestCase
         );
     }
 
+    public function testApplyPatchesVerifyOnlyExitsZeroWhenMarkersPresent(): void
+    {
+        $script = self::$root.'/script/apply-patches.sh';
+        if (!is_dir(self::$root.'/vendor/ircmaxell/php-cfg')) {
+            self::markTestSkipped('vendor/ircmaxell/php-cfg not installed');
+        }
+
+        $output = [];
+        $exitCode = 0;
+        exec('bash '.escapeshellarg($script).' --verify-only 2>&1', $output, $exitCode);
+        $joined = implode("\n", $output);
+
+        self::assertSame(0, $exitCode, "apply-patches --verify-only failed:\n".$joined);
+    }
+
     public function testPhpTypesUnionTypeReconstructorOverlayApplied(): void
     {
         $recon = self::$root.'/vendor/ircmaxell/php-types/lib/PHPTypes/TypeReconstructor.php';

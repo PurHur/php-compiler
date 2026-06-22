@@ -1067,11 +1067,23 @@ final class VmFs
     }
 
     /**
-     * stream_set_chunk_size() — php-src ext/standard/streams.c (issue #3754).
+     * stream_set_chunk_size() — php-src ext/standard/streams.c (issue #3754, #10459).
      *
      * @return int|false previous chunk size
      */
     public static function streamSetChunkSize(int $handle, int $chunkSize) {
+        if ($chunkSize <= 0) {
+            throw new \ValueError('stream_set_chunk_size(): Argument #2 ($size) must be greater than 0');
+        }
+        if (VmPhpMemoryStream::isValidHandle($handle)) {
+            return VmPhpMemoryStream::setChunkSize($handle, $chunkSize);
+        }
+        if (VmPhpFdStream::isValidHandle($handle)) {
+            return VmPhpFdStream::setChunkSize($handle, $chunkSize);
+        }
+        if (VmPhpInputOutputStream::isValidHandle($handle)) {
+            return VmPhpInputOutputStream::setChunkSize($handle, $chunkSize);
+        }
         $fp = self::lookup($handle);
         if (null === $fp) {
             return false;
@@ -1142,8 +1154,7 @@ final class VmFs
      */
     public static function streamIsLocal(int $handle): bool
     {
-        $fp = self::lookup($handle);
-        if (null === $fp) {
+        if (!self::isValidHandle($handle)) {
             return false;
         }
 

@@ -4,13 +4,17 @@ declare(strict_types=1);
 
 namespace PHPCompiler\JIT;
 
+use PHPCompiler\JIT\Builtin\EnumCasesRuntime;
 use PHPCompiler\JIT\Builtin\Type\Object_ as ObjectBuiltin;
 use PHPCompiler\JIT\Call\Native as NativeCall;
+use PHPCompiler\VM\EnumCasesJitHelper;
+use PHPCompiler\VM\EnumSupport;
 
 /**
- * JIT lowering for synthetic Enum::cases() (issue #3308, #4068).
+ * JIT lowering for synthetic Enum::cases() (issue #3308, #4068, #10395).
  *
  * php-src: Zend/zend_enum.c — zend_enum_list_cases
+ * SSOT: {@see EnumSupport::casesList()}, {@see EnumCasesJitHelper}
  */
 final class EnumCasesHelper
 {
@@ -25,8 +29,11 @@ final class EnumCasesHelper
         if ([] === $caseKeys) {
             return;
         }
+        $caseCount = EnumCasesJitHelper::casesListLength(\count($caseKeys));
+        if ($caseCount !== \count($caseKeys)) {
+            throw new \LogicException('Enum::cases() JIT case count mismatch for '.$funcName);
+        }
 
-        $void = $context->getTypeFromString('void');
         $valuePtr = $context->getTypeFromString('__value__*');
         $fnType = $context->context->functionType($valuePtr, false);
         $fn = $context->module->addFunction($funcName, $fnType);
@@ -37,22 +44,25 @@ final class EnumCasesHelper
         $restore = $context->builder->getInsertBlock();
         $entry = $fn->appendBasicBlock('entry');
         $context->builder->positionAtEnd($entry);
-        $ht = HashTableHelper::alloc($context);
-        foreach ($caseKeys as $index => $caseKey) {
-            $caseObj = $object->jitEnumCaseFromBacking($classId, $caseKey);
-            HashTableHelper::setAtIndex(
-                $context,
-                $ht,
-                $context->getTypeFromString('int64')->constInt($index, false),
-                $caseObj
-            );
+
+        EnumCasesRuntime::ensureLinked($context);
+        $i64 = $context->getTypeFromString('int64');
+        EnumCasesRuntime::callCasesListLength(
+            $context,
+            $i64->constInt($caseCount, false)
+        );
+
+        $caseVars = [];
+        foreach ($caseKeys as $caseKey) {
+            $caseVars[] = $object->jitEnumCaseFromBacking($classId, $caseKey);
         }
+        $htVar = HashTableHelper::packVariables($context, $caseVars);
         $slot = JitValueBox::alloc($context);
         $ptr = JitValueBox::pointer($context, $slot);
         $context->builder->call(
             $context->lookupFunction('__value__writeHashtable'),
             $ptr,
-            $ht
+            $htVar->value
         );
         $context->builder->returnValue($ptr);
         if (null !== $restore) {

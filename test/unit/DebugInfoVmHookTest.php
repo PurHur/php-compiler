@@ -42,6 +42,32 @@ PHP;
         self::assertArrayNotHasKey('secret', $props);
     }
 
+    public function testGetObjectDebugPropertiesAcceptsNullReturn(): void
+    {
+        $source = <<<'PHP'
+<?php
+class C {
+    public function __debugInfo(): ?array {
+        return null;
+    }
+}
+PHP;
+        $runtime = new Runtime();
+        $block = $runtime->parseAndCompile($source, 'debug_info_null.php');
+        self::assertNotNull($block);
+        $runtime->run($block);
+
+        $ctx = $runtime->vmContext;
+        $vm = $runtime->vm;
+        self::assertNotNull($vm);
+
+        $class = $ctx->classes['c'];
+        $object = new ObjectEntry($class);
+        $object->constructed = true;
+
+        self::assertSame([], $vm->getObjectDebugProperties($object));
+    }
+
     public function testGetObjectDebugPropertiesRejectsNonArrayReturn(): void
     {
         $source = <<<'PHP'

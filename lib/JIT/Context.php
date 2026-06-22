@@ -746,6 +746,7 @@ class Context {
             Builtin\StringGetenvAll::ensureStandaloneBodies($this);
             Builtin\StringTriggerError::ensureStandaloneBodies($this);
             Builtin\ScalarDimFetchRuntime::ensureStandaloneBodies($this);
+            Builtin\UndefinedVariableRuntime::ensureStandaloneBodies($this);
             Builtin\StringFormat::ensureStandaloneBodies($this);
             Builtin\GcToggleRuntime::ensureStandaloneBodies($this);
             Builtin\GcCollectCyclesRuntime::ensureStandaloneBodies($this);
@@ -929,6 +930,10 @@ class Context {
     public function compileInPlace() {
         if (is_null($this->result)) {
             McjitEmbedRuntime::prepareModule($this);
+            if (Builtin::LOAD_TYPE_STANDALONE !== $this->loadType) {
+                Builtin\ErrorRaise::finalizeJitBodies($this);
+                Builtin\TypeErrorRaise::finalizeJitBodies($this);
+            }
             $this->compileCommon();
             $engine = $this->module->createJITCompiler(0);
             if (!is_null($this->debugFile)) {

@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-// Maintainer repro for #9645 / #4613 — static closure bindTo/bind must Error (Zend/zend_closures.c).
+// Maintainer repro for #10432 / #9645 — static closure bindTo/bind warn and no-op (Zend/zend_closures.c).
 
 class C {
     public int $x = 1;
@@ -16,19 +16,11 @@ class C {
 
 $c = new C();
 $fn = $c->make();
-try {
-    $fn->bindTo($c);
-    echo "bindTo ok\n";
-} catch (Throwable $e) {
-    echo get_class($e), ': ', $e->getMessage(), "\n";
-}
+$fn->bindTo($c);
+echo "bindTo ok\n";
 
-try {
-    Closure::bind($fn, $c, 'C');
-    echo "bind ok\n";
-} catch (Throwable $e) {
-    echo get_class($e), ': ', $e->getMessage(), "\n";
-}
+Closure::bind($fn, $c, 'C');
+echo "bind ok\n";
 
 $unbound = $fn->bindTo(null);
 echo $unbound === null ? "null\n" : "object\n";

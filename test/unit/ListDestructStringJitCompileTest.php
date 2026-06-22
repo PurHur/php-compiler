@@ -9,7 +9,7 @@ use PHPUnit\Framework\TestCase;
 require_once __DIR__.'/../LlvmToolchain.php';
 
 /**
- * JIT compile-only verify for list destructuring from string RHS — TypeError (#7461, #4531).
+ * JIT compile-only verify for list destructuring from string RHS — NULL slots (#10486, #4531).
  *
  * Uses bin/jit.php -l in a child process (issue #98 — no in-process LLVM preload).
  *
@@ -32,18 +32,12 @@ final class ListDestructStringJitCompileTest extends TestCase
     {
         $this->assertJitCompileOnly(<<<'PHP'
 <?php
-try {
-    [$a] = 'ab';
-    echo "no-exception\n";
-} catch (TypeError $e) {
-    echo 'TypeError: ', $e->getMessage(), "\n";
-}
-try {
-    [$b, $c] = 'xy';
-    echo "no-exception\n";
-} catch (TypeError $e) {
-    echo 'TypeError: ', $e->getMessage(), "\n";
-}
+list($a, $b) = 'ab';
+echo "a=", var_export($a, true), " b=", var_export($b, true), "\n";
+[$x] = 'xy';
+echo "x=", var_export($x, true), "\n";
+[[ $y ]] = 'z';
+echo "y=", var_export($y, true), "\n";
 PHP
         );
     }

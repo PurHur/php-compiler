@@ -1,17 +1,12 @@
 --TEST--
-Language: public protected(set) parses and enforces set visibility (#9724, PHP 8.4 zend_compile.c)
+Language: public protected(set) rejected at compile (#10334, PHP 8.4 zend_compile.c)
 --FILE--
 <?php
 class A {
     public protected(set) string $x = 'ok';
 }
-$a = new A();
-echo $a->x, "\n";
-try {
-    $a->x = 'no';
-} catch (Error $e) {
-    echo get_class($e), ': ', $e->getMessage(), "\n";
-}
---EXPECT--
-ok
-Error: Cannot modify protected(set) property A::$x from global scope
+echo "compiled\n";
+--EXPECT_EXIT--
+255
+--EXPECTF--
+parseAndCompile failure: target=%s: Multiple access type modifiers are not allowed

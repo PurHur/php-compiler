@@ -228,9 +228,9 @@ PHP;
         }
 
         self::assertNotNull($arraySlot);
-        self::assertNotNull($boolSlot);
+        self::assertCount(4, $sendSlots, 'array_slice arg sends='.json_encode($sendSlots));
         self::assertSame($arraySlot, $sendSlots[0] ?? null, 'arg sends='.json_encode($sendSlots));
-        self::assertSame($boolSlot, $sendSlots[3] ?? null, 'arg sends='.json_encode($sendSlots));
+        self::assertNotSame($arraySlot, $sendSlots[3] ?? null, 'preserve_keys must not reuse array slot');
     }
 
     /** Issue #9456 — literal string key must not consume hoisted Array_+Assign producer slot. */
@@ -325,6 +325,34 @@ PHP;
 
         self::assertNotNull($castSlot);
         self::assertSame([$castSlot], $sendSlots, 'arg sends='.json_encode($sendSlots));
+    }
+
+    /** Issue #9684 — enum case ->name/->value in direct call args use property-fetch slot. */
+    public function testVarDumpEnumCaseMagicPropertyUsesPropertyFetchSlot(): void
+    {
+        $code = <<<'PHP'
+<?php
+enum E: int { case A = 1; }
+var_dump(E::A->name);
+var_dump(E::A->value);
+enum S { case A; }
+var_dump(S::A->name);
+PHP;
+        $runtime = new Runtime();
+        $block = $runtime->parseAndCompile($code, 'enum_case_magic_call_arg.php');
+
+        $propSlots = [];
+        $sendSlots = [];
+        foreach ($block->opCodes as $op) {
+            if (OpCode::TYPE_PROPERTY_FETCH === $op->type) {
+                $propSlots[] = $op->arg1;
+            }
+            if (OpCode::TYPE_ARG_SEND === $op->type) {
+                $sendSlots[] = $op->arg1;
+            }
+        }
+
+        self::assertSame($propSlots, $sendSlots, 'prop='.json_encode($propSlots).' sends='.json_encode($sendSlots));
     }
 
     /** Issue #9504 — var_export((string) new C()) wires Cast producer, not dead arg temp. */
@@ -422,6 +450,144 @@ PHP;
         ob_start();
         $runtime->run($block);
         self::assertSame("array (\n  'a' => 2,\n  'b' => 3,\n)\n", ob_get_clean());
+    }
+
+    /** Issue #10196 — nested inline array literals map to outermost Array_ per arg slot. */
+    public function testArrayReplaceRecursiveNestedInlineLiteralsUseRootArraySlots(): void
+    {
+        $code = <<<'PHP'
+<?php
+array_replace_recursive(['a' => ['b' => 1]], ['a' => ['b' => 2, 'c' => 3]]);
+PHP;
+        $runtime = new Runtime();
+        $block = $runtime->parseAndCompile($code, 'array_replace_recursive_nested_inline.php');
+
+        $arraySlots = [];
+        $sendSlots = [];
+        foreach ($block->opCodes as $op) {
+            if (OpCode::TYPE_INIT_ARRAY === $op->type) {
+                $arraySlots[] = $op->arg1;
+            }
+            if (OpCode::TYPE_ARG_SEND === $op->type) {
+                $sendSlots[] = $op->arg1;
+            }
+        }
+
+        self::assertCount(4, $arraySlots, 'array inits='.json_encode($arraySlots));
+        self::assertCount(2, $sendSlots, 'arg sends='.json_encode($sendSlots));
+        self::assertSame($arraySlots[1], $sendSlots[0], 'first nested inline array root must feed arg #1');
+        self::assertSame($arraySlots[3], $sendSlots[1], 'second nested inline array root must feed arg #2');
+    }
+
+    /** Issue #10196 — array_replace_recursive nested inline literal runtime parity with Zend. */
+    public function testArrayReplaceRecursiveNestedInlineLiteralRuntime(): void
+    {
+        $code = <<<'PHP'
+<?php
+var_export(array_replace_recursive(['a' => ['b' => 1]], ['a' => ['b' => 2, 'c' => 3]]));
+echo "\n";
+PHP;
+        $runtime = new Runtime();
+        $block = $runtime->parseAndCompile($code, 'array_replace_recursive_nested_inline_runtime.php');
+        ob_start();
+        $runtime->run($block);
+        self::assertSame("array (\n  'a' => array (\n    'b' => 2,\n    'c' => 3,\n  ),\n)\n", ob_get_clean());
+    }
+
+    /** Issue #10229 — var_export(array_slice($local, -2, 2, true)) folds negative offset + preserve_keys. */
+    public function testVarExportArraySliceNegativeOffsetPreserveKeysCompile(): void
+    {
+        $code = <<<'PHP'
+<?php
+$a = [0 => 'a', 1 => 'b', 2 => 'c', 3 => 'd'];
+var_export(array_slice($a, -2, 2, true));
+PHP;
+        $runtime = new Runtime();
+        $block = $runtime->parseAndCompile($code, 'array_slice_negative_offset.php');
+
+        $sliceSends = [];
+        $fcallOrdinal = 0;
+        foreach ($block->opCodes as $op) {
+            if (OpCode::TYPE_FUNCCALL_INIT === $op->type) {
+                ++$fcallOrdinal;
+                if (1 === $fcallOrdinal) {
+                    $sliceSends = [];
+                }
+            }
+            if (1 === $fcallOrdinal && OpCode::TYPE_ARG_SEND === $op->type) {
+                $sliceSends[] = $op->arg1;
+            }
+        }
+
+        self::assertCount(4, $sliceSends, 'array_slice arg sends');
+    }
+
+    public function testVarExportArraySliceNegativeOffsetPreserveKeysRuntime(): void
+    {
+        $code = <<<'PHP'
+<?php
+$a = [0 => 'a', 1 => 'b', 2 => 'c', 3 => 'd'];
+var_export(array_slice($a, -2, 2, true));
+echo "\n";
+$b = ['a', 'b', 'c', 'd', 'e'];
+var_export(array_slice($b, 1, -2));
+echo "\n";
+PHP;
+        $runtime = new Runtime();
+        $block = $runtime->parseAndCompile($code, 'array_slice_negative_offset.php');
+        ob_start();
+        $runtime->run($block);
+        self::assertSame(
+            "array (\n  2 => 'c',\n  3 => 'd',\n)\narray (\n  0 => 'b',\n  1 => 'c',\n)\n",
+            ob_get_clean()
+        );
+    }
+
+    /** Issue #10490 — inline array union + must wire Plus result slot, not dead array temps. */
+    public function testArrayUnionInlineLiteralUsesPlusResultSlot(): void
+    {
+        $code = <<<'PHP'
+<?php
+var_export([1 => 'a'] + [2 => 'b']);
+PHP;
+        $runtime = new Runtime();
+        $block = $runtime->parseAndCompile($code, 'array_union_inline_literals.php');
+
+        $plusSlot = null;
+        $sendSlots = [];
+        foreach ($block->opCodes as $op) {
+            if (OpCode::TYPE_PLUS === $op->type) {
+                $plusSlot = $op->arg1;
+            }
+            if (OpCode::TYPE_ARG_SEND === $op->type) {
+                $sendSlots[] = $op->arg1;
+            }
+        }
+
+        self::assertNotNull($plusSlot);
+        self::assertSame([$plusSlot], $sendSlots, 'arg sends='.json_encode($sendSlots));
+    }
+
+    /** Issue #10490 — array union inline literal runtime parity with Zend. */
+    public function testArrayUnionInlineLiteralRuntime(): void
+    {
+        $code = <<<'PHP'
+<?php
+var_export([1 => 'a'] + [2 => 'b']);
+echo "\n";
+var_export(['a' => 1] + ['a' => 2]);
+echo "\n";
+var_export([] + [1]);
+echo "\n";
+PHP;
+        $runtime = new Runtime();
+        $block = $runtime->parseAndCompile($code, 'array_union_inline_runtime.php');
+        ob_start();
+        $runtime->run($block);
+        self::assertSame(
+            "array (\n  1 => 'a',\n  2 => 'b',\n)\narray (\n  'a' => 1,\n)\narray (\n  0 => 1,\n)\n",
+            ob_get_clean()
+        );
     }
 
     /** Bootstrap helloworld — New_ then static MethodCall (null var) must not TypeError in producer filter. */
@@ -761,5 +927,86 @@ PHP;
         ob_start();
         $runtime->run($block);
         self::assertSame("hi world\n", ob_get_clean());
+    }
+
+    /** Issue #10373 — var_export(substr(...), true) wires nested FuncCall + ConstFetch producer slots. */
+    public function testVarExportNestedBuiltinReturnTrueUsesFuncCallProducerSlot(): void
+    {
+        $code = <<<'PHP'
+<?php
+echo var_export(substr('hello', 0, -2), true);
+echo "\n";
+echo var_export(array_keys(['a' => 1, 'b' => 2]), true);
+PHP;
+        $runtime = new Runtime();
+        $block = $runtime->parseAndCompile($code, 'var_export_nested_builtin_return_true.php');
+
+        $substrReturnSlot = null;
+        $varExportSends = [];
+        $fcallOrdinal = 0;
+        foreach ($block->opCodes as $op) {
+            if (OpCode::TYPE_FUNCCALL_INIT === $op->type) {
+                ++$fcallOrdinal;
+                if (2 === $fcallOrdinal) {
+                    $varExportSends = [];
+                }
+            }
+            if (1 === $fcallOrdinal && OpCode::TYPE_FUNCCALL_EXEC_RETURN === $op->type) {
+                $substrReturnSlot = $op->arg1;
+            }
+            if (2 === $fcallOrdinal && OpCode::TYPE_ARG_SEND === $op->type) {
+                $varExportSends[] = $op->arg1;
+            }
+        }
+
+        self::assertNotNull($substrReturnSlot);
+        self::assertCount(2, $varExportSends);
+        self::assertSame($substrReturnSlot, $varExportSends[0], 'arg sends='.json_encode($varExportSends));
+
+        ob_start();
+        $runtime->run($block);
+        $out = ob_get_clean();
+        self::assertStringContainsString("'hel'", $out);
+        self::assertStringContainsString("'a'", $out);
+        self::assertStringContainsString("'b'", $out);
+    }
+
+    /** Issue #10351 — var_export(array_pad([...], -N, 0), true) wires nested FuncCall + Array_ + UnaryMinus. */
+    public function testVarExportArrayPadNegativeLengthUsesNestedFuncCallProducerSlot(): void
+    {
+        $code = <<<'PHP'
+<?php
+echo var_export(array_pad([1], -3, 0), true);
+PHP;
+        $runtime = new Runtime();
+        $block = $runtime->parseAndCompile($code, 'var_export_array_pad_negative.php');
+
+        $padReturnSlot = null;
+        $varExportSends = [];
+        $fcallOrdinal = 0;
+        foreach ($block->opCodes as $op) {
+            if (OpCode::TYPE_FUNCCALL_INIT === $op->type) {
+                ++$fcallOrdinal;
+                if (2 === $fcallOrdinal) {
+                    $varExportSends = [];
+                }
+            }
+            if (1 === $fcallOrdinal && OpCode::TYPE_FUNCCALL_EXEC_RETURN === $op->type) {
+                $padReturnSlot = $op->arg1;
+            }
+            if (2 === $fcallOrdinal && OpCode::TYPE_ARG_SEND === $op->type) {
+                $varExportSends[] = $op->arg1;
+            }
+        }
+
+        self::assertNotNull($padReturnSlot);
+        self::assertCount(2, $varExportSends);
+        self::assertSame($padReturnSlot, $varExportSends[0], 'arg sends='.json_encode($varExportSends));
+
+        ob_start();
+        $runtime->run($block);
+        $out = ob_get_clean();
+        self::assertStringContainsString('0', $out);
+        self::assertStringContainsString('1', $out);
     }
 }

@@ -9,7 +9,7 @@ use PHPUnit\Framework\TestCase;
 require_once __DIR__.'/../LlvmToolchain.php';
 
 /**
- * MCJIT execute for list destructuring from string RHS — TypeError (#7461, #4531).
+ * MCJIT execute for list destructuring from string RHS — NULL slots (#10486, #4531).
  *
  * Spawns bin/jit.php in a child process (issue #98 — no in-process LLVM preload).
  *
@@ -28,30 +28,21 @@ final class ListDestructStringJitExecuteTest extends TestCase
         }
     }
 
-    public function testStringRhsThrowsTypeError(): void
+    public function testStringRhsLeavesTargetsNull(): void
     {
         $script = $this->writeProbeScript('list-destruct-string-jit-exec', <<<'PHP'
 <?php
-try {
-    [$a] = 'ab';
-    echo "no-exception\n";
-} catch (TypeError $e) {
-    echo 'TypeError: ', $e->getMessage(), "\n";
-}
-try {
-    [$b, $c] = 'xy';
-    echo "no-exception\n";
-} catch (TypeError $e) {
-    echo 'TypeError: ', $e->getMessage(), "\n";
-}
+list($a, $b) = 'ab';
+echo "a=", var_export($a, true), " b=", var_export($b, true), "\n";
+[$x] = 'xy';
+echo "x=", var_export($x, true), "\n";
+[[ $y ]] = 'z';
+echo "y=", var_export($y, true), "\n";
 PHP
         );
         $output = $this->runJitScript($script);
         @unlink($script);
-        $this->assertSame(
-            "TypeError: Cannot use string as array\nTypeError: Cannot use string as array\n",
-            $output
-        );
+        $this->assertSame("a=NULL b=NULL\nx=NULL\ny=NULL\n", $output);
     }
 
     private function writeProbeScript(string $basename, string $code): string

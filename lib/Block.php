@@ -826,6 +826,23 @@ class Block {
         return null;
     }
 
+    /**
+     * Zend CV init: parent frame marked slot initialized (e.g. list destruct skip null) (#10507).
+     */
+    private static function parentFrameInitializedSlot(?Frame $frame, int $slot): bool
+    {
+        if (null === $frame) {
+            return false;
+        }
+        for ($f = $frame; null !== $f; $f = $f->parent) {
+            if (isset($f->initializedSlots[$slot])) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
     public function getFrame(Context $context, ?Frame $frame = null): Frame {
         // Back-edge to the same block (goto label) must reuse the frame; otherwise each
         // jump chains a new parent Frame and getFrame never finishes (issue #1228).
@@ -844,7 +861,10 @@ class Block {
             // php-cfg may register the same slot under multiple Operand keys (#1885).
             // Variable reads in args must still resolve (#3787 merge + literal arm).
             if (isset($scope[$pos]) && !$this->args->contains($op)) {
-                if (isset($this->constants[$pos])) {
+                if (
+                    isset($this->constants[$pos])
+                    && !self::parentFrameInitializedSlot($frame, $pos)
+                ) {
                     $scope[$pos] = $this->constants[$pos];
                 }
 
@@ -877,7 +897,11 @@ class Block {
                 }
             }
 
-            if (isset($this->constants[$pos]) && !$this->args->contains($op)) {
+            if (
+                isset($this->constants[$pos])
+                && !$this->args->contains($op)
+                && !self::parentFrameInitializedSlot($frame, $pos)
+            ) {
                 $scope[$pos] = $this->constants[$pos];
             } elseif (isset($this->closureCaptureSlots[$pos])) {
                 $scope[$pos] = self::initialVariableForOperand($op, $context, $pos, $this);
@@ -979,7 +1003,7 @@ class Block {
             }
         }
 
-        $this->ensureOpcodeReferencedSlots($scope);
+        $this->ensureOpcodeReferencedSlots($scope, $frame);
 
         // Sparse slot indices must preserve keys; variadic spread reindexes (#137).
         $return = new Frame(null, $this, $frame);
@@ -1011,7 +1035,7 @@ class Block {
     /**
      * Opcodes may reference slot indices without a matching scope operand (#5911, enum ctor assign).
      */
-    private function ensureOpcodeReferencedSlots(array &$scope): void
+    private function ensureOpcodeReferencedSlots(array &$scope, ?Frame $frame = null): void
     {
         $max = -1;
         foreach ($this->opCodes as $op) {
@@ -1024,9 +1048,17 @@ class Block {
         }
         for ($i = 0; $i <= $max; ++$i) {
             if (isset($scope[$i])) {
-                if (isset($this->constants[$i])) {
+                if (
+                    isset($this->constants[$i])
+                    && !self::parentFrameInitializedSlot($frame, $i)
+                ) {
                     $scope[$i] = $this->constants[$i];
                 }
+
+                continue;
+            }
+            if (self::parentFrameInitializedSlot($frame, $i) && null !== $frame && isset($frame->scope[$i])) {
+                $scope[$i] = $frame->scope[$i];
 
                 continue;
             }

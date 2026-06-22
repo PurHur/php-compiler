@@ -23,21 +23,8 @@ final class TimeSleepRuntime
 
     public static function ensureLinked(Context $context): void
     {
-        // Emit-helper link stubs skip ext/* method bodies — SleepJitHelper cannot JIT (#9068).
-        if (self::shouldUseLibcBridgeForEmitHelperLink()) {
-            TimeSleepRuntimeLibcBridge::ensureLinked($context);
-
-            return;
-        }
         self::implementNanosleepBridge($context);
         self::implementUntilBridge($context);
-    }
-
-    private static function shouldUseLibcBridgeForEmitHelperLink(): bool
-    {
-        $flag = \getenv('PHP_COMPILER_EMIT_HELPER_LINK');
-
-        return '1' === $flag || 'true' === \strtolower((string) $flag);
     }
 
     private static function implementNanosleepBridge(Context $context): void
@@ -131,9 +118,18 @@ final class TimeSleepRuntime
 
         $runtime = $context->runtime;
         $path = \dirname(__DIR__, 3).self::HELPER_PATH;
-        $prevSelfHostAot = \getenv('PHP_COMPILER_SELFHOST_AOT');
+        $envKeys = [
+            'PHP_COMPILER_SELFHOST_AOT',
+            'PHP_COMPILER_EMIT_HELPER_LINK',
+            'PHP_COMPILER_M3_EMIT_TU',
+            'PHP_COMPILER_M3_COMPILE_DRIVER',
+        ];
+        $prevEnv = [];
         if (\function_exists('putenv')) {
-            \putenv('PHP_COMPILER_SELFHOST_AOT=0');
+            foreach ($envKeys as $key) {
+                $prevEnv[$key] = \getenv($key);
+                \putenv($key.'=0');
+            }
         }
         try {
             $block = $runtime->parseAndCompile((string) \file_get_contents($path), 'SleepJitHelper.php');
@@ -144,10 +140,12 @@ final class TimeSleepRuntime
             $jit->compile($block);
         } finally {
             if (\function_exists('putenv')) {
-                if (false === $prevSelfHostAot || null === $prevSelfHostAot) {
-                    \putenv('PHP_COMPILER_SELFHOST_AOT=');
-                } else {
-                    \putenv('PHP_COMPILER_SELFHOST_AOT='.$prevSelfHostAot);
+                foreach ($prevEnv as $key => $val) {
+                    if (false === $val || null === $val) {
+                        \putenv($key.'=');
+                    } else {
+                        \putenv($key.'='.$val);
+                    }
                 }
             }
         }

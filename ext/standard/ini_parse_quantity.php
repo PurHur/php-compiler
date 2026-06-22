@@ -14,7 +14,7 @@ use PHPLLVM\Value;
 /**
  * ini_parse_quantity() — parse ini byte shorthand (Zend/zend_ini.c; issue #6049).
  *
- * VM: {@see VmIniQuantity::parseQuantity()}; JIT/AOT: {@see JitIniParseQuantity}.
+ * VM: {@see VmIniQuantity::parseQuantity()}; JIT/AOT: {@see IniParseQuantityJitHelper} via {@see JitIniParseQuantity}.
  */
 final class ini_parse_quantity extends Internal
 {

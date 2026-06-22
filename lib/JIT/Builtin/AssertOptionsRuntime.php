@@ -5,8 +5,10 @@ declare(strict_types=1);
 namespace PHPCompiler\JIT\Builtin;
 
 use PHPCompiler\JIT;
+use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Builtin;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\JitVmHelperLink;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\Variable as VmVariable;
 use PHPLLVM\BasicBlock;
@@ -94,7 +96,7 @@ final class AssertOptionsRuntime
 
     public static function ensureStandaloneBodies(Context $context): void
     {
-        self::implement($context);
+        self::implementStandaloneStubs($context);
     }
 
     public static function lookupHelper(Context $context, string $logical): LlvmFunction
@@ -120,6 +122,117 @@ final class AssertOptionsRuntime
         self::ensureValueHelpers($context);
         self::implementAbiBridges($context);
         self::implementAssertOptions($context, $probe);
+    }
+
+    /** Standalone AOT: const/default ABI stubs without nested AssertOptionsJitHelper JIT (#9225). */
+    private static function implementStandaloneStubs(Context $context): void
+    {
+        $restoreBlock = BasicBlockHelper::tryGetInsertBlock($context);
+
+        self::implementStandaloneConstBoolBridge($context, AssertIniRuntime::ABI_ENABLED, false);
+        self::implementStandaloneConstBoolBridge($context, AssertIniRuntime::ABI_EXCEPTION_MODE, true);
+        self::implementStandaloneIniGetBridge($context, AssertIniRuntime::ABI_INI_GET_ZEND_ASSERTIONS, '-1');
+        self::implementStandaloneIniGetBridge($context, AssertIniRuntime::ABI_INI_GET_ACTIVE, '1');
+        self::implementStandaloneIniGetBridge($context, AssertIniRuntime::ABI_INI_GET_EXCEPTION, '1');
+        self::implementStandaloneIniSetNoopBridge($context, AssertIniRuntime::ABI_INI_SET_ZEND_ASSERTIONS);
+        self::implementStandaloneIniSetNoopBridge($context, AssertIniRuntime::ABI_INI_SET_ACTIVE);
+        self::implementStandaloneIniSetNoopBridge($context, AssertIniRuntime::ABI_INI_SET_EXCEPTION);
+
+        $probe = $context->module->getNamedFunction('__compiler_assert_options');
+        if (null !== $probe && 0 === $probe->countBasicBlocks()) {
+            $entry = $probe->appendBasicBlock('aopt_standalone_stub');
+            $context->builder->positionAtEnd($entry);
+            self::writeBoolFalse($context, $probe->getParam(3));
+            $context->builder->returnVoid();
+            $context->registerFunction('__compiler_assert_options', $probe);
+        }
+
+        if (null !== $restoreBlock) {
+            BasicBlockHelper::restoreInsertBlock($context, $restoreBlock);
+        } else {
+            $context->builder->clearInsertionPosition();
+        }
+    }
+
+    private static function implementStandaloneConstBoolBridge(Context $context, string $abiName, bool $value): void
+    {
+        $probe = $context->module->getNamedFunction($abiName);
+        if (null !== $probe && $probe->countBasicBlocks() > 0) {
+            $context->registerFunction($abiName, $probe);
+
+            return;
+        }
+
+        $i1 = $context->getTypeFromString('int1');
+        $ft = $context->context->functionType($i1, false);
+        $fn = null !== $probe
+            ? $probe
+            : $context->module->addFunction($abiName, $ft);
+
+        $entry = $fn->appendBasicBlock('assert_abi_standalone_entry');
+        $context->builder->positionAtEnd($entry);
+        $context->builder->returnValue($i1->constInt($value ? 1 : 0, false));
+        $context->registerFunction($abiName, $fn);
+    }
+
+    private static function implementStandaloneIniGetBridge(Context $context, string $abiName, string $literal): void
+    {
+        $probe = $context->module->getNamedFunction($abiName);
+        if (null !== $probe && $probe->countBasicBlocks() > 0) {
+            $context->registerFunction($abiName, $probe);
+
+            return;
+        }
+
+        $valPtr = $context->getTypeFromString('__value__*');
+        $voidTy = $context->getTypeFromString('void');
+        $ft = $context->context->functionType($voidTy, false, $valPtr);
+        $fn = null !== $probe
+            ? $probe
+            : $context->module->addFunction($abiName, $ft);
+
+        $entry = $fn->appendBasicBlock('assert_ini_get_standalone_entry');
+        $context->builder->positionAtEnd($entry);
+        $i64 = $context->getTypeFromString('int64');
+        $sizeT = $context->getTypeFromString('size_t');
+        $cstr = $context->constantFromString($literal);
+        $len = $sizeT->constInt(\strlen($literal), false);
+        $str = $context->builder->call(
+            $context->lookupFunction('__string__init'),
+            $context->builder->sext($len, $i64),
+            $context->builder->pointerCast($cstr, $context->getTypeFromString('char*'))
+        );
+        $context->builder->call($context->lookupFunction('__value__writeString'), $fn->getParam(0), $str);
+        $context->builder->returnVoid();
+        $context->registerFunction($abiName, $fn);
+        self::ensureExternal($context, '__string__init', $context->context->functionType(
+            $context->getTypeFromString('__string__*'),
+            false,
+            $i64,
+            $context->getTypeFromString('char*')
+        ));
+    }
+
+    private static function implementStandaloneIniSetNoopBridge(Context $context, string $abiName): void
+    {
+        $probe = $context->module->getNamedFunction($abiName);
+        if (null !== $probe && $probe->countBasicBlocks() > 0) {
+            $context->registerFunction($abiName, $probe);
+
+            return;
+        }
+
+        $i8p = $context->getTypeFromString('int8*');
+        $voidTy = $context->getTypeFromString('void');
+        $ft = $context->context->functionType($voidTy, false, $i8p);
+        $fn = null !== $probe
+            ? $probe
+            : $context->module->addFunction($abiName, $ft);
+
+        $entry = $fn->appendBasicBlock('assert_ini_set_standalone_entry');
+        $context->builder->positionAtEnd($entry);
+        $context->builder->returnVoid();
+        $context->registerFunction($abiName, $fn);
     }
 
     private static function implementAbiBridges(Context $context): void
@@ -566,54 +679,13 @@ final class AssertOptionsRuntime
         }
     }
 
-    private static bool $compilingHelper = false;
-
     private static function ensureJitHelperCompiled(Context $context): void
     {
-        if (self::$compilingHelper) {
-            return;
-        }
-
-        $missing = false;
-        foreach (self::COMPILED_HELPERS as $logical) {
-            if (!isset($context->functions[\strtolower($logical)])) {
-                $missing = true;
-                break;
-            }
-        }
-        if (!$missing) {
-            return;
-        }
-
-        self::$compilingHelper = true;
-        $runtime = $context->runtime;
-        $path = \dirname(__DIR__, 3).self::HELPER_PATH;
-        $prevSelfHostAot = \getenv('PHP_COMPILER_SELFHOST_AOT');
-        if (\function_exists('putenv')) {
-            \putenv('PHP_COMPILER_SELFHOST_AOT=0');
-        }
-        try {
-            $block = $runtime->parseAndCompile((string) \file_get_contents($path), 'AssertOptionsJitHelper.php');
-            if (null === $block) {
-                throw new \LogicException('AssertOptionsJitHelper.php parseAndCompile failed (#9513)');
-            }
-            $jit = new JIT($context);
-            $jit->compile($block);
-        } finally {
-            self::$compilingHelper = false;
-            if (\function_exists('putenv')) {
-                if (false === $prevSelfHostAot || null === $prevSelfHostAot) {
-                    \putenv('PHP_COMPILER_SELFHOST_AOT=');
-                } else {
-                    \putenv('PHP_COMPILER_SELFHOST_AOT='.$prevSelfHostAot);
-                }
-            }
-        }
-        foreach (self::COMPILED_HELPERS as $logical) {
-            $lc = \strtolower($logical);
-            if (!isset($context->functions[$lc])) {
-                throw new \LogicException($lc.' was not compiled for JIT (#9513)');
-            }
-        }
+        JitVmHelperLink::ensureCompiled(
+            $context,
+            self::HELPER_PATH,
+            self::COMPILED_HELPERS,
+            '#9513'
+        );
     }
 }

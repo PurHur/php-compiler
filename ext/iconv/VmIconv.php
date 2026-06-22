@@ -4,7 +4,9 @@ declare(strict_types=1);
 
 namespace PHPCompiler\ext\iconv;
 
+use PHPCompiler\Frame;
 use PHPCompiler\VM\EnumCaseSupport;
+use PHPCompiler\VM\ErrorReporter;
 use PHPCompiler\VM\Variable;
 
 /**
@@ -39,22 +41,38 @@ final class VmIconv
         return $var->toString();
     }
 
-    public static function iconv(string $fromEncoding, string $toEncoding, string $input): string|false
+    public static function iconv(string $fromEncoding, string $toEncoding, string $input, ?Frame $frame = null): string|false
     {
         if (null === CharsetEngine::parseEncodingSpec($fromEncoding)) {
-            throw new \ValueError(sprintf(
-                'iconv(): Argument #1 ($from_encoding) is not a supported encoding, "%s" given',
-                $fromEncoding
-            ));
+            self::triggerUnsupportedEncodingWarning($frame, $fromEncoding, $toEncoding);
+
+            return false;
         }
         if (null === CharsetEngine::parseEncodingSpec($toEncoding)) {
-            throw new \ValueError(sprintf(
-                'iconv(): Argument #2 ($to_encoding) is not a supported encoding, "%s" given',
-                $toEncoding
-            ));
+            self::triggerUnsupportedEncodingWarning($frame, $fromEncoding, $toEncoding);
+
+            return false;
         }
 
         return CharsetEngine::convert($fromEncoding, $toEncoding, $input);
+    }
+
+    private static function triggerUnsupportedEncodingWarning(?Frame $frame, string $fromEncoding, string $toEncoding): void
+    {
+        if (null === $frame?->vmContext) {
+            return;
+        }
+        $frame->vmContext->errors->triggerError(
+            sprintf(
+                'iconv(): Wrong encoding, conversion from "%s" to "%s" is not allowed',
+                $fromEncoding,
+                $toEncoding
+            ),
+            ErrorReporter::E_WARNING,
+            '' !== $frame->scriptPath ? $frame->scriptPath : null,
+            $frame->vmContext,
+            $frame
+        );
     }
 
     private static function typeLabel(Variable $var): string

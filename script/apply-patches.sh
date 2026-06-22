@@ -5711,6 +5711,7 @@ PY
   esac
 }
 
+if [[ "${1:-}" != "--verify-only" ]]; then
 apply_patch "$PATCH_DIR/php-llvm-chooser.patch"
 apply_patch "$PATCH_DIR/php-llvm-no-closures-array-map.patch"
 apply_patch "$PATCH_DIR/php-llvm-context-empty-arrays.patch"
@@ -5899,6 +5900,7 @@ fi
 if ((${#APPLY_PATCH_FAILURES[@]} > 0)); then
   echo "apply-patches: ${#APPLY_PATCH_FAILURES[@]} patch(es) failed: ${APPLY_PATCH_FAILURES[*]}" >&2
   exit 1
+fi
 fi
 
 # Language capabilities (#3802 throw expr, #3094 union, #3149 readonly) must survive harness tar-copy.

@@ -40,10 +40,10 @@ final class IconvNativeTest extends TestCase
         $this->assertSame($utf8, CharsetEngine::convert('ISO-8859-1', 'UTF-8', (string) $latin1));
     }
 
-    public function testUnknownEncodingThrowsValueError(): void
+    public function testUnknownEncodingReturnsFalse(): void
     {
-        $this->expectException(\ValueError::class);
-        VmIconv::iconv('KOI8-R', 'UTF-8', 'x');
+        $this->assertFalse(VmIconv::iconv('KOI8-R', 'UTF-8', 'x'));
+        $this->assertFalse(VmIconv::iconv('UTF-8', 'INVALID//IGNORE', 'hello'));
     }
 
     public function testIgnoreSuffixStripsInvalidAsciiBytes(): void
