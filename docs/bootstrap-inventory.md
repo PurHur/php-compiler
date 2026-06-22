@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 2867 |
-| Phase A inventory files (M2 ratio SSOT) | 2867 |
+| PHP files on vm.php path | 2868 |
+| Phase A inventory files (M2 ratio SSOT) | 2868 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 1 |
-| Source constructs flagged (warnings) | 7754 |
+| Source constructs flagged (warnings) | 7755 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -842,6 +842,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/standard/VmExif.php` | 0 | 1 |
 | `ext/standard/VmExit.php` | 0 | 6 |
 | `ext/standard/VmFilestatArg.php` | 0 | 1 |
+| `ext/standard/VmFilestatFailure.php` | 0 | 1 |
 | `ext/standard/VmFloatDtoa.php` | 0 | 1 |
 | `ext/standard/VmFnmatch.php` | 0 | 1 |
 | `ext/standard/VmFnmatchPure.php` | 0 | 1 |
@@ -6737,7 +6738,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/JitStat.php`
 
 **Warnings** (review for bootstrap subset):
-- 33 class method(s)
+- 34 class method(s)
 
 ### `ext/standard/JitStatArray.php`
 
@@ -8516,6 +8517,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 
 **Warnings** (review for bootstrap subset):
 - 7 class method(s)
+
+### `ext/standard/VmFilestatFailure.php`
+
+**Warnings** (review for bootstrap subset):
+- 1 class method(s)
 
 ### `ext/standard/VmFloatDtoa.php`
 
@@ -15046,9 +15052,9 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/Compiler/NewWithoutParensCompileCheck.php`
 
 **Warnings** (review for bootstrap subset):
-- new self (line 29)
-- new CompileError (line 61)
-- new CompileError (line 74)
+- new self (line 30)
+- new CompileError (line 66)
+- new CompileError (line 79)
 - 5 class method(s)
 
 ### `lib/Compiler/NoDiscardMetadata.php`
@@ -16104,8 +16110,8 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/Builtin/ScalarDimFetchRuntime.php`
 
 **Warnings** (review for bootstrap subset):
-- new JIT (line 127)
-- 8 class method(s)
+- new JIT (line 220)
+- 10 class method(s)
 - 1 closure(s)
 
 ### `lib/JIT/Builtin/ScriptExit.php`
