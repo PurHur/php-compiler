@@ -2219,6 +2219,7 @@ class Compiler {
         for ($j = $start; $j <= $end; ++$j) {
             $this->compileOp($ops[$j], $block);
         }
+        $checkOp->listUnpackNullInitSlots = $this->collectListDestructAssignTargetSlots($block, $checkOp);
 
         $mergeBlock = new Block($block->orig);
         $mergeBlock->inheritUndefinedLocals = true;
@@ -2232,6 +2233,42 @@ class Compiler {
         $mergeBlock->parents[] = $block;
 
         return [$mergeBlock, $end];
+    }
+
+    /**
+     * Named local slots written by guarded list destruct when assign path is skipped (#10591, #10486).
+     *
+     * @return list<int>
+     */
+    private function collectListDestructAssignTargetSlots(Block $block, OpCode $checkOp): array
+    {
+        $slots = [];
+        $found = false;
+        foreach ($block->opCodes as $op) {
+            if ($op === $checkOp) {
+                $found = true;
+                continue;
+            }
+            if (!$found) {
+                continue;
+            }
+            if (OpCode::TYPE_JUMP === $op->type) {
+                break;
+            }
+            if (OpCode::TYPE_ASSIGN === $op->type || OpCode::TYPE_ASSIGN_REF === $op->type) {
+                if (null !== $op->arg2 && $block->isNamedVariableSlot((int) $op->arg2)) {
+                    $slots[(int) $op->arg2] = (int) $op->arg2;
+                }
+                continue;
+            }
+            if (OpCode::TYPE_LIST_SPREAD_ASSIGN === $op->type) {
+                if (null !== $op->arg1 && $block->isNamedVariableSlot((int) $op->arg1)) {
+                    $slots[(int) $op->arg1] = (int) $op->arg1;
+                }
+            }
+        }
+
+        return array_values($slots);
     }
 
     private function splitCfgBlockAfterStringKeyedArray(Block $block): Block
