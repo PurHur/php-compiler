@@ -9,7 +9,7 @@ use PHPCompiler\Runtime;
 use PHPUnit\Framework\TestCase;
 
 /**
- * Issue #5534: AOT standalone must define last-error helpers without phpc_last_error.c.
+ * Issue #5534 / #9607: AOT standalone last-error ABI via ErrorLastJitHelper PHP, not LLVM globals.
  *
  * @group aot-lint
  */
@@ -33,5 +33,10 @@ final class LastErrorRuntimeStandaloneTest extends TestCase
             $this->assertNotNull($fn);
             $this->assertGreaterThan(0, $fn->countBasicBlocks());
         }
+
+        $this->assertNotNull(
+            $ctx->functions[\strtolower('PHPCompiler\\ext\\standard\\ErrorLastJitHelper::isActive')] ?? null
+        );
+        $this->assertNull($ctx->module->getNamedGlobal('phpc_last_error_active'));
     }
 }
