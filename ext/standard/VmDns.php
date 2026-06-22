@@ -12,7 +12,7 @@ use PHPCompiler\VM\Variable;
  *
  * VM resolves via /etc/hosts without host Zend DNS builtins; optional libc getaddrinfo/res_query when FFI is loaded.
  * Config reads (/etc/hosts, /etc/resolv.conf) via {@see VmFs::file()} / {@see VmFsReadNative} — no host \\file() (#8529).
- * JIT/AOT: lib/JIT/Builtin/GethostbynamelRuntime.php (__compiler_gethostbynamel),
+ * JIT/AOT: lib/JIT/Builtin/GethostbynamelRuntime.php → GethostbynamelJitHelper PHP (#9382),
  * CheckdnsrrRuntime.php (__compiler_checkdnsrr).
  *
  * php-src: ext/standard/dns.c — PHP_FUNCTION(gethostbynamel), PHP_FUNCTION(gethostbyaddr),
@@ -90,8 +90,23 @@ final class VmDns
      */
     public static function gethostbynamel(string $hostname)
     {
-        if ('' === $hostname || \strlen($hostname) > 255) {
+        $ips = self::resolveHostnameIpv4List($hostname);
+        if ([] === $ips) {
             return false;
+        }
+
+        return self::ipv4ListToIndexedHashTable($ips);
+    }
+
+    /**
+     * IPv4 address strings for hostname (php-src gethostbynamel resolver core).
+     *
+     * @return list<string>
+     */
+    public static function resolveHostnameIpv4List(string $hostname): array
+    {
+        if ('' === $hostname || \strlen($hostname) > 255) {
+            return [];
         }
 
         $ips = self::resolveViaEtcHosts($hostname);
@@ -99,17 +114,22 @@ final class VmDns
             $ips = self::resolveViaGetaddrinfo($hostname);
         }
         if (null === $ips || [] === $ips) {
-            return false;
+            return [];
         }
 
+        return $ips;
+    }
+
+    /**
+     * @param list<string> $ips
+     */
+    public static function ipv4ListToIndexedHashTable(array $ips): HashTable
+    {
         $ht = new HashTable();
         foreach ($ips as $index => $ip) {
             $var = new Variable(Variable::TYPE_STRING);
             $var->string($ip);
             $ht->add((string) $index, $var);
-        }
-        if (0 === $ht->getNumElements()) {
-            return false;
         }
 
         return $ht;
