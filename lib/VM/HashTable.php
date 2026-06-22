@@ -1320,19 +1320,48 @@ final class HashTable {
         if ($preserveKeys) {
             return $this->sliceCopyPreserveKeys($offset, $length);
         }
-        if (!$this->isWithoutHoles()) {
-            throw new \LogicException('sliceCopy() only supports packed list arrays without holes');
-        }
-        [$offset, $takeLen] = $this->normalizeSpliceRange($offset, $length, $this->numElements);
-        $out = new self();
-        $values = iterator_to_array($this->iterate(true), false);
-        for ($i = $offset; $i < $offset + $takeLen; ++$i) {
-            if (!isset($values[$i])) {
-                break;
+        if ($this->isPackedList()) {
+            [$offset, $takeLen] = $this->normalizeSpliceRange($offset, $length, $this->numElements);
+            $out = new self();
+            $values = iterator_to_array($this->iterate(true), false);
+            for ($i = $offset; $i < $offset + $takeLen; ++$i) {
+                if (!isset($values[$i])) {
+                    break;
+                }
+                $copy = new Variable();
+                $copy->copyFrom($values[$i]);
+                $out->append($copy);
             }
-            $copy = new Variable();
-            $copy->copyFrom($values[$i]);
-            $out->append($copy);
+
+            return $out;
+        }
+
+        return $this->sliceCopyReindexIntKeys($offset, $length);
+    }
+
+    /**
+     * array_slice() with preserve_keys=false on mixed/assoc arrays (ext/standard/array.c #10600).
+     *
+     * String keys are kept; integer keys are renumbered from 0.
+     */
+    private function sliceCopyReindexIntKeys(int $offset, ?int $length = null): HashTable
+    {
+        $pairs = iterator_to_array($this->iterateKeyed(true), false);
+        $num = \count($pairs);
+        [$offset, $takeLen] = $this->normalizeSpliceRange($offset, $length, $num);
+
+        $out = new self();
+        $nextIntKey = 0;
+        for ($i = $offset; $i < $offset + $takeLen; ++$i) {
+            [$key, $value] = $this->duplicateKeyedPair($pairs[$i]);
+            if (Variable::TYPE_STRING === $key->type) {
+                $this->copyKeyedEntry($out, $key, $value);
+                continue;
+            }
+            $reindexed = new Variable(Variable::TYPE_INTEGER);
+            $reindexed->int($nextIntKey);
+            ++$nextIntKey;
+            $this->copyKeyedEntry($out, $reindexed, $value);
         }
 
         return $out;
