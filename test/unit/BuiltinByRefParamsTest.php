@@ -47,4 +47,11 @@ final class BuiltinByRefParamsTest extends TestCase
         $this->assertSame([2], BuiltinByRefParams::forFunction('preg_match'));
         $this->assertSame([2], BuiltinByRefParams::forFunction('PREG_MATCH_ALL'));
     }
+
+    public function testArrayPointerFirstArgument(): void
+    {
+        foreach (['next', 'prev', 'reset', 'end', 'current', 'key'] as $fn) {
+            $this->assertSame([0], BuiltinByRefParams::forFunction($fn), $fn);
+        }
+    }
 }

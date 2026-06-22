@@ -43,6 +43,12 @@ final class BuiltinParamNames
             case 'array_pop':
             case 'array_shift':
             case 'array_unshift':
+            case 'current':
+            case 'end':
+            case 'key':
+            case 'next':
+            case 'prev':
+            case 'reset':
                 return ['array'];
             case 'array_slice':
                 return ['array', 'offset', 'length', 'preserve_keys'];
