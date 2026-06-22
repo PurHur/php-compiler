@@ -1,5 +1,5 @@
 --TEST--
-Property hook with inline default initializer — class and trait (#9945, Zend/zend_compile.c)
+Language: property hook with default initializer — parse error (#10592, Zend/zend_compile.c)
 --FILE--
 <?php
 class C {
@@ -12,15 +12,6 @@ trait T {
         get => $this->label;
     }
 }
-class U {
-    use T;
-}
-echo (new C())->label, "\n";
-echo (new U())->label, "\n";
-$c = new C();
-$c->label = 'changed';
-echo $c->label, "\n";
---EXPECT--
-default
-from-trait
-changed
+echo "compiled\n";
+--EXPECT_EXIT--
+255
