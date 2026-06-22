@@ -100,12 +100,13 @@ final class VmJsonFormat
             return self::wrapObject('{'.self::joinParts($parts, $flags, $depth).'}', $flags, $depth);
         }
         if (\is_array($value)) {
+            $encodeAsObject = !array_is_list($value) || self::forceObject($flags);
             if ([] === $value) {
-                $empty = array_is_list($value) ? '[]' : '{}';
+                $empty = $encodeAsObject ? '{}' : '[]';
 
                 return self::wrapContainer($empty, $flags, $depth);
             }
-            if (array_is_list($value)) {
+            if (!$encodeAsObject) {
                 $parts = [];
                 foreach ($value as $item) {
                     $parts[] = self::encodePairValue($item, $flags, $depth);
@@ -175,6 +176,11 @@ final class VmJsonFormat
     private static function keyValueSeparator(int $flags): string
     {
         return 0 !== ($flags & VmJsonFlags::PRETTY_PRINT) ? ': ' : ':';
+    }
+
+    private static function forceObject(int $flags): bool
+    {
+        return 0 !== ($flags & VmJsonFlags::FORCE_OBJECT);
     }
 
     private static function encodeFloat(float $num): string

@@ -12,6 +12,7 @@ namespace PHPCompiler\JIT\Builtin;
 
 use PHPCompiler\ext\standard\JitArrayIsList;
 use PHPCompiler\ext\standard\JitStringConcat;
+use PHPCompiler\ext\standard\VmJsonFlags;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\Variable;
 use PHPCompiler\VM\Variable as VmVariable;
@@ -76,6 +77,7 @@ final class StringJsonEncode
         $context->builder->store($i32->constInt(0, false), $lastErr);
 
         $valPtr = $fn->getParam(0);
+        $flags = $fn->getParam(1);
         $htPtrTy = $context->getTypeFromString('__hashtable__*');
         $ht = $context->builder->call(
             $context->lookupFunction('__value__readHashtable'),
@@ -89,12 +91,13 @@ final class StringJsonEncode
         $context->builder->positionAtEnd($arrayBb);
         $arrayResult = $context->builder->call(
             $context->lookupFunction('__compiler_json_encode_array'),
-            $ht
+            $ht,
+            $flags
         );
         $context->builder->returnValue($arrayResult);
 
         $context->builder->positionAtEnd($scalarBb);
-        $scalarResult = self::emitScalarJson($context, $fn, $valPtr);
+        $scalarResult = self::emitScalarJson($context, $fn, $valPtr, $flags);
         $context->builder->returnValue($scalarResult);
         $context->builder->clearInsertionPosition();
     }
@@ -106,22 +109,34 @@ final class StringJsonEncode
         $context->builder->positionAtEnd($entry);
 
         $ht = $fn->getParam(0);
+        $flags = $fn->getParam(1);
         $isList = JitArrayIsList::hashTableIsList($context, $ht);
+        $forceObject = self::flagIsSet($context, $flags, VmJsonFlags::FORCE_OBJECT);
+        $forceObjList = $context->builder->and($isList, $forceObject);
         $listBb = $fn->appendBasicBlock('je_arr_list');
+        $forceObjBb = $fn->appendBasicBlock('je_arr_force_obj');
         $assocBb = $fn->appendBasicBlock('je_arr_assoc');
+        $checkListBb = $fn->appendBasicBlock('je_arr_check_list');
+        $context->builder->branchIf($forceObjList, $forceObjBb, $checkListBb);
+
+        $context->builder->positionAtEnd($checkListBb);
         $context->builder->branchIf($isList, $listBb, $assocBb);
 
         $context->builder->positionAtEnd($listBb);
-        $listResult = self::emitListArrayJson($context, $fn, $ht);
+        $listResult = self::emitListArrayJson($context, $fn, $ht, $flags);
         $context->builder->returnValue($listResult);
 
+        $context->builder->positionAtEnd($forceObjBb);
+        $forceObjResult = self::emitListAsObjectJson($context, $fn, $ht, $flags);
+        $context->builder->returnValue($forceObjResult);
+
         $context->builder->positionAtEnd($assocBb);
-        $assocResult = self::emitAssocArrayJson($context, $fn, $ht);
+        $assocResult = self::emitAssocArrayJson($context, $fn, $ht, $flags);
         $context->builder->returnValue($assocResult);
         $context->builder->clearInsertionPosition();
     }
 
-    private static function emitListArrayJson(Context $context, LlvmFunction $fn, Value $ht): Value
+    private static function emitListArrayJson(Context $context, LlvmFunction $fn, Value $ht, Value $flags): Value
     {
         $htMap = $context->structFieldMap['__hashtable__'];
         $sizeT = $context->getTypeFromString('size_t');
@@ -191,7 +206,8 @@ final class StringJsonEncode
 
         $encoded = $context->builder->call(
             $context->lookupFunction('__compiler_json_encode_value'),
-            $entryPtr
+            $entryPtr,
+            $flags
         );
         $acc = $context->builder->load($resultSlot);
         $context->builder->store(JitStringConcat::concat($context, $acc, $encoded), $resultSlot);
@@ -214,7 +230,105 @@ final class StringJsonEncode
         return $context->builder->load($finalSlot);
     }
 
-    private static function emitAssocArrayJson(Context $context, LlvmFunction $fn, Value $ht): Value
+    private static function emitListAsObjectJson(Context $context, LlvmFunction $fn, Value $ht, Value $flags): Value
+    {
+        $htMap = $context->structFieldMap['__hashtable__'];
+        $sizeT = $context->getTypeFromString('size_t');
+        $valuePtrTy = $context->getTypeFromString('__value__*');
+        $strPtr = $context->getTypeFromString('__string__*');
+        $i8 = $context->getTypeFromString('int8');
+        $zeroSize = $sizeT->constInt(0, false);
+        $oneSize = $sizeT->constInt(1, false);
+
+        $resultSlot = $context->builder->alloca($strPtr, 1, 'je_fo_acc');
+        $firstSlot = $context->builder->alloca($i8, 1, 'je_fo_first');
+        $idxSlot = $context->builder->alloca($sizeT, 1, 'je_fo_i');
+        $finalSlot = $context->builder->alloca($strPtr, 1, 'je_fo_final');
+
+        $nextFree = $context->builder->load($context->builder->structGep($ht, $htMap['nextFreeElement']));
+        $isEmpty = $context->builder->icmp(Builder::INT_EQ, $nextFree, $zeroSize);
+        $emptyBb = $fn->appendBasicBlock('je_fo_empty');
+        $workBb = $fn->appendBasicBlock('je_fo_work');
+        $returnBb = $fn->appendBasicBlock('je_fo_return');
+        $context->builder->branchIf($isEmpty, $emptyBb, $workBb);
+
+        $context->builder->positionAtEnd($emptyBb);
+        $context->builder->store(self::literalString($context, '{}'), $finalSlot);
+        $context->builder->branch($returnBb);
+
+        $context->builder->positionAtEnd($workBb);
+        $context->builder->store(self::literalString($context, '{'), $resultSlot);
+        $context->builder->store($i8->constInt(1, false), $firstSlot);
+        $context->builder->store($zeroSize, $idxSlot);
+
+        $headBb = $fn->appendBasicBlock('je_fo_head');
+        $bodyBb = $fn->appendBasicBlock('je_fo_body');
+        $doneBb = $fn->appendBasicBlock('je_fo_done');
+        $context->builder->branch($headBb);
+
+        $context->builder->positionAtEnd($headBb);
+        $idx = $context->builder->load($idxSlot);
+        $atEnd = $context->builder->icmp(Builder::INT_SGE, $idx, $nextFree);
+        $context->builder->branchIf($atEnd, $doneBb, $bodyBb);
+
+        $context->builder->positionAtEnd($bodyBb);
+        $values = $context->builder->load($context->builder->structGep($ht, $htMap['values']));
+        $entryPtr = $context->builder->inBoundsGEP($values, $idx);
+        $kind = self::loadValueKind($context, $entryPtr);
+        $isNull = $context->builder->icmp(
+            Builder::INT_EQ,
+            $kind,
+            $i8->constInt(Variable::TYPE_NULL, false)
+        );
+        $emitBb = $fn->appendBasicBlock('je_fo_emit');
+        $nextBb = $fn->appendBasicBlock('je_fo_next');
+        $context->builder->branchIf($isNull, $nextBb, $emitBb);
+
+        $context->builder->positionAtEnd($emitBb);
+        $acc = $context->builder->load($resultSlot);
+        $isFirst = $context->builder->load($firstSlot);
+        $notFirst = $context->builder->icmp(Builder::INT_EQ, $isFirst, $i8->constInt(0, false));
+        $commaBb = $fn->appendBasicBlock('je_fo_comma');
+        $afterCommaBb = $fn->appendBasicBlock('je_fo_after_comma');
+        $context->builder->branchIf($notFirst, $commaBb, $afterCommaBb);
+        $context->builder->positionAtEnd($commaBb);
+        $acc = JitStringConcat::concat($context, $acc, self::literalString($context, ','));
+        $context->builder->store($acc, $resultSlot);
+        $context->builder->branch($afterCommaBb);
+        $context->builder->positionAtEnd($afterCommaBb);
+        $context->builder->store($i8->constInt(0, false), $firstSlot);
+
+        $quotedKey = self::indexKeyString($context, $idx);
+        $acc = $context->builder->load($resultSlot);
+        $acc = JitStringConcat::concat($context, $acc, $quotedKey);
+        $acc = JitStringConcat::concat($context, $acc, self::literalString($context, ':'));
+        $encoded = $context->builder->call(
+            $context->lookupFunction('__compiler_json_encode_value'),
+            $entryPtr,
+            $flags
+        );
+        $acc = JitStringConcat::concat($context, $acc, $encoded);
+        $context->builder->store($acc, $resultSlot);
+        $context->builder->branch($nextBb);
+
+        $context->builder->positionAtEnd($nextBb);
+        $context->builder->store($context->builder->addNoSignedWrap($idx, $oneSize), $idxSlot);
+        $context->builder->branch($headBb);
+
+        $context->builder->positionAtEnd($doneBb);
+        $acc = $context->builder->load($resultSlot);
+        $context->builder->store(
+            JitStringConcat::concat($context, $acc, self::literalString($context, '}')),
+            $finalSlot
+        );
+        $context->builder->branch($returnBb);
+
+        $context->builder->positionAtEnd($returnBb);
+
+        return $context->builder->load($finalSlot);
+    }
+
+    private static function emitAssocArrayJson(Context $context, LlvmFunction $fn, Value $ht, Value $flags): Value
     {
         $htMap = $context->structFieldMap['__hashtable__'];
         $nodeMap = $context->structFieldMap['__strkey_node__'];
@@ -331,7 +445,8 @@ final class StringJsonEncode
         $valField = $context->builder->structGep($nodePtr, $nodeMap['value']);
         $encodedVal = $context->builder->call(
             $context->lookupFunction('__compiler_json_encode_value'),
-            $context->builder->pointerCast($valField, $context->getTypeFromString('__value__*'))
+            $context->builder->pointerCast($valField, $context->getTypeFromString('__value__*')),
+            $flags
         );
         $acc = JitStringConcat::concat($context, $acc, $encodedVal);
         $context->builder->store($acc, $resultSlot);
@@ -353,7 +468,7 @@ final class StringJsonEncode
         return $context->builder->load($finalSlot);
     }
 
-    private static function emitScalarJson(Context $context, LlvmFunction $fn, Value $valPtr): Value
+    private static function emitScalarJson(Context $context, LlvmFunction $fn, Value $valPtr, Value $flags): Value
     {
         $valMap = $context->structFieldMap['__value__'];
         $strPtr = $context->getTypeFromString('__string__*');
@@ -495,7 +610,8 @@ final class StringJsonEncode
             $backingField = $context->builder->structGep($valPtr, $enumMap['backing']);
             $backingEncoded = $context->builder->call(
                 $context->lookupFunction('__compiler_json_encode_value'),
-                $context->builder->pointerCast($backingField, $context->getTypeFromString('__value__*'))
+                $context->builder->pointerCast($backingField, $context->getTypeFromString('__value__*')),
+                $flags
             );
             $context->builder->store($backingEncoded, $resultSlot);
         } else {
@@ -513,6 +629,31 @@ final class StringJsonEncode
         $valMap = $context->structFieldMap['__value__'];
 
         return $context->builder->load($context->builder->structGep($entryPtr, $valMap['type']));
+    }
+
+    private static function flagIsSet(Context $context, Value $flags, int $bit): Value
+    {
+        $i64 = $context->getTypeFromString('int64');
+        $masked = $context->builder->and($flags, $i64->constInt($bit, false));
+
+        return $context->builder->icmp(Builder::INT_NE, $masked, $i64->constInt(0, false));
+    }
+
+    private static function indexKeyString(Context $context, Value $idx): Value
+    {
+        $i8 = $context->getTypeFromString('int8');
+        $i8p = $context->getTypeFromString('int8*');
+        $i64 = $context->getTypeFromString('int64');
+        $numBuf = $context->builder->alloca($i8, $i64->constInt(32, false), 'je_idx_buf');
+        $bufC = $context->builder->pointerCast($numBuf, $i8p);
+        $fmt = $context->builder->pointerCast($context->constantFromString('%llu'), $i8p);
+        $idxI64 = $idx->typeOf() === $i64 ? $idx : $context->builder->zExt($idx, $i64);
+        $context->builder->call($context->lookupFunction('sprintf'), $bufC, $fmt, $idxI64);
+        $len = $context->builder->call($context->lookupFunction('strlen'), $bufC);
+        $lenI64 = $len->typeOf() === $i64 ? $len : $context->builder->zExt($len, $i64);
+        $keyStr = $context->builder->call($context->lookupFunction('__string__init'), $lenI64, $bufC);
+
+        return self::quoteString($context, $keyStr);
     }
 
     private static function literalString(Context $context, string $text): Value

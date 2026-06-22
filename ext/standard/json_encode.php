@@ -68,12 +68,13 @@ final class json_encode extends Internal
             throw new \LogicException('json_encode() accepts at most two arguments');
         }
 
-        $flags = self::resolveFlagsJit($context, $args);
+        $flagsVal = self::lowerFlagsJitValue($context, $args);
+        $knownFlags = self::tryCompileTimeFlags($context, $args);
         $literal = JitStringArg::compileTimeLiteral($args[0]);
         if (null !== $literal) {
-            $encoded = \json_encode($literal, $flags);
+            $encoded = \json_encode($literal, $knownFlags ?? 0);
             if (false === $encoded) {
-                if (VmJsonFlags::throwsOnError($flags)) {
+                if (VmJsonFlags::throwsOnError($knownFlags ?? 0)) {
                     throw new \JsonException(\json_last_error_msg(), \json_last_error());
                 }
                 throw new \LogicException('json_encode() failed');
@@ -81,11 +82,11 @@ final class json_encode extends Internal
 
             return $context->builder->load($context->constantStringFromString($encoded));
         }
-        if (0 !== $flags) {
+        if (null !== $knownFlags && 0 !== ($knownFlags & ~VmJsonFlags::FORCE_OBJECT)) {
             throw new \LogicException('json_encode() flags not supported at runtime in this compiler build');
         }
 
-        return JitJsonEncode::encode($context, $args[0]);
+        return JitJsonEncode::encode($context, $args[0], $flagsVal);
     }
 
     private static function resolveFlagsVm(Frame $frame, int $argc): int
@@ -106,7 +107,19 @@ final class json_encode extends Internal
     /**
      * @param list<JITVariable> $args
      */
-    private static function resolveFlagsJit(Context $context, array $args): int
+    private static function lowerFlagsJitValue(Context $context, array $args): Value
+    {
+        if (\count($args) < 2) {
+            return $context->getTypeFromString('int64')->constInt(0, false);
+        }
+
+        return JitIntdiv::lowerIntBuiltinArg($context, $args[1], 'json_encode', 2, 'flags');
+    }
+
+    /**
+     * @param list<JITVariable> $args
+     */
+    private static function tryCompileTimeFlags(Context $context, array $args): ?int
     {
         if (\count($args) < 2) {
             return 0;
@@ -116,6 +129,6 @@ final class json_encode extends Internal
             return (int) $context->llvm->lib->LLVMConstIntGetZExtValue($flagsArg->value->value);
         }
 
-        throw new \LogicException('json_encode() flags must be a compile-time integer in this compiler build');
+        return null;
     }
 }
