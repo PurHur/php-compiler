@@ -417,9 +417,12 @@ class Block {
     }
 
     /** Bind operand to a fresh slot (?: throw arm must not alias merge phi slot, #3802). */
-    public function forceFreshVarSlot(Operand $operand): int
+    public function forceFreshVarSlot(Operand $operand, ?int $excludeSlot = null): int
     {
         $slot = $this->nextScopeSlot();
+        if (null !== $excludeSlot && $slot <= $excludeSlot) {
+            $slot = $excludeSlot + 1;
+        }
         $this->scope[$operand] = $slot;
 
         return $slot;

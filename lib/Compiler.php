@@ -1189,7 +1189,81 @@ class Compiler {
     private function mergeCfgBlockUsesTernaryPhi(CfgBlock $merge): bool
     {
         return $this->mergeCfgBlockUsesEchoPhi($merge)
-            || $this->mergeCfgBlockUsesAssignPhi($merge);
+            || $this->mergeCfgBlockUsesAssignPhi($merge)
+            || $this->mergeCfgBlockUsesLogicalShortCircuit($merge);
+    }
+
+    /** && / || merge: one arm ends in (bool) cast, sibling in literal assign (php-cfg parseShortCircuiting). */
+    private function mergeCfgBlockUsesLogicalShortCircuit(CfgBlock $merge): bool
+    {
+        if (\count($merge->parents) < 2) {
+            return false;
+        }
+        $hasBoolCastArm = false;
+        $hasLiteralAssignArm = false;
+        foreach ($merge->parents as $parent) {
+            $tail = $this->branchTailExprBeforeJump($parent);
+            if ($tail instanceof Op\Expr\Cast\Bool_) {
+                $hasBoolCastArm = true;
+            }
+            if ($tail instanceof Op\Expr\Assign && $tail->expr instanceof Operand\Literal) {
+                $hasLiteralAssignArm = true;
+            }
+        }
+
+        return $hasBoolCastArm && $hasLiteralAssignArm;
+    }
+
+    private function branchTailExprBeforeJump(CfgBlock $branch): ?Op\Expr
+    {
+        $children = $branch->children;
+        for ($i = \count($children) - 1; $i >= 0; --$i) {
+            $child = $children[$i];
+            if ($child instanceof Op\Stmt\Jump) {
+                continue;
+            }
+            if ($child instanceof Op\Expr) {
+                return $child;
+            }
+
+            break;
+        }
+
+        return null;
+    }
+
+    /** && / || long-arm bool cast must store into the recorded phi merge slot (#10626). */
+    private function logicalShortCircuitPhiMergeSlot(Block $branch): ?int
+    {
+        if (null === $branch->orig) {
+            return null;
+        }
+        foreach ($this->ternaryMergeTargets($branch->orig) as $mergeCfg) {
+            if (!$this->mergeCfgBlockUsesLogicalShortCircuit($mergeCfg)) {
+                continue;
+            }
+            $recorded = $this->ternaryMergePhiRhsSlot($mergeCfg);
+            if (null !== $recorded) {
+                return $recorded;
+            }
+            foreach ($mergeCfg->parents as $parentCfg) {
+                if ($parentCfg === $branch->orig || !$this->seen->contains($parentCfg)) {
+                    continue;
+                }
+                $sibling = $this->seen[$parentCfg];
+                for ($i = $sibling->nOpCodes - 1; $i >= 0; --$i) {
+                    $op = $sibling->opCodes[$i];
+                    if (OpCode::TYPE_ASSIGN === $op->type) {
+                        return (int) $op->arg2;
+                    }
+                    if (OpCode::TYPE_JUMP === $op->type) {
+                        break;
+                    }
+                }
+            }
+        }
+
+        return null;
     }
 
     private function recordTernaryMergeVarSlots(CfgBlock $branchCfg, Block $compiled): void
@@ -6915,12 +6989,26 @@ class Compiler {
                 $this->throwCompileError('The (unset) cast is no longer supported');
             }
             $line = $expr->getLine();
-            return [new OpCode(
+            $castResultSlot = $this->compileOperand($expr->result, $block, false);
+            $ops = [new OpCode(
                 $this->getOpCodeTypeFromCastOp($expr),
-                $this->compileOperand($expr->result, $block, false),
+                $castResultSlot,
                 $this->compileOperand($expr->expr, $block, true),
                 $line > 0 ? $line : null,
             )];
+            if ($expr instanceof Op\Expr\Cast\Bool_) {
+                $phiSlot = $this->logicalShortCircuitPhiMergeSlot($block);
+                if (null !== $phiSlot && $castResultSlot !== $phiSlot) {
+                    $ops[] = new OpCode(
+                        OpCode::TYPE_ASSIGN,
+                        $phiSlot,
+                        $phiSlot,
+                        $castResultSlot
+                    );
+                }
+            }
+
+            return $ops;
         }
         switch (get_class($expr)) {
             case Op\Expr\ArrowFunction::class:
@@ -7170,7 +7258,7 @@ class Compiler {
             case Op\Expr\ArrayDimFetch::class:
                 $mergeEcho = $this->mergeEchoSlotForBranch($block);
                 if (null !== $mergeEcho && !$this->isArrayDimFetchForWrite($expr, $block)) {
-                    $block->forceFreshVarSlot($expr->result);
+                    $block->forceFreshVarSlot($expr->result, $mergeEcho);
                 }
                 $dimSlot = null !== $expr->dim
                     ? $this->compileOperand($expr->dim, $block, true)
