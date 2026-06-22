@@ -2894,8 +2894,6 @@ require_once __DIR__.'/../../../ext/standard/GcCollectCyclesJitHelper.php';
 require_once __DIR__.'/../../../ext/standard/GcStatusJitHelper.php';
 require_once __DIR__.'/../../../ext/standard/ObStatusJitHelper.php';
 require_once __DIR__.'/../../../ext/standard/GcToggleJitHelper.php';
-require_once __DIR__.'/../../../ext/standard/ErrorRaiseJitHelper.php';
-require_once __DIR__.'/../../../ext/standard/TypeErrorRaiseJitHelper.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/ExceptionThrowRuntime.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/GcToggleRuntime.php';
 require_once __DIR__.'/../../../lib/JIT/JitReferencableCheck.php';
