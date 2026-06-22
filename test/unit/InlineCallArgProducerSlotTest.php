@@ -1055,4 +1055,36 @@ PHP;
         self::assertStringContainsString("'NULL'", $out);
         self::assertStringContainsString("'stdClass'", $out);
     }
+
+    /** Issue #10453 — hoisted PASSWORD_BCRYPT ConstFetch maps to arg #2 when trailing Array_ options literal. */
+    public function testPasswordHashConstFetchAndArrayOptionSlots(): void
+    {
+        $code = <<<'PHP'
+<?php
+password_hash('secret', PASSWORD_BCRYPT, ['cost' => 10]);
+PHP;
+        $runtime = new Runtime();
+        $block = $runtime->parseAndCompile($code, 'password_hash_options.php');
+
+        $constSlot = null;
+        $arraySlot = null;
+        $sendSlots = [];
+        foreach ($block->opCodes as $op) {
+            if (OpCode::TYPE_CONST_FETCH === $op->type && null === $constSlot) {
+                $constSlot = $op->arg1;
+            }
+            if (OpCode::TYPE_INIT_ARRAY === $op->type && null === $arraySlot) {
+                $arraySlot = $op->arg1;
+            }
+            if (OpCode::TYPE_ARG_SEND === $op->type) {
+                $sendSlots[] = $op->arg1;
+            }
+        }
+
+        self::assertNotNull($constSlot);
+        self::assertNotNull($arraySlot);
+        self::assertCount(3, $sendSlots, 'password_hash arg sends='.json_encode($sendSlots));
+        self::assertSame($constSlot, $sendSlots[1] ?? null, 'arg sends='.json_encode($sendSlots));
+        self::assertSame($arraySlot, $sendSlots[2] ?? null, 'arg sends='.json_encode($sendSlots));
+    }
 }

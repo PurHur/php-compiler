@@ -12247,6 +12247,13 @@ class Compiler {
 
                     continue;
                 }
+                // password_hash(lit, PASSWORD_BCRYPT, [...]) — ConstFetch before trailing Array_ (#10453).
+                if (
+                    ($prev instanceof Op\Expr\ConstFetch || $prev instanceof Op\Expr\ClassConstFetch)
+                    && $this->isInlineExprCallArgProducer($prev)
+                ) {
+                    array_unshift($producers, $prev);
+                }
                 break;
             }
             array_unshift($producers, $child);
@@ -14761,7 +14768,19 @@ class Compiler {
             if ($producer instanceof Op\Expr\ConstFetch) {
                 $vm = $this->tryFoldGlobalConstFetch($producer);
                 if (null !== $vm) {
-                    return $block->registerConstant($arg, $vm);
+                    // php-cfg dead call-arg temp vs hoisted ConstFetch.result (#10453, password_hash PASSWORD_BCRYPT + options).
+                    $producerSlot = $block->slotForOperand($producer->result);
+                    if (null === $producerSlot) {
+                        foreach ($this->compileExpr($producer, $block) as $op) {
+                            $block->addOpCode($op);
+                        }
+                        $producerSlot = $block->slotForOperand($producer->result);
+                    }
+                    if (null !== $producerSlot) {
+                        return $producerSlot;
+                    }
+
+                    return $block->registerConstant($producer->result, $vm);
                 }
             }
             if ($producer instanceof Op\Expr\Cast) {
