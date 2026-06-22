@@ -50,4 +50,14 @@ final class IconvNativeTest extends TestCase
     {
         $this->assertSame('A', CharsetEngine::convert('ASCII//IGNORE', 'UTF-8', "A\xFF"));
     }
+
+    public function testTranslitSuffixMapsLatin1AccentsToAscii(): void
+    {
+        $this->assertSame('cafe', CharsetEngine::convert('UTF-8', 'ASCII//TRANSLIT', 'café'));
+        $this->assertSame(
+            'cafe',
+            VmIconv::iconv('UTF-8', 'ASCII//TRANSLIT', 'café')
+        );
+        $this->assertSame('caf', CharsetEngine::convert('UTF-8', 'ASCII//IGNORE', "caf\xC3\xA9"));
+    }
 }

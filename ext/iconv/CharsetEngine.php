@@ -185,25 +185,60 @@ final class CharsetEngine
         if (false === $latin1) {
             return false;
         }
-        if (!($flags & self::FLAG_IGNORE)) {
-            $len = \strlen($latin1);
-            for ($i = 0; $i < $len; ++$i) {
-                if (\ord($latin1[$i]) > 0x7F) {
-                    return false;
-                }
-            }
-
-            return $latin1;
-        }
 
         $out = '';
         $len = \strlen($latin1);
         for ($i = 0; $i < $len; ++$i) {
-            if (\ord($latin1[$i]) <= 0x7F) {
+            $byte = \ord($latin1[$i]);
+            if ($byte <= 0x7F) {
                 $out .= $latin1[$i];
+
+                continue;
             }
+            if ($flags & self::FLAG_TRANSLIT) {
+                $translit = self::transliterateLatin1($byte);
+                if (null !== $translit) {
+                    $out .= $translit;
+
+                    continue;
+                }
+            }
+            if ($flags & self::FLAG_IGNORE) {
+                continue;
+            }
+
+            return false;
         }
 
         return $out;
+    }
+
+    /**
+     * ISO-8859-1 → ASCII approximations for //TRANSLIT (php-src ext/iconv/iconv.c).
+     */
+    private static function transliterateLatin1(int $byte): ?string
+    {
+        static $map = [
+            0xC0 => 'A', 0xC1 => 'A', 0xC2 => 'A', 0xC3 => 'A', 0xC4 => 'A', 0xC5 => 'A',
+            0xC6 => 'AE', 0xC7 => 'C',
+            0xC8 => 'E', 0xC9 => 'E', 0xCA => 'E', 0xCB => 'E',
+            0xCC => 'I', 0xCD => 'I', 0xCE => 'I', 0xCF => 'I',
+            0xD0 => 'D', 0xD1 => 'N',
+            0xD2 => 'O', 0xD3 => 'O', 0xD4 => 'O', 0xD5 => 'O', 0xD6 => 'O',
+            0xD8 => 'O',
+            0xD9 => 'U', 0xDA => 'U', 0xDB => 'U', 0xDC => 'U',
+            0xDD => 'Y', 0xDE => 'TH', 0xDF => 'ss',
+            0xE0 => 'a', 0xE1 => 'a', 0xE2 => 'a', 0xE3 => 'a', 0xE4 => 'a', 0xE5 => 'a',
+            0xE6 => 'ae', 0xE7 => 'c',
+            0xE8 => 'e', 0xE9 => 'e', 0xEA => 'e', 0xEB => 'e',
+            0xEC => 'i', 0xED => 'i', 0xEE => 'i', 0xEF => 'i',
+            0xF0 => 'd', 0xF1 => 'n',
+            0xF2 => 'o', 0xF3 => 'o', 0xF4 => 'o', 0xF5 => 'o', 0xF6 => 'o',
+            0xF8 => 'o',
+            0xF9 => 'u', 0xFA => 'u', 0xFB => 'u', 0xFC => 'u',
+            0xFD => 'y', 0xFE => 'th', 0xFF => 'y',
+        ];
+
+        return $map[$byte] ?? null;
     }
 }
