@@ -10719,6 +10719,8 @@ class Compiler {
             || $producer instanceof Op\Expr\New_
             || $producer instanceof Op\Expr\UnaryMinus
             || $producer instanceof Op\Expr\UnaryPlus
+            || $producer instanceof Op\Expr\BitwiseNot
+            || $producer instanceof Op\Expr\BooleanNot
             || $producer instanceof Op\Expr\PostInc
             || $producer instanceof Op\Expr\PreInc
             || $producer instanceof Op\Expr\PostDec
@@ -12003,6 +12005,8 @@ class Compiler {
             || $op instanceof Op\Expr\NullsafeMethodCall
             || $op instanceof Op\Expr\UnaryMinus
             || $op instanceof Op\Expr\UnaryPlus
+            || $op instanceof Op\Expr\BitwiseNot
+            || $op instanceof Op\Expr\BooleanNot
             || $op instanceof Op\Expr\Empty_
             || $op instanceof Op\Expr\Isset_
             || $op instanceof Op\Expr\InstanceOf_
@@ -12060,7 +12064,11 @@ class Compiler {
                 }
             }
             // php-cfg `var_export(substr(..., -2), true)` — UnaryMinus feeds sibling FuncCall arg, not consumer (#10373).
-            if ($child instanceof Op\Expr\UnaryMinus || $child instanceof Op\Expr\UnaryPlus) {
+            if ($child instanceof Op\Expr\UnaryMinus
+                || $child instanceof Op\Expr\UnaryPlus
+                || $child instanceof Op\Expr\BitwiseNot
+                || $child instanceof Op\Expr\BooleanNot
+            ) {
                 $next = $cfgChildren[$i + 1] ?? null;
                 if (
                     ($next instanceof Op\Expr\FuncCall || $next instanceof Op\Expr\NsFuncCall)
