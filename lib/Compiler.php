@@ -15043,7 +15043,7 @@ class Compiler {
                             break;
                         }
                     }
-                    if (!$hasProducer && null === $this->findCoalesceStmtForCallArg($arg, $block)) {
+                    if (null === $this->findCoalesceStmtForCallArg($arg, $block)) {
                         $producerSlot = $this->findInlineExprCallArgProducerSlot($arg, $block, $cfgCallOp);
                         if (null !== $producerSlot) {
                             $valueSlot = $producerSlot;
