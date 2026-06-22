@@ -1777,7 +1777,7 @@ class JIT {
         }
 
         $this->queue[] = [$func, $block, $argVars];
-        if ($callbackType === 'void(*)()') {
+        if ($callbackType === 'void(*)()' && !Block::containsNonLiteralEvalOpcodes($block)) {
             $this->context->addExport($internalName, $callbackType, $block);
         }
         return $func;

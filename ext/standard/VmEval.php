@@ -41,6 +41,26 @@ final class VmEval
     }
 
     /**
+     * Compile eval source for JIT inline lowering — SSOT for parse path (#10248, #4652).
+     *
+     * Returns null on parse/compile failure (caller assigns false like Zend eval parse errors).
+     */
+    public static function tryCompileBlock(Runtime $runtime, string $code): ?Block
+    {
+        Runtime::clearLastParseFailure();
+        $runtime->compiler->resetCompileAbortDetail();
+        $wrapped = self::wrapEvalCode($code);
+
+        try {
+            return $runtime->parseAndCompile($wrapped, self::EVAL_FILENAME);
+        } catch (\CompileError) {
+            return null;
+        } catch (\Throwable) {
+            return null;
+        }
+    }
+
+    /**
      * Shared compile+execute path for TYPE_EVAL and the eval() builtin.
      */
     public static function evalCodeInFrame(
