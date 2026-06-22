@@ -14,6 +14,9 @@ use PHPCompiler\Web\Superglobals;
  */
 final class VmScope
 {
+    /** PHP EXTR_OVERWRITE — default when $flags omitted (php_array.h). */
+    public const EXTR_OVERWRITE = StdlibConstants::EXTR_OVERWRITE;
+
     /** PHP EXTR_SKIP — do not overwrite variables that already hold a value (php_array.h). */
     public const EXTR_SKIP = StdlibConstants::EXTR_SKIP;
 
@@ -69,7 +72,7 @@ final class VmScope
         if (Variable::TYPE_ARRAY !== $array->type) {
             throw new \LogicException('extract() first argument must be an array in this compiler build');
         }
-        $flags = self::EXTR_SKIP;
+        $flags = self::EXTR_OVERWRITE;
         if (2 === \count($frame->calledArgs)) {
             $flagsArg = $frame->calledArgs[1]->resolveIndirect();
             if (Variable::TYPE_INTEGER !== $flagsArg->type) {
