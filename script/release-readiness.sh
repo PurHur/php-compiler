@@ -121,6 +121,56 @@ run_gate() {
   return 1
 }
 
+run_gate_bootstrap_inventory() {
+  local name="bootstrap-inventory"
+  local label="bootstrap-inventory --check"
+  if [[ "${DRY_RUN}" -eq 1 ]]; then
+    log "dry-run: would run ${label}"
+    record_gate "${name}" skip "dry-run"
+    return 0
+  fi
+  if [[ ! -f "${_CI_REPO_ROOT}/vendor/autoload.php" ]]; then
+    log "vendor/ missing — running composer install + apply-patches (#10531)"
+    ci_install_deps
+  fi
+  log "gate ${label}..."
+  local err_file
+  err_file="$(mktemp)"
+  set +e
+  # Match north-star5 step 1: auto-regenerate when stale (#765) — bare --check alone
+  # false-fails while north-star5-verify-fast passes in the same bundle (#10531).
+  ci_ensure_generated_doc "${_CI_REPO_ROOT}/script/bootstrap-inventory.php" "${_CI_REPO_ROOT}/docs/bootstrap-inventory.md" >"${err_file}" 2>&1
+  local ensure_rc=$?
+  "$PHP_BIN" "${PHP_OPTS[@]}" script/bootstrap-inventory.php --check >>"${err_file}" 2>&1
+  local rc=$?
+  set -e
+  local body=""
+  if [[ -s "${err_file}" ]]; then
+    body="$(cat "${err_file}")"
+  fi
+  rm -f "${err_file}"
+  if [[ "${ensure_rc}" -eq 0 && "${rc}" -eq 0 ]] && grep -qE '^OK [0-9]+/[0-9]+$' <<<"${body}"; then
+    record_gate "${name}" ok "$(grep -E '^OK [0-9]+/[0-9]+$' <<<"${body}" | tail -n 1 | tr -d '\n')"
+    log "  ok: ${label}"
+    return 0
+  fi
+  local tail_msg=""
+  if [[ -n "${body}" ]]; then
+    tail_msg="$(printf '%s' "${body}" | tail -n 5 | tr '\n' ' ' | sed 's/  */ /g' | head -c 240)"
+  fi
+  if grep -qi 'vendor/ absent' <<<"${body}"; then
+    tail_msg="vendor/ missing; run composer install before --check (#10531). ${tail_msg}"
+  elif grep -qi 'Stale ' <<<"${body}"; then
+    tail_msg="stale docs/bootstrap-inventory.md — run: php script/bootstrap-inventory.php (#10368). ${tail_msg}"
+  fi
+  record_gate "${name}" fail "${tail_msg}"
+  log "  FAIL: ${label} (ensure=${ensure_rc} check=${rc})" >&2
+  if [[ -n "${body}" ]]; then
+    printf '%s\n' "${body}" | tail -n 8 >&2
+  fi
+  return 1
+}
+
 run_gate_allow_skip() {
   local name="$1"
   local label="$2"
@@ -194,11 +244,7 @@ release_readiness_ci_fast_subset() {
 FAILED=0
 
 # --- Quick bundle ---
-# Match north-star5 step 1: auto-regenerate when stale (#765) — bare --check alone
-# false-fails while north-star5-verify-fast passes in the same bundle (#10531).
-run_gate bootstrap-inventory "bootstrap-inventory --check" \
-  ci_ensure_generated_doc "${_CI_REPO_ROOT}/script/bootstrap-inventory.php" "${_CI_REPO_ROOT}/docs/bootstrap-inventory.md" \
-  || FAILED=1
+run_gate_bootstrap_inventory || FAILED=1
 
 run_gate spine-coverage "check-selfhost-spine-coverage-sync" \
   "$PHP_BIN" "${PHP_OPTS[@]}" script/check-selfhost-spine-coverage-sync.php \

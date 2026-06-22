@@ -19,6 +19,8 @@ final class BootstrapInventoryCheckTest extends TestCase
         $text = implode("\n", $out);
         if (1 === $code && str_contains($text, 'Stale')) {
             $this->assertStringContainsString('Diff:', $text);
+            $this->assertStringContainsString('File-list drift:', $text);
+            $this->assertStringContainsString('Optional construct-flag refresh', $text);
             $this->markTestSkipped('docs/bootstrap-inventory.md stale; regenerate with php script/bootstrap-inventory.php');
         }
         $this->assertSame(0, $code, $text);
