@@ -194,8 +194,10 @@ release_readiness_ci_fast_subset() {
 FAILED=0
 
 # --- Quick bundle ---
+# Match north-star5 step 1: auto-regenerate when stale (#765) — bare --check alone
+# false-fails while north-star5-verify-fast passes in the same bundle (#10531).
 run_gate bootstrap-inventory "bootstrap-inventory --check" \
-  "$PHP_BIN" "${PHP_OPTS[@]}" script/bootstrap-inventory.php --check \
+  ci_ensure_generated_doc "${_CI_REPO_ROOT}/script/bootstrap-inventory.php" "${_CI_REPO_ROOT}/docs/bootstrap-inventory.md" \
   || FAILED=1
 
 run_gate spine-coverage "check-selfhost-spine-coverage-sync" \
@@ -261,34 +263,13 @@ fi
 if [[ "${JSON_OUT}" -eq 1 ]]; then
   export _RR_MODE="${MODE}"
   export _RR_READY="${USER_RELEASE_READY}"
-  export _RR_NAMES
-  _RR_NAMES="$(printf '%s\n' "${GATE_NAMES[@]}")"
-  export _RR_STATUSES
-  _RR_STATUSES="$(printf '%s\n' "${GATE_STATUSES[@]}")"
-  export _RR_MESSAGES
-  _RR_MESSAGES="$(printf '%s\n' "${GATE_MESSAGES[@]}")"
-  "$PHP_BIN" -r '
-    $names = array_values(array_filter(explode("\n", getenv("_RR_NAMES") ?: ""), static fn ($v) => $v !== ""));
-    $statuses = array_values(array_filter(explode("\n", getenv("_RR_STATUSES") ?: ""), static fn ($v) => $v !== ""));
-    $messages = array_values(array_filter(explode("\n", getenv("_RR_MESSAGES") ?: ""), static fn ($v) => $v !== ""));
-    $gates = [];
-    $n = count($names);
-    for ($i = 0; $i < $n; ++$i) {
-        $gates[] = [
-            "name" => $names[$i] ?? ("gate".$i),
-            "status" => $statuses[$i] ?? "unknown",
-            "message" => $messages[$i] ?? "",
-        ];
-    }
-    echo json_encode(
-        [
-            "user_release_ready" => getenv("_RR_READY") ?: "no",
-            "mode" => getenv("_RR_MODE") ?: "quick",
-            "gates" => $gates,
-        ],
-        JSON_UNESCAPED_SLASHES | JSON_PRETTY_PRINT
-    ), "\n";
-  '
+  export _RR_GATE_COUNT="${#GATE_NAMES[@]}"
+  for i in "${!GATE_NAMES[@]}"; do
+    export "_RR_GATE_NAME_${i}=${GATE_NAMES[$i]}"
+    export "_RR_GATE_STATUS_${i}=${GATE_STATUSES[$i]}"
+    export "_RR_GATE_MESSAGE_${i}=${GATE_MESSAGES[$i]}"
+  done
+  "$PHP_BIN" "${PHP_OPTS[@]}" "${_CI_SCRIPT_DIR}/release-readiness-json-emit.php"
 else
   log "mode=${MODE} user_release_ready=${USER_RELEASE_READY}"
 fi
