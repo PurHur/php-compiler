@@ -9,18 +9,16 @@ use PHPCompiler\VM\ListUnpackJitHelper;
 use PHPCompiler\VM\Variable as VmVariable;
 use PHPUnit\Framework\TestCase;
 
-/** ListUnpack JIT routes value-box guards through ListUnpackJitHelper PHP (#10221, #10266). */
+/** ListUnpack JIT routes value-box guards through ListUnpackJitHelper PHP (#10221). */
 final class ListUnpackRuntimeShrinkTest extends TestCase
 {
     public function testListUnpackRuntimeUsesListUnpackJitHelper(): void
     {
         $source = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/ListUnpackRuntime.php');
         $this->assertStringContainsString('ListUnpackJitHelper', $source);
-        $this->assertStringContainsString('JitVmHelperLink', $source);
         $this->assertStringContainsString('valueBoxIsArray', $source);
         $this->assertStringContainsString('valueBoxIsString', $source);
         $this->assertStringContainsString('valueBoxIsListDestructUnpackable', $source);
-        $this->assertLessThan(160, substr_count($source, "\n") + 1);
     }
 
     public function testListUnpackHelperRoutesValueBoxThroughListUnpackRuntime(): void

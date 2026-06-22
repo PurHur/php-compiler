@@ -4,20 +4,21 @@ declare(strict_types=1);
 
 namespace PHPCompiler\JIT\Builtin;
 
+use PHPCompiler\JIT;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitValueBox;
-use PHPCompiler\JIT\JitVmHelperLink;
 use PHPCompiler\JIT\Variable;
 use PHPLLVM\Value;
+use PHPLLVM\Value\Function_ as LlvmFunction;
 
 /**
- * JIT/AOT link for list/spread unpack guards via ListUnpackJitHelper PHP (#10221, #10266).
+ * JIT/AOT link for list/spread unpack guards via ListUnpackJitHelper PHP (#10221).
  *
  * SSOT: {@see \PHPCompiler\VM\ListUnpackJitHelper}
  */
 final class ListUnpackRuntime
 {
-    private const HELPER_PATH = '/VM/ListUnpackJitHelper.php';
+    private const HELPER_PATH = '/lib/VM/ListUnpackJitHelper.php';
 
     private const VALUE_BOX_IS_ARRAY = 'PHPCompiler\\VM\\ListUnpackJitHelper::valueBoxIsArray';
 
@@ -32,12 +33,6 @@ final class ListUnpackRuntime
         self::VALUE_BOX_IS_UNPACKABLE,
     ];
 
-    private const ABI_IS_ARRAY = '__list_unpack__valueBoxIsArray';
-
-    private const ABI_IS_STRING = '__list_unpack__valueBoxIsString';
-
-    private const ABI_IS_UNPACKABLE = '__list_unpack__valueBoxIsListDestructUnpackable';
-
     public static function ensureLinked(Context $context): void
     {
         self::implement($context);
@@ -45,53 +40,30 @@ final class ListUnpackRuntime
 
     public static function implement(Context $context): void
     {
-        if (self::bridgesReady($context)) {
+        $probe = $context->module->getNamedFunction('__list_unpack__valueBoxIsArray');
+        if (null !== $probe && $probe->countBasicBlocks() > 0) {
+            self::registerLinkedRuntime($context);
+
             return;
         }
 
-        $i8 = $context->getTypeFromString('int8');
-        $i1 = $context->getTypeFromString('int1');
-
-        JitVmHelperLink::ensureBridge(
+        self::ensureJitHelperCompiled($context);
+        self::implementValueBoxBridge($context, '__list_unpack__valueBoxIsArray', self::VALUE_BOX_IS_ARRAY, 1);
+        self::implementValueBoxBridge($context, '__list_unpack__valueBoxIsString', self::VALUE_BOX_IS_STRING, 1);
+        self::implementValueBoxBridge(
             $context,
-            self::ABI_IS_ARRAY,
-            'list_unpack_value_box_is_array_entry',
-            [$i8],
-            $i1,
-            self::VALUE_BOX_IS_ARRAY,
-            self::HELPER_PATH,
-            self::COMPILED_HELPERS,
-            '#10266'
-        );
-        JitVmHelperLink::ensureBridge(
-            $context,
-            self::ABI_IS_STRING,
-            'list_unpack_value_box_is_string_entry',
-            [$i8],
-            $i1,
-            self::VALUE_BOX_IS_STRING,
-            self::HELPER_PATH,
-            self::COMPILED_HELPERS,
-            '#10266'
-        );
-        JitVmHelperLink::ensureBridge(
-            $context,
-            self::ABI_IS_UNPACKABLE,
-            'list_unpack_value_box_is_unpackable_entry',
-            [$i8, $i1],
-            $i1,
+            '__list_unpack__valueBoxIsListDestructUnpackable',
             self::VALUE_BOX_IS_UNPACKABLE,
-            self::HELPER_PATH,
-            self::COMPILED_HELPERS,
-            '#10266'
+            2
         );
+        self::registerLinkedRuntime($context);
         $context->builder->clearInsertionPosition();
     }
 
     public static function callValueBoxIsArray(Context $context, Value $typeByte): Value
     {
         self::ensureLinked($context);
-        $fn = $context->lookupFunction(self::ABI_IS_ARRAY);
+        $fn = $context->lookupFunction('__list_unpack__valueBoxIsArray');
         $i8 = $context->getTypeFromString('int8');
 
         return $context->builder->call(
@@ -103,7 +75,7 @@ final class ListUnpackRuntime
     public static function callValueBoxIsString(Context $context, Value $typeByte): Value
     {
         self::ensureLinked($context);
-        $fn = $context->lookupFunction(self::ABI_IS_STRING);
+        $fn = $context->lookupFunction('__list_unpack__valueBoxIsString');
         $i8 = $context->getTypeFromString('int8');
 
         return $context->builder->call(
@@ -118,7 +90,7 @@ final class ListUnpackRuntime
         Value $implementsArrayAccess
     ): Value {
         self::ensureLinked($context);
-        $fn = $context->lookupFunction(self::ABI_IS_UNPACKABLE);
+        $fn = $context->lookupFunction('__list_unpack__valueBoxIsListDestructUnpackable');
         $i8 = $context->getTypeFromString('int8');
         $i1 = $context->getTypeFromString('int1');
 
@@ -141,16 +113,107 @@ final class ListUnpackRuntime
         );
     }
 
-    private static function bridgesReady(Context $context): bool
+    private static function registerLinkedRuntime(Context $context): void
     {
-        foreach ([self::ABI_IS_ARRAY, self::ABI_IS_STRING, self::ABI_IS_UNPACKABLE] as $abiName) {
-            $probe = $context->module->getNamedFunction($abiName);
-            if (null === $probe || 0 === $probe->countBasicBlocks()) {
-                return false;
+        foreach ([
+            '__list_unpack__valueBoxIsArray',
+            '__list_unpack__valueBoxIsString',
+            '__list_unpack__valueBoxIsListDestructUnpackable',
+        ] as $abiName) {
+            $fn = $context->module->getNamedFunction($abiName);
+            if (null !== $fn) {
+                $context->registerFunction($abiName, $fn);
             }
+        }
+    }
+
+    private static function implementValueBoxBridge(
+        Context $context,
+        string $abiName,
+        string $helperLogical,
+        int $paramCount
+    ): void {
+        $probe = $context->module->getNamedFunction($abiName);
+        if (null !== $probe && $probe->countBasicBlocks() > 0) {
             $context->registerFunction($abiName, $probe);
+
+            return;
         }
 
-        return true;
+        $i8 = $context->getTypeFromString('int8');
+        $i1 = $context->getTypeFromString('int1');
+        $paramTypes = 2 === $paramCount ? [$i8, $i1] : [$i8];
+        $ft = $context->context->functionType($i1, false, ...$paramTypes);
+        $fn = null !== $probe
+            ? $probe
+            : $context->module->addFunction($abiName, $ft);
+
+        $entry = $fn->appendBasicBlock('list_unpack_value_box_bridge_entry');
+        $context->builder->positionAtEnd($entry);
+        $args = [];
+        for ($i = 0; $i < $paramCount; ++$i) {
+            $args[] = $fn->getParam($i);
+        }
+        $result = $context->builder->call(
+            self::helperFunction($context, $helperLogical),
+            ...$args
+        );
+        $context->builder->returnValue($result);
+        $context->registerFunction($abiName, $fn);
+    }
+
+    private static function helperFunction(Context $context, string $logical): LlvmFunction
+    {
+        self::ensureJitHelperCompiled($context);
+        $lc = \strtolower($logical);
+        $fn = $context->functions[$lc] ?? null;
+        if (null === $fn) {
+            throw new \LogicException($logical.' missing after ListUnpackJitHelper compile (#10221)');
+        }
+
+        return $fn;
+    }
+
+    private static function ensureJitHelperCompiled(Context $context): void
+    {
+        $missing = false;
+        foreach (self::COMPILED_HELPERS as $logical) {
+            if (!isset($context->functions[\strtolower($logical)])) {
+                $missing = true;
+                break;
+            }
+        }
+        if (!$missing) {
+            return;
+        }
+
+        $runtime = $context->runtime;
+        $path = \dirname(__DIR__, 3).self::HELPER_PATH;
+        $prevSelfHostAot = \getenv('PHP_COMPILER_SELFHOST_AOT');
+        if (\function_exists('putenv')) {
+            \putenv('PHP_COMPILER_SELFHOST_AOT=0');
+        }
+        try {
+            $block = $runtime->parseAndCompile((string) \file_get_contents($path), 'ListUnpackJitHelper.php');
+            if (null === $block) {
+                throw new \LogicException('ListUnpackJitHelper.php parseAndCompile failed (#10221)');
+            }
+            $jit = new JIT($context);
+            $jit->compile($block);
+        } finally {
+            if (\function_exists('putenv')) {
+                if (false === $prevSelfHostAot || null === $prevSelfHostAot) {
+                    \putenv('PHP_COMPILER_SELFHOST_AOT=');
+                } else {
+                    \putenv('PHP_COMPILER_SELFHOST_AOT='.$prevSelfHostAot);
+                }
+            }
+        }
+        foreach (self::COMPILED_HELPERS as $logical) {
+            $lc = \strtolower($logical);
+            if (!isset($context->functions[$lc])) {
+                throw new \LogicException($lc.' was not compiled for JIT (#10221)');
+            }
+        }
     }
 }
