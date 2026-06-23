@@ -82,6 +82,13 @@ final class ReferencableCheck
             if (!array_key_exists($paramIdx, $calledArgs)) {
                 continue;
             }
+            if (
+                0 === $paramIdx
+                && self::allowsEphemeralArrayLiteralByRef($fn)
+                && self::isEphemeralArrayArg($calledArgs[$paramIdx], $caller)
+            ) {
+                continue;
+            }
             $paramName = $paramNames[$paramIdx] ?? 'param'.($paramIdx + 1);
             self::assertArgument($fn, $paramIdx, $paramName, $calledArgs[$paramIdx], $caller);
         }
@@ -114,6 +121,38 @@ final class ReferencableCheck
             $paramIdx + 1,
             $paramName
         ));
+    }
+
+    /**
+     * Zend accepts inline array literals for current()/key() only (zend_compile.c ZEND_SEND_REF temp).
+     */
+    public static function allowsEphemeralArrayLiteralByRef(string $fn): bool
+    {
+        return \in_array(strtolower($fn), ['current', 'key'], true);
+    }
+
+    /** Inline array literal operand — not an lvalue, but allowed for read-only pointer builtins (#10654). */
+    public static function isEphemeralArrayArg(Variable $arg, Frame $caller): bool
+    {
+        if ($arg->isIndirect()) {
+            return false;
+        }
+        $resolved = $arg->resolveIndirect();
+        if (null !== $resolved->objectPropertyOwner) {
+            return false;
+        }
+        if (
+            Variable::TYPE_STRING_OFFSET === $resolved->type
+            || Variable::TYPE_ARRAYACCESS_OFFSET === $resolved->type
+            || Variable::TYPE_PROPERTY_HOOK_REF === $resolved->type
+        ) {
+            return false;
+        }
+        if (Variable::TYPE_ARRAY !== $resolved->type) {
+            return false;
+        }
+
+        return !self::isReferenceable($arg, $caller);
     }
 
     public static function isReferenceable(Variable $arg, Frame $caller): bool

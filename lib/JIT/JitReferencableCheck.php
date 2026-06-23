@@ -63,6 +63,9 @@ final class JitReferencableCheck
         if (!self::isEphemeralArrayArg($array)) {
             return true;
         }
+        if (\PHPCompiler\VM\ReferencableCheck::allowsEphemeralArrayLiteralByRef($fn)) {
+            return true;
+        }
         self::emitByRefError($context, $fn, 0);
         $context->builder->call($context->lookupFunction('abort'));
 

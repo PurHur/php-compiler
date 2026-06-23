@@ -14200,6 +14200,13 @@ class JIT {
                 continue;
             }
             if (!JIT\JitReferencableCheck::isOperandReferenceable($operand, $args[$idx])) {
+                if (
+                    0 === $idx
+                    && VM\ReferencableCheck::allowsEphemeralArrayLiteralByRef($name)
+                    && JIT\JitReferencableCheck::isEphemeralArrayArg($args[$idx])
+                ) {
+                    continue;
+                }
                 JIT\JitReferencableCheck::emitByRefError($this->context, $name, $idx);
 
                 continue;
