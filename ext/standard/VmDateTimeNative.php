@@ -100,6 +100,9 @@ final class VmDateTimeNative
     public static function parseDateTime(string $time, string $tzName): array
     {
         $time = trim($time);
+        if ('' === $time) {
+            return self::readNow();
+        }
         if ('now' === strtolower($time)) {
             return self::readNow();
         }
