@@ -13349,7 +13349,12 @@ class Compiler {
      */
     private function callNeedsReturnSlot(Operand $result, Block $block): bool
     {
-        if (!empty($result->usages) || $block->callResultFeedsReturn($result)) {
+        if (
+            !empty($result->usages)
+            || $block->callResultFeedsReturn($result)
+            || $block->callResultFeedsErrorSuppressExit($result)
+            || (null !== $block->orig && $block->orig instanceof ErrorSuppressBlock)
+        ) {
             return true;
         }
 

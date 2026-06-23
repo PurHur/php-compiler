@@ -393,6 +393,15 @@ final class JitStat
         );
     }
 
+    public static function warnPathStatArrayFailed(
+        Context $context,
+        Value $pathStr,
+        string $function,
+        bool $lstat
+    ): void {
+        self::emitPathStatFailureWarning($context, $pathStr, $function, $lstat);
+    }
+
     private static function emitPathStatFailureWarning(
         Context $context,
         Value $pathStr,

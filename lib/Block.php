@@ -11,6 +11,7 @@ namespace PHPCompiler;
 
 // used as a property type.
 // @phan-suppress-next-line PhanUnreferencedUseNormal
+use PHPCfg\ErrorSuppressBlock;
 use PHPCfg\Func;
 use PHPCfg\Op;
 use PHPCfg\Block as CfgBlock;
@@ -1162,6 +1163,37 @@ class Block {
             }
             if (self::cfgVarRoot($child->expr) === $resultRoot) {
                 return true;
+            }
+        }
+
+        return false;
+    }
+
+    /**
+     * `@` suppress region forwards its inner expression value across END_SILENCE (#10336, #3546).
+     *
+     * php-cfg {@see ErrorSuppressBlock}: readVariable() on the inner expr does not register FuncCall usages.
+     */
+    public function callResultFeedsErrorSuppressExit(Operand $result): bool
+    {
+        if (null === $this->orig || !($this->orig instanceof ErrorSuppressBlock)) {
+            return false;
+        }
+        $resultRoot = self::cfgVarRoot($result);
+        if (null === $resultRoot) {
+            return false;
+        }
+        foreach ($this->orig->children as $child) {
+            if (
+                $child instanceof Op\Expr\FuncCall
+                || $child instanceof Op\Expr\NsFuncCall
+                || $child instanceof Op\Expr\MethodCall
+                || $child instanceof Op\Expr\StaticCall
+                || $child instanceof Op\Expr\New_
+            ) {
+                if (self::cfgVarRoot($child->result) === $resultRoot) {
+                    return true;
+                }
             }
         }
 
