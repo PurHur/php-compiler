@@ -25,6 +25,10 @@ final class ArrayFillKeysVMTest extends BaseTest
             __DIR__.'/cases/stdlib/array_fill_keys_float_key.phpt',
             'array_fill_keys_float_key.phpt'
         );
+        yield 'array_fill_keys_array_key.phpt' => self::parsePHPT(
+            __DIR__.'/cases/stdlib/array_fill_keys_array_key.phpt',
+            'array_fill_keys_array_key.phpt'
+        );
     }
 
     public function setUp(): void

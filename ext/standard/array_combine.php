@@ -69,7 +69,7 @@ final class array_combine extends Internal
             $stored = new Variable();
             $stored->copyFrom($values[$i]);
             // Zend array_combine: duplicate keys keep the last value (ext/standard/array.c).
-            VmArray::storeCombineKey($ht, $keys[$i], $stored);
+            VmArray::storeCombineKey($ht, $keys[$i], $stored, $frame);
         }
         $frame->returnVar->array($ht);
     }

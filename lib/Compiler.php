@@ -11660,6 +11660,16 @@ class Compiler {
             return null;
         }
         if ($argCount < $producerCount) {
+            // array_fill_keys([[[1]]], 1) — all Array_ preludes belong to the sole hoisted arg (#10848).
+            if (
+                $this->producersAreNestedArrayLiteralChain($producers)
+                && $this->arrayProducersFormNestedChain($producers)
+            ) {
+                $soleHoisted = $this->soleNonEmbeddedCallArgIndex($callArgs);
+                if (null !== $soleHoisted && $argIndex === $soleHoisted) {
+                    return $producers[$producerCount - 1];
+                }
+            }
             $nestedArrayTrailing = $this->splitNestedArrayLiteralChainWithTrailingProducers($producers);
             if (null !== $nestedArrayTrailing) {
                 [$arrayChain, $trailing] = $nestedArrayTrailing;
@@ -11810,6 +11820,16 @@ class Compiler {
                 return null;
             }
             if ($this->producersAreNestedArrayLiteralChain($producers)) {
+                // array_fill_keys([[1]], 1) — nested Array_ preludes map to the sole hoisted arg (#10848).
+                if (
+                    $this->arrayProducersFormNestedChain($producers)
+                    && $producerCount >= 2
+                ) {
+                    $soleHoisted = $this->soleNonEmbeddedCallArgIndex($callArgs);
+                    if (null !== $soleHoisted && $argIndex === $soleHoisted) {
+                        return $producers[$producerCount - 1];
+                    }
+                }
                 $callArg = $callArgs[$argIndex] ?? null;
                 $paired = $producers[$argIndex] ?? null;
                 if (
@@ -12496,6 +12516,58 @@ class Compiler {
         }
 
         return true;
+    }
+
+    /**
+     * True when inline Array_ producers nest outer-wrapping-inner (#4738, #10848).
+     *
+     * @param list<Op\Expr> $producers
+     */
+    private function arrayProducersFormNestedChain(array $producers): bool
+    {
+        if (\count($producers) < 2) {
+            return false;
+        }
+        for ($i = 1, $n = \count($producers); $i < $n; ++$i) {
+            $inner = $producers[$i - 1];
+            $outer = $producers[$i];
+            if (!$inner instanceof Op\Expr\Array_ || !$outer instanceof Op\Expr\Array_) {
+                return false;
+            }
+            $nested = false;
+            foreach ($outer->values as $value) {
+                if ($this->operandsReferToSameVariable($value, $inner->result)) {
+                    $nested = true;
+                    break;
+                }
+            }
+            if (!$nested) {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    /**
+     * @param list<Operand> $callArgs
+     */
+    private function soleNonEmbeddedCallArgIndex(array $callArgs): ?int
+    {
+        $index = null;
+        $count = 0;
+        foreach ($callArgs as $i => $callArg) {
+            if ($this->isEmbeddedCallLiteralArg($callArg)) {
+                continue;
+            }
+            ++$count;
+            $index = $i;
+        }
+        if (1 !== $count) {
+            return null;
+        }
+
+        return $index;
     }
 
     /**

@@ -32,7 +32,7 @@ final class array_fill_keys extends Internal
         if (null === $frame->returnVar) {
             return;
         }
-        $frame->returnVar->array(VmArray::fillKeys($keysHt, $value));
+        $frame->returnVar->array(VmArray::fillKeys($keysHt, $value, $frame));
     }
 
     public function call(Context $context, JITVariable ...$args): Value
