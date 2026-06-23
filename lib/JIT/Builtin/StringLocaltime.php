@@ -4,48 +4,28 @@ declare(strict_types=1);
 
 namespace PHPCompiler\JIT\Builtin;
 
+use PHPCompiler\JIT;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\NestedJitCompileScope;
 use PHPLLVM\Builder;
 use PHPLLVM\Value;
 use PHPLLVM\Value\Function_ as LlvmFunction;
 
 /**
- * LLVM implementation of __compiler_localtime — localtime + numeric/assoc array.
+ * JIT/AOT link for __compiler_localtime via LocaltimeJitHelper PHP (#9181).
  *
- * Mirrors ext/standard/VmDate::localtimeBreakdown() (issue #6812).
+ * Replaces localtime/hashtable LLVM; SSOT {@see \PHPCompiler\ext\standard\VmDate}.
  * php-src: ext/standard/datetime.c — PHP_FUNCTION(localtime)
  */
 final class StringLocaltime
 {
-    private const TM_SEC = 0;
+    private const HELPER_PATH = '/ext/standard/LocaltimeJitHelper.php';
 
-    private const TM_MIN = 4;
-
-    private const TM_HOUR = 8;
-
-    private const TM_MDAY = 12;
-
-    private const TM_MON = 16;
-
-    private const TM_YEAR = 20;
-
-    private const TM_WDAY = 24;
-
-    private const TM_YDAY = 28;
-
-    private const TM_ISDST = 32;
+    private const LOCALTIME_HELPER = 'PHPCompiler\\ext\\standard\\LocaltimeJitHelper::localtime';
 
     /** @var list<string> */
-    private const ASSOC_KEYS = [
-        'tm_sec',
-        'tm_min',
-        'tm_hour',
-        'tm_mday',
-        'tm_mon',
-        'tm_year',
-        'tm_wday',
-        'tm_yday',
-        'tm_isdst',
+    private const COMPILED_HELPERS = [
+        self::LOCALTIME_HELPER,
     ];
 
     public static function ensureLinked(Context $context): void
@@ -62,185 +42,111 @@ final class StringLocaltime
             return;
         }
 
-        self::ensureHashtableHelpers($context);
+        self::ensureJitHelperCompiled($context);
+        self::implementLocaltimeBridge($context);
+        self::registerLinkedRuntime($context);
+        $context->builder->clearInsertionPosition();
+    }
+
+    private static function implementLocaltimeBridge(Context $context): void
+    {
+        $abiName = '__compiler_localtime';
+        $probe = $context->module->getNamedFunction($abiName);
+        if (null !== $probe && $probe->countBasicBlocks() > 0) {
+            $context->registerFunction($abiName, $probe);
+
+            return;
+        }
 
         $i64 = $context->getTypeFromString('int64');
         $i1 = $context->getTypeFromString('int1');
         $voidTy = $context->getTypeFromString('void');
         $valuePtr = $context->getTypeFromString('__value__*');
+        $htPtr = $context->getTypeFromString('__hashtable__*');
 
         $ft = $context->context->functionType($voidTy, false, $i64, $i1, $valuePtr);
         $fn = null !== $probe
             ? $probe
-            : $context->module->addFunction('__compiler_localtime', $ft);
-        self::implementLocaltime($context, $fn);
+            : $context->module->addFunction($abiName, $ft);
 
-        self::registerLinkedRuntime($context);
-    }
-
-    private static function implementLocaltime(Context $context, LlvmFunction $fn): void
-    {
-        $entry = $fn->appendBasicBlock('lt_entry');
+        $entry = $fn->appendBasicBlock('lt_bridge_entry');
+        $nullOutBb = $fn->appendBasicBlock('lt_null_out');
+        $bodyBb = $fn->appendBasicBlock('lt_body');
         $context->builder->positionAtEnd($entry);
 
         $timestamp = $fn->getParam(0);
         $associative = $fn->getParam(1);
         $out = $fn->getParam(2);
-
-        $i64 = $context->getTypeFromString('int64');
-        $i32 = $context->getTypeFromString('int32');
-        $i8p = $context->getTypeFromString('int8*');
-        $valuePtr = $context->getTypeFromString('__value__*');
-        $htPtr = $context->getTypeFromString('__hashtable__*');
-        $sizeT = $context->getTypeFromString('size_t');
         $nullOut = $context->builder->icmp(Builder::INT_EQ, $out, $valuePtr->constNull());
-        $nullRetBb = $fn->appendBasicBlock('lt_null_out');
-        $localBb = $fn->appendBasicBlock('lt_localtime');
-        $context->builder->branchIf($nullOut, $nullRetBb, $localBb);
+        $context->builder->branchIf($nullOut, $nullOutBb, $bodyBb);
 
-        $context->builder->positionAtEnd($nullRetBb);
+        $context->builder->positionAtEnd($nullOutBb);
         $context->builder->returnVoid();
-        $context->builder->clearInsertionPosition();
 
-        $context->builder->positionAtEnd($localBb);
-        $i64p = $context->getTypeFromString('int64*');
-        $tsSlot = $context->builder->alloca($i64, 1, 'lt_ts');
-        $context->builder->store($timestamp, $tsSlot);
-        $tsPtr = $context->builder->pointerCast($tsSlot, $i64p);
-        $tmPtr = $context->builder->call($context->lookupFunction('localtime'), $tsPtr);
-        $tmNull = $context->builder->icmp(Builder::INT_EQ, $tmPtr, $i8p->constNull());
-        $tmFailBb = $fn->appendBasicBlock('lt_tm_fail');
-        $fillBb = $fn->appendBasicBlock('lt_fill');
-        $context->builder->branchIf($tmNull, $tmFailBb, $fillBb);
-
-        $context->builder->positionAtEnd($tmFailBb);
-        $context->builder->returnVoid();
-        $context->builder->clearInsertionPosition();
-
-        $context->builder->positionAtEnd($fillBb);
-        $ht = $context->builder->call($context->lookupFunction('__hashtable__alloc'));
+        $context->builder->positionAtEnd($bodyBb);
+        $ht = $context->builder->call(
+            self::helperFunction($context, self::LOCALTIME_HELPER),
+            $timestamp,
+            $associative
+        );
         $htNull = $context->builder->icmp(Builder::INT_EQ, $ht, $htPtr->constNull());
-        $allocFailBb = $fn->appendBasicBlock('lt_alloc_fail');
-        $keysBb = $fn->appendBasicBlock('lt_keys');
-        $context->builder->branchIf($htNull, $allocFailBb, $keysBb);
+        $failBb = $fn->appendBasicBlock('lt_fail');
+        $storeBb = $fn->appendBasicBlock('lt_store');
+        $context->builder->branchIf($htNull, $failBb, $storeBb);
 
-        $context->builder->positionAtEnd($allocFailBb);
+        $context->builder->positionAtEnd($failBb);
         $context->builder->returnVoid();
-        $context->builder->clearInsertionPosition();
 
-        $context->builder->positionAtEnd($keysBb);
-        $offsets = [
-            self::TM_SEC,
-            self::TM_MIN,
-            self::TM_HOUR,
-            self::TM_MDAY,
-            self::TM_MON,
-            self::TM_YEAR,
-            self::TM_WDAY,
-            self::TM_YDAY,
-            self::TM_ISDST,
-        ];
-        $values = [];
-        foreach ($offsets as $offset) {
-            $values[] = $context->builder->zExt(self::loadTmField($context, $tmPtr, $offset), $i64);
-        }
-
-        $setLong = $context->lookupFunction('__hashtable__setStringKeyLong');
-        $setAt = $context->lookupFunction('__hashtable__setLongAt');
-        $assocBb = $fn->appendBasicBlock('lt_assoc');
-        $indexBb = $fn->appendBasicBlock('lt_index');
-        $doneBb = $fn->appendBasicBlock('lt_done');
-        $context->builder->branchIf($associative, $assocBb, $indexBb);
-
-        $context->builder->positionAtEnd($assocBb);
-        foreach (self::ASSOC_KEYS as $i => $key) {
-            $context->builder->call(
-                $setLong,
-                $ht,
-                self::literalString($context, $key),
-                $values[$i]
-            );
-        }
-        $context->builder->branch($doneBb);
-        $context->builder->clearInsertionPosition();
-
-        $context->builder->positionAtEnd($indexBb);
-        foreach ($values as $i => $val) {
-            $context->builder->call(
-                $setAt,
-                $ht,
-                $sizeT->constInt($i, false),
-                $val
-            );
-        }
-        $context->builder->branch($doneBb);
-        $context->builder->clearInsertionPosition();
-
-        $context->builder->positionAtEnd($doneBb);
+        $context->builder->positionAtEnd($storeBb);
         $context->builder->call(
             $context->lookupFunction('__value__writeHashtable'),
             $out,
             $ht
         );
         $context->builder->returnVoid();
-        $context->builder->clearInsertionPosition();
+        $context->registerFunction($abiName, $fn);
     }
 
-    private static function loadTmField(Context $context, Value $tmPtr, int $offset): Value
+    private static function helperFunction(Context $context, string $logical): LlvmFunction
     {
-        $i32 = $context->getTypeFromString('int32');
-        $i32p = $context->getTypeFromString('int32*');
-        $tmFields = $context->builder->pointerCast($tmPtr, $i32p);
-
-        return $context->builder->load(
-            $context->builder->gep($tmFields, $i32->constInt((int) ($offset / 4), false))
-        );
-    }
-
-    private static function literalString(Context $context, string $text): Value
-    {
-        $i64 = $context->getTypeFromString('int64');
-        $i8p = $context->getTypeFromString('int8*');
-        $cstr = $context->builder->pointerCast($context->constantFromString($text), $i8p);
-
-        return $context->builder->call(
-            $context->lookupFunction('__string__init'),
-            $i64->constInt(\strlen($text), false),
-            $cstr
-        );
-    }
-
-    private static function ensureHashtableHelpers(Context $context): void
-    {
-        $htPtr = $context->getTypeFromString('__hashtable__*');
-        $strPtr = $context->getTypeFromString('__string__*');
-        $valuePtr = $context->getTypeFromString('__value__*');
-        $i64 = $context->getTypeFromString('int64');
-        $sizeT = $context->getTypeFromString('size_t');
-        $voidTy = $context->getTypeFromString('void');
-
-        foreach ([
-            ['__hashtable__alloc', $htPtr, []],
-            ['__hashtable__setStringKeyLong', $voidTy, [$htPtr, $strPtr, $i64]],
-            ['__hashtable__setLongAt', $voidTy, [$htPtr, $sizeT, $i64]],
-            ['__value__writeHashtable', $voidTy, [$valuePtr, $htPtr]],
-            ['__string__init', $strPtr, [$i64, $context->getTypeFromString('int8*')]],
-        ] as [$name, $ret, $params]) {
-            self::ensureExternal(
-                $context,
-                $name,
-                $context->context->functionType($ret, false, ...$params)
-            );
+        self::ensureJitHelperCompiled($context);
+        $lc = \strtolower($logical);
+        $fn = $context->functions[$lc] ?? null;
+        if (null === $fn) {
+            throw new \LogicException($logical.' missing after LocaltimeJitHelper compile (#9181)');
         }
+
+        return $fn;
     }
 
-    private static function ensureExternal(Context $context, string $name, $ft): void
+    private static function ensureJitHelperCompiled(Context $context): void
     {
-        try {
-            $context->lookupFunction($name);
-        } catch (\Throwable) {
-            $fn = $context->module->addFunction($name, $ft);
-            $context->registerFunction($name, $fn);
+        $missing = false;
+        foreach (self::COMPILED_HELPERS as $logical) {
+            if (!isset($context->functions[\strtolower($logical)])) {
+                $missing = true;
+                break;
+            }
+        }
+        if (!$missing) {
+            return;
+        }
+
+        $runtime = $context->runtime;
+        $path = \dirname(__DIR__, 3).self::HELPER_PATH;
+        NestedJitCompileScope::run($context, static function () use ($context, $runtime, $path): void {
+            $block = $runtime->parseAndCompile((string) \file_get_contents($path), 'LocaltimeJitHelper.php');
+            if (null === $block) {
+                throw new \LogicException('LocaltimeJitHelper.php parseAndCompile failed (#9181)');
+            }
+            $jit = new JIT($context);
+            $jit->compile($block);
+        });
+        foreach (self::COMPILED_HELPERS as $logical) {
+            $lc = \strtolower($logical);
+            if (!isset($context->functions[$lc])) {
+                throw new \LogicException($lc.' was not compiled for JIT (#9181)');
+            }
         }
     }
 
@@ -248,7 +154,7 @@ final class StringLocaltime
     {
         $fn = $context->module->getNamedFunction('__compiler_localtime');
         if (null === $fn) {
-            throw new \LogicException('__compiler_localtime missing after StringLocaltime LLVM implement');
+            throw new \LogicException('__compiler_localtime missing after StringLocaltime bridge (#9181)');
         }
         $context->registerFunction('__compiler_localtime', $fn);
     }

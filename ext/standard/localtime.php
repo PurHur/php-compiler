@@ -12,7 +12,7 @@ use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
 
-/** localtime() — struct tm breakdown (VM VmDate; JIT/AOT StringLocaltime LLVM, #6812). */
+/** localtime() — struct tm breakdown (VM VmDate; JIT LocaltimeJitHelper, #6812, #9181). */
 final class localtime extends Internal
 {
     public function __construct()
