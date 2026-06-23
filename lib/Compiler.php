@@ -807,6 +807,9 @@ class Compiler {
                 $this->inheritCfgVarSlotsFromSiblingCfgBranches($block, $new);
                 $this->applyTernaryMergeVarSlots($block, $new);
             }
+            if ($this->isErrorSuppressEndBlock($block)) {
+                $this->inheritErrorSuppressExpressionSlots($parent, $new);
+            }
             $this->inheritFuncFromParent($new, $parent);
             // Match/ternary branch blocks reuse unnamed temporaries (subject slot) from the parent (#4274).
             $new->inheritUndefinedLocals = true;
@@ -823,6 +826,9 @@ class Compiler {
             // adds duplicate slot indices and breaks ?: echo (#3790).
             if (\count($block->parents) < 2) {
                 $child->inheritScopeFrom($parent);
+                if ($this->isErrorSuppressEndBlock($block)) {
+                    $this->inheritErrorSuppressExpressionSlots($parent, $child);
+                }
             }
             $this->inheritFuncFromParent($child, $parent);
         }
@@ -6778,6 +6784,147 @@ class Compiler {
         $parent = $block->parents[0];
 
         return $parent instanceof ErrorSuppressBlock;
+    }
+
+    /**
+     * php-cfg {@see ErrorSuppressBlock}: inner expr result is produced in the suppress branch but
+     * consumed in the post-suppress block; inheritScopeFrom alone can miss unnamed SSA temps (#10336).
+     */
+    private function inheritErrorSuppressExpressionSlots(Block $suppressCompiled, Block $endCompiled): void
+    {
+        $suppressCfg = $suppressCompiled->orig;
+        if (!$suppressCfg instanceof ErrorSuppressBlock) {
+            return;
+        }
+        $endCfg = $endCompiled->orig;
+        $innerSlots = [];
+        foreach ($suppressCfg->children as $child) {
+            if (!$this->isErrorSuppressInnerExpr($child)) {
+                continue;
+            }
+            if (!isset($child->result)) {
+                continue;
+            }
+            $slot = $suppressCompiled->slotForOperand($child->result);
+            if (null === $slot) {
+                $slot = $this->findFuncCallExecReturnSlot($suppressCompiled);
+            }
+            if (null === $slot) {
+                continue;
+            }
+            $innerSlots[] = [$child->result, $slot];
+            $endCompiled->forceBindScopeSlot($child->result, $slot);
+            $root = Block::cfgVarRoot($child->result);
+            if (null !== $root) {
+                $endCompiled->prebindCfgVarRoot($root, $slot);
+            }
+            foreach ($child->result->usages as $usage) {
+                if (
+                    !$usage instanceof Op\Expr\FuncCall
+                    && !$usage instanceof Op\Expr\NsFuncCall
+                    && !$usage instanceof Op\Expr\MethodCall
+                    && !$usage instanceof Op\Expr\StaticCall
+                    && !$usage instanceof Op\Expr\New_
+                ) {
+                    continue;
+                }
+                if (property_exists($usage, 'args') && is_array($usage->args)) {
+                    foreach ($usage->args as $arg) {
+                        if ($arg instanceof Operand) {
+                            $endCompiled->forceBindScopeSlot($arg, $slot);
+                        }
+                    }
+                }
+            }
+        }
+        if (1 === \count($innerSlots) && null !== $endCfg) {
+            [, $slot] = $innerSlots[0];
+            foreach ($endCfg->children as $endChild) {
+                if (
+                    !$endChild instanceof Op\Expr\FuncCall
+                    && !$endChild instanceof Op\Expr\NsFuncCall
+                    && !$endChild instanceof Op\Expr\MethodCall
+                    && !$endChild instanceof Op\Expr\StaticCall
+                ) {
+                    continue;
+                }
+                if (!property_exists($endChild, 'args') || !is_array($endChild->args)) {
+                    continue;
+                }
+                foreach ($endChild->args as $arg) {
+                    if (
+                        !$arg instanceof Operand
+                        || $arg instanceof Operand\Literal
+                        || $arg instanceof Operand\NullOperand
+                        || null !== Block::cfgVarRoot($arg)
+                    ) {
+                        continue;
+                    }
+                    // PhiResolver can replace the suppress inner result with an unrelated temp (#10336).
+                    $endCompiled->forceBindScopeSlot($arg, $slot);
+                }
+            }
+        }
+        if (null === $endCfg) {
+            return;
+        }
+        foreach ($innerSlots as [$suppressResult, $slot]) {
+            foreach ($endCfg->children as $endChild) {
+                $this->bindErrorSuppressResultOperandUsages($endChild, $endCompiled, $suppressResult, $slot);
+            }
+        }
+    }
+
+    private function isErrorSuppressInnerExpr(Op $child): bool
+    {
+        return $child instanceof Op\Expr\FuncCall
+            || $child instanceof Op\Expr\NsFuncCall
+            || $child instanceof Op\Expr\MethodCall
+            || $child instanceof Op\Expr\StaticCall
+            || $child instanceof Op\Expr\New_;
+    }
+
+    private function findFuncCallExecReturnSlot(Block $block): ?int
+    {
+        foreach ($block->opCodes as $op) {
+            if (OpCode::TYPE_FUNCCALL_EXEC_RETURN === $op->type) {
+                return (int) $op->arg1;
+            }
+        }
+
+        return null;
+    }
+
+    private function bindErrorSuppressResultOperandUsages(
+        Op $cfgOp,
+        Block $endCompiled,
+        Operand $suppressResult,
+        int $slot
+    ): void {
+        if ($cfgOp instanceof Op\Expr) {
+            if (property_exists($cfgOp, 'args') && is_array($cfgOp->args)) {
+                foreach ($cfgOp->args as $arg) {
+                    if ($arg instanceof Operand && $this->operandsReferToSameVariable($suppressResult, $arg)) {
+                        $endCompiled->bindScopeSlot($arg, $slot);
+                    }
+                }
+            }
+            if (property_exists($cfgOp, 'var') && $cfgOp->var instanceof Operand) {
+                if ($this->operandsReferToSameVariable($suppressResult, $cfgOp->var)) {
+                    $endCompiled->bindScopeSlot($cfgOp->var, $slot);
+                }
+            }
+            if (property_exists($cfgOp, 'expr') && $cfgOp->expr instanceof Operand) {
+                if ($this->operandsReferToSameVariable($suppressResult, $cfgOp->expr)) {
+                    $endCompiled->bindScopeSlot($cfgOp->expr, $slot);
+                }
+            }
+        }
+        foreach ($cfgOp->children ?? [] as $child) {
+            if ($child instanceof Op) {
+                $this->bindErrorSuppressResultOperandUsages($child, $endCompiled, $suppressResult, $slot);
+            }
+        }
     }
 
     /**

@@ -516,6 +516,12 @@ class Block {
         }
     }
 
+    /** Error-suppress exit may need to override an inherited empty slot (#10336). */
+    public function forceBindScopeSlot(Operand $operand, int $slot): void
+    {
+        $this->scope[$operand] = $slot;
+    }
+
     private function isArgSlot(int $slot): bool
     {
         foreach ($this->args as $op) {
