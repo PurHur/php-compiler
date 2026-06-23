@@ -42,9 +42,7 @@ final class date extends Internal
 
     private static function vmFormatArg(Frame $frame): string
     {
-        if (null !== $frame->parent && $frame->parent->block->strictTypes) {
-            return InternalStrictArg::requireString($frame, 0, 'date', 'format')->toString();
-        }
+        InternalStrictArg::rejectNullString($frame->calledArgs[0], 'date', 'format', 0);
 
         return VmString::coerceStringBuiltinArg($frame->calledArgs[0], 'date', 0, 'format');
     }

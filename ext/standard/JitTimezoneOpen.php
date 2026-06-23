@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace PHPCompiler\ext\standard;
 
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\InternalStrictArg as JitInternalStrictArg;
 use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\Variable as JITVariable;
@@ -22,6 +23,8 @@ final class JitTimezoneOpen
                 \sprintf('timezone_open() expects exactly 1 argument, %d given', \count($args))
             );
         }
+
+        JitInternalStrictArg::rejectNullString($context, $args[0], 'timezone_open', 'timezone', 1);
 
         $literal = JitStringBuiltinArg::compileTimeLiteral($args[0]);
         if (null === $literal) {

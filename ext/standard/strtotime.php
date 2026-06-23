@@ -8,6 +8,7 @@ use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\Variable as JITVariable;
+use PHPCompiler\VM\InternalStrictArg;
 use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
 
@@ -35,6 +36,7 @@ final class strtotime extends Internal
         if (null === $frame->returnVar) {
             return;
         }
+        InternalStrictArg::rejectNullString($frame->calledArgs[0], 'strtotime', 'datetime', 0);
         $time = VmString::coerceStringBuiltinArg($frame->calledArgs[0], 'strtotime', 0, 'datetime');
         $now = null;
         if (2 === $argc) {

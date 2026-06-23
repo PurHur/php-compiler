@@ -61,6 +61,24 @@ final class InternalStrictArg
         }
     }
 
+    /** Reject null for internal int parameters (Zend ZEND_VERIFY_NULL_NOT_ALLOWED). */
+    public static function rejectNullInt(Variable $arg, string $function, string $paramName, int $argIndex = 0): void
+    {
+        $v = $arg->resolveIndirect();
+        if (Variable::TYPE_NULL === $v->type) {
+            throw new \TypeError(self::message($function, $argIndex, $paramName, 'int', $v));
+        }
+    }
+
+    /** Reject null for internal bool parameters (Zend ZEND_VERIFY_NULL_NOT_ALLOWED). */
+    public static function rejectNullBool(Variable $arg, string $function, string $paramName, int $argIndex = 0): void
+    {
+        $v = $arg->resolveIndirect();
+        if (Variable::TYPE_NULL === $v->type) {
+            throw new \TypeError(self::message($function, $argIndex, $paramName, 'bool', $v));
+        }
+    }
+
     private static function callerStrict(Frame $frame): bool
     {
         return self::isCallerStrict($frame);

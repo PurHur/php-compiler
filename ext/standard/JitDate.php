@@ -262,6 +262,7 @@ final class JitDate
         if ($argc > 2) {
             throw new \ArgumentCountError("{$function}() expects at most 2 arguments, {$argc} given");
         }
+        JitInternalStrictArg::rejectNullString($context, $args[0], $function, 'format', 1);
         JitInternalStrictArg::requireString($context, $args[0], $function, 'format', 1);
         $format = JitStringArg::lower($context, $args[0], "{$function}() argument #1 ($format)");
         $i64 = $context->getTypeFromString('int64');
