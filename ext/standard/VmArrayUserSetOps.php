@@ -72,7 +72,7 @@ final class VmArrayUserSetOps
                 $fn.'() expects at least 3 arguments, '.$argc.' given'
             );
         }
-        $dataCompare = self::resolveCompareCallback($frame, $frame->calledArgs[$argc - 1], $fn);
+        $dataCompare = self::resolveCompareCallback($frame, $frame->calledArgs[$argc - 1], $fn, $argc);
         $first = VmArray::requireArrayParam($frame->calledArgs[0], $fn, 1, 'array');
         $others = self::collectOtherArrays($frame, $fn, 1, $argc - 1);
         if (null === $frame->returnVar) {
@@ -107,10 +107,11 @@ final class VmArrayUserSetOps
         $keyCompare = self::resolveCompareCallback(
             $frame,
             $frame->calledArgs[$argc - 1],
-            $fn
+            $fn,
+            $argc
         );
         $dataCompare = $dualCompare
-            ? self::resolveCompareCallback($frame, $frame->calledArgs[$argc - 2], $fn)
+            ? self::resolveCompareCallback($frame, $frame->calledArgs[$argc - 2], $fn, $argc - 1)
             : null;
         $arrayEnd = $dualCompare ? $argc - 2 : $argc - 1;
         $first = VmArray::requireArrayParam($frame->calledArgs[0], $fn, 1, 'array');
@@ -139,7 +140,7 @@ final class VmArrayUserSetOps
                 'array_diff_uassoc() expects at least 3 arguments, '.$argc.' given'
             );
         }
-        $dataCompare = self::resolveCompareCallback($frame, $frame->calledArgs[$argc - 1], 'array_diff_uassoc');
+        $dataCompare = self::resolveCompareCallback($frame, $frame->calledArgs[$argc - 1], 'array_diff_uassoc', $argc);
         $first = VmArray::requireArrayParam($frame->calledArgs[0], 'array_diff_uassoc', 1, 'array');
         $others = self::collectOtherArrays($frame, 'array_diff_uassoc', 1, $argc - 1);
         if (null === $frame->returnVar) {
@@ -166,7 +167,8 @@ final class VmArrayUserSetOps
         $dataCompare = self::resolveCompareCallback(
             $frame,
             $frame->calledArgs[$argc - 1],
-            'array_intersect_uassoc'
+            'array_intersect_uassoc',
+            $argc
         );
         $first = VmArray::requireArrayParam($frame->calledArgs[0], 'array_intersect_uassoc', 1, 'array');
         $others = self::collectOtherArrays($frame, 'array_intersect_uassoc', 1, $argc - 1);
@@ -191,7 +193,7 @@ final class VmArrayUserSetOps
                 'array_diff_ukey() expects at least 3 arguments, '.$argc.' given'
             );
         }
-        $keyCompare = self::resolveCompareCallback($frame, $frame->calledArgs[$argc - 1], 'array_diff_ukey');
+        $keyCompare = self::resolveCompareCallback($frame, $frame->calledArgs[$argc - 1], 'array_diff_ukey', $argc);
         $first = VmArray::requireArrayParam($frame->calledArgs[0], 'array_diff_ukey', 1, 'array');
         $others = self::collectOtherArrays($frame, 'array_diff_ukey', 1, $argc - 1);
         if (null === $frame->returnVar) {
@@ -218,7 +220,8 @@ final class VmArrayUserSetOps
         $keyCompare = self::resolveCompareCallback(
             $frame,
             $frame->calledArgs[$argc - 1],
-            'array_intersect_ukey'
+            'array_intersect_ukey',
+            $argc
         );
         $first = VmArray::requireArrayParam($frame->calledArgs[0], 'array_intersect_ukey', 1, 'array');
         $others = self::collectOtherArrays($frame, 'array_intersect_ukey', 1, $argc - 1);
@@ -238,9 +241,14 @@ final class VmArrayUserSetOps
     /**
      * @return callable
      */
-    private static function resolveCompareCallback(Frame $frame, Variable $callback, string $fn): callable
-    {
+    private static function resolveCompareCallback(
+        Frame $frame,
+        Variable $callback,
+        string $fn,
+        int $argNum
+    ): callable {
         $callback = $callback->resolveIndirect();
+        VmArraySortCallback::requireCallback($callback, $fn, $argNum, null);
         if (VmClosureCall::isClosure($callback)) {
             if (null === $frame->vmContext) {
                 throw new \LogicException($fn.'() requires VM context in this compiler build');
