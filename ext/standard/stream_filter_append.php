@@ -60,6 +60,6 @@ final class stream_filter_append extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        throw new \LogicException('stream_filter_append() is not implemented for JIT in this compiler build (issue #3283)');
+        return JitStreamFilter::append($context, ...$args);
     }
 }

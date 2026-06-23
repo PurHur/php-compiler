@@ -6,6 +6,7 @@ namespace PHPCompiler\ext\standard;
 
 use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Builtin\StreamBucket;
+use PHPCompiler\JIT\Builtin\StreamFilter as StreamFilterBuiltin;
 use PHPCompiler\JIT\Context;
 use PHPLLVM\Builder;
 use PHPLLVM\Value;
@@ -24,11 +25,32 @@ final class JitIsResource
         $oneI32 = $i32->constInt(1, false);
 
         $bucketBase = $i64->constInt(\PHPCompiler\JIT\Builtin\StreamBucketRuntime::BUCKET_HANDLE_BASE, false);
+        $filterBase = $i64->constInt(StreamFilterJitHelper::HANDLE_BASE, false);
         $isBucketRange = $context->builder->icmp(Builder::INT_SGE, $handleLong, $bucketBase);
         $bucketProbe = BasicBlockHelper::append($context, 'is_resource_bucket_probe');
-        $streamProbe = BasicBlockHelper::append($context, 'is_resource_stream_probe');
+        $filterProbe = BasicBlockHelper::append($context, 'is_resource_filter_probe');
         $done = BasicBlockHelper::append($context, 'is_resource_done');
-        $context->builder->branchIf($isBucketRange, $bucketProbe, $streamProbe);
+        $context->builder->branchIf($isBucketRange, $bucketProbe, $filterProbe);
+
+        $context->builder->positionAtEnd($filterProbe);
+        $isFilterRange = $context->builder->icmp(Builder::INT_SGE, $handleLong, $filterBase);
+        $streamProbe = BasicBlockHelper::append($context, 'is_resource_stream_probe');
+        $filterCheck = BasicBlockHelper::append($context, 'is_resource_filter_check');
+        $context->builder->branchIf($isFilterRange, $filterCheck, $streamProbe);
+
+        $context->builder->positionAtEnd($filterCheck);
+        StreamFilterBuiltin::ensureLinked($context);
+        $isFilter = $context->builder->call(
+            $context->lookupFunction('__compiler_is_stream_filter_resource'),
+            $handleLong
+        );
+        $filterOk = $context->builder->icmp(Builder::INT_NE, $isFilter, $zeroI32);
+        $filterTrue = BasicBlockHelper::append($context, 'is_resource_filter_true');
+        $context->builder->branchIf($filterOk, $filterTrue, $streamProbe);
+
+        $context->builder->positionAtEnd($filterTrue);
+        $filterEnd = $context->builder->getInsertBlock();
+        $context->builder->branch($done);
 
         $context->builder->positionAtEnd($bucketProbe);
         $isBucket = $context->builder->call(
@@ -72,6 +94,7 @@ final class JitIsResource
         $falseVal = $context->constantFromBool(false);
         $phi->addIncoming($trueVal, $bucketEnd);
         $phi->addIncoming($trueVal, $brigadeEnd);
+        $phi->addIncoming($trueVal, $filterEnd);
         $phi->addIncoming($context->builder->select($streamOk, $trueVal, $falseVal), $streamEnd);
 
         return $phi;

@@ -46,6 +46,6 @@ final class stream_filter_remove extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        throw new \LogicException('stream_filter_remove() is not implemented for JIT in this compiler build (issue #6040)');
+        return JitStreamFilter::remove($context, ...$args);
     }
 }
