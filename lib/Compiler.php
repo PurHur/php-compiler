@@ -12213,10 +12213,18 @@ class Compiler {
             ) {
                 continue;
             }
-            if ($child instanceof Op\Expr\ConstFetch) {
+            if ($child instanceof Op\Expr\ConstFetch || $child instanceof Op\Expr\ClassConstFetch) {
                 $next = $cfgChildren[$i + 1] ?? null;
                 if (
-                    ($next instanceof Op\Expr\UnaryMinus || $next instanceof Op\Expr\UnaryPlus)
+                    $next instanceof Op\Expr\Array_
+                    && $this->cfgExprUsesOperand($next, $child->result)
+                ) {
+                    // Hoisted scalar element inside sibling inline Array_ call arg (#10612).
+                    continue;
+                }
+                if (
+                    $child instanceof Op\Expr\ConstFetch
+                    && ($next instanceof Op\Expr\UnaryMinus || $next instanceof Op\Expr\UnaryPlus)
                     && $next->expr === $child->result
                 ) {
                     continue;
@@ -12336,11 +12344,18 @@ class Compiler {
                     continue;
                 }
                 // password_hash(lit, PASSWORD_BCRYPT, [...]) — ConstFetch before trailing Array_ (#10453).
-                if (
-                    ($prev instanceof Op\Expr\ConstFetch || $prev instanceof Op\Expr\ClassConstFetch)
-                    && $this->isInlineExprCallArgProducer($prev)
-                ) {
-                    array_unshift($producers, $prev);
+                if ($prev instanceof Op\Expr\ConstFetch || $prev instanceof Op\Expr\ClassConstFetch) {
+                    if ($this->cfgExprUsesOperand($child, $prev->result)) {
+                        $grandPrev = $cfgChildren[$i - 2] ?? null;
+                        if ($grandPrev instanceof Op\Expr\Array_) {
+                            continue;
+                        }
+                        break;
+                    }
+                    if ($this->isInlineExprCallArgProducer($prev)) {
+                        array_unshift($producers, $prev);
+                    }
+                    break;
                 }
                 break;
             }

@@ -494,6 +494,48 @@ PHP;
         self::assertSame("array (\n  'a' => array (\n    'b' => 2,\n    'c' => 3,\n  ),\n)\n", ob_get_clean());
     }
 
+    /** Issue #10612 — null element in inline Array_ must not steal first call-arg producer slot. */
+    public function testArrayReplaceRecursiveInlineNullElementUsesBothArraySlots(): void
+    {
+        $code = <<<'PHP'
+<?php
+array_replace_recursive(['a' => 1], ['a' => null]);
+PHP;
+        $runtime = new Runtime();
+        $block = $runtime->parseAndCompile($code, 'array_replace_recursive_inline_null.php');
+
+        $arraySlots = [];
+        $sendSlots = [];
+        foreach ($block->opCodes as $op) {
+            if (OpCode::TYPE_INIT_ARRAY === $op->type) {
+                $arraySlots[] = $op->arg1;
+            }
+            if (OpCode::TYPE_ARG_SEND === $op->type) {
+                $sendSlots[] = $op->arg1;
+            }
+        }
+
+        self::assertCount(2, $arraySlots, 'array inits='.json_encode($arraySlots));
+        self::assertCount(2, $sendSlots, 'arg sends='.json_encode($sendSlots));
+        self::assertSame($arraySlots[0], $sendSlots[0], 'first inline array must feed arg #1');
+        self::assertSame($arraySlots[1], $sendSlots[1], 'second inline array must feed arg #2');
+    }
+
+    /** Issue #10612 — array_replace_recursive inline null element runtime parity with Zend. */
+    public function testArrayReplaceRecursiveInlineNullElementRuntime(): void
+    {
+        $code = <<<'PHP'
+<?php
+var_export(array_replace_recursive(['a' => 1], ['a' => null]));
+echo "\n";
+PHP;
+        $runtime = new Runtime();
+        $block = $runtime->parseAndCompile($code, 'array_replace_recursive_inline_null_runtime.php');
+        ob_start();
+        $runtime->run($block);
+        self::assertSame("array (\n  'a' => NULL,\n)\n", ob_get_clean());
+    }
+
     /** Issue #10229 — var_export(array_slice($local, -2, 2, true)) folds negative offset + preserve_keys. */
     public function testVarExportArraySliceNegativeOffsetPreserveKeysCompile(): void
     {
