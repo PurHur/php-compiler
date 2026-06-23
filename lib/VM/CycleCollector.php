@@ -111,8 +111,25 @@ final class CycleCollector
         }
 
         $collected = 0;
+        /** @var array<int, ObjectEntry> $candidates */
+        $candidates = [];
         foreach (ObjectRegistry::snapshot() as $object) {
-            if (isset($marked[$object->id])) {
+            if (!isset($marked[$object->id])) {
+                $candidates[$object->id] = $object;
+            }
+        }
+        /** @var array<int, true> $peerLinked */
+        $peerLinked = [];
+        foreach ($candidates as $object) {
+            if (self::referencesCandidatePeer($object, $candidates)) {
+                $peerLinked[$object->id] = true;
+            }
+        }
+        foreach ($candidates as $object) {
+            // Refcount teardown already ran __destruct on a lone orphan — not cyclic GC (#10111).
+            if ($object->destructorInvoked && !isset($peerLinked[$object->id])) {
+                ObjectRegistry::release($object);
+
                 continue;
             }
             ObjectLifetime::invokeDestructorBeforeGcRelease($object);
@@ -125,6 +142,30 @@ final class CycleCollector
         self::$protected = false;
 
         return $collected;
+    }
+
+    /**
+     * True when an unreachable object still references another GC candidate (#10111).
+     *
+     * @param array<int, ObjectEntry> $candidates
+     */
+    private static function referencesCandidatePeer(ObjectEntry $object, array $candidates): bool
+    {
+        foreach ($object->propertiesWithNames() as $prop) {
+            if (Variable::TYPE_OBJECT !== $prop->type) {
+                continue;
+            }
+            try {
+                $peer = $prop->toObject();
+            } catch (\LogicException) {
+                continue;
+            }
+            if ($peer->id !== $object->id && isset($candidates[$peer->id])) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     /** Objects not reachable from VM roots — Zend GC root-buffer analogue. */
