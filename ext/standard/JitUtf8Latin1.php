@@ -9,7 +9,7 @@ use PHPCompiler\JIT\Context;
 use PHPLLVM\Value;
 
 /**
- * LLVM JIT/AOT helper for utf8_encode()/utf8_decode() — mirrors VmString (#5279).
+ * LLVM JIT/AOT helper for utf8_encode()/utf8_decode() — Utf8Latin1JitHelper PHP bridge (#9912).
  *
  * php-src: ext/standard/basic_functions.c — PHP_FUNCTION(utf8_encode/utf8_decode)
  */
