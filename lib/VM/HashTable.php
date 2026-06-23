@@ -1239,25 +1239,13 @@ final class HashTable {
         $count = $this->numElements;
         $target = abs($length);
         if ($target <= $count) {
-            $out = new self();
-            foreach ($this->iterate(true) as $element) {
-                $copy = new Variable();
-                $copy->copyFrom($element);
-                $out->append($copy);
-            }
-
-            return $out;
+            return $this->copyAllKeyedEntries();
         }
         $padCount = $target - $count;
         $pad = new Variable();
         $pad->copyFrom($value);
         if ($length > 0) {
-            $out = new self();
-            foreach ($this->iterate(true) as $element) {
-                $copy = new Variable();
-                $copy->copyFrom($element);
-                $out->append($copy);
-            }
+            $out = $this->copyAllKeyedEntries();
             for ($i = 0; $i < $padCount; ++$i) {
                 $copy = new Variable();
                 $copy->copyFrom($pad);
@@ -1274,10 +1262,19 @@ final class HashTable {
         }
         $out = new self();
         $out->unshiftPrepend(...$prepend);
-        foreach ($this->iterate(true) as $element) {
-            $copy = new Variable();
-            $copy->copyFrom($element);
-            $out->append($copy);
+        foreach ($this->iterateKeyed(true) as [$key, $element]) {
+            $this->copyKeyedEntry($out, $key, $element);
+        }
+
+        return $out;
+    }
+
+    /** Shallow copy preserving string/int keys (array_pad subset, #10777). */
+    private function copyAllKeyedEntries(): self
+    {
+        $out = new self();
+        foreach ($this->iterateKeyed(true) as [$key, $element]) {
+            $this->copyKeyedEntry($out, $key, $element);
         }
 
         return $out;

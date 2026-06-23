@@ -2419,11 +2419,149 @@ final class VmString
         string $string,
         int $flags = ENT_COMPAT
     ): string {
-        if (0 === ($flags & ENT_HTML5)) {
-            return self::htmlspecialchars_decode($string, $flags);
+        if (0 !== ($flags & ENT_HTML5)) {
+            return self::htmlEntityDecodeHtml5($string, $flags);
         }
 
-        return self::htmlEntityDecodeHtml5($string, $flags);
+        return self::htmlEntityDecodeHtml401($string, $flags);
+    }
+
+    /** html_entity_decode() default path — HTML401 named entities + basic flags (#10763). */
+    private static function htmlEntityDecodeHtml401(string $string, int $flags): string
+    {
+        $decodeDouble = 0 !== ($flags & 2);
+        $decodeSingle = 0 !== ($flags & 1);
+        $namedEntities = self::htmlEntityDecodeMap();
+        $out = '';
+        $len = self::byteLength($string);
+        $i = 0;
+        while ($i < $len) {
+            if ('&' !== $string[$i]) {
+                $out .= $string[$i];
+                ++$i;
+                continue;
+            }
+            if (self::entityAt($string, $i, $len, '&amp;', 5)) {
+                $out .= '&';
+                $i += 5;
+                continue;
+            }
+            if (self::entityAt($string, $i, $len, '&lt;', 4)) {
+                $out .= '<';
+                $i += 4;
+                continue;
+            }
+            if (self::entityAt($string, $i, $len, '&gt;', 4)) {
+                $out .= '>';
+                $i += 4;
+                continue;
+            }
+            if ($decodeDouble && self::entityAt($string, $i, $len, '&quot;', 6)) {
+                $out .= '"';
+                $i += 6;
+                continue;
+            }
+            if ($decodeSingle && self::entityAt($string, $i, $len, '&#039;', 6)) {
+                $out .= "'";
+                $i += 6;
+                continue;
+            }
+            if ($decodeSingle && self::entityAt($string, $i, $len, '&#39;', 5)) {
+                $out .= "'";
+                $i += 5;
+                continue;
+            }
+
+            $semi = strpos($string, ';', $i + 1);
+            if (false !== $semi && $semi > $i + 1 && $semi - $i <= 33) {
+                $entity = substr($string, $i, $semi - $i + 1);
+                $decoded = $namedEntities[$entity] ?? null;
+                if (null !== $decoded) {
+                    if ("'" === $decoded && !$decodeSingle) {
+                        $out .= $entity;
+                        $i = $semi + 1;
+                        continue;
+                    }
+                    if ('"' === $decoded && !$decodeDouble) {
+                        $out .= $entity;
+                        $i = $semi + 1;
+                        continue;
+                    }
+                    $out .= $decoded;
+                    $i = $semi + 1;
+                    continue;
+                }
+            }
+
+            $numericLen = self::htmlspecialcharsNumericEntityLen($string, $i, $len);
+            if ($numericLen > 0) {
+                $entity = substr($string, $i, $numericLen);
+                $decoded = self::decodeHtmlNumericEntity($entity);
+                if (null !== $decoded) {
+                    $out .= $decoded;
+                    $i += $numericLen;
+                    continue;
+                }
+            }
+
+            $out .= '&';
+            ++$i;
+        }
+
+        return $out;
+    }
+
+    /** @return array<string, string> */
+    private static function htmlEntityDecodeMap(): array
+    {
+        static $map = null;
+        if (null === $map) {
+            $map = [];
+            foreach (HtmlEntityTable::entitiesEntQuotes() as $char => $entity) {
+                $map[$entity] = $char;
+            }
+            $map['&apos;'] = "'";
+        }
+
+        return $map;
+    }
+
+    private static function decodeHtmlNumericEntity(string $entity): ?string
+    {
+        if (!str_starts_with($entity, '&#') || !str_ends_with($entity, ';')) {
+            return null;
+        }
+        $body = substr($entity, 2, -1);
+        if ('' === $body) {
+            return null;
+        }
+        if ('x' === $body[0] || 'X' === $body[0]) {
+            $code = hexdec(substr($body, 1));
+        } else {
+            if (!ctype_digit($body)) {
+                return null;
+            }
+            $code = (int) $body;
+        }
+        if ($code < 0 || $code > 0x10FFFF) {
+            return null;
+        }
+        if ($code <= 0x7F) {
+            return \chr($code);
+        }
+        if ($code <= 0x7FF) {
+            return \chr(0xC0 | ($code >> 6)).\chr(0x80 | ($code & 0x3F));
+        }
+        if ($code <= 0xFFFF) {
+            return \chr(0xE0 | ($code >> 12))
+                .\chr(0x80 | (($code >> 6) & 0x3F))
+                .\chr(0x80 | ($code & 0x3F));
+        }
+
+        return \chr(0xF0 | ($code >> 18))
+            .\chr(0x80 | (($code >> 12) & 0x3F))
+            .\chr(0x80 | (($code >> 6) & 0x3F))
+            .\chr(0x80 | ($code & 0x3F));
     }
 
     /**

@@ -103,6 +103,14 @@ final class VmDateTimeNative
         if ('now' === strtolower($time)) {
             return self::readNow();
         }
+        if (str_starts_with($time, '@')) {
+            $unix = substr($time, 1);
+            if ('' === $unix || !ctype_digit($unix)) {
+                self::throwMalformedDateTime($time);
+            }
+
+            return ['timestamp' => (int) $unix, 'microsecond' => 0];
+        }
         if (1 === preg_match('/^\d+$/', $time)) {
             return ['timestamp' => (int) $time, 'microsecond' => 0];
         }
@@ -752,6 +760,10 @@ final class VmDateTimeNative
                     continue;
                 }
                 switch ($ch) {
+                    case 'U':
+                        $out .= (string) $timestamp;
+
+                        break;
                     case 'Y':
                         $out .= self::padInt($year, 4);
 
