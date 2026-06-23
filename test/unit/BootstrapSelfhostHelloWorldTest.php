@@ -142,6 +142,14 @@ final class BootstrapSelfhostHelloWorldTest extends TestCase
         $this->assertStringContainsString('PHP_COMPILER_M3_EMIT_LOG_PREFIX=helloworld_compile_smoke', $compile);
     }
 
+    public function testM3CompileDriverMainSkipsStandaloneVmProbeGateAtJitMain(): void
+    {
+        $context = (string) file_get_contents(self::$root.'/lib/JIT/Context.php');
+        $this->assertStringContainsString('shouldSkipStandaloneMainEnvProbeGate', $context);
+        $this->assertStringContainsString('PHP_COMPILER_M3_COMPILE_DRIVER_MAIN', $context);
+        $this->assertStringContainsString('#10938', $context);
+    }
+
     public function testHelloWorldCompileBinScriptExists(): void
     {
         $script = self::$root.'/script/bootstrap-selfhost-helloworld-compile-bin.sh';
