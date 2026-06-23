@@ -100,6 +100,12 @@ final class VmSettype
             return;
         }
         if (Variable::TYPE_OBJECT === $v->type || Variable::TYPE_ENUM_CASE === $v->type) {
+            if (Variable::TYPE_OBJECT === $v->type && ResourceSupport::isResourceObject($v->toObject())) {
+                $vm = $frame?->vmContext?->runtime?->vm;
+                $result->int($v->toInt($vm));
+
+                return;
+            }
             $objectInt = EnumCaseSupport::tryCastToInt($v, $frame?->vmContext, $frame);
             if (null !== $objectInt) {
                 $result->int($objectInt);
@@ -149,6 +155,12 @@ final class VmSettype
             return;
         }
         if (Variable::TYPE_OBJECT === $v->type || Variable::TYPE_ENUM_CASE === $v->type) {
+            if (Variable::TYPE_OBJECT === $v->type && ResourceSupport::isResourceObject($v->toObject())) {
+                $handle = ResourceSupport::resolveHandle($v);
+                $result->float((float) (null !== $handle ? $handle : 0));
+
+                return;
+            }
             $objectFloat = EnumCaseSupport::tryCastToFloat($v, $frame?->vmContext, $frame);
             if (null !== $objectFloat) {
                 $result->float($objectFloat);
