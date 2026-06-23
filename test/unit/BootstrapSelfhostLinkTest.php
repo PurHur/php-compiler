@@ -61,6 +61,7 @@ final class BootstrapSelfhostLinkTest extends TestCase
         $link = (string) file_get_contents(self::$root.'/script/bootstrap-selfhost-link.sh');
         $this->assertStringContainsString('bootstrap-resolve-compile-invoke.sh', $link);
         $this->assertStringContainsString('bootstrap_compile_invoke', $link);
+        $this->assertStringContainsString('PHP_COMPILER_M3_COMPILE_DRIVER_MAIN=1', $link);
         $this->assertStringContainsString('BOOTSTRAP_GEN0_ENSURE_COMPILED_DRIVER', $link);
         $resolver = self::$root.'/script/bootstrap-resolve-compile-invoke.sh';
         $this->assertFileExists($resolver);

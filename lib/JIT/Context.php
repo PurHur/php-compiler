@@ -336,11 +336,15 @@ class Context {
     }
 
     /**
-     * M3 compile-driver emit calls PHP main() directly; env-probe LLVM gate segfaults during
-     * gen-0 native emit at c:main_before_php (#10938, #8719).
+     * VM env-probe LLVM gate is only for compiler_lib_spine_smoke (#8719, #8693). Other selfhost
+     * entries (compiler_minimal, helloworld, …) call PHP main() directly — emitting the gate for
+     * them segfaults at c:main_before_php (#10938, #11005). M3 compile-driver rebuild also skips.
      */
     private function shouldSkipStandaloneMainEnvProbeGate(): bool
     {
+        if (!$this->isCompilerLibSpineSmokeEntry()) {
+            return true;
+        }
         $flag = getenv('PHP_COMPILER_M3_COMPILE_DRIVER_MAIN');
 
         return '1' === $flag || 'true' === strtolower((string) $flag);

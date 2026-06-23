@@ -147,7 +147,8 @@ final class BootstrapSelfhostHelloWorldTest extends TestCase
         $context = (string) file_get_contents(self::$root.'/lib/JIT/Context.php');
         $this->assertStringContainsString('shouldSkipStandaloneMainEnvProbeGate', $context);
         $this->assertStringContainsString('PHP_COMPILER_M3_COMPILE_DRIVER_MAIN', $context);
-        $this->assertStringContainsString('#10938', $context);
+        $this->assertStringContainsString('isCompilerLibSpineSmokeEntry', $context);
+        $this->assertStringContainsString('#11005', $context);
     }
 
     public function testHelloWorldCompileBinScriptExists(): void
