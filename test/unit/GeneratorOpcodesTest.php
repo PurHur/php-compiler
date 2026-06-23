@@ -39,6 +39,43 @@ PHP
         $this->assertFalse(Block::requiresVmLowering($block));
     }
 
+    public function testContainsGeneratorOpcodesInCallableBodySkipsNestedClosure(): void
+    {
+        $runtime = new Runtime();
+        $block = $runtime->parseAndCompile(<<<'PHP'
+<?php
+return (static function (): array {
+    return iterator_to_array((static function (): Generator {
+        yield 1;
+    })());
+})();
+PHP
+            ,
+            'nested_closure_generator.php'
+        );
+        $findArrayClosure = static function (Block $b) use (&$findArrayClosure): ?Block {
+            foreach ($b->opCodes as $op) {
+                if (OpCode::TYPE_CLOSURE === $op->type && $op->block1 instanceof Block) {
+                    $inner = $op->block1;
+                    if (!$inner->isGenerator) {
+                        return $inner;
+                    }
+                    $found = $findArrayClosure($inner);
+                    if (null !== $found) {
+                        return $found;
+                    }
+                }
+            }
+
+            return null;
+        };
+        $arrayClosure = $findArrayClosure($block);
+        $this->assertNotNull($arrayClosure);
+        $this->assertFalse($arrayClosure->isGenerator);
+        $this->assertTrue(Block::containsGeneratorOpcodes($block));
+        $this->assertFalse(Block::containsGeneratorOpcodesInCallableBody($arrayClosure));
+    }
+
     public function testRequiresVmLoweringForSimpleTryCatch(): void
     {
         $runtime = new Runtime();

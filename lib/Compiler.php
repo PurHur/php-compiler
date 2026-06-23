@@ -7848,7 +7848,7 @@ class Compiler {
 
     protected function markGeneratorIfNeeded(Op\CallableOp $callable, Block $funcBlock): void
     {
-        if (Block::containsGeneratorOpcodes($funcBlock) || $this->callableOpHasSourceYield($callable)) {
+        if (Block::containsGeneratorOpcodesInCallableBody($funcBlock) || $this->callableOpHasSourceYield($callable)) {
             $this->markFunctionGenerator($funcBlock);
         }
     }
@@ -13739,18 +13739,86 @@ class Compiler {
     /**
      * php-cfg may leave call result usages empty when the next op is `return $tmp` (#1885).
      */
-    private function callNeedsReturnSlot(Operand $result, Block $block): bool
+    private function callNeedsReturnSlot(Operand $result, Block $block, ?Op $cfgCallOp = null): bool
     {
         if (
             !empty($result->usages)
             || $block->callResultFeedsReturn($result)
+            || $block->callResultFeedsEcho($result)
             || $block->callResultFeedsErrorSuppressExit($result)
             || (null !== $block->orig && $block->orig instanceof ErrorSuppressBlock)
+            || $this->isVarExportReturnTrueCall($cfgCallOp, $block)
+            || 'iterator_to_array' === $this->resolveCfgFuncCallName($cfgCallOp)
         ) {
             return true;
         }
 
         return $this->callResultFeedsInlineCallArg($result, $block);
+    }
+
+    /** `var_export($x, true)` returns a string instead of echoing (#10704). */
+    private function isVarExportReturnTrueCall(?Op $cfgCallOp, Block $block): bool
+    {
+        if (
+            !$cfgCallOp instanceof Op\Expr\FuncCall
+            && !$cfgCallOp instanceof Op\Expr\NsFuncCall
+        ) {
+            return false;
+        }
+        $name = $this->resolveCfgFuncCallName($cfgCallOp);
+        if ('var_export' !== $name) {
+            return false;
+        }
+        if (!property_exists($cfgCallOp, 'args') || !is_array($cfgCallOp->args)) {
+            return false;
+        }
+
+        return $this->cfgOperandIsTrue($cfgCallOp->args[1] ?? null, $block);
+    }
+
+    private function cfgOperandIsTrue(?Operand $operand, Block $block): bool
+    {
+        if ($operand instanceof Operand\Literal) {
+            return true === $operand->value;
+        }
+        if (null === $operand || null === $block->orig) {
+            return false;
+        }
+        foreach ($block->orig->children as $child) {
+            if (!$child instanceof Op\Expr) {
+                continue;
+            }
+            if ($child->result !== $operand) {
+                continue;
+            }
+            if ($child instanceof Op\Expr\ConstFetch && $child->name instanceof Operand\Literal) {
+                return 'true' === strtolower((string) $child->name->value);
+            }
+        }
+        $root = $operand;
+        while ($root instanceof Temporary && null !== $root->original) {
+            $root = $root->original;
+        }
+        if ($root instanceof Operand\Literal) {
+            return true === $root->value;
+        }
+
+        return false;
+    }
+
+    private function resolveCfgFuncCallName(?Op $call): ?string
+    {
+        if (!$call instanceof Op\Expr) {
+            return null;
+        }
+        if ($call instanceof Op\Expr\FuncCall && $call->name instanceof Operand\Literal) {
+            return strtolower((string) $call->name->value);
+        }
+        if ($call instanceof Op\Expr\NsFuncCall && $call->name instanceof Operand\Literal) {
+            return strtolower((string) $call->name->value);
+        }
+
+        return null;
     }
 
     /** php-cfg dead temps: inline FuncCall/New_/Array_ producer before a call (#8561, #4633). */
@@ -16861,7 +16929,7 @@ class Compiler {
     ): OpCode {
         $line = $startLine > 0 ? $startLine : null;
         if (
-            $this->callNeedsReturnSlot($result, $block)
+            $this->callNeedsReturnSlot($result, $block, $cfgCallOp)
             || $this->cfgCallOpImmediatelyVoidDiscarded($cfgCallOp, $block)
         ) {
             return new OpCode(

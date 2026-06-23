@@ -1157,9 +1157,6 @@ class Block {
     public function callResultFeedsReturn(Operand $result): bool
     {
         $resultRoot = self::cfgVarRoot($result);
-        if (null === $resultRoot) {
-            return false;
-        }
         foreach ($this->orig->children as $child) {
             if (!$child instanceof Op\Terminal\Return_) {
                 continue;
@@ -1167,9 +1164,97 @@ class Block {
             if (null === $child->expr) {
                 continue;
             }
-            if (self::cfgVarRoot($child->expr) === $resultRoot) {
+            if ($child->expr === $result) {
                 return true;
             }
+            if (null !== $resultRoot && self::cfgVarRoot($child->expr) === $resultRoot) {
+                return true;
+            }
+            $expr = $child->expr;
+            while ($expr instanceof Temporary && null !== $expr->original) {
+                if ($expr->original === $result) {
+                    return true;
+                }
+                if (null !== $resultRoot && self::cfgVarRoot($expr->original) === $resultRoot) {
+                    return true;
+                }
+                $expr = $expr->original;
+            }
+        }
+
+        return false;
+    }
+
+    /**
+     * Call result is echoed directly (php-cfg often omits usages on Terminal_Echo expr, #10704).
+     */
+    public function callResultFeedsEcho(Operand $result): bool
+    {
+        $resultRoot = self::cfgVarRoot($result);
+        foreach ($this->orig->children as $child) {
+            if (!$child instanceof Op\Terminal\Echo_) {
+                continue;
+            }
+            if (null === $child->expr) {
+                continue;
+            }
+            foreach (self::echoExprOperands($child->expr) as $expr) {
+                if ($this->callResultOperandMatchesConsumer($expr, $result, $resultRoot)) {
+                    return true;
+                }
+            }
+        }
+
+        return false;
+    }
+
+    /**
+     * @return list<Operand>
+     */
+    private static function echoExprOperands(Operand $expr): array
+    {
+        $concat = self::unwrapConcatListOperand($expr);
+        if (null !== $concat) {
+            return $concat->list;
+        }
+
+        return [$expr];
+    }
+
+    private static function unwrapConcatListOperand(Operand $operand): ?Op\Expr\ConcatList
+    {
+        while ($operand instanceof Temporary) {
+            if ($operand->original instanceof Op\Expr\ConcatList) {
+                return $operand->original;
+            }
+            if (null === $operand->original) {
+                return null;
+            }
+            $operand = $operand->original;
+        }
+        if ($operand instanceof Op\Expr\ConcatList) {
+            return $operand;
+        }
+
+        return null;
+    }
+
+    private function callResultOperandMatchesConsumer(Operand $expr, Operand $result, ?Operand $resultRoot): bool
+    {
+        if ($expr === $result) {
+            return true;
+        }
+        if (null !== $resultRoot && self::cfgVarRoot($expr) === $resultRoot) {
+            return true;
+        }
+        while ($expr instanceof Temporary && null !== $expr->original) {
+            if ($expr->original === $result) {
+                return true;
+            }
+            if (null !== $resultRoot && self::cfgVarRoot($expr->original) === $resultRoot) {
+                return true;
+            }
+            $expr = $expr->original;
         }
 
         return false;
@@ -1365,6 +1450,18 @@ class Block {
     }
 
     /**
+     * Direct callable body only — nested TYPE_CLOSURE / TYPE_FUNCDEF bodies are separate callables (#10731).
+     */
+    public static function containsGeneratorOpcodesInCallableBody(?self $root): bool
+    {
+        return self::containsOpcodeTypesSkippingNestedCallableBodies(
+            $root,
+            OpCode::TYPE_YIELD,
+            OpCode::TYPE_YIELD_FROM
+        );
+    }
+
+    /**
      * Top-level script scope only (skips nested TYPE_FUNCDEF bodies; issue #3074).
      * Used so bin/jit.php can MCJIT the main script while generator bodies use resume lowering.
      */
@@ -1403,6 +1500,48 @@ class Block {
                         if (
                             (OpCode::TYPE_FUNCDEF === $op->type || OpCode::TYPE_DECLARE_METHOD === $op->type)
                             && $sub === $op->block1
+                        ) {
+                            continue;
+                        }
+                        $stack[] = $sub;
+                    }
+                }
+            }
+        }
+
+        return false;
+    }
+
+    /**
+     * @param int ...$types OpCode::TYPE_* values to match
+     */
+    private static function containsOpcodeTypesSkippingNestedCallableBodies(?self $root, int ...$types): bool
+    {
+        if (null === $root || [] === $types) {
+            return false;
+        }
+        $want = array_fill_keys($types, true);
+        $seen = new \SplObjectStorage();
+        $stack = [$root];
+        while ([] !== $stack) {
+            $block = array_pop($stack);
+            if (!$block instanceof self || $seen->contains($block)) {
+                continue;
+            }
+            $seen->attach($block);
+            foreach ($block->opCodes as $op) {
+                if (isset($want[$op->type])) {
+                    return true;
+                }
+                foreach ([$op->block1, $op->block2, $op->block3] as $sub) {
+                    if ($sub instanceof self) {
+                        if (
+                            $sub === $op->block1
+                            && in_array($op->type, [
+                                OpCode::TYPE_FUNCDEF,
+                                OpCode::TYPE_DECLARE_METHOD,
+                                OpCode::TYPE_CLOSURE,
+                            ], true)
                         ) {
                             continue;
                         }
