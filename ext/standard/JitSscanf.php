@@ -33,7 +33,7 @@ final class JitSscanf
             return self::parseCompileTime($context, $strLit, $fmtLit, \array_slice($args, 2));
         }
 
-        $str = JitStringBuiltinArg::lower($context, $args[0], 'sscanf', 0, 'string');
+        $str = JitStringBuiltinArg::lowerRequiredString($context, $args[0], 'sscanf', 0, 'string');
         $fmt = JitStringBuiltinArg::lower($context, $args[1], 'sscanf', 1, 'format');
         $outCount = $argc - 2;
         $i64 = $context->getTypeFromString('int64');
