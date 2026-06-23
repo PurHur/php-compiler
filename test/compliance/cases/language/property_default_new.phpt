@@ -1,14 +1,11 @@
 --TEST--
-Property default new expressions — untyped instance per-object; promoted params compile (#3391, #5362; typed/static rejected #10095, #10693)
+Language: untyped instance property `new` default compile-rejects (#10693, Zend/zend_compile.c)
 --FILE--
 <?php
 class Box {
     public $inner = new stdClass();
 }
-$a = new Box();
-$b = new Box();
-echo ($a->inner instanceof stdClass) ? "1\n" : "0\n";
-echo ($a->inner !== $b->inner) ? "1\n" : "0\n";
---EXPECT--
-1
-1
+--EXPECT_EXIT--
+255
+--EXPECTF--
+parseAndCompile failure: target=%s: New expressions are not supported in this context
