@@ -1226,6 +1226,7 @@ final class StringFormatJit
         $switch->addCase($i32->constInt(ord('s'), false), $caseS);
         $switch->addCase($i32->constInt(ord('d'), false), $caseD);
         $switch->addCase($i32->constInt(ord('f'), false), $caseF);
+        $switch->addCase($i32->constInt(ord('F'), false), $caseF);
         foreach (['b', 'x', 'X', 'o', 'u', 'c', 'e', 'E', 'g', 'G', 'a', 'A'] as $snprintfSpec) {
             $switch->addCase($i32->constInt(ord($snprintfSpec), false), $caseSnprintf);
         }
@@ -1641,7 +1642,10 @@ final class StringFormatJit
             $context->builder->or(
                 $context->builder->icmp(Builder::INT_EQ, $spec32, $i32->constInt(ord('E'), false)),
                 $context->builder->or(
-                    $context->builder->icmp(Builder::INT_EQ, $spec32, $i32->constInt(ord('f'), false)),
+                    $context->builder->or(
+                        $context->builder->icmp(Builder::INT_EQ, $spec32, $i32->constInt(ord('f'), false)),
+                        $context->builder->icmp(Builder::INT_EQ, $spec32, $i32->constInt(ord('F'), false))
+                    ),
                     $context->builder->or(
                         $context->builder->icmp(Builder::INT_EQ, $spec32, $i32->constInt(ord('g'), false)),
                         $context->builder->or(
@@ -2370,7 +2374,10 @@ final class StringFormatJit
         $advanceParse();
         $usePos = $context->builder->load($usePosSlot);
         $appendSpecFloatPrec = $context->lookupFunction('__phpc_fmt_append_spec_f_prec');
-        $isFloatSpec = $context->builder->icmp(Builder::INT_EQ, $specCh, $i8->constInt(ord('f'), false));
+        $isFloatSpec = $context->builder->or(
+            $context->builder->icmp(Builder::INT_EQ, $specCh, $i8->constInt(ord('f'), false)),
+            $context->builder->icmp(Builder::INT_EQ, $specCh, $i8->constInt(ord('F'), false))
+        );
         $precVal = $context->builder->load($precSlot);
         $hasPrec = $context->builder->icmp(Builder::INT_SGE, $precVal, $zeroI32);
         $usePrecFloat = $context->builder->and($isFloatSpec, $hasPrec);
