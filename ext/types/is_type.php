@@ -11,10 +11,12 @@ namespace PHPCompiler\ext\types;
 
 use PHPCompiler\Func\Internal;
 use PHPCompiler\Frame;
-use PHPCompiler\VM\Variable;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitValueBox;
+use PHPCompiler\JIT\TypedPropertyUninitGuard;
 use PHPCompiler\JIT\Variable as JITVariable;
+use PHPCompiler\VM\TypedPropertyCheck;
+use PHPCompiler\VM\Variable;
 
 use PHPLLVM\Builder;
 use PHPLLVM\Value;
@@ -33,6 +35,7 @@ class is_type extends Internal {
             throw new \LogicException("Expecting exactly a single argument to {$this->name}()");
         }
         $var = $frame->calledArgs[0]->resolveIndirect();
+        TypedPropertyCheck::assertReadable($var);
         if (!is_null($frame->returnVar)) {
             if (Variable::TYPE_OBJECT === $this->type) {
                 // Zend is_object(): enum case operands are objects (zend_enum.c, #5448).
@@ -53,6 +56,9 @@ class is_type extends Internal {
         $this->context = $context;
         if (count($args) !== 1) {
             throw new \LogicException('Too few args passed to ' . $this->name . '()');
+        }
+        if (JITVariable::TYPE_VALUE === $args[0]->type) {
+            TypedPropertyUninitGuard::emitBeforeRead($context, $args[0]);
         }
         if ($args[0]->type & JITVariable::IS_NATIVE_ARRAY) {
             return $context->constantFromBool($this->type === Variable::TYPE_ARRAY);
