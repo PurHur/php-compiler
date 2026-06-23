@@ -593,8 +593,47 @@ final class StringJsonEncode
         $context->builder->branch($bbDone);
 
         $context->builder->positionAtEnd($bbDoubleOk);
+        $dbl = $context->getTypeFromString('double');
+        $trunc = $context->builder->fptosi($doubleVal, $i64);
+        $roundTrip = $context->builder->sitofp($trunc, $dbl);
+        $isWhole = $context->builder->fcmp(Builder::REAL_OEQ, $doubleVal, $roundTrip);
+        $preserveZero = self::flagIsSet($context, $flags, VmJsonFlags::PRESERVE_ZERO_FRACTION);
+        $bbDoubleWhole = $fn->appendBasicBlock('je_scalar_double_whole');
+        $bbDoubleFrac = $fn->appendBasicBlock('je_scalar_double_frac');
+        $context->builder->branchIf($isWhole, $bbDoubleWhole, $bbDoubleFrac);
+
+        $context->builder->positionAtEnd($bbDoubleWhole);
         $bufC = $context->builder->pointerCast($numBuf, $i8p);
-        $fmt = $context->builder->pointerCast($context->constantFromString('%.16G'), $i8p);
+        $preserveWhole = $context->builder->and($isWhole, $preserveZero);
+        $bbDoubleWholeInt = $fn->appendBasicBlock('je_scalar_double_whole_int');
+        $bbDoubleWholeFrac = $fn->appendBasicBlock('je_scalar_double_whole_frac');
+        $context->builder->branchIf($preserveWhole, $bbDoubleWholeFrac, $bbDoubleWholeInt);
+
+        $context->builder->positionAtEnd($bbDoubleWholeInt);
+        $fmt = $context->builder->pointerCast($context->constantFromString('%lld'), $i8p);
+        $context->builder->call($context->lookupFunction('sprintf'), $bufC, $fmt, $trunc);
+        $len = $context->builder->call($context->lookupFunction('strlen'), $bufC);
+        $lenI64 = $len->typeOf() === $i64 ? $len : $context->builder->zExt($len, $i64);
+        $context->builder->store(
+            $context->builder->call($context->lookupFunction('__string__init'), $lenI64, $bufC),
+            $resultSlot
+        );
+        $context->builder->branch($bbDone);
+
+        $context->builder->positionAtEnd($bbDoubleWholeFrac);
+        $fmt = $context->builder->pointerCast($context->constantFromString('%lld.0'), $i8p);
+        $context->builder->call($context->lookupFunction('sprintf'), $bufC, $fmt, $trunc);
+        $len = $context->builder->call($context->lookupFunction('strlen'), $bufC);
+        $lenI64 = $len->typeOf() === $i64 ? $len : $context->builder->zExt($len, $i64);
+        $context->builder->store(
+            $context->builder->call($context->lookupFunction('__string__init'), $lenI64, $bufC),
+            $resultSlot
+        );
+        $context->builder->branch($bbDone);
+
+        $context->builder->positionAtEnd($bbDoubleFrac);
+        $bufC = $context->builder->pointerCast($numBuf, $i8p);
+        $fmt = $context->builder->pointerCast($context->constantFromString('%.17G'), $i8p);
         $context->builder->call($context->lookupFunction('sprintf'), $bufC, $fmt, $doubleVal);
         $len = $context->builder->call($context->lookupFunction('strlen'), $bufC);
         $lenI64 = $len->typeOf() === $i64 ? $len : $context->builder->zExt($len, $i64);
@@ -792,7 +831,7 @@ final class StringJsonEncode
         $context->builder->positionAtEnd($bbDblFrac);
         $numBuf = $context->builder->alloca($i8, $i64->constInt(32, false), 'je_str_frac_buf');
         $bufC = $context->builder->pointerCast($numBuf, $i8p);
-        $fmt = $context->builder->pointerCast($context->constantFromString('%.16G'), $i8p);
+        $fmt = $context->builder->pointerCast($context->constantFromString('%.17G'), $i8p);
         $context->builder->call($context->lookupFunction('sprintf'), $bufC, $fmt, $dblVal);
         $bufLen = $context->builder->call($context->lookupFunction('strlen'), $bufC);
         $bufLenI64 = $bufLen->typeOf() === $i64 ? $bufLen : $context->builder->zExt($bufLen, $i64);

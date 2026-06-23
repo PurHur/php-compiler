@@ -86,7 +86,7 @@ final class VmJsonFormat
             return (string) $value;
         }
         if (\is_float($value)) {
-            return self::encodeFloat($value);
+            return self::encodeFloat($value, $flags);
         }
         if (\is_string($value)) {
             return self::encodeStringValue($value, $flags);
@@ -194,7 +194,7 @@ final class VmJsonFormat
     private static function encodeStringValue(string $value, int $flags): string
     {
         if (0 !== ($flags & VmJsonFlags::NUMERIC_CHECK)) {
-            $numeric = self::tryEncodeNumericStringValue($value);
+            $numeric = self::tryEncodeNumericStringValue($value, $flags);
             if (null !== $numeric) {
                 return $numeric;
             }
@@ -206,7 +206,7 @@ final class VmJsonFormat
     /**
      * php-src: ext/json/php_json_encoder.c — php_json_is_numeric_string / is_numeric_string.
      */
-    private static function tryEncodeNumericStringValue(string $value): ?string
+    private static function tryEncodeNumericStringValue(string $value, int $flags): ?string
     {
         if ('' === $value || !is_numeric($value)) {
             return null;
@@ -222,19 +222,34 @@ final class VmJsonFormat
             return (string) (int) $num;
         }
 
-        return self::encodeFloat($num);
+        return self::encodeFloat($num, $flags);
     }
 
-    private static function encodeFloat(float $num): string
+    /**
+     * php-src ext/json/php_json_encoder.c — php_json_encode_double / zend_gcvt dtoa.
+     */
+    private static function encodeFloat(float $num, int $flags): string
     {
         if (is_nan($num) || is_infinite($num)) {
             throw new VmJsonExportException(VmJson::ERROR_INF_OR_NAN);
         }
-        if ((float) (int) $num === $num && abs($num) < 1.0e15) {
+        $preserveZero = 0 !== ($flags & VmJsonFlags::PRESERVE_ZERO_FRACTION);
+        $isWhole = (float) (int) $num === $num && abs($num) < 1.0e15;
+        if ($isWhole && !$preserveZero) {
             return (string) (int) $num;
         }
 
-        return rtrim(rtrim(sprintf('%.16G', $num), '0'), '.');
+        $text = VmFloatDtoa::formatH($num);
+        if ($preserveZero && $isWhole && !self::hasDecimalOrExponent($text)) {
+            $text .= '.0';
+        }
+
+        return $text;
+    }
+
+    private static function hasDecimalOrExponent(string $text): bool
+    {
+        return str_contains($text, '.') || str_contains($text, 'E') || str_contains($text, 'e');
     }
 
     private static function escapeString(string $value, int $flags): string
