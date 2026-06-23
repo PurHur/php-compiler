@@ -372,26 +372,24 @@ final class PendingHeadersRuntime
         $idxSlot = $context->builder->alloca($i32, 1);
         $context->builder->store($i32->constInt(0, false), $idxSlot);
 
-        if (null !== HttpResponseCode::$global) {
-            $status = $context->builder->load(HttpResponseCode::$global);
-            $isUnset = $context->builder->icmp(Builder::INT_EQ, $status, $i32->constInt(0, false));
-            $needStatus = $context->builder->not($isUnset);
-            $context->builder->branchIf($needStatus, $statusBb, $skipStatus);
-            $context->builder->positionAtEnd($statusBb);
-            $statusBuf = $context->builder->alloca($context->getTypeFromString('int8')->arrayType(64), 1);
-            $statusBufPtr = $context->builder->pointerCast($statusBuf, $i8p);
-            $statusLen = $context->builder->call(
-                $context->lookupFunction('snprintf'),
-                $statusBufPtr,
-                $sizeT->constInt(64, false),
-                self::literalCstr($context, "Status: %d\r\n"),
-                $status
-            );
-            self::emitWriteStdout($context, $statusBufPtr, $statusLen);
-            $context->builder->store($i32->constInt(1, false), $wroteSlot);
-            $context->builder->branch($loopHead);
-            $context->builder->positionAtEnd($skipStatus);
-        }
+        $status = HttpResponseRuntime::loadStatusRaw($context);
+        $isUnset = $context->builder->icmp(Builder::INT_EQ, $status, $i32->constInt(0, false));
+        $needStatus = $context->builder->not($isUnset);
+        $context->builder->branchIf($needStatus, $statusBb, $skipStatus);
+        $context->builder->positionAtEnd($statusBb);
+        $statusBuf = $context->builder->alloca($context->getTypeFromString('int8')->arrayType(64), 1);
+        $statusBufPtr = $context->builder->pointerCast($statusBuf, $i8p);
+        $statusLen = $context->builder->call(
+            $context->lookupFunction('snprintf'),
+            $statusBufPtr,
+            $sizeT->constInt(64, false),
+            self::literalCstr($context, "Status: %d\r\n"),
+            $status
+        );
+        self::emitWriteStdout($context, $statusBufPtr, $statusLen);
+        $context->builder->store($i32->constInt(1, false), $wroteSlot);
+        $context->builder->branch($loopHead);
+        $context->builder->positionAtEnd($skipStatus);
         $context->builder->branch($loopHead);
 
         $context->builder->positionAtEnd($loopHead);
@@ -789,12 +787,9 @@ final class PendingHeadersRuntime
 
     private static function maybeSetLocationStatus(Context $context, Value $line): void
     {
-        if (null === HttpResponseCode::$global) {
-            return;
-        }
         $i32 = $context->getTypeFromString('int32');
         $i64 = $context->getTypeFromString('int64');
-        $status = $context->builder->load(HttpResponseCode::$global);
+        $status = HttpResponseRuntime::loadStatusRaw($context);
         $isUnset = $context->builder->icmp(Builder::INT_EQ, $status, $i32->constInt(0, false));
         $len = self::stringLen($context, $line);
         $longEnough = $context->builder->icmp(Builder::INT_SGE, $len, $i64->constInt(9, false));
@@ -813,7 +808,7 @@ final class PendingHeadersRuntime
             $i32->constInt(302, false),
             $status
         );
-        $context->builder->store($newStatus, HttpResponseCode::$global);
+        HttpResponseRuntime::storeStatusRaw($context, $newStatus);
     }
 
     private static function lineHasCrlf(Context $context, LlvmFunction $fn, Value $line): Value
