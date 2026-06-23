@@ -24,6 +24,10 @@ final class ArrayFillKeysJITTest extends BaseTest
             __DIR__.'/cases/stdlib/array_fill_keys_float_key_jit.phpt',
             'array_fill_keys_float_key_jit.phpt'
         );
+        yield 'array_fill_keys_null_key_jit.phpt' => self::parsePHPT(
+            __DIR__.'/cases/stdlib/array_fill_keys_null_key_jit.phpt',
+            'array_fill_keys_null_key_jit.phpt'
+        );
     }
 
     public function setUp(): void

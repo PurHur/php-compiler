@@ -84,6 +84,25 @@ final class ArrayFillKeysBuiltinTest extends TestCase
         $this->assertSame([2 => 'w'], $list);
     }
 
+    public function testFillKeysNullKeyCoercesToEmptyString(): void
+    {
+        $runtime = new Runtime();
+        $fn = new array_fill_keys();
+
+        $keys = new HashTable();
+        $nullKey = new VMVariable();
+        $nullKey->null();
+        $keys->addIndex(0, $nullKey);
+        $fill = new VMVariable();
+        $fill->string('x');
+        $out = $this->runFill($fn, $runtime, $keys, $fill);
+        $assoc = [];
+        foreach ($out->iterateKeyed(true) as [$key, $val]) {
+            $assoc[VMVariable::TYPE_STRING === $key->type ? $key->toString() : $key->toInt()] = $val->toString();
+        }
+        $this->assertSame(['' => 'x'], $assoc);
+    }
+
     public function testFillKeysEnumCaseThrowsError(): void
     {
         $runtime = new Runtime();
