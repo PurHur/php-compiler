@@ -17,6 +17,10 @@ final class GethostbynamelVMTest extends BaseTest
             __DIR__.'/cases/stdlib/gethostbynamel_localhost.phpt',
             'gethostbynamel_localhost.phpt'
         );
+        yield 'gethostbynamel_localhost_duplicates.phpt' => self::parsePHPT(
+            __DIR__.'/cases/stdlib/gethostbynamel_localhost_duplicates.phpt',
+            'gethostbynamel_localhost_duplicates.phpt'
+        );
     }
 
     public function setUp(): void

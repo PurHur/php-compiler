@@ -109,9 +109,13 @@ final class VmDns
             return [];
         }
 
-        $ips = self::resolveViaEtcHosts($hostname);
-        if (null === $ips || [] === $ips) {
+        // php-src: ext/standard/dns.c — php_network_getaddresses() via getaddrinfo when available.
+        $ips = null;
+        if (self::ffiEnabled()) {
             $ips = self::resolveViaGetaddrinfo($hostname);
+        }
+        if (null === $ips || [] === $ips) {
+            $ips = self::resolveViaEtcHosts($hostname);
         }
         if (null === $ips || [] === $ips) {
             return [];
@@ -539,7 +543,8 @@ final class VmDns
                 );
                 if (null !== $ntop) {
                     $ip = \FFI::string($buf);
-                    if ('' !== $ip && !\in_array($ip, $stored, true) && \count($stored) < self::MAX_ADDRS) {
+                    // php-src add_hostname_address: append every AF_INET result (duplicates allowed).
+                    if ('' !== $ip && \count($stored) < self::MAX_ADDRS) {
                         $stored[] = $ip;
                     }
                 }
