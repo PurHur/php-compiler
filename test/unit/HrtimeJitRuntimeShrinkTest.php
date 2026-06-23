@@ -6,14 +6,13 @@ namespace PHPCompiler;
 
 use PHPUnit\Framework\TestCase;
 
-/** hrtime JIT helpers route through VmHrtimeNative PHP, not /proc/uptime LLVM (#9182). */
+/** hrtime JIT helpers route through VmHrtimeNative PHP, not clock_gettime LLVM (#9182, #10859). */
 final class HrtimeJitRuntimeShrinkTest extends TestCase
 {
     public function testHrtimeJitHelperDelegatesToVmHrtimeNative(): void
     {
         $source = (string) \file_get_contents(__DIR__.'/../../ext/standard/HrtimeJitHelper.php');
-        $this->assertStringContainsString('VmHrtimeNative::parseUptimeRaw', $source);
-        $this->assertStringContainsString('/proc/uptime', $source);
+        $this->assertStringContainsString('VmHrtimeNative::readMonotonic', $source);
     }
 
     public function testStringHrtimeNoLongerUsesMonotonicReadLlvm(): void

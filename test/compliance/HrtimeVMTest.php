@@ -25,6 +25,10 @@ final class HrtimeVMTest extends BaseTest
             __DIR__.'/cases/stdlib/hrtime_jit_vm.phpt',
             'hrtime_jit_vm.phpt'
         );
+        yield 'hrtime_nanosecond_precision.phpt' => self::parsePHPT(
+            __DIR__.'/cases/stdlib/hrtime_nanosecond_precision.phpt',
+            'hrtime_nanosecond_precision.phpt'
+        );
     }
 
     public function setUp(): void

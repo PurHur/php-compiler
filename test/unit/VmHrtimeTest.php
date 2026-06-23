@@ -36,4 +36,26 @@ final class VmHrtimeTest extends TestCase
         [$sec, $nsec] = VmHrtimeNative::readMonotonic();
         $this->assertGreaterThan(0, $sec + $nsec);
     }
+
+    /** Issue #10859 — clock_gettime path exposes sub-microsecond nanoseconds. */
+    public function testNanosecondSubMicrosecondPrecision(): void
+    {
+        if (!\extension_loaded('ffi')) {
+            $this->markTestSkipped('ext/ffi required for nanosecond precision (#10859)');
+        }
+        $anyNonZeroMod = false;
+        for ($i = 0; $i < 10; ++$i) {
+            [, $nsec] = VmHrtime::hrtime(false);
+            if (0 !== $nsec % 1000) {
+                $anyNonZeroMod = true;
+
+                break;
+            }
+        }
+        $this->assertTrue($anyNonZeroMod, 'hrtime()[1] % 1000 should be non-zero with clock_gettime');
+
+        $a = VmHrtime::hrtime(false)[1];
+        $b = VmHrtime::hrtime(false)[1];
+        $this->assertNotSame($a, $b, 'consecutive hrtime() nanoseconds should differ');
+    }
 }

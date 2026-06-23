@@ -40,7 +40,9 @@ final class StringHrtimeRuntimeStandaloneTest extends TestCase
         $this->assertStringContainsString('HrtimeJitHelper', $runtimeSource);
 
         $helperSource = (string) \file_get_contents(__DIR__.'/../../../ext/standard/HrtimeJitHelper.php');
-        $this->assertStringContainsString('VmHrtimeNative::parseUptimeRaw', $helperSource);
-        $this->assertStringContainsString('VmFsReadNative::read', $helperSource);
+        $this->assertStringContainsString('VmHrtimeNative::readMonotonic', $helperSource);
+
+        $nativeSource = (string) \file_get_contents(__DIR__.'/../../../ext/standard/VmHrtimeNative.php');
+        $this->assertStringContainsString('clock_gettime', $nativeSource);
     }
 }
