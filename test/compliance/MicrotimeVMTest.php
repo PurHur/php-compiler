@@ -17,6 +17,10 @@ final class MicrotimeVMTest extends BaseTest
             __DIR__.'/cases/stdlib/microtime.phpt',
             'microtime.phpt'
         );
+        yield 'microtime_named.phpt' => self::parsePHPT(
+            __DIR__.'/cases/stdlib/microtime_named.phpt',
+            'microtime_named.phpt'
+        );
     }
 
     public function setUp(): void

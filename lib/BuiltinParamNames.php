@@ -138,6 +138,8 @@ final class BuiltinParamNames
                 return ['iterator', 'preserve_keys'];
             case 'hrtime':
                 return ['as_number'];
+            case 'microtime':
+                return ['as_float'];
             case 'mb_trim':
             case 'mb_ltrim':
             case 'mb_rtrim':
