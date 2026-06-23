@@ -235,18 +235,22 @@ final class VmInternalCompare
         if (StdlibConstants::SORT_NATURAL === $sortType) {
             return self::invoke(
                 self::resolveStringCallback(0 !== $caseFlag ? 'strnatcasecmp' : 'strnatcmp'),
-                $a,
-                $b
+                self::coerceForStringSort($a),
+                self::coerceForStringSort($b)
             );
         }
         if (StdlibConstants::SORT_LOCALE_STRING === $sortType) {
-            return self::invoke(self::resolveStringCallback('strcoll'), $a, $b);
+            return self::invoke(
+                self::resolveStringCallback('strcoll'),
+                self::coerceForStringSort($a),
+                self::coerceForStringSort($b)
+            );
         }
         if (StdlibConstants::SORT_STRING === $sortType) {
             return self::invoke(
                 self::resolveStringCallback(0 !== $caseFlag ? 'strcasecmp' : 'strcmp'),
-                $a,
-                $b
+                self::coerceForStringSort($a),
+                self::coerceForStringSort($b)
             );
         }
 
@@ -261,13 +265,21 @@ final class VmInternalCompare
             return self::compareNumericOperandsForSort($a, $b);
         }
         if (StdlibConstants::SORT_LOCALE_STRING === $sortType) {
-            return self::invoke(self::resolveStringCallback('strcoll'), $a, $b);
+            return self::invoke(
+                self::resolveStringCallback('strcoll'),
+                self::coerceForStringSort($a),
+                self::coerceForStringSort($b)
+            );
         }
         if (
             StdlibConstants::SORT_STRING === $sortType
             || StdlibConstants::SORT_NATURAL === $sortType
         ) {
-            return self::invoke(self::valueCompareForSortFlags($flags), $a, $b);
+            return self::invoke(
+                self::valueCompareForSortFlags($flags),
+                self::coerceForStringSort($a),
+                self::coerceForStringSort($b)
+            );
         }
 
         return self::compareValuesForSort($a, $b);
@@ -321,6 +333,19 @@ final class VmInternalCompare
         $fn->execute($frame);
 
         return $out->resolveIndirect()->toInt();
+    }
+
+    /** php-src php_array_keycompare / php_array_sort SORT_STRING — cast keys/values before strcmp. */
+    private static function coerceForStringSort(Variable $operand): Variable
+    {
+        $resolved = $operand->resolveIndirect();
+        if (Variable::TYPE_STRING === $resolved->type) {
+            return $resolved;
+        }
+        $str = new Variable();
+        $str->string($resolved->toString());
+
+        return $str;
     }
 
     /**
@@ -581,7 +606,14 @@ final class VmInternalCompare
         $n = \count($pairs);
         for ($i = 1; $i < $n; ++$i) {
             $j = $i;
-            while ($j > 0 && self::invoke($compare, $pairs[$j - 1][0], $pairs[$j][0]) > 0) {
+            while (
+                $j > 0
+                && self::invoke(
+                    $compare,
+                    self::coerceForStringSort($pairs[$j - 1][0]),
+                    self::coerceForStringSort($pairs[$j][0])
+                ) > 0
+            ) {
                 $tmp = $pairs[$j - 1];
                 $pairs[$j - 1] = $pairs[$j];
                 $pairs[$j] = $tmp;
