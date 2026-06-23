@@ -63,6 +63,7 @@ final class StreamReadJit
         }
 
         self::ensureLibc($context);
+        StreamFilter::ensureLinked($context);
 
         self::implementIfMissing($context, '__phpc_read_stream_bytes', self::emitReadStreamBytes(...));
         self::implementIfMissing($context, '__compiler_flock', self::emitFlock(...));
@@ -163,6 +164,7 @@ final class StreamReadJit
             ['fseek', $i32, [$i8p, $i64, $i32]],
             ['__string__init', $strPtr, [$i64, $i8p]],
             ['__string__strlen', $i64, [$strPtr]],
+            ['__compiler_stream_filter_apply_read', $strPtr, [$i64, $strPtr]],
         ] as [$name, $ret, $params]) {
             self::ensureExternal($context, $name, $context->context->functionType($ret, false, ...$params));
         }
@@ -936,13 +938,27 @@ final class StreamReadJit
         $context->builder->branchIf($empty, $emptyBb, $readBb);
 
         $context->builder->positionAtEnd($emptyBb);
+        $emptyStr = $context->builder->call(
+            $context->lookupFunction('__string__init'),
+            $zero64,
+            $context->pointerFromStringConstant('')
+        );
         $context->builder->returnValue(
-            $context->builder->call($context->lookupFunction('__string__init'), $zero64, $context->pointerFromStringConstant(''))
+            $context->builder->call(
+                $context->lookupFunction('__compiler_stream_filter_apply_read'),
+                $handle,
+                $emptyStr
+            )
         );
 
         $context->builder->positionAtEnd($readBb);
+        $raw = $context->builder->call($context->lookupFunction('__phpc_read_stream_bytes'), $fp, $maxlength);
         $context->builder->returnValue(
-            $context->builder->call($context->lookupFunction('__phpc_read_stream_bytes'), $fp, $maxlength)
+            $context->builder->call(
+                $context->lookupFunction('__compiler_stream_filter_apply_read'),
+                $handle,
+                $raw
+            )
         );
 
         $context->builder->positionAtEnd($failBb);

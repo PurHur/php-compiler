@@ -58,6 +58,7 @@ final class StreamIoJit
         }
 
         self::ensureStreamGlobals($context);
+        StreamFilter::ensureLinked($context);
 
         if (self::shouldDeferHeavyStreamIoEmitters($context)) {
             self::implementDeferredStreamIoStubs($context);
@@ -296,6 +297,8 @@ final class StreamIoJit
             ['dup', $i32, [$i32]],
             ['fdopen', $i8p, [$i32, $i8p]],
             ['close', $i32, [$i32]],
+            ['__compiler_stream_filter_apply_write', $strPtr, [$i64, $strPtr]],
+            ['__compiler_stream_filter_apply_read', $strPtr, [$i64, $strPtr]],
         ] as [$name, $ret, $params]) {
             self::ensureExternal($context, $name, $context->context->functionType($ret, false, ...$params));
         }
@@ -475,9 +478,14 @@ final class StreamIoJit
         $context->builder->returnValue($zeroI64);
 
         $context->builder->positionAtEnd($doWriteBb);
+        $filtered = $context->builder->call(
+            $context->lookupFunction('__compiler_stream_filter_apply_write'),
+            $handle,
+            $data
+        );
         $n = $context->builder->call(
             $context->lookupFunction('fwrite'),
-            self::stringData($context, $data),
+            self::stringData($context, $filtered),
             $sizeT->constInt(1, false),
             $writeLen,
             $fp
@@ -923,8 +931,17 @@ final class StreamIoJit
         $context->builder->branchIf($isZero, $emptyBb, $allocBb);
 
         $context->builder->positionAtEnd($emptyBb);
+        $emptyStr = $context->builder->call(
+            $context->lookupFunction('__string__init'),
+            $zeroI64,
+            $emptyCstr
+        );
         $context->builder->returnValue(
-            $context->builder->call($context->lookupFunction('__string__init'), $zeroI64, $emptyCstr)
+            $context->builder->call(
+                $context->lookupFunction('__compiler_stream_filter_apply_read'),
+                $handle,
+                $emptyStr
+            )
         );
 
         $context->builder->positionAtEnd($allocBb);
@@ -960,7 +977,13 @@ final class StreamIoJit
         $gotI64 = $context->builder->sext($got, $i64);
         $result = $context->builder->call($context->lookupFunction('__string__init'), $gotI64, $buf);
         $context->builder->call($context->lookupFunction('free'), $buf);
-        $context->builder->returnValue($result);
+        $context->builder->returnValue(
+            $context->builder->call(
+                $context->lookupFunction('__compiler_stream_filter_apply_read'),
+                $handle,
+                $result
+            )
+        );
 
         $context->builder->positionAtEnd($failBb);
         $context->builder->returnValue($nullStr);
