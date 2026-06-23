@@ -1,24 +1,20 @@
 --TEST--
-stdlib is_a() — TypeError for non-object/non-allowed-string subject (#4782, ext/standard/class.c)
+stdlib is_a() — null/scalar subject returns false (#10873, ext/standard/class.c)
 --FILE--
 <?php
-try {
-    var_dump(is_a(1, 'stdClass'));
-} catch (Throwable $e) {
-    echo $e::class, "\n";
-    echo $e->getMessage(), "\n";
-}
-try {
-    var_dump(is_a(1, 'stdClass', true));
-} catch (Throwable $e) {
-    echo $e::class, "\n";
-    echo $e->getMessage(), "\n";
-}
+var_dump(is_a(null, 'stdClass'));
+var_dump(is_a(false, 'stdClass'));
+var_dump(is_a(true, 'stdClass'));
+var_dump(is_a(1, 'stdClass'));
+var_dump(is_a(1, 'stdClass', true));
+var_dump(is_a([], 'stdClass'));
 class Widget {}
 var_dump(is_a('Widget', 'Widget'));
 --EXPECT--
-TypeError
-is_a(): Argument #1 ($object_or_class) must be of type object|string, int given
-TypeError
-is_a(): Argument #1 ($object_or_class) must be of type object|string, int given
+bool(false)
+bool(false)
+bool(false)
+bool(false)
+bool(false)
+bool(false)
 bool(false)

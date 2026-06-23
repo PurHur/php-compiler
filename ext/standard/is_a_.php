@@ -6,7 +6,6 @@ namespace PHPCompiler\ext\standard;
 
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
-use PHPCompiler\JIT\Builtin\TypeErrorRaise;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitBoolArg;
 use PHPCompiler\JIT\ReflectionBuiltinHelper;
@@ -19,9 +18,6 @@ use PHPLLVM\Value;
  */
 final class is_a_ extends Internal
 {
-    private const SUBJECT_TYPE_ERROR =
-        'is_a(): Argument #1 ($object_or_class) must be of type object|string, %s given';
-
     public function __construct()
     {
         parent::__construct('is_a');
@@ -39,7 +35,6 @@ final class is_a_ extends Internal
             $allowString = $frame->calledArgs[2]->resolveIndirect()->toBool();
         }
         $subject = $frame->calledArgs[0]->resolveIndirect();
-        self::requireValidSubject($subject, $allowString);
         $matches = false;
         if (Variable::TYPE_OBJECT === $subject->type || Variable::TYPE_ENUM_CASE === $subject->type) {
             $matches = VmReflection::isInstanceOfObject($ctx, $subject, $className);
@@ -48,6 +43,7 @@ final class is_a_ extends Internal
             $matches = null !== $child
                 && VmReflection::isInstanceOf($ctx, $child, $className);
         }
+        // null/scalar/array subjects — false without TypeError (php-src class.c, #10873).
         if (null !== $frame->returnVar) {
             $frame->returnVar->bool($matches);
         }
@@ -69,7 +65,7 @@ final class is_a_ extends Internal
             JITVariable::TYPE_STRING,
             JITVariable::TYPE_VALUE,
         ], true)) {
-            self::emitJitTypeErrorAndAbort($context, self::jitTypeErrorMessage($args[0]->type));
+            return $context->getTypeFromString('int1')->constInt(0, false);
         }
         $className = ReflectionBuiltinHelper::requireCompileTimeClassName(
             $context,
@@ -106,18 +102,6 @@ final class is_a_ extends Internal
         );
     }
 
-    private static function requireValidSubject(Variable $subject, bool $allowString): void
-    {
-        if (Variable::TYPE_OBJECT === $subject->type || Variable::TYPE_ENUM_CASE === $subject->type) {
-            return;
-        }
-        // object|string — disallowed string subjects return false in execute(), not TypeError (#4853).
-        if (Variable::TYPE_STRING === $subject->type) {
-            return;
-        }
-        throw new \TypeError(\sprintf(self::SUBJECT_TYPE_ERROR, self::vmTypeName($subject->type)));
-    }
-
     private static function jitAllowStringKnownFalse(Context $context, JITVariable $arg): bool
     {
         if (JITVariable::TYPE_NATIVE_BOOL === $arg->type && JITVariable::KIND_VALUE === $arg->kind) {
@@ -127,51 +111,4 @@ final class is_a_ extends Internal
         return false;
     }
 
-    private static function emitJitTypeErrorAndAbort(Context $context, string $message): void
-    {
-        TypeErrorRaise::registerDeclarations($context);
-        TypeErrorRaise::ensureLinked($context);
-        TypeErrorRaise::emitRaise($context, $message);
-        $context->builder->call($context->lookupFunction('abort'));
-    }
-
-    private static function jitTypeErrorMessage(int $type): string
-    {
-        switch ($type) {
-            case JITVariable::TYPE_NATIVE_LONG:
-                return \sprintf(self::SUBJECT_TYPE_ERROR, 'int');
-            case JITVariable::TYPE_NATIVE_DOUBLE:
-                return \sprintf(self::SUBJECT_TYPE_ERROR, 'float');
-            case JITVariable::TYPE_NATIVE_BOOL:
-                return \sprintf(self::SUBJECT_TYPE_ERROR, 'bool');
-            case JITVariable::TYPE_NULL:
-                return \sprintf(self::SUBJECT_TYPE_ERROR, 'null');
-            default:
-                return \sprintf(self::SUBJECT_TYPE_ERROR, 'mixed');
-        }
-    }
-
-    private static function vmTypeName(int $type): string
-    {
-        switch ($type) {
-            case Variable::TYPE_INTEGER:
-                return 'int';
-            case Variable::TYPE_FLOAT:
-                return 'float';
-            case Variable::TYPE_BOOLEAN:
-                return 'bool';
-            case Variable::TYPE_STRING:
-                return 'string';
-            case Variable::TYPE_NULL:
-                return 'null';
-            case Variable::TYPE_ARRAY:
-                return 'array';
-            case Variable::TYPE_OBJECT:
-                return 'object';
-            case Variable::TYPE_ENUM_CASE:
-                return 'object';
-            default:
-                return 'mixed';
-        }
-    }
 }
