@@ -377,6 +377,11 @@ final class VmReflection
 
             return self::methodExistsOnClass($class, $method);
         }
+        if (Variable::TYPE_NULL === $objectOrClass->type) {
+            throw new \TypeError(
+                'method_exists(): Argument #1 ($object_or_class) must be of type object|string, null given'
+            );
+        }
         throw new \LogicException('Expected object or class name string in this compiler build');
     }
 
