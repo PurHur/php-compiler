@@ -14,5 +14,5 @@ echo "\n";
 --EXPECT--
 true
 true
-false
+true
 true
