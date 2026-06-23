@@ -10781,7 +10781,13 @@ class Compiler {
                     ++$arrayProducerCount;
                 }
             }
-            if ($arrayProducerCount >= 2) {
+            $funcCallProducerCount = 0;
+            foreach ($producers as $producer) {
+                if ($producer instanceof Op\Expr\FuncCall || $producer instanceof Op\Expr\NsFuncCall) {
+                    ++$funcCallProducerCount;
+                }
+            }
+            if ($arrayProducerCount >= 2 || $funcCallProducerCount >= 2) {
                 $matched = $this->matchInlineCallArgProducer($producers, $callOp->args, $argIndex, $callOp);
                 if ($matched instanceof Op\Expr) {
                     if (null === $block->slotForOperand($matched->result)) {
@@ -11208,16 +11214,31 @@ class Compiler {
             if (
                 null !== $callIndex
                 && null !== $producerIndex
-                && (
-                    $this->isNestedCallArgProducerForConsumer($producer, $callOp, $producerIndex, $callIndex, $block->orig->children)
-                    || $this->isSiblingMultiArgFuncCallProducer(
-                        $producer,
-                        $callOp,
-                        $producerIndex,
-                        $callIndex,
-                        $block->orig->children
-                    )
+                && $this->isNestedCallArgProducerForConsumer(
+                    $producer,
+                    $callOp,
+                    $producerIndex,
+                    $callIndex,
+                    $block->orig->children
                 )
+            ) {
+                return $producerSlot;
+            }
+            if (
+                null !== $callIndex
+                && null !== $producerIndex
+                && $this->isSiblingMultiArgFuncCallProducer(
+                    $producer,
+                    $callOp,
+                    $producerIndex,
+                    $callIndex,
+                    $block->orig->children
+                )
+                && $this->siblingMultiArgFuncCallProducerTargetArgIndex(
+                    $producerIndex,
+                    $callIndex,
+                    $block->orig->children
+                ) === $argIndex
             ) {
                 return $producerSlot;
             }
@@ -11826,6 +11847,22 @@ class Compiler {
             return $producers[$mappedIndex] ?? null;
         }
         if ($producerCount === $argCount) {
+            // php-cfg `f(g(), h())` hoists sibling FuncCall producers with dead arg temps (#9463, #10917).
+            if ($argIndex < $producerCount) {
+                $allSiblingFuncCalls = true;
+                foreach ($producers as $candidate) {
+                    if (
+                        !$candidate instanceof Op\Expr\FuncCall
+                        && !$candidate instanceof Op\Expr\NsFuncCall
+                    ) {
+                        $allSiblingFuncCalls = false;
+                        break;
+                    }
+                }
+                if ($allSiblingFuncCalls) {
+                    return $producers[$argIndex];
+                }
+            }
             $closureIdx = null;
             $arrayIdx = null;
             foreach ($producers as $pi => $producer) {
@@ -13246,7 +13283,7 @@ class Compiler {
         }
         // Producer at distance d supplies consumer arg d-1; UnaryMinus prelude shifts arg 0 (#10673).
         $targetArg = $consumer->args[$targetArgIndex] ?? null;
-        if (!$targetArg instanceof Operand\Temporary) {
+        if (!$this->callArgIsDeadInlineTemporary($targetArg)) {
             return false;
         }
         for ($j = $producerIndex + 1; $j < $consumerIndex; ++$j) {
@@ -13299,8 +13336,114 @@ class Compiler {
         if (2 === $distance && $this->isUnaryInlineSiblingCallArgExpr($mid)) {
             return 0;
         }
+        $firstSibling = $this->firstSiblingInlineFuncCallProducerIndex($consumerIndex, $cfgChildren);
+        if (null === $firstSibling) {
+            return $distance - 1;
+        }
+        if ($producerIndex < $firstSibling || $producerIndex >= $consumerIndex) {
+            return null;
+        }
 
-        return $distance - 1;
+        return $producerIndex - $firstSibling;
+    }
+
+    /**
+     * First hoisted FuncCall in a sibling inline call-arg chain ending at {@see $consumerIndex}.
+     *
+     * @param list<Op> $cfgChildren
+     */
+    private function firstSiblingInlineFuncCallProducerIndex(int $consumerIndex, array $cfgChildren): ?int
+    {
+        $i = $consumerIndex - 1;
+        while ($i >= 0) {
+            $child = $cfgChildren[$i] ?? null;
+            if ($child instanceof Op\Expr\FuncCall || $child instanceof Op\Expr\NsFuncCall) {
+                --$i;
+                continue;
+            }
+            if ($this->isUnaryInlineSiblingCallArgExpr($child) && $i > 0) {
+                $before = $cfgChildren[$i - 1] ?? null;
+                if ($before instanceof Op\Expr\FuncCall || $before instanceof Op\Expr\NsFuncCall) {
+                    --$i;
+                    continue;
+                }
+            }
+            break;
+        }
+        $first = $i + 1;
+        if ($first >= $consumerIndex) {
+            return null;
+        }
+        $firstChild = $cfgChildren[$first] ?? null;
+        if (!$firstChild instanceof Op\Expr\FuncCall && !$firstChild instanceof Op\Expr\NsFuncCall) {
+            return null;
+        }
+
+        return $first;
+    }
+
+    /**
+     * php-cfg `f(g(), h())` — map arg N to the Nth sibling hoisted FuncCall producer (#9463, #10917).
+     */
+    private function resolveSiblingInlineCallArgProducerSlot(
+        Block $block,
+        Op $cfgCallOp,
+        int $argIndex,
+        array &$emitOps = []
+    ): ?int {
+        if (null === $block->orig || !property_exists($cfgCallOp, 'args') || !is_array($cfgCallOp->args)) {
+            return null;
+        }
+        $argCount = \count($cfgCallOp->args);
+        if ($argCount < 2 || $argIndex >= $argCount) {
+            return null;
+        }
+        $callIndex = null;
+        foreach ($block->orig->children as $i => $child) {
+            if ($child === $cfgCallOp) {
+                $callIndex = $i;
+                break;
+            }
+        }
+        if (null === $callIndex) {
+            return null;
+        }
+        $firstSibling = $this->firstSiblingInlineFuncCallProducerIndex($callIndex, $block->orig->children);
+        if (null === $firstSibling) {
+            return null;
+        }
+        $siblingCount = $callIndex - $firstSibling;
+        if ($siblingCount < 2 || $argIndex >= $siblingCount) {
+            return null;
+        }
+        $producerIndex = $firstSibling + $argIndex;
+        $producer = $block->orig->children[$producerIndex] ?? null;
+        if (!$producer instanceof Op\Expr\FuncCall && !$producer instanceof Op\Expr\NsFuncCall) {
+            return null;
+        }
+        if (!$this->isSiblingMultiArgFuncCallProducer(
+            $producer,
+            $cfgCallOp,
+            $producerIndex,
+            $callIndex,
+            $block->orig->children
+        )) {
+            return null;
+        }
+        if ($this->siblingMultiArgFuncCallProducerTargetArgIndex(
+            $producerIndex,
+            $callIndex,
+            $block->orig->children
+        ) !== $argIndex) {
+            return null;
+        }
+        if (null === $block->slotForOperand($producer->result)) {
+            foreach ($this->compileExpr($producer, $block) as $op) {
+                $emitOps[] = $op;
+            }
+        }
+
+        return $block->slotForOperand($producer->result);
     }
 
     /**
@@ -13423,12 +13566,25 @@ class Compiler {
             return false;
         }
         foreach ($callArgs as $callArg) {
-            if (!$callArg instanceof Operand\Temporary) {
+            if (!$this->callArgIsDeadInlineTemporary($callArg)) {
                 return false;
             }
         }
 
         return true;
+    }
+
+    /** php-cfg dead call-arg slot — Temporary or unnamed inferred Variable wrapper (#10917). */
+    private function callArgIsDeadInlineTemporary(?Operand $arg): bool
+    {
+        if (null === $arg) {
+            return false;
+        }
+        if ($arg instanceof Operand\Temporary) {
+            return true;
+        }
+
+        return $arg instanceof Operand\Variable && !$this->isNamedVariableOperand($arg);
     }
 
     /**
@@ -16466,6 +16622,21 @@ class Compiler {
                 (int) $argIndex
             ) as $assignOp) {
                 $sends[] = $assignOp;
+            }
+            if (null !== $cfgCallOp) {
+                $siblingOps = [];
+                $siblingSlot = $this->resolveSiblingInlineCallArgProducerSlot(
+                    $block,
+                    $cfgCallOp,
+                    (int) $argIndex,
+                    $siblingOps
+                );
+                if (null !== $siblingSlot) {
+                    if ([] !== $siblingOps) {
+                        $sends = array_merge($sends, $siblingOps);
+                    }
+                    $valueSlot = $siblingSlot;
+                }
             }
             $sends[] = new OpCode(OpCode::TYPE_ARG_SEND, $valueSlot, $nameSlot, $unpackFlag);
         }

@@ -37,6 +37,10 @@ final class SimilarTextVMTest extends BaseTest
             __DIR__.'/cases/stdlib/similar_text_strict_types.phpt',
             'similar_text_strict_types.phpt'
         );
+        yield 'similar_text_dual_str_repeat.phpt' => self::parsePHPT(
+            __DIR__.'/cases/stdlib/similar_text_dual_str_repeat.phpt',
+            'similar_text_dual_str_repeat.phpt'
+        );
     }
 
     public function setUp(): void

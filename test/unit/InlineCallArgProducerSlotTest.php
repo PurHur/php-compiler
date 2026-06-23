@@ -141,6 +141,104 @@ PHP;
         self::assertContains($sendSlots[1], $returnSlots, 'fcall returns='.json_encode($returnSlots));
     }
 
+    /** Issue #10917 — sibling str_repeat() producers map to distinct levenshtein() arg slots. */
+    public function testLevenshteinDualStrRepeatUsesDistinctProducerSlots(): void
+    {
+        $code = <<<'PHP'
+<?php
+$n = 100;
+levenshtein(str_repeat('a', $n), str_repeat('b', $n));
+PHP;
+        $runtime = new Runtime();
+        $block = $runtime->parseAndCompile($code, 'levenshtein_dual_str_repeat.php');
+
+        $returnSlots = [];
+        $sendSlots = [];
+        $fcallOrdinal = 0;
+        foreach ($block->opCodes as $op) {
+            if (OpCode::TYPE_FUNCCALL_INIT === $op->type) {
+                ++$fcallOrdinal;
+                if (3 === $fcallOrdinal) {
+                    $sendSlots = [];
+                }
+            }
+            if (OpCode::TYPE_FUNCCALL_EXEC_RETURN === $op->type) {
+                $returnSlots[] = $op->arg1;
+            }
+            if (3 === $fcallOrdinal && OpCode::TYPE_ARG_SEND === $op->type) {
+                $sendSlots[] = $op->arg1;
+            }
+        }
+
+        self::assertCount(2, $sendSlots);
+        self::assertNotSame($sendSlots[0], $sendSlots[1], 'arg sends='.json_encode($sendSlots));
+        self::assertContains($sendSlots[0], $returnSlots, 'fcall returns='.json_encode($returnSlots));
+        self::assertContains($sendSlots[1], $returnSlots, 'fcall returns='.json_encode($returnSlots));
+    }
+
+    /** Issue #10917 — levenshtein(str_repeat('a', n), str_repeat('b', n)) runtime parity with Zend. */
+    public function testLevenshteinDualStrRepeatRuntime(): void
+    {
+        $code = <<<'PHP'
+<?php
+$n = 100;
+echo levenshtein(str_repeat('a', $n), str_repeat('b', $n));
+PHP;
+        $runtime = new Runtime();
+        $block = $runtime->parseAndCompile($code, 'levenshtein_dual_str_repeat_runtime.php');
+        ob_start();
+        $runtime->run($block);
+        self::assertSame('100', ob_get_clean());
+    }
+
+    /** Issue #10918 — sibling str_repeat() producers map to distinct similar_text() arg slots. */
+    public function testSimilarTextDualStrRepeatUsesDistinctProducerSlots(): void
+    {
+        $code = <<<'PHP'
+<?php
+$n = 100;
+similar_text(str_repeat('a', $n), str_repeat('b', $n));
+PHP;
+        $runtime = new Runtime();
+        $block = $runtime->parseAndCompile($code, 'similar_text_dual_str_repeat.php');
+
+        $returnSlots = [];
+        $sendSlots = [];
+        $fcallOrdinal = 0;
+        foreach ($block->opCodes as $op) {
+            if (OpCode::TYPE_FUNCCALL_INIT === $op->type) {
+                ++$fcallOrdinal;
+                if (3 === $fcallOrdinal) {
+                    $sendSlots = [];
+                }
+            }
+            if (OpCode::TYPE_FUNCCALL_EXEC_RETURN === $op->type) {
+                $returnSlots[] = $op->arg1;
+            }
+            if (3 === $fcallOrdinal && OpCode::TYPE_ARG_SEND === $op->type) {
+                $sendSlots[] = $op->arg1;
+            }
+        }
+
+        self::assertCount(2, $sendSlots);
+        self::assertNotSame($sendSlots[0], $sendSlots[1], 'arg sends='.json_encode($sendSlots));
+    }
+
+    /** Issue #10918 — similar_text(str_repeat('a', n), str_repeat('b', n)) runtime parity with Zend. */
+    public function testSimilarTextDualStrRepeatRuntime(): void
+    {
+        $code = <<<'PHP'
+<?php
+$n = 100;
+echo similar_text(str_repeat('a', $n), str_repeat('b', $n));
+PHP;
+        $runtime = new Runtime();
+        $block = $runtime->parseAndCompile($code, 'similar_text_dual_str_repeat_runtime.php');
+        ob_start();
+        $runtime->run($block);
+        self::assertSame('0', ob_get_clean());
+    }
+
     /** Issue #9351 — sibling MethodCall producers map to distinct var_dump arg slots. */
     public function testVarDumpReceivesDistinctMethodCallProducerSlots(): void
     {
