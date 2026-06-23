@@ -39,6 +39,7 @@ use PHPCompiler\Compiler\AbstractMethodVisibilityCheck;
 use PHPCompiler\Compiler\InterfaceConstVisibilityCheck;
 use PHPCompiler\Compiler\InterfaceMethodVisibilityCheck;
 use PHPCompiler\Compiler\EnumAbstractMethodCompileCheck;
+use PHPCompiler\Compiler\ClassConstDuplicateCheck;
 use PHPCompiler\Compiler\EnumBackedCaseCheck;
 use PHPCompiler\Compiler\EnumMagicMethodCheck;
 use PHPCompiler\Compiler\EnumParentCompileCheck;
@@ -486,6 +487,7 @@ class Compiler {
         EnumAbstractMethodCompileCheck::validate($script);
         EnumParentCompileCheck::validate($script);
         EnumBackedCaseCheck::validate($script);
+        ClassConstDuplicateCheck::validate($script);
         ReadonlyClassCompileCheck::validate($script, $this->knownClassReadonly);
         AsymmetricVisibilityCompileCheck::validate($script);
         GeneratorStaticMethodCompileCheck::validate($script);
