@@ -4,20 +4,31 @@ declare(strict_types=1);
 
 namespace PHPCompiler\JIT\Builtin;
 
+use PHPCompiler\JIT;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitValueBox;
+use PHPCompiler\JIT\NestedJitCompileScope;
 use PHPLLVM\Builder;
 use PHPLLVM\Value;
 use PHPLLVM\Value\Function_ as LlvmFunction;
 
 /**
- * LLVM global stream notification callback storage (#6055).
+ * JIT/AOT link for stream_notification_callback via StreamNotificationJitHelper PHP (#9478).
  *
+ * Replaces LLVM module global callback slot; SSOT
+ * {@see \PHPCompiler\ext\standard\StreamNotificationJitHelper}.
  * php-src: ext/standard/streams.c — PHP_FUNCTION(stream_notification_callback)
  */
 final class StreamNotificationRuntime
 {
-    private const GLOBAL_CALLBACK = 'phpc_stream_notification_callback';
+    private const HELPER_PATH = '/ext/standard/StreamNotificationJitHelper.php';
+
+    private const SLOT_HELPER = 'PHPCompiler\\ext\\standard\\StreamNotificationJitHelper::jitCallbackSlot';
+
+    /** @var list<string> */
+    private const COMPILED_HELPERS = [
+        self::SLOT_HELPER,
+    ];
 
     /** @var list<string> */
     private const RUNTIME_FNS = [
@@ -38,7 +49,7 @@ final class StreamNotificationRuntime
             return;
         }
 
-        self::ensureGlobal($context);
+        self::ensureJitHelperCompiled($context);
 
         $voidTy = $context->getTypeFromString('void');
         $valPtr = $context->getTypeFromString('__value__*');
@@ -47,6 +58,7 @@ final class StreamNotificationRuntime
         self::implementSet($context, $fn);
 
         self::registerLinkedRuntime($context);
+        $context->builder->clearInsertionPosition();
     }
 
     private static function implementSet(Context $context, LlvmFunction $fn): void
@@ -58,52 +70,73 @@ final class StreamNotificationRuntime
         $newCb = $fn->getParam(0);
         $outPrev = $fn->getParam(1);
 
-        $global = $context->module->getNamedGlobal(self::GLOBAL_CALLBACK);
-        if (null === $global) {
-            throw new \LogicException('Missing global '.self::GLOBAL_CALLBACK);
-        }
-        $globalPtr = $context->builder->pointerCast($global, $valPtr->pointerType(0));
-        $oldCb = $context->builder->load($globalPtr);
+        $slot = $context->builder->call(self::helperFunction($context, self::SLOT_HELPER));
+        $slotNull = $context->builder->icmp(Builder::INT_EQ, $slot, $valPtr->constNull());
+        $failBb = $fn->appendBasicBlock('snc_set_fail');
+        $bodyBb = $fn->appendBasicBlock('snc_set_body');
+        $context->builder->branchIf($slotNull, $failBb, $bodyBb);
 
-        $hasOldBb = $fn->appendBasicBlock('snc_set_has_old');
-        $noOldBb = $fn->appendBasicBlock('snc_set_no_old');
-        $afterPrevBb = $fn->appendBasicBlock('snc_set_after_prev');
-        $context->builder->branchIf(
-            $context->builder->icmp(Builder::INT_NE, $oldCb, $valPtr->constNull()),
-            $hasOldBb,
-            $noOldBb
-        );
-
-        $context->builder->positionAtEnd($noOldBb);
+        $context->builder->positionAtEnd($failBb);
         $context->builder->call($context->lookupFunction('__value__writeNull'), $outPrev);
-        $context->builder->branch($afterPrevBb);
+        $context->builder->returnVoid();
 
-        $context->builder->positionAtEnd($hasOldBb);
-        JitValueBox::copyFromPointer($context, $outPrev, $oldCb);
-        $context->builder->branch($afterPrevBb);
-
-        $context->builder->positionAtEnd($afterPrevBb);
-        $context->builder->store($newCb, $globalPtr);
+        $context->builder->positionAtEnd($bodyBb);
+        JitValueBox::copyFromPointer($context, $outPrev, $slot);
+        JitValueBox::copyIntoPointer($context, $slot, $newCb);
         $context->builder->returnVoid();
     }
 
-    private static function ensureGlobal(Context $context): void
+    private static function helperFunction(Context $context, string $logical): LlvmFunction
     {
-        if (null !== $context->module->getNamedGlobal(self::GLOBAL_CALLBACK)) {
+        self::ensureJitHelperCompiled($context);
+        $lc = \strtolower($logical);
+        $fn = $context->functions[$lc] ?? null;
+        if (null === $fn) {
+            throw new \LogicException($logical.' missing after StreamNotificationJitHelper compile (#9478)');
+        }
+
+        return $fn;
+    }
+
+    private static function ensureJitHelperCompiled(Context $context): void
+    {
+        $missing = false;
+        foreach (self::COMPILED_HELPERS as $logical) {
+            if (!isset($context->functions[\strtolower($logical)])) {
+                $missing = true;
+                break;
+            }
+        }
+        if (!$missing) {
             return;
         }
-        $valPtr = $context->getTypeFromString('__value__*');
-        $global = $context->module->addGlobal($valPtr, self::GLOBAL_CALLBACK);
-        $global->setInitializer($valPtr->constNull());
+
+        $runtime = $context->runtime;
+        $path = \dirname(__DIR__, 3).self::HELPER_PATH;
+        NestedJitCompileScope::run($context, static function () use ($context, $runtime, $path): void {
+            $block = $runtime->parseAndCompile((string) \file_get_contents($path), 'StreamNotificationJitHelper.php');
+            if (null === $block) {
+                throw new \LogicException('StreamNotificationJitHelper.php parseAndCompile failed (#9478)');
+            }
+            $jit = new JIT($context);
+            $jit->compile($block);
+        });
+        foreach (self::COMPILED_HELPERS as $logical) {
+            $lc = \strtolower($logical);
+            if (!isset($context->functions[$lc])) {
+                throw new \LogicException($lc.' was not compiled for JIT (#9478)');
+            }
+        }
     }
 
     private static function registerLinkedRuntime(Context $context): void
     {
         foreach (self::RUNTIME_FNS as $name) {
             $fn = $context->module->getNamedFunction($name);
-            if (null !== $fn) {
-                $context->registerFunction($name, $fn);
+            if (null === $fn) {
+                throw new \LogicException($name.' missing after StreamNotificationRuntime bridge (#9478)');
             }
+            $context->registerFunction($name, $fn);
         }
     }
 }

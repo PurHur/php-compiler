@@ -33,8 +33,6 @@ final class VmStreamNotification
 
     private const PARAM_NOTIFICATION = 'notification';
 
-    private static ?Variable $globalCallback = null;
-
     /** @return array<string, int> */
     public static function constants(): array
     {
@@ -57,20 +55,12 @@ final class VmStreamNotification
 
     public static function setGlobal(Variable $callback): Variable
     {
-        $previous = self::$globalCallback;
-        $resolved = $callback->resolveIndirect();
-        if (Variable::TYPE_NULL === $resolved->type) {
-            self::$globalCallback = null;
-        } else {
-            self::$globalCallback = self::normalizeCallbackForStorage($callback);
-        }
-
-        return self::callbackReturnValue($previous);
+        return StreamNotificationJitHelper::setGlobal($callback);
     }
 
     public static function globalCallback(): ?Variable
     {
-        return self::$globalCallback;
+        return StreamNotificationJitHelper::globalCallback();
     }
 
     /**
@@ -189,35 +179,6 @@ final class VmStreamNotification
         }
 
         return false;
-    }
-
-    private static function normalizeCallbackForStorage(Variable $callback): Variable
-    {
-        self::requireValidCallback($callback);
-        $resolved = $callback->resolveIndirect();
-        if (Variable::TYPE_NULL === $resolved->type) {
-            $out = new Variable();
-            $out->null();
-
-            return $out;
-        }
-        $out = new Variable();
-        $out->copyFrom($resolved);
-
-        return $out;
-    }
-
-    private static function callbackReturnValue(?Variable $previous): Variable
-    {
-        $out = new Variable();
-        if (null === $previous) {
-            $out->null();
-
-            return $out;
-        }
-        $out->copyFrom($previous);
-
-        return $out;
     }
 
     private static function invoke(Context $ctx, Variable $callback, Variable ...$args): void
