@@ -42,6 +42,7 @@ final class gzopen extends Internal
         }
         $handle = VmGzStream::gzopen($filename, $mode, $useIncludePath);
         if (false === $handle) {
+            VmStreamOpenFailure::warnFailedToOpen($frame, 'gzopen', $filename);
             $frame->returnVar->bool(false);
 
             return;

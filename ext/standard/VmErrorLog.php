@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace PHPCompiler\ext\standard;
 
+use PHPCompiler\Frame;
+
 /**
  * error_log() dispatch (php-src ext/standard/basic_functions.c::_php_error_log).
  *
@@ -15,7 +17,7 @@ final class VmErrorLog
         int $messageType,
         string $message,
         ?string $destination = null,
-        ?string $extraHeaders = null
+        ?Frame $frame = null
     ): bool {
         switch ($messageType) {
             case 1:
@@ -38,6 +40,10 @@ final class VmErrorLog
                     \LOCK_EX | StdlibConstants::FILE_APPEND
                 );
                 if (false === $written) {
+                    if (null !== $frame) {
+                        VmStreamOpenFailure::warnFailedToOpen($frame, 'error_log', $destination);
+                    }
+
                     return false;
                 }
 
