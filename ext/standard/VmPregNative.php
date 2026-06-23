@@ -200,12 +200,19 @@ final class VmPregNative
 
         [$code, $matchData] = $compiled;
         try {
+            $offsetCapture = 0 !== ($flags & StdlibConstants::PREG_SPLIT_OFFSET_CAPTURE);
+            // php-src: limit 1 returns the subject unsplit; limit <= 0 is unlimited (#10545).
+            if (1 === $limit) {
+                self::$lastError = 0;
+
+                return [$offsetCapture ? [$subject, 0] : $subject];
+            }
+
             $subjectC = self::stringToC($subject);
             $parts = [];
             $offset = 0;
             $count = 0;
-            $maxParts = $limit < 0 ? \PHP_INT_MAX : $limit;
-            $offsetCapture = 0 !== ($flags & StdlibConstants::PREG_SPLIT_OFFSET_CAPTURE);
+            $maxParts = $limit <= 0 ? \PHP_INT_MAX : $limit;
             $noEmpty = 0 !== ($flags & StdlibConstants::PREG_SPLIT_NO_EMPTY);
             $delimCapture = 0 !== ($flags & StdlibConstants::PREG_SPLIT_DELIM_CAPTURE);
 
