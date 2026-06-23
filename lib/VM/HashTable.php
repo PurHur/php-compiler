@@ -1263,8 +1263,10 @@ final class HashTable {
         }
         $out = new self();
         $out->unshiftPrepend(...$prepend);
-        foreach ($this->iterateKeyed(true) as [$key, $element]) {
-            $this->copyKeyedEntry($out, $key, $element);
+        foreach ($this->iterate(true) as $element) {
+            $copy = new Variable();
+            $copy->copyFrom($element);
+            $out->append($copy);
         }
 
         return $out;
