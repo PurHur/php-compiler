@@ -18,12 +18,7 @@ final class usleep extends Internal
         if (1 !== \count($frame->calledArgs)) {
             throw new \LogicException('usleep() requires exactly one argument');
         }
-        $microseconds = VmMath::parseIntBuiltinArg(
-            $frame->calledArgs[0]->resolveIndirect(),
-            'usleep',
-            1,
-            'microseconds'
-        );
+        $microseconds = VmMath::parseIntBuiltinArgForFrame($frame, 0, 'usleep', 1, 'microseconds');
         VmSleep::usleep($microseconds);
         if (null !== $frame->returnVar) {
             $frame->returnVar->null();
