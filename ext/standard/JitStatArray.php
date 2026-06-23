@@ -33,6 +33,7 @@ final class JitStatArray
         $context->builder->branchIf($failed, $failBlock, $okBlock);
 
         $context->builder->positionAtEnd($failBlock);
+        JitStat::warnPathStatArrayFailed($context, $pathStr, $lstat ? 'lstat' : 'stat', $lstat);
         $falseSlot = JitValueBox::alloc($context);
         $falsePtr = JitValueBox::pointer($context, $falseSlot);
         JitValueBox::writeBool($context, $falseSlot, $context->getTypeFromString('int1')->constInt(0, false));

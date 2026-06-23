@@ -30,6 +30,7 @@ final class stat_ extends Internal
         }
         $info = VmFs::statInfo($path, false);
         if (false === $info) {
+            VmFilestatFailure::warnPathStatFailed($frame, 'stat', $path, false);
             $frame->returnVar->bool(false);
         } else {
             $frame->returnVar->array($info);

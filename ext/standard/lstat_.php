@@ -30,6 +30,7 @@ final class lstat_ extends Internal
         }
         $info = VmFs::statInfo($path, true);
         if (false === $info) {
+            VmFilestatFailure::warnPathStatFailed($frame, 'lstat', $path, true);
             $frame->returnVar->bool(false);
         } else {
             $frame->returnVar->array($info);
