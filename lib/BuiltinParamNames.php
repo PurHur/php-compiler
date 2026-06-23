@@ -123,6 +123,10 @@ final class BuiltinParamNames
                 return ['haystack', 'needle'];
             case 'preg_match':
                 return ['pattern', 'subject', 'matches', 'flags', 'offset'];
+            case 'preg_split':
+                return ['pattern', 'subject', 'limit', 'flags'];
+            case 'preg_replace':
+                return ['pattern', 'replacement', 'subject', 'limit', 'count'];
             case 'file_get_contents':
                 return ['filename', 'use_include_path', 'context', 'offset', 'length'];
             case 'fopen':
