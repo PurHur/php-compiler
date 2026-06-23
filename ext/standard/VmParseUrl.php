@@ -43,7 +43,17 @@ final class VmParseUrl
             ));
         }
 
-        return self::validateComponentInt($var->toInt());
+        return self::normalizeRawComponentInt($var->toInt());
+    }
+
+    /** php-src url.c — unknown component ids return the full parsed array (#10645). */
+    public static function normalizeRawComponentInt(int $component): int
+    {
+        if ($component < self::PHP_URL_SCHEME || $component > self::PHP_URL_FRAGMENT) {
+            return -1;
+        }
+
+        return $component;
     }
 
     public static function tryParseUrlComponentInt(Variable $var): ?int
@@ -80,7 +90,7 @@ final class VmParseUrl
 
     private static function validateComponentInt(int $component): int
     {
-        return self::componentFromBacking($component);
+        return self::normalizeRawComponentInt($component);
     }
 
     private static function isParseUrlEnum(string $className): bool

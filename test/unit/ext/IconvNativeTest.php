@@ -60,4 +60,12 @@ final class IconvNativeTest extends TestCase
         );
         $this->assertSame('caf', CharsetEngine::convert('UTF-8', 'ASCII//IGNORE', "caf\xC3\xA9"));
     }
+
+    public function testUtf16leRoundTrip(): void
+    {
+        $le = CharsetEngine::convert('UTF-8', 'UTF-16LE', 'a');
+        $this->assertSame('6100', bin2hex((string) $le));
+        $this->assertSame('a', CharsetEngine::convert('UTF-16LE', 'UTF-8', (string) $le));
+        $this->assertSame('a', VmIconv::iconv('UTF-16LE', 'UTF-8', (string) $le));
+    }
 }
