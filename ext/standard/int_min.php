@@ -74,9 +74,9 @@ final class int_min extends Internal
                 $double = $context->getTypeFromString('double');
                 $l = pow::toJitDouble($context, $args[0], $double);
                 $r = pow::toJitDouble($context, $args[1], $double);
-                $cmp = $context->builder->fcmp(Builder::REAL_OLT, $l, $r);
+                $cmp = $context->builder->fcmp(Builder::REAL_OGT, $l, $r);
 
-                return $context->builder->select($cmp, $l, $r);
+                return $context->builder->select($cmp, $r, $l);
             }
         }
 
