@@ -12233,6 +12233,18 @@ class Compiler {
 
             return $argIndex === $unaryArgIndex ? $producers[0] : null;
         }
+        // preg_match*() PREG_* | PREG_* — ConstFetch preludes + dead-temp BitwiseOr (#10517, #3148).
+        $lastProducer = $producers[\count($producers) - 1] ?? null;
+        if (
+            $lastProducer instanceof Op\Expr\BinaryOp\BitwiseOr
+            || $lastProducer instanceof Op\Expr\BinaryOp\BitwiseAnd
+            || $lastProducer instanceof Op\Expr\BinaryOp\BitwiseXor
+        ) {
+            $trailingNonEmbedded = $nonEmbeddedArgIndices[\count($nonEmbeddedArgIndices) - 1] ?? null;
+            if ($argIndex === $trailingNonEmbedded) {
+                return $lastProducer;
+            }
+        }
         if (\count($producers) !== \count($nonEmbeddedArgIndices)) {
             return null;
         }
@@ -15802,6 +15814,28 @@ class Compiler {
                 $vm = $this->tryFoldGlobalConstFetch($producer);
                 if (null !== $vm) {
                     // php-cfg dead call-arg temp vs hoisted ConstFetch.result (#10453, password_hash PASSWORD_BCRYPT + options).
+                    $producerSlot = $block->slotForOperand($producer->result);
+                    if (null === $producerSlot) {
+                        foreach ($this->compileExpr($producer, $block) as $op) {
+                            $block->addOpCode($op);
+                        }
+                        $producerSlot = $block->slotForOperand($producer->result);
+                    }
+                    if (null !== $producerSlot) {
+                        return $producerSlot;
+                    }
+
+                    return $block->registerConstant($producer->result, $vm);
+                }
+            }
+            if ($producer instanceof Op\Expr\BinaryOp) {
+                $vm = $this->tryFoldCompileTimeBinaryExprDefault(
+                    $producer,
+                    $block,
+                    $block->orig->children ?? [],
+                    true
+                );
+                if (null !== $vm) {
                     $producerSlot = $block->slotForOperand($producer->result);
                     if (null === $producerSlot) {
                         foreach ($this->compileExpr($producer, $block) as $op) {
