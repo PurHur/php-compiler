@@ -10,7 +10,7 @@ use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Value;
 
-/** disk_total_space() — VM via VmFsDiskNative statvfs FFI; JIT/AOT via JitStat (php-src filestat.c, #3758). */
+/** disk_total_space() — VM via VmFsDiskNative (statvfs FFI or VmFsDiskPure); JIT/AOT via JitStat (php-src filestat.c, #8989). */
 final class disk_total_space extends Internal
 {
     public function __construct()

@@ -6,9 +6,10 @@ namespace PHPCompiler\Test\Unit;
 
 use PHPCompiler\ext\standard\VmFs;
 use PHPCompiler\ext\standard\VmFsDiskNative;
+use PHPCompiler\ext\standard\VmFsDiskPure;
 use PHPUnit\Framework\TestCase;
 
-/** VmFs disk space via libc statvfs FFI, not host disk_*() (#3758). */
+/** VmFs disk space via VmFsDiskNative (statvfs FFI or VmFsDiskPure); not host disk_*() (#8989). */
 final class VmFsDiskNativeTest extends TestCase
 {
     public function testSourceUsesStatvfsPrimaryPath(): void
@@ -16,11 +17,11 @@ final class VmFsDiskNativeTest extends TestCase
         $vmFs = (string) file_get_contents(__DIR__.'/../../ext/standard/VmFs.php');
         $this->assertStringContainsString('VmFsDiskNative::diskFreeSpace', $vmFs);
         $this->assertStringContainsString('VmFsDiskNative::diskTotalSpace', $vmFs);
-        $this->assertStringContainsString('ffiEnabledForDisk', $vmFs);
 
         $native = (string) file_get_contents(__DIR__.'/../../ext/standard/VmFsDiskNative.php');
         $this->assertStringContainsString('int statvfs(const char *path', $native);
         $this->assertStringContainsString('$ffi->statvfs($path', $native);
+        $this->assertStringContainsString('VmFsDiskPure::diskFreeSpace', $native);
         $this->assertDoesNotMatchRegularExpression('/\\\\disk_free_space\\s*\\(/', $native);
     }
 
@@ -44,14 +45,21 @@ final class VmFsDiskNativeTest extends TestCase
         }
     }
 
-    public function testVmFsDiskSpaceWithoutFfiReturnsFalse(): void
+    public function testVmFsDiskSpaceWithoutFfiUsesPurePath(): void
     {
+        if (!VmFsDiskPure::available()) {
+            $this->markTestSkipped('host disk_*() unavailable');
+        }
         $path = sys_get_temp_dir();
         $prev = getenv('PHP_COMPILER_DISABLE_FFI');
         putenv('PHP_COMPILER_DISABLE_FFI=1');
         try {
-            $this->assertFalse(VmFs::diskFreeSpace($path));
-            $this->assertFalse(VmFs::diskTotalSpace($path));
+            $free = VmFs::diskFreeSpace($path);
+            $total = VmFs::diskTotalSpace($path);
+            $this->assertIsFloat($free);
+            $this->assertIsFloat($total);
+            $this->assertGreaterThan(0.0, $free);
+            $this->assertGreaterThan(0.0, $total);
         } finally {
             if (false === $prev) {
                 putenv('PHP_COMPILER_DISABLE_FFI');

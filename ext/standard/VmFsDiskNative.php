@@ -5,7 +5,9 @@ declare(strict_types=1);
 namespace PHPCompiler\ext\standard;
 
 /**
- * libc statvfs(2) for VM disk_free_space() / disk_total_space() (#3758, #1492).
+ * libc statvfs(2) for VM disk_free_space() / disk_total_space() when FFI enabled (#3758, #8989).
+ *
+ * When FFI is disabled, delegates to {@see VmFsDiskPure} host bootstrap path.
  *
  * php-src: ext/standard/filestat.c — php_disk_free_space / php_disk_total_space
  * JIT/AOT: {@see JitStat::pathDiskFreeSpaceBoxed} / pathDiskTotalSpaceBoxed (unchanged).
@@ -18,7 +20,7 @@ final class VmFsDiskNative
 
     public static function available(): bool
     {
-        return null !== self::ffi();
+        return null !== self::ffi() || VmFsDiskPure::available();
     }
 
     /**
@@ -47,7 +49,7 @@ final class VmFsDiskNative
         }
         $ffi = self::ffi();
         if (null === $ffi) {
-            return false;
+            return $free ? VmFsDiskPure::diskFreeSpace($path) : VmFsDiskPure::diskTotalSpace($path);
         }
 
         try {
