@@ -107,6 +107,30 @@ final class ArrayFillKeysBuiltinTest extends TestCase
         $this->runFill($fn, $runtime, $keys, $fill);
     }
 
+    /** Issue #10847: resource keys → "Resource id #N" string hash key (ext/standard/array.c). */
+    public function testFillKeysResourceKeyStringifiesLikeZend(): void
+    {
+        $runtime = new Runtime();
+        $ctx = $runtime->vmContext;
+        $fn = new array_fill_keys();
+
+        $var = new VMVariable();
+        $handle = \PHPCompiler\ext\standard\VmFs::fopen('php://memory', 'r+');
+        $this->assertIsInt($handle);
+        $var->streamHandle($handle, $ctx);
+
+        $keys = new HashTable();
+        $keys->addIndex(0, $var);
+        $fill = new VMVariable();
+        $fill->int(1);
+        $out = $this->runFill($fn, $runtime, $keys, $fill);
+        $assoc = [];
+        foreach ($out->iterateKeyed(true) as [$key, $val]) {
+            $assoc[$key->toString()] = $val->toInt();
+        }
+        $this->assertSame(['Resource id #'.$handle => 1], $assoc);
+    }
+
     private function runFill(Internal $fn, Runtime $runtime, HashTable $keys, VMVariable $value): HashTable
     {
         $frame = $fn->getFrame($runtime->vmContext);
