@@ -13,7 +13,7 @@ use PHPCompiler\VM\Variable;
  * VM resolves via /etc/hosts without host Zend DNS builtins; optional libc getaddrinfo/res_query when FFI is loaded.
  * Config reads (/etc/hosts, /etc/resolv.conf) via {@see VmFs::file()} / {@see VmFsReadNative} — no host \\file() (#8529).
  * JIT/AOT: lib/JIT/Builtin/GethostbynamelRuntime.php → GethostbynamelJitHelper PHP (#9382),
- * CheckdnsrrRuntime.php (__compiler_checkdnsrr).
+ * CheckdnsrrRuntime.php → CheckdnsrrJitHelper PHP (#9379).
  *
  * php-src: ext/standard/dns.c — PHP_FUNCTION(gethostbynamel), PHP_FUNCTION(gethostbyaddr),
  * PHP_FUNCTION(gethostbyname), PHP_FUNCTION(checkdnsrr), PHP_FUNCTION(dns_check_record),

@@ -18,7 +18,7 @@ use PHPLLVM\Value;
 /**
  * checkdnsrr() and dns_check_record() alias — DNS record existence probe (#5983).
  *
- * VM: VmDns (libc res_query FFI + host fallback). JIT/AOT: CheckdnsrrRuntime LLVM (#5983).
+ * VM: VmDns (libc res_query FFI + host fallback). JIT/AOT: CheckdnsrrRuntime → CheckdnsrrJitHelper PHP (#9379).
  *
  * @see https://github.com/php/php-src/blob/master/ext/standard/dns.c PHP_FUNCTION(checkdnsrr)
  */
