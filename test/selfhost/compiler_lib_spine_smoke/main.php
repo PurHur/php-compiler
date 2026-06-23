@@ -353,6 +353,7 @@ require_once __DIR__.'/../../../ext/standard/ErrorHandlerJitHelper.php';
 require_once __DIR__.'/../../../ext/standard/ErrorLastJitHelper.php';
 require_once __DIR__.'/../../../ext/standard/ErrorSilenceJitHelper.php';
 require_once __DIR__.'/../../../ext/standard/ExceptionJitHelper.php';
+require_once __DIR__.'/../../../ext/standard/ExecutionLimitsJitHelper.php';
 require_once __DIR__.'/../../../ext/standard/FunctionExistsJitHelper.php';
 require_once __DIR__.'/../../../ext/standard/GcCollectCyclesJitHelper.php';
 require_once __DIR__.'/../../../ext/standard/GcStatusJitHelper.php';
