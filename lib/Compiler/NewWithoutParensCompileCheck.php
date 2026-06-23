@@ -11,12 +11,13 @@ use PHPCfg\Script;
 use PHPCfg\Op\Terminal\Const_ as ConstTerminal;
 
 /**
- * Reject invalid `new` in class **constant** and **static property** initializers (#6549, #9484, #10095, #10391).
+ * Reject invalid `new` in class **constant**, **static property**, and **typed instance property** initializers
+ * (#6549, #9484, #10095, #10391, #10693).
  *
  * php-src rejects all `new` in class constant expressions with
  * "New expressions are not supported in this context" (zend_compile_const_expr).
- * Static property defaults remain forbidden; instance property/param defaults may use
- * `new` with or without `()` per PHP 8.1+ (#3391, #5362).
+ * Static and typed instance property defaults are forbidden; untyped instance properties and
+ * promoted constructor params may still use `new` with or without `()` (#3391, #5362).
  *
  * @see Zend/zend_compile.c — zend_compile_const_expr(), zend_compile_property()
  */
@@ -47,8 +48,12 @@ final class NewWithoutParensCompileCheck
                 $this->walkOpsRejectAllNew($stmt->valueBlock->children ?? []);
                 continue;
             }
-            if ($stmt instanceof Property && $stmt->static) {
-                $this->rejectStaticPropertyDefaultNew($stmt);
+            if ($stmt instanceof Property) {
+                if ($stmt->static) {
+                    $this->rejectStaticPropertyDefaultNew($stmt);
+                } elseif (!$this->cfgDeclaredTypeIsMixed($stmt->declaredType)) {
+                    $this->rejectInstanceTypedPropertyDefaultNew($stmt);
+                }
             }
         }
     }
@@ -65,6 +70,33 @@ final class NewWithoutParensCompileCheck
         if ($prop->defaultVar instanceof New_) {
             throw new \CompileError(self::MESSAGE);
         }
+    }
+
+    private function rejectInstanceTypedPropertyDefaultNew(Property $prop): void
+    {
+        if (null === $prop->defaultVar && null === $prop->defaultBlock) {
+            return;
+        }
+        if (null !== $prop->defaultBlock && [] !== ($prop->defaultBlock->children ?? [])) {
+            $this->walkOpsRejectAllNew($prop->defaultBlock->children);
+
+            return;
+        }
+        if ($prop->defaultVar instanceof New_) {
+            throw new \CompileError(self::MESSAGE);
+        }
+    }
+
+    private function cfgDeclaredTypeIsMixed(?Op\Type $declaredType): bool
+    {
+        if (null === $declaredType) {
+            return true;
+        }
+        if ($declaredType instanceof Op\Type\Mixed_) {
+            return true;
+        }
+
+        return $declaredType instanceof Op\Type\Literal && 'mixed' === strtolower($declaredType->name);
     }
 
     /**
