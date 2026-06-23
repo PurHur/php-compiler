@@ -2317,14 +2317,53 @@ final class VmString
         return $ht;
     }
 
-    /** htmlentities() — same subset as htmlspecialchars(); PHP default flags ENT_COMPAT (#2472). */
+    /** htmlentities() — full HTML_ENTITIES table for UTF-8 (#10734, ext/standard/html.c). */
     public static function htmlentities(
         string $string,
         int $flags = ENT_COMPAT,
         string $encoding = 'UTF-8',
         bool $doubleEncode = true
     ): string {
-        return self::htmlspecialchars($string, $flags, $encoding, $doubleEncode);
+        if (!self::isUtf8Encoding($encoding)) {
+            return \htmlentities($string, $flags, $encoding, $doubleEncode);
+        }
+        $entries = self::htmlEntitiesMapForFlags($flags);
+        $out = '';
+        $len = self::byteLength($string);
+        for ($i = 0; $i < $len;) {
+            $width = self::utf8CharByteWidth($string, $i);
+            $char = \substr($string, $i, $width);
+            if ('&' === $char[0] && !$doubleEncode) {
+                $entityLen = self::htmlentitiesExistingEntityLen($string, $i, $len);
+                if ($entityLen > 0) {
+                    $out .= \substr($string, $i, $entityLen);
+                    $i += $entityLen;
+                    continue;
+                }
+            }
+            $out .= $entries[$char] ?? $char;
+            $i += $width;
+        }
+
+        return $out;
+    }
+
+    /**
+     * @return array<string, string>
+     */
+    private static function htmlEntitiesMapForFlags(int $flags): array
+    {
+        $quoteBoth = 0 !== ($flags & ENT_QUOTES);
+        $quoteDouble = !$quoteBoth && (0 !== ($flags & ENT_COMPAT));
+        $entries = HtmlEntityTable::entitiesEntQuotes();
+        if (!$quoteBoth && !$quoteDouble) {
+            unset($entries['"']);
+        }
+        if (!$quoteBoth) {
+            unset($entries["'"]);
+        }
+
+        return $entries;
     }
 
     /**
@@ -2505,6 +2544,43 @@ final class VmString
         }
 
         return self::htmlspecialcharsNumericEntityLen($string, $pos, $len);
+    }
+
+    /** Named/numeric entity length for htmlentities() when $double_encode=false (#10734). */
+    private static function htmlentitiesExistingEntityLen(string $string, int $pos, int $len): int
+    {
+        $basic = self::htmlspecialcharsExistingEntityLen($string, $pos, $len);
+        if ($basic > 0) {
+            return $basic;
+        }
+        if ($pos >= $len || '&' !== $string[$pos]) {
+            return 0;
+        }
+        $semi = \strpos($string, ';', $pos + 1);
+        if (false === $semi || $semi <= $pos + 1 || $semi - $pos > 33) {
+            return 0;
+        }
+        $candidate = \substr($string, $pos, $semi - $pos + 1);
+        if (isset(self::htmlEntityLiteralSet()[$candidate])) {
+            return \strlen($candidate);
+        }
+
+        return 0;
+    }
+
+    /** @return array<string, true> */
+    private static function htmlEntityLiteralSet(): array
+    {
+        static $set = null;
+        if (null === $set) {
+            $set = [];
+            foreach (HtmlEntityTable::entitiesEntQuotes() as $entity) {
+                $set[$entity] = true;
+            }
+            $set['&apos;'] = true;
+        }
+
+        return $set;
     }
 
     /** @return int byte length including leading & and trailing ;, or 0 if not a numeric entity */

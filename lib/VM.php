@@ -7874,7 +7874,8 @@ restart:
             $this->context,
             $error->getMessage(),
             $file,
-            $line
+            $line,
+            $error->getCode()
         );
         $catchFrame = $this->findCatchFrameForThrow($frame, $thrown);
         if (null !== $catchFrame) {

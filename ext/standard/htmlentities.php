@@ -7,6 +7,7 @@ namespace PHPCompiler\ext\standard;
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\JitLongArg;
 use PHPCompiler\JIT\JitStringArg;
 use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\Variable as JITVariable;
@@ -39,11 +40,12 @@ final class htmlentities extends Internal
         $encoding = 'UTF-8';
         $doubleEncode = true;
         if ($argc >= 2) {
-            $flagsVar = $frame->calledArgs[1]->resolveIndirect();
-            if (Variable::TYPE_INTEGER !== $flagsVar->type) {
-                throw new \LogicException('htmlentities() flags must be an integer in this compiler build');
-            }
-            $flags = $flagsVar->toInt();
+            $flags = VmMath::parseIntBuiltinArg(
+                $frame->calledArgs[1],
+                'htmlentities',
+                2,
+                'flags'
+            );
         }
         if ($argc >= 3) {
             $encoding = self::resolveEncodingVm($frame->calledArgs[2]->resolveIndirect());
@@ -76,7 +78,8 @@ final class htmlentities extends Internal
             );
         }
 
-        if ($argc >= 2 && JITVariable::TYPE_NATIVE_LONG !== $args[1]->type) {
+        if ($argc >= 2 && JITVariable::TYPE_NATIVE_LONG !== $args[1]->type
+            && JITVariable::TYPE_VALUE !== $args[1]->type) {
             throw new \LogicException('htmlentities() flags must be an integer in this compiler build');
         }
 
@@ -87,21 +90,45 @@ final class htmlentities extends Internal
                 $literal = $maybeLiteral;
             }
         }
-        if (null !== $literal && 1 === $argc) {
+        $flags = ENT_COMPAT;
+        $flagsKnown = $argc < 2;
+        if ($argc >= 2) {
+            $flagsVal = self::compileTimeLong($context, $args[1]);
+            if (null !== $flagsVal) {
+                $flags = $flagsVal;
+                $flagsKnown = true;
+            }
+        }
+        if (null !== $literal && $flagsKnown && self::jitEffectiveArgc($argc, $args) <= 2) {
             return $context->builder->load(
                 $context->constantStringFromString(
-                    VmString::htmlentities($literal, ENT_COMPAT, 'UTF-8', true)
+                    VmString::htmlentities($literal, $flags, 'UTF-8', true)
                 )
             );
         }
 
         $str = JitStringBuiltinArg::lower($context, $args[0], 'htmlentities', 0, 'string');
-        $flags = $context->getTypeFromString('int64')->constInt(ENT_COMPAT, false);
+        $flagsLlvm = $context->getTypeFromString('int64')->constInt(ENT_COMPAT, false);
         if ($argc >= 2) {
-            $flags = $context->helper->loadValue($args[1]);
+            $flagsLlvm = $flagsKnown
+                ? $context->getTypeFromString('int64')->constInt($flags, false)
+                : JitLongArg::lower($context, $args[1], 'htmlentities() flags');
         }
 
-        return JitHtmlentities::escape($context, $str, $flags);
+        return JitHtmlentities::escape($context, $str, $flagsLlvm);
+    }
+
+    private static function compileTimeLong(Context $context, JITVariable $var): ?int
+    {
+        if (JITVariable::TYPE_NATIVE_LONG === $var->type
+            && JITVariable::KIND_VALUE === $var->kind) {
+            $lib = $context->llvm->lib;
+            if (null !== $lib->LLVMIsAConstantInt($var->value->value)) {
+                return (int) $lib->LLVMConstIntGetSExtValue($var->value->value);
+            }
+        }
+
+        return null;
     }
 
     private static function resolveEncodingVm(Variable $encVar): string

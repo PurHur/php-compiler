@@ -42,6 +42,14 @@ final class VmJsonFormat
     public static function decode(string $json, bool $assoc = false, int $maxDepth = 512, int $flags = 0): mixed
     {
         VmJson::setLastError(0);
+        if (!VmJsonFlags::ignoreInvalidUtf8($flags) && !VmJsonUtf8::isValidUtf8($json)) {
+            VmJson::setLastError(5);
+            if (VmJsonFlags::throwsOnError($flags)) {
+                throw new \JsonException(VmJson::lastErrorMsg(), 5);
+            }
+
+            return null;
+        }
         $parser = new VmJsonParser($json, $maxDepth, $assoc);
         $value = $parser->parseTop();
         if (VmJson::lastError() !== 0) {

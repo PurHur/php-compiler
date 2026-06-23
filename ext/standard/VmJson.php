@@ -52,6 +52,7 @@ final class VmJson
             0 => 'No error',
             1 => 'Maximum stack depth exceeded',
             4 => 'Syntax error',
+            5 => 'Malformed UTF-8 characters, possibly incorrectly encoded',
             self::ERROR_INF_OR_NAN => 'Inf and NaN cannot be JSON encoded',
             self::ERROR_UNSUPPORTED_TYPE => 'Type is not supported',
             default => 'Unknown error',
