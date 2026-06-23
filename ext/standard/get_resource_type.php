@@ -77,6 +77,14 @@ final class get_resource_type extends Internal
 
             return;
         }
+        if ($v->isDirResource()) {
+            $handle = \PHPCompiler\VM\ResourceSupport::resolveHandle($v);
+            if (null !== $handle && VmDir::isValidHandle($handle)) {
+                $frame->returnVar->string('stream');
+
+                return;
+            }
+        }
         if (!is_resource_::isResource($v)) {
             throw new \TypeError(\sprintf(self::TYPE_ERROR, VmStreamArg::debugTypeName($v)));
         }
