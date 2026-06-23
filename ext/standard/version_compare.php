@@ -26,8 +26,8 @@ final class version_compare extends Internal
         if ($argc < 2 || $argc > 3) {
             throw new \LogicException('version_compare() expects 2 or 3 arguments');
         }
-        $ver1 = VmString::coerceStringBuiltinArg($frame->calledArgs[0], 'version_compare', 0, 'version1');
-        $ver2 = VmString::coerceStringBuiltinArg($frame->calledArgs[1], 'version_compare', 1, 'version2');
+        $ver1 = VmString::requireStringBuiltinArg($frame->calledArgs[0], 'version_compare', 0, 'version1');
+        $ver2 = VmString::requireStringBuiltinArg($frame->calledArgs[1], 'version_compare', 1, 'version2');
         $operator = null;
         if (3 === $argc) {
             $opVar = $frame->calledArgs[2]->resolveIndirect();

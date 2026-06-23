@@ -29,8 +29,8 @@ final class strncmp extends Internal
         if (3 !== count($frame->calledArgs)) {
             throw new \LogicException('strncmp() requires exactly three arguments');
         }
-        $a = VmString::coerceStringBuiltinArg($frame->calledArgs[0], 'strncmp', 0, 'string1');
-        $b = VmString::coerceStringBuiltinArg($frame->calledArgs[1], 'strncmp', 1, 'string2');
+        $a = VmString::requireStringBuiltinArg($frame->calledArgs[0], 'strncmp', 0, 'string1');
+        $b = VmString::requireStringBuiltinArg($frame->calledArgs[1], 'strncmp', 1, 'string2');
         if (null === $frame->returnVar) {
             return;
         }
@@ -46,8 +46,8 @@ final class strncmp extends Internal
         if (3 !== count($args)) {
             throw new \LogicException('strncmp() requires exactly three arguments');
         }
-        $p0 = $this->stringDataPtr($context, JitStringBuiltinArg::lower($context, $args[0], 'strncmp', 0, 'string1'));
-        $p1 = $this->stringDataPtr($context, JitStringBuiltinArg::lower($context, $args[1], 'strncmp', 1, 'string2'));
+        $p0 = $this->stringDataPtr($context, JitStringBuiltinArg::lowerRequiredString($context, $args[0], 'strncmp', 0, 'string1'));
+        $p1 = $this->stringDataPtr($context, JitStringBuiltinArg::lowerRequiredString($context, $args[1], 'strncmp', 1, 'string2'));
         $length = $context->builder->zExt(
             $context->builder->trunc(
                 JitLongArg::lower($context, $args[2], 'strncmp() length'),

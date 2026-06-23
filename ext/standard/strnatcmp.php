@@ -27,8 +27,8 @@ final class strnatcmp extends Internal
         if (2 !== \count($frame->calledArgs)) {
             throw new \LogicException('strnatcmp() requires exactly two arguments');
         }
-        $a = VmString::coerceStringBuiltinArg($frame->calledArgs[0], 'strnatcmp', 0, 'string1');
-        $b = VmString::coerceStringBuiltinArg($frame->calledArgs[1], 'strnatcmp', 1, 'string2');
+        $a = VmString::requireStringBuiltinArg($frame->calledArgs[0], 'strnatcmp', 0, 'string1');
+        $b = VmString::requireStringBuiltinArg($frame->calledArgs[1], 'strnatcmp', 1, 'string2');
         if (null === $frame->returnVar) {
             return;
         }
@@ -44,8 +44,8 @@ final class strnatcmp extends Internal
             throw new \LogicException('strnatcmp() requires exactly two arguments');
         }
         StringStrnatcmp::ensureLinked($context);
-        $p0 = $this->stringDataPtr($context, JitStringBuiltinArg::lower($context, $args[0], 'strnatcmp', 0, 'string1'));
-        $p1 = $this->stringDataPtr($context, JitStringBuiltinArg::lower($context, $args[1], 'strnatcmp', 1, 'string2'));
+        $p0 = $this->stringDataPtr($context, JitStringBuiltinArg::lowerRequiredString($context, $args[0], 'strnatcmp', 0, 'string1'));
+        $p1 = $this->stringDataPtr($context, JitStringBuiltinArg::lowerRequiredString($context, $args[1], 'strnatcmp', 1, 'string2'));
         $fn = $context->lookupFunction('strnatcmp');
         $raw = $context->builder->call($fn, $p0, $p1);
         $i64 = $context->getTypeFromString('int64');

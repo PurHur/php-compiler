@@ -26,8 +26,8 @@ final class strcmp extends Internal
         if (2 !== count($frame->calledArgs)) {
             throw new \LogicException('strcmp() requires exactly two arguments');
         }
-        $a = VmString::coerceStringBuiltinArg($frame->calledArgs[0], 'strcmp', 0, 'string1');
-        $b = VmString::coerceStringBuiltinArg($frame->calledArgs[1], 'strcmp', 1, 'string2');
+        $a = VmString::requireStringBuiltinArg($frame->calledArgs[0], 'strcmp', 0, 'string1');
+        $b = VmString::requireStringBuiltinArg($frame->calledArgs[1], 'strcmp', 1, 'string2');
         if (null === $frame->returnVar) {
             return;
         }
@@ -42,8 +42,8 @@ final class strcmp extends Internal
         if (2 !== count($args)) {
             throw new \LogicException('strcmp() requires exactly two arguments');
         }
-        $left = JitStringBuiltinArg::lower($context, $args[0], 'strcmp', 0, 'string1');
-        $right = JitStringBuiltinArg::lower($context, $args[1], 'strcmp', 1, 'string2');
+        $left = JitStringBuiltinArg::lowerRequiredString($context, $args[0], 'strcmp', 0, 'string1');
+        $right = JitStringBuiltinArg::lowerRequiredString($context, $args[1], 'strcmp', 1, 'string2');
 
         return JitStringCompare::strcmp($context, $left, $right);
     }
