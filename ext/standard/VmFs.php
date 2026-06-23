@@ -2137,14 +2137,8 @@ final class VmFs
     public static function diskFreeSpace(?string $path)
     {
         $path = $path ?? '.';
-        if (self::ffiEnabledForDisk()) {
-            $native = VmFsDiskNative::diskFreeSpace($path);
-            if (false !== $native) {
-                return $native;
-            }
-        }
 
-        return false;
+        return VmFsDiskNative::diskFreeSpace($path);
     }
 
     /**
@@ -2155,23 +2149,7 @@ final class VmFs
     public static function diskTotalSpace(?string $path)
     {
         $path = $path ?? '.';
-        if (self::ffiEnabledForDisk()) {
-            $native = VmFsDiskNative::diskTotalSpace($path);
-            if (false !== $native) {
-                return $native;
-            }
-        }
 
-        return false;
-    }
-
-    private static function ffiEnabledForDisk(): bool
-    {
-        $v = getenv('PHP_COMPILER_DISABLE_FFI');
-        if (false !== $v && '' !== $v && '0' !== $v && 'false' !== strtolower($v)) {
-            return false;
-        }
-
-        return true;
+        return VmFsDiskNative::diskTotalSpace($path);
     }
 }
