@@ -28,12 +28,7 @@ final class set_time_limit extends Internal
         if (null === $frame->vmContext) {
             throw new \LogicException('set_time_limit() requires VM context');
         }
-        $seconds = VmMath::parseIntBuiltinArg(
-            $frame->calledArgs[0]->resolveIndirect(),
-            'set_time_limit',
-            1,
-            'seconds'
-        );
+        $seconds = VmMath::parseIntBuiltinArgForFrame($frame, 0, 'set_time_limit', 1, 'seconds');
         if (null === $frame->returnVar) {
             return;
         }

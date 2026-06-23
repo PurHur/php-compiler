@@ -18,12 +18,7 @@ final class sleep extends Internal
         if (1 !== \count($frame->calledArgs)) {
             throw new \LogicException('sleep() requires exactly one argument');
         }
-        $seconds = VmMath::parseIntBuiltinArg(
-            $frame->calledArgs[0]->resolveIndirect(),
-            'sleep',
-            1,
-            'seconds'
-        );
+        $seconds = VmMath::parseIntBuiltinArgForFrame($frame, 0, 'sleep', 1, 'seconds');
         if (null === $frame->returnVar) {
             return;
         }
