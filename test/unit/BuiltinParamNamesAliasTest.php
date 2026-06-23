@@ -177,6 +177,15 @@ final class BuiltinParamNamesAliasTest extends TestCase
         self::assertSame(1, BuiltinParamNames::lookupNamedParamIndex($set, 'value', 'ini_set'));
     }
 
+    /** @covers issue #10043 */
+    public function testRandomIntNamedParameters(): void
+    {
+        $names = BuiltinParamNames::forFunction('random_int');
+        self::assertSame(['min', 'max'], $names);
+        self::assertSame(0, BuiltinParamNames::lookupNamedParamIndex($names, 'min', 'random_int'));
+        self::assertSame(1, BuiltinParamNames::lookupNamedParamIndex($names, 'max', 'random_int'));
+    }
+
     /** @covers issue #10033 */
     public function testPregReplaceNamedParameters(): void
     {
