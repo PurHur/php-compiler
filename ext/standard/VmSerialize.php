@@ -59,7 +59,7 @@ final class VmSerialize
                 $data = self::invokeSerialize($ctx, $entry);
                 $exported = VmJson::export($data->resolveIndirect());
                 if (!\is_array($exported)) {
-                    throw new \LogicException('__serialize() must return an array');
+                    self::throwSerializeMustReturnArray($entry->class->name);
                 }
 
                 return self::encodeCustomObject($entry->class->name, $exported);
@@ -787,7 +787,7 @@ final class VmSerialize
         $recv->object($entry);
         $result = $ctx->runtime->vm->invokePhpFunction($method, $recv);
         if (Variable::TYPE_ARRAY !== $result->type) {
-            throw new \LogicException('__serialize() must return an array');
+            self::throwSerializeMustReturnArray($entry->class->name);
         }
 
         return $result;
@@ -850,6 +850,12 @@ final class VmSerialize
     private static function hasInstanceMethod(ClassEntry $class, string $methodName): bool
     {
         return isset($class->methods[strtolower($methodName)]);
+    }
+
+    /** php-src zend_class_serialize() — __serialize() must return array (TypeError). */
+    private static function throwSerializeMustReturnArray(string $className): never
+    {
+        throw new \TypeError($className.'::__serialize() must return an array');
     }
 }
 
