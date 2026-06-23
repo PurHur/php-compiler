@@ -117,4 +117,14 @@ final class BuiltinParamNamesAliasTest extends TestCase
         self::assertSame(1, BuiltinParamNames::lookupNamedParamIndex($names, 'column_key', 'array_column'));
         self::assertSame(2, BuiltinParamNames::lookupNamedParamIndex($names, 'index_key', 'array_column'));
     }
+
+    /** @covers issue #10045 */
+    public function testFileGetContentsFilenameNamedParameter(): void
+    {
+        $names = BuiltinParamNames::forFunction('file_get_contents');
+        self::assertSame(['filename', 'use_include_path', 'context', 'offset', 'length'], $names);
+        self::assertSame(0, BuiltinParamNames::lookupNamedParamIndex($names, 'filename', 'file_get_contents'));
+        self::assertSame(3, BuiltinParamNames::lookupNamedParamIndex($names, 'offset', 'file_get_contents'));
+        self::assertSame(4, BuiltinParamNames::lookupNamedParamIndex($names, 'length', 'file_get_contents'));
+    }
 }
