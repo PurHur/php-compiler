@@ -12,7 +12,7 @@ use PHPCompiler\VM\Variable;
  * VM memory introspection without host Zend memory_get_* (issue #4862, #3134).
  *
  * php-src: ext/standard/basic_functions.c, Zend/zend_alloc.c (emalloc subset).
- * JIT/AOT: ext/standard/JitMemory.php + lib/JIT/Builtin/MemoryRuntime.php.
+ * JIT/AOT: ext/standard/MemoryJitHelper.php via lib/JIT/Builtin/MemoryRuntime.php.
  */
 final class VmMemory
 {
@@ -116,7 +116,7 @@ final class VmMemory
     /**
      * RSS via /proc/self/statm only (VmFsReadNative; #7287, #4862, #8426).
      *
-     * JIT/AOT use the same source in MemoryRuntime::__phpc_memory_read_rss_bytes.
+     * JIT/AOT use the same source via MemoryJitHelper (#9377).
      */
     private static function readRssBytes(): int
     {

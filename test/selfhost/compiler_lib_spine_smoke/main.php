@@ -1510,6 +1510,7 @@ require_once __DIR__.'/../../../ext/standard/lstat_.php';
 require_once __DIR__.'/../../../ext/standard/md5.php';
 require_once __DIR__.'/../../../ext/standard/md5_file.php';
 require_once __DIR__.'/../../../ext/standard/memcmp.php';
+require_once __DIR__.'/../../../ext/standard/MemoryJitHelper.php';
 require_once __DIR__.'/../../../ext/standard/memory_get_peak_usage.php';
 require_once __DIR__.'/../../../ext/standard/memory_get_usage.php';
 require_once __DIR__.'/../../../ext/standard/memory_reset_peak_usage.php';
