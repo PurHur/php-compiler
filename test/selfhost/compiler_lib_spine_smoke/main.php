@@ -482,6 +482,7 @@ require_once __DIR__.'/../../../ext/standard/JitGetResources.php';
 require_once __DIR__.'/../../../ext/standard/JitGetallheaders.php';
 require_once __DIR__.'/../../../ext/standard/JitGetcwd.php';
 require_once __DIR__.'/../../../ext/standard/JitGetdate.php';
+require_once __DIR__.'/../../../ext/standard/GethostbyaddrJitHelper.php';
 require_once __DIR__.'/../../../ext/standard/JitGethostbyaddr.php';
 require_once __DIR__.'/../../../ext/standard/JitGethostbyname.php';
 require_once __DIR__.'/../../../ext/standard/GethostbynamelJitHelper.php';

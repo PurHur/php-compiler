@@ -11,7 +11,7 @@ use PHPCompiler\JIT\JitValueBox;
 use PHPLLVM\Builder;
 use PHPLLVM\Value;
 
-/** LLVM lowering for gethostbyaddr() via GethostbyaddrRuntime (JIT/AOT, #5854). */
+/** LLVM lowering for gethostbyaddr() via GethostbyaddrRuntime PHP bridge (JIT/AOT, #5854, #9474). */
 final class JitGethostbyaddr
 {
     private static int $blockSerial = 0;

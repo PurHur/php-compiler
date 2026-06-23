@@ -15,7 +15,7 @@ use PHPLLVM\Value;
 /**
  * gethostbyaddr() — reverse DNS for IPv4 (ext/standard/dns.c parity, #5854).
  *
- * VM: VmDns (libc FFI getnameinfo + /etc/hosts). JIT/AOT: GethostbyaddrRuntime LLVM.
+ * VM: VmDns (libc FFI getnameinfo + /etc/hosts). JIT/AOT: GethostbyaddrJitHelper PHP (#9474).
  *
  * @see https://github.com/php/php-src/blob/master/ext/standard/dns.c PHP_FUNCTION(gethostbyaddr)
  */
