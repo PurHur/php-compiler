@@ -4584,6 +4584,16 @@ final class VmString
         return $out;
     }
 
+    /** php-src basename.c / dir.c — backslash is a separator only on Windows (#10766). */
+    private static function isPathSeparatorByte(string $byte): bool
+    {
+        if ('/' === $byte) {
+            return true;
+        }
+
+        return '\\' === $byte && 'Windows' === \PHP_OS_FAMILY;
+    }
+
     public static function dirname(string $path, int $levels = 1): string
     {
         if ($levels < 1) {
@@ -4610,7 +4620,7 @@ final class VmString
             $afterScheme = $schemeSep + 3;
             $hasPathSep = false;
             for ($i = $afterScheme; $i < $len; ++$i) {
-                if ('/' === $path[$i] || '\\' === $path[$i]) {
+                if (self::isPathSeparatorByte($path[$i])) {
                     $hasPathSep = true;
                     break;
                 }
@@ -4620,7 +4630,7 @@ final class VmString
             }
         }
         $end = $len;
-        while ($end > 0 && ('/' === $path[$end - 1] || '\\' === $path[$end - 1])) {
+        while ($end > 0 && self::isPathSeparatorByte($path[$end - 1])) {
             --$end;
         }
         if (0 === $end) {
@@ -4628,7 +4638,7 @@ final class VmString
         }
         $last = -1;
         for ($i = $end - 1; $i >= 0; --$i) {
-            if ('/' === $path[$i] || '\\' === $path[$i]) {
+            if (self::isPathSeparatorByte($path[$i])) {
                 $last = $i;
                 break;
             }
@@ -4650,14 +4660,14 @@ final class VmString
             return self::stripBasenameSuffix('', $suffix);
         }
         $end = $len;
-        while ($end > 0 && ('/' === $path[$end - 1] || '\\' === $path[$end - 1])) {
+        while ($end > 0 && self::isPathSeparatorByte($path[$end - 1])) {
             --$end;
         }
         if (0 === $end) {
             return self::stripBasenameSuffix('', $suffix);
         }
         for ($i = $end - 1; $i >= 0; --$i) {
-            if ('/' === $path[$i] || '\\' === $path[$i]) {
+            if (self::isPathSeparatorByte($path[$i])) {
                 return self::stripBasenameSuffix(
                     self::byteSlice($path, $i + 1, $end - $i - 1),
                     $suffix
