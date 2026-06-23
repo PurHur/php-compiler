@@ -49,9 +49,13 @@ final class BuiltinExceptionSupport
         return self::materializeThrowable($ctx, self::CLASS_ARGUMENT_COUNT_ERROR, $message);
     }
 
-    public static function materializeValueError(Context $ctx, string $message): Variable
-    {
-        return self::materializeThrowable($ctx, self::CLASS_VALUE_ERROR, $message);
+    public static function materializeValueError(
+        Context $ctx,
+        string $message,
+        string $file = '',
+        int $line = 0
+    ): Variable {
+        return self::materializeThrowable($ctx, self::CLASS_VALUE_ERROR, $message, $file, $line);
     }
 
     public static function materializeAssertionError(
@@ -222,6 +226,9 @@ final class BuiltinExceptionSupport
         }
         if ($error instanceof \AssertionError) {
             return self::materializeAssertionError($ctx, $error->getMessage(), $file, $line);
+        }
+        if ($error instanceof \ValueError) {
+            return self::materializeValueError($ctx, $error->getMessage(), $file, $line);
         }
 
         return self::materializeError($ctx, $error->getMessage(), $file, $line);
