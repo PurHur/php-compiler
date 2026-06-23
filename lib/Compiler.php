@@ -12778,7 +12778,7 @@ class Compiler {
             array_unshift($producers, $child);
         }
 
-        return $this->filterDeadVoidStatementMethodCallProducers($producers);
+        return $this->filterDeadVoidStatementMethodCallProducers($producers, $callOp, $cfgChildren);
     }
 
     /**
@@ -12787,14 +12787,36 @@ class Compiler {
      * php-cfg: `$ao->setIteratorClass('X'); echo var_export($ao->getIteratorClass(), true);`
      * hoists both MethodCalls; the void setter must not map to var_export arg 0.
      *
+     * Sibling `var_dump($o->f(), $o->f())` also hoists dead-temp MethodCalls — keep those
+     * inside the inline-arg distance window (#10816, #9351).
+     *
      * @param list<Op\Expr> $producers
+     * @param list<Op>       $cfgChildren
      *
      * @return list<Op\Expr>
      */
-    private function filterDeadVoidStatementMethodCallProducers(array $producers): array
+    private function filterDeadVoidStatementMethodCallProducers(array $producers, Op $callOp, array $cfgChildren): array
     {
         if (\count($producers) < 2) {
             return $producers;
+        }
+        $consumerIndex = null;
+        foreach ($cfgChildren as $i => $child) {
+            if ($child === $callOp) {
+                $consumerIndex = $i;
+                break;
+            }
+        }
+        $tempArgCount = 0;
+        if (property_exists($callOp, 'args') && is_array($callOp->args)) {
+            foreach ($callOp->args as $arg) {
+                if ($arg instanceof Operand\Temporary) {
+                    ++$tempArgCount;
+                }
+            }
+        }
+        if ($tempArgCount < 1 && property_exists($callOp, 'args') && is_array($callOp->args)) {
+            $tempArgCount = \count($callOp->args);
         }
         $filtered = [];
         $count = \count($producers);
@@ -12807,6 +12829,22 @@ class Compiler {
                 && $i + 1 < $count
                 && $producers[$i + 1] instanceof Op\Expr\MethodCall
             ) {
+                if (null !== $consumerIndex) {
+                    $producerIndex = null;
+                    foreach ($cfgChildren as $pi => $child) {
+                        if ($child === $producer) {
+                            $producerIndex = $pi;
+                            break;
+                        }
+                    }
+                    $distance = null !== $producerIndex ? $consumerIndex - $producerIndex : null;
+                    if (null !== $distance && $distance <= $tempArgCount) {
+                        $filtered[] = $producer;
+
+                        continue;
+                    }
+                }
+
                 continue;
             }
             $filtered[] = $producer;
