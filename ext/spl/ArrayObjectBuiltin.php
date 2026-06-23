@@ -4,11 +4,14 @@ declare(strict_types=1);
 
 namespace PHPCompiler\ext\spl;
 
+use PHPCompiler\ext\standard\VmString;
+use PHPCompiler\ext\standard\VmReflection;
 use PHPCompiler\Frame;
 use PHPCompiler\VM\Builtin\VmClassMethod;
 use PHPCompiler\VM\ClassEntry;
 use PHPCompiler\VM\Context;
 use PHPCompiler\VM\HashTable;
+use PHPCompiler\VM\InterfaceCheck;
 use PHPCfg\Func as CfgFunc;
 
 /**
@@ -43,6 +46,10 @@ final class ArrayObjectBuiltin
         $entry->methodVisibility['getarraycopy'] = $pub;
         $entry->methods['count'] = new ArrayObjectCount();
         $entry->methodVisibility['count'] = $pub;
+        $entry->methods['getiteratorclass'] = new ArrayObjectGetIteratorClass();
+        $entry->methodVisibility['getiteratorclass'] = $pub;
+        $entry->methods['setiteratorclass'] = new ArrayObjectSetIteratorClass();
+        $entry->methodVisibility['setiteratorclass'] = $pub;
 
         $ctx->classes[self::CLASS_LC] = $entry;
     }
@@ -125,5 +132,67 @@ final class ArrayObjectCount extends VmClassMethod
             return;
         }
         $frame->returnVar->int(SplArrayStorage::count($object));
+    }
+}
+
+final class ArrayObjectGetIteratorClass extends VmClassMethod
+{
+    public function __construct()
+    {
+        parent::__construct('getIteratorClass');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $object = SplIteratorSupport::receiver(
+            $frame,
+            ArrayObjectBuiltin::CLASS_LC,
+            'ArrayObject::getIteratorClass()'
+        );
+        if (null === $frame->returnVar) {
+            return;
+        }
+        $frame->returnVar->string(SplArrayStorage::getIteratorClass($object));
+    }
+}
+
+final class ArrayObjectSetIteratorClass extends VmClassMethod
+{
+    public function __construct()
+    {
+        parent::__construct('setIteratorClass');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $object = SplIteratorSupport::receiver(
+            $frame,
+            ArrayObjectBuiltin::CLASS_LC,
+            'ArrayObject::setIteratorClass()'
+        );
+        if (\count($frame->calledArgs) < 2) {
+            throw new \ArgumentCountError(
+                'ArrayObject::setIteratorClass() expects exactly 1 argument, '
+                .(\count($frame->calledArgs) - 1).' given'
+            );
+        }
+        $iteratorClass = VmString::coerceStringBuiltinArg(
+            $frame->calledArgs[1],
+            'ArrayObject::setIteratorClass',
+            0,
+            'iteratorClass'
+        );
+        if (null === $frame->returnVar) {
+            return;
+        }
+        $entry = VmReflection::resolveClassEntry($frame->vmContext, $iteratorClass);
+        if (null === $entry
+            || !InterfaceCheck::entryIsInstanceOf($entry, ArrayIteratorBuiltin::CLASS_LC, $frame->vmContext)) {
+            throw new \TypeError(
+                'ArrayObject::setIteratorClass(): Argument #1 ($iteratorClass) must be a class name derived from ArrayIterator, '
+                .$iteratorClass.' given'
+            );
+        }
+        SplArrayStorage::setIteratorClass($object, $entry->name);
     }
 }
