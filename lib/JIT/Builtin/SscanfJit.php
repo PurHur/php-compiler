@@ -7,6 +7,7 @@ namespace PHPCompiler\JIT\Builtin;
 use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Builtin;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\TryCatchHelper;
 use PHPLLVM\BasicBlock;
 use PHPLLVM\Builder;
@@ -135,7 +136,7 @@ final class SscanfJit
             ),
             '__compiler_sscanf_array' => $context->module->addFunction(
                 $name,
-                $context->context->functionType($htPtr, false, $strPtr, $strPtr)
+                $context->context->functionType($context->getTypeFromString('__value__*'), false, $strPtr, $strPtr)
             ),
             default => throw new \LogicException('Unknown sscanf JIT helper: '.$name),
         };
@@ -176,9 +177,12 @@ final class SscanfJit
                 ['__hashtable__setLongAt', $void, [$htPtr, $sizeT, $i64]],
                 ['__hashtable__setStringAt', $void, [$htPtr, $sizeT, $strPtr]],
                 ['__hashtable__setDoubleAt', $void, [$htPtr, $sizeT, $dbl]],
+                ['__hashtable__setNullAt', $void, [$htPtr, $sizeT]],
                 ['__value__writeLong', $void, [$valuePtr, $i64]],
                 ['__value__writeString', $void, [$valuePtr, $strPtr]],
                 ['__value__writeDouble', $void, [$valuePtr, $dbl]],
+                ['__value__writeNull', $void, [$valuePtr]],
+                ['__value__writeHashtable', $void, [$valuePtr, $htPtr]],
             ] as [$name, $ret, $params]
         ) {
             self::ensureExternal($context, $name, $context->context->functionType($ret, false, ...$params));
@@ -817,11 +821,29 @@ final class SscanfJit
         $context->builder->branchIf($nullStr, $nullRet, $work);
 
         $context->builder->positionAtEnd($nullRet);
-        $context->builder->returnValue($context->builder->call($context->lookupFunction('__hashtable__alloc')));
+        self::emitSscanfArrayValueFromHashtable(
+            $context,
+            $fn,
+            $context->builder->call($context->lookupFunction('__hashtable__alloc')),
+            $sizeT->constInt(0, false),
+            $sizeT->constInt(0, false),
+            $sizeT->constInt(0, false)
+        );
 
         $context->builder->positionAtEnd($work);
         [$input, $inLen, $format, $fmtLen] = self::loadStringPair($context, $str, $fmt);
-        $ht = $context->builder->call($context->lookupFunction('__hashtable__alloc'));
+        $slots = $context->builder->call(
+            $context->lookupFunction('__phpc_sscanf_count_specs'),
+            $format,
+            $fmtLen
+        );
+        $slotsSlot = BasicBlockHelper::entryAlloca($context, $sizeT);
+        $context->builder->store($slots, $slotsSlot);
+        $htSlot = BasicBlockHelper::entryAlloca($context, $htPtr);
+        $context->builder->store(
+            $context->builder->call($context->lookupFunction('__hashtable__alloc')),
+            $htSlot
+        );
 
         $inPosSlot = BasicBlockHelper::entryAlloca($context, $sizeT);
         $outIdxSlot = BasicBlockHelper::entryAlloca($context, $sizeT);
@@ -836,6 +858,7 @@ final class SscanfJit
         $setLong = $context->lookupFunction('__hashtable__setLongAt');
         $setString = $context->lookupFunction('__hashtable__setStringAt');
         $setDouble = $context->lookupFunction('__hashtable__setDoubleAt');
+        $setNullAt = $context->lookupFunction('__hashtable__setNullAt');
         $stringInit = $context->lookupFunction('__string__init');
 
         $loopHead = $fn->appendBasicBlock('sscanf_arr_loop');
@@ -936,7 +959,7 @@ final class SscanfJit
             $afterD
         );
         $context->builder->positionAtEnd($afterD);
-        $context->builder->call($setLong, $ht, $outIdx, $context->builder->load($valSlot));
+        $context->builder->call($setLong, $context->builder->load($htSlot), $outIdx, $context->builder->load($valSlot));
         $context->builder->store($context->builder->add($outIdx, $oneSize), $outIdxSlot);
         $context->builder->store($context->builder->add($specPos, $oneSize), $fposSlot);
         $context->builder->branch($loopHead);
@@ -965,7 +988,7 @@ final class SscanfJit
             $context->builder->zExt($strLen, $i64),
             $bufPtr
         );
-        $context->builder->call($setString, $ht, $outIdx, $newStr);
+        $context->builder->call($setString, $context->builder->load($htSlot), $outIdx, $newStr);
         $context->builder->store($context->builder->add($outIdx, $oneSize), $outIdxSlot);
         $context->builder->store($context->builder->add($specPos, $oneSize), $fposSlot);
         $context->builder->branch($loopHead);
@@ -980,7 +1003,7 @@ final class SscanfJit
             $afterF
         );
         $context->builder->positionAtEnd($afterF);
-        $context->builder->call($setDouble, $ht, $outIdx, $context->builder->load($fltSlot));
+        $context->builder->call($setDouble, $context->builder->load($htSlot), $outIdx, $context->builder->load($fltSlot));
         $context->builder->store($context->builder->add($outIdx, $oneSize), $outIdxSlot);
         $context->builder->store($context->builder->add($specPos, $oneSize), $fposSlot);
         $context->builder->branch($loopHead);
@@ -989,10 +1012,85 @@ final class SscanfJit
         $context->builder->branch($retHt);
 
         $context->builder->positionAtEnd($retHt);
-        $context->builder->returnValue($ht);
+        self::emitSscanfArrayValueFromHashtable(
+            $context,
+            $fn,
+            $context->builder->load($htSlot),
+            $inLen,
+            $context->builder->load($outIdxSlot),
+            $context->builder->load($slotsSlot)
+        );
 
         $context->builder->positionAtEnd($loopDone);
-        $context->builder->returnValue($ht);
+        self::emitSscanfArrayValueFromHashtable(
+            $context,
+            $fn,
+            $context->builder->load($htSlot),
+            $inLen,
+            $context->builder->load($outIdxSlot),
+            $context->builder->load($slotsSlot)
+        );
+    }
+
+    private static function emitSscanfArrayValueFromHashtable(
+        Context $context,
+        LlvmFunction $fn,
+        Value $ht,
+        Value $inLen,
+        Value $assigned,
+        Value $slots
+    ): void {
+        $sizeT = $context->getTypeFromString('size_t');
+        $zeroSize = $sizeT->constInt(0, false);
+        $setNullAt = $context->lookupFunction('__hashtable__setNullAt');
+
+        $nullPhp = $fn->appendBasicBlock('sscanf_arr_null_php');
+        $arrayPhp = $fn->appendBasicBlock('sscanf_arr_array_php');
+        $isEmptyInput = $context->builder->icmp(Builder::INT_EQ, $inLen, $zeroSize);
+        $noAssigned = $context->builder->icmp(Builder::INT_EQ, $assigned, $zeroSize);
+        $hasSlots = $context->builder->icmp(Builder::INT_SGT, $slots, $zeroSize);
+        $returnNull = $context->builder->and(
+            $isEmptyInput,
+            $context->builder->and($noAssigned, $hasSlots)
+        );
+        $context->builder->branchIf($returnNull, $nullPhp, $arrayPhp);
+
+        $context->builder->positionAtEnd($arrayPhp);
+        $padHead = $fn->appendBasicBlock('sscanf_arr_pad_head');
+        $padBody = $fn->appendBasicBlock('sscanf_arr_pad_body');
+        $padDone = $fn->appendBasicBlock('sscanf_arr_pad_done');
+        $padIdxSlot = BasicBlockHelper::entryAlloca($context, $sizeT);
+        $context->builder->store($assigned, $padIdxSlot);
+        $context->builder->branch($padHead);
+
+        $context->builder->positionAtEnd($padHead);
+        $padIdx = $context->builder->load($padIdxSlot);
+        $padFinished = $context->builder->icmp(Builder::INT_SGE, $padIdx, $slots);
+        $context->builder->branchIf($padFinished, $padDone, $padBody);
+
+        $context->builder->positionAtEnd($padBody);
+        $context->builder->call($setNullAt, $ht, $padIdx);
+        $context->builder->store(
+            $context->builder->add($padIdx, $sizeT->constInt(1, false)),
+            $padIdxSlot
+        );
+        $context->builder->branch($padHead);
+
+        $context->builder->positionAtEnd($padDone);
+        $resultSlot = JitValueBox::alloc($context);
+        $resultPtr = JitValueBox::pointer($context, $resultSlot);
+        $context->builder->call(
+            $context->lookupFunction('__value__writeHashtable'),
+            $resultPtr,
+            $ht
+        );
+        $context->builder->returnValue($resultPtr);
+
+        $context->builder->positionAtEnd($nullPhp);
+        $nullSlot = JitValueBox::alloc($context);
+        $nullPtr = JitValueBox::pointer($context, $nullSlot);
+        $context->builder->call($context->lookupFunction('__value__writeNull'), $nullPtr);
+        $context->builder->returnValue($nullPtr);
     }
 
     private static function emitCountConversionSpecs(Context $context, LlvmFunction $fn): void

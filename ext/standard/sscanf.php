@@ -40,7 +40,12 @@ final class sscanf extends Internal
             return;
         }
         if ([] === $outVars) {
-            $frame->returnVar->array(VmSscanf::parseToArray($input, $format));
+            $parsed = VmSscanf::parseToArray($input, $format);
+            if (null === $parsed) {
+                $frame->returnVar->null();
+            } else {
+                $frame->returnVar->array($parsed);
+            }
 
             return;
         }

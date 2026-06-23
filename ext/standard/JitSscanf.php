@@ -38,20 +38,11 @@ final class JitSscanf
         $outCount = $argc - 2;
         $i64 = $context->getTypeFromString('int64');
         if (0 === $outCount) {
-            $raw = $context->builder->call(
+            return $context->builder->call(
                 $context->lookupFunction('__compiler_sscanf_array'),
                 $str,
                 $fmt
             );
-            $slot = JitValueBox::alloc($context);
-            $ptr = JitValueBox::pointer($context, $slot);
-            $context->builder->call(
-                $context->lookupFunction('__value__writeHashtable'),
-                $ptr,
-                $raw
-            );
-
-            return $ptr;
         }
         $ptrTy = $context->getTypeFromString('__value__*');
         $i32 = $context->getTypeFromString('int32');
@@ -108,14 +99,18 @@ final class JitSscanf
         $i64 = $context->getTypeFromString('int64');
         if ([] === $outArgs) {
             $ht = VmSscanf::parseToArray($input, $format);
-            $htVar = self::materializeVmHashTable($context, $ht);
             $slot = JitValueBox::alloc($context);
             $ptr = JitValueBox::pointer($context, $slot);
-            $context->builder->call(
-                $context->lookupFunction('__value__writeHashtable'),
-                $ptr,
-                HashTableHelper::loadHashtablePointer($context, $htVar)
-            );
+            if (null === $ht) {
+                $context->builder->call($context->lookupFunction('__value__writeNull'), $ptr);
+            } else {
+                $htVar = self::materializeVmHashTable($context, $ht);
+                $context->builder->call(
+                    $context->lookupFunction('__value__writeHashtable'),
+                    $ptr,
+                    HashTableHelper::loadHashtablePointer($context, $htVar)
+                );
+            }
 
             return $ptr;
         }
