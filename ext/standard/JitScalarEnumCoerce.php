@@ -377,7 +377,7 @@ final class JitScalarEnumCoerce
         return $context->builder->structGep($strPtr, $off);
     }
 
-    private static function emitObjectScalarWarning(Context $context, string $className, string $kind): void
+    public static function emitObjectScalarWarning(Context $context, string $className, string $kind): void
     {
         $message = 'int' === $kind
             ? "Object of class {$className} could not be converted to int"

@@ -563,7 +563,8 @@ final class JitSettype
                 return;
             }
             $context->builder->positionAtEnd($afterEnum);
-            $context->builder->branch($nonEnumTarget);
+            self::emitPlainObjectLegacyScalarCast($context, $dest, $objPtr, 'int');
+            $context->builder->branch($done);
 
             return;
         }
@@ -582,7 +583,8 @@ final class JitSettype
                 return;
             }
             $context->builder->positionAtEnd($afterEnum);
-            $context->builder->branch($nonEnumTarget);
+            self::emitPlainObjectLegacyScalarCast($context, $dest, $objPtr, 'float');
+            $context->builder->branch($done);
 
             return;
         }
@@ -845,6 +847,84 @@ final class JitSettype
         $context->builder->positionAtEnd($fallbackBlock);
         ErrorRaise::ensureLinked($context);
         ErrorRaise::emitRaise($context, 'Object of class stdClass could not be converted to string');
+    }
+
+    /**
+     * Zend settype($obj, 'int'|'float') on plain objects — E_WARNING + legacy 1 / 1.0 (#10690, type.c).
+     *
+     * @param 'int'|'float' $kind
+     */
+    private static function emitPlainObjectLegacyScalarCast(
+        Context $context,
+        Value $dest,
+        Value $objPtr,
+        string $kind
+    ): void {
+        /** @var ObjectBuiltin $objectBuiltin */
+        $objectBuiltin = $context->type->object;
+        $map = $context->structFieldMap['__object__'];
+        $classId = $context->builder->load(
+            $context->builder->structGep($objPtr, $map['class_id'])
+        );
+        $i64 = $context->getTypeFromString('int64');
+        $tag = 'st_loc_'.(string) spl_object_id($context);
+
+        $entries = [];
+        foreach ($objectBuiltin->allClassNamesById() as $id => $name) {
+            if ($objectBuiltin->isEnumClassLc(strtolower(ltrim($name, '\\')))) {
+                continue;
+            }
+            $entries[(int) $id] = $name;
+        }
+
+        $emitScalar = static function (Context $context, Value $dest, string $className, string $kind): void {
+            JitScalarEnumCoerce::emitObjectScalarWarning($context, $className, $kind);
+            if ('int' === $kind) {
+                $context->builder->call(
+                    $context->lookupFunction('__value__writeLong'),
+                    $dest,
+                    $context->getTypeFromString('int64')->constInt(1, false)
+                );
+
+                return;
+            }
+            $context->builder->call(
+                $context->lookupFunction('__value__writeDouble'),
+                $dest,
+                $context->getTypeFromString('double')->constReal(1.0)
+            );
+        };
+
+        if ([] === $entries) {
+            $emitScalar($context, $dest, 'stdClass', $kind);
+
+            return;
+        }
+
+        $ids = array_keys($entries);
+        $lastIdx = \count($ids) - 1;
+        $fallbackBlock = BasicBlockHelper::append($context, $tag.'_fallback');
+        foreach ($ids as $idx => $id) {
+            $matchBlock = BasicBlockHelper::append($context, $tag.'_match_'.$id);
+            $nextBlock = $idx === $lastIdx
+                ? $fallbackBlock
+                : BasicBlockHelper::append($context, $tag.'_next_'.$id);
+            $context->builder->branchIf(
+                $context->builder->icmp(
+                    Builder::INT_EQ,
+                    $classId,
+                    $i64->constInt($id, false)
+                ),
+                $matchBlock,
+                $nextBlock
+            );
+            $context->builder->positionAtEnd($matchBlock);
+            $emitScalar($context, $dest, $entries[$id], $kind);
+            $context->builder->positionAtEnd($nextBlock);
+        }
+
+        $context->builder->positionAtEnd($fallbackBlock);
+        $emitScalar($context, $dest, 'stdClass', $kind);
     }
 
 }

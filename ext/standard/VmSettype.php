@@ -7,6 +7,7 @@ namespace PHPCompiler\ext\standard;
 use PHPCompiler\Frame;
 use PHPCompiler\VM\CastSupport;
 use PHPCompiler\VM\EnumCaseSupport;
+use PHPCompiler\VM\ErrorReporter;
 use PHPCompiler\VM\HashTable;
 use PHPCompiler\VM\ObjectEntry;
 use PHPCompiler\VM\Variable;
@@ -104,6 +105,11 @@ final class VmSettype
 
                 return;
             }
+            if (Variable::TYPE_OBJECT === $v->type) {
+                self::legacyPlainObjectScalarCast($result, $v, $frame, 'int');
+
+                return;
+            }
         }
         throw new \LogicException('settype() to integer does not support this value type in this compiler build');
     }
@@ -145,6 +151,11 @@ final class VmSettype
             $objectFloat = EnumCaseSupport::tryCastToFloat($v, $frame?->vmContext, $frame);
             if (null !== $objectFloat) {
                 $result->float($objectFloat);
+
+                return;
+            }
+            if (Variable::TYPE_OBJECT === $v->type) {
+                self::legacyPlainObjectScalarCast($result, $v, $frame, 'float');
 
                 return;
             }
@@ -232,5 +243,39 @@ final class VmSettype
         $scalar = $object->allocateProperty('scalar');
         $scalar->copyFrom($v);
         $result->object($object);
+    }
+
+    /**
+     * Zend settype($obj, 'int'|'float') on plain objects — E_WARNING + legacy 1 / 1.0 (#10690, type.c).
+     *
+     * @param 'int'|'float' $kind
+     */
+    private static function legacyPlainObjectScalarCast(
+        Variable $result,
+        Variable $value,
+        ?Frame $frame,
+        string $kind
+    ): void {
+        $object = $value->resolveIndirect()->toObject();
+        $className = $object->class->name;
+        $context = $frame?->vmContext;
+        if (null !== $context) {
+            $message = 'int' === $kind
+                ? "Object of class {$className} could not be converted to int"
+                : "Object of class {$className} could not be converted to float";
+            $context->errors->triggerError(
+                $message,
+                ErrorReporter::E_WARNING,
+                null !== $frame && '' !== ($frame->scriptPath ?? '') ? $frame->scriptPath : null,
+                $context,
+                $frame
+            );
+        }
+        if ('int' === $kind) {
+            $result->int(1);
+
+            return;
+        }
+        $result->float(1.0);
     }
 }
