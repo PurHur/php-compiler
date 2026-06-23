@@ -490,10 +490,10 @@ final class VmArray
         return $dest;
     }
 
-    /** ksort() — return array sorted by key; packed lists are unchanged. */
+    /** ksort() — return array sorted by key ascending (php-src: no list-shaped skip; #10836). */
     public static function ksortCopy(HashTable $ht, int $flags = StdlibConstants::SORT_REGULAR): HashTable
     {
-        if ($ht->getNumElements() < 2 || self::isList($ht)) {
+        if ($ht->getNumElements() < 2) {
             return $ht;
         }
         $pairs = self::copyKeyedPairs($ht);
@@ -501,10 +501,10 @@ final class VmArray
         return self::hashTableFromSortedPairs($pairs);
     }
 
-    /** krsort() — return array sorted by key descending; packed lists are unchanged. */
+    /** krsort() — return array sorted by key descending (php-src: no list-shaped skip; #10836). */
     public static function krsortCopy(HashTable $ht, int $flags = StdlibConstants::SORT_REGULAR): HashTable
     {
-        if ($ht->getNumElements() < 2 || self::isList($ht)) {
+        if ($ht->getNumElements() < 2) {
             return $ht;
         }
         $pairs = self::copyKeyedPairs($ht);

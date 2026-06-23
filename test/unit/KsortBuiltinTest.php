@@ -50,7 +50,7 @@ final class KsortBuiltinTest extends TestCase
         $this->assertSame([10, 20, 30], $keys);
     }
 
-    public function testPackedListUnchanged(): void
+    public function testPackedListSortsByKeyAscending(): void
     {
         $runtime = new Runtime();
         $fn = new ksort_();
@@ -61,11 +61,11 @@ final class KsortBuiltinTest extends TestCase
             $ht->addIndex($i, $val);
         }
         $sorted = $this->runKsort($fn, $runtime, $ht);
-        $vals = [];
-        foreach ($sorted->iterate(true) as $v) {
-            $vals[] = $v->toInt();
+        $keys = [];
+        foreach ($sorted->iterateKeyed(true) as [$key]) {
+            $keys[] = $key->toInt();
         }
-        $this->assertSame([1, 2, 3], $vals);
+        $this->assertSame([0, 1, 2], $keys);
     }
 
     public function testTypeErrorOnObject(): void

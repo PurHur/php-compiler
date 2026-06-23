@@ -15,8 +15,8 @@ use PHPLLVM\Value;
 /**
  * krsort() — sort by key descending, preserving values (subset of PHP; issue #2282, #4118).
  *
- * VM: homogeneous string or integer keys; packed lists are no-op.
- * JIT/AOT: packed list no-op; string-key hashtable via __hashtable__sortStringKeysReverse.
+ * VM: homogeneous string or integer keys; list-shaped int keys sort by key (#10836).
+ * JIT/AOT: list-shaped arrays use packed key reorder; string-key hashtable via __hashtable__sortStringKeysReverse.
  */
 final class krsort_ extends Internal
 {

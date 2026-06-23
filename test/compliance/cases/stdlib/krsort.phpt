@@ -14,4 +14,4 @@ echo implode(',', array_keys($c)), "\n";
 --EXPECT--
 c,b,a
 2,1,0
-0,1,2
+2,1,0
