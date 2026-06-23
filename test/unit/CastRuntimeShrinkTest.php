@@ -6,23 +6,25 @@ namespace PHPCompiler\Test\Unit;
 
 use PHPUnit\Framework\TestCase;
 
-/** CastHelper must route bool (array) through CastJitHelper PHP, not inline LLVM (#10046). */
+/** CastHelper routes casts through PHP-backed helpers, not monolithic LLVM (#10046, #10244). */
 final class CastRuntimeShrinkTest extends TestCase
 {
-    public function testCastArrayRuntimeUsesCastJitHelper(): void
+    public function testCastArrayRuntimeUsesJitVmHelperLink(): void
     {
         $source = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/CastArrayRuntime.php');
+        $this->assertStringContainsString('JitVmHelperLink', $source);
         $this->assertStringContainsString('CastJitHelper', $source);
         $this->assertStringContainsString('boolYieldsEmptyArray', $source);
     }
 
-    public function testCastHelperRoutesBoolArrayThroughCastArrayRuntime(): void
+    public function testCastHelperIsThinDispatcher(): void
     {
         $source = (string) file_get_contents(__DIR__.'/../../lib/JIT/CastHelper.php');
-        $this->assertStringContainsString('CastArrayRuntime', $source);
+        $this->assertStringContainsString('CastArrayNativeJit', $source);
+        $this->assertStringContainsString('CastObjectNativeJit', $source);
+        $this->assertStringContainsString('CastUnsetJit', $source);
         $this->assertStringContainsString('CastArrayValueBoxJit', $source);
-        $this->assertStringContainsString('CastObjectValueBoxJit', $source);
-        $this->assertLessThanOrEqual(130, substr_count($source, "\n") + 1);
+        $this->assertLessThanOrEqual(45, substr_count($source, "\n") + 1);
     }
 
     public function testCastJitHelperAlignsWithCastSupport(): void
