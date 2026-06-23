@@ -40,6 +40,39 @@ final class VmFloatDtoa
         return self::formatH($value);
     }
 
+    /**
+     * php-src main/snprintf.c php_fcvt + php_conv_fp format 'F' (%f / locale-free %F).
+     */
+    public static function formatSprintfF(float $value, int $precision): string
+    {
+        if (\is_nan($value)) {
+            return 'NaN';
+        }
+        if (\is_infinite($value)) {
+            return $value > 0.0 ? 'INF' : '-INF';
+        }
+
+        $precision = \max(0, $precision);
+        if ($precision >= self::NDIGIT - 1) {
+            $precision = self::NDIGIT - 2;
+        }
+
+        $negative = $value < 0.0;
+        $abs = $negative ? -$value : $value;
+        if (0.0 === $abs) {
+            if ($precision > 0) {
+                return ($negative ? '-' : '').'0.'.\str_repeat('0', $precision);
+            }
+
+            return $negative ? '-0' : '0';
+        }
+
+        [$digits, $decpt] = self::fcvt($abs, $precision);
+        $formatted = self::convFpF($digits, $decpt, $precision);
+
+        return $negative ? '-'.$formatted : $formatted;
+    }
+
     private static function formatLargeScientific(float $value): string
     {
         $negative = $value < 0.0;
@@ -320,5 +353,177 @@ final class VmFloatDtoa
         $digits = \rtrim($digits, '0');
 
         return \rtrim($digits, '.');
+    }
+
+    /**
+     * php-src main/snprintf.c php_fcvt — fixed-format dtoa digits + decimal point index.
+     *
+     * @return array{0: string, 1: int}
+     */
+    private static function fcvt(float $abs, int $ndigit): array
+    {
+        [$digits, $decpt] = self::dtoaDigitsFromFloat($abs, $ndigit + 8);
+        $roundPos = $decpt + $ndigit;
+        [$digits, $decpt] = self::roundDigitsHalfEven($digits, $roundPos, $decpt);
+
+        $fracLen = \strlen($digits) - $decpt;
+        if ($fracLen < $ndigit) {
+            $digits .= \str_repeat('0', $ndigit - $fracLen);
+        } elseif ($fracLen > $ndigit) {
+            $digits = \substr($digits, 0, $decpt + $ndigit);
+        }
+
+        return [$digits, $decpt];
+    }
+
+    /**
+     * @return array{0: string, 1: int}
+     */
+    private static function dtoaDigitsFromFloat(float $abs, int $fracExtra): array
+    {
+        [$exp, $frac] = self::floatToParts($abs);
+        if (0 === $exp) {
+            if (0 === $frac) {
+                return ['0', 1];
+            }
+            $sig = $frac;
+            $binExp = -1022 - 52;
+        } else {
+            $sig = (1 << 52) | $frac;
+            $binExp = $exp - 1023 - 52;
+        }
+
+        $scale = self::NDIGIT + $fracExtra;
+        $digits = self::intToDecimal($sig);
+        for ($i = 0; $i < $scale; ++$i) {
+            $digits = self::decimalMulSmall($digits, 10);
+        }
+        if ($binExp >= 0) {
+            for ($i = 0; $i < $binExp; ++$i) {
+                $digits = self::decimalMulSmall($digits, 2);
+            }
+        } else {
+            for ($i = 0; $i < -$binExp; ++$i) {
+                [$digits] = self::binaryDiv2($digits, 0);
+            }
+        }
+
+        $digits = self::trimLeadingZeros($digits);
+        if ('0' === $digits) {
+            return ['0', 1];
+        }
+
+        return [$digits, \strlen($digits) - $scale];
+    }
+
+    /** php-src zend_dtoa half-to-even rounding at $roundPos (exclusive). */
+    private static function roundDigitsHalfEven(string $digits, int $roundPos, int $decpt): array
+    {
+        if ($roundPos >= \strlen($digits)) {
+            return [$digits, $decpt];
+        }
+
+        $roundDigit = (int) $digits[$roundPos];
+        $roundUp = false;
+        if ($roundDigit > 5) {
+            $roundUp = true;
+        } elseif (5 === $roundDigit) {
+            $hasTail = false;
+            for ($i = $roundPos + 1, $len = \strlen($digits); $i < $len; ++$i) {
+                if ('0' !== $digits[$i]) {
+                    $hasTail = true;
+                    break;
+                }
+            }
+            if ($hasTail) {
+                $roundUp = true;
+            } elseif ($roundPos > 0) {
+                $roundUp = 1 === ((int) $digits[$roundPos - 1]) % 2;
+            }
+        }
+
+        $digits = \substr($digits, 0, $roundPos);
+        if ($roundUp) {
+            return self::incrementDecimalAt($digits, $roundPos - 1, $decpt);
+        }
+
+        return [$digits, $decpt];
+    }
+
+    /** @return array{0: string, 1: int} */
+    private static function incrementDecimalAt(string $digits, int $pos, int $decpt): array
+    {
+        if ($pos < 0) {
+            return ['1'.$digits, $decpt + 1];
+        }
+
+        $chars = \str_split($digits);
+        $carry = 1;
+        for ($i = $pos; $i >= 0 && $carry > 0; --$i) {
+            $n = (int) $chars[$i] + $carry;
+            $chars[$i] = (string) ($n % 10);
+            $carry = intdiv($n, 10);
+        }
+        $digits = \implode('', $chars);
+        if ($carry > 0) {
+            $digits = '1'.$digits;
+            ++$decpt;
+        }
+
+        return [$digits, $decpt];
+    }
+
+    /** php-src main/snprintf.c php_conv_fp format 'F'. */
+    private static function convFpF(string $p, int $decimalPoint, int $precision): string
+    {
+        $ndig = self::NDIGIT;
+        $out = '';
+        $pos = 0;
+        $pLen = \strlen($p);
+
+        if ($decimalPoint <= 0) {
+            $out = '0';
+            if ($precision > 0) {
+                $out .= '.';
+                $dp = $decimalPoint;
+                while ($dp++ < 0) {
+                    $out .= '0';
+                }
+            }
+        } else {
+            $addz = $decimalPoint >= $ndig ? $decimalPoint - $ndig + 1 : 0;
+            $decimalPoint -= $addz;
+            while ($decimalPoint-- > 0) {
+                $out .= $pos < $pLen ? $p[$pos++] : '0';
+            }
+            while ($addz-- > 0) {
+                $out .= '0';
+            }
+            if ($precision > 0) {
+                $out .= '.';
+            }
+        }
+
+        if ($precision > 0 && $decimalPoint <= 0 && !\str_contains($out, '.')) {
+            $out .= '.';
+        }
+
+        while ($pos < $pLen) {
+            $out .= $p[$pos++];
+        }
+
+        if ($precision > 0) {
+            $dot = \strpos($out, '.');
+            if (false === $dot) {
+                $out .= '.'.\str_repeat('0', $precision);
+            } else {
+                $fracLen = \strlen($out) - $dot - 1;
+                if ($fracLen < $precision) {
+                    $out .= \str_repeat('0', $precision - $fracLen);
+                }
+            }
+        }
+
+        return $out;
     }
 }

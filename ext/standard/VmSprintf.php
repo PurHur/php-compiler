@@ -508,17 +508,10 @@ final class VmSprintf
         return \chr($value & 0xFF);
     }
 
-    /** php-src sprintf.c — %f (default precision 6; issue #10151). */
+    /** php-src sprintf.c — %f (default precision 6; issue #10151, #10796). */
     private static function formatFixed(float $value, int $precision = 6): string
     {
-        if (\is_nan($value)) {
-            return 'NaN';
-        }
-        if (\is_infinite($value)) {
-            return $value > 0 ? 'INF' : '-INF';
-        }
-
-        return VmNumberFormat::format($value, $precision, '.', '');
+        return VmFloatDtoa::formatSprintfF($value, $precision);
     }
 
     /** php-src sprintf.c — %e / %E (default precision 6). */
