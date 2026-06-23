@@ -54,10 +54,15 @@ final class VmJsonFlags
     /** @see JSON_THROW_ON_ERROR */
     public const THROW_ON_ERROR = 4194304;
 
-    /** Flags honored by json_encode() in this compiler build (issue #3281, #10555, #10601). */
-    public const ENCODE_SUPPORTED = self::UNESCAPED_SLASHES
+    /** Flags honored by json_encode() in this compiler build (issue #3281, #10555, #10601, #10954, #10956). */
+    public const ENCODE_SUPPORTED = self::HEX_TAG
+        | self::HEX_AMP
+        | self::HEX_APOS
+        | self::HEX_QUOT
+        | self::UNESCAPED_SLASHES
         | self::PRETTY_PRINT
         | self::UNESCAPED_UNICODE
+        | self::PARTIAL_OUTPUT_ON_ERROR
         | self::THROW_ON_ERROR
         | self::FORCE_OBJECT
         | self::NUMERIC_CHECK
@@ -119,5 +124,10 @@ final class VmJsonFlags
     public static function throwsOnError(int $flags): bool
     {
         return 0 !== ($flags & self::THROW_ON_ERROR);
+    }
+
+    public static function partialOutputOnError(int $flags): bool
+    {
+        return 0 !== ($flags & self::PARTIAL_OUTPUT_ON_ERROR);
     }
 }

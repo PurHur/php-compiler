@@ -125,10 +125,14 @@ final class json_encode extends Internal
             return 0;
         }
         $flagsArg = $args[1];
-        if (JITVariable::TYPE_NATIVE_LONG === $flagsArg->type && JITVariable::KIND_VALUE === $flagsArg->kind) {
-            return (int) $context->llvm->lib->LLVMConstIntGetZExtValue($flagsArg->value->value);
+        if (JITVariable::TYPE_NATIVE_LONG !== $flagsArg->type || JITVariable::KIND_VALUE !== $flagsArg->kind) {
+            return null;
+        }
+        $lib = $context->llvm->lib;
+        if (null === $lib->LLVMIsAConstantInt($flagsArg->value->value)) {
+            return null;
         }
 
-        return null;
+        return (int) $lib->LLVMConstIntGetZExtValue($flagsArg->value->value);
     }
 }
