@@ -10,7 +10,7 @@ use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Value;
 
-/** getrusage() — process resource usage (VM VmGetrusageNative; JIT/AOT StringGetrusage LLVM, #5388/#3240). */
+/** getrusage() — process resource usage (VM VmProcess; JIT/AOT GetrusageJitHelper, #5388/#9184). */
 final class getrusage extends Internal
 {
     public function __construct()

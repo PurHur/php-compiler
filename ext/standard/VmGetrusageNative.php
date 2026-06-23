@@ -8,7 +8,7 @@ namespace PHPCompiler\ext\standard;
  * libc getrusage(2) for VM without host PHP \\getrusage() (#5388 VM phase, #7287 pattern).
  *
  * php-src: ext/standard/microtime.c — PHP_FUNCTION(getrusage)
- * JIT/AOT: lib/JIT/Builtin/StringGetrusage.php (__compiler_getrusage).
+ * JIT/AOT: GetrusageJitHelper via StringGetrusageRuntime (#9184).
  */
 final class VmGetrusageNative
 {
