@@ -2028,6 +2028,7 @@ require_once __DIR__.'/../../../lib/JIT/Builtin/ErrorReporting.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/EvalRuntime.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/ExceptionHandlerJitRuntime.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/ExceptionHandlerOutput.php';
+require_once __DIR__.'/../../../lib/JIT/Builtin/JitHelperAbiBridge.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/ExceptionThrowRuntime.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/ExecutionLimitsRuntime.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/FilterInputTypeJit.php';
