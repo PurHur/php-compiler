@@ -4,34 +4,63 @@ declare(strict_types=1);
 
 namespace PHPCompiler\JIT\Builtin;
 
-use PHPCompiler\JIT\Builtin;
+use PHPCompiler\JIT;
 use PHPCompiler\JIT\Context;
-use PHPLLVM;
+use PHPCompiler\JIT\NestedJitCompileScope;
+use PHPLLVM\Builder;
+use PHPLLVM\Value;
+use PHPLLVM\Value\Function_ as LlvmFunction;
 
 /**
- * Pending LogicException for JIT readonly property writes (issue #1360).
+ * JIT pending Error buffer for readonly property writes (#1360, #9522).
+ *
+ * LLVM ABI bridges call compiled {@see \PHPCompiler\ext\standard\ReadonlyRaiseJitHelper} PHP; no phpc_jit_pending_* globals.
  */
 final class ReadonlyRaise
 {
+    private const HELPER_PATH = '/ext/standard/ReadonlyRaiseJitHelper.php';
+
+    private const RAISE_HELPER = 'PHPCompiler\\ext\\standard\\ReadonlyRaiseJitHelper::raise';
+
+    private const CLEAR_HELPER = 'PHPCompiler\\ext\\standard\\ReadonlyRaiseJitHelper::clear';
+
+    private const HAS_PENDING_HELPER = 'PHPCompiler\\ext\\standard\\ReadonlyRaiseJitHelper::hasPending';
+
+    private const TAKE_MESSAGE_HELPER = 'PHPCompiler\\ext\\standard\\ReadonlyRaiseJitHelper::takeMessage';
+
+    /** @var list<string> */
+    private const COMPILED_HELPERS = [
+        self::RAISE_HELPER,
+        self::CLEAR_HELPER,
+        self::HAS_PENDING_HELPER,
+        self::TAKE_MESSAGE_HELPER,
+    ];
+
+    /** @var list<string> */
+    private const ABI_FUNCTIONS = [
+        '__compiler_jit_raise_logic_exception',
+        'phpc_jit_clear_pending_exception',
+        'phpc_jit_has_pending_exception',
+        'phpc_jit_copy_pending_exception',
+        'phpc_jit_abort_if_pending_logic_exception',
+    ];
+
     private static ?int $hasPendingAddress = null;
 
     private static ?int $copyPendingAddress = null;
 
     private static ?int $clearPendingAddress = null;
 
+    private static bool $implementing = false;
+
     public static function ensureLinked(Context $context): void
     {
-        self::registerPendingGlobals($context);
-        self::registerDeclarations($context);
-        if (Builtin::LOAD_TYPE_STANDALONE !== $context->loadType) {
-            self::implementBodies($context);
-        }
+        self::implement($context);
     }
 
     public static function ensureStandaloneBodies(Context $context): void
     {
-        self::registerDeclarations($context);
-        self::implementBodies($context);
+        self::implement($context);
     }
 
     public static function emitRaise(Context $context, string $message): void
@@ -50,176 +79,202 @@ final class ReadonlyRaise
         );
     }
 
-    private static function implementBodies(Context $context): void
+    private static function implement(Context $context): void
     {
-        $fn = $context->module->getNamedFunction('__compiler_jit_raise_logic_exception');
-        if (null === $fn || $fn->countBasicBlocks() > 0) {
-            self::registerPendingGlobals($context);
+        $probe = $context->module->getNamedFunction('phpc_jit_has_pending_exception');
+        if (null !== $probe && $probe->countBasicBlocks() > 0) {
+            self::registerLinkedRuntime($context);
 
             return;
         }
 
-        self::registerPendingGlobals($context);
-        self::implementRaiseFunction($context);
-        self::implementPendingHelpers($context);
-        self::implementAbortIfPending($context);
+        if (NestedJitCompileScope::isActive()) {
+            self::registerDeclarations($context);
+
+            return;
+        }
+
+        if (self::$implementing) {
+            self::registerDeclarations($context);
+
+            return;
+        }
+
+        self::$implementing = true;
+        try {
+            self::ensureJitHelperCompiled($context);
+            self::implementRaiseBridge($context);
+            self::implementVoidBridge($context, 'phpc_jit_clear_pending_exception', self::CLEAR_HELPER);
+            self::implementHasPendingBridge($context);
+            self::implementCopyPendingBridge($context);
+            self::implementAbortIfPending($context);
+            self::registerLinkedRuntime($context);
+            $context->builder->clearInsertionPosition();
+        } finally {
+            self::$implementing = false;
+        }
     }
 
-    private static function registerPendingGlobals(Context $context): void
+    private static function implementRaiseBridge(Context $context): void
     {
-        $i8 = $context->getTypeFromString('int8');
-        $msgTy = $i8->arrayType(512);
-        if (null === $context->module->getNamedGlobal('phpc_jit_pending_flag')) {
-            $flag = $context->module->addGlobal($i8, 'phpc_jit_pending_flag');
-            $flag->setInitializer($i8->constInt(0, false));
-        }
-        if (null === $context->module->getNamedGlobal('phpc_jit_pending_msg')) {
-            $msgGlobal = $context->module->addGlobal($msgTy, 'phpc_jit_pending_msg');
-            $msgGlobal->setInitializer($msgTy->constNull());
-        }
-    }
+        $abiName = '__compiler_jit_raise_logic_exception';
+        $probe = $context->module->getNamedFunction($abiName);
+        if (null !== $probe && $probe->countBasicBlocks() > 0) {
+            $context->registerFunction($abiName, $probe);
 
-    private static function implementRaiseFunction(Context $context): void
-    {
-        $fn = $context->lookupFunction('__compiler_jit_raise_logic_exception');
-        $entry = $fn->appendBasicBlock('entry');
+            return;
+        }
+
+        $i8p = $context->getTypeFromString('int8*');
+        $i64 = $context->getTypeFromString('int64');
+        $sizeT = $context->getTypeFromString('size_t');
+        $voidTy = $context->getTypeFromString('void');
+        $ft = $context->context->functionType($voidTy, false, $i8p, $sizeT);
+        $fn = null !== $probe
+            ? $probe
+            : $context->module->addFunction($abiName, $ft);
+
+        $entry = $fn->appendBasicBlock('readonly_raise_entry');
         $context->builder->positionAtEnd($entry);
-
         $msg = $fn->getParam(0);
-        $len = $fn->getParam(1);
+        $msgLen = $fn->getParam(1);
+        $msgStr = self::cstrToStringWithLength($context, $msg, $context->builder->zExt($msgLen, $i64));
+        $context->builder->call(self::helperFunction($context, self::RAISE_HELPER), $msgStr);
+        $context->builder->returnVoid();
+        $context->registerFunction($abiName, $fn);
+    }
+
+    private static function implementHasPendingBridge(Context $context): void
+    {
+        $abiName = 'phpc_jit_has_pending_exception';
+        $probe = $context->module->getNamedFunction($abiName);
+        if (null !== $probe && $probe->countBasicBlocks() > 0) {
+            $context->registerFunction($abiName, $probe);
+
+            return;
+        }
+
+        $i32 = $context->getTypeFromString('int32');
+        $ft = $context->context->functionType($i32, false);
+        $fn = null !== $probe
+            ? $probe
+            : $context->module->addFunction($abiName, $ft);
+
+        $entry = $fn->appendBasicBlock('readonly_has_pending_entry');
+        $context->builder->positionAtEnd($entry);
+        $pending = $context->builder->call(self::helperFunction($context, self::HAS_PENDING_HELPER));
+        $context->builder->returnValue($context->builder->zext($pending, $i32));
+        $context->registerFunction($abiName, $fn);
+    }
+
+    private static function implementCopyPendingBridge(Context $context): void
+    {
+        $abiName = 'phpc_jit_copy_pending_exception';
+        $probe = $context->module->getNamedFunction($abiName);
+        if (null !== $probe && $probe->countBasicBlocks() > 0) {
+            $context->registerFunction($abiName, $probe);
+
+            return;
+        }
+
         $i8 = $context->getTypeFromString('int8');
         $i8p = $context->getTypeFromString('int8*');
-        $msgGlobal = $context->module->getNamedGlobal('phpc_jit_pending_msg');
-        $flagGlobal = $context->module->getNamedGlobal('phpc_jit_pending_flag');
-        $msgPtr = $context->builder->pointerCast($msgGlobal, $i8p);
-        $max = $context->constantFromInteger(511, 'size_t');
-        $copyLen = $len;
-        $cmp = $context->builder->icmp(PHPLLVM\Builder::INT_UGT, $len, $max);
-        $fnParent = $fn;
-        $lenOk = $fnParent->appendBasicBlock('len_ok');
-        $lenClamp = $fnParent->appendBasicBlock('len_clamp');
-        $done = $fnParent->appendBasicBlock('raise_done');
-        $context->builder->branchIf($cmp, $lenClamp, $lenOk);
-        $context->builder->positionAtEnd($lenClamp);
-        $context->builder->branch($lenOk);
-        $context->builder->positionAtEnd($lenOk);
-        $copyLenPhi = $context->builder->phi($len->typeOf());
-        $copyLenPhi->addIncoming($len, $entry);
-        $copyLenPhi->addIncoming($max, $lenClamp);
-        $context->intrinsic->memcpy($msgPtr, $msg, $copyLenPhi, false);
-        $nullTerm = $context->builder->inBoundsGEP($msgPtr, $copyLenPhi);
-        $context->builder->store($i8->constInt(0, false), $nullTerm);
-        $context->builder->store(
-            $i8->constInt(1, false),
-            $context->builder->pointerCast($flagGlobal, $i8p)
-        );
+        $i64 = $context->getTypeFromString('int64');
+        $sizeT = $context->getTypeFromString('size_t');
+        $voidTy = $context->getTypeFromString('void');
+        $ft = $context->context->functionType($voidTy, false, $i8p, $sizeT);
+        $fn = null !== $probe
+            ? $probe
+            : $context->module->addFunction($abiName, $ft);
+
+        $entry = $fn->appendBasicBlock('readonly_copy_entry');
+        $context->builder->positionAtEnd($entry);
+        $dest = $fn->getParam(0);
+        $bufsize = $fn->getParam(1);
+
+        $has = $context->builder->call(self::helperFunction($context, self::HAS_PENDING_HELPER));
+        $noPending = $context->builder->icmp(Builder::INT_EQ, $has, $i8->constInt(0, false));
+        $skipBlock = $fn->appendBasicBlock('readonly_copy_skip');
+        $copyBlock = $fn->appendBasicBlock('readonly_copy_do');
+        $done = $fn->appendBasicBlock('readonly_copy_done');
+        $context->builder->branchIf($noPending, $skipBlock, $copyBlock);
+
+        $context->builder->positionAtEnd($skipBlock);
+        $context->builder->store($i8->constInt(0, false), $dest);
         $context->builder->branch($done);
+
+        $context->builder->positionAtEnd($copyBlock);
+        $msgStr = $context->builder->call(self::helperFunction($context, self::TAKE_MESSAGE_HELPER));
+        $strMap = $context->structFieldMap['__string__'];
+        $msgLen = $context->builder->load(
+            $context->builder->structGep($msgStr, $strMap['length'])
+        );
+        $msgData = $context->builder->structGep($msgStr, $strMap['value']);
+        $max = $context->constantFromInteger(511, 'size_t');
+        $bufCmp = $context->builder->icmp(Builder::INT_UGT, $bufsize, $max);
+        $bufOk = $fn->appendBasicBlock('readonly_copy_buf_ok');
+        $bufClamp = $fn->appendBasicBlock('readonly_copy_buf_clamp');
+        $context->builder->branchIf($bufCmp, $bufClamp, $bufOk);
+        $context->builder->positionAtEnd($bufClamp);
+        $context->builder->branch($bufOk);
+        $context->builder->positionAtEnd($bufOk);
+        $useLenPhi = $context->builder->phi($sizeT);
+        $useLenPhi->addIncoming($bufsize, $copyBlock);
+        $useLenPhi->addIncoming($max, $bufClamp);
+        $msgLenSized = $context->builder->zExt($msgLen, $sizeT);
+        $lenCmp = $context->builder->icmp(Builder::INT_UGT, $msgLenSized, $useLenPhi);
+        $msgLenOk = $fn->appendBasicBlock('readonly_copy_msg_len_ok');
+        $msgLenClamp = $fn->appendBasicBlock('readonly_copy_msg_len_clamp');
+        $context->builder->branchIf($lenCmp, $msgLenClamp, $msgLenOk);
+        $context->builder->positionAtEnd($msgLenClamp);
+        $context->builder->branch($msgLenOk);
+        $context->builder->positionAtEnd($msgLenOk);
+        $copyLenPhi = $context->builder->phi($sizeT);
+        $copyLenPhi->addIncoming($msgLenSized, $bufOk);
+        $copyLenPhi->addIncoming($useLenPhi, $msgLenClamp);
+        $context->intrinsic->memcpy(
+            $dest,
+            $context->builder->pointerCast($msgData, $i8p),
+            $copyLenPhi,
+            false
+        );
+        $term = $context->builder->inBoundsGEP($dest, $copyLenPhi);
+        $context->builder->store($i8->constInt(0, false), $term);
+        $context->builder->branch($done);
+
         $context->builder->positionAtEnd($done);
         $context->builder->returnVoid();
-        $context->builder->clearInsertionPosition();
-    }
-
-    private static function implementPendingHelpers(Context $context): void
-    {
-        $i8 = $context->getTypeFromString('int8');
-        $i8p = $context->getTypeFromString('int8*');
-        $i32 = $context->getTypeFromString('int32');
-        $sizeT = $context->getTypeFromString('size_t');
-
-        if (null === $context->module->getNamedFunction('phpc_jit_clear_pending_exception')
-            || 0 === $context->module->getNamedFunction('phpc_jit_clear_pending_exception')->countBasicBlocks()
-        ) {
-            $clear = $context->lookupFunction('phpc_jit_clear_pending_exception');
-            $block = $clear->appendBasicBlock('entry');
-            $context->builder->positionAtEnd($block);
-            $flag = $context->module->getNamedGlobal('phpc_jit_pending_flag');
-            $context->builder->store(
-                $i8->constInt(0, false),
-                $context->builder->pointerCast($flag, $i8p)
-            );
-            $context->builder->returnVoid();
-            $context->builder->clearInsertionPosition();
-        }
-
-        if (null === $context->module->getNamedFunction('phpc_jit_has_pending_exception')
-            || 0 === $context->module->getNamedFunction('phpc_jit_has_pending_exception')->countBasicBlocks()
-        ) {
-            $has = $context->lookupFunction('phpc_jit_has_pending_exception');
-            $block = $has->appendBasicBlock('entry');
-            $context->builder->positionAtEnd($block);
-            $flag = $context->module->getNamedGlobal('phpc_jit_pending_flag');
-            $loaded = $context->builder->load($context->builder->pointerCast($flag, $i8p));
-            $result = $context->builder->zext($loaded, $i32);
-            $context->builder->returnValue($result);
-            $context->builder->clearInsertionPosition();
-        }
-
-        if (null === $context->module->getNamedFunction('phpc_jit_copy_pending_exception')
-            || 0 === $context->module->getNamedFunction('phpc_jit_copy_pending_exception')->countBasicBlocks()
-        ) {
-            $copyFn = $context->lookupFunction('phpc_jit_copy_pending_exception');
-            $block = $copyFn->appendBasicBlock('entry');
-            $context->builder->positionAtEnd($block);
-            $dest = $copyFn->getParam(0);
-            $bufsize = $copyFn->getParam(1);
-            $flag = $context->module->getNamedGlobal('phpc_jit_pending_flag');
-            $msgGlobal = $context->module->getNamedGlobal('phpc_jit_pending_msg');
-            $msgPtr = $context->builder->pointerCast($msgGlobal, $i8p);
-            $flagLoaded = $context->builder->load($context->builder->pointerCast($flag, $i8p));
-            $has = $context->builder->icmp(PHPLLVM\Builder::INT_NE, $flagLoaded, $i8->constInt(0, false));
-            $copyBlock = $copyFn->appendBasicBlock('copy');
-            $skipBlock = $copyFn->appendBasicBlock('skip');
-            $done = $copyFn->appendBasicBlock('done');
-            $context->builder->branchIf($has, $copyBlock, $skipBlock);
-            $context->builder->positionAtEnd($copyBlock);
-            $max = $context->constantFromInteger(511, 'size_t');
-            $useLen = $bufsize;
-            $cmp = $context->builder->icmp(PHPLLVM\Builder::INT_UGT, $bufsize, $max);
-            $lenOk = $copyFn->appendBasicBlock('copy_len_ok');
-            $lenClamp = $copyFn->appendBasicBlock('copy_len_clamp');
-            $context->builder->branchIf($cmp, $lenClamp, $lenOk);
-            $context->builder->positionAtEnd($lenClamp);
-            $context->builder->branch($lenOk);
-            $context->builder->positionAtEnd($lenOk);
-            $lenPhi = $context->builder->phi($sizeT);
-            $lenPhi->addIncoming($bufsize, $copyBlock);
-            $lenPhi->addIncoming($max, $lenClamp);
-            $context->intrinsic->memcpy($dest, $msgPtr, $lenPhi, false);
-            $term = $context->builder->inBoundsGEP($dest, $lenPhi);
-            $context->builder->store($i8->constInt(0, false), $term);
-            $context->builder->store($i8->constInt(0, false), $context->builder->pointerCast($flag, $i8p));
-            $context->builder->branch($done);
-            $context->builder->positionAtEnd($skipBlock);
-            $context->builder->store($i8->constInt(0, false), $dest);
-            $context->builder->branch($done);
-            $context->builder->positionAtEnd($done);
-            $context->builder->returnVoid();
-            $context->builder->clearInsertionPosition();
-        }
+        $context->registerFunction($abiName, $fn);
     }
 
     private static function implementAbortIfPending(Context $context): void
     {
-        if (null === $context->module->getNamedFunction('phpc_jit_abort_if_pending_logic_exception')
-            || 0 < $context->module->getNamedFunction('phpc_jit_abort_if_pending_logic_exception')->countBasicBlocks()
-        ) {
+        $abiName = 'phpc_jit_abort_if_pending_logic_exception';
+        $probe = $context->module->getNamedFunction($abiName);
+        if (null !== $probe && $probe->countBasicBlocks() > 0) {
+            $context->registerFunction($abiName, $probe);
+
             return;
         }
 
         self::ensureAbortLibcDecls($context);
 
-        $abortFn = $context->lookupFunction('phpc_jit_abort_if_pending_logic_exception');
-        $entry = $abortFn->appendBasicBlock('entry');
-        $context->builder->positionAtEnd($entry);
-
         $i8 = $context->getTypeFromString('int8');
         $i8p = $context->getTypeFromString('int8*');
         $i32 = $context->getTypeFromString('int32');
+        $voidTy = $context->getTypeFromString('void');
+        $ft = $context->context->functionType($voidTy, false);
+        $fn = null !== $probe
+            ? $probe
+            : $context->module->addFunction($abiName, $ft);
+
+        $entry = $fn->appendBasicBlock('readonly_abort_entry');
+        $context->builder->positionAtEnd($entry);
 
         $has = $context->builder->call($context->lookupFunction('phpc_jit_has_pending_exception'));
-        $noPending = $context->builder->icmp(PHPLLVM\Builder::INT_EQ, $has, $i32->constInt(0, false));
-        $retBlock = $abortFn->appendBasicBlock('no_pending');
-        $fatalBlock = $abortFn->appendBasicBlock('fatal');
+        $noPending = $context->builder->icmp(Builder::INT_EQ, $has, $i32->constInt(0, false));
+        $retBlock = $fn->appendBasicBlock('readonly_abort_ret');
+        $fatalBlock = $fn->appendBasicBlock('readonly_abort_fatal');
         $context->builder->branchIf($noPending, $retBlock, $fatalBlock);
 
         $context->builder->positionAtEnd($fatalBlock);
@@ -261,7 +316,95 @@ final class ReadonlyRaise
 
         $context->builder->positionAtEnd($retBlock);
         $context->builder->returnVoid();
+        $context->registerFunction($abiName, $fn);
         $context->builder->clearInsertionPosition();
+    }
+
+    private static function implementVoidBridge(Context $context, string $abiName, string $helperLogical): void
+    {
+        $probe = $context->module->getNamedFunction($abiName);
+        if (null !== $probe && $probe->countBasicBlocks() > 0) {
+            $context->registerFunction($abiName, $probe);
+
+            return;
+        }
+
+        $voidTy = $context->getTypeFromString('void');
+        $ft = $context->context->functionType($voidTy, false);
+        $fn = null !== $probe
+            ? $probe
+            : $context->module->addFunction($abiName, $ft);
+
+        $entry = $fn->appendBasicBlock('readonly_void_bridge_entry');
+        $context->builder->positionAtEnd($entry);
+        $context->builder->call(self::helperFunction($context, $helperLogical));
+        $context->builder->returnVoid();
+        $context->registerFunction($abiName, $fn);
+    }
+
+    private static function helperFunction(Context $context, string $logical): LlvmFunction
+    {
+        self::ensureJitHelperCompiled($context);
+        $lc = \strtolower($logical);
+        $fn = $context->functions[$lc] ?? null;
+        if (null === $fn) {
+            throw new \LogicException($logical.' missing after ReadonlyRaiseJitHelper compile (#9522)');
+        }
+
+        return $fn;
+    }
+
+    private static function ensureJitHelperCompiled(Context $context): void
+    {
+        $missing = false;
+        foreach (self::COMPILED_HELPERS as $logical) {
+            if (!isset($context->functions[\strtolower($logical)])) {
+                $missing = true;
+                break;
+            }
+        }
+        if (!$missing) {
+            return;
+        }
+
+        $runtime = $context->runtime;
+        $path = \dirname(__DIR__, 3).self::HELPER_PATH;
+        NestedJitCompileScope::run($context, static function () use ($context, $runtime, $path): void {
+            $block = $runtime->parseAndCompile((string) \file_get_contents($path), 'ReadonlyRaiseJitHelper.php');
+            if (null === $block) {
+                throw new \LogicException('ReadonlyRaiseJitHelper.php parseAndCompile failed (#9522)');
+            }
+            $jit = new JIT($context);
+            $jit->compile($block);
+        });
+        foreach (self::COMPILED_HELPERS as $logical) {
+            $lc = \strtolower($logical);
+            if (!isset($context->functions[$lc])) {
+                throw new \LogicException($lc.' was not compiled for JIT (#9522)');
+            }
+        }
+    }
+
+    private static function registerLinkedRuntime(Context $context): void
+    {
+        foreach (self::ABI_FUNCTIONS as $name) {
+            $fn = $context->module->getNamedFunction($name);
+            if (null === $fn) {
+                throw new \LogicException($name.' missing after ReadonlyRaise bridge (#9522)');
+            }
+            $context->registerFunction($name, $fn);
+        }
+    }
+
+    private static function cstrToStringWithLength(Context $context, Value $cstr, Value $lenI64): Value
+    {
+        $charPtr = $context->getTypeFromString('char*');
+
+        return $context->builder->call(
+            $context->lookupFunction('__string__init'),
+            $lenI64,
+            $context->builder->pointerCast($cstr, $charPtr)
+        );
     }
 
     private static function ensureAbortLibcDecls(Context $context): void

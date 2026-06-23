@@ -11,6 +11,13 @@ use PHPLLVM\BasicBlock;
  */
 final class NestedJitCompileScope
 {
+    private static int $depth = 0;
+
+    public static function isActive(): bool
+    {
+        return self::$depth > 0;
+    }
+
     /**
      * @template T
      *
@@ -33,9 +40,11 @@ final class NestedJitCompileScope
         }
         try {
             $context->builder->clearInsertionPosition();
+            ++self::$depth;
 
             return $compile();
         } finally {
+            --self::$depth;
             $context->scope->blockStorage = $savedBlockStorage;
             $context->scope->blockEntryStorage = $savedBlockEntryStorage;
             $context->builder = $savedBuilder;
