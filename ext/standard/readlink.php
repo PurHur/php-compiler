@@ -25,6 +25,7 @@ final class readlink extends Internal
         }
         $target = VmFs::readlink($path);
         if (false === $target) {
+            VmFilestatFailure::warnNoSuchFile($frame, 'readlink');
             $frame->returnVar->bool(false);
         } else {
             $frame->returnVar->string($target);

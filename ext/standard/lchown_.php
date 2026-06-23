@@ -29,7 +29,11 @@ final class lchown_ extends Internal
         if (null === $frame->returnVar) {
             return;
         }
-        $frame->returnVar->bool(VmFs::lchown($path, $userVar));
+        $ok = VmFs::lchown($path, $userVar);
+        if (!$ok) {
+            VmFilestatFailure::warnNoSuchFile($frame, 'chown');
+        }
+        $frame->returnVar->bool($ok);
     }
 
     public function call(Context $context, JITVariable ...$args): Value

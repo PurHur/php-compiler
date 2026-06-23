@@ -29,7 +29,11 @@ final class chgrp_ extends Internal
         if (null === $frame->returnVar) {
             return;
         }
-        $frame->returnVar->bool(VmFs::chgrp($path, $groupVar));
+        $ok = VmFs::chgrp($path, $groupVar);
+        if (!$ok) {
+            VmFilestatFailure::warnNoSuchFile($frame, 'chgrp');
+        }
+        $frame->returnVar->bool($ok);
     }
 
     public function call(Context $context, JITVariable ...$args): Value

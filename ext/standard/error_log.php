@@ -57,7 +57,8 @@ final class error_log extends Internal
             }
         }
 
-        $frame->returnVar->bool(VmErrorLog::errorLog($messageType, $message, $destination));
+        $ok = VmErrorLog::errorLog($messageType, $message, $destination, $frame);
+        $frame->returnVar->bool($ok);
     }
 
     public function call(Context $context, JITVariable ...$args): Value
