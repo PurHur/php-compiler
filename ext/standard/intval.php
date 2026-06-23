@@ -89,6 +89,11 @@ final class intval extends Internal
 
             return;
         }
+        if (Variable::TYPE_ARRAY === $v->type || Variable::TYPE_OBJECT === $v->type) {
+            $frame->returnVar->int(VmScalarType::zendIntvalOperand($v, $frame));
+
+            return;
+        }
         throw new \LogicException('intval() only supports integers, floats, booleans, strings, and null in this compiler build');
     }
 
@@ -121,6 +126,8 @@ final class intval extends Internal
                 );
             case JITVariable::TYPE_NULL:
                 return $i64->constInt(0, false);
+            case JITVariable::TYPE_HASHTABLE:
+                return JitScalarTypeCoerce::hashtableToLong($context, $v);
             case JITVariable::TYPE_VALUE:
                 return $this->valueToInt($context, $args[0], $baseVal);
             default:
@@ -203,6 +210,8 @@ final class intval extends Internal
         $boolBlock = BasicBlockHelper::append($context, 'intval_value_bool');
         $doubleBlock = BasicBlockHelper::append($context, 'intval_value_double');
         $stringBlock = BasicBlockHelper::append($context, 'intval_value_string');
+        $arrayBlock = BasicBlockHelper::append($context, 'intval_value_array');
+        $plainObjectBlock = BasicBlockHelper::append($context, 'intval_value_plain_object');
         $doneBlock = BasicBlockHelper::append($context, 'intval_value_done');
 
         $afterNull = BasicBlockHelper::append($context, 'intval_value_after_null');
@@ -278,12 +287,40 @@ final class intval extends Internal
             $context->builder->branch($doneBlock);
         }
         $context->builder->positionAtEnd($afterEnumDispatch);
+        $afterArray = BasicBlockHelper::append($context, 'intval_value_after_array');
+        $context->builder->branchIf(
+            $context->builder->icmp(Builder::INT_EQ, $typeByte, $i8->constInt(JITVariable::TYPE_HASHTABLE, false)),
+            $arrayBlock,
+            $afterArray
+        );
+
+        $context->builder->positionAtEnd($arrayBlock);
+        $htPtr = $context->builder->call($context->lookupFunction('__value__readHashtable'), $valuePtr);
+        $arrayInt = JitScalarTypeCoerce::hashtableToLong($context, $htPtr);
+        $arrayEndBlock = $context->builder->getInsertBlock();
+        $context->builder->branch($doneBlock);
+
+        $context->builder->positionAtEnd($afterArray);
         $fallbackBlock = BasicBlockHelper::append($context, 'intval_value_fallback');
+        $unknownBlock = BasicBlockHelper::append($context, 'intval_value_unknown');
         $context->builder->branchIf(
             $context->builder->icmp(Builder::INT_EQ, $typeByte, $i8->constInt(JITVariable::TYPE_STRING, false)),
             $stringBlock,
             $fallbackBlock
         );
+
+        $context->builder->positionAtEnd($fallbackBlock);
+        $context->builder->branchIf(
+            $context->builder->icmp(Builder::INT_EQ, $typeByte, $i8->constInt(JITVariable::TYPE_OBJECT, false)),
+            $plainObjectBlock,
+            $unknownBlock
+        );
+
+        $context->builder->positionAtEnd($plainObjectBlock);
+        $plainObjPtr = $context->builder->call($context->lookupFunction('__value__readObject'), $valuePtr);
+        $plainObjectInt = JitScalarTypeCoerce::emitPlainObjectToScalar($context, $plainObjPtr, 'int');
+        $plainObjectEndBlock = $context->builder->getInsertBlock();
+        $context->builder->branch($doneBlock);
 
         $context->builder->positionAtEnd($stringBlock);
         $stringVal = $context->builder->call($context->lookupFunction('__value__readString'), $valuePtr);
@@ -291,7 +328,7 @@ final class intval extends Internal
         $stringEndBlock = $context->builder->getInsertBlock();
         $context->builder->branch($doneBlock);
 
-        $context->builder->positionAtEnd($fallbackBlock);
+        $context->builder->positionAtEnd($unknownBlock);
         $context->builder->branch($doneBlock);
 
         $context->builder->positionAtEnd($doneBlock);
@@ -301,10 +338,12 @@ final class intval extends Internal
         $phi->addIncoming($boolInt, $boolEndBlock);
         $phi->addIncoming($doubleInt, $doubleEndBlock);
         $phi->addIncoming($stringInt, $stringEndBlock);
+        $phi->addIncoming($arrayInt, $arrayEndBlock);
+        $phi->addIncoming($plainObjectInt, $plainObjectEndBlock);
         if (null !== $enumLong && null !== $enumEndBlock) {
             $phi->addIncoming($enumLong, $enumEndBlock);
         }
-        $phi->addIncoming($zero, $fallbackBlock);
+        $phi->addIncoming($zero, $unknownBlock);
 
         return $phi;
     }
