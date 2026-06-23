@@ -1517,6 +1517,7 @@ require_once __DIR__.'/../../../ext/standard/memory_get_usage.php';
 require_once __DIR__.'/../../../ext/standard/memory_reset_peak_usage.php';
 require_once __DIR__.'/../../../ext/standard/metaphone.php';
 require_once __DIR__.'/../../../ext/standard/method_exists_.php';
+require_once __DIR__.'/../../../ext/standard/MicrotimeJitHelper.php';
 require_once __DIR__.'/../../../ext/standard/microtime.php';
 require_once __DIR__.'/../../../ext/standard/mime_content_type.php';
 require_once __DIR__.'/../../../ext/standard/mkdir_.php';

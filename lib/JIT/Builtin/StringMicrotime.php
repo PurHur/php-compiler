@@ -4,28 +4,30 @@ declare(strict_types=1);
 
 namespace PHPCompiler\JIT\Builtin;
 
+use PHPCompiler\JIT;
 use PHPCompiler\JIT\Context;
-use PHPLLVM\Builder;
-use PHPLLVM\Value;
+use PHPCompiler\JIT\NestedJitCompileScope;
 use PHPLLVM\Value\Function_ as LlvmFunction;
 
 /**
- * LLVM implementation of __compiler_microtime_string / __compiler_microtime_float.
+ * JIT/AOT link for __compiler_microtime_* via MicrotimeJitHelper PHP (#9181).
  *
- * Mirrors ext/standard/VmDate::microtime() (issue #6110, #5045/#2186).
+ * Replaces gettimeofday/snprintf LLVM; SSOT {@see \PHPCompiler\ext\standard\VmDate}.
  * php-src: ext/standard/basic_functions.c — PHP_FUNCTION(microtime)
  */
 final class StringMicrotime
 {
-    private const TIMEVAL_SIZE = 16;
+    private const HELPER_PATH = '/ext/standard/MicrotimeJitHelper.php';
 
-    private const TIMEVAL_OFF_TV_SEC = 0;
+    private const FLOAT_HELPER = 'PHPCompiler\\ext\\standard\\MicrotimeJitHelper::microtimeFloat';
 
-    private const TIMEVAL_OFF_TV_USEC = 8;
+    private const STRING_HELPER = 'PHPCompiler\\ext\\standard\\MicrotimeJitHelper::microtimeString';
 
-    private const USEC_PER_SEC = 1_000_000;
-
-    private const SNPRINTF_BUF = 64;
+    /** @var list<string> */
+    private const COMPILED_HELPERS = [
+        self::FLOAT_HELPER,
+        self::STRING_HELPER,
+    ];
 
     public static function ensureLinked(Context $context): void
     {
@@ -41,210 +43,103 @@ final class StringMicrotime
             return;
         }
 
-        self::ensureLibcGettimeofday($context);
-        self::ensureStringHelpers($context);
-
-        $strPtr = $context->getTypeFromString('__string__*');
-        $double = $context->getTypeFromString('double');
-
-        $ftStr = $context->context->functionType($strPtr, false);
-        $fnStr = null !== $strProbe
-            ? $strProbe
-            : $context->module->addFunction('__compiler_microtime_string', $ftStr);
-        self::implementMicrotimeString($context, $fnStr);
-
-        $floatProbe = $context->module->getNamedFunction('__compiler_microtime_float');
-        $ftFloat = $context->context->functionType($double, false);
-        $fnFloat = null !== $floatProbe
-            ? $floatProbe
-            : $context->module->addFunction('__compiler_microtime_float', $ftFloat);
-        self::implementMicrotimeFloat($context, $fnFloat);
-
+        self::ensureJitHelperCompiled($context);
+        self::implementFloatBridge($context);
+        self::implementStringBridge($context);
         self::registerLinkedRuntime($context);
-    }
-
-    private static function implementMicrotimeFloat(Context $context, LlvmFunction $fn): void
-    {
-        $entry = $fn->appendBasicBlock('mt_float_entry');
-        $context->builder->positionAtEnd($entry);
-
-        $double = $context->getTypeFromString('double');
-        $zero = $double->constReal(0.0);
-        [$sec, $usec, $ok] = self::readWallClock($context);
-
-        $failBb = $fn->appendBasicBlock('mt_float_fail');
-        $calcBb = $fn->appendBasicBlock('mt_float_calc');
-        $context->builder->branchIf($ok, $calcBb, $failBb);
-
-        $context->builder->positionAtEnd($failBb);
-        $context->builder->returnValue($zero);
-        $context->builder->clearInsertionPosition();
-
-        $context->builder->positionAtEnd($calcBb);
-        $context->builder->returnValue(self::wallClockToDouble($context, $sec, $usec));
         $context->builder->clearInsertionPosition();
     }
 
-    private static function implementMicrotimeString(Context $context, LlvmFunction $fn): void
+    private static function implementFloatBridge(Context $context): void
     {
-        $entry = $fn->appendBasicBlock('mt_str_entry');
-        $context->builder->positionAtEnd($entry);
+        $abiName = '__compiler_microtime_float';
+        $probe = $context->module->getNamedFunction($abiName);
+        if (null !== $probe && $probe->countBasicBlocks() > 0) {
+            $context->registerFunction($abiName, $probe);
 
-        $strPtr = $context->getTypeFromString('__string__*');
-        $i64 = $context->getTypeFromString('int64');
-        $i32 = $context->getTypeFromString('int32');
-        $i8 = $context->getTypeFromString('int8');
-        $charPtr = $context->getTypeFromString('char*');
-        $sizeT = $context->getTypeFromString('size_t');
-        $zeroStr = $context->builder->call(
-            $context->lookupFunction('__string__init'),
-            $i64->constInt(1, false),
-            $context->builder->pointerCast($context->constantFromString('0'), $charPtr)
-        );
-
-        [$sec, $usec, $ok] = self::readWallClock($context);
-        $failBb = $fn->appendBasicBlock('mt_str_fail');
-        $fmtBb = $fn->appendBasicBlock('mt_str_fmt');
-        $context->builder->branchIf($ok, $fmtBb, $failBb);
-
-        $context->builder->positionAtEnd($failBb);
-        $context->builder->returnValue($zeroStr);
-        $context->builder->clearInsertionPosition();
-
-        $context->builder->positionAtEnd($fmtBb);
-        $buf = $context->builder->alloca($i8, self::SNPRINTF_BUF, 'mt_buf');
-        $bufChar = $context->builder->pointerCast($buf, $charPtr);
-        $frac = self::usecFraction($context, $usec);
-        $secI64 = $context->builder->zExt($sec, $i64);
-        $fmtPtr = $context->builder->pointerCast(
-            $context->constantFromString('%.8f %ld'),
-            $charPtr
-        );
-        $written = $context->builder->call(
-            $context->lookupFunction('snprintf'),
-            $bufChar,
-            $sizeT->constInt(self::SNPRINTF_BUF, false),
-            $fmtPtr,
-            $frac,
-            $secI64
-        );
-        $len = $context->builder->zExt($written, $i64);
-        $result = $context->builder->call(
-            $context->lookupFunction('__string__init'),
-            $len,
-            $bufChar
-        );
-        $context->builder->returnValue($result);
-        $context->builder->clearInsertionPosition();
-    }
-
-    private static function wallClockToDouble(Context $context, Value $sec, Value $usec): Value
-    {
-        $double = $context->getTypeFromString('double');
-        $i64 = $context->getTypeFromString('int64');
-        $usecPerSec = $i64->constInt(self::USEC_PER_SEC, false);
-        $secD = $context->builder->sitofp($context->builder->zExt($sec, $i64), $double);
-        $usecD = $context->builder->sitofp($context->builder->zExt($usec, $i64), $double);
-        $divisor = $context->builder->sitofp($usecPerSec, $double);
-
-        return $context->builder->fAdd($secD, $context->builder->fDiv($usecD, $divisor));
-    }
-
-    private static function usecFraction(Context $context, Value $usec): Value
-    {
-        $double = $context->getTypeFromString('double');
-        $i64 = $context->getTypeFromString('int64');
-        $usecPerSec = $i64->constInt(self::USEC_PER_SEC, false);
-        $usecD = $context->builder->sitofp($context->builder->zExt($usec, $i64), $double);
-        $divisor = $context->builder->sitofp($usecPerSec, $double);
-
-        return $context->builder->fDiv($usecD, $divisor);
-    }
-
-    /**
-     * @return array{0: Value, 1: Value, 2: Value} tv_sec, tv_usec (i32), ok (i1)
-     */
-    private static function readWallClock(Context $context): array
-    {
-        $i32 = $context->getTypeFromString('int32');
-        $i64 = $context->getTypeFromString('int64');
-        $i8 = $context->getTypeFromString('int8');
-        $i8p = $context->getTypeFromString('int8*');
-        $zeroI32 = $i32->constInt(0, false);
-        $zero64 = $i64->constInt(0, false);
-
-        $tv = $context->builder->alloca($i8, self::TIMEVAL_SIZE, 'mt_tv');
-        $tvPtr = $context->builder->pointerCast($tv, $i8p);
-        $status = $context->builder->call(
-            $context->lookupFunction('gettimeofday'),
-            $tvPtr,
-            $i8p->constNull()
-        );
-        $ok = $context->builder->icmp(Builder::INT_EQ, $status, $zeroI32);
-        $secRaw = self::loadI64At($context, $tv, self::TIMEVAL_OFF_TV_SEC);
-        $usecRaw = self::loadI64At($context, $tv, self::TIMEVAL_OFF_TV_USEC);
-        $sec = $context->builder->truncOrBitCast(
-            $context->builder->select($ok, $secRaw, $zero64),
-            $i32
-        );
-        $usec = $context->builder->truncOrBitCast(
-            $context->builder->select($ok, $usecRaw, $zero64),
-            $i32
-        );
-
-        return [$sec, $usec, $ok];
-    }
-
-    private static function loadI64At(Context $context, Value $base, int $offset): Value
-    {
-        $i64 = $context->getTypeFromString('int64');
-        $i8 = $context->getTypeFromString('int8');
-        $ptr = $context->builder->gep($base, $i8->constInt($offset, false));
-        $slot = $context->builder->pointerCast($ptr, $i64->pointerType(0));
-
-        return $context->builder->load($slot);
-    }
-
-    private static function ensureLibcGettimeofday(Context $context): void
-    {
-        $i32 = $context->getTypeFromString('int32');
-        $i8p = $context->getTypeFromString('int8*');
-
-        self::ensureExternal(
-            $context,
-            'gettimeofday',
-            $context->context->functionType($i32, false, $i8p, $i8p)
-        );
-    }
-
-    private static function ensureStringHelpers(Context $context): void
-    {
-        $strPtr = $context->getTypeFromString('__string__*');
-        $i64 = $context->getTypeFromString('int64');
-        $charPtr = $context->getTypeFromString('char*');
-        $i32 = $context->getTypeFromString('int32');
-        $sizeT = $context->getTypeFromString('size_t');
-
-        foreach ([
-            ['__string__init', $strPtr, [$i64, $charPtr]],
-            ['snprintf', $i32, [$charPtr, $sizeT, $charPtr], true],
-        ] as $spec) {
-            $variadic = $spec[3] ?? false;
-            self::ensureExternal(
-                $context,
-                $spec[0],
-                $context->context->functionType($spec[1], $variadic, ...$spec[2])
-            );
+            return;
         }
+
+        $doubleTy = $context->getTypeFromString('double');
+        $fn = null !== $probe
+            ? $probe
+            : $context->module->addFunction(
+                $abiName,
+                $context->context->functionType($doubleTy, false)
+            );
+
+        $entry = $fn->appendBasicBlock('microtime_float_bridge_entry');
+        $context->builder->positionAtEnd($entry);
+        $result = $context->builder->call(self::helperFunction($context, self::FLOAT_HELPER));
+        $context->builder->returnValue($result);
+        $context->registerFunction($abiName, $fn);
     }
 
-    private static function ensureExternal(Context $context, string $name, $ft): void
+    private static function implementStringBridge(Context $context): void
     {
-        try {
-            $context->lookupFunction($name);
-        } catch (\Throwable) {
-            $fn = $context->module->addFunction($name, $ft);
-            $context->registerFunction($name, $fn);
+        $abiName = '__compiler_microtime_string';
+        $probe = $context->module->getNamedFunction($abiName);
+        if (null !== $probe && $probe->countBasicBlocks() > 0) {
+            $context->registerFunction($abiName, $probe);
+
+            return;
+        }
+
+        $strPtr = $context->getTypeFromString('__string__*');
+        $fn = null !== $probe
+            ? $probe
+            : $context->module->addFunction(
+                $abiName,
+                $context->context->functionType($strPtr, false)
+            );
+
+        $entry = $fn->appendBasicBlock('microtime_string_bridge_entry');
+        $context->builder->positionAtEnd($entry);
+        $result = $context->builder->call(self::helperFunction($context, self::STRING_HELPER));
+        $context->builder->returnValue($result);
+        $context->registerFunction($abiName, $fn);
+    }
+
+    private static function helperFunction(Context $context, string $logical): LlvmFunction
+    {
+        self::ensureJitHelperCompiled($context);
+        $lc = \strtolower($logical);
+        $fn = $context->functions[$lc] ?? null;
+        if (null === $fn) {
+            throw new \LogicException($logical.' missing after MicrotimeJitHelper compile (#9181)');
+        }
+
+        return $fn;
+    }
+
+    private static function ensureJitHelperCompiled(Context $context): void
+    {
+        $missing = false;
+        foreach (self::COMPILED_HELPERS as $logical) {
+            if (!isset($context->functions[\strtolower($logical)])) {
+                $missing = true;
+                break;
+            }
+        }
+        if (!$missing) {
+            return;
+        }
+
+        $runtime = $context->runtime;
+        $path = \dirname(__DIR__, 3).self::HELPER_PATH;
+        NestedJitCompileScope::run($context, static function () use ($context, $runtime, $path): void {
+            $block = $runtime->parseAndCompile((string) \file_get_contents($path), 'MicrotimeJitHelper.php');
+            if (null === $block) {
+                throw new \LogicException('MicrotimeJitHelper.php parseAndCompile failed (#9181)');
+            }
+            $jit = new JIT($context);
+            $jit->compile($block);
+        });
+        foreach (self::COMPILED_HELPERS as $logical) {
+            $lc = \strtolower($logical);
+            if (!isset($context->functions[$lc])) {
+                throw new \LogicException($lc.' was not compiled for JIT (#9181)');
+            }
         }
     }
 
@@ -253,7 +148,7 @@ final class StringMicrotime
         foreach (['__compiler_microtime_string', '__compiler_microtime_float'] as $name) {
             $fn = $context->module->getNamedFunction($name);
             if (null === $fn) {
-                throw new \LogicException($name.' missing after StringMicrotime LLVM implement');
+                throw new \LogicException($name.' missing after StringMicrotime bridge (#9181)');
             }
             $context->registerFunction($name, $fn);
         }

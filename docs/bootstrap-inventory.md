@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 2954 |
-| Phase A inventory files (M2 ratio SSOT) | 2954 |
+| PHP files on vm.php path | 2955 |
+| Phase A inventory files (M2 ratio SSOT) | 2955 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 7974 |
+| Source constructs flagged (warnings) | 7977 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -789,6 +789,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/standard/JitZendScalarCast.php` | 0 | 1 |
 | `ext/standard/JitZlib.php` | 0 | 1 |
 | `ext/standard/MemoryJitHelper.php` | 0 | 1 |
+| `ext/standard/MicrotimeJitHelper.php` | 0 | 1 |
 | `ext/standard/Module.php` | 0 | 742 |
 | `ext/standard/ModuleRegistry.php` | 0 | 1 |
 | `ext/standard/NativeLastError.php` | 0 | 7 |
@@ -2189,7 +2190,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/Builtin/StringJsonEncode.php` | 0 | 1 |
 | `lib/JIT/Builtin/StringLocaltime.php` | 0 | 1 |
 | `lib/JIT/Builtin/StringLzf.php` | 0 | 2 |
-| `lib/JIT/Builtin/StringMicrotime.php` | 0 | 1 |
+| `lib/JIT/Builtin/StringMicrotime.php` | 0 | 3 |
 | `lib/JIT/Builtin/StringMktime.php` | 0 | 1 |
 | `lib/JIT/Builtin/StringMultipart.php` | 0 | 1 |
 | `lib/JIT/Builtin/StringMultipartJit.php` | 0 | 1 |
@@ -7466,6 +7467,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 
 **Warnings** (review for bootstrap subset):
 - 5 class method(s)
+
+### `ext/standard/MicrotimeJitHelper.php`
+
+**Warnings** (review for bootstrap subset):
+- 2 class method(s)
 
 ### `ext/standard/Module.php`
 
@@ -17157,7 +17163,9 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/Builtin/StringMicrotime.php`
 
 **Warnings** (review for bootstrap subset):
-- 12 class method(s)
+- new JIT (line 135)
+- 7 class method(s)
+- 1 closure(s)
 
 ### `lib/JIT/Builtin/StringMktime.php`
 
