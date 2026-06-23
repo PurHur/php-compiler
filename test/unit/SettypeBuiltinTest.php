@@ -82,4 +82,23 @@ final class SettypeBuiltinTest extends TestCase
 
         $this->assertSame('ok', $var->resolveIndirect()->toString());
     }
+
+    /** Issue #10690: settype($obj, 'int') on plain object — E_WARNING + 1 (ext/standard/type.c). */
+    public function testSettypePlainObjectToIntEmitsWarningAndOne(): void
+    {
+        $ctx = new Context(new Runtime());
+        BuiltinClasses::register($ctx);
+        $frame = $this->getMockBuilder(Frame::class)->disableOriginalConstructor()->getMock();
+        $frame->vmContext = $ctx;
+
+        $object = new \PHPCompiler\VM\ObjectEntry($ctx->classes['stdclass']);
+        $object->constructed = true;
+        $var = new VMVariable();
+        $var->object($object);
+
+        VmSettype::apply($var, 'int', $frame);
+
+        $this->assertSame(VMVariable::TYPE_INTEGER, $var->resolveIndirect()->type);
+        $this->assertSame(1, $var->resolveIndirect()->toInt());
+    }
 }
